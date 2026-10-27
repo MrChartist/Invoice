@@ -97,7 +97,7 @@ test('R6-B2 pin: the shell copies PACK_ROUTES / PACK_OF_TYPE_INLINE equal PACK_T
   for (const t of PACK_TABS) {
     const route = t.path.split('?')[0];
     if (!moduleOfPath(route)) continue; // core routes (e.g. /receivables) are always visible
-    if (t.path.startsWith('/inventory?')) continue; // R9: the retail desks live on /inventory, which every retail profile keeps (PACK_ROUTES unchanged)
+    if (t.path.startsWith('/inventory?') || t.path.startsWith('/manufacturing?')) continue; // R13: manufacturing desks live on /manufacturing (module `inventory`, kept by every kind). R9: the retail desks live on /inventory, which every retail profile keeps (PACK_ROUTES unchanged)
     // R10: the service packs need no shell copy — every service profile keeps `time`, and the common-credit tab needs the
     // `gst` module anyway (an unregistered clinic has no GST pages); PACK_ROUTES stays unchanged (first paint 0).
     const packs = [t.pack, ...(t.alsoPacks ?? [])].filter((p) => !R10_PACKS.includes(p));

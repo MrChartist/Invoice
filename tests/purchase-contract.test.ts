@@ -1015,3 +1015,18 @@ test('R12 (AG-D4 / AG-D5) principal-certificate check and patronage register rea
   const p = patronage(2026, { members: [member], cycles: [], purchases: [urea, { ...urea, id: 'v', status: 'void' } as never], invoices: [], farmerIds: new Set(['v-iffco']) });
   assert.deepEqual([p.rows[0].suppliedQty, p.rows[0].suppliedValue], [100, 1000], 'taxable value, void skipped');
 });
+
+// R13 (MF-A4): the dated MRP reads open purchase orders through `purchaseOrderOutstanding` (bills by `liveBills`): a PO
+// line billed in part leaves the rest as dated supply (expected date), in base units (`lineFactor`).
+test('R13 (MF-A4) dated MRP reads the real bill shape: PO supply less what a bill received, by expected date', async () => {
+  const { resetStorage } = await import('./helpers/shim.ts');
+  const { setTable } = await import('../src/lib/storage.ts');
+  const { datedSources } = await import('../src/lib/mfg/mf-mrp-dated.ts');
+  resetStorage();
+  const po = { id: 'po1', po_number: 'PO/1', vendor_name: 'Acme Supplies', date: '2026-04-01', expected_date: '2026-04-20', lines: [{ id: 'pl1', name: 'Paper ream', hsn: '4802', unit: 'BOX', unit_factor: 5, quantity: 10, rate: 500, tax_rate: 18 }] };
+  setTable('purchase_orders', [po]);
+  setTable('purchases', [{ ...bill, lines: [{ ...bill.lines[0], quantity: 4, po_line_id: 'pl1' }] }, { ...bill, id: 'v', status: 'void', lines: [{ ...bill.lines[0], quantity: 6, po_line_id: 'pl1' }] }]);
+  const items = [{ id: 'paper', name: 'Paper ream', hsn: '4802', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }] as never[];
+  const { supply } = datedSources(items, '2026-04-10');
+  assert.deepEqual(supply.map((x) => [x.item_id, x.date, x.qty]), [['paper', '2026-04-20', 30]], '6 boxes × 5 left; the void bill received nothing');
+});

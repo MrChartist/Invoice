@@ -180,7 +180,7 @@ export function reportEntry(orderId: string, opId: string, input: Partial<JobCar
   card.status = cardTotals(card).good + 0.0005 >= num(card.planned.qty) ? 'done' : 'running';
   setTable(T, prev ? all.map((c) => (c.id === id ? card : c)) : [...all, card]);
   if (!prev) recordSeries(number);
-  return { card, warnings: overlapWarnings(others, entry, op.work_centre_id) };
+  return { card, warnings: overlapWarnings([...others, card], entry, op.work_centre_id) };
 }
 
 /** Remove one entry (the card stays, its number reserved); a card with no entry left is deleted through the bin. */
