@@ -270,6 +270,8 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   cost_cards: 'Food batch cost cards: recipe (from the BOM), output kg, yield, conversion ₹/kg, overhead %, packs with packing material and prices; versions by effective date (R13).',
   export_authorisations: 'Advance Authorisation / EPCG register: number, dates, import and export items, norm (SION / self / committee), EO due / extended, duty saved, EO multiple, status, EODC ref (R13).',
   incentive_claims: 'Incentive and subsidy claims (PLI, state capital subsidy, interest subvention …): period, base, rate, claimed, approved, received, income / capital, reasonable-assurance date and journals (R13).',
+  // R14-B
+  client_money: 'Client-money (trust) vouchers (CMV/FY…): receipt / payment on behalf / to fees / refund / transfer / interest, client, matter, amount, client-money bank account, purpose, invoice and office receipt (to fees), client\'s authority or owner override, journals (R14).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';
