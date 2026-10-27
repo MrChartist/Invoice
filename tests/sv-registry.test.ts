@@ -50,6 +50,21 @@ test('series: CLM used once (sv-shared); OPD / IPD / LAB / MEM reserved and unus
   for (const p of SV_RESERVED_SERIES) assert.equal((all.match(new RegExp(`'${p}'`, 'g')) ?? []).length, 1, `${p} only in the reserved list`);
 });
 
+test('SV-B block: clinic visits, admissions, lab tests / orders and the clinic settings; writers import the registry', () => {
+  const B = { clinic_visits: 'doc.create', admissions: 'doc.create', lab_tests: 'master.edit', lab_orders: 'doc.create', clinic_settings: 'settings.manage' };
+  for (const [t, a] of Object.entries(B)) {
+    assert.equal(SV_TABLE_ACTIONS[t], a, `${t} SV-B right`);
+    assert.equal(TABLE_ACTIONS[t], a, `${t} registered`);
+    assert.ok(TABLE_MEANING[t], `${t} in the open export`);
+  }
+  for (const t of ['clinic_visits', 'admissions', 'lab_tests', 'lab_orders']) assert.ok(WATCHED_TABLES[t]?.label && BACKUP_RECORD_TABLES.includes(t), `${t} audited and backed up`);
+  assert.equal(SV_OBJECTS.clinicSettings, 'clinic_settings');
+  assert.deepEqual([SV_SERIES.visits, SV_SERIES.admissions, SV_SERIES.labOrders], ['OPD', 'IPD', 'LAB']);
+  for (const f of ['sv-patients', 'sv-opd', 'sv-ipd', 'sv-lab', 'sv-referrals']) assert.match(src(`lib/services/${f}.ts`), /import '\.\/sv-registry';/, f);
+  const sync = src('lib/sync-engine.ts');
+  for (const [t, d] of [['clinic_visits', 'date'], ['admissions', 'admit_date'], ['lab_orders', 'date']]) assert.ok(sync.includes(`[\`\${DB_PREFIX}${t}\`]: { num: 'number', date: '${d}' }`), `${t} numbered in sync`);
+});
+
 test('SV-C block: rights, audit labels, backup / sync / open export, MEM used once, restore hooks', () => {
   const C = { member_plans: 'master.edit', memberships: 'doc.create', checkins: 'doc.create', class_schedules: 'master.edit', class_attendance: 'doc.create' };
   const sync = src('lib/sync-engine.ts');
