@@ -17,7 +17,8 @@ export const MF_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   routings: 'master.edit',
   job_cards: 'doc.create',
   // MF-B: drawings (master.edit), inspection_reports, job_quotes, process_runs, print_estimates (doc.create)
-  // MF-C: cut_plans (doc.create)
+  // MF-C: cut plans (lots, bundles inside) are documents
+  cut_plans: 'doc.create',
   // MF-D: cost_cards (master.edit), export_authorisations, incentive_claims (books.edit)
 };
 
@@ -29,6 +30,7 @@ export const MF_WATCHED: Readonly<Record<string, WatchedTable>> = {
   job_cards: { entity: 'stock_transfer', label: 'Job card' },
   // MF-B
   // MF-C
+  cut_plans: { entity: 'stock_transfer', label: 'Cut plan' },
   // MF-D
 };
 
