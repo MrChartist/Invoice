@@ -35,8 +35,19 @@ import { effectiveMrp, mrpIssues, withMrpIssues, type MrpIssues } from './retail
 import type { RetailSettings } from '../types/retail-r9';
 /** R9 (RT-A2): the guard helpers, re-exported so the POS / editor need no extra chunk. */
 export { MRP_TAG, isMrpMessage, recordMrpOverrides, withMrpIssues } from './retail/rt-mrp';
-/** R9 (RT-E3): save checks a mounted lazy pack part registers (the jewellery "Require PAN" and metal-rate gates); the editor runs them on issue. */
-export const saveGates = new Set<(rec: Pick<InvoiceRecord, 'doc_type' | 'total' | 'issue_date' | 'kyc' | 'items'>) => string[]>();
+/**
+ * QA10 (R12): the margin scheme (Rule 32(5), RT-D3): a registered buyer gets no ITC on a margin-scheme sale, so a bill with
+ * margin lines (`InvoiceItem.margin`) to a GSTIN is refused on issue (editor save gate below; the counter: `PosDevices`).
+ */
+export const MARGIN_B2B = 'Margin scheme: this buyer is registered (GSTIN) and gets no ITC on a margin-scheme sale — bill the full value with GST instead, or remove the GSTIN. Verify with your CA.';
+export const marginGate = (rec: Pick<InvoiceRecord, 'client' | 'items'>): string[] =>
+  (rec.items ?? []).some((l) => l?.margin) && String(rec.client?.gstin ?? '').trim() ? [MARGIN_B2B] : [];
+
+/**
+ * R9 (RT-E3): save checks a mounted lazy pack part registers (the jewellery "Require PAN" and metal-rate gates); the editor
+ * runs them on issue. QA10 R12: the margin scheme's "no registered buyer" check is always on.
+ */
+export const saveGates = new Set<(rec: Pick<InvoiceRecord, 'doc_type' | 'total' | 'issue_date' | 'kyc' | 'items' | 'client'>) => string[]>([marginGate]);
 import { can } from './access';
 
 const EPS = 1e-9;

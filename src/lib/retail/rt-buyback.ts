@@ -5,8 +5,9 @@
  *    customer as an individual vendor, NO GST, `itc_eligible: false`, no RCM (RT11). The device goes into the `'used'`
  *    godown (saleable) as a serial of a `second_hand` stock item ("<model> (used)"), carrying `used_goods`.
  *  - Exchange on a sale: a receipt row on the sale with `exchange_purchase_id` (moved no cash: `movedNoCash`; the ledger
- *    debits Sundry creditors — the customer). The voucher's `amount_paid` rises by the same value ("paid on the bill"),
- *    so payables show it settled. The sale invoice carries the FULL price (GST on all of it, RT11). The customer must be
+ *    debits Sundry creditors — the customer). QA10: the voucher's settled amount is DERIVED (cash paid + live exchange
+ *    rows, `urdSettled` in rt-doc-hooks.ts) and `amount_paid` re-synced from it, so payables show it settled, a voucher
+ *    paid out in cash is never offered again, and a deleted / cancelled sale frees it. The sale invoice carries the FULL price (GST on all of it, RT11). The customer must be
  *    the same party on both (their creditor and debtor balances net off).
  *  - Margin scheme resale (Rule 32(5), RT12): a sale line of a used serial bought with no ITC is split into a "cost"
  *    line (purchase value, no GST) and a "margin" line (selling price − purchase value, GST inside it; 0 when
@@ -27,9 +28,13 @@ import { purchasesDb } from '../purchases';
 import { vendorsDb } from '../vendors';
 import { godownsDb } from '../godowns';
 import { blankStockItem, stockDb, type StockItem } from '../inventory';
-import { loadTracking, lookupSerial, serialKey } from '../stock-tracking';
+import { MARGIN_B2B, loadTracking, lookupSerial, serialKey } from '../stock-tracking';
 import { isVoidStatus, readPurchase, readPurchaseLines } from '../purchase-normalize';
 import { nextUrdNumber, recordUrd } from './rt-urd';
+import { exchangedFrom, syncUrdPaid, urdLeft } from './rt-doc-hooks';
+
+
+export { exchangedFrom };
 
 export const EXCHANGE_METHOD = 'Exchange';
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -40,13 +45,9 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 export type BuyBack = PurchaseRecord & { used_goods: UsedGoods };
 export const isBuyBack = (p: Partial<PurchaseRecord> | undefined): p is BuyBack => !!p?.used_goods;
 
-/** Exchange value already used from a voucher (its exchange receipt rows). */
-export const exchangedFrom = (purchaseId: string, payments: readonly Payment[]): number =>
-  round2(payments.filter((p) => p.exchange_purchase_id === purchaseId).reduce((s, p) => s + num(p.amount), 0));
-
-/** URD vouchers (old device, or RT-E old metal) with value left to settle a sale by exchange. */
+/** URD vouchers (old device, or RT-E old metal) with value left to settle a sale by exchange (QA10 R1: cash paid counts). */
 export function openVouchers(purchases: readonly PurchaseRecord[], payments: readonly Payment[]): { purchase: PurchaseRecord; left: number }[] {
-  return purchases.filter((p) => p.used_goods || p.old_metal).map((purchase) => ({ purchase, left: round2(num(purchase.total) - exchangedFrom(purchase.id, payments)) })).filter((x) => x.left > 0.004);
+  return purchases.filter((p) => (p.used_goods || p.old_metal) && !isVoidStatus(p.status)).map((purchase) => ({ purchase, left: urdLeft(purchase, payments) })).filter((x) => x.left > 0.004);
 }
 
 /** The buy-back a serial came in on, with its value per unit (no ITC taken, no GST). */
@@ -86,8 +87,7 @@ export function marginLines(line: InvoiceItem, purchase: { id: string; value: nu
 }
 
 /** Margin scheme refused on a bill to a registered buyer (no ITC for them) — '' when allowed. */
-export const marginIssue = (rec: Pick<InvoiceRecord, 'client'>): string =>
-  String(rec.client?.gstin ?? '').trim() ? 'Margin scheme: this buyer is registered (GSTIN) and gets no ITC on a margin-scheme sale — bill the full value with GST instead. Verify with your CA.' : '';
+export const marginIssue = (rec: Pick<InvoiceRecord, 'client'>): string => (String(rec.client?.gstin ?? '').trim() ? MARGIN_B2B : '');
 
 /* ── Storage ── */
 
@@ -142,7 +142,7 @@ export function recordBuyBack(input: BuyBackInput): PurchaseRecord {
     const saved = purchasesDb.save({
       kind: 'PURCHASE', vendor_id: vendor.id, vendor_name: vendor.name, bill_number: number, date: input.date, category: 'Used goods (buy-back)',
       lines: [{ id: generateId(), name: item.name, item_id: item.id, hsn: input.hsn ?? '', unit: 'NOS', quantity: 1, rate: value, tax_rate: 0, serials: [serial], godown_id: godown }],
-      taxable: value, cgst: 0, sgst: 0, igst: 0, total: value, amount_paid: 0, itc_eligible: false, used_goods: goods,
+      taxable: value, cgst: 0, sgst: 0, igst: 0, total: value, amount_paid: 0, exchange_paid: 0, itc_eligible: false, used_goods: goods,
       notes: `Purchase voucher ${number}: used device bought from an unregistered person — no GST, no ITC, no reverse charge (RT11). Verify with your CA.`,
     });
     recordUrd(number);
@@ -158,16 +158,17 @@ export function applyExchange(invoiceId: string, purchaseId: string, amount?: nu
   if (!inv) throw new Error('The bill was not found.');
   if (!bb || !(bb.used_goods || bb.old_metal)) throw new Error('Pick the buy-back voucher.');
   if (String(inv.client?.name ?? '').trim().toLowerCase() !== bb.vendor_name.trim().toLowerCase()) throw new Error(`The buy-back is from ${bb.vendor_name}; put that name on the bill (it is now ${inv.client?.name ?? '—'}).`);
-  const pays = getTable<Payment>('transactions');
-  const left = round2(num(bb.total) - exchangedFrom(bb.id, pays));
+  const left = urdLeft(bb, getTable<Payment>('transactions')); // QA10 R1: what was paid out in cash is not left
+  if (!(left > 0.004)) throw new Error(`Nothing left to adjust: ${bb.bill_number} is already settled (paid or used in an exchange).`);
   const amt = round2(num(amount ?? Math.min(left, invoiceOpen(inv))));
   if (!(amt > 0)) throw new Error('Nothing left to adjust.');
   if (amt > left + 0.004) throw new Error(`Only ₹${left.toFixed(2)} of ${bb.bill_number} is left.`);
   if (amt > invoiceOpen(inv) + 0.004) throw new Error(`${inv.invoice_number} has only ₹${invoiceOpen(inv).toFixed(2)} unpaid.`);
   return withTablesRollback(['transactions', 'invoices', 'purchases', 'series_counters'], () => {
+    syncUrdPaid([bb.id]); // pin the cash part before the new row counts
     const p = localDb.payments.record({ invoiceId, amount: amt, method: EXCHANGE_METHOD, date: inv.issue_date, reference: bb.bill_number, note: bb.used_goods ? `Less: exchange (old device ${bb.used_goods.model ?? ''} ${bb.used_goods.serial ?? ''})` : `Less: old ${bb.old_metal?.metal ?? 'metal'} (${num(bb.old_metal?.gross_wt).toFixed(3)} g @ ${bb.old_metal?.purity_pct ?? ''}%)` }); // RT-E3 wording
     setTable('transactions', getTable<Payment>('transactions').map((x) => (x.id === p.id ? { ...x, exchange_purchase_id: bb.id } : x)));
-    setTable('purchases', purchasesDb.all().map((x) => (x.id === bb.id ? { ...x, amount_paid: round2(num(x.amount_paid) + amt), updated_at: new Date().toISOString() } : x)));
+    syncUrdPaid([bb.id]);
     return { ...p, exchange_purchase_id: bb.id };
   });
 }
@@ -179,8 +180,9 @@ export function undoExchange(paymentId: string): void {
   if (!p?.exchange_purchase_id) throw new Error('Not an exchange receipt.');
   const pid = p.exchange_purchase_id;
   withTablesRollback(['transactions', 'invoices', 'purchases'], () => {
+    syncUrdPaid([pid]);
     localDb.payments.remove(paymentId);
-    setTable('purchases', purchasesDb.all().map((x) => (x.id === pid ? { ...x, amount_paid: Math.max(round2(num(x.amount_paid) - num(p.amount)), 0) } : x)));
+    syncUrdPaid([pid]);
   });
 }
 

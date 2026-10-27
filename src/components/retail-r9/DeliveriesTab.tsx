@@ -12,7 +12,7 @@ import { getTable } from '../../lib/storage';
 import { formatCurrency, todayInput } from '../../lib/utils';
 import { chartOf, loadUserAccounts } from '../../lib/ledger/accounts';
 import {
-  NEXT_STATUS, cashWithRiders, deliveryRows, loadRiders, loadSettlements, moveDelivery, returnedCreditNote, riderOpenReceipts, saveRider, settleRider,
+  NEXT_STATUS, cashWithRiders, deliveryRows, loadRiders, loadSettlements, moveDelivery, returnedCreditNote, riderOpenReceipts, saveRider, settleRider, undoSettlement,
 } from '../../lib/retail/rt-delivery';
 import type { Payment } from '../../types/invoice';
 import type { DeliveryStatus } from '../../types/retail-r9';
@@ -147,6 +147,13 @@ export default function DeliveriesTab({ onDone }: { onDone: (msg: string, error?
               </>
             ))}
           </div>
+          {/* QA10 R17: a settlement's journal goes only with it (Books refuses to delete it alone) */}
+          {[...settlements].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).map((s) => (
+            <p key={s.id} className={controls.hint} data-settlement={s.voucher_number}>
+              {s.date} · {s.rider_name} · {formatCurrency(s.counted)} · {s.voucher_number}{' '}
+              <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => window.confirm(`${rtaT('undoSettle')} ${s.voucher_number ?? ''}?`) && run(() => { undoSettlement(s.id); return rtaT('undone', { number: s.voucher_number ?? '', rider: s.rider_name }); })} data-settle-undo>{rtaT('undoSettle')}</button>
+            </p>
+          ))}
           <p className={controls.hint}>{rtaT('workingPaper')}</p>
         </details>
       </div>

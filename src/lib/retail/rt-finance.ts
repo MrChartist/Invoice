@@ -33,6 +33,7 @@ import { bankAccountsDb } from '../bank-accounts';
 import { draftsDb, PURCHASE_DRAFTS_TABLE } from '../purchase-drafts';
 import { shiftDay } from '../dates';
 import { RT_TABLES } from './rt-shared';
+import { dropDeal } from './rt-doc-hooks';
 
 export const FINANCE_TABLE = RT_TABLES.financeDeals;
 export const FINANCE_CLEARING = 'Consumer finance clearing';
@@ -192,6 +193,7 @@ export function recordDisbursement(dealId: string, input: { date: string; amount
         kind: 'EXPENSE', vendor_name: deal.financier, bill_number: `DO ${deal.do_no}`, date: input.date, category: 'Finance charges (subvention / processing)',
         lines: [{ id: generateId(), name: `Subvention / processing fee — DO ${deal.do_no}`, hsn: f.sac, unit: 'OTH', quantity: 1, rate: f.taxable, tax_rate: f.rate }],
         taxable: f.taxable, cgst: round2(f.gst / 2), sgst: round2(f.gst - round2(f.gst / 2)), igst: 0, total: fee, amount_paid: 0, itc_eligible: true,
+        settled_by_voucher: v.number, // QA10 R15: posted, it shows as paid (the disbursement voucher settled it)
         notes: `Withheld by ${deal.financier} from DO ${deal.do_no}: settled against its creditor balance by ${v.number}. Check IGST / CGST + SGST and the GSTIN on its invoice — verify with your CA (RT10).`,
         draft: { source: 'manual', created_at: new Date().toISOString() },
       }).id;
@@ -230,11 +232,7 @@ export function cancelDeal(dealId: string): void {
   if (!deal) return;
   if (deal.disbursements.length) throw new Error('Undo the financier\'s disbursements first.');
   assertUnlocked({ id: deal.id, issue_date: deal.date, invoice_number: deal.invoice_number }, 'delete');
-  withTablesRollback(['transactions', 'invoices', 'vouchers', 'series_counters', FINANCE_TABLE], () => {
-    setTable(FINANCE_TABLE, deals.filter((d) => d.id !== dealId));
-    if (getTable<Payment>('transactions').some((p) => p.id === deal.transfer_payment_id)) localDb.payments.remove(deal.transfer_payment_id);
-    if (getTable<{ id: string }>('vouchers').some((v) => v.id === deal.transfer_voucher_id)) deleteVoucher(deal.transfer_voucher_id);
-  });
+  withTablesRollback(['transactions', 'invoices', 'vouchers', 'series_counters', FINANCE_TABLE], () => dropDeal(deal));
 }
 
 /** Deals of an invoice (the bill's finance strip). */

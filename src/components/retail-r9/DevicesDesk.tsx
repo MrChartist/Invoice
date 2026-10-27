@@ -16,7 +16,7 @@ import { printJobCard } from './JobCardPrint';
 import { loadImeiChecks, logImeiCheck, pairIndex, pairsOf, resaleCheckIssue, serialHit, serialIndex } from '../../lib/retail/rt-imei';
 import { cancelDeal, dealOpen, feeSplit, financeCsv, loadDeals, pendingDos, recordDisbursement, recordFinance, undoDisbursement } from '../../lib/retail/rt-finance';
 import { applyExchange, buyBackOf, buyBackRows, deleteBuyBack, marginIssue, marginLines, openVouchers, recordBuyBack } from '../../lib/retail/rt-buyback';
-import { cashReceiptIssue, sameDayCash } from '../../lib/retail/rt-cash-guard';
+import { cashFromCustomer, cashReceiptIssue } from '../../lib/retail/rt-cash-guard';
 import { addJob, billJob, canMove, deleteJob, isOpenJob, jobLink, loadJobs, moveJob, nextServiceStatus, repairRule, setClaim, updateJob } from '../../lib/retail/rt-service-jobs';
 import { readRetailSettings } from '../../lib/retail/rt-settings';
 import { serialScan } from '../../lib/scan';
@@ -240,7 +240,7 @@ function ServiceView({ run, day }: { run: Run; day: string }) {
 function JobWork({ job: j, run, day, onBill }: { job: ServiceJob; run: Run; day: string; onBill: (id: string) => void }) {
   const [parts, setParts] = useState(j.parts.map((p) => `${p.name} × ${p.qty} @ ${p.rate}${p.warranty ? ' w' : ''}`).join('\n'));
   const [labour, setLabour] = useState(String(j.labour || ''));
-  const done = !!j.invoice_id;
+  const done = !!j.invoice_id || !!j.billed_on; // QA10 R9: an all-warranty job is billed once (no invoice)
   const claim = (status: WarrantyClaim['status']) => {
     const c = status === 'sent' ? window.prompt(rtdT('claim'))?.split(',') : [j.claim?.vendor_name ?? '', j.claim?.claim_no ?? ''];
     if (c) run(() => (setClaim(j.id, { vendor_name: c[0] ?? '', claim_no: c[1]?.trim(), status, date: day }), rtdT(`c.${status}`)));
@@ -258,7 +258,7 @@ function JobWork({ job: j, run, day, onBill }: { job: ServiceJob; run: Run; day:
         return inv ? ok(inv.invoice_number) : rtdT('noCharge');
       })} data-dev-bill>{rtdT('billIt')}</button>}
       {canMove(j.status, 'returned') && <button type="button" className={gh} onClick={() => run(() => (moveJob(j.id, 'returned', day), rtdT('s.returned')))}>{rtdT('s.returned')}</button>}
-      {!done && <button type="button" className={gh} onClick={() => window.confirm(`${rtdT('del')} ${j.number}?`) && run(() => (deleteJob(j.id), ok(j.number)))}>{rtdT('del')}</button>}
+      {!j.invoice_id && <button type="button" className={gh} onClick={() => window.confirm(`${rtdT('del')} ${j.number}?`) && run(() => (deleteJob(j.id), ok(j.number)))}>{rtdT('del')}</button>}
     </div>
   );
 }
@@ -322,10 +322,12 @@ export function PosDevices({ record, cash, setItems, onPay, notify, catalog }: {
     const by = new Map(record.items.filter((l) => l.serials?.length && !l.serial_pairs).map((l) => [l.id, pairsOf(ps, l.serials!)]));
     if ([...by.values()].some(Boolean)) setItems((cur) => cur.map((l) => (by.get(l.id) ? { ...l, serial_pairs: by.get(l.id) } : l)));
   }, [record.items, setItems]);
-  const guard = cashReceiptIssue(readRetailSettings().cash_guard, cash, sameDayCash(record.client, record.issue_date, getTable<InvoiceRecord>('invoices'), pays), record.issue_date);
+  // QA10 R10 / R13: the payment dialog's computation (this bill on any day, the customer that day; receipts only).
+  const guard = cashReceiptIssue(readRetailSettings().cash_guard, cash, cashFromCustomer(pays, getTable<InvoiceRecord>('invoices'), record, record.issue_date), record.issue_date);
   const exAmt = ex ? Math.min(ex.amount, record.total) : 0;
   const finAmt = fin ? num(fin.loan) : 0;
-  const error = guard?.block ? guard.message
+  const margin = record.items.some((l) => l.margin) && marginIssue(record) ? rtdT('marginB2b') : ''; // QA10 R12: re-checked at the counter's save
+  const error = guard?.block ? guard.message : margin ? margin
     : fin && !(fin.financier.trim() && fin.doNo.trim() && finAmt > 0) ? `${rtdT('finTender')}: ${rtdT('financier')}, ${rtdT('loan')}, ${rtdT('doNo')}`
       : ex && ex.party.trim().toLowerCase() !== String(record.client?.name ?? '').trim().toLowerCase() ? rtdT('needName', { name: ex.party }) : '';
   useEffect(() => {

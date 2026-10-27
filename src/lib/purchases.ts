@@ -352,7 +352,8 @@ function writeBill(input: Omit<PurchaseRecord, 'id'> & { id?: string }): Purchas
     ...existing,
     ...input,
     id: existing?.id ?? input.id ?? generateId(),
-    amount_paid: round2(num(input.amount_paid)),
+    // QA10 R15: a bill settled in full by a journal (a financier's withheld fee) is never shown as due.
+    amount_paid: input.settled_by_voucher ? Math.max(round2(num(input.amount_paid)), supplierPayable(input)) : round2(num(input.amount_paid)),
     created_at: existing?.created_at ?? now(),
     updated_at: now(),
   };

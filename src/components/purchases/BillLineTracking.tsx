@@ -86,7 +86,7 @@ export function BillLineTracking({ line, index, ctx, onPatch }: {
             <input type="date" className={controls.input} value={line.expiry_date ?? ''} aria-label={purT('lineExpiry', { n })} onChange={(e) => onPatch({ expiry_date: e.target.value || undefined })} />
           </label>
           <label className={controls.field}>
-            <span className={controls.label}>{purT('mrp')}</span>
+            <span className={controls.label}>{line.unit?.trim() ? purT('mrpPer', { unit: line.unit.trim() }) : purT('mrp')}</span>
             <input
               className={`${controls.input} ${controls.inputNumeric}`}
               inputMode="decimal"

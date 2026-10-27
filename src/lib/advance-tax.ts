@@ -215,4 +215,4 @@ export function advanceTaxEvents(
  * here so it shares this chunk, which every cash / bank reader's route loads already: a chunk of its own would add an
  * entry to the first-paint preload map (bundle budget).
  */
-export { NO_CASH_LEDGER, RIDER_CASH_LEDGER, movedNoCash, noCashKind, type NoCashKind } from './no-cash';
+export { NO_CASH_LEDGER, RIDER_CASH_LEDGER, exchangeVoucherOf, movedNoCash, noCashKind, type NoCashKind } from './no-cash';

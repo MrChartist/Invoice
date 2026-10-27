@@ -271,6 +271,18 @@ export interface NormalPurchase {
 type Rec = Record<string, unknown>;
 const asRec = (v: unknown): Rec => (v && typeof v === 'object' ? (v as Rec) : {});
 
+/**
+ * QA10 R5: a URD purchase voucher (buy-back / old gold, R9) is owed to a CUSTOMER: in Tally / CSV its party is a creditor
+ * ledger kept apart from their debtor ledger ("<name> (Creditor)"), and an exchange receipt is a journal between the two.
+ * undefined for any other bill.
+ */
+export function urdCreditorLedger(raw: unknown, vendors: unknown[] = []): string | undefined {
+  const r = asRec(raw);
+  if (!r.used_goods && !r.old_metal) return undefined;
+  const n = normalizePurchase(r, vendors);
+  return n ? `${n.partyName} (Creditor)` : undefined;
+}
+
 export function normalizePurchase(raw: unknown, vendors: unknown[] = []): NormalPurchase | null {
   const r = asRec(raw);
   if (!Object.keys(r).length) return null;

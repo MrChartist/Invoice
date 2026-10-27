@@ -36,6 +36,7 @@ import { liveRedeemIssue } from '../retail/gift-voucher-core';
 import '../trade/tr-registry'; // R8-C: Round 8 tables' rights and audit labels (lazy registration)
 import '../hotel/hotel-registry'; // R7: hotel tables' rights and audit labels (lazy registration)
 import '../retail/rt-registry'; // R9: retail tables' rights and audit labels (lazy registration)
+import { syncUrdPaid, urdLeft } from '../retail/rt-doc-hooks'; // QA10 R7: URD vouchers settled by exchange
 
 export { BIN_TABLE };
 export const BIN_SETTINGS_KEY = `${DB_PREFIX}bin_settings`;
@@ -224,6 +225,8 @@ const OWNED_VOUCHERS: readonly { classes: readonly string[]; tables: readonly st
   { classes: ['Packaging deposit'], tables: ['packaging_moves'], redo: 'restore the packaging movement itself, or record it again in Distribution → Packaging' },
   // R9 (RT-D2): a financier's disbursement is undone on its DO
   { classes: ['Finance disbursement'], tables: ['finance_deals'], redo: 'record the disbursement again in Inventory → Devices → Finance' },
+  // QA10 R17: a rider settlement's journal comes back only with its settlement row
+  { classes: ['Rider settlement'], tables: ['rider_settlements'], redo: 'restore the rider settlement itself, or settle the rider again in Inventory → Deliveries' },
 ];
 const RA_CLASS = 'RA deduction';
 /** Journals paired one-to-one with a no-cash receipt row through `ra_journal_id` (R9 RT-D2: the finance transfer). */
@@ -270,6 +273,11 @@ registerRestoreHook('transactions', (row, e, live, bin) => {
   if (urd && !isLive(live, 'purchases', urd)) {
     const pair = inBin(bin, 'purchases', (r) => str(r.id) === urd);
     return pair ? { companions: [pair] } : { refuse: 'The buy-back voucher this exchange settled is gone for good. Record the buy-back and the exchange again.' };
+  }
+  // QA10 R7: only while the voucher still has that much left (it may have been paid in cash or used again since).
+  const urdRow = urd ? live('purchases').find((x) => str(x?.id) === urd) : undefined;
+  if (urdRow && urdLeft(urdRow as unknown as PurchaseRecord, live('transactions') as unknown as Payment[]) < (Number(row.amount) || 0) - 0.004) {
+    return { refuse: `Buy-back voucher ${str(urdRow.bill_number)} was paid or used in another exchange since this receipt was deleted. Restore the bill on its own and take the payment again.` };
   }
   const gv = str(row.gift_voucher_id);
   if (gv) {
@@ -322,6 +330,19 @@ const withMoves = (ids: unknown, live: LiveReader, bin: readonly BinEntry[]): Re
 };
 registerRestoreHook('jewel_tags', (row, e, live, bin) => (live('jewel_tags').some((t) => str(t?.tag).toUpperCase() === str(row.tag).toUpperCase() && str(t?.id) !== e.row_id) ? { refuse: `Tag ${str(row.tag)} was used again since. Add the piece again in Inventory → Jewellery → Tags.` } : withMoves(row.move_id, live, bin)));
 registerRestoreHook('karigar_moves', (row, _e, live, bin) => withMoves(row.move_ids, live, bin));
+// QA10 R9: a billed all-warranty repair job comes back with its warranty part issues.
+registerRestoreHook('service_jobs', (row, _e, live, bin) => withMoves(row.warranty_move_ids, live, bin));
+// QA10 R17: a rider settlement comes back with its journal, and only while its COD receipts are not settled again.
+registerRestoreHook('rider_settlements', (row, _e, live, bin) => {
+  const ids = new Set((Array.isArray(row.payment_ids) ? row.payment_ids : []).map(str));
+  if (live('rider_settlements').some((s) => (Array.isArray(s?.payment_ids) ? s.payment_ids : []).some((id) => ids.has(str(id))))) return { refuse: 'These COD receipts were settled again since. Undo that settlement first, or leave this one in the bin.' };
+  return companionOr(live, bin, 'vouchers', str(row.voucher_id), 'The journal of this rider settlement is gone for good. Settle the rider again in Inventory → Deliveries.');
+});
+// QA10 R8: a deleted finance sale comes back with the DO that went with it (and so its transfer row and journal).
+registerRestoreHook('invoices', (_row, e, live, bin) => {
+  const deals = bin.filter((b) => b.table === 'finance_deals' && isObj(b.row) && str(b.row.invoice_id) === e.row_id && !isLive(live, 'finance_deals', b.row_id));
+  return deals.length ? { companions: deals } : null;
+});
 registerRestoreHook('invoices', (row, _e, live) => {
   // QA8 T5: an interest draft of an undone run stays gone (its bills were freed to be charged again).
   const run = str(row.interest_run_id);
@@ -429,6 +450,8 @@ function putBack(e: BinEntry): void {
     setTable('transactions', [...getTable<Payment>('transactions'), row as unknown as Payment]);
     // The invoice re-derives what it has received (the ledger rows are the floor).
     if (inv) saveInvoice(inv);
+    // QA10 R7: the URD voucher an exchange receipt settles is settled again.
+    if (row.exchange_purchase_id) syncUrdPaid([str(row.exchange_purchase_id)]);
     return;
   }
   setTable(e.table, [...getTable<Row>(e.table), row]);
