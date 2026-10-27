@@ -4147,6 +4147,88 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+  await step('R12-B dairy desk: Dairy profile; a 3 × 3 cow chart and the union\'s two-axis chart; a morning shift of 3 farmers (one rejected) closed into stock; Make bills → one CYB purchase (stock by shift) with a feed bill set off (no cash); dispatch 40 L, acknowledged and billed → a bill of supply with kg fat; the reconciliation shows the shortage', async () => {
+    const keys = ['settings', 'agri_settings', 'vendors', 'clients', 'milk_rate_charts', 'milk_shifts', 'milk_dispatches', 'milk_cards', 'farmer_cycles', 'purchases', 'purchase_payments', 'invoices', 'transactions', 'vouchers', 'accounts', 'stock_items', 'stock_journals', 'series_counters', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'manufacturer', modules: undefined, industry_packs: ['agri', 'dairy'], agri_kind: 'dairy', service_kind: undefined, construction_kind: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'agri_settings', { centres: [{ id: 'e2e-c1', name: 'E2E Centre', kind: 'milk' }] });
+    for (const k of ['milk_rate_charts', 'milk_shifts', 'milk_dispatches', 'milk_cards', 'farmer_cycles']) await writeJson(page, k, null);
+    const base = { email: '', address: '', city: '', zip: '' };
+    const farmer = (n, over = {}) => ({ id: `e2e-f${n}`, name: `E2E Farmer ${n}`, principal_kind: 'agriculturist', ag: { code: `F-900${n}`, centre_id: 'e2e-c1', status: 'active' }, ...over });
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), farmer(1, { bank_account_no: '50100123456789' }), farmer(2), farmer(3)]);
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { ...base, id: 'e2e-union', name: 'E2E Milk Union' }, { ...base, id: 'e2e-fc1', name: 'E2E Farmer 1', ag: { code: 'F-9001' } }]);
+    const feedLine = { id: 'e2e-feed-l', name: 'Cattle feed', description: '', type: 'Goods', hsn: '2309', unit: 'BAG', quantity: 1, rate: 500, amount: 500, tax_rate: 0, discount_percent: 0, ag_class: 'cattle_feed' };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-feed', invoice_number: 'E2E-FEED-1', doc_type: 'INVOICE', status: 'Sent', issue_date: today, due_date: today, client: { ...base, id: 'e2e-fc1', name: 'E2E Farmer 1', company: '', gstin: '' }, items: [feedLine], subtotal: 500, taxable_value: 500, tax_amount: 0, total: 500, balance_due: 500, amount_paid: 0, currency: 'INR', gst_mode: 'NONE' }]);
+    // B1: the society's 3 × 3 cow matrix (the form's sample) and the union's two-axis chart.
+    await page.goto(srv.origin + '/inventory?tab=dairy&view=charts');
+    await page.locator('[data-dairy="chart-name"]').fill('E2E Cow', { timeout: 15000 });
+    await page.locator('[data-dairy="chart-from"]').fill(today);
+    await page.locator('[data-dairy="chart-save"]').click();
+    await readJson(page, 'milk_rate_charts', [], (v) => v?.some((c) => c.name === 'E2E Cow' && c.matrix?.rates?.length === 3));
+    await page.locator('[data-dairy="chart-name"]').fill('E2E Union');
+    await page.locator('[data-dairy="chart-basis"]').selectOption('two_axis');
+    await page.locator('[data-dairy="chart-unit"]').selectOption('KG');
+    await page.locator('[data-dairy="chart-buyer"]').selectOption('e2e-union');
+    await page.locator('[data-dairy="chart-fat"]').fill('500');
+    await page.locator('[data-dairy="chart-snf"]').fill('300');
+    await page.locator('[data-dairy="chart-save"]').click();
+    const charts = await readJson(page, 'milk_rate_charts', [], (v) => v?.length === 2);
+    check(charts.some((c) => c.buyer_id === 'e2e-union' && c.basis === 'two_axis'), 'two charts: the cow matrix and the union\'s kg fat + kg SNF chart');
+    // B2: a morning shift — 3 farmers, one rejected — then close it.
+    await page.goto(srv.origin + '/inventory?tab=dairy&view=collection');
+    await page.locator('[data-dairy="shift"]').selectOption('M', { timeout: 15000 });
+    await page.locator('[data-dairy="date"]').fill(today);
+    const can = async (code, qty, fat, snf, reject = '') => {
+      await page.locator('[data-dairy="code"]').fill(code);
+      await page.locator('[data-dairy="qty"]').fill(String(qty));
+      await page.locator('[data-dairy="fat"]').fill(String(fat));
+      await page.locator('[data-dairy="snf"]').fill(String(snf));
+      await page.locator('[data-dairy="reject"]').fill(reject);
+      await page.locator('[data-dairy="add"]').click();
+      await readJson(page, 'milk_shifts', [], (v) => v?.[0]?.entries?.some((e) => e.code === code));
+    };
+    await can('F-9001', 20, 3.7, 8.6);
+    await can('9002', 30, 4.1, 8.6);
+    await can('F-9003', 5, 3.7, 8.6, 'Sour');
+    await page.locator('[data-dairy="close-shift"]').click();
+    const [shift] = await readJson(page, 'milk_shifts', [], (v) => v?.[0]?.closed_at);
+    check(shift.entries.length === 3 && shift.entries.filter((e) => e.rejected).length === 1 && shift.entries[0].amount === 680 && !!shift.sj_id, `one shift row with 3 cans (one rejected), ₹34 a litre at fat 3.7 / SNF 8.6, closed into stock (${shift.sj_id ? 'journal' : 'no journal'})`);
+    check(/50 L/.test(await page.locator('[data-dairy="total-M"]').innerText()), 'the shift summary shows 50 L accepted');
+    // B3: Make bills → close → one pooled purchase marked stock_by_shift; the feed bill is set off without cash.
+    await page.goto(srv.origin + '/inventory?tab=dairy&view=bills');
+    await page.locator('[data-dairy="cycle-day"]').fill(today, { timeout: 15000 });
+    await page.locator('[data-dairy="make-bills"]').click();
+    const [cyc] = await readJson(page, 'farmer_cycles', [], (v) => v?.length === 1);
+    check(cyc.source === 'milk' && cyc.lines.length === 2 && cyc.lines.find((l) => l.farmer_id === 'e2e-f1')?.deductions?.[0]?.kind === 'feed', `${cyc.number}: two farmers, the feed bill deducted from Farmer 1`);
+    await page.locator('[data-dairy="close-cycle"]').click();
+    const bill = (await readJson(page, 'purchases', [], (v) => v?.some((p) => p.bill_number === cyc.number))).find((p) => p.bill_number === cyc.number);
+    check(bill?.ag?.stock_by_shift === true && Number(bill.total) === 680 + 30 * 37, `one CYB purchase ₹${bill?.total} marked stock-by-shift (milk is not counted twice)`);
+    const setOff = (await readJson(page, 'transactions', [], (v) => v?.some((p) => p.invoice_id === 'e2e-feed'))).filter((p) => p.invoice_id === 'e2e-feed');
+    check(setOff.length === 1 && setOff[0].exchange_purchase_id === bill.id, 'the feed bill is settled by a no-cash set-off receipt');
+    // B4: dispatch 40 L to the union, its acknowledgement, the bill and the reconciliation.
+    await page.goto(srv.origin + '/inventory?tab=dairy&view=dispatch');
+    await page.locator('[data-dairy="buyer"]').selectOption('e2e-union', { timeout: 15000 });
+    await page.locator('[data-dairy="tanker"]').fill('MH12 AB 1234');
+    await page.locator('[data-dairy="d-qty"]').fill('40');
+    await page.locator('[data-dairy="d-fat"]').fill('4');
+    await page.locator('[data-dairy="d-snf"]').fill('8.6');
+    await page.locator('[data-dairy="dispatch-save"]').click();
+    await readJson(page, 'milk_dispatches', [], (v) => v?.length === 1);
+    await page.locator('[data-dairy="ack-qty"]').fill('39.5');
+    await page.locator('[data-dairy="ack-fat"]').fill('3.9');
+    await page.locator('[data-dairy="ack-no"]').fill('ACK-1');
+    await page.locator('[data-dairy="ack-save"]').click();
+    await readJson(page, 'milk_dispatches', [], (v) => v?.[0]?.received?.ack_no === 'ACK-1');
+    await page.locator('[data-dairy="bill"]').click();
+    const [d] = await readJson(page, 'milk_dispatches', [], (v) => v?.[0]?.invoice_id);
+    const inv = (await readJson(page, 'invoices', [])).find((i) => i.id === d.invoice_id);
+    check(/^MDS\/FY\d\d-\d\d\/\d{4}$/.test(d.number) && inv?.doc_type === 'BILL_OF_SUPPLY' && inv.ag?.milk?.kg_fat > 1.5 && inv.ag?.milk?.tanker === 'MH12 AB 1234', `${d.number} billed as ${inv?.invoice_number}: a bill of supply with kg fat ${inv?.ag?.milk?.kg_fat}`);
+    check(/\d\.\d+ \([1-9]/.test(await page.locator('[data-dairy="short"]').first().innerText()), 'the reconciliation shows the kg fat shortage and its %');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {

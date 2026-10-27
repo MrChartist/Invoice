@@ -8,7 +8,6 @@ import { Lock, Printer, RotateCcw, Trash2 } from 'lucide-react';
 import type { MilkEntry, MilkShift, MilkShiftId } from '../../types/agri-r12';
 import { bT } from '../../i18n/areas/agri-r12b';
 import { closeShift, loadShifts, removeEntry, reopenShift, shiftsOn, shiftTotals } from '../../lib/agri/ag-shifts';
-import { cleanAnalyser, loadAnalyser, saveAnalyser, type AnalyserField } from '../../lib/agri/ag-analyser';
 import { readAgriSettings } from '../../lib/agri/ag-settings';
 import { esc, printHtmlDocument } from '../../lib/voucher-print';
 import { localDb } from '../../lib/localDb';
@@ -16,6 +15,7 @@ import { formatCurrency, todayInput } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import CollectionEntry from './CollectionEntry';
+import AnalyserSetup from './AnalyserSetup';
 import { farmers, milkCentres, sm, useRun, wrap, type Done } from './dairy-kit';
 import { CentrePick, F, Sel } from './dairy-ui';
 
@@ -38,7 +38,6 @@ export default function CollectionView({ onDone }: { onDone: Done }) {
   const day = useMemo(() => shiftsOn(loadShifts(), date, centreId), [tick, date, centreId]);
   const s = day.find((x) => x.shift === shift);
   const ms = readAgriSettings().milk;
-  const [prof, setProf] = useState(loadAnalyser);
   const print = (e: MilkEntry) => printHtmlDocument(slipHtml(e, { date, shift }, mm), () => onDone(bT('popupBlocked'), true));
   const wa = (e: MilkEntry) => {
     const f = farmers().find((v) => v.id === e.farmer_id);
@@ -77,17 +76,7 @@ export default function CollectionView({ onDone }: { onDone: Done }) {
       {s && (s.closed_at
         ? <button type="button" className={sm} onClick={() => run(() => { reopenShift(s.id); return bT('reopened'); })}><RotateCcw size={14} aria-hidden="true" /> {bT('reopen')}</button>
         : <button type="button" className={controls.btnPrimary} data-dairy="close-shift" onClick={() => run(() => { closeShift(s.id); return bT('shiftClosed'); })}><Lock size={14} aria-hidden="true" /> {bT('closeShift')}</button>)}
-      <details>
-        <summary>{bT('analyserSetup')}</summary>
-        <div className={controls.row} style={wrap}>
-          <Sel l={bT('preset')} v={prof.preset} set={(preset) => setProf({ ...prof, preset })} opts={[['csv', bT('presetCsv')], ['kv', 'key=value']]} />
-          <F l={bT('order')} w={200}><input className={controls.input} value={prof.order.join(',')} onChange={(e) => setProf(cleanAnalyser({ ...prof, order: e.target.value.split(',').map((x) => x.trim() as AnalyserField) }))} /></F>
-          <F l={bT('sep')} w={70}><input className={controls.input} value={prof.sep} maxLength={1} onChange={(e) => setProf({ ...prof, sep: e.target.value || ',' })} /></F>
-          <Sel l={bT('divide')} v={String(prof.div)} set={(v) => setProf({ ...prof, div: Number(v) })} opts={[['1', '1'], ['10', '10'], ['100', '100']]} w={80} />
-          <Sel l={bT('baud')} v={String(prof.baud)} set={(v) => setProf({ ...prof, baud: Number(v) })} opts={['2400', '4800', '9600', '19200'].map((b) => [b, b] as const)} w={100} />
-          <button type="button" className={sm} onClick={() => { saveAnalyser(prof); onDone(bT('saved')); }}>{bT('save')}</button>
-        </div>
-      </details>
+      <AnalyserSetup onSaved={() => onDone(bT('saved'))} />
     </>
   );
 }

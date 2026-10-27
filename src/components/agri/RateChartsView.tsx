@@ -4,7 +4,6 @@ import type { MilkKind, MilkRateChart } from '../../types/agri-r12';
 import { bT } from '../../i18n/areas/agri-r12b';
 import { chartRate, deleteChart, loadCharts, matrixCsv, parseMatrix, saveChart } from '../../lib/agri/ag-rate-chart';
 import { todayInput } from '../../lib/utils';
-import { parseCsv } from '../../lib/csv';
 import { downloadTextFile } from '../receivables/exportUtils';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -60,7 +59,6 @@ export default function RateChartsView({ onDone }: { onDone: Done }) {
               <td>{x.name}{x.buyer_id ? ` · ${bT('buyerChart')}` : ''}</td><td>{bT(`milk.${x.milk}`)}</td><td>{bT(`basis.${x.basis}`)} / {x.unit}</td><td>{x.effective_from}</td><td>{x.effective_to ?? '—'}</td>
               <td>
                 {x.matrix && <button type="button" className={sm} onClick={() => downloadTextFile(`${x.name}.csv`, matrixCsv(x.matrix!))}>CSV</button>}
-                {x.matrix && <button type="button" className={sm} onClick={() => void import('../../lib/xlsx').then((m) => m.downloadXlsx(`${x.name}.xlsx`, [{ name: 'Chart', rows: m.csvRowsToCells(parseCsv(matrixCsv(x.matrix!))) }]))}>XLSX</button>}
                 <button type="button" className={sm} onClick={() => run(() => { deleteChart(x.id); return bT('deleted'); })}>{bT('delete')}</button>
               </td>
             </tr>
