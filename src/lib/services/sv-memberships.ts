@@ -42,6 +42,12 @@ const find = (id: string) => {
   return m;
 };
 const put = (m: Membership) => write(loadMemberships().map((x) => (x.id === m.id ? { ...m, end: endOf(m), updated_at: now() } : x)));
+/** QA12 S2: a cancelled / upgraded membership takes no further action (a second cancel would refund twice). */
+const open = (id: string) => {
+  const m = find(id);
+  if (m.closed) throw new Error(`${m.number} is ${m.closed}.`);
+  return m;
+};
 const event = (m: Membership, e: MembershipEvent): MembershipEvent[] => [...(m.history ?? []), e];
 
 /** Sec 34(2): last day a GST credit note may be issued for a bill of `billDate`. */
@@ -50,7 +56,9 @@ export const sec34Limit = (billDate: string) => nextFyCutoff(getIndianFY(billDat
 /** A plan's sale line (rate by the plan, else its class on the date). */
 export function planLine(plan: Omit<MemberPlan, 'created_at'>, date: string, rate = num(plan.price), note = ''): InvoiceItem {
   const cls = plan.cls ? serviceClassAt(plan.cls, date) : undefined;
-  return { ...blankItem(), name: plan.name, description: note, rate: round2(rate), amount: round2(rate), tax_rate: plan.tax_rate ?? cls?.rate ?? num(localDb.settings.get().defaultTaxRate), hsn: plan.sac ?? cls?.sac ?? '', ...(plan.cls ? { sv: { cls: plan.cls } } : {}) };
+  const tax = plan.tax_rate ?? cls?.rate ?? num(localDb.settings.get().defaultTaxRate);
+  // QA12 S5: a 0% exempt class (education, charitable yoga, health care) reports in the Table 8 exempt column, not nil.
+  return { ...blankItem(), name: plan.name, description: note, rate: round2(rate), amount: round2(rate), tax_rate: tax, hsn: plan.sac ?? cls?.sac ?? '', ...(plan.cls ? { sv: { cls: plan.cls, ...(!num(tax) && cls?.exempt ? { exempt: cls.exempt } : {}) } } : {}) };
 }
 
 const clientOf = (m: Pick<Membership, 'client_id' | 'client_name' | 'phone'>): Client => (m.client_id ? localDb.clients.getById(m.client_id) : undefined) ?? { ...blankClient(), name: m.client_name, phone: m.phone ?? '' };
@@ -110,7 +118,7 @@ export interface SellInput {
 const TABLES = [SV_TABLES.memberships, 'invoices', 'series_counters', 'doc_links', 'advances'];
 
 /** Sell a plan: the membership row (MEM/FY…) and its sale bill (or, for a wallet, the first top-up). */
-export function sellPlan(i: SellInput, extra: { credit?: { value: number; note: string }; from?: Membership } = {}): Membership {
+export function sellPlan(i: SellInput, extra: { credit?: { value: number; note: string }; from?: Membership; draft?: boolean } = {}): Membership {
   requireAccess('doc.create');
   const plan = loadMemberPlans().find((p) => p.id === i.plan_id);
   if (!plan) throw new Error('Choose a plan.');
@@ -131,7 +139,7 @@ export function sellPlan(i: SellInput, extra: { credit?: { value: number; note: 
       const credit = Math.min(num(extra.credit?.value), num(plan.price));
       const span = m.end ? ` · ${fmt(m.start)} – ${fmt(m.end)}` : '';
       const line = planLine(plan, date, num(plan.price) - credit, `${number}${span}${credit ? ` · ${extra.credit!.note}` : ''}`);
-      const inv = bill(clientOf(m), [line], date, `${plan.name} ${number}`, { membership: { id: m.id, number, start: m.start, ...(m.end ? { end: m.end } : {}) } });
+      const inv = bill(clientOf(m), [line], date, `${plan.name} ${number}`, { membership: { id: m.id, number, start: m.start, ...(m.end ? { end: m.end } : {}) } }, extra.draft);
       m.invoice_ids.push(inv.id);
     }
     write([...loadMemberships(), m]);
@@ -143,7 +151,7 @@ export function sellPlan(i: SellInput, extra: { credit?: { value: number; note: 
 /** Freeze between `from` and `to` (the end moves by the frozen days); a plan fee is a separate small bill. */
 export function freeze(id: string, from: string, to: string, reason = '', date = from): Membership {
   requireAccess('doc.create');
-  const m = find(id);
+  const m = open(id);
   const err = freezeError(m, from, to);
   if (err) throw new Error(err);
   return withTablesRollback(TABLES, () => {
@@ -170,8 +178,7 @@ export function unfreeze(id: string, day: string): Membership {
  */
 export function upgrade(id: string, planId: string, date: string, mode = readServiceSettings().upgrade_mode ?? 'difference'): Membership {
   requireAccess('doc.create');
-  const m = find(id);
-  if (m.closed) throw new Error(`${m.number} is ${m.closed}.`);
+  const m = open(id);
   const u = unusedValue(m, shiftDay(date, -1), sessionsUsed(m, localDb.invoices.getAll(), loadCheckins()));
   const note = `₹${u.value} credited for ${u.left} unused ${u.by} of ${m.number}`;
   return withTablesRollback(TABLES, () => {
@@ -187,8 +194,7 @@ export function upgrade(id: string, planId: string, date: string, mode = readSer
 /** Transfer to another member from `date` (history kept on the same row; the plan's fee is billed to the old member). */
 export function transfer(id: string, to: { client_id?: string; client_name: string; phone?: string }, date: string): Membership {
   requireAccess('doc.create');
-  const m = find(id);
-  if (m.closed) throw new Error(`${m.number} is ${m.closed}.`);
+  const m = open(id);
   if (!m.plan.transferable) throw new Error(`${m.plan.name} is not transferable.`);
   if (!to.client_name.trim()) throw new Error('Choose the new member.');
   return withTablesRollback(TABLES, () => {
@@ -208,7 +214,7 @@ export function refundFor(m: Membership, date: string, custom?: number): number 
 /** Cancel with refund: a GST credit note on the sale bill for the refund (within Sec 34(2)); the row closes. */
 export function cancelMembership(id: string, date: string, reason: string, custom?: number): Membership {
   requireAccess('doc.create');
-  const m = find(id);
+  const m = open(id);
   if (!reason.trim()) throw new Error('Give the reason.');
   const refund = refundFor(m, date, custom);
   const sale = localDb.invoices.getById(m.invoice_ids[0] ?? '');
@@ -222,17 +228,14 @@ export function cancelMembership(id: string, date: string, reason: string, custo
 /** Renew: the same plan from the day after the end (or `date` when later); `draft` = an unissued bill (auto-renew). */
 export function renew(id: string, date: string, draft = false): Membership {
   requireAccess('doc.create');
-  const m = find(id);
+  const m = open(id);
   if (m.next_id) throw new Error(`${m.number} is already renewed.`);
   const start = m.end && shiftDay(m.end, 1) > date ? shiftDay(m.end, 1) : date;
   const plan = loadMemberPlans().find((p) => p.id === m.plan.id);
   if (!plan) throw new Error(`The plan ${m.plan.name} was deleted.`);
   return withTablesRollback(TABLES, () => {
-    const next = sellPlan({ plan_id: plan.id, client_id: m.client_id, client_name: m.client_name, phone: m.phone, start, date, trainer_id: m.trainer_id, auto_renew: m.auto_renew });
-    if (draft) {
-      const inv = localDb.invoices.getById(next.invoice_ids[0] ?? '');
-      if (inv) localDb.invoices.save({ ...inv, status: 'Draft' });
-    }
+    // QA12 S9: an auto-renewal bill is saved as a draft at once (it was issued first, then turned back into a draft).
+    const next = sellPlan({ plan_id: plan.id, client_id: m.client_id, client_name: m.client_name, phone: m.phone, start, date, trainer_id: m.trainer_id, auto_renew: m.auto_renew }, { draft });
     put({ ...find(id), next_id: next.id, history: event(m, { date, kind: 'renew', note: `→ ${next.number}${draft ? ' (draft bill)' : ''}`, invoice_id: next.invoice_ids[0] }) });
     return next;
   });
@@ -240,16 +243,25 @@ export function renew(id: string, date: string, draft = false): Membership {
 
 /** Auto-renew: every auto-renewing membership past its end gets its successor with a DRAFT bill (issue it to tax it). */
 export function autoRenewDue(today: string): Membership[] {
-  return loadMemberships().filter((m) => m.auto_renew && !m.closed && !m.next_id && m.end && m.end < today).map((m) => renew(m.id, shiftDay(m.end, 1), true)); // no gap: from the day after the end
+  // QA12 S9: one membership that cannot renew (its plan deleted) no longer stops every other renewal.
+  return loadMemberships().filter((m) => m.auto_renew && !m.closed && !m.next_id && m.end && m.end < today).flatMap((m) => {
+    try {
+      return [renew(m.id, shiftDay(m.end, 1), true)]; // no gap: from the day after the end
+    } catch {
+      return [];
+    }
+  });
 }
 
 /** Wallet top-up: an advance receipt (GST on receipt for services) plus the plan's bonus value (never cash). */
 export function topUp(id: string, amount: number, method: string, date: string): Membership {
   requireAccess('doc.create');
-  const m = find(id);
+  const m = open(id);
   if (m.plan.kind !== 'wallet') throw new Error(`${m.number} is not a wallet.`);
   const c = clientOf(m);
-  const adv = saveAdvance({ date, client: { id: c.id, name: c.name, gstin: c.gstin, state_code: c.state_code }, place_of_supply: c.state_code || senderStateCode(localDb.settings.activeProfile() ?? null), supply: 'services', tax_rate: num(m.plan.tax_rate), amount, method, description: `Wallet ${m.number}` });
+  // QA12 S3: the top-up's GST rate is the plan's rate as on a sale (its tax class, else the default rate) — the plan
+  // form has no rate field, so `plan.tax_rate` alone left every wallet top-up at 0%.
+  const adv = saveAdvance({ date, client: { id: c.id, name: c.name, gstin: c.gstin, state_code: c.state_code }, place_of_supply: c.state_code || senderStateCode(localDb.settings.activeProfile() ?? null), supply: 'services', tax_rate: num(planLine(m.plan, date).tax_rate), amount, method, description: `Wallet ${m.number}` });
   const bonus = round2((num(amount) * num(m.plan.bonus_pct)) / 100);
   put({ ...m, wallet: { ...m.wallet, topups: [...(m.wallet?.topups ?? []), { advance_id: adv.id, date, amount: adv.amount, bonus }] } });
   return find(id);
