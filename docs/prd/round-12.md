@@ -245,7 +245,7 @@ in two independent secondary sources that agree; otherwise **verify with CA**.
 | Dairy after 22 Sep 2025 | UHT milk 5% → nil; paneer / chena (pre-packaged) 5% → nil; ghee, butter, butter oil, cheese, condensed milk → 5% (old rate 12% in PTI / Taxscan, 18% in Tally's table) | — | S taxscan, theweek (PTI), tallysolutions, Min. of Cooperation (dtnext) | New rates M–H / **verified** (two sources agree); old rates L → AG4 |
 | Unbranded cereals, pulses, flour, paddy | Loose / not pre-packaged: nil; "pre-packaged and labelled" up to 25 kg / 25 L: 5% (N 6/2022-CT(R) from 18 Jul 2022; > 25 kg in one package is outside); paddy (1006 10) nil | User-typed rates | S outlookbusiness (FinMin FAQ) | M / verify (no 2025 change found) → AG5 |
 | By-products | Rice husk (1213) nil; rice bran (2302) nil as cattle / poultry / aquatic feed, 5% otherwise; de-oiled rice bran (2306) 5% irrespective of use; broken rice (1006 40) 5% in one AAR (pre-2022 "branded" regime); oil cake as cattle feed nil (S.No.102 of N 2/2017 as amended 1 Jan 2023), otherwise 5% | — | P GST Council FAQ (2024 reissue); P AAR (Tamal Kundu); S AAR cattle-feed note | M / **verified** (husk, bran, DORB); L (broken rice, oil cake) → AG6 |
-| Agricultural produce, farm services | N 12/2017-CT(R) entry 54: services relating to cultivation, supply of farm labour, processes by a cultivator that do not alter essential characteristics, renting of agri machinery, loading / unloading / packing / **storage or warehousing of agricultural produce**, agricultural extension, APMC services, commission agent for sale / purchase of agricultural produce — nil; "agricultural produce" defined in the Explanation to N 11/2017 | Aadat exempt for agricultural produce (TR9) | P N 12/2017 (recalled); S taxguru, busy.in caselaw | H (entry) / M (scope) → AG7 |
+| Agricultural produce, farm services | N 12/2017-CT(R) entry 54: services relating to cultivation, supply of farm labour, processes by a cultivator that do not alter essential characteristics, renting of agri machinery, loading / unloading / packing / **storage or warehousing of agricultural produce**, agricultural extension, APMC services, commission agent for sale / purchase of agricultural produce — nil; "agricultural produce" defined in the Explanation to N 11/2017 | Aadat exempt for agricultural produce (TR9) | P N 12/2017 (recalled); S taxguru, busy.in caselaw | H (entry) / M (scope) → AG1, AG7 |
 | Cold-storage rent | Storage / warehousing of agricultural produce: nil (54(e)), held service-specific, for farmers and traders alike (AP AAR, SSSVK); **renting a godown / chamber** treated as a separate taxable supply (Gujarat AAR, 9972) vs nil (AP AAR, SAC 998619); potatoes in cold storage stay "agricultural produce" (no processing); taxable for non-agri goods (frozen food, medicines, dry fruit processed) at 18% | — | S taxguru, busy.in caselaw; P AAR texts on gstcouncil.gov.in | M (exemption) / **L (rent vs storage)** → AG8 ★ |
 | Milling for PDS | Circular 153/09/2021-GST (17 Jun 2021): milling of paddy into rice / wheat into flour for the State for PDS is a composite supply of service; exempt (entry 3A, N 12/2017) if goods ≤ 25% of the value; else 5% as job work to a registered person (entry 26, N 11/2017), including a person registered only for Sec 51 TDS | — (job-work principal register exists) | P Circular 153 (HP, Goa copies) | H / **verified** → AG9 ★ |
 | Job milling for others | Milling a registered principal's grain on job work: 5% (entry 26 "food and food products"); for an unregistered farmer: 18%? or exempt as a process by a cultivator? (atta chakki for a household) | — | Recalled; no ruling read | L → AG10 |
@@ -359,8 +359,8 @@ Verdicts: **Exists** (done, file given), **Partial** (part done, gap named), **M
 | Members, shares, certificates | Missing | share capital is a ledger only (`notes-auto.ts`) | D5 |
 | Patronage / bonus, 80P / 80PA papers | Missing | — | D5 |
 
-**Totals:** 41 rows checked (shared 16, dairy 7, mills 7, cold / inputs / members 9 — plus 2 n/a merged): **10 exist**,
-**12 partial**, **19 missing**. Round 12 closes every partial / missing row; §2.2's 21 document rows map onto them.
+**Totals:** 40 rows checked (shared 17, dairy 7, mills 7, cold / inputs / members 9): **15 exist** (reused as they are),
+**8 partial**, **17 missing**. Round 12 closes every partial / missing row; §2.2's 21 document rows map onto them.
 
 ---
 
@@ -503,7 +503,8 @@ the checklist asks for my rate chart and my first farmers.
    [{ date, kind: 'mortality' | 'feed' | 'harvest' | 'medicine' | 'weight', qty, unit, note }], status }`. A batch
    creates its cost centre on first save (existing `cost-centres.ts`, kind `project`) so purchase bills and sales tagged
    to it give the batch P&L the existing reports already show. Memo figures: mortality %, feed kg, live weight / harvest
-   kg, **FCR** = feed kg ÷ weight gained kg, cost per kg. No posting from events.
+   kg, **FCR** = feed kg ÷ weight gained kg, cost per kg. No posting from events (GST classes for live poultry, eggs,
+   fresh fish: AG31).
 7. **Agricultural income** (farm kind): a ledger "Agricultural income (exempt)" under Other income is created on first
    use; sales of own produce can be tagged to it; the help topic says income from poultry, fishery, a mill, a dairy or
    a cold store is business income, not agricultural income (AG15).
@@ -589,7 +590,7 @@ from an agriculturist — exempt; no reverse charge", and I pay him by NEFT.
    agriculturist — agricultural produce; exempt; reverse charge not applicable" unless a line hits the R8 notified-goods
    prompt (TR17), which then prints its RCM line. An exempt-only sale is a bill of supply (existing) with "Agricultural
    produce — not pre-packaged and labelled" when a `*_loose` / `paddy` class is on it; a mixed bill is an
-   invoice-cum-bill of supply (Rule 46A, existing behaviour).
+   invoice-cum-bill of supply (Rule 46A, existing behaviour; AG2).
 6. **194Q hint**: when our turnover test passes (`BUYER_194Q_TURNOVER_RULES`) and a farmer's FY purchases cross
    ₹50 lakh, the voucher shows the existing 194Q prompt (agricultural produce is "goods" — AG13).
 7. Payment of a voucher uses the existing payment dialog; cash above ₹10,000 to a farmer vendor (`principal_kind:
@@ -848,7 +849,7 @@ by-product credit.
    - flour (roller): atta / maida / suji / chokar (bran);
    - dal: dal (main), chunni, husk, broken;
    - oil (expeller / kachi ghani): oil (main), oil cake (by-product);
-   with `co_product` cost % or `by_product` fixed rate (existing engine).
+   with `co_product` cost % or `by_product` fixed rate (existing engine); defaults per AG29.
 2. A milling batch is an ordinary **production order** (R4-A) with `ag.mill` (declaration merging on `ProductionOrder`):
    `{ input_moisture?, output_moisture?, standard_outturn_pct, std_source: 'own' | 'cmr' }`. Output reported through the
    existing manufacturing journal.
@@ -1291,9 +1292,9 @@ dated rule row or a setting default, never the design.
 | 3 | Where do the screens live? | Desk tabs on `/inventory` (module route), views in `&view=`. | No `PACK_ROUTES` row; R9 precedent. |
 | 4 | Invoice snapshot | One record key `ag` (≈ 10–20 B first paint); weighing reuses `wt`. | The only structured way to reprint agri particulars; budget headroom 0.3 kB. |
 | 5 | Farmer = vendor or client? | Vendor when he sells to us, client when he buys or deposits; linked by `ag.code`. | Ledgers and GST readers stay unchanged. |
-| 6 | 7,000 farmer bills a year | One pooled purchases row per cycle per centre; farmer split on the cycle row. | Volume; Table 5 and stock read it once. |
-| 7 | Milk stock | Posted per closed shift into the centre godown; the cycle purchase's lines are skipped by the stock reader (`ag.stock_by_shift`). | Dispatches are daily; the cycle closes every 10 days. |
-| 8 | Feed / input set-off from milk money | Receipt with the existing `exchange_purchase_id` + one set-off journal per cycle. | No new no-cash marker; cash readers unchanged. |
+| 6 | 7,000 farmer bills a year | One pooled purchases row per cycle per centre; farmer split on the cycle row. | Volume; Table 5 and stock read it once (AG26). |
+| 7 | Milk stock | Posted per closed shift into the centre godown; the cycle purchase's lines are skipped by the stock reader (`ag.stock_by_shift`). | Dispatches are daily; the cycle closes every 10 days (AG28). |
+| 8 | Feed / input set-off from milk money | Receipt with the existing `exchange_purchase_id` + one set-off journal per cycle. | No new no-cash marker; cash readers unchanged (AG27). |
 | 9 | Rate chart basis | Matrix (nearest lower step) by default; two-axis, kg-fat, TS-kg and flat available. | Covers union and society practice. |
 | 10 | Cash to farmers | No 40A(3) warning to agriculturists and pooled farmer cycles (Rule 6DD(e)); keep the warning for companies / traders. | Rule 6DD(e); Mad HC narrow reading (AG14). |
 | 11 | Agri tax rates | Class suggestions by date in `agri-rules.ts`, `verified: false` on every 22 Sep 2025 row until AG4; typed rate wins. | Notifications not read this round. |
@@ -1307,7 +1308,7 @@ dated rule row or a setting default, never the design.
 | 19 | Job milling for an unregistered farmer | No suggestion beyond "verify" (typed rate). | AG10 (L). |
 | 20 | Cold-storage rent | Agri produce storage nil; non-agri 18%; whole-chamber space rent 18% by default with a note. | Entry 54(e); conflicting AARs (AG8). |
 | 21 | Handling charges | Follow the storage class (composite) by default; "own rate" option. | AG8. |
-| 22 | Cold-storage lots | Custody only, never stock. | The goods are the depositor's. |
+| 22 | Cold-storage lots | Custody only, never stock. | The goods are the depositor's (AG30). |
 | 23 | Warehouse receipts | Printed as non-negotiable receipts; never called an e-NWR. | WDRA r.27: e-NWR only via repositories (AG23). |
 | 24 | Loans against lots | Simple interest by days; interest-first allocation; lien blocks the gate pass unless overridden with a reason. | Practice; AG24. |
 | 25 | Subsidised fertiliser | PoS txn no. + farmer ID last 4 required for flagged items; 50 bags / month warning; MRP guard `block`. | Reported practice (AG22). |
