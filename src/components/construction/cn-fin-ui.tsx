@@ -1,20 +1,24 @@
 /** CN-B: small form helpers shared by the contractor-finance Works views (one lazy chunk with them). */
+import type { Dispatch, SetStateAction } from 'react';
 import type { WorksContract } from '../../types/construction-r11';
-import { cbT, type CbKey } from '../../i18n/areas/construction-r11b';
+import { cbT } from '../../i18n/areas/construction-r11b';
 import { F } from '../transport/Field';
 import controls from '../../styles/controls.module.css';
 import styles from '../transport/transport.module.css';
 
-/** [field, label key, input type] — 'check' renders a checkbox. */
-export type Spec = readonly [string, CbKey, ('number' | 'date' | 'text' | 'check')?];
 export type Vals = Record<string, string | boolean | undefined>;
+/** [field, label, input type | select options] — 'check' renders a checkbox. */
+export type Spec = readonly [string, string, ('number' | 'date' | 'check' | readonly (readonly [string, string])[])?];
 
-export function Fields({ spec, v, on }: { spec: readonly Spec[]; v: Vals; on: (k: string, val: string | boolean) => void }) {
+export function Fields({ spec, v, set }: { spec: readonly Spec[]; v: Vals; set: Dispatch<SetStateAction<Vals>> }) {
+  const on = (k: string, val: string | boolean) => set((o) => ({ ...o, [k]: val }));
   return (
     <div className={styles.grid}>
       {spec.map(([k, l, t]) => (t === 'check'
-        ? <label key={k} className={controls.check}><input type="checkbox" checked={!!v[k]} onChange={(e) => on(k, e.target.checked)} /> {cbT(l)}</label>
-        : <F key={k} l={cbT(l)}><input className={controls.input} type={t || 'text'} value={String(v[k] ?? '')} onChange={(e) => on(k, e.target.value)} data-cn-f={k} /></F>))}
+        ? <label key={k} className={controls.check}><input type="checkbox" checked={!!v[k]} onChange={(e) => on(k, e.target.checked)} /> {l}</label>
+        : <F key={k} l={l}>{Array.isArray(t)
+          ? <select className={controls.select} value={String(v[k] ?? '')} onChange={(e) => on(k, e.target.value)} data-cn-f={k}>{t.map(([x, y]) => <option key={x} value={x}>{y}</option>)}</select>
+          : <input className={controls.input} type={(t as string) || 'text'} value={String(v[k] ?? '')} onChange={(e) => on(k, e.target.value)} data-cn-f={k} />}</F>))}
     </div>
   );
 }

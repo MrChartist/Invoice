@@ -10,8 +10,7 @@ import type { BankGuarantee, CnClosure, CnClosureKey, WorksContract } from '../.
 import type { SecurityDeposit } from '../../types/institutions-r5';
 import { num } from '../invoice-calc';
 import { raDueSplit } from '../works/ra-due';
-import { addMonthsDay } from '../works/measurements';
-import { contractBills, contractById, saveContract } from './cn-contracts';
+import { contractBills, contractById, plusMonths, saveContract } from './cn-contracts';
 import { isLiveBg } from './cn-guarantees';
 
 export const CLOSURE_KEYS: readonly CnClosureKey[] = ['final_bill', 'completion', 'dlp', 'retention', 'sd', 'bgs', 'pv_final', 'no_claim', 'reco'];
@@ -41,7 +40,7 @@ export function closureChecklist(c: WorksContract, d: ClosureData): ClosureItem[
     const out = num(b.ra_net_payable ?? b.total) + (b.ra_deductions ?? []).filter((x) => x.kind !== 'it_tds').reduce((s, x) => s + x.amount, 0) - mine.reduce((s, p) => s + num(p.amount), 0);
     return raDueSplit(b, mine, out).held.some((h) => h.kind === kind);
   });
-  const dlpEnd = c.completed_on && num(c.dlp_months) > 0 ? addMonthsDay(c.completed_on, num(c.dlp_months)) : c.completed_on;
+  const dlpEnd = c.completed_on && num(c.dlp_months) > 0 ? plusMonths(c.completed_on, num(c.dlp_months)) : c.completed_on;
   const done: Record<CnClosureKey, boolean> = {
     final_bill: bills.some((b) => b.ra_final),
     completion: !!c.completed_on,

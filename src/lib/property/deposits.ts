@@ -66,8 +66,6 @@ export interface DepositInput {
   bank_account_id?: string;
   lease_id?: string;
   interest_pct?: number;
-  /** R11 (CN-B5): EMD / SD paid to a client for this works contract. */
-  contract_id?: string;
 }
 
 /** Record a new deposit and the money that came in / went out. All or nothing. */
@@ -79,7 +77,7 @@ export function recordDeposit(i: DepositInput): SecurityDeposit {
   if (!str(i.party_name)) throw new R5cError('party');
   const d: SecurityDeposit = {
     id: generateId(), direction: i.direction === 'paid' ? 'paid' : 'received', party_id: str(i.party_id), party_name: str(i.party_name), amount, date, mode: str(i.mode) || 'bank',
-    ...(i.bank_account_id ? { bank_account_id: i.bank_account_id } : {}), ...(i.lease_id ? { lease_id: i.lease_id } : {}), ...(i.contract_id ? { contract_id: i.contract_id } : {}),
+    ...(i.bank_account_id ? { bank_account_id: i.bank_account_id } : {}), ...(i.lease_id ? { lease_id: i.lease_id } : {}),
     ...(money(i.interest_pct) > 0 ? { interest: { pct: money(i.interest_pct) } } : {}), movements: [], status: 'open', created_at: new Date().toISOString(),
   };
   lock(d, date);

@@ -71,5 +71,12 @@ export function deleteGuarantee(id: string): void {
   setTable(BG_TABLE, getTable<BankGuarantee>(BG_TABLE).filter((b) => b.id !== id));
 }
 
-/** EMD / security deposits paid to the client for a contract (R5-C6 rows with `contract_id`). */
-export const contractDeposits = (contractId: string): SecurityDeposit[] => peekTable<SecurityDeposit>('security_deposits').filter((d) => d && d.contract_id === contractId && d.direction === 'paid');
+/** EMD / security deposits paid to the client (R5-C6 rows, `direction: 'paid'`): this contract's, then the client's unlinked ones. */
+export const contractDeposits = (contractId: string, clientId?: string): SecurityDeposit[] =>
+  peekTable<SecurityDeposit>('security_deposits').filter((d) => d?.direction === 'paid' && (d.contract_id === contractId || (!d.contract_id && !!clientId && d.party_id === clientId)));
+
+/** Link a deposit paid (recorded in Recurring → Leases → Deposits) to a contract (additive `contract_id`). */
+export function linkDeposit(id: string, contractId: string): void {
+  requireAccess('books.edit');
+  setTable('security_deposits', getTable<SecurityDeposit>('security_deposits').map((d) => (d.id === id ? { ...d, contract_id: contractId } : d)));
+}

@@ -27,6 +27,14 @@ export const daysBetween = (a: string | undefined, b: string | undefined): numbe
   return Number.isFinite(n) ? n : 0;
 };
 
+/** `YYYY-MM-DD` + whole months (day clamped to the month's end). */
+export function plusMonths(d: string, months: number): string {
+  const t = +d.slice(0, 4) * 12 + +d.slice(5, 7) - 1 + Math.round(months);
+  const y = Math.floor(t / 12);
+  const m = (t % 12) + 1;
+  return `${y}-${String(m).padStart(2, '0')}-${String(Math.min(+d.slice(8, 10), new Date(y, m, 0).getDate())).padStart(2, '0')}`;
+}
+
 export const loadContracts = (): WorksContract[] => peekTable<WorksContract>(CONTRACTS_TABLE).filter((c) => c && typeof c.id === 'string');
 export const contractById = (id: string | undefined) => loadContracts().find((c) => c.id === id);
 
