@@ -1,6 +1,7 @@
 import type { InvoiceRecord } from '../../../types/invoice';
 import type {} from '../../../types/contacts';
 import { attentionText } from '../../../lib/contacts';
+import { visitText } from '../paper-helpers';
 import styles from './sales-r2-paper.module.css';
 
 /**
@@ -10,10 +11,16 @@ import styles from './sales-r2-paper.module.css';
  */
 export function AttentionLine({ invoice }: { invoice: InvoiceRecord }) {
   const text = attentionText(invoice.attention);
-  if (!text) return null;
+  const visit = visitText(invoice); // R10 (SV-B1): UHID · doctor (reg. no.) · token
+  if (!text && !visit) return null;
   return (
-    <div className={styles.attn} data-attention>
-      <span className={styles.attnLabel}>Kind attn.:</span> {text}
-    </div>
+    <>
+      {visit && <div className={styles.attn} data-visit>{visit}</div>}
+      {text && (
+        <div className={styles.attn} data-attention>
+          <span className={styles.attnLabel}>Kind attn.:</span> {text}
+        </div>
+      )}
+    </>
   );
 }
