@@ -24,6 +24,11 @@ import { scrapRegister } from '../src/lib/mfg/mf-scrap.ts';
 import { outwardLines, rule895, suggestInvertedRates, type IdLine } from '../src/lib/mfg/mf-inverted.ts';
 import { lotWithOrder, SIZES } from './helpers/garments.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
+import { vendorsDb } from '../src/lib/vendors.ts';
+import { loadVouchers } from '../src/lib/ledger/vouchers.ts';
+import { advanceOutstanding, draftPieceBill, payAdvance, pieceOf, removePieceBill, savePieceBill } from '../src/lib/mfg/mf-piece-bill.ts';
+import { BIN_TABLE, restoreEntry } from '../src/lib/trust/recycle-bin.ts';
+import type { BinEntry } from '../src/types/trade-r4.ts';
 import type { ProductionOrder } from '../src/types/production-r4.ts';
 
 beforeEach(() => {
@@ -144,4 +149,21 @@ test('M4 LUT exports are in ATT but not inverted turnover; a credit note on a ni
   assert.equal(r.taxPayable, 50000);
   assert.equal(r.att, 1400000, 'ATT = taxable 1,000,000 + zero-rated 400,000; nil and its credit note out');
   assert.deepEqual(suggestInvertedRates(o, ins), [5]);
+});
+
+/* ── M5: piece bill restore with its advance-recovery journal ───── */
+
+test('M5 a restored piece bill brings back its advance-recovery journal; the journal alone is refused', () => {
+  const k = vendorsDb.save({ name: 'Rehmat', mf: { karigar: { kind: 'home', rates: [] } } } as never);
+  payAdvance(k, { date: '2026-10-12', amount: 500 });
+  const bill = savePieceBill(k, draftPieceBill(k, [{ op: 'Stitching', pieces: 100, rate: 38, amount: 0, source: 'typed' }], { date: '2026-10-12', period: { from: '2026-10-06', to: '2026-10-12' }, advance: 300 }));
+  const jv = pieceOf(bill)!.advance_jv_id!;
+  removePieceBill(bill.id);
+  assert.equal(advanceOutstanding(k), 500);
+  const bin = getTable<BinEntry>(BIN_TABLE);
+  const jvEntry = bin.find((b) => b.table === 'vouchers' && b.row_id === jv)!;
+  assert.throws(() => restoreEntry(jvEntry.id), /post it twice/);
+  restoreEntry(bin.find((b) => b.table === 'purchases' && b.row_id === bill.id)!.id);
+  assert.ok(loadVouchers().some((v) => v.id === jv), 'the recovery journal is back with the bill');
+  assert.equal(advanceOutstanding(k), 200);
 });
