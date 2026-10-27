@@ -1030,3 +1030,18 @@ test('R13 (MF-A4) dated MRP reads the real bill shape: PO supply less what a bil
   const { supply } = datedSources(items, '2026-04-10');
   assert.deepEqual(supply.map((x) => [x.item_id, x.date, x.qty]), [['paper', '2026-04-20', 30]], '6 boxes × 5 left; the void bill received nothing');
 });
+
+// R13-D: cost cards (latest purchase rate), the MSME Form-1 paper (through msme.ts) and the AA import register read bills
+// through `readPurchase` / `readPurchaseLines` (void / expense left out, base units with `unit_factor`).
+test('R13 (MF-D1 / D3 / D4) cost-card rates, Form-1 rows and AA imports read the real bill shape', async () => {
+  const { latestPurchaseRates } = await import('../src/lib/mfg/mf-costcards.ts');
+  const { form1Half, form1Rows } = await import('../src/lib/mfg/mf-msme-form1.ts');
+  const { importsAgainst } = await import('../src/lib/mfg/mf-authorisations.ts');
+  const void_ = { ...bill, id: 'v', status: 'void' } as never;
+  const exp = { ...bill, id: 'e', kind: 'EXPENSE' } as never;
+  assert.equal(latestPurchaseRates([bill, void_, exp], [{ id: 's', name: 'Paper ream' }], '2026-12-31').get('s'), 100);
+  const v = [{ id: 'v1', name: 'Acme Supplies', msme_category: 'MICRO' as const }];
+  assert.equal(form1Rows([{ ...bill, vendor_id: 'v1' }], v, [], form1Half('2026-09-30')).length, 1);
+  const tagged = { ...bill, mf: { authorisation_id: 'aa' }, lines: [{ ...bill.lines[0], unit_factor: 500 }] };
+  assert.deepEqual(importsAgainst([tagged, { ...tagged, id: 'v', status: 'void' }, bill], 'aa', () => 's').map((m) => [m.qty, m.value]), [[5000, 1000]]);
+});
