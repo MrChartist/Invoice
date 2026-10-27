@@ -1483,8 +1483,7 @@ proposal decides what happens above it). Each package runs `npm run typecheck`, 
 | Accounts by name: "Client money held", "Unbilled revenue (WIP)", "Professional fees — unbilled", "Capital — <partner>", "Current — <partner>", "Partners' remuneration", "Interest on partners' capital", "Profit & loss appropriation", "Interest on drawings", "Platform fees" | A / B / C / D | created on first use | — | — | — | — |
 
 No migration (everything is additive). Client parties, PANs and conflict-check terms are personal data (DPDP Act 2023):
-they stay on the device and in the user's own backups like every other table; the conflict register is never exported in
-the open-export schema's "share" profile (only in full backups).
+they stay on the device and in the user's own backups and open exports like every other table; nothing is sent anywhere.
 
 ---
 
