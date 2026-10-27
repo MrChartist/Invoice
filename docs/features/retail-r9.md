@@ -559,3 +559,52 @@ ItemsTable, Pos, InvoiceCreator save gates, PaymentModal guard, e-Way check, rec
 - RT20: karigar labour SAC 9988 at 5 % when registered, nil and no RCM when not; ITC-04 opt-in.
 - RT21: metal with karigars stays in stock (their `'wip'` godown).
 - RT22: no e-Way bill for all-chapter-71 bills (Rule 138(14) annexure, recalled).
+
+---
+
+# QA10 fixes (docs/prd/qa-round-10.md, R1–R17)
+
+Regression tests: `tests/qa10-retail.test.ts` (one or more tests per finding, named `R1: …` … `R17: …`).
+
+- **R1 / R6 / R7 (one root): a URD voucher's settled amount is derived.** `rt-doc-hooks.ts`: settled = cash / bank paid
+  (`amount_paid − exchange_paid`, the exchange part the last sync saw; vouchers from before QA10 fall back to the live
+  exchange rows) + its LIVE exchange receipt rows. `urdLeft` feeds `openVouchers` (POS *Exchange* tender, Devices
+  buy-back list), `applyExchange` and `oldGoldVouchers`, so a voucher paid out in cash is never offered or used again.
+  `syncUrdPaid` rewrites `amount_paid` / `exchange_paid` after every exchange, undo, bill delete / cancel and
+  recycle-bin restore (payables and the ledger agree). New vouchers start with `exchange_paid: 0`.
+- **Bill delete / cancel hooks (R6, R8).** One slot `voidHook.f` (approval-gate.ts): `localDb.invoices.remove` and the
+  save / `setStatus` path (inside `holdIfCreditBlocked`) call it first; it acts on a delete or a cancel. `rt-doc-hooks.ts` (loaded
+  with every R9 writer, the recycle bin and the sync engine) frees the bill's exchange receipts and cancels its finance
+  DO with the transfer row and journal (refused while the financier has paid on it: undo the disbursement first).
+  Recycle bin: a restored bill brings its DO back (invoice hook → `finance_deals` companions → journal + transfer row);
+  a restored exchange receipt re-settles its voucher, and is refused if the voucher was paid / used again meanwhile.
+- **R2 karigar.** A receipt brings the pieces (or tags, `addTags` `cost`) in at the consumed metal's average cost, split
+  by fine weight (tags by net weight); labour stays an expense through its bill. Closing stock keeps the metal's value.
+- **R3 rider cash.** Books: a COD receipt tagged `rider_id` is in no cash / bank book (it stays in the day book); the
+  *Rider settlement* journal brings it into Cash. Cash book closing = ledger cash.
+- **R4 margin scheme in GST.** `isMarginCostLine` (gst-reports.ts): the `part: 'cost'` line is left out of GSTR-1 rates,
+  Table 8, HSN, 3B 3.1(a) / (c) and so `turnoverOf` (Rule 42 / 43); an info note `MARGIN_SCHEME` says so — verify with
+  your CA.
+- **R5 Tally / CSV.** A URD voucher's party is its own creditor ledger `"<name> (Creditor)"` (purchase voucher, supplier
+  payments); an exchange is a **Journal**: Dr that creditor (Agst Ref the URD number) / Cr the customer (Agst Ref the
+  bill). The receipts CSV deposits an exchange to the same creditor ledger (`exchangeVoucherOf`, no-cash.ts).
+- **R9 repairs.** `billJob` stamps `billed_on` (+ `warranty_move_ids`) even when nothing is chargeable; a second call is
+  refused, the desk hides *Bill job*. `deleteJob` removes those part issues (recycle bin; restored with the job).
+- **R10 / R13 cash guard.** `cashFromCustomer` = max(the customer's cash that day, this bill's cash on ANY day), receipts
+  only; the POS strip uses it too (`sameDayCash` no longer nets refunds).
+- **R11 MRP.** A bill line's MRP is per the line's unit ("MRP per STRIP"); the batch keeps it per base unit
+  (`mrp / unitFactor`, as the rate).
+- **R12.** Editor save gate `marginGate` (stock-tracking.ts, always on) and the POS devices strip refuse margin lines
+  on a bill to a GSTIN buyer.
+- **R14.** `panNeeded` (rt-cash-guard.ts) is the one Rule 114B test: an old-gold voucher needs PAN only ABOVE ₹2 lakh.
+- **R15.** The financier's fee draft carries `settled_by_voucher`; posted, the bill's `amount_paid` = its payable
+  (never shown due, never paid twice).
+- **R16.** `tailorBilled`: a slip's stamp counts only while its draft / bill (same id) exists; a discarded draft frees it.
+- **R17.** Books refuses to delete a *Rider settlement* journal while its settlement row names it; Deliveries →
+  *Undo settlement* (`undoSettlement`) removes both; the bin restores the settlement with its journal (refused when the
+  receipts were settled again), and refuses the journal alone.
+
+Sizes (gz, exact bytes): first paint 189,025 → 189,050 B (+25 B, the `voidHook` slot and its two calls) on top of CN-A;
+total JS 2,810.8 → 2,812.4 kB. No new shared chunk (the
+hooks module names `finance_deals` and drops the transfer journal itself, so the vouchers module does not join every
+lazy preload list).

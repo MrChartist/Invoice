@@ -458,6 +458,10 @@ export interface ServiceJob {
   invoice_number?: string;
   /** Stock journal moves of a warranty unit swap. */
   swap_move_ids?: string[];
+  /** QA10 R9: billed (local day) — set even when nothing was chargeable (all parts under warranty): billed once only. */
+  billed_on?: string;
+  /** QA10 R9: the warranty part issues `billJob` made (removed with the job, restored with it). */
+  warranty_move_ids?: string[];
   history: { status: ServiceStatus; date: string }[];
   created_at: string;
   updated_at?: string;
@@ -484,6 +488,13 @@ declare module './purchases' {
   }
   interface PurchaseRecord {
     used_goods?: UsedGoods;
+    /**
+     * QA10 R1/R6/R7: the exchange part of `amount_paid` at the last sync (`syncUrdPaid`, rt-doc-hooks.ts). A URD voucher's
+     * settled amount is derived: cash / bank paid (`amount_paid − exchange_paid`) + its LIVE exchange receipt rows.
+     */
+    exchange_paid?: number;
+    /** QA10 R15: settled in full by this journal / receipt voucher (a financier's withheld fee): never paid again. */
+    settled_by_voucher?: string;
   }
 }
 declare module '../lib/inventory' {

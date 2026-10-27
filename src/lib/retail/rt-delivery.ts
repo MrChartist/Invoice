@@ -21,7 +21,8 @@ import { requireAccess } from '../access';
 import { KEYS, generateId, getTable, setTable } from '../storage';
 import { localDb } from '../localDb';
 import { assertUnlocked } from '../period-lock';
-import { saveVoucher } from '../ledger/vouchers';
+import { withTablesRollback } from '../table-txn';
+import { deleteVoucher, saveVoucher } from '../ledger/vouchers';
 import { A } from '../ledger/accounts';
 import { ensureLedger } from '../trade/tr-ledger';
 import { RIDER_CASH_LEDGER, RT_TABLES } from './rt-shared';
@@ -188,7 +189,7 @@ export function settleRider(input: { riderId: string; day: string; counted: numb
   const id = generateId();
   assertUnlocked({ id, issue_date: input.day, invoice_number: `Rider ${rider.name}` }, 'create');
   const lines = settlementLines(expected, counted, riderCashLedger(), input.differenceAccountId);
-  const v = saveVoucher({ type: 'JOURNAL', date: input.day, narration: `Cash settled by rider ${rider.name}: expected ₹${expected}, counted ₹${counted} — verify with your CA`, lines, voucher_class: 'Rider settlement' });
+  const v = saveVoucher({ type: 'JOURNAL', date: input.day, narration: `Cash settled by rider ${rider.name}: expected ₹${expected}, counted ₹${counted} — verify with your CA`, lines, voucher_class: RIDER_SETTLEMENT_CLASS });
   const returned = deliveryRows(localDb.invoices.getAll()).filter((r) => r.delivery.rider_id === rider.id && r.delivery.status === 'returned' && (r.delivery.done_on ?? '') <= input.day).map((r) => r.invoice.id);
   const row: RiderSettlement = {
     id, date: input.day, rider_id: rider.id, rider_name: rider.name, payment_ids: open.map((p) => p.id), expected, counted,
@@ -198,6 +199,25 @@ export function settleRider(input: { riderId: string; day: string; counted: numb
   };
   setTable(SETTLEMENTS_TABLE, [...all, row]);
   return row;
+}
+
+/** The journal class of a rider settlement (owned by `rider_settlements`: Books refuses to delete it on its own). */
+export const RIDER_SETTLEMENT_CLASS = 'Rider settlement';
+
+/**
+ * QA10 R17: undo a settlement — the row and its journal go together (recycle bin; restored together), so the rider holds
+ * the COD cash again. Refused inside a locked period (the journal's own delete check).
+ */
+export function undoSettlement(id: string): void {
+  requireAccess('payment.record');
+  const all = loadSettlements();
+  const row = all.find((s) => s.id === id);
+  if (!row) return;
+  assertUnlocked({ id, issue_date: row.date, invoice_number: row.voucher_number ?? '' }, 'delete');
+  withTablesRollback([SETTLEMENTS_TABLE, 'vouchers', 'transactions', 'invoices'], () => {
+    setTable(SETTLEMENTS_TABLE, all.filter((s) => s.id !== id)); // first: the journal is then no longer owned
+    if (row.voucher_id) deleteVoucher(row.voucher_id);
+  });
 }
 
 /** Cash with riders now (live data), for the Z report line. */

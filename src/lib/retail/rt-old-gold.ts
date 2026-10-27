@@ -14,8 +14,6 @@
 import type { PurchaseRecord, Vendor } from '../../types/purchases';
 import type { Metal, OldMetal } from '../../types/retail-r9';
 import type { Payment } from '../../types/invoice';
-import { PAN_SALE_LIMIT_RULES } from '../retail-rules';
-import { ruleAt } from '../tax-rules';
 import { num, round2 } from '../invoice-calc';
 import { blankStockItem, stockDb } from '../inventory';
 import { vendorsDb } from '../vendors';
@@ -24,6 +22,8 @@ import { isVoidStatus, readPurchase } from '../purchase-normalize';
 import { generateId } from '../storage';
 import { nextUrdNumber, recordUrd } from './rt-urd';
 import { exchangedFrom, usedGodown } from './rt-buyback'; // RT-D3: the shared 'used' godown and exchange receipts
+import { urdLeft } from './rt-doc-hooks';
+import { panNeeded as overPanLimit } from './rt-cash-guard';
 import { netWeight } from './rt-jewel-line';
 import { r3 } from './rt-jewel-rates';
 
@@ -63,7 +63,7 @@ export function recordOldGold(input: OldGoldInput): PurchaseRecord {
   const v = oldGoldValue({ gross: input.gross, stone: input.stone, purity_pct: input.purity_pct, melt_pct: input.melt_pct, rate: input.rate, basis: input.basis });
   if (!input.customer.name.trim()) throw new Error('Type the customer\'s name.');
   if (!(v.fine > 0) || !(v.value > 0)) throw new Error('Enter the weight, touch % and the buy rate.');
-  const panNeeded = v.value >= ruleAt(PAN_SALE_LIMIT_RULES, input.date);
+  const panNeeded = overPanLimit(v.value, input.date); // QA10 R14: "exceeding" the limit, as on a sale (one rule)
   const c = input.customer;
   if (panNeeded && !/^[A-Z]{5}\d{4}[A-Z]$/.test(String(c.pan ?? '').toUpperCase()) && !c.form) throw new Error('This voucher reaches the PAN limit: take the customer\'s PAN or a Form 60 declaration (Rule 114B) — verify with your CA.');
   const vendor = customerVendor(c);
@@ -80,7 +80,7 @@ export function recordOldGold(input: OldGoldInput): PurchaseRecord {
   const bill = purchasesDb.save({
     kind: 'PURCHASE', vendor_id: vendor.id, vendor_name: vendor.name, bill_number: number, date: input.date, category: 'Old gold purchase (URD)',
     lines: [{ id: generateId(), name, hsn: item.hsn, unit: 'GMS', item_id: item.id, godown_id: used, quantity: v.fine, rate: Number((v.value / v.fine).toFixed(6)), tax_rate: 0 }],
-    taxable: v.value, cgst: 0, sgst: 0, igst: 0, total: v.value, amount_paid: 0, itc_eligible: false, old_metal: old,
+    taxable: v.value, cgst: 0, sgst: 0, igst: 0, total: v.value, amount_paid: 0, exchange_paid: 0, itc_eligible: false, old_metal: old,
     notes: `Purchase voucher for old ${input.metal} from an unregistered person — no GST / ITC / RCM (RT17). Verify with your CA.`,
   });
   recordUrd(number);
@@ -96,7 +96,7 @@ export function cashPaidToday(vendorId: string | undefined, date: string): numbe
 /** Old-gold vouchers (newest first) with what was settled by exchange and what is still owed. Reads the real bill shape. */
 export function oldGoldVouchers(purchases: readonly PurchaseRecord[], payments: readonly Payment[]): (PurchaseRecord & { exchanged: number; open: number })[] {
   return purchases.filter((p) => p?.old_metal && readPurchase(p) && !isVoidStatus(p.status))
-    .map((p) => ({ ...p, exchanged: exchangedFrom(p.id, payments), open: round2(num(p.total) - num(p.amount_paid)) }))
+    .map((p) => ({ ...p, exchanged: exchangedFrom(p.id, payments), open: urdLeft(p, payments) }))
     .sort((a, b) => b.date.localeCompare(a.date) || b.bill_number.localeCompare(a.bill_number));
 }
 
