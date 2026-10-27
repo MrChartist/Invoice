@@ -19,6 +19,9 @@ import { AGRI_PROFILES, applyAgriKind, isAgriKind, type AgriKindId } from '../..
 import { MfgKindPicker, type UdyamValue } from '../mfg/MfgKindPicker'; // R13 (MF-A1)
 import { mfPickT } from '../../i18n/areas/mfg-r13a-pick';
 import { MFG_PROFILES, applyMfgKind, isMfgKind, type MfgKindId } from '../../lib/shop-presets';
+import { PROF_PROFILES, applyProfKind, isProfKind, type ProfKindId } from '../../lib/shop-presets'; // R14 (PS-A1)
+import { ProfKindPicker } from '../prof/ProfKindPicker';
+import type { ProfIds } from '../../lib/prof/ps-profile';
 import { normalizeUdyam, validateUdyam } from '../../lib/msme';
 import { activePacks } from '../../lib/industry-packs';
 import { svPickT } from '../../i18n/areas/services-r10-pick';
@@ -71,6 +74,16 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
   const pickService = (k: ServiceKindId | '') => {
     setSvKind(k);
     if (k) setA((prev) => ({ ...prev, templateId: SERVICE_PROFILES[k].templateId }));
+  };
+  // R14 (PS-A1): the professional's kind under Services → Professional (business type stays `services`).
+  const [pfKind, setPfKind] = useState<ProfKindId | ''>(() => (isProfKind(localDb.settings.get().prof_kind) ? (localDb.settings.get().prof_kind as ProfKindId) : ''));
+  const [pfSub, setPfSub] = useState<string>(() => localDb.settings.get().prof_sub ?? '');
+  const [pfForm, setPfForm] = useState('proprietorship');
+  const [pfIds, setPfIds] = useState<ProfIds>({});
+  const pickProf = (k: ProfKindId | '') => {
+    setPfKind(k);
+    const t = k ? PROF_PROFILES[k].templateId : undefined;
+    if (t) setA((prev) => ({ ...prev, templateId: t }));
   };
   // R12 (AG-A1): the "Farm, dairy & food processing" card is not a business type: its kind writes one (or none).
   const [agOn, setAgOn] = useState(() => isAgriKind(localDb.settings.get().agri_kind));
@@ -137,12 +150,14 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
       const retail = !agri && !mfg && business === 'kirana' && retailKind ? retailKind : null; // R9 (RT-A1)
       const cons = !agri && !mfg && business === 'contractor' && cnKind ? cnKind : null; // R11 (CN-A1)
       const svc = !agri && !mfg && business === 'services' && svKind ? svKind : null; // R10 (SV-A1)
+      const prof = svc === 'professional' && pfKind ? pfKind : null; // R14 (PS-A1)
       const saved = {
         ...applyBusinessDefaults(applyAnswers(localDb.settings.get(), a), business),
         ...(trade ? { ...applyTradeKind(trade), defaultDueDays: TRADE_PROFILES[trade].defaultDueDays } : {}),
         ...(retail ? { ...applyRetailKind(retail, { registered: a.gstRegistered }), defaultDueDays: RETAIL_PROFILES[retail].defaultDueDays } : {}),
         ...(cons ? { ...applyConstructionKind(cons, { registered: a.gstRegistered }), defaultDueDays: CONSTRUCTION_PROFILES[cons].defaultDueDays } : {}),
         ...(svc ? { ...applyServiceKind(svc, { registered: a.gstRegistered, pharmacy: svPharmacy }), defaultDueDays: SERVICE_PROFILES[svc].defaultDueDays } : {}),
+        ...(prof ? { ...applyProfKind(prof, { registered: a.gstRegistered, sub: pfSub, firmForm: pfForm, currentPacks: activePacks(localDb.settings.get()) }), defaultDueDays: PROF_PROFILES[prof].defaultDueDays } : {}),
         ...(agri ? { ...applyAgriKind(agri, { registered: a.gstRegistered, mill_kind: agMill, currentPacks: activePacks(localDb.settings.get()) }), ...(AGRI_PROFILES[agri].defaultDueDays !== undefined ? { defaultDueDays: AGRI_PROFILES[agri].defaultDueDays } : {}) } : {}),
         ...(mfg ? { ...applyMfgKind(mfg, { registered: a.gstRegistered, sub: mfSub, currentPacks: activePacks(localDb.settings.get()) }), ...(MFG_PROFILES[mfg].defaultDueDays !== undefined ? { defaultDueDays: MFG_PROFILES[mfg].defaultDueDays } : {}) } : {}),
       };
@@ -152,11 +167,12 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
       if (mfg) void import('../../lib/mfg/mf-profile').then((m) => m.applyMfgSwitches(mfg, mfSub || undefined)).catch(() => undefined);
       if (agri) void import('../../lib/agri/ag-profile').then((m) => m.applyAgriSwitches(agri)).catch(() => undefined);
       if (svc) void import('../../lib/services/sv-profile').then((m) => m.applyServiceSwitches(svc)).catch(() => undefined);
+      if (prof) void import('../../lib/prof/ps-profile').then((m) => { m.applyProfSwitches(prof, pfSub || undefined, pfIds); return m.writeFirmForm(pfForm as 'proprietorship'); }).catch(() => undefined);
       if (cons) void import('../../lib/construction/cn-profile').then((m) => m.applyConstructionSwitches(cons, { government: cnGov })).catch(() => undefined);
       if (retail) void import('../../lib/retail/rt-profile').then((m) => m.applyRetailSwitches(retail)).catch(() => undefined);
       window.dispatchEvent(new Event(SHOP_MODE_EVENT));
       localDb.template.set(a.templateId);
-      onClose(mfg ? MFG_PROFILES[mfg].landing : agri ? AGRI_PROFILES[agri].landing : trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : svc ? SERVICE_PROFILES[svc].landing : BUSINESS_DEFAULTS[business].landing);
+      onClose(mfg ? MFG_PROFILES[mfg].landing : agri ? AGRI_PROFILES[agri].landing : trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : prof ? PROF_PROFILES[prof].landing : svc ? SERVICE_PROFILES[svc].landing : BUSINESS_DEFAULTS[business].landing);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -308,6 +324,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
                 <span className={controls.label}>{svPickT('title')}</span>
                 <span className={controls.hint}>{svPickT('lede')}</span>
                 <ServiceKindPicker value={svKind} onPick={pickService} pharmacy={svPharmacy} onPharmacy={setSvPharmacy} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
+                {svKind === 'professional' && <ProfKindPicker value={pfKind} onPick={pickProf} sub={pfSub} onSub={setPfSub} form={pfForm} onForm={setPfForm} ids={pfIds} onIds={setPfIds} gridClass={styles.shopGrid} cardClass={styles.shopCard} />}
               </div>
             )}
             {/* QA-3 F20: the demo choice belongs on the first step, before any required field. */}

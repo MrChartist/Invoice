@@ -106,6 +106,7 @@ export const discoverT = defineArea(
     'adv.serviceProfile': 'Service profile', // R10 (SV-A1)
     'adv.agriProfile': 'Agriculture profile', // R12 (AG-A1)
     'adv.mfgProfile': 'Manufacturing profile', // R13 (MF-A1)
+    'adv.profProfile': 'Professional profile', // R14 (PS-A1)
     'awho.batches': 'Lots with expiry (set per stock item)',
     'awho.serials': 'Goods sold by serial / IMEI (per item)',
     'awho.godowns': 'Stock in more than one place',
@@ -131,6 +132,7 @@ export const discoverT = defineArea(
     'awho.serviceProfile': 'Clinics, labs, salons, gyms, coaching, workshops — appointments, staff commission, service tax classes',
     'awho.agriProfile': 'FPOs, co-operatives, dairies, mills, cold storages, input dealers, farms — farmers, produce vouchers, payment cycles',
     'awho.mfgProfile': 'Job shops, garment units, moulders, presses, food units — work centres, routings, job cards, capacity',
+    'awho.profProfile': 'CA firms, advocates, architects, consultants, agencies, freelancers — matters, pre-bill, WIP, realisation',
   } as const,
   {
     learnMore: 'और जानें',
@@ -233,6 +235,7 @@ export const discoverT = defineArea(
     'adv.serviceProfile': 'सेवा प्रोफ़ाइल',
     'adv.agriProfile': 'कृषि प्रोफ़ाइल',
     'adv.mfgProfile': 'मैन्युफैक्चरिंग प्रोफ़ाइल',
+    'adv.profProfile': 'पेशेवर प्रोफ़ाइल',
     'awho.batches': 'एक्सपायरी वाले लॉट (हर स्टॉक आइटम पर)',
     'awho.serials': 'सीरियल / IMEI से बिक्री (हर आइटम पर)',
     'awho.godowns': 'एक से ज़्यादा जगह स्टॉक',
@@ -258,5 +261,6 @@ export const discoverT = defineArea(
     'awho.serviceProfile': 'क्लिनिक, लैब, सैलून, जिम, कोचिंग, वर्कशॉप — अपॉइंटमेंट, स्टाफ कमीशन, सेवा कर वर्ग',
     'awho.agriProfile': 'FPO, सहकारी, डेयरी, मिल, शीतगृह, खाद-बीज विक्रेता, फ़ार्म — किसान, उपज वाउचर, भुगतान चक्र',
     'awho.mfgProfile': 'जॉब शॉप, गारमेंट इकाई, मोल्डर, प्रेस, खाद्य इकाई — कार्य केंद्र, रूटिंग, जॉब कार्ड, क्षमता',
+    'awho.profProfile': 'CA फ़र्म, वकील, आर्किटेक्ट, कंसल्टेंट, एजेंसी, फ़्रीलांसर — मामले, प्री-बिल, अबिल्ड कार्य, वसूली दर',
   },
 );

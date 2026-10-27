@@ -4,7 +4,7 @@ import type { Client } from '../../types/invoice';
 import type { TimePrefs } from '../../types/time';
 import { loadCostCentres, type CostCentre } from '../../lib/cost-centres';
 import { loadTasks, type ProjectTask } from '../../lib/projects';
-import { loadWorkTypes, resolveEntryRate, type RateData, type RateSource, type RateSubject, type WorkType } from '../../lib/rate-cards';
+import { loadWorkTypes, resolveEntryRate, type RateData, type RateOpts, type RateSource, type RateSubject, type WorkType } from '../../lib/rate-cards';
 
 export interface RateMasters {
   tasks: ProjectTask[];
@@ -18,8 +18,8 @@ export function useRateMasters(): RateMasters {
   return m;
 }
 
-export function rateFor(subject: RateSubject, masters: RateMasters, clients: readonly Client[], prefs: TimePrefs): { rate: number; source: RateSource } {
+export function rateFor(subject: RateSubject, masters: RateMasters, clients: readonly Client[], prefs: TimePrefs, opts?: RateOpts): { rate: number; source: RateSource } {
   const data: RateData = { ...masters, clients, prefs };
-  return resolveEntryRate(subject, data);
+  return resolveEntryRate(subject, data, opts);
 }
 
