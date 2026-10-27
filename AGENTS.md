@@ -130,6 +130,20 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   (Aadhaar last 4 only) and `principal_kind: 'agriculturist'`; farmer set-offs reuse `exchange_purchase_id`, never a new
   no-cash marker; Rule 6DD(e) goes through `agri/ag-cash.ts`. Rule values in `src/lib/agri-rules.ts` (lazy only,
   `tests/ag-rules.test.ts`). Notes: `docs/features/agri-r12.md`.
+- Round 13 (manufacturing) company data: names in `src/lib/mfg/mf-shared.ts` (MF-A tables `work_centres`, `routings`,
+  `job_cards` (series `JCD`, one row per production order per operation with an `entries` array), object `mfg_settings`;
+  `FAI` / `PES` / `CUT` / `KPB` reserved for MF-B … D), all backed up and synced; settings `mfg_kind` / `mfg_sub` (a wizard
+  card, not a business type: `manufacturer`, `other` unchanged; packs `shopfloor` / `fabrication` / `garments` / `plastics` /
+  `press` / `foodmfg` in union with the company's packs — desk tabs on `/manufacturing` via `MFG_PACK_TABS`; `PACK_OF_TYPE` /
+  `PACK_ROUTES` unchanged). Rights and audit labels are registered at runtime by `src/lib/mfg/mf-registry.ts`: **every
+  module that writes a Round 13 table must `import './mf-registry'`** (`tests/mf-registry.test.ts`). Round 13 invoice
+  snapshots live under ONE record key `mf` (`R13_RECORD_KEYS`, spread into `R9_RECORD_KEYS`; no line key) — never add keys.
+  The Udyam line / MSE clause / FSSAI line print from the sender snapshot (`msme_category`, `udyam_print`, `fssai_no`).
+  Release copies the default routing onto the order (`ProductionOrder.mf.ops`, `mfg/mf-ops.ts`) only with `shopfloor`;
+  job-card scrap kg reaches stock once through `buildOutputVoucher`'s optional `{ scrapLines, conversion }` (without it
+  the journal is unchanged). Conversion absorption (MF-D5) is a dated setting, off by default; karigars are vendors,
+  piece-rate employees stay in payroll. Rule values in `src/lib/mfg-rules.ts` (lazy only, `tests/mf-rules.test.ts`).
+  Notes: `docs/features/mfg-r13.md`.
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 - Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,
