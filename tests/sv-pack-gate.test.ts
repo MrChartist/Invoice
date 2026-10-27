@@ -28,7 +28,7 @@ test('an existing services company: no desk tab listed', () => {
 
 test('hosts load Round 10 code lazily', () => {
   assert.match(src('pages/Time.tsx'), /const FrontDesk = lazy\(\(\) => import\('\.\.\/components\/services-r10\/FrontDesk'\)\);/);
-  assert.match(src('pages/Time.tsx'), /const R10Stub = lazy\(/);
+  for (const d of ['ClinicDesk', 'MembersDesk', 'WorkshopDesk']) assert.match(src('pages/Time.tsx'), new RegExp(`const ${d} = lazy\\(\\(\\) => import\\('\\.\\./components/services-r10/${d}'\\)\\)`), d); // every desk replaced R10Stub
   assert.match(src('components/creator/ItemsTable.tsx'), /const SvLineRow = lazy\(\(\) => import\('\.\.\/services-r10\/SvEditor'\)/);
   assert.match(src('components/creator/ItemsTable.tsx'), /\(svOn \|\| !!item\.sv\) && <Suspense/);
   assert.match(src('pages/Pos.tsx'), /const PosAppointment = lazy\(\(\) => import\('\.\.\/components\/services-r10\/PosAppointment'\)\);/);

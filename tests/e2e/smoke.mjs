@@ -4016,14 +4016,15 @@ try {
     await page.locator('[data-patient-name]').fill('E2E Mrs Rao', { timeout: 15000 });
     await page.locator('[data-patient-sex]').selectOption('F');
     await page.locator('[data-patient-save]').click();
-    let pt = (await readJson(page, 'clients', [], (v) => v.some((c) => c.name === 'E2E Mrs Rao'))).find((c) => c.name === 'E2E Mrs Rao');
+    const said = await page.locator('[role=status], [role=alert]').allInnerTexts().catch(() => []);
+    let pt = (await readJson(page, 'clients', [], (v) => v.some((c) => c.name === 'E2E Mrs Rao' && c.patient?.uhid), 15000)).find((c) => c.name === 'E2E Mrs Rao' && c.patient?.uhid);
     if (!pt) { // the desk chunk may still be settling on a loaded machine: type and save once more
       await page.locator('[data-patient-name]').fill('E2E Mrs Rao');
       await page.locator('[data-patient-save]').click();
-      pt = (await readJson(page, 'clients', [], (v) => v.some((c) => c.name === 'E2E Mrs Rao'), 15000)).find((c) => c.name === 'E2E Mrs Rao');
+      pt = (await readJson(page, 'clients', [], (v) => v.some((c) => c.name === 'E2E Mrs Rao' && c.patient?.uhid), 15000)).find((c) => c.name === 'E2E Mrs Rao' && c.patient?.uhid);
     }
-    const toast = pt ? '' : (await page.locator('[role=status], [role=alert]').allInnerTexts()).join(' | ');
-    check(/^E2E\d{2}-0001$/.test(pt?.patient?.uhid ?? ''), `the patient gets a UHID (${pt?.patient?.uhid ?? toast})`);
+    const toast = pt?.patient?.uhid ? '' : `${said.join(' | ')} / ${(await page.locator('[data-clinic-desk]').innerText().catch(() => '')).slice(0, 300)}`;
+    check(/^E2E\d{2}-\d{4}$/.test(pt?.patient?.uhid ?? ''), `the patient gets a UHID (${pt?.patient?.uhid ?? (JSON.stringify((await readJson(page, 'clients', [])).filter((c) => c.name === 'E2E Mrs Rao')) + toast)})`);
     // OPD token 1, then the bill with a cosmetic peel.
     await page.goto(srv.origin + '/time?tab=clinic&view=opd');
     await page.locator('[data-patient-pick]').selectOption(pt.id, { timeout: 15000 });

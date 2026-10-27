@@ -127,7 +127,7 @@ Measured on `d6c126b` (before SV-D's merge), `vite build`, gzip level 9:
 | Initial JS (first paint) | 189,145 B | 189,156 B | **+11 B** (the bell gate line) |
 | Total JS | 3,004,637 B | 3,034,648 B | **+30.0 kB** |
 
-After merging SV-D: first paint 189,131 B (184.7 kB), total 3,053,528 B (2,982.0 kB of the raised 3,200 kB).
+After merging SV-C and SV-D (`e6761a9`): first paint 189,144 B (184.7 kB), total 3,077,346 B (3,005.2 kB of the raised 3,200 kB).
 
 **Over the 12 kB share (+30 kB).** Breakdown (gz): clinic desk chunk 20.0 kB (seven views ≈ 10, en + hi strings ≈ 3.7,
 lab / report / referral / rate-list engines ≈ 6); patients + OPD + in-patient engines (shared with the bell) 5.4 kB; bell
