@@ -32,8 +32,14 @@ const r9T = defineArea(
   { 'r9.pharmacy': 'फ़ार्मेसी', 'r9.rx': 'दवा पर्ची', 'r9.doctors': 'डॉक्टर', 'r9.registers': 'H1 / X रजिस्टर', 'r9.refills': 'रीफ़िल याद', 'r9.prices': 'सीलिंग प्राइस और मार्जिन', 'r9.apparel': 'कपड़े', 'r9.matrix': 'साइज़ × रंग स्टॉक', 'r9.alterations': 'आल्टरेशन पर्ची', 'r9.bands': 'GST प्राइस बैंड', 'r9.devices': 'डिवाइस', 'r9.imei': 'IMEI खोज और जाँच', 'r9.finance': 'फ़ाइनेंस (EMI)', 'r9.buyback': 'बाय-बैक', 'r9.service': 'रिपेयर जॉब', 'r9.jewellery': 'ज्वेलरी', 'r9.rates': 'धातु रेट', 'r9.tags': 'ज्वेलरी टैग', 'r9.oldgold': 'पुराना सोना', 'r9.karigar': 'कारीगर खाता' },
 );
 
+// R11 rows (kept here so the palette does not load the construction areas).
+const r11T = defineArea(
+  { 'r11.ra': 'RA bills (running account)', 'r11.contracts': 'Contracts', 'r11.advances': 'Advances (mobilisation, secured)', 'r11.escalation': 'Price variation / escalation', 'r11.guarantees': 'Bank guarantees', 'r11.subcon': 'Sub-contracts', 'r11.labour': 'Labour & muster', 'r11.plant': 'Plant & equipment', 'r11.reco': 'Material reconciliation', 'r11.pnl': 'Site P&L', 'r11.realty': 'Realty (builder desk)' } as const,
+  { 'r11.ra': 'रनिंग बिल', 'r11.contracts': 'अनुबंध', 'r11.advances': 'अग्रिम (मोबिलाइज़ेशन, सिक्योर्ड)', 'r11.escalation': 'मूल्य परिवर्तन', 'r11.guarantees': 'बैंक गारंटी', 'r11.subcon': 'उप-ठेके', 'r11.labour': 'श्रम और मस्टर रोल', 'r11.plant': 'मशीनरी', 'r11.reco': 'सामग्री मिलान', 'r11.pnl': 'साइट लाभ-हानि', 'r11.realty': 'रियल्टी (बिल्डर डेस्क)' },
+);
+
 /** A row's label: a key of this package's area, else (B / C rows until they resolve their own) the key text. */
-const label = (key: string, pack?: string): string => (pack === 'hotel' && Object.hasOwn(hT.en, key) ? hT(key as keyof typeof hT.en) : Object.hasOwn(mT.en, key) ? mT(key as keyof typeof mT.en) : Object.hasOwn(twT.en, key) ? twT(key as keyof typeof twT.en) : Object.hasOwn(cT.en, key) ? cT(key as keyof typeof cT.en) : Object.hasOwn(r8T.en, key) ? r8T(key as keyof typeof r8T.en) : Object.hasOwn(r9T.en, key) ? r9T(key as keyof typeof r9T.en) : key);
+const label = (key: string, pack?: string): string => (pack === 'hotel' && Object.hasOwn(hT.en, key) ? hT(key as keyof typeof hT.en) : Object.hasOwn(mT.en, key) ? mT(key as keyof typeof mT.en) : Object.hasOwn(twT.en, key) ? twT(key as keyof typeof twT.en) : Object.hasOwn(cT.en, key) ? cT(key as keyof typeof cT.en) : Object.hasOwn(r8T.en, key) ? r8T(key as keyof typeof r8T.en) : Object.hasOwn(r9T.en, key) ? r9T(key as keyof typeof r9T.en) : Object.hasOwn(r11T.en, key) ? r11T(key as keyof typeof r11T.en) : key);
 
 export function packDestinations(): StaticEntry[] {
   const on = activePacks(localDb.settings.get());

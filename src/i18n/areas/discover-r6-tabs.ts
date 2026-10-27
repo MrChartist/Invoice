@@ -179,6 +179,7 @@ export const tabsT = defineArea(
     'receivables.interest': 'Interest on overdue bills',
     // R9: retail tabs (pack desks are also "Industry packs" rows)
     'receivables.deliveries': 'Home deliveries & rider cash',
+    'receivables.realty': 'Realty: projects, units, bookings, demands, RERA', // R11
     'inventory.shortbook': 'Short book (asked, not in stock)',
     'inventory.pharmacy': 'Pharmacy: prescriptions, doctors, registers',
     'inventory.apparel': 'Apparel: size grid, alterations, price bands',
@@ -373,6 +374,7 @@ export const tabsT = defineArea(
     'inventory.hsn': 'HSN अनुसार स्टॉक',
     'receivables.interest': 'बकाया बिलों पर ब्याज',
     'receivables.deliveries': 'होम डिलीवरी और राइडर कैश',
+    'receivables.realty': 'रियल्टी: प्रोजेक्ट, यूनिट, बुकिंग, माँग पत्र, रेरा',
     'inventory.shortbook': 'शॉर्ट बुक (माँगा, स्टॉक में नहीं)',
     'inventory.pharmacy': 'फ़ार्मेसी: दवा पर्ची, डॉक्टर, रजिस्टर',
     'inventory.apparel': 'कपड़े: साइज़ ग्रिड, आल्टरेशन, प्राइस बैंड',

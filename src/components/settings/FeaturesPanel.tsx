@@ -7,7 +7,10 @@ import { PACK_IDS, activePacks, type PackId } from '../../lib/industry-packs';
 import { FEATURE_ROWS, featureState, type FeatureRow, type FeatureSection } from '../../lib/features-catalog';
 import { featureText } from './feature-text';
 import { TradeKindPicker } from '../trade/TradeKindPicker'; // R8-C (TR-C5)
-import { applyRetailKind, applyTradeKind } from '../../lib/shop-presets';
+import { applyConstructionKind, applyRetailKind, applyTradeKind } from '../../lib/shop-presets';
+import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
+import { DB_PREFIX, getJson } from '../../lib/storage';
+import { cnPickT } from '../../i18n/areas/construction-r11-pick';
 import { RetailKindPicker } from '../retail-r9/RetailKindPicker';
 import { pickT } from '../../i18n/areas/retail-r9-pick'; // R9 (RT-A1)
 import { trT } from '../../i18n/areas/trade-r8c';
@@ -40,6 +43,7 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
   const [params] = useSearchParams();
   const [q, setQ] = useState(() => params.get('q') ?? ''); // Ctrl+K opens the tab filtered to one row
   const [tick, setTick] = useState(0);
+  const [cnGov, setCnGov] = useState(() => getJson<{ government?: boolean } | null>(`${DB_PREFIX}construction_settings`, null)?.government === true); // R11
   const [busy, setBusy] = useState('');
 
   const modulesOn = useMemo(() => new Set<ModuleId>(Array.isArray(settings.modules) ? settings.modules : ALL_MODULES), [settings.modules]);
@@ -113,6 +117,29 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
                 onChange(applyRetailKind(k, { registered }));
                 // The profile's switches (retail checks; pharma for a medical store) apply at once — they only turn checks on.
                 void import('../../lib/retail/rt-profile').then((m) => m.applyRetailSwitches(k)).catch(() => undefined);
+              }}
+            />
+          </div>
+        )}
+        {settings.business_type === 'contractor' && (
+          <div className={controls.field} data-features-construction>
+            <span className={controls.label}>{cnPickT('title')}</span>
+            <ConstructionKindPicker
+              value={settings.construction_kind}
+              custom
+              disabled={!owner}
+              government={cnGov}
+              onGovernment={(on) => {
+                setCnGov(on);
+                const k = settings.construction_kind;
+                if (on && k) void import('../../lib/construction/cn-profile').then((m) => m.applyConstructionSwitches(k, { government: true })).catch(() => undefined);
+              }}
+              onPick={(k) => {
+                if (!k) return onChange({ construction_kind: undefined });
+                const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
+                onChange(applyConstructionKind(k, { registered }));
+                // The profile's switches only add Works views and paper options; changing the profile deletes nothing.
+                void import('../../lib/construction/cn-profile').then((m) => m.applyConstructionSwitches(k, { government: cnGov })).catch(() => undefined);
               }}
             />
           </div>

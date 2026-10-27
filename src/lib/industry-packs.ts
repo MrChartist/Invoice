@@ -147,7 +147,8 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'jewellery', path: '/inventory?tab=jewellery&view=oldgold', labelKey: 'r9.oldgold' },
   { pack: 'jewellery', path: '/inventory?tab=jewellery&view=karigar', labelKey: 'r9.karigar' },
   // R11: construction — Works views on /time (pack `works`) and the builder desk on /receivables (pack `realty`);
-  // labels `r11.*` in `palette-destinations.ts`
+  // labels `r11.*` in `palette-destinations.ts`; CN-C adds the realty desk's views with its screens
+  { pack: 'works', path: '/time?tab=works&view=ra', labelKey: 'r11.ra' },
   { pack: 'works', path: '/time?tab=works&view=contracts', labelKey: 'r11.contracts' },
   { pack: 'works', path: '/time?tab=works&view=advances', labelKey: 'r11.advances' },
   { pack: 'works', path: '/time?tab=works&view=escalation', labelKey: 'r11.escalation' },
@@ -158,14 +159,6 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'works', path: '/time?tab=works&view=reco', labelKey: 'r11.reco' },
   { pack: 'works', path: '/time?tab=works&view=pnl', labelKey: 'r11.pnl' },
   { pack: 'realty', path: '/receivables?tab=realty', labelKey: 'r11.realty' },
-  { pack: 'realty', path: '/receivables?tab=realty&view=projects', labelKey: 'r11.projects' },
-  { pack: 'realty', path: '/receivables?tab=realty&view=units', labelKey: 'r11.units' },
-  { pack: 'realty', path: '/receivables?tab=realty&view=bookings', labelKey: 'r11.bookings' },
-  { pack: 'realty', path: '/receivables?tab=realty&view=plans', labelKey: 'r11.plans' },
-  { pack: 'realty', path: '/receivables?tab=realty&view=demands', labelKey: 'r11.demands' },
-  { pack: 'realty', path: '/receivables?tab=realty&view=rera', labelKey: 'r11.rera' },
-  { pack: 'realty', path: '/receivables?tab=realty&view=cancellations', labelKey: 'r11.cancellations' },
-  { pack: 'realty', path: '/receivables?tab=realty&view=procurement', labelKey: 'r11.procurement' },
 ];
 
 /**

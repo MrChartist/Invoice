@@ -14,8 +14,12 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../transport/transport.module.css';
 import own from './works.module.css';
+import { cnT } from '../../i18n/areas/construction-r11a'; // R11 (CN-A3 / A4)
+import { deviationWarnings } from '../../lib/construction/cn-abstract';
+import { deviationPct } from '../../lib/construction/cn-snapshot';
+import { readConstructionSettings } from '../../lib/construction/cn-settings';
 
-type Cell = { cum: string; mb: string; extra: string };
+type Cell = { cum: string; mb: string; extra: string; kind?: '' | 'extra' | 'substituted'; approval?: string; subs?: string };
 
 export function MeasurementForm({ boq, notify, refresh, tick }: PanelProps & { boq: InvoiceRecord }) {
   const invoices = useMemo(() => localDb.invoices.getAll(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -25,12 +29,14 @@ export function MeasurementForm({ boq, notify, refresh, tick }: PanelProps & { b
   const [final, setFinal] = useState(false);
   const [draft, setDraft] = useState(false);
   const [cells, setCells] = useState<Record<string, Cell>>({});
+  const [period, setPeriod] = useState({ from: '', to: '', measured: '' }); // R11 (CN-A3)
+  const devPct = useMemo(() => deviationPct(boq, undefined, readConstructionSettings(), date), [boq, date]);
   const set = (id: string, p: Partial<Cell>) => setCells((c) => ({ ...c, [id]: { ...{ cum: '', mb: '', extra: '' }, ...c[id], ...p } }));
   const lines = boqLines(boq);
   const save = () => {
-    const input: MeasureInput[] = Object.entries(cells).filter(([, c]) => c.cum.trim() !== '').map(([line_id, c]) => ({ line_id, cumulative_qty: Number(c.cum), mb_ref: c.mb, extra_reason: c.extra }));
+    const input: MeasureInput[] = Object.entries(cells).filter(([, c]) => c.cum.trim() !== '').map(([line_id, c]) => ({ line_id, cumulative_qty: Number(c.cum), mb_ref: c.mb, extra_reason: c.extra, ...(c.kind ? { kind: c.kind, approval: c.approval, substitutes: c.subs } : {}) }));
     try {
-      const { invoice } = saveRaBill(boq.id, { date, lines: input, final, draft });
+      const { invoice } = saveRaBill(boq.id, { date, lines: input, final, draft, period_from: period.from || undefined, period_to: period.to || undefined, measured_on: period.measured || undefined });
       notify(twT('raSaved', { ra: invoice.ra_no ?? '', no: invoice.invoice_number, net: fmtMoney(invoice.ra_net_payable ?? invoice.total) }));
       setCells({});
       setFinal(false);
@@ -44,7 +50,7 @@ export function MeasurementForm({ boq, notify, refresh, tick }: PanelProps & { b
       <h4 className={styles.toolbar}><ClipboardList size={16} aria-hidden="true" /> {twT('newMeasurement', { ra: raNo })}</h4>
       <div className={surface.tableWrap}>
         <table className={surface.table}>
-          <thead><tr><th>{twT('itemNo')}</th><th>{twT('description')}</th><th className={surface.numeric}>{twT('boqQty')}</th><th className={surface.numeric}>{twT('prevQty')}</th><th>{twT('cumQty')}</th><th className={surface.numeric}>{twT('thisQty')}</th><th>{twT('mbRef')}</th><th>{twT('excessReason')}</th></tr></thead>
+          <thead><tr><th>{twT('itemNo')}</th><th>{twT('description')}</th><th className={surface.numeric}>{twT('boqQty')}</th><th className={surface.numeric}>{twT('prevQty')}</th><th>{twT('cumQty')}</th><th className={surface.numeric}>{twT('thisQty')}</th><th>{twT('mbRef')}</th><th>{twT('excessReason')}</th><th>{cnT('lineKind')}</th></tr></thead>
           <tbody>
             {lines.map((l) => {
               const c = cells[l.id];
@@ -58,11 +64,26 @@ export function MeasurementForm({ boq, notify, refresh, tick }: PanelProps & { b
                   <td className={`${surface.numeric} ${thisQty < 0 ? styles.bad : ''}`}>{thisQty || ''}</td>
                   <td><input className={`${controls.input} ${own.qty}`} value={c?.mb ?? ''} onChange={(e) => set(l.id, { mb: e.target.value })} aria-label={twT('mbRef')} /></td>
                   <td>{over && <input className={controls.input} value={c?.extra ?? ''} onChange={(e) => set(l.id, { extra: e.target.value })} aria-label={twT('excessReason')} />}</td>
+                  <td>
+                    <select className={controls.select} value={c?.kind ?? ''} onChange={(e) => set(l.id, { kind: e.target.value as Cell['kind'] })} aria-label={cnT('lineKind')} data-ra-kind={l.boq_ref || l.name}>
+                      <option value="">{cnT('kind.boq')}</option><option value="extra">{cnT('kind.extra')}</option><option value="substituted">{cnT('kind.substituted')}</option>
+                    </select>
+                    {c?.kind && <input className={controls.input} value={c.approval ?? ''} placeholder={cnT('approval')} onChange={(e) => set(l.id, { approval: e.target.value })} aria-label={cnT('approval')} />}
+                    {c?.kind === 'substituted' && <input className={controls.input} value={c.subs ?? ''} placeholder={cnT('substitutes')} onChange={(e) => set(l.id, { subs: e.target.value })} aria-label={cnT('substitutes')} />}
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+      </div>
+      {deviationWarnings(boq, Object.entries(cells).filter(([, c]) => c.cum.trim() !== '').map(([line_id, c]) => ({ line_id, cumulative_qty: Number(c.cum) })), devPct).map((w) => (
+        <p key={w.line_id} className={styles.warn} role="status" data-ra-deviation>{cnT('deviationWarn', { name: w.name, cum: w.cumulative, limit: w.limit, pct: w.pct })}</p>
+      ))}
+      <div className={styles.toolbar}>
+        <F l={cnT('periodFrom')}><input className={controls.input} type="date" value={period.from} onChange={(e) => setPeriod({ ...period, from: e.target.value })} /></F>
+        <F l={cnT('periodTo')}><input className={controls.input} type="date" value={period.to} onChange={(e) => setPeriod({ ...period, to: e.target.value })} /></F>
+        <F l={cnT('measuredOn')}><input className={controls.input} type="date" value={period.measured} onChange={(e) => setPeriod({ ...period, measured: e.target.value })} /></F>
       </div>
       <div className={styles.toolbar}>
         <F l={twT('date')}><input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></F>

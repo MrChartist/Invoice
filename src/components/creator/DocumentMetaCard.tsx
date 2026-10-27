@@ -25,6 +25,8 @@ import styles from '../../pages/InvoiceCreator.module.css';
 const BranchSelect = lazy(() => import('../branches/BranchSelect').then((m) => ({ default: m.BranchSelect })));
 // R2-A1: payment terms picker (loads the terms master and the collections strings on its own).
 const TermsPicker = lazy(() => import('../collections/TermsPicker'));
+// R11 (CN-A3): Contract & RA bill panel — only with the works pack on or a document carrying the construction snapshot.
+const ContractPanel = lazy(() => import('./ContractPanel'));
 
 const DOC_TYPES = Object.keys(DOCUMENT_LABELS) as DocumentType[];
 const DUE_PRESETS = [0, 7, 15, 30, 45];
@@ -38,8 +40,13 @@ interface Props {
 /** "1 · Document": type, number (with the GST Rule 46 uniqueness/gap check), dates, currency, status. */
 export function DocumentMetaCard({ editing, saveTick }: Props) {
   const { t } = useT();
+  // R11: the works pack (explicit list, else implied by the contractor business type) — inline, no pack module here.
+  const worksOn = useMemo(() => {
+    const st = localDb.settings.get();
+    return Array.isArray(st.industry_packs) ? st.industry_packs.includes('works') : st.business_type === 'contractor';
+  }, []);
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['balance_due', 'branch_id', 'cost_centre_id', 'currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'payment_terms', 'po_number', 'reverse_charge', 'sender', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
+    useShallow((st) => pick(st, ['balance_due', 'branch_id', 'cost_centre_id', 'currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'payment_terms', 'po_number', 'reverse_charge', 'sender', 'boq_terms', 'ra_no', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
   );
 
   const nextNumber = useMemo(
@@ -191,6 +198,7 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
         )}
         <ForexFields />
         <TransportFields />
+        {(s.boq_terms?.cn || s.ra_no || worksOn) && <Suspense fallback={null}><ContractPanel /></Suspense>}
       </div>
     </section>
   );

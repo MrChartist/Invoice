@@ -51,6 +51,7 @@ export const RECEIVABLES_TABS = [
   { id: 'donations', pack: 'nonprofit' }, // R5-C
   { id: 'interest' }, // R8-A (TR-A4)
   { id: 'deliveries' }, // R9 (RT-A3): home-delivery board and rider cash
+  { id: 'realty', pack: 'realty' }, // R11 (CN-A1): builders' desk (screens in CN-C)
 ] as const;
 export type ReceivablesTab = (typeof RECEIVABLES_TABS)[number]['id'];
 /* ── Reports ── */

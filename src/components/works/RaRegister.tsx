@@ -7,13 +7,25 @@ import { raRegister, registerCsvRows } from '../../lib/works/measurements';
 import { abstractCsvRows, abstractHtml, abstractRows } from '../../lib/works/ra-abstract';
 import { localDb } from '../../lib/localDb';
 import { peekTable } from '../../lib/storage';
-import { B, csvDownload, fmtMoney, printHtml, today, type PanelProps } from '../transport/shared';
+import { B, csvDownload, errText, fmtMoney, printHtml, today, type PanelProps } from '../transport/shared';
+import { recomputeDraftSnapshot } from '../../lib/construction/cn-snapshot';
+import { cnT } from '../../i18n/areas/construction-r11a';
 import surface from '../../styles/surface.module.css';
 import styles from '../transport/transport.module.css';
 
-export function RaRegister({ boq, tick }: PanelProps & { boq: InvoiceRecord }) {
+export function RaRegister({ boq, tick, notify, refresh }: PanelProps & { boq: InvoiceRecord }) {
   const invoices = useMemo(() => localDb.invoices.getAll(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const rows = useMemo(() => raRegister(boq.id, invoices, peekTable<Payment>('transactions')), [boq.id, invoices]);
+  // R11 (CN-A4): re-snapshot the abstract of a DRAFT RA bill (issued bills print as certified).
+  const recompute = (id: string) => {
+    try {
+      recomputeDraftSnapshot(id);
+      notify(cnT('recomputed'));
+      refresh();
+    } catch (e) {
+      notify(errText(e), 'error');
+    }
+  };
   const abstract = (id: string, kind: 'print' | 'csv') => {
     const bill = invoices.find((i) => i.id === id);
     if (!bill) return;
@@ -40,6 +52,7 @@ export function RaRegister({ boq, tick }: PanelProps & { boq: InvoiceRecord }) {
                 <td className={surface.rowActions}>
                   <button type="button" className={B.gs} onClick={() => abstract(r.invoiceId, 'print')}>{twT('abstract')}</button>
                   <button type="button" className={B.gs} onClick={() => abstract(r.invoiceId, 'csv')}>CSV</button>
+                  {invoices.find((i) => i.id === r.invoiceId)?.status === 'Draft' && <button type="button" className={B.gs} onClick={() => recompute(r.invoiceId)} data-ra-recompute>{cnT('recompute')}</button>}
                 </td>
               </tr>
             ))}

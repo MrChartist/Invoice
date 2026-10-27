@@ -136,6 +136,11 @@ export const GLOSSARY = {
     'ग्राहकों ने जो माँगा पर स्टॉक में नहीं था, उसकी सूची।', 'इन्वेंटरी → शॉर्ट बुक: काउंटर पर जोड़ें, ड्राफ़्ट परचेज़ ऑर्डर बनाएँ, आने पर ग्राहक को बताएँ।'),
   cod: g('Cash on delivery (COD)', 'The customer pays the delivery person when the order arrives.', 'Delivered COD orders record the cash as the rider\'s; the rider settlement moves it to counter cash.',
     'ऑर्डर पहुँचने पर ग्राहक डिलीवरी वाले को भुगतान करता है।', 'डिलीवर हुए COD ऑर्डर का कैश राइडर के नाम दर्ज होता है; राइडर का हिसाब उसे काउंटर कैश में लाता है।', ['RT6']),
+  // R11: construction terms (CN-A)
+  'm-book': g('Measurement book (M-book)', 'The register in which the engineer records measured quantities of work, page by page.', 'Type the MB ref (book / pages) per line when you measure an RA bill; it prints under the line and in the abstract.',
+    'वह रजिस्टर जिसमें अभियंता काम की मापी गई मात्रा पेज-दर-पेज दर्ज करता है।', 'रनिंग बिल मापते समय हर लाइन पर एम-बुक संदर्भ (बुक / पेज) लिखें; यह लाइन के नीचे और सार में छपता है।', ['CN12']),
+  'works-contract': g('Works contract', 'A contract to build, repair or fit out immovable property with transfer of property in goods (Sec 2(119)) — a composite supply of services.', 'Works bills print the works-contract declaration; place of supply is the site State (Sec 12(3)).',
+    'अचल संपत्ति के निर्माण, मरम्मत या फ़िट-आउट का अनुबंध जिसमें माल का स्वामित्व भी जाता है (धारा 2(119)) — सेवाओं की संयुक्त आपूर्ति।', 'वर्क्स बिल पर वर्क्स-कॉन्ट्रैक्ट घोषणा छपती है; आपूर्ति का स्थान कार्य स्थल का राज्य है (धारा 12(3))।', ['CN3', 'CN4']),
 } satisfies Readonly<Record<string, GlossaryTerm>>;
 
 export type GlossaryId = keyof typeof GLOSSARY;
