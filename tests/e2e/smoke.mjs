@@ -3388,6 +3388,85 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+
+  await step('R11-A RA bill paper: Contractor → Civil / EPC + government; a BOQ with its site in Karnataka; RA 1 with MB refs → the paper shows "Running Account Bill No. 1", the contract box, "Item 2.1 · MB 112/45-47", Net payable and the sign-off boxes, the abstract page; a plain invoice is unchanged; Ctrl+K "RA bill"; help', async () => {
+    const keys = ['settings', 'construction_settings', 'invoices', 'transactions', 'clients', 'doc_links', 'series_counters', 'ra_measurements', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'contractor', modules: undefined, industry_packs: undefined, construction_kind: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'construction_settings', null);
+    // CN-A1: the construction picker in Settings → Features.
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-construction-kind-card="civil"]').click({ timeout: 15000 });
+    await page.locator('[data-construction-government] input').check();
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.construction_kind === 'civil');
+    const cs = await readJson(page, 'construction_settings', {}, (v) => v?.ra_paper === 'pwd' && v?.signoff_boxes === true);
+    check(st.industry_packs?.includes('works') && cs.government === true && cs.views?.contracts === true, 'Civil + government: works pack, PWD paper, sign-off boxes, contract views switched on');
+    // A BOQ whose site is in another State (place of supply = site, Sec 12(3)) with typed contract particulars.
+    const dept = { id: 'e2e-cn-dept', name: 'E2E PWD Division 7', email: '', address: 'Mumbai', city: 'Mumbai', zip: '', state_code: '27', gst_tds_deductor: true };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), dept]);
+    const boq = {
+      id: 'e2e-cn-boq', invoice_number: 'SO/E2E/0011', doc_type: 'SALES_ORDER', issue_date: '2026-05-01', due_date: '2026-05-31', status: 'Sent', currency: 'INR', template_id: 'classic_orange',
+      client: dept, sender: (prev.settings?.profiles ?? [])[0] ?? null,
+      items: [
+        { id: 'e2e-cn-l1', name: 'Earthwork excavation', boq_ref: '2.1', type: 'Service', hsn: '995411', unit: 'CUM', quantity: 1000, rate: 250, tax_rate: 18, discount_percent: 0, amount: 250000 },
+        { id: 'e2e-cn-l2', name: 'PCC 1:4:8', boq_ref: '2.2', type: 'Service', hsn: '995411', unit: 'CUM', quantity: 200, rate: 4500, tax_rate: 18, discount_percent: 0, amount: 900000 },
+      ],
+      gst_mode: 'CGST_SGST', place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false,
+      amount_paid: 0, notes: '', terms: '', subtotal: 1150000, discount_amount: 0, taxable_value: 1150000, cgst_amount: 103500, sgst_amount: 103500, igst_amount: 0, tax_amount: 207000, round_off: 0, total: 1357000, balance_due: 1357000,
+      boq_terms: {
+        work_order: 'WO/E2E/7', deductions: [{ kind: 'retention', rate: 5 }, { kind: 'it_tds', section: '194C-2' }, { kind: 'gst_tds' }, { kind: 'labour_cess' }],
+        header: { name_of_work: 'E2E widening of SH-12', agreement_no: '12/EE/2026-27', engineer: 'Executive Engineer', site: { address: 'Km 4–9, Belagavi', state_code: '29' } },
+      },
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), boq]);
+    await page.goto(srv.origin + '/time?tab=works&view=ra&boq=e2e-cn-boq');
+    await page.locator('[data-ra-cum="2.1"]').fill('400', { timeout: 15000 });
+    await page.locator('[data-ra-cum="2.1"]').locator('xpath=../following-sibling::td[2]/input').fill('112/45-47');
+    await page.locator('[data-ra-save]').click();
+    const ra = (await readJson(page, 'invoices', [], (v) => v.some((d) => d.boq_id === 'e2e-cn-boq' && d.ra_no === 1))).find((d) => d.boq_id === 'e2e-cn-boq' && d.ra_no === 1);
+    check(ra.place_of_supply === '29' && ra.gst_mode === 'IGST' && ra.boq_terms?.cn?.paper === 'pwd', `place of supply = site State (Karnataka, IGST), PWD paper (${ra.place_of_supply} ${ra.gst_mode})`);
+    check((ra.boq_terms?.cn?.abstract ?? []).some((r) => r.mb === '112/45-47'), 'the abstract snapshot carries the MB ref');
+    await page.goto(srv.origin + '/invoice/' + ra.id);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.locator('[data-works-abstract]').first().waitFor({ timeout: 15000 });
+    const paper = await dialog.innerText();
+    check(/RUNNING ACCOUNT BILL NO\. 1/i.test(paper), 'the title reads "Running Account Bill No. 1"');
+    check(await dialog.locator('[data-works-header]').count() > 0 && paper.includes('E2E widening of SH-12') && paper.includes('12/EE/2026-27') && /Karnataka/.test(paper), 'the contract particulars box: name of work, agreement, site and its State');
+    check(paper.includes('Item 2.1 · MB 112/45-47'), 'the line sub-line shows the BOQ item no. and the M-book ref');
+    check(await dialog.locator('[data-net-payable]').count() > 0 && /Net payable/.test(paper) && /GST TDS u\/s 51/.test(paper), 'the deductions block runs down to Net payable with the GST TDS note');
+    check(await dialog.locator('[data-signoff="measuredBy"]').count() > 0 && /Passed for payment/.test(paper), 'the measured / checked / passed boxes print');
+    check(/Abstract of cost/i.test(paper) && /A\. BOQ items/i.test(paper), 'page 2 is the abstract of cost');
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+    // A plain invoice prints no construction part.
+    const plain = (prev.invoices ?? []).find((i) => i.doc_type === 'TAX_INVOICE' && !i.ra_no && !i.boq_terms);
+    if (plain) {
+      await page.goto(srv.origin + '/invoice/' + plain.id);
+      await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+      const d2 = page.getByRole('dialog', { name: 'Document preview' });
+      await d2.waitFor();
+      check(await d2.locator('[data-works-header], [data-works-deductions], [data-works-abstract], [data-works-line]').count() === 0, 'a plain invoice prints unchanged (no construction part)');
+      await page.keyboard.press('Escape');
+      await d2.waitFor({ state: 'detached' });
+    }
+    await page.goto(srv.origin + '/time?tab=works');
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('RA bill');
+    await palette.getByRole('option', { name: /RA bills/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "RA bill" finds Time → Works → RA bills');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/time?tab=works&view=ra');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help="time:works:ra"]').waitFor({ timeout: 15000 });
+    check(true, 'Help opens on the RA bills topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {
