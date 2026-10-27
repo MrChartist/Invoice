@@ -1015,3 +1015,15 @@ test('R12 (AG-D4 / AG-D5) principal-certificate check and patronage register rea
   const p = patronage(2026, { members: [member], cycles: [], purchases: [urea, { ...urea, id: 'v', status: 'void' } as never], invoices: [], farmerIds: new Set(['v-iffco']) });
   assert.deepEqual([p.rows[0].suppliedQty, p.rows[0].suppliedValue], [100, 1000], 'taxable value, void skipped');
 });
+
+// R13 (MF-C4 / C5): the karigar ledger and the Rule 89(5) working paper read bills through `readPurchase` /
+// `readPurchaseLines` (vendor id from the row, void skipped, TDS on the bill, lines by HSN / rate).
+test('R13 (MF-C4 / MF-C5) karigar ledger and inverted-duty inputs read the real bill shape', async () => {
+  const { karigarBalance } = await import('../src/lib/mfg/mf-karigar.ts');
+  const { inwardLines } = await import('../src/lib/mfg/mf-inverted.ts');
+  const kb = { ...bill, vendor_id: 'k1', tds_section: '194C-1', tds_amount: 10, tds_on: 'BILL' as const };
+  const b = karigarBalance({ id: 'k1', name: 'Acme Supplies' }, [kb, { ...kb, id: 'v', status: 'void' }, { ...bill, vendor_id: 'other' }], []);
+  assert.deepEqual([b.billed, b.tds, b.payable], [1180, 10, 1170]);
+  const lines = inwardLines([bill, { ...bill, id: 'v', status: 'void' }, { ...bill, id: 'n', itc_eligible: false }], '2026-04-01', '2026-04-30');
+  assert.deepEqual(lines.map((l) => [l.doc, l.rate, l.taxable, l.tax, !!l.service]), [['AS/22', 18, 1000, 180, false]]);
+});

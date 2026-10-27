@@ -15,6 +15,13 @@ import { isRevenueDoc } from '../stats';
 import { isNonGstFinancialNote } from '../financial-note';
 import { ruleAt } from '../tax-rules';
 import { RULE_89_5_RULES } from './mf-c-pending';
+import { saveRefund, type GstRefundClaim } from '../gst-cash-refunds';
+
+/** Pre-fill a DRAFT refund claim (category `INVERTED_DUTY`) in the existing register; split CGST / SGST — edit the heads there. */
+export function prefillInvertedClaim(x: { from: string; to: string; refund: number; gstin?: string; notes?: string }): GstRefundClaim {
+  const half = round2(num(x.refund) / 2);
+  return saveRefund({ category: 'INVERTED_DUTY', period_from: x.from, period_to: x.to, relevant_date: x.to, ...(x.gstin ? { gstin: x.gstin } : {}), claimed: { igst: 0, cgst: half, sgst: round2(num(x.refund) - half), cess: 0 }, notes: `${x.notes ?? 'Rule 89(5) working paper'} — split by head as your credit ledger allows. Verify with your CA (MF26).` });
+}
 
 export interface IdLine {
   /** Document id (exclusion is by document). */

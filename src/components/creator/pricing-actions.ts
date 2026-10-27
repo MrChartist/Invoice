@@ -126,7 +126,10 @@ function scopeCtx(ctx: EditorPricing): ScopeCtx {
  */
 function markBand(lineId: string, source: Partial<InvoiceItem>): void {
   const st = useInvoiceStore.getState();
-  const kind = pricedDoc() ? source.gst_band ?? peekTable<StockItem>(TABLES.items).find((s) => s.name === source.name)?.gst_band : undefined;
+  const stock = pricedDoc() && !source.gst_band ? peekTable<StockItem>(TABLES.items).find((s) => s.name === source.name) : undefined;
+  // MF-C5: a textile `mf_class` garment / made-up turns the band on, even without the apparel pack.
+  const cls = (stock as { mf_class?: string } | undefined)?.mf_class;
+  const kind = pricedDoc() ? source.gst_band ?? stock?.gst_band ?? (cls === 'garment' ? 'apparel' : cls === 'made_up' ? 'made_ups' : undefined) : undefined;
   if (kind || st.items.find((i) => i.id === lineId)?.band_rate) st.patchItem(lineId, { band_rate: kind ? { kind, value_per_piece: 0 } : undefined });
 }
 

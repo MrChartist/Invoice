@@ -76,6 +76,11 @@ export function cmtInDraft(out: MaterialOut, lineId: string, p: CutPlan, parent:
     rejected += j;
     if (g) bySize.set(b.size, (bySize.get(b.size) ?? 0) + g);
   }
+  const got = new Set(receipts.map((r) => bundleId(p.number, r.no)));
+  for (const b of p.bundles ?? []) {
+    const id = bundleId(p.number, b.no);
+    if (sent.has(id) && !got.has(id) && b.at.where === 'fabricator' && livePieces(b)) short.push({ bundle: id, pieces: livePieces(b) });
+  }
   const received: JobWorkReceiptLine[] = [];
   for (const [size, q] of bySize) {
     const child = childFor(parent, items, size, p.colour);
