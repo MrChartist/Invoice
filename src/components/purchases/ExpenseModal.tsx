@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import type { PurchaseRecord, Vendor } from '../../types/purchases';
 import { PURCHASE_CATEGORIES } from '../../types/purchases';
 import { gstRateOptions } from '../../lib/tax-rules';
@@ -23,6 +23,10 @@ import { capT } from '../../i18n/areas/capture';
 import { billTdsInputFor, priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
+import { localDb } from '../../lib/localDb';
+
+// R14 PS-B1: the disbursement row (kind, on the client's behalf) — professional companies only, one lazy chunk.
+const DisbursementRow = lazy(() => import('../prof/DisbursementRow'));
 
 export interface ExpenseModalProps {
   open: boolean;
@@ -75,6 +79,8 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
     pure_agent: expense?.pure_agent,
   });
   const [attachments, setAttachments] = useState<AttachmentRef[]>(expense?.attachments ?? seeded ?? []);
+  const [psB, setPsB] = useState(() => (expense as { ps?: Record<string, unknown> } | undefined)?.ps); // R14 PS-B1
+  const profOn = useMemo(() => ((s: { prof_kind?: unknown; industry_packs?: unknown }) => !!s.prof_kind || (Array.isArray(s.industry_packs) && s.industry_packs.includes('practice')))(localDb.settings.get() as never), []);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   // R5-B3: a Sec 194C(6) nil deduction (reason T) keeps following the declaration on edit.
@@ -122,6 +128,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
         amount_paid: expense?.amount_paid ?? 0,
         notes: notes.trim() || undefined,
         ...billablePatch(billable),
+        ...(psB !== (expense as { ps?: unknown } | undefined)?.ps ? { ps: psB && Object.keys(psB).length ? psB : undefined } : {}), // R14 PS-B1
         cost_centre_id: costCentre,
         attachments: attachments.length ? attachments : undefined,
         ...tdsResolved.fields,
@@ -250,6 +257,11 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
       <TdsBillPanel value={tds} onChange={setTds} suggestion={tdsResolved.suggestion} payableNet={totals.total - (tdsResolved.fields.tds_on === 'BILL' ? tdsResolved.fields.tds_amount ?? 0 : 0)} nonResident={vendor?.non_resident} date={date} />
 
       <BillableFields idPrefix="exp" value={billable} onChange={setBillable} rebilledIn={expense?.rebilled_in} />
+      {(profOn || !!psB?.disb) && (
+        <Suspense fallback={null}>
+          <DisbursementRow ps={psB} date={date} itc={itc} onChange={(v) => { setPsB(v.ps); setBillable((b) => ({ ...b, pure_agent: v.pure_agent, markup_percent: v.markup_percent })); if (v.itc_eligible === false) setItc(false); }} />
+        </Suspense>
+      )}
 
       <AttachmentsPanel value={attachments} onChange={setAttachments} label={purT('attachments')} />
 

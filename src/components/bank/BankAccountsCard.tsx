@@ -4,6 +4,7 @@ import { DEFAULT_BANK_ID, bankAccountsDb, maskAccountNo, type BankAccount, liveB
 import { bnkT } from '../../i18n/areas/banking';
 import type { BankStatement } from '../../lib/bank-recon';
 import { generateId } from '../../lib/storage';
+import { localDb } from '../../lib/localDb';
 import { formatMoney } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { bankT } from '../../i18n/areas/bank';
@@ -29,6 +30,7 @@ interface Draft {
   opening_as_of: string;
   od: boolean;
   od_limit: string;
+  cm: boolean;
   account_no: string;
   ifsc: string;
   branch: string;
@@ -41,6 +43,7 @@ const toDraft = (a?: BankAccount): Draft => ({
   opening: a?.opening === undefined ? '' : String(a.opening),
   opening_as_of: a?.opening_as_of ?? '',
   od: !!a?.od,
+  cm: !!(a as { client_money?: boolean } | undefined)?.client_money,
   od_limit: a?.od_limit === undefined ? '' : String(a.od_limit),
   account_no: a?.account_no ?? '',
   ifsc: a?.ifsc ?? '',
@@ -54,6 +57,8 @@ const toDraft = (a?: BankAccount): Draft => ({
 export function BankAccountsCard({ accounts, statements, payments, onChange, notify }: Props) {
   useT(); // re-render on a language switch (5.4)
   const [draft, setDraft] = useState<Draft | null>(null);
+  // R14 (PS-B3): the client-money tick, for a law firm / CA firm (packs `legal`, `cafirm`) or an account already marked.
+  const [cmOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.some((p) => p === 'legal' || p === 'cafirm'))(localDb.settings.get() as never));
   // Advances, refunds, cheques and supplier payments count too (liveBankAccountUsage).
   const inUse = (id: string) => statements.some((s) => s.bank_account_id === id) || payments.some((p) => p.bank_account_id === id) || liveBankAccountUsage(id).length > 0;
 
@@ -77,6 +82,7 @@ export function BankAccountsCard({ accounts, statements, payments, onChange, not
         account_no: draft.account_no.replace(/\s+/g, '') || undefined,
         ifsc: draft.ifsc.trim().toUpperCase() || undefined,
         branch: draft.branch.trim() || undefined,
+        ...{ client_money: draft.id !== DEFAULT_BANK_ID && draft.cm ? true : undefined }, // R14 (PS-B3)
       });
       onChange(bankAccountsDb.all());
       setDraft(null);
@@ -183,6 +189,9 @@ export function BankAccountsCard({ accounts, statements, payments, onChange, not
                 <label className={controls.check}>
                   <input type="checkbox" checked={draft.od} onChange={(e) => setDraft({ ...draft, od: e.target.checked })} /> {bnkT('od')}
                 </label>
+                {(draft.cm || cmOn) && <label className={controls.check}>
+                  <input type="checkbox" checked={draft.cm} onChange={(e) => setDraft({ ...draft, cm: e.target.checked })} data-ps-client-money /> {bnkT('clientMoney')}
+                </label>}
                 {draft.od && (
                   <div className={controls.field}>
                     <label className={controls.label} htmlFor="ba-odlimit">{bnkT('odLimit')}</label>

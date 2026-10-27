@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { ClipboardList, FilePlus2, Pencil, Printer, ReceiptText, RotateCcw, Trash2, XCircle } from 'lucide-react';
 import type { PurchaseOrder, PurchaseRecord, Vendor } from '../../types/purchases';
 import {
@@ -15,6 +15,9 @@ import {
 } from '../../lib/purchase-orders';
 import { blankPurchaseLine } from '../../lib/purchases';
 import { localDb } from '../../lib/localDb';
+
+// R14 (PS-B5): a media buy turns the PO into a release order (`media` pack) — one lazy row.
+const MediaRows = lazy(() => import('../prof/MediaRows'));
 import { Link } from 'react-router-dom';
 import { getTable } from '../../lib/storage';
 import { s2T } from '../../i18n/areas/sales-r2';
@@ -271,6 +274,8 @@ function PoForm({
   const [pos, setPos] = useState(po?.place_of_supply ?? businessState);
   const [lines, setLines] = useState(po?.lines?.length ? po.lines : [blankPurchaseLine()]);
   const [notes, setNotes] = useState(po?.notes ?? '');
+  const [psB, setPsB] = useState(() => (po as { ps?: Record<string, unknown> } | undefined)?.ps); // R14 (PS-B5)
+  const [mediaOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('media'))(localDb.settings.get() as never));
   const [error, setError] = useState('');
   const vendor = vendors.find((v) => v.id === vendorId);
   const totals = useMemo(() => poTotals(lines, pos, businessState), [lines, pos, businessState]);
@@ -299,6 +304,7 @@ function PoForm({
         igst: totals.igst,
         total: totals.total,
         notes: notes.trim() || undefined,
+        ...(psB !== (po as { ps?: unknown } | undefined)?.ps ? { ps: psB } : {}), // R14 (PS-B5)
       });
       onSaved(po ? purT('updated', { name: saved.po_number }) : purT('poSaved', { number: saved.po_number }));
     } catch (err) {
@@ -367,6 +373,7 @@ function PoForm({
         <label className={controls.label} htmlFor="po-notes">{purT('poNotes')}</label>
         <textarea id="po-notes" className={controls.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
+      {(mediaOn || !!psB?.media) && <Suspense fallback={null}><MediaRows ps={psB} onChange={setPsB} /></Suspense>}
 
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>

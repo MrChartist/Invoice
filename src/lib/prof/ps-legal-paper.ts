@@ -34,6 +34,8 @@ export interface LegalApplyInput {
   /** Sender has a GSTIN. */
   registered: boolean;
   senior?: boolean;
+  /** The user's choice from the chip: every legal-services line takes this regime. */
+  force?: LegalRegime;
 }
 
 /**
@@ -42,20 +44,29 @@ export interface LegalApplyInput {
  */
 export function legalPatch(i: LegalApplyInput): { regime: LegalResult; doc: LegalDoc; patch: Partial<InvoiceRecord> & { ps: Record<string, unknown> } } {
   const date = String(i.record.issue_date ?? '').slice(0, 10);
-  const per = (i.record.items ?? []).map((l) => legalRegime({ client: i.record.client, line: l, supplier: { senior: i.senior }, date }));
+  const per = (i.record.items ?? []).map((l) => {
+    const r = legalRegime({ client: i.record.client, line: l, supplier: { senior: i.senior }, date });
+    if (!i.force || r.reason === 'non_legal' || i.force === r.regime) return r;
+    const rule = legalRegime({ client: i.force === 'rcm' ? { ps: { entity: 'business' } } : {}, line: l, date });
+    return { ...rule, regime: i.force, entry: i.force === 'taxable' ? '' : rule.entry };
+  });
   const regimes = per.map((r) => r.regime);
   const regime = docRegime(regimes);
   const first = per.find((r) => r.regime === regime) ?? legalRegime({ client: i.record.client, supplier: { senior: i.senior }, date });
   const doc = legalDocKind(i.registered, regimes);
   const items = (i.record.items ?? []).map((l, k): InvoiceItem => {
     if (!i.registered) return { ...l, tax_rate: 0 };
-    if (per[k].regime !== 'exempt') return l;
+    if (per[k].regime !== 'exempt') {
+      if (l.sv?.exempt !== 'EXEMPT') return l;
+      const { exempt: _e, ...sv } = l.sv;
+      return { ...l, tax_rate: 18, sv } as InvoiceItem; // was marked exempt by an earlier choice: legal services at 18 %
+    }
     return { ...l, tax_rate: 0, sv: { ...(l.sv ?? {}), exempt: 'EXEMPT' } } as InvoiceItem;
   });
   const ps = { ...((i.record.ps as Record<string, unknown> | undefined) ?? {}), legal: { regime, entry: first.entry }, ...(doc === 'fee_memo' ? { kind: 'memo' } : {}) };
   const patch: Partial<InvoiceRecord> & { ps: Record<string, unknown> } = { items, ps };
   if (doc === 'bill_of_supply') Object.assign(patch, { doc_type: 'BILL_OF_SUPPLY', reverse_charge: false, rcm_tax_excluded: undefined });
-  else if (i.registered && regime === 'rcm') Object.assign(patch, { reverse_charge: true, rcm_tax_excluded: true });
-  else if (!i.registered) Object.assign(patch, { gst_mode: 'NONE', reverse_charge: false, rcm_tax_excluded: undefined });
+  else if (i.registered) Object.assign(patch, regime === 'rcm' ? { reverse_charge: true, rcm_tax_excluded: true } : { reverse_charge: false, rcm_tax_excluded: undefined }, i.record.doc_type === 'BILL_OF_SUPPLY' ? { doc_type: 'TAX_INVOICE' } : {});
+  else Object.assign(patch, { gst_mode: 'NONE', reverse_charge: false, rcm_tax_excluded: undefined });
   return { regime: first, doc, patch };
 }
