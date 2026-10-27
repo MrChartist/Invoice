@@ -16,6 +16,14 @@ export interface ProfileContext {
 }
 
 export async function demoExtras(profile: DemoProfile, ctx: ProfileContext): Promise<DemoExtras> {
+  const base = await profileExtras(profile, ctx);
+  // R12: an agri Demo company (any profile with the `agri` pack) adds its rows (`profile-agri.ts`, by pack).
+  if (!ctx.packs.includes('agri')) return base;
+  const agri = (await import('./profile-agri')).agriExtras(ctx);
+  return { ...base, tables: { ...base.tables, ...agri.tables } };
+}
+
+async function profileExtras(profile: DemoProfile, ctx: ProfileContext): Promise<DemoExtras> {
   switch (profile) {
     case 'counter': { // R9 (RT-A1): plus the retail shop's rows (grocery, or the retail pack's block)
       const [{ counterExtras }, retail] = await Promise.all([import('./profile-counter'), import('./profile-retail')]);

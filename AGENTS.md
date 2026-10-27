@@ -118,6 +118,18 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   never add keys. A 0% line with `sv.exempt` is reported in its own Table 8 column (exempt / nil / non-GST); without it,
   nil-rated as before. Rule values in `src/lib/service-rules.ts` (lazy only, `tests/sv-rules.test.ts`). Notes:
   `docs/features/services-r10.md`.
+- Round 12 (agriculture) company data: names in `src/lib/agri/ag-shared.ts` (AG-A tables `farm_batches`,
+  `quality_cut_tables`, `farmer_cycles` (series `CYB`), object `agri_settings`; `FPV` farmer purchase vouchers on
+  `purchases`; `WBS` / `MDS` / `CMR` / `CSR` / `GPO` / `LAS` / `SHC` reserved for AG-B … D), all backed up and synced;
+  settings `agri_kind` / `mill_kind` (a wizard card, not a business type: `manufacturer`, or `kirana` + `retail_kind:
+  'general'` for input dealers; packs `agri` / `dairy` / `mill` / `coldstore` / `agri_inputs` / `fpo` — desk tabs on
+  `/inventory`; `PACK_OF_TYPE` / `PACK_ROUTES` unchanged). Rights and audit labels are registered at runtime by
+  `src/lib/agri/ag-registry.ts`: **every module that writes a Round 12 table must `import './ag-registry'`**
+  (`tests/ag-registry.test.ts`). Round 12 invoice snapshots live under ONE record key `ag` (`R12_RECORD_KEYS`, spread into
+  `R9_RECORD_KEYS`; weighing reuses the R8 line key `wt`) — never add keys. Farmers are vendors / clients with `ag`
+  (Aadhaar last 4 only) and `principal_kind: 'agriculturist'`; farmer set-offs reuse `exchange_purchase_id`, never a new
+  no-cash marker; Rule 6DD(e) goes through `agri/ag-cash.ts`. Rule values in `src/lib/agri-rules.ts` (lazy only,
+  `tests/ag-rules.test.ts`). Notes: `docs/features/agri-r12.md`.
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 - Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,

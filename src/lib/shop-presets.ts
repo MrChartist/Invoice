@@ -3,6 +3,7 @@
  * Only lazy screens (setup wizard, Settings, Dashboard tiles) import this; the shell needs only `shop-mode.ts`.
  */
 import { ALL_MODULES, type BusinessType, type ModuleId, type ShopModeSettings } from './shop-mode';
+import type { PackId } from './industry-packs';
 
 export const BUSINESS_TYPES: readonly BusinessType[] = [
   'kirana', 'restaurant', 'wholesale', 'services', 'manufacturer', 'full',
@@ -263,3 +264,54 @@ export function applyServiceKind(kind: ServiceKindId, opts: { registered?: boole
   return { business_type: 'services', modules, service_kind: kind, industry_packs: packs };
 }
 
+
+/* ── R12 (AG-A1): agri profile — a wizard card that is not a business type ── */
+
+/** The agri picker's choices (stored as `settings.agri_kind`); each writes an existing business type (or none). */
+export const AGRI_KINDS = ['fpo', 'coop', 'dairy', 'mill', 'cold', 'inputs', 'farm', 'other'] as const;
+export type AgriKindId = (typeof AGRI_KINDS)[number];
+export const MILL_KINDS = ['rice', 'flour', 'dal', 'oil'] as const;
+export type MillKindId = (typeof MILL_KINDS)[number];
+type AgriPackId = 'agri' | 'dairy' | 'mill' | 'coldstore' | 'agri_inputs' | 'fpo' | 'commodity';
+
+export interface AgriProfile {
+  /** `manufacturer` (or `kirana` for input dealers); absent (`other`) = the business type is unchanged. */
+  type?: BusinessType;
+  /** Without `gst`: a registered business adds it. Absent (`other`) = modules unchanged. */
+  modules?: readonly ModuleId[];
+  packs: readonly AgriPackId[];
+  landing: string;
+  defaultDueDays?: number;
+  templateId?: string;
+}
+
+const MFG_POS: readonly ModuleId[] = [...PRESETS.manufacturer, 'pos'];
+export const AGRI_PROFILES: Readonly<Record<AgriKindId, AgriProfile>> = {
+  fpo: { type: 'manufacturer', modules: MFG_POS, packs: ['agri', 'fpo', 'commodity'], landing: '/inventory?tab=members', defaultDueDays: 15, templateId: 'gst_tax_invoice' },
+  coop: { type: 'manufacturer', modules: MFG_POS, packs: ['agri', 'fpo'], landing: '/inventory?tab=members', defaultDueDays: 15, templateId: 'gst_tax_invoice' },
+  dairy: { type: 'manufacturer', modules: ['purchases', 'inventory', 'accounts', 'banking', 'reports', 'pos', 'recurring'], packs: ['agri', 'dairy'], landing: '/inventory?tab=dairy&view=collection', defaultDueDays: 0, templateId: 'retail_receipt' },
+  mill: { type: 'manufacturer', modules: PRESETS.manufacturer, packs: ['agri', 'mill', 'commodity'], landing: '/inventory?tab=mill&view=intake', defaultDueDays: 15, templateId: 'gst_tax_invoice' },
+  cold: { type: 'manufacturer', modules: ['purchases', 'inventory', 'accounts', 'banking', 'reports', 'gst', 'tds'], packs: ['agri', 'coldstore'], landing: '/inventory?tab=cold&view=lots', defaultDueDays: 0, templateId: 'gst_tax_invoice' },
+  inputs: { type: 'kirana', modules: [...PRESETS.kirana, 'accounts', 'banking'], packs: ['agri', 'agri_inputs'], landing: '/pos', defaultDueDays: 0, templateId: 'gst_tax_invoice' },
+  farm: { type: 'manufacturer', modules: ['purchases', 'inventory', 'accounts', 'banking', 'reports'], packs: ['agri'], landing: '/inventory?tab=farm&view=batches', defaultDueDays: 7, templateId: 'classic_orange' },
+  other: { packs: ['agri'], landing: '/inventory?tab=farm' },
+};
+
+export const isAgriKind = (v: unknown): v is AgriKindId => typeof v === 'string' && (AGRI_KINDS as readonly string[]).includes(v);
+
+/**
+ * Settings patch for an agri profile: the business type and modules (`registered` adds `gst`), the explicit packs and
+ * the kind (`mill_kind` for a mill). Input dealers also get `retail_kind: 'general'` so R9's "Pick your shop" step does
+ * not fire. `other` keeps the type and modules and adds `agri` to the packs the company has (`current`). The profile's
+ * switches (`agri_settings`) are written by `agri/ag-profile.ts`.
+ */
+export function applyAgriKind(kind: AgriKindId, opts: { registered?: boolean; mill_kind?: string; currentPacks?: readonly PackId[] } = {}): ShopModeSettings & { agri_kind: AgriKindId; mill_kind?: MillKindId; industry_packs: PackId[]; retail_kind?: 'general' } {
+  const p = AGRI_PROFILES[kind];
+  const packs: PackId[] = kind === 'other' ? [...new Set<PackId>([...(opts.currentPacks ?? []), 'agri'])] : [...p.packs];
+  const out: ShopModeSettings & { agri_kind: AgriKindId; mill_kind?: MillKindId; industry_packs: PackId[]; retail_kind?: 'general' } = { agri_kind: kind, industry_packs: packs };
+  if (p.type) out.business_type = p.type;
+  if (p.modules) out.modules = opts.registered && !p.modules.includes('gst') ? [...p.modules, 'gst'] : [...p.modules];
+  if (kind === 'mill') out.mill_kind = (MILL_KINDS as readonly string[]).includes(opts.mill_kind ?? '') ? (opts.mill_kind as MillKindId) : 'rice';
+  if (kind === 'inputs') out.retail_kind = 'general';
+  return out;
+}

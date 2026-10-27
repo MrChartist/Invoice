@@ -9,6 +9,9 @@ import { featureText } from './feature-text';
 import { TradeKindPicker } from '../trade/TradeKindPicker'; // R8-C (TR-C5)
 import { applyConstructionKind, applyRetailKind, applyServiceKind, applyTradeKind } from '../../lib/shop-presets';
 import { ServiceKindPicker } from '../services-r10/ServiceKindPicker'; // R10 (SV-A1)
+import { AgriKindPicker } from '../agri/AgriKindPicker'; // R12 (AG-A1)
+import { agPickT } from '../../i18n/areas/agri-r12-pick';
+import { applyAgriKind } from '../../lib/shop-presets';
 import { svPickT } from '../../i18n/areas/services-r10-pick';
 import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
 import { DB_PREFIX, getJson } from '../../lib/storage';
@@ -170,6 +173,24 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
             />
           </div>
         )}
+        {/* R12 (AG-A1): "Agriculture profile" for every company (a trader may add cold storage, a kirana inputs) */}
+        <div className={controls.field} data-features-agri>
+          <span className={controls.label}>{agPickT('title')}</span>
+          <AgriKindPicker
+            value={settings.agri_kind}
+            custom
+            disabled={!owner}
+            mill={settings.mill_kind}
+            onMill={(m) => settings.agri_kind === 'mill' && onChange({ mill_kind: m as typeof settings.mill_kind })}
+            onPick={(k) => {
+              if (!k) return onChange({ agri_kind: undefined });
+              const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
+              onChange(applyAgriKind(k, { registered, mill_kind: settings.mill_kind, currentPacks: packsOn }) as Partial<typeof settings>);
+              // The profile's switches only fill unset ones; changing the profile deletes nothing.
+              void import('../../lib/agri/ag-profile').then((m) => m.applyAgriSwitches(k)).catch(() => undefined);
+            }}
+          />
+        </div>
         <label className={controls.field} style={{ maxWidth: 360 }}>
           <span className={controls.label}>
             <Search size={14} aria-hidden="true" /> {discoverT('featSearch')}
