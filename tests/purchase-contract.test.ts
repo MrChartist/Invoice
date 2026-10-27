@@ -953,3 +953,9 @@ test('R9 (RT-D3) buy-back URD voucher: no GST / ITC in every reader, stock 1 ser
   assert.equal(buyBackOf('356938035643809', [{ ...urd, itc_eligible: true }]), undefined, 'ITC taken: no margin scheme');
   assert.equal(buyBackOf('356938035643809', [{ ...urd, status: 'void' } as never]), undefined, 'a void voucher is skipped');
 });
+
+test('R11 (CN-C5) 80% procurement test reads the real bill shape (registered by GSTIN, line HSN, the project cost centre)', async () => {
+  const { procurement80 } = await import('../src/lib/construction/cn-procurement80.ts');
+  const t = procurement80({ cost_centre_id: 'cc' }, 2026, [{ ...bill, cost_centre_id: 'cc' }, { ...bill, id: 'p2', vendor_gstin: undefined, cost_centre_id: 'cc' }, { ...bill, id: 'p3', status: 'void', cost_centre_id: 'cc' } as never]);
+  assert.deepEqual([t.total, t.registered, t.unregistered, t.pct], [2000, 1000, 1000, 50]);
+});

@@ -79,6 +79,7 @@ function clean(rows: unknown[]): BankAccount[] {
       ...(Number.isFinite(Number(o.fcy_opening)) && o.fcy_opening !== undefined && o.fcy_opening !== '' ? { fcy_opening: round2(Number(o.fcy_opening)) } : {}),
       ...(id !== DEFAULT_BANK_ID && o.clearing === true ? { clearing: true } : {}), // R5-A2: marketplace settlement clearing
       ...(o.fcra === 'designated' || o.fcra === 'utilisation' ? { fcra: o.fcra } : {}), // R5-C4: FCRA account
+      ...(typeof o.rera_project_id === 'string' && o.rera_project_id ? { rera_project_id: o.rera_project_id } : {}), // R11 (CN-C4): RERA 70% account
     });
   }
   if (!seen.has(DEFAULT_BANK_ID)) out.unshift({ ...MAIN });

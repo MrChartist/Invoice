@@ -45,6 +45,8 @@ export interface ConstructionSettings {
   photo_pages?: boolean;
   /** Labour contractor: manpower-supply bill preset (SAC 998519). */
   manpower_preset?: boolean;
+  /** CN-C: builder settings (interest on delay, forfeiture, allotment terms). */
+  realty?: RealtySettings;
   updated_at?: string;
 }
 
@@ -143,12 +145,11 @@ export interface CnPvSnapshot {
   [key: string]: unknown;
 }
 
-/** CN-C3: stage demand snapshot on a demand invoice (filled by CN-C). */
-export interface CnDemandSnapshot {
+/** CN-C3: stage demand snapshot on a demand invoice (fields: `CnDemandFields` in the CN-C block). */
+export interface CnDemandSnapshot extends CnDemandFields {
   booking_id?: string;
   unit?: string;
   stage?: string;
-  [key: string]: unknown;
 }
 
 /** CN-B (JV / consortium share, informational). */
@@ -219,6 +220,210 @@ declare module './invoice' {
 /* ════════════════════════════════════════ CN-C ════════════════════════════════════════
  * Builders: projects, units, bookings, payment plans, demands, RERA account. C adds `AdvanceRecord.booking_id` and
  * `BankAccount.rera_project_id` here. */
+
+/** Real-estate GST class of a booked unit (derived at booking, kept on the booking as a snapshot). */
+export type RealtyClass = 'realty_affordable' | 'realty_residential' | 'realty_commercial' | 'realty_old_option';
+export type RealtyUnitType = 'residential' | 'commercial' | 'parking' | 'plot';
+export type RealtyUnitStatus = 'available' | 'hold' | 'booked' | 'registered' | 'cancelled';
+export type BookingStatus = 'booked' | 'agreement' | 'registered' | 'possession' | 'cancelled';
+
+/** Table `realty_projects` (`master.edit`). */
+export interface RealtyProject {
+  id: string;
+  name: string;
+  cost_centre_id?: string;
+  rera_no?: string;
+  rera_valid_till?: string;
+  /** Bank account (bank_accounts id) designated as the RERA 70% account; collection account. */
+  rera_account_id?: string;
+  collection_account_id?: string;
+  address?: string;
+  state_code: string;
+  city_class: 'metro' | 'other';
+  gst_scheme: 'n03_2019' | 'old_option';
+  /** `old_option` projects: the typed GST rate with ITC. */
+  old_rate?: number;
+  started_on?: string;
+  /** Completion certificate / occupancy certificate (demands on / after `cc_date` carry no GST). */
+  cc_date?: string;
+  oc_date?: string;
+  towers: { id: string; name: string; floors: number; completion_pct?: number }[];
+  created_at: string;
+  updated_at?: string;
+}
+
+/** Table `realty_units` (`master.edit`). `base_rate` is ₹ per sq ft of saleable area (carpet when none). */
+export interface RealtyUnit {
+  id: string;
+  project_id: string;
+  tower_id: string;
+  unit_no: string;
+  floor: number;
+  type: RealtyUnitType;
+  carpet_sqm: number;
+  saleable_sqft?: number;
+  base_rate: number;
+  plc?: { label: string; amount: number }[];
+  status: RealtyUnitStatus;
+  booking_id?: string;
+}
+
+/** A cost-sheet head: taxable heads make the agreement value; pass-through heads (pure agent, Rule 33) never do. */
+export interface CostHead {
+  head: string;
+  amount: number;
+  taxable: boolean;
+  pass_through: boolean;
+}
+
+/** Cancellation snapshot on a booking (CN-C5). */
+export interface BookingCancellation {
+  date: string;
+  reason: string;
+  received: number;
+  forfeiture: number;
+  /** GST on demands outside the Sec 34 window, not reversed by a credit note (the buyer claims it, Circular 188). */
+  tax_retained: number;
+  refund: number;
+  path: 'credit_note' | 'refund_net';
+  credit_note_ids?: string[];
+  refund_numbers?: string[];
+  /** Refund still to be paid outside the advance vouchers (money already adjusted against demands). */
+  refund_pending?: number;
+  journal_id?: string;
+}
+
+/** Table `realty_bookings` (`BKG/FY…`, `doc.create`, dated `date`). */
+export interface RealtyBooking {
+  id: string;
+  number: string;
+  date: string;
+  unit_id: string;
+  project_id: string;
+  client_id?: string;
+  client_name: string;
+  co_applicants?: string;
+  cost_sheet: CostHead[];
+  /** Sum of the taxable heads (the consideration). */
+  agreement_value: number;
+  /** Stamp-duty value when higher (194-IA test). */
+  stamp_value?: number;
+  agreement_date?: string;
+  registered_on?: string;
+  plan_id: string;
+  cls: RealtyClass;
+  broker?: { vendor_id?: string; name?: string; pct: number };
+  loan?: { bank: string; sanction?: number };
+  status: BookingStatus;
+  /** Interest on delayed payment waived for this booking (audited with the row). */
+  interest_waived?: boolean;
+  cancellation?: BookingCancellation;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface PlanStage {
+  id: string;
+  label: string;
+  pct: number;
+  due_days: number;
+  trigger: 'booking' | 'agreement' | 'stage' | 'date';
+  date?: string;
+}
+
+/** Table `payment_plans` (`master.edit`); stage % sum to 100. */
+export interface PaymentPlan {
+  id: string;
+  name: string;
+  kind: 'clp' | 'time' | 'down_payment' | 'subvention';
+  stages: PlanStage[];
+}
+
+/** Table `stage_certificates` (`doc.create`, dated `certified_on`). */
+export interface StageCertificate {
+  id: string;
+  project_id: string;
+  tower_id: string;
+  stage_id: string;
+  stage_label: string;
+  certified_on: string;
+  by: string;
+  ref?: string;
+}
+
+export interface ReraCert {
+  name: string;
+  ref: string;
+  date: string;
+}
+
+/** Table `rera_withdrawals` (`books.edit`, dated `date`). `kind: 'deposit'` rows record transfers into the account. */
+export interface ReraWithdrawal {
+  id: string;
+  project_id: string;
+  date: string;
+  amount: number;
+  kind?: 'withdrawal' | 'deposit';
+  completion_pct?: number;
+  certificates?: { engineer?: ReraCert; architect?: ReraCert; ca?: ReraCert };
+  purpose?: 'land' | 'construction';
+  note?: string;
+}
+
+/** Builder settings, kept in `construction_settings.realty` (owner). */
+export interface RealtySettings {
+  /** Interest on delayed payment, % a year (state RERA rule — SBI MCLR + 2% by default). */
+  interest_rate?: number;
+  /** Forfeiture on cancellation: % of agreement value, or a fixed amount when set. */
+  forfeit_pct?: number;
+  forfeit_amount?: number;
+  /** Allotment-letter terms. */
+  terms?: string;
+}
+
+declare module './advances' {
+  interface AdvanceRecord {
+    /** CN-C2: the booking this receipt is for (realty desk). */
+    booking_id?: string;
+    /** CN-C2: a pass-through collection (stamp duty, registration, deposits — pure agent, no GST, outside RERA 70%). */
+    pass_through?: boolean;
+  }
+}
+
+declare module '../lib/bank-accounts' {
+  interface BankAccount {
+    /** CN-C4: this account is the RERA designated (70%) account of that project. */
+    rera_project_id?: string;
+  }
+}
+
+/** Fields of `boq_terms.cn.demand` (CN-C3), kept on the demand invoice as a snapshot. */
+export interface CnDemandFields {
+  number?: string;
+  booking_no?: string;
+  tower?: string;
+  carpet_sqm?: number;
+  rera_no?: string;
+  project?: string;
+  stage_id?: string;
+  stage_label?: string;
+  pct?: number;
+  agreement_value?: number;
+  /** Including this demand. */
+  demanded?: number;
+  previously_demanded?: number;
+  previously_received?: number;
+  /** Earlier demand documents' totals incl. GST (for the balance due). */
+  previously_billed?: number;
+  interest?: { days: number; rate: number; amount: number };
+  /** Dated on / after the completion certificate: not a supply (Sch III para 5(b)). */
+  cc_after?: boolean;
+  cls?: RealtyClass;
+  /** One-third land working: value, deemed land, taxable two-thirds, notification and effective rate. */
+  land?: { value: number; land: number; taxable: number; notif: number; effective: number };
+  account?: { name: string; no?: string; ifsc?: string };
+  plan?: { label: string; pct: number }[];
+}
 
 /* ════════════════════════════════════════ CN-D ════════════════════════════════════════
  * Site operations: sub-contract work orders, labour, muster, plant, reconciliation, site P&L. D adds

@@ -79,8 +79,8 @@ const InterestTab = lazy(() => import('../components/trade/InterestTab'));
 const intTabT = defineArea({ tab: 'Interest', deliveries: 'Deliveries' } as const, { tab: 'ब्याज', deliveries: 'डिलीवरी' });
 // R9 (RT-A3): home-delivery board, riders and rider cash settlement (every business, lazy).
 const DeliveriesTab = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.DeliveriesTab })));
-// R11 (CN-A1): the builders' desk (pack `realty`); CN-C replaces the stub target with `RealtyDesk`.
-const RealtyDesk = lazy(() => import('../components/construction/R11Stub'));
+// R11 (CN-C): the builders' desk (pack `realty`): projects, units, bookings, plans, demands, RERA, cancellations, 80% test.
+const RealtyDesk = lazy(() => import('../components/construction/RealtyDesk'));
 const realtyT = defineArea({ tab: 'Realty' } as const, { tab: 'रियल्टी' });
 
 type Tab = ReceivablesTab;
@@ -375,7 +375,7 @@ export function Receivables() {
         {tab === 'marketplace' && <Suspense fallback={<div className={surface.card}><p className={styles.note}>…</p></div>}><MarketplaceTab notify={notify} /></Suspense>}
         {tab === 'donations' && <Suspense fallback={null}><DonationsTab notify={notify} /></Suspense>}
         {tab === 'deliveries' && <Suspense fallback={null}><DeliveriesTab onDone={(m, e) => notify(m, e ? 'error' : 'success')} /></Suspense>}
-        {tab === 'realty' && <Suspense fallback={null}><div className={surface.card}><RealtyDesk title={realtyT('tab')} /></div></Suspense>}
+        {tab === 'realty' && <Suspense fallback={null}><div className={surface.card}><RealtyDesk onDone={notify} /></div></Suspense>}
         {tab === 'interest' && <Suspense fallback={null}><div className={surface.card}><InterestTab onDone={(m, e) => notify(m, e ? 'error' : 'success')} /></div></Suspense>}
       </div>
       {toastNode}

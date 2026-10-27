@@ -79,3 +79,66 @@ picker chunk 1.2 kB, settings 0.9 kB, profile 0.5 kB, help topics + glossary 0.7
 wizard / palette / Ctrl+K rows ≈ 2.1 kB, the rest in host chunks. **Over the 15 kB CN-A share by ≈ 7.4 kB**; total JS
 stays at ≈ 2,811 kB of 2,900 kB. Trimmed already: paper parts in one chunk, paper-only strings, pure section module,
 no stub views.
+
+## CN-C — Builders and developers (pack `realty`)
+
+Desk: **Receivables → Realty** (`/receivables?tab=realty&view=…`, one lazy chunk `components/construction/RealtyDesk.tsx`,
+strings `i18n/areas/construction-r11c.ts`, English + Hindi). Engines in `src/lib/construction/cn-*.ts`; every writer
+imports `./cn-registry`. Rules (`construction-rules.ts` `// CN-C`, every row dated, `source`, `verified: false`):
+`REALTY_RATE_RULES`, `REALTY_AFFORDABLE_RULES`, `REALTY_INTEREST_RULES`, `RERA_DEPOSIT_RULES`, `REALTY_194IA_RULES`,
+`REALTY_PROCUREMENT_RULES`. The Sec 34 limit reuses `nextFyCutoff` (`gst-penalties.ts`); no new tax-rules row.
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| C1 projects, towers, units | `cn-realty-projects.ts` (table `realty_projects`: RERA no. / validity, RERA (70%) and collection accounts, State, city class, GST scheme `n03_2019` / `old_option` + typed rate, CC / OC dates, towers with % completion; a project is also a cost centre of kind `project`; its RERA account carries `BankAccount.rera_project_id`, kept by `bank-accounts.ts` `clean`). `cn-units.ts` (table `realty_units`: tower / floor / unit no., type, carpet sq m, saleable sq ft, rate per sq ft, PLC, status; bulk add "A-101 …" skipping existing numbers; status moves; CSV). Grid by tower and floor with status badges (surface tokens); tap = hold / free. |
+| C1 / C3 tax maths | `cn-realty-tax.ts`: affordable test (carpet ≤ 60 sq m metro / 90 sq m other AND ≤ ₹45 lakh, both inclusive), `unitClass` at booking, `landSplit` (land one-third; 1.5% / 7.5% on two-thirds = 1% / 5%; before 1 Apr 2019 the 12% / 18% with-ITC row; old option = typed rate), `splitTax`, `afterCc`, `preAgreementWarning` (Sec 13 10%), `tds194ia` (≥ ₹50 lakh or stamp value; label `sectionText('194IA', date)` → "Sec 393(1) [Table: Sl. No. 3(i)] [old 194-IA]" from 1 Apr 2026). |
+| C2 bookings | `cn-bookings.ts` (table `realty_bookings`, `BKG/FY…` via `series_counters`, dated `date`): cost sheet (`defaultCostSheet`: basic, PLC, parking / club / development taxable; stamp duty, registration, maintenance deposit, corpus pass-through), `agreementValue` excludes pass-through, class snapshot, unit → booked; agreement / registration (unit → registered) / possession; interest waiver (audited row edit); delete only without receipts / demands. Receipts = advance receipt vouchers (`advances.ts`, `AdvanceInput.booking` → `AdvanceRecord.booking_id` / `pass_through`), place of supply = property State, GST at the class rate, none on pass-through or after CC; the payer (loan bank) goes in the note. Desk: 10% warning and 194-IA hint per booking, allotment letter print (`cn-allotment-print.ts`). |
+| C3 plans, demands | `cn-plans.ts` (`payment_plans`, stages sum to 100, "Booking 10, Plinth 15 …" parser; `stage_certificates`, one per tower and stage). `cn-demands.ts`: `candidates` (live bookings in the tower on a plan with the stage), `raiseDemands` (all or nothing): per booking one TAX_INVOICE in the invoice series + `DMD/FY…` and the snapshot `boq_terms.cn.demand` (unit, tower, carpet, RERA no., stage / %, agreement value, demanded so far, received, earlier billed, interest, land working, RERA account, plan); open booking advances adjusted (`applyAdvance`); a stage is demanded once per booking; on / after CC a `BILL_OF_SUPPLY` with `exempt_kind: 'NON_GST'` and the Sch III note. Interest on delay: owed on earlier demands × rate × days since the last due date (settings rate, default `REALTY_INTEREST_RULES`), a taxable line at the unit rate. Ageing per booking (0–30 / 31–60 / 61–90 / 90+), WhatsApp link per demand. Paper: `parts/DemandBlock.tsx` (in `WorksPaper`), strings in `construction-r11-paper.ts` `// CN-C`. Builder settings (interest rate, forfeiture % / amount, allotment terms) live in `construction_settings.realty` (owner). |
+| C4 RERA account | `cn-rera.ts`: `collections` (booking advances net of refunds + money paid against demands, `movedNoCash` rows and pass-through skipped), `reraStatement` per month (collected, 70% required, deposited = received into the RERA account + "transfer in" entries, withdrawn, cumulative shortfall, balance), `withdrawalWarnings` (over deposits / over completion % × deposits / missing engineer-architect-CA certificate refs — warnings only), table `rera_withdrawals` (`kind` withdrawal / deposit), QPR CSV per tower, year statement CSV. |
+| C5 cancellations | `cn-cancellations.ts`: `proposal` (received − forfeiture − GST on demands past the Sec 34(2) date), `cancelBooking`: full credit notes for demands inside the window (`createCreditNote`), refund vouchers (Rule 51) from open booking advances, the rest `refund_pending`; forfeiture → optional (draft) journal Dr Debtors / Cr "Forfeiture income"; booking `cancelled` with its snapshot; unit available. Print with the Circular 188/20/2022-GST note when GST stays paid. |
+| C5 80% test | `cn-procurement80.ts` (reads purchases via `readPurchase` / `readPurchaseLines`, added to `tests/purchase-contract.test.ts`): per project cost centre and FY; exclusions by HSN (2710 / 2711 / 2716) and words (TDR, FSI, lease premium, electricity, diesel, capital goods…); cement from unregistered suppliers at its own rate by bill date (28% → 18% from 22 Sep 2025); 18% RCM on the rest of the shortfall; "Book RCM liability" = optional journal Dr "RCM on procurement shortfall (no ITC)" (project cost centre) / Cr RCM payable. |
+
+Registry, storage, help: `cn-registry.ts` CN-C block (`realty_projects` / `realty_units` / `payment_plans` `master.edit`,
+`realty_bookings` / `stage_certificates` `doc.create`, `rera_withdrawals` `books.edit`; all audited); **the deferred
+imports are in** (`sync-engine.ts` → `./construction/cn-registry`, `trust/recycle-bin.ts` → `../construction/cn-registry`).
+`backup.ts` both lists, `sync-engine.ts` `DATED` (bookings `date`, certificates `certified_on`, RERA entries `date`) and
+`NUMBERED` (bookings), open-export meanings. Restore hooks (`recycle-bin.ts`): a deleted booking is refused ("book the
+unit again" — the delete freed the unit), a unit needs its live project, a certificate is refused next to a re-made one.
+Help topics `receivables:realty:<view>` (8, `topics-packs.ts`), `PACK_TABS` rows and palette labels `r11.realty.<view>`,
+glossary `rera-account`, `deemed-land`. Tests: `cn-units`, `cn-bookings`, `cn-demands`, `cn-rera`, `cn-cancellations`,
+`cn-procurement80` (+ registry, no-cash, purchase-contract rows). E2E step "R11-C builder desk".
+
+### Deviations from the PRD (CN-C)
+
+- **GSTR-1 value of a demand:** the demand line carries the full stage value at the **effective** rate (1% / 5%, a GST
+  slab), so GSTR-1 shows the full value at 1% / 5%; the paper prints the land one-third working (taxable two-thirds at
+  1.5% / 7.5%, CGST + SGST halves). Reporting the two-thirds at 7.5% needs a non-slab line rate the GST tables flag —
+  left for CN18. Tax amounts are identical (to the paisa in the tests).
+- The RERA account is chosen on the project form (which flags the bank account `rera_project_id`) instead of a
+  "RERA account of project" select on the bank-account form.
+- Pass-through collections are advance vouchers with `pass_through: true` and no GST (customer advances, a liability),
+  not a separate "Pass-through collections" ledger; they stay out of the agreement value, demands and RERA 70%.
+- Deposits into the RERA account = receipts made straight into it + "transfer in" rows on `rera_withdrawals`
+  (`kind: 'deposit'`); contra vouchers in the books are not read.
+- Cement from unregistered suppliers is taxed at its rate in full; the 18% applies to the shortfall beyond it.
+- Cancellation refunds of money already adjusted against demands are reported as "still to pay" (paid from Payments);
+  a deleted booking is not restorable from the bin (book the unit again).
+- Broker commission (194H bill) and reminders through follow-ups are not wired from the desk (existing purchase bill /
+  follow-up screens apply); the plan table on the demand paper is a one-line stage list.
+- `bill-guard.ts` realty no-ITC caution (left by CN-A) is not wired.
+
+### Budget (CN-C)
+
+Measured against `claude/elegant-cannon-cwapiv` at `e6a3ab9` (same machine, `vite build`, gzip -9):
+
+| | Before | After | Δ |
+|---|---|---|---|
+| Initial JS (first paint) | 189,104 B | 189,104 B | 0 B (the registry imports only add preload-list entries; within hash noise) |
+| Total JS | 2,881,385 B | 2,906,512 B | +24.5 kB (2,838.4 kB of 3,000) |
+
+Breakdown (gz): the desk chunk 20.1 kB (UI ≈ 8 kB, engines ≈ 7.5 kB, EN + HI strings ≈ 4.5 kB), demand paper +0.6 kB
+and paper strings +0.9 kB, help topics + glossary + palette + `PACK_TABS` rows ≈ 2 kB, registry / backup / sync /
+export / restore-hook rows ≈ 0.6 kB. **Over the 14 kB CN-C share by ≈ 10.5 kB** — the 15 items (eight views, five
+engines with prints) do not fit 14 kB with Hindi; total JS stays well inside the 3,000 kB budget.

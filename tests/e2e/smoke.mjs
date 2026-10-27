@@ -3469,6 +3469,88 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+  await step('R11-C builder desk: Contractor → Builder; a project with RERA no. and a tower of 4 units; book A-101 with stamp duty as pass-through, a 12% receipt before the agreement warns; certify Plinth → the demand shows land one-third and CGST 3.75% + SGST 3.75%, the RERA account and the plan; after the CC date the next demand is non-GST; RERA view shows 70% required', async () => {
+    const keys = ['settings', 'construction_settings', 'invoices', 'transactions', 'clients', 'doc_links', 'series_counters', 'advances', 'bank_accounts', 'cost_centres', 'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'contractor', modules: undefined, industry_packs: undefined, construction_kind: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'construction_settings', null);
+    await writeJson(page, 'bank_accounts', [...(prev.bank_accounts ?? []), { id: 'e2e-rera', name: 'E2E RERA account', account_no: '50100099887', ifsc: 'HDFC0000123', active: true }]);
+    // Settings → Features: the Builder profile switches the realty pack on.
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-construction-kind-card="builder"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.construction_kind === 'builder');
+    check(st.industry_packs?.includes('realty'), 'Builder profile: the realty pack is on');
+    // C1: project + units.
+    await page.goto(srv.origin + '/receivables?tab=realty&view=projects');
+    const pf = page.locator('[data-rc-project-form]');
+    await pf.locator('[data-rc="p-name"]').fill('E2E Green Heights', { timeout: 15000 });
+    await pf.locator('[data-rc="p-rera"]').fill('P52100099999');
+    await pf.locator('[data-rc="p-towers"]').fill('A:1:20');
+    await pf.locator('[data-rc="p-rera-acc"]').selectOption('e2e-rera');
+    await page.locator('[data-rc-save-project]').click();
+    const proj = (await readJson(page, 'realty_projects', [], (v) => v?.some((p) => p.name === 'E2E Green Heights'))).find((p) => p.name === 'E2E Green Heights');
+    check(proj?.rera_no === 'P52100099999' && proj?.towers?.[0]?.name === 'A', 'project saved with its RERA no. and tower A');
+    await page.goto(srv.origin + '/receivables?tab=realty&view=units');
+    const bulk = page.locator('[data-rc-bulk]');
+    await bulk.locator('[data-rc="b-carpet"]').fill('100', { timeout: 15000 });
+    await bulk.locator('[data-rc="b-rate"]').fill('5000');
+    await page.locator('[data-rc-add-units]').click();
+    await page.locator('[data-rc-unit="A-104"]').waitFor({ timeout: 15000 });
+    check(await page.locator('[data-rc-unit]').count() === 4, 'a tower of 4 units (A-101 … A-104)');
+    // C3: a construction-linked plan.
+    await page.goto(srv.origin + '/receivables?tab=realty&view=plans');
+    await page.locator('[data-rc="plan-name"]').fill('E2E CLP', { timeout: 15000 });
+    await page.locator('[data-rc-plan-save]').click();
+    await readJson(page, 'payment_plans', [], (v) => v?.length > 0);
+    // C2: book A-101 with stamp duty as pass-through, then a 12% receipt before the agreement.
+    await page.goto(srv.origin + '/receivables?tab=realty&view=bookings');
+    await page.locator('[data-rc="k-name"]').fill('E2E Buyer Asha', { timeout: 15000 });
+    await page.locator('[data-rc="h-Stamp duty"]').fill('400000');
+    await page.locator('[data-rc-book-save]').click();
+    const bk = (await readJson(page, 'realty_bookings', [], (v) => v?.length > 0))[0];
+    check(/^BKG\/FY\d\d-\d\d\/0001$/.test(bk?.number ?? '') && bk.cost_sheet.some((h) => h.head === 'Stamp duty' && h.pass_through && h.amount === 400000) && bk.agreement_value === 5381950, `booking ${bk?.number}: stamp duty outside the agreement value (${bk?.agreement_value})`);
+    await page.locator('[data-rc="r-amount"]').fill(String(Math.round(bk.agreement_value * 0.12)));
+    await page.locator('[data-rc-receipt-save]').click();
+    await page.locator('[data-rc-warn10]').waitFor({ timeout: 15000 });
+    check(true, 'a 12% receipt before the registered agreement shows the RERA Sec 13 10% warning');
+    const adv = (await readJson(page, 'advances', [], (v) => v?.some((a) => a.booking_id === bk.id))).find((a) => a.booking_id === bk.id);
+    check(adv?.tax_rate === 5, 'the receipt is an advance tagged with the booking, GST 5%');
+    check(await page.locator('[data-rc-tds]').count() > 0, '194-IA hint shows for a booking of ₹50 lakh or more');
+    // C3: certify Plinth → raise the demand.
+    await page.goto(srv.origin + '/receivables?tab=realty&view=demands');
+    await page.locator('[data-rc="c-stage"]').selectOption('Plinth', { timeout: 15000 });
+    await page.locator('[data-rc-certify-save]').click();
+    await page.locator('[data-rc-raise]').click({ timeout: 15000 });
+    const dm = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.boq_terms?.cn?.demand?.booking_id === bk.id))).find((i) => i.boq_terms?.cn?.demand?.booking_id === bk.id);
+    check(dm.doc_type === 'TAX_INVOICE' && dm.boq_terms.cn.demand.land?.notif === 7.5 && Math.abs(dm.tax_amount - dm.taxable_value * 0.05) < 0.02, `demand ${dm.boq_terms.cn.demand.number}: 7.5% on two-thirds = 5% (${dm.tax_amount})`);
+    await page.goto(srv.origin + '/invoice/' + dm.id);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.locator('[data-demand]').first().waitFor({ timeout: 15000 });
+    const paper = await dialog.innerText();
+    check(/Value of land deemed one-third/.test(paper) && /CGST 3\.75% \+ SGST 3\.75%/.test(paper), 'the demand paper shows land one-third and CGST 3.75% + SGST 3.75% on two-thirds');
+    check(/Pay only to this account: E2E RERA account/.test(paper) && /Payment plan/.test(paper) && paper.includes('P52100099999'), 'the RERA account, the stage table and the RERA no. print');
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+    // CC date → the next stage is a non-GST "not a supply" demand.
+    const projects = await readJson(page, 'realty_projects', []);
+    const today = dm.issue_date;
+    await writeJson(page, 'realty_projects', projects.map((p) => (p.id === proj.id ? { ...p, cc_date: today } : p)));
+    await page.goto(srv.origin + '/receivables?tab=realty&view=demands');
+    await page.locator('[data-rc="c-stage"]').selectOption('1st slab', { timeout: 15000 });
+    await page.locator('[data-rc-certify-save]').click();
+    await page.locator('[data-rc-raise]').click({ timeout: 15000 });
+    const dm2 = (await readJson(page, 'invoices', [], (v) => v.filter((i) => i.boq_terms?.cn?.demand?.booking_id === bk.id).length > 1)).filter((i) => i.boq_terms?.cn?.demand?.booking_id === bk.id).find((i) => i.id !== dm.id);
+    check(dm2?.doc_type === 'BILL_OF_SUPPLY' && dm2.tax_amount === 0 && dm2.boq_terms.cn.demand.cc_after === true && /not a supply/.test(dm2.notes), 'after the completion certificate the demand is non-GST (Sch III para 5(b))');
+    // C4: the RERA view shows 70% required vs deposited.
+    await page.goto(srv.origin + '/receivables?tab=realty&view=rera');
+    const rera = page.locator('[data-rc-table="rera"]');
+    await rera.waitFor({ timeout: 15000 });
+    check(/70% required/i.test(await rera.innerText()) && /Deposited/i.test(await rera.innerText()), 'RERA view: 70% required vs deposited');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {
