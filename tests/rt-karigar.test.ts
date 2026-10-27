@@ -67,3 +67,20 @@ test('a registered karigar\'s labour carries 5% (SAC 9988); a deleted KAR number
   const d = draftsDb.all().find((x) => x.id === r.bill_draft_id)!;
   assert.deepEqual([d.taxable, d.cgst, d.sgst, d.total, d.itc_eligible], [1000, 25, 25, 1050, true]);
 });
+
+test('recycle bin: a deleted karigar entry comes back with its stock moves; its unposted labour draft went with it', async () => {
+  const { restoreEntry } = await import('../src/lib/trust/recycle-bin.ts');
+  const metal = fine();
+  const a = recordKarigar({ date: '2026-10-01', karigar: salim, kind: 'issue', lines: [karigarLine({ item_id: metal.id, item_name: metal.name, metal: 'gold', purity: '24K', gross_wt: 10 })] });
+  const wip = () => loadTracking().get(metal.id)!.byGodown[godownsDb.list().find((g) => g.kind === 'wip')!.id] ?? 0;
+  const r = recordKarigar({ date: '2026-10-02', karigar: salim, kind: 'receipt', lines: [karigarLine({ item_name: 'Rings', metal: 'gold', purity: '22K', gross_wt: 5, touch_pct: 91.6 })], labour: { basis: 'per_gram', rate: 100 } });
+  assert.ok(draftsDb.all().some((d) => d.id === r.bill_draft_id));
+  deleteKarigarMove(r.id);
+  assert.ok(!draftsDb.all().some((d) => d.id === r.bill_draft_id), 'the labour draft goes with the entry');
+  deleteKarigarMove(a.id);
+  assert.equal(wip(), 0);
+  const e = getTable<{ id: string; table: string; row_id: string }>('recycle_bin').find((b) => b.table === 'karigar_moves' && b.row_id === a.id)!;
+  restoreEntry(e.id);
+  assert.equal(wip(), 10, 'both stock moves came back with the entry');
+  assert.equal(loadKarigarMoves().length, 1);
+});

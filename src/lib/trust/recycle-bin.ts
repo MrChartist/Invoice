@@ -315,6 +315,13 @@ registerRestoreHook('finance_deals', (row, _e, live, bin) => {
   if (t?.refuse) return t;
   return { companions: [...(v?.companions ?? []), ...(t?.companions ?? [])] };
 });
+// R9 (RT-E1 / E4): a jewellery tag or a karigar entry comes back with the stock moves its delete removed.
+const withMoves = (ids: unknown, live: LiveReader, bin: readonly BinEntry[]): RestoreHookResult | null => {
+  const rows = (Array.isArray(ids) ? ids : [ids]).map(str).filter((id) => id && !isLive(live, 'stock_moves', id)).map((id) => inBin(bin, 'stock_moves', (r) => str(r.id) === id)).filter((b): b is BinEntry => !!b);
+  return rows.length ? { companions: rows } : null;
+};
+registerRestoreHook('jewel_tags', (row, e, live, bin) => (live('jewel_tags').some((t) => str(t?.tag).toUpperCase() === str(row.tag).toUpperCase() && str(t?.id) !== e.row_id) ? { refuse: `Tag ${str(row.tag)} was used again since. Add the piece again in Inventory → Jewellery → Tags.` } : withMoves(row.move_id, live, bin)));
+registerRestoreHook('karigar_moves', (row, _e, live, bin) => withMoves(row.move_ids, live, bin));
 registerRestoreHook('invoices', (row, _e, live) => {
   // QA8 T5: an interest draft of an undone run stays gone (its bills were freed to be charged again).
   const run = str(row.interest_run_id);

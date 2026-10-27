@@ -158,7 +158,7 @@ export function recordKarigar(input: KarigarInput): KarigarMove {
   return row;
 }
 
-/** Delete a move and its stock moves (to the recycle bin; the number stays used). Tags made on it stay — delete them first. */
+/** Delete a move, its stock moves and its unposted labour draft (to the recycle bin; the number stays used). Tags made on it must go first. */
 export function deleteKarigarMove(id: string): void {
   requireAccess('books.edit');
   const all = loadKarigarMoves();
@@ -167,5 +167,6 @@ export function deleteKarigarMove(id: string): void {
   if (m.tags?.length && loadTags().some((t) => m.tags!.includes(t.tag))) throw new Error(`Tags ${m.tags.join(', ')} came in on ${m.number}; delete them on the Tags view first.`);
   assertUnlocked({ id, issue_date: m.date, invoice_number: m.number }, 'delete');
   for (const mv of m.move_ids ?? []) stockDb.deleteMove(mv);
+  if (m.bill_draft_id && draftsDb.all().some((d) => d.id === m.bill_draft_id)) draftsDb.remove(m.bill_draft_id); // a labour bill not yet posted goes too
   setTable(KARIGAR_TABLE, all.filter((x) => x.id !== id));
 }
