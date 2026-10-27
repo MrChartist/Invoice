@@ -494,34 +494,130 @@ declare module '../lib/inventory' {
 }
 
 /* ════════════════════════════════════════ RT-E ════════════════════════════════════════ */
+export type Metal = 'gold' | 'silver' | 'platinum';
+export type MakingBasis = 'per_gram' | 'percent' | 'fixed';
+
 /** RT-E2: jewellery line breakdown (snapshot); `rate` = amount ÷ quantity so calc readers are unchanged. */
 export interface JewelLine {
+  /** Tag no. (= the piece's serial); absent = a loose sale by net weight (quantity = net g). */
   tag?: string;
-  metal: string;
+  metal: Metal;
+  /** Purity key: '22K', '18K' … for gold, '925' … for silver / platinum (`rt-jewel-rates.ts` PURITIES). */
   purity: string;
   gross_wt: number;
   stone_wt: number;
   net_wt: number;
+  /** Sale rate per gram of the bill date (snapshot). */
   rate: number;
   wastage_pct: number;
-  making: { basis: 'per_gram' | 'percent' | 'fixed'; value: number };
+  /** Wastage in grams instead of % (valued at the rate). */
+  wastage_g?: number;
+  making: { basis: MakingBasis; value: number };
   stone_value: number;
   hallmark_charge: number;
   huid?: string;
   rate_locked?: boolean;
+  /** The rate was typed by the owner on a day with no rate on the board (audited). */
+  override?: true;
+  /** Job work on the customer's own metal: no metal value; making etc. at the job-work rate (SAC 9988); net wt = memo. */
+  job_work?: true;
+  /** The BIS verification line in force on the bill date (printed under the totals; Reg. 5(11)). */
+  bis?: string;
 }
 /** RT-E3: old metal bought / taken in exchange (URD purchase voucher). */
 export interface OldMetal {
-  metal: string;
+  metal: Metal;
   gross_wt: number;
   stone_wt: number;
   net_wt: number;
+  /** Touch (purity found by test), %. */
   purity_pct: number;
   melt_loss_pct: number;
+  /** Fine weight in 24K grams = net × touch% × (1 − melt%), 3 decimals. */
   fine_wt: number;
+  /** The buy rate used (24K, or the stated purity's when `basis` is 'purity'). */
   rate_24k: number;
+  basis?: 'fine' | 'purity';
   value: number;
   test_method?: string;
+  /** Customer's PAN / Form 60 / ID snapshot (value ≥ the PAN limit). */
+  kyc?: SaleKyc & { id_type?: string; id_last4?: string };
+  /** Sale invoices this voucher settled by exchange. */
+  settled?: { invoice_id: string; number: string; amount: number; payment_id: string }[];
+}
+
+/** RT-E1 metal rate board row (table `metal_rates`, `master.edit`, dated `date`; append-only — the latest row of a day wins). */
+export interface MetalRate {
+  id: string;
+  date: string;
+  metal: Metal;
+  purity: string;
+  /** Sale rate per gram. */
+  sale: number;
+  /** Buy rate per gram (old metal). */
+  buy: number;
+  created_at: string;
+}
+
+/** RT-E1 tagged piece (table `jewel_tags`, `master.edit`): the tag no. is the serial of its stock item. */
+export interface JewelTag {
+  id: string;
+  tag: string;
+  item_id: string;
+  item_name: string;
+  metal: Metal;
+  purity: string;
+  gross_wt: number;
+  stone_wt: number;
+  net_wt: number;
+  stones?: { type: string; carat?: number; count?: number; value: number }[];
+  stone_value: number;
+  wastage_pct: number;
+  making: { basis: MakingBasis; value: number };
+  hallmark_charge: number;
+  huid?: string;
+  design_no?: string;
+  image?: string;
+  /** The stock move that brought it in (tags added on the desk), when not a bill / karigar receipt. */
+  move_id?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+/** RT-E4 karigar line: weights in grams; fine = net × touch%. */
+export interface KarigarLine {
+  item_id?: string;
+  item_name: string;
+  metal: Metal;
+  purity: string;
+  gross_wt: number;
+  net_wt: number;
+  touch_pct: number;
+  fine_wt: number;
+  pieces?: number;
+}
+/** RT-E4 karigar issue / receipt / metal return (table `karigar_moves`, `books.edit`, numbered `KAR/FY…`, dated `date`). */
+export interface KarigarMove {
+  id: string;
+  number: string;
+  date: string;
+  karigar_id: string;
+  karigar_name: string;
+  kind: 'issue' | 'receipt' | 'return_metal';
+  lines: KarigarLine[];
+  /** Receipt: wastage allowed, % of the fine weight received. */
+  wastage_pct?: number;
+  wastage_fine?: number;
+  /** Receipt: labour charge. */
+  labour?: { basis: 'per_gram' | 'per_piece'; rate: number; amount: number };
+  /** Draft purchase bill (labour) made for a receipt. */
+  bill_draft_id?: string;
+  /** Stock moves written (issue to / receipt from the karigar's wip godown). */
+  move_ids?: string[];
+  /** Tags created on a receipt. */
+  tags?: string[];
+  note?: string;
+  created_at: string;
 }
 declare module './invoice' {
   interface InvoiceItem {
