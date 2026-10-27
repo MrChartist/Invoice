@@ -57,7 +57,7 @@ test('checklist v3: each business type gets its documented steps', () => {
   assert.deepEqual(kinds(none, ctxOf('kirana', { modules: new Set(['pos', 'inventory']) })), ['profile', 'retailProfile', 'item', 'posbill', 'whatsapp', 'payment', 'backup'], 'kirana (no GST module): no client / invoice, a POS bill; R9: "Pick your shop" until a shop is chosen');
   assert.deepEqual(kinds(none, ctxOf('full')), ['profile', 'opening', 'import', 'client', 'item', 'invoice', 'payment', 'gstPeriod', 'backup']);
   assert.deepEqual(kinds(none, ctxOf(undefined)), kinds(none, ctxOf('full')), 'an existing company without a type is "full"');
-  assert.deepEqual(kinds(none, ctxOf('services')), ['profile', 'client', 'item', 'invoice', 'whatsapp', 'payment', 'gstPeriod', 'backup']);
+  assert.deepEqual(kinds(none, ctxOf('services')), ['profile', 'serviceProfile', 'client', 'item', 'invoice', 'whatsapp', 'payment', 'gstPeriod', 'backup']); // R10: "Pick your kind of service" until chosen
   assert.deepEqual(kinds(none, ctxOf('wholesale')), ['profile', 'tradeProfile', 'opening', 'import', 'client', 'item', 'invoice', 'whatsapp', 'payment', 'gstPeriod', 'backup'], 'R8-C: "Pick your trade" until a trade profile is chosen');
   assert.deepEqual(kinds(none, ctxOf('wholesale', { tradeKind: 'wholesaler' })), ['profile', 'opening', 'import', 'client', 'item', 'invoice', 'whatsapp', 'payment', 'gstPeriod', 'backup']);
   assert.deepEqual(kinds(none, ctxOf('restaurant')), ['profile', 'client', 'item', 'posbill', 'invoice', 'payment', 'gstPeriod', 'backup']);
