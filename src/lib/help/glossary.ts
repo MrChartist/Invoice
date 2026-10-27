@@ -136,6 +136,11 @@ export const GLOSSARY = {
     'ग्राहकों ने जो माँगा पर स्टॉक में नहीं था, उसकी सूची।', 'इन्वेंटरी → शॉर्ट बुक: काउंटर पर जोड़ें, ड्राफ़्ट परचेज़ ऑर्डर बनाएँ, आने पर ग्राहक को बताएँ।'),
   cod: g('Cash on delivery (COD)', 'The customer pays the delivery person when the order arrives.', 'Delivered COD orders record the cash as the rider\'s; the rider settlement moves it to counter cash.',
     'ऑर्डर पहुँचने पर ग्राहक डिलीवरी वाले को भुगतान करता है।', 'डिलीवर हुए COD ऑर्डर का कैश राइडर के नाम दर्ज होता है; राइडर का हिसाब उसे काउंटर कैश में लाता है।', ['RT6']),
+  // R10: service terms (SV-A)
+  'invoice-cum-bos': g('Invoice-cum-Bill of Supply', 'One document for a customer without a GSTIN that has both taxable and exempt items (Rule 46A).', 'With the switch on, a mixed bill to an unregistered customer prints this title; a registered customer gets two documents.',
+    'बिना GSTIN वाले ग्राहक के लिए एक दस्तावेज़ जिसमें कर-योग्य और छूट वाली दोनों चीज़ें हों (Rule 46A)।', 'स्विच चालू होने पर बिना पंजीकरण वाले ग्राहक का मिला-जुला बिल यही शीर्षक छापता है; पंजीकृत ग्राहक को दो दस्तावेज़ मिलते हैं।', ['SV5']),
+  'without-itc': g('Without ITC', 'A lower GST rate on which the supplier may not take credit of the tax paid on inputs used for that supply.', 'Salons, gyms and some hospital rooms: purchase bills with ITC get a caution, and the Rule 42 working counts that turnover as exempt.',
+    'कम GST दर जिस पर आपूर्तिकर्ता उस आपूर्ति के इनपुट पर चुकाए कर का क्रेडिट नहीं ले सकता।', 'सैलून, जिम और कुछ अस्पताल कमरे: ITC वाले ख़रीद बिल पर चेतावनी आती है, और Rule 42 गणना उस टर्नओवर को छूट गिनती है।', ['SV11', 'SV12']),
   // R11: construction terms (CN-A)
   'm-book': g('Measurement book (M-book)', 'The register in which the engineer records measured quantities of work, page by page.', 'Type the MB ref (book / pages) per line when you measure an RA bill; it prints under the line and in the abstract.',
     'वह रजिस्टर जिसमें अभियंता काम की मापी गई मात्रा पेज-दर-पेज दर्ज करता है।', 'रनिंग बिल मापते समय हर लाइन पर एम-बुक संदर्भ (बुक / पेज) लिखें; यह लाइन के नीचे और सार में छपता है।', ['CN12']),

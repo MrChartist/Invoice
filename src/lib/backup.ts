@@ -476,6 +476,8 @@ const RECORD_TABLES = [
   'delivery_riders', 'rider_settlements', 'short_book', 'doctors', 'rx_refills', 'alteration_jobs', 'imei_checks', 'finance_deals', 'service_jobs', 'metal_rates', 'jewel_tags', 'karigar_moves',
   // R11-C: builders — projects, units, bookings (BKG/FY…), payment plans, stage certificates, RERA account entries
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
+  // R10-A: appointments, service staff, commission plans, staff payouts, payer claims (CLM/FY…)
+  'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -549,6 +551,8 @@ const ID_TABLES = new Set([
   'delivery_riders', 'rider_settlements', 'short_book', 'doctors', 'rx_refills', 'alteration_jobs', 'imei_checks', 'finance_deals', 'service_jobs', 'metal_rates', 'jewel_tags', 'karigar_moves',
   // R11-C: builders — projects, units, bookings (BKG/FY…), payment plans, stage certificates, RERA account entries
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
+  // R10-A: appointments, service staff, commission plans, staff payouts, payer claims (CLM/FY…)
+  'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

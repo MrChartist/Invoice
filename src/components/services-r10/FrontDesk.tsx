@@ -20,6 +20,7 @@ import { appointmentDraft, appointmentText, billedMap, birthdaysIn, fillMessage,
 import { fromMin, overlaps, slotsFor, toMin, weekdayOf } from '../../lib/services/sv-slots';
 import { DEFAULT_MESSAGES, hoursOf, readServiceSettings, saveServiceSettings } from '../../lib/services/sv-settings';
 import { bookableStaff, loadStaff } from '../../lib/services/sv-staff';
+import { compositionNote } from '../../lib/services/sv-tax';
 import { useT } from '../../i18n';
 import { svT, type SvKey } from '../../i18n/areas/services-r10a';
 import { Modal } from '../ui/Modal';
@@ -142,6 +143,15 @@ function Appointments({ view, notify }: { view: View; notify: Notify }) {
           <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setSetup(true)}>{svT('settings')}</button>
         </div>
 
+        {!settings.composition_note_seen && (() => {
+          const n = compositionNote(getTable<InvoiceRecord>('invoices'), localDb.settings.activeProfile(), today); // SV13: one-time notice
+          return n && (
+            <p className={controls.hint} role="note" data-sv-composition>
+              {svT('compNote', { c: n.composition, r: n.regular })}{' '}
+              <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => { try { saveServiceSettings({ composition_note_seen: true }); refresh(); } catch (e) { notify((e as Error).message, 'error'); } }}>{svT('dismiss')}</button>
+            </p>
+          );
+        })()}
         {view === 'day' && (
           <>
             <p className={styles.muted}>{svT('totals', { n: live.length, value: formatCurrency(value) })}{!staff.length ? ` · ${svT('noStaff')}` : ''}</p>
