@@ -21,7 +21,10 @@ import { feeBase } from '../src/lib/prof/ps-tds-recv.ts';
 import { presumptive } from '../src/lib/prof/ps-presumptive.ts';
 import { thresholdCard } from '../src/lib/prof/ps-threshold.ts';
 import { refundSvcPaper } from '../src/lib/prof/ps-refund-svc.ts';
-import { recoveryValue, PURE_AGENT_CHARGE } from '../src/lib/trade/pure-agent.ts';
+import * as pureAgent from '../src/lib/trade/pure-agent.ts';
+
+const { PURE_AGENT_CHARGE } = pureAgent;
+const recoveryValue = (d: Parameters<typeof pureAgent.recoveryValue>[0]) => (pureAgent as { recoveryValue?: typeof pureAgent.recoveryValue }).recoveryValue?.(d) ?? NaN;
 import { exportCheck, verdict } from '../src/lib/prof/ps-export-check.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
 
