@@ -474,6 +474,8 @@ const RECORD_TABLES = [
   // Round 9 (R9-A … R9-E): retail riders / settlements / short book; doctors, refills; alterations; IMEI checks, finance
   // deals, service jobs; metal rates, jewellery tags, karigar moves (names in `retail/rt-shared.ts`)
   'delivery_riders', 'rider_settlements', 'short_book', 'doctors', 'rx_refills', 'alteration_jobs', 'imei_checks', 'finance_deals', 'service_jobs', 'metal_rates', 'jewel_tags', 'karigar_moves',
+  // R11-B (construction finance): contract register, secured advances, price-variation statements, bank guarantees
+  'works_contracts', 'secured_advances', 'price_variations', 'bank_guarantees',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -545,6 +547,8 @@ const ID_TABLES = new Set([
   // Round 9 (R9-A … R9-E): retail riders / settlements / short book; doctors, refills; alterations; IMEI checks, finance
   // deals, service jobs; metal rates, jewellery tags, karigar moves (names in `retail/rt-shared.ts`)
   'delivery_riders', 'rider_settlements', 'short_book', 'doctors', 'rx_refills', 'alteration_jobs', 'imei_checks', 'finance_deals', 'service_jobs', 'metal_rates', 'jewel_tags', 'karigar_moves',
+  // R11-B (construction finance): contract register, secured advances, price-variation statements, bank guarantees
+  'works_contracts', 'secured_advances', 'price_variations', 'bank_guarantees',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

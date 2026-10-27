@@ -14,6 +14,7 @@ import { generateId, getTable, peekTable, setTable } from '../storage';
 import { ruleAt } from '../tax-rules';
 import { ADVANCE_DEFAULTS } from '../construction-rules';
 import { raDueSplit } from '../works/ra-due';
+import { movedNoCash } from '../advance-tax';
 import './cn-registry';
 
 export const CONTRACTS_TABLE = 'works_contracts';
@@ -169,7 +170,7 @@ export function contractSummary(c: WorksContract, invoices: readonly InvoiceReco
   let retention = 0;
   for (const b of bills) {
     const mine = payments.filter((p) => p.invoice_id === b.id);
-    received += mine.filter((p) => !p.ra_journal_id && !p.advance_id && !p.write_off).reduce((s, p) => s + num(p.amount), 0);
+    received += mine.filter((p) => !movedNoCash(p)).reduce((s, p) => s + num(p.amount), 0);
     const out = num(b.ra_net_payable ?? b.total) + (b.ra_deductions ?? []).filter((d) => d.kind !== 'it_tds').reduce((s, d) => s + d.amount, 0) - mine.reduce((s, p) => s + num(p.amount), 0);
     retention += raDueSplit(b, mine, out).held.filter((h) => h.kind === 'retention').reduce((s, h) => s + h.amount, 0);
   }

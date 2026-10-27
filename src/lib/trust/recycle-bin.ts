@@ -36,6 +36,7 @@ import { liveRedeemIssue } from '../retail/gift-voucher-core';
 import '../trade/tr-registry'; // R8-C: Round 8 tables' rights and audit labels (lazy registration)
 import '../hotel/hotel-registry'; // R7: hotel tables' rights and audit labels (lazy registration)
 import '../retail/rt-registry'; // R9: retail tables' rights and audit labels (lazy registration)
+import '../construction/cn-registry'; // R11: construction tables' rights and audit labels (lazy registration)
 
 export { BIN_TABLE };
 export const BIN_SETTINGS_KEY = `${DB_PREFIX}bin_settings`;
@@ -224,6 +225,8 @@ const OWNED_VOUCHERS: readonly { classes: readonly string[]; tables: readonly st
   { classes: ['Packaging deposit'], tables: ['packaging_moves'], redo: 'restore the packaging movement itself, or record it again in Distribution → Packaging' },
   // R9 (RT-D2): a financier's disbursement is undone on its DO
   { classes: ['Finance disbursement'], tables: ['finance_deals'], redo: 'record the disbursement again in Inventory → Devices → Finance' },
+  // R11 (CN-B2): a secured advance's receipt journal is undone with its row
+  { classes: ['Secured advance'], tables: ['secured_advances'], redo: 'record the secured advance again in Time → Works → Advances' },
 ];
 const RA_CLASS = 'RA deduction';
 /** Journals paired one-to-one with a no-cash receipt row through `ra_journal_id` (R9 RT-D2: the finance transfer). */
@@ -322,6 +325,9 @@ const withMoves = (ids: unknown, live: LiveReader, bin: readonly BinEntry[]): Re
 };
 registerRestoreHook('jewel_tags', (row, e, live, bin) => (live('jewel_tags').some((t) => str(t?.tag).toUpperCase() === str(row.tag).toUpperCase() && str(t?.id) !== e.row_id) ? { refuse: `Tag ${str(row.tag)} was used again since. Add the piece again in Inventory → Jewellery → Tags.` } : withMoves(row.move_id, live, bin)));
 registerRestoreHook('karigar_moves', (row, _e, live, bin) => withMoves(row.move_ids, live, bin));
+// R11 (CN-B): a secured advance comes back with its receipt journal; a PV statement only while no live one covers its period.
+registerRestoreHook('secured_advances', (row, _e, live, bin) => companionOr(live, bin, 'vouchers', str(row.voucher_id), 'The receipt journal of this secured advance is gone for good. Record it again in Time → Works → Advances.'));
+registerRestoreHook('price_variations', (row, e, live) => (str(row.status) !== 'cancelled' && live('price_variations').some((p) => str(p?.id) !== e.row_id && str(p?.contract_id) === str(row.contract_id) && str(p?.status) !== 'cancelled' && str(p?.period_from) <= str(row.period_to) && str(p?.period_to) >= str(row.period_from)) ? { refuse: 'A price variation statement for this period was made again since; restoring this one would bill it twice.' } : null));
 registerRestoreHook('invoices', (row, _e, live) => {
   // QA8 T5: an interest draft of an undone run stays gone (its bills were freed to be charged again).
   const run = str(row.interest_run_id);
