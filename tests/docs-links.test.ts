@@ -9,6 +9,10 @@ import { join } from 'node:path';
 
 const read = (p: string) => readFileSync(p, 'utf8');
 
+// R15: TV ids (travel and cross-cutting). TV sits before T so "TV1" is never read as "T" + junk (a digit must follow).
+const CITED_RE = /CA_REVIEW[^\n]*?\b((?:MF|AG|G|TV|T|PS|P|AC|I|X|CN|SV)\d{1,2})\b/g;
+const CA_LIST_RE = /(?:MF|CN|SV|AG|G|TV|T|PS|P|AC|I|X)\d{1,2}/g;
+
 test('every docs/features/*.md path named in the roadmap exists', () => {
   const roadmap = read('docs/ROADMAP.md');
   const named = [...new Set(roadmap.match(/docs\/features\/[a-z0-9-]+\.md/g) ?? [])];
@@ -41,8 +45,8 @@ test('CA_REVIEW ids are unique, and every id the help cites exists there', () =>
   };
   walk(helpDir);
   const cited = new Set<string>();
-  for (const f of files) for (const m of read(f).matchAll(/CA_REVIEW[^\n]*?\b((?:MF|AG|G|T|PS|P|AC|I|X|CN|SV)\d{1,2})\b/g)) cited.add(m[1]);
-  for (const f of files) for (const m of read(f).matchAll(/\bca:\s*\[([^\]]*)\]/g)) for (const id of m[1].match(/(?:MF|CN|SV|AG|G|T|PS|P|AC|I|X)\d{1,2}/g) ?? []) cited.add(id);
+  for (const f of files) for (const m of read(f).matchAll(CITED_RE)) cited.add(m[1]);
+  for (const f of files) for (const m of read(f).matchAll(/\bca:\s*\[([^\]]*)\]/g)) for (const id of m[1].match(CA_LIST_RE) ?? []) cited.add(id);
   assert.deepEqual([...cited].filter((id) => !ids.has(id)), []);
 });
 
@@ -50,4 +54,10 @@ test('feature docs that hand statutory points to a CA point at the consolidated 
   for (const doc of ['collections-r2', 'sales-r2', 'docs-compliance-r3', 'production-r4', 'marketplace-r5', 'transport-works-r5', 'institutions-property-r5']) {
     assert.match(read(`docs/features/${doc}.md`), /Consolidated in `docs\/CA_REVIEW\.md` \(ids /, doc);
   }
+});
+
+test('R15: CA-id patterns read TV ids whole and never confuse them with T ids', () => {
+  assert.deepEqual([...'see CA_REVIEW TV1 and CA_REVIEW T12'.matchAll(CITED_RE)].map((m) => m[1]), ['TV1', 'T12']);
+  assert.deepEqual("ca: ['TV1', 'T3', 'TV26']".match(CA_LIST_RE), ['TV1', 'T3', 'TV26']);
+  assert.equal('TVQ1'.match(CA_LIST_RE), null);
 });

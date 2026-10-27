@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import type { TdsSuggestion, BillTdsInput } from '../../lib/tds-payables';
-import { TDS_PAYABLE_SECTIONS } from '../../lib/tds-rules';
+import { TDS_PAYABLE_SECTIONS, manpowerHint } from '../../lib/tds-rules';
 import { formatCurrency } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { tdsT } from '../../i18n/areas/tds';
@@ -16,7 +16,7 @@ const numOrUndef = (text: string): number | undefined => {
 };
 
 /** The "TDS deducted by you" block of the bill / expense forms (Tally parity). Controlled. */
-export function TdsBillPanel({ value, onChange, suggestion, payableNet, nonResident, date }: {
+export function TdsBillPanel({ value, onChange, suggestion, payableNet, nonResident, date, names = '' }: {
   value: BillTdsInput;
   onChange: (v: BillTdsInput) => void;
   suggestion: TdsSuggestion | null;
@@ -25,11 +25,14 @@ export function TdsBillPanel({ value, onChange, suggestion, payableNet, nonResid
   nonResident?: boolean;
   /** Bill / expense date: picks the Income-tax Act whose section references the list shows (2025 Act from 1 Apr 2026). */
   date?: string;
+  /** R15-A4: item / ledger names of the bill, for the "supply of manpower is work" hint. */
+  names?: string;
 }) {
   useT();
   const uid = useId();
   const set = (p: Partial<BillTdsInput>) => onChange({ ...value, ...p });
   const on = !!value.section;
+  const manpower = manpowerHint(names, value.section, date);
   const shownRate = value.rate ?? suggestion?.rate ?? 0;
   const shownBase = value.base ?? suggestion?.base ?? 0;
   const shownAmount = value.amount ?? (value.rate !== undefined || value.base !== undefined ? Math.round((shownBase * shownRate) / 100) : suggestion?.amount ?? 0);
@@ -108,6 +111,7 @@ export function TdsBillPanel({ value, onChange, suggestion, payableNet, nonResid
                 <span>{formatCurrency(payableNet)}</span>
               </div>
             )}
+            {manpower && <p className={styles.note} role="note">{tdsT('manpowerHint', { label: manpower })}</p>}
             {nonResident && <p className={styles.note}>{tdsT('nonResident')}</p>}
             <p className={styles.note}>{tdsT('blockNote')}</p>
           </>
