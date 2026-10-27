@@ -110,3 +110,26 @@ test('G3: shift reopened and changed after the draft → closing the stale draft
   assert.ok(loadShifts().every((s) => s.cycle_id === c.id));
   assert.equal(loadCycles().length, 1);
 });
+
+/* ── G4: a milk dispatch bill does not take the milk out of stock a second time ── */
+
+test('G4: shift 50 L → dispatch 40 L → bill the union: stock stays 10 L; a milk-card bill still moves stock', async () => {
+  const { localDb } = await import('../src/lib/localDb.ts');
+  const { loadPositions } = await import('../src/lib/inventory.ts');
+  const { billDispatch, saveDispatch } = await import('../src/lib/agri/ag-dispatch.ts');
+  const { billCard, saveCard } = await import('../src/lib/agri/ag-milk-cards.ts');
+  saveChart(cowMatrix());
+  const union = localDb.clients.upsert({ name: 'District Milk Union' });
+  saveChart(cowMatrix({ name: 'Union cow', buyer_id: union, basis: 'flat', unit: 'KG', flat_rate: 40, matrix: undefined }));
+  const { shift } = addEntry({ centre_id: 'c1', date: '2026-11-05', shift: 'M' }, { farmer_id: 'f1', milk: 'cow', qty: 50, unit: 'L', fat: 4, snf: 8.5 });
+  closeShift(shift.id);
+  const milk = () => loadPositions().find((p) => p.item.name === 'Cow milk')?.qty;
+  const d = saveDispatch({ date: '2026-11-05', shift: 'M', centre_id: 'c1', buyer_id: union, milk: 'cow', sent: { qty: 40, unit: 'L', fat: 4, snf: 8.5 } });
+  assert.equal(milk(), 10);
+  billDispatch(d.id);
+  assert.equal(milk(), 10, 'the bill (in kg, on the union\'s figures) moves no stock');
+  const home = localDb.clients.upsert({ name: 'Sharma household' });
+  const card = saveCard({ client_id: home, client_name: 'Sharma', month: '2026-11', milk: 'cow', rate: 60, default_qty: 0, days: { 6: 2 } });
+  billCard(card.id, '2026-11-30');
+  assert.equal(milk(), 8, 'local sale on a card still leaves stock');
+});
