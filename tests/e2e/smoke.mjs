@@ -3981,6 +3981,9 @@ try {
     }
     await row2.locator('[data-ws-bill]').click();
     await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    // The split picker lists the job only once its draft bill and job link reach IndexedDB.
+    const billed2 = (await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.id === job2.id && j.invoice_id), 15000)).find((j) => j.id === job2.id);
+    await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === billed2?.invoice_id), 15000);
     await page.goto(srv.origin + '/time?tab=workshop&view=claims');
     await page.locator('[data-ws-job]').last().selectOption(job2.id, { timeout: 15000 });
     await page.locator('[data-ws-apr]').last().fill('42000');
