@@ -5,6 +5,8 @@
  *   3. client rate (`clients.doc_defaults.hourly_rate`, R3-B5)
  *   4. work type rate (`work_types.rate`)
  *   5. `default_rate` from the time preferences.
+ * R14 (PS-A4): with the optional `{ staffRate }` argument the timekeeper's standard rate is one more level, after the
+ * task and before the project; without the argument the result is identical (PS-C4 fills `currency`).
  * The entry keeps the rate it captured (`TimeEntry.hourly_rate`), so editing a card never reprices
  * logged time; "Re-rate unbilled" (`reRate`) is the explicit way to apply new cards to unbilled work.
  *
@@ -32,7 +34,7 @@ export interface WorkType {
   inactive?: boolean;
 }
 
-export type RateSource = 'task' | 'project' | 'client' | 'work_type' | 'default';
+export type RateSource = 'task' | 'staff' | 'project' | 'client' | 'work_type' | 'default';
 
 export interface RateContext {
   task?: { rate?: number } | null;
@@ -45,6 +47,14 @@ export interface RateContext {
 export interface ResolvedRate {
   rate: number;
   source: RateSource;
+  /** R14: the card's currency when the caller passed one (PS-C4). */
+  currency?: string;
+}
+
+/** R14 (PS-A4 / C4): optional resolver argument — the timekeeper's standard rate and the rate-card currency. */
+export interface RateOpts {
+  staffRate?: number;
+  currency?: string;
 }
 
 const positive = (v: unknown): number | undefined => {
@@ -53,9 +63,16 @@ const positive = (v: unknown): number | undefined => {
 };
 
 /** The first level of the card that sets a rate (> 0) wins; an inactive work type is skipped. */
-export function resolveRate(ctx: RateContext): ResolvedRate {
+export function resolveRate(ctx: RateContext, opts?: RateOpts): ResolvedRate {
+  const r = resolveLevels(ctx, opts);
+  return opts?.currency ? { ...r, currency: opts.currency } : r;
+}
+
+function resolveLevels(ctx: RateContext, opts?: RateOpts): ResolvedRate {
   const task = positive(ctx.task?.rate);
   if (task !== undefined) return { rate: task, source: 'task' };
+  const staff = positive(opts?.staffRate);
+  if (staff !== undefined) return { rate: staff, source: 'staff' };
   const project = positive(ctx.project?.hourly_rate);
   if (project !== undefined) return { rate: project, source: 'project' };
   const client = positive(ctx.client?.doc_defaults?.hourly_rate);
@@ -90,7 +107,7 @@ export function rateContext(e: RateSubject, data: RateData): RateContext {
   };
 }
 
-export const resolveEntryRate = (e: RateSubject, data: RateData): ResolvedRate => resolveRate(rateContext(e, data));
+export const resolveEntryRate = (e: RateSubject, data: RateData, opts?: RateOpts): ResolvedRate => resolveRate(rateContext(e, data), opts);
 
 /** SAC for a billed entry: its (active or not — it was chosen when logged) work type's SAC, else the preference. */
 export function sacFor(e: Partial<Pick<TimeEntry, 'work_type_id'>>, workTypes: readonly WorkType[], fallback: string): string {

@@ -20,7 +20,7 @@ import { PaymentScheduleBlock } from './parts/PaymentScheduleBlock'; // R2-A1
 import { AcceptanceBlock } from './parts/AcceptanceBlock';
 import { OptionalItemsBlock } from './parts/OptionalItemsBlock';
 import { ProposalSections } from './parts/ProposalSections';
-import { agriDeclaration, mfDeclaration, bisText, cashDiscountText, exchangeText, rcmTaxNote, worksLineText } from './paper-helpers';
+import { agriDeclaration, mfDeclaration, psDeclaration, bisText, cashDiscountText, exchangeText, rcmTaxNote, worksLineText } from './paper-helpers';
 import { amountInWords } from '../../lib/amount-in-words';
 import { amountInWordsHi } from '../../lib/amount-in-words-hi';
 import { supplyDeclaration } from '../../lib/bill-of-supply';
@@ -45,6 +45,9 @@ const LazyAgriStatement = lazy(() => import('./parts/AgriStatementPage'));
 // R13 (MF-A5): job particulars and the manufacturing annexure — lazy, mounted only when the document carries `mf`.
 const LazyMfgBlock = lazy(() => import('./parts/MfgBlock'));
 const LazyMfgAnnexure = lazy(() => import('./parts/MfgAnnexurePage'));
+// R14 (PS-A5): professional particulars after the parties and the professional annexure page (only with `ps`).
+const LazyProfBlock = lazy(() => import('./parts/ProfBlock'));
+const LazyProfAnnexure = lazy(() => import('./parts/ProfAnnexurePage'));
 // R11 (CN-A3 … A5): construction paper parts — one lazy chunk, loaded only for documents with the construction snapshot.
 const worksPaper = () => import('./parts/WorksPaper');
 const LazyWorksHeader = lazy(() => worksPaper().then((m) => ({ default: m.WorksHeaderBlock })));
@@ -136,6 +139,8 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
   const agDecl = agriDeclaration(invoice); // R12 (AG-A5)
   const mfDecl = mfDeclaration(invoice); // R13 (MF-A5): '' without `mf` or an MSE seller snapshot
   const mfgBlock = invoice.mf && layout !== 'receipt' && <Suspense fallback={null}><LazyMfgBlock invoice={invoice} /></Suspense>; // R13 (MF-A5)
+  const profBlock = invoice.ps && layout !== 'receipt' && <Suspense fallback={null}><LazyProfBlock invoice={invoice} /></Suspense>; // R14 (PS-A5)
+  const psDecl = psDeclaration(invoice); // R14 (PS-A5): '' without `ps`
   // R12 (AG-A5): the agri box after the parties (before the GST grid); never on receipt paper unless it is a dealer bill.
   const agriBlock = invoice.ag && (layout !== 'receipt' || invoice.ag.kind === 'inputs') && <Suspense fallback={null}><LazyAgriBlock invoice={invoice} /></Suspense>;
 
@@ -172,6 +177,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           <ProposalSections invoice={invoice} place="before" />
           {agriBlock}
           {mfgBlock}
+          {profBlock}
           {layout === 'gst' ? <GstBody invoice={invoice} sender={sender} totals={totals} skipEway={irn?.ewayNo} works={worksHead} /> : <ReceiptBody invoice={invoice} sender={sender} totals={totals} />}
           {worksDeds}
           {exportBlock}
@@ -198,6 +204,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
         {worksHead}
         {agriBlock}
         {mfgBlock}
+        {profBlock}
         {exportBlock}
         <CustomFieldsBlock invoice={invoice} />
         <TransportBlock invoice={invoice} skipEway={irn?.ewayNo} />
@@ -258,6 +265,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           {exch && <SupplyDeclaration text={exch} />}
           {agDecl && <SupplyDeclaration text={agDecl} />}
           {mfDecl && <SupplyDeclaration text={mfDecl} />}
+          {psDecl && <SupplyDeclaration text={psDecl} />}
           {returnNote && <SupplyDeclaration text={returnNote} />}
           {/* 8.5: "Previous balance + This bill = Total due" from the bill's own snapshot (off by default). */}
           <PartyBalanceBlock invoice={invoice} compact={layout === 'receipt'} />
@@ -275,6 +283,8 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           {invoice.ag && layout !== 'receipt' && <Suspense fallback={null}><LazyAgriStatement invoice={invoice} /></Suspense>}
           {/* R13 (MF-A5): size × colour breakdown, inspection summary, scrap weighment as a following page. */}
           {invoice.mf && layout !== 'receipt' && <Suspense fallback={null}><LazyMfgAnnexure invoice={invoice} /></Suspense>}
+          {/* R14 (PS-A5): time by timekeeper (B–D: disbursements, stages, media) as a following page. */}
+          {invoice.ps && layout !== 'receipt' && <Suspense fallback={null}><LazyProfAnnexure invoice={invoice} /></Suspense>}
           {/* R3-C2: photo pages after the totals / annexure (2 × 2 per page). */}
           {invoice.attachments?.some((a) => a.print) && <Suspense fallback={null}><LazyPhotoPages invoice={invoice} /></Suspense>}
         </div>

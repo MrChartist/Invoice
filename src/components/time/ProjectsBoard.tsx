@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
 import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, FolderKanban, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react';
 import type { Client, InvoiceRecord } from '../../types/invoice';
 import type { TimeEntry, TimePrefs } from '../../types/time';
@@ -21,6 +21,10 @@ import controls from '../../styles/controls.module.css';
 import styles from './service-r3.module.css';
 import { useT } from '../../i18n';
 import { svcT } from '../../i18n/areas/service-r3';
+import { isPackOn } from '../../lib/industry-packs';
+import { localDb } from '../../lib/localDb';
+// R14 (PS-A): professional rows, only while the `practice` pack is on (one small lazy chunk).
+const MatterLink = lazy(() => import('../prof/ProfRows').then((m) => ({ default: m.MatterLink })));
 
 type Notify = (message: string, tone?: 'success' | 'error') => void;
 
@@ -326,6 +330,7 @@ export default function ProjectsBoard({ clients, prefs, entries, invoices, proje
         {editProject && (
           <form className={styles.section} onSubmit={(e) => { e.preventDefault(); saveProject(); }}>
             <ProjectForm value={editProject} clients={clients} onChange={setEditProject} />
+            {isPackOn(localDb.settings.get(), 'practice') && <Suspense fallback={null}><MatterLink code={loadCostCentres().find((c) => c.id === editProject.id)?.ps?.code} /></Suspense>}
             <div className={styles.row}>
               <button type="button" className={controls.btnOutline} onClick={() => setEditProject(null)}>{svcT('cancel')}</button>
               <button type="submit" className={controls.btnPrimary} disabled={!editProject.name.trim()} data-save-project>{svcT('save')}</button>

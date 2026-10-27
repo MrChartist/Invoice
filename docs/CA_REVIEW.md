@@ -46,8 +46,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84, AG90 | 65 | 15 |
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF40–MF42, MF50–MF54, MF60–MF65, MF80–MF82, MF90–MF96 | 60 | 12 |
-| 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS40 | 40 | 13 |
-| **Total** | | **464** | **119** |
+| 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44 | 44 | 13 |
+| **Total** | | **468** | **119** |
 
 ---
 
@@ -936,7 +936,7 @@ e-way bills and ITC-04, MSME (Udyam, 43B(h), Form-1), export authorisations, inc
 `MF` ids are counted once here. The ★ items (MF1, MF3, MF5, MF6, MF7, MF9, MF16, MF19, MF20, MF24, MF25) are the ones a
 beta factory's figures depend on first.
 
-## 14. Professional and knowledge-services firms (Round 14, ids PS1–PS40)
+## 14. Professional and knowledge-services firms (Round 14, ids PS1–PS44)
 
 Added with `docs/prd/round-14.md`. It covers CA / CS / CMA firms (client billing beside the practice desk), advocates and
 law firms, architects and interior designers, consulting and IT / software agencies (including exports of services),
@@ -1027,6 +1027,15 @@ exports of services under the FEMA 2026 regulations, 194J / 194T, partners and S
 | PS38 | **Equalisation levy and service-export incentives.** The 2 % levy on e-commerce operators ended on 1 Aug 2024 and the 6 % levy on online advertising on 1 Apr 2025; SEIS ended for exports from 1 Apr 2020 and nothing replaced it for services. The app has no module for either and says so in help for agencies and exporters. Agreed? | No module. | `help/topics-*.ts` | 2024-08-01; 2025-04-01 | Business Today, KNAV, Fox Mandal; mondaq, razorpay |
 | PS39 | **Purpose codes on export invoices.** The app prints the RBI purpose code the user picks (an editable short list for services, e.g. software consultancy, legal, accounting, advertising) with SWIFT / IBAN on export documents. Any objection to printing it on the invoice? | As stated; the list is an example. | `prof-rules.ts` `PURPOSE_CODE_EXAMPLES`; `templates/parts/ProfBlock.tsx` | — | Developers' reading |
 | PS40 | **Advocates' document types.** A registered advocate whose fee memo has only exempt lines issues a Bill of Supply; with reverse-charge lines a tax invoice showing "tax payable by the recipient"; an unregistered advocate a plain "Fee memo". Should a registered advocate's RCM invoice also go to e-Invoicing above the turnover limit? | As stated; e-Invoice by the existing rules. | `prof/ps-legal-paper.ts`; `rcm.ts` | — | Developers' reading |
+
+### 14.7 Added by PS-A (the practice core)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| PS41 | **Write-downs on the fee note.** At billing the pre-bill compares the standard value of the time billed (hours × the rate each entry captured) with what the fee note charges, and stores the difference with a reason (cap, fixed fee, courtesy …) on the document only. The client copy shows the hours on the annexure but never the write-down column. Is anything in that comparison something a CA would expect on the client's paper (e.g. "discount" wording for GST valuation, Sec 15(3))? | Management figure only; the fee note's taxable value is what is charged; no discount line. | `prof/ps-prebill.ts`, `ps-writedown.ts`; `annexure.ts` | — | Developers' reading |
+| PS42 | **Realisation definitions.** Billing realisation = billed ÷ standard of the time billed (WIP written off in the period counts as standard billed at nil); collection = (receipts + TDS deducted by the client, capped at the note less credit notes) ÷ billed; overall = collected ÷ standard. Is counting TDS deducted as collected, and reducing collection (not billing) by a later credit note, the usual practice view? | As stated; printed under the table. | `prof/ps-realisation.ts` | — | Developers' reading; Clio / Karbon help pages (two definitions) |
+| PS43 | **Year-end accrual journal.** When the dated setting is on, the unbilled work (standard less the expected write-down) is posted Dr "Unbilled revenue (WIP)" (other current assets) Cr "Professional fees — unbilled" (revenue) on the closing date and reversed the next day; engagements of up to 90 days on the completed-service method are shown at nil. Acceptable presentation under AS 9 / ICDS IV, and is the next-day reversal right for the books? | Off by default; memo paper always. | `prof/ps-yearend.ts` | — | ICDS IV (as read on taxguru / cleartax); AS 9 (recalled) |
+| PS44 | **Matter particulars and bank details on the fee note.** The fee note prints the matter code / name / court / case no., the engagement number and billing model, and a billing-basis sentence ("Capped at ₹40,000 (₹40,000 used)"); export documents print SWIFT / IBAN / intermediary bank from the sender snapshot. Any objection, e.g. client confidentiality of case numbers on a document that also goes to GST records? | Printed only when the document carries the snapshot. | `templates/parts/ProfBlock.tsx`, `prof/ps-print.ts`; `trade/exporter.ts` | — | Developers' reading |
 
 `PS` ids are counted once here. The ★ items (PS1, PS3, PS4, PS5, PS6, PS12, PS15, PS18, PS20, PS22, PS23, PS26, PS27)
 are the ones a beta professional firm's figures depend on first.

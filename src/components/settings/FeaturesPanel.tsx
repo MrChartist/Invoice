@@ -15,6 +15,9 @@ import { applyAgriKind, applyMfgKind } from '../../lib/shop-presets';
 import { MfgKindPicker } from '../mfg/MfgKindPicker'; // R13 (MF-A1)
 import { mfPickT } from '../../i18n/areas/mfg-r13a-pick';
 import { svPickT } from '../../i18n/areas/services-r10-pick';
+import { applyProfKind } from '../../lib/shop-presets';
+import { ProfKindPicker } from '../prof/ProfKindPicker'; // R14 (PS-A1)
+import { psPickT } from '../../i18n/areas/prof-r14a-pick';
 import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
 import { DB_PREFIX, getJson } from '../../lib/storage';
 import { cnPickT } from '../../i18n/areas/construction-r11-pick';
@@ -171,6 +174,26 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
                 onChange(applyServiceKind(k, { registered, pharmacy: svPharmacy }));
                 // The profile's switches only fill unset ones; changing the profile deletes nothing.
                 void import('../../lib/services/sv-profile').then((m) => m.applyServiceSwitches(k)).catch(() => undefined);
+              }}
+            />
+          </div>
+        )}
+        {/* R14 (PS-A1): "Professional profile" for every services company (+ Custom); the firm form is set in the wizard / annual pack */}
+        {settings.business_type === 'services' && (
+          <div className={controls.field} data-features-prof>
+            <span className={controls.label}>{psPickT('title')}</span>
+            <ProfKindPicker
+              value={settings.prof_kind}
+              custom
+              disabled={!owner}
+              sub={settings.prof_sub}
+              onSub={(x) => settings.prof_kind && onChange({ prof_sub: x })}
+              onPick={(k) => {
+                if (!k) return onChange({ prof_kind: undefined });
+                const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
+                onChange(applyProfKind(k, { registered, sub: settings.prof_sub, currentPacks: packsOn }) as Partial<typeof settings>);
+                // The profile's switches only fill unset ones; changing the profile deletes nothing.
+                void import('../../lib/prof/ps-profile').then((m) => m.applyProfSwitches(k, settings.prof_sub)).catch(() => undefined);
               }}
             />
           </div>

@@ -14,6 +14,7 @@ import type {} from '../types/retail-r9'; // R9: retail record / line fields (R9
 import type {} from '../types/services-r10'; // R10: the record / line snapshot key `sv` (appended to R9's lists)
 import type {} from '../types/agri-r12'; // R12: the record snapshot key `ag` (R12_RECORD_KEYS)
 import type {} from '../types/mfg-r13'; // R13: the record snapshot key `mf` (R13_RECORD_KEYS)
+import type {} from '../types/prof-r14'; // R14: the record snapshot key `ps` (R14_RECORD_KEYS)
 import { generateId } from '../lib/storage';
 import { deriveGstMode, num } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
@@ -174,7 +175,9 @@ export const R8_LINE_KEYS = ['disc_chain', 'disc_per_unit', 'wt', 'charge_head_i
 export const R12_RECORD_KEYS = ['ag'] as const;
 /** R13 (MF-A, src/types/mfg-r13.ts): ONE record key `mf` (the manufacturing snapshot); no line key. */
 export const R13_RECORD_KEYS = ['mf'] as const;
-export const R9_RECORD_KEYS = ['delivery', 'kyc', 'sv', ...R12_RECORD_KEYS, ...R13_RECORD_KEYS] as const; // R12 / R13: one spread token each (normalizeRecord, RECORD_KEYS)
+/** R14 (PS-A, src/types/prof-r14.ts): ONE record key `ps` (the professional snapshot); no line key. */
+export const R14_RECORD_KEYS = ['ps'] as const;
+export const R9_RECORD_KEYS = ['delivery', 'kyc', 'sv', ...R12_RECORD_KEYS, ...R13_RECORD_KEYS, ...R14_RECORD_KEYS] as const; // R12 / R13 / R14: one spread token each (normalizeRecord, RECORD_KEYS)
 export const R9_LINE_KEYS = ['band_rate', 'serial_pairs', 'margin', 'jw', 'sv', 'ag_class'] as const; // QA13 G7: + the R12 line class
 
 function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {

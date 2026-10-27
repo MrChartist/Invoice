@@ -129,6 +129,9 @@ export const TIME_TABS = [
   { id: 'clinic', pack: 'clinic' }, // SV-B: views patients / opd / ipd / lab / tests / referrals / rates
   { id: 'members', pack: 'fitness', alsoPacks: ['salon'] }, // SV-C: views plans / members / checkin / classes / recipes
   { id: 'workshop', pack: 'workshop' }, // SV-D: views jobs / estimates / claims / reminders / labour / vehicles
+  // R14: professional desks (one lazy chunk each; views in `&view=`). B / C / D append clientmoney, exportsvc, firm, cadesk.
+  { id: 'matters', pack: 'practice' }, // PS-A2: views matters / engagements / conflicts / letters
+  { id: 'wip', pack: 'practice' }, // PS-A3 / A4: views wip / prebill / realisation / utilisation / profit / yearend
 ] as const;
 export type TimeTab = (typeof TIME_TABS)[number]['id'];
 /* ── Recurring ── */
