@@ -170,11 +170,12 @@ Severity:
 
 ## 3. Checks and budget
 
-- `tsc -b`, `eslint .` (0 errors), the full `node --test` suite, `vite build` + `postbuild`, the bundle check and the
-  Playwright smoke (`E2E_TIMEOUT=60000`) — see the hand-off for the run. `npm run …` itself exits 216 in this sandbox
-  before running a script, so each script's command was run directly.
-- First paint: unchanged within hash noise (every fix sits in lazy chunks: construction engines, `vouchers`,
-  `purchases`, `advances` / `advance-tax`, `bill-guard`, `recycle-bin`, `measurements`). No new icon.
+- `tsc -b` clean; `eslint .` 0 errors (27 warnings, as before); `node --test` 3,019 / 3,019; `vite build` + `postbuild`
+  ok; bundle check ok; Playwright smoke (`E2E_TIMEOUT=60000`) all checks passed. `npm run …` itself exits 216 in this
+  sandbox before running a script, so each script's command was run directly.
+- Budget (`vite build`, gzip -9, against `f5645b2`): first paint 189,141 B → 189,130 B (−11 B: the unused stub left the
+  preload map); total JS 2,959,813 B → 2,961,101 B (+1.3 kB). Every fix sits in lazy chunks (construction engines,
+  `vouchers`, `purchases`, `advances` / `advance-tax`, `bill-guard`, `recycle-bin`, `measurements`). No new icon.
 
 ## 4. CA questions added
 
