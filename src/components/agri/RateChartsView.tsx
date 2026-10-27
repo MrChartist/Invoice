@@ -72,10 +72,10 @@ export default function RateChartsView({ onDone }: { onDone: Done }) {
       <div className={controls.row} style={wrap}>
         <F l={bT('name')} w={180}><input className={controls.input} value={c.name} onChange={(e) => set({ name: e.target.value })} data-dairy="chart-name" /></F>
         <Sel l={bT('milk')} v={c.milk} set={(milk) => set({ milk })} opts={milkOpts()} />
-        <Sel l={bT('basis')} v={c.basis} set={(basis) => set({ basis })} opts={BASES.map((b) => [b, bT(`basis.${b}`)] as const)} w={180} />
-        <Sel l={bT('unit')} v={c.unit} set={(unit) => set({ unit })} opts={[['L', 'L'], ['KG', 'kg']]} w={80} />
-        <F l={bT('from')} w={160}><input type="date" className={controls.input} value={c.from} onChange={(e) => set({ from: e.target.value })} /></F>
-        <Sel l={bT('buyer')} v={c.buyer} set={(buyer) => set({ buyer })} opts={[['', bT('farmersChart')], ...clientOpts()]} w={200} />
+        <Sel l={bT('basis')} v={c.basis} set={(basis) => set({ basis })} opts={BASES.map((b) => [b, bT(`basis.${b}`)] as const)} w={180} d="chart-basis" />
+        <Sel l={bT('unit')} v={c.unit} set={(unit) => set({ unit })} opts={[['L', 'L'], ['KG', 'kg']]} w={80} d="chart-unit" />
+        <F l={bT('from')} w={160}><input type="date" className={controls.input} value={c.from} onChange={(e) => set({ from: e.target.value })} data-dairy="chart-from" /></F>
+        <Sel l={bT('buyer')} v={c.buyer} set={(buyer) => set({ buyer })} opts={[['', bT('farmersChart')], ...clientOpts()]} w={200} d="chart-buyer" />
       </div>
       {c.basis === 'matrix' ? (
         <>
@@ -90,8 +90,8 @@ export default function RateChartsView({ onDone }: { onDone: Done }) {
         </>
       ) : (
         <div className={controls.row} style={wrap}>
-          {c.basis === 'flat' ? <N l={bT('flatRate')} v={c.flat} set={(flat) => set({ flat })} /> : c.basis === 'ts_kg' ? <N l={bT('tsRate')} v={c.ts} set={(ts) => set({ ts })} /> : <N l={bT('fatRate')} v={c.fat} set={(fat) => set({ fat })} />}
-          {c.basis === 'two_axis' && <N l={bT('snfRate')} v={c.snf} set={(snf) => set({ snf })} />}
+          {c.basis === 'flat' ? <N l={bT('flatRate')} v={c.flat} set={(flat) => set({ flat })} /> : c.basis === 'ts_kg' ? <N l={bT('tsRate')} v={c.ts} set={(ts) => set({ ts })} /> : <N l={bT('fatRate')} v={c.fat} set={(fat) => set({ fat })} d="chart-fat" />}
+          {c.basis === 'two_axis' && <N l={bT('snfRate')} v={c.snf} set={(snf) => set({ snf })} d="chart-snf" />}
         </div>
       )}
       <div className={controls.row} style={wrap}>
