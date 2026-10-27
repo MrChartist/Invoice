@@ -225,7 +225,7 @@ export { GST_SLAB_RULES, slabsAt, rateInSlabs } from './tax-rules';
 
 export { isOwnGstin } from './gstin';
 
-export type GstExceptionCode = 'IRN_MISSING' | 'IRP_WINDOW_CLOSED' | 'B2B_NO_HSN' | 'POS_STATE_MISMATCH' | 'RATE_NOT_IN_SLABS' | 'B2CL_EDGE' | 'OWN_GSTIN';
+export type GstExceptionCode = 'IRN_MISSING' | 'IRP_WINDOW_CLOSED' | 'B2B_NO_HSN' | 'POS_STATE_MISMATCH' | 'RATE_NOT_IN_SLABS' | 'B2CL_EDGE' | 'OWN_GSTIN' | 'BAND_RATE' | 'BAND_EDGE' | 'BAND_DISCOUNT';
 
 export interface GstException {
   code: GstExceptionCode;
@@ -250,6 +250,17 @@ export interface ExceptionOptions {
   today: string;
   /** Only documents of this sender GSTIN ('' = all). */
   gstin?: string;
+}
+
+// R9 (RT-C1): price-band lines (rate vs the band, near the limit, decided by a discount) — one lazy check. The caller
+// passes the loader (its chunk already lists the deps); loaded only for a company with band lines or the apparel pack.
+type BandCheck = (inv: InvoiceRecord) => { code: GstExceptionCode; vars: Record<string, string | number> }[];
+let bandCheck: BandCheck | null = null;
+let bandLoad: Promise<boolean> | null = null;
+/** Resolves true once the check has just loaded (re-run the exceptions then). */
+export function loadBandCheck(invoices: readonly InvoiceRecord[], force: boolean, load: () => Promise<{ liveBandExceptions: BandCheck }>): Promise<boolean> {
+  if (bandCheck || (!force && !invoices.some((i) => i?.items?.some((l) => l?.band_rate)))) return Promise.resolve(false);
+  return (bandLoad ??= load().then((m) => { bandCheck = m.liveBandExceptions; return true; }, () => false));
 }
 
 /** GST exceptions for documents dated in [from, to]. Errors first, then by date. */
@@ -297,6 +308,7 @@ export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOp
       const v = Number(inv.total) || 0;
       if (v >= t * (1 - B2CL_EDGE_BAND) && v <= t * (1 + B2CL_EDGE_BAND)) push('B2CL_EDGE', 'warning', { value: r2(v), threshold: t, section: v > t ? 'B2CL' : 'B2CS' });
     }
+    for (const b of bandCheck?.(inv) ?? []) push(b.code, 'warning', b.vars);
   }
   const rank = (e: GstException) => (e.severity === 'error' ? 0 : 1);
   return out.sort((a, b) => rank(a) - rank(b) || a.date.localeCompare(b.date) || a.number.localeCompare(b.number));

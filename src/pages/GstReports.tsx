@@ -59,7 +59,8 @@ import { defineArea } from '../i18n/area';
 import { buildPreflight, needsPreflight, preflightCount, type PreflightForm } from '../lib/gst-preflight';
 import type { LutIssue } from '../lib/trade/lut-register';
 import type { LutRow } from '../types/trade-r4';
-import { aatoFor, gstExceptions } from '../lib/gst-guards';
+import { aatoFor, gstExceptions, loadBandCheck } from '../lib/gst-guards';
+import { impliedPacks } from '../lib/shop-mode';
 import { rememberDownload, stripReturn, type FilerFrequency } from '../lib/compliance';
 import { FilingStrip } from '../components/gst-reports/FilingStrip'; // R6-C4
 import { todayIso } from '../lib/tax-rules';
@@ -258,6 +259,9 @@ export function GstReports() {
   // R4-C1: zero-rated exports of the period without a live LUT (register in Settings → Business → Export); the LUT
   // module loads on demand, only when the period has such a supply.
   const [lutFindings, setLutFindings] = useState<LutIssue[]>([]);
+  // R9 (RT-C1): the lazy price-band check; re-run the exceptions once it has loaded.
+  const [bandTick, setBandTick] = useState(0);
+  useEffect(() => { loadBandCheck(invoices, impliedPacks(localDb.settings.get()).includes('apparel'), () => import('../lib/retail/rt-bands')).then((n) => n && setBandTick((x) => x + 1)); }, [invoices]);
   useEffect(() => {
     const { from, to } = periodRange(period);
     const docs = invoices.filter((i) => (i.supply_type === 'EXPORT_LUT' || i.supply_type === 'SEZ_WITHOUT_PAYMENT') && (i.issue_date ?? '') >= from && (i.issue_date ?? '').slice(0, 10) <= to && (!gstin || (i.sender?.companyGstin ?? '').toUpperCase() === gstin));
@@ -273,8 +277,8 @@ export function GstReports() {
     const s = localDb.settings.get();
     const active = s.profiles.find((p) => p.id === s.activeProfileId) ?? null;
     const exceptions = gstExceptions(invoices, { ...periodRange(period), irnIds, aato: (inv) => aatoFor(inv, s.profiles, active), today: todayIso(), gstin });
-    return { exceptions, issues, gaps, lut: lutFindings };
-  }, [invoices, period, gstin, issues, gaps, lutFindings]);
+    return { exceptions, issues, gaps, lut: lutFindings, bandTick };
+  }, [invoices, period, gstin, issues, gaps, lutFindings, bandTick]);
   const preflight = useMemo(() => buildPreflight(preflightInput), [preflightInput]);
   const checkCount = preflightCount(preflight);
   // R3-C4: unresolved portal errors of this period × GSTIN add an optional step to the filing strip.
@@ -583,7 +587,7 @@ export function GstReports() {
       case 'guards':
         return (
           <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
-            <Gst8dPanel view="guards" period={period} gstin={gstin} g1={g1} g3={g3} invoices={invoices} notify={notify} />
+            <Gst8dPanel key={bandTick} view="guards" period={period} gstin={gstin} g1={g1} g3={g3} invoices={invoices} notify={notify} />
           </Suspense>
         );
       case 'setoff':

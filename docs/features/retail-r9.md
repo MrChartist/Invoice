@@ -124,7 +124,87 @@ the picker's strings split off so the wizard does not load the RT-A area.
 
 # RT-C — Apparel, footwear, textiles
 
-(RT-C)
+Pack `apparel` (shop profile *Garments / footwear / textiles*). One lazy desk chunk (`ApparelDesk.tsx`, which also holds
+the editor / POS / supplier-bill parts and `MatrixEntryDialog.tsx` / `AlterationSlip.tsx`); strings in
+`i18n/areas/retail-r9c.ts` (English + Hindi). Working papers — verify with your CA (RT1–RT3).
+
+## 1. Items
+
+**C1 Price-band GST.** `retail-rules.ts` `PRICE_BAND_RULES` (date-keyed, every row `verified: false`): apparel
+2017-07-01 ≤ ₹1,000 → 5 % else 12 %, 2025-09-22 ≤ ₹2,500 → 5 % else 18 %; footwear 2017-07-01 ≤ ₹500, 2018-07-27
+≤ ₹1,000 (low confidence), 2025-09-22 ≤ ₹2,500, each else 18 %; made-ups as apparel (assumed). The comparison is **≤**.
+`retail/rt-bands.ts` (pure; one `peekTable` lookup): `bandRate(kind, perPiece, date, inclusive)`; `syncBands(record,
+kindOf?)` takes each band line's value per piece from `calculateInvoice` (gross − line discount − its pro-rata share of
+the invoice discount, ÷ pieces = quantity × `lineFactor`, so "3 for ₹1,999" counts 3) and sets `tax_rate` plus the
+snapshot `band_rate { kind, value_per_piece, rate }`. Tax-inclusive (MRP) prices: the lower band if price ÷ 1.05 ≤ the
+limit, else the higher, no loop; the price stays. A rate typed on the line (tax rate ≠ `band_rate.rate`) marks the line
+`manual` and is kept. Credit / debit notes, bills of supply and no-GST documents are never re-banded (a credit note keeps
+the sale's rate). Item field `gst_band` (stock item or catalogue row); Apparel → *Price bands* sets it per item or in
+bulk by HSN chapter (61 / 62 apparel, 63 made-ups, 64 footwear; a style's children follow it) and lists the dated rows.
+Editor: a catalogue pick / scan of a band item marks the line (`pricing-actions.ts` `markBand`), `EditorApparel`
+re-bands on every store change (rate, discount, quantity, invoice discount, date), `BandChip` under the line
+("5% band · ₹2,379.15/pc"). POS: `PosApparel` re-bands the cart after offers / loyalty / promo vouchers (lookup by item
+name) and shows the chips. GST → Exceptions (`gst-guards.ts`, one lazy check loaded by the GST page only when a document
+has band lines or the pack is on): `BAND_RATE` (stored rate ≠ band), `BAND_EDGE` (within ₹50 of the limit), `BAND_DISCOUNT`
+(the band was decided by a discount), all warnings.
+
+**C2 Size × colour grid.** `retail/rt-matrix.ts` over `variants.ts` children: `gridCells`, `linesToGrid` (the grid
+opens with the bill's quantities), `gridToLines` (a non-zero cell updates its child's line in place — the first one,
+extra duplicates dropped — or adds one; a zero cell removes it; other lines kept; blank starter lines dropped; children
+missing are reported, and *Create missing* runs `generateVariants` with the style's band). `saleLine` marks a band
+child's line for C1; `purchaseLine` stocks in by `item_id` and takes the band of the cost per piece on the bill date.
+`MatrixEntryDialog` (rows = axis 1, columns = axis 2, one table per value of axis 3; one rate or a rate per cell):
+*Size grid* button in the invoice editor (every document type with prices, pack on) and the supplier bill
+(`BillModal`, pack on). Apparel → *Size × colour*: stock per cell from the stock engine (`loadTracking`, godown filter),
+sold in the last 30 days, sold-out cells in red, CSV. Labels: `label-sheet.ts` `attrLine` prints "M / Blue" under the
+name (`LabelItem.attrs`, filled from `variant_attrs` by `LabelSheetModal`).
+
+**C3 Alteration slips.** `retail/rt-alterations.ts` (imports `rt-registry`): table `alteration_jobs` (`doc.create`,
+dated `date`, numbered `ALT/FY…` through `series-counters.ts`; a deleted number stays used; delete goes to the recycle
+bin; period lock on create / delete). Fields: customer, phone, linked bill (typed number, resolved to the invoice), garment,
+notes / measurements, tailor (a vendor), ready-by day, charge (0 = free), tailor's rate, status received → with tailor →
+ready → delivered | cancelled. Charge: `chargeLine` = one service line, SAC / rate from `ALTERATION_RULES` (998821 at 5 %,
+unverified, RT3), description = the slip number; *Bill ₹…* opens a new invoice with it (`billedJobs` marks it billed).
+A free alteration adds nothing. *Make tailor bill*: a purchase-bill **draft** (`EXPENSE`, "Tailoring charges", no GST /
+ITC, unregistered tailor, no RCM) of the tailor's delivered, unbilled jobs in a period at the tailor's rates; the jobs
+keep the draft id (a billed slip cannot be deleted). Board by status / due day with overdue marks, `wa.me` "ready" link,
+80 mm slip (customer copy + shop copy with the token). POS: "n alteration(s) due" link (pack on).
+
+## 2. Deviations
+
+- PO / GRN editors have no *Size grid* button (each host chunk would carry the desk's ~60-entry preload list, ≈ 0.6 kB
+  each): a purchase order converted to a bill keeps its lines, and the supplier bill has the grid.
+- The stock matrix uses the tracking engine's quantity (same numbers as the stock summary, `tests/rt-matrix.test.ts`);
+  "sold in 30 days" matches sale lines by item name.
+- A charged alteration is billed on its own new invoice (the sale bill can take the same line by hand); `charge_invoice_id`
+  is not written — `billedJobs` finds the line by the slip number.
+- The GST exceptions band check is loaded by the GST Reports page (it remounts the Guards view once it is ready); the
+  8D panel no longer loads anything itself.
+
+## 3. Sizes (gz, `npm run build && npm run check:size`)
+
+Measured against the merged base `7976a93`:
+
+| | Before | After | Δ |
+|---|---|---|---|
+| Initial JS | 189,048 B | 189,043 B | **−5 B** |
+| Total JS | 2,779,905 B | 2,796,487 B (2731 kB / 2900) | **+16.6 kB** |
+
+**Deviation (total):** over RT-C's 10 kB share. Breakdown: `ApparelDesk` chunk 11.8 kB (three desk views, grid dialog,
+slip, editor / POS / bill parts, `rt-matrix`, `rt-alterations`, en + hi strings ≈ 3 kB); `rt-bands` 1.8 kB (shared by the
+editor, POS and GST exceptions; holds the dated rows); `variants` split into its own chunk +1.3 kB (−1.0 kB from
+`DepthTab`); sample block +0.6; host glue (lazy mounts and their preload lists, chip, band hook, label line, exception
+strings) ≈ 1.6 kB across InvoiceCreator, Pos, Expenses, Inventory, GstReports, gst-guards, LabelSheetModal,
+pricing-actions; `rt-shared` split +0.3 (−0.2 from `rt-settings`). Trimmed: grid tables shared by the dialog and the
+stock grid, one desk chunk (a separate dialog chunk cost +1.1 kB), the band check's import moved from `gst-guards` to the
+page (−0.35 kB), PO / GRN mounts dropped (−1.2 kB).
+
+## 4. CA items (RT-C)
+
+- RT1: band rows from 2017 / 2018 typed from memory (`verified: false`); made-ups assumed as apparel.
+- RT2: per-piece value after the line discount and the pro-rata invoice discount; tax-inclusive prices solved by
+  testing the lower band first (an MRP between ₹2,625 and ₹2,950 lands in 18 % with a taxable value under ₹2,500).
+- RT3: alteration charge SAC 998821 at 5 % (unverified); tailor bills carry no GST / RCM.
 
 # RT-D — Electronics and mobiles
 
