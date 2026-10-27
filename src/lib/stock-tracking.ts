@@ -257,12 +257,13 @@ export function fefoBatch(t: ItemTracking | undefined, day: string, godown?: str
 
 /** Split `qty` across unexpired batches in FEFO order; `short` is what no batch can cover. */
 export function fefoAllocate(
-  t: ItemTracking | undefined, day: string, qty: number, godown?: string,
+  t: ItemTracking | undefined, day: string, qty: number, godown?: string, keep?: (b: BatchOption) => boolean,
 ): { lines: BatchOption[]; short: number } {
   let rest = num(qty);
   const lines: BatchOption[] = [];
   for (const b of batchOptions(t, day, godown)) {
     if (rest <= EPS || b.expired) break;
+    if (keep && !keep(b)) continue; // QA16 P2: a client's minimum shelf life (MF-D2)
     const take = Math.min(rest, b.qty);
     lines.push({ ...b, qty: roundQty(take) });
     rest -= take;
@@ -271,10 +272,10 @@ export function fefoAllocate(
 }
 
 /** Invoice lines for a FEFO split of `line` (first keeps its id; quantities follow the batches). */
-export function splitLineByFefo(line: InvoiceItem, t: ItemTracking | undefined, day: string, newId: () => string): InvoiceItem[] {
+export function splitLineByFefo(line: InvoiceItem, t: ItemTracking | undefined, day: string, newId: () => string, keep?: (b: BatchOption) => boolean): InvoiceItem[] {
   // Batches hold base units; a line typed in an alternate unit (WP-8) is split back into its own unit.
   const f = lineFactor(line);
-  const { lines, short } = fefoAllocate(t, day, num(line.quantity) * f, line.godown_id || undefined);
+  const { lines, short } = fefoAllocate(t, day, num(line.quantity) * f, line.godown_id || undefined, keep);
   if (lines.length === 0) return [line];
   const out = lines.map((b, i) => withBatch({ ...line, id: i === 0 ? line.id : newId(), quantity: roundQty(b.qty / f) }, b));
   if (short > EPS) out[out.length - 1] = { ...out[out.length - 1], quantity: roundQty(out[out.length - 1].quantity + short / f) };

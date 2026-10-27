@@ -25,9 +25,9 @@ export default function MsmeView({ ctx }: { ctx: MfgContext }) {
   const mse = sellerIsMse(sender);
   const data = useMemo(() => {
     void ctx.version;
-    return { invoices: localDb.invoices.getAll(), pays: localDb.payments.getAll(), bills: purchasesDb.all(), vpays: paymentsDb.all(), vendors: vendorsDb.all(), clients: localDb.clients.getAll() };
+    return { invoices: localDb.invoices.getAll(), pays: localDb.payments.getAll(), bills: purchasesDb.all(), vpays: paymentsDb.all(), vendors: vendorsDb.all(), clients: localDb.clients.getAll(), links: getTable<{ from_id: string; to_id: string; relation: string }>('doc_links') };
   }, [ctx.version]);
-  const groups = mse ? byBuyer(mseReceivables(data.invoices, data.pays, asOf)) : [];
+  const groups = mse ? byBuyer(mseReceivables(data.invoices, data.pays, asOf, data.links)) : [];
   const seller = { name: sender?.companyName ?? '', udyam: sender?.msme_udyam ?? '', category: sender?.msme_category ?? '' };
   const [half, setHalf] = useState(() => previousHalf(form1Half(todayInput())));
   const reasons = readMfgSettings().form1_reasons ?? {};

@@ -107,7 +107,7 @@ export const tabsT = defineArea(
     'mfg.reorder': 'Reorder status',
     'mfg.reports': 'Stock reports',
     // R13: manufacturing desks (also "Industry packs" rows)
-    'mfg.floor': 'Shop floor: work centres, routings, job cards, load', 'mfg.shop': 'Engineering shop: drawings, weight quotes, inspection, scrap', 'mfg.moulding': 'Moulding: runs, regrind, material balance, EPR', 'mfg.press': 'Printing press: estimates, job tickets, paper', 'mfg.garments': 'Garments: styles, cut plans, bundles, CMT, karigars', 'mfg.food': 'Food unit: cost cards, shelf life, schemes', 'mfg.statutory': 'Factory statutory: MSME, incentives, authorisations, inventories',
+    'mfg.floor': 'Shop floor: work centres, routings, job cards, load', 'mfg.shop': 'Engineering shop: drawings, weight quotes, inspection, scrap', 'mfg.moulding': 'Moulding: runs, regrind, material balance, EPR', 'mfg.press': 'Printing press: estimates, job tickets, paper', 'mfg.garments': 'Garments: styles, cut plans, bundles, CMT, karigars, inverted-duty refund', 'mfg.food': 'Food unit: cost cards, FSSAI, shelf life, near expiry, schemes', 'mfg.statutory': 'Factory statutory: MSME Form-1 and interest, incentives, AA / EPCG, inventories',
     // Payroll
     'payroll.employees': 'Employees',
     'payroll.heads': 'Pay heads',
@@ -316,7 +316,7 @@ export const tabsT = defineArea(
     'mfg.landed': 'लैंडेड कॉस्ट',
     'mfg.reorder': 'रीऑर्डर स्थिति',
     'mfg.reports': 'स्टॉक रिपोर्ट',
-    'mfg.floor': 'शॉप फ़्लोर: कार्य केंद्र, रूटिंग, जॉब कार्ड, लोड', 'mfg.shop': 'इंजीनियरिंग शॉप: ड्रॉइंग, वज़न कोटेशन, निरीक्षण, स्क्रैप', 'mfg.moulding': 'मोल्डिंग: रन, रीग्राइंड, मटीरियल बैलेंस, EPR', 'mfg.press': 'छपाई प्रेस: अनुमान, जॉब टिकट, कागज़', 'mfg.garments': 'गारमेंट: स्टाइल, कटिंग प्लान, बंडल, CMT, कारीगर', 'mfg.food': 'खाद्य इकाई: लागत कार्ड, शेल्फ़ लाइफ़, योजनाएँ', 'mfg.statutory': 'कारख़ाना वैधानिक: MSME, प्रोत्साहन, प्राधिकार, इन्वेंटरी',
+    'mfg.floor': 'शॉप फ़्लोर: कार्य केंद्र, रूटिंग, जॉब कार्ड, लोड', 'mfg.shop': 'इंजीनियरिंग शॉप: ड्रॉइंग, वज़न कोटेशन, निरीक्षण, स्क्रैप', 'mfg.moulding': 'मोल्डिंग: रन, रीग्राइंड, मटीरियल बैलेंस, EPR', 'mfg.press': 'छपाई प्रेस: अनुमान, जॉब टिकट, कागज़', 'mfg.garments': 'गारमेंट: स्टाइल, कटिंग प्लान, बंडल, CMT, कारीगर, इनवर्टेड ड्यूटी रिफ़ंड', 'mfg.food': 'खाद्य इकाई: लागत कार्ड, FSSAI, शेल्फ़ लाइफ़, एक्सपायरी के क़रीब, स्कीम', 'mfg.statutory': 'कारख़ाना वैधानिक: MSME फ़ॉर्म-1 व ब्याज, प्रोत्साहन, AA / EPCG, इन्वेंटरी',
     'payroll.employees': 'कर्मचारी',
     'payroll.heads': 'पे हेड',
     'payroll.structures': 'वेतन संरचना',

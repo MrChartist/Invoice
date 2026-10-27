@@ -40,10 +40,21 @@ export interface MseReceivable {
   paidLate: boolean;
 }
 
-/** Sales to GSTIN buyers past the Sec 15 limit on `asOf` (open, or paid late with interest), oldest limit first. */
-export function mseReceivables(invoices: readonly InvoiceRecord[], payments: readonly Payment[], asOf: string): MseReceivable[] {
-  const byInv = new Map<string, Payment[]>();
+/**
+ * Sales to GSTIN buyers past the Sec 15 limit on `asOf` (open, or paid late with interest), oldest limit first. QA16 P1:
+ * credit notes linked to a bill (`doc_links` relation `credit_note`, issued on or before `asOf`) settle it from their
+ * date like a receipt (returned goods / rate difference are not owed — no interest on them after the note).
+ */
+export function mseReceivables(invoices: readonly InvoiceRecord[], payments: readonly Payment[], asOf: string, links: readonly { from_id: string; to_id: string; relation: string }[] = []): MseReceivable[] {
+  const byInv = new Map<string, { amount?: unknown; date?: unknown }[]>();
   for (const p of payments) if (p?.invoice_id) byInv.set(p.invoice_id, [...(byInv.get(p.invoice_id) ?? []), p]);
+  const docById = new Map(invoices.map((i) => [i.id, i]));
+  const credits = new Map<string, { amount: number; date: string }[]>();
+  for (const l of links) {
+    const cn = l?.relation === 'credit_note' ? docById.get(l.to_id) : undefined;
+    if (!cn || cn.doc_type !== 'CREDIT_NOTE' || cn.status === 'Cancelled' || cn.status === 'Draft') continue;
+    credits.set(l.from_id, [...(credits.get(l.from_id) ?? []), { amount: round2(receivableTotal(cn)), date: String(cn.issue_date ?? '').slice(0, 10) }]);
+  }
   const out: MseReceivable[] = [];
   for (const inv of invoices) {
     if (!isRevenueDoc(inv) || inv.doc_type === 'DEBIT_NOTE') continue;
@@ -58,6 +69,7 @@ export function mseReceivables(invoices: readonly InvoiceRecord[], payments: rea
     const recorded = rows.reduce((s, p) => s + p.amount, 0);
     const extra = round2(num(inv.amount_paid) - recorded);
     if (extra > 0) rows.push({ amount: extra, date });
+    rows.push(...(credits.get(inv.id) ?? []));
     rows.sort((a, b) => a.date.localeCompare(b.date));
     let open = total;
     let interest = 0;

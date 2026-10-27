@@ -95,7 +95,7 @@ export default function IncentivesTab({ rows, notify, changed }: { rows: Realisa
                 const f = incentiveFigures(r);
                 return (
                   <tr key={r.id}>
-                    <td>{trT(`k_${r.kind}`)}{r.rate ? ` · ${r.rate}%` : ''}</td>
+                    <td>{trT(`k_${r.kind}`)}{r.appendix ? ` · ${r.appendix}` : ''}{r.rate ? ` · ${r.rate}%` : ''}</td>
                     <td>{numberOf(r.invoice_id)}</td>
                     <td>{formatDate(r.date)}</td>
                     <td className={styles.num}>{money(f.claimed)}</td>

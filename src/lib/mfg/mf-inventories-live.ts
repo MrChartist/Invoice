@@ -55,8 +55,10 @@ export function liveWipStatement(date: string, memoConversion?: (orderId: string
     memoConversion = (id) => m.get(id) ?? 0;
   }
   const positions = new Map(loadPositions().map((p) => [p.item.id, p]));
-  const docs = loadOrderDocs();
-  const orders = productionOrdersDb.all();
+  // QA16 P3: as on `date` — movements after it are left out, and an order closed after it was still open then.
+  const all = loadOrderDocs();
+  const docs = { transfers: all.transfers.filter((d) => d.date <= date), mfg: all.mfg.filter((d) => d.date <= date), journals: all.journals.filter((d) => d.date <= date) };
+  const orders = productionOrdersDb.all().map((o) => (o.status === 'closed' && o.closed_at && o.closed_at > date ? { ...o, status: 'in_progress' as const } : o));
   const avg = (id: string) => {
     const p = positions.get(id);
     if (!p) return 0;

@@ -129,7 +129,7 @@ export interface MemoRow {
 
 /** Memo conversion on open orders at `date` (report time only) and the FY's unabsorbed overhead (period cost). */
 export function memoConversion(
-  orders: readonly Pick<ProductionOrder, 'id' | 'number' | 'status' | 'mf'>[], cards: readonly JobCard[], centres: readonly WorkCentre[], vouchers: readonly Pick<ManufacturingVoucher, 'production_order_id' | 'costs' | 'date'>[], date: string,
+  orders: readonly (Pick<ProductionOrder, 'id' | 'number' | 'status' | 'mf'> & { closed_at?: string })[], cards: readonly JobCard[], centres: readonly WorkCentre[], vouchers: readonly Pick<ManufacturingVoucher, 'production_order_id' | 'costs' | 'date'>[], date: string,
 ): { rows: MemoRow[]; total: number; unabsorbed: number } {
   const fyHours = centreHoursInFy(cards, date);
   const upTo = vouchers.filter((v) => v.date <= date);
@@ -139,7 +139,8 @@ export function memoConversion(
     if (!o.mf?.ops?.length) continue;
     const c = orderConversion(o, cards, centres, date, fyHours);
     unabsorbed += c.unabsorbed;
-    if (o.status === 'closed' || o.status === 'cancelled') continue;
+    // QA16 P3: an order closed after `date` was still open on it.
+    if ((o.status === 'closed' && !(o.closed_at && o.closed_at > date)) || o.status === 'cancelled') continue;
     const absorbed = absorbedSoFar(o.id, upTo);
     const memo = round2(Math.max(c.total - absorbed, 0));
     if (memo > 0) rows.push({ order_id: o.id, number: o.number, spent: c.total, absorbed, memo });
