@@ -71,7 +71,7 @@ export function buildDemand(b: RealtyBooking, unit: RealtyUnit, project: RealtyP
   return {
     amount, booking_id: b.id, booking_no: b.number, unit: unit.unit_no, tower, carpet_sqm: unit.carpet_sqm, rera_no: project.rera_no, project: project.name,
     stage: stage.label, stage_id: stage.id, stage_label: stage.label, pct: num(stage.pct), agreement_value: b.agreement_value,
-    previously_demanded: prevDemanded, demanded: round2(prevDemanded + amount), previously_received: received,
+    previously_demanded: prevDemanded, previously_billed: round2(earlier.reduce((s, i) => s + num(i.total), 0)), demanded: round2(prevDemanded + amount), previously_received: received,
     ...(interest ? { interest } : {}), ...(cc ? { cc_after: true } : { land: landSplit(amount + (interest?.amount ?? 0), b.cls, date, project.old_rate) }), cls: b.cls,
     ...(acc ? { account: { name: acc.name, ...(acc.account_no ? { no: acc.account_no } : {}), ...(acc.ifsc ? { ifsc: acc.ifsc } : {}) } } : {}),
     plan: plan.stages.map((s) => ({ label: s.label, pct: s.pct })),

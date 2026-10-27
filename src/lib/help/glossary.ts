@@ -141,6 +141,11 @@ export const GLOSSARY = {
     'वह रजिस्टर जिसमें अभियंता काम की मापी गई मात्रा पेज-दर-पेज दर्ज करता है।', 'रनिंग बिल मापते समय हर लाइन पर एम-बुक संदर्भ (बुक / पेज) लिखें; यह लाइन के नीचे और सार में छपता है।', ['CN12']),
   'works-contract': g('Works contract', 'A contract to build, repair or fit out immovable property with transfer of property in goods (Sec 2(119)) — a composite supply of services.', 'Works bills print the works-contract declaration; place of supply is the site State (Sec 12(3)).',
     'अचल संपत्ति के निर्माण, मरम्मत या फ़िट-आउट का अनुबंध जिसमें माल का स्वामित्व भी जाता है (धारा 2(119)) — सेवाओं की संयुक्त आपूर्ति।', 'वर्क्स बिल पर वर्क्स-कॉन्ट्रैक्ट घोषणा छपती है; आपूर्ति का स्थान कार्य स्थल का राज्य है (धारा 12(3))।', ['CN3', 'CN4']),
+  // R11: builder terms (CN-C)
+  'rera-account': g('RERA designated account', '70% of the money realised from allottees goes into a separate bank account, used only for land and construction and withdrawn against engineer, architect and CA certificates (RERA Sec 4(2)(l)(D)).', 'Receivables → Realty → RERA account compares 70% of collections with the deposits and checks each withdrawal.',
+    'आवंटियों से मिली राशि का 70% अलग बैंक खाते में, जो केवल ज़मीन और निर्माण पर ख़र्च हो और इंजीनियर, आर्किटेक्ट व CA के प्रमाणपत्र पर निकले (रेरा धारा 4(2)(l)(D))।', 'प्राप्य → रियल्टी → रेरा खाता वसूली के 70% की जमा से तुलना करता है और हर निकासी जाँचता है।', ['CN25']),
+  'deemed-land': g('Land deemed one-third', 'On the sale of a flat before completion, one-third of the total amount is treated as the value of land, so GST at 1.5% / 7.5% on the rest equals 1% / 5% of the whole.', 'Demand letters print the land line, the taxable two-thirds and the CGST / SGST on it.',
+    'निर्माणाधीन फ़्लैट की बिक्री में कुल राशि का एक-तिहाई ज़मीन का मूल्य माना जाता है, इसलिए शेष पर 1.5% / 7.5% GST पूरे का 1% / 5% होता है।', 'माँग पत्र पर ज़मीन की पंक्ति, कर योग्य दो-तिहाई और उस पर CGST / SGST छपते हैं।', ['CN18']),
 } satisfies Readonly<Record<string, GlossaryTerm>>;
 
 export type GlossaryId = keyof typeof GLOSSARY;

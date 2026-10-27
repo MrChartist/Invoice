@@ -413,6 +413,8 @@ export interface CnDemandFields {
   demanded?: number;
   previously_demanded?: number;
   previously_received?: number;
+  /** Earlier demand documents' totals incl. GST (for the balance due). */
+  previously_billed?: number;
   interest?: { days: number; rate: number; amount: number };
   /** Dated on / after the completion certificate: not a supply (Sch III para 5(b)). */
   cc_after?: boolean;

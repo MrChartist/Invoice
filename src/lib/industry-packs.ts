@@ -151,6 +151,15 @@ export const PACK_TABS: readonly PackTab[] = [
   // their screens (one row + help topic + palette label each).
   { pack: 'works', path: '/time?tab=works&view=ra', labelKey: 'r11.ra' },
   { pack: 'realty', path: '/receivables?tab=realty', labelKey: 'r11.realty' },
+  // CN-C: the builder desk's views
+  { pack: 'realty', path: '/receivables?tab=realty&view=projects', labelKey: 'r11.realty.projects' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=units', labelKey: 'r11.realty.units' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=bookings', labelKey: 'r11.realty.bookings' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=plans', labelKey: 'r11.realty.plans' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=demands', labelKey: 'r11.realty.demands' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=rera', labelKey: 'r11.realty.rera' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=cancellations', labelKey: 'r11.realty.cancellations' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=procurement', labelKey: 'r11.realty.procurement' },
 ];
 
 /**
