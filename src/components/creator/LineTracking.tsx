@@ -5,7 +5,7 @@ import type { InvoiceItem } from '../../types/invoice';
 import { num } from '../../lib/invoice-calc';
 import { generateId, getTable, KEYS } from '../../lib/storage';
 import { lineFactor } from '../../lib/units';
-import { floorBatches, floorOf } from '../../lib/mfg/mf-shelf-floor';
+import { floorBatches, floorOf, meetsFloor } from '../../lib/mfg/mf-shelf-floor';
 import { formatDate } from '../../lib/utils';
 import {
   batchOptions, fefoBatch, isExpired, serialKey, serialsInStock, serialsSold, splitLineByFefo, withBatch,
@@ -143,7 +143,7 @@ export function LineTracking({ item, index, ctx }: { item: InvoiceItem; index: n
           <button
             type="button"
             className={`${controls.btnGhost} ${controls.btnSm}`}
-            onClick={() => replaceItem(item.id, splitLineByFefo({ ...withBatch(item, undefined), ...(ctx.multi ? { godown_id: godown } : {}) }, t, ctx.day, generateId))}
+            onClick={() => replaceItem(item.id, splitLineByFefo({ ...withBatch(item, undefined), ...(ctx.multi ? { godown_id: godown } : {}) }, t, ctx.day, generateId, floor ? (b) => meetsFloor(b, ctx.day, floor) : undefined))}
           >
             <Split size={14} aria-hidden="true" /> {edT('ltSplit')}
           </button>

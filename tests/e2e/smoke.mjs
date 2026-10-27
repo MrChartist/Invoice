@@ -2577,9 +2577,30 @@ try {
         await new Promise((r) => setTimeout(r, 200));
       }
     };
+    // QA16: the demo flow reloads TWICE (switch to the Demo company, then reload after the sample data is flushed). A
+    // check that ran between the two hit "Execution context was destroyed". Count the page loads and settle only after
+    // the second one; in-page reads retry across a navigation.
+    const loads = new WeakMap();
+    const settled = async (p, want, timeout = 30000) => {
+      const until = Date.now() + timeout;
+      while ((loads.get(p) ?? 0) < want && Date.now() < until) await new Promise((r) => setTimeout(r, 100));
+      await p.waitForLoadState('load');
+      await p.locator('#company-switch').waitFor({ timeout: 20000 });
+    };
+    const stable = async (p, fn) => {
+      for (let i = 0; ; i++) {
+        try {
+          return await fn();
+        } catch (e) {
+          if (i >= 5 || !/context was destroyed|navigat/i.test(String(e?.message ?? e))) throw e;
+          await p.waitForLoadState('load').catch(() => undefined);
+        }
+      }
+    };
     const fresh = async () => {
       const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1280, height: 900 } });
       const p = await ctx.newPage();
+      p.on('load', () => loads.set(p, (loads.get(p) ?? 0) + 1));
       watch(p, errors);
       p.setDefaultTimeout(Number(process.env.E2E_TIMEOUT) || 10000);
       await p.goto(srv.origin + '/');
@@ -2602,14 +2623,13 @@ try {
     await a.p.getByRole('dialog', { name: 'How clients pay you' }).waitFor();
     await a.p.getByRole('button', { name: /Next/ }).click();
     await a.p.getByRole('dialog', { name: /Logo/ }).waitFor();
+    const aLoads = loads.get(a.p) ?? 0;
     await a.p.getByRole('button', { name: 'Explore with sample data instead' }).click();
-    await a.p.locator('#company-switch').waitFor({ timeout: 20000 });
+    await settled(a.p, aLoads + 2);
     const demoInv = await waitRows(a.p, 'invoices', 1);
     check(demoInv.length > 0, `the Demo company holds the sample invoices (${demoInv.length})`);
-    await a.p.waitForLoadState('load');
-    await a.p.locator('#company-switch').waitFor({ timeout: 20000 });
     await a.p.waitForTimeout(500);
-    check(await a.p.getByRole('dialog', { name: 'What do you do?' }).count() === 0, 'the wizard does not start again in the Demo company');
+    check(await stable(a.p, () => a.p.getByRole('dialog', { name: 'What do you do?' }).count()) === 0, 'the wizard does not start again in the Demo company');
     await a.ctx.close();
     // F5: skip the wizard, then the Dashboard card.
     const b = await fresh();
@@ -2629,10 +2649,11 @@ try {
     await b.p.bringToFront();
     const cta = b.p.getByRole('button', { name: 'Open a separate Demo company (recommended)' });
     await cta.waitFor({ timeout: 15000 });
-    await Promise.all([b.p.waitForEvent('load', { timeout: 20000 }), cta.click()]);
-    await b.p.locator('#company-switch').waitFor({ timeout: 20000 });
+    const bLoads = loads.get(b.p) ?? 0;
+    await cta.click();
+    await settled(b.p, bLoads + 2);
     const sample = await waitRows(b.p, 'invoices', 1, 20000);
-    const activeId = await b.p.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_companies') || 'null')?.active ?? 'default');
+    const activeId = await stable(b.p, () => b.p.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_companies') || 'null')?.active ?? 'default'));
     check(sample.length > 0 && activeId !== 'default', `the Dashboard chooser filled a separate Demo company (${sample.length} invoices in ${activeId})`);
     await b.p.locator('[data-demo-company]').getByRole('button', { name: /Switch to/ }).waitFor({ timeout: 15000 });
     check(true, 'the Demo banner offers the way back to the company the user came from');
@@ -4700,6 +4721,18 @@ try {
     check(/Raw materials/.test(await page.locator('[data-statutory-desk]').innerText()), 'inventories split: besan under raw materials');
     await page.goto(srv.origin + '/manufacturing?tab=floor&view=wip');
     check(/OFF/.test(await page.locator('[data-mfd-absorb]').innerText({ timeout: 15000 })), 'conversion absorption is off by default (stock values as today)');
+    // QA16: a 375 px pass over the MF-D desks — wide tables scroll inside their own box, never the page.
+    await page.setViewportSize({ width: 375, height: 800 });
+    const wide = [];
+    for (const v of ['food&view=costcards', 'food&view=shelf', 'food&view=schemes', 'statutory&view=msme', 'statutory&view=authorisations', 'statutory&view=incentives', 'statutory&view=inventories', 'floor&view=wip']) {
+      await page.goto(srv.origin + `/manufacturing?tab=${v}`);
+      await page.locator('[data-food-desk], [data-statutory-desk], [data-floor-desk]').first().waitFor({ timeout: 15000 }).catch(() => undefined);
+      await page.waitForTimeout(300);
+      const over = await page.evaluate(() => Math.max(0, ...[document.documentElement, ...document.querySelectorAll('main')].map((e) => e.scrollWidth - e.clientWidth)));
+      if (over > 1) wide.push(`${v} ${over}px`);
+    }
+    check(wide.length === 0, `MF-D desks at 375 px: no horizontal page scroll (${wide.join(', ') || 'none'})`);
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });

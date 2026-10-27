@@ -46,6 +46,15 @@ export function foodOutputDefaults(order: unknown, item: object | undefined, dat
 }
 
 /**
+ * QA16 P7: the output dialog's batch dates for an output reported on `date` — MFG = the order's packed date, else the
+ * OUTPUT date (not the day the dialog opened); expiry = the typed one (`typed`, null = untouched), else the default.
+ */
+export function outputFoodDates(order: unknown, item: object | undefined, date: string, typed: string | null): { mfg_date?: string; expiry_date: string } {
+  const d = foodOutputDefaults(order, item, date);
+  return { ...(d.mfg_date ? { mfg_date: d.mfg_date } : {}), expiry_date: typed ?? d.expiry_date ?? '' };
+}
+
+/**
  * Actual yield of an order: Σ finished kg reported ÷ Σ weight of the components consumed (weight / volume units only;
  * packing material and counted units are left out). Null when nothing was consumed.
  */

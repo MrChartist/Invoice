@@ -201,7 +201,7 @@ export function makeJobTicket(id: string, qty: number, items: readonly StockItem
   const b = estimateBreaks(e).find((x) => x.qty === Math.round(num(qty)));
   if (!b) throw new Error('Pick one of the estimate\'s quantities.');
   const paper = items.find((i) => i.id === e.stock_item_id);
-  const paperQty = String(paper?.unit ?? '').toUpperCase() === 'KG' ? b.kg : b.sheets;
+  const paperQty = paperIssueQty(paper?.unit, b);
   return withTablesRollback([ESTIMATES_TABLE, 'boms', 'production_orders', 'series_counters'], () => {
     const bom = bomsDb.save({ item_id: e.item_id!, name: `Print job ${e.number} × ${b.qty}`, batch_qty: b.qty, is_default: false, components: [{ id: generateId(), item_id: e.stock_item_id!, qty: paperQty }], outputs: [] }, items);
     const order = productionOrdersDb.save({ date: e.date, item_id: e.item_id!, bom_id: bom.id, planned_qty: b.qty, narration: `Job ticket ${e.number}: ${e.job}` }, items, bomsDb.all());
@@ -210,10 +210,30 @@ export function makeJobTicket(id: string, qty: number, items: readonly StockItem
   });
 }
 
-/** Sheets of the paper item issued to the order (net of returns), base units — for "actual vs estimate". */
-export function actualPaper(e: Pick<PrintEstimate, 'order_id' | 'stock_item_id'>): number | undefined {
+/** QA16 P5: sheets per unit of the paper item — by weight (kg / g / tonne, from the break's kg per sheet), reams of 500, else sheets. */
+function sheetsPer(unit: string | undefined, b: Pick<EstimateBreak, 'kg' | 'sheets'>): number {
+  const u = String(unit ?? '').trim().toUpperCase().replace(/\.$/, '');
+  const perKg = b.kg > 0 ? b.sheets / b.kg : 0;
+  if (/^(KG|KGS|KILOGRAMS?)$/.test(u)) return perKg;
+  if (/^(G|GM|GMS|GRAMS?)$/.test(u)) return perKg / 1000;
+  if (/^(T|TON|TONS|TONNES?|MT)$/.test(u)) return perKg * 1000;
+  if (/^(REAM|REAMS|RM)$/.test(u)) return 500;
+  return 1;
+}
+
+/** The paper of a break in the paper item's own unit (the job ticket's BOM line). */
+export const paperIssueQty = (unit: string | undefined, b: Pick<EstimateBreak, 'kg' | 'sheets'>): number => {
+  const per = sheetsPer(unit, b);
+  return per === 1 ? b.sheets : per > 0 ? r3(b.sheets / per) : b.kg;
+};
+
+/** Sheets of the paper item issued to the order (net of returns, converted from the item's unit) — "actual vs estimate". */
+export function actualPaper(e: Pick<PrintEstimate, 'order_id' | 'stock_item_id'> & Partial<Omit<PrintEstimate, 'order_id' | 'stock_item_id'>>, items: readonly Pick<StockItem, 'id' | 'unit'>[] = stockDb.items()): number | undefined {
   const o = e.order_id ? productionOrdersDb.get(e.order_id) : undefined;
   if (!o || !e.stock_item_id) return undefined;
   const p = orderProgress(o, loadOrderDocs());
-  return r3((p.issued.get(e.stock_item_id) ?? 0) - (p.returned.get(e.stock_item_id) ?? 0));
+  const base = (p.issued.get(e.stock_item_id) ?? 0) - (p.returned.get(e.stock_item_id) ?? 0);
+  const b = Array.isArray(e.breaks) ? estimateBreaks(e as PrintEstimate).find((x) => x.qty === o.planned_qty) : undefined;
+  const per = b ? sheetsPer(items.find((i) => i.id === e.stock_item_id)?.unit, b) : 1;
+  return per > 0 ? Math.round(base * per) : r3(base);
 }

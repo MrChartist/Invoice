@@ -22,9 +22,13 @@ const add = (m: LoadMap, centre: string, day: string, h: number) => {
   m.set(centre, d);
 };
 
-/** Refuses a centre that never has an available hour (shifts / days / efficiency of 0). */
+/**
+ * Refuses a centre that never has an available hour (shifts / days / efficiency of 0). QA16 P6: judged on its weekly
+ * pattern without holidays — a shutdown of a week or more (Diwali) is not "no working hours"; the loading loops skip it.
+ */
 export function assertHours(c: WorkCentre, from: string): void {
-  for (let i = 0; i < 7; i++) if (availableHours(c, addDays(from, i)) > 0) return;
+  const plain = { ...c, holidays: [] };
+  for (let i = 0; i < 7; i++) if (availableHours(plain, addDays(from, i)) > 0) return;
   throw new Error(`Work centre ${c.name} has no working hours: give it a shift and working days.`);
 }
 
