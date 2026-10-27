@@ -2993,7 +2993,13 @@ try {
     await page.getByLabel('Item 1 name').fill('E2E Havells');
     await page.getByRole('option', { name: /E2E Havells MCB/ }).first().click({ timeout: 15000 });
     await page.getByText('Party rate price').first().waitFor({ timeout: 15000 });
-    check((await page.getByLabel('Item 1 rate').inputValue()).startsWith('900'), `the party rate prices the line (${await page.getByLabel('Item 1 rate').inputValue()})`);
+    // The "Party rate" label can paint a frame before the rate input takes the new value: wait for the value itself.
+    let rateNow = '';
+    for (let i = 0; i < 150 && !rateNow.startsWith('900'); i++) {
+      rateNow = await page.getByLabel('Item 1 rate').inputValue();
+      if (!rateNow.startsWith('900')) await new Promise((r) => setTimeout(r, 100));
+    }
+    check(rateNow.startsWith('900'), `the party rate prices the line (${rateNow})`);
     await page.locator('[data-disc-chain="0"]').fill('18+4');
     await page.locator('[data-disc-eff="0"]').waitFor({ timeout: 15000 });
     check(/21\.28%/.test(await page.locator('[data-disc-eff="0"]').innerText()), 'the line shows the effective 21.28 %');
