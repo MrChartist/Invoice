@@ -4,7 +4,8 @@
  * Per bill the maths is `interest.ts` `computeInterest` unchanged (simple, 365-day year, payments and credit notes
  * reduce the balance from their date, opening bills included). Rate: the party's own late-fee terms when they are a
  * % p.a. → the company default (`interest_settings.rate`) → none (party skipped). Basis: from the due date, or from the
- * bill date + the party's credit days. A bill already charged in an earlier run is charged only after the date it
+ * bill date + the party's credit days; a bill sold on credit till harvest (R12 AG-D4, `ag.inputs.season_due`) always
+ * starts at its season due date. A bill already charged in an earlier run is charged only after the date it
  * was charged to (the earlier amount is taken off), so no bill-period is charged twice.
  * Raise: one DRAFT invoice per ticked party (G6 / TR18: interest for delayed payment is part of the value of the
  * supply, so each line takes the principal supply's GST rate and HSN of its bill), `interest_run_id` on each, and one
@@ -93,7 +94,7 @@ export function partyInterest(asOf: string, s: InterestSettings, d: InterestData
     const fee = c?.late_fee?.mode === 'percent_pa' && num(c.late_fee.rate) > 0 ? c.late_fee : undefined;
     const rate = fee ? num(fee.rate) : num(s.rate);
     if (!(rate > 0)) return;
-    const startDue = s.basis === 'bill' ? shiftDay(date, Math.max(num(c?.credit_days), 0)) : due;
+    const startDue = inv?.ag?.inputs?.season_due || (s.basis === 'bill' ? shiftDay(date, Math.max(num(c?.credit_days), 0)) : due); // R12 (AG-D4): credit till harvest runs from the season due date
     const cfg = { enabled: true, mode: 'annual' as const, rate, grace_days: fee ? num(fee.graceDays) : num(s.grace_days) };
     const at = (day: string) => computeInterest({ ...input, due_date: startDue }, cfg, day);
     const now = at(asOf);

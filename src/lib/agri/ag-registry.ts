@@ -25,7 +25,11 @@ export const AG_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // AG-C: mills — weighbridge slips and custom-milling agreements (documents)
   weighbridge_slips: 'doc.create',
   cmr_agreements: 'doc.create',
-  // AG-D: cold_lots (doc.create), cold_rent_plans (master.edit), agri_loans, member_shares (books.edit)
+  // AG-D: lots are documents; rent plans are masters; loans and the share ledger post vouchers
+  cold_lots: 'doc.create',
+  cold_rent_plans: 'master.edit',
+  agri_loans: 'books.edit',
+  member_shares: 'books.edit',
 };
 
 /** Audited tables (every row change logged; deletes go to the recycle bin). `agri_settings` is audited on save. */
@@ -43,6 +47,10 @@ export const AG_WATCHED: Readonly<Record<string, WatchedTable>> = {
   weighbridge_slips: { entity: 'item', label: 'Weighbridge slip' },
   cmr_agreements: { entity: 'client', label: 'Custom-milling agreement' },
   // AG-D
+  cold_lots: { entity: 'invoice', label: 'Cold-storage lot' },
+  cold_rent_plans: { entity: 'item', label: 'Storage rent plan' },
+  agri_loans: { entity: 'payment', label: 'Loan against stored produce' },
+  member_shares: { entity: 'payment', label: 'Member share entry' },
 };
 
 /** Idempotent: adds the rows once (never overwrites a row another module set). */

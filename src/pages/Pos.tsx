@@ -115,6 +115,7 @@ const PosApparel = lazy(() => import('../components/retail-r9/ApparelDesk').then
 const PosDevices = lazy(() => import('../components/retail-r9/DevicesDesk').then((m) => ({ default: m.PosDevices }))); // R9 (RT-D) IMEI, finance, exchange, cash guard
 const PosJewel = lazy(() => import('../components/retail-r9/JewelleryDesk').then((m) => ({ default: m.PosJewel }))); // R9 (RT-E2/E3) tag box, cash / PAN guard
 const PosAppointment = lazy(() => import('../components/services-r10/PosAppointment')); // R10 (SV-A2) `?appt=` bill from the front desk
+const PosInputsStrip = lazy(() => import('../components/agri/PosInputsStrip')); // R12 (AG-D4) PoS txn no., farmer ID, credit till harvest
 const PosPackages = lazy(() => import('../components/services-r10/SvRedeem').then((m) => ({ default: m.PosPackages }))); // R10 (SV-C1) "Use package"
 // R4-B3: the counter's branch (store price list). Inline labels, so the POS does not load the stores catalogue.
 const storeT = defineArea({ counter: 'This counter is branch', none: 'No branch' } as const, { counter: 'यह काउंटर इस शाखा का है', none: 'कोई शाखा नहीं' });
@@ -231,6 +232,7 @@ export function Pos() {
   const [rxPos, setRxPos] = useState<PosRx | null>(null); // R9 (RT-B1) prescription strip
   const [devPay, setDevPay] = useState<DevPay | null>(null); // R9 (RT-D2/D3) finance + exchange tenders, cash guard
   const [jwPos, setJwPos] = useState<{ kyc?: SaleKyc; errors: string[] } | null>(null); // R9 (RT-E3) cash / PAN guard
+  const [agPos, setAgPos] = useState<{ ag: NonNullable<InvoiceRecord['ag']>; due?: string; errors: string[] } | null>(null); // R12 (AG-D4)
   const pharmaOn = useMemo(() => readPharmaSettings().enabled, []);
   /** The line the last scan / pick went to (Alt+Q), the quantity field last focused (Alt+W live weight). */
   const lastLine = useRef<string | null>(null);
@@ -266,7 +268,7 @@ export function Pos() {
   // 7U: a running bill-value offer applies after the price level / slab and the loyalty redemption.
   const offered = useMemo(() => applyBillOffer(promoted, data.pricing?.schemes ?? [], { retotalRecord: true }), [promoted, data.pricing]);
   const jwKyc = jwPos?.kyc; // R9 (RT-E3)
-  const record = useMemo(() => (agentId || delivery || rxPos || jwKyc ? { ...offered, ...(agentId ? { agent_id: agentId } : {}), ...(delivery?.address.trim() ? { delivery } : {}), ...(rxPos?.rx ? { rx: rxPos.rx } : {}), ...(rxPos?.att?.length ? { attachments: rxPos.att } : {}), ...(jwKyc ? { kyc: jwKyc } : {}) } : offered), [offered, agentId, delivery, rxPos, jwKyc]);
+  const record = useMemo(() => (agentId || delivery || rxPos || jwKyc || agPos ? { ...offered, ...(agentId ? { agent_id: agentId } : {}), ...(delivery?.address.trim() ? { delivery } : {}), ...(rxPos?.rx ? { rx: rxPos.rx } : {}), ...(rxPos?.att?.length ? { attachments: rxPos.att } : {}), ...(jwKyc ? { kyc: jwKyc } : {}), ...(agPos ? { ag: agPos.ag, ...(agPos.due ? { due_date: agPos.due } : {}) } : {}) } : offered), [offered, agentId, delivery, rxPos, jwKyc, agPos]);
   // R9: retail checks (MRP guard, deliveries, short book) read once; the strip loads only when one is on.
   const retailRs = useMemo(() => getJson<RetailSettings | null>(`${DB_PREFIX}retail_settings`, null) ?? {}, []);
   const retailStrip = (!!retailRs.mrp_guard && retailRs.mrp_guard !== 'off') || !!retailRs.delivery?.enabled || !!retailRs.short_book?.enabled;
@@ -543,6 +545,7 @@ export function Pos() {
     setRxPos(null); // R9 (RT-B1)
     setDevPay(null); // R9 (RT-D)
     setJwPos(null); // R9 (RT-E3)
+    setAgPos(null); // R12 (AG-D4)
     setRedeemPts(0);
     setGvApplied([]);
     setParty(WALK_IN);
@@ -577,6 +580,7 @@ export function Pos() {
     if (rxPos?.errors.length) return setErrors(rxPos.errors); // R9 (RT-B1): "Require prescription for H1 / X"
     if (devPay?.error) return setErrors([devPay.error]); // R9 (RT-D)
     if (jwPos?.errors.length) return setErrors(jwPos.errors); // R9 (RT-E3): cash 269ST / PAN 114B
+    if (agPos?.errors.length) return setErrors(agPos.errors); // R12 (AG-D4): subsidised fertiliser needs the PoS txn no.
     // 8E (8.144): an "On account" amount must be what is left unpaid.
     if (onAccount > 0.004 && Math.abs(onAccount - summary.due) > 0.004) {
       setErrors([retailT('accountMismatch', { due: formatCurrency(summary.due) })]);
@@ -1108,6 +1112,7 @@ export function Pos() {
               {params.get('appt') && <Suspense fallback={null}><PosAppointment id={params.get('appt')!} onLoad={(lines, p) => { setItems(lines); setParty(p); setParams((q) => { q.delete('appt'); return q; }, { replace: true }); }} /></Suspense>}
               {party.client && (isPackOn(settings, 'salon') || isPackOn(settings, 'fitness')) && <Suspense fallback={null}><PosPackages client={party.client} items={items} setItems={setItems} notify={notify} /></Suspense>}
               {isPackOn(settings, 'apparel') && <Suspense fallback={null}><PosApparel record={record} setItems={setItems} /></Suspense>}
+              {isPackOn(settings, 'agri_inputs') && <Suspense fallback={null}><PosInputsStrip key={lastBill?.id} record={record} onChange={setAgPos} /></Suspense>}
               {(isPackOn(settings, 'jewellery') || !!retailRs.require_pan) && <Suspense fallback={null}><PosJewel record={record} cash={devicesOn ? 0 : Math.max(summary.cash - summary.change, 0)} setItems={setItems} onChange={setJwPos} /></Suspense>}
               {party.client ? null : (
                 <>
