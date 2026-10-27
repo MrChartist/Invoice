@@ -44,8 +44,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 9. Retail shops (Round 9, planned) | RT1–RT22 | 22 | 8 |
 | 10. Service businesses (Round 10, planned) | SV1–SV30, SV41–SV48, SV60–SV62 | 41 | 12 |
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
-| 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69 | 59 | 14 |
-| **Total** | | **356** | **92** |
+| 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84 | 64 | 15 |
+| **Total** | | **361** | **93** |
 
 ---
 
@@ -678,7 +678,7 @@ sub-contractors, builders and real-estate developers, interiors and MEP contract
 | CN34 | **Builder's bills and the contractor's site cost (QA11 C3, C9).** (a) Sub-contractor and plant-hire bills charged to a project on the 1% / 5% scheme are booked with ITC not claimed (cost = total incl. GST), and a typed bill claiming ITC is cautioned — right for every input of such a project? (b) Amounts the client recovers on our RA bills (material issued, plant hire, water & power, LD, interest on advance) are shown as site cost in the site P&L — right, or should client-issued material be netted from revenue instead? | (a) No ITC. (b) Site cost. | `construction/cn-subcon.ts` `noItcCentre`, `bill-guard.ts`, `cn-site-pnl.ts` | 2019-04-01 | N 03/2019-CT(R) (recalled) |
 | CN35 | **Delay interest base (QA11 C11).** Interest on delayed payment (Sec 15(2)(d) value, state RERA rate) is simple: on the instalments owed (including their GST), never on interest billed by an earlier demand, from the latest earlier due date to the new demand date. (a) Should the GST part of an instalment carry interest? (b) Is "from the latest earlier due date" acceptable when older instalments are still unpaid? | (a) Yes, on the amount demanded. (b) A working figure, waivable per booking. | `construction/cn-demands.ts` `delayInterest` | — | State RERA rules (recalled) |
 
-## 12. Agriculture and food processing (Round 12, ids AG1–AG45, AG50–AG53, AG60–AG69)
+## 12. Agriculture and food processing (Round 12, ids AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84)
 
 Added with `docs/prd/round-12.md`. It covers farmer producer organisations and co-operatives, dairies and milk
 collection centres, rice / flour / dal / oil mills, cold storages, seed / fertiliser / pesticide dealers, and poultry /
@@ -794,6 +794,16 @@ fishery farms.
 | AG67 | **Share capital entries.** Allotment from application money is a journal (Dr "Share application money — members", Cr "Share capital — members"). A surrender is refunded at face value. A forfeiture is credited to "Forfeited shares" under reserves. (a) May a producer company's member surrender shares for a refund, or only transfer them (Sec 378 provisions as recalled)? (b) Is the forfeiture entry right for co-operatives? | As stated; certificates are numbered `SHC/FY…` and a transfer gets a new certificate. | `agri/ag-members.ts` | 2021-02-11 | Companies Act Ch. XXIA (as recalled; AG18, AG19) |
 | AG68 | **Patronage basis and the profit split.** A member's business is the value supplied (cycle amounts and the member's own vouchers at taxable value) plus the value bought (sales at taxable value). The split runs: statutory reserve % on profit after tax, then dividend at the lower of the typed % and the cap on paid-up capital, then the patronage pool shared by business, and the rest retained. Is that the right order and basis? | A draft (optional) journal only, for the general meeting. | `agri/ag-patronage.ts` `patronage`, `distribution` | — | — (practice; AG18, AG25) |
 | AG69 | **80P / Sec 149 members' share.** Next to each head of profit the paper shows the members' share of supplies from the patronage register, and a "members' part" (profit × that share). Is that a sensible way to apportion income from members vs non-members? | Shown as a memo; the CA decides the claim. | `agri/ag-coop-papers.ts` `coopPaper` | 2026-04-01 | — (AG16) |
+
+### 12.9 Raised by QA round 13 (`docs/prd/qa-round-13.md`)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| AG80 | **A farmer whose deductions exceed his milk money (QA13 G1).** His line nets to zero and the excess carries to the next cycle. The deductions journal debits the pooled producers' account with the full deductions, so that account shows a debit (the farmer owes us) until the next cycle recovers it; the pooled bill is marked settled except for the farmers' net. Is a debit balance on the pooled account acceptable, or should the carried amount move to the farmer's own receivable (or "Farmer advances") at close? | Debit on the pooled account; the cycle row holds the farmer-wise carry. | `agri/ag-cycle-post.ts` `closeCycle` | — | — (design) |
+| AG81 ★ | **Loose sale from a labelled bag (QA13 G6).** The 25 kg rule is applied to editor / POS lines from the stock item's pack size and label. A line selling less than one pack (e.g. 5 kg from a labelled 25 kg rice bag) is treated as a loose counter sale (nil); whole packs ≤ 25 kg as pre-packaged and labelled (5%). Is "less than one pack" the right test, and does a retailer's sale of a whole labelled 25 kg bag stay at 5% (FinMin FAQ of July 2022)? | As stated; a soft notice, the typed rate wins. | `agri/ag-hooks.ts`, `ag-packing.ts` `packClass` | 2022-07-18 | N 6/2022-CT(R); FinMin FAQ (2022) — as recalled |
+| AG82 | **e-Way bill for nil / exempt goods (QA13 G5).** When every goods line of a bill is at nil, the e-Way preflight shows "may not be needed for exempt goods — verify (AG12)". Rule 138(14) lists goods in its Annexure and goods exempt under N 2/2017-CT(R) (except de-oiled cake); nil-rated goods outside that notification still need one. Is a note on any all-nil bill acceptable, or should it be limited to N 2/2017 goods (by HSN)? | Note on any all-nil bill; nothing is blocked. | `einvoice-validate.ts` (`EWB_EXEMPT`); `agri/ag-packing.ts` `ewayHint` | 2018-04-01 | Rule 138(14) CGST Rules (as recalled) |
+| AG83 | **Milk sold to the union: stock vs bill (QA13 G4).** Stock leaves at the sent litres (the dispatch's stock journal); the bill to the union is on its received figures (kg, fat, SNF) and moves no stock; the transit difference is a memo in the reconciliation, absorbed in the cost of milk sold. Right, or should a transit loss above tolerance be written off separately? | As stated. | `agri/ag-dispatch.ts`, `inventory.ts`, `ag-milk-reco.ts` | — | AS 2 (developers' reading) |
+| AG84 | **194Q with pooled cycles (QA13 G14).** A farmer's purchases for the 194Q threshold now add his amounts on closed pooled cycles (paid through the centre's pooled bill) to his own vouchers in the FY. Is the per-farmer split the right base, given the pooled bill is booked in the centre's name? | Per farmer, cycle lines + own vouchers, by the cycle's end date. | `agri/ag-vouchers.ts` `fyPurchasesOf` | 2021-07-01 | Sec 194Q (2025-Act label from `ita2025.ts`) |
 
 ## Answers log
 
