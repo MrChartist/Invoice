@@ -107,7 +107,7 @@ wrong; **P2** friction, a working-paper figure off, cosmetic.
 
 `tsc -b` clean; `eslint .` 0 errors (27 warnings, as before); `node --test` 3,380 / 3,380 (seven new M regressions; they assert the
 fixed behaviour and were not re-run against `4c2b8e6`); `vite build` + `postbuild` ok; bundle check ok; `node --check tests/e2e/smoke.mjs`
-ok; Playwright smoke (`E2E_TIMEOUT=60000`) — see the report. `npm run …` exits 216 in this sandbox, so each command was
+ok; Playwright smoke (`E2E_TIMEOUT=60000`): all checks passed (543 PASS lines) on the second run — the first run had one navigation race in the QA-3 F4 / F5 Demo-company step ("Execution context was destroyed"), which the M fixes do not touch. `npm run …` exits 216 in this sandbox, so each command was
 run directly.
 
 Budget (vite build, gzip -9): first paint 189,213 B (MF-B's recorded 189,216 B: **−3 B**, lazy-map churn); every change is
