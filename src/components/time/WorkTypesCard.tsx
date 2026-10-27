@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { deleteWorkType, loadWorkTypes, saveWorkType, type WorkType } from '../../lib/rate-cards';
 import { can } from '../../lib/access';
@@ -8,6 +8,10 @@ import controls from '../../styles/controls.module.css';
 import styles from './service-r3.module.css';
 import { useT } from '../../i18n';
 import { svcT } from '../../i18n/areas/service-r3';
+import { localDb } from '../../lib/localDb';
+
+// R14 (PS-B2): "bills per hour / appearance / item" — a `legal` company only, one lazy cell.
+const WorkUnitSelect = lazy(() => import('../prof/PartyRows').then((m) => ({ default: m.WorkUnitSelect })));
 
 type Notify = (message: string, tone?: 'success' | 'error') => void;
 
@@ -17,6 +21,7 @@ export function WorkTypesCard({ notify }: { notify: Notify }) {
   const editable = can('master.edit');
   const [rows, setRows] = useState<WorkType[]>(() => loadWorkTypes());
   const [draft, setDraft] = useState({ name: '', rate: '', sac: '' });
+  const [legalOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('legal'))(localDb.settings.get() as never));
 
   const run = (fn: () => void) => {
     try {
@@ -42,7 +47,7 @@ export function WorkTypesCard({ notify }: { notify: Notify }) {
         {rows.length ? (
           <div className={surface.tableWrap}>
             <table className={surface.table}>
-              <thead><tr><th>{svcT('wtName')}</th><th className={surface.numeric}>{svcT('wtRate')}</th><th>{svcT('wtSac')}</th><th>{svcT('wtInactive')}</th><th><span className={surface.srOnly}>{svcT('delete')}</span></th></tr></thead>
+              <thead><tr><th>{svcT('wtName')}</th><th className={surface.numeric}>{svcT('wtRate')}</th><th>{svcT('wtSac')}</th><th>{svcT('wtInactive')}</th>{legalOn && <th />}<th><span className={surface.srOnly}>{svcT('delete')}</span></th></tr></thead>
               <tbody>
                 {rows.map((w) => (
                   <tr key={w.id}>
@@ -58,6 +63,7 @@ export function WorkTypesCard({ notify }: { notify: Notify }) {
                     <td>
                       <input type="checkbox" checked={!!w.inactive} disabled={!editable} aria-label={`${svcT('wtInactive')} ${w.name}`} onChange={(e) => update(w, { inactive: e.target.checked || undefined })} />
                     </td>
+                    {legalOn && <td><Suspense fallback={null}><WorkUnitSelect value={w as { ps?: unknown }} label={w.name} disabled={!editable} onChange={(ps) => update(w, { ps } as Partial<WorkType>)} /></Suspense></td>}
                     <td className={surface.rowActions}>
                       <button type="button" className={cn(controls.btnGhost, controls.btnSm)} disabled={!editable} aria-label={`${svcT('delete')} ${w.name}`}
                         onClick={() => run(() => notify(deleteWorkType(w.id) === 'inactive' ? svcT('wtInactiveMsg') : svcT('wtDeleted')))}>

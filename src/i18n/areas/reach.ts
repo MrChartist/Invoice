@@ -273,6 +273,7 @@ export const reachT = defineArea(
     'ck.shelfLife': 'Set shelf-life days on your products',
     'ck.firstMatter': 'Open your first matter', 'ck.staffCapacity': 'Add your timekeepers (capacity and rates)', 'ck.enrolment': 'Add your enrolment no. and Bar Council', 'ck.conflictCheck': 'Run your first conflict check', // R14 (PS-A1)
     'ck.feeSchedule': 'Set your fee schedule', 'ck.linkCompanies': 'Link your clients\' companies on this device', 'ck.partners': 'Add your partners and the deed terms', // R14 (PS-D)
+    'ck.clientMoneyBank': 'Mark your client-money bank account', 'ck.stageTemplate': 'Set the stage fees of your first project', // R14 (PS-B)
     'ck.lut': 'Record your LUT for exports', 'ck.edf': 'Prepare your first EDF', // R14 (PS-C)
   } as const,
   {
@@ -535,6 +536,7 @@ export const reachT = defineArea(
     'ck.shelfLife': 'उत्पादों पर शेल्फ़ लाइफ़ दिन दर्ज करें',
     'ck.firstMatter': 'पहला मामला खोलें', 'ck.staffCapacity': 'टाइमकीपर जोड़ें (क्षमता और दरें)', 'ck.enrolment': 'नामांकन नंबर और बार काउंसिल जोड़ें', 'ck.conflictCheck': 'पहली हितों का टकराव जाँच करें',
     'ck.feeSchedule': 'अपनी फ़ीस सूची बनाएँ', 'ck.linkCompanies': 'इस डिवाइस पर क्लाइंट की कंपनियाँ जोड़ें', 'ck.partners': 'साझेदार और साझेदारी विलेख की शर्तें जोड़ें',
+    'ck.clientMoneyBank': 'क्लाइंट-पैसे का बैंक खाता चिह्नित करें', 'ck.stageTemplate': 'पहली परियोजना के चरण शुल्क तय करें',
     'ck.lut': 'निर्यात के लिए LUT दर्ज करें', 'ck.edf': 'पहला EDF तैयार करें',
   },
 );

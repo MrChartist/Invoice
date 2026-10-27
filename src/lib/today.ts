@@ -11,6 +11,7 @@ import { receivableBalance } from './rcm';
 import { isVoidStatus, readPurchase } from './purchase-normalize';
 import { formatCurrency } from './utils';
 import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
+import { getTable } from './storage';
 
 export interface TodaySummary {
   day: string;
@@ -43,8 +44,12 @@ export function todaySummary(input: { invoices: readonly InvoiceRecord[]; paymen
     out.bills++;
     out.udhaar = round2(out.udhaar + Math.max(receivableBalance(inv), 0));
   }
+  // R14 PS-B3: `isClientMoneyAccount` (bank-accounts.ts) read inline — Today is on the dashboard, and importing the bank
+  // module there would grow the first-paint lazy-import map. Same rule: a non-main account marked `client_money`.
+  const clientMoney = new Set(getTable<{ id?: string; client_money?: boolean }>('bank_accounts').filter((a) => a?.client_money === true && a.id !== 'default').map((a) => a.id));
   for (const p of input.payments) {
     if (!p || movedNoCash(p) || isoDay(p.date) !== day || !inr(byId.get(p.invoice_id))) continue; // QA6-1 F4: no money moved
+    if (p.bank_account_id && clientMoney.has(p.bank_account_id)) continue; // R14 PS-B3: clients' money, not the firm's
     const k = modeOf(p.method);
     out[k] = round2(out[k] + num(p.amount));
   }

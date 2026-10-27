@@ -509,6 +509,8 @@ const RECORD_TABLES = [
   'engagements', 'conflict_checks',
   // R14-D: partners, partner runs (year-end appropriation, monthly 194T credits), UDIN register
   'partners', 'partner_runs', 'udin_register',
+  // R14-B: client-money (trust) vouchers (CMV/FY…)
+  'client_money',
   // R14-C: EDF register (export of services, FEMA 2026)
   'edf_register',
 ];
@@ -617,6 +619,8 @@ const ID_TABLES = new Set([
   'engagements', 'conflict_checks',
   // R14-D: partners, partner runs (year-end appropriation, monthly 194T credits), UDIN register
   'partners', 'partner_runs', 'udin_register',
+  // R14-B: client-money (trust) vouchers (CMV/FY…)
+  'client_money',
   // R14-C: EDF register (export of services, FEMA 2026)
   'edf_register',
 ]);

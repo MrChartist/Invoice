@@ -57,6 +57,7 @@ const EX_KEY = {
   SV_RATE_OLD: 'exSvRateOld', // R10 (SV-A4)
   SV_NIL_NOT_EXEMPT: 'exSvNil',
   AG_CLASS_RATE: 'exAgClass', // R12 (AG-A3)
+  PS_PURE_AGENT_OLD: 'exPsPureAgent', // R14 (PS-B1)
 } as const;
 
 /** Return-period key used by the compliance calendar for a report period. */

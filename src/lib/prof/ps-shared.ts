@@ -13,6 +13,8 @@ export const PS_TABLES = {
   partners: 'partners',
   partnerRuns: 'partner_runs',
   udin: 'udin_register',
+  // PS-B: client-money (trust) vouchers (CMV/FY…, dated, numbered)
+  clientMoney: 'client_money',
   // PS-C: EDF register (export of services, dated by `date` = the end of the invoice month)
   edf: 'edf_register',
 } as const;
@@ -25,9 +27,10 @@ export const PS_OBJECTS = {
 /** New Indian-FY series (`<PREFIX>/FY<yy-yy>/<seq>`, through `series-counters.ts`; never reused after a delete). */
 export const PS_SERIES = {
   engagements: 'ENG', // PS-A2 engagements
+  clientMoney: 'CMV', // PS-B3 client-money vouchers
 } as const;
-/** Series reserved for PS-B (client-money vouchers): B moves its prefix into `PS_SERIES`. */
-export const PS_RESERVED_SERIES: readonly string[] = ['CMV'];
+/** Series reserved for later packages (none left: PS-B moved CMV into `PS_SERIES`). */
+export const PS_RESERVED_SERIES: readonly string[] = [];
 
 /** The seven Round 14 packs (`industry-packs.ts`): `practice` is the shared core every professional kind turns on. */
 export const PS_PACKS = ['practice', 'cafirm', 'legal', 'design', 'media', 'svcexport', 'partners'] as const;
@@ -39,12 +42,14 @@ export const PS_DATED: Readonly<Record<string, string>> = {
   // PS-D
   partner_runs: 'date',
   udin_register: 'date',
+  client_money: 'date', // PS-B
   edf_register: 'date', // PS-C
 };
 
 /** Numbered tables (`number` field) and their series (mirrors the `sync-engine.ts` NUMBERED rows). */
 export const PS_NUMBERED: Readonly<Record<string, string>> = {
   engagements: PS_SERIES.engagements,
+  client_money: PS_SERIES.clientMoney, // PS-B
 };
 
 /* ── PS-D ── */

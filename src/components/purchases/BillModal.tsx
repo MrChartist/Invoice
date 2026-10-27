@@ -40,6 +40,7 @@ import styles from './purchases.module.css';
 const BoeDutySheet = lazy(() => import('../trade/BoeDutySheet'));
 // R8-C (TR-C2): notified goods from an agriculturist / unregistered supplier → reverse charge prompt (lazy).
 const RcmGoodsNotice = lazy(() => import('../trade/RcmGoodsNotice'));
+const MediaRows = lazy(() => import('../prof/MediaRows')); // R14 (PS-B5): media buy for a client (`media` pack)
 // R8-A (TR-A1): supplier's special rate and last purchase rate, as hints (trade discounts or a trading pack, lazy).
 const BillRateHints = lazy(() => import('../trade/BillRateHints'));
 // R8-B (TR-B1/B2/B3): bags / weight rows, bill charges and the broker (commodity / agency pack, lazy).
@@ -164,6 +165,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
     pure_agent: purchase?.pure_agent,
   });
   const [attachments, setAttachments] = useState<AttachmentRef[]>(purchase?.attachments ?? []);
+  const [psB, setPsB] = useState(() => (purchase as { ps?: Record<string, unknown> } | undefined)?.ps); // R14 (PS-B5)
+  const [mediaOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('media'))(localDb.settings.get() as never));
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   // TDS deducted by us (Tally parity). Undefined rate / base / amount follow the suggestion.
@@ -266,6 +269,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         landed_basis: landed.basis === 'qty' && landed.costs.length ? 'qty' : undefined,
         boe_duty: importType === 'GOODS' ? boeDuty : undefined, // R4-C3
         ...billablePatch(billable),
+        ...(psB !== (purchase as { ps?: unknown } | undefined)?.ps ? { ps: psB } : {}), // R14 (PS-B5)
         cost_centre_id: costCentre,
         branch_id: branchId,
         attachments: attachments.length ? attachments : undefined,
@@ -484,6 +488,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       </div>
 
       <BillableFields idPrefix="bill" value={billable} onChange={setBillable} rebilledIn={purchase?.rebilled_in} />
+      {(mediaOn || !!psB?.media) && <Suspense fallback={null}><MediaRows ps={psB} onChange={setPsB} /></Suspense>}
 
       <AttachmentsPanel value={attachments} onChange={setAttachments} label={purT('attachments')} />
 

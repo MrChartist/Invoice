@@ -134,6 +134,7 @@ export const TIME_TABS = [
   { id: 'wip', pack: 'practice' }, // PS-A3 / A4: views wip / prebill / realisation / utilisation / profit / yearend
   { id: 'firm', pack: 'partners', alsoPacks: ['practice'] }, // PS-D1–D4: views partners / appropriation / tds194t / presumptive / tds194j
   { id: 'cadesk', pack: 'cafirm' }, // PS-D5: views events / fees / udin
+  { id: 'clientmoney', pack: 'legal', alsoPacks: ['cafirm'] }, // PS-B3: views ledger / reconcile / statements
   { id: 'exportsvc', pack: 'svcexport' }, // PS-C: views checker / edf / realisation / refund / platforms
 ] as const;
 export type TimeTab = (typeof TIME_TABS)[number]['id'];

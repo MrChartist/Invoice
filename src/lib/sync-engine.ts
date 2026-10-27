@@ -461,6 +461,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   // R14-D: partner runs (year-end and monthly credits), UDIN register
   [`${DB_PREFIX}partner_runs`]: 'date',
   [`${DB_PREFIX}udin_register`]: 'date',
+  // R14-B: client-money vouchers
+  [`${DB_PREFIX}client_money`]: 'date',
   // R14-C: EDF register (the end of the invoice month)
   [`${DB_PREFIX}edf_register`]: 'date',
 };
@@ -1086,6 +1088,8 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}cut_plans`]: { num: 'number', date: 'date' },
   // R14-A: engagements (ENG/FY…)
   [`${DB_PREFIX}engagements`]: { num: 'number', date: 'start' },
+  // R14-B: client-money vouchers (CMV/FY…)
+  [`${DB_PREFIX}client_money`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };

@@ -4798,6 +4798,62 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R14-B legal desk: a law firm (legal pack) with a client-money account; receipt ₹50,000 → stamp duty ₹12,000 paid on the client\'s behalf → ₹20,000 moved to fees against the fee memo with the client\'s e-mail authority → held ₹18,000; the office receipt settles the memo; the three-way reconciliation agrees at ₹18,000; the statement closes at ₹18,000; Ctrl+K "client money"; help', async () => {
+    const keys = ['settings', 'clients', 'bank_accounts', 'invoices', 'transactions', 'client_money', 'vouchers', 'accounts', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'professional', modules: undefined, prof_kind: 'legal', industry_packs: ['practice', 'legal'], lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-lg-c', name: 'E2E Bharat Traders (legal)', gstin: '27AAPFU0939F1ZV', state_code: '27' }]);
+    await writeJson(page, 'bank_accounts', [...(prev.bank_accounts ?? []), { id: 'e2e-lg-cm', name: 'E2E Client account', active: true, client_money: true }]);
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-lg-inv', invoice_number: 'E2E/LG/1', doc_type: 'INVOICE', status: 'Sent', issue_date: today, due_date: today, client: { id: 'e2e-lg-c', name: 'E2E Bharat Traders (legal)' }, items: [{ id: 'l1', name: 'Professional fees', quantity: 1, rate: 20000, tax_rate: 0, amount: 20000 }], subtotal: 20000, taxable_value: 20000, tax_amount: 0, total: 20000, amount_paid: 0, balance_due: 20000, gst_mode: 'NONE' }]);
+    await page.goto(srv.origin + '/time?tab=clientmoney&view=ledger');
+    await page.locator('[data-ps-desk="clientmoney"]').waitFor({ timeout: 15000 });
+    const tabs = (await page.getByRole('tab').allInnerTexts()).join('|');
+    check(/Client money/.test(tabs), `Time lists the Client money desk (${tabs})`);
+    const rec = async (kind, amount, more) => {
+      await page.locator('[data-cm="kind"]').selectOption(kind);
+      await page.locator('[data-cm="client"]').selectOption('e2e-lg-c');
+      if (more) await more();
+      await page.locator('[data-cm="amount"]').fill(String(amount));
+      await page.locator('[data-cm-b="record"]').click();
+      await readJson(page, 'client_money', [], (v) => v.some((r) => r.kind === kind && r.amount === amount));
+    };
+    await rec('receipt', 50000);
+    await rec('payment', 12000);
+    await rec('to_fees', 20000, async () => {
+      await page.locator('[data-cm="invoice"]').selectOption('e2e-lg-inv');
+      await page.locator('[data-cm="auth"]').selectOption('email');
+      await page.locator('[data-cm="auth-ref"]').fill('Mail of today');
+    });
+    check(/18,000/.test(await page.locator('[data-cm-total]').innerText()), 'held for the client: ₹18,000');
+    const pays = await readJson(page, 'transactions', [], (v) => v.some((p) => p.invoice_id === 'e2e-lg-inv'));
+    check(pays.filter((p) => p.invoice_id === 'e2e-lg-inv').length === 1 && (await readJson(page, 'invoices', [])).find((i) => i.id === 'e2e-lg-inv')?.balance_due === 0, 'one office receipt settles the fee memo');
+    await page.goto(srv.origin + '/time?tab=clientmoney&view=reconcile');
+    await page.locator('[data-cm="stmt"]').fill('18000', { timeout: 15000 });
+    check((await page.locator('[data-cm-agreed]').getAttribute('data-cm-agreed')) === 'yes', 'three-way reconciliation: bank, ledger and clients agree at ₹18,000');
+    await page.goto(srv.origin + '/time?tab=clientmoney&view=statements');
+    await page.locator('[data-cm="st-client"]').selectOption('e2e-lg-c', { timeout: 15000 });
+    await page.locator('[data-cm="st-from"]').fill(`${today.slice(0, 8)}01`);
+    check((await page.locator('[data-cm-closing]').getAttribute('data-cm-closing')) === '18000', 'the client statement closes at ₹18,000');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('client money');
+    await palette.getByRole('option', { name: /Client money/i }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "client money" finds the desk');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/time?tab=clientmoney&view=reconcile');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="time:clientmoney"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a client-money topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   await step('R14-D firm desk: three partners 40 / 30 / 30 → the year-end run (Sec 40(b) allowable, journals balance); a 194T credit in the TDS register; a 194J client default; the presumptive paper; CA desk: a linked company\'s filed GSTR-3B → Bill from the board → a draft with the fee; cancelling it frees the work; Ctrl+K "UDIN"; help', async () => {
     const keys = ['settings', 'clients', 'items_catalog', 'partners', 'partner_runs', 'vouchers', 'accounts', 'tds_deductions', 'invoices', 'compliance', 'prof_settings', 'udin_register', 'series_counters'];
     const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));

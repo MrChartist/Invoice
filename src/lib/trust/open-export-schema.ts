@@ -278,6 +278,8 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   partners: "Partners of a firm / LLP: PAN, working or not, designated, joined / left, deed terms by date (profit-sharing ratio, remuneration, interest on capital and drawings), capital and current ledgers (R14).",
   partner_runs: "Partner postings: the year-end appropriation per FY (book profit, Sec 40(b) allowable and disallowed, interest, residual share by partner) and monthly credits, with their journals and 194T TDS rows (R14).",
   udin_register: 'UDIN register: UDIN, date, client, kind (certificate, tax / GST / statutory audit), description, member no., FY / PAN, revocation (R14).',
+  // R14-B
+  client_money: 'Client-money (trust) vouchers (CMV/FY…): receipt / payment on behalf / to fees / refund / transfer / interest, client, matter, amount, client-money bank account, purpose, invoice and office receipt (to fees), client\'s authority or owner override, journals (R14).',
   // R14-C
   edf_register: 'EDF register (export of services, FEMA 2026): kind (software / services / SOFTEX history), month, invoices, currency, value FC / ₹, due, EDF no. and filing day, authority (AD bank / STPI / SEZ), small-value declaration, status (R14).',
 };

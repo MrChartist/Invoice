@@ -33,6 +33,7 @@ import { loadWorkTypes, sacFor, type WorkType } from './rate-cards';
 import { loadRetainers, retainerCover, type RetainerCover } from './retainers';
 import { buildAnnexure, type AnnexureContext } from './annexure';
 import { loadTasks } from './projects';
+import { PURE_AGENT_CHARGE } from './trade/pure-agent';
 
 export const TIME_TABLE = 'time_entries';
 export const MILEAGE_TABLE = 'mileage';
@@ -362,9 +363,12 @@ export function expenseLine(p: PurchaseRecord, prefs: TimePrefs): InvoiceItem {
   const cc = p.cost_centre_id ? { cost_centre_id: p.cost_centre_id } : {};
   const label = [p.category || 'Expense', p.vendor_name].filter(Boolean).join(': ') + (p.bill_number ? ` (#${p.bill_number})` : '');
   if (p.pure_agent) {
+    // R14 PS-B1: the R8 pure-agent line key (sentinel head `rule33` + the shared Rule 33 text), so GSTR-1 / e-Invoice /
+    // e-Way leave the reimbursement out of the supply (`isPureAgentLine`); old invoices keep their nil-rated 0% line.
     return line({
       name: `Reimbursement — ${label}`,
-      description: `${shortDay(p.date)} · ${PURE_AGENT_NOTE}`,
+      description: PURE_AGENT_CHARGE,
+      charge_head_id: 'rule33',
       unit: 'NOS',
       quantity: 1,
       rate: round2(num(p.total)),
