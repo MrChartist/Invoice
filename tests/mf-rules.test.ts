@@ -27,8 +27,8 @@ test('the rule file is imported only by Round 13 modules', () => {
 
 test('every rule row has a date, a source and `verified`, in date order', () => {
   let n = 0;
-  for (const v of Object.values(rules)) {
-    if (!Array.isArray(v)) continue;
+  const lists = Object.values(rules).flatMap((v) => (Array.isArray(v) ? [v] : v && typeof v === 'object' ? Object.values(v).filter(Array.isArray) : [])); // MF-B: per-class rule maps
+  for (const v of lists) {
     v.forEach((r: { from: string; source?: string; verified?: boolean }, i) => {
       n++;
       assert.match(r.from, /^\d{4}-\d{2}-\d{2}$/);
