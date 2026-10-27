@@ -8,7 +8,7 @@ import { installSettings } from './helpers/world.ts';
 import { getTable, setTable, KEYS } from '../src/lib/storage.ts';
 import '../src/lib/trust/recycle-bin.ts';
 import { addLot, bagsOut, chamberUse, deleteLot, depositorLots, editLot, loadLots, lotBalance, receiptHtml, transferBags } from '../src/lib/agri/ag-cold-lots.ts';
-import { checkGatePass, gatePassHtml, issueGatePass, undoGatePass } from '../src/lib/agri/ag-gatepass.ts';
+import { checkGatePass, depositorStatement, gatePassHtml, issueGatePass, statementHtml, undoGatePass } from '../src/lib/agri/ag-gatepass.ts';
 import { giveLoan, loadLoans, loanState, repayLoan } from '../src/lib/agri/ag-loans.ts';
 import { savePlan } from '../src/lib/agri/ag-cold-rent.ts';
 import { saveAgriSettings } from '../src/lib/agri/ag-settings.ts';
@@ -99,4 +99,28 @@ test('custody only: no stock module reads cold_lots; the stock engine sees nothi
   const stock = readdirSync(new URL('../src/lib/', import.meta.url)).filter((f) => /^(inventory|stock-|godowns|closing-stock)/.test(f));
   for (const f of stock) assert.ok(!readFileSync(new URL(`../src/lib/${f}`, import.meta.url), 'utf8').includes('cold_lots'), `${f} reads no lots`);
   assert.equal(localDb.invoices.getAll().length, 0);
+});
+
+test('depositor statement: lots in / out / balance, rent billed and due (issued bills only), open loans with interest; the print', () => {
+  const a = lot();
+  lot({ bags: 40 });
+  transferBags(a.id, { date: '2026-05-01', to_depositor_id: trader.id, to_depositor_name: trader.name, bags: 20, note: 'Both agree' });
+  const r = issueGatePass(a.id, { date: '2026-06-01', bags: 60 });
+  assert.ok(r.bill, 'rent bill drafted');
+  const issued = { ...r.bill!, id: 'issued', status: 'Sent', balance_due: 500 } as never;
+  giveLoan({ date: '2026-04-10', borrower_id: farmer.id, borrower_name: farmer.name, lot_ids: [a.id], principal: 10000, rate_pct: 12, disbursed_by: 'cash' });
+  const st = depositorStatement(loadLots(), [r.bill!, issued], loadLoans(), farmer.id, '2026-07-10');
+  assert.deepEqual([st.lots.length, st.in, st.out, st.balance], [2, 280, 80, 200]);
+  assert.equal(st.billed, Math.round(r.bill!.total * 2 * 100) / 100, 'draft + issued billed');
+  assert.equal(st.due, 500, 'only the issued bill is due');
+  assert.equal(st.loansDue, loanState(loadLoans()[0], '2026-07-10').total);
+  assert.ok(st.loansDue > 10000, 'interest to date included');
+  const other = depositorStatement(loadLots(), [r.bill!], loadLoans(), trader.id, '2026-07-10');
+  assert.deepEqual([other.lots.length, other.balance, other.billed, other.loans.length], [1, 20, 0, 0]);
+  const html = statementHtml(st, farmer.name, 'Cold Co', '2026-07-10');
+  assert.match(html, /Depositor statement — Ram Singh/);
+  assert.match(html, new RegExp(`${a.number.replace(/\//g, '\\/')} · Potato</td><td>in 240 · out 80 · balance 160 bags`));
+  assert.match(html, /Rent billed \/ due/);
+  assert.match(html, /Loan LAS\/FY26-27\/0001/);
+  assert.match(html, /never our stock/);
 });

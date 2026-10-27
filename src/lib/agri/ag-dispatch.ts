@@ -27,6 +27,8 @@ import { centreGodown, milkItemId, milkJournal } from './ag-shifts';
 const T = AG_TABLES.dispatches;
 export const MDS = AG_SERIES.dispatches;
 export const loadDispatches = (): MilkDispatch[] => getTable<MilkDispatch>(T).filter((d) => d && typeof d.id === 'string');
+/** QA13 G9: a bill that still stands (a cancelled or deleted bill frees its dispatch / milk card to be billed again). */
+export const liveBill = (id?: string): boolean => { const b = id ? localDb.invoices.getById(id) : undefined; return !!b && b.status !== 'Cancelled'; };
 export const MILK_LABEL: Readonly<Record<MilkKind, string>> = { cow: 'Cow milk', buffalo: 'Buffalo milk', mixed: 'Mixed milk' };
 
 /**
@@ -55,7 +57,7 @@ export function saveDispatch(input: DispatchInput): MilkDispatch {
   const all = loadDispatches();
   const prev = input.id ? all.find((d) => d.id === input.id) : undefined;
   const sentChanged = !prev || prev.date !== input.date || prev.milk !== input.milk || prev.centre_id !== input.centre_id || JSON.stringify(prev.sent) !== JSON.stringify(input.sent);
-  if (prev?.invoice_id && sentChanged && localDb.invoices.getById(prev.invoice_id)) throw new Error(`${prev.number} is billed: only the union's acknowledgement can change.`);
+  if (sentChanged && liveBill(prev?.invoice_id)) throw new Error(`${prev?.number} is billed: only the union's acknowledgement can change.`);
   return withTablesRollback([T, SJ_TABLE, 'stock_items', 'series_counters'], () => {
     const number = prev?.number && numberFitsFy(prev.number, input.date) ? prev.number : nextSeriesNumberFor(MDS, input.date, all.map((d) => d.number));
     const id = prev?.id ?? generateId();
@@ -78,7 +80,7 @@ export function deleteDispatch(id: string): void {
   requireAccess('doc.create');
   const d = loadDispatches().find((x) => x.id === id);
   if (!d) return;
-  if (d.invoice_id && localDb.invoices.getById(d.invoice_id)) throw new Error(`${d.number} is billed: delete or cancel the bill first.`);
+  if (liveBill(d.invoice_id)) throw new Error(`${d.number} is billed: delete or cancel the bill first.`);
   withTablesRollback([T, SJ_TABLE], () => {
     if (d.sj_id && stockJournalsDb.all().some((j) => j.id === d.sj_id)) stockJournalsDb.remove(d.sj_id);
     setTable(T, loadDispatches().filter((x) => x.id !== id));
@@ -109,7 +111,7 @@ export function billDispatch(id: string, date?: string): InvoiceRecord {
   requireAccess('doc.create');
   const d = loadDispatches().find((x) => x.id === id);
   if (!d) throw new Error('Dispatch not found.');
-  if (d.invoice_id && localDb.invoices.getById(d.invoice_id)) throw new Error(`${d.number} is already billed.`);
+  if (liveBill(d.invoice_id)) throw new Error(`${d.number} is already billed.`);
   const { item, ag } = dispatchBillParts(d, getTable<MilkRateChart>(AG_TABLES.rateCharts));
   const client = localDb.clients.getById(d.buyer_id) ?? { ...blankClient(), name: d.buyer_name ?? 'Union' };
   return withTablesRollback([T, 'invoices', 'clients', 'series_counters'], () => {

@@ -1,0 +1,327 @@
+/**
+ * QA round 13 (agriculture vertical, Round 12 AG-A / AG-B / AG-C): one regression per finding G1…Gn
+ * (docs/prd/qa-round-13.md).
+ */
+import './helpers/shim.ts';
+import { beforeEach, test } from 'node:test';
+import assert from 'node:assert/strict';
+import { resetStorage } from './helpers/shim.ts';
+import { clientMH, createViaStore, installSettings } from './helpers/world.ts';
+import { getTable } from '../src/lib/storage.ts';
+import { purchasesDb } from '../src/lib/purchases.ts';
+import { loadVouchers } from '../src/lib/ledger/vouchers.ts';
+import type { Payment } from '../src/types/invoice.ts';
+import type { PurchaseRecord, Vendor } from '../src/types/purchases.ts';
+import { vendorsDb } from '../src/lib/vendors.ts';
+import { saveFarmer } from '../src/lib/agri/ag-farmers.ts';
+import { closeCycle, loadCycles, payCycle, reopenCycle, saveCycleDraft } from '../src/lib/agri/ag-cycle-post.ts';
+import { saveChart } from '../src/lib/agri/ag-rate-chart.ts';
+import { addEntry, closeShift, loadShifts, reopenShift } from '../src/lib/agri/ag-shifts.ts';
+import { closeMilkCycle, makeMilkCycle } from '../src/lib/agri/ag-milk-cycle.ts';
+import { cowMatrix } from './helpers/ag-dairy.ts';
+
+beforeEach(() => {
+  resetStorage();
+  installSettings();
+});
+
+const bin = () => getTable<{ id: string; table: string; row_id: string }>('recycle_bin');
+const cyclePurchases = (id: string) => getTable<PurchaseRecord>('purchases').filter((p) => p.ag?.cycle_id === id);
+
+/* ── G1: a cycle with a carried / over-deducted farmer can be paid, and the pooled bill ends settled ── */
+
+test('G1: deductions above one farmer\'s milk money: pay works, the bill is settled; next cycle\'s carry settles too', () => {
+  const ram = saveFarmer({ name: 'Ram', ag: { code: 'F-0001' } });
+  const sita = saveFarmer({ name: 'Sita', ag: { code: 'F-0002' } });
+  const d1 = saveCycleDraft({ period_from: '2026-10-01', period_to: '2026-10-10', source: 'produce', lines: [
+    { farmer_id: ram.id, name: 'Ram', qty: 20, unit: 'KG', amount: 1000, deductions: [{ kind: 'advance', amount: 1500 }], net: 0, mode: 'cash' },
+    { farmer_id: sita.id, name: 'Sita', qty: 20, unit: 'KG', amount: 1000, deductions: [], net: 0, mode: 'cash' },
+  ] });
+  closeCycle(d1.id);
+  payCycle(d1.id, '2026-10-12');
+  const b1 = purchasesDb.get(cyclePurchases(d1.id)[0].id)!;
+  assert.equal(b1.amount_paid, b1.total, 'cycle 1 bill settled (deductions + carry + cash)');
+  const d2 = saveCycleDraft({ period_from: '2026-10-11', period_to: '2026-10-20', source: 'produce', lines: [
+    { farmer_id: ram.id, name: 'Ram', qty: 20, unit: 'KG', amount: 1000, carried: -500, deductions: [], net: 0, mode: 'cash' },
+  ] });
+  closeCycle(d2.id);
+  payCycle(d2.id, '2026-10-22');
+  const b2 = purchasesDb.get(cyclePurchases(d2.id)[0].id)!;
+  assert.equal(b2.amount_paid, b2.total, 'cycle 2 bill settled: the carried-in recovery is not left as a payable');
+});
+
+/* ── G2: a reopened cycle's old bill / set-off receipt / deductions journal never come back next to the re-close ── */
+
+test('G2: after reopen + close again, the old pooled bill, set-off receipt and journal stay in the bin', async () => {
+  const { restoreEntry } = await import('../src/lib/trust/recycle-bin.ts');
+  const ram = saveFarmer({ name: 'Ram', ag: { code: 'F-0001' } });
+  const client = { ...clientMH, id: 'c-ram', name: 'Ram', ag: { code: 'F-0001' } };
+  const feed = createViaStore({ client, date: '2026-10-05', lines: [{ name: 'Cattle feed', qty: 1, rate: 400, tax: 0, hsn: '2309' }] });
+  const d = saveCycleDraft({ period_from: '2026-10-11', period_to: '2026-10-20', source: 'produce', lines: [
+    { farmer_id: ram.id, name: 'Ram', qty: 50, unit: 'KG', amount: 2500, deductions: [{ kind: 'feed', ref_id: feed.id, amount: 400 }, { kind: 'share', amount: 100 }], net: 0, mode: 'cash' },
+  ] });
+  const first = closeCycle(d.id);
+  reopenCycle(d.id);
+  const again = closeCycle(d.id);
+  assert.notEqual(again.purchase_id, first.purchase_id);
+  const entry = (table: string, id?: string) => bin().find((x) => x.table === table && x.row_id === id);
+  assert.throws(() => restoreEntry(entry('purchases', first.purchase_id)!.id), /closed again|cycle/i, 'old pooled bill');
+  assert.throws(() => restoreEntry(entry('transactions', first.receipt_ids![0])!.id), /closed again|cycle|gone/i, 'old set-off receipt');
+  assert.throws(() => restoreEntry(entry('vouchers', first.journal_id)!.id), /twice|again/i, 'old deductions journal');
+  assert.equal(cyclePurchases(d.id).length, 1);
+  assert.equal(getTable<Payment>('transactions').filter((p) => p.invoice_id === feed.id).length, 1);
+  assert.equal(loadVouchers().filter((v) => v.voucher_class === 'Farmer cycle deductions').length, 1);
+  // A stray delete of the live pooled bill (cycle still closed and naming it) still restores.
+  purchasesDb.remove(again.purchase_id!, { confirmStock: true });
+  restoreEntry(entry('purchases', again.purchase_id)!.id);
+  assert.ok(purchasesDb.get(again.purchase_id!));
+});
+
+test('G3b: a deleted milk draft does not come back next to the milk bill made again for that centre and period', async () => {
+  const { restoreEntry } = await import('../src/lib/trust/recycle-bin.ts');
+  const { deleteCycle } = await import('../src/lib/agri/ag-cycle-post.ts');
+  saveChart(cowMatrix());
+  const f = vendorsDb.save({ name: 'Ramesh', ag: { code: 'F-0001', centre_id: 'c1' } }) as Vendor;
+  const { shift } = addEntry({ centre_id: 'c1', date: '2026-11-02', shift: 'M' }, { farmer_id: f.id, name: f.name, milk: 'cow', qty: 10, unit: 'L', fat: 3.7, snf: 8.6 });
+  closeShift(shift.id);
+  const old = makeMilkCycle('c1', '2026-11-01', '2026-11-10');
+  deleteCycle(old.id);
+  makeMilkCycle('c1', '2026-11-01', '2026-11-10');
+  assert.throws(() => restoreEntry(bin().find((x) => x.table === 'farmer_cycles' && x.row_id === old.id)!.id), /twice/);
+});
+
+/* ── G3: a milk draft whose shifts changed since it was made is not closed with stale lines ── */
+
+test('G3: shift reopened and changed after the draft → closing the stale draft is refused; remade it closes', () => {
+  saveChart(cowMatrix());
+  const f = vendorsDb.save({ name: 'Ramesh', ag: { code: 'F-0001', centre_id: 'c1' } }) as Vendor;
+  const k = { centre_id: 'c1', date: '2026-11-02', shift: 'M' as const };
+  const { shift } = addEntry(k, { farmer_id: f.id, name: f.name, milk: 'cow', qty: 10, unit: 'L', fat: 3.7, snf: 8.6 });
+  closeShift(shift.id);
+  const c = makeMilkCycle('c1', '2026-11-01', '2026-11-10');
+  reopenShift(shift.id);
+  addEntry(k, { farmer_id: f.id, name: f.name, milk: 'cow', qty: 5, unit: 'L', fat: 3.7, snf: 8.6 }, { allowDuplicate: true });
+  closeShift(shift.id);
+  assert.throws(() => closeMilkCycle(c.id), /changed|again/i);
+  assert.throws(() => closeCycle(c.id), /changed|again/i, 'Farm → Cycles close too');
+  makeMilkCycle('c1', '2026-11-01', '2026-11-10', c.id);
+  const done = closeMilkCycle(c.id);
+  assert.equal(done.lines[0].qty, 15);
+  assert.ok(loadShifts().every((s) => s.cycle_id === c.id));
+  assert.equal(loadCycles().length, 1);
+});
+
+/* ── G4: a milk dispatch bill does not take the milk out of stock a second time ── */
+
+test('G4: shift 50 L → dispatch 40 L → bill the union: stock stays 10 L; a milk-card bill still moves stock', async () => {
+  const { localDb } = await import('../src/lib/localDb.ts');
+  const { loadPositions } = await import('../src/lib/inventory.ts');
+  const { billDispatch, saveDispatch } = await import('../src/lib/agri/ag-dispatch.ts');
+  const { billCard, saveCard } = await import('../src/lib/agri/ag-milk-cards.ts');
+  saveChart(cowMatrix());
+  const union = localDb.clients.upsert({ name: 'District Milk Union' });
+  saveChart(cowMatrix({ name: 'Union cow', buyer_id: union, basis: 'flat', unit: 'KG', flat_rate: 40, matrix: undefined }));
+  const { shift } = addEntry({ centre_id: 'c1', date: '2026-11-05', shift: 'M' }, { farmer_id: 'f1', milk: 'cow', qty: 50, unit: 'L', fat: 4, snf: 8.5 });
+  closeShift(shift.id);
+  const milk = () => loadPositions().find((p) => p.item.name === 'Cow milk')?.qty;
+  const d = saveDispatch({ date: '2026-11-05', shift: 'M', centre_id: 'c1', buyer_id: union, milk: 'cow', sent: { qty: 40, unit: 'L', fat: 4, snf: 8.5 } });
+  assert.equal(milk(), 10);
+  billDispatch(d.id);
+  assert.equal(milk(), 10, 'the bill (in kg, on the union\'s figures) moves no stock');
+  const home = localDb.clients.upsert({ name: 'Sharma household' });
+  const card = saveCard({ client_id: home, client_name: 'Sharma', month: '2026-11', milk: 'cow', rate: 60, default_qty: 0, days: { 6: 2 } });
+  billCard(card.id, '2026-11-30');
+  assert.equal(milk(), 8, 'local sale on a card still leaves stock');
+});
+
+/* ── G5: the e-Way preflight says "may not be needed" for exempt-only goods (AG-C4 leftover) ── */
+
+test('G5: exempt-only goods → EWB_EXEMPT note (same text as ewayHint); taxable goods → none', async () => {
+  const { preflightEway } = await import('../src/lib/einvoice-validate.ts');
+  const { EXEMPT_EWAY_NOTE } = await import('../src/lib/agri/ag-packing.ts');
+  const { invoice, item } = await import('./einvoice-fixtures.ts');
+  const road = { mode: 'ROAD' as const, vehicle: 'MH12AB1234', distance: 120 };
+  const paddy = preflightEway(invoice({ items: [item({ name: 'Paddy', hsn: '1006', quantity: 100, rate: 2300, tax_rate: 0 })] }), { transport: road, now: new Date(2025, 5, 20) });
+  const w = paddy.warnings.find((x) => x.code === 'EWB_EXEMPT');
+  assert.equal(w?.message, EXEMPT_EWAY_NOTE);
+  const taxed = preflightEway(invoice({ items: [item({ quantity: 10, rate: 10000 })] }), { transport: road, now: new Date(2025, 5, 20) });
+  assert.ok(!taxed.warnings.some((x) => x.code === 'EWB_EXEMPT'));
+});
+
+/* ── G6: the 25 kg rule and the class notice reach lines typed in the editor / POS (class from the stock item) ── */
+
+test('G6: a labelled 25 kg rice bag sold at nil is flagged (5%); 5 kg loose from the bag is not', async () => {
+  const { agExceptions } = await import('../src/lib/agri/ag-hooks.ts');
+  const { blankStockItem, stockDb } = await import('../src/lib/inventory.ts');
+  stockDb.saveItem(blankStockItem({ name: 'Sona rice 25 kg', unit: 'BAG', hsn: '1006', ag_class: 'cereal_loose', ag_pack_kg: 25, ag_labelled: true }));
+  const inv = (lines: { quantity: number; unit: string; tax_rate: number; unit_factor?: number }[]) =>
+    ({ issue_date: '2026-10-05', items: lines.map((l, i) => ({ id: `l${i}`, name: 'Sona rice 25 kg', hsn: '1006', rate: 1500, amount: 0, ...l })) }) as never;
+  const bag = agExceptions(inv([{ quantity: 2, unit: 'BAG', tax_rate: 0 }]));
+  assert.equal(bag.length, 1, 'a whole labelled 25 kg bag at nil is flagged');
+  assert.equal(bag[0].vars.want, 5);
+  assert.deepEqual(agExceptions(inv([{ quantity: 5, unit: 'KG', tax_rate: 0 }])), [], 'loose 5 kg from the bag (counter sale) stays nil');
+  assert.deepEqual(agExceptions(inv([{ quantity: 0.2, unit: 'BAG', tax_rate: 0 }])), [], 'a fifth of a bag is loose too');
+  assert.equal(agExceptions(inv([{ quantity: 2, unit: 'BAG', tax_rate: 5 }])).length, 0, 'right rate → no notice');
+});
+
+/* ── G7: opening an agri document in the editor keeps each line's class ── */
+
+test('G7: normalizeRecord keeps ag_class on lines (milk bill, milling charges, cattle-feed invoice)', async () => {
+  const { normalizeRecord } = await import('../src/store/invoice-defaults.ts');
+  const rec = normalizeRecord({ id: 'x', doc_type: 'BILL_OF_SUPPLY', issue_date: '2026-10-05', items: [{ id: 'a', name: 'Cow milk', quantity: 1, rate: 50, tax_rate: 0, ag_class: 'milk_fresh' }, { id: 'b', name: 'Feed', quantity: 1, rate: 50, tax_rate: 0, ag_class: 'cattle_feed' }] });
+  assert.deepEqual(rec.items.map((i) => i.ag_class), ['milk_fresh', 'cattle_feed']);
+});
+
+/* ── G8: one feed invoice is never set off twice (two drafts, or paid since the draft) ── */
+
+test('G8: two drafts pulling the same feed invoice → the second close is refused; a partly paid invoice too', async () => {
+  const { inputDeductions } = await import('../src/lib/agri/ag-cycles.ts');
+  const { localDb } = await import('../src/lib/localDb.ts');
+  const ram = saveFarmer({ name: 'Ram', ag: { code: 'F-0001' } });
+  const client = { ...clientMH, id: 'c-ram', name: 'Ram', ag: { code: 'F-0001' } };
+  const feed = createViaStore({ client, date: '2026-10-05', lines: [{ name: 'Cattle feed', qty: 1, rate: 400, tax: 0, hsn: '2309' }] });
+  const ded = inputDeductions('F-0001', [client], getTable('invoices'), getTable('transactions'), 5000);
+  const line = { farmer_id: ram.id, name: 'Ram', qty: 50, unit: 'KG', amount: 2500, deductions: ded, net: 0, mode: 'cash' as const };
+  const a = saveCycleDraft({ period_from: '2026-10-11', period_to: '2026-10-20', source: 'produce', lines: [line] });
+  const b = saveCycleDraft({ period_from: '2026-10-21', period_to: '2026-10-31', source: 'produce', lines: [line] });
+  closeCycle(a.id);
+  assert.throws(() => closeCycle(b.id), /only 0\.00 left/);
+  assert.equal(loadCycles().find((c) => c.id === b.id)?.status, 'draft', 'rolled back');
+  assert.deepEqual(getTable<Payment>('transactions').filter((p) => p.invoice_id === feed.id).map((p) => p.amount), [400]);
+  // Paid ₹100 in cash after the draft was made → the stale ₹400 set-off is refused.
+  const feed2 = createViaStore({ client, date: '2026-10-06', lines: [{ name: 'Cattle feed', qty: 1, rate: 400, tax: 0, hsn: '2309' }] });
+  const d2 = inputDeductions('F-0001', [client], getTable('invoices'), getTable('transactions'), 5000);
+  const c = saveCycleDraft({ period_from: '2026-11-01', period_to: '2026-11-10', source: 'produce', lines: [{ ...line, deductions: d2 }] });
+  localDb.payments.record({ invoiceId: feed2.id, amount: 100, method: 'Cash', date: '2026-11-02' });
+  assert.throws(() => closeCycle(c.id), /only 300\.00 left/);
+});
+
+/* ── G9: a cancelled milk-card / dispatch bill frees the card / dispatch to be billed again ── */
+
+test('G9: cancel a wrong milk-card bill → the card can be corrected and billed again', async () => {
+  const { localDb } = await import('../src/lib/localDb.ts');
+  const { billCard, saveCard, loadCards } = await import('../src/lib/agri/ag-milk-cards.ts');
+  const { cancelDocument } = await import('../src/lib/documents.ts');
+  const home = localDb.clients.upsert({ name: 'Sharma household' });
+  const card = saveCard({ client_id: home, client_name: 'Sharma', month: '2026-11', milk: 'cow', rate: 60, default_qty: 1, days: {} });
+  const first = billCard(card.id, '2026-11-30');
+  assert.throws(() => billCard(card.id, '2026-11-30'), /already billed/);
+  cancelDocument(first, 'wrong rate');
+  assert.equal(localDb.invoices.getById(first.id)?.status, 'Cancelled');
+  saveCard({ ...loadCards()[0], rate: 62 });
+  const again = billCard(card.id, '2026-11-30');
+  assert.notEqual(again.id, first.id);
+  assert.equal(again.total, 1860);
+});
+
+/* ── AG-D (cold storage): lien, loan vouchers in the bin, gate pass undo ── */
+
+async function coldWorld() {
+  const { setTable, KEYS } = await import('../src/lib/storage.ts');
+  const { addLot } = await import('../src/lib/agri/ag-cold-lots.ts');
+  const { savePlan } = await import('../src/lib/agri/ag-cold-rent.ts');
+  const { giveLoan } = await import('../src/lib/agri/ag-loans.ts');
+  setTable(KEYS.clients, [{ id: 'c-ram', name: 'Ram Singh', state_code: '09' }, { id: 'c-trader', name: 'Gupta Traders', state_code: '09' }]);
+  const plan = savePlan({ name: 'P', basis: 'bag_season', rate: 180, part_month: 'full', charges: [{ name: 'Loading', when: 'out', basis: 'bag', rate: 5 }], class: 'storage_agri', bill_at: 'out' } as never);
+  const lot = addLot({ date_in: '2026-03-10', depositor_id: 'c-ram', depositor_name: 'Ram Singh', commodity: 'Potato', bags: 240, chamber_id: 'c', season: '2026', rent_plan_id: plan.id });
+  const loan = () => giveLoan({ date: '2026-04-01', borrower_id: 'c-ram', borrower_name: 'Ram Singh', lot_ids: [lot.id], principal: 120000, rate_pct: 12, disbursed_by: 'cash' });
+  return { lot, loan };
+}
+
+test('G10: pledged bags cannot leave the borrower by a transfer to another depositor', async () => {
+  const { transferBags, deleteLot } = await import('../src/lib/agri/ag-cold-lots.ts');
+  const { lot, loan } = await coldWorld();
+  loan();
+  assert.throws(() => transferBags(lot.id, { date: '2026-05-01', to_depositor_id: 'c-trader', to_depositor_name: 'Gupta Traders', bags: 100, note: 'sold in store' }), /lien/);
+  assert.throws(() => deleteLot(lot.id), /open loan/, 'G12: a pledged lot is not deleted');
+});
+
+test('G11: an undone loan repayment / a deleted loan\'s voucher does not come back from the bin', async () => {
+  const { restoreEntry } = await import('../src/lib/trust/recycle-bin.ts');
+  const { deleteLoan, repayLoan, undoRepayment, loadLoans } = await import('../src/lib/agri/ag-loans.ts');
+  const { loan } = await coldWorld();
+  const l = loan();
+  const repaid = repayLoan(l.id, { date: '2026-05-01', amount: 5000, by: 'cash' });
+  undoRepayment(l.id);
+  const entry = (id: string) => bin().find((x) => x.table === 'vouchers' && x.row_id === id)!.id;
+  assert.throws(() => restoreEntry(entry(repaid.repayments[0].receipt_id)), /twice/);
+  deleteLoan(l.id);
+  assert.throws(() => restoreEntry(entry(l.payment_voucher_id!)), /twice/);
+  assert.equal(loadLoans().length, 0);
+  assert.equal(loadVouchers().filter((v) => v.voucher_class === 'Loan against produce').length, 0);
+  // The same for a deleted share allotment (FPO / co-op members' capital).
+  const { allotShares, deleteShareRow } = await import('../src/lib/agri/ag-members.ts');
+  const row = allotShares({ id: 'c-ram', name: 'Ram Singh', kind: 'client' }, { date: '2026-05-01', shares: 10, face_value: 100, paid_from: 'bank' });
+  deleteShareRow(row.id);
+  assert.throws(() => restoreEntry(entry(row.voucher_id!)), /twice/);
+});
+
+test('G12: undoing a gate pass whose release was billed is refused until the rent bill goes', async () => {
+  const { issueGatePass, undoGatePass } = await import('../src/lib/agri/ag-gatepass.ts');
+  const { localDb } = await import('../src/lib/localDb.ts');
+  const { lot } = await coldWorld();
+  const g = issueGatePass(lot.id, { date: '2026-07-20', bags: 60 });
+  assert.ok(g.bill);
+  assert.throws(() => undoGatePass(lot.id), /Rent bill/);
+  localDb.invoices.remove(g.bill!.id);
+  assert.equal(undoGatePass(lot.id).outs.length, 0);
+});
+
+/* ── G14: the 194Q base counts the farmer's shares of pooled cycles ── */
+
+test('G14: fyPurchasesOf adds his lines on closed cycles of the FY (not drafts, not another FY)', async () => {
+  const { fyPurchasesOf } = await import('../src/lib/agri/ag-vouchers.ts');
+  const ram = saveFarmer({ name: 'Ram', ag: { code: 'F-0001' } });
+  const line = (amount: number) => ({ farmer_id: ram.id, name: 'Ram', qty: 1, unit: 'L', amount, deductions: [], net: 0, mode: 'cash' as const });
+  const a = saveCycleDraft({ period_from: '2026-10-01', period_to: '2026-10-10', source: 'produce', lines: [line(30000)] });
+  closeCycle(a.id);
+  saveCycleDraft({ period_from: '2026-10-11', period_to: '2026-10-20', source: 'produce', lines: [line(5000)] });
+  const old = saveCycleDraft({ period_from: '2026-03-21', period_to: '2026-03-31', source: 'produce', lines: [line(7000)] });
+  closeCycle(old.id);
+  assert.equal(fyPurchasesOf(ram.id, '2026-11-01', getTable('purchases'), loadCycles()), 30000);
+});
+
+/* ── G15: deleting a farmer voucher frees its weighbridge slip; the old voucher never returns next to a new one ── */
+
+test('G15: delete the slip\'s voucher → the slip makes a new voucher; the deleted one stays in the bin', async () => {
+  const { restoreEntry } = await import('../src/lib/trust/recycle-bin.ts');
+  const { openSlip, recordTare, voucherFromSlip, loadSlips } = await import('../src/lib/agri/ag-weighbridge.ts');
+  const { deleteFarmerVoucher } = await import('../src/lib/agri/ag-vouchers.ts');
+  const ram = saveFarmer({ name: 'Ram', ag: { code: 'F-0001' } }) as Vendor;
+  const s = openSlip({ date: '2026-10-05', vehicle: 'PB10AB1234', party_kind: 'farmer', party_id: ram.id, commodity: 'Paddy', gross_kg: 8000 });
+  recordTare(s.id, 6000);
+  const v1 = voucherFromSlip(s.id, { vendor: ram, rate: 2300 });
+  deleteFarmerVoucher(v1.id);
+  assert.equal(loadSlips()[0].ref_id, undefined, 'slip free again');
+  const v2 = voucherFromSlip(s.id, { vendor: ram, rate: 2350 });
+  assert.equal(loadSlips()[0].ref_id, v2.id);
+  assert.throws(() => restoreEntry(bin().find((x) => x.table === 'purchases' && x.row_id === v1.id)!.id), /used again/);
+});
+
+/* ── G16: demo mill numbers carry their own date's FY (first week of April) ── */
+
+test('G16: on 3 Apr the demo slip of 28 Mar is numbered in the old FY', async () => {
+  const { agriExtras } = await import('../src/lib/demo/profile-agri.ts');
+  const x = agriExtras({ today: '2026-04-03', packs: ['agri', 'mill'], base: {} } as never);
+  const slip = (x.tables as Record<string, { number: string; date: string }[]>).weighbridge_slips[0];
+  assert.equal(slip.date, '2026-03-28');
+  assert.equal(slip.number, 'WBS/FY25-26/0001');
+});
+
+/* ── G13: mill intake reads a bill typed in an alternate unit (50 kg bags of a quintal item) ── */
+
+test('G13: 10 bags × 0.5 QTL of paddy is 500 kg of own intake, not 5', async () => {
+  const { millWorld, runBatch } = await import('./helpers/mill.ts');
+  const { thawDate } = await import('./helpers/shim.ts');
+  const { setTable } = await import('../src/lib/storage.ts');
+  const { loadMillReportInput, millMonths } = await import('../src/lib/agri/ag-mill-reports.ts');
+  const { ids } = millWorld('2026-11-30');
+  try {
+    setTable('purchases', [{ id: 'p1', kind: 'PURCHASE', vendor_name: 'Farmer', bill_number: 'FPV/1', date: '2026-10-03', lines: [{ id: 'l', name: 'Paddy', item_id: ids.paddy, unit: 'BAG', unit_factor: 0.5, quantity: 10, rate: 1150, tax_rate: 0 }], taxable: 11500, total: 11500 }]);
+    runBatch('2026-10-10', 100, 64);
+    const oct = millMonths(await loadMillReportInput()).find((m) => m.month === '2026-10')!;
+    assert.equal(oct.intakeOwn, 500);
+  } finally {
+    thawDate();
+  }
+});

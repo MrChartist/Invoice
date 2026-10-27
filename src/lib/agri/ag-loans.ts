@@ -20,7 +20,7 @@ import { A } from '../ledger/accounts';
 import { deleteVoucher, saveVoucher } from '../ledger/vouchers';
 import { ensureLedger, postPair } from '../trade/tr-ledger';
 import { AG_SERIES, AG_TABLES } from './ag-shared';
-import { lotBalance } from './ag-cold-lots';
+import { lotBalance, smallPaper } from './ag-cold-lots';
 
 export const LOANS_TABLE = AG_TABLES.agriLoans;
 export const LOAN_LEDGER = 'Loans to depositors';
@@ -123,6 +123,15 @@ export function interestStatement(loan: AgriLoan, asOf: string): { date: string;
   }
   if (asOf > prev) step(asOf, 'Interest to date', 0);
   return rows;
+}
+
+/** The interest statement paper (A5): one row per step, then what is due. */
+export function loanStatementHtml(loan: AgriLoan, asOf: string, company: string): string {
+  const s = loanState(loan, asOf);
+  return smallPaper(`Interest statement ${loan.number}`, `${company} · ${loan.borrower_name} · ${num(loan.rate_pct)}% a year, as at ${asOf}`, [
+    ...interestStatement(loan, asOf).map((r): [string, unknown] => [`${r.date} · ${r.what}`, `${r.days} days · interest ₹${r.interest.toFixed(2)} · paid ₹${r.paid.toFixed(2)} · principal ₹${r.principal.toFixed(2)}`]),
+    ['Due now', `₹${s.total.toFixed(2)} (principal ₹${s.principal.toFixed(2)} + interest ₹${s.interest.toFixed(2)})`],
+  ], 'Simple interest by days, 365-day year. Interest is GST-exempt; money-lenders law — verify AG24.');
 }
 
 /** Loans past their due date with anything due (the bell / list flag). */

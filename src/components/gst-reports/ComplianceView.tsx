@@ -18,6 +18,7 @@ import { estimateFor } from '../../lib/gst-penalties';
 import { buildGstReport, journalItcReversals, periodForDate } from '../../lib/gst-reports';
 import { compositionLateInputs } from '../../lib/gstr4-annual';
 import { localDb } from '../../lib/localDb';
+import { isPackOn } from '../../lib/industry-packs';
 import { QRMP_TURNOVER_LIMIT, todayIso } from '../../lib/tax-rules';
 import { readLinks } from '../../lib/documents';
 import { formatDate } from '../../lib/utils';
@@ -38,6 +39,8 @@ const TdsDueCalendar = lazy(() => import('../tds/TdsDueCalendar'));
 const Gst8dPanel = lazy(() => import('./Gst8dPanel'));
 // R8-C (TR-C2): composition-limit tracker (composition profiles only, lazy).
 const CompositionTracker = lazy(() => import('../trade/CompositionTracker'));
+// R12 (AG-D5): producer company / co-operative reminders (fpo pack only, lazy).
+const MembersCalendar = lazy(() => import('../agri/MembersCalendar'));
 
 export interface ComplianceViewProps {
   invoices: InvoiceRecord[];
@@ -194,6 +197,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
         <TdsDueCalendar today={today} />
       </Suspense>
       <Suspense fallback={null}><CompositionTracker invoices={invoices} stateCode={stateCode} today={today} /></Suspense>
+      {isPackOn(localDb.settings.get(), 'fpo') && <Suspense fallback={null}><MembersCalendar today={today} /></Suspense>}
       <ul className={local.notes}>
         <li><strong>{gvT('ncEstimates')}</strong> {gvT('ncDue')}</li>
         <li>{gvT('ncLateFee')}</li>

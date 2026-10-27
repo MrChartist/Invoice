@@ -7,7 +7,7 @@ import { installSettings } from './helpers/world.ts';
 import { setTable, KEYS } from '../src/lib/storage.ts';
 import '../src/lib/trust/recycle-bin.ts';
 import { addLot, loadLots } from '../src/lib/agri/ag-cold-lots.ts';
-import { deleteLoan, giveLoan, interestStatement, liensOn, loadLoans, loanState, ltvWarning, overdueLoans, releaseCovered, repayLoan, splitRepayment, undoRepayment, LOAN_LEDGER, INTEREST_LEDGER } from '../src/lib/agri/ag-loans.ts';
+import { deleteLoan, giveLoan, interestStatement, loanStatementHtml, liensOn, loadLoans, loanState, ltvWarning, overdueLoans, releaseCovered, repayLoan, splitRepayment, undoRepayment, LOAN_LEDGER, INTEREST_LEDGER } from '../src/lib/agri/ag-loans.ts';
 import { savePlan } from '../src/lib/agri/ag-cold-rent.ts';
 import { loadVouchers } from '../src/lib/ledger/vouchers.ts';
 import { chartOf, loadUserAccounts } from '../src/lib/ledger/accounts.ts';
@@ -71,4 +71,15 @@ test('give, repay to zero (closes), vouchers balance; undo and delete through th
   assert.equal(loadLoans().length, 0);
   assert.equal(loadVouchers().length, 0);
   assert.equal(giveLoan({ date: '2026-04-02', borrower_id: farmer.id, borrower_name: farmer.name, lot_ids: [lot.id], principal: 1000, rate_pct: 12, disbursed_by: 'bank' }).number, 'LAS/FY26-27/0002', 'number never reused');
+});
+
+test('interest statement print: one row per step and what is due now', () => {
+  const l = L({ repayments: [{ id: 'p1', date: '2026-05-01', amount: 21183.56, interest_part: 1183.56, principal_part: 20000, receipt_id: 'r', receipt_no: 'RCT/1' }] });
+  const html = loanStatementHtml(l, '2026-06-01', 'Cold Co');
+  assert.match(html, /Interest statement LAS\/FY26-27\/0001/);
+  assert.match(html, /2026-04-01 · Disbursed LAS\/FY26-27\/0001/);
+  assert.match(html, /2026-05-01 · Repaid RCT\/1<\/td><td>30 days · interest ₹1183.56 · paid ₹21183.56 · principal ₹100000.00/);
+  const s = loanState(l, '2026-06-01');
+  assert.match(html, new RegExp(`Due now</td><td>₹${s.total.toFixed(2)}`));
+  assert.equal(interestStatement(l, '2026-06-01').length, 3);
 });

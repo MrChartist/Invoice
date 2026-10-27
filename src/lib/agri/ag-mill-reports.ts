@@ -143,7 +143,7 @@ export function millMonths(i: MillReportInput): MillMonth[] {
     for (const l of readPurchaseLines(raw)) {
       const it = (l.itemId && inputs.has(l.itemId) ? byId.get(l.itemId) : undefined) ?? inputNames.get(low(l.name));
       if (!it) continue;
-      get(monthOf(p.date)).intakeOwn = r3(get(monthOf(p.date)).intakeOwn + l.quantity * l.unitFactor * (kgPer(l.unit || it.unit) ?? 1));
+      get(monthOf(p.date)).intakeOwn = r3(get(monthOf(p.date)).intakeOwn + (l.unitFactor !== 1 ? l.quantity * l.unitFactor * (kgPer(it.unit) ?? 1) : l.quantity * (kgPer(l.unit || it.unit) ?? 1))); // QA13 G13: an alternate unit converts to the item's unit first
     }
   }
   const cmrJwp = new Set<string>();
