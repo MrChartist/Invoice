@@ -21,7 +21,10 @@ export const SV_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   service_settings: 'settings.manage',
   // SV-B: clinic_visits, admissions, lab_tests, lab_orders, clinic_settings
   // SV-C: member_plans, memberships, checkins, class_attendance, class_schedules
-  // SV-D: service_assets, labour_ops, workshop_settings
+  // SV-D: vehicles / appliances and labour operations are masters; the workshop settings object is the owner's
+  service_assets: 'master.edit',
+  labour_ops: 'master.edit',
+  workshop_settings: 'settings.manage',
 };
 
 /** Audited tables (every row change logged; deletes go to the recycle bin). `service_settings` is audited on save. */
@@ -35,6 +38,8 @@ export const SV_WATCHED: Readonly<Record<string, WatchedTable>> = {
   // SV-B
   // SV-C
   // SV-D
+  service_assets: { entity: 'item', label: 'Vehicle / appliance' },
+  labour_ops: { entity: 'item', label: 'Labour operation' },
 };
 
 /** Idempotent: adds the rows once (never overwrites a row another module set). */

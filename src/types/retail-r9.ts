@@ -398,7 +398,9 @@ export interface FinanceDeal {
 }
 
 /** RT-D4 / SV-D: job status flow. `at_service_centre` = sent to the brand / authorised centre. */
-export type ServiceStatus = 'received' | 'diagnosed' | 'approved' | 'in_repair' | 'at_service_centre' | 'ready' | 'delivered' | 'returned';
+export type ServiceStatus = 'received' | 'diagnosed' | 'approved' | 'in_repair' | 'at_service_centre' | 'ready' | 'delivered' | 'returned'
+  // R10 SV-D (workshops): additive steps of the same engine (rt-service-jobs `canMove`)
+  | 'estimate_sent' | 'awaiting_parts' | 'awaiting_insurer' | 'quality_check';
 
 /** RT-D4: one part issued on a job (out of stock when billed); `warranty` = replaced free under warranty (no GST). */
 export interface ServicePart {
