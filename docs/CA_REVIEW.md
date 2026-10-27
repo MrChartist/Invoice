@@ -46,8 +46,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84, AG90 | 65 | 15 |
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF40–MF42, MF50–MF54, MF60–MF65, MF80–MF82, MF90–MF96 | 60 | 12 |
-| 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS80 | 67 | 13 |
-| **Total** | | **491** | **119** |
+| 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
+| **Total** | | **496** | **119** |
 
 ---
 
@@ -936,7 +936,7 @@ e-way bills and ITC-04, MSME (Udyam, 43B(h), Form-1), export authorisations, inc
 `MF` ids are counted once here. The ★ items (MF1, MF3, MF5, MF6, MF7, MF9, MF16, MF19, MF20, MF24, MF25) are the ones a
 beta factory's figures depend on first.
 
-## 14. Professional and knowledge-services firms (Round 14, ids PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS80)
+## 14. Professional and knowledge-services firms (Round 14, ids PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85)
 
 Added with `docs/prd/round-14.md`. It covers CA / CS / CMA firms (client billing beside the practice desk), advocates and
 law firms, architects and interior designers, consulting and IT / software agencies (including exports of services),
@@ -1069,6 +1069,17 @@ exports of services under the FEMA 2026 regulations, 194J / 194T, partners and S
 | PS54 | **A senior advocate's supply to another advocate.** As reported, entry 45 does not exempt it; the app then applies reverse charge (entry 2) when the recipient advocate is treated as a business entity. Should it instead be forward charge by the senior advocate? | Reverse charge, marked verify. | `prof/ps-legal.ts` (`senior_to_advocate`) | — | Secondary sources (gstgyaan, cleartax) |
 | PS55 | **Media bought as principal.** The re-bill shows the media cost and the agency fee as two taxable lines at the agency's rate (18 %), unless the user picks the media's own class (e.g. print space 5 %) for the cost line. Is splitting the bill this way acceptable, or must a principal's bill be one composite supply at one rate? | Two lines; the media class only when the user picks it. | `prof/ps-media.ts` `mediaLines` | — | Developers' reading |
 | PS56 | **Writing off an unrecovered disbursement.** The cost was booked as an expense when paid (gross posting, T25), so a write-off only removes it from the unrecovered list and posts nothing. Right, or should a recoverable (asset) posting and a write-off journal be used? | No journal. | `prof/ps-disb.ts` `writeOffDisbursement` | — | Developers' reading |
+
+
+### 14.10 Added by QA round 17 (`docs/prd/qa-round-17.md`)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| PS81 | **Book profit with interest above 12 %.** When the deed allows more than 12 % on capital, the excess is disallowed under Sec 40(b)(iv); the run now adds that excess back when working out book profit (Explanation 3: profit computed under Sec 28–44D) before the remuneration limit. Right? (See PS72 for crediting the deed rate.) | Excess added back (QA17 R2). | `prof/ps-partner-run.ts` `computeRun` | 1997-04-01 | Sec 40(b) Expl. 3 (recalled) |
+| PS82 | **Pure-agent recoveries in the other papers.** Rule 33 recoveries are left out of the GST registration turnover, the Rule 89(4) zero-rated turnover (each receipt scaled by the fee share of its invoice) and adjusted total turnover, the 194J fee base and 44ADA gross receipts; the EDF value and the FEMA realisation register keep the whole invoice value (the recovery is also to be realised in foreign exchange). Right on each — in particular, do reimbursements count in 44ADA gross receipts? | As stated (QA17 R3). | `trade/pure-agent.ts` `recoveryValue`; `prof/ps-threshold.ts`, `ps-refund-svc.ts`, `ps-tds-recv.ts`, `ps-presumptive.ts`, `ps-edf.ts` | — | Rule 33 CGST Rules; Sec 2(6) CGST (aggregate turnover); developers' reading |
+| PS83 ★ | **Realisation period 5 Jun – 30 Sep 2026.** FEMA 23(R)/(8)/2026-RB (First Amendment Regulations 2026, Reg 9), in force 5 Jun 2026, as reported cut the 15 months back to 9. The app now gives 9 months to exports invoiced / shipped from 5 Jun 2026 and keeps 15 for 13 Nov 2025 – 4 Jun 2026. Does the 9 months apply only to exports made from 5 Jun, and is anything outstanding on that day still on 15? | As stated (dated row, verify). | `trade/trade-rules.ts` `EXPORT_REALISATION_MONTHS_RULES` | 2026-06-05 | taxmann (5 Jun 2026 notification), thetaxcorp, winvesta |
+| PS84 | **Partner-wise note.** The annual pack's partner-wise table shows opening, introduced, drawings, interest, remuneration (gross), share of profit, a column "TDS 194T and other" (TDS deducted, interest on drawings, any other entry) and closing, so each row foots. Is that presentation acceptable for the partners' capital note, or should TDS and interest on drawings be separate columns? | One balancing column (QA17 R7). | `ledger/notes-auto.ts` | — | Developers' reading |
+| PS85 | **Pure-agent expense with ITC.** An expense marked "pure agent" is recovered at its total including GST even if the bill was marked ITC-eligible (the R3 timesheet flow; the disbursement row turns ITC off for "on the client's behalf"). Rule 33 suggests a pure agent takes no ITC on it: should the app refuse ITC on a pure-agent expense, or recover only the taxable value when ITC is taken? | Unchanged; noted by QA17. | `timesheets.ts` `expenseLine`; `prof/ps-disb.ts` | — | Rule 33 CGST Rules (recalled) |
 
 `PS` ids are counted once here. The ★ items (PS1, PS3, PS4, PS5, PS6, PS12, PS15, PS18, PS20, PS22, PS23, PS26, PS27)
 are the ones a beta professional firm's figures depend on first.
