@@ -13,7 +13,7 @@ import { PACK_TABS, activePacks } from '../industry-packs';
 import { enabledModules, isPathVisible } from '../shop-mode';
 import {
   BOOKS_TABS, MFG_TABS, PAYROLL_TABS, EXPENSES_TABS, RECEIVABLES_TABS, REPORTS_TABS, INVENTORY_TABS, DISTRIBUTION_TABS, TIME_TABS,
-  RECURRING_TABS, RECONCILE_TABS, SETTINGS_TABS, INVENTORY_PACK_TABS,
+  RECURRING_TABS, RECONCILE_TABS, SETTINGS_TABS, INVENTORY_PACK_TABS, MFG_PACK_TABS,
 } from '../../pages/page-tabs';
 import { tabsT } from '../../i18n/areas/discover-r6-tabs';
 import { GST_GROUP_SYNONYMS, synonymsFor } from './synonyms';
@@ -55,7 +55,7 @@ export const TAB_PAGES: readonly TabPage[] = [
   { key: 'distribution', route: '/distribution', ids: ids(DISTRIBUTION_TABS) },
   { key: 'expenses', route: '/expenses', ids: ids(EXPENSES_TABS) },
   { key: 'inventory', route: '/inventory', ids: [...ids(INVENTORY_TABS), ...ids(INVENTORY_PACK_TABS)] }, // R9: pack desks (pack rows)
-  { key: 'mfg', route: '/manufacturing', ids: ids(MFG_TABS) },
+  { key: 'mfg', route: '/manufacturing', ids: [...ids(MFG_TABS), ...ids(MFG_PACK_TABS)] }, // R13: manufacturing desks (pack rows)
   { key: 'books', route: '/books', ids: ids(BOOKS_TABS) },
   { key: 'reconcile', route: '/reconcile', ids: ids(RECONCILE_TABS), need: 'books.edit' },
   { key: 'tds', route: '/tds', ids: TDS_TAB_IDS },

@@ -26,7 +26,9 @@ export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit
   // R10 (SV-A1): service packs (desk tabs on /time; switched on by the `services` service profile, never by a business type)
   | 'clinic' | 'salon' | 'fitness' | 'workshop'
   // R12 (AG-A1): agri packs (desk tabs on /inventory; switched on by the agri profile, never by a business type)
-  | 'agri' | 'dairy' | 'mill' | 'coldstore' | 'agri_inputs' | 'fpo';
+  | 'agri' | 'dairy' | 'mill' | 'coldstore' | 'agri_inputs' | 'fpo'
+  // R13 (MF-A1): manufacturing packs (desk tabs on /manufacturing; switched on by the manufacturing profile, never by a type)
+  | 'shopfloor' | 'fabrication' | 'garments' | 'plastics' | 'press' | 'foodmfg';
 
 export const PACK_IDS: readonly PackId[] = [
   'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
@@ -36,6 +38,7 @@ export const PACK_IDS: readonly PackId[] = [
   'realty', // R11 (CN-A1)
   'clinic', 'salon', 'fitness', 'workshop', // R10 (SV-A1)
   'agri', 'dairy', 'mill', 'coldstore', 'agri_inputs', 'fpo', // R12 (AG-A1)
+  'shopfloor', 'fabrication', 'garments', 'plastics', 'press', 'foodmfg', // R13 (MF-A1)
 ];
 
 /** The packs a business type implies when `industry_packs` is absent. */
@@ -250,7 +253,42 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'fpo', path: '/inventory?tab=members&view=shares', labelKey: 'r12.members.shares' },
   { pack: 'fpo', path: '/inventory?tab=members&view=patronage', labelKey: 'r12.members.patronage' },
   { pack: 'fpo', path: '/inventory?tab=members&view=papers', labelKey: 'r12.members.papers' },
-  { pack: 'fpo', path: '/inventory?tab=members&view=loans', labelKey: 'r12.members.loans' },
+  { pack: 'fpo', path: '/inventory?tab=members&view=loans', labelKey: 'r12.members.loans' },  // R13: manufacturing desks on /manufacturing (MF-A writes every row; labels `r13.*` in `palette-destinations.ts`). B / C / D
+  // replace their desk's stub with their screens; the rows stay.
+  { pack: 'shopfloor', path: '/manufacturing?tab=floor', labelKey: 'r13.floor' },
+  { pack: 'shopfloor', path: '/manufacturing?tab=floor&view=centres', labelKey: 'r13.floor.centres' },
+  { pack: 'shopfloor', path: '/manufacturing?tab=floor&view=routings', labelKey: 'r13.floor.routings' },
+  { pack: 'shopfloor', path: '/manufacturing?tab=floor&view=cards', labelKey: 'r13.floor.cards' },
+  { pack: 'shopfloor', path: '/manufacturing?tab=floor&view=load', labelKey: 'r13.floor.load' },
+  { pack: 'shopfloor', path: '/manufacturing?tab=floor&view=wip', labelKey: 'r13.floor.wip' },
+  { pack: 'fabrication', path: '/manufacturing?tab=shop', labelKey: 'r13.shop' },
+  { pack: 'fabrication', path: '/manufacturing?tab=shop&view=drawings', labelKey: 'r13.shop.drawings' },
+  { pack: 'fabrication', path: '/manufacturing?tab=shop&view=quotes', labelKey: 'r13.shop.quotes' },
+  { pack: 'fabrication', path: '/manufacturing?tab=shop&view=inspection', labelKey: 'r13.shop.inspection' },
+  { pack: 'fabrication', path: '/manufacturing?tab=shop&view=scrap', labelKey: 'r13.shop.scrap' },
+  { pack: 'plastics', path: '/manufacturing?tab=moulding', labelKey: 'r13.moulding' },
+  { pack: 'plastics', path: '/manufacturing?tab=moulding&view=runs', labelKey: 'r13.moulding.runs' },
+  { pack: 'plastics', path: '/manufacturing?tab=moulding&view=balance', labelKey: 'r13.moulding.balance' },
+  { pack: 'plastics', path: '/manufacturing?tab=moulding&view=epr', labelKey: 'r13.moulding.epr' },
+  { pack: 'press', path: '/manufacturing?tab=press', labelKey: 'r13.press' },
+  { pack: 'press', path: '/manufacturing?tab=press&view=estimates', labelKey: 'r13.press.estimates' },
+  { pack: 'press', path: '/manufacturing?tab=press&view=tickets', labelKey: 'r13.press.tickets' },
+  { pack: 'press', path: '/manufacturing?tab=press&view=paper', labelKey: 'r13.press.paper' },
+  { pack: 'garments', path: '/manufacturing?tab=garments', labelKey: 'r13.garments' },
+  { pack: 'garments', path: '/manufacturing?tab=garments&view=styles', labelKey: 'r13.garments.styles' },
+  { pack: 'garments', path: '/manufacturing?tab=garments&view=cutplans', labelKey: 'r13.garments.cutplans' },
+  { pack: 'garments', path: '/manufacturing?tab=garments&view=bundles', labelKey: 'r13.garments.bundles' },
+  { pack: 'garments', path: '/manufacturing?tab=garments&view=cmt', labelKey: 'r13.garments.cmt' },
+  { pack: 'garments', path: '/manufacturing?tab=garments&view=karigars', labelKey: 'r13.garments.karigars' },
+  { pack: 'foodmfg', path: '/manufacturing?tab=food', labelKey: 'r13.food' },
+  { pack: 'foodmfg', path: '/manufacturing?tab=food&view=costcards', labelKey: 'r13.food.costcards' },
+  { pack: 'foodmfg', path: '/manufacturing?tab=food&view=shelflife', labelKey: 'r13.food.shelflife' },
+  { pack: 'foodmfg', path: '/manufacturing?tab=food&view=schemes', labelKey: 'r13.food.schemes' },
+  { pack: 'shopfloor', path: '/manufacturing?tab=statutory', labelKey: 'r13.statutory' },
+  { pack: 'shopfloor', path: '/manufacturing?tab=statutory&view=msme', labelKey: 'r13.statutory.msme' },
+  { pack: 'shopfloor', path: '/manufacturing?tab=statutory&view=incentives', labelKey: 'r13.statutory.incentives' },
+  { pack: 'shopfloor', path: '/manufacturing?tab=statutory&view=authorisations', labelKey: 'r13.statutory.authorisations' },
+  { pack: 'shopfloor', path: '/manufacturing?tab=statutory&view=inventories', labelKey: 'r13.statutory.inventories' },
 ];
 
 /**

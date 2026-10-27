@@ -13,6 +13,7 @@ import type {} from '../types/trade-r8'; // R8: trading record / line fields (R8
 import type {} from '../types/retail-r9'; // R9: retail record / line fields (R9_RECORD_KEYS, R9_LINE_KEYS)
 import type {} from '../types/services-r10'; // R10: the record / line snapshot key `sv` (appended to R9's lists)
 import type {} from '../types/agri-r12'; // R12: the record snapshot key `ag` (R12_RECORD_KEYS)
+import type {} from '../types/mfg-r13'; // R13: the record snapshot key `mf` (R13_RECORD_KEYS)
 import { generateId } from '../lib/storage';
 import { deriveGstMode, num } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
@@ -171,7 +172,9 @@ export const R8_LINE_KEYS = ['disc_chain', 'disc_per_unit', 'wt', 'charge_head_i
 /** R9 (owner RT-A, every package's keys — src/types/retail-r9.ts): delivery / KYC on the record; band, IMEI pairs, margin, jewellery breakdown on lines. R10: `sv` (src/types/services-r10.ts). */
 /** R12 (AG-A, src/types/agri-r12.ts): ONE record key `ag` (the agri snapshot); weighing reuses the R8 line key `wt`. */
 export const R12_RECORD_KEYS = ['ag'] as const;
-export const R9_RECORD_KEYS = ['delivery', 'kyc', 'sv', ...R12_RECORD_KEYS] as const; // R12: one spread token (normalizeRecord, RECORD_KEYS)
+/** R13 (MF-A, src/types/mfg-r13.ts): ONE record key `mf` (the manufacturing snapshot); no line key. */
+export const R13_RECORD_KEYS = ['mf'] as const;
+export const R9_RECORD_KEYS = ['delivery', 'kyc', 'sv', ...R12_RECORD_KEYS, ...R13_RECORD_KEYS] as const; // R12 / R13: one spread token each (normalizeRecord, RECORD_KEYS)
 export const R9_LINE_KEYS = ['band_rate', 'serial_pairs', 'margin', 'jw', 'sv', 'ag_class'] as const; // QA13 G7: + the R12 line class
 
 function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {

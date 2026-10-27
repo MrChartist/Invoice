@@ -45,8 +45,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 10. Service businesses (Round 10, planned) | SV1–SV30, SV41–SV48, SV60–SV62, SV70–SV71 | 43 | 13 |
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84, AG90 | 65 | 15 |
-| 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF32 | 32 | 11 |
-| **Total** | | **396** | **105** |
+| 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36 | 36 | 11 |
+| **Total** | | **400** | **105** |
 
 ---
 
@@ -814,7 +814,7 @@ fishery farms.
 | AG84 | **194Q with pooled cycles (QA13 G14).** A farmer's purchases for the 194Q threshold now add his amounts on closed pooled cycles (paid through the centre's pooled bill) to his own vouchers in the FY. Is the per-farmer split the right base, given the pooled bill is booked in the centre's name? | Per farmer, cycle lines + own vouchers, by the cycle's end date. | `agri/ag-vouchers.ts` `fyPurchasesOf` | 2021-07-01 | Sec 194Q (2025-Act label from `ita2025.ts`) |
 | AG90 | **Allotment from share application money (QA13 follow-up).** An allotment paid from application money is now refused above what is available on its date: the credit balance of "Share application money — members" is the ceiling; a member's own share deductions from pooled cycles are his, and only the rest of the ledger (receipts not tied to a cycle) is open to any member. Is that attribution right (e.g. should a member's own application receipt be tagged to him), and should money held beyond the period allowed for allotment be shown as refundable? | As stated. | `agri/ag-members.ts` `allotShares`, `applicationAvailable` | — | Companies Act 2013 Sec 42 / Sec 378A (producer companies) — as recalled |
 
-## 13. Manufacturing MSMEs (Round 13, ids MF1–MF32)
+## 13. Manufacturing MSMEs (Round 13, ids MF1–MF36)
 
 Added with `docs/prd/round-13.md`. It covers engineering / fabrication job shops, textile and garment units, plastics and
 packaging converters, printing presses and small food / FMCG units, plus what every factory meets: scrap sales, job-work
@@ -883,6 +883,15 @@ e-way bills and ITC-04, MSME (Udyam, 43B(h), Form-1), export authorisations, inc
 | MF16 ★ | **Advance Authorisation.** Register per authorisation: imports (duty foregone: BCD, IGST, cess), exports against it, EO by quantity and value, import validity 12 months and EO 18 months (90-day EOP items), EODC by ANF 4F; "duty at risk" memo = duty saved × unfulfilled share; shortfall → duty + interest and a penalty (5 × CIF of the shortfall as read in the HBP 2026 copy). Should the app accrue a liability for duty at risk at the year end (AS 29 / contingent liability note)? Is IGST on AA imports still exempt or paid and refunded? (DGFT consultant for the procedure.) | Memo only; nothing posted. | `mfg/mf-authorisations.ts`; `AA_RULES` | — | DGFT HBP 2026 Ch. 4 (primary); myscheme.gov.in; lawrbit |
 | MF17 | **EPCG.** EO = 6 × duty saved within 6 years, block-wise (as recalled, not re-read). Average export obligation? Accounting of the duty saved (deferred / contingent)? | 6 × default, editable; memo only. | `EPCG_RULES` | — | Recalled (unverified) |
 | MF18 | **RoDTEP and drawback on AA / EOU / SEZ exports.** RoDTEP extended to 31 Dec 2026 for DTA (Appendix 4R) and AA / SEZ / EOU (Appendix 4RE) with rates unchanged (DGFT N 41/2026-27, as reported). Drawback on AA exports: only the customs portion not exempted / brand rate? The claim row carries 4R / 4RE; nothing else changes. | As stated. | `trade/export-incentives.ts` (`appendix`) | 2026-10-01 | taxguru; PIB summary (secondary) |
+
+### 13.5 Added while building MF-A (profile, shop floor, paper)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| MF33 | **Udyam line and the MSE clause on the invoice.** The seller's Udyam number prints under the GSTIN as "Udyam: UDYAM-XX-00-0000000 (Micro)" once the business profile carries the category (so documents saved before Round 13 print nothing new), with a switch to turn it off. For a micro / small seller billing a buyer with a GSTIN, the terms print "Payment due within 45 days of acceptance — MSMED Act 2006 Sec 15; interest u/s 16 beyond", whatever the agreed due date. Is the wording right, should it also print for unregistered business buyers, and should a medium enterprise print the number at all? | As stated; nothing for medium sellers except the number. | `templates/paper-helpers.ts` `mfSellerText`, `mfDeclaration` | — | MSMED Act 2006 Sec 15, 16 (recalled) |
+| MF34 | **Job-card scrap in the output journal.** Scrap kg reported on job cards becomes a fixed-value scrap output of the order's next manufacturing journal (counted once), valued at the scrap item's sale rate (else its opening rate), which lowers the finished goods' cost. Is the net realisable value of scrap the right credit to production cost (AS 2 para 10 / by-products), and should scrap made but not yet sold be valued lower? | As stated. | `mfg/mf-jobcards.ts` `scrapDue`; `production/orders.ts` `buildOutputVoucher` | — | AS 2 (recalled) |
+| MF35 | **Piece units from job cards into payroll.** Good units (never rejected or rework) reported by an employee operator in a month are imported into a payroll production type, multiplied by its piece rate; karigars who are not employees stay vendors. Are rejected pieces unpaid by default acceptable under the wage rules, and is a piece-rate worker's wage still tested against the minimum wage by the user? | Good units only; minimum-wage test by the user. | `mfg/mf-jobcards.ts` `unitsByEmployee`; payroll attendance | — | — (design; labour-law adviser) |
+| MF36 | **Standard conversion from routings.** Standard conversion per unit = Σ planned hours (set-up + run ÷ efficiency) × the work centre's machine-hour rate (machine + labour + power + overhead), and "Use routing" writes it onto the order for R4-A's variances. Should fixed overhead be in the hourly rate at normal capacity only (AS 2 para 9), with the unabsorbed part a period cost? | As stated; normal hours typed per centre, absorption itself is MF-D5 (off by default, MF24). | `mfg/mf-routings.ts` `standardConversion`; `mf-centres.ts` `machineHourRate` | — | AS 2 (recalled) |
 
 `MF` ids are counted once here. The ★ items (MF1, MF3, MF5, MF6, MF7, MF9, MF16, MF19, MF20, MF24, MF25) are the ones a
 beta factory's figures depend on first.
