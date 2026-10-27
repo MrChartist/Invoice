@@ -48,10 +48,11 @@ test('with every retail check off, the stock checks read no Round 9 table', () =
 
 test('hosts mount the Round 9 screens lazily', () => {
   const inv = src('pages/Inventory.tsx');
-  for (const d of ['PharmacyDesk', 'ApparelDesk', 'DevicesDesk', 'JewelleryDesk', 'ShortBookTab', 'RelabelQueue']) assert.match(inv, new RegExp(`lazy\\(\\(\\) => import\\('\\.\\./components/retail-r9/${d}'\\)`), d);
-  assert.match(src('pages/Receivables.tsx'), /lazy\(\(\) => import\('\.\.\/components\/retail-r9\/DeliveriesTab'\)\)/);
-  assert.match(src('pages/Pos.tsx'), /lazy\(\(\) => import\('\.\.\/components\/retail-r9\/DeliveryStrip'\)/);
-  assert.match(src('components/creator/SummaryPanel.tsx'), /lazy\(\(\) => import\('\.\.\/retail-r9\/DeliveryStrip'\)\)/);
+  for (const d of ['PharmacyDesk', 'ApparelDesk', 'DevicesDesk', 'JewelleryDesk']) assert.match(inv, new RegExp(`lazy\\(\\(\\) => import\\('\\.\\./components/retail-r9/${d}'\\)`), d);
+  // RT-A's own parts come from one lazy hub chunk (each chunk name costs first-paint bytes).
+  for (const [f, part] of [['pages/Inventory.tsx', 'ShortBookTab'], ['pages/Inventory.tsx', 'RelabelQueue'], ['pages/Receivables.tsx', 'DeliveriesTab'], ['pages/Pos.tsx', 'PosRetailStrip'], ['pages/Settings.tsx', 'RetailChecks'], ['components/creator/SummaryPanel.tsx', 'DeliveryStrip']]) {
+    assert.match(src(f), new RegExp(`lazy\\(\\(\\) => import\\('[./]+(components/)?retail-r9/rt-a-hub'\\)\\.then\\(\\(m\\) => \\(\\{ default: m\\.${part} \\}\\)\\)\\)`), `${f}: ${part}`);
+  }
   for (const f of ['pages/Inventory.tsx', 'pages/Receivables.tsx', 'pages/Pos.tsx', 'components/creator/SummaryPanel.tsx']) {
     assert.ok(!/^import .*retail-r9\//m.test(src(f).replace(/^import type .*$/gm, '')), `${f} has no static import of a retail-r9 component`);
   }

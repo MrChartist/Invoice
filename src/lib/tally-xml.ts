@@ -46,8 +46,7 @@ import type { InvoiceItem, InvoiceRecord, Payment } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { fxNarration, inrTotals, inrValue } from './fx';
 import { receivableTotal } from './rcm';
-import { NO_CASH_LEDGER, advanceMovements, movedNoCash, noCashKind, type NoCashKind } from './advance-tax'; // no-cash.ts
-import { RIDER_CASH_LEDGER } from './retail/rt-shared'; // R9 (RT-A3)
+import { NO_CASH_LEDGER, RIDER_CASH_LEDGER, advanceMovements, movedNoCash, noCashKind, type NoCashKind } from './advance-tax'; // no-cash.ts
 import { debitNoteVouchers } from './tally-debit-notes';
 import { tallyBankResolver } from './tally-bank';
 import { booksVouchers, groupMasters, openingLedgers } from './tally-books';

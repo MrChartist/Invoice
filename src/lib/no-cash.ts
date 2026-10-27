@@ -43,6 +43,9 @@ export function noCashKind(p: NoCashMarkers | null | undefined): NoCashKind | ''
 export const movedNoCash = (p: NoCashMarkers | null | undefined): boolean => noCashKind(p) !== '';
 
 /** The ledger the app's own books debit instead of cash / bank (names as `ledger/accounts.ts` and the modules create them). */
+/** R9 (RT-A3): COD cash a delivery rider collected DID move — it sits in this cash ledger until the rider settles. */
+export const RIDER_CASH_LEDGER = 'Cash with riders';
+
 export const NO_CASH_LEDGER: Readonly<Record<NoCashKind, string>> = {
   advance: 'Advances from customers',
   write_off: 'Bad debts written off',

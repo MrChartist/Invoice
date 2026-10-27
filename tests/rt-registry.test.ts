@@ -14,6 +14,8 @@ import { TABLE_ACTIONS } from '../src/lib/access.ts';
 import { WATCHED_TABLES } from '../src/lib/audit-edits.ts';
 import { RT_TABLE_ACTIONS, RT_WATCHED } from '../src/lib/retail/rt-registry.ts';
 import { DEMO_EXTRA_TABLES } from '../src/lib/demo-data.ts';
+import { RIDER_CASH_LEDGER } from '../src/lib/retail/rt-shared.ts';
+import { RIDER_CASH_LEDGER as NO_CASH_RIDER } from '../src/lib/no-cash.ts';
 
 const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8');
 
@@ -21,6 +23,7 @@ test('the storage table of the PRD (§6): 12 tables, one object, four series', (
   assert.deepEqual(Object.values(RT_TABLES).sort(), ['alteration_jobs', 'delivery_riders', 'doctors', 'finance_deals', 'imei_checks', 'jewel_tags', 'karigar_moves', 'metal_rates', 'rider_settlements', 'rx_refills', 'service_jobs', 'short_book']);
   assert.deepEqual(Object.values(RT_OBJECTS), ['retail_settings']);
   assert.deepEqual(Object.values(RT_SERIES).sort(), ['ALT', 'KAR', 'SVC', 'URD']);
+  assert.equal(RIDER_CASH_LEDGER, NO_CASH_RIDER, 'one ledger name for COD cash with riders');
   assert.deepEqual(RT_TABLE_ACTIONS, {
     delivery_riders: 'master.edit', rider_settlements: 'payment.record', short_book: 'doc.create', retail_settings: 'settings.manage',
     doctors: 'master.edit', rx_refills: 'doc.create', alteration_jobs: 'doc.create', imei_checks: 'doc.create', finance_deals: 'doc.create',

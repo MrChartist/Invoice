@@ -25,6 +25,9 @@ import { saveVoucher } from '../ledger/vouchers';
 import { A } from '../ledger/accounts';
 import { ensureLedger } from '../trade/tr-ledger';
 import { RIDER_CASH_LEDGER, RT_TABLES } from './rt-shared';
+import { cashWithRiders } from '../pos';
+
+export { cashWithRiders };
 
 export const RIDERS_TABLE = RT_TABLES.deliveryRiders;
 export const SETTLEMENTS_TABLE = RT_TABLES.riderSettlements;
@@ -89,18 +92,6 @@ export function deliveryRows(invoices: readonly InvoiceRecord[]): DeliveryRow[] 
 export function riderOpenReceipts(payments: readonly Payment[], settlements: readonly RiderSettlement[], riderId: string, day: string): Payment[] {
   const done = new Set(settlements.flatMap((s) => s.payment_ids));
   return payments.filter((p) => p.rider_id === riderId && p.date <= day && !done.has(p.id) && String(p.method).toLowerCase() === 'cash');
-}
-
-/** Cash with riders at the end of `day`: COD cash collected up to that day less what was settled up to it. */
-export function cashWithRiders(payments: readonly Payment[], settlements: readonly RiderSettlement[], day: string): number {
-  const settledBy = new Map<string, string>();
-  for (const s of settlements) for (const id of s.payment_ids) settledBy.set(id, s.date);
-  return round2(
-    payments
-      .filter((p) => p.rider_id && p.date <= day && String(p.method).toLowerCase() === 'cash')
-      .filter((p) => !(settledBy.has(p.id) && settledBy.get(p.id)! <= day))
-      .reduce((s, p) => s + num(p.amount), 0),
-  );
 }
 
 /** The settlement journal lines (paise): Dr Cash counted, Cr Cash with riders expected, the difference to `diffAcc`. */

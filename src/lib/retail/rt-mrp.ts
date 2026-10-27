@@ -128,6 +128,20 @@ export function withMrpIssues<T extends { errors: string[]; expired: string[]; w
 /** Is the guard on for this company (so callers without stock tracking still check)? */
 export const mrpGuardOn = (s: Pick<RetailSettings, 'mrp_guard'>): boolean => !!s.mrp_guard && s.mrp_guard !== 'off';
 
+/**
+ * Audit the owner's "Sell anyway" over blocked MRP lines once, after the confirmed save. `record` is `audit.record`
+ * (passed in, so this module stays pure and its callers keep their own audit import).
+ */
+export function recordMrpOverrides(doc: { id?: string; invoice_number?: string }, confirmed: readonly string[], actor: string, record: (row: { entity: 'invoice'; entity_id: string; action: 'update'; doc_number?: string; summary: string }) => unknown): void {
+  const lines = confirmed.filter(isMrpMessage);
+  if (!lines.length) return;
+  try {
+    record({ entity: 'invoice', entity_id: doc.id || doc.invoice_number || 'pos', action: 'update', doc_number: doc.invoice_number, summary: `Sale above MRP allowed by ${actor}: ${lines.map((m) => m.replace(MRP_TAG, '').trim()).join('; ')}` });
+  } catch {
+    /* logging never blocks */
+  }
+}
+
 /** RT-A2 relabel queue: the price a shelf label shows now (selling rate and effective MRP at the item's own GST rate). */
 export function labelPriceNow(item: { rate?: number; sale_rate?: number; mrp?: number; tax_rate?: number; mrp_tax_basis?: MrpTaxBasis }): { rate: number; mrp: number } {
   const rate = round2(num(item.rate ?? item.sale_rate));

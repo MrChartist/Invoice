@@ -3098,6 +3098,7 @@ try {
     await page.locator(`[data-delivery-order="${bill.invoice_number}"] [data-delivery-next="delivered"]`).click({ timeout: 15000 });
     const pays = await readJson(page, 'transactions', [], (v) => v.some((p) => p.invoice_id === bill.id && p.rider_id === 'e2e-rider'));
     check(pays.some((p) => p.invoice_id === bill.id && p.rider_id === 'e2e-rider' && p.method === 'Cash' && p.amount === 48), 'delivered COD: a cash receipt with the rider');
+    await page.locator('[data-settle] summary').click();
     await page.locator('[data-settle-rider]').selectOption('e2e-rider');
     await page.locator('[data-settle-save]').click();
     const sets = await readJson(page, 'rider_settlements', [], (v) => v.length > 0);

@@ -4,11 +4,10 @@
  * Absent = everything off, so existing companies see no change. Small on purpose: the stock checks read it.
  */
 import { DB_PREFIX, getJson, setJson } from '../storage';
-import { currentActor, requireAccess } from '../access';
+import { requireAccess } from '../access';
 import { audit } from '../audit';
 import type { GuardMode, RetailSettings } from '../../types/retail-r9';
 import { RT_OBJECTS } from './rt-shared';
-import { MRP_TAG, isMrpMessage } from './rt-mrp';
 
 export const RETAIL_SETTINGS_KEY = `${DB_PREFIX}${RT_OBJECTS.retailSettings}`;
 
@@ -49,21 +48,4 @@ export function saveRetailSettings(patch: Partial<RetailSettings>): RetailSettin
     /* logging never blocks */
   }
   return readRetailSettings();
-}
-
-/** Audit the owner's "Sell anyway" over blocked MRP lines (called once, after the confirmed save). */
-export function recordMrpOverrides(doc: { id?: string; invoice_number?: string }, confirmed: readonly string[]): void {
-  const lines = confirmed.filter(isMrpMessage);
-  if (!lines.length) return;
-  try {
-    audit.record({
-      entity: 'invoice',
-      entity_id: doc.id || doc.invoice_number || 'pos',
-      action: 'update',
-      doc_number: doc.invoice_number,
-      summary: `Sale above MRP allowed by ${currentActor()?.name ?? 'the owner'}: ${lines.map((m) => m.replace(MRP_TAG, '').trim()).join('; ')}`,
-    });
-  } catch {
-    /* logging never blocks */
-  }
 }

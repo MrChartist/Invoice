@@ -21,15 +21,13 @@ import { makeDraft, senderStateCode } from '../store/invoice-defaults';
 import { resolveStateCode } from './india-states';
 import { customFieldsDb, finalizeValues } from './custom-fields';
 import { isPeriodLockedError } from './period-lock';
-import { requireAccess } from './access';
+import { currentActor, requireAccess } from './access';
 import { audit } from './audit';
 import { generateId, getTable, setTable } from './storage';
 import {
-  batchOptions, editorStockContext, liveDocTrackingIssues, liveMrpIssues, withBatch,
+  batchOptions, editorStockContext, liveDocTrackingIssues, liveMrpIssues, recordMrpOverrides, withBatch, withMrpIssues,
   type EditorStockContext,
 } from './stock-tracking';
-import { withMrpIssues } from './retail/rt-mrp'; // R9 (RT-A2)
-import { recordMrpOverrides } from './retail/rt-settings';
 import { toCsv } from './csv';
 import { formatCurrency, formatDate } from './utils';
 import { nextPartyBalanceSnapshot } from './party-balance';
@@ -318,7 +316,7 @@ export function savePosBill(input: PosSaveInput): PosSaveResult {
   } catch (err) {
     return { ok: false, errors: [(err as Error).message], locked: isPeriodLockedError(err), summary };
   }
-  if (input.expiredOk) recordMrpOverrides(saved, issues.expired); // R9 (RT-A2): the owner's "Sell anyway" over MRP
+  if (input.expiredOk) recordMrpOverrides(saved, issues.expired, currentActor()?.name ?? 'the owner', (r) => audit.record(r)); // R9 (RT-A2): the owner's "Sell anyway" over MRP
   const payments: Payment[] = [];
   try {
     if (exchange) {
@@ -353,6 +351,19 @@ export function savePosBill(input: PosSaveInput): PosSaveResult {
 }
 
 /* ── Z report ────────────────────────────────────────────────── */
+
+/** R9 (RT-A3) Cash with riders at the end of `day`: COD cash collected up to that day less what was settled up to it. */
+export function cashWithRiders(payments: readonly Payment[], settlements: readonly { date: string; payment_ids: readonly string[] }[], day: string): number {
+  const settledBy = new Map<string, string>();
+  for (const s of settlements) for (const id of s.payment_ids) settledBy.set(id, s.date);
+  return round2(
+    payments
+      .filter((p) => p.rider_id && p.date <= day && String(p.method).toLowerCase() === 'cash')
+      .filter((p) => !(settledBy.has(p.id) && settledBy.get(p.id)! <= day))
+      .reduce((s, p) => s + num(p.amount), 0),
+  );
+}
+
 
 export interface ZReport {
   day: string;

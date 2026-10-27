@@ -23,7 +23,7 @@ import {
   buildItemIndex, cleanSerials, collectEvents, invoiceEffect, liveInputs, loadSettings,
   type MoveKind, type StockEvent, type StockInputs, type StockItem,
 } from './inventory';
-import { KEYS, getTable } from './storage';
+import { DB_PREFIX, KEYS, getJson, getTable } from './storage';
 import { lotIssues } from './trade/lot-gate';
 import type { Arrival } from '../types/trade-r8';
 import { memoOnReads } from './table-memo';
@@ -32,7 +32,9 @@ import { creditNoteReturnsGoods } from './credit-restock';
 import { GODOWNS_TABLE, TRANSFERS_TABLE, consignmentGodowns, godownList, godownName, nonSaleableGodowns } from './godowns';
 import { batchDelta, dayWindow, eventLabel, firstShortAfter, godownDelta, serialDelta } from './stock-timeline';
 import { effectiveMrp, mrpIssues, withMrpIssues, type MrpIssues } from './retail/rt-mrp'; // R9 (RT-A2)
-import { readRetailSettings } from './retail/rt-settings';
+import type { RetailSettings } from '../types/retail-r9';
+/** R9 (RT-A2): the guard helpers, re-exported so the POS / editor need no extra chunk. */
+export { MRP_TAG, isMrpMessage, recordMrpOverrides, withMrpIssues } from './retail/rt-mrp';
 import { can } from './access';
 
 const EPS = 1e-9;
@@ -830,7 +832,7 @@ export function liveDocTrackingIssues(doc: DocInput): TrackingIssues {
  * Callers without batch / serial / godown tracking (no stock context) call this directly.
  */
 export function liveMrpIssues(doc: DocInput, already?: ReadonlySet<string>): MrpIssues {
-  const settings = readRetailSettings();
+  const settings = getJson<RetailSettings | null>(`${DB_PREFIX}retail_settings`, null) ?? {};
   const none: MrpIssues = { errors: [], warnings: [], confirm: [] };
   if (!settings.mrp_guard || settings.mrp_guard === 'off' || doc.status === 'Draft' || doc.status === 'Cancelled') return none;
   try {

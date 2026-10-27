@@ -6,7 +6,9 @@ import { resetStorage } from './helpers/shim.ts';
 import { installSettings } from './helpers/world.ts';
 import { KEYS, getTable, setJson, setTable } from '../src/lib/storage.ts';
 import { basisFromRates, effectiveMrp, labelPriceNow, mrpAfterRateChange, mrpIssues, pricesPerBaseUnit as perUnit, relabelDue, withMrpIssues } from '../src/lib/retail/rt-mrp.ts';
-import { RETAIL_SETTINGS_KEY, recordMrpOverrides, saveRetailSettings } from '../src/lib/retail/rt-settings.ts';
+import { RETAIL_SETTINGS_KEY, saveRetailSettings } from '../src/lib/retail/rt-settings.ts';
+import { recordMrpOverrides } from '../src/lib/stock-tracking.ts';
+import { audit } from '../src/lib/audit.ts';
 import { liveDocTrackingIssues, liveMrpIssues } from '../src/lib/stock-tracking.ts';
 import { PHARMA_SETTINGS_KEY } from '../src/lib/pharma-gate.ts';
 import { mrpLessRate } from '../src/lib/pricing.ts';
@@ -89,7 +91,7 @@ test('pharma "block above MRP" and the guard together: the stricter applies, rep
 });
 
 test('owner override is audited; relabel queue after a price change', () => {
-  recordMrpOverrides({ id: 'i1', invoice_number: 'INV/1' }, ['Biscuit: ₹48.00 a unit (incl. GST) is above the MRP ₹45.00 (MRP check)', 'Expired batch']);
+  recordMrpOverrides({ id: 'i1', invoice_number: 'INV/1' }, ['Biscuit: ₹48.00 a unit (incl. GST) is above the MRP ₹45.00 (MRP check)', 'Expired batch'], 'Owner', (r) => audit.record(r));
   const row = getTable<{ summary: string; doc_number?: string }>('audit_log').find((a) => /Sale above MRP allowed/.test(a.summary));
   assert.ok(row && row.doc_number === 'INV/1' && !/Expired/.test(row.summary));
   setTable(KEYS.items, [{ id: 'c1', name: 'Biscuit', rate: 48, mrp: 50, tax_rate: 0, barcode: '8901' }]);

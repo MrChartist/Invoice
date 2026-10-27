@@ -60,4 +60,4 @@ export const RT_NUMBERED: Readonly<Record<string, string>> = {
 };
 
 /** RT-A3: the user ledger (group Cash & bank) that holds COD cash collected by delivery riders until settled. */
-export const RIDER_CASH_LEDGER = 'Cash with riders';
+export const RIDER_CASH_LEDGER = 'Cash with riders'; // = no-cash.ts RIDER_CASH_LEDGER (pinned by tests/rt-registry.test.ts)

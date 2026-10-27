@@ -13,8 +13,8 @@ import { reachT } from '../../i18n/areas/reach';
 import { SHOP_MODE_EVENT, type BusinessType } from '../../lib/shop-mode';
 import { BUSINESS_DEFAULTS, BUSINESS_TYPES, RETAIL_PROFILES, TRADE_PROFILES, applyBusinessDefaults, applyRetailKind, applyTradeKind, isRetailKind, isTradeKind, type RetailKindId, type TradeKindId } from '../../lib/shop-presets';
 import { TradeKindPicker } from '../trade/TradeKindPicker'; // R8-C (TR-C5)
-import { RetailKindPicker } from '../retail-r9/RetailKindPicker'; // R9 (RT-A1)
-import { rtaT } from '../../i18n/areas/retail-r9a';
+import { RetailKindPicker } from '../retail-r9/RetailKindPicker';
+import { pickT } from '../../i18n/areas/retail-r9-pick'; // R9 (RT-A1)
 import { trT } from '../../i18n/areas/trade-r8c';
 import { startDemoCompany, useDemoPending } from './demo-company';
 import { companiesSupported } from '../../lib/companies';
@@ -202,8 +202,8 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
             )}
             {business === 'kirana' && (
               <div className={controls.field} data-wizard-retail>
-                <span className={controls.label}>{rtaT('retailTitle')}</span>
-                <span className={controls.hint}>{rtaT('retailLede')}</span>
+                <span className={controls.label}>{pickT('retailTitle')}</span>
+                <span className={controls.hint}>{pickT('retailLede')}</span>
                 <RetailKindPicker value={retailKind} onPick={pickRetail} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
               </div>
             )}

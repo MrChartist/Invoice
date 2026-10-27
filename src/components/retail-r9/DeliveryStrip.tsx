@@ -16,9 +16,9 @@ import { rtaT } from '../../i18n/areas/retail-r9a';
 import { generateId, getTable } from '../../lib/storage';
 import { num, round2 } from '../../lib/invoice-calc';
 import { todayInput } from '../../lib/utils';
-import { liveMrpIssues } from '../../lib/stock-tracking';
-import { MRP_TAG } from '../../lib/retail/rt-mrp';
+import { MRP_TAG, liveMrpIssues } from '../../lib/stock-tracking';
 import { RT_TABLES } from '../../lib/retail/rt-shared';
+import { addShortBook } from '../../lib/retail/rt-short-book';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { DeliveryInfo, DeliveryRider } from '../../types/retail-r9';
 import { NumberInput } from '../ui/NumberInput';
@@ -108,10 +108,12 @@ export function PosRetailStrip({ record, query, delivery, onDelivery, onAddLine,
   const msgs = mrp ? [...mrp.errors, ...mrp.confirm, ...mrp.warnings].map((m) => m.replace(MRP_TAG, '').trim()) : [];
   const q = query.trim();
   const addShort = () => {
-    void import('../../lib/retail/rt-short-book')
-      .then((m) => m.addShortBook({ date: todayInput(), name: q, customer: record.client?.name, phone: record.client?.phone }))
-      .then((row) => notify(rtaT('sbAdded', { name: row.name }), 'success'))
-      .catch((err: Error) => notify(err.message, 'error'));
+    try {
+      const row = addShortBook({ date: todayInput(), name: q, customer: record.client?.name, phone: record.client?.phone });
+      notify(rtaT('sbAdded', { name: row.name }), 'success');
+    } catch (err) {
+      notify((err as Error).message, 'error');
+    }
   };
   return (
     <div data-pos-retail>

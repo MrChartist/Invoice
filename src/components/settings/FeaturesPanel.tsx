@@ -8,8 +8,8 @@ import { FEATURE_ROWS, featureState, type FeatureRow, type FeatureSection } from
 import { featureText } from './feature-text';
 import { TradeKindPicker } from '../trade/TradeKindPicker'; // R8-C (TR-C5)
 import { applyRetailKind, applyTradeKind } from '../../lib/shop-presets';
-import { RetailKindPicker } from '../retail-r9/RetailKindPicker'; // R9 (RT-A1)
-import { rtaT } from '../../i18n/areas/retail-r9a';
+import { RetailKindPicker } from '../retail-r9/RetailKindPicker';
+import { pickT } from '../../i18n/areas/retail-r9-pick'; // R9 (RT-A1)
 import { trT } from '../../i18n/areas/trade-r8c';
 import { can } from '../../lib/access';
 import { useT } from '../../i18n';
@@ -102,7 +102,7 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
         )}
         {settings.business_type === 'kirana' && (
           <div className={controls.field} data-features-retail>
-            <span className={controls.label}>{rtaT('retailTitle')}</span>
+            <span className={controls.label}>{pickT('retailTitle')}</span>
             <RetailKindPicker
               value={settings.retail_kind}
               custom

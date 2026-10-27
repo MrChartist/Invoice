@@ -78,7 +78,7 @@ const donTabT = defineArea({ tab: 'Donations' } as const, { tab: 'दान' });
 const InterestTab = lazy(() => import('../components/trade/InterestTab'));
 const intTabT = defineArea({ tab: 'Interest', deliveries: 'Deliveries' } as const, { tab: 'ब्याज', deliveries: 'डिलीवरी' });
 // R9 (RT-A3): home-delivery board, riders and rider cash settlement (every business, lazy).
-const DeliveriesTab = lazy(() => import('../components/retail-r9/DeliveriesTab'));
+const DeliveriesTab = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.DeliveriesTab })));
 
 type Tab = ReceivablesTab;
 // R6-B1: the ids (and packs) live in receivables-tabs.ts; the labels stay here.

@@ -38,10 +38,8 @@ import { uxT } from '../i18n/areas/invoicing-ux';
 import { clientToParty } from '../store/invoice-defaults';
 import { issuingProfile } from '../lib/sync-device';
 import { lockState } from '../lib/period-lock';
-import { editorStockContext, liveDocTrackingIssues, liveMrpIssues } from '../lib/stock-tracking';
-import { isMrpMessage, withMrpIssues } from '../lib/retail/rt-mrp'; // R9 (RT-A2)
-import { recordMrpOverrides } from '../lib/retail/rt-settings';
-import { can } from '../lib/access';
+import { editorStockContext, isMrpMessage, liveDocTrackingIssues, liveMrpIssues, recordMrpOverrides, withMrpIssues } from '../lib/stock-tracking'; // R9 (RT-A2) helpers
+import { can, currentActor } from '../lib/access';
 import { audit } from '../lib/audit';
 import { trT } from '../i18n/areas/trade-r8c';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -219,7 +217,7 @@ export function InvoiceCreator() {
         if (items !== st.items) st.patch({ items });
       }
       const result = useInvoiceStore.getState().saveInvoice({ asDraft });
-      if (result.ok && result.record && !asDraft && expiredOk) recordMrpOverrides(result.record, mrpConfirmed.current); // R9 (RT-A2)
+      if (result.ok && result.record && !asDraft && expiredOk) recordMrpOverrides(result.record, mrpConfirmed.current, currentActor()?.name ?? 'the owner', (r) => audit.record(r)); // R9 (RT-A2)
       mrpConfirmed.current = [];
       if (!result.ok) {
         setErrors(result.errors);

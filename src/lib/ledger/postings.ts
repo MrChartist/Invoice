@@ -54,7 +54,7 @@ import { inBooks, reversalOf } from './voucher-variants';
 import type { TdsChallan } from '../tds-payables';
 import type { VendorPayment } from '../../types/purchases';
 import { depreciationSchedule, fyLabelOf, type FixedAsset } from './assets';
-import { advanceMovements, isAdvanceAdjustment, type AdvanceMovement } from '../advance-tax';
+import { RIDER_CASH_LEDGER, advanceMovements, isAdvanceAdjustment, type AdvanceMovement } from '../advance-tax';
 import { purchaseReturnPostings } from './postings-returns';
 import { openingVouchers } from './postings-openings';
 import { applyBankLedgers } from './postings-bank';
@@ -64,7 +64,6 @@ import type { Branch } from '../branch';
 import { voucherBranches } from './branch-books';
 import { FINANCIAL_REASON_LABELS, financialAccountOf, isFinancialNote } from '../financial-note';
 import { gvLiabilityId } from '../retail/gift-voucher-core'; // R4-B1
-import { RIDER_CASH_LEDGER } from '../retail/rt-shared'; // R9 (RT-A3)
 import { sectionText } from '../ita2025';
 
 export interface PostingLine {

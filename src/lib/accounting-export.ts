@@ -41,8 +41,7 @@ import {
 import { generateTallyExport, type TallyOptions } from './tally-xml';
 import { registerCells, registerColumns } from './custom-fields';
 import { csvCell as baseCsvCell, safeText } from './csv';
-import { NO_CASH_LEDGER, movedNoCash, noCashKind, type NoCashKind } from './advance-tax'; // no-cash.ts (QA6-1 F4)
-import { RIDER_CASH_LEDGER } from './retail/rt-shared'; // R9 (RT-A3)
+import { NO_CASH_LEDGER, RIDER_CASH_LEDGER, movedNoCash, noCashKind, type NoCashKind } from './advance-tax'; // no-cash.ts (QA6-1 F4)
 
 export * from './export-shared';
 

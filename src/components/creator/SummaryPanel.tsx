@@ -32,7 +32,7 @@ import { impliedPacks } from '../../lib/shop-mode';
 // R8-B (TR-B2/B3): bill charges, broker and weight slip (commodity / agency pack, lazy).
 const ChargesStrip = lazy(() => import('../trade/tr-b-hub').then((m) => ({ default: m.ChargesStrip })));
 // R9 (RT-A3): home delivery (Retail checks "Home delivery" on, or a document that carries one; lazy).
-const DeliveryStrip = lazy(() => import('../retail-r9/DeliveryStrip'));
+const DeliveryStrip = lazy(() => import('../retail-r9/rt-a-hub').then((m) => ({ default: m.DeliveryStrip })));
 
 const GST_MODES: { id: GstMode; label: MessageKey }[] = [
   { id: 'CGST_SGST', label: 'summary.modeCgstSgst' },

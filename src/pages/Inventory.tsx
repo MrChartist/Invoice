@@ -62,9 +62,9 @@ const PharmacyDesk = lazy(() => import('../components/retail-r9/PharmacyDesk'));
 const ApparelDesk = lazy(() => import('../components/retail-r9/ApparelDesk'));
 const DevicesDesk = lazy(() => import('../components/retail-r9/DevicesDesk'));
 const JewelleryDesk = lazy(() => import('../components/retail-r9/JewelleryDesk'));
-const ShortBookTab = lazy(() => import('../components/retail-r9/ShortBookTab'));
-const RelabelQueue = lazy(() => import('../components/retail-r9/RelabelQueue'));
-const MrpBasisTool = lazy(() => import('../components/retail-r9/RelabelQueue').then((m) => ({ default: m.MrpBasisTool })));
+const ShortBookTab = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.ShortBookTab })));
+const RelabelQueue = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.RelabelQueue })));
+const MrpBasisTool = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.MrpBasisTool })));
 const r9TabT = defineArea(
   { pharmacy: 'Pharmacy', apparel: 'Apparel', devices: 'Devices', jewellery: 'Jewellery', shortbook: 'Short book' } as const,
   { pharmacy: 'फ़ार्मेसी', apparel: 'कपड़े', devices: 'डिवाइस', jewellery: 'ज्वेलरी', shortbook: 'शॉर्ट बुक' },
