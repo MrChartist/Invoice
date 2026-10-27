@@ -8,7 +8,7 @@ import { localDb } from '../src/lib/localDb.ts';
 import { getTable, setTable } from '../src/lib/storage.ts';
 import { billFromBoard, clientFees, draftLines, feeItems, patchClientPs, retainerClients, setFeeEvent, typedEvent } from '../src/lib/prof/ps-ca-bill.ts';
 import { caEvents, caKey, type CaEvent } from '../src/lib/prof/ps-ca-events.ts';
-import type { InvoiceItem, InvoiceRecord } from '../src/types/invoice.ts';
+import type { InvoiceRecord } from '../src/types/invoice.ts';
 import type { PurchaseRecord } from '../src/types/purchases.ts';
 
 beforeEach(() => {
@@ -62,5 +62,4 @@ test('the draft: one line per event, disbursements at actual, events billed, can
   assert.equal(billed()[0].billedBy, undefined);
   assert.deepEqual([...retainerClients([{ client_id: 'c1', model: 'retainer', status: 'active' }, { client_id: 'c2', model: 'fixed', status: 'active' }])], ['c1']);
   assert.throws(() => billFromBoard('nobody', [ev3b]), /no longer/);
-  void ({} as InvoiceItem);
 });

@@ -13,7 +13,6 @@ import { num, round2 } from '../invoice-calc';
 import { isPureAgentLine } from '../trade/pure-agent';
 import { isRevenueDoc } from '../stats';
 import { sectionRate, tdsThreshold } from '../tds-rules';
-import { fyQuarterOf } from '../tds-payables';
 import { form16aDueDate, type TdsRegister, type Quarter } from '../tds-register';
 import { formText, quarterStart, sectionText } from '../ita2025';
 
@@ -52,6 +51,9 @@ export function feeBase(inv: Pick<InvoiceRecord, 'items' | 'taxable_value'>): nu
   return round2((num(inv.taxable_value) * fees) / all);
 }
 
+/** Indian FY start year of a local day (`YYYY-MM-DD`). */
+const fyOf = (d: string) => (+d.slice(5, 7) >= 4 ? +d.slice(0, 4) : +d.slice(0, 4) - 1);
+
 const sameClient = (a: Pick<InvoiceRecord, 'client'>, c: Pick<Client, 'id' | 'name'>) => (c.id && a.client?.id ? a.client.id === c.id : (a.client?.name ?? '').trim().toLowerCase() === (c.name ?? '').trim().toLowerCase());
 
 export interface ExpectedTds {
@@ -76,9 +78,9 @@ export function expectedTds(input: { client: Pick<Client, 'id' | 'name'>; def: C
   if (!def || def.section === 'none') return null;
   const { code, family } = codeFor(def.section, input.ourForm);
   const rate = def.rate ?? sectionRate(code, input.date, input.ourForm === 'proprietorship' ? 'INDIVIDUAL' : 'FIRM') ?? 0;
-  const fy = fyQuarterOf(input.date)?.fy;
+  const fy = fyOf(input.date);
   const fyBefore = round2(input.invoices
-    .filter((i) => i.id !== input.excludeId && i.status !== 'Draft' && i.status !== 'Cancelled' && sameClient(i, input.client) && fyQuarterOf(String(i.issue_date ?? '').slice(0, 10))?.fy === fy && String(i.issue_date) <= input.date)
+    .filter((i) => i.id !== input.excludeId && i.status !== 'Draft' && i.status !== 'Cancelled' && sameClient(i, input.client) && /^\d{4}-\d{2}/.test(String(i.issue_date)) && fyOf(String(i.issue_date)) === fy && String(i.issue_date) <= input.date)
     .reduce((s, i) => s + (i.doc_type === 'CREDIT_NOTE' ? -1 : isRevenueDoc(i) ? 1 : 0) * feeBase(i), 0));
   const th = tdsThreshold(family, input.date) ?? {};
   const after = round2(fyBefore + input.base);

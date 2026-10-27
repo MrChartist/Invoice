@@ -131,3 +131,32 @@ export function reverseRun(fy: number): void {
   if (!r) throw new Error('No year-end run is posted for this year.');
   undoPartnerRun(r.id);
 }
+
+/** One partner's capital and current account statement for an FY (₹; balances credit-positive). */
+export interface PartnerStatement { partner_id: string; name: string; opening: number; introduced: number; drawings: number; interest: number; remuneration: number; tds: number; drawingsInterest: number; share: number; closing: number }
+
+/** Statements of every partner for an FY from the books and the FY's postings (the annual pack's partners' note reads these). */
+export function partnerStatements(fy: number): PartnerStatement[] {
+  const { start, end } = fyBounds(fy);
+  const ledger = loadLedger();
+  const open = closingBalances(ledger, `${fy}-03-31`);
+  const close = closingBalances(ledger, end);
+  const runs = loadPartnerRuns().filter((r) => r.fy === fy);
+  const bal = (m: Map<string, number>, ids: string[]) => round2(-ids.reduce((s, id) => s + (m.get(id) ?? 0), 0) / 100);
+  return loadPartners().filter((p) => p.joined <= end && (!p.left || p.left >= start)).map((p) => {
+    const ids = [p.capital_account_id, p.current_account_id];
+    const capMoves = ledger.vouchers.filter((v) => v.date >= start && v.date <= end).flatMap((v) => v.lines.filter((l) => l.account === p.capital_account_id));
+    const lines = runs.flatMap((r) => (r.lines ?? []).filter((l) => l.partner_id === p.id));
+    const credits = runs.filter((r) => r.kind === 'credit' && r.partner_id === p.id);
+    const sum = (f: (x: (typeof lines)[number]) => number) => round2(lines.reduce((s, l) => s + f(l), 0));
+    const cr = (pick: (k?: string) => boolean, f: (c: (typeof credits)[number]) => number) => credits.filter((c) => pick(c.credit_kind)).reduce((s, c) => s + f(c), 0);
+    return {
+      partner_id: p.id, name: p.name, opening: bal(open, ids), introduced: round2(capMoves.reduce((s, l) => s + (l.cr - l.dr), 0) / 100),
+      drawings: round2(drawingsOf(p, start, end).reduce((s, d) => s + d.amount, 0)),
+      interest: round2(sum((l) => l.interest) + cr((k) => k === 'interest', (c) => c.amount ?? 0)),
+      remuneration: round2(sum((l) => l.remuneration) + cr((k) => k !== 'interest', (c) => c.amount ?? 0)),
+      tds: round2(sum((l) => l.tds ?? 0) + cr(() => true, (c) => c.tds ?? 0)),
+      drawingsInterest: sum((l) => l.drawings_interest), share: sum((l) => l.share), closing: bal(close, ids),
+    };
+  });
+}

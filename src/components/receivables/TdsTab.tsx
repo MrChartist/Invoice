@@ -3,7 +3,7 @@
  * Form 16A tracking and a 26AS / AIS CSV reconciliation. Loaded lazily, so none
  * of this (or the CSV / import-mapping code it pulls in) touches the main bundle.
  */
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { MAX_IMPORT_BYTES } from '../../lib/csv';
 import { Link } from 'react-router-dom';
 import {
@@ -31,6 +31,9 @@ import { rcvT } from '../../i18n/areas/receivables';
 import { ita25Words } from '../../i18n/areas/ita2025';
 import { formText, quarterStart, sectionText } from '../../lib/ita2025';
 import styles from './TdsTab.module.css';
+
+// R14 (PS-D3): certificates to chase (Form 131 / 16A) with a chase letter — lazy panel.
+const ChasePanel = lazy(() => import('../prof/TdsChasePanel'));
 
 export interface TdsTabProps {
   data: { invoices: InvoiceRecord[]; payments: Payment[]; clients: Client[]; extraExpected?: TdsExpectedLine[] };
@@ -137,6 +140,8 @@ export default function TdsTab({ data: rawData, notify }: TdsTabProps) {
       {reg.quarters.map((q) => <QuarterCard key={q.key} block={q} onToggle={toggleCert} />)}
 
       <Reconcile data={data} notify={notify} />
+
+      <Suspense fallback={null}><ChasePanel reg={all} clients={data.clients} /></Suspense>
 
       <p className={surface.sectionNote}>
         {rcvT('tdsNote')}
