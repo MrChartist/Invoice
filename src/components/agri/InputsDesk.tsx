@@ -1,17 +1,20 @@
 /**
  * AG-D4 input dealer desk (`/inventory?tab=inputs&view=`, pack `agri_inputs`): licences and principal certificates,
- * subsidised fertiliser (PoS vs book), credit till harvest. Each view is a lazy sub-chunk.
+ * subsidised fertiliser (PoS vs book), credit till harvest. One lazy chunk with its views (budget: one chunk per desk).
  */
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { Desk } from './agd-kit';
 import type { Done } from './agd-ui';
+import LicencesView from './LicencesView';
+import SubsidyView from './SubsidyView';
+import SeasonCreditView from './SeasonCreditView';
 
 const VIEWS = ['licences', 'subsidy', 'credit'] as const;
 const BODY = {
-  licences: lazy(() => import('./LicencesView')),
-  subsidy: lazy(() => import('./SubsidyView')),
-  credit: lazy(() => import('./SeasonCreditView')),
+  licences: LicencesView,
+  subsidy: SubsidyView,
+  credit: SeasonCreditView,
 };
 
 export default function InputsDesk({ view, onDone }: { view?: string; onDone: Done }) {

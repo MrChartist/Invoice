@@ -1,19 +1,24 @@
 /**
  * AG-D cold storage desk (`/inventory?tab=cold&view=`, pack `coldstore`): lots and receipts, gate passes, rent plans and
- * bills, loans against lots, chambers. Each view is a lazy sub-chunk. Lots are custody only — never stock.
+ * bills, loans against lots, chambers. One lazy chunk with its views; the loans view (shared with the members desk) is
+ * its own sub-chunk. Lots are custody only — never stock.
  */
 import { lazy, Suspense } from 'react';
 import { Snowflake } from 'lucide-react';
 import { Desk } from './agd-kit';
 import type { Done } from './agd-ui';
+import LotsView from './LotsView';
+import GatePassView from './GatePassView';
+import RentView from './RentView';
+import ChambersView from './ChambersView';
 
 const VIEWS = ['lots', 'gatepasses', 'rent', 'loans', 'chambers'] as const;
 const BODY = {
-  lots: lazy(() => import('./LotsView')),
-  gatepasses: lazy(() => import('./GatePassView')),
-  rent: lazy(() => import('./RentView')),
+  lots: LotsView,
+  gatepasses: GatePassView,
+  rent: RentView,
   loans: lazy(() => import('./LoansView')),
-  chambers: lazy(() => import('./ChambersView')),
+  chambers: ChambersView,
 };
 
 export default function ColdDesk({ view, onDone }: { view?: string; onDone: Done }) {
