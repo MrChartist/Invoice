@@ -32,7 +32,7 @@ export function SettlementsPanel(props: PanelProps) {
   const [teach, setTeach] = useState<ReadonlyMap<string, SettlementBucket>>(new Map());
   const [tick, setTick] = useState(0);
   const [feeInv, setFeeInv] = useState(false);
-  const banks = useMemo(() => pickableBankAccounts('brs'), []);
+  const banks = useMemo(() => pickableBankAccounts('payout'), []); // QA17 R5: never a client-money account
   const [bankId, setBankId] = useState(DEFAULT_BANK_ID);
   const [filter, setFilter] = useState<OrderStatus | 'all'>('all');
   const [feeBill, setFeeBill] = useState<{ id: string; no: string; date: string; sac: string } | null>(null);

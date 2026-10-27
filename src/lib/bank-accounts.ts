@@ -127,7 +127,7 @@ export function liveBankAccountUsage(id: string): string[] {
  * never prints cheques, never pays suppliers by bulk e-payment and never receives a bank statement. R14 PS-B3: a
  * client-money account (`isClientMoneyAccount`) is offered only for statements ('brs').
  */
-export type BankPickPurpose = 'cheque' | 'epay' | 'brs' | 'any';
+export type BankPickPurpose = 'cheque' | 'epay' | 'brs' | 'payout' | 'any'; // QA17 R5: 'payout' = the firm's own real bank
 export function pickableBankAccounts(purpose: BankPickPurpose, accounts: readonly BankAccount[] = bankAccountsDb.active()): BankAccount[] {
   // R14 PS-B3: a client-money account takes statements (BRS) but never a fee receipt, supplier payment or cheque.
   return accounts.filter((a) => (purpose === 'any' || !(a as { clearing?: boolean }).clearing) && (purpose === 'brs' || !isClientMoneyAccount(a)));

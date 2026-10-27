@@ -21,7 +21,7 @@ export default function Tds194jHint() {
   const def = client ? clientTdsDefault(client, profKind()) : undefined;
   const isNew = !localDb.invoices.getById(s.id);
   const exp = client && def && (s.doc_type ?? 'INVOICE') !== 'CREDIT_NOTE'
-    ? expectedTds({ client, def, date: s.issue_date, base: feeBase({ items: s.items, taxable_value: s.totals?.taxable_value ?? 0 }), invoices: localDb.invoices.getAll(), ourForm: firmForm(), excludeId: s.id })
+    ? expectedTds({ client, def, date: s.issue_date, base: feeBase({ items: s.items, taxable_value: s.totals?.taxable_value ?? 0, discount_type: s.discount_type, discount_rate: s.discount_rate }), invoices: localDb.invoices.getAll(), ourForm: firmForm(), excludeId: s.id })
     : null;
   const done = useRef('');
   useEffect(() => {
