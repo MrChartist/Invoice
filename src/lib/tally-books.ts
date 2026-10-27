@@ -323,13 +323,13 @@ export function booksVouchers(
     out.push(voucher('Journal', date, `DEP/${date.slice(0, 4)}`, '', 'Depreciation for the year (Income-tax Act WDV, fixed-asset register)', entries));
   }
 
-  /* Stock transfers → Stock Journal (quantity only). */
+  /* Stock transfers → Stock Journal (quantity only, in the item's base unit — QA14 Q4: a line typed in an alternate unit is converted). */
   const items = new Map((src.stockItems ?? []).map((i) => [i.id, i]));
   const godownName = (id: string) => (src.godowns ?? []).find((g) => g.id === id)?.name ?? (id === 'main' || !id ? 'Main Location' : id);
   for (const t of src.stockTransfers ?? []) {
     if (!t || !inRange(t.date, o.range)) continue;
     const lines = t.lines
-      .map((l) => ({ item: items.get(l.item_id)?.name ?? '', unit: (items.get(l.item_id)?.unit ?? 'NOS').toUpperCase(), qty: Number(l.qty) || 0, batch: l.batch_no ?? '' }))
+      .map((l) => ({ item: items.get(l.item_id)?.name ?? '', unit: (items.get(l.item_id)?.unit ?? 'NOS').toUpperCase(), qty: (Number(l.qty) || 0) * (Number(l.unit_factor) > 0 ? Number(l.unit_factor) : 1), batch: l.batch_no ?? '' }))
       .filter((l) => l.item && l.qty > 0);
     if (!lines.length) continue;
     const v = voucher('Stock Journal', t.date, t.transfer_number, '', [`Transfer ${godownName(t.from_godown)} → ${godownName(t.to_godown)}`, t.notes].filter(Boolean).join(' | '), []);

@@ -33,6 +33,7 @@ import { generateId } from './storage';
 import { loadBranches, type Branch } from './branch';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { makeDraft } from '../store/invoice-defaults';
+import { lineFactor } from './units';
 
 export const BRANCH_TRANSFER_CATEGORY = 'Branch transfer';
 export const BRANCH_TRANSFER_CA_NOTE = 'Supply between distinct persons (Sec 25(4), Schedule I para 2 CGST Act). Value per Rule 28 — verify with your CA.';
@@ -61,6 +62,12 @@ export function transferTaxPair(t: Pick<StockTransfer, 'from_godown' | 'to_godow
   const b = gstinOf(to);
   return a && b && a !== b ? { from, to } : null;
 }
+
+/**
+ * QA14 Q1: a transfer line's quantity in the item's base unit. A line typed in an alternate unit (10 BOX of 12) is billed
+ * as 120 NOS at the per-base-unit rate the dialog suggests (average cost), never 10 × the per-piece cost.
+ */
+export const transferBaseQty = (l: StockTransfer['lines'][number]): number => Math.round(num(l.qty) * lineFactor(l) * 1000) / 1000;
 
 /** The live tax invoice already raised for a transfer, if any. */
 export function transferInvoiceOf(transferId: string, invoices: readonly Pick<InvoiceRecord, 'id' | 'branch_transfer_id' | 'status' | 'invoice_number'>[]) {
@@ -115,10 +122,10 @@ export function buildTransferPair(x: TransferPairInput): { invoice: InvoiceRecor
         type: 'goods',
         ...(it?.hsn ? { hsn: it.hsn } : {}),
         unit: it?.unit || 'NOS',
-        quantity: num(l.qty),
+        quantity: transferBaseQty(l),
         rate,
         tax_rate: num(it?.tax_rate ?? x.settings.defaultTaxRate),
-        amount: round2(num(l.qty) * rate),
+        amount: round2(transferBaseQty(l) * rate),
       };
     });
   const note = `Stock transfer ${t.transfer_number} from ${x.from.name} (${gstinOf(x.from)}) to ${x.to.name} (${gstinOf(x.to)}). ${BRANCH_TRANSFER_CA_NOTE}`;
