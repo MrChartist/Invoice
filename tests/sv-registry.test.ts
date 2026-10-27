@@ -19,7 +19,7 @@ const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url),
 
 test('SV-A block: rights, audit labels, registered at runtime; first-paint maps carry none', () => {
   const A = { appointments: 'doc.create', service_staff: 'master.edit', commission_plans: 'master.edit', staff_payouts: 'books.edit', payer_claims: 'doc.create', service_settings: 'settings.manage' };
-  assert.deepEqual(SV_TABLE_ACTIONS, A);
+  assert.deepEqual(Object.fromEntries(Object.entries(SV_TABLE_ACTIONS).filter(([t]) => t in A)), A); // B–D add their own blocks
   for (const [t, a] of Object.entries(A)) {
     assert.equal(TABLE_ACTIONS[t], a, `${t} registered`);
     assert.ok(TABLE_MEANING[t], `${t} in the open export`);
@@ -48,4 +48,16 @@ test('series: CLM used once (sv-shared); OPD / IPD / LAB / MEM reserved and unus
   const all = readdirSync(new URL('../src/lib/', import.meta.url), { recursive: true }).filter((f) => String(f).endsWith('.ts') && !String(f).startsWith('help')).map((f) => readFileSync(new URL(`../src/lib/${f}`, import.meta.url), 'utf8')).join('\n');
   assert.equal((all.match(/'CLM'/g) ?? []).length, 1);
   for (const p of SV_RESERVED_SERIES) assert.equal((all.match(new RegExp(`'${p}'`, 'g')) ?? []).length, 1, `${p} only in the reserved list`);
+});
+
+test('SV-D block: vehicles / appliances and labour operations (masters), workshop settings (owner); writers import the registry', () => {
+  const D = { service_assets: 'master.edit', labour_ops: 'master.edit', workshop_settings: 'settings.manage' };
+  for (const [t, a] of Object.entries(D)) {
+    assert.equal(SV_TABLE_ACTIONS[t], a, t);
+    assert.equal(TABLE_ACTIONS[t], a, `${t} registered`);
+    assert.ok(TABLE_MEANING[t], `${t} in the open export`);
+  }
+  assert.deepEqual([SV_WATCHED.service_assets?.label, SV_WATCHED.labour_ops?.label], ['Vehicle / appliance', 'Labour operation']);
+  assert.equal(SV_OBJECTS.workshopSettings, 'workshop_settings');
+  for (const f of ['sv-assets', 'sv-jobs-workshop', 'sv-estimates', 'sv-parts-issue', 'sv-labour', 'sv-motor-claims']) assert.match(src(`lib/services/${f}.ts`), /import '\.\/sv-registry';/, f);
 });
