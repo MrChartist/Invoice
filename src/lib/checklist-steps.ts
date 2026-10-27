@@ -22,10 +22,12 @@ export type StepKind =
   // R11 (CN-A1): construction profile and the steps of each kind (append-only)
   | 'constructionProfile' | 'contract' | 'boq' | 'realtyProject' | 'units' | 'paymentPlan' | 'labourContract'
   // R10 (SV-A1): service profile and the steps of each kind (append-only)
-  | 'serviceProfile' | 'doctorProfile' | 'serviceMenu' | 'staff' | 'labTest' | 'memberPlan' | 'batch' | 'labourOp' | 'jobCard';
+  | 'serviceProfile' | 'doctorProfile' | 'serviceMenu' | 'staff' | 'labTest' | 'memberPlan' | 'batch' | 'labourOp' | 'jobCard'
+  // R12 (AG-A1): the steps of each agri kind (append-only; existing companies have no `agri_kind`, so none fire)
+  | 'farmers' | 'rateChart' | 'firstShift' | 'millBom' | 'cmrAgreement' | 'chambers' | 'rentPlan' | 'agriLicence' | 'shareCapital' | 'farmBatch';
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -51,6 +53,9 @@ export interface ChecklistCtx {
   constructionKind?: string;
   /** R10 (SV-A1): `settings.service_kind` (a services company without one gets "Pick your kind of service"). */
   serviceKind?: string;
+  /** R12 (AG-A1): `settings.agri_kind` / `settings.mill_kind`. */
+  agriKind?: string;
+  millKind?: string;
 }
 
 export interface ChecklistFactsV3 {
@@ -103,7 +108,28 @@ export interface ChecklistFactsV3 {
   batches?: number;
   labourOps?: number;
   jobCards?: number;
+  /** R12 (AG-A1): rows per agri step (farmers, rate charts, shifts, BOMs, CMR agreements, chambers, rent plans,
+   *  licences, member shares, farm batches) — counted only for the kind that has the step. */
+  agri?: Partial<Record<AgriStep, number>>;
 }
+
+/** R12 (AG-A1): the agri steps, the kinds that have them and where each opens. */
+type AgriStep = 'farmers' | 'rateChart' | 'firstShift' | 'millBom' | 'cmrAgreement' | 'chambers' | 'rentPlan' | 'agriLicence' | 'shareCapital' | 'farmBatch';
+const AGRI_STEPS: Readonly<Record<AgriStep, [kinds: string, to: string]>> = {
+  farmers: ['fpo coop dairy mill cold inputs farm other', '/inventory?tab=farm&view=farmers'],
+  rateChart: ['dairy', '/inventory?tab=dairy&view=charts'],
+  firstShift: ['dairy', '/inventory?tab=dairy&view=collection'],
+  millBom: ['mill', '/manufacturing?tab=boms'],
+  cmrAgreement: ['mill:rice', '/inventory?tab=mill&view=cmr'],
+  chambers: ['cold', '/inventory?tab=cold&view=chambers'],
+  rentPlan: ['cold', '/inventory?tab=cold&view=rent'],
+  agriLicence: ['inputs', '/inventory?tab=inputs&view=licences'],
+  shareCapital: ['fpo coop', '/inventory?tab=members&view=shares'],
+  farmBatch: ['farm', '/inventory?tab=farm&view=batches'],
+};
+const isAgriStep = (k: string): k is AgriStep => Object.hasOwn(AGRI_STEPS, k);
+const agriApplies = (k: AgriStep, ctx: ChecklistCtx): boolean =>
+  !!ctx.agriKind && AGRI_STEPS[k][0].split(' ').some((x) => x === ctx.agriKind || x === `${ctx.agriKind}:${ctx.millKind ?? 'rice'}`);
 
 export interface SetupProgress {
   skipped: string[];
@@ -184,7 +210,7 @@ function applies(kind: StepKind, ctx: ChecklistCtx): boolean {
     case 'memberPlan': return ctx.serviceKind === 'fitness';
     case 'batch': return ctx.serviceKind === 'coaching';
     case 'labourOp': case 'jobCard': return ctx.serviceKind === 'workshop' || ctx.serviceKind === 'appliance';
-    default: return true; // profile, item, payment, backup
+    default: return isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri steps
   }
 }
 
@@ -237,6 +263,7 @@ function stepsOf(kind: StepKind, f: ChecklistFactsV3, ctx: ChecklistCtx): Omit<C
     case 'batch': return one((f.batches ?? 0) > 0, '/recurring?tab=fees&view=batches');
     case 'labourOp': return one((f.labourOps ?? 0) > 0, '/time?tab=workshop&view=labour');
     case 'jobCard': return one((f.jobCards ?? 0) > 0, '/time?tab=workshop&view=jobs');
+    default: return one((f.agri?.[kind] ?? 0) > 0, AGRI_STEPS[kind][1]); // R12 (AG-A1)
   }
 }
 
@@ -322,6 +349,20 @@ function drugLicenceCount(profileText: unknown): number {
   return n || (typeof profileText === 'string' && profileText.trim() ? 1 : 0);
 }
 
+/** R12 (AG-A1): rows behind each agri step (farmers = vendors / clients with `ag`; chambers / licences in `agri_settings`). */
+function agriFacts(kind: string): Partial<Record<AgriStep, number>> {
+  const ag = getJson<{ chambers?: unknown[]; licences?: unknown[] } | null>(`${DB_PREFIX}agri_settings`, null);
+  const n = (t: string) => peekTable(t).length;
+  const out: Partial<Record<AgriStep, number>> = { farmers: [...peekTable<{ ag?: unknown }>('vendors'), ...peekTable<{ ag?: unknown }>(KEYS.clients)].filter((r) => r?.ag).length };
+  if (kind === 'dairy') Object.assign(out, { rateChart: n('milk_rate_charts'), firstShift: n('milk_shifts') });
+  if (kind === 'mill') Object.assign(out, { millBom: n('boms'), cmrAgreement: n('cmr_agreements') });
+  if (kind === 'cold') Object.assign(out, { chambers: ag?.chambers?.length ?? 0, rentPlan: n('cold_rent_plans') });
+  if (kind === 'inputs') out.agriLicence = ag?.licences?.length ?? 0;
+  if (kind === 'fpo' || kind === 'coop') out.shareCapital = n('member_shares');
+  if (kind === 'farm') out.farmBatch = n('farm_batches');
+  return out;
+}
+
 /** Counts only, from the shared parsed rows (PERF-2: never copied). */
 export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: ChecklistCtx } {
   const settings = localDb.settings.get();
@@ -338,6 +379,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
   const cnRaw = (settings as { construction_kind?: unknown }).construction_kind; // R11 (CN-A1)
   const cnKind = typeof cnRaw === 'string' ? cnRaw : undefined;
   const svKind = typeof settings.service_kind === 'string' ? settings.service_kind : undefined; // R10 (SV-A1)
+  const agKind = typeof settings.agri_kind === 'string' ? settings.agri_kind : undefined; // R12 (AG-A1)
   const facts: ChecklistFactsV3 = {
     profileReady: !!settings.onboarded && Boolean(profile?.companyName?.trim()) && Boolean(profile?.upiId || profile?.accountNumber),
     clients: peekTable(KEYS.clients).length,
@@ -373,6 +415,8 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     ...(svKind === 'coaching' ? { batches: peekTable('class_schedules').length } : {}),
     ...(svKind === 'workshop' || svKind === 'appliance' ? { labourOps: peekTable('labour_ops').length, jobCards: peekTable('service_jobs').length } : {}),
     ...(cnKind === 'builder' ? { realtyProjects: peekTable('realty_projects').length, realtyUnits: peekTable('realty_units').length, paymentPlans: peekTable('payment_plans').length } : {}),
+    // R12 (AG-A1): agri steps (read only for an agri company; B–D tables count once their package writes them)
+    ...(agKind ? { agri: agriFacts(agKind) } : {}),
     ...(retailKind === 'grocery' ? { barcodeItems: stock.filter((r) => r?.barcode || r?.sold_by_weight).length + peekTable<{ barcode?: unknown; sold_by_weight?: unknown }>(KEYS.items).filter((r) => r?.barcode || r?.sold_by_weight).length } : {}),
   };
   const ctx: ChecklistCtx = {
@@ -385,6 +429,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     ...(retailKind ? { retailKind } : {}),
     ...(cnKind ? { constructionKind: cnKind } : {}),
     ...(svKind ? { serviceKind: svKind } : {}),
+    ...(agKind ? { agriKind: agKind, ...(typeof settings.mill_kind === 'string' ? { millKind: settings.mill_kind } : {}) } : {}),
   };
   return { facts, ctx };
 }
