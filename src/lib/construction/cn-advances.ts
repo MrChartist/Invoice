@@ -111,13 +111,14 @@ export interface AdvanceStatus {
 /** Works → Advances: each advance of the contract with recovered, balance, interest to date and the schedule check. */
 export function advanceStatus(c: Pick<WorksContract, 'advance_terms' | 'contract_value'>, bills: readonly InvoiceRecord[], advances: readonly AdvanceLike[], today: string, boqAdvanceId?: string): AdvanceStatus[] {
   const work = bills.reduce((s, b) => s + num(b.taxable_value), 0);
-  const workPct = num(c.contract_value) > 0 ? round2((work / num(c.contract_value)) * 100) : 0;
+  const raw = num(c.contract_value) > 0 ? (work / num(c.contract_value)) * 100 : 0;
+  const workPct = round2(raw);
   return (c.advance_terms ?? []).map((term) => {
     const advance = advances.find((a) => a.id === term.advance_id);
     const amount = num(advance?.amount);
     const recovered = advance ? recoveredOn(bills, advance.id, boqAdvanceId) : 0;
     const balance = round2(Math.max(amount - recovered, 0));
-    const target = scheduleTarget(amount, workPct, num(term.recover_from_pct ?? 10), num(term.recover_by_pct ?? 80));
+    const target = scheduleTarget(amount, raw, num(term.recover_from_pct ?? 10), num(term.recover_by_pct ?? 80));
     return {
       term, advance, amount, recovered, balance, workPct, target,
       interest: advance ? simpleInterest(balance, num(term.interest_pct), lastDay(bills, advance), today) : 0,
