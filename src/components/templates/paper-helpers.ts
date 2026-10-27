@@ -1,6 +1,7 @@
 import type { CalcTotals } from '../../lib/invoice-calc';
 import type { InvoiceItem, InvoiceRecord, Payment, SenderProfile } from '../../types/invoice';
 import { getTable } from '../../lib/storage';
+import { noCashKind } from '../../lib/no-cash';
 import { upiLink } from '../../lib/share';
 import { shiftDay } from '../../lib/dates';
 import { weightText, wtHolds } from '../../lib/trade/tr-weight';
@@ -117,6 +118,6 @@ export { weightText };
 export const pharmacistText = (sender: Pick<SenderProfile, 'pharmacist'>): string => (sender.pharmacist ? `Registered pharmacist: ${sender.pharmacist}` : '');
 /** R9 (RT-D3 / E3): "Less: old gold (12.300 g @ 84%) ₹…" per exchange receipt on the bill (no cash; '' otherwise). */
 export const exchangeText = (invoice: Pick<InvoiceRecord, 'id'>, money: (n: number) => string): string =>
-  invoice.id ? getTable<Payment>('transactions').filter((p) => p?.invoice_id === invoice.id && p.exchange_purchase_id).map((p) => `${p.note || 'Less: exchange'} ${money(p.amount)}`).join(' · ') : '';
+  invoice.id ? getTable<Payment>('transactions').filter((p) => p?.invoice_id === invoice.id && noCashKind(p) === 'exchange').map((p) => `${p.note || 'Less: exchange'} ${money(p.amount)}`).join(' · ') : '';
 /** R9 (RT-E2): the BIS verification line snapshotted on the bill's jewellery lines (printed under the totals; '' otherwise). */
 export const bisText = (invoice: Pick<InvoiceRecord, 'items'>): string => invoice.items?.find((i) => i.jw?.bis)?.jw?.bis ?? '';

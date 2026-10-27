@@ -17,6 +17,7 @@ import { godownsDb } from '../src/lib/godowns.ts';
 import { movedNoCash } from '../src/lib/no-cash.ts';
 import { calculateInvoice, calcInputFromRecord } from '../src/lib/invoice-calc.ts';
 import { withTotals } from '../src/lib/pos.ts';
+import { exchangeText } from '../src/components/templates/paper-helpers.ts';
 import type { InvoiceRecord, Payment } from '../src/types/invoice.ts';
 
 beforeEach(() => {
@@ -68,6 +69,8 @@ test('exchange: the sale keeps its full value (GST on ₹1,40,000); the exchange
   assert.ok(Math.abs(inv.total - 140000) < 0.02, 'about ₹1,40,000 incl. 3% GST');
   assert.equal(inv.balance_due, Math.round((inv.total - 101253.6) * 100) / 100, 'the rest (≈ ₹38,746.40) by UPI / cash');
   assert.throws(() => applyExchange('inv1', p.id), /Nothing left|has only/);
+  assert.equal(exchangeText(inv, (n) => `₹${n}`), 'Less: old gold (12.300 g @ 84%) ₹101253.6', 'printed under the totals');
+  assert.equal(exchangeText({ id: 'other' }, String), '');
 });
 
 test('PAN at the limit; cash paid for old gold is a purchase payment (counted for 40A(3), never a receipt)', () => {
