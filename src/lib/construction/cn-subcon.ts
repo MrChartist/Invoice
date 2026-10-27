@@ -50,7 +50,23 @@ export function fromBoq(boq: Pick<InvoiceRecord, 'items'>, lineIds: readonly str
   }));
 }
 
-export const woValue = (wo: Pick<SubWorkOrder, 'lines'>) => round2(wo.lines.reduce((s, l) => s + num(l.qty) * num(l.rate), 0));
+/** Pure (D1 → D5): margin per BOQ item = (our RA rate − sub-contract rate) × quantity billed by the sub-contractor. */
+export function boqMargins(boq: Pick<InvoiceRecord, 'id' | 'items'>, wos: readonly SubWorkOrder[], bills: readonly { wo_id: string; status: string; lines: { line_id: string; this_qty: number }[] }[]) {
+  const ours = new Map(boqLines(boq).map((l) => [l.id, num(l.rate)]));
+  const out: { ref: string; description: string; ours: number; sub: number; qty: number; margin: number }[] = [];
+  for (const wo of wos) {
+    if (wo.boq_id !== boq.id || wo.status === 'cancelled') continue;
+    for (const l of wo.lines) {
+      if (!l.boq_line_id || !ours.has(l.boq_line_id)) continue;
+      const qty = round2(bills.filter((b) => b.wo_id === wo.id && b.status !== 'cancelled').reduce((s, b) => s + b.lines.filter((x) => x.line_id === l.id).reduce((a, x) => a + num(x.this_qty), 0), 0));
+      const our = ours.get(l.boq_line_id)!;
+      out.push({ ref: l.ref, description: l.description, ours: our, sub: num(l.rate), qty, margin: round2((our - num(l.rate)) * qty) });
+    }
+  }
+  return out;
+}
+
+export const woValue =(wo: Pick<SubWorkOrder, 'lines'>) => round2(wo.lines.reduce((s, l) => s + num(l.qty) * num(l.rate), 0));
 
 export interface WoInput {
   id?: string;
