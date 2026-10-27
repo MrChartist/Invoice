@@ -16,6 +16,7 @@ import { can } from '../../lib/access';
 import { downloadText, toCsv } from '../../lib/download';
 import { parseCsv } from '../../lib/csv';
 import { printHtmlDocument } from '../../lib/voucher-print';
+import { labelSheetHtml, layoutById } from '../../lib/label-sheet';
 import { formatCurrency, todayInput } from '../../lib/utils';
 import { refundAdvance, saveAdvance } from '../../lib/advances';
 import { senderStateCode } from '../../store/invoice-defaults';
@@ -461,6 +462,7 @@ function Results({ o, run, onBill }: { o: LabOrder; run: Run; onBill: () => void
         <button type="button" className={btn} onClick={() => setShow(!show)} data-report-preview>{bT('report')}</button>
         {!liveInvoice(o.invoice_id) && <button type="button" className={btn} onClick={onBill}>{svT('bill')}</button>}
         <button type="button" className={btn} onClick={() => run(() => logDelivery(o.id, 'whatsapp'))}>{bT('sentWa')}</button>
+        <button type="button" className={btn} onClick={() => printHtmlDocument(labelSheetHtml(o.samples.map((x) => ({ name: `${o.patient_name} · ${x.type}`, code: o.number.replace(/\//g, '-'), copies: 1, note: [o.uhid, o.date].filter(Boolean).join(' · ') })), { layout: layoutById('lab-sample'), price: 'none' }), fallback)}>{bT('labels')}</button>
       </div>
       {show && <LabReportPrint o={{ ...o, results: vals }} signers={by.filter(Boolean).map((n) => { const s = staff.find((x) => x.name === n); const d = s?.doctor_id ? doctorsDb.get(s.doctor_id) : undefined; return { name: n, qual: d?.qualification }; })} onPrint={() => run(() => logDelivery(o.id, 'print'))} />}
     </div>
