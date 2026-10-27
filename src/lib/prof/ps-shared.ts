@@ -15,6 +15,8 @@ export const PS_TABLES = {
   udin: 'udin_register',
   // PS-B: client-money (trust) vouchers (CMV/FY…, dated, numbered)
   clientMoney: 'client_money',
+  // PS-C: EDF register (export of services, dated by `date` = the end of the invoice month)
+  edf: 'edf_register',
 } as const;
 
 /** Company objects (singletons). */
@@ -41,6 +43,7 @@ export const PS_DATED: Readonly<Record<string, string>> = {
   partner_runs: 'date',
   udin_register: 'date',
   client_money: 'date', // PS-B
+  edf_register: 'date', // PS-C
 };
 
 /** Numbered tables (`number` field) and their series (mirrors the `sync-engine.ts` NUMBERED rows). */

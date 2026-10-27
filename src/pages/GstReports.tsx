@@ -272,13 +272,25 @@ export function GstReports() {
       live = false;
     };
   }, [invoices, period, gstin]);
+  // R14 PS-C1: soft Sec 2(6) findings on LUT exports of the period (svcexport pack only; the check loads on demand).
+  const [psIssues, setPsIssues] = useState<Parameters<typeof buildPreflight>[0]['issues']>([]);
+  useEffect(() => {
+    const { from, to } = periodRange(period);
+    const docs = impliedPacks(localDb.settings.get()).includes('svcexport') ? invoices.filter((i) => i.supply_type === 'EXPORT_LUT' && (i.issue_date ?? '') >= from && (i.issue_date ?? '').slice(0, 10) <= to) : [];
+    let live = true;
+    if (!docs.length) setPsIssues((x) => (x.length ? [] : x));
+    else import('../lib/prof/ps-export-check').then((m) => live && setPsIssues(m.preflightIssues(docs, { clients: localDb.clients.getAll(), receipts: getTable('transactions'), irms: getTable('export_irms') })), () => undefined);
+    return () => {
+      live = false;
+    };
+  }, [invoices, period]);
   const preflightInput = useMemo(() => {
     const irnIds = new Set(getTable<{ invoice_id?: string; irn?: string }>(EINVOICE_META_TABLE).filter((m) => m?.irn && m.invoice_id).map((m) => m.invoice_id as string));
     const s = localDb.settings.get();
     const active = s.profiles.find((p) => p.id === s.activeProfileId) ?? null;
     const exceptions = gstExceptions(invoices, { ...periodRange(period), irnIds, aato: (inv) => aatoFor(inv, s.profiles, active), today: todayIso(), gstin });
-    return { exceptions, issues, gaps, lut: lutFindings, bandTick };
-  }, [invoices, period, gstin, issues, gaps, lutFindings, bandTick]);
+    return { exceptions, issues: psIssues.length ? [...issues, ...psIssues] : issues, gaps, lut: lutFindings, bandTick };
+  }, [invoices, period, gstin, issues, gaps, lutFindings, bandTick, psIssues]);
   const preflight = useMemo(() => buildPreflight(preflightInput), [preflightInput]);
   const checkCount = preflightCount(preflight);
   // R3-C4: unresolved portal errors of this period × GSTIN add an optional step to the filing strip.

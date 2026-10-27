@@ -16,6 +16,8 @@ const LutHint = lazy(() => import('../trade/LutHint'));
 const PartyTaxHints = lazy(() => import('../trade/PartyTaxHints'));
 // R14 (PS-D3): the TDS a professional's client is expected to deduct on this fee note (lazy; professional profile or a client TDS default only).
 const Tds194jHint = lazy(() => import('../prof/Tds194jHint'));
+// R14 PS-C1: Sec 2(6) export-of-services check (lazy; shows only with the `svcexport` pack).
+const ExportCheckChip = lazy(() => import('../prof/ExportCheckChip'));
 import { tradingTcsPresets } from '../../lib/trade/tr-statutory';
 import { localDb } from '../../lib/localDb';
 import { tcsPresets, tdsSections } from '../../lib/tax-rules';
@@ -34,7 +36,7 @@ import styles from './AdvancedTaxPanel.module.css';
 export function AdvancedTaxPanel() {
   useT(); // re-render on a language switch (5.4)
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['client', 'currency', 'issue_date', 'lut_date', 'lut_number', 'price_includes_tax', 'round_mode', 'round_off_enabled', 'setLut', 'setPriceIncludesTax', 'setRoundMode', 'setSupplyType', 'setTcs', 'setTds', 'supply_type', 'tcs_base', 'tcs_enabled', 'tcs_label', 'tcs_rate', 'tds_enabled', 'tds_on_taxable', 'tds_rate', 'tds_section', 'totals'])),
+    useShallow((st) => pick(st, ['client', 'currency', 'issue_date', 'lut_date', 'lut_number', 'place_of_supply', 'price_includes_tax', 'round_mode', 'round_off_enabled', 'setLut', 'setPriceIncludesTax', 'setRoundMode', 'setSupplyType', 'setTcs', 'setTds', 'supply_type', 'tcs_base', 'tcs_enabled', 'tcs_label', 'tcs_rate', 'tds_enabled', 'tds_on_taxable', 'tds_rate', 'tds_section', 'totals'])),
   );
   const money = (n: number) => formatCurrency(n, s.currency);
   const roundMode: RoundMode = s.round_mode ?? (s.round_off_enabled ? 'nearest' : 'none');
@@ -70,6 +72,7 @@ export function AdvancedTaxPanel() {
             </div>
           )}
           {(s.supply_type === 'EXPORT_LUT' || s.supply_type === 'SEZ_WITHOUT_PAYMENT') && <Suspense fallback={null}><LutHint /></Suspense>}
+          {(s.supply_type === 'EXPORT_LUT' || s.supply_type === 'EXPORT_WITH_PAYMENT' || s.place_of_supply === '96' || s.place_of_supply === '97') && <Suspense fallback={null}><ExportCheckChip /></Suspense>}
           <p className={styles.hint}>
             {edT('atLutHint')}
           </p>

@@ -463,6 +463,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}udin_register`]: 'date',
   // R14-B: client-money vouchers
   [`${DB_PREFIX}client_money`]: 'date',
+  // R14-C: EDF register (the end of the invoice month)
+  [`${DB_PREFIX}edf_register`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;

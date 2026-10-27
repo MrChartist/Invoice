@@ -36,6 +36,8 @@ const SettleRestFields = lazy(() => import('../collections/SettleRestFields'));
 const RecoveryOffer = lazy(() => import('../collections/RecoveryOffer'));
 // R5-B5: RA bill deductions / net payable — only for a bill carrying `ra_deductions` (the block checks the works pack).
 const RaReceiptPanel = lazy(() => import('../works/RaReceiptPanel'));
+// R14 PS-C4: "Receive via platform" (gross, fees, rupees credited) on a foreign invoice — `svcexport` pack only.
+const PlatformReceipt = lazy(() => import('../prof/PlatformReceiptDialog'));
 
 export interface PaymentModalProps {
   invoice: InvoiceRecord | null;
@@ -310,6 +312,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
               </span>
             </label>
           )}
+          {foreign && <Suspense fallback={null}><PlatformReceipt invoice={{ ...live, balance_due: balance }} onDone={() => { setVersion((v) => v + 1); refreshEditor(live.id); onChanged(); }} /></Suspense>}
           {can('payment.record') && Number(amount) > 0 && Number(amount) < balance - 0.005 && (
             <Suspense fallback={null}>
               <SettleRestFields invoice={live} due={balance} amount={Number(amount)} date={date} value={settle} onChange={setSettle} />

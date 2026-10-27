@@ -280,6 +280,8 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   udin_register: 'UDIN register: UDIN, date, client, kind (certificate, tax / GST / statutory audit), description, member no., FY / PAN, revocation (R14).',
   // R14-B
   client_money: 'Client-money (trust) vouchers (CMV/FY…): receipt / payment on behalf / to fees / refund / transfer / interest, client, matter, amount, client-money bank account, purpose, invoice and office receipt (to fees), client\'s authority or owner override, journals (R14).',
+  // R14-C
+  edf_register: 'EDF register (export of services, FEMA 2026): kind (software / services / SOFTEX history), month, invoices, currency, value FC / ₹, due, EDF no. and filing day, authority (AD bank / STPI / SEZ), small-value declaration, status (R14).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';
