@@ -16,7 +16,7 @@ import { blankClient } from '../../store/invoice-defaults';
 import { AG_TABLES } from './ag-shared';
 import { agSnapshot } from './ag-snapshot';
 import { q3 } from './ag-rate-chart';
-import { milkLine, milkSaleBill } from './ag-dispatch';
+import { liveBill, milkLine, milkSaleBill } from './ag-dispatch';
 
 const T = AG_TABLES.milkCards;
 export const loadCards = (): MilkCard[] => getTable<MilkCard>(T).filter((c) => c && typeof c.id === 'string');
@@ -37,7 +37,7 @@ export function cardTotals(c: MilkCard): { days: number; litres: number; amount:
   }
   return { days, litres: q3(litres), amount: round2(q3(litres) * num(c.rate)) };
 }
-const billed = (c: MilkCard) => !!c.invoice_id && !!localDb.invoices.getById(c.invoice_id);
+const billed = (c: MilkCard) => liveBill(c.invoice_id);
 
 /** Save a card (one per customer per month). A billed card is read-only. */
 export function saveCard(input: Omit<MilkCard, 'id'> & { id?: string }): MilkCard {

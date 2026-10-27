@@ -140,7 +140,7 @@ test('G5: exempt-only goods → EWB_EXEMPT note (same text as ewayHint); taxable
   const { preflightEway } = await import('../src/lib/einvoice-validate.ts');
   const { EXEMPT_EWAY_NOTE } = await import('../src/lib/agri/ag-packing.ts');
   const { invoice, item } = await import('./einvoice-fixtures.ts');
-  const road = { mode: 'road' as const, vehicle: 'MH12AB1234', distance: 120 };
+  const road = { mode: 'ROAD' as const, vehicle: 'MH12AB1234', distance: 120 };
   const paddy = preflightEway(invoice({ items: [item({ name: 'Paddy', hsn: '1006', quantity: 100, rate: 2300, tax_rate: 0 })] }), { transport: road, now: new Date(2025, 5, 20) });
   const w = paddy.warnings.find((x) => x.code === 'EWB_EXEMPT');
   assert.equal(w?.message, EXEMPT_EWAY_NOTE);
@@ -194,4 +194,22 @@ test('G8: two drafts pulling the same feed invoice → the second close is refus
   const c = saveCycleDraft({ period_from: '2026-11-01', period_to: '2026-11-10', source: 'produce', lines: [{ ...line, deductions: d2 }] });
   localDb.payments.record({ invoiceId: feed2.id, amount: 100, method: 'Cash', date: '2026-11-02' });
   assert.throws(() => closeCycle(c.id), /only 300\.00 left/);
+});
+
+/* ── G9: a cancelled milk-card / dispatch bill frees the card / dispatch to be billed again ── */
+
+test('G9: cancel a wrong milk-card bill → the card can be corrected and billed again', async () => {
+  const { localDb } = await import('../src/lib/localDb.ts');
+  const { billCard, saveCard, loadCards } = await import('../src/lib/agri/ag-milk-cards.ts');
+  const { cancelDocument } = await import('../src/lib/documents.ts');
+  const home = localDb.clients.upsert({ name: 'Sharma household' });
+  const card = saveCard({ client_id: home, client_name: 'Sharma', month: '2026-11', milk: 'cow', rate: 60, default_qty: 1, days: {} });
+  const first = billCard(card.id, '2026-11-30');
+  assert.throws(() => billCard(card.id, '2026-11-30'), /already billed/);
+  cancelDocument(first, 'wrong rate');
+  assert.equal(localDb.invoices.getById(first.id)?.status, 'Cancelled');
+  saveCard({ ...loadCards()[0], rate: 62 });
+  const again = billCard(card.id, '2026-11-30');
+  assert.notEqual(again.id, first.id);
+  assert.equal(again.total, 1860);
 });
