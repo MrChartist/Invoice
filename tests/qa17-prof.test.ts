@@ -128,3 +128,23 @@ test('R7: the annual pack\'s partner-wise table foots (194T TDS and interest on 
   }
   assert.ok(t.rows.some((r) => (r[7] as number) < 0), 'the TDS deducted shows');
 });
+
+test('R9: exports from 5 Jun 2026 have 9 months to realise (FEMA 23(R)/(8)/2026-RB), not 15; the old rows stand', async () => {
+  const { EXPORT_REALISATION_MONTHS_RULES, exportRealisationMonths } = await import('../src/lib/trade/trade-rules.ts');
+  assert.equal(exportRealisationMonths('2026-06-04'), 15);
+  assert.equal(exportRealisationMonths('2026-06-05'), 9);
+  assert.equal(exportRealisationMonths('2026-09-30'), 9);
+  assert.deepEqual(EXPORT_REALISATION_MONTHS_RULES.slice(0, 2).map((r) => [r.from, r.value]), [['2013-04-01', 9], ['2025-11-13', 15]]);
+});
+
+test('R8: a 194T row in the TDS register cannot be deleted while its partner posting lives', async () => {
+  const { deleteManualDeduction } = await import('../src/lib/tds-payables.ts');
+  const { undoPartnerRun } = await import('../src/lib/prof/ps-194t.ts');
+  const ps = twoPartners();
+  const c = creditPartner({ partnerId: ps[0].id, kind: 'remuneration', amount: 50000, date: '2026-05-31' });
+  assert.ok(c.tds_row_id);
+  assert.throws(() => deleteManualDeduction(c.tds_row_id!), /Time → Firm/);
+  assert.equal(getTable('tds_deductions').length, 1);
+  undoPartnerRun(c.id);
+  assert.equal(getTable('tds_deductions').length, 0, 'the undo still removes it');
+});

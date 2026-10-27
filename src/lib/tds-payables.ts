@@ -1183,6 +1183,8 @@ export function deleteManualDeduction(id: string): void {
   const row = all.find((m) => m.id === id);
   if (!row) return;
   requireAccess('books.edit');
+  // QA17 R8: a 194T row of a partner posting goes only with that posting (its journal credits TDS payable).
+  if (getTable<{ tds_row_id?: string; lines?: { tds_row_id?: string }[] }>('partner_runs').some((r) => r?.tds_row_id === id || r?.lines?.some((l) => l?.tds_row_id === id))) throw new Error('This 194T deduction was posted with a partner credit or the year-end run. Undo it in Time → Firm instead.');
   assertUnlocked({ id, issue_date: row.date }, 'delete');
   setTable(TDS_DEDUCTIONS_TABLE, all.filter((m) => m.id !== id));
   audit.record({ entity: 'tds', entity_id: id, action: 'delete', doc_number: row.section, summary: `Deleted manual TDS deduction u/s ${row.section} from ${row.vendor_name} (${money(row.amount)})` });
