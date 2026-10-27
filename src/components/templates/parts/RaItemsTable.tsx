@@ -1,8 +1,8 @@
 import type { InvoiceRecord } from '../../../types/invoice';
 import type { CalcTotals } from '../../../lib/invoice-calc';
+import type { worksLineText } from '../paper-helpers';
 import { currencySymbol, formatQuantity } from '../../../lib/utils';
 import { usePaper } from '../paper-context';
-import { worksLineText } from '../paper-helpers';
 import { PL } from './works-label';
 import styles from './works-paper.module.css';
 
@@ -12,7 +12,7 @@ import styles from './works-paper.module.css';
  * are the bill's own lines (amounts from the calculator, so the table ties to the totals); quantities from the
  * snapshot `boq_terms.cn.lines`. Non-gst layouts only (on the `gst` layout the abstract page carries the columns).
  */
-export function RaItemsTable({ invoice, totals }: { invoice: InvoiceRecord; totals: CalcTotals }) {
+export function RaItemsTable({ invoice, totals, lineText }: { invoice: InvoiceRecord; totals: CalcTotals; /** `worksLineText` (passed by TemplateEngine, keeps paper-helpers in the preview chunk). */ lineText: typeof worksLineText }) {
   const { money, bilingual: bi } = usePaper();
   const cn = invoice.boq_terms?.cn;
   const cur = invoice.currency;
@@ -36,7 +36,7 @@ export function RaItemsTable({ invoice, totals }: { invoice: InvoiceRecord; tota
         {totals.lines.map((line, i) => {
           const src = invoice.items.find((it) => it.id === line.id);
           const l = src ? cn?.lines?.[src.id] : undefined;
-          const sub = worksLineText(src, cn);
+          const sub = lineText(src, cn);
           return (
             <tr key={line.id}>
               <td className={styles.n}>{i + 1}</td>

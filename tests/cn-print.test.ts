@@ -5,10 +5,10 @@ import assert from 'node:assert/strict';
 import { setupWorks } from './helpers/transport-works.ts';
 import { saveBoqTerms } from '../src/lib/works/boq.ts';
 import { saveRaBill } from '../src/lib/works/measurements.ts';
-import { DEDUCTION_GROUP, deductionNotes, deductionsTotal, defaultCertificateFor, groupDeductions, netPayableOf } from '../src/lib/construction/cn-print.ts';
+import { DEDUCTION_GROUP, deductionNotes, deductionsTotal, groupDeductions, netPayableOf } from '../src/lib/construction/cn-print.ts';
 import { amountInWords } from '../src/lib/amount-in-words.ts';
 import { DEDUCTION_LABELS } from '../src/lib/works/deductions.ts';
-import { certificateOf } from '../src/lib/construction/cn-snapshot.ts';
+import { certificateOf, defaultCertificateFor } from '../src/lib/construction/cn-snapshot.ts';
 import { DEFAULT_CERTIFICATE } from '../src/lib/construction-rules.ts';
 import type { RaDeduction } from '../src/types/transport-works-r5.ts';
 

@@ -1,4 +1,4 @@
-import type { CnKey } from '../../../i18n/areas/construction-r11a';
+import type { CnPaperKey as CnKey } from '../../../i18n/areas/construction-r11-paper';
 import { pe, ph } from './works-text';
 import styles from './works-paper.module.css';
 

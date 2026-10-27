@@ -20,7 +20,7 @@ import { PaymentScheduleBlock } from './parts/PaymentScheduleBlock'; // R2-A1
 import { AcceptanceBlock } from './parts/AcceptanceBlock';
 import { OptionalItemsBlock } from './parts/OptionalItemsBlock';
 import { ProposalSections } from './parts/ProposalSections';
-import { cashDiscountText, rcmTaxNote } from './paper-helpers';
+import { cashDiscountText, rcmTaxNote, worksLineText } from './paper-helpers';
 import { amountInWords } from '../../lib/amount-in-words';
 import { amountInWordsHi } from '../../lib/amount-in-words-hi';
 import { supplyDeclaration } from '../../lib/bill-of-supply';
@@ -185,7 +185,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
         <CustomFieldsBlock invoice={invoice} />
         <TransportBlock invoice={invoice} skipEway={irn?.ewayNo} />
         <ProposalSections invoice={invoice} place="before" />
-        {hideAmounts ? <ChallanQtyTable invoice={invoice} /> : cnDoc?.paper === 'pwd' ? <Suspense fallback={null}><LazyRaItems invoice={invoice} totals={totals} /></Suspense> : <PaperItemsTable invoice={invoice} totals={totals} tableStyle={effMeta.tableStyle} />}
+        {hideAmounts ? <ChallanQtyTable invoice={invoice} /> : cnDoc?.paper === 'pwd' ? <Suspense fallback={null}><LazyRaItems invoice={invoice} totals={totals} lineText={worksLineText} /></Suspense> : <PaperItemsTable invoice={invoice} totals={totals} tableStyle={effMeta.tableStyle} />}
         {!hideAmounts && <TaxSummary invoice={invoice} totals={totals} />}
         <OptionalItemsBlock invoice={invoice} />
         <ProposalSections invoice={invoice} place="after" />

@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { InvoiceRecord } from '../../../types/invoice';
 import type { CnAbstractRow } from '../../../types/construction-r11';
-import { abstractGrand, abstractSections } from '../../../lib/construction/cn-abstract';
+import { abstractGrand, abstractSections } from '../../../lib/construction/cn-sections';
 import { deductionsTotal, netPayableOf } from '../../../lib/construction/cn-print';
 import { formatQuantity } from '../../../lib/utils';
 import { num } from '../../../lib/invoice-calc';

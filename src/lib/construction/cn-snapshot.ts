@@ -10,7 +10,7 @@
  */
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { MeasurementLine } from '../../types/transport-works-r5';
-import type { CnClass, CnHeader, CnLine, CnSite, CnSnapshot, ConstructionSettings } from '../../types/construction-r11';
+import type { CnClass, CnHeader, CnLine, CnSite, CnSnapshot, ConstructionKind, ConstructionSettings } from '../../types/construction-r11';
 import { num } from '../invoice-calc';
 import { localDb } from '../localDb';
 import { boqLines } from '../works/boq';
@@ -207,3 +207,9 @@ export function recomputeDraftSnapshot(invoiceId: string): InvoiceRecord {
   const abstract = buildAbstract(boq, bill, earlierStages(boq.id, bill, localDb.invoices.getAll()), lines);
   return localDb.invoices.save({ ...bill, boq_terms: { ...bill.boq_terms, cn: { ...cn, abstract, lines: withLineQuantities(lines, bill.items, abstract) } } });
 }
+
+/** Certificate defaults by kind: every construction kind prints the contractor's certificate; builders' demands do not. */
+export function defaultCertificateFor(kind: ConstructionKind | undefined, government: boolean): { text?: string; boxes: boolean } {
+  return { ...(kind === 'builder' ? {} : { text: DEFAULT_CERTIFICATE }), boxes: government };
+}
+

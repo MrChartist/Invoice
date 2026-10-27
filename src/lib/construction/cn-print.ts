@@ -5,10 +5,8 @@
  */
 import type { InvoiceRecord } from '../../types/invoice';
 import type { RaDeduction, RaDeductionKind } from '../../types/transport-works-r5';
-import type { CnHeader, CnSnapshot, ConstructionKind } from '../../types/construction-r11';
+import type { CnClass, CnHeader, CnLine, CnSnapshot } from '../../types/construction-r11';
 import { num, round2 } from '../invoice-calc';
-import { DEFAULT_CERTIFICATE } from '../construction-rules';
-import { worksDeclarations } from './cn-tax';
 
 export type DeductionGroup = 'statutory' | 'recoveries' | 'held' | 'other';
 
@@ -60,11 +58,6 @@ export function deductionNotes(deds: readonly RaDeduction[] | undefined, money: 
 /** The declaration lines of a works document (composite supply / supply + installation / pure labour). */
 export const cnDeclarations = (cn: CnSnapshot | undefined, isRaBill: boolean): string[] => (cn || isRaBill ? worksDeclarations(cn?.lines, !!cn?.works || isRaBill) : []);
 
-/** Certificate defaults by kind: every construction kind prints the contractor's certificate; builders' demands do not. */
-export function defaultCertificateFor(kind: ConstructionKind | undefined, government: boolean): { text?: string; boxes: boolean } {
-  return { ...(kind === 'builder' ? {} : { text: DEFAULT_CERTIFICATE }), boxes: government };
-}
-
 /** One row of the "Contract particulars" box: `key` names its paper label (`p.<key>`); empty values are dropped. */
 export interface HeaderRow {
   key: 'nameOfWork' | 'agreement' | 'workOrder' | 'tender' | 'clientOffice' | 'engineer' | 'site' | 'contractValue' | 'stipulated' | 'extended' | 'bill' | 'period' | 'measuredOn' | 'mbNos' | 'jv';
@@ -96,3 +89,29 @@ export function headerRows(h: CnHeader | undefined, fmt: { date: (d: string) => 
   ];
   return rows.filter((r) => r.value);
 }
+
+/* ── Declarations (CN-A2 AC4) ── */
+
+export type WorksDeclarationKind = 'works' | 'supply_install' | 'none';
+
+/** Which declaration a works document prints, from its line classes. */
+export function declarationKind(classes: readonly (CnClass | undefined)[], works: boolean): WorksDeclarationKind {
+  if (classes.includes('supply_goods')) return 'supply_install';
+  if (works || classes.some((c) => c && c.startsWith('wc_'))) return 'works';
+  return 'none';
+}
+
+export const DECLARATION_TEXT: Readonly<Record<Exclude<WorksDeclarationKind, 'none'>, string>> = {
+  works: 'Composite supply of works contract as defined in Sec 2(119) of the CGST Act, 2017.',
+  supply_install: 'Supply of goods with installation (the supply part at the goods rate; installation as a service).',
+};
+
+export const PURE_LABOUR_TEXT = 'Exempt — pure labour (verify with your CA, CN2).';
+
+/** The declaration lines of a works document ('' entries dropped). */
+export function worksDeclarations(lines: Readonly<Record<string, CnLine>> | undefined, works: boolean): string[] {
+  const classes = Object.values(lines ?? {}).map((l) => l.cls);
+  const k = declarationKind(classes, works);
+  return [k === 'none' ? '' : DECLARATION_TEXT[k], classes.includes('pure_labour_exempt') ? PURE_LABOUR_TEXT : ''].filter(Boolean);
+}
+

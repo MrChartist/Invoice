@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { headerRows } from '../src/lib/construction/cn-print.ts';
 import { worksLineText, raDocTitle, trackingText } from '../src/components/templates/paper-helpers.ts';
-import { cnT } from '../src/i18n/areas/construction-r11a.ts';
+import { cnPaperT as cnT } from '../src/i18n/areas/construction-r11-paper.ts';
 import type { CnHeader } from '../src/types/construction-r11.ts';
 
 const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8');

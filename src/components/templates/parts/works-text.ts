@@ -1,4 +1,4 @@
-import { cnT, type CnKey } from '../../../i18n/areas/construction-r11a';
+import { cnPaperT as cnT, type CnPaperKey as CnKey } from '../../../i18n/areas/construction-r11-paper';
 
 /** "{x}" placeholders filled from `vars`. */
 export const fill = (s: string, vars?: Record<string, string | number>) => (vars ? s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m)) : s);

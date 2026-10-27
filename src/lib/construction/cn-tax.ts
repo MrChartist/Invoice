@@ -62,30 +62,8 @@ export function otherStateNotice(site: CnSite | undefined, senderStates: readonl
   return `Services for immovable property are supplied where the property is (Sec 12(3)); you may need registration in ${name} — verify with your CA (CN4).`;
 }
 
-/* ── Declarations (CN-A2 AC4) ── */
-
-export type WorksDeclarationKind = 'works' | 'supply_install' | 'none';
-
-/** Which declaration a works document prints, from its line classes. */
-export function declarationKind(classes: readonly (CnClass | undefined)[], works: boolean): WorksDeclarationKind {
-  if (classes.includes('supply_goods')) return 'supply_install';
-  if (works || classes.some((c) => c && c.startsWith('wc_'))) return 'works';
-  return 'none';
-}
-
-export const DECLARATION_TEXT: Readonly<Record<Exclude<WorksDeclarationKind, 'none'>, string>> = {
-  works: 'Composite supply of works contract as defined in Sec 2(119) of the CGST Act, 2017.',
-  supply_install: 'Supply of goods with installation (the supply part at the goods rate; installation as a service).',
-};
-
-export const PURE_LABOUR_TEXT = 'Exempt — pure labour (verify with your CA, CN2).';
-
-/** The declaration lines of a works document ('' entries dropped). */
-export function worksDeclarations(lines: Readonly<Record<string, CnLine>> | undefined, works: boolean): string[] {
-  const classes = Object.values(lines ?? {}).map((l) => l.cls);
-  const k = declarationKind(classes, works);
-  return [k === 'none' ? '' : DECLARATION_TEXT[k], classes.includes('pure_labour_exempt') ? PURE_LABOUR_TEXT : ''].filter(Boolean);
-}
+/* ── Declarations (CN-A2 AC4): in `cn-print.ts` (the paper chunk prints them) ── */
+export { DECLARATION_TEXT, PURE_LABOUR_TEXT, declarationKind, worksDeclarations, type WorksDeclarationKind } from './cn-print';
 
 /* ── Supply + installation split (MEP / interiors, CN3) ── */
 
