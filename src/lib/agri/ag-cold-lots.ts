@@ -16,6 +16,8 @@ import { nextSeriesNumberFor, recordSeries } from '../series-counters';
 import { withTablesRollback } from '../table-txn';
 import { esc } from '../voucher-print';
 import { AG_SERIES, AG_TABLES } from './ag-shared';
+import { liensOn, loadLoans, releaseCovered } from './ag-loans';
+import { readAgriSettings } from './ag-settings';
 
 export const LOTS_TABLE = AG_TABLES.coldLots;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -135,6 +137,7 @@ export function deleteLot(id: string): void {
   const lot = all.find((l) => l.id === id);
   if (!lot) return;
   if (bagsOut(lot) > 0) throw new Error('Bags have gone out of this lot: delete its gate passes first.');
+  if (loadLoans().some((l) => l.status !== 'closed' && l.lot_ids.includes(id))) throw new Error('An open loan is against this lot: close or delete the loan first.'); // QA13 G12
   assertUnlocked({ id, issue_date: lot.date_in, invoice_number: lot.number }, 'delete');
   writeLots(all.filter((l) => l.id !== id));
 }
@@ -154,6 +157,9 @@ export function transferBags(lotId: string, t: { date: string; to_depositor_id: 
   if (!t.to_depositor_id || t.to_depositor_id === lot.depositor_id) throw new Error('Choose the other depositor.');
   if (!t.note.trim()) throw new Error('Note both parties\' consent.');
   if (!(bags > 0) || bags > lotBalance(lot)) throw new Error(`Only ${lotBalance(lot)} bags are in this lot.`);
+  // QA13 G10: bags pledged to an open loan do not leave the borrower by a transfer (the gate-pass lien rule).
+  const lien = liensOn(lot.id, loadLoans(), t.date).find((l) => !releaseCovered(l, all, lot.id, bags, t.date, readAgriSettings().cold?.release_ltv_pct));
+  if (lien) throw new Error(`Loan ${lien.number} has a lien on this lot: clear it before transferring the bags.`);
   const number = nextSeriesNumberFor(AG_SERIES.csr, t.date, all.map((l) => l.number));
   assertUnlocked({ issue_date: t.date, invoice_number: number }, 'create');
   const child: ColdLot = {

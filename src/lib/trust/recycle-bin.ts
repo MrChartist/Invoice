@@ -237,6 +237,9 @@ const OWNED_VOUCHERS: readonly { classes: readonly string[]; tables: readonly st
   { classes: ['Rider settlement'], tables: ['rider_settlements'], redo: 'restore the rider settlement itself, or settle the rider again in Inventory → Deliveries' },
   // QA13 G2: a farmer cycle's deductions journal is undone when the cycle is reopened
   { classes: ['Farmer cycle deductions'], tables: ['farmer_cycles'], redo: 'close the cycle again in Inventory → Farm → Cycles' },
+  // QA13 G11: a produce loan's disbursement / repayment vouchers are undone on the loan
+  { classes: ['Loan against produce'], tables: ['agri_loans'], redo: 'record it again on the loan in Inventory → Cold storage → Loans' },
+  { classes: ['Share allotment', 'Share surrender', 'Share forfeiture'], tables: ['member_shares'], redo: 'enter it again in Inventory → Members → Shares' },
 ];
 const RA_CLASS = 'RA deduction';
 /** Journals paired one-to-one with a no-cash receipt row through `ra_journal_id` (R9 RT-D2: the finance transfer). */

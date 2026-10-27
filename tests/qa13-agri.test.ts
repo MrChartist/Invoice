@@ -213,3 +213,56 @@ test('G9: cancel a wrong milk-card bill → the card can be corrected and billed
   assert.notEqual(again.id, first.id);
   assert.equal(again.total, 1860);
 });
+
+/* ── AG-D (cold storage): lien, loan vouchers in the bin, gate pass undo ── */
+
+async function coldWorld() {
+  const { setTable, KEYS } = await import('../src/lib/storage.ts');
+  const { addLot } = await import('../src/lib/agri/ag-cold-lots.ts');
+  const { savePlan } = await import('../src/lib/agri/ag-cold-rent.ts');
+  const { giveLoan } = await import('../src/lib/agri/ag-loans.ts');
+  setTable(KEYS.clients, [{ id: 'c-ram', name: 'Ram Singh', state_code: '09' }, { id: 'c-trader', name: 'Gupta Traders', state_code: '09' }]);
+  const plan = savePlan({ name: 'P', basis: 'bag_season', rate: 180, part_month: 'full', charges: [{ name: 'Loading', when: 'out', basis: 'bag', rate: 5 }], class: 'storage_agri', bill_at: 'out' } as never);
+  const lot = addLot({ date_in: '2026-03-10', depositor_id: 'c-ram', depositor_name: 'Ram Singh', commodity: 'Potato', bags: 240, chamber_id: 'c', season: '2026', rent_plan_id: plan.id });
+  const loan = () => giveLoan({ date: '2026-04-01', borrower_id: 'c-ram', borrower_name: 'Ram Singh', lot_ids: [lot.id], principal: 120000, rate_pct: 12, disbursed_by: 'cash' });
+  return { lot, loan };
+}
+
+test('G10: pledged bags cannot leave the borrower by a transfer to another depositor', async () => {
+  const { transferBags, deleteLot } = await import('../src/lib/agri/ag-cold-lots.ts');
+  const { lot, loan } = await coldWorld();
+  loan();
+  assert.throws(() => transferBags(lot.id, { date: '2026-05-01', to_depositor_id: 'c-trader', to_depositor_name: 'Gupta Traders', bags: 100, note: 'sold in store' }), /lien/);
+  assert.throws(() => deleteLot(lot.id), /open loan/, 'G12: a pledged lot is not deleted');
+});
+
+test('G11: an undone loan repayment / a deleted loan\'s voucher does not come back from the bin', async () => {
+  const { restoreEntry } = await import('../src/lib/trust/recycle-bin.ts');
+  const { deleteLoan, repayLoan, undoRepayment, loadLoans } = await import('../src/lib/agri/ag-loans.ts');
+  const { loan } = await coldWorld();
+  const l = loan();
+  const repaid = repayLoan(l.id, { date: '2026-05-01', amount: 5000, by: 'cash' });
+  undoRepayment(l.id);
+  const entry = (id: string) => bin().find((x) => x.table === 'vouchers' && x.row_id === id)!.id;
+  assert.throws(() => restoreEntry(entry(repaid.repayments[0].receipt_id)), /twice/);
+  deleteLoan(l.id);
+  assert.throws(() => restoreEntry(entry(l.payment_voucher_id!)), /twice/);
+  assert.equal(loadLoans().length, 0);
+  assert.equal(loadVouchers().filter((v) => v.voucher_class === 'Loan against produce').length, 0);
+  // The same for a deleted share allotment (FPO / co-op members' capital).
+  const { allotShares, deleteShareRow } = await import('../src/lib/agri/ag-members.ts');
+  const row = allotShares({ id: 'c-ram', name: 'Ram Singh', kind: 'client' }, { date: '2026-05-01', shares: 10, face_value: 100, paid_from: 'bank' });
+  deleteShareRow(row.id);
+  assert.throws(() => restoreEntry(entry(row.voucher_id!)), /twice/);
+});
+
+test('G12: undoing a gate pass whose release was billed is refused until the rent bill goes', async () => {
+  const { issueGatePass, undoGatePass } = await import('../src/lib/agri/ag-gatepass.ts');
+  const { localDb } = await import('../src/lib/localDb.ts');
+  const { lot } = await coldWorld();
+  const g = issueGatePass(lot.id, { date: '2026-07-20', bags: 60 });
+  assert.ok(g.bill);
+  assert.throws(() => undoGatePass(lot.id), /Rent bill/);
+  localDb.invoices.remove(g.bill!.id);
+  assert.equal(undoGatePass(lot.id).outs.length, 0);
+});
