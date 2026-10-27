@@ -12,7 +12,7 @@ import { useT } from '../../i18n';
 import { rteT } from '../../i18n/areas/retail-r9e';
 import type { InvoiceItem, InvoiceRecord, Payment } from '../../types/invoice';
 import type { JewelLine, Metal, MakingBasis, KarigarLine, SaleKyc } from '../../types/retail-r9';
-import { METALS, PURITIES, fineness, lastBoard, loadRates, noRateError, purityLabel, rateFor, ratesOn, saveRates } from '../../lib/retail/rt-jewel-rates';
+import { METALS, PURITIES, fineness, lastBoard, loadRates, purityLabel, rateFor, ratesOn, saveRates } from '../../lib/retail/rt-jewel-rates';
 import { addTags, deleteTag, ensureJewelItem, loadTags, parseBulk, tagJewel, tagLabels, tagSummary, tagsInStock, type TagInput } from '../../lib/retail/rt-jewel-tags';
 import { applyJewel, huidWarning, jewelAmount, jwHolds, netWeight } from '../../lib/retail/rt-jewel-line';
 import { cashPaidToday, oldGoldValue, oldGoldVouchers, recordOldGold } from '../../lib/retail/rt-old-gold';
@@ -148,7 +148,9 @@ function TagsView({ onDone }: { onDone: Done }) {
     const item = ensureJewelItem(f.item.trim() || rteT('defaultItem'));
     const base: TagInput = { item_id: item.id, metal: f.metal, purity: f.purity, gross_wt: f.gross_wt, stone_wt: f.stone_wt, stone_value: f.stone_value, wastage_pct: f.wastage_pct, making: f.making, hallmark_charge: f.hallmark_charge, huid: f.huid, design_no: f.design_no };
     const rows = f.bulk.trim() ? parseBulk(f.bulk).map((b) => ({ ...base, ...b, purity: b.purity ?? f.purity })) : [base];
-    const made = addTags(rows, { date: todayInput(), toStock: true });
+    // Stock value of a piece: its metal at the day's buy rate of its purity + its stones (cost; edit by a stock journal).
+    const rates = loadRates();
+    const made = addTags(rows, { date: todayInput(), toStock: true, cost: (t) => t.net_wt * (rateFor(rates, t.metal, t.purity, todayInput())?.buy ?? 0) + t.stone_value });
     setF({ ...f, gross_wt: 0, stone_wt: 0, huid: '', bulk: '' });
     return rteT('tagsSaved', { n: made.length, first: made[0]?.tag ?? '' });
   });
@@ -371,14 +373,18 @@ function KarigarView({ onDone }: { onDone: Done }) {
 
 const jewelItem = (name: string) => stockDb.items().find((i) => i.jewel && i.name.trim().toLowerCase() === name.trim().toLowerCase());
 
+const noRate = (jw: JewelLine, date: string) => rteT('noRate', { metal: rteT(`m.${jw.metal}`), purity: jw.purity, date });
 /** The breakdown of a line at the rate of `date` (override = an owner-typed rate on a day with no board rate). */
 function priced(jw: JewelLine, date: string, typed?: number): { jw: JewelLine; error: string } {
   if (jw.rate_locked || jw.job_work) return { jw, error: '' };
   const r = rateFor(loadRates(), jw.metal, jw.purity, date);
   if (r) return { jw: { ...jw, rate: r.sale, override: undefined }, error: '' };
   if (typed && typed > 0 && can('settings.manage')) return { jw: { ...jw, rate: typed, override: true }, error: '' };
-  return { jw, error: noRateError(jw.metal, jw.purity, date) };
+  return { jw, error: noRate(jw, date) };
 }
+/** Editor save gate (RT-E1): a jewellery line with no board rate on the bill date (not locked, job work or owner-typed). */
+const rateGate = (rec: Pick<InvoiceRecord, 'issue_date' | 'items'>): string[] =>
+  rec.items.filter((l) => l.jw && !l.jw.rate_locked && !l.jw.job_work && !l.jw.override && !rateFor(loadRates(), l.jw.metal, l.jw.purity, rec.issue_date)).map((l) => `${l.name}: ${noRate(l.jw!, rec.issue_date)}`);
 
 /** Editor sub-row of a jewellery line: tag or loose weight, purity, wastage, making, stones, hallmarking. */
 export function JewelLineRow({ item, date }: { item: InvoiceItem; date: string }) {
@@ -386,11 +392,9 @@ export function JewelLineRow({ item, date }: { item: InvoiceItem; date: string }
   const patch = useInvoiceStore.getState().patchItem;
   const jwTag = item.jw?.tag;
   const stock = useMemo(() => (jwTag || jewelItem(item.name) ? tagsInStock(loadTags(), loadTracking()).filter((t) => t.item_name.toLowerCase() === item.name.trim().toLowerCase() || t.tag === jwTag) : []), [item.name, jwTag]);
-  const [err, setErr] = useState('');
   const [typed, setTyped] = useState(0);
   const apply = (jw: JewelLine, rate = typed) => {
     const p = priced(jw, date, rate);
-    setErr(p.error);
     if (p.jw.override && !jw.override) audit.record({ entity: 'item', entity_id: item.id, action: 'override', summary: `Metal rate typed for ${item.name}: ₹${p.jw.rate}/g on ${date} (no ${jw.metal} ${jw.purity} rate on the board)` });
     patch(item.id, applyJewel(item, p.jw, date));
   };
@@ -405,6 +409,7 @@ export function JewelLineRow({ item, date }: { item: InvoiceItem; date: string }
   const jw: JewelLine = item.jw ?? { metal: 'gold', purity: '22K', gross_wt: 0, stone_wt: 0, net_wt: 0, rate: 0, wastage_pct: 0, making: { basis: 'per_gram', value: 0 }, stone_value: 0, hallmark_charge: 0 };
   const set = (p: Partial<JewelLine>) => { const n = { ...jw, ...p }; apply({ ...n, net_wt: netWeight(n.gross_wt, n.stone_wt) }); };
   const a = jewelAmount(jw);
+  const err = jw.override ? '' : rateGate({ issue_date: date, items: [{ ...item, jw }] }).length ? noRate(jw, date) : '';
   const warn = huidWarning({ name: item.name, jw }, date);
   return (
     <div className={controls.row} style={{ ...row, fontSize: '0.85em' }} data-jewel-row>
@@ -420,7 +425,7 @@ export function JewelLineRow({ item, date }: { item: InvoiceItem; date: string }
       <N l={rteT('hallmark')} v={jw.hallmark_charge} set={(hallmark_charge) => set({ hallmark_charge })} w={80} />
       <label className={controls.hint}><input type="checkbox" checked={!!jw.job_work} onChange={(e) => set({ job_work: e.target.checked || undefined })} /> {rteT('jobWork')}</label>
       <label className={controls.hint}><input type="checkbox" checked={!!jw.rate_locked} onChange={(e) => set({ rate_locked: e.target.checked || undefined })} /> {rteT('rateLocked')}</label>
-      {err && can('settings.manage') && <N l={rteT('typeRate')} v={typed} set={(n) => { setTyped(n); apply(jw, n); }} d="line-rate" />}
+      {(err || jw.override) && can('settings.manage') && <N l={rteT('typeRate')} v={typed} set={(n) => { setTyped(n); apply(jw, n); }} d="line-rate" />}
       <span className={controls.hint} data-jw-amount>{g3(jw.net_wt)} g × ₹{jw.rate}{jw.override ? ` (${rteT('typed')})` : ''} = {formatCurrency(a.metal)} + {formatCurrency(a.wastage)} + {formatCurrency(a.making)} → <strong>{formatCurrency(a.total)}</strong></span>
       {(err || warn) && <span className={controls.hint} style={{ color: err ? 'var(--loss)' : 'var(--warning)' }} role="status" data-jw-error>{err || warn}</span>}
     </div>
@@ -443,8 +448,8 @@ const GuardList = ({ list }: { list: readonly (Guard | string)[] }) => <>{list.m
 export function EditorJewel() {
   useT();
   useEffect(() => {
-    saveGates.add(kycGate);
-    return () => void saveGates.delete(kycGate);
+    saveGates.add(kycGate).add(rateGate);
+    return () => void (saveGates.delete(kycGate), saveGates.delete(rateGate));
   }, []);
   const st = useInvoiceStore(useShallow((s) => ({ total: s.total, kyc: s.kyc, issue_date: s.issue_date, items: s.items, client: s.client, id: s.id })));
   const guards = liveSaleGuards(st as unknown as InvoiceRecord, 0);

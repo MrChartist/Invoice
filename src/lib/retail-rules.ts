@@ -78,7 +78,7 @@ export const FINANCE_FEE_RULES: readonly RtRule<{ sac: string; rate: number }>[]
 /* ── RT-E: jewellery ── */
 /** RT16: jewellery (HSN 7113 / 7114 / 7116) on the whole value incl. making; job work on the customer's metal (SAC 9988). */
 export const JEWELLERY_GST_RULES: readonly RtRule<{ goodsRate: number; jobWorkRate: number; jobWorkSac: string }>[] = [
-  { from: '2017-07-01', value: { goodsRate: 3, jobWorkRate: 5, jobWorkSac: '9988' }, source: 'N 1/2017-CT(R) Sch V ch. 71 (3%); CBIC gems & jewellery FAQ as quoted (making inside the 3% value); job work on the principal\'s metal 5% (N 11/2017-CT(R)) — sub-code not confirmed (RT16)', verified: false },
+  { from: '2017-07-01', value: { goodsRate: 3, jobWorkRate: 5, jobWorkSac: '9988' }, source: 'N 1/2017-CT(R) Sch V ch. 71 (3%); CBIC gems & jewellery FAQ as quoted (making inside the 3% value); job work on the customer\'s metal 5% per PRD §8 #24 (N 11/2017-CT(R) heading 9988) — NOT re-read: entry 26(i) job work on Chapter 71 goods for a registered principal may be 1.5% (as amended), and an unregistered customer\'s metal may fall under "other manufacturing services" (RT16, CA item)', verified: false },
 ];
 const BIS_LINE = 'Purity of hallmarked jewellery can be verified at any BIS-recognised A&H centre.';
 /** RT19: HUID on gold jewellery (notified districts; a warning only) and the bill line of Reg. 5(11). */
