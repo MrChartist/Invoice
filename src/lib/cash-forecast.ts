@@ -34,6 +34,7 @@ import { previewOccurrences, scheduleStatus, templateTotals, type RecurringSched
 import { receivableBalance } from './rcm';
 import { openInstalments } from './payment-schedule';
 import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
+import { bankAccountsDb, isClientMoneyAccount } from './bank-accounts'; // R14 PS-B3
 
 /** Open receivable `inr` split over a document's unpaid instalments (one part on `due_date` without a schedule). */
 function scheduledParts(inv: InvoiceRecord, inr: number): { due: string; label: string; amount: number }[] {
@@ -134,7 +135,9 @@ const partyName = (c: Pick<Client, 'name' | 'company'> | null | undefined) => St
 export function collectionLags(invoices: readonly InvoiceRecord[], payments: readonly Payment[]): Map<string, { days: number; receipts: number; party: string }> {
   const byId = new Map(invoices.map((i) => [i.id, i]));
   const acc = new Map<string, { w: number; sum: number; n: number; party: string }>();
+  const banks = bankAccountsDb.all();
   for (const p of payments) {
+    if (isClientMoneyAccount(p.bank_account_id, banks)) continue; // R14 PS-B3: clients' money, not the firm's
     const inv = byId.get(p.invoice_id);
     const due = isoDay(inv?.due_date);
     const paid = isoDay(p.date);
@@ -380,7 +383,8 @@ function shiftMonthKey(key: string, months: number): string {
 
 /** Today's cash + bank, as the Books cash and bank books show it. */
 export function openingCash(books: BooksData, today: string): number {
-  const vouchers = buildVouchers(books);
+  const banks = bankAccountsDb.all();
+  const vouchers = buildVouchers(books).filter((v) => !isClientMoneyAccount(v.bank_account_id, banks)); // R14 PS-B3
   return round2(accountBalanceAt(vouchers, books.openings, 'cash', today) + accountBalanceAt(vouchers, books.openings, 'bank', today));
 }
 

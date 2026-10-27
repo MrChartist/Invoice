@@ -246,5 +246,11 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:cadesk:events', 'Work to bill', 'बिल करने वाला काम', 'Returns filed, DSC renewals, checklist and UDINs of the month per linked client; Bill from the board makes a draft fee note.', 'At month end.', { statutory: ca(['PS36', 'PS79']) }),
   t('time:cadesk:fees', 'Fee schedule', 'फ़ीस सूची', 'A catalogue item per kind of work, each client\'s agreed fees, and which company on this device is which client.', 'Once; when fees change.'),
   t('time:cadesk:udin', 'UDIN register', 'यूडीआईएन रजिस्टर', 'UDINs generated on the institute\'s portal, typed here; format check, revocation and the UDINs not yet billed.', 'Each certificate or report.', { statutory: ca(['PS29', 'PS80']) }),
+  // R14 (PS-B): client money and the design stages
+  t('time:clientmoney', 'Client money', 'क्लाइंट का पैसा', 'Money held for clients in a marked bank account: receipts, payments on their behalf, moves to fees, refunds. Kept out of the firm\'s cash views.', 'For every deposit.', { statutory: ca(['PS10', 'PS27', 'PS32']) }),
+  t('time:clientmoney:ledger', 'Ledger', 'खाता', 'Record each entry; no client or matter may go below zero. Moving money to fees needs an issued bill and the client\'s authority (owner override audited).', 'For every entry.', { statutory: ca(['PS27', 'PS52']) }),
+  t('time:clientmoney:reconcile', 'Three-way reconciliation', 'त्रि-पक्षीय मिलान', 'Bank statement, ledger and the sum of client balances on a date; every difference listed.', 'Monthly.', { statutory: ca(['PS27', 'PS51']) }),
+  t('time:clientmoney:statements', 'Statements', 'विवरण', 'A client\'s (or matter\'s) entries and balance for a period: print or WhatsApp.', 'On request.', { statutory: ca(['PS27']) }),
+  t('time:matters:stages', 'Stages', 'चरण शुल्क', 'Fee as a % of project cost, billed by stage; a cost revision is caught up on the next bill. The property\'s State is the place of supply.', 'At each stage.', { statutory: ca(['PS6', 'PS30']) }),
   t('inventory:members:papers', 'Papers', 'कागज़ात', '80P / Sec 149 by head with the members\' share, 80PA and the statutory calendar; type your own due dates (they also feed the bell and the card on GST → Compliance).', 'At year end.', { statutory: ca(['AG16', 'AG17', 'AG69']) }),
 ];

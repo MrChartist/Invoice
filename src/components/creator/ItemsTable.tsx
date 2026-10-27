@@ -47,6 +47,7 @@ const EditorJewel = lazy(() => import('../retail-r9/JewelleryDesk').then((m) => 
 // R10 (SV-A3 / A4): staff, service class and exempt column per line; the Rule 46A note (service profile / pack, lazy).
 const SvLineRow = lazy(() => import('../services-r10/SvEditor').then((m) => ({ default: m.SvLineRow })));
 const EditorService = lazy(() => import('../services-r10/SvEditor').then((m) => ({ default: m.EditorService })));
+const LegalRegimeChip = lazy(() => import('../prof/LegalRegimeChip')); // R14 (PS-B2) legal-services regime
 const RedeemChip = lazy(() => import('../services-r10/SvRedeem').then((m) => ({ default: m.RedeemChip }))); // R10 (SV-C1) "Use package"
 import { impliedPacks } from '../../lib/shop-mode';
 import styles from './ItemsTable.module.css';
@@ -67,6 +68,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const apparelOn = useMemo(() => impliedPacks(localDb.settings.get()).includes('apparel'), []); // R9 (RT-C)
   const devicesOn = useMemo(() => impliedPacks(localDb.settings.get()).includes('electronics'), []); // R9 (RT-D)
   const jewelOn = useMemo(() => impliedPacks(localDb.settings.get()).includes('jewellery'), []); // R9 (RT-E)
+  const legalOn = useMemo(() => (impliedPacks(localDb.settings.get()) as string[]).includes('legal'), []); // R14 (PS-B2)
   const svOn = useMemo(() => ((s) => !!s.service_kind || impliedPacks(s).some((p) => p === 'clinic' || p === 'salon' || p === 'fitness' || p === 'workshop'))(localDb.settings.get()), []); // R10 (SV-A)
   // Batch / serial / godown pickers (null for simple users: nothing tracked, one godown).
   // `stockTick` re-reads live stock when an item name gains focus (another tab may have sold some).
@@ -350,6 +352,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
         {devicesOn && priced && <Suspense fallback={null}><EditorDevices /></Suspense>}
         {(jewelOn || items.some((i) => i.jw)) && <Suspense fallback={null}><EditorJewel /></Suspense>}
         {svOn && <Suspense fallback={null}><EditorService /></Suspense>}
+        {legalOn && <Suspense fallback={null}><LegalRegimeChip /></Suspense>}
         <span className={styles.keyHint}>
           {tNodes('items.keyHint', { enter: <kbd>Enter</kbd>, alt: <kbd>Alt</kbd>, arrows: <><kbd>↑</kbd>/<kbd>↓</kbd></>, ctrl: <kbd>Ctrl</kbd> })}
         </span>

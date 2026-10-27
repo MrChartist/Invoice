@@ -9,6 +9,7 @@ export const bnkT = defineArea(
     // bank accounts master
     od: 'Overdraft / cash-credit account (ledger under Bank OD A/c)',
     odTag: ' · OD',
+    clientMoney: 'Client money (trust) account: held for clients, kept out of the firm\'s cash views (PS27)', // R14 (PS-B3)
     odLimit: 'OD / CC limit',
     fullAccountNo: 'Full account number (for deposit slips and upload files)',
     ifsc: 'IFSC',
@@ -90,6 +91,7 @@ export const bnkT = defineArea(
   {
     od: 'ओवरड्राफ्ट / कैश-क्रेडिट खाता (बैंक OD खाते के अंतर्गत लेजर)',
     odTag: ' · OD',
+    clientMoney: 'क्लाइंट का पैसा (ट्रस्ट) खाता: मुवक्किलों के लिए रखा, फ़र्म के नकद हिसाब से बाहर (PS27)',
     odLimit: 'OD / CC सीमा',
     fullAccountNo: 'पूरा खाता नंबर (जमा पर्ची और अपलोड फ़ाइल के लिए)',
     ifsc: 'IFSC',

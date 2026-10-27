@@ -46,8 +46,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84, AG90 | 65 | 15 |
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF40–MF42, MF50–MF54, MF60–MF65, MF80–MF82, MF90–MF96 | 60 | 12 |
-| 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS70–PS80 | 55 | 13 |
-| **Total** | | **479** | **119** |
+| 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS70–PS80 | 62 | 13 |
+| **Total** | | **486** | **119** |
 
 ---
 
@@ -1052,6 +1052,18 @@ exports of services under the FEMA 2026 regulations, 194J / 194T, partners and S
 | PS78 | **Cash share for 44ADA / Sec 58.** Cash receipts ÷ all receipts of the FY, counting receipts that moved money (advance adjustments, write-offs and other no-cash rows left out), foreign-currency receipts at the invoice's rate. Is "receipts in cash" the right base (rather than cash ÷ gross receipts on accrual), and does an advance received in cash count in its own year? | As stated. | `prof/ps-presumptive.ts` | 2023-04-01 | taxguru, cleartax (secondary) |
 | PS79 | **Billable compliance events.** GSTR-1 and IFF bill as "GSTR-1", GSTR-3B and CMP-08 as "GSTR-3B", GSTR-9 and GSTR-4 as "annual return"; a DSC is "renewed" in the month its validity starts; the monthly checklist bills once a month when any item is ticked. Any event a CA firm would bill differently (per GSTIN, per quarter)? | As stated; typed events for the rest. | `prof/ps-ca-events.ts` | — | Developers' reading |
 | PS80 | **UDIN on the fee note.** The UDIN of a certificate billed prints in the line's description and in the document's `ps` snapshot; a revoked UDIN is not offered for billing. Should a revoked UDIN already billed trigger a credit note prompt? | No prompt. | `prof/ps-udin.ts`; `prof/ps-ca-bill.ts` | 2019-02-01 | ICAI UDIN FAQs (Jul 2024) |
+
+### 14.9 Questions raised while building PS-B (disbursements, legal, client money, design, media)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| PS50 | **One "Client money held" ledger.** The books carry one liability ledger "Client money held"; the per-client (and per-matter) balances are kept in the client-money register (`client_money`, CMV/FY…) and printed in the client statements and the year-end list. Is one control ledger with a client-wise register acceptable for BCI Rule 25 / the CA Act, or should each client have its own ledger in the books? | One control ledger + client-wise register. | `prof/ps-cm-post.ts` | — | Developers' reading |
+| PS51 | **Interest earned on a client-money account that belongs to the firm.** When the firm keeps the interest (`interest_to: firm`), the app credits "Interest received" and the money stays in the client account until moved out; the three-way reconciliation lists it as a difference to clear. Should the app instead require it to be moved to the office account at once? Is interest on clients' money the firm's to keep at all? | Credited to the firm, listed as a reconciling item. | `prof/ps-cm-post.ts`, `ps-cm-reco.ts` | — | Developers' reading |
+| PS52 | **Authority to apply client money to fees.** Moving client money to fees needs an issued invoice and a recorded authority (written, e-mail or a clause in the engagement letter); without it only the owner may proceed, with a reason (audited). Is a standing clause in the engagement letter enough, or is a fresh authority needed for each transfer (BCI Rules 26–27; CA Act)? | Any of the three; owner override audited. | `prof/ps-cm-post.ts` `recordClientMoney` | — | BCI Rules 25–26 (Lok Sabha reply); CA Act (recalled) |
+| PS53 | **Which lines are "legal services".** The app applies RCM / exemption only to lines with SAC 99821x (legal advisory and representation; an empty SAC on a fee memo counts as legal) and treats 99822x (accounting / audit) and 99823x (tax consultancy and preparation) billed by a law firm as forward-charge supplies. Right? Are arbitral tribunals' services (entry 1 of N 13/2017) to be handled the same way? | As stated. | `prof/ps-b-rules.ts` `LEGAL_SERVICES_RULES.sac`; `ps-legal.ts` | — | SAC scheme (recalled) |
+| PS54 | **A senior advocate's supply to another advocate.** As reported, entry 45 does not exempt it; the app then applies reverse charge (entry 2) when the recipient advocate is treated as a business entity. Should it instead be forward charge by the senior advocate? | Reverse charge, marked verify. | `prof/ps-legal.ts` (`senior_to_advocate`) | — | Secondary sources (gstgyaan, cleartax) |
+| PS55 | **Media bought as principal.** The re-bill shows the media cost and the agency fee as two taxable lines at the agency's rate (18 %), unless the user picks the media's own class (e.g. print space 5 %) for the cost line. Is splitting the bill this way acceptable, or must a principal's bill be one composite supply at one rate? | Two lines; the media class only when the user picks it. | `prof/ps-media.ts` `mediaLines` | — | Developers' reading |
+| PS56 | **Writing off an unrecovered disbursement.** The cost was booked as an expense when paid (gross posting, T25), so a write-off only removes it from the unrecovered list and posts nothing. Right, or should a recoverable (asset) posting and a write-off journal be used? | No journal. | `prof/ps-disb.ts` `writeOffDisbursement` | — | Developers' reading |
 
 `PS` ids are counted once here. The ★ items (PS1, PS3, PS4, PS5, PS6, PS12, PS15, PS18, PS20, PS22, PS23, PS26, PS27)
 are the ones a beta professional firm's figures depend on first.

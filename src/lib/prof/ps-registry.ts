@@ -15,7 +15,8 @@ export const PS_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   prof_settings: 'settings.manage',
   engagements: 'doc.create',
   conflict_checks: 'master.edit',
-  // PS-B: client_money (books.edit)
+  // PS-B: client-money vouchers post journals (books)
+  client_money: 'books.edit',
   // PS-C: edf_register (books.edit)
   // PS-D: partners are owner data; partner postings are books; the UDIN register is documents
   partners: 'settings.manage',
@@ -33,6 +34,9 @@ export const PS_WATCHED: Readonly<Record<string, WatchedTable>> = {
   partner_runs: { entity: 'voucher', label: 'Partner posting' },
   udin_register: { entity: 'item', label: 'UDIN' },
   // PS-B / PS-C: add their blocks here
+  // PS-B
+  client_money: { entity: 'payment', label: 'Client-money voucher' },
+  // PS-C / PS-D: add their blocks here
 };
 
 /** Idempotent: adds the rows once (never overwrites a row another module set). */

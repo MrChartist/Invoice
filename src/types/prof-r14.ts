@@ -366,7 +366,22 @@ declare module './trade-r4' {
 }
 
 /* ════════════════════════════════════════ PS-B ════════════════════════════════════════ */
-// PS-B: client_money vouchers, stage templates, media rows (fill here).
+// B4: the stage plan of a design engagement (fee % of project cost, revisions, stages, the property — PS6, PS30).
+export interface PsStagePlan {
+  fee_pct: number;
+  cost_basis: 'estimate' | 'tender' | 'actual';
+  revisions: { date: string; cost: number; note?: string }[];
+  stages: { id: string; label: string; cum_pct: number }[];
+  /** Documentation / site-visit charges, % of the fee. */
+  extra_pct?: number;
+  property: { state?: string; city?: string; country?: string };
+}
+export interface Engagement {
+  /** B4: stage fees on project cost (model `milestone`). */
+  stage?: PsStagePlan;
+}
+// B3: client-money vouchers live in `prof/ps-client-money.ts` (`ClientMoneyVoucher`); B1 / B5 purchase fields are read
+// through `ps-disb.ts` / `ps-media.ts` (the PS-A declaration above carries the keys).
 
 /* ════════════════════════════════════════ PS-C ════════════════════════════════════════ */
 // PS-C: EDF register rows, platform receipts (fill here).

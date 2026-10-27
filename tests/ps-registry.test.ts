@@ -47,10 +47,20 @@ test('every writer, the sync engine and the recycle bin import the registry; dat
   assert.match(src('lib/trust/recycle-bin.ts'), /registerRestoreHook\('engagements'/);
 });
 
-test('series: ENG written once (ps-shared); CMV reserved and unused elsewhere', () => {
+test('series: ENG and CMV written once (ps-shared)', () => {
   assert.equal(PS_SERIES.engagements, 'ENG');
-  assert.deepEqual([...PS_RESERVED_SERIES], ['CMV']);
+  assert.equal(PS_SERIES.clientMoney, 'CMV'); // PS-B moved it out of the reserved list
+  assert.deepEqual([...PS_RESERVED_SERIES], []);
   const all = readdirSync(new URL('../src/lib/', import.meta.url), { recursive: true }).filter((f) => String(f).endsWith('.ts') && !String(f).startsWith('help')).map((f) => readFileSync(new URL(`../src/lib/${f}`, import.meta.url), 'utf8')).join('\n');
   assert.equal((all.match(/'ENG'/g) ?? []).length, 1, 'ENG');
-  assert.equal((all.match(/'CMV'/g) ?? []).length, 1, 'CMV only in the reserved list');
+  assert.equal((all.match(/'CMV'/g) ?? []).length, 1, 'CMV');
+});
+
+test('PS-B block: client_money rights, audit label, writer imports the registry, dated and numbered', () => {
+  assert.equal(PS_TABLE_ACTIONS.client_money, 'books.edit');
+  assert.equal(TABLE_ACTIONS.client_money, 'books.edit');
+  assert.equal(WATCHED_TABLES.client_money?.label, 'Client-money voucher');
+  assert.ok(TABLE_MEANING.client_money);
+  assert.match(src('lib/prof/ps-cm-post.ts'), /import '\.\/ps-registry';/);
+  assert.deepEqual([PS_DATED.client_money, PS_NUMBERED.client_money], ['date', 'CMV']);
 });
