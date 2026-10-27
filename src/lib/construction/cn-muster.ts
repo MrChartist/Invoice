@@ -107,8 +107,8 @@ export function undoSettlement(musNo: string): void {
   const days = loadMuster().filter((d) => d.mus_no === musNo);
   if (!days.length) return;
   withTablesRollback([SD.muster, VOUCHERS_TABLE], () => {
-    if (days[0].voucher_id) deleteVoucher(days[0].voucher_id);
     setTable(SD.muster, getTable<MusterDay>(SD.muster).map((d) => (d.mus_no === musNo ? { id: d.id, site_id: d.site_id, date: d.date, entries: d.entries } : d)));
+    if (days[0].voucher_id) deleteVoucher(days[0].voucher_id); // QA11 C4: after the days let go of it
   });
 }
 

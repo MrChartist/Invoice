@@ -122,6 +122,15 @@ function recalc(rec: InvoiceRecord): InvoiceRecord {
   return { ...rec, subtotal: t.subtotal, discount_amount: t.discount_amount, taxable_value: t.taxable_value, cgst_amount: t.cgst_amount, sgst_amount: t.sgst_amount, igst_amount: t.igst_amount, tax_amount: t.tax_amount, round_off: t.round_off, total: t.total, balance_due: t.balance_due, cess_amount: t.cess_amount, tcs_amount: t.tcs_amount, tds_amount: t.tds_amount };
 }
 
+/**
+ * QA11 C6: Sec 51(1) proviso — no GST TDS where the location of the supplier and the place of supply (the site, CN-A2)
+ * are in one State and the recipient is registered in another (its GSTIN's State). Verify with your CA (CA_REVIEW QA11-3).
+ */
+export function gstTdsProvisoApplies(supplierState: string | undefined, pos: string | undefined, recipientGstin: string | undefined): boolean {
+  const rec = String(recipientGstin ?? '').trim().slice(0, 2);
+  return !!supplierState && !!pos && /^\d\d$/.test(rec) && supplierState === pos && rec !== pos;
+}
+
 /** Retention release day: the typed day, else completion (or this final bill's date) + DLP months. */
 /** `YYYY-MM-DD` plus whole months (day clamped to the month's last day). */
 export function addMonthsDay(day: string, months: number): string {
@@ -190,7 +199,7 @@ export function saveRaBill(boqId: string, req: RaRequest): { measurement: RaMeas
       previousGross: round2(earlier.reduce((s, b) => s + num(b.taxable_value), 0)),
       previousRetention: round2(sumKind('retention')),
       ...(advance ? { advance: { amount: num(advance.amount), recovered: round2(sumKind('advance_recovery')) } } : {}),
-      gstTdsDeductor: !!localDb.clients.getById(boq.client?.id ?? '')?.gst_tds_deductor || !!boq.client?.gst_tds_deductor,
+      gstTdsDeductor: (!!localDb.clients.getById(boq.client?.id ?? '')?.gst_tds_deductor || !!boq.client?.gst_tds_deductor) && !gstTdsProvisoApplies(senderStateCode(sender ?? null), bill.place_of_supply, bill.client?.gstin || boq.client?.gstin),
       intraState: bill.gst_mode !== 'IGST',
     });
     // R11 (CN-B2 / B4): contract advances (recovery schedule + interest), secured advance and typed recoveries.

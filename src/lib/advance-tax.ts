@@ -80,6 +80,8 @@ export interface AdvanceBalance {
    * an over-adjustment (e.g. one made while an invoice was cancelled, then the invoice reinstated).
    */
   over: number;
+  /** QA11 C2: kept on a cancelled booking (CN-C5 forfeiture, `forfeits`): no money moved; it closes that part. */
+  forfeited?: number;
 }
 
 export function advanceBalance(
@@ -90,7 +92,8 @@ export function advanceBalance(
   const amount = round2(num(adv.amount));
   const adjusted = round2(liveAdjustments(adv.id, payments, invoices).reduce((s, p) => s + num(p.amount), 0));
   const refunded = round2((adv.refunds ?? []).reduce((s, r) => s + num(r.amount), 0));
-  return { amount, adjusted, refunded, open: round2(Math.max(amount - adjusted - refunded, 0)), over: round2(Math.max(adjusted + refunded - amount, 0)) };
+  const forfeited = round2((adv.forfeits ?? []).reduce((s, f) => s + num(f.amount), 0));
+  return { amount, adjusted, refunded, ...(forfeited ? { forfeited } : {}), open: round2(Math.max(amount - adjusted - refunded - forfeited, 0)), over: round2(Math.max(adjusted + refunded + forfeited - amount, 0)) };
 }
 
 /* ── Movements ────────────────────────────────────────────────── */

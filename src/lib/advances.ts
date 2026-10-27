@@ -185,7 +185,7 @@ export function saveAdvance(input: AdvanceInput, ctx: Ctx = {}): AdvanceRecord {
   const nowIso = (ctx.now ?? new Date()).toISOString();
   if (prev) {
     const bal = advanceBalance(prev, ctxPayments(ctx), ctxInvoices(ctx));
-    if (bal.adjusted > 0 || bal.refunded > 0) {
+    if (bal.adjusted > 0 || bal.refunded > 0 || num(bal.forfeited) > 0) {
       throw new AdvanceError(`${prev.number} has been adjusted or refunded; remove those entries before editing it.`);
     }
     assertUnlocked(lockOf(prev.id, prev.date, prev.number), 'edit');
@@ -232,7 +232,7 @@ export function deleteAdvance(id: string, ctx: Ctx = {}): void {
   const adv = rows.find((a) => a.id === id);
   if (!adv) return;
   const bal = advanceBalance(adv, ctxPayments(ctx), ctxInvoices(ctx));
-  if (bal.adjusted > 0 || bal.refunded > 0) {
+  if (bal.adjusted > 0 || bal.refunded > 0 || num(bal.forfeited) > 0) {
     throw new AdvanceError(`${adv.number} has been adjusted or refunded; remove those entries first.`);
   }
   assertUnlocked(lockOf(adv.id, adv.date, adv.number), 'delete');
