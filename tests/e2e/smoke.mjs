@@ -3246,6 +3246,70 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+  await step('R9-D electronics: Electronics profile; two phones bought with IMEI pairs, scanning IMEI 2 at the POS adds the phone with IMEI 1; a finance tender → Devices → Finance lists the DO; a buy-back exchange settles a bill with no cash moved', async () => {
+    const keys = ['settings', 'items_catalog', 'stock_items', 'purchases', 'invoices', 'transactions', 'finance_deals', 'vouchers', 'bank_accounts', 'vendors', 'godowns', 'series_counters', 'retail_settings', 'imei_checks'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'kirana', modules: undefined, industry_packs: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'retail_settings', null);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-retail-kind-card="electronics"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.retail_kind === 'electronics');
+    check(st.industry_packs?.includes('electronics'), 'Electronics: the electronics pack is on');
+    const [A1, A2, B1] = ['490154203237518', '356938035643809', '353918052034572'];
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), { id: 'e2e-ph', name: 'E2E Phone X', hsn: '8517', unit: 'NOS', track_stock: true, track_serials: true, serial_kind: 'imei', warranty_months: 12, opening_qty: 0, opening_rate: 0, reorder_level: 0, sale_rate: 20000, tax_rate: 0 },
+      { id: 'e2e-chg', name: 'E2E Charger', hsn: '8504', unit: 'NOS', track_stock: false, opening_qty: 0, opening_rate: 0, reorder_level: 0, sale_rate: 6000, tax_rate: 0 }]);
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-chg-c', name: 'E2E Charger', type: 'Product', hsn: '8504', unit: 'NOS', quantity: 1, rate: 6000, tax_rate: 0, amount: 0, barcode: '8901063099777' }]);
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []), { id: 'e2e-ph-bill', kind: 'PURCHASE', vendor_name: 'E2E Distributor', bill_number: 'E2E-D1', date: '2026-01-02', category: 'Purchases', lines: [{ id: 'l1', name: 'E2E Phone X', item_id: 'e2e-ph', hsn: '8517', quantity: 2, rate: 15000, tax_rate: 0, serials: [A1, B1], serial_pairs: { [A1]: A2 } }], taxable: 30000, cgst: 0, sgst: 0, igst: 0, total: 30000, amount_paid: 0, itc_eligible: true }]);
+    // RT-D1: scanning IMEI 2 adds the phone with IMEI 1 picked; RT-D2: the finance tender leaves ₹15,000 to the financier.
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor({ timeout: 15000 });
+    await page.locator('[data-pos-devices]').waitFor({ timeout: 15000 });
+    await scan.fill(A2);
+    await scan.press('Enter');
+    await page.locator('[data-pos-finance-on]').check({ timeout: 15000 });
+    await page.locator('[data-pos-financier]').fill('E2E Finserv');
+    await page.locator('[data-pos-loan]').fill('15000');
+    await page.locator('[data-pos-do]').fill('E2E-DO-1');
+    await page.locator('#pos-Cash').fill('5000');
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id)))).find((i) => !beforeIds.has(i.id));
+    const line = bill?.items?.[0];
+    check(line?.name === 'E2E Phone X' && line.serials?.[0] === A1 && line.serial_pairs?.[A1] === A2, `IMEI 2 scan → the phone with IMEI 1 and its pair (${JSON.stringify(line?.serials)})`);
+    const deals = await readJson(page, 'finance_deals', [], (v) => v.length > 0);
+    check(deals[0]?.do_no === 'E2E-DO-1' && deals[0].loan === 15000 && deals[0].invoice_id === bill.id, 'the finance deal (DO) is recorded on the bill');
+    check((await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === bill.id && i.status === 'Paid'))).some((i) => i.id === bill.id), 'the customer\'s bill is settled (the loan moved to the financier)');
+    await page.goto(srv.origin + '/inventory?tab=devices&view=finance');
+    await page.locator('[data-dev-deal="E2E-DO-1"]').waitFor({ timeout: 15000 });
+    check(true, 'Devices → Finance lists the DO');
+    // RT-D3: a buy-back (URD voucher) settles ₹5,000 of a ₹6,000 bill; only ₹1,000 cash moves.
+    await page.goto(srv.origin + '/inventory?tab=devices&view=buyback');
+    await page.locator('[data-dev-customer]').fill('E2E Ravi', { timeout: 15000 });
+    await page.locator('[data-dev-model]').fill('Old phone');
+    await page.locator('[data-dev-imei]').fill('358240051111110');
+    await page.locator('[data-dev-value]').fill('5000');
+    await page.locator('[data-dev-save]').click();
+    const urd = (await readJson(page, 'purchases', [], (v) => v.some((p) => p.used_goods))).find((p) => p.used_goods);
+    check(/^URD\/FY\d{2}-\d{2}\/0001$/.test(urd?.bill_number ?? '') && urd.cgst + urd.sgst + urd.igst === 0 && urd.itc_eligible === false, `buy-back voucher ${urd?.bill_number}: no GST / ITC`);
+    const before2 = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/pos');
+    await page.locator('#pos-scan').waitFor({ timeout: 15000 });
+    await page.getByLabel('Walk-in name').fill('E2E Ravi');
+    await page.locator('#pos-scan').fill('8901063099777');
+    await page.locator('#pos-scan').press('Enter');
+    await page.locator('[data-pos-exchange-pick]').selectOption(urd.id, { timeout: 15000 });
+    await page.locator('#pos-Cash').fill('1000');
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    const sale = (await readJson(page, 'invoices', [], (v) => v.some((i) => !before2.has(i.id)))).find((i) => !before2.has(i.id));
+    const rows = (await readJson(page, 'transactions', [], (v) => v.some((p) => p.invoice_id === sale.id && p.exchange_purchase_id))).filter((p) => p.invoice_id === sale.id);
+    const cash = rows.filter((p) => p.method === 'Cash').reduce((s, p) => s + p.amount, 0);
+    const ex = rows.find((p) => p.exchange_purchase_id === urd.id);
+    check(sale.total === 6000 && ex?.amount === 5000 && cash === 1000, `bill ₹${sale.total}: exchange ₹${ex?.amount} (no cash), cash ₹${cash}`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {
