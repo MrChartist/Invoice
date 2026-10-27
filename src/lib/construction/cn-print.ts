@@ -5,7 +5,7 @@
  */
 import type { InvoiceRecord } from '../../types/invoice';
 import type { RaDeduction, RaDeductionKind } from '../../types/transport-works-r5';
-import type { CnSnapshot, ConstructionKind } from '../../types/construction-r11';
+import type { CnHeader, CnSnapshot, ConstructionKind } from '../../types/construction-r11';
 import { num, round2 } from '../invoice-calc';
 import { amountInWords } from '../amount-in-words';
 import { DEFAULT_CERTIFICATE } from '../construction-rules';
@@ -66,4 +66,36 @@ export const cnDeclarations = (cn: CnSnapshot | undefined, isRaBill: boolean): s
 /** Certificate defaults by kind: every construction kind prints the contractor's certificate; builders' demands do not. */
 export function defaultCertificateFor(kind: ConstructionKind | undefined, government: boolean): { text?: string; boxes: boolean } {
   return { ...(kind === 'builder' ? {} : { text: DEFAULT_CERTIFICATE }), boxes: government };
+}
+
+/** One row of the "Contract particulars" box: `key` names its paper label (`p.<key>`); empty values are dropped. */
+export interface HeaderRow {
+  key: 'nameOfWork' | 'agreement' | 'workOrder' | 'tender' | 'clientOffice' | 'engineer' | 'site' | 'contractValue' | 'stipulated' | 'extended' | 'bill' | 'period' | 'measuredOn' | 'mbNos' | 'jv';
+  value: string;
+  wide?: boolean;
+}
+
+/** Pure: the contract-particulars rows of a header snapshot, in print order (empty fields skipped). */
+export function headerRows(h: CnHeader | undefined, fmt: { date: (d: string) => string; money: (n: number) => string; state: (code: string) => string }): HeaderRow[] {
+  if (!h) return [];
+  const d = (v?: string) => (v ? fmt.date(v) : '');
+  const pair = (a?: string, b?: string) => [a, d(b)].filter(Boolean).join(' · ');
+  const rows: HeaderRow[] = [
+    { key: 'nameOfWork', value: h.name_of_work ?? '', wide: true },
+    { key: 'agreement', value: pair(h.agreement_no, h.agreement_date) },
+    { key: 'workOrder', value: pair(h.work_order_no, h.work_order_date) },
+    { key: 'tender', value: h.tender_ref ?? '' },
+    { key: 'clientOffice', value: h.client_office ?? '' },
+    { key: 'engineer', value: h.engineer ?? '' },
+    { key: 'site', value: h.site ? [h.site.address, h.site.state_code ? fmt.state(h.site.state_code) : ''].filter(Boolean).join(', ') : '', wide: true },
+    { key: 'contractValue', value: num(h.contract_value) > 0 ? fmt.money(num(h.contract_value)) : '' },
+    { key: 'stipulated', value: [d(h.stipulated_start), d(h.stipulated_completion)].filter(Boolean).join(' – ') },
+    { key: 'extended', value: d(h.extended_completion) },
+    { key: 'bill', value: h.ra_label ?? '' },
+    { key: 'period', value: [d(h.period_from), d(h.period_to)].filter(Boolean).join(' – ') },
+    { key: 'measuredOn', value: d(h.measured_on) },
+    { key: 'mbNos', value: (h.mb_nos ?? []).join(', ') },
+    { key: 'jv', value: h.jv_note ?? '' },
+  ];
+  return rows.filter((r) => r.value);
 }

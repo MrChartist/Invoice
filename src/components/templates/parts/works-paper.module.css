@@ -1,0 +1,272 @@
+/* R11 (CN-A3 … A5) construction bill paper: contract particulars, cumulative item table, deductions, certificate and the
+   abstract page. Colours come from the template variables only (accent / ink / muted / line / soft, Critical Rule 5). */
+
+.box {
+  margin: 0 0 12px;
+  border: 1px solid var(--tpl-line);
+  border-top: 3px solid var(--tpl-accent);
+  border-radius: 4px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.boxTitle {
+  padding: 4px 10px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tpl-accent);
+  background: var(--tpl-soft);
+  border-bottom: 1px solid var(--tpl-line);
+}
+
+.grid {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.cell {
+  display: flex;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 10px;
+  border-bottom: 1px solid var(--tpl-line);
+  min-width: 0;
+}
+
+.cell:nth-child(odd) {
+  border-right: 1px solid var(--tpl-line);
+}
+
+.wide {
+  grid-column: 1 / -1;
+  border-right: none !important;
+}
+
+.cell dt {
+  flex: none;
+  min-width: 110px;
+  color: var(--tpl-muted);
+  font-weight: 600;
+}
+
+.cell dd {
+  margin: 0;
+  color: var(--tpl-ink);
+  overflow-wrap: anywhere;
+}
+
+.hi {
+  display: block;
+  font-size: 8px;
+  font-weight: 400;
+}
+
+/* Cumulative item table (`pwd` paper) and the abstract */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5px;
+  margin: 0 0 10px;
+}
+
+.table th,
+.table td {
+  padding: 3px 4px;
+  border: 1px solid var(--tpl-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tpl-muted);
+  background: var(--tpl-soft);
+}
+
+.table tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.n {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sub {
+  font-size: 8.5px;
+  color: var(--tpl-muted);
+}
+
+.section td {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tpl-accent);
+  background: var(--tpl-soft);
+}
+
+.total td {
+  font-weight: 700;
+  color: var(--tpl-ink);
+  border-top: 2px solid var(--tpl-accent);
+}
+
+/* Deductions block */
+.deds {
+  margin: 10px 0 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
+  gap: 14px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.notes {
+  font-size: 9px;
+  color: var(--tpl-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dedTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.dedTable td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--tpl-line);
+}
+
+.group td {
+  padding-top: 6px;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tpl-accent);
+}
+
+.net td {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--tpl-on-accent, var(--tpl-ink));
+  background: var(--tpl-accent);
+}
+
+.words {
+  margin-top: 4px;
+  font-size: 9px;
+  font-style: italic;
+  color: var(--tpl-ink);
+}
+
+/* Certificate and sign-off boxes */
+.cert {
+  margin: 12px 0 0;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  font-size: 9.5px;
+  color: var(--tpl-body);
+}
+
+.certText {
+  padding: 6px 10px;
+  border-left: 3px solid var(--tpl-accent);
+  background: var(--tpl-soft);
+}
+
+.signRow {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.signBox {
+  min-height: 78px;
+  padding: 6px 8px;
+  border: 1px solid var(--tpl-line);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.signHead {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tpl-accent);
+}
+
+.signLine {
+  font-size: 8px;
+  color: var(--tpl-muted);
+  border-top: 1px solid var(--tpl-line);
+  padding-top: 2px;
+}
+
+.signImg {
+  max-height: 40px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+/* Abstract page (a following page, like the R3-B4 annexure) */
+.page {
+  break-before: page;
+  page-break-before: always;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--tpl-body);
+}
+
+.pageHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--tpl-accent);
+}
+
+.pageTitle {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--tpl-accent);
+}
+
+.meta {
+  font-size: 10px;
+  color: var(--tpl-muted);
+}
+
+.summary {
+  margin-left: auto;
+  width: min(100%, 340px);
+}
+
+.spacer {
+  flex: none;
+}
+
+@media print {
+  .spacer {
+    display: none;
+  }
+}

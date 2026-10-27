@@ -7,7 +7,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import type { InvoiceRecord } from '../../../types/invoice';
 import type { TemplateTableStyle } from '../registry';
 import { usePaper } from '../paper-context';
-import { isRcmTotals, trackingText } from '../paper-helpers';
+import { isRcmTotals, trackingText, worksLineText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { ItemCustomLine } from './CustomFieldsBlock';
 import art from './docs-r3-paper.module.css';
@@ -87,6 +87,7 @@ export function PaperItemsTable({ invoice, totals, tableStyle }: ItemsTableProps
                 {source?.description && <div className={styles.itemDesc}>{source.description}</div>}
                 <ItemCustomLine values={source?.custom_values} />
                 {show.tracking && trackingText(source) && <div className={styles.itemDesc}>{trackingText(source)}</div>}
+                {worksLineText(source, invoice.boq_terms?.cn) && <div className={styles.itemDesc} data-works-line>{worksLineText(source, invoice.boq_terms?.cn)}</div>}
               </td>
               {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '—'}</td>}
               <td className={cn(styles.right, styles.num)}>

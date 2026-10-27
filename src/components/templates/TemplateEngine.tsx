@@ -37,6 +37,14 @@ const LazyPhotoPages = lazy(() => import('./parts/PhotoPages'));
 const LazyDeliveryProof = lazy(() => import('./parts/DeliveryProofBlock'));
 // R4-C1: export details (IEC / AD code, Incoterms, ports, countries, marks) — lazy; nothing without export data.
 const LazyExportBlock = lazy(() => import('./parts/ExportBlock'));
+// R11 (CN-A3 … A5): construction paper parts — one lazy chunk, loaded only for documents with the construction snapshot.
+const worksPaper = () => import('./parts/WorksPaper');
+const LazyWorksHeader = lazy(() => worksPaper().then((m) => ({ default: m.WorksHeaderBlock })));
+const LazyRaItems = lazy(() => worksPaper().then((m) => ({ default: m.RaItemsTable })));
+const LazyWorksDeds = lazy(() => worksPaper().then((m) => ({ default: m.WorksDeductionsBlock })));
+const LazyWorksAbstract = lazy(() => worksPaper().then((m) => ({ default: m.WorksAbstractPage })));
+const LazyPvPage = lazy(() => worksPaper().then((m) => ({ default: m.PvWorkingPage })));
+const LazyDemand = lazy(() => worksPaper().then((m) => ({ default: m.DemandBlock })));
 const EXPORT_KEYS = ['incoterm', 'port_of_loading', 'port_of_discharge', 'country_of_origin', 'country_of_destination', 'pre_carriage', 'vessel_flight', 'marks_numbers', 'export_payment_terms'] as const;
 
 export interface TemplateEngineProps extends TemplateProps {
@@ -131,13 +139,24 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
     <Suspense fallback={null}><LazyExportBlock invoice={invoice} sender={sender} /></Suspense>
   );
 
+  // R11: the construction snapshot (or an RA number) mounts the works parts; never on receipt / thermal paper.
+  const cnDoc = layout !== 'receipt' && (invoice.boq_terms?.cn || invoice.ra_no) ? invoice.boq_terms?.cn ?? {} : null;
+  const worksHead = cnDoc && (
+    <Suspense fallback={null}>
+      <LazyWorksHeader invoice={invoice} />
+      {cnDoc.demand && <LazyDemand invoice={invoice} />}
+    </Suspense>
+  );
+  const worksDeds = cnDoc && <Suspense fallback={null}><LazyWorksDeds invoice={invoice} sender={sender} /></Suspense>;
+
   const layoutBody = (() => {
     // R2-B3: proposal sections and optional items wrap the ruled GST grid / the receipt.
     if ((layout === 'gst' || layout === 'receipt') && !hideAmounts) {
       return (
         <>
           <ProposalSections invoice={invoice} place="before" />
-          {layout === 'gst' ? <GstBody invoice={invoice} sender={sender} totals={totals} skipEway={irn?.ewayNo} /> : <ReceiptBody invoice={invoice} sender={sender} totals={totals} />}
+          {layout === 'gst' ? <GstBody invoice={invoice} sender={sender} totals={totals} skipEway={irn?.ewayNo} works={worksHead} /> : <ReceiptBody invoice={invoice} sender={sender} totals={totals} />}
+          {worksDeds}
           {exportBlock}
           <OptionalItemsBlock invoice={invoice} />
           <ProposalSections invoice={invoice} place="after" />
@@ -159,11 +178,12 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           <StatementStrip invoice={invoice} due={cfg.currency(totals.balance_due, invoice.currency)} />
         )}
         <PartyPanel invoice={invoice} plain={plainParties} skipDates={layout === 'letterhead'} />
+        {worksHead}
         {exportBlock}
         <CustomFieldsBlock invoice={invoice} />
         <TransportBlock invoice={invoice} skipEway={irn?.ewayNo} />
         <ProposalSections invoice={invoice} place="before" />
-        {hideAmounts ? <ChallanQtyTable invoice={invoice} /> : <PaperItemsTable invoice={invoice} totals={totals} tableStyle={effMeta.tableStyle} />}
+        {hideAmounts ? <ChallanQtyTable invoice={invoice} /> : cnDoc?.paper === 'pwd' ? <Suspense fallback={null}><LazyRaItems invoice={invoice} totals={totals} /></Suspense> : <PaperItemsTable invoice={invoice} totals={totals} tableStyle={effMeta.tableStyle} />}
         {!hideAmounts && <TaxSummary invoice={invoice} totals={totals} />}
         <OptionalItemsBlock invoice={invoice} />
         <ProposalSections invoice={invoice} place="after" />
@@ -175,6 +195,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           </div>
           {!hideAmounts && <TotalsBlock invoice={invoice} sender={sender} totals={totals} />}
         </div>
+        {!hideAmounts && worksDeds}
 
         {layout === 'letterhead' && (
           <div className={styles.letterFoot}>
@@ -224,6 +245,9 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           {invoice.delivery_proof && <Suspense fallback={null}><LazyDeliveryProof invoice={invoice} compact={layout === 'receipt'} /></Suspense>}
           {/* R3-B4: annexure as a following page (never on thermal / receipt paper). */}
           {invoice.annexure && layout !== 'receipt' && <Suspense fallback={null}><LazyAnnexure invoice={invoice} /></Suspense>}
+          {/* R11 (CN-A4): the abstract of cost (and CN-B's price-variation working) as following pages. */}
+          {cnDoc?.abstract && <Suspense fallback={null}><LazyWorksAbstract invoice={invoice} /></Suspense>}
+          {cnDoc?.pv && <Suspense fallback={null}><LazyPvPage invoice={invoice} /></Suspense>}
           {/* R3-C2: photo pages after the totals / annexure (2 × 2 per page). */}
           {invoice.attachments?.some((a) => a.print) && <Suspense fallback={null}><LazyPhotoPages invoice={invoice} /></Suspense>}
         </div>
