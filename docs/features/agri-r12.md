@@ -228,4 +228,20 @@ e2e step "R12-D cold store desk".
 
 ### Bundle (AG-D)
 
-BUNDLE_PLACEHOLDER
+Measured with `vite build` + gzip -9 (the budget script's method), before = `claude/elegant-cannon-cwapiv` at `228ca3c`
+(AG-A merged), after = this branch merged with it.
+
+| Budget | Before | After | Delta | Share |
+|---|---|---|---|---|
+| Initial JS (first paint) | 189,162 B (184.73 kB) | 189,135 B (184.70 kB) | **−27 B** (no AG-D code; index chunk-name churn) | ≤ +0.03 kB ✓ |
+| Total JS | 3,126,902 B (3053.6 kB) | 3,172,559 B (3098.2 kB) | **+45,657 B (+44.6 kB)** | ≤ 9 kB ✗ |
+
+**Overrun: ≈ +35.6 kB over AG-D's 9 kB share** (total stays under the 3200 kB limit: 3098.2 kB). Breakdown (gz, by
+chunk): desks and views 23 kB (ColdDesk 9.6 with the rent and gate-pass engines inside, MembersDesk 6.0, InputsDesk 2.7,
+shared LoansView 1.7, POS strip 1.1, members calendar card 0.5, desk kit 1.4); engines 11 kB (`ag-loans` 2.5,
+`ag-cold-lots` 2.1, `ag-patronage` + `ag-members` 2.2, `ag-season-credit` + `ag-subsidy` 1.6, `ag-licences` 0.9, bell
+notices 0.7, the AG-D rule rows ≈ 1.3); strings `agri-r12d` 6.9 kB (English + Hindi, every view); wiring (POS, bell,
+compliance card, stock gate, interest branch, demo rows, chunk splits) ≈ 4 kB. Already applied: one chunk per desk
+(−8 kB against lazy views). Further trimming options for the lead: drop the members' calendar card on GST → Compliance
+(−0.5 kB), shorten the Hindi notes (≈ −1 kB), fold the subsidy / season-credit views into the licences view (≈ −1 kB),
+or the PRD §1 fallback raise.
