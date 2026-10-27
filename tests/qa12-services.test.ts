@@ -164,3 +164,25 @@ test('S8: a rejected claim is re-billed once', () => {
   assert.throws(() => rejectAndRebill(c.id, 'again', '2026-10-06'), /already rejected/);
   assert.equal(localDb.invoices.getAll().length, n, 'no second re-bill');
 });
+
+/* ── S10: recycle-bin restore of a service bill billed again ── */
+
+test('S10: a deleted OPD bill does not come back next to the bill made again for the visit; a stray delete still restores', async () => {
+  const { restoreEntry } = await import('../src/lib/trust/recycle-bin.ts');
+  const { doctorsDb } = await import('../src/lib/retail/rt-pharmacy-rx.ts');
+  const { billVisit, saveVisit } = await import('../src/lib/services/sv-opd.ts');
+  const bin = () => getTable<{ id: string; table: string; row_id: string }>('recycle_bin');
+  const dr = doctorsDb.save({ name: 'Dr Shah', consult_fee: 600, active: true });
+  const v = saveVisit({ date: '2026-10-05', patient_name: 'Mrs Rao', doctor_id: dr.id });
+  const first = billVisit(v.id);
+  localDb.invoices.remove(first.id);
+  const again = billVisit(v.id);
+  assert.notEqual(again.id, first.id);
+  assert.throws(() => restoreEntry(bin().find((x) => x.table === 'invoices' && x.row_id === first.id)!.id), /billed again/);
+  // A bill deleted with nothing made again comes back.
+  const v2 = saveVisit({ date: '2026-10-05', patient_name: 'Mr Rao', doctor_id: dr.id });
+  const b2 = billVisit(v2.id);
+  localDb.invoices.remove(b2.id);
+  restoreEntry(bin().find((x) => x.table === 'invoices' && x.row_id === b2.id)!.id);
+  assert.ok(localDb.invoices.getById(b2.id));
+});
