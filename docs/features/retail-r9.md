@@ -487,7 +487,7 @@ limit the voucher needs PAN or Form 60 (snapshotted in `old_metal.kyc`). Settled
 ₹…" (`exchangeText`). Paid in cash / bank as an ordinary purchase payment; cash above ₹10,000 to the person that day
 asks first (Sec 40A(3), `cashPaymentIssue`). Guards (`rt-cash-guard.ts`, generic, not pack-gated): RT-D's 269ST
 check per bill + the customer's same-day cash (POS strip `PosDevices`, mounted whenever a cash guard is set) and the
-*Receive payment* dialog (`liveSaleGuards`, cash only, same-day cash of the customer included; *block* stops it);
+payment dialog (`PaymentModal`) (`liveSaleGuards`, cash only, same-day cash of the customer included; *block* stops it);
 `panGuard` — a sale **above** ₹2,00,000 (any mode) needs PAN or a Form 60 / 97 declaration (`kyc` on the record): a
 warning, an error with *Require PAN* (POS: the PAN fields appear and the bill is refused; editor: a save gate on
 issue); PMLA note at ₹10,00,000 cash from one customer in a day (reachable only with the guard off). Refunds, no-cash
@@ -523,8 +523,8 @@ purchases: RT-D's hook brings an exchange receipt back only with its URD voucher
 - The job-work rate stays 5 % (§8 #24) but the rule row says it was not re-read: Chapter 71 job work for a registered
   principal may be 1.5 % (N 11/2017-CT(R) entry 26(i), as amended), and making on an unregistered customer's metal may
   be "other manufacturing services" — CA item RT16 / RT20. The karigar labour draft uses the same 5 %, always as CGST +
-  SGST (an out-of-state karigar's draft is corrected to IGST when it is posted).
-- The editor takes the cash guard on *Receive payment* (the editor has no tender panel); the editor's PAN / Form 60 sits
+  SGST (for an out-of-state karigar, change it to IGST on the draft before posting).
+- The editor takes the cash guard in the payment dialog (the editor has no tender panel); the editor's PAN / Form 60 sits
   in the items-table footer and is an issue-time save gate (`saveGates` in `stock-tracking.ts`).
 - 2025-Act section numbers for 269ST / 40A(3) / Rule 114B are not confirmed (no `ita2025.ts` row): the messages name the
   1961 sections.
