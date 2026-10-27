@@ -20,7 +20,12 @@ export type RtRule<T> = Versioned<T> & { verified: boolean };
 /* ── RT-B: pharmacy ── */
 /** Years a register / prescription must be kept (RT7). */
 export interface PharmaRetention { h1Years: number; xPrescriptionYears: number; cashMemoYears: number }
-export const PHARMA_RETENTION_RULES: readonly RtRule<PharmaRetention>[] = [];
+export const PHARMA_RETENTION_RULES: readonly RtRule<PharmaRetention>[] = [
+  // Schedule H1 (GSR 588(E), 30 Aug 2013, in force 1 Mar 2014): separate H1 register kept 3 years (Rule 65(3));
+  // Schedule X: duplicate prescription kept 2 years (Rule 65(9)(a)); sale records / cash memos 3 years (Rule 65).
+  // Read in secondary sources only (okcredit guide, Nagaland district order, Wikipedia "Schedule X") — RT7.
+  { from: '2014-03-01', value: { h1Years: 3, xPrescriptionYears: 2, cashMemoYears: 3 }, source: 'Drugs & Cosmetics Rules 1945, Rule 65(3) / 65(9)(a) as cited by secondary sources (RT7)', verified: false },
+];
 
 /* ── RT-C: apparel, footwear, textiles ── */
 export type PriceBandKind = 'apparel' | 'footwear' | 'made_ups';

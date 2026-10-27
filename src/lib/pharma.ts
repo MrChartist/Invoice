@@ -21,7 +21,7 @@ import { num } from './invoice-calc';
 import { isRevenueDoc } from './stats';
 import { toCsv } from './csv';
 import { PHARMA_SETTINGS_KEY, plusDays, type PharmaSettings } from './pharma-gate';
-import { getTable, setJson, setTable } from './storage';
+import { getJson, getTable, setJson, setTable } from './storage';
 import { requireAccess } from './access';
 import type { TrackingMap } from './stock-tracking';
 
@@ -142,7 +142,11 @@ export function nearExpiryStock(tracking: TrackingMap, day: string, days: number
 
 export function savePharmaSettings(s: PharmaSettings): void {
   requireAccess('settings.manage');
+  // R9 (RT-B2): the pharmacy desk's licences / pharmacist / "require prescription" are kept unless `s` sets them.
+  const prev = getJson<Partial<PharmaSettings> | null>(PHARMA_SETTINGS_KEY, null) ?? {};
+  const keep = { licences: s.licences ?? prev.licences, pharmacist: s.pharmacist ?? prev.pharmacist, require_rx: s.require_rx ?? prev.require_rx };
   setJson(PHARMA_SETTINGS_KEY, {
+    ...JSON.parse(JSON.stringify(keep)),
     enabled: !!s.enabled,
     block_expired: !!s.block_expired,
     near_expiry_days: Math.min(Math.max(Math.round(num(s.near_expiry_days)), 0), 730),
