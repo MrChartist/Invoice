@@ -5,7 +5,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
-import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText } from '../paper-helpers';
+import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText, svDocTitle } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { CustomFieldsBlock, ItemCustomLine } from './CustomFieldsBlock';
 import { TransportBlock } from './TransportBlock';
@@ -33,7 +33,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
   const { money, currency, date, col, show, footerText, headerNote, title: titled } = usePaper();
   const cur = invoice.currency;
   const c = invoice.client;
-  const title = titled(DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice', invoice.doc_type); // R2-C5 suffix
+  const title = titled(svDocTitle(invoice) || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'), invoice.doc_type); // R2-C5 suffix; R10 Rule 46A title
   // Reverse charge: the tax is printed in the recipient-pays note, never added up here.
   const rcm = isRcmTotals(totals);
   const cgstSgst = isTaxed(invoice, totals) && !rcm;

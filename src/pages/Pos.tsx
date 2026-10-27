@@ -114,6 +114,7 @@ const RxStrip = lazy(() => import('../components/retail-r9/PharmacyDesk').then((
 const PosApparel = lazy(() => import('../components/retail-r9/ApparelDesk').then((m) => ({ default: m.PosApparel }))); // R9 (RT-C1/C3)
 const PosDevices = lazy(() => import('../components/retail-r9/DevicesDesk').then((m) => ({ default: m.PosDevices }))); // R9 (RT-D) IMEI, finance, exchange, cash guard
 const PosJewel = lazy(() => import('../components/retail-r9/JewelleryDesk').then((m) => ({ default: m.PosJewel }))); // R9 (RT-E2/E3) tag box, cash / PAN guard
+const PosAppointment = lazy(() => import('../components/services-r10/PosAppointment')); // R10 (SV-A2) `?appt=` bill from the front desk
 // R4-B3: the counter's branch (store price list). Inline labels, so the POS does not load the stores catalogue.
 const storeT = defineArea({ counter: 'This counter is branch', none: 'No branch' } as const, { counter: 'यह काउंटर इस शाखा का है', none: 'कोई शाखा नहीं' });
 
@@ -1103,6 +1104,7 @@ export function Pos() {
               </Suspense>
               {retailStrip && <Suspense fallback={null}><PosRetailStrip record={record} query={query} delivery={delivery} onDelivery={setDelivery} onAddLine={(l) => setItems((prev) => [...prev.filter((x) => x.name !== 'Delivery charge'), l])} deliveryOn={!!retailRs.delivery?.enabled} shortBookOn={!!retailRs.short_book?.enabled} notify={notify} /></Suspense>}
               {pharmaOn && <Suspense fallback={null}><RxStrip record={record} value={rxPos} onChange={setRxPos} /></Suspense>}
+              {params.get('appt') && <Suspense fallback={null}><PosAppointment id={params.get('appt')!} onLoad={(lines, p) => { setItems(lines); setParty(p); setParams((q) => { q.delete('appt'); return q; }, { replace: true }); }} /></Suspense>}
               {isPackOn(settings, 'apparel') && <Suspense fallback={null}><PosApparel record={record} setItems={setItems} /></Suspense>}
               {(isPackOn(settings, 'jewellery') || !!retailRs.require_pan) && <Suspense fallback={null}><PosJewel record={record} cash={devicesOn ? 0 : Math.max(summary.cash - summary.change, 0)} setItems={setItems} onChange={setJwPos} /></Suspense>}
               {party.client ? null : (

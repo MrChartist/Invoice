@@ -86,6 +86,8 @@ test('the Ctrl+K common-credit row is on for every pack that shows the GST tab (
 
 /* ── R6-B2: pack routes stay in the sidebar ─────────────────── */
 
+const R10_PACKS: readonly string[] = ['clinic', 'salon', 'fitness', 'workshop'];
+
 test('R6-B2 pin: the shell copies PACK_ROUTES / PACK_OF_TYPE_INLINE equal PACK_TABS / PACK_OF_TYPE', async () => {
   const { PACK_ROUTES, PACK_OF_TYPE_INLINE, moduleOfPath } = await import('../src/lib/shop-mode.ts');
   const { PACK_OF_TYPE } = await import('../src/lib/industry-packs.ts');
@@ -94,8 +96,12 @@ test('R6-B2 pin: the shell copies PACK_ROUTES / PACK_OF_TYPE_INLINE equal PACK_T
     const route = t.path.split('?')[0];
     if (!moduleOfPath(route)) continue; // core routes (e.g. /receivables) are always visible
     if (t.path.startsWith('/inventory?')) continue; // R9: the retail desks live on /inventory, which every retail profile keeps (PACK_ROUTES unchanged)
+    // R10: the service packs need no shell copy — every service profile keeps `time`, and the common-credit tab needs the
+    // `gst` module anyway (an unregistered clinic has no GST pages); PACK_ROUTES stays unchanged (first paint 0).
+    const packs = [t.pack, ...(t.alsoPacks ?? [])].filter((p) => !R10_PACKS.includes(p));
+    if (!packs.length) continue;
     const set = want.get(route) ?? new Set<string>();
-    for (const p of [t.pack, ...(t.alsoPacks ?? [])]) set.add(p);
+    for (const p of packs) set.add(p);
     want.set(route, set);
   }
   assert.deepEqual(Object.keys(PACK_ROUTES).sort(), [...want.keys()].sort());

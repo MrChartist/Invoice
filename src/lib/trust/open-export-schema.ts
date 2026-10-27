@@ -201,6 +201,13 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   hotel_settings: 'Hotel settings: business date, times, SAC codes, premises declarations.', // R7
   interest_settings: 'Interest-on-overdue defaults (R8-A).', bank_statement_settings: 'Bank stock-statement terms per bank account (R8-C).', tds_settings: 'TDS settings: our turnover per FY for 194Q (R8-C).',
   retail_settings: 'Retail checks: MRP guard, deliveries, short book, free quantity on bills, cash / PAN guard (R9).',
+  // R10-A
+  service_settings: 'Service desk settings: opening hours, slot, rooms / chairs / bays, message templates, Rule 46A and no-ITC switches (R10).',
+  appointments: 'Appointment book: client, date, start, services (price snapshot), staff, status, walk-in token (R10).',
+  service_staff: 'Service staff (stylists, trainers, doctors …): role, hours, payroll / supplier link, commission plan (R10).',
+  commission_plans: 'Staff commission plans: rules by item / category / kind, % of taxable or per unit, monthly slab (R10).',
+  staff_payouts: 'Monthly commission payouts per staff member: payroll adjustment or journal reference (R10).',
+  payer_claims: 'Payer claims (CLM/FY…): insurer / TPA / employer, beneficiary, approved amount, the two bills, status (R10).',
   // R11-A
   construction_settings: 'Construction profile switches: RA bill paper style, M-book column, government sign-off boxes, certificate text, deviation limit, works views (R11).',
   // R11-C

@@ -96,6 +96,8 @@ export const ggT = defineArea(
     exBandRate: '{name}: GST {rate}% but the price band gives {band}% (₹{value} per piece, limit ₹{limit}) — verify with your CA.',
     exBandEdge: '{name}: ₹{value} per piece is within ₹50 of the ₹{limit} price band — check the price (band {band}%).',
     exBandDiscount: '{name}: the discount moved the line into the {band}% band (₹{value} per piece, limit ₹{limit}).',
+    exSvRateOld: '{name}: GST {rate}% but this service class is {want}% without ITC on this date (rate looks old) — verify with your CA.', // R10 (SV-A4)
+    exSvNil: '{name}: a 0% line of an exempt service class without the exempt mark is reported as nil-rated — set Exempt on the line.',
     sevError: 'Error',
     sevReview: 'Review',
     colSeverity: 'Severity',
@@ -258,6 +260,8 @@ export const ggT = defineArea(
     exBandRate: '{name}: GST {rate}% पर प्राइस बैंड से {band}% बनता है (₹{value} प्रति पीस, सीमा ₹{limit}) — अपने CA से जाँचें।',
     exBandEdge: '{name}: ₹{value} प्रति पीस ₹{limit} प्राइस बैंड से ₹50 के भीतर — कीमत जाँचें (बैंड {band}%)।',
     exBandDiscount: '{name}: छूट से पंक्ति {band}% बैंड में आई (₹{value} प्रति पीस, सीमा ₹{limit})।',
+    exSvRateOld: '{name}: GST {rate}% पर इस तारीख़ को यह सेवा वर्ग {want}% बिना ITC है (दर पुरानी लगती है) — अपने CA से जाँचें।',
+    exSvNil: '{name}: छूट वाले सेवा वर्ग की 0% पंक्ति पर "छूट" निशान नहीं है, इसलिए यह निल-रेटेड में जाती है — पंक्ति पर छूट चुनें।',
     sevError: 'त्रुटि',
     sevReview: 'जाँचें',
     colSeverity: 'गंभीरता',
