@@ -3498,6 +3498,8 @@ try {
     await page.locator('[data-rc-add-units]').click();
     await page.locator('[data-rc-unit="A-104"]').waitFor({ timeout: 15000 });
     check(await page.locator('[data-rc-unit]').count() === 4, 'a tower of 4 units (A-101 … A-104)');
+    // The units must reach IndexedDB before the next page load reads them back.
+    await readJson(page, 'realty_units', [], (v) => v?.filter((u) => u.project_id === proj?.id).length >= 4, 15000);
     // C3: a construction-linked plan.
     await page.goto(srv.origin + '/receivables?tab=realty&view=plans');
     await page.locator('[data-rc="plan-name"]').fill('E2E CLP', { timeout: 15000 });
