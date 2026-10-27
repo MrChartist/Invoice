@@ -491,6 +491,8 @@ const RECORD_TABLES = [
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
   // R12-A: farm batches, quality-cut tables, pooled farmer cycles (CYB/FY…)
   'farm_batches', 'quality_cut_tables', 'farmer_cycles',
+  // R12-C (mills): weighbridge slips (WBS/FY…), custom-milling agreements (deliveries CMR/FY…)
+  'weighbridge_slips', 'cmr_agreements',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -579,6 +581,8 @@ const ID_TABLES = new Set([
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
   // R12-A: farm batches, quality-cut tables, pooled farmer cycles (CYB/FY…)
   'farm_batches', 'quality_cut_tables', 'farmer_cycles',
+  // R12-C (mills): weighbridge slips (WBS/FY…), custom-milling agreements (deliveries CMR/FY…)
+  'weighbridge_slips', 'cmr_agreements',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

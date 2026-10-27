@@ -98,14 +98,25 @@ export const MILK_DEFAULTS: readonly AgRule<{ clrCow: number; clrBuffalo: number
   { from: '2017-07-01', value: { clrCow: 28, clrBuffalo: 30, fatTolerancePct: 0.5 }, source: 'Practice (union rate charts); not a statutory value', verified: false },
 ];
 
-/* ── AG-C: mills (filled by AG-C) ────────────────────────────────────────────────────────────────────────────── */
+/* ── AG-C: mills — outturn standards, the Circular 153 test, job milling ─────────────────────────────────────────── */
 /** CMR outturn kg per 100 kg paddy: raw 67, parboiled 68 (agency norm; CAG Report 31 of 2015). */
 export const OUTTURN_STANDARDS: readonly AgRule<{ raw: number; parboiled: number }>[] = [
   { from: '2005-01-01', value: { raw: 67, parboiled: 68 }, source: 'Agency norm; CAG Report 31 of 2015 (norms unrevised since 2005) — AG agency terms win', verified: false },
 ];
+/**
+ * Own-mill outturn starters by mill kind (main + listed co-products per 100 of input; editable on each batch) and the
+ * flag tolerance in points (C2-4). Practice, not statute — adjust.
+ */
+export const OWN_OUTTURN_STARTERS: readonly AgRule<{ rice: number; flour: number; dal: number; oil: number; tolerance_pts: number }>[] = [
+  { from: '2005-01-01', value: { rice: 67, flour: 82, dal: 76, oil: 33, tolerance_pts: 1 }, source: 'Practice starters: rice = the CMR raw norm; roller-mill atta + maida + suji ~82%; dal + broken ~76%; mustard expeller oil ~33% — adjust (AG29, AG52)', verified: false },
+];
 /** Circular 153/09/2021: composite milling supply for PDS exempt when goods ≤ 25% of value. */
 export const MILLING_PDS_RULES: readonly AgRule<{ goodsPct: number; exemptEntry: string; elseRate: number }>[] = [
   { from: '2021-06-17', value: { goodsPct: 25, exemptEntry: 'N 12/2017-CT(R) entry 3A', elseRate: 5 }, source: 'Circular 153/09/2021-GST (17 Jun 2021) — read (AG9)', verified: true },
+];
+/** Job milling for others: 5% for a registered principal (entry 26); unregistered — no rule found, typed rate (AG10). */
+export const JOB_MILLING_RULES: readonly AgRule<{ registered: number; unregistered: number | null }>[] = [
+  { from: '2017-07-01', value: { registered: 5, unregistered: null }, source: 'N 11/2017-CT(R) entry 26 ("food and food products", registered principal) — recalled; unregistered principal: none found (AG10)', verified: false },
 ];
 
 /* ── AG-D: cold storage, input dealers, members (filled by AG-D) ─────────────────────────────────────────────── */
