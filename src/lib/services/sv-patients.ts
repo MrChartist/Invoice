@@ -55,6 +55,10 @@ export function saveClinicSettings(patch: Partial<ClinicSettings>): ClinicSettin
   return next;
 }
 
+const utc = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+/** Whole days from `a` to `b` (local `YYYY-MM-DD`). */
+export const dayDiff = (a: string, b: string): number => Math.round((utc(b) - utc(a)) / 864e5);
+
 /** UHID of a client (the R5-C roll no. when no UHID was given). */
 export const uhidOf = (c: Pick<Client, 'patient' | 'roll_no'> | undefined): string => c?.patient?.uhid || c?.roll_no || '';
 
@@ -143,7 +147,7 @@ export function clinicDraft(client: Client, items: InvoiceItem[], date: string, 
 export const patientClient = (id: string | undefined, name: string): Client => (id ? localDb.clients.getById(id) : undefined) ?? { ...blankClient(), name };
 
 /** Live (issued, not cancelled) invoice by id — "billed" is derived from it. */
-export const liveInvoice = (id: string | undefined, invoices = getTable<InvoiceRecord>('invoices')): InvoiceRecord | undefined => {
+export const liveInvoice = (id: string | undefined, invoices: readonly InvoiceRecord[] = getTable<InvoiceRecord>('invoices')): InvoiceRecord | undefined => {
   const inv = id ? invoices.find((i) => i.id === id) : undefined;
   return inv && inv.status !== 'Cancelled' ? inv : undefined;
 };
