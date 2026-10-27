@@ -20,13 +20,16 @@ export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit
   // R8-C: trading packs (tabs on /distribution; switched on by the `wholesale` trade profile, never by a business type)
   | 'distributor' | 'commodity' | 'agency'
   // R9 (RT-A1): retail packs (a tab each on /inventory; switched on by the `kirana` retail profile, never by a business type)
-  | 'pharmacy' | 'apparel' | 'electronics' | 'jewellery';
+  | 'pharmacy' | 'apparel' | 'electronics' | 'jewellery'
+  // R11 (CN-A1): builders / developers (a tab on /receivables; switched on by the `builder` construction profile)
+  | 'realty';
 
 export const PACK_IDS: readonly PackId[] = [
   'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
   'hotel', // R7-A
   'distributor', 'commodity', 'agency', // R8-C
   'pharmacy', 'apparel', 'electronics', 'jewellery', // R9 (RT-A1)
+  'realty', // R11 (CN-A1)
 ];
 
 /** The packs a business type implies when `industry_packs` is absent. */
@@ -143,6 +146,26 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'jewellery', path: '/inventory?tab=jewellery&view=tags', labelKey: 'r9.tags' },
   { pack: 'jewellery', path: '/inventory?tab=jewellery&view=oldgold', labelKey: 'r9.oldgold' },
   { pack: 'jewellery', path: '/inventory?tab=jewellery&view=karigar', labelKey: 'r9.karigar' },
+  // R11: construction — Works views on /time (pack `works`) and the builder desk on /receivables (pack `realty`);
+  // labels `r11.*` in `palette-destinations.ts`
+  { pack: 'works', path: '/time?tab=works&view=contracts', labelKey: 'r11.contracts' },
+  { pack: 'works', path: '/time?tab=works&view=advances', labelKey: 'r11.advances' },
+  { pack: 'works', path: '/time?tab=works&view=escalation', labelKey: 'r11.escalation' },
+  { pack: 'works', path: '/time?tab=works&view=guarantees', labelKey: 'r11.guarantees' },
+  { pack: 'works', path: '/time?tab=works&view=subcon', labelKey: 'r11.subcon' },
+  { pack: 'works', path: '/time?tab=works&view=labour', labelKey: 'r11.labour' },
+  { pack: 'works', path: '/time?tab=works&view=plant', labelKey: 'r11.plant' },
+  { pack: 'works', path: '/time?tab=works&view=reco', labelKey: 'r11.reco' },
+  { pack: 'works', path: '/time?tab=works&view=pnl', labelKey: 'r11.pnl' },
+  { pack: 'realty', path: '/receivables?tab=realty', labelKey: 'r11.realty' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=projects', labelKey: 'r11.projects' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=units', labelKey: 'r11.units' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=bookings', labelKey: 'r11.bookings' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=plans', labelKey: 'r11.plans' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=demands', labelKey: 'r11.demands' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=rera', labelKey: 'r11.rera' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=cancellations', labelKey: 'r11.cancellations' },
+  { pack: 'realty', path: '/receivables?tab=realty&view=procurement', labelKey: 'r11.procurement' },
 ];
 
 /**

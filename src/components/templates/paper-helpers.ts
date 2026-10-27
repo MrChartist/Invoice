@@ -89,3 +89,18 @@ export { weightText };
 
 /** R9 (RT-B2): "Registered pharmacist: name (reg. no.)" from the sender snapshot ('' when none, so other bills print as before). */
 export const pharmacistText = (sender: Pick<SenderProfile, 'pharmacist'>): string => (sender.pharmacist ? `Registered pharmacist: ${sender.pharmacist}` : '');
+
+/**
+ * R11 (CN-A3): the works sub-line under a bill line, from the document's construction snapshot only —
+ * "Item 2.1.3 · MB 112/45–47 · Extra item (approval EE/123)". '' without `boq_terms.cn`, so other documents print as before.
+ */
+export function worksLineText(item: Pick<InvoiceItem, 'id'> | undefined, cn: { lines?: Record<string, { ref?: string; mb?: string; kind?: string; approval?: string; substitutes?: string }> } | undefined): string {
+  const l = item && cn?.lines?.[item.id];
+  if (!l) return '';
+  const kind = l.kind === 'extra' ? 'Extra item' : l.kind === 'substituted' ? `Substituted item${l.substitutes ? ` for ${l.substitutes}` : ''}` : l.kind === 'deviation' ? 'Deviation' : '';
+  return [l.ref && `Item ${l.ref}`, l.mb && `MB ${l.mb}`, kind && `${kind}${l.approval ? ` (approval ${l.approval})` : ''}`].filter(Boolean).join(' · ');
+}
+
+/** R11 (CN-A3): "Tax Invoice — Running Account Bill No. 4" / "… — Final Bill" for an RA bill; '' otherwise. */
+export const raDocTitle = (inv: Pick<InvoiceRecord, 'ra_no' | 'ra_final'>, label: string): string =>
+  inv.ra_no ? `${label} — ${inv.ra_final ? 'Final Bill' : `Running Account Bill No. ${inv.ra_no}`}` : '';

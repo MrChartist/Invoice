@@ -153,7 +153,10 @@ export interface Transporter194c6 {
 
 /* ── Works contracts (R5-B4 … B6) ─────────────────────────────── */
 
-export type RaDeductionKind = 'retention' | 'advance_recovery' | 'it_tds' | 'gst_tds' | 'labour_cess' | 'security_deposit' | 'ld' | 'other';
+export type RaDeductionKind = 'retention' | 'advance_recovery' | 'it_tds' | 'gst_tds' | 'labour_cess' | 'security_deposit' | 'ld' | 'other'
+  // R11 (CN-B2 / B4): secured-advance recovery, client-material recovery, water & electricity, plant hire, interest on
+  // mobilisation advance, withheld amount (types only; the maths is CN-B's)
+  | 'secured_advance' | 'material_recovery' | 'water_power' | 'hire_charges' | 'advance_interest' | 'withheld';
 
 /** One row of a BOQ's deduction set (defaults for its RA bills). */
 export interface DeductionRule {

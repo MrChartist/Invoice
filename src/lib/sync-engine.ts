@@ -62,6 +62,7 @@ import type { AuditEntry } from '../types/audit';
 import './trade/tr-registry'; // R8-C: Round 8 tables' rights and audit labels (lazy registration)
 import './hotel/hotel-registry'; // R7: hotel tables' rights and audit labels (lazy registration)
 import './retail/rt-registry'; // R9: retail tables' rights and audit labels (lazy registration)
+import './construction/cn-registry'; // R11: construction tables' rights and audit labels (lazy registration)
 
 export const [SYNC_STATE_KEY, SYNC_CONFLICTS_KEY, SYNC_AUDIT_KEY] = SYNC_META_KEYS;
 

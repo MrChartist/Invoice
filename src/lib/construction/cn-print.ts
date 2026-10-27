@@ -1,0 +1,69 @@
+/**
+ * CN-A5: what the deductions block of a works bill prints — the `ra_deductions` snapshot grouped Statutory / Recoveries
+ * / Held / Other, net payable in figures and words, the notes and the certificate. Every amount comes from the
+ * snapshot (`ra_deductions`, `ra_net_payable`); nothing is recomputed at print. Pure. Working paper — verify with your CA.
+ */
+import type { InvoiceRecord } from '../../types/invoice';
+import type { RaDeduction, RaDeductionKind } from '../../types/transport-works-r5';
+import type { CnSnapshot, ConstructionKind } from '../../types/construction-r11';
+import { num, round2 } from '../invoice-calc';
+import { amountInWords } from '../amount-in-words';
+import { DEFAULT_CERTIFICATE } from '../construction-rules';
+import { worksDeclarations } from './cn-tax';
+
+export type DeductionGroup = 'statutory' | 'recoveries' | 'held' | 'other';
+
+/** Every deduction kind's group (the six CN-B kinds included, so B only fills the maths). */
+export const DEDUCTION_GROUP: Readonly<Record<RaDeductionKind, DeductionGroup>> = {
+  it_tds: 'statutory', gst_tds: 'statutory', labour_cess: 'statutory',
+  advance_recovery: 'recoveries', secured_advance: 'recoveries', material_recovery: 'recoveries', water_power: 'recoveries', hire_charges: 'recoveries', advance_interest: 'recoveries',
+  retention: 'held', security_deposit: 'held', withheld: 'held',
+  ld: 'other', other: 'other',
+};
+
+export const GROUP_ORDER: readonly DeductionGroup[] = ['statutory', 'recoveries', 'held', 'other'];
+export const GROUP_TITLE: Readonly<Record<DeductionGroup, string>> = { statutory: 'Statutory', recoveries: 'Recoveries', held: 'Held', other: 'Other' };
+
+export interface DeductionGroupRows {
+  group: DeductionGroup;
+  rows: RaDeduction[];
+  total: number;
+}
+
+/** Pure: the deductions grouped in print order (empty groups dropped; an unknown kind prints under Other). */
+export function groupDeductions(deds: readonly RaDeduction[] | undefined): DeductionGroupRows[] {
+  const list = (deds ?? []).filter((d) => d && num(d.amount) !== 0);
+  return GROUP_ORDER.map((group) => {
+    const rows = list.filter((d) => (DEDUCTION_GROUP[d.kind] ?? 'other') === group);
+    return { group, rows, total: round2(rows.reduce((s, d) => s + num(d.amount), 0)) };
+  }).filter((g) => g.rows.length > 0);
+}
+
+export const deductionsTotal = (deds: readonly RaDeduction[] | undefined): number => round2((deds ?? []).reduce((s, d) => s + num(d.amount), 0));
+
+/** Net payable as stored on the bill (`ra_net_payable`); a bill without it: total − Σ deductions. */
+export function netPayableOf(inv: Pick<InvoiceRecord, 'total' | 'ra_net_payable' | 'ra_deductions'>): number {
+  return inv.ra_net_payable !== undefined && Number.isFinite(Number(inv.ra_net_payable)) ? round2(num(inv.ra_net_payable)) : round2(num(inv.total) - deductionsTotal(inv.ra_deductions));
+}
+
+/** "Rupees Eight Lakh … Only" (Indian system, `amountInWords`). */
+export const netPayableWords = (amount: number, currency = 'INR'): string => amountInWords(amount, currency);
+
+/** Notes printed under the deductions (only for the rows that exist). `money` formats an amount. */
+export function deductionNotes(deds: readonly RaDeduction[] | undefined, money: (n: number) => string): string[] {
+  const list = deds ?? [];
+  if (!list.length) return [];
+  const sum = (k: RaDeductionKind) => round2(list.filter((d) => d.kind === k).reduce((s, d) => s + num(d.amount), 0));
+  const out = ['GST is charged on the full bill value; deductions do not reduce it.'];
+  if (sum('gst_tds') > 0) out.push(`GST TDS u/s 51 (${money(sum('gst_tds'))}) to be deducted by the recipient — credit after GSTR-7.`);
+  if (sum('labour_cess') > 0) out.push(`Labour cess deducted at source (${money(sum('labour_cess'))}).`);
+  return out;
+}
+
+/** The declaration lines of a works document (composite supply / supply + installation / pure labour). */
+export const cnDeclarations = (cn: CnSnapshot | undefined, isRaBill: boolean): string[] => (cn || isRaBill ? worksDeclarations(cn?.lines, !!cn?.works || isRaBill) : []);
+
+/** Certificate defaults by kind: every construction kind prints the contractor's certificate; builders' demands do not. */
+export function defaultCertificateFor(kind: ConstructionKind | undefined, government: boolean): { text?: string; boxes: boolean } {
+  return { ...(kind === 'builder' ? {} : { text: DEFAULT_CERTIFICATE }), boxes: government };
+}

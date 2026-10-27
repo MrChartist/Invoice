@@ -102,6 +102,7 @@ export const discoverT = defineArea(
     'adv.tables': 'Restaurant tables & KOT',
     'adv.pharma': 'Pharma checks (expiry, MRP)',
     'adv.scale': 'Weighing scale',
+    'adv.construction': 'Construction profile', // R11 (CN-A1)
     'awho.batches': 'Lots with expiry (set per stock item)',
     'awho.serials': 'Goods sold by serial / IMEI (per item)',
     'awho.godowns': 'Stock in more than one place',
@@ -123,6 +124,7 @@ export const discoverT = defineArea(
     'awho.tables': 'Dine-in tables',
     'awho.pharma': 'Block expired stock and above-MRP sales',
     'awho.scale': 'Weighing loose goods (this device)',
+    'awho.construction': 'Contractors: civil / EPC, sub-contractor, builder, interiors, MEP, labour — RA bill paper and Works views',
   } as const,
   {
     learnMore: 'और जानें',
@@ -221,6 +223,7 @@ export const discoverT = defineArea(
     'adv.tables': 'रेस्टोरेंट टेबल और KOT',
     'adv.pharma': 'फ़ार्मा जाँच (एक्सपायरी, MRP)',
     'adv.scale': 'तौल मशीन',
+    'adv.construction': 'निर्माण प्रोफ़ाइल',
     'awho.batches': 'एक्सपायरी वाले लॉट (हर स्टॉक आइटम पर)',
     'awho.serials': 'सीरियल / IMEI से बिक्री (हर आइटम पर)',
     'awho.godowns': 'एक से ज़्यादा जगह स्टॉक',
@@ -242,5 +245,6 @@ export const discoverT = defineArea(
     'awho.tables': 'डाइन-इन टेबल',
     'awho.pharma': 'एक्सपायर्ड स्टॉक और MRP से ऊपर बिक्री रोकें',
     'awho.scale': 'खुला सामान तौलना (यह डिवाइस)',
+    'awho.construction': 'ठेकेदार: सिविल / EPC, उप-ठेकेदार, बिल्डर, इंटीरियर, MEP, लेबर — रनिंग बिल पेपर और वर्क्स व्यू',
   },
 );
