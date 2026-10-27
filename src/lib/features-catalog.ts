@@ -24,7 +24,8 @@ export type AdvancedId =
   | 'tables' | 'pharma' | 'scale'
   | 'construction' // R11 (CN-A1)
   | 'serviceProfile' // R10 (SV-A1)
-  | 'agriProfile'; // R12 (AG-A1)
+  | 'agriProfile' // R12 (AG-A1)
+  | 'mfgProfile'; // R13 (MF-A1)
 
 export interface FeatureRow {
   /** `mod.<id>`, `pack.<id>` or `adv.<id>`. */
@@ -102,6 +103,8 @@ const ADVANCED: readonly { id: AdvancedId; href: string; isOn: FeatureRow['isOn'
   { id: 'serviceProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { service_kind?: unknown }).service_kind === 'string' },
   // R12 (AG-A1): the agri profile (Settings → Features "Agriculture profile", shown for every company)
   { id: 'agriProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { agri_kind?: unknown }).agri_kind === 'string' },
+  // R13 (MF-A1): the manufacturing profile (Settings → Features "Manufacturing profile", shown for every company)
+  { id: 'mfgProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { mfg_kind?: unknown }).mfg_kind === 'string' },
 ];
 
 /** Where each module's screen is (the first sidebar route that belongs to it). */
@@ -153,6 +156,13 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   coldstore: '/inventory?tab=cold',
   agri_inputs: '/inventory?tab=inputs',
   fpo: '/inventory?tab=members',
+  // R13 (MF-A1): manufacturing desks (tabs on Manufacturing)
+  shopfloor: '/manufacturing?tab=floor',
+  fabrication: '/manufacturing?tab=shop',
+  garments: '/manufacturing?tab=garments',
+  plastics: '/manufacturing?tab=moulding',
+  press: '/manufacturing?tab=press',
+  foodmfg: '/manufacturing?tab=food',
 };
 
 export const FEATURE_ROWS: readonly FeatureRow[] = [

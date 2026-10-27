@@ -315,3 +315,54 @@ export function applyAgriKind(kind: AgriKindId, opts: { registered?: boolean; mi
   if (kind === 'inputs') out.retail_kind = 'general';
   return out;
 }
+
+/* ── R13 (MF-A1): manufacturing profile — a wizard card that is not a business type ── */
+
+/** The manufacturing picker's choices (stored as `settings.mfg_kind`); each writes `manufacturer` (or nothing: `other`). */
+export const MFG_KINDS = ['engineering', 'textile', 'plastics', 'printing', 'food', 'other'] as const;
+export type MfgKindId = (typeof MFG_KINDS)[number];
+/** The sub-choice of a kind (settings `mfg_sub`); the first is the default. */
+export const MFG_SUBS: Readonly<Partial<Record<MfgKindId, readonly string[]>>> = {
+  engineering: ['drawing', 'catalogue'],
+  textile: ['garments', 'yarn', 'fabric', 'processing'],
+  plastics: ['moulding', 'extrusion', 'film', 'corrugation'],
+};
+type MfgPackId = 'shopfloor' | 'fabrication' | 'garments' | 'plastics' | 'press' | 'foodmfg';
+
+export interface MfgProfile {
+  /** `manufacturer`; absent (`other`) = the business type and modules are unchanged. */
+  type?: BusinessType;
+  modules?: readonly ModuleId[];
+  packs: readonly MfgPackId[];
+  landing: string;
+  defaultDueDays?: number;
+  templateId?: string;
+}
+
+const MF_GST: Pick<MfgProfile, 'type' | 'modules' | 'templateId'> = { type: 'manufacturer', modules: PRESETS.manufacturer, templateId: 'gst_tax_invoice' };
+export const MFG_PROFILES: Readonly<Record<MfgKindId, MfgProfile>> = {
+  engineering: { ...MF_GST, packs: ['shopfloor', 'fabrication'], landing: '/manufacturing?tab=floor&view=cards', defaultDueDays: 30 },
+  textile: { ...MF_GST, packs: ['shopfloor', 'garments'], landing: '/manufacturing?tab=garments&view=styles', defaultDueDays: 45 },
+  plastics: { ...MF_GST, packs: ['shopfloor', 'plastics'], landing: '/manufacturing?tab=moulding&view=runs', defaultDueDays: 30 },
+  printing: { ...MF_GST, packs: ['shopfloor', 'press'], landing: '/manufacturing?tab=press&view=estimates', defaultDueDays: 30 },
+  food: { ...MF_GST, modules: [...PRESETS.manufacturer, 'pos'], packs: ['shopfloor', 'foodmfg'], landing: '/manufacturing?tab=food&view=costcards', defaultDueDays: 15 },
+  other: { packs: ['shopfloor'], landing: '/manufacturing?tab=floor' },
+};
+
+export const isMfgKind = (v: unknown): v is MfgKindId => typeof v === 'string' && (MFG_KINDS as readonly string[]).includes(v);
+
+/**
+ * Settings patch for a manufacturing profile: business type and modules (`registered` adds `gst`; every kind keeps
+ * `inventory` and `payroll`), the packs (the kind's own, in union with the packs the company has, so an agri mill that
+ * also packs namkeen keeps its agri desks) and the kind / sub-choice. `other` keeps the type and modules. The profile's
+ * switches (`mfg_settings`) are written by `mfg/mf-profile.ts`.
+ */
+export function applyMfgKind(kind: MfgKindId, opts: { registered?: boolean; sub?: string; currentPacks?: readonly PackId[] } = {}): ShopModeSettings & { mfg_kind: MfgKindId; mfg_sub?: string; industry_packs: PackId[] } {
+  const p = MFG_PROFILES[kind];
+  const out: ShopModeSettings & { mfg_kind: MfgKindId; mfg_sub?: string; industry_packs: PackId[] } = { mfg_kind: kind, industry_packs: [...new Set<PackId>([...(opts.currentPacks ?? []), ...p.packs])] };
+  if (p.type) out.business_type = p.type;
+  if (p.modules) out.modules = [...new Set<ModuleId>([...p.modules, 'inventory', 'payroll', ...(opts.registered ? ['gst' as const] : [])])];
+  const subs = MFG_SUBS[kind];
+  if (subs) out.mfg_sub = subs.includes(opts.sub ?? '') ? opts.sub : subs[0];
+  return out;
+}
