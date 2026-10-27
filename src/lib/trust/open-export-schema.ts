@@ -208,6 +208,12 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   commission_plans: 'Staff commission plans: rules by item / category / kind, % of taxable or per unit, monthly slab (R10).',
   staff_payouts: 'Monthly commission payouts per staff member: payroll adjustment or journal reference (R10).',
   payer_claims: 'Payer claims (CLM/FY…): insurer / TPA / employer, beneficiary, approved amount, the two bills, status (R10).',
+  // R10-C
+  member_plans: 'Membership plans and packages: kind, term / sessions, price and tax class, freeze / transfer / refund rules, wallet bonus (R10).',
+  memberships: 'Memberships (MEM/FY…): member, plan snapshot, start / end, freezes, upgrade / transfer / renewal history, sale bills, wallet top-ups (R10).',
+  checkins: 'Check-ins: one row per day with each member, time, membership and a redeemed session (R10).',
+  class_schedules: 'Classes and coaching batches: teacher / trainer, weekdays and time, dates, capacity, members and wait-list, holidays (R10).',
+  class_attendance: 'Class / batch attendance: one row per class and day, present / absent / late per member or student (R10).',
   // R11-A
   construction_settings: 'Construction profile switches: RA bill paper style, M-book column, government sign-off boxes, certificate text, deviation limit, works views (R11).',
   // R11-C

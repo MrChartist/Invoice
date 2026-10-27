@@ -52,6 +52,7 @@ export function cleanServiceSettings(raw: unknown): ServiceSettings {
   for (const k of ['print_staff', 'staff_required', 'rule46a', 'no_itc_as_exempt', 'itc_caution', 'composition_note_seen'] as const) if (typeof r[k] === 'boolean') out[k] = r[k] as boolean;
   if (r.tips === 'pass-through' || r.tips === 'off') out.tips = r.tips;
   if (r.checkin_gate === 'off' || r.checkin_gate === 'warn' || r.checkin_gate === 'block') out.checkin_gate = r.checkin_gate;
+  if (r.upgrade_mode === 'difference' || r.upgrade_mode === 'credit_note') out.upgrade_mode = r.upgrade_mode; // SV-C
   if (typeof r.updated_at === 'string') out.updated_at = r.updated_at;
   return out;
 }

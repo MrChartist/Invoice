@@ -480,6 +480,8 @@ const RECORD_TABLES = [
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
   // R10-A: appointments, service staff, commission plans, staff payouts, payer claims (CLM/FY…)
   'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
+  // R10-C: membership plans, memberships (MEM/FY…), check-ins (one row per day), classes / batches, class attendance
+  'member_plans', 'memberships', 'checkins', 'class_schedules', 'class_attendance',
   // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
   // (MUS settlements), hired equipment, plant log sheets (PLG)
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
@@ -560,6 +562,8 @@ const ID_TABLES = new Set([
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
   // R10-A: appointments, service staff, commission plans, staff payouts, payer claims (CLM/FY…)
   'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
+  // R10-C: membership plans, memberships (MEM/FY…), check-ins (one row per day), classes / batches, class attendance
+  'member_plans', 'memberships', 'checkins', 'class_schedules', 'class_attendance',
   // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
   // (MUS settlements), hired equipment, plant log sheets (PLG)
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
