@@ -5,7 +5,7 @@
 import './helpers/shim.ts';
 import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freezeDate, resetStorage, thawDate } from './helpers/shim.ts';
+import { ZONES, freezeDate, inTimeZones, resetStorage, thawDate } from './helpers/shim.ts';
 import { SELLER, createViaStore, gstin, installSettings } from './helpers/world.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { DB_PREFIX, getTable, readRaw, setTable, writeRaw } from '../src/lib/storage.ts';
@@ -19,6 +19,9 @@ import { BIN_TABLE, restoreEntry } from '../src/lib/trust/recycle-bin.ts';
 import { withCancel } from '../src/lib/einvoice-cancel.ts';
 import { BACKUP_RECORD_TABLES, buildBackup, parseBackup, restoreBackup, wipeAppData } from '../src/lib/backup.ts';
 import { fullSource } from './export-fixtures.ts';
+import { readFileSync } from 'node:fs';
+import { amountInWords } from '../src/lib/amount-in-words.ts';
+import { amountInWordsHi } from '../src/lib/amount-in-words-hi.ts';
 import type { StockTransfer } from '../src/types/stock.ts';
 import type { BinEntry } from '../src/types/trade-r4.ts';
 import type { EInvoiceMeta } from '../src/lib/einvoice.ts';
@@ -61,17 +64,33 @@ test('Q2: a hand-entered journal whose class matches a module class restores fro
   assert.throws(() => restoreEntry(e2.id), /post it twice/);
 });
 
-test('Q3: an e-invoice cancel marked done just after midnight is dated the local day', () => {
+test('Q5: an e-invoice cancel marked done just after midnight is dated the local day', () => {
   const meta = { invoice_id: 'i1', irn: 'x' } as unknown as EInvoiceMeta;
-  const at = new Date(2026, 9, 25, 0, 30); // 25 Oct 00:30 local (IST: 24 Oct 19:00 UTC)
-  assert.equal(withCancel(meta, 'irn', { status: 'done' }, at).irn_cancel?.done_on, '2026-10-25');
+  inTimeZones(ZONES, (tz) => {
+    const at = new Date(2026, 9, 25, 0, 30); // 25 Oct 00:30 local (IST: 24 Oct 19:00 UTC)
+    assert.equal(withCancel(meta, 'irn', { status: 'done' }, at).irn_cancel?.done_on, '2026-10-25', tz);
+  });
 });
 
-test('Q4: Tally stock journal — a transfer line in an alternate unit goes out in the item base unit', () => {
+test('Q3: Tally stock journal — a transfer line in an alternate unit goes out in the item base unit', () => {
   const src = { ...fullSource(), books: { today: '2026-08-01', chart: chartOf([]), stockItems: [{ id: 'i1', name: 'Widget', unit: 'nos' }], godowns: [{ id: 'g2', name: 'Warehouse 2' }], stockTransfers: [{ id: 't1', transfer_number: 'STR/FY26-27/0002', date: '2026-07-25', from_godown: 'main', to_godown: 'g2', lines: [{ id: 'l1', item_id: 'i1', qty: 5, unit: 'BOX', unit_factor: 12 }] }] } };
   const b = buildTallyModel(src as never, { companyName: 'X' });
   const sj = b.vouchers.find((v) => v.type === 'Stock Journal')!;
   assert.deepEqual(sj.stock?.lines.map((l) => [l.qty, l.unit]), [[60, 'NOS']]);
+});
+
+test('Q4: amount in words at ₹1,000 crore and above (never "undefined Hundred Crore")', () => {
+  assert.equal(amountInWords(1e11), 'Rupees Ten Thousand Crore Only');
+  assert.equal(amountInWords(12e9), 'Rupees One Thousand Two Hundred Crore Only', 'same words as the Hindi line (एक हज़ार दो सौ करोड़)');
+  assert.match(amountInWordsHi(12e9), /एक हज़ार दो सौ करोड़/);
+  assert.equal(amountInWords(1e12 + 0.5), 'Rupees One Lakh Crore and Fifty Paise Only');
+  assert.equal(amountInWords(2e12, 'USD'), 'Dollars Two Thousand Billion Only');
+  assert.equal(amountInWords(99_99_99_999.99), 'Rupees Ninety Nine Crore Ninety Nine Lakh Ninety Nine Thousand Nine Hundred Ninety Nine and Ninety Nine Paise Only', 'below 1,000 crore unchanged');
+});
+
+test('Q6: the paper reads receipt rows without copying the table (it renders on every keystroke of the live preview)', () => {
+  const src = readFileSync(new URL('../src/components/templates/paper-helpers.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /\bgetTable\b/, 'peekTable only: a 20,000-row receipts table was copied row by row on each render');
 });
 
 test('backup → wipe → restore round-trips every record table (R7–R12 included) of a plain company', () => {
