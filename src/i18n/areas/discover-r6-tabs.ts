@@ -198,7 +198,7 @@ export const tabsT = defineArea(
     'time.settings': 'Time settings',
     'time.works': 'Works contracts (BOQ, RA bills, sub-contracts, muster, plant, site P&L)',
     // R10: service desks (also "Industry packs" rows)
-    'time.matters': 'Matters, engagements, conflict checks, letters', 'time.wip': 'WIP, pre-bill, realisation, utilisation, year end', // R14 (PS-A)
+    'time.matters': 'Matters, engagements, conflict checks, letters', 'time.wip': 'WIP, pre-bill, realisation, utilisation, year end', 'time.exportsvc': 'Exports of services: Sec 2(6) check, EDF, realisation, refund, platforms', // R14 (PS-A)
     'time.appointments': 'Appointments: day book, queue, reminders', 'time.commission': 'Staff & commission', 'time.clinic': 'Clinic: patients, OPD, lab', 'time.members': 'Members: plans, check-in, classes', 'time.workshop': 'Workshop: job cards, estimates, claims',
     // Recurring
     'recurring.schedules': 'Recurring schedules',
@@ -396,7 +396,7 @@ export const tabsT = defineArea(
     'time.retainers': 'रिटेनर',
     'time.settings': 'समय सेटिंग्स',
     'time.works': 'वर्क्स कॉन्ट्रैक्ट (BOQ, RA बिल, उप-ठेके, हाज़िरी, प्लांट, साइट लाभ-हानि)',
-    'time.matters': 'मामले, नियुक्तियाँ, हितों का टकराव जाँच, नियुक्ति पत्र', 'time.wip': 'अबिल्ड कार्य, प्री-बिल, वसूली दर, उपयोग दर, वर्ष अंत',
+    'time.matters': 'मामले, नियुक्तियाँ, हितों का टकराव जाँच, नियुक्ति पत्र', 'time.wip': 'अबिल्ड कार्य, प्री-बिल, वसूली दर, उपयोग दर, वर्ष अंत', 'time.exportsvc': 'सेवाओं का निर्यात: धारा 2(6) जाँच, EDF, वसूली, रिफंड, प्लेटफ़ॉर्म',
     'time.appointments': 'अपॉइंटमेंट: दिन बुक, कतार, रिमाइंडर', 'time.commission': 'स्टाफ और कमीशन', 'time.clinic': 'क्लिनिक: मरीज़, OPD, लैब', 'time.members': 'सदस्य: प्लान, चेक-इन, क्लास', 'time.workshop': 'वर्कशॉप: जॉब कार्ड, एस्टिमेट, क्लेम',
     'recurring.schedules': 'आवर्ती शेड्यूल',
     'recurring.batch': 'बैच इनवॉइस',

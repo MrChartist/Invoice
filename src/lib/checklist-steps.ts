@@ -31,7 +31,7 @@ export type StepKind =
   | PsStep;
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'lut', 'edf', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -127,12 +127,15 @@ export interface ChecklistFactsV3 {
 }
 
 /** R14 (PS-A1): the professional steps, the kinds that have them and where each opens. */
-type PsStep = 'firstMatter' | 'staffCapacity' | 'enrolment' | 'conflictCheck';
+type PsStep = 'firstMatter' | 'staffCapacity' | 'enrolment' | 'conflictCheck' | 'lut' | 'edf'; // PS-C: lut, edf (pack `svcexport`)
 const PS_STEPS: Readonly<Record<PsStep, [kinds: string, to: string]>> = {
   firstMatter: ['ca legal design consulting agency freelancer other', '/time?tab=matters&view=matters'],
   staffCapacity: ['ca legal design consulting agency freelancer other', '/time?tab=wip&view=utilisation'],
   enrolment: ['legal', '/settings?tab=features'],
   conflictCheck: ['legal', '/time?tab=matters&view=conflicts'],
+  // PS-C (any kind with the `svcexport` pack): the LUT register, the first EDF
+  lut: ['@svcexport', '/settings?tab=business'],
+  edf: ['@svcexport', '/time?tab=exportsvc&view=edf'],
 };
 const isPsStep = (k: string): k is PsStep => Object.hasOwn(PS_STEPS, k);
 
@@ -249,7 +252,7 @@ function applies(kind: StepKind, ctx: ChecklistCtx): boolean {
     case 'memberPlan': return ctx.serviceKind === 'fitness';
     case 'batch': return ctx.serviceKind === 'coaching';
     case 'labourOp': case 'jobCard': return ctx.serviceKind === 'workshop' || ctx.serviceKind === 'appliance';
-    default: return isPsStep(kind) ? !!ctx.profKind && PS_STEPS[kind][0].split(' ').includes(ctx.profKind) : isMfStep(kind) ? !!ctx.mfgKind && MF_STEPS[kind][0].split(' ').includes(ctx.mfgKind) : isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri / R13 mfg steps
+    default: return isPsStep(kind) ? !!ctx.profKind && (PS_STEPS[kind][0] === '@svcexport' ? ctx.packs.includes('svcexport') : PS_STEPS[kind][0].split(' ').includes(ctx.profKind)) : isMfStep(kind) ? !!ctx.mfgKind && MF_STEPS[kind][0].split(' ').includes(ctx.mfgKind) : isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri / R13 mfg steps
   }
 }
 
@@ -422,6 +425,8 @@ function profFacts(): Partial<Record<PsStep, number>> {
     staffCapacity: peekTable<{ ps?: { capacity_hours_week?: number } }>('service_staff').filter((s) => (s?.ps?.capacity_hours_week ?? 0) > 0).length,
     enrolment: ps?.legal?.enrolment ? 1 : 0,
     conflictCheck: peekTable('conflict_checks').length,
+    lut: peekTable('lut_register').length, // PS-C
+    edf: peekTable('edf_register').length,
   };
 }
 

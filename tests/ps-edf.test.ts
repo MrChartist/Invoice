@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { resetStorage } from './helpers/shim.ts';
 import { installSettings } from './helpers/world.ts';
 import { EDF_TABLE, edfDb, edfDue, edfDueList, edfKindOf, prepareEdf } from '../src/lib/prof/ps-edf.ts';
-import { EDF_RULES } from '../src/lib/prof/ps-c-rules.ts';
+import { EDF_RULES } from '../src/lib/prof-rules.ts';
 import { getTable } from '../src/lib/storage.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
 
@@ -62,4 +62,13 @@ test('register: drafts written once, filed, closed on declaration only when smal
   assert.throws(() => edfDb.addSoftex({ period: '2026-10', currency: 'USD', value_fc: 1, value_inr: 1 }), /edfSoftexAfter/);
   edfDb.remove(big.id);
   assert.equal(getTable(EDF_TABLE).length, 3);
+});
+
+test('registry: edf_register is books, audited, backed up, synced by `date`; the writers import the registry', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { PS_TABLE_ACTIONS, PS_WATCHED } = await import('../src/lib/prof/ps-registry.ts');
+  assert.equal(PS_TABLE_ACTIONS.edf_register, 'books.edit');
+  assert.ok(PS_WATCHED.edf_register.label);
+  for (const f of ['ps-edf', 'ps-platforms']) assert.match(readFileSync(new URL(`../src/lib/prof/${f}.ts`, import.meta.url), 'utf8'), /import '\.\/ps-registry';/, f);
+  assert.match(readFileSync(new URL('../src/lib/sync-engine.ts', import.meta.url), 'utf8'), /\[`\$\{DB_PREFIX\}edf_register`\]: 'date'/);
 });

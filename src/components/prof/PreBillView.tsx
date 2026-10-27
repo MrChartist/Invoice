@@ -1,5 +1,5 @@
 /** PS-A3 Pre-bill: review a matter's unbilled time row by row, apply the engagement's model, and create the draft fee note. */
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { loadCostCentres } from '../../lib/cost-centres';
 import { clientKey, currentLiveInvoiceIds, readTimePrefs, timeDb, unbilledTime } from '../../lib/timesheets';
@@ -16,6 +16,9 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field } from './ps-ui';
 import { runWith, type PsDeskProps } from './ps-run';
+
+// R14 PS-C4: foreign-currency rate cards converted at the currency master's rate (lazy; nothing without such a card).
+const FxRateRow = lazy(() => import('./FxRateRow'));
 
 export default function PreBillView({ notify }: Pick<PsDeskProps, 'notify'>) {
   const run = runWith(notify);
@@ -72,6 +75,7 @@ export default function PreBillView({ notify }: Pick<PsDeskProps, 'notify'>) {
             {(eng.milestones ?? []).filter((m) => !view?.use.milestones.includes(m.id)).map((m) => <label key={m.id} className={controls.check}><input type="checkbox" checked={ms.includes(m.id)} onChange={(e) => setMs(e.target.checked ? [...ms, m.id] : ms.filter((x) => x !== m.id))} /> {m.label}{m.done_on || (m.due && m.due <= todayInput()) ? ' ✓' : ''}</label>)}
           </div>
         )}
+        {!!view?.sel.time.length && <Suspense fallback={null}><FxRateRow entries={view.sel.time} currency={eng?.currency} onApply={(r) => setEdits((x) => ({ ...x, ...Object.fromEntries(Object.entries(r).map(([id, rate]) => [id, { ...x[id], rate }])) }))} /></Suspense>}
         {!view?.sel.time.length && !view?.sel.expenses.length && <p className={controls.hint}>{pwT('nothing')}</p>}
         <div className={surface.tableWrap}>
           <table className={surface.table} data-prebill>

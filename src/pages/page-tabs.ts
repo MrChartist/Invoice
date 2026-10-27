@@ -132,6 +132,7 @@ export const TIME_TABS = [
   // R14: professional desks (one lazy chunk each; views in `&view=`). B / C / D append clientmoney, exportsvc, firm, cadesk.
   { id: 'matters', pack: 'practice' }, // PS-A2: views matters / engagements / conflicts / letters
   { id: 'wip', pack: 'practice' }, // PS-A3 / A4: views wip / prebill / realisation / utilisation / profit / yearend
+  { id: 'exportsvc', pack: 'svcexport' }, // PS-C: views checker / edf / realisation / refund / platforms
 ] as const;
 export type TimeTab = (typeof TIME_TABS)[number]['id'];
 /* ── Recurring ── */

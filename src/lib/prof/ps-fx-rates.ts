@@ -48,3 +48,22 @@ export function atClosing(amount: number, currency: string, yearEnd: string, row
   const r = inrPerUnit(currency, yearEnd, rows);
   return r ? round2(amount * r.rate) : null;
 }
+
+/**
+ * Pre-bill (C4): unbilled entries whose rate card is in another currency than the document — the work type's
+ * `ps.currency` names it — with the rate converted on the bill date. Entries in the document currency are left out.
+ */
+export function entryConversions(
+  entries: readonly { id: string; hourly_rate: number; work_type_id?: string }[],
+  workTypes: readonly { id: string; ps?: { currency?: string } }[],
+  to: string,
+  date: string,
+  rows: readonly CurrencyRate[],
+): (Converted & { id: string; original: number })[] {
+  const cur = new Map(workTypes.map((w) => [w.id, cardCurrency(w)]));
+  const t = (to || 'INR').toUpperCase();
+  return entries.flatMap((e) => {
+    const from = (e.work_type_id && cur.get(e.work_type_id)) || 'INR';
+    return from === t || !(e.hourly_rate > 0) ? [] : [{ ...convertRate(e.hourly_rate, from, t, date, rows), id: e.id, original: e.hourly_rate }];
+  });
+}

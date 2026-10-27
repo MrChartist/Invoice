@@ -7,7 +7,7 @@ import { installSettings, SELLER } from './helpers/world.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { exportCheck, preflightIssues, verdict, withChecks } from '../src/lib/prof/ps-export-check.ts';
 import { servicePos } from '../src/lib/prof/ps-pos.ts';
-import { INTERMEDIARY_POS_RULES, intermediaryPos } from '../src/lib/prof/ps-c-rules.ts';
+import { INTERMEDIARY_POS_RULES, intermediaryPos } from '../src/lib/prof-rules.ts';
 import { buildCommissionInvoice } from '../src/lib/trade/tr-indents.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
 import type { Indent } from '../src/types/trade-r8.ts';
@@ -21,7 +21,7 @@ const inv = (over: Record<string, unknown> = {}) => ({
   id: 'i1', invoice_number: 'INV/FY26-27/0001', doc_type: 'INVOICE', status: 'Sent', supply_type: 'EXPORT_LUT', place_of_supply: '96', currency: 'USD',
   total: 2200, issue_date: '2026-10-31', sender: SELLER, client: { id: 'c1', name: 'Acme Inc' }, items: [{ id: 'l', name: 'Consulting', type: 'Service', hsn: '998313', quantity: 40, rate: 55, tax_rate: 0, amount: 2200 }],
   ...over,
-}) as Partial<InvoiceRecord> & { ps?: { export?: Record<string, unknown> } };
+}) as Partial<InvoiceRecord>;
 const us = { ps: { country: 'US' } };
 const states = (c: ReturnType<typeof exportCheck>) => c.items.map((i) => `${i.id}:${i.state}`).join(' ');
 
@@ -42,7 +42,7 @@ test('recipient in India, an Indian establishment, own branch → not an export'
   assert.equal(exportCheck({ invoice: inv(), client: { ps: { country: 'India' } } }).items[1].reason, 'recipientIndia');
   const est = exportCheck({ invoice: inv(), client: { ps: { country: 'GB', fixed_estab_in_india: true } } });
   assert.deepEqual([est.items[1].state, est.items[1].reason, verdict(est)], ['fail', 'estabIndia', 'not']);
-  const br = exportCheck({ invoice: inv(), client: { ps: { country: 'US', relation: 'own_branch' } } });
+  const br = exportCheck({ invoice: inv(), client: { ps: { country: 'US', relation: 'distinct_person' } } });
   assert.deepEqual([br.items[4].state, verdict(br)], ['fail', 'not']);
   assert.equal(exportCheck({ invoice: inv(), client: { ps: { country: 'US', relation: 'group' } } }).items[4].state, 'ok');
   // No country: place of supply 96 → abroad; an Indian document with no country → unknown.
@@ -77,13 +77,15 @@ test('payment in INR: only through a route marked RBI-permitted (SRVA, Circular 
 });
 
 test('snapshot keeps the other ps sub-objects; preflight: warning on a failing LUT export, info while pending', () => {
-  const doc = inv({ ps: { matter: { code: 'M1' }, export: { purpose_code: 'P0802' } } });
+  const doc = inv({ ps: { matter: { id: 'm', code: 'M1', name: 'M' }, purpose_code: 'P0802', export: { pos_class: 'general' } } });
   const c = exportCheck({ invoice: doc, client: us });
-  const snap = withChecks(doc, c) as typeof doc & { ps: { matter: unknown; export: { checks: unknown; purpose_code: string } } };
-  assert.deepEqual(snap.ps.matter, { code: 'M1' });
-  assert.equal(snap.ps.export.purpose_code, 'P0802');
-  assert.equal(snap.ps.export.checks, c);
-  const issues = preflightIssues([inv(), inv({ id: 'i2', invoice_number: 'B', client: { id: 'c2', name: 'Branch' } }), inv({ id: 'i3', supply_type: 'EXPORT_WITH_PAYMENT' })], { clients: [{ id: 'c1', ps: { country: 'US' } }, { id: 'c2', ps: { country: 'US', relation: 'own_branch' } }] });
+  const snap = withChecks(doc, c) as InvoiceRecord;
+  assert.equal(snap.ps?.matter?.code, 'M1');
+  assert.equal(snap.ps?.purpose_code, 'P0802');
+  assert.equal(snap.ps?.export?.pos_class, 'general');
+  assert.deepEqual(snap.ps?.export?.checks, [{ key: 'supplier', ok: true }, { key: 'recipient', ok: true }, { key: 'pos', ok: true }, { key: 'payment', ok: false }, { key: 'distinct', ok: true }]);
+  assert.equal(snap.ps?.export?.checked_on, '2026-10-31');
+  const issues = preflightIssues([inv(), inv({ id: 'i2', invoice_number: 'B', client: { id: 'c2', name: 'Branch' } }), inv({ id: 'i3', supply_type: 'EXPORT_WITH_PAYMENT' })], { clients: [{ id: 'c1', ps: { country: 'US' } }, { id: 'c2', ps: { country: 'US', relation: 'distinct_person' } }] });
   assert.deepEqual(issues.map((i) => `${i.invoiceId}:${i.severity}:${i.code}`), ['i1:info:PS_EXPORT_PENDING', 'i2:warning:PS_EXPORT_FAIL']);
 });
 

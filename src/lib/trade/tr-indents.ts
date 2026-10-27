@@ -24,7 +24,7 @@ import { isValidGstin } from '../gstin';
 import { tdsSections } from '../tax-rules';
 import { AgencyError } from './tr-arrivals';
 import { TR_SERIES, TR_TABLES } from './tr-shared';
-import { intermediaryPos } from '../prof/ps-c-rules'; // R14 PS-C1
+import { intermediaryPos } from '../prof/ps-pos'; // R14 PS-C1 (PS4)
 
 export const INDENTS_TABLE = TR_TABLES.indents;
 export const COMMISSION_SAC = '996111';

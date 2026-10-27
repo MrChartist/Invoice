@@ -7,9 +7,10 @@ import { localDb } from '../../lib/localDb';
 import { formatCurrency } from '../../lib/utils';
 import { pickableBankAccounts } from '../../lib/bank-accounts';
 import { loadPlatforms, PLATFORM_KINDS, readPurposeCode, savePlatforms, savePurposeCode, type Platform } from '../../lib/prof/ps-platforms';
-import { PURPOSE_BY_KIND, PURPOSE_CODE_EXAMPLES } from '../../lib/prof/ps-c-rules';
+import { PURPOSE_BY_KIND, purposeCodes } from '../../lib/prof/ps-platforms';
 import { pcT } from '../../i18n/areas/prof-r14c-export';
-import { Fld, Tbl } from './pc-ui';
+import { Tbl } from './pc-ui';
+import { Field } from './ps-ui';
 import { runner, type Notify } from './pc-run';
 import controls from '../../styles/controls.module.css';
 import css from './exportsvc.module.css';
@@ -21,7 +22,7 @@ export default function PlatformsView({ notify }: { notify: Notify }) {
   const [tick, setTick] = useState(0);
   const run = runner(notify, () => setTick((n) => n + 1));
   const [list, setList] = useState<Platform[]>(() => loadPlatforms());
-  const [code, setCode] = useState(() => readPurposeCode() ?? PURPOSE_BY_KIND[String((localDb.settings.get() as { prof_kind?: string }).prof_kind ?? 'other')] ?? '');
+  const [code, setCode] = useState(() => readPurposeCode() ?? PURPOSE_BY_KIND[localDb.settings.get().prof_kind ?? 'other'] ?? '');
   const banks = useMemo(() => pickableBankAccounts('any'), []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const open = useMemo(() => localDb.invoices.getAll().filter((i) => String(i.currency || 'INR').toUpperCase() !== 'INR' && i.status !== 'Draft' && i.status !== 'Cancelled' && i.status !== 'Paid' && Number(i.balance_due) > 0.005), [tick]);
@@ -39,7 +40,7 @@ export default function PlatformsView({ notify }: { notify: Notify }) {
       <div className={css.bar}>
         <button type="button" className={sm} onClick={() => setList([...list, { name: '', kind: 'payoneer', non_resident: true }])} data-ps-plat-add>{pcT('addPlatform')}</button>
         <button type="button" className={controls.btnPrimary} onClick={() => run(() => void setList(savePlatforms(list)))} data-ps-plat-list-save>{pcT('save')}</button>
-        <Fld l={pcT('defPurpose')}><select className={controls.select} value={code} onChange={(e) => setCode(e.target.value)}>{PURPOSE_CODE_EXAMPLES.map(([c, l]) => <option key={c} value={c}>{`${c} — ${l}`}</option>)}</select></Fld>
+        <Field label={pcT('defPurpose')}><select className={controls.select} value={code} onChange={(e) => setCode(e.target.value)}>{purposeCodes().map(([c, l]) => <option key={c} value={c}>{`${c} — ${l}`}</option>)}</select></Field>
         <button type="button" className={sm} onClick={() => run(() => savePurposeCode(code))}>{pcT('save')}</button>
       </div>
       <Tbl tag="plat-open" head={[pcT('invoice'), pcT('date'), pcT('party'), pcT('value'), '']} rows={open.map((i) => [i.invoice_number, i.issue_date, i.client?.name ?? '', formatCurrency(i.balance_due ?? 0, i.currency), <Suspense key="r" fallback={null}><PlatformReceiptDialog invoice={i} notify={notify} onDone={() => setTick((n) => n + 1)} /></Suspense>])} />

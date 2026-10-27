@@ -12,7 +12,11 @@
  */
 import type { InvoiceRecord } from '../../types/invoice';
 import type { PurchaseRecord } from '../../types/purchases';
-import { DB_PREFIX, generateId, getJson, setJson } from '../storage';
+import './ps-registry';
+import type { PsPlatform } from '../../types/prof-r14';
+import { generateId } from '../storage';
+import { readProfSettings, saveProfSettings } from './ps-settings';
+export { PURPOSE_BY_KIND, purposeCodes } from '../prof-rules';
 import { requireAccess } from '../access';
 import { localDb } from '../localDb';
 import { computePurchaseTotals, paymentsDb, purchasesDb } from '../purchases';
@@ -20,23 +24,13 @@ import { supplierPayableOf } from '../purchase-normalize';
 import { withTablesRollback } from '../table-txn';
 import { mulRound2, num, round2 } from '../invoice-calc';
 
-export const PLATFORM_KINDS = ['paypal', 'wise', 'payoneer', 'upwork', 'skydo', 'stripe', 'razorpay', 'other'] as const;
-export type PlatformKind = (typeof PLATFORM_KINDS)[number];
-export interface Platform {
-  name: string;
-  kind: PlatformKind;
-  /** Bank account the payouts reach (`bank-accounts.ts`). */
-  bank_account_id?: string;
-  /** Expense head of the fees (bill category). */
-  fee_ledger?: string;
-  vendor_id?: string;
-  non_resident?: boolean;
-}
+export type Platform = PsPlatform;
+export type PlatformKind = Platform['kind'];
+export const PLATFORM_KINDS: readonly PlatformKind[] = ['paypal', 'wise', 'payoneer', 'upwork', 'skydo', 'stripe', 'razorpay', 'other'];
 /** SAC of the platform's fee (financial and related services). */
 export const PLATFORM_FEE_SAC = '997159';
 export const RCM_IGST_RATE = 18;
 
-const KEY = `${DB_PREFIX}prof_settings`;
 const clean = (p: Partial<Platform>): Platform | null => {
   const name = String(p?.name ?? '').trim().slice(0, 40);
   if (!name) return null;
@@ -44,26 +38,18 @@ const clean = (p: Partial<Platform>): Platform | null => {
   return { name, kind, ...(p.bank_account_id ? { bank_account_id: p.bank_account_id } : {}), ...(p.fee_ledger ? { fee_ledger: String(p.fee_ledger).slice(0, 60) } : {}), ...(p.vendor_id ? { vendor_id: p.vendor_id } : {}), ...(p.non_resident ? { non_resident: true } : {}) };
 };
 
-export function loadPlatforms(): Platform[] {
-  const s = getJson<{ platforms?: unknown[] } | null>(KEY, null);
-  return (Array.isArray(s?.platforms) ? s!.platforms : []).map((p) => clean(p as Platform)).filter((p): p is Platform => !!p);
-}
-/** Owner only: replace the list (other `prof_settings` fields kept). Names are unique. */
+export const loadPlatforms = (): Platform[] => (readProfSettings().platforms ?? []).map(clean).filter((p): p is Platform => !!p);
+/** Owner only: replace the list (`prof_settings`, audited). Names are unique. */
 export function savePlatforms(list: readonly Partial<Platform>[]): Platform[] {
-  requireAccess('settings.manage');
   const seen = new Set<string>();
   const platforms = list.map(clean).filter((p): p is Platform => !!p && !seen.has(p.name.toLowerCase()) && !!seen.add(p.name.toLowerCase()));
-  setJson(KEY, { ...getJson<object | null>(KEY, null), platforms, updated_at: new Date().toISOString() });
+  saveProfSettings({ platforms });
   return platforms;
 }
 
 /** `prof_settings.export.purpose_code`: the default RBI purpose code for services (PS39); absent = by `prof_kind`. */
-export const readPurposeCode = (): string | undefined => getJson<{ export?: { purpose_code?: string } } | null>(KEY, null)?.export?.purpose_code || undefined;
-export function savePurposeCode(code: string): void {
-  requireAccess('settings.manage');
-  const s = getJson<{ export?: object } | null>(KEY, null);
-  setJson(KEY, { ...s, export: { ...s?.export, purpose_code: code.trim().toUpperCase().slice(0, 6) || undefined }, updated_at: new Date().toISOString() });
-}
+export const readPurposeCode = (): string | undefined => readProfSettings().export?.purpose_code || undefined;
+export const savePurposeCode = (code: string): void => void saveProfSettings({ export: { ...readProfSettings().export, purpose_code: code.trim().toUpperCase().slice(0, 6) || undefined } });
 
 export interface PlatformReceipt {
   gross: number;
@@ -85,7 +71,7 @@ export interface PlatformPlan {
 }
 
 /** Pure: the figures of a platform receipt (throws a reason key on bad input). */
-export function planPlatformReceipt(r: PlatformReceipt, p: Pick<Platform, 'non_resident'>, registered: boolean): PlatformPlan {
+export function planPlatformReceipt(r: PlatformReceipt, p: Partial<Pick<Platform, 'non_resident'>>, registered: boolean): PlatformPlan {
   const gross = round2(num(r.gross)), feeFc = round2(num(r.fee) + num(r.conversion));
   const net = round2(gross - feeFc);
   if (!(gross > 0) || feeFc < 0 || !(net > 0)) throw new Error('platGross');

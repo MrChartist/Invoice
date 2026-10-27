@@ -1,7 +1,9 @@
 /** R14 PS-C desk: run a write and report it. */
 import { pcT, type PcKey } from '../../i18n/areas/prof-r14c-export';
 
-export type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
+import type { Notify } from './ps-run';
+
+export type { Notify };
 
 /** Run a write; report the message (a reason key from the engines is translated) or the error. */
 export function runner(notify: Notify, done: () => void) {

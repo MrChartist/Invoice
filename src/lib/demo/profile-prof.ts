@@ -30,6 +30,12 @@ export function profExtras(ctx: ProfileContext): DemoExtras {
     const te = (id: string, d: number, mins: number, staffId: string, rate: number, cc: string, desc: string): TimeEntry & { demo: true } => ({ id, demo: true, client_id: client?.id, client_name: client?.name ?? '', description: desc, date: shiftDay(today, -d), minutes: mins, hourly_rate: rate, billable: true, cost_centre_id: cc, staff_id: staffId });
     tables.time_entries = [te('demo-pt-1', 20, 300, 'demo-tk-1', 4000, 'demo-mt-1', 'Drafting the reply (demo)'), te('demo-pt-2', 12, 330, 'demo-tk-1', 4000, 'demo-mt-1', 'Hearing (demo)'), te('demo-pt-3', 5, 240, 'demo-tk-1', 4000, 'demo-mt-1', 'Written arguments (demo)'), te('demo-pt-4', 8, 600, 'demo-tk-2', 2000, 'demo-mt-2', 'Monthly returns (demo)')];
   }
-  // PS-B / PS-C / PS-D: add their blocks here.
+  // PS-C (svcexport): last month's EDF for software exports, filed with the AD bank.
+  if (packs.includes('svcexport')) {
+    const d = new Date(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, 0);
+    const end = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    tables.edf_register = [{ id: 'demo-edf-1', demo: true, kind: 'software', period: end.slice(0, 7), invoice_ids: [], date: end, authority: 'ad_bank', currency: 'USD', value_fc: 4800, value_inr: 403200, due: shiftDay(end, 30), edf_no: 'EDF-DEMO-1', filed_on: shiftDay(end, 12), status: 'filed', created_at: `${end}T09:00:00.000Z` } as never];
+  }
+  // PS-B / PS-D: add their blocks here.
   return { tables };
 }

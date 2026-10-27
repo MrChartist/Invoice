@@ -10,7 +10,7 @@ import { isRevenueDoc } from '../stats';
 import { isExportDoc } from '../trade/exporter';
 import { inrValue } from '../fx';
 import { round2 } from '../invoice-calc';
-import { thresholdRule } from './ps-c-rules';
+import { thresholdRule } from '../prof-rules';
 
 /** Indian FY of a local day. */
 export function fyOf(day: string): { start: string; end: string } {

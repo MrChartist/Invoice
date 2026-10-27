@@ -7,10 +7,11 @@ import { useMemo, useState } from 'react';
 import { localDb } from '../../lib/localDb';
 import { formatCurrency, todayInput } from '../../lib/utils';
 import { shiftDay } from '../../lib/dates';
-import { edfDb, prepareEdf, type EdfRow } from '../../lib/prof/ps-edf';
-import { edfRule } from '../../lib/prof/ps-c-rules';
+import { edfDb, edfRule, prepareEdf, type EdfRow } from '../../lib/prof/ps-edf';
+
 import { pcT } from '../../i18n/areas/prof-r14c-export';
-import { Fld, Tbl } from './pc-ui';
+import { Tbl } from './pc-ui';
+import { Field } from './ps-ui';
 import { runner, type Notify } from './pc-run';
 import controls from '../../styles/controls.module.css';
 import css from './exportsvc.module.css';
@@ -27,7 +28,7 @@ export default function EdfView({ notify }: { notify: Notify }) {
   return (
     <>
       <div className={css.bar}>
-        <Fld l={pcT('month')}><input type="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} data-ps-edf-month /></Fld>
+        <Field label={pcT('month')}><input type="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} data-ps-edf-month /></Field>
         <button type="button" className={controls.btnPrimary} disabled={!drafts.length} onClick={() => run(() => String(edfDb.saveDrafts(month, drafts).length))} data-ps-edf-save>{pcT('toRegister')}</button>
       </div>
       <p className={controls.label}>{pcT('prepare', { month })}</p>

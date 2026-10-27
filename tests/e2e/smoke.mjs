@@ -4798,6 +4798,44 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R14-C export desk: a USD invoice under LUT to a US client → export check 4 / 5 (payment pending); a platform receipt with a fee → 5 / 5, a fee bill under import RCM; "Prepare EDF" for October → due 30 Nov; realisation 9 months from the invoice date, 15 for a 15 Sep 2026 invoice', async () => {
+    const keys = ['settings', 'clients', 'invoices', 'transactions', 'purchases', 'purchase_payments', 'edf_register', 'prof_settings'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const s0 = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...s0, business_type: 'services', modules: undefined, service_kind: 'professional', prof_kind: 'consulting', industry_packs: ['practice', 'svcexport'], lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-c-us', name: 'E2E Acme Inc', address: 'San Francisco', state_code: '96', ps: { country: 'US' } }]);
+    const line = { id: 'l1', name: 'Software development', type: 'Service', hsn: '998314', unit: 'HRS', quantity: 40, rate: 55, tax_rate: 0, amount: 2200 };
+    const inv = (id, number, date) => ({ id, invoice_number: number, doc_type: 'INVOICE', status: 'Sent', supply_type: 'EXPORT_LUT', place_of_supply: '96', currency: 'USD', exchange_rate: 84, issue_date: date, due_date: date, subtotal: 2200, taxable_value: 2200, total: 2200, amount_paid: 0, balance_due: 2200, client: { id: 'e2e-c-us', name: 'E2E Acme Inc', state_code: '96' }, items: [line] });
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv('e2e-c-oct', 'E2E/EXP/1', '2026-10-15'), inv('e2e-c-sep', 'E2E/EXP/0', '2026-09-15')]);
+    await writeJson(page, 'prof_settings', { platforms: [{ name: 'E2E Payoneer', kind: 'payoneer', non_resident: true }] });
+    await page.goto(srv.origin + '/time?tab=exportsvc&view=checker');
+    await page.locator('[data-ps-desk="checker"]').waitFor({ timeout: 15000 });
+    const row = page.locator('[data-ps-check]', { hasText: 'E2E/EXP/1' }).first();
+    check(/4 \/ 5/.test(await row.innerText()), 'export check 4 / 5 while the payment is pending');
+    await page.goto(srv.origin + '/time?tab=exportsvc&view=platforms');
+    await page.locator('[data-ps-plat-open]', { hasText: 'E2E/EXP/1' }).locator('[data-ps-via-platform]').click({ timeout: 15000 });
+    await page.locator('[data-ps-plat-gross]').fill('2200');
+    await page.locator('[data-ps-plat-fee]').fill('55');
+    await page.locator('[data-ps-plat-inr]').fill('182325');
+    await page.locator('[data-ps-plat-save]').click();
+    const pays = await readJson(page, 'transactions', [], (v) => v.some((p) => p.invoice_id === 'e2e-c-oct'));
+    check(pays.some((p) => p.invoice_id === 'e2e-c-oct' && p.amount === 2200 && p.realised_rate === 85), 'gross USD 2,200 received at the realised ₹85');
+    const bills = await readJson(page, 'purchases', [], (v) => v.some((b) => b.vendor_name === 'E2E Payoneer'));
+    check(bills.some((b) => b.vendor_name === 'E2E Payoneer' && b.import_type === 'SERVICES' && b.taxable === 4675), 'fee bill ₹4,675 under import-of-services RCM');
+    await page.goto(srv.origin + '/time?tab=exportsvc&view=checker');
+    check(/5 \/ 5/.test(await page.locator('[data-ps-check]', { hasText: 'E2E/EXP/1' }).first().innerText({ timeout: 15000 })), 'export check 5 / 5 after the receipt');
+    await page.goto(srv.origin + '/time?tab=exportsvc&view=edf');
+    await page.locator('[data-ps-edf-month]').fill('2026-10', { timeout: 15000 });
+    check(await page.locator('[data-ps-edf-due="2026-11-30"]').count() >= 1, 'EDF for October due 30 Nov 2026');
+    await page.locator('[data-ps-edf-save]').click();
+    await readJson(page, 'edf_register', [], (v) => v.some((r) => r.period === '2026-10' && r.due === '2026-11-30'));
+    await page.goto(srv.origin + '/time?tab=exportsvc&view=realisation');
+    await page.locator('[data-ps-desk="realisation"]').waitFor({ timeout: 15000 });
+    check(await page.locator('[data-ps-real-due="2027-07-15"]').count() === 1, 'realisation due 9 months from the invoice date (15 Jul 2027)');
+    check(await page.locator('[data-ps-real-due="2027-12-15"]').count() === 1, 'an invoice of 15 Sep 2026 keeps 15 months');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {

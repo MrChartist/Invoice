@@ -18,7 +18,8 @@ import { servicesRows } from '../../lib/prof/ps-fema';
 import { brcRows } from '../../lib/prof/ps-brc';
 import { refundSvcPaper, saveDraftClaim, statementSheet } from '../../lib/prof/ps-refund-svc';
 import { pcT, type PcKey } from '../../i18n/areas/prof-r14c-export';
-import { Fld, Tbl } from './pc-ui';
+import { Tbl } from './pc-ui';
+import { Field } from './ps-ui';
 import { runner, type Notify } from './pc-run';
 import controls from '../../styles/controls.module.css';
 import css from './exportsvc.module.css';
@@ -51,12 +52,12 @@ export default function RefundSvcView({ notify }: { notify: Notify }) {
   return (
     <>
       <div className={css.bar}>
-        <Fld l={pcT('from')}><input type="date" className={controls.input} value={p.from} onChange={(e) => setP({ ...p, from: e.target.value })} /></Fld>
-        <Fld l={pcT('to')}><input type="date" className={controls.input} value={p.to} onChange={(e) => setP({ ...p, to: e.target.value })} /></Fld>
-        <Fld l={pcT('att')}><input type="number" className={controls.input} value={att} onChange={(e) => setAtt(e.target.value)} /></Fld>
+        <Field label={pcT('from')}><input type="date" className={controls.input} value={p.from} onChange={(e) => setP({ ...p, from: e.target.value })} /></Field>
+        <Field label={pcT('to')}><input type="date" className={controls.input} value={p.to} onChange={(e) => setP({ ...p, to: e.target.value })} /></Field>
+        <Field label={pcT('att')}><input type="number" className={controls.input} value={att} onChange={(e) => setAtt(e.target.value)} /></Field>
       </div>
       <p className={controls.label}>{pcT('netItc')}</p>
-      <div className={css.form}>{HEADS.map((h) => <Fld key={h} l={h.toUpperCase()}><input type="number" className={controls.input} value={itc[h]} onChange={(e) => setItc({ ...itc, [h]: e.target.value })} {...{ [`data-ps-itc-${h}`]: '' }} /></Fld>)}</div>
+      <div className={css.form}>{HEADS.map((h) => <Field key={h} label={h.toUpperCase()}><input type="number" className={controls.input} value={itc[h]} onChange={(e) => setItc({ ...itc, [h]: e.target.value })} {...{ [`data-ps-itc-${h}`]: '' }} /></Field>)}</div>
       <ul data-ps-refund>{lines.map(([k, v]) => <li key={k}>{pcT(k)}: <strong>{m(v)}</strong></li>)}<li>{paper.adjustedTotalTurnover ? `${m(paper.zeroRated)} ÷ ${m(paper.adjustedTotalTurnover)}` : ''}</li></ul>
       {paper.result.notes.map((n, i) => <p key={i} className={controls.hint}>{n}</p>)}
       <Tbl tag="stmt" head={sheet[0].map(String)} rows={sheet.slice(1)} />

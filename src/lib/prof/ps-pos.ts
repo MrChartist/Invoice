@@ -4,7 +4,9 @@
  * property's location — PS6), services needing physical presence or on goods made available (13(3), where performed),
  * events (13(5), where held) and intermediary services (13(8)(b) by the dated rule — PS4). Pure; verify with your CA.
  */
-import { intermediaryPos } from './ps-c-rules';
+import { intermediaryPos } from '../prof-rules';
+/** The dated intermediary rule, for readers outside `lib/prof` (the R8 indent note). */
+export { intermediaryPos };
 
 export type PosClass = 'general' | 'property' | 'physical' | 'event' | 'intermediary';
 export const POS_CLASSES: readonly PosClass[] = ['general', 'property', 'physical', 'event', 'intermediary'];

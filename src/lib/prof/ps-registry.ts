@@ -16,7 +16,8 @@ export const PS_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   engagements: 'doc.create',
   conflict_checks: 'master.edit',
   // PS-B: client_money (books.edit)
-  // PS-C: edf_register (books.edit)
+  // PS-C: the EDF register is books (FEMA working paper)
+  edf_register: 'books.edit',
   // PS-D: partners (settings.manage), partner_runs (books.edit), udin_register (doc.create)
 };
 
@@ -25,7 +26,9 @@ export const PS_WATCHED: Readonly<Record<string, WatchedTable>> = {
   // PS-A
   engagements: { entity: 'invoice', label: 'Engagement' },
   conflict_checks: { entity: 'client', label: 'Conflict check' },
-  // PS-B / PS-C / PS-D: add their blocks here
+  // PS-C
+  edf_register: { entity: 'payment', label: 'EDF (export of services)' },
+  // PS-B / PS-D: add their blocks here
 };
 
 /** Idempotent: adds the rows once (never overwrites a row another module set). */

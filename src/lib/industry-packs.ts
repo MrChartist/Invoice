@@ -307,6 +307,13 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'practice', path: '/time?tab=wip&view=utilisation', labelKey: 'r14.wip.utilisation' },
   { pack: 'practice', path: '/time?tab=wip&view=profit', labelKey: 'r14.wip.profit' },
   { pack: 'practice', path: '/time?tab=wip&view=yearend', labelKey: 'r14.wip.yearend' },
+  // PS-C: export-of-services desk
+  { pack: 'svcexport', path: '/time?tab=exportsvc', labelKey: 'r14.exportsvc' },
+  { pack: 'svcexport', path: '/time?tab=exportsvc&view=checker', labelKey: 'r14.exportsvc.checker' },
+  { pack: 'svcexport', path: '/time?tab=exportsvc&view=edf', labelKey: 'r14.exportsvc.edf' },
+  { pack: 'svcexport', path: '/time?tab=exportsvc&view=realisation', labelKey: 'r14.exportsvc.realisation' },
+  { pack: 'svcexport', path: '/time?tab=exportsvc&view=refund', labelKey: 'r14.exportsvc.refund' },
+  { pack: 'svcexport', path: '/time?tab=exportsvc&view=platforms', labelKey: 'r14.exportsvc.platforms' },
 ];
 
 /**

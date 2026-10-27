@@ -9,6 +9,8 @@ export const PS_TABLES = {
   // PS-A: engagements (ENG/FY…, dated by `start`), conflict checks (dated)
   engagements: 'engagements',
   conflicts: 'conflict_checks',
+  // PS-C: EDF register (export of services, dated by `date` = the end of the invoice month)
+  edf: 'edf_register',
 } as const;
 
 /** Company objects (singletons). */
@@ -30,6 +32,7 @@ export const PS_PACKS = ['practice', 'cafirm', 'legal', 'design', 'media', 'svce
 export const PS_DATED: Readonly<Record<string, string>> = {
   engagements: 'start',
   conflict_checks: 'date',
+  edf_register: 'date', // PS-C
 };
 
 /** Numbered tables (`number` field) and their series (mirrors the `sync-engine.ts` NUMBERED rows). */

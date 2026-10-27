@@ -13,14 +13,15 @@ import { exportCheck, verdict, type PsExport, type PsExportParty } from '../../l
 import { POS_CLASSES } from '../../lib/prof/ps-pos';
 import type { ExportIrm } from '../../types/trade-r4';
 import { pcT, type PcKey } from '../../i18n/areas/prof-r14c-export';
-import { Fld, Tbl } from './pc-ui';
+import { Tbl } from './pc-ui';
+import { Field } from './ps-ui';
 import { runner, type Notify } from './pc-run';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import css from './exportsvc.module.css';
 
-type Doc = InvoiceRecord & { ps?: { export?: PsExport } };
-type Party = Client & { ps?: PsExportParty };
+type Doc = InvoiceRecord;
+type Party = Client;
 const badge = { export: surface.badgePaid, pending: surface.badgePartial, unknown: surface.badgePartial, not: surface.badgeOverdue } as const;
 
 export default function ExportCheckView({ notify }: { notify: Notify }) {
@@ -56,10 +57,10 @@ function PartyFacts({ client, run }: { client: Party; run: (fn: () => string | v
   const [f, setF] = useState<PsExportParty>(client.ps ?? {});
   return (
     <div className={css.bar}>
-      <Fld l={pcT('country')}><input className={controls.input} value={f.country ?? ''} onChange={(e) => setF({ ...f, country: e.target.value.slice(0, 40) })} data-ps-country /></Fld>
-      <Fld l={pcT('relation')}><select className={controls.select} value={f.relation ?? 'unrelated'} onChange={(e) => setF({ ...f, relation: e.target.value as PsExportParty['relation'] })}>{(['unrelated', 'group', 'own_branch'] as const).map((r) => <option key={r} value={r}>{pcT(`rel.${r}`)}</option>)}</select></Fld>
+      <Field label={pcT('country')}><input className={controls.input} value={f.country ?? ''} onChange={(e) => setF({ ...f, country: e.target.value.slice(0, 40) })} data-ps-country /></Field>
+      <Field label={pcT('relation')}><select className={controls.select} value={f.relation ?? 'unrelated'} onChange={(e) => setF({ ...f, relation: e.target.value as PsExportParty['relation'] })}>{(['unrelated', 'group', 'distinct_person'] as const).map((r) => <option key={r} value={r}>{pcT(`rel.${r}`)}</option>)}</select></Field>
       <label className={controls.check}><input type="checkbox" checked={!!f.fixed_estab_in_india} onChange={(e) => setF({ ...f, fixed_estab_in_india: e.target.checked })} /> {pcT('estab')}</label>
-      <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => run(() => void localDb.clients.upsert({ ...client, ps: { ...client.ps, ...f } } as Party))} data-ps-party-save>{pcT('save')}</button>
+      <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => run(() => void localDb.clients.upsert({ ...client, ps: { ...client.ps, ...f } } ))} data-ps-party-save>{pcT('save')}</button>
     </div>
   );
 }
@@ -69,12 +70,12 @@ function DocFacts({ inv, run }: { inv: Doc; run: (fn: () => string | void) => bo
   const box = (k: 'abroad' | 'inr_permitted' | 'inr_settled', l: PcKey) => <label className={controls.check}><input type="checkbox" checked={!!f[k]} onChange={(e) => setF({ ...f, [k]: e.target.checked })} /> {pcT(l)}</label>;
   return (
     <div className={css.bar}>
-      <Fld l={pcT('posClass')}><select className={controls.select} value={f.pos_class ?? 'general'} onChange={(e) => setF({ ...f, pos_class: e.target.value as PsExport['pos_class'] })} data-ps-posclass>{POS_CLASSES.map((p) => <option key={p} value={p}>{pcT(`pc.${p}`)}</option>)}</select></Fld>
-      {f.pos_class === 'property' && <Fld l={pcT('propState')}><input className={controls.input} value={f.property_state ?? ''} onChange={(e) => setF({ ...f, property_state: e.target.value.replace(/\D/g, '').slice(0, 2) })} /></Fld>}
+      <Field label={pcT('posClass')}><select className={controls.select} value={f.pos_class ?? 'general'} onChange={(e) => setF({ ...f, pos_class: e.target.value as PsExport['pos_class'] })} data-ps-posclass>{POS_CLASSES.map((p) => <option key={p} value={p}>{pcT(`pc.${p}`)}</option>)}</select></Field>
+      {f.pos_class === 'property' && <Field label={pcT('propState')}><input className={controls.input} value={f.property_state ?? ''} onChange={(e) => setF({ ...f, property_state: e.target.value.replace(/\D/g, '').slice(0, 2) })} /></Field>}
       {(f.pos_class === 'physical' || f.pos_class === 'event') && box('abroad', 'abroad')}
       {box('inr_permitted', 'inrPermitted')}
       {box('inr_settled', 'inrSettled')}
-      <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => run(() => void localDb.invoices.save({ ...inv, ps: { ...inv.ps, export: { ...inv.ps?.export, ...f } } } as Doc))} data-ps-doc-save>{pcT('save')}</button>
+      <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => run(() => void localDb.invoices.save({ ...inv, ps: { ...inv.ps, export: { ...inv.ps?.export, ...f } } } ))} data-ps-doc-save>{pcT('save')}</button>
     </div>
   );
 }

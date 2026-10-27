@@ -13,12 +13,9 @@ import { receiptInr } from '../fx-gain';
 import { fxRate } from '../fx';
 import { mulRound2, round2 } from '../invoice-calc';
 import { movedNoCash } from '../advance-tax';
-import type { PsExport } from './ps-export-check';
 
 /** `ExportIrm.ps` (PS-C block). */
-export interface PsIrm {
-  fira_no?: string;
-}
+export type PsIrm = NonNullable<ExportIrm['ps']>;
 export const CHARGES_LIMIT_INR = 1000000;
 const CHARGE_WORDS = /charge|platform|fee/i;
 
@@ -43,7 +40,7 @@ export interface BrcRow {
   status: RealisationRow['status'];
 }
 
-type Inv = Partial<InvoiceRecord> & { ps?: { export?: PsExport } };
+type Inv = Partial<InvoiceRecord>;
 
 export function brcRows(rows: readonly RealisationRow[], invoices: readonly Inv[], payments: readonly Partial<Payment>[], irms: readonly (ExportIrm & { ps?: PsIrm })[]): BrcRow[] {
   const byId = new Map(invoices.map((i) => [i.id, i]));
@@ -58,7 +55,7 @@ export function brcRows(rows: readonly RealisationRow[], invoices: readonly Inv[
     const deducted = r.irms.length ? round2(Math.max(Math.min(r.receivedFcy, r.fcy) - r.irmFcy, 0)) : round2(noted);
     const declared = r.writeOffReason && CHARGE_WORDS.test(r.writeOffReason) ? r.writtenOffFcy : 0;
     const chargesFcy = round2(deducted + declared);
-    const platform = !!inv.ps?.export?.platform || mine.some((p) => /^Platform:/.test(String(p.note ?? ''))) || /platform/i.test(r.writeOffReason ?? '');
+    const platform = mine.some((p) => /^Platform:/.test(String(p.note ?? ''))) || /platform/i.test(r.writeOffReason ?? '');
     return {
       invoiceId: r.invoiceId,
       number: r.number,

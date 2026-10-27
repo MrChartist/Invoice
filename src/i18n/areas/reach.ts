@@ -272,6 +272,7 @@ export const reachT = defineArea(
     'ck.fssai': 'Add your FSSAI number (printed on invoices)',
     'ck.shelfLife': 'Set shelf-life days on your products',
     'ck.firstMatter': 'Open your first matter', 'ck.staffCapacity': 'Add your timekeepers (capacity and rates)', 'ck.enrolment': 'Add your enrolment no. and Bar Council', 'ck.conflictCheck': 'Run your first conflict check', // R14 (PS-A1)
+    'ck.lut': 'Record your LUT for exports', 'ck.edf': 'Prepare your first EDF', // R14 (PS-C)
   } as const,
   {
     'title.shop': 'आप क्या काम करते हैं?',
@@ -532,5 +533,6 @@ export const reachT = defineArea(
     'ck.fssai': 'अपना FSSAI नंबर जोड़ें (इनवॉइस पर छपता है)',
     'ck.shelfLife': 'उत्पादों पर शेल्फ़ लाइफ़ दिन दर्ज करें',
     'ck.firstMatter': 'पहला मामला खोलें', 'ck.staffCapacity': 'टाइमकीपर जोड़ें (क्षमता और दरें)', 'ck.enrolment': 'नामांकन नंबर और बार काउंसिल जोड़ें', 'ck.conflictCheck': 'पहली हितों का टकराव जाँच करें',
+    'ck.lut': 'निर्यात के लिए LUT दर्ज करें', 'ck.edf': 'पहला EDF तैयार करें',
   },
 );

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { inTimeZones, ZONES } from './helpers/shim.ts';
 import { fyOf, thresholdCard } from '../src/lib/prof/ps-threshold.ts';
-import { REGISTRATION_THRESHOLD_RULES } from '../src/lib/prof/ps-c-rules.ts';
+import { REGISTRATION_THRESHOLD_RULES } from '../src/lib/prof-rules.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
 
 const doc = (id: string, issue_date: string, taxable_value: number, over: Partial<InvoiceRecord> = {}): Partial<InvoiceRecord> =>

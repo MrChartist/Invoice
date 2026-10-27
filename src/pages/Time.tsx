@@ -75,7 +75,7 @@ const PS_DESKS = new Map(Object.entries(PS_DESK_OF).flatMap(([tab, file]) => {
   const load = PS_DESK_FILES[`../components/prof/${file}.tsx`];
   return load ? [[tab, lazy(load)] as const] : [];
 }));
-const r14T = defineArea({ matters: 'Matters', wip: 'WIP & billing' } as const, { matters: 'मामले', wip: 'अबिल्ड कार्य और बिलिंग' });
+const r14T = defineArea({ matters: 'Matters', wip: 'WIP & billing', exportsvc: 'Exports of services' } as const, { matters: 'मामले', wip: 'अबिल्ड कार्य और बिलिंग', exportsvc: 'सेवाओं का निर्यात' });
 
 type Tab = TimeTab;
 // R6-B1: the ids (and packs) live in time-tabs.ts; the labels stay here.
@@ -88,7 +88,7 @@ const TAB_LABEL: Record<Tab, () => string> = {
   settings: () => timeT('tabSettings'),
   works: () => wkT('tab'), // R5-B
   appointments: () => r10T('appointments'), commission: () => r10T('commission'), clinic: () => r10T('clinic'), members: () => r10T('members'), workshop: () => r10T('workshop'), // R10
-  matters: () => r14T('matters'), wip: () => r14T('wip'), // R14 (PS-A); B / C / D add their labels
+  matters: () => r14T('matters'), wip: () => r14T('wip'), exportsvc: () => r14T('exportsvc'), // R14 (PS-A, PS-C); B / D add their labels
 };
 const TABS: { id: Tab; label: () => string; pack?: PackId; alsoPacks?: readonly PackId[] }[] = TIME_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];

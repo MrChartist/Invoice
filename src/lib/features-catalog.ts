@@ -172,7 +172,7 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   legal: '/time?tab=matters',
   design: '/time?tab=matters',
   media: '/time?tab=matters',
-  svcexport: '/time?tab=wip',
+  svcexport: '/time?tab=exportsvc',
   partners: '/time?tab=wip',
 };
 

@@ -5,11 +5,14 @@
  *   (iii) place of supply outside India (`ps-pos.ts`, intermediary by the dated rule — PS4);
  *   (iv) payment in convertible foreign exchange, or INR where RBI permits (SRVA, Circular 202/14/2023) — pending until
  *        a receipt or an IRM exists;
- *   (v) not merely establishments of a distinct person (`Client.ps.relation: 'own_branch'` fails, Explanation 1 Sec 8).
- * Soft only: the supply type is never changed. The result is snapshotted on the document as `ps.export.checks`.
+ *   (v) not merely establishments of a distinct person (`Client.ps.relation: 'distinct_person'` — our own branch — fails,
+ *       Explanation 1 Sec 8).
+ * Soft only: the supply type is never changed. The result is snapshotted on the document as `ps.export.checks`
+ * (`{ key, ok }` per condition, which the paper prints as "n / 5") with `checked_on`.
  * Pure. Working paper — verify with your CA (PS5).
  */
-import type { InvoiceRecord, Payment } from '../../types/invoice';
+import type { Client, InvoiceRecord, Payment } from '../../types/invoice';
+import type { PsExportSnap } from '../../types/prof-r14';
 import type { ExportIrm } from '../../types/trade-r4';
 import { isExportDoc } from '../trade/exporter';
 import { movedNoCash } from '../advance-tax';
@@ -29,29 +32,11 @@ export interface ExportChecks {
   items: Condition[];
 }
 
-/** The document's `ps.export` sub-object (PS-C; record key `ps`). */
-export interface PsExport {
-  checks?: ExportChecks;
-  pos_class?: PosClass;
-  property_state?: string;
-  /** 13(3) / 13(5): performed / held outside India. */
-  abroad?: boolean;
-  /** Paid in INR through a route the user marks as RBI-permitted (SRVA …). */
-  inr_permitted?: boolean;
-  /** Settled in INR (the 12-month realisation rule, PS15 (c)). */
-  inr_settled?: boolean;
-  purpose_code?: string;
-  /** Platform the receipt came through (`prof_settings.platforms[].name`). */
-  platform?: string;
-}
-/** Party fields the check reads (`Client.ps`, PS-C block). */
-export interface PsExportParty {
-  country?: string;
-  fixed_estab_in_india?: boolean;
-  relation?: 'unrelated' | 'own_branch' | 'group';
-}
+/** The document's `ps.export` sub-object and the party's `Client.ps` (types in `types/prof-r14.ts`). */
+export type PsExport = PsExportSnap;
+export type PsExportParty = NonNullable<Client['ps']>;
 
-type Doc = Partial<InvoiceRecord> & { ps?: { export?: PsExport } };
+type Doc = Partial<InvoiceRecord>;
 export interface ExportCheckInput {
   invoice: Doc;
   client?: { ps?: PsExportParty; gstin?: string; state_code?: string } | null;
@@ -92,7 +77,7 @@ export function exportCheck({ invoice: inv, client, engagement, receipts = [], i
     : !inr ? { id: 'payment', state: 'ok', reason: 'payFx' }
       : x.inr_permitted ? { id: 'payment', state: 'ok', reason: 'payInrRbi' } : { id: 'payment', state: 'fail', reason: 'payInr' };
   // (v) distinct person.
-  const distinct: Condition = p.relation === 'own_branch' ? { id: 'distinct', state: 'fail', reason: 'ownBranch' } : { id: 'distinct', state: 'ok', reason: p.relation === 'group' ? 'groupOk' : 'distinct' };
+  const distinct: Condition = p.relation === 'distinct_person' ? { id: 'distinct', state: 'fail', reason: 'ownBranch' } : { id: 'distinct', state: 'ok', reason: p.relation === 'group' ? 'groupOk' : 'distinct' };
   const items = [supplier, recipient, posC, payment, distinct];
   return { at: day, ok: items.filter((c) => c.state === 'ok').length, items };
 }
@@ -104,10 +89,11 @@ export function verdict(c: Pick<ExportChecks, 'items'>): 'export' | 'not' | 'pen
   return c.items.every((i) => i.state === 'ok' || i.id === 'payment') ? 'pending' : 'unknown';
 }
 
-/** The document with the check snapshotted under `ps.export.checks` (other `ps` sub-objects kept). */
-export function withChecks<T extends Doc>(inv: T, checks: ExportChecks): T {
-  return { ...inv, ps: { ...inv.ps, export: { ...inv.ps?.export, checks } } };
+/** The document with the check snapshotted under `ps.export` (other `ps` sub-objects kept). */
+export function withChecks<T extends Doc>(inv: T, c: ExportChecks): T {
+  return { ...inv, ps: { ...inv.ps, export: { ...inv.ps?.export, checks: snapChecks(c), checked_on: c.at } } };
 }
+export const snapChecks = (c: ExportChecks) => c.items.map((i) => ({ key: i.id, ok: i.state === 'ok' }));
 
 /** Documents the check applies to: exports by supply type or place of supply 96 / 97. */
 export const checkApplies = (inv: Doc): boolean => isExportDoc(inv as InvoiceRecord);
@@ -116,7 +102,7 @@ export const checkApplies = (inv: Doc): boolean => isExportDoc(inv as InvoiceRec
  * GST preflight (soft): an LUT export with a failing condition → warning; (iv) still pending → info. Same shape as the
  * report issues (`ReconIssue`).
  */
-export function preflightIssues(docs: readonly Doc[], input: Omit<ExportCheckInput, 'invoice' | 'client'> & { clients: readonly { id?: string; ps?: PsExportParty; gstin?: string; state_code?: string }[] }) {
+export function preflightIssues(docs: readonly Doc[], input: Omit<ExportCheckInput, 'invoice' | 'client'> & { clients: readonly Pick<Client, 'id' | 'ps' | 'gstin' | 'state_code'>[] }) {
   const out: { id: string; severity: 'warning' | 'info'; code: string; message: string; invoiceId: string; invoiceNumber: string }[] = [];
   for (const d of docs) {
     if (d.supply_type !== 'EXPORT_LUT' || !d.id) continue;

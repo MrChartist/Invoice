@@ -8,7 +8,6 @@
 import type { InvoiceRecord } from '../../types/invoice';
 import { addMonths, daysBetween, type RealisationRow } from '../trade/export-register';
 import { EXPORT_REALISATION_INR_MONTHS_RULES, exportRealisationInrMonths, exportRealisationMonths } from '../trade/trade-rules';
-import type { PsExport } from './ps-export-check';
 
 /** Months and which rule applies for a clock starting on `date` (`inr`: invoiced or settled in INR). */
 export function realisationRule(date: string, inr: boolean): { months: number; rule: 'fx' | 'inr' } {
@@ -17,7 +16,7 @@ export function realisationRule(date: string, inr: boolean): { months: number; r
 }
 
 /** Services rows of the register, with the INR rule applied to documents marked "settled in INR". */
-export function servicesRows(rows: readonly RealisationRow[], invoices: readonly (Partial<InvoiceRecord> & { ps?: { export?: PsExport } })[], today: string): RealisationRow[] {
+export function servicesRows(rows: readonly RealisationRow[], invoices: readonly Partial<InvoiceRecord>[], today: string): RealisationRow[] {
   const settled = new Set(invoices.filter((i) => i.ps?.export?.inr_settled).map((i) => i.id));
   return rows.filter((r) => r.services).map((r) => {
     if (r.inrRule || !settled.has(r.invoiceId)) return r;

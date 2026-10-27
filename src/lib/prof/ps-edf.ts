@@ -7,6 +7,7 @@
  * a month whose every invoice is up to ₹10 lakh may be closed on the exporter's declaration. Before 1 Oct 2026 only
  * `softex` rows (history) are kept. Working paper — verify with your CA.
  */
+import './ps-registry';
 import type { InvoiceRecord } from '../../types/invoice';
 import { requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
@@ -15,9 +16,11 @@ import { isoDay, localDayOf, shiftDay } from '../dates';
 import { round2 } from '../invoice-calc';
 import { inrValue } from '../fx';
 import { exportInvoices, isServicesExport } from '../trade/export-register';
-import { edfRule } from './ps-c-rules';
+import { edfRule } from '../prof-rules';
+import { PS_TABLES } from './ps-shared';
+export { edfRule };
 
-export const EDF_TABLE = 'edf_register';
+export const EDF_TABLE = PS_TABLES.edf;
 export type EdfKind = 'software' | 'services' | 'softex';
 export type EdfStatus = 'due' | 'filed' | 'closed';
 export interface EdfRow {

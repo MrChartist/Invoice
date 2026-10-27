@@ -369,7 +369,40 @@ declare module './trade-r4' {
 // PS-B: client_money vouchers, stage templates, media rows (fill here).
 
 /* ════════════════════════════════════════ PS-C ════════════════════════════════════════ */
-// PS-C: EDF register rows, platform receipts (fill here).
+// PS-C: the export check's document facts (`ps.export`), payment platforms in `prof_settings`. EDF rows: `EdfRow` in
+// `lib/prof/ps-edf.ts`.
+
+/** C1: document facts the check reads, beside A's `checks` / `edf_no` (all optional). */
+export interface PsExportSnap {
+  /** Local day the snapshotted check was run for. */
+  checked_on?: string;
+  pos_class?: 'general' | 'property' | 'physical' | 'event' | 'intermediary';
+  /** 13(4): the property's GST State code (`96` = abroad). */
+  property_state?: string;
+  /** 13(3) / 13(5): performed / held outside India. */
+  abroad?: boolean;
+  /** (iv): INR through a route the user marks as RBI-permitted (SRVA …). */
+  inr_permitted?: boolean;
+  /** PS15 (c): settled in INR — the 12-month realisation rule. */
+  inr_settled?: boolean;
+}
+
+/** C4: a payment platform (`prof_settings.platforms[]`). */
+export interface PsPlatform {
+  name: string;
+  kind: 'paypal' | 'wise' | 'payoneer' | 'upwork' | 'skydo' | 'stripe' | 'razorpay' | 'other';
+  bank_account_id?: string;
+  fee_ledger?: string;
+  vendor_id?: string;
+  non_resident?: boolean;
+}
+
+export interface ProfSettings {
+  /** C4: payment platforms. */
+  platforms?: PsPlatform[];
+  /** C1 / A5: the default RBI purpose code for services (PS39). */
+  export?: { purpose_code?: string };
+}
 
 /* ════════════════════════════════════════ PS-D ════════════════════════════════════════ */
 // PS-D: partners, partner runs, UDIN register (fill here).

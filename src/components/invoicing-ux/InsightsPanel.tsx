@@ -75,7 +75,7 @@ export function InsightsPanel({ books, stock }: { books: BooksData; stock: Stock
             </Link>
           ))}
         </div>
-        {(localDb.settings.get() as { prof_kind?: string }).prof_kind === 'freelancer' && <Suspense fallback={null}><ThresholdView compact /></Suspense>}
+        {localDb.settings.get().prof_kind === 'freelancer' && <Suspense fallback={null}><ThresholdView compact /></Suspense>}
         <p className={ux.muted}>{uxT('inFoot')}</p>
       </div>
     </div>
