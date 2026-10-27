@@ -14,6 +14,8 @@ const ROUND_MODES: RoundMode[] = ['nearest', 'up', 'down', 'none'];
 const LutHint = lazy(() => import('../trade/LutHint'));
 // R8-C (TR-C2): Form 27C / 127 declaration, 206C(1F) value check, customer deducts 194Q (lazy).
 const PartyTaxHints = lazy(() => import('../trade/PartyTaxHints'));
+// R14 (PS-D3): the TDS a professional's client is expected to deduct on this fee note (lazy; professional profile or a client TDS default only).
+const Tds194jHint = lazy(() => import('../prof/Tds194jHint'));
 // R14 PS-C1: Sec 2(6) export-of-services check (lazy; shows only with the `svcexport` pack).
 const ExportCheckChip = lazy(() => import('../prof/ExportCheckChip'));
 import { tradingTcsPresets } from '../../lib/trade/tr-statutory';
@@ -41,6 +43,7 @@ export function AdvancedTaxPanel() {
   const t = s.totals;
   const TCS_PRESETS = [...tcsPresets(s.issue_date), ...tradingTcsPresets(s.issue_date, { declaration: !!(s.client?.id && localDb.clients.getById(s.client.id)?.tcs_declaration) })]; // R8-C: 206C(1) / (1F)
   const TDS_SECTIONS = tdsSections(s.issue_date);
+  const psTds = !!(localDb.settings.get() as { prof_kind?: string }).prof_kind || !!(s.client?.id && (localDb.clients.getById(s.client.id) as { ps?: { tds?: unknown } } | undefined)?.ps?.tds); // R14 (PS-D3)
   const active =
     s.tcs_enabled || s.tds_enabled || s.price_includes_tax || (s.supply_type ?? 'B2B') !== 'B2B';
 
@@ -138,6 +141,7 @@ export function AdvancedTaxPanel() {
         </div>
 
         <Suspense fallback={null}><PartyTaxHints /></Suspense>
+        {psTds && <Suspense fallback={null}><Tds194jHint /></Suspense>}
 
         <div className={styles.group}>
           <div className={styles.groupTitle}>{edT('atRounding')}</div>

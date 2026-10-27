@@ -4798,6 +4798,84 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R14-D firm desk: three partners 40 / 30 / 30 → the year-end run (Sec 40(b) allowable, journals balance); a 194T credit in the TDS register; a 194J client default; the presumptive paper; CA desk: a linked company\'s filed GSTR-3B → Bill from the board → a draft with the fee; cancelling it frees the work; Ctrl+K "UDIN"; help', async () => {
+    const keys = ['settings', 'clients', 'items_catalog', 'partners', 'partner_runs', 'vouchers', 'accounts', 'tds_deductions', 'invoices', 'compliance', 'prof_settings', 'udin_register', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const fy = d.getMonth() + 1 >= 4 ? d.getFullYear() : d.getFullYear() - 1;
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'professional', modules: undefined, prof_kind: 'ca', industry_packs: ['practice', 'partners', 'cafirm'], lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-psd-c', name: 'E2E Vertex Pvt Ltd' }]);
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-psd-i', name: 'E2E GSTR-3B filing', hsn: '998231', rate: 1500, tax_rate: 18, quantity: 1, amount: 1500 }]);
+    await page.goto(srv.origin + '/time?tab=firm&view=partners');
+    await page.locator('[data-firm-desk]').waitFor({ timeout: 15000 });
+    const tabs = (await page.getByRole('tab').allInnerTexts()).join('|');
+    check(/Firm/.test(tabs) && /CA desk/.test(tabs), `Time lists the Firm and CA desks (${tabs})`);
+    for (const [name, pan, share] of [['E2E Asha', 'AAAPA1234A', '40'], ['E2E Bala', 'AAAPB1234B', '30'], ['E2E Chitra', 'AAAPC1234C', '30']]) {
+      await page.locator('[data-ps="p-name"]').fill(name);
+      await page.locator('[data-ps="p-pan"]').fill(pan);
+      await page.locator('[data-ps="p-joined"]').fill(`${fy - 1}-04-01`);
+      await page.locator('[data-ps="p-share"]').fill(share);
+      await page.locator('[data-ps-b="p-add"]').click();
+      await readJson(page, 'partners', [], (v) => v.some((p) => p.name === name));
+    }
+    check((await page.locator('[data-ps-shares]').count()) === 0, 'shares total 100 %');
+    await page.goto(srv.origin + '/time?tab=firm&view=appropriation');
+    await page.locator('[data-ps-b="a-compute"]').click({ timeout: 15000 });
+    check(/Allowable remuneration/.test(await page.locator('[data-firm-desk]').innerText()), 'the run shows the Sec 40(b) allowable remuneration');
+    await page.locator('[data-ps-b="a-post"]').click();
+    const run = (await readJson(page, 'partner_runs', [], (v) => v.some((r) => r.kind === 'year_end'))).find((r) => r.kind === 'year_end');
+    const vs = (await readJson(page, 'vouchers', [])).filter((v) => run?.voucher_ids?.includes(v.id));
+    check(vs.length >= 1 && vs.every((v) => v.lines.reduce((s, l) => s + l.dr - l.cr, 0) === 0), `year-end run posted with balanced journals (${vs.length})`);
+    await page.goto(srv.origin + '/time?tab=firm&view=tds194t');
+    await page.locator('[data-ps="t-partner"]').selectOption({ label: 'E2E Asha' }, { timeout: 15000 });
+    await page.locator('[data-ps="t-amount"]').fill('25000');
+    await page.locator('[data-ps="t-date"]').fill(today);
+    await page.locator('[data-ps-b="t-credit"]').click();
+    const t194 = (await readJson(page, 'tds_deductions', [], (v) => v.some((r) => r.section === '194T' && r.date === today))).find((r) => r.section === '194T' && r.date === today);
+    check(t194?.amount === 2500, `194T on the crossing credit in the TDS register (${t194?.amount})`);
+    await page.goto(srv.origin + '/time?tab=firm&view=tds194j');
+    await page.locator('[data-ps-row]').filter({ hasText: 'E2E Vertex Pvt Ltd' }).locator('[data-ps="j-section"]').selectOption('194J', { timeout: 15000 });
+    check((await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-psd-c' && c.ps?.tds?.section === '194J'))).length > 0, 'the client\'s 194J default is saved');
+    await page.locator('[data-ps-chase]').waitFor();
+    await page.goto(srv.origin + '/time?tab=firm&view=presumptive');
+    check(/Limit that applies/.test(await page.locator('[data-firm-desk]').innerText({ timeout: 15000 })) && (await page.locator('[data-ps-elig]').count()) === 1, 'the presumptive paper shows the limit and the eligibility ticks');
+    // CA desk
+    await writeJson(page, 'compliance', [...(prev.compliance ?? []), { id: `GSTR3B:${today.slice(0, 7)}:`, form: 'GSTR3B', period_key: today.slice(0, 7), gstin: '', filed_on: today, marked_at: `${today}T10:00:00.000Z` }]);
+    await page.goto(srv.origin + '/time?tab=cadesk&view=fees');
+    await page.locator('[data-ca-desk]').waitFor({ timeout: 15000 });
+    await page.locator('[data-ps="fee-item-gstr3b"]').selectOption('e2e-psd-i');
+    await page.locator('[data-ps="link-client"]').first().selectOption('e2e-psd-c');
+    await readJson(page, 'prof_settings', {}, (v) => (v.ca?.company_clients ?? []).some((l) => l.client_id === 'e2e-psd-c'));
+    await page.goto(srv.origin + '/time?tab=cadesk&view=events');
+    const block = page.locator('[data-ps-client="e2e-psd-c"]');
+    await block.waitFor({ timeout: 15000 });
+    await block.locator('[data-ps-b="ca-bill"]').click();
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.items?.some((it) => (it.bill_refs ?? []).some((r) => r.startsWith('ca:e2e-psd-c:gstr3b')))))).find((i) => i.items?.some((it) => (it.bill_refs ?? []).some((r) => r.startsWith('ca:e2e-psd-c:gstr3b'))));
+    check(inv?.status === 'Draft' && inv.items.some((it) => it.rate === 1500), 'Bill from the board: a draft fee note with the GSTR-3B fee');
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).map((i) => (i.id === inv?.id ? { ...i, status: 'Cancelled' } : i)));
+    await page.goto(srv.origin + '/time?tab=cadesk&view=udin');
+    await page.goto(srv.origin + '/time?tab=cadesk&view=events');
+    await block.waitFor({ timeout: 15000 });
+    check(!/Billed/.test(await block.innerText()), 'cancelling the draft frees the work');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('UDIN');
+    await palette.getByRole('option', { name: /UDIN register/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "UDIN" finds Time → CA desk → UDIN register');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/time?tab=firm&view=partners');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="time:firm"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a Firm topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   await step('R14-C export desk: a USD invoice under LUT to a US client → export check 4 / 5 (payment pending); a platform receipt with a fee → 5 / 5, a fee bill under import RCM; "Prepare EDF" for October → due 30 Nov; realisation 9 months from the invoice date, 15 for a 15 Sep 2026 invoice', async () => {
     const keys = ['settings', 'clients', 'invoices', 'transactions', 'purchases', 'purchase_payments', 'edf_register', 'prof_settings'];
     const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));

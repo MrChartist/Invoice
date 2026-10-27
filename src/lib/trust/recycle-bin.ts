@@ -244,6 +244,8 @@ const OWNED_VOUCHERS: readonly { classes: readonly string[]; tables: readonly st
   { classes: ['Share allotment', 'Share surrender', 'Share forfeiture'], tables: ['member_shares'], redo: 'enter it again in Inventory → Members → Shares' },
   // QA15 M5: a karigar piece bill's advance-recovery journal comes back only with its bill
   { classes: ['Karigar advance recovery'], tables: ['purchases'], redo: 'restore the piece bill itself, or make the bill again in Manufacturing → Garments → Karigars' },
+  // R14-D: partners' year-end appropriation and monthly credits are undone on their run
+  { classes: ['Partners appropriation', 'Partner credit'], tables: ['partner_runs'], redo: 'restore the partner posting itself, or post it again in Time → Firm' },
 ];
 const RA_CLASS = 'RA deduction';
 /** Journals paired one-to-one with a no-cash receipt row through `ra_journal_id` (R9 RT-D2: the finance transfer). */
@@ -668,3 +670,21 @@ export function deleteForGood(ids: readonly string[], opts: { pinOk?: boolean } 
   });
   return gone.length;
 }
+
+/* R14-D: a partner posting comes back with its journals and 194T rows (both or neither), never beside a re-post. */
+registerRestoreHook('partner_runs', (row, e, live, bin) => {
+  if (str(row.kind) === 'year_end' && live('partner_runs').some((r) => str(r?.id) !== e.row_id && str(r?.kind) === 'year_end' && Number(r?.fy) === Number(row.fy))) return { refuse: 'The year-end run for this year was posted again since. Leave this one in the bin.' };
+  const comp: BinEntry[] = [];
+  const ids = (Array.isArray(row.voucher_ids) ? row.voucher_ids : []).map(str);
+  const tds = [str(row.tds_row_id), ...(Array.isArray(row.lines) ? row.lines : []).map((l) => str((l as Row)?.tds_row_id))].filter(Boolean);
+  for (const [table, list] of [['vouchers', ids], ['tds_deductions', tds]] as const) {
+    for (const id of list) {
+      const c = companionOr(live, bin, table, id, 'A journal or 194T row of this partner posting is gone for good. Post it again in Time → Firm.');
+      if (c?.refuse) return c;
+      comp.push(...(c?.companions ?? []));
+    }
+  }
+  return comp.length ? { companions: comp } : null;
+});
+registerRestoreHook('udin_register', (row, e, live) => (live('udin_register').some((r) => str(r?.id) !== e.row_id && str(r?.udin) === str(row.udin)) ? { refuse: `UDIN ${str(row.udin)} was entered again since.` } : null));
+registerRestoreHook('partners', (row, e, live) => (live('partners').some((r) => str(r?.id) !== e.row_id && str(r?.name).toLowerCase() === str(row.name).toLowerCase()) ? { refuse: `A partner named ${str(row.name)} was added again since.` } : null));

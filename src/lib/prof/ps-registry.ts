@@ -16,9 +16,12 @@ export const PS_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   engagements: 'doc.create',
   conflict_checks: 'master.edit',
   // PS-B: client_money (books.edit)
+  // PS-D: partners are owner data; partner postings are books; the UDIN register is documents
+  partners: 'settings.manage',
+  partner_runs: 'books.edit',
+  udin_register: 'doc.create',
   // PS-C: the EDF register is books (FEMA working paper)
   edf_register: 'books.edit',
-  // PS-D: partners (settings.manage), partner_runs (books.edit), udin_register (doc.create)
 };
 
 /** Audited tables (every row change logged; deletes go to the recycle bin). `prof_settings` is audited on save. */
@@ -26,9 +29,13 @@ export const PS_WATCHED: Readonly<Record<string, WatchedTable>> = {
   // PS-A
   engagements: { entity: 'invoice', label: 'Engagement' },
   conflict_checks: { entity: 'client', label: 'Conflict check' },
+  // PS-D
+  partners: { entity: 'settings', label: 'Partner' },
+  partner_runs: { entity: 'voucher', label: 'Partner posting' },
+  udin_register: { entity: 'item', label: 'UDIN' },
   // PS-C
   edf_register: { entity: 'payment', label: 'EDF (export of services)' },
-  // PS-B / PS-D: add their blocks here
+  // PS-B: add its block here
 };
 
 /** Idempotent: adds the rows once (never overwrites a row another module set). */

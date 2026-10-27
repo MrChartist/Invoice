@@ -19,6 +19,7 @@ import { safeStem } from '../../../lib/pdf-batch';
 import { formatMoney } from '../../../lib/utils';
 import type { EntityType, NoteText } from '../../../types/books-r2';
 import type { Vendor } from '../../../types/purchases';
+import type { PartnerNoteRow } from '../../../lib/ledger/notes-auto';
 import type { Period } from '../../../lib/books';
 import { useCan } from '../../../hooks/useCan';
 import { useT } from '../../../i18n';
@@ -57,6 +58,18 @@ export default function AnnualPackTab({ period, today, notify }: { period: Perio
 
   // MF-D5: Schedule III inventory sub-heads (lazy; company-wide stock, so not on a branch-scoped pack).
   const [invRows, setInvRows] = useState<{ label: string; cur: number; prev: number }[]>([]);
+  // PS-D1: partner-wise statements for a partnership / LLP (lazy; only when the firm desk has partners).
+  const [partnerRows, setPartnerRows] = useState<PartnerNoteRow[]>([]);
+  useEffect(() => {
+    let live = true;
+    if (entity !== 'partnership' && entity !== 'llp') return;
+    void import('../../../lib/prof/ps-partner-post').then((m) => {
+      if (!live) return;
+      const p = (x: number) => Math.round(x * 100);
+      setPartnerRows(m.partnerStatements(fy).map((r) => ({ name: r.name, opening: p(r.opening), introduced: p(r.introduced), drawings: p(r.drawings), interest: p(r.interest), remuneration: p(r.remuneration), share: p(r.share), closing: p(r.closing) })));
+    }, () => undefined);
+    return () => { live = false; };
+  }, [entity, fy]);
   const pack = useMemo(
     () =>
       buildAnnualPack({
@@ -74,8 +87,9 @@ export default function AnnualPackTab({ period, today, notify }: { period: Perio
         // QA-3 F18: a running year is drawn to the report period's end (never past today), labelled interim.
         asAt: period.end,
         inventoryRows: ledger.branchId || stock?.mode !== 'inventory' ? undefined : invRows,
+        partnerRows: ledger.branchId || (entity !== 'partnership' && entity !== 'llp') ? undefined : partnerRows, // PS-D1
       }),
-    [ledger, stock, fy, company, entity, stored, scopeLabel, today, period.end, invRows],
+    [ledger, stock, fy, company, entity, stored, scopeLabel, today, period.end, invRows, partnerRows],
   );
   const { asAt: invAt, prev: { end: invPrev } } = pack;
   useEffect(() => {

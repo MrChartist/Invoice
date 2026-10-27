@@ -9,6 +9,10 @@ export const PS_TABLES = {
   // PS-A: engagements (ENG/FY…, dated by `start`), conflict checks (dated)
   engagements: 'engagements',
   conflicts: 'conflict_checks',
+  // PS-D: partners, partner postings (year-end run / monthly credits, dated), UDIN register (dated)
+  partners: 'partners',
+  partnerRuns: 'partner_runs',
+  udin: 'udin_register',
   // PS-C: EDF register (export of services, dated by `date` = the end of the invoice month)
   edf: 'edf_register',
 } as const;
@@ -32,6 +36,9 @@ export const PS_PACKS = ['practice', 'cafirm', 'legal', 'design', 'media', 'svce
 export const PS_DATED: Readonly<Record<string, string>> = {
   engagements: 'start',
   conflict_checks: 'date',
+  // PS-D
+  partner_runs: 'date',
+  udin_register: 'date',
   edf_register: 'date', // PS-C
 };
 
@@ -39,3 +46,19 @@ export const PS_DATED: Readonly<Record<string, string>> = {
 export const PS_NUMBERED: Readonly<Record<string, string>> = {
   engagements: PS_SERIES.engagements,
 };
+
+/* ── PS-D ── */
+/** Voucher classes written by the firm desk (journals undone only from the desk; recycle-bin `OWNED_VOUCHERS`). */
+export const PS_D_CLASSES = {
+  appropriation: 'Partners appropriation',
+  credit: 'Partner credit',
+  drawings: 'Partner drawings',
+} as const;
+
+/** Ledgers the firm desk creates by name on first use (PRD §6 storage summary). */
+export const PS_D_ACCOUNTS = {
+  remuneration: "Partners' remuneration",
+  interest: "Interest on partners' capital",
+  appropriation: 'Profit & loss appropriation',
+  drawingsInterest: 'Interest on drawings',
+} as const;

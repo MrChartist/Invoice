@@ -307,6 +307,18 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'practice', path: '/time?tab=wip&view=utilisation', labelKey: 'r14.wip.utilisation' },
   { pack: 'practice', path: '/time?tab=wip&view=profit', labelKey: 'r14.wip.profit' },
   { pack: 'practice', path: '/time?tab=wip&view=yearend', labelKey: 'r14.wip.yearend' },
+  // R14 PS-D: the firm desk (partners; also practice — the presumptive and 194J views need no partners) and the CA desk
+  { pack: 'partners', alsoPacks: ['practice'], path: '/time?tab=firm', labelKey: 'r14.firm' },
+  { pack: 'partners', alsoPacks: ['practice'], path: '/time?tab=firm&view=partners', labelKey: 'r14.firm.partners' },
+  { pack: 'partners', alsoPacks: ['practice'], path: '/time?tab=firm&view=appropriation', labelKey: 'r14.firm.appropriation' },
+  { pack: 'partners', alsoPacks: ['practice'], path: '/time?tab=firm&view=tds194t', labelKey: 'r14.firm.tds194t' },
+  { pack: 'partners', alsoPacks: ['practice'], path: '/time?tab=firm&view=presumptive', labelKey: 'r14.firm.presumptive' },
+  { pack: 'partners', alsoPacks: ['practice'], path: '/time?tab=firm&view=tds194j', labelKey: 'r14.firm.tds194j' },
+  { pack: 'partners', alsoPacks: ['practice'], path: '/time?tab=firm&view=threshold', labelKey: 'r14.firm.threshold' }, // PS-C5
+  { pack: 'cafirm', path: '/time?tab=cadesk', labelKey: 'r14.cadesk' },
+  { pack: 'cafirm', path: '/time?tab=cadesk&view=events', labelKey: 'r14.cadesk.events' },
+  { pack: 'cafirm', path: '/time?tab=cadesk&view=fees', labelKey: 'r14.cadesk.fees' },
+  { pack: 'cafirm', path: '/time?tab=cadesk&view=udin', labelKey: 'r14.cadesk.udin' },
   // PS-C: export-of-services desk
   { pack: 'svcexport', path: '/time?tab=exportsvc', labelKey: 'r14.exportsvc' },
   { pack: 'svcexport', path: '/time?tab=exportsvc&view=checker', labelKey: 'r14.exportsvc.checker' },
