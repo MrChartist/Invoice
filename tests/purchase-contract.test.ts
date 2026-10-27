@@ -1051,6 +1051,8 @@ test('R13 (MF-B1) heat no. carry reads the real bill shape', async () => {
   const purchases = [{ ...bill, lines: [line] }, { ...bill, id: 'v', status: 'void', lines: [{ ...line, mf_heat: 'VOID' }] }, { ...bill, id: 'e', kind: 'EXPENSE', lines: [{ ...line, mf_heat: 'EXP' }] }];
   const docs = { mfg: [{ item_id: 'br', batch_no: 'B1', components: [{ id: 'c', item_id: 'ms', qty: 1, batch_no: 'L1' }] }], transfers: [], purchases };
   assert.deepEqual(heatsForBatch('br', 'B1', docs as never), ['H1']);
+});
+
 // R13-D: cost cards (latest purchase rate), the MSME Form-1 paper (through msme.ts) and the AA import register read bills
 // through `readPurchase` / `readPurchaseLines` (void / expense left out, base units with `unit_factor`).
 test('R13 (MF-D1 / D3 / D4) cost-card rates, Form-1 rows and AA imports read the real bill shape', async () => {

@@ -158,22 +158,22 @@ export interface FoodClassRate {
   hsn: string;
 }
 
-const N1 = 'N 1/2017-CT(R) schedules — recalled';
-const SEP25 = 'GST rate rationalisation from 22 Sep 2025 (L&S, Business Standard, Petpooja; N 9/2025-CT(R) not read — MF6)';
+const FOOD_N1 = 'N 1/2017-CT(R) schedules — recalled';
+const FOOD_SEP25 = 'GST rate rationalisation from 22 Sep 2025 (L&S, Business Standard, Petpooja; N 9/2025-CT(R) not read — MF6)';
 const fr = (from: string, rate: number, hsn: string, source: string): MfRule<FoodClassRate> => ({ from, value: { rate, hsn }, source, verified: false });
-const cut = (hsn: string, before: number, note = '') => [fr('2017-07-01', before, hsn, N1), fr('2025-09-22', 5, hsn, SEP25 + note)];
+const foodCut = (hsn: string, before: number, note = '') => [fr('2017-07-01', before, hsn, FOOD_N1), fr('2025-09-22', 5, hsn, FOOD_SEP25 + note)];
 
 /** Food class → rate / HSN by document date (append-only per class; §2.3a of the PRD). */
 export const FOOD_CLASS_RULES: Readonly<Record<FoodClass, readonly MfRule<FoodClassRate>[]>> = {
-  namkeen: cut('2106', 12),
-  biscuits: cut('1905', 18, '; one "expected" table conflicts'),
-  sauces: cut('2103', 12),
-  pasta_noodles: cut('1902', 12),
-  sweets: [fr('2017-07-01', 5, '2106', `${N1} (mithai 5%; no change reported)`)],
-  chocolates: cut('1806', 18),
-  spices_packed: [fr('2017-07-01', 5, '0910', `${N1} (no change reported)`)],
-  pickles: cut('2001', 12),
-  rte_food: cut('2106', 12),
+  namkeen: foodCut('2106', 12),
+  biscuits: foodCut('1905', 18, '; one "expected" table conflicts'),
+  sauces: foodCut('2103', 12),
+  pasta_noodles: foodCut('1902', 12),
+  sweets: [fr('2017-07-01', 5, '2106', `${FOOD_N1} (mithai 5%; no change reported)`)],
+  chocolates: foodCut('1806', 18),
+  spices_packed: [fr('2017-07-01', 5, '0910', `${FOOD_N1} (no change reported)`)],
+  pickles: foodCut('2001', 12),
+  rte_food: foodCut('2106', 12),
 };
 
 /* ── D3: MSME Form-1 (MCA) ──────────────────────────────────────────────────────────────────────────────────────── */
