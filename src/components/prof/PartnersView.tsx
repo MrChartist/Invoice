@@ -4,7 +4,7 @@ import { fdT } from '../../i18n/areas/prof-r14d-firm';
 import { todayInput } from '../../lib/utils';
 import { A } from '../../lib/ledger/accounts';
 import { loadPartners, postDrawings, savePartner, saveRatio, shareProblems, termOn } from '../../lib/prof/ps-partners';
-import type { PartnerRemuneration } from '../../types/prof-r14d';
+import type { PartnerRemuneration } from '../../types/prof-r14';
 import { NumberInput } from '../ui/NumberInput';
 import { Fld, Tbl } from './ps-d-ui';
 import { inr, type PsDeskCtx, row } from './ps-desk';

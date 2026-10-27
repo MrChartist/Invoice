@@ -41,7 +41,6 @@ import '../services/sv-registry'; // R10: service tables' rights and audit label
 import '../agri/ag-registry'; // R12: agri tables' rights and audit labels (lazy registration)
 import '../mfg/mf-registry'; // R13: manufacturing tables' rights and audit labels (lazy registration)
 import '../prof/ps-registry'; // R14: professional tables' rights and audit labels (lazy registration)
-import '../prof/ps-d-registry'; // R14-D: firm-desk tables' rights and audit labels (lazy registration)
 import { syncUrdPaid, urdLeft } from '../retail/rt-doc-hooks'; // QA10 R7: URD vouchers settled by exchange
 
 export { BIN_TABLE };

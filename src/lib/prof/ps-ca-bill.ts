@@ -8,7 +8,7 @@
  * Working paper — verify with your CA (PS36).
  */
 import type { Client, InvoiceItem, InvoiceRecord } from '../../types/invoice';
-import type { CaFeeEvent, ClientTdsDefault, ProfCaSettings } from '../../types/prof-r14d';
+import type { CaFeeEvent, ClientTdsDefault, ProfCaSettings } from '../../types/prof-r14';
 import type { PracticeTables } from '../practice';
 import { generateId, getTable, setTable } from '../storage';
 import { requireAccess } from '../access';

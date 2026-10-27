@@ -5,7 +5,7 @@ import { localDb } from '../../lib/localDb';
 import { activeCompanyId, readRegistry } from '../../lib/company-registry';
 import { CA_FEE_EVENTS, clientFees, feeItems, patchClientPs, setFeeEvent } from '../../lib/prof/ps-ca-bill';
 import { linkCompany, readCaSettings } from '../../lib/prof/ps-d-settings';
-import type { CaFeeEvent } from '../../types/prof-r14d';
+import type { CaFeeEvent } from '../../types/prof-r14';
 import { NumberInput } from '../ui/NumberInput';
 import { Fld, Tbl } from './ps-d-ui';
 import { row, type PsDeskCtx } from './ps-desk';

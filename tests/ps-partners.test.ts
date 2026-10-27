@@ -7,7 +7,7 @@ import { installSettings } from './helpers/world.ts';
 import { chartOf, loadUserAccounts, A } from '../src/lib/ledger/accounts.ts';
 import { loadVouchers } from '../src/lib/ledger/vouchers.ts';
 import { deletePartner, drawingsOf, interestOnDrawings, loadPartners, postDrawings, savePartner, saveRatio, shareProblems, sharesOn, termOn, validatePartner } from '../src/lib/prof/ps-partners.ts';
-import type { Partner } from '../src/types/prof-r14d.ts';
+import type { Partner } from '../src/types/prof-r14.ts';
 
 beforeEach(() => {
   resetStorage();

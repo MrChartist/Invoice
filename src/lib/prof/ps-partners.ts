@@ -5,17 +5,17 @@
  * (by month). Shares of the partners in the firm on a date must total 100 % (`shareProblems`; a run refuses otherwise).
  * Working papers — verify with your CA (PS20, PS34).
  */
-import './ps-d-registry';
-import type { Partner, PartnerTerm } from '../../types/prof-r14d';
+import './ps-registry';
+import type { Partner, PartnerTerm } from '../../types/prof-r14';
 import { generateId, getTable, setTable } from '../storage';
 import { requireAccess } from '../access';
 import { round2 } from '../invoice-calc';
 import { chartOf, loadUserAccounts, saveUserAccount, type GroupId } from '../ledger/accounts';
 import { loadVouchers, saveVoucher } from '../ledger/vouchers';
-import { PS_D_CLASSES, PS_D_TABLES } from './ps-d-shared';
-import { PARTNER_INTEREST_CAP_RULES, psRuleAt } from './ps-d-rules';
+import { PS_D_CLASSES, PS_TABLES } from './ps-shared';
+import { PARTNER_INTEREST_CAP_RULES, psRuleAt } from '../prof-rules';
 
-const T = PS_D_TABLES.partners;
+const T = PS_TABLES.partners;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const n = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
@@ -125,7 +125,7 @@ export function deletePartner(id: string): void {
   const all = loadPartners();
   const p = all.find((x) => x.id === id);
   if (!p) return;
-  const used = getTable<{ partner_id?: string; lines?: { partner_id: string }[] }>(PS_D_TABLES.partnerRuns).some((r) => r?.partner_id === id || (r?.lines ?? []).some((l) => l.partner_id === id));
+  const used = getTable<{ partner_id?: string; lines?: { partner_id: string }[] }>(PS_TABLES.partnerRuns).some((r) => r?.partner_id === id || (r?.lines ?? []).some((l) => l.partner_id === id));
   if (used || loadVouchers().some((v) => v.lines.some((l) => l.account_id === p.current_account_id || l.account_id === p.capital_account_id))) {
     throw new Error(`${p.name} has postings. Enter an exit date instead of deleting.`);
   }

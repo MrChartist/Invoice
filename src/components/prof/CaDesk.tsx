@@ -7,11 +7,12 @@ import { useState } from 'react';
 import { useT } from '../../i18n';
 import { caT } from '../../i18n/areas/prof-r14d-ca';
 import controls from '../../styles/controls.module.css';
-import { Views } from './ps-d-ui';
+import { Views } from './ps-ui';
 import CaFeesView from './CaFeesView';
 import CaEventsView from './CaEventsView';
 import UdinView from './UdinView';
-import type { PsDeskCtx, PsDeskProps } from './ps-desk';
+import type { PsDeskCtx } from './ps-desk';
+import type { PsDeskProps } from './ps-run';
 
 const VIEWS = ['events', 'fees', 'udin'] as const;
 
@@ -36,7 +37,7 @@ export default function CaDesk({ view, notify }: PsDeskProps) {
   };
   return (
     <section data-ca-desk>
-      <Views tab="cadesk" views={VIEWS} view={v} label={(k) => caT(`view.${k}` as 'view.fees')} />
+      <Views tab="cadesk" views={VIEWS} value={v as (typeof VIEWS)[number]} label={(k) => caT(`view.${k}`)} />
       {v === 'fees' && <CaFeesView ctx={ctx} />}
       {v === 'events' && <CaEventsView ctx={ctx} />}
       {v === 'udin' && <UdinView ctx={ctx} />}

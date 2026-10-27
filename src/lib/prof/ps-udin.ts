@@ -5,15 +5,15 @@
  * cancelled invoice frees them). The UDIN prints on the billed line (PS-A5 `ps.lines[lineId].udin`). No ICAI / ICSI /
  * ICMAI portal call: the UDIN is generated there and typed here.
  */
-import './ps-d-registry';
-import type { UdinRow } from '../../types/prof-r14d';
+import './ps-registry';
+import type { UdinRow } from '../../types/prof-r14';
 import type { InvoiceRecord } from '../../types/invoice';
 import { generateId, getTable, setTable } from '../storage';
 import { requireAccess } from '../access';
-import { PS_D_TABLES } from './ps-d-shared';
-import { UDIN_FORMAT_RULES, psRuleAt } from './ps-d-rules';
+import { PS_TABLES } from './ps-shared';
+import { UDIN_FORMAT_RULES, psRuleAt } from '../prof-rules';
 
-const T = PS_D_TABLES.udin;
+const T = PS_TABLES.udin;
 export const UDIN_KINDS: readonly UdinRow['kind'][] = ['certificate', 'tax_audit', 'gst_audit', 'stat_audit', 'other'];
 export const udinRef = (id: string) => `udin:${id}`;
 

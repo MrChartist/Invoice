@@ -6,7 +6,7 @@ import { getIndianFY } from '../../lib/invoice-number';
 import { sectionText } from '../../lib/ita2025';
 import { KINDS_194T, creditPartner, loadPartnerRuns, register194t, undoPartnerRun } from '../../lib/prof/ps-194t';
 import { loadPartners } from '../../lib/prof/ps-partners';
-import type { PartnerCreditKind } from '../../types/prof-r14d';
+import type { PartnerCreditKind } from '../../types/prof-r14';
 import { NumberInput } from '../ui/NumberInput';
 import { Fld, Tbl } from './ps-d-ui';
 import { inr, sm, type PsDeskCtx, row } from './ps-desk';

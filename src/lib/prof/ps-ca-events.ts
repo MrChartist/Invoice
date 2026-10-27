@@ -7,7 +7,7 @@
  * Event key `ca:<client>:<kind>:<period>` (UDIN events `udin:<id>`); billed state comes from live invoice lines'
  * `bill_refs`, exactly like time entries (cancel the invoice → the events are unbilled again).
  */
-import type { CaFeeEvent, ProfCaSettings, UdinRow } from '../../types/prof-r14d';
+import type { CaFeeEvent, ProfCaSettings, UdinRow } from '../../types/prof-r14';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { PracticeTables } from '../practice';
 import { liveInvoiceIds } from '../timesheets';

@@ -8,13 +8,14 @@ import { useState } from 'react';
 import { useT } from '../../i18n';
 import { fdT } from '../../i18n/areas/prof-r14d-firm';
 import controls from '../../styles/controls.module.css';
-import { Views } from './ps-d-ui';
+import { Views } from './ps-ui';
 import PartnersView from './PartnersView';
 import AppropriationView from './AppropriationView';
 import Tds194tView from './Tds194tView';
 import PresumptiveView from './PresumptiveView';
 import Tds194jView from './Tds194jView';
-import type { PsDeskCtx, PsDeskProps } from './ps-desk';
+import type { PsDeskCtx } from './ps-desk';
+import type { PsDeskProps } from './ps-run';
 
 const VIEWS = ['partners', 'appropriation', 'tds194t', 'presumptive', 'tds194j'] as const;
 
@@ -39,7 +40,7 @@ export default function FirmDesk({ view, notify }: PsDeskProps) {
   };
   return (
     <section data-firm-desk>
-      <Views tab="firm" views={VIEWS} view={v} label={(k) => fdT(`view.${k}` as 'view.partners')} />
+      <Views tab="firm" views={VIEWS} value={v as (typeof VIEWS)[number]} label={(k) => fdT(`view.${k}`)} />
       {v === 'partners' && <PartnersView ctx={ctx} />}
       {v === 'appropriation' && <AppropriationView ctx={ctx} />}
       {v === 'tds194t' && <Tds194tView ctx={ctx} />}

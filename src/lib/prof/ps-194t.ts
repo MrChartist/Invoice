@@ -6,8 +6,8 @@
  * `saveManualDeduction` (26Q / Form 140 working paper, challans); a 31 March credit is due by 30 April (the March rule).
  * Drawings and the residual profit share never. Working paper — verify with your CA.
  */
-import './ps-d-registry';
-import type { Partner, PartnerCreditKind, PartnerRun } from '../../types/prof-r14d';
+import './ps-registry';
+import type { Partner, PartnerCreditKind, PartnerRun } from '../../types/prof-r14';
 import { generateId, getTable, setTable } from '../storage';
 import { requireAccess } from '../access';
 import { round2 } from '../invoice-calc';
@@ -15,11 +15,11 @@ import { withTablesRollback } from '../table-txn';
 import { A } from '../ledger/accounts';
 import { deleteVoucher, saveVoucher } from '../ledger/vouchers';
 import { deleteManualDeduction, depositDueDate, fyQuarterOf, saveManualDeduction, suggestTds, type PriorCredit, type TdsSuggestion } from '../tds-payables';
-import { PS_D_ACCOUNTS, PS_D_CLASSES, PS_D_TABLES } from './ps-d-shared';
+import { PS_D_ACCOUNTS, PS_D_CLASSES, PS_TABLES } from './ps-shared';
 import { ensureLedger, loadPartners } from './ps-partners';
 
 export const KINDS_194T: readonly PartnerCreditKind[] = ['salary', 'remuneration', 'commission', 'bonus', 'interest'];
-const RUNS = PS_D_TABLES.partnerRuns;
+const RUNS = PS_TABLES.partnerRuns;
 
 export const loadPartnerRuns = (): PartnerRun[] => getTable<PartnerRun>(RUNS).filter((r) => !!r && typeof r.id === 'string');
 

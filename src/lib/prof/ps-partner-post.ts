@@ -6,8 +6,8 @@
  *  - residual profit: Dr "Profit & loss appropriation" (capital group) / Cr Current — partner in the ratio (a loss the
  *    other way round) (PS33). No GST on partner remuneration (PS21). Working paper — verify with your CA.
  */
-import './ps-d-registry';
-import type { PartnerRun } from '../../types/prof-r14d';
+import './ps-registry';
+import type { PartnerRun } from '../../types/prof-r14';
 import { generateId, setTable } from '../storage';
 import { requireAccess } from '../access';
 import { round2 } from '../invoice-calc';
@@ -15,7 +15,7 @@ import { withTablesRollback } from '../table-txn';
 import { A } from '../ledger/accounts';
 import { saveVoucher, type ManualVoucherLine } from '../ledger/vouchers';
 import { closingBalances, ledgerProfitAndLoss, loadLedger, loadStockValuer } from '../ledger/index';
-import { PS_D_ACCOUNTS, PS_D_CLASSES, PS_D_TABLES } from './ps-d-shared';
+import { PS_D_ACCOUNTS, PS_D_CLASSES, PS_TABLES } from './ps-shared';
 import { drawingsOf, ensureLedger, loadPartners } from './ps-partners';
 import { loadPartnerRuns, record194t, tds194tFor, undoPartnerRun } from './ps-194t';
 import { averageCapital, fyBounds, type RunInput, type RunResult } from './ps-partner-run';
@@ -60,7 +60,7 @@ export function postRun(res: RunResult, adjustments: readonly { label: string; a
   if (yearEndRun(res.fy)) throw new Error(`The year-end run for FY ${res.fy}-${String(res.fy + 1).slice(2)} is already posted. Undo it first.`);
   const partners = new Map(loadPartners().map((p) => [p.id, p]));
   const date = fyBounds(res.fy).end;
-  return withTablesRollback([PS_D_TABLES.partnerRuns, 'vouchers', 'accounts', 'tds_deductions'], () => {
+  return withTablesRollback([PS_TABLES.partnerRuns, 'vouchers', 'accounts', 'tds_deductions'], () => {
     const id = generateId();
     const vouchers: string[] = [];
     const lines = res.lines.map((l) => ({ ...l }));
@@ -119,7 +119,7 @@ export function postRun(res: RunResult, adjustments: readonly { label: string; a
       allowable: res.allowable, remuneration_total: res.remunerationTotal, disallowed: res.disallowed, interest_total: res.interestTotal, residual: res.residual,
       lines, voucher_ids: vouchers, created_at: new Date().toISOString(),
     };
-    setTable(PS_D_TABLES.partnerRuns, [...loadPartnerRuns(), row]);
+    setTable(PS_TABLES.partnerRuns, [...loadPartnerRuns(), row]);
     return row;
   });
 }

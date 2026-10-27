@@ -7,7 +7,7 @@
  * your CA (PS18, PS25).
  */
 import type { Client, InvoiceItem, InvoiceRecord } from '../../types/invoice';
-import type { ClientTdsDefault } from '../../types/prof-r14d';
+import type { ClientTdsDefault } from '../../types/prof-r14';
 import type { EntityType } from '../../types/books-r2';
 import { num, round2 } from '../invoice-calc';
 import { isPureAgentLine } from '../trade/pure-agent';

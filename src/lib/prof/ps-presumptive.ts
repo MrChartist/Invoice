@@ -13,7 +13,7 @@ import { movedNoCash } from '../advance-tax';
 import { isRevenueDoc } from '../stats';
 import { feeBase } from './ps-tds-recv';
 import { fyBounds } from './ps-partner-run';
-import { PRESUMPTIVE_ADVANCE_TAX_RULES, PRESUMPTIVE_PROF_RULES, psRuleAt } from './ps-d-rules';
+import { PRESUMPTIVE_ADVANCE_TAX_RULES, PRESUMPTIVE_PROF_RULES, psRuleAt } from '../prof-rules';
 
 /** The professions of Sec 44AA(1) and those notified (the user ticks one; the list is not a decision). */
 export const PRESUMPTIVE_PROFESSIONS = ['legal', 'medical', 'engineering', 'architecture', 'accountancy', 'technical_consultancy', 'interior_decoration', 'film_artist', 'company_secretary', 'information_technology', 'authorised_representative'] as const;

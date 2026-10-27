@@ -168,12 +168,12 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   foodmfg: '/manufacturing?tab=food',
   // R14 (PS-A1): professional desks (tabs on Time). B / C / D point their pack at their own desk when it lands.
   practice: '/time?tab=matters',
-  cafirm: '/time?tab=matters',
+  cafirm: '/time?tab=cadesk',
   legal: '/time?tab=matters',
   design: '/time?tab=matters',
   media: '/time?tab=matters',
   svcexport: '/time?tab=wip',
-  partners: '/time?tab=wip',
+  partners: '/time?tab=firm',
 };
 
 export const FEATURE_ROWS: readonly FeatureRow[] = [

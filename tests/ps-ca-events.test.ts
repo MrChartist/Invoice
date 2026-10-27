@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { caEvents, caKey, companyEvents } from '../src/lib/prof/ps-ca-events.ts';
 import type { PracticeTables } from '../src/lib/practice.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
-import type { UdinRow } from '../src/types/prof-r14d.ts';
+import type { UdinRow } from '../src/types/prof-r14.ts';
 
 const peek: PracticeTables = Object.freeze({
   compliance: [

@@ -9,7 +9,7 @@ import { caEvents, type CaEvent } from '../../lib/prof/ps-ca-events';
 import { CA_FEE_EVENTS, billFromBoard, loadLinkedPeeks, retainerClients, typedEvent } from '../../lib/prof/ps-ca-bill';
 import { loadUdins } from '../../lib/prof/ps-udin';
 import { readCaSettings } from '../../lib/prof/ps-d-settings';
-import type { CaFeeEvent } from '../../types/prof-r14d';
+import type { CaFeeEvent } from '../../types/prof-r14';
 import type { InvoiceRecord } from '../../types/invoice';
 import { Fld, Tbl } from './ps-d-ui';
 import { sm, type PsDeskCtx, row } from './ps-desk';

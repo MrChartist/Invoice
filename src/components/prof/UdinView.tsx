@@ -5,7 +5,7 @@ import { todayInput } from '../../lib/utils';
 import { localDb } from '../../lib/localDb';
 import { UDIN_KINDS, deleteUdin, loadUdins, revokeUdin, saveUdin, udinProblems, unbilledUdins } from '../../lib/prof/ps-udin';
 import { readCaSettings } from '../../lib/prof/ps-d-settings';
-import type { UdinRow } from '../../types/prof-r14d';
+import type { UdinRow } from '../../types/prof-r14';
 import { Fld, Tbl } from './ps-d-ui';
 import { sm, type PsDeskCtx, row } from './ps-desk';
 import controls from '../../styles/controls.module.css';
@@ -13,7 +13,7 @@ import controls from '../../styles/controls.module.css';
 export default function UdinView({ ctx }: { ctx: PsDeskCtx }) {
   const today = todayInput();
   const d = useMemo(() => { void ctx.tick; return { rows: loadUdins(), clients: localDb.clients.getAll(), invoices: localDb.invoices.getAll() }; }, [ctx.tick]);
-  const [f, setF] = useState({ udin: '', date: today, client_id: '', kind: 'certificate' as UdinRow['kind'], description: '', member_no: readCaSettings().member_no ?? '', fy: '', pan: '' });
+  const [f, setF] = useState({ udin: '', date: today, client_id: '', kind: 'certificate' as UdinRow['kind'], description: '', member_no: readCaSettings().membership ?? '', fy: '', pan: '' });
   const [reason, setReason] = useState('');
   const problems = f.udin ? udinProblems(f.udin, f.member_no, f.date) : [];
   const unbilled = new Set(unbilledUdins(d.rows, d.invoices).map((r) => r.id));

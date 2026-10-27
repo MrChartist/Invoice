@@ -12,7 +12,7 @@ import { loadVouchers, voucherTotals } from '../src/lib/ledger/vouchers.ts';
 import { allowableRemuneration, averageCapital, computeRun, splitByRatio } from '../src/lib/prof/ps-partner-run.ts';
 import { postRun, reverseRun, yearEndRun } from '../src/lib/prof/ps-partner-post.ts';
 import { loadPartners, savePartner } from '../src/lib/prof/ps-partners.ts';
-import type { Partner } from '../src/types/prof-r14d.ts';
+import type { Partner } from '../src/types/prof-r14.ts';
 
 beforeEach(() => {
   resetStorage();

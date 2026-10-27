@@ -11,9 +11,9 @@
  *  - the residual profit (or loss) shared in the profit-sharing ratio on 31 March.
  * Amounts in ₹ (2 decimals). Working paper — verify with your CA.
  */
-import type { Partner, PartnerRunLine } from '../../types/prof-r14d';
+import type { Partner, PartnerRunLine } from '../../types/prof-r14';
 import { round2 } from '../invoice-calc';
-import { PARTNER_INTEREST_CAP_RULES, PARTNER_REMUNERATION_RULES, psRuleAt } from './ps-d-rules';
+import { PARTNER_INTEREST_CAP_RULES, PARTNER_REMUNERATION_RULES, psRuleAt } from '../prof-rules';
 import { activeOn, interestOnDrawings, termOn } from './ps-partners';
 
 export const fyBounds = (fy: number) => ({ start: `${fy}-04-01`, end: `${fy + 1}-03-31` });

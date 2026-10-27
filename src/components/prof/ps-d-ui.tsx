@@ -1,17 +1,7 @@
-/** PS-D desks (Firm, CA desk) and the TDS chase panel: view switch, labelled field, plain table (≤ 1 kB gz). */
+/** PS-D desks (Firm, CA desk) and the TDS chase panel: labelled field and plain table (the view switch is PS-A's `ps-ui.tsx`) (≤ 1 kB gz). */
 import type { ReactNode } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
-
-export function Views({ tab, views, view, label }: { tab: string; views: readonly string[]; view: string; label: (v: string) => string }) {
-  const [, set] = useSearchParams();
-  return (
-    <div role="tablist" className={controls.segment} style={{ marginBottom: '0.75rem' }}>
-      {views.map((k) => <button key={k} type="button" role="tab" aria-selected={k === view} className={k === view ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => set({ tab, view: k }, { replace: true })} data-ps-view={k}>{label(k)}</button>)}
-    </div>
-  );
-}
 
 export const Fld = ({ l, children }: { l: string; children: ReactNode }) => <label className={controls.field}><span className={controls.label}>{l}</span>{children}</label>;
 
