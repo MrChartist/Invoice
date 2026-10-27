@@ -6,10 +6,22 @@ import { useState } from 'react';
 import { localDb } from '../../lib/localDb';
 import { validateFssai } from '../../lib/mfg/mf-print';
 import { useT } from '../../i18n';
-import { mfPickT } from '../../i18n/areas/mfg-r13a-pick';
+import { defineArea } from '../../i18n/area';
 import controls from '../../styles/controls.module.css';
 
 type Cat = 'MICRO' | 'SMALL' | 'MEDIUM';
+
+// Own strings (not the picker's area), so the picker's strings stay in the wizard / Features chunk.
+const mfPickT = defineArea(
+  {
+    category: 'Udyam category', 'cat.MICRO': 'Micro', 'cat.SMALL': 'Small', 'cat.MEDIUM': 'Medium', printUdyam: 'Print Udyam number on documents', fssai: 'FSSAI licence no. (14 digits)', save: 'Save', profileSaved: 'Saved on the business profile.',
+    profileHint: 'With a category, documents print "Udyam: … (Micro)" under the GSTIN, and micro / small sellers print the 45-day MSMED clause to GSTIN buyers (verify, MF22). FSSAI prints under the GSTIN (MF13).',
+  } as const,
+  {
+    category: 'उद्यम श्रेणी', 'cat.MICRO': 'सूक्ष्म', 'cat.SMALL': 'लघु', 'cat.MEDIUM': 'मध्यम', printUdyam: 'दस्तावेज़ों पर उद्यम नंबर छापें', fssai: 'FSSAI लाइसेंस नं. (14 अंक)', save: 'सहेजें', profileSaved: 'बिज़नेस प्रोफ़ाइल पर सहेजा गया।',
+    profileHint: 'श्रेणी चुनने पर दस्तावेज़ों पर GSTIN के नीचे "Udyam: … (Micro)" छपता है, और सूक्ष्म / लघु विक्रेता GSTIN वाले ख़रीदार को 45 दिन का MSMED खंड छापते हैं (जाँचें, MF22)। FSSAI GSTIN के नीचे छपता है (MF13)।',
+  },
+);
 
 export default function MfProfileRow({ notify }: { notify: (m: string, tone?: 'success' | 'error' | 'info') => void }) {
   useT();

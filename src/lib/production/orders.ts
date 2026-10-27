@@ -34,7 +34,7 @@ import { nextSeriesNumberFor, numberFitsFy, recordSeries } from '../series-count
 import { withTablesRollback } from '../table-txn';
 import { godownsDb, transfersDb } from '../godowns';
 import { MFG_TABLE, SJ_TABLE, consumptionShortfalls, manufacturingDb, saveConsumeOnlyJournal } from '../manufacturing';
-import { opsForRelease } from '../mfg/mf-routings'; // R13 (MF-A2): copies the default routing at release (shopfloor pack only)
+import { opsForRelease } from '../mfg/mf-ops'; // R13 (MF-A2): copies the default routing at release (shopfloor pack only)
 
 export const ORDERS_TABLE = 'production_orders';
 export const ORDER_PREFIX = 'WO';

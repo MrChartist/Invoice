@@ -13,9 +13,7 @@ import { MF_TABLES } from './mf-shared';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** ₹ / hour: machine + labour + power + overhead (2 decimals). */
-export const machineHourRate = (c: Pick<WorkCentre, 'hourly_rate' | 'labour_rate' | 'power_rate' | 'overhead_rate'>): number =>
-  round2(num(c.hourly_rate) + num(c.labour_rate) + num(c.power_rate) + num(c.overhead_rate));
+export { machineHourRate } from './mf-ops';
 
 /** Weekday of a local day (0 = Sunday), without `new Date(str)` (AGENTS rule 8). */
 export function weekday(day: string): number {

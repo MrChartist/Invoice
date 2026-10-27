@@ -10,8 +10,6 @@ export const mfPickT = defineArea(
     sub: 'Which kind?', 'sub.drawing': 'To customer drawings', 'sub.catalogue': 'Own catalogue', 'sub.garments': 'Garments / made-ups', 'sub.yarn': 'Yarn / spinning', 'sub.fabric': 'Fabric (weaving / knitting)', 'sub.processing': 'Processing house',
     'sub.moulding': 'Moulding', 'sub.extrusion': 'Extrusion', 'sub.film': 'Film / laminates', 'sub.corrugation': 'Corrugated boxes',
     udyam: 'Udyam number (optional)', category: 'Category', 'cat.MICRO': 'Micro', 'cat.SMALL': 'Small', 'cat.MEDIUM': 'Medium', custom: 'Custom (keep packs as set)',
-    printUdyam: 'Print Udyam number on documents', fssai: 'FSSAI licence no. (14 digits)', save: 'Save', profileSaved: 'Saved on the business profile.',
-    profileHint: 'With a category, documents print "Udyam: … (Micro)" under the GSTIN, and micro / small sellers print the 45-day MSMED clause to GSTIN buyers (verify, MF22). FSSAI prints under the GSTIN (MF13).',
   } as const,
   {
     card: 'कारख़ाना / मैन्युफैक्चरिंग', cardHint: 'जॉब शॉप, गारमेंट इकाई, मोल्डर, प्रेस, खाद्य इकाई।',
@@ -21,7 +19,5 @@ export const mfPickT = defineArea(
     sub: 'किस तरह का?', 'sub.drawing': 'ग्राहक की ड्रॉइंग पर', 'sub.catalogue': 'अपना कैटलॉग', 'sub.garments': 'गारमेंट / मेड-अप', 'sub.yarn': 'धागा / कताई', 'sub.fabric': 'कपड़ा (बुनाई / निटिंग)', 'sub.processing': 'प्रोसेसिंग हाउस',
     'sub.moulding': 'मोल्डिंग', 'sub.extrusion': 'एक्सट्रूज़न', 'sub.film': 'फ़िल्म / लैमिनेट', 'sub.corrugation': 'कोरुगेटेड बॉक्स',
     udyam: 'उद्यम पंजीकरण नंबर (वैकल्पिक)', category: 'श्रेणी', 'cat.MICRO': 'सूक्ष्म', 'cat.SMALL': 'लघु', 'cat.MEDIUM': 'मध्यम', custom: 'कस्टम (पैक जैसे हैं वैसे रहें)',
-    printUdyam: 'दस्तावेज़ों पर उद्यम नंबर छापें', fssai: 'FSSAI लाइसेंस नं. (14 अंक)', save: 'सहेजें', profileSaved: 'बिज़नेस प्रोफ़ाइल पर सहेजा गया।',
-    profileHint: 'श्रेणी चुनने पर दस्तावेज़ों पर GSTIN के नीचे "Udyam: … (Micro)" छपता है, और सूक्ष्म / लघु विक्रेता GSTIN वाले ख़रीदार को 45 दिन का MSMED खंड छापते हैं (जाँचें, MF22)। FSSAI GSTIN के नीचे छपता है (MF13)।',
   },
 );
