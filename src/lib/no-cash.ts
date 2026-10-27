@@ -39,6 +39,9 @@ export function noCashKind(p: NoCashMarkers | null | undefined): NoCashKind | ''
   return '';
 }
 
+/** QA10 R5: the URD voucher an exchange receipt row settled ('' for any other row). */
+export const exchangeVoucherOf = (p: NoCashMarkers | null | undefined): string => (p?.exchange_purchase_id ? String(p.exchange_purchase_id) : '');
+
 /** True when the receipt row settled the bill without cash / bank money moving. */
 export const movedNoCash = (p: NoCashMarkers | null | undefined): boolean => noCashKind(p) !== '';
 

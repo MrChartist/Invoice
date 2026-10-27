@@ -285,6 +285,10 @@ export function deleteVoucher(id: string): void {
   const row = all.find((v) => v.id === id);
   if (!row) return;
   requireAccess('books.edit');
+  // QA10 R17: a rider settlement's journal goes only with its settlement (Inventory → Deliveries → Undo settlement).
+  if (row.voucher_class === 'Rider settlement' && getTable<{ voucher_id?: string }>('rider_settlements').some((s) => s?.voucher_id === id)) {
+    throw new Error(`${row.number} settles a delivery rider's cash. Undo the settlement in Inventory → Deliveries instead (it removes this journal with it).`);
+  }
   const lock = assertUnlocked({ id, issue_date: row.date, invoice_number: row.number }, 'delete');
   if (row.reverse_on) assertUnlocked({ id, issue_date: row.reverse_on, invoice_number: row.number }, 'delete');
   // Its bill-wise receipt rows go with it, whichever screen deletes it (M3): all or nothing.

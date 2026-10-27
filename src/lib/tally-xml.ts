@@ -46,7 +46,7 @@ import type { InvoiceItem, InvoiceRecord, Payment } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { fxNarration, inrTotals, inrValue } from './fx';
 import { receivableTotal } from './rcm';
-import { NO_CASH_LEDGER, RIDER_CASH_LEDGER, advanceMovements, movedNoCash, noCashKind, type NoCashKind } from './advance-tax'; // no-cash.ts
+import { NO_CASH_LEDGER, RIDER_CASH_LEDGER, exchangeVoucherOf, advanceMovements, movedNoCash, noCashKind, type NoCashKind } from './advance-tax'; // no-cash.ts
 import { debitNoteVouchers } from './tally-debit-notes';
 import { tallyBankResolver } from './tally-bank';
 import { booksVouchers, groupMasters, openingLedgers } from './tally-books';
@@ -64,6 +64,7 @@ import {
   invoiceStateCode,
   isoDate,
   partyNameOf,
+  urdCreditorLedger,
   stateNameOf,
   toPaise,
   voucherKindOf,
@@ -397,6 +398,13 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
   const ccLedgers = new Set<string>();
   const allocatedBy = new Set((source.books?.manualVouchers ?? []).map((v) => v.id));
 
+  const urdLedgers = new Map<string, string>();
+  for (const raw of source.purchases ?? []) {
+    const name = urdCreditorLedger(raw, source.vendors);
+    if (name) urdLedgers.set(String((raw as { id?: unknown }).id ?? ''), name);
+  }
+  const urdLedgerOf = (id: string) => urdLedgers.get(id);
+
   const registerParty = (inv: InvoiceRecord, name: string) => {
     const c = inv.client ?? ({} as InvoiceRecord['client']);
     const code = invoiceStateCode(inv);
@@ -552,9 +560,28 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       // QA6-1 F4: a row that moved no money debits its own ledger, never the bank (as the app's ledger posts it); an RA
       // deduction row goes through its clearing account, which its journal clears.
       const kind = noCashKind(p);
+      if (kind === 'exchange') {
+        // QA10 R5: an exchange is a journal — Dr the customer's URD creditor ledger (Agst Ref the voucher) / Cr the
+        // customer (Agst Ref the bill), as the app's ledger posts it; no "Sundry creditors — exchange" ledger.
+        const raw = (source.purchases ?? []).find((x) => String((x as { id?: unknown })?.id ?? '') === exchangeVoucherOf(p));
+        const creditor = urdLedgerOf(exchangeVoucherOf(p)) ?? `${party} (Creditor)`;
+        addLedger({ name: creditor, parent: 'Sundry Creditors', billwise: true });
+        const paise = toPaise(inrValue(num(p.amount), inv));
+        const invNo = clean(inv.invoice_number) || String(inv.id);
+        const urdNo = clean((raw as { bill_number?: unknown } | undefined)?.bill_number) || clean(p.reference) || creditor;
+        const entries: TallyEntry[] = [];
+        push(entries, creditor, 'Dr', paise, { name: urdNo, type: 'Agst Ref' });
+        push(entries, party, 'Cr', paise, { name: invNo, type: 'Agst Ref' });
+        vouchers.push({
+          type: 'Journal', date: isoDate(p.date), number: `${invNo}/X${seqOf.get(p) ?? 1}`, party, partyGstin: '', stateName: '',
+          narration: [`Exchange: ${urdNo} adjusted against ${invNo}`, clean(p.note)].filter(Boolean).join(' | '),
+          reference: urdNo, entries, inventory: [], inventoryLedger: '',
+        });
+        continue;
+      }
       // R9 (RT-A3): COD cash a delivery rider collected sits in "Cash with riders" (Cash-in-Hand) until settled.
       const riderCash = !!p.rider_id && /^\s*cash\s*$/i.test(String(p.method ?? ''));
-      const { ledger: bank, parent: bankParent } = movedNoCash(p) && kind !== 'ra_deduction' ? { ledger: NO_CASH_LEDGER[kind as NoCashKind], parent: kind === 'write_off' ? 'Indirect Expenses' : kind === 'exchange' ? 'Sundry Creditors' : 'Current Liabilities' } : riderCash ? { ledger: RIDER_CASH_LEDGER, parent: 'Cash-in-Hand' } : bankOf(p); // WP-5: one ledger per bank (tally-bank.ts)
+      const { ledger: bank, parent: bankParent } = movedNoCash(p) && kind !== 'ra_deduction' ? { ledger: NO_CASH_LEDGER[kind as NoCashKind], parent: kind === 'write_off' ? 'Indirect Expenses' : 'Current Liabilities' } : riderCash ? { ledger: RIDER_CASH_LEDGER, parent: 'Cash-in-Hand' } : bankOf(p); // WP-5: one ledger per bank (tally-bank.ts)
       std(bank, bankParent);
       const paise = toPaise(inrValue(num(p.amount), inv));
       const invNo = clean(inv.invoice_number) || String(inv.id);
@@ -646,7 +673,10 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
 
   /* Purchases */
   if (o.includePurchases) {
-    for (const p of filterPurchases(source.purchases, source.vendors, o.range)) {
+    for (const np of filterPurchases(source.purchases, source.vendors, o.range)) {
+      // QA10 R5: a URD voucher's customer is credited in their own creditor ledger (never merged with their debtor one).
+      const urd = urdLedgerOf(np.id);
+      const p = urd ? { ...np, partyName: urd } : np;
       const total = Math.abs(toPaise(p.total));
       if (total === 0) continue;
       const entries: TallyEntry[] = [];

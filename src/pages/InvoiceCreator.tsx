@@ -192,7 +192,7 @@ export function InvoiceCreator() {
           };
           // R9 (RT-A2): the MRP guard runs even without batch / serial / godown tracking (or agency lots).
           const found: ReturnType<typeof liveDocTrackingIssues> = ctx || st.items.some((i) => i.arrival_id) ? liveDocTrackingIssues(doc) : withMrpIssues({ errors: [], expired: [], warnings: [] }, liveMrpIssues(doc));
-          const rxErr = [...rxRequiredErrors({ ...doc, rx: now.rx }), ...[...saveGates].flatMap((g) => g({ ...doc, total: now.total, kyc: now.kyc }))]; // R9 (RT-B1) "Require prescription for H1 / X"; RT-E3 "Require PAN"
+          const rxErr = [...rxRequiredErrors({ ...doc, rx: now.rx }), ...[...saveGates].flatMap((g) => g({ ...doc, total: now.total, kyc: now.kyc, client: now.client }))]; // R9 (RT-B1) "Require prescription for H1 / X"; RT-E3 "Require PAN"
           const issues = rxErr.length ? { ...found, errors: [...found.errors, ...rxErr] } : found;
           // QA8 T15: only agency-lot errors left — the owner may sell anyway, with a reason (audited).
           const lotOnly = !!issues.lots?.length && issues.errors.every((e) => issues.lots!.includes(e));

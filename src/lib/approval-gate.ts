@@ -139,8 +139,17 @@ export function holdForCredit(doc: InvoiceRecord, note: string): void {
   doc.status = 'Draft';
 }
 
-/** The data layer's credit branch (next to `holdIfApprovalNeeded` in `localDb.invoices.save` / `setStatus`). */
+/**
+ * QA10 (R6 / R8): a lazy module's say on a bill right before it is deleted (`localDb.invoices.remove`: `next` absent) or
+ * saved (`localDb.invoices.save` / `setStatus`, from `holdIfCreditBlocked`: it acts on a cancel). Set by
+ * `retail/rt-doc-hooks.ts` (an exchange receipt frees its URD voucher, a finance DO is cancelled with its transfer
+ * journal); it may refuse (throw). One slot, kept tiny for first paint.
+ */
+export const voidHook: { f?: (stored: InvoiceRecord | undefined, next?: InvoiceRecord) => void } = {};
+
+/** The data layer's credit branch (next to `holdIfApprovalNeeded` in `localDb.invoices.save` / `setStatus`); runs `voidHook` first. */
 export function holdIfCreditBlocked(doc: InvoiceRecord, stored: InvoiceRecord | undefined): void {
+  voidHook.f?.(stored, doc);
   if (doc.pos || doc.status === 'Draft' || doc.status === 'Cancelled' || (stored && stored.status !== 'Draft')) return;
   if (creditGate) creditGate(doc);
   else if (!can('doc.approve') && /"block"/.test(readRaw(CREDIT_POLICY_KEY) ?? '')) holdForCredit(doc, 'The credit position could not be checked.');
