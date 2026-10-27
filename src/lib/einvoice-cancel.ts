@@ -15,6 +15,7 @@
  *    `2` order cancelled, `3` data entry mistake, `4` others.
  */
 
+import { localDayOf } from './dates';
 import { saveEInvoiceMeta, type EInvoiceMeta, type PortalCancel } from './einvoice';
 
 export type CancelReason = PortalCancel['reason'];
@@ -93,7 +94,7 @@ export function withCancel(meta: EInvoiceMeta, which: 'irn' | 'ewb', patch: Part
     remark: patch.remark ?? prev?.remark ?? '',
     prepared_at: prev?.prepared_at ?? now.toISOString(),
     status: patch.status,
-    ...(patch.status === 'done' ? { done_on: patch.done_on ?? prev?.done_on ?? now.toISOString().slice(0, 10) } : {}),
+    ...(patch.status === 'done' ? { done_on: patch.done_on ?? prev?.done_on ?? localDayOf(now) } : {}), // QA14: the local day (UTC was the day before until 05:30 IST)
   };
   return { ...meta, [key]: next, updated_at: now.toISOString() };
 }

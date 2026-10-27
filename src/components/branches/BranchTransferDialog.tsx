@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { useT } from '../../i18n';
 import { branchT } from '../../i18n/areas/branch-books';
-import { defaultTransferRates, raiseTransferPair } from '../../lib/branch-transfer';
+import { defaultTransferRates, raiseTransferPair, transferBaseQty } from '../../lib/branch-transfer';
 import { loadPositions, type StockItem } from '../../lib/inventory';
 import type { Branch } from '../../lib/branch';
 import type { StockTransfer } from '../../types/stock';
@@ -74,7 +74,7 @@ export default function BranchTransferDialog({ transfer, from, to, items, onClos
             {transfer.lines.map((l) => (
               <tr key={l.id}>
                 <td>{byId.get(l.item_id)?.name ?? '—'}</td>
-                <td className={surface.numeric}>{l.qty}</td>
+                <td className={surface.numeric}>{transferBaseQty(l)} {byId.get(l.item_id)?.unit ?? ''}</td>
                 <td className={surface.numeric}>
                   <input
                     className={controls.input}
