@@ -39,7 +39,8 @@ export function applyRetailSwitches(kind: RetailKindId): RetailSettings {
   const saved = saveRetailSettings(retailSwitchesFor(kind, readRetailSettings()));
   if (RETAIL_PROFILES[kind].pharma) {
     const ph = readPharmaSettings();
-    if (!ph.enabled || !ph.block_expired || !ph.block_above_mrp) savePharmaSettings({ ...ph, enabled: true, block_expired: true, block_above_mrp: true });
+    // RT-B1 (§8 #8): a medical store blocks H1 / X sales without patient + prescriber (the owner may turn it to warn).
+    if (!ph.enabled || !ph.block_expired || !ph.block_above_mrp || !ph.require_rx) savePharmaSettings({ ...ph, enabled: true, block_expired: true, block_above_mrp: true, require_rx: true });
   }
   return saved;
 }

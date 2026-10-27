@@ -44,6 +44,8 @@ const RcmGoodsNotice = lazy(() => import('../trade/RcmGoodsNotice'));
 const BillRateHints = lazy(() => import('../trade/BillRateHints'));
 // R8-B (TR-B1/B2/B3): bags / weight rows, bill charges and the broker (commodity / agency pack, lazy).
 const BillTradePanel = lazy(() => import('../trade/tr-b-hub').then((m) => ({ default: m.BillTradePanel })));
+// R9 (RT-B3): batch MRP above the NPPA ceiling + GST (pharmacy pack, warning only, lazy).
+const CeilingNotice = lazy(() => import('../retail-r9/PharmacyDesk').then((m) => ({ default: m.CeilingNotice })));
 // R9 (RT-C2): size × colour grid entry (apparel pack, lazy).
 const BillGrid = lazy(() => import('../retail-r9/ApparelDesk').then((m) => ({ default: m.BillGrid })));
 import { impliedPacks } from '../../lib/shop-mode';
@@ -348,6 +350,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       {impliedPacks(localDb.settings.get()).includes('apparel') && <Suspense fallback={null}><BillGrid lines={lines} onChange={changeLines} date={date} /></Suspense>}
       {vendor && ((x) => !!x.trade_discounts || !!x.industry_packs?.some((p) => p === 'distributor' || p === 'commodity'))(localDb.settings.get()) && <Suspense fallback={null}><BillRateHints lines={lines} vendor={vendor} date={date} onRate={(id, rate) => changeLines(lines.map((l) => (l.id === id ? { ...l, rate } : l)))} /></Suspense>}
       {tradeOn && <Suspense fallback={null}><BillTradePanel lines={lines} onLines={changeLines} vendor={vendor} broker={brokerId} onBroker={setBrokerId} isNew={!purchase} /></Suspense>}
+      {localDb.settings.get().industry_packs?.includes('pharmacy') && <Suspense fallback={null}><CeilingNotice lines={lines} date={date} /></Suspense>}
       {!rcm && !importType && vendor && <Suspense fallback={null}><RcmGoodsNotice lines={lines} date={date} vendor={vendor} onApply={() => setRcm(true)} /></Suspense>}
       <LandedCostFields value={landed} onChange={setLanded} />
 

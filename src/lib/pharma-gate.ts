@@ -7,7 +7,7 @@
  *    an error with "Block near-expiry sales" on.
  * Pure apart from reading the settings.
  */
-import { DB_PREFIX, getJson } from './storage';
+import { DB_PREFIX, getJson, getTable } from './storage';
 
 export const PHARMA_SETTINGS_KEY = `${DB_PREFIX}pharma_settings`;
 
@@ -76,6 +76,18 @@ export function pharmaGate<T extends Issues>(
     }
   }
   return out;
+}
+
+/**
+ * R9 (RT-B1): with "Require prescription for H1 / X" on (`pharma_settings.require_rx`, the pharmacy profile's default),
+ * an issued sale of a Schedule H1 / X item without the patient and the prescriber is an error (editor and POS saves).
+ */
+export function rxRequiredErrors(doc: { doc_type?: string; status?: string; items: readonly { name: string; quantity?: number }[]; rx?: { patient?: string; prescriber?: string } }): string[] {
+  const raw = getJson<{ enabled?: boolean; require_rx?: boolean } | null>(PHARMA_SETTINGS_KEY, null);
+  if (!raw?.enabled || !raw.require_rx || !SALE_TYPES.has(doc.doc_type ?? '') || doc.status === 'Draft' || (doc.rx?.patient?.trim() && doc.rx.prescriber?.trim())) return [];
+  const strict = new Set(getTable<{ name?: string; drug_schedule?: string }>('stock_items').filter((i) => i?.drug_schedule === 'H1' || i?.drug_schedule === 'X').map((i) => String(i.name ?? '').trim().toLowerCase()));
+  const names = doc.items.filter((l) => (Number(l.quantity) || 0) > 0 && strict.has(l.name.trim().toLowerCase())).map((l) => l.name);
+  return names.length ? [`Schedule H1 / X (${names.join(', ')}): enter the patient and the prescriber — "Require prescription" is on (pharma setting).`] : [];
 }
 
 /* ── 8F sale limits: non-saleable godowns and the batch MRP ceiling ── */

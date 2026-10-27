@@ -54,7 +54,7 @@ test('dated / numbered tables in the sync engine; the series prefixes are used o
 });
 
 test('the lazy writers and the RT-A writers import the registry; first-paint maps carry no R9 row', () => {
-  for (const f of ['lib/sync-engine.ts', 'lib/trust/recycle-bin.ts', 'lib/retail/rt-delivery.ts', 'lib/retail/rt-short-book.ts', 'lib/retail/rt-alterations.ts']) assert.ok(/import '\.{1,2}\/(retail\/)?rt-registry'/.test(src(f)), f);
+  for (const f of ['lib/sync-engine.ts', 'lib/trust/recycle-bin.ts', 'lib/retail/rt-delivery.ts', 'lib/retail/rt-short-book.ts', 'lib/retail/rt-pharmacy-rx.ts', 'lib/retail/rt-refills.ts', 'lib/retail/rt-alterations.ts']) assert.ok(/import '\.{1,2}\/(retail\/)?rt-registry'/.test(src(f)), f);
   for (const t of [...Object.values(RT_TABLES), ...Object.values(RT_OBJECTS)]) {
     assert.ok(!src('lib/access.ts').includes(`  ${t}:`), `${t} not in access.ts (first paint)`);
     assert.ok(!src('lib/audit-edits.ts').includes(`  ${t}:`), `${t} not in audit-edits.ts (first paint)`);

@@ -616,7 +616,13 @@ export interface InvoiceRecord {
   /** Bill-value offer applied (`src/lib/offers.ts`); `value` (₹) is part of the invoice's amount discount. */
   offer?: { scheme_id: string; label: string; value: number };
   /** Pharma pack: prescription details for Schedule H / H1 / X sales (Schedule H1 register). */
-  rx?: { patient: string; patient_address?: string; prescriber: string; prescriber_reg?: string };
+  rx?: {
+    patient: string; patient_address?: string; prescriber: string; prescriber_reg?: string;
+    /* R9 (RT-B1), additive: doctors-master row (prescriber / reg. are its snapshot), patient age / gender, the
+     * prescription's number and date, Schedule X "prescription retained", and the Rx photo (an `attachments` ref id,
+     * never printed). `client_id` = the patient is a saved client (else walk-in text). */
+    doctor_id?: string; age?: number; gender?: 'M' | 'F' | 'O'; rx_no?: string; rx_date?: string; retained?: boolean; image_id?: string; client_id?: string;
+  };
   /**
    * Additive (8.5, daily khata loop): the party's balance frozen when the bill was first issued, so
    * "Previous balance + This bill = Total due" prints the same on every reprint (Critical Rule 3).
