@@ -18,7 +18,9 @@ export const AG_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   quality_cut_tables: 'master.edit',
   farmer_cycles: 'doc.create',
   // AG-B: milk_rate_charts (master.edit), milk_shifts, milk_dispatches, milk_cards (doc.create)
-  // AG-C: weighbridge_slips, cmr_agreements (doc.create)
+  // AG-C: mills — weighbridge slips and custom-milling agreements (documents)
+  weighbridge_slips: 'doc.create',
+  cmr_agreements: 'doc.create',
   // AG-D: lots are documents; rent plans are masters; loans and the share ledger post vouchers
   cold_lots: 'doc.create',
   cold_rent_plans: 'master.edit',
@@ -34,6 +36,8 @@ export const AG_WATCHED: Readonly<Record<string, WatchedTable>> = {
   farmer_cycles: { entity: 'invoice', label: 'Farmer cycle bill' },
   // AG-B
   // AG-C
+  weighbridge_slips: { entity: 'item', label: 'Weighbridge slip' },
+  cmr_agreements: { entity: 'client', label: 'Custom-milling agreement' },
   // AG-D
   cold_lots: { entity: 'invoice', label: 'Cold-storage lot' },
   cold_rent_plans: { entity: 'item', label: 'Storage rent plan' },

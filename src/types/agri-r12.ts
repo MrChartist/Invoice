@@ -370,15 +370,108 @@ declare module '../lib/inventory' {
 // AG-B: milk_rate_charts, milk_shifts (one row per centre per shift), milk_dispatches (MDS), milk_cards; agri_settings.milk.
 
 /* ════════════════════════════════════════ AG-C ════════════════════════════════════════ */
-// AG-C: weighbridge_slips (WBS), cmr_agreements (CMR deliveries); `ProductionOrder.ag.mill` (declared below).
-/** C2: the milling batch on a production order (filled by AG-C). */
-export interface AgMillOrder {
-  standard_pct?: number;
-  moisture_in_pct?: number;
+// AG-C: weighbridge_slips (WBS), cmr_agreements (CMR deliveries); `ProductionOrder.ag.mill`; `ag.cmr` is `AgCmrSnap`.
+
+export type WbsPartyKind = 'farmer' | 'trader' | 'agency' | 'other';
+export type WbsUse = 'purchase' | 'cmr' | 'job' | 'sale' | 'other';
+export type WbsReadingKey = 'moisture' | 'foreign' | 'damaged' | 'immature' | 'broken';
+/** Lab readings on the slip, % (absent = not read). */
+export type WbsReadings = Partial<Record<WbsReadingKey, number>>;
+
+/** Weighbridge / gate-entry slip (C1). Table `weighbridge_slips`, `WBS/FY<yy-yy>/<seq>`, dated `date`. */
+export interface WeighbridgeSlip {
+  id: string;
+  number: string;
+  /** yyyy-mm-dd of the first weighing (FY of the number). */
+  date: string;
+  vehicle: string;
+  party_kind: WbsPartyKind;
+  /** Vendor (farmer / trader) or client (agency) id. */
+  party_id?: string;
+  /** Party name snapshot (typed when there is no master row). */
+  party_name?: string;
+  commodity: string;
+  /** First weighing (loaded vehicle), kg, and when (local `yyyy-mm-ddTHH:mm`). */
+  gross_kg: number;
+  gross_at: string;
+  /** Second weighing (empty vehicle), kg — absent while the slip is open. */
+  tare_kg?: number;
+  tare_at?: string;
+  /** gross − tare (0 while open). */
+  net_kg: number;
+  bags?: number;
+  readings: WbsReadings;
+  use: WbsUse;
+  /** What the slip was used for: the purchase voucher, the CMR agreement or the JWP receipt. */
+  ref_id?: string;
+  status: 'open' | 'done' | 'cancelled';
+  note?: string;
+  cancel_reason?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Paddy received for custom milling: a principal's-material receipt (`job_work_principal`, JWP). */
+export interface CmrPaddyLot {
+  id: string;
+  wbs_id?: string;
+  jwp_id: string;
+  date: string;
+  /** Quintals of paddy. */
+  qty: number;
+}
+
+/** Rice delivered to the agency against an acknowledgement (`CMR/FY…`); its JWP return closes the paddy milled. */
+export interface CmrDelivery {
+  id: string;
+  number: string;
+  date: string;
+  /** Quintals of rice. */
+  qty: number;
+  lot_no: string;
+  ack_no?: string;
+  fortified?: boolean;
+  jwp_id?: string;
+}
+
+/** Custom-milling (CMR) agreement with the State agency (C3). Table `cmr_agreements`. */
+export interface CmrAgreement {
+  id: string;
+  /** The agency (a client). */
+  agency_id: string;
+  agency_name: string;
+  /** e.g. "Kharif 2026-27". */
+  season: string;
+  kind: 'raw' | 'parboiled';
+  /** Rice due per 100 of paddy (default 67 raw / 68 parboiled — agency norm, verify). */
+  outturn_pct: number;
+  paddy_lots: CmrPaddyLot[];
+  deliveries: CmrDelivery[];
+  /** Milling charges, ₹ per quintal of rice delivered. */
+  milling_rate?: number;
+  /** By-product value the agency recovers: ₹ per quintal of paddy, or a lump sum. */
+  byproduct_recovery?: { basis: 'per_qtl_paddy' | 'lump'; rate: number };
+  /** Last day for delivery (yyyy-mm-dd). */
+  due_by?: string;
+  /** Bank guarantee given for the paddy (R11 `bank_guarantees`). */
+  bg_id?: string;
+  status: 'open' | 'closed';
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** C2: the milling batch on a production order (`ProductionOrder.ag.mill`). */
+export interface MillOrderMeta {
+  /** Moisture % of the input (paddy / grain / seed) and of the output (rice / flour …). */
+  input_moisture?: number;
+  output_moisture?: number;
+  /** Standard outturn %: main + listed co-products per 100 of input. */
+  standard_outturn_pct: number;
+  std_source: 'own' | 'cmr';
 }
 declare module './production-r4' {
   interface ProductionOrder {
-    ag?: { mill?: AgMillOrder };
+    ag?: { mill?: MillOrderMeta };
   }
 }
 

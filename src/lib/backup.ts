@@ -491,6 +491,8 @@ const RECORD_TABLES = [
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
   // R12-A: farm batches, quality-cut tables, pooled farmer cycles (CYB/FY…)
   'farm_batches', 'quality_cut_tables', 'farmer_cycles',
+  // R12-C (mills): weighbridge slips (WBS/FY…), custom-milling agreements (deliveries CMR/FY…)
+  'weighbridge_slips', 'cmr_agreements',
   // R12-D: cold-storage lots (CSR / GPO), rent plans, loans against stored produce (LAS), members' share ledger (SHC)
   'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares',
 ];
@@ -581,6 +583,8 @@ const ID_TABLES = new Set([
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
   // R12-A: farm batches, quality-cut tables, pooled farmer cycles (CYB/FY…)
   'farm_batches', 'quality_cut_tables', 'farmer_cycles',
+  // R12-C (mills): weighbridge slips (WBS/FY…), custom-milling agreements (deliveries CMR/FY…)
+  'weighbridge_slips', 'cmr_agreements',
   // R12-D: cold-storage lots (CSR / GPO), rent plans, loans against stored produce (LAS), members' share ledger (SHC)
   'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares',
 ]);

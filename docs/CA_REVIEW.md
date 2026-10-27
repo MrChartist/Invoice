@@ -44,8 +44,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 9. Retail shops (Round 9, planned) | RT1–RT22 | 22 | 8 |
 | 10. Service businesses (Round 10, planned) | SV1–SV30, SV41–SV48, SV60–SV62 | 41 | 12 |
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
-| 12. Agriculture and food processing (Round 12, planned) | AG1–AG39, AG60–AG69 | 49 | 12 |
-| **Total** | | **346** | **90** |
+| 12. Agriculture and food processing (Round 12, planned) | AG1–AG39, AG50–AG53, AG60–AG69 | 53 | 13 |
+| **Total** | | **350** | **91** |
 
 ---
 
@@ -678,7 +678,7 @@ sub-contractors, builders and real-estate developers, interiors and MEP contract
 | CN34 | **Builder's bills and the contractor's site cost (QA11 C3, C9).** (a) Sub-contractor and plant-hire bills charged to a project on the 1% / 5% scheme are booked with ITC not claimed (cost = total incl. GST), and a typed bill claiming ITC is cautioned — right for every input of such a project? (b) Amounts the client recovers on our RA bills (material issued, plant hire, water & power, LD, interest on advance) are shown as site cost in the site P&L — right, or should client-issued material be netted from revenue instead? | (a) No ITC. (b) Site cost. | `construction/cn-subcon.ts` `noItcCentre`, `bill-guard.ts`, `cn-site-pnl.ts` | 2019-04-01 | N 03/2019-CT(R) (recalled) |
 | CN35 | **Delay interest base (QA11 C11).** Interest on delayed payment (Sec 15(2)(d) value, state RERA rate) is simple: on the instalments owed (including their GST), never on interest billed by an earlier demand, from the latest earlier due date to the new demand date. (a) Should the GST part of an instalment carry interest? (b) Is "from the latest earlier due date" acceptable when older instalments are still unpaid? | (a) Yes, on the amount demanded. (b) A working figure, waivable per booking. | `construction/cn-demands.ts` `delayInterest` | — | State RERA rules (recalled) |
 
-## 12. Agriculture and food processing (Round 12, ids AG1–AG39, AG60–AG69; B–C add AG40+ / AG50+)
+## 12. Agriculture and food processing (Round 12, ids AG1–AG39, AG50–AG53, AG60–AG69; B adds AG40+)
 
 Added with `docs/prd/round-12.md`. It covers farmer producer organisations and co-operatives, dairies and milk
 collection centres, rice / flour / dal / oil mills, cold storages, seed / fertiliser / pesticide dealers, and poultry /
@@ -760,7 +760,16 @@ fishery farms.
 | AG38 | **Bonus / price difference run.** The year-end run computes ₹ per unit on each farmer's cycle quantity and exports a CSV; the journal (price difference to purchase cost, or patronage to appropriation, AG25) is entered by the user. Should the run post a draft journal itself, and should the bonus be spread over the farmers' bills of the year (for 194Q totals)? | CSV working only; journal by the user. | `agri/ag-cycles.ts` `bonusRun`; Farm → Cycles | — | — (design) |
 | AG39 | **Farm batches and agricultural income.** A flock / pond / herd / crop batch is a cost centre with a memo (mortality %, FCR, cost per kg); no posting from events. The "Agricultural income (exempt)" ledger is offered only for own cultivation. Is a separate ledger enough for the return (Schedule EI), or should exempt agricultural income also be kept out of the P&L totals the app shows? | Separate ledger under Other income; P&L shows it. | `agri/ag-batches.ts`; `agri/ag-cycle-post.ts` `agriIncomeLedger` | — | IT Act 1961 Sec 10(1) / 2025 Act Sec 11 (as reported, AG15) |
 
-### 12.6 Cold storage, input dealers and members — choices made while building AG-D (AG60–AG69)
+### 12.6 Added while building AG-C (mills)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| AG50 | **Paddy received for custom milling (CMR) as the agency's material.** Each paddy lot is a job-work principal's receipt (JWP register, never our stock); each rice delivery (CMR/FY…, against the agency's acknowledgement) is recorded as a return of the paddy it was milled from (rice ÷ outturn %, marked processed). (a) Is that register enough as our record of the agency's goods (Sec 143 / Rule 45 apply to the principal; anything for the miller)? (b) A shortfall in outturn (rice delivered below 67 / 68% of paddy) that the agency recovers in money — a supply by the miller, a penalty, or a reduction of the milling charges? (c) Gunny / FRK issued by the agency: register only? | (a) Register only; (b) not computed — shown as rice still due; (c) typed as principal's material lines. | `agri/ag-cmr.ts` (`addPaddyLot`, `addDelivery`); `job-work.ts` `principalDb` (unchanged) | 2021-06-17 | Circular 153/09/2021 (primary); job-work provisions (developers' reading) |
+| AG51 ★ | **The 25% test per milling-charges bill.** The app runs the Circular 153 test on each bill: goods typed on the bill (fortificant / FRK bought by the miller, gunny, packing) ÷ (milling charges + those goods); ≤ 25% → exempt (entry 3A), else 5% (entry 26). (a) Is the test per bill right, or per agreement / season / State order? (b) FRK supplied by the agency (not charged by us) — left out of both values? (c) By-product value the agency recovers — left out (as AG9 assumes)? | Per bill; agency-supplied goods and by-product recovery left out; the user decides. | `agri/ag-cmr.ts` `pdsTest`, `millingChargesInvoice`; `MILLING_PDS_RULES` | 2021-06-17 | Circular 153/09/2021 (primary) |
+| AG52 | **Milling loss and moisture loss.** A batch shows loss = input − all outputs, split into moisture loss (input × (m_in − m_out) ÷ (100 − m_out)) and an unexplained part. Both stay in the cost of the main product and co-products (normal loss, AS 2); nothing is written off and no journal is made. Should an unexplained loss above a tolerance be treated as abnormal and charged to P&L, and is a 1-point outturn tolerance a reasonable flag? | Memo and flag only; normal loss absorbed. | `agri/ag-yield.ts`; `OUTTURN_STANDARDS` | — | AS 2 (developers' reading); practice |
+| AG53 | **Bank stock statement for a mill.** The drawing-power working groups stock as paddy / rice / broken / bran / husk / packing at the books' cost (by-products at the typed rate the BOM credits), deducts creditors for goods, and keeps CMR / job-milling paddy out (memo of quintals held). Is valuing by-products at that rate acceptable for a bank's stock statement, and should paddy bought but not yet paid (farmer vouchers) be deducted like other creditors? | As stated; margins typed per account. | `agri/ag-mill-reports.ts`; `trade/tr-stock-statement.ts` (`STOCK_STATEMENT_PRESETS.mill`) | — | Bank practice (TR19) |
+
+### 12.7 Cold storage, input dealers and members — choices made while building AG-D (AG60–AG69)
 
 | Id | Question | App's assumption | Where | From | Source used |
 |---|---|---|---|---|---|

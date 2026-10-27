@@ -96,9 +96,100 @@ quality) plus the cycle posting engine. Trimming options for the lead: merge the
 
 (AG-B)
 
-## AG-C — Mills
+## AG-C — Mills: rice, flour, dal, oil (pack `mill`)
 
-(AG-C)
+### What shipped
+
+| Item | Where |
+|---|---|
+| C1 intake | Table `weighbridge_slips` (`WBS/FY…`, `doc.create`, dated `date`, numbered): `agri/ag-weighbridge.ts` (`openSlip` = first weighing, `recordTare` = second weighing → `net = gross − tare`, `setReadings`, `cancelSlip` (number kept, prints "CANCELLED"), `deleteSlip` (unused only; recycle bin, number reserved), `markUsed` / `releaseSlip`, `receiveForJob` → a JWP receipt). Pure: `slipNet`, `cleanReadings`, `openSlips` (> 24 h flagged), `dailyIntake` (by commodity / party kind / use, net-weighted moisture), `voucherPrefill` (net as QTL, bags, the R8 `wt` weighing with the vehicle net as gross, readings → quality cuts), `slipHtml` (A5 small paper: both weighings with times, net, readings, "Subject to quality cut"). View `components/agri/IntakeView.tsx`: first weighing, open slips with tare (Web Serial scale via `scale-serial.ts` on demand, or typed), the day's slips (Print, Make voucher, Receive for CMR, Receive for job milling, Cancel), daily intake. |
+| C2 milling batches | Starters `agri/ag-mill-bom.ts` (`MILL_STARTERS` rice / flour / dal / oil per 100 of input, `starterBom`, `installMillStarter` — items reused by name or created in QTL with their `ag_class`, BOM saved through `bomsDb`, default for the main item; "practice — adjust"). A batch is an ordinary production order with `ag.mill` (`MillOrderMeta`: moisture in / out, `standard_outturn_pct`, `std_source`), saved by `agri/ag-yield.ts` `setMillMeta` (`books.edit`). Yield read from the order's manufacturing journals only: `voucherFigures` (components via `lineFactor`, kg via `kgPer`), `batchYield`, `yieldOf` (outturn = main + co-products, by-product %, loss, moisture loss `in × (m_in − m_out) ÷ (100 − m_out)`, unexplained, cost per unit from the engine's `cost_snapshot`, flag beyond `OUTTURN_STANDARDS.tolerance_pts`). Panel `components/agri/YieldPanel.tsx` mounted lazily by `production/OrdersTab.tsx` with the `mill` pack; view `MillBatchesView.tsx` (starter, batch list with outturn / standard / flag). |
+| C3 CMR and job milling | Table `cmr_agreements` (`doc.create`): `agri/ag-cmr.ts`. Paddy lots are JWP receipts (`principalDb`, register only — never stock); a delivery (`CMR/FY…`, lot / ACK no., fortified) is a JWP return of the paddy milled (rice ÷ outturn, `processed`). `cmrAccount` (paddy, due, delivered, balance, % complete, days left / overdue, by-product recovery due, charges earned). `pdsTest` (Circular 153: goods ≤ 25% of the value → exempt, else 5%; boundary in), `millingChargesInvoice` (draft bill of supply when exempt, tax invoice at 5% otherwise, lines classed `milling_pds`, `ag.cmr` snapshot), `jobMillingRate` / `jobMillingInvoice` (`jobChargesLine`, class `job_milling`, 5% for a registered principal, typed rate otherwise — AG10). `job-work.ts` is used read-only (no edit). View `CmrView.tsx`. |
+| C4 packing rule | `agri/ag-packing.ts` (pure): `packClass` (labelled and ≤ 25 kg / 25 L → packed class, exactly 25 in; else loose; `counterLoose` for a retail sale from a larger bag), `endUseClass` / `needsEndUse` (bran, oil cake as feed or not), `suggestLine` (class → rate / HSN by date from `AGRI_CLASS_RULES`, with the N 6/2022 note), `ewayHint` (exempt-only goods → "may not be needed — verify AG12"; taxable goods over ₹50,000 → prompt; the value test on the taxable lines). Item fields `ag_pack_kg`, `ag_labelled` (and `ag_class`) on stock items through the lazy `components/agri/PackSizeRow.tsx` in the stock item form (mill / agri pack, or already set). The class-rate notice in `gst-guards.ts` is AG-A's hook; it calls `suggestLine` (no second edit). |
+| C5 reports | `agri/ag-mill-reports.ts`: `millMonths` (intake own — purchases of the batches' input items through `readPurchase` / `readPurchaseLines`, CMR lots, job receipts; milled; outputs by kind; outturn vs input-weighted standard; moisture loss; flagged batches; by-product realisation from issued sales), `realisation`, `millGroup` / `millStockGroups` (preset `STOCK_STATEMENT_PRESETS.mill` added to `trade/tr-stock-statement.ts` — one constant, the working unchanged), `principalMemo` (JWP pending, quintals and typed value), `loadMillStockStatement` (TR-C4 input regrouped; principals' material as a memo). View `YieldView.tsx` (monthly table, realisation, stock statement; CSV / XLSX). Oil mills read outturn as oil yield and by-product % as cake. |
+
+### Storage (R12-C)
+
+| Key / field | Kind | Backed up | Synced | Audited | Right |
+|---|---|---|---|---|---|
+| `weighbridge_slips` (`WBS`) | table, dated `date`, numbered | yes | yes (`DATED`, `NUMBERED`) | yes | `doc.create` |
+| `cmr_agreements` (`CMR` on deliveries, inside the row) | table | yes | yes | yes | `doc.create` |
+| `ProductionOrder.ag.mill`; item `ag_pack_kg`, `ag_labelled`; invoice `ag.cmr` | additive | yes | yes | yes | — |
+
+Deletes go through the data layer: an unused slip and an agreement without lots / deliveries go to the recycle bin
+(restore needs no module hook: nothing else names them); a lot / delivery is removed with its JWP row through
+`principalDb.remove` (its own guards); WBS / CMR numbers stay reserved. Writers import `./ag-registry`.
+
+### Rules (`agri-rules.ts`, section AG-C)
+
+`OUTTURN_STANDARDS` (CMR 67 raw / 68 parboiled — agency norm, CAG 2015, `verified: false`), `OWN_OUTTURN_STARTERS`
+(own-mill starters rice 67, flour 82, dal 76, oil 33; flag tolerance 1 point — practice), `MILLING_PDS_RULES` (goods ≤
+25% → exempt entry 3A, else 5%, from 2021-06-17, Circular 153 — `verified: true`), `JOB_MILLING_RULES` (5% registered,
+unregistered `null` → typed, AG10). SACs come from AG-A's class rows (`agClassAt('milling_pds' | 'job_milling')`);
+the 25 kg line from `PACKED_25KG_RULES`.
+
+### Wiring to AG-A
+
+- **Make voucher** (Intake): `voucherFromSlip(slip, { vendor, rate, tare_per_bag, params })` calls AG-A3's
+  `saveVoucher` (FPV/FY…, quality cuts from the commodity's table via `qualityTableFor`) with the slip's net weight as the
+  R8 weighing, bags, readings, vehicle and `wbs_id`, and marks the slip used — one tap from the slip, no edit of AG-A's
+  view. Offered for slips whose party is a farmer vendor.
+- **Desk**: `components/agri/MillDesk.tsx` replaces AG-A's stub in place (same props); `Inventory.tsx` not edited.
+- **Snapshot**: milling-charges / job-milling drafts write `agSnapshot('cmr', { cmr: AgCmrSnap })` /
+  `agSnapshot('job_milling', …)`; AG-A's `AgriBlock` prints the "Custom milling" box.
+- **Names / registry / rules / types**: AG-C rows in `ag-shared.ts` (`AG_TABLES.weighbridge` / `.cmr`, `AG_SERIES.wbs` /
+  `.cmr` moved out of `AG_RESERVED_SERIES`, `AG_DATED.weighbridge_slips`), `ag-registry.ts` (AG-C block),
+  `agri-rules.ts` (AG-C section: `OUTTURN_STANDARDS` kept, `OWN_OUTTURN_STARTERS`, `MILLING_PDS_RULES` kept,
+  `JOB_MILLING_RULES`), `types/agri-r12.ts` (AG-C block; `ProductionOrder.ag.mill` is `MillOrderMeta` per the PRD —
+  `{ input_moisture?, output_moisture?, standard_outturn_pct, std_source }` — replacing AG-A's placeholder
+  `AgMillOrder`, which nothing used).
+- **Class-rate hook**: the 25 kg rule plugs into `agri/ag-hooks.ts` `agExceptions` (no second edit of `gst-guards.ts`): a
+  line's class is moved to its packed / loose pair from the stock item's pack size and label before the rate check.
+- **Help**: the five `inventory:mill*` topics in `topics-packs.ts` reworded to what shipped (CA ids AG50–AG53 added).
+- **Demo**: `demo/profile-agri.ts` AG-C block — a done weighbridge slip, the rice starter items / BOM, one milling batch
+  (production order + manufacturing journal, outturn 68% vs 67%), a CMR agreement with a paddy lot and one delivery
+  (JWP receipt and return). `DEMO_EXTRA_TABLES` gained `weighbridge_slips`, `cmr_agreements`, `job_work_principal`,
+  `boms`, `production_orders`, `manufacturing_vouchers`.
+- **e2e**: step "R12-C mill desk" in `tests/e2e/smoke.mjs` (slip → net; yield panel 68% vs 67%; CMR due 33.5 qtl, a
+  CMR/FY… delivery, JWP in / out; the 25% test exempt / 5%).
+
+### Deviations from the PRD (AG-C)
+
+- **e-Way note (C4-4)**: `ewayHint` (exempt-only bill → "may not be needed — verify AG12"; taxable lines over ₹50,000 →
+  prompt) is an engine with tests; it is not yet shown in the editor's e-way prompt (that UI is outside AG-C's files).
+- **End-use choice (C4-3)**: `endUseClass` picks feed / other for bran and cake; the editor line has no extra control —
+  the class is chosen on the stock item (`PackSizeRow`) and the typed rate wins as usual.
+- **Counter sale from a > 25 kg bag (C4-2)**: `packClass(…, { counterLoose: true })` exists; the POS does not pass it yet.
+- **Job milling receipt**: "Receive for job milling" records the JWP receipt directly from the slip (net weight in QTL);
+  the job-milling bill is made on Custom milling → Job milling (`jobChargesLine`, class `job_milling`).
+- **Views are one chunk** with the desk (not lazy sub-chunks): each lazy split costs a preload map in the parent chunk.
+- `ag-cmr` and the JWP writer need `books.edit` for paddy lots / deliveries (the job-work register's own right).
+
+### CA items
+
+AG50 (CMR paddy as the agency's material; shortfall), AG51 ★ (the 25% test per bill), AG52 (milling and moisture loss),
+AG53 (bank stock statement for a mill) — `docs/CA_REVIEW.md` §12.5.
+
+### Bundle (AG-C)
+
+Measured with `vite build` + gzip -9 (the budget script's method), before = `claude/elegant-cannon-cwapiv` at `228ca3c`
+(AG-A merged), after = this branch merged with it.
+
+| Budget | Before | After | Delta | Share |
+|---|---|---|---|---|
+| Initial JS (first paint) | 189,162 B | 189,186 B | **+24 B** | ≤ +0.03 kB ✓ |
+| Total JS | 3,126,902 B (3053.6 kB) | 3,156,623 B (3082.6 kB) | **+29,721 B (+29.0 kB)** | ≤ 7 kB ✗ |
+
+Breakdown of the total (gz): the mill desk chunk (four views + weighbridge, CMR, mill-report and starter engines)
++15.0 kB; the shared mill chunk (Hindi / English strings, form helpers) +5.0 kB; `agri-rules` split out of AG-A's
+`ag-tax` chunk +0.6 kB net; `ag-yield` +1.4 kB; yield panel +1.1 kB; pack-size row + packing rule +1.4 kB; preload maps
+of the two lazy mounts in `OrdersTab` / `ItemFormModal` +1.35 kB; `tr-stock-statement` split from its tab +0.3 kB net;
+help wording +0.6 kB; demo block +1.1 kB; the rest ≤ 0.3 kB each. First paint: the `index` chunk +24 B (preload map of
+the real desk). Measures already taken: one chunk for the desk and its views (a chunk per view cost ~0.15 kB each),
+common words and the stock-statement rows reused from the R8 trade area, no namespace (dynamic) import of first-paint
+modules (that cost +160 B of first paint through renamed exports). Trimming options for the lead: drop the demo
+block (−1.1 kB), drop job milling / the stock-statement preset from the desk (≈ −2 kB), or move the pack-size row into
+the item form without a lazy split once the item form has another lazy part (−0.6 kB).
 
 ## AG-D — Cold storage, input dealers, FPO / co-operative
 
