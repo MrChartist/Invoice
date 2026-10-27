@@ -133,3 +133,41 @@ test('G4: shift 50 L → dispatch 40 L → bill the union: stock stays 10 L; a m
   billCard(card.id, '2026-11-30');
   assert.equal(milk(), 8, 'local sale on a card still leaves stock');
 });
+
+/* ── G5: the e-Way preflight says "may not be needed" for exempt-only goods (AG-C4 leftover) ── */
+
+test('G5: exempt-only goods → EWB_EXEMPT note (same text as ewayHint); taxable goods → none', async () => {
+  const { preflightEway } = await import('../src/lib/einvoice-validate.ts');
+  const { EXEMPT_EWAY_NOTE } = await import('../src/lib/agri/ag-packing.ts');
+  const { invoice, item } = await import('./einvoice-fixtures.ts');
+  const road = { mode: 'road' as const, vehicle: 'MH12AB1234', distance: 120 };
+  const paddy = preflightEway(invoice({ items: [item({ name: 'Paddy', hsn: '1006', quantity: 100, rate: 2300, tax_rate: 0 })] }), { transport: road, now: new Date(2025, 5, 20) });
+  const w = paddy.warnings.find((x) => x.code === 'EWB_EXEMPT');
+  assert.equal(w?.message, EXEMPT_EWAY_NOTE);
+  const taxed = preflightEway(invoice({ items: [item({ quantity: 10, rate: 10000 })] }), { transport: road, now: new Date(2025, 5, 20) });
+  assert.ok(!taxed.warnings.some((x) => x.code === 'EWB_EXEMPT'));
+});
+
+/* ── G6: the 25 kg rule and the class notice reach lines typed in the editor / POS (class from the stock item) ── */
+
+test('G6: a labelled 25 kg rice bag sold at nil is flagged (5%); 5 kg loose from the bag is not', async () => {
+  const { agExceptions } = await import('../src/lib/agri/ag-hooks.ts');
+  const { blankStockItem, stockDb } = await import('../src/lib/inventory.ts');
+  stockDb.saveItem(blankStockItem({ name: 'Sona rice 25 kg', unit: 'BAG', hsn: '1006', ag_class: 'cereal_loose', ag_pack_kg: 25, ag_labelled: true }));
+  const inv = (lines: { quantity: number; unit: string; tax_rate: number; unit_factor?: number }[]) =>
+    ({ issue_date: '2026-10-05', items: lines.map((l, i) => ({ id: `l${i}`, name: 'Sona rice 25 kg', hsn: '1006', rate: 1500, amount: 0, ...l })) }) as never;
+  const bag = agExceptions(inv([{ quantity: 2, unit: 'BAG', tax_rate: 0 }]));
+  assert.equal(bag.length, 1, 'a whole labelled 25 kg bag at nil is flagged');
+  assert.equal(bag[0].vars.want, 5);
+  assert.deepEqual(agExceptions(inv([{ quantity: 5, unit: 'KG', tax_rate: 0 }])), [], 'loose 5 kg from the bag (counter sale) stays nil');
+  assert.deepEqual(agExceptions(inv([{ quantity: 0.2, unit: 'BAG', tax_rate: 0 }])), [], 'a fifth of a bag is loose too');
+  assert.equal(agExceptions(inv([{ quantity: 2, unit: 'BAG', tax_rate: 5 }])).length, 0, 'right rate → no notice');
+});
+
+/* ── G7: opening an agri document in the editor keeps each line's class ── */
+
+test('G7: normalizeRecord keeps ag_class on lines (milk bill, milling charges, cattle-feed invoice)', async () => {
+  const { normalizeRecord } = await import('../src/store/invoice-defaults.ts');
+  const rec = normalizeRecord({ id: 'x', doc_type: 'BILL_OF_SUPPLY', issue_date: '2026-10-05', items: [{ id: 'a', name: 'Cow milk', quantity: 1, rate: 50, tax_rate: 0, ag_class: 'milk_fresh' }, { id: 'b', name: 'Feed', quantity: 1, rate: 50, tax_rate: 0, ag_class: 'cattle_feed' }] });
+  assert.deepEqual(rec.items.map((i) => i.ag_class), ['milk_fresh', 'cattle_feed']);
+});

@@ -366,6 +366,8 @@ export function validateEway(bill: EwayBill, record?: InvoiceRecord, opts: { now
   if (!(bill.totInvValue > 0)) out.push(issue('error', 'EWB_VALUE', 'Value', 'Consignment value must be greater than zero.'));
   const ch71 = ewayChapterNote(bill.itemList.map((i) => String(i.hsnCode)), record?.issue_date); // R9 (RT-E2): chapter 71 needs no e-Way bill
   if (ch71) out.push(issue('warning', 'EWB_CH71', 'Items', ch71));
+  // QA13 G5 (AG-C4, AG12): only nil / exempt goods — the same note as `ag-packing.ts` EXEMPT_EWAY_NOTE.
+  else if (bill.itemList.length > 0 && bill.itemList.every((i) => !(Number(i.igstRate) || Number(i.cgstRate) || Number(i.cessRate)))) out.push(issue('warning', 'EWB_EXEMPT', 'Items', 'e-Way bill may not be needed for exempt goods — verify with your CA (AG12).'));
   else if (bill.totInvValue <= EWAY_THRESHOLD && bill.itemList.length > 0) {
     out.push(issue('warning', 'EWB_BELOW_THRESHOLD', 'Value', `Consignment value is ₹${bill.totInvValue.toLocaleString('en-IN')}, at or below the ₹50,000 threshold. An e-Way Bill is not mandatory for it (some states and goods differ).`));
   }
