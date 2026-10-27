@@ -14,7 +14,7 @@ import { round2 } from '../invoice-calc';
 import { withTablesRollback } from '../table-txn';
 import { A } from '../ledger/accounts';
 import { saveVoucher, type ManualVoucherLine } from '../ledger/vouchers';
-import { closingBalances, ledgerProfitAndLoss, loadLedger, loadStockValuer } from '../ledger';
+import { closingBalances, ledgerProfitAndLoss, loadLedger, loadStockValuer } from '../ledger/index';
 import { PS_D_ACCOUNTS, PS_D_CLASSES, PS_D_TABLES } from './ps-d-shared';
 import { drawingsOf, ensureLedger, loadPartners } from './ps-partners';
 import { loadPartnerRuns, record194t, tds194tFor, undoPartnerRun } from './ps-194t';

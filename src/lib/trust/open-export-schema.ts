@@ -270,6 +270,10 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   cost_cards: 'Food batch cost cards: recipe (from the BOM), output kg, yield, conversion ₹/kg, overhead %, packs with packing material and prices; versions by effective date (R13).',
   export_authorisations: 'Advance Authorisation / EPCG register: number, dates, import and export items, norm (SION / self / committee), EO due / extended, duty saved, EO multiple, status, EODC ref (R13).',
   incentive_claims: 'Incentive and subsidy claims (PLI, state capital subsidy, interest subvention …): period, base, rate, claimed, approved, received, income / capital, reasonable-assurance date and journals (R13).',
+  // R14-D
+  partners: "Partners of a firm / LLP: PAN, working or not, designated, joined / left, deed terms by date (profit-sharing ratio, remuneration, interest on capital and drawings), capital and current ledgers (R14).",
+  partner_runs: "Partner postings: the year-end appropriation per FY (book profit, Sec 40(b) allowable and disallowed, interest, residual share by partner) and monthly credits, with their journals and 194T TDS rows (R14).",
+  udin_register: 'UDIN register: UDIN, date, client, kind (certificate, tax / GST / statutory audit), description, member no., FY / PAN, revocation (R14).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';

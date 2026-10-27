@@ -98,6 +98,27 @@ export function savePartner(input: Omit<Partner, 'id' | 'capital_account_id' | '
   return row;
 }
 
+/**
+ * A new profit-sharing ratio from `from` for the partners in the firm that day: each gets a term copied from the one in
+ * force (remuneration, interest kept) with its new share. The shares must total 100 %. Owner only, audited.
+ */
+export function saveRatio(from: string, shares: Readonly<Record<string, number>>): Partner[] {
+  requireAccess('settings.manage');
+  if (!DAY.test(from)) throw new Error('Enter the date the new ratio starts.');
+  const all = loadPartners();
+  const inFirm = activeOn(all, from);
+  const total = round2(inFirm.reduce((s, p) => s + n(shares[p.id]), 0));
+  if (Math.abs(total - 100) > 0.005) throw new Error(`The new shares total ${total} %; they must total 100 %.`);
+  const next = all.map((p) => {
+    if (!inFirm.includes(p)) return p;
+    const cur = termOn(p, from) ?? p.terms[0];
+    const t: PartnerTerm = { ...cur, from, share_pct: round2(n(shares[p.id])) };
+    return { ...p, terms: [...p.terms.filter((x) => x.from !== from), t].sort((a, b) => a.from.localeCompare(b.from)) };
+  });
+  setTable(T, next);
+  return next;
+}
+
 /** Delete a partner who has no posting (the row goes to the recycle bin; ledgers stay). */
 export function deletePartner(id: string): void {
   requireAccess('settings.manage');

@@ -66,6 +66,7 @@ import './construction/cn-registry'; // R11: construction tables' rights and aud
 import './services/sv-registry'; // R10: service tables' rights and audit labels (lazy registration)
 import './agri/ag-registry'; // R12: agri tables' rights and audit labels (lazy registration)
 import './mfg/mf-registry'; // R13: manufacturing tables' rights and audit labels (lazy registration)
+import './prof/ps-d-registry'; // R14-D: firm-desk tables' rights and audit labels (lazy registration)
 
 export const [SYNC_STATE_KEY, SYNC_CONFLICTS_KEY, SYNC_AUDIT_KEY] = SYNC_META_KEYS;
 
@@ -454,6 +455,9 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}cost_cards`]: 'effective_from',
   [`${DB_PREFIX}export_authorisations`]: 'date',
   [`${DB_PREFIX}incentive_claims`]: 'period_to',
+  // R14-D: partner runs (year-end and monthly credits), UDIN register
+  [`${DB_PREFIX}partner_runs`]: 'date',
+  [`${DB_PREFIX}udin_register`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;

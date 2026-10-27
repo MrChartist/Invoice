@@ -35,8 +35,11 @@ export function partnerCredits(partnerId: string, fy: number, runs: readonly Par
       if (l.partner_id === partnerId && l.remuneration + l.interest > 0) out.push({ id: `${r.id}:${partnerId}`, date: r.date, base: round2(l.remuneration + l.interest), tds: round2(l.tds ?? 0), code: '194T' });
     }
   }
-  return out;
+  // A credit taxed later by the catch-up is not caught up again: mark it (a token amount, never shown).
+  const lastTaxed = out.filter((c) => c.tds > 0).map((c) => c.date).sort().pop();
+  return lastTaxed ? out.map((c) => (c.tds > 0 || c.date > lastTaxed ? c : { ...c, tds: COVERED })) : out;
 }
+const COVERED = 1e-9;
 
 /** 194T on a new credit of `amount` to `p` on `date` (null before 1 Apr 2025: no section). */
 export function tds194tFor(p: Pick<Partner, 'id' | 'pan'>, date: string, amount: number, runs?: readonly PartnerRun[], excludeId?: string): TdsSuggestion | null {
@@ -105,7 +108,7 @@ export function register194t(fy: number, partners: readonly Partner[] = loadPart
     const credits = partnerCredits(p.id, fy, runs).sort((a, b) => a.date.localeCompare(b.date));
     return {
       partner: p,
-      credits: credits.map((c) => ({ ...c, due: c.tds > 0 ? depositDueDate(c.date) : '' })),
+      credits: credits.map((c) => ({ ...c, tds: round2(c.tds), due: c.tds >= 0.01 ? depositDueDate(c.date) : '' })),
       total: round2(credits.reduce((s, c) => s + c.base, 0)),
       tds: round2(credits.reduce((s, c) => s + c.tds, 0)),
     };
