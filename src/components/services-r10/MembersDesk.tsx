@@ -93,13 +93,13 @@ function Plans({ notify, tick, refresh }: P) {
   return (
     <div className={styles.stack}>
       <div className={styles.toolbar}>
-        <T l={mcT('name')} v={f.name} on={(name) => set({ name })} d="plan-name" />
-        <S l={mcT('kind')} v={f.kind} o={o(KINDS, 'k.')} on={(k) => set({ kind: k as MemberPlanKind })} d="plan-kind" />
-        {NUMS.filter(([, , show]) => [...show].some((c) => fl.includes(c))).map(([k, l]) => <T key={k} l={mcT(l)} t="number" v={f.x[k]} on={(val) => set({ x: { ...f.x, [k]: val } })} d={`plan-${k}`} />)}
-        <S l={mcT('cls')} v={f.cls} o={[['', '—'], ...SV_CLASSES.map((c) => [c, svT(`cl.${c}`)] as const)]} on={(cls) => set({ cls })} d="plan-cls" />
-        {fl.includes('s') && <><T l={mcT('covers')} v={f.covers} on={(covers) => set({ covers })} d="plan-covers" /><S l={mcT('trainer')} v={f.trainer} o={staffOpts()} on={(trainer) => set({ trainer })} /><C l={mcT('onCheckin')} v={f.onCheckin} on={(onCheckin) => set({ onCheckin })} /></>}
+        <T l={mcT('name')} v={f.name} on={(name) => set({ name })} d="mp-name" />
+        <S l={mcT('kind')} v={f.kind} o={o(KINDS, 'k.')} on={(k) => set({ kind: k as MemberPlanKind })} d="mp-kind" />
+        {NUMS.filter(([, , show]) => [...show].some((c) => fl.includes(c))).map(([k, l]) => <T key={k} l={mcT(l)} t="number" v={f.x[k]} on={(val) => set({ x: { ...f.x, [k]: val } })} d={`mp-${k}`} />)}
+        <S l={mcT('cls')} v={f.cls} o={[['', '—'], ...SV_CLASSES.map((c) => [c, svT(`cl.${c}`)] as const)]} on={(cls) => set({ cls })} d="mp-cls" />
+        {fl.includes('s') && <><T l={mcT('covers')} v={f.covers} on={(covers) => set({ covers })} d="mp-covers" /><S l={mcT('trainer')} v={f.trainer} o={staffOpts()} on={(trainer) => set({ trainer })} /><C l={mcT('onCheckin')} v={f.onCheckin} on={(onCheckin) => set({ onCheckin })} /></>}
         {fl !== 'w' && <S l={mcT('refund')} v={f.refund} o={o(['none', 'pro_rata'], 'r.')} on={(refund) => set({ refund })} />}
-        <B p l={mcT('save')} on={save} d="plan-save" />
+        <B p l={mcT('save')} on={save} d="mp-save" />
       </div>
       <Tbl h={[mcT('name'), mcT('kind'), mcT('price'), '']} rows={plans.map((p) => [p.name, mcT(`k.${p.kind}`), rs(p.price), <span key="a"><B sm l={mcT('edit')} on={() => edit(p)} /> <B g sm l={mcT('del')} on={() => attempt(notify, () => { deleteMemberPlan(p.id); refresh(); })} /></span>])} />
     </div>
@@ -161,7 +161,7 @@ function Members({ notify, tick, refresh }: P) {
       <Tbl d="mem-list" h={[mcT('number'), mcT('member'), mcT('plan'), mcT('start'), mcT('end'), mcT('status'), mcT('used'), '']} rows={all.slice(0, 300).map((m) => [
         m.number, m.client_name, m.plan.name, m.start, m.end || '—', <span key="s" data-mem-status={m.number}>{mcT(`s.${statusOf(m, d, used(m))}`)}</span>,
         m.plan.sessions ? `${used(m)} / ${m.plan.sessions}` : m.plan.kind === 'wallet' ? mcT('bonusLeft', { amount: rs(bonusLeft(m)) }) : '',
-        <span key="a">{m.invoice_ids[0] && <Link to={`/invoice/${m.invoice_ids[0]}`}>{mcT('bill')}</Link>} <B sm l={mcT('act')} on={() => setSel(m)} d={`mem-act-${m.number}`} /></span>,
+        <span key="a">{m.invoice_ids[0] && <Link to={`/invoice/${m.invoice_ids[0]}`}>{mcT('bill')}</Link>} <B sm l={mcT('act')} on={() => setSel(m)} d="mem-act-row" /></span>,
       ])} />
       {sel && (
         <div className={styles.toolbar} data-mem-action>
