@@ -69,9 +69,8 @@ export function nextUhid(clients: readonly Client[], prefix: string, date: strin
   const taken = new Set(clients.map((c) => uhidOf(c).toUpperCase()).filter(Boolean));
   let n = 0;
   for (const u of taken) if (u.startsWith(head.toUpperCase())) n = Math.max(n, Number(u.slice(head.length)) || 0);
-  let id = '';
-  do id = `${head}${String(++n).padStart(4, '0')}`;
-  while (taken.has(id.toUpperCase()));
+  let id = `${head}${String(++n).padStart(4, '0')}`;
+  while (taken.has(id.toUpperCase())) id = `${head}${String(++n).padStart(4, '0')}`;
   return id;
 }
 
