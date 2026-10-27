@@ -3903,6 +3903,9 @@ try {
     await page.locator('[data-screen-help^="time:workshop"]').first().waitFor({ timeout: 15000 });
     check(true, 'Help opens on a workshop topic');
     await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 
   await step('R10-B clinic desk: Clinic profile; a patient gets a UHID; OPD token 1 for Dr Shah; consult (exempt) + a cosmetic peel (18%) → "Invoice-cum-Bill of Supply" with UHID and reg. no.; a lab order with a high Hb shows "H"; a ₹6,000 / day private room bills at 5%', async () => {
     const keys = ['settings', 'service_settings', 'clinic_settings', 'doctors', 'clients', 'items_catalog', 'clinic_visits', 'lab_tests', 'lab_orders', 'admissions', 'invoices', 'series_counters', 'audit_log'];

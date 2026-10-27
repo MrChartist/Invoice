@@ -83,6 +83,58 @@ GST guards, common credit, demo) ≈ 3.5. The PRD's 14 kB covered A's five items
 (every R10 help topic, palette label and Ctrl+K title, ≈ 3 kB) nor two languages of desk strings. Total JS stays under
 the 3,000 kB budget (2,934 kB); SV-B / C / D then have ≈ 66 kB, above their planned 31 kB.
 
+## SV-B — Clinics, dentists and diagnostic labs
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| B1 patients | `services/sv-patients.ts`: `Client.patient` (UHID, age + `age_on` or a full `dob`, sex, guardian, blood group, referring doctor, allergies never printed); UHID `<prefix><yy>-<seq>` (`clinic_settings.uhid_prefix`, FY start year, editable, unique, falls back to R5-C `roll_no`); `findPatients` by UHID / phone / name (desk pickers); patients are written to `clients` directly (two patients may share a name — the name-merging `upsert` is not used). Company object `clinic_settings` (`settings.manage`, audited on save): UHID prefix, rooms, room-day rule, deposit alert, referral switch, rate-list names. `clinicDraft`: a saved draft tax invoice (Bill of Supply with every line untaxed when the profile has no GSTIN), Rule 46A switch snapshotted (`sv.rule46a`). |
+| B1 OPD | `sv-opd.ts` (table `clinic_visits`, `OPD/FY…`): daily token per doctor, new / follow-up (last billed visit to the same doctor within `follow_up_days` → follow-up fee), status `waiting → with_doctor → done → billed`, `visitFromAppointment` (arrived appointments, doctor by its staff link), `billVisit` (consultation line class `health_exempt`, SAC 999312 from `HEALTH_CLASS_RULES`, the doctor's staff on the line, catalogue items added as extra lines by their class; record `sv.visit` {uhid, doctor, `doctor_reg`, token}). RT-B1 `doctors` gains `in_house`, `speciality`, `consult_fee`, `follow_up_fee`, `follow_up_days`, `staff_id`, `share` (types block `// SV-B`; `doctorsDb` reused, registry row stays RT-B's); edited in OPD → Doctors. |
+| B1 paper | `paper-helpers.ts` `visitText` ("UHID … · Dr … (Reg. no. …) · Token n", printed by `AttentionLine` under the bill-to and by the receipt layout) and `svRegText` (header line in classic / GST / receipt layouts). Registrations on the sender profile (`SenderProfile.sv_regs`: CEA / state no. + validity, council, NABL, PCPNDT) in a lazy `ClinicRegsPanel` (ProfileEditor, clinic pack only). Bell (`sv-clinic-alerts.ts`, one gate line in `NotificationBell` for an explicit clinic pack): registration expiring within 60 days / expired, admissions open > 7 days, deposits short of charges by more than `deposit_alert`. |
+| B1 rate list | `sv-rate-list.ts`: health-class items (catalogue + stock), second-language names and label (`rate_names`, `rate_lang`), A4 / A3, "Rates as on"; the printed signature is stored (`rates_printed`) and a price change shows "Rate list out of date — reprint". |
+| B2 in-patients | `sv-ipd.ts` (table `admissions`, `IPD/FY…`): room snapshot, charges (stock items get their FEFO batch and stay `Goods` lines with their HSN so the stock reader moves them out), `roomDays` (midnight census / 24 h), `roomClass` (`HOSPITAL_ROOM_RULES`: ICU kinds exempt; > ₹5,000 a day from 2022-07-18 → `hospital_room_high` 5%), composite medicines / consumables exempt, interim print (`interimHtml`, not a document), discharge, `finalBill` (one draft, or with a payer claim the SV-A5 `billClaim` split reusing the draft), deposits = advance receipts at 0% attached by id, `applyDeposits` (existing advance adjustment after issue), refund of the excess through `refundAdvance`. Desk view mounts `ClaimsView`. |
+| B3 lab | `sv-lab.ts` (tables `lab_tests`, `lab_orders` `LAB/FY…`): panels expanded without duplicates (a test inside a picked panel is not charged again), the tests snapshotted on the order, `rangeFor` (sex / age band, most specific wins), `flagOf` (H / L / CH / CL), sample flow, `enterResults` (partial / final; an edit after final keeps `history` and sets `amended_at`), delivery log, `billOrder` (exempt lines, `sv.lab_order`, referrer), `outsourcedDue` / `bookOutsourcedBill` (one purchase bill per reference lab and period, no GST / ITC, orders marked so never twice), analyser CSV paste, ranges as text, master CSV export / import. `sv-lab-report.ts` A4 report HTML (letterhead + NABL, patient block, department tables, flags bold, interpretation, two signers, "End of report", page numbers); `LabReportPrint.tsx` preview + print. Label preset `lab-sample` appended to `label-sheet.ts`. |
+| B4 referrals | `sv-referrals.ts`: referral report by doctor from `sv.referrer` on visits / orders / admissions / bills (CSV); consultant fee share through the SV-A3 engine with a synthetic fee-share plan (% of the doctor's lines) or ₹ per visit; payout via `postPayout` (journal, opt-in 194J, never twice); referral payments / benefits only with `record_referral_payments` on → journal to "Referral fees — disallowable (Sec 37)" (created by name) with the caution in the narration and on the desk; 194R reminder above ₹20,000 of benefits a FY (`REFERRAL_CAUTION_RULES`). |
+| Shared rows | `sv-shared` (tables, `clinic_settings`, series `OPD` / `IPD` / `LAB`, reserved list now `MEM`), `sv-registry` SV-B block, backup / sync (`DATED`, `NUMBERED`; admissions dated `admit_date`) / open-export rows (`// R10-B`), help topics (`time:clinic*` rewritten), e2e step "R10-B clinic desk", CA items SV27–SV30 (§10.6). |
+
+### Shared-file rules
+
+- Exempt lines carry `sv.exempt` (`clinicLine`), so they reach GSTR-1 Table 8 (exempt column) and 3B 3.1(c) through SV-A's branch.
+- No cash / bank reader was added; deposits and refunds go through `advances.ts`, payouts through `sv-payouts.ts`.
+- Deletes: visits / admissions / orders / tests through `setTable` (recycle bin); a row with a live bill refuses deletion
+  (cancel the bill instead); numbers stay used in `series_counters`. Restoring a deleted visit / admission / order only
+  brings back the row: billed state is derived from the live invoice, nothing posts again. A restored referral or
+  fee-share journal is SV-A's / the voucher bin's rule (`staff_payouts` blocks a second payout of the same month).
+
+### Deviations from the PRD (SV-B)
+
+- Patient search by UHID / phone works in the clinic desk pickers, not yet in every client picker of the app.
+- Consultant payout posts SV-A's journal (Dr Staff commission, Cr the doctor) with opt-in 194J, not a purchase bill.
+- Referral payments post a journal to the disallowable ledger (Cr Sundry creditors, party = doctor), not a `staff_payouts`
+  row; there is no tax-audit disallowance list in the app yet — the ledger name carries "disallowable (Sec 37)".
+- Rate list second language: names typed per item on the desk (no automatic translation); header labels stay English.
+- Interim bill and the lab report are script-free HTML prints; PDF through the browser's print.
+- The doctor registration checklist step still reads `regLine` (a first-paint file); `sv_regs` is printed but not counted.
+- No Demo-company clinic block.
+
+### Bundle (SV-B)
+
+Measured on `d6c126b` (before SV-D's merge), `vite build`, gzip level 9:
+
+| | Before | After | Δ |
+|---|---|---|---|
+| Initial JS (first paint) | 189,145 B | 189,156 B | **+11 B** (the bell gate line) |
+| Total JS | 3,004,637 B | 3,034,648 B | **+30.0 kB** |
+
+After merging SV-D: first paint 189,131 B (184.7 kB), total 3,053,528 B (2,982.0 kB of the raised 3,200 kB).
+
+**Over the 12 kB share (+30 kB).** Breakdown (gz): clinic desk chunk 20.0 kB (seven views ≈ 10, en + hi strings ≈ 3.7,
+lab / report / referral / rate-list engines ≈ 6); patients + OPD + in-patient engines (shared with the bell) 5.4 kB; bell
+provider 1.0; registrations panel 0.8; hosts (Time, open export, bell, paper lines, profile, label sheet, backup, sync)
+≈ 1.3; re-splitting of `sv-commission`, `sv-claims` and `rt-pharmacy-rx` into shared chunks (they were inlined into the
+front desk / claims / pharmacy chunks) ≈ +1.5 net.
+
 ## SV-D — Repair and service centres (vehicle workshops, AC / appliance service)
 
 ### What shipped
