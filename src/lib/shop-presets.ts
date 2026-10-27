@@ -126,3 +126,46 @@ export function applyTradeKind(kind: TradeKindId): ShopModeSettings & { trade_ki
   return { business_type: 'wholesale', modules: [...p.modules], trade_kind: kind, industry_packs: [...p.packs], trade_discounts: p.trade_discounts, returnable_packaging: p.returnable_packaging };
 }
 
+/* ── R9 (RT-A1): retail profile under the `kirana` business type ── */
+
+/** The shop picker's six choices (stored as `settings.retail_kind`); the business type stays `kirana`. */
+export const RETAIL_KINDS = ['grocery', 'pharmacy', 'apparel', 'electronics', 'jewellery', 'general'] as const;
+export type RetailKindId = (typeof RETAIL_KINDS)[number];
+type RetailPackId = 'pharmacy' | 'apparel' | 'electronics' | 'jewellery';
+
+export interface RetailProfile {
+  /** Without `gst`: a registered shop adds it (`applyRetailKind(…, { registered })`). */
+  modules: readonly ModuleId[];
+  /** Explicit `industry_packs` list (an empty list = none). */
+  packs: readonly RetailPackId[];
+  landing: string;
+  defaultDueDays: number;
+  templateId: string;
+  /** `retail_settings` switches the profile turns on (RT-A2 / A3 / A4, RT-E3). */
+  retail: { mrp_guard: 'off' | 'warn' | 'block'; delivery?: boolean; short_book?: boolean; free_qty?: boolean; cash_guard?: 'warn' | 'block'; require_pan?: boolean };
+  /** The 7U pharma switches (`pharma_settings`: enabled, block expired, block above MRP), pharmacy only. */
+  pharma?: boolean;
+}
+
+const COUNTER = PRESETS.kirana;
+export const RETAIL_PROFILES: Readonly<Record<RetailKindId, RetailProfile>> = {
+  grocery: { modules: COUNTER, packs: [], landing: '/pos', defaultDueDays: 0, templateId: 'retail_receipt', retail: { mrp_guard: 'warn', delivery: true, short_book: true, free_qty: true } },
+  pharmacy: { modules: [...COUNTER, 'accounts', 'banking'], packs: ['pharmacy'], landing: '/pos', defaultDueDays: 0, templateId: 'gst_tax_invoice', retail: { mrp_guard: 'block', delivery: true, short_book: true, free_qty: true }, pharma: true },
+  apparel: { modules: [...COUNTER, 'accounts'], packs: ['apparel'], landing: '/pos', defaultDueDays: 0, templateId: 'retail_receipt', retail: { mrp_guard: 'off' } },
+  electronics: { modules: [...COUNTER, 'accounts', 'banking', 'tds'], packs: ['electronics'], landing: '/pos', defaultDueDays: 0, templateId: 'gst_tax_invoice', retail: { mrp_guard: 'off', cash_guard: 'warn' } },
+  jewellery: { modules: [...COUNTER, 'accounts', 'banking', 'tds'], packs: ['jewellery'], landing: '/inventory?tab=jewellery&view=rates', defaultDueDays: 0, templateId: 'gst_tax_invoice', retail: { mrp_guard: 'off', cash_guard: 'block', require_pan: true } },
+  general: { modules: COUNTER, packs: [], landing: '/pos', defaultDueDays: 0, templateId: 'retail_receipt', retail: { mrp_guard: 'warn' } },
+};
+
+export const isRetailKind = (v: unknown): v is RetailKindId => typeof v === 'string' && (RETAIL_KINDS as readonly string[]).includes(v);
+
+/**
+ * Settings patch for a retail profile: business type `kirana`, its modules (`registered` adds `gst`), the explicit packs
+ * and the kind. The profile's switches (`retail_settings`, pharma) are written by `retail/rt-profile.ts`.
+ */
+export function applyRetailKind(kind: RetailKindId, opts: { registered?: boolean } = {}): ShopModeSettings & { retail_kind: RetailKindId; industry_packs: RetailPackId[] } {
+  const p = RETAIL_PROFILES[kind];
+  const modules: ModuleId[] = opts.registered && !p.modules.includes('gst') ? [...p.modules, 'gst'] : [...p.modules];
+  return { business_type: 'kirana', modules, retail_kind: kind, industry_packs: [...p.packs] };
+}
+

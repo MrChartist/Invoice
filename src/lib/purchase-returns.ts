@@ -66,7 +66,10 @@ function lineUnitCost(l: PurchaseLine): number {
 
 export interface ReturnableLine {
   line: PurchaseLine;
+  /** Units received on the line: paid + free (R9 RT-A4 `free_qty`). */
   billed: number;
+  /** R9 (RT-A4): the paid units among them (free units go back at zero value). */
+  paid: number;
   /** Already returned on goods notes against this bill. */
   returned: number;
   /** Still returnable. */
@@ -92,10 +95,20 @@ export function returnableLines(bill: PurchaseRecord, notes: readonly PurchaseRe
   return (bill.lines ?? [])
     .filter((l) => num(l.quantity) > 0)
     .map((line) => {
-      const billed = num(line.quantity);
+      const paid = num(line.quantity);
+      const billed = round2(paid + Math.max(num(line.free_qty), 0));
       const back = returned.get(line.id) ?? 0;
-      return { line, billed, returned: back, available: Math.max(round2(billed - back), 0), unitCost: lineUnitCost(line) };
+      return { line, billed, paid, returned: back, available: Math.max(round2(billed - back), 0), unitCost: lineUnitCost(line) };
     });
+}
+
+/**
+ * R9 (RT-A4): of `quantity` units returned now, how many are free units (zero value). Paid units go back first, so a
+ * return never credits more than was paid: 10 + 1 returned in full credits the 10 paid.
+ */
+export function freeUnitsReturned(r: Pick<ReturnableLine, 'paid' | 'returned'>, quantity: number): number {
+  const paidLeft = Math.max(round2(num(r.paid) - Math.min(num(r.returned), num(r.paid))), 0);
+  return Math.max(round2(Math.max(num(quantity), 0) - paidLeft), 0);
 }
 
 /** Value already taken off the bill by earlier notes (their totals). */
@@ -148,7 +161,12 @@ export function noteLineFrom(r: ReturnableLine, quantity: number): PurchaseRetur
     ...(l.hsn ? { hsn: l.hsn } : {}),
     ...(l.unit ? { unit: l.unit } : {}),
     quantity: round2(Math.max(num(quantity), 0)),
-    rate: round2(r.unitCost),
+    // R9 (RT-A4): free units in the return carry no value (the rate is the paid units' value over all units returned).
+    rate: (() => {
+      const q = round2(Math.max(num(quantity), 0));
+      const free = r.paid === undefined ? 0 : freeUnitsReturned(r, q);
+      return q > 0 && free > 0 ? round2((r.unitCost * (q - free)) / q) : round2(r.unitCost);
+    })(),
     tax_rate: num(l.tax_rate),
     ...(l.godown_id ? { godown_id: l.godown_id } : {}),
     ...(l.batch_no ? { batch_no: l.batch_no } : {}),

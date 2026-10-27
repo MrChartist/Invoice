@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Eye, FilePlus2, History, Palette, Save, X } from 'lucide-react';
 import { useInvoiceStore } from '../store/useInvoiceStore';
@@ -38,8 +38,8 @@ import { uxT } from '../i18n/areas/invoicing-ux';
 import { clientToParty } from '../store/invoice-defaults';
 import { issuingProfile } from '../lib/sync-device';
 import { lockState } from '../lib/period-lock';
-import { editorStockContext, liveDocTrackingIssues } from '../lib/stock-tracking';
-import { can } from '../lib/access';
+import { editorStockContext, isMrpMessage, liveDocTrackingIssues, liveMrpIssues, recordMrpOverrides, withMrpIssues } from '../lib/stock-tracking'; // R9 (RT-A2) helpers
+import { can, currentActor } from '../lib/access';
 import { audit } from '../lib/audit';
 import { trT } from '../i18n/areas/trade-r8c';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -164,6 +164,7 @@ export function InvoiceCreator() {
     if (!store.sender && profiles.length) store.setSender(issuingProfile(profiles, localDb.settings.activeProfile()) ?? profiles[0]);
   }, [profiles, id]);
 
+  const mrpConfirmed = useRef<string[]>([]); // R9 (RT-A2): MRP lines the owner confirmed ("Sell anyway"), audited on save
   const save = useCallback(
     (asDraft = false, andNew = false, expiredOk = false, then: SaveChoice | 'sheet' = 'sheet') => {
       // Batch / serial / godown checks (6.6 / 6.10 / 6.11) — only when issuing; drafts never move stock.
@@ -175,15 +176,21 @@ export function InvoiceCreator() {
             if (!it.godown_id && it.name.trim() && ctx.find(it.name, it.hsn)) st.patchItem(it.id, { godown_id: ctx.defaultGodown });
           }
         }
-        if (ctx || st.items.some((i) => i.arrival_id)) {
+        {
           const now = useInvoiceStore.getState();
-          const issues = liveDocTrackingIssues({
+          const doc = {
             id: now.id || undefined,
+            invoice_number: now.invoice_number,
             doc_type: now.doc_type,
             status: now.status === 'Draft' ? 'Sent' : now.status,
             issue_date: now.issue_date,
             items: now.items.filter((i) => i.name.trim() || num(i.rate) > 0),
-          });
+            discount_type: now.discount_type,
+            discount_rate: now.discount_rate,
+            price_includes_tax: now.price_includes_tax,
+          };
+          // R9 (RT-A2): the MRP guard runs even without batch / serial / godown tracking (or agency lots).
+          const issues: ReturnType<typeof liveDocTrackingIssues> = ctx || st.items.some((i) => i.arrival_id) ? liveDocTrackingIssues(doc) : withMrpIssues({ errors: [], expired: [], warnings: [] }, liveMrpIssues(doc));
           // QA8 T15: only agency-lot errors left — the owner may sell anyway, with a reason (audited).
           const lotOnly = !!issues.lots?.length && issues.errors.every((e) => issues.lots!.includes(e));
           const reason = lotOnly && can('settings.manage') ? window.prompt(trT('lotOverride', { list: issues.lots!.join(' ') }))?.trim() : '';
@@ -198,6 +205,9 @@ export function InvoiceCreator() {
             setExpiredAsk({ andNew, lines: issues.expired });
             return;
           }
+          const mrpWarn = issues.warnings.filter(isMrpMessage);
+          if (mrpWarn.length) notify(mrpWarn[0], 'info');
+          if (expiredOk) mrpConfirmed.current = issues.expired;
         }
       }
       // R3-C2: each line snapshots its catalogue photo reference at save (later photo changes never reach it).
@@ -207,6 +217,8 @@ export function InvoiceCreator() {
         if (items !== st.items) st.patch({ items });
       }
       const result = useInvoiceStore.getState().saveInvoice({ asDraft });
+      if (result.ok && result.record && !asDraft && expiredOk) recordMrpOverrides(result.record, mrpConfirmed.current, currentActor()?.name ?? 'the owner', (r) => audit.record(r)); // R9 (RT-A2)
+      mrpConfirmed.current = [];
       if (!result.ok) {
         setErrors(result.errors);
         if (result.locked) setLockTick((t) => t + 1);

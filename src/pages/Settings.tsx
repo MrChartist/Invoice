@@ -45,6 +45,7 @@ const ReminderSchedulePanel = lazy(() => import('../components/settings/Reminder
 
 // R6-B5: Settings → Features (every module, pack and advanced option in one list) — its own chunk.
 const FeaturesPanel = lazy(() => import('../components/settings/FeaturesPanel'));
+const RetailChecks = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.RetailChecks }))); // R9 (RT-A2)
 
 type Tab = SettingsTab;
 
@@ -280,6 +281,7 @@ export function Settings() {
         <>
           <CatalogPanel notify={notify} />
           <PricingPanel notify={notify} />
+          <Suspense fallback={null}><RetailChecks notify={notify} /></Suspense>
         </>
       )}
       {tab === 'fields' && (

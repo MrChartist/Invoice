@@ -3061,6 +3061,73 @@ try {
     check((await st.getAttribute('data-brokerage')) === '297', `Brokers lists the brokerage ₹297 (59.4 qtl × ₹5): ${await st.getAttribute('data-brokerage')}`);
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+  await step('R9-A retail profile: Kirana → Grocery (MRP warn on), ₹48 over a ₹45 MRP warns at the counter, a COD delivery bill delivered and the rider settled (Z "Cash with riders" ₹0), short book → draft PO, a 10 + 1 bill line → stock 11', async () => {
+    const keys = ['settings', 'items_catalog', 'invoices', 'transactions', 'retail_settings', 'pharma_settings', 'delivery_riders', 'rider_settlements', 'short_book', 'purchase_orders', 'purchases', 'stock_items', 'accounts', 'vouchers', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const settings = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...settings, business_type: 'kirana', modules: undefined, industry_packs: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'retail_settings', null);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-retail-kind-card="grocery"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.retail_kind === 'grocery');
+    const rs = await readJson(page, 'retail_settings', {}, (v) => v?.mrp_guard === 'warn');
+    check(st.retail_kind === 'grocery' && st.business_type === 'kirana' && Array.isArray(st.industry_packs) && st.industry_packs.length === 0 && st.modules?.includes('pos'), 'Grocery: kirana, no pack, POS module');
+    check(rs?.mrp_guard === 'warn' && rs?.delivery?.enabled && rs?.short_book?.enabled && rs?.free_qty, 'Grocery turns on the MRP warning, deliveries, short book and free quantity');
+    // MRP ₹45, typed rate ₹48 → the counter warns.
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-biscuit', name: 'E2E Biscuit', type: 'Product', hsn: '1905', unit: 'PCS', quantity: 1, rate: 48, mrp: 45, tax_rate: 0, amount: 0, barcode: '8901063010011' }]);
+    await writeJson(page, 'delivery_riders', [{ id: 'e2e-rider', name: 'E2E Raju', active: true }]);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor({ timeout: 15000 });
+    await scan.fill('8901063010011');
+    await scan.press('Enter');
+    await page.locator('[data-pos-mrp]').waitFor({ timeout: 15000 });
+    check(/above the MRP ₹45\.00/.test(await page.locator('[data-pos-mrp]').innerText()), 'the counter warns: above the MRP');
+    // A COD delivery bill (nothing tendered: the rider collects).
+    await page.locator('[data-pos-delivery]').check();
+    await page.locator('[data-delivery-address]').fill('12 E2E Lane');
+    await page.locator('[data-delivery-rider]').selectOption('e2e-rider');
+    await page.locator('[data-delivery-cod]').check();
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.delivery))).find((i) => !beforeIds.has(i.id) && i.delivery);
+    check(bill?.delivery?.status === 'packed' && bill.delivery.cod && bill.balance_due === 48, `delivery bill ${bill?.invoice_number} saved packed, ₹48 to collect`);
+    await page.goto(srv.origin + '/receivables?tab=deliveries');
+    await page.locator(`[data-delivery-order="${bill.invoice_number}"] [data-delivery-next="out"]`).click({ timeout: 15000 });
+    await page.locator(`[data-delivery-order="${bill.invoice_number}"] [data-delivery-next="delivered"]`).click({ timeout: 15000 });
+    const pays = await readJson(page, 'transactions', [], (v) => v.some((p) => p.invoice_id === bill.id && p.rider_id === 'e2e-rider'));
+    check(pays.some((p) => p.invoice_id === bill.id && p.rider_id === 'e2e-rider' && p.method === 'Cash' && p.amount === 48), 'delivered COD: a cash receipt with the rider');
+    await page.locator('[data-settle] summary').click();
+    await page.locator('[data-settle-rider]').selectOption('e2e-rider');
+    await page.locator('[data-settle-save]').click();
+    const sets = await readJson(page, 'rider_settlements', [], (v) => v.length > 0);
+    check(sets.length === 1 && sets[0].expected === 48 && sets[0].counted === 48, 'the rider settled ₹48');
+    await page.goto(srv.origin + '/pos');
+    await page.getByRole('button', { name: 'Z report' }).click({ timeout: 15000 });
+    const z = page.getByRole('dialog', { name: 'Day-end Z report' });
+    await z.locator('[data-z="riders"]').waitFor({ timeout: 15000 });
+    check(/0\.00/.test(await z.locator('[data-z="riders"]').innerText()), 'Z report: Cash with riders ₹0 after settling');
+    await page.keyboard.press('Escape');
+    // Short book → draft purchase order.
+    const poBefore = (await readJson(page, 'purchase_orders', [])).length;
+    await page.goto(srv.origin + '/inventory?tab=shortbook');
+    await page.locator('[data-sb-name]').fill('E2E Ghee', { timeout: 15000 });
+    await page.locator('[data-sb-add]').click();
+    await page.locator('[data-sb-row="E2E Ghee"]').waitFor({ timeout: 15000 });
+    await page.locator('[data-sb-po]').click();
+    const pos = await readJson(page, 'purchase_orders', [], (v) => v.length > poBefore);
+    check(pos.length === poBefore + 1 && pos[pos.length - 1].lines.some((l) => l.name === 'E2E Ghee'), 'Make draft PO creates a purchase order');
+    // A supplier bill line 10 + 1 free at ₹80 less 5% → stock + 11.
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), { id: 'e2e-strip', name: 'E2E Strip', hsn: '3004', unit: 'STRIP', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }]);
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []), { id: 'e2e-free-bill', kind: 'PURCHASE', vendor_name: 'E2E Distributor', bill_number: 'FREE-1', date: bill.issue_date, status: 'unpaid', lines: [{ id: 'e2e-fl', name: 'E2E Strip', hsn: '3004', unit: 'STRIP', quantity: 10, free_qty: 1, rate: 80, discount_percent: 5, tax_rate: 5, item_id: 'e2e-strip' }], taxable: 760, cgst: 19, sgst: 19, igst: 0, total: 798, amount_paid: 0, itc_eligible: true }]);
+    await page.goto(srv.origin + '/inventory');
+    const row = page.locator('tr', { hasText: 'E2E Strip' }).first();
+    await row.waitFor({ timeout: 15000 });
+    check(/\b11\b/.test(await row.innerText()), `stock of the 10 + 1 line is 11 (${(await row.innerText()).replace(/\s+/g, ' ').slice(0, 80)})`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {

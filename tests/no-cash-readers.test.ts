@@ -15,7 +15,7 @@ import { setupWorks } from './helpers/transport-works.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { getTable } from '../src/lib/storage.ts';
 import { giftVouchersDb, redeemOnInvoice } from '../src/lib/retail/gift-vouchers.ts';
-import { movedNoCash } from '../src/lib/no-cash.ts';
+import { NO_CASH_LEDGER, movedNoCash, noCashKind } from '../src/lib/no-cash.ts';
 import { todaySummary } from '../src/lib/today.ts';
 import { receiptCandidates } from '../src/lib/bank-recon.ts';
 import { paymentModes } from '../src/lib/sales-reports.ts';
@@ -41,7 +41,10 @@ afterEach(() => thawDate());
 test('movedNoCash: every no-cash marker, and nothing else', () => {
   assert.equal(movedNoCash({}), false);
   assert.equal(movedNoCash(null), false);
-  for (const k of ['gift_voucher_id', 'deposit_adjustment_id', 'ra_journal_id', 'advance_id']) assert.equal(movedNoCash({ [k]: 'x' }), true, k);
+  for (const k of ['gift_voucher_id', 'deposit_adjustment_id', 'ra_journal_id', 'advance_id', 'exchange_purchase_id']) assert.equal(movedNoCash({ [k]: 'x' }), true, k); // R9: exchange
+  assert.equal(noCashKind({ exchange_purchase_id: 'urd1' }), 'exchange');
+  assert.equal(NO_CASH_LEDGER.exchange, 'Sundry creditors — exchange');
+  assert.equal(movedNoCash({ rider_id: 'r1' } as never), false, 'R9: COD cash with a rider DID move (its own ledger, not a no-cash row)');
   assert.equal(movedNoCash({ write_off: true }), true);
   assert.equal(movedNoCash({ gift_voucher_id: '' }), false);
 });
@@ -140,7 +143,7 @@ test('guard: no other module tests the no-cash markers itself (use movedNoCash f
     const f = rel(p);
     if (f.startsWith('types/') || f.startsWith('i18n/') || MARKER_OWNERS.has(f)) continue;
     const text = readFileSync(p, 'utf8');
-    if (/\.\s*(gift_voucher_id|deposit_adjustment_id|ra_journal_id)\b/.test(text)) bad.push(f);
+    if (/\.\s*(gift_voucher_id|deposit_adjustment_id|ra_journal_id|exchange_purchase_id)\b/.test(text)) bad.push(f);
   }
   assert.deepEqual(bad, [], 'these files read a no-cash marker directly');
 });

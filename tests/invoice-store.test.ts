@@ -98,6 +98,8 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     fee_plan_id: 'fp1', fee_instalment: 2,
     // R8 (src/types/trade-r8.ts)
     cash_discount: { percent: 2, days: 7 }, price_drop_id: 'pd1', interest_run_id: 'ir1', broker_id: 'b1', agency: true,
+    // R9 (src/types/retail-r9.ts)
+    delivery: { address: '12 Park Lane', status: 'packed', cod: true, rider_id: 'r1' }, kyc: { form: '60', ref: 'F60-1' },
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

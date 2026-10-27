@@ -4,6 +4,7 @@ import { GST_NOTE_REASONS } from '../../types/purchases';
 import {
   noteGstMode,
   noteLineFrom,
+  freeUnitsReturned,
   noteTotals,
   notedValue,
   purchaseReturnsDb,
@@ -24,6 +25,9 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import local from './returns.module.css';
+import { defineArea } from '../../i18n/area';
+
+const freeRetT = defineArea({ msg: '{n} free unit(s) go back at zero value.' } as const, { msg: '{n} फ़्री इकाई शून्य मूल्य पर वापस जाएँगी।' }); // R9 (RT-A4)
 
 export interface ReturnModalProps {
   /** Which entry to record; null = closed. */
@@ -88,6 +92,8 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, initialQty, onClo
   const returnable = useMemo(() => (bill ? returnableLines(bill, notes) : []), [bill, notes]);
   const room = bill ? round2(num(bill.total) - notedValue(bill, notes)) : 0;
   const vendor = vendors.find((v) => v.id === vendorId);
+  // R9 (RT-A4): free units in this return go back at zero value (paid units go first).
+  const freeBack = useMemo(() => returnable.reduce((s, r) => s + freeUnitsReturned(r, num(qty[r.line.id])), 0), [returnable, qty]);
 
   const lines: PurchaseReturnLine[] = useMemo(() => {
     if (goods && bill) {
@@ -309,6 +315,7 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, initialQty, onClo
       </div>
       <p className={styles.note}>{prT('effectNote')}</p>
 
+      {goods && freeBack > 0 && <p className={styles.formError} role="status" data-return-free>{freeRetT('msg', { n: freeBack })}</p>}
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>
         <button type="button" className={controls.btnOutline} onClick={onClose}>{prT('cancel')}</button>

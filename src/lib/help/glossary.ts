@@ -127,6 +127,15 @@ export const GLOSSARY = {
     'ख़रीदार की घोषणा कि माल निर्माण के लिए है, व्यापार के लिए नहीं — 206C(1) TCS नहीं।', 'एडिटर के TCS भाग में पार्टी पर टिक करें।', ['TR14']),
   'compound-discount': g('Compound discount', 'Trade discounts applied one after another ("10 + 5"): the second is on the price after the first.', 'The line keeps the steps for printing and the effective discount for tax.',
     'एक के बाद एक लगने वाली ट्रेड छूट ("10 + 5"): दूसरी छूट पहली के बाद के दाम पर।', 'लाइन पर छपाई के लिए चरण और टैक्स के लिए प्रभावी छूट रहती है।', ['TR1']),
+  // R9: retail terms (RT-A)
+  mrp: g('MRP (maximum retail price)', 'The highest price, inclusive of all taxes, at which a packaged item may be sold; it is printed on the pack.', 'Settings → Items → Retail checks can warn or block a sale above the MRP; old-MRP stock after a GST cut sells at the lowered MRP.',
+    'पैक पर छपी अधिकतम खुदरा कीमत, सभी टैक्स सहित; इससे ऊपर पैक सामान नहीं बिक सकता।', 'सेटिंग्स → आइटम → रिटेल जाँच MRP से ऊपर बिक्री पर चेतावनी दे सकती है या रोक सकती है; GST घटने पर पुराने MRP वाला स्टॉक घटे MRP पर बिकता है।', ['RT4']),
+  'free-goods': g('Free goods ("10 + 1")', 'Extra units a supplier gives free with a purchase, often as a scheme.', 'Enter them in the Free cell of the bill line: stock takes paid and free units, the cost is spread over all of them, GST stays on the paid value.',
+    'ख़रीद के साथ सप्लायर द्वारा मुफ़्त दी गई अतिरिक्त इकाइयाँ, अक्सर स्कीम के रूप में।', 'बिल लाइन के फ़्री कॉलम में डालें: स्टॉक में भुगतान और फ़्री दोनों, लागत सब पर बँटती है, GST भुगतान वाले मूल्य पर।', ['RT5']),
+  'short-book': g('Short book', 'A chemist\'s or shopkeeper\'s list of items customers asked for that were out of stock.', 'Inventory → Short book: add rows at the counter, make draft purchase orders, tell the customer when it arrives.',
+    'ग्राहकों ने जो माँगा पर स्टॉक में नहीं था, उसकी सूची।', 'इन्वेंटरी → शॉर्ट बुक: काउंटर पर जोड़ें, ड्राफ़्ट परचेज़ ऑर्डर बनाएँ, आने पर ग्राहक को बताएँ।'),
+  cod: g('Cash on delivery (COD)', 'The customer pays the delivery person when the order arrives.', 'Delivered COD orders record the cash as the rider\'s; the rider settlement moves it to counter cash.',
+    'ऑर्डर पहुँचने पर ग्राहक डिलीवरी वाले को भुगतान करता है।', 'डिलीवर हुए COD ऑर्डर का कैश राइडर के नाम दर्ज होता है; राइडर का हिसाब उसे काउंटर कैश में लाता है।', ['RT6']),
 } satisfies Readonly<Record<string, GlossaryTerm>>;
 
 export type GlossaryId = keyof typeof GLOSSARY;

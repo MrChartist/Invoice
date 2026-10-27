@@ -315,9 +315,18 @@ export function splitLumpTax(
 export interface PurchaseLineCore {
   name: string;
   hsn: string;
+  /** Units received into stock: the paid quantity plus any free units (R9 RT-A4 `free_qty`). */
   quantity: number;
-  /** Unit cost after the line discount, before tax. */
+  /**
+   * Unit cost after the line discount, before tax — spread over every unit received, free ones included (R9 RT-A4:
+   * 10 + 1 at ₹80 less 5% → ₹760 ÷ 11 = ₹69.09). `quantity × unitCost` is always the line's taxable value.
+   */
   unitCost: number;
+  /** R9 (RT-A4): the paid quantity (GST / ITC value is on these only) and the free units received with them. */
+  paidQty: number;
+  freeQty: number;
+  /** R9 (RT-A4): rate per PAID unit after the line discount (the rate the supplier charged), before tax. */
+  netRate: number;
   /* Stock tracking (6.6 / 6.10 / 6.11); '' / [] when the line carries none. */
   batchNo: string;
   /** yyyy-mm-dd or ''. */
@@ -358,15 +367,21 @@ export function readPurchaseLines(raw: unknown, extra?: Readonly<Record<string, 
   const out: PurchaseLineCore[] = [];
   for (const l of lines) {
     const line = asRec(l);
-    const quantity = num(line.quantity ?? line.qty);
+    const paidQty = num(line.quantity ?? line.qty);
     let rate = num(line.rate ?? line.unit_price);
-    if (!rate && num(line.amount)) rate = num(line.amount) / (quantity || 1);
+    if (!rate && num(line.amount)) rate = num(line.amount) / (paidQty || 1);
     rate *= 1 - Math.min(Math.max(num(line.discount_percent), 0), 100) / 100;
+    // R9 (RT-A4): free units come into stock at no value; the paid value is spread over paid + free.
+    const freeQty = paidQty > 0 ? Math.max(num(line.free_qty), 0) : 0;
+    const quantity = paidQty + freeQty;
     out.push({
       name: pickStr(line, ['name', 'description']),
       hsn: pickStr(line, ['hsn']),
       quantity,
-      unitCost: rate,
+      unitCost: freeQty > 0 ? (rate * paidQty) / quantity : rate,
+      paidQty,
+      freeQty,
+      netRate: rate,
       batchNo: pickStr(line, ['batch_no', 'batch']),
       mfgDate: isoDay(pickStr(line, ['mfg_date'])),
       expiryDate: isoDay(pickStr(line, ['expiry_date', 'expiry'])),

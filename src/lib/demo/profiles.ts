@@ -11,12 +11,16 @@ export interface ProfileContext {
   base: DemoDataset;
   /** The Demo company's industry packs. */
   packs: readonly string[];
+  /** R9: the Demo company's business type (a kirana counter gets the grocery rows). */
+  businessType?: string;
 }
 
 export async function demoExtras(profile: DemoProfile, ctx: ProfileContext): Promise<DemoExtras> {
   switch (profile) {
-    case 'counter':
-      return (await import('./profile-counter')).counterExtras(ctx);
+    case 'counter': { // R9 (RT-A1): plus the retail shop's rows (grocery, or the retail pack's block)
+      const [{ counterExtras }, retail] = await Promise.all([import('./profile-counter'), import('./profile-retail')]);
+      return retail.mergeExtras(counterExtras(ctx), retail.retailExtras(ctx));
+    }
     case 'services':
       return (await import('./profile-services')).servicesExtras(ctx);
     case 'transport':
