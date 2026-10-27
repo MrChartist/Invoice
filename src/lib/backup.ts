@@ -491,6 +491,8 @@ const RECORD_TABLES = [
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
   // R12-A: farm batches, quality-cut tables, pooled farmer cycles (CYB/FY…)
   'farm_batches', 'quality_cut_tables', 'farmer_cycles',
+  // R12-B: dairy — rate charts, shift collection (one row per centre per shift), milk dispatches (MDS/FY…), milk cards
+  'milk_rate_charts', 'milk_shifts', 'milk_dispatches', 'milk_cards',
   // R12-C (mills): weighbridge slips (WBS/FY…), custom-milling agreements (deliveries CMR/FY…)
   'weighbridge_slips', 'cmr_agreements',
 ];
@@ -581,6 +583,8 @@ const ID_TABLES = new Set([
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
   // R12-A: farm batches, quality-cut tables, pooled farmer cycles (CYB/FY…)
   'farm_batches', 'quality_cut_tables', 'farmer_cycles',
+  // R12-B: dairy — rate charts, shift collection (one row per centre per shift), milk dispatches (MDS/FY…), milk cards
+  'milk_rate_charts', 'milk_shifts', 'milk_dispatches', 'milk_cards',
   // R12-C (mills): weighbridge slips (WBS/FY…), custom-milling agreements (deliveries CMR/FY…)
   'weighbridge_slips', 'cmr_agreements',
 ]);

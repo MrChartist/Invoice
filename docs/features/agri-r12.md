@@ -92,9 +92,80 @@ assumed AG-A would mostly configure existing screens; A2–A4 needed four new wo
 quality) plus the cycle posting engine. Trimming options for the lead: merge the five Farm views into one chunk
 (≈ −1.5 kB of preload maps), drop the farmer cards / CSV import (≈ −1.5 kB), or the fallback raise in the PRD §1.
 
-## AG-B — Dairy and milk collection
+## AG-B — Dairy and milk collection (pack `dairy`)
 
-(AG-B)
+Inventory → **Dairy** (`/inventory?tab=dairy&view=`): `charts`, `collection`, `bills`, `dispatch`, `products`, `cards`.
+One lazy chunk (`DairyDesk.tsx` with its views, engines and the `agri-r12b` strings); nothing is read until the tab opens.
+
+| Item | What it does | Code |
+|---|---|---|
+| B1 rate charts | Table `milk_rate_charts` (`master.edit`, dated `effective_from`). Bases `matrix` (nearest lower step, or nearest), `fat_kg`, `ts_kg`, `two_axis`, `flat`; minimum fat / SNF with reject / flat / deduct; add-ons by shift, milk kind and quantity; `buyer_id` marks a union's chart (B4). Append-only: a new chart closes the open one of the same milk / centres / buyer the day before; a chart used by an entry cannot be edited or deleted. Matrix in / out as CSV and XLSX, heat preview, "test a sample". kg = L × (1 + CLR / 1000), CLR default 28 cow / 30 buffalo (`MILK_DEFAULTS`). | `agri/ag-rate-chart.ts`, `RateChartsView.tsx` |
+| B2 shift sheet | Table `milk_shifts`: **one row per centre per date per shift** with an `entries` array (300 farmers × 365 days = 730 rows; a day reads ≤ 2). Each entry stores chart id, rate and amount (never repriced). Rejected cans: quantity, zero amount, reason. A second can of a farmer in the shift needs "Add again". Close posts the accepted litres per milk kind into the centre godown as ONE stock journal (`SJ/FY…`, production lines at the shift's ₹ / L, tagged `milk_ref`, `books.edit`); reopen removes it (refused while a closed / paid cycle billed the shift). Analyser: plain ASCII over Web Serial (`ag-analyser.ts`, presets generic CSV / key=value, field order, separator, fixed-point divisor, baud), device-local `mrchartist_milk_analyser` (set in `AnalyserSetup.tsx` on the Collection view); can weight from the existing scale reader. Slip 58 / 80 mm (HTML print), optional `wa.me` message per can (setting, off by default). | `agri/ag-shifts.ts`, `ag-analyser.ts`, `CollectionView.tsx`, `CollectionEntry.tsx`, `AnalyserSetup.tsx` |
+| B3 milk bills | `buildMilkCycle(centre, from, to)` → one line per farmer (litres, kg fat, kg SNF, amount, shift-wise snapshot, carried-in, feed / input deductions, bank / cash mode) on AG-A4's `farmer_cycles`; an unclosed shift blocks. `closeMilkCycle` closes through A4 (one exempt pooled purchase) and marks it `ag.stock_by_shift`. Farmer bills (A5 pages) print from the cycle row only; summary by farmer / village / route with "no supply". Paying, the bank file and slips are A4's (Farm → Cycles). | `agri/ag-milk-cycle.ts`, `MilkBillsView.tsx` |
+| B4 dispatch | Table `milk_dispatches` (`MDS/FY…`): saving takes the milk out of the centre godown (consume-only stock journal, remade when the sent figures change); the union's acknowledgement; "Bill" raises a nil-rated **bill of supply** at the buyer's chart on the received figures (setting `invoice_from`), with the `ag` snapshot (`kind: 'milk_sale'`, tanker, shift, kg fat, kg SNF, chart name; per-line fat / SNF / litres). Reconciliation by day / month: collected vs sent vs received, milk-card litres as local outflow, centre gap, transit shortage and its % of kg fat, flag beyond the tolerance (0.5% default). | `agri/ag-dispatch.ts`, `ag-milk-reco.ts`, `DispatchView.tsx` |
+| B5 products, cards | Starter BOMs (paneer + whey, khoa, curd, ghee + residue, buttermilk; typical yields "practice — adjust") with the A3 classes (paneer nil / ghee 5% from 22 Sep 2025); fat memo. Table `milk_cards` (one per customer per month, default litres, day overrides, 0 = skipped); "Bill month" → one bill of supply per card ("29 days · 29.5 L"), re-billing refused; "Copy last month". | `agri/ag-dairy-products.ts`, `ag-milk-cards.ts`, `ProductsView.tsx`, `MilkCardsView.tsx` |
+
+**No double counting (AG28).** Milk enters stock per closed shift; the pooled cycle purchase is the ledger posting and
+the stock reader skips it through ONE guarded line in `collectEvents` (`inventory.ts`): `if (p.ag?.stock_by_shift)
+continue`. `tests/purchase-contract.test.ts` and `tests/ag-shifts.test.ts` prove the stock stays at the shifts' litres
+after the cycle purchase is written.
+
+**Rights, audit, bin, backup.** `ag-registry.ts` block AG-B: charts `master.edit`; shifts, dispatches, cards
+`doc.create` (closing a shift / saving a dispatch also writes a stock journal: `books.edit`). All four tables audited,
+backed up, synced (`DATED`: charts by `effective_from`, shifts and dispatches by `date`; `NUMBERED`: dispatches) and in
+the open-export schema. Restore rules (`trust/recycle-bin.ts`): a dispatch only with its stock journal (journals are not
+binned, so: enter it again); a milk card not next to a re-made card of the same customer and month. No new no-cash
+marker (feed set-off is A4's `exchange_purchase_id`).
+
+**CA items.** AG40–AG45 (`docs/CA_REVIEW.md` §12.5).
+
+**Tests.** `ag-rate-chart`, `ag-analyser`, `ag-shifts`, `ag-milk-cycle`, `ag-dispatch`, `ag-milk-cards`,
+`ag-dairy-products` (+ a `purchase-contract` case). E2E step "R12-B dairy desk".
+
+**Centres.** The desk uses the milk centres of `agri_settings.centres` (kind `milk`, each with its godown); with none set
+up it works on one built-in "Main centre" (id `main`, the Main godown), so a single-centre society needs no setup. Settings
+sub-object `agri_settings.milk` (`AgMilkSettings`): stock item per milk kind (created on first close: "Cow milk" …, LTR,
+HSN 0401, class `milk_fresh`), CLR, tolerance, bill basis, WhatsApp-per-can switch.
+
+**Sample data.** `profile-agri.ts` AG-B block (pack `dairy`): 12 farmers (vendors, codes F-0001…), a cow matrix chart,
+20 days × 2 closed shifts at the Main centre (sample rows: no stock journal), one acknowledged dispatch, one milk card.
+`DEMO_EXTRA_TABLES` gains `vendors` and the four dairy tables.
+
+### Deviations from the PRD (AG-B)
+
+- **One chunk, not a sub-chunk per view**: the desk, its six views, engines and strings load as ONE lazy chunk (gzip
+  shares their vocabulary: ≈ 6 kB less than a chunk per view), the R9 `JewelleryDesk` pattern.
+- **Device settings row not added**: a lazy analyser row in the POS device settings (`RetailSettings.tsx`) split the
+  dairy strings into a second chunk (+6.6 kB); the analyser profile is set on Dairy → Collection instead (same
+  device-local key).
+- **Slips print as HTML** (58 / 80 mm page) through the print dialog, not through the ESC/POS byte path.
+- **Shift stock journal written directly** (`milkJournal` in `ag-shifts.ts`: role `books.edit`, period lock, `SJ`
+  series, audit): `stockJournalsDb.save` requires a source line and a shift receipt has none. Closing a shift therefore
+  needs `books.edit` (a clerk can enter cans; the owner / accountant closes).
+- **Stock journals are not in the recycle bin** (not a watched table), so a deleted dispatch cannot be restored — enter
+  it again (restore rule refuses with that message).
+- **Rate-chart import / export**: CSV both ways; XLSX import (via `xlsxToCsv`); no XLSX export (trimmed for the budget).
+- **Union deductions on its payment** are the existing short-payment handling on the receipt (no new screen).
+
+### Bundle (AG-B)
+
+`vite build` + gzip -9, before = `claude/elegant-cannon-cwapiv` at `43b397e` (AG-A + AG-C merged), after = this branch.
+
+| Budget | Before | After | Delta |
+|---|---|---|---|
+| Initial JS (first paint) | 189,186 B | 189,182 B | **−4 B** (≤ +0.03 kB ✓) |
+| Total JS | 3,156,623 B (3082.6 kB) | 3,179,237 B (3104.7 kB) | **+22,614 B (+22.1 kB)** |
+
+**Overrun: +14.1 kB over the 8 kB share** (inside the lead's ≤ 25 kB cap; total 3104.7 / 3200 kB). The DairyDesk chunk
+is 21.6 kB; the rest is shared-file growth (help topics +0.3, demo block +0.8, `ag-snapshot` now a shared chunk +0.3,
+open-export / recycle-bin / registry / sync rows +0.5). Per-module gzip measured alone (sum 31.9 kB; ≈ 0.68 of that
+once bundled in one chunk): strings `agri-r12b` (English + Hindi) 3.7; engines 14.9 (`ag-shifts` 2.6, `ag-milk-cycle`
+2.4, `ag-dispatch` 2.3, `ag-rate-chart` 2.1, `ag-milk-cards` 1.4, `ag-analyser` 1.2, `ag-milk-reco` 0.9,
+`ag-dairy-products` 0.9); views 13.3 (RateCharts 2.3, Dispatch 2.3, Collection 2.1, MilkCards 1.5, MilkBills 1.5,
+CollectionEntry 1.3, Products 1.0, desk / kit / ui / analyser setup 2.5). The 8 kB share assumed B mostly configures
+existing engines; the rate-chart engine, the shift sheet with devices, dispatch billing and reconciliation and the card
+grid are new. Further trims for the lead: drop the products view (≈ −1.3 kB), the add-ons / heat preview (≈ −0.4 kB) or
+shorten Hindi strings.
 
 ## AG-C — Mills: rice, flour, dal, oil (pack `mill`)
 

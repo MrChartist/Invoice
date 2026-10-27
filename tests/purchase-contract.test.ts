@@ -981,6 +981,19 @@ test('R12 (AG-A) agri readers read the real bill shape: farmer vouchers, FY purc
   assert.equal(b.get('v1')!.payable, 1000, 'pooled cycle bills counted from the cycle, not twice');
 });
 
+test('R12 (AG-B2 / B3) pooled milk cycle purchase: the stock reader skips its lines (milk came in per shift); books / GST / exports read it once', async () => {
+  const cyb: PurchaseRecord = {
+    ...bill, id: 'cyb', vendor_gstin: undefined, bill_number: 'CYB/FY26-27/0001', category: 'Milk purchases', itc_eligible: false, cgst: 0, sgst: 0, igst: 0, taxable: 34000, total: 34000,
+    lines: [{ id: 'lm', name: 'Cow milk', hsn: '0401', unit: 'LTR', quantity: 1000, rate: 34, tax_rate: 0 }], ag: { cycle_id: 'c1', stock_by_shift: true },
+  };
+  const items = [{ id: 'm', name: 'Cow milk', hsn: '0401', unit: 'LTR', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }];
+  assert.equal(collectEvents({ items, moves: [], invoices: [], purchases: [cyb] } as never).get('m')?.length ?? 0, 0, 'no second receipt');
+  assert.equal(collectEvents({ items, moves: [], invoices: [], purchases: [{ ...cyb, ag: { cycle_id: 'c1' } }] } as never).get('m')?.[0]?.qty, 1000, 'without the flag it is stock');
+  for (const n of [booksNormalize(cyb as never), exportNormalize(cyb), gstNormalize(cyb, '27')]) assert.equal(n!.taxable, 34000);
+  const { closeMilkCycle } = await import('../src/lib/agri/ag-milk-cycle.ts');
+  assert.equal(typeof closeMilkCycle, 'function');
+});
+
 test('R12 (AG-C5) mill report reads the real bill shape: own intake of the batches\' input item (by item id or name), void and expense bills left out', async () => {
   const { millMonths } = await import('../src/lib/agri/ag-mill-reports.ts');
   const items = [{ id: 'paddy', name: 'Paper ream', unit: 'KG' }, { id: 'rice', name: 'Rice', unit: 'KG' }] as never[];
