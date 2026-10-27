@@ -35,7 +35,7 @@ export const DEDUCTION_CLEARING = 'RA deductions clearing';
 
 const norm = (s: string) => s.trim().toLowerCase();
 
-function ensureAccount(name: string, group: PrimaryGroupId, startCode: number): string {
+export function ensureAccountByName(name: string, group: PrimaryGroupId, startCode: number): string {
   const chart = chartOf(loadUserAccounts());
   const found = chart.find((a) => norm(a.name) === norm(name));
   if (found) return found.id;
@@ -46,9 +46,23 @@ function ensureAccount(name: string, group: PrimaryGroupId, startCode: number): 
 }
 
 /** "GST TDS receivable" (same name, group and code as A5 reads / creates it). */
-export const ensureGstTdsReceivableAccount = () => ensureAccount(GST_TDS_RECEIVABLE_ACCOUNT, 'DUTIES_TAXES', 2373);
+export const ensureGstTdsReceivableAccount = () => ensureAccountByName(GST_TDS_RECEIVABLE_ACCOUNT, 'DUTIES_TAXES', 2373);
 /** "Labour cess deducted": an expense of the contractor (default) or a recoverable (other current assets). */
-export const ensureLabourCessAccount = (mode: 'expense' | 'recoverable' = 'expense') => ensureAccount(LABOUR_CESS_ACCOUNT, mode === 'recoverable' ? 'OTHER_CA' : 'INDIRECT_EXPENSES', mode === 'recoverable' ? 3702 : 6197);
+export const ensureLabourCessAccount = (mode: 'expense' | 'recoverable' = 'expense') => ensureAccountByName(LABOUR_CESS_ACCOUNT, mode === 'recoverable' ? 'OTHER_CA' : 'INDIRECT_EXPENSES', mode === 'recoverable' ? 3702 : 6197);
+
+/** R11 (CN-B2 / B4): the account each client recovery is booked to at receipt (name, group, first free code). */
+export const SECURED_ACCOUNT: [string, PrimaryGroupId, number] = ['Secured advance from clients', 'OTHER_CL', 2385];
+const RECOVERY_ACCOUNTS: Partial<Record<RaDeductionKind, [string, PrimaryGroupId, number]>> = {
+  secured_advance: SECURED_ACCOUNT,
+  material_recovery: ['Material issued by client', 'PURCHASES', 5105],
+  water_power: ['Water & electricity — site', 'DIRECT_EXPENSES', 5305],
+  hire_charges: ['Plant hire charges', 'DIRECT_EXPENSES', 5315],
+  advance_interest: ['Interest on mobilisation advance', 'FINANCE', 6405],
+  ld: ['Liquidated damages', 'INDIRECT_EXPENSES', 6195],
+};
+/** Kinds recorded as a no-cash receipt into the clearing account plus a journal (GST TDS, cess and the recoveries). */
+export const CLEARING_KINDS: readonly RaDeductionKind[] = ['gst_tds', 'labour_cess', ...(Object.keys(RECOVERY_ACCOUNTS) as RaDeductionKind[])];
+export type ClearingKind = 'gst_tds' | 'labour_cess' | 'secured_advance' | 'material_recovery' | 'water_power' | 'hire_charges' | 'advance_interest' | 'ld';
 
 type Pay = Pick<Payment, 'id' | 'invoice_id' | 'amount' | 'ra_kind' | 'advance_id' | 'write_off'>;
 
@@ -63,7 +77,7 @@ export interface ReceiptPlan {
 /** Pure: what the payment dialog pre-fills for an RA bill. */
 export function receiptPlan(inv: InvoiceRecord, payments: readonly Pay[], outstanding: number): ReceiptPlan {
   const split = raDueSplit(inv, payments, outstanding);
-  const rows = split.held.filter((h) => h.kind === 'gst_tds' || h.kind === 'labour_cess' || h.kind === 'advance_recovery').map((h) => ({ kind: h.kind as RaDeductionKind, label: h.label, amount: h.amount }));
+  const rows = split.held.filter((h) => CLEARING_KINDS.includes(h.kind as RaDeductionKind) || h.kind === 'advance_recovery').map((h) => ({ kind: h.kind as RaDeductionKind, label: h.label, amount: h.amount }));
   return { cash: round2(Math.max(split.dueNow, 0)), rows, held: split.held.filter((h) => !rows.some((r) => r.kind === h.kind)) };
 }
 
@@ -85,7 +99,7 @@ export function ensureDeductionClearing(): string {
  * clearing account — so the receipt settles the bill like any other (TDS on the invoice included) and the clearing
  * account nets to zero.
  */
-export function recordDeductionRow(invoiceId: string, kind: 'gst_tds' | 'labour_cess', opts: { date: string; amount?: number }): Payment {
+export function recordDeductionRow(invoiceId: string, kind: ClearingKind, opts: { date: string; amount?: number }): Payment {
   requireAccess('payment.record');
   const inv = localDb.invoices.getById(invoiceId);
   if (!inv) throw new Error('RA bill not found.');
@@ -96,15 +110,16 @@ export function recordDeductionRow(invoiceId: string, kind: 'gst_tds' | 'labour_
   if (!(amount > 0)) throw new Error('Nothing is left to record for this deduction.');
   return withTablesRollback(['vouchers', 'transactions', 'invoices', 'accounts', 'bank_accounts', 'series_counters'], () => {
     const clearing = ensureDeductionClearing();
-    const account = kind === 'gst_tds' ? ensureGstTdsReceivableAccount() : ensureLabourCessAccount(localDb.invoices.getById(inv.boq_id ?? '')?.boq_terms?.cess_mode);
+    const own = RECOVERY_ACCOUNTS[kind];
+    const account = own ? ensureAccountByName(...own) : kind === 'gst_tds' ? ensureGstTdsReceivableAccount() : ensureLabourCessAccount(localDb.invoices.getById(inv.boq_id ?? '')?.boq_terms?.cess_mode);
     const p = rupeesToPaise(amount);
-    const label = kind === 'gst_tds' ? 'GST TDS u/s 51' : 'Labour cess';
+    const label = own ? d[0].label : kind === 'gst_tds' ? 'GST TDS u/s 51' : 'Labour cess';
     const v = saveVoucher({
       type: 'JOURNAL', date: opts.date, voucher_class: 'RA deduction',
       narration: `${label} deducted by ${inv.client?.name ?? ''} from ${inv.invoice_number}${inv.ra_no ? ` (RA ${inv.ra_no})` : ''}`,
       lines: [{ account_id: account, dr: p, cr: 0 }, { account_id: bankLedgerId(clearing), dr: 0, cr: p }],
     });
-    const pay = localDb.payments.record({ invoiceId, amount, method: kind === 'gst_tds' ? GST_TDS_METHOD : CESS_METHOD, date: opts.date, bankAccountId: clearing, reference: inv.invoice_number, note: `${label} — journal ${v.number}` });
+    const pay = localDb.payments.record({ invoiceId, amount, method: own ? `Recovery — ${label}`.slice(0, 60) : kind === 'gst_tds' ? GST_TDS_METHOD : CESS_METHOD, date: opts.date, bankAccountId: clearing, reference: inv.invoice_number, note: `${label} — journal ${v.number}` });
     tag([pay.id], kind, v.id);
     return { ...pay, ra_kind: kind, ra_journal_id: v.id };
   });
@@ -130,24 +145,38 @@ export function removeDeductionRow(paymentId: string): void {
   });
 }
 
-/** Advance recovery: the existing advance adjustment, tagged as the RA deduction. */
+/** Advance recovery: the existing advance adjustment, tagged as the RA deduction (R11: one per advance, `ref_id`). */
 export function recoverAdvance(invoiceId: string, opts: { date: string; amount?: number }): Payment {
   const inv = localDb.invoices.getById(invoiceId);
   if (!inv) throw new Error('RA bill not found.');
-  const advanceId = localDb.invoices.getById(inv.boq_id ?? '')?.boq_terms?.advance_id;
-  if (!advanceId) throw new Error('No mobilisation advance is linked to the BOQ.');
-  const due = round2((inv.ra_deductions ?? []).filter((d) => d.kind === 'advance_recovery').reduce((s, d) => s + d.amount, 0));
+  const boqAdvance = localDb.invoices.getById(inv.boq_id ?? '')?.boq_terms?.advance_id;
+  const rows = (inv.ra_deductions ?? []).filter((d) => d.kind === 'advance_recovery');
+  const done = getTable<Payment>('transactions').filter((p) => p.invoice_id === invoiceId && p.advance_id);
+  const byAdvance = new Map<string, number>();
+  for (const d of rows) {
+    const id = d.ref_id || boqAdvance;
+    if (id) byAdvance.set(id, round2((byAdvance.get(id) ?? 0) + d.amount));
+  }
+  if (!byAdvance.size) throw new Error('No mobilisation advance is linked to the BOQ.');
   return withTablesRollback(['transactions', 'invoices'], () => {
-    const p = applyAdvance({ advanceId, invoiceId, amount: round2(opts.amount ?? due), date: opts.date });
-    tag([p.id], 'advance_recovery');
-    return { ...p, ra_kind: 'advance_recovery' };
+    let last: Payment | undefined;
+    for (const [advanceId, due] of byAdvance) {
+      const open = round2(due - done.filter((p) => p.advance_id === advanceId).reduce((s, p) => s + num(p.amount), 0));
+      const left = opts.amount === undefined ? open : Math.min(round2(opts.amount), open);
+      if (!(left > 0)) continue;
+      const p = applyAdvance({ advanceId, invoiceId, amount: left, date: opts.date });
+      tag([p.id], 'advance_recovery');
+      last = { ...p, ra_kind: 'advance_recovery' };
+    }
+    if (!last) throw new Error('Nothing is left to record for this deduction.');
+    return last;
   });
 }
 
 /** Release of retention / security deposit: the later receipt, tagged with the held kind. */
-export function releaseHeld(invoiceId: string, kind: 'retention' | 'security_deposit', opts: { date: string; amount: number; method: string; bankAccountId?: string; reference?: string }): Payment {
+export function releaseHeld(invoiceId: string, kind: 'retention' | 'security_deposit' | 'withheld' | 'ld', opts: { date: string; amount: number; method: string; bankAccountId?: string; reference?: string }): Payment {
   return withTablesRollback(['transactions', 'invoices'], () => {
-    const p = localDb.payments.record({ invoiceId, amount: opts.amount, method: opts.method, date: opts.date, reference: opts.reference, bankAccountId: opts.bankAccountId, note: kind === 'retention' ? 'Retention released' : 'Security deposit released' });
+    const p = localDb.payments.record({ invoiceId, amount: opts.amount, method: opts.method, date: opts.date, reference: opts.reference, bankAccountId: opts.bankAccountId, note: { retention: 'Retention released', security_deposit: 'Security deposit released', withheld: 'Withheld amount released', ld: 'Liquidated damages refunded / waived' }[kind] });
     tag([p.id], kind);
     return { ...p, ra_kind: kind };
   });

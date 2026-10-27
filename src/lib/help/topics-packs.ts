@@ -63,6 +63,11 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:workshop:reminders', 'Reminders', 'रिमाइंडर', 'Next service due and AMC visits.', 'Weekly.', { statutory: ca(['SV23']) }),
   t('time:workshop:labour', 'Labour operations', 'लेबर काम', 'Standard labour operations with time and rate.', 'Once, then when rates change.', { statutory: ca(['SV20']) }),
   t('time:workshop:vehicles', 'Vehicles', 'वाहन', 'Vehicles and appliances with their service history.', 'When a new one comes in.'),
+  // R11 (CN-B): contractor finance
+  t('time:works:contracts', 'Contracts', 'अनुबंध', 'Contract register: agreement, value, dates and extensions of time, LD clause, retention / SD / water and electricity %, JV share; billed and received to date, delay and LD exposure; the closure checklist.', 'When a contract is signed, extended or closed.', { statutory: ca(['CN11', 'CN27']) }),
+  t('time:works:advances', 'Advances', 'अग्रिम', 'Mobilisation and plant advances recovered from RA bills on the contract schedule with simple interest on the balance; secured advances on materials at site (a liability, recovered as used).', 'At each RA bill.', { statutory: ca(['CN7', 'CN8']) }),
+  t('time:works:escalation', 'Escalation', 'मूल्य परिवर्तन', 'Price variation by the contract formula (CPWD 10CC-type) from typed indices: a supplementary bill or a credit note, with the working printed as a page.', 'Each quarter or as the contract says.', { statutory: ca(['CN6']) }),
+  t('time:works:guarantees', 'Guarantees', 'गारंटी', 'Bank guarantees with expiry alerts, extensions, release and invocation; EMD and security deposits paid to clients.', 'When a guarantee is given, extended or released.', { statutory: ca(['CN13']) }),
   t('receivables:realty', 'Realty', 'रियल्टी', 'Builder desk: projects with RERA details, units, bookings, payment plans, stage demands and the RERA account.', 'Each booking and stage.', { statutory: ca(['CN18', 'CN21', 'CN25']) }),
   // CN-C: the builder desk's views
   t('receivables:realty:projects', 'Projects', 'प्रोजेक्ट', 'Builder projects: RERA registration and validity, the RERA (70%) and collection accounts, city class, GST scheme, towers and the completion certificate date (as the app applies it).', 'When a project is registered or a certificate arrives.', { statutory: ca(['CN19', 'CN21', 'CN25']) }),

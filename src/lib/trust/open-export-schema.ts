@@ -183,6 +183,9 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   doctors: 'Doctors (prescribers).', rx_refills: 'Repeat-prescription refill schedules.', alteration_jobs: 'Alteration slips (ALT/FY…).',
   imei_checks: 'Blocked-IMEI check log (filled by the user from the government portal).', finance_deals: 'Consumer-finance (EMI) deals and DOs.', service_jobs: 'Repair job sheets (SVC/FY…).',
   metal_rates: 'Daily metal rates by purity.', jewel_tags: 'Jewellery tags (pieces with weights and HUID).', karigar_moves: 'Karigar metal issue / receipt by fine weight (KAR/FY…).',
+  // R11-B: construction finance
+  works_contracts: 'Works contract register (agreement, value, dates, EOTs, LD, retention / SD %, advances, escalation clause, closure).', secured_advances: 'Secured advances on materials at site (liability, recovered on RA bills).',
+  price_variations: 'Price-variation (escalation) statements (PVB/FY…).', bank_guarantees: 'Bank guarantees given to clients (expiry, extensions, release / invocation).',
   // Child CSVs (flattened arrays)
   invoice_items: 'Lines of sales documents, keyed by invoice_id.',
   purchase_lines: 'Lines of supplier bills, keyed by purchase_id.',

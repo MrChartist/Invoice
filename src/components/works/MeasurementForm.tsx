@@ -1,5 +1,5 @@
 /** R5-B4: "New measurement" — cumulative (or this-bill) quantity per BOQ line, MB ref, excess / variation, final bill. */
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { ClipboardList } from 'lucide-react';
 import { twT } from '../../i18n/areas/packs-transport-works-r5';
 import type { InvoiceRecord } from '../../types/invoice';
@@ -18,6 +18,10 @@ import { cnT } from '../../i18n/areas/construction-r11a'; // R11 (CN-A3 / A4)
 import { deviationWarnings } from '../../lib/construction/cn-abstract';
 import { deviationPct } from '../../lib/construction/cn-snapshot';
 import { readConstructionSettings } from '../../lib/construction/cn-settings';
+import type { CnRecoveryInput } from '../../types/construction-r11';
+
+// R11 (CN-B2 / B4): recoveries typed on this bill (lazy).
+const BillRecoveries = lazy(() => import('../construction/BillRecoveries'));
 
 type Cell = { cum: string; mb: string; extra: string; kind?: '' | 'extra' | 'substituted'; approval?: string; subs?: string };
 
@@ -30,15 +34,17 @@ export function MeasurementForm({ boq, notify, refresh, tick }: PanelProps & { b
   const [draft, setDraft] = useState(false);
   const [cells, setCells] = useState<Record<string, Cell>>({});
   const [period, setPeriod] = useState({ from: '', to: '', measured: '' }); // R11 (CN-A3)
+  const [recoveries, setRecoveries] = useState<CnRecoveryInput[]>([]);
   const devPct = useMemo(() => deviationPct(boq, undefined, readConstructionSettings(), date), [boq, date]);
   const set = (id: string, p: Partial<Cell>) => setCells((c) => ({ ...c, [id]: { ...{ cum: '', mb: '', extra: '' }, ...c[id], ...p } }));
   const lines = boqLines(boq);
   const save = () => {
     const input: MeasureInput[] = Object.entries(cells).filter(([, c]) => c.cum.trim() !== '').map(([line_id, c]) => ({ line_id, cumulative_qty: Number(c.cum), mb_ref: c.mb, extra_reason: c.extra, ...(c.kind ? { kind: c.kind, approval: c.approval, substitutes: c.subs } : {}) }));
     try {
-      const { invoice } = saveRaBill(boq.id, { date, lines: input, final, draft, period_from: period.from || undefined, period_to: period.to || undefined, measured_on: period.measured || undefined });
+      const { invoice } = saveRaBill(boq.id, { date, lines: input, final, draft, period_from: period.from || undefined, period_to: period.to || undefined, measured_on: period.measured || undefined, recoveries });
       notify(twT('raSaved', { ra: invoice.ra_no ?? '', no: invoice.invoice_number, net: fmtMoney(invoice.ra_net_payable ?? invoice.total) }));
       setCells({});
+      setRecoveries([]);
       setFinal(false);
       refresh();
     } catch (e) {
@@ -85,6 +91,7 @@ export function MeasurementForm({ boq, notify, refresh, tick }: PanelProps & { b
         <F l={cnT('periodTo')}><input className={controls.input} type="date" value={period.to} onChange={(e) => setPeriod({ ...period, to: e.target.value })} /></F>
         <F l={cnT('measuredOn')}><input className={controls.input} type="date" value={period.measured} onChange={(e) => setPeriod({ ...period, measured: e.target.value })} /></F>
       </div>
+      <Suspense fallback={null}><BillRecoveries key={raNo} boqId={boq.id} onChange={setRecoveries} /></Suspense>
       <div className={styles.toolbar}>
         <F l={twT('date')}><input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></F>
         <label className={controls.check}><input type="checkbox" checked={final} onChange={(e) => setFinal(e.target.checked)} /> {twT('finalBill')}</label>
