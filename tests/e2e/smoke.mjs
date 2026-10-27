@@ -3436,12 +3436,13 @@ try {
     check(await dialog.locator('[data-works-header]').count() > 0 && paper.includes('E2E widening of SH-12') && paper.includes('12/EE/2026-27') && /Karnataka/.test(paper), 'the contract particulars box: name of work, agreement, site and its State');
     check(paper.includes('Item 2.1 · MB 112/45-47'), 'the line sub-line shows the BOQ item no. and the M-book ref');
     check(await dialog.locator('[data-net-payable]').count() > 0 && /Net payable/.test(paper) && /GST TDS u\/s 51/.test(paper), 'the deductions block runs down to Net payable with the GST TDS note');
-    check(await dialog.locator('[data-signoff="measuredBy"]').count() > 0 && /Passed for payment/.test(paper), 'the measured / checked / passed boxes print');
+    check(await dialog.locator('[data-signoff="measuredBy"]').count() > 0 && /Passed for payment/i.test(paper) && /Measured by/i.test(paper), 'the measured / checked / passed boxes print');
     check(/Abstract of cost/i.test(paper) && /A\. BOQ items/i.test(paper), 'page 2 is the abstract of cost');
     await page.keyboard.press('Escape');
     await dialog.waitFor({ state: 'detached' });
     // A plain invoice prints no construction part.
-    const plain = (prev.invoices ?? []).find((i) => i.doc_type === 'TAX_INVOICE' && !i.ra_no && !i.boq_terms);
+    const plain = (prev.invoices ?? []).find((i) => !['SALES_ORDER', 'QUOTATION', 'DELIVERY_CHALLAN'].includes(i.doc_type) && !i.ra_no && !i.boq_terms?.cn && i.status !== 'Cancelled');
+    check(!!plain, `a plain invoice to compare (${plain?.invoice_number})`);
     if (plain) {
       await page.goto(srv.origin + '/invoice/' + plain.id);
       await page.getByRole('button', { name: /Preview & download PDF/ }).click();
@@ -3451,7 +3452,8 @@ try {
       await page.keyboard.press('Escape');
       await d2.waitFor({ state: 'detached' });
     }
-    await page.goto(srv.origin + '/time?tab=works');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
     await page.keyboard.press('Control+k');
     const palette = page.getByRole('dialog', { name: 'Command palette' });
     await palette.waitFor();

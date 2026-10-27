@@ -45,6 +45,16 @@ test('notes only when the rows exist; nothing for a bill without deductions', ()
   assert.deepEqual(deductionNotes([{ kind: 'retention', label: 'Retention 5%', base: 100, amount: 5 }], money), ['GST is charged on the full bill value; deductions do not reduce it.']);
 });
 
+test('a civil + government profile snapshots the certificate with the sign-off boxes and the PWD paper on its RA bills', async () => {
+  const boq = setupWorks();
+  const { applyConstructionSwitches } = await import('../src/lib/construction/cn-profile.ts');
+  applyConstructionSwitches('civil');
+  applyConstructionSwitches('civil', { government: true });
+  const cn = saveRaBill(boq.id, { date: '2026-06-30', lines: [{ line_id: 'l1', cumulative_qty: 400 }] }).invoice.boq_terms!.cn!;
+  assert.deepEqual(cn.certificate, { text: DEFAULT_CERTIFICATE, boxes: true });
+  assert.equal(cn.paper, 'pwd');
+});
+
 test('certificate defaults by kind and settings', () => {
   assert.deepEqual(defaultCertificateFor('civil', true), { text: DEFAULT_CERTIFICATE, boxes: true });
   assert.deepEqual(defaultCertificateFor('builder', false), { boxes: false });
