@@ -9,6 +9,9 @@ import { principalDb } from '../src/lib/job-work.ts';
 import { getTable } from '../src/lib/storage.ts';
 import { TABLE_ACTIONS } from '../src/lib/access.ts';
 import { WATCHED_TABLES } from '../src/lib/audit-edits.ts';
+import { TABLE_MEANING } from '../src/lib/trust/open-export-schema.ts';
+import { readFileSync } from 'node:fs';
+import '../src/lib/agri/ag-cmr.ts';
 import {
   cancelSlip, cleanReadings, dailyIntake, deleteSlip, hoursBetween, loadSlips, openSlip, openSlips, receiveForJob, recordTare, setReadings, slipHtml, slipNet, voucherPrefill,
 } from '../src/lib/agri/ag-weighbridge.ts';
@@ -24,9 +27,24 @@ afterEach(() => thawDate());
 
 const first = (o: Record<string, unknown> = {}) => openSlip({ date: '2026-10-27', vehicle: 'pb10 ab 1234', party_kind: 'farmer', party_name: 'Gurdev Singh', commodity: 'Paddy PR-126', gross_kg: 8640, bags: 52, readings: { moisture: 19.2 }, gross_at: '2026-10-27T09:00', ...o } as never);
 
-test('registered at runtime: rights and audit labels', () => {
-  assert.equal(TABLE_ACTIONS.weighbridge_slips, 'doc.create');
-  assert.equal(WATCHED_TABLES.weighbridge_slips?.label, 'Weighbridge slip');
+const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8');
+
+test('AG-C block: rights and audit labels at runtime; backed up, synced (dated / numbered), described; writers import the registry', () => {
+  const backup = src('lib/backup.ts');
+  const sync = src('lib/sync-engine.ts');
+  for (const [t, label] of [['weighbridge_slips', 'Weighbridge slip'], ['cmr_agreements', 'Custom-milling agreement']]) {
+    assert.equal(TABLE_ACTIONS[t], 'doc.create', t);
+    assert.equal(WATCHED_TABLES[t]?.label, label);
+    assert.ok(TABLE_MEANING[t], `${t} in the open export`);
+    assert.equal((backup.match(new RegExp(`'${t}'`, 'g')) ?? []).length, 2, `${t} in both backup lists`);
+  }
+  assert.match(sync, /\$\{DB_PREFIX\}weighbridge_slips`\]: 'date'/);
+  assert.match(sync, /\$\{DB_PREFIX\}weighbridge_slips`\]: \{ num: 'number', date: 'date' \}/);
+  for (const f of ['ag-weighbridge', 'ag-cmr', 'ag-yield', 'ag-mill-bom']) assert.match(src(`lib/agri/${f}.ts`), /import '\.\/ag-registry';/, f);
+  assert.ok(!/weighbridge_slips|cmr_agreements/.test(src('lib/access.ts') + src('lib/audit-edits.ts')), 'Round 12 tables only at runtime');
+  // The rules file imports types only; no first-paint module imports it.
+  assert.ok(!/^import (?!type)/m.test(src('lib/agri-rules.ts')), 'agri-rules.ts has no runtime import');
+  for (const f of ['lib/tax-rules.ts', 'lib/shop-mode.ts', 'lib/storage.ts', 'lib/localDb.ts', 'store/invoice-defaults.ts']) assert.ok(!src(f).includes('agri-rules'), f);
 });
 
 test('net = gross − tare (never below 0; 0 while open); readings are clean %', () => {
