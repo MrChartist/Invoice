@@ -19,11 +19,16 @@ import type { ManufacturingVoucher } from '../../types/manufacturing';
 import type { PrincipalMovement } from '../../types/job-work';
 import type { ProductionOrder } from '../../types/production-r4';
 import type { BankStatementTerms } from '../../types/trade-r8';
-import type { StockItem, StockPosition } from '../inventory';
+import { computeStock, liveInputs, stockDb, type StockItem, type StockPosition } from '../inventory';
 import { num, round2 } from '../invoice-calc';
 import { isRevenueDoc } from '../stats';
+import { getTable } from '../storage';
 import { readPurchase, readPurchaseLines } from '../purchase-normalize';
-import { principalBalances } from '../job-work';
+import { principalBalances, principalDb } from '../job-work';
+import { manufacturingDb } from '../manufacturing';
+import { productionOrdersDb } from '../production/orders';
+import { loadStockStatementInput } from '../trade/tr-stock-live';
+import { loadAgreements } from './ag-cmr';
 import { kgPer } from '../trade/tr-weight';
 import { STOCK_STATEMENT_PRESETS, type StockStatementInput } from '../trade/tr-stock-statement';
 import { ZERO, addFigures, moistureLoss, voucherFigures, yieldOf, type YieldFigures } from './ag-yield';
@@ -209,14 +214,11 @@ export function principalMemo(rows: readonly PrincipalMovement[]): { qtl: number
 }
 
 /* ================================================================
-   Storage (lazy readers)
+   Storage (readers)
    ================================================================ */
 
 /** Everything the monthly mill report reads. */
-export async function loadMillReportInput(): Promise<MillReportInput> {
-  const [{ getTable }, { productionOrdersDb }, { manufacturingDb }, { stockDb }, { principalDb }, { loadAgreements }] = await Promise.all([
-    import('../storage'), import('../production/orders'), import('../manufacturing'), import('../inventory'), import('../job-work'), import('./ag-cmr'),
-  ]);
+export function loadMillReportInput(): MillReportInput {
   return {
     orders: productionOrdersDb.all(), mfg: manufacturingDb.all(), items: stockDb.items(), purchases: getTable('purchases'),
     principal: principalDb.all(), agreements: loadAgreements(), invoices: getTable<InvoiceRecord>('invoices'),
@@ -224,8 +226,7 @@ export async function loadMillReportInput(): Promise<MillReportInput> {
 }
 
 /** The bank stock statement input with the mill preset: stock regrouped, principals' material as a memo. */
-export async function loadMillStockStatement(asOf: string, bankAccountId: string, terms: BankStatementTerms, label: (g: MillGroup) => string): Promise<StockStatementInput & { valuerLabel?: string; principalQtl: number }> {
-  const [{ loadStockStatementInput }, { computeStock, liveInputs }, { principalDb }] = await Promise.all([import('../trade/tr-stock-live'), import('../inventory'), import('../job-work')]);
+export function loadMillStockStatement(asOf: string, bankAccountId: string, terms: BankStatementTerms, label: (g: MillGroup) => string): StockStatementInput & { valuerLabel?: string; principalQtl: number } {
   const base = loadStockStatementInput(asOf, bankAccountId, terms);
   const memo = principalMemo(principalDb.all().filter((r) => r.date <= asOf));
   return { ...base, groups: millStockGroups(computeStock({ ...liveInputs(), asOf }), label), consignment: round2(base.consignment + memo.value), principalQtl: memo.qtl };

@@ -13,7 +13,7 @@ import { manufacturingDb } from '../../lib/manufacturing';
 import { batchYield, defaultMillMeta, setMillMeta } from '../../lib/agri/ag-yield';
 import { B, fmtMoney } from '../transport/shared';
 import { Num, Sel, Table } from './mill-ui';
-import { T, errText, q, row } from './mill-kit';
+import { T, W, errText, q, row } from './mill-kit';
 import controls from '../../styles/controls.module.css';
 
 export default function YieldPanel({ order, items, canEdit, onSaved }: { order: ProductionOrder; items: readonly StockItem[]; canEdit: boolean; onSaved: (msg: string, error?: boolean) => void }) {
@@ -38,7 +38,7 @@ export default function YieldPanel({ order, items, canEdit, onSaved }: { order: 
           <Num l={T('outMoisture')} v={m.outM} set={(x) => setM({ ...m, outM: x })} />
           <Num l={T('standard')} v={m.std} set={(x) => setM({ ...m, std: x })} d="std" />
           <Sel l={T('stdSource')} v={m.src} set={(x) => setM({ ...m, src: x as MillOrderMeta['std_source'] })} o={[['own', T('s.own')], ['cmr', T('s.cmr')]]} x={160} />
-          <button type="button" className={B.os} onClick={save}>{T('save')}</button>
+          <button type="button" className={B.os} onClick={save}>{W('save')}</button>
         </div>
       )}
       {y.input > 0 ? (
@@ -50,7 +50,7 @@ export default function YieldPanel({ order, items, canEdit, onSaved }: { order: 
             [T('co'), q(y.co), y.input ? Math.round((y.co * 10000) / y.input) / 100 : 0],
             [T('by'), q(y.by), y.byPct],
             ...(y.scrap ? [[T('scrap'), q(y.scrap), y.input ? Math.round((y.scrap * 10000) / y.input) / 100 : 0]] : []),
-            [T('lossKg'), q(y.loss), y.lossPct],
+            [T('loss'), q(y.loss), y.lossPct],
             [`— ${T('moistureLoss')}`, q(y.moistureLoss), ''],
             [`— ${T('unexplained')}`, q(y.unexplained), ''],
           ]} />

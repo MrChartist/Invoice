@@ -1,6 +1,6 @@
 /** AG-C mill desk: the small form / table helpers its views share (one lazy chunk with them). */
 import type { ReactNode } from 'react';
-import { T } from './mill-kit';
+import { W } from './mill-kit';
 import { F } from '../transport/Field';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -15,4 +15,4 @@ export function Sel({ l, v, set, o, x, d }: { l: string; v: string; set: (k: str
 }
 export const Table = ({ head, rows, d }: { head: string[]; rows: ReactNode[][]; d?: string }) => rows.length ? (
   <div className={surface.tableWrap}><table className={surface.table} data-ml-table={d}><thead><tr>{head.map((h, i) => <th key={i}>{h}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody></table></div>
-) : <p className={controls.hint}>{T('none')}</p>;
+) : <p className={controls.hint}>{W('none')}</p>;

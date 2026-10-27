@@ -8,7 +8,7 @@ import { cancelSlip, dailyIntake, deleteSlip, loadSlips, localStamp, openSlip, r
 import { addPaddyLot, loadAgreements } from '../../lib/agri/ag-cmr';
 import { B, printHtml, today } from '../transport/shared';
 import { Num, Sel, Table, Txt } from './mill-ui';
-import { T, n, opt, row, useRun, type Done } from './mill-kit';
+import { T, W, n, opt, row, useRun, type Done } from './mill-kit';
 import controls from '../../styles/controls.module.css';
 
 const KINDS: readonly WbsPartyKind[] = ['farmer', 'trader', 'agency', 'other'];
@@ -36,7 +36,7 @@ export default function IntakeView({ onDone }: { onDone: Done }) {
   const scale = (set: (v: string) => void) => void readScale().then((r) => {
     if (!r) return onDone(T('noScale'), true);
     set(String(r.kg));
-    onDone(T(r.stable ? 'scaleRead' : 'scaleUnstable', { kg: kg(r.kg) }), !r.stable);
+    onDone(T('scaleRead', { kg: kg(r.kg) }), !r.stable);
   }).catch((e: Error) => onDone(e.message, true));
   const readings = (): WbsReadings => Object.fromEntries((['moisture', 'foreign', 'damaged'] as const).filter((k) => f[k] !== '').map((k) => [k, n(f[k])]));
   const now = localStamp();
@@ -48,7 +48,7 @@ export default function IntakeView({ onDone }: { onDone: Done }) {
     <div data-ml-view="intake">
       <h4>{T('firstWeighing')}</h4>
       <div style={row}>
-        <Txt l={T('vehicle')} v={f.vehicle} set={(x) => setF({ ...f, vehicle: x })} x={150} d="vehicle" />
+        <Txt l={W('vehicle')} v={f.vehicle} set={(x) => setF({ ...f, vehicle: x })} x={150} d="vehicle" />
         <Sel l={T('partyKind')} v={f.kind} set={(x) => setF({ ...f, kind: x as WbsPartyKind, party: '' })} o={KINDS.map((k) => [k, T(`pk.${k}`)] as const)} x={130} />
         <Sel l={T('party')} v={f.party} set={(x) => setF({ ...f, party: x })} o={opt(parties, (p) => p.id, (p) => p.name)} x={200} />
         {!f.party && <Txt l={T('partyName')} v={f.name} set={(x) => setF({ ...f, name: x })} x={180} d="party-name" />}
@@ -69,7 +69,7 @@ export default function IntakeView({ onDone }: { onDone: Done }) {
       </div>
 
       <h4>{T('openSlips')}</h4>
-      <Table d="open" head={[T('slip'), T('vehicle'), T('party'), T('commodity'), T('gross'), T('since'), T('tare'), '']} rows={report.open.map(({ slip: s, hours, stale }) => [
+      <Table d="open" head={[T('slip'), W('vehicle'), T('party'), T('commodity'), T('gross'), '', T('tare'), '']} rows={report.open.map(({ slip: s, hours, stale }) => [
         s.number, s.vehicle, name(s), s.commodity, kg(s.gross_kg),
         <span key="h" data-ml-stale={stale ? '1' : undefined}>{T('hours', { n: hours })}{stale ? ` · ${T('stale')}` : ''}</span>,
         <span key="t" style={row}><input className={controls.input} style={{ maxWidth: 110 }} type="number" aria-label={T('tare')} value={tare[s.id] ?? ''} onChange={(e) => setTare({ ...tare, [s.id]: e.target.value })} data-ml="tare" /><button type="button" className={B.gs} onClick={() => scale((x) => setTare((p) => ({ ...p, [s.id]: x })))}>{T('readScale')}</button></span>,
@@ -79,19 +79,19 @@ export default function IntakeView({ onDone }: { onDone: Done }) {
         </span>,
       ])} />
 
-      <div style={row}><h4>{T('doneSlips')}</h4><Txt l={T('date')} v={day} set={setDay} type="date" x={170} /></div>
-      <Table d="done" head={[T('slip'), T('vehicle'), T('party'), T('commodity'), T('net'), T('moisture'), T('used'), '']} rows={done.map((s) => [
+      <div style={row}><h4>{T('doneSlips')}</h4><Txt l={W('date')} v={day} set={setDay} type="date" x={170} /></div>
+      <Table d="done" head={[T('slip'), W('vehicle'), T('party'), T('commodity'), T('net'), T('moisture'), T('used'), '']} rows={done.map((s) => [
         s.number, s.vehicle, name(s), s.commodity, kg(s.net_kg), s.readings?.moisture ?? '—',
-        s.status === 'cancelled' ? `${T('cancelled')}${s.cancel_reason ? ` (${s.cancel_reason})` : ''}` : s.ref_id ? T(`u.${s.use}`) : '—',
+        s.status === 'cancelled' ? `${W('cancelled')}${s.cancel_reason ? ` (${s.cancel_reason})` : ''}` : s.ref_id ? T(`u.${s.use}`) : '—',
         <span key="a" style={row}>
-          <button type="button" className={B.gs} onClick={() => printHtml(slipHtml(s, business()), s.number)}>{T('print')}</button>
+          <button type="button" className={B.gs} onClick={() => printHtml(slipHtml(s, business()), s.number)}>{W('print')}</button>
           {s.status === 'done' && !s.ref_id && <>
             <Link className={B.os} to={`/inventory?tab=farm&view=vouchers&wbs=${s.id}`} data-ml-voucher>{T('makeVoucher')}</Link>
             {d.agreements.length > 0 && <><select className={controls.select} style={{ maxWidth: 170 }} aria-label={T('forCmr')} value={cmr[s.id] ?? ''} onChange={(e) => setCmr({ ...cmr, [s.id]: e.target.value })}>{opt(d.agreements, (a) => a.id, (a) => `${a.agency_name} · ${a.season}`).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
               <button type="button" className={B.os} disabled={!cmr[s.id]} onClick={() => run(() => { addPaddyLot(cmr[s.id], { date: s.date, wbs_id: s.id }); return T('lotAdded'); })}>{T('forCmr')}</button></>}
-            <input className={controls.input} style={{ maxWidth: 150 }} placeholder={T('principal')} aria-label={T('principal')} value={job[s.id] ?? name(s)} onChange={(e) => setJob({ ...job, [s.id]: e.target.value })} />
+            <input className={controls.input} style={{ maxWidth: 150 }} placeholder={W('principal')} aria-label={W('principal')} value={job[s.id] ?? name(s)} onChange={(e) => setJob({ ...job, [s.id]: e.target.value })} />
             <button type="button" className={B.os} onClick={() => run(() => T('jobReceived', { n: receiveForJob(s.id, { name: job[s.id] ?? s.party_name ?? '' }).jwpNumber }))}>{T('forJob')}</button>
-            <button type="button" className={B.gs} onClick={() => run(() => { const r = window.prompt(T('reason')); if (r) cancelSlip(s.id, r); })}>{T('cancel')}</button>
+            <button type="button" className={B.gs} onClick={() => run(() => { const r = window.prompt(W('cancelReason')); if (r) cancelSlip(s.id, r); })}>{W('cancel')}</button>
           </>}
         </span>,
       ])} />
@@ -103,7 +103,6 @@ export default function IntakeView({ onDone }: { onDone: Done }) {
       {([['byCommodity', report.byCommodity, (k: string) => k], ['byParty', report.byParty, (k: string) => T(`pk.${k as WbsPartyKind}`)], ['byUse', report.byUse, (k: string) => T(`u.${k as WbsUse}`)]] as const).map(([h, rows, label]) => (
         <Table key={h} d={h} head={[T(h), T('slips'), T('net'), T('moisture')]} rows={rows.map((g) => [label(g.key), g.slips, kg(g.net_kg), g.avg_moisture ?? '—'])} />
       ))}
-      <p className={controls.hint}>{T('intakeNote')}</p>
     </div>
   );
 }

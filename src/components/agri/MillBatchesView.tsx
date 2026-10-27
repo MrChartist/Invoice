@@ -10,7 +10,7 @@ import { MILL_STARTERS, installMillStarter } from '../../lib/agri/ag-mill-bom';
 import { batchYield } from '../../lib/agri/ag-yield';
 import { B } from '../transport/shared';
 import { Sel, Table } from './mill-ui';
-import { T, q, row, useRun, type Done } from './mill-kit';
+import { T, W, q, row, useRun, type Done } from './mill-kit';
 import controls from '../../styles/controls.module.css';
 
 const KINDS = Object.keys(MILL_STARTERS) as MillKind[];
@@ -31,12 +31,11 @@ export default function MillBatchesView({ onDone }: { onDone: Done }) {
         <Link className={B.p} to="/manufacturing?tab=orders">{T('newBatch')}</Link>
       </div>
       <p className={controls.hint}>{T('starterNote')}</p>
-      <Table d="batches" head={[T('order'), T('date'), T('item'), `${T('input')} (${T('qtl')})`, T('outturn'), T('standard'), T('byPct'), T('loss'), T('flag'), '']} rows={rows.map(({ o, y, name }) => [
+      <Table d="batches" head={[T('order'), W('date'), W('item'), `${T('input')} (${T('qtl')})`, T('outturn'), T('standard'), T('byPct'), T('loss'), '', '']} rows={rows.map(({ o, y, name }) => [
         o.number, o.date, name, y.input ? q(y.input) : '—', y.input ? y.outturnPct : '—', y.standard || '—', y.input ? y.byPct : '—', y.input ? y.lossPct : '—',
         <span key="f" data-ml-flag={y.flag ?? ''}>{y.flag ? T(`f.${y.flag}`) : ''}</span>,
-        <Link key="l" className={B.gs} to={`/manufacturing?tab=orders&order=${o.id}`}>{T('openOrder')}</Link>,
+        <Link key="l" className={B.gs} to={`/manufacturing?tab=orders&order=${o.id}`}>{W('open')}</Link>,
       ])} />
-      <p className={controls.hint}>{T('batchesNote')}</p>
     </div>
   );
 }

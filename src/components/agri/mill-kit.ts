@@ -1,9 +1,12 @@
 /** AG-C mill desk: shared non-component helpers (strings, layout, the writer runner). */
 import { useState } from 'react';
 import { mlT, type MlKey } from '../../i18n/areas/agri-r12c';
+import { trT } from '../../i18n/areas/trade-r8c';
 
 export type Done = (msg: string, error?: boolean) => void;
 export const T = (k: MlKey, v?: Record<string, string | number>) => mlT(k, v);
+/** Common words and the stock-statement rows, shared with the R8 trade area (already in the bundle). */
+export const W = (k: Parameters<typeof trT>[0], v?: Record<string, string | number>) => trT(k, v);
 export const row = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' } as const;
 export const n = (s: string) => Number(s) || 0;
 export const q = (kg: number) => (Math.round((kg / 100) * 1000) / 1000).toLocaleString('en-IN');
