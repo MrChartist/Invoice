@@ -14,6 +14,8 @@ import { MeasurementForm } from './MeasurementForm';
 import { RaRegister } from './RaRegister';
 import { RetentionPanel } from './RetentionPanel';
 import { SitesPanel } from './SitesPanel';
+import { readConstructionSettings, worksViewOn } from '../../lib/construction/cn-settings';
+import type { CnWorksView } from '../../types/construction-r11';
 import { type Notify } from '../transport/shared';
 import { F } from '../transport/Field';
 import controls from '../../styles/controls.module.css';
@@ -21,11 +23,19 @@ import styles from '../transport/transport.module.css';
 
 // R5-A5's credit panel, mounted for GST TDS u/s 51 (contractors need no marketplace pack).
 const TcsCreditPanel = lazy(() => import('../marketplace/TcsCreditPanel'));
+// R11 (CN-B): contractor-finance views, one lazy chunk.
+const fin = () => import('../construction/cn-finance-views');
+const CN_B = {
+  contracts: lazy(() => fin().then((m) => ({ default: m.ContractsView }))),
+  advances: lazy(() => fin().then((m) => ({ default: m.AdvancesView }))),
+  escalation: lazy(() => fin().then((m) => ({ default: m.EscalationView }))),
+  guarantees: lazy(() => fin().then((m) => ({ default: m.GuaranteesView }))),
+} as const;
 
 // R11 (CN-A1): CN-B / CN-D append their views here ('contracts', 'advances', 'escalation', 'guarantees', 'subcon',
 // 'labour', 'plant', 'reco', 'pnl'), each listed when `construction_settings.views[view]` is on (`worksViewOn`); an
 // unknown view (a profile landing before its package merged) opens the BOQ view.
-const VIEWS = ['boq', 'ra', 'retention', 'sites', 'gsttds'] as const;
+const VIEWS = ['boq', 'ra', 'retention', 'sites', 'gsttds', 'contracts', 'advances', 'escalation', 'guarantees'] as const;
 type View = (typeof VIEWS)[number];
 
 export default function WorksTab({ notify }: { notify: Notify }) {
@@ -43,15 +53,17 @@ export default function WorksTab({ notify }: { notify: Notify }) {
     setParams(next, { replace: true });
   };
   const shared = { notify, refresh, tick };
+  const cn = readConstructionSettings();
+  const CnView = (CN_B as Record<string, (typeof CN_B)['advances']>)[view];
   return (
     <div className={styles.stack} data-works-tab>
       {!isPackOn(localDb.settings.get(), 'works') && <p className={styles.warn}>{twT('packOffWorks')}</p>}
       <div className={styles.views} role="tablist" aria-label={twT('tab.works')}>
-        {VIEWS.map((v) => (
+        {VIEWS.filter((v) => !(v in CN_B) || v === view || worksViewOn(cn, v as CnWorksView)).map((v) => (
           <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? styles.viewActive : styles.view} onClick={() => go('view', v)} data-tw-view={v}>{twT(`view.${v}`)}</button>
         ))}
       </div>
-      {view !== 'gsttds' && view !== 'retention' && (
+      {view !== 'gsttds' && view !== 'retention' && !CnView && (
         <F l={twT('boq')}>
           <select className={controls.select} value={boqId} onChange={(e) => go('boq', e.target.value)} data-works-boq>
             {boqs.length === 0 && <option value="">{twT('noBoq')}</option>}
@@ -63,6 +75,7 @@ export default function WorksTab({ notify }: { notify: Notify }) {
       {view === 'retention' && <RetentionPanel {...shared} />}
       {view === 'sites' && boq && <SitesPanel key={boq.id} {...shared} boq={boq} />}
       {view === 'gsttds' && <Suspense fallback={null}><TcsCreditPanel kind="tds" notify={notify} /></Suspense>}
+      {CnView && <Suspense fallback={null}><CnView {...shared} boqId={boqId} /></Suspense>}
       <p className={styles.note}>{twT('workingPaper')}</p>
     </div>
   );

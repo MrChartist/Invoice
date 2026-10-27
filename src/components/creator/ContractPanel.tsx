@@ -31,7 +31,7 @@ const PAPERS: readonly RaPaperStyle[] = ['standard', 'pwd', 'summary'];
 
 export default function ContractPanel() {
   useT();
-  const s = useInvoiceStore(useShallow((st) => pick(st, ['boq_terms', 'boq_id', 'ra_no', 'ra_final', 'items', 'issue_date', 'place_of_supply', 'patch', 'patchItem'])));
+  const s = useInvoiceStore(useShallow((st) => pick(st, ['boq_terms', 'boq_id', 'ra_no', 'ra_final', 'items', 'issue_date', 'place_of_supply', 'patch', 'patchItem', 'ra_deductions', 'ra_net_payable'])));
   const cn: CnSnapshot = s.boq_terms?.cn ?? {};
   const h: CnHeader = cn.header ?? {};
   const lines = cn.lines ?? {};
@@ -124,6 +124,10 @@ export default function ContractPanel() {
           {SPLIT_CAUTION} <button type="button" className={controls.btnOutline} onClick={() => setCn({ ...cn, lines: reclassAsWorks(lines) })}>{cnT('treatAsWorks')}</button>
         </p>
       )}
+      {/* R11 (CN-B): the bill's deductions / recoveries and net payable (as they print), and a PV statement's number. */}
+      {(s.ra_deductions ?? []).map((d, i) => <div key={i} className={controls.hint} data-cn-ded={d.kind}>{d.label}: −{d.amount.toFixed(2)}{d.reason ? ` (${d.reason})` : ''}</div>)}
+      {s.ra_net_payable !== undefined && <strong data-cn-net>{lbl('p.net')}: {s.ra_net_payable.toFixed(2)}</strong>}
+      {cn.pv?.number && <div className={controls.hint} data-cn-pv>{lbl('p.pvAmount')}: {cn.pv.number} · {Number(cn.pv.amount ?? 0).toFixed(2)}</div>}
       <p className={controls.hint}>{cnT('deductionsNote')}</p>
     </details>
   );
