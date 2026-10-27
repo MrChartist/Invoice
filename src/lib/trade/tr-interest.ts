@@ -93,7 +93,7 @@ export function partyInterest(asOf: string, s: InterestSettings, d: InterestData
     const fee = c?.late_fee?.mode === 'percent_pa' && num(c.late_fee.rate) > 0 ? c.late_fee : undefined;
     const rate = fee ? num(fee.rate) : num(s.rate);
     if (!(rate > 0)) return;
-    const startDue = s.basis === 'bill' ? shiftDay(date, Math.max(num(c?.credit_days), 0)) : due;
+    const startDue = inv?.ag?.inputs?.season_due || (s.basis === 'bill' ? shiftDay(date, Math.max(num(c?.credit_days), 0)) : due); // R12 (AG-D4): credit till harvest runs from the season due date
     const cfg = { enabled: true, mode: 'annual' as const, rate, grace_days: fee ? num(fee.graceDays) : num(s.grace_days) };
     const at = (day: string) => computeInterest({ ...input, due_date: startDue }, cfg, day);
     const now = at(asOf);
