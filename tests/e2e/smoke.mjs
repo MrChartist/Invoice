@@ -3547,7 +3547,7 @@ try {
     await page.goto(srv.origin + '/receivables?tab=realty&view=rera');
     const rera = page.locator('[data-rc-table="rera"]');
     await rera.waitFor({ timeout: 15000 });
-    check(/70% required/.test(await rera.innerText()) && /Deposited/.test(await rera.innerText()), 'RERA view: 70% required vs deposited');
+    check(/70% required/i.test(await rera.innerText()) && /Deposited/i.test(await rera.innerText()), 'RERA view: 70% required vs deposited');
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
