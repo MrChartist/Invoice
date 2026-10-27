@@ -413,6 +413,10 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}appointments`]: 'date',
   [`${DB_PREFIX}staff_payouts`]: 'date',
   [`${DB_PREFIX}payer_claims`]: 'date',
+  // R10-B: OPD visits, admissions (admitted on), lab orders
+  [`${DB_PREFIX}clinic_visits`]: 'date',
+  [`${DB_PREFIX}admissions`]: 'admit_date',
+  [`${DB_PREFIX}lab_orders`]: 'date',
   // R11-D: work orders, sub-contractor bills, muster days, plant log sheets
   [`${DB_PREFIX}sub_work_orders`]: 'date',
   [`${DB_PREFIX}sub_measurements`]: 'date',
@@ -1013,6 +1017,10 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}realty_bookings`]: { num: 'number', date: 'date' },
   // R10-A: payer claims (CLM/FY…)
   [`${DB_PREFIX}payer_claims`]: { num: 'number', date: 'date' },
+  // R10-B: OPD visits (OPD/FY…), admissions (IPD/FY…), lab orders (LAB/FY…)
+  [`${DB_PREFIX}clinic_visits`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}admissions`]: { num: 'number', date: 'admit_date' },
+  [`${DB_PREFIX}lab_orders`]: { num: 'number', date: 'date' },
   // R11-D: work orders (SWO/FY…), sub-contractor bills (SCB/FY…), plant log sheets (PLG/FY…)
   [`${DB_PREFIX}sub_work_orders`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}sub_measurements`]: { num: 'number', date: 'date' },

@@ -19,7 +19,12 @@ export const SV_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   staff_payouts: 'books.edit',
   payer_claims: 'doc.create',
   service_settings: 'settings.manage',
-  // SV-B: clinic_visits, admissions, lab_tests, lab_orders, clinic_settings
+  // SV-B: visits, admissions and lab orders are documents of the desk; the test master is a master
+  clinic_visits: 'doc.create',
+  admissions: 'doc.create',
+  lab_tests: 'master.edit',
+  lab_orders: 'doc.create',
+  clinic_settings: 'settings.manage',
   // SV-C: member_plans, memberships, checkins, class_attendance, class_schedules
   // SV-D: service_assets, labour_ops, workshop_settings
 };
@@ -33,6 +38,10 @@ export const SV_WATCHED: Readonly<Record<string, WatchedTable>> = {
   staff_payouts: { entity: 'payment', label: 'Staff payout' },
   payer_claims: { entity: 'invoice', label: 'Payer claim' },
   // SV-B
+  clinic_visits: { entity: 'invoice', label: 'OPD visit' },
+  admissions: { entity: 'invoice', label: 'Admission' },
+  lab_tests: { entity: 'item', label: 'Lab test' },
+  lab_orders: { entity: 'invoice', label: 'Lab order' },
   // SV-C
   // SV-D
 };

@@ -309,6 +309,198 @@ declare module '../lib/inventory' {
 // SV-B: clinic_settings, clinic_visits (OPD), admissions (IPD), lab_tests, lab_orders (LAB); client `patient`;
 // RT-B1 doctors' additive fields (`in_house`, `speciality`, `consult_fee`, `follow_up_fee`, `follow_up_days`, `staff_id`, `share`).
 
+/** SV-B1 patient data on a client (billing data only; the allergies note is never printed). */
+export interface PatientInfo {
+  /** Unique hospital id; falls back to the R5-C `roll_no` on read. */
+  uhid?: string;
+  /** Age in years on `age_on` (when no full `dob`). */
+  age?: number;
+  age_on?: string;
+  sex?: 'M' | 'F' | 'O';
+  guardian?: string;
+  blood?: string;
+  /** Referring doctor (`doctors` id). */
+  referred_by?: string;
+  allergies?: string;
+}
+
+export type ClinicRoomKind = 'general' | 'private' | 'icu' | 'ccu' | 'iccu' | 'nicu';
+export interface ClinicRoom { id: string; name: string; kind: ClinicRoomKind; rate: number }
+
+/** Company object `mrchartist_inv_clinic_settings` (`settings.manage`, audited on save, synced as a singleton). */
+export interface ClinicSettings {
+  uhid_prefix?: string;
+  rooms?: ClinicRoom[];
+  /** Room-days: midnight census (default) or every started 24 h. */
+  room_day?: 'midnight' | '24h';
+  /** Bell when charges exceed deposits by more than this (0 = off). */
+  deposit_alert?: number;
+  /** SV-B4: book referral payments (default off; Sec 37 caution). */
+  record_referral_payments?: boolean;
+  /** Rate list: second-language names by item id, the language label, and the rates last printed. */
+  rate_names?: Record<string, string>;
+  rate_lang?: string;
+  rates_printed?: string;
+  updated_at?: string;
+}
+
+/** SV-B1 table `clinic_visits` (`doc.create`, audited "OPD visit", dated `date`, numbered `OPD/FY…`). */
+export interface ClinicVisit {
+  id: string;
+  number: string;
+  date: string;
+  patient_id?: string;
+  patient_name: string;
+  uhid?: string;
+  doctor_id?: string;
+  doctor_name?: string;
+  /** Daily token per doctor. */
+  token: number;
+  kind: 'new' | 'follow-up';
+  fee: number;
+  /** Free text, never printed. */
+  vitals?: string;
+  status: 'waiting' | 'with_doctor' | 'done' | 'billed';
+  appointment_id?: string;
+  referrer?: { doctor_id?: string; name?: string };
+  invoice_id?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+/** SV-B2 a charge on an admission's running bill. */
+export interface IpdCharge {
+  id: string;
+  date: string;
+  name: string;
+  qty: number;
+  rate: number;
+  hsn?: string;
+  /** Stock item (medicines / consumables) and its batch; billed as an exempt line of the composite supply. */
+  item_id?: string;
+  batch_no?: string;
+  doctor_id?: string;
+}
+
+/** SV-B2 table `admissions` (`doc.create`, audited "Admission", dated `admit_date`, numbered `IPD/FY…`). */
+export interface Admission {
+  id: string;
+  number: string;
+  admit_date: string;
+  /** `HH:MM`. */
+  admit_time?: string;
+  discharge_date?: string;
+  discharge_time?: string;
+  patient_id?: string;
+  patient_name: string;
+  uhid?: string;
+  doctor_ids?: string[];
+  /** Room snapshot at admission (name, kind, rate per day). */
+  room?: Omit<ClinicRoom, 'id'> & { id?: string };
+  claim_id?: string;
+  /** Deposits: existing advance receipts. */
+  deposits?: string[];
+  charges: IpdCharge[];
+  status: 'admitted' | 'discharged' | 'billed';
+  referrer?: { doctor_id?: string; name?: string };
+  invoice_id?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+/** SV-B3 reference range of a parameter (by sex and age band; `text` for non-numeric). */
+export interface LabRange { sex?: 'M' | 'F'; age_from?: number; age_to?: number; low?: number; high?: number; text?: string }
+export interface LabParam {
+  code: string;
+  name: string;
+  unit?: string;
+  kind: 'numeric' | 'text' | 'option';
+  options?: string[];
+  decimals?: number;
+  ranges?: LabRange[];
+  crit_low?: number;
+  crit_high?: number;
+}
+
+/** SV-B3 table `lab_tests` (`master.edit`, audited "Lab test"). A panel lists other tests (`panel`). */
+export interface LabTest {
+  id: string;
+  code: string;
+  name: string;
+  dept?: string;
+  sample?: string;
+  container?: string;
+  /** Turnaround, hours. */
+  tat?: number;
+  price: number;
+  method?: string;
+  params: LabParam[];
+  panel?: string[];
+  outsourced?: { vendor_id?: string; vendor_name?: string; cost: number };
+  /** Interpretation note (printed). */
+  note?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export type LabSampleStatus = 'to_collect' | 'collected' | 'received' | 'in_process' | 'done';
+/** A test on an order: snapshot of the master at ordering (a later edit never changes a report). */
+export type LabOrderTest = Pick<LabTest, 'id' | 'code' | 'name' | 'dept' | 'sample' | 'tat' | 'price' | 'method' | 'params' | 'note' | 'outsourced'>;
+
+/** SV-B3 table `lab_orders` (`doc.create`, audited "Lab order", dated `date`, numbered `LAB/FY…`). */
+export interface LabOrder {
+  id: string;
+  number: string;
+  date: string;
+  patient_id?: string;
+  patient_name: string;
+  uhid?: string;
+  sex?: 'M' | 'F' | 'O';
+  age?: number;
+  referrer?: { doctor_id?: string; name?: string };
+  tests: LabOrderTest[];
+  samples: { type: string; status: LabSampleStatus; at?: string; by?: string }[];
+  /** Results by `<test id>:<param code>`. */
+  results: Record<string, string>;
+  verified_by?: string[];
+  report: 'pending' | 'partial' | 'final' | 'delivered';
+  /** Earlier versions of a final report (amended reports keep them). */
+  history?: { at: string; results: Record<string, string> }[];
+  amended_at?: string;
+  delivery?: { via: 'print' | 'whatsapp' | 'email'; at: string }[];
+  invoice_id?: string;
+  /** Outsourced cost billed by the reference lab (purchase bill id). */
+  outsourced_bill_id?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+declare module './invoice' {
+  interface Client {
+    /** SV-B1 patient data. */
+    patient?: PatientInfo;
+  }
+  interface SenderProfile {
+    /** SV-B1 registrations printed in the header when set (CEA / state, council, NABL, PCPNDT). */
+    sv_regs?: { cea?: string; cea_valid?: string; council?: string; nabl?: string; pcpndt?: string };
+  }
+}
+
+declare module './retail-r9' {
+  interface Doctor {
+    /** SV-B1 clinic fields. */
+    in_house?: boolean;
+    speciality?: string;
+    consult_fee?: number;
+    follow_up_fee?: number;
+    follow_up_days?: number;
+    /** SV-A3 staff link (lines carry `sv.staff_id`). */
+    staff_id?: string;
+    /** SV-B4 visiting consultant fee-share: % of their lines or ₹ per visit. */
+    share?: { pct?: number; per_visit?: number };
+  }
+}
+
 /* ════════════════════════════════════════ SV-C ════════════════════════════════════════ */
 // SV-C: member_plans, memberships (MEM), checkins, class_schedules, class_attendance; `Enrolment.class_id`.
 
