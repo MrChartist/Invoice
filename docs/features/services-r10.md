@@ -82,3 +82,54 @@ palette labels 0.9; reach / checklist / glossary / discover strings ≈ 2; picke
 GST guards, common credit, demo) ≈ 3.5. The PRD's 14 kB covered A's five items but not the Round-10-wide rows A owns
 (every R10 help topic, palette label and Ctrl+K title, ≈ 3 kB) nor two languages of desk strings. Total JS stays under
 the 3,000 kB budget (2,934 kB); SV-B / C / D then have ≈ 66 kB, above their planned 31 kB.
+
+## SV-D — Repair and service centres (vehicle workshops, AC / appliance service)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| D1 vehicles and appliances | `services/sv-assets.ts`: table `service_assets` (`master.edit`, audited "Vehicle / appliance"), kind `vehicle` / `appliance`; registration no. normalised (`normReg`, `MH12AB1234`) and unique; make, model, variant, fuel, year, VIN, engine no., colour, class (`hatch` / `sedan` / `suv` / `2W` / `3W` / `commercial`), serial / site for appliances, owner (client or name), insurer, policy no. / expiry, odometer readings (`withReading`; a reading below the last one is a warning, never a block, `odometerIssue`), next service date / km. History: `assetJobs` (newest first), `lastService`. Delete is a data-layer delete (recycle bin), refused while a job card names the asset. Company object `workshop_settings` (`settings.manage`, audited on save): checklist, job-card terms, labour rate per class, depreciation table, default service interval, parts warranty months. |
+| D1 job cards | `services/sv-jobs-workshop.ts`, a thin layer over RT-D4 `retail/rt-service-jobs.ts` (same `service_jobs` table, `SVC/FY…`, `addJob` / `moveJob` / `canMove`): `openJob` adds the SV-D fields (asset, odometer in / out, fuel, customer voice, inspection checklist, promised time, bay = SV-A resource, technicians = SV-A staff, site visit + address, AMC) to the RT-D4 row. A site visit books an appointment (kind `job`, first technician) on the SV-A book. Statuses appended to RT-D4 (`types/retail-r9.ts` union + `WORKSHOP_MOVES` in `canMove`): `estimate_sent`, `awaiting_insurer`, `awaiting_parts`, `quality_check`; the phone flow is unchanged. `moveWorkshopJob` warns before *In repair* without a logged approval and, on delivery, records the odometer out and the AMC visit. Board by status with age colours (`board`). Prints (`WorkshopJobCardPrint.tsx`): job card with the terms and the customer's signature line; gate pass on delivery. `wa.me` "ready" message. |
+| D2 estimates, approvals, labour | `services/sv-estimates.ts`: an estimate is a QUOTATION (status Sent, record `sv.job`) listed on the job (`quote_ids`); supplementary estimates are more quotations. `labourLine` (hours per class × class rate, unit HRS, or the op's flat price; SAC `REPAIR_SAC_RULES` by asset kind; 18%), `partLine` (stock item's HSN / rate), `subletLine` (cost + markup, repair SAC). `approveEstimate` logs `{quote_id, by, how, at, note}` and marks the quote Accepted. `billWorkshopJob`: every approved estimate's lines on ONE invoice (RT-D4's `jobLines` when no estimate was approved), parts and labour as separate lines at their own rates, AMC-covered labour dropped, issued parts settled back from WIP first, the job's advance adjusted, `doc_links` quote → invoice (`converted`), "Parts warranty until …" note, the asset's next service; a job whose claim needs two invoices is billed as a DRAFT for the split. `services/sv-labour.ts`: table `labour_ops` (`master.edit`, audited "Labour operation"; code unique), technician clock in / out (`clocks` on the job) → a NON-billable `time_entries` row with `job_id` / `staff_id` (never billed twice), `efficiency` (billed labour hours per `line.sv.staff_id` ÷ clocked hours). |
+| D2 parts issue | `services/sv-parts-issue.ts`: issue = ordinary stock transfer (`STR/FY…`) main → `wip` godown "Jobs in progress" (created on first use, non-saleable); return = the reverse, never more than issued; `settleForBill` moves what is still issued back before the sale, so stock leaves once and company totals never change by an issue. Transfer ids on the job (`parts_issue`); the expanded job row shows issued vs estimated per item. |
+| D3 motor claims | `services/sv-motor-claims.ts` over SV-A5 `payer_claims` (kind `motor`; `PayerClaim.mode` / `surveyor` / `survey_date` / `salvage`, declared in the SV-D block): `openMotorClaim` (job ↔ claim, salvage as a note, no stock entry), `depreciationPct` (user table first, then `MOTOR_DEPRECIATION_DEFAULTS` — insurer practice, not statute; metal by vehicle age bands), `motorSplit` (per line: approved − depreciation to the insurer; excess taken off labour lines first; tags `depreciation` / `excess` / `non_covered` / `disallowed`), `billMotorClaim` (splits the job's draft through `billClaim` — per line, or per head on the approved total), `motorBuckets` (survey pending, approval pending, delivered unpaid, short-paid). Cashless → two invoices (insurer in its own name / GSTIN, B2B); reimbursement → one invoice to the owner with "Claim with …" on it, unless the insurer client has `sv_insurer_invoice: 'insurer'` (checkbox on the claim form). The claims view mounts SV-A5's `ClaimsView` below the motor part (write-off of short payment, rejection re-bill). |
+| D4 reminders and AMC | `services/sv-reminders.ts`: `nextService` (shortest op interval, else `workshop_settings.default_interval`; date = bill day + days, or earlier when the km per day from the odometer history reaches the km interval first; km = last reading + interval), `dueList` (service and insurance expiry due in 30 days / overdue), `reminderText` (en / hi `wa.me` text), `amcDue` (AMC contracts naming `asset_ids`: due visits per asset, skipped while an AMC job is open) → *Create job* (`amc_id`); delivery logs the visit with `visitFromJob` (`amc.ts`: additive `asset_ids`, `AmcVisit.job_id`, kept by `recordVisit`). |
+| Desk | `components/services-r10/WorkshopDesk.tsx` (lazy in `Time.tsx`, replaces the stub and mounts the claims view): views `jobs`, `estimates`, `claims`, `reminders`, `labour`, `vehicles`; strings `i18n/areas/services-r10d.ts` (en / hi). Help topics of the six views reworded (`topics-packs.ts`); palette labels and Ctrl+K titles were already SV-A's. |
+| Registry and data | `sv-shared.ts` (`assets`, `labourOps`, `workshopSettings`), `sv-registry.ts` SV-D block (`service_assets` / `labour_ops` `master.edit`, `workshop_settings` `settings.manage`; audit labels), `backup.ts` `// R10-D` rows, open-export rows. Neither table is dated or numbered (masters), so no sync row; the settings object syncs as a singleton. Every writer imports `./sv-registry` (and `../retail/rt-registry` where it writes `service_jobs`). |
+| Tests | `sv-workshop-jobs`, `sv-estimates`, `sv-motor-claims`, `sv-reminders` (+ an SV-D block in `sv-registry.test.ts`); e2e step "R10-D workshop desk". |
+
+### Deviations from the PRD (SV-D)
+
+- **Status union**: the four workshop statuses are appended to `ServiceStatus` in `types/retail-r9.ts` (a type alias cannot be
+  extended by declaration merging) and labelled in `i18n/areas/retail-r9d.ts` (the devices desk lists every job); the
+  PRD said `retail-r9.ts` is not edited. `canMove` gets one additive map (`WORKSHOP_MOVES`).
+- **`ServiceJobsView`** is not split out of `DevicesDesk.tsx`: the workshop board is its own (status columns, age, bay,
+  technicians), so the devices desk is untouched apart from the strings.
+- **Billing from estimates** writes the `doc_links` rows itself (one per approved quotation → the job bill) instead of
+  `convertDocument` (which converts one source); quotations are marked Accepted on approval.
+- **AMC**: `visitFromJob` lives in `amc.ts` as planned; the AMC tile and panel are unchanged; parts-warranty is a
+  job-level "Parts warranty until …" note from `workshop_settings.parts_warranty_months` (serial warranty stays RT-D4's).
+- **Claims split for cashless jobs** does not adjust the job's advance automatically (the draft is split first; apply
+  the advance on the owner's bill). A reimbursement job adjusts it as RT-D4 does.
+- **Technician time** is clocked on the job row (`clocks`) and saved as non-billable time entries; the R3-B timer is not
+  reused (it is one timer per device).
+- **Demo**: no workshop block in `demo/profile-services.ts`.
+- **CA items** SV41–SV43 were added in `docs/CA_REVIEW.md` §10.6 (ids from 41 so they do not clash with SV-B / SV-C).
+
+### Bundle (SV-D)
+
+Measured against `claude/elegant-cannon-cwapiv` at `0772013` (vite build, gzip level 9, the `check:size` method):
+
+| | Before | After | Δ |
+|---|---|---|---|
+| Initial JS (first paint) | 189,145 B (184.7 kB) | 189,142 B (184.7 kB) | **−3 B** (noise: nothing in the shell changed) |
+| Total JS | 3,004,637 B (2,934.2 kB) | 3,021,032 B (2,950.2 kB) | **+16.0 kB** |
+
+**Over the 10 kB aim** (+16.0 kB). Chunk view: `WorkshopDesk` 18.2 kB (which now also carries SV-A's claims view, 3.7 kB
+that was its own chunk), and RT-D4's engine + strings moved out of `DevicesDesk` into a shared `rt-service-jobs` chunk
+(6.1 kB in, 5.0 kB out of the devices desk: ≈ 1.1 kB of split overhead, unavoidable once two desks share the engine).
+By module (minified + gzip, each alone): desk UI 6.8, strings en + hi 3.1, estimates / bill 2.5, motor claims 1.2,
+reminders 1.3, assets + settings 1.5, jobs layer 1.5, labour + clocks 1.1, parts issue 0.9, prints 0.8, rules rows 0.4
+(together ≈ 21 kB alone, ≈ 15 kB in one chunk). The PRD's 9 kB assumed the job board came from RT-D4; the workshop board,
+the six views and both languages of their strings are new. Total JS stays under the 3,000 kB budget (2,950.2 kB).
