@@ -111,3 +111,20 @@ test('R6: a stage bill for an Indian property of a client abroad fails the Sec 2
   assert.equal(c.items.find((i) => i.id === 'pos')!.state, 'fail');
   assert.equal(verdict(c), 'not');
 });
+
+test('R7: the annual pack\'s partner-wise table foots (194T TDS and interest on drawings shown)', async () => {
+  const { partnerStatements } = await import('../src/lib/prof/ps-partner-post.ts');
+  const { buildAnnualPack } = await import('../src/lib/ledger/annual-pack.ts');
+  const { loadLedger, loadStockValuer } = await import('../src/lib/ledger/index.ts');
+  const ps = twoPartners();
+  postRun(computeRun({ fy: 2025, partners: ps, netProfit: 900000, capital: Object.fromEntries(ps.map((p) => [p.id, 100000])) }));
+  const p = (x: number) => Math.round(x * 100);
+  const rows = partnerStatements(2025).map((r) => ({ name: r.name, opening: p(r.opening), introduced: p(r.introduced), drawings: p(r.drawings), interest: p(r.interest), remuneration: p(r.remuneration), share: p(r.share), closing: p(r.closing) }));
+  const pack = buildAnnualPack({ ledger: loadLedger(), stock: loadStockValuer(), fyStartYear: 2025, assets: [], vendors: [], invoices: [], company: { name: 'A & B' }, entity: 'partnership', generatedOn: '2026-04-30', partnerRows: rows });
+  const t = pack.notes.find((n) => n.id === 'capital')!.tables.find((x) => /Partner-wise/.test(x.title ?? ''))!;
+  for (const r of t.rows) {
+    const [, open, intro, draw, int, rem, share, other, close] = r as number[];
+    assert.equal(open + intro - draw + int + rem + share + other, close, String(r[0]));
+  }
+  assert.ok(t.rows.some((r) => (r[7] as number) < 0), 'the TDS deducted shows');
+});
