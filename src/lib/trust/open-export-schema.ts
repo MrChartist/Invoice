@@ -274,6 +274,10 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   engagements: 'Engagements (ENG/FY…): client, matters covered, billing model (hourly, fixed, milestones, retainer, capped, success, blended), fee / cap / milestones, letter quotation, acceptance, renewal, status (R14).',
   conflict_checks: 'Conflict checks: names / PAN / GSTIN searched, hits in clients, suppliers and matter parties, result (clear / conflict / waived), reason and consent note (R14).',
   incentive_claims: 'Incentive and subsidy claims (PLI, state capital subsidy, interest subvention …): period, base, rate, claimed, approved, received, income / capital, reasonable-assurance date and journals (R13).',
+  // R14-D
+  partners: "Partners of a firm / LLP: PAN, working or not, designated, joined / left, deed terms by date (profit-sharing ratio, remuneration, interest on capital and drawings), capital and current ledgers (R14).",
+  partner_runs: "Partner postings: the year-end appropriation per FY (book profit, Sec 40(b) allowable and disallowed, interest, residual share by partner) and monthly credits, with their journals and 194T TDS rows (R14).",
+  udin_register: 'UDIN register: UDIN, date, client, kind (certificate, tax / GST / statutory audit), description, member no., FY / PAN, revocation (R14).',
   // R14-B
   client_money: 'Client-money (trust) vouchers (CMV/FY…): receipt / payment on behalf / to fees / refund / transfer / interest, client, matter, amount, client-money bank account, purpose, invoice and office receipt (to fees), client\'s authority or owner override, journals (R14).',
 };

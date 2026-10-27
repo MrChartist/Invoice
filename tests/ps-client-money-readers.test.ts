@@ -56,8 +56,9 @@ test('cash-forecast opening leaves client money out; the BRS still offers the ac
 });
 
 test('static guard: the firm cash readers call isClientMoneyAccount', () => {
-  for (const f of ['src/lib/today.ts', 'src/lib/sales-reports.ts', 'src/lib/cash-forecast.ts']) {
+  for (const f of ['src/lib/sales-reports.ts', 'src/lib/cash-forecast.ts']) {
     assert.match(readFileSync(f, 'utf8'), /isClientMoneyAccount\(/, f);
   }
+  assert.match(readFileSync('src/lib/today.ts', 'utf8'), /client_money === true/, 'Today: the same rule inline (first-paint map)');
   assert.doesNotMatch(readFileSync('src/lib/no-cash.ts', 'utf8'), /client_money/, 'no new no-cash marker');
 });

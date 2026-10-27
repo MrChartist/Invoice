@@ -507,6 +507,8 @@ const RECORD_TABLES = [
   'cost_cards', 'export_authorisations', 'incentive_claims',
   // R14-A: engagements (ENG/FY…), conflict checks
   'engagements', 'conflict_checks',
+  // R14-D: partners, partner runs (year-end appropriation, monthly 194T credits), UDIN register
+  'partners', 'partner_runs', 'udin_register',
   // R14-B: client-money (trust) vouchers (CMV/FY…)
   'client_money',
 ];
@@ -613,6 +615,8 @@ const ID_TABLES = new Set([
   'cost_cards', 'export_authorisations', 'incentive_claims',
   // R14-A: engagements (ENG/FY…), conflict checks
   'engagements', 'conflict_checks',
+  // R14-D: partners, partner runs (year-end appropriation, monthly 194T credits), UDIN register
+  'partners', 'partner_runs', 'udin_register',
   // R14-B: client-money (trust) vouchers (CMV/FY…)
   'client_money',
 ]);

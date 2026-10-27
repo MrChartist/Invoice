@@ -33,7 +33,7 @@ import {
   type LedgerProfitLoss,
   type TrialBalance,
 } from './reports';
-import { buildNotes, capitalTitle, reservesTitle, TEXT_NOTES, type NoteCell, type PackNote } from './notes-auto';
+import { buildNotes, capitalTitle, reservesTitle, TEXT_NOTES, type NoteCell, type PackNote, type PartnerNoteRow } from './notes-auto';
 
 export const NOTES_TABLE = 'notes_to_accounts';
 export const ENTITY_TYPES: readonly EntityType[] = ['proprietorship', 'partnership', 'llp', 'company'];
@@ -86,6 +86,8 @@ export interface AnnualPackInput {
   asAt?: string;
   /** MF-D5 (optional): Schedule III inventory sub-heads for the note (paise; `mfg/mf-inventories.ts` `noteRows`). */
   inventoryRows?: readonly { label: string; cur: number; prev: number }[];
+  /** PS-D1 (optional): partner-wise capital and current accounts for the note (paise). */
+  partnerRows?: readonly PartnerNoteRow[];
 }
 
 /** The date the pack's statements run to: the FY end once the FY has ended, else the picked as-at date (or today) inside the FY. */
@@ -138,7 +140,7 @@ export function buildAnnualPack(input: AnnualPackInput): AnnualPack {
   const plPrev = ledgerProfitAndLoss(input.ledger, prevP, input.stock);
   const cf = cashFlowStatement(input.ledger, curP, input.stock);
   const tb = trialBalance(input.ledger, curP);
-  const notes = buildNotes({ ledger: input.ledger, fy: { ...fy, end: asAt }, prev, bs, bsPrev, pl, plPrev, stock: input.stock, assets: input.assets, vendors: input.vendors, invoices: input.invoices, entity, stored: input.notes ?? null, ...(input.inventoryRows?.length ? { inventoryRows: input.inventoryRows } : {}) });
+  const notes = buildNotes({ ledger: input.ledger, fy: { ...fy, end: asAt }, prev, bs, bsPrev, pl, plPrev, stock: input.stock, assets: input.assets, vendors: input.vendors, invoices: input.invoices, entity, stored: input.notes ?? null, ...(input.inventoryRows?.length ? { inventoryRows: input.inventoryRows } : {}), ...(input.partnerRows?.length ? { partnerRows: input.partnerRows } : {}) });
   return {
     fy, prev, company: input.company, entity, scopeLabel: input.scopeLabel, generatedOn, asAt, interim,
     bs, bsPrev, pl, plPrev, cf, tb, notes, difference: bs.difference,

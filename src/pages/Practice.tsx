@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Download, Lock, RefreshCw } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -20,6 +20,9 @@ import { dkT } from '../i18n/areas/desks-r3';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/practice/practice.module.css';
+
+// R14 (PS-D5): "Bill" for a company linked to a client of the firm (CA desk); the board stays read-only.
+const PracticeBillLink = lazy(() => import('../components/prof/PracticeBillLink'));
 
 /** The open company's tables, read from the live storage (same shape as a peek). */
 function currentTables(): PracticeTables {
@@ -160,6 +163,7 @@ export function Practice() {
                         : r.current
                         ? <Link to="/gst-reports?tab=compliance" className={`${controls.btnGhost} ${controls.btnSm}`}>{dkT('pr.markFiled')}</Link>
                         : <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => open(r.id)}>{dkT('pr.open')}</button>}
+                      {!r.missing && <Suspense fallback={null}><PracticeBillLink companyId={r.id} /></Suspense>}
                     </td>
                   </tr>
                 ))}

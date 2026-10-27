@@ -31,7 +31,7 @@ export type StepKind =
   | PsStep;
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'clientMoneyBank', 'stageTemplate', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'clientMoneyBank', 'stageTemplate', 'feeSchedule', 'linkCompanies', 'partners', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -127,12 +127,18 @@ export interface ChecklistFactsV3 {
 }
 
 /** R14 (PS-A1): the professional steps, the kinds that have them and where each opens. */
-type PsStep = 'firstMatter' | 'staffCapacity' | 'enrolment' | 'conflictCheck' | 'clientMoneyBank' | 'stageTemplate';
+type PsStep = 'firstMatter' | 'staffCapacity' | 'enrolment' | 'conflictCheck'
+  | 'feeSchedule' | 'linkCompanies' | 'partners'
+  | 'clientMoneyBank' | 'stageTemplate'; // R14 (PS-D): CA fee schedule and company links; partners of a firm
 const PS_STEPS: Readonly<Record<PsStep, [kinds: string, to: string]>> = {
   firstMatter: ['ca legal design consulting agency freelancer other', '/time?tab=matters&view=matters'],
   staffCapacity: ['ca legal design consulting agency freelancer other', '/time?tab=wip&view=utilisation'],
   enrolment: ['legal', '/settings?tab=features'],
   conflictCheck: ['legal', '/time?tab=matters&view=conflicts'],
+  // PS-D (`partners` only with the partners pack)
+  feeSchedule: ['ca', '/time?tab=cadesk&view=fees'],
+  linkCompanies: ['ca', '/time?tab=cadesk&view=fees'],
+  partners: ['ca legal design consulting agency freelancer other', '/time?tab=firm&view=partners'],
   // PS-B: a client-money account (law firm; skippable) and the stage template (design)
   clientMoneyBank: ['legal', '/reconcile?tab=statements'],
   stageTemplate: ['design', '/time?tab=matters&view=stages'],
@@ -252,6 +258,7 @@ function applies(kind: StepKind, ctx: ChecklistCtx): boolean {
     case 'memberPlan': return ctx.serviceKind === 'fitness';
     case 'batch': return ctx.serviceKind === 'coaching';
     case 'labourOp': case 'jobCard': return ctx.serviceKind === 'workshop' || ctx.serviceKind === 'appliance';
+    case 'partners': return !!ctx.profKind && (ctx.packs ?? []).includes('partners'); // R14 (PS-D1)
     default: return isPsStep(kind) ? !!ctx.profKind && PS_STEPS[kind][0].split(' ').includes(ctx.profKind) : isMfStep(kind) ? !!ctx.mfgKind && MF_STEPS[kind][0].split(' ').includes(ctx.mfgKind) : isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri / R13 mfg steps
   }
 }
@@ -425,6 +432,10 @@ function profFacts(): Partial<Record<PsStep, number>> {
     staffCapacity: peekTable<{ ps?: { capacity_hours_week?: number } }>('service_staff').filter((s) => (s?.ps?.capacity_hours_week ?? 0) > 0).length,
     enrolment: ps?.legal?.enrolment ? 1 : 0,
     conflictCheck: peekTable('conflict_checks').length,
+    // PS-D
+    feeSchedule: peekTable<{ ps?: { fee_event?: string } }>('items_catalog').filter((i) => i?.ps?.fee_event).length,
+    linkCompanies: (ps as { ca?: { company_clients?: unknown[] } } | null)?.ca?.company_clients?.length ?? 0,
+    partners: peekTable('partners').length,
     clientMoneyBank: peekTable<{ client_money?: boolean }>('bank_accounts').filter((a) => a?.client_money).length, // PS-B
     stageTemplate: peekTable<{ stage?: unknown }>('engagements').filter((e) => e?.stage).length,
   };

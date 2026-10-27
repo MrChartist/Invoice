@@ -396,7 +396,7 @@ export interface ProfProfile {
 
 const PROF_ACC: readonly ModuleId[] = [...PRESETS.services, 'accounts'];
 export const PROF_PROFILES: Readonly<Record<ProfKindId, ProfProfile>> = {
-  ca: { modules: PROF_ACC, packs: ['practice', 'cafirm'], landing: '/time?tab=matters', defaultDueDays: 15, templateId: 'gst_tax_invoice' }, // PS-D: → cadesk events
+  ca: { modules: PROF_ACC, packs: ['practice', 'cafirm'], landing: '/time?tab=cadesk&view=events', defaultDueDays: 15, templateId: 'gst_tax_invoice' }, // PS-D5: the CA desk
   legal: { modules: PROF_ACC, packs: ['practice', 'legal'], landing: '/time?tab=matters&view=matters', defaultDueDays: 15, templateId: 'freelancer_light' },
   design: { modules: PROF_ACC, packs: ['practice', 'design'], landing: '/time?tab=matters&view=stages', defaultDueDays: 15, templateId: 'gst_tax_invoice' }, // PS-B4: the stages view
   consulting: { modules: PROF_ACC, packs: ['practice'], landing: '/time?tab=wip&view=wip', defaultDueDays: 30, templateId: 'gst_tax_invoice' },

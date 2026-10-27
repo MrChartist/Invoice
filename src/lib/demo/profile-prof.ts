@@ -36,6 +36,11 @@ export function profExtras(ctx: ProfileContext): DemoExtras {
     const stage = { fee_pct: 6, cost_basis: 'estimate' as const, revisions: [{ date: from, cost: 42000000 }], stages: [['s1', 'Concept design', 10], ['s2', 'Preliminary drawings and estimate', 30], ['s3', 'Working drawings and tender', 50], ['s4', 'Construction stage', 75], ['s5', 'Completion', 100]].map(([id, label, cum_pct]) => ({ id: id as string, label: label as string, cum_pct: cum_pct as number })), property: { state: 'Maharashtra', city: 'Pune', country: 'India' } };
     tables.engagements = [...(tables.engagements ?? []), { id: 'demo-eng-st', demo: true, number: `ENG/${getIndianFY(today).label}/9003`, client_id: base.clients[0].id ?? '', matter_ids: [], title: 'House at Baner, Pune (demo)', model: 'milestone', currency: 'INR', disb_policy: 'agent', start: from, status: 'active', created_at: `${from}T09:00:00.000Z`, stage } as Engagement & { demo: true }];
   }
-  // PS-C / PS-D: add their blocks here.
+  // PS-D (cafirm): one UDIN of a certificate this month, not yet billed (CA desk → Work to bill / UDIN register).
+  if (packs.includes('cafirm') && base.clients[0]) {
+    const day = shiftDay(today, -3);
+    tables.udin_register = [{ id: 'demo-udin-1', demo: true, udin: `${day.slice(2, 4)}123456DEMO000001`, date: day, client_id: base.clients[0].id, client_name: base.clients[0].name, kind: 'certificate', description: 'Net worth certificate (demo)', member_no: '123456', created_at: `${day}T09:00:00.000Z` }] as never;
+  }
+  // PS-C: add its block here.
   return { tables };
 }
