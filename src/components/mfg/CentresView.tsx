@@ -84,7 +84,7 @@ export default function CentresView({ ctx }: { ctx: MfgContext }) {
       )}
       <Grid attr="centres" head={[fT('name'), fT('kind'), fT('rate'), fT('hoursDay'), fT('days'), '']} rows={rows.map((c) => [
         c.name, fT(`kind.${c.kind}`),
-        `${[c.hourly_rate, c.labour_rate, c.power_rate, c.overhead_rate].filter((x) => num(x) > 0).map(fmt).join(' + ')} = ₹${fmt(machineHourRate(c))}`,
+        `${[c.hourly_rate, c.labour_rate, c.power_rate, c.overhead_rate].filter((x) => num(x) > 0).map((x) => fmt(num(x))).join(' + ')} = ₹${fmt(machineHourRate(c))}`,
         `${fmt(shiftHours(c))} × ${c.capacity_units ?? 1} @ ${c.efficiency_pct ?? 100}%`,
         DAYS.filter((n) => c.days.includes(n)).map((n) => fT(`d${n}` as 'd0')).join(' '),
         ctx.canMasters ? <span style={row}><button type="button" className={controls.btnOutline} onClick={() => setD(draftOf(c))}>{fT('edit')}</button><button type="button" className={controls.btnDanger} onClick={() => remove(c)}>{fT('delete')}</button></span> : null,

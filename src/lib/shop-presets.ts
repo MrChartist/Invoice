@@ -4,6 +4,7 @@
  */
 import { ALL_MODULES, type BusinessType, type ModuleId, type ShopModeSettings } from './shop-mode';
 import type { PackId } from './industry-packs';
+import type { MfgSub } from '../types/mfg-r13';
 
 export const BUSINESS_TYPES: readonly BusinessType[] = [
   'kirana', 'restaurant', 'wholesale', 'services', 'manufacturer', 'full',
@@ -357,12 +358,12 @@ export const isMfgKind = (v: unknown): v is MfgKindId => typeof v === 'string' &
  * also packs namkeen keeps its agri desks) and the kind / sub-choice. `other` keeps the type and modules. The profile's
  * switches (`mfg_settings`) are written by `mfg/mf-profile.ts`.
  */
-export function applyMfgKind(kind: MfgKindId, opts: { registered?: boolean; sub?: string; currentPacks?: readonly PackId[] } = {}): ShopModeSettings & { mfg_kind: MfgKindId; mfg_sub?: string; industry_packs: PackId[] } {
+export function applyMfgKind(kind: MfgKindId, opts: { registered?: boolean; sub?: string; currentPacks?: readonly PackId[] } = {}): ShopModeSettings & { mfg_kind: MfgKindId; mfg_sub?: MfgSub; industry_packs: PackId[] } {
   const p = MFG_PROFILES[kind];
-  const out: ShopModeSettings & { mfg_kind: MfgKindId; mfg_sub?: string; industry_packs: PackId[] } = { mfg_kind: kind, industry_packs: [...new Set<PackId>([...(opts.currentPacks ?? []), ...p.packs])] };
+  const out: ShopModeSettings & { mfg_kind: MfgKindId; mfg_sub?: MfgSub; industry_packs: PackId[] } = { mfg_kind: kind, industry_packs: [...new Set<PackId>([...(opts.currentPacks ?? []), ...p.packs])] };
   if (p.type) out.business_type = p.type;
   if (p.modules) out.modules = [...new Set<ModuleId>([...p.modules, 'inventory', 'payroll', ...(opts.registered ? ['gst' as const] : [])])];
   const subs = MFG_SUBS[kind];
-  if (subs) out.mfg_sub = subs.includes(opts.sub ?? '') ? opts.sub : subs[0];
+  if (subs) out.mfg_sub = (subs.includes(opts.sub ?? '') ? opts.sub : subs[0]) as MfgSub;
   return out;
 }
