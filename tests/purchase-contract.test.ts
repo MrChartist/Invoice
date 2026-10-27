@@ -1002,3 +1002,16 @@ test('R12 (AG-C5) mill report reads the real bill shape: own intake of the batch
   const [m] = millMonths({ orders: [], mfg, items, purchases, principal: [], agreements: [], invoices: [] });
   assert.deepEqual([m.month, m.intakeOwn, m.input, m.main], ['2026-04', 20, 10, 6], 'two bills of 10 KG each (by name, by item id)');
 });
+
+// R12-D: the dealer desk's principal-certificate check and the FPO patronage register read bills through `readPurchase` /
+// `readPurchaseLines` (date, party, lines, void skipped; the vendor id from the row).
+test('R12 (AG-D4 / AG-D5) principal-certificate check and patronage register read the real bill shape', async () => {
+  const { principalWarnings } = await import('../src/lib/agri/ag-licences.ts');
+  const { patronage } = await import('../src/lib/agri/ag-patronage.ts');
+  const urea = { ...bill, vendor_id: 'v-iffco', lines: [{ id: 'l1', name: 'Urea 45 kg', hsn: '3102', unit: 'BAG', quantity: 100, rate: 240, tax_rate: 5 }] };
+  const of = (n: string) => (n === 'urea 45 kg' ? 'fertiliser' : undefined);
+  assert.deepEqual(principalWarnings([urea, { ...urea, id: 'v', status: 'void' } as never], [], of).map((w) => [w.bill, w.vendor, w.kind]), [['AS/22', 'Acme Supplies', 'fertiliser']]);
+  const member = { id: 'v-iffco', name: 'Acme Supplies', kind: 'vendor' as const };
+  const p = patronage(2026, { members: [member], cycles: [], purchases: [urea, { ...urea, id: 'v', status: 'void' } as never], invoices: [], farmerIds: new Set(['v-iffco']) });
+  assert.deepEqual([p.rows[0].suppliedQty, p.rows[0].suppliedValue], [100, 1000], 'taxable value, void skipped');
+});

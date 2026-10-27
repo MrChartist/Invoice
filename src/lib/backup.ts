@@ -495,6 +495,8 @@ const RECORD_TABLES = [
   'milk_rate_charts', 'milk_shifts', 'milk_dispatches', 'milk_cards',
   // R12-C (mills): weighbridge slips (WBS/FY…), custom-milling agreements (deliveries CMR/FY…)
   'weighbridge_slips', 'cmr_agreements',
+  // R12-D: cold-storage lots (CSR / GPO), rent plans, loans against stored produce (LAS), members' share ledger (SHC)
+  'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -587,6 +589,8 @@ const ID_TABLES = new Set([
   'milk_rate_charts', 'milk_shifts', 'milk_dispatches', 'milk_cards',
   // R12-C (mills): weighbridge slips (WBS/FY…), custom-milling agreements (deliveries CMR/FY…)
   'weighbridge_slips', 'cmr_agreements',
+  // R12-D: cold-storage lots (CSR / GPO), rent plans, loans against stored produce (LAS), members' share ledger (SHC)
+  'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

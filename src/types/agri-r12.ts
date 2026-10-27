@@ -604,4 +604,33 @@ declare module './production-r4' {
 
 /* ════════════════════════════════════════ AG-D ════════════════════════════════════════ */
 // AG-D: cold_lots (CSR, GPO), cold_rent_plans, agri_loans (LAS), member_shares (SHC); agri_settings chambers / licences /
-// principals / seasons.
+// principals / seasons. Row shapes live in `types/agri-r12d.ts`; here: the D fields of `ag.rent` / `ag.inputs` and of
+// `agri_settings` (interface merging with AG-A's declarations above).
+import type { AgriSettingsD, RentBasis, StorageClass } from './agri-r12d';
+
+/** D2: what the rent bill covered (the fields AG-A's paper prints are filled too: lot_no, bags_in / out / balance …). */
+export interface AgRentSnap {
+  lot_id?: string;
+  /** Bags this bill charges rent for (season bags already billed are not billed again). */
+  bags?: number;
+  basis?: RentBasis;
+  rate?: number;
+  period_from?: string;
+  period_to?: string;
+  months?: number;
+  out_id?: string;
+  gate_pass_no?: string;
+  class?: StorageClass;
+  plan?: string;
+  notified?: { rate: number; order_ref: string };
+  /** The 'in' handling charges are on this bill (billed once per lot). */
+  in_charges?: boolean;
+}
+/** D4: the farmer ID as typed (Aadhaar last 4 or KCC; `farmer_id_last4` is set for 4 digits) and credit till harvest. */
+export interface AgInputsSnap {
+  farmer_id?: string;
+  season?: string;
+  season_due?: string;
+}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface AgriSettings extends AgriSettingsD {}
