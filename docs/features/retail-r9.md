@@ -431,4 +431,131 @@ claims, strings shortened (−1 kB), the job card reduced to one copy.
 
 # RT-E — Jewellery
 
-(RT-E)
+Inventory → *Jewellery* (pack `jewellery`; the Jewellery shop profile lands on `?tab=jewellery&view=rates` and sets the
+cash guard to *block* and *Require PAN* on). One lazy chunk, `JewelleryDesk.tsx`: views *Rates*, *Tags*, *Old gold*,
+*Karigar*, and the host parts `JewelLineRow` (editor line), `EditorJewel` (editor PAN / HUID notes and save gates) and
+`PosJewel` (tag box, PAN / PMLA at the counter). Strings in `i18n/areas/retail-r9e.ts` (English + Hindi). Engines in
+`src/lib/retail/rt-{jewel-rates,jewel-tags,jewel-line,old-gold,karigar}.ts`, plus RT-D's `rt-cash-guard.ts` (extended)
+and `rt-buyback.ts` / `rt-urd.ts` (reused). Every writer imports `./rt-registry`. Working papers — verify with your CA
+(RT14, RT16–RT22).
+
+## 1. Items
+
+**E1 Metal rates and tagged pieces.** `metal_rates` (`master.edit`, audited "Metal rate"): one row per metal + purity +
+day, append-only — a correction is a newer row and the latest of the day wins (`ratesOn`). Purities: gold 24K (999) /
+23K / 22K (916) / 21K / 20K / 18K (750) / 14K (585) / 9K (375); silver 999 / 925 / 900 / 800; platinum 950 / 900. *Rates*
+is one grid of the day (sale and buy ₹/g) with *Copy yesterday* (`lastBoard`: the latest earlier day). A bill uses the
+rate of its **own** date (`rateFor`), snapshotted on the line; no rate that day is an error on the line and an editor
+save gate (`rateGate`), unless the line is *rate locked*, job work, or the owner (`settings.manage`) typed a line rate —
+that override is audited (`audit.record`, action `override`). `jewel_tags` (`master.edit`, audited "Jewellery tag"):
+each piece is a **serial** of its design item (`ensureJewelItem`: `track_serials`, `jewel`, HSN 7113, 3 %), so stock,
+godowns, transfers and the serial lookup are unchanged; a tag sold leaves stock through the line's `serials`. Tag row:
+tag no. (`JW-0001` …, or typed), metal, purity, gross / stone / net (gross − stones, 3 dp) weight, stone value, wastage
+%, making (`per_gram` / `percent` / `fixed`), hallmark charge, HUID (6 letters / digits, validated; empty allowed),
+design no. A tag added on the desk comes in by a +1 adjustment carrying its serial, valued at net × the day's **buy**
+rate of its purity + stones. Bulk rows ("gross, stones, purity, HUID, design") on the desk and on a karigar receipt.
+*Tags* lists the tags in stock, the stock by purity (pieces, net g, fine g in 24K) and prints tag labels on the new
+label-sheet layout `jewel-tag` (60 × 15 mm roll: tag barcode, net weight, "22K (916)", HUID). A sold tag cannot be
+deleted; deleting one in stock removes its stock move (recycle bin).
+
+**E2 Jewellery bill line.** `rt-jewel-line.ts` `jewelAmount`: metal = net × rate; wastage = metal × % (or wastage g ×
+rate); making per g × net / % of metal / fixed; + stones + hallmarking; rounded to the paisa (`rupee` option). The ring
+example: 6.040 g × ₹9,350 = ₹56,474 + 2 % ₹1,129.48 + ₹650/g ₹3,926 + ₹4,800 + ₹45 = **₹66,374.48**. `applyJewel`
+writes quantity 1 (tag, its serial on the line) or net g in `GMS` (loose sale), `rate` = amount ÷ quantity, GST 3 % on
+the **whole** value (`JEWELLERY_GST_RULES`), HSN 7113 when empty, and the `jw` snapshot (with the BIS line in force).
+`invoice-calc.ts`, GST, HSN summary and stock read the line as any other. A typed rate / quantity that no longer gives
+the breakdown clears `jw` (`jwHolds`: the line is manual). *Job work (customer's metal)*: no metal value, SAC 9988 at the
+rule-file rate (5 %, §8 #24, CA item), the net weight printed as a memo. *Rate locked* keeps a quotation's rate on
+conversion. Print (`paper-helpers.ts` `jewelText`, via `trackingText`): tag, gross / stones, net, "22K (916)", HUID,
+₹/g, wastage, making, stones, hallmarking; `bisText` prints "Purity of hallmarked jewellery can be verified at any
+BIS-recognised A&H centre." under the totals (`HALLMARK_RULES`, dated). A gold line without a valid HUID is a warning
+from 1 Apr 2023 (`huidWarning`), never a block. e-Way: `validateEway` replaces the below-threshold note with "e-Way bill
+not required for Chapter 71 goods (Rule 138(14) annexure) — verify with your CA" when every goods HSN is chapter 71
+(`ewayChapterNote`, `EWAY_EXEMPT_CHAPTER_RULES`); a mixed bill keeps the usual checks. Editor: the jewel sub-row mounts
+for the jewellery pack or any line with `jw`; POS: *Scan tag* adds the priced piece.
+
+**E3 Old gold and the cash / PAN guards.** `rt-old-gold.ts` `oldGoldValue`: net = gross − stones; fine = net × touch %
+× (1 − melting loss %) (3 dp); value = fine × the day's 24K **buy** rate (or, *Net × purity rate*, net × (1 − melt %) ×
+the stated purity's rate). PRD example: 12.300 g at 84 % less 2 % → 10.125 g fine → ₹1,01,253.60 at ₹10,000.
+`recordOldGold`: a purchase voucher numbered `URD/FY…` (`rt-urd.ts`), from the customer as an individual vendor
+(matched by phone, else name), one line `Old gold (fine 24K)` (GMS, quantity = fine g; silver: `Old silver (fine)`,
+HSN 7106) into RT-D's `'used'` godown, no GST, `itc_eligible: false`, no RCM, `old_metal` snapshot; at or above the PAN
+limit the voucher needs PAN or Form 60 (snapshotted in `old_metal.kyc`). Settled by exchange against a sale (RT-D's
+`applyExchange`: the `exchange_purchase_id` receipt, no cash, `movedNoCash`; the sale keeps its **full** value and GST,
+§8 #19) — from the *Old gold* form ("Against bill no."), the list (*Settle a bill*), or the POS *Exchange* tender
+(RT-D's `ExchangeTender` lists `old_metal` vouchers). The bill prints each exchange as "Less: old gold (12.300 g @ 84%)
+₹…" (`exchangeText`). Paid in cash / bank as an ordinary purchase payment; cash above ₹10,000 to the person that day
+asks first (Sec 40A(3), `cashPaymentIssue`). Guards (`rt-cash-guard.ts`, generic, not pack-gated): RT-D's 269ST
+check per bill + the customer's same-day cash (POS strip `PosDevices`, mounted whenever a cash guard is set) and the
+*Receive payment* dialog (`liveSaleGuards`, cash only, same-day cash of the customer included; *block* stops it);
+`panGuard` — a sale **above** ₹2,00,000 (any mode) needs PAN or a Form 60 / 97 declaration (`kyc` on the record): a
+warning, an error with *Require PAN* (POS: the PAN fields appear and the bill is refused; editor: a save gate on
+issue); PMLA note at ₹10,00,000 cash from one customer in a day (reachable only with the guard off). Refunds, no-cash
+rows and cash we **pay** for old gold are never counted as receipts.
+
+**E4 Karigar account by fine weight.** `karigar_moves` (`books.edit`, numbered `KAR/FY…`, audited "Karigar issue /
+receipt"): karigar = a vendor (flagged `karigar` on first use), kind issue / receipt / return_metal, lines with metal,
+purity, gross, net, touch % and fine weight (net × touch %). Issue moves the metal out of the main godown into the
+karigar's own `'wip'` godown (`Karigar — <name>`, non-saleable, still our stock: RT21); a receipt consumes the issued
+metal from it (fine received + wastage allowed, in the issued item's grams) and brings the pieces in (tags from bulk
+rows, or the item by g / pieces); a metal return moves it back. `karigarLedger`: issued − received − wastage allowed −
+returned = balance (fine g), with ageing from the oldest uncovered issue (FIFO). Labour (per g of net received or per
+piece) makes a **draft** expense bill (Expenses → Drafts): SAC 9988, 5 % (CGST + SGST) when the karigar has a GSTIN,
+nil and no RCM when not. The Salim example: 50 g fine issued; 52.100 g net at 91.6 % back (47.724 g fine) with 1.5 %
+wastage (0.716 g) → balance 1.560 g; labour ₹450/g = ₹23,445. "ITC-04 may apply" note; the job-work challan / ITC-04
+stay on the existing job-work model (opt-in). Deleting an entry removes its stock moves and its unposted labour draft;
+its number stays used.
+
+## 2. Recycle bin
+
+Restore hooks (`trust/recycle-bin.ts`): a `karigar_moves` row or a `jewel_tags` row comes back with the stock moves its
+delete removed (`move_ids` / `move_id`); a tag is refused when its tag no. was used again. Old-gold vouchers are
+purchases: RT-D's hook brings an exchange receipt back only with its URD voucher.
+
+## 3. Deviations
+
+- Tags count **pieces** (unit PCS, one serial each), not grams: the weights live on the tag rows and the bill line (the
+  PRD's "unit GMS with base quantity in grams" would make a serial-tracked quantity of 6.04, which the serial engine
+  does not support). Loose sales by weight (no tag) use GMS.
+- `JewelLineRow` and `OldGoldDialog` are not separate files: the line row, the editor / POS parts and the old-gold form
+  live in the one desk chunk (as RT-D did), so the POS and the editor load one chunk. The old-gold voucher is made on
+  the desk; the POS settles it with RT-D's *Exchange* tender.
+- The job-work rate stays 5 % (§8 #24) but the rule row says it was not re-read: Chapter 71 job work for a registered
+  principal may be 1.5 % (N 11/2017-CT(R) entry 26(i), as amended), and making on an unregistered customer's metal may
+  be "other manufacturing services" — CA item RT16 / RT20. The karigar labour draft uses the same 5 %, always as CGST +
+  SGST (an out-of-state karigar's draft is corrected to IGST when it is posted).
+- The editor takes the cash guard on *Receive payment* (the editor has no tender panel); the editor's PAN / Form 60 sits
+  in the items-table footer and is an issue-time save gate (`saveGates` in `stock-tracking.ts`).
+- 2025-Act section numbers for 269ST / 40A(3) / Rule 114B are not confirmed (no `ita2025.ts` row): the messages name the
+  1961 sections.
+- Desk tags are valued at net × the day's buy rate + stones (a cost estimate; correct it by a stock journal).
+- Sample data (Demo only): today's board, five 22K tags (one without HUID) and the ring bill; old gold and karigar
+  entries are made from the desk.
+
+## 4. Sizes (gz, `npm run build` + exact bytes of `check:size`)
+
+Measured against the merged base `98c794d` (RT-A … RT-D):
+
+| | Before | After | Δ |
+|---|---|---|---|
+| Initial JS | 189,053 B | 189,041 B | **−12 B** |
+| Total JS | 2,834,405 B | 2,855,477 B (2789 kB / 2900) | **+20.6 kB** |
+
+**Deviation (total):** over RT-E's 15 kB share by ≈5.6 kB. Breakdown: `JewelleryDesk` chunk 15.5 kB (four views, editor
+line row, POS / editor guard parts, five engines ≈ 7.8 kB, en + hi strings ≈ 3.3 kB); shared-chunk splits now that two
+desks use them: `rt-buyback` (2.8 kB) and `rt-cash-guard` (1.6 kB, with RT-E's PAN / PMLA / live guards ≈ 0.8 kB) left
+`DevicesDesk` (−1.9 kB) — net +2.5 kB; `label-sheet` left `LabelSheetModal` (+0.3 kB net); rule rows +0.6; sample block
++0.7; print helpers (`jewelText`, `bisText`, `exchangeText`) +0.55 in `TemplateEngine`; host glue (lazy mounts in
+ItemsTable, Pos, InvoiceCreator save gates, PaymentModal guard, e-Way check, recycle-bin hooks) ≈ 0.9 kB.
+
+## 5. CA items (RT-E)
+
+- RT16: 3 % on the whole line (metal, wastage, making, stones, hallmarking); job work 5 % SAC 9988 — 1.5 % (Chapter 71
+  job work) not ruled out, see §3.
+- RT17: old gold from an individual: no GST / ITC / RCM; the exchange sale carries the full value.
+- RT18: 269ST ₹2,00,000 (receipts, per bill and per customer per day); Rule 114B ₹2,00,000 (above; PAN or Form 60 / 97);
+  PMLA ₹10,00,000 cash note — thresholds recalled, rows `verified: false`.
+- RT19: HUID warning from 1 Apr 2023 (notified districts), BIS verification line (Reg. 5(11)) from 16 Jun 2021.
+- RT20: karigar labour SAC 9988 at 5 % when registered, nil and no RCM when not; ITC-04 opt-in.
+- RT21: metal with karigars stays in stock (their `'wip'` godown).
+- RT22: no e-Way bill for all-chapter-71 bills (Rule 138(14) annexure, recalled).
