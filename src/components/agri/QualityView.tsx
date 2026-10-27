@@ -5,7 +5,8 @@ import { agT } from '../../i18n/areas/agri-r12a';
 import { loadQualityTables, removeQualityTable, saveQualityTable } from '../../lib/agri/ag-quality';
 import type { QualityCutTable, QualityParam } from '../../types/agri-r12';
 import controls from '../../styles/controls.module.css';
-import { F, Grid, In, useRun, wrap, type Done } from './agri-ui';
+import { F, Grid, In } from './agri-ui';
+import { useRun, wrap, type Done } from './agri-util';
 
 const KEYS: QualityParam['key'][] = ['moisture', 'foreign', 'damaged', 'immature', 'broken', 'custom'];
 type Row = { key: QualityParam['key']; label: string; norm: string; mode: 'weight' | 'price'; per: string; max: string; reject: string };

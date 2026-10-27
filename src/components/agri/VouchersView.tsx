@@ -22,7 +22,8 @@ import { prompt194q } from '../../lib/agri/ag-tax';
 import { voucherHtml } from '../../lib/agri/ag-print';
 import type { AgVoucherCharge } from '../../types/agri-r12';
 import controls from '../../styles/controls.module.css';
-import { F, Grid, In, money, useRun, wrap, type Done } from './agri-ui';
+import { F, Grid, In } from './agri-ui';
+import { money, useRun, wrap, type Done } from './agri-util';
 
 const n = (s: string) => Number(s) || 0;
 

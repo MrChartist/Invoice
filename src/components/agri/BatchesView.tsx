@@ -10,7 +10,8 @@ import { addBatchEvent, batchMemo, loadBatches, saveBatch } from '../../lib/agri
 import { agriIncomeLedger } from '../../lib/agri/ag-cycle-post';
 import type { FarmBatch, FarmBatchEvent } from '../../types/agri-r12';
 import controls from '../../styles/controls.module.css';
-import { F, Grid, In, useRun, wrap, type Done } from './agri-ui';
+import { F, Grid, In } from './agri-ui';
+import { useRun, wrap, type Done } from './agri-util';
 
 const KINDS: FarmBatch['kind'][] = ['flock', 'pond', 'herd', 'crop'];
 const EVENTS: FarmBatchEvent['kind'][] = ['mortality', 'feed', 'weight', 'harvest', 'medicine'];

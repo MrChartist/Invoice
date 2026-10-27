@@ -20,7 +20,8 @@ import { slipHtml } from '../../lib/agri/ag-print';
 import { slipText, slipWaLink } from '../../lib/agri/ag-slips';
 import type { AgCycleSettings, AgDeduction, FarmerCycle, FarmerCycleLine } from '../../types/agri-r12';
 import controls from '../../styles/controls.module.css';
-import { F, Grid, In, money, useRun, wrap, type Done } from './agri-ui';
+import { F, Grid, In } from './agri-ui';
+import { money, useRun, wrap, type Done } from './agri-util';
 
 const KINDS: AgDeduction['kind'][] = ['advance', 'loan', 'share', 'insurance', 'union', 'other'];
 

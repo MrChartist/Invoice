@@ -44,8 +44,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 9. Retail shops (Round 9, planned) | RT1–RT22 | 22 | 8 |
 | 10. Service businesses (Round 10, planned) | SV1–SV26, SV41–SV48 | 34 | 10 |
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
-| 12. Agriculture and food processing (Round 12, planned) | AG1–AG32 | 32 | 10 |
-| **Total** | | **322** | **86** |
+| 12. Agriculture and food processing (Round 12, planned) | AG1–AG39 | 39 | 10 |
+| **Total** | | **329** | **86** |
 
 ---
 
@@ -659,7 +659,7 @@ sub-contractors, builders and real-estate developers, interiors and MEP contract
 | CN34 | **Builder's bills and the contractor's site cost (QA11 C3, C9).** (a) Sub-contractor and plant-hire bills charged to a project on the 1% / 5% scheme are booked with ITC not claimed (cost = total incl. GST), and a typed bill claiming ITC is cautioned — right for every input of such a project? (b) Amounts the client recovers on our RA bills (material issued, plant hire, water & power, LD, interest on advance) are shown as site cost in the site P&L — right, or should client-issued material be netted from revenue instead? | (a) No ITC. (b) Site cost. | `construction/cn-subcon.ts` `noItcCentre`, `bill-guard.ts`, `cn-site-pnl.ts` | 2019-04-01 | N 03/2019-CT(R) (recalled) |
 | CN35 | **Delay interest base (QA11 C11).** Interest on delayed payment (Sec 15(2)(d) value, state RERA rate) is simple: on the instalments owed (including their GST), never on interest billed by an earlier demand, from the latest earlier due date to the new demand date. (a) Should the GST part of an instalment carry interest? (b) Is "from the latest earlier due date" acceptable when older instalments are still unpaid? | (a) Yes, on the amount demanded. (b) A working figure, waivable per booking. | `construction/cn-demands.ts` `delayInterest` | — | State RERA rules (recalled) |
 
-## 12. Agriculture and food processing (Round 12, ids AG1–AG32)
+## 12. Agriculture and food processing (Round 12, ids AG1–AG39; B–D add AG40+)
 
 Added with `docs/prd/round-12.md`. It covers farmer producer organisations and co-operatives, dairies and milk
 collection centres, rice / flour / dal / oil mills, cold storages, seed / fertiliser / pesticide dealers, and poultry /
@@ -728,6 +728,18 @@ fishery farms.
 | AG30 ★ | **Cold-storage revenue and custody.** Depositors' goods are never in our stock or balance sheet; rent is billed at release (default), monthly, at season end or in advance. (a) At the year end, should rent earned but not billed (goods still in store) be accrued as income? (b) Is insurance taken by the cold store on depositors' goods recoverable as part of rent (composite) or a pure-agent reimbursement? | (a) Memo of unbilled rent shown; no auto-accrual; (b) part of rent (composite) by default. | `agri/ag-cold-rent.ts` | — | — |
 | AG31 | **Poultry and fishery.** Live poultry, eggs and fresh fish nil; frozen / packed meat and fish 5%? Feed for poultry / fish nil. Is poultry or fish farming income ever agricultural income (AG15 says no)? Any TDS on purchases of chicks / fingerlings (none assumed)? | As stated; batches with FCR are a memo on a cost centre. | `AGRI_CLASS_RULES` (`live_poultry`, `eggs`, `fish_fresh`); `agri/ag-batches.ts` | — | Recalled |
 | AG32 | **Credit till harvest.** A dealer selling seeds (nil) and fertiliser (5%) on credit due at harvest charges interest after the due date: interest for delayed payment is part of the value (Sec 15(2)(d), G6), so nil on seeds and 5% on fertiliser — right? On a mixed bill, is the interest split by line value? | Interest notes take each bill's line rates (existing TR18 behaviour), split by line value on a mixed bill. | `trade/tr-interest.ts` (season due date); `agri/ag-season-credit.ts` | — | Sec 15(2)(d) (developers' reading) |
+
+### 12.5 Added while building AG-A (profile, farmers, vouchers, cycles, paper)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| AG33 | **Where the feed set-off lands in the books.** The app posts a set-off receipt (`exchange_purchase_id`) as Dr Sundry creditors (party = the farmer) / Cr Debtors (the R9 posting rule), so the cycle's journal is Dr pooled vendor / Cr Sundry creditors (party = the farmer) — not a separate "Sundry creditors — exchange" ledger as AG27 described. Is this presentation acceptable (both sides clear inside Sundry creditors)? | As stated. | `agri/ag-cycle-post.ts` `closeCycle`; `ledger/postings.ts` (unchanged) | — | — (design) |
+| AG34 | **Quality cuts and recovered charges on the voucher value.** A moisture / foreign-matter cut reduces the accepted weight (line quantity) or the rate; hamali / bardana recovered from the farmer is a less-line on the voucher. So the GSTR-3B Table 5 exempt-inward value is the net voucher value. Should Table 5 show the gross produce value instead, with the recovered charges as our income? | Net voucher value. | `agri/ag-vouchers.ts`; `gst-reports.ts` Table 5 (unchanged) | — | — (design) |
+| AG35 | **Mandi fee paid by the buyer.** Market fee / RDF / commission "paid by us" are printed on the farmer voucher as a memo only; the user books them as an expense (or to the mandi payable). Is it right that they are not part of the purchase value of the produce (stock cost)? Should they be capitalised into the stock cost (AS 2)? | Memo on the voucher; booked separately as an expense. | `agri/ag-vouchers.ts` (charges `by: 'us'`) | — | AS 2 (developers' reading) |
+| AG36 | **Rule 6DD(e) on a pooled cash payment.** A cycle's cash farmers are paid by one cash payment on the pooled bill (the total may exceed ₹10,000 although each farmer's share is smaller). The app shows the Rule 6DD(e) note, never the Sec 40A(3) warning, for payments to a farmer vendor or a pooled farmer cycle. Is the per-farmer split on the cycle (with each farmer's acknowledgement) enough evidence? | As stated. | `agri/ag-cash.ts`; `retail/rt-cash-guard.ts` `cashPaymentIssue` | 2017-04-01 | IT Rules 1962 Rule 6DD(e) |
+| AG37 | **A farmer's net below zero.** When deductions exceed a farmer's milk / produce money, the net is paid as zero and the excess is carried to his next cycle as a deduction (memo on the cycle rows; no debtor is booked in between). Is it acceptable that the receivable sits only on the cycle until the next close, or must it be booked as a debtor at the cycle end (year end at least)? | Memo carry-forward; reviewed at year end. | `agri/ag-cycles.ts` `lineNet`, `carriedIn` | — | — (design) |
+| AG38 | **Bonus / price difference run.** The year-end run computes ₹ per unit on each farmer's cycle quantity and exports a CSV; the journal (price difference to purchase cost, or patronage to appropriation, AG25) is entered by the user. Should the run post a draft journal itself, and should the bonus be spread over the farmers' bills of the year (for 194Q totals)? | CSV working only; journal by the user. | `agri/ag-cycles.ts` `bonusRun`; Farm → Cycles | — | — (design) |
+| AG39 | **Farm batches and agricultural income.** A flock / pond / herd / crop batch is a cost centre with a memo (mortality %, FCR, cost per kg); no posting from events. The "Agricultural income (exempt)" ledger is offered only for own cultivation. Is a separate ledger enough for the return (Schedule EI), or should exempt agricultural income also be kept out of the P&L totals the app shows? | Separate ledger under Other income; P&L shows it. | `agri/ag-batches.ts`; `agri/ag-cycle-post.ts` `agriIncomeLedger` | — | IT Act 1961 Sec 10(1) / 2025 Act Sec 11 (as reported, AG15) |
 
 ## Answers log
 

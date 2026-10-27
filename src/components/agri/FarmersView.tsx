@@ -12,7 +12,8 @@ import { aadhaarProblem, duplicateWarnings, farmerBalances, farmersCsv, importFa
 import { readAgriSettings, saveAgriSettings } from '../../lib/agri/ag-settings';
 import type { AgCentre, FarmerCycle } from '../../types/agri-r12';
 import controls from '../../styles/controls.module.css';
-import { F, Grid, In, money, useRun, wrap, type Done } from './agri-ui';
+import { F, Grid, In } from './agri-ui';
+import { money, useRun, wrap, type Done } from './agri-util';
 
 const FarmerCard = lazy(() => import('./FarmerCard'));
 type Form = { id?: string; name: string; code: string; village: string; centre_id: string; member_no: string; member: boolean; phone: string; account: string; ifsc: string; upi: string; aadhaar_last4: string; language: string };

@@ -7,7 +7,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { agT } from '../../i18n/areas/agri-r12a';
 import controls from '../../styles/controls.module.css';
-import type { Done } from './agri-ui';
+import type { Done } from './agri-util';
 
 const VIEWS = {
   farmers: lazy(() => import('./FarmersView')),

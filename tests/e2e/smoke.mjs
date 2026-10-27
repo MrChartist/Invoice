@@ -4001,6 +4001,87 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+  await step('R12-A agri desk: Settings → Agriculture profile → Mill (rice) → agri + mill packs, the Farm and Mill desks; a farmer F-0001 (Aadhaar refuses 5 digits); a Paddy cut table; an FPV voucher of 52 bags with moisture 19% on a 17% norm prints the 2% cut row and "Purchased from an agriculturist"; ₹15,000 cash to the farmer shows Rule 6DD(e), not 40A(3); a plain invoice is unchanged; Ctrl+K "farmers"; help', async () => {
+    const keys = ['settings', 'agri_settings', 'vendors', 'purchases', 'purchase_payments', 'quality_cut_tables', 'series_counters', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'manufacturer', modules: undefined, industry_packs: undefined, agri_kind: undefined, mill_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'agri_settings', null);
+    await writeJson(page, 'vendors', (prev.vendors ?? []).filter((v) => !v.ag));
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-agri-kind-card="mill"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.agri_kind === 'mill');
+    check(st.agri_kind === 'mill' && st.mill_kind === 'rice' && st.business_type === 'manufacturer' && ['agri', 'mill', 'commodity'].every((x) => st.industry_packs?.includes(x)), `Mill (rice): manufacturer + agri / mill packs (${st.industry_packs})`);
+    await page.goto(srv.origin + '/inventory?tab=farm&view=farmers');
+    await page.locator('[data-farm-desk]').waitFor({ timeout: 15000 });
+    const tabs = await page.locator('body').innerText();
+    check(/\bFarm\b/.test(tabs) && /\bMill\b/.test(tabs) && !/\bDairy\b/.test(tabs), 'Inventory shows the Farm and Mill desks, not Dairy');
+    await page.locator('[data-ag-add-farmer]').click();
+    await page.locator('[data-ag-farmer-name]').fill('E2E Ram Lal');
+    await page.locator('[data-ag-aadhaar]').fill('12345');
+    await page.locator('[data-ag-warn]').first().waitFor({ timeout: 5000 });
+    await page.locator('[data-ag-save-farmer]').click();
+    check((await readJson(page, 'vendors', [])).every((v) => v.name !== 'E2E Ram Lal'), 'five Aadhaar digits are refused');
+    await page.locator('[data-ag-aadhaar]').fill('1234');
+    await page.locator('[data-ag-save-farmer]').click();
+    const farmer = (await readJson(page, 'vendors', [], (v) => v.some((x) => x.name === 'E2E Ram Lal'))).find((x) => x.name === 'E2E Ram Lal');
+    check(farmer?.ag?.code === 'F-0001' && farmer.ag.aadhaar_last4 === '1234' && farmer.principal_kind === 'agriculturist', `farmer F-0001 saved as an agriculturist (${farmer?.ag?.code})`);
+    await page.goto(srv.origin + '/inventory?tab=farm&view=quality');
+    await page.locator('[data-ag-q-commodity]').fill('Paddy', { timeout: 15000 });
+    await page.locator('[data-ag-q-norm]').fill('17');
+    await page.locator('[data-ag-q-per]').fill('1');
+    await page.locator('[data-ag-q-save]').click();
+    const qt = (await readJson(page, 'quality_cut_tables', [], (v) => v.length > 0))[0];
+    check(qt?.commodity === 'Paddy', 'the Paddy cut table is saved');
+    await page.goto(srv.origin + '/inventory?tab=farm&view=vouchers');
+    await page.locator('[data-ag-v-farmer]').selectOption(farmer.id, { timeout: 15000 });
+    await page.locator('[data-ag-v-table]').selectOption(qt.id);
+    await page.locator('[data-ag-v-item]').fill('Paddy');
+    await page.locator('[data-ag-v-bags]').fill('52');
+    await page.locator('[data-ag-v-gross]').fill('2640');
+    await page.locator('[data-ag-v-tare]').fill('0.5');
+    await page.locator('[data-ag-v-rate]').fill('2300');
+    await page.locator('[data-ag-v-reading="moisture"]').fill('19');
+    await page.locator('[data-ag-cut-row]').first().waitFor({ timeout: 5000 });
+    check(/19% \(\S+ 17%\) → 2% = 52\.28 kg/.test(await page.locator('[data-ag-cut-row]').first().innerText()), 'the moisture cut row: 19% on a 17% norm → 2% = 52.28 kg');
+    check(/Purchased from an agriculturist/.test(await page.locator('[data-ag-declaration]').innerText()), 'the agriculturist declaration');
+    await page.locator('[data-ag-save-voucher]').click();
+    const bill = (await readJson(page, 'purchases', [], (v) => v.some((b) => b.ag?.voucher))).find((b) => b.ag?.voucher);
+    check(/^FPV\/FY\d\d-\d\d\/0001$/.test(bill?.bill_number ?? '') && bill.lines[0].quantity === 25.617 && bill.cgst === 0, `FPV voucher in our series, accepted weight as quantity, no GST (${bill?.bill_number} ${bill?.lines?.[0]?.quantity})`);
+    await page.locator('[data-ag-pay]').first().click();
+    await page.locator('[data-ag-pay-amount]').fill('15000');
+    const note = await page.locator('[data-ag-cash-note]').innerText({ timeout: 5000 });
+    check(/Rule 6DD\(e\)/.test(note) && !/40A\(3\)/.test(note), 'cash ₹15,000 to the farmer: Rule 6DD(e) note, no 40A(3) warning');
+    await page.locator('[data-ag-pay-save]').click();
+    check((await readJson(page, 'purchase_payments', [], (v) => v.some((x) => x.purchase_id === bill.id))).some((x) => x.purchase_id === bill.id && x.amount === 15000), 'the payment is recorded');
+    // A plain invoice prints no agri part.
+    const plain = (await readJson(page, 'invoices', [])).find((i) => i.doc_type === 'INVOICE' && !i.ag && i.status !== 'Cancelled');
+    if (plain) {
+      await page.goto(srv.origin + '/invoice/' + plain.id);
+      await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+      const d2 = page.getByRole('dialog', { name: 'Document preview' });
+      await d2.waitFor();
+      check(await d2.locator('[data-agri-block], [data-agri-statement]').count() === 0, 'a plain invoice prints unchanged (no agri part)');
+      await page.keyboard.press('Escape');
+      await d2.waitFor({ state: 'detached' });
+    }
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('farmers');
+    await palette.getByRole('option', { name: /Farmers/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "farmers" finds Inventory → Farm → Farmers');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/inventory?tab=farm&view=vouchers');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="inventory:farm"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a farm topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {
