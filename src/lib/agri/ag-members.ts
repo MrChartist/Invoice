@@ -16,7 +16,9 @@ import { requireAccess } from '../access';
 import { generateId, getTable, setTable, KEYS } from '../storage';
 import { nextSeriesNumberFor, recordSeries } from '../series-counters';
 import { withTablesRollback } from '../table-txn';
-import { A } from '../ledger/accounts';
+import { A, chartOf, loadUserAccounts } from '../ledger/accounts';
+import { loadLedger } from '../ledger/index';
+import { closingBalances } from '../ledger/reports';
 import { deleteVoucher } from '../ledger/vouchers';
 import { ensureLedger, postPair } from '../trade/tr-ledger';
 import { AG_SERIES, AG_TABLES } from './ag-shared';
@@ -75,16 +77,30 @@ export function registerAt(members: readonly Member[], rows: readonly MemberShar
   });
 }
 
-/** Application money a member has from the pooled cycles' `share` deductions (AG-A4), less what allotments used. */
-export function applicationMoney(memberIds: readonly string[], cycles: readonly unknown[], rows: readonly MemberShareRow[]): number {
-  const ids = new Set(memberIds.filter(Boolean));
+/**
+ * Application money a member has from the pooled cycles' `share` deductions (AG-A4), less what allotments used.
+ * `null` ids = every farmer (the cycle money of all members together).
+ */
+export function applicationMoney(memberIds: readonly string[] | null, cycles: readonly unknown[], rows: readonly MemberShareRow[]): number {
+  const ids = memberIds && new Set(memberIds.filter(Boolean));
+  const has = (id: string | undefined) => !ids || ids.has(id ?? '');
   let got = 0;
   for (const c of cycles as { status?: string; lines?: { farmer_id?: string; deductions?: { kind?: string; amount?: number }[] }[] }[]) {
     if (!c || c.status === 'draft') continue;
-    for (const l of c.lines ?? []) if (ids.has(l.farmer_id ?? '')) for (const d of l.deductions ?? []) if (d.kind === 'share') got += num(d.amount);
+    for (const l of c.lines ?? []) if (has(l.farmer_id)) for (const d of l.deductions ?? []) if (d.kind === 'share') got += num(d.amount);
   }
-  const used = rows.filter((r) => ids.has(r.member_id) && r.kind === 'allot' && r.paid_from === 'application').reduce((s, r) => s + num(r.amount), 0);
+  const used = rows.filter((r) => has(r.member_id) && r.kind === 'allot' && r.paid_from === 'application').reduce((s, r) => s + num(r.amount), 0);
   return round2(got - used);
+}
+
+/**
+ * QA13: what an allotment from application money may use. The ledger's credit balance is the ceiling (receipts may also
+ * feed it, not only cycles); cycle money is the member's own, so another member's unused cycle money is held back and
+ * only the unattributed rest (ledger − all members' cycle money, e.g. receipts) is open to anyone.
+ */
+export function applicationAvailable(ledgerBalance: number, member: number, all: number): number {
+  const l = Math.max(num(ledgerBalance), 0);
+  return round2(Math.max(Math.min(l, Math.max(num(member), 0) + Math.max(l - Math.max(num(all), 0), 0)), 0));
 }
 
 /** Share certificate (A5). */
@@ -124,6 +140,13 @@ export function allotShares(m: Member, i: { date: string; shares: number; face_v
   requireAccess('books.edit');
   const all = loadShares();
   const row = base(m, i.date, i.shares, i.face_value);
+  if (i.paid_from === 'application') {
+    const cycles = getTable('farmer_cycles');
+    const acc = chartOf(loadUserAccounts()).find((a) => a.name.trim().toLowerCase() === APPLICATION_LEDGER.toLowerCase());
+    const bal = acc ? round2(Math.max(-(closingBalances(loadLedger(), i.date).get(acc.id) ?? 0), 0) / 100) : 0;
+    const avail = applicationAvailable(bal, applicationMoney([m.id, m.other_id ?? ''], cycles, all), applicationMoney(null, cycles, all));
+    if (row.amount - avail > 0.004) throw new Error(`Only ₹${avail.toFixed(2)} of share application money is available for ${m.name} on ${i.date} (₹${bal.toFixed(2)} in "${APPLICATION_LEDGER}"); record the application money first or allot against bank / cash.`);
+  }
   const number = nextSeriesNumberFor(AG_SERIES.shc, i.date, all.map((r) => r.certificate_no ?? '').filter(Boolean));
   return withTablesRollback([SHARES_TABLE, 'vouchers', 'accounts', 'series_counters'], () => {
     const cap = ledger(CAPITAL_LEDGER, 'CAPITAL', 1060);
