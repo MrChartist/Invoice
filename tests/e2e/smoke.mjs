@@ -3469,6 +3469,118 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+
+  await step('R11-B contractor finance: a contract with water + electricity, a mobilisation advance at 10% and a secured advance on 100 bags; RA 2 recovers advance + interest + secured + client material; Advances balance ₹0; escalation → supplementary bill with the working page; recovery receipts move no cash; a PBG expiring in 20 days rings the bell', async () => {
+    const keys = ['settings', 'construction_settings', 'invoices', 'transactions', 'clients', 'advances', 'vouchers', 'accounts', 'bank_accounts', 'doc_links', 'series_counters', 'ra_measurements', 'works_contracts', 'secured_advances', 'price_variations', 'bank_guarantees', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const day = (n) => page.evaluate((x) => { const d = new Date(); d.setDate(d.getDate() + x); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }, n);
+    const today = await day(0);
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'contractor', modules: undefined, industry_packs: ['works'], construction_kind: 'civil', lock_until: undefined });
+    await writeJson(page, 'construction_settings', { views: { contracts: true, advances: true, escalation: true, guarantees: true } });
+    const dept = { id: 'e2e-cnb-dept', name: 'E2E CPWD Division 2', email: '', address: 'Mumbai', city: 'Mumbai', zip: '', state_code: '27' };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), dept]);
+    const boq = {
+      id: 'e2e-cnb-boq', invoice_number: 'SO/E2E/0021', doc_type: 'SALES_ORDER', issue_date: await day(-90), due_date: await day(-60), status: 'Sent', currency: 'INR', template_id: 'classic_orange',
+      client: dept, sender: (prev.settings?.profiles ?? [])[0] ?? null,
+      items: [
+        { id: 'e2e-cnb-l1', name: 'Earthwork excavation', boq_ref: '2.1', type: 'Service', hsn: '995411', unit: 'CUM', quantity: 1000, rate: 250, tax_rate: 18, discount_percent: 0, amount: 250000 },
+        { id: 'e2e-cnb-l2', name: 'PCC 1:4:8', boq_ref: '2.2', type: 'Service', hsn: '995411', unit: 'CUM', quantity: 200, rate: 4500, tax_rate: 18, discount_percent: 0, amount: 900000 },
+      ],
+      gst_mode: 'CGST_SGST', place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false,
+      amount_paid: 0, notes: '', terms: '', subtotal: 1150000, discount_amount: 0, taxable_value: 1150000, cgst_amount: 103500, sgst_amount: 103500, igst_amount: 0, tax_amount: 207000, round_off: 0, total: 1357000, balance_due: 1357000,
+      boq_terms: { deductions: [{ kind: 'retention', rate: 5 }] },
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), boq]);
+    const adv = { id: 'e2e-cnb-adv', number: 'ADV/E2E/0001', date: await day(-60), client: { id: dept.id, name: dept.name }, place_of_supply: '27', supply: 'services', tax_rate: 18, amount: 115000, method: 'Bank transfer', tax: { applies: true, supply_type: 'INTRA', taxable: 97457.63, igst: 0, cgst: 8771.19, sgst: 8771.18 }, created_at: new Date().toISOString() };
+    await writeJson(page, 'advances', [...(prev.advances ?? []), adv]);
+    // B1: the contract.
+    await page.goto(srv.origin + '/time?tab=works&view=contracts');
+    await page.locator('[data-cn-new-contract]').click({ timeout: 15000 });
+    await page.locator('[data-cn-f="client_id"]').selectOption(dept.id);
+    await page.locator('[data-cn-f="boq_id"]').selectOption(boq.id);
+    for (const [k, v] of [['name_of_work', 'E2E road SH-4'], ['agreement_no', 'AG/E2E/4'], ['contract_value', '1150000'], ['water_pct', '1'], ['power_pct', '1']]) await page.locator(`[data-cn-f="${k}"]`).fill(v);
+    await page.locator('[data-cn-save-contract]').click();
+    const contract = (await readJson(page, 'works_contracts', [], (v) => v?.some((c) => c.boq_id === boq.id))).find((c) => c.boq_id === boq.id);
+    check(contract?.agreement_no === 'AG/E2E/4' && contract?.water_pct === 1, 'the contract is saved against its BOQ');
+    await page.locator('[data-cn-row="AG/E2E/4"]').waitFor();
+    // B2: link the advance (10% interest) and record a secured advance on 100 bags.
+    await page.locator('[data-tw-view="advances"]').click();
+    await page.locator('[data-cn-f="advance_id"]').selectOption(adv.id, { timeout: 15000 });
+    await page.locator('[data-cn-adv-link]').click();
+    await readJson(page, 'works_contracts', [], (v) => v?.some((c) => c.advance_terms?.length));
+    for (const [k, v] of [['description0', 'Cement'], ['qty0', '100'], ['unit0', 'bag'], ['rate0', '400']]) await page.locator(`[data-cn-f="${k}"]`).fill(v);
+    await page.locator('[data-cn-sa-save]').click();
+    const sa = (await readJson(page, 'secured_advances', [], (v) => v?.length > 0))[0];
+    check(sa?.amount === 30000, `secured advance 75% of ₹40,000 = ₹30,000 (${sa?.amount})`);
+    // RA 1 and RA 2 (RA 2 recovers the advance on schedule, interest, the secured advance and client cement).
+    await page.locator('[data-tw-view="ra"]').click();
+    await page.locator('[data-ra-cum="2.1"]').fill('400', { timeout: 15000 });
+    await page.locator('[data-ra-save]').click();
+    await readJson(page, 'invoices', [], (v) => v.some((d) => d.boq_id === boq.id && d.ra_no === 1));
+    await page.locator('[data-ra-cum="2.2"]').fill('100');
+    await page.locator('[data-cn-recoveries] summary').click();
+    await page.locator('[data-cn-f="kind0"]').selectOption('secured_advance');
+    await page.locator('[data-cn-f="ref0"]').selectOption(sa.id);
+    await page.locator('[data-cn-f="qty0"]').fill('100');
+    await page.locator('[data-cn-rec-add]').click();
+    await page.locator('[data-cn-f="kind1"]').selectOption('material_recovery');
+    await page.locator('[data-cn-f="qty1"]').fill('10');
+    await page.locator('[data-cn-f="rate1"]').fill('450');
+    await page.locator('[data-ra-save]').click();
+    const ra2 = (await readJson(page, 'invoices', [], (v) => v.some((d) => d.boq_id === boq.id && d.ra_no === 2))).find((d) => d.boq_id === boq.id && d.ra_no === 2);
+    const by = (k) => (ra2?.ra_deductions ?? []).find((d) => d.kind === k)?.amount ?? 0;
+    const ra1 = (await readJson(page, 'invoices', [])).find((d) => d.boq_id === boq.id && d.ra_no === 1);
+    const interest = (ra1?.ra_deductions ?? []).find((d) => d.kind === 'advance_interest')?.amount ?? 0;
+    check(by('advance_recovery') > 0 && interest > 0, `mobilisation advance: RA 2 recovers ${by('advance_recovery')} (10%→80% schedule), interest ${interest} on the balance`);
+    check(by('secured_advance') === 30000 && by('material_recovery') === 4500 && by('water_power') === 9000, `RA 2: secured ₹30,000, cement ₹4,500, water + electricity 2% ₹9,000 (${by('secured_advance')} ${by('material_recovery')} ${by('water_power')})`);
+    check(ra2?.total === 531000, 'GST on the full value (₹4,50,000 + 18%)');
+    await page.locator('[data-tw-view="advances"]').click();
+    const bal = (await page.locator('[data-cn-sa-balance]').first().innerText({ timeout: 15000 })).trim();
+    check(/₹0\.00/.test(bal), `Works → Advances: secured advance balance ${bal}`);
+    // B3: escalation → supplementary bill with the working page.
+    await page.locator('[data-tw-view="escalation"]').click();
+    await page.locator('[data-cn-f="s0"]').fill('100', { timeout: 15000 });
+    await page.locator('[data-cn-f="b0"]').fill('400');
+    await page.locator('[data-cn-pv-clause]').click();
+    await readJson(page, 'works_contracts', [], (v) => v?.some((c) => c.escalation?.components?.length === 1));
+    await page.locator('[data-cn-f="from"]').fill(await day(-1), { timeout: 15000 });
+    await page.locator('[data-cn-f="to"]').fill(today);
+    await page.locator('[data-cn-f="i:cement"]').fill('440');
+    await page.locator('[data-cn-pv-save]').click();
+    await page.locator('[data-cn-pv-bill]').click({ timeout: 15000 });
+    const pv = (await readJson(page, 'price_variations', [], (v) => v?.[0]?.status === 'billed'))[0];
+    check(pv?.amount === 46750, `PV = 0.85 × ₹5,50,000 × 10% = ₹46,750 (${pv?.amount})`);
+    await page.goto(srv.origin + '/invoice/' + pv.invoice_id);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.locator('[data-pv-working]').first().waitFor({ timeout: 15000 });
+    check(/Price variation statement PVB\/FY/.test(await dialog.innerText()), 'the working prints as the following page');
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+    // B4: recovery receipts (cement, water + electricity …) are recorded through the clearing account — no cash.
+    await page.goto(srv.origin + '/time?tab=works&view=retention');
+    const row = page.locator(`[data-ra-split="${ra2.invoice_number}"]`);
+    await row.waitFor({ timeout: 15000 });
+    for (let i = 0; i < 4; i++) {
+      const btn = row.getByRole('button', { name: 'Record deducted' }).first();
+      if (!(await btn.count())) break;
+      await btn.click();
+      await page.waitForTimeout(300);
+    }
+    const rows = (await readJson(page, 'transactions', [], (v) => v.filter((p) => p.invoice_id === ra2.id && p.ra_journal_id).length >= 3)).filter((p) => p.invoice_id === ra2.id);
+    check(rows.some((p) => p.ra_kind === 'material_recovery') && rows.some((p) => p.ra_kind === 'water_power') && rows.every((p) => p.ra_journal_id || p.advance_id), 'recovery receipts carry their journal (no cash moved)');
+    // B5: a performance guarantee expiring in 20 days rings the bell.
+    await page.goto(srv.origin + '/time?tab=works&view=guarantees');
+    for (const [k, v] of [['bank', 'E2E Bank'], ['bg_no', 'PBG/E2E/1'], ['amount', '57500'], ['expires_on', await day(20)]]) await page.locator(`[data-cn-f="${k}"]`).fill(v, { timeout: 15000 });
+    await page.locator('[data-cn-bg-save]').click();
+    await page.locator('[data-cn-bg-row="PBG/E2E/1"]').waitFor();
+    await page.getByRole('button', { name: /^Notifications/ }).click();
+    await page.getByRole('dialog', { name: 'Notifications' }).getByText(/Bank guarantee PBG\/E2E\/1/).first().waitFor({ timeout: 15000 });
+    check(true, 'the bell lists the guarantee expiring in 20 days');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {
