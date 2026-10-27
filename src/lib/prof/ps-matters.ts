@@ -24,7 +24,7 @@ export const isOpen = (c: Pick<CostCentre, 'ps'>): boolean => !c.ps?.closed;
 export function clientCode(c: Pick<Client, 'name' | 'ps'> | undefined): string {
   const own = c?.ps?.code?.trim().toUpperCase();
   if (own) return own;
-  const words = (c?.name ?? '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').split(/\s+/).filter((w) => w && !['M', 'MS', 'THE', 'PVT', 'LTD', 'LLP', 'AND', 'CO'].includes(w));
+  const words = (c?.name ?? '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').split(/\s+/).filter((w) => w && !['M', 'S', 'MS', 'THE', 'PVT', 'LTD', 'LLP', 'AND', 'CO'].includes(w));
   const ini = words.map((w) => w[0]).join('').slice(0, 4);
   return ini.length >= 2 ? ini : (words[0] ?? 'MAT').slice(0, 3);
 }

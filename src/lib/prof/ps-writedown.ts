@@ -43,8 +43,12 @@ export function docBilling(inv: Pick<InvoiceRecord, 'items' | 'ps'>, entries: Re
   const list = [...shares.values()];
   const stdAll = list.reduce((s, e) => s + e.standard, 0);
   if (fee) list.forEach((e) => { e.billed += stdAll > 0 ? (fee * e.standard) / stdAll : fee / list.length; });
+  const total = round2(list.reduce((s, e) => s + e.billed, 0) || fee);
   for (const e of list) e.billed = round2(e.billed);
-  return { standard: round2(stdAll), billed: round2(list.length ? list.reduce((s, e) => s + e.billed, 0) : fee), entries: list };
+  // Rounding residue goes to the largest entry, so the shares add up to the note exactly.
+  const big = list.reduce<EntryShare | undefined>((m, e) => (!m || e.standard > m.standard ? e : m), undefined);
+  if (big) big.billed = round2(big.billed + total - list.reduce((s, e) => s + e.billed, 0));
+  return { standard: round2(stdAll), billed: total, entries: list };
 }
 
 /** Billed − standard (positive = write-up). */
