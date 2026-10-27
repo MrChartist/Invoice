@@ -11,7 +11,9 @@ import { LANGUAGES, isLang, setLanguage, useT } from '../../i18n';
 import { setupT } from '../../i18n/areas/setup';
 import { reachT } from '../../i18n/areas/reach';
 import { SHOP_MODE_EVENT, type BusinessType } from '../../lib/shop-mode';
-import { BUSINESS_DEFAULTS, BUSINESS_TYPES, RETAIL_PROFILES, TRADE_PROFILES, applyBusinessDefaults, applyRetailKind, applyTradeKind, isRetailKind, isTradeKind, type RetailKindId, type TradeKindId } from '../../lib/shop-presets';
+import { BUSINESS_DEFAULTS, BUSINESS_TYPES, CONSTRUCTION_PROFILES, RETAIL_PROFILES, TRADE_PROFILES, applyBusinessDefaults, applyConstructionKind, applyRetailKind, applyTradeKind, isConstructionKind, isRetailKind, isTradeKind, type ConstructionKindId, type RetailKindId, type TradeKindId } from '../../lib/shop-presets';
+import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
+import { cnPickT } from '../../i18n/areas/construction-r11-pick';
 import { TradeKindPicker } from '../trade/TradeKindPicker'; // R8-C (TR-C5)
 import { RetailKindPicker } from '../retail-r9/RetailKindPicker';
 import { pickT } from '../../i18n/areas/retail-r9-pick'; // R9 (RT-A1)
@@ -45,6 +47,13 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
   const pickRetail = (k: RetailKindId | '') => {
     setRetailKind(k);
     if (k) setA((prev) => ({ ...prev, templateId: RETAIL_PROFILES[k].templateId }));
+  };
+  // R11 (CN-A1): the construction business under "Contractor" (business type stays `contractor`).
+  const [cnKind, setCnKind] = useState<ConstructionKindId | ''>(() => (isConstructionKind(localDb.settings.get().construction_kind) ? (localDb.settings.get().construction_kind as ConstructionKindId) : ''));
+  const [cnGov, setCnGov] = useState(false);
+  const pickConstruction = (k: ConstructionKindId | '') => {
+    setCnKind(k);
+    if (k) setA((prev) => ({ ...prev, templateId: CONSTRUCTION_PROFILES[k].templateId }));
   };
   const { lang } = useT();
   const pickBusiness = (b: BusinessType) => {
@@ -83,15 +92,18 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
     try {
       const trade = business === 'wholesale' && tradeKind ? tradeKind : null; // R8-C
       const retail = business === 'kirana' && retailKind ? retailKind : null; // R9 (RT-A1)
+      const cons = business === 'contractor' && cnKind ? cnKind : null; // R11 (CN-A1)
       localDb.settings.save({
         ...applyBusinessDefaults(applyAnswers(localDb.settings.get(), a), business),
         ...(trade ? { ...applyTradeKind(trade), defaultDueDays: TRADE_PROFILES[trade].defaultDueDays } : {}),
         ...(retail ? { ...applyRetailKind(retail, { registered: a.gstRegistered }), defaultDueDays: RETAIL_PROFILES[retail].defaultDueDays } : {}),
+        ...(cons ? { ...applyConstructionKind(cons, { registered: a.gstRegistered }), defaultDueDays: CONSTRUCTION_PROFILES[cons].defaultDueDays } : {}),
       });
+      if (cons) void import('../../lib/construction/cn-profile').then((m) => m.applyConstructionSwitches(cons, { government: cnGov })).catch(() => undefined);
       if (retail) void import('../../lib/retail/rt-profile').then((m) => m.applyRetailSwitches(retail)).catch(() => undefined);
       window.dispatchEvent(new Event(SHOP_MODE_EVENT));
       localDb.template.set(a.templateId);
-      onClose(trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : BUSINESS_DEFAULTS[business].landing);
+      onClose(trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : BUSINESS_DEFAULTS[business].landing);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -205,6 +217,13 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
                 <span className={controls.label}>{pickT('retailTitle')}</span>
                 <span className={controls.hint}>{pickT('retailLede')}</span>
                 <RetailKindPicker value={retailKind} onPick={pickRetail} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
+              </div>
+            )}
+            {business === 'contractor' && (
+              <div className={controls.field} data-wizard-construction>
+                <span className={controls.label}>{cnPickT('title')}</span>
+                <span className={controls.hint}>{cnPickT('lede')}</span>
+                <ConstructionKindPicker value={cnKind} onPick={pickConstruction} government={cnGov} onGovernment={setCnGov} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
               </div>
             )}
             {/* QA-3 F20: the demo choice belongs on the first step, before any required field. */}

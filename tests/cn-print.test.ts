@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { setupWorks } from './helpers/transport-works.ts';
 import { saveBoqTerms } from '../src/lib/works/boq.ts';
 import { saveRaBill } from '../src/lib/works/measurements.ts';
-import { DEDUCTION_GROUP, deductionNotes, deductionsTotal, defaultCertificateFor, groupDeductions, netPayableOf, netPayableWords } from '../src/lib/construction/cn-print.ts';
+import { DEDUCTION_GROUP, deductionNotes, deductionsTotal, defaultCertificateFor, groupDeductions, netPayableOf } from '../src/lib/construction/cn-print.ts';
+import { amountInWords } from '../src/lib/amount-in-words.ts';
 import { DEDUCTION_LABELS } from '../src/lib/works/deductions.ts';
 import { certificateOf } from '../src/lib/construction/cn-snapshot.ts';
 import { DEFAULT_CERTIFICATE } from '../src/lib/construction-rules.ts';
@@ -32,7 +33,7 @@ test('net payable = total − Σ deductions = the stored ra_net_payable; words i
   assert.equal(netPayableOf(inv), inv.ra_net_payable);
   assert.equal(netPayableOf(inv), Math.round((inv.total - total) * 100) / 100);
   assert.equal(netPayableOf({ total: 1000, ra_deductions: [{ kind: 'retention', label: 'R', base: 1000, amount: 50 }] }), 950, 'fallback without a stored figure');
-  assert.equal(netPayableWords(876400), 'Rupees Eight Lakh Seventy Six Thousand Four Hundred Only');
+  assert.equal(amountInWords(876400), 'Rupees Eight Lakh Seventy Six Thousand Four Hundred Only', 'net payable words: the Indian system (the paper passes amountInWords)');
   const notes = deductionNotes(inv.ra_deductions, money);
   assert.equal(notes[0], 'GST is charged on the full bill value; deductions do not reduce it.');
   assert.ok(notes.some((n) => /GST TDS u\/s 51 \(₹2000\.00\).*GSTR-7/.test(n)), notes.join('|'));

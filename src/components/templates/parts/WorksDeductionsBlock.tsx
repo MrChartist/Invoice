@@ -1,9 +1,7 @@
 import type { InvoiceRecord, SenderProfile } from '../../../types/invoice';
-import { amountInWordsHi } from '../../../lib/amount-in-words-hi';
-import { cnDeclarations, deductionNotes, deductionsTotal, groupDeductions, netPayableOf, netPayableWords } from '../../../lib/construction/cn-print';
+import { cnDeclarations, deductionNotes, deductionsTotal, groupDeductions, netPayableOf } from '../../../lib/construction/cn-print';
 import { receivableTotal } from '../../../lib/rcm';
 import { usePaper } from '../paper-context';
-import { SupplyDeclaration } from './SupplyDeclaration';
 import { PL } from './works-label';
 import { pe } from './works-text';
 import styles from './works-paper.module.css';
@@ -15,7 +13,13 @@ import styles from './works-paper.module.css';
  * government work, the "Measured by / Checked by / Passed for payment" boxes. Every figure comes from the document's
  * snapshot (`ra_deductions`, `ra_net_payable`, `boq_terms.cn`), never recomputed at print.
  */
-export function WorksDeductionsBlock({ invoice, sender }: { invoice: InvoiceRecord; sender: SenderProfile }) {
+export function WorksDeductionsBlock({ invoice, sender, words, wordsHi }: {
+  invoice: InvoiceRecord;
+  sender: SenderProfile;
+  /** `amountInWords` / `amountInWordsHi`, passed by TemplateEngine (keeps them in the preview chunk). */
+  words: (amount: number, currency?: string) => string;
+  wordsHi: (amount: number, currency?: string) => string;
+}) {
   const { currency, show, bilingual: bi } = usePaper();
   const cur = invoice.currency;
   const m = (n: number) => currency(n, cur);
@@ -56,14 +60,18 @@ export function WorksDeductionsBlock({ invoice, sender }: { invoice: InvoiceReco
             </table>
             {show.words && (
               <div className={styles.words} data-net-words>
-                {pe('p.words')}: {netPayableWords(net, cur)}
-                {bi && <span className={styles.hi} lang="hi">{amountInWordsHi(net, cur)}</span>}
+                {pe('p.words')}: {words(net, cur)}
+                {bi && <span className={styles.hi} lang="hi">{wordsHi(net, cur)}</span>}
               </div>
             )}
           </div>
         </section>
       )}
-      {notes.map((n) => <SupplyDeclaration key={n} text={n} />)}
+      {notes.length > 0 && (
+        <div className={styles.declare} data-works-notes>
+          {notes.map((n) => <div key={n}>{n}</div>)}
+        </div>
+      )}
       {cert && (cert.text || cert.boxes) && (
         <section className={styles.cert} aria-label="Contractor's certificate" data-works-certificate>
           {cert.text && (

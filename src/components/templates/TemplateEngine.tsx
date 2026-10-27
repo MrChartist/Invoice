@@ -21,6 +21,8 @@ import { AcceptanceBlock } from './parts/AcceptanceBlock';
 import { OptionalItemsBlock } from './parts/OptionalItemsBlock';
 import { ProposalSections } from './parts/ProposalSections';
 import { cashDiscountText, rcmTaxNote } from './paper-helpers';
+import { amountInWords } from '../../lib/amount-in-words';
+import { amountInWordsHi } from '../../lib/amount-in-words-hi';
 import { supplyDeclaration } from '../../lib/bill-of-supply';
 import { buildIrnPrint, resolveEInvoiceMeta } from '../../lib/einvoice-print';
 import type { EInvoiceMeta } from '../../lib/einvoice';
@@ -147,7 +149,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
       {cnDoc.demand && <LazyDemand invoice={invoice} />}
     </Suspense>
   );
-  const worksDeds = cnDoc && <Suspense fallback={null}><LazyWorksDeds invoice={invoice} sender={sender} /></Suspense>;
+  const worksDeds = cnDoc && <Suspense fallback={null}><LazyWorksDeds invoice={invoice} sender={sender} words={amountInWords} wordsHi={amountInWordsHi} /></Suspense>;
 
   const layoutBody = (() => {
     // R2-B3: proposal sections and optional items wrap the ruled GST grid / the receipt.

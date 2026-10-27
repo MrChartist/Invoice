@@ -171,6 +171,19 @@
   color: var(--tpl-ink);
 }
 
+.declare {
+  margin: 8px 0 0;
+  padding: 5px 10px;
+  font-size: 9px;
+  color: var(--tpl-body);
+  border: 1px dashed var(--tpl-line);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  break-inside: avoid;
+}
+
 /* Certificate and sign-off boxes */
 .cert {
   margin: 12px 0 0;

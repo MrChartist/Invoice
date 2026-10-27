@@ -7,7 +7,6 @@ import type { InvoiceRecord } from '../../types/invoice';
 import type { RaDeduction, RaDeductionKind } from '../../types/transport-works-r5';
 import type { CnHeader, CnSnapshot, ConstructionKind } from '../../types/construction-r11';
 import { num, round2 } from '../invoice-calc';
-import { amountInWords } from '../amount-in-words';
 import { DEFAULT_CERTIFICATE } from '../construction-rules';
 import { worksDeclarations } from './cn-tax';
 
@@ -46,8 +45,6 @@ export function netPayableOf(inv: Pick<InvoiceRecord, 'total' | 'ra_net_payable'
   return inv.ra_net_payable !== undefined && Number.isFinite(Number(inv.ra_net_payable)) ? round2(num(inv.ra_net_payable)) : round2(num(inv.total) - deductionsTotal(inv.ra_deductions));
 }
 
-/** "Rupees Eight Lakh … Only" (Indian system, `amountInWords`). */
-export const netPayableWords = (amount: number, currency = 'INR'): string => amountInWords(amount, currency);
 
 /** Notes printed under the deductions (only for the rows that exist). `money` formats an amount. */
 export function deductionNotes(deds: readonly RaDeduction[] | undefined, money: (n: number) => string): string[] {
