@@ -47,7 +47,7 @@ let svBillCaution: ((bill: BillInput) => string) | null = null;
 export const setSvBillCaution = (fn: (bill: BillInput) => string): void => { svBillCaution = fn; };
 // R10 (SV-A4): a service company (profile or pack) loads the service hooks once — no shared chunk, nothing for others.
 const svOn = ((s) => !!s?.service_kind || (Array.isArray(s?.industry_packs) && s.industry_packs.some((p) => p === 'clinic' || p === 'salon' || p === 'fitness' || p === 'workshop')))(getJson<{ service_kind?: unknown; industry_packs?: unknown } | null>(SINGLETON_KEYS.settings, null));
-if (svOn) void import('./services/sv-hooks').catch(() => undefined);
+if (svOn) void import('./services/sv-hooks').then((m) => { svBillCaution ??= m.billCaution; }, () => undefined);
 
 export type GuardedSave =
   | { kind: 'warn'; message: string }

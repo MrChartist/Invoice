@@ -34,8 +34,9 @@ test('hosts load Round 10 code lazily', () => {
   assert.match(src('pages/Pos.tsx'), /const PosAppointment = lazy\(\(\) => import\('\.\.\/components\/services-r10\/PosAppointment'\)\);/);
   for (const f of ['components/onboarding/SetupWizard.tsx', 'components/settings/FeaturesPanel.tsx']) assert.match(src(f), /import\('\.\.\/\.\.\/lib\/services\/sv-profile'\)/, f);
   for (const f of ['lib/bill-guard.ts', 'lib/gst-guards.ts']) {
-    assert.match(src(f), /if \(svOn\) void import\('\.\/services\/sv-hooks'\)/, f);
+    assert.match(src(f), /if \(svOn\) void import\('\.\/services\/sv-hooks'\)\.then/, f);
     assert.ok(!/from '\.\/services\/sv-(tax|hooks)'/.test(src(f)), `${f} never imports the service engines statically`);
   }
+  assert.ok(!/from '\.\.\/(bill-guard|gst-guards)'/.test(src('lib/services/sv-hooks.ts')), 'no static cycle back to the hosts (no shared chunk)');
   assert.ok(!/services/.test(src('components/templates/paper-helpers.ts').split('\n').filter((l) => l.startsWith('import')).join('\n')), 'the paper reads only the snapshot');
 });

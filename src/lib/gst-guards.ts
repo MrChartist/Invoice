@@ -270,7 +270,7 @@ let svCheck: BandCheck | null = null;
 export const setSvExceptionCheck = (fn: BandCheck): void => { svCheck = fn; };
 // R10 (SV-A4): a service company (profile or pack) loads the service hooks once — no shared chunk, nothing for others.
 const svOn = ((s) => !!s?.service_kind || (Array.isArray(s?.industry_packs) && s.industry_packs.some((p) => p === 'clinic' || p === 'salon' || p === 'fitness' || p === 'workshop')))(getJson<{ service_kind?: unknown; industry_packs?: unknown } | null>(SINGLETON_KEYS.settings, null));
-if (svOn) void import('./services/sv-hooks').catch(() => undefined);
+if (svOn) void import('./services/sv-hooks').then((m) => { svCheck ??= m.svExceptions; }, () => undefined);
 
 /** GST exceptions for documents dated in [from, to]. Errors first, then by date. */
 export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOptions): GstException[] {
