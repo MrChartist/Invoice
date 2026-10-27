@@ -100,9 +100,12 @@ export function cleanExportFields(input: Partial<Record<ExportFieldKey, unknown>
 }
 
 /** Print labels (English: the document paper is English; the Design Studio has no overridable keys for these). */
-export const EXPORT_LABELS: Record<ExportFieldKey | 'iec' | 'ad_code', string> = {
+export const EXPORT_LABELS: Record<ExportFieldKey | 'iec' | 'ad_code' | 'swift' | 'iban' | 'intermediary_bank', string> = {
   iec: 'IEC',
   ad_code: 'AD code',
+  swift: 'SWIFT', // R14 (PS-A5): bank details for remittances, from the sender snapshot
+  iban: 'IBAN',
+  intermediary_bank: 'Intermediary bank',
   incoterm: 'Incoterms',
   pre_carriage: 'Pre-carriage by',
   vessel_flight: 'Vessel / flight no.',
@@ -115,7 +118,7 @@ export const EXPORT_LABELS: Record<ExportFieldKey | 'iec' | 'ad_code', string> =
 };
 
 export interface ExportPrintRow {
-  key: ExportFieldKey | 'iec' | 'ad_code';
+  key: ExportFieldKey | 'iec' | 'ad_code' | 'swift' | 'iban' | 'intermediary_bank';
   label: string;
   value: string;
 }
@@ -136,6 +139,7 @@ export function exportPrintRows(inv: Partial<InvoiceRecord>, sender?: Partial<Se
   if (exportDoc) {
     add('iec', sender?.iec);
     add('ad_code', sender?.ad_code ? `${sender.ad_code}${sender.ad_bank ? ` (${sender.ad_bank})` : ''}` : '');
+    for (const k of ['swift', 'iban', 'intermediary_bank'] as const) add(k, sender?.[k]); // R14 (PS-A5): export documents only
   }
   if (!fields) return rows;
   add('incoterm', inv.incoterm);

@@ -21,9 +21,13 @@ export async function demoExtras(profile: DemoProfile, ctx: ProfileContext): Pro
   const agri = ctx.packs.includes('agri') ? (await import('./profile-agri')).agriExtras(ctx) : {};
   // R13: a manufacturing Demo company (pack `shopfloor`) adds its rows (`profile-mfg.ts`, by pack; stock items appended).
   const mfg = ctx.packs.includes('shopfloor') ? (await import('./profile-mfg')).mfgExtras(ctx) : {};
-  if (!agri.tables && !mfg.tables) return base;
+  // R14: a professional Demo company (pack `practice`) adds its rows (`profile-prof.ts`, by pack; time entries appended).
+  const prof = ctx.packs.includes('practice') ? (await import('./profile-prof')).profExtras(ctx) : {};
+  if (!agri.tables && !mfg.tables && !prof.tables) return base;
   const stock = [...(base.tables?.stock_items ?? []), ...(agri.tables?.stock_items ?? []), ...(mfg.tables?.stock_items ?? [])];
-  return { ...base, tables: { ...base.tables, ...agri.tables, ...mfg.tables, ...(stock.length ? { stock_items: stock } : {}) } };
+  const time = [...(base.tables?.time_entries ?? []), ...(prof.tables?.time_entries ?? [])];
+  const staff = [...(base.tables?.service_staff ?? []), ...(prof.tables?.service_staff ?? [])];
+  return { ...base, tables: { ...base.tables, ...agri.tables, ...mfg.tables, ...prof.tables, ...(stock.length ? { stock_items: stock } : {}), ...(time.length ? { time_entries: time } : {}), ...(staff.length ? { service_staff: staff } : {}) } };
 }
 
 async function profileExtras(profile: DemoProfile, ctx: ProfileContext): Promise<DemoExtras> {

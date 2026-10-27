@@ -104,6 +104,7 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     sv: { rule46a: true, claim: { id: 'c1', number: 'CLM/FY26-27/0001', role: 'payer' } },
     ag: { kind: 'rent', rent: { lot_no: 'CSR/FY26-27/0001', bags_out: 60, exempt: true }, lines: { l1: { lot: 'CSR/FY26-27/0001', bags: 60, rate_bag: 180 } } }, // R12 (AG-A5)
     mf: { kind: 'drawing', header: { customer_po: 'PO-77' }, lines: { l1: { drawing: '1145-B', rev: 'C' } } }, // R13 (MF-A5)
+    ps: { kind: 'fee', matter: { id: 'cc1', code: 'RSK/014', name: 'Sec 138' }, engagement: { id: 'e1', number: 'ENG/26-27/0001', model: 'capped' }, basis: 'Capped at ₹40,000', wd: { standard: 58000, billed: 40000, reasons: [{ reason: 'Cap', amount: -18000 }] }, lines: { l1: { matter: 'RSK/014' } } }, // R14 (PS-A5)
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.
