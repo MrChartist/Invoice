@@ -10,7 +10,7 @@ import { clientTdsDefault } from '../../lib/prof/ps-tds-recv';
 import { patchClientPs } from '../../lib/prof/ps-ca-bill';
 import { profKind } from '../../lib/prof/ps-d-settings';
 import type { ClientTdsDefault } from '../../types/prof-r14d';
-import { Tbl } from '../mfg/mfd-ui';
+import { Tbl } from './ps-d-ui';
 import type { PsDeskCtx } from './ps-desk';
 import ChasePanel from './TdsChasePanel';
 import controls from '../../styles/controls.module.css';

@@ -10,3 +10,4 @@ export interface PsDeskCtx {
 }
 export const sm = `${controls.btnOutline} ${controls.btnSm}`;
 export const inr = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+export const row = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.75rem' } as const;

@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { useT } from '../../i18n';
 import { fdT } from '../../i18n/areas/prof-r14d-firm';
 import controls from '../../styles/controls.module.css';
-import { Views } from '../mfg/mfd-ui';
+import { Views } from './ps-d-ui';
 import PartnersView from './PartnersView';
 import AppropriationView from './AppropriationView';
 import Tds194tView from './Tds194tView';

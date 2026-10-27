@@ -13,9 +13,8 @@ import { presumptive } from '../../lib/prof/ps-presumptive';
 import { fyBounds } from '../../lib/prof/ps-partner-run';
 import { firmForm } from '../../lib/prof/ps-d-settings';
 import type { InvoiceRecord, Payment } from '../../types/invoice';
-import { Fld, Tbl } from '../mfg/mfd-ui';
-import { row } from '../mfg/mfd-util';
-import { inr } from './ps-desk';
+import { Fld, Tbl } from './ps-d-ui';
+import { inr, row } from './ps-desk';
 import controls from '../../styles/controls.module.css';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);

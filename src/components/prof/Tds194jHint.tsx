@@ -6,11 +6,12 @@
  */
 import { useEffect, useRef } from 'react';
 import { useT } from '../../i18n';
-import { fdT } from '../../i18n/areas/prof-r14d-firm';
+import { ptT } from '../../i18n/areas/prof-r14d-tds';
 import { localDb } from '../../lib/localDb';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { clientTdsDefault, expectedTds, feeBase } from '../../lib/prof/ps-tds-recv';
 import { firmForm, profKind } from '../../lib/prof/ps-d-settings';
+import { sectionText } from '../../lib/ita2025';
 import controls from '../../styles/controls.module.css';
 
 export default function Tds194jHint() {
@@ -29,5 +30,6 @@ export default function Tds194jHint() {
     s.setTds({ enabled: true, section: exp.code, rate: exp.rate, onTaxable: true });
   }, [exp?.applies, exp?.code, exp?.rate, isNew, s, client?.id]);
   if (!exp) return null;
-  return <p className={controls.hint} role="note" data-ps-tds-hint>{exp.message}{exp.applies ? ` ${fdT('expected')}: ₹${exp.amount}` : ''}</p>;
+  const section = sectionText(exp.code, s.issue_date);
+  return <p className={controls.hint} role="note" data-ps-tds-hint>{exp.applies ? ptT('onBase', { section, rate: exp.rate, base: exp.base, amount: exp.amount }) : ptT('notYet', { sofar: Math.round((exp.fyBefore + exp.base) * 100) / 100, limit: exp.threshold, section })}</p>;
 }

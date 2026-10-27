@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { useT } from '../../i18n';
 import { caT } from '../../i18n/areas/prof-r14d-ca';
 import controls from '../../styles/controls.module.css';
-import { Views } from '../mfg/mfd-ui';
+import { Views } from './ps-d-ui';
 import CaFeesView from './CaFeesView';
 import CaEventsView from './CaEventsView';
 import UdinView from './UdinView';

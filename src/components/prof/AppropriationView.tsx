@@ -7,9 +7,8 @@ import { sectionText } from '../../lib/ita2025';
 import { computeRun, type RunResult } from '../../lib/prof/ps-partner-run';
 import { loadRunInput, partnerStatements, postRun, reverseRun, yearEndRun } from '../../lib/prof/ps-partner-post';
 import { NumberInput } from '../ui/NumberInput';
-import { Fld, Tbl } from '../mfg/mfd-ui';
-import { row } from '../mfg/mfd-util';
-import { inr, sm, type PsDeskCtx } from './ps-desk';
+import { Fld, Tbl } from './ps-d-ui';
+import { inr, sm, type PsDeskCtx, row } from './ps-desk';
 import controls from '../../styles/controls.module.css';
 
 export default function AppropriationView({ ctx }: { ctx: PsDeskCtx }) {

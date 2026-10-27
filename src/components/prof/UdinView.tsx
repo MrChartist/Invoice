@@ -6,9 +6,8 @@ import { localDb } from '../../lib/localDb';
 import { UDIN_KINDS, deleteUdin, loadUdins, revokeUdin, saveUdin, udinProblems, unbilledUdins } from '../../lib/prof/ps-udin';
 import { readCaSettings } from '../../lib/prof/ps-d-settings';
 import type { UdinRow } from '../../types/prof-r14d';
-import { Fld, Tbl } from '../mfg/mfd-ui';
-import { row } from '../mfg/mfd-util';
-import { sm, type PsDeskCtx } from './ps-desk';
+import { Fld, Tbl } from './ps-d-ui';
+import { sm, type PsDeskCtx, row } from './ps-desk';
 import controls from '../../styles/controls.module.css';
 
 export default function UdinView({ ctx }: { ctx: PsDeskCtx }) {

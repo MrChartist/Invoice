@@ -6,9 +6,8 @@ import { A } from '../../lib/ledger/accounts';
 import { loadPartners, postDrawings, savePartner, saveRatio, shareProblems, termOn } from '../../lib/prof/ps-partners';
 import type { PartnerRemuneration } from '../../types/prof-r14d';
 import { NumberInput } from '../ui/NumberInput';
-import { Fld, Tbl } from '../mfg/mfd-ui';
-import { row } from '../mfg/mfd-util';
-import { inr, type PsDeskCtx } from './ps-desk';
+import { Fld, Tbl } from './ps-d-ui';
+import { inr, type PsDeskCtx, row } from './ps-desk';
 import controls from '../../styles/controls.module.css';
 
 const num = (v: number, on: (n: number) => void, k: string) => <NumberInput className={controls.input} style={{ maxWidth: 110 }} value={v} onChange={on} data-ps={k} />;

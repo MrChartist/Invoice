@@ -7,9 +7,8 @@ import { CA_FEE_EVENTS, clientFees, feeItems, patchClientPs, setFeeEvent } from 
 import { linkCompany, readCaSettings } from '../../lib/prof/ps-d-settings';
 import type { CaFeeEvent } from '../../types/prof-r14d';
 import { NumberInput } from '../ui/NumberInput';
-import { Fld, Tbl } from '../mfg/mfd-ui';
-import { row } from '../mfg/mfd-util';
-import type { PsDeskCtx } from './ps-desk';
+import { Fld, Tbl } from './ps-d-ui';
+import { row, type PsDeskCtx } from './ps-desk';
 import controls from '../../styles/controls.module.css';
 
 export default function CaFeesView({ ctx }: { ctx: PsDeskCtx }) {

@@ -8,9 +8,8 @@ import { KINDS_194T, creditPartner, loadPartnerRuns, register194t, undoPartnerRu
 import { loadPartners } from '../../lib/prof/ps-partners';
 import type { PartnerCreditKind } from '../../types/prof-r14d';
 import { NumberInput } from '../ui/NumberInput';
-import { Fld, Tbl } from '../mfg/mfd-ui';
-import { row } from '../mfg/mfd-util';
-import { inr, sm, type PsDeskCtx } from './ps-desk';
+import { Fld, Tbl } from './ps-d-ui';
+import { inr, sm, type PsDeskCtx, row } from './ps-desk';
 import controls from '../../styles/controls.module.css';
 
 export default function Tds194tView({ ctx }: { ctx: PsDeskCtx }) {

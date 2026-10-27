@@ -1,6 +1,6 @@
 /** PS-D3 certificates to chase (Form 131 / 16A) per client × quarter, with a chase letter (print, `wa.me`, `mailto:`). */
 import { useMemo } from 'react';
-import { fdT } from '../../i18n/areas/prof-r14d-firm';
+import { ptT } from '../../i18n/areas/prof-r14d-tds';
 import { todayInput } from '../../lib/utils';
 import { getTable } from '../../lib/storage';
 import { localDb } from '../../lib/localDb';
@@ -9,7 +9,7 @@ import { downloadText } from '../../lib/download';
 import { TDS_CERT_TABLE, buildTdsRegister, type TdsCertificate, type TdsRegister } from '../../lib/tds-register';
 import { chaseLetter, chaseList } from '../../lib/prof/ps-tds-recv';
 import type { Client, Payment } from '../../types/invoice';
-import { Tbl } from '../mfg/mfd-ui';
+import { Tbl } from './ps-d-ui';
 import { inr, sm } from './ps-desk';
 import controls from '../../styles/controls.module.css';
 
@@ -26,16 +26,16 @@ export default function ChasePanel({ reg, clients }: { reg?: TdsRegister; client
   const cl = clients ?? localDb.clients.getAll();
   return (
     <section data-ps-chase>
-      <p className={controls.label}>{fdT('chase')}</p>
-      <Tbl empty={fdT('none')} head={[fdT('client'), fdT('quarter'), fdT('due'), fdT('tds'), '']} rows={list.map((r) => {
+      <p className={controls.label}>{ptT('chase')}</p>
+      <Tbl empty={ptT('none')} head={[ptT('client'), ptT('quarter'), ptT('due'), ptT('tds'), '']} rows={list.map((r) => {
         const text = chaseLetter(r, firm);
         const c = cl.find((x) => x.id === r.partyKey);
         const phone = String(c?.phone ?? '').replace(/\D/g, '');
-        return [r.partyName, `Q${r.quarter} FY${String(r.fy).slice(2)}`, `${r.due}${r.overdue ? ` · ${fdT('overdue')}` : ''}`, inr(r.tds),
+        return [r.partyName, `Q${r.quarter} FY${String(r.fy).slice(2)}`, `${r.due}${r.overdue ? ` · ${ptT('overdue')}` : ''}`, inr(r.tds),
           <span key="a">
-            <button type="button" className={sm} onClick={() => printHtmlDocument(`<!doctype html><meta charset="utf-8"><pre style="font:14px/1.5 sans-serif;white-space:pre-wrap">${esc(text)}</pre>`, (h) => downloadText('tds-chase.html', h, 'text/html'))} data-ps-b="chase-letter">{fdT('letter')}</button>
-            <a className={sm} href={`https://wa.me/${phone.length === 10 ? `91${phone}` : phone}?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer">{fdT('whatsapp')}</a>
-            <a className={sm} href={`mailto:${c?.email ?? ''}?subject=${encodeURIComponent(`TDS certificate Q${r.quarter}`)}&body=${encodeURIComponent(text)}`}>{fdT('email')}</a>
+            <button type="button" className={sm} onClick={() => printHtmlDocument(`<!doctype html><meta charset="utf-8"><pre style="font:14px/1.5 sans-serif;white-space:pre-wrap">${esc(text)}</pre>`, (h) => downloadText('tds-chase.html', h, 'text/html'))} data-ps-b="chase-letter">{ptT('letter')}</button>
+            <a className={sm} href={`https://wa.me/${phone.length === 10 ? `91${phone}` : phone}?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer">{ptT('whatsapp')}</a>
+            <a className={sm} href={`mailto:${c?.email ?? ''}?subject=${encodeURIComponent(`TDS certificate Q${r.quarter}`)}&body=${encodeURIComponent(text)}`}>{ptT('email')}</a>
           </span>];
       })} />
     </section>

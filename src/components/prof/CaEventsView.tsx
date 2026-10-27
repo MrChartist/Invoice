@@ -11,9 +11,8 @@ import { loadUdins } from '../../lib/prof/ps-udin';
 import { readCaSettings } from '../../lib/prof/ps-d-settings';
 import type { CaFeeEvent } from '../../types/prof-r14d';
 import type { InvoiceRecord } from '../../types/invoice';
-import { Fld, Tbl } from '../mfg/mfd-ui';
-import { row } from '../mfg/mfd-util';
-import { sm, type PsDeskCtx } from './ps-desk';
+import { Fld, Tbl } from './ps-d-ui';
+import { sm, type PsDeskCtx, row } from './ps-desk';
 import controls from '../../styles/controls.module.css';
 
 export default function CaEventsView({ ctx }: { ctx: PsDeskCtx }) {
