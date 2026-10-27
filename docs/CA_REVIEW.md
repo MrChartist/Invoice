@@ -42,9 +42,9 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 7. Hotel and lodging pack (Round 7, planned) | HT1–HT17 | 17 | 6 |
 | 8. Trading businesses (Round 8, planned) | TR1–TR22 | 22 | 8 |
 | 9. Retail shops (Round 9, planned) | RT1–RT22 | 22 | 8 |
-| 10. Service businesses (Round 10, planned) | SV1–SV24 | 24 | 9 |
+| 10. Service businesses (Round 10, planned) | SV1–SV26 | 26 | 9 |
 | 11. Construction (Round 11, planned) | CN1–CN31 | 31 | 10 |
-| **Total** | | **276** | **75** |
+| **Total** | | **278** | **75** |
 
 ---
 
@@ -501,7 +501,7 @@ and mobiles, and jewellery.
 | RT21 | **Stock valuation for jewellers.** Tags valued at cost (metal at purchase rate by fine weight + making paid). Old gold at its purchase value. Year-end at the lower of cost and NRV (AS 2). Is valuation by fine weight at the year-end rate (a common trade practice) acceptable instead? How should metal held by karigars (wip godown) be shown? | The books' valuation method is unchanged (existing engine). Karigar metal is shown as stock with job workers. | `retail/rt-karigar.ts`; `ledger/closing-stock.ts` (existing) | — | AS 2 (developers' reading) |
 | RT22 | **e-Way bill for jewellery.** Under the Rule 138(14) annexure, Chapter 71 goods (precious metals, jewellery) need no e-Way bill. The app suppresses the e-Way prompt only when every goods line on the bill is Chapter 71. Is the exemption still current? Does it cover silver articles and imitation jewellery (7117)? | As stated. 7117 is not treated as exempt. | `retail-rules.ts` `EWAY_EXEMPT_CHAPTER_RULES` | 2017-07-01 | Rule 138(14) annexure (recalled) |
 
-## 10. Service businesses (Round 10, ids SV1–SV24)
+## 10. Service businesses (Round 10, ids SV1–SV26)
 
 Added with `docs/prd/round-10.md`, which covers clinics, dentists and diagnostic labs; salons, spas and beauty parlours;
 gyms, fitness studios and yoga; coaching and training institutes; and vehicle workshops and AC / appliance service
@@ -558,6 +558,13 @@ centres.
 | SV22 ★ | **Motor insurance claims.** (a) Cashless: one invoice in the **insurer's name** (with its GSTIN) for the approved amount and one to the owner for depreciation, compulsory / voluntary excess and non-covered work (Circular 217/11/2024-GST). (b) Reimbursement: one invoice to the owner unless the insurer asks for its own. (c) Is the depreciation the owner pays a supply to the owner at the line's own rate (as billed), and is the place of supply on the insurer's invoice by the insurer's registered State? (d) Salvage parts kept by the insurer: any GST on their transfer? (e) The default depreciation table (rubber / plastic / nylon 50%, fibre glass 30%, glass 0%, metal by vehicle age) is insurer practice, not statute — the user edits it. | As stated. | `services/sv-claims.ts`, `sv-motor-claims.ts`; `service-rules.ts` `MOTOR_DEPRECIATION_DEFAULTS` | 2024-06-26 | Circular 217/11/2024-GST (gstcouncil.gov.in copy) |
 | SV23 | **AMC and warranty in service centres.** (a) An annual maintenance contract paid up front is invoiced (and taxed) at sale at 18% (a comprehensive AMC with parts is a composite service). (b) Parts used in covered AMC visits: no further supply, no ITC reversal? (c) Parts replaced free under the **manufacturer's** warranty by an authorised service centre reimbursed by the manufacturer: the centre's supply is to the manufacturer (see RT13, Circular 195/07/2023). (d) A workshop's own parts warranty (free re-fit within 6 months): no GST, no ITC reversal? | As stated. | `amc.ts`; `services/sv-reminders.ts`; RT-D4 `retail/rt-service-jobs.ts` | — | Circular 195/07/2023-GST (recalled); developers' reading |
 | SV24 | **Sublet work and job-in-progress stock.** (a) Outside work (machining, denting, upholstery) sent to another shop and re-billed with a markup is part of our supply at the line's rate (not pure-agent); 194C on our payment above the thresholds. (b) Parts issued to a job before billing sit in a "Jobs in progress" (`wip`) godown until billed; at the year end they are stock even when the car is ready but not yet invoiced — right, or has the supply already been made (Sec 31 time limit for invoicing a completed service)? | As stated. | `services/sv-estimates.ts`, `sv-parts-issue.ts`; `tds-rules.ts` 194C | — | Rule 33 CGST Rules; Sec 31(2) CGST Act; Sec 194C |
+
+### 10.5 Added while building SV-A (front desk)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| SV25 | **Splitting a claim bill per head.** When the payer approves a lump sum (not line by line), the app divides **every line** of the job in the ratio approved ÷ job total (GST included), so the insurer's and the owner's invoices carry the same items, HSN / SAC and rates with smaller values, and together equal the job. (a) Is a proportional split of each line acceptable, or must the payer's invoice list only the items it approved (line-by-line split, which the app also supports)? (b) Both invoices are dated on the day the claim is billed and the owner's part reuses the job's draft number — any objection? | Proportional per head by default; line-by-line when the approval lists lines. | `services/sv-claims.ts` `splitForPayer`, `billClaim` | — | Developers' reading of Circular 217/11/2024-GST |
+| SV26 | **Commission to salaried staff in payroll.** The front desk posts a month's commission of an employee linked to payroll as a payroll **earning adjustment** ("Commission <month>", taxable, tag `bonus`), so salary TDS (Sec 192 / 392) applies through the payroll run. (a) Is commission part of "wages" for **ESI** (the app's payroll treats the earning as ESI wages like other earnings) and is it outside EPF "basic wages" unless paid to all employees alike? (b) Should a target-linked slab bonus be treated differently from a flat % commission? | Taxable earning; EPF / ESI treatment as the payroll engine applies to adjustments today. | `services/sv-payouts.ts`; `types/payroll.ts` `PayrollAdjustment` | — | Developers' reading; EPF Act Sec 2(b), ESI Act Sec 2(22) (not re-read) |
 
 ## 11. Construction (Round 11, ids CN1–CN31)
 

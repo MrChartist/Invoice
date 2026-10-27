@@ -187,7 +187,7 @@ function StatementView({ staff, plans, run, tick }: { staff: ServiceStaff[]; pla
       <div className={styles.bar}>
         <select className={controls.select} value={staffId} onChange={(e) => setStaffId(e.target.value)} aria-label={svT('staff')} style={{ maxWidth: '14rem' }} data-statement-staff>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
         <input className={controls.input} type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} aria-label={svT('month')} style={{ maxWidth: '11rem' }} />
-        {st && <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => downloadText(`commission-${s!.name}-${month}.csv`, `﻿${toCsv(statementRows(st))}`, 'text/csv')}>{svT('csv')}</button>}
+        {st && <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => downloadText(`commission-${s!.name}-${month}.csv`, `\uFEFF${toCsv(statementRows(st))}`, 'text/csv')}>{svT('csv')}</button>}
       </div>
       {st && (
         <div className={surface.tableWrap}>
