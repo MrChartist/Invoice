@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { TrendingUp } from 'lucide-react';
 import type { BooksData } from '../../lib/books';
 import { peekTable } from '../../lib/storage';
+import { localDb } from '../../lib/localDb';
 import { localDayOf } from '../../lib/dates';
 import { buildInsights, type Insight, type StockRow } from '../../lib/insights';
 import { liveCostPurchases, liveUnitCosts } from '../../lib/margin';
@@ -14,6 +15,9 @@ import ux from './ux.module.css';
 import { svcT } from '../../i18n/areas/service-r3'; // R3-B7
 import { loadQuietSettings } from '../../lib/quiet-customers';
 import type { Client } from '../../types/invoice';
+
+// R14 PS-C5: the registration-threshold card, for a freelancer profile only (lazy).
+const ThresholdView = lazy(() => import('../prof/ThresholdView'));
 
 const fmt = (i: Pick<Insight, 'unit'>, v: number) => (i.unit === 'inr' ? formatCurrency(v, 'INR') : i.unit === 'pct' ? `${v}%` : i.unit === 'days' ? uxT('inDays', { n: v }) : String(v));
 
@@ -71,6 +75,7 @@ export function InsightsPanel({ books, stock }: { books: BooksData; stock: Stock
             </Link>
           ))}
         </div>
+        {(localDb.settings.get() as { prof_kind?: string }).prof_kind === 'freelancer' && <Suspense fallback={null}><ThresholdView compact /></Suspense>}
         <p className={ux.muted}>{uxT('inFoot')}</p>
       </div>
     </div>

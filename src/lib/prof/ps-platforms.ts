@@ -57,6 +57,14 @@ export function savePlatforms(list: readonly Partial<Platform>[]): Platform[] {
   return platforms;
 }
 
+/** `prof_settings.export.purpose_code`: the default RBI purpose code for services (PS39); absent = by `prof_kind`. */
+export const readPurposeCode = (): string | undefined => getJson<{ export?: { purpose_code?: string } } | null>(KEY, null)?.export?.purpose_code || undefined;
+export function savePurposeCode(code: string): void {
+  requireAccess('settings.manage');
+  const s = getJson<{ export?: object } | null>(KEY, null);
+  setJson(KEY, { ...s, export: { ...s?.export, purpose_code: code.trim().toUpperCase().slice(0, 6) || undefined }, updated_at: new Date().toISOString() });
+}
+
 export interface PlatformReceipt {
   gross: number;
   fee: number;
