@@ -1,7 +1,7 @@
 /**
  * Round 12 package D (cold storage, input dealers, FPO / co-operative) — the row shapes of D's tables and of D's
- * `agri_settings` sub-fields and `ag` snapshot sub-objects. `src/types/agri-r12.ts` (AG-A) merges the record / settings
- * fields in its `// AG-D` block from these types. Type-only: zero bytes. See docs/features/agri-r12.md §AG-D.
+ * `agri_settings` sub-fields (object-valued, so AG-A's `cleanAgriSettings` keeps them). `src/types/agri-r12.ts` merges
+ * the settings and the `ag.rent` / `ag.inputs` fields in its `// AG-D` block. Type-only: zero bytes. See docs/features/agri-r12.md §AG-D.
  */
 
 /* ── D1 cold-storage lots (custody only, never stock) ── */
@@ -102,33 +102,6 @@ export interface ColdRentPlan {
   notified?: { rate: number; order_ref: string };
 }
 
-/** `ag.rent` on a rent bill (snapshot; printed by the agri paper, never recomputed). */
-export interface AgRentSnap {
-  lot_id: string;
-  lot_no: string;
-  depositor: string;
-  commodity: string;
-  variety?: string;
-  chamber?: string;
-  date_in: string;
-  season: string;
-  bags: number;
-  bags_in: number;
-  balance: number;
-  basis: RentBasis;
-  rate: number;
-  period_from: string;
-  period_to: string;
-  months?: number;
-  out_id?: string;
-  gate_pass_no?: string;
-  class: StorageClass;
-  plan: string;
-  notified?: { rate: number; order_ref: string };
-  /** The 'in' charges (loading, unloading) are on this bill. */
-  in_charges?: boolean;
-}
-
 /* ── D3 loans against stored produce ── */
 
 export interface AgriLoanRepayment {
@@ -195,19 +168,6 @@ export interface AgriSeason {
 /** PoS stock typed from the fertiliser PoS device's report: month (`YYYY-MM`) → item id → bags. */
 export type PosStock = Record<string, Record<string, number>>;
 
-/** `ag.inputs` on a dealer's bill (snapshot). */
-export interface AgInputsSnap {
-  /** Licence lines printed in the dealer block. */
-  licences?: { kind: AgriLicenceKind; number: string; valid_to?: string }[];
-  /** Subsidised fertiliser: the government PoS transaction no. and the farmer ID (Aadhaar last 4 / KCC). */
-  pos_txn?: string;
-  farmer_id?: string;
-  subsidised_bags?: number;
-  /** Credit till harvest. */
-  season?: string;
-  season_due?: string;
-}
-
 /* ── D5 members' capital ── */
 
 export type ShareKind = 'allot' | 'transfer_in' | 'transfer_out' | 'surrender' | 'refund' | 'forfeit';
@@ -234,15 +194,13 @@ export interface MemberShareRow {
 /** D-owned `agri_settings` sub-fields. */
 export interface AgriSettingsD {
   chambers?: ColdChamber[];
-  /** Storage receipt terms (printed). */
-  receipt_terms?: string;
-  /** Partial release under a lien: remaining bags must cover the loan at this LTV % (absent = no partial release). */
-  release_ltv_pct?: number;
+  /** Cold store: receipt terms (printed) and the partial-release LTV % under a lien (absent = no partial release). */
+  cold?: { receipt_terms?: string; release_ltv_pct?: number };
   licences?: AgriLicence[];
   principals?: AgriPrincipal[];
   seasons?: AgriSeason[];
   /** Monthly subsidised bags per farmer before a warning (default from `FERT_SUBSIDY_DEFAULTS`). */
-  subsidy_cap?: number;
+  subsidy?: { cap?: number };
   pos_stock?: PosStock;
   /** Co-operative: statutory reserve % and dividend cap % (State Act, typed; AG19). */
   coop?: { reserve_pct?: number; dividend_cap_pct?: number; face_value?: number; primary_producers?: boolean };

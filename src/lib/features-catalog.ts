@@ -23,7 +23,8 @@ export type AdvancedId =
   | 'costCentres' | 'currency' | 'einvoice' | 'composition' | 'vault' | 'sync' | 'users' | 'gateway' | 'shifts'
   | 'tables' | 'pharma' | 'scale'
   | 'construction' // R11 (CN-A1)
-  | 'serviceProfile'; // R10 (SV-A1)
+  | 'serviceProfile' // R10 (SV-A1)
+  | 'agriProfile'; // R12 (AG-A1)
 
 export interface FeatureRow {
   /** `mod.<id>`, `pack.<id>` or `adv.<id>`. */
@@ -99,6 +100,8 @@ const ADVANCED: readonly { id: AdvancedId; href: string; isOn: FeatureRow['isOn'
   { id: 'construction', href: '/settings?tab=features', isOn: (s) => typeof (s as { construction_kind?: unknown }).construction_kind === 'string' },
   // R10 (SV-A1): the service profile (picked in Settings → Features under Services)
   { id: 'serviceProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { service_kind?: unknown }).service_kind === 'string' },
+  // R12 (AG-A1): the agri profile (Settings → Features "Agriculture profile", shown for every company)
+  { id: 'agriProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { agri_kind?: unknown }).agri_kind === 'string' },
 ];
 
 /** Where each module's screen is (the first sidebar route that belongs to it). */
@@ -143,7 +146,10 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   salon: '/time?tab=appointments',
   fitness: '/time?tab=members',
   workshop: '/time?tab=workshop',
-  // R12 (AG-D): desks on Inventory
+  // R12 (AG-A1): agri desks (tabs on Inventory)
+  agri: '/inventory?tab=farm',
+  dairy: '/inventory?tab=dairy',
+  mill: '/inventory?tab=mill',
   coldstore: '/inventory?tab=cold',
   agri_inputs: '/inventory?tab=inputs',
   fpo: '/inventory?tab=members',

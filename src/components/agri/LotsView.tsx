@@ -53,7 +53,7 @@ export default function LotsView({ onDone }: { onDone: Done }) {
         flag={lots.map((l) => lotBalance(l) <= 0)}
         rows={lots.map((l) => [l.number, l.date_in, l.depositor_name, [l.commodity, l.variety].filter(Boolean).join(' — '), l.bags, lotBalance(l), chamberName(l.chamber_id), planName(l.rent_plan_id),
           <span key="a" style={{ display: 'flex', gap: 4 }}>
-            <button type="button" className={btn} aria-label={agdT('print')} onClick={() => printPaper(receiptHtml(l, { company: company(), chamber: chamberName(l.chamber_id), plan: planName(l.rent_plan_id), terms: s.receipt_terms }), l.number)}><Printer size={14} aria-hidden="true" /></button>
+            <button type="button" className={btn} aria-label={agdT('print')} onClick={() => printPaper(receiptHtml(l, { company: company(), chamber: chamberName(l.chamber_id), plan: planName(l.rent_plan_id), terms: s.cold?.receipt_terms }), l.number)}><Printer size={14} aria-hidden="true" /></button>
             <button type="button" className={btn} aria-label={agdT('delete')} onClick={() => run(() => { deleteLot(l.id); return agdT('deleted'); })}><Trash2 size={14} aria-hidden="true" /></button>
           </span>])}
       />

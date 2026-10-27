@@ -22,7 +22,7 @@ export default function GatePassView({ onDone }: { onDone: Done }) {
   const [billId, setBillId] = useState('');
   const lot = lots.find((l) => l.id === p.lot);
   const chambers = readAgriSettings().chambers ?? [];
-  const check = lot && p.bags > 0 ? checkGatePass(lot, p.bags, p.date, { loans: loadLoans(), lots, invoices: localDb.invoices.getAll(), releaseLtv: readAgriSettings().release_ltv_pct }) : undefined;
+  const check = lot && p.bags > 0 ? checkGatePass(lot, p.bags, p.date, { loans: loadLoans(), lots, invoices: localDb.invoices.getAll(), releaseLtv: readAgriSettings().cold?.release_ltv_pct }) : undefined;
   const owner = can('settings.manage');
   const passes = lots.flatMap((l) => l.outs.map((o) => ({ l, o }))).sort((a, b) => b.o.number.localeCompare(a.o.number));
   const issue = () => run(() => {

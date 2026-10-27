@@ -77,9 +77,13 @@ export const INVENTORY_PACK_TABS = [
   { id: 'apparel', pack: 'apparel' }, // RT-C: views matrix / alterations / bands
   { id: 'devices', pack: 'electronics' }, // RT-D: views imei / finance / buyback / service
   { id: 'jewellery', pack: 'jewellery' }, // RT-E: views rates / tags / oldgold / karigar
-  { id: 'cold', pack: 'coldstore' }, // R12 (AG-D): views lots / gatepasses / rent / loans / chambers
-  { id: 'inputs', pack: 'agri_inputs' }, // R12 (AG-D): views licences / subsidy / credit
-  { id: 'members', pack: 'fpo' }, // R12 (AG-D): views register / shares / patronage / papers (+ loans)
+  // R12 (AG-A1): agri desks, one tab per pack (packages never edit these rows)
+  { id: 'farm', pack: 'agri' }, // AG-A: views farmers / vouchers / cycles / quality / batches
+  { id: 'dairy', pack: 'dairy' }, // AG-B: views charts / collection / bills / dispatch / products / cards
+  { id: 'mill', pack: 'mill' }, // AG-C: views intake / batches / cmr / yield
+  { id: 'cold', pack: 'coldstore' }, // AG-D: views lots / gatepasses / rent / loans / chambers
+  { id: 'inputs', pack: 'agri_inputs' }, // AG-D: views licences / subsidy / credit
+  { id: 'members', pack: 'fpo' }, // AG-D: views register / shares / patronage / papers
 ] as const;
 export type InventoryPackTab = (typeof INVENTORY_PACK_TABS)[number]['id'];
 /* ── Distribution ── */

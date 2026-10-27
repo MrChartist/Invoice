@@ -15,8 +15,8 @@ export default function ChambersView({ onDone }: { onDone: Done }) {
   const s = useMemo(() => { void tick; return readAgriSettings(); }, [tick]);
   const chambers = s.chambers ?? [];
   const [c, setC] = useState({ name: '', capacity_bags: 0, floors: 0, temp_range: '' });
-  const [terms, setTerms] = useState(s.receipt_terms ?? '');
-  const [ltv, setLtv] = useState(s.release_ltv_pct ?? 0);
+  const [terms, setTerms] = useState(s.cold?.receipt_terms ?? '');
+  const [ltv, setLtv] = useState(s.cold?.release_ltv_pct ?? 0);
   const use = chamberUse(loadLots(), chambers);
   return (
     <>
@@ -40,7 +40,7 @@ export default function ChambersView({ onDone }: { onDone: Done }) {
       <div style={wrap}>
         <F label={agdT('terms')}><textarea className={controls.textarea} rows={2} value={terms} onChange={(e) => setTerms(e.target.value)} /></F>
         <F label={agdT('releaseLtv')} w={160}><NumberInput className={controls.input} value={ltv} onChange={setLtv} /></F>
-        <button type="button" className={btn} onClick={() => run(() => { saveAgriSettings({ receipt_terms: terms.trim(), release_ltv_pct: ltv > 0 ? ltv : undefined }); return agdT('saved'); })}>{agdT('save')}</button>
+        <button type="button" className={btn} onClick={() => run(() => { saveAgriSettings({ cold: { receipt_terms: terms.trim(), ...(ltv > 0 ? { release_ltv_pct: ltv } : {}) } }); return agdT('saved'); })}>{agdT('save')}</button>
       </div>
       <p className={controls.hint}>{agdT('custodyNote')}</p>
     </>

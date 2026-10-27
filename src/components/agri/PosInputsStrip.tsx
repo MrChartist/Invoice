@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
 import { agdT } from '../../i18n/areas/agri-r12d';
 import { localDb } from '../../lib/localDb';
-import { capWarning, subsidisedTest, subsidyErrors } from '../../lib/agri/ag-subsidy';
+import { capWarning, subsidisedBags, subsidisedTest, subsidyErrors } from '../../lib/agri/ag-subsidy';
 import { classIndex, licenceLines, unlicensedWarnings } from '../../lib/agri/ag-licences';
 import { DEFAULT_SEASONS, seasonDue } from '../../lib/agri/ag-season-credit';
 import { readAgriSettings } from '../../lib/agri/ag-settings';
@@ -30,10 +30,10 @@ export default function PosInputsStrip({ record, onChange }: { record: InvoiceRe
   const sub = (record.items ?? []).some((l) => l.name && isSub(l.name));
   const seasons = s.seasons?.length ? s.seasons : DEFAULT_SEASONS;
   const due = v.season ? seasonDue(seasons, v.season, day) : '';
-  const ag: AgSnapshot = { kind: 'inputs', inputs: { ...(licenceLines(s.licences, day).length ? { licences: licenceLines(s.licences, day) } : {}), ...(v.pos_txn.trim() ? { pos_txn: v.pos_txn.trim() } : {}), ...(v.farmer_id.trim() ? { farmer_id: v.farmer_id.trim() } : {}), ...(due ? { season: v.season, season_due: due } : {}) } };
+  const ag: AgSnapshot = { kind: 'inputs', inputs: { ...(licenceLines(s.licences, day).length ? { licences: licenceLines(s.licences, day) } : {}), ...(v.pos_txn.trim() ? { pos_txn: v.pos_txn.trim() } : {}), ...(v.farmer_id.trim() ? { farmer_id: v.farmer_id.trim() } : {}), ...(/^\d{4}$/.test(v.farmer_id.trim()) ? { farmer_id_last4: v.farmer_id.trim() } : {}), ...(sub ? { subsidy_bags: subsidisedBags(record, isSub) } : {}), ...(due ? { season: v.season, season_due: due } : {}) } };
   const probe = { ...record, status: 'Sent' as const, ag };
   const errors = subsidyErrors(probe, isSub);
-  const warns = [capWarning(probe, localDb.invoices.getAll(), isSub, s.subsidy_cap), ...unlicensedWarnings(record.items ?? [], s.licences, day, (n) => idx.get(n))].filter(Boolean) as string[];
+  const warns = [capWarning(probe, localDb.invoices.getAll(), isSub, s.subsidy?.cap), ...unlicensedWarnings(record.items ?? [], s.licences, day, (n) => idx.get(n))].filter(Boolean) as string[];
   const key = `${names}|${v.pos_txn}|${v.farmer_id}|${v.season}|${day}`;
   useEffect(() => {
     onChange(Object.keys(ag.inputs ?? {}).length ? { ag, ...(due ? { due } : {}), errors } : errors.length ? { ag, errors } : null);

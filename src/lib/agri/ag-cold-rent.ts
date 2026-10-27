@@ -12,7 +12,9 @@
  * Working paper — verify with your CA (AG8, AG30). Pure above "Storage".
  */
 import './ag-registry';
-import type { ColdGateOut, ColdLot, ColdRentPlan, RentBasis, StorageClass, AgRentSnap } from '../../types/agri-r12d';
+import type { ColdGateOut, ColdLot, ColdRentPlan, RentBasis, StorageClass } from '../../types/agri-r12d';
+import type { AgRentSnap } from '../../types/agri-r12';
+import { agSnapshot } from './ag-snapshot';
 import type { Client, InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import { calcInputFromRecord, calculateInvoice, deriveGstMode, num, round2 } from '../invoice-calc';
 import { ruleAt } from '../tax-rules';
@@ -21,13 +23,14 @@ import { generateId, getTable, setTable } from '../storage';
 import { localDb } from '../localDb';
 import { isValidGstin } from '../gstin';
 import { makeDraft, senderStateCode } from '../../store/invoice-defaults';
-import { AGRI_PRODUCE_WORDS, NON_AGRI_WORDS, STORAGE_CLASS_RULES } from '../agri-rules';
+import { STORAGE_CLASS_RULES, STORAGE_WORD_RULES } from '../agri-rules';
 import { AG_TABLES } from './ag-shared';
 import { lotBalance, q3 } from './ag-cold-lots';
 
 export const PLANS_TABLE = AG_TABLES.coldRentPlans;
 export const EXEMPT_NOTE = 'Exempt — storage of agricultural produce (N 12/2017 entry 54(e); verify AG8).';
-const SEASONAL = new Set<RentBasis>(['bag_season', 'qtl_season', 'flat']);
+const SEASONAL = new Set<RentBasis | undefined>(['bag_season', 'qtl_season', 'flat']);
+const BASIS_TEXT: Readonly<Record<RentBasis, string>> = { bag_season: 'per bag per season', bag_month: 'per bag per month', qtl_season: 'per quintal per season', qtl_month: 'per quintal per month', flat: 'lump sum' };
 
 /* ── Pure ── */
 
@@ -62,8 +65,9 @@ export function suggestClass(commodity: string, space = false): StorageClass | u
   if (space) return 'storage_other';
   const c = commodity.trim().toLowerCase();
   if (!c) return undefined;
-  if (NON_AGRI_WORDS.some((w) => c.includes(w))) return 'storage_other';
-  return AGRI_PRODUCE_WORDS.some((w) => c.includes(w)) ? 'storage_agri' : undefined;
+  const w = ruleAt(STORAGE_WORD_RULES);
+  if (w.other.some((x) => c.includes(x))) return 'storage_other';
+  return w.agri.some((x) => c.includes(x)) ? 'storage_agri' : undefined;
 }
 
 export const classRule = (cls: StorageClass, date?: string) => ruleAt(STORAGE_CLASS_RULES[cls], date);
@@ -119,7 +123,7 @@ export function billedOn(invoices: readonly InvoiceRecord[], lotId: string) {
     seasonBags: q3(bills.filter((r) => SEASONAL.has(r.basis)).reduce((s, r) => s + num(r.bags), 0)),
     inCharges: bills.some((r) => r.in_charges),
     outs: new Set(bills.map((r) => r.out_id).filter(Boolean) as string[]),
-    monthTo: bills.filter((r) => !SEASONAL.has(r.basis) && !r.out_id).reduce((m, r) => (r.period_to > m ? r.period_to : m), ''),
+    monthTo: bills.filter((r) => !SEASONAL.has(r.basis) && !r.out_id).reduce((m, r) => ((r.period_to ?? '') > m ? r.period_to! : m), ''),
   };
 }
 
@@ -165,17 +169,20 @@ export function buildRentBill(lot: ColdLot, plan: ColdRentPlan, occ: ReturnType<
   const home = senderStateCode(ctx.sender);
   const pos = (gstin ? ctx.client.gstin!.slice(0, 2) : ctx.client.state_code) || home;
   const items: InvoiceItem[] = taxed.map((l) => ({ id: generateId(), name: l.name, description: `${lot.number} · ${lot.commodity}`, type: 'service', hsn: plan.space ? rule.spaceSac : rule.sac, unit: l.unit, quantity: l.qty, rate: l.rate, tax_rate: anyTax ? l.tax : 0, discount_percent: 0, amount: l.amount }));
+  const rate = num(plan.notified?.rate) > 0 ? num(plan.notified!.rate) : num(plan.rate);
   const rent: AgRentSnap = {
-    lot_id: lot.id, lot_no: lot.number, depositor: lot.depositor_name, commodity: lot.commodity, ...(lot.variety ? { variety: lot.variety } : {}), ...(ctx.chamber ? { chamber: ctx.chamber } : {}),
-    date_in: lot.date_in, season: lot.season, bags: occ.bags, bags_in: num(lot.bags), balance: lotBalance(lot), basis: plan.basis, rate: num(plan.notified?.rate) > 0 ? num(plan.notified!.rate) : num(plan.rate),
-    period_from: occ.from, period_to: occ.to, ...(work.months !== undefined ? { months: work.months } : {}), ...(occ.out ? { out_id: occ.out.id, gate_pass_no: occ.out.number } : {}),
-    class: plan.class, plan: plan.name, ...(plan.notified?.order_ref ? { notified: plan.notified } : {}), ...(occ.inCharges && (plan.charges ?? []).some((c) => c.when === 'in') ? { in_charges: true } : {}),
+    lot_id: lot.id, lot_no: lot.number, depositor: lot.depositor_name, commodity: lot.commodity, variety: lot.variety, chamber: ctx.chamber,
+    date_in: lot.date_in, season: lot.season, bags: occ.bags, bags_in: num(lot.bags), bags_out: occ.outBags || undefined, bags_balance: lotBalance(lot),
+    basis: plan.basis, rate, rate_basis: `₹${rate} ${BASIS_TEXT[plan.basis]}`, exempt: !anyTax, period_from: occ.from, period_to: occ.to, months: work.months,
+    out_id: occ.out?.id, gate_pass_no: occ.out?.number, class: plan.class, plan: plan.name, notified: plan.notified?.order_ref ? plan.notified : undefined,
+    in_charges: occ.inCharges || undefined,
+    working: [{ label: 'Period', value: `${occ.from} to ${occ.to}${work.months !== undefined ? ` (${work.months} month(s))` : ''}` }, ...work.lines.map((l) => ({ label: l.name, value: `${l.qty} ${l.unit} × ₹${l.rate} = ₹${l.amount}` })), { label: 'Total', value: `₹${work.total}` }],
   };
   const rec: InvoiceRecord = {
     ...draft, issue_date: occ.date, due_date: occ.date > draft.due_date ? occ.date : draft.due_date, status: 'Draft', client: { ...ctx.client }, items, place_of_supply: pos,
     ...(anyTax ? { gst_mode: deriveGstMode({ senderStateCode: home, placeOfSupply: pos, senderHasGstin: !!ctx.sender?.companyGstin?.trim(), taxEnabled: true }) } : {}),
     notes: [plan.class === 'storage_agri' ? EXEMPT_NOTE : 'Storage of goods other than agricultural produce — taxable (verify AG8).', plan.space ? 'Renting space may be a separate taxable supply (Gujarat AAR) — verify AG8.' : '', plan.notified?.order_ref ? `Rent as notified: ${plan.notified.order_ref}.` : ''].filter(Boolean).join(' '),
-    ag: { kind: 'rent', rent },
+    ag: agSnapshot('rent', { rent, lines: { [items[0].id]: { lot: lot.number, bags: occ.bags || undefined, rate_bag: plan.basis === 'bag_season' || plan.basis === 'bag_month' ? rate : undefined, season: lot.season } } }),
   };
   const t = calculateInvoice(calcInputFromRecord(rec, { amount_paid: 0 }));
   return { ...rec, subtotal: t.subtotal, discount_amount: t.discount_amount, taxable_value: t.taxable_value, cgst_amount: t.cgst_amount, sgst_amount: t.sgst_amount, igst_amount: t.igst_amount, tax_amount: t.tax_amount, round_off: t.round_off, total: t.total, balance_due: t.balance_due, cess_amount: t.cess_amount };
@@ -206,10 +213,10 @@ export function rentDue(invoices: readonly InvoiceRecord[], lots: readonly ColdL
     const r = i?.ag?.rent;
     if (!r || i.status === 'Draft' || i.status === 'Cancelled') continue;
     const k = `${r.depositor}|${r.season}`;
-    const row = m.get(k) ?? { depositor: r.depositor, season: r.season, billed: 0, due: 0, closedUnpaid: false };
+    const row = m.get(k) ?? { depositor: r.depositor ?? '', season: r.season ?? '', billed: 0, due: 0, closedUnpaid: false };
     row.billed = round2(row.billed + num(i.total));
     row.due = round2(row.due + Math.max(num(i.balance_due), 0));
-    if (num(i.balance_due) > 0.005 && closed.has(r.lot_id)) row.closedUnpaid = true;
+    if (num(i.balance_due) > 0.005 && closed.has(r.lot_id ?? '')) row.closedUnpaid = true;
     m.set(k, row);
   }
   return [...m.values()].sort((a, b) => b.due - a.due);

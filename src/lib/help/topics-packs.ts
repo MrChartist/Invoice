@@ -146,7 +146,31 @@ export const TOPICS: readonly HelpTopic[] = [
   t('inventory:jewellery:tags', 'Tags', 'टैग', 'Each piece with its gross, stone and net weight, purity and HUID; stock by purity.', 'When pieces come from the karigar or a supplier.', { statutory: ca(['RT19', 'RT21']) }),
   t('inventory:jewellery:oldgold', 'Old gold', 'पुराना सोना', 'Old gold bought or taken in exchange: weight, touch, melting loss and value; the exchange settles part of the bill.', 'When a customer brings old jewellery.', { statutory: ca(['RT17', 'RT18']) }),
   t('inventory:jewellery:karigar', 'Karigar', 'कारीगर', 'Metal issued to each karigar and pieces received back, by fine weight, and the labour bill.', 'When you give metal to a karigar or receive pieces.', { statutory: ca(['RT20']) }),
-  // R12 (AG-D): cold storage, input dealer, FPO / co-operative desks on Inventory
+  // R12: agri desks on Inventory (AG-A writes every row; AG-B / C / D refine theirs). Working papers — verify with your CA.
+  t('inventory:farm', 'Farm', 'खेती', 'The shared farm desk of every agri business: farmers and members, farmer purchase vouchers with quality cuts, pooled payment cycles, quality-cut tables and farm batches.', 'Daily at the gate or the centre; at each cycle close.', {
+    statutory: ca(['AG1', 'AG11', 'AG14']),
+    related: rel(['Farmers', '/inventory?tab=farm&view=farmers'], ['Cycles', '/inventory?tab=farm&view=cycles']),
+  }),
+  t('inventory:farm:farmers', 'Farmers', 'किसान', 'Farmers and members with a short code for the can or the gate, village, centre, member no., bank and UPI. Only the last four digits of the Aadhaar number are kept. Print farmer cards with a QR of the code; import a CSV.', 'When a farmer joins.', { statutory: ca(['AG26']) }),
+  t('inventory:farm:vouchers', 'Farmer vouchers', 'किसान वाउचर', 'Our own purchase voucher (FPV) for produce bought from a farmer: weighment, quality readings and cuts, mandi / hamali charges (no preset rate — your State\'s and your contract\'s), the agriculturist declaration and the 194Q hint.', 'Each purchase at the gate.', {
+    steps: ['Pick the farmer and the commodity.', 'Type the bags, gross weight, tare and the rate.', 'Type the quality readings; check the cut rows.', 'Save, print the voucher and pay him.'],
+    statutory: ca(['AG1', 'AG5', 'AG11', 'AG13', 'AG14', 'AG20']),
+  }),
+  t('inventory:farm:cycles', 'Payment cycles', 'भुगतान चक्र', 'One pooled purchase bill per centre per cycle with the farmer-wise split: feed and input bills set off from his money, advances and share money deducted, the bank file, slips on WhatsApp and the cash note under Rule 6DD(e).', 'At each cycle end (weekly, 10-day, fortnight or month).', { statutory: ca(['AG14', 'AG25', 'AG26', 'AG27']) }),
+  t('inventory:farm:quality', 'Quality cuts', 'गुणवत्ता कटौती', 'Per commodity: the norm of each parameter (moisture, foreign matter, damaged …), the cut per point above it on weight or price, a cap and a reject line. The app ships no values — they are your contract or agency terms.', 'Once per commodity, then when terms change.', { statutory: ca(['AG5']) }),
+  t('inventory:farm:batches', 'Farm batches', 'फ़ार्म बैच', 'A flock, pond, herd or crop on its own cost centre: mortality, feed, live weight and harvest events with mortality %, FCR and cost per kg. Income of poultry, fishery, a mill, a dairy or a cold store is business income, not agricultural income.', 'Daily or weekly on the farm.', { statutory: ca(['AG15', 'AG31']) }),
+  t('inventory:dairy', 'Dairy', 'डेयरी', 'Milk collection desk: fat / SNF rate charts, shift collection with analyser and scale, milk bills per cycle, dispatch to the union and reconciliation, dairy products and household milk cards (arrives with the dairy update).', 'Every shift.', { statutory: ca(['AG3', 'AG4', 'AG26', 'AG27']) }),
+  t('inventory:dairy:charts', 'Rate charts', 'दर तालिका', 'Fat / SNF rate charts by effective date; old shifts keep their rate.', 'When the union changes rates.'),
+  t('inventory:dairy:collection', 'Collection', 'दूध संग्रह', 'The shift collection sheet: farmer code, quantity, fat and SNF per can.', 'Morning and evening shifts.'),
+  t('inventory:dairy:bills', 'Milk bills', 'दूध बिल', 'The 10-day milk bill per farmer with feed and advance deductions.', 'At each cycle end.', { statutory: ca(['AG26', 'AG27']) }),
+  t('inventory:dairy:dispatch', 'Dispatch', 'डिस्पैच', 'Milk sent to the union or plant and the fat-kg / SNF-kg reconciliation.', 'Each tanker.', { statutory: ca(['AG3']) }),
+  t('inventory:dairy:products', 'Dairy products', 'डेयरी उत्पाद', 'Paneer, ghee, curd made from milk, with their tax classes.', 'Each batch.', { statutory: ca(['AG4']) }),
+  t('inventory:dairy:cards', 'Milk cards', 'दूध कार्ड', 'Household milk cards with the daily quantity.', 'Monthly.'),
+  t('inventory:mill', 'Mill', 'मिल', 'Mill desk: gate entry and weighbridge, milling batches with outturn and by-products, custom milling (CMR) and yield reports (arrives with the mill update).', 'Each lot.', { statutory: ca(['AG5', 'AG6', 'AG9', 'AG10']) }),
+  t('inventory:mill:intake', 'Intake', 'आवक', 'Gate entry and weighbridge slips with moisture.', 'Each truck.'),
+  t('inventory:mill:batches', 'Milling batches', 'मिलिंग बैच', 'Outturn against the standard, by-products and moisture loss.', 'Each batch.', { statutory: ca(['AG6']) }),
+  t('inventory:mill:cmr', 'Custom milling', 'कस्टम मिलिंग', 'The CMR account with the State agency: paddy received, rice due and delivered, milling charges.', 'Each delivery.', { statutory: ca(['AG9']) }),
+  t('inventory:mill:yield', 'Yield', 'उपज', 'Yield and stock reports; the bank stock statement for mills.', 'Monthly.'),
   t('inventory:cold', 'Cold storage', 'शीतगृह', 'Depositors\' lots held in custody (never your stock): storage receipts, gate passes, rent per bag or quintal, loans against lots, chambers.', 'When produce comes in or goes out, and at the season end.', { statutory: ca(['AG8', 'AG23', 'AG30']) }),
   t('inventory:cold:lots', 'Lots & receipts', 'लॉट और रसीद', 'Receive a lot (bags, chamber, rent plan) and print its non-negotiable storage receipt; move bags to another depositor; see a depositor\'s statement.', 'When a depositor brings produce.', { statutory: ca(['AG23', 'AG60']) }),
   t('inventory:cold:gatepasses', 'Gate passes', 'गेट पास', 'Release bags against a gate pass: it shows the balance, stops while a loan has a lien on the lot and raises the rent bill for the bags released.', 'Every time bags leave the store.', { statutory: ca(['AG8', 'AG64']) }),
@@ -162,5 +186,4 @@ export const TOPICS: readonly HelpTopic[] = [
   t('inventory:members:shares', 'Shares', 'शेयर', 'Allot shares from application money or a payment, transfer, surrender or forfeit them; print the share certificate.', 'When a member buys, transfers or gives up shares.', { statutory: ca(['AG18', 'AG67']) }),
   t('inventory:members:patronage', 'Patronage', 'संरक्षण', 'Each member\'s business with you in the year, and a draft split of the profit into reserve, dividend and patronage bonus.', 'At the year end, before the general meeting.', { statutory: ca(['AG25', 'AG68']) }),
   t('inventory:members:papers', 'Papers', 'कागज़ात', 'Co-operative deduction by head (80P, Sec 149 from the 2025 Act), the producer company 80PA paper and the statutory calendar.', 'At the year end, for your CA.', { statutory: ca(['AG16', 'AG17', 'AG69']) }),
-  t('inventory:members:loans', 'Member loans', 'सदस्य ऋण', 'Loans to members against their stored produce, with the lien, interest by days and repayments.', 'When a member borrows or repays.', { statutory: ca(['AG24', 'AG62']) }),
 ];

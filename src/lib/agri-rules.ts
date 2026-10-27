@@ -1,15 +1,114 @@
 /**
- * Agriculture statutory values (Round 12), keyed by the date they take effect — the `Versioned` / `ruleAt` shape of
- * `tax-rules.ts`: add a new dated row, never edit an old one. Imported only by lazy screens and engines — never by
- * `tax-rules.ts`, `shop-mode.ts` or the shell. Every row carries a `source` and `verified`. Working papers — verify with
- * your CA (docs/CA_REVIEW.md AG1–AG32, AG60–AG69). One section per package; this minimum compatible version (written by
- * AG-D before AG-A landed) holds the AG-D section only. AG-A owns the file and the other sections.
+ * Agriculture and food-processing statutory values and practice defaults (Round 12), keyed by the date they take effect
+ * — the same `Versioned` / `ruleAt` shape as `tax-rules.ts`: add a new dated row, never edit an old one. Imported only
+ * by lazy agri screens and engines — never by `tax-rules.ts`, `shop-mode.ts` or the shell (`tests/ag-rules.test.ts`
+ * checks the import graph). Values that already live in `trading-rules.ts` (RCM notified goods, 194Q buyer test, TCS)
+ * stay there; this file re-exports nothing from it.
+ *
+ * One section per package (§6 of docs/prd/round-12.md). Every row carries a `source` and `verified` (false where the
+ * notification text was not read or sources conflict). Working papers — verify with your CA (docs/CA_REVIEW.md §12).
  */
-import type { Versioned } from './tax-rules';
+import { ruleAt, type Versioned } from './tax-rules';
+import type { AgClass } from '../types/agri-r12';
 
+/** A dated agri rule row: `source` plus whether the value was confirmed from an official text. */
 export type AgRule<T> = Versioned<T> & { verified: boolean };
 
-/* ── AG-D: cold storage, input dealers, FPO / co-operative ── */
+/* ── AG-A: agri tax classes, Rule 6DD(e), the 25 kg pre-packaged line ─────────────────────────────────────────── */
+
+/** What a class suggests on a date: GST rate (%) and HSN / SAC. */
+export interface AgClassRate {
+  rate: number;
+  hsn: string;
+}
+
+const N2 = 'N 2/2017-CT(R) (nil goods) — recalled';
+const N1 = 'N 1/2017-CT(R) schedules — recalled';
+const PACK = 'N 6/2022-CT(R): pre-packaged and labelled ≤ 25 kg / 25 L at 5% from 18 Jul 2022 (FinMin FAQ, secondary — AG5)';
+const SEP25 = 'GST rate rationalisation from 22 Sep 2025 (taxscan, PTI, Tally summaries; notification not read — AG4)';
+const row = (from: string, rate: number, hsn: string, source: string, verified = false): AgRule<AgClassRate> => ({ from, value: { rate, hsn }, source, verified });
+const nil = (hsn: string, source = N2) => [row('2017-07-01', 0, hsn, source)];
+const flat = (hsn: string, rate: number, source = N1) => [row('2017-07-01', rate, hsn, source)];
+const packed = (hsn: string) => [row('2017-07-01', 0, hsn, 'Unbranded: nil (N 2/2017-CT(R)) — recalled'), row('2022-07-18', 5, hsn, PACK)];
+const cut = (hsn: string, before: number, src = N1) => [row('2017-07-01', before, hsn, src), row('2025-09-22', 5, hsn, SEP25)];
+
+/** Class → rate / HSN by document date (append-only per class; §2.3 / §2.3a of the PRD). */
+export const AGRI_CLASS_RULES: Readonly<Record<AgClass, readonly AgRule<AgClassRate>[]>> = {
+  milk_fresh: [row('2017-07-01', 0, '0401', 'N 2/2017-CT(R) S.No. 25 fresh / pasteurised milk (excl. UHT) — two secondary sources agree (AG3)', true)],
+  milk_uht: [row('2017-07-01', 5, '0401', N1), row('2025-09-22', 0, '0401', `${SEP25}; UHT milk nil`)],
+  curd_loose: nil('0403'),
+  curd_packed: packed('0403'),
+  paneer: [row('2017-07-01', 5, '0406', `${N1} (pre-packaged)`), row('2025-09-22', 0, '0406', `${SEP25}; paneer / chena nil`)],
+  ghee_butter: cut('0405', 12, 'N 1/2017-CT(R) 12% (PTI, Taxscan; Tally shows 18% — AG4 conflict)'),
+  cheese: cut('0406', 12),
+  milk_powder: flat('0402', 5, 'N 1/2017-CT(R) — no 2025 change found in the summaries (AG3, L)'),
+  cereal_loose: nil('1001'),
+  cereal_packed_25: packed('1006'),
+  paddy: nil('100610'),
+  rice_husk: nil('1213', 'N 2/2017-CT(R); GST Council FAQ (2024 reissue) — husk nil'),
+  rice_bran_feed: nil('2302', 'N 2/2017-CT(R) S.No. 102 (as cattle / poultry / aquatic feed); GST Council FAQ (AG6)'),
+  rice_bran_other: flat('2302', 5, 'N 1/2017-CT(R): rice bran other than feed (GST Council FAQ, AG6)'),
+  dorb: flat('2306', 5, 'De-oiled rice bran 5% irrespective of use (GST Council FAQ, AG6)'),
+  broken_rice: nil('100640', 'Loose broken rice treated like loose cereals; one AAR held 5% under the pre-2022 "branded" regime (AG6, L)'),
+  oil_cake_feed: nil('2306', 'N 2/2017-CT(R) S.No. 102 as amended 1 Jan 2023 — oil cake as cattle feed (AG6, L)'),
+  oil_cake_other: flat('2306', 5, 'Oil cake other than feed (AG6, L)'),
+  edible_oil: flat('1507', 5),
+  pulses_loose: nil('0713'),
+  pulses_packed_25: packed('0713'),
+  flour_loose: nil('1101'),
+  flour_packed_25: packed('1101'),
+  veg_fruit_fresh: nil('0709'),
+  potato: nil('0701'),
+  seed_sowing: nil('1209', 'N 2/2017-CT(R) seeds for sowing — recalled'),
+  fertiliser: flat('3105', 5, 'N 1/2017-CT(R) chapter 31 — no 2025 change reported (M)'),
+  fert_input: [row('2017-07-01', 18, '2807', N1), row('2025-09-22', 5, '2807', `${SEP25}; sulphuric / nitric acid, ammonia`)],
+  pesticide_chem: flat('3808', 18, 'N 1/2017-CT(R) 3808 — no 2025 change reported (M)'),
+  biopesticide: cut('3808', 12),
+  micronutrient: cut('3105', 12, 'N 1/2017-CT(R) micronutrients (FCO Sch. 1 Part A) 12%'),
+  cattle_feed: nil('2309', 'N 2/2017-CT(R) S.No. 102 cattle / poultry / aquatic feed — recalled'),
+  tractor: cut('8701', 12),
+  farm_machine: cut('8433', 12),
+  live_poultry: nil('0105', 'N 2/2017-CT(R) live animals — recalled (AG31)'),
+  eggs: nil('0407', 'N 2/2017-CT(R) birds\' eggs in shell — recalled (AG31)'),
+  fish_fresh: nil('0302', 'N 2/2017-CT(R) fresh fish — recalled (AG31)'),
+  storage_agri: [row('2017-07-01', 0, '998619', 'N 12/2017-CT(R) entry 54(e): storage / warehousing of agricultural produce nil (AG8 ★ — chamber rent conflict)')],
+  storage_other: flat('996721', 18, 'N 11/2017-CT(R) heading 9967: storage of other goods 18% (AG8)'),
+  milling_pds: [row('2021-06-17', 0, '998817', 'Circular 153/09/2021-GST: milling for PDS exempt (entry 3A) when goods ≤ 25% of value, else 5% — the app shows the test (AG9)', true)],
+  job_milling: flat('998817', 5, 'N 11/2017-CT(R) entry 26: job work on food products for a registered person 5% (AG10 for an unregistered farmer: verify)'),
+  interest: nil('997113', 'N 12/2017-CT(R) entry 27: interest on loans nil — recalled (AG24)'),
+};
+
+/** The suggested rate / HSN of a class on a date (null for an unknown class). */
+export const agClassAt = (cls: AgClass, date?: string): AgClassRate | null => (AGRI_CLASS_RULES[cls] ? ruleAt(AGRI_CLASS_RULES[cls], date) : null);
+
+/** Rule 6DD(e): cash paid to the cultivator / grower / producer of agri produce is outside Sec 40A(3) (AG14 ★). */
+export const RULE_6DDE_RULES: readonly AgRule<{ applies: boolean; label: string }>[] = [
+  { from: '2017-04-01', value: { applies: true, label: 'Rule 6DD(e)' }, source: 'IT Rules 1962 Rule 6DD(e) (incometaxindia.gov.in); Mad HC 2025 reads "producer" narrowly (taxmann)', verified: true },
+  { from: '2026-04-01', value: { applies: true, label: 'Rule 6DD(e) (2025-Act rule not confirmed)' }, source: 'Income-tax Act 2025 equivalent of Sec 40A(3) / Rule 6DD not read — verify (AG14)', verified: false },
+];
+
+/** The pre-packaged and labelled line for cereals / pulses / flour (kg or L in one package). */
+export const PACKED_25KG_RULES: readonly AgRule<number>[] = [
+  { from: '2022-07-18', value: 25, source: 'N 6/2022-CT(R) + FinMin FAQ (2022): ≤ 25 kg / 25 L pre-packaged and labelled; Legal Metrology (Packaged Commodities) Rules 2011 (AG5)', verified: false },
+];
+
+/* ── AG-B: dairy (filled by AG-B) ────────────────────────────────────────────────────────────────────────────── */
+/** CLR defaults (cow 28, buffalo 30) and the fat-kg tolerance on dispatch (practice, not statute). */
+export const MILK_DEFAULTS: readonly AgRule<{ clrCow: number; clrBuffalo: number; fatTolerancePct: number }>[] = [
+  { from: '2017-07-01', value: { clrCow: 28, clrBuffalo: 30, fatTolerancePct: 0.5 }, source: 'Practice (union rate charts); not a statutory value', verified: false },
+];
+
+/* ── AG-C: mills (filled by AG-C) ────────────────────────────────────────────────────────────────────────────── */
+/** CMR outturn kg per 100 kg paddy: raw 67, parboiled 68 (agency norm; CAG Report 31 of 2015). */
+export const OUTTURN_STANDARDS: readonly AgRule<{ raw: number; parboiled: number }>[] = [
+  { from: '2005-01-01', value: { raw: 67, parboiled: 68 }, source: 'Agency norm; CAG Report 31 of 2015 (norms unrevised since 2005) — AG agency terms win', verified: false },
+];
+/** Circular 153/09/2021: composite milling supply for PDS exempt when goods ≤ 25% of value. */
+export const MILLING_PDS_RULES: readonly AgRule<{ goodsPct: number; exemptEntry: string; elseRate: number }>[] = [
+  { from: '2021-06-17', value: { goodsPct: 25, exemptEntry: 'N 12/2017-CT(R) entry 3A', elseRate: 5 }, source: 'Circular 153/09/2021-GST (17 Jun 2021) — read (AG9)', verified: true },
+];
+
+/* ── AG-D: cold storage, input dealers, members (filled by AG-D) ─────────────────────────────────────────────── */
 /** Storage class → SAC and GST rate (AG8). `storage_agri`: storage / warehousing of agricultural produce, nil (entry 54(e)). */
 export interface StorageClassRule { sac: string; rate: number; spaceSac: string }
 export const STORAGE_CLASS_RULES: Readonly<Record<'storage_agri' | 'storage_other', readonly AgRule<StorageClassRule>[]>> = {
@@ -17,8 +116,9 @@ export const STORAGE_CLASS_RULES: Readonly<Record<'storage_agri' | 'storage_othe
   storage_other: [{ from: '2017-07-01', value: { sac: '996721', rate: 18, spaceSac: '997212' }, source: 'Storage of non-agricultural goods / renting a whole chamber (Gujarat AAR, 9972) — 18% (AG8)', verified: false }],
 };
 /** Words that mark a commodity as fresh agricultural produce (exempt storage) vs processed / non-agri goods (AG1, AG8 (d)). */
-export const AGRI_PRODUCE_WORDS = ['potato', 'onion', 'garlic', 'apple', 'fruit', 'vegetable', 'grain', 'paddy', 'wheat', 'maize', 'pulse', 'chana', 'gram', 'seed', 'chilli', 'turmeric', 'carrot', 'peas', 'orange', 'kinnow', 'grape', 'banana', 'mango', 'आलू', 'प्याज़', 'प्याज', 'सेब', 'धान', 'गेहूं'];
-export const NON_AGRI_WORDS = ['frozen', 'processed', 'dry fruit', 'dried', 'medicine', 'chemical', 'ice cream', 'meat', 'fish', 'dairy', 'paneer', 'ghee', 'butter', 'pickle', 'pulp', 'juice'];
+export const STORAGE_WORD_RULES: readonly AgRule<{ agri: readonly string[]; other: readonly string[] }>[] = [
+  { from: '2017-07-01', value: { agri: ['potato', 'onion', 'garlic', 'apple', 'fruit', 'vegetable', 'grain', 'paddy', 'wheat', 'maize', 'pulse', 'chana', 'gram', 'seed', 'chilli', 'turmeric', 'carrot', 'peas', 'orange', 'kinnow', 'grape', 'banana', 'mango', 'आलू', 'प्याज़', 'प्याज', 'सेब', 'धान', 'गेहूं'], other: ['frozen', 'processed', 'dry fruit', 'dried', 'medicine', 'chemical', 'ice cream', 'meat', 'fish', 'dairy', 'paneer', 'ghee', 'butter', 'pickle', 'pulp', 'juice'] }, source: 'Explanation to N 11/2017-CT(R) "agricultural produce" as read by the developers (AG1, AG8 (d)) — a suggestion only', verified: false },
+];
 
 /** Subsidised fertiliser: bags per farmer per month before a warning (reported, AG22); sale at or below MRP. */
 export const FERT_SUBSIDY_DEFAULTS: readonly AgRule<{ capBagsPerMonth: number }>[] = [

@@ -63,7 +63,7 @@ test('the gate pass raises a bill of supply for the bags released only, with the
   assert.equal(bill.tax_amount, 0);
   assert.ok(bill.notes?.includes(EXEMPT_NOTE));
   const snap = bill.ag!.rent!;
-  assert.deepEqual([snap.lot_no, snap.bags, snap.bags_in, snap.balance, snap.out_id, snap.chamber, snap.in_charges], [lot.number, 60, 240, 180, g.out.id, 'Chamber 1', true]);
+  assert.deepEqual([snap.lot_no, snap.bags, snap.bags_in, snap.bags_balance, snap.out_id, snap.chamber, snap.in_charges], [lot.number, 60, 240, 180, g.out.id, 'Chamber 1', true]);
   assert.throws(() => raiseRentBill(loadLots()[0], { kind: 'out', out: g.out }), /already billed/);
   const g2 = issueGatePass(lot.id, { date: '2026-08-01', bags: 40 });
   assert.equal(g2.bill!.total, 40 * 180 + 40 * 5, 'no unloading the second time');

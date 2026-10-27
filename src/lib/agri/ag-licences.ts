@@ -70,4 +70,4 @@ export function principalWarnings(purchases: readonly unknown[], principals: rea
 }
 
 /** The licence lines printed in the dealer block (valid on the bill date). */
-export const licenceLines = (licences: readonly AgriLicence[] | undefined, date: string) => (licences ?? []).filter((l) => l.number.trim() && validOn(l, date)).map((l) => ({ kind: l.kind, number: l.number, ...(l.valid_to ? { valid_to: l.valid_to } : {}) }));
+export const licenceLines = (licences: readonly AgriLicence[] | undefined, date: string) => (licences ?? []).filter((l) => l.number.trim() && validOn(l, date)).map((l) => ({ kind: l.kind, no: l.number }));

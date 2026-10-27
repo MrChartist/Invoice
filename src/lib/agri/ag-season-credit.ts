@@ -5,7 +5,8 @@
  * interest notes (`tr-interest.ts` starts a season bill's interest at its season due date, whatever the basis;
  * AG32: interest follows each bill's line rates). The khata shows "due at harvest". Pure.
  */
-import type { AgInputsSnap, AgriSeason } from '../../types/agri-r12d';
+import type { AgriSeason } from '../../types/agri-r12d';
+import type { AgInputsSnap } from '../../types/agri-r12';
 import type { InvoiceRecord } from '../../types/invoice';
 import { num } from '../invoice-calc';
 

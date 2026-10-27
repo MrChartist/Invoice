@@ -13,6 +13,10 @@ import { reachT } from '../../i18n/areas/reach';
 import { SHOP_MODE_EVENT, type BusinessType } from '../../lib/shop-mode';
 import { BUSINESS_DEFAULTS, BUSINESS_TYPES, CONSTRUCTION_PROFILES, RETAIL_PROFILES, SERVICE_PROFILES, TRADE_PROFILES, applyBusinessDefaults, applyConstructionKind, applyRetailKind, applyServiceKind, applyTradeKind, isConstructionKind, isRetailKind, isServiceKind, isTradeKind, type ConstructionKindId, type RetailKindId, type ServiceKindId, type TradeKindId } from '../../lib/shop-presets';
 import { ServiceKindPicker } from '../services-r10/ServiceKindPicker'; // R10 (SV-A1)
+import { AgriKindPicker } from '../agri/AgriKindPicker'; // R12 (AG-A1)
+import { agPickT } from '../../i18n/areas/agri-r12-pick';
+import { AGRI_PROFILES, applyAgriKind, isAgriKind, type AgriKindId } from '../../lib/shop-presets';
+import { activePacks } from '../../lib/industry-packs';
 import { svPickT } from '../../i18n/areas/services-r10-pick';
 import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
 import { cnPickT } from '../../i18n/areas/construction-r11-pick';
@@ -64,8 +68,19 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
     setSvKind(k);
     if (k) setA((prev) => ({ ...prev, templateId: SERVICE_PROFILES[k].templateId }));
   };
+  // R12 (AG-A1): the "Farm, dairy & food processing" card is not a business type: its kind writes one (or none).
+  const [agOn, setAgOn] = useState(() => isAgriKind(localDb.settings.get().agri_kind));
+  const [agKind, setAgKind] = useState<AgriKindId | ''>(() => (isAgriKind(localDb.settings.get().agri_kind) ? (localDb.settings.get().agri_kind as AgriKindId) : ''));
+  const [agMill, setAgMill] = useState<string>(() => localDb.settings.get().mill_kind ?? 'rice');
+  const pickAgri = (k: AgriKindId | '') => {
+    setAgKind(k);
+    const p = k ? AGRI_PROFILES[k] : undefined;
+    if (p?.type) setBusiness(p.type);
+    if (p?.templateId) setA((prev) => ({ ...prev, templateId: p.templateId! }));
+  };
   const { lang } = useT();
   const pickBusiness = (b: BusinessType) => {
+    setAgOn(false); // R12
     setBusiness(b);
     // The design follows the business type until the user picks one on the last step.
     set({ templateId: BUSINESS_DEFAULTS[b].templateId });
@@ -99,23 +114,26 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
     if (problem) return setError(problem);
     if (!last) return setStep((s) => s + 1);
     try {
-      const trade = business === 'wholesale' && tradeKind ? tradeKind : null; // R8-C
-      const retail = business === 'kirana' && retailKind ? retailKind : null; // R9 (RT-A1)
-      const cons = business === 'contractor' && cnKind ? cnKind : null; // R11 (CN-A1)
-      const svc = business === 'services' && svKind ? svKind : null; // R10 (SV-A1)
+      const agri = agOn && agKind ? agKind : null; // R12 (AG-A1): the agri profile wins over the type's own picker
+      const trade = !agri && business === 'wholesale' && tradeKind ? tradeKind : null; // R8-C
+      const retail = !agri && business === 'kirana' && retailKind ? retailKind : null; // R9 (RT-A1)
+      const cons = !agri && business === 'contractor' && cnKind ? cnKind : null; // R11 (CN-A1)
+      const svc = !agri && business === 'services' && svKind ? svKind : null; // R10 (SV-A1)
       localDb.settings.save({
         ...applyBusinessDefaults(applyAnswers(localDb.settings.get(), a), business),
         ...(trade ? { ...applyTradeKind(trade), defaultDueDays: TRADE_PROFILES[trade].defaultDueDays } : {}),
         ...(retail ? { ...applyRetailKind(retail, { registered: a.gstRegistered }), defaultDueDays: RETAIL_PROFILES[retail].defaultDueDays } : {}),
         ...(cons ? { ...applyConstructionKind(cons, { registered: a.gstRegistered }), defaultDueDays: CONSTRUCTION_PROFILES[cons].defaultDueDays } : {}),
         ...(svc ? { ...applyServiceKind(svc, { registered: a.gstRegistered, pharmacy: svPharmacy }), defaultDueDays: SERVICE_PROFILES[svc].defaultDueDays } : {}),
+        ...(agri ? { ...applyAgriKind(agri, { registered: a.gstRegistered, mill_kind: agMill, currentPacks: activePacks(localDb.settings.get()) }), ...(AGRI_PROFILES[agri].defaultDueDays !== undefined ? { defaultDueDays: AGRI_PROFILES[agri].defaultDueDays } : {}) } : {}),
       });
+      if (agri) void import('../../lib/agri/ag-profile').then((m) => m.applyAgriSwitches(agri)).catch(() => undefined);
       if (svc) void import('../../lib/services/sv-profile').then((m) => m.applyServiceSwitches(svc)).catch(() => undefined);
       if (cons) void import('../../lib/construction/cn-profile').then((m) => m.applyConstructionSwitches(cons, { government: cnGov })).catch(() => undefined);
       if (retail) void import('../../lib/retail/rt-profile').then((m) => m.applyRetailSwitches(retail)).catch(() => undefined);
       window.dispatchEvent(new Event(SHOP_MODE_EVENT));
       localDb.template.set(a.templateId);
-      onClose(trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : svc ? SERVICE_PROFILES[svc].landing : BUSINESS_DEFAULTS[business].landing);
+      onClose(agri ? AGRI_PROFILES[agri].landing : trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : svc ? SERVICE_PROFILES[svc].landing : BUSINESS_DEFAULTS[business].landing);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -211,34 +229,46 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
             <p className={controls.hint}>{reachT('shopLede')}</p>
             <div className={styles.shopGrid} role="radiogroup" aria-label={reachT('title.shop')}>
               {BUSINESS_TYPES.map((b) => (
-                <button key={b} type="button" role="radio" aria-checked={business === b} className={styles.shopCard} onClick={() => pickBusiness(b)}>
+                <button key={b} type="button" role="radio" aria-checked={business === b && !agOn} className={styles.shopCard} onClick={() => pickBusiness(b)}>
                   <strong>{reachT(`type.${b}`)}</strong>
                   <span>{reachT(`hint.${b}`)}</span>
                 </button>
               ))}
+              {/* R12 (AG-A1): not a business type — its kind writes one */}
+              <button type="button" role="radio" aria-checked={agOn} className={styles.shopCard} onClick={() => setAgOn(true)} data-wizard-agri-card>
+                <strong>{agPickT('card')}</strong>
+                <span>{agPickT('cardHint')}</span>
+              </button>
             </div>
-            {business === 'wholesale' && (
+            {agOn && (
+              <div className={controls.field} data-wizard-agri>
+                <span className={controls.label}>{agPickT('title')}</span>
+                <span className={controls.hint}>{agPickT('lede')}</span>
+                <AgriKindPicker value={agKind} onPick={pickAgri} mill={agMill} onMill={setAgMill} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
+              </div>
+            )}
+            {!agOn && business === 'wholesale' && (
               <div className={controls.field} data-wizard-trade>
                 <span className={controls.label}>{trT('tradeTitle')}</span>
                 <span className={controls.hint}>{trT('tradeLede')}</span>
                 <TradeKindPicker value={tradeKind} onPick={setTradeKind} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
               </div>
             )}
-            {business === 'kirana' && (
+            {!agOn && business === 'kirana' && (
               <div className={controls.field} data-wizard-retail>
                 <span className={controls.label}>{pickT('retailTitle')}</span>
                 <span className={controls.hint}>{pickT('retailLede')}</span>
                 <RetailKindPicker value={retailKind} onPick={pickRetail} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
               </div>
             )}
-            {business === 'contractor' && (
+            {!agOn && business === 'contractor' && (
               <div className={controls.field} data-wizard-construction>
                 <span className={controls.label}>{cnPickT('title')}</span>
                 <span className={controls.hint}>{cnPickT('lede')}</span>
                 <ConstructionKindPicker value={cnKind} onPick={pickConstruction} government={cnGov} onGovernment={setCnGov} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
               </div>
             )}
-            {business === 'services' && (
+            {!agOn && business === 'services' && (
               <div className={controls.field} data-wizard-service>
                 <span className={controls.label}>{svPickT('title')}</span>
                 <span className={controls.hint}>{svPickT('lede')}</span>

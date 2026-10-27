@@ -62,16 +62,20 @@ const PharmacyDesk = lazy(() => import('../components/retail-r9/PharmacyDesk'));
 const ApparelDesk = lazy(() => import('../components/retail-r9/ApparelDesk'));
 const DevicesDesk = lazy(() => import('../components/retail-r9/DevicesDesk'));
 const JewelleryDesk = lazy(() => import('../components/retail-r9/JewelleryDesk'));
-// R12 (AG-D): cold-storage, input-dealer and members desks (one lazy chunk each).
-const ColdDesk = lazy(() => import('../components/agri/ColdDesk'));
-const InputsDesk = lazy(() => import('../components/agri/InputsDesk'));
-const MembersDesk = lazy(() => import('../components/agri/MembersDesk'));
 const ShortBookTab = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.ShortBookTab })));
 const RelabelQueue = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.RelabelQueue })));
 const MrpBasisTool = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.MrpBasisTool })));
+// R12: agri desks (one lazy chunk each). AG-A's farm desk; the dairy / mill / cold / inputs / members desks are stubs
+// until AG-B / C / D replace those files (this page is not edited again).
+const FarmDesk = lazy(() => import('../components/agri/FarmDesk'));
+const DairyDesk = lazy(() => import('../components/agri/DairyDesk'));
+const MillDesk = lazy(() => import('../components/agri/MillDesk'));
+const ColdDesk = lazy(() => import('../components/agri/ColdDesk'));
+const InputsDesk = lazy(() => import('../components/agri/InputsDesk'));
+const MembersDesk = lazy(() => import('../components/agri/MembersDesk'));
 const r9TabT = defineArea(
-  { pharmacy: 'Pharmacy', apparel: 'Apparel', devices: 'Devices', jewellery: 'Jewellery', shortbook: 'Short book', cold: 'Cold storage', inputs: 'Input dealer', members: 'Members' } as const,
-  { pharmacy: 'फ़ार्मेसी', apparel: 'कपड़े', devices: 'डिवाइस', jewellery: 'ज्वेलरी', shortbook: 'शॉर्ट बुक', cold: 'शीतगृह', inputs: 'खाद-बीज विक्रेता', members: 'सदस्य' },
+  { pharmacy: 'Pharmacy', apparel: 'Apparel', devices: 'Devices', jewellery: 'Jewellery', shortbook: 'Short book', farm: 'Farm', dairy: 'Dairy', mill: 'Mill', cold: 'Cold storage', inputs: 'Inputs', members: 'Members' } as const,
+  { pharmacy: 'फ़ार्मेसी', apparel: 'कपड़े', devices: 'डिवाइस', jewellery: 'ज्वेलरी', shortbook: 'शॉर्ट बुक', farm: 'खेती', dairy: 'डेयरी', mill: 'मिल', cold: 'शीतगृह', inputs: 'खाद-बीज', members: 'सदस्य' },
 );
 /** R9: the short book tab shows for a retail counter, once it is switched on, or once it has rows. */
 const shortBookShown = (): boolean => {
@@ -413,6 +417,10 @@ export function Inventory() {
             {activeTab === 'apparel' && <ApparelDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
             {activeTab === 'devices' && <DevicesDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
             {activeTab === 'jewellery' && <JewelleryDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
+            {/* R12: agri desks */}
+            {activeTab === 'farm' && <FarmDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
+            {activeTab === 'dairy' && <DairyDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
+            {activeTab === 'mill' && <MillDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
             {activeTab === 'cold' && <ColdDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
             {activeTab === 'inputs' && <InputsDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
             {activeTab === 'members' && <MembersDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}

@@ -18,14 +18,14 @@ export default function SubsidyView({ onDone }: { onDone: Done }) {
   const positions = useMemo(() => { void tick; return loadPositions(); }, [tick]);
   const isSub = useMemo(() => { void tick; return subsidisedTest(); }, [tick]);
   const r = posCheck(month, positions, s.pos_stock, localDb.invoices.getAll(), isSub);
-  const [cap, setCap] = useState(s.subsidy_cap ?? 0);
+  const [cap, setCap] = useState(s.subsidy?.cap ?? 0);
   const setPos = (id: string, v: number) => run(() => { saveAgriSettings({ pos_stock: { ...(s.pos_stock ?? {}), [month]: { ...(s.pos_stock?.[month] ?? {}), [id]: v } } }); });
   return (
     <>
       <div style={wrap}>
         <F label={agdT('month')}><input type="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} /></F>
         <F label={agdT('cap')} w={150}><NumberInput className={controls.input} value={cap} onChange={setCap} /></F>
-        <button type="button" className={btn} onClick={() => run(() => { saveAgriSettings({ subsidy_cap: cap > 0 ? cap : undefined }); return agdT('saved'); })}>{agdT('save')}</button>
+        <button type="button" className={btn} onClick={() => run(() => { saveAgriSettings({ subsidy: cap > 0 ? { cap } : {} }); return agdT('saved'); })}>{agdT('save')}</button>
       </div>
       <Tbl
         head={[agdT('item'), agdT('book'), agdT('posStock'), agdT('diff')]}

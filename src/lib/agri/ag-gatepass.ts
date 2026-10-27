@@ -23,7 +23,7 @@ import { localDb } from '../localDb';
 import { readAgriSettings } from './ag-settings';
 
 const liveInvoices = () => localDb.invoices.getAll();
-const readLtv = () => readAgriSettings().release_ltv_pct;
+const readLtv = () => readAgriSettings().cold?.release_ltv_pct;
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 

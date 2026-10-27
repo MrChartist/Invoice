@@ -117,6 +117,11 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   '/time?tab=appointments&view=birthdays': ['birthday', 'anniversary', 'reminder', 'whatsapp'],
   '/time?tab=commission': ['commission', 'stylist', 'trainer', 'staff', 'incentive'],
   '/time?tab=workshop&view=claims': ['insurance claim', 'tpa', 'insurer', 'cashless'],
+  // R12 (AG-A)
+  '/inventory?tab=farm&view=farmers': ['farmer', 'kisan', 'member', 'farmer card', 'village'],
+  '/inventory?tab=farm&view=vouchers': ['farmer voucher', 'fpv', 'paddy purchase', 'moisture cut', 'mandi fee'],
+  '/inventory?tab=farm&view=cycles': ['milk bill', 'farmer payment', '10 day', 'pakhwada', 'neft file', 'cattle feed'],
+  '/inventory?tab=farm&view=batches': ['flock', 'broiler', 'pond', 'fcr', 'mortality'],
   // R11 (CN-A)
   '/time?tab=works&view=ra': ['ra bill', 'running bill', 'running account bill', 'measurement', 'm-book', 'abstract', 'net payable'],
   '/receivables?tab=realty': ['builder', 'flat', 'rera', 'booking', 'demand letter'],

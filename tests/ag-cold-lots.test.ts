@@ -72,7 +72,7 @@ test('a loan\'s lien blocks the gate pass until repaid; an owner override needs 
 test('repaid in full → the pass is allowed; partial release when the rest still covers the loan at the release LTV', () => {
   const a = lot();
   const loan = giveLoan({ date: '2026-04-10', borrower_id: farmer.id, borrower_name: farmer.name, lot_ids: [a.id], principal: 50000, rate_pct: 12, disbursed_by: 'bank', bag_rate: 600 });
-  saveAgriSettings({ release_ltv_pct: 70 });
+  saveAgriSettings({ cold: { release_ltv_pct: 70 } });
   // 240 bags × ₹600 × 70% = ₹1,00,800 cover; due ≈ ₹50,800 → up to ~119 bags may go
   assert.equal(issueGatePass(a.id, { date: '2026-06-01', bags: 100, bill: false }).out.loan_check, 'clear');
   assert.throws(() => issueGatePass(a.id, { date: '2026-06-02', bags: 40 }), /has a lien/);

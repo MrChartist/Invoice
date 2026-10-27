@@ -489,6 +489,8 @@ const RECORD_TABLES = [
   // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
   // (MUS settlements), hired equipment, plant log sheets (PLG)
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
+  // R12-A: farm batches, quality-cut tables, pooled farmer cycles (CYB/FY…)
+  'farm_batches', 'quality_cut_tables', 'farmer_cycles',
   // R12-D: cold-storage lots (CSR / GPO), rent plans, loans against stored produce (LAS), members' share ledger (SHC)
   'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares',
 ];
@@ -577,6 +579,8 @@ const ID_TABLES = new Set([
   // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
   // (MUS settlements), hired equipment, plant log sheets (PLG)
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
+  // R12-A: farm batches, quality-cut tables, pooled farmer cycles (CYB/FY…)
+  'farm_batches', 'quality_cut_tables', 'farmer_cycles',
   // R12-D: cold-storage lots (CSR / GPO), rent plans, loans against stored produce (LAS), members' share ledger (SHC)
   'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares',
 ]);

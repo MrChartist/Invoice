@@ -41,7 +41,7 @@ test('CA_REVIEW ids are unique, and every id the help cites exists there', () =>
   };
   walk(helpDir);
   const cited = new Set<string>();
-  for (const f of files) for (const m of read(f).matchAll(/CA_REVIEW[^\n]*?\b((?:G|T|P|AC|I|X|CN|SV|AG)\d{1,2})\b/g)) cited.add(m[1]);
+  for (const f of files) for (const m of read(f).matchAll(/CA_REVIEW[^\n]*?\b((?:AG|G|T|P|AC|I|X|CN|SV)\d{1,2})\b/g)) cited.add(m[1]);
   for (const f of files) for (const m of read(f).matchAll(/\bca:\s*\[([^\]]*)\]/g)) for (const id of m[1].match(/(?:CN|SV|AG|G|T|P|AC|I|X)\d{1,2}/g) ?? []) cited.add(id);
   assert.deepEqual([...cited].filter((id) => !ids.has(id)), []);
 });

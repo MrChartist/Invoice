@@ -96,7 +96,7 @@ export const liensOn = (lotId: string, loans: readonly AgriLoan[], asOf: string)
 
 /**
  * A partial release under a lien is allowed when the bags left in ALL the loan's lots still cover what is due at
- * `ltvPct` of the loan's typed bag rate (setting `release_ltv_pct`; absent / no bag rate = never).
+ * `ltvPct` of the loan's typed bag rate (setting `cold.release_ltv_pct`; absent / no bag rate = never).
  */
 export function releaseCovered(loan: AgriLoan, lots: readonly ColdLot[], lotId: string, bags: number, asOf: string, ltvPct: number | undefined): boolean {
   if (!(num(ltvPct) > 0) || !(num(loan.bag_rate) > 0)) return false;

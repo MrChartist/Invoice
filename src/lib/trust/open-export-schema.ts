@@ -224,6 +224,11 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   workshop_settings: 'Workshop settings: inspection checklist, job-card terms, vehicle classes, labour rates, depreciation table, service interval (R10).',
   service_assets: 'Vehicles and appliances: registration / serial no., make, model, owner, insurer and policy, odometer readings, next service (R10).',
   labour_ops: 'Labour operations: code, description, SAC, standard hours per vehicle class or flat price, service interval (R10).',
+  // R12-A
+  agri_settings: 'Agri profile settings: centres / clusters, payment cycles, switches; B–D add milk, chambers, licences, seasons (R12).',
+  farm_batches: 'Farm batches (flock / pond / herd / crop): placed, events (mortality, feed, weight, harvest), cost centre (R12).',
+  quality_cut_tables: 'Quality-cut tables per commodity: norm, cut per point on weight or price, cap, reject line (R12).',
+  farmer_cycles: 'Pooled farmer cycle bills (CYB/FY…): period, farmer-wise qty / amount / deductions / net, the purchase and journal they made (R12).',
   // R11-A
   construction_settings: 'Construction profile switches: RA bill paper style, M-book column, government sign-off boxes, certificate text, deviation limit, works views (R11).',
   // R11-C
@@ -236,7 +241,6 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   muster_days: 'Site attendance, one row per site per day, and the weekly settlement (MUS/FY…, R11).', hired_equipment: 'Equipment hired in, with rate, basis and operator flag (R11).',
   plant_logs: 'Daily plant log sheets: hours, idle, breakdown, fuel, hire out (PLG/FY…, R11).',
   // R12-D
-  agri_settings: 'Agriculture settings: chambers, receipt terms, release LTV, dealer licences and principal certificates, seasons, subsidy cap, PoS stock, co-operative figures, calendar dates (R12).',
   cold_lots: 'Cold-storage lots held in custody (never our stock): storage receipt (CSR/FY…), depositor, commodity, bags, chamber, rent plan, gate passes out (GPO/FY…), transfers (R12).',
   cold_rent_plans: 'Storage rent plans: per bag / quintal, per season / month or lump sum, handling charges, exempt or taxable class, billing time (R12).',
   agri_loans: 'Loans against stored produce (LAS/FY…): borrower, lots under lien, principal, rate, repayments split interest / principal (R12).',

@@ -18,6 +18,7 @@ import { num, round2 } from '../invoice-calc';
 import { movedNoCash } from '../advance-tax'; // no-cash.ts (QA6-1 F4)
 import { getTable } from '../storage';
 import { readRetailSettings } from './rt-settings';
+import { cashPayeeNote } from '../agri/ag-cash'; // R12 (AG-A4): Rule 6DD(e) (pure, no imports)
 
 /* ── RT-D: 269ST / 40A(3) ── */
 
@@ -46,10 +47,14 @@ export function cashReceiptIssue(mode: GuardMode | undefined, cash: number, earl
   return { block: mode === 'block', message: `Cash of ₹${limit.toLocaleString('en-IN')} or more cannot be accepted from one person in a day (Sec 269ST): ₹${total.toLocaleString('en-IN')} in cash. Take the rest by UPI / card / bank — verify with your CA.` };
 }
 
-/** Sec 40A(3) warning for cash paid to one person in a day (buy-back / old gold). '' when fine. */
-export function cashPaymentIssue(paidToday: number, date?: string): string {
+/**
+ * Sec 40A(3) warning for cash paid to one person in a day (buy-back / old gold). '' when fine. R12 (AG-A4): with a
+ * `payee`, a cultivator (farmer vendor / pooled farmer cycle) gets the Rule 6DD(e) note instead (`agri/ag-cash.ts`).
+ */
+export function cashPaymentIssue(paidToday: number, date?: string, payee?: Parameters<typeof cashPayeeNote>[0]): string {
   const limit = cashPaymentLimit(date);
-  return num(paidToday) > limit ? `Sec 40A(3): cash above ₹${limit.toLocaleString('en-IN')} paid to one person in a day may be disallowed — pay by bank. Verify with your CA.` : '';
+  const warn = num(paidToday) > limit ? `Sec 40A(3): cash above ₹${limit.toLocaleString('en-IN')} paid to one person in a day may be disallowed — pay by bank. Verify with your CA.` : '';
+  return payee ? cashPayeeNote(payee, paidToday, limit, warn) : warn; // R12 (AG-A4): Rule 6DD(e)
 }
 
 /* ── RT-E: PAN, PMLA, live guards (counter, editor, receipts), e-Way chapter 71 ── */

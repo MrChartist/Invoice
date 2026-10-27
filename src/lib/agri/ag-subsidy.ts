@@ -7,7 +7,8 @@
  *    units already converted) against the PoS stock typed from the device's report, with the sales missing a PoS no.
  * The full Aadhaar number is never stored (4 digits only). Pure above "Storage".
  */
-import type { AgInputsSnap, PosStock } from '../../types/agri-r12d';
+import type { PosStock } from '../../types/agri-r12d';
+import type { AgInputsSnap } from '../../types/agri-r12';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { StockItem, StockPosition } from '../inventory';
 import { num } from '../invoice-calc';
