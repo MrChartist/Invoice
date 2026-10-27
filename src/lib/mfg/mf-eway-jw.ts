@@ -65,6 +65,8 @@ export function buildJwReturnEway(m: PrincipalMovement, principal: Party | undef
   const notes = b.notes.filter((n) => !/job worker has no GSTIN|job worker's address/.test(n));
   if (!principal?.address) notes.push("The principal's address is not in the customer master: add it before uploading.");
   notes.push('Values are the principal\'s goods as on his challan (MF11: a GSTAT ruling left them out of a return\'s value — verify).', need.note);
+  // QA16: references disagree on whether "job work returns" is valid with an OUTWARD supply type (MF92).
+  notes.push('Outward + sub-type 6 (job work returns): if the portal refuses the combination (error 203), the principal generates it as Inward / job work returns instead — verify MF92.');
   return { payload: { ...b.payload, billLists: [bill] }, bill, notes, required: need.needed };
 }
 

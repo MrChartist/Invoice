@@ -162,7 +162,11 @@ export interface EoStatus {
   bell: '' | '90' | '30' | 'overdue';
 }
 
-export function eoStatus(a: ExportAuthorisation, exports: readonly EoMovement[], imports: readonly EoMovement[], today: string): EoStatus {
+export function eoStatus(a: ExportAuthorisation, allExports: readonly EoMovement[], imports: readonly EoMovement[], today: string): EoStatus {
+  // QA16 P7: an AA's obligation is in its export items — other lines on a tagged invoice (another product, packing,
+  // freight) count towards neither quantity nor value. EPCG obligations are in value of any goods made: all lines count.
+  const eoItems = new Set(a.kind === 'aa' ? a.items_export.map((x) => x.item_id).filter(Boolean) : []);
+  const exports = eoItems.size ? allExports.filter((e) => eoItems.has(e.item_id)) : allExports;
   const qtyDone = exports.reduce((s, e) => s + e.qty, 0);
   const valueDone = round2(exports.reduce((s, e) => s + e.value, 0));
   const imported = { qty: imports.reduce((s, e) => s + e.qty, 0), value: round2(imports.reduce((s, e) => s + e.value, 0)) };
