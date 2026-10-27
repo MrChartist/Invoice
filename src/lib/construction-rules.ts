@@ -63,7 +63,25 @@ export const DEVIATION_DEFAULTS: readonly CnRule<{ pct: number }>[] = [
 /** Default contractor's certificate (editable in Settings → Features and per bill). */
 export const DEFAULT_CERTIFICATE = 'Certified that the work has been executed as per specifications and the quantities are as measured and recorded in the measurement book; no previous claim has been made for this work.';
 
-/* ── CN-B: contractor finance (ADVANCE_DEFAULTS, ESCALATION_DEFAULTS) — filled by CN-B ── */
+/* ── CN-B: contractor finance ─────────────────────────────────────────────────────────────────────────────────── */
+
+/** Advances (§8 Q12 / Q13): contract practice, every value a contract term the agreement overrides. */
+export const ADVANCE_DEFAULTS: readonly CnRule<{ mobilisation_pct: number; interest_pct: number; recover_from_pct: number; recover_by_pct: number; secured_pct: number; secured_alert_days: number }>[] = [
+  { from: '2017-07-01', value: { mobilisation_pct: 10, interest_pct: 10, recover_from_pct: 10, recover_by_pct: 80, secured_pct: 75, secured_alert_days: 90 }, source: 'CPWD Works Manual practice (mobilisation advance 10% at 10% simple interest, recovered 10%→80% of work; secured advance 75% of materials at site) — contract practice, verify (CN7 / CN8)', verified: false },
+];
+
+/** Price variation (§8 Q14): M = 0.85 (profit and overheads 15%). The contract clause governs (CN6). */
+export const ESCALATION_DEFAULTS: readonly CnRule<{ m_factor: number }>[] = [
+  { from: '2017-07-01', value: { m_factor: 0.85 }, source: 'CPWD clause 10CC-type formula — contract practice, verify (CN6)', verified: false },
+];
+
+/**
+ * Recoveries and alerts (§8 Q16 / Q18 / Q19 / Q34): water + electricity 1% + 1% of the value before GST; wastage band
+ * ±3% with recovery of the excess at 2× the issue rate; withheld and guarantee alert horizons. Contract terms.
+ */
+export const RECOVERY_DEFAULTS: readonly CnRule<{ water_pct: number; power_pct: number; wastage_band_pct: number; penal_factor: number; withheld_alert_days: number; bg_alert_days: number }>[] = [
+  { from: '2017-07-01', value: { water_pct: 1, power_pct: 1, wastage_band_pct: 3, penal_factor: 2, withheld_alert_days: 90, bg_alert_days: 30 }, source: 'Common PWD clauses (water / electricity, cement & steel variation) — contract terms, verify (CN9 / CN10 / CN11)', verified: false },
+];
 
 /* ── CN-C: builders (REALTY_RATE_RULES, REALTY_AFFORDABLE_RULES, REALTY_INTEREST_RULES, RERA_DEPOSIT_RULES,
  *    REALTY_PROCUREMENT_RULES) — filled by CN-C ── */

@@ -17,7 +17,11 @@ export const CN_OBJECTS = { constructionSettings: 'construction_settings' } as c
 export const CN_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // CN-A: the construction profile switches (owner only)
   construction_settings: 'settings.manage',
-  // CN-B: works_contracts, secured_advances, price_variations, bank_guarantees
+  // CN-B: contract register (a master), secured advances and PV statements (documents), guarantees (books)
+  works_contracts: 'master.edit',
+  secured_advances: 'doc.create',
+  price_variations: 'doc.create',
+  bank_guarantees: 'books.edit',
   // CN-C: realty_projects, realty_units, realty_bookings, payment_plans, stage_certificates, rera_withdrawals
   // CN-D: sub_work_orders, sub_measurements, labour_compliance, site_labour, muster_days, hired_equipment, plant_logs
 };
@@ -26,6 +30,10 @@ export const CN_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
 export const CN_WATCHED: Readonly<Record<string, WatchedTable>> = {
   // CN-A: none (the settings object is audited on save)
   // CN-B
+  works_contracts: { entity: 'client', label: 'Works contract' },
+  secured_advances: { entity: 'payment', label: 'Secured advance' },
+  price_variations: { entity: 'invoice', label: 'Price variation statement' },
+  bank_guarantees: { entity: 'payment', label: 'Bank guarantee' },
   // CN-C
   // CN-D
 };
