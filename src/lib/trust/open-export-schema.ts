@@ -258,6 +258,8 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   work_centres: 'Work centres: kind, machine / labour / power / overhead rates per hour, shifts, working days, efficiency, parallel units, holidays (R13).',
   routings: 'Routings per item: operations with work centre, set-up and run time, batch size, inspection, piece rate (R13).',
   job_cards: 'Job cards (JCD/FY…): one per production order per operation, with entries (hours, operator, good / rejected / rework, scrap kg) (R13).',
+  // R13-C
+  cut_plans: 'Cut plans / lots (CUT/FY…): style, colour, fabric, lays (plies × marker ratio, length), pieces cut by size, fabric issued / end bits / waste, bundles with their operation history (R13).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';

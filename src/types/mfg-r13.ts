@@ -286,11 +286,11 @@ declare module './invoice' {
 declare module './purchases' {
   interface Vendor {
     /** C4: a karigar paid by the piece; D3: an Udyam-registered trader (outside 43B(h)). */
-    mf?: { karigar?: boolean; msme_trader?: boolean };
+    mf?: { karigar?: MfKarigar; msme_trader?: boolean };
   }
   interface PurchaseRecord {
     /** B3 scrap bought, C4 karigar piece bills. */
-    mf?: { kind?: 'scrap' | 'piece_bill'; ref_id?: string };
+    mf?: { kind?: 'scrap' | 'piece_bill'; ref_id?: string; piece?: MfPieceBill };
   }
 }
 
@@ -313,7 +313,7 @@ declare module '../lib/inventory' {
     mf_epr?: string;
     shelf_life_days?: number;
     mf_inv_class?: string;
-    mf?: { style?: string };
+    mf?: { style?: MfStyle };
   }
 }
 
@@ -338,7 +338,7 @@ declare module './manufacturing' {
 declare module './job-work' {
   interface JobWorkLine {
     /** C: bundle / lot reference of a CMT challan line. */
-    mf?: { lot?: string; bundles?: string[] };
+    mf?: { lot?: string; bundles?: string[]; pieces?: number; scrap_at_jw?: boolean };
   }
 }
 
@@ -348,6 +348,114 @@ declare module './job-work' {
 
 /* ════════════════════════════════════════ MF-C ════════════════════════════════════════ */
 // MF-C: cut_plans (CUT, bundles inside), karigar piece bills (KPB on `purchases`); `mf.cmt`. Declare the row shapes here.
+
+
+/** C1: a style's fabric (per colour, optional) and trims; on `StockItem.mf.style` of the style (a variant parent). */
+export interface MfStyle {
+  fabric_items: { item_id: string; per_piece_m: number; colour_map?: Record<string, string> }[];
+  trims?: { item_id: string; per_piece: number }[];
+  size_ratio_default?: Record<string, number>;
+  routing_id?: string;
+}
+
+/** C1: one lay of a cut plan. */
+export interface MfLay {
+  plies: number;
+  marker_ratio: Record<string, number>;
+  marker_length_m: number;
+  width_cm?: number;
+}
+
+/** C2: one operation a bundle went through (or a reject). */
+export interface MfBundleStep {
+  date: string;
+  op_id?: string;
+  op?: string;
+  good: number;
+  rejected: number;
+  reason?: string;
+  /** Who (karigar vendor id / employee id) and the job-card entry it was recorded against. */
+  by?: string;
+  jc_entry_id?: string;
+}
+
+export type MfBundleWhere = 'floor' | 'fabricator' | 'finished' | 'rejected';
+
+/** C2: a bundle inside its lot (`<lot>/<no>`). `pieces` as cut; rejected pieces leave it (`rejected`). */
+export interface MfBundle {
+  no: number;
+  size: string;
+  colour: string;
+  shade?: string;
+  pieces: number;
+  rejected?: number;
+  at: { op_id?: string; op?: string; where: MfBundleWhere; party_id?: string; challan_id?: string };
+  history: MfBundleStep[];
+  /** The output journal (R4-A manufacturing voucher) that reported its finished pieces. */
+  reported?: string;
+}
+
+/** C1: cut plan / lot `CUT/FY…` (table `cut_plans`, `doc.create`); bundles inside. */
+export interface CutPlan {
+  id: string;
+  number: string;
+  date: string;
+  order_id?: string;
+  style_id: string;
+  colour: string;
+  fabric_item_id: string;
+  fabric_batch?: string;
+  lays: MfLay[];
+  /** Pieces cut by size (Σ plies × ratio unless typed). */
+  cut: Record<string, number>;
+  fabric_issued_m: number;
+  end_bits_m?: number;
+  cut_waste_kg?: number;
+  waste_item_id?: string;
+  bundle_size?: number;
+  bundles?: MfBundle[];
+  /** Stock documents written for the cut (R4-A issue / return, the waste journal). */
+  docs?: { issue_id?: string; return_id?: string; waste_id?: string };
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** C4: a karigar's rate (operation id or name; a style-specific row wins). */
+export interface MfKarigarRate {
+  op: string;
+  style_id?: string;
+  rate: number;
+  from: string;
+}
+
+/** C4: `Vendor.mf.karigar` — a piece-rate worker who is not on payroll. PAN / bank come from the vendor master. */
+export interface MfKarigar {
+  kind: 'home' | 'floor' | 'fabricator';
+  rates: MfKarigarRate[];
+  upi?: string;
+  /** Deduct pieces rejected for his fault from the bill (default on). */
+  deduct_rejects?: boolean;
+}
+
+export interface MfPieceLine {
+  op: string;
+  style?: string;
+  pieces: number;
+  rate: number;
+  amount: number;
+  source: 'jobcard' | 'bundle' | 'cmt' | 'typed';
+  refs?: string[];
+}
+
+/** C4: `PurchaseRecord.mf.piece` of a karigar piece bill `KPB/FY…`. */
+export interface MfPieceBill {
+  period: { from: string; to: string };
+  lines: MfPieceLine[];
+  rejected_deducted?: number;
+  advance_recovered?: number;
+  advance_jv_id?: string;
+}
 
 /* ════════════════════════════════════════ MF-D ════════════════════════════════════════ */
 // MF-D: cost_cards, export_authorisations, incentive_claims; `mf.food`, `mf.export_aa`. Declare the row shapes here.

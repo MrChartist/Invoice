@@ -128,6 +128,8 @@ export interface Settlement {
   item_id: string;
   qty: number;
   what: SettleKind;
+  /** MF-C3: a loss line tagged `mf.scrap_at_jw` — waste / scrap kept or sold by the job worker (Sec 143(5)); still a loss. */
+  scrap_at_jw?: true;
 }
 
 /**
@@ -170,7 +172,7 @@ export function challanBalances(outs: readonly MaterialOut[], ins: readonly Mate
         r[what] += q;
         r.pending -= q;
         rest -= q;
-        settlements.push({ inId: v.id, outId: r.outId, outLineId: r.lineId, item_id: r.item_id, qty: roundQty(q), what });
+        settlements.push({ inId: v.id, outId: r.outId, outLineId: r.lineId, item_id: r.item_id, qty: roundQty(q), what, ...(what === 'lost' && (l as { mf?: { scrap_at_jw?: boolean } }).mf?.scrap_at_jw ? { scrap_at_jw: true as const } : {}) });
         if (r.deadline && day(v.date) > r.deadline) r.late = true;
       };
       const named = l.out_line_id ? byLine.get(l.out_line_id) : undefined;
