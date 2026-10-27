@@ -2993,7 +2993,13 @@ try {
     await page.getByLabel('Item 1 name').fill('E2E Havells');
     await page.getByRole('option', { name: /E2E Havells MCB/ }).first().click({ timeout: 15000 });
     await page.getByText('Party rate price').first().waitFor({ timeout: 15000 });
-    check((await page.getByLabel('Item 1 rate').inputValue()).startsWith('900'), `the party rate prices the line (${await page.getByLabel('Item 1 rate').inputValue()})`);
+    // The "Party rate" label can paint a frame before the rate input takes the new value: wait for the value itself.
+    let rateNow = '';
+    for (let i = 0; i < 150 && !rateNow.startsWith('900'); i++) {
+      rateNow = await page.getByLabel('Item 1 rate').inputValue();
+      if (!rateNow.startsWith('900')) await new Promise((r) => setTimeout(r, 100));
+    }
+    check(rateNow.startsWith('900'), `the party rate prices the line (${rateNow})`);
     await page.locator('[data-disc-chain="0"]').fill('18+4');
     await page.locator('[data-disc-eff="0"]').waitFor({ timeout: 15000 });
     check(/21\.28%/.test(await page.locator('[data-disc-eff="0"]').innerText()), 'the line shows the effective 21.28 %');
@@ -3307,6 +3313,78 @@ try {
     const cash = rows.filter((p) => p.method === 'Cash').reduce((s, p) => s + p.amount, 0);
     const ex = rows.find((p) => p.exchange_purchase_id === urd.id);
     check(sale.total === 6000 && ex?.amount === 5000 && cash === 1000, `bill ₹${sale.total}: exchange ₹${ex?.amount} (no cash), cash ₹${cash}`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R9-E jewellery: Jewellery profile, 22K rate ₹9,350, a tag 6.420 / 0.380 g with HUID billed to the paisa (₹66,374.48), the paper shows net weight, "22K (916)", HUID and the BIS line; old gold settles part by exchange (no cash); ₹2,00,000 cash is refused', async () => {
+    const keys = ['settings', 'retail_settings', 'stock_items', 'stock_moves', 'metal_rates', 'jewel_tags', 'invoices', 'transactions', 'purchases', 'vendors', 'godowns', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'kirana', modules: undefined, industry_packs: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'retail_settings', null);
+    for (const k of ['metal_rates', 'jewel_tags']) await writeJson(page, k, []);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-retail-kind-card="jewellery"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.retail_kind === 'jewellery');
+    const rs = await readJson(page, 'retail_settings', {}, (v) => v?.cash_guard === 'block');
+    check(st.industry_packs?.includes('jewellery') && rs.cash_guard === 'block' && rs.require_pan === true, 'Jewellery: pack on, cash guard block, Require PAN');
+    // RT-E1: today's rate, then a tagged ring.
+    await page.goto(srv.origin + '/inventory?tab=jewellery&view=rates');
+    await page.locator('[data-rate-sale="gold:22K"]').fill('9350', { timeout: 15000 });
+    await page.locator('[data-rates-save]').click();
+    const rates = await readJson(page, 'metal_rates', [], (v) => v.length > 0);
+    check(rates.some((r) => r.metal === 'gold' && r.purity === '22K' && r.sale === 9350), 'the 22K sale rate is on today\'s board');
+    await page.goto(srv.origin + '/inventory?tab=jewellery&view=tags');
+    const fill = async (k, v) => page.locator(`[data-tag-form] [data-jw="${k}"]`).fill(String(v), { timeout: 15000 });
+    await fill('item', 'E2E Rings');
+    for (const [k, v] of [['gross', 6.42], ['stone', 0.38], ['stones', 4800], ['wastage', 2], ['making', 650], ['hallmark', 45], ['huid', 'AB12CD']]) await fill(k, v);
+    await page.locator('[data-tag-save]').click();
+    const [tag] = await readJson(page, 'jewel_tags', [], (v) => v.length === 1);
+    check(tag.net_wt === 6.04 && tag.huid === 'AB12CD', `tag ${tag.tag}: net 6.040 g, HUID AB12CD`);
+    await page.locator(`[data-tag-row="${tag.tag}"]`).waitFor({ timeout: 15000 });
+    // RT-E2: bill it in the editor.
+    const before = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/invoice');
+    await page.getByLabel('Client name').fill('E2E Mrs Rao');
+    await page.getByLabel('Item 1 name').fill('E2E Rings');
+    const row = page.locator('[data-jewel-row]').first();
+    await row.locator('[data-jw="tag"]').selectOption(tag.tag, { timeout: 15000 });
+    await row.locator('[data-jw-amount]', { hasText: '66,374.48' }).waitFor({ timeout: 15000 });
+    check(await page.getByLabel('Item 1 rate').inputValue() === '66374.48', 'the line amount equals the ring example (₹66,374.48)');
+    await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
+    const sale = (await readJson(page, 'invoices', [], (v) => v.some((i) => !before.has(i.id)))).find((i) => !before.has(i.id));
+    check(sale?.items?.[0]?.jw?.tag === tag.tag && sale.items[0].tax_rate === 3 && sale.items[0].serials?.[0] === tag.tag, `${sale?.invoice_number}: the jw snapshot, GST 3%, the tag as its serial`);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.getByText(/BIS-recognised A&H centre/).first().waitFor({ timeout: 15000 });
+    const paper = await dialog.innerText();
+    check(/Net 6\.040 g/.test(paper) && paper.includes('22K (916)') && paper.includes('HUID AB12CD') && /Hallmarking ₹45/.test(paper), 'the paper shows net weight, 22K (916), HUID, hallmarking and the BIS line');
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+    // RT-E3: old gold settles part of the bill by exchange (no cash).
+    await page.goto(srv.origin + '/inventory?tab=jewellery&view=oldgold');
+    const og = (k, v) => page.locator(`[data-og-form] [data-og="${k}"], [data-og-form] [data-jw="${k}"]`).first().fill(String(v), { timeout: 15000 });
+    await og('name', 'E2E Mrs Rao');
+    for (const [k, v] of [['og-gross', 2], ['og-touch', 84], ['og-melt', 2], ['og-rate', 10000], ['bill', sale.invoice_number]]) await og(k, v);
+    await page.locator('[data-og-value]', { hasText: '16,464' }).waitFor({ timeout: 15000 });
+    await page.locator('[data-og-save]').click();
+    const urd = (await readJson(page, 'purchases', [], (v) => v.some((p) => p.old_metal))).find((p) => p.old_metal);
+    const ex = (await readJson(page, 'transactions', [], (v) => v.some((t) => t.exchange_purchase_id))).find((t) => t.exchange_purchase_id === urd.id);
+    check(/^URD\/FY\d{2}-\d{2}\/0001$/.test(urd.bill_number) && urd.cgst === 0 && urd.itc_eligible === false && urd.total === 16464, `${urd.bill_number}: 2 g @ 84% less 2% = 1.646 g fine, ₹16,464, no GST / ITC`);
+    check(ex?.invoice_id === sale.id && ex.amount === 16464 && ex.method === 'Exchange', 'the exchange receipt settles ₹16,464 of the bill (no cash moved)');
+    // RT-E3: a ₹2,00,000 cash tender is refused at the counter.
+    await writeJson(page, 'jewel_tags', [...(await readJson(page, 'jewel_tags', [])), { ...tag, id: 'e2e-tag-2', tag: 'E2E-BIG', gross_wt: 25, stone_wt: 0, net_wt: 25, stone_value: 0 }]);
+    await writeJson(page, 'stock_moves', [...(await readJson(page, 'stock_moves', [])), { id: 'e2e-mv-big', item_id: tag.item_id, date: rates[0].date, qty: 1, rate: 0, kind: 'adjustment', serials: ['E2E-BIG'] }]);
+    const posBefore = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/pos');
+    await page.locator('[data-pos-tag]').fill('E2E-BIG', { timeout: 15000 });
+    await page.locator('[data-pos-tag]').press('Enter');
+    await page.locator('#pos-Cash').fill('200000');
+    await page.locator('[data-pos-cash-guard], [data-guard="error"]', { hasText: /269ST/ }).first().waitFor({ timeout: 15000 }); // RT-D's counter guard (cash guard on)
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    await page.getByText(/cannot be accepted from one person in a day/).first().waitFor({ timeout: 15000 });
+    check((await readJson(page, 'invoices', [])).every((i) => posBefore.has(i.id)), '₹2,00,000 in cash is refused (Sec 269ST): no bill saved');
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });

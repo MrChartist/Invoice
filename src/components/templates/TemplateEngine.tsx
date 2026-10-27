@@ -20,7 +20,7 @@ import { PaymentScheduleBlock } from './parts/PaymentScheduleBlock'; // R2-A1
 import { AcceptanceBlock } from './parts/AcceptanceBlock';
 import { OptionalItemsBlock } from './parts/OptionalItemsBlock';
 import { ProposalSections } from './parts/ProposalSections';
-import { cashDiscountText, rcmTaxNote, worksLineText } from './paper-helpers';
+import { bisText, cashDiscountText, exchangeText, rcmTaxNote, worksLineText } from './paper-helpers';
 import { amountInWords } from '../../lib/amount-in-words';
 import { amountInWordsHi } from '../../lib/amount-in-words-hi';
 import { supplyDeclaration } from '../../lib/bill-of-supply';
@@ -125,6 +125,8 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
   // Rule 46(p): tax payable on reverse charge, printed once under every layout (new-style RCM documents).
   const rcmNote = rcmTaxNote(totals, (n) => cfg.currency(n, invoice.currency));
   const cdNote = cashDiscountText(invoice, totals.total, (n) => cfg.currency(n, invoice.currency)); // TR-A1
+  const bis = bisText(invoice); // R9 (RT-E2): BIS Reg. 5(11) verification line
+  const exch = exchangeText(invoice, (n) => cfg.currency(n, invoice.currency)); // R9 (RT-E3): "Less: old gold (… g @ …%)"
 
   const irn = buildIrnPrint(einvoiceMeta === undefined ? resolveEInvoiceMeta(invoice.id) : einvoiceMeta);
 
@@ -237,6 +239,8 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           {declaration && <SupplyDeclaration text={declaration} />}
           {rcmNote && <SupplyDeclaration text={rcmNote} />}
           {cdNote && <SupplyDeclaration text={cdNote} />}
+          {bis && <SupplyDeclaration text={bis} />}
+          {exch && <SupplyDeclaration text={exch} />}
           {returnNote && <SupplyDeclaration text={returnNote} />}
           {/* 8.5: "Previous balance + This bill = Total due" from the bill's own snapshot (off by default). */}
           <PartyBalanceBlock invoice={invoice} compact={layout === 'receipt'} />

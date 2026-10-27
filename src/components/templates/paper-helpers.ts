@@ -1,8 +1,34 @@
 import type { CalcTotals } from '../../lib/invoice-calc';
-import type { InvoiceItem, InvoiceRecord, SenderProfile } from '../../types/invoice';
+import type { InvoiceItem, InvoiceRecord, Payment, SenderProfile } from '../../types/invoice';
+import { getTable } from '../../lib/storage';
+import { noCashKind } from '../../lib/advance-tax'; // no-cash.ts (QA6-1 F4)
 import { upiLink } from '../../lib/share';
 import { shiftDay } from '../../lib/dates';
 import { weightText, wtHolds } from '../../lib/trade/tr-weight';
+import type { JewelLine } from '../../types/retail-r9';
+
+/** R9 (RT-E2) gold fineness by karat, for "22K (916)" on the bill (BIS Reg. 5(11); same table as `rt-jewel-rates.ts`). */
+const KARAT: Readonly<Record<string, number>> = { '24K': 999, '23K': 958, '22K': 916, '21K': 875, '20K': 833, '18K': 750, '14K': 585, '9K': 375 };
+const g3 = (x: number) => `${(Number(x) || 0).toFixed(3)} g`;
+const rs = (x: number) => `₹${(Number(x) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+
+/** R9 (RT-E2): the printed jewellery sub-line — weights, purity in carat and fineness, HUID, rate and charges. */
+export function jewelText(jw: JewelLine | undefined): string {
+  if (!jw) return '';
+  const m = jw.making;
+  return [
+    jw.tag && `Tag ${jw.tag}`,
+    jw.stone_wt > 0 && `Gross ${g3(jw.gross_wt)} · Stones ${g3(jw.stone_wt)}`,
+    jw.job_work ? `Customer's metal ${g3(jw.net_wt)} (memo)` : `Net ${g3(jw.net_wt)}`,
+    jw.metal === 'gold' && KARAT[jw.purity] ? `${jw.purity} (${KARAT[jw.purity]})` : jw.purity,
+    jw.huid && `HUID ${jw.huid}`,
+    !jw.job_work && `${rs(jw.rate)}/g`,
+    jw.wastage_g ? `Wastage ${g3(jw.wastage_g)}` : jw.wastage_pct > 0 && `Wastage ${jw.wastage_pct}%`,
+    m?.value > 0 && `Making ${m.basis === 'percent' ? `${m.value}%` : rs(m.value)}${m.basis === 'per_gram' ? '/g' : ''}`,
+    jw.stone_value > 0 && `Stones ${rs(jw.stone_value)}`,
+    jw.hallmark_charge > 0 && `Hallmarking ${rs(jw.hallmark_charge)}`,
+  ].filter(Boolean).join(' · ');
+}
 
 /** `YYYY-MM-DD` → `MM/YYYY`, the way batch dates are printed on packs. */
 function monthYear(day: string): string {
@@ -15,8 +41,9 @@ function monthYear(day: string): string {
  * (6.6 / 6.11), e.g. "Batch B12 · Mfg 01/2026 · Exp 06/2027" or "S/N: 3567…, 3567… · Warranty 12 months".
  * '' for untracked lines, so ordinary documents print exactly as before.
  */
-export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit'>> & { bin?: string }) | undefined): string {
+export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw'>> & { bin?: string }) | undefined): string {
   if (!item) return '';
+  if (item.jw) return jewelText(item.jw); // R9 (RT-E2): the BIS sub-line (the tag no. is its serial)
   const parts: string[] = [];
   if (discountText(item)) parts.push(discountText(item)); // TR-A1
   if (item.bin) parts.push(`Bin ${item.bin}`); // 8.86: snapshot on delivery challan lines
@@ -89,6 +116,11 @@ export { weightText };
 
 /** R9 (RT-B2): "Registered pharmacist: name (reg. no.)" from the sender snapshot ('' when none, so other bills print as before). */
 export const pharmacistText = (sender: Pick<SenderProfile, 'pharmacist'>): string => (sender.pharmacist ? `Registered pharmacist: ${sender.pharmacist}` : '');
+/** R9 (RT-D3 / E3): "Less: old gold (12.300 g @ 84%) ₹…" per exchange receipt on the bill (no cash; '' otherwise). */
+export const exchangeText = (invoice: Pick<InvoiceRecord, 'id'>, money: (n: number) => string): string =>
+  invoice.id ? getTable<Payment>('transactions').filter((p) => p?.invoice_id === invoice.id && noCashKind(p) === 'exchange').map((p) => `${p.note || 'Less: exchange'} ${money(p.amount)}`).join(' · ') : '';
+/** R9 (RT-E2): the BIS verification line snapshotted on the bill's jewellery lines (printed under the totals; '' otherwise). */
+export const bisText = (invoice: Pick<InvoiceRecord, 'items'>): string => invoice.items?.find((i) => i.jw?.bis)?.jw?.bis ?? '';
 
 /**
  * R11 (CN-A3): the works sub-line under a bill line, from the document's construction snapshot only —

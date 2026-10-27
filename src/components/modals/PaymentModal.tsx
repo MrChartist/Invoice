@@ -132,6 +132,13 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
       const settleAmount = settle.choice !== 'leave' && value < balance - 0.005 ? round2(Math.min(Number(settle.amount) || 0, balance - value)) : 0;
       let payment: Payment;
       let note = '';
+      if (/^cash$/i.test(method)) {
+        // R9 (RT-E3): Sec 269ST cash guard (retail setting; off by default), same-day cash of this customer included.
+        const g = (await import('../../lib/retail/rt-cash-guard')).liveSaleGuards(live, value, date, false);
+        const stop = g.find((x) => x.level === 'error');
+        if (stop) return setError(stop.message);
+        note = g.map((x) => x.message).join(' ');
+      }
       if (method === GV_METHOD) {
         // R4-B1: checks code, balance and expiry; records the receipt with its gift_voucher_id (all or nothing).
         const m = await import('../../lib/retail/gift-vouchers');
