@@ -1067,3 +1067,15 @@ test('R13 (MF-D1 / D3 / D4) cost-card rates, Form-1 rows and AA imports read the
   const tagged = { ...bill, mf: { authorisation_id: 'aa' }, lines: [{ ...bill.lines[0], unit_factor: 500 }] };
   assert.deepEqual(importsAgainst([tagged, { ...tagged, id: 'v', status: 'void' }, bill], 'aa', () => 's').map((m) => [m.qty, m.value]), [[5000, 1000]]);
 });
+
+// R14 (PS-B1 / PS-B5): unrecovered disbursements and media re-bills read bills through `readPurchase` (void rows left out;
+// the cost is net of a claimed credit, the full amount on the client's behalf).
+test('R14 (PS-B1 / PS-B5) disbursements and media rows read the real bill shape', async () => {
+  const { unrecoveredDisbursements } = await import('../src/lib/prof/ps-disb.ts');
+  const { unbilledMedia } = await import('../src/lib/prof/ps-media.ts');
+  const disb = { ...bill, id: 'd', kind: 'EXPENSE', billable_to_client_id: 'c', ps: { disb: 'travel', on_behalf: false } };
+  assert.deepEqual(unrecoveredDisbursements([disb, { ...disb, id: 'v', status: 'void' }], () => false, '2026-04-22').map((r) => [r.id, r.amount, r.age]), [['d', 1000, 10]]);
+  assert.equal(unrecoveredDisbursements([{ ...disb, ps: { disb: 'stamp', on_behalf: true } }], () => false, '2026-04-22')[0].amount, 1180);
+  const media = { ...bill, id: 'm', ps: { media: { client_id: 'c', medium: 'print', mode: 'principal' } } };
+  assert.deepEqual(unbilledMedia([media], 'c', () => false).map((r) => [r.date, r.vendor, r.ref, r.cost, r.total]), [['2026-04-12', 'Acme Supplies', 'AS/22', 1000, 1180]]);
+});

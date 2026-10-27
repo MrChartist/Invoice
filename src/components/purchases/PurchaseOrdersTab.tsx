@@ -49,12 +49,19 @@ export interface PurchaseOrdersTabProps {
 function printPo(po: PurchaseOrder, vendors: Vendor[]) {
   const p = localDb.settings.activeProfile();
   const v = vendors.find((x) => x.id === po.vendor_id);
-  const html = poHtml(
-    po,
-    { name: p?.companyName || 'Buyer', gstin: p?.companyGstin, address: p?.companyAddress, phone: p?.companyPhone, email: p?.companyEmail },
-    v ? { address: v.address, phone: v.phone, email: v.email } : undefined,
-  );
+  const buyer = { name: p?.companyName || 'Buyer', gstin: p?.companyGstin, address: p?.companyAddress, phone: p?.companyPhone, email: p?.companyEmail };
+  const vend = v ? { address: v.address, phone: v.phone, email: v.email } : undefined;
   const w = window.open('', '_blank');
+  // R14 PS-B5: a PO carrying a media buy prints as a release order (one lazy part).
+  const media = (po as { ps?: { media?: { client_id?: string } } }).ps?.media;
+  if (media) {
+    void import('../../lib/prof/ps-ro').then((m) => show(w, po, m.roHtml(po, buyer, vend, localDb.clients.getById(media.client_id ?? '')?.name ?? '')));
+    return;
+  }
+  show(w, po, poHtml(po, buyer, vend));
+}
+
+function show(w: Window | null, po: PurchaseOrder, html: string) {
   if (w) {
     w.document.open();
     w.document.write(html);
