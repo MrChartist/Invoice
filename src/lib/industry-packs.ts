@@ -146,18 +146,10 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'jewellery', path: '/inventory?tab=jewellery&view=tags', labelKey: 'r9.tags' },
   { pack: 'jewellery', path: '/inventory?tab=jewellery&view=oldgold', labelKey: 'r9.oldgold' },
   { pack: 'jewellery', path: '/inventory?tab=jewellery&view=karigar', labelKey: 'r9.karigar' },
-  // R11: construction — Works views on /time (pack `works`) and the builder desk on /receivables (pack `realty`);
-  // labels `r11.*` in `palette-destinations.ts`; CN-C adds the realty desk's views with its screens
+  // R11: construction — the RA bill view on /time (pack `works`) and the builder desk on /receivables (pack `realty`);
+  // labels `r11.*` in `palette-destinations.ts`. CN-B / CN-D add their Works views and CN-C the desk's views with
+  // their screens (one row + help topic + palette label each).
   { pack: 'works', path: '/time?tab=works&view=ra', labelKey: 'r11.ra' },
-  { pack: 'works', path: '/time?tab=works&view=contracts', labelKey: 'r11.contracts' },
-  { pack: 'works', path: '/time?tab=works&view=advances', labelKey: 'r11.advances' },
-  { pack: 'works', path: '/time?tab=works&view=escalation', labelKey: 'r11.escalation' },
-  { pack: 'works', path: '/time?tab=works&view=guarantees', labelKey: 'r11.guarantees' },
-  { pack: 'works', path: '/time?tab=works&view=subcon', labelKey: 'r11.subcon' },
-  { pack: 'works', path: '/time?tab=works&view=labour', labelKey: 'r11.labour' },
-  { pack: 'works', path: '/time?tab=works&view=plant', labelKey: 'r11.plant' },
-  { pack: 'works', path: '/time?tab=works&view=reco', labelKey: 'r11.reco' },
-  { pack: 'works', path: '/time?tab=works&view=pnl', labelKey: 'r11.pnl' },
   { pack: 'realty', path: '/receivables?tab=realty', labelKey: 'r11.realty' },
 ];
 

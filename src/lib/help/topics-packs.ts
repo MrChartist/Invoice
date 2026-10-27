@@ -25,17 +25,8 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:works', 'Works', 'वर्क्स', 'Works-contract pack: BOQ, measured RA bills, retention and deductions.', 'Each running-account bill.', { statutory: ca(['I15', 'I16', 'I17', 'I18', 'I19']) }),
   t('time:works:retention', 'Retention', 'रिटेंशन', 'Retention money held by clients and when it is due back.', 'When retention is released.', { statutory: ca(['I16']) }),
   t('time:works:sites', 'Sites', 'साइट', 'Sites with material issued against the theoretical use per BOQ unit.', 'Weekly on site.'),
-  // R11 (CN-A): the RA bill and its paper; Works views of the construction profile (screens arrive with CN-B / CN-D)
+  // R11 (CN-A): the RA bill and its paper; the builder desk (screens arrive with CN-C)
   t('time:works:ra', 'RA bills', 'रनिंग बिल', 'Measured running-account bills: the paper prints the contract particulars, BOQ item no. and M-book under each line, deductions down to net payable, the certificate and the abstract of cost as page 2 — snapshotted at save.', 'Each measurement.', { statutory: ca(['CN3', 'CN4', 'CN5', 'CN12', 'CN14']) }),
-  t('time:works:contracts', 'Contracts', 'अनुबंध', 'Agreement, dates, extension of time, LD cap and deviation limit per contract.', 'When a work order is signed.', { statutory: ca(['CN11']) }),
-  t('time:works:advances', 'Advances', 'अग्रिम', 'Mobilisation advance with interest and secured advance against materials, recovered from RA bills.', 'When an advance is paid or recovered.', { statutory: ca(['CN7', 'CN8']) }),
-  t('time:works:escalation', 'Price variation', 'मूल्य परिवर्तन', 'Escalation by the contract formula and typed indices, billed as a supplementary bill.', 'Each escalation period.', { statutory: ca(['CN6']) }),
-  t('time:works:guarantees', 'Guarantees', 'बैंक गारंटी', 'Bank guarantees, PBG, EMD and security deposits with expiry alerts.', 'When a guarantee is given or renewed.', { statutory: ca(['CN13']) }),
-  t('time:works:subcon', 'Sub-contracts', 'उप-ठेके', 'Back-to-back work orders and measured sub-contractor bills.', 'Each sub-contractor bill.', { statutory: ca(['CN14']) }),
-  t('time:works:labour', 'Labour', 'श्रम', 'Labour contractors\' compliance proof and the daily site muster.', 'Daily on site; monthly for proof.', { statutory: ca(['CN15', 'CN16']) }),
-  t('time:works:plant', 'Plant', 'मशीनरी', 'Plant and equipment log sheets, hire in and hire out.', 'Daily on site.', { statutory: ca(['CN17']) }),
-  t('time:works:reco', 'Reconciliation', 'सामग्री मिलान', 'Cement and steel issued vs theoretical use, wastage band and recovery.', 'Each RA bill.', { statutory: ca(['CN9']) }),
-  t('time:works:pnl', 'Site P&L', 'साइट लाभ-हानि', 'Revenue, costs, unbilled work and cost to complete per site (memo).', 'Monthly.', { statutory: ca(['CN26']) }),
   t('receivables:realty', 'Realty', 'रियल्टी', 'Builder desk: projects with RERA details, units, bookings, payment plans, stage demands and the RERA account.', 'Each booking and stage.', { statutory: ca(['CN18', 'CN21', 'CN25']) }),
   // R7 hotel (R7-A topics; R7-C added the HT ids). Working papers — verify with your CA.
   t('tables:frontdesk', 'Front desk', 'फ्रंट डेस्क', 'Hotel pack board: arrivals, in-house guests, due-outs and room status for the business date.', 'All day at the front desk.', {

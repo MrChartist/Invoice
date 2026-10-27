@@ -51,17 +51,6 @@ export const cnT = defineArea(
     deviationWarn: '"{name}": cumulative {cum} is beyond the deviation limit {limit} (BOQ + {pct}%). The excess is billed as a deviation item — keep the approval on record.',
     recompute: 'Recompute abstract',
     recomputed: 'Draft RA bill re-snapshotted.',
-    // Works views (stubs until CN-B / CN-D)
-    'view.contracts': 'Contracts',
-    'view.advances': 'Advances',
-    'view.escalation': 'Price variation',
-    'view.guarantees': 'Guarantees',
-    'view.subcon': 'Sub-contracts',
-    'view.labour': 'Labour & muster',
-    'view.plant': 'Plant & equipment',
-    'view.reco': 'Material reconciliation',
-    'view.pnl': 'Site P&L',
-    stub: 'This view arrives with the next construction update. Your RA bills, BOQs and deductions already work in the other views.',
     // Builder desk (stub until CN-C)
     // Settings switches
   } as const,
@@ -108,16 +97,6 @@ export const cnT = defineArea(
     deviationWarn: '"{name}": संचयी {cum} विचलन सीमा {limit} (BOQ + {pct}%) से अधिक है। अधिक मात्रा विचलन मद के रूप में बिल होगी — स्वीकृति रिकॉर्ड में रखें।',
     recompute: 'सार फिर से गिनें',
     recomputed: 'ड्राफ़्ट रनिंग बिल का सार फिर से लिया गया।',
-    'view.contracts': 'अनुबंध',
-    'view.advances': 'अग्रिम',
-    'view.escalation': 'मूल्य परिवर्तन',
-    'view.guarantees': 'बैंक गारंटी',
-    'view.subcon': 'उप-ठेके',
-    'view.labour': 'श्रम और मस्टर रोल',
-    'view.plant': 'मशीनरी',
-    'view.reco': 'सामग्री मिलान',
-    'view.pnl': 'साइट लाभ-हानि',
-    stub: 'यह व्यू अगले निर्माण अपडेट में आएगा। आपके रनिंग बिल, BOQ और कटौतियाँ बाकी व्यू में पहले से काम करती हैं।',
   },
 );
 

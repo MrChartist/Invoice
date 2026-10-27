@@ -34,8 +34,8 @@ const r9T = defineArea(
 
 // R11 rows (kept here so the palette does not load the construction areas).
 const r11T = defineArea(
-  { 'r11.ra': 'RA bills (running account)', 'r11.contracts': 'Contracts', 'r11.advances': 'Advances (mobilisation, secured)', 'r11.escalation': 'Price variation / escalation', 'r11.guarantees': 'Bank guarantees', 'r11.subcon': 'Sub-contracts', 'r11.labour': 'Labour & muster', 'r11.plant': 'Plant & equipment', 'r11.reco': 'Material reconciliation', 'r11.pnl': 'Site P&L', 'r11.realty': 'Realty (builder desk)' } as const,
-  { 'r11.ra': 'रनिंग बिल', 'r11.contracts': 'अनुबंध', 'r11.advances': 'अग्रिम (मोबिलाइज़ेशन, सिक्योर्ड)', 'r11.escalation': 'मूल्य परिवर्तन', 'r11.guarantees': 'बैंक गारंटी', 'r11.subcon': 'उप-ठेके', 'r11.labour': 'श्रम और मस्टर रोल', 'r11.plant': 'मशीनरी', 'r11.reco': 'सामग्री मिलान', 'r11.pnl': 'साइट लाभ-हानि', 'r11.realty': 'रियल्टी (बिल्डर डेस्क)' },
+  { 'r11.ra': 'RA bills (running account)', 'r11.realty': 'Realty (builder desk)' } as const,
+  { 'r11.ra': 'रनिंग बिल', 'r11.realty': 'रियल्टी (बिल्डर डेस्क)' },
 );
 
 /** A row's label: a key of this package's area, else (B / C rows until they resolve their own) the key text. */
