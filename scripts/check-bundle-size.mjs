@@ -38,7 +38,9 @@ const BUDGET_ENTRY = env('BUDGET_ENTRY_GZ_KB', 90);
 // Raised to 2600 for round 4 and the round-5 industry packs, then to 2800 for the round-7 hotel and round-8 trading
 // packs, then to 2900 for the round-9 retail and round-10 service packs, then to 3000 for the
 // round-11 construction packs (all pack screens lazy, loaded only when a pack is on): every screen is a lazy chunk loaded only by companies that turn the pack on; first paint keeps its 185 kB budget.
-const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 3000);
+// Raised to 3200 for the rest of round 10 (clinics, memberships, workshops) and the round-12 agriculture packs:
+// same rule, every pack screen lazy, first paint unchanged.
+const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 3200);
 
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 // De-duplicated: with an import cycle Vite emits the entry both as the script and as a modulepreload.

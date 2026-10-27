@@ -214,6 +214,10 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   admissions: 'In-patient admissions (IPD/FY…): patient, room snapshot, admit / discharge, running charges, deposits, claim, final bill (R10).',
   lab_tests: 'Lab test master: code, department, sample, TAT, price, parameters with reference ranges, panels, outsourcing (R10).',
   lab_orders: 'Lab orders (LAB/FY…): patient, tests (snapshot), sample status, results, report status and history, delivery log, bill (R10).',
+  // R10-D
+  workshop_settings: 'Workshop settings: inspection checklist, job-card terms, vehicle classes, labour rates, depreciation table, service interval (R10).',
+  service_assets: 'Vehicles and appliances: registration / serial no., make, model, owner, insurer and policy, odometer readings, next service (R10).',
+  labour_ops: 'Labour operations: code, description, SAC, standard hours per vehicle class or flat price, service interval (R10).',
   // R11-A
   construction_settings: 'Construction profile switches: RA bill paper style, M-book column, government sign-off boxes, certificate text, deviation limit, works views (R11).',
   // R11-C

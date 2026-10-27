@@ -3792,6 +3792,117 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+  await step('R10-D workshop desk: Services → Vehicle workshop; vehicle MH12AB1234 and a labour op; job card with the odometer; estimate (pads + labour) approved by phone; Bill job → parts and labour lines at their own rates; a ₹50,000 accident job with a cashless claim approved ₹42,000 → two invoices (insurer, owner) totalling the job; Reminders shows the next service; help', async () => {
+    const keys = ['settings', 'workshop_settings', 'service_assets', 'labour_ops', 'service_jobs', 'invoices', 'stock_items', 'clients', 'payer_claims', 'series_counters', 'audit_log', 'doc_links', 'transactions', 'appointments'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', modules: undefined, industry_packs: ['workshop'], service_kind: 'workshop', construction_kind: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), { id: 'e2e-pads', name: 'E2E Brake pads', unit: 'NOS', hsn: '8708', track_stock: true, opening_qty: 10, opening_rate: 1500, reorder_level: 0, sale_rate: 2150, tax_rate: 18 }]);
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-acko', name: 'E2E ACKO General', email: '', address: '', city: 'Mumbai', zip: '', state_code: '27' }]);
+    // SV-D1 vehicle; SV-D2 labour op, rates and the interval.
+    await page.goto(srv.origin + '/time?tab=workshop&view=vehicles');
+    await page.locator('[data-ws-reg_no]').fill('mh12 ab 1234', { timeout: 15000 });
+    await page.locator('[data-ws-make]').fill('Maruti');
+    await page.locator('[data-ws-model]').fill('Swift');
+    await page.locator('[data-ws-owner_name]').fill('E2E Mr Patil');
+    await page.locator('[data-ws-cls]').selectOption('hatch');
+    await page.locator('[data-ws-asset-save]').click();
+    const asset = (await readJson(page, 'service_assets', [], (v) => v.some((a) => a.reg_no === 'MH12AB1234'))).find((a) => a.reg_no === 'MH12AB1234');
+    check(asset?.vclass === 'hatch', 'the vehicle is saved with its registration no. normalised');
+    await page.goto(srv.origin + '/time?tab=workshop&view=labour');
+    await page.locator('[data-ws-code]').fill('BRK01', { timeout: 15000 });
+    await page.locator('[data-ws-name]').fill('Front brake pad replace');
+    await page.locator('[data-ws-hhatch]').fill('0.8');
+    await page.locator('[data-ws-op-save]').click();
+    await readJson(page, 'labour_ops', [], (v) => v.some((o) => o.code === 'BRK01'));
+    await page.locator('[data-ws-rhatch]').fill('900');
+    await page.locator('[data-ws-interval_days]').last().fill('20');
+    await page.locator('[data-ws-settings-save]').click();
+    await readJson(page, 'workshop_settings', {}, (v) => v?.labour_rate?.hatch === 900);
+    // Job card with the odometer.
+    await page.goto(srv.origin + '/time?tab=workshop&view=jobs');
+    await page.locator('[data-ws-asset]').selectOption(asset.id, { timeout: 15000 });
+    await page.locator('[data-ws-odometer]').fill('48210');
+    await page.locator('[data-ws-complaints]').fill('Brake noise');
+    await page.locator('[data-ws-open]').click();
+    const job = (await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.asset_id === asset.id))).find((j) => j.asset_id === asset.id);
+    check(job?.odometer_in === 48210 && /^SVC\//.test(job.number), `job card ${job?.number} with the odometer`);
+    // Estimate: pads + labour, approved by phone.
+    await page.goto(srv.origin + '/time?tab=workshop&view=estimates');
+    await page.locator('[data-ws-job]').selectOption(job.id, { timeout: 15000 });
+    await page.locator('[data-ws-op]').selectOption({ label: 'BRK01 · Front brake pad replace' });
+    await page.locator('[data-ws-add-op]').click();
+    await page.locator('[data-ws-item]').selectOption('e2e-pads');
+    await page.locator('[data-ws-qty]').fill('1');
+    await page.locator('[data-ws-add-part]').click();
+    await page.locator('[data-ws-estimate]').click();
+    const quote = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.sv?.job?.id === job.id && i.doc_type === 'QUOTATION'))).find((i) => i.sv?.job?.id === job.id && i.doc_type === 'QUOTATION');
+    check(quote?.items?.length === 2, 'the estimate is a quotation on the job');
+    await page.locator('[data-ws-quote]').selectOption(quote.id);
+    await page.locator('[data-ws-by]').fill('E2E Mr Patil');
+    await page.locator('[data-ws-approve]').click();
+    await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.id === job.id && j.approvals?.[0]?.how === 'phone'));
+    // Board: move to ready, Bill job.
+    await page.goto(srv.origin + '/time?tab=workshop&view=jobs');
+    const row = page.locator(`[data-ws-job="${job.number}"]`);
+    for (const s of ['diagnosed', 'approved', 'in_repair', 'ready']) {
+      await row.locator(`[data-ws-move="${s}"]`).click({ timeout: 15000 });
+      await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.id === job.id && j.status === s));
+    }
+    await row.locator('[data-ws-bill]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.sv?.job?.id === job.id && i.doc_type !== 'QUOTATION'))).find((i) => i.sv?.job?.id === job.id && i.doc_type !== 'QUOTATION');
+    const lab = bill?.items.find((l) => l.sv?.labour_op_id);
+    const pad = bill?.items.find((l) => l.name === 'E2E Brake pads');
+    check(lab?.quantity === 0.8 && lab.rate === 900 && lab.hsn === '998714' && Number(lab.tax_rate) === 18 && pad?.rate === 2150 && pad.hsn === '8708', `bill ${bill?.invoice_number}: labour 0.8 h × ₹900 (SAC 998714, 18%) and the pads at their own HSN`);
+    // Claim: a ₹50,000 job, cashless, approved ₹42,000.
+    await page.goto(srv.origin + '/time?tab=workshop&view=jobs');
+    await page.locator('[data-ws-asset]').selectOption(asset.id, { timeout: 15000 });
+    await page.locator('[data-ws-odometer]').fill('48300');
+    await page.locator('[data-ws-complaints]').fill('Accident repair');
+    await page.locator('[data-ws-open]').click();
+    const job2 = (await readJson(page, 'service_jobs', [], (v) => v.filter((j) => j.asset_id === asset.id).length === 2)).find((j) => j.asset_id === asset.id && j.id !== job.id);
+    await page.goto(srv.origin + '/time?tab=workshop&view=estimates');
+    await page.locator('[data-ws-job]').selectOption(job2.id, { timeout: 15000 });
+    await page.locator('[data-ws-sublet]').fill('Body work');
+    await page.locator('[data-ws-cost]').fill('42372.88');
+    await page.getByRole('button', { name: /Outside work \+/ }).click();
+    await page.locator('[data-ws-estimate]').click();
+    const q2 = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.sv?.job?.id === job2.id))).find((i) => i.sv?.job?.id === job2.id);
+    await page.locator('[data-ws-quote]').selectOption(q2.id);
+    await page.locator('[data-ws-by]').fill('E2E Surveyor');
+    await page.locator('[data-ws-approve]').click();
+    await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.id === job2.id && j.approvals?.length));
+    await page.goto(srv.origin + '/time?tab=workshop&view=claims');
+    await page.locator('[data-ws-job]').first().selectOption(job2.id, { timeout: 15000 });
+    await page.locator('[data-ws-insurer]').selectOption('e2e-acko');
+    await page.locator('[data-ws-apr]').first().fill('42000');
+    await page.locator('[data-ws-claim]').click();
+    await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.id === job2.id && j.claim_id));
+    await page.goto(srv.origin + '/time?tab=workshop&view=jobs');
+    const row2 = page.locator(`[data-ws-job="${job2.number}"]`);
+    for (const s of ['diagnosed', 'approved', 'in_repair', 'ready']) {
+      await row2.locator(`[data-ws-move="${s}"]`).click({ timeout: 15000 });
+      await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.id === job2.id && j.status === s));
+    }
+    await row2.locator('[data-ws-bill]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await page.goto(srv.origin + '/time?tab=workshop&view=claims');
+    await page.locator('[data-ws-job]').last().selectOption(job2.id, { timeout: 15000 });
+    await page.locator('[data-ws-apr]').last().fill('42000');
+    await page.locator('[data-ws-split]').click();
+    const claim = (await readJson(page, 'payer_claims', [], (v) => v.some((c) => c.source?.id === job2.id && c.payer_invoice_id))).find((c) => c.source?.id === job2.id);
+    const invs = await readJson(page, 'invoices', []);
+    const payer = invs.find((i) => i.id === claim?.payer_invoice_id);
+    const owner = invs.find((i) => i.id === claim?.beneficiary_invoice_id);
+    check(payer?.client?.name === 'E2E ACKO General' && Math.abs(Number(payer.total) - 42000) <= 1 && Math.abs(Number(payer.total) + Number(owner?.total) - 50000) <= 1, `two invoices: insurer ${payer?.total}, owner ${owner?.total} (job ₹50,000)`);
+    // Reminders: next service within 20 days.
+    await page.goto(srv.origin + '/time?tab=workshop&view=reminders');
+    await page.locator('[data-ws-due="service"]').first().waitFor({ timeout: 15000 });
+    check(/MH12AB1234/.test(await page.locator('[data-ws-due="service"]').first().innerText()), 'Reminders shows the next service');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="time:workshop"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a workshop topic');
+    await page.keyboard.press('Escape');
 
   await step('R10-B clinic desk: Clinic profile; a patient gets a UHID; OPD token 1 for Dr Shah; consult (exempt) + a cosmetic peel (18%) → "Invoice-cum-Bill of Supply" with UHID and reg. no.; a lab order with a high Hb shows "H"; a ₹6,000 / day private room bills at 5%', async () => {
     const keys = ['settings', 'service_settings', 'clinic_settings', 'doctors', 'clients', 'items_catalog', 'clinic_visits', 'lab_tests', 'lab_orders', 'admissions', 'invoices', 'series_counters', 'audit_log'];

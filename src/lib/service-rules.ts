@@ -100,3 +100,24 @@ export interface CoachingRefundRule { basis: 'days' | 'months'; dueDays: number 
 /* ── SV-D: repair and service centres (filled by SV-D) ───────────────────────────────────────────────────────── */
 // MOTOR_DEPRECIATION_DEFAULTS ("insurer practice, not statute"), REPAIR_SAC_RULES — SV20, SV22.
 export interface RepairSacRule { vehicle: string; appliance: string; computer: string; telecom: string; other: string }
+
+/** SV20: repair SAC per asset kind (group 9987; labour 18% when priced separately from parts). */
+export const REPAIR_SAC_RULES: readonly SvRule<RepairSacRule>[] = [
+  { from: '2017-07-01', value: { vehicle: '998714', appliance: '998715', computer: '998713', telecom: '998716', other: '998729' }, source: 'SAC 9987: 998714 transport machinery, 998715 household appliances, 998713 computers, 998716 telecom, 998729 other goods — as recalled; AAR WB Alok Bhanuka 2018 / UP Premier Car Sales 2019 on separate supplies (SV20, secondary)', verified: false },
+];
+
+/** Depreciation % the owner pays on an approved part, by category; metal by vehicle age ([months up to, %]). */
+export interface MotorDepreciation {
+  pct: Readonly<Record<'rubber' | 'plastic' | 'fibre' | 'glass' | 'paint' | 'other', number>>;
+  metal: readonly (readonly [number, number])[];
+}
+
+/** SV22: insurer practice, NOT statute (the motor tariff schedule carried in private-car policies) — the user edits it. */
+export const MOTOR_DEPRECIATION_DEFAULTS: readonly SvRule<MotorDepreciation>[] = [
+  {
+    from: '2002-07-01',
+    value: { pct: { rubber: 50, plastic: 50, fibre: 30, glass: 0, paint: 25, other: 0 }, metal: [[6, 0], [12, 5], [24, 10], [36, 15], [48, 25], [60, 35], [120, 40], [Infinity, 50]] },
+    source: 'Insurer practice, not statute: India Motor Tariff GR 9 schedule as carried in private-car policies (rubber / nylon / plastic 50%, fibre glass 30%, glass nil, metal by vehicle age) — verify with the insurer (SV22)',
+    verified: false,
+  },
+];
