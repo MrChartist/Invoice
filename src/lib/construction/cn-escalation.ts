@@ -108,6 +108,8 @@ export function billPv(id: string, date: string): { doc: InvoiceRecord; late?: s
   const rec: InvoiceRecord = {
     ...draft, issue_date: date, due_date: date, status: 'Sent', client: { ...last.client }, items: [item], place_of_supply: last.place_of_supply, gst_mode: last.gst_mode, currency: last.currency,
     ...(credit ? { po_number: last.invoice_number } : {}),
+    // QA11 C8: the contract's BOQ and cost centre, so the site P&L and Books → Projects see the PV (no RA number: never an RA bill).
+    ...(contract?.boq_id ? { boq_id: contract.boq_id } : {}), ...((last.cost_centre_id || contract?.cost_centre_id) ? { cost_centre_id: last.cost_centre_id || contract?.cost_centre_id } : {}),
     notes: `${credit ? 'Credit note' : 'Supplementary bill'}: price variation statement ${pv.number}${contract?.agreement_no ? ` · agreement ${contract.agreement_no}` : ''}.`,
     boq_terms: { cn: { v: 1, works: true, ...(last.boq_terms?.cn?.header ? { header: { ...last.boq_terms.cn.header, ra_label: undefined, period_from: pv.period_from, period_to: pv.period_to } } : {}), pv: { ...pv.working, statement_id: pv.id, number: pv.number } } },
   };

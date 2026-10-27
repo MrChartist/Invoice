@@ -203,13 +203,15 @@ export function cancelSubBill(id: string): SubMeasurement {
   if (!m || !live(m)) throw new Error('This bill is already cancelled.');
   if (m.purchase_id && paymentsDb.forPurchase(m.purchase_id).length) throw new Error('Payments are recorded on this bill. Delete them first.');
   return withTablesRollback([SD.bills, SD.logs, PURCHASES_TABLE, 'purchase_payments', VOUCHERS_TABLE], () => {
-    if (m.purchase_id && purchasesDb.get(m.purchase_id)) purchasesDb.remove(m.purchase_id);
-    if (m.jv_id && loadVouchers().some((v) => v.id === m.jv_id)) deleteVoucher(m.jv_id);
-    setTable(SD.logs, loadLogs().map((l) => (l.recovered_in === m.number ? { ...l, recovered_in: undefined } : l)));
     const { purchase_id: _p, jv_id: _j, ...rest } = m; // the bin keeps them; the row no longer names them (restore guard)
     void _p;
     void _j;
-    return put(SD.bills, { ...rest, status: 'cancelled' as const });
+    // QA11 C4 / C5: the row lets go of the bill and journal first — both refuse to go while a live row names them.
+    const out = put(SD.bills, { ...rest, status: 'cancelled' as const });
+    if (m.purchase_id && purchasesDb.get(m.purchase_id)) purchasesDb.remove(m.purchase_id);
+    if (m.jv_id && loadVouchers().some((v) => v.id === m.jv_id)) deleteVoucher(m.jv_id);
+    setTable(SD.logs, loadLogs().map((l) => (l.recovered_in === m.number ? { ...l, recovered_in: undefined } : l)));
+    return out;
   });
 }
 
