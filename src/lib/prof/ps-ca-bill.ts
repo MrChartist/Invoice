@@ -16,6 +16,7 @@ import { num, round2 } from '../invoice-calc';
 import { localDb } from '../localDb';
 import { purchasesDb } from '../purchases';
 import { blankClient, makeDraft } from '../../store/invoice-defaults';
+import { activeCompanyId, companyDbName } from '../company-registry';
 import { buildBillDraft, expenseLine, readTimePrefs, unbilledFor } from '../timesheets';
 import type { CaEvent } from './ps-ca-events';
 import { caKey } from './ps-ca-events';
@@ -111,7 +112,6 @@ function currentTables(): PracticeTables {
 
 /** Peek every linked company read-only (`peekCompliance`, never created or upgraded). */
 export async function loadLinkedPeeks(s: ProfCaSettings): Promise<Map<string, PracticeTables | undefined>> {
-  const { activeCompanyId, companyDbName } = await import('../company-registry');
   const { peekCompliance } = await import('../company-peek');
   const here = activeCompanyId();
   const out = new Map<string, PracticeTables | undefined>();
