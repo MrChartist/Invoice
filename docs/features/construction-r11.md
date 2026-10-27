@@ -70,12 +70,12 @@ Measured against `claude/elegant-cannon-cwapiv` at `aa7a504` (same machine, `vit
 
 | | Before | After | Δ |
 |---|---|---|---|
-| Initial JS (first paint) | 189,038 B | 189,044 B ± hash noise | ≈ +0.006 kB (entry content unchanged) |
-| Total JS | 2,855,361 B | ≈ 2,877,500 B | ≈ +21.6 kB |
+| Initial JS (first paint) | 189,038 B | 189,025 B | ≈ 0 kB (entry content unchanged; ± hash noise) |
+| Total JS | 2,855,361 B | 2,878,262 B | +22.4 kB (2,810.8 kB of 2,900) |
 
 Breakdown of the total (gz): engines `cn-tax` chunk (cn-tax / snapshot / abstract / rules / UI strings) 7.5 kB,
 paper chunk 3.2 kB + paper strings 1.6 kB, editor panel 2.2 kB, `cn-print` / sections 1.5 kB, picker in the shared
 picker chunk 1.2 kB, settings 0.9 kB, profile 0.5 kB, help topics + glossary 0.7 kB, checklist / reach / Features /
-wizard / palette / Ctrl+K rows ≈ 2.1 kB, the rest in host chunks. **Over the 15 kB CN-A share by ≈ 6.6 kB**; total JS
+wizard / palette / Ctrl+K rows ≈ 2.1 kB, the rest in host chunks. **Over the 15 kB CN-A share by ≈ 7.4 kB**; total JS
 stays at ≈ 2,811 kB of 2,900 kB. Trimmed already: paper parts in one chunk, paper-only strings, pure section module,
 no stub views.
