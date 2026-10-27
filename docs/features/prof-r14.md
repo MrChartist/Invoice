@@ -79,15 +79,15 @@ each package edits only its own section and records its own bundle numbers.
 
 ### Bundle (PS-A)
 
-Measured with `vite build` + gzip -9 (the budget script's method); before = `claude/elegant-cannon-cwapiv` at `fbb9d60`,
-after = this branch. See the PS-A report for the numbers after the final merge.
+Measured with `vite build` + gzip -9 (the budget script's method); before = `claude/elegant-cannon-cwapiv` at `fad67a3`
+(with QA16), after = this branch merged with it.
 
 | Budget | Before | After | Delta | Share |
 |---|---|---|---|---|
-| Initial JS (first paint) | 189,216 B (184.78 kB) | 189,236 B (184.80 kB) | **+20 B** (the `ps` token, lazy-map churn) | ≤ +0.03 kB ✓ |
-| Total JS | 3,373,795 B (3294.7 kB) | 3,419,500 B (3339.4 kB) | **+45.7 kB** | ≤ 18 kB (PRD) / ≈ 20 kB (lead) ✗ |
+| Initial JS (first paint) | 189,212 B (184.78 kB) | 189,217 B (184.78 kB) | **+5 B** (the `ps` token) | ≤ +0.03 kB ✓ |
+| Total JS | 3,375,024 B (3295.9 kB) | 3,419,591 B (3339.4 kB) | **+43.5 kB** | ≤ 18 kB (PRD) / ≈ 20 kB (lead) ✗ |
 
-**Overrun: ≈ +26 kB over the lead's ≈ 20 kB.** Breakdown (gz): WIP desk 13.5 kB (six views; strings EN + HI ≈ 3 kB;
+**Overrun: ≈ +23.5 kB over the lead's ≈ 20 kB** (total budget 3,500 kB: 160 kB headroom left). Breakdown (gz): WIP desk 13.5 kB (six views; strings EN + HI ≈ 3 kB;
 `ps-wip`, `ps-realisation`, `ps-utilisation`, `ps-profit`, `ps-yearend`, `ps-models`, `ps-prebill`), Matters desk 9.6 kB
 (four views; strings ≈ 2.5 kB; `ps-matters`, `ps-letters`), the chunk the two desks share 3.4 kB (`ps-ui`, `ps-run`,
 `ps-conflicts`, `ps-engagements`, `ps-writedown`, `ps-staff` parts), the picker in the wizard / Features chunk 1.4 kB,

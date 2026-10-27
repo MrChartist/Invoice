@@ -12,6 +12,7 @@ import { saveEngagement, type EngagementInput } from '../src/lib/prof/ps-engagem
 import { planBill } from '../src/lib/prof/ps-models.ts';
 import { createPrebillDraft, prebillFor } from '../src/lib/prof/ps-prebill.ts';
 import { docBilling } from '../src/lib/prof/ps-writedown.ts';
+import type { Engagement } from '../src/types/prof-r14.ts';
 
 const P = DEFAULT_TIME_PREFS;
 const money = (n: number) => `₹${n}`;
@@ -38,7 +39,7 @@ test('pure models: hourly target, blended, capped (date order), fixed / mileston
   const rows = [te('a', '2026-06-01', 600, 4000), te('b', '2026-06-02', 270, 4000)];
   const h = planBill(rows, {}, undefined, { prefs: P, money, target: 29000 });
   assert.equal(h.time.reduce((s, e) => s + (e.minutes / 60) * e.hourly_rate, 0), 29000);
-  const capped = { id: 'e', number: 'ENG/1', client_id: 'c', matter_ids: [], title: 'T', currency: 'INR', disb_policy: 'agent', start: '2026-06-01', status: 'active', created_at: '' } as const;
+  const capped: Omit<Engagement, 'model'> = { id: 'e', number: 'ENG/1', client_id: 'c', matter_ids: [], title: 'T', currency: 'INR', disb_policy: 'agent', start: '2026-06-01', status: 'active', created_at: '' };
   const c = planBill(rows, {}, { ...capped, model: 'capped', cap: 40000 }, { prefs: P, money, used: 0 });
   assert.deepEqual(c.time.map((e) => [e.id, e.minutes, e.hourly_rate]), [['a', 600, 4000], ['b', 0 + 270, 0]], 'the cap stops billing; the rest covered at 0');
   assert.deepEqual([c.basis, c.reason], ['Capped at ₹40000 (₹40000 used)', 'Cap']);
