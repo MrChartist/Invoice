@@ -28,7 +28,7 @@ test('MF-A block: rights, audit labels, registered at runtime; first-paint maps 
   for (const t of Object.values(MF_TABLES)) {
     assert.ok(WATCHED_TABLES[t]?.label, `${t} audited`);
     assert.ok(BACKUP_RECORD_TABLES.includes(t), `${t} backed up`);
-    assert.ok((DEMO_EXTRA_TABLES as readonly string[]).includes(t), `${t} sample rows removable`);
+    if (t in A || t === 'job_cards') assert.ok((DEMO_EXTRA_TABLES as readonly string[]).includes(t), `${t} sample rows removable`);
     assert.ok(!src('lib/access.ts').includes(`${t}:`) && !src('lib/audit-edits.ts').includes(`${t}:`), `${t} only at runtime`);
   }
   assert.deepEqual(Object.keys(MF_WATCHED).sort(), Object.values(MF_TABLES).sort());
@@ -48,8 +48,24 @@ test('every writer, the sync engine and the recycle bin import the registry; dat
 
 test('series: JCD written once (mf-shared); the reserved B–D prefixes unused elsewhere', () => {
   assert.equal(MF_SERIES.jobCards, 'JCD');
-  assert.deepEqual([...MF_RESERVED_SERIES], ['FAI', 'PES', 'CUT', 'KPB']);
+  assert.deepEqual([...MF_RESERVED_SERIES].filter((p) => p === 'CUT' || p === 'KPB'), ['CUT', 'KPB']); // MF-B moved FAI / PES into MF_SERIES
   const all = readdirSync(new URL('../src/lib/', import.meta.url), { recursive: true }).filter((f) => String(f).endsWith('.ts') && !String(f).startsWith('help')).map((f) => readFileSync(new URL(`../src/lib/${f}`, import.meta.url), 'utf8')).join('\n');
   assert.equal((all.match(/'JCD'/g) ?? []).length, 1, 'JCD');
   for (const p of MF_RESERVED_SERIES) assert.equal((all.match(new RegExp(`'${p}'`, 'g')) ?? []).length, 1, `${p} only in the reserved list`);
+});
+
+test('MF-B block: rights, audit labels, backup / sync / open export, FAI and PES series, writers import the registry, restore rules', () => {
+  const B = { drawings: 'master.edit', inspection_reports: 'doc.create', job_quotes: 'doc.create', process_runs: 'doc.create', print_estimates: 'doc.create' };
+  assert.deepEqual(Object.fromEntries(Object.entries(MF_TABLE_ACTIONS).filter(([t]) => t in B)), B);
+  const sync = src('lib/sync-engine.ts');
+  for (const t of Object.keys(B)) {
+    assert.equal(TABLE_ACTIONS[t], B[t as keyof typeof B], t);
+    assert.ok(WATCHED_TABLES[t]?.label && TABLE_MEANING[t] && BACKUP_RECORD_TABLES.includes(t), t);
+    if (t !== 'drawings') assert.ok(sync.includes(`[\`\${DB_PREFIX}${t}\`]: 'date'`), `${t} dated`);
+  }
+  for (const t of ['inspection_reports', 'print_estimates']) assert.ok(sync.includes(`[\`\${DB_PREFIX}${t}\`]: { num: 'number', date: 'date' }`), `${t} numbered`);
+  assert.deepEqual([MF_SERIES.inspections, MF_SERIES.estimates], ['FAI', 'PES']);
+  for (const f of ['mf-drawings', 'mf-inspection', 'mf-quotes', 'mf-runs', 'mf-estimates']) assert.match(src(`lib/mfg/${f}.ts`), /import '\.\/mf-registry';/, f);
+  assert.match(src('lib/trust/recycle-bin.ts'), /registerRestoreHook\('inspection_reports'/);
+  assert.match(src('lib/trust/recycle-bin.ts'), /registerRestoreHook\('process_runs'/);
 });

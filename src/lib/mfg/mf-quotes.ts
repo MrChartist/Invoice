@@ -8,6 +8,7 @@
  * revision in the `mf` snapshot (conversions keep it). A won quote hands over its material rate to the material item's
  * dated `standard_costs`. Pure maths above the "Storage" divider (tests/mf-quotes.test.ts).
  */
+import './mf-registry';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { JobQuote } from '../../types/mfg-r13';
 import type { StockItem } from '../inventory';

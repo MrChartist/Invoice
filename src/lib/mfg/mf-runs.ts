@@ -11,6 +11,7 @@
  * shots so far = the typed starting count + the runs' shots (derived, never written by a run). Pure helpers above
  * "Storage" (tests/mf-runs.test.ts).
  */
+import './mf-registry';
 import type { MfMould, ProcessRun } from '../../types/mfg-r13';
 import type { ManufacturingVoucher } from '../../types/manufacturing';
 import type { StockInputs, StockItem } from '../inventory';

@@ -7,9 +7,16 @@
  * The app never decides whether goods are "scrap" for TCS (MF9). Working papers — verify with your CA.
  */
 import { ruleAt } from '../tax-rules';
-import { METAL_SCRAP, METAL_SCRAP_HSN, SCRAP_CLASS_RULES, SCRAP_TAX_RULES, type MfClassRate, type ScrapClass } from '../mfg-rules';
+import { SCRAP_CLASS_RULES, SCRAP_TAX_RULES, type MfClassRate, type ScrapClass } from '../mfg-rules';
 import { tradingTcsPresets, supplierKinds, type TradeTcsPreset } from '../trade/tr-statutory';
 import { num } from '../invoice-calc';
+
+export type { ScrapClass };
+export const SCRAP_CLASSES = Object.keys(SCRAP_CLASS_RULES) as ScrapClass[];
+/** Metal scrap classes (ch 72–81 waste): RCM on purchase from unregistered, GST TDS u/s 51 on B2B sales (MF7). */
+const METAL_SCRAP: readonly ScrapClass[] = ['metal_ferrous', 'metal_nonferrous'];
+/** HSN headings of metal waste and scrap (ch 72–81): a line with one of these is metal scrap without a class. */
+const METAL_SCRAP_HSN: readonly string[] = ['7204', '7404', '7503', '7602', '7802', '7902', '8002', ...Array.from({ length: 13 }, (_, i) => String(8101 + i))];
 
 export const TCS_SCOPE_NOTE = 'TCS u/s 394(1) (206C(1)) applies to scrap from manufacture or mechanical working (High Court rulings); the app does not decide the scope — verify with your CA (MF9).';
 

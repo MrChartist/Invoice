@@ -8,6 +8,7 @@ import { clearOverrides } from '../src/lib/period-lock.ts';
 import { stockDb, computeStock } from '../src/lib/inventory.ts';
 import { liveTrackingInputs as liveStockInputs } from '../src/lib/stock-tracking.ts';
 import { manufacturingDb } from '../src/lib/manufacturing.ts';
+import { getTable } from '../src/lib/storage.ts';
 import { expectedOutput, loadMoulds, loadRuns, mouldLife, partGrams, regrindWarning, removeRun, runBalance, saveMould, saveRun } from '../src/lib/mfg/mf-runs.ts';
 import type { ProcessRun } from '../src/types/mfg-r13.ts';
 
@@ -38,7 +39,7 @@ test('expected output = hours × 3600 ÷ cycle × cavities; efficiency; balance 
   assert.equal(partGrams({}, { shot_g: 70, runner_g: 10, cavities: 4 }), 15, 'part weight from the mould');
 });
 
-test('one manufacturing journal per run (stock once); edit keeps it; delete removes both; mould life from runs', () => {
+test('one manufacturing journal per run (stock once); edit keeps it; delete removes both and the run is not restored alone; mould life from runs', async () => {
   for (const [id, name] of [['cap', 'PP cap'], ['pp', 'PP virgin'], ['mb', 'Masterbatch'], ['rg', 'PP regrind']]) {
     stockDb.saveItem({ id, name, unit: id === 'cap' ? 'NOS' : 'KG', track_stock: true, opening_qty: id === 'cap' ? 0 : 200, opening_rate: 100, reorder_level: 0 } as never);
   }
@@ -61,4 +62,8 @@ test('one manufacturing journal per run (stock once); edit keeps it; delete remo
   removeRun(r.id);
   assert.equal(loadRuns().length, 0);
   assert.equal(manufacturingDb.all().length, 0);
+  const { restoreEntry } = await import('../src/lib/trust/recycle-bin.ts');
+  const bin = getTable<{ id: string; table: string; row_id: string }>('recycle_bin');
+  assert.throws(() => restoreEntry(bin.find((e) => e.table === 'process_runs' && e.row_id === r.id)!.id), /journal of this run is gone/, 'a run never comes back without its stock journal');
+  assert.equal(loadRuns().length, 0);
 });

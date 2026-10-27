@@ -7,6 +7,7 @@
  * The QC release / reject of the order's output stays on the R4-A QC desk. Pure helpers above "Storage"
  * (tests/mf-drawings.test.ts).
  */
+import './mf-registry';
 import type { Drawing, DrawingChar, InspectionReport } from '../../types/mfg-r13';
 import type { InvoiceRecord } from '../../types/invoice';
 import { generateId } from '../storage';

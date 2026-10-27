@@ -16,7 +16,12 @@ export const MF_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   work_centres: 'master.edit',
   routings: 'master.edit',
   job_cards: 'doc.create',
-  // MF-B: drawings (master.edit), inspection_reports, job_quotes, process_runs, print_estimates (doc.create)
+  // MF-B: drawings are masters; inspection reports, quotes, runs and print estimates are documents
+  drawings: 'master.edit',
+  inspection_reports: 'doc.create',
+  job_quotes: 'doc.create',
+  process_runs: 'doc.create',
+  print_estimates: 'doc.create',
   // MF-C: cut_plans (doc.create)
   // MF-D: cost_cards (master.edit), export_authorisations, incentive_claims (books.edit)
 };
@@ -28,6 +33,11 @@ export const MF_WATCHED: Readonly<Record<string, WatchedTable>> = {
   routings: { entity: 'item', label: 'Routing' },
   job_cards: { entity: 'stock_transfer', label: 'Job card' },
   // MF-B
+  drawings: { entity: 'item', label: 'Drawing' },
+  inspection_reports: { entity: 'item', label: 'Inspection report' },
+  job_quotes: { entity: 'invoice', label: 'Job quote sheet' },
+  process_runs: { entity: 'stock_transfer', label: 'Moulding run' },
+  print_estimates: { entity: 'invoice', label: 'Print estimate' },
   // MF-C
   // MF-D
 };

@@ -12,6 +12,8 @@ import {
 } from '../src/lib/mfg/mf-drawings.ts';
 import { attachToInvoice, evaluate, inTol, inspectionSnap, loadReports, removeReport, reportHtml, saveReport } from '../src/lib/mfg/mf-inspection.ts';
 import { mfSnapshot } from '../src/lib/mfg/mf-snapshot.ts';
+import { impliedPacks } from '../src/lib/shop-mode.ts';
+import { opsForRelease } from '../src/lib/mfg/mf-ops.ts';
 import { clientOf, mfDraft, mfLine, saveDraft } from '../src/lib/mfg/mf-b-docs.ts';
 
 beforeEach(() => {
@@ -45,11 +47,13 @@ test('a hold revision blocks the release of an order of its item (fabrication pa
   const d = setHold(saveDrawing({ number: 'D-9', title: 'Shaft', item_id: 'sh' }).id, true);
   assert.match(holdBlock('sh', loadDrawings()), /D-9 rev A is on hold/);
   assert.equal(holdBlock('other', loadDrawings()), '');
-  assert.equal(releaseHold('sh'), '', 'pack off: nothing read, nothing blocked');
+  assert.equal(releaseHold('sh', []), '', 'pack off: nothing read, nothing blocked');
   localDb.settings.save({ ...localDb.settings.get(), industry_packs: ['shopfloor', 'fabrication'] as never });
-  assert.match(releaseHold('sh'), /on hold/);
+  assert.match(releaseHold('sh', impliedPacks(localDb.settings.get())), /on hold/);
+  assert.throws(() => opsForRelease({ item_id: 'sh', planned_qty: 5 }), /D-9 rev A is on hold/, 'the release path (MF-A2) refuses it');
+  assert.equal(opsForRelease({ item_id: 'other', planned_qty: 5 }), undefined);
   overrideHold(d.id);
-  assert.equal(releaseHold('sh'), '', 'owner override for this revision');
+  assert.equal(releaseHold('sh', impliedPacks(localDb.settings.get())), '', 'owner override for this revision');
   setHold(d.id, false);
   assert.equal(loadDrawings()[0].release_override, undefined, 'released: the override is cleared');
 });

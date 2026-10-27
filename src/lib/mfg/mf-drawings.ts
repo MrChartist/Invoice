@@ -7,30 +7,26 @@
  * carried to the output batch through the order's batch-wise issues (R4-A genealogy) for the invoice sub-line.
  * Pure helpers above the "Storage" divider (tests/mf-drawings.test.ts). Working papers — verify with your CA.
  */
+import './mf-registry';
 import type { Drawing, DrawingRevision, MfLineSnap, MfSnapshot } from '../../types/mfg-r13';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { ManufacturingVoucher } from '../../types/manufacturing';
 import type { StockTransfer } from '../../types/stock';
-import { generateId, peekTable } from '../storage';
+import { generateId } from '../storage';
 import { requireAccess, currentActor } from '../access';
 import { audit } from '../audit';
 import { isVoidStatus, readPurchase, readPurchaseLines } from '../purchase-normalize';
-import { impliedPacks } from '../shop-mode';
 import { localDb } from '../localDb';
 import { MF_TABLES } from './mf-shared';
 import { mfSnapshot } from './mf-snapshot';
+import { currentRev } from './mf-drawing-hold';
+export { currentRev, holdBlock, releaseHold } from './mf-drawing-hold';
 import { DAY, drop, mustGet, nowIso, put, rowsOf } from './mf-b-db';
 
 export const DRAWINGS_TABLE = MF_TABLES.drawings;
 const key = (s: string | undefined) => String(s ?? '').trim().toUpperCase();
 
 /* ── Pure ─────────────────────────────────────────────────────── */
-
-/** The current revision (else the newest that is not superseded, else the newest). */
-export function currentRev(d: Pick<Drawing, 'revisions'>): DrawingRevision | undefined {
-  const r = d.revisions ?? [];
-  return r.find((x) => x.status === 'current') ?? [...r].reverse().find((x) => x.status !== 'superseded') ?? r[r.length - 1];
-}
 
 /** Add a revision: it becomes `current` (or `hold`); every earlier current / hold revision is superseded. */
 export function withRevision(d: Drawing, rev: Omit<DrawingRevision, 'status'> & { status?: 'current' | 'hold' }): Drawing {
@@ -72,16 +68,6 @@ export function docRevWarnings(mf: MfSnapshot | undefined, drawings: readonly Dr
   return out;
 }
 
-/** '' or why an order of `itemId` may not be released: a drawing of the item whose live revision is on hold. */
-export function holdBlock(itemId: string, drawings: readonly Drawing[]): string {
-  for (const d of drawings) {
-    if (d.item_id !== itemId) continue;
-    const cur = currentRev(d);
-    if (cur?.status === 'hold' && key(d.release_override?.rev) !== key(cur.rev)) return `Drawing ${d.number} rev ${cur.rev} is on hold — release it in the drawing register (or the owner overrides it) first.`;
-  }
-  return '';
-}
-
 export interface HeatDocs {
   mfg: readonly Pick<ManufacturingVoucher, 'item_id' | 'batch_no' | 'production_order_id' | 'components'>[];
   transfers: readonly Pick<StockTransfer, 'production_order_id' | 'lines'>[];
@@ -121,12 +107,6 @@ export function heatsForBatch(itemId: string, batch: string, docs: HeatDocs): st
    ================================================================ */
 
 export const loadDrawings = (): Drawing[] => rowsOf<Drawing>(DRAWINGS_TABLE).filter((d) => Array.isArray(d.revisions));
-
-/** Release guard for `production/orders.ts` (via MF-A's routing copy): reads drawings only with the fabrication pack. */
-export function releaseHold(itemId: string): string {
-  if (!impliedPacks(localDb.settings.get()).includes('fabrication')) return '';
-  return holdBlock(itemId, peekTable<Drawing>(DRAWINGS_TABLE).filter((d) => d && Array.isArray(d.revisions)));
-}
 
 export type DrawingInput = Pick<Drawing, 'number' | 'title'> & Partial<Pick<Drawing, 'id' | 'client_id' | 'item_id' | 'characteristics' | 'material_grade'>> & { rev?: string; rev_date?: string };
 

@@ -11,6 +11,7 @@
  * production order (R4-A) — the finishing steps print on the ticket; actual sheets issued vs estimated on completion.
  * Printing classes (`PRINT_CLASS_RULES`) are suggestions by date; a typed rate wins (MF3–MF5).
  */
+import './mf-registry';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { MfPress, PrintEstimate } from '../../types/mfg-r13';
 import type { ProductionOrder } from '../../types/production-r4';
@@ -38,6 +39,7 @@ export const PES = MF_SERIES.estimates;
 export const ESTIMATES_TABLE = MF_TABLES.estimates;
 
 /** A printing class suggestion on a date (`rate: null` = goods rate of the printed product — type it). */
+export const PRINT_CLASSES = Object.keys(PRINT_CLASS_RULES) as PrintClass[];
 export const printClassRate = (c: PrintClass, date?: string): MfClassRate => ruleAt(PRINT_CLASS_RULES[c], date);
 
 export interface EstimateBreak {
