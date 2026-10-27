@@ -206,6 +206,12 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'workshop', path: '/time?tab=workshop&view=reminders', labelKey: 'r10.reminders' },
   { pack: 'workshop', path: '/time?tab=workshop&view=labour', labelKey: 'r10.labour' },
   { pack: 'workshop', path: '/time?tab=workshop&view=vehicles', labelKey: 'r10.vehicles' },
+  // CN-D: site operations (Works views)
+  { pack: 'works', path: '/time?tab=works&view=subcon', labelKey: 'r11.subcon' },
+  { pack: 'works', path: '/time?tab=works&view=labour', labelKey: 'r11.labour' },
+  { pack: 'works', path: '/time?tab=works&view=plant', labelKey: 'r11.plant' },
+  { pack: 'works', path: '/time?tab=works&view=reco', labelKey: 'r11.reco' },
+  { pack: 'works', path: '/time?tab=works&view=pnl', labelKey: 'r11.pnl' },
 ];
 
 /**

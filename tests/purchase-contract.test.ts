@@ -959,3 +959,13 @@ test('R11 (CN-C5) 80% procurement test reads the real bill shape (registered by 
   const t = procurement80({ cost_centre_id: 'cc' }, 2026, [{ ...bill, cost_centre_id: 'cc' }, { ...bill, id: 'p2', vendor_gstin: undefined, cost_centre_id: 'cc' }, { ...bill, id: 'p3', status: 'void', cost_centre_id: 'cc' } as never]);
   assert.deepEqual([t.total, t.registered, t.unregistered, t.pct], [2000, 1000, 1000, 50]);
 });
+
+test('R11 (CN-D) site readers read the real bill shape: labour holds, plant-hire split and site P&L classify each bill once', async () => {
+  const { labourBills } = await import('../src/lib/construction/cn-labour-compliance.ts');
+  const { sitePnl } = await import('../src/lib/construction/cn-site-pnl.ts');
+  const lab = { ...bill, id: 'lab', vendor_id: 'v-lab', category: 'Labour contract', cost_centre_id: 'cc' };
+  assert.equal(labourBills([lab as never], [])[0].hold, 118, '10% of the bill, no pack');
+  const boq = { id: 'boq', items: [], boq_terms: { cost_centre_id: 'cc' } } as never;
+  const p = sitePnl({ boq, period: { start: '2026-04-01', end: '2027-03-31' }, invoices: [], purchases: [lab, { ...bill, id: 'o', cost_centre_id: 'cc' }, { ...bill, id: 'x' }, { ...bill, id: 'v', status: 'void', cost_centre_id: 'cc' }], vouchers: [], payments: [], measurements: [], material: new Map(), internal: new Map(), sites: [], logs: [], compliance: [] });
+  assert.deepEqual([p.costs.labour, p.costs.other], [1000, 1000], 'ITC taken: cost = taxable; untagged and void bills left out');
+});

@@ -192,7 +192,7 @@ export const tabsT = defineArea(
     'time.projects': 'Projects',
     'time.retainers': 'Retainers',
     'time.settings': 'Time settings',
-    'time.works': 'Works contracts (BOQ, RA bills)',
+    'time.works': 'Works contracts (BOQ, RA bills, sub-contracts, muster, plant, site P&L)',
     // R10: service desks (also "Industry packs" rows)
     'time.appointments': 'Appointments: day book, queue, reminders', 'time.commission': 'Staff & commission', 'time.clinic': 'Clinic: patients, OPD, lab', 'time.members': 'Members: plans, check-in, classes', 'time.workshop': 'Workshop: job cards, estimates, claims',
     // Recurring
@@ -388,7 +388,7 @@ export const tabsT = defineArea(
     'time.projects': 'प्रोजेक्ट',
     'time.retainers': 'रिटेनर',
     'time.settings': 'समय सेटिंग्स',
-    'time.works': 'वर्क्स कॉन्ट्रैक्ट (BOQ, RA बिल)',
+    'time.works': 'वर्क्स कॉन्ट्रैक्ट (BOQ, RA बिल, उप-ठेके, हाज़िरी, प्लांट, साइट लाभ-हानि)',
     'time.appointments': 'अपॉइंटमेंट: दिन बुक, कतार, रिमाइंडर', 'time.commission': 'स्टाफ और कमीशन', 'time.clinic': 'क्लिनिक: मरीज़, OPD, लैब', 'time.members': 'सदस्य: प्लान, चेक-इन, क्लास', 'time.workshop': 'वर्कशॉप: जॉब कार्ड, एस्टिमेट, क्लेम',
     'recurring.schedules': 'आवर्ती शेड्यूल',
     'recurring.batch': 'बैच इनवॉइस',

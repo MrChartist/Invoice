@@ -133,6 +133,12 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   '/time?tab=works': ['ra bill', 'running bill', 'boq', 'measurement', 'works contract'],
   '/time?tab=works&view=retention': ['retention', 'retention money'],
   '/time?tab=works&view=sites': ['site', 'project site'],
+  // R11 (CN-D)
+  '/time?tab=works&view=subcon': ['sub-contractor', 'subcontractor', 'petty contractor', 'work order', 'sub-contract bill'],
+  '/time?tab=works&view=labour': ['muster', 'attendance', 'labour contractor', 'pf esi challan', 'manpower supply'],
+  '/time?tab=works&view=plant': ['log sheet', 'jcb', 'equipment hire', 'machinery hire', 'diesel'],
+  '/time?tab=works&view=reco': ['cement reconciliation', 'steel reconciliation', 'material reconciliation', 'wastage'],
+  '/time?tab=works&view=pnl': ['site p&l', 'site profit', 'wip', 'cost to complete'],
   '/receivables?tab=donations': ['80g', '10bd', 'form 10bd', 'donation', 'receipt 80g', 'दान'],
   '/books?tab=funds': ['fund', 'fcra', 'fc-4', 'corpus', 'earmarked'],
   '/recurring?tab=fees': ['fee', 'fees', 'tuition', 'school fees', 'student'],

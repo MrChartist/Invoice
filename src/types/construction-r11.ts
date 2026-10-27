@@ -7,6 +7,7 @@
  * One block per package, marked `// CN-A` … `// CN-D`: each package fills only its own block. Types only (0 bytes).
  * Everything here is a working paper — verify with your CA (docs/CA_REVIEW.md §11, CN1–CN28).
  */
+import type { AttachmentRef } from './attachments'; // CN-D2 (labour compliance files)
 
 /* ════════════════════════════════════════ CN-A ════════════════════════════════════════ */
 
@@ -623,4 +624,236 @@ export interface CnDemandFields {
 
 /* ════════════════════════════════════════ CN-D ════════════════════════════════════════
  * Site operations: sub-contract work orders, labour, muster, plant, reconciliation, site P&L. D adds
- * `PurchaseRecord.cn_sub` and `FixedAsset.cn_equipment` here. */
+ * `PurchaseRecord.cn_sub` and `FixedAsset.cn_equipment` here (and `Godown.cn_reco`, `BoqTerms.site_pnl`). */
+
+/** CN-D1: deductions on a sub-contractor's bill (a work-order rule; `rate` % of the value before GST, or `amount`). */
+export type SubDeductionKind = 'retention' | 'advance_recovery' | 'material_recovery' | 'hire_recovery' | 'other';
+export interface SubDeductionRule {
+  kind: SubDeductionKind;
+  rate?: number;
+  amount?: number;
+  label?: string;
+}
+
+export interface SubWoLine {
+  id: string;
+  /** The BOQ line this item is sublet from (back-to-back). */
+  boq_line_id?: string;
+  ref: string;
+  description: string;
+  unit: string;
+  qty: number;
+  rate: number;
+  sac: string;
+  gst_rate: number;
+}
+
+/** Table `sub_work_orders` (`SWO/FY…`, `doc.create`, dated `date`). */
+export interface SubWorkOrder {
+  id: string;
+  number: string;
+  date: string;
+  vendor_id: string;
+  vendor_name: string;
+  contract_id?: string;
+  boq_id?: string;
+  /** Site godown (kind `site`) and its cost centre. */
+  site_id?: string;
+  cost_centre_id?: string;
+  lines: SubWoLine[];
+  deductions: SubDeductionRule[];
+  /** IT TDS section of his bills (default 194C by PAN). */
+  tds_section?: string;
+  status: 'open' | 'closed' | 'cancelled';
+  created_at: string;
+  updated_at?: string;
+}
+
+/** Table `sub_measurements` (`SCB/FY…`, `doc.create`, dated `date`): the `ra_measurements` shape against a work order. */
+export interface SubMeasurement {
+  id: string;
+  number: string;
+  wo_id: string;
+  date: string;
+  period_from?: string;
+  period_to?: string;
+  lines: { line_id: string; cumulative_qty: number; this_qty: number; mb_ref?: string }[];
+  /** The purchase bill made from it and the deductions journal. */
+  purchase_id?: string;
+  jv_id?: string;
+  status: 'billed' | 'cancelled';
+  created_at: string;
+}
+
+/** One deduction booked on a sub-contractor's bill (snapshot). */
+export interface CnSubDeduction {
+  kind: SubDeductionKind;
+  label: string;
+  amount: number;
+  item_id?: string;
+  qty?: number;
+  rate?: number;
+}
+
+/** `PurchaseRecord.cn_sub`: a sub-contractor bill (D1) or a plant-hire bill (D3), snapshotted at save. */
+export interface CnSubSnapshot {
+  kind: 'subcon' | 'hire';
+  wo_id?: string;
+  wo_number?: string;
+  measurement_id?: string;
+  /** SCB/FY… */
+  number?: string;
+  site_id?: string;
+  abstract?: { ref: string; description: string; unit: string; rate: number; prev_qty: number; this_qty: number; cum_qty: number; amount: number; mb?: string }[];
+  deductions?: CnSubDeduction[];
+  tds?: number;
+  /** Bill total − TDS − deductions. */
+  net?: number;
+  /** Journal Dr creditors | Cr retention payable / recoveries (its amount sits in `amount_paid`). */
+  jv_id?: string;
+  /** D3: hired equipment, month (YYYY-MM) and operator flag. */
+  equipment_id?: string;
+  month?: string;
+  with_operator?: boolean;
+}
+
+/** CN-D2: table `labour_compliance` (vendor × month, `doc.create`). Files go through the attachments store. */
+export interface LabourCompliance {
+  id: string;
+  vendor_id: string;
+  vendor_name: string;
+  /** YYYY-MM */
+  month: string;
+  headcount: number;
+  wages: number;
+  pf: { trrn?: string; amount?: number; file?: AttachmentRef };
+  esi: { challan?: string; amount?: number; file?: AttachmentRef };
+  wage_register?: AttachmentRef;
+  licence?: { no: string; valid_till: string };
+  status: 'pending' | 'proved' | 'waived';
+}
+
+/** CN-D2: table `site_labour` (`master.edit`). `site_id` = site godown. */
+export interface SiteLabour {
+  id: string;
+  name: string;
+  trade: string;
+  daily_rate: number;
+  ot_rate: number;
+  /** Minimum wage typed for the trade (warning only). */
+  min_wage?: number;
+  phone?: string;
+  id_ref?: string;
+  site_id: string;
+  /** Linked payroll employee (later). */
+  employee_id?: string;
+  active: boolean;
+}
+
+/** CN-D2: table `muster_days` — one row per site per day (`doc.create`, dated `date`). */
+export interface MusterDay {
+  id: string;
+  site_id: string;
+  date: string;
+  entries: { labour_id: string; present: 0 | 0.5 | 1; ot_hours?: number }[];
+  /** Weekly settlement `MUS/FY…` and its payment voucher. */
+  mus_no?: string;
+  voucher_id?: string;
+}
+
+/** CN-D3: table `hired_equipment` (`master.edit`). */
+export interface HiredEquipment {
+  id: string;
+  vendor_id: string;
+  vendor_name: string;
+  description: string;
+  rate: number;
+  basis: 'hour' | 'day' | 'month';
+  with_operator: boolean;
+  from: string;
+  to?: string;
+  /** Fuel per working hour, typed range (litres). */
+  fuel_min?: number;
+  fuel_max?: number;
+}
+
+/** CN-D3: table `plant_logs` (`PLG/FY…`, `doc.create`, dated `date`). `equipment_ref` = `fa:<asset id>` | `hire:<id>`. */
+export interface PlantLog {
+  id: string;
+  number: string;
+  date: string;
+  equipment_ref: string;
+  site_id: string;
+  hours_worked: number;
+  idle_hours: number;
+  breakdown_hours: number;
+  fuel_litres: number;
+  operator?: string;
+  /** Hire out: charged to this sub-contractor (vendor id) at the equipment's hire-out rate. */
+  sub_contractor_id?: string;
+  /** The sub-contractor bill (SCB number) that recovered it. */
+  recovered_in?: string;
+}
+
+/** `FixedAsset.cn_equipment` (D3). */
+export interface CnEquipment {
+  kind: string;
+  reg_no?: string;
+  hour_meter?: number;
+  cost_centre_id?: string;
+  /** Internal charge to our own sites and hire-out rate, per hour. */
+  internal_rate?: number;
+  hire_rate?: number;
+  fuel_min?: number;
+  fuel_max?: number;
+}
+
+/** `Godown.cn_reco` on a site godown (D4): contract terms per material and client-issued receipts. */
+export interface CnSiteReco {
+  /** Per stock item: permissible band (−lo% / +hi%), issue rate and penal factor (contract terms). */
+  terms?: Record<string, { lo?: number; hi?: number; issue_rate?: number; penal?: number }>;
+  /** Materials issued by the client: free (quantity only, value 0) or against recovery at `rate`. */
+  issues?: { id: string; date: string; item_id: string; qty: number; mode: 'free' | 'recovery'; rate?: number; ref?: string }[];
+}
+
+/** `boq_terms.site_pnl` on a BOQ (D5 memo inputs, typed). */
+export interface CnSitePnlInputs {
+  /** Work done but not yet measured (₹). */
+  unmeasured?: number;
+  /** Cost to complete per BOQ group (₹). */
+  ctc?: { group: string; amount: number }[];
+  updated_at?: string;
+}
+
+export interface ConstructionSettings {
+  /** CN-D2: hold on a labour contractor's bill until the month's PF / ESI is proved (% of the bill, default 10). */
+  labour_withhold_pct?: number;
+}
+
+declare module './purchases' {
+  interface PurchaseRecord {
+    /** CN-D1 / D3: sub-contractor bill or plant-hire bill snapshot. */
+    cn_sub?: CnSubSnapshot;
+  }
+}
+
+declare module '../lib/ledger/assets' {
+  interface FixedAsset {
+    /** CN-D3: this asset is site equipment (log sheets, hire out, internal charge). */
+    cn_equipment?: CnEquipment;
+  }
+}
+
+declare module './stock' {
+  interface Godown {
+    /** CN-D4: material reconciliation terms and client-issued receipts of a site godown. */
+    cn_reco?: CnSiteReco;
+  }
+}
+
+declare module './transport-works-r5' {
+  interface BoqTerms {
+    /** CN-D5: WIP memo inputs (work not yet measured, cost to complete). */
+    site_pnl?: CnSitePnlInputs;
+  }
+}

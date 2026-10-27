@@ -480,6 +480,9 @@ const RECORD_TABLES = [
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
   // R10-A: appointments, service staff, commission plans, staff payouts, payer claims (CLM/FY…)
   'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
+  // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
+  // (MUS settlements), hired equipment, plant log sheets (PLG)
+  'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -557,6 +560,9 @@ const ID_TABLES = new Set([
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
   // R10-A: appointments, service staff, commission plans, staff payouts, payer claims (CLM/FY…)
   'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
+  // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
+  // (MUS settlements), hired equipment, plant log sheets (PLG)
+  'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
