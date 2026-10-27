@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { lazy, Suspense, useId, useMemo, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { gstRateOptions } from '../../lib/tax-rules';
 import { cleanAltUnits, compoundUnits, unitSymbols, unitsDb, validateAltUnits } from '../../lib/units';
@@ -17,6 +17,8 @@ import { catalogueEntryFor, setStockShortCode } from '../../lib/catalog';
 import { retailT } from '../../i18n/areas/retail';
 import { impliedPacks } from '../../lib/shop-mode';
 import { localDb } from '../../lib/localDb';
+
+const PackSizeRow = lazy(() => import('../agri/PackSizeRow')); // R12 AG-C4: agri class, pack size, labelled (mill / agri pack)
 
 export interface ItemFormModalProps {
   open: boolean;
@@ -69,6 +71,9 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
   const [d, setD] = useState<Draft>(() => toDraft(item));
   const [weighOn] = useState(() => impliedPacks(localDb.settings.get()).some((p) => p === 'commodity' || p === 'agency') || !!item.sold_by_weight_bags); // R8-B
   const [touched, setTouched] = useState(false);
+  // R12 AG-C4: agri class / pack size / labelled, shown with the mill or agri pack (or when already set on the item).
+  const [ag, setAg] = useState<Pick<StockItem, 'ag_class' | 'ag_pack_kg' | 'ag_labelled'>>(() => ({ ag_class: item.ag_class, ag_pack_kg: item.ag_pack_kg, ag_labelled: item.ag_labelled }));
+  const [agOn] = useState(() => impliedPacks(localDb.settings.get()).some((p) => p === 'mill' || p === 'agri') || !!(item.ag_class || item.ag_pack_kg));
   const uid = useId();
   // QA-3 F24: the counter short code lives on the catalogue entry of the same name; it is edited here too.
   const [shortCode, setShortCode] = useState(() => catalogueEntryFor(item.name)?.short_code ?? '');
@@ -128,6 +133,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
       selling_prices: cleanPriceList(d.masters.prices.map((e) => ({ from: e.from, rate: e.rate === '' ? undefined : num(e.rate) }))),
       qc_on_receipt: d.track_stock && d.masters.qc ? true : undefined, // R4-A4
       sold_by_weight_bags: d.sold_by_weight_bags || undefined, // R8-B
+      ...(agOn ? { ag_class: ag.ag_class || undefined, ag_pack_kg: ag.ag_pack_kg && ag.ag_pack_kg > 0 ? ag.ag_pack_kg : undefined, ag_labelled: ag.ag_labelled || undefined } : {}), // R12 AG-C4
     });
   };
 
@@ -272,6 +278,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
           </>
         )}
         {weighOn && <label className={controls.check}><input type="checkbox" checked={d.sold_by_weight_bags} onChange={(e) => set('sold_by_weight_bags', e.target.checked)} data-sold-by-weight /> {invT('soldByWeight')}</label>}
+        {agOn && <Suspense fallback={null}><PackSizeRow value={ag} unit={d.unit} onChange={setAg} /></Suspense>}
         <MastersFields
           draft={d.masters}
           onChange={(m) => set('masters', m)}
