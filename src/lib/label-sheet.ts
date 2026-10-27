@@ -40,6 +40,8 @@ export const LABEL_LAYOUTS: LabelLayout[] = [
   { id: 'jewel-tag', label: 'Jewellery tag roll 60 × 15 mm', cols: 1, rows: 1, width: 60, height: 15, top: 0, left: 0, gapX: 0, gapY: 0, roll: true },
   // R10 (SV-B3): lab sample label roll (order no. barcode, patient, sample type).
   { id: 'lab-sample', label: 'Lab sample label roll 50 × 25 mm', cols: 1, rows: 1, width: 50, height: 25, top: 0, left: 0, gapX: 0, gapY: 0, roll: true },
+  // R10 (SV-C2): member cards, credit-card size (member code as the barcode).
+  { id: 'member-card', label: 'Member cards 85.6 × 54 mm (2 × 5)', cols: 2, rows: 5, width: 85.6, height: 54, top: 13.5, left: 17, gapX: 4, gapY: 0 },
 ];
 
 /** Page size of a layout in mm: A4 for sheets; the roll width × label height for rolls. */

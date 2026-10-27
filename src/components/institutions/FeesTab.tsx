@@ -2,7 +2,7 @@
  * Recurring → Fees (R5-C1): plans, students / patients, the billing run (one Bill of Supply and / or one tax invoice
  * per student per instalment, issued in one batch, undo by cancelling) and dues. Lazy; listed with the `fees` pack.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useMemo, useState } from 'react';
 import type { FeePlan } from '../../types/institutions-r5';
 import { localDb } from '../../lib/localDb';
 import { deletePlan, loadPlans } from '../../lib/institutions/fee-plans';
@@ -17,7 +17,8 @@ import { DuesPanel } from './DuesPanel';
 import { B, S, Shell, T } from './Views';
 import { attempt, feeCtx, rs, today, useView, type Notify } from './ui';
 
-const VIEWS = ['plans', 'students', 'bill', 'dues'] as const;
+const VIEWS = ['plans', 'students', 'bill', 'dues', 'batches', 'attendance', 'refunds'] as const; // R10 (SV-C): coaching views
+const FeesR10Views = lazy(() => import('../services-r10/FeesR10Views'));
 
 export default function FeesTab({ notify }: { notify: Notify }) {
   useT();
@@ -77,6 +78,7 @@ export default function FeesTab({ notify }: { notify: Notify }) {
         </div>
       )}
       {view === 'dues' && <DuesPanel plans={plans} notify={notify} tick={tick} refresh={refresh} />}
+      {(view === 'batches' || view === 'attendance' || view === 'refunds') && <Suspense fallback={null}><FeesR10Views view={view} notify={notify} /></Suspense>}
     </Shell>
   );
 }

@@ -135,6 +135,66 @@ provider 1.0; registrations panel 0.8; hosts (Time, open export, bell, paper lin
 ≈ 1.3; re-splitting of `sv-commission`, `sv-claims` and `rt-pharmacy-rx` into shared chunks (they were inlined into the
 front desk / claims / pharmacy chunks) ≈ +1.5 net.
 
+## SV-C — Memberships, packages, classes and attendance (salons, spas, gyms, yoga, coaching)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| C1 plans and memberships | `services/sv-members.ts` (table `member_plans`, `master.edit`, audited "Membership plan"; pure maths: `addMonths` / `baseEnd` — month ends clamp, 31 Jan + 1 month = 28 Feb — `endOf` with freezes, `statusOf`, `sessionsUsed` from live bills' `sv.redeem` lines + redeeming check-ins, `freezeError` (min / max days, max times, overlap), `unusedValue` pro rata by days (time-based) or sessions (package) at the old price, `redeemPatch`, `sessionText`, `renewals`, `forfeited`). `services/sv-memberships.ts` (table `memberships`, `doc.create`, audited "Membership", dated `start`, numbered `MEM/FY…`): `sellPlan` (ONE issued invoice for the whole price, taxed at sale — record `sv.membership`, so commission sees a membership sale; a wallet sells no bill), `freeze` / `unfreeze` (end moves by the frozen days; fee = own small bill), `upgrade` (unused value credited on one invoice for the difference with the credit on the line — or `service_settings.upgrade_mode = 'credit_note'`: a credit note on the old bill + a full bill), `transfer` (same row, history kept, fee billed to the old member), `cancelMembership` (refund none / pro rata / typed → GST credit note `valueNote` within Sec 34(2), refused past it), `renew` / `autoRenewDue` (successor from the day after the end, DRAFT bill — the desk runs it on open), `topUp` (wallet top-up = an advance receipt, GST on receipt; bonus % recorded, `useBonus` / `bonusLeft` — a discount, never cash), `deleteMembership` (refused while a live bill belongs to it). Redemption: `SvRedeem.tsx` — `RedeemChip` under each editor line (one lazy line in `ItemsTable.tsx`), `PosPackages` on the POS customer panel (salon / fitness pack, one lazy line in `Pos.tsx`): the line becomes ₹0, prints "Session 3 of 6 — MEM/…" in its description and carries `sv.redeem` (value = price ÷ sessions, SV-A's commission base); over-use, expired, frozen and uncovered items are refused. |
+| C2 check-in and attendance | `services/sv-checkin.ts` (table `checkins`, `doc.create`, audited "Check-ins", dated `date`, ONE row per day): `findMembers` (MEM number, its last four digits, phone, name), `gateFor` (`service_settings.checkin_gate`, default `warn`), `checkIn` (duplicate refused, `redeem_on_checkin` packages use a session), `undoCheckin`, `footfall` (per day / hour), `notSeen` (churn list with `wa.me`). `services/sv-attendance.ts` (table `class_attendance`, `doc.create`, audited "Attendance", one row per class × day): `saveAttendance`, `attendanceOf` (late = present; held = meeting days of the month up to today, holidays skipped), `attendanceLine` → the R5-C dues reminder gains " Attendance this month: 18 / 22." (one line in `DuesPanel.tsx`). Member cards: label-sheet preset `member-card` (85.6 × 54 mm, 2 × 5; MEM number as the barcode). |
+| C3 classes, PT, coaching refunds | `services/sv-classes.ts` (table `class_schedules`, `master.edit`, audited "Class / batch"): weekdays / time / dates / capacity / holidays, `occurrences`, `enrolMember` (place or wait-list), `dropMember` (first waiting moves up), `studentsOfBatch` / `setBatch` (`Enrolment.class_id`), `feeIncreaseWarning`. PT: a package plan with a trainer (`trainer_id`); each session redeemed on a bill line with the trainer as staff earns the "package redemption" commission. `services/sv-coaching-refund.ts`: `coachingRefund` (pure; refund = paid − course × used ÷ total, by days or started months; due = request + 10 days from `COACHING_REFUND_RULES`), `refundBasis` (course and paid on refundable heads: per-instalment heads unless `FeeHead.no_refund`; once-heads kept), `issueCoachingRefund` (credit notes across the instalment bills, tax reversed on the taxable part only; `Enrolment.refund`), `markRefundPaid`. Fees tab views `batches`, `attendance`, `refunds` (`FeesR10Views.tsx`, one lazy mount in `FeesTab.tsx`). |
+| C4 service recipes | `services/sv-recipes.ts` `recipeReport`: kit services (`StockItem.kit` + default BOM — the engine already honours `unit_factor`, so no change to `events-kits.ts`) by product, service and staff; cost at the latest standard cost else the opening rate; `line.sv.recipe_qty` overrides per product. Members desk `recipes` view with CSV. |
+| Desk | `MembersDesk.tsx` replaces `R10Stub` for Time → Members (views `plans`, `members`, `checkin`, `classes`, `recipes`); strings `i18n/areas/services-r10c.ts` (en + hi). Help topics for the members views reworded in place. |
+| Shared rows | `sv-shared.ts` (5 tables, series `MEM`, dropped from `SV_RESERVED_SERIES`), `sv-registry.ts` SV-C block, backup (`// R10-C`, both lists), sync (`memberships` by `start`, `checkins` / `class_attendance` by `date`; `memberships` numbered), open-export rows, restore hooks in `trust/recycle-bin.ts` (a check-in / attendance day recorded again since stays in the bin; a membership whose sale bill now belongs to another membership stays). Demo: fitness / salon Demo companies get three plans, four members (one frozen), a week of check-ins and a yoga class. E2E step "R10-C members desk". |
+
+### GST timing (CA items SV14, SV15, SV44–SV48)
+
+- Membership / package: the whole price is invoiced and taxed on the sale date (Sec 13: invoice or payment, earlier).
+- Redemption: a ₹0 line — the value was taxed at sale, so it is never taxed twice; it still shows the session.
+- Wallet: the top-up is an advance receipt (GST on receipt); spending adjusts the advance as usual; the bonus is a
+  discount on the later bill.
+- Expiry / forfeiture: no GST event; `forfeited` lists the value per month for the books (**CA question SV44**).
+- Upgrade (difference mode) taxes only the difference on the new bill; refunds are GST credit notes within Sec 34(2).
+
+### Deviations from the PRD (SV-C)
+
+- **Sale** is made from the Members desk (an issued bill, opened from the list for payment), not from a "Sell plan"
+  button in the POS / editor. **Session text** prints through the line description (no `sessionText` branch in
+  `paper-helpers.ts`, so no template change).
+- **Auto-renew** makes the successor and a draft bill when the desk opens (not a `recurring` schedule: a schedule
+  cannot create the membership row). No bell notice ("expiring this week"): the renewals list sits on the Members view.
+- **`defer_package_income`** and the "Package income recognised" journal are not built (report only).
+- **Camera QR** check-in is not built: the member card carries the MEM number as a barcode, which any keyboard
+  scanner types into the code box. Member card = barcode, not QR.
+- **Class bookings** per occurrence (appointments with `class_id`) are not built: enrolment with capacity and a
+  wait-list per class. Attendance is taken per class and day for coaching batches; gym check-ins can carry `class_id`.
+- **Item form** sub-row "Products used per service" not added (the existing Kit + BOM screens set the recipe); the
+  bill-line override `sv.recipe_qty` is read by the report only (stock follows the BOM). Variance vs physical count: not built.
+- **Fee increase** warning: `feeIncreaseWarning` exists (tested) but `FeePlanForm` (R5-C) does not call it yet.
+- **Coaching refund** records the request on the enrolment (no new table) and credits by value: the credited line keeps
+  quantity 1 on a new line id, so the R5-C "creditable quantity" tracking is untouched; the total-credit cap still holds.
+- **CA ids** SV44–SV48 (not sequential after SV26: SV27+ is SV-B's, SV41–SV43 SV-D's).
+- **Found on the way:** saving any invoice upserts its client snapshot, and a fee bill's snapshot carries
+  `enrolments` — re-saving an old fee bill (or a credit note copied from it) would reset the student's enrolments.
+  `valueNote` strips `enrolments` from its snapshot; the R5-C editor path still has the hazard (lead to decide).
+
+### Bundle (SV-C)
+
+Measured against `claude/elegant-cannon-cwapiv` at `341fffb` (both built in the same directory, gzip level 9, the
+`check:size` method):
+
+| | Before | After | Δ |
+|---|---|---|---|
+| Initial JS (first paint) | 189,142 B | 189,134 B | **−8 B** (chunk-map noise; no first-paint file touched) |
+| Total JS | 3,021,032 B (2,950.2 kB) | 3,045,925 B (2,974.5 kB) | **+24.3 kB** |
+
+**Over the 12 kB aim** (PRD share 10 kB). Breakdown (each module minified alone, gz): engines ≈ 11 kB (memberships 3.8,
+plan maths 2.1, coaching refund 1.3, check-in 1.2, classes 1.2, recipes 0.7, attendance 0.7); Members desk UI 5.4;
+Fees views 1.9; redeem chip 1.0; strings en + hi 3.3; hosts / registries / backup / sync / export / restore hooks /
+label preset / demo ≈ 1.3; re-chunking of the R5-C modules now shared with the coaching views ≈ 1. The PRD's 10 kB
+assumed C1–C4 at the size of one desk; the four items carry seven engines (each with its writer, rules and history)
+and two languages. Total JS stays under the raised 3,200 kB budget (2,974.5 kB).
 ## SV-D — Repair and service centres (vehicle workshops, AC / appliance service)
 
 ### What shipped

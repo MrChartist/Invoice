@@ -42,10 +42,10 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 7. Hotel and lodging pack (Round 7, planned) | HT1–HT17 | 17 | 6 |
 | 8. Trading businesses (Round 8, planned) | TR1–TR22 | 22 | 8 |
 | 9. Retail shops (Round 9, planned) | RT1–RT22 | 22 | 8 |
-| 10. Service businesses (Round 10, planned) | SV1–SV30, SV41–SV43 | 33 | 10 |
+| 10. Service businesses (Round 10, planned) | SV1–SV30, SV41–SV48 | 38 | 11 |
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG32 | 32 | 10 |
-| **Total** | | **321** | **86** |
+| **Total** | | **326** | **87** |
 
 ---
 
@@ -502,7 +502,7 @@ and mobiles, and jewellery.
 | RT21 | **Stock valuation for jewellers.** Tags valued at cost (metal at purchase rate by fine weight + making paid). Old gold at its purchase value. Year-end at the lower of cost and NRV (AS 2). Is valuation by fine weight at the year-end rate (a common trade practice) acceptable instead? How should metal held by karigars (wip godown) be shown? | The books' valuation method is unchanged (existing engine). Karigar metal is shown as stock with job workers. | `retail/rt-karigar.ts`; `ledger/closing-stock.ts` (existing) | — | AS 2 (developers' reading) |
 | RT22 | **e-Way bill for jewellery.** Under the Rule 138(14) annexure, Chapter 71 goods (precious metals, jewellery) need no e-Way bill. The app suppresses the e-Way prompt only when every goods line on the bill is Chapter 71. Is the exemption still current? Does it cover silver articles and imitation jewellery (7117)? | As stated. 7117 is not treated as exempt. | `retail-rules.ts` `EWAY_EXEMPT_CHAPTER_RULES` | 2017-07-01 | Rule 138(14) annexure (recalled) |
 
-## 10. Service businesses (Round 10, ids SV1–SV30, SV41–SV43)
+## 10. Service businesses (Round 10, ids SV1–SV30, SV41–SV48)
 
 Added with `docs/prd/round-10.md`, which covers clinics, dentists and diagnostic labs; salons, spas and beauty parlours;
 gyms, fitness studios and yoga; coaching and training institutes; and vehicle workshops and AC / appliance service
@@ -585,6 +585,18 @@ Ids start at SV41 so they cannot clash with the ids SV-B / SV-C add at the same 
 | SV41 | **Excess on a motor claim bill.** The compulsory / voluntary excess is taken off the insurer's approved value of the **labour** lines first (then parts), so the owner's invoice carries that part of the line, tagged "excess", at the line's own rate (labour 18%). Is that right, or should the excess be a separate recovery from the owner (and at what rate)? Depreciation stays on the part's line at the part's rate. | As stated. | `services/sv-motor-claims.ts` `motorSplit` | 2024-06-26 | Developers' reading of Circular 217/11/2024-GST |
 | SV42 | **SAC for "other" repairs and outside work.** The workshop uses 998729 (repair of other goods) for an asset that is neither a vehicle nor a household appliance, while Round 9's phone desk uses 998719 for "other". Outside work (machining, denting) re-billed to the customer uses the job's own repair SAC (998714 vehicles, 998715 appliances) at 18%. Which "other" code is right, and is outside work rightly billed at the repair SAC? | 998729; outside work at the repair SAC. | `service-rules.ts` `REPAIR_SAC_RULES`; `services/sv-estimates.ts` `subletLine`; `retail-rules.ts` `REPAIR_SERVICE_RULES` | — | SAC list (recalled) |
 | SV43 | **Labour hours on the invoice.** Labour lines carry the standard hours as the quantity (unit HRS) and the hourly rate, so the HSN summary of GSTR-1 shows the SAC with a quantity in hours. Acceptable, or should service lines report the UQC as "OTH" / NA with no quantity? | Hours as the quantity; the HSN summary as the existing engine builds it. | `services/sv-estimates.ts` `labourLine`; `gst-reports.ts` (HSN summary, unchanged) | — | GSTR-1 HSN summary notes (recalled) |
+
+### 10.8 Added while building SV-C (memberships, packages, classes, coaching)
+
+Ids start at SV44 (SV27 up is SV-B's, SV41–SV43 SV-D's; the lead may renumber).
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| SV44 ★ | **Forfeiture of unused sessions and wallet value.** (a) A package's sessions unused at expiry lapse: the price was invoiced and taxed at sale, so the app makes **no** GST entry and only lists the forfeited value per month (for the books). (b) A wallet top-up is an advance taxed on receipt (G3); value never used and written back to income — any GST event, or none because tax was paid on the advance? (c) Is the forfeited value income of the year of expiry (AS 9) when the books defer package income? | (a) No GST event; report only. (b) No further GST. (c) Year of expiry; the app posts no deferral journal yet. | `services/sv-members.ts` `forfeited`; `sv-memberships.ts` `topUp` | — | Sec 13 / 15 CGST Act; developers' reading |
+| SV45 | **A redemption as a ₹0 line.** A session redeemed on a later bill is a ₹0 line ("Session 3 of 6 — MEM/…") with the service's SAC and rate, so the bill shows what was done without taxing it again. Is a ₹0 line on a tax invoice acceptable (it reaches the HSN summary with nil value), or should redemptions go on a non-tax delivery note instead? | ₹0 line on the bill. | `services/sv-members.ts` `redeemPatch`; `SvRedeem.tsx` | — | Rule 46 CGST Rules; developers' reading |
+| SV46 | **Cancellation refund after the Sec 34(2) date.** Within the date the refund of a membership is a GST credit note (tax reversed) on the sale bill. After it the app refuses the GST note and asks the user to record the refund as a payment with no GST adjustment. Right? | As stated. | `services/sv-memberships.ts` `valueNote`, `cancelMembership` | 2021-04-01 | Sec 34(2) as amended by Finance Act 2022 (30 November) |
+| SV47 | **Coaching refund documents.** The refund on leaving is a credit note against each instalment bill in proportion to its refundable value: tax reversed on taxable heads (tuition), a no-tax note against a Bill of Supply (exempt hostel / mess); once-heads (registration, material) are kept. When the instalment was not yet paid, the note reduces the amount due instead of a cash refund. Acceptable? | As stated. | `services/sv-coaching-refund.ts` | 2024-01-16 | SV18; Sec 34 CGST Act |
+| SV48 | **Freeze and transfer fees.** A freeze fee or a transfer fee is billed on its own small invoice at the plan's class rate (5% without ITC for gyms / salons from 22 Sep 2025). Is it ancillary to the membership (same rate), or a separate supply at 18%? | Same class as the plan. | `services/sv-memberships.ts` `freeze`, `transfer` | 2025-09-22 | SV11; developers' reading |
 
 ---
 

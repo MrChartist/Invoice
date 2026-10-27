@@ -25,7 +25,12 @@ export const SV_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   lab_tests: 'master.edit',
   lab_orders: 'doc.create',
   clinic_settings: 'settings.manage',
-  // SV-C: member_plans, memberships, checkins, class_attendance, class_schedules
+  // SV-C: plans / classes are masters; memberships, check-ins and attendance are front-desk documents
+  member_plans: 'master.edit',
+  memberships: 'doc.create',
+  checkins: 'doc.create',
+  class_schedules: 'master.edit',
+  class_attendance: 'doc.create',
   // SV-D: vehicles / appliances and labour operations are masters; the workshop settings object is the owner's
   service_assets: 'master.edit',
   labour_ops: 'master.edit',
@@ -46,6 +51,11 @@ export const SV_WATCHED: Readonly<Record<string, WatchedTable>> = {
   lab_tests: { entity: 'item', label: 'Lab test' },
   lab_orders: { entity: 'invoice', label: 'Lab order' },
   // SV-C
+  member_plans: { entity: 'item', label: 'Membership plan' },
+  memberships: { entity: 'invoice', label: 'Membership' },
+  checkins: { entity: 'invoice', label: 'Check-ins' },
+  class_schedules: { entity: 'item', label: 'Class / batch' },
+  class_attendance: { entity: 'invoice', label: 'Attendance' },
   // SV-D
   service_assets: { entity: 'item', label: 'Vehicle / appliance' },
   labour_ops: { entity: 'item', label: 'Labour operation' },

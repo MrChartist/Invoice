@@ -17,6 +17,12 @@ export const SV_TABLES = {
   admissions: 'admissions',
   labTests: 'lab_tests',
   labOrders: 'lab_orders',
+  // SV-C: membership plans, memberships (MEM/FY…), check-ins (one row per day), classes / batches, class attendance
+  memberPlans: 'member_plans',
+  memberships: 'memberships',
+  checkins: 'checkins',
+  classes: 'class_schedules',
+  attendance: 'class_attendance',
   // SV-B: clinic_visits, admissions, lab_tests, lab_orders — SV-C: member_plans, memberships, checkins, class_schedules,
   // class_attendance — SV-D: service_assets, labour_ops (each package adds its own rows)
   // SV-D: vehicles / appliances, labour operations
@@ -38,10 +44,10 @@ export const SV_SERIES = {
   visits: 'OPD', // SV-B1
   admissions: 'IPD', // SV-B2
   labOrders: 'LAB', // SV-B3
-  // Reserved for their packages (one commit, §5): OPD (SV-B1), IPD (SV-B2), LAB (SV-B3), MEM (SV-C1)
+  memberships: 'MEM', // SV-C1
 } as const;
-/** Series prefixes reserved for SV-B / SV-C (written as strings there; listed here so nothing else takes them). */
-export const SV_RESERVED_SERIES = ['MEM'] as const; // SV-B took OPD, IPD, LAB (SV_SERIES)
+/** Series prefixes once reserved for SV-B / SV-C: all taken now (SV_SERIES). */
+export const SV_RESERVED_SERIES: readonly string[] = [];
 
 /** The four Round 10 packs (`industry-packs.ts`). */
 export const SV_PACKS = ['clinic', 'salon', 'fitness', 'workshop'] as const;

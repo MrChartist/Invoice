@@ -10,12 +10,13 @@ import controls from '../../styles/controls.module.css';
 import styles from './institutions.module.css';
 import { B, T, Tbl } from './Views';
 import { attempt, csv, feeCtx, rs, today, type Notify } from './ui';
+import { attendanceLine } from '../../lib/services/sv-attendance'; // R10 (SV-C2): "Attendance this month: 18 / 22"
 
 export function DuesPanel({ plans, notify, tick, refresh }: { plans: readonly FeePlan[]; notify: Notify; tick: number; refresh: () => void }) {
   const [cls, setCls] = useState('');
   const rows = useMemo(() => feeDues(localDb.invoices.getAll(), localDb.clients.getAll(), plans, today()), [plans, tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const shown = rows.filter((r) => !cls || (r.student.class_label ?? '').toLowerCase() === cls.toLowerCase());
-  const text = (r: DueRow) => iT('reminder', { who: r.student.name, what: `${r.plan.name} — ${r.label}`, amount: rs(r.due), date: r.due_date });
+  const text = (r: DueRow) => iT('reminder', { who: r.student.name, what: `${r.plan.name} — ${r.label}`, amount: rs(r.due), date: r.due_date }) + attendanceLine(r.student.id, today());
   const head = [iT('name'), iT('rollNo'), iT('classLabel'), iT('plan'), iT('instalment'), iT('dueDate'), iT('due'), iT('days'), iT('fine'), iT('guardian'), iT('phone')];
   return (
     <div className={styles.stack}>

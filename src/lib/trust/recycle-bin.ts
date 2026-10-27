@@ -401,6 +401,15 @@ registerRestoreHook('purchase_returns', (row, e, live) => {
   const set = isObj(claim.settlement) ? claim.settlement : {};
   return str(set.return_id) === e.row_id ? null : { refuse: `This supplier credit note settled claim ${m[1]}, which was unsettled since. Settle the claim again in Distribution → Claims.` };
 });
+// R10 (SV-C): one check-in row per day and one attendance row per class × day — a day recorded again since stays; a
+// membership never comes back next to a live one naming its sale bill (sold again: the bill would count twice).
+const svDup = (t: string, keys: string[]) => registerRestoreHook(t, (row, e, live) => (live(t).some((x) => str(x?.id) !== e.row_id && keys.every((k) => str(x?.[k]) === str(row[k]))) ? { refuse: 'This day was recorded again since. Leave this row in the bin.' } : null));
+svDup('checkins', ['date']);
+svDup('class_attendance', ['class_id', 'date']);
+registerRestoreHook('memberships', (row, e, live) => {
+  const ids = (Array.isArray(row.invoice_ids) ? row.invoice_ids : []).map(str);
+  return live('memberships').some((m) => str(m?.id) !== e.row_id && (Array.isArray(m?.invoice_ids) ? m.invoice_ids : []).some((x) => ids.includes(str(x)))) ? { refuse: 'Its sale bill now belongs to another membership.' } : null;
+});
 
 /** The module hooks' verdict on one entry: the first refusal, else every companion. */
 function moduleVerdict(e: BinEntry, live: LiveReader, bin: readonly BinEntry[]): RestoreHookResult {

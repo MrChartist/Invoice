@@ -60,8 +60,8 @@ const wkT = defineArea({ tab: 'Works' } as const, { tab: 'वर्क्स' })
 // R10: service desks — each a lazy chunk; a package that has not merged yet shows `R10Stub` (one line, replaced by it).
 const FrontDesk = lazy(() => import('../components/services-r10/FrontDesk')); // SV-A2 / A3 (appointments, commission)
 const WorkshopDesk = lazy(() => import('../components/services-r10/WorkshopDesk')); // SV-D (mounts SV-A5's claims view)
-const R10Stub = lazy(() => import('../components/services-r10/R10Stub')); // SV-C members until it merges
 const ClinicDesk = lazy(() => import('../components/services-r10/ClinicDesk')); // SV-B clinic desk
+const MembersDesk = lazy(() => import('../components/services-r10/MembersDesk')); // SV-C members, packages, check-in, classes, recipes
 const r10T = defineArea(
   { appointments: 'Appointments', commission: 'Staff & commission', clinic: 'Clinic', members: 'Members', workshop: 'Workshop' } as const,
   { appointments: 'अपॉइंटमेंट', commission: 'स्टाफ और कमीशन', clinic: 'क्लिनिक', members: 'सदस्य', workshop: 'वर्कशॉप' },
@@ -429,7 +429,7 @@ export function Time() {
       {(tab === 'appointments' || tab === 'commission') && <Suspense fallback={null}><FrontDesk tab={tab} view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
       {tab === 'workshop' && <Suspense fallback={null}><WorkshopDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
       {tab === 'clinic' && <Suspense fallback={null}><ClinicDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
-      {tab === 'members' && <Suspense fallback={null}><R10Stub title={TAB_LABEL[tab]()} /></Suspense>}
+      {tab === 'members' && <Suspense fallback={null}><MembersDesk notify={notify} /></Suspense>}
 
       {tab === 'settings' && (
         <section className={cn(surface.card, styles.prefs)}>

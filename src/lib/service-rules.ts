@@ -97,6 +97,11 @@ export const REFERRAL_CAUTION_RULES: readonly SvRule<{ ledger: string; caution: 
 // COACHING_REFUND_RULES (pro rata by days, refund due in N days) — SV18.
 export interface CoachingRefundRule { basis: 'days' | 'months'; dueDays: number }
 
+/** SV18: unused period refunded pro rata (by days; months is a setting), due within 10 days of the request. */
+export const COACHING_REFUND_RULES: readonly SvRule<CoachingRefundRule>[] = [
+  { from: '2024-01-16', value: { basis: 'days', dueDays: 10 }, source: 'MoE Guidelines for Registration and Regulation of Coaching Centres 2024 (as reported: pro rata refund of the remaining period within 10 days, hostel / mess too) — secondary, date unverified (SV18)', verified: false },
+];
+
 /* ── SV-D: repair and service centres (filled by SV-D) ───────────────────────────────────────────────────────── */
 // MOTOR_DEPRECIATION_DEFAULTS ("insurer practice, not statute"), REPAIR_SAC_RULES — SV20, SV22.
 export interface RepairSacRule { vehicle: string; appliance: string; computer: string; telecom: string; other: string }

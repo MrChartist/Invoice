@@ -214,6 +214,12 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   admissions: 'In-patient admissions (IPD/FY…): patient, room snapshot, admit / discharge, running charges, deposits, claim, final bill (R10).',
   lab_tests: 'Lab test master: code, department, sample, TAT, price, parameters with reference ranges, panels, outsourcing (R10).',
   lab_orders: 'Lab orders (LAB/FY…): patient, tests (snapshot), sample status, results, report status and history, delivery log, bill (R10).',
+  // R10-C
+  member_plans: 'Membership plans and packages: kind, term / sessions, price and tax class, freeze / transfer / refund rules, wallet bonus (R10).',
+  memberships: 'Memberships (MEM/FY…): member, plan snapshot, start / end, freezes, upgrade / transfer / renewal history, sale bills, wallet top-ups (R10).',
+  checkins: 'Check-ins: one row per day with each member, time, membership and a redeemed session (R10).',
+  class_schedules: 'Classes and coaching batches: teacher / trainer, weekdays and time, dates, capacity, members and wait-list, holidays (R10).',
+  class_attendance: 'Class / batch attendance: one row per class and day, present / absent / late per member or student (R10).',
   // R10-D
   workshop_settings: 'Workshop settings: inspection checklist, job-card terms, vehicle classes, labour rates, depreciation table, service interval (R10).',
   service_assets: 'Vehicles and appliances: registration / serial no., make, model, owner, insurer and policy, odometer readings, next service (R10).',
