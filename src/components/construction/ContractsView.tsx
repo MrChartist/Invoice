@@ -12,7 +12,6 @@ import type { CnClosureKey, CnEot, WorksContract } from '../../types/constructio
 import type { SecurityDeposit } from '../../types/institutions-r5';
 import { localDb } from '../../lib/localDb';
 import { peekTable } from '../../lib/storage';
-import { listBoqs } from '../../lib/works/boq';
 import { contractSummary, deleteContract, loadContracts, saveContract } from '../../lib/construction/cn-contracts';
 import { closeContract, closureChecklist, HAND_TICKS, setClosure } from '../../lib/construction/cn-closure';
 import { loadGuarantees } from '../../lib/construction/cn-guarantees';
@@ -52,7 +51,7 @@ export default function ContractsView({ notify, refresh, tick }: PanelProps) {
   const run = runner(notify, refresh);
   const day = today();
   const spec: Spec[] = [
-    ['client_id', twT('client'), [['', '—'], ...clients.map((c) => [c.id ?? '', c.name] as const)]], ['boq_id', twT('boq'), [['', '—'], ...listBoqs(invoices).map((b) => [b.id, `${b.invoice_number} · ${b.client?.name}`] as const)]],
+    ['client_id', twT('client'), [['', '—'], ...clients.map((c) => [c.id ?? '', c.name] as const)]], ['boq_id', twT('boq'), [['', '—'], ...invoices.filter((b) => (b.doc_type === 'SALES_ORDER' || b.doc_type === 'QUOTATION') && b.status !== 'Cancelled').map((b) => [b.id, `${b.invoice_number} · ${b.client?.name}`] as const)]],
     ['name_of_work', cbT('nameOfWork')], ['agreement_no', cbT('agreementNo')], ['agreement_date', cbT('agreementDate'), 'date'], ['work_order_no', twT('workOrder')], ['work_order_date', `${twT('workOrder')} — ${twT('date')}`, 'date'],
     ['tender_ref', cbT('tenderRef')], ['client_office', cbT('clientOffice')], ['engineer', cbT('engineer')], ['site_address', cbT('siteAddress')], ['site_state', cbT('siteState')],
     ['contract_value', twT('contractValue'), 'number'], ['stipulated_start', cbT('start'), 'date'], ['stipulated_completion', cbT('completion'), 'date'], ['completed_on', twT('completedOn'), 'date'],
