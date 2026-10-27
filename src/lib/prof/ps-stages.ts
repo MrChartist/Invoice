@@ -7,10 +7,17 @@
  * "Already billed" = live stage invoices of the engagement less their credit notes (`progress-billing.ts` helper).
  * The stage template is an editable example (COA scale is recommendatory — PS30). Working paper — verify with your CA.
  */
-import { num, round2 } from '../invoice-calc';
+import type { InvoiceRecord } from '../../types/invoice';
+import { calcInputFromRecord, calculateInvoice, deriveGstMode, num, round2 } from '../invoice-calc';
 import { stageCredits, type LinkLike } from '../progress-billing';
 import { ruleAt } from '../tax-rules';
+import { requireAccess } from '../access';
+import { generateId, getTable } from '../storage';
+import { localDb } from '../localDb';
+import { buildBillDraft } from '../timesheets';
+import { makeDraft, senderStateCode } from '../../store/invoice-defaults';
 import { DESIGN_STAGE_EXAMPLE } from './ps-b-rules';
+import { propertyPos } from './ps-property-pos';
 
 export interface StageDef {
   id: string;
@@ -101,4 +108,50 @@ export function stageSnap(p: StagePlan, stageId: string, date: string, billedBef
   const s = p.stages[k];
   if (!s) throw new Error('Pick the stage.');
   return { no: k + 1, of: p.stages.length, label: s.label, project_cost: costOn(p, date), fee_pct: num(p.fee_pct), stage_pct: num(s.cum_pct), billed_before: round2(billedBefore) };
+}
+
+/** The engagement fields a stage bill needs (PS-A's `Engagement` with PS-B's `stage`). */
+export interface StageEngagement {
+  id: string;
+  number: string;
+  model: string;
+  client_id: string;
+  title?: string;
+  stage?: StagePlan;
+}
+
+/**
+ * Raise the draft fee note for stage `stageId` on `date`: one line "Professional fees — stage n of N: label" for this
+ * bill, the place of supply from the property (PS6, suggested once — the user may change it on the draft), the `ps`
+ * snapshot (`kind: 'stage'`, engagement, stage computation). Refused when nothing is due (a downward revision suggests a
+ * credit note instead — never raised automatically).
+ */
+export function createStageBill(e: StageEngagement, stageId: string, date: string, opts: { sac?: string; gstRate?: number } = {}): InvoiceRecord {
+  requireAccess('doc.create');
+  const plan = e.stage;
+  if (!plan) throw new Error('Set up the stage plan first.');
+  const err = validatePlan(plan);
+  if (err) throw new Error(err);
+  const client = localDb.clients.getById(e.client_id);
+  if (!client) throw new Error('The client of this engagement is no longer in your client list.');
+  const billed = billedOnEngagement(e.id, localDb.invoices.getAll() as never, getTable<LinkLike>('doc_links'));
+  const b = stageBill(plan, stageId, date, billed);
+  if (b.credit > 0) throw new Error(`The revised cost makes ₹${b.credit} already billed too much: raise a credit note for it.`);
+  if (!(b.amount > 0)) throw new Error('Nothing is due for this stage.');
+  const snap = stageSnap(plan, stageId, date, billed);
+  const settings = localDb.settings.get();
+  const sender = localDb.settings.activeProfile() ?? null;
+  const base = makeDraft({ settings, sender, docType: 'INVOICE', templateId: localDb.template.get() });
+  const item = { id: generateId(), type: 'Service', name: `Professional fees — stage ${snap.no} of ${snap.of}: ${snap.label}`, description: `${num(plan.fee_pct)}% of project cost ₹${snap.project_cost} × ${snap.stage_pct}% cumulative, less ₹${snap.billed_before} billed`, hsn: opts.sac ?? '998321', unit: 'OTH', quantity: 1, rate: b.amount, tax_rate: opts.gstRate ?? 18, discount_percent: 0, amount: b.amount };
+  let rec = buildBillDraft({ ...base, id: generateId(), issue_date: date }, client, [item], sender);
+  const pos = propertyPos(plan.property, client).pos;
+  if (pos && pos !== rec.place_of_supply) {
+    const gst_mode = deriveGstMode({ senderStateCode: senderStateCode(sender), placeOfSupply: pos, senderHasGstin: Boolean(sender?.companyGstin?.trim()), taxEnabled: true });
+    const t = calculateInvoice(calcInputFromRecord({ ...rec, place_of_supply: pos, gst_mode }));
+    rec = { ...rec, place_of_supply: pos, gst_mode, cgst_amount: t.cgst_amount, sgst_amount: t.sgst_amount, igst_amount: t.igst_amount, tax_amount: t.tax_amount, round_off: t.round_off, total: t.total, balance_due: t.balance_due };
+  }
+  const ps = { kind: 'stage', engagement: { id: e.id, number: e.number, model: e.model }, basis: `Stage ${snap.no} of ${snap.of} on project cost`, stage: snap, lines: { [item.id]: { stage: `Stage ${snap.no} of ${snap.of} — ${snap.label}` } } };
+  rec = { ...rec, ps } as InvoiceRecord;
+  rec.invoice_number = localDb.invoices.nextNumber(rec.issue_date, rec.doc_type, sender?.invoicePrefix || undefined);
+  return localDb.invoices.save(rec);
 }

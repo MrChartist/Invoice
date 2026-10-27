@@ -53,3 +53,22 @@ test('the stage snapshot for the paper', async () => {
   const { stageSnap } = await import('../src/lib/prof/ps-stages.ts');
   assert.deepEqual(stageSnap(plan(), 's3', '2026-10-01', 756000), { no: 3, of: 5, label: 'Working drawings and tender', project_cost: 42000000, fee_pct: 6, stage_pct: 50, billed_before: 756000 });
 });
+
+test('a stage bill: the property State is the place of supply for a client abroad; the next stage catches up', async () => {
+  const { resetStorage } = await import('./helpers/shim.ts');
+  const { installSettings } = await import('./helpers/world.ts');
+  const { localDb } = await import('../src/lib/localDb.ts');
+  const { createStageBill } = await import('../src/lib/prof/ps-stages.ts');
+  resetStorage();
+  installSettings();
+  localDb.clients.upsert({ id: 'dxb', name: 'Mr A. Khan (Dubai)', email: '', address: 'Dubai', city: 'Dubai', zip: '', state_code: '96', country: 'AE' } as never);
+  const e = { id: 'e1', number: 'ENG/FY26-27/0001', model: 'milestone', client_id: 'dxb', stage: plan({ property: { state: 'Karnataka', city: 'Bengaluru', country: 'India' } }) };
+  const s1 = createStageBill(e, 's1', '2026-05-01');
+  assert.deepEqual([s1.place_of_supply, s1.gst_mode, s1.taxable_value, s1.igst_amount], ['29', 'IGST', 252000, 45360]);
+  assert.match(s1.items[0].name, /stage 1 of 5: Concept design/);
+  localDb.invoices.save({ ...s1, status: 'Sent' } as never);
+  const rev = { ...e, stage: { ...e.stage, revisions: [...e.stage.revisions, { date: '2026-09-15', cost: 46000000 }] } };
+  const s2 = createStageBill(rev, 's2', '2026-10-01');
+  assert.equal(s2.taxable_value, Math.round(2760000 * 0.3) - 252000);
+  assert.throws(() => createStageBill(e, 's1', '2026-10-01'), /Nothing is due/);
+});
