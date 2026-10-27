@@ -4721,6 +4721,18 @@ try {
     check(/Raw materials/.test(await page.locator('[data-statutory-desk]').innerText()), 'inventories split: besan under raw materials');
     await page.goto(srv.origin + '/manufacturing?tab=floor&view=wip');
     check(/OFF/.test(await page.locator('[data-mfd-absorb]').innerText({ timeout: 15000 })), 'conversion absorption is off by default (stock values as today)');
+    // QA16: a 375 px pass over the MF-D desks — wide tables scroll inside their own box, never the page.
+    await page.setViewportSize({ width: 375, height: 800 });
+    const wide = [];
+    for (const v of ['food&view=costcards', 'food&view=shelf', 'food&view=schemes', 'statutory&view=msme', 'statutory&view=authorisations', 'statutory&view=incentives', 'statutory&view=inventories', 'floor&view=wip']) {
+      await page.goto(srv.origin + `/manufacturing?tab=${v}`);
+      await page.locator('[data-food-desk], [data-statutory-desk], [data-floor-desk]').first().waitFor({ timeout: 15000 }).catch(() => undefined);
+      await page.waitForTimeout(300);
+      const over = await page.evaluate(() => Math.max(0, ...[document.documentElement, ...document.querySelectorAll('main')].map((e) => e.scrollWidth - e.clientWidth)));
+      if (over > 1) wide.push(`${v} ${over}px`);
+    }
+    check(wide.length === 0, `MF-D desks at 375 px: no horizontal page scroll (${wide.join(', ') || 'none'})`);
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });

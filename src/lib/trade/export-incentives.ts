@@ -136,7 +136,7 @@ export const incentivesDb = {
       claimed: round2(n(input.claimed)),
       ...(input.credited !== undefined ? { credited: round2(n(input.credited)) } : {}),
       ...('appendix' in input ? { appendix: input.kind === 'rodtep' && (input.appendix === '4R' || input.appendix === '4RE') ? input.appendix : undefined } : {}), // MF-D4 (MF18)
-      // QA16 P8: a new RoDTEP row on an export made under an Advance Authorisation defaults to Appendix 4RE.
+      // QA16 P9: a new RoDTEP row on an export made under an Advance Authorisation defaults to Appendix 4RE.
       ...(!prev && !('appendix' in input) && input.kind === 'rodtep' && underAa(input.invoice_id) ? { appendix: '4RE' as const } : {}),
       voucher_ids: prev?.voucher_ids ?? input.voucher_ids ?? [],
       created_at: prev?.created_at ?? now,

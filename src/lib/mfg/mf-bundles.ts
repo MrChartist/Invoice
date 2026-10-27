@@ -64,7 +64,7 @@ export function recordStep(p: CutPlan, no: number, x: BundleStepInput): CutPlan 
   const good = x.good === undefined ? live - rejected : Math.max(Math.floor(num(x.good)), 0);
   if (good + rejected > live) throw new Error(`Bundle ${bundleId(p.number, no)} holds ${live} pieces.`);
   if (rejected && !x.reason?.trim()) throw new Error('Give the reason for the rejected pieces.');
-  // QA16 P9: pieces received stitched on a CMT challan are already in stock (QA15 M1) — a reject here would move nothing.
+  // QA16 P10: pieces received stitched on a CMT challan are already in stock (QA15 M1) — a reject here would move nothing.
   if (rejected && b.reported) throw new Error(`Bundle ${bundleId(p.number, no)} is already in stock (received stitched). Record the ${rejected} rejected piece${rejected === 1 ? '' : 's'} in Manufacturing → Rejections so they leave stock.`);
   const step: MfBundleStep = { date: x.date, ...(x.op_id ? { op_id: x.op_id } : {}), ...(x.op ? { op: x.op } : {}), good, rejected, ...(x.reason ? { reason: x.reason.trim() } : {}), ...(x.by ? { by: x.by } : {}), ...(x.jc_entry_id ? { jc_entry_id: x.jc_entry_id } : {}) };
   const nextRej = num(b.rejected) + rejected;

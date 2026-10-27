@@ -46,7 +46,7 @@ export function foodOutputDefaults(order: unknown, item: object | undefined, dat
 }
 
 /**
- * QA16 P6: the output dialog's batch dates for an output reported on `date` — MFG = the order's packed date, else the
+ * QA16 P7: the output dialog's batch dates for an output reported on `date` — MFG = the order's packed date, else the
  * OUTPUT date (not the day the dialog opened); expiry = the typed one (`typed`, null = untouched), else the default.
  */
 export function outputFoodDates(order: unknown, item: object | undefined, date: string, typed: string | null): { mfg_date?: string; expiry_date: string } {

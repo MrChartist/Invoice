@@ -94,9 +94,9 @@ test('P4 a recognised grant journal cannot be deleted from Books while its claim
   assert.equal(loadVouchers().length, 1);
 });
 
-/* ── P6: food batch dates follow the output date ──────────────── */
+/* ── P7: food batch dates follow the output date ──────────────── */
 
-test('P6 MFG / best-before follow the output date, not the day the dialog opened; a typed expiry wins', () => {
+test('P7 MFG / best-before follow the output date, not the day the dialog opened; a typed expiry wins', () => {
   const item = { shelf_life_days: 90 };
   assert.deepEqual(outputFoodDates({}, item, '2026-05-01', null), { mfg_date: '2026-05-01', expiry_date: '2026-07-30' });
   assert.deepEqual(outputFoodDates({ mf: { food: { packed_on: '2026-04-28' } } }, item, '2026-05-01', null), { mfg_date: '2026-04-28', expiry_date: '2026-07-27' });
@@ -104,21 +104,21 @@ test('P6 MFG / best-before follow the output date, not the day the dialog opened
   assert.deepEqual(outputFoodDates({}, {}, '2026-05-01', null), { expiry_date: '' }, 'no food data: nothing filled');
 });
 
-/* ── P7 / P8: AA obligation items; RoDTEP 4RE ─────────────────── */
+/* ── P8 / P9: AA obligation items; RoDTEP 4RE ─────────────────── */
 
 const aa = (): ExportAuthorisation => ({
   id: 'aa1', kind: 'aa', number: '0310001234', date: '2026-01-15', items_import: [{ item_id: 'pp', qty: 12000, cif_value: 1200000 }], items_export: [{ item_id: 'caps', qty: 10000, fob_value: 2000000 }],
   norm: 'sion', ...defaultDates('aa', '2026-01-15'), duty_saved: 300000, status: 'open',
 });
 
-test('P7 only the authorisation\'s export items count towards an AA obligation', () => {
+test('P8 only the authorisation\'s export items count towards an AA obligation', () => {
   const ex = { id: 'e1', invoice_number: 'EXP/1', doc_type: 'INVOICE', status: 'Sent', issue_date: '2026-03-01', items: [{ id: 'l', name: 'Caps', quantity: 4000, rate: 100, tax_rate: 0 }, { id: 'm', name: 'Crates', quantity: 6000, rate: 200, tax_rate: 0 }], mf: withExportAa(undefined, aa()) } as unknown as InvoiceRecord;
   const ids: Record<string, string> = { caps: 'caps', crates: 'crates' };
   const s = eoStatus(aa(), exportsAgainst([ex], 'aa1', (n) => ids[n.toLowerCase()]), [], '2026-05-12');
   assert.deepEqual([s.qtyDone, s.valueDone, s.fulfilled], [4000, 400000, 0.2]);
 });
 
-test('P8 a RoDTEP row on an export under an AA defaults to Appendix 4RE', () => {
+test('P9 a RoDTEP row on an export under an AA defaults to Appendix 4RE', () => {
   setTable('invoices', [{ id: 'e1', invoice_number: 'EXP/1', doc_type: 'INVOICE', status: 'Sent', issue_date: '2026-03-01', items: [], mf: withExportAa(undefined, aa()) }, { id: 'e2', invoice_number: 'EXP/2', doc_type: 'INVOICE', status: 'Sent', issue_date: '2026-03-01', items: [] }]);
   assert.equal(incentivesDb.save({ invoice_id: 'e1', kind: 'rodtep', date: '2026-03-05', claimed: 5000 }).appendix, '4RE');
   assert.equal(incentivesDb.save({ invoice_id: 'e2', kind: 'rodtep', date: '2026-03-05', claimed: 5000 }).appendix, undefined);
@@ -140,17 +140,17 @@ test('P5 the job ticket issues paper in the item\'s own unit (KGS, reams, tonnes
   assert.equal(paperIssueQty('SHEETS', b), b.sheets);
 });
 
-/* ── P9: no silent reject on a bundle already in stock ────────── */
+/* ── P10: no silent reject on a bundle already in stock ────────── */
 
-test('P9 rejecting pieces of a bundle received stitched (already in stock) is refused with the way to write them off', () => {
+test('P10 rejecting pieces of a bundle received stitched (already in stock) is refused with the way to write them off', () => {
   const plan = { id: 'p', number: 'CUT/FY26-27/0001', cut: { M: 12 }, colour: 'Blue', bundles: [{ no: 1, size: 'M', colour: 'Blue', pieces: 12, at: { where: 'floor' }, history: [], reported: 'cmt:mi1' }] } as unknown as CutPlan;
   assert.throws(() => recordStep(plan, 1, { date: '2026-05-12', rejected: 1, reason: 'stain' }), /Rejections/);
   assert.equal(recordStep(plan, 1, { date: '2026-05-12', op: 'Press', last: true }).bundles![0].at.where, 'finished', 'finishing steps still record');
 });
 
-/* ── P10: a shutdown week is not "no working hours" ───────────── */
+/* ── P6: a shutdown week is not "no working hours" ───────────── */
 
-test('P10 a Diwali shutdown of a full working week does not stop the load view', () => {
+test('P6 a Diwali shutdown of a full working week does not stop the load view', () => {
   const c = { id: 'wc', name: 'Press 1', shifts: [{ name: 'S', hours: 8 }], days: [1, 2, 3, 4, 5, 6], holidays: ['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14'] } as unknown as WorkCentre;
   assert.doesNotThrow(() => assertHours(c, '2026-11-08'));
   const order = { id: 'o', number: 'WO/1', status: 'released', date: '2026-11-01', due_date: '2026-11-14', planned_qty: 10 } as unknown as ProductionOrder;

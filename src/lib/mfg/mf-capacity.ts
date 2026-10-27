@@ -23,7 +23,7 @@ const add = (m: LoadMap, centre: string, day: string, h: number) => {
 };
 
 /**
- * Refuses a centre that never has an available hour (shifts / days / efficiency of 0). QA16 P10: judged on its weekly
+ * Refuses a centre that never has an available hour (shifts / days / efficiency of 0). QA16 P6: judged on its weekly
  * pattern without holidays — a shutdown of a week or more (Diwali) is not "no working hours"; the loading loops skip it.
  */
 export function assertHours(c: WorkCentre, from: string): void {

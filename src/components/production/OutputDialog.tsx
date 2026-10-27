@@ -38,7 +38,7 @@ export function OutputDialog({ ctx, order, boms, onClose }: { ctx: MfgContext; o
   const [typedExpiry, setExpiry] = useState<string | null>(null);
   const [serialText, setSerialText] = useState('');
   const [labour, setLabour] = useState('');
-  const dated = outputFoodDates(order, item, date, typedExpiry); // QA16 P6: follows the output date until typed
+  const dated = outputFoodDates(order, item, date, typedExpiry); // QA16 P7: follows the output date until typed
   const expiry = dated.expiry_date;
   const draftFor = (q: number) => buildOutputVoucher(order, progress, bom, { qty: q, date });
   const [components, setComponents] = useState<VoucherStockLine[]>(() => draftFor(num(qty)).components);

@@ -163,7 +163,7 @@ export interface EoStatus {
 }
 
 export function eoStatus(a: ExportAuthorisation, allExports: readonly EoMovement[], imports: readonly EoMovement[], today: string): EoStatus {
-  // QA16 P7: an AA's obligation is in its export items — other lines on a tagged invoice (another product, packing,
+  // QA16 P8: an AA's obligation is in its export items — other lines on a tagged invoice (another product, packing,
   // freight) count towards neither quantity nor value. EPCG obligations are in value of any goods made: all lines count.
   const eoItems = new Set(a.kind === 'aa' ? a.items_export.map((x) => x.item_id).filter(Boolean) : []);
   const exports = eoItems.size ? allExports.filter((e) => eoItems.has(e.item_id)) : allExports;
