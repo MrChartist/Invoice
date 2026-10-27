@@ -3636,7 +3636,7 @@ try {
     await page.getByRole('button', { name: /Preview & download PDF/ }).click();
     const dialog = page.getByRole('dialog', { name: 'Document preview' });
     await dialog.locator('[data-pv-working]').first().waitFor({ timeout: 15000 });
-    check(/Price variation statement PVB\/FY/.test(await dialog.innerText()), 'the working prints as the following page');
+    check(/Price variation statement PVB\/FY/i.test(await dialog.innerText()) && /46,750/.test(await dialog.innerText()), 'the working prints as the following page (PVB number, ₹46,750)');
     await page.keyboard.press('Escape');
     await dialog.waitFor({ state: 'detached' });
     // B4: recovery receipts (cement, water + electricity …) are recorded through the clearing account — no cash.
