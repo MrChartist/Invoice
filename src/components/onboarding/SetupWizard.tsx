@@ -167,7 +167,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
       if (mfg) void import('../../lib/mfg/mf-profile').then((m) => m.applyMfgSwitches(mfg, mfSub || undefined)).catch(() => undefined);
       if (agri) void import('../../lib/agri/ag-profile').then((m) => m.applyAgriSwitches(agri)).catch(() => undefined);
       if (svc) void import('../../lib/services/sv-profile').then((m) => m.applyServiceSwitches(svc)).catch(() => undefined);
-      if (prof) void import('../../lib/prof/ps-profile').then((m) => { m.applyProfSwitches(prof, pfSub || undefined, pfIds); return m.writeFirmForm(pfForm as 'proprietorship'); }).catch(() => undefined);
+      if (prof) void import('../../lib/prof/ps-profile').then((m) => { m.applyProfSwitches(prof, pfSub || undefined, pfIds); m.writeFirmForm(pfForm as 'proprietorship'); }).catch(() => undefined);
       if (cons) void import('../../lib/construction/cn-profile').then((m) => m.applyConstructionSwitches(cons, { government: cnGov })).catch(() => undefined);
       if (retail) void import('../../lib/retail/rt-profile').then((m) => m.applyRetailSwitches(retail)).catch(() => undefined);
       window.dispatchEvent(new Event(SHOP_MODE_EVENT));

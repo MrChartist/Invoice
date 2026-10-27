@@ -6,7 +6,9 @@
  * `notes_to_accounts.entity_type` of the current FY), never a second field. Changing the profile deletes nothing.
  */
 import type { FirmForm, ProfKind, ProfSettings, PsSwitches } from '../../types/prof-r14';
-import { getTable } from '../storage';
+import { getTable, setTable } from '../storage';
+import { requireAccess } from '../access';
+import { audit } from '../audit';
 import { localDb } from '../localDb';
 import { getIndianFY } from '../invoice-number';
 import { todayInput } from '../utils';
@@ -54,13 +56,16 @@ export function readFirmForm(): FirmForm | undefined {
   return rows[0]?.entity_type;
 }
 
-/** Write the firm form as the current FY's entity type (through the annual pack's own store; notes kept). */
-export async function writeFirmForm(form: FirmForm, day = todayInput()): Promise<void> {
-  const { fyId, notesDb } = await import('../ledger/annual-pack');
-  const id = fyId(getIndianFY(day).startYear);
-  const prev = notesDb.get(id);
+/** Write the firm form as the current FY's entity type (the annual pack's own row; its notes kept; audited). */
+export function writeFirmForm(form: FirmForm, day = todayInput()): void {
+  requireAccess('books.edit');
+  const fy = getIndianFY(day).label;
+  const id = `FY${fy}`;
+  const rows = getTable<{ id?: string; notes?: object; entity_type?: FirmForm }>(NOTES);
+  const prev = rows.find((r) => r?.id === id);
   if (prev?.entity_type === form) return;
-  notesDb.save(id, prev?.notes ?? {}, form);
+  setTable(NOTES, [...rows.filter((r) => r?.id !== id), { notes: {}, ...prev, id, entity_type: form, updated_at: new Date().toISOString() }]);
+  audit.record({ entity: 'settings', entity_id: id, action: prev ? 'update' : 'create', summary: `Firm form for ${id}: ${form} (professional profile)` });
 }
 
 /** A professional company (any kind)? Used to hide the profession's rows from everyone else. */

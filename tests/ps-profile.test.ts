@@ -13,6 +13,7 @@ import { PACK_ROUTES } from '../src/lib/shop-mode.ts';
 import { PACK_HREF } from '../src/lib/features-catalog.ts';
 import { allSteps, type ChecklistCtx, type ChecklistFactsV3 } from '../src/lib/checklist-steps.ts';
 import { TIME_TABS } from '../src/pages/page-tabs.ts';
+import { notesDb } from '../src/lib/ledger/annual-pack.ts';
 
 beforeEach(() => {
   resetStorage();
@@ -67,9 +68,10 @@ test('switches fill only unset ones; ids saved; settings keep B–D sub-objects;
   assert.deepEqual((readProfSettings() as { partners_cfg?: unknown }).partners_cfg, { ratio: [1, 1] }, 'object-valued keys of B–D kept');
 });
 
-test('the firm form is the annual pack entity type (one value)', async () => {
+test('the firm form is the annual pack entity type (one value)', () => {
   assert.equal(readFirmForm(), undefined);
-  await writeFirmForm('partnership', '2026-06-01');
+  writeFirmForm('partnership', '2026-06-01');
+  assert.equal(notesDb.get('FY26-27')?.entity_type, 'partnership', 'the annual pack reads it');
   assert.equal(readFirmForm(), 'partnership');
   assert.equal(localDb.settings.get().prof_kind, undefined);
 });

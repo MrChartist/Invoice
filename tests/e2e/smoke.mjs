@@ -4704,6 +4704,67 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R14-A practice desk: Settings → Professional profile → Consulting → practice pack, the Matters and WIP desks; a conflict check finds the party; a capped engagement (₹40,000) on matter RSK/014 with 14.5 h at ₹4,000 → the pre-bill shows ₹58,000 → the draft bills ₹40,000 with a ₹18,000 "Cap" write-down → realisation 68.97%; the draft prints the matter and engagement; Ctrl+K "pre-bill"; help', async () => {
+    const keys = ['settings', 'clients', 'cost_centres', 'engagements', 'conflict_checks', 'time_entries', 'invoices', 'series_counters', 'prof_settings', 'service_staff'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'professional', modules: undefined, industry_packs: undefined, prof_kind: undefined, prof_sub: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-prof-kind-card="consulting"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.prof_kind === 'consulting');
+    check(st.business_type === 'services' && st.service_kind === 'professional' && st.industry_packs?.includes('practice'), `Consulting: services / professional + practice pack (${st.industry_packs})`);
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-ps-c', name: 'E2E Rajesh Sharma & Kumar' }]);
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), { id: 'e2e-ps-m', name: 'E2E Sec 138 NI Act', kind: 'project', client_id: 'e2e-ps-c', active: true, created_at: today, ps: { code: 'RSK/014', kind: 'matter', opened: today, court: 'Saket', parties: [{ name: 'Shree Traders', role: 'opposite' }] } }]);
+    await writeJson(page, 'engagements', [{ id: 'e2e-ps-e', number: 'ENG/FY26-27/0901', client_id: 'e2e-ps-c', matter_ids: ['e2e-ps-m'], title: 'Defence', model: 'capped', cap: 40000, currency: 'INR', disb_policy: 'agent', start: today, status: 'active', created_at: today }]);
+    const te = (id, minutes) => ({ id, client_id: 'e2e-ps-c', client_name: 'E2E Rajesh Sharma & Kumar', description: 'Work', date: today, minutes, hourly_rate: 4000, billable: true, cost_centre_id: 'e2e-ps-m' });
+    await writeJson(page, 'time_entries', [...(prev.time_entries ?? []), te('e2e-ps-t1', 300), te('e2e-ps-t2', 330), te('e2e-ps-t3', 240)]);
+    await page.goto(srv.origin + '/time?tab=matters&view=conflicts');
+    await page.locator('[data-matters-desk]').waitFor({ timeout: 15000 });
+    const tabs = (await page.getByRole('tab').allInnerTexts()).join('|');
+    check(/Matters/.test(tabs) && /WIP/.test(tabs), `Time lists the Matters and WIP desks (${tabs})`);
+    await page.locator('[data-conflict-terms]').fill('M/s Shree Traders Pvt Ltd');
+    await page.locator('[data-conflict-search]').click();
+    check(Number(await page.locator('[data-conflict-hits]').getAttribute('data-conflict-hits', { timeout: 10000 })) >= 1, 'the conflict check finds the matter party');
+    await page.goto(srv.origin + '/time?tab=wip&view=prebill&client=e2e-ps-c&matter=e2e-ps-m');
+    const pre = page.locator('[data-prebill-preview]');
+    await pre.waitFor({ timeout: 15000 });
+    check(/Capped at/.test(await pre.innerText()) && /58,000/.test(await pre.innerText()), `the pre-bill shows ₹58,000 of time against the cap (${await pre.innerText()})`);
+    await page.locator('[data-prebill-create]').click();
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.ps?.engagement?.id === 'e2e-ps-e'))).find((i) => i.ps?.engagement?.id === 'e2e-ps-e');
+    check(inv?.taxable_value === 40000 && inv.ps.wd?.standard === 58000 && inv.ps.wd.reasons[0]?.reason === 'Cap' && inv.ps.wd.reasons[0]?.amount === -18000, `the draft bills ₹40,000 with an ₹18,000 "Cap" write-down (${JSON.stringify(inv?.ps?.wd)})`);
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Document preview' });
+    await dlg.waitFor();
+    await dlg.locator('[data-prof-block]').first().waitFor({ timeout: 15000 });
+    const paper = await dlg.innerText();
+    check(/RSK\/014/.test(paper) && /ENG\/FY26-27\/0901/.test(paper) && !/Write-up|58,000/.test(paper), 'the draft prints the matter and the engagement (never the write-down)');
+    await page.keyboard.press('Escape');
+    await dlg.waitFor({ state: 'detached' });
+    await page.goto(srv.origin + '/time?tab=wip&view=realisation');
+    const real = page.locator('[data-realisation]');
+    await real.waitFor({ timeout: 15000 });
+    check(/68\.97%/.test(await real.innerText()), 'realisation: billed ÷ standard 68.97%');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('pre-bill');
+    await palette.getByRole('option', { name: /Pre-bill/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "pre-bill" finds Time → WIP & billing → Pre-bill');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/time?tab=wip&view=wip');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="time:wip"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a WIP topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {
