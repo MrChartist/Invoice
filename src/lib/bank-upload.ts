@@ -79,6 +79,15 @@ export function validateUpload(input: UploadInput): string[] {
   return errors;
 }
 
+/**
+ * R12 (AG-A4): a pooled farmer cycle as a source — one row per farmer with a bank account and a positive net (the
+ * others are paid in cash). Presets and formats are unchanged.
+ */
+export function cycleUploadRows(lines: readonly { farmer_id: string; name?: string; net: number; bank?: { account?: string; ifsc?: string; name?: string } }[], reference: string): UploadRow[] {
+  return lines.filter((l) => num(l.net) > 0 && cleanAccountNo(l.bank?.account) && l.bank?.ifsc)
+    .map((l) => ({ beneficiary: l.name ?? '', accountNo: l.bank!.account!, ifsc: l.bank!.ifsc!, amount: round2(num(l.net)), mode: suggestMode(l.net), reference, vendorId: l.farmer_id, ...(l.bank?.name ? { bankName: l.bank.name } : {}) }));
+}
+
 /** NEFT up to ₹2 lakh, RTGS from ₹2 lakh — the usual default. */
 export const suggestMode = (amount: number): UploadMode => (round2(num(amount)) >= RTGS_MIN ? 'RTGS' : 'NEFT');
 

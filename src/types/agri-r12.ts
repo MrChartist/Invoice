@@ -491,7 +491,7 @@ export interface AgriSettings {
 }
 declare module './manufacturing' {
   interface StockJournal {
-    /** AG-B2 / B4: the milk shift or dispatch whose stock this journal posted (restored only with its owner). */
+    /** AG-B2 / B4: the milk shift or dispatch whose stock this journal posted. */
     milk_ref?: string;
   }
 }

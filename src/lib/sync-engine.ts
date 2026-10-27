@@ -427,6 +427,9 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}sub_measurements`]: 'date',
   [`${DB_PREFIX}muster_days`]: 'date',
   [`${DB_PREFIX}plant_logs`]: 'date',
+  // R12-A: farm batches (by start), pooled farmer cycles (by period end)
+  [`${DB_PREFIX}farm_batches`]: 'start',
+  [`${DB_PREFIX}farmer_cycles`]: 'period_to',
   // R12-B: rate charts (by effective date), milk shifts, milk dispatches
   [`${DB_PREFIX}milk_rate_charts`]: 'effective_from',
   [`${DB_PREFIX}milk_shifts`]: 'date',
@@ -1036,6 +1039,8 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}sub_work_orders`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}sub_measurements`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}plant_logs`]: { num: 'number', date: 'date' },
+  // R12-A: pooled farmer cycle bills (CYB/FY…)
+  [`${DB_PREFIX}farmer_cycles`]: { num: 'number', date: 'period_to' },
   // R12-B: milk dispatches (MDS/FY…)
   [`${DB_PREFIX}milk_dispatches`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own

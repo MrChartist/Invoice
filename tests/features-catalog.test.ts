@@ -25,11 +25,11 @@ beforeEach(() => {
 const row = (id: string) => FEATURE_ROWS.find((r) => r.id === id)!;
 const on = (id: string) => featureState(row(id));
 
-test('every module of ALL_MODULES, every pack and the 23 advanced options (R11: construction profile; R10: service profile) have a row with a title and a "who" line', () => {
+test('every module of ALL_MODULES, every pack and the 24 advanced options (R11: construction profile; R10: service profile; R12: agri profile) have a row with a title and a "who" line', () => {
   for (const m of ALL_MODULES) assert.ok(row(`mod.${m}`), m);
   for (const p of PACK_IDS) assert.ok(row(`pack.${p}`), p);
   const adv = FEATURE_ROWS.filter((r) => r.section === 'advanced');
-  assert.equal(adv.length, 23);
+  assert.equal(adv.length, 24);
   for (const r of adv) {
     const id = r.id.slice(4);
     assert.ok(Object.hasOwn(discoverT.en, `adv.${id}`) && Object.hasOwn(discoverT.en, `awho.${id}`), `${r.id} text`);

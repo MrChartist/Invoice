@@ -31,7 +31,7 @@ export const AG_SERIES = {
   dispatches: 'MDS', // AG-B4 milk dispatches
 } as const;
 /** Series reserved for AG-B … AG-D (one commit, PRD §5; each package moves its prefix into `AG_SERIES`). */
-export const AG_RESERVED_SERIES = ['WBS', 'MDS', 'CMR', 'CSR', 'GPO', 'LAS', 'SHC'] as const;
+export const AG_RESERVED_SERIES = ['WBS', 'CMR', 'CSR', 'GPO', 'LAS', 'SHC'] as const;
 
 /** The six Round 12 packs (`industry-packs.ts`): `agri` is the shared farm base every agri kind turns on. */
 export const AG_PACKS = ['agri', 'dairy', 'mill', 'coldstore', 'agri_inputs', 'fpo'] as const;

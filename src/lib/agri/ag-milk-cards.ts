@@ -14,6 +14,7 @@ import { withTablesRollback } from '../table-txn';
 import { localDb } from '../localDb';
 import { blankClient } from '../../store/invoice-defaults';
 import { AG_TABLES } from './ag-shared';
+import { agSnapshot } from './ag-snapshot';
 import { q3 } from './ag-rate-chart';
 import { milkLine, milkSaleBill } from './ag-dispatch';
 
@@ -83,7 +84,7 @@ export function billCard(id: string, date: string): InvoiceRecord {
   const text = `${t.days} days · ${t.litres} L`;
   const item = milkLine(c.milk, t.litres, 'L', c.rate, `${c.month} · ${text}`);
   return withTablesRollback([T, 'invoices', 'clients', 'series_counters'], () => {
-    const inv = milkSaleBill(client, [item], date, { kind: 'milk_sale', lines: { [item.id]: { litres: t.litres, text } } }, `Milk card ${c.month}.`);
+    const inv = milkSaleBill(client, [item], date, agSnapshot('milk_sale', { lines: { [item.id]: { litres: t.litres, text } } }), `Milk card ${c.month}.`);
     setTable(T, loadCards().map((x) => (x.id === id ? { ...x, invoice_id: inv.id } : x)));
     return inv;
   });

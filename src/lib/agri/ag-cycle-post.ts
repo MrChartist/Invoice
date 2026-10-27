@@ -48,7 +48,7 @@ const LEDGERS: Readonly<Record<string, [string, PrimaryGroupId, number]>> = {
   union: ['Union deductions payable', 'OTHER_CL', 2490],
   other: ['Other deductions — farmers', 'OTHER_CL', 2495],
 };
-function ledgerId(name: string, group: PrimaryGroupId, code: number): string {
+export function ledgerId(name: string, group: PrimaryGroupId, code: number): string {
   const chart = chartOf(loadUserAccounts());
   const hit = chart.find((a) => a.name.toLowerCase() === name.toLowerCase());
   if (hit) return hit.id;
@@ -183,3 +183,6 @@ export function deleteCycle(id: string): void {
   if (c && c.status !== 'draft') throw new Error('Reopen the cycle before deleting it.');
   setTable(T, loadCycles().filter((x) => x.id !== id));
 }
+
+/** AG-A1 (farm kind): the "Agricultural income (exempt)" ledger under Other income, created on first use (AG15). */
+export const agriIncomeLedger = (): string => ledgerId('Agricultural income (exempt)', 'OTHER_INCOME', 4830);

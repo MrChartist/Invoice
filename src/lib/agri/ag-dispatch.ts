@@ -19,6 +19,7 @@ import { blankClient, blankItem, makeDraft } from '../../store/invoice-defaults'
 import { buildBillDraft } from '../timesheets';
 import { SJ_TABLE, stockJournalsDb } from '../manufacturing';
 import { AG_SERIES, AG_TABLES } from './ag-shared';
+import { agSnapshot } from './ag-snapshot';
 import { readAgriSettings } from './ag-settings';
 import { chartAt, chartRate, clrOf, q3, solids, toL } from './ag-rate-chart';
 import { centreGodown, milkItemId, milkJournal } from './ag-shifts';
@@ -100,7 +101,7 @@ export function dispatchBillParts(d: MilkDispatch, charts: readonly MilkRateChar
   const qty = chart.unit === 'KG' ? q3(f.unit === 'KG' ? f.qty : f.qty * (1 + clr / 1000)) : toL(f.qty, f.unit, clr);
   const sol = solids(f.qty, f.unit, f.fat, f.snf, clr);
   const item = milkLine(d.milk, qty, chart.unit, r.rate, `${d.number} · ${d.shift === 'M' ? 'morning' : 'evening'}`);
-  return { item, ag: { kind: 'milk_sale', milk: { ...(d.tanker ? { tanker: d.tanker } : {}), shift: d.shift, kg_fat: sol.kgFat, kg_snf: sol.kgSnf, chart: chart.name }, lines: { [item.id]: { fat: f.fat, snf: f.snf, litres: toL(f.qty, f.unit, clr) } } } };
+  return { item, ag: agSnapshot('milk_sale', { milk: { tanker: d.tanker, shift: d.shift, kg_fat: sol.kgFat, kg_snf: sol.kgSnf, chart: chart.name }, lines: { [item.id]: { fat: f.fat, snf: f.snf, litres: toL(f.qty, f.unit, clr) } } }) };
 }
 
 /** Raise the bill of a dispatch (once). */

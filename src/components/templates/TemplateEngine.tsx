@@ -20,7 +20,7 @@ import { PaymentScheduleBlock } from './parts/PaymentScheduleBlock'; // R2-A1
 import { AcceptanceBlock } from './parts/AcceptanceBlock';
 import { OptionalItemsBlock } from './parts/OptionalItemsBlock';
 import { ProposalSections } from './parts/ProposalSections';
-import { bisText, cashDiscountText, exchangeText, rcmTaxNote, worksLineText } from './paper-helpers';
+import { agriDeclaration, bisText, cashDiscountText, exchangeText, rcmTaxNote, worksLineText } from './paper-helpers';
 import { amountInWords } from '../../lib/amount-in-words';
 import { amountInWordsHi } from '../../lib/amount-in-words-hi';
 import { supplyDeclaration } from '../../lib/bill-of-supply';
@@ -39,6 +39,9 @@ const LazyPhotoPages = lazy(() => import('./parts/PhotoPages'));
 const LazyDeliveryProof = lazy(() => import('./parts/DeliveryProofBlock'));
 // R4-C1: export details (IEC / AD code, Incoterms, ports, countries, marks) — lazy; nothing without export data.
 const LazyExportBlock = lazy(() => import('./parts/ExportBlock'));
+// R12 (AG-A5): agri particulars and the agri statement page — lazy, mounted only when the document carries `ag`.
+const LazyAgriBlock = lazy(() => import('./parts/AgriBlock'));
+const LazyAgriStatement = lazy(() => import('./parts/AgriStatementPage'));
 // R11 (CN-A3 … A5): construction paper parts — one lazy chunk, loaded only for documents with the construction snapshot.
 const worksPaper = () => import('./parts/WorksPaper');
 const LazyWorksHeader = lazy(() => worksPaper().then((m) => ({ default: m.WorksHeaderBlock })));
@@ -127,6 +130,9 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
   const cdNote = cashDiscountText(invoice, totals.total, (n) => cfg.currency(n, invoice.currency)); // TR-A1
   const bis = bisText(invoice); // R9 (RT-E2): BIS Reg. 5(11) verification line
   const exch = exchangeText(invoice, (n) => cfg.currency(n, invoice.currency)); // R9 (RT-E3): "Less: old gold (… g @ …%)"
+  const agDecl = agriDeclaration(invoice); // R12 (AG-A5)
+  // R12 (AG-A5): the agri box after the parties (before the GST grid); never on receipt paper unless it is a dealer bill.
+  const agriBlock = invoice.ag && (layout !== 'receipt' || invoice.ag.kind === 'inputs') && <Suspense fallback={null}><LazyAgriBlock invoice={invoice} /></Suspense>;
 
   const irn = buildIrnPrint(einvoiceMeta === undefined ? resolveEInvoiceMeta(invoice.id) : einvoiceMeta);
 
@@ -159,6 +165,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
       return (
         <>
           <ProposalSections invoice={invoice} place="before" />
+          {agriBlock}
           {layout === 'gst' ? <GstBody invoice={invoice} sender={sender} totals={totals} skipEway={irn?.ewayNo} works={worksHead} /> : <ReceiptBody invoice={invoice} sender={sender} totals={totals} />}
           {worksDeds}
           {exportBlock}
@@ -183,6 +190,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
         )}
         <PartyPanel invoice={invoice} plain={plainParties} skipDates={layout === 'letterhead'} />
         {worksHead}
+        {agriBlock}
         {exportBlock}
         <CustomFieldsBlock invoice={invoice} />
         <TransportBlock invoice={invoice} skipEway={irn?.ewayNo} />
@@ -241,6 +249,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           {cdNote && <SupplyDeclaration text={cdNote} />}
           {bis && <SupplyDeclaration text={bis} />}
           {exch && <SupplyDeclaration text={exch} />}
+          {agDecl && <SupplyDeclaration text={agDecl} />}
           {returnNote && <SupplyDeclaration text={returnNote} />}
           {/* 8.5: "Previous balance + This bill = Total due" from the bill's own snapshot (off by default). */}
           <PartyBalanceBlock invoice={invoice} compact={layout === 'receipt'} />
@@ -254,6 +263,8 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           {/* R11 (CN-A4): the abstract of cost (and CN-B's price-variation working) as following pages. */}
           {cnDoc?.abstract && <Suspense fallback={null}><LazyWorksAbstract invoice={invoice} /></Suspense>}
           {cnDoc?.pv && <Suspense fallback={null}><LazyPvPage invoice={invoice} /></Suspense>}
+          {/* R12 (AG-A5): the agri statement (rent working, CMR statement, milk lines) as a following page. */}
+          {invoice.ag && layout !== 'receipt' && <Suspense fallback={null}><LazyAgriStatement invoice={invoice} /></Suspense>}
           {/* R3-C2: photo pages after the totals / annexure (2 × 2 per page). */}
           {invoice.attachments?.some((a) => a.print) && <Suspense fallback={null}><LazyPhotoPages invoice={invoice} /></Suspense>}
         </div>
