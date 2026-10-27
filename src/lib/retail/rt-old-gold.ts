@@ -25,7 +25,7 @@ import { isVoidStatus, readPurchase } from '../purchase-normalize';
 import { generateId } from '../storage';
 import { nextUrdNumber, recordUrd, exchangeSettled } from './rt-urd';
 import { netWeight } from './rt-jewel-line';
-import { r3 } from './rt-jewel-text';
+import { r3 } from './rt-jewel-rates';
 
 /** Fine weight and value of old metal (pure). `basis` 'purity': net × (1 − melt %) at the stated purity's buy rate. */
 export function oldGoldValue(i: { gross: number; stone?: number; purity_pct: number; melt_pct?: number; rate: number; basis?: 'fine' | 'purity' }): { net: number; fine: number; value: number } {

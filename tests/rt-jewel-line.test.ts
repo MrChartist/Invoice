@@ -3,9 +3,10 @@
 import './helpers/shim.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyJewel, ewayChapterNote, huidWarning, jewelAmount, jewelGst, jwHolds, netWeight, validHuid } from '../src/lib/retail/rt-jewel-line.ts';
-import { jewelText, purityLabel } from '../src/lib/retail/rt-jewel-text.ts';
-import { bisText, trackingText } from '../src/components/templates/paper-helpers.ts';
+import { applyJewel, huidWarning, jewelAmount, jewelGst, jwHolds, netWeight, validHuid } from '../src/lib/retail/rt-jewel-line.ts';
+import { ewayChapterNote } from '../src/lib/retail/rt-cash-guard.ts';
+import { purityLabel } from '../src/lib/retail/rt-jewel-rates.ts';
+import { bisText, jewelText, trackingText } from '../src/components/templates/paper-helpers.ts';
 import { calculateInvoice, calcInputFromRecord, mulRound2 } from '../src/lib/invoice-calc.ts';
 import type { InvoiceItem, InvoiceRecord } from '../src/types/invoice.ts';
 import type { JewelLine } from '../src/types/retail-r9.ts';

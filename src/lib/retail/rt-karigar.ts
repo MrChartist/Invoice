@@ -25,7 +25,7 @@ import { stockDb } from '../inventory';
 import { godownsDb, MAIN_GODOWN_ID } from '../godowns';
 import { draftsDb } from '../purchase-drafts';
 import { RT_SERIES, RT_TABLES } from './rt-shared';
-import { r3 } from './rt-jewel-text';
+import { r3 } from './rt-jewel-rates';
 import { addTags, loadTags, type TagInput } from './rt-jewel-tags';
 
 export const KARIGAR_TABLE = RT_TABLES.karigarMoves;

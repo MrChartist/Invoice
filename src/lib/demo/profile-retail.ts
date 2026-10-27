@@ -6,7 +6,6 @@
  */
 import type { InvoiceRecord } from '../../types/invoice';
 import type { AlterationJob, DeliveryRider, Doctor, JewelTag, Metal, MetalRate, RxRefill, ShortBookEntry } from '../../types/retail-r9';
-import { applyJewel } from '../retail/rt-jewel-line';
 import type { StockItem } from '../inventory';
 import { applyTotals, type Demo, type DemoExtras } from '../demo-data';
 import { shiftDay } from '../dates';
@@ -134,8 +133,11 @@ function jewelleryBlock({ today, base }: ProfileContext): DemoExtras {
   }));
   const fy = getIndianFY(today).label;
   const t = tags[0];
-  const line = applyJewel({ id: 'demo-jw-1-l1', name: item.name, type: 'Goods', hsn: '7113', unit: 'PCS', quantity: 1, rate: 0, tax_rate: 3, discount_percent: 0, amount: 0 },
-    { tag: t.tag, metal: 'gold', purity: '22K', gross_wt: t.gross_wt, stone_wt: t.stone_wt, net_wt: t.net_wt, rate: 9350, wastage_pct: 2, making: t.making, stone_value: t.stone_value, hallmark_charge: 45, huid: t.huid }, today);
+  // 6.040 g × ₹9,350 + 2% wastage + ₹650/g making + ₹4,800 stones + ₹45 hallmarking = ₹66,374.48 (rt-jewel-line.ts).
+  const line = {
+    id: 'demo-jw-1-l1', name: item.name, type: 'Goods' as const, hsn: '7113', unit: 'PCS', quantity: 1, rate: 66374.48, tax_rate: 3, discount_percent: 0, amount: 66374.48, serials: [t.tag],
+    jw: { tag: t.tag, metal: 'gold' as const, purity: '22K', gross_wt: t.gross_wt, stone_wt: t.stone_wt, net_wt: t.net_wt, rate: 9350, wastage_pct: 2, making: t.making, stone_value: t.stone_value, hallmark_charge: 45, huid: t.huid, bis: 'Purity of hallmarked jewellery can be verified at any BIS-recognised A&H centre.' },
+  };
   const sale = applyTotals({
     ...base.invoices[0], id: 'demo-jw-1', demo: true, invoice_number: buildInvoiceNumber('DEMOJW', fy, 1), issue_date: today, due_date: today, status: 'Paid', pos: true,
     client: { id: 'demo-walkin-jw', name: 'Mrs. Iyer (demo)', email: '', address: '', city: 'Chennai', zip: '', state_code: '33', phone: '9800000021' },

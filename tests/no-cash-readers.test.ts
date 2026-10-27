@@ -131,6 +131,8 @@ const MARKER_OWNERS = new Set([
   // Settlement payout matching reads only its clearing account's rows.
   'lib/marketplace/settlement-post.ts',
   'lib/trust/open-export-schema.ts', 'pages/Pos.tsx', 'components/modals/PaymentModal.tsx',
+  // R9 (RT-E3 / RT-D3): writes the exchange receipt and sums each URD voucher's exchange settlements.
+  'lib/retail/rt-urd.ts',
 ]);
 
 test('guard: the cash / bank readers call movedNoCash', () => {

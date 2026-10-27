@@ -16,13 +16,13 @@ import { METALS, PURITIES, fineness, lastBoard, loadRates, noRateError, purityLa
 import { addTags, deleteTag, ensureJewelItem, loadTags, parseBulk, tagJewel, tagLabels, tagSummary, tagsInStock, type TagInput } from '../../lib/retail/rt-jewel-tags';
 import { applyJewel, huidWarning, jewelAmount, jwHolds, netWeight } from '../../lib/retail/rt-jewel-line';
 import { cashPaidToday, exchangeNote, oldGoldValue, oldGoldVouchers, recordOldGold } from '../../lib/retail/rt-old-gold';
-import { cashPaidWarning, liveSaleGuards, maskPan, type Guard } from '../../lib/retail/rt-cash-guard';
+import { cashPaidWarning, kycGate, liveSaleGuards, maskPan, type Guard } from '../../lib/retail/rt-cash-guard';
 import { settleByExchange } from '../../lib/retail/rt-urd';
 import { deleteKarigarMove, karigarLedger, karigarLine, loadKarigarMoves, recordKarigar } from '../../lib/retail/rt-karigar';
 import { labelSheetHtml, layoutById } from '../../lib/label-sheet';
 import { printHtmlDocument } from '../../lib/voucher-print';
 import { stockDb } from '../../lib/inventory';
-import { loadTracking } from '../../lib/stock-tracking';
+import { loadTracking, saveGates } from '../../lib/stock-tracking';
 import { vendorsDb } from '../../lib/vendors';
 import { paymentsDb, purchasesDb } from '../../lib/purchases';
 import { can } from '../../lib/access';
@@ -440,9 +440,13 @@ function KycFields({ kyc, set }: { kyc?: SaleKyc; set: (k: SaleKyc | undefined) 
 }
 const GuardList = ({ list }: { list: readonly (Guard | string)[] }) => <>{list.map((g, i) => { const x = typeof g === 'string' ? { level: 'warn', message: g } : g; return <p key={i} className={controls.hint} style={{ color: x.level === 'error' ? 'var(--loss)' : 'var(--warning)' }} role="status" data-guard={x.level}>{x.message}</p>; })}</>;
 
-/** Editor: PAN / Form 60 / 97 on a big sale and the HUID warnings (the save gate is `kycGate` in rt-cash-guard). */
+/** Editor: PAN / Form 60 / 97 on a big sale and the HUID warnings; while mounted, `kycGate` is an editor save gate. */
 export function EditorJewel() {
   useT();
+  useEffect(() => {
+    saveGates.add(kycGate);
+    return () => void saveGates.delete(kycGate);
+  }, []);
   const st = useInvoiceStore(useShallow((s) => ({ total: s.total, kyc: s.kyc, issue_date: s.issue_date, items: s.items, client: s.client, id: s.id })));
   const guards = liveSaleGuards(st as unknown as InvoiceRecord, 0);
   const huid = st.items.map((l) => huidWarning(l, st.issue_date)).filter(Boolean);

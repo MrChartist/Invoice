@@ -35,7 +35,7 @@ import {
   type EwayOptions,
 } from './eway';
 import { rcmTaxOf } from './rcm';
-import { ewayChapterNote } from './retail/rt-jewel-line'; // R9 (RT-E2 / RT22)
+import { ewayChapterNote } from './retail/rt-cash-guard'; // R9 (RT-E2 / RT22)
 
 export interface PreflightResult {
   errors: PreflightIssue[];

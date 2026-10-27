@@ -35,6 +35,8 @@ import { effectiveMrp, mrpIssues, withMrpIssues, type MrpIssues } from './retail
 import type { RetailSettings } from '../types/retail-r9';
 /** R9 (RT-A2): the guard helpers, re-exported so the POS / editor need no extra chunk. */
 export { MRP_TAG, isMrpMessage, recordMrpOverrides, withMrpIssues } from './retail/rt-mrp';
+/** R9 (RT-E3): save checks a mounted lazy pack part registers (the jewellery "Require PAN" gate); the editor runs them on issue. */
+export const saveGates = new Set<(rec: Pick<InvoiceRecord, 'doc_type' | 'total' | 'issue_date' | 'kyc'>) => string[]>();
 import { can } from './access';
 
 const EPS = 1e-9;

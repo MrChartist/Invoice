@@ -11,10 +11,10 @@
  */
 import type { InvoiceRecord, Payment } from '../../types/invoice';
 import type { GuardMode, SaleKyc } from '../../types/retail-r9';
-import { CASH_PAYMENT_LIMIT_RULES, CASH_RECEIPT_LIMIT_RULES, PAN_SALE_LIMIT_RULES, PMLA_CASH_RULES } from '../retail-rules';
+import { CASH_PAYMENT_LIMIT_RULES, CASH_RECEIPT_LIMIT_RULES, EWAY_EXEMPT_CHAPTER_RULES, PAN_SALE_LIMIT_RULES, PMLA_CASH_RULES } from '../retail-rules';
 import { ruleAt } from '../tax-rules';
 import { num, round2 } from '../invoice-calc';
-import { movedNoCash } from '../no-cash';
+import { movedNoCash } from '../advance-tax'; // the no-cash rule, through its usual chunk
 import { formatCurrency } from '../utils';
 import { getTable } from '../storage';
 import { readRetailSettings } from './rt-settings';
@@ -59,6 +59,13 @@ export function panGuard(total: number, date: string, kyc: SaleKyc | undefined, 
 export function cashPaidWarning(paidToday: number, date: string): string {
   const limit = ruleAt(CASH_PAYMENT_LIMIT_RULES, date);
   return num(paidToday) > limit ? `Cash paid of ${formatCurrency(round2(num(paidToday)))} to one person today is above ${formatCurrency(limit)}: the purchase may be disallowed under Sec 40A(3) — pay by bank. Verify with your CA.` : '';
+}
+
+/** RT-E2 / RT22 (kept here: the small checks the hosts load): e-Way note when every goods line is chapter 71, else ''. */
+export function ewayChapterNote(hsns: readonly string[], date?: string): string {
+  const ch = ruleAt(EWAY_EXEMPT_CHAPTER_RULES, date);
+  const goods = hsns.map((h) => String(h ?? '').replace(/\D/g, '')).filter((h) => h && !h.startsWith('99'));
+  return goods.length && goods.every((h) => ch.some((c) => h.startsWith(c))) ? 'e-Way bill not required for Chapter 71 goods (Rule 138(14) annexure) — verify with your CA.' : '';
 }
 
 const SALE_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY']);

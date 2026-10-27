@@ -14,10 +14,10 @@
  */
 import type { InvoiceItem } from '../../types/invoice';
 import type { JewelLine } from '../../types/retail-r9';
-import { EWAY_EXEMPT_CHAPTER_RULES, HALLMARK_RULES, JEWELLERY_GST_RULES } from '../retail-rules';
+import { HALLMARK_RULES, JEWELLERY_GST_RULES } from '../retail-rules';
 import { ruleAt } from '../tax-rules';
 import { mulRound2, num, round2 } from '../invoice-calc';
-import { r3 } from './rt-jewel-text';
+import { r3 } from './rt-jewel-rates';
 
 export interface JewelAmount { metal: number; wastage: number; making: number; total: number }
 
@@ -78,11 +78,4 @@ export function huidWarning(line: Pick<InvoiceItem, 'name' | 'jw'>, date: string
   const jw = line.jw;
   if (!jw || jw.metal !== 'gold' || jw.job_work || validHuid(jw.huid) || !ruleAt(HALLMARK_RULES, date).huidMandatory) return '';
   return `${line.name}: no valid 6-character HUID — gold jewellery in a notified district must be hallmarked (verify with your CA).`;
-}
-
-/** e-Way: the note when every goods line is chapter 71 (RT22), else '' (the usual threshold applies). */
-export function ewayChapterNote(hsns: readonly string[], date?: string): string {
-  const ch = ruleAt(EWAY_EXEMPT_CHAPTER_RULES, date);
-  const goods = hsns.map((h) => String(h ?? '').replace(/\D/g, '')).filter((h) => h && !h.startsWith('99'));
-  return goods.length && goods.every((h) => ch.some((c) => h.startsWith(c))) ? 'e-Way bill not required for Chapter 71 goods (Rule 138(14) annexure) — verify with your CA.' : '';
 }

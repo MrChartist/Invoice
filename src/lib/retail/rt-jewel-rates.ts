@@ -10,12 +10,25 @@ import { num, round2 } from '../invoice-calc';
 import { requireAccess } from '../access';
 import { generateId, getTable, setTable } from '../storage';
 import { RT_TABLES } from './rt-shared';
-import { fineness, r3 } from './rt-jewel-text';
 
 export const RATES_TABLE = RT_TABLES.metalRates;
 export const METALS: readonly Metal[] = ['gold', 'silver', 'platinum'];
 
-export { PURITIES, fineness, purityLabel, r3 } from './rt-jewel-text';
+/** Purity key → fineness (parts per 1000). Gold by karat (the bill's karat table is `paper-helpers.ts` KARAT). */
+export const PURITIES: Readonly<Record<Metal, readonly (readonly [string, number])[]>> = {
+  gold: [['24K', 999], ['23K', 958], ['22K', 916], ['21K', 875], ['20K', 833], ['18K', 750], ['14K', 585], ['9K', 375]],
+  silver: [['999', 999], ['925', 925], ['900', 900], ['800', 800]],
+  platinum: [['950', 950], ['900', 900]],
+};
+
+/** Fineness of a purity key (0 when unknown). */
+export const fineness = (metal: Metal, purity: string): number => PURITIES[metal]?.find(([k]) => k === purity)?.[1] ?? 0;
+
+/** "22K (916)" for gold, "925" for silver — the BIS bill shows carat and fineness. */
+export const purityLabel = (metal: Metal, purity: string): string => (metal === 'gold' && fineness(metal, purity) ? `${purity} (${fineness(metal, purity)})` : purity);
+
+/** Grams, 3 decimals. */
+export const r3 = (x: number): number => Math.round((x + Number.EPSILON) * 1000) / 1000 || 0;
 
 /** Fine weight (24K grams) of `net` grams at a purity. */
 export const fineOf = (metal: Metal, purity: string, net: number): number => r3((num(net) * fineness(metal, purity)) / 1000);
