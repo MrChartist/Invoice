@@ -208,6 +208,10 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   commission_plans: 'Staff commission plans: rules by item / category / kind, % of taxable or per unit, monthly slab (R10).',
   staff_payouts: 'Monthly commission payouts per staff member: payroll adjustment or journal reference (R10).',
   payer_claims: 'Payer claims (CLM/FY…): insurer / TPA / employer, beneficiary, approved amount, the two bills, status (R10).',
+  // R10-D
+  workshop_settings: 'Workshop settings: inspection checklist, job-card terms, vehicle classes, labour rates, depreciation table, service interval (R10).',
+  service_assets: 'Vehicles and appliances: registration / serial no., make, model, owner, insurer and policy, odometer readings, next service (R10).',
+  labour_ops: 'Labour operations: code, description, SAC, standard hours per vehicle class or flat price, service interval (R10).',
   // R11-A
   construction_settings: 'Construction profile switches: RA bill paper style, M-book column, government sign-off boxes, certificate text, deviation limit, works views (R11).',
   // R11-C
