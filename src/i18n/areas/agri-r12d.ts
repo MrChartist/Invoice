@@ -257,6 +257,7 @@ export const agdT = defineArea(
     typedDate: 'Your date (MM-DD)',
     resetDates: 'Use default dates',
     calendarNote: 'Reminders only, as recalled — verify AG18 (producer company) / AG19 (State Act).',
+    pastDue: 'Past due',
   },
   {
     cold: 'शीतगृह',
@@ -509,6 +510,7 @@ export const agdT = defineArea(
     typedDate: 'आपकी तारीख़ (MM-DD)',
     resetDates: 'डिफ़ॉल्ट तारीख़ें',
     calendarNote: 'केवल रिमाइंडर, याद के आधार पर — AG18 (उत्पादक कंपनी) / AG19 (राज्य अधिनियम) जाँचें।',
+    pastDue: 'देय तिथि निकल गई',
   },
 );
 

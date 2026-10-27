@@ -969,3 +969,16 @@ test('R11 (CN-D) site readers read the real bill shape: labour holds, plant-hire
   const p = sitePnl({ boq, period: { start: '2026-04-01', end: '2027-03-31' }, invoices: [], purchases: [lab, { ...bill, id: 'o', cost_centre_id: 'cc' }, { ...bill, id: 'x' }, { ...bill, id: 'v', status: 'void', cost_centre_id: 'cc' }], vouchers: [], payments: [], measurements: [], material: new Map(), internal: new Map(), sites: [], logs: [], compliance: [] });
   assert.deepEqual([p.costs.labour, p.costs.other], [1000, 1000], 'ITC taken: cost = taxable; untagged and void bills left out');
 });
+
+// R12-D: the dealer desk's principal-certificate check and the FPO patronage register read bills through `readPurchase` /
+// `readPurchaseLines` (date, party, lines, void skipped; the vendor id from the row).
+test('R12 (AG-D4 / AG-D5) principal-certificate check and patronage register read the real bill shape', async () => {
+  const { principalWarnings } = await import('../src/lib/agri/ag-licences.ts');
+  const { patronage } = await import('../src/lib/agri/ag-patronage.ts');
+  const urea = { ...bill, vendor_id: 'v-iffco', lines: [{ id: 'l1', name: 'Urea 45 kg', hsn: '3102', unit: 'BAG', quantity: 100, rate: 240, tax_rate: 5 }] };
+  const of = (n: string) => (n === 'urea 45 kg' ? 'fertiliser' : undefined);
+  assert.deepEqual(principalWarnings([urea, { ...urea, id: 'v', status: 'void' } as never], [], of).map((w) => [w.bill, w.vendor, w.kind]), [['AS/22', 'Acme Supplies', 'fertiliser']]);
+  const member = { id: 'v-iffco', name: 'Acme Supplies', kind: 'vendor' as const };
+  const p = patronage(2026, { members: [member], cycles: [], purchases: [urea, { ...urea, id: 'v', status: 'void' } as never], invoices: [], farmerIds: new Set(['v-iffco']) });
+  assert.deepEqual([p.rows[0].suppliedQty, p.rows[0].suppliedValue], [100, 1000], 'taxable value, void skipped');
+});

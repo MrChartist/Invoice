@@ -229,6 +229,11 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   labour_compliance: 'Labour-contractor PF / ESI / wage-register proof per month (R11).', site_labour: 'Daily-wage site workers with rates (R11).',
   muster_days: 'Site attendance, one row per site per day, and the weekly settlement (MUS/FY…, R11).', hired_equipment: 'Equipment hired in, with rate, basis and operator flag (R11).',
   plant_logs: 'Daily plant log sheets: hours, idle, breakdown, fuel, hire out (PLG/FY…, R11).',
+  // R12-D
+  cold_lots: 'Cold-storage lots held in custody (never our stock): storage receipt (CSR/FY…), depositor, commodity, bags, chamber, rent plan, gate passes out (GPO/FY…), transfers (R12).',
+  cold_rent_plans: 'Storage rent plans: per bag / quintal, per season / month or lump sum, handling charges, exempt or taxable class, billing time (R12).',
+  agri_loans: 'Loans against stored produce (LAS/FY…): borrower, lots under lien, principal, rate, repayments split interest / principal (R12).',
+  member_shares: 'Members\' share ledger: allotments with certificates (SHC/FY…), transfers, surrenders, forfeitures (R12).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';

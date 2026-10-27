@@ -318,6 +318,7 @@ function ensureTransportWorksAlerts(onReady: () => void): void {
   gate('works', 'contractor', () => import('../../lib/works/works-alerts'));
   gate('hotel', 'hotel', () => import('../hotel/hotel-lazy').then((l) => l.hotelChunk()).then((m) => m.registerHotelAlerts())); // R7-C2 ensureHotelAlerts (the pack's chunk)
   gate('pharmacy', '-', () => import('../retail-r9/PharmacyDesk').then((m) => m.registerPharmacyAlerts())); // R9 (RT-B): licence expiry, refills due (explicit pack only)
+  for (const p of ['agri_inputs', 'coldstore', 'fpo']) gate(p, '-', () => import('../../lib/agri/ag-d-alerts')); // R12 (AG-D): dealer licences, overdue loans against lots (registers itself once)
 }
 
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {
