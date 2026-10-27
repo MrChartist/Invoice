@@ -17,7 +17,7 @@ export type LegalReason = 'non_legal' | 'advocate' | 'senior_to_advocate' | 'gst
 
 /** The PS-B part of `Client.ps` / `Vendor.ps` (declared in `types/prof-r14.ts`). */
 export interface PsPartyB {
-  entity?: 'business' | 'person';
+  entity?: 'business' | 'individual' | 'government' | 'advocate';
   small_business?: boolean;
   advocate?: boolean;
 }
@@ -53,7 +53,7 @@ export function legalRegime(i: LegalInput): LegalResult {
   const out = (regime: LegalRegime, reason: LegalReason, verified = row.verified): LegalResult => ({ regime, reason, entry: regime === 'rcm' ? r.rcm : regime === 'exempt' ? r.exempt : '', verified });
   if (!isLegalLine(i.line, i.date)) return out('taxable', 'non_legal', true);
   const ps = psOfParty(i.client);
-  if (ps.advocate) return i.supplier?.senior ? out('rcm', 'senior_to_advocate', false) : out('exempt', 'advocate');
+  if (ps.advocate || ps.entity === 'advocate') return i.supplier?.senior ? out('rcm', 'senior_to_advocate', false) : out('exempt', 'advocate');
   const business = !!String(i.client?.gstin ?? '').trim() || ps.entity === 'business';
   if (!business) return out('exempt', 'person');
   if (ps.small_business) return out('exempt', 'small_business');

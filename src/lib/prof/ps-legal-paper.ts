@@ -36,6 +36,8 @@ export interface LegalApplyInput {
   senior?: boolean;
   /** The user's choice from the chip: every legal-services line takes this regime. */
   force?: LegalRegime;
+  /** `prof_settings.legal`: enrolment no. and State Bar Council, printed under the name (snapshotted). */
+  paper?: { enrolment?: string; bar_council?: string };
 }
 
 /**
@@ -63,7 +65,7 @@ export function legalPatch(i: LegalApplyInput): { regime: LegalResult; doc: Lega
     }
     return { ...l, tax_rate: 0, sv: { ...(l.sv ?? {}), exempt: 'EXEMPT' } } as InvoiceItem;
   });
-  const ps = { ...((i.record.ps as Record<string, unknown> | undefined) ?? {}), legal: { regime, entry: first.entry }, ...(doc === 'fee_memo' ? { kind: 'memo' } : {}) };
+  const ps = { ...((i.record.ps as Record<string, unknown> | undefined) ?? {}), legal: { regime, entry: first.entry, ...(i.paper?.enrolment ? { enrolment: i.paper.enrolment } : {}), ...(i.paper?.bar_council ? { bar_council: i.paper.bar_council } : {}) }, ...(doc === 'fee_memo' ? { kind: 'memo' } : {}) };
   const patch: Partial<InvoiceRecord> & { ps: Record<string, unknown> } = { items, ps };
   if (doc === 'bill_of_supply') Object.assign(patch, { doc_type: 'BILL_OF_SUPPLY', reverse_charge: false, rcm_tax_excluded: undefined });
   else if (i.registered) Object.assign(patch, regime === 'rcm' ? { reverse_charge: true, rcm_tax_excluded: true } : { reverse_charge: false, rcm_tax_excluded: undefined }, i.record.doc_type === 'BILL_OF_SUPPLY' ? { doc_type: 'TAX_INVOICE' } : {});

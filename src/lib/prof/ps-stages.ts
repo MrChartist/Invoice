@@ -94,3 +94,11 @@ export function billedOnEngagement(engagementId: string, invoices: readonly Bill
   const credits = stageCredits(new Set(stages.map((s) => s.id)), invoices as never, links);
   return round2(stages.reduce((s, i) => s + num(i.taxable_value), 0) - credits.reduce((s, c) => s + num(c.taxable_value), 0));
 }
+
+/** The `ps.stage` snapshot printed on the fee note (PS-A5 paper): stage n of N, cost, fee %, stage %, billed before. */
+export function stageSnap(p: StagePlan, stageId: string, date: string, billedBefore: number): { no: number; of: number; label: string; project_cost: number; fee_pct: number; stage_pct: number; billed_before: number } {
+  const k = p.stages.findIndex((s) => s.id === stageId);
+  const s = p.stages[k];
+  if (!s) throw new Error('Pick the stage.');
+  return { no: k + 1, of: p.stages.length, label: s.label, project_cost: costOn(p, date), fee_pct: num(p.fee_pct), stage_pct: num(s.cum_pct), billed_before: round2(billedBefore) };
+}

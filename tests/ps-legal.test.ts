@@ -81,3 +81,14 @@ test('inward: a bill from an advocate with a legal SAC prompts RCM unless we are
   assert.equal(advocateInward([{ hsn: '998311' }], { ps: { advocate: true } }, D), null);
   assert.equal(advocateInward([{ hsn: '998212' }], {}, D), null);
 });
+
+test('the chip\'s choice overrides the regime; enrolment snapshotted; a later choice undoes the exempt mark', () => {
+  const rec = { client: clientRetail, items: [{ id: 'a', name: 'Fees', hsn: '998213', quantity: 1, rate: 10000, tax_rate: 18, discount_percent: 0, amount: 10000, type: 'Service' }], issue_date: D, doc_type: 'TAX_INVOICE' } as unknown as InvoiceRecord;
+  const ex = legalPatch({ record: rec, registered: true, paper: { enrolment: 'D/1234/2010', bar_council: 'Delhi' } });
+  assert.deepEqual(ex.patch.ps.legal, { regime: 'exempt', entry: 'N 12/2017-CT(R) entry 45', enrolment: 'D/1234/2010', bar_council: 'Delhi' });
+  const r = legalPatch({ record: { ...rec, ...ex.patch } as InvoiceRecord, registered: true, force: 'rcm' });
+  assert.deepEqual([r.doc, r.patch.doc_type, r.patch.reverse_charge, r.patch.items![0].tax_rate, r.patch.items![0].sv?.exempt], ['tax_invoice', 'TAX_INVOICE', true, 18, undefined]);
+  assert.equal(legalPatch({ record: rec, registered: true, force: 'taxable' }).patch.reverse_charge, false);
+  assert.equal(legalRegime({ client: { ps: { entity: 'government' } }, line, date: D }).regime, 'exempt');
+  assert.equal(legalRegime({ client: { ps: { entity: 'advocate' } }, line, date: D }).reason, 'advocate');
+});

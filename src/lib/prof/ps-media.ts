@@ -1,6 +1,6 @@
 /**
  * R14 PS-B5 media and digital agencies: media bought for a client and re-billed (pure). A media bill carries
- * `PurchaseRecord.ps.media = { client_id, engagement_id?, ro_no?, medium, insert_from?, insert_to?, mode, commission_pct? }`.
+ * `PurchaseRecord.ps.media = { client_id, engagement_id?, ro?, medium, insert_from?, insert_to?, mode, commission_pct? }`.
  *  - `principal` (space bought in our name and resold — the default): the cost is part of our taxable supply, at our
  *    service rate unless the user picks the media class, plus the agency fee;
  *  - `agent` (the client contracts with the media / platform, Rule 33 conditions met): a pure-agent line (the B1 key)
@@ -22,7 +22,7 @@ export const MEDIUMS: readonly Medium[] = ['print', 'tv', 'radio', 'outdoor', 'd
 export interface MediaBuy {
   client_id: string;
   engagement_id?: string;
-  ro_no?: string;
+  ro?: string;
   medium: Medium;
   /** Publication / channel / platform and the client's reference (release order). */
   publication?: string;
@@ -72,7 +72,7 @@ export interface MediaBillPrefs {
 }
 
 type Line = Omit<InvoiceItem, 'id' | 'amount' | 'type'> & { charge_head_id?: string };
-const label = (r: MediaRow) => `${r.media.publication || r.vendor} — ${r.media.medium}${r.media.ro_no ? ` (RO ${r.media.ro_no})` : ''}`;
+const label = (r: MediaRow) => `${r.media.publication || r.vendor} — ${r.media.medium}${r.media.ro ? ` (RO ${r.media.ro})` : ''}`;
 
 /** Invoice lines for media rows (principal: cost at the chosen rate + fee; agent: pure-agent recovery + fee). */
 export function mediaLines(rows: readonly MediaRow[], prefs: MediaBillPrefs): Line[] {
@@ -111,3 +111,9 @@ export const mediaTds = (date: string): { section: string; levy: boolean } => {
 
 /** The media schedule printed on the annexure (A5). */
 export const mediaSchedule = (rows: readonly MediaRow[]) => rows.map((r) => ({ date: r.date, medium: r.media.medium, publication: r.media.publication || r.vendor, slots: [r.media.insert_from, r.media.insert_to].filter(Boolean).join(' – '), cost: r.cost, mode: r.media.mode }));
+
+/** The `ps.media` snapshot printed on the fee note / annexure (PS-A5): RO, medium, edition, date, amount. */
+export const mediaSnap = (rows: readonly MediaRow[], commissionPct?: number) => ({
+  rows: rows.map((r) => ({ ro: r.media.ro ?? '', media: r.media.medium, ...(r.media.publication ? { edition: r.media.publication } : {}), date: r.media.insert_from || r.date, amount: r.media.mode === 'agent' ? r.total : r.cost })),
+  ...(commissionPct ? { commission_pct: commissionPct } : {}),
+});

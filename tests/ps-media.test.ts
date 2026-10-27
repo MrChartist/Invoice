@@ -27,7 +27,7 @@ const bill = (id: string, total: number, media: Record<string, unknown>, over: P
 } as PurchaseRecord);
 
 test('the user story: newspaper space as principal (+15 % fee, all taxable), Meta spend as pure agent (+ fee)', () => {
-  purchasesDb.save(bill('np', 300000, { publication: 'Times of India, Delhi', ro_no: 'PO/FY26-27/0042' }));
+  purchasesDb.save(bill('np', 300000, { publication: 'Times of India, Delhi', ro: 'PO/FY26-27/0042' }));
   purchasesDb.save(bill('meta', 120000, { medium: 'digital', mode: 'agent', publication: 'Meta ads (client account)' }));
   const rows = unbilledMedia(purchasesDb.all(), 'c-mh', () => false);
   assert.equal(rows.length, 2);
@@ -68,4 +68,10 @@ test('a foreign platform bill keeps the existing import-of-services RCM reading'
   const b = bill('meta', 50000, { medium: 'digital', mode: 'principal' }, { import_type: 'SERVICES', reverse_charge: true } as never);
   const p = readPurchase(b)!;
   assert.deepEqual([p.importType, p.reverseCharge], ['SERVICES', true]);
+});
+
+test('the media snapshot for the paper', async () => {
+  const { mediaSnap } = await import('../src/lib/prof/ps-media.ts');
+  purchasesDb.save(bill('np', 300000, { publication: 'Times of India, Delhi', ro: 'PO/FY26-27/0042', insert_from: '2026-10-12' }));
+  assert.deepEqual(mediaSnap(unbilledMedia(purchasesDb.all(), 'c-mh', () => false), 15), { rows: [{ ro: 'PO/FY26-27/0042', media: 'print', edition: 'Times of India, Delhi', date: '2026-10-12', amount: 300000 }], commission_pct: 15 });
 });

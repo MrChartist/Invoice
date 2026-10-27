@@ -26,10 +26,13 @@ export interface CmCtx {
   run: (fn: () => string | void) => void;
 }
 
-export default function ClientMoneyDesk({ view }: { view?: string }) {
+type Notify = (m: string, tone?: 'success' | 'error' | 'info') => void;
+
+export default function ClientMoneyDesk({ view, notify: outer }: { view?: string; notify?: Notify }) {
   useT();
   const v = (VIEWS as readonly string[]).includes(view ?? '') ? view! : 'ledger';
-  const { notify, toastNode } = useToast();
+  const own = useToast();
+  const notify: Notify = outer ?? ((m, tone) => own.notify(m, tone === 'info' ? 'success' : tone));
   const [version, setVersion] = useState(0);
   const run = useCallback((fn: () => string | void) => {
     try {
@@ -57,7 +60,7 @@ export default function ClientMoneyDesk({ view }: { view?: string }) {
         {v === 'statements' && <StatementsView ctx={ctx} />}
       </Suspense>
       <p className={controls.hint}>{cmT('wp')}</p>
-      {toastNode}
+      {!outer && own.toastNode}
     </div>
   );
 }

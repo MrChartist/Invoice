@@ -18,7 +18,7 @@ export default function MediaRows({ ps, onChange }: { ps: unknown; onChange: (ps
     const out = next.client_id ? { ...rest, media: next } : rest;
     onChange(Object.keys(out).length ? out : undefined);
   };
-  const txt = (k: 'publication' | 'ro_no' | 'client_ref', l: string) => <label className={controls.field}><span className={controls.label}>{l}</span><input className={controls.input} value={m?.[k] ?? ''} onChange={(e) => set({ [k]: e.target.value || undefined })} data-ps-media={k} /></label>;
+  const txt = (k: 'publication' | 'ro' | 'client_ref', l: string) => <label className={controls.field}><span className={controls.label}>{l}</span><input className={controls.input} value={m?.[k] ?? ''} onChange={(e) => set({ [k]: e.target.value || undefined })} data-ps-media={k} /></label>;
   const day = (k: 'insert_from' | 'insert_to', l: string) => <label className={controls.field}><span className={controls.label}>{l}</span><input type="date" className={controls.input} value={m?.[k] ?? ''} onChange={(e) => set({ [k]: e.target.value || undefined })} /></label>;
   return (
     <fieldset className={controls.row} data-ps-media-rows>
@@ -44,7 +44,7 @@ export default function MediaRows({ ps, onChange }: { ps: unknown; onChange: (ps
             </select>
           </label>
           {txt('publication', psbT('publication'))}
-          {txt('ro_no', psbT('roNo'))}
+          {txt('ro', psbT('roNo'))}
           {txt('client_ref', psbT('clientRef'))}
           {day('insert_from', psbT('from'))}
           {day('insert_to', psbT('to'))}

@@ -18,13 +18,14 @@ const NEXT: Record<LegalRegime, LegalRegime> = { rcm: 'exempt', exempt: 'taxable
 
 export default function LegalRegimeChip() {
   useT();
-  const senior = useMemo(() => getJson<{ legal?: { senior?: boolean } } | null>(`${DB_PREFIX}prof_settings`, null)?.legal?.senior === true, []);
+  const legal0 = useMemo(() => getJson<{ legal?: { senior?: boolean; enrolment?: string; bar_council?: string } } | null>(`${DB_PREFIX}prof_settings`, null)?.legal ?? {}, []);
+  const senior = legal0.senior === true;
   const s = useInvoiceStore(useShallow((st) => ({ id: st.id, client: st.client, items: st.items, issue_date: st.issue_date, doc_type: st.doc_type, sender: st.sender, ps: (st as { ps?: Record<string, unknown> }).ps })));
   const isNew = useMemo(() => !getTable<{ id: string }>('invoices').some((i) => i?.id === s.id), [s.id]);
   const registered = !!s.sender?.companyGstin?.trim();
   const done = useRef('');
   const apply = (force?: LegalRegime) => {
-    const r = legalPatch({ record: s as unknown as InvoiceRecord, registered, senior, force });
+    const r = legalPatch({ record: s as unknown as InvoiceRecord, registered, senior, force, paper: legal0 });
     useInvoiceStore.getState().patch(r.patch as never);
   };
   const key = s.client?.id ?? s.client?.name ?? '';

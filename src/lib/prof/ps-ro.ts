@@ -14,7 +14,7 @@ export function roFields(po: Pick<PurchaseOrder, 'po_number'> & { ps?: unknown }
   const m: MediaBuy | undefined = mediaOf(po);
   if (!m) return null;
   return ([
-    ['RO no.', m.ro_no || po.po_number],
+    ['RO no.', m.ro || po.po_number],
     ['Medium', m.medium],
     ['Publication / platform', m.publication ?? ''],
     ['Schedule', [m.insert_from, m.insert_to].filter(Boolean).join(' – ')],

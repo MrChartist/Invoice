@@ -10,7 +10,7 @@ import controls from '../../styles/controls.module.css';
 type PsHolder = { ps?: unknown };
 const merge = (p: PsHolder, patch: Partial<PsPartyB>) => ({ ps: { ...((p.ps as object | undefined) ?? {}), ...patch } });
 
-/** Client form: business entity or not, small business (entry 45), an advocate. */
+/** Client form: business entity, individual, government or an advocate; small business (entry 45). */
 export function ClientLegalRow({ value, onChange }: { value: PsHolder; onChange: (p: { ps: Record<string, unknown> }) => void }) {
   useT();
   const ps = psOfParty(value);
@@ -20,12 +20,10 @@ export function ClientLegalRow({ value, onChange }: { value: PsHolder; onChange:
         <span className={controls.label}>{psbT('legalStatus')}</span>
         <select className={controls.select} value={ps.entity ?? ''} onChange={(e) => onChange(merge(value, { entity: (e.target.value || undefined) as PsPartyB['entity'] }))}>
           <option value="">{psbT('e.')}</option>
-          <option value="business">{psbT('e.business')}</option>
-          <option value="person">{psbT('e.person')}</option>
+          {(['business', 'individual', 'government', 'advocate'] as const).map((k) => <option key={k} value={k}>{psbT(`e.${k}`)}</option>)}
         </select>
       </label>
       <label className={controls.check}><input type="checkbox" checked={!!ps.small_business} onChange={(e) => onChange(merge(value, { small_business: e.target.checked || undefined }))} /> {psbT('small')}</label>
-      <label className={controls.check}><input type="checkbox" checked={!!ps.advocate} onChange={(e) => onChange(merge(value, { advocate: e.target.checked || undefined }))} /> {psbT('advocate')}</label>
     </div>
   );
 }

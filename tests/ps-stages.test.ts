@@ -48,3 +48,8 @@ test('already billed: live stage bills of the engagement less their credit notes
   const rows = [inv('a', 252000), inv('b', 504000), inv('c', 1, { status: 'Cancelled' }), inv('d', 9, { ps: { engagement: { id: 'e2' } } }), { id: 'cn', doc_type: 'CREDIT_NOTE', status: 'Sent', taxable_value: 2000 }];
   assert.equal(billedOnEngagement('e1', rows, [{ relation: 'credit_note', from_id: 'b', to_id: 'cn' }] as never), 754000);
 });
+
+test('the stage snapshot for the paper', async () => {
+  const { stageSnap } = await import('../src/lib/prof/ps-stages.ts');
+  assert.deepEqual(stageSnap(plan(), 's3', '2026-10-01', 756000), { no: 3, of: 5, label: 'Working drawings and tender', project_cost: 42000000, fee_pct: 6, stage_pct: 50, billed_before: 756000 });
+});
