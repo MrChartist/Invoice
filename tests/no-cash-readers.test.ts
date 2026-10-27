@@ -133,6 +133,7 @@ const MARKER_OWNERS = new Set([
   'lib/trust/open-export-schema.ts', 'pages/Pos.tsx', 'components/modals/PaymentModal.tsx',
   // R9 (RT-D2 / D3): the finance transfer row (ra_journal_id pattern) and the exchange receipt are written here.
   'lib/retail/rt-finance.ts', 'lib/retail/rt-buyback.ts',
+  'lib/construction/cn-rera.ts', 'lib/construction/cn-bookings.ts', // R11 (CN-C): RERA collections, booking receipts
   // QA10: the URD voucher's settled amount is derived from its exchange rows (and bills free them on delete / cancel).
   'lib/retail/rt-doc-hooks.ts',
 ]);

@@ -18,7 +18,13 @@ export const CN_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // CN-A: the construction profile switches (owner only)
   construction_settings: 'settings.manage',
   // CN-B: works_contracts, secured_advances, price_variations, bank_guarantees
-  // CN-C: realty_projects, realty_units, realty_bookings, payment_plans, stage_certificates, rera_withdrawals
+  // CN-C: builders (masters, bookings / stage certificates, the RERA account)
+  realty_projects: 'master.edit',
+  realty_units: 'master.edit',
+  realty_bookings: 'doc.create',
+  payment_plans: 'master.edit',
+  stage_certificates: 'doc.create',
+  rera_withdrawals: 'books.edit',
   // CN-D: sub_work_orders, sub_measurements, labour_compliance, site_labour, muster_days, hired_equipment, plant_logs
 };
 
@@ -27,6 +33,12 @@ export const CN_WATCHED: Readonly<Record<string, WatchedTable>> = {
   // CN-A: none (the settings object is audited on save)
   // CN-B
   // CN-C
+  realty_projects: { entity: 'item', label: 'Realty project' },
+  realty_units: { entity: 'item', label: 'Realty unit' },
+  realty_bookings: { entity: 'invoice', label: 'Booking' },
+  payment_plans: { entity: 'item', label: 'Payment plan' },
+  stage_certificates: { entity: 'invoice', label: 'Stage certificate' },
+  rera_withdrawals: { entity: 'payment', label: 'RERA account entry' },
   // CN-D
 };
 
