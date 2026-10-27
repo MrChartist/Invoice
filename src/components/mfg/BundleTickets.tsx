@@ -6,7 +6,8 @@ import { bundleId, livePieces } from '../../lib/mfg/mf-bundles';
 import { printHtmlDocument } from '../../lib/voucher-print';
 import { downloadText } from '../../lib/download';
 import { gT } from '../../i18n/areas/mfg-r13c';
-import { Btn, F, In, row, Sel } from './garments-ui';
+import { Btn, F, In, Sel } from './garments-ui';
+import { row } from './garments-util';
 
 const page = (body: string, per: number) => `<!doctype html><html><head><meta charset="utf-8"><title>Bundle tickets</title><style>
 @page{size:A4;margin:8mm}body{font:10px sans-serif;margin:0}.t{display:grid;grid-template-columns:repeat(${per === 12 ? 3 : 2},1fr);gap:4mm}

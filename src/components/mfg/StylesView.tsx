@@ -7,7 +7,8 @@ import { bandMemo, TEXTILE_CLASSES } from '../../lib/mfg/mf-textile-tax';
 import { num } from '../../lib/invoice-calc';
 import { todayInput } from '../../lib/utils';
 import { gT } from '../../i18n/areas/mfg-r13c';
-import { Btn, F, Grid, In, opts, parseRatio, ratioText, row, run, Sel, stack } from './garments-ui';
+import { Btn, F, Grid, In, Sel } from './garments-ui';
+import { opts, parseRatio, ratioText, row, run, stack } from './garments-util';
 
 type D = { id: string; fabric: string; per: string; map: string; ratio: string; cls: string };
 

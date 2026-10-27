@@ -12,7 +12,8 @@ import { printHtmlDocument } from '../../lib/voucher-print';
 import { downloadText } from '../../lib/download';
 import { num } from '../../lib/invoice-calc';
 import { gT } from '../../i18n/areas/mfg-r13c';
-import { Btn, F, Grid, In, n2, opts, parseRatio, ratioText, row, run, Sel, stack, today } from './garments-ui';
+import { Btn, F, Grid, In, Sel } from './garments-ui';
+import { n2, opts, parseRatio, ratioText, row, run, stack, today } from './garments-util';
 
 type Lay = { plies: string; ratio: string; len: string };
 type D = { id?: string; date: string; style: string; colour: string; order: string; fabric: string; lays: Lay[]; issued: string; ends: string; kg: string; wasteItem: string; want: string; cap: string };

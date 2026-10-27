@@ -21,7 +21,8 @@ import { downloadText } from '../../lib/download';
 import { num } from '../../lib/invoice-calc';
 import { shiftDay } from '../../lib/dates';
 import { gT } from '../../i18n/areas/mfg-r13c';
-import { Btn, F, Grid, In, n2, opts, row, run, Sel, stack, today } from './garments-ui';
+import { Btn, F, Grid, In, Sel } from './garments-ui';
+import { n2, opts, row, run, stack, today } from './garments-util';
 
 const KINDS = ['home', 'floor', 'fabricator'] as const;
 const rateText = (k?: MfKarigar) => (k?.rates ?? []).map((r) => `${r.op}=${r.rate}`).join('; ');
@@ -54,9 +55,14 @@ export default function KarigarsView({ ctx }: { ctx: MfgContext }) {
     }));
   };
   const draft = () => k && draftPieceBill(k, lines, { date: to, period: { from, to }, ourState: localDb.settings.activeProfile()?.stateCode, tds, advance: num(adv), purchases: purchasesDb.all() });
-  let preview: ReturnType<typeof draftPieceBill> | undefined;
-  let note = '';
-  try { preview = lines.length ? draft() : undefined; note = preview?.tds.note ?? ''; } catch (e) { note = (e as Error).message; }
+  const [preview, note] = ((): [ReturnType<typeof draftPieceBill> | undefined, string] => {
+    try {
+      const p = lines.length ? draft() : undefined;
+      return [p, p?.tds.note ?? ''];
+    } catch (e) {
+      return [undefined, (e as Error).message];
+    }
+  })();
   const save = () => k && run(ctx, () => {
     const d = draft()!;
     const b = savePieceBill(k, d);

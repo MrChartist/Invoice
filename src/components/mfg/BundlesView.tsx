@@ -13,7 +13,8 @@ import { vendorsDb } from '../../lib/vendors';
 import { num } from '../../lib/invoice-calc';
 import { ScanField } from '../scan/ScanField';
 import { gT } from '../../i18n/areas/mfg-r13c';
-import { Btn, F, Grid, In, opts, ratioText, row, run, Sel, stack, today } from './garments-ui';
+import { Btn, F, Grid, In, Sel } from './garments-ui';
+import { opts, ratioText, row, run, stack, today } from './garments-util';
 
 const BundleTickets = lazy(() => import('./BundleTickets'));
 

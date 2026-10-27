@@ -20,7 +20,8 @@ import { stringifyEway } from '../../lib/eway';
 import { downloadText } from '../../lib/download';
 import { num } from '../../lib/invoice-calc';
 import { gT } from '../../i18n/areas/mfg-r13c';
-import { Btn, F, Grid, In, n2, opts, row, run, Sel, stack, today } from './garments-ui';
+import { Btn, F, Grid, In, Sel } from './garments-ui';
+import { n2, opts, row, run, stack, today } from './garments-util';
 
 const sender = () => {
   const p = localDb.settings.activeProfile();
