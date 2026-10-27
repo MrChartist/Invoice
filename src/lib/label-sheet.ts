@@ -36,6 +36,8 @@ export const LABEL_LAYOUTS: LabelLayout[] = [
   { id: 'roll-50x25', label: 'Roll 50 × 25 mm (1 across)', cols: 1, rows: 1, width: 50, height: 25, top: 0, left: 0, gapX: 0, gapY: 0, roll: true },
   { id: 'roll-38x25-2', label: 'Roll 38 × 25 mm (2 across)', cols: 2, rows: 1, width: 38, height: 25, top: 0, left: 0, gapX: 2, gapY: 0, roll: true },
   { id: 'roll-100x50', label: 'Roll 100 × 50 mm (1 across)', cols: 1, rows: 1, width: 100, height: 50, top: 0, left: 0, gapX: 0, gapY: 0, roll: true },
+  // R9 (RT-E1): jewellery tag roll (tag no. barcode, net weight, purity, HUID on the printable flap).
+  { id: 'jewel-tag', label: 'Jewellery tag roll 60 × 15 mm', cols: 1, rows: 1, width: 60, height: 15, top: 0, left: 0, gapX: 0, gapY: 0, roll: true },
 ];
 
 /** Page size of a layout in mm: A4 for sheets; the roll width × label height for rolls. */

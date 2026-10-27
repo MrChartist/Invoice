@@ -76,15 +76,33 @@ export const FINANCE_FEE_RULES: readonly RtRule<{ sac: string; rate: number }>[]
 ];
 
 /* ── RT-E: jewellery ── */
-export const JEWELLERY_GST_RULES: readonly RtRule<{ goodsRate: number; jobWorkRate: number; jobWorkSac: string }>[] = [];
-export const HALLMARK_RULES: readonly RtRule<{ huidMandatory: boolean; verifyLine: string }>[] = [];
-// The two cash limits are filled by RT-D (electronics cash guard, buy-back cash); RT-E adds PAN / PMLA rows.
+/** RT16: jewellery (HSN 7113 / 7114 / 7116) on the whole value incl. making; job work on the customer's metal (SAC 9988). */
+export const JEWELLERY_GST_RULES: readonly RtRule<{ goodsRate: number; jobWorkRate: number; jobWorkSac: string }>[] = [
+  { from: '2017-07-01', value: { goodsRate: 3, jobWorkRate: 5, jobWorkSac: '9988' }, source: 'N 1/2017-CT(R) Sch V ch. 71 (3%); CBIC gems & jewellery FAQ as quoted (making inside the 3% value); job work on the principal\'s metal 5% (N 11/2017-CT(R)) — sub-code not confirmed (RT16)', verified: false },
+];
+const BIS_LINE = 'Purity of hallmarked jewellery can be verified at any BIS-recognised A&H centre.';
+/** RT19: HUID on gold jewellery (notified districts; a warning only) and the bill line of Reg. 5(11). */
+export const HALLMARK_RULES: readonly RtRule<{ huidMandatory: boolean; verifyLine: string }>[] = [
+  { from: '2021-06-16', value: { huidMandatory: false, verifyLine: BIS_LINE }, source: 'BIS Hallmarking Regulations 2018 Reg. 5(11) as cited; mandatory hallmarking from 16 Jun 2021 (RT19)', verified: false },
+  { from: '2023-04-01', value: { huidMandatory: true, verifyLine: BIS_LINE }, source: 'BIS FAQ (bis.gov.in): 6-character HUID from 1 Apr 2023 in notified districts (RT19)', verified: false },
+];
+/** RT18: Sec 269ST — no cash receipt of this much or more from a person in a day / one transaction / one event. */
 export const CASH_RECEIPT_LIMIT_RULES: readonly RtRule<number>[] = [
-  { from: '2017-04-01', value: 200000, source: 'Sec 269ST Income-tax Act 1961 (no cash receipt of ₹2 lakh or more; penalty Sec 271DA) — recalled; 2025-Act section not confirmed', verified: false },
+  { from: '2017-04-01', value: 200000, source: 'IT Act 1961 Sec 269ST (Finance Act 2017; penalty 271DA) — recalled; Income-tax Act 2025 section not confirmed (RT18)', verified: false },
 ];
-export const PAN_SALE_LIMIT_RULES: readonly RtRule<number>[] = [];
-export const PMLA_CASH_RULES: readonly RtRule<number>[] = [];
+/** RT18: Rule 114B — PAN or a Form 60 / 97 declaration on a sale of goods above this per transaction. */
+export const PAN_SALE_LIMIT_RULES: readonly RtRule<number>[] = [
+  { from: '2016-01-01', value: 200000, source: 'IT Rules 1962 Rule 114B (from 1 Jan 2016) as reported (iifl, taxmann); Form 97 under the 2026 Rules as reported (RT18)', verified: false },
+];
+/** RT18: PMLA — cash of this much or more from one customer in a day (dealers in precious metals). */
+export const PMLA_CASH_RULES: readonly RtRule<number>[] = [
+  { from: '2020-12-28', value: 1000000, source: 'PMLA notification of 28 Dec 2020 — recalled, not re-read (RT18)', verified: false },
+];
+/** RT14: Sec 40A(3) — cash paid to one person in a day above this is disallowed. */
 export const CASH_PAYMENT_LIMIT_RULES: readonly RtRule<number>[] = [
-  { from: '2017-04-01', value: 10000, source: 'Sec 40A(3) Income-tax Act 1961 (cash expenditure above ₹10,000 to a person in a day disallowed) — recalled; 2025-Act section not confirmed', verified: false },
+  { from: '2017-04-01', value: 10000, source: 'IT Act 1961 Sec 40A(3) (Finance Act 2017) — recalled; 2025-Act section not confirmed (RT14)', verified: false },
 ];
-export const EWAY_EXEMPT_CHAPTER_RULES: readonly RtRule<readonly string[]>[] = [];
+/** RT22: HSN chapters needing no e-Way bill (Rule 138(14) annexure: precious metals / jewellery). */
+export const EWAY_EXEMPT_CHAPTER_RULES: readonly RtRule<readonly string[]>[] = [
+  { from: '2018-04-01', value: ['71'], source: 'CGST Rules Rule 138(14)(a) annexure, chapter 71 — recalled (RT22)', verified: false },
+];
