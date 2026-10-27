@@ -538,10 +538,10 @@ Measured against the merged base `98c794d` (RT-A … RT-D):
 
 | | Before | After | Δ |
 |---|---|---|---|
-| Initial JS | 189,053 B | 189,041 B | **−12 B** |
-| Total JS | 2,834,405 B | 2,855,477 B (2789 kB / 2900) | **+20.6 kB** |
+| Initial JS | 189,053 B | 189,038 B | **−15 B** |
+| Total JS | 2,834,405 B | 2,855,361 B (2788.4 kB / 2900) | **+20.5 kB** |
 
-**Deviation (total):** over RT-E's 15 kB share by ≈5.6 kB. Breakdown: `JewelleryDesk` chunk 15.5 kB (four views, editor
+**Deviation (total):** over RT-E's 15 kB share by ≈5.5 kB. Breakdown: `JewelleryDesk` chunk 15.5 kB (four views, editor
 line row, POS / editor guard parts, five engines ≈ 7.8 kB, en + hi strings ≈ 3.3 kB); shared-chunk splits now that two
 desks use them: `rt-buyback` (2.8 kB) and `rt-cash-guard` (1.6 kB, with RT-E's PAN / PMLA / live guards ≈ 0.8 kB) left
 `DevicesDesk` (−1.9 kB) — net +2.5 kB; `label-sheet` left `LabelSheetModal` (+0.3 kB net); rule rows +0.6; sample block
