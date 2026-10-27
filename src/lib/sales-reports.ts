@@ -35,6 +35,7 @@ import { isOutwardRcm, supplierView } from './rcm';
 import { toCsv } from './csv';
 import { isFinancialNote } from './financial-note';
 import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
+import { bankAccountsDb, isClientMoneyAccount } from './bank-accounts'; // R14 PS-B3
 import {
   inPeriod,
   monthLabel,
@@ -632,8 +633,10 @@ export function canonicalMethod(raw: unknown): string {
 export function paymentModes(payments: readonly Payment[], invoices: readonly InvoiceRecord[], period: Period): { rows: PaymentModeRow[]; total: number; count: number } {
   const foreign = new Set(invoices.filter((i) => (i.currency || 'INR').toUpperCase() !== 'INR').map((i) => i.id));
   const map = new Map<string, PaymentModeRow>();
+  const banks = bankAccountsDb.all();
   for (const p of payments) {
     const date = isoDay(p.date);
+    if (isClientMoneyAccount(p.bank_account_id, banks)) continue; // R14 PS-B3: clients' money, not the firm's
     const amount = round2(Math.abs(num(p.amount)));
     // Advance adjustments (5.3) are not money received in the period.
     if (!date || amount === 0 || !inPeriod(date, period) || foreign.has(p.invoice_id) || movedNoCash(p)) continue; // QA6-1 F4: no money moved (`no-cash.ts`)

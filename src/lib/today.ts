@@ -11,6 +11,7 @@ import { receivableBalance } from './rcm';
 import { isVoidStatus, readPurchase } from './purchase-normalize';
 import { formatCurrency } from './utils';
 import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
+import { bankAccountsDb, isClientMoneyAccount } from './bank-accounts'; // R14 PS-B3
 
 export interface TodaySummary {
   day: string;
@@ -43,8 +44,10 @@ export function todaySummary(input: { invoices: readonly InvoiceRecord[]; paymen
     out.bills++;
     out.udhaar = round2(out.udhaar + Math.max(receivableBalance(inv), 0));
   }
+  const banks = bankAccountsDb.all();
   for (const p of input.payments) {
     if (!p || movedNoCash(p) || isoDay(p.date) !== day || !inr(byId.get(p.invoice_id))) continue; // QA6-1 F4: no money moved
+    if (isClientMoneyAccount(p.bank_account_id, banks)) continue; // R14 PS-B3: clients' money, not the firm's
     const k = modeOf(p.method);
     out[k] = round2(out[k] + num(p.amount));
   }
