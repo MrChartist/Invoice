@@ -144,6 +144,18 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   the journal is unchanged). Conversion absorption (MF-D5) is a dated setting, off by default; karigars are vendors,
   piece-rate employees stay in payroll. Rule values in `src/lib/mfg-rules.ts` (lazy only, `tests/mf-rules.test.ts`).
   Notes: `docs/features/mfg-r13.md`.
+- Round 14 (professional firms) company data: names in `src/lib/prof/ps-shared.ts` (PS-A tables `engagements` (series
+  `ENG`), `conflict_checks`, object `prof_settings`; `CMV` reserved for PS-B), all backed up and synced; settings `prof_kind` /
+  `prof_sub` (a profile under business type `services` + `service_kind: 'professional'`, packs `practice` / `cafirm` / `legal` /
+  `design` / `media` / `svcexport` / `partners` — desk tabs on `/time`, mounted by file name through `import.meta.glob` over
+  `components/prof/*Desk.tsx`; `PACK_OF_TYPE` / `PACK_ROUTES` unchanged). The firm form is the annual pack's entity type
+  (`notes_to_accounts.entity_type`), never a second field. A matter IS a project cost centre with `CostCentre.ps`. Rights and
+  audit labels are registered at runtime by `src/lib/prof/ps-registry.ts`: **every module that writes a Round 14 table must
+  `import './ps-registry'`** (`tests/ps-registry.test.ts`). Round 14 invoice snapshots live under ONE record key `ps`
+  (`R14_RECORD_KEYS`, spread into `R9_RECORD_KEYS`; per-line particulars in `ps.lines[lineId]`) — never add keys; pure-agent
+  disbursement lines carry `charge_head_id: 'rule33'`. Write-downs are derived from `bill_refs` (`ps-writedown.ts`), never a
+  per-entry table; a WIP write-off stamps `TimeEntry.ps.wo` / `PurchaseRecord.ps.wo` (the Unbilled list leaves them out).
+  Rule values in `src/lib/prof-rules.ts` (lazy only, `tests/ps-rules.test.ts`). Notes and the B–D API: `docs/features/prof-r14.md`.
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 - Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,

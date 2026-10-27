@@ -22,6 +22,8 @@ const ExportSettingsPanel = lazy(() => import('../trade/ExportSettingsPanel'));
 const NpoRegistrationsPanel = lazy(() => import('../institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.NpoRegistrationsPanel })));
 // R10 (SV-B1): clinic registrations — only with the clinic pack on.
 const ClinicRegsPanel = lazy(() => import('../services-r10/ClinicRegsPanel'));
+// R14 (PS-A): professional rows, only while the `practice` pack is on (one small lazy chunk).
+const SwiftRow = lazy(() => import('../prof/ProfRows').then((m) => ({ default: m.SwiftRow })));
 
 interface Props {
   profile: SenderProfile;
@@ -224,6 +226,7 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
       </Suspense>
       {isPackOn(localDb.settings.get(), 'nonprofit') && <Suspense fallback={null}><NpoRegistrationsPanel profile={profile} onChange={onChange} /></Suspense>}
       {isPackOn(localDb.settings.get(), 'clinic') && <Suspense fallback={null}><ClinicRegsPanel profile={profile} onChange={onChange} /></Suspense>}
+      {(isPackOn(localDb.settings.get(), 'practice') || isPackOn(localDb.settings.get(), 'svcexport')) && <Suspense fallback={null}><SwiftRow profile={profile} onChange={onChange} /></Suspense>}
 
       <fieldset className={styles.group}>
         <legend>{setT('paymentDetails')}</legend>

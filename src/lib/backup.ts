@@ -505,6 +505,8 @@ const RECORD_TABLES = [
   'cut_plans',
   // R13-D: food batch cost cards (versions by effective date), AA / EPCG export authorisations, incentive claims
   'cost_cards', 'export_authorisations', 'incentive_claims',
+  // R14-A: engagements (ENG/FY…), conflict checks
+  'engagements', 'conflict_checks',
   // R14-C: EDF register (export of services, FEMA 2026)
   'edf_register',
 ];
@@ -609,6 +611,8 @@ const ID_TABLES = new Set([
   'cut_plans',
   // R13-D: food batch cost cards (versions by effective date), AA / EPCG export authorisations, incentive claims
   'cost_cards', 'export_authorisations', 'incentive_claims',
+  // R14-A: engagements (ENG/FY…), conflict checks
+  'engagements', 'conflict_checks',
   // R14-C: EDF register (export of services, FEMA 2026)
   'edf_register',
 ]);

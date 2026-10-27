@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import type { Client } from '../../types/invoice';
 import type { MileageEntry, TimeEntry, TimePrefs } from '../../types/time';
 import { formatMinutes, mileageDb, parseDuration, timeDb } from '../../lib/timesheets';
@@ -13,6 +13,11 @@ import { useT } from '../../i18n';
 import { timeT } from '../../i18n/areas/time';
 import { RateSourceTag, TaskSelect, WorkTypeSelect } from './rate-ui'; // R3-B1 / B2
 import { rateFor, useRateMasters } from './rate-masters';
+import { isPackOn } from '../../lib/industry-packs';
+import { localDb } from '../../lib/localDb';
+
+// R14 (PS-A4): "Who" (the timekeeper) while the `practice` pack is on.
+const WhoRow = lazy(() => import('../prof/WhoRow'));
 
 /** Client dropdown over CRM rows with an id (billing links by id). */
 export function ClientSelect({ id, clients, value, onChange }: {
@@ -69,7 +74,8 @@ function EntryForm({ entry, clients, prefs, onClose, onSaved }: {
   const [taskId, setTaskId] = useState(entry?.task_id ?? '');
   const [workTypeId, setWorkTypeId] = useState(entry?.work_type_id ?? '');
   const [typedRate, setTypedRate] = useState<number | null>(entry ? entry.hourly_rate : null);
-  const resolved = rateFor({ client_id: clientId || entry?.client_id, task_id: taskId || undefined, cost_centre_id: costCentre, work_type_id: workTypeId || undefined }, masters, clients, prefs);
+  const [who, setWho] = useState<{ id?: string; rate?: number }>({ id: entry?.staff_id });
+  const resolved = rateFor({ client_id: clientId || entry?.client_id, task_id: taskId || undefined, cost_centre_id: costCentre, work_type_id: workTypeId || undefined }, masters, clients, prefs, { staffRate: who.rate });
   const rate = typedRate ?? resolved.rate;
   const setRate = (v: number) => setTypedRate(v);
   const pickTask = (id: string) => {
@@ -99,6 +105,7 @@ function EntryForm({ entry, clients, prefs, onClose, onSaved }: {
       cost_centre_id: costCentre,
       task_id: taskId || undefined,
       work_type_id: workTypeId || undefined,
+      staff_id: who.id ?? entry?.staff_id,
     });
     onSaved(entry ? timeT('entryUpdated') : timeT('logged', { time: formatMinutes(minutes) }));
     onClose();
@@ -133,6 +140,7 @@ function EntryForm({ entry, clients, prefs, onClose, onSaved }: {
         <TaskSelect id="te-task" masters={masters} clientId={clientId} value={taskId} onChange={pickTask} />
         <WorkTypeSelect id="te-wt" workTypes={masters.workTypes} value={workTypeId} onChange={setWorkTypeId} />
       </div>
+      {isPackOn(localDb.settings.get(), 'practice') && <Suspense fallback={null}><WhoRow value={who.id} date={date} onChange={(id, r) => setWho({ id, rate: r })} /></Suspense>}
       <div className={controls.field}>
         <label className={controls.label} htmlFor="te-desc">{timeT('description')}</label>
         <input id="te-desc" className={controls.input} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={timeT('descPh')} />

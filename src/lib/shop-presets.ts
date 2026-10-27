@@ -367,3 +367,59 @@ export function applyMfgKind(kind: MfgKindId, opts: { registered?: boolean; sub?
   if (subs) out.mfg_sub = (subs.includes(opts.sub ?? '') ? opts.sub : subs[0]) as MfgSub;
   return out;
 }
+
+/* ── R14 (PS-A1): professional profile under `services` / `professional` ── */
+
+/** The professional picker's choices (stored as `settings.prof_kind`); business type stays `services`. */
+export const PROF_KINDS = ['ca', 'legal', 'design', 'consulting', 'agency', 'freelancer', 'other'] as const;
+export type ProfKindId = (typeof PROF_KINDS)[number];
+/** The sub-choice of a kind (settings `prof_sub`); the first is the default. `exports` adds the `svcexport` pack. */
+export const PROF_SUBS: Readonly<Partial<Record<ProfKindId, readonly string[]>>> = {
+  ca: ['icai', 'icsi', 'icmai'],
+  legal: ['litigation', 'advisory', 'both'],
+  design: ['architect', 'interior', 'engineer'],
+  consulting: ['domestic', 'exports'],
+  agency: ['creative', 'media_buying'],
+  freelancer: ['domestic', 'exports'],
+};
+export const FIRM_FORMS = ['proprietorship', 'partnership', 'llp', 'company'] as const;
+type ProfPackId = 'practice' | 'cafirm' | 'legal' | 'design' | 'media' | 'svcexport' | 'partners';
+
+export interface ProfProfile {
+  /** Without `gst`: a registered firm adds it. Every kind keeps `time`. */
+  modules: readonly ModuleId[];
+  packs: readonly ProfPackId[];
+  landing: string;
+  defaultDueDays: number;
+  templateId?: string;
+}
+
+const PROF_ACC: readonly ModuleId[] = [...PRESETS.services, 'accounts'];
+export const PROF_PROFILES: Readonly<Record<ProfKindId, ProfProfile>> = {
+  ca: { modules: PROF_ACC, packs: ['practice', 'cafirm'], landing: '/time?tab=matters', defaultDueDays: 15, templateId: 'gst_tax_invoice' }, // PS-D: → cadesk events
+  legal: { modules: PROF_ACC, packs: ['practice', 'legal'], landing: '/time?tab=matters&view=matters', defaultDueDays: 15, templateId: 'freelancer_light' },
+  design: { modules: PROF_ACC, packs: ['practice', 'design'], landing: '/time?tab=matters', defaultDueDays: 15, templateId: 'gst_tax_invoice' }, // PS-B: → stages
+  consulting: { modules: PROF_ACC, packs: ['practice'], landing: '/time?tab=wip&view=wip', defaultDueDays: 30, templateId: 'gst_tax_invoice' },
+  agency: { modules: PROF_ACC, packs: ['practice', 'media'], landing: '/time?tab=matters&view=engagements', defaultDueDays: 30, templateId: 'gst_tax_invoice' },
+  freelancer: { modules: PRESETS.services, packs: ['practice'], landing: '/invoice', defaultDueDays: 15, templateId: 'freelancer_light' },
+  other: { modules: PRESETS.services, packs: ['practice'], landing: '/time?tab=matters', defaultDueDays: 15 },
+};
+
+export const isProfKind = (v: unknown): v is ProfKindId => typeof v === 'string' && (PROF_KINDS as readonly string[]).includes(v);
+
+/**
+ * Settings patch for a professional profile: business type `services`, `service_kind: 'professional'`, modules
+ * (`registered` adds `gst`; `time` always kept), packs in union with the company's (`exports` / the `exports` sub add
+ * `svcexport`; a partnership or LLP adds `partners`) and the kind / sub-choice. The firm form itself is the annual pack's
+ * entity type (`prof/ps-profile.ts` writes it); the switches (`prof_settings`) too.
+ */
+export function applyProfKind(kind: ProfKindId, opts: { registered?: boolean; sub?: string; firmForm?: string; exports?: boolean; currentPacks?: readonly PackId[] } = {}): ShopModeSettings & { service_kind: 'professional'; prof_kind: ProfKindId; prof_sub?: string; industry_packs: PackId[] } {
+  const p = PROF_PROFILES[kind];
+  const subs = PROF_SUBS[kind];
+  const sub = subs ? (subs.includes(opts.sub ?? '') ? opts.sub! : subs[0]) : undefined;
+  const packs = new Set<PackId>([...(opts.currentPacks ?? []), ...p.packs]);
+  if (opts.exports || sub === 'exports') packs.add('svcexport');
+  if (opts.firmForm === 'partnership' || opts.firmForm === 'llp') packs.add('partners');
+  const modules = [...new Set<ModuleId>([...p.modules, 'time', ...(opts.registered ? ['gst' as const] : [])])];
+  return { business_type: 'services', modules, service_kind: 'professional', prof_kind: kind, ...(sub ? { prof_sub: sub } : {}), industry_packs: [...packs] };
+}

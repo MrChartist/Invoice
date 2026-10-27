@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import type { TimePrefs } from '../../types/time';
 import { billUnbilled, buildBillLines, currentLiveInvoiceIds, timeDb, unbilledFor, unbilledTime, type BillSelection } from '../../lib/timesheets';
 import { num, round2 } from '../../lib/invoice-calc';
@@ -16,6 +16,9 @@ import styles from './time.module.css';
 import { useT } from '../../i18n';
 import { timeT } from '../../i18n/areas/time';
 import { svcT } from '../../i18n/areas/service-r3';
+import { isPackOn } from '../../lib/industry-packs';
+// R14 (PS-A): professional rows, only while the `practice` pack is on (one small lazy chunk).
+const PreBillLink = lazy(() => import('../prof/ProfRows').then((m) => ({ default: m.PreBillLink })));
 
 /** Preview and create a new draft invoice from a client's unbilled time, costs and trips. */
 export function BillClientModal({ target, prefs, onClose, onCreated }: {
@@ -194,6 +197,7 @@ function BillForm({ clientKey: key, projectId, prefs, onClose, onCreated }: {
       {notice && <p className={styles.muted} role="status">{notice}</p>}
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.actions}>
+        {isPackOn(localDb.settings.get(), 'practice') && <Suspense fallback={null}><PreBillLink clientKey={key} projectId={projectId} /></Suspense>}
         <button type="button" className={controls.btnOutline} onClick={onClose}>{timeT('cancel')}</button>
         <button type="button" className={controls.btnPrimary} disabled={!lines.length} onClick={create}>{timeT('createDraft')}</button>
       </div>

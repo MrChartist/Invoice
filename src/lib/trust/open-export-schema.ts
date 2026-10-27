@@ -269,6 +269,10 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   // R13-D
   cost_cards: 'Food batch cost cards: recipe (from the BOM), output kg, yield, conversion ₹/kg, overhead %, packs with packing material and prices; versions by effective date (R13).',
   export_authorisations: 'Advance Authorisation / EPCG register: number, dates, import and export items, norm (SION / self / committee), EO due / extended, duty saved, EO multiple, status, EODC ref (R13).',
+  // R14-A
+  prof_settings: 'Professional profile settings: switches, write-down reasons, ageing buckets, the dated WIP accrual, advocate / CA ids; B–D add their sub-objects (R14).',
+  engagements: 'Engagements (ENG/FY…): client, matters covered, billing model (hourly, fixed, milestones, retainer, capped, success, blended), fee / cap / milestones, letter quotation, acceptance, renewal, status (R14).',
+  conflict_checks: 'Conflict checks: names / PAN / GSTIN searched, hits in clients, suppliers and matter parties, result (clear / conflict / waived), reason and consent note (R14).',
   incentive_claims: 'Incentive and subsidy claims (PLI, state capital subsidy, interest subvention …): period, base, rate, claimed, approved, received, income / capital, reasonable-assurance date and journals (R13).',
   // R14-C
   edf_register: 'EDF register (export of services, FEMA 2026): kind (software / services / SOFTEX history), month, invoices, currency, value FC / ₹, due, EDF no. and filing day, authority (AD bank / STPI / SEZ), small-value declaration, status (R14).',
