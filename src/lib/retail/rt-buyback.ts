@@ -165,7 +165,7 @@ export function applyExchange(invoiceId: string, purchaseId: string, amount?: nu
   if (amt > left + 0.004) throw new Error(`Only ₹${left.toFixed(2)} of ${bb.bill_number} is left.`);
   if (amt > invoiceOpen(inv) + 0.004) throw new Error(`${inv.invoice_number} has only ₹${invoiceOpen(inv).toFixed(2)} unpaid.`);
   return withTablesRollback(['transactions', 'invoices', 'purchases', 'series_counters'], () => {
-    const p = localDb.payments.record({ invoiceId, amount: amt, method: EXCHANGE_METHOD, date: inv.issue_date, reference: bb.bill_number, note: bb.used_goods ? `Less: exchange (old device ${bb.used_goods.model ?? ''} ${bb.used_goods.serial ?? ''})` : `Less: old ${bb.old_metal?.metal ?? 'metal'} (${bb.old_metal?.gross_wt ?? ''} g)` });
+    const p = localDb.payments.record({ invoiceId, amount: amt, method: EXCHANGE_METHOD, date: inv.issue_date, reference: bb.bill_number, note: bb.used_goods ? `Less: exchange (old device ${bb.used_goods.model ?? ''} ${bb.used_goods.serial ?? ''})` : `Less: old ${bb.old_metal?.metal ?? 'metal'} (${num(bb.old_metal?.gross_wt).toFixed(3)} g @ ${bb.old_metal?.purity_pct ?? ''}%)` }); // RT-E3 wording
     setTable('transactions', getTable<Payment>('transactions').map((x) => (x.id === p.id ? { ...x, exchange_purchase_id: bb.id } : x)));
     setTable('purchases', purchasesDb.all().map((x) => (x.id === bb.id ? { ...x, amount_paid: round2(num(x.amount_paid) + amt), updated_at: new Date().toISOString() } : x)));
     return { ...p, exchange_purchase_id: bb.id };
