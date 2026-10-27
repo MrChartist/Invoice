@@ -35,6 +35,7 @@ import {
   type EwayOptions,
 } from './eway';
 import { rcmTaxOf } from './rcm';
+import { ewayChapterNote } from './retail/rt-jewel-line'; // R9 (RT-E2 / RT22)
 
 export interface PreflightResult {
   errors: PreflightIssue[];
@@ -363,7 +364,9 @@ export function validateEway(bill: EwayBill, record?: InvoiceRecord, opts: { now
     out.push(issue('warning', 'EWB_SERVICES_SKIPPED', 'Items', `${opts.skippedServiceLines} service line(s) were left out of the e-Way file; it covers goods only.`));
   }
   if (!(bill.totInvValue > 0)) out.push(issue('error', 'EWB_VALUE', 'Value', 'Consignment value must be greater than zero.'));
-  if (bill.totInvValue <= EWAY_THRESHOLD && bill.itemList.length > 0) {
+  const ch71 = ewayChapterNote(bill.itemList.map((i) => String(i.hsnCode)), record?.issue_date); // R9 (RT-E2): chapter 71 needs no e-Way bill
+  if (ch71) out.push(issue('warning', 'EWB_CH71', 'Items', ch71));
+  else if (bill.totInvValue <= EWAY_THRESHOLD && bill.itemList.length > 0) {
     out.push(issue('warning', 'EWB_BELOW_THRESHOLD', 'Value', `Consignment value is ₹${bill.totInvValue.toLocaleString('en-IN')}, at or below the ₹50,000 threshold. An e-Way Bill is not mandatory for it (some states and goods differ).`));
   }
   const parts = bill.totalValue + bill.cgstValue + bill.sgstValue + bill.igstValue + bill.cessValue + bill.TotNonAdvolVal + bill.OthValue;

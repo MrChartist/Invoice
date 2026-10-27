@@ -27,12 +27,11 @@ export const maskPan = (s: string): string => s.replace(/^(.{5}).{4}/, '$1****')
 
 const digits = (s: unknown) => String(s ?? '').replace(/\D/g, '').slice(-10);
 
-/** Cash received on `date` from the customer of `rec` (same client id or phone) on OTHER bills — receipts only. */
+/** Cash already received on `date` from the customer of `rec` (this bill, or the same client id / phone) — receipts only. */
 export function cashFromCustomer(payments: readonly Payment[], invoices: readonly InvoiceRecord[], rec: Pick<InvoiceRecord, 'id' | 'client'>, date: string): number {
   const id = rec.client?.id;
   const phone = digits(rec.client?.phone);
-  if (!id && phone.length < 10) return 0;
-  const mine = new Set(invoices.filter((i) => i && i.id !== rec.id && ((id && i.client?.id === id) || (phone.length === 10 && digits(i.client?.phone) === phone))).map((i) => i.id));
+  const mine = new Set(invoices.filter((i) => i && ((rec.id && i.id === rec.id) || (id && i.client?.id === id) || (phone.length === 10 && digits(i.client?.phone) === phone))).map((i) => i.id));
   return round2(payments.filter((p) => mine.has(p.invoice_id) && p.date === date && String(p.method).toLowerCase() === 'cash' && num(p.amount) > 0 && !movedNoCash(p)).reduce((s, p) => s + num(p.amount), 0));
 }
 
@@ -60,6 +59,15 @@ export function panGuard(total: number, date: string, kyc: SaleKyc | undefined, 
 export function cashPaidWarning(paidToday: number, date: string): string {
   const limit = ruleAt(CASH_PAYMENT_LIMIT_RULES, date);
   return num(paidToday) > limit ? `Cash paid of ${formatCurrency(round2(num(paidToday)))} to one person today is above ${formatCurrency(limit)}: the purchase may be disallowed under Sec 40A(3) — pay by bank. Verify with your CA.` : '';
+}
+
+const SALE_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY']);
+
+/** Editor save gate: a sale above the PAN limit without PAN / Form 60 / 97 while *Require PAN* is on (errors only). */
+export function kycGate(rec: Pick<InvoiceRecord, 'doc_type' | 'total' | 'issue_date' | 'kyc'>): string[] {
+  if (!SALE_DOCS.has(rec.doc_type)) return [];
+  const g = panGuard(rec.total, rec.issue_date, rec.kyc, !!readRetailSettings().require_pan);
+  return g?.level === 'error' ? [g.message] : [];
 }
 
 /** The live guards of a sale (POS / editor / receipt): settings, earlier cash of the customer that day. */

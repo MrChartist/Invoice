@@ -927,3 +927,12 @@ test('R9 (RT-B2 / RT-B3) pharmacy readers (narcotic register, margin view) read 
   const [m] = marginRows([free], [{ id: 's', name: 'Paper ream' }], [{ name: 'Paper ream', rate: 60 }]);
   assert.deepEqual([m.ptr, m.cost, m.scheme], [45, 40.91, '10 + 1'], 'PTR per base unit after the line discount; cost spread over the free units');
 });
+
+test('R9 (RT-E3) old-gold voucher reader reads the real bill shape (no GST, value only; void skipped)', async () => {
+  const urd: PurchaseRecord = { ...bill, id: 'pu', vendor_gstin: undefined, bill_number: 'URD/FY26-27/0001', category: 'Old gold purchase (URD)', lines: [{ id: 'lu', name: 'Old gold (fine 24K)', hsn: '7108', unit: 'GMS', quantity: 10.125, rate: 10000.355556, tax_rate: 0 }], taxable: 101253.6, cgst: 0, sgst: 0, total: 101253.6, itc_eligible: false, amount_paid: 50000, old_metal: { metal: 'gold', gross_wt: 12.3, stone_wt: 0, net_wt: 12.3, purity_pct: 84, melt_loss_pct: 2, fine_wt: 10.125, rate_24k: 10000, value: 101253.6 } };
+  const { oldGoldVouchers } = await import('../src/lib/retail/rt-old-gold.ts');
+  const rows = oldGoldVouchers([urd, bill, { ...urd, id: 'pv', status: 'void' } as never], [{ id: 'x', invoice_id: 'i', amount: 50000, method: 'Exchange', date: '2026-04-12', exchange_purchase_id: 'pu' } as never]);
+  assert.deepEqual(rows.map((r) => [r.id, r.exchanged, r.open]), [['pu', 50000, 51253.6]]);
+  const c = readPurchase(urd)!;
+  assert.deepEqual([c.taxable, c.tax, c.itcEligible], [101253.6, 0, false], 'GSTR-2 / ITC: nothing claimed');
+});

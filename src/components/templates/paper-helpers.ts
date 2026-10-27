@@ -3,6 +3,7 @@ import type { InvoiceItem, InvoiceRecord, SenderProfile } from '../../types/invo
 import { upiLink } from '../../lib/share';
 import { shiftDay } from '../../lib/dates';
 import { weightText, wtHolds } from '../../lib/trade/tr-weight';
+import { jewelText } from '../../lib/retail/rt-jewel-text';
 
 /** `YYYY-MM-DD` → `MM/YYYY`, the way batch dates are printed on packs. */
 function monthYear(day: string): string {
@@ -15,8 +16,9 @@ function monthYear(day: string): string {
  * (6.6 / 6.11), e.g. "Batch B12 · Mfg 01/2026 · Exp 06/2027" or "S/N: 3567…, 3567… · Warranty 12 months".
  * '' for untracked lines, so ordinary documents print exactly as before.
  */
-export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit'>> & { bin?: string }) | undefined): string {
+export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw'>> & { bin?: string }) | undefined): string {
   if (!item) return '';
+  if (item.jw) return jewelText(item.jw); // R9 (RT-E2): the BIS sub-line (the tag no. is its serial)
   const parts: string[] = [];
   if (discountText(item)) parts.push(discountText(item)); // TR-A1
   if (item.bin) parts.push(`Bin ${item.bin}`); // 8.86: snapshot on delivery challan lines
@@ -89,3 +91,5 @@ export { weightText };
 
 /** R9 (RT-B2): "Registered pharmacist: name (reg. no.)" from the sender snapshot ('' when none, so other bills print as before). */
 export const pharmacistText = (sender: Pick<SenderProfile, 'pharmacist'>): string => (sender.pharmacist ? `Registered pharmacist: ${sender.pharmacist}` : '');
+/** R9 (RT-E2): the BIS verification line snapshotted on the bill's jewellery lines (printed under the totals; '' otherwise). */
+export const bisText = (invoice: Pick<InvoiceRecord, 'items'>): string => invoice.items?.find((i) => i.jw?.bis)?.jw?.bis ?? '';

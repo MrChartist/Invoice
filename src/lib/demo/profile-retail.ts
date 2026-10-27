@@ -5,7 +5,8 @@
  * grocery block; RT-B … RT-E fill their own block functions. Pure. Extra tables must be in `DEMO_EXTRA_TABLES`.
  */
 import type { InvoiceRecord } from '../../types/invoice';
-import type { AlterationJob, DeliveryRider, Doctor, RxRefill, ShortBookEntry } from '../../types/retail-r9';
+import type { AlterationJob, DeliveryRider, Doctor, JewelTag, Metal, MetalRate, RxRefill, ShortBookEntry } from '../../types/retail-r9';
+import { applyJewel } from '../retail/rt-jewel-line';
 import type { StockItem } from '../inventory';
 import { applyTotals, type Demo, type DemoExtras } from '../demo-data';
 import { shiftDay } from '../dates';
@@ -120,7 +121,29 @@ function apparelBlock({ today, base }: ProfileContext): DemoExtras {
 /* ── RT-D: electronics (phones with IMEIs, a finance sale, a buy-back) — filled by RT-D ── */
 const electronicsBlock = (ctx: ProfileContext): DemoExtras => (void ctx, {});
 /* ── RT-E: jewellery (today's rates, five tags, a sale with old gold) — filled by RT-E ── */
-const jewelleryBlock = (ctx: ProfileContext): DemoExtras => (void ctx, {});
+function jewelleryBlock({ today, base }: ProfileContext): DemoExtras {
+  const at = `${shiftDay(today, -20)}T00:00:00.000Z`;
+  const board: [Metal, string, number, number][] = [['gold', '24K', 10200, 10000], ['gold', '22K', 9350, 9150], ['gold', '18K', 7650, 7400], ['silver', '925', 112, 100]];
+  const rates: Demo<MetalRate>[] = board.map(([metal, purity, sale, buy]) => ({ id: `demo-rate-${metal}-${purity}`, demo: true, date: today, metal, purity, sale, buy, created_at: `${today}T09:00:00.000Z` }));
+  const tagNos = ['JW-D001', 'JW-D002', 'JW-D003', 'JW-D004', 'JW-D005'];
+  const item: Demo<StockItem> = { id: 'demo-stock-rings', demo: true, name: 'Rings 22K (demo)', hsn: '7113', unit: 'PCS', track_stock: true, track_serials: true, jewel: true, opening_qty: 5, opening_rate: 50000, opening_serials: tagNos, reorder_level: 0, tax_rate: 3, created_at: at };
+  const weights = [[6.42, 0.38], [4.85, 0], [5.6, 0.25], [7.1, 0.5], [3.95, 0]];
+  const tags: Demo<JewelTag>[] = tagNos.map((tag, i) => ({
+    id: `demo-tag-${i + 1}`, demo: true, tag, item_id: item.id, item_name: item.name, metal: 'gold', purity: '22K', gross_wt: weights[i][0], stone_wt: weights[i][1], net_wt: Math.round((weights[i][0] - weights[i][1]) * 1000) / 1000,
+    stone_value: weights[i][1] ? 4800 : 0, wastage_pct: 2, making: { basis: 'per_gram', value: 650 }, hallmark_charge: 45, ...(i === 4 ? {} : { huid: `AB12C${i}` }), created_at: at,
+  }));
+  const fy = getIndianFY(today).label;
+  const t = tags[0];
+  const line = applyJewel({ id: 'demo-jw-1-l1', name: item.name, type: 'Goods', hsn: '7113', unit: 'PCS', quantity: 1, rate: 0, tax_rate: 3, discount_percent: 0, amount: 0 },
+    { tag: t.tag, metal: 'gold', purity: '22K', gross_wt: t.gross_wt, stone_wt: t.stone_wt, net_wt: t.net_wt, rate: 9350, wastage_pct: 2, making: t.making, stone_value: t.stone_value, hallmark_charge: 45, huid: t.huid }, today);
+  const sale = applyTotals({
+    ...base.invoices[0], id: 'demo-jw-1', demo: true, invoice_number: buildInvoiceNumber('DEMOJW', fy, 1), issue_date: today, due_date: today, status: 'Paid', pos: true,
+    client: { id: 'demo-walkin-jw', name: 'Mrs. Iyer (demo)', email: '', address: '', city: 'Chennai', zip: '', state_code: '33', phone: '9800000021' },
+    items: [line], gst_mode: 'CGST_SGST', place_of_supply: '33', discount_rate: 0, notes: 'Sample jewellery bill: 22K ring by tag, net weight × day rate + wastage + making + stones + hallmarking, GST 3% (demo).',
+  } as Demo<InvoiceRecord>);
+  sale.amount_paid = sale.total;
+  return { invoices: [sale], tables: { stock_items: [item], metal_rates: rates, jewel_tags: tags } };
+}
 
 const BLOCKS: Readonly<Record<RetailDemoKind, (ctx: ProfileContext) => DemoExtras>> = {
   grocery: groceryBlock, pharmacy: pharmacyBlock, apparel: apparelBlock, electronics: electronicsBlock, jewellery: jewelleryBlock,

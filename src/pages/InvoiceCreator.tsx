@@ -40,6 +40,7 @@ import { issuingProfile } from '../lib/sync-device';
 import { lockState } from '../lib/period-lock';
 import { editorStockContext, isMrpMessage, liveDocTrackingIssues, liveMrpIssues, recordMrpOverrides, withMrpIssues } from '../lib/stock-tracking'; // R9 (RT-A2) helpers
 import { rxRequiredErrors } from '../lib/pharma-gate';
+import { kycGate } from '../lib/retail/rt-cash-guard'; // R9 (RT-E3) PAN / Form 60 on a big sale
 import { can, currentActor } from '../lib/access';
 import { audit } from '../lib/audit';
 import { trT } from '../i18n/areas/trade-r8c';
@@ -192,7 +193,7 @@ export function InvoiceCreator() {
           };
           // R9 (RT-A2): the MRP guard runs even without batch / serial / godown tracking (or agency lots).
           const found: ReturnType<typeof liveDocTrackingIssues> = ctx || st.items.some((i) => i.arrival_id) ? liveDocTrackingIssues(doc) : withMrpIssues({ errors: [], expired: [], warnings: [] }, liveMrpIssues(doc));
-          const rxErr = rxRequiredErrors({ ...doc, rx: now.rx }); // R9 (RT-B1) "Require prescription for H1 / X"
+          const rxErr = [...rxRequiredErrors({ ...doc, rx: now.rx }), ...kycGate({ ...doc, total: now.total, kyc: now.kyc })]; // R9 (RT-B1) "Require prescription for H1 / X"; RT-E3 "Require PAN"
           const issues = rxErr.length ? { ...found, errors: [...found.errors, ...rxErr] } : found;
           // QA8 T15: only agency-lot errors left — the owner may sell anyway, with a reason (audited).
           const lotOnly = !!issues.lots?.length && issues.errors.every((e) => issues.lots!.includes(e));

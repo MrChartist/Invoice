@@ -85,7 +85,7 @@ export const loadKarigarMoves = (): KarigarMove[] => getTable<KarigarMove>(KARIG
 
 /** The karigar's wip godown (created once; non-saleable). */
 export function karigarGodown(k: Pick<Vendor, 'id' | 'name'>): string {
-  return (godownsDb.list().find((g) => g.kind === 'wip' && g.vendor_id === k.id) ?? godownsDb.save({ name: `Karigar — ${k.name}`, kind: 'wip', vendor_id: k.id })).id;
+  return (godownsDb.list().find((g) => g.kind === 'wip' && g.vendor_id === k.id) ?? godownsDb.save({ name: `Karigar — ${k.name}`, kind: 'wip', job_worker: true, vendor_id: k.id })).id;
 }
 
 function move(itemId: string, date: string, qty: number, godown: string, note: string): string {
