@@ -22,11 +22,11 @@ import { CentrePick, F, Sel } from './dairy-ui';
 
 export default function MilkBillsView({ onDone }: { onDone: Done }) {
   const [tick, run] = useRun(onDone);
-  const [centre, setCentre] = useState(() => milkCentres()[0]?.id ?? '');
+  const [centre, setCentre] = useState(() => milkCentres()[0].id);
   const [day, setDay] = useState(todayInput());
   const [by, setBy] = useState<'farmer' | 'village' | 'route'>('farmer');
   const [open, setOpen] = useState('');
-  const centreId = centre || milkCentres()[0]?.id || '';
+  const centreId = centre;
   const per = cyclePeriod(day, cyclesOf(readAgriSettings(), centreId));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const cycles = useMemo(() => loadCycles().filter((c) => c.source === 'milk' && (c.centre_id ?? '') === centreId).sort((a, b) => b.period_to.localeCompare(a.period_to)), [tick, centreId]);
@@ -37,7 +37,7 @@ export default function MilkBillsView({ onDone }: { onDone: Done }) {
   return (
     <>
       <div className={controls.row} style={wrap}>
-        <CentrePick v={centreId} set={setCentre} onDone={onDone} />
+        <CentrePick v={centreId} set={setCentre} />
         <F l={bT('dayInCycle')} w={160}><input type="date" className={controls.input} value={day} onChange={(e) => setDay(e.target.value)} data-dairy="cycle-day" /></F>
         <span className={controls.hint}>{per.from} → {per.to}</span>
         <button type="button" className={controls.btnPrimary} data-dairy="make-bills" onClick={() => run(() => bT('billsMade', { no: makeMilkCycle(centreId, per.from, per.to, cycles.find((c) => c.period_from === per.from && c.status === 'draft')?.id).number }))}>{bT('makeBills')}</button>

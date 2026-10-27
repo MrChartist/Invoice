@@ -27,7 +27,11 @@ export function useRun(onDone: Done) {
 }
 
 export const milkOpts = () => (['cow', 'buffalo', 'mixed'] as const).map((k) => [k, bT(`milk.${k}`)] as const);
-export const milkCentres = () => (readAgriSettings().centres ?? []).filter((c) => c.kind === 'milk');
+/** Milk centres (Farm settings); with none set up, one built-in "Main centre" (id `main`, the Main godown). */
+export const milkCentres = () => {
+  const l = (readAgriSettings().centres ?? []).filter((c) => c.kind === 'milk');
+  return l.length ? l : [{ id: 'main', name: bT('mainCentre') }];
+};
 export const farmers = (): Vendor[] => getTable<Vendor>('vendors').filter((v) => v.ag?.code);
 export const clientOpts = () => localDb.clients.getAll().filter((c) => c.id).map((c) => [c.id!, c.company || c.name] as const);
 

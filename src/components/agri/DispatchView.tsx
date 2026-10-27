@@ -35,14 +35,14 @@ function Ack({ d, run }: { d: MilkDispatch; run: (fn: () => string | void) => vo
 
 export default function DispatchView({ onDone }: { onDone: Done }) {
   const [tick, run] = useRun(onDone);
-  const [centre, setCentre] = useState(() => milkCentres()[0]?.id ?? '');
+  const [centre, setCentre] = useState(() => milkCentres()[0].id);
   const [f, setF] = useState(blank);
   const set = (p: Partial<typeof f>) => setF({ ...f, ...p });
   const [month, setMonth] = useState(todayInput().slice(0, 7));
   const [group, setGroup] = useState<'day' | 'month'>('day');
   const ms = readAgriSettings().milk ?? {};
   const [cfg, setCfg] = useState({ from: ms.invoice_from ?? 'received', tol: ms.tolerance_pct ?? 0, wa: !!ms.slip_wa });
-  const centreId = centre || milkCentres()[0]?.id || '';
+  const centreId = centre;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const list = useMemo(() => loadDispatches().filter((d) => d.centre_id === centreId).sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number)), [tick, centreId]);
   const reco = useMemo(() => milkReco({ shifts: loadShifts(), dispatches: list, cards: loadCards(), from: `${month}-01`, to: `${month}-31`, centreId, group, settings: readAgriSettings().milk }), [list, month, centreId, group]);
@@ -50,7 +50,7 @@ export default function DispatchView({ onDone }: { onDone: Done }) {
   return (
     <>
       <div className={controls.row} style={wrap}>
-        <CentrePick v={centreId} set={setCentre} onDone={onDone} />
+        <CentrePick v={centreId} set={setCentre} />
         <F l={bT('date')} w={160}><input type="date" className={controls.input} value={f.date} onChange={(e) => set({ date: e.target.value })} /></F>
         <Sel l={bT('shift')} v={f.shift} set={(shift) => set({ shift })} opts={[['M', 'M'], ['E', 'E']]} w={70} />
         <Sel l={bT('buyer')} v={buyer} set={(b) => set({ buyer: b })} opts={clientOpts()} w={200} d="buyer" />

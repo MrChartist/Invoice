@@ -79,6 +79,16 @@ test('a shift billed in a closed cycle cannot reopen', () => {
   assert.throws(() => reopenShift(shift.id), /reopen that cycle/);
 });
 
+test('demo (Demo company only): 12 farmers, a chart, 20 days of closed shifts at the Main centre, a dispatch, a card; nothing without the pack', async () => {
+  const { agriExtras } = await import('../src/lib/demo/profile-agri.ts');
+  const t = agriExtras({ today: '2026-11-25', base: {} as never, packs: ['agri', 'dairy'] }).tables!;
+  assert.equal(t.vendors?.length, 12);
+  assert.equal(t.milk_shifts?.length, 40);
+  assert.ok((t.milk_shifts as MilkShift[]).every((s) => s.centre_id === 'main' && s.closed_at && s.entries.length === 12));
+  assert.deepEqual([t.milk_rate_charts?.length, t.milk_dispatches?.length, t.milk_cards?.length], [1, 1, 1]);
+  assert.equal(agriExtras({ today: '2026-11-25', base: {} as never, packs: ['agri'] }).tables!.milk_shifts, undefined);
+});
+
 test('volume: 300 farmers × 365 days × 2 shifts is 730 rows; a day reads at most 2', () => {
   const rows: MilkShift[] = [];
   const entries = Array.from({ length: 300 }, (_, i) => ({ id: `e${i}`, farmer_id: `f${i}`, milk: 'cow' as const, qty: 5, unit: 'L' as const, fat: 4, snf: 8.5, rate: 35, amount: 175, at: '' }));

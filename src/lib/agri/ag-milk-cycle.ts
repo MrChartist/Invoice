@@ -105,7 +105,7 @@ export function cycleSummary(c: Pick<FarmerCycle, 'lines' | 'centre_id'>, vendor
   }
   const rows = [...m.values()].map(({ fq, q, ...r }) => ({ ...r, avgFat: q > 0 ? round2(fq / q) : 0 })).sort((a, b) => b.avgFat - a.avgFat);
   const on = new Set(c.lines.map((l) => l.farmer_id));
-  return { rows, noSupply: vendors.filter((v) => v.ag?.code && v.ag.status !== 'inactive' && (!c.centre_id || v.ag.centre_id === c.centre_id) && !on.has(v.id)) };
+  return { rows, noSupply: vendors.filter((v) => v.ag?.code && v.ag.status !== 'inactive' && (!c.centre_id || c.centre_id === 'main' || v.ag.centre_id === c.centre_id) && !on.has(v.id)) };
 }
 
 const f2 = (n: number) => num(n).toFixed(2);

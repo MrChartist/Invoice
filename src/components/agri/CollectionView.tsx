@@ -29,11 +29,11 @@ const waText = (e: MilkEntry, s: Pick<MilkShift, 'date' | 'shift'>, hi: boolean)
 
 export default function CollectionView({ onDone }: { onDone: Done }) {
   const [tick, run] = useRun(onDone);
-  const [centre, setCentre] = useState(() => milkCentres()[0]?.id ?? '');
+  const [centre, setCentre] = useState(() => milkCentres()[0].id);
   const [date, setDate] = useState(todayInput());
   const [shift, setShift] = useState<MilkShiftId>(() => (new Date().getHours() < 13 ? 'M' : 'E'));
   const [mm, setMm] = useState(58);
-  const centreId = centre || milkCentres()[0]?.id || '';
+  const centreId = centre;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const day = useMemo(() => shiftsOn(loadShifts(), date, centreId), [tick, date, centreId]);
   const s = day.find((x) => x.shift === shift);
@@ -48,7 +48,7 @@ export default function CollectionView({ onDone }: { onDone: Done }) {
   return (
     <>
       <div className={controls.row} style={wrap}>
-        <CentrePick v={centreId} set={setCentre} onDone={onDone} />
+        <CentrePick v={centreId} set={setCentre} />
         <F l={bT('date')} w={160}><input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} data-dairy="date" /></F>
         <Sel l={bT('shift')} v={shift} set={setShift} opts={SHIFT_OPTS} w={70} d="shift" />
         <Sel l={bT('slip')} v={String(mm)} set={(v) => setMm(Number(v))} opts={[['58', '58 mm'], ['80', '80 mm']]} w={90} />
