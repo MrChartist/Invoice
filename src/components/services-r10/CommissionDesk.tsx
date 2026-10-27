@@ -4,7 +4,7 @@
  * monthly statement per staff member with its payout (payroll adjustment for employees, else a journal with opt-in
  * TDS) and undo. Part of the front-desk chunk. Working papers — verify with your CA (SV16).
  */
-import { useMemo, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { InvoiceRecord, Payment } from '../../types/invoice';
 import type { CommissionKind, CommissionPlan, CommissionRule, ServiceStaff, StaffRole } from '../../types/services-r10';
@@ -20,6 +20,9 @@ import { svT, type SvKey } from '../../i18n/areas/services-r10a';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './services.module.css';
+import { isPackOn } from '../../lib/industry-packs';
+// R14 (PS-A): professional rows, only while the `practice` pack is on (one small lazy chunk).
+const StaffPsRow = lazy(() => import('../prof/ProfRows').then((m) => ({ default: m.StaffPsRow })));
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 const VIEWS = ['staff', 'plans', 'statement'] as const;
@@ -86,6 +89,7 @@ function StaffView({ staff, plans, run }: { staff: ServiceStaff[]; plans: Commis
         {f.employment === 'freelance' && <Field k="tds"><select className={controls.select} value={f.tds_section ?? ''} onChange={(e) => set({ tds_section: e.target.value || undefined })}><option value="">{f.role === 'doctor' ? '194J' : '194H'}</option>{['194H', '194J', '194C'].map((x) => <option key={x}>{x}</option>)}</select></Field>}
         <Field k="plan"><select className={controls.select} value={f.plan_id ?? ''} onChange={(e) => set({ plan_id: e.target.value || undefined })} data-staff-plan><option value="">—</option>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
         <Field k="breakFrom"><input className={controls.input} type="time" value={brk.from} onChange={(e) => set({ hours: { ...f.hours, breaks: e.target.value ? [{ from: e.target.value, to: brk.to || e.target.value }] : [] } })} /></Field>
+        {isPackOn(localDb.settings.get(), 'practice') && <Suspense fallback={null}><StaffPsRow value={f.ps} onChange={(ps) => set({ ps })} /></Suspense>}
         <Field k="breakTo"><input className={controls.input} type="time" value={brk.to} onChange={(e) => set({ hours: { ...f.hours, breaks: brk.from ? [{ from: brk.from, to: e.target.value }] : [] } })} /></Field>
       </div>
       <div className={styles.actions}>

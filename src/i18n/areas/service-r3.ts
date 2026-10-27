@@ -43,6 +43,7 @@ export const svcT = defineArea(
     wtDeleted: 'Work type deleted.',
     wtInactiveMsg: 'Work type is used by time entries, so it was made inactive.',
     'src.task': 'from task',
+    'src.staff': 'timekeeper rate', // R14 (PS-A4)
     'src.project': 'from project',
     'src.client': 'from client',
     'src.work_type': 'from work type',
@@ -269,6 +270,7 @@ export const svcT = defineArea(
     wtDeleted: 'प्रकार हटाया गया।',
     wtInactiveMsg: 'यह प्रकार समय-प्रविष्टियों में इस्तेमाल हुआ है, इसलिए निष्क्रिय किया गया।',
     'src.task': 'काम से',
+    'src.staff': 'टाइमकीपर दर',
     'src.project': 'प्रोजेक्ट से',
     'src.client': 'क्लाइंट से',
     'src.work_type': 'काम के प्रकार से',

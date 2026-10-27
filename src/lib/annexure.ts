@@ -66,6 +66,16 @@ export function buildAnnexure(sel: Pick<BillSelection, 'time' | 'expenses'>, pre
   return { kind: 'timesheet', rows, ...(expenses.length ? { expenses } : {}), taken_at: at };
 }
 
+/**
+ * R14 (PS-A3): the optional `standard` (value at the captured rate) and `billed` row fields of a pre-billed annexure —
+ * printed only on the internal pre-bill, never on the client copy; old annexures print unchanged.
+ */
+export const withStandard = (rows: readonly AnnexureRow[], standardOf: (ref: string) => number | undefined): AnnexureRow[] =>
+  rows.map((r) => {
+    const s = r.ref ? standardOf(r.ref) : undefined;
+    return s === undefined ? r : { ...r, standard: round2(s), billed: r.amount };
+  });
+
 export interface AnnexureTotals {
   minutes: number;
   billed_minutes: number;

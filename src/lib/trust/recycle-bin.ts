@@ -40,6 +40,7 @@ import '../construction/cn-registry'; // R11: construction tables' rights and au
 import '../services/sv-registry'; // R10: service tables' rights and audit labels (lazy registration)
 import '../agri/ag-registry'; // R12: agri tables' rights and audit labels (lazy registration)
 import '../mfg/mf-registry'; // R13: manufacturing tables' rights and audit labels (lazy registration)
+import '../prof/ps-registry'; // R14: professional tables' rights and audit labels (lazy registration)
 import '../prof/ps-d-registry'; // R14-D: firm-desk tables' rights and audit labels (lazy registration)
 import { syncUrdPaid, urdLeft } from '../retail/rt-doc-hooks'; // QA10 R7: URD vouchers settled by exchange
 
@@ -384,6 +385,8 @@ registerRestoreHook('farmer_cycles', (row, e, live) => (str(row.source) === 'mil
 // default routing only while the item has no other default.
 registerRestoreHook('job_cards', (row, e, live) => (!isLive(live, 'production_orders', str(row.order_id)) ? { refuse: 'The production order of this job card is gone.' } : live('job_cards').some((c) => str(c?.id) !== e.row_id && str(c?.order_id) === str(row.order_id) && str(c?.op_id) === str(row.op_id)) ? { refuse: 'A new job card was opened for this operation since; report the entries on it.' } : null));
 registerRestoreHook('routings', (row, e, live) => (row.is_default && live('routings').some((r) => str(r?.id) !== e.row_id && str(r?.item_id) === str(row.item_id) && r?.is_default) ? { refuse: 'This item has another default routing now: restore after unmarking it, or make this one again.' } : null));
+// R14 (PS-A): an engagement comes back only while its client lives (its ENG number stays reserved, never reused).
+registerRestoreHook('engagements', (row, _e, live) => (isLive(live, 'clients', str(row.client_id)) ? null : { refuse: 'The client of this engagement is gone. Restore the client first.' }));
 // R13-B: an inspection report comes back only while its drawing lives; a moulding run only with its manufacturing journal.
 registerRestoreHook('inspection_reports', (row, _e, live) => (isLive(live, 'drawings', str(row.drawing_id)) ? null : { refuse: 'The drawing of this inspection report is gone. Restore the drawing first.' }));
 // QA15 M5: a karigar piece bill (KPB) that recovered an advance comes back with its recovery journal.

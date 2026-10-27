@@ -25,7 +25,8 @@ export type AdvancedId =
   | 'construction' // R11 (CN-A1)
   | 'serviceProfile' // R10 (SV-A1)
   | 'agriProfile' // R12 (AG-A1)
-  | 'mfgProfile'; // R13 (MF-A1)
+  | 'mfgProfile' // R13 (MF-A1)
+  | 'profProfile'; // R14 (PS-A1)
 
 export interface FeatureRow {
   /** `mod.<id>`, `pack.<id>` or `adv.<id>`. */
@@ -105,6 +106,8 @@ const ADVANCED: readonly { id: AdvancedId; href: string; isOn: FeatureRow['isOn'
   { id: 'agriProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { agri_kind?: unknown }).agri_kind === 'string' },
   // R13 (MF-A1): the manufacturing profile (Settings → Features "Manufacturing profile", shown for every company)
   { id: 'mfgProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { mfg_kind?: unknown }).mfg_kind === 'string' },
+  // R14 (PS-A1): the professional profile (Settings → Features under Services)
+  { id: 'profProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { prof_kind?: unknown }).prof_kind === 'string' },
 ];
 
 /** Where each module's screen is (the first sidebar route that belongs to it). */
@@ -163,6 +166,14 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   plastics: '/manufacturing?tab=moulding',
   press: '/manufacturing?tab=press',
   foodmfg: '/manufacturing?tab=food',
+  // R14 (PS-A1): professional desks (tabs on Time). B / C / D point their pack at their own desk when it lands.
+  practice: '/time?tab=matters',
+  cafirm: '/time?tab=matters',
+  legal: '/time?tab=matters',
+  design: '/time?tab=matters',
+  media: '/time?tab=matters',
+  svcexport: '/time?tab=wip',
+  partners: '/time?tab=wip',
 };
 
 export const FEATURE_ROWS: readonly FeatureRow[] = [

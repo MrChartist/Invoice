@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { Pause, Play, Square, Trash2 } from 'lucide-react';
 import type { Client } from '../../types/invoice';
 import type { TimePrefs } from '../../types/time';
@@ -14,6 +14,12 @@ import { timeT } from '../../i18n/areas/time';
 import { RateSourceTag, TaskSelect, WorkTypeSelect } from './rate-ui'; // R3-B1 / B2
 import { rateFor, useRateMasters } from './rate-masters';
 import { svcT } from '../../i18n/areas/service-r3';
+import { isPackOn } from '../../lib/industry-packs';
+import { localDb } from '../../lib/localDb';
+import { todayInput } from '../../lib/utils';
+
+// R14 (PS-A4): "Who" (the timekeeper) while the `practice` pack is on.
+const WhoRow = lazy(() => import('../prof/WhoRow'));
 
 /** Start / pause / resume / stop. Stopping turns the clock into a time entry. */
 export function TimerCard({ clients, prefs, onLogged }: { clients: Client[]; prefs: TimePrefs; onLogged: (message: string) => void }) {
@@ -28,9 +34,10 @@ export function TimerCard({ clients, prefs, onLogged }: { clients: Client[]; pre
   const [taskId, setTaskId] = useState('');
   const [workTypeId, setWorkTypeId] = useState('');
   const [typedRate, setTypedRate] = useState<number | null>(null);
+  const [who, setWho] = useState<{ id?: string; rate?: number }>({});
   const task = masters.tasks.find((t) => t.id === taskId);
   const ccId = task?.cost_centre_id ?? '';
-  const resolved = rateFor({ client_id: clientId || undefined, task_id: taskId || undefined, cost_centre_id: ccId || undefined, work_type_id: workTypeId || undefined }, masters, clients, prefs);
+  const resolved = rateFor({ client_id: clientId || undefined, task_id: taskId || undefined, cost_centre_id: ccId || undefined, work_type_id: workTypeId || undefined }, masters, clients, prefs, { staffRate: who.rate });
   const rate = typedRate ?? resolved.rate;
   const pickTask = (id: string) => {
     setTaskId(id);
@@ -53,6 +60,7 @@ export function TimerCard({ clients, prefs, onLogged }: { clients: Client[]; pre
       ...(taskId ? { task_id: taskId } : {}),
       ...(ccId ? { cost_centre_id: ccId } : {}),
       ...(workTypeId ? { work_type_id: workTypeId } : {}),
+      ...(who.id ? { staff_id: who.id } : {}),
     }, Date.now()));
   };
 
@@ -72,6 +80,7 @@ export function TimerCard({ clients, prefs, onLogged }: { clients: Client[]; pre
         ...(timer.task_id ? { task_id: timer.task_id } : {}),
         ...(timer.cost_centre_id ? { cost_centre_id: timer.cost_centre_id } : {}),
         ...(timer.work_type_id ? { work_type_id: timer.work_type_id } : {}),
+        ...(timer.staff_id ? { staff_id: timer.staff_id } : {}),
       });
       onLogged(timeT('loggedFor', { time: formatMinutes(minutes), client: timer.client_name ?? '' }));
     } else {
@@ -134,6 +143,7 @@ export function TimerCard({ clients, prefs, onLogged }: { clients: Client[]; pre
         </div>
         <TaskSelect id="tm-task" masters={masters} clientId={clientId} value={taskId} onChange={pickTask} />
         <WorkTypeSelect id="tm-wt" workTypes={masters.workTypes} value={workTypeId} onChange={setWorkTypeId} />
+        {isPackOn(localDb.settings.get(), 'practice') && <Suspense fallback={null}><WhoRow value={who.id} date={todayInput()} onChange={(id, r) => setWho({ id, rate: r })} /></Suspense>}
         <div className={controls.field}>
           <label className={controls.label} htmlFor="tm-rate">{svcT('rate')} <RateSourceTag source={typedRate === null ? resolved.source : 'manual'} /></label>
           <input id="tm-rate" type="number" min={0} step="0.01" className={controls.input} value={rate || ''} onChange={(e) => setTypedRate(e.target.value === '' ? null : Math.max(Number(e.target.value) || 0, 0))} />
