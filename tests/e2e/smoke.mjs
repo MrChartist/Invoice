@@ -4645,6 +4645,65 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R13-D food & statutory desk: a cost card from the BOM → cost per 200 g pack; an MSE receivable past 45 days with Sec 16 interest; the Form-1 paper lists the supplier; an AA → EO balance and duty at risk; an incentive claim recognised after assurance (journal); the inventories split; absorption OFF by default', async () => {
+    const keys = ['settings', 'stock_items', 'boms', 'cost_cards', 'invoices', 'vendors', 'purchases', 'export_authorisations', 'incentive_claims', 'vouchers', 'accounts'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const s0 = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...s0, business_type: 'manufacturer', modules: undefined, mfg_kind: 'food', industry_packs: ['shopfloor', 'foodmfg'], lock_until: undefined,
+      profiles: (s0.profiles ?? []).map((p) => (p.id === s0.activeProfileId ? { ...p, companyName: 'E2E Namkeen Private Limited', msme_udyam: 'UDYAM-MH-26-0012345', msme_category: 'MICRO', fssai_no: '12345678901234' } : p)) });
+    const day = (n) => { const d = new Date(Date.now() - n * 86400000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const item = (id, name, extra) => ({ id, name, unit: 'KG', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), item('e2e-d-besan', 'E2E Besan', { opening_qty: 500, opening_rate: 80 }), item('e2e-d-bhujia', 'E2E Bhujia', { shelf_life_days: 90 })]);
+    await writeJson(page, 'boms', [...(prev.boms ?? []), { id: 'e2e-d-bom', item_id: 'e2e-d-bhujia', name: 'Std', batch_qty: 100, is_default: true, components: [{ id: 'c1', item_id: 'e2e-d-besan', qty: 100 }] }]);
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-d-inv', invoice_number: 'E2E/MSE/1', doc_type: 'INVOICE', status: 'Sent', issue_date: day(100), due_date: '', total: 50000, amount_paid: 0, balance_due: 50000, client: { name: 'E2E Modern Trade', gstin: '27AAPFU0939F1ZV' }, items: [] }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-d-mill', name: 'E2E Besan Mill', msme_category: 'MICRO', msme_udyam: 'UDYAM-MH-01-0000001', pan: 'AAAPM1234C' }]);
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []), { id: 'e2e-d-bill', kind: 'PURCHASE', vendor_id: 'e2e-d-mill', vendor_name: 'E2E Besan Mill', bill_number: 'BM/77', date: day(300), lines: [], taxable: 20000, total: 20000, amount_paid: 0 }]);
+    await page.goto(srv.origin + '/manufacturing?tab=food&view=costcards');
+    await page.locator('[data-food-desk]').waitFor({ timeout: 15000 });
+    await page.locator('[data-mfd="card-item"]').selectOption('e2e-d-bhujia');
+    await page.locator('[data-mfd-b="bom"]').click();
+    await page.locator('[data-mfd-b="pack"]').click();
+    await page.locator('[data-mfd="pack-label"]').fill('200 g');
+    await page.locator('[data-mfd="pack-kg"]').fill('0.2');
+    await page.locator('[data-mfd="pack-cost"]').fill('1.6');
+    check((await page.locator('[data-mfd-perpack]').innerText()).trim() === '17.6', 'cost per 200 g pack: 0.2 kg × ₹80 + ₹1.60 packing = ₹17.60');
+    await page.locator('[data-mfd-b="save-card"]').click();
+    await readJson(page, 'cost_cards', [], (v) => v.some((c) => c.item_id === 'e2e-d-bhujia'));
+    check(true, 'cost card version saved');
+    await page.goto(srv.origin + '/manufacturing?tab=statutory&view=msme');
+    await page.locator('[data-statutory-desk]').waitFor({ timeout: 15000 });
+    const buyer = await page.locator('[data-mfd-buyer]').first().innerText();
+    check(/E2E Modern Trade/.test(buyer) && /E2E\/MSE\/1/.test(buyer) && !/interest u\/s 16 ₹\s*0\b/i.test(buyer), 'MSE receivable past the Sec 15 limit with Sec 16 interest');
+    check(await page.locator('[data-mfd="form1-reason"]').count() >= 1 && /E2E Besan Mill/.test(await page.locator('[data-statutory-desk]').innerText()), 'Form-1 paper lists the micro supplier unpaid beyond 45 days');
+    await page.goto(srv.origin + '/manufacturing?tab=statutory&view=authorisations');
+    await page.locator('[data-mfd="aa-number"]').fill('E2E-AA-1', { timeout: 15000 });
+    await page.locator('[data-mfd="aa-duty"]').fill('100000');
+    await page.locator('[data-mfd="aa-exp"]').selectOption('e2e-d-bhujia');
+    await page.locator('[data-mfd="aa-expQty"]').fill('1000');
+    await page.locator('[data-mfd="aa-fob"]').fill('500000');
+    await page.locator('[data-mfd-b="aa-add"]').click();
+    await readJson(page, 'export_authorisations', [], (v) => v.some((a) => a.number === 'E2E-AA-1'));
+    check(/AA E2E-AA-1[\s\S]*1,00,000/.test(await page.locator('[data-statutory-desk]').innerText()), 'AA register: EO balance 0 / 1000, duty at risk ₹1,00,000 (memo)');
+    await page.goto(srv.origin + '/manufacturing?tab=statutory&view=incentives');
+    await page.locator('[data-mfd="inc-name"]').fill('E2E PLI', { timeout: 15000 });
+    await page.locator('[data-mfd="inc-from"]').fill(day(200));
+    await page.locator('[data-mfd="inc-to"]').fill(day(20));
+    await page.locator('[data-mfd="inc-claimed"]').fill('25000');
+    await page.locator('[data-mfd-b="inc-add"]').click();
+    await readJson(page, 'incentive_claims', [], (v) => v.some((c) => c.name === 'E2E PLI'));
+    check(!(await readJson(page, 'vouchers', [])).some((v) => v.voucher_class === 'Government grant'), 'claim lodged: nothing booked before assurance');
+    await page.locator('[data-mfd-b="inc-recognise"]').first().click();
+    const claim = (await readJson(page, 'incentive_claims', [], (v) => v.some((c) => c.name === 'E2E PLI' && c.recognised_on))).find((c) => c.name === 'E2E PLI');
+    check(!!claim?.recognised_on && claim.voucher_ids?.length === 1, 'recognised after reasonable assurance: one grant journal');
+    await page.goto(srv.origin + '/manufacturing?tab=statutory&view=inventories');
+    await page.locator('[data-mfd-inv-total]').waitFor({ timeout: 15000 });
+    check(/Raw materials/.test(await page.locator('[data-statutory-desk]').innerText()), 'inventories split: besan under raw materials');
+    await page.goto(srv.origin + '/manufacturing?tab=floor&view=wip');
+    check(/OFF/.test(await page.locator('[data-mfd-absorb]').innerText({ timeout: 15000 })), 'conversion absorption is off by default (stock values as today)');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {

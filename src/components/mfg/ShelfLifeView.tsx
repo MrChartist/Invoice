@@ -6,7 +6,7 @@ import { stockDb } from '../../lib/inventory';
 import { computeTracking } from '../../lib/stock-tracking';
 import { godownName } from '../../lib/godowns';
 import { todayInput } from '../../lib/utils';
-import { BUCKET_ACTION, bucketTotals, floorOf, LIFE_BUCKETS, nearExpiry } from '../../lib/mfg/mf-shelf';
+import { BUCKET_ACTION, bucketTotals, LIFE_BUCKETS, nearExpiry } from '../../lib/mfg/mf-shelf';
 import { NumberInput } from '../ui/NumberInput';
 import type { MfgContext } from '../manufacturing/context';
 import { Fld, Tbl } from './mfd-ui';
@@ -20,8 +20,8 @@ export default function ShelfLifeView({ ctx }: { ctx: MfgContext }) {
   const clients = useMemo(() => { void ctx.version; return localDb.clients.getAll(); }, [ctx.version]);
   const [f, setF] = useState({ client: '', pct: 0, days: 0 });
   const pickClient = (id: string) => {
-    const fl = floorOf(clients.find((c) => c.id === id));
-    setF({ client: id, pct: fl?.pct ?? 0, days: fl?.days ?? 0 });
+    const fl = clients.find((c) => c.id === id)?.mf;
+    setF({ client: id, pct: fl?.min_shelf_pct ?? 0, days: fl?.min_shelf_days ?? 0 });
   };
   const saveFloor = () => run(ctx, () => {
     const c = clients.find((x) => x.id === f.client);

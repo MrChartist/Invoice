@@ -8,9 +8,17 @@
  * Batches hold base units (the editor converts a line's alternate unit with `lineFactor` before comparing). Pure — no
  * storage. Working paper: dates follow the FSS labelling rules as summarised (MF14); the floor is a trade term.
  */
-import { remainingLife } from './mf-shelf-floor';
-
-export { floorBatches, floorOf, meetsFloor, remainingLife, shortfallText, type ShelfFloor } from './mf-shelf-floor';
+// The FEFO floor lives in `mf-shelf-floor.ts`, imported by the editor alone so it stays inside the editor chunk (no shared
+// chunk, no extra preload entry on first paint); the desk keeps this small copy of the remaining-life maths.
+const dayNo = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) / 86400000;
+function remainingLife(b: { mfg?: string; expiry?: string }, day: string): { pct: number | null; days: number | null } {
+  if (!b.expiry) return { pct: null, days: null };
+  const days = Math.round(dayNo(b.expiry) - dayNo(day));
+  if (!b.mfg) return { pct: null, days };
+  const total = Math.round(dayNo(b.expiry) - dayNo(b.mfg));
+  const pct = total > 0 ? Math.max(Math.min(Math.round((days / total) * 1000) / 10, 100), 0) : days >= 0 ? 100 : 0;
+  return { pct: days < 0 ? 0 : pct, days };
+}
 
 /* ── Near-expiry desk ─────────────────────────────────────────── */
 

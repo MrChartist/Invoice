@@ -2,7 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { bucketOf, bucketTotals, CIRCULAR_251_NOTE, floorBatches, floorOf, FOOD_SCHEME_PRESETS, meetsFloor, nearExpiry, presetScheme, remainingLife } from '../src/lib/mfg/mf-shelf.ts';
+import { bucketOf, bucketTotals, CIRCULAR_251_NOTE, FOOD_SCHEME_PRESETS, nearExpiry, presetScheme } from '../src/lib/mfg/mf-shelf.ts';
+import { floorBatches, floorOf, meetsFloor, remainingLife } from '../src/lib/mfg/mf-shelf-floor.ts';
 import { validateScheme } from '../src/lib/pricing.ts';
 import { isNonGstFinancialNote } from '../src/lib/financial-note.ts';
 
