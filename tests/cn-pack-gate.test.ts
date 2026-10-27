@@ -28,7 +28,7 @@ test('the realty tab is listed only with the realty pack (URL still opens it)', 
 });
 
 test('hosts load Round 11 code lazily', () => {
-  assert.match(src('pages/Receivables.tsx'), /const RealtyDesk = lazy\(\(\) => import\('\.\.\/components\/construction\/R11Stub'\)\);/);
+  assert.match(src('pages/Receivables.tsx'), /const RealtyDesk = lazy\(\(\) => import\('\.\.\/components\/construction\/RealtyDesk'\)\);/);
   assert.match(src('components/creator/DocumentMetaCard.tsx'), /const ContractPanel = lazy\(\(\) => import\('\.\/ContractPanel'\)\);/);
   assert.match(src('components/creator/DocumentMetaCard.tsx'), /\(s\.boq_terms\?\.cn \|\| s\.ra_no \|\| worksOn\) && <Suspense/);
   for (const f of ['components/onboarding/SetupWizard.tsx', 'components/settings/FeaturesPanel.tsx']) assert.match(src(f), /import\('\.\.\/\.\.\/lib\/construction\/cn-profile'\)/, f);

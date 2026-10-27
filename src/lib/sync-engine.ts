@@ -404,6 +404,10 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}secured_advances`]: 'date',
   [`${DB_PREFIX}price_variations`]: 'date',
   [`${DB_PREFIX}bank_guarantees`]: 'issued_on',
+  // R11-C: bookings, stage certificates, RERA account entries
+  [`${DB_PREFIX}realty_bookings`]: 'date',
+  [`${DB_PREFIX}stage_certificates`]: 'certified_on',
+  [`${DB_PREFIX}rera_withdrawals`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -995,6 +999,8 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}karigar_moves`]: { num: 'number', date: 'date' },
   // R11-B: price-variation statements (PVB/FY…)
   [`${DB_PREFIX}price_variations`]: { num: 'number', date: 'date' },
+  // R11-C: bookings (BKG/FY…)
+  [`${DB_PREFIX}realty_bookings`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };

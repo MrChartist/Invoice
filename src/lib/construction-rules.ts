@@ -84,6 +84,45 @@ export const RECOVERY_DEFAULTS: readonly CnRule<{ water_pct: number; power_pct: 
 ];
 
 /* ── CN-C: builders (REALTY_RATE_RULES, REALTY_AFFORDABLE_RULES, REALTY_INTEREST_RULES, RERA_DEPOSIT_RULES,
- *    REALTY_PROCUREMENT_RULES) — filled by CN-C ── */
+ *    REALTY_PROCUREMENT_RULES) ── */
+
+/** One real-estate class: notification rate (on the value less deemed land), effective rate on the full value, ITC. */
+export interface RealtyRate {
+  notif: number;
+  effective: number;
+  itc: boolean;
+}
+
+/** Real-estate classes by document date: rate on two-thirds (land deemed one-third, `land`) = the effective rate. */
+export const REALTY_RATE_RULES: readonly CnRule<{ land: number; sac: string; classes: Record<'realty_affordable' | 'realty_residential' | 'realty_commercial', RealtyRate> }>[] = [
+  { from: '2017-07-01', value: { land: 1 / 3, sac: '9954', classes: { realty_affordable: { notif: 12, effective: 8, itc: true }, realty_residential: { notif: 18, effective: 12, itc: true }, realty_commercial: { notif: 18, effective: 12, itc: true } } }, source: 'N 11/2017-CT(R) entry 3(i) and para 2 (land deemed one-third); affordable 12% from 25 Jan 2018 (N 1/2018) — as recalled, verify (CN18)', verified: false },
+  { from: '2019-04-01', value: { land: 1 / 3, sac: '9954', classes: { realty_affordable: { notif: 1.5, effective: 1, itc: false }, realty_residential: { notif: 7.5, effective: 5, itc: false }, realty_commercial: { notif: 7.5, effective: 5, itc: false } } }, source: 'N 03/2019-CT(R) amending N 11/2017-CT(R) entries 3(i)(ia)(ib)/(ic): 0.75% / 3.75% CGST without ITC; para 2 land one-third; commercial in an RREP — verify (CN18)', verified: false },
+];
+
+/** Affordable residential apartment: carpet ≤ 60 sq m (metro) / 90 sq m (other) AND value ≤ ₹45 lakh. */
+export const REALTY_AFFORDABLE_RULES: readonly CnRule<{ maxValue: number; metroSqm: number; otherSqm: number; metros: string }>[] = [
+  { from: '2019-04-01', value: { maxValue: 4500000, metroSqm: 60, otherSqm: 90, metros: 'Bengaluru, Chennai, Delhi NCR, Hyderabad, Kolkata, Mumbai (MMR)' }, source: 'N 03/2019-CT(R) explanation (affordable residential apartment) — verify (CN19)', verified: false },
+];
+
+/** Interest on delayed payment by allottees, % a year (state RERA rule: SBI MCLR + 2% — set yours in settings). */
+export const REALTY_INTEREST_RULES: readonly CnRule<{ rate: number }>[] = [
+  { from: '2017-07-01', value: { rate: 10.85 }, source: 'State RERA rules: SBI highest MCLR + 2% (8.85% + 2% assumed) — state RERA rule, set yours (CN23)', verified: false },
+];
+
+/** RERA Sec 4(2)(l)(D) share to deposit; Sec 13 cap before a registered agreement. */
+export const RERA_DEPOSIT_RULES: readonly CnRule<{ pct: number; preAgreementPct: number }>[] = [
+  { from: '2016-05-01', value: { pct: 70, preAgreementPct: 10 }, source: 'RERA 2016 Sec 4(2)(l)(D) (70%) and Sec 13 (10% before agreement) — verify (CN25)', verified: false },
+];
+
+/** Income-tax TDS by the buyer on immovable property (194-IA / ITA 2025 Sec 393(1) Table 3(i)). */
+export const REALTY_194IA_RULES: readonly CnRule<{ threshold: number; rate: number }>[] = [
+  { from: '2013-06-01', value: { threshold: 5000000, rate: 1 }, source: 'Sec 194-IA (₹50 lakh, 1%); ITA 2025 Sec 393(1) Table Sl. 3(i) from 1 Apr 2026 (CN24)', verified: false },
+];
+
+/** 80% registered procurement test (promoters at 1% / 5%): RCM on the shortfall; excluded inputs; cement's own rate. */
+export const REALTY_PROCUREMENT_RULES: readonly CnRule<{ pct: number; rcmRate: number; cementHsn: string; cementRate: number; excludeHsn: string[]; excludeWords: string[] }>[] = [
+  { from: '2019-04-01', value: { pct: 80, rcmRate: 18, cementHsn: '2523', cementRate: 28, excludeHsn: ['2710', '2711', '2716'], excludeWords: ['tdr', 'fsi', 'development right', 'lease premium', 'electricity', 'diesel', 'petrol', 'motor spirit', 'natural gas', 'capital goods'] }, source: 'N 03/2019-CT(R) / N 07/2019-CT(R) (RCM on shortfall at 18%, cement at its rate) — exclusions as understood, verify (CN20)', verified: false },
+  { from: '2025-09-22', value: { pct: 80, rcmRate: 18, cementHsn: '2523', cementRate: 18, excludeHsn: ['2710', '2711', '2716'], excludeWords: ['tdr', 'fsi', 'development right', 'lease premium', 'electricity', 'diesel', 'petrol', 'motor spirit', 'natural gas', 'capital goods'] }, source: 'Cement 28% → 18% from 22 Sep 2025 (N 9/2025-CT(R)) — verify (CN20, CN28)', verified: false },
+];
 
 /* ── CN-D: site operations (WASTAGE_BAND_DEFAULTS, COEFFICIENT_STARTERS, LABOUR_WITHHOLD_DEFAULTS) — filled by CN-D ── */

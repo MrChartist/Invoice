@@ -20,7 +20,7 @@ const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url),
 test('CN-A block: the construction settings object (owner only), described in the open export', () => {
   assert.deepEqual(CN_OBJECTS, { constructionSettings: 'construction_settings' });
   assert.equal(CN_TABLE_ACTIONS.construction_settings, 'settings.manage');
-  assert.ok(!('construction_settings' in CN_WATCHED));
+  assert.ok(!('construction_settings' in CN_WATCHED), 'the settings object is audited on save');
   assert.equal(TABLE_ACTIONS.construction_settings, 'settings.manage', 'registered at runtime');
   assert.ok(TABLE_MEANING.construction_settings);
 });
@@ -29,13 +29,31 @@ test('first-paint maps carry no Round 11 row; writers import the registry', () =
   assert.ok(!src('lib/access.ts').includes('construction_settings'));
   assert.ok(!src('lib/audit-edits.ts').includes('construction_settings'));
   assert.match(src('lib/construction/cn-settings.ts'), /from '\.\/cn-registry'/);
-  for (const t of Object.keys(WATCHED_TABLES)) assert.ok(!t.startsWith('realty_') && !t.startsWith('sub_'), t);
+  assert.ok(!/realty_|sub_work/.test(src('lib/access.ts') + src('lib/audit-edits.ts')), 'Round 11 tables only at runtime');
+});
+
+test('CN-C block: builder tables, rights and audit labels, registered at runtime; every writer and the all-table writers import the registry', () => {
+  const C = { realty_projects: 'master.edit', realty_units: 'master.edit', realty_bookings: 'doc.create', payment_plans: 'master.edit', stage_certificates: 'doc.create', rera_withdrawals: 'books.edit' };
+  for (const [t, a] of Object.entries(C)) {
+    assert.equal(CN_TABLE_ACTIONS[t], a, t);
+    assert.equal(TABLE_ACTIONS[t], a, `${t} registered`);
+    assert.ok(WATCHED_TABLES[t]?.label, `${t} audited`);
+    assert.ok(TABLE_MEANING[t], `${t} in the open export`);
+  }
+  for (const f of ['cn-realty-projects', 'cn-units', 'cn-plans', 'cn-bookings', 'cn-demands', 'cn-rera', 'cn-cancellations']) assert.match(src(`lib/construction/${f}.ts`), /import '\.\/cn-registry';/, f);
+  assert.match(src('lib/sync-engine.ts'), /import '\.\/construction\/cn-registry';/);
+  assert.match(src('lib/trust/recycle-bin.ts'), /import '\.\.\/construction\/cn-registry';/);
 });
 
 test('the six CN-B deduction kinds are in the union (labelled); reserved series prefixes are unused', () => {
   for (const k of ['secured_advance', 'material_recovery', 'water_power', 'hire_charges', 'advance_interest', 'withheld']) assert.ok(k in DEDUCTION_LABELS, k);
   const all = readdirSync(new URL('../src/lib/', import.meta.url), { recursive: true }).filter((f) => String(f).endsWith('.ts')).map((f) => readFileSync(new URL(`../src/lib/${f}`, import.meta.url), 'utf8')).join('\n');
-  for (const p of ['SWO', 'SCB', 'BKG', 'DMD', 'MUS', 'PLG']) assert.equal((all.match(new RegExp(`'${p}'`, 'g')) ?? []).length, 0, `${p} free for its package`);
+  for (const p of ['SWO', 'SCB', 'MUS', 'PLG']) assert.equal((all.match(new RegExp(`'${p}'`, 'g')) ?? []).length, 0, `${p} free for its package`);
+  // CN-C uses its two: bookings BKG/FY… and demands DMD/FY…, once each.
+  for (const [p, f] of [['BKG', 'cn-bookings'], ['DMD', 'cn-demands']]) {
+    assert.equal((all.match(new RegExp(`'${p}'`, 'g')) ?? []).length, 1, p);
+    assert.match(src(`lib/construction/${f}.ts`), new RegExp(`= '${p}';`));
+  }
 });
 
 test('CN-B block: four tables with rights, audit labels, backup / sync / open-export rows; the all-table writers import the registry', () => {

@@ -336,6 +336,11 @@ registerRestoreHook('karigar_moves', (row, _e, live, bin) => withMoves(row.move_
 // R11 (CN-B): a secured advance comes back with its receipt journal; a PV statement only while no live one covers its period.
 registerRestoreHook('secured_advances', (row, _e, live, bin) => companionOr(live, bin, 'vouchers', str(row.voucher_id), 'The receipt journal of this secured advance is gone for good. Record it again in Time → Works → Advances.'));
 registerRestoreHook('price_variations', (row, e, live) => (str(row.status) !== 'cancelled' && live('price_variations').some((p) => str(p?.id) !== e.row_id && str(p?.contract_id) === str(row.contract_id) && str(p?.status) !== 'cancelled' && str(p?.period_from) <= str(row.period_to) && str(p?.period_to) >= str(row.period_from)) ? { refuse: 'A price variation statement for this period was made again since; restoring this one would bill it twice.' } : null));
+// R11 (CN-C): a deleted booking freed its unit (book it again; the BKG number stays used); a unit needs its project;
+// a stage certificate does not come back next to a re-made one of the same tower and stage.
+registerRestoreHook('realty_bookings', () => ({ refuse: 'Deleting the booking freed its unit. Book the unit again in Receivables → Realty → Bookings.' }));
+registerRestoreHook('realty_units', (row, _e, live) => (isLive(live, 'realty_projects', str(row.project_id)) ? null : { refuse: 'The project of this unit is gone. Restore the project first.' }));
+registerRestoreHook('stage_certificates', (row, e, live) => (live('stage_certificates').some((c) => str(c?.id) !== e.row_id && str(c?.tower_id) === str(row.tower_id) && str(c?.stage_label).toLowerCase() === str(row.stage_label).toLowerCase()) ? { refuse: 'This stage was certified again since.' } : null));
 // QA10 R9: a billed all-warranty repair job comes back with its warranty part issues.
 registerRestoreHook('service_jobs', (row, _e, live, bin) => withMoves(row.warranty_move_ids, live, bin));
 // QA10 R17: a rider settlement comes back with its journal, and only while its COD receipts are not settled again.

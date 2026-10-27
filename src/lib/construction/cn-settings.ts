@@ -29,6 +29,12 @@ export function cleanConstructionSettings(raw: unknown): ConstructionSettings {
     for (const k of CN_WORKS_VIEWS) if ((r.views as Record<string, unknown>)[k] === true) v[k] = true;
     if (Object.keys(v).length) out.views = v;
   }
+  // CN-C: builder settings (numbers ≥ 0, terms text).
+  if (r.realty && typeof r.realty === 'object') {
+    const x = r.realty as Record<string, unknown>;
+    const re = Object.fromEntries(Object.entries(x).filter(([k, v]) => (k === 'terms' ? typeof v === 'string' && v.trim() : ['interest_rate', 'forfeit_pct', 'forfeit_amount'].includes(k) && Number(v) >= 0)));
+    if (Object.keys(re).length) out.realty = re;
+  }
   if (typeof r.updated_at === 'string') out.updated_at = r.updated_at;
   return out;
 }

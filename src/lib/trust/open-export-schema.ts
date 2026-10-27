@@ -203,6 +203,10 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   retail_settings: 'Retail checks: MRP guard, deliveries, short book, free quantity on bills, cash / PAN guard (R9).',
   // R11-A
   construction_settings: 'Construction profile switches: RA bill paper style, M-book column, government sign-off boxes, certificate text, deviation limit, works views (R11).',
+  // R11-C
+  realty_projects: 'Builder projects: RERA registration, RERA account, towers, completion certificate (R11).', realty_units: 'Flats / shops / plots with carpet area, rate and status (R11).',
+  realty_bookings: 'Bookings with cost sheet, payment plan and cancellation (BKG/FY…, R11).', payment_plans: 'Payment plans with stage percentages (R11).',
+  stage_certificates: 'Stage completion certificates of a tower (R11).', rera_withdrawals: 'RERA designated account withdrawals (with certificates) and transfers in (R11).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';
