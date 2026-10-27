@@ -164,6 +164,8 @@ export function normalizeAssets(rows: unknown[]): FixedAsset[] {
       ...(typeof o.party === 'string' && o.party.trim() ? { party: o.party.trim() } : {}),
       created_at: typeof o.created_at === 'string' ? o.created_at : '',
       ...(typeof o.updated_at === 'string' ? { updated_at: o.updated_at } : {}),
+      // CN-D3: site-equipment details are kept verbatim (types/construction-r11.ts).
+      ...(o.cn_equipment && typeof o.cn_equipment === 'object' ? { cn_equipment: o.cn_equipment as FixedAsset['cn_equipment'] } : {}),
     });
   }
   return out;
@@ -216,6 +218,7 @@ export function saveAsset(input: FixedAssetInput): FixedAsset {
     ...(input.party && input.party.trim() ? { party: input.party.trim() } : {}),
     created_at: prev?.created_at ?? now,
     ...(prev ? { updated_at: now } : {}),
+    ...(prev?.cn_equipment ? { cn_equipment: prev.cn_equipment } : {}), // CN-D3: an edit keeps the equipment details
   };
   setTable(ASSETS_TABLE, prev ? all.map((a) => (a.id === id ? row : a)) : [...all, row]);
   audit.record({

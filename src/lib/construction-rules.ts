@@ -107,4 +107,30 @@ export const REALTY_PROCUREMENT_RULES: readonly CnRule<{ pct: number; rcmRate: n
   { from: '2025-09-22', value: { pct: 80, rcmRate: 18, cementHsn: '2523', cementRate: 18, excludeHsn: ['2710', '2711', '2716'], excludeWords: ['tdr', 'fsi', 'development right', 'lease premium', 'electricity', 'diesel', 'petrol', 'motor spirit', 'natural gas', 'capital goods'] }, source: 'Cement 28% → 18% from 22 Sep 2025 (N 9/2025-CT(R)) — verify (CN20, CN28)', verified: false },
 ];
 
-/* ── CN-D: site operations (WASTAGE_BAND_DEFAULTS, COEFFICIENT_STARTERS, LABOUR_WITHHOLD_DEFAULTS) — filled by CN-D ── */
+/* ── CN-D: site operations (WASTAGE_BAND_DEFAULTS, COEFFICIENT_STARTERS, LABOUR_WITHHOLD_DEFAULTS) ── */
+
+/** Permissible variation of actual vs theoretical consumption (−lo% / +hi%) and the penal factor on the issue rate. */
+export const WASTAGE_BAND_DEFAULTS: readonly CnRule<{ lo: number; hi: number; penal: number }>[] = [
+  { from: '2017-07-01', value: { lo: 3, hi: 3, penal: 2 }, source: 'CPWD-style contract practice (cement / steel ±3%, recovery at twice the issue rate) — the agreement governs (CN29)', verified: false },
+];
+
+/** Starter coefficients (stock per unit of work) — typical figures, not statutory: set yours per BOQ line. */
+export const COEFFICIENT_STARTERS: readonly CnRule<readonly { work: string; unit: string; material: string; qty: number }[]>[] = [
+  {
+    from: '2017-07-01',
+    value: [
+      { work: 'PCC 1:2:4', unit: 'cum', material: 'Cement (bags)', qty: 6.34 },
+      { work: 'RCC M20 (1:1.5:3)', unit: 'cum', material: 'Cement (bags)', qty: 8.06 },
+      { work: 'RCC M20 — reinforcement', unit: 'cum', material: 'Steel (kg)', qty: 80 },
+      { work: 'Brickwork CM 1:6', unit: 'cum', material: 'Cement (bags)', qty: 1.25 },
+      { work: 'Plaster 12 mm CM 1:6', unit: 'sqm', material: 'Cement (bags)', qty: 0.03 },
+    ],
+    source: 'Typical — set yours (common CPWD-analysis orders of magnitude; non-statutory)',
+    verified: false,
+  },
+];
+
+/** Hold on a labour contractor's bill until the month's PF / ESI challans are shown (% of the bill, or PF + ESI if more). */
+export const LABOUR_WITHHOLD_DEFAULTS: readonly CnRule<{ pct: number }>[] = [
+  { from: '2017-07-01', value: { pct: 10 }, source: 'Contract practice under the Labour Codes (principal employer liability) — a warning, never a block (CN15)', verified: false },
+];
