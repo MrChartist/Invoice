@@ -8,8 +8,9 @@
  *    farmer) | Cr Debtors, so the set-off journal moves the total from the pooled payable to that same party;
  *  - advance / loan → Cr "Farmer advances"; share → Cr "Share application money — members"; insurance / union / other →
  *    a named ledger (created on first use).
- * The journal total is rolled into the purchase's `amount_paid` (as the R11 sub-contractor deductions), so payables show
- * the net due. Pay: one purchase payment per mode (bank / cash); the bank file is built separately (nothing is sent).
+ * The journal total (± carried balances, QA13 G1) is rolled into the purchase's `amount_paid` (as the R11 sub-contractor
+ * deductions): the bill's balance is exactly the farmers' net, so paying it settles the bill.
+ * Pay: one purchase payment per mode (bank / cash); the bank file is built separately (nothing is sent).
  * Reopen (closed, unpaid): its receipts, journal and purchase go through their own guards (recycle bin); the CYB number
  * stays used. Working paper — verify with your CA (AG26, AG27).
  */
@@ -111,7 +112,7 @@ export function closeCycle(id: string, centreName?: string): FarmerCycle {
     const gross = round2(pl.reduce((s, l) => s + num(l.quantity) * num(l.rate), 0));
     const bill = purchasesDb.save({
       kind: 'PURCHASE', vendor_id: vendor.id, vendor_name: vendor.name, bill_number: c.number, date: c.period_to, category: c.source === 'milk' ? 'Milk purchases' : 'Farm produce purchase',
-      lines: pl, taxable: gross, cgst: 0, sgst: 0, igst: 0, total: gross, amount_paid: round2(Math.min(t.deductions, gross)), itc_eligible: false, ag: { cycle_id: c.id, ...(c.source === 'milk' ? { stock_by_shift: true } : {}) },
+      lines: pl, taxable: gross, cgst: 0, sgst: 0, igst: 0, total: gross, amount_paid: round2(Math.max(gross - t.net, 0)) /* QA13 G1: deductions and carries settle all but the net */, itc_eligible: false, ag: { cycle_id: c.id, ...(c.source === 'milk' ? { stock_by_shift: true } : {}) },
       notes: `Pooled cycle bill ${c.number}: ${lines.length} farmer(s), ${c.period_from} to ${c.period_to}; farmer-wise split on the cycle. Verify with your CA (AG26).`,
     });
     const p = (n: number) => Math.round(n * 100);
