@@ -970,6 +970,17 @@ test('R11 (CN-D) site readers read the real bill shape: labour holds, plant-hire
   assert.deepEqual([p.costs.labour, p.costs.other], [1000, 1000], 'ITC taken: cost = taxable; untagged and void bills left out');
 });
 
+test('R12 (AG-A) agri readers read the real bill shape: farmer vouchers, FY purchases (194Q base), farmer balances', async () => {
+  const { farmerVouchers, fyPurchasesOf } = await import('../src/lib/agri/ag-vouchers.ts');
+  const { farmerBalances } = await import('../src/lib/agri/ag-farmers.ts');
+  const fpv = { ...bill, id: 'f1', vendor_id: 'v1', vendor_gstin: undefined, bill_number: 'FPV/FY26-27/0001', cgst: 0, sgst: 0, taxable: 1000, total: 1000, itc_eligible: false, ag: { voucher: { quality: [], cut_kg: 0, accepted_kg: 100 } } };
+  const voided = { ...fpv, id: 'f2', status: 'void' } as never;
+  assert.deepEqual(farmerVouchers([fpv, voided, bill]).map((p) => p.id), ['f1'], 'void bills and non-vouchers left out');
+  assert.equal(fyPurchasesOf('v1', '2026-10-01', [fpv, voided, { ...bill, vendor_id: 'v1' }]), 2000, 'taxable of every live bill of the farmer');
+  const b = farmerBalances([{ id: 'v1', name: 'Ram', ag: { code: 'F-0001' } }], [fpv, voided, { ...fpv, id: 'cy', ag: { cycle_id: 'c' } }], [], [], [], []);
+  assert.equal(b.get('v1')!.payable, 1000, 'pooled cycle bills counted from the cycle, not twice');
+});
+
 test('R12 (AG-C5) mill report reads the real bill shape: own intake of the batches\' input item (by item id or name), void and expense bills left out', async () => {
   const { millMonths } = await import('../src/lib/agri/ag-mill-reports.ts');
   const items = [{ id: 'paddy', name: 'Paper ream', unit: 'KG' }, { id: 'rice', name: 'Rice', unit: 'KG' }] as never[];
