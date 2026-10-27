@@ -18,10 +18,12 @@ export type StepKind =
   // R8-C (TR-C5): trade profile and the trading packs' own steps
   | 'tradeProfile' | 'schemeScope' | 'weightItem' | 'principal'
   // R9 (RT-A1): retail profile and the steps of each shop (append-only)
-  | 'retailProfile' | 'drugLicence' | 'doctor' | 'variantGrid' | 'serialItem' | 'metalRate' | 'jewelTag' | 'scaleOrBarcode';
+  | 'retailProfile' | 'drugLicence' | 'doctor' | 'variantGrid' | 'serialItem' | 'metalRate' | 'jewelTag' | 'scaleOrBarcode'
+  // R11 (CN-A1): construction profile and the steps of each kind (append-only)
+  | 'constructionProfile' | 'contract' | 'boq' | 'realtyProject' | 'units' | 'paymentPlan' | 'labourContract';
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -43,6 +45,8 @@ export interface ChecklistCtx {
   tradeKind?: string;
   /** R9 (RT-A1): `settings.retail_kind` (a kirana company without one gets "Pick your shop"). */
   retailKind?: string;
+  /** R11 (CN-A1): `settings.construction_kind` (a contractor company without one gets "Pick your kind of construction business"). */
+  constructionKind?: string;
 }
 
 export interface ChecklistFactsV3 {
@@ -78,6 +82,13 @@ export interface ChecklistFactsV3 {
   metalRates?: number;
   jewelTags?: number;
   barcodeItems?: number;
+  /** R11 (CN-A1): contracts (CN-B table), BOQs (sales orders / quotations), builder projects, units and payment plans
+   *  (CN-C tables) — each counted only when its kind applies. */
+  contracts?: number;
+  boqs?: number;
+  realtyProjects?: number;
+  realtyUnits?: number;
+  paymentPlans?: number;
 }
 
 export interface SetupProgress {
@@ -144,6 +155,12 @@ function applies(kind: StepKind, ctx: ChecklistCtx): boolean {
     case 'serialItem': return ctx.retailKind === 'electronics';
     case 'metalRate': case 'jewelTag': return ctx.retailKind === 'jewellery';
     case 'scaleOrBarcode': return ctx.retailKind === 'grocery';
+    // R11 (CN-A1): existing contractor companies get "Pick your kind of construction business"; each kind its steps
+    case 'constructionProfile': return isType(ctx, 'contractor') && !ctx.constructionKind;
+    case 'contract': return ctx.constructionKind === 'civil' || ctx.constructionKind === 'mep';
+    case 'boq': return ['civil', 'mep', 'subcontractor', 'interiors'].includes(ctx.constructionKind ?? '');
+    case 'realtyProject': case 'units': case 'paymentPlan': return ctx.constructionKind === 'builder';
+    case 'labourContract': return ctx.constructionKind === 'labour';
     default: return true; // profile, item, payment, backup
   }
 }
@@ -179,6 +196,14 @@ function stepsOf(kind: StepKind, f: ChecklistFactsV3, ctx: ChecklistCtx): Omit<C
     case 'metalRate': return one((f.metalRates ?? 0) > 0, '/inventory?tab=jewellery&view=rates');
     case 'jewelTag': return one((f.jewelTags ?? 0) > 0, '/inventory?tab=jewellery&view=tags');
     case 'scaleOrBarcode': return one((f.barcodeItems ?? 0) > 0, '/inventory');
+    // R11 (CN-A1)
+    case 'constructionProfile': return one(!!ctx.constructionKind, '/settings?tab=features');
+    case 'contract': return one((f.contracts ?? 0) > 0, '/time?tab=works&view=contracts');
+    case 'boq': return one((f.boqs ?? 0) > 0, '/time?tab=works&view=boq');
+    case 'realtyProject': return one((f.realtyProjects ?? 0) > 0, '/receivables?tab=realty&view=projects');
+    case 'units': return one((f.realtyUnits ?? 0) > 0, '/receivables?tab=realty&view=units');
+    case 'paymentPlan': return one((f.paymentPlans ?? 0) > 0, '/receivables?tab=realty&view=plans');
+    case 'labourContract': return one((f.contracts ?? 0) > 0, '/time?tab=works&view=labour');
   }
 }
 
@@ -277,6 +302,8 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
   }
   const retailKind = typeof settings.retail_kind === 'string' ? settings.retail_kind : undefined;
   const stock = retailKind ? peekTable<{ track_serials?: unknown; variant_axes?: unknown; barcode?: unknown; sold_by_weight?: unknown }>('stock_items') : [];
+  const cnRaw = (settings as { construction_kind?: unknown }).construction_kind; // R11 (CN-A1)
+  const cnKind = typeof cnRaw === 'string' ? cnRaw : undefined;
   const facts: ChecklistFactsV3 = {
     profileReady: !!settings.onboarded && Boolean(profile?.companyName?.trim()) && Boolean(profile?.upiId || profile?.accountNumber),
     clients: peekTable(KEYS.clients).length,
@@ -300,6 +327,10 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     ...(retailKind === 'apparel' ? { variantStyles: stock.filter((r) => Array.isArray(r?.variant_axes) && r.variant_axes.length).length } : {}),
     ...(retailKind === 'electronics' ? { serialItems: stock.filter((r) => r?.track_serials).length } : {}),
     ...(retailKind === 'jewellery' ? { metalRates: peekTable('metal_rates').length, jewelTags: peekTable('jewel_tags').length } : {}),
+    // R11 (CN-A1): construction steps (read only for that kind)
+    ...(cnKind === 'civil' || cnKind === 'mep' || cnKind === 'labour' ? { contracts: peekTable('works_contracts').length } : {}),
+    ...(cnKind && cnKind !== 'builder' && cnKind !== 'labour' && cnKind !== 'other' ? { boqs: peekTable<{ doc_type?: string; status?: string }>(KEYS.invoices).filter((r) => (r?.doc_type === 'SALES_ORDER' || r?.doc_type === 'QUOTATION') && r.status !== 'Cancelled').length } : {}),
+    ...(cnKind === 'builder' ? { realtyProjects: peekTable('realty_projects').length, realtyUnits: peekTable('realty_units').length, paymentPlans: peekTable('payment_plans').length } : {}),
     ...(retailKind === 'grocery' ? { barcodeItems: stock.filter((r) => r?.barcode || r?.sold_by_weight).length + peekTable<{ barcode?: unknown; sold_by_weight?: unknown }>(KEYS.items).filter((r) => r?.barcode || r?.sold_by_weight).length } : {}),
   };
   const ctx: ChecklistCtx = {
@@ -310,6 +341,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     gstRegistered: Boolean(profile?.companyGstin?.trim()),
     ...(typeof settings.trade_kind === 'string' ? { tradeKind: settings.trade_kind } : {}),
     ...(retailKind ? { retailKind } : {}),
+    ...(cnKind ? { constructionKind: cnKind } : {}),
   };
   return { facts, ctx };
 }

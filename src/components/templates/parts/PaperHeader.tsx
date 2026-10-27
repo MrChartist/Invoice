@@ -7,7 +7,7 @@ import { usePaper } from '../paper-context';
 import styles from '../invoice-paper.module.css';
 import { useHeaderBand } from './header-band';
 import art from './docs-r3-paper.module.css';
-import { pharmacistText } from '../paper-helpers';
+import { pharmacistText, raDocTitle } from '../paper-helpers';
 
 interface HeaderProps {
   invoice: InvoiceRecord;
@@ -102,7 +102,7 @@ export function SenderIdentity({
 function DocTitle({ invoice, style }: { invoice: InvoiceRecord; style?: CSSProperties }) {
   const { bilingual, title: titled } = usePaper();
   // R2-C5: the statutory title always prints; a Design Studio suffix is appended.
-  const title = titled(DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice', invoice.doc_type);
+  const title = titled(raDocTitle(invoice, DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice') || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'), invoice.doc_type); // R11: RA bill title
   return (
     <>
       <div className={styles.docTitle} style={style}>
@@ -139,7 +139,7 @@ export function StatementStrip({ invoice, due }: { invoice: InvoiceRecord; due: 
 export function PaperHeader({ invoice, sender, meta }: HeaderProps) {
   const { logoPosition, bilingual, title: titled } = usePaper();
   const layout = meta.layout;
-  const title = titled(DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice', invoice.doc_type); // R2-C5 suffix
+  const title = titled(raDocTitle(invoice, DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice') || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'), invoice.doc_type); // R2-C5 suffix; R11 RA title
   // The Ink skin sets its own serif title face in CSS; don't override it inline.
   const titleStyle = layout === 'ink' ? undefined : { fontFamily: meta.fontFamily };
   const number = invoice.invoice_number || 'DRAFT';

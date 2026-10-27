@@ -247,13 +247,13 @@ export function TotalsBlock({ invoice, sender, totals }: BlockProps) {
           {invoice.lut_date ? ` dated ${invoice.lut_date}` : ''}.
         </div>
       )}
-      {totals.tds_amount > 0 && (
+      {totals.tds_amount > 0 && !invoice.ra_deductions?.length && ( // R11: a works bill prints IT TDS once, in its deductions block
         <div className={styles.totalRow}>
           <span>Less: TDS{invoice.tds_section && invoice.tds_section !== 'CUSTOM' ? ` (${sectionText(invoice.tds_section, invoice.issue_date, ACT_WORDS_PRINT)})` : ''}</span>
           <span>-{money(totals.tds_amount, cur)}</span>
         </div>
       )}
-      {(totals.amount_paid > 0 || totals.tds_amount > 0) && (
+      {(totals.amount_paid > 0 || (totals.tds_amount > 0 && !invoice.ra_deductions?.length)) && (
         <div className={styles.balance}>
           <span>{t('balanceDue')}</span>
           <span>{money(totals.balance_due, cur)}</span>

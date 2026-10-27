@@ -22,6 +22,9 @@ import styles from '../transport/transport.module.css';
 // R5-A5's credit panel, mounted for GST TDS u/s 51 (contractors need no marketplace pack).
 const TcsCreditPanel = lazy(() => import('../marketplace/TcsCreditPanel'));
 
+// R11 (CN-A1): CN-B / CN-D append their views here ('contracts', 'advances', 'escalation', 'guarantees', 'subcon',
+// 'labour', 'plant', 'reco', 'pnl'), each listed when `construction_settings.views[view]` is on (`worksViewOn`); an
+// unknown view (a profile landing before its package merged) opens the BOQ view.
 const VIEWS = ['boq', 'ra', 'retention', 'sites', 'gsttds'] as const;
 type View = (typeof VIEWS)[number];
 

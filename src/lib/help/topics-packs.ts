@@ -25,6 +25,9 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:works', 'Works', 'वर्क्स', 'Works-contract pack: BOQ, measured RA bills, retention and deductions.', 'Each running-account bill.', { statutory: ca(['I15', 'I16', 'I17', 'I18', 'I19']) }),
   t('time:works:retention', 'Retention', 'रिटेंशन', 'Retention money held by clients and when it is due back.', 'When retention is released.', { statutory: ca(['I16']) }),
   t('time:works:sites', 'Sites', 'साइट', 'Sites with material issued against the theoretical use per BOQ unit.', 'Weekly on site.'),
+  // R11 (CN-A): the RA bill and its paper; the builder desk (screens arrive with CN-C)
+  t('time:works:ra', 'RA bills', 'रनिंग बिल', 'Measured running-account bills: the paper prints the contract particulars, BOQ item no. and M-book under each line, deductions down to net payable, the certificate and the abstract of cost as page 2 — snapshotted at save.', 'Each measurement.', { statutory: ca(['CN3', 'CN4', 'CN5', 'CN12', 'CN14']) }),
+  t('receivables:realty', 'Realty', 'रियल्टी', 'Builder desk: projects with RERA details, units, bookings, payment plans, stage demands and the RERA account.', 'Each booking and stage.', { statutory: ca(['CN18', 'CN21', 'CN25']) }),
   // R7 hotel (R7-A topics; R7-C added the HT ids). Working papers — verify with your CA.
   t('tables:frontdesk', 'Front desk', 'फ्रंट डेस्क', 'Hotel pack board: arrivals, in-house guests, due-outs and room status for the business date.', 'All day at the front desk.', {
     statutory: ca(['HT1', 'HT2', 'HT5', 'HT13']),

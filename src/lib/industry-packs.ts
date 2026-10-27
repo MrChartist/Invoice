@@ -20,13 +20,16 @@ export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit
   // R8-C: trading packs (tabs on /distribution; switched on by the `wholesale` trade profile, never by a business type)
   | 'distributor' | 'commodity' | 'agency'
   // R9 (RT-A1): retail packs (a tab each on /inventory; switched on by the `kirana` retail profile, never by a business type)
-  | 'pharmacy' | 'apparel' | 'electronics' | 'jewellery';
+  | 'pharmacy' | 'apparel' | 'electronics' | 'jewellery'
+  // R11 (CN-A1): builders / developers (a tab on /receivables; switched on by the `builder` construction profile)
+  | 'realty';
 
 export const PACK_IDS: readonly PackId[] = [
   'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
   'hotel', // R7-A
   'distributor', 'commodity', 'agency', // R8-C
   'pharmacy', 'apparel', 'electronics', 'jewellery', // R9 (RT-A1)
+  'realty', // R11 (CN-A1)
 ];
 
 /** The packs a business type implies when `industry_packs` is absent. */
@@ -143,6 +146,11 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'jewellery', path: '/inventory?tab=jewellery&view=tags', labelKey: 'r9.tags' },
   { pack: 'jewellery', path: '/inventory?tab=jewellery&view=oldgold', labelKey: 'r9.oldgold' },
   { pack: 'jewellery', path: '/inventory?tab=jewellery&view=karigar', labelKey: 'r9.karigar' },
+  // R11: construction — the RA bill view on /time (pack `works`) and the builder desk on /receivables (pack `realty`);
+  // labels `r11.*` in `palette-destinations.ts`. CN-B / CN-D add their Works views and CN-C the desk's views with
+  // their screens (one row + help topic + palette label each).
+  { pack: 'works', path: '/time?tab=works&view=ra', labelKey: 'r11.ra' },
+  { pack: 'realty', path: '/receivables?tab=realty', labelKey: 'r11.realty' },
 ];
 
 /**
