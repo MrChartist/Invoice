@@ -266,7 +266,7 @@ the item form without a lazy split once the item form has another lazy part (−
 
 Three desks on `/inventory`, one lazy chunk each (views inside the desk chunk; the loans view is a shared sub-chunk):
 `cold` (pack `coldstore`: `lots`, `gatepasses`, `rent`, `loans`, `chambers`), `inputs` (pack `agri_inputs`: `licences`,
-`subsidy`, `credit`) and `members` (pack `fpo`: `register`, `shares`, `papers`, plus `loans` when the
+`subsidy`, `credit`) and `members` (pack `fpo`: `register`, `shares`, `patronage`, `papers`, plus `loans` when the
 cold-storage pack is off). Strings: `src/i18n/areas/agri-r12d.ts` (English + Hindi). Working papers — verify with your
 CA (AG8, AG16–AG25, AG30, AG32, AG60–AG69).
 
@@ -281,7 +281,9 @@ CA (AG8, AG16–AG25, AG30, AG32, AG60–AG69).
   overrides with a reason (`loan_check: 'override'`, audit row). Unpaid rent bills warn. With a plan billing at
   release the draft rent bill for the released bags is raised in the same step (all or nothing).
 - Papers (A5, `smallPaper`): storage receipt ("Non-negotiable receipt — not a WDRA e-NWR", AG23, terms from settings),
-  gate pass with the balance bags. Chambers (`agri_settings.chambers`) with utilisation; depositor statement engine (`depositorLots`; screen off for the budget).
+  gate pass with the balance bags. Chambers (`agri_settings.chambers`) with utilisation. Lots also carry the bag transfer
+  form (consent note) and the depositor statement (`depositorStatement` in `ag-gatepass.ts`: lots in / out / balance,
+  rent billed / due on issued bills, open loans with interest to date) with an A5 print (`statementHtml`).
 
 ### D2 Rent (`ag-cold-rent.ts`)
 
@@ -298,7 +300,8 @@ CA (AG8, AG16–AG25, AG30, AG32, AG60–AG69).
   a period (monthly plans), season end. No double billing: season bags already on live rent bills, `in` charges once
   per lot, a gate pass once, monthly periods never overlap (`billedOn` reads live invoices, so a deleted draft frees
   its bags).
-- Engines (screens off for the budget): rent due by depositor and season with closed lots unpaid flagged (`rentDue`);
+- The plan form carries minimum months, part month, late rent (after `MM-DD`, ₹ / bag / month) and the notified rate
+  with its order ref. Tables on Rent: rent due by depositor and season with closed lots unpaid flagged (`rentDue`);
   unbilled rent memo (`unbilledRent`, AG30, no accrual).
 
 ### D3 Loans against stored produce (`ag-loans.ts`)
@@ -307,22 +310,27 @@ CA (AG8, AG16–AG25, AG30, AG32, AG60–AG69).
   last repayment; `monthly_compound` optional (AG62). Repayments interest first, in date order; closes at zero.
 - Posting (real money, ordinary vouchers): disbursement PAYMENT Dr "Loans to depositors" | Cr bank / cash; repayment
   RECEIPT Dr bank / cash | Cr "Loans to depositors" + Cr "Interest on loans to depositors". Undo / delete go through
-  `deleteVoucher` and `setTable` (recycle bin). LTV warning (`ltvWarning`), interest statement (`interestStatement`) and overdue loans (`overdueLoans`): engines, screens off.
+  `deleteVoucher` and `setTable` (recycle bin). The form takes the max. LTV % and the market rate per bag and warns
+  (`ltvWarning`); the loan number opens the interest statement (`interestStatement`) with an A5 print
+  (`loanStatementHtml`); the partial-release LTV (`cold.release_ltv_pct`) is set on the view; overdue loans are flagged
+  and reach the bell as "Lien: loans past due".
 
 ### D4 Input dealer desk (`ag-licences.ts`, `ag-subsidy.ts`, `ag-season-credit.ts`, `ag-expiry.ts`)
 
 - Licences and principal certificates in `agri_settings.licences` / `.principals`; notices with R9's `licenceNotices`
-  (60-day window, ≤ 45 days "due soon", expired) on the desk. Engines with screens off for the budget: unlicensed-class
-  warnings (`unlicensedWarnings`) and bills of licensed classes from a supplier without a principal certificate
-  (`principalWarnings`, purchases read through `readPurchase` / `readPurchaseLines`, in the purchase contract test).
+  (60-day window, ≤ 45 days "due soon", expired) on the desk and in the bell. Principal certificates are typed on
+  Licences, with the bills of licensed classes from a supplier without one (`principalWarnings`, purchases read through
+  `readPurchase` / `readPurchaseLines`, in the purchase contract test); the POS strip warns on an item whose class needs
+  a licence kind with none valid (`unlicensedWarnings`, never a block).
 - Expiry by class: `ag-expiry.ts` runs inside the stock checks after the pharma gate and turns an expired batch of
   seeds / pesticides into an error (fertilisers keep the confirmation). It mirrors the `block` rows of
   `DEALER_CLASS_RULES` (pinned by `tests/ag-inputs.test.ts`) so the stock checks do not pull the rules chunk.
 - Subsidised fertiliser: stock items flagged `ag_subsidised` (desk). The POS strip (`PosInputsStrip`, lazy, pack
   `agri_inputs`) asks the PoS transaction no. and the farmer ID (Aadhaar last 4 or KCC — 12 digits refused) when the
-  cart has a flagged item; missing ones stop the save. Engines, screens off: monthly cap warning (`capWarning`,
-  `FERT_SUBSIDY_DEFAULTS` 50 or `agri_settings.subsidy.cap`); PoS vs book (`posCheck`: book stock at month end from the
-  engine ledger against `agri_settings.pos_stock`, and flagged sales without a PoS no.).
+  cart has a flagged item; missing ones stop the save. The strip also warns above the monthly cap (`capWarning`,
+  `FERT_SUBSIDY_DEFAULTS` 50 or `agri_settings.subsidy.cap`, set on Subsidy). Subsidy shows PoS vs book (`posCheck`:
+  book stock at month end from the engine ledger against the PoS stock typed into `agri_settings.pos_stock`, and
+  flagged sales without a PoS no.).
 - Credit till harvest: seasons (`agri_settings.seasons`, `YYYY-MM-DD` or `MM-DD`, defaults Kharif 11-15 / Rabi 04-30 /
   Zaid 07-15) from the POS strip or the desk ("Set season" on an open bill): `ag.inputs.season` / `season_due` and the
   due date. `tr-interest.ts` starts a season bill's interest at `season_due` whatever the company basis (one branch).
@@ -333,18 +341,21 @@ CA (AG8, AG16–AG25, AG30, AG32, AG60–AG69).
 
 - Members = vendors / clients with `ag.member` (one per `ag.code`). Table `member_shares` (`books.edit`, dated):
   allot (`SHC/FY…` certificate; from application money JOURNAL or bank / cash RECEIPT), transfer (pair of rows, new
-  certificate, totals unchanged), surrender (optional refund PAYMENT), forfeit (JOURNAL to "Forfeited shares") — the last two engine-only (screen off).
+  certificate, totals unchanged), surrender (optional refund PAYMENT), forfeit (JOURNAL to "Forfeited shares") — all four on Members → Shares.
   Application money per member from closed `farmer_cycles` `share` deductions less allotments that used it. Register
-  as at a date (folio, shares, paid up, membership date, cessation, certificates; CSV); certificate print with
-  distinctive numbers.
+  as at a date (folio, shares, paid up, membership date, cessation, certificates); certificate print with
+  distinctive numbers (`distinctive`, also a column on Shares).
 - Patronage per FY: supplies (cycle lines by `farmer_id` + the member's own vouchers at taxable value) and purchases
   by the member; members vs non-members of all farmer vendors. Distribution paper (reserve %, dividend % with cap,
-  patronage pool by business, retained) → an OPTIONAL (draft) appropriation journal (`draftAppropriation`). All engine-only: the patronage view was taken off for the budget.
+  patronage pool by business, retained) → an OPTIONAL (draft) appropriation journal (`draftAppropriation`), on
+  Members → Patronage (`patronageOf` reads the live tables).
 - Papers: co-operative profit by head with the members' share — `80P(2)` before 1 Apr 2026, `Sec 149` (Income-tax
   Act 2025, as reported) from then (`COOP_DEDUCTION_RULES`); producer company 80PA keyed by assessment year
   (`PRODUCER_COMPANY_RULES`): 100% under ₹100 crore turnover for AY 2019-20 … 2024-25, nothing after ("no deduction
-  found — verify AG17"). Statutory calendar (`MEMBERS_CALENDAR_RULES` defaults; the engine also reads typed dates from
-  `agri_settings.calendar`) shown on the desk. The co-op head table is off (`coopPaper` engine kept).
+  found — verify AG17"). The co-op paper takes the profit by head and shows the members' share (`coopPaper`, members'
+  % from the patronage register). Statutory calendar (`MEMBERS_CALENDAR_RULES` defaults; dates typed per row on Papers
+  go to `agri_settings.calendar`, "Use default dates" clears them), also a lazy card on GST → Compliance
+  (`MembersCalendar`, pack `fpo`) and in the bell.
 
 ### Storage, registries, rules
 
@@ -364,13 +375,18 @@ No new no-cash marker: loans, rent and interest move real money. Rule rows (`// 
 `COOP_DEDUCTION_RULES`, `PRODUCER_COMPANY_RULES`, `MEMBERS_CALENDAR_RULES`, each with `source` and `verified`.
 
 Edits to shared files (one line or one block each): `stock-tracking.ts` (expiry gate), `trade/tr-interest.ts` (season
-due date), `pages/Pos.tsx` (lazy strip, state, save check). No bell or GST → Compliance edits (taken out for the budget).
+due date), `pages/Pos.tsx` (lazy strip, state, save check), `NotificationBell.tsx` (one gate line: `ag-d-alerts.ts`
+  loads only with an explicit `agri_inputs` / `coldstore` / `fpo` pack — licences, liens past due, members' dates within
+  30 days of today), `gst-reports/ComplianceView.tsx` (the lazy `MembersCalendar` card, pack `fpo`).
 
 Demo (`demo/profile-agri.ts`, pack `coldstore`): a season rent plan and three lots of the demo clients, one partly
 released (loans, shares and licences are left to the desks: they post vouchers or live in settings).
 
-Tests: `ag-d-registry` (names, registry, backup / sync / export rows, pack gate), `ag-cold-lots`, `ag-cold-rent`, `ag-loans`, `ag-inputs`, `ag-members`; purchase contract (R12-D readers);
-e2e step "R12-D cold store desk".
+Tests: `ag-d-registry` (names, registry, backup / sync / export rows, pack gate incl. the bell line, the compliance card
+and the members' views), `ag-cold-lots` (+ depositor statement and its print), `ag-cold-rent`, `ag-loans` (+ interest
+statement print), `ag-inputs` (+ bell: licences, liens past due, members' dates), `ag-members`; purchase contract
+(R12-D readers); e2e step "R12-D cold store desk" (also the depositor statement with its print and the patronage
+view's draft journal).
 
 ### Deviations from the PRD (AG-D)
 
@@ -380,12 +396,16 @@ e2e step "R12-D cold store desk".
   stock checks do not pull `agri-rules.ts` into their chunk graph (that added two preload entries to first paint).
 - **Settings scalars** are nested (`cold.release_ltv_pct`, `cold.receipt_terms`, `subsidy.cap`): AG-A's cleaner keeps
   object-valued keys only.
-- **Compliance calendar**: the members' reminders are a table on Members → Papers (defaults by rule, typed dates read
-  from `agri_settings.calendar`); the card on GST → Compliance was taken out for the budget.
-- **Loans view under Members** shows only when the cold-storage pack is off and has no `PACK_TABS` row / own help topic
-  (it falls back to the Members topic).
+- **Compliance calendar**: the members' reminders are a table on Members → Papers (defaults by rule, typed dates in
+  `agri_settings.calendar`) and a lazy card on GST → Compliance (last closed FY), not rows inside the TDS calendar.
+- **Loans view under Members** shows only when the cold-storage pack is off; it has its own help topic
+  (`inventory:members:loans`) and `PACK_TABS` row (Ctrl+K "Member loans against produce"). With both packs on, that
+  Ctrl+K row lands on the register (the loans live on Cold storage → Loans).
 - **Demo**: lots and a rent plan only (see above).
-- **Screens taken off for the budget** (engines and tests kept): see the Bundle section below.
+- **Screens taken off for the budget** in the first build all shipped in the follow-up (see "Restored screens").
+- **Bell "lien release"** = loans past their due date with anything due (the lien still holds their lots); a closed
+  loan lifts the lien with no notice. Members' dates come from the last closed and the current FY.
+- **Partial-release LTV** is set on Loans (it was on Chambers): it is a loan rule.
 - **Loan / share entries** post ordinary vouchers through `postPair` / `saveVoucher` (no new marker; real money).
 
 ### Bundle (AG-D)
@@ -417,3 +437,32 @@ unlicensed / cap warnings (`principalWarnings`, `unlicensedWarnings`, `capWarnin
 calendar dates, the members' card on GST → Compliance and the bell notices. Still ≈ 5 kB over the lead's ≈ 25 kB: the
 rest is the core of the brief (lots, gate pass, rent bill, loans, licences, subsidy gate, season credit, share register,
 80P / 80PA papers) and the Hindi strings; getting lower means dropping one of those desks' core flows.
+
+### Restored screens (AG-D follow-up) — shipped
+
+Every screen listed above as "off the UI" is back in the existing lazy desks (same `agd-kit` `Form` / `Tbl` / `B`
+helpers, text buttons, no new icon names), with English + Hindi strings in `agri-r12d.ts` and help wording updated:
+
+- **Cold storage**: Lots → bag transfer (consent note) and the depositor statement with print; Rent → plan extras
+  (minimum months, part month, late rent, notified rate + order ref), rent due by depositor / season and the unbilled
+  memo.
+- **Loans** (cold-storage and members' view): max. LTV % + market ₹ / bag with the warning, the interest statement
+  (click the loan number) with print, the partial-release LTV setting; own help topic `inventory:members:loans` and a
+  `PACK_TABS` row for the members' view (Ctrl+K "Member loans against produce").
+- **FPO / co-op**: Shares → surrender (refund by bank / cash or none) and forfeit, distinctive numbers column and on the
+  certificate; Members → Patronage (register, members vs non-members, distribution paper, optional draft journal);
+  Papers → co-op head table with the members' share, typed calendar dates and "Use default dates".
+- **Input dealer**: principal certificates and the bills without one (Licences); PoS vs book with the PoS stock typed per
+  month, sales missing a PoS no. and the monthly cap (Subsidy); unlicensed-class and monthly-cap warnings on the POS
+  strip.
+- **Shared, lazy, pack-gated**: the members' calendar card on GST → Compliance (`fpo`); the bell (`ag-d-alerts.ts`, one
+  gate line in `NotificationBell.tsx`): licence expiry, liens past due, members' AGM / return dates within 30 days.
+
+Bundle (vite build + gzip -9, before = `claude/elegant-cannon-cwapiv` at `789a935`): initial JS 189,147 → 189,160 B
+(**+13 B**, chunk-name churn in the entry's lazy-import map; 184.7 / 185 kB); total JS 3,210,900 → 3,221,455 B
+(**+10,555 B, +10.3 kB**; 3146.0 / 3400 kB). By chunk (B gz): strings `agri-r12d` now its own chunk +6,617 while the
+desk kit drops −5,178 (net ≈ +1.4 kB of Hindi + English strings); MembersDesk +1,938 (patronage view, co-op heads,
+typed dates, share entries); ColdDesk +1,203 (transfer, statement, rent tables, plan extras); bell `ag-d-alerts` +1,029;
+`ag-licences` +932 and `ag-coop-papers` +882 (now shared chunks: POS strip / bell / compliance card); InputsDesk +673;
+MembersCalendar +509; `ag-loans` +495 (statement print); topics +467; LoansView +437; `ag-cold-lots` +339; others ≤ 260
+each (GST reports +218, bell +206, POS strip +118).

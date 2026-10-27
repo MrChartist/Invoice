@@ -4285,7 +4285,7 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
-  await step('R12-D cold store desk: a lot of 240 bags at ₹180 / bag-season; a ₹50,000 loan against it blocks the gate pass for 60 bags; repaid → the pass is allowed and its rent bill is a bill of supply with the lot snapshot; a licence due in 30 days shows on the dealer desk; FPO: 10 shares allotted with certificate SHC/FY…; the 80PA paper for FY 2025-26 says "no deduction found"', async () => {
+  await step('R12-D cold store desk: a lot of 240 bags at ₹180 / bag-season; a ₹50,000 loan against it blocks the gate pass for 60 bags; repaid → the pass is allowed and its rent bill is a bill of supply with the lot snapshot; a licence due in 30 days shows on the dealer desk; the depositor statement shows 180 bags left and prints; FPO: 10 shares allotted with certificate SHC/FY…; the patronage view drafts a ₹25,000 reserve as an optional journal; the 80PA paper for FY 2025-26 says "no deduction found"', async () => {
     const keys = ['settings', 'clients', 'vendors', 'invoices', 'vouchers', 'accounts', 'series_counters', 'agri_settings', 'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares'];
     const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
     const day = new Date();
@@ -4338,6 +4338,14 @@ try {
     check(/^GPO\/FY\d{2}-\d{2}\/0001$/.test(outs[0]?.number ?? ''), `gate pass ${outs[0]?.number} issued`);
     const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.ag?.rent?.lot_id === lot.id))).find((i) => i.ag?.rent?.lot_id === lot.id);
     check(bill?.doc_type === 'BILL_OF_SUPPLY' && bill.total === 10800 && bill.ag.rent.bags === 60 && bill.ag.rent.lot_no === lot.number, `the rent bill is a bill of supply for 60 bags × ₹180 with the lot snapshot (${bill?.doc_type} ₹${bill?.total})`);
+    // D1: the depositor statement after the pass, and its print.
+    await page.goto(srv.origin + '/inventory?tab=cold&view=lots');
+    await page.locator('[data-agd="who"]').selectOption('e2e-dep', { timeout: 15000 });
+    const stText = await page.locator('[data-agd-statement]').innerText({ timeout: 15000 });
+    check(/1 lots · in 240 · out 60 · balance 180 bags/.test(stText) && /rent billed ₹10,800/.test(stText), `the depositor statement shows the lot after the pass (${stText})`);
+    const [pop] = await Promise.all([page.waitForEvent('popup', { timeout: 15000 }), page.locator('[data-agd-b="print-statement"]').click()]);
+    check(/Depositor statement — E2E Ram Singh[\s\S]*in 240 · out 60 · balance 180 bags/.test(await pop.content()), 'the depositor statement prints with the lot');
+    await pop.close();
     // D4: the licence due in 30 days.
     await page.goto(srv.origin + '/inventory?tab=inputs&view=licences');
     await page.getByText('Expires within 45 days').first().waitFor({ timeout: 15000 });
@@ -4349,6 +4357,14 @@ try {
     await page.locator('[data-agd-b="save-share"]').click();
     const sh = (await readJson(page, 'member_shares', [], (v) => v.length === 1))[0];
     check(/^SHC\/FY\d{2}-\d{2}\/0001$/.test(sh?.certificate_no ?? '') && sh.shares === 10, `10 shares allotted, certificate ${sh?.certificate_no}`);
+    // D5: the patronage view — the distribution paper and its optional draft journal.
+    await page.goto(srv.origin + '/inventory?tab=members&view=patronage');
+    await page.locator('[data-agd-patronage]').waitFor({ timeout: 15000 });
+    for (const [k, v] of [['pat', '100000'], ['reservePct', '25']]) { await page.locator(`[data-agd="${k}"]`).fill(v); await page.locator(`[data-agd="${k}"]`).blur(); }
+    await page.getByText('25,000').first().waitFor({ timeout: 15000 });
+    await page.locator('[data-agd-b="post-draft"]').click();
+    const draft = (await readJson(page, 'vouchers', [], (v) => v.some((x) => x.voucher_class === 'Appropriation (draft)'))).find((x) => x.voucher_class === 'Appropriation (draft)');
+    check(draft?.variant === 'OPTIONAL' && draft.lines?.some((l) => l.cr === 2500000), `the patronage view posts a draft appropriation journal with the ₹25,000 reserve (${draft?.variant})`);
     await page.goto(srv.origin + '/inventory?tab=members&view=papers');
     const fyBox = page.getByLabel('FY starting');
     await fyBox.fill('2025', { timeout: 15000 });
