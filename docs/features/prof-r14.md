@@ -160,14 +160,19 @@ Breakdown (gz): client-money desk 7.6 kB (three views + strings ≈ 2.3 kB), sta
 
 ### Bundle (PS-C)
 
-Before = `claude/elegant-cannon-cwapiv` at `36881db` (PS-A merged); after = this branch. `vite build` + gzip -9.
+Before = `claude/elegant-cannon-cwapiv` at `f723ad1` (PS-A, PS-B, PS-D merged); after = this branch. `vite build` + gzip -9.
 
 | Budget | Before | After | Delta |
 |---|---|---|---|
-| Initial JS | 189,217 B | 189,226 B | **+9 B** (lazy-import map churn) |
-| Total JS | 3,419,591 B | 3,446,649 B | **+27.1 kB** (aim 15, PRD 13) ✗ |
+| Initial JS | 189,217 B | 189,230 B | **+13 B** (lazy-import map churn) |
+| Total JS | 3,480,242 B (3398.7 kB) | 3,506,471 B (3424.3 kB) | **+25.6 kB** (aim 15, PRD 13) ✗ |
 
-Breakdown (gz): desk with five views + `ps-brc` / `ps-refund-svc` 6.8 kB; strings EN + HI 3.9 kB; threshold card (+ strings, engine) 1.9 kB; `ps-edf` + `ps-fema` 1.7 kB; `ps-platforms` 1.5 kB; `ps-export-check` 1.4 kB; platform dialog 1.4 kB; editor chip 1.2 kB; pre-bill FX row 1.0 kB; help topics 0.6 kB; `prof-rules` §PS-C 0.6 kB; compliance card 0.55 kB; host wiring (Time label, Insights, receipt dialog, GST preflight, editor, export register, trade rules, palette, checklist, demo, open export, recycle bin) ≈ 2.5 kB; chunk churn ≈ 0.6 kB. Trim options: the SOFTEX / platform list editing UI, the refund statement XLSX, the threshold dashboard card (≈ −0.5 kB each), shorter Hindi strings (≈ −1 kB).
+Breakdown (gz): desk with five views + `ps-brc` / `ps-refund-svc` 6.8 kB; strings EN + HI 3.9 kB; threshold card (+ strings,
+engine) 1.9 kB; `ps-edf` + `ps-fema` 1.7 kB; `ps-platforms` 1.5 kB; `ps-export-check` 1.4 kB; platform dialog 1.4 kB; editor
+chip 1.2 kB; pre-bill FX row 1.0 kB; help topics 0.7 kB; `prof-rules` §PS-C 0.6 kB; compliance card 0.55 kB; `ps-pos` 0.3 kB;
+host wiring (Firm desk threshold view, Time label, Insights, receipt dialog, GST preflight, editor, export register, trade
+rules, palette, demo, open export) ≈ 2.9 kB. Trim options: the platform list editor and the refund XLSX (≈ −0.5 kB each),
+the dashboard threshold card (≈ −0.4 kB), shorter Hindi / English strings (≈ −1 kB).
 
 ## PS-D — The firm's statutory desk (packs `partners`, `practice`, `cafirm`)
 
