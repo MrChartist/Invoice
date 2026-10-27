@@ -18,9 +18,12 @@ export interface ProfileContext {
 export async function demoExtras(profile: DemoProfile, ctx: ProfileContext): Promise<DemoExtras> {
   const base = await profileExtras(profile, ctx);
   // R12: an agri Demo company (any profile with the `agri` pack) adds its rows (`profile-agri.ts`, by pack).
-  if (!ctx.packs.includes('agri')) return base;
-  const agri = (await import('./profile-agri')).agriExtras(ctx);
-  return { ...base, tables: { ...base.tables, ...agri.tables } };
+  const agri = ctx.packs.includes('agri') ? (await import('./profile-agri')).agriExtras(ctx) : {};
+  // R13: a manufacturing Demo company (pack `shopfloor`) adds its rows (`profile-mfg.ts`, by pack; stock items appended).
+  const mfg = ctx.packs.includes('shopfloor') ? (await import('./profile-mfg')).mfgExtras(ctx) : {};
+  if (!agri.tables && !mfg.tables) return base;
+  const stock = [...(base.tables?.stock_items ?? []), ...(agri.tables?.stock_items ?? []), ...(mfg.tables?.stock_items ?? [])];
+  return { ...base, tables: { ...base.tables, ...agri.tables, ...mfg.tables, ...(stock.length ? { stock_items: stock } : {}) } };
 }
 
 async function profileExtras(profile: DemoProfile, ctx: ProfileContext): Promise<DemoExtras> {

@@ -16,7 +16,8 @@ import { num } from '../../lib/invoice-calc';
 import { todayInput } from '../../lib/utils';
 import { fT } from '../../i18n/areas/mfg-r13a';
 import controls from '../../styles/controls.module.css';
-import { F, Grid, In, Sel, fmt, row } from './floor-ui';
+import { F, Grid, In, Sel } from './floor-ui';
+import { fmt, row } from './floor-util';
 
 export default function LoadView({ ctx }: { ctx: MfgContext }) {
   const [v, setV] = useState(0);

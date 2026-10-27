@@ -28,6 +28,3 @@ export function In({ v, set, type = 'text', ...rest }: { v: string; set: (s: str
 export function Sel({ v, set, o, ...rest }: { v: string; set: (s: string) => void; o: readonly (readonly [string, string])[] } & Record<string, unknown>) {
   return <select className={controls.select} value={v} onChange={(e) => set(e.target.value)} {...rest}>{o.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>;
 }
-
-export const row = { display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' } as const;
-export const fmt = (n: number) => n.toLocaleString('en-IN', { maximumFractionDigits: 3 });

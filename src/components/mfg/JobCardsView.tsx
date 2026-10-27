@@ -6,10 +6,10 @@
  */
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { JobCard, JobCardEntry, MfOrderOp } from '../../types/mfg-r13';
+import type { JobCard, MfOrderOp } from '../../types/mfg-r13';
 import type { ProductionOrder } from '../../types/production-r4';
 import type { MfgContext } from '../manufacturing/context';
-import { cardTotals, loadCards, removeEntry, reportEntry } from '../../lib/mfg/mf-jobcards';
+import { cardTotals, loadCards, removeEntry } from '../../lib/mfg/mf-jobcards';
 import { loadCentres } from '../../lib/mfg/mf-centres';
 import { defaultRoutingOf, outsideSendHref, standardConversion } from '../../lib/mfg/mf-routings';
 import { rejectReasons } from '../../lib/mfg/mf-settings';
@@ -20,10 +20,11 @@ import { num } from '../../lib/invoice-calc';
 import { todayInput } from '../../lib/utils';
 import { fT } from '../../i18n/areas/mfg-r13a';
 import controls from '../../styles/controls.module.css';
-import { F, Grid, In, Sel, fmt, row } from './floor-ui';
+import { F, Grid, In, Sel } from './floor-ui';
+import { fmt, row } from './floor-util';
 import OperatorScreen from './OperatorScreen';
+import { submitEntry, usePeople, type EntryDraft } from './floor-util';
 
-export type EntryDraft = Partial<JobCardEntry> & { opKind?: string; opId?: string };
 
 /** The entry form (also used by the operator screen). */
 export function EntryForm({ ctx, value, set, people }: { ctx: MfgContext; value: EntryDraft; set: (p: EntryDraft) => void; people: { employees: [string, string][]; karigars: [string, string][] } }) {
@@ -53,26 +54,6 @@ export function EntryForm({ ctx, value, set, people }: { ctx: MfgContext; value:
       </div>
     </div>
   );
-}
-
-export function usePeople(): { employees: [string, string][]; karigars: [string, string][] } {
-  return useMemo(() => ({
-    employees: getTable<{ id: string; name: string; active?: boolean }>('employees').filter((e) => e?.id && e.active !== false).map((e) => [e.id, e.name]),
-    karigars: getTable<{ id: string; name: string; mf?: { karigar?: boolean } }>('vendors').filter((x) => x?.mf?.karigar).map((x) => [x.id, x.name]),
-  }), []);
-}
-
-/** Save an entry draft on an order's operation (shared with the operator screen). */
-export function submitEntry(ctx: MfgContext, order: ProductionOrder, op: MfOrderOp, d: EntryDraft, oos: boolean): boolean {
-  try {
-    const { opKind, opId, ...e } = d;
-    const { card, warnings } = reportEntry(order.id, op.id, { ...e, ...(opId ? { operator: { kind: opKind === 'karigar' ? 'karigar' : 'employee', id: opId } } : {}) }, { allowOutOfSequence: oos });
-    ctx.changed([fT('entrySaved', { number: card.number }), ...warnings].join(' '));
-    return true;
-  } catch (err) {
-    ctx.error((err as Error).message);
-    return false;
-  }
 }
 
 export default function JobCardsView({ ctx }: { ctx: MfgContext }) {

@@ -12,8 +12,10 @@ import { num } from '../../lib/invoice-calc';
 import { todayInput } from '../../lib/utils';
 import { fT } from '../../i18n/areas/mfg-r13a';
 import controls from '../../styles/controls.module.css';
-import { EntryForm, submitEntry, type EntryDraft } from './JobCardsView';
-import { F, In, Sel, fmt } from './floor-ui';
+import { EntryForm } from './JobCardsView';
+import { submitEntry, type EntryDraft } from './floor-util';
+import { F, In, Sel } from './floor-ui';
+import { fmt } from './floor-util';
 
 const big = { minHeight: 56, fontSize: '1.1rem', width: '100%' } as const;
 const now = () => {

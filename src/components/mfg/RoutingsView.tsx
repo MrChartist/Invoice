@@ -9,7 +9,8 @@ import { num } from '../../lib/invoice-calc';
 import { downloadText } from '../../lib/download';
 import { fT } from '../../i18n/areas/mfg-r13a';
 import controls from '../../styles/controls.module.css';
-import { F, Grid, In, Sel, fmt, row } from './floor-ui';
+import { F, Grid, In, Sel } from './floor-ui';
+import { fmt, row } from './floor-util';
 
 const blankOp = (seq: number, centre = ''): RoutingOp => ({ id: generateId(), seq, name: '', work_centre_id: centre, setup_min: 0 });
 const n = (s: string) => (s.trim() === '' ? undefined : num(s));

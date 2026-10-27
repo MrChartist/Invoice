@@ -15,7 +15,8 @@ import { num } from '../../lib/invoice-calc';
 import { todayInput } from '../../lib/utils';
 import { fT } from '../../i18n/areas/mfg-r13a';
 import controls from '../../styles/controls.module.css';
-import { F, Grid, Sel, fmt, row } from './floor-ui';
+import { F, Grid, Sel } from './floor-ui';
+import { fmt, row } from './floor-util';
 
 export default function DatedPlanView({ ctx, lines, due }: { ctx: MfgContext; lines: readonly ProductionPlanLine[]; due?: string }) {
   const [by, setBy] = useState<'day' | 'week'>('week');
