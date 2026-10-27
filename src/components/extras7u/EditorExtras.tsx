@@ -3,7 +3,7 @@
  * pharma pack exists): sales agent, the bill-value offer line (applied automatically after the price
  * was chosen, removable per bill), prescription details for Schedule H1 / X sales.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { RECORD_KEYS, useInvoiceStore } from '../../store/useInvoiceStore';
 import { agentsDb } from '../../lib/sales-commission';
@@ -17,6 +17,8 @@ import { useT } from '../../i18n';
 import { x7T } from '../../i18n/areas/extras-7u';
 import controls from '../../styles/controls.module.css';
 import own from './x7u.module.css';
+
+const RxEditorExtra = lazy(() => import('../retail-r9/RxStrip').then((m) => ({ default: m.RxEditorExtra })));
 
 const SALES = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY', 'QUOTATION', 'PROFORMA', 'SALES_ORDER', 'DELIVERY_CHALLAN', 'CREDIT_NOTE']);
 const OFFER_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY', 'QUOTATION', 'PROFORMA', 'SALES_ORDER']);
@@ -56,11 +58,6 @@ export default function EditorExtras() {
 
   if (!SALES.has(s.doc_type)) return null;
   const missing = pharma.enabled ? rxMissing({ items: s.items, rx: s.rx }, index) : [];
-  const rx = s.rx ?? { patient: '', prescriber: '' };
-  const setRx = (patch: Partial<NonNullable<InvoiceRecord['rx']>>) => {
-    const next = { ...rx, ...patch };
-    s.patch({ rx: next.patient.trim() || next.prescriber.trim() || next.patient_address?.trim() || next.prescriber_reg?.trim() ? next : undefined });
-  };
   const liveAgents = agents.filter((a) => a.active !== false || a.id === s.agent_id);
 
   return (
@@ -82,16 +79,7 @@ export default function EditorExtras() {
       {pharma.enabled && (
         <div className={own.box}>
           <p className={own.sub}>{x7T('prescription')}</p>
-          <div className={own.row}>
-            <label className={controls.field}><span className={controls.label}>{x7T('patient')}</span>
-              <input className={controls.input} value={rx.patient} onChange={(e) => setRx({ patient: e.target.value })} /></label>
-            <label className={controls.field}><span className={controls.label}>{x7T('patientAddress')}</span>
-              <input className={controls.input} value={rx.patient_address ?? ''} onChange={(e) => setRx({ patient_address: e.target.value })} /></label>
-            <label className={controls.field}><span className={controls.label}>{x7T('prescriber')}</span>
-              <input className={controls.input} value={rx.prescriber} onChange={(e) => setRx({ prescriber: e.target.value })} /></label>
-            <label className={controls.field}><span className={controls.label}>{x7T('prescriberReg')}</span>
-              <input className={controls.input} value={rx.prescriber_reg ?? ''} onChange={(e) => setRx({ prescriber_reg: e.target.value })} /></label>
-          </div>
+          <Suspense fallback={null}><RxEditorExtra /></Suspense>{/* R9 (RT-B1): doctor picker, age / gender, Rx no. / date / photo */}
           {missing.length > 0 && <p className={own.warn}>{x7T('rxNeeded', { items: missing.join(', ') })}</p>}
         </div>
       )}
