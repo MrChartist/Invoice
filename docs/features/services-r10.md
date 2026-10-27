@@ -62,23 +62,23 @@ bundle numbers.
 
 ### Bundle (SV-A)
 
-Measured against `claude/elegant-cannon-cwapiv` at `4b0ba14` (`npm run build`, gzip level 9, same script as
-`check:size`):
+Measured against `claude/elegant-cannon-cwapiv` at `5f0c499` (vite build, gzip level 9, the `check:size` method):
 
 | | Before | After | Δ |
 |---|---|---|---|
-| Initial JS (first paint) | 189,141 B (184.7 kB) | 189,126 B (184.7 kB) | **−15 B** |
-| Total JS | 2,959,813 B (2,890.4 kB) | ≈ 3,002,600 B (≈ 2,932 kB) | **≈ +42.8 kB** |
+| Initial JS (first paint) | 189,130 B (184.7 kB) | 189,145 B (184.7 kB) | **+15 B (0.015 kB)** |
+| Total JS | 2,961,101 B (2,891.7 kB) | 3,004,637 B (2,934.2 kB) | **+42.5 kB** |
 
 First paint: the only shell-adjacent touch is `'sv'` appended to `R9_RECORD_KEYS` / `R9_LINE_KEYS`
 (`invoice-defaults.ts` is its own lazy chunk). The service hooks are loaded by a dynamic import in `bill-guard.ts` /
 `gst-guards.ts` and import neither host (an earlier static cycle split `bill-guard` into its own chunk and added a
-filename to the entry's preload map: +40 B, removed).
+filename to the entry's preload map: +40 B, removed). The remaining +15 B is preload-map bookkeeping of the hosts' new
+lazy imports.
 
-**Over the 14 kB share** (≈ +43 kB). Breakdown (gz): front desk + appointment dialog + commission desk 10.9 kB; desk
+**Over the 14 kB share** (+42.5 kB). Breakdown (gz): front desk + appointment dialog + commission desk 10.9 kB; desk
 strings en + hi 5.9 kB; claims desk 3.7 kB; engines (appointments 2.6, settings 1.5, tax 1.4, staff 0.9, rules 0.7,
 hooks 0.6, slots / profile / registry / shared ≈ 1.1); editor row 1.2; help topics for all 36 Round 10 tab rows 2.0;
 palette labels 0.9; reach / checklist / glossary / discover strings ≈ 2; picker 1.3; hosts (Time, Pos, ItemsTable,
 GST guards, common credit, demo) ≈ 3.5. The PRD's 14 kB covered A's five items but not the Round-10-wide rows A owns
 (every R10 help topic, palette label and Ctrl+K title, ≈ 3 kB) nor two languages of desk strings. Total JS stays under
-the 3,000 kB budget (≈ 2,932 kB); SV-B / C / D then have ≈ 68 kB, above their planned 31 kB.
+the 3,000 kB budget (2,934 kB); SV-B / C / D then have ≈ 66 kB, above their planned 31 kB.
