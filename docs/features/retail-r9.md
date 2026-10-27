@@ -296,7 +296,138 @@ page (−0.35 kB), PO / GRN mounts dropped (−1.2 kB).
 
 # RT-D — Electronics and mobiles
 
-(RT-D)
+Pack `electronics` (shop profile *Electronics / mobiles*; the profile also turns the cash guard to *warn*). One lazy desk
+chunk (`DevicesDesk.tsx`, which also holds `FinanceTender.tsx`, `ExchangeTender.tsx`, `JobCardPrint.tsx` and the POS /
+editor parts `PosDevices` / `EditorDevices`); strings in `i18n/areas/retail-r9d.ts` (English + Hindi). Engines in
+`src/lib/retail/rt-{imei,finance,buyback,service-jobs,cash-guard}.ts`; every writer imports `./rt-registry`. Working
+papers — verify with your CA (RT10–RT15).
+
+## 1. Items
+
+**D1 IMEI-first counter.** `rt-imei.ts`: `luhnOk` / `imeiIssues` (15-digit serials of an IMEI item — `serial_kind:
+'imei'`, or unmarked in HSN 8517 — whose check digit fails: a warning on the bill line, never a block; the bill line keeps
+an inline copy, compared by `tests/rt-imei.test.ts`). Dual IMEI: the bill line's serial box takes "IMEI1 / IMEI2" rows
+(two 14–16 digit numbers only, so other serials keep their "/") into `serials` (IMEI 1, what the stock engine tracks) and
+`serial_pairs` (IMEI 1 → IMEI 2). `serialIndex` (in-stock serials → item + godown, IMEI 2 keys point at IMEI 1) and
+`serialHit` (a sale line source with the serial, its godown, warranty months and pair) back `scan.ts`'s new last fallback
+`serialScan.find` (after barcode / SKU), registered only while the POS strip (`PosDevices`) or the editor part
+(`EditorDevices`, items table footer) is mounted, and built on the first unknown code — no cost without serial items.
+`addScannedLine` copies a source's serials / godown / warranty / pair onto a new line and never merges a serial line. A
+serial picked by hand on the POS gets its IMEI 2 from the purchase line (`pairsOf`). Sale lines print both
+(`trackingText`: `S/N: IMEI1 / IMEI2`). Blocked-IMEI check log `imei_checks` (`logImeiCheck`; date, IMEI, clear / blocked,
+portal reference; the app never calls the portal); `resaleCheckIssue` warns on a used-device resale (and on a buy-back)
+without a "clear" check of either IMEI within `IMEI_CHECK_RULES.resaleCheckDays` (30, from 22 Oct 2025, unverified) and
+stops at a "blocked" result. Devices → *IMEI*: lookup by IMEI 1 or IMEI 2 (item, pair, in stock / sold with warranty) and
+the check log.
+
+**D2 EMI / consumer finance.** `rt-finance.ts` (`finance_deals`): `recordFinance(invoiceId, financier, loan, DO, scheme,
+loan a/c last 4)` — the bill stays the customer's at full value; the loan part is a receipt row on it into the clearing
+account "Consumer finance clearing" (a `bank_accounts` row with `clearing: true`, never offered by bank pickers), tagged
+`ra_journal_id` with its journal (class *Finance transfer*: Dr Sundry debtors — financier | Cr clearing). So the customer
+is nil, the financier owes the DO, and every cash / bank reader skips the row (`movedNoCash`, unchanged). The cash book
+leaves the transfer journal out (`books.ts`, like *RA deduction*). `recordDisbursement(deal, { amount, fee })`: receipt
+voucher (class *Finance disbursement*) Dr Bank (net) + Dr Sundry creditors — financier (fee) | Cr Sundry debtors —
+financier, and the fee as the financier's own bill: a purchase **draft** (SAC 997119, 18 %, ITC per its invoice;
+`FINANCE_FEE_RULES`, unverified). The DO closes when receipts + fees = loan; a partial disbursement keeps it open.
+`undoDisbursement` (voucher → recycle bin, draft removed), `cancelDeal` (no disbursement: row + journal removed, the bill is
+due again), `pendingDos` (> 7 days), `financierSummary`, `financeCsv`. POS: *Finance (EMI)* tender row (financier, loan,
+DO, scheme) — the loan is taken off what the counter must collect and recorded on the bill right after it is saved. A card
+EMI stays a card tender; a retailer-funded no-cost discount is an ordinary invoice discount (RT10). Devices → *Finance*:
+record finance on any saved bill (editor bills too), DOs with *Received* / *Undo*, the "unpaid over 7 days" count, CSV.
+
+**D3 Buy-back / exchange and resale.** `rt-buyback.ts`: `recordBuyBack` — a `purchases` row (kind PURCHASE) numbered
+`URD/FY…` (`rt-urd.ts`), from the customer as an individual vendor (matched by name + phone, else created), no GST,
+`itc_eligible: false`, no RCM, `used_goods` (model, IMEI, condition, accessories, ID type / last 4, linked IMEI check, stock
+item, godown); the device goes into the `'used'` godown ("Used goods", created once) as a serial of a `second_hand`,
+serial-tracked item "<model> (used)". `applyExchange(invoice, voucher)` — a receipt row `exchange_purchase_id` (no cash; the
+ledger debits Sundry creditors — the customer) and the voucher's `amount_paid` rises (payables show it settled); refused
+unless the bill's customer is the voucher's party (their creditor and debtor balances net). `undoExchange`, `deleteBuyBack`
+(refused once it settled a sale; URD number stays used). `openVouchers` also lists RT-E's old-metal (`old_metal`) URD
+vouchers, so RT-E's old gold uses the same `ExchangeTender` without code of its own. Margin scheme (Rule 32(5)):
+`buyBackOf(serial)` reads the voucher through the purchases contract (void / ITC taken / any GST → no margin scheme);
+`marginLines` splits the sale line into a *cost* line (purchase value, 0 %, keeps the serial) and a *margin* line (selling
+price − purchase value, GST inside it: rate = margin × 100 ÷ (100 + r) on a tax-exclusive bill); a nil / negative margin
+leaves one 0 % line. `invoice-calc.ts` is unchanged. `marginIssue` refuses it for a buyer with a GSTIN. POS / editor: a
+*Margin scheme* button on each second-hand line (with the IMEI resale-check warning); POS *Exchange* tender. Devices →
+*Buy-back*: the voucher form (40A(3) cash note), the list with resale bill and margin, *Exchange on bill*.
+
+**D4 Repair job sheets — the job engine (`service_jobs`).** See §2 for the API. Devices → *Repairs*: new job (kind,
+customer, model, IMEI / serial, complaint, accessories, estimate, ready-by, technician; warranty read from the serial),
+board of open jobs (or all) with status moves, *At service centre*, `wa.me` update, job card print; per job: parts
+("name × qty @ ₹", `w` = under warranty) and labour, claim buttons (sent → approved / rejected → settled), *Bill job*
+(opens the bill), *Returned unrepaired*, delete.
+
+**Cash guard (generic).** `rt-cash-guard.ts` — built here for the electronics counter (RT-A's profile sets *warn*); RT-E
+extends it (PAN, PMLA). `cashReceiptIssue(mode, cash on the bill, the customer's other cash today)` ≥
+`CASH_RECEIPT_LIMIT_RULES` (₹2,00,000 from 2017-04-01, Sec 269ST, unverified) → warning, or an error with *block*;
+`sameDayCash` (client id, else name + phone; no-cash rows skipped); `cashPaymentIssue` (> ₹10,000 a day, Sec 40A(3),
+`CASH_PAYMENT_LIMIT_RULES`). The POS strip mounts for the electronics pack or whenever a cash guard is set.
+
+## 2. `service_jobs` API (for Round 10 SV-D workshops)
+
+`src/lib/retail/rt-service-jobs.ts`, types in `types/retail-r9.ts` (`ServiceJob`, `ServicePart`, `WarrantyClaim`,
+`ServiceStatus`), rule `REPAIR_SERVICE_RULES` (`retail-rules.ts`, `RepairKind`).
+
+| Call | What it does |
+|---|---|
+| `addJob(input, tracking?)` | `doc.create`; numbered `SVC/FY…` (`nextServiceNumber`, `series-counters.ts`, never reused); period lock on the date; `kind` = `phone` / `computer` / `appliance` / `vehicle` / `other`; `asset` = `{ model, serial?, item_id?, sale_invoice_id?, reg_no?, odometer? }` (a vehicle uses `reg_no` / `odometer`); with `tracking` the warranty (`warrantyFor`: sale date + warranty months from the stock engine) and our sale are filled in. |
+| `updateJob(id, { parts, labour, estimate, technician, due, advance_id, sac, warranty })` | Not once billed. Parts: `{ item_id?, name, hsn?, qty, rate, tax_rate, serials?, warranty? }`. |
+| `canMove` / `moveJob(id, to, day)` / `nextServiceStatus` | received → diagnosed → approved → in_repair \| at_service_centre → ready → delivered; `returned` from any open step; history kept. |
+| `setClaim(id, claim)` | brand / service-centre claim `sent → approved / rejected → settled` (never back; settled only after approved). |
+| `warrantyCovers(job)` / `jobLines(job, date)` | Labour line (SAC by kind from `REPAIR_SERVICE_RULES` — phone 998716, computer 998713, appliance 998715, vehicle 998714, other 998719 — or the job's `sac`; 18 %, job number in the description) + chargeable parts at their own HSN / rate; warranty parts are dropped when covered (claim approved / settled, else warranty active): no sale, no GST (`WARRANTY_REPLACEMENT_RULES`). |
+| `billJob(id, date)` | Saves one invoice (`makeDraft` + `calculateInvoice`; parts leave stock through the sale), adjusts the job's advance (`advances.applyAdvance`), issues covered warranty parts out of stock at no value (`warrantyMoves`), stamps `invoice_id` / `invoice_number`. Nothing chargeable → no invoice. |
+| `replacementSwap(id, { itemId, outSerial, inSerial, date })` | Warranty unit swap: two zero-value adjustments (stock count unchanged), ids on the job. |
+| `overdueJobs`, `jobAge`, `isOpenJob`, `jobLink`, `deleteJob` | Board helpers; delete refused once billed (recycle bin; number kept). |
+
+SV-D can reuse it as is: add its own `kind` handling in the UI, its SAC through the job's `sac` or a new dated rule row,
+and its own desk; the table, series and rights stay `service_jobs` / `SVC` / `doc.create`.
+
+## 3. Recycle bin
+
+Restore hooks (`trust/recycle-bin.ts`): a *Finance transfer* journal and its receipt row are one entry (the RA-deduction
+pairing, now a class set); *Finance disbursement* is owned by `finance_deals` (refused once undone on the DO — "record the
+disbursement again"); a `finance_deals` row comes back with its transfer journal and row, and is refused when the same DO
+was recorded again; an exchange receipt comes back only with its URD voucher. Service jobs and IMEI checks post nothing.
+
+## 4. Deviations
+
+- Finance and exchange on the **editor**: recorded from the desk on the saved bill (*Record finance*, *Exchange on bill*);
+  the POS has the tender rows. The editor has the IMEI scan and the margin scheme.
+- The transfer row uses the existing `ra_journal_id` no-cash pairing (R5-B5 / R7-B5 pattern) instead of a new marker, so
+  `no-cash.ts` is untouched; the receipts CSV names that row's Deposit To "RA deductions clearing" (Tally and the ledger
+  use the real "Consumer finance clearing").
+- Overdue jobs show on the Repairs board (not on the bell). No financier master: the financier is typed (suggested from
+  clients flagged `financier` and earlier DOs) and is its party ledger name.
+- Sample data (Demo only) cannot hold purchases or vouchers: it has IMEI phones, a second-hand phone in "Used goods", a
+  clear IMEI check, an open repair job and a finance-ready bill; the DO and a URD voucher are made from the desk.
+- RT-D fills the two cash-limit rows of the RT-E section of `retail-rules.ts` and creates `rt-cash-guard.ts` (RT-E's file in
+  the PRD): RT-E extends it.
+
+## 5. Sizes (gz, `npm run build` + `check:size`)
+
+Measured against the merged base `dd2b5cf` (RT-A, RT-B, RT-C):
+
+| | Before | After | Δ |
+|---|---|---|---|
+| Initial JS | 189,035 B | 189,053 B | **+18 B** (preload-map entries) |
+| Total JS | 2,815,944 B | 2,834,405 B (2768 kB / 2900) | **+18.5 kB** |
+
+**Deviation (total):** over RT-D's 13 kB share. Breakdown: `DevicesDesk` chunk 15.9 kB (four views, POS / editor parts,
+tenders, job card, five engines ≈ 10 kB minified-gz between them, en + hi strings 2.8 kB); sample block +0.6; rule rows
++0.5; host glue (two lazy mounts with their preload lists, bill-line pair / Luhn, recycle-bin hooks, scan fallback,
+`trackingText`) ≈ 1.5 kB across LineItemsEditor, InvoiceCreator, Pos, recycle-bin, purchases, scan. Trimmed: one chunk for
+desk + POS + editor parts, the serial lookup reimplemented in two lines instead of mounting `SerialLookup` (it split
+Inventory into two new chunks: +1.1 kB total and +42 B first paint), prompts instead of inline forms for disbursements and
+claims, strings shortened (−1 kB), the job card reduced to one copy.
+
+## 6. CA items (RT-D)
+
+- RT10: finance part moved to the financier by a journal; the fee is the financier's 18 % bill (SAC 997119, unverified).
+- RT11: buy-back voucher without GST / ITC / RCM; the sale carries the full value.
+- RT12: margin = price − buy-back value, GST inside the margin, negative ignored; refused for a registered buyer.
+- RT13: repair SAC 998716 (phones; 998713 / 998715 / 998714 / 998719 by kind) at 18 % unverified; warranty parts no sale.
+- RT14 / RT18: cash guard thresholds ₹2,00,000 (269ST) and ₹10,000 (40A(3)) from memory.
+- RT15: blocked-IMEI check log, 30-day resale window (the app's default; the rule text not re-read).
 
 # RT-E — Jewellery
 

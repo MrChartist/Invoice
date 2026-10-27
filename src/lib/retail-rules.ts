@@ -52,15 +52,39 @@ export const ALTERATION_RULES: readonly RtRule<AlterationRule>[] = [
 ];
 
 /* ── RT-D: electronics and mobiles ── */
-export const IMEI_CHECK_RULES: readonly RtRule<{ resaleCheckDays: number }>[] = [];
-export const MARGIN_SCHEME_RULES: readonly RtRule<{ rule: string }>[] = [];
-export const WARRANTY_REPLACEMENT_RULES: readonly RtRule<{ noSale: boolean }>[] = [];
+/** RT15: a used device's IMEI is checked on the central blocked-IMEI database before resale; the app keeps a log only. */
+export const IMEI_CHECK_RULES: readonly RtRule<{ resaleCheckDays: number }>[] = [
+  { from: '2025-10-22', value: { resaleCheckDays: 30 }, source: 'Telecommunications (Telecom Cyber Security) Amendment Rules 2025, GSR 771(E) of 22 Oct 2025 — as reported (conventuslaw, scconline), text not re-read; the 30-day window is the app\'s default', verified: false },
+];
+/** RT12: value of a second-hand sale = selling price − purchase price (negative ignored), only with no ITC on the purchase. */
+export const MARGIN_SCHEME_RULES: readonly RtRule<{ rule: string }>[] = [
+  { from: '2017-07-01', value: { rule: 'Rule 32(5), CGST Rules 2017' }, source: 'Rule 32(5) CGST Rules — from memory, not re-read; AAR Karnataka (Aadhya Gold, 2018) denied it where the goods changed nature', verified: false },
+];
+/** RT13: a part / unit replaced free under warranty is no supply: no GST, no ITC reversal. */
+export const WARRANTY_REPLACEMENT_RULES: readonly RtRule<{ noSale: boolean }>[] = [
+  { from: '2023-07-17', value: { noSale: true }, source: 'Circular 195/07/2023-GST (warranty replacements) — as understood, not re-read', verified: false },
+];
+/** What a repair job sheet covers (RT-D4). Round 10 SV-D (workshops) uses `vehicle`. */
+export type RepairKind = 'phone' | 'computer' | 'appliance' | 'vehicle' | 'other';
+/** RT13: maintenance and repair SAC per kind (group 9987) and the rate. 998714 is transport machinery (SV20). */
+export const REPAIR_SERVICE_RULES: readonly RtRule<{ sac: Record<RepairKind, string>; rate: number }>[] = [
+  { from: '2017-07-01', value: { sac: { phone: '998716', computer: '998713', appliance: '998715', vehicle: '998714', other: '998719' }, rate: 18 }, source: 'SAC 9987 maintenance and repair: 998716 telecom equipment, 998713 computers, 998715 household appliances, 998714 transport machinery, 998719 other — classification as recalled; 18% unverified', verified: false },
+];
+/** RT10: the financier's subvention / processing fee billed to the dealer (its own supply; ITC per its invoice). */
+export const FINANCE_FEE_RULES: readonly RtRule<{ sac: string; rate: number }>[] = [
+  { from: '2017-07-01', value: { sac: '997119', rate: 18 }, source: 'SAC 997119 (other financial services) at 18% — AAR Daimler FS on subvention as quoted (vinodkothari 2019), not re-read', verified: false },
+];
 
 /* ── RT-E: jewellery ── */
 export const JEWELLERY_GST_RULES: readonly RtRule<{ goodsRate: number; jobWorkRate: number; jobWorkSac: string }>[] = [];
 export const HALLMARK_RULES: readonly RtRule<{ huidMandatory: boolean; verifyLine: string }>[] = [];
-export const CASH_RECEIPT_LIMIT_RULES: readonly RtRule<number>[] = [];
+// The two cash limits are filled by RT-D (electronics cash guard, buy-back cash); RT-E adds PAN / PMLA rows.
+export const CASH_RECEIPT_LIMIT_RULES: readonly RtRule<number>[] = [
+  { from: '2017-04-01', value: 200000, source: 'Sec 269ST Income-tax Act 1961 (no cash receipt of ₹2 lakh or more; penalty Sec 271DA) — recalled; 2025-Act section not confirmed', verified: false },
+];
 export const PAN_SALE_LIMIT_RULES: readonly RtRule<number>[] = [];
 export const PMLA_CASH_RULES: readonly RtRule<number>[] = [];
-export const CASH_PAYMENT_LIMIT_RULES: readonly RtRule<number>[] = [];
+export const CASH_PAYMENT_LIMIT_RULES: readonly RtRule<number>[] = [
+  { from: '2017-04-01', value: 10000, source: 'Sec 40A(3) Income-tax Act 1961 (cash expenditure above ₹10,000 to a person in a day disallowed) — recalled; 2025-Act section not confirmed', verified: false },
+];
 export const EWAY_EXEMPT_CHAPTER_RULES: readonly RtRule<readonly string[]>[] = [];

@@ -12,6 +12,12 @@ import { purT } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
+/**
+ * R9 (RT-D1): the IMEI check digit (Luhn) — a warning only (MEIDs and odd stickers exist). Same rule as `rt-imei.ts`
+ * `luhnOk` (kept inline so the bill chunk does not load the devices engine; `tests/rt-imei.test.ts` compares them).
+ */
+const luhn = (d: string) => [...d].reverse().reduce((s, c, i) => s + (i % 2 ? [0, 2, 4, 6, 8, 1, 3, 5, 7, 9][+c] : +c), 0) % 10 === 0;
+
 /** What the bill form knows about stock tracking (6.6 / 6.10 / 6.11). */
 export interface BillStockContext {
   /** Tracked stock item a line's name + HSN matches, if any. */
@@ -95,16 +101,23 @@ export function BillLineTracking({ line, index, ctx, onPatch }: {
         <label className={`${controls.field} ${styles.trackWide}`}>
           <span className={controls.label}>
             {purT('serialsLabel', { have: serials.length, want })}
+            {(item.serial_kind ?? (String(item.hsn ?? '').startsWith('8517') ? 'imei' : '')) === 'imei' && serials.some((s) => /^\d{15}$/.test(s) && !luhn(s)) && <span className={controls.error} data-imei-luhn> · {purT('imeiLuhn')}</span>}
           </span>
           <textarea
             className={controls.textarea}
             rows={Math.min(Math.max(want, 2), 6)}
-            defaultValue={serials.join('\n')}
+            defaultValue={serials.map((s) => (line.serial_pairs?.[s] ? `${s} / ${line.serial_pairs[s]}` : s)).join('\n')}
             aria-label={purT('lineSerials', { n })}
             placeholder={purT('serialsPh')}
             onChange={(e) => {
-              const list = parseSerials(e.target.value);
-              onPatch({ serials: list.length ? list : undefined });
+              // R9 (RT-D1): "IMEI1 / IMEI2" rows pair a dual-IMEI device (the stock engine tracks IMEI 1).
+              const pairs: Record<string, string> = {};
+              const list = parseSerials(e.target.value).map((r) => {
+                const m = /^(\d{14,16})\s*\/\s*(\d{14,16})$/.exec(r);
+                if (m) pairs[m[1]] = m[2];
+                return m ? m[1] : r;
+              });
+              onPatch({ serials: list.length ? list : undefined, serial_pairs: Object.keys(pairs).length ? pairs : undefined });
             }}
           />
         </label>

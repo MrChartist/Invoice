@@ -222,8 +222,12 @@ const OWNED_VOUCHERS: readonly { classes: readonly string[]; tables: readonly st
   { classes: ['Brokerage'], tables: ['brokerage_postings'], redo: 'restore the brokerage posting itself, or post it again in Distribution → Brokers' },
   { classes: ['Trade claim'], tables: ['trade_claims'], redo: 'settle the claim again in Distribution → Claims' },
   { classes: ['Packaging deposit'], tables: ['packaging_moves'], redo: 'restore the packaging movement itself, or record it again in Distribution → Packaging' },
+  // R9 (RT-D2): a financier's disbursement is undone on its DO
+  { classes: ['Finance disbursement'], tables: ['finance_deals'], redo: 'record the disbursement again in Inventory → Devices → Finance' },
 ];
 const RA_CLASS = 'RA deduction';
+/** Journals paired one-to-one with a no-cash receipt row through `ra_journal_id` (R9 RT-D2: the finance transfer). */
+const PAIRED_CLASSES = new Set([RA_CLASS, 'Finance transfer']);
 const SETTLEMENT_METHOD = 'Marketplace settlement'; // as settlement-post.ts records it (not imported: keeps this chunk small)
 
 const inBin = (bin: readonly BinEntry[], table: string, pick: (r: Row) => boolean) => [...bin].reverse().find((b) => b.table === table && isObj(b.row) && pick(b.row));
@@ -232,11 +236,11 @@ const what = (e: BinEntry) => `${describeEntry(e).label} ${describeEntry(e).numb
 
 registerRestoreHook('vouchers', (row, e, live, bin) => {
   const cls = str(row.voucher_class);
-  if (cls === RA_CLASS) {
-    // A deduction journal and its receipt row are one entry: both or neither.
+  if (PAIRED_CLASSES.has(cls)) {
+    // A deduction (or finance transfer) journal and its receipt row are one entry: both or neither.
     if (live('transactions').some((p) => str(p?.ra_journal_id) === e.row_id)) return null;
     const pair = inBin(bin, 'transactions', (r) => str(r.ra_journal_id) === e.row_id);
-    return pair ? { companions: [pair] } : { refuse: `${what(e)} is the journal of a GST TDS / labour cess deduction whose receipt is gone for good. Record the deduction again from the RA bill.` };
+    return pair ? { companions: [pair] } : { refuse: `${what(e)} is the journal of a ${cls === RA_CLASS ? 'GST TDS / labour cess deduction' : 'finance transfer'} whose receipt is gone for good. Record it again from the bill.` };
   }
   const owner = OWNED_VOUCHERS.find((o) => o.classes.includes(cls));
   if (!owner) return null;
@@ -260,6 +264,12 @@ registerRestoreHook('transactions', (row, e, live, bin) => {
   }
   if (str(row.method) === SETTLEMENT_METHOD && !mentions(live('settlements'), e.row_id)) {
     return { refuse: 'This receipt was posted from a marketplace settlement that has since been unposted. Post the settlement again in Receivables → Marketplace → Settlements.' };
+  }
+  // R9 (RT-D3 / E3): an exchange receipt comes back only with its buy-back voucher.
+  const urd = str(row.exchange_purchase_id);
+  if (urd && !isLive(live, 'purchases', urd)) {
+    const pair = inBin(bin, 'purchases', (r) => str(r.id) === urd);
+    return pair ? { companions: [pair] } : { refuse: 'The buy-back voucher this exchange settled is gone for good. Record the buy-back and the exchange again.' };
   }
   const gv = str(row.gift_voucher_id);
   if (gv) {
@@ -295,6 +305,15 @@ registerRestoreHook('packaging_moves', (row, _e, live, bin) => {
   const inv = str(row.charge_invoice_id);
   if (inv && !live('invoices').some((x) => str(x?.id) === inv && str(x?.status) !== 'Cancelled')) return { refuse: 'This movement closed crates billed on an invoice that is gone or cancelled. Charge the crates again in Distribution → Packaging.' };
   return companionOr(live, bin, 'vouchers', str(row.voucher_id), 'The deposit voucher of this movement is gone for good. Record the movement again in Distribution → Packaging.');
+});
+registerRestoreHook('finance_deals', (row, _e, live, bin) => {
+  // R9 (RT-D2): a DO comes back with its transfer row and journal (both or neither), never next to a re-made deal.
+  if (live('finance_deals').some((d) => str(d?.invoice_id) === str(row.invoice_id) && str(d?.do_no) === str(row.do_no))) return { refuse: 'This DO was recorded again since; restoring it would post the finance part twice.' };
+  const v = companionOr(live, bin, 'vouchers', str(row.transfer_voucher_id), 'The finance transfer journal of this DO is gone for good. Record the finance sale again in Inventory → Devices → Finance.');
+  if (v?.refuse) return v;
+  const t = companionOr(live, bin, 'transactions', str(row.transfer_payment_id), 'The finance part receipt of this DO is gone for good. Record the finance sale again in Inventory → Devices → Finance.');
+  if (t?.refuse) return t;
+  return { companions: [...(v?.companions ?? []), ...(t?.companions ?? [])] };
 });
 registerRestoreHook('invoices', (row, _e, live) => {
   // QA8 T5: an interest draft of an undone run stays gone (its bills were freed to be charged again).

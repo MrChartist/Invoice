@@ -30,8 +30,8 @@ export function codeKey(raw: string | undefined): string {
 export interface CodeMatch {
   /** The catalogue row (or a catalogue-shaped copy of a stock item that is not in the catalogue). */
   item: InvoiceItem;
-  /** Which field matched. */
-  via: 'barcode' | 'sku';
+  /** Which field matched (`serial`: an in-stock serial / IMEI, R9 RT-D1). */
+  via: 'barcode' | 'sku' | 'serial';
   /** The stock item it also matches, when stock is tracked. */
   stock?: StockItem;
 }
@@ -67,8 +67,11 @@ export function findByCode(raw: string, catalog: readonly InvoiceItem[], stock: 
     };
     return { item, via, stock: s };
   }
-  return null;
+  return serialScan.find?.(raw) ?? null;
 }
+
+/** R9 (RT-D1): last fallback — an in-stock serial / IMEI → its item with the serial picked; set by the devices desk. */
+export const serialScan: { find?: (code: string) => CodeMatch | null } = {};
 
 /**
  * 8E (8.141): the item whose `short_code` is exactly `term` (case and leading zeros ignored, like a barcode).
@@ -105,7 +108,8 @@ export function addScannedLine(
     !l.free_of &&
     norm(l.name) === norm(source.name) &&
     (!l.hsn || !source.hsn || l.hsn === source.hsn) &&
-    !(l.serials && l.serials.length);
+    !(l.serials && l.serials.length) &&
+    !source.serials?.length;
   const idx = items.findIndex(sameItem);
   if (idx >= 0) {
     const line = items[idx];
@@ -128,6 +132,7 @@ export function addScannedLine(
     amount: round2(qty * rate),
     ...(num(source.cess_rate) > 0 ? { cess_rate: num(source.cess_rate) } : {}),
     ...(num(source.cess_per_unit) > 0 ? { cess_per_unit: num(source.cess_per_unit) } : {}),
+    ...(source.serials?.length ? { serials: source.serials, godown_id: source.godown_id, warranty_months: source.warranty_months, serial_pairs: source.serial_pairs } : {}), // R9 (RT-D1)
   };
   const last = items[items.length - 1];
   if (last && blank(last)) return { items: [...items.slice(0, -1), line], lineId: line.id, incremented: false };
