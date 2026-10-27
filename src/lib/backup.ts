@@ -122,6 +122,7 @@ export function attachmentRestoreNote(summary: BackupSummary | undefined | null)
 }
 
 function collectBackup(now: Date): BackupFile {
+  audit.flush(); // R15-A2: this task's audit appends belong in the file
   const data = collectAppData();
   for (const key of Object.keys(data)) if (leaveOut(key)) delete data[key];
   return { app: BACKUP_APP_ID, version: 1, exportedAt: now.toISOString(), data };

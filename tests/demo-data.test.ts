@@ -15,6 +15,7 @@ import {
 import { localDb } from '../src/lib/localDb.ts';
 import { writeRegistry } from '../src/lib/company-registry.ts';
 import { KEYS, getTable } from '../src/lib/storage.ts';
+import { audit } from '../src/lib/audit.ts';
 import { checkGstin } from '../src/lib/gstin.ts';
 import { summarize, isRevenueDoc } from '../src/lib/stats.ts';
 import { buildReceivables } from '../src/lib/receivables.ts';
@@ -74,7 +75,8 @@ function realInvoice(id = 'real-1'): InvoiceRecord {
   return { ...base, subtotal: t.subtotal, tax_amount: t.tax_amount, total: t.total, balance_due: t.balance_due };
 }
 
-const snapshot = () => dumpStorage();
+// R15-A2: audit appends are written once per task; flush before reading storage directly.
+const snapshot = () => (audit.flush(), dumpStorage());
 /** Storage minus nothing: exact equality of every key/value. */
 const assertSameStorage = (a: Record<string, string>, b: Record<string, string>) => {
   assert.deepEqual(Object.keys(a).sort(), Object.keys(b).sort());
