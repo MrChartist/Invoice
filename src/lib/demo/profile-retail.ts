@@ -5,7 +5,7 @@
  * grocery block; RT-B … RT-E fill their own block functions. Pure. Extra tables must be in `DEMO_EXTRA_TABLES`.
  */
 import type { InvoiceRecord } from '../../types/invoice';
-import type { DeliveryRider, ShortBookEntry } from '../../types/retail-r9';
+import type { DeliveryRider, Doctor, RxRefill, ShortBookEntry } from '../../types/retail-r9';
 import type { StockItem } from '../inventory';
 import { applyTotals, type Demo, type DemoExtras } from '../demo-data';
 import { shiftDay } from '../dates';
@@ -56,8 +56,42 @@ function groceryBlock({ today, base }: ProfileContext): DemoExtras {
   return { invoices: [order], tables: { stock_items: [loose], delivery_riders: [rider], short_book: [short] } };
 }
 
-/* ── RT-B: pharmacy (scheduled drugs, two doctors, an Rx bill, a refill) — filled by RT-B ── */
-const pharmacyBlock = (ctx: ProfileContext): DemoExtras => (void ctx, {});
+/* ── RT-B: pharmacy (scheduled drugs, two doctors, an Rx bill, a refill) ── */
+function pharmacyBlock({ today, base }: ProfileContext): DemoExtras {
+  const at = (d: number) => `${shiftDay(today, d)}T00:00:00.000Z`;
+  const azi = {
+    id: 'demo-stock-azi', demo: true, name: 'Azithromycin 500 TAB (demo)', hsn: '3004', unit: 'TAB', track_stock: true, opening_qty: 90, opening_rate: 18,
+    sale_rate: 23.5, tax_rate: 5, drug_schedule: 'H1', alt_units: [{ unit: 'STRIP', factor: 3 }], ceiling_prices: [{ from: shiftDay(today, -200), price_per_unit: 23.98 }], reorder_level: 0, created_at: at(-90),
+  } as Demo<StockItem>; // drug_schedule: the 7U pharma field (pharma.ts)
+  const para: Demo<StockItem> = {
+    id: 'demo-stock-para', demo: true, name: 'Paracetamol 650 TAB (demo)', hsn: '3004', unit: 'TAB', track_stock: true, opening_qty: 300, opening_rate: 1.4,
+    sale_rate: 2.04, tax_rate: 5, alt_units: [{ unit: 'STRIP', factor: 15 }], reorder_level: 0, created_at: at(-90),
+  };
+  const doctors: Demo<Doctor>[] = [
+    { id: 'demo-doctor-1', demo: true, name: 'Dr. A. Mehta (demo)', qualification: 'MBBS, MD', reg_no: 'MMC 2011/04/1234', council: 'Maharashtra Medical Council', clinic: 'Mehta Clinic', phone: '9800000011', active: true, created_at: at(-60) },
+    { id: 'demo-doctor-2', demo: true, name: 'Dr. S. Rao (demo)', qualification: 'MBBS', reg_no: 'MMC 2016/02/5678', council: 'Maharashtra Medical Council', active: true, created_at: at(-60) },
+  ];
+  const fy = getIndianFY(today).label;
+  const day = shiftDay(today, -27);
+  const bill = applyTotals({
+    ...base.invoices[0],
+    id: 'demo-rx-bill-1', demo: true, invoice_number: buildInvoiceNumber('DEMORX', fy, 1), issue_date: day, due_date: day, status: 'Paid', pos: true,
+    client: { id: 'demo-walkin-rx', name: 'Mrs. Kulkarni (demo)', email: '', address: '4 Lake Road, Pune', city: 'Pune', zip: '', state_code: '27', phone: '9800000012' },
+    items: [
+      { id: 'demo-rx-bill-1-l1', name: azi.name, type: 'Goods', hsn: '3004', unit: 'TAB', quantity: 3, rate: 23.5, tax_rate: 5, discount_percent: 0, amount: 70.5 },
+      { id: 'demo-rx-bill-1-l2', name: para.name, type: 'Goods', hsn: '3004', unit: 'TAB', quantity: 15, rate: 2.04, tax_rate: 5, discount_percent: 0, amount: 30.6 },
+    ],
+    gst_mode: 'CGST_SGST', place_of_supply: '27', discount_rate: 0,
+    rx: { patient: 'Mrs. Kulkarni (demo)', patient_address: '4 Lake Road, Pune', prescriber: doctors[0].name, prescriber_reg: `${doctors[0].reg_no}, ${doctors[0].council}`, doctor_id: doctors[0].id, age: 58, gender: 'F', rx_no: 'MC-118', rx_date: day },
+    notes: 'Sample prescription bill (demo).',
+  } as Demo<InvoiceRecord>);
+  bill.amount_paid = bill.total;
+  const refill: Demo<RxRefill> = {
+    id: 'demo-refill-1', demo: true, name: 'Mrs. Kulkarni (demo)', phone: '9800000012', items: [{ name: para.name, quantity: 15 }], every_days: 30,
+    next_due: shiftDay(day, 30), invoice_id: bill.id, doctor_id: doctors[0].id, active: true, created_at: `${day}T10:00:00.000Z`,
+  };
+  return { invoices: [bill], tables: { stock_items: [azi, para], doctors, rx_refills: [refill] } };
+}
 /* ── RT-C: apparel (a 4 × 3 style, a band-crossing discount, an alteration) — filled by RT-C ── */
 const apparelBlock = (ctx: ProfileContext): DemoExtras => (void ctx, {});
 /* ── RT-D: electronics (phones with IMEIs, a finance sale, a buy-back) — filled by RT-D ── */

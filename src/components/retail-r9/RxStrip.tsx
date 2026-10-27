@@ -20,7 +20,7 @@ import { doctorsDb, pickDoctor, readRxSettings, rxIssues, scheduledLines, type R
 import { ceilingIssues } from '../../lib/retail/rt-pharmacy-prices';
 import type { StockItem } from '../../lib/inventory';
 import type { AttachmentRef } from '../../lib/attachments';
-import type { InvoiceRecord } from '../../types/invoice';
+import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { PosRx } from '../../types/retail-r9';
 import { NumberInput } from '../ui/NumberInput';
 import controls from '../../styles/controls.module.css';
@@ -101,8 +101,9 @@ function Messages({ issues, ceiling }: { issues: readonly RxIssue[]; ceiling: re
   );
 }
 
-const ceilingText = (lines: InvoiceRecord['items'], day: string) =>
-  ceilingIssues(lines, stockItems(), day).map((c) => rtbT('ceilingWarn', { name: c.name, mrp: c.mrp.toFixed(2), limit: c.limit.toFixed(2), date: c.from }));
+// A counter line carries no MRP of its own: the catalogue's (per base unit) is checked.
+const ceilingText = (lines: InvoiceRecord['items'], day: string, cat = getTable<InvoiceItem>('items_catalog')) =>
+  ceilingIssues(lines.map((l) => (l.mrp ? l : { ...l, mrp: cat.find((c) => c.name.trim().toLowerCase() === l.name.trim().toLowerCase())?.mrp })), stockItems(), day).map((c) => rtbT('ceilingWarn', { name: c.name, mrp: c.mrp.toFixed(2), limit: c.limit.toFixed(2), date: c.from }));
 
 /** POS strip (controlled by the counter: `value` is merged into the bill; `errors` stop the save). */
 export default function RxStrip({ record, value, onChange }: { record: InvoiceRecord; value: PosRx | null; onChange: (v: PosRx | null) => void }) {

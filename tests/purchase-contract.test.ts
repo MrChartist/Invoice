@@ -917,3 +917,13 @@ test('R9 (RT-A4) free quantity / line discount: stock takes paid + free, every m
   const s = lastSuppliers([free]).get('name:paper ream')!;
   assert.deepEqual([s.vendorName, s.rate], ['Acme Supplies', 90], 'short book: last supplier and the rate per paid unit');
 });
+
+test('R9 (RT-B2 / RT-B3) pharmacy readers (narcotic register, margin view) read the real bill shape', async () => {
+  const free: PurchaseRecord = { ...bill, id: 'pn', lines: [{ ...bill.lines[0], id: 'ln', batch_no: 'B7', free_qty: 1, discount_percent: 10, unit: 'BOX', unit_factor: 2 }] };
+  const { narcoticRegister } = await import('../src/lib/retail/rt-pharmacy-registers.ts');
+  const [n] = narcoticRegister([{ id: 's', name: 'Paper ream', unit: 'NOS', narcotic: true }], [free, { ...free, id: 'void', status: 'void' }], [], { from: '2026-04-01', to: '2026-04-30' });
+  assert.deepEqual([n.batch, n.received], ['B7', 22], 'paid + free, in base units; a void bill is skipped');
+  const { marginRows } = await import('../src/lib/retail/rt-pharmacy-prices.ts');
+  const [m] = marginRows([free], [{ id: 's', name: 'Paper ream' }], [{ name: 'Paper ream', rate: 60 }]);
+  assert.deepEqual([m.ptr, m.cost, m.scheme], [45, 40.91, '10 + 1'], 'PTR per base unit after the line discount; cost spread over the free units');
+});

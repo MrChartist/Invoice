@@ -28,6 +28,7 @@ import {
   batchOptions, editorStockContext, liveDocTrackingIssues, liveMrpIssues, recordMrpOverrides, withBatch, withMrpIssues,
   type EditorStockContext,
 } from './stock-tracking';
+import { rxRequiredErrors } from './pharma-gate';
 import { toCsv } from './csv';
 import { formatCurrency, formatDate } from './utils';
 import { nextPartyBalanceSnapshot } from './party-balance';
@@ -275,7 +276,7 @@ export function savePosBill(input: PosSaveInput): PosSaveResult {
   if (input.exchangeReturnId && !exchange) return { ok: false, errors: ['This exchange credit was already used.'] };
   const credit = exchange ? Math.min(exchange.amount, rec.total) : 0;
   const summary = tenderSummary(round2(rec.total - credit), input.tenders);
-  const errors = posIssues(rec, summary, !!input.allowCredit);
+  const errors = [...posIssues(rec, summary, !!input.allowCredit), ...rxRequiredErrors(rec)]; // R9 (RT-B1) "Require prescription"
   // R4-B1: every gift-voucher tender is checked (balance, expiry, cancelled) before anything is written.
   for (const p of summary.payments) if (p.method === 'Gift voucher') {
     const issue = p.gift_voucher_id ? liveRedeemIssue(p.gift_voucher_id, p.amount, rec.issue_date) : 'Scan or type the gift voucher code.';
