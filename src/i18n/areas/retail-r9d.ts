@@ -71,6 +71,7 @@ export const rtdT = defineArea(
     's.ready': 'Ready',
     's.delivered': 'Delivered',
     's.returned': 'Returned unrepaired',
+    's.estimate_sent': 'Estimate sent', 's.awaiting_parts': 'Awaiting parts', 's.awaiting_insurer': 'Awaiting insurer', 's.quality_check': 'Quality check', // R10 SV-D
     'w.active': 'Warranty till {until}',
     'w.expired': 'Warranty over',
     'w.none': 'No warranty',
@@ -159,6 +160,7 @@ export const rtdT = defineArea(
     's.ready': 'तैयार',
     's.delivered': 'दे दिया',
     's.returned': 'बिना रिपेयर लौटाया',
+    's.estimate_sent': 'एस्टिमेट भेजा', 's.awaiting_parts': 'पार्ट्स का इंतज़ार', 's.awaiting_insurer': 'बीमा कंपनी का इंतज़ार', 's.quality_check': 'क्वालिटी जाँच', // R10 SV-D
     'w.active': 'वारंटी {until} तक',
     'w.expired': 'वारंटी ख़त्म',
     'w.none': 'वारंटी नहीं',

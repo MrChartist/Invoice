@@ -20,12 +20,16 @@ export const SV_TABLES = {
   attendance: 'class_attendance',
   // SV-B: clinic_visits, admissions, lab_tests, lab_orders — SV-C: member_plans, memberships, checkins, class_schedules,
   // class_attendance — SV-D: service_assets, labour_ops (each package adds its own rows)
+  // SV-D: vehicles / appliances, labour operations
+  assets: 'service_assets',
+  labourOps: 'labour_ops',
 } as const;
 
 /** Company objects (singletons). */
 export const SV_OBJECTS = {
   serviceSettings: 'service_settings', // SV-A: resources, hours, messages, tips, Rule 46A, no-ITC switches
   // SV-B: clinic_settings — SV-D: workshop_settings
+  workshopSettings: 'workshop_settings', // SV-D: checklists, terms, classes, labour rates, depreciation, intervals
 } as const;
 
 /** New Indian-FY series (`<PREFIX>/FY<yy-yy>/<seq>`, through `series-counters.ts`; never reused after a delete). */

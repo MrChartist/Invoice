@@ -482,6 +482,8 @@ const RECORD_TABLES = [
   'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
   // R10-C: membership plans, memberships (MEM/FY…), check-ins (one row per day), classes / batches, class attendance
   'member_plans', 'memberships', 'checkins', 'class_schedules', 'class_attendance',
+  // R10-D: vehicles / appliances, labour operations (job cards stay in R9's service_jobs)
+  'service_assets', 'labour_ops',
   // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
   // (MUS settlements), hired equipment, plant log sheets (PLG)
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
@@ -564,6 +566,8 @@ const ID_TABLES = new Set([
   'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
   // R10-C: membership plans, memberships (MEM/FY…), check-ins (one row per day), classes / batches, class attendance
   'member_plans', 'memberships', 'checkins', 'class_schedules', 'class_attendance',
+  // R10-D: vehicles / appliances, labour operations (job cards stay in R9's service_jobs)
+  'service_assets', 'labour_ops',
   // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
   // (MUS settlements), hired equipment, plant log sheets (PLG)
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',

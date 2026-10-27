@@ -42,10 +42,10 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 7. Hotel and lodging pack (Round 7, planned) | HT1–HT17 | 17 | 6 |
 | 8. Trading businesses (Round 8, planned) | TR1–TR22 | 22 | 8 |
 | 9. Retail shops (Round 9, planned) | RT1–RT22 | 22 | 8 |
-| 10. Service businesses (Round 10, planned) | SV1–SV26 | 26 | 9 |
+| 10. Service businesses (Round 10, planned) | SV1–SV26, SV41–SV43 | 29 | 9 |
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG32 | 32 | 10 |
-| **Total** | | **314** | **85** |
+| **Total** | | **317** | **85** |
 
 ---
 
@@ -566,6 +566,18 @@ centres.
 |---|---|---|---|---|---|
 | SV25 | **Splitting a claim bill per head.** When the payer approves a lump sum (not line by line), the app divides **every line** of the job in the ratio approved ÷ job total (GST included), so the insurer's and the owner's invoices carry the same items, HSN / SAC and rates with smaller values, and together equal the job. (a) Is a proportional split of each line acceptable, or must the payer's invoice list only the items it approved (line-by-line split, which the app also supports)? (b) Both invoices are dated on the day the claim is billed and the owner's part reuses the job's draft number — any objection? | Proportional per head by default; line-by-line when the approval lists lines. | `services/sv-claims.ts` `splitForPayer`, `billClaim` | — | Developers' reading of Circular 217/11/2024-GST |
 | SV26 | **Commission to salaried staff in payroll.** The front desk posts a month's commission of an employee linked to payroll as a payroll **earning adjustment** ("Commission <month>", taxable, tag `bonus`), so salary TDS (Sec 192 / 392) applies through the payroll run. (a) Is commission part of "wages" for **ESI** (the app's payroll treats the earning as ESI wages like other earnings) and is it outside EPF "basic wages" unless paid to all employees alike? (b) Should a target-linked slab bonus be treated differently from a flat % commission? | Taxable earning; EPF / ESI treatment as the payroll engine applies to adjustments today. | `services/sv-payouts.ts`; `types/payroll.ts` `PayrollAdjustment` | — | Developers' reading; EPF Act Sec 2(b), ESI Act Sec 2(22) (not re-read) |
+
+### 10.6 Added while building SV-D (workshops and service centres)
+
+Ids start at SV41 so they cannot clash with the ids SV-B / SV-C add at the same time (the lead may renumber).
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| SV41 | **Excess on a motor claim bill.** The compulsory / voluntary excess is taken off the insurer's approved value of the **labour** lines first (then parts), so the owner's invoice carries that part of the line, tagged "excess", at the line's own rate (labour 18%). Is that right, or should the excess be a separate recovery from the owner (and at what rate)? Depreciation stays on the part's line at the part's rate. | As stated. | `services/sv-motor-claims.ts` `motorSplit` | 2024-06-26 | Developers' reading of Circular 217/11/2024-GST |
+| SV42 | **SAC for "other" repairs and outside work.** The workshop uses 998729 (repair of other goods) for an asset that is neither a vehicle nor a household appliance, while Round 9's phone desk uses 998719 for "other". Outside work (machining, denting) re-billed to the customer uses the job's own repair SAC (998714 vehicles, 998715 appliances) at 18%. Which "other" code is right, and is outside work rightly billed at the repair SAC? | 998729; outside work at the repair SAC. | `service-rules.ts` `REPAIR_SAC_RULES`; `services/sv-estimates.ts` `subletLine`; `retail-rules.ts` `REPAIR_SERVICE_RULES` | — | SAC list (recalled) |
+| SV43 | **Labour hours on the invoice.** Labour lines carry the standard hours as the quantity (unit HRS) and the hourly rate, so the HSN summary of GSTR-1 shows the SAC with a quantity in hours. Acceptable, or should service lines report the UQC as "OTH" / NA with no quantity? | Hours as the quantity; the HSN summary as the existing engine builds it. | `services/sv-estimates.ts` `labourLine`; `gst-reports.ts` (HSN summary, unchanged) | — | GSTR-1 HSN summary notes (recalled) |
+
+---
 
 ## 11. Construction (Round 11, ids CN1–CN35)
 

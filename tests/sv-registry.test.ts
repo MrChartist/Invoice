@@ -19,7 +19,7 @@ const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url),
 
 test('SV-A block: rights, audit labels, registered at runtime; first-paint maps carry none', () => {
   const A = { appointments: 'doc.create', service_staff: 'master.edit', commission_plans: 'master.edit', staff_payouts: 'books.edit', payer_claims: 'doc.create', service_settings: 'settings.manage' };
-  for (const [t, a] of Object.entries(A)) assert.equal(SV_TABLE_ACTIONS[t], a, t); // each package pins its own block
+  assert.deepEqual(Object.fromEntries(Object.entries(SV_TABLE_ACTIONS).filter(([t]) => t in A)), A); // B–D add their own blocks
   for (const [t, a] of Object.entries(A)) {
     assert.equal(TABLE_ACTIONS[t], a, `${t} registered`);
     assert.ok(TABLE_MEANING[t], `${t} in the open export`);
@@ -66,4 +66,16 @@ test('SV-C block: rights, audit labels, backup / sync / open export, MEM used on
   assert.equal((lib.match(/'MEM'/g) ?? []).length, 1);
   for (const f of ['sv-members', 'sv-memberships', 'sv-checkin', 'sv-classes', 'sv-attendance', 'sv-coaching-refund']) assert.match(src(`lib/services/${f}.ts`), /import '\.\/sv-registry';/, f);
   for (const t of ['checkins', 'class_attendance', 'memberships']) assert.ok(src('lib/trust/recycle-bin.ts').includes(`'${t}'`), `${t} restore hook`);
+});
+
+test('SV-D block: vehicles / appliances and labour operations (masters), workshop settings (owner); writers import the registry', () => {
+  const D = { service_assets: 'master.edit', labour_ops: 'master.edit', workshop_settings: 'settings.manage' };
+  for (const [t, a] of Object.entries(D)) {
+    assert.equal(SV_TABLE_ACTIONS[t], a, t);
+    assert.equal(TABLE_ACTIONS[t], a, `${t} registered`);
+    assert.ok(TABLE_MEANING[t], `${t} in the open export`);
+  }
+  assert.deepEqual([SV_WATCHED.service_assets?.label, SV_WATCHED.labour_ops?.label], ['Vehicle / appliance', 'Labour operation']);
+  assert.equal(SV_OBJECTS.workshopSettings, 'workshop_settings');
+  for (const f of ['sv-assets', 'sv-jobs-workshop', 'sv-estimates', 'sv-parts-issue', 'sv-labour', 'sv-motor-claims']) assert.match(src(`lib/services/${f}.ts`), /import '\.\/sv-registry';/, f);
 });

@@ -472,3 +472,156 @@ declare module './institutions-r5' {
 /* ════════════════════════════════════════ SV-D ════════════════════════════════════════ */
 // SV-D: service_assets, labour_ops, workshop_settings; RT-D4 `service_jobs` fields; AMC `asset_ids`, visit `job_id`;
 // client `sv_insurer_invoice`; `TimeEntry.job_id`.
+
+/** Vehicle class: picks a labour op's standard hours and the labour rate (`workshop_settings.classes`). */
+export type VehicleClass = 'hatch' | 'sedan' | 'suv' | '2W' | '3W' | 'commercial';
+
+/** Table `service_assets` (`master.edit`, audited "Vehicle / appliance"): one row per vehicle or appliance. */
+export interface ServiceAsset {
+  id: string;
+  kind: 'vehicle' | 'appliance';
+  /** Vehicle: registration no., normalised (`MH12AB1234`), unique. */
+  reg_no?: string;
+  /** Make / brand. */
+  make?: string;
+  model: string;
+  variant?: string;
+  fuel?: string;
+  year?: number;
+  vin?: string;
+  engine_no?: string;
+  colour?: string;
+  vclass?: VehicleClass;
+  /** Appliance: serial no. and the site address it is installed at. */
+  serial?: string;
+  site?: string;
+  client_id?: string;
+  owner_name: string;
+  phone?: string;
+  insurer?: string;
+  policy_no?: string;
+  policy_expiry?: string;
+  amc_id?: string;
+  /** Odometer readings (km) in date order; the last one is the current reading. */
+  odometer?: { date: string; km: number }[];
+  next_service_date?: string;
+  next_service_km?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+/** Table `labour_ops` (`master.edit`, audited "Labour operation"). */
+export interface LabourOp {
+  id: string;
+  code: string;
+  name: string;
+  /** SAC (absent = `REPAIR_SAC_RULES` by the asset kind). */
+  sac?: string;
+  /** Standard hours per vehicle class (`hours.all` for every class). */
+  hours?: Partial<Record<VehicleClass | 'all', number>>;
+  /** Flat price (ex-GST) instead of hours × rate. */
+  price?: number;
+  /** Next-service interval this op sets (periodic service). */
+  interval_days?: number;
+  interval_km?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+/** One depreciation row of the motor-claim table (% of the approved part value the owner pays). */
+export interface DepreciationRow {
+  category: 'rubber' | 'plastic' | 'fibre' | 'glass' | 'metal' | 'paint' | 'other';
+  pct: number;
+}
+
+/** Company object `mrchartist_inv_workshop_settings` (`settings.manage`, audited on save, synced as a singleton). */
+export interface WorkshopSettings {
+  /** Inspection checklist items. */
+  checklists?: string[];
+  /** Terms printed on the job card. */
+  terms?: string;
+  classes?: VehicleClass[];
+  /** Labour rate per hour (ex-GST), per class (`all` for every class). */
+  labour_rate?: Partial<Record<VehicleClass | 'all', number>>;
+  /** Editable depreciation table (insurer practice, not statute); metal by age comes from the rules unless set here. */
+  depreciation?: DepreciationRow[];
+  default_interval?: { days?: number; km?: number };
+  /** Parts warranty (months) printed on the bill as "Parts warranty until …". */
+  parts_warranty_months?: number;
+  updated_at?: string;
+}
+
+/** An estimate approval logged on a job. */
+export interface JobApproval {
+  quote_id: string;
+  by: string;
+  how: 'signature' | 'phone' | 'whatsapp' | 'in person';
+  at: string;
+  note?: string;
+}
+
+declare module './retail-r9' {
+  interface ServiceJob {
+    /** SV-D1: `service_assets` row, odometer in / out, fuel level, customer voice, inspection checklist, photos. */
+    asset_id?: string;
+    odometer_in?: number;
+    odometer_out?: number;
+    fuel?: string;
+    complaints?: string[];
+    checklist?: string[];
+    photos?: string[];
+    /** Promised date-time (`YYYY-MM-DDTHH:MM`). */
+    promised?: string;
+    /** Bay (SV-A2 resource id) and technicians (SV-A3 staff ids). */
+    bay?: string;
+    technicians?: string[];
+    /** Appliance call: site visit (`YYYY-MM-DDTHH:MM`), address and the appointment booked for it. */
+    visit_at?: string;
+    site?: string;
+    appointment_id?: string;
+    /** SV-D4: the AMC contract covering this job (covered labour is not charged). */
+    amc_id?: string;
+    /** SV-D2: estimates (QUOTATION ids), approvals, parts issued to the job (stock transfer ids). */
+    quote_ids?: string[];
+    approvals?: JobApproval[];
+    parts_issue?: string[];
+    /** SV-D2: running technician clocks (staff id → ISO start). */
+    clocks?: Record<string, string>;
+    /** SV-D3: the motor claim (`payer_claims`) of this job. */
+    claim_id?: string;
+  }
+}
+
+/** SV-D3 motor claims (merged into SV-A's `PayerClaim`): cashless / reimbursement, surveyor, survey date, salvage note. */
+export interface PayerClaim {
+  mode?: 'cashless' | 'reimbursement';
+  surveyor?: string;
+  survey_date?: string;
+  salvage?: string;
+}
+
+declare module './invoice' {
+  interface Client {
+    /** SV-D3: an insurer's choice on reimbursement claims (default `owner`: one invoice to the owner). */
+    sv_insurer_invoice?: 'insurer' | 'owner';
+  }
+}
+
+declare module './time' {
+  interface TimeEntry {
+    /** SV-D2: technician time on a job (not billable by itself; the job bill carries the labour). */
+    job_id?: string;
+    staff_id?: string;
+  }
+}
+
+declare module '../lib/amc' {
+  interface AmcContract {
+    /** SV-D4: vehicles / appliances the contract covers. */
+    asset_ids?: string[];
+  }
+  interface AmcVisit {
+    /** SV-D4: the job card of the visit. */
+    job_id?: string;
+  }
+}

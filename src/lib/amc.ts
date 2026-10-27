@@ -192,7 +192,7 @@ export const amcDb = {
     const c = amcDb.all().find((x) => x.id === id);
     if (!c) throw new Error('Contract not found.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(visit.date)) throw new Error('Enter the visit date.');
-    return amcDb.save({ ...c, visits: [...(c.visits ?? []), { date: visit.date, ...(visit.note?.trim() ? { note: visit.note.trim() } : {}), ...(visit.by ? { by: visit.by } : {}) }].sort((a, b) => a.date.localeCompare(b.date)) });
+    return amcDb.save({ ...c, visits: [...(c.visits ?? []), { date: visit.date, ...(visit.note?.trim() ? { note: visit.note.trim() } : {}), ...(visit.by ? { by: visit.by } : {}), ...(visit.job_id ? { job_id: visit.job_id } : {}) }].sort((a, b) => a.date.localeCompare(b.date)) });
   },
   cancel(id: string): void {
     const c = amcDb.all().find((x) => x.id === id);
@@ -203,6 +203,9 @@ export const amcDb = {
     setTable(AMC_TABLE, amcDb.all().filter((c) => c.id !== id));
   },
 };
+
+/** SV-D4: the AMC visit a delivered job card records (job number as the note). */
+export const visitFromJob = (job: { id: string; number: string }, date: string): AmcVisit => ({ date, note: `Job ${job.number}`, job_id: job.id });
 
 /** The next term of a contract: same length, starting the day after it ends. */
 export function renewalDraft(c: AmcContract): Omit<AmcContract, 'id'> {
