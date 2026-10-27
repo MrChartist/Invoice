@@ -260,7 +260,9 @@ registerRestoreHook('vouchers', (row, e, live, bin) => {
     return pair ? { companions: [pair] } : { refuse: `${what(e)} is the journal of a ${cls === RA_CLASS ? 'GST TDS / labour cess deduction' : 'finance transfer'} whose receipt is gone for good. Record it again from the bill.` };
   }
   const owner = OWNED_VOUCHERS.find((o) => o.classes.includes(cls));
-  if (!owner) return null;
+  // QA14 Q2: the class is free text in the voucher editor — a hand-entered "Loan" / "Donation" journal of a company that
+  // never used that module (no row live or binned in its tables) is the user's own and restores as any voucher.
+  if (!owner || !owner.tables.some((t) => live(t).length || bin.some((b) => b.table === t))) return null;
   // Restoring repairs a stray delete only while the module still counts the voucher as posted.
   if (!owner.tables.some((t) => mentions(live(t), e.row_id))) return { refuse: `${what(e)} (${cls}) was undone where it was posted, so restoring it here would post it twice. Instead, ${owner.redo}.` };
   // Its bill-wise receipt rows (a deposit adjustment) come back with it.
