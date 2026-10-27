@@ -55,6 +55,11 @@ export interface NotesContext {
   invoices: readonly InvoiceRecord[];
   entity: EntityType;
   stored: NotesToAccounts | null;
+  /**
+   * MF-D5 (optional): Schedule III sub-heads of the Inventories line (paise; `mfg/mf-inventories.ts` `noteRows`). Absent
+   * or empty = the one-line note as before.
+   */
+  inventoryRows?: readonly { label: string; cur: number; prev: number }[];
 }
 
 /* ── Wording ──────────────────────────────────────────────────── */
@@ -353,6 +358,16 @@ function fixedAssetsNote(c: NotesContext): PackNote {
 
 const inventoriesOf = (bs: LedgerBalanceSheet) => bs.assets.flatMap((x) => x.items).filter((i) => i.groupId === 'INVENTORIES').reduce((t, i) => t + i.amount, 0);
 
+/** MF-D5: the sub-head rows, a balancing row for what the split does not hold (ledger balances, typed figures), the total. */
+function inventorySplitRows(rows: readonly { label: string; cur: number; prev: number }[], cur: number, prev: number): NoteCell[][] {
+  const out: NoteCell[][] = rows.map((r) => [r.label, r.cur, r.prev]);
+  const dc = cur - rows.reduce((t, r) => t + r.cur, 0);
+  const dp = prev - rows.reduce((t, r) => t + r.prev, 0);
+  if (dc || dp) out.push(['Other inventories (ledger balances / typed closing stock)', dc, dp]);
+  out.push(['Total (at cost or net realisable value, whichever is lower)', cur, prev]);
+  return out;
+}
+
 function inventoryNote(c: NotesContext): PackNote {
   return {
     id: 'inventory',
@@ -364,7 +379,12 @@ function inventoryNote(c: NotesContext): PackNote {
         : 'Closing stock is not valued in the books (Books → P&L → closing stock). Add it before finalising.',
     ],
     // The balance-sheet line (report-time valuation and / or an Inventories ledger, netted so it is counted once).
-    tables: [{ columns: ['Particulars', c.fy.label, c.prev.label], rows: [['Stock-in-trade / goods (at cost or net realisable value, whichever is lower)', inventoriesOf(c.bs), inventoriesOf(c.bsPrev)]] }],
+    tables: [{
+      columns: ['Particulars', c.fy.label, c.prev.label],
+      rows: c.inventoryRows?.length
+        ? inventorySplitRows(c.inventoryRows, inventoriesOf(c.bs), inventoriesOf(c.bsPrev))
+        : [['Stock-in-trade / goods (at cost or net realisable value, whichever is lower)', inventoriesOf(c.bs), inventoriesOf(c.bsPrev)]],
+    }],
   };
 }
 

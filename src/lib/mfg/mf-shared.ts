@@ -19,6 +19,10 @@ export const MF_TABLES = {
   estimates: 'print_estimates',
   // MF-C: cut plans / lots (CUT/FY…, bundles inside)
   cutPlans: 'cut_plans',
+  // MF-D: food batch cost cards (versions by effective date), AA / EPCG register, incentive claims
+  costCards: 'cost_cards',
+  authorisations: 'export_authorisations',
+  incentiveClaims: 'incentive_claims',
 } as const;
 
 /** Company objects (singletons). */
@@ -49,6 +53,10 @@ export const MF_DATED: Readonly<Record<string, string>> = {
   process_runs: 'date',
   print_estimates: 'date',
   cut_plans: 'date',
+  // MF-D
+  cost_cards: 'effective_from',
+  export_authorisations: 'date',
+  incentive_claims: 'period_to',
 };
 
 /** Numbered tables (`number` field) and their series (mirrors the `sync-engine.ts` NUMBERED rows). */

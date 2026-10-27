@@ -450,6 +450,10 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}print_estimates`]: 'date',
   // R13-C: cut plans (the cutting day)
   [`${DB_PREFIX}cut_plans`]: 'date',
+  // R13-D: cost cards (by effective date), export authorisations (by issue date), incentive claims (by period end)
+  [`${DB_PREFIX}cost_cards`]: 'effective_from',
+  [`${DB_PREFIX}export_authorisations`]: 'date',
+  [`${DB_PREFIX}incentive_claims`]: 'period_to',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;

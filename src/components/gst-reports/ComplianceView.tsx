@@ -41,6 +41,8 @@ const Gst8dPanel = lazy(() => import('./Gst8dPanel'));
 const CompositionTracker = lazy(() => import('../trade/CompositionTracker'));
 // R12 (AG-D5): producer company / co-operative reminders (fpo pack only, lazy).
 const MembersCalendar = lazy(() => import('../agri/MembersCalendar'));
+// R13 (MF-D3 / D4): Form-1, export-obligation and incentive reminders (shopfloor pack only, lazy).
+const MfgCalendar = lazy(() => import('../mfg/MfgCalendar'));
 
 export interface ComplianceViewProps {
   invoices: InvoiceRecord[];
@@ -198,6 +200,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
       </Suspense>
       <Suspense fallback={null}><CompositionTracker invoices={invoices} stateCode={stateCode} today={today} /></Suspense>
       {isPackOn(localDb.settings.get(), 'fpo') && <Suspense fallback={null}><MembersCalendar today={today} /></Suspense>}
+      {isPackOn(localDb.settings.get(), 'shopfloor') && <Suspense fallback={null}><MfgCalendar today={today} /></Suspense>}
       <ul className={local.notes}>
         <li><strong>{gvT('ncEstimates')}</strong> {gvT('ncDue')}</li>
         <li>{gvT('ncLateFee')}</li>

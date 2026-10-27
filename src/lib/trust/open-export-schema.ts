@@ -266,6 +266,10 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   print_estimates: 'Print estimates (PES/FY…): size, colours, sheet, GSM, press, paper and plate rates, finishing, margin, quantity breaks, quotations and job ticket (R13).',
   // R13-C
   cut_plans: 'Cut plans / lots (CUT/FY…): style, colour, fabric, lays (plies × marker ratio, length), pieces cut by size, fabric issued / end bits / waste, bundles with their operation history (R13).',
+  // R13-D
+  cost_cards: 'Food batch cost cards: recipe (from the BOM), output kg, yield, conversion ₹/kg, overhead %, packs with packing material and prices; versions by effective date (R13).',
+  export_authorisations: 'Advance Authorisation / EPCG register: number, dates, import and export items, norm (SION / self / committee), EO due / extended, duty saved, EO multiple, status, EODC ref (R13).',
+  incentive_claims: 'Incentive and subsidy claims (PLI, state capital subsidy, interest subvention …): period, base, rate, claimed, approved, received, income / capital, reasonable-assurance date and journals (R13).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';

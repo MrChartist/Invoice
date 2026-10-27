@@ -145,6 +145,13 @@ export function YearEndWizard({ open, onClose, notify }: YearEndWizardProps) {
             <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => mark('agency_lots')}>{migT('markReviewed')}</button>
           </div>
         );
+      case 'wip_statement': // MF-D5
+        return (
+          <div className={styles.inline}>
+            <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => void import('../../lib/mfg/mf-wip-csv').then((m) => m.downloadWipStatement(fyEndOf(fy)))}>{migT('wipDownload')}</button>
+            <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => mark('wip_statement')}>{migT('markReviewed')}</button>
+          </div>
+        );
       case 'auditor_pack': // R4-C5
         return <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => mark('auditor_pack')}>{migT('markReviewed')}</button>;
       case 'lock':

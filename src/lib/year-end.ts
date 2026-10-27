@@ -39,8 +39,10 @@ export type YearEndStepId = 'integrity' | 'closing_stock' | 'depreciation' | 'pr
   // R4-C5: "Auditor pack generated" (mark only; Settings → Activity → Auditor pack marks it)
   | 'auditor_pack'
   // QA8 T10 (TR22): agency lots whose sales are not settled on a posted bikri patti (shown whenever arrivals exist)
-  | 'agency_lots';
-export const YEAR_END_STEPS: readonly YearEndStepId[] = ['integrity', 'closing_stock', 'depreciation', 'provisions', 'opening_bills', 'agency_lots', 'lock', 'carry_forward', 'auditor_pack'];
+  | 'agency_lots'
+  // MF-D5: year-end WIP statement reviewed (shown when the `shopfloor` pack is on)
+  | 'wip_statement';
+export const YEAR_END_STEPS: readonly YearEndStepId[] = ['integrity', 'closing_stock', 'depreciation', 'provisions', 'opening_bills', 'agency_lots', 'wip_statement', 'lock', 'carry_forward', 'auditor_pack'];
 
 export type StepStatus = 'done' | 'todo' | 'warn';
 
@@ -90,6 +92,8 @@ export interface YearEndInput {
    * whatever the agency pack's state.
    */
   agencyLots?: readonly { number: string; lot_no: string; principal: string }[];
+  /** MF-D5: open production orders and their WIP (paise) at the year end — absent unless the `shopfloor` pack is on. */
+  wipStatement?: { orders: number; value: number };
   /** R9 (RT-B2): bills of the year with Schedule H1 / X lines still inside the Drugs Rules retention (pharma features on). */
   rxRetained?: { count: number; until: string };
 }
@@ -209,6 +213,19 @@ export function yearEndChecklist(input: YearEndInput): YearEndStep[] {
       facts: lots.length
         ? [`${lots.length} agency lot${lots.length === 1 ? ' has' : 's have'} sales not settled on a posted bikri patti: ${lots.slice(0, 10).map((l) => `${l.lot_no} (${l.number}, ${l.principal})`).join(', ')}${lots.length > 10 ? ' …' : ''}. Their sales still sit in Sales: post the pattis in Distribution → Agency (turn the agency pack on if it is off) — verify with your CA.`]
         : ['Every agency lot sold up to the year end is settled on a posted bikri patti.'],
+    });
+  }
+
+  /* 5b. Year-end WIP statement (MF-D5) */
+  if (input.wipStatement) {
+    const w = input.wipStatement;
+    steps.push({
+      id: 'wip_statement',
+      status: !w.orders || marks.wip_statement ? 'done' : 'todo',
+      amount: w.value,
+      facts: w.orders
+        ? [`${w.orders} open production order${w.orders === 1 ? '' : 's'} hold ${rs(w.value)} of work-in-progress at the year end (material; conversion is a memo unless absorption is on). Download the WIP statement for the auditor (Schedule III, AS 2) — verify MF24 / MF25 with your CA.`]
+        : ['No production order holds work-in-progress at the year end.'],
     });
   }
 
