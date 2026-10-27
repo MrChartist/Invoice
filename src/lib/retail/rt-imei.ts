@@ -44,9 +44,12 @@ export function luhnOk(digits: string): boolean {
   return sum % 10 === 0;
 }
 
+/** An IMEI item: marked `serial_kind: 'imei'`, or unmarked in HSN 8517 (phones) — the electronics default. */
+export const isImeiItem = (item: Pick<StockItem, 'serial_kind' | 'hsn'> | undefined): boolean => (item?.serial_kind ?? (String(item?.hsn ?? '').startsWith('8517') ? 'imei' : '')) === 'imei';
+
 /** 15-digit serials of an IMEI item whose check digit fails (warnings only). */
-export function imeiIssues(item: Pick<StockItem, 'serial_kind'> | undefined, serials: readonly string[] = []): string[] {
-  if (item?.serial_kind !== 'imei') return [];
+export function imeiIssues(item: Pick<StockItem, 'serial_kind' | 'hsn'> | undefined, serials: readonly string[] = []): string[] {
+  if (!isImeiItem(item)) return [];
   return serials.map((s) => s.trim()).filter((s) => /^\d{15}$/.test(s) && !luhnOk(s));
 }
 

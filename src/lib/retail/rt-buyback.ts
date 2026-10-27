@@ -28,6 +28,7 @@ import { vendorsDb } from '../vendors';
 import { godownsDb } from '../godowns';
 import { blankStockItem, stockDb, type StockItem } from '../inventory';
 import { loadTracking, lookupSerial, serialKey } from '../stock-tracking';
+import { isVoidStatus, readPurchase, readPurchaseLines } from '../purchase-normalize';
 import { nextUrdNumber, recordUrd } from './rt-urd';
 
 export const EXCHANGE_METHOD = 'Exchange';
@@ -43,13 +44,20 @@ export const isBuyBack = (p: Partial<PurchaseRecord> | undefined): p is BuyBack 
 export const exchangedFrom = (purchaseId: string, payments: readonly Payment[]): number =>
   round2(payments.filter((p) => p.exchange_purchase_id === purchaseId).reduce((s, p) => s + num(p.amount), 0));
 
+/** URD vouchers (old device, or RT-E old metal) with value left to settle a sale by exchange. */
+export function openVouchers(purchases: readonly PurchaseRecord[], payments: readonly Payment[]): { purchase: PurchaseRecord; left: number }[] {
+  return purchases.filter((p) => p.used_goods || p.old_metal).map((purchase) => ({ purchase, left: round2(num(purchase.total) - exchangedFrom(purchase.id, payments)) })).filter((x) => x.left > 0.004);
+}
+
 /** The buy-back a serial came in on, with its value per unit (no ITC taken, no GST). */
 export function buyBackOf(serial: string, purchases: readonly PurchaseRecord[]): { purchase: PurchaseRecord; value: number } | undefined {
   const k = serialKey(serial);
   for (const p of purchases) {
-    if (!isBuyBack(p) || p.itc_eligible) continue;
-    const l = p.lines.find((x) => (x.serials ?? []).some((s) => serialKey(s) === k));
-    if (l) return { purchase: p, value: round2(num(l.rate)) };
+    // Rule 9: read through the purchases contract (a void bill, ITC taken or any GST on it rules the margin scheme out).
+    const c = readPurchase(p);
+    if (!isBuyBack(p) || !c || isVoidStatus(c.status) || c.itcEligible || c.tax > 0) continue;
+    const l = readPurchaseLines(p).find((x) => x.serials.some((s) => serialKey(s) === k));
+    if (l) return { purchase: p, value: round2(l.unitCost) };
   }
   return undefined;
 }
@@ -142,13 +150,13 @@ export function recordBuyBack(input: BuyBackInput): PurchaseRecord {
   });
 }
 
-/** Settle part of a sale by a buy-back (no cash moved). The bill's customer must be the voucher's party. */
+/** Settle part of a sale by a buy-back / old-metal voucher (no cash moved). The bill's customer must be the voucher's party. */
 export function applyExchange(invoiceId: string, purchaseId: string, amount?: number): Payment {
   requireAccess('payment.record');
   const inv = localDb.invoices.getById(invoiceId);
   const bb = purchasesDb.get(purchaseId);
   if (!inv) throw new Error('The bill was not found.');
-  if (!isBuyBack(bb)) throw new Error('Pick the buy-back voucher.');
+  if (!bb || !(bb.used_goods || bb.old_metal)) throw new Error('Pick the buy-back voucher.');
   if (String(inv.client?.name ?? '').trim().toLowerCase() !== bb.vendor_name.trim().toLowerCase()) throw new Error(`The buy-back is from ${bb.vendor_name}; put that name on the bill (it is now ${inv.client?.name ?? '—'}).`);
   const pays = getTable<Payment>('transactions');
   const left = round2(num(bb.total) - exchangedFrom(bb.id, pays));
@@ -157,7 +165,7 @@ export function applyExchange(invoiceId: string, purchaseId: string, amount?: nu
   if (amt > left + 0.004) throw new Error(`Only ₹${left.toFixed(2)} of ${bb.bill_number} is left.`);
   if (amt > invoiceOpen(inv) + 0.004) throw new Error(`${inv.invoice_number} has only ₹${invoiceOpen(inv).toFixed(2)} unpaid.`);
   return withTablesRollback(['transactions', 'invoices', 'purchases', 'series_counters'], () => {
-    const p = localDb.payments.record({ invoiceId, amount: amt, method: EXCHANGE_METHOD, date: inv.issue_date, reference: bb.bill_number, note: `Less: exchange (old device ${bb.used_goods.model ?? ''} ${bb.used_goods.serial ?? ''})`.trim() });
+    const p = localDb.payments.record({ invoiceId, amount: amt, method: EXCHANGE_METHOD, date: inv.issue_date, reference: bb.bill_number, note: bb.used_goods ? `Less: exchange (old device ${bb.used_goods.model ?? ''} ${bb.used_goods.serial ?? ''})` : `Less: old ${bb.old_metal?.metal ?? 'metal'} (${bb.old_metal?.gross_wt ?? ''} g)` });
     setTable('transactions', getTable<Payment>('transactions').map((x) => (x.id === p.id ? { ...x, exchange_purchase_id: bb.id } : x)));
     setTable('purchases', purchasesDb.all().map((x) => (x.id === bb.id ? { ...x, amount_paid: round2(num(x.amount_paid) + amt), updated_at: new Date().toISOString() } : x)));
     return { ...p, exchange_purchase_id: bb.id };
@@ -183,7 +191,7 @@ export function deleteBuyBack(purchaseId: string): void {
 }
 
 /** Buy-backs with their resale (sale line of the serial) and margin, newest first. */
-export function buyBackRows(purchases: readonly PurchaseRecord[], invoices: readonly InvoiceRecord[]): { purchase: PurchaseRecord; sale?: InvoiceRecord; price?: number; margin?: number }[] {
+export function buyBackRows(purchases: readonly PurchaseRecord[], invoices: readonly InvoiceRecord[]): { purchase: BuyBack; sale?: InvoiceRecord; price?: number; margin?: number }[] {
   return purchases.filter(isBuyBack).sort((a, b) => b.date.localeCompare(a.date)).map((p) => {
     const s = serialKey(p.used_goods.serial ?? '');
     const sale = invoices.find((i) => i.status !== 'Cancelled' && i.doc_type !== 'CREDIT_NOTE' && (i.items ?? []).some((l) => (l.serials ?? []).some((x) => serialKey(x) === s)));

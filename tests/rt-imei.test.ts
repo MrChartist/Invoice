@@ -2,6 +2,7 @@
 import './helpers/shim.ts';
 import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { freezeDate, resetStorage, thawDate } from './helpers/shim.ts';
 import { clientRetail, createViaStore, installSettings } from './helpers/world.ts';
 import { blankStockItem, stockDb } from '../src/lib/inventory.ts';
@@ -43,6 +44,12 @@ test('Luhn: valid IMEIs pass, a changed digit fails; only imei items are checked
   assert.equal(luhnOk('490154203237519'), false);
   assert.deepEqual(imeiIssues({ serial_kind: 'imei' }, [A1, '490154203237519', 'SN-ABC']), ['490154203237519']);
   assert.deepEqual(imeiIssues({ serial_kind: 'serial' }, ['490154203237519']), [], 'not an IMEI item');
+  assert.deepEqual(imeiIssues({ hsn: '85171300' }, ['490154203237519']), ['490154203237519'], 'unmarked HSN 8517 items are IMEI items');
+  // The bill line's inline copy (kept out of the devices chunk) agrees with luhnOk.
+  const src = readFileSync(new URL('../src/components/purchases/BillLineTracking.tsx', import.meta.url), 'utf8');
+  const body = /const luhn = \(d: string\) => (.+);\n/.exec(src)![1];
+  const inline = new Function('d', `return ${body}`) as (d: string) => boolean;
+  for (const s of [A1, A2, B1, '490154203237519', '123456789012345', '000000000000000']) assert.equal(inline(s), luhnOk(s), s);
 });
 
 test('dual IMEI: "IMEI1 / IMEI2" rows split into the tracked serial and its pair; other "/" serials untouched', () => {

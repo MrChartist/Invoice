@@ -127,6 +127,7 @@ export const purT = defineArea(
     mrp: 'MRP',
     lineMrp: 'Line {n} MRP',
     serialsLabel: 'Serial / IMEI numbers — one per line ({have} of {want})',
+    imeiLuhn: 'an IMEI check digit looks wrong — check the sticker (warning only)',
     lineSerials: 'Line {n} serial numbers',
     serialsPh: 'Scan or paste, one per line',
     // Line items editor
@@ -429,6 +430,7 @@ export const purT = defineArea(
     mrp: 'MRP',
     lineMrp: 'लाइन {n} का MRP',
     serialsLabel: 'सीरियल / IMEI नंबर — हर लाइन में एक ({want} में से {have})',
+    imeiLuhn: 'किसी IMEI का चेक अंक ग़लत लगता है — स्टिकर जाँचें (सिर्फ़ चेतावनी)',
     lineSerials: 'लाइन {n} के सीरियल नंबर',
     serialsPh: 'स्कैन या पेस्ट करें, हर लाइन में एक',
     thItem: 'आइटम',
