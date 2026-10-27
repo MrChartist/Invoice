@@ -22,6 +22,15 @@ import { TR_OBJECTS } from './tr-shared';
 export const BANK_STATEMENT_KEY = `${DB_PREFIX}${TR_OBJECTS.bankStatementSettings}`;
 export const DEFAULT_TERMS: BankStatementTerms = { stock_margin: 25, debtor_margin: 40, age_days: 90 };
 
+/**
+ * Stock groupings other verticals print instead of the stock groups (R12 AG-C5: mills — paddy, rice, broken, bran,
+ * husk, packing material; principals' material received for custom / job milling is never ours, so it is excluded and
+ * shown as a memo, like consignment lots). Read by `agri/ag-mill-reports.ts`; the working above is unchanged.
+ */
+export const STOCK_STATEMENT_PRESETS = {
+  mill: { groups: ['paddy', 'rice', 'broken', 'bran', 'husk', 'packing', 'other'], excludePrincipal: true },
+} as const;
+
 export interface StockStatementInput {
   asOf: string;
   /** Stock at cost by group (stock engine). */

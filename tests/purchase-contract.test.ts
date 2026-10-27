@@ -993,3 +993,12 @@ test('R12 (AG-B2 / B3) pooled milk cycle purchase: the stock reader skips its li
   const { closeMilkCycle } = await import('../src/lib/agri/ag-milk-cycle.ts');
   assert.equal(typeof closeMilkCycle, 'function');
 });
+
+test('R12 (AG-C5) mill report reads the real bill shape: own intake of the batches\' input item (by item id or name), void and expense bills left out', async () => {
+  const { millMonths } = await import('../src/lib/agri/ag-mill-reports.ts');
+  const items = [{ id: 'paddy', name: 'Paper ream', unit: 'KG' }, { id: 'rice', name: 'Rice', unit: 'KG' }] as never[];
+  const mfg = [{ id: 'm', number: 'MFG/1', date: '2026-04-20', item_id: 'rice', qty: 6, production_order_id: 'o', components: [{ id: 'c', item_id: 'paddy', qty: 10 }], outputs: [], costs: [] }] as never[];
+  const purchases = [bill, { ...bill, id: 'v', status: 'void' }, { ...bill, id: 'e', kind: 'EXPENSE' }, { ...bill, id: 'i', lines: [{ ...bill.lines[0], name: 'Other name', item_id: 'paddy' }] }];
+  const [m] = millMonths({ orders: [], mfg, items, purchases, principal: [], agreements: [], invoices: [] });
+  assert.deepEqual([m.month, m.intakeOwn, m.input, m.main], ['2026-04', 20, 10, 6], 'two bills of 10 KG each (by name, by item id)');
+});

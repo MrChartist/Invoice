@@ -15,7 +15,9 @@ export const AG_TABLES = {
   shifts: 'milk_shifts',
   dispatches: 'milk_dispatches',
   milkCards: 'milk_cards',
-  // AG-C: weighbridge_slips, cmr_agreements
+  // AG-C: weighbridge slips (WBS/FY…), custom-milling agreements (deliveries CMR/FY… inside the row)
+  weighbridge: 'weighbridge_slips',
+  cmr: 'cmr_agreements',
   // AG-D: cold_lots, cold_rent_plans, agri_loans, member_shares
 } as const;
 
@@ -29,9 +31,11 @@ export const AG_SERIES = {
   vouchers: 'FPV', // AG-A3 farmer purchase vouchers (on `purchases`)
   cycles: 'CYB', // AG-A4 pooled cycle bills (on `purchases` and `farmer_cycles`)
   dispatches: 'MDS', // AG-B4 milk dispatches
+  wbs: 'WBS', // AG-C1 weighbridge slips
+  cmr: 'CMR', // AG-C3 custom-milled rice deliveries (inside `cmr_agreements`)
 } as const;
 /** Series reserved for AG-B … AG-D (one commit, PRD §5; each package moves its prefix into `AG_SERIES`). */
-export const AG_RESERVED_SERIES = ['WBS', 'CMR', 'CSR', 'GPO', 'LAS', 'SHC'] as const;
+export const AG_RESERVED_SERIES = ['CSR', 'GPO', 'LAS', 'SHC'] as const;
 
 /** The six Round 12 packs (`industry-packs.ts`): `agri` is the shared farm base every agri kind turns on. */
 export const AG_PACKS = ['agri', 'dairy', 'mill', 'coldstore', 'agri_inputs', 'fpo'] as const;
@@ -44,4 +48,5 @@ export const AG_DATED: Readonly<Record<string, string>> = {
   milk_rate_charts: 'effective_from',
   milk_shifts: 'date',
   milk_dispatches: 'date',
+  weighbridge_slips: 'date', // AG-C
 };

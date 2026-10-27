@@ -22,7 +22,9 @@ export const AG_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   milk_shifts: 'doc.create',
   milk_dispatches: 'doc.create',
   milk_cards: 'doc.create',
-  // AG-C: weighbridge_slips, cmr_agreements (doc.create)
+  // AG-C: mills — weighbridge slips and custom-milling agreements (documents)
+  weighbridge_slips: 'doc.create',
+  cmr_agreements: 'doc.create',
   // AG-D: cold_lots (doc.create), cold_rent_plans (master.edit), agri_loans, member_shares (books.edit)
 };
 
@@ -38,6 +40,8 @@ export const AG_WATCHED: Readonly<Record<string, WatchedTable>> = {
   milk_dispatches: { entity: 'stock_transfer', label: 'Milk dispatch' },
   milk_cards: { entity: 'invoice', label: 'Milk card' },
   // AG-C
+  weighbridge_slips: { entity: 'item', label: 'Weighbridge slip' },
+  cmr_agreements: { entity: 'client', label: 'Custom-milling agreement' },
   // AG-D
 };
 

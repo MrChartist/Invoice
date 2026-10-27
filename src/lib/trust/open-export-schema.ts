@@ -245,6 +245,9 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   milk_shifts: 'Milk collection, one row per centre per date per shift: each can with farmer, quantity, fat, SNF, CLR, chart, rate, amount, rejection (R12).',
   milk_dispatches: 'Milk dispatches to the union / plant (MDS/FY…): tanker, sent and received quantity / fat / SNF, acknowledgement, bill (R12).',
   milk_cards: 'Household milk cards, one row per customer per month: rate, daily default, day-wise quantities, bill (R12).',
+  // R12-C
+  weighbridge_slips: 'Weighbridge / gate-entry slips: vehicle, party, commodity, gross and tare with times, net, moisture and other readings, use (WBS/FY…, R12).',
+  cmr_agreements: 'Custom-milling (CMR) agreements with the State agency: season, outturn %, paddy lots (JWP receipts), rice deliveries (CMR/FY…), milling rate, by-product recovery (R12).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';
