@@ -80,6 +80,61 @@ wizard / palette / Ctrl+K rows ≈ 2.1 kB, the rest in host chunks. **Over the 1
 stays at ≈ 2,811 kB of 2,900 kB. Trimmed already: paper parts in one chunk, paper-only strings, pure section module,
 no stub views.
 
+## CN-B — Contractor finance
+
+Works views `contracts`, `advances`, `escalation`, `guarantees` (one lazy chunk `cn-finance-views`, listed by
+`worksViewOn`; `PACK_TABS` rows with `twT` labels `view.*`, help topics `time:works:*`). Tables `works_contracts`
+(`master.edit`), `secured_advances` (`doc.create`, dated), `price_variations` (`doc.create`, dated, numbered `PVB/FY…`),
+`bank_guarantees` (`books.edit`, dated `issued_on`): registered in `cn-registry.ts`, `backup.ts`, `sync-engine.ts`
+(`DATED` / `NUMBERED`), the open-export schema; audited and binned. CN-B added the deferred `cn-registry` imports to
+`sync-engine.ts` / `trust/recycle-bin.ts` (CN-C merged the same lines; kept once). Every figure is a working paper —
+verify with your CA.
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| B1 contract register | `cn-contracts.ts`: `saveContract` / `cleanContract` (one contract per BOQ; EOTs sorted, each after the previous date; derived `extended_completion` and `jv_note` so CN-A's `contractOfBoq` → header snapshot prints them), `delayDays`, `ldExposure` (value × % per week × weeks from the last EOT granted **without** LD, capped; informational only), `contractSummary` (billed, % billed, cash received via `movedNoCash`, retention held, days left / delay), `contractRules` (contract retention / SD / water + electricity % win over the BOQ deduction set). `ContractsView.tsx`: register, form (EOTs typed as "date ref [LD]"), "Create / import the BOQ" link; BOQ panel links back. |
+| B2 advances | `cn-advances.ts`: `simpleInterest` (365-day year), `scheduleTarget` / `recoveryThisBill` (max of the BOQ rule and the straight-line schedule `recover_from_pct` 10 → `recover_by_pct` 80, capped at the balance), `advanceDeductions` (rows `advance_recovery` + `advance_interest`, `ref_id` = the advance, interest from the last bill or the advance date), `advanceStatus` (behind-schedule flag). Contract `advance_terms` (defaults `ADVANCE_DEFAULTS`). `recoverAdvance` now applies each advance separately (`ref_id`; old rows fall back to the BOQ's `advance_id`). `cn-secured.ts`: 75% of materials at site, receipt journal Dr bank \| Cr "Secured advance from clients" (class `Secured advance`, no GST), recovered on RA bills by quantity used (average rate × %) or a typed amount, never past the balance; "recovered" is read from live RA bills; delete removes row + journal together. `AdvancesView.tsx`. |
+| B3 price variation | `cn-escalation.ts`: `pvFormula` (PV = M × W × Σ share × (I − I0)/I0, shares must total 100), `pvWorkValue` (RA bills of the period, extra / deviation lines excluded when the clause says so), `savePv` (PVB/FY…, no overlapping period), `billPv` (PV > 0 → works invoice at the RA bills' rate; PV < 0 → credit note linked to the period's last RA bill in `doc_links`, `sec34Deadline` warning), `cancelPv`, `readIndexSheet` (user's own CSV / XLSX). Snapshot `boq_terms.cn.pv` (`CnPvSnapshot` / `CnPvRow`), printed by `parts/PvWorkingPage.tsx` (paper strings `p.pv*`). `EscalationView.tsx`. |
+| B4 recoveries | `cn-recoveries.ts`: `wastageRecovery` (±3% band, excess at 2× issue rate, shortfall at the issue rate — `RECOVERY_DEFAULTS`), `recoveryRow`, `cnBillDeductions` — the one call `saveRaBill` makes (contract advances, secured advance, typed recoveries; `RaRequest.recoveries`). Kinds: `material_recovery`, `water_power` (also a BOQ `DEDUCTION_KINDS` row), `hire_charges`, `withheld` (reason + `release_on`, held bucket), `ld` (label carries the delay vs the contract; paper note "not a supply, Circular 178/10/2022"). Receipts: `recordDeductionRow` handles every clearing kind (`CLEARING_KINDS`): no-cash receipt into "RA deductions clearing" + journal (class `RA deduction`, `ra_journal_id`) to "Material issued by client", "Water & electricity — site", "Plant hire charges", "Interest on mobilisation advance", "Liquidated damages", "Secured advance from clients"; `releaseHeld` takes `withheld` / `ld` (cash). `RaReceiptPanel` / `RetentionPanel` offer the rows. Measurement form: lazy `BillRecoveries.tsx`. Editor `ContractPanel` lists the deductions, net payable and a PV statement no. |
+| B5 guarantees & closure | `cn-guarantees.ts`: register, `expiringGuarantees` (≤ 30 days), `extendGuarantee` (history), `closeGuarantee` (released / invoked), `bgCommission`, `contractDeposits` / `linkDeposit` (R5-C6 deposits paid, additive `contract_id`). `cn-closure.ts`: checklist (final bill, completion, DLP over, retention, SD / EMD, BGs, PV final, no-claim, material reco) derived where possible, ticks / waivers with reason, `closeContract`. `cn-alerts.ts` (via `works-alerts.ts`): BG expiry, secured advance > 90 days, advance not recovered at its "fully by" %, withheld > 90 days. `GuaranteesView.tsx`; closure in `ContractsView`. |
+
+Restore safety: `OWNED_VOUCHERS` row for `Secured advance`; hooks: a secured advance comes back with its journal, a PV
+statement only while no live statement covers its period; recovery receipts use the existing paired `RA deduction`
+path. Tests: `cn-contracts`, `cn-advances`, `cn-escalation`, `cn-recoveries`, `cn-guarantees`, `cn-registry` (CN-B
+block). E2E step "R11-B contractor finance".
+
+### Deviations from the PRD (CN-B)
+
+- Deduction kinds use CN-A's union names (`secured_advance`, `water_power`, `hire_charges`), not the PRD's
+  (`secured_advance_recovery`, `water_electricity`, `hire_recovery`).
+- `measurements.ts` (A-owned) gained one guarded call (`contractRules` + `cnBillDeductions`) and `RaRequest.recoveries`;
+  `MeasurementForm.tsx` mounts the lazy recoveries form.
+- Secured advance: `recovered[]` is derived from live RA bills (not stored); proposal by quantity typed on the bill (D4
+  coefficients not used). Bank pick: main bank / cash only.
+- Client material recovered is booked to an expense-type account "Material issued by client" at receipt; no stock inward
+  (CN9 stock path left to CN-D4). Free-issue material is quantity only (not entered on the bill).
+- PV is billed as a separate supplementary invoice / credit note only (no "line on the next RA bill" option).
+- BG commission and margin FD are recorded on the register, not posted (booked where paid).
+- EMD / SD: deposits are recorded in Recurring → Leases → Deposits and linked to the contract here (`deposits.ts` untouched).
+- The contract field is `deviation_pct` (CN-A's `ContractLike` name), not `deviation_limit_pct`.
+
+### Budget (CN-B)
+
+Measured against `claude/elegant-cannon-cwapiv` at `ecf2e55` (CN-A + CN-C), same machine, `vite build`, gzip -9:
+
+| | Before | After | Δ |
+|---|---|---|---|
+| Initial JS (first paint) | 189,104 B | 189,123 B | +19 B (registry imports; ≤ 60 B) |
+| Total JS | 2,906,512 B | 2,930,522 B | +24.0 kB (2,861.8 kB of 3,000) |
+
+Breakdown (gz): views 8.3 kB, strings + form helpers 3.7 kB, contract / advance / secured engines 3.9 kB, guarantees +
+closure 1.1 kB, recoveries 1.0 kB, recoveries form 1.0 kB, bell 0.8 kB, Works tab mounts 0.7 kB, receipts 0.5 kB, help
+0.45 kB, PV paper 0.4 kB + strings 0.45 kB, rules 0.3 kB, the rest in host chunks. **Over the 12 kB share by ≈ 12 kB.**
+Trimmed already: one chunk for the four views, spec-driven forms, common words reused from the works area strings,
+no `deposits.ts` / `boq.ts` / `measurements.ts` imports from the views (each had split a shared chunk).
+
 ## CN-C — Builders and developers (pack `realty`)
 
 Desk: **Receivables → Realty** (`/receivables?tab=realty&view=…`, one lazy chunk `components/construction/RealtyDesk.tsx`,

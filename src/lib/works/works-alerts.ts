@@ -12,6 +12,7 @@ import { localDb } from '../localDb';
 import { isPackOn } from '../industry-packs';
 import { num, round2 } from '../invoice-calc';
 import { raDueSplit } from './ra-due';
+import { cnFinanceNotices } from '../construction/cn-alerts'; // R11 (CN-B): guarantees, advances, withheld
 
 export const RETENTION_ALERT_DAYS = 30;
 
@@ -60,7 +61,12 @@ export function registerWorksAlerts(): void {
   unregister = registerNotificationProvider((ctx) => {
     if (!isPackOn(localDb.settings.get(), 'works')) return [];
     const today = localDayOf(ctx.now);
-    return memoOnTables('r5b:works-alerts', ['invoices', 'transactions'], () => worksNotices(peekTable<InvoiceRecord>('invoices'), peekTable<Payment>('transactions'), today, ctx.now.toISOString()), today) as AppNotification[];
+    return memoOnTables('r5b:works-alerts', ['invoices', 'transactions', 'works_contracts', 'bank_guarantees', 'secured_advances', 'advances'], () => {
+      const invoices = peekTable<InvoiceRecord>('invoices');
+      const payments = peekTable<Payment>('transactions');
+      const at = ctx.now.toISOString();
+      return [...worksNotices(invoices, payments, today, at), ...cnFinanceNotices({ contracts: peekTable('works_contracts'), guarantees: peekTable('bank_guarantees'), secured: peekTable('secured_advances'), advances: peekTable('advances'), invoices, payments }, today, at)];
+    }, today) as AppNotification[];
   });
 }
 
