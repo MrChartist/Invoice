@@ -345,7 +345,233 @@ declare module './job-work' {
 
 /* ════════════════════════════════════════ MF-B ════════════════════════════════════════ */
 // MF-B: drawings, inspection_reports (FAI), job_quotes, process_runs, print_estimates (PES); `mf.drawing`, `mf.print`,
-// `mf.scrap`. Declare the row shapes here.
+// `mf.scrap`.
+
+/** B1: one revision of a drawing; exactly one is `current` (a newer revision supersedes it). */
+export interface DrawingRevision {
+  rev: string;
+  date: string;
+  note?: string;
+  attachment_id?: string;
+  status: 'current' | 'superseded' | 'hold';
+}
+
+/** B1: a dimension / characteristic to inspect (nominal − tol_minus … nominal + tol_plus). */
+export interface DrawingChar {
+  id: string;
+  name: string;
+  nominal: number;
+  tol_minus: number;
+  tol_plus: number;
+  unit: string;
+  critical?: boolean;
+}
+
+/** B1: drawing register (table `drawings`, `master.edit`). */
+export interface Drawing {
+  id: string;
+  number: string;
+  title: string;
+  client_id?: string;
+  item_id?: string;
+  revisions: DrawingRevision[];
+  characteristics?: DrawingChar[];
+  material_grade?: string;
+  /** Owner override of a `hold` revision for production release (audited). */
+  release_override?: { rev: string; by: string; at: string };
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** B1: inspection report `FAI/FY…` (table `inspection_reports`, `doc.create`, dated). */
+export interface InspectionReport {
+  id: string;
+  number: string;
+  date: string;
+  kind: 'first_article' | 'lot' | 'final';
+  order_id?: string;
+  drawing_id: string;
+  rev: string;
+  sample: number;
+  readings: { char_id: string; values: number[] }[];
+  result: 'pass' | 'fail' | 'deviation';
+  inspector: string;
+  note?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** B2: a blank / finished shape (mm; `kg_per_m` for sections). */
+export interface MfShape {
+  kind: 'plate' | 'round' | 'tube' | 'ring' | 'section';
+  l?: number;
+  w?: number;
+  t?: number;
+  d?: number;
+  od?: number;
+  id?: number;
+  kg_per_m?: number;
+}
+
+/** B2: weight-based job quote sheet (table `job_quotes`, `doc.create`, dated). Times are per piece unless `setup_h`. */
+export interface JobQuote {
+  id: string;
+  date: string;
+  client_id?: string;
+  item_id?: string;
+  part: string;
+  drawing_id?: string;
+  rev?: string;
+  material: string;
+  /** g / cc. */
+  density: number;
+  blank: MfShape;
+  /** Finished shape, or `net_kg` typed. */
+  finish?: MfShape;
+  net_kg?: number;
+  material_rate: number;
+  scrap_rate: number;
+  ops: { name: string; hours: number; setup_h?: number; rate: number; work_centre_id?: string }[];
+  outside: { name: string; basis: 'kg' | 'piece'; rate: number }[];
+  packing?: number;
+  freight?: number;
+  overhead_pct: number;
+  margin_pct: number;
+  breaks: number[];
+  quote_ids?: string[];
+  status: 'draft' | 'quoted' | 'won' | 'lost';
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** B4: a mould / die (`mfg_settings.moulds`). */
+export interface MfMould {
+  id: string;
+  name: string;
+  item_id: string;
+  cavities: number;
+  cycle_s: number;
+  /** Shot weight incl. runner, g; runner weight, g (part weight = (shot − runner) ÷ cavities). */
+  shot_g?: number;
+  runner_g?: number;
+  life_shots?: number;
+  shots_done: number;
+}
+
+/** B4: moulding / extrusion run (table `process_runs`, `doc.create`, dated). */
+export interface ProcessRun {
+  id: string;
+  date: string;
+  shift?: string;
+  order_id?: string;
+  work_centre_id?: string;
+  mould_id?: string;
+  item_id: string;
+  hours: number;
+  cycle_s?: number;
+  cavities?: number;
+  shots?: number;
+  /** g per good part (else from the mould). */
+  part_g?: number;
+  inputs: { item_id: string; kind: 'virgin' | 'regrind' | 'masterbatch' | 'additive'; kg: number; batch?: string }[];
+  good_qty: number;
+  reject_qty: number;
+  runner_kg?: number;
+  purge_kg?: number;
+  regrind_out_kg?: number;
+  regrind_item_id?: string;
+  /** The manufacturing journal the run wrote. */
+  voucher_id?: string;
+  note?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** B5: a press (`mfg_settings.presses`); sheet sizes in mm. */
+export interface MfPress {
+  id: string;
+  name: string;
+  max_sheet: { w: number; h: number };
+  colours: number;
+  impressions_per_hour: number;
+  make_ready_min: number;
+  make_ready_sheets: number;
+  rate_per_1000_imp: number;
+  min_charge: number;
+  work_centre_id?: string;
+}
+
+/** B5: a finishing line of an estimate (₹ per sq in of sheet, per sheet, per piece or per lot). */
+export interface PrintFinish {
+  name: string;
+  basis: 'sqin' | 'sheet' | 'piece' | 'lot';
+  rate: number;
+}
+
+/** B5: print estimate `PES/FY…` (table `print_estimates`, `doc.create`, dated). Sizes in mm. */
+export interface PrintEstimate {
+  id: string;
+  number: string;
+  date: string;
+  client_id?: string;
+  item_id?: string;
+  job: string;
+  size: { w: number; h: number };
+  breaks: number[];
+  colours_front: number;
+  colours_back: number;
+  varnish_plate?: boolean;
+  press_id?: string;
+  sheet: { w: number; h: number };
+  margins?: { gripper: number; bleed: number; edge: number };
+  gsm: number;
+  stock_item_id?: string;
+  /** Paper ₹ per kg. */
+  paper_rate: number;
+  plate_rate: number;
+  running_waste_pct: number;
+  finishing: PrintFinish[];
+  outside?: number;
+  margin_pct: number;
+  quote_ids?: string[];
+  order_id?: string;
+  status: 'draft' | 'quoted' | 'won' | 'lost';
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** B4 / B5 sub-fields of the company object `mfg_settings`. */
+export interface MfgSettings {
+  moulds?: MfMould[];
+  presses?: MfPress[];
+  /** B4: the stock item regrind goes to when a run names none. */
+  regrind_item_id?: string;
+}
+
+export interface MfScrapSnap {
+  /** B3: the buyer's declaration of use in manufacturing (Form 127 / earlier 27C) — TCS not collected. */
+  declaration?: string;
+  /** B3: "Buyer deducts GST TDS 2% u/s 51" note printed. */
+  gst_tds?: boolean;
+}
+
+declare module './purchases' {
+  interface PurchaseLine {
+    /** B1: heat no. / material test certificate ref of the material bought (carried to the output batch). */
+    mf_heat?: string;
+  }
+}
+
+declare module '../lib/inventory' {
+  interface StockItem {
+    /** B4: highest regrind % in the mix the customer / quality term allows. */
+    mf_max_regrind_pct?: number;
+    /** B4: post-consumer recycled material (recycled content in the EPR register). */
+    mf_pcr?: boolean;
+    /** B4: kg per unit for EPR kg when the item is not sold in kg. */
+    mf_unit_kg?: number;
+  }
+}
 
 /* ════════════════════════════════════════ MF-C ════════════════════════════════════════ */
 // MF-C: cut_plans (CUT, bundles inside), karigar piece bills (KPB on `purchases`); `mf.cmt`. Declare the row shapes here.

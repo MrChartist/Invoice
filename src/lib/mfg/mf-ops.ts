@@ -10,6 +10,7 @@ import { peekTable } from '../storage';
 import { impliedPacks } from '../shop-mode';
 import { localDb } from '../localDb';
 import { MF_TABLES } from './mf-shared';
+import { releaseHold } from './mf-drawing-hold';
 
 /** ₹ / hour: machine + labour + power + overhead (2 decimals). */
 export const machineHourRate = (c: Pick<WorkCentre, 'hourly_rate' | 'labour_rate' | 'power_rate' | 'overhead_rate'>): number =>
@@ -52,7 +53,10 @@ export const shopfloorOn = (): boolean => impliedPacks(localDb.settings.get()).i
  * `shopfloor` pack is on (else `undefined`, and the order is released exactly as before).
  */
 export function opsForRelease(order: Pick<ProductionOrder, 'item_id' | 'planned_qty'>): MfOrderOp[] | undefined {
-  if (!shopfloorOn()) return undefined;
+  const packs = impliedPacks(localDb.settings.get());
+  const hold = releaseHold(order.item_id, packs); // MF-B1: a drawing revision on hold blocks the release (owner override)
+  if (hold) throw new Error(hold);
+  if (!packs.includes('shopfloor')) return undefined;
   const r = defaultRoutingOf(order.item_id);
   return r?.ops.length ? opsForQty(r, num(order.planned_qty), peekTable<WorkCentre>(MF_TABLES.centres)) : undefined;
 }

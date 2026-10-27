@@ -499,6 +499,8 @@ const RECORD_TABLES = [
   'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares',
   // R13-A: work centres, routings, job cards (JCD/FY…, one row per order per operation)
   'work_centres', 'routings', 'job_cards',
+  // R13-B: drawings, inspection reports (FAI/FY…), job quotes, moulding runs, print estimates (PES/FY…)
+  'drawings', 'inspection_reports', 'job_quotes', 'process_runs', 'print_estimates',
   // R13-C: cut plans / lots (CUT/FY…, bundles inside)
   'cut_plans',
   // R13-D: food batch cost cards (versions by effective date), AA / EPCG export authorisations, incentive claims
@@ -599,6 +601,8 @@ const ID_TABLES = new Set([
   'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares',
   // R13-A: work centres, routings, job cards (JCD/FY…, one row per order per operation)
   'work_centres', 'routings', 'job_cards',
+  // R13-B: drawings, inspection reports (FAI/FY…), job quotes, moulding runs, print estimates (PES/FY…)
+  'drawings', 'inspection_reports', 'job_quotes', 'process_runs', 'print_estimates',
   // R13-C: cut plans / lots (CUT/FY…, bundles inside)
   'cut_plans',
   // R13-D: food batch cost cards (versions by effective date), AA / EPCG export authorisations, incentive claims
