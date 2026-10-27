@@ -21,11 +21,11 @@ import { makeDraft, senderStateCode } from '../store/invoice-defaults';
 import { resolveStateCode } from './india-states';
 import { customFieldsDb, finalizeValues } from './custom-fields';
 import { isPeriodLockedError } from './period-lock';
-import { requireAccess } from './access';
+import { currentActor, requireAccess } from './access';
 import { audit } from './audit';
 import { generateId, getTable, setTable } from './storage';
 import {
-  batchOptions, editorStockContext, liveDocTrackingIssues, withBatch,
+  batchOptions, editorStockContext, liveDocTrackingIssues, liveMrpIssues, recordMrpOverrides, withBatch, withMrpIssues,
   type EditorStockContext,
 } from './stock-tracking';
 import { toCsv } from './csv';
@@ -283,11 +283,11 @@ export function savePosBill(input: PosSaveInput): PosSaveResult {
   }
   if (errors.length) return { ok: false, errors, summary };
 
-  if (ctx) {
-    const issues = liveDocTrackingIssues({ doc_type: rec.doc_type, status: 'Sent', issue_date: rec.issue_date, items: rec.items });
-    if (issues.errors.length) return { ok: false, errors: issues.errors, summary };
-    if (issues.expired.length && !input.expiredOk) return { ok: false, errors: [], expired: issues.expired, summary };
-  }
+  // R9 (RT-A2): the MRP guard runs even without batch / serial / godown tracking (no stock context).
+  const check = { doc_type: rec.doc_type, status: 'Sent' as const, issue_date: rec.issue_date, items: rec.items, discount_type: rec.discount_type, discount_rate: rec.discount_rate, price_includes_tax: rec.price_includes_tax };
+  const issues = ctx ? liveDocTrackingIssues(check) : withMrpIssues({ errors: [], expired: [], warnings: [] }, liveMrpIssues(check));
+  if (issues.errors.length) return { ok: false, errors: issues.errors, summary };
+  if (issues.expired.length && !input.expiredOk) return { ok: false, errors: [], expired: issues.expired, summary };
 
   // Same finishing steps as the editor's save: custom-field snapshot, number from the profile's series.
   const defs = customFieldsDb.all();
@@ -316,6 +316,7 @@ export function savePosBill(input: PosSaveInput): PosSaveResult {
   } catch (err) {
     return { ok: false, errors: [(err as Error).message], locked: isPeriodLockedError(err), summary };
   }
+  if (input.expiredOk) recordMrpOverrides(saved, issues.expired, currentActor()?.name ?? 'the owner', (r) => audit.record(r)); // R9 (RT-A2): the owner's "Sell anyway" over MRP
   const payments: Payment[] = [];
   try {
     if (exchange) {
@@ -351,6 +352,19 @@ export function savePosBill(input: PosSaveInput): PosSaveResult {
 
 /* ── Z report ────────────────────────────────────────────────── */
 
+/** R9 (RT-A3) Cash with riders at the end of `day`: COD cash collected up to that day less what was settled up to it. */
+export function cashWithRiders(payments: readonly Payment[], settlements: readonly { date: string; payment_ids: readonly string[] }[], day: string): number {
+  const settledBy = new Map<string, string>();
+  for (const s of settlements) for (const id of s.payment_ids) settledBy.set(id, s.date);
+  return round2(
+    payments
+      .filter((p) => p.rider_id && p.date <= day && String(p.method).toLowerCase() === 'cash')
+      .filter((p) => !(settledBy.has(p.id) && settledBy.get(p.id)! <= day))
+      .reduce((s, p) => s + num(p.amount), 0),
+  );
+}
+
+
 export interface ZReport {
   day: string;
   bills: number;
@@ -378,6 +392,8 @@ export interface ZReport {
   exchangeIn: number;
   /** R4-B1: gift vouchers redeemed on the day's bills (not new money: left out of the tenders and the drawer). */
   giftVouchers: number;
+  /** R9 (RT-A3): COD cash collected on the day's bills by delivery riders (with the riders, not in the drawer). */
+  riderCash: number;
   /** Net sales less the day's returns. */
   netAfterReturns: number;
 }
@@ -409,6 +425,7 @@ export function zReport(day: string, invoices: readonly InvoiceRecord[], payment
     returns: zReturns(day, returns, invoices),
     exchangeIn: 0,
     giftVouchers: 0,
+    riderCash: 0,
     netAfterReturns: 0,
   };
   const lines: CalcLine[] = [];
@@ -436,6 +453,10 @@ export function zReport(day: string, invoices: readonly InvoiceRecord[], payment
       if (p.gift_voucher_id) r.giftVouchers += num(p.amount);
       continue;
     }
+    if (p.rider_id && methodKey(p.method) === 'cash') { // R9 (RT-A3): cash still with the rider, not in the drawer
+      r.riderCash += num(p.amount);
+      continue;
+    }
     r.tenders[methodKey(p.method)] += num(p.amount);
   }
   for (const k of Object.keys(r.tenders) as (keyof ZReport['tenders'])[]) r.tenders[k] = round2(r.tenders[k]);
@@ -443,6 +464,7 @@ export function zReport(day: string, invoices: readonly InvoiceRecord[], payment
   r.received = round2(r.tenders.cash + r.tenders.upi + r.tenders.card + r.tenders.other);
   r.exchangeIn = round2(r.exchangeIn);
   r.giftVouchers = round2(r.giftVouchers);
+  r.riderCash = round2(r.riderCash);
   r.netAfterReturns = round2(r.net - r.returns.value);
   r.credit = round2(live.reduce((s, i) => s + Math.max(num(i.balance_due), 0), 0));
   return r;
@@ -562,6 +584,7 @@ export function zReportCsv(z: ZReport, close?: PosDayClose): string {
     ['Received', z.received],
     ['On account', z.credit],
     ...(z.giftVouchers ? [['Gift vouchers redeemed', z.giftVouchers]] : []),
+    ...(z.riderCash ? [['Cash collected by riders', z.riderCash]] : []),
   ];
   if (z.returns?.count) {
     rows.push(

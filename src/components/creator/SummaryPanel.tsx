@@ -31,6 +31,8 @@ import { localDb } from '../../lib/localDb';
 import { impliedPacks } from '../../lib/shop-mode';
 // R8-B (TR-B2/B3): bill charges, broker and weight slip (commodity / agency pack, lazy).
 const ChargesStrip = lazy(() => import('../trade/tr-b-hub').then((m) => ({ default: m.ChargesStrip })));
+// R9 (RT-A3): home delivery (Retail checks "Home delivery" on, or a document that carries one; lazy).
+const DeliveryStrip = lazy(() => import('../retail-r9/rt-a-hub').then((m) => ({ default: m.DeliveryStrip })));
 
 const GST_MODES: { id: GstMode; label: MessageKey }[] = [
   { id: 'CGST_SGST', label: 'summary.modeCgstSgst' },
@@ -61,6 +63,8 @@ export function SummaryPanel() {
   // Cheap check of the stored programme flag; the loyalty module itself loads only when it is on.
   const loyaltyOn = useMemo(() => getJson<{ enabled?: boolean } | null>(`${DB_PREFIX}loyalty_program`, null)?.enabled === true, []);
   const trOn = useMemo(() => ((x) => !!x.trade_discounts || !!x.returnable_packaging || impliedPacks(x).some((p) => p === 'distributor' || p === 'commodity' || p === 'agency'))(localDb.settings.get()), []); // R8-A
+  const hasDelivery = useInvoiceStore((st) => !!st.delivery);
+  const deliveryOn = useMemo(() => getJson<{ delivery?: { enabled?: boolean } } | null>(`${DB_PREFIX}retail_settings`, null)?.delivery?.enabled === true, []) || hasDelivery; // R9
   const packOn = useMemo(() => impliedPacks(localDb.settings.get()).some((p) => p === 'commodity' || p === 'agency'), []); // R8-B
   const hasCharges = useInvoiceStore((st) => st.items.some((i) => !!i.charge_head_id)); // QA8 T16: saved charge lines stay live
   const tradeOn = packOn || hasCharges;
@@ -103,6 +107,7 @@ export function SummaryPanel() {
         </Suspense>
       )}
       {tradeOn && <Suspense fallback={null}><ChargesStrip /></Suspense>}
+      {deliveryOn && <Suspense fallback={null}><DeliveryStrip /></Suspense>}
       {t.invoice_discount_amount > 0 && (
         <Row label={tr('summary.discountApplied')} tone="good">
           −{money(t.invoice_discount_amount)}

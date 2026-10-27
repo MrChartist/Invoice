@@ -36,8 +36,8 @@ const BUDGET_ENTRY = env('BUDGET_ENTRY_GZ_KB', 90);
 // Raised to 2400 for rounds 2–3 (collections, sales documents, annual pack, restaurant, service billing, compliance
 // desks): all lazy route / dialog chunks precached for offline; first paint keeps its 185 kB budget.
 // Raised to 2600 for round 4 and the round-5 industry packs, then to 2800 for the round-7 hotel and round-8 trading
-// packs (six packages, measured ~2665 kB after the first two): every screen is a lazy chunk loaded only by companies that turn the pack on; first paint keeps its 185 kB budget.
-const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 2800);
+// packs, then to 2900 for the round-9 retail and round-10 service packs (all pack screens lazy, loaded only when a pack is on): every screen is a lazy chunk loaded only by companies that turn the pack on; first paint keeps its 185 kB budget.
+const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 2900);
 
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 // De-duplicated: with an import cycle Vite emits the entry both as the script and as a modulepreload.

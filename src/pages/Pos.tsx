@@ -14,7 +14,8 @@ import { BankAccountSelect } from '../components/bank/BankAccountSelect';
 import { HeldBills } from '../components/pos/HeldBills';
 import { PosTiles } from '../components/pos/PosTiles';
 import { localDb } from '../lib/localDb';
-import { KEYS, generateId, getTable, peekTable } from '../lib/storage';
+import { DB_PREFIX, KEYS, generateId, getJson, getTable, peekTable } from '../lib/storage';
+import type { DeliveryInfo, RetailSettings } from '../types/retail-r9';
 import { num, round2 } from '../lib/invoice-calc';
 import { makeSuggester } from '../lib/suggest';
 import { addScannedLine, findByCode, findByShortCode } from '../lib/scan';
@@ -106,6 +107,7 @@ const TENDER_KEY: Record<MoneyTender, PosAction> = { Cash: 'cash', UPI: 'upi', C
 // R4-B1: the gift-voucher tender panel loads only when the company has vouchers.
 const GiftVoucherTender = lazy(() => import('../components/retail/GiftVoucherTender'));
 const RoomPicker = lazy(() => import('../components/hotel/FrontDesk').then((m) => ({ default: m.RoomPicker }))); // R7-B2 "Room" tender (hotel pack only)
+const PosRetailStrip = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.PosRetailStrip }))); // R9 (RT-A2/A3/A4)
 // R4-B3: the counter's branch (store price list). Inline labels, so the POS does not load the stores catalogue.
 const storeT = defineArea({ counter: 'This counter is branch', none: 'No branch' } as const, { counter: 'यह काउंटर इस शाखा का है', none: 'कोई शाखा नहीं' });
 
@@ -217,6 +219,7 @@ export function Pos() {
   const [modFor, setModFor] = useState<{ item: InvoiceItem; groups: ModGroup[]; qty?: number } | null>(null); // R3-A4
   const [imageFor, setImageFor] = useState<InvoiceRecord | null>(null); // R3-A5
   const [lastShare, setLastShare] = useState<InvoiceRecord | null>(null);
+  const [delivery, setDelivery] = useState<DeliveryInfo | null>(null); // R9 (RT-A3)
   /** The line the last scan / pick went to (Alt+Q), the quantity field last focused (Alt+W live weight). */
   const lastLine = useRef<string | null>(null);
   const focusedQty = useRef<string | null>(null);
@@ -250,7 +253,10 @@ export function Pos() {
   const promoted = promo.record ?? redeemed?.record ?? built;
   // 7U: a running bill-value offer applies after the price level / slab and the loyalty redemption.
   const offered = useMemo(() => applyBillOffer(promoted, data.pricing?.schemes ?? [], { retotalRecord: true }), [promoted, data.pricing]);
-  const record = useMemo(() => (agentId ? { ...offered, agent_id: agentId } : offered), [offered, agentId]);
+  const record = useMemo(() => (agentId || delivery ? { ...offered, ...(agentId ? { agent_id: agentId } : {}), ...(delivery?.address.trim() ? { delivery } : {}) } : offered), [offered, agentId, delivery]);
+  // R9: retail checks (MRP guard, deliveries, short book) read once; the strip loads only when one is on.
+  const retailRs = useMemo(() => getJson<RetailSettings | null>(`${DB_PREFIX}retail_settings`, null) ?? {}, []);
+  const retailStrip = (!!retailRs.mrp_guard && retailRs.mrp_guard !== 'off') || !!retailRs.delivery?.enabled || !!retailRs.short_book?.enabled;
   const tenders: Tender[] = useMemo(
     () => [
       ...(Object.keys(tender) as MoneyTender[]).map((m) => ({
@@ -518,6 +524,7 @@ export function Pos() {
 
   const reset = () => {
     setItems([]);
+    setDelivery(null); // R9 (RT-A3)
     setRedeemPts(0);
     setGvApplied([]);
     setParty(WALK_IN);
@@ -568,7 +575,7 @@ export function Pos() {
       setCreditOk(true);
       return;
     }
-    const res = savePosBill({ record, tenders, expiredOk, allowCredit: !!party.client, exchangeReturnId: exchange?.id, ...(promoV && promo.record ? { promoVoucher: { id: promoV.id, amount: promoV.amount } } : {}) });
+    const res = savePosBill({ record, tenders, expiredOk, allowCredit: !!party.client || !!record.delivery?.cod, exchangeReturnId: exchange?.id, ...(promoV && promo.record ? { promoVoucher: { id: promoV.id, amount: promoV.amount } } : {}) });
     if (res.expired?.length) {
       setExpiredAsk(res.expired);
       return;
@@ -1061,6 +1068,7 @@ export function Pos() {
               <Suspense fallback={null}>
                 <PosDistExtras client={party.client} record={record} unpaid={summary.due} agentId={agentId} onAgent={setAgentId} />
               </Suspense>
+              {retailStrip && <Suspense fallback={null}><PosRetailStrip record={record} query={query} delivery={delivery} onDelivery={setDelivery} onAddLine={(l) => setItems((prev) => [...prev.filter((x) => x.name !== 'Delivery charge'), l])} deliveryOn={!!retailRs.delivery?.enabled} shortBookOn={!!retailRs.short_book?.enabled} notify={notify} /></Suspense>}
               {party.client ? null : (
                 <>
                   <Typeahead

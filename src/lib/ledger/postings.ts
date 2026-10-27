@@ -54,7 +54,7 @@ import { inBooks, reversalOf } from './voucher-variants';
 import type { TdsChallan } from '../tds-payables';
 import type { VendorPayment } from '../../types/purchases';
 import { depreciationSchedule, fyLabelOf, type FixedAsset } from './assets';
-import { advanceMovements, isAdvanceAdjustment, type AdvanceMovement } from '../advance-tax';
+import { RIDER_CASH_LEDGER, advanceMovements, isAdvanceAdjustment, type AdvanceMovement } from '../advance-tax';
 import { purchaseReturnPostings } from './postings-returns';
 import { openingVouchers } from './postings-openings';
 import { applyBankLedgers } from './postings-bank';
@@ -292,19 +292,22 @@ function tdsSettlements(invoices: InvoiceRecord[], transactions: Payment[]): Map
   return out;
 }
 
-function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number, gvAcc?: string): LedgerVoucher | null {
+function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number, gvAcc?: string, riderAcc?: string): LedgerVoucher | null {
   const date = toIsoDate(t.date);
   const amount = Math.abs(toPaise(inrValue(num(t.amount), inv)));
   if (!date || amount === 0) return null;
   const party = inv ? partyOfInvoice(inv) : str((t as { client_name?: unknown }).client_name) || 'Unknown customer';
   // 8.106: a bad-debt write-off never touches cash / bank; R2-A3 debits its own "Bad debts written off" ledger.
   // R4-B1: a gift-voucher redemption debits the "Gift vouchers outstanding" liability (Other current liabilities if missing).
-  const cashAcc = t.write_off ? A.badDebts : t.gift_voucher_id ? gvAcc || A.otherCl : accountForMethod(t.method) === 'cash' ? A.cash : A.bank;
+  // R9: an exchange (old device / old gold) clears the debtor against the customer's URD voucher (creditor); COD cash
+  // collected by a delivery rider sits in "Cash with riders" until the rider settles (RT-A3).
+  const cash = accountForMethod(t.method) === 'cash';
+  const cashAcc = t.write_off ? A.badDebts : t.gift_voucher_id ? gvAcc || A.otherCl : t.exchange_purchase_id ? A.creditors : cash && t.rider_id && riderAcc ? riderAcc : cash ? A.cash : A.bank;
   // Realised exchange difference (6.19): the bank gets the realised rupees, the debtor is
   // cleared at the invoice rate, the difference is a gain (Cr) or a loss (Dr).
   const fx = realisedFx(t, inv);
   const received = fx ? Math.abs(toPaise(fx.realisedInr)) : amount;
-  const l = new Lines().dr(cashAcc, received);
+  const l = new Lines().dr(cashAcc, received, t.exchange_purchase_id ? party : undefined);
   if (tds > 0) l.dr(A.tdsReceivable, tds);
   l.cr(A.debtors, amount + tds, party);
   if (fx) l.cr(A.fxGain, received - amount);
@@ -669,7 +672,8 @@ export function buildLedger(input: LedgerInput): Ledger {
   // WP-1 (P0-11): receipt rows a manual voucher allocated bill-wise are posted by that voucher, not again here.
   const allocatedBy = new Set(input.manual.map((m) => m.id));
   const gvAcc = gvLiabilityId(input.userAccounts); // R4-B1
-  for (const t of input.transactions) if (!isAdvanceAdjustment(t) && !allocatedBy.has(str((t as { voucher_id?: unknown }).voucher_id))) push(receiptVoucher(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0, gvAcc));
+  const riderAcc = input.userAccounts.find((a) => a.name.trim().toLowerCase() === RIDER_CASH_LEDGER.toLowerCase())?.id; // R9 (RT-A3)
+  for (const t of input.transactions) if (!isAdvanceAdjustment(t) && !allocatedBy.has(str((t as { voucher_id?: unknown }).voucher_id))) push(receiptVoucher(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0, gvAcc, riderAcc));
   // R6-C2: the voucher posts the money, but the customer's TDS on the bill it clears is booked here, as for an invoice receipt.
   for (const t of input.transactions) if (allocatedBy.has(str((t as { voucher_id?: unknown }).voucher_id)) && (tds.get(String(t.id)) ?? 0) > 0) push(voucherTdsJournal(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0));
   for (const m of advanceMovements(input.advances ?? [], input.transactions, input.invoices)) {

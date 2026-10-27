@@ -11,8 +11,10 @@ import { LANGUAGES, isLang, setLanguage, useT } from '../../i18n';
 import { setupT } from '../../i18n/areas/setup';
 import { reachT } from '../../i18n/areas/reach';
 import { SHOP_MODE_EVENT, type BusinessType } from '../../lib/shop-mode';
-import { BUSINESS_DEFAULTS, BUSINESS_TYPES, TRADE_PROFILES, applyBusinessDefaults, applyTradeKind, isTradeKind, type TradeKindId } from '../../lib/shop-presets';
+import { BUSINESS_DEFAULTS, BUSINESS_TYPES, RETAIL_PROFILES, TRADE_PROFILES, applyBusinessDefaults, applyRetailKind, applyTradeKind, isRetailKind, isTradeKind, type RetailKindId, type TradeKindId } from '../../lib/shop-presets';
 import { TradeKindPicker } from '../trade/TradeKindPicker'; // R8-C (TR-C5)
+import { RetailKindPicker } from '../retail-r9/RetailKindPicker';
+import { pickT } from '../../i18n/areas/retail-r9-pick'; // R9 (RT-A1)
 import { trT } from '../../i18n/areas/trade-r8c';
 import { startDemoCompany, useDemoPending } from './demo-company';
 import { companiesSupported } from '../../lib/companies';
@@ -38,6 +40,12 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
   const [business, setBusiness] = useState<BusinessType>(() => localDb.settings.get().business_type ?? 'full');
   // R8-C (TR-C5): the trade under "Wholesale" (business type stays `wholesale`).
   const [tradeKind, setTradeKind] = useState<TradeKindId | ''>(() => (isTradeKind(localDb.settings.get().trade_kind) ? (localDb.settings.get().trade_kind as TradeKindId) : ''));
+  // R9 (RT-A1): the shop under "Kirana / retail shop" (business type stays `kirana`).
+  const [retailKind, setRetailKind] = useState<RetailKindId | ''>(() => (isRetailKind(localDb.settings.get().retail_kind) ? (localDb.settings.get().retail_kind as RetailKindId) : ''));
+  const pickRetail = (k: RetailKindId | '') => {
+    setRetailKind(k);
+    if (k) setA((prev) => ({ ...prev, templateId: RETAIL_PROFILES[k].templateId }));
+  };
   const { lang } = useT();
   const pickBusiness = (b: BusinessType) => {
     setBusiness(b);
@@ -74,10 +82,16 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
     if (!last) return setStep((s) => s + 1);
     try {
       const trade = business === 'wholesale' && tradeKind ? tradeKind : null; // R8-C
-      localDb.settings.save({ ...applyBusinessDefaults(applyAnswers(localDb.settings.get(), a), business), ...(trade ? { ...applyTradeKind(trade), defaultDueDays: TRADE_PROFILES[trade].defaultDueDays } : {}) });
+      const retail = business === 'kirana' && retailKind ? retailKind : null; // R9 (RT-A1)
+      localDb.settings.save({
+        ...applyBusinessDefaults(applyAnswers(localDb.settings.get(), a), business),
+        ...(trade ? { ...applyTradeKind(trade), defaultDueDays: TRADE_PROFILES[trade].defaultDueDays } : {}),
+        ...(retail ? { ...applyRetailKind(retail, { registered: a.gstRegistered }), defaultDueDays: RETAIL_PROFILES[retail].defaultDueDays } : {}),
+      });
+      if (retail) void import('../../lib/retail/rt-profile').then((m) => m.applyRetailSwitches(retail)).catch(() => undefined);
       window.dispatchEvent(new Event(SHOP_MODE_EVENT));
       localDb.template.set(a.templateId);
-      onClose(trade ? TRADE_PROFILES[trade].landing : BUSINESS_DEFAULTS[business].landing);
+      onClose(trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : BUSINESS_DEFAULTS[business].landing);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -184,6 +198,13 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
                 <span className={controls.label}>{trT('tradeTitle')}</span>
                 <span className={controls.hint}>{trT('tradeLede')}</span>
                 <TradeKindPicker value={tradeKind} onPick={setTradeKind} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
+              </div>
+            )}
+            {business === 'kirana' && (
+              <div className={controls.field} data-wizard-retail>
+                <span className={controls.label}>{pickT('retailTitle')}</span>
+                <span className={controls.hint}>{pickT('retailLede')}</span>
+                <RetailKindPicker value={retailKind} onPick={pickRetail} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
               </div>
             )}
             {/* QA-3 F20: the demo choice belongs on the first step, before any required field. */}

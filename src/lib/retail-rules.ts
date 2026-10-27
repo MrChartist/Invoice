@@ -1,0 +1,45 @@
+/**
+ * Retail statutory values (Round 9), keyed by the date they take effect — the same `Versioned` / `ruleAt` shape as
+ * `tax-rules.ts`: add a new dated row, never edit an old one. Imported only by lazy screens and engines — never by
+ * `tax-rules.ts`, `shop-mode.ts` or the shell (`tests/rt-rules.test.ts` checks the import graph).
+ *
+ * One section per package (§6 of docs/prd/round-9.md): RT-A committed the headers and types; each package fills its
+ * own section. Every row carries a `source` and `verified` (false where the text was not seen). Working papers —
+ * verify with your CA (docs/CA_REVIEW.md RT1–RT22).
+ */
+import type { Versioned } from './tax-rules';
+
+/** A dated retail rule row: `source` (inherited) plus whether the value was confirmed from an official text. */
+export type RtRule<T> = Versioned<T> & { verified: boolean };
+
+/* ── RT-A: retail profile and shared pieces ──────────────────────────────────────────────────────────────────────
+ * No statutory rows. The GST-cut MRP formula (effective MRP = MRP × (100 + new rate) ÷ (100 + old rate), only when the
+ * rate fell; never raised) lives in `retail/rt-mrp.ts` (RT4). The Legal Metrology "no sale above MRP" rule is a guard
+ * setting, not a dated value. */
+
+/* ── RT-B: pharmacy ── */
+/** Years a register / prescription must be kept (RT7). */
+export interface PharmaRetention { h1Years: number; xPrescriptionYears: number; cashMemoYears: number }
+export const PHARMA_RETENTION_RULES: readonly RtRule<PharmaRetention>[] = [];
+
+/* ── RT-C: apparel, footwear, textiles ── */
+export type PriceBandKind = 'apparel' | 'footwear' | 'made_ups';
+/** One band table: value per piece ≤ `upTo` → `rate`, else `above` (RT1, RT2). */
+export interface PriceBand { upTo: number; rate: number; above: number }
+export const PRICE_BAND_RULES: Readonly<Record<PriceBandKind, readonly RtRule<PriceBand>[]>> = { apparel: [], footwear: [], made_ups: [] };
+export interface AlterationRule { sac: string; rate: number }
+export const ALTERATION_RULES: readonly RtRule<AlterationRule>[] = [];
+
+/* ── RT-D: electronics and mobiles ── */
+export const IMEI_CHECK_RULES: readonly RtRule<{ resaleCheckDays: number }>[] = [];
+export const MARGIN_SCHEME_RULES: readonly RtRule<{ rule: string }>[] = [];
+export const WARRANTY_REPLACEMENT_RULES: readonly RtRule<{ noSale: boolean }>[] = [];
+
+/* ── RT-E: jewellery ── */
+export const JEWELLERY_GST_RULES: readonly RtRule<{ goodsRate: number; jobWorkRate: number; jobWorkSac: string }>[] = [];
+export const HALLMARK_RULES: readonly RtRule<{ huidMandatory: boolean; verifyLine: string }>[] = [];
+export const CASH_RECEIPT_LIMIT_RULES: readonly RtRule<number>[] = [];
+export const PAN_SALE_LIMIT_RULES: readonly RtRule<number>[] = [];
+export const PMLA_CASH_RULES: readonly RtRule<number>[] = [];
+export const CASH_PAYMENT_LIMIT_RULES: readonly RtRule<number>[] = [];
+export const EWAY_EXEMPT_CHAPTER_RULES: readonly RtRule<readonly string[]>[] = [];

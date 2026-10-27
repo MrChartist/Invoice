@@ -50,6 +50,7 @@ export const RECEIVABLES_TABS = [
   { id: 'marketplace', pack: 'marketplace' }, // R5-A
   { id: 'donations', pack: 'nonprofit' }, // R5-C
   { id: 'interest' }, // R8-A (TR-A4)
+  { id: 'deliveries' }, // R9 (RT-A3): home-delivery board and rider cash
 ] as const;
 export type ReceivablesTab = (typeof RECEIVABLES_TABS)[number]['id'];
 /* ── Reports ── */
@@ -67,8 +68,16 @@ export const REPORTS_TABS = [
 ] as const;
 export type ReportsTab = (typeof REPORTS_TABS)[number]['id'];
 /* ── Inventory ── */
-export type InventoryTab = 'summary' | 'movement' | 'dead' | 'margin' | 'batches' | 'godowns' | 'transfers' | 'serials' | 'query' | 'orders' | 'analysis' | 'depth' | 'expiry' | 'hsn';
-export const INVENTORY_TABS: readonly InventoryTab[] = ['summary', 'movement', 'dead', 'margin', 'batches', 'godowns', 'transfers', 'serials', 'query', 'orders', 'analysis', 'depth', 'expiry', 'hsn']; // 'hsn': R8-C (TR-C4)
+export type InventoryTab = 'summary' | 'movement' | 'dead' | 'margin' | 'batches' | 'godowns' | 'transfers' | 'serials' | 'query' | 'orders' | 'analysis' | 'depth' | 'expiry' | 'hsn' | 'shortbook';
+export const INVENTORY_TABS: readonly InventoryTab[] = ['summary', 'movement', 'dead', 'margin', 'batches', 'godowns', 'transfers', 'serials', 'query', 'orders', 'analysis', 'depth', 'expiry', 'hsn', 'shortbook']; // 'hsn': R8-C (TR-C4); 'shortbook': R9 (RT-A4)
+/** R9 (RT-A1): the retail pack desks on Inventory, one tab per pack (listed through `visibleTabs`; views in `&view=`). */
+export const INVENTORY_PACK_TABS = [
+  { id: 'pharmacy', pack: 'pharmacy' }, // RT-B: views rx / doctors / registers / refills / prices
+  { id: 'apparel', pack: 'apparel' }, // RT-C: views matrix / alterations / bands
+  { id: 'devices', pack: 'electronics' }, // RT-D: views imei / finance / buyback / service
+  { id: 'jewellery', pack: 'jewellery' }, // RT-E: views rates / tags / oldgold / karigar
+] as const;
+export type InventoryPackTab = (typeof INVENTORY_PACK_TABS)[number]['id'];
 /* ── Distribution ── */
 export const DISTRIBUTION_TABS = [
   { id: 'masters' },

@@ -50,4 +50,9 @@ export const TOPICS: readonly HelpTopic[] = [
   t('design', 'Design Studio', 'डिज़ाइन स्टूडियो', 'Change the look of your invoices: template, colours, fonts and layout.', 'Once, then whenever you want a new look.', { related: rel(['New invoice', '/invoice']) }),
   // R8-A (TR-A4; topic written by TR-C)
   t('receivables:interest', 'Interest', 'ब्याज', 'Interest on overdue bills for every party, and one interest invoice per party in a single run.', 'Month end.', { statutory: ca(['G6', 'TR18']) }),
+  // R9 (RT-A3)
+  t('receivables:deliveries', 'Deliveries', 'डिलीवरी', 'Home-delivery and phone orders by status and rider, the run sheet, cash on delivery collected by riders and the rider\'s cash settlement.', 'Through the day; settle each rider at night.', {
+    steps: ['On the POS bill, tick Home delivery and fill the address and rider.', 'Move the order: packed, out for delivery, delivered.', 'Delivered with cash on delivery records the rider\'s cash.', 'At night, settle the rider: count the cash, any shortage goes to a ledger you pick.'],
+    statutory: ca(['RT6']),
+  }),
 ];

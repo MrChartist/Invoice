@@ -16,10 +16,12 @@ import { localDb } from './localDb';
 export type StepKind =
   | 'profile' | 'opening' | 'import' | 'client' | 'item' | 'posbill' | 'invoice' | 'packFirst' | 'whatsapp' | 'payment' | 'gstPeriod' | 'backup'
   // R8-C (TR-C5): trade profile and the trading packs' own steps
-  | 'tradeProfile' | 'schemeScope' | 'weightItem' | 'principal';
+  | 'tradeProfile' | 'schemeScope' | 'weightItem' | 'principal'
+  // R9 (RT-A1): retail profile and the steps of each shop (append-only)
+  | 'retailProfile' | 'drugLicence' | 'doctor' | 'variantGrid' | 'serialItem' | 'metalRate' | 'jewelTag' | 'scaleOrBarcode';
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'opening', 'import', 'client', 'item', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -39,6 +41,8 @@ export interface ChecklistCtx {
   gstRegistered?: boolean;
   /** R8-C: `settings.trade_kind` (a wholesale company without one gets "Pick your trade"). */
   tradeKind?: string;
+  /** R9 (RT-A1): `settings.retail_kind` (a kirana company without one gets "Pick your shop"). */
+  retailKind?: string;
 }
 
 export interface ChecklistFactsV3 {
@@ -65,6 +69,15 @@ export interface ChecklistFactsV3 {
   scopedSchemes?: number;
   weightItems?: number;
   principals?: number;
+  /** R9 (RT-A1): drug licences on file, doctors, styles with a size / colour grid, serial-tracked items, metal rates,
+   *  jewellery tags, items with a barcode or sold by weight (each counted only when its shop applies). */
+  drugLicences?: number;
+  doctors?: number;
+  variantStyles?: number;
+  serialItems?: number;
+  metalRates?: number;
+  jewelTags?: number;
+  barcodeItems?: number;
 }
 
 export interface SetupProgress {
@@ -93,8 +106,8 @@ export interface ChecklistStepV3 {
 /** Where a C3 import run is recorded (the wizard appends one row per run). */
 export const IMPORT_RUNS_TABLE = 'import_runs';
 
-/** The table whose first row completes a pack's first step. */
-export const PACK_FIRST_TABLE: Readonly<Record<PackId, string>> = {
+/** The table whose first row completes a pack's first step (R9 retail packs have their own steps per shop instead). */
+export const PACK_FIRST_TABLE: Readonly<Partial<Record<PackId, string>>> = {
   transport: 'consignment_notes',
   works: 'ra_measurements',
   fees: 'fee_plans',
@@ -119,11 +132,18 @@ function applies(kind: StepKind, ctx: ChecklistCtx): boolean {
     case 'posbill': return isType(ctx, 'kirana', 'restaurant');
     case 'whatsapp': return isType(ctx, 'services', 'kirana', 'wholesale');
     case 'gstPeriod': return !!ctx.gstRegistered && moduleOn(ctx, 'gst');
-    case 'packFirst': return ctx.packs.length > 0;
+    case 'packFirst': return ctx.packs.some((p) => PACK_FIRST_TABLE[p]);
     case 'tradeProfile': return isType(ctx, 'wholesale') && !ctx.tradeKind; // R8-C: existing wholesale companies
     case 'schemeScope': return ctx.packs.includes('distributor');
     case 'weightItem': return ctx.packs.includes('commodity');
     case 'principal': return ctx.packs.includes('agency');
+    // R9 (RT-A1): existing kirana companies get "Pick your shop"; each shop its own first steps
+    case 'retailProfile': return isType(ctx, 'kirana') && !ctx.retailKind;
+    case 'drugLicence': case 'doctor': return ctx.retailKind === 'pharmacy';
+    case 'variantGrid': return ctx.retailKind === 'apparel';
+    case 'serialItem': return ctx.retailKind === 'electronics';
+    case 'metalRate': case 'jewelTag': return ctx.retailKind === 'jewellery';
+    case 'scaleOrBarcode': return ctx.retailKind === 'grocery';
     default: return true; // profile, item, payment, backup
   }
 }
@@ -141,7 +161,7 @@ function stepsOf(kind: StepKind, f: ChecklistFactsV3, ctx: ChecklistCtx): Omit<C
     case 'item': return one(f.items > 0 || (inventory && (f.stockItems ?? 0) > 0), inventory ? '/inventory?new=1' : '/settings?tab=items');
     case 'posbill': return one((f.posBills ?? 0) > 0, '/pos');
     case 'invoice': return one(f.invoices > 0, '/invoice');
-    case 'packFirst': return ctx.packs.map((p) => ({ key: `packFirst:${p}`, kind, pack: p, done: (f.packRecords?.[p] ?? 0) > 0, to: packHref(p) }));
+    case 'packFirst': return ctx.packs.filter((p) => PACK_FIRST_TABLE[p]).map((p) => ({ key: `packFirst:${p}`, kind, pack: p, done: (f.packRecords?.[p] ?? 0) > 0, to: packHref(p) }));
     case 'whatsapp': return one(f.messagesSent > 0, '/transactions');
     case 'payment': return one(f.payments > 0, '/transactions?filter=unpaid&pay=1');
     case 'gstPeriod': return one((f.gstPeriods ?? 0) > 0, '/gst-reports');
@@ -150,6 +170,15 @@ function stepsOf(kind: StepKind, f: ChecklistFactsV3, ctx: ChecklistCtx): Omit<C
     case 'schemeScope': return one((f.scopedSchemes ?? 0) > 0, '/settings?tab=items');
     case 'weightItem': return one((f.weightItems ?? 0) > 0, '/inventory');
     case 'principal': return one((f.principals ?? 0) > 0, '/expenses?tab=vendors');
+    // R9 (RT-A1)
+    case 'retailProfile': return one(!!ctx.retailKind, '/settings?tab=features');
+    case 'drugLicence': return one((f.drugLicences ?? 0) > 0, '/inventory?tab=pharmacy&view=registers');
+    case 'doctor': return one((f.doctors ?? 0) > 0, '/inventory?tab=pharmacy&view=doctors');
+    case 'variantGrid': return one((f.variantStyles ?? 0) > 0, '/inventory?tab=depth');
+    case 'serialItem': return one((f.serialItems ?? 0) > 0, '/inventory');
+    case 'metalRate': return one((f.metalRates ?? 0) > 0, '/inventory?tab=jewellery&view=rates');
+    case 'jewelTag': return one((f.jewelTags ?? 0) > 0, '/inventory?tab=jewellery&view=tags');
+    case 'scaleOrBarcode': return one((f.barcodeItems ?? 0) > 0, '/inventory');
   }
 }
 
@@ -228,6 +257,13 @@ export const withSkipped = (p: SetupProgress, key: string, on: boolean): SetupPr
 
 /* ── Reading the facts (Dashboard card, Help → Setup checklist) ─────────────── */
 
+/** R9: drug licences on file — RT-B's `pharma_settings.licences`, else the profile's printed licence text. */
+function drugLicenceCount(profileText: unknown): number {
+  const ph = getJson<{ licences?: unknown } | null>(`${DB_PREFIX}pharma_settings`, null);
+  const n = Array.isArray(ph?.licences) ? ph.licences.length : 0;
+  return n || (typeof profileText === 'string' && profileText.trim() ? 1 : 0);
+}
+
 /** Counts only, from the shared parsed rows (PERF-2: never copied). */
 export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: ChecklistCtx } {
   const settings = localDb.settings.get();
@@ -235,7 +271,12 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
   const packs = activePacks(settings);
   const invoices = peekTable<{ pos?: boolean }>(KEYS.invoices);
   const packRecords: Partial<Record<PackId, number>> = {};
-  for (const p of packs) packRecords[p] = peekTable(PACK_FIRST_TABLE[p]).length;
+  for (const p of packs) {
+    const table = PACK_FIRST_TABLE[p];
+    if (table) packRecords[p] = peekTable(table).length;
+  }
+  const retailKind = typeof settings.retail_kind === 'string' ? settings.retail_kind : undefined;
+  const stock = retailKind ? peekTable<{ track_serials?: unknown; variant_axes?: unknown; barcode?: unknown; sold_by_weight?: unknown }>('stock_items') : [];
   const facts: ChecklistFactsV3 = {
     profileReady: !!settings.onboarded && Boolean(profile?.companyName?.trim()) && Boolean(profile?.upiId || profile?.accountNumber),
     clients: peekTable(KEYS.clients).length,
@@ -254,6 +295,12 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     ...(packs.includes('distributor') ? { scopedSchemes: peekTable<{ scope?: unknown }>('schemes').filter((r) => r?.scope).length } : {}),
     ...(packs.includes('commodity') ? { weightItems: peekTable<{ sold_by_weight_bags?: unknown }>('stock_items').filter((r) => r?.sold_by_weight_bags).length } : {}),
     ...(packs.includes('agency') ? { principals: peekTable<{ principal_kind?: unknown }>('vendors').filter((r) => r?.principal_kind).length } : {}),
+    // R9 (RT-A1): each shop's first steps (read only for that shop)
+    ...(retailKind === 'pharmacy' ? { drugLicences: drugLicenceCount(profile?.drug_licence), doctors: peekTable('doctors').length } : {}),
+    ...(retailKind === 'apparel' ? { variantStyles: stock.filter((r) => Array.isArray(r?.variant_axes) && r.variant_axes.length).length } : {}),
+    ...(retailKind === 'electronics' ? { serialItems: stock.filter((r) => r?.track_serials).length } : {}),
+    ...(retailKind === 'jewellery' ? { metalRates: peekTable('metal_rates').length, jewelTags: peekTable('jewel_tags').length } : {}),
+    ...(retailKind === 'grocery' ? { barcodeItems: stock.filter((r) => r?.barcode || r?.sold_by_weight).length + peekTable<{ barcode?: unknown; sold_by_weight?: unknown }>(KEYS.items).filter((r) => r?.barcode || r?.sold_by_weight).length } : {}),
   };
   const ctx: ChecklistCtx = {
     businessType: typeof settings.business_type === 'string' ? settings.business_type : undefined,
@@ -262,6 +309,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     role: currentRole(),
     gstRegistered: Boolean(profile?.companyGstin?.trim()),
     ...(typeof settings.trade_kind === 'string' ? { tradeKind: settings.trade_kind } : {}),
+    ...(retailKind ? { retailKind } : {}),
   };
   return { facts, ctx };
 }

@@ -935,7 +935,7 @@ A non-warranty repair is billed with the screen as a part.
    brand / service centre (vendor) with claim no. and status `sent → approved / rejected → settled`. A free replacement
    part or unit under warranty creates no sale. A replacement unit swapped in stock is a stock journal (out old serial,
    in new serial, no value; RT13).
-3. **Billing**: *Bill job* creates an invoice with the service line (SAC 998714 "maintenance and repair of telecom /
+3. **Billing**: *Bill job* creates an invoice with the service line (SAC 998716 (verify; 998714 is transport machinery) "maintenance and repair of telecom /
    electronics", 18%, unverified) and parts lines (stock items, out of stock), adjusting the advance.
 4. Devices desk → *Service* board by status and age; overdue jobs on the bell.
 
@@ -1365,7 +1365,7 @@ rule row or a setting default, never the design.
 | 20 | Second-hand resale | Margin scheme offered per line, only with no ITC on the buy-back; not on a B2B bill wanting ITC. | Rule 32(5) (RT12). |
 | 21 | Used goods godown | New `Godown.kind` `'used'`, saleable. | Keeps used stock visible and separate in stock statements. |
 | 22 | Warranty replacement | No sale, no GST, no ITC reversal; stock swap by journal. | Circular 195/07/2023 as understood (RT13). |
-| 23 | Repair service SAC / rate | SAC 998714 at 18% (unverified); parts as goods lines at their own rates. | RT13. |
+| 23 | Repair service SAC / rate | SAC 998716 at 18% (unverified; 998714 is transport machinery — see SV20); parts as goods lines at their own rates. | RT13. |
 | 24 | Jewellery GST | 3% on the whole line (metal + wastage + making + stones + hallmarking); job work on customer's metal 5% SAC 9988 as a separate mode. | CBIC FAQ (RT16). |
 | 25 | Jewellery line storage | Breakdown snapshot `jw`; `rate` = amount ÷ quantity so calc, GST, HSN and stock are unchanged. | The Round 8 weight-line approach. |
 | 26 | Metal rate missing for the day | Error with an audited owner override (typed line rate). | Rates move daily; avoids stale prices. |

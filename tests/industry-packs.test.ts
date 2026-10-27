@@ -22,6 +22,10 @@ test('each new type implies its pack; an explicit list (even empty) beats the ty
   assert.ok(PACK_IDS.includes('hotel')); // R7-A
   assert.ok(PACK_IDS.length >= 9, 'six R5 packs + three R8 trading packs'); // R8-C
   for (const p of ['distributor', 'commodity', 'agency']) assert.ok(PACK_IDS.includes(p as never), p);
+  // R9 (RT-A1): four retail packs; `kirana` implies none (existing kirana companies unchanged); no shell route change.
+  for (const p of ['pharmacy', 'apparel', 'electronics', 'jewellery']) assert.ok(PACK_IDS.includes(p as never), p);
+  assert.deepEqual(activePacks({ business_type: 'kirana' }), []);
+  assert.ok(PACK_TABS.filter((t) => ['pharmacy', 'apparel', 'electronics', 'jewellery'].includes(t.pack)).every((t) => t.path.startsWith('/inventory?tab=')));
 });
 
 test('applyBusinessType / defaults for each new type', () => {
@@ -89,6 +93,7 @@ test('R6-B2 pin: the shell copies PACK_ROUTES / PACK_OF_TYPE_INLINE equal PACK_T
   for (const t of PACK_TABS) {
     const route = t.path.split('?')[0];
     if (!moduleOfPath(route)) continue; // core routes (e.g. /receivables) are always visible
+    if (t.path.startsWith('/inventory?')) continue; // R9: the retail desks live on /inventory, which every retail profile keeps (PACK_ROUTES unchanged)
     const set = want.get(route) ?? new Set<string>();
     for (const p of [t.pack, ...(t.alsoPacks ?? [])]) set.add(p);
     want.set(route, set);

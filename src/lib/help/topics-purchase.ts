@@ -56,4 +56,8 @@ export const TOPICS: readonly HelpTopic[] = [
   t('distribution:credit', 'Credit control', 'क्रेडिट नियंत्रण', 'Credit limits and days per party, and who is over them.', 'Before billing a party with old dues.'),
   // R8-C (TR-C4)
   t('inventory:hsn', 'HSN stock', 'HSN अनुसार स्टॉक', 'Closing quantity and value at cost by HSN code and godown on a date.', 'For the bank, the annual return or a stock audit.', { statutory: ca(['TR19']) }),
+  // R9 (RT-A4)
+  t('inventory:shortbook', 'Short book', 'शॉर्ट बुक', 'Items customers asked for that were not in stock. Make draft purchase orders from them, grouped by the item\'s last supplier; rows close when the stock comes in.', 'Daily at the counter; before you place orders.', {
+    steps: ['At the counter, type the item; if it is not found, add it to the short book.', 'Here, check the open rows.', 'Make draft PO, then check quantities and rates on the order.', 'When the stock comes in, tell the customer on WhatsApp.'],
+  }),
 ];

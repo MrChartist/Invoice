@@ -110,6 +110,9 @@ export function LabelSheetModal({ open, onClose, onChanged, preselected }: {
 
   const print = () => {
     const html = labelSheetHtml(chosen, { layout, price, skip, business: localDb.settings.activeProfile()?.companyName });
+    // R9 (RT-A2): stamp the print (and the price shown) so the relabel queue knows what is current.
+    const printed = rows.filter((r) => (copies[r.key] ?? 0) > 0).map((r) => r.key);
+    void import('../../lib/retail/rt-mrp-store').then((m) => m.stampLabelsPrinted(printed) && onChanged()).catch(() => undefined);
     const w = window.open('', '_blank');
     if (w) {
       w.document.open();

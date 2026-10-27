@@ -31,7 +31,10 @@ export interface Godown {
   kind?: 'van' | 'expiry' | 'wip' | 'qc' | 'transit' | 'site' // R5-B6: 'site' = material at a works site (non-saleable)
     // R8-C (TR-C1): 'consignment' = principals' goods held by a commission agent (arrivals). Non-saleable for our own
     // sales; an agency line (one naming its arrival, `arrival_id`) may sell from it. Not in our stock valuation.
-    | 'consignment';
+    | 'consignment'
+    // R9 (RT-A, used by RT-D3 / RT-E3): 'used' = second-hand goods bought from customers (buy-back devices, old gold).
+    // SALEABLE (`nonSaleableGodowns` leaves it out); a sale from it is flagged for the margin scheme (`isUsedGodown`).
+    | 'used';
   created_at?: string;
   updated_at?: string;
 }

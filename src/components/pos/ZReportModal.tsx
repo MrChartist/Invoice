@@ -15,6 +15,11 @@ import { areaNodes } from '../../i18n/areas/nodes';
 import { posReturnsDb } from '../../lib/pos-returns';
 import { ZReturnsRows } from '../pos-returns/ZReturnsRows';
 import { dayOpeningFloat, shiftsDb } from '../../lib/pos-shifts';
+import { cashWithRiders } from '../../lib/pos'; // R9 (RT-A3)
+import { peekTable } from '../../lib/storage';
+import { defineArea } from '../../i18n/area';
+
+const zrT = defineArea({ riders: 'Cash with riders' } as const, { riders: 'राइडरों के पास कैश' });
 
 function printHtml(html: string, name: string) {
   const w = window.open('', '_blank');
@@ -119,6 +124,7 @@ export function ZReportModal({ open, onClose, notify }: { open: boolean; onClose
             <tr><th scope="row">UPI</th><td className={surface.numeric} data-z="upi">{formatCurrency(z.tenders.upi)}</td></tr>
             <tr><th scope="row">{posT('m.Card')}</th><td className={surface.numeric} data-z="card">{formatCurrency(z.tenders.card)}</td></tr>
             {z.tenders.other ? <tr><th scope="row">{posT('zOther')}</th><td className={surface.numeric}>{formatCurrency(z.tenders.other)}</td></tr> : null}
+            {peekTable('delivery_riders').length > 0 && <tr><th scope="row">{zrT('riders')}</th><td className={surface.numeric} data-z="riders">{formatCurrency(cashWithRiders(localDb.payments.getAll(), peekTable<{ date: string; payment_ids: string[] }>('rider_settlements'), day))}</td></tr>}
             {z.credit ? <tr><th scope="row">{posT('zOnAccount')}</th><td className={surface.numeric}>{formatCurrency(z.credit)}</td></tr> : null}
             <ZReturnsRows z={z} />
           </tbody>

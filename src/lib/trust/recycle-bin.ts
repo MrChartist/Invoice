@@ -35,6 +35,7 @@ import { PAYROLL_TABLES } from './payroll-tables';
 import { liveRedeemIssue } from '../retail/gift-voucher-core';
 import '../trade/tr-registry'; // R8-C: Round 8 tables' rights and audit labels (lazy registration)
 import '../hotel/hotel-registry'; // R7: hotel tables' rights and audit labels (lazy registration)
+import '../retail/rt-registry'; // R9: retail tables' rights and audit labels (lazy registration)
 
 export { BIN_TABLE };
 export const BIN_SETTINGS_KEY = `${DB_PREFIX}bin_settings`;

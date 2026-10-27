@@ -49,17 +49,37 @@ const OrdersOutstandingTab = lazy(() => import('../components/inventory/OrdersOu
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Inventory.module.css';
-import { INVENTORY_TABS, type InventoryTab } from './page-tabs'; // R6-B1
+import { INVENTORY_PACK_TABS, INVENTORY_TABS, type InventoryPackTab, type InventoryTab } from './page-tabs'; // R6-B1; R9 pack desks
+import { visibleTabs } from '../lib/industry-packs';
+import { defineArea } from '../i18n/area';
+import { getJson, peekTable, DB_PREFIX } from '../lib/storage';
 import { discoverT } from '../i18n/areas/discover-r6';
 
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
 const HsnStockTab = lazy(() => import('../components/trade/HsnStockTab')); // R8-C (TR-C4)
+// R9: retail pack desks (one lazy chunk each; stubs until RT-B … RT-E merge), the short book and the relabel queue (RT-A).
+const PharmacyDesk = lazy(() => import('../components/retail-r9/PharmacyDesk'));
+const ApparelDesk = lazy(() => import('../components/retail-r9/ApparelDesk'));
+const DevicesDesk = lazy(() => import('../components/retail-r9/DevicesDesk'));
+const JewelleryDesk = lazy(() => import('../components/retail-r9/JewelleryDesk'));
+const ShortBookTab = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.ShortBookTab })));
+const RelabelQueue = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.RelabelQueue })));
+const MrpBasisTool = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.MrpBasisTool })));
+const r9TabT = defineArea(
+  { pharmacy: 'Pharmacy', apparel: 'Apparel', devices: 'Devices', jewellery: 'Jewellery', shortbook: 'Short book' } as const,
+  { pharmacy: 'फ़ार्मेसी', apparel: 'कपड़े', devices: 'डिवाइस', jewellery: 'ज्वेलरी', shortbook: 'शॉर्ट बुक' },
+);
+/** R9: the short book tab shows for a retail counter, once it is switched on, or once it has rows. */
+const shortBookShown = (): boolean => {
+  const rs = getJson<{ short_book?: { enabled?: boolean } } | null>(`${DB_PREFIX}retail_settings`, null);
+  return localDb.settings.get().business_type === 'kirana' || !!rs?.short_book?.enabled || peekTable('short_book').length > 0;
+};
 import { trT } from '../i18n/areas/trade-r8c';
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
-type Tab = InventoryTab;
-const TABS = INVENTORY_TABS; // R6-B1: list in inventory-tabs.ts
+type Tab = InventoryTab | InventoryPackTab;
+const TABS: readonly Tab[] = [...INVENTORY_TABS, ...INVENTORY_PACK_TABS.map((t) => t.id)]; // R6-B1: list in page-tabs.ts; R9 pack desks
 type Filter = 'all' | 'low' | 'out' | 'negative' | 'untracked';
 
 function download(filename: string, csv: string) {
@@ -135,6 +155,8 @@ export function Inventory() {
     ['query', imT('tabQuery')], ['orders', imT('tabOrders')],
     ['analysis', skT('tabAnalysis')], ['depth', skT('tabDepth')], ...(showBatches ? [['expiry', skT('tabExpiry')]] : []),
     ['hsn', trT('hsnTitle')], // R8-C (TR-C4)
+    ...(shortBookShown() || tab === 'shortbook' ? [['shortbook', r9TabT('shortbook')]] : []), // R9 (RT-A4)
+    ...visibleTabs(INVENTORY_PACK_TABS, localDb.settings.get(), tab).map((t) => [t.id, r9TabT(t.id)]), // R9 pack desks
   ] as [Tab, string][]);
   // Stock groups / categories (WP-8): filters appear once any exist.
   /* eslint-disable react-hooks/exhaustive-deps */
@@ -380,7 +402,15 @@ export function Inventory() {
           </div>
         )}
 
-        {!hasItems ? (
+        {activeTab === 'shortbook' || INVENTORY_PACK_TABS.some((t) => t.id === activeTab) ? (
+          <Suspense fallback={null}>
+            {activeTab === 'shortbook' && <ShortBookTab onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
+            {activeTab === 'pharmacy' && <PharmacyDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
+            {activeTab === 'apparel' && <ApparelDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
+            {activeTab === 'devices' && <DevicesDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
+            {activeTab === 'jewellery' && <JewelleryDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
+          </Suspense>
+        ) : !hasItems ? (
           <EmptyState
             icon={Boxes}
             title={invT('emptyTitle')}
@@ -399,6 +429,7 @@ export function Inventory() {
           />
         ) : (
           <div className={surface.tableWrap}>
+            {activeTab === 'summary' && <Suspense fallback={null}><RelabelQueue version={version} /><MrpBasisTool onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} /></Suspense>}
             {activeTab === 'summary' && (
               <table className={surface.table}>
                 <thead>
@@ -482,6 +513,7 @@ export function Inventory() {
             {activeTab === 'batches' && (
               <BatchesTab tracking={tracking} today={today} days={expiryDays} godowns={godowns} onDownload={download} />
             )}
+            {activeTab === 'batches' && <Suspense fallback={null}><MrpBasisTool onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} /></Suspense>}
 
             {activeTab === 'godowns' && (
               <table className={surface.table}>

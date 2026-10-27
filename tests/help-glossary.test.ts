@@ -52,6 +52,6 @@ test('no glossary text states a percentage or rupee amount unless "as the app ap
 });
 
 test('CA ids cited by terms exist in docs/CA_REVIEW.md', () => {
-  const ids = new Set([...readFileSync(join(import.meta.dirname, '../docs/CA_REVIEW.md'), 'utf8').matchAll(/^\| ((?:G|TR|T|P|AC|I|X)\d+)\b/gm)].map((m) => m[1]));
+  const ids = new Set([...readFileSync(join(import.meta.dirname, '../docs/CA_REVIEW.md'), 'utf8').matchAll(/^\| ((?:G|TR|T|P|AC|I|X|HT|RT)\d+)\b/gm)].map((m) => m[1])); // R9: RT ids
   for (const [id, g] of Object.entries(GLOSSARY)) for (const c of (g as { caItems?: readonly string[] }).caItems ?? []) assert.ok(ids.has(c), `${id}: ${c}`);
 });

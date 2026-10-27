@@ -178,6 +178,11 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   trade_charge_heads: 'Bill-charge heads (market fee, aadat, hamali …).', brokerage_postings: 'Brokerage postings per broker and period.',
   // R8-C: agents
   arrivals: 'Arrivals of principals\' goods (agency lots).', sale_pattis: 'Bikri pattis (settlements to principals).', indents: 'Indent register.',
+  // R9: retail shops (RT-A … RT-E)
+  delivery_riders: 'Home-delivery riders.', rider_settlements: 'Rider cash (COD) settlements.', short_book: 'Short book: items customers asked for that were out of stock.',
+  doctors: 'Doctors (prescribers).', rx_refills: 'Repeat-prescription refill schedules.', alteration_jobs: 'Alteration slips (ALT/FY…).',
+  imei_checks: 'Blocked-IMEI check log (filled by the user from the government portal).', finance_deals: 'Consumer-finance (EMI) deals and DOs.', service_jobs: 'Repair job sheets (SVC/FY…).',
+  metal_rates: 'Daily metal rates by purity.', jewel_tags: 'Jewellery tags (pieces with weights and HUID).', karigar_moves: 'Karigar metal issue / receipt by fine weight (KAR/FY…).',
   // Child CSVs (flattened arrays)
   invoice_items: 'Lines of sales documents, keyed by invoice_id.',
   purchase_lines: 'Lines of supplier bills, keyed by purchase_id.',
@@ -192,6 +197,7 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   setup_progress: 'Setup checklist: skipped steps and when the card was hidden (the owner at the top level, each clerk under byUser).',
   hotel_settings: 'Hotel settings: business date, times, SAC codes, premises declarations.', // R7
   interest_settings: 'Interest-on-overdue defaults (R8-A).', bank_statement_settings: 'Bank stock-statement terms per bank account (R8-C).', tds_settings: 'TDS settings: our turnover per FY for 194Q (R8-C).',
+  retail_settings: 'Retail checks: MRP guard, deliveries, short book, free quantity on bills, cash / PAN guard (R9).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';

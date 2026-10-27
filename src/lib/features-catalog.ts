@@ -125,6 +125,11 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   distributor: '/distribution?tab=claims',
   commodity: '/distribution?tab=mandi',
   agency: '/distribution?tab=agency',
+  // R9 (RT-A1): retail packs (desk tabs on Inventory)
+  pharmacy: '/inventory?tab=pharmacy',
+  apparel: '/inventory?tab=apparel',
+  electronics: '/inventory?tab=devices',
+  jewellery: '/inventory?tab=jewellery',
 };
 
 export const FEATURE_ROWS: readonly FeatureRow[] = [

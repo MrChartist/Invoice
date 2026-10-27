@@ -17,6 +17,7 @@ import { useT } from '../../i18n';
 import { purT } from '../../i18n/areas/purchases';
 import { useCreateOnTheFly } from '../masters/useCreateOnTheFly';
 import { isAltC } from '../masters/useMasterKeys';
+import { defineArea } from '../../i18n/area';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
@@ -28,7 +29,16 @@ export interface LineItemsEditorProps {
   stock?: BillStockContext;
   /** Document date: the GST rate list offers the slabs in force that day (QA-3 F9). Today when absent. */
   date?: string;
+  /** R9 (RT-A4): bills only — Free units and Disc % cells ("10 + 1 at ₹80 less 5%"). */
+  freeCells?: boolean;
 }
+
+// R9 (RT-A4): the two bill-line cells (kept here so the purchases chunk does not load the retail area).
+const freeT = defineArea(
+  { free: 'Free', disc: 'Disc %', freeOf: 'Free units, line {n}', discOf: 'Discount %, line {n}', hint: 'Free units carry no value and no GST; stock takes paid + free and the cost is spread over them.' } as const,
+  { free: 'फ़्री', disc: 'छूट %', freeOf: 'फ़्री इकाइयाँ, लाइन {n}', discOf: 'छूट %, लाइन {n}', hint: 'फ़्री इकाइयों का कोई मूल्य या GST नहीं; स्टॉक में भुगतान + फ़्री दोनों आते हैं और लागत सब पर बँटती है।' },
+);
+const lineValue = (l: PurchaseLine) => round2(l.quantity * l.rate * (1 - Math.min(Math.max(l.discount_percent ?? 0, 0), 100) / 100));
 
 /** True when a bill line is a tracked stock item and needs the extra batch / serial / godown row. */
 function needsTracking(line: PurchaseLine, ctx: BillStockContext | undefined): boolean {
@@ -38,7 +48,7 @@ function needsTracking(line: PurchaseLine, ctx: BillStockContext | undefined): b
 }
 
 /** Editable bill lines: item, HSN/SAC, qty, rate, GST%. */
-export function LineItemsEditor({ lines, onChange, stock, date }: LineItemsEditorProps) {
+export function LineItemsEditor({ lines, onChange, stock, date, freeCells }: LineItemsEditorProps) {
   useT(); // re-render on a language switch (5.4)
   const patch = (id: string, change: Partial<PurchaseLine>) =>
     onChange(lines.map((l) => {
@@ -87,7 +97,9 @@ export function LineItemsEditor({ lines, onChange, stock, date }: LineItemsEdito
               <th className={styles.colName}>{purT('thItem')}</th>
               <th className={styles.colHsn}>{purT('thHsn')}</th>
               <th className={styles.colQty}>{purT('thQty')}</th>
+              {freeCells && <th className={styles.colQty} title={freeT('hint')}>{freeT('free')}</th>}
               <th className={styles.colRate}>{purT('thRate')}</th>
+              {freeCells && <th className={styles.colQty}>{freeT('disc')}</th>}
               <th className={styles.colTax}>{purT('thGstPct')}</th>
               <th className={styles.colAmt}>{purT('thAmount')}</th>
               <th className={styles.colAct}><span className={surface.srOnly}>{purT('remove')}</span></th>
@@ -148,6 +160,11 @@ export function LineItemsEditor({ lines, onChange, stock, date }: LineItemsEdito
                     );
                   })()}
                 </td>
+                {freeCells && (
+                  <td data-label={freeT('free')}>
+                    <NumberInput className={controls.ghostNumeric} value={l.free_qty ?? 0} aria-label={freeT('freeOf', { n: i + 1 })} onChange={(n) => patch(l.id, { free_qty: n > 0 ? n : undefined })} data-bill-free={i} />
+                  </td>
+                )}
                 <td data-label={purT('thRate')}>
                   <NumberInput
                     className={controls.ghostNumeric}
@@ -157,6 +174,11 @@ export function LineItemsEditor({ lines, onChange, stock, date }: LineItemsEdito
                     onChange={(rate) => patch(l.id, { rate })}
                   />
                 </td>
+                {freeCells && (
+                  <td data-label={freeT('disc')}>
+                    <NumberInput className={controls.ghostNumeric} value={l.discount_percent ?? 0} aria-label={freeT('discOf', { n: i + 1 })} onChange={(n) => patch(l.id, { discount_percent: n > 0 ? Math.min(n, 100) : undefined })} data-bill-disc={i} />
+                  </td>
+                )}
                 <td data-label={purT('thGstPct')}>
                   <select
                     className={controls.ghost}
@@ -169,7 +191,7 @@ export function LineItemsEditor({ lines, onChange, stock, date }: LineItemsEdito
                     ))}
                   </select>
                 </td>
-                <td className={styles.lineAmount} data-label={purT('thAmount')}>{formatCurrency(round2(l.quantity * l.rate))}</td>
+                <td className={styles.lineAmount} data-label={purT('thAmount')}>{formatCurrency(lineValue(l))}</td>
                 <td>
                   <button
                     type="button"
@@ -184,7 +206,7 @@ export function LineItemsEditor({ lines, onChange, stock, date }: LineItemsEdito
               </tr>
               {stock && needsTracking(l, stock) && (
                 <tr className={styles.trackRow}>
-                  <td colSpan={7}>
+                  <td colSpan={freeCells ? 9 : 7}>
                     <BillLineTracking line={l} index={i} ctx={stock} onPatch={(change) => patch(l.id, change)} />
                   </td>
                 </tr>

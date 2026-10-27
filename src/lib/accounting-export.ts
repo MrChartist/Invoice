@@ -41,7 +41,7 @@ import {
 import { generateTallyExport, type TallyOptions } from './tally-xml';
 import { registerCells, registerColumns } from './custom-fields';
 import { csvCell as baseCsvCell, safeText } from './csv';
-import { NO_CASH_LEDGER, movedNoCash, noCashKind, type NoCashKind } from './advance-tax'; // no-cash.ts (QA6-1 F4)
+import { NO_CASH_LEDGER, RIDER_CASH_LEDGER, movedNoCash, noCashKind, type NoCashKind } from './advance-tax'; // no-cash.ts (QA6-1 F4)
 
 export * from './export-shared';
 
@@ -314,7 +314,7 @@ export function receipts(source: ExportSource, opts: CsvOptions = {}): CsvTable 
       partyNameOf(inv.client),
       money(p.amount),
       clean(p.method),
-      movedNoCash(p) ? NO_CASH_LEDGER[kind as NoCashKind] : cash ? 'Cash' : 'Bank',
+      movedNoCash(p) ? NO_CASH_LEDGER[kind as NoCashKind] : cash && p.rider_id ? RIDER_CASH_LEDGER : cash ? 'Cash' : 'Bank', // R9 (RT-A3)
       clean(p.reference),
       clean(p.note),
     ];
