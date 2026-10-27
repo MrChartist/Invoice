@@ -78,8 +78,11 @@ export function valueNote(inv: InvoiceRecord, taxable: number, date: string, rea
     const l = inv.items.find((x) => x.id === c.id)!;
     return { ...l, id: generateId(), quantity: 1, rate: v, amount: v, discount_percent: 0, description: reason };
   }).filter((l) => l.rate > 0);
+  // The save upserts the client from the snapshot: an old snapshot must not reset the enrolments (batch, refund).
+  const { enrolments: _enr, ...client } = inv.client;
+  void _enr;
   const rec: InvoiceRecord = {
-    ...inv, id: generateId(), invoice_number: '', doc_type: 'CREDIT_NOTE', issue_date: date, due_date: date, status: 'Sent', items, attachments: undefined,
+    ...inv, client, id: generateId(), invoice_number: '', doc_type: 'CREDIT_NOTE', issue_date: date, due_date: date, status: 'Sent', items, attachments: undefined,
     discount_type: 'PERCENT', discount_rate: 0, shipping: 0, other_charges: 0, amount_paid: 0, po_number: inv.invoice_number, goods_returned: false, price_includes_tax: false,
     notes: `Credit note against ${inv.invoice_number} dated ${inv.issue_date}. Reason: ${reason}.`,
     created_at: undefined, updated_at: undefined, approval: undefined, party_balance_snapshot: undefined, pos: undefined, transport: undefined, late_fee_for: undefined, recurring_id: undefined, fee_plan_id: undefined, fee_instalment: undefined,
