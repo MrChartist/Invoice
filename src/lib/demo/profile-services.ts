@@ -7,7 +7,7 @@ import type { Retainer } from '../retainers';
 import type { Demo, DemoExtras } from '../demo-data';
 import { shiftDay } from '../dates';
 import type { ProfileContext } from './profiles';
-import type { Appointment, CommissionPlan, ServiceStaff } from '../../types/services-r10';
+import type { Appointment, CheckinDay, ClassSchedule, CommissionPlan, MemberPlan, Membership, ServiceStaff } from '../../types/services-r10';
 
 const TASKS = ['Wireframes', 'Client call', 'Homepage design', 'Copy review', 'Landing page build', 'Analytics setup', 'Bug fixes', 'Handover notes'];
 
@@ -46,7 +46,8 @@ export function servicesExtras(ctx: ProfileContext): DemoExtras {
     created_at: `${y}-${m}-01T00:00:00.000Z`,
   };
   const sv = ctx.packs.some((p) => p === 'salon' || p === 'clinic' || p === 'fitness' || p === 'workshop') ? frontDeskBlock(ctx) : {}; // R10 (SV-A)
-  return { tables: { time_entries: entries, retainers: [retainer], ...sv } };
+  const mc = ctx.packs.some((p) => p === 'fitness' || p === 'salon') ? membersBlock(ctx) : {}; // R10 (SV-C)
+  return { tables: { time_entries: entries, retainers: [retainer], ...sv, ...mc } };
 }
 
 /* ── R10 (SV-A): the shared front desk — three staff with a commission plan and a day of appointments. SV-B … SV-D add
@@ -62,4 +63,23 @@ function frontDeskBlock({ today, base }: ProfileContext) {
     return { id: `demo-sv-appt-${i + 1}`, demo: true, date: today, start: start as string, minutes: services.reduce((n, x) => n + x.minutes, 0), client_id: c.id, client_name: c.name, services, staff_id: staff[s as number].id, status: i === 0 ? 'arrived' : 'booked', source: 'call', created_at: at };
   });
   return { appointments: appts, service_staff: staff, commission_plans: [plan] };
+}
+
+/* ── R10 (SV-C): members desk — three plans, members (one frozen, one expiring), a week of check-ins, a yoga class. ── */
+function membersBlock({ today, base }: ProfileContext) {
+  const at = `${today}T09:00:00.000Z`;
+  const plans: Demo<MemberPlan>[] = [
+    { id: 'demo-mp-1', demo: true, name: '3 months gym (demo)', kind: 'membership', months: 3, price: 4500, cls: 'fitness_9997', freeze: { max_days: 30, max_times: 2, min_days: 7 }, refund: 'pro_rata', created_at: at },
+    { id: 'demo-mp-2', demo: true, name: '6 facials (demo)', kind: 'package', sessions: 6, validity_days: 180, covers: ['Facial'], price: 7500, cls: 'beauty_9997', created_at: at },
+    { id: 'demo-mp-3', demo: true, name: 'PT 12 sessions (demo)', kind: 'package', sessions: 12, price: 12000, cls: 'fitness_9997', redeem_on_checkin: true, created_at: at },
+  ];
+  const { created_at: _c, ...p0 } = plans[0];
+  void _c;
+  const members: Demo<Membership>[] = base.clients.slice(0, 4).map((c, i) => {
+    const start = shiftDay(today, -[20, 60, 85, 10][i]);
+    return { id: `demo-mem-${i + 1}`, demo: true, number: `MEM/DEMO/${i + 1}`, client_id: c.id, client_name: c.name, plan: p0, start, end: shiftDay(start, 89 + (i === 1 ? 14 : 0)), ...(i === 1 ? { freezes: [{ from: shiftDay(today, -3), to: shiftDay(today, 10) }] } : {}), invoice_ids: [], created_at: at };
+  });
+  const checkins: Demo<CheckinDay>[] = [1, 2, 3, 4, 5, 6].map((d) => ({ id: `demo-ci-${d}`, demo: true, date: shiftDay(today, -d), entries: members.filter((_m, i) => i !== 1 && (d + i) % 2 === 0).map((m) => ({ client_id: m.client_id, name: m.client_name, time: `0${6 + (d % 3)}:15`, membership_id: m.id })) }));
+  const yoga: Demo<ClassSchedule> = { id: 'demo-class-1', demo: true, name: 'Morning Hatha (demo)', kind: 'class', days: [0, 1, 2, 3, 4], start: '06:30', minutes: 60, capacity: 20, members: members.map((m) => m.client_id!), created_at: at };
+  return { member_plans: plans, memberships: members, checkins, class_schedules: [yoga] };
 }
