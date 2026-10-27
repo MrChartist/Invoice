@@ -237,7 +237,7 @@ export function renew(id: string, date: string, draft = false): Membership {
 
 /** Auto-renew: every auto-renewing membership past its end gets its successor with a DRAFT bill (issue it to tax it). */
 export function autoRenewDue(today: string): Membership[] {
-  return loadMemberships().filter((m) => m.auto_renew && !m.closed && !m.next_id && m.end && m.end < today).map((m) => renew(m.id, today, true));
+  return loadMemberships().filter((m) => m.auto_renew && !m.closed && !m.next_id && m.end && m.end < today).map((m) => renew(m.id, shiftDay(m.end, 1), true)); // no gap: from the day after the end
 }
 
 /** Wallet top-up: an advance receipt (GST on receipt for services) plus the plan's bonus value (never cash). */
