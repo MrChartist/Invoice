@@ -137,6 +137,9 @@ export function closeCycle(id: string, centreName?: string): FarmerCycle {
       if (d.kind === 'feed' || d.kind === 'input') {
         const inv = invoices.find((i) => i.id === d.ref_id);
         if (!inv) throw new Error(`${l.name ?? 'A farmer'}: the invoice of a feed / input deduction was not found.`);
+        // QA13 G8: the draft's set-off may be stale (paid since, or set off by another cycle): never above what is open now.
+        const open = round2(num(inv.total) - getTable<Payment>('transactions').filter((x) => x.invoice_id === inv.id).reduce((s, x) => s + num(x.amount), 0));
+        if (num(d.amount) > open + 0.004) throw new Error(`${l.name ?? 'A farmer'}: ${inv.invoice_number ?? 'a feed / input invoice'} has only ${open.toFixed(2)} left to set off (paid or set off since the draft) — make the draft again.`);
         const r = localDb.payments.record({ invoiceId: inv.id, amount: d.amount, method: SET_OFF_METHOD, date: c.period_to, reference: c.number, note: `Set off against milk / produce money (${c.number})` });
         setTable('transactions', getTable<Payment>('transactions').map((x) => (x.id === r.id ? { ...x, exchange_purchase_id: bill.id } : x)));
         receiptIds.push(r.id);

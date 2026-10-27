@@ -171,3 +171,27 @@ test('G7: normalizeRecord keeps ag_class on lines (milk bill, milling charges, c
   const rec = normalizeRecord({ id: 'x', doc_type: 'BILL_OF_SUPPLY', issue_date: '2026-10-05', items: [{ id: 'a', name: 'Cow milk', quantity: 1, rate: 50, tax_rate: 0, ag_class: 'milk_fresh' }, { id: 'b', name: 'Feed', quantity: 1, rate: 50, tax_rate: 0, ag_class: 'cattle_feed' }] });
   assert.deepEqual(rec.items.map((i) => i.ag_class), ['milk_fresh', 'cattle_feed']);
 });
+
+/* ── G8: one feed invoice is never set off twice (two drafts, or paid since the draft) ── */
+
+test('G8: two drafts pulling the same feed invoice → the second close is refused; a partly paid invoice too', async () => {
+  const { inputDeductions } = await import('../src/lib/agri/ag-cycles.ts');
+  const { localDb } = await import('../src/lib/localDb.ts');
+  const ram = saveFarmer({ name: 'Ram', ag: { code: 'F-0001' } });
+  const client = { ...clientMH, id: 'c-ram', name: 'Ram', ag: { code: 'F-0001' } };
+  const feed = createViaStore({ client, date: '2026-10-05', lines: [{ name: 'Cattle feed', qty: 1, rate: 400, tax: 0, hsn: '2309' }] });
+  const ded = inputDeductions('F-0001', [client], getTable('invoices'), getTable('transactions'), 5000);
+  const line = { farmer_id: ram.id, name: 'Ram', qty: 50, unit: 'KG', amount: 2500, deductions: ded, net: 0, mode: 'cash' as const };
+  const a = saveCycleDraft({ period_from: '2026-10-11', period_to: '2026-10-20', source: 'produce', lines: [line] });
+  const b = saveCycleDraft({ period_from: '2026-10-21', period_to: '2026-10-31', source: 'produce', lines: [line] });
+  closeCycle(a.id);
+  assert.throws(() => closeCycle(b.id), /only 0\.00 left/);
+  assert.equal(loadCycles().find((c) => c.id === b.id)?.status, 'draft', 'rolled back');
+  assert.deepEqual(getTable<Payment>('transactions').filter((p) => p.invoice_id === feed.id).map((p) => p.amount), [400]);
+  // Paid ₹100 in cash after the draft was made → the stale ₹400 set-off is refused.
+  const feed2 = createViaStore({ client, date: '2026-10-06', lines: [{ name: 'Cattle feed', qty: 1, rate: 400, tax: 0, hsn: '2309' }] });
+  const d2 = inputDeductions('F-0001', [client], getTable('invoices'), getTable('transactions'), 5000);
+  const c = saveCycleDraft({ period_from: '2026-11-01', period_to: '2026-11-10', source: 'produce', lines: [{ ...line, deductions: d2 }] });
+  localDb.payments.record({ invoiceId: feed2.id, amount: 100, method: 'Cash', date: '2026-11-02' });
+  assert.throws(() => closeCycle(c.id), /only 300\.00 left/);
+});
