@@ -198,6 +198,8 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   hotel_settings: 'Hotel settings: business date, times, SAC codes, premises declarations.', // R7
   interest_settings: 'Interest-on-overdue defaults (R8-A).', bank_statement_settings: 'Bank stock-statement terms per bank account (R8-C).', tds_settings: 'TDS settings: our turnover per FY for 194Q (R8-C).',
   retail_settings: 'Retail checks: MRP guard, deliveries, short book, free quantity on bills, cash / PAN guard (R9).',
+  // R11-A
+  construction_settings: 'Construction profile switches: RA bill paper style, M-book column, government sign-off boxes, certificate text, deviation limit, works views (R11).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';

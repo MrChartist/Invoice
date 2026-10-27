@@ -57,6 +57,8 @@ export const GST_TDS_51_RULES: readonly Versioned<{ rate: number; threshold: num
 /** BOCW labour cess (Building and Other Construction Workers Welfare Cess Act 1996): % of the cost of construction. */
 export const LABOUR_CESS_RULES: readonly Versioned<number>[] = [
   { from: '2017-07-01', value: 1, source: 'BOCW Cess Act 1996, Sec 3 (1%), state-agnostic default — verify the state practice' },
+  // R11 (CN5): same 1% under the Code on Social Security 2020 (in force 21 Nov 2025)
+  { from: '2025-11-21', value: 1, source: 'Code on Social Security 2020 Sec 100; S.O. 2322(E) 8 May 2026 as reported — verify (CN5)' },
 ];
 
 /** Default GST rate for works-contract BOQ lines (general / government works). */

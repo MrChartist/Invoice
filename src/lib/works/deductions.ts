@@ -29,6 +29,13 @@ export const DEDUCTION_LABELS: Record<RaDeductionKind, string> = {
   security_deposit: 'Security deposit',
   ld: 'Liquidated damages',
   other: 'Other deduction',
+  // R11 (CN-B2 / B4)
+  secured_advance: 'Secured advance recovery',
+  material_recovery: 'Material issued by client — recovery',
+  water_power: 'Water & electricity charges',
+  hire_charges: 'Plant / equipment hire charges',
+  advance_interest: 'Interest on mobilisation advance',
+  withheld: 'Amount withheld',
 };
 
 export interface DeductionContext {

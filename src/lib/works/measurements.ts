@@ -20,6 +20,10 @@ import { localDb } from '../localDb';
 import { createBalanceInvoice, createProgressInvoice, lineValue, progressSummary, roundQty, stageInvoices, type LinkLike } from '../progress-billing';
 import { boqLines, contractValue } from './boq';
 import { computeDeductions, withDeductions } from './deductions';
+import { raSnapshotFor, siteOfBoq } from '../construction/cn-snapshot-io'; // R11 (CN-A3 / A4)
+import { splitDeviation } from '../construction/cn-abstract';
+import { worksPlaceOfSupply } from '../construction/cn-tax';
+import { senderStateCode } from '../../store/invoice-defaults';
 
 export const RA_TABLE = 'ra_measurements';
 const EPS = 1e-6;
@@ -60,6 +64,10 @@ export interface MeasureInput {
   mb_ref?: string;
   /** Tick "excess / variation" with a reason to pass the BOQ quantity. */
   extra_reason?: string;
+  /** R11 (CN-A4): the measured line is an extra item / a substituted item (approval ref; the BOQ item it replaces). */
+  kind?: 'extra' | 'substituted';
+  approval?: string;
+  substitutes?: string;
 }
 
 /** Pure: cumulative ↔ this-bill derivation and the BOQ check. Throws `RaError`. */
@@ -77,7 +85,11 @@ export function deriveLines(boq: Pick<InvoiceRecord, 'items'>, previous: Readonl
     if (!(thisQty > EPS)) continue;
     const reason = String(m.extra_reason ?? '').trim();
     if (cumulative > num(line.quantity) + EPS && !reason) throw new RaError(`"${line.name}": cumulative ${cumulative} exceeds the BOQ quantity ${num(line.quantity)}. Tick "excess / variation" and give a reason.`);
-    out.push({ line_id: line.id, cumulative_qty: cumulative, this_qty: thisQty, ...(m.mb_ref?.trim() ? { mb_ref: m.mb_ref.trim() } : {}), ...(cumulative > num(line.quantity) + EPS ? { extra: { reason } } : {}) });
+    out.push({
+      line_id: line.id, cumulative_qty: cumulative, this_qty: thisQty, ...(m.mb_ref?.trim() ? { mb_ref: m.mb_ref.trim() } : {}), ...(cumulative > num(line.quantity) + EPS ? { extra: { reason } } : {}),
+      // R11 (CN-A4): line class and approval reach the bill's snapshot
+      ...(m.kind === 'extra' || m.kind === 'substituted' ? { kind: m.kind } : {}), ...(m.approval?.trim() ? { approval: m.approval.trim().slice(0, 80) } : {}), ...(m.kind === 'substituted' && m.substitutes?.trim() ? { substitutes: m.substitutes.trim().slice(0, 40) } : {}),
+    });
   }
   if (!out.length) throw new RaError('Enter a measured quantity above what was already billed for at least one line.');
   return out;
@@ -129,6 +141,10 @@ export interface RaRequest {
   final?: boolean;
   /** Save the RA bill as issued (default) or leave it a draft for review. */
   draft?: boolean;
+  /** R11 (CN-A3): work done from – to and the date of measurement (defaults: day after the last bill's period – the bill date). */
+  period_from?: string;
+  period_to?: string;
+  measured_on?: string;
 }
 
 /**
@@ -153,7 +169,12 @@ export function saveRaBill(boqId: string, req: RaRequest): { measurement: RaMeas
       : createProgressInvoice(boq, { basis: 'measured', lineQtys: Object.fromEntries(lines.map((l) => [l.line_id, l.this_qty])), allowOver: extras.length > 0, overReason: extras.map((e) => e.extra!.reason).join('; ') }, req.date);
     const terms = boq.boq_terms ?? {};
     const rules = terms.deductions ?? [];
-    let bill = recalc({ ...stage, items: splitExtras(stage.items, boq, previous, lines) });
+    // R11 (CN-A2 / A4): quantity beyond the deviation limit as its own line; place of supply = the site State (Sec 12(3)).
+    const snap = raSnapshotFor(boq, raNo, req);
+    const site = siteOfBoq(boq, snap.contract);
+    const sender = stage.sender ?? localDb.settings.activeProfile();
+    const pos = site ? worksPlaceOfSupply(site, stage.place_of_supply, { state: senderStateCode(sender ?? null), hasGstin: !!sender?.companyGstin?.trim(), taxEnabled: stage.gst_mode !== 'NONE' }) : null;
+    let bill = recalc({ ...stage, ...(pos?.fromSite && stage.gst_mode !== 'NONE' && stage.gst_mode !== 'SINGLE' ? { place_of_supply: pos.place_of_supply, gst_mode: pos.gst_mode } : {}), items: splitDeviation(splitExtras(stage.items, boq, previous, lines), boq, previous, lines, snap.deviationPct) });
     const earlier = raBills(boqId, invoices);
     const advance = terms.advance_id ? getTable<{ id: string; amount: number }>('advances').find((a) => a.id === terms.advance_id) : undefined;
     const sumKind = (k: string) => earlier.reduce((s, b) => s + (b.ra_deductions ?? []).filter((d) => d.kind === k).reduce((t, d) => t + d.amount, 0), 0);
@@ -177,6 +198,7 @@ export function saveRaBill(boqId: string, req: RaRequest): { measurement: RaMeas
       ...(release ? { retention_release_on: release } : {}),
       notes: [`RA bill no. ${raNo}${final ? ' (final)' : ''} — ${boq.invoice_number}${terms.work_order ? ` · work order ${terms.work_order}` : ''}`, (stage.notes ?? '').split('\n').slice(1).join('\n')].filter((s) => s.trim()).join('\n'),
     };
+    bill = { ...bill, boq_terms: { ...bill.boq_terms, cn: snap.build(bill, invoices, lines) } }; // R11: the paper's snapshot
     const invoice = localDb.invoices.save(bill);
     const row: RaMeasurement = { id: generateId(), boq_id: boqId, ra_no: raNo, date: req.date, lines, invoice_id: invoice.id, status: 'billed', ...(final ? { final: true } : {}), created_at: new Date().toISOString() };
     setTable(RA_TABLE, [...getTable<RaMeasurement>(RA_TABLE), row]);

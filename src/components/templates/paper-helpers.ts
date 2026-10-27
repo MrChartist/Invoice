@@ -121,3 +121,18 @@ export const exchangeText = (invoice: Pick<InvoiceRecord, 'id'>, money: (n: numb
   invoice.id ? getTable<Payment>('transactions').filter((p) => p?.invoice_id === invoice.id && noCashKind(p) === 'exchange').map((p) => `${p.note || 'Less: exchange'} ${money(p.amount)}`).join(' · ') : '';
 /** R9 (RT-E2): the BIS verification line snapshotted on the bill's jewellery lines (printed under the totals; '' otherwise). */
 export const bisText = (invoice: Pick<InvoiceRecord, 'items'>): string => invoice.items?.find((i) => i.jw?.bis)?.jw?.bis ?? '';
+
+/**
+ * R11 (CN-A3): the works sub-line under a bill line, from the document's construction snapshot only —
+ * "Item 2.1.3 · MB 112/45–47 · Extra item (approval EE/123)". '' without `boq_terms.cn`, so other documents print as before.
+ */
+export function worksLineText(item: Pick<InvoiceItem, 'id'> | undefined, cn: { lines?: Record<string, { ref?: string; mb?: string; kind?: string; approval?: string; substitutes?: string }> } | undefined): string {
+  const l = item && cn?.lines?.[item.id];
+  if (!l) return '';
+  const kind = l.kind === 'extra' ? 'Extra item' : l.kind === 'substituted' ? `Substituted item${l.substitutes ? ` for ${l.substitutes}` : ''}` : l.kind === 'deviation' ? 'Deviation' : '';
+  return [l.ref && `Item ${l.ref}`, l.mb && `MB ${l.mb}`, kind && `${kind}${l.approval ? ` (approval ${l.approval})` : ''}`].filter(Boolean).join(' · ');
+}
+
+/** R11 (CN-A3): "Tax Invoice — Running Account Bill No. 4" / "… — Final Bill" for an RA bill; '' otherwise. */
+export const raDocTitle = (inv: Pick<InvoiceRecord, 'ra_no' | 'ra_final'>, label: string): string =>
+  inv.ra_no ? `${label} — ${inv.ra_final ? 'Final Bill' : `Running Account Bill No. ${inv.ra_no}`}` : '';

@@ -21,7 +21,8 @@ export type FeatureSection = 'modules' | 'packs' | 'advanced';
 export type AdvancedId =
   | 'batches' | 'serials' | 'godowns' | 'branches' | 'approvals' | 'credit' | 'loyalty' | 'offers' | 'priceLevels'
   | 'costCentres' | 'currency' | 'einvoice' | 'composition' | 'vault' | 'sync' | 'users' | 'gateway' | 'shifts'
-  | 'tables' | 'pharma' | 'scale';
+  | 'tables' | 'pharma' | 'scale'
+  | 'construction'; // R11 (CN-A1)
 
 export interface FeatureRow {
   /** `mod.<id>`, `pack.<id>` or `adv.<id>`. */
@@ -93,6 +94,8 @@ const ADVANCED: readonly { id: AdvancedId; href: string; isOn: FeatureRow['isOn'
     },
   },
   { id: 'scale', href: '/pos', isOn: () => deviceKey('mrchartist_pos_scale') },
+  // R11 (CN-A1): the construction profile (picked in Settings → Features under Contractor)
+  { id: 'construction', href: '/settings?tab=features', isOn: (s) => typeof (s as { construction_kind?: unknown }).construction_kind === 'string' },
 ];
 
 /** Where each module's screen is (the first sidebar route that belongs to it). */
@@ -130,6 +133,8 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   apparel: '/inventory?tab=apparel',
   electronics: '/inventory?tab=devices',
   jewellery: '/inventory?tab=jewellery',
+  // R11 (CN-A1): builders desk (a tab on Receivables)
+  realty: '/receivables?tab=realty',
 };
 
 export const FEATURE_ROWS: readonly FeatureRow[] = [

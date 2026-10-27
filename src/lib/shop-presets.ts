@@ -169,3 +169,45 @@ export function applyRetailKind(kind: RetailKindId, opts: { registered?: boolean
   return { business_type: 'kirana', modules, retail_kind: kind, industry_packs: [...p.packs] };
 }
 
+/* ── R11 (CN-A1): construction profile under the `contractor` business type ── */
+
+/** The construction picker's seven choices (stored as `settings.construction_kind`); the business type stays `contractor`. */
+export const CONSTRUCTION_KINDS = ['civil', 'subcontractor', 'builder', 'interiors', 'mep', 'labour', 'other'] as const;
+export type ConstructionKindId = (typeof CONSTRUCTION_KINDS)[number];
+type ConstructionPackId = 'works' | 'realty';
+
+export interface ConstructionProfile {
+  modules: readonly ModuleId[];
+  /** Explicit `industry_packs` list; absent (`other`) = the `works` pack implied by `contractor` (today's behaviour). */
+  packs?: readonly ConstructionPackId[];
+  landing: string;
+  defaultDueDays: number;
+  templateId: string;
+  /** Kinds that ask "Do you work for government departments / PSUs?" */
+  asksGovernment?: boolean;
+}
+
+const WORKS_MODULES = PRESETS.contractor;
+export const CONSTRUCTION_PROFILES: Readonly<Record<ConstructionKindId, ConstructionProfile>> = {
+  civil: { modules: WORKS_MODULES, packs: ['works'], landing: '/time?tab=works&view=contracts', defaultDueDays: 30, templateId: 'gst_tax_invoice', asksGovernment: true },
+  subcontractor: { modules: WORKS_MODULES, packs: ['works'], landing: '/time?tab=works&view=ra', defaultDueDays: 30, templateId: 'gst_tax_invoice', asksGovernment: true },
+  builder: { modules: [...WORKS_MODULES, 'recurring'], packs: ['realty', 'works'], landing: '/receivables?tab=realty', defaultDueDays: 15, templateId: 'corporate_navy' },
+  interiors: { modules: WORKS_MODULES.filter((m) => m !== 'payroll'), packs: ['works'], landing: '/time?tab=works&view=boq', defaultDueDays: 15, templateId: 'corporate_navy' },
+  mep: { modules: WORKS_MODULES, packs: ['works'], landing: '/time?tab=works&view=boq', defaultDueDays: 30, templateId: 'gst_tax_invoice', asksGovernment: true },
+  labour: { modules: ['purchases', 'accounts', 'banking', 'reports', 'gst', 'tds', 'payroll', 'time'], packs: ['works'], landing: '/time?tab=works&view=labour', defaultDueDays: 15, templateId: 'gst_tax_invoice' },
+  other: { modules: WORKS_MODULES, landing: '/time?tab=works', defaultDueDays: 30, templateId: 'corporate_navy' },
+};
+
+export const isConstructionKind = (v: unknown): v is ConstructionKindId => typeof v === 'string' && (CONSTRUCTION_KINDS as readonly string[]).includes(v);
+
+/**
+ * Settings patch for a construction profile: business type `contractor`, its modules (`registered` adds `gst`), the
+ * explicit packs (none for `other`: the implied `works` pack, as today) and the kind. The profile's switches
+ * (`construction_settings`) are written by `construction/cn-profile.ts`.
+ */
+export function applyConstructionKind(kind: ConstructionKindId, opts: { registered?: boolean } = {}): ShopModeSettings & { construction_kind: ConstructionKindId; industry_packs: ConstructionPackId[] | undefined } {
+  const p = CONSTRUCTION_PROFILES[kind];
+  const modules: ModuleId[] = opts.registered && !p.modules.includes('gst') ? [...p.modules, 'gst'] : [...p.modules];
+  return { business_type: 'contractor', modules, construction_kind: kind, industry_packs: p.packs ? [...p.packs] : undefined };
+}
+

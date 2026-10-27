@@ -111,6 +111,9 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   '/inventory?tab=hsn': ['hsn stock', 'hsn wise'],
   // R9: retail
   '/receivables?tab=deliveries': ['delivery', 'home delivery', 'cod', 'rider', 'run sheet'],
+  // R11 (CN-A)
+  '/time?tab=works&view=ra': ['ra bill', 'running bill', 'running account bill', 'measurement', 'm-book', 'abstract', 'net payable'],
+  '/receivables?tab=realty': ['builder', 'flat', 'rera', 'booking', 'demand letter'],
   '/inventory?tab=shortbook': ['short book', 'shortage', 'out of stock', 'want list'],
   '/inventory?tab=pharmacy&view=doctors': ['doctor', 'prescriber'],
   '/inventory?tab=pharmacy&view=registers': ['h1 register', 'schedule x', 'narcotic', 'drug licence'],

@@ -89,7 +89,7 @@ export function PartyPanel({ invoice, plain, skipDates }: PartyPanelProps) {
         <AttentionLine invoice={invoice} />
         {ship && (
           <div className={styles.shipTo}>
-            <div className={styles.eyebrow}>{t('shipTo')}</div>
+            <div className={styles.eyebrow}>{invoice.boq_terms?.cn ? 'Site' : t('shipTo')}</div>
             <div className={styles.meta}>
               {ship.name && (
                 <>

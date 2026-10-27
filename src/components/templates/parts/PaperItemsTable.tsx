@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { cn, currencySymbol, formatQuantity } from '../../../lib/utils';
 import { ASSET_TABLE, isAssetRef, parseAssets, resolveImage } from '../../../lib/assets';
 import { SAFE_IMAGE } from '../../../lib/item-images';
@@ -7,7 +7,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import type { InvoiceRecord } from '../../../types/invoice';
 import type { TemplateTableStyle } from '../registry';
 import { usePaper } from '../paper-context';
-import { isRcmTotals, trackingText } from '../paper-helpers';
+import { isRcmTotals, trackingText, worksLineText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { ItemCustomLine } from './CustomFieldsBlock';
 import art from './docs-r3-paper.module.css';
@@ -16,6 +16,8 @@ interface ItemsTableProps {
   invoice: InvoiceRecord;
   totals: CalcTotals;
   tableStyle: TemplateTableStyle;
+  /** R11 (CN-A4): the `pwd` paper's cumulative item table, printed instead of this one. */
+  works?: ReactNode;
 }
 
 const STYLE_CLASS: Record<TemplateTableStyle, string | undefined> = {
@@ -30,7 +32,7 @@ const STYLE_CLASS: Record<TemplateTableStyle, string | undefined> = {
  * when they carry information, so a simple service bill stays uncluttered while
  * a GST invoice shows everything a tax invoice must.
  */
-export function PaperItemsTable({ invoice, totals, tableStyle }: ItemsTableProps) {
+export function PaperItemsTable({ invoice, totals, tableStyle, works }: ItemsTableProps) {
   const { t, money, col, show, itemImages } = usePaper();
   // R3-C2: the photo each line snapshotted at save (`asset:<id>`), resolved once per render; none when off.
   const photos = useMemo(() => {
@@ -52,6 +54,7 @@ export function PaperItemsTable({ invoice, totals, tableStyle }: ItemsTableProps
   const showTaxable = taxed && col.taxable;
   const showGst = taxed && col.taxRate;
 
+  if (works) return <>{works}</>;
   return (
     <table className={cn(styles.items, STYLE_CLASS[tableStyle])}>
       <thead>
@@ -87,6 +90,7 @@ export function PaperItemsTable({ invoice, totals, tableStyle }: ItemsTableProps
                 {source?.description && <div className={styles.itemDesc}>{source.description}</div>}
                 <ItemCustomLine values={source?.custom_values} />
                 {show.tracking && trackingText(source) && <div className={styles.itemDesc}>{trackingText(source)}</div>}
+                {worksLineText(source, invoice.boq_terms?.cn) && <div className={styles.itemDesc} data-works-line>{worksLineText(source, invoice.boq_terms?.cn)}</div>}
               </td>
               {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '—'}</td>}
               <td className={cn(styles.right, styles.num)}>
