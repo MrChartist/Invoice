@@ -16,9 +16,8 @@ import { isNonGstFinancialNote } from './financial-note';
 import { ruleAt, type Versioned, b2clThreshold, rateInSlabs } from './tax-rules';
 import { complianceCalendar, daysBetween, filedFor, type CalendarOptions, type FiledReturn, type ReturnDue, type ReturnForm } from './compliance';
 import { shiftDay } from './dates';
-import { getTable, setTable } from './storage';
+import { SINGLETON_KEYS, getJson, getTable, setTable } from './storage';
 import { isOwnGstin } from './gstin';
-import { ensureServiceHooks } from './services/ensure-sv'; // R10 (SV-A4)
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -266,10 +265,12 @@ export function loadBandCheck(invoices: readonly InvoiceRecord[], force: boolean
 }
 
 // R10 (SV-A4): service-class line checks (old salon / gym rate, exempt line reported as nil) — one lazy check registered
-// by `services/sv-hooks.ts`, which `ensureServiceHooks` loads for service companies only.
+// by `services/sv-hooks.ts`, loaded below for service companies only.
 let svCheck: BandCheck | null = null;
 export const setSvExceptionCheck = (fn: BandCheck): void => { svCheck = fn; };
-void ensureServiceHooks();
+// R10 (SV-A4): a service company (profile or pack) loads the service hooks once — no shared chunk, nothing for others.
+const svOn = ((s) => !!s?.service_kind || (Array.isArray(s?.industry_packs) && s.industry_packs.some((p) => p === 'clinic' || p === 'salon' || p === 'fitness' || p === 'workshop')))(getJson<{ service_kind?: unknown; industry_packs?: unknown } | null>(SINGLETON_KEYS.settings, null));
+if (svOn) void import('./services/sv-hooks').catch(() => undefined);
 
 /** GST exceptions for documents dated in [from, to]. Errors first, then by date. */
 export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOptions): GstException[] {

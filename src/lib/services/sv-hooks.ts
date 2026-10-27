@@ -1,5 +1,5 @@
 /**
- * SV-A4 hooks, loaded by `ensure-sv.ts` for service companies only: the 5%-without-ITC caution on purchase bills
+ * SV-A4 hooks, loaded by `bill-guard.ts` / `gst-guards.ts` (one dynamic import each) for service companies only: the 5%-without-ITC caution on purchase bills
  * (`bill-guard.ts`, the GTA pattern) and the exceptions-report checks (`gst-guards.ts`, the price-band pattern).
  * Working papers — verify with your CA (SV11, SV12).
  */

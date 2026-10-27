@@ -26,7 +26,6 @@ import { defineArea } from '../i18n/area';
 import { isPackOn } from './industry-packs';
 import { getIndianFY } from './invoice-number';
 import { SINGLETON_KEYS, getJson, peekTable } from './storage';
-import { ensureServiceHooks } from './services/ensure-sv'; // R10 (SV-A4)
 
 // R5-B2: informational ITC caution for a GTA that opted for 5% forward charge without ITC this FY (transport pack only).
 const gtaT = defineArea(
@@ -46,7 +45,9 @@ const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 // R10 (SV-A4): the 5%-without-ITC caution of a service company — one lazy check registered by `services/sv-hooks.ts`.
 let svBillCaution: ((bill: BillInput) => string) | null = null;
 export const setSvBillCaution = (fn: (bill: BillInput) => string): void => { svBillCaution = fn; };
-void ensureServiceHooks();
+// R10 (SV-A4): a service company (profile or pack) loads the service hooks once — no shared chunk, nothing for others.
+const svOn = ((s) => !!s?.service_kind || (Array.isArray(s?.industry_packs) && s.industry_packs.some((p) => p === 'clinic' || p === 'salon' || p === 'fitness' || p === 'workshop')))(getJson<{ service_kind?: unknown; industry_packs?: unknown } | null>(SINGLETON_KEYS.settings, null));
+if (svOn) void import('./services/sv-hooks').catch(() => undefined);
 
 export type GuardedSave =
   | { kind: 'warn'; message: string }
