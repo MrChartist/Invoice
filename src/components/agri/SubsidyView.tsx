@@ -7,37 +7,28 @@ import { loadPositions } from '../../lib/inventory';
 import { flagSubsidised, posCheck, subsidisedTest } from '../../lib/agri/ag-subsidy';
 import { readAgriSettings, saveAgriSettings } from '../../lib/agri/ag-settings';
 import { NumberInput } from '../ui/NumberInput';
-import { F, Tbl } from './agd-kit';
-import { btn, useRun, wrap, type Done } from './agd-ui';
+import { B, Form, Hint, Tbl } from './agd-kit';
+import { useRun, wrap, type Done } from './agd-ui';
 import controls from '../../styles/controls.module.css';
 
 export default function SubsidyView({ onDone }: { onDone: Done }) {
   const { tick, run } = useRun(onDone);
-  const [month, setMonth] = useState(todayInput().slice(0, 7));
   const s = useMemo(() => { void tick; return readAgriSettings(); }, [tick]);
   const positions = useMemo(() => { void tick; return loadPositions(); }, [tick]);
-  const isSub = useMemo(() => { void tick; return subsidisedTest(); }, [tick]);
-  const r = posCheck(month, positions, s.pos_stock, localDb.invoices.getAll(), isSub);
-  const [cap, setCap] = useState(s.subsidy?.cap ?? 0);
-  const setPos = (id: string, v: number) => run(() => { saveAgriSettings({ pos_stock: { ...(s.pos_stock ?? {}), [month]: { ...(s.pos_stock?.[month] ?? {}), [id]: v } } }); });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [f, setF] = useState<Record<string, any>>({ month: todayInput().slice(0, 7), cap: s.subsidy?.cap ?? 0 });
+  const r = posCheck(f.month, positions, s.pos_stock, localDb.invoices.getAll(), subsidisedTest());
+  const setPos = (id: string, v: number) => run(() => { saveAgriSettings({ pos_stock: { ...s.pos_stock, [f.month]: { ...s.pos_stock?.[f.month], [id]: v } } }); });
   return (
     <>
-      <div style={wrap}>
-        <F label={agdT('month')}><input type="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} /></F>
-        <F label={agdT('cap')} w={150}><NumberInput className={controls.input} value={cap} onChange={setCap} /></F>
-        <button type="button" className={btn} onClick={() => run(() => { saveAgriSettings({ subsidy: cap > 0 ? { cap } : {} }); return agdT('saved'); })}>{agdT('save')}</button>
-      </div>
-      <Tbl
-        head={[agdT('item'), agdT('book'), agdT('posStock'), agdT('diff')]}
-        flag={r.rows.map((x) => !!x.diff)}
-        rows={r.rows.map((x) => [x.item, x.book, <NumberInput key="p" className={controls.input} style={{ maxWidth: 110 }} value={x.pos ?? 0} onChange={(v) => setPos(x.item_id, v)} data-agd="pos-stock" />, x.diff ?? '—'])}
-      />
-      {!!r.missing.length && <><h3>{agdT('missingPos')}</h3><Tbl head={[agdT('bill'), agdT('date'), agdT('party')]} rows={r.missing.map((i) => [i.invoice_number, i.issue_date, i.client?.name ?? ''])} /></>}
+      <Form v={f} set={setF} f={[['month', 'month', 'm'], ['cap', 'cap', 'n', 150]]}>
+        <B k="save" on={() => run(() => { saveAgriSettings({ subsidy: { cap: f.cap } }); return agdT('saved'); })} />
+      </Form>
+      <Tbl head={['item', 'book', 'posStock', 'diff']} flag={r.rows.map((x) => !!x.diff)} rows={r.rows.map((x) => [x.item, x.book, <NumberInput key="p" className={controls.input} style={{ maxWidth: 110 }} value={x.pos ?? 0} onChange={(v) => setPos(x.item_id, v)} data-agd="pos-stock" />, x.diff ?? '—'])} />
+      {!!r.missing.length && <><h3>{agdT('missingPos')}</h3><Tbl head={['bill', 'date', 'party']} rows={r.missing.map((i) => [i.invoice_number, i.issue_date, i.client?.name ?? ''])} /></>}
       <h3>{agdT('flagItems')}</h3>
-      <div style={wrap}>
-        {positions.filter((p) => p.item.track_stock).map((p) => <label key={p.item.id}><input type="checkbox" checked={!!p.item.ag_subsidised} onChange={(e) => run(() => flagSubsidised(p.item.id, e.target.checked))} /> {p.item.name}</label>)}
-      </div>
-      <p className={controls.hint}>{agdT('subsidyNote')}</p>
+      <div style={wrap}>{positions.filter((p) => p.item.track_stock).map((p) => <label key={p.item.id}><input type="checkbox" checked={!!p.item.ag_subsidised} onChange={(e) => run(() => flagSubsidised(p.item.id, e.target.checked))} /> {p.item.name}</label>)}</div>
+      <Hint k="subsidyNote" />
     </>
   );
 }

@@ -4218,40 +4218,40 @@ try {
     await writeJson(page, 'series_counters', (prev.series_counters ?? []).filter((r) => !/^(CSR|GPO|LAS|SHC)/.test(String(r?.id ?? ''))));
     // D1: receive the lot.
     await page.goto(srv.origin + '/inventory?tab=cold&view=lots');
-    await page.locator('[data-agd="depositor"]').selectOption('e2e-dep', { timeout: 15000 });
+    await page.locator('[data-agd="depositor_id"]').selectOption('e2e-dep', { timeout: 15000 });
     await page.locator('[data-agd="commodity"]').fill('Potato');
     await page.locator('[data-agd="bags"]').fill('240');
-    await page.locator('[data-agd="chamber"]').selectOption('e2e-ch');
-    await page.locator('[data-agd="plan"]').selectOption('e2e-plan');
-    await page.locator('[data-agd-add-lot]').click();
+    await page.locator('[data-agd="chamber_id"]').selectOption('e2e-ch');
+    await page.locator('[data-agd="rent_plan_id"]').selectOption('e2e-plan');
+    await page.locator('[data-agd-b="add-lot"]').click();
     const lot = (await readJson(page, 'cold_lots', [], (v) => v.length === 1))[0];
     check(/^CSR\/FY\d{2}-\d{2}\/0001$/.test(lot?.number ?? ''), `the storage receipt is ${lot?.number}`);
     // D3: a loan against the lot.
     await page.goto(srv.origin + '/inventory?tab=cold&view=loans');
-    await page.locator('[data-agd="borrower"]').selectOption('e2e-dep', { timeout: 15000 });
+    await page.locator('[data-agd="borrower_id"]').selectOption('e2e-dep', { timeout: 15000 });
     await page.locator('[data-agd-loan-lot]').first().check();
     await page.locator('[data-agd="principal"]').fill('50000');
-    await page.locator('[data-agd-give-loan]').click();
+    await page.locator('[data-agd-b="give-loan"]').click();
     const loan = (await readJson(page, 'agri_loans', [], (v) => v.length === 1))[0];
     check(loan?.principal === 50000, 'the loan of ₹50,000 is recorded');
     // D1: the lien blocks the gate pass.
     await page.goto(srv.origin + '/inventory?tab=cold&view=gatepasses');
-    await page.locator('[data-agd="pass-lot"]').selectOption(lot.id, { timeout: 15000 });
-    await page.locator('[data-agd="pass-bags"]').fill('60');
+    await page.locator('[data-agd="lot"]').selectOption(lot.id, { timeout: 15000 });
+    await page.locator('[data-agd="bags"]').fill('60');
     await page.locator('[data-agd-pass-check]').first().waitFor({ timeout: 15000 });
     check(/lien/.test(await page.locator('[data-agd-pass-check]').first().innerText()), 'the gate pass shows the lien');
-    await page.locator('[data-agd-issue-pass]').click();
+    await page.locator('[data-agd-b="issue-pass"]').click();
     await page.waitForTimeout(300);
     check(((await readJson(page, 'cold_lots', []))[0]?.outs ?? []).length === 0, 'the gate pass for 60 bags is refused');
     // Repay in full → the pass goes and raises the rent bill.
     await page.goto(srv.origin + '/inventory?tab=cold&view=loans');
-    await page.locator('[data-agd="repay-loan"]').selectOption(loan.id, { timeout: 15000 });
-    await page.locator('[data-agd-repay]').click();
+    await page.locator('[data-agd="loan"]').selectOption(loan.id, { timeout: 15000 });
+    await page.locator('[data-agd-b="repay"]').click();
     check((await readJson(page, 'agri_loans', [], (v) => v[0]?.status === 'closed'))[0]?.status === 'closed', 'the loan is repaid and closed');
     await page.goto(srv.origin + '/inventory?tab=cold&view=gatepasses');
-    await page.locator('[data-agd="pass-lot"]').selectOption(lot.id, { timeout: 15000 });
-    await page.locator('[data-agd="pass-bags"]').fill('60');
-    await page.locator('[data-agd-issue-pass]').click();
+    await page.locator('[data-agd="lot"]').selectOption(lot.id, { timeout: 15000 });
+    await page.locator('[data-agd="bags"]').fill('60');
+    await page.locator('[data-agd-b="issue-pass"]').click();
     const outs = ((await readJson(page, 'cold_lots', [], (v) => v[0]?.outs?.length === 1))[0]?.outs ?? []);
     check(/^GPO\/FY\d{2}-\d{2}\/0001$/.test(outs[0]?.number ?? ''), `gate pass ${outs[0]?.number} issued`);
     const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.ag?.rent?.lot_id === lot.id))).find((i) => i.ag?.rent?.lot_id === lot.id);
@@ -4262,9 +4262,9 @@ try {
     check(true, 'the insecticide licence due in 30 days is flagged');
     // D5: allot 10 shares; the 80PA paper for FY 2025-26.
     await page.goto(srv.origin + '/inventory?tab=members&view=shares');
-    await page.locator('[data-agd="share-member"]').selectOption('e2e-mem', { timeout: 15000 });
-    await page.locator('[data-agd="share-count"]').fill('10');
-    await page.locator('[data-agd-save-share]').click();
+    await page.locator('[data-agd="member"]').selectOption('e2e-mem', { timeout: 15000 });
+    await page.locator('[data-agd="shares"]').fill('10');
+    await page.locator('[data-agd-b="save-share"]').click();
     const sh = (await readJson(page, 'member_shares', [], (v) => v.length === 1))[0];
     check(/^SHC\/FY\d{2}-\d{2}\/0001$/.test(sh?.certificate_no ?? '') && sh.shares === 10, `10 shares allotted, certificate ${sh?.certificate_no}`);
     await page.goto(srv.origin + '/inventory?tab=members&view=papers');

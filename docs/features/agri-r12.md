@@ -210,8 +210,7 @@ CA (AG8, AG16–AG25, AG30, AG32, AG60–AG69).
   overrides with a reason (`loan_check: 'override'`, audit row). Unpaid rent bills warn. With a plan billing at
   release the draft rent bill for the released bags is raised in the same step (all or nothing).
 - Papers (A5, `smallPaper`): storage receipt ("Non-negotiable receipt — not a WDRA e-NWR", AG23, terms from settings),
-  gate pass with the balance bags. Chambers (`agri_settings.chambers`) with utilisation; depositor statement (lots,
-  bags, rent billed / due, loans due).
+  gate pass with the balance bags. Chambers (`agri_settings.chambers`) with utilisation; depositor statement engine (`depositorLots`; screen off for the budget).
 
 ### D2 Rent (`ag-cold-rent.ts`)
 
@@ -228,7 +227,8 @@ CA (AG8, AG16–AG25, AG30, AG32, AG60–AG69).
   a period (monthly plans), season end. No double billing: season bags already on live rent bills, `in` charges once
   per lot, a gate pass once, monthly periods never overlap (`billedOn` reads live invoices, so a deleted draft frees
   its bags).
-- Rent due by depositor and season (closed lots with rent unpaid flagged); unbilled rent memo (AG30, no accrual).
+- Engines (screens off for the budget): rent due by depositor and season with closed lots unpaid flagged (`rentDue`);
+  unbilled rent memo (`unbilledRent`, AG30, no accrual).
 
 ### D3 Loans against stored produce (`ag-loans.ts`)
 
@@ -236,7 +236,7 @@ CA (AG8, AG16–AG25, AG30, AG32, AG60–AG69).
   last repayment; `monthly_compound` optional (AG62). Repayments interest first, in date order; closes at zero.
 - Posting (real money, ordinary vouchers): disbursement PAYMENT Dr "Loans to depositors" | Cr bank / cash; repayment
   RECEIPT Dr bank / cash | Cr "Loans to depositors" + Cr "Interest on loans to depositors". Undo / delete go through
-  `deleteVoucher` and `setTable` (recycle bin). LTV warning (memo); interest statement; overdue loans in the bell.
+  `deleteVoucher` and `setTable` (recycle bin). LTV warning (memo); interest statement engine (`interestStatement`); overdue loans in the bell.
 
 ### D4 Input dealer desk (`ag-licences.ts`, `ag-subsidy.ts`, `ag-season-credit.ts`, `ag-expiry.ts`)
 
@@ -262,18 +262,18 @@ CA (AG8, AG16–AG25, AG30, AG32, AG60–AG69).
 
 - Members = vendors / clients with `ag.member` (one per `ag.code`). Table `member_shares` (`books.edit`, dated):
   allot (`SHC/FY…` certificate; from application money JOURNAL or bank / cash RECEIPT), transfer (pair of rows, new
-  certificate, totals unchanged), surrender (optional refund PAYMENT), forfeit (JOURNAL to "Forfeited shares").
+  certificate, totals unchanged), surrender (optional refund PAYMENT), forfeit (JOURNAL to "Forfeited shares") — the last two engine-only (screen off).
   Application money per member from closed `farmer_cycles` `share` deductions less allotments that used it. Register
   as at a date (folio, shares, paid up, membership date, cessation, certificates; CSV); certificate print with
   distinctive numbers.
 - Patronage per FY: supplies (cycle lines by `farmer_id` + the member's own vouchers at taxable value) and purchases
   by the member; members vs non-members of all farmer vendors. Distribution paper (reserve %, dividend % with cap,
-  patronage pool by business, retained) → an OPTIONAL (draft) appropriation journal.
+  patronage pool by business, retained) → an OPTIONAL (draft) appropriation journal (`draftAppropriation`, engine-only for now).
 - Papers: co-operative profit by head with the members' share — `80P(2)` before 1 Apr 2026, `Sec 149` (Income-tax
   Act 2025, as reported) from then (`COOP_DEDUCTION_RULES`); producer company 80PA keyed by assessment year
   (`PRODUCER_COMPANY_RULES`): 100% under ₹100 crore turnover for AY 2019-20 … 2024-25, nothing after ("no deduction
   found — verify AG17"). Statutory calendar (`MEMBERS_CALENDAR_RULES` defaults, typed overrides
-  `agri_settings.calendar`) on the desk and as a lazy card in GST → Compliance with the `fpo` pack.
+  `agri_settings.calendar`) shown on the desk.
 
 ### Storage, registries, rules
 
@@ -310,29 +310,37 @@ e2e step "R12-D cold store desk".
   stock checks do not pull `agri-rules.ts` into their chunk graph (that added two preload entries to first paint).
 - **Settings scalars** are nested (`cold.release_ltv_pct`, `cold.receipt_terms`, `subsidy.cap`): AG-A's cleaner keeps
   object-valued keys only.
-- **Compliance calendar**: the members' reminders are a lazy card on GST → Compliance (fpo pack) and a table on
-  Members → Papers; they are not merged into the GST return calendar rows.
+- **Compliance calendar**: the members' reminders are a table on Members → Papers (defaults by rule, typed dates read
+  from `agri_settings.calendar`); the card on GST → Compliance was taken out for the budget.
 - **Loans view under Members** shows only when the cold-storage pack is off and has no `PACK_TABS` row / own help topic
   (it falls back to the Members topic).
 - **Demo**: lots and a rent plan only (see above).
+- **Screens taken off for the budget** (engines and tests kept): see the Bundle section below.
 - **Loan / share entries** post ordinary vouchers through `postPair` / `saveVoucher` (no new marker; real money).
 
 ### Bundle (AG-D)
 
-Measured with `vite build` + gzip -9 (the budget script's method), before = `claude/elegant-cannon-cwapiv` at `228ca3c`
-(AG-A merged), after = this branch merged with it.
+Measured with `vite build` + gzip -9 (the budget script's method), before = `claude/elegant-cannon-cwapiv` at `a32a832`
+(AG-A and AG-C merged), after = this branch merged with it.
 
 | Budget | Before | After | Delta | Share |
 |---|---|---|---|---|
-| Initial JS (first paint) | 189,162 B (184.73 kB) | 189,135 B (184.70 kB) | **−27 B** (no AG-D code; index chunk-name churn) | ≤ +0.03 kB ✓ |
-| Total JS | 3,126,902 B (3053.6 kB) | 3,172,559 B (3098.2 kB) | **+45,657 B (+44.6 kB)** | ≤ 9 kB ✗ |
+| Initial JS (first paint) | 189,186 B (184.75 kB) | 189,146 B (184.71 kB) | **−40 B** (no AG-D code; index chunk-name churn) | ≤ +0.03 kB ✓ |
+| Total JS | 3,156,623 B (3082.6 kB) | 3,193,321 B (3118.5 kB) | **+36,698 B (+35.8 kB)** | ≤ 9 kB (lead: ≈ 25 kB) ✗ |
 
-**Overrun: ≈ +35.6 kB over AG-D's 9 kB share** (total stays under the 3200 kB limit: 3098.2 kB). Breakdown (gz, by
-chunk): desks and views 23 kB (ColdDesk 9.6 with the rent and gate-pass engines inside, MembersDesk 6.0, InputsDesk 2.7,
-shared LoansView 1.7, POS strip 1.1, members calendar card 0.5, desk kit 1.4); engines 11 kB (`ag-loans` 2.5,
-`ag-cold-lots` 2.1, `ag-patronage` + `ag-members` 2.2, `ag-season-credit` + `ag-subsidy` 1.6, `ag-licences` 0.9, bell
-notices 0.7, the AG-D rule rows ≈ 1.3); strings `agri-r12d` 6.9 kB (English + Hindi, every view); wiring (POS, bell,
-compliance card, stock gate, interest branch, demo rows, chunk splits) ≈ 4 kB. Already applied: one chunk per desk
-(−8 kB against lazy views). Further trimming options for the lead: drop the members' calendar card on GST → Compliance
-(−0.5 kB), shorten the Hindi notes (≈ −1 kB), fold the subsidy / season-credit views into the licences view (≈ −1 kB),
-or the PRD §1 fallback raise.
+Breakdown (gz, by chunk): ColdDesk 7.8 kB (views + the rent and gate-pass engines), MembersDesk 6.4 (views + members,
+patronage and co-op papers engines), InputsDesk 2.4, shared LoansView 1.3, POS strip 0.9, desk kit 1.6; engines in
+their own chunks: `ag-loans` 2.4, `ag-cold-lots` 1.8, `ag-season-credit` + `ag-subsidy` 1.6, `ag-licences` 0.9, bell
+notices 0.8; AG-D rule rows ≈ 1.3 (in the shared `agri-rules` chunk); strings `agri-r12d` 6.0 (English + Hindi); wiring
+(help topics, POS, bell, stock gate, interest branch, demo rows, registry / backup / sync / export rows) ≈ 3.5.
+
+Trims applied to get here (from +45.7 kB): one chunk per desk (−8 kB vs lazy views); a data-driven field row (`Form`)
+for every view; text buttons instead of icons; short help topics; and these screens were taken **off the UI** (their
+engines and tests stay, so they can come back without new logic): bag transfer between depositors and the depositor
+statement (`transferBags`, `depositorLots`), the loan interest statement (`interestStatement`), share surrender /
+forfeiture and distinctive certificate numbers (`reduceShares`, `distinctive`), the draft appropriation journal button
+(`draftAppropriation`), the rent-due and unbilled-rent tables (`rentDue`, `unbilledRent`), the typed calendar dates
+and the members' card on GST → Compliance. Still over the lead's ≈ 25 kB: further options — drop the bell notices
+(−0.9 kB), the PoS-vs-book table (−0.8), the patronage / distribution view (−1.8), the co-op head table (−0.6), late
+fee / notified rate / part-month by days on rent plans (−0.7), monthly compounding and partial release on loans
+(−0.4); getting to 25 kB needs about all of these plus shorter Hindi notes.

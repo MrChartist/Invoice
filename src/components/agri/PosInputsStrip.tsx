@@ -12,40 +12,37 @@ import { capWarning, subsidisedBags, subsidisedTest, subsidyErrors } from '../..
 import { classIndex, licenceLines, unlicensedWarnings } from '../../lib/agri/ag-licences';
 import { DEFAULT_SEASONS, seasonDue } from '../../lib/agri/ag-season-credit';
 import { readAgriSettings } from '../../lib/agri/ag-settings';
+import { agSnapshot } from '../../lib/agri/ag-snapshot';
 import type { AgSnapshot } from '../../types/agri-r12';
 import type { InvoiceRecord } from '../../types/invoice';
-import { F, Sel } from './agd-kit';
+import { Form } from './agd-kit';
 import controls from '../../styles/controls.module.css';
 
 export interface PosAgri { ag: AgSnapshot; due?: string; errors: string[] }
 
 export default function PosInputsStrip({ record, onChange }: { record: InvoiceRecord; onChange: (v: PosAgri | null) => void }) {
   useT();
-  const s = useMemo(() => readAgriSettings(), []);
-  const isSub = useMemo(() => subsidisedTest(), []);
-  const idx = useMemo(() => classIndex(), []);
-  const [v, setV] = useState({ pos_txn: '', farmer_id: '', season: '' });
+  const [s, isSub, idx] = useMemo(() => [readAgriSettings(), subsidisedTest(), classIndex()] as const, []);
+  const [v, setV] = useState<Record<string, string>>({});
   const day = record.issue_date;
-  const names = (record.items ?? []).map((l) => `${l.name}:${l.quantity}`).join('|');
-  const sub = (record.items ?? []).some((l) => l.name && isSub(l.name));
+  const sub = subsidisedBags(record, isSub);
   const seasons = s.seasons?.length ? s.seasons : DEFAULT_SEASONS;
   const due = v.season ? seasonDue(seasons, v.season, day) : '';
-  const ag: AgSnapshot = { kind: 'inputs', inputs: { ...(licenceLines(s.licences, day).length ? { licences: licenceLines(s.licences, day) } : {}), ...(v.pos_txn.trim() ? { pos_txn: v.pos_txn.trim() } : {}), ...(v.farmer_id.trim() ? { farmer_id: v.farmer_id.trim() } : {}), ...(/^\d{4}$/.test(v.farmer_id.trim()) ? { farmer_id_last4: v.farmer_id.trim() } : {}), ...(sub ? { subsidy_bags: subsidisedBags(record, isSub) } : {}), ...(due ? { season: v.season, season_due: due } : {}) } };
-  const probe = { ...record, status: 'Sent' as const, ag };
-  const errors = subsidyErrors(probe, isSub);
-  const warns = [capWarning(probe, localDb.invoices.getAll(), isSub, s.subsidy?.cap), ...unlicensedWarnings(record.items ?? [], s.licences, day, (n) => idx.get(n))].filter(Boolean) as string[];
-  const key = `${names}|${v.pos_txn}|${v.farmer_id}|${v.season}|${day}`;
+  const id = v.farmer_id?.trim();
+  const ag = agSnapshot('inputs', { inputs: { licences: licenceLines(s.licences, day), pos_txn: v.pos_txn?.trim(), farmer_id: id, farmer_id_last4: /^\d{4}$/.test(id ?? '') ? id : undefined, subsidy_bags: sub || undefined, season: due ? v.season : undefined, season_due: due || undefined } });
+  const errors = subsidyErrors({ ...record, status: 'Sent', ag }, isSub);
+  const warns = [capWarning({ ...record, ag }, localDb.invoices.getAll(), isSub, s.subsidy?.cap), ...unlicensedWarnings(record.items ?? [], s.licences, day, (n) => idx.get(n))];
+  const key = JSON.stringify([ag, errors, due]);
   useEffect(() => {
-    onChange(Object.keys(ag.inputs ?? {}).length ? { ag, ...(due ? { due } : {}), errors } : errors.length ? { ag, errors } : null);
+    onChange(ag.inputs || errors.length ? { ag, due: due || undefined, errors } : null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   return (
-    <div className={controls.row} style={{ flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }} data-agd-pos>
-      {sub && <F label={agdT('posTxn')} w={160}><input className={controls.input} value={v.pos_txn} onChange={(e) => setV({ ...v, pos_txn: e.target.value })} data-agd="pos-txn" /></F>}
-      {sub && <F label={agdT('farmerId')} w={140}><input className={controls.input} value={v.farmer_id} maxLength={20} onChange={(e) => setV({ ...v, farmer_id: e.target.value })} data-agd="farmer-id" /></F>}
-      <F label={agdT('creditTill')}><Sel value={v.season} onChange={(x) => setV({ ...v, season: x })} opts={seasons.map((x) => [x.name, x.name])} blank={agdT('noCredit')} data-agd="season" /></F>
-      {due && <span className={controls.hint}>{agdT('dueAt', { date: due })}</span>}
-      {[...errors, ...warns].map((m) => <p key={m} className={controls.hint} role="alert">{m}</p>)}
+    <div data-agd-pos>
+      <Form v={v} set={setV} f={[!!sub && ['pos_txn', 'posTxn', 't', 160], !!sub && ['farmer_id', 'farmerId', 't', 140], ['season', 'creditTill', seasons.map((x) => [x.name, x.name] as const)]]}>
+        {due && <span className={controls.hint}>{agdT('dueAt', { date: due })}</span>}
+      </Form>
+      {[...errors, ...warns].filter(Boolean).map((m) => <p key={m} className={controls.hint} role="alert">{m}</p>)}
     </div>
   );
 }
