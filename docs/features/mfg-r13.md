@@ -74,15 +74,15 @@ only its own section and records its own bundle numbers.
 
 ### Bundle (MF-A)
 
-Measured with `vite build` + gzip -9 (the budget script's method); before = `claude/elegant-cannon-cwapiv` at `bcdddc8`,
+Measured with `vite build` + gzip -9 (the budget script's method); before = `claude/elegant-cannon-cwapiv` at `166d7d7`,
 after = this branch merged with it.
 
 | Budget | Before | After | Delta | Share |
 |---|---|---|---|---|
-| Initial JS (first paint) | 189,198 B (184.76 kB) | 189,202 B (184.77 kB) | **+4 B** | ≤ +0.03 kB ✓ |
-| Total JS | 3,227,940 B (3152.3 kB) | 3,271,076 B (3194.4 kB) | **+43,136 B (+42.1 kB)** | ≤ 18 kB ✗ |
+| Initial JS (first paint) | 189,182 B (184.75 kB) | 189,186 B (184.75 kB) | **+4 B** | ≤ +0.03 kB ✓ |
+| Total JS | 3,228,040 B (3152.4 kB) | 3,270,891 B (3194.2 kB) | **+42,851 B (+41.8 kB)** | ≤ 18 kB ✗ |
 
-**Overrun: +24 kB over MF-A's 18 kB share** (total stays well under 3400 kB). Breakdown (gz): Floor desk and views
+**Overrun: +23.8 kB over MF-A's 18 kB share** (total stays well under 3400 kB). Breakdown (gz): Floor desk and views
 14.5 kB (FloorDesk chunk 8.2 kB: centres, routings, job cards + operator screen, load; its shared chunk 6.4 kB: the
 `mfg-r13a` strings in English + Hindi, `floor-ui`, `mf-routings` + CSV, `mf-centres`), job-card engine 2.5 kB (shared by
 the desk, the output dialog and payroll), dated plan 2.4 kB + the `mrp.ts` split into a shared chunk 0.8 kB net;
