@@ -13,14 +13,15 @@
  *    It warns, never blocks: the owner decides.
  *  - `licenceNotices`: licences expiring within 60 days or expired.
  *
- * Working papers — verify with your drug inspector / CA. Pure.
+ * Working papers — verify with your drug inspector / CA. Pure above the read-only "Storage" section.
  */
 import type { InvoiceRecord } from '../../types/invoice';
 import type { DrugLicence } from '../../types/retail-r9';
 import { num } from '../invoice-calc';
 import { isRevenueDoc } from '../stats';
 import { toCsv } from '../csv';
-import { plusDays } from '../pharma-gate';
+import { plusDays, readPharmaSettings } from '../pharma-gate';
+import { liveScheduleIndex, type H1Row } from '../pharma';
 import { isVoidStatus, readPurchase, readPurchaseLines } from '../purchase-normalize';
 import { lineFactor } from '../units';
 import { ruleAt } from '../tax-rules';
@@ -199,4 +200,24 @@ export const LICENCE_ALERT_DAYS = 60;
 export function licenceNotices(licences: readonly DrugLicence[] | undefined, today: string, days = LICENCE_ALERT_DAYS): { licence: DrugLicence; expired: boolean }[] {
   const limit = plusDays(today, days);
   return (licences ?? []).filter((l) => l?.valid_to && l.valid_to <= limit).map((l) => ({ licence: l, expired: l.valid_to! < today }));
+}
+
+/* ── Schedule H1 / H register cells (rows from `pharma.ts` `h1Register`) ── */
+
+export const H1_HEAD = ['Date', 'Bill no.', 'Patient', 'Patient address', 'Prescriber', 'Reg. no.', 'Drug', 'Schedule', 'Batch', 'Expiry', 'Qty', 'Unit', 'Details missing'] as const;
+export const h1Cells = (r: H1Row): (string | number)[] => [r.date, r.number, r.patient, r.patient_address, r.prescriber, r.prescriber_reg, r.drug, r.schedule, r.batch, r.expiry, r.qty, r.unit, r.missingRx ? 'Yes' : ''];
+
+/* ── Storage (read only): retention warnings for the recycle bin and the year-end checklist ── */
+
+/** Invoice rows (live or deleted) with H1 / X lines still inside retention on `today` ([] with the pharma features off). */
+export function retainedAmong(rows: readonly unknown[], today: string): { id: string; number: string; until: string }[] {
+  if (!readPharmaSettings().enabled) return [];
+  const invoices = rows.filter((r): r is InvoiceRecord => !!r && typeof r === 'object' && Array.isArray((r as InvoiceRecord).items));
+  return invoices.length ? retainedBills(invoices, liveScheduleIndex(), today) : [];
+}
+
+/** Year-end: bills of the year (`from` … `to`) with H1 / X lines to keep, and the latest keep-until day. */
+export function rxRetainedInYear(invoices: readonly InvoiceRecord[], from: string, to: string, today: string): { count: number; until: string } | undefined {
+  const rows = retainedAmong(invoices.filter((i) => i?.issue_date >= from && i.issue_date <= to), today);
+  return rows.length ? { count: rows.length, until: rows.reduce((m, r) => (r.until > m ? r.until : m), '') } : undefined;
 }

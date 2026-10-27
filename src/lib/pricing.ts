@@ -127,12 +127,10 @@ export function slabFor(slabs: readonly QtySlab[] | undefined, qty: number): Qty
  * rate when it has no MRP or no such percent. The catalogue form stores the result as `rate` too, so
  * importers and conversions see the same price.
  */
-export function mrpLessRate(item: Pick<InvoiceItem, 'rate'> & Partial<Pick<InvoiceItem, 'mrp' | 'mrp_less_percent' | 'mrp_tax_basis' | 'tax_rate' | 'mrp_pack'>>): number {
+export function mrpLessRate(item: Pick<InvoiceItem, 'rate'> & Partial<Pick<InvoiceItem, 'mrp' | 'mrp_less_percent' | 'mrp_tax_basis' | 'tax_rate'>>): number {
   // R9 (RT-A2): an MRP printed for an older, higher GST rate is lowered by (100 + new) ÷ (100 + old) — never raised (rt-mrp.ts).
   const mrp = item.mrp_tax_basis && num(item.mrp_tax_basis.rate) > num(item.tax_rate) ? round2((num(item.mrp) * (100 + num(item.tax_rate))) / (100 + num(item.mrp_tax_basis.rate))) : num(item.mrp);
   const pct = num(item.mrp_less_percent);
-  // R9 (RT-B3): loose sale — MRP printed per pack (strip of 10), no rate set: one base unit = MRP ÷ pack (less %).
-  if (num(item.mrp_pack) > 1 && mrp > 0 && !(num(item.rate) > 0)) return round2((mrp / num(item.mrp_pack)) * (pct > 0 && pct < 100 ? 1 - pct / 100 : 1));
   if (mrp > 0 && pct > 0 && pct < 100) return round2(mrp * (1 - pct / 100));
   return round2(num(item.rate));
 }

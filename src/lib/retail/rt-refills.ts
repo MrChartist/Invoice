@@ -13,6 +13,10 @@ import { isRevenueDoc } from '../stats';
 import { plusDays } from '../pharma-gate';
 import { requireAccess } from '../access';
 import { generateId, getTable, setTable } from '../storage';
+import { lineFactor } from '../units';
+import { addScannedLine } from '../scan';
+import type { HeldCart } from '../pos-hold';
+import type { InvoiceItem } from '../../types/invoice';
 import { RT_TABLES } from './rt-shared';
 
 export const REFILLS_TABLE = RT_TABLES.rxRefills;
@@ -36,7 +40,8 @@ export function refillFromBill(inv: InvoiceRecord, every: number, lineIds: reado
     ...(inv.client?.id ? { client_id: inv.client.id } : {}),
     name,
     ...(inv.client?.phone?.trim() ? { phone: inv.client.phone.trim() } : {}),
-    items: lines.map((l) => ({ name: l.name, quantity: num(l.quantity), ...(l.unit ? { unit: l.unit } : {}) })),
+    // In base units (a line typed in STRIP of 10 → 10 × quantity), so the refill cart sells at the catalogue's base rate.
+    items: lines.map((l) => ({ name: l.name, quantity: num(l.quantity) * lineFactor(l), ...(l.unit && lineFactor(l) === 1 ? { unit: l.unit } : {}) })),
     every_days: days,
     next_due: plusDays(inv.issue_date, days),
     invoice_id: inv.id,
@@ -84,6 +89,25 @@ export function advanceRefill(r: RxRefill, invoices: readonly InvoiceRecord[]): 
 export function refillWaLink(r: RxRefill, message: string): string {
   const p = digits(r.phone);
   return p.length === 10 ? `https://wa.me/91${p}?text=${encodeURIComponent(message)}` : '';
+}
+
+/**
+ * The POS cart for *Bill now*: each refill item at the catalogue's rate / GST / HSN (an item no longer in the catalogue
+ * comes in at ₹0 for the counter to price), the customer or the walk-in name and phone. Parked as a held cart.
+ */
+export function refillCart(r: RxRefill, catalog: readonly InvoiceItem[], client: HeldCart['client'], newId: () => string = generateId): HeldCart {
+  let items: InvoiceItem[] = [];
+  for (const it of r.items) {
+    const src = catalog.find((c) => norm(c.name) === norm(it.name)) ?? ({ id: '', name: it.name, description: '', type: 'Product', hsn: '', unit: it.unit || 'NOS', quantity: 1, rate: 0, tax_rate: 0, discount_percent: 0, amount: 0 } as InvoiceItem);
+    items = addScannedLine(items, src, { newId, qty: num(it.quantity) || 1 }).items;
+  }
+  return {
+    id: newId(),
+    held_at: new Date().toISOString(),
+    items,
+    ...(client ? { client } : { name: r.name, ...(r.phone ? { phone: r.phone } : {}) }),
+    total: items.reduce((s, l) => s + num(l.amount) * (1 + num(l.tax_rate) / 100), 0),
+  };
 }
 
 /* ── Storage ── */

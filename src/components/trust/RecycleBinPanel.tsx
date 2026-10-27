@@ -11,6 +11,7 @@ import { can } from '../../lib/access';
 import { verifyPin } from '../../lib/auth';
 import { grantOverride, isPeriodLockedError } from '../../lib/period-lock';
 import { peekTable } from '../../lib/storage';
+import { localDayOf } from '../../lib/dates';
 import { BIN_RETENTION } from '../../lib/trade/trade-rules';
 import {
   BIN_TABLE, RestoreError, binRetentionDays, currentViewer, deleteForGood, describeEntry, lockedEntries, planRestore,
@@ -83,10 +84,15 @@ export default function RecycleBinPanel({ onClose, notify }: { onClose: () => vo
       setError(trErr(err));
     }
   };
-  const remove = (ids: string[]) => {
+  const remove = async (ids: string[]) => {
     setError('');
-    if (!ids.length || !window.confirm(trT('binConfirmDelete', { n: ids.length }))) return;
+    if (!ids.length) return;
     const entries = all.filter((e) => ids.includes(e.id));
+    // R9 (RT-B2): bills with Schedule H1 / X lines inside their retention window — a warning, never a block.
+    const bills = entries.filter((e) => e.table === 'invoices').map((e) => e.row);
+    const kept = bills.length ? await import('../../lib/retail/rt-pharmacy-registers').then((m) => m.retainedAmong(bills, localDayOf(new Date())), () => []) : [];
+    const warn = kept.length ? `${trT('binRxRetained', { bills: kept.map((k) => k.number).join(', '), until: kept.reduce((m, k) => (k.until > m ? k.until : m), '') })}\n\n` : '';
+    if (!window.confirm(warn + trT('binConfirmDelete', { n: ids.length }))) return;
     if (lockedEntries(entries).length) return setPending({ kind: 'delete', ids });
     try {
       const n = deleteForGood(ids);
@@ -100,7 +106,7 @@ export default function RecycleBinPanel({ onClose, notify }: { onClose: () => vo
   return (
     <Modal open onClose={onClose} size="xl" title={<><History size={18} aria-hidden="true" /> {trT('binTitle')}</>}
       footer={<>
-        {owner && all.length > 0 && <button type="button" className={controls.btnDanger} onClick={() => remove(all.map((e) => e.id))}><Trash2 size={14} aria-hidden="true" /> {trT('binEmptyAll')}</button>}
+        {owner && all.length > 0 && <button type="button" className={controls.btnDanger} onClick={() => void remove(all.map((e) => e.id))}><Trash2 size={14} aria-hidden="true" /> {trT('binEmptyAll')}</button>}
         <button type="button" className={controls.btnPrimary} onClick={onClose}>{trT('close')}</button>
       </>}>
       <div className={styles.stack} data-recycle-bin>
@@ -161,7 +167,7 @@ export default function RecycleBinPanel({ onClose, notify }: { onClose: () => vo
                             <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={plan.refusal === 'module'} onClick={() => restore(e)} aria-label={`${trT('binRestore')} ${d.number || d.label}`}><Undo2 size={14} aria-hidden="true" /> {trT('binRestore')}</button>
                           )}
                           {plan.children.length > 0 && <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => restore(e, { withChildren: true })}>{trT('binRestoreWith', { n: plan.children.length })}</button>}
-                          {owner && <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} aria-label={`${trT('binDeleteForGood')} ${d.number || d.label}`} onClick={() => remove([e.id])}><Trash2 size={14} aria-hidden="true" /></button>}
+                          {owner && <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} aria-label={`${trT('binDeleteForGood')} ${d.number || d.label}`} onClick={() => void remove([e.id])}><Trash2 size={14} aria-hidden="true" /></button>}
                         </div>
                       </td>
                     </tr>

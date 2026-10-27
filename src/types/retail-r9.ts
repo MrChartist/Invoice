@@ -255,10 +255,6 @@ declare module '../lib/inventory' {
   }
 }
 declare module './invoice' {
-  interface InvoiceItem {
-    /** RT-B3, catalogue rows: the MRP is printed per this many base units (a strip of 10 tablets → 10): with no rate set, one base unit sells at MRP ÷ pack (less `mrp_less_percent`). */
-    mrp_pack?: number;
-  }
   interface SenderProfile {
     /** RT-B2: "name (reg. no.)" of the registered pharmacist, written from the pharmacy desk (snapshotted with the profile). */
     pharmacist?: string;
