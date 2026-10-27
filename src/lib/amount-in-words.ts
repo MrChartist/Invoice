@@ -48,7 +48,7 @@ function indianWords(n: number): string {
   const rest = n % 1000;
 
   let words = '';
-  if (crore) words += threeDigit(crore) + ' Crore ';
+  if (crore) words += indianWords(crore) + ' Crore '; // QA14: ₹10,000 crore and up read "One Lakh Crore", not "undefined Hundred"
   if (lakh) words += twoDigit(lakh) + ' Lakh ';
   if (thousand) words += twoDigit(thousand) + ' Thousand ';
   if (rest) words += threeDigit(rest);
@@ -63,7 +63,7 @@ function internationalWords(n: number): string {
   const rest = n % 1000;
 
   let words = '';
-  if (billion) words += threeDigit(billion) + ' Billion ';
+  if (billion) words += internationalWords(billion) + ' Billion ';
   if (million) words += threeDigit(million) + ' Million ';
   if (thousand) words += threeDigit(thousand) + ' Thousand ';
   if (rest) words += threeDigit(rest);

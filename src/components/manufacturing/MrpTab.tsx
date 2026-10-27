@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Factory, Plus, Save, ShoppingCart, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -15,6 +15,8 @@ import type { ProductionPlan, ProductionPlanLine } from '../../types/manufacturi
 import type { PurchaseOrder, PurchaseRecord, ReceiptNote, Vendor } from '../../types/purchases';
 import { s7T } from '../../i18n/areas/inventory-7s';
 import { defineArea } from '../../i18n/area';
+import { impliedPacks } from '../../lib/shop-mode';
+import { localDb } from '../../lib/localDb';
 
 // R4-A1: "Create production orders" (inline strings, so the MRP tab does not load the production catalogue).
 const woT = defineArea(
@@ -25,6 +27,10 @@ import { money, qtyText, type MfgContext } from './context';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './manufacturing.module.css';
+
+// R13 (MF-A4): the dated view of the plan (lazy, offered with the shop-floor pack).
+const DatedPlanView = lazy(() => import('../mfg/DatedPlanView'));
+const byDateT = defineArea({ byDate: 'By date' } as const, { byDate: 'तारीख़ के अनुसार' });
 
 const blank = (): ProductionPlanLine => ({ id: generateId(), item_id: '', qty: 1 });
 
@@ -46,6 +52,8 @@ export function MrpTab({ ctx }: { ctx: MfgContext }) {
   const [netFinished, setNetFinished] = useState(true);
   const [vendorId, setVendorId] = useState('');
   const [deleting, setDeleting] = useState<ProductionPlan | null>(null);
+  const [dated, setDated] = useState(false); // R13 (MF-A4)
+  const shopfloor = useMemo(() => impliedPacks(localDb.settings.get()).includes('shopfloor'), []);
 
   const base = useMemo(() => {
     const positions = computeStock(ctx.inputs);
@@ -163,6 +171,7 @@ export function MrpTab({ ctx }: { ctx: MfgContext }) {
       </div>
       <div className={styles.bar} style={{ marginTop: '0.5rem' }}>
         <label className={controls.check}><input type="checkbox" checked={netFinished} onChange={(e) => setNetFinished(e.target.checked)} /> {s7T('netFinished')}</label>
+        {shopfloor && <label className={controls.check}><input type="checkbox" checked={dated} onChange={(e) => setDated(e.target.checked)} data-mrp-dated /> {byDateT('byDate')}</label>}
         {ctx.canBooks && (
           <span style={{ display: 'inline-flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => load(null)}>{s7T('newPlan')}</button>
@@ -172,6 +181,7 @@ export function MrpTab({ ctx }: { ctx: MfgContext }) {
       </div>
 
       <p className={styles.section} style={{ margin: '1rem 0 0.5rem' }}>{s7T('requirement')}</p>
+      {dated && <Suspense fallback={null}><DatedPlanView ctx={ctx} lines={lines} due={due || undefined} /></Suspense>}
       {rows.length === 0 ? <p className={styles.muted}>{s7T('mrpEmpty')}</p> : (
         <div className={surface.tableWrap}>
           <table className={surface.table} data-testid="mrp-table">

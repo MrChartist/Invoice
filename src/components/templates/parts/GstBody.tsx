@@ -7,7 +7,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
-import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText, raDocTitle, svDocTitle, svRegText, trackingText, worksLineText } from '../paper-helpers';
+import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText, raDocTitle, svDocTitle, svRegText, trackingText, worksLineText, mfSellerText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { formatCustomValue, printableValues } from '../../../lib/custom-fields';
 import { ItemCustomLine } from './CustomFieldsBlock';
@@ -101,6 +101,7 @@ export function GstBody({ invoice, sender, totals, skipEway, works }: Props) {
             )}
             {sender.pharmacist && <>{pharmacistText(sender)}<br /></>}
             {sender.sv_regs && <>{svRegText(sender)}<br /></>}
+            {mfSellerText(sender) && <>{mfSellerText(sender)}<br /></>}
             {sender.companyPhone && <>Contact: {sender.companyPhone}<br /></>}
             {sender.companyEmail && <>E-Mail: {sender.companyEmail}<br /></>}
             {sender.regLine}
@@ -188,7 +189,7 @@ export function GstBody({ invoice, sender, totals, skipEway, works }: Props) {
                   <div className={styles.itemName}>{line.name || '—'}</div>
                   {src?.description && <div className={styles.itemDesc}>{src.description}</div>}
                   <ItemCustomLine values={src?.custom_values} />
-                  {show.tracking && trackingText(src, invoice.ag) && <div className={styles.itemDesc}>{trackingText(src, invoice.ag)}</div>}
+                  {show.tracking && trackingText(src, invoice.ag, invoice.mf) && <div className={styles.itemDesc}>{trackingText(src, invoice.ag, invoice.mf)}</div>}
                   {worksLineText(src, invoice.boq_terms?.cn) && <div className={styles.itemDesc} data-works-line>{worksLineText(src, invoice.boq_terms?.cn)}</div>}
                 </td>
                 {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '—'}</td>}

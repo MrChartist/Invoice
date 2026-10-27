@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { FileJson, Pencil, Plus, Printer, Truck, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -28,7 +29,16 @@ import styles from './job-work.module.css';
 /** Material Out: delivery challans (Rule 55) sending inputs / capital goods to a job worker. */
 export function MaterialOutPanel({ data }: { data: JwData }) {
   const { ctx } = data;
-  const [editing, setEditing] = useState<MaterialOut | 'new' | null>(null);
+  // R13 (MF-A2): "Send" on an outside operation opens a new challan pre-filled (`mfout=vendor~item~qty~process`).
+  const [params] = useSearchParams();
+  const [prefill] = useState(() => {
+    const raw = params.get('mfout');
+    if (!raw) return undefined;
+    const [vendorId, itemId, qty, process] = raw.split('~').map(decodeURIComponent);
+    const v = data.parties.find((p) => p.id === vendorId);
+    return { party: { party_name: v?.name ?? '', vendor_id: v?.id, party_gstin: v?.gstin, party_state_code: v?.state_code }, item_id: itemId, qty: num(qty), process };
+  });
+  const [editing, setEditing] = useState<MaterialOut | 'new' | null>(prefill && ctx.canBooks ? 'new' : null);
   const [deleting, setDeleting] = useState<MaterialOut | null>(null);
   const [eway, setEway] = useState<MaterialOut | null>(null);
   const rows = [...data.outs].sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number, undefined, { numeric: true }));
@@ -87,7 +97,7 @@ export function MaterialOutPanel({ data }: { data: JwData }) {
           </tbody>
         </table>
       </div>
-      {editing && <OutModal data={data} doc={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onPrint={print} />}
+      {editing && <OutModal data={data} doc={editing === 'new' ? null : editing} prefill={editing === 'new' ? prefill : undefined} onClose={() => setEditing(null)} onPrint={print} />}
       {eway && <JobWorkEwayDialog challan={eway} items={ctx.items} units={data.units} onClose={() => setEway(null)} />}
       <ConfirmDialog
         open={!!deleting} destructive title={jwT('delete')} message={jwT('confirmDelete', { number: deleting?.number ?? '' })} confirmLabel={jwT('delete')}
@@ -106,13 +116,13 @@ export function MaterialOutPanel({ data }: { data: JwData }) {
   );
 }
 
-function OutModal({ data, doc, onClose, onPrint }: { data: JwData; doc: MaterialOut | null; onClose: () => void; onPrint: (o: MaterialOut) => void }) {
+function OutModal({ data, doc, prefill, onClose, onPrint }: { data: JwData; doc: MaterialOut | null; prefill?: { party: PartyValue; item_id: string; qty: number; process?: string }; onClose: () => void; onPrint: (o: MaterialOut) => void }) {
   const { ctx } = data;
   const [date, setDate] = useState(doc?.date ?? todayInput());
-  const [party, setParty] = useState<PartyValue>({ party_name: doc?.party_name ?? '', vendor_id: doc?.vendor_id, party_gstin: doc?.party_gstin, party_state_code: doc?.party_state_code });
+  const [party, setParty] = useState<PartyValue>(prefill?.party ?? { party_name: doc?.party_name ?? '', vendor_id: doc?.vendor_id, party_gstin: doc?.party_gstin, party_state_code: doc?.party_state_code });
   const [orderId, setOrderId] = useState(doc?.order_id ?? '');
-  const [process, setProcess] = useState(doc?.process ?? '');
-  const [lines, setLines] = useState<JwGridLine[]>(() => doc?.lines.map((l) => ({ ...l })) ?? [blankJwLine()]);
+  const [process, setProcess] = useState(doc?.process ?? prefill?.process ?? '');
+  const [lines, setLines] = useState<JwGridLine[]>(() => doc?.lines.map((l) => ({ ...l })) ?? [blankJwLine(prefill ? { item_id: prefill.item_id, qty: prefill.qty } : {})]);
   const [eway, setEway] = useState(doc?.eway_bill_no ?? '');
   // 7S: transport details for the e-Way bill JSON.
   const [vehicle, setVehicle] = useState(doc?.vehicle_no ?? '');

@@ -117,6 +117,11 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   '/time?tab=appointments&view=birthdays': ['birthday', 'anniversary', 'reminder', 'whatsapp'],
   '/time?tab=commission': ['commission', 'stylist', 'trainer', 'staff', 'incentive'],
   '/time?tab=workshop&view=claims': ['insurance claim', 'tpa', 'insurer', 'cashless'],
+  // R13 (MF-A)
+  '/manufacturing?tab=floor&view=cards': ['job card', 'machine hours', 'operator', 'scrap kg', 'rejection', 'jcd'],
+  '/manufacturing?tab=floor&view=centres': ['work centre', 'machine hour rate', 'workstation', 'shift'],
+  '/manufacturing?tab=floor&view=routings': ['routing', 'operations', 'process sheet', 'setup time'],
+  '/manufacturing?tab=floor&view=load': ['capacity', 'machine load', 'promise date', 'delivery date'],
   // R12 (AG-A)
   '/inventory?tab=farm&view=farmers': ['farmer', 'kisan', 'member', 'farmer card', 'village'],
   '/inventory?tab=farm&view=vouchers': ['farmer voucher', 'fpv', 'paddy purchase', 'moisture cut', 'mandi fee'],
