@@ -88,7 +88,9 @@ test('the Ctrl+K common-credit row is on for every pack that shows the GST tab (
 
 /* ── R6-B2: pack routes stay in the sidebar ─────────────────── */
 
-const R10_PACKS: readonly string[] = ['clinic', 'salon', 'fitness', 'workshop'];
+const R10_PACKS: readonly string[] = ['clinic', 'salon', 'fitness', 'workshop',
+  // R14: the professional packs live on /time like R10's — every professional kind keeps `time` (PACK_ROUTES unchanged).
+  'practice', 'cafirm', 'legal', 'design', 'media', 'svcexport', 'partners'];
 
 test('R6-B2 pin: the shell copies PACK_ROUTES / PACK_OF_TYPE_INLINE equal PACK_TABS / PACK_OF_TYPE', async () => {
   const { PACK_ROUTES, PACK_OF_TYPE_INLINE, moduleOfPath } = await import('../src/lib/shop-mode.ts');

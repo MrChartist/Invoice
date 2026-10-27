@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, createElement, lazy, useCallback, useEffect, useMemo, useState, type ComponentType } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Car, ChevronLeft, ChevronRight, Clock, Download, FileSpreadsheet, IndianRupee, Pencil, Plus, ReceiptText, Timer, Trash2 } from 'lucide-react';
 import type { MileageEntry, TimeEntry, TimePrefs } from '../types/time';
@@ -67,6 +67,16 @@ const r10T = defineArea(
   { appointments: 'अपॉइंटमेंट', commission: 'स्टाफ और कमीशन', clinic: 'क्लिनिक', members: 'सदस्य', workshop: 'वर्कशॉप' },
 );
 
+// R14: the six professional desks (PS-A matters / wip, PS-B clientmoney, PS-C exportsvc, PS-D firm / cadesk), one lazy chunk
+// each. A desk whose package has not merged has no file and no TIME_TABS row, so it is never mounted (no stubs).
+const PS_DESK_FILES = import.meta.glob<{ default: ComponentType<{ view?: string; notify: (m: string, tone?: 'success' | 'error' | 'info') => void }> }>('../components/prof/*Desk.tsx');
+const PS_DESK_OF: Record<string, string> = { matters: 'MattersDesk', wip: 'WipDesk', clientmoney: 'ClientMoneyDesk', exportsvc: 'ExportSvcDesk', firm: 'FirmDesk', cadesk: 'CaDesk' };
+const PS_DESKS = new Map(Object.entries(PS_DESK_OF).flatMap(([tab, file]) => {
+  const load = PS_DESK_FILES[`../components/prof/${file}.tsx`];
+  return load ? [[tab, lazy(load)] as const] : [];
+}));
+const r14T = defineArea({ matters: 'Matters', wip: 'WIP & billing', clientmoney: 'Client money' } as const, { matters: 'मामले', wip: 'अबिल्ड कार्य और बिलिंग', clientmoney: 'क्लाइंट का पैसा' });
+
 type Tab = TimeTab;
 // R6-B1: the ids (and packs) live in time-tabs.ts; the labels stay here.
 const TAB_LABEL: Record<Tab, () => string> = {
@@ -78,6 +88,7 @@ const TAB_LABEL: Record<Tab, () => string> = {
   settings: () => timeT('tabSettings'),
   works: () => wkT('tab'), // R5-B
   appointments: () => r10T('appointments'), commission: () => r10T('commission'), clinic: () => r10T('clinic'), members: () => r10T('members'), workshop: () => r10T('workshop'), // R10
+  matters: () => r14T('matters'), wip: () => r14T('wip'), clientmoney: () => r14T('clientmoney'), // R14 (PS-A); B / C / D add their labels
 };
 const TABS: { id: Tab; label: () => string; pack?: PackId; alsoPacks?: readonly PackId[] }[] = TIME_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -430,6 +441,7 @@ export function Time() {
       {tab === 'workshop' && <Suspense fallback={null}><WorkshopDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
       {tab === 'clinic' && <Suspense fallback={null}><ClinicDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
       {tab === 'members' && <Suspense fallback={null}><MembersDesk notify={notify} /></Suspense>}
+      {PS_DESKS.has(tab) && <Suspense fallback={null}><PsDesk tab={tab} view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
 
       {tab === 'settings' && (
         <section className={cn(surface.card, styles.prefs)}>
@@ -503,4 +515,10 @@ export function Time() {
       {toastNode}
     </div>
   );
+}
+
+/** R14: mounts the professional desk of `tab` (lazy). */
+function PsDesk({ tab, view, notify }: { tab: string; view?: string; notify: (m: string, tone?: 'success' | 'error' | 'info') => void }) {
+  const Desk = PS_DESKS.get(tab);
+  return Desk ? createElement(Desk, { view, notify }) : null;
 }

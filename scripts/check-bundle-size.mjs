@@ -42,7 +42,8 @@ const BUDGET_ENTRY = env('BUDGET_ENTRY_GZ_KB', 90);
 // same rule, every pack screen lazy, first paint unchanged.
 // Raised to 3400 so the round-12 screens trimmed for size (cold-storage statements, loan interest, FPO patronage,
 // input-dealer checks) can ship: same rule, lazy pack chunks only; first paint unchanged.
-const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 3400);
+// Raised to 3500 for the round-14 professional-firm packs: same rule, lazy pack chunks only; first paint unchanged.
+const BUDGET_TOTAL = env('BUDGET_TOTAL_GZ_KB', 3500);
 
 const html = readFileSync(join(dist, 'index.html'), 'utf8');
 // De-duplicated: with an import cycle Vite emits the entry both as the script and as a modulepreload.

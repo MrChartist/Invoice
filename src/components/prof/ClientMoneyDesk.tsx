@@ -1,21 +1,22 @@
 /**
- * R14 PS-B3 client-money desk on `/time?tab=clientmoney&view=ledger|reconcile|statements` (packs `legal`, `cafirm`).
- * Each view is its own lazy chunk; they share the context below. Working paper — verify with your CA (PS27).
+ * R14 PS-B3 client-money desk on `/time?tab=clientmoney&view=ledger|reconcile|statements` (packs `legal`, `cafirm`),
+ * mounted by `Time.tsx` by file name. One lazy chunk with its views. Working paper — verify with your CA (PS27).
  */
-import { Suspense, lazy, useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
 import { cmT } from '../../i18n/areas/prof-r14b-cm';
 import { bankAccountsDb, isClientMoneyAccount, type BankAccount } from '../../lib/bank-accounts';
 import { localDb } from '../../lib/localDb';
 import { loadCostCentres } from '../../lib/cost-centres';
-import { useToast } from '../ui/useToast';
-import { Views } from '../mfg/mfd-ui';
+import { Views } from './ps-ui';
+import type { PsDeskProps } from './ps-run';
+import LedgerView from './CmLedgerView';
+import ReconcileView from './CmReconcileView';
+import StatementsView from './CmStatementsView';
 import controls from '../../styles/controls.module.css';
 
 const VIEWS = ['ledger', 'reconcile', 'statements'] as const;
-const LedgerView = lazy(() => import('./CmLedgerView'));
-const ReconcileView = lazy(() => import('./CmReconcileView'));
-const StatementsView = lazy(() => import('./CmStatementsView'));
+type View = (typeof VIEWS)[number];
 
 export interface CmCtx {
   version: number;
@@ -26,13 +27,9 @@ export interface CmCtx {
   run: (fn: () => string | void) => void;
 }
 
-type Notify = (m: string, tone?: 'success' | 'error' | 'info') => void;
-
-export default function ClientMoneyDesk({ view, notify: outer }: { view?: string; notify?: Notify }) {
+export default function ClientMoneyDesk({ view, notify }: PsDeskProps) {
   useT();
-  const v = (VIEWS as readonly string[]).includes(view ?? '') ? view! : 'ledger';
-  const own = useToast();
-  const notify: Notify = outer ?? ((m, tone) => own.notify(m, tone === 'info' ? 'success' : tone));
+  const v: View = (VIEWS as readonly string[]).includes(view ?? '') ? (view as View) : 'ledger';
   const [version, setVersion] = useState(0);
   const run = useCallback((fn: () => string | void) => {
     try {
@@ -51,16 +48,13 @@ export default function ClientMoneyDesk({ view, notify: outer }: { view?: string
     matters: loadCostCentres().filter((c) => c.active && c.kind === 'project').map((c) => ({ id: c.id, name: c.name, client_id: c.client_id })),
   }), [version, run]);
   return (
-    <div data-ps-desk="clientmoney">
-      <Views tab="clientmoney" views={VIEWS} view={v} label={(k) => cmT(`view.${k}` as 'view.ledger')} />
+    <section data-ps-desk="clientmoney">
+      <Views tab="clientmoney" views={VIEWS} value={v} label={(k) => cmT(`view.${k}`)} />
       {!ctx.accounts.length && <p className={controls.hint} role="status">{cmT('noAccount')}</p>}
-      <Suspense fallback={null}>
-        {v === 'ledger' && <LedgerView ctx={ctx} />}
-        {v === 'reconcile' && <ReconcileView ctx={ctx} />}
-        {v === 'statements' && <StatementsView ctx={ctx} />}
-      </Suspense>
+      {v === 'ledger' && <LedgerView ctx={ctx} />}
+      {v === 'reconcile' && <ReconcileView ctx={ctx} />}
+      {v === 'statements' && <StatementsView ctx={ctx} />}
       <p className={controls.hint}>{cmT('wp')}</p>
-      {!outer && own.toastNode}
-    </div>
+    </section>
   );
 }

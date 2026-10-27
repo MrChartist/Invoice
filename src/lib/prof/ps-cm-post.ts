@@ -12,6 +12,7 @@
  * No client's or matter's balance may go negative. Deletes go through `removeClientMoney` (recycle bin; its journals and
  * office receipt go with it). Working paper — verify with your CA (PS10, PS27, PS32).
  */
+import './ps-registry';
 import { requireAccess, can } from '../access';
 import { assertUnlocked } from '../period-lock';
 import { generateId, getTable, setTable } from '../storage';

@@ -17,9 +17,10 @@ import { isPureAgentLine } from '../trade/pure-agent';
 import { requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
 import { getTable, setTable } from '../storage';
-import { DISB_DEFAULTS, DISB_KINDS, type DisbKind } from './ps-b-rules';
+import { DISB_DEFAULTS, type DisbKind } from '../prof-rules';
 
-export { DISB_KINDS, type DisbKind };
+export type { DisbKind };
+export const DISB_KINDS: readonly DisbKind[] = ['court_fee', 'stamp', 'govt_fee', 'filing', 'notary', 'travel', 'courier', 'other'];
 
 /** The PS-B part of `PurchaseRecord.ps` (declared in `types/prof-r14.ts`). */
 export interface PsPurchaseB {

@@ -28,7 +28,9 @@ export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit
   // R12 (AG-A1): agri packs (desk tabs on /inventory; switched on by the agri profile, never by a business type)
   | 'agri' | 'dairy' | 'mill' | 'coldstore' | 'agri_inputs' | 'fpo'
   // R13 (MF-A1): manufacturing packs (desk tabs on /manufacturing; switched on by the manufacturing profile, never by a type)
-  | 'shopfloor' | 'fabrication' | 'garments' | 'plastics' | 'press' | 'foodmfg';
+  | 'shopfloor' | 'fabrication' | 'garments' | 'plastics' | 'press' | 'foodmfg'
+  // R14 (PS-A1): professional packs (desk tabs on /time; switched on by the professional profile, never by a type)
+  | 'practice' | 'cafirm' | 'legal' | 'design' | 'media' | 'svcexport' | 'partners';
 
 export const PACK_IDS: readonly PackId[] = [
   'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
@@ -39,6 +41,7 @@ export const PACK_IDS: readonly PackId[] = [
   'clinic', 'salon', 'fitness', 'workshop', // R10 (SV-A1)
   'agri', 'dairy', 'mill', 'coldstore', 'agri_inputs', 'fpo', // R12 (AG-A1)
   'shopfloor', 'fabrication', 'garments', 'plastics', 'press', 'foodmfg', // R13 (MF-A1)
+  'practice', 'cafirm', 'legal', 'design', 'media', 'svcexport', 'partners', // R14 (PS-A1)
 ];
 
 /** The packs a business type implies when `industry_packs` is absent. */
@@ -290,6 +293,26 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'shopfloor', path: '/manufacturing?tab=statutory&view=incentives', labelKey: 'r13.statutory.incentives' },
   { pack: 'shopfloor', path: '/manufacturing?tab=statutory&view=authorisations', labelKey: 'r13.statutory.authorisations' },
   { pack: 'shopfloor', path: '/manufacturing?tab=statutory&view=inventories', labelKey: 'r13.statutory.inventories' },
+  // R14: professional desks on /time (PS-A writes its own rows; labels `r14.*` in `palette-destinations.ts`). B / C / D add
+  // their desks' rows with their TIME_TABS rows.
+  { pack: 'practice', path: '/time?tab=matters', labelKey: 'r14.matters' },
+  { pack: 'practice', path: '/time?tab=matters&view=matters', labelKey: 'r14.matters.matters' },
+  { pack: 'practice', path: '/time?tab=matters&view=engagements', labelKey: 'r14.matters.engagements' },
+  { pack: 'practice', path: '/time?tab=matters&view=conflicts', labelKey: 'r14.matters.conflicts' },
+  { pack: 'practice', path: '/time?tab=matters&view=letters', labelKey: 'r14.matters.letters' },
+  { pack: 'practice', path: '/time?tab=wip', labelKey: 'r14.wip' },
+  { pack: 'practice', path: '/time?tab=wip&view=wip', labelKey: 'r14.wip.wip' },
+  { pack: 'practice', path: '/time?tab=wip&view=prebill', labelKey: 'r14.wip.prebill' },
+  { pack: 'practice', path: '/time?tab=wip&view=realisation', labelKey: 'r14.wip.realisation' },
+  { pack: 'practice', path: '/time?tab=wip&view=utilisation', labelKey: 'r14.wip.utilisation' },
+  { pack: 'practice', path: '/time?tab=wip&view=profit', labelKey: 'r14.wip.profit' },
+  { pack: 'practice', path: '/time?tab=wip&view=yearend', labelKey: 'r14.wip.yearend' },
+  // PS-B: the client-money desk (legal; CA firms too) and the design stages view of the Matters desk
+  { pack: 'legal', alsoPacks: ['cafirm'], path: '/time?tab=clientmoney', labelKey: 'r14.cm' },
+  { pack: 'legal', alsoPacks: ['cafirm'], path: '/time?tab=clientmoney&view=ledger', labelKey: 'r14.cm.ledger' },
+  { pack: 'legal', alsoPacks: ['cafirm'], path: '/time?tab=clientmoney&view=reconcile', labelKey: 'r14.cm.reconcile' },
+  { pack: 'legal', alsoPacks: ['cafirm'], path: '/time?tab=clientmoney&view=statements', labelKey: 'r14.cm.statements' },
+  { pack: 'design', path: '/time?tab=matters&view=stages', labelKey: 'r14.matters.stages' },
 ];
 
 /**

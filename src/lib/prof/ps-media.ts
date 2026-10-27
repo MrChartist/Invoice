@@ -14,7 +14,7 @@ import { num, round2 } from '../invoice-calc';
 import { ruleAt } from '../tax-rules';
 import { isVoidStatus, readPurchase } from '../purchase-normalize';
 import { PURE_AGENT_CHARGE } from '../trade/pure-agent';
-import { MEDIA_RULES } from './ps-b-rules';
+import { MEDIA_RULES } from '../prof-rules';
 
 export type Medium = 'print' | 'tv' | 'radio' | 'outdoor' | 'digital' | 'other';
 export const MEDIUMS: readonly Medium[] = ['print', 'tv', 'radio', 'outdoor', 'digital', 'other'];

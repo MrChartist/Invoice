@@ -6,6 +6,7 @@
  * `ps.legal = { regime, entry }` prints the sentence (PS-A5 paper). Working paper — verify with your CA (PS1, PS2, PS40).
  */
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
+import type { PsSnapshot } from '../../types/prof-r14';
 import { legalRegime, type LegalRegime, type LegalResult } from './ps-legal';
 
 export type LegalDoc = 'fee_memo' | 'bill_of_supply' | 'tax_invoice';
@@ -44,7 +45,7 @@ export interface LegalApplyInput {
  * The patch the editor applies once on a new fee note (the user may change it after): per-line regimes, the document
  * regime, the reverse-charge flag, exempt markers, Bill of Supply and the `ps.legal` snapshot.
  */
-export function legalPatch(i: LegalApplyInput): { regime: LegalResult; doc: LegalDoc; patch: Partial<InvoiceRecord> & { ps: Record<string, unknown> } } {
+export function legalPatch(i: LegalApplyInput): { regime: LegalResult; doc: LegalDoc; patch: Partial<InvoiceRecord> & { ps: PsSnapshot } } {
   const date = String(i.record.issue_date ?? '').slice(0, 10);
   const per = (i.record.items ?? []).map((l) => {
     const r = legalRegime({ client: i.record.client, line: l, supplier: { senior: i.senior }, date });
@@ -65,8 +66,8 @@ export function legalPatch(i: LegalApplyInput): { regime: LegalResult; doc: Lega
     }
     return { ...l, tax_rate: 0, sv: { ...(l.sv ?? {}), exempt: 'EXEMPT' } } as InvoiceItem;
   });
-  const ps = { ...((i.record.ps as Record<string, unknown> | undefined) ?? {}), legal: { regime, entry: first.entry, ...(i.paper?.enrolment ? { enrolment: i.paper.enrolment } : {}), ...(i.paper?.bar_council ? { bar_council: i.paper.bar_council } : {}) }, ...(doc === 'fee_memo' ? { kind: 'memo' } : {}) };
-  const patch: Partial<InvoiceRecord> & { ps: Record<string, unknown> } = { items, ps };
+  const ps: PsSnapshot = { ...((i.record.ps as PsSnapshot | undefined) ?? {}), legal: { regime, entry: first.entry, ...(i.paper?.enrolment ? { enrolment: i.paper.enrolment } : {}), ...(i.paper?.bar_council ? { bar_council: i.paper.bar_council } : {}) }, ...(doc === 'fee_memo' ? { kind: 'memo' as const, unregistered: true } : {}) };
+  const patch: Partial<InvoiceRecord> & { ps: PsSnapshot } = { items, ps };
   if (doc === 'bill_of_supply') Object.assign(patch, { doc_type: 'BILL_OF_SUPPLY', reverse_charge: false, rcm_tax_excluded: undefined });
   else if (i.registered) Object.assign(patch, regime === 'rcm' ? { reverse_charge: true, rcm_tax_excluded: true } : { reverse_charge: false, rcm_tax_excluded: undefined }, i.record.doc_type === 'BILL_OF_SUPPLY' ? { doc_type: 'TAX_INVOICE' } : {});
   else Object.assign(patch, { gst_mode: 'NONE', reverse_charge: false, rcm_tax_excluded: undefined });

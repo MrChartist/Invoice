@@ -10,7 +10,7 @@
  * The app suggests; the user can change it per document. Working paper — verify with your CA (PS1, PS2).
  */
 import { ruleAt } from '../tax-rules';
-import { LEGAL_SERVICES_RULES } from './ps-b-rules';
+import { LEGAL_SERVICES_RULES } from '../prof-rules';
 
 export type LegalRegime = 'rcm' | 'exempt' | 'taxable';
 export type LegalReason = 'non_legal' | 'advocate' | 'senior_to_advocate' | 'gstin' | 'business' | 'small_business' | 'person';

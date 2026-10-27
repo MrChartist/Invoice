@@ -3,7 +3,7 @@ import './helpers/shim.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { billedOnEngagement, costOn, exampleStages, feeOn, stageBill, stageSchedule, validatePlan, type StagePlan } from '../src/lib/prof/ps-stages.ts';
-import { DESIGN_STAGE_EXAMPLE } from '../src/lib/prof/ps-b-rules.ts';
+import { DESIGN_STAGE_EXAMPLE } from '../src/lib/prof-rules.ts';
 
 const plan = (over: Partial<StagePlan> = {}): StagePlan => ({
   fee_pct: 6, cost_basis: 'estimate', revisions: [{ date: '2026-04-01', cost: 42000000 }], stages: exampleStages(), property: { state: 'Maharashtra', city: 'Pune' }, ...over,

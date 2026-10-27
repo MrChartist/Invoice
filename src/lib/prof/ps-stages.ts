@@ -8,6 +8,7 @@
  * The stage template is an editable example (COA scale is recommendatory — PS30). Working paper — verify with your CA.
  */
 import type { InvoiceRecord } from '../../types/invoice';
+import type { PsStagePlan } from '../../types/prof-r14';
 import { calcInputFromRecord, calculateInvoice, deriveGstMode, num, round2 } from '../invoice-calc';
 import { stageCredits, type LinkLike } from '../progress-billing';
 import { ruleAt } from '../tax-rules';
@@ -16,7 +17,7 @@ import { generateId, getTable } from '../storage';
 import { localDb } from '../localDb';
 import { buildBillDraft } from '../timesheets';
 import { makeDraft, senderStateCode } from '../../store/invoice-defaults';
-import { DESIGN_STAGE_EXAMPLE } from './ps-b-rules';
+import { DESIGN_STAGE_EXAMPLE } from '../prof-rules';
 import { propertyPos } from './ps-property-pos';
 
 export interface StageDef {
@@ -26,15 +27,7 @@ export interface StageDef {
   cum_pct: number;
 }
 
-export interface StagePlan {
-  fee_pct: number;
-  cost_basis: 'estimate' | 'tender' | 'actual';
-  revisions: { date: string; cost: number; note?: string }[];
-  stages: StageDef[];
-  /** Documentation / site-visit charges, % of the fee. */
-  extra_pct?: number;
-  property: { state?: string; city?: string; country?: string };
-}
+export type StagePlan = PsStagePlan;
 
 /** The editable example stages (copies; never a rule). */
 export const exampleStages = (date?: string): StageDef[] => ruleAt(DESIGN_STAGE_EXAMPLE, date).map((s) => ({ ...s }));

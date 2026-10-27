@@ -1068,6 +1068,23 @@ test('R13 (MF-D1 / D3 / D4) cost-card rates, Form-1 rows and AA imports read the
   assert.deepEqual(importsAgainst([tagged, { ...tagged, id: 'v', status: 'void' }, bill], 'aa', () => 's').map((m) => [m.qty, m.value]), [[5000, 1000]]);
 });
 
+// R14 (PS-A4): WIP, profitability and the year-end paper read re-billable bills through `rebillCost` (net of GST when
+// the credit is claimed, else the total — the same values `readPurchase` reports), the same reader as Time → Unbilled.
+test('R14 (PS-A4) WIP, profitability and year-end paper read re-billable bills like Time → Unbilled', async () => {
+  const { wipRows } = await import('../src/lib/prof/ps-wip.ts');
+  const { profitability } = await import('../src/lib/prof/ps-profit.ts');
+  const { yearEndPaper } = await import('../src/lib/prof/ps-yearend.ts');
+  const p = { ...bill, billable_to_client_id: 'c1', cost_centre_id: 'm1' };
+  const n = readPurchase(p as never)!;
+  assert.equal(rebillCost(p), n.taxable, 'ITC claimed: net of GST');
+  assert.equal(rebillCost({ ...p, itc_eligible: false }), n.total);
+  const rows = wipRows([], [p], { prefs: DEFAULT_TIME_PREFS, today: '2026-04-30', buckets: [30], by: 'matter', centres: [] });
+  assert.equal(rows[0].costs, 1000);
+  const wo = { ...p, ps: { wo: { date: '2026-04-20', reason: 'x' } } };
+  assert.equal(profitability({ from: '2026-04-01', to: '2026-04-30', by: 'matter', prefs: DEFAULT_TIME_PREFS, invoices: [], entries: [], costs: [wo], staff: new Map() })[0].unrecovered, 1000);
+  assert.equal(yearEndPaper({ closing: '2026-04-30', prefs: DEFAULT_TIME_PREFS, entries: [], costs: [p], invoices: [], centres: [] }).standard, 1000);
+});
+
 // R14 (PS-B1 / PS-B5): unrecovered disbursements and media re-bills read bills through `readPurchase` (void rows left out;
 // the cost is net of a claimed credit, the full amount on the client's behalf).
 test('R14 (PS-B1 / PS-B5) disbursements and media rows read the real bill shape', async () => {

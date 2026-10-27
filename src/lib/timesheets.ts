@@ -138,7 +138,7 @@ export function clientKey(row: { client_id?: string; client_name?: string }): st
 export function unbilledTime(entries: TimeEntry[], live: Set<string>, cover?: RetainerCover, prefs?: TimePrefs): TimeEntry[] {
   const out: TimeEntry[] = [];
   for (const e of entries) {
-    if (!e.billable || isBilled(e.invoiced_in, live, e.id)) continue;
+    if (!e.billable || e.ps?.wo || isBilled(e.invoiced_in, live, e.id)) continue; // R14 (PS-A4): a WIP write-off leaves the list
     const covered = cover?.covered.get(e.id) ?? 0;
     const rate = cover?.overageRate.get(e.id);
     if (!covered && rate === undefined) {
@@ -156,7 +156,7 @@ export const unbilledMileage = (trips: MileageEntry[], live: Set<string>): Milea
   trips.filter((t) => !isBilled(t.invoiced_in, live, t.id));
 
 export const unbilledExpenses = (purchases: PurchaseRecord[], live: Set<string>): PurchaseRecord[] =>
-  purchases.filter((p) => !!p.billable_to_client_id && !isBilled(p.rebilled_in, live, p.id));
+  purchases.filter((p) => !!p.billable_to_client_id && !p.ps?.wo && !isBilled(p.rebilled_in, live, p.id)); // R14: + WIP write-off
 
 /**
  * Rows an invoice bills that another live invoice bills too (reinstating it would bill them twice).

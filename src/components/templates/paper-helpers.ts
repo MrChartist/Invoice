@@ -8,6 +8,7 @@ import { weightText, wtHolds } from '../../lib/trade/tr-weight';
 import type { JewelLine } from '../../types/retail-r9';
 import type { AgSnapshot } from '../../types/agri-r12';
 import type { MfSnapshot } from '../../types/mfg-r13';
+import type { PsSnapshot } from '../../types/prof-r14';
 import { MSME_PAYMENT_DAYS } from '../../lib/tax-rules';
 
 /** R9 (RT-E2) gold fineness by karat, for "22K (916)" on the bill (BIS Reg. 5(11); same table as `rt-jewel-rates.ts`). */
@@ -44,7 +45,7 @@ function monthYear(day: string): string {
  * (6.6 / 6.11), e.g. "Batch B12 · Mfg 01/2026 · Exp 06/2027" or "S/N: 3567…, 3567… · Warranty 12 months".
  * '' for untracked lines, so ordinary documents print exactly as before.
  */
-export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw' | 'id' | 'sv'>> & { bin?: string }) | undefined, ag?: AgSnapshot, mf?: MfSnapshot): string {
+export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw' | 'id' | 'sv'>> & { bin?: string }) | undefined, ag?: AgSnapshot, mf?: MfSnapshot, ps?: PsSnapshot): string {
   if (!item) return '';
   if (item.jw) return jewelText(item.jw); // R9 (RT-E2): the BIS sub-line (the tag no. is its serial)
   const parts: string[] = [];
@@ -59,6 +60,7 @@ export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' |
   parts.push(agriLineText(item, ag)); // R12 (AG-A5): '' without the `ag` snapshot
   parts.push(staffText(item)); // R10 (SV-A): '' without the `sv.staff_print` snapshot
   parts.push(mfLineText(item, mf)); // R13 (MF-A5): '' without the `mf` snapshot
+  parts.push(psLineText(item, ps)); // R14 (PS-A5): '' without the `ps` snapshot
   return parts.filter(Boolean).join(' · ');
 }
 
@@ -252,5 +254,32 @@ export function mfDeclaration(inv: Pick<InvoiceRecord, 'mf' | 'sender' | 'client
   if (s?.msme_udyam && (s.msme_category === 'MICRO' || s.msme_category === 'SMALL') && inv.client?.gstin?.trim() && inv.doc_type !== 'QUOTATION') {
     out.push(`Payment due within ${MSME_PAYMENT_DAYS.agreed} days of acceptance — MSMED Act 2006 Sec 15; interest u/s 16 beyond (verify, MF22).`);
   }
+  return out.join(' ');
+}
+
+/**
+ * R14 (PS-A5): the sub-line under a fee-note line from the document's `ps` snapshot: "Matter RSK/014" / "UDIN …" /
+ * "Stage 3 of 5 — working drawings" / "RO 0042" / "Covered by the agreed fee". '' without `ps` (plain bills unchanged).
+ */
+export function psLineText(item: { id?: string } | undefined, ps: PsSnapshot | undefined): string {
+  const l = item?.id ? ps?.lines?.[item.id] : undefined;
+  if (!l) return '';
+  return [l.matter && `Matter ${l.matter}`, l.udin && `UDIN ${l.udin}`, l.stage, l.ro && `RO ${l.ro}`, l.covered && 'Covered by the agreed fee'].filter(Boolean).join(' · ');
+}
+
+/**
+ * R14 (PS-A5): the declarations of a professional document, from its snapshot only — the legal-services regime (B2),
+ * disbursements recovered as pure agent (B1 lines carry `charge_head_id: 'rule33'`), the export check (C1) and the
+ * unregistered supplier (C5). Each sentence whose CA item is open says "verify". '' without `ps`.
+ */
+export function psDeclaration(inv: Pick<InvoiceRecord, 'ps' | 'items'>): string {
+  const ps = inv.ps;
+  if (!ps) return '';
+  const out: string[] = [];
+  if (ps.legal?.regime === 'rcm') out.push('GST on this supply is payable by the recipient under reverse charge — N 13/2017-CT(R) entry 2 (verify, PS1).');
+  if (ps.legal?.regime === 'exempt') out.push('Exempt legal services — N 12/2017-CT(R) entry 45 (verify, PS1).');
+  if (inv.items?.some((i) => i.charge_head_id === 'rule33')) out.push('Disbursements recovered at actual as pure agent (Rule 33) — outside the taxable value (verify, PS3).');
+  if (ps.export?.checks?.length) out.push(`Export of services: Sec 2(6) IGST conditions checked ${ps.export.checks.filter((c) => c.ok).length} of ${ps.export.checks.length} (verify, PS5).`);
+  if (ps.unregistered) out.push('Supplier not registered under GST (verify, PS13).');
   return out.join(' ');
 }

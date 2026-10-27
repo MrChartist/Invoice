@@ -66,6 +66,7 @@ import './construction/cn-registry'; // R11: construction tables' rights and aud
 import './services/sv-registry'; // R10: service tables' rights and audit labels (lazy registration)
 import './agri/ag-registry'; // R12: agri tables' rights and audit labels (lazy registration)
 import './mfg/mf-registry'; // R13: manufacturing tables' rights and audit labels (lazy registration)
+import './prof/ps-registry'; // R14: professional tables' rights and audit labels (lazy registration)
 
 export const [SYNC_STATE_KEY, SYNC_CONFLICTS_KEY, SYNC_AUDIT_KEY] = SYNC_META_KEYS;
 
@@ -454,6 +455,9 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}cost_cards`]: 'effective_from',
   [`${DB_PREFIX}export_authorisations`]: 'date',
   [`${DB_PREFIX}incentive_claims`]: 'period_to',
+  // R14-A: engagements (by start), conflict checks (by date)
+  [`${DB_PREFIX}engagements`]: 'start',
+  [`${DB_PREFIX}conflict_checks`]: 'date',
   // R14-B: client-money vouchers
   [`${DB_PREFIX}client_money`]: 'date',
 };
@@ -1077,6 +1081,8 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}print_estimates`]: { num: 'number', date: 'date' },
   // R13-C: cut plans / lots (CUT/FY…)
   [`${DB_PREFIX}cut_plans`]: { num: 'number', date: 'date' },
+  // R14-A: engagements (ENG/FY…)
+  [`${DB_PREFIX}engagements`]: { num: 'number', date: 'start' },
   // R14-B: client-money vouchers (CMV/FY…)
   [`${DB_PREFIX}client_money`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own

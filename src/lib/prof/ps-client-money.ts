@@ -7,9 +7,11 @@
  */
 import { num, round2 } from '../invoice-calc';
 import { isoDay } from '../dates';
+import { PS_SERIES, PS_TABLES } from './ps-shared';
+import { getTable } from '../storage';
 
-export const CLIENT_MONEY_TABLE = 'client_money';
-export const CMV_SERIES = 'CMV';
+export const CLIENT_MONEY_TABLE = PS_TABLES.clientMoney;
+export const CMV_SERIES = PS_SERIES.clientMoney;
 
 export type CmKind = 'receipt' | 'payment' | 'to_fees' | 'refund' | 'transfer' | 'interest';
 export const CM_KINDS: readonly CmKind[] = ['receipt', 'payment', 'to_fees', 'refund', 'transfer', 'interest'];
@@ -147,3 +149,7 @@ export function cmStatement(rows: readonly ClientMoneyVoucher[], clientId: strin
   }
   return { opening, rows: out, closing: bal };
 }
+
+/** Client money held on a matter today (the Matters list column; read by PS-A through `import.meta.glob`). */
+export const matterBalance = (matterId: string): number =>
+  round2(cmBalances(getTable<ClientMoneyVoucher>(CLIENT_MONEY_TABLE)).filter((b) => b.matter === matterId).reduce((s, b) => s + b.balance, 0));
