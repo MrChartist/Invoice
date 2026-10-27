@@ -43,8 +43,13 @@ const key = (s: string | undefined) => String(s ?? '').trim().toLowerCase();
 export const interestRate = (date: string) => num(readConstructionSettings().realty?.interest_rate) || ruleAt(REALTY_INTEREST_RULES, date).rate;
 
 /** Pure: interest on the amount owed on earlier demands, from the last earlier due date to `date` (simple, 365 days). */
-export function delayInterest(earlier: readonly Pick<InvoiceRecord, 'total' | 'due_date'>[], received: number, date: string, rate: number): { days: number; rate: number; amount: number } | undefined {
-  const owed = round2(earlier.reduce((s, i) => s + num(i.total), 0) - num(received));
+export function delayInterest(earlier: readonly (Pick<InvoiceRecord, 'total' | 'due_date'> & Partial<Pick<InvoiceRecord, 'boq_terms'>>)[], received: number, date: string, rate: number): { days: number; rate: number; amount: number } | undefined {
+  // QA11 C11: simple interest — on the instalments owed, never on interest billed by an earlier demand (with its GST).
+  const interestBilled = (i: Partial<Pick<InvoiceRecord, 'boq_terms'>>) => {
+    const d = i.boq_terms?.cn?.demand;
+    return num(d?.interest?.amount) * (1 + num(d?.land?.effective) / 100);
+  };
+  const owed = round2(earlier.reduce((s, i) => s + num(i.total) - interestBilled(i), 0) - num(received));
   const due = earlier.map((i) => i.due_date).filter(Boolean).sort().at(-1);
   const days = due ? daysBetween(due, date) : 0;
   if (!(owed > 0.004) || days <= 0 || !(rate > 0)) return undefined;

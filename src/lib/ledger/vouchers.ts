@@ -280,6 +280,14 @@ export function saveVoucher(input: ManualVoucherInput, chart: readonly Account[]
 }
 
 /** Delete a manual voucher (period lock applies). */
+/** QA11 C4: journals a construction module posts and undoes itself — table, "names this journal", where to undo it. */
+const OWNED_JOURNALS: Readonly<Record<string, readonly [string, (r: Record<string, unknown> | null, id: string) => boolean, string]>> = {
+  'Sub-contractor deductions': ['sub_measurements', (r, id) => r?.jv_id === id, 'cancel the sub-contractor bill in Time → Works → Sub-contracts'],
+  'Site wages': ['muster_days', (r, id) => r?.voucher_id === id, 'undo the settlement in Time → Works → Labour'],
+  'Secured advance': ['secured_advances', (r, id) => r?.voucher_id === id, 'delete the secured advance in Time → Works → Advances'],
+  'Booking forfeiture': ['advances', (r, id) => Array.isArray(r?.forfeits) && r.forfeits.some((f: { journal_id?: string } | null) => f?.journal_id === id), 'it closed the buyer\'s advance when the booking was cancelled; reverse it with a journal'],
+};
+
 export function deleteVoucher(id: string): void {
   const all = loadVouchers();
   const row = all.find((v) => v.id === id);
@@ -289,6 +297,9 @@ export function deleteVoucher(id: string): void {
   if (row.voucher_class === 'Rider settlement' && getTable<{ voucher_id?: string }>('rider_settlements').some((s) => s?.voucher_id === id)) {
     throw new Error(`${row.number} settles a delivery rider's cash. Undo the settlement in Inventory → Deliveries instead (it removes this journal with it).`);
   }
+  // QA11 C4: a construction journal goes only with the row that posted it (its own Cancel / Undo), never orphaning it.
+  const own = OWNED_JOURNALS[row.voucher_class ?? ''];
+  if (own && getTable<Record<string, unknown>>(own[0]).some((r) => own[1](r, id))) throw new Error(`${row.number} (${row.voucher_class}) is posted from its own screen: ${own[2]} instead (it removes this voucher with it).`);
   const lock = assertUnlocked({ id, issue_date: row.date, invoice_number: row.number }, 'delete');
   if (row.reverse_on) assertUnlocked({ id, issue_date: row.reverse_on, invoice_number: row.number }, 'delete');
   // Its bill-wise receipt rows go with it, whichever screen deletes it (M3): all or nothing.
