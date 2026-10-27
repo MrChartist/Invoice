@@ -39,18 +39,25 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 /* ── Pure ── */
 
 export const SERVICE_FLOW: readonly ServiceStatus[] = ['received', 'diagnosed', 'approved', 'in_repair', 'ready', 'delivered'];
-const OPEN = new Set<ServiceStatus>(['received', 'diagnosed', 'approved', 'in_repair', 'at_service_centre']);
+const OPEN = new Set<ServiceStatus>(['received', 'diagnosed', 'approved', 'in_repair', 'at_service_centre', 'estimate_sent', 'awaiting_parts', 'awaiting_insurer', 'quality_check']);
+/** R10 SV-D: the workshop's extra steps (additive; the phone flow above is unchanged). */
+export const WORKSHOP_MOVES: Readonly<Partial<Record<ServiceStatus, readonly ServiceStatus[]>>> = {
+  diagnosed: ['estimate_sent', 'awaiting_insurer'], estimate_sent: ['approved', 'awaiting_insurer'], awaiting_insurer: ['approved'],
+  in_repair: ['awaiting_parts', 'quality_check'], awaiting_parts: ['in_repair'], quality_check: ['ready', 'in_repair'],
+};
 
 /** Allowed moves: one step on, the service-centre branch in place of in_repair, `returned` from any open step. */
 export function canMove(from: ServiceStatus, to: ServiceStatus): boolean {
   if (from === 'delivered' || from === 'returned') return false;
   if (to === 'returned') return true;
+  if (WORKSHOP_MOVES[from]?.includes(to)) return true; // R10 SV-D
+  if (!SERVICE_FLOW.includes(from) && from !== 'at_service_centre') return false; // R10 SV-D: a workshop step moves only as listed
   if (to === 'at_service_centre') return from === 'received' || from === 'diagnosed' || from === 'approved';
   if (from === 'at_service_centre') return to === 'ready' || to === 'in_repair';
   return SERVICE_FLOW[SERVICE_FLOW.indexOf(from) + 1] === to;
 }
 
-export const nextServiceStatus = (s: ServiceStatus): ServiceStatus | undefined => (s === 'at_service_centre' ? 'ready' : SERVICE_FLOW[SERVICE_FLOW.indexOf(s) + 1]);
+export const nextServiceStatus = (s: ServiceStatus): ServiceStatus | undefined => (s === 'at_service_centre' ? 'ready' : WORKSHOP_MOVES[s] && !SERVICE_FLOW.includes(s) ? WORKSHOP_MOVES[s]![0] : SERVICE_FLOW[SERVICE_FLOW.indexOf(s) + 1]);
 export const isOpenJob = (j: Pick<ServiceJob, 'status'>): boolean => OPEN.has(j.status) || j.status === 'ready';
 
 export const nextServiceNumber = (date: string, jobs: readonly Pick<ServiceJob, 'number'>[]): string => nextSeriesNumberFor(RT_SERIES.serviceJobs, date, jobs.map((j) => j.number));
