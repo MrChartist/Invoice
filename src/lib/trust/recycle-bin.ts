@@ -241,6 +241,8 @@ const OWNED_VOUCHERS: readonly { classes: readonly string[]; tables: readonly st
   // QA13 G11: a produce loan's disbursement / repayment vouchers are undone on the loan
   { classes: ['Loan against produce'], tables: ['agri_loans'], redo: 'record it again on the loan in Inventory → Cold storage → Loans' },
   { classes: ['Share allotment', 'Share surrender', 'Share forfeiture'], tables: ['member_shares'], redo: 'enter it again in Inventory → Members → Shares' },
+  // QA15 M5: a karigar piece bill's advance-recovery journal comes back only with its bill
+  { classes: ['Karigar advance recovery'], tables: ['purchases'], redo: 'restore the piece bill itself, or make the bill again in Manufacturing → Garments → Karigars' },
 ];
 const RA_CLASS = 'RA deduction';
 /** Journals paired one-to-one with a no-cash receipt row through `ra_journal_id` (R9 RT-D2: the finance transfer). */
@@ -381,6 +383,11 @@ registerRestoreHook('job_cards', (row, e, live) => (!isLive(live, 'production_or
 registerRestoreHook('routings', (row, e, live) => (row.is_default && live('routings').some((r) => str(r?.id) !== e.row_id && str(r?.item_id) === str(row.item_id) && r?.is_default) ? { refuse: 'This item has another default routing now: restore after unmarking it, or make this one again.' } : null));
 // R13-B: an inspection report comes back only while its drawing lives; a moulding run only with its manufacturing journal.
 registerRestoreHook('inspection_reports', (row, _e, live) => (isLive(live, 'drawings', str(row.drawing_id)) ? null : { refuse: 'The drawing of this inspection report is gone. Restore the drawing first.' }));
+// QA15 M5: a karigar piece bill (KPB) that recovered an advance comes back with its recovery journal.
+registerRestoreHook('purchases', (row, _e, live, bin) => {
+  const piece = isObj(row.mf) && str(row.mf.kind) === 'piece_bill' && isObj(row.mf.piece) ? row.mf.piece : undefined;
+  return piece ? companionOr(live, bin, 'vouchers', str(piece.advance_jv_id), 'The advance-recovery journal of this piece bill is gone for good. Make the piece bill again in Manufacturing → Garments → Karigars.') : null;
+});
 registerRestoreHook('process_runs', (row, _e, live, bin) => companionOr(live, bin, 'manufacturing_vouchers', str(row.voucher_id), 'The manufacturing journal of this run is gone for good. Record the run again in Manufacturing → Moulding.'));
 registerRestoreHook('realty_units', (row, _e, live) => (isLive(live, 'realty_projects', str(row.project_id)) ? null : { refuse: 'The project of this unit is gone. Restore the project first.' }));
 // R11 (CN-D): a sub-contractor bill made from a measurement comes back only while that measurement still names it

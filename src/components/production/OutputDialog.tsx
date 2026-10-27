@@ -40,7 +40,7 @@ export function OutputDialog({ ctx, order, boms, onClose }: { ctx: MfgContext; o
   const [error, setError] = useState('');
   // R13 (MF-A3): an order released with a routing reports its job cards' scrap kg in this journal (once) and offers the
   // last operation's good units; the job-card module loads only for such an order.
-  const [jc, setJc] = useState<{ scrapLines: VoucherOutputLine[]; ready: number } | null>(null);
+  const [jc, setJc] = useState<{ scrapLines: VoucherOutputLine[]; replaceScrapOf: string[]; ready: number } | null>(null);
   useEffect(() => {
     if (!order.mf?.ops?.length) return;
     let live = true;
@@ -53,7 +53,7 @@ export function OutputDialog({ ctx, order, boms, onClose }: { ctx: MfgContext; o
     try {
       const godown = order.output_to_qc ? ensureQcGodown().id : undefined;
       const serials = parseSerials(serialText);
-      const base = buildOutputVoucher(order, progress, bom, { qty: num(qty), date, batch_no: batch, expiry_date: expiry || undefined, serials: serials.length ? serials : undefined, godown_id: godown }, undefined, jc?.scrapLines.length ? { scrapLines: jc.scrapLines } : undefined);
+      const base = buildOutputVoucher(order, progress, bom, { qty: num(qty), date, batch_no: batch, expiry_date: expiry || undefined, serials: serials.length ? serials : undefined, godown_id: godown }, undefined, jc?.replaceScrapOf.length ? { scrapLines: jc.scrapLines, replaceScrapOf: jc.replaceScrapOf } : undefined);
       const v = productionOrdersDb.reportOutput(order.id, { ...base, components: components.filter((c) => num(c.qty) > 0), costs: num(labour) > 0 ? [{ id: 'labour', label: pT('additionalCosts'), mode: 'amount', value: num(labour) }] : [] }, ctx.items, ctx.inputs);
       onClose();
       ctx.changed(pT('outputSaved', { number: v.number, qty: qtyText(v.qty) }));

@@ -21,7 +21,7 @@ import { productionOrdersDb } from '../production/orders';
 import { bundleId, livePieces, moveBundles, parseBundleId, recordStep } from './mf-bundles';
 import { cutPlanOf, loadCutPlans, putPlan } from './mf-cutplans';
 import { childFor } from './mf-styles';
-import type { CutPlan } from '../../types/mfg-r13';
+import type { CutPlan, MfBundle } from '../../types/mfg-r13';
 
 /** The CMT tag of a job-work line (`JobWorkLine.mf`), read defensively. */
 export interface CmtTag { lot?: string; bundles?: string[]; pieces?: number; scrap_at_jw?: boolean }
@@ -34,8 +34,8 @@ export function cmtOutLine(p: CutPlan, nos: readonly number[], o: { perPieceM: n
   const set = new Set(nos);
   const picked = (p.bundles ?? []).filter((b) => set.has(b.no));
   if (!picked.length) throw new Error('Pick the bundles to send.');
-  const bad = picked.find((b) => b.at.where !== 'floor' || !livePieces(b));
-  if (bad) throw new Error(`Bundle ${bundleId(p.number, bad.no)} is ${bad.at.where === 'floor' ? 'empty' : `at ${bad.at.where}`}.`);
+  const bad = picked.find((b) => b.at.where !== 'floor' || !livePieces(b) || b.reported);
+  if (bad) throw new Error(`Bundle ${bundleId(p.number, bad.no)} is ${bad.reported ? 'already stitched and in stock' : bad.at.where === 'floor' ? 'empty' : `at ${bad.at.where}`}.`);
   if (!(num(o.perPieceM) > 0)) throw new Error('Enter the fabric metres a piece.');
   const pieces = picked.reduce((s, b) => s + livePieces(b), 0);
   return {
@@ -44,6 +44,11 @@ export function cmtOutLine(p: CutPlan, nos: readonly number[], o: { perPieceM: n
     mf: { lot: p.number, bundles: picked.map((b) => bundleId(p.number, b.no)), pieces },
   };
 }
+
+/** A bundle at the fabricator on challan `outId` (a bundle moved before the challan id was kept passes on `where`). */
+const atFabricator = (b: Pick<MfBundle, 'at'>, outId: string) => b.at.where === 'fabricator' && (!b.at.challan_id || b.at.challan_id === outId);
+/** Live pieces of a bundle not yet received back from the fabricator. */
+const openPieces = (b: Pick<MfBundle, 'pieces' | 'rejected' | 'at'>) => Math.max(livePieces(b) - num(b.at.got), 0);
 
 export interface BundleReceipt { no: number; good: number; rejected: number; reason?: string }
 
@@ -75,10 +80,13 @@ export function cmtInDraft(out: MaterialOut, lineId: string, p: CutPlan, parent:
     const id = bundleId(p.number, r.no);
     const b = (p.bundles ?? []).find((x) => x.no === r.no);
     if (!b || !sent.has(id)) throw new Error(`Bundle ${id} was not sent on ${out.number}.`);
+    // QA15 M1: only a bundle still at the fabricator on THIS challan, and only its pieces not yet received back.
+    if (!atFabricator(b, out.id)) throw new Error(`Bundle ${id} is not at the fabricator on ${out.number} (already received?).`);
+    const open = openPieces(b);
     const g = Math.max(Math.floor(num(r.good)), 0);
     const j = Math.max(Math.floor(num(r.rejected)), 0);
-    if (g + j > livePieces(b)) throw new Error(`Bundle ${id} carried ${livePieces(b)} pieces.`);
-    if (g + j < livePieces(b)) short.push({ bundle: id, pieces: livePieces(b) - g - j });
+    if (g + j > open) throw new Error(`Bundle ${id} has ${open} pieces still at the fabricator.`);
+    if (g + j < open) short.push({ bundle: id, pieces: open - g - j });
     good += g;
     rejected += j;
     if (g) bySize.set(b.size, (bySize.get(b.size) ?? 0) + g);
@@ -86,7 +94,7 @@ export function cmtInDraft(out: MaterialOut, lineId: string, p: CutPlan, parent:
   const got = new Set(receipts.map((r) => bundleId(p.number, r.no)));
   for (const b of p.bundles ?? []) {
     const id = bundleId(p.number, b.no);
-    if (sent.has(id) && !got.has(id) && b.at.where === 'fabricator' && livePieces(b)) short.push({ bundle: id, pieces: livePieces(b) });
+    if (sent.has(id) && !got.has(id) && atFabricator(b, out.id) && openPieces(b)) short.push({ bundle: id, pieces: openPieces(b) });
   }
   const received: JobWorkReceiptLine[] = [];
   for (const [size, q] of bySize) {
@@ -143,7 +151,15 @@ export function receiveCmt(outId: string, lineId: string, receipts: readonly Bun
     const inn = materialInDb.save({ date: x.date, party_name: out.party_name, ...(out.vendor_id ? { vendor_id: out.vendor_id } : {}), ...(out.party_gstin ? { party_gstin: out.party_gstin } : {}), job_worker_godown: out.job_worker_godown, order_id: out.order_id, consumed: d.consumed, received: d.received, ...(losses.length ? { losses } : {}), ...(d.charges ? { charges: d.charges } : {}) }, items);
     let plan = p;
     // The bundle's step is the CMT receipt (`cmt:<id>`): counted once — the karigar ledger reads the Material In.
-    for (const r of receipts) if (num(r.good) + num(r.rejected) > 0) plan = recordStep(plan, r.no, { date: x.date, op: out.process, good: num(r.good), rejected: num(r.rejected), reason: r.reason || 'Fabricator reject', ...(out.vendor_id ? { by: out.vendor_id } : {}), jc_entry_id: `cmt:${inn.id}` });
+    for (const r of receipts) {
+      if (!(num(r.good) + num(r.rejected) > 0)) continue;
+      const before = plan.bundles!.find((b) => b.no === r.no)!;
+      const left = openPieces(before) - Math.floor(num(r.good)) - Math.floor(num(r.rejected));
+      plan = recordStep(plan, r.no, { date: x.date, op: out.process, good: num(r.good), rejected: num(r.rejected), reason: r.reason || 'Fabricator reject', ...(out.vendor_id ? { by: out.vendor_id } : {}), jc_entry_id: `cmt:${inn.id}` });
+      // QA15 M1: the stitched pieces reached stock on this Material In (processed lines) — the bundle is never reported
+      // as output again; pieces still out keep it at the fabricator with the count received so far.
+      plan = { ...plan, bundles: plan.bundles!.map((b) => (b.no !== r.no || b.at.where === 'rejected' ? b : left > 0 ? { ...b, at: { ...before.at, got: num(before.at.got) + Math.floor(num(r.good)) } } : { ...b, reported: `cmt:${inn.id}` })) };
+    }
     putPlan({ ...plan, updated_at: new Date().toISOString() });
     return { inn, draft: d };
   });

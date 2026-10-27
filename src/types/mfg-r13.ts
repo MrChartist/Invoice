@@ -615,9 +615,11 @@ export interface MfBundle {
   shade?: string;
   pieces: number;
   rejected?: number;
-  at: { op_id?: string; op?: string; where: MfBundleWhere; party_id?: string; challan_id?: string };
+  /** QA15 M1: `got` = pieces of the bundle already received back on its CMT challan (a part-received bundle stays there). */
+  at: { op_id?: string; op?: string; where: MfBundleWhere; party_id?: string; challan_id?: string; got?: number };
   history: MfBundleStep[];
-  /** The output journal (R4-A manufacturing voucher) that reported its finished pieces. */
+  /** The output journal (R4-A manufacturing voucher) that reported its finished pieces, or `cmt:<Material In id>` when
+   *  its stitched pieces reached stock on a CMT receipt (QA15 M1: never reported again). */
   reported?: string;
 }
 

@@ -26,7 +26,9 @@ test('register: made from journals (BOM / job-card / QC scrap), pending job-card
   const rows = scrapRegister({
     items,
     mfg: [
-      { date: '2026-10-05', production_order_id: 'o1', outputs: [{ id: 'a', item_id: 'turn', qty: 3.4, kind: 'scrap', mf_jc: true }, { id: 'b', item_id: 'turn', qty: 10, kind: 'scrap' }] },
+      { date: '2026-10-05', production_order_id: 'o1', outputs: [{ id: 'a', item_id: 'turn', qty: 3.4, kind: 'scrap', mf_jc: true }] },
+      // QA15 M3: a BOM scrap line of another order (on the same order it would count as posting the cards' kg).
+      { date: '2026-10-05', production_order_id: 'o2', outputs: [{ id: 'b', item_id: 'turn', qty: 10, kind: 'scrap' }] },
     ] as never,
     journals: [{ date: '2026-10-09', produce: [{ id: 'c', item_id: 'brass', qty: 0.24, unit_factor: 1000 }] }] as never,
     cards: [{ order_id: 'o1', entries: [{ id: 'e1', date: '2026-10-04', scrap_kg: 3.4, scrap_item_id: 'turn' }, { id: 'e2', date: '2026-10-20', scrap_kg: 1.2, scrap_item_id: 'turn' }] }] as never,

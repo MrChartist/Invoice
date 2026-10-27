@@ -35,6 +35,8 @@ export interface IdLine {
   service?: boolean;
   capital?: boolean;
   itc?: boolean;
+  /** Output side: zero-rated (export / SEZ under LUT — no tax at its nominal rate): in ATT, never inverted turnover (QA15 M4). */
+  zero?: boolean;
 }
 
 const inP = (d: string, from: string, to: string) => d >= from && d <= to;
@@ -47,7 +49,7 @@ export function outwardLines(invoices: readonly InvoiceRecord[], from: string, t
     if (!inP(d, from, to) || inv.status === 'Cancelled' || inv.status === 'Draft' || isNonGstFinancialNote(inv)) continue;
     const sign = inv.doc_type === 'CREDIT_NOTE' ? -1 : isRevenueDoc(inv) && inv.doc_type !== 'BILL_OF_SUPPLY' ? 1 : 0;
     if (!sign) continue;
-    for (const l of calculateInvoice(calcInputFromRecord(inv)).lines) out.push({ doc_id: inv.id, doc: inv.invoice_number ?? '', date: d, rate: num(l.nominal_rate ?? l.tax_rate), taxable: sign * l.taxable, tax: sign * l.tax });
+    for (const l of calculateInvoice(calcInputFromRecord(inv)).lines) out.push({ doc_id: inv.id, doc: inv.invoice_number ?? '', date: d, rate: num(l.nominal_rate ?? l.tax_rate), taxable: sign * l.taxable, tax: sign * l.tax, ...(num(l.nominal_rate) > 0 && !(num(l.tax_rate) > 0) ? { zero: true } : {}) });
   }
   return out;
 }
@@ -87,10 +89,12 @@ export function rule895(outs: readonly IdLine[], ins: readonly IdLine[], inverte
   const rule = ruleAt(RULE_89_5_RULES, periodTo);
   const o = outs.filter((l) => !exclude.has(l.doc_id));
   const i = ins.filter((l) => !exclude.has(l.doc_id));
-  const inv = o.filter((l) => invertedRates.includes(l.rate));
+  // QA15 M4: zero-rated lines (LUT exports, Rule 89(4)) are not inverted rated supply; a credit note on a nil / exempt
+  // supply (rate 0) does not reduce the adjusted total turnover.
+  const inv = o.filter((l) => !l.zero && invertedRates.includes(l.rate));
   const invertedTurnover = round2(inv.reduce((s, l) => s + l.taxable, 0));
   const taxPayable = round2(inv.reduce((s, l) => s + l.tax, 0));
-  const att = round2(o.filter((l) => l.rate > 0 || l.taxable < 0).reduce((s, l) => s + l.taxable, 0));
+  const att = round2(o.filter((l) => l.rate > 0).reduce((s, l) => s + l.taxable, 0));
   const netItc = round2(i.filter((l) => !l.capital && (rule.inputServices || !l.service)).reduce((s, l) => s + l.tax, 0));
   const itcAvailed = round2(i.filter((l) => !l.capital).reduce((s, l) => s + l.tax, 0));
   const notes: string[] = [];
@@ -108,5 +112,5 @@ export function rule895(outs: readonly IdLine[], ins: readonly IdLine[], inverte
 /** Output rates that sit below some input-goods rate (the default pick). */
 export function suggestInvertedRates(outs: readonly IdLine[], ins: readonly IdLine[]): number[] {
   const top = Math.max(0, ...ins.filter((l) => !l.service && !l.capital).map((l) => l.rate));
-  return [...new Set(outs.filter((l) => l.rate > 0 && l.rate < top).map((l) => l.rate))].sort((a, b) => a - b);
+  return [...new Set(outs.filter((l) => !l.zero && l.rate > 0 && l.rate < top).map((l) => l.rate))].sort((a, b) => a - b);
 }

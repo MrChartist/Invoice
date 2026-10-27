@@ -22,6 +22,7 @@ import { requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
 import { nextSeriesNumberFor, recordSeries } from '../series-counters';
 import { MF_SERIES, MF_TABLES } from './mf-shared';
+import { readMfgSettings } from './mf-settings';
 
 const r3 = (x: number) => Math.round((num(x) + Number.EPSILON) * 1000) / 1000 || 0;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -97,9 +98,11 @@ export function scrapDue(order: Pick<ProductionOrder, 'id'>, cards: readonly Job
       if (item && num(e.scrap_kg) > 0) due.set(item, r3((due.get(item) ?? 0) + num(e.scrap_kg)));
     }
   }
+  // QA15 M3: every scrap line of the item already in the order's journals counts — the job-card lines (`mf_jc`) and a
+  // BOM scrap line of the same item posted before (the output dialog drops the BOM's line for an item the cards report).
   for (const v of vouchers) {
     if (v.production_order_id !== order.id) continue;
-    for (const o of v.outputs ?? []) if (o.mf_jc && due.has(o.item_id)) due.set(o.item_id, r3((due.get(o.item_id) ?? 0) - num(o.qty)));
+    for (const o of v.outputs ?? []) if ((o.mf_jc || o.kind === 'scrap') && due.has(o.item_id)) due.set(o.item_id, r3((due.get(o.item_id) ?? 0) - num(o.qty)));
   }
   return [...due].filter(([, q]) => q > 0.0005).map(([item_id, qty]) => {
     const it = items.find((i) => i.id === item_id);
@@ -195,9 +198,20 @@ export function removeEntry(cardId: string, entryId: string): void {
   setTable(T, entries.length ? all.map((x) => (x.id === cardId ? { ...c, entries, status: 'running', updated_at: new Date().toISOString() } : x)) : all.filter((x) => x.id !== cardId));
 }
 
-/** Output extras for an order (lazy, from R4-A's output dialog): scrap lines due and the last operation's good units. */
-export function outputExtras(order: ProductionOrder, items: readonly StockItem[], scrapItem?: string): { scrapLines: VoucherOutputLine[]; ready: number } {
+/** Scrap items the order's job cards report (entries with scrap kg; `fallbackItem` for those that name none). */
+export function cardScrapItems(cards: readonly Pick<JobCard, 'order_id' | 'entries'>[], orderId: string, fallbackItem?: string): string[] {
+  const out = new Set<string>();
+  for (const c of cards) if (c.order_id === orderId) for (const e of c.entries) { const it = e.scrap_item_id || fallbackItem; if (it && num(e.scrap_kg) > 0) out.add(it); }
+  return [...out];
+}
+
+/**
+ * Output extras for an order (lazy, from R4-A's output dialog): scrap lines due, the items the cards report scrap of
+ * (`replaceScrapOf`: the BOM's standard scrap line of such an item is left out — actual card scrap replaces it, QA15 M3)
+ * and the last operation's good units. Entries with no scrap item use Settings' default scrap item (QA15 M2).
+ */
+export function outputExtras(order: ProductionOrder, items: readonly StockItem[], scrapItem: string | undefined = readMfgSettings().scrap_item_id): { scrapLines: VoucherOutputLine[]; replaceScrapOf: string[]; ready: number } {
   const cards = loadCards().filter((c) => c.order_id === order.id);
   const vouchers = peekTable<ManufacturingVoucher>('manufacturing_vouchers');
-  return { scrapLines: scrapDue(order, cards, vouchers, items, scrapItem), ready: lastOpGood(order, cards) };
+  return { scrapLines: scrapDue(order, cards, vouchers, items, scrapItem), replaceScrapOf: cardScrapItems(cards, order.id, scrapItem), ready: lastOpGood(order, cards) };
 }
