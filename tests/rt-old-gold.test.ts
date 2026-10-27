@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { resetStorage } from './helpers/shim.ts';
 import { installSettings } from './helpers/world.ts';
 import { getTable } from '../src/lib/storage.ts';
-import { cashPaidToday, exchangeNote, oldGoldValue, oldGoldVouchers, recordOldGold } from '../src/lib/retail/rt-old-gold.ts';
-import { settleByExchange } from '../src/lib/retail/rt-urd.ts';
+import { cashPaidToday, oldGoldValue, oldGoldVouchers, recordOldGold } from '../src/lib/retail/rt-old-gold.ts';
+import { applyExchange } from '../src/lib/retail/rt-buyback.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { paymentsDb, purchasesDb } from '../src/lib/purchases.ts';
 import { readPurchase } from '../src/lib/purchase-normalize.ts';
@@ -56,7 +56,7 @@ test('exchange: the sale keeps its full value (GST on ₹1,40,000); the exchange
   const sale = withTotals({ id: 'inv1', invoice_number: 'INV/FY26-27/0001', doc_type: 'INVOICE', status: 'Sent', issue_date: DAY, due_date: DAY, gst_mode: 'CGST_SGST', discount_type: 'PERCENT', discount_rate: 0, client: { name: 'Mrs. Iyer', phone: '9800000021' }, items: [{ id: 'l', name: 'Necklace', type: 'Goods', hsn: '7113', unit: 'PCS', quantity: 1, rate: 135922.33, tax_rate: 3, discount_percent: 0, amount: 135922.33 }] } as unknown as InvoiceRecord);
   localDb.invoices.save(sale);
   assert.equal(calculateInvoice(calcInputFromRecord(sale)).taxable_value, 135922.33, 'GST on the full value, not on the net of old gold');
-  const r = settleByExchange(p.id, 'inv1', DAY, exchangeNote(p.old_metal!));
+  const r = applyExchange('inv1', p.id);
   assert.deepEqual([r.amount, r.method, r.exchange_purchase_id, r.note], [101253.6, 'Exchange', p.id, 'Less: old gold (12.300 g @ 84%)']);
   assert.ok(movedNoCash(r), 'cash book, Z report and bank reco skip it');
   const row = getTable<Payment>('transactions').find((x) => x.id === r.id)!;
@@ -67,7 +67,7 @@ test('exchange: the sale keeps its full value (GST on ₹1,40,000); the exchange
   const inv = localDb.invoices.getById('inv1')!;
   assert.ok(Math.abs(inv.total - 140000) < 0.02, 'about ₹1,40,000 incl. 3% GST');
   assert.equal(inv.balance_due, Math.round((inv.total - 101253.6) * 100) / 100, 'the rest (≈ ₹38,746.40) by UPI / cash');
-  assert.throws(() => settleByExchange(p.id, 'inv1', DAY, 'x'), /Nothing left/);
+  assert.throws(() => applyExchange('inv1', p.id), /Nothing left|has only/);
 });
 
 test('PAN at the limit; cash paid for old gold is a purchase payment (counted for 40A(3), never a receipt)', () => {

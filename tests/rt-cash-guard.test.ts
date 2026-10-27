@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { resetStorage } from './helpers/shim.ts';
 import { installSettings } from './helpers/world.ts';
 import { setJson } from '../src/lib/storage.ts';
-import { cashFromCustomer, cashGuards, cashPaidWarning, kycGate, liveSaleGuards, maskPan, panGuard, validPan } from '../src/lib/retail/rt-cash-guard.ts';
+import { cashFromCustomer, cashGuards, cashPaymentIssue, kycGate, liveSaleGuards, maskPan, panGuard, validPan } from '../src/lib/retail/rt-cash-guard.ts';
 import { RETAIL_SETTINGS_KEY } from '../src/lib/retail/rt-settings.ts';
 import { CASH_RECEIPT_LIMIT_RULES, PAN_SALE_LIMIT_RULES } from '../src/lib/retail-rules.ts';
 import { ruleAt } from '../src/lib/tax-rules.ts';
@@ -65,8 +65,8 @@ test('PAN above ₹2 lakh (any mode): PAN or Form 60 / 97; warning, or an error 
 });
 
 test('Sec 40A(3) cash paid above ₹10,000 a day: a warning; PMLA note at ₹10 lakh; rule rows by date', () => {
-  assert.equal(cashPaidWarning(10000, DAY), '');
-  assert.match(cashPaidWarning(10001, DAY), /Sec 40A\(3\)/);
+  assert.equal(cashPaymentIssue(10000, DAY), '');
+  assert.match(cashPaymentIssue(10001, DAY), /Sec 40A\(3\)/);
   assert.match(cashGuards('off', DAY, 1000000).map((g) => g.message).join(), /PMLA/);
   assert.equal(ruleAt(CASH_RECEIPT_LIMIT_RULES, '2017-04-01'), 200000);
   assert.equal(ruleAt(PAN_SALE_LIMIT_RULES, '2016-01-01'), 200000);

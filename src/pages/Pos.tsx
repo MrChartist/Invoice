@@ -38,6 +38,7 @@ import { loadBranches, type Branch } from '../lib/branch';
 import { defineArea } from '../i18n/area';
 import type { BranchPrice } from '../types/stores-r4';
 import type { AppliedVoucher } from '../components/retail/GiftVoucherTender';
+import type { DevPay } from '../components/retail-r9/DevicesDesk';
 // 8E retail speed pack: entry parsing, keymap, scale labels, shifts, customer display, price lists, WhatsApp.
 import { effectiveKeys, loadKeymap, looksLikeCode, parseCounterEntry, rateFromGross, searchTermOf, type PosKeymap } from '../lib/pos-keys';
 import { findByPlu, loadScaleProfile, parseScaleBarcode, scaleLine, type ScaleProfile, type ScaleRead } from '../lib/scale-barcode';
@@ -111,6 +112,7 @@ const RoomPicker = lazy(() => import('../components/hotel/FrontDesk').then((m) =
 const PosRetailStrip = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.PosRetailStrip }))); // R9 (RT-A2/A3/A4)
 const RxStrip = lazy(() => import('../components/retail-r9/PharmacyDesk').then((m) => ({ default: m.RxStrip }))); // R9 (RT-B1/B2/B3) pharma switch only
 const PosApparel = lazy(() => import('../components/retail-r9/ApparelDesk').then((m) => ({ default: m.PosApparel }))); // R9 (RT-C1/C3)
+const PosDevices = lazy(() => import('../components/retail-r9/DevicesDesk').then((m) => ({ default: m.PosDevices }))); // R9 (RT-D) IMEI, finance, exchange, cash guard
 const PosJewel = lazy(() => import('../components/retail-r9/JewelleryDesk').then((m) => ({ default: m.PosJewel }))); // R9 (RT-E2/E3) tag box, cash / PAN guard
 // R4-B3: the counter's branch (store price list). Inline labels, so the POS does not load the stores catalogue.
 const storeT = defineArea({ counter: 'This counter is branch', none: 'No branch' } as const, { counter: 'यह काउंटर इस शाखा का है', none: 'कोई शाखा नहीं' });
@@ -225,6 +227,7 @@ export function Pos() {
   const [lastShare, setLastShare] = useState<InvoiceRecord | null>(null);
   const [delivery, setDelivery] = useState<DeliveryInfo | null>(null); // R9 (RT-A3)
   const [rxPos, setRxPos] = useState<PosRx | null>(null); // R9 (RT-B1) prescription strip
+  const [devPay, setDevPay] = useState<DevPay | null>(null); // R9 (RT-D2/D3) finance + exchange tenders, cash guard
   const [jwPos, setJwPos] = useState<{ kyc?: SaleKyc; errors: string[] } | null>(null); // R9 (RT-E3) cash / PAN guard
   const pharmaOn = useMemo(() => readPharmaSettings().enabled, []);
   /** The line the last scan / pick went to (Alt+Q), the quantity field last focused (Alt+W live weight). */
@@ -265,6 +268,8 @@ export function Pos() {
   // R9: retail checks (MRP guard, deliveries, short book) read once; the strip loads only when one is on.
   const retailRs = useMemo(() => getJson<RetailSettings | null>(`${DB_PREFIX}retail_settings`, null) ?? {}, []);
   const retailStrip = (!!retailRs.mrp_guard && retailRs.mrp_guard !== 'off') || !!retailRs.delivery?.enabled || !!retailRs.short_book?.enabled;
+  const devicesOn = isPackOn(settings, 'electronics') || (!!retailRs.cash_guard && retailRs.cash_guard !== 'off'); // R9 (RT-D)
+  const devCatalog = useCallback(() => data.catalog, [data.catalog]);
   const tenders: Tender[] = useMemo(
     () => [
       ...(Object.keys(tender) as MoneyTender[]).map((m) => ({
@@ -280,7 +285,7 @@ export function Pos() {
   );
   // An exchange credit (WP-9) pays part of the bill; the tenders cover the rest.
   const credit = exchange ? Math.min(exchange.amount, record.total) : 0;
-  const payable = round2(record.total - credit);
+  const payable = round2(record.total - credit - (devPay?.amount ?? 0));
   const summary = tenderSummary(payable, tenders);
   // 8.22: the number this bill will take, for the UPI QR's transaction reference (tr).
   const upiOn = tender.UPI > 0;
@@ -534,6 +539,7 @@ export function Pos() {
     setItems([]);
     setDelivery(null); // R9 (RT-A3)
     setRxPos(null); // R9 (RT-B1)
+    setDevPay(null); // R9 (RT-D)
     setJwPos(null); // R9 (RT-E3)
     setRedeemPts(0);
     setGvApplied([]);
@@ -567,6 +573,7 @@ export function Pos() {
       return;
     }
     if (rxPos?.errors.length) return setErrors(rxPos.errors); // R9 (RT-B1): "Require prescription for H1 / X"
+    if (devPay?.error) return setErrors([devPay.error]); // R9 (RT-D)
     if (jwPos?.errors.length) return setErrors(jwPos.errors); // R9 (RT-E3): cash 269ST / PAN 114B
     // 8E (8.144): an "On account" amount must be what is left unpaid.
     if (onAccount > 0.004 && Math.abs(onAccount - summary.due) > 0.004) {
@@ -587,7 +594,7 @@ export function Pos() {
       setCreditOk(true);
       return;
     }
-    const res = savePosBill({ record, tenders, expiredOk, allowCredit: !!party.client || !!record.delivery?.cod, exchangeReturnId: exchange?.id, ...(promoV && promo.record ? { promoVoucher: { id: promoV.id, amount: promoV.amount } } : {}) });
+    const res = savePosBill({ record, tenders, expiredOk, allowCredit: !!party.client || !!record.delivery?.cod || !!devPay?.amount, exchangeReturnId: exchange?.id, ...(promoV && promo.record ? { promoVoucher: { id: promoV.id, amount: promoV.amount } } : {}) });
     if (res.expired?.length) {
       setExpiredAsk(res.expired);
       return;
@@ -599,16 +606,16 @@ export function Pos() {
       return;
     }
     const change = res.summary?.change ?? 0;
-    const saved = res.record;
+    const saved = devPay?.post ? devPay.post(res.record) : res.record; // R9 (RT-D): finance / exchange settle the rest
     if (shift) shiftsDb.addBill(shift.id, saved.id); // 8.142: the bill counts in this cashier's shift
     // 8E (8.147 / 8.148): the change in a big strip for 3 s; WhatsApp the bill from the toast.
     if (change > 0) setChangeStrip({ amount: change, key: ++stripSeq.current });
     notify(posT('saved', { doc: docName(saved.doc_type), number: saved.invoice_number }), 'success', { action: { label: retailT('whatsapp'), onClick: () => sendWhatsapp(saved) }, duration: 6000 });
     setLastShare(saved); // R3-A5: "Share as image" in the header for the bill just saved
     postDisplay(thanksMessage(saved.sender?.companyName ?? '', saved.total, change), true);
-    setLastBill(res.record);
+    setLastBill(saved);
     setExchange(null);
-    if (autoPrint) setPrinting(res.record);
+    if (autoPrint) setPrinting(saved);
     reset();
   };
 
@@ -1097,7 +1104,7 @@ export function Pos() {
               {retailStrip && <Suspense fallback={null}><PosRetailStrip record={record} query={query} delivery={delivery} onDelivery={setDelivery} onAddLine={(l) => setItems((prev) => [...prev.filter((x) => x.name !== 'Delivery charge'), l])} deliveryOn={!!retailRs.delivery?.enabled} shortBookOn={!!retailRs.short_book?.enabled} notify={notify} /></Suspense>}
               {pharmaOn && <Suspense fallback={null}><RxStrip record={record} value={rxPos} onChange={setRxPos} /></Suspense>}
               {isPackOn(settings, 'apparel') && <Suspense fallback={null}><PosApparel record={record} setItems={setItems} /></Suspense>}
-              {(isPackOn(settings, 'jewellery') || (!!retailRs.cash_guard && retailRs.cash_guard !== 'off') || !!retailRs.require_pan) && <Suspense fallback={null}><PosJewel record={record} cash={Math.max(summary.cash - summary.change, 0)} setItems={setItems} onChange={setJwPos} /></Suspense>}
+              {(isPackOn(settings, 'jewellery') || !!retailRs.require_pan) && <Suspense fallback={null}><PosJewel record={record} cash={devicesOn ? 0 : Math.max(summary.cash - summary.change, 0)} setItems={setItems} onChange={setJwPos} /></Suspense>}
               {party.client ? null : (
                 <>
                   <Typeahead
@@ -1159,6 +1166,7 @@ export function Pos() {
                   <GiftVoucherTender day={record.issue_date} due={summary.due} applied={gvApplied} onChange={setGvApplied} />
                 </Suspense>
               )}
+              {devicesOn && <Suspense fallback={null}><PosDevices key={lastBill?.id} record={record} cash={summary.cash - summary.change} setItems={setItems} onPay={setDevPay} notify={notify} catalog={devCatalog} /></Suspense>}
               {isPackOn(settings, 'hotel') && items.length > 0 && <Suspense fallback={null}><RoomPicker record={record} notify={notify} onDone={reset} /></Suspense>}
               {promo.error && <p className={controls.error} role="alert">{promo.error}</p>}
               {tender.Cheque > 0 && (

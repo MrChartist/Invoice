@@ -8,7 +8,7 @@
  * No GST, no ITC, no RCM: a private person selling old jewellery is not supplying in the course of business (RT17).
  * Stock: the `Old gold (fine)` item (GMS, quantity = fine weight) in the 'used' godown (saleable, RT-D3's kind). The
  * customer's PAN / Form 60 / ID is snapshotted when the value reaches the PAN limit. Paid in cash / bank (purchase
- * payment; Sec 40A(3) warning) or settled by exchange against a sale (`settleByExchange`: the sale keeps its FULL
+ * payment; Sec 40A(3) warning) or settled by exchange against a sale (RT-D3 `applyExchange` in rt-buyback.ts: the sale keeps its FULL
  * value — GST on it, §8 #19, CA item RT17). Working paper — verify with your CA.
  */
 import type { PurchaseRecord, Vendor } from '../../types/purchases';
@@ -18,12 +18,12 @@ import { PAN_SALE_LIMIT_RULES } from '../retail-rules';
 import { ruleAt } from '../tax-rules';
 import { num, round2 } from '../invoice-calc';
 import { blankStockItem, stockDb } from '../inventory';
-import { godownsDb } from '../godowns';
 import { vendorsDb } from '../vendors';
 import { paymentsDb, purchasesDb } from '../purchases';
 import { isVoidStatus, readPurchase } from '../purchase-normalize';
 import { generateId } from '../storage';
-import { nextUrdNumber, recordUrd, exchangeSettled } from './rt-urd';
+import { nextUrdNumber, recordUrd } from './rt-urd';
+import { exchangedFrom, usedGodown } from './rt-buyback'; // RT-D3: the shared 'used' godown and exchange receipts
 import { netWeight } from './rt-jewel-line';
 import { r3 } from './rt-jewel-rates';
 
@@ -70,7 +70,7 @@ export function recordOldGold(input: OldGoldInput): PurchaseRecord {
   const name = input.metal === 'silver' ? 'Old silver (fine)' : 'Old gold (fine 24K)';
   let item = stockDb.items().find((i) => i.name === name);
   if (!item) stockDb.saveItem((item = blankStockItem({ name, unit: 'GMS', hsn: input.metal === 'silver' ? '7106' : '7108', tax_rate: 3 })));
-  const used = godownsDb.list().find((g) => g.kind === 'used') ?? godownsDb.save({ name: 'Old gold / used goods', kind: 'used' });
+  const used = usedGodown(); // RT-D3's 'used' godown (saleable)
   const number = nextUrdNumber(input.date);
   const old: OldMetal = {
     metal: input.metal, gross_wt: r3(num(input.gross)), stone_wt: r3(num(input.stone)), net_wt: v.net, purity_pct: num(input.purity_pct), melt_loss_pct: num(input.melt_pct),
@@ -79,7 +79,7 @@ export function recordOldGold(input: OldGoldInput): PurchaseRecord {
   };
   const bill = purchasesDb.save({
     kind: 'PURCHASE', vendor_id: vendor.id, vendor_name: vendor.name, bill_number: number, date: input.date, category: 'Old gold purchase (URD)',
-    lines: [{ id: generateId(), name, hsn: item.hsn, unit: 'GMS', item_id: item.id, godown_id: used.id, quantity: v.fine, rate: Number((v.value / v.fine).toFixed(6)), tax_rate: 0 }],
+    lines: [{ id: generateId(), name, hsn: item.hsn, unit: 'GMS', item_id: item.id, godown_id: used, quantity: v.fine, rate: Number((v.value / v.fine).toFixed(6)), tax_rate: 0 }],
     taxable: v.value, cgst: 0, sgst: 0, igst: 0, total: v.value, amount_paid: 0, itc_eligible: false, old_metal: old,
     notes: `Purchase voucher for old ${input.metal} from an unregistered person — no GST / ITC / RCM (RT17). Verify with your CA.`,
   });
@@ -95,11 +95,8 @@ export function cashPaidToday(vendorId: string | undefined, date: string): numbe
 
 /** Old-gold vouchers (newest first) with what was settled by exchange and what is still owed. Reads the real bill shape. */
 export function oldGoldVouchers(purchases: readonly PurchaseRecord[], payments: readonly Payment[]): (PurchaseRecord & { exchanged: number; open: number })[] {
-  const ex = exchangeSettled(payments);
   return purchases.filter((p) => p?.old_metal && readPurchase(p) && !isVoidStatus(p.status))
-    .map((p) => ({ ...p, exchanged: ex.get(p.id) ?? 0, open: round2(num(p.total) - num(p.amount_paid)) }))
+    .map((p) => ({ ...p, exchanged: exchangedFrom(p.id, payments), open: round2(num(p.total) - num(p.amount_paid)) }))
     .sort((a, b) => b.date.localeCompare(a.date) || b.bill_number.localeCompare(a.bill_number));
 }
 
-/** "Less: old gold (12.300 g @ 84%)" — the note on the exchange receipt. */
-export const exchangeNote = (o: Pick<OldMetal, 'metal' | 'gross_wt' | 'purity_pct'>): string => `Less: old ${o.metal} (${o.gross_wt.toFixed(3)} g @ ${o.purity_pct}%)`;

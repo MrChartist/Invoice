@@ -15,9 +15,9 @@ import type { JewelLine, Metal, MakingBasis, KarigarLine, SaleKyc } from '../../
 import { METALS, PURITIES, fineness, lastBoard, loadRates, noRateError, purityLabel, rateFor, ratesOn, saveRates } from '../../lib/retail/rt-jewel-rates';
 import { addTags, deleteTag, ensureJewelItem, loadTags, parseBulk, tagJewel, tagLabels, tagSummary, tagsInStock, type TagInput } from '../../lib/retail/rt-jewel-tags';
 import { applyJewel, huidWarning, jewelAmount, jwHolds, netWeight } from '../../lib/retail/rt-jewel-line';
-import { cashPaidToday, exchangeNote, oldGoldValue, oldGoldVouchers, recordOldGold } from '../../lib/retail/rt-old-gold';
-import { cashPaidWarning, kycGate, liveSaleGuards, maskPan, type Guard } from '../../lib/retail/rt-cash-guard';
-import { settleByExchange } from '../../lib/retail/rt-urd';
+import { cashPaidToday, oldGoldValue, oldGoldVouchers, recordOldGold } from '../../lib/retail/rt-old-gold';
+import { cashPaymentIssue, kycGate, liveSaleGuards, maskPan, type Guard } from '../../lib/retail/rt-cash-guard';
+import { applyExchange } from '../../lib/retail/rt-buyback'; // RT-D3: the shared exchange receipt
 import { deleteKarigarMove, karigarLedger, karigarLine, loadKarigarMoves, recordKarigar } from '../../lib/retail/rt-karigar';
 import { labelSheetHtml, layoutById } from '../../lib/label-sheet';
 import { printHtmlDocument } from '../../lib/voucher-print';
@@ -227,7 +227,7 @@ function OldGoldView({ onDone }: { onDone: Done }) {
     const inv = f.bill.trim() ? findBill(f.bill) : undefined;
     if (f.bill.trim() && !inv) throw new Error(rteT('noBill', { number: f.bill }));
     const p = recordOldGold({ date: day, customer: { name: f.name, phone: f.phone, pan: f.pan || undefined, ...(f.form60 ? { form: '60' as const } : {}) }, metal: f.metal, gross: f.gross, stone: f.stone, purity_pct: f.purity_pct, melt_pct: f.melt_pct, rate, basis: f.basis, test_method: f.test || undefined });
-    if (inv) settleByExchange(p.id, inv.id, day, exchangeNote(p.old_metal!));
+    if (inv) applyExchange(inv.id, p.id);
     setF(BLANK_OG);
     return rteT('ogSaved', { number: p.bill_number, value: formatCurrency(p.total) }) + (inv ? ` ${rteT('ogSettled', { bill: inv.invoice_number })}` : '');
   });
@@ -237,15 +237,14 @@ function OldGoldView({ onDone }: { onDone: Done }) {
     run(() => {
       const inv = findBill(no);
       if (!inv) throw new Error(rteT('noBill', { number: no }));
-      const p = purchasesDb.get(id)!;
-      settleByExchange(id, inv.id, day, exchangeNote(p.old_metal!));
+      applyExchange(inv.id, id);
       return rteT('ogSettled', { bill: inv.invoice_number });
     });
   };
   const pay = (id: string, cash: boolean) => run(() => {
     const p = purchasesDb.get(id)!;
     const open = num(p.total) - num(p.amount_paid);
-    const warn = cash ? cashPaidWarning(cashPaidToday(p.vendor_id, day) + open, day) : '';
+    const warn = cash ? cashPaymentIssue(cashPaidToday(p.vendor_id, day) + open, day) : '';
     if (warn && !window.confirm(warn)) return rteT('cancelled');
     paymentsDb.record(id, { amount: open, date: day, method: cash ? 'Cash' : 'Bank transfer' });
     return rteT('ogPaid', { number: p.bill_number }) + (warn ? ` ${warn}` : '');
@@ -454,7 +453,7 @@ export function EditorJewel() {
   return <div data-editor-jewel><KycFields kyc={st.kyc} set={(kyc) => useInvoiceStore.getState().patch({ kyc })} /><GuardList list={[...guards, ...huid]} /></div>;
 }
 
-/** POS: tag box (scan a tag → the priced line), cash / PAN guards and KYC; reports blocking errors to the counter. */
+/** POS: tag box (scan a tag → the priced line), PAN / Form 60 and the PMLA note (269ST is RT-D's counter guard when the cash guard is on); reports blocking errors. */
 export function PosJewel({ record, cash, setItems, onChange }: { record: InvoiceRecord; cash: number; setItems: (fn: (cur: InvoiceItem[]) => InvoiceItem[]) => void; onChange: (v: { kyc?: SaleKyc; errors: string[] } | null) => void }) {
   useT();
   const [kyc, setKyc] = useState<SaleKyc | undefined>();

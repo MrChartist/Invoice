@@ -331,13 +331,147 @@ export interface UsedGoods {
   id_last4?: string;
   photo_ref?: string;
   imei_check_id?: string;
+  /** Stock item the device was taken into (`second_hand`, serial-tracked) and the `'used'` godown. */
+  item_id?: string;
+  godown_id?: string;
 }
+
+/** RT-D1 blocked-IMEI check log (table `imei_checks`, `doc.create`, dated `date`). The app never calls the portal. */
+export interface ImeiCheck {
+  id: string;
+  date: string;
+  imei: string;
+  result: 'clear' | 'blocked';
+  /** Portal reference / request id typed by the user. */
+  portal_ref?: string;
+  /** Screenshot (attachment id). */
+  attachment?: string;
+  by?: string;
+  note?: string;
+  created_at: string;
+}
+
+/** RT-D2 one disbursement from the financier: bank receipt (net) + its fee (subvention / processing, incl. GST). */
+export interface FinanceDisbursement {
+  id: string;
+  date: string;
+  /** Money that reached the bank. */
+  amount: number;
+  /** Subvention + processing fee withheld (incl. GST), billed to us by the financier. */
+  fee: number;
+  method: string;
+  bank_account_id?: string;
+  /** The receipt voucher (Dr bank + Dr financier as creditor | Cr financier as debtor). */
+  voucher_id: string;
+  voucher_number?: string;
+  /** The financier's fee bill (purchase draft, SAC 997119, 18%). */
+  draft_id?: string;
+}
+
+/** RT-D2 consumer-finance deal / DO (table `finance_deals`, `doc.create`, dated `date`). */
+export interface FinanceDeal {
+  id: string;
+  date: string;
+  invoice_id: string;
+  invoice_number: string;
+  customer: string;
+  /** The financier (a client row with `financier: true`) and its name snapshot (its party ledger). */
+  financier_id?: string;
+  financier: string;
+  /** Loan amount = the finance part of the bill (owed by the financier). */
+  loan: number;
+  do_no: string;
+  /** "6/0" no-cost, "9/1" … */
+  scheme?: string;
+  /** Paid by the customer on the bill (the other tenders). */
+  down_payment: number;
+  /** Expected subvention + processing fee (₹, incl. GST). */
+  expected_fee?: number;
+  /** Customer's loan account, last 4 only. */
+  loan_account?: string;
+  /** The receipt row on the customer's bill (into the finance clearing account) and its transfer journal. */
+  transfer_payment_id: string;
+  transfer_voucher_id: string;
+  disbursements: FinanceDisbursement[];
+  created_at: string;
+  updated_at?: string;
+}
+
+/** RT-D4 / SV-D: job status flow. `at_service_centre` = sent to the brand / authorised centre. */
+export type ServiceStatus = 'received' | 'diagnosed' | 'approved' | 'in_repair' | 'at_service_centre' | 'ready' | 'delivered' | 'returned';
+
+/** RT-D4: one part issued on a job (out of stock when billed); `warranty` = replaced free under warranty (no GST). */
+export interface ServicePart {
+  id: string;
+  item_id?: string;
+  name: string;
+  hsn?: string;
+  qty: number;
+  rate: number;
+  tax_rate: number;
+  serials?: string[];
+  warranty?: boolean;
+}
+
+/** RT-D4: warranty claim to the brand / service centre (a vendor). */
+export interface WarrantyClaim {
+  vendor_id?: string;
+  vendor_name: string;
+  claim_no?: string;
+  status: 'sent' | 'approved' | 'rejected' | 'settled';
+  date: string;
+  note?: string;
+}
+
+/**
+ * RT-D4 repair job sheet (table `service_jobs`, `doc.create`, dated `date`, numbered `SVC/FY…`). Generic over the
+ * asset (`kind`: phone, computer, appliance, vehicle, other) so Round 10 SV-D (workshops) can build on it.
+ */
+export interface ServiceJob {
+  id: string;
+  number: string;
+  date: string;
+  kind: import('../lib/retail-rules').RepairKind;
+  customer: string;
+  client_id?: string;
+  phone?: string;
+  /** What came in: model, serial / IMEI (or registration no. for a vehicle), our stock item and sale, if any. */
+  asset: { model: string; serial?: string; item_id?: string; sale_invoice_id?: string; reg_no?: string; odometer?: number };
+  complaint: string;
+  accessories?: string;
+  condition?: string;
+  estimate: number;
+  /** A normal advance receipt (`advances`), adjusted on the bill. */
+  advance_id?: string;
+  status: ServiceStatus;
+  technician?: string;
+  due?: string;
+  /** Warranty status from the serial (`lookupSerial`) when the job was taken, or set by hand. */
+  warranty?: { status: 'none' | 'active' | 'expired'; until?: string };
+  claim?: WarrantyClaim;
+  parts: ServicePart[];
+  /** Labour / service charge (ex-GST). */
+  labour: number;
+  /** SAC override (absent = `REPAIR_SERVICE_RULES` for the kind). */
+  sac?: string;
+  invoice_id?: string;
+  invoice_number?: string;
+  /** Stock journal moves of a warranty unit swap. */
+  swap_move_ids?: string[];
+  history: { status: ServiceStatus; date: string }[];
+  created_at: string;
+  updated_at?: string;
+}
+
 declare module './invoice' {
   interface InvoiceItem {
     /** RT-D1: IMEI 1 → IMEI 2 pairs of the serials on the line (snapshot). */
     serial_pairs?: Record<string, string>;
-    /** RT-D3: margin-scheme resale (Rule 32(5)): the buy-back it was bought on and its value. */
-    margin?: { purchase_id: string; purchase_value: number };
+    /**
+     * RT-D3: margin-scheme resale (Rule 32(5)): the buy-back it was bought on and its value. A margin sale is two lines:
+     * `part: 'cost'` (purchase value, no GST) and `part: 'margin'` (the margin, GST inside it).
+     */
+    margin?: { purchase_id: string; purchase_value: number; part?: 'cost' | 'margin' };
   }
   interface Client {
     /** RT-D2: a consumer-finance company (Bajaj Finserv, HDFC …). */
