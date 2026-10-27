@@ -7,7 +7,9 @@ import { PACK_IDS, activePacks, type PackId } from '../../lib/industry-packs';
 import { FEATURE_ROWS, featureState, type FeatureRow, type FeatureSection } from '../../lib/features-catalog';
 import { featureText } from './feature-text';
 import { TradeKindPicker } from '../trade/TradeKindPicker'; // R8-C (TR-C5)
-import { applyConstructionKind, applyRetailKind, applyTradeKind } from '../../lib/shop-presets';
+import { applyConstructionKind, applyRetailKind, applyServiceKind, applyTradeKind } from '../../lib/shop-presets';
+import { ServiceKindPicker } from '../services-r10/ServiceKindPicker'; // R10 (SV-A1)
+import { svPickT } from '../../i18n/areas/services-r10-pick';
 import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
 import { DB_PREFIX, getJson } from '../../lib/storage';
 import { cnPickT } from '../../i18n/areas/construction-r11-pick';
@@ -45,6 +47,7 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
   const [tick, setTick] = useState(0);
   const [cnGov, setCnGov] = useState(() => getJson<{ government?: boolean } | null>(`${DB_PREFIX}construction_settings`, null)?.government === true); // R11
   const [busy, setBusy] = useState('');
+  const [svPharmacy, setSvPharmacy] = useState(() => settings.service_kind === 'clinic' && activePacks(settings).includes('pharmacy')); // R10
 
   const modulesOn = useMemo(() => new Set<ModuleId>(Array.isArray(settings.modules) ? settings.modules : ALL_MODULES), [settings.modules]);
   const packsOn = activePacks(settings);
@@ -140,6 +143,29 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
                 onChange(applyConstructionKind(k, { registered }));
                 // The profile's switches only add Works views and paper options; changing the profile deletes nothing.
                 void import('../../lib/construction/cn-profile').then((m) => m.applyConstructionSwitches(k, { government: cnGov })).catch(() => undefined);
+              }}
+            />
+          </div>
+        )}
+        {settings.business_type === 'services' && (
+          <div className={controls.field} data-features-service>
+            <span className={controls.label}>{svPickT('title')}</span>
+            <ServiceKindPicker
+              value={settings.service_kind}
+              custom
+              disabled={!owner}
+              pharmacy={svPharmacy}
+              onPharmacy={(on) => {
+                setSvPharmacy(on);
+                const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
+                if (settings.service_kind) onChange(applyServiceKind(settings.service_kind, { registered, pharmacy: on }));
+              }}
+              onPick={(k) => {
+                if (!k) return onChange({ service_kind: undefined });
+                const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
+                onChange(applyServiceKind(k, { registered, pharmacy: svPharmacy }));
+                // The profile's switches only fill unset ones; changing the profile deletes nothing.
+                void import('../../lib/services/sv-profile').then((m) => m.applyServiceSwitches(k)).catch(() => undefined);
               }}
             />
           </div>

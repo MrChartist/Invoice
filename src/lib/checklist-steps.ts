@@ -20,10 +20,12 @@ export type StepKind =
   // R9 (RT-A1): retail profile and the steps of each shop (append-only)
   | 'retailProfile' | 'drugLicence' | 'doctor' | 'variantGrid' | 'serialItem' | 'metalRate' | 'jewelTag' | 'scaleOrBarcode'
   // R11 (CN-A1): construction profile and the steps of each kind (append-only)
-  | 'constructionProfile' | 'contract' | 'boq' | 'realtyProject' | 'units' | 'paymentPlan' | 'labourContract';
+  | 'constructionProfile' | 'contract' | 'boq' | 'realtyProject' | 'units' | 'paymentPlan' | 'labourContract'
+  // R10 (SV-A1): service profile and the steps of each kind (append-only)
+  | 'serviceProfile' | 'doctorProfile' | 'serviceMenu' | 'staff' | 'labTest' | 'memberPlan' | 'batch' | 'labourOp' | 'jobCard';
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'serviceProfile', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -47,6 +49,8 @@ export interface ChecklistCtx {
   retailKind?: string;
   /** R11 (CN-A1): `settings.construction_kind` (a contractor company without one gets "Pick your kind of construction business"). */
   constructionKind?: string;
+  /** R10 (SV-A1): `settings.service_kind` (a services company without one gets "Pick your kind of service"). */
+  serviceKind?: string;
 }
 
 export interface ChecklistFactsV3 {
@@ -89,6 +93,16 @@ export interface ChecklistFactsV3 {
   realtyProjects?: number;
   realtyUnits?: number;
   paymentPlans?: number;
+  /** R10 (SV-A1): the doctor's registration line on the profile, items with a service class, service staff, lab tests
+   *  (SV-B), member plans / batches (SV-C), labour operations / job cards (SV-D) — each counted only when its kind applies. */
+  regLine?: boolean;
+  serviceItems?: number;
+  serviceStaff?: number;
+  labTests?: number;
+  memberPlans?: number;
+  batches?: number;
+  labourOps?: number;
+  jobCards?: number;
 }
 
 export interface SetupProgress {
@@ -161,6 +175,15 @@ function applies(kind: StepKind, ctx: ChecklistCtx): boolean {
     case 'boq': return ['civil', 'mep', 'subcontractor', 'interiors'].includes(ctx.constructionKind ?? '');
     case 'realtyProject': case 'units': case 'paymentPlan': return ctx.constructionKind === 'builder';
     case 'labourContract': return ctx.constructionKind === 'labour';
+    // R10 (SV-A1): existing services companies get "Pick your kind of service"; each kind its steps
+    case 'serviceProfile': return isType(ctx, 'services') && !ctx.serviceKind;
+    case 'doctorProfile': return ctx.serviceKind === 'clinic';
+    case 'serviceMenu': return ctx.serviceKind === 'clinic' || ctx.serviceKind === 'salon';
+    case 'staff': return ctx.serviceKind === 'salon' || ctx.serviceKind === 'fitness';
+    case 'labTest': return ctx.serviceKind === 'lab';
+    case 'memberPlan': return ctx.serviceKind === 'fitness';
+    case 'batch': return ctx.serviceKind === 'coaching';
+    case 'labourOp': case 'jobCard': return ctx.serviceKind === 'workshop' || ctx.serviceKind === 'appliance';
     default: return true; // profile, item, payment, backup
   }
 }
@@ -204,6 +227,16 @@ function stepsOf(kind: StepKind, f: ChecklistFactsV3, ctx: ChecklistCtx): Omit<C
     case 'units': return one((f.realtyUnits ?? 0) > 0, '/receivables?tab=realty&view=units');
     case 'paymentPlan': return one((f.paymentPlans ?? 0) > 0, '/receivables?tab=realty&view=plans');
     case 'labourContract': return one((f.contracts ?? 0) > 0, '/time?tab=works&view=labour');
+    // R10 (SV-A1)
+    case 'serviceProfile': return one(!!ctx.serviceKind, '/settings?tab=features');
+    case 'doctorProfile': return one(!!f.regLine, '/settings');
+    case 'serviceMenu': return one((f.serviceItems ?? 0) > 0, '/settings?tab=items');
+    case 'staff': return one((f.serviceStaff ?? 0) > 0, '/time?tab=commission&view=staff');
+    case 'labTest': return one((f.labTests ?? 0) > 0, '/time?tab=clinic&view=tests');
+    case 'memberPlan': return one((f.memberPlans ?? 0) > 0, '/time?tab=members&view=plans');
+    case 'batch': return one((f.batches ?? 0) > 0, '/recurring?tab=fees&view=batches');
+    case 'labourOp': return one((f.labourOps ?? 0) > 0, '/time?tab=workshop&view=labour');
+    case 'jobCard': return one((f.jobCards ?? 0) > 0, '/time?tab=workshop&view=jobs');
   }
 }
 
@@ -304,6 +337,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
   const stock = retailKind ? peekTable<{ track_serials?: unknown; variant_axes?: unknown; barcode?: unknown; sold_by_weight?: unknown }>('stock_items') : [];
   const cnRaw = (settings as { construction_kind?: unknown }).construction_kind; // R11 (CN-A1)
   const cnKind = typeof cnRaw === 'string' ? cnRaw : undefined;
+  const svKind = typeof settings.service_kind === 'string' ? settings.service_kind : undefined; // R10 (SV-A1)
   const facts: ChecklistFactsV3 = {
     profileReady: !!settings.onboarded && Boolean(profile?.companyName?.trim()) && Boolean(profile?.upiId || profile?.accountNumber),
     clients: peekTable(KEYS.clients).length,
@@ -330,6 +364,14 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     // R11 (CN-A1): construction steps (read only for that kind)
     ...(cnKind === 'civil' || cnKind === 'mep' || cnKind === 'labour' ? { contracts: peekTable('works_contracts').length } : {}),
     ...(cnKind && cnKind !== 'builder' && cnKind !== 'labour' && cnKind !== 'other' ? { boqs: peekTable<{ doc_type?: string; status?: string }>(KEYS.invoices).filter((r) => (r?.doc_type === 'SALES_ORDER' || r?.doc_type === 'QUOTATION') && r.status !== 'Cancelled').length } : {}),
+    // R10 (SV-A1): service steps (read only for that kind; SV-B / C / D tables count once their package writes them)
+    ...(svKind === 'clinic' ? { regLine: Boolean(profile?.regLine?.trim()) } : {}),
+    ...(svKind === 'clinic' || svKind === 'salon' ? { serviceItems: [...peekTable<{ sv_class?: unknown }>(KEYS.items), ...peekTable<{ sv_class?: unknown }>('stock_items')].filter((r) => r?.sv_class).length } : {}),
+    ...(svKind === 'salon' || svKind === 'fitness' ? { serviceStaff: peekTable('service_staff').length } : {}),
+    ...(svKind === 'lab' ? { labTests: peekTable('lab_tests').length } : {}),
+    ...(svKind === 'fitness' ? { memberPlans: peekTable('member_plans').length } : {}),
+    ...(svKind === 'coaching' ? { batches: peekTable('class_schedules').length } : {}),
+    ...(svKind === 'workshop' || svKind === 'appliance' ? { labourOps: peekTable('labour_ops').length, jobCards: peekTable('service_jobs').length } : {}),
     ...(cnKind === 'builder' ? { realtyProjects: peekTable('realty_projects').length, realtyUnits: peekTable('realty_units').length, paymentPlans: peekTable('payment_plans').length } : {}),
     ...(retailKind === 'grocery' ? { barcodeItems: stock.filter((r) => r?.barcode || r?.sold_by_weight).length + peekTable<{ barcode?: unknown; sold_by_weight?: unknown }>(KEYS.items).filter((r) => r?.barcode || r?.sold_by_weight).length } : {}),
   };
@@ -342,6 +384,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     ...(typeof settings.trade_kind === 'string' ? { tradeKind: settings.trade_kind } : {}),
     ...(retailKind ? { retailKind } : {}),
     ...(cnKind ? { constructionKind: cnKind } : {}),
+    ...(svKind ? { serviceKind: svKind } : {}),
   };
   return { facts, ctx };
 }

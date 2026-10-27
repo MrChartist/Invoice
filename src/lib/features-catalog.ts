@@ -22,7 +22,8 @@ export type AdvancedId =
   | 'batches' | 'serials' | 'godowns' | 'branches' | 'approvals' | 'credit' | 'loyalty' | 'offers' | 'priceLevels'
   | 'costCentres' | 'currency' | 'einvoice' | 'composition' | 'vault' | 'sync' | 'users' | 'gateway' | 'shifts'
   | 'tables' | 'pharma' | 'scale'
-  | 'construction'; // R11 (CN-A1)
+  | 'construction' // R11 (CN-A1)
+  | 'serviceProfile'; // R10 (SV-A1)
 
 export interface FeatureRow {
   /** `mod.<id>`, `pack.<id>` or `adv.<id>`. */
@@ -96,6 +97,8 @@ const ADVANCED: readonly { id: AdvancedId; href: string; isOn: FeatureRow['isOn'
   { id: 'scale', href: '/pos', isOn: () => deviceKey('mrchartist_pos_scale') },
   // R11 (CN-A1): the construction profile (picked in Settings → Features under Contractor)
   { id: 'construction', href: '/settings?tab=features', isOn: (s) => typeof (s as { construction_kind?: unknown }).construction_kind === 'string' },
+  // R10 (SV-A1): the service profile (picked in Settings → Features under Services)
+  { id: 'serviceProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { service_kind?: unknown }).service_kind === 'string' },
 ];
 
 /** Where each module's screen is (the first sidebar route that belongs to it). */
@@ -135,6 +138,11 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   jewellery: '/inventory?tab=jewellery',
   // R11 (CN-A1): builders desk (a tab on Receivables)
   realty: '/receivables?tab=realty',
+  // R10 (SV-A1): service desks (tabs on Time)
+  clinic: '/time?tab=clinic',
+  salon: '/time?tab=appointments',
+  fitness: '/time?tab=members',
+  workshop: '/time?tab=workshop',
 };
 
 export const FEATURE_ROWS: readonly FeatureRow[] = [

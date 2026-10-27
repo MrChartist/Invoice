@@ -11,7 +11,9 @@ import { generateId, getTable, setTable } from '../storage';
 import { requireAccess } from '../access';
 import { normalizePhone } from '../share';
 import { shiftDay } from '../dates';
-import { blankItem } from '../../store/invoice-defaults';
+import { blankClient, blankItem, makeDraft } from '../../store/invoice-defaults';
+import { localDb } from '../localDb';
+import { buildBillDraft } from '../timesheets';
 import { serviceClassAt } from '../service-rules';
 import { SV_TABLES } from './sv-shared';
 import { DEFAULT_MESSAGES } from './sv-settings';
@@ -123,6 +125,20 @@ export function billLines(a: Appointment, staff: readonly Pick<ServiceStaff, 'id
       },
     };
   });
+}
+
+/**
+ * Bill in the editor (no POS module): a draft invoice with the appointment's lines and client, saved for the user to
+ * review and issue. The appointment shows *billed* once the bill is issued (derived from the lines).
+ */
+export function appointmentDraft(a: Appointment, staff: readonly Pick<ServiceStaff, 'id' | 'name'>[], date: string): InvoiceRecord {
+  requireAccess('doc.create');
+  const settings = localDb.settings.get();
+  const sender = localDb.settings.activeProfile() ?? null;
+  const base = makeDraft({ settings, sender, docType: 'INVOICE', templateId: localDb.template.get() });
+  const client: Client = (a.client_id ? localDb.clients.getById(a.client_id) : undefined) ?? { ...blankClient(), name: a.client_name, phone: a.phone ?? '' };
+  const draft = buildBillDraft({ ...base, id: generateId(), issue_date: date }, client, billLines(a, staff, date), sender);
+  return localDb.invoices.save({ ...draft, invoice_number: localDb.invoices.nextNumber(date, draft.doc_type, sender?.invoicePrefix || undefined) });
 }
 
 /** No-shows of a client (by id, else by name). */
