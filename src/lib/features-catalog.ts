@@ -143,6 +143,10 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   salon: '/time?tab=appointments',
   fitness: '/time?tab=members',
   workshop: '/time?tab=workshop',
+  // R12 (AG-D): desks on Inventory
+  coldstore: '/inventory?tab=cold',
+  agri_inputs: '/inventory?tab=inputs',
+  fpo: '/inventory?tab=members',
 };
 
 export const FEATURE_ROWS: readonly FeatureRow[] = [

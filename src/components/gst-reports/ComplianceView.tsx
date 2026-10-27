@@ -197,7 +197,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
         <TdsDueCalendar today={today} />
       </Suspense>
       <Suspense fallback={null}><CompositionTracker invoices={invoices} stateCode={stateCode} today={today} /></Suspense>
-      {isPackOn(localDb.settings.get(), 'fpo' as never) && <Suspense fallback={null}><MembersCalendar today={today} /></Suspense>}
+      {isPackOn(localDb.settings.get(), 'fpo') && <Suspense fallback={null}><MembersCalendar today={today} /></Suspense>}
       <ul className={local.notes}>
         <li><strong>{gvT('ncEstimates')}</strong> {gvT('ncDue')}</li>
         <li>{gvT('ncLateFee')}</li>

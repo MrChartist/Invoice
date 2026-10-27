@@ -23,7 +23,7 @@ const BODY = {
 };
 
 export default function MembersDesk({ view, onDone }: { view?: string; onDone: Done }) {
-  const views = ['register', 'shares', 'patronage', 'papers', ...(isPackOn(localDb.settings.get(), 'coldstore' as never) ? [] : ['loans'])] as (keyof typeof BODY)[];
+  const views = ['register', 'shares', 'patronage', 'papers', ...(isPackOn(localDb.settings.get(), 'coldstore') ? [] : ['loans'])] as (keyof typeof BODY)[];
   const v = views.includes(view as keyof typeof BODY) ? (view as keyof typeof BODY) : 'register';
   const Body = BODY[v];
   return (

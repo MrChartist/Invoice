@@ -11,6 +11,7 @@ import type {} from '../types/trade-r4'; // R4-C1: export document fields (RECOR
 import type {} from '../types/hotel-r7'; // R7: folio_id / reservation_id / stay / hotel_band (RECORD_KEYS)
 import type {} from '../types/trade-r8'; // R8: trading record / line fields (R8_RECORD_KEYS, R8_LINE_KEYS)
 import type {} from '../types/retail-r9'; // R9: retail record / line fields (R9_RECORD_KEYS, R9_LINE_KEYS)
+import type {} from '../types/agri-r12'; // R12: the agri snapshot (R12_RECORD_KEYS)
 import type {} from '../types/services-r10'; // R10: the record / line snapshot key `sv` (appended to R9's lists)
 import { generateId } from '../lib/storage';
 import { deriveGstMode, num } from '../lib/invoice-calc';
@@ -170,6 +171,8 @@ export const R8_LINE_KEYS = ['disc_chain', 'disc_per_unit', 'wt', 'charge_head_i
 /** R9 (owner RT-A, every package's keys — src/types/retail-r9.ts): delivery / KYC on the record; band, IMEI pairs, margin, jewellery breakdown on lines. R10: `sv` (src/types/services-r10.ts). */
 export const R9_RECORD_KEYS = ['delivery', 'kyc', 'sv'] as const;
 export const R9_LINE_KEYS = ['band_rate', 'serial_pairs', 'margin', 'jw', 'sv'] as const;
+/** R12 (src/types/agri-r12.ts): the agri snapshot `ag` — one record key for the round, no line key (weighing reuses `wt`). */
+export const R12_RECORD_KEYS = ['ag'] as const;
 
 function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
   const item = (raw ?? {}) as Partial<InvoiceItem>;
@@ -346,7 +349,7 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     // R5-B (additive): freight-bill LRs, RA bill number / deductions / retention day, BOQ terms survive an edit.
     ...Object.fromEntries(R5B_RECORD_KEYS.filter((k) => r[k] != null).map((k) => [k, r[k]])),
     ...Object.fromEntries(R7_RECORD_KEYS.filter((k) => r[k] != null).map((k) => [k, r[k]])), // R7
-    ...Object.fromEntries([...R8_RECORD_KEYS, ...R9_RECORD_KEYS].filter((k) => r[k] != null).map((k) => [k, r[k]])), // R8-C, R9
+    ...Object.fromEntries([...R8_RECORD_KEYS, ...R9_RECORD_KEYS, ...R12_RECORD_KEYS].filter((k) => r[k] != null).map((k) => [k, r[k]])), // R8-C, R9
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),

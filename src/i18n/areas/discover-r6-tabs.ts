@@ -185,6 +185,9 @@ export const tabsT = defineArea(
     'inventory.apparel': 'Apparel: size grid, alterations, price bands',
     'inventory.devices': 'Devices: IMEI, finance, buy-back, repairs',
     'inventory.jewellery': 'Jewellery: rates, tags, old gold, karigar',
+    'inventory.cold': 'Cold storage: lots, gate passes, rent, loans', // R12 (AG-D)
+    'inventory.inputs': 'Input dealer: licences, subsidy, credit till harvest',
+    'inventory.members': 'Members: register, shares, patronage, 80P / 80PA',
     // Time
     'time.timesheet': 'Timesheet',
     'time.mileage': 'Mileage',
@@ -382,6 +385,9 @@ export const tabsT = defineArea(
     'inventory.apparel': 'कपड़े: साइज़ ग्रिड, आल्टरेशन, प्राइस बैंड',
     'inventory.devices': 'डिवाइस: IMEI, फ़ाइनेंस, बाय-बैक, रिपेयर',
     'inventory.jewellery': 'ज्वेलरी: रेट, टैग, पुराना सोना, कारीगर',
+    'inventory.cold': 'शीतगृह: लॉट, गेट पास, किराया, ऋण',
+    'inventory.inputs': 'खाद-बीज विक्रेता: लाइसेंस, सब्सिडी, फ़सल तक उधार',
+    'inventory.members': 'सदस्य: रजिस्टर, शेयर, संरक्षण, 80P / 80PA',
     'time.timesheet': 'टाइमशीट',
     'time.mileage': 'माइलेज',
     'time.billing': 'बिल बाकी समय',

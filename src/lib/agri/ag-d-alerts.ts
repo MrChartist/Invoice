@@ -8,7 +8,7 @@
 import { registerNotificationProvider, type AppNotification } from '../notifications';
 import { localDayOf } from '../dates';
 import { localDb } from '../localDb';
-import { isPackOn } from '../industry-packs';
+import { isPackOn, type PackId } from '../industry-packs';
 import { peekTable } from '../storage';
 import { agdT } from '../../i18n/areas/agri-r12d';
 import { agriLicenceNotices } from './ag-licences';
@@ -33,7 +33,7 @@ export function agdNotices(today: string, at: string, packs: { inputs: boolean; 
 
 registerNotificationProvider((ctx) => {
   const s = localDb.settings.get();
-  const on = (p: string) => isPackOn(s, p as never);
+  const on = (p: PackId) => isPackOn(s, p);
   const packs = { inputs: on('agri_inputs'), loans: on('coldstore') || on('fpo'), loansTab: on('coldstore') ? 'cold' : 'members' };
   return packs.inputs || packs.loans ? agdNotices(localDayOf(ctx.now), ctx.now.toISOString(), packs) : [];
 });

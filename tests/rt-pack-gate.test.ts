@@ -30,7 +30,7 @@ test('an existing kirana company: no retail pack, no desk tab listed (opened by 
   assert.deepEqual(visibleTabs(INVENTORY_PACK_TABS, s, 'devices').map((t) => t.id), ['devices'], 'its URL still opens it');
   localDb.settings.save({ ...s, industry_packs: ['pharmacy', 'jewellery'] });
   assert.deepEqual(visibleTabs(INVENTORY_PACK_TABS, localDb.settings.get()).map((t) => t.id), ['pharmacy', 'jewellery']);
-  assert.deepEqual(INVENTORY_PACK_TABS.map((t) => [t.id, t.pack]), [['pharmacy', 'pharmacy'], ['apparel', 'apparel'], ['devices', 'electronics'], ['jewellery', 'jewellery']]);
+  assert.deepEqual(INVENTORY_PACK_TABS.map((t) => [t.id, t.pack]), [['pharmacy', 'pharmacy'], ['apparel', 'apparel'], ['devices', 'electronics'], ['jewellery', 'jewellery'], ['cold', 'coldstore'], ['inputs', 'agri_inputs'], ['members', 'fpo']]); // R12 (AG-D) desks appended
 });
 
 test('with every retail check off, the stock checks read no Round 9 table', () => {

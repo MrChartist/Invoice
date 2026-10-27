@@ -1112,7 +1112,7 @@ export function Pos() {
               {params.get('appt') && <Suspense fallback={null}><PosAppointment id={params.get('appt')!} onLoad={(lines, p) => { setItems(lines); setParty(p); setParams((q) => { q.delete('appt'); return q; }, { replace: true }); }} /></Suspense>}
               {party.client && (isPackOn(settings, 'salon') || isPackOn(settings, 'fitness')) && <Suspense fallback={null}><PosPackages client={party.client} items={items} setItems={setItems} notify={notify} /></Suspense>}
               {isPackOn(settings, 'apparel') && <Suspense fallback={null}><PosApparel record={record} setItems={setItems} /></Suspense>}
-              {isPackOn(settings, 'agri_inputs' as never) && <Suspense fallback={null}><PosInputsStrip key={lastBill?.id} record={record} onChange={setAgPos} /></Suspense>}
+              {isPackOn(settings, 'agri_inputs') && <Suspense fallback={null}><PosInputsStrip key={lastBill?.id} record={record} onChange={setAgPos} /></Suspense>}
               {(isPackOn(settings, 'jewellery') || !!retailRs.require_pan) && <Suspense fallback={null}><PosJewel record={record} cash={devicesOn ? 0 : Math.max(summary.cash - summary.change, 0)} setItems={setItems} onChange={setJwPos} /></Suspense>}
               {party.client ? null : (
                 <>
