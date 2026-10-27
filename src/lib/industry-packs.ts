@@ -24,7 +24,9 @@ export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit
   // R11 (CN-A1): builders / developers (a tab on /receivables; switched on by the `builder` construction profile)
   | 'realty'
   // R10 (SV-A1): service packs (desk tabs on /time; switched on by the `services` service profile, never by a business type)
-  | 'clinic' | 'salon' | 'fitness' | 'workshop';
+  | 'clinic' | 'salon' | 'fitness' | 'workshop'
+  // R12 (AG-A1): agri packs (desk tabs on /inventory; switched on by the agri profile, never by a business type)
+  | 'agri' | 'dairy' | 'mill' | 'coldstore' | 'agri_inputs' | 'fpo';
 
 export const PACK_IDS: readonly PackId[] = [
   'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
@@ -33,6 +35,7 @@ export const PACK_IDS: readonly PackId[] = [
   'pharmacy', 'apparel', 'electronics', 'jewellery', // R9 (RT-A1)
   'realty', // R11 (CN-A1)
   'clinic', 'salon', 'fitness', 'workshop', // R10 (SV-A1)
+  'agri', 'dairy', 'mill', 'coldstore', 'agri_inputs', 'fpo', // R12 (AG-A1)
 ];
 
 /** The packs a business type implies when `industry_packs` is absent. */
@@ -212,6 +215,41 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'works', path: '/time?tab=works&view=plant', labelKey: 'r11.plant' },
   { pack: 'works', path: '/time?tab=works&view=reco', labelKey: 'r11.reco' },
   { pack: 'works', path: '/time?tab=works&view=pnl', labelKey: 'r11.pnl' },
+  // R12: agri desks on /inventory (AG-A writes every row; labels `r12.*` in `palette-destinations.ts`). B / C / D replace
+  // their desk's stub with their screens; the rows stay.
+  { pack: 'agri', path: '/inventory?tab=farm', labelKey: 'r12.farm' },
+  { pack: 'agri', path: '/inventory?tab=farm&view=farmers', labelKey: 'r12.farm.farmers' },
+  { pack: 'agri', path: '/inventory?tab=farm&view=vouchers', labelKey: 'r12.farm.vouchers' },
+  { pack: 'agri', path: '/inventory?tab=farm&view=cycles', labelKey: 'r12.farm.cycles' },
+  { pack: 'agri', path: '/inventory?tab=farm&view=quality', labelKey: 'r12.farm.quality' },
+  { pack: 'agri', path: '/inventory?tab=farm&view=batches', labelKey: 'r12.farm.batches' },
+  { pack: 'dairy', path: '/inventory?tab=dairy', labelKey: 'r12.dairy' },
+  { pack: 'dairy', path: '/inventory?tab=dairy&view=charts', labelKey: 'r12.dairy.charts' },
+  { pack: 'dairy', path: '/inventory?tab=dairy&view=collection', labelKey: 'r12.dairy.collection' },
+  { pack: 'dairy', path: '/inventory?tab=dairy&view=bills', labelKey: 'r12.dairy.bills' },
+  { pack: 'dairy', path: '/inventory?tab=dairy&view=dispatch', labelKey: 'r12.dairy.dispatch' },
+  { pack: 'dairy', path: '/inventory?tab=dairy&view=products', labelKey: 'r12.dairy.products' },
+  { pack: 'dairy', path: '/inventory?tab=dairy&view=cards', labelKey: 'r12.dairy.cards' },
+  { pack: 'mill', path: '/inventory?tab=mill', labelKey: 'r12.mill' },
+  { pack: 'mill', path: '/inventory?tab=mill&view=intake', labelKey: 'r12.mill.intake' },
+  { pack: 'mill', path: '/inventory?tab=mill&view=batches', labelKey: 'r12.mill.batches' },
+  { pack: 'mill', path: '/inventory?tab=mill&view=cmr', labelKey: 'r12.mill.cmr' },
+  { pack: 'mill', path: '/inventory?tab=mill&view=yield', labelKey: 'r12.mill.yield' },
+  { pack: 'coldstore', path: '/inventory?tab=cold', labelKey: 'r12.cold' },
+  { pack: 'coldstore', path: '/inventory?tab=cold&view=lots', labelKey: 'r12.cold.lots' },
+  { pack: 'coldstore', path: '/inventory?tab=cold&view=gatepasses', labelKey: 'r12.cold.gatepasses' },
+  { pack: 'coldstore', path: '/inventory?tab=cold&view=rent', labelKey: 'r12.cold.rent' },
+  { pack: 'coldstore', path: '/inventory?tab=cold&view=loans', labelKey: 'r12.cold.loans' },
+  { pack: 'coldstore', path: '/inventory?tab=cold&view=chambers', labelKey: 'r12.cold.chambers' },
+  { pack: 'agri_inputs', path: '/inventory?tab=inputs', labelKey: 'r12.inputs' },
+  { pack: 'agri_inputs', path: '/inventory?tab=inputs&view=licences', labelKey: 'r12.inputs.licences' },
+  { pack: 'agri_inputs', path: '/inventory?tab=inputs&view=subsidy', labelKey: 'r12.inputs.subsidy' },
+  { pack: 'agri_inputs', path: '/inventory?tab=inputs&view=credit', labelKey: 'r12.inputs.credit' },
+  { pack: 'fpo', path: '/inventory?tab=members', labelKey: 'r12.members' },
+  { pack: 'fpo', path: '/inventory?tab=members&view=register', labelKey: 'r12.members.register' },
+  { pack: 'fpo', path: '/inventory?tab=members&view=shares', labelKey: 'r12.members.shares' },
+  { pack: 'fpo', path: '/inventory?tab=members&view=patronage', labelKey: 'r12.members.patronage' },
+  { pack: 'fpo', path: '/inventory?tab=members&view=papers', labelKey: 'r12.members.papers' },
 ];
 
 /**

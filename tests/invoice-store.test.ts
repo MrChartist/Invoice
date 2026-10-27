@@ -102,6 +102,7 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     delivery: { address: '12 Park Lane', status: 'packed', cod: true, rider_id: 'r1' }, kyc: { form: '60', ref: 'F60-1' },
     // R10 (src/types/services-r10.ts): the record snapshot key `sv`
     sv: { rule46a: true, claim: { id: 'c1', number: 'CLM/FY26-27/0001', role: 'payer' } },
+    ag: { kind: 'rent', rent: { lot_no: 'CSR/FY26-27/0001', bags_out: 60, exempt: true }, lines: { l1: { lot: 'CSR/FY26-27/0001', bags: 60, rate_bag: 180 } } }, // R12 (AG-A5)
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.
