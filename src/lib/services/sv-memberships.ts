@@ -70,7 +70,7 @@ export function valueNote(inv: InvoiceRecord, taxable: number, date: string, rea
   const lines = calc.lines.filter((c) => num(c.taxable) > 0 && (!only || only(inv.items.find((l) => l.id === c.id)!)));
   const base = lines.reduce((s, c) => s + num(c.taxable), 0);
   if (!(taxable > 0) || !(base > 0)) throw new Error('Nothing to credit.');
-  if (date > sec34Limit(inv.issue_date)) throw new Error(`Past the Sec 34(2) date (${sec34Limit(inv.issue_date)}) for ${inv.invoice_number}: a GST credit note is not allowed. Record the refund as a payment and ask your CA.`);
+  if (date > sec34Limit(inv.issue_date)) throw new Error(`Past the Sec 34(2) date (${sec34Limit(inv.issue_date)}) for ${inv.invoice_number}: no GST credit note — ask your CA.`);
   let left = round2(Math.min(taxable, base));
   const items = lines.map((c, i) => {
     const v = i === lines.length - 1 ? left : round2((Math.min(taxable, base) * num(c.taxable)) / base);

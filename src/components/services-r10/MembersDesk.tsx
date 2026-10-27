@@ -69,45 +69,36 @@ export default function MembersDesk({ notify }: { notify: Notify }) {
 
 type P = { notify: Notify; tick: number; refresh: () => void };
 
+// Numeric plan fields: [field, label, kinds shown] (t = time-based, s = sessions, w = wallet, p = package only).
+const NUMS: [string, McKey, string][] = [['months', 'months', 't'], ['days', 'days', 't'], ['sessions', 'sessions', 's'], ['validity_days', 'validity', 'p'], ['price', 'price', 'ts'], ['max_days', 'fMax', 't'], ['max_times', 'fTimes', 't'], ['min_days', 'fMin', 't'], ['fee', 'fFee', 't'], ['transfer_fee', 'tFee', 'ts'], ['bonus_pct', 'bonus', 'w']];
+const FREEZE = ['max_days', 'max_times', 'min_days', 'fee'];
+const flags = (k: MemberPlanKind) => ({ membership: 't', package: 'sp', wallet: 'w', combo: 'ts' })[k];
+
 function Plans({ notify, tick, refresh }: P) {
   const plans = useMemo(() => loadMemberPlans(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
-  const blank = { name: '', kind: 'membership' as MemberPlanKind, months: '1', days: '', sessions: '', validity: '', covers: '', price: '', cls: '' as SvClass | '', fMax: '', fTimes: '', fMin: '', fFee: '', tFee: '', refund: 'none', bonus: '', onCheckin: false, trainer: '' };
+  const blank = { id: '', name: '', kind: 'membership' as MemberPlanKind, covers: '', cls: '', refund: 'none', trainer: '', onCheckin: false, x: { months: '1' } as Record<string, string> };
   const [f, setF] = useState(blank);
-  const [id, setId] = useState<string>();
   const set = (x: Partial<typeof f>) => setF({ ...f, ...x });
-  const edit = (p: MemberPlan) => {
-    setId(p.id);
-    setF({ name: p.name, kind: p.kind, months: String(p.months ?? ''), days: String(p.days ?? ''), sessions: String(p.sessions ?? ''), validity: String(p.validity_days ?? ''), covers: (p.covers ?? []).join(', '), price: String(p.price), cls: p.cls ?? '', fMax: String(p.freeze?.max_days ?? ''), fTimes: String(p.freeze?.max_times ?? ''), fMin: String(p.freeze?.min_days ?? ''), fFee: String(p.freeze?.fee ?? ''), tFee: p.transferable ? String(p.transfer_fee ?? 0) : '', refund: p.refund ?? 'none', bonus: String(p.bonus_pct ?? ''), onCheckin: !!p.redeem_on_checkin, trainer: p.trainer_id ?? '' });
-  };
+  const edit = (p: MemberPlan) => setF({ id: p.id, name: p.name, kind: p.kind, covers: (p.covers ?? []).join(', '), cls: p.cls ?? '', refund: p.refund ?? 'none', trainer: p.trainer_id ?? '', onCheckin: !!p.redeem_on_checkin, x: Object.fromEntries(NUMS.map(([k]) => [k, String((FREEZE.includes(k) ? p.freeze?.[k as 'fee'] : p[k as 'price']) ?? '')])) });
   const save = () => attempt(notify, () => {
+    const v = Object.fromEntries(NUMS.map(([k]) => [k, n(f.x[k] ?? '')]));
     saveMemberPlan({
-      id, name: f.name, kind: f.kind, months: n(f.months), days: n(f.days), sessions: n(f.sessions), validity_days: n(f.validity), covers: list(f.covers), price: Number(f.price) || 0, ...(f.cls ? { cls: f.cls } : {}),
-      freeze: { max_days: n(f.fMax), max_times: n(f.fTimes), min_days: n(f.fMin), fee: n(f.fFee) }, transferable: f.tFee.trim() !== '', transfer_fee: n(f.tFee), refund: f.refund as MemberPlan['refund'], bonus_pct: n(f.bonus), redeem_on_checkin: f.onCheckin, trainer_id: f.trainer || undefined, active: true,
+      ...(Object.fromEntries(Object.entries(v).filter(([k]) => !FREEZE.includes(k))) as Partial<MemberPlan>), id: f.id || undefined, name: f.name, kind: f.kind, covers: list(f.covers), price: v.price ?? 0, cls: (f.cls || undefined) as SvClass, refund: f.refund as MemberPlan['refund'], trainer_id: f.trainer || undefined, redeem_on_checkin: f.onCheckin,
+      freeze: Object.fromEntries(FREEZE.map((k) => [k, v[k]])), transferable: v.transfer_fee !== undefined, active: true,
     });
     setF(blank);
-    setId(undefined);
     refresh();
   }, mcT('saved'));
-  const timed = f.kind === 'membership' || f.kind === 'combo';
-  const sess = f.kind === 'package' || f.kind === 'combo';
+  const fl = flags(f.kind);
   return (
     <div className={styles.stack}>
       <div className={styles.toolbar}>
         <T l={mcT('name')} v={f.name} on={(name) => set({ name })} d="plan-name" />
         <S l={mcT('kind')} v={f.kind} o={o(KINDS, 'k.')} on={(k) => set({ kind: k as MemberPlanKind })} d="plan-kind" />
-        {timed && <T l={mcT('months')} t="number" v={f.months} on={(months) => set({ months })} d="plan-months" />}
-        {timed && <T l={mcT('days')} t="number" v={f.days} on={(days) => set({ days })} />}
-        {sess && <T l={mcT('sessions')} t="number" v={f.sessions} on={(sessions) => set({ sessions })} d="plan-sessions" />}
-        {f.kind === 'package' && <T l={mcT('validity')} t="number" v={f.validity} on={(validity) => set({ validity })} />}
-        {f.kind !== 'wallet' && <T l={mcT('price')} t="number" v={f.price} on={(price) => set({ price })} d="plan-price" />}
-        <S l={mcT('cls')} v={f.cls} o={[['', '—'], ...SV_CLASSES.map((c) => [c, svT(`cl.${c}`)] as const)]} on={(c) => set({ cls: c as SvClass })} d="plan-cls" />
-      </div>
-      <div className={styles.toolbar}>
-        {sess && <T l={mcT('covers')} v={f.covers} on={(covers) => set({ covers })} d="plan-covers" />}
-        {timed && <><T l={mcT('fMax')} t="number" v={f.fMax} on={(fMax) => set({ fMax })} /><T l={mcT('fTimes')} t="number" v={f.fTimes} on={(fTimes) => set({ fTimes })} /><T l={mcT('fMin')} t="number" v={f.fMin} on={(fMin) => set({ fMin })} /><T l={mcT('fFee')} t="number" v={f.fFee} on={(fFee) => set({ fFee })} /></>}
-        {f.kind !== 'wallet' && <><T l={mcT('tFee')} t="number" v={f.tFee} on={(tFee) => set({ tFee })} /><S l={mcT('refund')} v={f.refund} o={o(['none', 'pro_rata'], 'r.')} on={(refund) => set({ refund })} /></>}
-        {f.kind === 'wallet' && <T l={mcT('bonus')} t="number" v={f.bonus} on={(bonus) => set({ bonus })} />}
-        {sess && <><S l={mcT('trainer')} v={f.trainer} o={staffOpts()} on={(trainer) => set({ trainer })} /><C l={mcT('onCheckin')} v={f.onCheckin} on={(onCheckin) => set({ onCheckin })} /></>}
+        {NUMS.filter(([, , show]) => [...show].some((c) => fl.includes(c))).map(([k, l]) => <T key={k} l={mcT(l)} t="number" v={f.x[k]} on={(val) => set({ x: { ...f.x, [k]: val } })} d={`plan-${k}`} />)}
+        <S l={mcT('cls')} v={f.cls} o={[['', '—'], ...SV_CLASSES.map((c) => [c, svT(`cl.${c}`)] as const)]} on={(cls) => set({ cls })} d="plan-cls" />
+        {fl.includes('s') && <><T l={mcT('covers')} v={f.covers} on={(covers) => set({ covers })} d="plan-covers" /><S l={mcT('trainer')} v={f.trainer} o={staffOpts()} on={(trainer) => set({ trainer })} /><C l={mcT('onCheckin')} v={f.onCheckin} on={(onCheckin) => set({ onCheckin })} /></>}
+        {fl !== 'w' && <S l={mcT('refund')} v={f.refund} o={o(['none', 'pro_rata'], 'r.')} on={(refund) => set({ refund })} />}
         <B p l={mcT('save')} on={save} d="plan-save" />
       </div>
       <Tbl h={[mcT('name'), mcT('kind'), mcT('price'), '']} rows={plans.map((p) => [p.name, mcT(`k.${p.kind}`), rs(p.price), <span key="a"><B sm l={mcT('edit')} on={() => edit(p)} /> <B g sm l={mcT('del')} on={() => attempt(notify, () => { deleteMemberPlan(p.id); refresh(); })} /></span>])} />
