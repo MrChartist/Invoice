@@ -60,7 +60,7 @@ const utc = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice
 export const dayDiff = (a: string, b: string): number => Math.round((utc(b) - utc(a)) / 864e5);
 
 /** UHID of a client (the R5-C roll no. when no UHID was given). */
-export const uhidOf = (c: Pick<Client, 'patient' | 'roll_no'> | undefined): string => c?.patient?.uhid || c?.roll_no || '';
+export const uhidOf = (c: Pick<Client, 'patient' | 'roll_no'> | undefined): string => String(c?.patient?.uhid || c?.roll_no || '');
 
 /** Pure: next UHID `<prefix><yy>-<seq>` (4 digits; the FY's first year). Never reuses a taken one. */
 export function nextUhid(clients: readonly Client[], prefix: string, date: string): string {
@@ -91,7 +91,7 @@ export function findPatients(all: readonly Client[], q: string): Client[] {
   const s = q.trim().toLowerCase();
   if (!s) return [...all];
   const digits = s.replace(/\D/g, '');
-  return all.filter((c) => uhidOf(c).toLowerCase().includes(s) || c.name.toLowerCase().includes(s) || (digits.length >= 4 && String(c.phone ?? '').replace(/\D/g, '').includes(digits)));
+  return all.filter((c) => uhidOf(c).toLowerCase().includes(s) || String(c.name ?? '').toLowerCase().includes(s) || (digits.length >= 4 && String(c.phone ?? '').replace(/\D/g, '').includes(digits)));
 }
 
 export type PatientInput = { id?: string; name: string; phone?: string; dob?: string; patient: PatientInfo };
