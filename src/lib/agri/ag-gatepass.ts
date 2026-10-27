@@ -148,6 +148,9 @@ export function undoGatePass(lotId: string): ColdLot {
   const last = lot?.outs[lot.outs.length - 1];
   if (!lot || !last) throw new Error('No gate pass to undo.');
   assertUnlocked({ issue_date: last.date, invoice_number: last.number }, 'delete');
+  // QA13 G12: its rent bill goes first (else a gate pass issued again bills the release a second time).
+  const bill = liveInvoices().find((i) => i?.ag?.rent?.out_id === last.id && i.status !== 'Cancelled');
+  if (bill) throw new Error(`Rent bill ${bill.invoice_number || '(draft)'} bills this gate pass: delete or cancel it first.`);
   const next: ColdLot = { ...lot, outs: lot.outs.slice(0, -1) };
   next.status = lotStatus(next);
   writeLots(lots.map((l) => (l.id === lotId ? next : l)));

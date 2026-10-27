@@ -21,6 +21,7 @@ import './ag-registry';
 import type { AgCmrSnap, AgSnapshot, CmrAgreement, CmrDelivery, CmrPaddyLot } from '../../types/agri-r12';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import { generateId } from '../storage';
+import { todayInput } from '../utils'; // QA13 G16: local day, never the UTC date
 import { requireAccess } from '../access';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from '../invoice-calc';
 import { ruleAt } from '../tax-rules';
@@ -141,7 +142,7 @@ const stamp = () => new Date().toISOString();
 export type AgreementInput = Pick<CmrAgreement, 'agency_id' | 'season' | 'kind'> & Partial<Pick<CmrAgreement, 'id' | 'outturn_pct' | 'milling_rate' | 'byproduct_recovery' | 'due_by' | 'bg_id' | 'status'>>;
 
 /** Create or edit an agreement (lots and deliveries are kept; the outturn cannot drop below what is delivered). */
-export function saveAgreement(i: AgreementInput, today = new Date().toISOString().slice(0, 10)): CmrAgreement {
+export function saveAgreement(i: AgreementInput, today = todayInput()): CmrAgreement {
   requireAccess('doc.create');
   const agency = localDb.clients.getById(i.agency_id);
   if (!agency) throw new Error('Choose the agency (a client).');
@@ -200,7 +201,7 @@ export function addPaddyLot(agreementId: string, x: { date: string; qty?: number
 }
 
 /** Remove a paddy lot (its JWP receipt through the register's own guards; the slip is freed). */
-export function removePaddyLot(agreementId: string, lotId: string, today = new Date().toISOString().slice(0, 10)): void {
+export function removePaddyLot(agreementId: string, lotId: string, today = todayInput()): void {
   requireAccess('doc.create');
   const a = mustGet(agreementId);
   const lot = a.paddy_lots.find((l) => l.id === lotId);

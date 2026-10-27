@@ -8,13 +8,14 @@
  *    farmer) | Cr Debtors, so the set-off journal moves the total from the pooled payable to that same party;
  *  - advance / loan → Cr "Farmer advances"; share → Cr "Share application money — members"; insurance / union / other →
  *    a named ledger (created on first use).
- * The journal total is rolled into the purchase's `amount_paid` (as the R11 sub-contractor deductions), so payables show
- * the net due. Pay: one purchase payment per mode (bank / cash); the bank file is built separately (nothing is sent).
+ * The journal total (± carried balances, QA13 G1) is rolled into the purchase's `amount_paid` (as the R11 sub-contractor
+ * deductions): the bill's balance is exactly the farmers' net, so paying it settles the bill.
+ * Pay: one purchase payment per mode (bank / cash); the bank file is built separately (nothing is sent).
  * Reopen (closed, unpaid): its receipts, journal and purchase go through their own guards (recycle bin); the CYB number
  * stays used. Working paper — verify with your CA (AG26, AG27).
  */
 import './ag-registry';
-import type { FarmerCycle, FarmerCycleLine } from '../../types/agri-r12';
+import type { FarmerCycle, FarmerCycleLine, MilkShift } from '../../types/agri-r12';
 import type { InvoiceRecord, Payment } from '../../types/invoice';
 import type { PurchaseLine, Vendor } from '../../types/purchases';
 import { generateId, getTable, setTable } from '../storage';
@@ -94,6 +95,19 @@ function purchaseLines(lines: readonly FarmerCycleLine[], source: FarmerCycle['s
   return [...by.entries()].map(([unit, g]) => ({ id: generateId(), name: source === 'milk' ? 'Milk (pooled from farmers)' : 'Farm produce (pooled from farmers)', unit, quantity: g.qty, rate: g.qty > 0 ? Number((g.amount / g.qty).toFixed(4)) : g.amount, tax_rate: 0 }));
 }
 
+/**
+ * QA13 G3: a milk draft closes only while its shifts are what it was made from — every shift tagged with it closed and
+ * each farmer's accepted amount equal to his line (a shift reopened and changed after the draft refuses: make it again).
+ */
+function milkDraftFresh(c: FarmerCycle): void {
+  const shifts = getTable<MilkShift>(AG_TABLES.shifts).filter((s) => s?.cycle_id === c.id);
+  if (!shifts.length) return; // a milk cycle typed by hand (no shift sheet)
+  const by = new Map<string, number>();
+  for (const s of shifts) for (const e of s.closed_at ? s.entries ?? [] : []) if (!e.rejected) by.set(e.farmer_id, round2((by.get(e.farmer_id) ?? 0) + num(e.amount)));
+  const stale = shifts.some((s) => !s.closed_at) || by.size !== c.lines.length || c.lines.some((l) => Math.abs((by.get(l.farmer_id) ?? -1) - num(l.amount)) > 0.005);
+  if (stale) throw new Error(`The milk shifts of ${c.number} changed after it was made: make the milk bill again (Dairy → Milk bills).`);
+}
+
 /** Close a draft: the pooled purchase, the set-off receipts and the deductions journal (`books.edit`). */
 export function closeCycle(id: string, centreName?: string): FarmerCycle {
   requireAccess('books.edit');
@@ -102,6 +116,7 @@ export function closeCycle(id: string, centreName?: string): FarmerCycle {
   if (c.status !== 'draft') throw new Error(`${c.number} is already closed.`);
   if (!c.lines.length) throw new Error('Add the farmers\' lines first.');
   assertUnlocked({ id: c.id, issue_date: c.period_to }, 'create');
+  if (c.source === 'milk') milkDraftFresh(c);
   const lines = settleLines(c.lines);
   const t = cycleTotals({ lines });
   const invoices = getTable<InvoiceRecord>('invoices');
@@ -111,7 +126,7 @@ export function closeCycle(id: string, centreName?: string): FarmerCycle {
     const gross = round2(pl.reduce((s, l) => s + num(l.quantity) * num(l.rate), 0));
     const bill = purchasesDb.save({
       kind: 'PURCHASE', vendor_id: vendor.id, vendor_name: vendor.name, bill_number: c.number, date: c.period_to, category: c.source === 'milk' ? 'Milk purchases' : 'Farm produce purchase',
-      lines: pl, taxable: gross, cgst: 0, sgst: 0, igst: 0, total: gross, amount_paid: round2(Math.min(t.deductions, gross)), itc_eligible: false, ag: { cycle_id: c.id, ...(c.source === 'milk' ? { stock_by_shift: true } : {}) },
+      lines: pl, taxable: gross, cgst: 0, sgst: 0, igst: 0, total: gross, amount_paid: round2(Math.max(gross - t.net, 0)) /* QA13 G1: deductions and carries settle all but the net */, itc_eligible: false, ag: { cycle_id: c.id, ...(c.source === 'milk' ? { stock_by_shift: true } : {}) },
       notes: `Pooled cycle bill ${c.number}: ${lines.length} farmer(s), ${c.period_from} to ${c.period_to}; farmer-wise split on the cycle. Verify with your CA (AG26).`,
     });
     const p = (n: number) => Math.round(n * 100);
@@ -122,6 +137,9 @@ export function closeCycle(id: string, centreName?: string): FarmerCycle {
       if (d.kind === 'feed' || d.kind === 'input') {
         const inv = invoices.find((i) => i.id === d.ref_id);
         if (!inv) throw new Error(`${l.name ?? 'A farmer'}: the invoice of a feed / input deduction was not found.`);
+        // QA13 G8: the draft's set-off may be stale (paid since, or set off by another cycle): never above what is open now.
+        const open = round2(num(inv.total) - getTable<Payment>('transactions').filter((x) => x.invoice_id === inv.id).reduce((s, x) => s + num(x.amount), 0));
+        if (num(d.amount) > open + 0.004) throw new Error(`${l.name ?? 'A farmer'}: ${inv.invoice_number ?? 'a feed / input invoice'} has only ${open.toFixed(2)} left to set off (paid or set off since the draft) — make the draft again.`);
         const r = localDb.payments.record({ invoiceId: inv.id, amount: d.amount, method: SET_OFF_METHOD, date: c.period_to, reference: c.number, note: `Set off against milk / produce money (${c.number})` });
         setTable('transactions', getTable<Payment>('transactions').map((x) => (x.id === r.id ? { ...x, exchange_purchase_id: bill.id } : x)));
         receiptIds.push(r.id);

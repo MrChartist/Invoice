@@ -494,6 +494,8 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     if (!effect) continue;
     // A discount / rate-difference / GST-correction credit note brings no goods back.
     if (effect === 'in' && !creditNoteReturnsGoods(inv, input.links)) continue;
+    const ag = (inv as { ag?: { kind?: string; milk?: unknown } }).ag;
+    if (ag?.kind === 'milk_sale' && ag.milk) continue; // QA13 G4: a milk dispatch bill — the dispatch's stock journal took the milk out
     const date = dayOf(inv.issue_date);
     const clientName = inv.client?.name ? ` · ${inv.client.name}` : '';
     for (const line of inv.items ?? []) {

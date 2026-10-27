@@ -8,10 +8,11 @@
  * Numbers never return after a delete (`series_counters`). Working paper — verify with your CA (AG1, AG11, AG13, AG20).
  */
 import './ag-registry';
-import type { AgVoucher, AgVoucherCharge, QualityParam } from '../../types/agri-r12';
+import type { AgVoucher, AgVoucherCharge, FarmerCycle, QualityParam } from '../../types/agri-r12';
 import type { LineWeight } from '../../types/trade-r8';
 import type { PurchaseLine, PurchaseRecord, Vendor } from '../../types/purchases';
-import { generateId, getTable } from '../storage';
+import { generateId, getTable, setTable } from '../storage';
+import { withTablesRollback } from '../table-txn';
 import { num, round2 } from '../invoice-calc';
 import { nextSeriesNumberFor, recordSeries } from '../series-counters';
 import { getIndianFY } from '../invoice-number';
@@ -108,11 +109,25 @@ export function farmerVouchers(purchases: readonly unknown[]): PurchaseRecord[] 
     .sort((a, b) => b.date.localeCompare(a.date) || b.bill_number.localeCompare(a.bill_number));
 }
 
-/** A farmer's purchases in the FY of `date` (every bill of that vendor, through the contract) — the 194Q base. */
-export function fyPurchasesOf(vendorId: string, date: string, purchases: readonly unknown[]): number {
+/**
+ * A farmer's purchases in the FY of `date` (every bill of that vendor, through the contract) plus his lines on closed
+ * pooled cycles (QA13 G14: the pooled bill is in the centre's name, the farmer's share is on the cycle) — the 194Q base.
+ */
+export function fyPurchasesOf(vendorId: string, date: string, purchases: readonly unknown[], cycles: readonly FarmerCycle[] = []): number {
   const fy = getIndianFY(date).label;
-  return round2(purchases.reduce<number>((s, raw) => {
+  const bills = purchases.reduce<number>((s, raw) => {
     const c = readPurchase(raw);
     return c && (raw as PurchaseRecord).vendor_id === vendorId && !isVoidStatus(c.status) && getIndianFY(c.date).label === fy ? s + c.taxable : s;
-  }, 0));
+  }, 0);
+  const pooled = cycles.reduce((s, c) => (c?.status !== 'draft' && Array.isArray(c?.lines) && getIndianFY(c.period_to).label === fy ? s + c.lines.filter((l) => l.farmer_id === vendorId).reduce((t, l) => t + num(l.amount) + num(l.bonus), 0) : s), 0);
+  return round2(bills + pooled);
+}
+
+/** Delete a farmer voucher (recycle bin, number kept) and free the weighbridge slip it was made from (QA13 G15). */
+export function deleteFarmerVoucher(id: string): void {
+  withTablesRollback(['purchases', 'weighbridge_slips'], () => {
+    purchasesDb.remove(id);
+    const slips = getTable<{ id: string; ref_id?: string }>('weighbridge_slips');
+    if (slips.some((s) => s?.ref_id === id)) setTable('weighbridge_slips', slips.map((s) => (s?.ref_id === id ? (({ ref_id: _r, ...r }) => (void _r, r))(s) : s)));
+  });
 }
