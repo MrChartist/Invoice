@@ -258,6 +258,8 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   work_centres: 'Work centres: kind, machine / labour / power / overhead rates per hour, shifts, working days, efficiency, parallel units, holidays (R13).',
   routings: 'Routings per item: operations with work centre, set-up and run time, batch size, inspection, piece rate (R13).',
   job_cards: 'Job cards (JCD/FY…): one per production order per operation, with entries (hours, operator, good / rejected / rework, scrap kg) (R13).',
+  // R13-C
+  cut_plans: 'Cut plans / lots (CUT/FY…): style, colour, fabric, lays (plies × marker ratio, length), pieces cut by size, fabric issued / end bits / waste, bundles with their operation history (R13).',
   // R13-D
   cost_cards: 'Food batch cost cards: recipe (from the BOM), output kg, yield, conversion ₹/kg, overhead %, packs with packing material and prices; versions by effective date (R13).',
   export_authorisations: 'Advance Authorisation / EPCG register: number, dates, import and export items, norm (SION / self / committee), EO due / extended, duty saved, EO multiple, status, EODC ref (R13).',

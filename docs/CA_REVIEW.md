@@ -45,8 +45,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 10. Service businesses (Round 10, planned) | SV1–SV30, SV41–SV48, SV60–SV62, SV70–SV71 | 43 | 13 |
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84, AG90 | 65 | 15 |
-| 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36 | 36 | 11 |
-| **Total** | | **400** | **105** |
+| 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF50–MF54 | 41 | 11 |
+| **Total** | | **405** | **105** |
 
 ---
 
@@ -814,7 +814,7 @@ fishery farms.
 | AG84 | **194Q with pooled cycles (QA13 G14).** A farmer's purchases for the 194Q threshold now add his amounts on closed pooled cycles (paid through the centre's pooled bill) to his own vouchers in the FY. Is the per-farmer split the right base, given the pooled bill is booked in the centre's name? | Per farmer, cycle lines + own vouchers, by the cycle's end date. | `agri/ag-vouchers.ts` `fyPurchasesOf` | 2021-07-01 | Sec 194Q (2025-Act label from `ita2025.ts`) |
 | AG90 | **Allotment from share application money (QA13 follow-up).** An allotment paid from application money is now refused above what is available on its date: the credit balance of "Share application money — members" is the ceiling; a member's own share deductions from pooled cycles are his, and only the rest of the ledger (receipts not tied to a cycle) is open to any member. Is that attribution right (e.g. should a member's own application receipt be tagged to him), and should money held beyond the period allowed for allotment be shown as refundable? | As stated. | `agri/ag-members.ts` `allotShares`, `applicationAvailable` | — | Companies Act 2013 Sec 42 / Sec 378A (producer companies) — as recalled |
 
-## 13. Manufacturing MSMEs (Round 13, ids MF1–MF36)
+## 13. Manufacturing MSMEs (Round 13, ids MF1–MF36, MF50–MF54)
 
 Added with `docs/prd/round-13.md`. It covers engineering / fabrication job shops, textile and garment units, plastics and
 packaging converters, printing presses and small food / FMCG units, plus what every factory meets: scrap sales, job-work
@@ -892,6 +892,16 @@ e-way bills and ITC-04, MSME (Udyam, 43B(h), Form-1), export authorisations, inc
 | MF34 | **Job-card scrap in the output journal.** Scrap kg reported on job cards becomes a fixed-value scrap output of the order's next manufacturing journal (counted once), valued at the scrap item's sale rate (else its opening rate), which lowers the finished goods' cost. Is the net realisable value of scrap the right credit to production cost (AS 2 para 10 / by-products), and should scrap made but not yet sold be valued lower? | As stated. | `mfg/mf-jobcards.ts` `scrapDue`; `production/orders.ts` `buildOutputVoucher` | — | AS 2 (recalled) |
 | MF35 | **Piece units from job cards into payroll.** Good units (never rejected or rework) reported by an employee operator in a month are imported into a payroll production type, multiplied by its piece rate; karigars who are not employees stay vendors. Are rejected pieces unpaid by default acceptable under the wage rules, and is a piece-rate worker's wage still tested against the minimum wage by the user? | Good units only; minimum-wage test by the user. | `mfg/mf-jobcards.ts` `unitsByEmployee`; payroll attendance | — | — (design; labour-law adviser) |
 | MF36 | **Standard conversion from routings.** Standard conversion per unit = Σ planned hours (set-up + run ÷ efficiency) × the work centre's machine-hour rate (machine + labour + power + overhead), and "Use routing" writes it onto the order for R4-A's variances. Should fixed overhead be in the hourly rate at normal capacity only (AS 2 para 9), with the unabsorbed part a period cost? | As stated; normal hours typed per centre, absorption itself is MF-D5 (off by default, MF24). | `mfg/mf-routings.ts` `standardConversion`; `mf-centres.ts` `machineHourRate` | — | AS 2 (recalled) |
+
+### 13.6 Added while building MF-C (textiles and garments)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| MF50 | **Rule 89(5) working paper inputs.** Outward lines of the period by rate (credit notes subtract, financial credit notes and bills of supply left out); adjusted total turnover = taxable outward value at a positive rate (nil / exempt out); net ITC = eligible ITC on goods bills (SAC 99… lines, expense bills and `common_capital` bills out); ITC availed = net ITC + input services; the user ticks the inverted output rates (default: output rates below the highest input rate) and may leave documents out; the draft claim splits the amount CGST / SGST half each. Right, and should zero-rated supplies stay inside ATT? | As stated. | `mfg/mf-inverted.ts`; `RULE_89_5_RULES` | 2022-07-05 | Rule 89(5), N 14/2022-CT (recalled) |
+| MF51 | **CMT challans in fabric metres.** Cut pieces sent to a fabricator go on the Rule 55 challan as the lot's fabric (metres = pieces × metres a piece, at the fabric's cost), with the lot and bundle numbers; stitched pieces come back as the style's variants (processed), rejected cut pieces as fabric returned, short pieces stay pending. ITC-04 Table 4 / 5A therefore report metres. Is describing cut panels by their fabric acceptable on the challan and in ITC-04, or must "cut pieces" be a separate item / UQC (PCS)? | As stated. | `mfg/mf-cmt.ts` | — | Rule 55, ITC-04 (developers' reading) |
+| MF52 | **Waste and scrap at the job worker** (Sec 143(5)). A Material In loss line ticked "kept or sold by the job worker" settles the challan as losses and wastes and is reported once in Table 5A (or 5B) loss quantity, never as goods received. Should scrap the principal sells from the job worker's premises go to Table 5C instead, and does the principal pay GST on it? | 5A / 5B losses and wastes. | `job-work.ts` (settlement tag), `mfg/mf-itc04-extra.ts` | — | Sec 143(5) (recalled) |
+| MF53 | **Karigar advance set-off and TDS base.** An advance is a payment voucher to "Karigar advances"; the piece bill recovers part of it by journal (Dr Sundry creditors, Cr Karigar advances) — no receipt. TDS 194C is worked on the bill's full value (before the advance is recovered), thresholds per the payables rules. Right? | As stated. | `mfg/mf-piece-bill.ts` | — | Sec 194C / 2025 Act Sec 393 (recalled) |
+| MF54 | **Cut waste and garment output.** Cut waste (kg) goes to stock by a stock journal that consumes the wasted fabric metres from the shop floor and produces the waste item at its scrap rate; finished bundles are reported as one manufacturing journal per size × colour variant (tagged with the order), consuming the order's materials per piece. Is valuing cutting waste at its realisable rate, inside the order's cost, acceptable (AS 2)? | As stated. | `mfg/mf-cutplans.ts` `writeCutWaste`; `mf-bundles.ts` `reportFinished` | — | AS 2 (recalled) |
 
 `MF` ids are counted once here. The ★ items (MF1, MF3, MF5, MF6, MF7, MF9, MF16, MF19, MF20, MF24, MF25) are the ones a
 beta factory's figures depend on first.

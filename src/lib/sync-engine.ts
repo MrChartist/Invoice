@@ -443,6 +443,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}member_shares`]: 'date',
   // R13-A: job cards (by the first entry's day)
   [`${DB_PREFIX}job_cards`]: 'date',
+  // R13-C: cut plans (the cutting day)
+  [`${DB_PREFIX}cut_plans`]: 'date',
   // R13-D: cost cards (by effective date), export authorisations (by issue date), incentive claims (by period end)
   [`${DB_PREFIX}cost_cards`]: 'effective_from',
   [`${DB_PREFIX}export_authorisations`]: 'date',
@@ -1063,6 +1065,8 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}agri_loans`]: { num: 'number', date: 'date' },
   // R13-A: job cards (JCD/FY…)
   [`${DB_PREFIX}job_cards`]: { num: 'number', date: 'date' },
+  // R13-C: cut plans / lots (CUT/FY…)
+  [`${DB_PREFIX}cut_plans`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };
