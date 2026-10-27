@@ -7,7 +7,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
-import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText, raDocTitle, svDocTitle, trackingText, worksLineText } from '../paper-helpers';
+import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText, raDocTitle, svDocTitle, svRegText, trackingText, worksLineText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { formatCustomValue, printableValues } from '../../../lib/custom-fields';
 import { ItemCustomLine } from './CustomFieldsBlock';
@@ -100,6 +100,7 @@ export function GstBody({ invoice, sender, totals, skipEway, works }: Props) {
               </>
             )}
             {sender.pharmacist && <>{pharmacistText(sender)}<br /></>}
+            {sender.sv_regs && <>{svRegText(sender)}<br /></>}
             {sender.companyPhone && <>Contact: {sender.companyPhone}<br /></>}
             {sender.companyEmail && <>E-Mail: {sender.companyEmail}<br /></>}
             {sender.regLine}

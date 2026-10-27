@@ -61,6 +61,7 @@ const wkT = defineArea({ tab: 'Works' } as const, { tab: 'वर्क्स' })
 const FrontDesk = lazy(() => import('../components/services-r10/FrontDesk')); // SV-A2 / A3 (appointments, commission)
 const ClaimsView = lazy(() => import('../components/services-r10/ClaimsView')); // SV-A5 (workshop claims until SV-D)
 const R10Stub = lazy(() => import('../components/services-r10/R10Stub')); // SV-B clinic, SV-C members, SV-D workshop
+const ClinicDesk = lazy(() => import('../components/services-r10/ClinicDesk')); // SV-B clinic desk
 const r10T = defineArea(
   { appointments: 'Appointments', commission: 'Staff & commission', clinic: 'Clinic', members: 'Members', workshop: 'Workshop' } as const,
   { appointments: 'अपॉइंटमेंट', commission: 'स्टाफ और कमीशन', clinic: 'क्लिनिक', members: 'सदस्य', workshop: 'वर्कशॉप' },
@@ -427,7 +428,8 @@ export function Time() {
       {/* R10: service desks (lazy) */}
       {(tab === 'appointments' || tab === 'commission') && <Suspense fallback={null}><FrontDesk tab={tab} view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
       {tab === 'workshop' && params.get('view') === 'claims' && <Suspense fallback={null}><ClaimsView notify={notify} /></Suspense>}
-      {(tab === 'clinic' || tab === 'members' || (tab === 'workshop' && params.get('view') !== 'claims')) && <Suspense fallback={null}><R10Stub title={TAB_LABEL[tab]()} /></Suspense>}
+      {tab === 'clinic' && <Suspense fallback={null}><ClinicDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
+      {(tab === 'members' || (tab === 'workshop' && params.get('view') !== 'claims')) && <Suspense fallback={null}><R10Stub title={TAB_LABEL[tab]()} /></Suspense>}
 
       {tab === 'settings' && (
         <section className={cn(surface.card, styles.prefs)}>
