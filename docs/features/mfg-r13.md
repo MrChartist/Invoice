@@ -124,7 +124,26 @@ routing CSV import / export (≈ −0.8 kB), or shorten the B–D help topics un
 
 ### Bundle (MF-B)
 
-BUNDLE_PLACEHOLDER
+Measured with `vite build` + gzip -9 (the budget script's method); before = `claude/elegant-cannon-cwapiv` with MF-A and
+MF-C merged (`87c0c2e`), after = this branch merged with it.
+
+| Budget | Before | After | Delta | Share |
+|---|---|---|---|---|
+| Initial JS (first paint) | 189,201 B (184.8 kB) | 189,216 B (184.8 kB) | **+15 B** (lazy-map churn in the entry) | ≤ +0.02 kB ✓ |
+| Total JS | 3222.6 kB | 3258.5 kB | **+35.9 kB** | ≤ 14 kB (PRD) / ≈ 25 kB (lead) ✗ |
+
+**Overrun: ≈ +11 kB over the lead's ≈ 25 kB (+22 kB over the PRD's 14 kB).** Breakdown (gz): Shop desk 15.4 kB (strings
+EN + HI ≈ 4 kB, drawings / inspection / quotes / scrap views ≈ 6 kB, `mf-drawings` + `mf-inspection` + `mf-quotes` +
+`mf-scrap` + `mf-weight` ≈ 5.5 kB), Press desk 8.5 kB (strings ≈ 2.3 kB, estimates / paper / tickets views ≈ 3 kB,
+`mf-estimates` + `mf-paper` ≈ 3 kB), Moulding desk 7.1 kB (strings ≈ 2 kB, runs / balance / EPR views ≈ 2.6 kB,
+`mf-runs` + `mf-epr` ≈ 2.5 kB), shared desk kit + DB helpers (`mfb-util` chunk) 1.5 kB, scrap tax (shared by the Shop desk
+and the bill modal's RCM notice) 1.0 kB, `mfg-rules` MF-B section 0.8 kB, draft builder `mf-b-docs` 0.7 kB, RCM notice
+lookup 0.6 kB, demo rows 0.5 kB, open-export rows 0.3 kB, help wording 0.3 kB, release hold guard in the production chunk
+0.2 kB, Manufacturing lazy-map churn 0.2 kB, registry / shared / backup / sync / recycle-bin rows ≈ 0.5 kB.
+Trimming options for the lead: drop the A4 inspection report and job-ticket prints (≈ −1.2 kB), the paper-by-GSM table
+(≈ −0.5 kB), the draft-line stamping panel on Drawings (≈ −1 kB), the moulds / presses masters on the views (owner forms,
+≈ −1.2 kB; set them in data), the EPR item / customer field editors (≈ −0.8 kB), share the ~20 common words of the three
+MF-B areas in one area (≈ −0.6 kB, against the per-desk rule).
 
 ## MF-C — Textiles and garments (pack `garments`)
 
