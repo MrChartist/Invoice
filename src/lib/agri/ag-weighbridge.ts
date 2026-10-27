@@ -21,9 +21,10 @@ import { assertUnlocked } from '../period-lock';
 import { withTablesRollback } from '../table-txn';
 import { principalDb } from '../job-work';
 import { esc } from '../voucher-print';
+import { AG_SERIES, AG_TABLES } from './ag-shared';
 
-export const WBS = 'WBS';
-export const WBS_TABLE = 'weighbridge_slips';
+export const WBS = AG_SERIES.wbs;
+export const WBS_TABLE = AG_TABLES.weighbridge;
 export const READING_KEYS: readonly WbsReadingKey[] = ['moisture', 'foreign', 'damaged', 'immature', 'broken'];
 /** An open slip older than this is flagged in the daily intake report. */
 export const STALE_HOURS = 24;

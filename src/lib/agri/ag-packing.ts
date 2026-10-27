@@ -14,7 +14,7 @@ import type { AgClass } from '../../types/agri-r12';
 import { ruleAt } from '../tax-rules';
 import { num } from '../invoice-calc';
 import { EWAY_THRESHOLD } from '../eway';
-import { AGRI_CLASS_RULES, PACKED_25KG_RULES, type AgClassRate } from '../agri-rules';
+import { PACKED_25KG_RULES, agClassAt, type AgClassRate } from '../agri-rules';
 
 /** Loose class → its pre-packaged and labelled (≤ 25 kg) pair. Broken rice packs like cereals (AG6, §8 Q13). */
 export const PACKED_PAIR: Readonly<Partial<Record<AgClass, AgClass>>> = {
@@ -33,7 +33,6 @@ export const END_USE_PAIR: Readonly<Partial<Record<AgClass, readonly [AgClass, A
 };
 
 const LOOSE_OF: Readonly<Partial<Record<AgClass, AgClass>>> = { cereal_packed_25: 'cereal_loose', pulses_packed_25: 'pulses_loose', flour_packed_25: 'flour_loose', curd_packed: 'curd_loose' };
-const LITRE_UNITS = new Set(['L', 'LTR', 'LTRS', 'LITRE', 'LITRES', 'ML']);
 
 /** The loose class of a pair (a packed class maps back to its loose one; others unchanged). */
 export const looseOf = (c: AgClass): AgClass => LOOSE_OF[c] ?? c;
@@ -45,11 +44,10 @@ export interface PackFacts {
   unit?: string;
 }
 
-/** True when the pack is pre-packaged and labelled and within the limit (25 kg, or 25 L for a litre unit). Exactly 25 is in. */
-export function withinPackLimit(f: PackFacts, date?: string): boolean {
-  const r = ruleAt(PACKED_25KG_RULES, date);
+/** True when the pack is pre-packaged and labelled and within the limit (25 kg / 25 L — the same number). Exactly 25 is in. */
+export function withinPackLimit(f: Pick<PackFacts, 'ag_pack_kg' | 'ag_labelled'>, date?: string): boolean {
+  const max = ruleAt(PACKED_25KG_RULES, date);
   const size = num(f.ag_pack_kg);
-  const max = LITRE_UNITS.has(String(f.unit ?? '').trim().toUpperCase()) ? r.max_l : r.max_kg;
   return !!f.ag_labelled && size > 0 && size <= max + 1e-9;
 }
 
@@ -73,7 +71,7 @@ export function endUseClass(c: AgClass, asFeed: boolean): AgClass {
 export const needsEndUse = (c: AgClass | undefined): boolean => !!c && !!END_USE_PAIR[c];
 
 /** The class's suggested rate and HSN on `date` (undefined for a class the rules do not list). */
-export const classRate = (c: AgClass | undefined, date?: string): AgClassRate | undefined => (c ? ruleAt(AGRI_CLASS_RULES, date)[c] : undefined);
+export const classRate = (c: AgClass | undefined, date?: string): AgClassRate | undefined => (c ? agClassAt(c, date) ?? undefined : undefined);
 
 export interface LineSuggestion {
   ag_class: AgClass;
@@ -93,8 +91,8 @@ export function suggestLine(f: PackFacts, opts: { counterLoose?: boolean; asFeed
   if (!r) return undefined;
   const paired = !!PACKED_PAIR[looseOf(c)] || Object.values(PACKED_PAIR).includes(c);
   return {
-    ag_class: c, rate: r.rate, hsn: r.hsn, exempt: !!r.exempt,
-    ...(paired ? { note: `Pre-packaged and labelled ≤ ${ruleAt(PACKED_25KG_RULES, opts.date).max_kg} kg → 5% (N 6/2022); larger or loose → nil. Verify with your CA (AG5).` } : {}),
+    ag_class: c, rate: r.rate, hsn: r.hsn, exempt: r.rate === 0,
+    ...(paired ? { note: `Pre-packaged and labelled ≤ ${ruleAt(PACKED_25KG_RULES, opts.date)} kg → 5% (N 6/2022); larger or loose → nil. Verify with your CA (AG5).` } : {}),
   };
 }
 

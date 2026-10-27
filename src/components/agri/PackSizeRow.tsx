@@ -4,7 +4,6 @@
  */
 import type { AgClass } from '../../types/agri-r12';
 import { useT } from '../../i18n';
-import { AGRI_CLASS_RULES } from '../../lib/agri-rules';
 import { suggestLine } from '../../lib/agri/ag-packing';
 import { Num, Sel } from './mill-ui';
 import { T, row } from './mill-kit';
@@ -12,7 +11,8 @@ import controls from '../../styles/controls.module.css';
 
 export interface PackFields { ag_class?: AgClass; ag_pack_kg?: number; ag_labelled?: boolean }
 
-const CLASSES = Object.keys(AGRI_CLASS_RULES[AGRI_CLASS_RULES.length - 1].value) as AgClass[];
+/** The mill classes (AG-A's full list stays in the catalogue / bill panels). */
+const CLASSES: readonly AgClass[] = ['paddy', 'cereal_loose', 'cereal_packed_25', 'broken_rice', 'flour_loose', 'flour_packed_25', 'pulses_loose', 'pulses_packed_25', 'rice_bran_feed', 'rice_bran_other', 'dorb', 'rice_husk', 'edible_oil', 'oil_cake_feed', 'oil_cake_other', 'cattle_feed'];
 
 export default function PackSizeRow({ value, unit, onChange }: { value: PackFields; unit?: string; onChange: (v: PackFields) => void }) {
   useT();

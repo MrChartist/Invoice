@@ -51,7 +51,7 @@ test('account: paddy 50 qtl → rice due 33.5; a delivery numbered CMR/FY…; ba
   assert.throws(() => addDelivery(a.id, { date: '2026-11-07', qty: 4, lot_no: 'L-3' }), /Only 3\.5 qtl/);
   assert.equal(cmrAccount(loadAgreements()[0], '2027-04-02').overdue, true);
   const snap = cmrSnapshot(loadAgreements()[0], '2026-11-06');
-  assert.deepEqual([snap.kind, snap.paddy, snap.rice_due, snap.rice_delivered, snap.outturn_pct], ['cmr', 50, 33.5, 30, 67]);
+  assert.deepEqual([snap.agency, snap.paddy_qtl, snap.rice_due_qtl, snap.rice_delivered_qtl, snap.outturn_pct], [AGENCY.name, 50, 33.5, 30, 67]);
 });
 
 test('paddy is the principal\'s material: JWP receipt and processed return, never in our stock valuation', () => {
@@ -93,7 +93,7 @@ test('Circular 153: goods ≤ 25% exempt (boundary in), above → 5%; the millin
   const ex = millingChargesInvoice(a.id, { date: '2026-10-27', qty: 20, goods_value: 200 });
   assert.deepEqual([ex.test.goodsPct, ex.test.exempt, ex.invoice.doc_type, ex.invoice.tax_amount, ex.invoice.items.length], [20, true, 'BILL_OF_SUPPLY', 0, 2]);
   assert.equal(ex.invoice.ag?.kind, 'cmr');
-  assert.equal(ex.invoice.ag?.cmr?.suggestion, 'exempt');
+  assert.equal(ex.invoice.ag?.cmr?.goods_pct, 20);
   assert.match(ex.invoice.notes ?? '', /entry 3A/);
   // goods 30% of the whole value → 5%.
   const t = millingChargesInvoice(a.id, { date: '2026-10-27', qty: 20, goods_value: 342.86 });
@@ -105,10 +105,10 @@ test('Circular 153: goods ≤ 25% exempt (boundary in), above → 5%; the millin
 });
 
 test('job milling: 5% for a registered principal; unregistered → typed rate required (AG10)', () => {
-  assert.deepEqual(jobMillingRate(true, '2026-10-27'), { rate: 5, sac: '9988' });
+  assert.deepEqual(jobMillingRate(true, '2026-10-27'), { rate: 5, sac: '998817' });
   assert.equal(jobMillingRate(false).rate, null);
   const inv = jobMillingInvoice({ client_id: AGENCY.id, date: '2026-10-27', qty: 30, rate: 60, registered: true, process: 'dal milling', jwp_number: 'JWP/FY26-27/0001' });
-  assert.deepEqual([inv.items[0].tax_rate, inv.items[0].hsn, inv.items[0].ag_class, inv.ag?.kind], [5, '9988', 'job_milling', 'job_milling']);
+  assert.deepEqual([inv.items[0].tax_rate, inv.items[0].hsn, inv.items[0].ag_class, inv.ag?.kind], [5, '998817', 'job_milling', 'job_milling']);
   assert.match(inv.items[0].name, /dal milling/);
   assert.throws(() => jobMillingInvoice({ client_id: 'c-farmer', date: '2026-10-27', qty: 2, rate: 60, registered: false }), /type the GST rate/);
   const own = jobMillingInvoice({ client_id: 'c-farmer', date: '2026-10-27', qty: 2, rate: 60, registered: false, tax_rate: 0 });

@@ -18,7 +18,7 @@
  * above the "Storage" divider (tests/ag-cmr.test.ts). Working papers — verify with your CA.
  */
 import './ag-registry';
-import type { AgCmrSnapshot, CmrAgreement, CmrDelivery, CmrPaddyLot } from '../../types/agri-r12';
+import type { AgCmrSnap, AgSnapshot, CmrAgreement, CmrDelivery, CmrPaddyLot } from '../../types/agri-r12';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import { generateId } from '../storage';
 import { requireAccess } from '../access';
@@ -30,11 +30,15 @@ import { withTablesRollback } from '../table-txn';
 import { jobChargesLine, principalDb } from '../job-work';
 import { localDb } from '../localDb';
 import { makeDraft } from '../../store/invoice-defaults';
-import { JOB_MILLING_RULES, MILLING_PDS_RULES, OUTTURN_STANDARDS } from '../agri-rules';
+import { JOB_MILLING_RULES, MILLING_PDS_RULES, OUTTURN_STANDARDS, agClassAt } from '../agri-rules';
+import { AG_SERIES, AG_TABLES } from './ag-shared';
+import { agSnapshot } from './ag-snapshot';
 import { WBS_TABLE, drop, loadSlips, markUsed, put, releaseSlip, rowsOf } from './ag-weighbridge';
 
-export const CMR = 'CMR';
-export const CMR_TABLE = 'cmr_agreements';
+export const CMR = AG_SERIES.cmr;
+export const CMR_TABLE = AG_TABLES.cmr;
+/** SAC of milling for PDS / job milling (the class rows of `AGRI_CLASS_RULES`). */
+const sacOf = (cls: 'milling_pds' | 'job_milling', date?: string) => agClassAt(cls, date)?.hsn ?? '9988';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const r3 = (x: number) => Math.round((x + Number.EPSILON) * 1000) / 1000 || 0;
@@ -42,7 +46,7 @@ const r3 = (x: number) => Math.round((x + Number.EPSILON) * 1000) / 1000 || 0;
 /* ── Pure ─────────────────────────────────────────────────────── */
 
 /** Default rice due per 100 of paddy for an agreement of `kind` on `date` (agency norm — verify). */
-export const defaultOutturn = (kind: CmrAgreement['kind'], date?: string): number => ruleAt(OUTTURN_STANDARDS, date).cmr[kind];
+export const defaultOutturn = (kind: CmrAgreement['kind'], date?: string): number => ruleAt(OUTTURN_STANDARDS, date)[kind];
 
 /** The paddy line name of an agreement in the JWP register (receipts and returns match on it). */
 export const paddyName = (a: Pick<CmrAgreement, 'season' | 'kind'>) => `Paddy — CMR ${a.season.trim()}${a.kind === 'parboiled' ? ' (parboiled)' : ''}`;
@@ -102,23 +106,23 @@ export function pdsTest(goods: number, total: number, date?: string): PdsTest {
   const r = ruleAt(MILLING_PDS_RULES, date);
   const t = num(total);
   const goodsPct = t > 0 ? round2((Math.max(num(goods), 0) * 100) / t) : 0;
-  const exempt = goodsPct <= r.goods_max_pct;
-  return { goodsPct, limit: r.goods_max_pct, exempt, rate: exempt ? 0 : r.above_rate, sac: r.sac, suggestion: exempt ? 'exempt' : 'job_work_5' };
+  const exempt = goodsPct <= r.goodsPct;
+  return { goodsPct, limit: r.goodsPct, exempt, rate: exempt ? 0 : r.elseRate, sac: sacOf('milling_pds', date), suggestion: exempt ? 'exempt' : 'job_work_5' };
 }
 
 /** Job milling suggestion: 5% for a registered principal; null (user's rate, "verify — AG10") otherwise. */
 export function jobMillingRate(registered: boolean, date?: string): { rate: number | null; sac: string } {
   const r = ruleAt(JOB_MILLING_RULES, date);
-  return { rate: registered ? r.registered_rate : r.unregistered_rate, sac: r.sac };
+  return { rate: registered ? r.registered : r.unregistered, sac: sacOf('job_milling', date) };
 }
 
-/** The `ag.cmr` snapshot a milling-charges invoice prints (AG-A5 "Custom milling" block). */
-export function cmrSnapshot(a: CmrAgreement, today: string, test?: PdsTest & { goods: number; total: number }, lot?: Pick<CmrDelivery, 'lot_no' | 'ack_no'>): AgCmrSnapshot {
+/** The `ag.cmr` snapshot a milling-charges invoice prints (AG-A5 "Custom milling" block; field names are AG-A's `AgCmrSnap`). */
+export function cmrSnapshot(a: CmrAgreement, today: string, goodsPct?: number, lot?: Pick<CmrDelivery, 'lot_no' | 'ack_no'>): AgCmrSnap {
   const acc = cmrAccount(a, today);
   return {
-    kind: 'cmr', agency: a.agency_name, season: a.season, agreement_id: a.id, ...(lot?.lot_no ? { lot_no: lot.lot_no } : {}), ...(lot?.ack_no ? { ack_no: lot.ack_no } : {}),
-    paddy: acc.paddy, outturn_pct: num(a.outturn_pct), rice_due: acc.due, rice_delivered: acc.delivered,
-    ...(test ? { goods_value: round2(test.goods), total_value: round2(test.total), goods_pct: test.goodsPct, suggestion: test.suggestion } : {}),
+    agency: a.agency_name, season: a.season, ...(lot ? { lot_ack: [lot.lot_no, lot.ack_no].filter(Boolean).join(' / ') } : {}),
+    paddy_qtl: acc.paddy, outturn_pct: num(a.outturn_pct), rice_due_qtl: acc.due, rice_delivered_qtl: acc.delivered,
+    ...(goodsPct !== undefined ? { goods_pct: goodsPct } : {}),
   };
 }
 
@@ -251,7 +255,7 @@ export function removeDelivery(agreementId: string, deliveryId: string): void {
 }
 
 /** A draft sales document (bill of supply when exempt) to a client, with the `ag` snapshot. */
-function draftDoc(clientId: string, date: string, items: Omit<InvoiceItem, 'id' | 'type' | 'amount'>[], exempt: boolean, notes: string, ag: { kind: 'cmr' | 'job_milling'; cmr: AgCmrSnapshot }): InvoiceRecord {
+function draftDoc(clientId: string, date: string, items: Omit<InvoiceItem, 'id' | 'type' | 'amount'>[], exempt: boolean, notes: string, ag: AgSnapshot): InvoiceRecord {
   requireAccess('doc.create');
   const client = localDb.clients.getById(clientId);
   if (!client) throw new Error('Choose the client.');
@@ -283,7 +287,7 @@ export function millingChargesInvoice(agreementId: string, x: { date: string; qt
   const note = test.exempt
     ? `Milling of paddy for PDS — goods ${test.goodsPct}% of value (≤ ${test.limit}%): exempt, N 12/2017 entry 3A (Circular 153/09/2021-GST). Working paper — verify with your CA (AG9).`
     : `Milling of paddy for PDS — goods ${test.goodsPct}% of value (> ${test.limit}%): 5% job work, N 11/2017 entry 26 (Circular 153/09/2021-GST). Working paper — verify with your CA (AG9).`;
-  const invoice = draftDoc(a.agency_id, x.date, items, test.exempt, note, { kind: 'cmr', cmr: cmrSnapshot(a, x.date, { ...test, goods, total: service + goods }) });
+  const invoice = draftDoc(a.agency_id, x.date, items, test.exempt, note, agSnapshot('cmr', { cmr: cmrSnapshot(a, x.date, test.goodsPct) }));
   return { invoice, test };
 }
 
@@ -296,5 +300,5 @@ export function jobMillingInvoice(x: { client_id: string; date: string; qty: num
   const note = `Job milling (class job_milling, SAC ${s.sac}) — ${x.registered ? '5% suggested for a registered principal, N 11/2017 entry 26' : 'unregistered principal: rate typed'}. Working paper — verify with your CA (AG10).`;
   const { id: _i, type: _t, amount: _a, ...rest } = line;
   void _i; void _t; void _a;
-  return draftDoc(x.client_id, x.date, [{ ...rest, ag_class: 'job_milling' }], taxRate === 0, note, { kind: 'job_milling', cmr: { kind: 'job_milling', ...(x.jwp_number ? { lot_no: x.jwp_number } : {}) } });
+  return draftDoc(x.client_id, x.date, [{ ...rest, hsn: s.sac, ag_class: 'job_milling' }], taxRate === 0, note, agSnapshot('job_milling', { header: x.jwp_number ? { jwp: x.jwp_number } : undefined }));
 }

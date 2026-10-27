@@ -16,7 +16,7 @@ test('class pick by pack size and label: 25 kg exactly is packed (5%), 25.01 kg 
   assert.equal(packClass({ ag_class: 'broken_rice', ag_pack_kg: 25, ag_labelled: true }, { date: D }), 'cereal_packed_25', 'broken rice packs like cereals');
   assert.equal(packClass({ ag_class: 'edible_oil', ag_pack_kg: 15, ag_labelled: true }), 'edible_oil', 'no pair → unchanged');
   assert.equal(packClass({}), undefined);
-  assert.equal(withinPackLimit({ ag_pack_kg: 25, ag_labelled: true, unit: 'LTR' }, D), true, '25 L for a litre unit');
+  assert.equal(withinPackLimit({ ag_pack_kg: 25, ag_labelled: true }, D), true, '25 kg / 25 L is in');
   assert.equal(looseOf('pulses_packed_25'), 'pulses_loose');
   const s5 = suggestLine({ ...rice, ag_pack_kg: 25 }, { date: D });
   const s0 = suggestLine({ ...rice, ag_pack_kg: 50 }, { date: D });

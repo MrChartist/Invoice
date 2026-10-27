@@ -42,8 +42,8 @@ test('AG-C block: rights and audit labels at runtime; backed up, synced (dated /
   assert.match(sync, /\$\{DB_PREFIX\}weighbridge_slips`\]: \{ num: 'number', date: 'date' \}/);
   for (const f of ['ag-weighbridge', 'ag-cmr', 'ag-yield', 'ag-mill-bom']) assert.match(src(`lib/agri/${f}.ts`), /import '\.\/ag-registry';/, f);
   assert.ok(!/weighbridge_slips|cmr_agreements/.test(src('lib/access.ts') + src('lib/audit-edits.ts')), 'Round 12 tables only at runtime');
-  // The rules file imports types only; no first-paint module imports it.
-  assert.ok(!/^import (?!type)/m.test(src('lib/agri-rules.ts')), 'agri-rules.ts has no runtime import');
+  // The rules file imports only the dated-rule helper; no first-paint module imports it.
+  assert.deepEqual([...src('lib/agri-rules.ts').matchAll(/^import (?!type)[^;]*from '([^']+)'/gm)].map((m) => m[1]), ['./tax-rules']);
   for (const f of ['lib/tax-rules.ts', 'lib/shop-mode.ts', 'lib/storage.ts', 'lib/localDb.ts', 'store/invoice-defaults.ts']) assert.ok(!src(f).includes('agri-rules'), f);
 });
 

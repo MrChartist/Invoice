@@ -10,7 +10,7 @@
  *   cost per unit   = the engine's own cost snapshot (Σ finished value ÷ Σ main qty), after the by-product credit
  *                     (Σ snapshot deductions) — never recomputed here.
  *
- * A batch over or under its standard by more than the tolerance (`OUTTURN_STANDARDS`, 1 point) is flagged (C5).
+ * A batch over or under its standard by more than the tolerance (`OWN_OUTTURN_STARTERS`, 1 point) is flagged (C5).
  * Pure above "Storage" (tests/ag-yield.test.ts).
  */
 import './ag-registry';
@@ -24,7 +24,7 @@ import { ruleAt } from '../tax-rules';
 import { requireAccess } from '../access';
 import { ordersStore } from '../production/orders';
 import { kgPer } from '../trade/tr-weight';
-import { OUTTURN_STANDARDS } from '../agri-rules';
+import { OWN_OUTTURN_STARTERS } from '../agri-rules';
 
 const r3 = (x: number) => Math.round((x + Number.EPSILON) * 1000) / 1000 || 0;
 
@@ -95,7 +95,7 @@ export interface MillYield extends YieldFigures {
 }
 
 /** Pure: percentages, losses and the flag of a batch (or a month) from its figures. */
-export function yieldOf(f: YieldFigures, meta: Partial<MillOrderMeta> | undefined, tolerance = ruleAt(OUTTURN_STANDARDS).tolerance_pts, moisture?: number): MillYield {
+export function yieldOf(f: YieldFigures, meta: Partial<MillOrderMeta> | undefined, tolerance = ruleAt(OWN_OUTTURN_STARTERS).tolerance_pts, moisture?: number): MillYield {
   const pct = (x: number) => (f.input > 0 ? round2((x * 100) / f.input) : 0);
   const loss = r3(f.input - f.main - f.co - f.by - f.scrap);
   const ml = moisture ?? moistureLoss(f.input, meta?.input_moisture, meta?.output_moisture);
@@ -121,7 +121,7 @@ export function batchYield(order: Pick<ProductionOrder, 'id' | 'ag'>, mfg: reado
 
 /** The default mill meta for a new batch: own standard by `mill_kind` (rice when absent). */
 export function defaultMillMeta(millKind: MillKind | undefined, date?: string): MillOrderMeta {
-  return { standard_outturn_pct: ruleAt(OUTTURN_STANDARDS, date).own[millKind ?? 'rice'], std_source: 'own' };
+  return { standard_outturn_pct: ruleAt(OWN_OUTTURN_STARTERS, date)[millKind ?? 'rice'], std_source: 'own' };
 }
 
 /* ================================================================
