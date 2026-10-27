@@ -217,6 +217,9 @@ const OWNED_VOUCHERS: readonly { classes: readonly string[]; tables: readonly st
   { classes: ['Sales commission'], tables: ['commission_postings'], redo: 'post the commission again' },
   { classes: ['GST TCS credit', 'GST TDS credit'], tables: ['eco_credits'], redo: 'accept the credit again' },
   { classes: ['Customs duty (BOE)'], tables: ['purchases'], redo: 'post the duty again from the bill of entry' },
+  // R11 (CN-D): a sub-contractor bill's deductions journal and a muster week's wage payment
+  { classes: ['Sub-contractor deductions'], tables: ['sub_measurements'], redo: 'measure the sub-contractor bill again in Time → Works → Sub-contracts' },
+  { classes: ['Site wages'], tables: ['muster_days'], redo: 'settle the week again in Time → Works → Labour' },
   // R8-C: agency desk (TR-C1)
   { classes: ['Arrival advance'], tables: ['arrivals'], redo: 'cancel the arrival and enter it again in Distribution → Agency' },
   { classes: ['Bikri patti'], tables: ['sale_pattis'], redo: 'post the patti again in Distribution → Agency → Bikri patti' },
@@ -335,6 +338,9 @@ registerRestoreHook('karigar_moves', (row, _e, live, bin) => withMoves(row.move_
 // a stage certificate does not come back next to a re-made one of the same tower and stage.
 registerRestoreHook('realty_bookings', () => ({ refuse: 'Deleting the booking freed its unit. Book the unit again in Receivables → Realty → Bookings.' }));
 registerRestoreHook('realty_units', (row, _e, live) => (isLive(live, 'realty_projects', str(row.project_id)) ? null : { refuse: 'The project of this unit is gone. Restore the project first.' }));
+// R11 (CN-D): a sub-contractor bill made from a measurement comes back only while that measurement still names it
+// (cancelling it removed the bill and its deductions journal — measure again).
+registerRestoreHook('purchases', (row, e, live) => (isObj(row.cn_sub) && str((row.cn_sub as Row).kind) === 'subcon' && !mentions(live('sub_measurements'), e.row_id) ? { refuse: 'This sub-contractor bill was cancelled from its measurement. Measure it again in Time → Works → Sub-contracts.' } : null));
 registerRestoreHook('stage_certificates', (row, e, live) => (live('stage_certificates').some((c) => str(c?.id) !== e.row_id && str(c?.tower_id) === str(row.tower_id) && str(c?.stage_label).toLowerCase() === str(row.stage_label).toLowerCase()) ? { refuse: 'This stage was certified again since.' } : null));
 // QA10 R9: a billed all-warranty repair job comes back with its warranty part issues.
 registerRestoreHook('service_jobs', (row, _e, live, bin) => withMoves(row.warranty_move_ids, live, bin));

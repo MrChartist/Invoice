@@ -26,6 +26,9 @@ import {
   type CostCentreKind,
 } from '../../../lib/cost-centres';
 import { localDb } from '../../../lib/localDb';
+import { Link } from 'react-router-dom';
+import { isPackOn } from '../../../lib/industry-packs';
+import { siteViewLabel } from '../../works/site-views';
 import type { Period } from '../../../lib/books';
 import { formatDate } from '../../../lib/utils';
 import { EmptyState } from '../../ui/EmptyState';
@@ -229,6 +232,8 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
           </section>
           <p className={books.muted}>
             {planT('projectNote')}
+            {/* R11 (CN-D5): the works site P&L (memo working paper) sits next to this ledger-based P&L. */}
+            {isPackOn(localDb.settings.get(), 'works') && <> <Link to="/time?tab=works&view=pnl" data-site-pnl-link>{siteViewLabel('pnl')} →</Link></>}
           </p>
         </>
       )}

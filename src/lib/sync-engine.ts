@@ -404,6 +404,11 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}realty_bookings`]: 'date',
   [`${DB_PREFIX}stage_certificates`]: 'certified_on',
   [`${DB_PREFIX}rera_withdrawals`]: 'date',
+  // R11-D: work orders, sub-contractor bills, muster days, plant log sheets
+  [`${DB_PREFIX}sub_work_orders`]: 'date',
+  [`${DB_PREFIX}sub_measurements`]: 'date',
+  [`${DB_PREFIX}muster_days`]: 'date',
+  [`${DB_PREFIX}plant_logs`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -995,6 +1000,10 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}karigar_moves`]: { num: 'number', date: 'date' },
   // R11-C: bookings (BKG/FY…)
   [`${DB_PREFIX}realty_bookings`]: { num: 'number', date: 'date' },
+  // R11-D: work orders (SWO/FY…), sub-contractor bills (SCB/FY…), plant log sheets (PLG/FY…)
+  [`${DB_PREFIX}sub_work_orders`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}sub_measurements`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}plant_logs`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };

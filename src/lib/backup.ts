@@ -476,6 +476,9 @@ const RECORD_TABLES = [
   'delivery_riders', 'rider_settlements', 'short_book', 'doctors', 'rx_refills', 'alteration_jobs', 'imei_checks', 'finance_deals', 'service_jobs', 'metal_rates', 'jewel_tags', 'karigar_moves',
   // R11-C: builders — projects, units, bookings (BKG/FY…), payment plans, stage certificates, RERA account entries
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
+  // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
+  // (MUS settlements), hired equipment, plant log sheets (PLG)
+  'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -549,6 +552,9 @@ const ID_TABLES = new Set([
   'delivery_riders', 'rider_settlements', 'short_book', 'doctors', 'rx_refills', 'alteration_jobs', 'imei_checks', 'finance_deals', 'service_jobs', 'metal_rates', 'jewel_tags', 'karigar_moves',
   // R11-C: builders — projects, units, bookings (BKG/FY…), payment plans, stage certificates, RERA account entries
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
+  // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
+  // (MUS settlements), hired equipment, plant log sheets (PLG)
+  'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

@@ -206,7 +206,10 @@ export function cancelSubBill(id: string): SubMeasurement {
     if (m.purchase_id && purchasesDb.get(m.purchase_id)) purchasesDb.remove(m.purchase_id);
     if (m.jv_id && loadVouchers().some((v) => v.id === m.jv_id)) deleteVoucher(m.jv_id);
     setTable(SD.logs, loadLogs().map((l) => (l.recovered_in === m.number ? { ...l, recovered_in: undefined } : l)));
-    return put(SD.bills, { ...m, status: 'cancelled' as const });
+    const { purchase_id: _p, jv_id: _j, ...rest } = m; // the bin keeps them; the row no longer names them (restore guard)
+    void _p;
+    void _j;
+    return put(SD.bills, { ...rest, status: 'cancelled' as const });
   });
 }
 

@@ -204,6 +204,11 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   realty_projects: 'Builder projects: RERA registration, RERA account, towers, completion certificate (R11).', realty_units: 'Flats / shops / plots with carpet area, rate and status (R11).',
   realty_bookings: 'Bookings with cost sheet, payment plan and cancellation (BKG/FY…, R11).', payment_plans: 'Payment plans with stage percentages (R11).',
   stage_certificates: 'Stage completion certificates of a tower (R11).', rera_withdrawals: 'RERA designated account withdrawals (with certificates) and transfers in (R11).',
+  // R11-D
+  sub_work_orders: 'Sub-contract work orders: lines back-to-back from the BOQ, deduction rules (SWO/FY…, R11).', sub_measurements: 'Measured sub-contractor bills and the purchase bill / deductions journal they made (SCB/FY…, R11).',
+  labour_compliance: 'Labour-contractor PF / ESI / wage-register proof per month (R11).', site_labour: 'Daily-wage site workers with rates (R11).',
+  muster_days: 'Site attendance, one row per site per day, and the weekly settlement (MUS/FY…, R11).', hired_equipment: 'Equipment hired in, with rate, basis and operator flag (R11).',
+  plant_logs: 'Daily plant log sheets: hours, idle, breakdown, fuel, hire out (PLG/FY…, R11).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';
