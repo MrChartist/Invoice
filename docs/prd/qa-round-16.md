@@ -157,7 +157,7 @@ wrong; **P2** friction, a working-paper figure off, cosmetic.
 
 `tsc -b` clean; `eslint .` 0 errors (27 warnings, as before); `node --test` 3,424 / 3,424 (ten new P regressions, each
 re-run against the baseline source and failing there); `vite build` + `postbuild` ok; bundle check ok; `node --check
-tests/e2e/smoke.mjs` ok; Playwright smoke (`E2E_TIMEOUT=60000`): see the report. `npm run …` exits 216 in this sandbox, so each
+tests/e2e/smoke.mjs` ok; Playwright smoke (`E2E_TIMEOUT=60000`): all checks passed (553 PASS lines, incl. the QA-3 F4 / F5 step and the new 375 px check) on the first run. `npm run …` exits 216 in this sandbox, so each
 command was run directly.
 
 Budget (vite build, gzip -9): first paint 189,212 B (baseline `fbb9d60` 189,216 B: **−4 B**, lazy-map churn); total JS
