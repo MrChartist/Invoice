@@ -44,7 +44,7 @@ test('every writer, the sync engine and the recycle bin import the registry; dat
   assert.ok(sync.includes("[`${DB_PREFIX}farmer_cycles`]: { num: 'number', date: 'period_to' }"));
 });
 
-test('series: FPV and CYB used once (ag-shared); WBS / MDS / CMR / CSR / GPO / LAS / SHC reserved and unused (help text excluded)', () => {
+test('series: FPV and CYB used once (ag-shared); the reserved B / C prefixes unused (help text excluded); AG-D moved CSR / GPO / LAS / SHC into AG_SERIES', () => {
   assert.deepEqual([AG_SERIES.vouchers, AG_SERIES.cycles], ['FPV', 'CYB']);
   const all = readdirSync(new URL('../src/lib/', import.meta.url), { recursive: true }).filter((f) => String(f).endsWith('.ts') && !String(f).startsWith('help')).map((f) => readFileSync(new URL(`../src/lib/${f}`, import.meta.url), 'utf8')).join('\n');
   for (const p of ['FPV', 'CYB']) assert.equal((all.match(new RegExp(`'${p}'`, 'g')) ?? []).length, 1, p);

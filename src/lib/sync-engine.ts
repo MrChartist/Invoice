@@ -436,6 +436,10 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}milk_dispatches`]: 'date',
   // R12-C: weighbridge slips
   [`${DB_PREFIX}weighbridge_slips`]: 'date',
+  // R12-D: cold-storage lots (by date in), loans against stored produce, members' share ledger
+  [`${DB_PREFIX}cold_lots`]: 'date_in',
+  [`${DB_PREFIX}agri_loans`]: 'date',
+  [`${DB_PREFIX}member_shares`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -1047,6 +1051,9 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}milk_dispatches`]: { num: 'number', date: 'date' },
   // R12-C: weighbridge slips (WBS/FY…); CMR delivery numbers live inside `cmr_agreements` (guarded by series_counters)
   [`${DB_PREFIX}weighbridge_slips`]: { num: 'number', date: 'date' },
+  // R12-D: cold-storage receipts (CSR/FY…), loans against stored produce (LAS/FY…)
+  [`${DB_PREFIX}cold_lots`]: { num: 'number', date: 'date_in' },
+  [`${DB_PREFIX}agri_loans`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };

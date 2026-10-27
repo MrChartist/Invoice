@@ -5,6 +5,7 @@
 import type { DemoExtras } from '../demo-data';
 import type { AgClass, FarmBatch, MilkCard, MilkDispatch, MilkEntry, MilkRateChart, MilkShift } from '../../types/agri-r12';
 import type { Vendor } from '../../types/purchases';
+import type { ColdLot, ColdRentPlan } from '../../types/agri-r12d';
 import { shiftDay } from '../dates';
 import { getIndianFY } from '../invoice-number';
 import type { ProfileContext } from './profiles';
@@ -81,6 +82,21 @@ export function agriExtras(ctx: ProfileContext): DemoExtras {
       deliveries: [{ id: 'del1', number: `CMR/FY${fy}/0001`, date: d3, qty: 10, lot_no: 'L-1', ack_no: 'ACK-101', jwp_id: 'demo-jwp-2' }],
     }]);
   }
-  // AG-D (cold / inputs / fpo): lots, rent plan, gate pass, loan; licences, subsidised sale; members with shares.
+  // AG-D (cold): a season rent plan and three lots of the demo clients, one partly released (custody only; loans,
+  // shares and licences post vouchers or live in settings, so the user makes them on the desks).
+  if (packs.includes('coldstore')) {
+    const plan: ColdRentPlan & { demo: true } = { id: 'demo-rent-1', demo: true, name: 'Potato season (demo)', basis: 'bag_season', rate: 180, season: { from: '03-01', to: '11-30' }, part_month: 'full', charges: [{ name: 'Loading', basis: 'bag', rate: 5, when: 'out' }], class: 'storage_agri', bill_at: 'out' };
+    const lot = (i: number, bags: number, out: number): ColdLot & { demo: true } => {
+      const c = ctx.base.clients[i % Math.max(ctx.base.clients.length, 1)];
+      const date_in = shiftDay(today, -60 + i * 5);
+      return {
+        id: `demo-lot-${i}`, demo: true, number: `CSR/DEMO/${i}`, date_in, depositor_id: c?.id ?? '', depositor_name: c?.name ?? 'Depositor', commodity: 'Potato', variety: 'Kufri Jyoti', bags, bag_kg: 50,
+        chamber_id: 'demo-ch-1', season: today.slice(0, 4), rent_plan_id: plan.id, status: out ? 'part_out' : 'stored',
+        outs: out ? [{ id: `demo-gpo-${i}`, number: `GPO/DEMO/${i}`, date: shiftDay(today, -3), bags: out, loan_check: 'clear' }] : [],
+      };
+    };
+    tables.cold_rent_plans = [plan];
+    tables.cold_lots = [lot(1, 240, 60), lot(2, 120, 0), lot(3, 400, 0)];
+  }
   return { tables };
 }

@@ -248,6 +248,11 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   // R12-C
   weighbridge_slips: 'Weighbridge / gate-entry slips: vehicle, party, commodity, gross and tare with times, net, moisture and other readings, use (WBS/FY…, R12).',
   cmr_agreements: 'Custom-milling (CMR) agreements with the State agency: season, outturn %, paddy lots (JWP receipts), rice deliveries (CMR/FY…), milling rate, by-product recovery (R12).',
+  // R12-D
+  cold_lots: 'Cold-storage lots held in custody (never our stock): storage receipt (CSR/FY…), depositor, commodity, bags, chamber, rent plan, gate passes out (GPO/FY…), transfers (R12).',
+  cold_rent_plans: 'Storage rent plans: per bag / quintal, per season / month or lump sum, handling charges, exempt or taxable class, billing time (R12).',
+  agri_loans: 'Loans against stored produce (LAS/FY…): borrower, lots under lien, principal, rate, repayments split interest / principal (R12).',
+  member_shares: 'Members\' share ledger: allotments with certificates (SHC/FY…), transfers, surrenders, forfeitures (R12).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';
