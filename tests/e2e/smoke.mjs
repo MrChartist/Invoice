@@ -3884,6 +3884,9 @@ try {
     await page.locator('[data-refund-issue]').click();
     const notes = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'CREDIT_NOTE' && i.client?.id === 'e2e-kiran'))).filter((i) => i.doc_type === 'CREDIT_NOTE' && i.client?.id === 'e2e-kiran');
     check(notes.length === 1 && Number(notes[0].taxable_value) === 70000 && Number(notes[0].tax_amount) === 12600, `credit note ${notes[0]?.invoice_number}: ₹70,000 taxable with 18% reversed`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
   await step('R10-D workshop desk: Services → Vehicle workshop; vehicle MH12AB1234 and a labour op; job card with the odometer; estimate (pads + labour) approved by phone; Bill job → parts and labour lines at their own rates; a ₹50,000 accident job with a cashless claim approved ₹42,000 → two invoices (insurer, owner) totalling the job; Reminders shows the next service; help', async () => {
     const keys = ['settings', 'workshop_settings', 'service_assets', 'labour_ops', 'service_jobs', 'invoices', 'stock_items', 'clients', 'payer_claims', 'series_counters', 'audit_log', 'doc_links', 'transactions', 'appointments'];
     const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
