@@ -11,13 +11,13 @@ import { todayInput } from '../../lib/utils';
 import { downloadText } from '../../lib/download';
 import { printHtmlDocument } from '../../lib/voucher-print';
 import { localDb } from '../../lib/localDb';
-import { paymentsDb, purchasesDb } from '../../lib/purchases';
+import { balanceOf, paymentsDb, purchasesDb } from '../../lib/purchases';
 import { chargeAmount, chargeBase, headsFor, loadHeads } from '../../lib/trade/tr-charges';
 import { blankWeight } from '../../lib/trade/tr-weight';
 import { cashPaymentIssue } from '../../lib/retail/rt-cash-guard';
 import { loadFarmers } from '../../lib/agri/ag-farmers';
 import { loadQualityTables } from '../../lib/agri/ag-quality';
-import { farmerVouchers, fyPurchasesOf, saveVoucher, voucherWorking, type VoucherInput } from '../../lib/agri/ag-vouchers';
+import { deleteFarmerVoucher, farmerVouchers, fyPurchasesOf, saveVoucher, voucherWorking, type VoucherInput } from '../../lib/agri/ag-vouchers';
 import { prompt194q } from '../../lib/agri/ag-tax';
 import { voucherHtml } from '../../lib/agri/ag-print';
 import type { AgVoucherCharge } from '../../types/agri-r12';
@@ -61,7 +61,7 @@ export default function VouchersView({ onDone }: { onDone: Done }) {
   const charges: AgVoucherCharge[] = heads.filter((h) => by[h.id]).map((h) => ({ head_id: h.id, name: h.name, by: by[h.id] as 'us' | 'farmer', amount: chargeAmount(h, base).amount }));
   const input: VoucherInput | null = goods && { ...goods, charges };
   const w = input && pre ? voucherWorking(input) : null;
-  const q194 = w && vendor ? prompt194q(date, fyPurchasesOf(vendor.id, date, getTable('purchases')) + w.value, getJson<{ turnover_by_fy?: Record<string, number> }>(`${DB_PREFIX}tds_settings`, {})?.turnover_by_fy) : '';
+  const q194 = w && vendor ? prompt194q(date, fyPurchasesOf(vendor.id, date, getTable('purchases'), getTable('farmer_cycles')) + w.value, getJson<{ turnover_by_fy?: Record<string, number> }>(`${DB_PREFIX}tds_settings`, {})?.turnover_by_fy) : '';
   const profile = localDb.settings.activeProfile();
   const print = (id: string) => {
     const b = purchasesDb.get(id);
@@ -105,8 +105,8 @@ export default function VouchersView({ onDone }: { onDone: Done }) {
       <Grid attr="vouchers" head={[agT('number'), agT('date'), agT('farmer'), agT('produce'), agT('total'), agT('paid'), '']} rows={vouchers.map((b) => [b.bill_number, b.date, b.vendor_name, b.lines[0]?.name ?? '', money(b.total), money(b.amount_paid), (
         <span key="a" style={{ display: 'flex', gap: 4 }}>
           <button type="button" className={controls.btnGhost} onClick={() => print(b.id)} data-ag-print-voucher>{agT('print')}</button>
-          <button type="button" className={controls.btnGhost} onClick={() => setPay({ id: b.id, amount: String(Math.max(b.total - b.amount_paid, 0)), method: 'Cash' })} data-ag-pay>{agT('pay')}</button>
-          <button type="button" className={controls.btnGhost} onClick={() => run(() => { purchasesDb.remove(b.id); return agT('deleted'); })}>{agT('delete')}</button>
+          <button type="button" className={controls.btnGhost} onClick={() => setPay({ id: b.id, amount: String(balanceOf(b)), method: 'Cash' })} data-ag-pay>{agT('pay')}</button>
+          <button type="button" className={controls.btnGhost} onClick={() => run(() => { deleteFarmerVoucher(b.id); return agT('deleted'); })}>{agT('delete')}</button>
         </span>
       )])} />
       {pay && payBill && (

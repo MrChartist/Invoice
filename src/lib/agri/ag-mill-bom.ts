@@ -17,6 +17,7 @@ import { blankStockItem, stockDb, type StockItem } from '../inventory';
 import { bomsDb } from '../manufacturing';
 import { requireAccess } from '../access';
 import { generateId } from '../storage';
+import { todayInput } from '../utils';
 import { num } from '../invoice-calc';
 
 export type MillRole = 'input' | 'main' | 'co' | 'by';
@@ -128,6 +129,6 @@ export function installMillStarter(kind: MillKind, opts: { unit?: string; rates?
   const items = stockDb.items();
   const draft = starterBom(s, itemIds, opts.rates);
   const taken = bomsDb.all().some((b) => b.item_id === draft.item_id && b.name.trim().toLowerCase() === draft.name.toLowerCase());
-  const bom = bomsDb.save(taken ? { ...draft, name: `${draft.name} ${new Date().toISOString().slice(0, 10)}` } : draft, items);
+  const bom = bomsDb.save(taken ? { ...draft, name: `${draft.name} ${todayInput()}` } : draft, items);
   return { bom, itemIds };
 }

@@ -266,3 +266,62 @@ test('G12: undoing a gate pass whose release was billed is refused until the ren
   localDb.invoices.remove(g.bill!.id);
   assert.equal(undoGatePass(lot.id).outs.length, 0);
 });
+
+/* ── G14: the 194Q base counts the farmer's shares of pooled cycles ── */
+
+test('G14: fyPurchasesOf adds his lines on closed cycles of the FY (not drafts, not another FY)', async () => {
+  const { fyPurchasesOf } = await import('../src/lib/agri/ag-vouchers.ts');
+  const ram = saveFarmer({ name: 'Ram', ag: { code: 'F-0001' } });
+  const line = (amount: number) => ({ farmer_id: ram.id, name: 'Ram', qty: 1, unit: 'L', amount, deductions: [], net: 0, mode: 'cash' as const });
+  const a = saveCycleDraft({ period_from: '2026-10-01', period_to: '2026-10-10', source: 'produce', lines: [line(30000)] });
+  closeCycle(a.id);
+  saveCycleDraft({ period_from: '2026-10-11', period_to: '2026-10-20', source: 'produce', lines: [line(5000)] });
+  const old = saveCycleDraft({ period_from: '2026-03-21', period_to: '2026-03-31', source: 'produce', lines: [line(7000)] });
+  closeCycle(old.id);
+  assert.equal(fyPurchasesOf(ram.id, '2026-11-01', getTable('purchases'), loadCycles()), 30000);
+});
+
+/* ── G15: deleting a farmer voucher frees its weighbridge slip; the old voucher never returns next to a new one ── */
+
+test('G15: delete the slip\'s voucher → the slip makes a new voucher; the deleted one stays in the bin', async () => {
+  const { restoreEntry } = await import('../src/lib/trust/recycle-bin.ts');
+  const { openSlip, recordTare, voucherFromSlip, loadSlips } = await import('../src/lib/agri/ag-weighbridge.ts');
+  const { deleteFarmerVoucher } = await import('../src/lib/agri/ag-vouchers.ts');
+  const ram = saveFarmer({ name: 'Ram', ag: { code: 'F-0001' } }) as Vendor;
+  const s = openSlip({ date: '2026-10-05', vehicle: 'PB10AB1234', party_kind: 'farmer', party_id: ram.id, commodity: 'Paddy', gross_kg: 8000 });
+  recordTare(s.id, 6000);
+  const v1 = voucherFromSlip(s.id, { vendor: ram, rate: 2300 });
+  deleteFarmerVoucher(v1.id);
+  assert.equal(loadSlips()[0].ref_id, undefined, 'slip free again');
+  const v2 = voucherFromSlip(s.id, { vendor: ram, rate: 2350 });
+  assert.equal(loadSlips()[0].ref_id, v2.id);
+  assert.throws(() => restoreEntry(bin().find((x) => x.table === 'purchases' && x.row_id === v1.id)!.id), /used again/);
+});
+
+/* ── G16: demo mill numbers carry their own date's FY (first week of April) ── */
+
+test('G16: on 3 Apr the demo slip of 28 Mar is numbered in the old FY', async () => {
+  const { agriExtras } = await import('../src/lib/demo/profile-agri.ts');
+  const x = agriExtras({ today: '2026-04-03', packs: ['agri', 'mill'], base: {} } as never);
+  const slip = (x.tables as Record<string, { number: string; date: string }[]>).weighbridge_slips[0];
+  assert.equal(slip.date, '2026-03-28');
+  assert.equal(slip.number, 'WBS/FY25-26/0001');
+});
+
+/* ── G13: mill intake reads a bill typed in an alternate unit (50 kg bags of a quintal item) ── */
+
+test('G13: 10 bags × 0.5 QTL of paddy is 500 kg of own intake, not 5', async () => {
+  const { millWorld, runBatch } = await import('./helpers/mill.ts');
+  const { thawDate } = await import('./helpers/shim.ts');
+  const { setTable } = await import('../src/lib/storage.ts');
+  const { loadMillReportInput, millMonths } = await import('../src/lib/agri/ag-mill-reports.ts');
+  const { ids } = millWorld('2026-11-30');
+  try {
+    setTable('purchases', [{ id: 'p1', kind: 'PURCHASE', vendor_name: 'Farmer', bill_number: 'FPV/1', date: '2026-10-03', lines: [{ id: 'l', name: 'Paddy', item_id: ids.paddy, unit: 'BAG', unit_factor: 0.5, quantity: 10, rate: 1150, tax_rate: 0 }], taxable: 11500, total: 11500 }]);
+    runBatch('2026-10-10', 100, 64);
+    const oct = millMonths(await loadMillReportInput()).find((m) => m.month === '2026-10')!;
+    assert.equal(oct.intakeOwn, 500);
+  } finally {
+    thawDate();
+  }
+});

@@ -360,6 +360,12 @@ registerRestoreHook('purchases', (row, e, live) => {
   const cy = isObj(row.ag) ? str(row.ag.cycle_id) : '';
   return cy && !live('farmer_cycles').some((c) => str(c?.id) === cy && str(c?.purchase_id) === e.row_id) ? { refuse: AG_UNDONE } : null;
 });
+// QA13 G15: a deleted farmer voucher made from a weighbridge slip comes back only while the slip is still free.
+registerRestoreHook('purchases', (row, e, live) => {
+  const wbs = isObj(row.ag) && isObj(row.ag.voucher) ? str(row.ag.voucher.wbs_id) : '';
+  const slip = wbs ? live('weighbridge_slips').find((s) => str(s?.id) === wbs) : undefined;
+  return slip && str(slip.ref_id) && str(slip.ref_id) !== e.row_id ? { refuse: `Weighbridge slip ${str(slip.number)} was used again since. Leave this voucher in the bin.` } : null;
+});
 registerRestoreHook('transactions', (row, e, live, bin) => {
   const urd = str(row.exchange_purchase_id);
   const bill = urd ? live('purchases').find((x) => str(x?.id) === urd) ?? inBin(bin, 'purchases', (r) => str(r.id) === urd)?.row : undefined;
