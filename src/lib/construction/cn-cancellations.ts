@@ -11,7 +11,7 @@ import './cn-registry';
 import type { BookingCancellation, RealtyBooking } from '../../types/construction-r11';
 import type { AdvanceRecord } from '../../types/advances';
 import type { InvoiceRecord, Payment } from '../../types/invoice';
-import { getTable } from '../storage';
+import { generateId, getTable, setTable } from '../storage';
 import { requireAccess } from '../access';
 import { num, round2 } from '../invoice-calc';
 import { getIndianFY } from '../invoice-number';
@@ -82,9 +82,38 @@ export function cancelBooking(id: string, date: string, reason: string, method =
       numbers.push(refundAdvance(a.id, { amount: amt, date: date < a.date ? a.date : date, method, note: `Booking ${b.number} cancelled` }).number);
       left = round2(left - amt);
     }
+    // QA11 C2: the forfeiture is kept first out of money still held as an open booking advance (that part of the
+    // advance is closed — `forfeits` — and its GST paid at receipt stays paid), the rest out of the buyer's credit on
+    // the demands (Debtors). A forfeiture that closes an advance is posted (the advance register closes at once);
+    // one wholly out of Debtors stays a draft as before.
+    const pc = (n: number) => Math.round(n * 100);
+    let fLeft = p.forfeiture;
+    const kept: { a: AdvanceRecord; amount: number; tax: number }[] = [];
+    for (const a of loadAdvances().filter((x) => x.booking_id === id && !x.pass_through)) {
+      const amt = round2(Math.min(advanceBalance(a, getTable<Payment>('transactions'), localDb.invoices.getAll()).open, fLeft));
+      if (amt <= 0.004) continue;
+      const tax = num(a.amount) > 0 ? round2(((num(a.tax?.igst) + num(a.tax?.cgst) + num(a.tax?.sgst)) * amt) / num(a.amount)) : 0;
+      kept.push({ a, amount: amt, tax });
+      fLeft = round2(fLeft - amt);
+    }
+    const fromAdv = round2(kept.reduce((s2, k) => s2 + k.amount, 0));
+    const advTax = round2(kept.reduce((s2, k) => s2 + k.tax, 0));
     const journal = p.forfeiture > 0
-      ? saveVoucher({ type: 'JOURNAL', date, variant: 'OPTIONAL', voucher_class: 'Booking forfeiture', narration: `Forfeiture on cancellation of booking ${b.number} (${b.client_name}) — no GST by default; verify with your CA (CN22).`, lines: [{ account_id: A.debtors, dr: Math.round(p.forfeiture * 100), cr: 0, party: b.client_name }, { account_id: ledger('Forfeiture income', 'OTHER_INCOME', 4810), dr: 0, cr: Math.round(p.forfeiture * 100) }] }).id
+      ? saveVoucher({
+        type: 'JOURNAL', date, ...(fromAdv > 0 ? {} : { variant: 'OPTIONAL' as const }), voucher_class: 'Booking forfeiture',
+        narration: `Forfeiture on cancellation of booking ${b.number} (${b.client_name}) — no GST by default${advTax > 0 ? '; GST paid on the advance kept stays paid' : ''}; verify with your CA (CN22).`,
+        lines: [
+          ...(fromAdv > 0 ? [{ account_id: A.custAdvances, dr: pc(fromAdv), cr: 0, party: b.client_name }] : []),
+          ...(fLeft > 0.004 ? [{ account_id: A.debtors, dr: pc(fLeft), cr: 0, party: b.client_name }] : []),
+          ...(advTax > 0 ? [{ account_id: A.gstOnAdvances, dr: 0, cr: pc(advTax) }] : []),
+          { account_id: ledger('Forfeiture income', 'OTHER_INCOME', 4810), dr: 0, cr: pc(fromAdv) + pc(fLeft > 0.004 ? fLeft : 0) - pc(advTax) },
+        ],
+      }).id
       : undefined;
+    if (journal && kept.length) {
+      const by = new Map(kept.map((k) => [k.a.id, k.amount]));
+      setTable('advances', getTable<AdvanceRecord>('advances').map((a) => (by.has(a.id) ? { ...a, forfeits: [...(a.forfeits ?? []), { id: generateId(), date, amount: by.get(a.id)!, booking_id: id, journal_id: journal }], updated_at: new Date().toISOString() } : a)));
+    }
     const c: BookingCancellation = {
       date, reason: reason.trim(), received: p.received, forfeiture: p.forfeiture, tax_retained: p.taxRetained, refund: p.refund, path: p.path,
       ...(notes.length ? { credit_note_ids: notes } : {}), ...(numbers.length ? { refund_numbers: numbers } : {}), ...(left > 0.004 ? { refund_pending: left } : {}), ...(journal ? { journal_id: journal } : {}),

@@ -21,7 +21,7 @@ import { computePurchaseTotals, purchasesDb } from '../purchases';
 import { billTdsInputFor, priorCreditsFor, resolveBillTds } from '../tds-payables';
 import { withTablesRollback } from '../table-txn';
 import { PLANT_HIRE_SAC_RULES } from '../construction-rules';
-import { SD } from './cn-subcon';
+import { SD, noItcCentre } from './cn-subcon';
 import { subTdsCode } from './cn-subcon-bill';
 import { loadHired, loadLogs, machines } from './cn-plant';
 
@@ -80,7 +80,7 @@ export function bookHireIn(equipmentId: string, month: string, billNo: string): 
   const cc = main ? getTable<{ id: string; cost_centre_id?: string }>('godowns').find((g) => g.id === main)?.cost_centre_id : undefined;
   return purchasesDb.save({
     kind: 'PURCHASE', vendor_id: e.vendor_id, vendor_name: e.vendor_name, ...(vendor?.gstin ? { vendor_gstin: vendor.gstin } : {}), bill_number: billNo.trim(), date, place_of_supply: pos,
-    category: 'Plant hire', lines: [line], taxable: t.taxable, cgst: t.cgst, sgst: t.sgst, igst: t.igst, total: t.total, itc_eligible: !!vendor?.gstin, amount_paid: 0, ...tds,
+    category: 'Plant hire', lines: [line], taxable: t.taxable, cgst: t.cgst, sgst: t.sgst, igst: t.igst, total: t.total, itc_eligible: !!vendor?.gstin && !noItcCentre(cc), amount_paid: 0, ...tds,
     ...(cc ? { cost_centre_id: cc } : {}), cn_sub: { kind: 'hire', equipment_id: e.id, month, with_operator: e.with_operator, ...(main ? { site_id: main } : {}) },
   } as Omit<PurchaseRecord, 'id'>);
 }

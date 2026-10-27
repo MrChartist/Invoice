@@ -584,6 +584,8 @@ declare module './advances' {
     booking_id?: string;
     /** CN-C2: a pass-through collection (stamp duty, registration, deposits — pure agent, no GST, outside RERA 70%). */
     pass_through?: boolean;
+    /** QA11 C2: part of the advance kept on cancelling the booking (forfeiture journal `journal_id`); closes that part. */
+    forfeits?: { id: string; date: string; amount: number; booking_id?: string; journal_id?: string }[];
   }
 }
 

@@ -24,7 +24,7 @@ import { billTdsInputFor, deducteeTypeFromPan, priorCreditsFor, resolveBillTds }
 import { adjustAgainstBill, unallocatedOf, vendorPaymentsDb, VENDOR_PAYMENTS_TABLE } from '../billwise';
 import { A, chartOf, loadUserAccounts, saveUserAccount, type PrimaryGroupId } from '../ledger/accounts';
 import { deleteVoucher, loadVouchers, saveVoucher, VOUCHERS_TABLE } from '../ledger/vouchers';
-import { DAY, SD, put, rowsOf, loadWorkOrders } from './cn-subcon';
+import { DAY, SD, noItcCentre, put, rowsOf, loadWorkOrders } from './cn-subcon';
 import { hireRecoveryFor, loadLogs, machines } from './cn-plant';
 
 export const SCB = 'SCB';
@@ -178,7 +178,7 @@ export function saveSubBill(woId: string, i: SubBillInput): { measurement: SubMe
     const bill = purchasesDb.save({
       kind: 'PURCHASE', vendor_id: wo.vendor_id, vendor_name: wo.vendor_name, ...(vendor?.gstin ? { vendor_gstin: vendor.gstin } : {}), bill_number: number, date: i.date,
       place_of_supply: pos, category: 'Sub-contract work', lines: pl, taxable: t.taxable, cgst: t.cgst, sgst: t.sgst, igst: t.igst, total: t.total,
-      itc_eligible: !!vendor?.gstin, amount_paid: jvTotal, ...tds, ...(wo.cost_centre_id ? { cost_centre_id: wo.cost_centre_id } : {}), cn_sub: cn,
+      itc_eligible: !!vendor?.gstin && !noItcCentre(wo.cost_centre_id), amount_paid: jvTotal, ...tds, ...(wo.cost_centre_id ? { cost_centre_id: wo.cost_centre_id } : {}), cn_sub: cn,
       notes: `Sub-contractor bill ${number} against work order ${wo.number}${i.period_from ? `, ${i.period_from} to ${i.period_to ?? i.date}` : ''}.`,
     } as Omit<PurchaseRecord, 'id'>);
     let left = deds.find((d) => d.kind === 'advance_recovery')?.amount ?? 0;

@@ -29,9 +29,23 @@ import { SINGLETON_KEYS, getJson, peekTable } from './storage';
 
 // R5-B2: informational ITC caution for a GTA that opted for 5% forward charge without ITC this FY (transport pack only).
 const gtaT = defineArea(
-  { warnGta: 'GTA option FY {fy}: 5% without ITC — check the ITC on this bill (verify with your CA).' } as const,
-  { warnGta: 'GTA विकल्प वित्त वर्ष {fy}: 5% बिना ITC — इस बिल का ITC जाँचें (CA से पुष्टि करें)।' },
+  {
+    warnGta: 'GTA option FY {fy}: 5% without ITC — check the ITC on this bill (verify with your CA).',
+    warnRealty: 'Project {name} pays GST at 1% / 5% without ITC — this bill claims ITC (verify with your CA).',
+  } as const,
+  {
+    warnGta: 'GTA विकल्प वित्त वर्ष {fy}: 5% बिना ITC — इस बिल का ITC जाँचें (CA से पुष्टि करें)।',
+    warnRealty: 'प्रोजेक्ट {name} पर GST 1% / 5% बिना ITC है — यह बिल ITC ले रहा है (CA से पुष्टि करें)।',
+  },
 );
+
+/** QA11 C9: a bill charged to a builder's project on the 1% / 5% scheme (N 03/2019, no ITC) that claims ITC. */
+function realtyItcCaution(input: BillInput): string {
+  if (!input.itc_eligible || !input.cost_centre_id || !(num(input.cgst) + num(input.sgst) + num(input.igst) > 0)) return '';
+  if (!isPackOn(getJson(SINGLETON_KEYS.settings, null), 'realty')) return '';
+  const p = peekTable<{ name?: string; cost_centre_id?: string; gst_scheme?: string }>('realty_projects').find((x) => x?.cost_centre_id === input.cost_centre_id && x.gst_scheme !== 'old_option');
+  return p ? gtaT('warnRealty', { name: p.name ?? '' }) : '';
+}
 
 function gtaItcCaution(input: BillInput): string {
   if (!input.itc_eligible || !(num(input.cgst) + num(input.sgst) + num(input.igst) > 0)) return '';
@@ -62,6 +76,8 @@ export function billWarnings(input: BillInput, purchases: readonly PurchaseRecor
   if (draft?.foreign_buyer) out.push(capT('warnBuyer', { gstin: draft.foreign_buyer }));
   const gta = gtaItcCaution(input); // R5-B2
   if (gta) out.push(gta);
+  const realty = realtyItcCaution(input); // QA11 C9
+  if (realty) out.push(realty);
   return out;
 }
 
