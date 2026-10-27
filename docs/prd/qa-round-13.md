@@ -200,7 +200,7 @@ AG83 (dispatch stock vs the union's bill), AG84 (194Q with pooled cycles) — `d
 Shipped on top of this round: the QA12 vault-mode storage race (`storage.ts`, +28 B gz), CMR bills tied to deliveries,
 the farmer's negative carry on the Farmers view, the application-money check on allotment, and the SV-A / SV-B / SV-C
 deferred items (`docs/features/services-r10.md` "Deferred items — shipped"). Milk shift sync stays a row conflict (why:
-`docs/features/agri-r12.md`). New CA questions SV70 ★, SV71, AG90 (total 364).
+`docs/features/agri-r12.md`). New CA questions SV70 ★, SV71, AG90 (total 396 with Round 13's MF items).
 
 Bundle (vite build + gzip -9, before = `claude/elegant-cannon-cwapiv` at `6560185`): initial JS 189,161 → 189,198 B
 (**+37 B**: `storage` +28, entry +9 from the lazy-import map); total JS 3,223,401 → 3,227,940 B (**+4.4 kB**). No new
