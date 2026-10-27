@@ -190,7 +190,19 @@ Demo company only). Strings: `i18n/areas/retail-r9b.ts` (en + hi). Tests: `rt-ph
 
 ## 3. Sizes (gz)
 
-(see the commit message of the RT-B merge; filled below)
+Measured against `claude/elegant-cannon-cwapiv` at `770d2f7` (RT-A + RT-C merged), `npm run build && npm run check:size`:
+
+| | Before | After | Δ |
+|---|---|---|---|
+| Initial JS | 189,043 B | 189,035 B | **−8 B** (184.6 / 185 kB) |
+| Total JS | 2,796,487 B (2730.9 kB) | 2,815,944 B (2749.9 kB / 2900) | **+19.0 kB** |
+
+**Deviation (total):** over RT-B's 10 kB share. Breakdown (gz): the one RT-B chunk (`PharmacyDesk`: five desk views,
+POS strip, editor fields, bill-modal notice, bell provider, the rx / refills / registers / prices engines and the en + hi
+strings) 15.7 kB; host preload lists of that chunk (EditorExtras, Pos, NotificationBell, Expenses / BillModal,
+Inventory) ≈ 1.6 kB; retention module for the recycle bin / year-end ≈ 0.7 kB + their call sites ≈ 0.7 kB; the retention
+rule row and the shared rule chunk split ≈ 0.6 kB; Demo rows 0.6 kB; `pharma-gate` save gate 0.2 kB. Trimmed already: one
+chunk instead of seven (−4 kB), strings shortened (−1.2 kB), the held cart is built by the POS (no `pos-hold` split).
 
 ## 4. CA items touched
 
