@@ -150,6 +150,11 @@ export const PACK_TABS: readonly PackTab[] = [
   // labels `r11.*` in `palette-destinations.ts`. CN-B / CN-D add their Works views and CN-C the desk's views with
   // their screens (one row + help topic + palette label each).
   { pack: 'works', path: '/time?tab=works&view=ra', labelKey: 'r11.ra' },
+  // CN-B: contractor finance (labels `view.*` in `packs-transport-works-r5.ts`)
+  { pack: 'works', path: '/time?tab=works&view=contracts', labelKey: 'view.contracts' },
+  { pack: 'works', path: '/time?tab=works&view=advances', labelKey: 'view.advances' },
+  { pack: 'works', path: '/time?tab=works&view=escalation', labelKey: 'view.escalation' },
+  { pack: 'works', path: '/time?tab=works&view=guarantees', labelKey: 'view.guarantees' },
   { pack: 'realty', path: '/receivables?tab=realty', labelKey: 'r11.realty' },
   // CN-C: the builder desk's views
   { pack: 'realty', path: '/receivables?tab=realty&view=projects', labelKey: 'r11.realty.projects' },

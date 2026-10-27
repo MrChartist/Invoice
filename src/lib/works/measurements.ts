@@ -24,6 +24,10 @@ import { raSnapshotFor, siteOfBoq } from '../construction/cn-snapshot-io'; // R1
 import { splitDeviation } from '../construction/cn-abstract';
 import { worksPlaceOfSupply } from '../construction/cn-tax';
 import { senderStateCode } from '../../store/invoice-defaults';
+import type { CnRecoveryInput, WorksContract } from '../../types/construction-r11';
+import { contractRules } from '../construction/cn-contracts'; // R11 (CN-B)
+import { cnBillDeductions } from '../construction/cn-recoveries';
+import { loadSecured } from '../construction/cn-secured';
 
 export const RA_TABLE = 'ra_measurements';
 const EPS = 1e-6;
@@ -145,6 +149,8 @@ export interface RaRequest {
   period_from?: string;
   period_to?: string;
   measured_on?: string;
+  /** R11 (CN-B2 / B4): recoveries typed on this bill (secured advance used, client material, hire, withheld, LD). */
+  recoveries?: CnRecoveryInput[];
 }
 
 /**
@@ -168,9 +174,10 @@ export function saveRaBill(boqId: string, req: RaRequest): { measurement: RaMeas
       ? createBalanceInvoice(boq, req.date)
       : createProgressInvoice(boq, { basis: 'measured', lineQtys: Object.fromEntries(lines.map((l) => [l.line_id, l.this_qty])), allowOver: extras.length > 0, overReason: extras.map((e) => e.extra!.reason).join('; ') }, req.date);
     const terms = boq.boq_terms ?? {};
-    const rules = terms.deductions ?? [];
     // R11 (CN-A2 / A4): quantity beyond the deviation limit as its own line; place of supply = the site State (Sec 12(3)).
     const snap = raSnapshotFor(boq, raNo, req);
+    const contract = snap.contract as WorksContract | undefined;
+    const rules = contractRules(terms.deductions ?? [], contract); // R11 (CN-B1): the contract's terms win
     const site = siteOfBoq(boq, snap.contract);
     const sender = stage.sender ?? localDb.settings.activeProfile();
     const pos = site ? worksPlaceOfSupply(site, stage.place_of_supply, { state: senderStateCode(sender ?? null), hasGstin: !!sender?.companyGstin?.trim(), taxEnabled: stage.gst_mode !== 'NONE' }) : null;
@@ -178,13 +185,18 @@ export function saveRaBill(boqId: string, req: RaRequest): { measurement: RaMeas
     const earlier = raBills(boqId, invoices);
     const advance = terms.advance_id ? getTable<{ id: string; amount: number }>('advances').find((a) => a.id === terms.advance_id) : undefined;
     const sumKind = (k: string) => earlier.reduce((s, b) => s + (b.ra_deductions ?? []).filter((d) => d.kind === k).reduce((t, d) => t + d.amount, 0), 0);
-    const deds = computeDeductions(bill, rules, {
+    const base = computeDeductions(bill, rules, {
       contractValue: contractValue(boq),
       previousGross: round2(earlier.reduce((s, b) => s + num(b.taxable_value), 0)),
       previousRetention: round2(sumKind('retention')),
       ...(advance ? { advance: { amount: num(advance.amount), recovered: round2(sumKind('advance_recovery')) } } : {}),
       gstTdsDeductor: !!localDb.clients.getById(boq.client?.id ?? '')?.gst_tds_deductor || !!boq.client?.gst_tds_deductor,
       intraState: bill.gst_mode !== 'IGST',
+    });
+    // R11 (CN-B2 / B4): contract advances (recovery schedule + interest), secured advance and typed recoveries.
+    const deds = cnBillDeductions({
+      base, contract, taxable: num(bill.taxable_value), date: req.date, earlier, invoices, secured: loadSecured(), recoveries: req.recoveries, boqAdvanceId: terms.advance_id,
+      advances: getTable<{ id: string; number?: string; date: string; amount: number }>('advances'), rulePct: rules.find((r) => r.kind === 'advance_recovery')?.rate,
     });
     const final = !!req.final;
     const release = deds.some((d) => d.kind === 'retention') ? releaseDay(terms, req.date, final) : undefined;

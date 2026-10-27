@@ -25,7 +25,9 @@ export function raDueSplit(inv: Pick<InvoiceRecord, 'id' | 'ra_deductions' | 're
     const left = r2(Math.min(Math.max(same.reduce((s, x) => s + x.amount, 0) - settled, 0), room));
     if (same[0] !== d || !(left > 0)) continue;
     room = r2(room - left);
-    held.push({ kind: d.kind, label: d.label, amount: left, ...(d.kind === 'retention' && inv.retention_release_on ? { release_on: inv.retention_release_on } : {}) });
+    // R11 (CN-B4): a withheld amount carries its own expected release day.
+    const release = d.kind === 'retention' ? inv.retention_release_on : d.release_on;
+    held.push({ kind: d.kind, label: d.label, amount: left, ...(release ? { release_on: release } : {}) });
   }
   const heldTotal = r2(held.reduce((s, h) => s + h.amount, 0));
   return { dueNow: r2(Math.max(outstanding, 0) - heldTotal), held, heldTotal };

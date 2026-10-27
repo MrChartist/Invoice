@@ -474,6 +474,8 @@ const RECORD_TABLES = [
   // Round 9 (R9-A … R9-E): retail riders / settlements / short book; doctors, refills; alterations; IMEI checks, finance
   // deals, service jobs; metal rates, jewellery tags, karigar moves (names in `retail/rt-shared.ts`)
   'delivery_riders', 'rider_settlements', 'short_book', 'doctors', 'rx_refills', 'alteration_jobs', 'imei_checks', 'finance_deals', 'service_jobs', 'metal_rates', 'jewel_tags', 'karigar_moves',
+  // R11-B (construction finance): contract register, secured advances, price-variation statements, bank guarantees
+  'works_contracts', 'secured_advances', 'price_variations', 'bank_guarantees',
   // R11-C: builders — projects, units, bookings (BKG/FY…), payment plans, stage certificates, RERA account entries
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
   // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
@@ -550,6 +552,8 @@ const ID_TABLES = new Set([
   // Round 9 (R9-A … R9-E): retail riders / settlements / short book; doctors, refills; alterations; IMEI checks, finance
   // deals, service jobs; metal rates, jewellery tags, karigar moves (names in `retail/rt-shared.ts`)
   'delivery_riders', 'rider_settlements', 'short_book', 'doctors', 'rx_refills', 'alteration_jobs', 'imei_checks', 'finance_deals', 'service_jobs', 'metal_rates', 'jewel_tags', 'karigar_moves',
+  // R11-B (construction finance): contract register, secured advances, price-variation statements, bank guarantees
+  'works_contracts', 'secured_advances', 'price_variations', 'bank_guarantees',
   // R11-C: builders — projects, units, bookings (BKG/FY…), payment plans, stage certificates, RERA account entries
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
   // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days

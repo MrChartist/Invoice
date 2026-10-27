@@ -9,7 +9,7 @@ import { isPackOn } from '../../lib/industry-packs';
 import { localDb } from '../../lib/localDb';
 import { peekTable } from '../../lib/storage';
 import { amountDue } from '../../lib/amount-due';
-import { receiptPlan, recordDeductionRow, recoverAdvance } from '../../lib/works/ra-receivable';
+import { receiptPlan, recordDeductionRow, recoverAdvance, type ClearingKind } from '../../lib/works/ra-receivable';
 import { B, errText, fmtMoney, today } from '../transport/shared';
 import styles from '../transport/transport.module.css';
 import own from './works.module.css';
@@ -41,7 +41,7 @@ export default function RaReceiptPanel({ invoice, version, onPrefill, onDone, on
       {plan.rows.map((r) => (
         <div key={r.kind} className={styles.toolbar}>
           <span>{r.label}: {fmtMoney(r.amount)}</span>
-          <button type="button" className={B.gs} onClick={() => run(() => (r.kind === 'advance_recovery' ? recoverAdvance(invoice.id, { date: today() }) : recordDeductionRow(invoice.id, r.kind as 'gst_tds' | 'labour_cess', { date: today() })))}>{r.kind === 'advance_recovery' ? twT('recoverAdvance') : twT('recordDeducted')}</button>
+          <button type="button" className={B.gs} onClick={() => run(() => (r.kind === 'advance_recovery' ? recoverAdvance(invoice.id, { date: today() }) : recordDeductionRow(invoice.id, r.kind as ClearingKind, { date: today() })))}>{r.kind === 'advance_recovery' ? twT('recoverAdvance') : twT('recordDeducted')}</button>
         </div>
       ))}
       {plan.held.length > 0 && <p className={styles.note}>{twT('heldNote', { list: plan.held.map((h) => `${h.label} ${fmtMoney(h.amount)}`).join(', ') })}</p>}
