@@ -40,6 +40,7 @@ import { useVirtualRows } from '../hooks/useVirtualRows';
 
 import { PaymentModal } from '../components/modals/PaymentModal';
 import { localDb, generateId, isIssued } from '../lib/localDb';
+import { ensureRetailHooks } from '../lib/retail/ensure-hooks';
 import { useCan } from '../hooks/useCan';
 import { isLocked } from '../lib/period-lock';
 import { useInvoiceStore } from '../store/useInvoiceStore';
@@ -62,6 +63,9 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Transactions.module.css';
 import { receivableBalance, receivableTotal } from '../lib/rcm';
+
+// QA10: release a retail bill's exchange receipts / finance DO on delete or cancel, even before any retail screen opened.
+ensureRetailHooks();
 
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
 
