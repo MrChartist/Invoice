@@ -54,7 +54,7 @@ export default function ContractPanel() {
       <label className={controls.check}>
         <input type="checkbox" checked={!!cn.works} onChange={(e) => setCn({ ...cn, works: e.target.checked || undefined })} data-cn-works /> {cnT('worksBill')}
       </label>
-      {s.boq_id && <button type="button" className={controls.btnOutline} onClick={refresh} data-cn-refresh>{cnT('refresh')}</button>}
+      {s.boq_id && !!s.ra_no && <button type="button" className={controls.btnOutline} onClick={refresh} data-cn-refresh>{cnT('refresh')}</button>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.5rem' }}>
         {TEXT.map(([k, l]) => (
           <label key={k} className={controls.field}><span className={controls.label}>{lbl(l)}</span>

@@ -371,6 +371,27 @@ registerRestoreHook('invoices', (_row, e, live) => {
   const lines = live('hotel_folios').flatMap((f) => (Array.isArray(f?.lines) ? f.lines : []) as Row[]);
   return lines.some((l) => isObj(l.src) && str(l.src.was_invoice_id) === e.row_id && str(l.src.invoice_id)) ? { refuse: 'The folio lines this invoice billed were billed again. Cancel that invoice first, or bill the stay again on the folio.' } : null;
 });
+registerRestoreHook('invoices', (row, e, live) => {
+  // QA11 C10: a builder's stage demand never comes back next to a demand raised again for that booking and stage; an
+  // RA bill never next to an RA bill of its BOQ made since the delete (its quantities were measured again) — and a
+  // PV bill only while its statement still names it. Each would bill the same work twice.
+  const cn = isObj(row.boq_terms) && isObj(row.boq_terms.cn) ? row.boq_terms.cn : undefined;
+  const d = cn && isObj(cn.demand) ? cn.demand : undefined;
+  const liveDocs = live('invoices').filter((x) => str(x?.id) !== e.row_id && str(x?.status) !== 'Cancelled' && str(x?.doc_type) !== 'CREDIT_NOTE');
+  if (d && str(row.doc_type) !== 'CREDIT_NOTE') {
+    const again = liveDocs.some((x) => {
+      const o = isObj(x.boq_terms) && isObj(x.boq_terms.cn) && isObj(x.boq_terms.cn.demand) ? x.boq_terms.cn.demand : undefined;
+      return !!o && str(o.booking_id) === str(d.booking_id) && (str(o.stage_id) === str(d.stage_id) || str(o.stage_label).toLowerCase() === str(d.stage_label).toLowerCase());
+    });
+    if (again) return { refuse: `This stage was demanded again for booking ${str(d.booking_no)}; restoring this demand would bill it twice.` };
+  }
+  if (Number(row.ra_no) > 0 && str(row.boq_id) && str(row.doc_type) !== 'CREDIT_NOTE' && liveDocs.some((x) => str(x?.boq_id) === str(row.boq_id) && Number(x?.ra_no) > 0 && (Number(x?.ra_no) === Number(row.ra_no) || str(x?.created_at) > e.deleted_at))) {
+    return { refuse: 'RA bills of this BOQ were measured again since this one was deleted; restoring it would bill the same quantities twice. Measure the work again instead.' };
+  }
+  const pv = cn && isObj(cn.pv) ? str(cn.pv.statement_id) : '';
+  if (pv && !live('price_variations').some((x) => str(x?.id) === pv && str(x?.status) === 'billed' && str(x?.invoice_id) === e.row_id)) return { refuse: 'Its price variation statement was cancelled or billed again since. Bill the statement again in Time → Works → Escalation.' };
+  return null;
+});
 registerRestoreHook('purchase_returns', (row, e, live) => {
   // A supplier note that settled a trade claim comes back only while the claim still names it.
   const m = /^Against claim (\S+)$/.exec(str(row.notes).trim());

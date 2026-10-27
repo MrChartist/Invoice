@@ -263,3 +263,16 @@ Breakdown (gz): the site chunk 25.0 kB (EN + HI strings ≈ 5.8 kB, eight engine
 equipment + logs + hire in / out, reconciliation + terms + client issues, P&L + WIP) with Hindi; total JS stays inside the
 3,000 kB budget. Trimmed already: one chunk, shared form helpers, no new icons, the rule file reached only through lazy
 engines, the payables / assets edits are single guarded lines.
+
+## QA round 11 (fixes; report `docs/prd/qa-round-11.md`)
+
+- Cancellation: a forfeiture kept out of an open booking advance closes it — additive `AdvanceRecord.forfeits[]`
+  (`{ id, date, amount, booking_id, journal_id }`, read by `advanceBalance` as `forfeited`); the journal (Dr Advances from
+  customers | Cr GST paid on advances | Cr Forfeiture income) is posted. A forfeiture wholly out of Debtors stays a draft.
+- Owned journals: "Sub-contractor deductions", "Site wages", "Secured advance", "Booking forfeiture" are deleted only
+  from their own screens (`vouchers.ts` `OWNED_JOURNALS`); a measured sub-contractor bill only from Sub-contracts.
+- RA bills: GST TDS u/s 51 off under the proviso (`gstTdsProvisoApplies`: our State = site State ≠ client's GSTIN State).
+- Site P&L: client recoveries on our RA bills are costs; draft RA bills are WIP; PV bills carry `boq_id` + cost centre.
+- Builders: sub-contractor / hire-in bills of a 1% / 5% project take no ITC (`noItcCentre`); the bill form cautions.
+- Recycle bin: a demand / RA bill / PV bill is not restored next to the one made again. Plant logs: `recovered_invoice_id`.
+- Delay interest is simple (earlier interest and its GST left out of the amount owed).

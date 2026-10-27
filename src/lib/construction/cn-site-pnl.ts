@@ -2,7 +2,8 @@
  * CN-D5 site P&L per contract (a BOQ and its project cost centre) and period — a working paper next to Books →
  * Projects (which stays ledger-based). Revenue: RA bills of the BOQ and other sales documents of the cost centre
  * (taxable, gross and net payable; `isRevenueDoc`), less credit notes. Costs, each source counted ONCE: stock consumed
- * at the site (`siteCostByCentre`) less material recovered from sub-contractors; sub-contractor bills (D1, `cn_sub`);
+ * at the site (`siteCostByCentre`) less material recovered from sub-contractors, plus what the client recovers on our RA
+ * bills (material issued, plant hire, water & power, LD, advance interest — QA11 C3); sub-contractor bills (D1, `cn_sub`);
  * labour-contractor bills and the muster's site wages (D2); plant hire bills (split by the month's log hours per site)
  * and the internal charge of our own plant less hire recovered (D3); other bills / expenses of the cost centre.
  * Purchases are read through `readPurchase` (cost = taxable when ITC is taken, else the total). Memo: unbilled work
@@ -68,6 +69,9 @@ export function sitePnl(i: SitePnlInput): SitePnl {
   const cc = i.boq.boq_terms?.cost_centre_id;
   const mine = (inv: Pick<InvoiceRecord, 'boq_id' | 'cost_centre_id'>) => inv.boq_id === i.boq.id || (!!cc && inv.cost_centre_id === cc);
   const rev = { taxable: 0, gross: 0, net: 0, credit: 0 };
+  // QA11 C3: what the client recovers on our RA bills is our cost (booked to these heads at receipt, ra-receivable.ts).
+  const clientCost: Partial<Record<string, 'material' | 'plant' | 'other'>> = { material_recovery: 'material', hire_charges: 'plant', water_power: 'other', ld: 'other', advance_interest: 'other' };
+  const recovered = { material: 0, plant: 0, other: 0 };
   let billedToDate = 0;
   const held = new Map<string, { kind: string; label: string; amount: number }>();
   for (const inv of i.invoices) {
@@ -84,13 +88,17 @@ export function sitePnl(i: SitePnlInput): SitePnl {
       held.set(h.kind, { ...x, amount: round2(x.amount + h.amount) });
     }
     if (!inP(inv.issue_date, i.period)) continue;
+    if (inv.boq_id === i.boq.id) for (const d of inv.ra_deductions ?? []) {
+      const head = clientCost[d.kind];
+      if (head) recovered[head] += num(d.amount);
+    }
     rev.taxable += num(inv.taxable_value);
     rev.gross += num(inv.total);
     rev.net += inv.ra_net_payable ?? num(inv.total);
   }
   const siteIds = new Set(i.sites.filter((g) => g.kind === 'site' && (g.boq_id === i.boq.id || (!!cc && g.cost_centre_id === cc))).map((g) => g.id));
   const labourVendors = new Set(i.compliance.map((r) => r.vendor_id));
-  const c = { material: i.material.get(cc ?? '') ?? 0, subcon: 0, labour: 0, muster: 0, plant: 0, other: 0 };
+  const c = { material: (i.material.get(cc ?? '') ?? 0) + recovered.material, subcon: 0, labour: 0, muster: 0, plant: recovered.plant, other: recovered.other };
   let retentionPayable = 0;
   for (const raw of i.purchases) {
     const p = readPurchase(raw);
@@ -129,7 +137,9 @@ export function sitePnl(i: SitePnlInput): SitePnl {
   const margin = round2(income - totalCost);
   // WIP memo: draft measurements × BOQ rate + typed "not yet measured"; cost to complete; expected margin.
   const rate = new Map(boqLines(i.boq).map((l) => [l.id, num(l.rate)]));
-  const unbilled = round2(i.measurements.filter((m) => m.boq_id === i.boq.id && m.status === 'draft').reduce((s, m) => s + m.lines.reduce((a, l) => a + num(l.this_qty) * (rate.get(l.line_id) ?? 0), 0), 0));
+  // QA11 C7: a measurement whose RA bill is still a draft is measured, not billed (saveRaBill stamps it 'billed').
+  const draftBills = new Set(i.invoices.filter((x) => x.status === 'Draft').map((x) => x.id));
+  const unbilled = round2(i.measurements.filter((m) => m.boq_id === i.boq.id && (m.status === 'draft' || (m.status === 'billed' && !!m.invoice_id && draftBills.has(m.invoice_id)))).reduce((s, m) => s + m.lines.reduce((a, l) => a + num(l.this_qty) * (rate.get(l.line_id) ?? 0), 0), 0));
   const inputs = i.boq.boq_terms?.site_pnl ?? {};
   const unmeasured = round2(num(inputs.unmeasured));
   const value = contractValue(i.boq);

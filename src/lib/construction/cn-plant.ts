@@ -95,7 +95,7 @@ export function saveLog(i: LogInput): PlantLog {
 export function deleteLog(id: string): void {
   requireAccess('doc.create');
   const l = loadLogs().find((x) => x.id === id);
-  if (l?.recovered_in) throw new Error(`Recovered on ${l.recovered_in}; cancel that bill first.`);
+  if (l && isRecovered(l, getTable<{ id: string; status?: string }>('invoices'))) throw new Error(`Recovered on ${l.recovered_in}; cancel that bill first.`);
   drop(SD.logs, id);
 }
 
@@ -140,9 +140,16 @@ export function monthSummary(logs: readonly PlantLog[], month: string, list: rea
   return [...out.values()];
 }
 
+/**
+ * QA11 C13: recovered on a sub-contractor bill, or on a hire-out invoice that still exists (not cancelled) — a deleted /
+ * cancelled draft invoice gives its logs back. Without `invoices` every marked log counts as recovered.
+ */
+export const isRecovered = (l: Pick<PlantLog, 'recovered_in' | 'recovered_invoice_id'>, invoices?: readonly { id: string; status?: string }[]): boolean =>
+  !!l.recovered_in && !(l.recovered_invoice_id && invoices && !invoices.some((i) => i?.id === l.recovered_invoice_id && i.status !== 'Cancelled'));
+
 /** Pure: logs charged to a sub-contractor not yet recovered (up to `date`) and their value at the hire-out rate. */
-export function hireRecoveryFor(vendorId: string, date: string, logs: readonly PlantLog[], list: readonly Machine[]): { logs: PlantLog[]; amount: number } {
-  const open = logs.filter((l) => l.sub_contractor_id === vendorId && !l.recovered_in && l.date <= date);
+export function hireRecoveryFor(vendorId: string, date: string, logs: readonly PlantLog[], list: readonly Machine[], invoices?: readonly { id: string; status?: string }[]): { logs: PlantLog[]; amount: number } {
+  const open = logs.filter((l) => l.sub_contractor_id === vendorId && !isRecovered(l, invoices) && l.date <= date);
   const amount = round2(open.reduce((s, l) => s + num(l.hours_worked) * (list.find((m) => m.ref === l.equipment_ref)?.hireOut ?? 0), 0));
   return { logs: open, amount };
 }

@@ -24,7 +24,7 @@ import { billTdsInputFor, deducteeTypeFromPan, priorCreditsFor, resolveBillTds }
 import { adjustAgainstBill, unallocatedOf, vendorPaymentsDb, VENDOR_PAYMENTS_TABLE } from '../billwise';
 import { A, chartOf, loadUserAccounts, saveUserAccount, type PrimaryGroupId } from '../ledger/accounts';
 import { deleteVoucher, loadVouchers, saveVoucher, VOUCHERS_TABLE } from '../ledger/vouchers';
-import { DAY, SD, put, rowsOf, loadWorkOrders } from './cn-subcon';
+import { DAY, SD, noItcCentre, put, rowsOf, loadWorkOrders } from './cn-subcon';
 import { hireRecoveryFor, loadLogs, machines } from './cn-plant';
 
 export const SCB = 'SCB';
@@ -151,7 +151,7 @@ export function saveSubBill(woId: string, i: SubBillInput): { measurement: SubMe
   const tdsIn = { ...billTdsInputFor(null, vendor), section: subTdsCode(wo, vendor) };
   const tds = resolveBillTds(tdsIn, { date: i.date, taxable: t.taxable, prior: priorCreditsFor(purchases, { id: vendor?.id, name: wo.vendor_name, pan: vendor?.pan }) }).fields;
   const advances = openAdvances(wo.vendor_id);
-  const hire = i.recoverHire === false ? { logs: [], amount: 0 } : hireRecoveryFor(wo.vendor_id, i.date, loadLogs(), machines());
+  const hire = i.recoverHire === false ? { logs: [], amount: 0 } : hireRecoveryFor(wo.vendor_id, i.date, loadLogs(), machines(), localDb.invoices.getAll());
   const deds = subDeductions(wo, t.taxable, { material: i.material, hire: hire.amount + num(i.hire), advanceOpen: advances.reduce((s, a) => s + a.open, 0) });
   const net = round2(t.total - num(tds.tds_amount) - deds.reduce((s, d) => s + d.amount, 0));
   if (net < 0) throw new Error('The deductions are more than the bill.');
@@ -178,7 +178,7 @@ export function saveSubBill(woId: string, i: SubBillInput): { measurement: SubMe
     const bill = purchasesDb.save({
       kind: 'PURCHASE', vendor_id: wo.vendor_id, vendor_name: wo.vendor_name, ...(vendor?.gstin ? { vendor_gstin: vendor.gstin } : {}), bill_number: number, date: i.date,
       place_of_supply: pos, category: 'Sub-contract work', lines: pl, taxable: t.taxable, cgst: t.cgst, sgst: t.sgst, igst: t.igst, total: t.total,
-      itc_eligible: !!vendor?.gstin, amount_paid: jvTotal, ...tds, ...(wo.cost_centre_id ? { cost_centre_id: wo.cost_centre_id } : {}), cn_sub: cn,
+      itc_eligible: !!vendor?.gstin && !noItcCentre(wo.cost_centre_id), amount_paid: jvTotal, ...tds, ...(wo.cost_centre_id ? { cost_centre_id: wo.cost_centre_id } : {}), cn_sub: cn,
       notes: `Sub-contractor bill ${number} against work order ${wo.number}${i.period_from ? `, ${i.period_from} to ${i.period_to ?? i.date}` : ''}.`,
     } as Omit<PurchaseRecord, 'id'>);
     let left = deds.find((d) => d.kind === 'advance_recovery')?.amount ?? 0;
@@ -188,7 +188,7 @@ export function saveSubBill(woId: string, i: SubBillInput): { measurement: SubMe
       adjustAgainstBill(a.v.id, bill.id, amt, i.date < a.v.date ? a.v.date : i.date);
       left = round2(left - amt);
     }
-    if (hire.logs.length) setTable(SD.logs, loadLogs().map((l) => (hire.logs.some((h) => h.id === l.id) ? { ...l, recovered_in: number } : l)));
+    if (hire.logs.length) setTable(SD.logs, loadLogs().map((l) => (hire.logs.some((h) => h.id === l.id) ? { ...l, recovered_in: number, recovered_invoice_id: undefined } : l)));
     const m: SubMeasurement = { id, number, wo_id: wo.id, date: i.date, ...(i.period_from ? { period_from: i.period_from } : {}), ...(i.period_to ? { period_to: i.period_to } : {}), lines, purchase_id: bill.id, ...(jvId ? { jv_id: jvId } : {}), status: 'billed', created_at: new Date().toISOString() };
     put(SD.bills, m);
     recordSeries(number);
@@ -203,13 +203,15 @@ export function cancelSubBill(id: string): SubMeasurement {
   if (!m || !live(m)) throw new Error('This bill is already cancelled.');
   if (m.purchase_id && paymentsDb.forPurchase(m.purchase_id).length) throw new Error('Payments are recorded on this bill. Delete them first.');
   return withTablesRollback([SD.bills, SD.logs, PURCHASES_TABLE, 'purchase_payments', VOUCHERS_TABLE], () => {
-    if (m.purchase_id && purchasesDb.get(m.purchase_id)) purchasesDb.remove(m.purchase_id);
-    if (m.jv_id && loadVouchers().some((v) => v.id === m.jv_id)) deleteVoucher(m.jv_id);
-    setTable(SD.logs, loadLogs().map((l) => (l.recovered_in === m.number ? { ...l, recovered_in: undefined } : l)));
     const { purchase_id: _p, jv_id: _j, ...rest } = m; // the bin keeps them; the row no longer names them (restore guard)
     void _p;
     void _j;
-    return put(SD.bills, { ...rest, status: 'cancelled' as const });
+    // QA11 C4 / C5: the row lets go of the bill and journal first — both refuse to go while a live row names them.
+    const out = put(SD.bills, { ...rest, status: 'cancelled' as const });
+    if (m.purchase_id && purchasesDb.get(m.purchase_id)) purchasesDb.remove(m.purchase_id);
+    if (m.jv_id && loadVouchers().some((v) => v.id === m.jv_id)) deleteVoucher(m.jv_id);
+    setTable(SD.logs, loadLogs().map((l) => (l.recovered_in === m.number ? { ...l, recovered_in: undefined } : l)));
+    return out;
   });
 }
 

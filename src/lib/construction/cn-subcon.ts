@@ -29,6 +29,10 @@ export const SD = {
 export const SWO = 'SWO';
 
 export const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** QA11 C9: a cost centre of a builder's project on the 1% / 5% scheme (N 03/2019) takes no ITC on its bills. */
+export const noItcCentre = (costCentreId: string | undefined): boolean =>
+  !!costCentreId && getTable<{ cost_centre_id?: string; gst_scheme?: string }>('realty_projects').some((p) => p?.cost_centre_id === costCentreId && p.gst_scheme !== 'old_option');
 export const rowsOf = <T>(t: string): T[] => getTable<T>(t).filter((r) => !!r && typeof (r as { id?: unknown }).id === 'string');
 /** Insert or replace a row by id (one table write: the edit observer audits it). */
 export function put<T extends { id: string }>(t: string, row: T): T {
