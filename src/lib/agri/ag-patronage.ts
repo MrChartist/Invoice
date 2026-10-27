@@ -16,7 +16,9 @@ import { isVoidStatus, readPurchase, readPurchaseLines } from '../purchase-norma
 import { A } from '../ledger/accounts';
 import { saveVoucher, type ManualVoucher } from '../ledger/vouchers';
 import { ensureLedger } from '../trade/tr-ledger';
-import type { Member } from './ag-members';
+import { getTable } from '../storage';
+import { localDb } from '../localDb';
+import { loadMembers, type Member } from './ag-members';
 
 export interface PatronageRow { member: Member; suppliedQty: number; suppliedValue: number; boughtValue: number; business: number; share: number }
 
@@ -81,6 +83,9 @@ export function distribution(i: { pat: number; reservePct: number; dividendPct: 
 }
 
 /* ── Storage ── */
+
+/** The register for an FY from the live tables (farmer vendors = vendors carrying `ag`). */
+export const patronageOf = (fyStartYear: number) => patronage(fyStartYear, { members: loadMembers(), cycles: getTable('farmer_cycles'), purchases: getTable('purchases'), invoices: localDb.invoices.getAll(), farmerIds: new Set(getTable<{ id: string; ag?: unknown }>('vendors').filter((v) => v.ag).map((v) => v.id)) });
 
 /** Post the distribution as an OPTIONAL (draft) appropriation journal: Dr surplus | Cr reserve, dividend, patronage payable. */
 export function draftAppropriation(dist: Distribution, date: string): ManualVoucher {

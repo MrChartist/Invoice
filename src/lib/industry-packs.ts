@@ -250,6 +250,7 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'fpo', path: '/inventory?tab=members&view=shares', labelKey: 'r12.members.shares' },
   { pack: 'fpo', path: '/inventory?tab=members&view=patronage', labelKey: 'r12.members.patronage' },
   { pack: 'fpo', path: '/inventory?tab=members&view=papers', labelKey: 'r12.members.papers' },
+  { pack: 'fpo', path: '/inventory?tab=members&view=loans', labelKey: 'r12.members.loans' },
 ];
 
 /**
