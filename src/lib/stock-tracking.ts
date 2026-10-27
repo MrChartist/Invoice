@@ -804,7 +804,7 @@ export function liveDocTrackingIssues(doc: DocInput): TrackingIssues {
         events: collectEvents({ ...input, includeTransfers: true, excludeInvoiceId: doc.id }),
       };
     }, doc.id ?? '');
-    const tracked = agriExpiryGate(pharmaGate(docTrackingIssues(doc, sharedTrackingInputs(), multi, pre), doc), doc.issue_date); // 7U pharma pack (off by default); R12 (AG-D4) expired seeds / pesticides
+    const tracked = agriExpiryGate(pharmaGate(docTrackingIssues(doc, sharedTrackingInputs(), multi, pre), doc)); // 7U pharma pack (off by default); R12 (AG-D4) expired seeds / pesticides
     if (doc.status === 'Draft' || doc.status === 'Cancelled') return tracked;
     // QA8 T15: an agency line may not oversell its lot or sell a cancelled one.
     const lots = (doc.items ?? []).some((l) => l?.arrival_id) ? lotIssues(doc, getTable<InvoiceRecord>('invoices'), getTable<Arrival>('arrivals')) : [];

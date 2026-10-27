@@ -5,8 +5,9 @@ import assert from 'node:assert/strict';
 import { resetStorage } from './helpers/shim.ts';
 import { installSettings } from './helpers/world.ts';
 import { setTable, KEYS } from '../src/lib/storage.ts';
-import { agriLicenceNotices, licenceLines, principalWarnings, unlicensedWarnings } from '../src/lib/agri/ag-licences.ts';
-import { agriExpiryGate, classIndex } from '../src/lib/agri/ag-expiry.ts';
+import { agriLicenceNotices, classIndex, licenceLines, principalWarnings, unlicensedWarnings } from '../src/lib/agri/ag-licences.ts';
+import { BLOCK_ON_EXPIRY, agriExpiryGate } from '../src/lib/agri/ag-expiry.ts';
+import { DEALER_CLASS_RULES } from '../src/lib/agri-rules.ts';
 import { bookAt, capWarning, posCheck, subsidyErrors, validFarmerId } from '../src/lib/agri/ag-subsidy.ts';
 import { seasonCredit, seasonDue, withSeason } from '../src/lib/agri/ag-season-credit.ts';
 import { partyInterest } from '../src/lib/trade/tr-interest.ts';
@@ -50,12 +51,14 @@ test('a licensed class with no valid licence warns (never blocks); a purchase wi
 test('expiry by class: an expired pesticide / seed batch is an error; an expired fertiliser keeps the confirmation', () => {
   setTable('stock_items', [{ id: 'i1', name: 'Chlorpyrifos 20 EC', ag_class: 'pesticide_chem' }, { id: 'i2', name: 'Urea 45 kg', ag_class: 'fertiliser' }]);
   const issues = { errors: [], warnings: [], expired: ['Chlorpyrifos 20 EC: batch C1 expired on 2026-06-30.', 'Urea 45 kg: batch U9 expired on 2026-06-30.'] };
-  const out = agriExpiryGate(issues, '2026-07-10');
+  const out = agriExpiryGate(issues);
   assert.equal(out.errors.length, 1);
   assert.match(out.errors[0], /^Chlorpyrifos 20 EC: batch C1 expired.*cannot be sold/);
   assert.deepEqual(out.expired, ['Urea 45 kg: batch U9 expired on 2026-06-30.']);
   setTable('stock_items', []);
-  assert.equal(agriExpiryGate(issues, '2026-07-10'), issues, 'no agri classes: untouched');
+  assert.equal(agriExpiryGate(issues), issues, 'no agri classes: untouched');
+  const latest = DEALER_CLASS_RULES[DEALER_CLASS_RULES.length - 1].value;
+  assert.deepEqual([...BLOCK_ON_EXPIRY].sort(), Object.keys(latest).filter((k) => latest[k].expiry === 'block').sort(), 'the gate mirrors the rule rows');
   assert.match(readFileSync(new URL('../src/lib/stock-tracking.ts', import.meta.url), 'utf8'), /agriExpiryGate\(pharmaGate\(/);
 });
 

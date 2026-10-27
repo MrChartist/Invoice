@@ -2,26 +2,22 @@
  * AG-D4 expiry gate by class, applied by the stock checks next to the pharma gate: an expired batch of a class whose
  * rule says `block` (pesticides, seeds — Insecticides Rules / Seeds Order, AG21) becomes an error that stops the sale;
  * other classes (fertilisers) keep the "Sell anyway" confirmation. Does nothing unless an item carries `ag_class`.
+ * Kept tiny and self-contained (the stock checks load with the editor): the blocked classes mirror the `block` rows of
+ * `agri-rules.ts` `DEALER_CLASS_RULES` — `tests/ag-inputs.test.ts` pins the two together.
  */
-import { DEALER_CLASS_RULES } from '../agri-rules';
-import { ruleAt } from '../tax-rules';
 import { getTable, KEYS } from '../storage';
+
+export const BLOCK_ON_EXPIRY: ReadonlySet<string> = new Set(['seed_sowing', 'pesticide_chem', 'biopesticide']);
 
 interface Issues { errors: string[]; expired: string[] }
 
-export function agriExpiryGate<T extends Issues>(issues: T, date: string): T {
+export function agriExpiryGate<T extends Issues>(issues: T): T {
   if (!issues.expired.length) return issues;
-  const classes = classIndex();
-  if (!classes.size) return issues;
-  const rules = ruleAt(DEALER_CLASS_RULES, date);
-  const blocked = (e: string) => rules[classes.get(e.slice(0, e.indexOf(': batch ')).trim().toLowerCase()) ?? '']?.expiry === 'block';
-  const stop = issues.expired.filter(blocked);
+  const blocked = new Set<string>();
+  for (const t of ['stock_items', KEYS.items]) for (const i of getTable<{ name?: string; ag_class?: string }>(t)) if (i?.name && BLOCK_ON_EXPIRY.has(i.ag_class ?? '')) blocked.add(i.name.trim().toLowerCase());
+  if (!blocked.size) return issues;
+  const hit = (e: string) => blocked.has(e.slice(0, e.indexOf(': batch ')).trim().toLowerCase());
+  const stop = issues.expired.filter(hit);
   if (!stop.length) return issues;
-  return { ...issues, errors: [...issues.errors, ...stop.map((e) => `${e} Expired seeds / pesticides cannot be sold (verify AG21).`)], expired: issues.expired.filter((e) => !blocked(e)) };
-}
-/** `ag_class` of every catalogue / stock item by lower-cased name (the catalogue wins). */
-export function classIndex(): Map<string, string> {
-  const m = new Map<string, string>();
-  for (const t of ['stock_items', KEYS.items]) for (const i of getTable<{ name?: string; ag_class?: string }>(t)) if (i?.ag_class && i.name) m.set(i.name.trim().toLowerCase(), i.ag_class);
-  return m;
+  return { ...issues, errors: [...issues.errors, ...stop.map((e) => `${e} Expired seeds / pesticides cannot be sold (verify AG21).`)], expired: issues.expired.filter((e) => !hit(e)) };
 }

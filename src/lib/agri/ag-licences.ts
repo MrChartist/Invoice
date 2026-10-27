@@ -11,10 +11,10 @@
 import type { AgriLicence, AgriLicenceKind, AgriPrincipal } from '../../types/agri-r12d';
 import type { DrugLicence } from '../../types/retail-r9';
 import { ruleAt } from '../tax-rules';
+import { getTable, KEYS } from '../storage';
 import { isVoidStatus, readPurchase, readPurchaseLines } from '../purchase-normalize';
 import { licenceNotices } from '../retail/rt-pharmacy-registers';
 import { DEALER_CLASS_RULES } from '../agri-rules';
-export { classIndex } from './ag-expiry';
 
 export const LICENCE_KINDS: readonly AgriLicenceKind[] = ['fertiliser_retail', 'fertiliser_wholesale', 'seed', 'insecticide', 'fssai', 'apmc', 'other'];
 export const SOON_DAYS = 45;
@@ -26,6 +26,13 @@ export function agriLicenceNotices(licences: readonly AgriLicence[] | undefined,
 }
 
 const validOn = (l: { valid_from?: string; valid_to?: string }, day: string) => (!l.valid_from || l.valid_from <= day) && (!l.valid_to || l.valid_to >= day);
+
+/** `ag_class` of every catalogue / stock item by lower-cased name (the catalogue wins). */
+export function classIndex(): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const t of ['stock_items', KEYS.items]) for (const i of getTable<{ name?: string; ag_class?: string }>(t)) if (i?.ag_class && i.name) m.set(i.name.trim().toLowerCase(), i.ag_class);
+  return m;
+}
 
 /** The class rule (licence kinds needed, expiry policy) by date. */
 export const classRules = (date?: string) => ruleAt(DEALER_CLASS_RULES, date);
