@@ -12,13 +12,12 @@ import type { Godown } from '../../types/stock';
 import { generateId, getTable, setTable } from '../storage';
 import { requireAccess } from '../access';
 import { num, round2 } from '../invoice-calc';
-import { ruleAt } from '../tax-rules';
 import { nextSeriesNumberFor, recordSeries } from '../series-counters';
 import { assertUnlocked } from '../period-lock';
 import { withTablesRollback } from '../table-txn';
 import { A } from '../ledger/accounts';
 import { deleteVoucher, saveVoucher, VOUCHERS_TABLE } from '../ledger/vouchers';
-import { CASH_PAYMENT_LIMIT_RULES } from '../retail-rules';
+import { cashPaymentLimit } from '../retail/rt-cash-guard'; // Sec 40A(3) limit (`CASH_PAYMENT_LIMIT_RULES`)
 import { DAY, SD, put, rowsOf } from './cn-subcon';
 import { ledgerId } from './cn-subcon-bill';
 
@@ -57,7 +56,7 @@ export interface WageRow {
 }
 
 /** Pure: the wage sheet of a site for `from`…`to` (unsettled days only). */
-export function wageSheet(days: readonly MusterDay[], labour: readonly SiteLabour[], siteId: string, from: string, to: string, advances: Readonly<Record<string, number>> = {}, cash = true, limit = ruleAt(CASH_PAYMENT_LIMIT_RULES, to)): WageRow[] {
+export function wageSheet(days: readonly MusterDay[], labour: readonly SiteLabour[], siteId: string, from: string, to: string, advances: Readonly<Record<string, number>> = {}, cash = true, limit = cashPaymentLimit(to)): WageRow[] {
   const acc = new Map<string, { days: number; ot: number }>();
   for (const d of days) {
     if (d.site_id !== siteId || d.date < from || d.date > to || d.mus_no) continue;

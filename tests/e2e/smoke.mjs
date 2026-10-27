@@ -3551,6 +3551,56 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+
+  await step('R11-D site desk: a work order back-to-back at 90% of the BOQ rate; measuring 10 cum makes the purchase bill with 194C on the value before GST and 5% retention by journal; a muster day settles as MUS with a payment voucher; the site P&L shows the sub-contractor cost and the margin', async () => {
+    const keys = ['settings', 'construction_settings', 'invoices', 'vendors', 'godowns', 'cost_centres', 'purchases', 'vouchers', 'accounts', 'series_counters', 'sub_work_orders', 'sub_measurements', 'site_labour', 'muster_days', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'contractor', modules: undefined, industry_packs: ['works'], construction_kind: 'civil', retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'construction_settings', { views: { subcon: true, labour: true, plant: true, reco: true, pnl: true } });
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), { id: 'e2e-sd-cc', name: 'E2E SH-14 project', kind: 'project', active: true }]);
+    await writeJson(page, 'godowns', [...(prev.godowns ?? []), { id: 'e2e-sd-site', name: 'E2E SH-14 site', kind: 'site', boq_id: 'e2e-sd-boq', cost_centre_id: 'e2e-sd-cc' }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-sd-sub', name: 'E2E Kumar Plasterers', pan: 'ABCPK1234L', state_code: '27' }]);
+    const client = { id: 'e2e-sd-dept', name: 'E2E PWD Division 9', email: '', address: 'Pune', city: 'Pune', zip: '', state_code: '27' };
+    const boq = {
+      id: 'e2e-sd-boq', invoice_number: 'SO/E2E/0014', doc_type: 'SALES_ORDER', issue_date: '2026-05-01', due_date: '2026-05-31', status: 'Sent', currency: 'INR', template_id: 'classic_orange', client, sender: (prev.settings?.profiles ?? [])[0] ?? null,
+      items: [{ id: 'e2e-sd-l1', name: 'Plaster 12 mm', boq_ref: '5.1', type: 'Service', hsn: '995411', unit: 'SQM', quantity: 1000, rate: 400, tax_rate: 18, discount_percent: 0, amount: 400000 }],
+      gst_mode: 'CGST_SGST', place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false,
+      amount_paid: 0, notes: '', terms: '', subtotal: 400000, discount_amount: 0, taxable_value: 400000, cgst_amount: 36000, sgst_amount: 36000, igst_amount: 0, tax_amount: 72000, round_off: 0, total: 472000, balance_due: 472000,
+      boq_terms: { cost_centre_id: 'e2e-sd-cc' },
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), boq]);
+    // D1: work order from the BOQ at 90%, 5% retention.
+    await page.goto(srv.origin + '/time?tab=works&view=subcon&boq=e2e-sd-boq');
+    await page.locator('[data-sd="wo-vendor"]').selectOption('e2e-sd-sub', { timeout: 15000 });
+    await page.locator('[data-sd-save-wo]').click();
+    const wo = (await readJson(page, 'sub_work_orders', [], (v) => v?.length > 0))[0];
+    check(/^SWO\/FY\d\d-\d\d\/0001$/.test(wo?.number ?? '') && wo.lines[0].rate === 360 && wo.lines[0].ref === '5.1', `work order ${wo?.number}: back-to-back at 90% (${wo?.lines?.[0]?.rate})`);
+    // Measure 100 sqm → the purchase bill.
+    await page.locator('[data-sd-cum]').first().fill('100');
+    await page.locator('[data-sd-save-bill]').click();
+    const bill = (await readJson(page, 'purchases', [], (v) => v?.some((p) => p.cn_sub?.kind === 'subcon'))).find((p) => p.cn_sub?.kind === 'subcon');
+    check(bill?.taxable === 36000 && bill.tds_section === '194C-1' && bill.tds_amount === 360 && bill.cn_sub.deductions.some((d) => d.kind === 'retention' && d.amount === 1800) && bill.amount_paid === 1800, `sub-contractor bill ${bill?.bill_number}: 194C 1% on ₹36,000 and 5% retention by journal`);
+    const jv = (await readJson(page, 'vouchers', [], (v) => v?.some((x) => x.id === bill?.cn_sub?.jv_id))).find((x) => x.id === bill?.cn_sub?.jv_id);
+    check(jv?.voucher_class === 'Sub-contractor deductions', 'the deductions journal is posted');
+    // D2: a worker, a muster day, the weekly settlement.
+    await page.goto(srv.origin + '/time?tab=works&view=labour');
+    await page.locator('[data-sd="w-name"]').fill('E2E Ramu', { timeout: 15000 });
+    await page.locator('[data-sd="w-rate"]').fill('800');
+    await page.locator('[data-sd-add-worker]').click();
+    await page.locator('[data-sd-mark]').click({ timeout: 15000 });
+    await readJson(page, 'muster_days', [], (v) => v?.length > 0);
+    await page.locator('[data-sd-settle]').click({ timeout: 15000 });
+    const days = await readJson(page, 'muster_days', [], (v) => v?.some((d) => d.mus_no));
+    check(/^MUS\/FY\d\d-\d\d\/0001$/.test(days[0]?.mus_no ?? '') && !!days[0].voucher_id, `muster settled ${days[0]?.mus_no} with a payment voucher`);
+    // D5: the site P&L.
+    await page.goto(srv.origin + '/time?tab=works&view=pnl&boq=e2e-sd-boq');
+    const pnl = page.locator('[data-sd-table="pnl"]');
+    await pnl.waitFor({ timeout: 15000 });
+    const text = await pnl.innerText();
+    check(/Sub-contractor bills/.test(text) && /36,000/.test(text) && /Site wages/.test(text) && /800/.test(text) && (await page.locator('[data-sd-margin]').count()) === 1, 'site P&L: sub-contractor bill and muster wages as costs, a margin line');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {
