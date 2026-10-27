@@ -43,6 +43,8 @@ const CompositionTracker = lazy(() => import('../trade/CompositionTracker'));
 const MembersCalendar = lazy(() => import('../agri/MembersCalendar'));
 // R13 (MF-D3 / D4): Form-1, export-obligation and incentive reminders (shopfloor pack only, lazy).
 const MfgCalendar = lazy(() => import('../mfg/MfgCalendar'));
+// R14 (PS-C2): EDF and services-realisation reminders (svcexport pack only, lazy).
+const ExportSvcCalendar = lazy(() => import('../prof/ExportSvcCalendar'));
 
 export interface ComplianceViewProps {
   invoices: InvoiceRecord[];
@@ -201,6 +203,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
       <Suspense fallback={null}><CompositionTracker invoices={invoices} stateCode={stateCode} today={today} /></Suspense>
       {isPackOn(localDb.settings.get(), 'fpo') && <Suspense fallback={null}><MembersCalendar today={today} /></Suspense>}
       {isPackOn(localDb.settings.get(), 'shopfloor') && <Suspense fallback={null}><MfgCalendar today={today} /></Suspense>}
+      {isPackOn(localDb.settings.get(), 'svcexport') && <Suspense fallback={null}><ExportSvcCalendar today={today} /></Suspense>}
       <ul className={local.notes}>
         <li><strong>{gvT('ncEstimates')}</strong> {gvT('ncDue')}</li>
         <li>{gvT('ncLateFee')}</li>

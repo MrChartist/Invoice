@@ -314,6 +314,7 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'partners', alsoPacks: ['practice'], path: '/time?tab=firm&view=tds194t', labelKey: 'r14.firm.tds194t' },
   { pack: 'partners', alsoPacks: ['practice'], path: '/time?tab=firm&view=presumptive', labelKey: 'r14.firm.presumptive' },
   { pack: 'partners', alsoPacks: ['practice'], path: '/time?tab=firm&view=tds194j', labelKey: 'r14.firm.tds194j' },
+  { pack: 'partners', alsoPacks: ['practice'], path: '/time?tab=firm&view=threshold', labelKey: 'r14.firm.threshold' }, // PS-C5
   { pack: 'cafirm', path: '/time?tab=cadesk', labelKey: 'r14.cadesk' },
   { pack: 'cafirm', path: '/time?tab=cadesk&view=events', labelKey: 'r14.cadesk.events' },
   { pack: 'cafirm', path: '/time?tab=cadesk&view=fees', labelKey: 'r14.cadesk.fees' },
@@ -324,6 +325,13 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'legal', alsoPacks: ['cafirm'], path: '/time?tab=clientmoney&view=reconcile', labelKey: 'r14.cm.reconcile' },
   { pack: 'legal', alsoPacks: ['cafirm'], path: '/time?tab=clientmoney&view=statements', labelKey: 'r14.cm.statements' },
   { pack: 'design', path: '/time?tab=matters&view=stages', labelKey: 'r14.matters.stages' },
+  // PS-C: export-of-services desk
+  { pack: 'svcexport', path: '/time?tab=exportsvc', labelKey: 'r14.exportsvc' },
+  { pack: 'svcexport', path: '/time?tab=exportsvc&view=checker', labelKey: 'r14.exportsvc.checker' },
+  { pack: 'svcexport', path: '/time?tab=exportsvc&view=edf', labelKey: 'r14.exportsvc.edf' },
+  { pack: 'svcexport', path: '/time?tab=exportsvc&view=realisation', labelKey: 'r14.exportsvc.realisation' },
+  { pack: 'svcexport', path: '/time?tab=exportsvc&view=refund', labelKey: 'r14.exportsvc.refund' },
+  { pack: 'svcexport', path: '/time?tab=exportsvc&view=platforms', labelKey: 'r14.exportsvc.platforms' },
 ];
 
 /**

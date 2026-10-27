@@ -4,7 +4,7 @@
  * `tax-rules.ts` is part of the first-paint bundle and the trade desk is not. Append new versions at the end of a
  * list — never edit an old one. Every value is an UNVERIFIED working-paper value: verify with your CA.
  */
-import { ruleAt, type Versioned } from '../tax-rules';
+import { ruleAt, todayIso, type Versioned } from '../tax-rules';
 
 /**
  * FEMA period for realising export proceeds, in months from the date of export (shipment), keyed by the
@@ -14,8 +14,21 @@ import { ruleAt, type Versioned } from '../tax-rules';
 export const EXPORT_REALISATION_MONTHS_RULES: readonly Versioned<number>[] = [
   { from: '2013-04-01', value: 9, source: 'RBI Master Direction — Export of Goods and Services (9 months) — verify' },
   { from: '2025-11-13', value: 15, source: 'RBI FEMA (Export of Goods & Services) amendment, Nov 2025 (15 months) — verify the date' },
+  // R14 PS-C2 (PS15 / X1): FEMA (Export and Import of Goods and Services) Regulations 2026 in force 1 Oct 2026; services
+  // count from the invoice date (Reg 5(1)(a)). Goods exports read the same row.
+  { from: '2026-10-01', value: 9, source: 'FEMA 23(R)/2026-RB Reg 5(1)(a), as amended by FEMA 23(R)(1)/2026-RB of 22 Sep 2026 — verify transition (PS15)' },
 ];
 export const exportRealisationMonths = (shipDate?: string): number => ruleAt(EXPORT_REALISATION_MONTHS_RULES, shipDate);
+
+/**
+ * R14 PS-C2: exports invoiced or settled in INR (first proviso to Reg 5(1)), keyed by the same clock date. Before the
+ * first row the foreign-currency rule above applies.
+ */
+export const EXPORT_REALISATION_INR_MONTHS_RULES: readonly Versioned<number>[] = [
+  { from: '2026-10-01', value: 12, source: 'FEMA 23(R)/2026-RB Reg 5(1) first proviso, as amended 22 Sep 2026 — verify (PS15)' },
+];
+export const exportRealisationInrMonths = (date?: string): number =>
+  (date || todayIso()) >= EXPORT_REALISATION_INR_MONTHS_RULES[0].from ? ruleAt(EXPORT_REALISATION_INR_MONTHS_RULES, date) : exportRealisationMonths(date);
 
 /** Social Welfare Surcharge, % of basic customs duty (Finance Act 2018, from 2 Feb 2018). Per-tariff exemptions are typed per line. */
 export const CUSTOMS_SWS_PCT_RULES: readonly Versioned<number>[] = [

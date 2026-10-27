@@ -4,7 +4,7 @@
  * One lazy chunk with its views (the R13 desk pattern); nothing is read until the tab opens. Working papers — verify
  * with your CA; nothing is filed.
  */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useT } from '../../i18n';
 import { fdT } from '../../i18n/areas/prof-r14d-firm';
 import controls from '../../styles/controls.module.css';
@@ -16,8 +16,13 @@ import PresumptiveView from './PresumptiveView';
 import Tds194jView from './Tds194jView';
 import type { PsDeskCtx } from './ps-desk';
 import type { PsDeskProps } from './ps-run';
+import { defineArea } from '../../i18n/area';
 
-const VIEWS = ['partners', 'appropriation', 'tds194t', 'presumptive', 'tds194j'] as const;
+// R14 PS-C5: the GST registration-threshold card (its own lazy chunk, shared with the freelancer's Dashboard).
+const ThresholdView = lazy(() => import('./ThresholdView'));
+const thL = defineArea({ t: 'Threshold' } as const, { t: 'पंजीकरण सीमा' });
+
+const VIEWS = ['partners', 'appropriation', 'tds194t', 'presumptive', 'tds194j', 'threshold'] as const; // PS-C: threshold
 
 export default function FirmDesk({ view, notify }: PsDeskProps) {
   useT();
@@ -40,12 +45,13 @@ export default function FirmDesk({ view, notify }: PsDeskProps) {
   };
   return (
     <section data-firm-desk>
-      <Views tab="firm" views={VIEWS} value={v as (typeof VIEWS)[number]} label={(k) => fdT(`view.${k}`)} />
+      <Views tab="firm" views={VIEWS} value={v as (typeof VIEWS)[number]} label={(k) => (k === 'threshold' ? thL('t') : fdT(`view.${k}`))} />
       {v === 'partners' && <PartnersView ctx={ctx} />}
       {v === 'appropriation' && <AppropriationView ctx={ctx} />}
       {v === 'tds194t' && <Tds194tView ctx={ctx} />}
       {v === 'presumptive' && <PresumptiveView />}
       {v === 'tds194j' && <Tds194jView ctx={ctx} />}
+      {v === 'threshold' && <Suspense fallback={null}><ThresholdView /></Suspense>}
       <p className={controls.hint}>{fdT('wp')}</p>
     </section>
   );

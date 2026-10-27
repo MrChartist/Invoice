@@ -41,6 +41,11 @@ export function profExtras(ctx: ProfileContext): DemoExtras {
     const day = shiftDay(today, -3);
     tables.udin_register = [{ id: 'demo-udin-1', demo: true, udin: `${day.slice(2, 4)}123456DEMO000001`, date: day, client_id: base.clients[0].id, client_name: base.clients[0].name, kind: 'certificate', description: 'Net worth certificate (demo)', member_no: '123456', created_at: `${day}T09:00:00.000Z` }] as never;
   }
-  // PS-C: add its block here.
+  // PS-C (svcexport): last month's EDF for software exports, filed with the AD bank.
+  if (packs.includes('svcexport')) {
+    const d = new Date(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, 0);
+    const end = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    tables.edf_register = [{ id: 'demo-edf-1', demo: true, kind: 'software', period: end.slice(0, 7), invoice_ids: [], date: end, authority: 'ad_bank', currency: 'USD', value_fc: 4800, value_inr: 403200, due: shiftDay(end, 30), edf_no: 'EDF-DEMO-1', filed_on: shiftDay(end, 12), status: 'filed', created_at: `${end}T09:00:00.000Z` } as never];
+  }
   return { tables };
 }
