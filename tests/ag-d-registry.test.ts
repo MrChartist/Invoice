@@ -52,5 +52,11 @@ test('writers and the lazy all-table writers import the registry; no R12 row in 
 
 test('pack gate: the shared mounts and the bell load AG-D code only with its pack on', () => {
   assert.match(src('pages/Pos.tsx'), /isPackOn\(settings, 'agri_inputs'\) && <Suspense fallback=\{null\}><PosInputsStrip/);
+  assert.match(src('components/command/NotificationBell.tsx'), /for \(const p of \['agri_inputs', 'coldstore', 'fpo'\]\) gate\(p, '-', \(\) => import\('\.\.\/\.\.\/lib\/agri\/ag-d-alerts'\)\)/);
+  assert.match(src('components/gst-reports/ComplianceView.tsx'), /isPackOn\(localDb\.settings\.get\(\), 'fpo'\) && <Suspense fallback=\{null\}><MembersCalendar/);
+  assert.match(src('components/gst-reports/ComplianceView.tsx'), /const MembersCalendar = lazy\(\(\) => import\('\.\.\/agri\/MembersCalendar'\)\)/);
+  assert.match(src('components/agri/MembersDesk.tsx'), /\['register', 'shares', 'patronage', 'papers', \.\.\.\(isPackOn\(localDb\.settings\.get\(\), 'coldstore'\) \? \[\] : \['loans'\]\)\]/);
+  // the shared cards stay off the agri engines that pull vouchers (they compute the FY inline)
+  for (const f of ['components/agri/MembersCalendar.tsx', 'lib/agri/ag-d-alerts.ts']) assert.ok(!/ag-patronage|ag-members'/.test(src(f)), f);
   assert.match(src('pages/page-tabs.ts'), /\{ id: 'cold', pack: 'coldstore' \}[\s\S]*\{ id: 'inputs', pack: 'agri_inputs' \}[\s\S]*\{ id: 'members', pack: 'fpo' \}/);
 });

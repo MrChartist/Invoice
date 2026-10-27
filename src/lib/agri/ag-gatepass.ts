@@ -8,7 +8,7 @@
 import './ag-registry';
 import type { AgriLoan, ColdGateOut, ColdLot } from '../../types/agri-r12d';
 import type { InvoiceRecord } from '../../types/invoice';
-import { num } from '../invoice-calc';
+import { num, round2 } from '../invoice-calc';
 import { can, requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
 import { generateId } from '../storage';
@@ -16,7 +16,7 @@ import { nextSeriesNumberFor, recordSeries } from '../series-counters';
 import { withTablesRollback } from '../table-txn';
 import { audit } from '../audit';
 import { AG_SERIES } from './ag-shared';
-import { LOTS_TABLE, loadLots, lotBalance, lotStatus, q3, smallPaper, writeLots } from './ag-cold-lots';
+import { LOTS_TABLE, bagsOut, depositorLots, loadLots, lotBalance, lotStatus, q3, smallPaper, writeLots } from './ag-cold-lots';
 import { liensOn, loadLoans, loanState, releaseCovered } from './ag-loans';
 import { loadPlans, raiseRentBill } from './ag-cold-rent';
 import { localDb } from '../localDb';
@@ -58,6 +58,25 @@ export function gatePassHtml(lot: ColdLot, out: ColdGateOut, company: string): s
     ['Bags released', out.bags], ['Weight (kg)', out.weight_kg ?? ''], ['Balance bags', q3(num(lot.bags) - upTo)], ['To / vehicle', [out.to, out.vehicle].filter(Boolean).join(' · ')],
     ['Taken by', out.by ?? ''], ['Loan check', out.loan_check === 'override' ? `Overridden: ${out.override_reason}` : 'Clear'],
   ], 'Goods released against this pass only.');
+}
+
+/** Pure: a depositor's statement on `day` — lots (bags in / out / balance), rent billed and due (issued bills), open loans with what is due. */
+export function depositorStatement(lots: readonly ColdLot[], invoices: readonly InvoiceRecord[], loans: readonly AgriLoan[], id: string, day: string) {
+  const bills = invoices.filter((i) => i?.ag?.rent && i.client?.id === id && i.status !== 'Cancelled');
+  const open = loans.filter((l) => l.borrower_id === id && l.status !== 'closed').map((loan) => ({ loan, due: loanState(loan, day).total }));
+  return {
+    ...depositorLots(lots, id), loans: open, loansDue: round2(open.reduce((s, x) => s + x.due, 0)),
+    billed: round2(bills.reduce((s, i) => s + num(i.total), 0)), due: round2(bills.filter((i) => i.status !== 'Draft').reduce((s, i) => s + num(i.balance_due), 0)),
+  };
+}
+
+/** The depositor statement paper (A5): one row per lot, then rent and each open loan. */
+export function statementHtml(st: ReturnType<typeof depositorStatement>, name: string, company: string, day: string): string {
+  return smallPaper(`Depositor statement — ${name}`, `${company} · as at ${day}`, [
+    ...st.lots.map((l): [string, unknown] => [`${l.number} · ${l.commodity}`, `in ${l.bags} · out ${bagsOut(l)} · balance ${lotBalance(l)} bags`]),
+    ['Total bags', `in ${st.in} · out ${st.out} · balance ${st.balance}`], ['Rent billed / due', `₹${st.billed.toFixed(2)} / ₹${st.due.toFixed(2)}`],
+    ...st.loans.map((x): [string, unknown] => [`Loan ${x.loan.number}`, `₹${x.due.toFixed(2)} due (principal + interest)`]),
+  ], 'Goods held in custody for the depositor — never our stock. Working paper; verify with your CA.');
 }
 
 /* ── Storage ── */

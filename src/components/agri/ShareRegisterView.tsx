@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { agdT, type AgdKey } from '../../i18n/areas/agri-r12d';
 import { getTable } from '../../lib/storage';
 import { todayInput } from '../../lib/utils';
-import { allotShares, applicationMoney, certificateHtml, deleteShareRow, loadMembers, loadShares, registerAt, transferShares } from '../../lib/agri/ag-members';
+import { allotShares, applicationMoney, certificateHtml, deleteShareRow, distinctive, loadMembers, loadShares, reduceShares, registerAt, transferShares } from '../../lib/agri/ag-members';
 import { readAgriSettings, saveAgriSettings } from '../../lib/agri/ag-settings';
 import { B, Form, Tbl } from './agd-kit';
 import { company, fmt, printPaper, useRun, type Done } from './agd-ui';
@@ -33,22 +33,23 @@ export default function ShareRegisterView({ onDone, mode }: { onDone: Done; mode
   const save = () => run(() => {
     if (!m) throw new Error(agdT('memberNeed'));
     const base = { date: f.date, shares: f.shares, face_value: f.face, approved_on: f.approved || undefined };
-    const r = f.kind === 'allot' ? allotShares(m, { ...base, paid_from: f.paid }) : transferShares(m, members.find((x) => x.id === f.to)!, base);
+    const r = f.kind === 'allot' ? allotShares(m, { ...base, paid_from: f.paid }) : f.kind === 'transfer' ? transferShares(m, members.find((x) => x.id === f.to)!, base)
+      : reduceShares(m, f.kind, { ...base, refund_by: f.kind === 'surrender' && f.paid !== 'application' ? f.paid : undefined });
     return agdT('shareSaved', { n: r.certificate_no ?? r.kind });
   });
   return (
     <>
-      <Form v={f} set={setF} f={[['kind', 'entry', ['allot', 'transfer'].map((k) => [k, sk(k)] as const)], ['member', 'member', opts], f.kind === 'transfer' && ['to', 'toMember', opts], ['shares', 'shares', 'n', 90], ['face', 'faceValue', 'n', 100], ['date', 'date', 'd'],
-        f.kind === 'allot' && ['paid', 'paidFrom', [['application', agdT('application')], ['bank', agdT('bank')], ['cash', agdT('cash')]]], ['approved', 'approvedOn', 'd']]}>
+      <Form v={f} set={setF} f={[['kind', 'entry', ['allot', 'transfer', 'surrender', 'forfeit'].map((k) => [k, sk(k)] as const)], ['member', 'member', opts], f.kind === 'transfer' && ['to', 'toMember', opts], ['shares', 'shares', 'n', 90], ['face', 'faceValue', 'n', 100], ['date', 'date', 'd'],
+        (f.kind === 'allot' || f.kind === 'surrender') && ['paid', 'paidFrom', [['application', agdT(f.kind === 'allot' ? 'application' : 'noRefund')], ['bank', agdT('bank')], ['cash', agdT('cash')]]], ['approved', 'approvedOn', 'd']]}>
         <B p k="save" on={save} data-agd-b="save-share" />
       </Form>
       {m && <p>{agdT('appMoney', { amount: fmt(applicationMoney([m.id, m.other_id ?? ''], getTable('farmer_cycles'), rows)) })}</p>}
       <Tbl
-        head={['date', 'member', 'entry', 'shares', 'amount', 'certificate', '']}
-        rows={[...rows].reverse().map((r) => [r.date, r.member_name, sk(r.kind), r.shares, fmt(r.amount), r.certificate_no ?? '', <span key="a">
-          {r.certificate_no && <B k="print" on={() => { const mm = members.find((x) => x.id === r.member_id); printPaper(certificateHtml(r, { company: company(), folio: mm?.member_no ?? mm?.code }), r.certificate_no!); }} />}
+        head={['date', 'member', 'entry', 'shares', 'amount', 'certificate', 'distinctiveNos', '']}
+        rows={[...rows].reverse().map((r) => { const dn = r.certificate_no ? distinctive(rows, r.id) : undefined; return [r.date, r.member_name, sk(r.kind), /out|surr|forf/.test(r.kind) ? -r.shares : r.shares, fmt(r.amount), r.certificate_no ?? '', dn ? `${dn.from}–${dn.to}` : '', <span key="a">
+          {r.certificate_no && <B k="print" on={() => { const mm = members.find((x) => x.id === r.member_id); printPaper(certificateHtml(r, { company: company(), folio: mm?.member_no ?? mm?.code, ...dn }), r.certificate_no!); }} data-agd-b="print-cert" />}
           <B k="delete" on={() => run(() => { deleteShareRow(r.id); return agdT('deleted'); })} />
-        </span>])}
+        </span>]; })}
       />
     </>
   );

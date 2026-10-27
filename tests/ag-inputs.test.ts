@@ -99,3 +99,24 @@ test('season due date (MM-DD rolls to the next one), the snapshot, the khata lis
   assert.equal(p.bills[0].days, 30);
 });
 
+
+test('bell: licence notices with the inputs pack; liens past due with the cold-store / FPO pack; members\' dates near today; nothing when off', async () => {
+  const { saveAgriSettings } = await import('../src/lib/agri/ag-settings.ts');
+  const { agdNotices } = await import('../src/lib/agri/ag-d-alerts.ts');
+  saveAgriSettings({ licences: [lic('insecticide', '2026-07-01'), lic('seed', '2026-08-01')] });
+  setTable('agri_loans', [{ id: 'l', number: 'LAS/FY26-27/0001', date: '2026-04-01', borrower_id: 'c', borrower_name: 'R', lot_ids: ['lot'], principal: 1000, rate_pct: 12, basis: 'simple', due_date: '2026-06-30', disbursed_by: 'cash', payment_voucher_id: 'v', repayments: [], status: 'open' }]);
+  const n = agdNotices('2026-07-10', 'x', { inputs: true, loans: true, loansTab: 'members' });
+  assert.deepEqual(n.map((x) => x.severity), ['critical', 'warning', 'warning']);
+  assert.equal(n[2].href, '/inventory?tab=members&view=loans');
+  assert.match(n[2].title, /LAS\/FY26-27\/0001/);
+  assert.equal(agdNotices('2026-07-10', 'x', { inputs: false, loans: false }).length, 0);
+  // Members' calendar (FY 2025-26 defaults: internal audit 03-31, register 04-30, AGM 09-30 …): dates within 30 days either side of today; a typed date wins.
+  const sep = agdNotices('2026-09-20', 'x', { inputs: false, loans: false, members: 'producer' });
+  assert.ok(sep.some((x) => x.id === 'agd:cal:agm:2026-09-30' && x.severity === 'info' && x.href === '/inventory?tab=members&view=papers'));
+  assert.ok(sep.every((x) => x.id.startsWith('agd:cal:') && !x.id.endsWith('2026-03-31')));
+  assert.ok(agdNotices('2026-03-20', 'x', { inputs: false, loans: false, members: 'producer' }).some((x) => x.id === 'agd:cal:internalAudit:2026-03-31'), 'the current FY\'s own dates count');
+  saveAgriSettings({ calendar: { agm: '08-15' } });
+  const row = agdNotices('2026-09-01', 'x', { inputs: false, loans: false, members: 'producer' }).find((x) => x.id === 'agd:cal:agm:2026-08-15');
+  assert.ok(row && row.severity === 'critical' && /Past due/.test(row.title), 'past due within 30 days is critical');
+  assert.equal(agdNotices('2026-09-20', 'x', { inputs: false, loans: false, members: 'producer' }).filter((x) => x.id.includes(':2026-08-15')).length, 0, 'older than 30 days drops off');
+});
