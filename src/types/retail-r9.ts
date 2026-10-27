@@ -262,12 +262,56 @@ declare module './invoice' {
 }
 
 /* ════════════════════════════════════════ RT-C ════════════════════════════════════════ */
+/** RT-C1 line snapshot: the band that set `tax_rate`, the value per piece it was decided on and the rate it gave. */
+export interface BandRate {
+  kind: PriceBandKind;
+  value_per_piece: number;
+  /** The rate the band gave (absent = not decided yet). A line `tax_rate` that differs = typed by hand. */
+  rate?: number;
+  /** The user typed the GST rate: the band no longer sets it (the exceptions view still compares it). */
+  manual?: true;
+}
+
+export type AlterationStatus = 'received' | 'with_tailor' | 'ready' | 'delivered' | 'cancelled';
+
+/** RT-C3 alteration slip (table `alteration_jobs`, `doc.create`, dated `date`, numbered `ALT/FY…`). */
+export interface AlterationJob {
+  id: string;
+  number: string;
+  date: string;
+  customer: string;
+  phone?: string;
+  invoice_id?: string;
+  invoice_number?: string;
+  garment: string;
+  /** Alteration notes and measurements (free text). */
+  notes?: string;
+  /** Tailor (a `vendors` row) and the name snapshot. */
+  tailor_id?: string;
+  tailor_name?: string;
+  due: string;
+  /** Charge to the customer (₹, incl. nothing else; 0 = free alteration). */
+  charge: number;
+  /** What the tailor is paid for this job (₹). */
+  tailor_rate: number;
+  status: AlterationStatus;
+  /** Local days the status changed. */
+  ready_on?: string;
+  delivered_on?: string;
+  /** The bill that charged the alteration (its own draft or a sale bill line). */
+  charge_invoice_id?: string;
+  /** The tailor bill draft (purchase_drafts) that paid the tailor. */
+  tailor_bill_id?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
 declare module './invoice' {
   interface InvoiceItem {
     /** RT-C1, catalogue rows: GST by sale value per piece. */
     gst_band?: PriceBandKind;
     /** RT-C1, lines: the band that set `tax_rate` and the value per piece it was decided on (snapshot). */
-    band_rate?: { kind: PriceBandKind; value_per_piece: number };
+    band_rate?: BandRate;
   }
 }
 declare module '../lib/inventory' {

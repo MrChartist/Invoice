@@ -54,7 +54,12 @@ export interface LabelItem {
   copies: number;
   /** 8.87: extra line under the name (weighed goods: "0.750 kg @ ₹120.00/kg"). */
   note?: string;
+  /** R9 (RT-C2): variant attributes ("M / Blue"), printed under the name. */
+  attrs?: string;
 }
+
+/** R9 (RT-C2): a variant child's attribute line ("M / Blue"), '' for other items. */
+export const attrLine = (attrs: Record<string, string> | undefined): string => Object.values(attrs ?? {}).filter(Boolean).join(' / ');
 
 export type PriceShown = 'sale' | 'mrp' | 'both' | 'none';
 
@@ -115,7 +120,7 @@ export function labelSheetHtml(items: readonly LabelItem[], opts: LabelSheetOpti
   const label = (it: LabelItem | null) => {
     if (!it) return '<div class="cell"></div>';
     const price = priceLine(it, opts.price, currency, small);
-    return `<div class="cell"><div class="name">${esc(it.name)}</div>${it.note ? `<div class="price">${esc(it.note)}</div>` : ''}${price ? `<div class="price">${esc(price)}</div>` : ''}<div class="bars">${barcodeSvg(it.code, { height: barH })}</div></div>`;
+    return `<div class="cell"><div class="name">${esc(it.name)}</div>${it.attrs ? `<div class="price">${esc(it.attrs)}</div>` : ''}${it.note ? `<div class="price">${esc(it.note)}</div>` : ''}${price ? `<div class="price">${esc(price)}</div>` : ''}<div class="bars">${barcodeSvg(it.code, { height: barH })}</div></div>`;
   };
 
   const page = pageSize(L);

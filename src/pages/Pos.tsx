@@ -110,6 +110,7 @@ const GiftVoucherTender = lazy(() => import('../components/retail/GiftVoucherTen
 const RoomPicker = lazy(() => import('../components/hotel/FrontDesk').then((m) => ({ default: m.RoomPicker }))); // R7-B2 "Room" tender (hotel pack only)
 const PosRetailStrip = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.PosRetailStrip }))); // R9 (RT-A2/A3/A4)
 const RxStrip = lazy(() => import('../components/retail-r9/PharmacyDesk').then((m) => ({ default: m.RxStrip }))); // R9 (RT-B1/B2/B3) pharma switch only
+const PosApparel = lazy(() => import('../components/retail-r9/ApparelDesk').then((m) => ({ default: m.PosApparel }))); // R9 (RT-C1/C3)
 // R4-B3: the counter's branch (store price list). Inline labels, so the POS does not load the stores catalogue.
 const storeT = defineArea({ counter: 'This counter is branch', none: 'No branch' } as const, { counter: 'यह काउंटर इस शाखा का है', none: 'कोई शाखा नहीं' });
 
@@ -1090,6 +1091,7 @@ export function Pos() {
               </Suspense>
               {retailStrip && <Suspense fallback={null}><PosRetailStrip record={record} query={query} delivery={delivery} onDelivery={setDelivery} onAddLine={(l) => setItems((prev) => [...prev.filter((x) => x.name !== 'Delivery charge'), l])} deliveryOn={!!retailRs.delivery?.enabled} shortBookOn={!!retailRs.short_book?.enabled} notify={notify} /></Suspense>}
               {pharmaOn && <Suspense fallback={null}><RxStrip record={record} value={rxPos} onChange={setRxPos} /></Suspense>}
+              {isPackOn(settings, 'apparel') && <Suspense fallback={null}><PosApparel record={record} setItems={setItems} /></Suspense>}
               {party.client ? null : (
                 <>
                   <Typeahead
