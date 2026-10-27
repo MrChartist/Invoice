@@ -60,7 +60,15 @@ export interface NotesContext {
    * or empty = the one-line note as before.
    */
   inventoryRows?: readonly { label: string; cur: number; prev: number }[];
+  /**
+   * PS-D1 (optional): partners' capital and current account statements for the FY (paise; `prof/ps-partner-post.ts`
+   * `partnerStatements`). Absent or empty = the note as before.
+   */
+  partnerRows?: readonly PartnerNoteRow[];
 }
+
+/** One partner's line in the partners' note (paise). */
+export interface PartnerNoteRow { name: string; opening: number; introduced: number; drawings: number; interest: number; remuneration: number; share: number; closing: number }
 
 /* ── Wording ──────────────────────────────────────────────────── */
 
@@ -189,7 +197,11 @@ function capitalNote(c: NotesContext): PackNote {
     title: capitalTitle(c.entity),
     kind: 'auto',
     paragraphs: c.entity === 'company' ? ['Authorised, issued, subscribed and paid-up share capital, and the shareholding of promoters: (add details).'] : [],
-    tables: [{ columns: ['Account', `Opening ${c.fy.start}`, 'Introduced / credited', 'Withdrawn / debited', `Closing ${c.fy.end}`], rows }],
+    tables: [
+      { columns: ['Account', `Opening ${c.fy.start}`, 'Introduced / credited', 'Withdrawn / debited', `Closing ${c.fy.end}`], rows },
+      // PS-D1: partner-wise capital and current accounts (only when the firm desk has partners).
+      ...(c.partnerRows?.length ? [{ title: 'Partner-wise capital and current accounts (verify with your CA)', columns: ['Partner', 'Opening', 'Introduced', 'Drawings', 'Interest on capital', 'Remuneration', 'Share of profit', 'Closing'], rows: c.partnerRows.map((p) => [p.name, p.opening, p.introduced, p.drawings, p.interest, p.remuneration, p.share, p.closing]) }] : []),
+    ],
   };
 }
 
