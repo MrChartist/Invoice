@@ -120,10 +120,21 @@ function scopeCtx(ctx: EditorPricing): ScopeCtx {
   return { clientId: masterClient(peekTable<Client>(KEYS.clients), useInvoiceStore.getState().client)?.id, levelId: ctx.level?.id, ...tr!.liveScopeItems(ctx.data.catalog) };
 }
 
+/**
+ * R9 (RT-C1): a picked / scanned item with a price band (`gst_band` on the catalogue row or its stock item) marks the
+ * line for the band (decided by the lazy band hook); any other pick clears an old band. Credit notes keep their rate.
+ */
+function markBand(lineId: string, source: Partial<InvoiceItem>): void {
+  const st = useInvoiceStore.getState();
+  const kind = pricedDoc() ? source.gst_band ?? peekTable<StockItem>(TABLES.items).find((s) => s.name === source.name)?.gst_band : undefined;
+  if (kind || st.items.find((i) => i.id === lineId)?.band_rate) st.patchItem(lineId, { band_rate: kind ? { kind, value_per_piece: 0 } : undefined });
+}
+
 /** Catalogue pick (typeahead or picker): fills the line, then applies level / slab / scheme. */
 export function pickCatalogItem(lineId: string, source: Partial<InvoiceItem>): void {
   const st = useInvoiceStore.getState();
   st.applyCatalogItem(lineId, source);
+  markBand(lineId, source); // R9 (RT-C1)
   // 8.86: a delivery challan line remembers the bin / rack it is picked from (printed on the challan).
   if (st.doc_type === 'DELIVERY_CHALLAN' && source.name) {
     const bin = binForName(getTable<StockItem>('stock_items'), source.name);
@@ -201,6 +212,7 @@ export function addScannedCode(code: string): { ok: boolean; message: string } {
   } else {
     st.patch({ items: r.items });
     st.applyCatalogItem(r.lineId, match.item); // same fields (and item custom fields) as a catalogue pick
+    markBand(r.lineId, match.item); // R9 (RT-C1)
     const ctx = editorPricing();
     reprice(r.lineId, ctx, true);
     syncSchemes(ctx);

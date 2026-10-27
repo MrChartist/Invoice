@@ -51,6 +51,9 @@ const EX_KEY = {
   RATE_NOT_IN_SLABS: 'exRate',
   B2CL_EDGE: 'exB2cl',
   OWN_GSTIN: 'exOwnGstin',
+  BAND_RATE: 'exBandRate', // R9 (RT-C1)
+  BAND_EDGE: 'exBandEdge',
+  BAND_DISCOUNT: 'exBandDiscount',
 } as const;
 
 /** Return-period key used by the compliance calendar for a report period. */
