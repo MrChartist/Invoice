@@ -88,3 +88,18 @@ test('Rule 6DD(e): no 40A(3) warning to a farmer, the note instead; others keep 
   assert.match(cashPaymentIssue(15000, '2026-10-20'), /40A\(3\)/);
   assert.equal(cashPaymentIssue(9000, '2026-10-20', { principal_kind: 'agriculturist' }), '');
 });
+
+test('a milk cycle closed from Farm → Cycles marks its purchase stock_by_shift (milk is not counted twice)', () => {
+  const ram = saveFarmer({ name: 'Ram', ag: { code: 'F-0001' } });
+  const milk = saveCycleDraft({ period_from: '2026-10-11', period_to: '2026-10-20', source: 'milk', lines: [
+    { farmer_id: ram.id, name: 'Ram', qty: 100, unit: 'L', amount: 4000, deductions: [], net: 0, mode: 'cash' },
+  ] });
+  const produce = saveCycleDraft({ period_from: '2026-10-11', period_to: '2026-10-20', source: 'produce', lines: [
+    { farmer_id: ram.id, name: 'Ram', qty: 10, unit: 'KG', amount: 500, deductions: [], net: 0, mode: 'cash' },
+  ] });
+  const m = closeCycle(milk.id, 'Rampur');
+  const p = closeCycle(produce.id, 'Rampur');
+  const flag = (id?: string) => (purchasesDb.get(id!) as { ag?: { stock_by_shift?: boolean } } | undefined)?.ag?.stock_by_shift;
+  assert.equal(flag(m.purchase_id), true);
+  assert.equal(flag(p.purchase_id), undefined, 'produce stays in stock through its purchase');
+});
