@@ -78,8 +78,8 @@ export function validateStyle(parent: Pick<StockItem, 'name' | 'variant_axes'>, 
   return '';
 }
 
-/** Save the style part of an item (`master.edit`; the stock_items row keeps every other field). */
-export function saveStyle(itemId: string, s: MfStyle): void {
+/** Save the style part of an item and its textile class (`master.edit`; the row keeps every other field). */
+export function saveStyle(itemId: string, s: MfStyle, cls?: string): void {
   requireAccess('master.edit');
   const all = getTable<StockItem>('stock_items');
   const it = all.find((i) => i.id === itemId);
@@ -87,7 +87,9 @@ export function saveStyle(itemId: string, s: MfStyle): void {
   const err = validateStyle(it, s);
   if (err) throw new Error(err);
   const mf = { ...((it as { mf?: object }).mf ?? {}), style: s };
-  setTable('stock_items', all.map((i) => (i.id === itemId ? ({ ...i, mf, updated_at: new Date().toISOString() } as StockItem) : i)));
+  const kids = new Set(all.filter((i) => i.variant_of === itemId).map((i) => i.id));
+  // MF-C5: the class goes on the style and its variants (the editor's band hook reads the picked item).
+  setTable('stock_items', all.map((i) => (i.id === itemId ? ({ ...i, mf, ...(cls !== undefined ? { mf_class: cls || undefined } : {}) } as StockItem) : kids.has(i.id) && cls !== undefined ? ({ ...i, mf_class: cls || undefined } as StockItem) : i)));
 }
 
 /** Styles: variant parents that carry a style part. */

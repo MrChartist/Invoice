@@ -7,12 +7,18 @@
  *    short (pending on the challan, flagged per bundle); job charges = good × piece rate.
  * Sec 143 clocks and ITC-04 keep working on the fabric metres. Pure.
  */
-import type { JobWorkLine, JobWorkReceiptLine, MaterialOut } from '../../types/job-work';
+import type { JobWorkLine, JobWorkReceiptLine, MaterialIn, MaterialOut } from '../../types/job-work';
+import type { Vendor } from '../../types/purchases';
 import type { StockItem } from '../inventory';
 import { generateId } from '../storage';
 import { num, round2 } from '../invoice-calc';
 import { lineFactor } from '../units';
-import { bundleId, livePieces, parseBundleId } from './mf-bundles';
+import { withTablesRollback } from '../table-txn';
+import { godownsDb } from '../godowns';
+import { ensureJobWorkerGodown, JOB_WORK_TABLES, materialInDb, materialOutDb } from '../job-work';
+import { productionOrdersDb } from '../production/orders';
+import { bundleId, livePieces, moveBundles, parseBundleId, recordStep } from './mf-bundles';
+import { cutPlanOf, loadCutPlans, putPlan } from './mf-cutplans';
 import { childFor } from './mf-styles';
 import type { CutPlan } from './mf-c-pending';
 
@@ -99,3 +105,40 @@ export function challanBundles(out: Pick<MaterialOut, 'lines'>): { lot: string; 
 
 /** Good pieces stitched per Material In (its processed lines tagged with a lot). */
 export const cmtPieces = (lines: readonly JobWorkReceiptLine[] | undefined): number => (lines ?? []).filter((l) => l.kind === 'processed' && cmtTag(l)?.lot).reduce((s, l) => s + num(l.qty) * lineFactor(l), 0);
+
+/* ════════════════════════ Storage ════════════════════════ */
+
+/** Send bundles to a fabricator: a Material Out (books.edit inside) from the order's WIP godown, bundles marked "at fabricator". */
+export function sendCmt(planId: string, nos: readonly number[], x: { date: string; vendor: Pick<Vendor, 'id' | 'name' | 'gstin' | 'state_code'>; perPieceM: number; process?: string }, items: readonly StockItem[]): MaterialOut {
+  const p = cutPlanOf(planId);
+  if (!p) throw new Error('Lot not found.');
+  const from = (p.order_id && productionOrdersDb.get(p.order_id)?.wip_godown_id) || 'main';
+  return withTablesRollback([JOB_WORK_TABLES.out, 'cut_plans', 'godowns', 'series_counters'], () => {
+    const jw = ensureJobWorkerGodown({ name: x.vendor.name, vendor_id: x.vendor.id });
+    const rate = items.find((i) => i.id === p.fabric_item_id)?.opening_rate;
+    const line = cmtOutLine(p, nos, { perPieceM: x.perPieceM, godownId: from, ...(num(rate) > 0 ? { ratePerM: num(rate) } : {}) });
+    const out = materialOutDb.save({ date: x.date, party_name: x.vendor.name, vendor_id: x.vendor.id, ...(x.vendor.gstin ? { party_gstin: x.vendor.gstin } : {}), ...(x.vendor.state_code ? { party_state_code: x.vendor.state_code } : {}), job_worker_godown: jw.id, process: x.process || 'Stitching', lines: [line] }, items, godownsDb.list());
+    putPlan(moveBundles(p, nos, { where: 'fabricator', party_id: x.vendor.id, challan_id: out.id }));
+    return out;
+  });
+}
+
+/** Receive a CMT challan line by bundle: a Material In (+ scrap kept by the fabricator, metres, Sec 143(5)); bundles back on the floor. */
+export function receiveCmt(outId: string, lineId: string, receipts: readonly BundleReceipt[], x: { date: string; rate?: number; scrapM?: number }, items: readonly StockItem[]): { inn: MaterialIn; draft: CmtInDraft } {
+  const out = materialOutDb.all().find((o) => o.id === outId);
+  const tag = cmtTag(out?.lines.find((l) => l.id === lineId));
+  const p = loadCutPlans().find((q) => q.number === tag?.lot);
+  const parent = items.find((i) => i.id === p?.style_id);
+  if (!out || !p || !parent) throw new Error('CMT challan or lot not found.');
+  const d = cmtInDraft(out, lineId, p, parent, items, receipts, { rate: x.rate });
+  const line = out.lines.find((l) => l.id === lineId)!;
+  const losses = num(x.scrapM) > 0 ? [{ id: generateId(), item_id: line.item_id, qty: r3(num(x.scrapM)), out_line_id: lineId, mf: { scrap_at_jw: true } } as JobWorkLine] : [];
+  return withTablesRollback([JOB_WORK_TABLES.in, 'cut_plans', 'series_counters'], () => {
+    const inn = materialInDb.save({ date: x.date, party_name: out.party_name, ...(out.vendor_id ? { vendor_id: out.vendor_id } : {}), ...(out.party_gstin ? { party_gstin: out.party_gstin } : {}), job_worker_godown: out.job_worker_godown, order_id: out.order_id, consumed: d.consumed, received: d.received, ...(losses.length ? { losses } : {}), ...(d.charges ? { charges: d.charges } : {}) }, items);
+    let plan = p;
+    // The bundle's step is the CMT receipt (`cmt:<id>`): counted once — the karigar ledger reads the Material In.
+    for (const r of receipts) if (num(r.good) + num(r.rejected) > 0) plan = recordStep(plan, r.no, { date: x.date, op: out.process, good: num(r.good), rejected: num(r.rejected), reason: r.reason || 'Fabricator reject', ...(out.vendor_id ? { by: out.vendor_id } : {}), jc_entry_id: `cmt:${inn.id}` });
+    putPlan({ ...plan, updated_at: new Date().toISOString() });
+    return { inn, draft: d };
+  });
+}

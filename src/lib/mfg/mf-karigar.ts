@@ -76,7 +76,7 @@ export function pieceLines(vendorId: string, k: MfKarigar | undefined, period: {
   for (const p of s.plans ?? []) {
     for (const b of p.bundles ?? []) {
       for (const h of b.history) {
-        if (h.by !== vendorId || !inRange(h.date, period) || (h.jc_entry_id && usedEntries.has(h.jc_entry_id))) continue;
+        if (h.by !== vendorId || !inRange(h.date, period) || (h.jc_entry_id && (usedEntries.has(h.jc_entry_id) || h.jc_entry_id.startsWith('cmt:')))) continue;
         add(h.op ?? h.op_id ?? 'Operation', h.op_id, p.style_id, num(h.good) + (deduct ? 0 : num(h.rejected)), 'bundle', `${p.number}/${b.no}`, h.date);
       }
     }
