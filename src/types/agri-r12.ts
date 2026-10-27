@@ -368,6 +368,133 @@ declare module '../lib/inventory' {
 
 /* ════════════════════════════════════════ AG-B ════════════════════════════════════════ */
 // AG-B: milk_rate_charts, milk_shifts (one row per centre per shift), milk_dispatches (MDS), milk_cards; agri_settings.milk.
+export type MilkKind = 'cow' | 'buffalo' | 'mixed';
+export type MilkUnit = 'L' | 'KG';
+export type MilkShiftId = 'M' | 'E';
+/** B1: a fat / SNF rate chart (table `milk_rate_charts`, dated `effective_from`; append-only: a change is a new row). */
+export interface MilkRateChart {
+  id: string;
+  name: string;
+  milk: MilkKind;
+  /** matrix: ₹ per unit at (fat, SNF); fat_kg: ₹ per kg fat; ts_kg: ₹ per kg fat + SNF; two_axis: kg fat × fat rate + kg SNF × SNF rate; flat. */
+  basis: 'matrix' | 'fat_kg' | 'ts_kg' | 'two_axis' | 'flat';
+  unit: MilkUnit;
+  effective_from: string;
+  effective_to?: string;
+  matrix?: { fat_steps: number[]; snf_steps: number[]; rates: number[][] };
+  /** Matrix lookup: nearest lower step (default) or nearest step. */
+  lookup?: 'lower' | 'nearest';
+  fat_rate?: number;
+  snf_rate?: number;
+  ts_rate?: number;
+  flat_rate?: number;
+  min_fat?: number;
+  min_snf?: number;
+  below_min: 'reject' | 'flat' | 'deduct';
+  /** ₹ per unit paid (`flat`) or taken off (`deduct`) below the minimum. */
+  below_rate?: number;
+  /** Add-ons ₹ per unit: shift (key M / E), category (key = milk kind), quantity (key = minimum quantity). */
+  incentives?: { kind: 'shift' | 'category' | 'quantity'; key: string; add: number }[];
+  centre_ids?: string[];
+  /** B4: the buyer's (union / plant) chart used to bill a dispatch. */
+  buyer_id?: string;
+  created_at?: string;
+}
+/** B2: one can at the collection centre. Rate, chart and amount are stored, so a later chart never reprices it. */
+export interface MilkEntry {
+  id: string;
+  /** Vendor id of the farmer. */
+  farmer_id: string;
+  name?: string;
+  code?: string;
+  milk: MilkKind;
+  qty: number;
+  unit: MilkUnit;
+  fat: number;
+  snf: number;
+  clr?: number;
+  water_pct?: number;
+  chart_id?: string;
+  /** ₹ per chart unit, incentives included. */
+  rate: number;
+  amount: number;
+  incentive?: number;
+  sample_only?: boolean;
+  rejected?: boolean;
+  reason?: string;
+  at: string;
+}
+/** B2: ONE row per centre per date per shift (table `milk_shifts`, dated `date`). Totals are derived. */
+export interface MilkShift {
+  id: string;
+  centre_id: string;
+  date: string;
+  shift: MilkShiftId;
+  entries: MilkEntry[];
+  closed_at?: string;
+  closed_by?: string;
+  /** The farmer cycle (A4) that billed this shift: it cannot reopen while that cycle is closed. */
+  cycle_id?: string;
+  /** The stock journal (`SJ/FY…`) that took the accepted milk into the centre godown on close. */
+  sj_id?: string;
+  updated_at?: string;
+}
+/** B4: milk sent to the union / plant (table `milk_dispatches`, `MDS/FY…`). */
+export interface MilkDispatch {
+  id: string;
+  number: string;
+  date: string;
+  shift: MilkShiftId;
+  centre_id: string;
+  buyer_id: string;
+  buyer_name?: string;
+  milk: MilkKind;
+  tanker?: string;
+  sent: { qty: number; unit: MilkUnit; fat: number; snf: number; temp?: number };
+  received?: { qty: number; fat: number; snf: number; ack_no: string; date: string };
+  invoice_id?: string;
+  /** Consume-only stock journal that took the milk out of the centre godown. */
+  sj_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+/** B5: a household milk card (table `milk_cards`, one row per customer per month). */
+export interface MilkCard {
+  id: string;
+  client_id: string;
+  client_name?: string;
+  /** `YYYY-MM`. */
+  month: string;
+  milk: MilkKind;
+  rate: number;
+  default_qty: number;
+  /** Day of month ("1" … "31") → litres; absent day = the default; 0 = skipped. */
+  days: Record<string, number>;
+  delivered_by?: string;
+  invoice_id?: string;
+  updated_at?: string;
+}
+/** `agri_settings.milk` (B): stock items per milk kind, CLR, dispatch tolerance and billing basis. */
+export interface AgMilkSettings {
+  items?: Partial<Record<MilkKind, string>>;
+  clr_cow?: number;
+  clr_buffalo?: number;
+  /** Shortage flag: % of kg fat (default 0.5 — practice, AG28). */
+  tolerance_pct?: number;
+  /** Bill a dispatch on the union's received figures (default) or on what was sent. */
+  invoice_from?: 'received' | 'sent';
+  /** Offer a WhatsApp message per entry (off by default). */
+  slip_wa?: boolean;
+}
+export interface AgriSettings {
+  milk?: AgMilkSettings;
+}
+declare module './manufacturing' {
+  interface StockJournal {
+    /** AG-B2 / B4: the milk shift or dispatch whose stock this journal posted. */
+    milk_ref?: string;
+  }
+}
 
 /* ════════════════════════════════════════ AG-C ════════════════════════════════════════ */
 // AG-C: weighbridge_slips (WBS), cmr_agreements (CMR deliveries); `ProductionOrder.ag.mill`; `ag.cmr` is `AgCmrSnap`.

@@ -44,8 +44,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 9. Retail shops (Round 9, planned) | RT1–RT22 | 22 | 8 |
 | 10. Service businesses (Round 10, planned) | SV1–SV30, SV41–SV48, SV60–SV62 | 41 | 12 |
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
-| 12. Agriculture and food processing (Round 12, planned) | AG1–AG39, AG50–AG53 | 43 | 11 |
-| **Total** | | **340** | **89** |
+| 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53 | 49 | 12 |
+| **Total** | | **346** | **90** |
 
 ---
 
@@ -678,7 +678,7 @@ sub-contractors, builders and real-estate developers, interiors and MEP contract
 | CN34 | **Builder's bills and the contractor's site cost (QA11 C3, C9).** (a) Sub-contractor and plant-hire bills charged to a project on the 1% / 5% scheme are booked with ITC not claimed (cost = total incl. GST), and a typed bill claiming ITC is cautioned — right for every input of such a project? (b) Amounts the client recovers on our RA bills (material issued, plant hire, water & power, LD, interest on advance) are shown as site cost in the site P&L — right, or should client-issued material be netted from revenue instead? | (a) No ITC. (b) Site cost. | `construction/cn-subcon.ts` `noItcCentre`, `bill-guard.ts`, `cn-site-pnl.ts` | 2019-04-01 | N 03/2019-CT(R) (recalled) |
 | CN35 | **Delay interest base (QA11 C11).** Interest on delayed payment (Sec 15(2)(d) value, state RERA rate) is simple: on the instalments owed (including their GST), never on interest billed by an earlier demand, from the latest earlier due date to the new demand date. (a) Should the GST part of an instalment carry interest? (b) Is "from the latest earlier due date" acceptable when older instalments are still unpaid? | (a) Yes, on the amount demanded. (b) A working figure, waivable per booking. | `construction/cn-demands.ts` `delayInterest` | — | State RERA rules (recalled) |
 
-## 12. Agriculture and food processing (Round 12, ids AG1–AG39, AG50–AG53; B–D add AG40+)
+## 12. Agriculture and food processing (Round 12, ids AG1–AG45, AG50–AG53; D adds AG60+)
 
 Added with `docs/prd/round-12.md`. It covers farmer producer organisations and co-operatives, dairies and milk
 collection centres, rice / flour / dal / oil mills, cold storages, seed / fertiliser / pesticide dealers, and poultry /
@@ -760,7 +760,18 @@ fishery farms.
 | AG38 | **Bonus / price difference run.** The year-end run computes ₹ per unit on each farmer's cycle quantity and exports a CSV; the journal (price difference to purchase cost, or patronage to appropriation, AG25) is entered by the user. Should the run post a draft journal itself, and should the bonus be spread over the farmers' bills of the year (for 194Q totals)? | CSV working only; journal by the user. | `agri/ag-cycles.ts` `bonusRun`; Farm → Cycles | — | — (design) |
 | AG39 | **Farm batches and agricultural income.** A flock / pond / herd / crop batch is a cost centre with a memo (mortality %, FCR, cost per kg); no posting from events. The "Agricultural income (exempt)" ledger is offered only for own cultivation. Is a separate ledger enough for the return (Schedule EI), or should exempt agricultural income also be kept out of the P&L totals the app shows? | Separate ledger under Other income; P&L shows it. | `agri/ag-batches.ts`; `agri/ag-cycle-post.ts` `agriIncomeLedger` | — | IT Act 1961 Sec 10(1) / 2025 Act Sec 11 (as reported, AG15) |
 
-### 12.6 Added while building AG-C (mills)
+### 12.6 Dairy and milk collection (AG-B, added with the build)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| AG40 | **Household milk cards.** A dairy bills each household once a month for the fresh milk delivered daily (nil-rated), as one bill of supply per customer per month. Is a monthly bill of supply acceptable for daily deliveries to unregistered persons (Rule 49; the consolidated-bill provisos of Rules 46 / 49 for small values), and must the bill show each day's quantity or only the month's total? | One bill of supply per card per month with "N days · L litres"; the day grid stays in the app. | `agri/ag-milk-cards.ts` | — | Rules 46, 49 (developers' reading) |
+| AG41 | **Milk sold to the union / plant.** The union pays on its own figures (quantity, fat, SNF at its plant). (a) Is the sale value the union's received figures (app default) or what the society sent? (b) The union's deductions on its payment (cattle feed it supplied, cess, testing charges): a purchase from the union / an expense, not a discount on our sale — right? | (a) Received figures by default (a setting), the sale is a nil-rated bill of supply; (b) typed as deductions on the receipt (existing short-payment handling) — to be booked as purchases / expenses. | `agri/ag-dispatch.ts`; receipts | — | — (practice) |
+| AG42 | **Add-ons and rejected milk.** Shift / quantity / category add-ons from the rate chart are part of the price paid to the farmer (no separate bonus). Rejected milk (sour, adulterated, below the chart minimum) is recorded with its quantity and a reason at zero value and never enters stock. Sample-only cans are milk at zero value. Is that right for the books and for the farmer's bill? | As stated. | `agri/ag-rate-chart.ts`, `ag-shifts.ts` | — | — (practice) |
+| AG43 | **Milk stock valuation and units.** Accepted milk enters stock per closed shift at that shift's purchase value (₹ per litre); litres ↔ kg use CLR (kg = L × (1 + CLR / 1000), default 28 cow / 30 buffalo); the cycle purchase posts the cost once and adds no stock. Acceptable as the stock record (AS 2) and for the bank's stock statement? | As stated; CLR defaults in `MILK_DEFAULTS` (practice). | `agri/ag-shifts.ts`; `MILK_DEFAULTS` | — | — (practice) |
+| AG44 ★ | **Dairy product classes.** Starter BOMs suggest: paneer / chena nil from 22 Sep 2025 (5% before), khoa treated like paneer, curd and buttermilk loose nil / pre-packaged 5%, ghee 5% (12% before), whey and ghee residue as by-products. (a) Khoa / mawa — which heading and rate (0402 / 0406; nil, 5% or 12% before 22 Sep 2025)? (b) Whey (0404) and ghee residue sold as cattle feed — nil or 5%? | Khoa follows the paneer class; whey / residue carry no class (typed rate). Typical yields are "practice — adjust". | `agri/ag-dairy-products.ts`; `AGRI_CLASS_RULES` | 2025-09-22 | Summaries of the 56th Council (secondary) |
+| AG45 | **Cash to milk producers through a centre.** A collection centre pays its farmers in cash out of a pooled cycle (each farmer's share is usually below ₹10,000 per day); the union pays the society by bank. Besides AG14 (Rule 6DD(e)), is any record beyond the farmer-wise cycle split and the signed payment sheet expected? | The farmer-wise split on the cycle row and the printed milk bill per farmer are the record. | `agri/ag-milk-cycle.ts`; AG-A4 cash check | — | — |
+
+### 12.7 Added while building AG-C (mills)
 
 | Id | Question | App's assumption | Where | From | Source used |
 |---|---|---|---|---|---|
