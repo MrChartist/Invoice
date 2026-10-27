@@ -497,3 +497,339 @@ Vendors and reviews:
   minutedock (write-downs in accounting firms).
 
 ---
+
+## 3. Ranked list: what to build now
+
+Value 1–5 (5 = every firm of that kind meets it every day). Effort S = 1, M = 2, L = 3. Score = value ÷ effort.
+
+| Rank | Id | Gap | Who needs it | Value | Effort | Score | Package |
+|---|---|---|---|---|---|---|---|
+| 1 | PS-A1 | Professional profile (picker, packs, desk tabs, checklist, help, sample data) | every professional | 5 | S | 5.0 | A |
+| 2 | PS-B1 | Disbursements and pure agent (GSTR-1 / e-Invoice exclusion, disbursement kinds, unrecovered ageing) | advocates, CAs, CSs, architects | 5 | S | 5.0 | B |
+| 3 | PS-A5 | Professional paper (matter / engagement header, billing basis, UDIN, purpose code, write-down column) | every firm | 5 | S | 5.0 | A |
+| 4 | PS-A3 | Billing models and the pre-bill (fixed, milestone, capped, blended, success; write-up / write-down) | every firm | 5 | M | 2.5 | A |
+| 5 | PS-A2 | Matters, engagements, letters and conflict checks | every firm | 5 | M | 2.5 | A |
+| 6 | PS-B2 | Advocates: RCM / exemption by client type, fee memo, registration notice | advocates, law firms, their business clients | 5 | S | 5.0 | B |
+| 7 | PS-C2 | FEMA 2026: EDF register, services clock from the invoice date, 9 / 12-month rows | every service exporter | 5 | S | 5.0 | C |
+| 8 | PS-D3 | 194J receivable by client (10 % / 2 % / 194C), expected TDS, chase letters | every firm with business clients | 5 | S | 5.0 | D |
+| 9 | PS-A4 | WIP, realisation, utilisation, profitability; year-end unbilled paper | every firm with staff | 5 | M | 2.5 | A |
+| 10 | PS-C1 | Export-of-services check (Sec 2(6), place of supply, intermediary from 30 Mar 2026) | exporters, consultants with foreign clients | 5 | M | 2.5 | C |
+| 11 | PS-D4 | 44ADA / Sec 58 presumptive working paper | freelancers, small practices | 4 | S | 4.0 | D |
+| 12 | PS-D1 | Partners: capital / current accounts, 40(b) / Sec 35, appropriation | partnership / LLP firms | 5 | M | 2.5 | D |
+| 13 | PS-D2 | 194T TDS on partner payments | partnership / LLP firms | 4 | S | 4.0 | D |
+| 14 | PS-C4 | Multi-currency rate cards, Rule 34(2) note, platform receipts | freelancers, agencies, IT firms | 4 | M | 2.0 | C |
+| 15 | PS-B3 | Client-money ledger, three-way reconciliation, statements | advocates, CAs holding deposits | 4 | M | 2.0 | B |
+| 16 | PS-D5 | CA / CS / CMA desk: compliance billing from the practice desk, UDIN register | CA / CS / CMA firms | 4 | M | 2.0 | D |
+| 17 | PS-C3 | IRM / FIRA / e-BRC per services invoice; refund statement | exporters claiming refunds | 3 | S | 3.0 | C |
+| 18 | PS-B4 | Architects' stage fees on project cost; interior fit-out pass-through | architects, interior designers | 4 | M | 2.0 | B |
+| 19 | PS-B5 | Media agencies: principal vs pure agent, release orders, commission | media / digital agencies | 3 | M | 1.5 | B |
+| 20 | PS-C5 | Freelancer's registration threshold and unregistered export invoice | freelancers | 3 | S | 3.0 | C |
+| — | — | Client portal with logins, online payment collection | — | 4 | L | 1.3 | no (server) |
+| — | — | Court diary / e-Courts status, document assembly | — | 3 | L | 1.0 | no (outside billing, network) |
+| — | — | ICAI UDIN generation, EDF / e-BRC filing, TRACES downloads | — | 3 | L | 1.0 | no (regulator portals) |
+| — | — | LEDES / UTBMS e-billing | — | 2 | M | 1.0 | no (CSV annexure covers it) |
+
+All 20 are taken. If the lead keeps the 3,400 kB budget (§1), the drop order is C5, B5, B4, C3, D5 (ranks 20 → 16).
+
+---
+
+## 4. Specifications (20 items)
+
+Conventions for every item:
+- **Logic and tests.** Pure logic in `src/lib/prof/ps-*.ts` (new folder), tested with `node:test` in `tests/ps-*.test.ts`.
+  UI checks are `step(...)` blocks in `tests/e2e/smoke.mjs` (§7). Existing files are edited only where §6 says.
+- **Components** in the new folder `src/components/prof/`. Each desk is one lazy component mounted by the `/time` page
+  (`MattersDesk`, `WipDesk`, `ClientMoneyDesk`, `ExportSvcDesk`, `FirmDesk`, `CaDesk`); its views are lazy
+  sub-components. Template parts live in `src/components/templates/parts/` (`ProfBlock.tsx`, `ProfAnnexurePage.tsx`),
+  each lazy.
+- **Strings.** One area per desk plus `prof-r14-common.ts` (§1). Hindi uses the trade's words (मामला / मैटर, मुवक्किल,
+  वकील, वकालतनामा, फ़ीस, फ़ीस मेमो, अग्रिम फ़ीस, क्लाइंट का पैसा, कोर्ट फ़ीस, स्टांप शुल्क, सरकारी फ़ीस, शुद्ध एजेंट के रूप में
+  प्रतिपूर्ति, हितों का टकराव, नियुक्ति पत्र, समय-पत्रक, अबिल्ड कार्य, कटौती / बढ़ोतरी, वसूली दर, उपयोग दर, साझेदार,
+  पूंजी खाता, चालू खाता, आहरण, लाभ विभाजन, पारिश्रमिक, पूंजी पर ब्याज, अनुमानित आय, सेवाओं का निर्यात, विदेशी मुद्रा,
+  विनिमय दर, निर्यात घोषणा पत्र, बैंक प्राप्ति प्रमाणपत्र, यूडीआईएन, प्रमाणपत्र, चरण शुल्क, मीडिया लागत, रिलीज़ ऑर्डर).
+- **Storage.** New company tables `mrchartist_inv_<table>` go through `getTable` / `setTable`. Each is registered in:
+  - `backup.ts` (`RECORD_TABLES` / `ID_TABLES`);
+  - the open-export schema (`trust/open-export-schema.ts`);
+  - `sync-engine.ts` `DATED` / `NUMBERED`, when dated or numbered;
+  - **`src/lib/prof/ps-registry.ts`** (`PS_TABLE_ACTIONS`, `PS_WATCHED`), registered at runtime, never in first-paint
+    `access.ts` / `audit-edits.ts`. Every writer module and the two all-table lazy writers (`sync-engine.ts`,
+    `trust/recycle-bin.ts`) import it for its side effect (`tests/ps-registry.test.ts`).
+
+  Each table gets one row in `docs/ARCHITECTURE.md` (lead). Additive record fields come by declaration merging in
+  `src/types/prof-r14.ts`: one file, one `declare module` block per package. Table and series names live in
+  `src/lib/prof/ps-shared.ts` (the `tr-shared.ts` / `mf-shared.ts` pattern).
+- **Volume.** Time entries are the high-volume table (a 25-person firm logs ≈ 40,000 entries a year). Round 14 adds **no
+  per-entry table**: write-downs are derived at billing time from the invoice line and the entries it bills
+  (`bill_refs`), and only a WIP write-off stamps the entry (`TimeEntry.ps.wo`). A test builds two years of a 25-person
+  firm and checks that the realisation view for one month reads only entries billed or dated in that month.
+- **Invoice snapshots.** Everything Round 14 stores on an invoice lives under the record key **`ps`** (one object; each
+  package owns its sub-fields, §6). Templates read them from the record only. Purchases rows that carry professional
+  fields (disbursement kind, matter, media buy, write-off) carry them as `PurchaseRecord.ps` (declaration merging; PS-A
+  checks that `readPurchase` passes the key through and adds `ps` to the purchase keep-list if it does not).
+- **Numbers.** New series go through `series-counters.ts` (`nextSeriesNumberFor` + `recordSeries`) as
+  `XXX/FY<yy-yy>/<seq>`, never reused after a delete: `ENG` (engagements), `CMV` (client-money vouchers). Neither prefix
+  is in use today (checked by grep; PS-A adds a test). Matter codes are not a series: they are the firm's own codes
+  (`<client code>/<seq>` suggested, editable, unique).
+- **Guards.** Destructive calls use `requireAccess`. Writes in a locked period use `assertUnlocked`. Money goes through
+  `round2`, hours through 2 decimals, percentages through 2 decimals. Every delete goes through `setTable` on a watched
+  table, so the recycle bin gets the row.
+- **Packs.** A desk tab is listed only when its pack is on (its URL still opens it). Tables are not read while their
+  pack is off (`tests/ps-pack-gate.test.ts`, like `tests/mf-pack-gate.test.ts`).
+- **Help.** Every new tab / view gets a topic (`tests/help-registry.test.ts` fails otherwise) and a Ctrl+K title in
+  `src/i18n/areas/discover-r6-tabs.ts`. Statutory topics cite the PS ids. The CA-id regexes in
+  `tests/help-registry.test.ts`, `tests/help-glossary.test.ts` and `tests/docs-links.test.ts` (both the `cited` and the
+  `ca: [...]` regex) gain `PS` (owner A). `PS` cannot collide with the payroll ids `P1…`: the regexes need a digit right
+  after the prefix.
+- **Cash readers.** **No new receipt marker.** Money in and out of a client-money account (B3) is held for clients, not
+  the firm's: it is recorded as **`client_money` vouchers, not `transactions` rows**, so `movedNoCash` and the no-cash
+  readers are not edited. The client-money **bank account** is a real bank (BRS and the cash book read it like any
+  account); the firm's own cash views (Today, payment modes, collection lag, cash-flow forecast) leave it out through one
+  predicate `isClientMoneyAccount` beside `pickableBankAccounts` (§6, reviewed by the lead).
+  `tests/no-cash-readers.test.ts` is unchanged; B3 adds `tests/ps-client-money-readers.test.ts`.
+- **Purchases contract.** Every new module that reads `purchases` (A3, A4, B1, B5, C4, D4) is added to
+  `tests/purchase-contract.test.ts` and reads bills through `readPurchase`.
+- **Ethics guards** are prompts with an owner override and an audit line, never a block in the data layer: the app
+  cannot know the facts (an advocate's non-litigation advisory work, a CA's Reg 192 case).
+
+### PS-A — Professional profile and the practice core (pack `practice`)
+
+#### PS-A1 Professional profile (professional picker)
+
+**User story.** When I set up the app I pick "Services", then "Professional", then *Law firm* and *Partnership*. The app
+turns on the matters, WIP, client-money and firm desks, lands me on Time → Matters, and the checklist asks for my
+enrolment number, my partners, my first matter and a conflict check.
+
+**Acceptance criteria.**
+1. `PackId` gains `practice`, `cafirm`, `legal`, `design`, `media`, `svcexport`, `partners` (appended to `PACK_IDS`).
+   `PACK_OF_TYPE`, `PACK_OF_TYPE_INLINE` and `PACK_ROUTES` are unchanged.
+2. Settings fields `prof_kind?: 'ca' | 'legal' | 'design' | 'consulting' | 'agency' | 'freelancer' | 'other'`,
+   `prof_sub?: string` (the sub-choice of §1) and object `prof_settings` (`settings.manage`, audited, synced as a
+   singleton). The entity question reads and writes the annual pack's existing entity value (`firm_form` is only its name
+   in the picker). `applyProfKind(kind, { registered, sub, firmForm, currentPacks })` (`shop-presets.ts`, R12 / R13
+   pattern) returns business type `services`, `service_kind: 'professional'`, modules, packs (union with
+   `currentPacks`), defaults and switches:
+
+   | kind | modules | industry_packs | landing | due days | template | switches turned on |
+   |---|---|---|---|---|---|---|
+   | ca | `PRESETS.services` + `accounts` | `practice`, `cafirm` (+ `partners`) | `/time?tab=cadesk&view=events` | 15 | `gst_tax_invoice` | matters; fee schedule; UDIN on lines; disbursements as pure agent; 194J 10 % default |
+   | legal | `PRESETS.services` + `accounts` | `practice`, `legal` (+ `partners`) | `/time?tab=matters&view=matters` | 15 | `freelancer_light` | matters with parties; conflict check before opening; RCM by client type; fee memo; client money; success-fee prompt |
+   | design | `PRESETS.services` + `accounts` | `practice`, `design` (+ `partners`) | `/time?tab=matters&view=stages` | 15 | `gst_tax_invoice` | stage fees; project-cost revisions; immovable-property POS check |
+   | consulting | `PRESETS.services` + `accounts` | `practice` (+ `svcexport`, + `partners`) | `/time?tab=wip&view=wip` | 30 | `gst_tax_invoice` | engagements; capped / fixed fees; utilisation; export check when exports |
+   | agency | `PRESETS.services` + `accounts` | `practice`, `media` (+ `svcexport`) | `/time?tab=matters&view=engagements` | 30 | `gst_tax_invoice` | monthly retainers; media pass-through; 194C default for clients |
+   | freelancer | `PRESETS.services` | `practice` (+ `svcexport`) | `/invoice` | 15 | `freelancer_light` | simple time; foreign-currency cards when exports; presumptive paper; threshold card |
+   | other | `PRESETS.services` | `practice` | `/time?tab=matters` | 15 | — | matters and WIP only |
+
+   `registered` adds `gst`; every kind keeps `time` (so `/time` stays visible); a `partnership` / `llp` firm form adds
+   `partners`. An unregistered `legal` profile prints fee memos without GST (B2).
+3. Wizard: the R10 service picker's `professional` card opens the kinds and their sub-choice (lazy, inside the wizard
+   chunk); every kind asks "Are you registered under GST?" and "Firm form"; `legal` asks enrolment no. and State Bar
+   Council (`prof_settings.legal`), `ca` asks membership / firm registration no. (`prof_settings.ca`). Settings → Features
+   shows "Professional profile" for every `services` company with the same choices plus "Custom". Changing the profile
+   never deletes data.
+4. Existing companies are unchanged (no `prof_kind`, no step). Companies that pick a kind get checklist steps
+   (`checklist-steps.ts`, append-only): every kind → `firstMatter`, `staffCapacity` (skippable for one person); legal →
+   `enrolment`, `conflictCheck`, `clientMoneyBank` (skippable); ca → `feeSchedule`, `linkCompanies`; design →
+   `stageTemplate`; partners → `partners`; svcexport → `lut` (the existing LUT register), `edf`.
+5. **Desk tabs**: each package adds its own `TIME_TABS` rows (§1, §6) in its own commit; PS-A adds `matters` and `wip`.
+   `Time.tsx` mounts a desk lazily when its tab is listed (one lazy map entry per desk).
+6. Features catalogue (`features-catalog.ts`): one row per new pack and one "Professional profile" row with `PACK_HREF`.
+7. **Sample data** (R6-B4): `src/lib/demo/profile-prof.ts`, only in the Demo company, dispatched by `prof_kind`; each
+   package adds its own block (§6): legal — 2 partners, 3 matters (one litigation with parties, one advisory, one with a
+   conflict waived), a deposit in the client account, an RCM fee memo with a court-fee disbursement; ca — 3 linked
+   companies with filed returns, a fee schedule, one UDIN; design — a house at ₹4.2 crore with 5 stages, two billed;
+   consulting — a capped engagement and a fixed-fee one with time over budget, one USD invoice with an EDF; agency — a
+   monthly retainer with a media pass-through; freelancer — a USD client paid through a platform, the threshold card at
+   70 %.
+
+**Files.** New: `src/lib/prof/{ps-profile,ps-registry,ps-settings,ps-shared}.ts`, `src/lib/prof-rules.ts` (scaffold with
+one section per package), `src/types/prof-r14.ts` (scaffold), `src/components/prof/ProfKindPicker.tsx`,
+`src/lib/demo/profile-prof.ts`. Edit: `industry-packs.ts`, `shop-presets.ts`, `features-catalog.ts`,
+`checklist-steps.ts`, the R10 service picker (one lazy sub-step), `FeaturesPanel.tsx`, `page-tabs.ts` (A's two rows),
+`Time.tsx` (lazy desk mounts), the demo dispatcher.
+
+**Storage.** Settings fields `prof_kind`, `prof_sub`, `prof_settings` (object).
+
+**Tests.** `tests/ps-profile.test.ts`: each kind's type / modules / packs / landing / switches; `registered` adds `gst`;
+partnership / LLP adds `partners`; packs union with existing packs; `PACK_OF_TYPE` / `PACK_ROUTES` unchanged; a services
+company without `prof_kind` unchanged; checklist steps by kind. `tests/industry-packs.test.ts` extended with the seven ids.
+
+#### PS-A2 Matters, engagements, letters and conflict checks
+
+*Seen in:* Clio / PracticePanther (matters, conflict checks), Ignition / Karbon (engagements, letters), Zoho Books
+(project billing methods).
+
+**User story.** A new client wants us to defend a cheque-bounce case against "Shree Traders". I run a conflict check on
+both names: one hit (we advised Shree Traders in 2024, an unrelated matter) — I record "no conflict: unrelated matter".
+I open matter `RSK/014` "Sec 138 NI Act — Delhi" with an engagement on a fixed fee of ₹60,000 in three stages plus
+court fees at actuals, send the engagement letter for signature, and start logging time against it.
+
+**Acceptance criteria.**
+1. **Matter = project cost centre** (no new table): additive `CostCentre.ps = { code, kind: 'matter' | 'assignment' |
+   'project', practice_area?, court?, case_no?, forum?, parties: [{ name, role: 'client' | 'opposite' | 'related' |
+   'witness' | 'other', pan?, gstin? }], responsible_id? (service_staff), originating_id?, opened, closed?, conflict_id?,
+   engagement_id? }`. The matter code is unique per company (`<client code>/<seq>` suggested; client code = additive
+   `Client.ps.code`, else initials). The R3-B project board, budgets and bell work unchanged on a matter.
+2. **Engagements** — table `engagements` (`ENG/FY…`, dated by `start`, numbered): `{ id, number, client_id, matter_ids[],
+   title, model: 'hourly' | 'fixed' | 'milestone' | 'retainer' | 'capped' | 'success' | 'blended', fee?, cap?,
+   blended_rate?, currency, milestones?: [{ id, label, pct? | amount?, due?, event? }], success?: { basis, pct? | amount?,
+   event }, retainer_id? (R3-B3 hours), disb_policy: 'agent' | 'markup' | 'included', tds_section?, letter_quote_id?,
+   accepted_at?, start, end?, renew_on?, status: 'draft' | 'sent' | 'accepted' | 'active' | 'closed', notes }`. One
+   engagement may cover several matters (a retainer for a group of companies).
+3. **Engagement letter** = the existing quotation document with proposal sections (R2-B3) and offline acceptance (8G):
+   "Make letter" creates a draft quotation for the client with the engagement's fee lines and the profession's letter
+   template (snippets shipped per `prof_kind`: CA — objective and scope, responsibilities of management, limitations,
+   fees, UDIN note (SA 210 headings); legal — scope, fees, court fees and expenses, client-money terms, no guarantee of
+   outcome; design — services by stage, fee on project cost, revisions, site visits; consulting / agency — deliverables,
+   change requests, IP, payment terms). Acceptance on the quote sets `accepted_at` and `status: 'active'`. Templates are
+   editable snippet text; nothing is legal advice (PS31).
+4. **Conflict check** — table `conflict_checks` (dated): `{ id, date, by, terms: string[], hits: [{ source: 'client' |
+   'vendor' | 'party' | 'engagement', ref_id, name, matter_code?, role?, score }], result: 'clear' | 'conflict' |
+   'waived', reason?, consent_note?, matter_id? }`. Matching: normalised names (case, punctuation, "pvt ltd / private
+   limited / llp / & co / m/s" folded), PAN and GSTIN exact, token overlap ≥ 0.8; it searches clients, vendors, every
+   matter's parties and closed matters. Opening a matter in a `legal` profile asks for a check first (the owner may skip
+   with a reason, audited). A "conflict" result without a waiver warns on every new engagement for those names. BCI Rule
+   33 and ICAI independence are cited (PS28); the app never decides.
+5. **Ethics prompt on the model**: `success` (and percentage-of-recovery milestones) shows a warning for `legal` (BCI Rule
+   20) and `ca` (First Schedule clause (10) / Reg 192) profiles, with an owner override reason (PS26); other profiles see
+   no prompt.
+6. Matters list: open / closed, responsible, unbilled WIP, billed, received, client-money balance (when B3 has merged —
+   read through an optional lazy import, never a hard dependency), last activity; CSV / XLSX.
+
+**Files.** New: `src/lib/prof/{ps-matters,ps-engagements,ps-conflicts,ps-letters}.ts`,
+`src/components/prof/{MattersDesk,MattersView,EngagementsView,ConflictsView,LettersView}.tsx`. Edit: the cost-centre form
+(one lazy "Matter details" row when `practice` is on), the timer / time form (the matter picker shows
+`CostCentre.ps.code` — one lazy label helper), the proposal snippet seed list (append-only rows).
+
+**Tests.** `tests/ps-matters.test.ts` (code uniqueness, close / reopen, parties), `tests/ps-engagements.test.ts` (model
+validation, milestones ≤ 100 %, letter → acceptance → active, renewal), `tests/ps-conflicts.test.ts` (name folding, PAN /
+GSTIN exact, closed matters searched, waiver carried, 5,000 parties under 50 ms).
+
+#### PS-A3 Billing models and the pre-bill (write-ups and write-downs)
+
+*Seen in:* Bill4Time / Clio pre-bills, Karbon engagement billing, Zoho Books billing methods, Harvest uninvoiced report.
+
+**User story.** At month end I open the pre-bill for each matter: 14.5 hours worth ₹58,000 against a capped engagement
+with ₹40,000 of the cap left. I bill ₹40,000; the pre-bill records a write-down of ₹18,000 ("cap"); the annexure still
+lists every hour; the realisation view shows 69 %.
+
+**Acceptance criteria.**
+1. **Pre-bill** (`wip` desk → `prebill`): per matter / client, the unbilled time at standard value (minutes × captured
+   rate), disbursements (B1) and mileage, the engagement's model and what it allows this period; the reviewer edits per
+   row (hours to bill, rate, exclude, defer) and per bill (target amount); a **write-up / write-down** = billed − standard,
+   with a reason from `prof_settings.wip.reasons` (cap, fixed fee, courtesy, inefficiency, junior time, rate override —
+   editable). "Create draft" goes through the existing `billUnbilled` path with the edited selection, so `bill_refs`, the
+   annexure and derived billing are unchanged.
+2. **Models**:
+   - `hourly` — today's flow;
+   - `fixed` / `milestone` — the fee line(s) come from the engagement (a milestone that is due or whose event is ticked);
+     time entries are marked billed by the same draft (on the annexure as "covered by fixed fee", value 0 on the client
+     paper, standard value kept for realisation); milestone % uses `progress-billing.ts`'s exported helpers (no edit);
+   - `capped` — billed time stops at the remaining cap; the excess is a write-down with reason "cap";
+   - `blended` — every hour at the engagement's one rate, whatever the timekeeper's card;
+   - `retainer` — the R3-B3 retainer when the engagement links one; else a monthly fee line (recurring) with time covered;
+   - `success` — a success-fee line only when its event is marked done (date, reference); basis × % or a fixed sum; time
+     covered at 0 (PS9 for time of supply).
+3. The write-down is **derived** per billed line: Σ standard value of the entries in `bill_refs` − the line's taxable
+   value (fixed-fee / milestone lines: Σ standard of the entries billed with them − the fee line). It is stored only as a
+   snapshot on the invoice (`ps.wd = { standard, billed, reasons: [{ reason, amount }] }`), so the paper stays as issued
+   and reports re-derive after an edit.
+4. The annexure snapshot (R3-B4) gains additive row fields `standard` and `billed` (old annexures print as before); write-
+   down columns print only on the internal pre-bill PDF, never on the client copy by default.
+5. Credit notes against a fee note reduce **collected** realisation only (PS35); a cancelled invoice frees its entries as
+   today.
+6. Multi-currency: the pre-bill works in the engagement currency; standard values in another currency convert at the
+   currency master's rate on the bill date (C4).
+
+**Files.** New: `src/lib/prof/{ps-prebill,ps-models,ps-writedown}.ts`, `src/components/prof/{WipDesk,PreBillView}.tsx`.
+Edit: `annexure.ts` (two optional fields in the row builder — additive; `tests/annexure.test.ts` unchanged), `BillClientModal`
+(one lazy "Open pre-bill" link; `billUnbilled` unchanged).
+
+**Tests.** `tests/ps-prebill.test.ts`: standard value; write-up and write-down; each model (fixed covers time at 0, cap
+stops, blended, success only after its event, milestone shares); `bill_refs` identical to `billUnbilled`'s; annexure
+fields; cancel frees; currency conversion.
+
+#### PS-A4 WIP, realisation, utilisation and profitability; year-end unbilled work
+
+*Seen in:* Clio (utilisation / realisation / collection), Karbon realisation report, Harvest utilisation, FreshBooks team
+cost rates.
+
+**User story.** On the 5th I look at the dashboard: firm utilisation 61 % (target 70 %), two juniors under 40 %, the tax
+team's realisation 78 % because of fixed-fee GST work, ₹3.4 lakh of WIP older than 90 days on two matters. At the year end
+I print the unbilled-work statement for the auditors.
+
+**Acceptance criteria.**
+1. **Timekeepers**: `service_staff` (R10) is the staff master; additive `ServiceStaff.ps = { capacity_hours_week,
+   rates: [{ from, standard_rate, cost_rate }], target_pct?, user_hint? }`. With `practice` on, the timer and time form
+   show "Who" (`TimeEntry.staff_id`, the existing R10 field), defaulting to the staff row whose `user_hint` matches the
+   local user (a hint only — local users are device-local). The rate card gains one level: **timekeeper standard rate**,
+   after task and before project (the R3-B1 order is otherwise unchanged; `rate-cards.ts` gets one optional resolver
+   argument, §6).
+2. **WIP** (`wip` view): unbilled time + unbilled disbursements by matter / client / partner with ageing buckets (0–30,
+   31–60, 61–90, 90+ days; editable), oldest entry, engagement model, cap left. **WIP write-off**: selected entries are
+   stamped `TimeEntry.ps.wo = { date, reason, by }` (disbursements `PurchaseRecord.ps.wo`), leave the Unbilled list, count
+   as write-down in realisation, and can be reversed by the owner (audited; refused in a locked period).
+3. **Realisation** (`realisation` view): per period and by partner / staff / client / matter / work type — worked
+   (standard value), billed, **billing realisation** = billed ÷ standard (write-offs included), collected (receipts
+   allocated to those invoices; TDS deducted counts as collected), **collection realisation** = collected ÷ billed,
+   **overall** = collected ÷ standard. The definitions print under the table (Clio's own pages define realisation two
+   ways; ours is stated).
+4. **Utilisation** (`utilisation` view): per staff and week / month — available hours (capacity − leave from payroll
+   attendance when the staff row links an employee, else capacity), billable hours, non-billable by work type,
+   utilisation = billable ÷ available, vs target; CSS bars; CSV.
+5. **Profitability** (`profit` view): per matter / client / engagement — fees billed − staff cost (hours × cost rate) −
+   unrecovered disbursements = contribution and margin %. Cost rates are management data and never print.
+6. **Year-end unbilled work** (working paper, `wip` → "Year end"): unbilled time and disbursements on the closing date at
+   standard value, less expected write-down (the client's or engagement's billing realisation of the last 12 months,
+   editable), by matter; method note per AS 9 / ICDS IV (percentage of completion; the ≤ 90-day completed-service option
+   by engagement) — PS23. **Optional accrual** (dated setting `prof_settings.wip.accrue_from`, off by default): a journal
+   Dr "Unbilled revenue (WIP)" Cr "Professional fees — unbilled" on the closing date, reversed the next day; GST is never
+   touched (no invoice, no time of supply).
+
+**Files.** New: `src/lib/prof/{ps-staff,ps-wip,ps-realisation,ps-utilisation,ps-profit,ps-yearend}.ts`,
+`src/components/prof/{WipView,RealisationView,UtilisationView,ProfitView,YearEndWipView}.tsx`. Edit: `rate-cards.ts`
+(one optional resolver argument; existing tests unchanged), the time form and timer card (one lazy "Who" row), the
+`service_staff` form (one lazy "Capacity and rates" row).
+
+**Tests.** `tests/ps-wip.test.ts` (ageing, write-off stamp / reverse, locked period refused), `tests/ps-realisation.test.ts`
+(three ratios on a worked example; fixed fee; credit note; TDS as collected; the two-year volume test reads one month
+only), `tests/ps-utilisation.test.ts` (capacity, leave, targets), `tests/ps-profit.test.ts`, `tests/ps-yearend.test.ts`
+(expected write-down, accrual on / off, reversal next day, no GST rows).
+
+#### PS-A5 Professional paper (matter header, billing basis, UDIN, purpose code)
+
+**User story.** My fee note shows "Matter RSK/014 — Sec 138 NI Act, Delhi · Engagement ENG/26-27/0031" under the client;
+the line reads "Professional fees — stage 2 of 3 (fixed fee)"; disbursements are listed separately as recovered at actual
+as pure agent; a CA's certificate line shows "UDIN 26123456ABCDEF1234"; a USD invoice shows purpose code P0802 and our
+SWIFT / IBAN.
+
+**Acceptance criteria.**
+1. **Snapshot** `ps` on invoices (one record key, §1): `{ kind?: 'fee' | 'memo' | 'stage' | 'media' | 'export',
+   matter?: { id, code, name, court?, case_no? }, engagement?: { id, number, model }, basis?: string, wd?: {...} (A3),
+   udin?: string[] (D5), purpose_code?: string, export?: { checks, edf_no?, edf_date? } (C1 / C2), legal?: { regime:
+   'rcm' | 'exempt' | 'taxable', entry? } (B2), stage?: {...} (B4), media?: {...} (B5), lines?: Record<lineId, { matter?,
+   udin?, stage?, ro?, covered? }> }`; each package writes its sub-object through one `psSnapshot(kind, …)` helper. Old
+   documents without `ps` print unchanged.
+2. **Header block** (`ProfBlock.tsx`, lazy, after `PartyPanel` and the R12 / R13 blocks, before `GstBody`, never on
+   `receipt`): matter code / name / court / case no., engagement number and model, the billing-basis sentence, and — for
+   exports — purpose code and the export-check summary (C1). Accent variable only.
+3. **Line sub-line**: `trackingText` gains one helper call `psLineText(item, ps)` → "Matter RSK/014" / "UDIN …" / "Stage 3
+   of 5 — working drawings" / "RO 0042 · Times of India, Delhi, 12 Oct" printed under the line name in both item tables.
+   Without `ps` it returns ''.
+4. **Annexure page** (`ProfAnnexurePage.tsx`, lazy, R3-B4 pattern): the matter's time summary by timekeeper (hours, rate,
+   amount), the disbursement schedule (B1), the stage computation (B4), the media schedule (B5) — from the snapshot only.
+   The existing timesheet annexure is unchanged and prints first.
+5. **Bank details for exports**: additive `SenderProfile.swift`, `iban`, `intermediary_bank` (printed only on export
+   documents; snapshotted with the sender).
+6. Declarations (`psDeclaration` in `paper-helpers.ts`): the B2 legal-services sentence; "Disbursements recovered at
+   actual as pure agent (Rule 33) — outside the taxable value"; the C1 export sentence; the C5 "not registered under GST"
+   sentence. Each statutory sentence carries "verify" where its CA item is open.
+7. Print copies, the share link and PDF export carry the same paper (they render `TemplateEngine`).
+
+**Files.** New: `src/components/templates/parts/{ProfBlock,ProfAnnexurePage}.tsx` + `prof-paper.module.css`,
+`src/lib/prof/{ps-snapshot,ps-print}.ts`. Edit: `TemplateEngine.tsx` (two lazy mounts, §6), `paper-helpers.ts`
+(`psLineText`, `psDeclaration`), `invoice-defaults.ts` (`R14_RECORD_KEYS`, one spread token), the profile form (SWIFT /
+IBAN — lazy row).
+
+**Tests.** `tests/ps-print.test.ts`: header by snapshot; sub-line texts per kind; declarations; old invoices without `ps`
+render byte-identical (paper HTML fixture); `ps` survives `normalizeRecord` (load → edit → save); SWIFT / IBAN only on
+export documents.
