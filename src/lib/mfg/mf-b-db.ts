@@ -6,6 +6,8 @@
 import './mf-registry';
 import { getTable, setTable } from '../storage';
 import { num } from '../invoice-calc';
+import { requireAccess } from '../access';
+import { stockDb, type StockItem } from '../inventory';
 
 export const DAY = /^\d{4}-\d{2}-\d{2}$/;
 export const r2 = (x: number) => Math.round((num(x) + Number.EPSILON) * 100) / 100 || 0;
@@ -29,6 +31,14 @@ export function mustGet<T extends { id: string }>(t: string, id: string, what: s
   const r = rowsOf<T>(t).find((x) => x.id === id);
   if (!r) throw new Error(`This ${what} no longer exists.`);
   return r;
+}
+
+/** Master edit of a stock item's MF-B fields (scrap class, EPR category, regrind limit …). */
+export function patchItem(id: string, patch: Partial<StockItem>): void {
+  requireAccess('master.edit');
+  const it = stockDb.items().find((i) => i.id === id);
+  if (!it) throw new Error('Item not found.');
+  stockDb.saveItem({ ...it, ...patch });
 }
 
 /** Scrap / regrind rate of an item (its sale rate, else its opening rate). */

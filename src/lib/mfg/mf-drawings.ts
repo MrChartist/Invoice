@@ -7,7 +7,8 @@
  * carried to the output batch through the order's batch-wise issues (R4-A genealogy) for the invoice sub-line.
  * Pure helpers above the "Storage" divider (tests/mf-drawings.test.ts). Working papers — verify with your CA.
  */
-import type { Drawing, DrawingRevision, MfSnapshot } from '../../types/mfg-r13';
+import type { Drawing, DrawingRevision, MfLineSnap, MfSnapshot } from '../../types/mfg-r13';
+import type { InvoiceRecord } from '../../types/invoice';
 import type { ManufacturingVoucher } from '../../types/manufacturing';
 import type { StockTransfer } from '../../types/stock';
 import { generateId, peekTable } from '../storage';
@@ -17,6 +18,7 @@ import { isVoidStatus, readPurchase, readPurchaseLines } from '../purchase-norma
 import { impliedPacks } from '../shop-mode';
 import { localDb } from '../localDb';
 import { MF_TABLES } from './mf-shared';
+import { mfSnapshot } from './mf-snapshot';
 import { DAY, drop, mustGet, nowIso, put, rowsOf } from './mf-b-db';
 
 export const DRAWINGS_TABLE = MF_TABLES.drawings;
@@ -183,4 +185,16 @@ export function removeDrawing(id: string, inspectionDrawingIds: readonly string[
   const d = mustGet<Drawing>(DRAWINGS_TABLE, id, 'drawing');
   if (inspectionDrawingIds.includes(id)) throw new Error(`Drawing ${d.number} has inspection reports; keep it.`);
   drop(DRAWINGS_TABLE, id);
+}
+
+/** Stamp drawing / revision / PO line / heat on the lines of a DRAFT document (`mf.lines`; issued documents keep theirs). */
+export function stampDocLines(invoiceId: string, lines: Record<string, MfLineSnap>): InvoiceRecord {
+  requireAccess('doc.create');
+  const inv = localDb.invoices.getById(invoiceId);
+  if (!inv) throw new Error('Document not found.');
+  if (inv.status !== 'Draft') throw new Error('Only a draft can be changed; an issued document keeps its print.');
+  const keep = new Set(inv.items.map((l) => l.id));
+  const merged = { ...inv.mf?.lines };
+  for (const [id, l] of Object.entries(lines)) if (keep.has(id)) merged[id] = { ...merged[id], ...l };
+  return localDb.invoices.save({ ...inv, mf: { ...inv.mf, ...mfSnapshot(inv.mf?.kind ?? 'drawing', { ...inv.mf, lines: merged }) } });
 }

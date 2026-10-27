@@ -46,7 +46,7 @@ test('a hold revision blocks the release of an order of its item (fabrication pa
   assert.match(holdBlock('sh', loadDrawings()), /D-9 rev A is on hold/);
   assert.equal(holdBlock('other', loadDrawings()), '');
   assert.equal(releaseHold('sh'), '', 'pack off: nothing read, nothing blocked');
-  localDb.settings.save({ ...localDb.settings.get(), industry_packs: ['shopfloor', 'fabrication'] });
+  localDb.settings.save({ ...localDb.settings.get(), industry_packs: ['shopfloor', 'fabrication'] as never });
   assert.match(releaseHold('sh'), /on hold/);
   overrideHold(d.id);
   assert.equal(releaseHold('sh'), '', 'owner override for this revision');
