@@ -83,11 +83,14 @@ export const searchFarmers = (all: readonly Farmer[], q: string): Farmer[] => {
   return s ? all.filter((f) => f.ag.code.toLowerCase().includes(s) || f.name.toLowerCase().includes(s) || (f.ag.phone ?? '').includes(s) || (f.ag.village ?? '').toLowerCase().includes(s)) : [...all];
 };
 
-export interface FarmerBalance { payable: number; receivable: number }
+/** `carry`: the negative cycle net carried to the next cycle (QA13 / AG80), already inside `receivable`. */
+export interface FarmerBalance { payable: number; receivable: number; carry?: number }
 
 /**
  * Balances per farmer vendor id: payable = his own vouchers' unpaid amount (read through the purchases contract) + his
- * net on closed, unpaid pooled cycles; receivable = unpaid sales to the client linked by the same `ag.code`.
+ * net on closed, unpaid pooled cycles; receivable = unpaid sales to the client linked by the same `ag.code` + the
+ * negative net carried out of his centre's latest closed / paid cycle (`carry_out`, not yet recovered by a later one —
+ * the same cycle `carriedIn` reads).
  */
 export function farmerBalances(farmers: readonly Farmer[], purchases: readonly unknown[], cycles: readonly FarmerCycle[], clients: readonly Client[], invoices: readonly InvoiceRecord[], payments: readonly Payment[]): Map<string, FarmerBalance> {
   const out = new Map<string, FarmerBalance>(farmers.map((f) => [f.id, { payable: 0, receivable: 0 }]));
@@ -101,6 +104,18 @@ export function farmerBalances(farmers: readonly Farmer[], purchases: readonly u
   for (const cy of cycles) if (cy.status === 'closed') for (const l of cy.lines) {
     const b = out.get(l.farmer_id);
     if (b) b.payable = round2(b.payable + Math.max(num(l.net), 0));
+  }
+  const latest = new Map<string, FarmerCycle>();
+  for (const cy of cycles) {
+    const k = cy.centre_id ?? '';
+    const p = latest.get(k);
+    if (cy.status !== 'draft' && (!p || cy.period_to > p.period_to)) latest.set(k, cy);
+  }
+  for (const cy of latest.values()) for (const l of cy.lines) {
+    const b = out.get(l.farmer_id);
+    if (!b || !(num(l.carry_out) < 0)) continue;
+    b.carry = round2((b.carry ?? 0) - num(l.carry_out));
+    b.receivable = round2(b.receivable - num(l.carry_out));
   }
   const clientCode = new Map(clients.filter((c) => c.ag?.code && c.id).map((c) => [c.id!, c.ag!.code.toUpperCase()]));
   const byCode = new Map(farmers.map((f) => [f.ag.code.toUpperCase(), f.id]));

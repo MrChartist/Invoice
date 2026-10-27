@@ -151,7 +151,7 @@ export const TOPICS: readonly HelpTopic[] = [
     statutory: ca(['AG1', 'AG11', 'AG14']),
     related: rel(['Farmers', '/inventory?tab=farm&view=farmers'], ['Cycles', '/inventory?tab=farm&view=cycles']),
   }),
-  t('inventory:farm:farmers', 'Farmers', 'किसान', 'Farmers and members with a short code for the can or the gate, village, centre, member no., bank and UPI. Only the last four digits of the Aadhaar number are kept. Print farmer cards with a QR of the code; import a CSV.', 'When a farmer joins.', { statutory: ca(['AG26']) }),
+  t('inventory:farm:farmers', 'Farmers', 'किसान', 'Farmers and members with a short code for the can or the gate, village, centre, member no., bank and UPI. Only the last four digits of the Aadhaar number are kept. The receivable includes a negative cycle net carried to the next cycle (shown next to it) until that cycle recovers it. Print farmer cards with a QR of the code; import a CSV.', 'When a farmer joins.', { statutory: ca(['AG26', 'AG80']) }),
   t('inventory:farm:vouchers', 'Farmer vouchers', 'किसान वाउचर', 'Our own purchase voucher (FPV) for produce bought from a farmer: weighment, quality readings and cuts, mandi / hamali charges (no preset rate — your State\'s and your contract\'s), the agriculturist declaration and the 194Q hint.', 'Each purchase at the gate.', {
     steps: ['Pick the farmer and the commodity.', 'Type the bags, gross weight, tare and the rate.', 'Type the quality readings; check the cut rows.', 'Save, print the voucher and pay him.'],
     statutory: ca(['AG1', 'AG5', 'AG11', 'AG13', 'AG14', 'AG20']),

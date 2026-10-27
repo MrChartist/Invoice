@@ -73,7 +73,7 @@ export default function FarmersView({ onDone }: { onDone: Done }) {
           </div>
         </fieldset>
       )}
-      <Grid attr="farmers" head={[agT('code'), agT('name'), agT('village'), agT('centre'), agT('phone'), agT('payable'), agT('receivable'), '']} rows={list.map((x) => [x.ag.code, x.name, x.ag.village ?? '', cName(x.ag.centre_id), x.ag.phone ?? '', money(bal.get(x.id)?.payable), money(bal.get(x.id)?.receivable), <button key="e" type="button" className={controls.btnGhost} onClick={() => setF(formOf(x))}>{agT('edit')}</button>])} />
+      <Grid attr="farmers" head={[agT('code'), agT('name'), agT('village'), agT('centre'), agT('phone'), agT('payable'), agT('receivable'), '']} rows={list.map((x) => [x.ag.code, x.name, x.ag.village ?? '', cName(x.ag.centre_id), x.ag.phone ?? '', money(bal.get(x.id)?.payable), <span key="r" data-ag-carry={bal.get(x.id)?.carry ?? 0}>{money(bal.get(x.id)?.receivable)}{bal.get(x.id)?.carry ? <small className={controls.hint}> · {agT('inclCarry', { amt: money(bal.get(x.id)?.carry) })}</small> : null}</span>, <button key="e" type="button" className={controls.btnGhost} onClick={() => setF(formOf(x))}>{agT('edit')}</button>])} />
       <div style={wrap}>
         <F label={agT('newCentre')}><In v={centre} set={setCentre} /></F>
         <button type="button" className={controls.btnOutline} disabled={!centre.trim()} onClick={() => run(() => { saveAgriSettings({ centres: [...centres, { id: '', name: centre, kind: 'cluster' } as AgCentre] }); setCentre(''); return agT('saved'); })}>{agT('addCentre')}</button>
