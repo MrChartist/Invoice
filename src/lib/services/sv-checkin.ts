@@ -35,7 +35,7 @@ export function checkIn(m: Membership, date: string, time: string, ctx: { gate?:
   requireAccess('doc.create');
   const days = loadCheckins();
   const used = sessionsUsed(m, ctx.invoices, days);
-  const st = statusOf(m, date, used);
+  const st = statusOf(m, date, used, ctx.invoices);
   if (gateFor(st, ctx.gate) === 'block') throw new Error(`${m.number} is ${st}. Renew it to check in.`);
   const row = days.find((d) => d.date === date);
   if (row?.entries.some((e) => e.membership_id === m.id && (e.class_id ?? '') === (ctx.class_id ?? ''))) throw new Error(`${m.client_name} is already checked in today.`);

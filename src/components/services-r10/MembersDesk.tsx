@@ -159,7 +159,7 @@ function Members({ notify, tick, refresh }: P) {
         <B p l={mcT('sell')} on={sell} d="mem-sell" dis={!plan} />
       </div>
       <Tbl d="mem-list" h={[mcT('number'), mcT('member'), mcT('plan'), mcT('start'), mcT('end'), mcT('status'), mcT('used'), '']} rows={all.slice(0, 300).map((m) => [
-        m.number, m.client_name, m.plan.name, m.start, m.end || '—', <span key="s" data-mem-status={m.number}>{mcT(`s.${statusOf(m, d, used(m))}`)}</span>,
+        m.number, m.client_name, m.plan.name, m.start, m.end || '—', <span key="s" data-mem-status={m.number}>{mcT(`s.${statusOf(m, d, used(m), invoices)}`)}</span>,
         m.plan.sessions ? `${used(m)} / ${m.plan.sessions}` : m.plan.kind === 'wallet' ? mcT('bonusLeft', { amount: rs(bonusLeft(m)) }) : '',
         <span key="a">{m.invoice_ids[0] && <Link to={`/invoice/${m.invoice_ids[0]}`}>{mcT('bill')}</Link>} <B sm l={mcT('act')} on={() => setSel(m)} d="mem-act-row" /></span>,
       ])} />
@@ -194,7 +194,7 @@ function Checkin({ notify, tick, refresh }: P) {
   const invoices = getTable<InvoiceRecord>('invoices');
   const hits = findMembers(q, all).slice(0, 8);
   const line = (m: Membership) => {
-    const st = statusOf(m, d, sessionsUsed(m, invoices, days));
+    const st = statusOf(m, d, sessionsUsed(m, invoices, days), invoices);
     return gateFor(st, gate) === 'block' ? mcT('blocked') : st === 'active' ? mcT('till', { date: m.end || '—' }) : st === 'frozen' ? mcT('frozenNow') : st === 'expired' ? mcT('exp', { n: Math.max(0, daysBetween(m.end || d, d)) }) : mcT(`s.${st}`);
   };
   const go = (m: Membership) => attempt(notify, () => {

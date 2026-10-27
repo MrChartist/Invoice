@@ -42,10 +42,10 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 7. Hotel and lodging pack (Round 7, planned) | HT1–HT17 | 17 | 6 |
 | 8. Trading businesses (Round 8, planned) | TR1–TR22 | 22 | 8 |
 | 9. Retail shops (Round 9, planned) | RT1–RT22 | 22 | 8 |
-| 10. Service businesses (Round 10, planned) | SV1–SV30, SV41–SV48 | 38 | 11 |
+| 10. Service businesses (Round 10, planned) | SV1–SV30, SV41–SV48, SV60–SV62 | 41 | 12 |
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG32, AG50–AG53 | 36 | 11 |
-| **Total** | | **330** | **88** |
+| **Total** | | **333** | **89** |
 
 ---
 
@@ -597,6 +597,16 @@ Ids start at SV44 (SV27 up is SV-B's, SV41–SV43 SV-D's; the lead may renumber)
 | SV46 | **Cancellation refund after the Sec 34(2) date.** Within the date the refund of a membership is a GST credit note (tax reversed) on the sale bill. After it the app refuses the GST note and asks the user to record the refund as a payment with no GST adjustment. Right? | As stated. | `services/sv-memberships.ts` `valueNote`, `cancelMembership` | 2021-04-01 | Sec 34(2) as amended by Finance Act 2022 (30 November) |
 | SV47 | **Coaching refund documents.** The refund on leaving is a credit note against each instalment bill in proportion to its refundable value: tax reversed on taxable heads (tuition), a no-tax note against a Bill of Supply (exempt hostel / mess); once-heads (registration, material) are kept. When the instalment was not yet paid, the note reduces the amount due instead of a cash refund. Acceptable? | As stated. | `services/sv-coaching-refund.ts` | 2024-01-16 | SV18; Sec 34 CGST Act |
 | SV48 | **Freeze and transfer fees.** A freeze fee or a transfer fee is billed on its own small invoice at the plan's class rate (5% without ITC for gyms / salons from 22 Sep 2025). Is it ancillary to the membership (same rate), or a separate supply at 18%? | Same class as the plan. | `services/sv-memberships.ts` `freeze`, `transfer` | 2025-09-22 | SV11; developers' reading |
+
+### 10.9 Added in QA round 12 (services audit)
+
+Ids start at SV60 so they cannot clash with ids the packages may still add. Findings: `docs/prd/qa-round-12.md`.
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| SV60 ★ | **GST rate on a wallet top-up (QA12 S3).** A salon / gym wallet top-up is an advance taxed on receipt. The app now taxes it at the plan's class rate (beauty / fitness 5% without ITC from 22 Sep 2025), else the company's default rate — before the fix it was 0% whenever the plan had no typed rate. A wallet can later be spent on 5% services **and** 18% products. Where the rate of the later supply is not determinable at receipt, is the advance taxed at 18% (Rule 50 proviso / Sec 13 read with the advance rules), and how is the difference adjusted when the wallet is spent? | Plan's class rate, else the default rate; adjustment as an ordinary advance. | `services/sv-memberships.ts` `topUp`, `planLine`; `advances.ts` | 2025-09-22 | Rule 50 CGST Rules (recalled); developers' reading |
+| SV61 | **Exempt plans in Table 8 (QA12 S5).** A membership / package of an exempt class (charitable yoga u/e 12AB, education, health care) is now reported in the **exempt** column of GSTR-1 Table 8 and 3B 3.1(c), not as nil-rated. Right column? | Exempt. | `services/sv-memberships.ts` `planLine`; `gst-reports.ts` (line column) | 2017-07-01 | N 12/2017-CT(R) (recalled) |
+| SV62 | **Commission on receipt basis (QA12 S4).** For staff paid on collection, the app now treats a bill settled from the customer's wallet (advance), a gift voucher, a deposit or an exchange as **paid** (the money came in earlier), and a write-off as not paid; a prepaid package session redeemed on a ₹0 line earns on the day it is redeemed. Is that the basis you would accept for the commission expense / payroll working (no tax effect beyond 194H / 194J on the payout)? | As stated. | `services/sv-commission.ts` `commissionFor` | — | — (design) |
 
 ---
 

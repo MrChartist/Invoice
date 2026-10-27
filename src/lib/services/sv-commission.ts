@@ -3,7 +3,8 @@
  * on the line's TAXABLE value (GST excluded) or a fixed ₹ per unit. The nearest rule wins (item > category > kind).
  * A prepaid package redemption earns on the redeemed value (price ÷ sessions); a package / membership sale earns only
  * its own rule (default 0) — no double commission. Credit notes take back; drafts and cancelled bills earn nothing.
- * Basis `receipt` earns pro rata as the bill is paid (no-cash receipt rows — write-offs, vouchers — never count).
+ * Basis `receipt` earns pro rata as the bill is paid (a write-off never counts; wallet / voucher / deposit settlements
+ * do — QA12 S4); a package redemption was paid at sale, so it earns on the bill's date.
  * Monthly slab: above the target the `add` % applies to the excess, or `replace` re-rates the excess.
  * A working paper for payroll / payouts — TDS on commission is a CA call (SV16).
  */
@@ -11,7 +12,7 @@ import type { InvoiceItem, InvoiceRecord, Payment } from '../../types/invoice';
 import type { CommissionKind, CommissionPlan, CommissionRule, ServiceStaff } from '../../types/services-r10';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from '../invoice-calc';
 import { isRevenueDoc } from '../stats';
-import { movedNoCash } from '../advance-tax';
+import { noCashKind } from '../advance-tax';
 import { isoDay } from '../dates';
 
 export interface CommissionData {
@@ -99,7 +100,10 @@ export function commissionFor(staff: Pick<ServiceStaff, 'id' | 'plan_id'>, month
   if (plan?.basis === 'receipt') {
     const byInv = new Map(data.invoices.filter((i) => i && isRevenueDoc(i)).map((i) => [i.id, i]));
     const paid = new Map<string, number>();
-    const rows = data.payments.filter((p) => p && byInv.has(p.invoice_id) && !movedNoCash(p)).slice().sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+    // QA12 S4: the customer paid when the bill is settled by a wallet / advance, a gift voucher, a deposit or an
+    // exchange (the money came in earlier); only a write-off is not a payment. A prepaid redemption (a ₹0 line, paid
+    // when the package was sold) earns on the bill's date below, never through this bill's receipts.
+    const rows = data.payments.filter((p) => p && byInv.has(p.invoice_id) && noCashKind(p) !== 'write_off').slice().sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
     for (const p of rows) {
       const inv = byInv.get(p.invoice_id)!;
       const total = num(inv.total);
@@ -110,8 +114,9 @@ export function commissionFor(staff: Pick<ServiceStaff, 'id' | 'plan_id'>, month
       const day = isoDay(p.date);
       if (day.slice(0, 7) !== month) continue;
       const f = (upto - before) / total;
-      if (f > 0) for (const l of documentCommission(inv, staff, data)) lines.push({ ...l, date: day, base: round2(l.base * f), amount: round2(l.amount * f) });
+      if (f > 0) for (const l of documentCommission(inv, staff, data)) if (l.kind !== 'package_redemption') lines.push({ ...l, date: day, base: round2(l.base * f), amount: round2(l.amount * f) });
     }
+    for (const inv of byInv.values()) if (isoDay(inv.issue_date).slice(0, 7) === month) lines.push(...documentCommission(inv, staff, data).filter((l) => l.kind === 'package_redemption'));
     // Credit notes take back in the month they are issued.
     for (const inv of data.invoices) if (inv?.doc_type === 'CREDIT_NOTE' && counts(inv) && isoDay(inv.issue_date).slice(0, 7) === month) lines.push(...documentCommission(inv, staff, data));
   } else {

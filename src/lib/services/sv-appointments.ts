@@ -109,7 +109,9 @@ export function billLines(a: Appointment, staff: readonly Pick<ServiceStaff, 'id
   return a.services.map((s) => {
     const staffId = s.staff_id || a.staff_id;
     const cls = s.sv_class ? serviceClassAt(s.sv_class, date) : undefined;
-    const rate = typeof s.tax_rate === 'number' ? s.tax_rate : cls?.rate ?? 0;
+    // QA12 S7: a typed service (no catalogue rate, no class) takes the default GST rate like any new line — it was 0%,
+    // reported as a nil-rated supply.
+    const rate = typeof s.tax_rate === 'number' ? s.tax_rate : cls?.rate ?? (Number(localDb.settings.get().defaultTaxRate) || 0);
     return {
       ...blankItem(rate),
       name: s.name,
