@@ -5,7 +5,7 @@ import { cn, todayInput } from '../../lib/utils';
 import { num } from '../../lib/invoice-calc';
 import { buildOutputVoucher, defaultOutputBatch, loadOrderDocs, orderProgress, productionOrdersDb } from '../../lib/production/orders';
 import { ensureQcGodown } from '../../lib/production/qc';
-import type { Bom, VoucherOutputLine, VoucherStockLine } from '../../types/manufacturing';
+import type { AdditionalCost, Bom, VoucherOutputLine, VoucherStockLine } from '../../types/manufacturing';
 import type { ProductionOrder } from '../../types/production-r4';
 import { pT } from '../../i18n/areas/production-r4';
 import { defineArea } from '../../i18n/area';
@@ -50,14 +50,22 @@ export function OutputDialog({ ctx, order, boms, onClose }: { ctx: MfgContext; o
     void import('../../lib/mfg/mf-jobcards').then((m) => live && setJc(m.outputExtras(order, ctx.items)), () => undefined);
     return () => { live = false; };
   }, [order, ctx.items]);
+  // MF-D5: with the dated absorption switch on, the cards' conversion (hours × rate, AS 2 cap) goes into this journal.
+  const [conv, setConv] = useState<{ date: string; lines?: AdditionalCost[] } | null>(null);
+  useEffect(() => {
+    if (!order.mf?.ops?.length) return;
+    let live = true;
+    void import('../../lib/mfg/mf-conversion').then((m) => live && setConv({ date, lines: m.outputConversion(order, date) }), () => undefined);
+    return () => { live = false; };
+  }, [order, date]);
   const name = (id: string) => ctx.items.find((i) => i.id === id)?.name ?? '?';
 
   const submit = () => {
     try {
       const godown = order.output_to_qc ? ensureQcGodown().id : undefined;
       const serials = parseSerials(serialText);
-      const base = buildOutputVoucher(order, progress, bom, { qty: num(qty), date, batch_no: batch, expiry_date: expiry || undefined, serials: serials.length ? serials : undefined, godown_id: godown }, undefined, jc?.scrapLines.length ? { scrapLines: jc.scrapLines } : undefined);
-      const v = productionOrdersDb.reportOutput(order.id, { ...base, ...(base.batch_no && food.mfg_date ? { mfg_date: food.mfg_date } : {}), components: components.filter((c) => num(c.qty) > 0), costs: num(labour) > 0 ? [{ id: 'labour', label: pT('additionalCosts'), mode: 'amount', value: num(labour) }] : [] }, ctx.items, ctx.inputs);
+      const base = buildOutputVoucher(order, progress, bom, { qty: num(qty), date, batch_no: batch, expiry_date: expiry || undefined, serials: serials.length ? serials : undefined, godown_id: godown }, undefined, jc?.scrapLines.length || conv?.lines?.length ? { ...(jc?.scrapLines.length ? { scrapLines: jc.scrapLines } : {}), ...(conv?.date === date && conv.lines?.length ? { conversion: conv.lines } : {}) } : undefined);
+      const v = productionOrdersDb.reportOutput(order.id, { ...base, ...(base.batch_no && food.mfg_date ? { mfg_date: food.mfg_date } : {}), components: components.filter((c) => num(c.qty) > 0), costs: [...base.costs, ...(num(labour) > 0 ? [{ id: 'labour', label: pT('additionalCosts'), mode: 'amount' as const, value: num(labour) }] : [])] }, ctx.items, ctx.inputs);
       onClose();
       ctx.changed(pT('outputSaved', { number: v.number, qty: qtyText(v.qty) }));
     } catch (e) {

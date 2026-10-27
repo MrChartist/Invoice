@@ -12,6 +12,7 @@ import { computeTracking, liveTrackingInputs } from '../stock-tracking';
 import { isPackOn } from '../industry-packs';
 import { localDb } from '../localDb';
 import { loadOrderDocs, orderProgress, productionOrdersDb } from '../production/orders';
+import { liveMemoConversion } from './mf-conversion';
 import { anyExplicitClass, classOf, defaultClasses, inventorySplit, noteRows, valueAt, wipStatement, type InventorySplit } from './mf-inventories';
 
 /** The split is shown when the `shopfloor` pack is on or any item carries a class. */
@@ -27,8 +28,15 @@ function wipQtyOn(date: string): (itemId: string) => number {
   return (id) => Object.entries(tracking.get(id)?.byGodown ?? {}).reduce((s, [g, q]) => s + (wip.has(g) ? q : 0), 0);
 }
 
-/** The split on `date` with an optional memo conversion (paise). */
-export function liveSplit(date: string, memoConversion = 0): InventorySplit {
+/** Memo conversion (D5) on open orders at `date`: per order and the total, in paise; unabsorbed overhead (period cost). */
+export function liveMemo(date: string): { byOrder: Map<string, number>; total: number; unabsorbed: number } {
+  if (!isPackOn(localDb.settings.get(), 'shopfloor' as never)) return { byOrder: new Map(), total: 0, unabsorbed: 0 };
+  const m = liveMemoConversion(date);
+  return { byOrder: new Map(m.rows.map((r) => [r.order_id, Math.round(r.memo * 100)])), total: Math.round(m.total * 100), unabsorbed: Math.round(m.unabsorbed * 100) };
+}
+
+/** The split on `date` with an optional memo conversion (paise; working only). */
+export function liveSplit(date: string, memoConversion = liveMemo(date).total): InventorySplit {
   const positions = loadPositions();
   const defaults = defaultClasses(positions.map((p) => p.item), bomsDb.all());
   return inventorySplit(positions, date, (i) => classOf(i, defaults), wipQtyOn(date), memoConversion);
@@ -37,11 +45,15 @@ export function liveSplit(date: string, memoConversion = 0): InventorySplit {
 /** Note rows for the annual pack (empty when the split is not wanted). */
 export function liveNoteRows(cur: string, prev: string): { label: string; cur: number; prev: number }[] {
   if (!splitWanted()) return [];
-  return noteRows(liveSplit(cur), liveSplit(prev));
+  return noteRows(liveSplit(cur, 0), liveSplit(prev, 0));
 }
 
 /** Year-end WIP statement on `date` (material at the item's average value on that day). */
 export function liveWipStatement(date: string, memoConversion?: (orderId: string) => number) {
+  if (!memoConversion) {
+    const m = liveMemo(date).byOrder;
+    memoConversion = (id) => m.get(id) ?? 0;
+  }
   const positions = new Map(loadPositions().map((p) => [p.item.id, p]));
   const docs = loadOrderDocs();
   const orders = productionOrdersDb.all();
