@@ -4001,6 +4001,71 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+
+  await step('R10-B clinic desk: Clinic profile; a patient gets a UHID; OPD token 1 for Dr Shah; consult (exempt) + a cosmetic peel (18%) → "Invoice-cum-Bill of Supply" with UHID and reg. no.; a lab order with a high Hb shows "H"; a ₹6,000 / day private room bills at 5%', async () => {
+    const keys = ['settings', 'service_settings', 'clinic_settings', 'doctors', 'clients', 'items_catalog', 'clinic_visits', 'lab_tests', 'lab_orders', 'admissions', 'invoices', 'series_counters', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'clinic', industry_packs: ['clinic'], modules: undefined, lock_until: undefined });
+    await writeJson(page, 'service_settings', { rule46a: true });
+    await writeJson(page, 'clinic_settings', { uhid_prefix: 'E2E', rooms: [{ id: 'rp', name: 'Deluxe', kind: 'private', rate: 6000 }] });
+    await writeJson(page, 'doctors', [{ id: 'dr-shah', name: 'Dr Shah', council: 'MMC', reg_no: '2011/04/1234', consult_fee: 600, active: true }]);
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'peel', name: 'E2E Chemical peel', type: 'Service', hsn: '9993', unit: 'NOS', quantity: 1, rate: 2000, tax_rate: 18, amount: 2000, sv_class: 'health_cosmetic' }]);
+    await writeJson(page, 'lab_tests', [{ id: 'cbc', code: 'CBC', name: 'CBC', dept: 'Haematology', sample: 'EDTA', price: 400, params: [{ code: 'HB', name: 'Haemoglobin', unit: 'g/dL', kind: 'numeric', ranges: [{ sex: 'F', low: 12, high: 15 }] }], created_at: '2026-01-01T00:00:00.000Z' }]);
+    // B1: register a patient.
+    await page.goto(srv.origin + '/time?tab=clinic&view=patients');
+    await page.locator('[data-patient-name]').fill('E2E Mrs Rao', { timeout: 15000 });
+    await page.locator('[data-patient-sex]').selectOption('F');
+    await page.locator('[data-patient-save]').click();
+    const said = await page.locator('[role=status], [role=alert]').allInnerTexts().catch(() => []);
+    let pt = (await readJson(page, 'clients', [], (v) => v.some((c) => c.name === 'E2E Mrs Rao' && c.patient?.uhid), 15000)).find((c) => c.name === 'E2E Mrs Rao' && c.patient?.uhid);
+    if (!pt) { // the desk chunk may still be settling on a loaded machine: type and save once more
+      await page.locator('[data-patient-name]').fill('E2E Mrs Rao');
+      await page.locator('[data-patient-save]').click();
+      pt = (await readJson(page, 'clients', [], (v) => v.some((c) => c.name === 'E2E Mrs Rao' && c.patient?.uhid), 15000)).find((c) => c.name === 'E2E Mrs Rao' && c.patient?.uhid);
+    }
+    const toast = pt?.patient?.uhid ? '' : `${said.join(' | ')} / ${(await page.locator('[data-clinic-desk]').innerText().catch(() => '')).slice(0, 300)}`;
+    check(/^E2E\d{2}-\d{4}$/.test(pt?.patient?.uhid ?? ''), `the patient gets a UHID (${pt?.patient?.uhid ?? (JSON.stringify((await readJson(page, 'clients', [])).filter((c) => c.name === 'E2E Mrs Rao')) + toast)})`);
+    // OPD token 1, then the bill with a cosmetic peel.
+    await page.goto(srv.origin + '/time?tab=clinic&view=opd');
+    await page.locator('[data-patient-pick]').selectOption(pt.id, { timeout: 15000 });
+    await page.locator('[data-doctor-pick="doctor"]').selectOption('dr-shah');
+    await page.locator('[data-visit-new]').click();
+    const visit = (await readJson(page, 'clinic_visits', [], (v) => v.length > 0))[0];
+    check(visit?.token === 1 && visit.fee === 600 && /^OPD\/FY/.test(visit.number), `OPD token 1 with the ₹600 fee (${visit?.number})`);
+    const vrow = page.locator(`[data-visit="${visit.number}"]`);
+    await vrow.locator('select').selectOption('E2E Chemical peel');
+    await vrow.locator('[data-visit-bill]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.sv?.visit?.id === visit.id))).find((i) => i.sv?.visit?.id === visit.id);
+    const consult = bill?.items?.[0];
+    check(Number(consult?.tax_rate) === 0 && consult?.sv?.exempt === 'EXEMPT' && Number(bill?.items?.[1]?.tax_rate) === 18, 'the consult is exempt and the peel taxed at 18%');
+    check(bill?.sv?.rule46a === true && bill.sv.visit.uhid === pt.patient.uhid && bill.sv.visit.doctor_reg === 'MMC 2011/04/1234', 'Rule 46A title and the UHID / registration snapshot on the bill');
+    // B3: a lab order with a high haemoglobin → "H" on the report preview.
+    await page.goto(srv.origin + '/time?tab=clinic&view=lab');
+    await page.locator('[data-patient-pick]').selectOption(pt.id, { timeout: 15000 });
+    await page.locator('[data-lab-test="CBC"]').check();
+    await page.locator('[data-lab-order]').click();
+    const order = (await readJson(page, 'lab_orders', [], (v) => v.length > 0))[0];
+    await page.locator(`[data-order="${order.number}"]`).click();
+    await page.locator('[data-result="HB"]').fill('16.4');
+    await page.locator('[data-results-save]').click();
+    await page.locator('[data-report-preview]').click();
+    check((await page.locator('[data-lab-report] [data-flag]').first().innerText({ timeout: 15000 })).trim() === 'H', 'the report preview flags the high haemoglobin "H"');
+    // B2: admission in the ₹6,000 / day private room → the final bill has a 5% room line.
+    await page.goto(srv.origin + '/time?tab=clinic&view=ipd');
+    await page.locator('[data-patient-pick]').selectOption(pt.id, { timeout: 15000 });
+    await page.locator('[data-admit-room]').selectOption('rp');
+    await page.locator('[data-admit]').click();
+    const adm = (await readJson(page, 'admissions', [], (v) => v.length > 0))[0];
+    await page.locator(`[data-admission="${adm.number}"]`).click();
+    await page.locator('[data-discharge]').click();
+    await page.locator('[data-final-bill]').click({ timeout: 15000 });
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const fin = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.sv?.admission?.id === adm.id))).find((i) => i.sv?.admission?.id === adm.id);
+    check(Number(fin?.items?.[0]?.tax_rate) === 5 && fin.items[0].sv?.cls === 'hospital_room_high', 'the room above ₹5,000 a day is billed at 5%');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {

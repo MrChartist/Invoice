@@ -20,6 +20,8 @@ import styles from './Settings.module.css';
 const ExportSettingsPanel = lazy(() => import('../trade/ExportSettingsPanel'));
 // R5-C3: non-profit registrations (PAN, 12AB, 80G URN, 35(1), FCRA) — only with the non-profit pack on.
 const NpoRegistrationsPanel = lazy(() => import('../institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.NpoRegistrationsPanel })));
+// R10 (SV-B1): clinic registrations — only with the clinic pack on.
+const ClinicRegsPanel = lazy(() => import('../services-r10/ClinicRegsPanel'));
 
 interface Props {
   profile: SenderProfile;
@@ -221,6 +223,7 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
         <ExportSettingsPanel profile={profile} onChange={onChange} />
       </Suspense>
       {isPackOn(localDb.settings.get(), 'nonprofit') && <Suspense fallback={null}><NpoRegistrationsPanel profile={profile} onChange={onChange} /></Suspense>}
+      {isPackOn(localDb.settings.get(), 'clinic') && <Suspense fallback={null}><ClinicRegsPanel profile={profile} onChange={onChange} /></Suspense>}
 
       <fieldset className={styles.group}>
         <legend>{setT('paymentDetails')}</legend>

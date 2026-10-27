@@ -42,10 +42,10 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 7. Hotel and lodging pack (Round 7, planned) | HT1–HT17 | 17 | 6 |
 | 8. Trading businesses (Round 8, planned) | TR1–TR22 | 22 | 8 |
 | 9. Retail shops (Round 9, planned) | RT1–RT22 | 22 | 8 |
-| 10. Service businesses (Round 10, planned) | SV1–SV26, SV41–SV48 | 34 | 10 |
+| 10. Service businesses (Round 10, planned) | SV1–SV30, SV41–SV48 | 38 | 11 |
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG32, AG60–AG69 | 42 | 12 |
-| **Total** | | **332** | **88** |
+| **Total** | | **336** | **89** |
 
 ---
 
@@ -502,7 +502,7 @@ and mobiles, and jewellery.
 | RT21 | **Stock valuation for jewellers.** Tags valued at cost (metal at purchase rate by fine weight + making paid). Old gold at its purchase value. Year-end at the lower of cost and NRV (AS 2). Is valuation by fine weight at the year-end rate (a common trade practice) acceptable instead? How should metal held by karigars (wip godown) be shown? | The books' valuation method is unchanged (existing engine). Karigar metal is shown as stock with job workers. | `retail/rt-karigar.ts`; `ledger/closing-stock.ts` (existing) | — | AS 2 (developers' reading) |
 | RT22 | **e-Way bill for jewellery.** Under the Rule 138(14) annexure, Chapter 71 goods (precious metals, jewellery) need no e-Way bill. The app suppresses the e-Way prompt only when every goods line on the bill is Chapter 71. Is the exemption still current? Does it cover silver articles and imitation jewellery (7117)? | As stated. 7117 is not treated as exempt. | `retail-rules.ts` `EWAY_EXEMPT_CHAPTER_RULES` | 2017-07-01 | Rule 138(14) annexure (recalled) |
 
-## 10. Service businesses (Round 10, ids SV1–SV26)
+## 10. Service businesses (Round 10, ids SV1–SV30, SV41–SV48)
 
 Added with `docs/prd/round-10.md`, which covers clinics, dentists and diagnostic labs; salons, spas and beauty parlours;
 gyms, fitness studios and yoga; coaching and training institutes; and vehicle workshops and AC / appliance service
@@ -567,7 +567,16 @@ centres.
 | SV25 | **Splitting a claim bill per head.** When the payer approves a lump sum (not line by line), the app divides **every line** of the job in the ratio approved ÷ job total (GST included), so the insurer's and the owner's invoices carry the same items, HSN / SAC and rates with smaller values, and together equal the job. (a) Is a proportional split of each line acceptable, or must the payer's invoice list only the items it approved (line-by-line split, which the app also supports)? (b) Both invoices are dated on the day the claim is billed and the owner's part reuses the job's draft number — any objection? | Proportional per head by default; line-by-line when the approval lists lines. | `services/sv-claims.ts` `splitForPayer`, `billClaim` | — | Developers' reading of Circular 217/11/2024-GST |
 | SV26 | **Commission to salaried staff in payroll.** The front desk posts a month's commission of an employee linked to payroll as a payroll **earning adjustment** ("Commission <month>", taxable, tag `bonus`), so salary TDS (Sec 192 / 392) applies through the payroll run. (a) Is commission part of "wages" for **ESI** (the app's payroll treats the earning as ESI wages like other earnings) and is it outside EPF "basic wages" unless paid to all employees alike? (b) Should a target-linked slab bonus be treated differently from a flat % commission? | Taxable earning; EPF / ESI treatment as the payroll engine applies to adjustments today. | `services/sv-payouts.ts`; `types/payroll.ts` `PayrollAdjustment` | — | Developers' reading; EPF Act Sec 2(b), ESI Act Sec 2(22) (not re-read) |
 
-### 10.6 Added while building SV-D (workshops and service centres)
+### 10.6 Added while building SV-B (clinics and labs)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| SV27 ★ | **Room-days and the ₹5,000 test.** The app counts room-days by **midnight census** (default; a same-day stay is one day) or per started 24 hours (setting), and applies the 5%-without-ITC rate to the whole room line when the room's **rate per day** is above ₹5,000 (ICU / CCU / ICCU / NICU always exempt), on the admission date's rule. (a) Is the per-day test on the tariff rate or on the room charge actually billed for a day (a part day, a room change mid-stay)? (b) A room upgraded during the stay: should each room's days be tested separately (the app tests the room on the admission)? | Tariff rate per day of the room on the admission; one room line; midnight census. | `services/sv-ipd.ts` `roomDays`, `roomClass`; `service-rules.ts` `HOSPITAL_ROOM_RULES` | 2022-07-18 | N 03/2022 + 04/2022-CT(R) (secondary) |
+| SV28 | **Deposits on admission.** A deposit is an ordinary advance receipt at **0%** (health care is exempt) and is adjusted against the final bill through the advance adjustment (GSTR-1 Table 11B untouched). When the stay turns out to include a 5% room, should the part of the deposit for the room carry GST on receipt (Sec 13(2), G3)? | No GST on deposits; the 5% is charged on the final bill only. | `services/sv-ipd.ts` `applyDeposits`; `ClinicDesk` deposit; `advances.ts` | — | Developers' reading |
+| SV29 | **Outsourced lab tests.** A test sent to a reference lab is billed by us to the patient as exempt health care; the reference lab's monthly bill is booked as a purchase **without GST and without ITC**, and **no TDS** is suggested on it. (a) Is a lab-to-lab test exempt (entry 74 to a clinical establishment)? (b) Is TDS due on the reference lab's bill (194J professional / technical or 194C) above the thresholds? | Exempt both ways; no TDS on the outsourced bill (add it on the bill if your CA says so). | `services/sv-lab.ts` `bookOutsourcedBill` | — | Developers' reading |
+| SV30 | **Visiting consultant fee share.** The month's share (a % of the consultant's own lines, GST excluded, or ₹ per visit) is posted as a **journal** Dr "Staff commission" Cr the doctor (Sundry creditors), with opt-in 194J at 10% where the FY's payouts to that doctor pass ₹50,000 — not as a purchase bill. (a) Is the consultant's share the clinic's expense (the clinic bills the whole fee) or should the clinic bill as the consultant's agent (pure agent, Rule 33)? (b) Is the ₹50,000 test right across fee-share payouts only, or with other payments to the same doctor? | Clinic is the supplier and bills the full fee; the share is an expense; threshold over fee-share payouts. | `services/sv-referrals.ts` `feeShare`, `payFeeShare`; `services/sv-payouts.ts` | 2025-04-01 | Sec 194J; CBDT practice (secondary) |
+
+### 10.7 Added while building SV-D (workshops and service centres)
 
 Ids start at SV41 so they cannot clash with the ids SV-B / SV-C add at the same time (the lead may renumber).
 
@@ -577,7 +586,7 @@ Ids start at SV41 so they cannot clash with the ids SV-B / SV-C add at the same 
 | SV42 | **SAC for "other" repairs and outside work.** The workshop uses 998729 (repair of other goods) for an asset that is neither a vehicle nor a household appliance, while Round 9's phone desk uses 998719 for "other". Outside work (machining, denting) re-billed to the customer uses the job's own repair SAC (998714 vehicles, 998715 appliances) at 18%. Which "other" code is right, and is outside work rightly billed at the repair SAC? | 998729; outside work at the repair SAC. | `service-rules.ts` `REPAIR_SAC_RULES`; `services/sv-estimates.ts` `subletLine`; `retail-rules.ts` `REPAIR_SERVICE_RULES` | — | SAC list (recalled) |
 | SV43 | **Labour hours on the invoice.** Labour lines carry the standard hours as the quantity (unit HRS) and the hourly rate, so the HSN summary of GSTR-1 shows the SAC with a quantity in hours. Acceptable, or should service lines report the UQC as "OTH" / NA with no quantity? | Hours as the quantity; the HSN summary as the existing engine builds it. | `services/sv-estimates.ts` `labourLine`; `gst-reports.ts` (HSN summary, unchanged) | — | GSTR-1 HSN summary notes (recalled) |
 
-### 10.7 Added while building SV-C (memberships, packages, classes, coaching)
+### 10.8 Added while building SV-C (memberships, packages, classes, coaching)
 
 Ids start at SV44 (SV27 up is SV-B's, SV41–SV43 SV-D's; the lead may renumber).
 

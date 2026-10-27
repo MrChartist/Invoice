@@ -5,7 +5,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
-import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText, svDocTitle } from '../paper-helpers';
+import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText, svDocTitle, svRegText, visitText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { CustomFieldsBlock, ItemCustomLine } from './CustomFieldsBlock';
 import { TransportBlock } from './TransportBlock';
@@ -52,6 +52,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
           {sender.companyGstin && <>GSTIN: {sender.companyGstin}</>}
           {sender.drug_licence && <><br />DL No.: {sender.drug_licence}</>}
           {sender.pharmacist && <><br />{pharmacistText(sender)}</>}
+          {sender.sv_regs && <><br />{svRegText(sender)}</>}
         </div>
       </div>
 
@@ -68,6 +69,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
           {c.gstin && <> · GSTIN {c.gstin}</>}
         </div>
       )}
+      {visitText(invoice) && <div className={styles.rcSmall} data-visit>{visitText(invoice)}</div>}
       <CustomFieldsBlock invoice={invoice} compact />
       <TransportBlock invoice={invoice} compact />
       <hr className={styles.rcRule} />
