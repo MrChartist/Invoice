@@ -36,6 +36,7 @@ import { liveRedeemIssue } from '../retail/gift-voucher-core';
 import '../trade/tr-registry'; // R8-C: Round 8 tables' rights and audit labels (lazy registration)
 import '../hotel/hotel-registry'; // R7: hotel tables' rights and audit labels (lazy registration)
 import '../retail/rt-registry'; // R9: retail tables' rights and audit labels (lazy registration)
+import '../construction/cn-registry'; // R11: construction tables' rights and audit labels (lazy registration)
 
 export { BIN_TABLE };
 export const BIN_SETTINGS_KEY = `${DB_PREFIX}bin_settings`;
@@ -322,6 +323,11 @@ const withMoves = (ids: unknown, live: LiveReader, bin: readonly BinEntry[]): Re
 };
 registerRestoreHook('jewel_tags', (row, e, live, bin) => (live('jewel_tags').some((t) => str(t?.tag).toUpperCase() === str(row.tag).toUpperCase() && str(t?.id) !== e.row_id) ? { refuse: `Tag ${str(row.tag)} was used again since. Add the piece again in Inventory → Jewellery → Tags.` } : withMoves(row.move_id, live, bin)));
 registerRestoreHook('karigar_moves', (row, _e, live, bin) => withMoves(row.move_ids, live, bin));
+// R11 (CN-C): a deleted booking freed its unit (book it again; the BKG number stays used); a unit needs its project;
+// a stage certificate does not come back next to a re-made one of the same tower and stage.
+registerRestoreHook('realty_bookings', () => ({ refuse: 'Deleting the booking freed its unit. Book the unit again in Receivables → Realty → Bookings.' }));
+registerRestoreHook('realty_units', (row, _e, live) => (isLive(live, 'realty_projects', str(row.project_id)) ? null : { refuse: 'The project of this unit is gone. Restore the project first.' }));
+registerRestoreHook('stage_certificates', (row, e, live) => (live('stage_certificates').some((c) => str(c?.id) !== e.row_id && str(c?.tower_id) === str(row.tower_id) && str(c?.stage_label).toLowerCase() === str(row.stage_label).toLowerCase()) ? { refuse: 'This stage was certified again since.' } : null));
 registerRestoreHook('invoices', (row, _e, live) => {
   // QA8 T5: an interest draft of an undone run stays gone (its bills were freed to be charged again).
   const run = str(row.interest_run_id);
