@@ -2,7 +2,7 @@
 import './helpers/shim.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { atClosing, cardCurrency, convertRate, inrPerUnit } from '../src/lib/prof/ps-fx-rates.ts';
+import { atClosing, cardCurrency, convertRate, entryConversions, inrPerUnit } from '../src/lib/prof/ps-fx-rates.ts';
 import type { CurrencyRate } from '../src/lib/currency-rates.ts';
 
 const rows: CurrencyRate[] = [
@@ -34,4 +34,12 @@ test('year-end memo: foreign WIP at the closing rate (PS37)', () => {
   assert.equal(atClosing(1000, 'USD', '2027-03-31', rows), 86000);
   assert.equal(atClosing(1000, 'INR', '2027-03-31', rows), 1000);
   assert.equal(atClosing(1000, 'JPY', '2027-03-31', rows), null);
+});
+
+test('pre-bill: entries on a USD work-type card billed in INR are converted; same-currency and INR cards are left out', () => {
+  const wt = [{ id: 'dev', ps: { currency: 'USD' } }, { id: 'local' }];
+  const out = entryConversions([{ id: 'a', hourly_rate: 55, work_type_id: 'dev' }, { id: 'b', hourly_rate: 2000, work_type_id: 'local' }, { id: 'c', hourly_rate: 2000 }], wt, 'INR', '2026-10-31', rows);
+  assert.deepEqual(out.map((c) => [c.id, c.from, c.rate, c.original, c.refDate]), [['a', 'USD', 4620, 55, '2026-10-31']]);
+  assert.deepEqual(entryConversions([{ id: 'a', hourly_rate: 55, work_type_id: 'dev' }], wt, 'USD', '2026-10-31', rows), []);
+  assert.equal(entryConversions([{ id: 'b', hourly_rate: 4200, work_type_id: 'local' }], wt, 'USD', '2026-11-02', rows)[0].rate, 50);
 });

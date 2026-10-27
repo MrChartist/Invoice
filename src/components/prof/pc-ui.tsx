@@ -1,4 +1,4 @@
-/** R14 PS-C desk bits: a table (fields come from `ps-ui.tsx`). */
+/** R14 PS-C desk bits: a table (fields come from PS-A's `ps-ui.tsx`). */
 import type { ReactNode } from 'react';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';

@@ -4,7 +4,7 @@
  * converted rate as today; nothing new is snapshotted). Rule 34(2) note. Nothing when every card is in the note's currency.
  */
 import { useMemo } from 'react';
-import { loadWorkTypes } from '../../lib/rate-cards';
+import { getTable } from '../../lib/storage';
 import { loadRates } from '../../lib/currency-rates';
 import { todayInput } from '../../lib/utils';
 import { entryConversions } from '../../lib/prof/ps-fx-rates';
@@ -14,7 +14,7 @@ import controls from '../../styles/controls.module.css';
 
 export default function FxRateRow({ entries, currency, onApply }: { entries: readonly { id: string; hourly_rate: number; work_type_id?: string }[]; currency?: string; onApply: (rates: Record<string, number>) => void }) {
   useT();
-  const conv = useMemo(() => entryConversions(entries, loadWorkTypes(), currency || 'INR', todayInput(), loadRates()), [entries, currency]);
+  const conv = useMemo(() => entryConversions(entries, getTable<{ id: string; ps?: { currency?: string } }>('work_types'), currency || 'INR', todayInput(), loadRates()), [entries, currency]);
   if (!conv.length) return null;
   const ok = conv.filter((c) => !c.missing);
   const hints = [...new Set(conv.map((c) => (c.missing ? pcT('fxMissing', { from: c.from }) : pcT('fxHint', { from: c.from, rate: c.original, inr: c.inr ?? 0, to: c.to, conv: c.rate, date: c.refDate ?? '' }))))];
