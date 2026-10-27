@@ -11,7 +11,10 @@ import { localDb } from '../../lib/localDb';
 import { NEXT_STATUS, appointmentText, deleteAppointment, monthDay, noShowCount, saveAppointment, setAppointmentStatus, waLink } from '../../lib/services/sv-appointments';
 import { durationOf, overlaps, slotsFor } from '../../lib/services/sv-slots';
 import { SV_CLASSES } from '../../lib/services/sv-tax';
-import { formatDate } from '../../lib/utils';
+import { formatCurrency, formatDate } from '../../lib/utils';
+import { getTable } from '../../lib/storage';
+import { loadAdvances, openAdvancesFor } from '../../lib/advances';
+import type { InvoiceRecord, Payment } from '../../types/invoice';
 import { svT, type SvKey } from '../../i18n/areas/services-r10a';
 import controls from '../../styles/controls.module.css';
 import styles from './services.module.css';
@@ -37,12 +40,15 @@ export function AppointmentDialog({ appt, preset, staff, settings, all, billed, 
   const [f, setF] = useState({
     client_id: init.client_id ?? '', client_name: init.client_name ?? '', phone: init.phone ?? '', date: init.date ?? '', start: init.start ?? '',
     staff_id: init.staff_id ?? '', resource_id: init.resource_id ?? '', source: (init.source ?? 'call') as AppointmentSource, notes: init.notes ?? '',
+    advance_id: init.advance_id ?? '',
   });
   const [services, setServices] = useState<AppointmentService[]>(() => init.services ?? []);
   const client = clients.find((c) => c.id === f.client_id);
   const [dob, setDob] = useState(() => monthDay(client?.dob));
   const [ann, setAnn] = useState(() => monthDay(client?.anniversary));
   const [reason, setReason] = useState('');
+  // SV-A follow-up: the deposit is one of the client's open advance receipts (ADV/…); applied on the bill as usual.
+  const deposits = useMemo(() => (client ? openAdvancesFor(client, loadAdvances(), getTable<Payment>('transactions'), getTable<InvoiceRecord>('invoices')) : []), [client]);
   const set = (p: Partial<typeof f>) => setF((x) => ({ ...x, ...p }));
   const minutes = durationOf(services, settings.slot_step ?? 15);
   const slots = useMemo(() => {
@@ -66,7 +72,7 @@ export function AppointmentDialog({ appt, preset, staff, settings, all, billed, 
 
   const save = () => {
     try {
-      saveAppointment({ ...appt, ...f, client_id: f.client_id || undefined, staff_id: f.staff_id || undefined, resource_id: f.resource_id || undefined, phone: f.phone || undefined, notes: f.notes || undefined, services, minutes });
+      saveAppointment({ ...appt, ...f, advance_id: (client && f.advance_id) || undefined, client_id: f.client_id || undefined, staff_id: f.staff_id || undefined, resource_id: f.resource_id || undefined, phone: f.phone || undefined, notes: f.notes || undefined, services, minutes });
       if (client && (dob !== monthDay(client.dob) || ann !== monthDay(client.anniversary))) localDb.clients.upsert({ ...client, dob: dob || undefined, anniversary: ann || undefined });
       notify(clash.length ? svT('overlap', { list: clash.map((c) => `${c.start} ${c.client_name}`).join(', ') }) : svT('saved'), clash.length ? 'info' : undefined);
       onDone();
@@ -102,6 +108,7 @@ export function AppointmentDialog({ appt, preset, staff, settings, all, billed, 
         {field('staff', <select className={controls.select} value={f.staff_id} onChange={(e) => set({ staff_id: e.target.value })} data-appt-staff><option value="">{svT('unassigned')}</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>)}
         {!!settings.resources?.length && field('resource', <select className={controls.select} value={f.resource_id} onChange={(e) => set({ resource_id: e.target.value })}><option value="">—</option>{settings.resources.filter((r) => r.active !== false).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select>)}
         {field('source', <select className={controls.select} value={f.source} onChange={(e) => set({ source: e.target.value as AppointmentSource })}>{SOURCES.map((s) => <option key={s} value={s}>{svT(`src.${s}`)}</option>)}</select>)}
+        {client && (deposits.length > 0 || !!f.advance_id) && field('deposit', <select className={controls.select} value={f.advance_id} onChange={(e) => set({ advance_id: e.target.value })} data-appt-deposit><option value="">{svT('noDeposit')}</option>{f.advance_id && !deposits.some((d) => d.advance.id === f.advance_id) && <option value={f.advance_id}>{f.advance_id}</option>}{deposits.map((d) => <option key={d.advance.id} value={d.advance.id}>{svT('depositOpen', { n: d.advance.number, amount: formatCurrency(d.balance.open) })}</option>)}</select>)}
         {client && field('dob', <input className={controls.input} placeholder="MM-DD" value={dob} onChange={(e) => setDob(e.target.value)} />)}
         {client && field('anniversary', <input className={controls.input} placeholder="MM-DD" value={ann} onChange={(e) => setAnn(e.target.value)} />)}
       </div>

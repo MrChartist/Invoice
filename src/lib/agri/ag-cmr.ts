@@ -127,6 +127,32 @@ export function cmrSnapshot(a: CmrAgreement, today: string, goodsPct?: number, l
   };
 }
 
+/** What live milling-charges bills already cover for an agreement: rice billed and the delivery ids. */
+export interface CmrBilling {
+  billed: number;
+  /** Delivered rice not yet on a live bill (qtl). */
+  unbilled: number;
+  /** Delivery id → the number of the live bill that covers it. */
+  billedBy: Map<string, string>;
+}
+
+/**
+ * Pure: the bills of `a` among `invoices` (`ag.cmr.agreement_id`, not cancelled — a cancelled or deleted bill frees
+ * its deliveries, like `liveBill`), the rice they bill and the deliveries they cover.
+ */
+export function cmrBilling(a: Pick<CmrAgreement, 'id' | 'deliveries'>, invoices: readonly InvoiceRecord[]): CmrBilling {
+  const billedBy = new Map<string, string>();
+  let billed = 0;
+  for (const inv of invoices) {
+    const c = inv.ag?.cmr;
+    if (c?.agreement_id !== a.id || inv.status === 'Cancelled') continue;
+    billed += num(c.billed_qtl);
+    for (const id of c.delivery_ids ?? []) billedBy.set(id, inv.invoice_number || '—');
+  }
+  const delivered = (a.deliveries ?? []).reduce((s, d) => s + num(d.qty), 0);
+  return { billed: r3(billed), unbilled: r3(Math.max(delivered - billed, 0)), billedBy };
+}
+
 /* ================================================================
    Storage
    ================================================================ */
@@ -248,6 +274,8 @@ export function removeDelivery(agreementId: string, deliveryId: string): void {
   const a = mustGet(agreementId);
   const d = a.deliveries.find((x) => x.id === deliveryId);
   if (!d) return;
+  const bill = cmrBilling(a, localDb.invoices.getAll()).billedBy.get(d.id);
+  if (bill) throw new Error(`Delivery ${d.number} is on milling-charges bill ${bill}; cancel the bill first.`);
   assertUnlocked({ id: d.id, issue_date: d.date, invoice_number: d.number }, 'delete');
   withTablesRollback([CMR_TABLE, 'job_work_principal'], () => {
     if (d.jwp_id) principalDb.remove(d.jwp_id);
@@ -272,23 +300,34 @@ function draftDoc(clientId: string, date: string, items: Omit<InvoiceItem, 'id' 
 /**
  * Milling-charges draft: rice `qty` × the agreement's milling rate, plus the typed goods value (fortificant, gunny,
  * packing) as a second line; the Circular 153 test on goods ÷ total picks exempt (bill of supply) or 5%.
+ * QA13: the bill is tied to the deliveries it covers (`ag.cmr.agreement_id` / `delivery_ids` / `billed_qtl`) — by
+ * default every delivery not yet on a live bill — and rice already billed is refused (no double bill).
  */
-export function millingChargesInvoice(agreementId: string, x: { date: string; qty: number; goods_value?: number; rate?: number }): { invoice: InvoiceRecord; test: PdsTest } {
+export function millingChargesInvoice(agreementId: string, x: { date: string; qty?: number; goods_value?: number; rate?: number; delivery_ids?: string[] }): { invoice: InvoiceRecord; test: PdsTest } {
   const a = mustGet(agreementId);
+  const b = cmrBilling(a, localDb.invoices.getAll());
+  const open = a.deliveries.filter((d) => !b.billedBy.has(d.id));
+  const picked = x.delivery_ids ? a.deliveries.filter((d) => x.delivery_ids!.includes(d.id)) : open;
+  if (x.delivery_ids && picked.length !== new Set(x.delivery_ids).size) throw new Error('A chosen delivery no longer exists.');
+  const twice = picked.find((d) => b.billedBy.has(d.id));
+  if (twice) throw new Error(`Delivery ${twice.number} is already billed on ${b.billedBy.get(twice.id)}.`);
+  if (!picked.length || !(b.unbilled > 0)) throw new Error('All rice delivered on this agreement is already billed.');
   const rate = num(x.rate ?? a.milling_rate);
-  const qty = r3(num(x.qty));
+  const qty = r3(x.qty !== undefined && num(x.qty) > 0 ? num(x.qty) : Math.min(picked.reduce((s, d) => s + num(d.qty), 0), b.unbilled));
   if (!(qty > 0) || !(rate > 0)) throw new Error('Enter the rice quantity and the milling rate.');
+  if (qty - b.unbilled > 0.0005) throw new Error(`Only ${b.unbilled} qtl of delivered rice is not billed yet (${b.billed} qtl already billed).`);
   const service = round2(qty * rate);
   const goods = round2(Math.max(num(x.goods_value), 0));
   const test = pdsTest(goods, service + goods, x.date);
   const items = [
-    { name: `Milling charges — CMR ${a.season} (${qty} qtl rice)`, hsn: test.sac, unit: 'QTL', quantity: qty, rate, tax_rate: test.rate, ag_class: 'milling_pds' as const },
+    { name: `Milling charges — CMR ${a.season} (${qty} qtl rice; ${picked.map((d) => d.number).join(', ')})`, hsn: test.sac, unit: 'QTL', quantity: qty, rate, tax_rate: test.rate, ag_class: 'milling_pds' as const },
     ...(goods > 0 ? [{ name: 'Goods used in milling (fortificant, gunny, packing)', hsn: test.sac, unit: 'NOS', quantity: 1, rate: goods, tax_rate: test.rate, ag_class: 'milling_pds' as const }] : []),
   ];
   const note = test.exempt
     ? `Milling of paddy for PDS — goods ${test.goodsPct}% of value (≤ ${test.limit}%): exempt, N 12/2017 entry 3A (Circular 153/09/2021-GST). Working paper — verify with your CA (AG9).`
     : `Milling of paddy for PDS — goods ${test.goodsPct}% of value (> ${test.limit}%): 5% job work, N 11/2017 entry 26 (Circular 153/09/2021-GST). Working paper — verify with your CA (AG9).`;
-  const invoice = draftDoc(a.agency_id, x.date, items, test.exempt, note, agSnapshot('cmr', { cmr: cmrSnapshot(a, x.date, test.goodsPct) }));
+  const cmr = { ...cmrSnapshot(a, x.date, test.goodsPct), agreement_id: a.id, delivery_ids: picked.map((d) => d.id), billed_qtl: qty };
+  const invoice = draftDoc(a.agency_id, x.date, items, test.exempt, note, agSnapshot('cmr', { cmr }));
   return { invoice, test };
 }
 

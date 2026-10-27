@@ -120,6 +120,13 @@ let backend: StorageBackend = 'local';
 const cache = new Map<string, string>();
 /** Writes not yet committed to IndexedDB (null = delete). */
 const pending = new Map<string, string | null>();
+/**
+ * `dataVersion` at this tab's last write of each key, and the version up to which writes are in a
+ * flush transaction (`sent`): a remote read that started before a key's write was sent is older than
+ * this tab's value, even once a slow vault decrypt finishes after that write was flushed (QA12).
+ */
+const wrote = new Map<string, number>();
+let sent = 0;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let flushing: Promise<void> | null = null;
 let flushError: StorageWriteError | null = null;
@@ -239,6 +246,7 @@ export async function flushStorage(): Promise<void> {
   while (flushing) await flushing;
   if (backend !== 'idb' || pending.size === 0) return;
   const batch = [...pending];
+  const ver = dataVersion;
   const key = vaultKey;
   const expect = vaultId;
   const run = (async () => {
@@ -247,6 +255,7 @@ export async function flushStorage(): Promise<void> {
       : batch.map(([, v]) => v);
     // Sealed values only into this tab's vault; readable ones only into a store with no vault.
     await guardedWrite(expect, (s) => {
+      sent = ver;
       batch.forEach(([k], i) => {
         const v = values[i];
         if (v === null) s.delete(k);
@@ -296,6 +305,7 @@ export function reloadAfterFlush(): void {
 async function onRemoteChange(keys: unknown[]): Promise<void> {
   const wanted = keys.filter((k): k is string => typeof k === 'string' && !isLocalOnlyKey(k));
   if (backend !== 'idb' || wanted.length === 0) return;
+  const at = sent;
   let reqs: IDBRequest[];
   try {
     reqs = await idbTx(DATA_STORE, 'readonly', (s) => wanted.map((k) => s.get(k)));
@@ -316,7 +326,7 @@ async function onRemoteChange(keys: unknown[]): Promise<void> {
     }),
   );
   wanted.forEach((k, i) => {
-    if (pending.has(k)) return; // this tab's newer, unsaved write wins (as it did with localStorage)
+    if (pending.has(k) || wrote.get(k)! > at) return; // this tab's newer write wins (as it did with localStorage)
     const v = values[i];
     if (v === undefined) return;
     if (v === null) cache.delete(k);
@@ -787,6 +797,7 @@ export function writeRaw(fullKey: string, value: string): void {
     if (flushError?.quotaExceeded && value.length > (cache.get(fullKey)?.length ?? 0)) throw flushError;
     cache.set(fullKey, value);
     pending.set(fullKey, value);
+    wrote.set(fullKey, dataVersion);
     scheduleFlush();
     return;
   }
@@ -805,6 +816,7 @@ export function removeRaw(fullKey: string): void {
     if (!cache.has(fullKey) && !pending.has(fullKey)) return;
     cache.delete(fullKey);
     pending.set(fullKey, null);
+    wrote.set(fullKey, dataVersion);
     scheduleFlush();
     return;
   }

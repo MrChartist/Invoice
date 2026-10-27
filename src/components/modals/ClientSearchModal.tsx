@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import { Modal } from '../ui/Modal';
 import { Avatar } from '../ui/Avatar';
 import { localDb } from '../../lib/localDb';
+import { isPackOn } from '../../lib/industry-packs';
+import { patientMatch, uhidOf } from '../../lib/services/sv-find';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { clientToParty } from '../../store/invoice-defaults';
 import type { Client } from '../../types/invoice';
@@ -22,6 +24,8 @@ export function ClientSearchModal({ isOpen, onClose }: Props) {
   const setClient = useInvoiceStore((s) => s.setClient);
   const [query, setQuery] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
+  // SV-B: UHID / phone search while the clinic pack is on (read when the picker opens).
+  const clinic = useMemo(() => isOpen && isPackOn(localDb.settings.get(), 'clinic'), [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -33,10 +37,10 @@ export function ClientSearchModal({ isOpen, onClose }: Props) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = q
-      ? clients.filter((c) => [c.name, c.company, c.email, c.gstin, c.city].some((f) => f?.toLowerCase().includes(q)))
+      ? clients.filter((c) => [c.name, c.company, c.email, c.gstin, c.city].some((f) => f?.toLowerCase().includes(q)) || (clinic && patientMatch(c, q))) // SV-B: UHID / phone with the clinic pack
       : clients;
     return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [clients, query]);
+  }, [clients, query, clinic]);
 
   const pick = (c: Client) => {
     setClient(clientToParty(c));
@@ -47,7 +51,7 @@ export function ClientSearchModal({ isOpen, onClose }: Props) {
     <Modal open={isOpen} onClose={onClose} title={salesT('pick.clientTitle')} subtitle={salesT('pick.clientSub')} flush>
       <label className={styles.search}>
         <Search size={16} />
-        <input autoFocus type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={salesT('pick.clientSearch')} aria-label={salesT('cl.searchAria')} />
+        <input autoFocus type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={salesT(clinic ? 'pick.clientSearchClinic' : 'pick.clientSearch')} aria-label={salesT('cl.searchAria')} />
       </label>
       {filtered.length === 0 ? (
         <p className={styles.empty}>
@@ -69,7 +73,7 @@ export function ClientSearchModal({ isOpen, onClose }: Props) {
                 <Avatar name={c.name} size={34} square />
                 <span className={styles.main}>
                   <span className={styles.title}>{c.name}</span>
-                  <span className={styles.sub}>{[c.company, c.city, c.gstin].filter(Boolean).join(' · ') || c.email || '—'}</span>
+                  <span className={styles.sub}>{[clinic && uhidOf(c), c.company, c.city, c.gstin].filter(Boolean).join(' · ') || c.email || '—'}</span>
                 </span>
               </button>
             </li>

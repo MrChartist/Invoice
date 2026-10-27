@@ -274,6 +274,10 @@ export interface AgCmrSnap {
   rice_due_qtl?: number;
   rice_delivered_qtl?: number;
   goods_pct?: number;
+  /** QA13 follow-up: the agreement and the deliveries this milling-charges bill covers, and the rice billed (qtl). */
+  agreement_id?: string;
+  delivery_ids?: string[];
+  billed_qtl?: number;
 }
 /** D (storage rent). */
 export interface AgRentSnap {

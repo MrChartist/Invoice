@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { FeeHead, FeePlan, FeePreset } from '../../types/institutions-r5';
 import { FEE_PRESETS, equalShares, presetHead, savePlan } from '../../lib/institutions/fee-plans';
+import { localDb } from '../../lib/localDb';
 import { iT } from '../../i18n/areas/packs-institutions-r5';
 import styles from './institutions.module.css';
 import { B, S, T } from './Views';
@@ -56,7 +57,15 @@ export function FeePlanForm({ plan, notify, onSaved }: { plan?: FeePlan; notify:
           <T l={iT('cap')} v={fine.cap} on={(v) => set({ fine: { ...fine, cap: num(v) || undefined } })} />
         </>)}
       </div>
-      <div><B p l={iT('save')} d="fee-plan-save" on={() => attempt(notify, () => { savePlan(p); onSaved(); }, iT('saved'))} /></div>
+      <div><B p l={iT('save')} d="fee-plan-save" on={() => attempt(notify, () => {
+        const saved = savePlan(p);
+        onSaved();
+        // SV-C: warn when an edit raises the per-student total while students are enrolled (lazy, after the save).
+        if (plan) void import('../../lib/services/sv-classes').then(({ feeIncreaseWarning }) => {
+          const n = feeIncreaseWarning(plan, saved, localDb.clients.getAll());
+          if (n > 0) notify(iT('feeIncrease', { n }), 'info');
+        });
+      }, iT('saved'))} /></div>
     </div>
   );
 }

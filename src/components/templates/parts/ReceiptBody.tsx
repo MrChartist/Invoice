@@ -5,7 +5,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
-import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText, svDocTitle, svRegText, visitText, mfSellerText } from '../paper-helpers';
+import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText, staffText, svDocTitle, svRegText, visitText, mfSellerText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { CustomFieldsBlock, ItemCustomLine } from './CustomFieldsBlock';
 import { TransportBlock } from './TransportBlock';
@@ -85,6 +85,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
                 {col.hsn && line.hsn && <span className={styles.rcSmall}> [{line.hsn}]</span>}
               </div>
               <ItemCustomLine values={src?.custom_values} />
+              {staffText(src) && <div className={styles.rcSmall}>{staffText(src)}</div>}
               <div className={styles.rcRow}>
                 <span>
                   {formatQuantity(line.quantity)}

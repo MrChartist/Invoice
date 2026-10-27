@@ -6,11 +6,12 @@ import { resetStorage } from './helpers/shim.ts';
 import { installSettings } from './helpers/world.ts';
 import { setTable, KEYS } from '../src/lib/storage.ts';
 import '../src/lib/trust/recycle-bin.ts';
-import { allotShares, applicationMoney, certificateHtml, deleteShareRow, distinctive, holdings, loadMembers, loadShares, paidUp, reduceShares, registerAt, transferShares, APPLICATION_LEDGER, CAPITAL_LEDGER } from '../src/lib/agri/ag-members.ts';
+import { allotShares, applicationAvailable, applicationMoney, certificateHtml, deleteShareRow, distinctive, holdings, loadMembers, loadShares, paidUp, reduceShares, registerAt, transferShares, APPLICATION_LEDGER, CAPITAL_LEDGER } from '../src/lib/agri/ag-members.ts';
 import { distribution, draftAppropriation, fyOf, patronage } from '../src/lib/agri/ag-patronage.ts';
 import { coopPaper, coopSection, membersCalendar, producerPaper } from '../src/lib/agri/ag-coop-papers.ts';
 import { loadVouchers } from '../src/lib/ledger/vouchers.ts';
-import { chartOf, loadUserAccounts } from '../src/lib/ledger/accounts.ts';
+import { A, chartOf, loadUserAccounts } from '../src/lib/ledger/accounts.ts';
+import { ensureLedger, postPair } from '../src/lib/trade/tr-ledger.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
 
 const vendors = [
@@ -31,13 +32,15 @@ test('members from vendors and clients, one per farmer code; allotment from appl
   assert.deepEqual(ms.map((m) => [m.id, m.other_id, m.member_no]), [['v1', 'c1', 'M-1'], ['v2', undefined, 'M-2']]);
   const cycles = [{ status: 'closed', lines: [{ farmer_id: 'v1', deductions: [{ kind: 'share', amount: 200 }, { kind: 'feed', amount: 50 }] }, { farmer_id: 'v1', deductions: [{ kind: 'share', amount: 800 }] }] }, { status: 'draft', lines: [{ farmer_id: 'v1', deductions: [{ kind: 'share', amount: 999 }] }] }];
   assert.equal(applicationMoney(['v1', 'c1'], cycles, []), 1000);
+  assert.throws(() => allotShares(ms[0], { date: '2026-06-01', shares: 10, face_value: 100, paid_from: 'application' }), /Only ₹0\.00 of share application money/, 'nothing in the ledger yet');
+  postPair({ type: 'RECEIPT', date: '2026-05-15', dr: A.bank, cr: ensureLedger(APPLICATION_LEDGER, 'OTHER_CL', 2460), amount: 1000, narration: 'Application money', cls: 'test' });
   const a = allotShares(ms[0], { date: '2026-06-01', shares: 10, face_value: 100, paid_from: 'application', approved_on: '2026-05-30' });
   assert.equal(a.certificate_no, 'SHC/FY26-27/0001');
   assert.equal(applicationMoney(['v1', 'c1'], cycles, loadShares()), 0, 'allotment used the application money');
   const b = allotShares(ms[1], { date: '2026-06-02', shares: 5, face_value: 100, paid_from: 'cash' });
   assert.equal(b.certificate_no, 'SHC/FY26-27/0002');
   const names = new Map(chartOf(loadUserAccounts()).map((x) => [x.id, x.name]));
-  const [j, r] = loadVouchers();
+  const [, j, r] = loadVouchers();
   assert.deepEqual([j.type, names.get(j.lines[0].account_id), names.get(j.lines[1].account_id), j.lines[0].dr], ['JOURNAL', APPLICATION_LEDGER, CAPITAL_LEDGER, 100000]);
   assert.equal(r.type, 'RECEIPT');
   assert.throws(() => allotShares(ms[1], { date: '2026-06-02', shares: 2.5, face_value: 100, paid_from: 'cash' }), /whole numbers/);
@@ -97,4 +100,31 @@ test('80PA after AY 2024-25 computes nothing; Sec 149 labels from 1 Apr 2026; ca
   assert.equal(paper.total, 105000);
   const cal = membersCalendar('producer', 2026, { agm: '09-15' });
   assert.deepEqual(cal.map((c) => [c.key, c.due]), [['internalAudit', '2027-03-31'], ['register', '2027-04-30'], ['agm', '2027-09-15'], ['financials', '2027-10-30'], ['annualReturn', '2027-11-29']]);
+});
+
+test('QA13: allotment from application money checks the balance — ledger ceiling, other members\' cycle money held back', () => {
+  const [asha, bholu] = loadMembers();
+  // Pure: ledger 1,000; Asha's cycle money 300, all members' 800 → 300 + (1,000 − 800) = 500.
+  assert.equal(applicationAvailable(1000, 300, 800), 500);
+  assert.equal(applicationAvailable(200, 300, 300), 200, 'never above the ledger');
+  assert.equal(applicationAvailable(-50, 0, 0), 0);
+  const app = ensureLedger(APPLICATION_LEDGER, 'OTHER_CL', 2460);
+  // Cycles: Asha 300, Bholu 500 of share deductions (closed); the deductions journal credits the ledger 800.
+  setTable('farmer_cycles', [{ id: 'cy', number: 'CYB/1', status: 'closed', period_from: '2026-05-01', period_to: '2026-05-10', source: 'milk', lines: [
+    { farmer_id: 'v1', qty: 1, unit: 'L', amount: 300, net: 0, deductions: [{ kind: 'share', amount: 300 }] },
+    { farmer_id: 'v2', qty: 1, unit: 'L', amount: 500, net: 0, deductions: [{ kind: 'share', amount: 500 }] },
+  ] }]);
+  postPair({ type: 'JOURNAL', date: '2026-05-10', dr: A.creditors, cr: app, amount: 800, narration: 'Deductions', cls: 'test' });
+  // Asha cannot use Bholu's money.
+  assert.throws(() => allotShares(asha, { date: '2026-06-01', shares: 5, face_value: 100, paid_from: 'application' }), /Only ₹300\.00 of share application money is available for Asha Devi/);
+  // A receipt of 200 into the ledger (not tied to a cycle) is open to her.
+  postPair({ type: 'RECEIPT', date: '2026-05-20', dr: A.bank, cr: app, amount: 200, narration: 'Application money — Asha', cls: 'test' });
+  const a = allotShares(asha, { date: '2026-06-01', shares: 5, face_value: 100, paid_from: 'application' });
+  assert.equal(a.amount, 500);
+  // The ledger is read as at the allotment date: before the cycle journal there is nothing.
+  assert.throws(() => allotShares(bholu, { date: '2026-05-05', shares: 1, face_value: 100, paid_from: 'application' }), /Only ₹0\.00/);
+  allotShares(bholu, { date: '2026-06-02', shares: 5, face_value: 100, paid_from: 'application' });
+  assert.throws(() => allotShares(bholu, { date: '2026-06-03', shares: 1, face_value: 100, paid_from: 'application' }), /Only ₹0\.00/, 'the ledger is used up');
+  // Bank / cash allotments are not affected.
+  assert.equal(allotShares(bholu, { date: '2026-06-03', shares: 1, face_value: 100, paid_from: 'bank' }).paid_from, 'bank');
 });

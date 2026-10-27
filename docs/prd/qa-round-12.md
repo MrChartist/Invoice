@@ -146,12 +146,17 @@ e2e harness (`idbPut` writes IndexedDB directly and broadcasts, as "another tab"
 - **Without a vault there is no lost-update race inside one tab.** A remote refresh never overwrites a key this tab has
   pending; its read transaction is ordered before or after this tab's write transaction by IndexedDB, and its result is
   applied in the same microtask checkpoint as the read completes, before this tab's flush can complete.
-- **With vault mode on there is one (P2, not fixed here):** the remote value is decrypted asynchronously
+- **With vault mode on there was one (P2; fixed after QA round 13 — see below):** the remote value is decrypted asynchronously
   (`crypto.subtle`), so this tab's own write of the same key can be flushed (and leave `pending`) while the decrypt
   runs; the older remote value then replaces this tab's newer one **in the cache** (IndexedDB keeps the newer value,
   so a reload shows it). The fix — remember a per-key local write sequence and skip remote values read before it — sits
   in `storage.ts` (first paint, ≈ 30 B gzip), which is over this round's +0.02 kB budget; listed for the next shell pass.
   The e2e harness does not use a vault, so this is not the e2e symptom.
+  **Fixed (QA13 follow-up):** `storage.ts` records `dataVersion` at each local write of a key (`wrote`) and the version
+  up to which writes are inside a flush transaction (`sent`, set in the write callback); a remote refresh skips a key
+  this tab wrote after the version `sent` held when the remote read began (or still has pending), so a value read before
+  this tab's write reached IndexedDB never replaces it. +28 B gz in `storage`. Test: `tests/vault.test.ts` "QA12: a remote
+  value still being decrypted …" (fails without the fix).
 - **The desks' lists are memoised on a local `tick`** (`ClinicDesk`, `MembersDesk`, `WorkshopDesk`): a record written by
   another tab (or by the harness through IndexedDB) while the desk is mounted is not in its dropdowns until the desk
   re-renders with a new tick or the page reloads. That is the app's documented cross-tab behaviour ("Updated in another

@@ -83,10 +83,11 @@ Severity:
 
 - **Two devices entering cans into the same shift at once** sync as a row conflict (one row per shift); the conflict is
   listed for the user, nothing is merged entry by entry. One counter per centre and shift is the expected use.
-- **Milling-charges bills are not tied to deliveries**: the desk suggests the delivered quantity, but billing the same
+  (Reviewed in the follow-up: a per-entry merge is not safe without a base copy — `docs/features/agri-r12.md`.)
+- ~~**Milling-charges bills are not tied to deliveries**~~ (fixed in the follow-up): the desk suggests the delivered quantity, but billing the same
   rice twice is not refused (no link on the bill to the agreement beyond the snapshot).
-- **A farmer's negative carry** is not added to his receivable on the Farmers view (the next cycle recovers it; AG80).
-- **Allotment from application money** does not check the application balance (receipts may also feed that ledger).
+- ~~**A farmer's negative carry** is not added to his receivable on the Farmers view~~ (fixed in the follow-up; AG80).
+- ~~**Allotment from application money** does not check the application balance~~ (fixed in the follow-up; AG90).
 
 ---
 
@@ -193,3 +194,14 @@ cycle checks +0.3, `ag-hooks` +0.21, `ag-vouchers` +0.2, e-Way note +0.07 — of
 
 AG80 (pooled account debit for a carried farmer), AG81 ★ (loose sale from a labelled bag), AG82 (e-Way for nil goods),
 AG83 (dispatch stock vs the union's bill), AG84 (194Q with pooled cycles) — `docs/CA_REVIEW.md` §12.9.
+
+## Follow-up (deferred items of Rounds 10–12)
+
+Shipped on top of this round: the QA12 vault-mode storage race (`storage.ts`, +28 B gz), CMR bills tied to deliveries,
+the farmer's negative carry on the Farmers view, the application-money check on allotment, and the SV-A / SV-B / SV-C
+deferred items (`docs/features/services-r10.md` "Deferred items — shipped"). Milk shift sync stays a row conflict (why:
+`docs/features/agri-r12.md`). New CA questions SV70 ★, SV71, AG90 (total 396 with Round 13's MF items).
+
+Bundle (vite build + gzip -9, before = `claude/elegant-cannon-cwapiv` at `6560185`): initial JS 189,161 → 189,198 B
+(**+37 B**: `storage` +28, entry +9 from the lazy-import map); total JS 3,223,401 → 3,227,940 B (**+4.4 kB**). No new
+icon names.

@@ -44,7 +44,7 @@ function monthYear(day: string): string {
  * (6.6 / 6.11), e.g. "Batch B12 · Mfg 01/2026 · Exp 06/2027" or "S/N: 3567…, 3567… · Warranty 12 months".
  * '' for untracked lines, so ordinary documents print exactly as before.
  */
-export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw' | 'id'>> & { bin?: string }) | undefined, ag?: AgSnapshot, mf?: MfSnapshot): string {
+export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw' | 'id' | 'sv'>> & { bin?: string }) | undefined, ag?: AgSnapshot, mf?: MfSnapshot): string {
   if (!item) return '';
   if (item.jw) return jewelText(item.jw); // R9 (RT-E2): the BIS sub-line (the tag no. is its serial)
   const parts: string[] = [];
@@ -57,9 +57,13 @@ export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' |
   if (item.serials?.length && item.warranty_months) parts.push(`Warranty ${item.warranty_months} month${item.warranty_months === 1 ? '' : 's'}`);
   if (item.wt && (item.quantity === undefined || wtHolds(item))) parts.push(weightText(item.wt)); // R8-B (TR-B1); QA8 T12 / T16: only while it still gives the quantity
   parts.push(agriLineText(item, ag)); // R12 (AG-A5): '' without the `ag` snapshot
+  parts.push(staffText(item)); // R10 (SV-A): '' without the `sv.staff_print` snapshot
   parts.push(mfLineText(item, mf)); // R13 (MF-A5): '' without the `mf` snapshot
   return parts.filter(Boolean).join(' · ');
 }
+
+/** R10 (SV-A): "Staff: Asha" under a line, from the snapshot `sv.staff_print` only; '' otherwise (plain bills unchanged). */
+export const staffText = (item: Partial<Pick<InvoiceItem, 'sv'>> | undefined): string => (item?.sv?.staff_print ? `Staff: ${item.sv.staff_print}` : '');
 
 /** Printed UPI QR. Built by the validating `upiLink`, so a malformed or doctored VPA never reaches a QR. */
 export function buildUpiUrl(sender: SenderProfile): string {
