@@ -111,7 +111,7 @@ export function closeCycle(id: string, centreName?: string): FarmerCycle {
     const gross = round2(pl.reduce((s, l) => s + num(l.quantity) * num(l.rate), 0));
     const bill = purchasesDb.save({
       kind: 'PURCHASE', vendor_id: vendor.id, vendor_name: vendor.name, bill_number: c.number, date: c.period_to, category: c.source === 'milk' ? 'Milk purchases' : 'Farm produce purchase',
-      lines: pl, taxable: gross, cgst: 0, sgst: 0, igst: 0, total: gross, amount_paid: round2(Math.min(t.deductions, gross)), itc_eligible: false, ag: { cycle_id: c.id },
+      lines: pl, taxable: gross, cgst: 0, sgst: 0, igst: 0, total: gross, amount_paid: round2(Math.min(t.deductions, gross)), itc_eligible: false, ag: { cycle_id: c.id, ...(c.source === 'milk' ? { stock_by_shift: true } : {}) },
       notes: `Pooled cycle bill ${c.number}: ${lines.length} farmer(s), ${c.period_from} to ${c.period_to}; farmer-wise split on the cycle. Verify with your CA (AG26).`,
     });
     const p = (n: number) => Math.round(n * 100);

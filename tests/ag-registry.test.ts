@@ -50,3 +50,17 @@ test('series: FPV and CYB used once (ag-shared); the reserved B / C prefixes unu
   for (const p of ['FPV', 'CYB']) assert.equal((all.match(new RegExp(`'${p}'`, 'g')) ?? []).length, 1, p);
   for (const p of AG_RESERVED_SERIES) assert.equal((all.match(new RegExp(`'${p}'`, 'g')) ?? []).length, 1, `${p} only in the reserved list`);
 });
+
+test('AG-B block: dairy tables registered, audited, backed up, in the open export; MDS used once; writers import the registry', () => {
+  const B = { milk_rate_charts: 'master.edit', milk_shifts: 'doc.create', milk_dispatches: 'doc.create', milk_cards: 'doc.create' };
+  for (const [t, a] of Object.entries(B)) {
+    assert.equal(TABLE_ACTIONS[t], a, `${t} registered`);
+    assert.ok(WATCHED_TABLES[t]?.label && TABLE_MEANING[t] && BACKUP_RECORD_TABLES.includes(t), `${t} audited, exported, backed up`);
+  }
+  assert.equal(AG_SERIES.dispatches, 'MDS');
+  const all = readdirSync(new URL('../src/lib/', import.meta.url), { recursive: true }).filter((f) => String(f).endsWith('.ts') && !String(f).startsWith('help')).map((f) => readFileSync(new URL(`../src/lib/${f}`, import.meta.url), 'utf8')).join('\n');
+  assert.equal((all.match(/'MDS'/g) ?? []).length, 1, 'MDS written once');
+  for (const f of ['ag-rate-chart', 'ag-shifts', 'ag-milk-cycle', 'ag-dispatch', 'ag-milk-cards']) assert.match(src(`lib/agri/${f}.ts`), /import '\.\/ag-registry';/, f);
+  const sync = src('lib/sync-engine.ts');
+  assert.ok(sync.includes("[`${DB_PREFIX}milk_shifts`]: 'date'") && sync.includes("[`${DB_PREFIX}milk_dispatches`]: { num: 'number', date: 'date' }"));
+});

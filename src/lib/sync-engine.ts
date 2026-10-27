@@ -430,6 +430,10 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   // R12-A: farm batches (by start), pooled farmer cycles (by period end)
   [`${DB_PREFIX}farm_batches`]: 'start',
   [`${DB_PREFIX}farmer_cycles`]: 'period_to',
+  // R12-B: rate charts (by effective date), milk shifts, milk dispatches
+  [`${DB_PREFIX}milk_rate_charts`]: 'effective_from',
+  [`${DB_PREFIX}milk_shifts`]: 'date',
+  [`${DB_PREFIX}milk_dispatches`]: 'date',
   // R12-C: weighbridge slips
   [`${DB_PREFIX}weighbridge_slips`]: 'date',
   // R12-D: cold-storage lots (by date in), loans against stored produce, members' share ledger
@@ -1043,6 +1047,8 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}plant_logs`]: { num: 'number', date: 'date' },
   // R12-A: pooled farmer cycle bills (CYB/FY…)
   [`${DB_PREFIX}farmer_cycles`]: { num: 'number', date: 'period_to' },
+  // R12-B: milk dispatches (MDS/FY…)
+  [`${DB_PREFIX}milk_dispatches`]: { num: 'number', date: 'date' },
   // R12-C: weighbridge slips (WBS/FY…); CMR delivery numbers live inside `cmr_agreements` (guarded by series_counters)
   [`${DB_PREFIX}weighbridge_slips`]: { num: 'number', date: 'date' },
   // R12-D: cold-storage receipts (CSR/FY…), loans against stored produce (LAS/FY…)
