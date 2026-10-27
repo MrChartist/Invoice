@@ -30,6 +30,11 @@ export function profExtras(ctx: ProfileContext): DemoExtras {
     const te = (id: string, d: number, mins: number, staffId: string, rate: number, cc: string, desc: string): TimeEntry & { demo: true } => ({ id, demo: true, client_id: client?.id, client_name: client?.name ?? '', description: desc, date: shiftDay(today, -d), minutes: mins, hourly_rate: rate, billable: true, cost_centre_id: cc, staff_id: staffId });
     tables.time_entries = [te('demo-pt-1', 20, 300, 'demo-tk-1', 4000, 'demo-mt-1', 'Drafting the reply (demo)'), te('demo-pt-2', 12, 330, 'demo-tk-1', 4000, 'demo-mt-1', 'Hearing (demo)'), te('demo-pt-3', 5, 240, 'demo-tk-1', 4000, 'demo-mt-1', 'Written arguments (demo)'), te('demo-pt-4', 8, 600, 'demo-tk-2', 2000, 'demo-mt-2', 'Monthly returns (demo)')];
   }
-  // PS-B / PS-C / PS-D: add their blocks here.
+  // PS-D (cafirm): one UDIN of a certificate this month, not yet billed (CA desk → Work to bill / UDIN register).
+  if (packs.includes('cafirm') && base.clients[0]) {
+    const day = shiftDay(today, -3);
+    tables.udin_register = [{ id: 'demo-udin-1', demo: true, udin: `${day.slice(2, 4)}123456DEMO000001`, date: day, client_id: base.clients[0].id, client_name: base.clients[0].name, kind: 'certificate', description: 'Net worth certificate (demo)', member_no: '123456', created_at: `${day}T09:00:00.000Z` }] as never;
+  }
+  // PS-B / PS-C: add their blocks here.
   return { tables };
 }
