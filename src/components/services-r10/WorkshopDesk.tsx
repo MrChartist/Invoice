@@ -263,6 +263,7 @@ function Estimates({ c }: { c: Ctx }) {
 function MotorClaims({ c }: { c: Ctx }) {
   const [f, setF] = useState<Form>({ mode: 'cashless', date: c.day });
   const [s, setS] = useState<Form>({});
+  const [own, setOwn] = useState(false);
   const claims = loadClaims();
   const b = motorBuckets(claims, c.jobs, c.invoices, c.day);
   const clients = localDb.clients.getAll().filter((x) => x.id && x.name?.trim()).map((x) => [x.id!, x.name] as const);
@@ -288,10 +289,13 @@ function MotorClaims({ c }: { c: Ctx }) {
         const j = free.find((x) => x.id === f.job);
         const ins = clients.find(([id]) => id === f.insurer);
         if (!j || !ins) throw new Error(`${wsT('job')}, ${wsT('insurer')}`);
+        const cl0 = localDb.clients.getById(ins[0]);
+        if (cl0 && own !== (cl0.sv_insurer_invoice === 'insurer')) localDb.clients.upsert({ ...cl0, sv_insurer_invoice: own ? 'insurer' : 'owner' });
         const cl = openMotorClaim(j, { date: c.day, payer_id: ins[0], payer_name: ins[1], policy_no: f.policy, claim_no: f.claimNo, surveyor: f.surveyor, survey_date: f.survey || undefined, mode: f.mode as 'cashless', estimate: num(f.est), approved: num(f.apr), salvage: f.salvage?.trim() || undefined });
         setF({ mode: 'cashless' });
+        setOwn(false);
         return cl.number;
-      })} data-ws-claim>{wsT('claim')}</button></div>
+      })} data-ws-claim>{wsT('claim')}</button>{f.mode === 'reimbursement' && <label className={controls.check}><input type="checkbox" checked={own} onChange={(e) => setOwn(e.target.checked)} /> {wsT('ownInv')}</label>}</div>
       <h3>{wsT('split')}</h3>
       <Fields f={s} set={setS} spec={[['job', jobOpts(splitJobs), wsT('job')], ['apr', 'number'], ['excess', 'number'], ['ageM', 'number']]} />
       {bill && <p className={controls.hint}>{wsT('perLine')}</p>}
