@@ -4482,6 +4482,108 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R13-B engineering desk: drawing rev B → C and a draft line naming rev B warns; a weight quote → two quotation drafts; 300 kg of MS turnings → the 2% scrap TCS preset, dropped by the buyer\'s declaration; plastics: one run → balance and one journal; printing: an estimate → sheets / kg / impressions → quotation', async () => {
+    const keys = ['settings', 'mfg_settings', 'drawings', 'job_quotes', 'process_runs', 'print_estimates', 'inspection_reports', 'stock_items', 'manufacturing_vouchers', 'invoices', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const s0 = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...s0, business_type: 'manufacturer', mfg_kind: 'engineering', industry_packs: ['shopfloor', 'fabrication', 'plastics', 'press'], lock_until: undefined });
+    for (const k of ['mfg_settings', 'drawings', 'job_quotes', 'process_runs', 'print_estimates', 'inspection_reports']) await writeJson(page, k, null);
+    const item = (id, name, extra) => ({ id, name, unit: 'KG', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []),
+      item('e2e-b-br', 'E2E-B Bracket', { unit: 'NOS', hsn: '7326', tax_rate: 18 }), item('e2e-b-turn', 'E2E-B MS turnings', { hsn: '7204', tax_rate: 18, sale_rate: 32, opening_qty: 500, mf_scrap_class: 'metal_ferrous' }),
+      item('e2e-b-pp', 'E2E-B PP resin', { opening_qty: 200, opening_rate: 100 }), item('e2e-b-rg', 'E2E-B PP regrind', { opening_qty: 50, opening_rate: 40, sale_rate: 40 }), item('e2e-b-cap', 'E2E-B Cap', { unit: 'NOS' })]);
+    // B1: drawing at rev B, then rev C; a draft line naming rev B warns.
+    await page.goto(srv.origin + '/manufacturing?tab=shop&view=drawings');
+    await page.locator('[data-shop-desk="drawings"]').waitFor({ timeout: 15000 });
+    await page.locator('[data-mfb="dwg-no"]').fill('E2E-1145');
+    await page.locator('[data-mfb="dwg-title"]').fill('Bracket');
+    await page.locator('[data-mfb="dwg-rev"]').fill('B');
+    await page.locator('[data-mfb-save-drawing]').click();
+    await readJson(page, 'drawings', [], (v) => v.length === 1);
+    await page.locator('[data-mfb="new-rev"]').fill('C');
+    await page.locator('[data-mfb-add-rev]').click();
+    const dw = await readJson(page, 'drawings', [], (v) => v[0]?.revisions?.length === 2);
+    check(dw[0].revisions.map((r) => `${r.rev}:${r.status}`).join() === 'B:superseded,C:current', 'rev C supersedes rev B');
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-b-draft', invoice_number: '', doc_type: 'INVOICE', status: 'Draft', issue_date: today, client: { name: 'E2E-B Buyer' }, items: [{ id: 'l1', name: 'E2E-B Bracket', quantity: 1, rate: 100, amount: 100 }], mf: { lines: { l1: { drawing: 'E2E-1145', rev: 'B' } } } }]);
+    await page.reload();
+    await page.locator('[data-mfb="stamp-doc"]').selectOption('e2e-b-draft', { timeout: 15000 });
+    await page.locator('[data-mfb-rev-warning]').getByText('PO says rev B; current is rev C').waitFor({ timeout: 10000 });
+    check(true, 'a draft line naming rev B warns');
+    // B2: weight quote with two breaks → two quotation drafts.
+    await page.goto(srv.origin + '/manufacturing?tab=shop&view=quotes');
+    await page.locator('[data-mfb="q-part"]').fill('E2E-B Flange', { timeout: 15000 });
+    await page.locator('[data-mfb="q-shape"]').selectOption('ring');
+    await page.locator('[data-mfb="q-od"]').fill('300');
+    await page.locator('[data-mfb="q-id"]').fill('160');
+    await page.locator('[data-mfb="q-t"]').fill('20');
+    await page.locator('[data-mfb="q-net"]').fill('2.9');
+    await page.locator('[data-mfb="q-mrate"]').fill('62');
+    await page.locator('[data-mfb="q-srate"]').fill('32');
+    await page.locator('[data-mfb="q-op"]').fill('VMC');
+    await page.locator('[data-mfb="q-hours"]').fill('0.4');
+    await page.locator('[data-mfb="q-rate"]').fill('900');
+    await page.locator('[data-mfb="q-breaks"]').fill('100, 500');
+    check(await page.locator('[data-mfb-price]').count() === 2, 'the quote shows two price breaks');
+    await page.locator('[data-mfb-save-quote]').click();
+    await readJson(page, 'job_quotes', [], (v) => v.length === 1);
+    await page.locator('[data-mfb-make-quotation]').click();
+    const qs = await readJson(page, 'invoices', [], (v) => v.filter((i) => i.doc_type === 'QUOTATION' && i.items?.[0]?.name === 'E2E-B Flange').length === 2);
+    check(qs.filter((i) => i.doc_type === 'QUOTATION' && i.items?.[0]?.name === 'E2E-B Flange').length === 2, 'two quotation drafts made');
+    // B3: scrap sale with the 2% TCS preset, dropped by the declaration.
+    await page.goto(srv.origin + '/manufacturing?tab=shop&view=scrap');
+    await page.locator('[data-mfb="scrap-name"]').fill('E2E-B Kabadi', { timeout: 15000 });
+    await page.locator('[data-mfb="scrap-item"]').selectOption('e2e-b-turn');
+    await page.locator('[data-mfb="scrap-net"]').fill('300');
+    await page.locator('[data-mfb-tcs="on"]').getByText(/206C\(1\) scrap 2%/).waitFor({ timeout: 10000 });
+    check(true, 'the 2% scrap TCS preset is suggested');
+    await page.locator('[data-mfb="scrap-declaration"]').fill('Form 127 dt 01-10-2026');
+    await page.locator('[data-mfb-tcs="off"]').waitFor({ timeout: 10000 });
+    await page.locator('[data-mfb-scrap-sale]').click();
+    const sc = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.mf?.kind === 'scrap'))).find((i) => i.mf?.kind === 'scrap');
+    check(sc && !sc.tcs_enabled && sc.mf.scrap.declaration === 'Form 127 dt 01-10-2026', 'the declaration drops the TCS on the scrap invoice');
+    // B4: one moulding run → material balance, one journal.
+    await page.goto(srv.origin + '/manufacturing?tab=moulding&view=runs');
+    await page.locator('[data-mfb="run-item"]').selectOption('e2e-b-cap', { timeout: 15000 });
+    await page.locator('[data-mfb="run-hours"]').fill('10');
+    await page.locator('[data-mfb="run-cycle"]').fill('22');
+    await page.locator('[data-mfb="run-cav"]').fill('4');
+    await page.locator('[data-mfb="run-part"]').fill('15');
+    await page.locator('[data-mfb="run-input"]').selectOption('e2e-b-pp');
+    await page.locator('[data-mfb="run-kg"]').fill('100');
+    await page.locator('[data-mfb="run-good"]').fill('6000');
+    await page.locator('[data-mfb="run-runner"]').fill('3');
+    await page.locator('[data-mfb="run-rgout"]').fill('3');
+    await page.locator('[data-mfb="run-rgitem"]').selectOption('e2e-b-rg');
+    await page.locator('[data-mfb-run-preview]').getByText(/yield 90%/).waitFor({ timeout: 10000 });
+    await page.locator('[data-mfb-save-run]').click();
+    const runs = await readJson(page, 'process_runs', [], (v) => v.length === 1 && v[0].voucher_id);
+    const mv = await readJson(page, 'manufacturing_vouchers', [], (v) => v.some((m) => m.id === runs[0].voucher_id));
+    check(mv.filter((m) => m.id === runs[0].voucher_id).length === 1, 'the run posts one manufacturing journal');
+    await page.goto(srv.origin + '/manufacturing?tab=moulding&view=balance');
+    check((await page.locator('[data-mfb-loss]').first().innerText({ timeout: 15000 })).trim() === '7', 'the balance closes: 100 kg in = 90 good + 3 runners + 7 unaccounted');
+    // B5: an estimate → sheets / kg / impressions → quotation.
+    await page.goto(srv.origin + '/manufacturing?tab=press&view=estimates');
+    await page.locator('[data-mfb="est-job"]').fill('E2E-B Carton', { timeout: 15000 });
+    await page.locator('[data-mfb="est-w"]').fill('350');
+    await page.locator('[data-mfb="est-h"]').fill('230');
+    await page.locator('[data-mfb="est-breaks"]').fill('10000');
+    await page.locator('[data-mfb="est-sw"]').fill('762');
+    await page.locator('[data-mfb="est-sh"]').fill('508');
+    await page.locator('[data-mfb="est-gsm"]').fill('300');
+    await page.locator('[data-mfb="est-prate"]').fill('80');
+    const row = await page.locator('[data-mfb-table="est-preview"] tbody tr').first().innerText({ timeout: 10000 });
+    check(/2,500 \+ 50 = 2,550/.test(row) && /296\.1/.test(row), `the estimate shows 4 ups → 2,550 sheets ≈ 296 kg (${row.replace(/\s+/g, ' ')})`);
+    await page.locator('[data-mfb-save-estimate]').click();
+    await readJson(page, 'print_estimates', [], (v) => v.length === 1 && /^PES\//.test(v[0].number));
+    await page.locator('[data-mfb-print-quotation]').click();
+    const pq = await readJson(page, 'invoices', [], (v) => v.some((i) => i.mf?.kind === 'print'));
+    check(pq.some((i) => i.doc_type === 'QUOTATION' && i.mf?.print?.sheets === 2550), 'the print quotation carries the job particulars');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   await step('R13-C garments desk: a style S–XL × 2 colours; a cut plan of 20 plies → 80 pieces and consumption vs standard; 8 bundle tickets; 4 bundles out to a fabricator → 3 back, 1 short; the karigar piece bill for the good pieces with a bank row; a job-work return → e-way JSON sub-type 6', async () => {
     const keys = ['settings', 'stock_items', 'vendors', 'cut_plans', 'job_work_out', 'job_work_in', 'job_work_principal', 'godowns', 'purchases', 'series_counters'];
     const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));

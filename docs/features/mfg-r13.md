@@ -96,7 +96,54 @@ routing CSV import / export (≈ −0.8 kB), or shorten the B–D help topics un
 
 ## MF-B — Engineering, plastics and printing (packs `fabrication`, `plastics`, `press`)
 
-(MF-B fills this section.)
+### What shipped
+
+| Item | Where |
+|---|---|
+| B1 drawings | `mfg/mf-drawings.ts` (table `drawings`, `master.edit`): number, title, customer, item, material grade, revisions (a new revision is `current`, every earlier one `superseded`; `hold` on the live one), characteristics (nominal, − / + tolerance, unit, critical). `revWarning` / `docRevWarnings`: "Drawing 1145-B: PO says rev B; current is rev C." `stampDocLines` puts drawing / rev / PO line / heat no. on a **draft**'s lines (`mf.lines`, A5 prints them); heat nos. come from `PurchaseLine.mf_heat` on the bills whose batches the output batch consumed (`heatsForBatch`: the order's batch-wise issues and journal lines → bill lines, read through `readPurchase` / `readPurchaseLines`). **Hold blocks release**: `mf-drawing-hold.ts` (tiny, no heavy imports) is called from MF-A's `opsForRelease` (`mf-ops.ts`, the one plug-in line) and throws "Drawing … is on hold" while the `fabrication` pack is on; the owner may override that revision (`overrideHold`, `settings.manage`, audited). Shop → Drawings. |
+| B1 inspection | `mfg/mf-inspection.ts` (table `inspection_reports`, `FAI/FY…`, `doc.create`, dated): first-article / lot / final against a drawing revision, readings per characteristic, out-of-tolerance values marked, result suggested (all in → pass; a critical one out → fail; only non-critical out → deviation; the inspector may record another). A4 print; `attachToInvoice` writes the summary into a draft's `mf.drawing.inspection` (A5's annexure page prints it). Shop → Inspection. |
+| B2 weight quotes | `mfg/mf-weight.ts` (plate, round bar, tube, ring / flange, section by kg / m; densities `DENSITY_DEFAULTS` MS 7.85, SS 7.93, Al 2.70, brass 8.50, copper 8.96, editable) and `mfg/mf-quotes.ts` (table `job_quotes`, `doc.create`, dated): material on gross kg, operations (hours / piece × ₹ / hour, set-up hours spread over the break), outside work ₹ / kg net or ₹ / piece, packing, freight, scrap credit (gross − net kg × scrap rate), overhead %, margin %; 1–4 breaks. "Make quotation" saves one `QUOTATION` draft per break with the drawing / revision on the line (`mf.kind = 'drawing'`; conversions keep `mf`). "Won" dates the material rate into the material item's `standard_costs`. Shop → Quotes. |
+| B3 scrap | `mfg/mf-scrap.ts`: register by scrap item × month — made (manufacturing-journal scrap lines incl. MF-A's `mf_jc` job-card lines, stock-journal scrap destinations), "on job cards" (card scrap kg not yet posted, counted once against the `mf_jc` lines), sold (sales net of credit notes, base units by `lineFactor`), in stock (stock engine), value at the scrap rate, average realisation. Scrap sale: `scrapSaleDraft` → a draft invoice with weighment rows (`mf.scrap.rows`, A5 annexure), the class rate / HSN where the item has none, the `206C(1) scrap` preset from `trading-rules.ts` (1% → 2% from 1 Apr 2026) unless the buyer's declaration (typed, or `Client.tcs_declaration`) — then no TCS and the reference in the notes — and the GST TDS u/s 51 note for a registered buyer of metal scrap above ₹2.5 lakh. `mfg/mf-scrap-tax.ts`: classes `SCRAP_CLASS_RULES` (metal 18%; paper waste 12% → 5% from 22 Sep 2025; plastic waste **no suggestion**, MF8; textile waste 5% unverified), `SCRAP_TAX_RULES` (RCM and GST TDS from 10 Oct 2024), `scrapRcm` — the bill modal's `RcmGoodsNotice` imports it lazily, only for an unregistered supplier, and shows "RCM: N 6/2024-CT(R)" for metal scrap. The GST TDS a buyer deducts is a typed short payment on the receipt ("GST TDS receivable"): no new no-cash marker. Item scrap class set on Shop → Scrap. |
+| B4 runs | `mfg/mf-runs.ts` (table `process_runs`, `doc.create`, dated; moulds in `mfg_settings.moulds`, owner): expected output = hours × 3600 ÷ cycle × cavities, efficiency, part weight (typed or (shot − runner) ÷ cavities), material balance (input = good + rejects + runners + purge + unaccounted), yield, regrind % against the finished item's `mf_max_regrind_pct`; **one manufacturing journal per run** (`production_order_id` when given): inputs consumed, good parts produced, regrind made as a fixed-value scrap line at the regrind item's rate (MF42). An edit rewrites the same journal; a delete removes both; the recycle bin refuses to restore a run without its journal. Mould shots = typed start + the runs' shots (derived; warning at 90% of life). Moulding → Runs / Balance. |
+| B4 EPR | `mfg/mf-epr.ts`: kg supplied by month × EPR category (item `mf_epr` I–IV) × customer (with `Client.mf.epr_no`) from sales net of credit notes (KG items by quantity, others by `mf_unit_kg`), recycled share of the month's runs (input items flagged `mf_pcr`), CSV for the brand owner; item EPR fields and the customer's EPR number are edited on the view. Moulding → EPR. |
+| B5 estimates | `mfg/mf-paper.ts` (ups in both orientations after gripper / edge / bleed, sheets, make-ready per pass + running %, kg from GSM, reams, sq in) and `mfg/mf-estimates.ts` (table `print_estimates`, `PES/FY…`, `doc.create`, dated; presses in `mfg_settings.presses`, owner): per break — ups, net + waste sheets, kg, plates (front + back + varnish plate), colour passes (colours ÷ press colours per side; a pass per colour without a press), impressions = sheets × passes, press cost (÷ 1000 × rate, not below the minimum), press hours, finishing (₹ / sq in of sheet, / sheet, / piece, / lot), outside work, margin, per piece. Quotation per break with `mf.print` (A5's "Print job" box). **Job ticket**: a BOM "Print job PES/… × qty" (the break's paper, in the paper item's unit) and a planned production order; ticket print with actual sheets issued (order issues − returns). `PRINT_CLASS_RULES` (own-paper goods: product rate; job work ch 48 / 49 12% → 5%; cartons 4819 12% → 5%; paper 4802 12% → 18%; other 18%) shown as suggestions. Press → Estimates / Job tickets / Paper (calculator + paper by GSM with stock). |
+| Registrations | `mf-shared.ts` (`drawings`, `inspection_reports`, `job_quotes`, `process_runs`, `print_estimates`; series `FAI`, `PES` moved out of the reserved list; dated / numbered rows), `mf-registry.ts` MF-B block, backup / sync (`DATED`, `NUMBERED`) / open-export rows (`// R13-B`), recycle-bin restore rules (an inspection report needs its drawing; a run needs its journal), `mfg-rules.ts` MF-B section (`SCRAP_CLASS_RULES`, `SCRAP_TAX_RULES`, `PRINT_CLASS_RULES`, `DENSITY_DEFAULTS`). Types in the MF-B block of `types/mfg-r13.ts` (`PurchaseLine.mf_heat`, `StockItem.mf_max_regrind_pct` / `mf_pcr` / `mf_unit_kg`, `MfgSettings.moulds` / `presses` / `regrind_item_id`, `MfScrapSnap.declaration` / `gst_tds`). |
+| Desks | `ShopDesk`, `MouldingDesk`, `PressDesk` replace MF-A's stubs (same default export and props); one lazy chunk each with its views; small shared UI `mfb-ui.tsx` / `mfb-util.ts`; strings per desk (`i18n/areas/mfg-r13b-shop.ts`, `-mould.ts`, `-press.ts`, English + Hindi). Help topics reworded; CA items MF40–MF42. Demo: drawing 1145-B at rev C and a carton estimate. E2E: "R13-B engineering desk". Tests: `mf-drawings`, `mf-weight`, `mf-quotes`, `mf-scrap`, `mf-runs`, `mf-epr`, `mf-paper`, `mf-estimates`; purchase contract (heat carry); registry (MF-B block). |
+
+### Deviations from the PRD (MF-B)
+
+- **Heat no.** sits on the bill line as `PurchaseLine.mf_heat` (MF-A typed `PurchaseRecord.mf` as `{ kind, ref_id }`, which cannot be widened by merging); it is typed into data, there is no bill-modal field yet.
+- **Drawing attachments**: `attachment_id` is in the type but there is no upload (the attachment store's orphan clean-up only keeps attachments of its listed owner tables).
+- **Drawing / rev / heat on lines** are stamped on drafts from Shop → Drawings (and written by quotations); the editor has no inline field.
+- **Inspection → QC**: the report suggests and records the result; the release / reject of the order's output stays on R4-A's QC desk (link from the view).
+- **Scrap prompts in the editor**: the TCS preset, declaration and GST TDS note are applied when the scrap invoice is made from Shop → Scrap; the editor's own TCS picker (R8) is unchanged, and the receipt dialog has no new GST TDS shortcut (typed short payment).
+- **Job ticket routing**: the finishing steps print on the ticket; no routing is created (finishing lines carry no work centre).
+- **Plastic regrind sale**: no special path — sold as a scrap item with class `plastic_waste` (no rate suggested) or a typed rate.
+- **Run restore**: a deleted run is not restored (its manufacturing journal is not kept by the recycle bin); record it again.
+- **Demo**: no moulding run sample (a run always comes with its stock journal).
+
+### Bundle (MF-B)
+
+Measured with `vite build` + gzip -9 (the budget script's method); before = `claude/elegant-cannon-cwapiv` with MF-A and
+MF-C merged (`87c0c2e`), after = this branch merged with it.
+
+| Budget | Before | After | Delta | Share |
+|---|---|---|---|---|
+| Initial JS (first paint) | 189,201 B (184.8 kB) | 189,216 B (184.8 kB) | **+15 B** (lazy-map churn in the entry) | ≤ +0.02 kB ✓ |
+| Total JS | 3222.6 kB | 3258.5 kB | **+35.9 kB** | ≤ 14 kB (PRD) / ≈ 25 kB (lead) ✗ |
+
+**Overrun: ≈ +11 kB over the lead's ≈ 25 kB (+22 kB over the PRD's 14 kB).** Breakdown (gz): Shop desk 15.4 kB (strings
+EN + HI ≈ 4 kB, drawings / inspection / quotes / scrap views ≈ 6 kB, `mf-drawings` + `mf-inspection` + `mf-quotes` +
+`mf-scrap` + `mf-weight` ≈ 5.5 kB), Press desk 8.5 kB (strings ≈ 2.3 kB, estimates / paper / tickets views ≈ 3 kB,
+`mf-estimates` + `mf-paper` ≈ 3 kB), Moulding desk 7.1 kB (strings ≈ 2 kB, runs / balance / EPR views ≈ 2.6 kB,
+`mf-runs` + `mf-epr` ≈ 2.5 kB), shared desk kit + DB helpers (`mfb-util` chunk) 1.5 kB, scrap tax (shared by the Shop desk
+and the bill modal's RCM notice) 1.0 kB, `mfg-rules` MF-B section 0.8 kB, draft builder `mf-b-docs` 0.7 kB, RCM notice
+lookup 0.6 kB, demo rows 0.5 kB, open-export rows 0.3 kB, help wording 0.3 kB, release hold guard in the production chunk
+0.2 kB, Manufacturing lazy-map churn 0.2 kB, registry / shared / backup / sync / recycle-bin rows ≈ 0.5 kB.
+Trimming options for the lead: drop the A4 inspection report and job-ticket prints (≈ −1.2 kB), the paper-by-GSM table
+(≈ −0.5 kB), the draft-line stamping panel on Drawings (≈ −1 kB), the moulds / presses masters on the views (owner forms,
+≈ −1.2 kB; set them in data), the EPR item / customer field editors (≈ −0.8 kB), share the ~20 common words of the three
+MF-B areas in one area (≈ −0.6 kB, against the per-desk rule).
 
 ## MF-C — Textiles and garments (pack `garments`)
 

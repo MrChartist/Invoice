@@ -132,7 +132,7 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   `tests/ag-rules.test.ts`). Notes: `docs/features/agri-r12.md`.
 - Round 13 (manufacturing) company data: names in `src/lib/mfg/mf-shared.ts` (MF-A tables `work_centres`, `routings`,
   `job_cards` (series `JCD`, one row per production order per operation with an `entries` array), object `mfg_settings`;
-  `FAI` / `PES` / `CUT` / `KPB` reserved for MF-B … D), all backed up and synced; settings `mfg_kind` / `mfg_sub` (a wizard
+  MF-B / MF-C series `FAI` / `PES` / `CUT` / `KPB` in `MF_SERIES`; see `docs/features/mfg-r13.md` for each package's tables), all backed up and synced; settings `mfg_kind` / `mfg_sub` (a wizard
   card, not a business type: `manufacturer`, `other` unchanged; packs `shopfloor` / `fabrication` / `garments` / `plastics` /
   `press` / `foodmfg` in union with the company's packs — desk tabs on `/manufacturing` via `MFG_PACK_TABS`; `PACK_OF_TYPE` /
   `PACK_ROUTES` unchanged). Rights and audit labels are registered at runtime by `src/lib/mfg/mf-registry.ts`: **every

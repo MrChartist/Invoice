@@ -10,6 +10,13 @@ export const MF_TABLES = {
   centres: 'work_centres',
   routings: 'routings',
   jobCards: 'job_cards',
+  // MF-B: drawings (revisions inside), inspection reports (FAI/FY…), weight-based job quotes, moulding runs, print
+  // estimates (PES/FY…)
+  drawings: 'drawings',
+  inspections: 'inspection_reports',
+  quotes: 'job_quotes',
+  runs: 'process_runs',
+  estimates: 'print_estimates',
   // MF-C: cut plans / lots (CUT/FY…, bundles inside)
   cutPlans: 'cut_plans',
 } as const;
@@ -22,11 +29,13 @@ export const MF_OBJECTS = {
 /** New Indian-FY series (`<PREFIX>/FY<yy-yy>/<seq>`, through `series-counters.ts`; never reused after a delete). */
 export const MF_SERIES = {
   jobCards: 'JCD', // MF-A3 job cards
+  inspections: 'FAI', // MF-B1 inspection reports
+  estimates: 'PES', // MF-B5 print estimates
   cutPlans: 'CUT', // MF-C1 cut plans (lots)
   pieceBills: 'KPB', // MF-C4 karigar piece bills (on `purchases`)
 } as const;
 /** Series reserved for MF-B … MF-D (one commit, PRD §5; each package moves its prefix into `MF_SERIES`). */
-export const MF_RESERVED_SERIES: readonly string[] = ['FAI', 'PES'];
+export const MF_RESERVED_SERIES: readonly string[] = [];
 
 /** The six Round 13 packs (`industry-packs.ts`): `shopfloor` is the shared core every manufacturing kind turns on. */
 export const MF_PACKS = ['shopfloor', 'fabrication', 'garments', 'plastics', 'press', 'foodmfg'] as const;
@@ -34,11 +43,18 @@ export const MF_PACKS = ['shopfloor', 'fabrication', 'garments', 'plastics', 'pr
 /** The date field each dated table is synced / period-locked by (mirrors the `sync-engine.ts` DATED rows). */
 export const MF_DATED: Readonly<Record<string, string>> = {
   job_cards: 'date',
+  // MF-B
+  inspection_reports: 'date',
+  job_quotes: 'date',
+  process_runs: 'date',
+  print_estimates: 'date',
   cut_plans: 'date',
 };
 
 /** Numbered tables (`number` field) and their series (mirrors the `sync-engine.ts` NUMBERED rows). */
 export const MF_NUMBERED: Readonly<Record<string, string>> = {
   job_cards: MF_SERIES.jobCards,
+  inspection_reports: MF_SERIES.inspections, // MF-B
+  print_estimates: MF_SERIES.estimates,
   cut_plans: MF_SERIES.cutPlans,
 };

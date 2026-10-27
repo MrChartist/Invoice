@@ -379,6 +379,9 @@ registerRestoreHook('farmer_cycles', (row, e, live) => (str(row.source) === 'mil
 // default routing only while the item has no other default.
 registerRestoreHook('job_cards', (row, e, live) => (!isLive(live, 'production_orders', str(row.order_id)) ? { refuse: 'The production order of this job card is gone.' } : live('job_cards').some((c) => str(c?.id) !== e.row_id && str(c?.order_id) === str(row.order_id) && str(c?.op_id) === str(row.op_id)) ? { refuse: 'A new job card was opened for this operation since; report the entries on it.' } : null));
 registerRestoreHook('routings', (row, e, live) => (row.is_default && live('routings').some((r) => str(r?.id) !== e.row_id && str(r?.item_id) === str(row.item_id) && r?.is_default) ? { refuse: 'This item has another default routing now: restore after unmarking it, or make this one again.' } : null));
+// R13-B: an inspection report comes back only while its drawing lives; a moulding run only with its manufacturing journal.
+registerRestoreHook('inspection_reports', (row, _e, live) => (isLive(live, 'drawings', str(row.drawing_id)) ? null : { refuse: 'The drawing of this inspection report is gone. Restore the drawing first.' }));
+registerRestoreHook('process_runs', (row, _e, live, bin) => companionOr(live, bin, 'manufacturing_vouchers', str(row.voucher_id), 'The manufacturing journal of this run is gone for good. Record the run again in Manufacturing → Moulding.'));
 registerRestoreHook('realty_units', (row, _e, live) => (isLive(live, 'realty_projects', str(row.project_id)) ? null : { refuse: 'The project of this unit is gone. Restore the project first.' }));
 // R11 (CN-D): a sub-contractor bill made from a measurement comes back only while that measurement still names it
 // (cancelling it removed the bill and its deductions journal — measure again).
