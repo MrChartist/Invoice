@@ -7,7 +7,8 @@ import { actualPaper, estimateBreaks, loadEstimates, makeJobTicket, ticketHtml }
 import { prT as P } from '../../i18n/areas/mfg-r13b-press';
 import { B, printHtml } from '../transport/shared';
 import controls from '../../styles/controls.module.css';
-import { Table, fmt, row, useRun, type Done } from './mfb-ui';
+import { Table } from './mfb-ui';
+import { fmt, row, useRun, type Done } from './mfb-util';
 
 export default function TicketsView({ ctx, done }: { ctx: MfgContext; done: Done }) {
   const [tick, run] = useRun(done, P('saved'));

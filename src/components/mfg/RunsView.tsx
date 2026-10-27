@@ -9,7 +9,8 @@ import { readMfgSettings } from '../../lib/mfg/mf-settings';
 import { moT as M } from '../../i18n/areas/mfg-r13b-mould';
 import { B, today } from '../transport/shared';
 import controls from '../../styles/controls.module.css';
-import { Num, Sel, Table, Txt, fmt, n, opt, row, useRun, type Done } from './mfb-ui';
+import { Num, Sel, Table, Txt } from './mfb-ui';
+import { fmt, n, opt, row, useRun, type Done } from './mfb-util';
 
 type In = { item: string; kind: ProcessRun['inputs'][number]['kind']; kg: string };
 const KINDS: readonly In['kind'][] = ['virgin', 'regrind', 'masterbatch', 'additive'];

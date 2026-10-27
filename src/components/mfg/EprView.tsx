@@ -10,7 +10,8 @@ import { loadRuns } from '../../lib/mfg/mf-runs';
 import { moT as M } from '../../i18n/areas/mfg-r13b-mould';
 import { B, today } from '../transport/shared';
 import controls from '../../styles/controls.module.css';
-import { Num, Sel, Table, Txt, fmt, n, opt, row, useRun, type Done } from './mfb-ui';
+import { Num, Sel, Table, Txt } from './mfb-ui';
+import { fmt, n, opt, row, useRun, type Done } from './mfb-util';
 
 const CATS = ['I', 'II', 'III', 'IV'] as const;
 

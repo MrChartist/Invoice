@@ -12,7 +12,8 @@ import { loadReports } from '../../lib/mfg/mf-inspection';
 import { shT as S } from '../../i18n/areas/mfg-r13b-shop';
 import { B, today } from '../transport/shared';
 import controls from '../../styles/controls.module.css';
-import { Num, Sel, Table, Txt, n, opt, row, useRun, type Done } from './mfb-ui';
+import { Num, Sel, Table, Txt } from './mfb-ui';
+import { n, opt, row, useRun, type Done } from './mfb-util';
 
 const blankChar = (): DrawingChar => ({ id: '', name: '', nominal: 0, tol_minus: 0, tol_plus: 0, unit: 'mm' });
 

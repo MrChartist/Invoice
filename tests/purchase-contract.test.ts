@@ -1030,3 +1030,13 @@ test('R13 (MF-A4) dated MRP reads the real bill shape: PO supply less what a bil
   const { supply } = datedSources(items, '2026-04-10');
   assert.deepEqual(supply.map((x) => [x.item_id, x.date, x.qty]), [['paper', '2026-04-20', 30]], '6 boxes × 5 left; the void bill received nothing');
 });
+
+// R13 (MF-B1): the heat-number carry reads bills through `readPurchase` / `readPurchaseLines` (void and expense bills left
+// out; the line's item id and batch from the real shape, `mf_heat` from the same line).
+test('R13 (MF-B1) heat no. carry reads the real bill shape', async () => {
+  const { heatsForBatch } = await import('../src/lib/mfg/mf-drawings.ts');
+  const line = { ...bill.lines[0], item_id: 'ms', batch_no: 'L1', mf_heat: 'H1' };
+  const purchases = [{ ...bill, lines: [line] }, { ...bill, id: 'v', status: 'void', lines: [{ ...line, mf_heat: 'VOID' }] }, { ...bill, id: 'e', kind: 'EXPENSE', lines: [{ ...line, mf_heat: 'EXP' }] }];
+  const docs = { mfg: [{ item_id: 'br', batch_no: 'B1', components: [{ id: 'c', item_id: 'ms', qty: 1, batch_no: 'L1' }] }], transfers: [], purchases };
+  assert.deepEqual(heatsForBatch('br', 'B1', docs as never), ['H1']);
+});

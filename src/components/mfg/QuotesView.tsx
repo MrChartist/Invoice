@@ -10,7 +10,8 @@ import { loadQuotes, makeQuotations, markWon, quoteBreaks, removeQuote, saveQuot
 import { shT as S } from '../../i18n/areas/mfg-r13b-shop';
 import { B, today } from '../transport/shared';
 import { money } from '../manufacturing/context';
-import { Num, Sel, Table, Txt, fmt, n, opt, row, useRun, type Done } from './mfb-ui';
+import { Num, Sel, Table, Txt } from './mfb-ui';
+import { fmt, n, opt, row, useRun, type Done } from './mfb-util';
 
 const SHAPES: readonly MfShape['kind'][] = ['plate', 'round', 'tube', 'ring', 'section'];
 const DIMS: Record<MfShape['kind'], readonly Exclude<keyof MfShape, 'kind'>[]> = { plate: ['l', 'w', 't'], round: ['d', 'l'], tube: ['od', 'id', 'l'], ring: ['od', 'id', 't'], section: ['kg_per_m', 'l'] };

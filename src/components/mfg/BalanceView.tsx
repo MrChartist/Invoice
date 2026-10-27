@@ -3,7 +3,8 @@ import { useMemo } from 'react';
 import type { MfgContext } from '../manufacturing/context';
 import { loadMoulds, loadRuns, regrindWarning, runBalance } from '../../lib/mfg/mf-runs';
 import { moT as M } from '../../i18n/areas/mfg-r13b-mould';
-import { Table, fmt } from './mfb-ui';
+import { Table } from './mfb-ui';
+import { fmt } from './mfb-util';
 
 export default function BalanceView({ ctx }: { ctx: MfgContext }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps

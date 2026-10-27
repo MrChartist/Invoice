@@ -14,7 +14,8 @@ import { SCRAP_CLASSES, scrapClassRate, TCS_SCOPE_NOTE } from '../../lib/mfg/mf-
 import { shT as S } from '../../i18n/areas/mfg-r13b-shop';
 import { B, today } from '../transport/shared';
 import controls from '../../styles/controls.module.css';
-import { Num, Sel, Table, Txt, fmt, n, opt, row, useRun, type Done } from './mfb-ui';
+import { Num, Sel, Table, Txt } from './mfb-ui';
+import { attempt, fmt, n, opt, row, useRun, type Done } from './mfb-util';
 
 type L = { item: string; gross: string; tare: string; net: string; rate: string };
 const blank = (): L => ({ item: '', gross: '', tare: '', net: '', rate: '' });
@@ -35,12 +36,7 @@ export default function ScrapView({ ctx, done }: { ctx: MfgContext; done: Done }
   const scrapItems = ctx.items.filter((i) => d.ids.has(i.id));
   const net = (l: L) => (l.net !== '' ? n(l.net) : Math.max(n(l.gross) - n(l.tare), 0));
   const saleLines: ScrapSaleLine[] = lines.filter((l) => l.item).map((l) => ({ item_id: l.item, net_kg: net(l), rate: n(l.rate) || scrapRate(item(l.item)), gross_kg: n(l.gross) || undefined, tare_kg: n(l.tare) || undefined }));
-  let preview: InvoiceRecord | null = null;
-  try {
-    preview = saleLines.some((l) => l.net_kg > 0) ? scrapSaleDraft({ date: f.date, client_id: f.client || undefined, client_name: f.name, declaration: f.declaration, lines: saleLines }, ctx.items) : null;
-  } catch {
-    preview = null;
-  }
+  const preview: InvoiceRecord | null = saleLines.some((l) => l.net_kg > 0) ? attempt(() => scrapSaleDraft({ date: f.date, client_id: f.client || undefined, client_name: f.name, declaration: f.declaration, lines: saleLines }, ctx.items), null) : null;
   const setL = (i: number, p: Partial<L>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...p } : l)));
   return (
     <div data-mfb-view="scrap">

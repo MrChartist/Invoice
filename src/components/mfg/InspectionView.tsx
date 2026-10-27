@@ -10,7 +10,8 @@ import { attachToInvoice, evaluate, loadReports, removeReport, reportHtml, saveR
 import { shT as S } from '../../i18n/areas/mfg-r13b-shop';
 import { B, printHtml, today } from '../transport/shared';
 import controls from '../../styles/controls.module.css';
-import { Num, Sel, Table, Txt, n, opt, row, useRun, type Done } from './mfb-ui';
+import { Num, Sel, Table, Txt } from './mfb-ui';
+import { n, opt, row, useRun, type Done } from './mfb-util';
 
 const KINDS: readonly InspectionReport['kind'][] = ['first_article', 'lot', 'final'];
 const vals = (s: string) => s.split(/[\s,;]+/).filter(Boolean).map(Number).filter((x) => Number.isFinite(x));

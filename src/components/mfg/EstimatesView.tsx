@@ -12,7 +12,8 @@ import { DEFAULT_MARGINS, netSheets, paperKg, reams, upsOn } from '../../lib/mfg
 import { prT as P } from '../../i18n/areas/mfg-r13b-press';
 import { B, today } from '../transport/shared';
 import controls from '../../styles/controls.module.css';
-import { Num, Sel, Table, Txt, fmt, n, opt, row, useRun, type Done } from './mfb-ui';
+import { Num, Sel, Table, Txt } from './mfb-ui';
+import { attempt, fmt, n, opt, row, useRun, type Done } from './mfb-util';
 
 const BASES: readonly PrintFinish['basis'][] = ['sqin', 'sheet', 'piece', 'lot'];
 type Fin = { name: string; basis: PrintFinish['basis']; rate: string };
@@ -30,12 +31,7 @@ export default function EstimatesView({ ctx, done }: { ctx: MfgContext; done: Do
     colours_front: n(f.front), colours_back: n(f.back), varnish_plate: f.varnish, ...(f.press ? { press_id: f.press } : {}), sheet: { w: n(f.sw), h: n(f.sh) }, margins: DEFAULT_MARGINS, gsm: n(f.gsm),
     ...(f.paper ? { stock_item_id: f.paper } : {}), paper_rate: n(f.prate), plate_rate: n(f.plate), running_waste_pct: n(f.waste), finishing: fins.filter((x) => x.name.trim()).map((x) => ({ ...x, rate: n(x.rate) })), outside: n(f.outside), margin_pct: n(f.margin),
   };
-  let preview: ReturnType<typeof estimateBreaks> = [];
-  try {
-    preview = n(f.w) && n(f.sw) && n(f.gsm) ? estimateBreaks(input, d.presses.find((x) => x.id === f.press)) : [];
-  } catch {
-    preview = [];
-  }
+  const preview = n(f.w) && n(f.sw) && n(f.gsm) ? attempt(() => estimateBreaks(input, d.presses.find((x) => x.id === f.press)), []) : [];
   const cr = printClassRate(f.cls as never, today());
   return (
     <div data-mfb-view="estimates">
@@ -117,7 +113,6 @@ export function PaperView({ ctx }: { ctx: MfgContext }) {
   const u = upsOn({ w: n(c.sw), h: n(c.sh) }, { w: n(c.w), h: n(c.h) });
   const net = netSheets(n(c.qty), u.ups);
   const sheets = net + Math.ceil((net * n(c.waste)) / 100);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const byGsm = useMemo(() => {
     const stock = new Map(computeStock(ctx.inputs).map((p) => [p.item.id, p]));
     const m = new Map<string, { gsm: number; item: string; kg: number }>();
@@ -129,7 +124,7 @@ export function PaperView({ ctx }: { ctx: MfgContext }) {
       m.set(k, r);
     }
     return [...m.values()].sort((a, b) => a.gsm - b.gsm).map((r) => ({ ...r, name: stock.get(r.item)?.item.name ?? '—', unit: stock.get(r.item)?.item.unit ?? '', qty: stock.get(r.item)?.qty ?? 0 }));
-  }, [ctx.version, ctx.inputs]);
+  }, [ctx.inputs]);
   return (
     <div data-mfb-view="paper">
       <div style={row}>
