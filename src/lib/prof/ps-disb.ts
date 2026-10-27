@@ -9,7 +9,7 @@
  */
 import type { InvoiceRecord } from '../../types/invoice';
 import type { PurchaseRecord } from '../../types/purchases';
-import { calcInputFromRecord, calculateInvoice, num, round2 } from '../invoice-calc';
+import { num, round2 } from '../invoice-calc';
 import { isoDay } from '../dates';
 import { ruleAt } from '../tax-rules';
 import { isVoidStatus, readPurchase } from '../purchase-normalize';
@@ -53,17 +53,6 @@ export function disbursementPatch(p: Pick<PurchaseRecord, 'date' | 'itc_eligible
 export const LEGACY_PURE_AGENT_TEXT = 'as a pure agent (Rule 33, CGST Rules)';
 export const isLegacyPureAgentLine = (l: { charge_head_id?: string; description?: string; tax_rate?: number } | null | undefined): boolean =>
   !!l && !l.charge_head_id && num(l.tax_rate) === 0 && String(l.description ?? '').includes(LEGACY_PURE_AGENT_TEXT);
-
-/**
- * Base for the expected 194J on a fee note: the taxable value of the fee lines — GST and pure-agent recoveries (new and
- * old style) left out (PS25, Circular 23/2017 as recalled).
- */
-export function feeTdsBase(rec: InvoiceRecord): number {
-  const items = rec.items ?? [];
-  const skip = new Set(items.filter((i) => isPureAgentLine(i) || isLegacyPureAgentLine(i)).map((i) => i.id));
-  const calc = calculateInvoice(calcInputFromRecord(rec, { round_off_enabled: false, round_mode: 'none', amount_paid: 0 }));
-  return round2(calc.lines.filter((l) => !skip.has(l.id)).reduce((s, l) => s + num(l.taxable), 0));
-}
 
 export interface DisbRow {
   id: string;

@@ -4940,7 +4940,7 @@ try {
     await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-c-us', name: 'E2E Acme Inc', address: 'San Francisco', state_code: '96', ps: { country: 'US' } }]);
     const line = { id: 'l1', name: 'Software development', type: 'Service', hsn: '998314', unit: 'HRS', quantity: 40, rate: 55, tax_rate: 0, amount: 2200 };
     const inv = (id, number, date) => ({ id, invoice_number: number, doc_type: 'INVOICE', status: 'Sent', supply_type: 'EXPORT_LUT', place_of_supply: '96', currency: 'USD', exchange_rate: 84, issue_date: date, due_date: date, sender: { ...((s0.profiles ?? []).find((p) => p.id === s0.activeProfileId) ?? {}), stateCode: '27' }, subtotal: 2200, taxable_value: 2200, total: 2200, amount_paid: 0, balance_due: 2200, client: { id: 'e2e-c-us', name: 'E2E Acme Inc', state_code: '96' }, items: [line] });
-    await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv('e2e-c-oct', 'E2E/EXP/1', '2026-10-15'), inv('e2e-c-sep', 'E2E/EXP/0', '2026-09-15')]);
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv('e2e-c-oct', 'E2E/EXP/1', '2026-10-15'), inv('e2e-c-sep', 'E2E/EXP/0', '2026-05-15')]);
     await writeJson(page, 'prof_settings', { platforms: [{ name: 'E2E Payoneer', kind: 'payoneer', non_resident: true }] });
     await page.goto(srv.origin + '/time?tab=exportsvc&view=checker');
     await page.locator('[data-ps-desk="checker"]').waitFor({ timeout: 15000 });
@@ -4966,7 +4966,7 @@ try {
     await page.goto(srv.origin + '/time?tab=exportsvc&view=realisation');
     await page.locator('[data-ps-desk="realisation"]').waitFor({ timeout: 15000 });
     check(await page.locator('[data-ps-real-due="2027-07-15"]').count() === 1, 'realisation due 9 months from the invoice date (15 Jul 2027)');
-    check(await page.locator('[data-ps-real-due="2027-12-15"]').count() === 1, 'an invoice of 15 Sep 2026 keeps 15 months');
+    check(await page.locator('[data-ps-real-due="2027-08-15"]').count() === 1, 'an invoice of 15 May 2026 keeps 15 months (QA17 R9: 9 from 5 Jun 2026)');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 

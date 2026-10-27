@@ -68,7 +68,8 @@ export interface NotesContext {
 }
 
 /** One partner's line in the partners' note (paise). */
-export interface PartnerNoteRow { name: string; opening: number; introduced: number; drawings: number; interest: number; remuneration: number; share: number; closing: number }
+/** QA17 R7: `other` = TDS u/s 194T, interest on drawings and any other entry, so each row foots to its closing. */
+export interface PartnerNoteRow { name: string; opening: number; introduced: number; drawings: number; interest: number; remuneration: number; share: number; other?: number; closing: number }
 
 /* ── Wording ──────────────────────────────────────────────────── */
 
@@ -200,7 +201,7 @@ function capitalNote(c: NotesContext): PackNote {
     tables: [
       { columns: ['Account', `Opening ${c.fy.start}`, 'Introduced / credited', 'Withdrawn / debited', `Closing ${c.fy.end}`], rows },
       // PS-D1: partner-wise capital and current accounts (only when the firm desk has partners).
-      ...(c.partnerRows?.length ? [{ title: 'Partner-wise capital and current accounts (verify with your CA)', columns: ['Partner', 'Opening', 'Introduced', 'Drawings', 'Interest on capital', 'Remuneration', 'Share of profit', 'Closing'], rows: c.partnerRows.map((p) => [p.name, p.opening, p.introduced, p.drawings, p.interest, p.remuneration, p.share, p.closing]) }] : []),
+      ...(c.partnerRows?.length ? [{ title: 'Partner-wise capital and current accounts (verify with your CA)', columns: ['Partner', 'Opening', 'Introduced', 'Drawings', 'Interest on capital', 'Remuneration', 'Share of profit', 'TDS 194T and other', 'Closing'], rows: c.partnerRows.map((p) => [p.name, p.opening, p.introduced, p.drawings, p.interest, p.remuneration, p.share, p.other ?? p.closing - p.opening - p.introduced + p.drawings - p.interest - p.remuneration - p.share, p.closing]) }] : []),
     ],
   };
 }

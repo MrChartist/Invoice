@@ -19,20 +19,22 @@ const exp = (id: string, over: Partial<InvoiceRecord> = {}): Partial<InvoiceReco
 const reg = (invoices: Partial<InvoiceRecord>[], today = '2026-11-25') => buildRegister({ invoices, payments: [], irms: [], writeoffs: [], today });
 
 test('rule rows are appended, never edited: 9 → 15 (13 Nov 2025) → 9 (1 Oct 2026); INR 12 from 1 Oct 2026', () => {
-  assert.deepEqual(EXPORT_REALISATION_MONTHS_RULES.map((r) => [r.from, r.value]), [['2013-04-01', 9], ['2025-11-13', 15], ['2026-10-01', 9]]);
-  assert.equal(exportRealisationMonths('2026-09-30'), 15);
+  assert.deepEqual(EXPORT_REALISATION_MONTHS_RULES.map((r) => [r.from, r.value]), [['2013-04-01', 9], ['2025-11-13', 15], ['2026-06-05', 9], ['2026-10-01', 9]]);
+  assert.equal(exportRealisationMonths('2026-06-04'), 15);
+  assert.equal(exportRealisationMonths('2026-09-30'), 9, 'QA17 R9: 9 months from 5 Jun 2026');
   assert.equal(exportRealisationMonths('2026-10-01'), 9);
   assert.equal(EXPORT_REALISATION_INR_MONTHS_RULES[0].from, '2026-10-01');
   assert.equal(exportRealisationInrMonths('2026-10-01'), 12);
-  assert.equal(exportRealisationInrMonths('2026-09-15'), 15, 'before the INR rule: the FX rule');
+  assert.equal(exportRealisationInrMonths('2026-09-15'), 9, 'before the INR rule: the FX rule (9 from 5 Jun 2026, QA17 R9)');
   assert.deepEqual(realisationRule('2026-10-01', true), { months: 12, rule: 'inr' });
-  assert.deepEqual(realisationRule('2026-09-01', true), { months: 15, rule: 'fx' });
+  assert.deepEqual(realisationRule('2026-09-01', true), { months: 9, rule: 'fx' });
+  assert.deepEqual(realisationRule('2026-05-01', true), { months: 15, rule: 'fx' });
 });
 
-test('services exports: clock from the invoice date, never flagged; 9 months from 1 Oct 2026, 15 for 15 Sep 2026', () => {
+test('services exports: clock from the invoice date, never flagged; 9 months from 1 Oct 2026, and from 5 Jun 2026 (QA17 R9)', () => {
   const [oct, sep] = reg([exp('1'), exp('2', { issue_date: '2026-09-15' })]).sort((a, b) => a.invoiceDate.localeCompare(b.invoiceDate)).reverse();
   assert.deepEqual([oct.services, oct.sbMissing, oct.shipDate, oct.months, oct.dueDate], [true, false, '2026-10-14', 9, '2027-07-14']);
-  assert.deepEqual([sep.months, sep.dueDate], [15, '2027-12-15']);
+  assert.deepEqual([sep.months, sep.dueDate], [9, '2027-06-15']);
   // A typed shipping-bill date does not move a services clock.
   assert.equal(reg([exp('3', { shipping_bill_date: '2026-11-30', shipping_bill_no: 'X' })])[0].shipDate, '2026-10-14');
 });
