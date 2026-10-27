@@ -44,6 +44,9 @@ export const TDS_PAYABLE_SECTIONS: readonly TdsPayableSection[] = [
   { code: '195-F', family: '195', section: '195', label: '195 Non-resident — fees for technical services', rpu: '195' },
   { code: '195-I', family: '195', section: '195', label: '195 Non-resident — interest', rpu: '195' },
   { code: '195-O', family: '195', section: '195', label: '195 Non-resident — other sums', rpu: '195' },
+  // R14 (PS-D2): Sec 194T — salary, remuneration, commission, bonus or interest to a partner of a firm / LLP, from
+  // 1 Apr 2025 (rate `TDS_194T_RULES`, threshold below). RPU / Form 140 code NOT confirmed (PS19) — verify with your CA.
+  { code: '194T', family: '194T', section: '194T', label: '194T Payments to partners', rpu: '94T' },
 ];
 
 export function payableSection(code: string | undefined): TdsPayableSection | undefined {
@@ -64,6 +67,7 @@ export const TDS_194A_RATE_RULES: readonly Versioned<number>[] = [
  */
 export function sectionRate(code: string, date?: string, deductee?: DeducteeType): number | null {
   if (code === '194A') return ruleAt(TDS_194A_RATE_RULES, date);
+  if (code === '194T') return ruleAt(TDS_194T_RULES, date); // R14 (PS-D2)
   if (code.startsWith('195-')) return nrActRate(nrNatureOf(code), date, deductee).rate;
   let c = code;
   if (code === '194C-1' || code === '194C-2') c = deductee === 'INDIVIDUAL' || deductee === 'HUF' ? '194C-1' : deductee ? '194C-2' : code;
@@ -128,6 +132,8 @@ export function tdsThreshold(family: string, date?: string): TdsThreshold | unde
 export const TDS_EXTRA_THRESHOLD_RULES: Readonly<Record<string, readonly Versioned<TdsThreshold | null>[]>> = {
   '194R': [{ from: '2022-07-01', value: { aggregate: 20000 }, source: 'Sec 194R — verify' }],
   '194S': [{ from: '2022-07-01', value: { aggregate: 10000 }, source: 'Sec 194S (other than a specified person) — verify' }],
+  // R14 (PS-D2): 194T — ₹20,000 per FY per partner across salary, remuneration, commission, bonus and interest.
+  '194T': [{ from: '2025-04-01', value: { aggregate: 20000 }, source: 'Finance (No. 2) Act 2024 (Sec 194T) — taxmann, L&S, tdsman' }],
 };
 
 /** Sec 206AA: payee without a valid PAN — at least 20% (5% for 194Q from 1 Jul 2021). */
@@ -271,4 +277,15 @@ export const TDS_194O_RULES: readonly Versioned<{ individualExemption: number; n
  */
 export const TDS_194C6_RULES: readonly Versioned<{ maxVehicles: number; reason: string } | null>[] = [
   { from: '2015-06-01', value: { maxVehicles: 10, reason: 'T' }, source: 'Sec 194C(6) as amended by Finance Act 2015 (≤ 10 goods carriages, PAN + declaration) — verify' },
+];
+
+/**
+ * R14 (PS-D2): Sec 194T — a firm (incl. an LLP) deducts 10% on salary, remuneration, commission, bonus or interest
+ * credited / paid to a partner from 1 Apr 2025 (Finance (No. 2) Act 2024; none before: null). Drawings and the exempt
+ * share of profit are outside. Rate and date verified in secondary sources; the 2025-Act table entry and the RPU code
+ * are not (PS19) — verify with your CA. Append-only.
+ */
+export const TDS_194T_RULES: readonly Versioned<number | null>[] = [
+  { from: '2017-07-01', value: null },
+  { from: '2025-04-01', value: 10, source: 'Sec 194T (Finance (No. 2) Act 2024) — taxmann, Lakshmikumaran & Sridharan, tdsman' },
 ];

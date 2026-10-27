@@ -74,6 +74,9 @@ export const ACT_REF_RULES: Readonly<Record<string, readonly Versioned<ActRef>[]
   '206C1F': refRules('206C(1F)', 'Sec 394(1) [Table: Sl. No. 6]', false, `${BILL_TABLE}; Sl. 6 vs 6.D disputed (TR15)`),
   // R5-C: donee approval for donations (80G → Sec 133(1)(b)(ii)); the donee statement (10BD) is Sec 354(1) / Form 113 — verify.
   '80G': refRules('80G', 'Sec 133(1)(b)(ii)', false, 'Section mapping guide ITA 1961 → 2025 as understood — verify'),
+  // R14 (PS-D2): 194T (payments to partners) — the Sec 393 table entry is not confirmed (PS19): the label names the
+  // section only and stays "verify with your CA" until a CA answers.
+  '194T': refRules('194T', 'Sec 393(1) [Table: entry to confirm]', false, 'Not found in the sources read (PS19) — verify'),
 };
 
 /** Stored internal codes that are not themselves a section family. */
