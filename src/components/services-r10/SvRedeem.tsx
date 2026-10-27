@@ -4,7 +4,7 @@
  * of 6 — MEM/…", `sv.redeem`; the value for commission is price ÷ sessions). Sessions already on this document count.
  */
 import { useMemo } from 'react';
-import type { Client, InvoiceItem } from '../../types/invoice';
+import type { Client, InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { Membership } from '../../types/services-r10';
 import { getTable } from '../../lib/storage';
 import { localDb } from '../../lib/localDb';
@@ -19,12 +19,13 @@ import controls from '../../styles/controls.module.css';
 /** Open session packages of a customer (by id, else name) with the sessions used so far (bills + `onDoc` lines). */
 function packagesOf(client: Pick<Client, 'id' | 'name'> | null | undefined, onDoc: readonly InvoiceItem[], docId: string | undefined, day: string) {
   if (!client?.name) return [];
-  const invoices = getTable<{ id: string }>('invoices').filter((i) => i.id !== docId) as never[];
+  const all = getTable<InvoiceRecord>('invoices');
+  const invoices = all.filter((i) => i.id !== docId);
   const checkins = loadCheckins();
   return loadMemberships()
     .filter((m) => Number(m.plan.sessions) > 0 && (m.client_id ? m.client_id === client.id : m.client_name.toLowerCase() === client.name.trim().toLowerCase()))
     .map((m) => ({ m, used: sessionsUsed(m, invoices, checkins) + onDoc.filter((l) => l.sv?.redeem?.membership_id === m.id).length }))
-    .filter(({ m, used }) => statusOf(m, day, used) === 'active');
+    .filter(({ m, used }) => statusOf(m, day, used, all) === 'active');
 }
 
 const label = (m: Membership, used: number) => mcT('use', { number: m.number, left: Number(m.plan.sessions) - used });

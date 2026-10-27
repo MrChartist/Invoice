@@ -208,6 +208,12 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   commission_plans: 'Staff commission plans: rules by item / category / kind, % of taxable or per unit, monthly slab (R10).',
   staff_payouts: 'Monthly commission payouts per staff member: payroll adjustment or journal reference (R10).',
   payer_claims: 'Payer claims (CLM/FY…): insurer / TPA / employer, beneficiary, approved amount, the two bills, status (R10).',
+  // R10-B
+  clinic_settings: 'Clinic settings: UHID prefix, rooms with kind and rate per day, room-day rule, deposit alert, referral switch, rate-list names (R10).',
+  clinic_visits: 'OPD visits (OPD/FY…): patient, UHID, doctor, daily token, new / follow-up fee, status, bill (R10).',
+  admissions: 'In-patient admissions (IPD/FY…): patient, room snapshot, admit / discharge, running charges, deposits, claim, final bill (R10).',
+  lab_tests: 'Lab test master: code, department, sample, TAT, price, parameters with reference ranges, panels, outsourcing (R10).',
+  lab_orders: 'Lab orders (LAB/FY…): patient, tests (snapshot), sample status, results, report status and history, delivery log, bill (R10).',
   // R10-C
   member_plans: 'Membership plans and packages: kind, term / sessions, price and tax class, freeze / transfer / refund rules, wallet bonus (R10).',
   memberships: 'Memberships (MEM/FY…): member, plan snapshot, start / end, freezes, upgrade / transfer / renewal history, sale bills, wallet top-ups (R10).',

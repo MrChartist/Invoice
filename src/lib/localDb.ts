@@ -233,6 +233,8 @@ function logSafe(make: () => AuditInput | AuditInput[] | null): void {
 const OVERRIDE_NOTE = ' (period-lock override)';
 
 /** Copy of `obj` without undefined / null / empty-string fields. */
+const PARTY_KEYS = 'id name email address city zip company gstin phone state state_code pan tan'.split(' ') as (keyof Client)[];
+
 function keepFilled<T extends object>(obj: T): Partial<T> {
   const out: Partial<T> = {};
   for (const [k, v] of Object.entries(obj)) {
@@ -474,10 +476,11 @@ export const localDb = {
 
       // Grow the local CRM / catalogue from real usage.
       if (toSave.client?.name?.trim()) {
-        // Credit terms (6.25) live on the client master only: an old snapshot must never reset them.
-        // 8F: so do the distribution fields (area / beat / default agent / credit policy).
-        const { credit_limit: _limit, credit_days: _days, area_id: _a, beat_id: _b, agent_id: _g, credit_policy: _p, reminder_mode: _rm, payment_terms_id: _pt, ...snapshot } = toSave.client;
-        localDb.clients.upsert(snapshot);
+        // QA12 S1: only the party's identity is learnt from a document. Everything else on the master (credit terms,
+        // distribution fields, enrolments, contacts, birthdays, defaults …) is the master's own: an old snapshot
+        // re-saved must never reset it.
+        const c = toSave.client;
+        localDb.clients.upsert(Object.fromEntries(PARTY_KEYS.filter((k) => k in c).map((k) => [k, c[k]])) as unknown as Client);
       }
       localDb.items.upsertMany(
         (toSave.items ?? [])

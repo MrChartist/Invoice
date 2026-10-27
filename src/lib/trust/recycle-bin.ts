@@ -412,6 +412,21 @@ registerRestoreHook('memberships', (row, e, live) => {
   return live('memberships').some((m) => str(m?.id) !== e.row_id && (Array.isArray(m?.invoice_ids) ? m.invoice_ids : []).some((x) => ids.includes(str(x)))) ? { refuse: 'Its sale bill now belongs to another membership.' } : null;
 });
 
+// QA12 S10: a deleted OPD / lab / admission / workshop-job bill never comes back next to the bill made again for that
+// visit, order, admission or job (the source row now names the new live bill): the same service would be billed twice.
+registerRestoreHook('invoices', (row, e, live) => {
+  const sv = isObj(row.sv) ? row.sv : {};
+  if (['QUOTATION', 'CREDIT_NOTE'].includes(str(row.doc_type))) return null;
+  const alive = (id: string) => live('invoices').some((x) => str(x?.id) === id && str(x?.status) !== 'Cancelled');
+  for (const [t, k] of [['clinic_visits', 'visit'], ['lab_orders', 'lab_order'], ['admissions', 'admission'], ['service_jobs', 'job']] as const) {
+    const id = isObj(sv[k]) ? str(sv[k].id) : '';
+    const src = id ? live(t).find((r) => str(r?.id) === id) : undefined;
+    const now = src ? str(src.invoice_id) : '';
+    if (now && now !== e.row_id && alive(now)) return { refuse: `It was billed again since (${str(src!.number)}). Cancel that bill first if this one should stand.` };
+  }
+  return null;
+});
+
 /** The module hooks' verdict on one entry: the first refusal, else every companion. */
 function moduleVerdict(e: BinEntry, live: LiveReader, bin: readonly BinEntry[]): RestoreHookResult {
   const r = isObj(e.row) ? e.row : {};

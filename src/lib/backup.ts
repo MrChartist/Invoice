@@ -480,6 +480,8 @@ const RECORD_TABLES = [
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
   // R10-A: appointments, service staff, commission plans, staff payouts, payer claims (CLM/FY…)
   'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
+  // R10-B: OPD visits (OPD/FY…), admissions (IPD/FY…), lab test master, lab orders (LAB/FY…)
+  'clinic_visits', 'admissions', 'lab_tests', 'lab_orders',
   // R10-C: membership plans, memberships (MEM/FY…), check-ins (one row per day), classes / batches, class attendance
   'member_plans', 'memberships', 'checkins', 'class_schedules', 'class_attendance',
   // R10-D: vehicles / appliances, labour operations (job cards stay in R9's service_jobs)
@@ -566,6 +568,8 @@ const ID_TABLES = new Set([
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
   // R10-A: appointments, service staff, commission plans, staff payouts, payer claims (CLM/FY…)
   'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
+  // R10-B: OPD visits (OPD/FY…), admissions (IPD/FY…), lab test master, lab orders (LAB/FY…)
+  'clinic_visits', 'admissions', 'lab_tests', 'lab_orders',
   // R10-C: membership plans, memberships (MEM/FY…), check-ins (one row per day), classes / batches, class attendance
   'member_plans', 'memberships', 'checkins', 'class_schedules', 'class_attendance',
   // R10-D: vehicles / appliances, labour operations (job cards stay in R9's service_jobs)
