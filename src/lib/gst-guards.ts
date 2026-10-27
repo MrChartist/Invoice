@@ -225,7 +225,7 @@ export { GST_SLAB_RULES, slabsAt, rateInSlabs } from './tax-rules';
 
 export { isOwnGstin } from './gstin';
 
-export type GstExceptionCode = 'IRN_MISSING' | 'IRP_WINDOW_CLOSED' | 'B2B_NO_HSN' | 'POS_STATE_MISMATCH' | 'RATE_NOT_IN_SLABS' | 'B2CL_EDGE' | 'OWN_GSTIN';
+export type GstExceptionCode = 'IRN_MISSING' | 'IRP_WINDOW_CLOSED' | 'B2B_NO_HSN' | 'POS_STATE_MISMATCH' | 'RATE_NOT_IN_SLABS' | 'B2CL_EDGE' | 'OWN_GSTIN' | 'BAND_RATE' | 'BAND_EDGE' | 'BAND_DISCOUNT';
 
 export interface GstException {
   code: GstExceptionCode;
@@ -251,6 +251,10 @@ export interface ExceptionOptions {
   /** Only documents of this sender GSTIN ('' = all). */
   gstin?: string;
 }
+
+// R9 (RT-C1): price-band lines (rate vs the band, near the limit, decided by a discount) — one lazy check.
+let bandCheck: ((inv: InvoiceRecord) => { code: GstExceptionCode; vars: Record<string, string | number> }[]) | null = null;
+export const bandCheckReady = import('./retail/rt-bands').then((m) => { bandCheck = m.liveBandExceptions; }, () => {});
 
 /** GST exceptions for documents dated in [from, to]. Errors first, then by date. */
 export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOptions): GstException[] {
@@ -297,6 +301,7 @@ export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOp
       const v = Number(inv.total) || 0;
       if (v >= t * (1 - B2CL_EDGE_BAND) && v <= t * (1 + B2CL_EDGE_BAND)) push('B2CL_EDGE', 'warning', { value: r2(v), threshold: t, section: v > t ? 'B2CL' : 'B2CS' });
     }
+    for (const b of bandCheck?.(inv) ?? []) push(b.code, 'warning', b.vars);
   }
   const rank = (e: GstException) => (e.severity === 'error' ? 0 : 1);
   return out.sort((a, b) => rank(a) - rank(b) || a.date.localeCompare(b.date) || a.number.localeCompare(b.number));
