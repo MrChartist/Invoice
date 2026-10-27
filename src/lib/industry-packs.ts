@@ -165,6 +165,12 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'realty', path: '/receivables?tab=realty&view=rera', labelKey: 'r11.realty.rera' },
   { pack: 'realty', path: '/receivables?tab=realty&view=cancellations', labelKey: 'r11.realty.cancellations' },
   { pack: 'realty', path: '/receivables?tab=realty&view=procurement', labelKey: 'r11.realty.procurement' },
+  // CN-D: site operations (Works views)
+  { pack: 'works', path: '/time?tab=works&view=subcon', labelKey: 'r11.subcon' },
+  { pack: 'works', path: '/time?tab=works&view=labour', labelKey: 'r11.labour' },
+  { pack: 'works', path: '/time?tab=works&view=plant', labelKey: 'r11.plant' },
+  { pack: 'works', path: '/time?tab=works&view=reco', labelKey: 'r11.reco' },
+  { pack: 'works', path: '/time?tab=works&view=pnl', labelKey: 'r11.pnl' },
 ];
 
 /**

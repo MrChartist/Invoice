@@ -197,3 +197,69 @@ Breakdown (gz): the desk chunk 20.1 kB (UI ≈ 8 kB, engines ≈ 7.5 kB, EN + HI
 and paper strings +0.9 kB, help topics + glossary + palette + `PACK_TABS` rows ≈ 2 kB, registry / backup / sync /
 export / restore-hook rows ≈ 0.6 kB. **Over the 14 kB CN-C share by ≈ 10.5 kB** — the 15 items (eight views, five
 engines with prints) do not fit 14 kB with Hindi; total JS stays well inside the 3,000 kB budget.
+
+## CN-D — Site operations (Works views `subcon`, `labour`, `plant`, `reco`, `pnl`)
+
+Screens: **Time → Works** views, listed when the construction profile switches them on (`construction_settings.views`;
+their URLs always open). One lazy chunk `components/construction/SiteOps.tsx` (Sub-contracts, Labour, Plant, Material
+reco, Site P&L views + `site-ui.tsx` / `site-kit.ts`), strings `i18n/areas/construction-r11d.ts` (English + Hindi); tab
+labels in the small `works/site-views.ts`. Engines in `src/lib/construction/cn-*.ts`; every writer imports
+`./cn-registry`. Rules (`construction-rules.ts` `// CN-D`, dated, `source`, `verified: false`): `WASTAGE_BAND_DEFAULTS`
+(−3% / +3%, penal 2), `COEFFICIENT_STARTERS` (typical, non-statutory), `LABOUR_WITHHOLD_DEFAULTS` (10%). Sec 40A(3)
+reuses `CASH_PAYMENT_LIMIT_RULES` through `retail/rt-cash-guard.ts` (`cashPaymentLimit`); plant SAC / TDS reuses CN-A's
+`PLANT_HIRE_SAC_RULES`.
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| D1 work orders | `cn-subcon.ts`: table `sub_work_orders` (`SWO/FY…`): vendor, BOQ, site godown + cost centre, lines "From BOQ" at a rate % of ours (or typed), deduction rules (retention %, advance-recovery %, other), TDS section (default 194C by PAN). `boqMargins` = (our rate − his rate) × his billed qty (shown in the site P&L). Also the CN-D table names (`SD`) and row helpers. |
+| D1 bills | `cn-subcon-bill.ts`: table `sub_measurements` (`SCB/FY…`, cumulative / this qty + M-book). Saving makes one `PURCHASE` bill through `purchasesDb.save` (lines = this-bill qty at WO rates, SAC 9954, PoS = his State, GST only when he has a GSTIN), TDS through `resolveBillTds` (194C on the value before GST, thresholds, ITA 2025 labels) and the snapshot `PurchaseRecord.cn_sub` (abstract, deductions, TDS, net). Retention / material / plant-hire / other recoveries → ONE journal "Sub-contractor deductions" Dr Sundry creditors (party) │ Cr "Retention payable to sub-contractors" / "Material recovered from sub-contractors" / "Plant hire recoveries" / "Other recoveries — sub-contractors"; its amount is rolled into the bill's `amount_paid`, so the bill's balance, status and payables show the **net due**. Advance recovery = bill-wise Agst Ref adjustment of his open advances (`adjustAgainstBill`). Cancel removes the bill and journal (recycle bin) and frees the quantities; retention payable per sub-contractor with "Release" (PAYMENT voucher, class "Retention release"). Abstract print "Sub-contractor bill". |
+| D1 payables | `billwise.ts` one guarded line: on a `cn_sub` bill the journal part shows as an adjustment "Sub-contract deductions (journal)" (the net due ages). |
+| D2 compliance | `cn-labour-compliance.ts`: table `labour_compliance` (vendor × month; PF TRRN / amount / file, ESI challan / amount / file, wage register file, licence; pending / proved / waived — proved needs TRRN + challan). Files through the attachments store (`labour_compliance` added to `ATTACHMENT_OWNER_TABLES`). `withholdFor` = max(hold % of the bill, PF + ESI) until proved / waived; `labourBills` lists labour contractors' bills with balance, hold and "pay now" (warning, never a block); hold % in `construction_settings.labour_withhold_pct`. Manpower supply bill = a DRAFT tax invoice, SAC 998519 at the `manpower` class rate, lines Wages / Statutory contributions / Service charge; compliance annexure print. |
+| D2 muster | `cn-muster.ts`: `site_labour` (name, trade, daily / OT rate, typed minimum wage, phone, ID ref, site) and `muster_days` (one row per site per day; present 0 / ½ / 1, OT hours). `wageSheet` (gross = days × rate + OT − advances; cash-limit and minimum-wage warnings); `settleWeek` → `MUS/FY…` + one PAYMENT voucher "Site wages" Dr "Site labour wages" (site cost centre) │ Cr "Advances to site labour" │ Cr cash / bank; the days are locked; "Undo" removes the voucher (recycle bin). Not linked to payroll. |
+| D3 plant | `cn-plant.ts`: equipment = fixed asset with `cn_equipment` (kind, reg no., hour meter, internal / hire-out rate per hour, fuel range — `ledger/assets.ts` now keeps the field through normalise / edit) or `hired_equipment`; log sheets `plant_logs` (`PLG/FY…`, hours ≤ 24); `monthSummary` (utilisation %, L/h flagged outside the range); `hireRecoveryFor` (logs charged to a sub-contractor at the hire-out rate → `hire_recovery` on his next bill, logs marked `recovered_in`); `internalCharges` (own plant at own sites, memo). `cn-plant-hire.ts`: `hireProposal` / `bookHireIn` — month-end bill (hour / day / month basis), 194-I(a) without operator, 194C (by PAN) with, labels by `sectionText`, once per machine and month (`cn_sub.kind 'hire'`); `hireOutInvoice` (draft invoice at SAC per rule, 18%); shared `draftInvoice`. |
+| D4 reconciliation | `cn-reco.ts` on top of `works/sites.ts` (new export `siteOpening`): per site and material — opening, received own (transfers, `lineFactor`), client issue free (qty only) / against recovery, theoretical, actual, variation %, band (terms per material on the site godown `Godown.cn_reco`, else defaults), beyond band (over + short), recovery rate (issue rate × penal), recovery (only where the client issued material), closing. Client issues typed on the site; RA-bill `material_recovery` rows that carry `item_id` / `qty` are also read. CSV and print "Material reconciliation statement"; starter coefficients table. Sites panel links to it. |
+| D5 site P&L | `cn-site-pnl.ts` (`sitePnl` pure, `gatherSitePnl` reads every source once): revenue = RA bills of the BOQ + sales documents of its cost centre (taxable; gross / net payable), less credit notes; costs — materials (`siteCostByCentre`) less material recovered from sub-contractors, sub-contractor bills (net of "other" recoveries), labour-contractor bills, muster wages, plant (hire bills split by the month's log hours per site + internal charge − hire recovered), other bills / expenses of the cost centre; each purchase is classified once through `readPurchase`. Memo: measured-not-billed (draft measurements × BOQ rate), typed "not measured" and cost to complete per group (`BoqTerms.site_pnl`), remaining contract value, expected margin; held amounts from `raDueSplit`; retention payable. CSV and print; Books → Projects links to it. |
+
+Registry / storage: `cn-registry.ts` CN-D block (`sub_work_orders`, `sub_measurements`, `labour_compliance`,
+`muster_days`, `plant_logs` `doc.create`; `site_labour`, `hired_equipment` `master.edit`; all audited); `backup.ts` both
+lists; `sync-engine.ts` `DATED` (work orders, bills, muster days, logs) and `NUMBERED` (SWO, SCB, PLG; MUS lives on the
+muster rows, guarded by `series_counters`); open-export meanings. Restore rules (`recycle-bin.ts`): the deductions
+journal and the site-wages voucher are owned vouchers (refused once undone where posted); a sub-contractor bill cancelled
+from its measurement is refused (measure again). Help topics `time:works:{subcon,labour,plant,reco,pnl}`, `PACK_TABS`
+rows, palette labels `r11.*`, synonyms, the `time.works` Ctrl+K title. Tests: `cn-subcon`, `cn-labour`, `cn-plant`,
+`cn-reco`, `cn-site-pnl` (+ registry and purchase-contract rows). E2E step "R11-D site desk". CA items CN29–CN31.
+
+### Deviations from the PRD (CN-D)
+
+- One lazy chunk for the five views (the PRD's five view files are separate modules inside it) instead of five chunks.
+- Material and plant recoveries on a sub-contractor bill are credited to recovery ledgers by journal, not a debit note /
+  stock credit at site; material issued through `job-work.ts` challans is not read (typed on the bill instead).
+- Retention is moved to its liability at the bill (journal), so the payables ageing simply ages the net due; the
+  "guarded call" is the relabelled adjustment in `billwise.ts`.
+- The sub-contractor abstract is an HTML print, not the `WorksAbstractPage` component (keeps the paper chunk apart).
+- Labour hold: shown on the Labour view with a "pay now" figure; the Purchases payment dialog is not changed.
+- Client-issued material: quantities only in the reconciliation (typed on the site godown, or CN-B4 rows if they ever
+  carry an item and quantity — CN-B's rows do not today); no stock inward is booked for it (left by CN-B4; free issue
+  never valued). Attachment to the final-bill closure checklist (B5) is not wired.
+- Site P&L is per BOQ (contract) and its project cost centre; other vouchers' expense lines tagged to the cost centre
+  are not read (purchases / expenses are); muster wages are read from the "Site wages" vouchers.
+- Minimum wage is typed per worker (not a per-trade table).
+
+### Budget (CN-D)
+
+Measured against `claude/elegant-cannon-cwapiv` at `3a46851` (CN-A + CN-B + CN-C), same machine, `vite build`, gzip -9:
+
+| | Before | After | Δ |
+|---|---|---|---|
+| Initial JS (first paint) | 189,123 B | 189,140 B | +17 B (≤ 40 B; `PACK_TABS` rows) |
+| Total JS | 2,930,522 B | 2,959,630 B | +29.1 kB (2,890.3 kB of 3,000) |
+
+Breakdown (gz): the site chunk 25.0 kB (EN + HI strings ≈ 5.8 kB, eight engines with three prints ≈ 9 kB, five views ≈
+10 kB), help topics + palette + synonyms + `PACK_TABS` ≈ 1.2 kB, registry / backup / sync / export / restore rows ≈
+0.5 kB, Works tab / Books link / billwise / assets ≈ 0.4 kB, the rest chunk-split overhead. **Over the 11 kB share by ≈
+18 kB**: D1–D5 are five full screens (work orders + measured bills + retention, compliance + manpower bill + muster,
+equipment + logs + hire in / out, reconciliation + terms + client issues, P&L + WIP) with Hindi; total JS stays inside the
+3,000 kB budget. Trimmed already: one chunk, shared form helpers, no new icons, the rule file reached only through lazy
+engines, the payables / assets edits are single guarded lines.

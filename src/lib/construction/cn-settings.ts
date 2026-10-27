@@ -35,6 +35,9 @@ export function cleanConstructionSettings(raw: unknown): ConstructionSettings {
     const re = Object.fromEntries(Object.entries(x).filter(([k, v]) => (k === 'terms' ? typeof v === 'string' && v.trim() : ['interest_rate', 'forfeit_pct', 'forfeit_amount'].includes(k) && Number(v) >= 0)));
     if (Object.keys(re).length) out.realty = re;
   }
+  // CN-D2: labour-contractor hold % (0–100).
+  const wh = Number(r.labour_withhold_pct);
+  if (r.labour_withhold_pct !== undefined && Number.isFinite(wh) && wh >= 0 && wh <= 100) out.labour_withhold_pct = wh;
   if (typeof r.updated_at === 'string') out.updated_at = r.updated_at;
   return out;
 }
