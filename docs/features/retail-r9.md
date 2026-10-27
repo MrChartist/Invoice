@@ -89,7 +89,25 @@ strip (from the search text).
 
 ## 3. Sizes (gz, `npm run build && npm run check:size`)
 
-Filled in at the end of the package (see the RT-A report).
+Measured against `ab8a25f` (same code as the merged base `7351dd9`):
+
+| | Before | After | Δ |
+|---|---|---|---|
+| Initial JS | 189,026 B | 189,048 B | **+22 B** (preload-map entries of the new lazy chunks) |
+| Total JS | 2,745,934 B (2681.6 kB) | 2,779,905 B (2714.8 kB / 2800) | **+33.2 kB** |
+
+**Deviation (total):** over RT-A's 12 kB (PRD) / 14 kB (lead) share. Breakdown (gz):
+- shared Round 9 work done here for every package ≈ 8 kB: help topics for all 20 pack views + RT-A tabs (topics-packs
+  +1.6, topics-purchase / sales +0.4), glossary +0.9, pack / profile / checklist labels in `reach` +0.9, Ctrl+K titles and
+  pack palette labels +1.2, checklist steps +0.5, registry / shared names / rule scaffold +0.8, four desk stubs +0.6,
+  open-export descriptions +0.4, sample-data builder +1.0;
+- RT-A screens in one lazy hub (`rt-a-hub`: deliveries board, POS / editor strips, short book, relabel queue, GST-cut
+  tool, retail checks, their engines and English + Hindi strings) 12.3 kB; shop picker with its strings 1.7 kB;
+  `rt-mrp` 1.3 kB, `rt-settings` 0.9 kB, `rt-mrp-store` 0.7 kB, `rt-profile` 0.5 kB;
+- host glue (lazy mounts, free / disc cells, purchase return note, Z report line, MRP save paths) ≈ 5 kB across
+  Inventory, Settings, Pos, InvoiceCreator, LineItemsEditor, purchases, stock-tracking, pos, SetupWizard, FeaturesPanel.
+Trimmed already: one hub chunk instead of seven (first paint +103 B → +22 B, total −1 kB), unused strings removed,
+the picker's strings split off so the wizard does not load the RT-A area.
 
 ## 4. Round 9 changes that touch existing CA items (RT-A)
 
