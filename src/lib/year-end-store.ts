@@ -18,6 +18,7 @@ import { isoDay } from './dates';
 import type { InvoiceRecord } from '../types/invoice';
 import { agencySales, loadArrivals } from './trade/tr-arrivals';
 import { loadPattis, unsettledLots } from './trade/tr-patti';
+import { rxRetainedInYear } from './retail/rt-pharmacy-retention';
 import {
   CLOSING_STOCK_CLASS,
   YEAR_END_TABLE,
@@ -107,6 +108,7 @@ export function loadYearEnd(fyStart: number): YearEndState {
   const old = loadOpeningBills().filter((b) => b.date < fyBegin && (b.side === 'payable' ? cred : debt).has(b.party_name));
   const manual = loadVouchers();
   const agencyLots = loadAgencyLots(end);
+  const rxRetained = rxRetainedInYear(localDb.invoices.getAll() as InvoiceRecord[], fyBegin, end, today); // R9 (RT-B2)
   const steps = yearEndChecklist({
     fyStart,
     ledger,
@@ -120,6 +122,7 @@ export function loadYearEnd(fyStart: number): YearEndState {
     record: loadYearEndRecord(fyStart),
     today,
     ...(agencyLots ? { agencyLots } : {}),
+    ...(rxRetained ? { rxRetained } : {}),
   });
   return { steps, ledger, integrity, manual, ...(valuation ? { valuation } : {}) };
 }

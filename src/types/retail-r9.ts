@@ -168,13 +168,96 @@ declare module '../lib/inventory' {
 /* ════════════════════════════════════════ RT-B ════════════════════════════════════════
  * Doctors, refills, registers, licences, ceiling prices. Note: `InvoiceRecord.rx` is an inline object type in
  * invoice.ts, which declaration merging cannot widen — RT-B widens it there (one edit) or keeps the additions
- * (`doctor_id`, `age`, `gender`, `rx_no`, `rx_date`, `retained`) in its own shape. */
+ * (`doctor_id`, `age`, `gender`, `rx_no`, `rx_date`, `retained`) in its own shape. RT-B widened it in invoice.ts. */
+
+/**
+ * RT-B1 doctors master (table `doctors`, `master.edit`, audited "Doctor"). Round 10 SV-B adds clinic fields
+ * (`in_house`, `speciality`, `consult_fee`, `follow_up_fee`, `follow_up_days`, `staff_id`) by declaration merging
+ * on this interface — keep it an interface. No referral / commission field (RT9).
+ */
+export interface Doctor {
+  id: string;
+  name: string;
+  qualification?: string;
+  /** Registration number with the medical council (printed on the H1 / X registers as "reg. no."). */
+  reg_no?: string;
+  council?: string;
+  clinic?: string;
+  phone?: string;
+  address?: string;
+  active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** RT-B1 refill schedule (table `rx_refills`, `doc.create`, dated `next_due`). */
+export interface RxRefill {
+  id: string;
+  /** Saved client (patient) when known; else the name / phone typed. */
+  client_id?: string;
+  name: string;
+  phone?: string;
+  items: { name: string; quantity: number; unit?: string }[];
+  every_days: number;
+  /** Local day the next purchase is due. */
+  next_due: string;
+  /** Local day of the last bill that refilled it (absent = only the bill it was made from). */
+  last_billed?: string;
+  /** Bill it was made from. */
+  invoice_id?: string;
+  doctor_id?: string;
+  active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+/** RT-B2 drug licence forms (Drugs Rules 1945): 20 / 21 retail, 20B / 21B wholesale, 20F / 21G Schedule X, 21C restricted. */
+export type DrugLicenceForm = '20' | '21' | '20B' | '21B' | '20F' | '21G' | '21C' | 'other';
+export interface DrugLicence {
+  form: DrugLicenceForm;
+  number: string;
+  valid_from?: string;
+  valid_to?: string;
+  premises?: string;
+}
+export interface Pharmacist {
+  name: string;
+  reg_no: string;
+  council?: string;
+}
+
+/** RT-B1: the POS prescription strip's state (merged into the bill; `errors` stop the save). */
+export interface PosRx {
+  rx?: NonNullable<import('./invoice').InvoiceRecord['rx']>;
+  /** The Rx photo(s) stored as attachments of the bill. */
+  att?: import('./attachments').AttachmentRef[];
+  errors: string[];
+}
+
+declare module '../lib/pharma-gate' {
+  interface PharmaSettings {
+    /** RT-B2: drug licences on file (printed licence line; expiry alerts; Schedule X needs 20F / 21G). */
+    licences?: DrugLicence[];
+    /** RT-B2: registered pharmacist printed on the bill. */
+    pharmacist?: Pharmacist;
+    /** RT-B1: H1 / X without patient + prescriber is an error (pharmacy profile) instead of a warning. */
+    require_rx?: boolean;
+  }
+}
 declare module '../lib/inventory' {
   interface StockItem {
     /** RT-B3: NPPA ceiling price per unit, ex-GST, dated (append-only). */
     ceiling_prices?: { from: string; price_per_unit: number; unit?: string }[];
     /** RT-B2: narcotic / psychotropic item (own register). */
     narcotic?: boolean;
+    /** RT-B3: price to stockist, typed (margin view only). */
+    pts?: number;
+  }
+}
+declare module './invoice' {
+  interface SenderProfile {
+    /** RT-B2: "name (reg. no.)" of the registered pharmacist, written from the pharmacy desk (snapshotted with the profile). */
+    pharmacist?: string;
   }
 }
 

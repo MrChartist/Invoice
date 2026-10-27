@@ -94,6 +94,7 @@ export function receiptLines(rec: InvoiceRecord, sender: Partial<SenderProfile>,
   if (sender.companyPhone) L.push(center(`Ph: ${sender.companyPhone}`, cols));
   if (sender.companyGstin) L.push(center(`GSTIN: ${sender.companyGstin}`, cols));
   if (sender.drug_licence) for (const l of wrap(`DL No.: ${sender.drug_licence}`, cols)) L.push(center(l, cols));
+  if (sender.pharmacist) for (const l of wrap(`Pharmacist: ${sender.pharmacist}`, cols)) L.push(center(l, cols)); // R9 (RT-B2)
   L.push(rule);
   L.push(center(TITLES[rec.doc_type] ?? 'BILL', cols));
   L.push(lr(`No: ${rec.invoice_number || 'DRAFT'}`, rec.issue_date.split('-').reverse().join('-'), cols));

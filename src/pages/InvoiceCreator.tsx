@@ -39,6 +39,7 @@ import { clientToParty } from '../store/invoice-defaults';
 import { issuingProfile } from '../lib/sync-device';
 import { lockState } from '../lib/period-lock';
 import { editorStockContext, isMrpMessage, liveDocTrackingIssues, liveMrpIssues, recordMrpOverrides, withMrpIssues } from '../lib/stock-tracking'; // R9 (RT-A2) helpers
+import { rxRequiredErrors } from '../lib/pharma-gate';
 import { can, currentActor } from '../lib/access';
 import { audit } from '../lib/audit';
 import { trT } from '../i18n/areas/trade-r8c';
@@ -190,7 +191,9 @@ export function InvoiceCreator() {
             price_includes_tax: now.price_includes_tax,
           };
           // R9 (RT-A2): the MRP guard runs even without batch / serial / godown tracking (or agency lots).
-          const issues: ReturnType<typeof liveDocTrackingIssues> = ctx || st.items.some((i) => i.arrival_id) ? liveDocTrackingIssues(doc) : withMrpIssues({ errors: [], expired: [], warnings: [] }, liveMrpIssues(doc));
+          const found: ReturnType<typeof liveDocTrackingIssues> = ctx || st.items.some((i) => i.arrival_id) ? liveDocTrackingIssues(doc) : withMrpIssues({ errors: [], expired: [], warnings: [] }, liveMrpIssues(doc));
+          const rxErr = rxRequiredErrors({ ...doc, rx: now.rx }); // R9 (RT-B1) "Require prescription for H1 / X"
+          const issues = rxErr.length ? { ...found, errors: [...found.errors, ...rxErr] } : found;
           // QA8 T15: only agency-lot errors left — the owner may sell anyway, with a reason (audited).
           const lotOnly = !!issues.lots?.length && issues.errors.every((e) => issues.lots!.includes(e));
           const reason = lotOnly && can('settings.manage') ? window.prompt(trT('lotOverride', { list: issues.lots!.join(' ') }))?.trim() : '';

@@ -15,7 +15,8 @@ import { HeldBills } from '../components/pos/HeldBills';
 import { PosTiles } from '../components/pos/PosTiles';
 import { localDb } from '../lib/localDb';
 import { DB_PREFIX, KEYS, generateId, getJson, getTable, peekTable } from '../lib/storage';
-import type { DeliveryInfo, RetailSettings } from '../types/retail-r9';
+import type { DeliveryInfo, PosRx, RetailSettings } from '../types/retail-r9';
+import { readPharmaSettings } from '../lib/pharma-gate';
 import { num, round2 } from '../lib/invoice-calc';
 import { makeSuggester } from '../lib/suggest';
 import { addScannedLine, findByCode, findByShortCode } from '../lib/scan';
@@ -108,6 +109,7 @@ const TENDER_KEY: Record<MoneyTender, PosAction> = { Cash: 'cash', UPI: 'upi', C
 const GiftVoucherTender = lazy(() => import('../components/retail/GiftVoucherTender'));
 const RoomPicker = lazy(() => import('../components/hotel/FrontDesk').then((m) => ({ default: m.RoomPicker }))); // R7-B2 "Room" tender (hotel pack only)
 const PosRetailStrip = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.PosRetailStrip }))); // R9 (RT-A2/A3/A4)
+const RxStrip = lazy(() => import('../components/retail-r9/PharmacyDesk').then((m) => ({ default: m.RxStrip }))); // R9 (RT-B1/B2/B3) pharma switch only
 const PosApparel = lazy(() => import('../components/retail-r9/ApparelDesk').then((m) => ({ default: m.PosApparel }))); // R9 (RT-C1/C3)
 // R4-B3: the counter's branch (store price list). Inline labels, so the POS does not load the stores catalogue.
 const storeT = defineArea({ counter: 'This counter is branch', none: 'No branch' } as const, { counter: 'यह काउंटर इस शाखा का है', none: 'कोई शाखा नहीं' });
@@ -221,6 +223,8 @@ export function Pos() {
   const [imageFor, setImageFor] = useState<InvoiceRecord | null>(null); // R3-A5
   const [lastShare, setLastShare] = useState<InvoiceRecord | null>(null);
   const [delivery, setDelivery] = useState<DeliveryInfo | null>(null); // R9 (RT-A3)
+  const [rxPos, setRxPos] = useState<PosRx | null>(null); // R9 (RT-B1) prescription strip
+  const pharmaOn = useMemo(() => readPharmaSettings().enabled, []);
   /** The line the last scan / pick went to (Alt+Q), the quantity field last focused (Alt+W live weight). */
   const lastLine = useRef<string | null>(null);
   const focusedQty = useRef<string | null>(null);
@@ -254,7 +258,7 @@ export function Pos() {
   const promoted = promo.record ?? redeemed?.record ?? built;
   // 7U: a running bill-value offer applies after the price level / slab and the loyalty redemption.
   const offered = useMemo(() => applyBillOffer(promoted, data.pricing?.schemes ?? [], { retotalRecord: true }), [promoted, data.pricing]);
-  const record = useMemo(() => (agentId || delivery ? { ...offered, ...(agentId ? { agent_id: agentId } : {}), ...(delivery?.address.trim() ? { delivery } : {}) } : offered), [offered, agentId, delivery]);
+  const record = useMemo(() => (agentId || delivery || rxPos ? { ...offered, ...(agentId ? { agent_id: agentId } : {}), ...(delivery?.address.trim() ? { delivery } : {}), ...(rxPos?.rx ? { rx: rxPos.rx } : {}), ...(rxPos?.att?.length ? { attachments: rxPos.att } : {}) } : offered), [offered, agentId, delivery, rxPos]);
   // R9: retail checks (MRP guard, deliveries, short book) read once; the strip loads only when one is on.
   const retailRs = useMemo(() => getJson<RetailSettings | null>(`${DB_PREFIX}retail_settings`, null) ?? {}, []);
   const retailStrip = (!!retailRs.mrp_guard && retailRs.mrp_guard !== 'off') || !!retailRs.delivery?.enabled || !!retailRs.short_book?.enabled;
@@ -526,6 +530,7 @@ export function Pos() {
   const reset = () => {
     setItems([]);
     setDelivery(null); // R9 (RT-A3)
+    setRxPos(null); // R9 (RT-B1)
     setRedeemPts(0);
     setGvApplied([]);
     setParty(WALK_IN);
@@ -557,6 +562,7 @@ export function Pos() {
       setErrors([promoMany]);
       return;
     }
+    if (rxPos?.errors.length) return setErrors(rxPos.errors); // R9 (RT-B1): "Require prescription for H1 / X"
     // 8E (8.144): an "On account" amount must be what is left unpaid.
     if (onAccount > 0.004 && Math.abs(onAccount - summary.due) > 0.004) {
       setErrors([retailT('accountMismatch', { due: formatCurrency(summary.due) })]);
@@ -681,6 +687,20 @@ export function Pos() {
   };
 
   const drop = (id: string) => storeHeld(loadHeld().filter((c) => c.id !== id));
+  // R9 (RT-B1): Pharmacy → Refills "Bill now" opens `/pos?refill=<id>`: the refill is parked as a held cart and recalled.
+  useEffect(() => {
+    const id = params.get('refill');
+    if (!id) return;
+    const next = new URLSearchParams(params);
+    next.delete('refill');
+    setParams(next, { replace: true });
+    void import('../components/retail-r9/PharmacyDesk').then((m) => {
+      const cart = m.refillCartById(id);
+      const r = cart && holdCart(loadHeld(), cart);
+      if (cart && r?.ok && storeHeld(r.list)) recall(cart.id);
+      else if (cart) notify(posT('heldFull'), 'error');
+    });
+  }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── 8E: bills to browse, live weight, customer display ───── */
 
@@ -1070,6 +1090,7 @@ export function Pos() {
                 <PosDistExtras client={party.client} record={record} unpaid={summary.due} agentId={agentId} onAgent={setAgentId} />
               </Suspense>
               {retailStrip && <Suspense fallback={null}><PosRetailStrip record={record} query={query} delivery={delivery} onDelivery={setDelivery} onAddLine={(l) => setItems((prev) => [...prev.filter((x) => x.name !== 'Delivery charge'), l])} deliveryOn={!!retailRs.delivery?.enabled} shortBookOn={!!retailRs.short_book?.enabled} notify={notify} /></Suspense>}
+              {pharmaOn && <Suspense fallback={null}><RxStrip record={record} value={rxPos} onChange={setRxPos} /></Suspense>}
               {isPackOn(settings, 'apparel') && <Suspense fallback={null}><PosApparel record={record} setItems={setItems} /></Suspense>}
               {party.client ? null : (
                 <>

@@ -90,6 +90,8 @@ export interface YearEndInput {
    * whatever the agency pack's state.
    */
   agencyLots?: readonly { number: string; lot_no: string; principal: string }[];
+  /** R9 (RT-B2): bills of the year with Schedule H1 / X lines still inside the Drugs Rules retention (pharma features on). */
+  rxRetained?: { count: number; until: string };
 }
 
 const rs = (p: number) => `₹${(Math.abs(p) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -212,7 +214,7 @@ export function yearEndChecklist(input: YearEndInput): YearEndStep[] {
 
   /* 6. Lock */
   const locked = !!input.lockUntil && input.lockUntil >= end;
-  steps.push({ id: 'lock', status: locked ? 'done' : 'todo', facts: [locked ? `Books are locked up to ${input.lockUntil}.` : input.lockUntil ? `Locked only up to ${input.lockUntil}.` : 'The year is not locked.'] });
+  steps.push({ id: 'lock', status: locked ? 'done' : 'todo', facts: [locked ? `Books are locked up to ${input.lockUntil}.` : input.lockUntil ? `Locked only up to ${input.lockUntil}.` : 'The year is not locked.', ...(input.rxRetained ? [`${input.rxRetained.count} bill(s) with Schedule H1 / X drugs must be kept until ${input.rxRetained.until} (Drugs Rules retention, RT7) — do not delete them; verify with your drug inspector / CA.`] : [])] });
 
   /* 7. Carry forward */
   steps.push({ id: 'carry_forward', status: marks.carry_forward ? 'done' : 'todo', facts: ['Opening balances of the new year = closing balances of this year (the profit moves to Reserves & surplus).'] });
