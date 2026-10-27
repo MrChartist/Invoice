@@ -12,6 +12,8 @@
  * more than 180 days after the claim (`INCENTIVE_RULES`). Tax treatment (subsidy as income, Explanation 10 to Sec 43(1),
  * 2025 Act mapping) is help text only. Working paper — verify MF19 with your CA.
  */
+import './mf-registry';
+import { MF_TABLES } from './mf-shared';
 import { num, round2 } from '../invoice-calc';
 import { isoDay } from '../dates';
 import { ruleAt } from '../tax-rules';
@@ -21,9 +23,9 @@ import { generateId, getTable, setTable } from '../storage';
 import { withTablesRollback } from '../table-txn';
 import { A, chartOf, loadUserAccounts, saveUserAccount, type GroupId } from '../ledger/accounts';
 import { saveVoucher, type ManualVoucherLine } from '../ledger/vouchers';
-import { INCENTIVE_RULES } from './mf-d-rules';
+import { INCENTIVE_RULES } from '../mfg-rules';
 
-export const INCENTIVE_CLAIMS_TABLE = 'incentive_claims';
+export const INCENTIVE_CLAIMS_TABLE = MF_TABLES.incentiveClaims;
 export const GRANT_CLASS = 'Government grant';
 
 export type IncentiveScheme = 'pli' | 'state_capital' | 'interest_subvention' | 'power' | 'sgst_reimbursement' | 'freight' | 'other';

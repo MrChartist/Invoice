@@ -39,6 +39,7 @@ import '../retail/rt-registry'; // R9: retail tables' rights and audit labels (l
 import '../construction/cn-registry'; // R11: construction tables' rights and audit labels (lazy registration)
 import '../services/sv-registry'; // R10: service tables' rights and audit labels (lazy registration)
 import '../agri/ag-registry'; // R12: agri tables' rights and audit labels (lazy registration)
+import '../mfg/mf-registry'; // R13: manufacturing tables' rights and audit labels (lazy registration)
 import { syncUrdPaid, urdLeft } from '../retail/rt-doc-hooks'; // QA10 R7: URD vouchers settled by exchange
 
 export { BIN_TABLE };
@@ -259,7 +260,9 @@ registerRestoreHook('vouchers', (row, e, live, bin) => {
     return pair ? { companions: [pair] } : { refuse: `${what(e)} is the journal of a ${cls === RA_CLASS ? 'GST TDS / labour cess deduction' : 'finance transfer'} whose receipt is gone for good. Record it again from the bill.` };
   }
   const owner = OWNED_VOUCHERS.find((o) => o.classes.includes(cls));
-  if (!owner) return null;
+  // QA14 Q2: the class is free text in the voucher editor — a hand-entered "Loan" / "Donation" journal of a company that
+  // never used that module (no row live or binned in its tables) is the user's own and restores as any voucher.
+  if (!owner || !owner.tables.some((t) => live(t).length || bin.some((b) => b.table === t))) return null;
   // Restoring repairs a stray delete only while the module still counts the voucher as posted.
   if (!owner.tables.some((t) => mentions(live(t), e.row_id))) return { refuse: `${what(e)} (${cls}) was undone where it was posted, so restoring it here would post it twice. Instead, ${owner.redo}.` };
   // Its bill-wise receipt rows (a deposit adjustment) come back with it.
@@ -372,6 +375,10 @@ registerRestoreHook('transactions', (row, e, live, bin) => {
   return isObj(bill) && isObj(bill.ag) && str(bill.ag.cycle_id) && !mentions(live('farmer_cycles'), e.row_id) ? { refuse: AG_UNDONE } : null;
 });
 registerRestoreHook('farmer_cycles', (row, e, live) => (str(row.source) === 'milk' && live('farmer_cycles').some((c) => str(c?.id) !== e.row_id && str(c?.source) === 'milk' && str(c?.centre_id) === str(row.centre_id) && str(c?.period_from) <= str(row.period_to) && str(c?.period_to) >= str(row.period_from)) ? { refuse: 'A milk bill for this centre and period was made again since; restoring this one would pay the milk twice.' } : null));
+// R13 (MF-A): a job card comes back only while its order lives and no new card was opened for the same operation; a
+// default routing only while the item has no other default.
+registerRestoreHook('job_cards', (row, e, live) => (!isLive(live, 'production_orders', str(row.order_id)) ? { refuse: 'The production order of this job card is gone.' } : live('job_cards').some((c) => str(c?.id) !== e.row_id && str(c?.order_id) === str(row.order_id) && str(c?.op_id) === str(row.op_id)) ? { refuse: 'A new job card was opened for this operation since; report the entries on it.' } : null));
+registerRestoreHook('routings', (row, e, live) => (row.is_default && live('routings').some((r) => str(r?.id) !== e.row_id && str(r?.item_id) === str(row.item_id) && r?.is_default) ? { refuse: 'This item has another default routing now: restore after unmarking it, or make this one again.' } : null));
 registerRestoreHook('realty_units', (row, _e, live) => (isLive(live, 'realty_projects', str(row.project_id)) ? null : { refuse: 'The project of this unit is gone. Restore the project first.' }));
 // R11 (CN-D): a sub-contractor bill made from a measurement comes back only while that measurement still names it
 // (cancelling it removed the bill and its deductions journal — measure again).

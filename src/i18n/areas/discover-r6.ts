@@ -105,6 +105,7 @@ export const discoverT = defineArea(
     'adv.construction': 'Construction profile', // R11 (CN-A1)
     'adv.serviceProfile': 'Service profile', // R10 (SV-A1)
     'adv.agriProfile': 'Agriculture profile', // R12 (AG-A1)
+    'adv.mfgProfile': 'Manufacturing profile', // R13 (MF-A1)
     'awho.batches': 'Lots with expiry (set per stock item)',
     'awho.serials': 'Goods sold by serial / IMEI (per item)',
     'awho.godowns': 'Stock in more than one place',
@@ -129,6 +130,7 @@ export const discoverT = defineArea(
     'awho.construction': 'Contractors: civil / EPC, sub-contractor, builder, interiors, MEP, labour — RA bill paper and Works views',
     'awho.serviceProfile': 'Clinics, labs, salons, gyms, coaching, workshops — appointments, staff commission, service tax classes',
     'awho.agriProfile': 'FPOs, co-operatives, dairies, mills, cold storages, input dealers, farms — farmers, produce vouchers, payment cycles',
+    'awho.mfgProfile': 'Job shops, garment units, moulders, presses, food units — work centres, routings, job cards, capacity',
   } as const,
   {
     learnMore: 'और जानें',
@@ -230,6 +232,7 @@ export const discoverT = defineArea(
     'adv.construction': 'निर्माण प्रोफ़ाइल',
     'adv.serviceProfile': 'सेवा प्रोफ़ाइल',
     'adv.agriProfile': 'कृषि प्रोफ़ाइल',
+    'adv.mfgProfile': 'मैन्युफैक्चरिंग प्रोफ़ाइल',
     'awho.batches': 'एक्सपायरी वाले लॉट (हर स्टॉक आइटम पर)',
     'awho.serials': 'सीरियल / IMEI से बिक्री (हर आइटम पर)',
     'awho.godowns': 'एक से ज़्यादा जगह स्टॉक',
@@ -254,5 +257,6 @@ export const discoverT = defineArea(
     'awho.construction': 'ठेकेदार: सिविल / EPC, उप-ठेकेदार, बिल्डर, इंटीरियर, MEP, लेबर — रनिंग बिल पेपर और वर्क्स व्यू',
     'awho.serviceProfile': 'क्लिनिक, लैब, सैलून, जिम, कोचिंग, वर्कशॉप — अपॉइंटमेंट, स्टाफ कमीशन, सेवा कर वर्ग',
     'awho.agriProfile': 'FPO, सहकारी, डेयरी, मिल, शीतगृह, खाद-बीज विक्रेता, फ़ार्म — किसान, उपज वाउचर, भुगतान चक्र',
+    'awho.mfgProfile': 'जॉब शॉप, गारमेंट इकाई, मोल्डर, प्रेस, खाद्य इकाई — कार्य केंद्र, रूटिंग, जॉब कार्ड, क्षमता',
   },
 );

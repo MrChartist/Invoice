@@ -1,18 +1,25 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Factory } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { cn, todayInput } from '../../lib/utils';
 import { num } from '../../lib/invoice-calc';
 import { buildOutputVoucher, defaultOutputBatch, loadOrderDocs, orderProgress, productionOrdersDb } from '../../lib/production/orders';
 import { ensureQcGodown } from '../../lib/production/qc';
-import type { Bom, VoucherStockLine } from '../../types/manufacturing';
+import type { Bom, VoucherOutputLine, VoucherStockLine } from '../../types/manufacturing';
 import type { ProductionOrder } from '../../types/production-r4';
 import { pT } from '../../i18n/areas/production-r4';
+import { defineArea } from '../../i18n/area';
 import { qtyText, type MfgContext } from '../manufacturing/context';
 import { parseSerials } from '../../lib/stock-tracking';
 import { foodOutputDefaults } from '../../lib/mfg/mf-food';
 import controls from '../../styles/controls.module.css';
 import mfg from '../manufacturing/manufacturing.module.css';
+
+// R13 (MF-A3): job-card figures (inline; the job-card module itself loads only for an order with a routing).
+const jcT = defineArea(
+  { ready: 'Job cards: last operation good {ready}; scrap {kg} kg goes into this journal.' } as const,
+  { ready: 'जॉब कार्ड: अंतिम ऑपरेशन ठीक {ready}; स्क्रैप {kg} किलो इस जर्नल में जाएगा।' },
+);
 
 /**
  * Report output (R4-A1): a normal Manufacturing Journal tagged with the order. Components are consumed from the shop
@@ -34,13 +41,22 @@ export function OutputDialog({ ctx, order, boms, onClose }: { ctx: MfgContext; o
   const draftFor = (q: number) => buildOutputVoucher(order, progress, bom, { qty: q, date });
   const [components, setComponents] = useState<VoucherStockLine[]>(() => draftFor(num(qty)).components);
   const [error, setError] = useState('');
+  // R13 (MF-A3): an order released with a routing reports its job cards' scrap kg in this journal (once) and offers the
+  // last operation's good units; the job-card module loads only for such an order.
+  const [jc, setJc] = useState<{ scrapLines: VoucherOutputLine[]; ready: number } | null>(null);
+  useEffect(() => {
+    if (!order.mf?.ops?.length) return;
+    let live = true;
+    void import('../../lib/mfg/mf-jobcards').then((m) => live && setJc(m.outputExtras(order, ctx.items)), () => undefined);
+    return () => { live = false; };
+  }, [order, ctx.items]);
   const name = (id: string) => ctx.items.find((i) => i.id === id)?.name ?? '?';
 
   const submit = () => {
     try {
       const godown = order.output_to_qc ? ensureQcGodown().id : undefined;
       const serials = parseSerials(serialText);
-      const base = buildOutputVoucher(order, progress, bom, { qty: num(qty), date, batch_no: batch, expiry_date: expiry || undefined, serials: serials.length ? serials : undefined, godown_id: godown });
+      const base = buildOutputVoucher(order, progress, bom, { qty: num(qty), date, batch_no: batch, expiry_date: expiry || undefined, serials: serials.length ? serials : undefined, godown_id: godown }, undefined, jc?.scrapLines.length ? { scrapLines: jc.scrapLines } : undefined);
       const v = productionOrdersDb.reportOutput(order.id, { ...base, ...(base.batch_no && food.mfg_date ? { mfg_date: food.mfg_date } : {}), components: components.filter((c) => num(c.qty) > 0), costs: num(labour) > 0 ? [{ id: 'labour', label: pT('additionalCosts'), mode: 'amount', value: num(labour) }] : [] }, ctx.items, ctx.inputs);
       onClose();
       ctx.changed(pT('outputSaved', { number: v.number, qty: qtyText(v.qty) }));
@@ -53,6 +69,7 @@ export function OutputDialog({ ctx, order, boms, onClose }: { ctx: MfgContext; o
     <Modal open onClose={onClose} size="lg" title={`${pT('reportOutput')} · ${order.number}`} subtitle={pT('outputHint', { done: qtyText(progress.output), planned: qtyText(order.planned_qty) })}
       footer={<><button type="button" className={controls.btnOutline} onClick={onClose}>{pT('cancel')}</button><button type="button" className={controls.btnPrimary} onClick={submit} data-testid="wo-output-save"><Factory size={16} aria-hidden="true" /> {pT('save')}</button></>}>
       <div className={mfg.form}>
+        {jc && <p className={controls.hint} data-mf-output>{jcT('ready', { ready: qtyText(jc.ready), kg: qtyText(jc.scrapLines.reduce((t, l) => t + num(l.qty), 0)) })}</p>}
         <div className={controls.row3}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="out-date">{pT('date')}</label>

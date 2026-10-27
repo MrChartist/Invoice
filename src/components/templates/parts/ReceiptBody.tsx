@@ -5,7 +5,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
-import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText, staffText, svDocTitle, svRegText, visitText } from '../paper-helpers';
+import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText, staffText, svDocTitle, svRegText, visitText, mfSellerText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { CustomFieldsBlock, ItemCustomLine } from './CustomFieldsBlock';
 import { TransportBlock } from './TransportBlock';
@@ -53,6 +53,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
           {sender.drug_licence && <><br />DL No.: {sender.drug_licence}</>}
           {sender.pharmacist && <><br />{pharmacistText(sender)}</>}
           {sender.sv_regs && <><br />{svRegText(sender)}</>}
+          {mfSellerText(sender) && <><br />{mfSellerText(sender)}</>}
         </div>
       </div>
 

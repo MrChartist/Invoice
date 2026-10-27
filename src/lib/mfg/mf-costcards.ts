@@ -13,13 +13,15 @@
  * base units with `unitFactor`). Saved versions: the card in force on a day is the latest `effective_from` ≤ day.
  * Money through `round2`. Working paper — verify with your CA.
  */
+import './mf-registry';
+import { MF_TABLES } from './mf-shared';
 import { round2 } from '../invoice-calc';
 import { isoDay } from '../dates';
 import { requireAccess } from '../access';
 import { generateId, getTable, setTable } from '../storage';
 import { isVoidStatus, readPurchase, readPurchaseLines } from '../purchase-normalize';
 
-export const COST_CARDS_TABLE = 'cost_cards';
+export const COST_CARDS_TABLE = MF_TABLES.costCards;
 
 const n = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 

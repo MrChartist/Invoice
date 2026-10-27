@@ -18,6 +18,9 @@
  */
 import type { InvoiceRecord } from '../../types/invoice';
 import type { BoeDuty } from '../../types/trade-r4';
+import type { MfExportAaSnap } from '../../types/mfg-r13';
+import './mf-registry';
+import { MF_TABLES } from './mf-shared';
 import { num, round2 } from '../invoice-calc';
 import { isoDay, shiftDay } from '../dates';
 import { ruleAt } from '../tax-rules';
@@ -27,9 +30,9 @@ import { assertUnlocked } from '../period-lock';
 import { generateId, getTable, setTable } from '../storage';
 import { isRevenueDoc } from '../stats';
 import { isVoidStatus, readPurchase, readPurchaseLines } from '../purchase-normalize';
-import { AA_RULES, EPCG_RULES } from './mf-d-rules';
+import { AA_RULES, EPCG_RULES } from '../mfg-rules';
 
-export const AUTHORISATIONS_TABLE = 'export_authorisations';
+export const AUTHORISATIONS_TABLE = MF_TABLES.authorisations;
 
 export type AuthorisationKind = 'aa' | 'epcg';
 export type AuthorisationStatus = 'open' | 'eodc_applied' | 'redeemed' | 'lapsed';
@@ -58,13 +61,8 @@ export interface ExportAuthorisation {
   updated_at?: string;
 }
 
-/** The `mf` snapshot an export invoice carries under an authorisation (A5 prints it). */
-export interface ExportAaSnapshot {
-  authorisation_id: string;
-  kind: AuthorisationKind;
-  number: string;
-  sion_ref?: string;
-}
+/** The `mf.export_aa` snapshot an export invoice carries under an authorisation (A5 prints "AA no." / "SION"). */
+export type ExportAaSnapshot = MfExportAaSnap;
 
 const addMonths = (day: string, months: number) => {
   const y = +day.slice(0, 4);
@@ -270,6 +268,6 @@ export function withExportAa(mf: Record<string, unknown> | undefined, a: ExportA
     return Object.keys(next).length ? next : undefined;
   }
   next.kind = 'export_aa';
-  next.export_aa = { authorisation_id: a.id, kind: a.kind, number: a.number, ...(a.sion_ref ? { sion_ref: a.sion_ref } : {}) } satisfies ExportAaSnapshot;
+  next.export_aa = { authorisation_id: a.id, aa_no: a.kind === 'epcg' ? `EPCG ${a.number}` : a.number, ...(a.sion_ref ? { sion: a.sion_ref } : {}) } satisfies ExportAaSnapshot;
   return next;
 }

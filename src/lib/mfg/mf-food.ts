@@ -12,7 +12,8 @@
  */
 import { shiftDay } from '../dates';
 import { kgPerUnit } from './mf-costcards';
-import { foodClassRate, type FoodClassRate } from './mf-d-rules';
+import { ruleAt } from '../tax-rules';
+import { FOOD_CLASS_RULES, type FoodClass, type FoodClassRate } from '../mfg-rules';
 
 export interface FoodBatch {
   batch_no?: string;
@@ -86,6 +87,15 @@ export function fssaiLicences(licences: readonly { kind: string; number: string;
     const days = l.valid_to ? Math.round((Date.UTC(+l.valid_to.slice(0, 4), +l.valid_to.slice(5, 7) - 1, +l.valid_to.slice(8, 10)) - Date.UTC(+today.slice(0, 4), +today.slice(5, 7) - 1, +today.slice(8, 10))) / 86400000) : null;
     return { number: l.number.trim(), valid_to: l.valid_to, days, expired: days !== null && days < 0, soon: days !== null && days >= 0 && days <= 60 };
   });
+}
+
+/** The food classes, in list order. */
+export const FOOD_CLASSES = Object.keys(FOOD_CLASS_RULES) as FoodClass[];
+
+/** The class rate on `date` (undefined for an unknown class). */
+export function foodClassRate(cls: string | undefined, date?: string): FoodClassRate | undefined {
+  const rows = cls ? FOOD_CLASS_RULES[cls as FoodClass] : undefined;
+  return rows ? ruleAt(rows, date) : undefined;
 }
 
 /** Class rate suggestion and the "rate differs" notice ('' when the typed rate matches or there is no class). */

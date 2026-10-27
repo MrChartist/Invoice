@@ -12,7 +12,7 @@ import { round2 } from '../invoice-calc';
 import { ruleAt } from '../tax-rules';
 import { shiftDay } from '../dates';
 import { daysBetween, msmeBills, traderExcluded } from '../msme';
-import { MSME_FORM1_RULES } from './mf-d-rules';
+import { MSME_FORM1_RULES } from '../mfg-rules';
 
 export interface Form1Half {
   /** 'H1-2026' = Apr–Sep 2026; 'H2-2026' = Oct 2026 – Mar 2027. */

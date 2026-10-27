@@ -497,6 +497,8 @@ const RECORD_TABLES = [
   'weighbridge_slips', 'cmr_agreements',
   // R12-D: cold-storage lots (CSR / GPO), rent plans, loans against stored produce (LAS), members' share ledger (SHC)
   'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares',
+  // R13-A: work centres, routings, job cards (JCD/FY…, one row per order per operation)
+  'work_centres', 'routings', 'job_cards',
   // R13-D: food batch cost cards (versions by effective date), AA / EPCG export authorisations, incentive claims
   'cost_cards', 'export_authorisations', 'incentive_claims',
 ];
@@ -593,6 +595,8 @@ const ID_TABLES = new Set([
   'weighbridge_slips', 'cmr_agreements',
   // R12-D: cold-storage lots (CSR / GPO), rent plans, loans against stored produce (LAS), members' share ledger (SHC)
   'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares',
+  // R13-A: work centres, routings, job cards (JCD/FY…, one row per order per operation)
+  'work_centres', 'routings', 'job_cards',
   // R13-D: food batch cost cards (versions by effective date), AA / EPCG export authorisations, incentive claims
   'cost_cards', 'export_authorisations', 'incentive_claims',
 ]);

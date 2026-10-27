@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Save } from 'lucide-react';
 import { loadAttendance, loadAttendanceTypes, loadEmployees, saveAttendance } from '../../lib/payroll/store';
 import { daysEmployed } from '../../lib/payroll/compute';
@@ -8,6 +8,8 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
 import { gridKeyDown, parseAmount } from './shared';
+import { impliedPacks } from '../../lib/shop-mode';
+import { localDb } from '../../lib/localDb';
 
 interface Props {
   month: string;
@@ -17,6 +19,10 @@ interface Props {
 }
 
 type Cells = Record<string, Record<string, string>>;
+
+// R13 (MF-A3): production units from job cards (lazy row, shop-floor pack only).
+const PayrollUnitsRow = lazy(() => import('../mfg/PayrollUnitsRow'));
+const shopfloorOn = () => impliedPacks(localDb.settings.get()).includes('shopfloor');
 
 export function AttendanceTab({ month, version, refresh, notify }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -68,6 +74,19 @@ export function AttendanceTab({ month, version, refresh, notify }: Props) {
           <Save size={15} /> {pT('att.save')}
         </button>
       </div>
+      {employees.length > 0 && shopfloorOn() && (
+        <Suspense fallback={null}>
+          <PayrollUnitsRow month={month} cols={types.map((t) => ({ id: t.id, label: `${t.name} (${t.unit})` }))} onUnits={(col, units, note) => {
+            setEdits((p) => {
+              const base = p.month === month ? p.cells : {};
+              const next = { ...base };
+              for (const e of employees) if (units[e.id] !== undefined) next[e.id] = { ...(cells[e.id] ?? {}), ...(next[e.id] ?? {}), [col]: String(units[e.id]) };
+              return { month, cells: next };
+            });
+            notify(note);
+          }} />
+        </Suspense>
+      )}
       {employees.length === 0 ? (
         <div className={surface.cardBody}><p className={styles.note}>{pT('att.none')}</p></div>
       ) : (

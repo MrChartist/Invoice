@@ -32,6 +32,17 @@ export type BooksTab = (typeof BOOKS_TABS)[number]['id'];
 /* ── Manufacturing ── */
 export type MfgTab = 'boms' | 'mfg' | 'journal' | 'physical' | 'jobwork' | 'rejections' | 'plan' | 'reorder' | 'reports' | 'orders' | 'costing' | 'trace' | 'qc' | 'landed';
 export const MFG_TABS: readonly MfgTab[] = ['boms', 'mfg', 'orders', 'journal', 'physical', 'jobwork', 'rejections', 'plan', 'costing', 'trace', 'qc', 'landed', 'reorder', 'reports'];
+/** R13 (MF-A1): manufacturing desks, one tab per pack (views in `&view=`; packages never edit these rows). */
+export const MFG_PACK_TABS = [
+  { id: 'floor', pack: 'shopfloor' }, // MF-A: views centres / routings / cards / load / wip (wip: MF-D)
+  { id: 'shop', pack: 'fabrication' }, // MF-B: views drawings / quotes / inspection / scrap
+  { id: 'moulding', pack: 'plastics' }, // MF-B: views runs / balance / epr
+  { id: 'press', pack: 'press' }, // MF-B: views estimates / tickets / paper
+  { id: 'garments', pack: 'garments' }, // MF-C: views styles / cutplans / bundles / cmt / karigars
+  { id: 'food', pack: 'foodmfg' }, // MF-D: views costcards / shelflife / schemes
+  { id: 'statutory', pack: 'shopfloor' }, // MF-D: views msme / incentives / authorisations / inventories
+] as const;
+export type MfgPackTab = (typeof MFG_PACK_TABS)[number]['id'];
 /* ── Payroll ── */
 export const PAYROLL_TABS = ['employees', 'heads', 'structures', 'attendance', 'leave', 'run', 'arrears', 'extras', 'loans', 'payments', 'fnf', 'reports', 'more'] as const;
 export type PayrollTab = (typeof PAYROLL_TABS)[number];

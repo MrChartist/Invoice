@@ -14,7 +14,7 @@
  * Amounts in integer PAISE (the notes' unit). Pure. Working paper — verify MF25 (sub-heads) with your CA.
  */
 import { ruleAt } from '../tax-rules';
-import { INVENTORY_HEADS, type InvClass } from './mf-d-rules';
+import { INVENTORY_HEADS, type InvClass } from '../mfg-rules';
 
 export type { InvClass };
 export const INV_CLASSES: readonly InvClass[] = ['raw', 'wip', 'finished', 'traded', 'stores', 'packing', 'tools', 'scrap'];
