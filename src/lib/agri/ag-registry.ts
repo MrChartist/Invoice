@@ -17,7 +17,11 @@ export const AG_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   farm_batches: 'doc.create',
   quality_cut_tables: 'master.edit',
   farmer_cycles: 'doc.create',
-  // AG-B: milk_rate_charts (master.edit), milk_shifts, milk_dispatches, milk_cards (doc.create)
+  // AG-B: rate charts are masters; shifts, dispatches and milk cards are documents
+  milk_rate_charts: 'master.edit',
+  milk_shifts: 'doc.create',
+  milk_dispatches: 'doc.create',
+  milk_cards: 'doc.create',
   // AG-C: weighbridge_slips, cmr_agreements (doc.create)
   // AG-D: cold_lots (doc.create), cold_rent_plans (master.edit), agri_loans, member_shares (books.edit)
 };
@@ -29,6 +33,10 @@ export const AG_WATCHED: Readonly<Record<string, WatchedTable>> = {
   quality_cut_tables: { entity: 'item', label: 'Quality-cut table' },
   farmer_cycles: { entity: 'invoice', label: 'Farmer cycle bill' },
   // AG-B
+  milk_rate_charts: { entity: 'item', label: 'Milk rate chart' },
+  milk_shifts: { entity: 'stock_transfer', label: 'Milk collection shift' },
+  milk_dispatches: { entity: 'stock_transfer', label: 'Milk dispatch' },
+  milk_cards: { entity: 'invoice', label: 'Milk card' },
   // AG-C
   // AG-D
 };

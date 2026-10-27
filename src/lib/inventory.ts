@@ -545,6 +545,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     // expenses (rent, fees ...) never move stock.
     const bill = readPurchase(p);
     if (!bill || isVoidStatus(bill.status) || bill.isExpense) continue;
+    if ((p as { ag?: { stock_by_shift?: boolean } }).ag?.stock_by_shift) continue; // AG-B2: milk entered stock per closed shift (AG28)
     for (const line of readPurchaseLines(p)) {
       // WP-8: the picked stock item (`item_id`) first, name + HSN for older lines; quantity in base units.
       const byItemId = line.itemId ? byId.get(line.itemId) : undefined;

@@ -10,7 +10,11 @@ export const AG_TABLES = {
   batches: 'farm_batches',
   quality: 'quality_cut_tables',
   cycles: 'farmer_cycles',
-  // AG-B: milk_rate_charts, milk_shifts, milk_dispatches, milk_cards
+  // AG-B: fat / SNF rate charts, shift collection (one row per centre per shift), dispatches (MDS/FY…), milk cards
+  rateCharts: 'milk_rate_charts',
+  shifts: 'milk_shifts',
+  dispatches: 'milk_dispatches',
+  milkCards: 'milk_cards',
   // AG-C: weighbridge_slips, cmr_agreements
   // AG-D: cold_lots, cold_rent_plans, agri_loans, member_shares
 } as const;
@@ -24,6 +28,7 @@ export const AG_OBJECTS = {
 export const AG_SERIES = {
   vouchers: 'FPV', // AG-A3 farmer purchase vouchers (on `purchases`)
   cycles: 'CYB', // AG-A4 pooled cycle bills (on `purchases` and `farmer_cycles`)
+  dispatches: 'MDS', // AG-B4 milk dispatches
 } as const;
 /** Series reserved for AG-B … AG-D (one commit, PRD §5; each package moves its prefix into `AG_SERIES`). */
 export const AG_RESERVED_SERIES = ['WBS', 'MDS', 'CMR', 'CSR', 'GPO', 'LAS', 'SHC'] as const;
@@ -35,4 +40,8 @@ export const AG_PACKS = ['agri', 'dairy', 'mill', 'coldstore', 'agri_inputs', 'f
 export const AG_DATED: Readonly<Record<string, string>> = {
   farm_batches: 'start',
   farmer_cycles: 'period_to',
+  // AG-B
+  milk_rate_charts: 'effective_from',
+  milk_shifts: 'date',
+  milk_dispatches: 'date',
 };
