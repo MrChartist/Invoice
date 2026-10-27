@@ -35,9 +35,9 @@ export const foodOf = (order: unknown): FoodBatch | undefined => (order as { mf?
  * Output batch defaults for an order of `item` reported on `date`: the order's food batch number and packed date (else
  * the output date), and expiry from the typed best-before / use-by, else packed + shelf life (order, else item).
  */
-export function foodOutputDefaults(order: unknown, item: { shelf_life_days?: number } | undefined, date: string): { batch_no?: string; mfg_date?: string; expiry_date?: string } {
+export function foodOutputDefaults(order: unknown, item: object | undefined, date: string): { batch_no?: string; mfg_date?: string; expiry_date?: string } {
   const f = foodOf(order);
-  const shelf = n(f?.shelf_life_days) || n(item?.shelf_life_days);
+  const shelf = n(f?.shelf_life_days) || n((item as { shelf_life_days?: number } | undefined)?.shelf_life_days);
   if (!f && !(shelf > 0)) return {};
   const packed = f?.packed_on || date;
   const expiry = f?.use_by || f?.best_before || bestBefore(packed, shelf);

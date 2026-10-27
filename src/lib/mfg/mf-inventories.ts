@@ -105,17 +105,9 @@ export function inventorySplit(positions: readonly PositionLike[], date: string,
   return { rows, total: rows.reduce((s, r) => s + r.value, 0), memoConversion: Math.round(memoConversion) };
 }
 
-/**
- * The note's rows (label, this year, previous year) — only heads with a value in either year. `bsCur` / `bsPrev` = the
- * balance-sheet Inventories line: a difference (an Inventories ledger balance, typed figures) is shown as its own row so
- * the note still totals to the balance sheet.
- */
-export function noteRows(cur: InventorySplit, prev: InventorySplit, bsCur: number, bsPrev: number): { label: string; cur: number; prev: number }[] {
-  const rows = cur.rows.map((r, i) => ({ label: r.label, cur: r.value, prev: prev.rows[i]?.value ?? 0 })).filter((r) => r.cur || r.prev);
-  const dc = bsCur - cur.total;
-  const dp = bsPrev - prev.total;
-  if (dc || dp) rows.push({ label: 'Other inventories (ledger balances / typed closing stock)', cur: dc, prev: dp });
-  return rows;
+/** The note's rows (label, this year, previous year): only heads with a value in either year (`inventoryNote` adds the rest). */
+export function noteRows(cur: InventorySplit, prev: InventorySplit): { label: string; cur: number; prev: number }[] {
+  return cur.rows.map((r, i) => ({ label: r.label, cur: r.value, prev: prev.rows[i]?.value ?? 0 })).filter((r) => r.cur || r.prev);
 }
 
 /* ── Year-end WIP statement ───────────────────────────────────── */

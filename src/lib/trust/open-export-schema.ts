@@ -253,6 +253,10 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   cold_rent_plans: 'Storage rent plans: per bag / quintal, per season / month or lump sum, handling charges, exempt or taxable class, billing time (R12).',
   agri_loans: 'Loans against stored produce (LAS/FY…): borrower, lots under lien, principal, rate, repayments split interest / principal (R12).',
   member_shares: 'Members\' share ledger: allotments with certificates (SHC/FY…), transfers, surrenders, forfeitures (R12).',
+  // R13-D
+  cost_cards: 'Food batch cost cards: recipe (from the BOM), output kg, yield, conversion ₹/kg, overhead %, packs with packing material and prices; versions by effective date (R13).',
+  export_authorisations: 'Advance Authorisation / EPCG register: number, dates, import and export items, norm (SION / self / committee), EO due / extended, duty saved, EO multiple, status, EODC ref (R13).',
+  incentive_claims: 'Incentive and subsidy claims (PLI, state capital subsidy, interest subvention …): period, base, rate, claimed, approved, received, income / capital, reasonable-assurance date and journals (R13).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';

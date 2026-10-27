@@ -116,6 +116,8 @@ export interface ExportIncentive {
   transferred?: { date: string; value: number; amount: number; voucher_id?: string };
   /** IGST refund (shipping-bill route): portal status as typed. */
   refund_status?: string;
+  /** MF-D4 (MF18): RoDTEP schedule — Appendix 4R (DTA) or 4RE (exports under AA / EOU / SEZ). Absent = 4R. */
+  appendix?: '4R' | '4RE';
   /** Journals posted for this row (claim, credit, utilisation, transfer). */
   voucher_ids: string[];
   /** The claim journal, once posted. */

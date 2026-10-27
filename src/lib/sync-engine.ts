@@ -440,6 +440,10 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}cold_lots`]: 'date_in',
   [`${DB_PREFIX}agri_loans`]: 'date',
   [`${DB_PREFIX}member_shares`]: 'date',
+  // R13-D: cost cards (by effective date), export authorisations (by issue date), incentive claims (by period end)
+  [`${DB_PREFIX}cost_cards`]: 'effective_from',
+  [`${DB_PREFIX}export_authorisations`]: 'date',
+  [`${DB_PREFIX}incentive_claims`]: 'period_to',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
