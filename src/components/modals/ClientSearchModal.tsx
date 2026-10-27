@@ -24,12 +24,12 @@ export function ClientSearchModal({ isOpen, onClose }: Props) {
   const setClient = useInvoiceStore((s) => s.setClient);
   const [query, setQuery] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
-  const [clinic, setClinic] = useState(false);
+  // SV-B: UHID / phone search while the clinic pack is on (read when the picker opens).
+  const clinic = useMemo(() => isOpen && isPackOn(localDb.settings.get(), 'clinic'), [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
       setClients(localDb.clients.getAll());
-      setClinic(isPackOn(localDb.settings.get(), 'clinic'));
       setQuery('');
     }
   }, [isOpen]);

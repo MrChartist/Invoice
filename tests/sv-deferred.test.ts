@@ -104,7 +104,7 @@ test('SV-B: UHID / phone search in the general client picker, only with the clin
   assert.equal(patientMatch(p, 'meena'), true);
   assert.deepEqual(findPatients([p, { name: 'Other' } as never], '0007').length, 1, 'the clinic desk uses the same match');
   const modal = src('components/modals/ClientSearchModal.tsx');
-  assert.match(modal, /setClinic\(isPackOn\(localDb\.settings\.get\(\), 'clinic'\)\)/);
+  assert.match(modal, /isOpen && isPackOn\(localDb\.settings\.get\(\), 'clinic'\)/);
   assert.match(modal, /\|\| \(clinic && patientMatch\(c, q\)\)/);
 });
 
