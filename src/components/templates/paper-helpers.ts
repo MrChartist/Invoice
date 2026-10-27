@@ -147,3 +147,14 @@ export function svDocTitle(inv: Pick<InvoiceRecord, 'doc_type' | 'client' | 'ite
   const items = (inv.items ?? []).filter((i) => i && (Number(i.rate) || Number(i.quantity)));
   return items.some((i) => Number(i.tax_rate) > 0) && items.some((i) => Number(i.tax_rate) === 0) ? 'Invoice-cum-Bill of Supply' : '';
 }
+
+/** R10 (SV-B1): "UHID … · Dr name (Reg. no. …) · Token n" under the bill-to, from the record snapshot `sv.visit`; '' otherwise. */
+export function visitText(inv: Pick<InvoiceRecord, 'sv'>): string {
+  const v = inv.sv?.visit;
+  return v ? [v.uhid && `UHID ${v.uhid}`, v.doctor_name && `${v.doctor_name}${v.doctor_reg ? ` (Reg. no. ${v.doctor_reg})` : ''}`, v.token && `Token ${v.token}`].filter(Boolean).join(' · ') : '';
+}
+/** R10 (SV-B1): clinic registrations from the sender snapshot (CEA / state, council, NABL, PCPNDT); '' when none. */
+export function svRegText(sender: Pick<SenderProfile, 'sv_regs'>): string {
+  const r = sender.sv_regs;
+  return r ? [r.cea && `Reg. ${r.cea}`, r.council && `Council reg. ${r.council}`, r.nabl && `NABL ${r.nabl}`, r.pcpndt && `PCPNDT ${r.pcpndt}`].filter(Boolean).join(' · ') : '';
+}

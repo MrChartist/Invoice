@@ -67,6 +67,32 @@ export const COMPOSITION_SERVICE_NOTE_RULES: readonly SvRule<{ composition: numb
 // HOSPITAL_ROOM_RULES (room-charge threshold, ICU kinds), HEALTH_CLASS_RULES, REFERRAL_CAUTION_RULES — SV3, SV4, SV8.
 export interface HospitalRoomRule { threshold: number; rate: number; sac: string; exemptKinds: readonly string[] }
 
+const ICU_KINDS = ['icu', 'ccu', 'iccu', 'nicu'] as const;
+/** SV3: a non-ICU room charging more than `threshold` a day per patient → `rate` % without ITC (null = always exempt). */
+export const HOSPITAL_ROOM_RULES: readonly SvRule<HospitalRoomRule | null>[] = [
+  { from: '2017-07-01', value: null, source: 'N 12/2017-CT(R) entry 74: health care services by a clinical establishment exempt (room included)', verified: false },
+  { from: '2022-07-18', value: { threshold: 5000, rate: 5, sac: '9993', exemptKinds: ICU_KINDS }, source: 'N 03/2022 + 04/2022-CT(R): room charges above ₹5,000 per day per patient (other than ICU / CCU / ICCU / NICU) 5% without ITC (SV3, secondary)', verified: false },
+];
+
+/** SV1 / SV4: SAC of a consultation and the composite treatment (medicines, consumables, implants, food on admission). */
+export const HEALTH_CLASS_RULES: readonly SvRule<{ consultSac: string; compositeExempt: boolean }>[] = [
+  { from: '2017-07-01', value: { consultSac: '999312', compositeExempt: true }, source: 'SAC 999312 medical services; Circular 32/06/2018-GST para 5: in-patient medicines / food part of the composite health care supply — as recalled (SV1, SV4)', verified: false },
+];
+
+/** SV8: the permanent caution on referral payments to doctors. */
+export const REFERRAL_CAUTION_RULES: readonly SvRule<{ ledger: string; caution: string; benefitLimit: number }>[] = [
+  {
+    from: '2022-02-22',
+    value: {
+      ledger: 'Referral fees — disallowable (Sec 37)',
+      caution: 'Payments or gifts to doctors for referrals are prohibited for doctors (IMC / NMC regulations) and are disallowed for tax (Sec 37(1) Expl. 1; Apex Laboratories, SC 2022). Verify with your CA.',
+      benefitLimit: 20000,
+    },
+    source: 'Apex Laboratories v DCIT (SC, 22 Feb 2022); IMC (Professional Conduct) Reg. 6.4 / NMC 2023; Sec 194R ₹20,000 a year (SV8)',
+    verified: false,
+  },
+];
+
 /* ── SV-C: memberships, classes and coaching (filled by SV-C) ────────────────────────────────────────────────── */
 // COACHING_REFUND_RULES (pro rata by days, refund due in N days) — SV18.
 export interface CoachingRefundRule { basis: 'days' | 'months'; dueDays: number }

@@ -7,7 +7,7 @@ import { usePaper } from '../paper-context';
 import styles from '../invoice-paper.module.css';
 import { useHeaderBand } from './header-band';
 import art from './docs-r3-paper.module.css';
-import { pharmacistText, raDocTitle, svDocTitle } from '../paper-helpers';
+import { pharmacistText, raDocTitle, svDocTitle, svRegText } from '../paper-helpers';
 
 interface HeaderProps {
   invoice: InvoiceRecord;
@@ -93,6 +93,7 @@ export function SenderIdentity({
           </>
         )}
         {sender.pharmacist && <>{pharmacistText(sender)}<br /></>}
+        {sender.sv_regs && <>{svRegText(sender)}<br /></>}
         {sender.regLine && <>{sender.regLine}</>}
       </div>
     </div>
