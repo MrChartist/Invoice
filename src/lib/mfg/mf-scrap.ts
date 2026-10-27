@@ -68,7 +68,7 @@ export function scrapRegister(d: ScrapDocs): ScrapRow[] {
       if (!ids.has(o.item_id)) continue;
       const q = num(o.qty) * lineFactor(o);
       at(o.item_id, v.date).made += q;
-      if ((o as { mf_jc?: boolean }).mf_jc && v.production_order_id) posted.set(`${v.production_order_id}|${o.item_id}`, (posted.get(`${v.production_order_id}|${o.item_id}`) ?? 0) + q);
+      if (((o as { mf_jc?: boolean }).mf_jc || o.kind === 'scrap') && v.production_order_id) posted.set(`${v.production_order_id}|${o.item_id}`, (posted.get(`${v.production_order_id}|${o.item_id}`) ?? 0) + q);
     }
   }
   for (const j of d.journals) for (const p of j.produce ?? []) if (ids.has(p.item_id)) at(p.item_id, j.date).made += num(p.qty) * lineFactor(p);

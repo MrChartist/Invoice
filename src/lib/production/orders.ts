@@ -286,7 +286,7 @@ export interface OutputDraftOptions {
  */
 export function buildOutputVoucher(
   order: ProductionOrder, p: OrderProgress, bom: Pick<Bom, 'batch_qty' | 'outputs'> | undefined, opts: OutputDraftOptions, newId: () => string = generateId,
-  extra?: { scrapLines?: VoucherOutputLine[]; conversion?: AdditionalCost[] }, // R13 (MF-A3 / MF-D5): job-card scrap, conversion cost
+  extra?: { scrapLines?: VoucherOutputLine[]; conversion?: AdditionalCost[]; replaceScrapOf?: readonly string[] }, // R13 (MF-A3 / MF-D5): job-card scrap (replaces the BOM's scrap line of the same item, QA15 M3), conversion cost
 ): Omit<ManufacturingVoucher, 'id' | 'number'> {
   const wip = order.wip_godown_id;
   const components: VoucherStockLine[] = [];
@@ -308,7 +308,7 @@ export function buildOutputVoucher(
     }
   }
   const factor = num(opts.qty) / (num(bom?.batch_qty) > 0 ? num(bom?.batch_qty) : 1);
-  const outputs: VoucherOutputLine[] = (bom?.outputs ?? []).filter((o) => o.item_id && num(o.qty) > 0).map((o) => ({
+  const outputs: VoucherOutputLine[] = (bom?.outputs ?? []).filter((o) => o.item_id && num(o.qty) > 0 && !(o.kind === 'scrap' && extra?.replaceScrapOf?.includes(o.item_id))).map((o) => ({
     id: newId(), item_id: o.item_id, qty: rq(num(o.qty) * factor), kind: o.kind,
     ...(o.kind === 'co_product' ? { cost_pct: num(o.cost_pct) } : { rate: Math.max(num(o.rate), 0) }),
     ...(o.godown_id ? { godown_id: o.godown_id } : {}),
