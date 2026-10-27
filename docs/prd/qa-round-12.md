@@ -160,7 +160,9 @@ e2e harness (`idbPut` writes IndexedDB directly and broadcasts, as "another tab"
 
 ## 4. Checks and budget
 
-See the commit message and the hand-off report for the final numbers. Budget (vite build, gzip -9, against `402be84`):
+`tsc -b` clean; `eslint .` 0 errors (27 warnings, as before); `node --test` 3,124 / 3,124; `vite build` + `postbuild`
+ok; bundle check ok; Playwright smoke (`E2E_TIMEOUT=60000`) all checks passed (472 PASS lines). `npm run …` exits 216 in
+this sandbox, so each command was run directly. The ten regressions fail on `402be84` and pass after the fixes. Budget (vite build, gzip -9, against `402be84`):
 first paint 189,144 B → 189,147 B (**+3 B**: `PARTY_KEYS` replaced the old eight-key strip in `localDb.ts`); total JS
 3,077,346 B → 3,078,416 B (+1.0 kB). Every other fix sits in lazy service chunks or `trust/recycle-bin.ts`; no new icon.
 
