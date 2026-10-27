@@ -73,7 +73,7 @@ the property instead). Tree-shaken, so they cost no bytes; wiring them is featur
 | Budget | Before (`ca0438f` / `fb3b378`) | After | Delta |
 |---|---|---|---|
 | Initial JS (first paint) | 184.8 kB | 184.8 kB | 0 |
-| Total JS | 3,425.6 kB | 3,426.1 kB | +0.5 kB (`recoveryValue`, the guards) |
+| Total JS | 3,425.6 kB | 3,426.0 kB | +0.4 kB (`recoveryValue`, the guards) |
 
 The 8 kB trim was **not reached**. Measured on the built chunks (gzip -9):
 - Round 14 strings are already terse (47.5 kB raw EN + HI over 952 keys; the long ones are the working-paper notes with
@@ -93,7 +93,7 @@ The 8 kB trim was **not reached**. Measured on the built chunks (gzip -9):
 
 `tests/qa17-prof.test.ts` (R1–R9). Updated existing tests that pinned the old behaviour: `ps-partner-run.test.ts`
 (book profit 476,000 with the cap add-back), `ps-fema.test.ts` (9 months for 5 Jun – 30 Sep 2026), `ps-disb.test.ts`
-(the fee base now comes from `ps-tds-recv.ts`).
+(the fee base now comes from `ps-tds-recv.ts`); e2e step "R14-C export desk" checks 15 months on a 15 May 2026 invoice (was 15 Sep 2026).
 
 ## 4. CA questions
 
