@@ -38,6 +38,7 @@ import '../hotel/hotel-registry'; // R7: hotel tables' rights and audit labels (
 import '../retail/rt-registry'; // R9: retail tables' rights and audit labels (lazy registration)
 import '../construction/cn-registry'; // R11: construction tables' rights and audit labels (lazy registration)
 import '../services/sv-registry'; // R10: service tables' rights and audit labels (lazy registration)
+import '../agri/ag-registry'; // R12: agri tables' rights and audit labels (lazy registration)
 import { syncUrdPaid, urdLeft } from '../retail/rt-doc-hooks'; // QA10 R7: URD vouchers settled by exchange
 
 export { BIN_TABLE };
@@ -343,6 +344,10 @@ registerRestoreHook('price_variations', (row, e, live) => (str(row.status) !== '
 // R11 (CN-C): a deleted booking freed its unit (book it again; the BKG number stays used); a unit needs its project;
 // a stage certificate does not come back next to a re-made one of the same tower and stage.
 registerRestoreHook('realty_bookings', () => ({ refuse: 'Deleting the booking freed its unit. Book the unit again in Receivables → Realty → Bookings.' }));
+// R12 (AG-B): a dispatch comes back only with its stock journal (journals are not binned: enter it again); a milk card
+// not next to a re-made card of the same customer and month.
+registerRestoreHook('milk_dispatches', (row, _e, live, bin) => companionOr(live, bin, 'stock_journals', str(row.sj_id), 'The stock journal of this dispatch is gone for good. Enter the dispatch again in Inventory → Dairy → Dispatch.'));
+registerRestoreHook('milk_cards', (row, e, live) => (live('milk_cards').some((c) => str(c?.id) !== e.row_id && str(c?.client_id) === str(row.client_id) && str(c?.month) === str(row.month)) ? { refuse: 'This customer has a card for the month again; restoring this one would bill the month twice.' } : null));
 registerRestoreHook('realty_units', (row, _e, live) => (isLive(live, 'realty_projects', str(row.project_id)) ? null : { refuse: 'The project of this unit is gone. Restore the project first.' }));
 // R11 (CN-D): a sub-contractor bill made from a measurement comes back only while that measurement still names it
 // (cancelling it removed the bill and its deductions journal — measure again).

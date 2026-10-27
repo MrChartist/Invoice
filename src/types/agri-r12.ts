@@ -489,6 +489,12 @@ export interface AgMilkSettings {
 export interface AgriSettings {
   milk?: AgMilkSettings;
 }
+declare module './manufacturing' {
+  interface StockJournal {
+    /** AG-B2 / B4: the milk shift or dispatch whose stock this journal posted (restored only with its owner). */
+    milk_ref?: string;
+  }
+}
 
 /* ════════════════════════════════════════ AG-C ════════════════════════════════════════ */
 // AG-C: weighbridge_slips (WBS), cmr_agreements (CMR deliveries); `ProductionOrder.ag.mill` (declared below).

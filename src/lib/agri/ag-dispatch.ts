@@ -57,14 +57,15 @@ export function saveDispatch(input: DispatchInput): MilkDispatch {
   if (prev?.invoice_id && sentChanged && localDb.invoices.getById(prev.invoice_id)) throw new Error(`${prev.number} is billed: only the union's acknowledgement can change.`);
   return withTablesRollback([T, SJ_TABLE, 'stock_items', 'series_counters'], () => {
     const number = prev?.number && numberFitsFy(prev.number, input.date) ? prev.number : nextSeriesNumberFor(MDS, input.date, all.map((d) => d.number));
+    const id = prev?.id ?? generateId();
     let sj_id = prev?.sj_id;
     if (sentChanged) {
       if (sj_id && stockJournalsDb.all().some((j) => j.id === sj_id)) stockJournalsDb.remove(sj_id);
       const litres = toL(input.sent.qty, input.sent.unit, clrOf(input.milk, readAgriSettings().milk, input.date));
-      sj_id = milkJournal(input.date, [{ item_id: milkItemId(input.milk), qty: litres, godown_id: centreGodown(input.centre_id) }], 'out', `Milk dispatch ${number}${input.tanker ? ` · tanker ${input.tanker}` : ''}`).id;
+      sj_id = milkJournal(input.date, [{ item_id: milkItemId(input.milk), qty: litres, godown_id: centreGodown(input.centre_id) }], 'out', `Milk dispatch ${number}${input.tanker ? ` · tanker ${input.tanker}` : ''}`, id).id;
     }
     const buyer = localDb.clients.getById(input.buyer_id);
-    const row: MilkDispatch = { ...prev, ...input, id: prev?.id ?? generateId(), number, buyer_name: buyer?.company || buyer?.name || input.buyer_name, ...(sj_id ? { sj_id } : {}), created_at: prev?.created_at ?? new Date().toISOString(), updated_at: new Date().toISOString() };
+    const row: MilkDispatch = { ...prev, ...input, id, number, buyer_name: buyer?.company || buyer?.name || input.buyer_name, ...(sj_id ? { sj_id } : {}), created_at: prev?.created_at ?? new Date().toISOString(), updated_at: new Date().toISOString() };
     setTable(T, prev ? all.map((d) => (d.id === row.id ? row : d)) : [...all, row]);
     recordSeries(number);
     return row;

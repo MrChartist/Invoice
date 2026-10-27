@@ -128,14 +128,14 @@ export function milkItemId(milk: MilkKind): string {
 export const centreGodown = (centreId: string): string | undefined => readAgriSettings().centres?.find((c) => c.id === centreId)?.godown_id;
 
 /** Write a stock journal straight (role, lock, series, audit) — production lines only (receipt) or consumption only. */
-export function milkJournal(date: string, lines: { item_id: string; qty: number; rate?: number; godown_id?: string }[], dir: 'in' | 'out', narration: string): StockJournal {
+export function milkJournal(date: string, lines: { item_id: string; qty: number; rate?: number; godown_id?: string }[], dir: 'in' | 'out', narration: string, ref: string): StockJournal {
   requireAccess('books.edit');
   const all = getTable<StockJournal>(SJ_TABLE);
   const id = generateId();
   const number = nextSeriesNumberFor(SJ_PREFIX, date, all.map((j) => j.number));
   assertUnlocked({ id, issue_date: date, invoice_number: number }, 'create');
   const ls = lines.filter((l) => l.qty > 0).map((l) => ({ id: generateId(), item_id: l.item_id, qty: q3(l.qty), ...(l.godown_id ? { godown_id: l.godown_id } : {}), ...(dir === 'in' ? { rate: Math.round(num(l.rate) * 10000) / 10000 } : {}) }));
-  const row: StockJournal = { id, number, date, consume: dir === 'out' ? ls : [], produce: dir === 'in' ? ls : [], costs: [], narration, created_at: new Date().toISOString() };
+  const row: StockJournal = { id, number, date, consume: dir === 'out' ? ls : [], produce: dir === 'in' ? ls : [], costs: [], narration, milk_ref: ref, created_at: new Date().toISOString() };
   setTable(SJ_TABLE, [...all, row]);
   recordSeries(number);
   audit.record({ entity: 'stock_journal', entity_id: id, action: 'create', doc_number: number, summary: `Created stock journal ${number}: ${narration}` });
@@ -151,7 +151,7 @@ export function closeShift(id: string): MilkShift {
   return withTablesRollback([T, SJ_TABLE, 'stock_items', 'series_counters'], () => {
     const godown_id = centreGodown(s.centre_id);
     const lines = (Object.entries(t.byMilk) as [MilkKind, { litres: number; amount: number }][]).map(([milk, v]) => ({ item_id: milkItemId(milk), qty: v.litres, rate: v.litres > 0 ? v.amount / v.litres : 0, godown_id }));
-    const sj = lines.some((l) => l.qty > 0) ? milkJournal(s.date, lines, 'in', `Milk collected — ${s.date} ${s.shift === 'M' ? 'morning' : 'evening'} shift`) : undefined;
+    const sj = lines.some((l) => l.qty > 0) ? milkJournal(s.date, lines, 'in', `Milk collected — ${s.date} ${s.shift === 'M' ? 'morning' : 'evening'} shift`, s.id) : undefined;
     const next: MilkShift = { ...s, closed_at: new Date().toISOString(), ...(currentActor()?.name ? { closed_by: currentActor()!.name } : {}), ...(sj ? { sj_id: sj.id } : {}) };
     put(next);
     return next;
