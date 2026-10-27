@@ -130,7 +130,7 @@ export function rentOccasion(lot: ColdLot, plan: ColdRentPlan, occ: RentOccasion
   const b = billedOn(invoices, lot.id);
   const seasonal = SEASONAL.has(plan.basis);
   const seasonEnd = plan.season?.to ? nextOn(plan.season.to, lot.date_in) : lot.date_in;
-  const inCharges = !b.inCharges;
+  const inCharges = !b.inCharges && (plan.charges ?? []).some((c) => c.when === 'in');
   if (occ.kind === 'out') {
     if (b.outs.has(occ.out.id)) throw new Error(`Gate pass ${occ.out.number} is already billed.`);
     const rentBags = seasonal ? Math.max(Math.min(num(occ.out.bags), num(lot.bags) - b.seasonBags), 0) : plan.bill_at === 'monthly' ? 0 : num(occ.out.bags);

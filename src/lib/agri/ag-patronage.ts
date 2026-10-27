@@ -51,7 +51,7 @@ export function patronage(fyStartYear: number, d: { members: readonly Member[]; 
     return { member: m, suppliedQty: Math.round(s.q * 1000) / 1000, suppliedValue: round2(s.v), boughtValue: round2(b), business: round2(s.v + b), share: 0 };
   });
   const total = base.reduce((t, r) => t + r.business, 0);
-  const rows = base.map((r) => ({ ...r, share: total > 0 ? Math.round((r.business / total) * 1e6) / 1e4 : 0 }));
+  const rows = base.map((r) => ({ ...r, share: total > 0 ? Math.round((r.business / total) * 1e4) / 1e2 : 0 }));
   const memberIds = new Set(d.members.flatMap(ids));
   const members = round2([...sup].filter(([id]) => memberIds.has(id)).reduce((t, [, x]) => t + x.v, 0));
   const nonMembers = round2([...sup].filter(([id]) => !memberIds.has(id) && d.farmerIds.has(id)).reduce((t, [, x]) => t + x.v, 0));

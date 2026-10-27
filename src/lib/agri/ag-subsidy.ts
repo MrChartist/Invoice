@@ -19,8 +19,11 @@ const SALES = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY']);
 const live = (i: InvoiceRecord) => SALES.has(i.doc_type) && i.status !== 'Draft' && i.status !== 'Cancelled';
 const q3 = (n: number) => Math.round(n * 1000) / 1000;
 
-/** Farmer ID: Aadhaar last four digits, or a KCC number (letters / digits, 6 to 20). */
-export const validFarmerId = (id: string | undefined): boolean => /^\d{4}$/.test(String(id ?? '').trim()) || /^[A-Z0-9/-]{6,20}$/i.test(String(id ?? '').trim());
+/** Farmer ID: Aadhaar last four digits, or a KCC number (letters / digits, 6 to 20) — never 12 digits (a full Aadhaar). */
+export function validFarmerId(id: string | undefined): boolean {
+  const v = String(id ?? '').trim();
+  return /^\d{4}$/.test(v) || (!/^\d{12}$/.test(v) && /^[A-Z0-9/-]{6,20}$/i.test(v));
+}
 
 /** Bags of flagged items on a document (alternate units converted to the base unit). */
 export const subsidisedBags = (doc: Pick<InvoiceRecord, 'items'>, isSub: (name: string) => boolean): number => q3((doc.items ?? []).filter((l) => l?.name && isSub(l.name)).reduce((s, l) => s + num(l.quantity) * lineFactor(l), 0));
