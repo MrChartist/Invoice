@@ -63,5 +63,22 @@ export function mfgExtras(ctx: ProfileContext): DemoExtras {
     const karigar = (id: string, name: string, kind: string, rate: number) => ({ id, demo: true, name, mf: { karigar: { kind, rates: [{ op: 'Stitching', rate, from: `${today.slice(0, 4)}-04-01` }, { op: 'Finishing', rate: 4, from: `${today.slice(0, 4)}-04-01` }] } } }) as never;
     tables.vendors = [...(tables.vendors ?? []), karigar('demo-karigar-1', 'Rehmat Tailors (demo)', 'fabricator', 38), karigar('demo-karigar-2', 'Shabana (home karigar, demo)', 'home', 36)];
   }
+  // MF-D (food): namkeen ingredients and a 200 g pack with 90 days' shelf life, a cost card, a "10 + 1" scheme.
+  if (packs.includes('foodmfg')) {
+    const item = (id: string, name: string, extra: Record<string, unknown>) => ({ id, demo: true, name, track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra }) as never;
+    tables.stock_items = [
+      ...(tables.stock_items ?? []),
+      item('demo-food-besan', 'Besan (demo)', { unit: 'KG', hsn: '1106', opening_qty: 200, opening_rate: 80, tax_rate: 0 }),
+      item('demo-food-oil', 'Groundnut oil (demo)', { unit: 'LTR', hsn: '1508', opening_qty: 100, opening_rate: 140, tax_rate: 5 }),
+      item('demo-food-bhujia', 'Aloo bhujia 200 g (demo)', { unit: 'PCS', hsn: '2106', sale_rate: 30, tax_rate: 5, track_batches: true, shelf_life_days: 90, mf_class: 'namkeen' }),
+    ];
+    tables.cost_cards = [{
+      id: 'demo-cc-bhujia', demo: true, item_id: 'demo-food-bhujia', name: 'Aloo bhujia (demo)', effective_from: `${today.slice(0, 4)}-04-01`,
+      lines: [{ item_id: 'demo-food-besan', name: 'Besan (demo)', qty: 40, unit: 'KG', rate: 80 }, { item_id: 'demo-food-oil', name: 'Groundnut oil (demo)', qty: 22, unit: 'LTR', rate: 140 }],
+      output_kg: 60, conversion_per_kg: 12, overhead_pct: 5,
+      packs: [{ id: 'p200', label: '200 g', item_id: 'demo-food-bhujia', pack_kg: 0.2, packing: [{ label: 'Film + carton share', cost: 1.6 }], prices: { distributor: 30, retailer: 34, mrp: 40 } }],
+    }] as never;
+    tables.schemes = [...(tables.schemes ?? []), { id: 'demo-scheme-bhujia', demo: true, item_id: 'demo-food-bhujia', item_name: 'Aloo bhujia 200 g (demo)', buy_qty: 10, free_qty: 1 } as never];
+  }
   return { tables };
 }
