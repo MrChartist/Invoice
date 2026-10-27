@@ -131,14 +131,14 @@ glossary `rera-account`, `deemed-land`. Tests: `cn-units`, `cn-bookings`, `cn-de
 
 ### Budget (CN-C)
 
-Measured against `claude/elegant-cannon-cwapiv` at `5431046` (same machine, `vite build`, gzip -9):
+Measured against `claude/elegant-cannon-cwapiv` at `e6a3ab9` (same machine, `vite build`, gzip -9):
 
 | | Before | After | Δ |
 |---|---|---|---|
-| Initial JS (first paint) | 189,025 B | 189,082 B | +57 B (the registry imports in the sync / recycle-bin preload lists; limit +60 B) |
-| Total JS | 2,878,262 B | 2,903,518 B | +24.7 kB (2,835.5 kB of 3,000) |
+| Initial JS (first paint) | 189,104 B | 189,104 B | 0 B (the registry imports only add preload-list entries; within hash noise) |
+| Total JS | 2,881,385 B | 2,906,512 B | +24.5 kB (2,838.4 kB of 3,000) |
 
 Breakdown (gz): the desk chunk 20.1 kB (UI ≈ 8 kB, engines ≈ 7.5 kB, EN + HI strings ≈ 4.5 kB), demand paper +0.6 kB
 and paper strings +0.9 kB, help topics + glossary + palette + `PACK_TABS` rows ≈ 2 kB, registry / backup / sync /
-export / restore-hook rows ≈ 0.6 kB. **Over the 14 kB CN-C share by ≈ 10.7 kB** — the 15 items (eight views, five
+export / restore-hook rows ≈ 0.6 kB. **Over the 14 kB CN-C share by ≈ 10.5 kB** — the 15 items (eight views, five
 engines with prints) do not fit 14 kB with Hindi; total JS stays well inside the 3,000 kB budget.
