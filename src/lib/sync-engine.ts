@@ -458,6 +458,9 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   // R14-A: engagements (by start), conflict checks (by date)
   [`${DB_PREFIX}engagements`]: 'start',
   [`${DB_PREFIX}conflict_checks`]: 'date',
+  // R14-D: partner runs (year-end and monthly credits), UDIN register
+  [`${DB_PREFIX}partner_runs`]: 'date',
+  [`${DB_PREFIX}udin_register`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;

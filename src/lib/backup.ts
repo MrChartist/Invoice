@@ -507,6 +507,8 @@ const RECORD_TABLES = [
   'cost_cards', 'export_authorisations', 'incentive_claims',
   // R14-A: engagements (ENG/FY…), conflict checks
   'engagements', 'conflict_checks',
+  // R14-D: partners, partner runs (year-end appropriation, monthly 194T credits), UDIN register
+  'partners', 'partner_runs', 'udin_register',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -611,6 +613,8 @@ const ID_TABLES = new Set([
   'cost_cards', 'export_authorisations', 'incentive_claims',
   // R14-A: engagements (ENG/FY…), conflict checks
   'engagements', 'conflict_checks',
+  // R14-D: partners, partner runs (year-end appropriation, monthly 194T credits), UDIN register
+  'partners', 'partner_runs', 'udin_register',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

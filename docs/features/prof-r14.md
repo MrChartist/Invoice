@@ -98,3 +98,40 @@ registry / shared / presets / packs / features / sync / bin / export rows ≈ 2.
 the profitability view (≈ −1.5 kB), the year-end accrual posting (keep the paper, ≈ −0.8 kB), the letters view (the
 engagement list already makes letters, ≈ −0.8 kB), the CSV buttons (≈ −0.6 kB), the WIP write-off reversal (≈ −0.4 kB),
 shorten the Hindi / English desk strings (≈ −1.5 kB).
+
+## PS-D — The firm's statutory desk (packs `partners`, `practice`, `cafirm`)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| Desks | `TIME_TABS` rows `firm` (pack `partners`, also `practice`: views `partners`, `appropriation`, `tds194t`, `presumptive`, `tds194j`) and `cadesk` (pack `cafirm`: views `events`, `fees`, `udin`); `components/prof/FirmDesk.tsx`, `CaDesk.tsx` (mounted by PS-A's glob), `PACK_TABS` rows, palette labels `r14.firm.*` / `r14.cadesk.*`, Ctrl+K titles `time.firm` / `time.cadesk`, help topics `time:firm*` / `time:cadesk*`, strings `prof-r14d-firm.ts`, `prof-r14d-ca.ts`, `prof-r14d-tds.ts` (EN + HI). CA landing `/time?tab=cadesk&view=events`; `PACK_HREF` of `cafirm` → CA desk, `partners` → Firm. Checklist steps `feeSchedule`, `linkCompanies` (ca), `partners` (with the partners pack). |
+| D1 partners | Table `partners` (`settings.manage`): deed terms by date (share, remuneration fixed / % of book profit / maximum allowable, interest on capital and drawings, deed ref); "Capital — <name>" / "Current — <name>" ledgers (group Capital) made on save; shares above 100 % refused, ≠ 100 % flagged (`shareProblems`); a new ratio from a date for all partners at once (`saveRatio`); drawings (payment voucher class "Partner drawings"); interest on drawings by the product method (`prof/ps-partners.ts`). |
+| D1 year-end run | `prof/ps-partner-run.ts` `computeRun` (pure): interest on opening capital or daily balances at the deed rate (part above `PARTNER_INTEREST_CAP_RULES` 12 % shown as disallowed), book profit = ledger net profit + remuneration already credited − this run's interest + interest on drawings + listed adjustments, allowable remuneration from `PARTNER_REMUNERATION_RULES` (₹1.5 / 3 lakh slabs from 2009, ₹3 / 6 lakh from FY 2024-25, Sec 35 row from TY 2026-27 `verified: false`), remuneration per deed (working partners), excess disallowed (note, no journal), residual by ratio. `prof/ps-partner-post.ts` `postRun` (all or nothing, one per FY, journals class "Partners appropriation", 194T through D2), `reverseRun` (owner), `partnerStatements` (feeds the annual pack's partners' note through `notes-auto.ts` optional `partnerRows`, loaded lazily by `AnnualPackTab` for a partnership / LLP). Book profit / net profit via `loadStockValuer`, like every statement. |
+| D2 194T | `tds-rules.ts` appended: `TDS_PAYABLE_SECTIONS` row `194T` (RPU `94T`, unverified), `TDS_194T_RULES` (10 % from 2025-04-01, none before), threshold `TDS_EXTRA_THRESHOLD_RULES['194T']` ₹20,000 FY aggregate; `ita2025.ts` rows `194T` (Sec 393, entry to confirm, verify), `40B` (Sec 35(e)), `44ADA` (Sec 58), all `verified: false`. `prof/ps-194t.ts`: monthly credits (`partner_runs` `kind: 'credit'`, Dr Partners' remuneration / Interest on partners' capital, Cr Current, Cr TDS payable) and the year-end lines share one FY aggregate per partner; catch-up on the crossing credit through `suggestTds`; the deduction goes to the register through `saveManualDeduction` (26Q / Form 140 paper, challans; 31 March → 30 April). |
+| D3 194J | `prof/ps-tds-recv.ts`: client default (`Client.ps.tds`, set on Firm → 194J), profile defaults (ca / legal / design / freelancer 194J, agency 194C, consulting asked), fee base (pure-agent lines and GST out), expected TDS after the client's FY threshold; 194C rate by our firm form; chase list per client × quarter and the chase letter (Form 131 / 168 by date). Editor: lazy `Tds194jHint` in the tax panel fills section and rate once on a new note; Receivables → TDS gains the lazy `TdsChasePanel` (print / `wa.me` / `mailto:`). |
+| D4 presumptive | `prof/ps-presumptive.ts` + `PRESUMPTIVE_PROF_RULES` / `PRESUMPTIVE_ADVANCE_TAX_RULES` (`prof-rules.ts`): accrual and cash bases, cash share (no-cash rows skipped with `movedNoCash`), limit, deemed 50 %, books' profit, LLP / company / firm notes; eligibility ticked by the user; printable. |
+| D5 CA desk | `prof/ps-ca-events.ts` (derived events: filed returns / TDS returns / DSC renewals / checklist from `peekCompliance` — unchanged and read-only — or the open company's tables; UDINs; monthly retainer when an active retainer engagement exists; billed state from `bill_refs`), `prof/ps-ca-bill.ts` (fee schedule: catalogue `ps.fee_event`, `Client.ps.fees`; `billFromBoard` through the timesheet draft builder `buildBillDraft`, retainer-covered events at 0, unbilled pure-agent disbursements via `expenseLine`; typed events), `prof/ps-udin.ts` (table `udin_register`, format check `UDIN_FORMAT_RULES` verify, revoke, unbilled list, delete refused while billed), company links in `prof_settings.ca.company_clients` (`prof/ps-d-settings.ts`). Practice board: lazy "Bill" link per linked company (`PracticeBillLink`, board unchanged otherwise). |
+| Registrations | `ps-registry.ts` / `ps-shared.ts` D blocks (`partners` settings.manage, `partner_runs` books.edit dated, `udin_register` doc.create dated; `PS_D_CLASSES`, `PS_D_ACCOUNTS`), backup / sync / open-export rows (`// R14-D`), recycle bin: restore hooks (`partner_runs` comes back with its journals and 194T rows or is refused; duplicate UDIN / partner refused) and `OWNED_VOUCHERS` for the two classes. `DEMO_EXTRA_TABLES` + a demo UDIN (`demo/profile-prof.ts`). |
+| Tests / e2e | `ps-partners`, `ps-partner-run`, `ps-194t`, `ps-tds-recv`, `ps-presumptive`, `ps-udin`, `ps-ca-events`, `ps-ca-bill`, `ps-d-registry`. E2E step "R14-D firm desk". CA items PS70–PS80 (`CA_REVIEW.md` §14.8). |
+
+### Deviations (PS-D)
+
+- **Client TDS default and fee events** are set in the desks (Firm → 194J, CA desk → Fee schedule), not as lazy rows in the client / catalogue forms (keeps PS-B's client row untouched).
+- **Expected TDS** fills section and rate; the editor still computes the amount on its own base (taxable value), the hint shows the fee-base figure (PS76).
+- **Monthly partner credits** are `partner_runs` rows `kind: 'credit'` (no extra table), so the 194T aggregate reads one table.
+- **Draft builder (D5)** is the timesheet `buildBillDraft` (the one `billUnbilled` and PS-A's pre-bill use), not `createPrebillDraft` (which bills time of one matter).
+- **UDIN on the line** prints in the line description; `ps.udin` / `ps.lines[id].udin` are written too.
+- **Demo**: a UDIN only; partners need ledgers created by the data layer, so no demo partners.
+- Views of each desk are in the desk's chunk (R13 pattern), not separate lazy chunks.
+
+### Bundle (PS-D)
+
+Before = `claude/elegant-cannon-cwapiv` at `36881db`; after = this branch (gzip -9).
+
+| Budget | Before | After | Delta |
+|---|---|---|---|
+| Initial JS | 189,217 B | 189,217 B | **0 B** |
+| Total JS | 3,419,591 B | 3,452,287 B | **+32.7 kB** (aim 15 kB ✗) |
+
+Breakdown (gz): Firm desk 7.8 kB (five views + strings ≈ 2.5 kB), partner engines 5.7 kB (`ps-partners`, `ps-partner-run`, `ps-partner-post`, `ps-194t`), CA desk 4.4 kB (three views + strings ≈ 1.8 kB), CA engines 3.2 kB (`ps-ca-bill`, `ps-ca-events`, `ps-udin`), `ps-tds-recv` 1.7 kB, chase panel 1.1 kB, editor hint 0.8 kB, small strings 0.7 kB, rules 0.7 kB, help 0.9 kB, desk helpers / settings 1.3 kB, palette / Ctrl+K / checklist / packs 0.9 kB, host-page wiring (Time, TdsTab, Practice, AnnualPackTab, InvoiceCreator) ≈ 2.0 kB, registry / backup / sync / bin / export / tds-rules / ita2025 rows ≈ 1.0 kB. Trimming options: drop the daily-balance capital mode and partner statements (≈ −1.2 kB), the editor hint (≈ −0.8 kB), typed CA events (≈ −0.3 kB), shorten EN / HI strings (≈ −1.5 kB).
