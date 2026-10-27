@@ -50,6 +50,24 @@ test('series: CLM used once (sv-shared); OPD / IPD / LAB / MEM reserved and unus
   for (const p of SV_RESERVED_SERIES) assert.equal((all.match(new RegExp(`'${p}'`, 'g')) ?? []).length, 1, `${p} only in the reserved list`);
 });
 
+test('SV-C block: rights, audit labels, backup / sync / open export, MEM used once, restore hooks', () => {
+  const C = { member_plans: 'master.edit', memberships: 'doc.create', checkins: 'doc.create', class_schedules: 'master.edit', class_attendance: 'doc.create' };
+  const sync = src('lib/sync-engine.ts');
+  for (const [t, a] of Object.entries(C)) {
+    assert.equal(SV_TABLE_ACTIONS[t], a, t);
+    assert.equal(TABLE_ACTIONS[t], a, `${t} registered`);
+    assert.ok(SV_WATCHED[t]?.label && TABLE_MEANING[t] && BACKUP_RECORD_TABLES.includes(t), `${t} audited, exported, backed up`);
+  }
+  for (const [t, f] of [['memberships', 'start'], ['checkins', 'date'], ['class_attendance', 'date']]) assert.ok(sync.includes(`[\`\${DB_PREFIX}${t}\`]: '${f}'`), `${t} dated`);
+  assert.ok(sync.includes("[`${DB_PREFIX}memberships`]: { num: 'number', date: 'start' }"));
+  assert.equal(SV_SERIES.memberships, 'MEM');
+  assert.ok(!(SV_RESERVED_SERIES as readonly string[]).includes('MEM'));
+  const lib = readdirSync(new URL('../src/lib/', import.meta.url), { recursive: true }).filter((f) => String(f).endsWith('.ts') && !String(f).startsWith('help')).map((f) => readFileSync(new URL(`../src/lib/${f}`, import.meta.url), 'utf8')).join('\n');
+  assert.equal((lib.match(/'MEM'/g) ?? []).length, 1);
+  for (const f of ['sv-members', 'sv-memberships', 'sv-checkin', 'sv-classes', 'sv-attendance', 'sv-coaching-refund']) assert.match(src(`lib/services/${f}.ts`), /import '\.\/sv-registry';/, f);
+  for (const t of ['checkins', 'class_attendance', 'memberships']) assert.ok(src('lib/trust/recycle-bin.ts').includes(`'${t}'`), `${t} restore hook`);
+});
+
 test('SV-D block: vehicles / appliances and labour operations (masters), workshop settings (owner); writers import the registry', () => {
   const D = { service_assets: 'master.edit', labour_ops: 'master.edit', workshop_settings: 'settings.manage' };
   for (const [t, a] of Object.entries(D)) {

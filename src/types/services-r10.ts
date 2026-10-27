@@ -312,6 +312,163 @@ declare module '../lib/inventory' {
 /* ════════════════════════════════════════ SV-C ════════════════════════════════════════ */
 // SV-C: member_plans, memberships (MEM), checkins, class_schedules, class_attendance; `Enrolment.class_id`.
 
+/** `membership` = time-based, `package` = n sessions, `wallet` = prepaid value (an advance), `combo` = time + sessions. */
+export type MemberPlanKind = 'membership' | 'package' | 'wallet' | 'combo';
+
+/** Table `member_plans` (`master.edit`, audited "Membership plan"). */
+export interface MemberPlan {
+  id: string;
+  name: string;
+  kind: MemberPlanKind;
+  /** Membership / combo term. */
+  months?: number;
+  days?: number;
+  /** Package / combo sessions and the package validity in days (from the start). */
+  sessions?: number;
+  validity_days?: number;
+  /** Items (names) or categories a session covers; empty = any service. */
+  covers?: string[];
+  /** Price before GST (the sale line's rate). */
+  price: number;
+  tax_rate?: number;
+  sac?: string;
+  cls?: SvClass;
+  freeze?: { max_days?: number; max_times?: number; min_days?: number; fee?: number };
+  transferable?: boolean;
+  transfer_fee?: number;
+  /** Refund on cancellation: none (default) or pro rata of the unused value. */
+  refund?: 'none' | 'pro_rata';
+  /** Wallet: bonus value on a top-up (%), a discount on later use, never cash. */
+  bonus_pct?: number;
+  /** Package: a check-in redeems one session. */
+  redeem_on_checkin?: boolean;
+  /** PT package: the trainer (service staff). */
+  trainer_id?: string;
+  active?: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface MembershipEvent {
+  date: string;
+  kind: 'upgrade' | 'transfer' | 'renew' | 'cancel' | 'forfeit';
+  note: string;
+  invoice_id?: string;
+  credit_note_id?: string;
+}
+
+/** Table `memberships` (`doc.create`, audited "Membership", dated `start`, numbered `MEM/FY…`). */
+export interface Membership {
+  id: string;
+  number: string;
+  client_id?: string;
+  client_name: string;
+  phone?: string;
+  plan: Omit<MemberPlan, 'created_at' | 'updated_at'>;
+  start: string;
+  /** Last day (freezes included); stored, re-derived on every change. */
+  end: string;
+  /** Terminal states are stored; active / frozen / expired are derived by date. */
+  closed?: 'cancelled' | 'transferred' | 'upgraded';
+  freezes?: { from: string; to: string; reason?: string; invoice_id?: string }[];
+  history?: MembershipEvent[];
+  invoice_ids: string[];
+  trainer_id?: string;
+  auto_renew?: boolean;
+  /** Renewal / upgrade successor. */
+  next_id?: string;
+  wallet?: { topups: { advance_id: string; date: string; amount: number; bonus: number }[]; bonus_used?: number };
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface CheckinEntry {
+  client_id?: string;
+  name: string;
+  /** `HH:MM`. */
+  time: string;
+  membership_id?: string;
+  /** User who checked the member in. */
+  by?: string;
+  class_id?: string;
+  /** A package session was redeemed by this check-in. */
+  redeem?: boolean;
+}
+
+/** Table `checkins` (`doc.create`, audited "Check-ins", dated `date`): ONE row per day. */
+export interface CheckinDay {
+  id: string;
+  date: string;
+  entries: CheckinEntry[];
+  updated_at?: string;
+}
+
+/** Table `class_schedules` (`master.edit`, audited "Class / batch"). */
+export interface ClassSchedule {
+  id: string;
+  name: string;
+  kind: 'class' | 'batch';
+  staff_id?: string;
+  resource_id?: string;
+  /** Weekdays, 0 = Monday … 6 = Sunday. */
+  days: number[];
+  start: string;
+  minutes: number;
+  from?: string;
+  to?: string;
+  capacity?: number;
+  /** Member plans that cover it (fitness) or the R5-C fee plan (coaching batch). */
+  plan_ids?: string[];
+  fee_plan_id?: string;
+  holidays?: string[];
+  /** Enrolled members (client ids) and the wait-list, in order (students are on `Enrolment.class_id`). */
+  members?: string[];
+  waitlist?: string[];
+  active?: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export type AttendanceMark = 'P' | 'A' | 'L';
+
+/** Table `class_attendance` (`doc.create`, audited "Attendance", dated `date`): one row per class × date. */
+export interface ClassAttendance {
+  id: string;
+  class_id: string;
+  date: string;
+  marks: Record<string, AttendanceMark>;
+  updated_at?: string;
+}
+
+/** A coaching refund request on the student's enrolment (SV-C3). */
+export interface CoachingRefundRecord {
+  requested: string;
+  leave: string;
+  due: string;
+  amount: number;
+  note_ids: string[];
+  paid_on?: string;
+}
+
+/** SV-C switches on the service settings object (interfaces merge within this module). */
+export interface ServiceSettings {
+  /** Upgrade: one invoice for the difference (default) or a credit note on the old bill + a full bill (SV14). */
+  upgrade_mode?: 'difference' | 'credit_note';
+}
+
+declare module './institutions-r5' {
+  interface Enrolment {
+    /** SV-C3: the batch (class_schedules row) of this student on the plan. */
+    class_id?: string;
+    /** SV-C3: refund on leaving midway. */
+    refund?: CoachingRefundRecord;
+  }
+  interface FeeHead {
+    /** SV-C3: never refunded on leaving (default: once-heads are not refunded, per-instalment heads are). */
+    no_refund?: boolean;
+  }
+}
+
 /* ════════════════════════════════════════ SV-D ════════════════════════════════════════ */
 // SV-D: service_assets, labour_ops, workshop_settings; RT-D4 `service_jobs` fields; AMC `asset_ids`, visit `job_id`;
 // client `sv_insurer_invoice`; `TimeEntry.job_id`.
