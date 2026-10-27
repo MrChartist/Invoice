@@ -45,7 +45,7 @@ const BillRateHints = lazy(() => import('../trade/BillRateHints'));
 // R8-B (TR-B1/B2/B3): bags / weight rows, bill charges and the broker (commodity / agency pack, lazy).
 const BillTradePanel = lazy(() => import('../trade/tr-b-hub').then((m) => ({ default: m.BillTradePanel })));
 // R9 (RT-B3): batch MRP above the NPPA ceiling + GST (pharmacy pack, warning only, lazy).
-const CeilingNotice = lazy(() => import('../retail-r9/RxStrip').then((m) => ({ default: m.CeilingNotice })));
+const CeilingNotice = lazy(() => import('../retail-r9/PharmacyDesk').then((m) => ({ default: m.CeilingNotice })));
 import { impliedPacks } from '../../lib/shop-mode';
 
 export interface BillModalProps {

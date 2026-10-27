@@ -90,7 +90,7 @@ export default function RecycleBinPanel({ onClose, notify }: { onClose: () => vo
     const entries = all.filter((e) => ids.includes(e.id));
     // R9 (RT-B2): bills with Schedule H1 / X lines inside their retention window — a warning, never a block.
     const bills = entries.filter((e) => e.table === 'invoices').map((e) => e.row);
-    const kept = bills.length ? await import('../../lib/retail/rt-pharmacy-registers').then((m) => m.retainedAmong(bills, localDayOf(new Date())), () => []) : [];
+    const kept = bills.length ? await import('../../lib/retail/rt-pharmacy-retention').then((m) => m.retainedAmong(bills, localDayOf(new Date())), () => []) : [];
     const warn = kept.length ? `${trT('binRxRetained', { bills: kept.map((k) => k.number).join(', '), until: kept.reduce((m, k) => (k.until > m ? k.until : m), '') })}\n\n` : '';
     if (!window.confirm(warn + trT('binConfirmDelete', { n: ids.length }))) return;
     if (lockedEntries(entries).length) return setPending({ kind: 'delete', ids });

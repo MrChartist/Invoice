@@ -18,7 +18,7 @@ import { isoDay } from './dates';
 import type { InvoiceRecord } from '../types/invoice';
 import { agencySales, loadArrivals } from './trade/tr-arrivals';
 import { loadPattis, unsettledLots } from './trade/tr-patti';
-import { rxRetainedInYear } from './retail/rt-pharmacy-registers';
+import { rxRetainedInYear } from './retail/rt-pharmacy-retention';
 import {
   CLOSING_STOCK_CLASS,
   YEAR_END_TABLE,

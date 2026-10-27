@@ -7,8 +7,9 @@ import { installSettings } from './helpers/world.ts';
 import { DB_PREFIX, setJson, setTable } from '../src/lib/storage.ts';
 import { h1Register } from '../src/lib/pharma.ts';
 import {
-  H1_HEAD, h1Cells, keepUntil, licenceNotices, narcoticRegister, paginate, registerBook, registerCsv, retainedAmong, retainedBills, retentionAt, rxRetainedInYear, xCells, xRegister,
+  H1_HEAD, h1Cells, licenceNotices, narcoticRegister, paginate, registerBook, registerCsv, xCells, xRegister,
 } from '../src/lib/retail/rt-pharmacy-registers.ts';
+import { keepUntil, retainedAmong, retainedBills, retentionAt, rxRetainedInYear } from '../src/lib/retail/rt-pharmacy-retention.ts';
 import { pharmacyNotices } from '../src/lib/retail/rt-pharmacy-alerts.ts';
 import { licenceLine } from '../src/lib/retail/rt-pharmacy-rx.ts';
 import { yearEndChecklist } from '../src/lib/year-end.ts';

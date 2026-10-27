@@ -20,12 +20,10 @@ import type { DrugLicence } from '../../types/retail-r9';
 import { num } from '../invoice-calc';
 import { isRevenueDoc } from '../stats';
 import { toCsv } from '../csv';
-import { plusDays, readPharmaSettings } from '../pharma-gate';
-import { liveScheduleIndex, type H1Row } from '../pharma';
+import { plusDays } from '../pharma-gate';
+import type { H1Row } from '../pharma';
 import { isVoidStatus, readPurchase, readPurchaseLines } from '../purchase-normalize';
 import { lineFactor } from '../units';
-import { ruleAt } from '../tax-rules';
-import { PHARMA_RETENTION_RULES, type PharmaRetention } from '../retail-rules';
 
 type Schedule = 'H' | 'H1' | 'X';
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase();
@@ -167,31 +165,6 @@ export function registerBook(opts: { title: string; shop: string; licence?: stri
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(opts.title)}</title><style>@page{size:A4;margin:12mm}body{font:10px system-ui,sans-serif;color:#000}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}header{margin-bottom:6px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #444;padding:2px 4px;text-align:left}tr.bad td{background:#eee}footer{margin-top:6px;font-size:9px}</style></head><body>${body}</body></html>`;
 }
 
-/* ── Retention ── */
-
-export const retentionAt = (day: string): PharmaRetention => ruleAt(PHARMA_RETENTION_RULES, day);
-
-/** Local day until which a bill of `day` with lines of `schedules` is kept (H1: register years; X: prescription years). */
-export function keepUntil(day: string, schedules: readonly Schedule[]): string {
-  const r = retentionAt(day);
-  const years = Math.max(schedules.includes('H1') ? r.h1Years : 0, schedules.includes('X') ? r.xPrescriptionYears : 0);
-  if (!years) return '';
-  return plusDays(`${+day.slice(0, 4) + years}${day.slice(4)}`, 0);
-}
-
-/** Bills with H1 / X lines still inside their retention window on `today`. */
-export function retainedBills(invoices: readonly InvoiceRecord[], index: ReadonlyMap<string, Schedule>, today: string): { id: string; number: string; until: string }[] {
-  const out: { id: string; number: string; until: string }[] = [];
-  for (const inv of invoices) {
-    if (!inv?.issue_date) continue;
-    const sch = [...new Set((inv.items ?? []).map((l) => index.get(norm(l.name))).filter((s): s is Schedule => s === 'H1' || s === 'X'))];
-    if (!sch.length) continue;
-    const until = keepUntil(inv.issue_date, sch);
-    if (until && until > today) out.push({ id: inv.id, number: inv.invoice_number, until });
-  }
-  return out;
-}
-
 /* ── Licences ── */
 
 export const LICENCE_ALERT_DAYS = 60;
@@ -206,18 +179,3 @@ export function licenceNotices(licences: readonly DrugLicence[] | undefined, tod
 
 export const H1_HEAD = ['Date', 'Bill no.', 'Patient', 'Patient address', 'Prescriber', 'Reg. no.', 'Drug', 'Schedule', 'Batch', 'Expiry', 'Qty', 'Unit', 'Details missing'] as const;
 export const h1Cells = (r: H1Row): (string | number)[] => [r.date, r.number, r.patient, r.patient_address, r.prescriber, r.prescriber_reg, r.drug, r.schedule, r.batch, r.expiry, r.qty, r.unit, r.missingRx ? 'Yes' : ''];
-
-/* ── Storage (read only): retention warnings for the recycle bin and the year-end checklist ── */
-
-/** Invoice rows (live or deleted) with H1 / X lines still inside retention on `today` ([] with the pharma features off). */
-export function retainedAmong(rows: readonly unknown[], today: string): { id: string; number: string; until: string }[] {
-  if (!readPharmaSettings().enabled) return [];
-  const invoices = rows.filter((r): r is InvoiceRecord => !!r && typeof r === 'object' && Array.isArray((r as InvoiceRecord).items));
-  return invoices.length ? retainedBills(invoices, liveScheduleIndex(), today) : [];
-}
-
-/** Year-end: bills of the year (`from` … `to`) with H1 / X lines to keep, and the latest keep-until day. */
-export function rxRetainedInYear(invoices: readonly InvoiceRecord[], from: string, to: string, today: string): { count: number; until: string } | undefined {
-  const rows = retainedAmong(invoices.filter((i) => i?.issue_date >= from && i.issue_date <= to), today);
-  return rows.length ? { count: rows.length, until: rows.reduce((m, r) => (r.until > m ? r.until : m), '') } : undefined;
-}

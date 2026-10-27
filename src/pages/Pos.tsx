@@ -109,7 +109,7 @@ const TENDER_KEY: Record<MoneyTender, PosAction> = { Cash: 'cash', UPI: 'upi', C
 const GiftVoucherTender = lazy(() => import('../components/retail/GiftVoucherTender'));
 const RoomPicker = lazy(() => import('../components/hotel/FrontDesk').then((m) => ({ default: m.RoomPicker }))); // R7-B2 "Room" tender (hotel pack only)
 const PosRetailStrip = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.PosRetailStrip }))); // R9 (RT-A2/A3/A4)
-const RxStrip = lazy(() => import('../components/retail-r9/RxStrip')); // R9 (RT-B1/B2/B3) pharma pack only
+const RxStrip = lazy(() => import('../components/retail-r9/PharmacyDesk').then((m) => ({ default: m.RxStrip }))); // R9 (RT-B1/B2/B3) pharma switch only
 // R4-B3: the counter's branch (store price list). Inline labels, so the POS does not load the stores catalogue.
 const storeT = defineArea({ counter: 'This counter is branch', none: 'No branch' } as const, { counter: 'यह काउंटर इस शाखा का है', none: 'कोई शाखा नहीं' });
 
@@ -686,14 +686,19 @@ export function Pos() {
   };
 
   const drop = (id: string) => storeHeld(loadHeld().filter((c) => c.id !== id));
-  // R9 (RT-B1): Pharmacy → Refills "Bill now" parks the refill as a held cart and opens `/pos?recall=<id>`.
+  // R9 (RT-B1): Pharmacy → Refills "Bill now" opens `/pos?refill=<id>`: the refill is parked as a held cart and recalled.
   useEffect(() => {
-    const id = params.get('recall');
+    const id = params.get('refill');
     if (!id) return;
-    recall(id);
     const next = new URLSearchParams(params);
-    next.delete('recall');
+    next.delete('refill');
     setParams(next, { replace: true });
+    void import('../components/retail-r9/PharmacyDesk').then((m) => {
+      const cart = m.refillCartById(id);
+      const r = cart && holdCart(loadHeld(), cart);
+      if (cart && r?.ok && storeHeld(r.list)) recall(cart.id);
+      else if (cart) notify(posT('heldFull'), 'error');
+    });
   }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── 8E: bills to browse, live weight, customer display ───── */

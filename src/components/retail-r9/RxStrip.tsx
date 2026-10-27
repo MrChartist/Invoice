@@ -30,7 +30,7 @@ const EMPTY: Rx = { patient: '', prescriber: '' };
 const stockItems = () => getTable<StockItem>('stock_items');
 
 /** Issue → translated message. */
-export const issueText = (i: RxIssue): string => rtbT(`i.${i.code}`, { items: i.items.join(', ') });
+const issueText = (i: RxIssue): string => rtbT(`i.${i.code}`, { items: i.items.join(', ') });
 
 /** The prescription fields (controlled). `x` = the bill has a Schedule X line. */
 function RxFields({ rx, onRx, x, onImage }: { rx: Rx; onRx: (r: Rx) => void; x: boolean; onImage?: (ref: AttachmentRef) => void }) {
@@ -45,7 +45,7 @@ function RxFields({ rx, onRx, x, onImage }: { rx: Rx; onRx: (r: Rx) => void; x: 
       const { attachFile } = await import('../../lib/attachment-upload');
       const ref = await attachFile(f);
       onImage(ref);
-      setBusy(rtbT('rxPhotoOk'));
+      setBusy('✓');
     } catch (err) {
       setBusy((err as Error).message);
     }
@@ -83,7 +83,7 @@ function RxFields({ rx, onRx, x, onImage }: { rx: Rx; onRx: (r: Rx) => void; x: 
       {onImage && (
         <>
           <input ref={file} type="file" accept="image/*,application/pdf" capture="environment" hidden onChange={(e) => void snap(e.target.files?.[0])} />
-          <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => file.current?.click()}><Camera size={14} aria-hidden="true" /> {rx.image_id ? rtbT('rxPhotoAgain') : rtbT('rxPhoto')}</button>
+          <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => file.current?.click()}><Camera size={14} aria-hidden="true" /> {rtbT('rxPhoto')}{rx.image_id ? ' ✓' : ''}</button>
           {busy && <span className={controls.hint}>{busy}</span>}
         </>
       )}
@@ -148,7 +148,6 @@ export function RxEditorExtra() {
     <div data-rx-editor>
       <RxFields rx={rx} x={lines.some((l) => l.schedule === 'X')} onRx={setRx}
         onImage={(ref) => { setRx({ ...rx, image_id: ref.id }); s.patch({ attachments: [...(s.attachments ?? []), ref] }); }} />
-      {settings.require_rx && lines.some((l) => l.schedule !== 'H') && !(rx.patient.trim() && rx.prescriber.trim()) && <p className={controls.error}>{rtbT('editorBlock')}</p>}
       <Messages issues={issues} ceiling={ceilingText(s.items, s.issue_date)} />
     </div>
   );

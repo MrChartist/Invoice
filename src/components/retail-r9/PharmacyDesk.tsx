@@ -20,11 +20,11 @@ import { localDb } from '../../lib/localDb';
 import { getTable } from '../../lib/storage';
 import { todayInput } from '../../lib/utils';
 import { h1Register, liveScheduleIndex } from '../../lib/pharma';
-import { holdCart, loadHeld, saveHeld } from '../../lib/pos-hold';
 import { unitChoices } from '../../lib/units';
 import type { StockItem } from '../../lib/inventory';
 import { doctorSalesCsv, doctorWiseSales, doctorsDb, readRxSettings, saveRxSettings, scheduledLines } from '../../lib/retail/rt-pharmacy-rx';
-import { H1_HEAD, NARCOTIC_HEAD, X_HEAD, h1Cells, licenceNotices, narcoticCells, narcoticRegister, registerBook, registerCsv, retentionAt, xCells, xRegister } from '../../lib/retail/rt-pharmacy-registers';
+import { H1_HEAD, NARCOTIC_HEAD, X_HEAD, h1Cells, licenceNotices, narcoticCells, narcoticRegister, registerBook, registerCsv, xCells, xRegister } from '../../lib/retail/rt-pharmacy-registers';
+import { retentionAt } from '../../lib/retail/rt-pharmacy-retention';
 import { dueRefills, loadRefills, refillCart, refillFromBill, refillWaLink, removeRefill, saveRefill, syncRefills } from '../../lib/retail/rt-refills';
 import { addCeiling, applyLoosePrice, importCeilings, loosePack, marginCsv, marginRows, parseCeilingCsv, patchStockItem } from '../../lib/retail/rt-pharmacy-prices';
 import type { InvoiceRecord } from '../../types/invoice';
@@ -112,7 +112,6 @@ function RxView({ onDone }: { onDone: Done }) {
           made.has(i.id) ? rtbT('refillMade') : <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => run(() => { const r = saveRefill(refillFromBill(i, every)); return rtbT('refillSaved', { name: r.name, date: r.next_due }); })} data-rtb-make-refill>{rtbT('makeRefill')}</button>,
         ])}
       />
-      <p className={controls.hint}>{rtbT('rxNote')}</p>
     </>
   );
 }
@@ -138,7 +137,6 @@ function DoctorsView({ onDone }: { onDone: Done }) {
         {field('name', rtbT('doctorName'))}{field('qualification', rtbT('qualification'))}{field('reg_no', rtbT('regNo'))}{field('council', rtbT('council'))}{field('clinic', rtbT('clinic'))}{field('phone', rtbT('phone'))}
         <button type="button" className={controls.btnPrimary} disabled={!form.name.trim()} onClick={() => run(() => { const d = doctorsDb.save(form); setForm(BLANK); return rtbT('doctorSaved', { name: d.name }); })} data-doc-save>{rtbT('save')}</button>
       </div>
-      <p className={controls.hint}>{rtbT('doctorNote')}</p>
       <Table
         head={[rtbT('doctorName'), rtbT('regNo'), rtbT('clinic'), rtbT('phone'), '']}
         rows={list.map((d) => [
@@ -199,7 +197,7 @@ function RegistersView({ onDone }: { onDone: Done }) {
       <p className={controls.hint} data-rtb-retention>{rtbT('retention', { h1: ret.h1Years, x: ret.xPrescriptionYears, memo: ret.cashMemoYears })}</p>
       {kind === 'narcotic' && (
         <div style={wrap}>
-          <label className={controls.field}><span className={controls.label}>{rtbT('narcoticItems')}</span>
+          <label className={controls.field}><span className={controls.label}>{rtbT('reg.narcotic')}</span>
             <select className={controls.select} value={pick} onChange={(e) => setPick(e.target.value)}>
               <option value="">—</option>
               {items.filter((i) => !i.narcotic).map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
@@ -244,7 +242,6 @@ function Licences({ onDone }: { onDone: Done }) {
       </div>
       <label className={controls.check}><input type="checkbox" checked={req} onChange={(e) => setReq(e.target.checked)} data-rtb-require /> {rtbT('requireRx')}</label>
       <p><button type="button" className={controls.btnPrimary} onClick={() => run(() => { saveRxSettings({ licences: lics, pharmacist: ph, require_rx: req }); return rtbT('saved'); })} data-rtb-lic-save>{rtbT('save')}</button></p>
-      <p className={controls.hint}>{rtbT('licenceNote')}</p>
     </section>
   );
 }
@@ -262,16 +259,7 @@ function RefillsView({ onDone }: { onDone: Done }) {
   }, [tick]);
   const due = dueRefills(all, day);
   const shop = localDb.settings.activeProfile()?.companyName ?? '';
-  const billNow = (id: string) => run(() => {
-    const r = all.find((x) => x.id === id);
-    if (!r) return '';
-    const client = r.client_id ? localDb.clients.getAll().find((c) => c.id === r.client_id) ?? null : null;
-    const held = holdCart(loadHeld(), refillCart(r, localDb.items.getAll(), client));
-    if (!held.ok) throw new Error(rtbT('heldFull'));
-    saveHeld(held.list);
-    navigate(`/pos?recall=${held.list[held.list.length - 1].id}`);
-    return '';
-  });
+  const billNow = (id: string) => navigate(`/pos?refill=${id}`); // the counter parks it as a held cart (refillCartById)
   const left = (n: number) => (n < 0 ? rtbT('overdue', { n: -n }) : n === 0 ? rtbT('dueToday') : rtbT('dueIn', { n }));
   return (
     <>
@@ -300,7 +288,6 @@ function RefillsView({ onDone }: { onDone: Done }) {
           </span>,
         ])}
       />
-      <p className={controls.hint}>{rtbT('refillNote')}</p>
     </>
   );
 }
@@ -376,4 +363,17 @@ export default function PharmacyDesk({ view, onDone }: { view?: string; onDone: 
       <p className={controls.hint} style={{ padding: '0 1rem 1rem' }}>{rtbT('workingPaper')}</p>
     </section>
   );
+}
+
+/* ── One chunk for every RT-B part (POS strip, editor fields, bill-modal notice, bell): hosts import this file. ── */
+export { default as RxStrip, RxEditorExtra, CeilingNotice } from './RxStrip';
+// eslint-disable-next-line react-refresh/only-export-components
+export { registerPharmacyAlerts } from '../../lib/retail/rt-pharmacy-alerts';
+
+/** *Bill now*: the refill as a POS cart (catalogue rates; the saved customer when there is one), or undefined. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function refillCartById(id: string) {
+  const r = loadRefills().find((x) => x.id === id);
+  if (!r) return undefined;
+  return refillCart(r, localDb.items.getAll(), (r.client_id && localDb.clients.getAll().find((c) => c.id === r.client_id)) || null);
 }

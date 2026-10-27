@@ -1,5 +1,5 @@
 /**
- * RT-B bell notices, loaded lazily by the notification bell only with the pharmacy pack on (it registers itself on load):
+ * RT-B bell notices, registered by the notification bell only with the pharmacy pack on (through the desk chunk):
  *  - drug licences expiring within 60 days, or expired (RT-B2);
  *  - "Refills due today: n" (active refills due today or overdue, RT-B1).
  * Read only: the due list is derived (`advanceRefill`), nothing is written from the bell.
@@ -39,4 +39,3 @@ export function registerPharmacyAlerts(): void {
   });
 }
 
-registerPharmacyAlerts();

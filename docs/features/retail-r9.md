@@ -120,7 +120,83 @@ the picker's strings split off so the wizard does not load the RT-A area.
 
 # RT-B — Pharmacy
 
-(RT-B)
+Everything is gated by the pharmacy pack (desk tab, bell notices, bill-modal ceiling notice) or by the 7U pharma switch
+(`pharma_settings.enabled`: POS Rx strip, editor Rx fields, the save gate), so other shops see nothing new. Working papers
+— verify register formats with your drug inspector and GST rates with your CA; medicine GST rates stay user-entered.
+
+## 1. Items
+
+**B1 Prescription at the counter, doctors, patients, refills.** `retail/rt-pharmacy-rx.ts`: `doctorsDb` (table `doctors`,
+`master.edit`, audited "Doctor"; `Doctor` is an **interface** in `types/retail-r9.ts` with name, qualification, `reg_no`,
+council, clinic, phone, address, active — Round 10 SV-B adds `in_house`, `speciality`, `consult_fee`, `follow_up_fee`,
+`follow_up_days`, `staff_id` by declaration merging and reuses `doctorsDb`; no referral / commission field, RT9);
+`pickDoctor` (snapshot `rx.prescriber` / `prescriber_reg` + `rx.doctor_id`; later doctor edits never rewrite a bill);
+`rxIssues` (H1 / X without patient + prescriber: warning, error with *Require prescription*; X also needs the address and
+"Prescription retained", and a 20F / 21G licence on file — warning; an expired licence is a warning, never a block);
+`doctorWiseSales` / CSV. `InvoiceRecord.rx` was widened in `invoice.ts` (additive `doctor_id`, `age`, `gender`, `rx_no`,
+`rx_date`, `retained`, `image_id`, `client_id`). The save gate is `pharma-gate.ts` `rxRequiredErrors` (raw
+`pharma_settings.require_rx`, stock items' `drug_schedule`), called from the editor save (`InvoiceCreator.tsx`) and
+`pos.ts` `savePosBill`; drafts are never checked. The medical-store profile turns `require_rx` on (§8 #8); existing 7U
+companies keep the warning. UI: `RxStrip.tsx` (one lazy chunk) — default export is the POS strip beside the cart (shown
+while the cart holds H / H1 / X lines: doctor picker or typed prescriber, patient, age, gender, address, Rx no. / date,
+"retained" for X, Rx photo through `attachment-upload.ts` → the bill's `attachments` + `rx.image_id`, never printed;
+the expired-licence red line and ceiling warnings); `RxEditorExtra` replaces the 7U editor inputs (EditorExtras, one
+lazy line). Refills: `retail/rt-refills.ts` (table `rx_refills`, `doc.create`, dated `next_due`): `refillFromBill`
+(quantities in base units), `dueRefills` (3-day window + overdue), `advanceRefill` / `syncRefills` (a later bill of the
+same customer with one of the items moves `next_due` = that day + N — derived from the bills, written when the desk
+opens), `refillCart` (*Bill now* parks a held POS cart and opens `/pos?recall=<id>`), `refillWaLink` (`wa.me`, en / hi
+text). Bell: `rt-pharmacy-alerts.ts` (one "Refills due today: n" notice + licence notices), loaded by the bell only with
+the pharmacy pack.
+
+**B2 Registers, licences, pharmacist.** `retail/rt-pharmacy-registers.ts`: H1 / H via the unchanged `pharma.ts`
+`h1Register` (`H1_HEAD` / `h1Cells`), `xRegister` (date, bill, patient + address, prescriber + reg., drug, batch, qty,
+retained, Rx no., flagged when details are missing), `narcoticRegister` (stock item `narcotic`; opening / received
+(purchase lines paid + free through the purchases contract, customer returns) / sold / closing per item and batch, base
+units), `registerBook` (script-free A4 HTML, page "n of N", period on every page, drug-inspector note, shaded flagged rows)
+and `registerCsv`. Retention: `retail-rules.ts` `PHARMA_RETENTION_RULES` (from 2014-03-01: H1 3 years, X prescriptions 2
+years, cash memos 3 years; `verified: false`, RT7); `retainedBills` / `retainedAmong` warn in the recycle bin's
+*Delete permanently* confirm (`RecycleBinPanel.tsx`, lazy import only when invoices are selected) and as a fact on the
+year-end checklist's *Lock* step (`year-end.ts` `rxRetained`). Never blocked. Licences / pharmacist / `require_rx` live on
+`pharma_settings` (`savePharmaSettings` keeps them); `saveRxSettings` (owner) writes the printed licence line
+(`licenceLine`, falling back to the profile's own `drug_licence` text) and `SenderProfile.pharmacist` into the profiles, so
+new bills snapshot them; templates (GST, letterhead / classic header, receipt) and ESC/POS print "Registered pharmacist:
+name (reg. no.)" via `paper-helpers.ts` `pharmacistText`. `licenceNotices`: bell warning 60 days ahead, critical once
+expired.
+
+**B3 Ceiling price, loose units, margins.** `retail/rt-pharmacy-prices.ts`: stock item `ceiling_prices` (dated,
+append-only, ex-GST; per base unit or per an alternate unit, converted), `ceilingIssues` (MRP per base unit above ceiling
+× (1 + GST %) on the date — bill modal `CeilingNotice` and the POS strip, warning only), CSV paste (`parseCeilingCsv` /
+`importCeilings`). Loose units: `loosePack` (largest alternate unit), `looseRate` (strip MRP ÷ factor, less
+`mrp_less_percent`; ₹62 / 10 → 4 TAB = ₹24.80) and `applyLoosePrice` (catalogue MRP and — when no rate is set — rate per
+base unit; the existing unit picker then sells "4 TAB" or "1 STRIP" with `lineFactor`). Margin view `marginRows`: PTR =
+net rate per base unit of the latest bill per batch, cost after free goods, PTS (typed on the stock item), MRP, selling
+rate, margin % on PTR and after free, scheme "10 + 1"; CSV.
+
+Desk: `PharmacyDesk.tsx` (`rx` bills with Rx / scheduled lines + *Make refill*, `doctors` + doctor-wise sales,
+`registers` + narcotic items + licences form, `refills`, `prices`). Sample rows: `profile-retail.ts` `pharmacyBlock`
+(two scheduled drugs with strips and a ceiling, two doctors, a prescription bill 27 days old, a refill due in 3 days;
+Demo company only). Strings: `i18n/areas/retail-r9b.ts` (en + hi). Tests: `rt-pharmacy`, `rt-pharmacy-registers`,
+`rt-pharmacy-prices`, `purchase-contract` (RT-B readers), `rt-registry` (importers). E2E step "R9-B pharmacy".
+
+## 2. Deviations
+
+- Loose pricing does not add a `pricing.ts` branch: the strip MRP is converted once on the desk (`applyLoosePrice`) into
+  per-base-unit MRP / rate, which keeps the app's MRP-per-base-unit convention (RT-A2 guard, batch MRP) and the shell
+  untouched. `pricing.ts` is unchanged.
+- *Make refill* is on the Pharmacy desk's Prescriptions list (per bill), not on each editor line.
+- The year-end checklist shows the retention fact on its *Lock* step rather than a new step.
+- The POS strip and the save gate follow `pharma_settings.enabled` (the 7U switch the medical-store profile turns on), so
+  a 7U pharma company without the new pack also gets the strip (warning mode).
+
+## 3. Sizes (gz)
+
+(see the commit message of the RT-B merge; filled below)
+
+## 4. CA items touched
+
+- RT7: retention rows are unverified secondary-source readings; warnings only.
+- RT8: ceilings are user-typed, ex-GST, warning only.
+- RT9: the doctors master has no referral / commission field.
 
 # RT-C — Apparel, footwear, textiles
 

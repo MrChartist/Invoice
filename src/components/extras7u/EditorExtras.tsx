@@ -18,7 +18,7 @@ import { x7T } from '../../i18n/areas/extras-7u';
 import controls from '../../styles/controls.module.css';
 import own from './x7u.module.css';
 
-const RxEditorExtra = lazy(() => import('../retail-r9/RxStrip').then((m) => ({ default: m.RxEditorExtra })));
+const RxEditorExtra = lazy(() => import('../retail-r9/PharmacyDesk').then((m) => ({ default: m.RxEditorExtra })));
 
 const SALES = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY', 'QUOTATION', 'PROFORMA', 'SALES_ORDER', 'DELIVERY_CHALLAN', 'CREDIT_NOTE']);
 const OFFER_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY', 'QUOTATION', 'PROFORMA', 'SALES_ORDER']);

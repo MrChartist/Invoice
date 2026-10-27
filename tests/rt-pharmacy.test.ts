@@ -130,7 +130,7 @@ test('doctor-wise sales and CSV', () => {
 test('pack-off gate: nothing loads or blocks without the pharmacy features', () => {
   assert.deepEqual(rxRequiredErrors({ doc_type: 'TAX_INVOICE', items: [{ name: 'X', quantity: 1 }] }), []);
   const bell = readFileSync(new URL('../src/components/command/NotificationBell.tsx', import.meta.url), 'utf8');
-  assert.match(bell, /gate\('pharmacy', '-', \(\) => import\('\.\.\/\.\.\/lib\/retail\/rt-pharmacy-alerts'\)\)/, 'the bell loads the notices only with the pharmacy pack');
+  assert.match(bell, /gate\('pharmacy', '-', \(\) => import\('\.\.\/retail-r9\/PharmacyDesk'\)\.then\(\(m\) => m\.registerPharmacyAlerts\(\)\)\)/, 'the bell loads the notices only with the pharmacy pack');
   const pos = readFileSync(new URL('../src/pages/Pos.tsx', import.meta.url), 'utf8');
   assert.match(pos, /\{pharmaOn && <Suspense fallback=\{null\}><RxStrip /, 'the POS mounts the Rx strip only with the pharma features on');
   const bill = readFileSync(new URL('../src/components/purchases/BillModal.tsx', import.meta.url), 'utf8');
