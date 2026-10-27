@@ -11,6 +11,7 @@ import type {} from '../types/trade-r4'; // R4-C1: export document fields (RECOR
 import type {} from '../types/hotel-r7'; // R7: folio_id / reservation_id / stay / hotel_band (RECORD_KEYS)
 import type {} from '../types/trade-r8'; // R8: trading record / line fields (R8_RECORD_KEYS, R8_LINE_KEYS)
 import type {} from '../types/retail-r9'; // R9: retail record / line fields (R9_RECORD_KEYS, R9_LINE_KEYS)
+import type {} from '../types/services-r10'; // R10: the record / line snapshot key `sv` (appended to R9's lists)
 import { generateId } from '../lib/storage';
 import { deriveGstMode, num } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
@@ -166,9 +167,9 @@ export function advancedTaxDefaults(): Partial<InvoiceRecord> {
  */
 export const R8_RECORD_KEYS = ['cash_discount', 'price_drop_id', 'interest_run_id', 'broker_id', 'agency'] as const;
 export const R8_LINE_KEYS = ['disc_chain', 'disc_per_unit', 'wt', 'charge_head_id', 'arrival_id'] as const;
-/** R9 (owner RT-A, every package's keys — src/types/retail-r9.ts): delivery / KYC on the record; band, IMEI pairs, margin, jewellery breakdown on lines. */
-export const R9_RECORD_KEYS = ['delivery', 'kyc'] as const;
-export const R9_LINE_KEYS = ['band_rate', 'serial_pairs', 'margin', 'jw'] as const;
+/** R9 (owner RT-A, every package's keys — src/types/retail-r9.ts): delivery / KYC on the record; band, IMEI pairs, margin, jewellery breakdown on lines. R10: `sv` (src/types/services-r10.ts). */
+export const R9_RECORD_KEYS = ['delivery', 'kyc', 'sv'] as const;
+export const R9_LINE_KEYS = ['band_rate', 'serial_pairs', 'margin', 'jw', 'sv'] as const;
 
 function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
   const item = (raw ?? {}) as Partial<InvoiceItem>;

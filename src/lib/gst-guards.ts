@@ -18,6 +18,7 @@ import { complianceCalendar, daysBetween, filedFor, type CalendarOptions, type F
 import { shiftDay } from './dates';
 import { getTable, setTable } from './storage';
 import { isOwnGstin } from './gstin';
+import { ensureServiceHooks } from './services/ensure-sv'; // R10 (SV-A4)
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -225,7 +226,8 @@ export { GST_SLAB_RULES, slabsAt, rateInSlabs } from './tax-rules';
 
 export { isOwnGstin } from './gstin';
 
-export type GstExceptionCode = 'IRN_MISSING' | 'IRP_WINDOW_CLOSED' | 'B2B_NO_HSN' | 'POS_STATE_MISMATCH' | 'RATE_NOT_IN_SLABS' | 'B2CL_EDGE' | 'OWN_GSTIN' | 'BAND_RATE' | 'BAND_EDGE' | 'BAND_DISCOUNT';
+export type GstExceptionCode = 'IRN_MISSING' | 'IRP_WINDOW_CLOSED' | 'B2B_NO_HSN' | 'POS_STATE_MISMATCH' | 'RATE_NOT_IN_SLABS' | 'B2CL_EDGE' | 'OWN_GSTIN' | 'BAND_RATE' | 'BAND_EDGE' | 'BAND_DISCOUNT'
+  | 'SV_RATE_OLD' | 'SV_NIL_NOT_EXEMPT'; // R10 (SV-A4)
 
 export interface GstException {
   code: GstExceptionCode;
@@ -262,6 +264,12 @@ export function loadBandCheck(invoices: readonly InvoiceRecord[], force: boolean
   if (bandCheck || (!force && !invoices.some((i) => i?.items?.some((l) => l?.band_rate)))) return Promise.resolve(false);
   return (bandLoad ??= load().then((m) => { bandCheck = m.liveBandExceptions; return true; }, () => false));
 }
+
+// R10 (SV-A4): service-class line checks (old salon / gym rate, exempt line reported as nil) — one lazy check registered
+// by `services/sv-hooks.ts`, which `ensureServiceHooks` loads for service companies only.
+let svCheck: BandCheck | null = null;
+export const setSvExceptionCheck = (fn: BandCheck): void => { svCheck = fn; };
+void ensureServiceHooks();
 
 /** GST exceptions for documents dated in [from, to]. Errors first, then by date. */
 export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOptions): GstException[] {
@@ -309,6 +317,7 @@ export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOp
       if (v >= t * (1 - B2CL_EDGE_BAND) && v <= t * (1 + B2CL_EDGE_BAND)) push('B2CL_EDGE', 'warning', { value: r2(v), threshold: t, section: v > t ? 'B2CL' : 'B2CS' });
     }
     for (const b of bandCheck?.(inv) ?? []) push(b.code, 'warning', b.vars);
+    for (const b of svCheck?.(inv) ?? []) push(b.code, 'warning', b.vars); // R10 (SV-A4)
   }
   const rank = (e: GstException) => (e.severity === 'error' ? 0 : 1);
   return out.sort((a, b) => rank(a) - rank(b) || a.date.localeCompare(b.date) || a.number.localeCompare(b.number));

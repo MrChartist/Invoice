@@ -54,6 +54,8 @@ const EX_KEY = {
   BAND_RATE: 'exBandRate', // R9 (RT-C1)
   BAND_EDGE: 'exBandEdge',
   BAND_DISCOUNT: 'exBandDiscount',
+  SV_RATE_OLD: 'exSvRateOld', // R10 (SV-A4)
+  SV_NIL_NOT_EXEMPT: 'exSvNil',
 } as const;
 
 /** Return-period key used by the compliance calendar for a report period. */

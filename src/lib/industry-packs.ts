@@ -22,7 +22,9 @@ export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit
   // R9 (RT-A1): retail packs (a tab each on /inventory; switched on by the `kirana` retail profile, never by a business type)
   | 'pharmacy' | 'apparel' | 'electronics' | 'jewellery'
   // R11 (CN-A1): builders / developers (a tab on /receivables; switched on by the `builder` construction profile)
-  | 'realty';
+  | 'realty'
+  // R10 (SV-A1): service packs (desk tabs on /time; switched on by the `services` service profile, never by a business type)
+  | 'clinic' | 'salon' | 'fitness' | 'workshop';
 
 export const PACK_IDS: readonly PackId[] = [
   'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
@@ -30,6 +32,7 @@ export const PACK_IDS: readonly PackId[] = [
   'distributor', 'commodity', 'agency', // R8-C
   'pharmacy', 'apparel', 'electronics', 'jewellery', // R9 (RT-A1)
   'realty', // R11 (CN-A1)
+  'clinic', 'salon', 'fitness', 'workshop', // R10 (SV-A1)
 ];
 
 /** The packs a business type implies when `industry_packs` is absent. */
@@ -94,7 +97,7 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'leases', path: '/recurring?tab=leases', labelKey: 'tab.leases' },
   { pack: 'nonprofit', path: '/receivables?tab=donations', labelKey: 'tab.donations' },
   { pack: 'nonprofit', path: '/books?tab=funds', labelKey: 'tab.funds' },
-  { pack: 'fees', alsoPacks: ['nonprofit', 'leases', 'hotel'], path: '/gst-reports?tab=common-credit', labelKey: 'tab.commonCredit' },
+  { pack: 'fees', alsoPacks: ['nonprofit', 'leases', 'hotel', 'clinic', 'salon', 'fitness'], path: '/gst-reports?tab=common-credit', labelKey: 'tab.commonCredit' }, // R10 (SV-A4): + clinic / salon / fitness
   // R5-B: transport (Distribution → Transport) and works contracts (Time → Works); labels in `packs-transport-works-r5.ts`
   { pack: 'transport', path: '/distribution?tab=transport', labelKey: 'tab.transport' },
   { pack: 'transport', path: '/distribution?tab=transport&view=trips', labelKey: 'view.trips' },
@@ -160,6 +163,44 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'realty', path: '/receivables?tab=realty&view=rera', labelKey: 'r11.realty.rera' },
   { pack: 'realty', path: '/receivables?tab=realty&view=cancellations', labelKey: 'r11.realty.cancellations' },
   { pack: 'realty', path: '/receivables?tab=realty&view=procurement', labelKey: 'r11.realty.procurement' },
+  // R10: service desks on /time (SV-A writes every row; labels `r10.*` in `palette-destinations.ts`). The front desk is
+  // shared: appointments for clinic / salon / fitness / workshop, commission for the same four.
+  { pack: 'clinic', alsoPacks: ['salon', 'fitness', 'workshop'], path: '/time?tab=appointments', labelKey: 'r10.appointments' },
+  { pack: 'clinic', alsoPacks: ['salon', 'fitness', 'workshop'], path: '/time?tab=appointments&view=day', labelKey: 'r10.day' },
+  { pack: 'clinic', alsoPacks: ['salon', 'fitness', 'workshop'], path: '/time?tab=appointments&view=week', labelKey: 'r10.week' },
+  { pack: 'clinic', alsoPacks: ['salon', 'fitness', 'workshop'], path: '/time?tab=appointments&view=queue', labelKey: 'r10.queue' },
+  { pack: 'clinic', alsoPacks: ['salon', 'fitness', 'workshop'], path: '/time?tab=appointments&view=birthdays', labelKey: 'r10.birthdays' },
+  { pack: 'salon', alsoPacks: ['fitness', 'clinic', 'workshop'], path: '/time?tab=commission', labelKey: 'r10.commission' },
+  { pack: 'salon', alsoPacks: ['fitness', 'clinic', 'workshop'], path: '/time?tab=commission&view=staff', labelKey: 'r10.staff' },
+  { pack: 'salon', alsoPacks: ['fitness', 'clinic', 'workshop'], path: '/time?tab=commission&view=plans', labelKey: 'r10.plans' },
+  { pack: 'salon', alsoPacks: ['fitness', 'clinic', 'workshop'], path: '/time?tab=commission&view=statement', labelKey: 'r10.statement' },
+  // SV-B: clinic desk
+  { pack: 'clinic', path: '/time?tab=clinic', labelKey: 'r10.clinic' },
+  { pack: 'clinic', path: '/time?tab=clinic&view=patients', labelKey: 'r10.patients' },
+  { pack: 'clinic', path: '/time?tab=clinic&view=opd', labelKey: 'r10.opd' },
+  { pack: 'clinic', path: '/time?tab=clinic&view=ipd', labelKey: 'r10.ipd' },
+  { pack: 'clinic', path: '/time?tab=clinic&view=lab', labelKey: 'r10.lab' },
+  { pack: 'clinic', path: '/time?tab=clinic&view=tests', labelKey: 'r10.tests' },
+  { pack: 'clinic', path: '/time?tab=clinic&view=referrals', labelKey: 'r10.referrals' },
+  { pack: 'clinic', path: '/time?tab=clinic&view=rates', labelKey: 'r10.rates' },
+  // SV-C: members desk (fitness, salon packages) and the coaching views of the Fees tab
+  { pack: 'fitness', alsoPacks: ['salon'], path: '/time?tab=members', labelKey: 'r10.members' },
+  { pack: 'fitness', alsoPacks: ['salon'], path: '/time?tab=members&view=plans', labelKey: 'r10.memberPlans' },
+  { pack: 'fitness', alsoPacks: ['salon'], path: '/time?tab=members&view=members', labelKey: 'r10.memberList' },
+  { pack: 'fitness', alsoPacks: ['salon'], path: '/time?tab=members&view=checkin', labelKey: 'r10.checkin' },
+  { pack: 'fitness', alsoPacks: ['salon'], path: '/time?tab=members&view=classes', labelKey: 'r10.classes' },
+  { pack: 'fitness', alsoPacks: ['salon'], path: '/time?tab=members&view=recipes', labelKey: 'r10.recipes' },
+  { pack: 'fees', path: '/recurring?tab=fees&view=batches', labelKey: 'r10.batches' },
+  { pack: 'fees', path: '/recurring?tab=fees&view=attendance', labelKey: 'r10.attendance' },
+  { pack: 'fees', path: '/recurring?tab=fees&view=refunds', labelKey: 'r10.refunds' },
+  // SV-D: workshop desk (claims view: SV-A5's claims desk until SV-D merges its own)
+  { pack: 'workshop', path: '/time?tab=workshop', labelKey: 'r10.workshop' },
+  { pack: 'workshop', path: '/time?tab=workshop&view=jobs', labelKey: 'r10.jobs' },
+  { pack: 'workshop', path: '/time?tab=workshop&view=estimates', labelKey: 'r10.estimates' },
+  { pack: 'workshop', path: '/time?tab=workshop&view=claims', labelKey: 'r10.claims' },
+  { pack: 'workshop', path: '/time?tab=workshop&view=reminders', labelKey: 'r10.reminders' },
+  { pack: 'workshop', path: '/time?tab=workshop&view=labour', labelKey: 'r10.labour' },
+  { pack: 'workshop', path: '/time?tab=workshop&view=vehicles', labelKey: 'r10.vehicles' },
 ];
 
 /**

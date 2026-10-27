@@ -72,7 +72,7 @@ export const GST_TABS: readonly GstTab[] = [
 ];
 
 /** R5-C: tabs listed only while one of these packs is on (their URL always opens them). */
-export const PACK_GST_TABS: Readonly<Partial<Record<GstTabId, readonly PackId[]>>> = { 'common-credit': ['fees', 'nonprofit', 'leases', 'hotel'], 'hotel-gst': ['hotel'] };
+export const PACK_GST_TABS: Readonly<Partial<Record<GstTabId, readonly PackId[]>>> = { 'common-credit': ['fees', 'nonprofit', 'leases', 'hotel', 'clinic', 'salon', 'fitness'], 'hotel-gst': ['hotel'] }; // R10 (SV-A4): + clinic / salon / fitness
 
 /** Display order: GSTR-1 sections, GSTR-3B and payment, reconciliation, then the other tools. */
 export const GST_TAB_GROUPS: readonly { id: GstTabGroupId; tabs: readonly GstTabId[] }[] = [
