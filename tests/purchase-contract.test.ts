@@ -927,3 +927,20 @@ test('R9 (RT-B2 / RT-B3) pharmacy readers (narcotic register, margin view) read 
   const [m] = marginRows([free], [{ id: 's', name: 'Paper ream' }], [{ name: 'Paper ream', rate: 60 }]);
   assert.deepEqual([m.ptr, m.cost, m.scheme], [45, 40.91, '10 + 1'], 'PTR per base unit after the line discount; cost spread over the free units');
 });
+
+test('R9 (RT-D3) buy-back URD voucher: no GST / ITC in every reader, stock 1 serial into the used godown; the margin reader uses the contract', async () => {
+  const urd: PurchaseRecord = {
+    ...bill, id: 'urd1', vendor_gstin: undefined, bill_number: 'URD/FY26-27/0001', category: 'Used goods (buy-back)', itc_eligible: false, cgst: 0, sgst: 0, igst: 0, taxable: 18000, total: 18000,
+    lines: [{ id: 'lu', name: 'iPhone 12 (used)', item_id: 's', hsn: '8517', unit: 'NOS', quantity: 1, rate: 18000, tax_rate: 0, serials: ['356938035643809'], godown_id: 'g-used' }],
+    used_goods: { serial: '356938035643809', model: 'iPhone 12' },
+  };
+  for (const n of [booksNormalize(urd as never), exportNormalize(urd), gstNormalize(urd, '27')]) assert.equal(n!.taxable, 18000);
+  const c = readPurchase(urd)!;
+  assert.deepEqual([c.tax, c.itcEligible], [0, false], 'no GST, no ITC');
+  const ev = collectEvents({ items: [{ id: 's', name: 'iPhone 12 (used)', unit: 'NOS', track_stock: true, track_serials: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }], moves: [], invoices: [], purchases: [urd] } as never).get('s') ?? [];
+  assert.deepEqual(ev.filter((e) => e.kind === 'purchase').map((e) => [e.qty, e.godown, e.serials]), [[1, 'g-used', ['356938035643809']]]);
+  const { buyBackOf } = await import('../src/lib/retail/rt-buyback.ts');
+  assert.equal(buyBackOf('356938035643809', [urd])?.value, 18000);
+  assert.equal(buyBackOf('356938035643809', [{ ...urd, itc_eligible: true }]), undefined, 'ITC taken: no margin scheme');
+  assert.equal(buyBackOf('356938035643809', [{ ...urd, status: 'void' } as never]), undefined, 'a void voucher is skipped');
+});

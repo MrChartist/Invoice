@@ -5,7 +5,7 @@
  * grocery block; RT-B … RT-E fill their own block functions. Pure. Extra tables must be in `DEMO_EXTRA_TABLES`.
  */
 import type { InvoiceRecord } from '../../types/invoice';
-import type { AlterationJob, DeliveryRider, Doctor, RxRefill, ShortBookEntry } from '../../types/retail-r9';
+import type { AlterationJob, DeliveryRider, Doctor, ImeiCheck, RxRefill, ServiceJob, ShortBookEntry } from '../../types/retail-r9';
 import type { StockItem } from '../inventory';
 import { applyTotals, type Demo, type DemoExtras } from '../demo-data';
 import { shiftDay } from '../dates';
@@ -118,7 +118,34 @@ function apparelBlock({ today, base }: ProfileContext): DemoExtras {
   return { invoices: [sale], tables: { stock_items: [style, ...kids], alteration_jobs: [alteration] } };
 }
 /* ── RT-D: electronics (phones with IMEIs, a finance sale, a buy-back) — filled by RT-D ── */
-const electronicsBlock = (ctx: ProfileContext): DemoExtras => (void ctx, {});
+// Demo extras cannot hold purchases or vouchers, so the finance DO and the URD buy-back voucher are made from the desk:
+// the sample has a finance-ready bill (loan part unpaid), a second-hand phone in the "Used goods" godown, a clear
+// IMEI check and an open repair job.
+function electronicsBlock({ today, base }: ProfileContext): DemoExtras {
+  const at = `${shiftDay(today, -40)}T00:00:00.000Z`;
+  const imeis = ['490154203237518', '353918052034572', '356938035643809'];
+  const phone: Demo<StockItem> = { id: 'demo-redmi13', demo: true, name: 'Redmi 13 5G 8/128 (demo)', hsn: '8517', unit: 'NOS', track_stock: true, track_serials: true, serial_kind: 'imei', warranty_months: 12, opening_qty: 2, opening_rate: 11500, opening_serials: imeis.slice(0, 2), reorder_level: 1, sale_rate: 13999, tax_rate: 18, created_at: at };
+  const used: Demo<StockItem> = { id: 'demo-iphone12-used', demo: true, name: 'iPhone 12 64GB (used) (demo)', hsn: '8517', unit: 'NOS', track_stock: true, track_serials: true, serial_kind: 'imei', second_hand: true, opening_qty: 1, opening_rate: 18000, opening_serials: [imeis[2]], reorder_level: 0, sale_rate: 22000, tax_rate: 18, created_at: at };
+  const godown: Demo<{ id: string; name: string; kind: 'used' }> = { id: 'demo-godown-used', demo: true, name: 'Used goods (demo)', kind: 'used' };
+  const fy = getIndianFY(today).label;
+  const sale = applyTotals({
+    ...base.invoices[0],
+    id: 'demo-emi-1', demo: true, invoice_number: buildInvoiceNumber('DEMOEMI', fy, 1), issue_date: today, due_date: today, status: 'Partially Paid',
+    client: { id: 'demo-walkin-emi', name: 'Mr. Iyer (demo)', email: '', address: '', city: 'Mumbai', zip: '', state_code: '27', phone: '9800000011' },
+    items: [{ id: 'demo-emi-1-l1', name: 'LED TV 43" (demo)', type: 'Goods', hsn: '8528', unit: 'NOS', quantity: 1, rate: 35593.22, tax_rate: 18, discount_percent: 0, amount: 35593.22 }],
+    gst_mode: 'CGST_SGST', place_of_supply: '27', discount_rate: 0, amount_paid: 8400, pos: true, notes: 'EMI sale (demo): ₹8,400 down payment; record the ₹33,600 loan on Inventory → Devices → Finance.',
+  } as Demo<InvoiceRecord>);
+  const check: Demo<ImeiCheck> = { id: 'demo-imei-check', demo: true, date: today, imei: imeis[2], result: 'clear', portal_ref: 'DEMO-REF-1', created_at: `${today}T09:00:00.000Z` };
+  const job: Demo<ServiceJob> = {
+    id: 'demo-svc-1', demo: true, number: buildInvoiceNumber('DEMOSVC', fy, 1), date: today, kind: 'phone', customer: 'Ms. Rao (demo)', phone: '9800000012', asset: { model: 'Redmi Note 12', serial: '358240051111110' },
+    complaint: 'Broken screen', estimate: 3200, status: 'received', parts: [], labour: 0, due: shiftDay(today, 3), warranty: { status: 'none' }, history: [{ status: 'received', date: today }], created_at: `${today}T10:00:00.000Z`,
+  };
+  return {
+    invoices: [sale],
+    payments: [{ id: 'demo-emi-1-p1', demo: true, invoice_id: sale.id, amount: 8400, method: 'Cash', date: today, note: 'Down payment (demo)' }],
+    tables: { stock_items: [phone, used], godowns: [godown], imei_checks: [check], service_jobs: [job] },
+  };
+}
 /* ── RT-E: jewellery (today's rates, five tags, a sale with old gold) — filled by RT-E ── */
 const jewelleryBlock = (ctx: ProfileContext): DemoExtras => (void ctx, {});
 

@@ -634,7 +634,8 @@ function cashSideOf(accountId: string): { account: CashAccount; bank?: string } 
  * as the ledger posts it (`inBooks` / `reversalOf`, `ledger/voucher-variants.ts`): optional and memorandum vouchers and
  * post-dated ones not yet due stay out; a reversing journal is reversed on its day. Never counted twice:
  *  - a voucher whose receipt rows are in `transactions` (bill-wise RV, P0-11) is carried by those rows;
- *  - an RA deduction journal (class "RA deduction") pairs a no-cash row on the clearing account, so both stay out.
+ *  - an RA deduction journal (class "RA deduction") or a finance transfer (R9 RT-D2) pairs a no-cash row on the clearing
+ *    account, so both stay out.
  */
 export function manualCashVouchers(rows: readonly ManualVoucherRow[], transactions: readonly Payment[] = [], today: string = toIsoDate(new Date())): Voucher[] {
   const carried = new Set(transactions.map((t) => str((t as { voucher_id?: unknown }).voucher_id)).filter(Boolean));
@@ -670,7 +671,7 @@ export function manualCashVouchers(rows: readonly ManualVoucherRow[], transactio
     const id = str(v?.id);
     const date = toIsoDate(v?.date);
     if (!id || !date || carried.has(id) || v.variant === 'OPTIONAL' || v.variant === 'MEMO' || (v.post_dated === true && date > today)) continue;
-    if (str(v.voucher_class) === 'RA deduction') continue;
+    if (str(v.voucher_class) === 'RA deduction' || str(v.voucher_class) === 'Finance transfer') continue; // R9 (RT-D2): paired with its no-cash row
     push(v, id, date, str(v.number), str(v.narration), 1);
     const rev = toIsoDate(v.reverse_on);
     if (v.type === 'JOURNAL' && rev && rev > date) push(v, `${id}~rev`, rev, `${str(v.number)}-R`, `Reversal of ${str(v.number)}`, -1);

@@ -120,7 +120,7 @@ const rel = (p: string) => relative(SRC, p).replace(/\\/g, '/');
 /** Readers that turn receipt rows into cash / bank figures (QA6-1 F4 list). Add a new reader here. */
 const CASH_READERS = [
   'lib/books.ts', 'lib/today.ts', 'lib/bank-recon.ts', 'lib/sales-reports.ts', 'lib/tally-xml.ts', 'lib/accounting-export.ts',
-  'lib/cash-forecast.ts', 'lib/pos.ts', 'lib/forex-bank.ts',
+  'lib/cash-forecast.ts', 'lib/pos.ts', 'lib/forex-bank.ts', 'lib/retail/rt-cash-guard.ts',
 ];
 /** Modules that WRITE a marker or post it to its own ledger: they may name the fields directly. */
 const MARKER_OWNERS = new Set([
@@ -131,6 +131,8 @@ const MARKER_OWNERS = new Set([
   // Settlement payout matching reads only its clearing account's rows.
   'lib/marketplace/settlement-post.ts',
   'lib/trust/open-export-schema.ts', 'pages/Pos.tsx', 'components/modals/PaymentModal.tsx',
+  // R9 (RT-D2 / D3): the finance transfer row (ra_journal_id pattern) and the exchange receipt are written here.
+  'lib/retail/rt-finance.ts', 'lib/retail/rt-buyback.ts',
 ]);
 
 test('guard: the cash / bank readers call movedNoCash', () => {
