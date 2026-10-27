@@ -85,9 +85,19 @@ export function sessionsUsed(m: Pick<Membership, 'id'>, invoices: readonly Invoi
 
 export type MemberStatus = 'active' | 'frozen' | 'expired' | 'cancelled' | 'transferred' | 'upgraded';
 
+/**
+ * QA12 S6: the sale bill was cancelled or deleted outside the Members desk (not through *Cancel with refund*): the
+ * member did not pay for it, so it is no longer active (gate, redemption, check-in).
+ */
+export const saleVoid = (m: Pick<Membership, 'invoice_ids'>, invoices: readonly Pick<InvoiceRecord, 'id' | 'status'>[]): boolean => {
+  const id = m.invoice_ids?.[0];
+  return !!id && !invoices.some((i) => i?.id === id && i.status !== 'Cancelled');
+};
+
 /** Status on `today`: stored terminal state, else frozen (a freeze covers today), expired (past the end or used up), active. */
-export function statusOf(m: Membership, today: string, used = 0): MemberStatus {
+export function statusOf(m: Membership, today: string, used = 0, invoices?: readonly Pick<InvoiceRecord, 'id' | 'status'>[]): MemberStatus {
   if (m.closed) return m.closed;
+  if (invoices && saleVoid(m, invoices)) return 'cancelled';
   if ((m.freezes ?? []).some((f) => f.from <= today && today <= f.to)) return 'frozen';
   if ((m.end && today > m.end) || (num(m.plan.sessions) > 0 && used >= num(m.plan.sessions))) return 'expired';
   return 'active';
@@ -136,9 +146,9 @@ export const sessionText = (n: number, of: number, number: string) => `Session $
  * The redemption of one session on `line`: the line becomes ₹0 (no second tax), prints the session text and carries
  * `sv.redeem` (value = price ÷ sessions, the commission base). Refused when used up, expired, frozen or closed.
  */
-export function redeemPatch(m: Membership, line: Pick<InvoiceItem, 'sv' | 'name'>, today: string, used: number): Partial<InvoiceItem> {
+export function redeemPatch(m: Membership, line: Pick<InvoiceItem, 'sv' | 'name'>, today: string, used: number, invoices?: readonly Pick<InvoiceRecord, 'id' | 'status'>[]): Partial<InvoiceItem> {
   const of = num(m.plan.sessions);
-  const st = statusOf(m, today, used);
+  const st = statusOf(m, today, used, invoices);
   if (!of) throw new Error(`${m.number} has no sessions.`);
   if (st !== 'active') throw new Error(`${m.number} is ${st}${st === 'expired' ? ' — renew it' : ''}.`);
   if (!covers(m.plan, line.name)) throw new Error(`${m.plan.name} does not cover ${line.name}.`);

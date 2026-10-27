@@ -43,16 +43,16 @@ test('gate by status: warn lets in, block refuses an expired member', () => {
   assert.equal(gateFor('active', 'block'), 'ok');
   assert.equal(gateFor('expired', 'warn'), 'warn');
   assert.equal(gateFor('expired', 'off'), 'ok');
-  assert.throws(() => checkIn(a, '2026-05-02', '07:00', { gate: 'block', invoices: [] }), /expired. Renew/);
-  assert.equal(checkIn(a, '2026-05-02', '07:00', { gate: 'warn', invoices: [] }).name, 'Asha');
+  assert.throws(() => checkIn(a, '2026-05-02', '07:00', { gate: 'block', invoices: localDb.invoices.getAll() }), /expired. Renew/);
+  assert.equal(checkIn(a, '2026-05-02', '07:00', { gate: 'warn', invoices: localDb.invoices.getAll() }).name, 'Asha');
 });
 
 test('a package with redeem_on_checkin redeems a session; used up → no more redemption', () => {
   const p = sellPlan({ plan_id: saveMemberPlan({ name: 'PT 2', kind: 'package', sessions: 2, price: 2000, redeem_on_checkin: true }).id, client_name: 'Ravi', start: '2026-05-01' });
-  checkIn(p, '2026-05-02', '07:00', { invoices: [] });
-  checkIn(p, '2026-05-03', '07:00', { invoices: [] });
+  checkIn(p, '2026-05-02', '07:00', { invoices: localDb.invoices.getAll() });
+  checkIn(p, '2026-05-03', '07:00', { invoices: localDb.invoices.getAll() });
   assert.equal(sessionsUsed(p, [], loadCheckins()), 2);
-  const e = checkIn(p, '2026-05-04', '07:00', { invoices: [] });
+  const e = checkIn(p, '2026-05-04', '07:00', { invoices: localDb.invoices.getAll() });
   assert.equal(e.redeem, undefined);
 });
 

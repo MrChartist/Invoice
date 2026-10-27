@@ -163,6 +163,8 @@ export function rejectAndRebill(claimId: string, reason: string, date = todayInp
   const c = loadClaims().find((x) => x.id === claimId);
   const payerInv = c?.payer_invoice_id ? localDb.invoices.getById(c.payer_invoice_id) : undefined;
   if (!c || !payerInv) throw new Error('This claim has no payer bill.');
+  // QA12 S8: a rejected claim is re-billed once (a second call billed the beneficiary again).
+  if (c.status === 'rejected' || c.rebill_invoice_id) throw new Error(`Claim ${c.number} is already rejected and re-billed.`);
   return withTablesRollback([SV_TABLES.claims, 'invoices', 'doc_links', 'series_counters'], () => {
     const rebill = localDb.invoices.save(draftFor(c, 'beneficiary', payerInv.items.map((l) => ({ ...l, id: generateId(), sv: { ...l.sv, claim_part: 'non_covered' as const } })), date));
     if (payerInv.status !== 'Cancelled') cancelDocument(payerInv, `Claim ${c.number} rejected: ${reason.trim()}`, { acknowledgePayments: true });
