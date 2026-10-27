@@ -25,6 +25,7 @@ test('each new type implies its pack; an explicit list (even empty) beats the ty
   // R9 (RT-A1): four retail packs; `kirana` implies none (existing kirana companies unchanged); no shell route change.
   for (const p of ['pharmacy', 'apparel', 'electronics', 'jewellery']) assert.ok(PACK_IDS.includes(p as never), p);
   for (const p of ['agri', 'dairy', 'mill', 'coldstore', 'agri_inputs', 'fpo']) assert.ok(PACK_IDS.includes(p as never), p); // R12 (AG-A1)
+  for (const p of ['shopfloor', 'fabrication', 'garments', 'plastics', 'press', 'foodmfg']) assert.ok(PACK_IDS.includes(p as never), p); // R13 (MF-A1)
   assert.deepEqual(activePacks({ business_type: 'kirana' }), []);
   assert.ok(PACK_TABS.filter((t) => ['pharmacy', 'apparel', 'electronics', 'jewellery'].includes(t.pack)).every((t) => t.path.startsWith('/inventory?tab=')));
 });
@@ -96,7 +97,7 @@ test('R6-B2 pin: the shell copies PACK_ROUTES / PACK_OF_TYPE_INLINE equal PACK_T
   for (const t of PACK_TABS) {
     const route = t.path.split('?')[0];
     if (!moduleOfPath(route)) continue; // core routes (e.g. /receivables) are always visible
-    if (t.path.startsWith('/inventory?')) continue; // R9: the retail desks live on /inventory, which every retail profile keeps (PACK_ROUTES unchanged)
+    if (t.path.startsWith('/inventory?') || t.path.startsWith('/manufacturing?')) continue; // R13: manufacturing desks live on /manufacturing (module `inventory`, kept by every kind). R9: the retail desks live on /inventory, which every retail profile keeps (PACK_ROUTES unchanged)
     // R10: the service packs need no shell copy — every service profile keeps `time`, and the common-credit tab needs the
     // `gst` module anyway (an unregistered clinic has no GST pages); PACK_ROUTES stays unchanged (first paint 0).
     const packs = [t.pack, ...(t.alsoPacks ?? [])].filter((p) => !R10_PACKS.includes(p));

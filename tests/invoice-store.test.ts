@@ -103,6 +103,7 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     // R10 (src/types/services-r10.ts): the record snapshot key `sv`
     sv: { rule46a: true, claim: { id: 'c1', number: 'CLM/FY26-27/0001', role: 'payer' } },
     ag: { kind: 'rent', rent: { lot_no: 'CSR/FY26-27/0001', bags_out: 60, exempt: true }, lines: { l1: { lot: 'CSR/FY26-27/0001', bags: 60, rate_bag: 180 } } }, // R12 (AG-A5)
+    mf: { kind: 'drawing', header: { customer_po: 'PO-77' }, lines: { l1: { drawing: '1145-B', rev: 'C' } } }, // R13 (MF-A5)
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

@@ -4374,6 +4374,114 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+  await step('R13-A shop floor: Settings → Manufacturing profile → Engineering → shop-floor + fabrication packs, the Floor / Shop / Statutory desks; two work centres and a routing; release an order → planned hours; two job-card entries with 1.2 kg scrap → the output journal carries the scrap once; an invoice with the Udyam category prints the Udyam line and the MSE clause; a plain invoice is unchanged; Ctrl+K "job cards"; help', async () => {
+    const keys = ['settings', 'mfg_settings', 'work_centres', 'routings', 'job_cards', 'stock_items', 'boms', 'production_orders', 'godowns', 'stock_transfers', 'manufacturing_vouchers', 'invoices', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'manufacturer', modules: undefined, industry_packs: undefined, mfg_kind: undefined, mfg_sub: undefined, agri_kind: undefined, lock_until: undefined });
+    for (const k of ['mfg_settings', 'work_centres', 'routings', 'job_cards']) await writeJson(page, k, null);
+    const item = (id, name, extra) => ({ id, name, unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), item('e2e-mf-steel', 'E2E MS sheet', { unit: 'KG', opening_qty: 100, opening_rate: 60 }), item('e2e-mf-br', 'E2E Bracket'), item('e2e-mf-scrap', 'E2E MS off-cuts', { unit: 'KG', sale_rate: 28 })]);
+    await writeJson(page, 'boms', [...(prev.boms ?? []), { id: 'e2e-mf-bom', item_id: 'e2e-mf-br', name: 'Standard', batch_qty: 1, is_default: true, components: [{ id: 'c1', item_id: 'e2e-mf-steel', qty: 0.5 }] }]);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-mfg-kind-card="engineering"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.mfg_kind === 'engineering');
+    check(st.business_type === 'manufacturer' && st.mfg_sub === 'drawing' && ['shopfloor', 'fabrication'].every((x) => st.industry_packs?.includes(x)), `Engineering: manufacturer + shopfloor / fabrication packs (${st.industry_packs})`);
+    await page.goto(srv.origin + '/manufacturing?tab=floor&view=centres');
+    await page.locator('[data-floor-desk]').waitFor({ timeout: 15000 });
+    const tabs = (await page.locator('[data-mfg-tab]').allInnerTexts()).join('|');
+    check(/Floor/.test(tabs) && /Shop/.test(tabs) && /Statutory/.test(tabs) && !/Moulding/.test(tabs), `Manufacturing shows the Floor, Shop and Statutory desks only (${tabs})`);
+    for (const [name, rate] of [['E2E Laser', '1800'], ['E2E Brake', '900']]) {
+      await page.locator('[data-mf-centre-new]').click();
+      await page.locator('[data-mf="c-name"]').fill(name);
+      await page.locator('[data-mf="c-rate"]').fill(rate);
+      await page.locator('[data-mf="c-save"]').click();
+      await page.getByText(`Work centre ${name} saved.`).waitFor({ timeout: 10000 });
+    }
+    const centres = await readJson(page, 'work_centres', [], (v) => v.length === 2);
+    check(centres.length === 2, 'two work centres saved');
+    await page.goto(srv.origin + '/manufacturing?tab=floor&view=routings');
+    await page.locator('[data-mf-routing-new]').click({ timeout: 15000 });
+    await page.locator('[data-mf="r-item"]').selectOption('e2e-mf-br');
+    await page.locator('[data-mf="op-name-0"]').fill('Cut');
+    await page.locator('[data-mf="op-centre-0"]').selectOption(centres.find((c) => c.name === 'E2E Laser').id);
+    await page.locator('[data-mf="op-run-0"]').fill('3');
+    await page.locator('[data-mf="r-save"]').click();
+    await readJson(page, 'routings', [], (v) => v.some((r) => r.item_id === 'e2e-mf-br'));
+    await writeJson(page, 'production_orders', [...(prev.production_orders ?? []), { id: 'e2e-mf-wo', number: 'WO/FY26-27/0901', date: today, item_id: 'e2e-mf-br', planned_qty: 10, status: 'planned', wip_godown_id: '', log: [] }]);
+    await page.goto(srv.origin + '/manufacturing?tab=orders');
+    await page.getByRole('button', { name: /Open\s+WO\/FY26-27\/0901/ }).click({ timeout: 15000 });
+    const detail = page.getByTestId('wo-detail');
+    await detail.getByRole('button', { name: 'Release', exact: true }).click();
+    const wo = (await readJson(page, 'production_orders', [], (v) => v.some((o) => o.id === 'e2e-mf-wo' && o.mf?.ops))).find((o) => o.id === 'e2e-mf-wo');
+    check(wo?.mf?.ops?.[0]?.planned_hours === 0.5, `release copies the routing: Cut 10 × 3 min = 0.5 h (${wo?.mf?.ops?.[0]?.planned_hours})`);
+    await page.goto(srv.origin + '/manufacturing?tab=floor&view=cards');
+    await page.locator('[data-mf="order"]').selectOption('e2e-mf-wo', { timeout: 15000 });
+    for (const [good, kg] of [['6', '0.7'], ['4', '0.5']]) {
+      await page.locator('[data-mf="report-10"]').click();
+      await page.locator('[data-mf="e-hours"]').fill('1');
+      await page.locator('[data-mf="e-good"]').fill(good);
+      await page.locator('[data-mf="e-scrap"]').fill(kg);
+      await page.locator('[data-mf="e-scrap-item"]').selectOption('e2e-mf-scrap');
+      await page.locator('[data-mf="e-save"]').click();
+      await page.getByText(/Saved on JCD\/FY\d\d-\d\d\/\d+/).first().waitFor({ timeout: 10000 });
+    }
+    const cards = await readJson(page, 'job_cards', [], (v) => v.some((c) => c.entries?.length === 2));
+    check(cards.length === 1 && cards[0].entries.length === 2 && /^JCD\//.test(cards[0].number), 'one job card per order per operation, with two entries');
+    await page.goto(srv.origin + '/manufacturing?tab=orders');
+    await page.getByRole('button', { name: /Open\s+WO\/FY26-27\/0901/ }).click({ timeout: 15000 });
+    await detail.getByRole('button', { name: 'Issue materials' }).click();
+    await page.getByTestId('wo-issue-save').click();
+    await page.getByText(/Materials issued on STR\/FY\d\d-\d\d\/\d+/).waitFor();
+    await detail.getByRole('button', { name: 'Report output' }).click();
+    await page.locator('[data-mf-output]').waitFor({ timeout: 10000 });
+    await page.getByTestId('wo-output-save').click();
+    const mv = (await readJson(page, 'manufacturing_vouchers', [], (v) => v.some((m) => m.production_order_id === 'e2e-mf-wo'))).filter((m) => m.production_order_id === 'e2e-mf-wo');
+    const scrapLines = mv.flatMap((m) => m.outputs ?? []).filter((o) => o.item_id === 'e2e-mf-scrap');
+    check(scrapLines.length === 1 && scrapLines[0].qty === 1.2 && scrapLines[0].mf_jc, `the output journal carries the job cards' 1.2 kg scrap once (${JSON.stringify(scrapLines.map((x) => x.qty))})`);
+    // The Udyam line and the MSE clause print from the sender snapshot; a plain invoice prints none of it.
+    const seller = { ...((st.profiles ?? [])[0] ?? {}), msme_udyam: 'UDYAM-MH-26-0012345', msme_category: 'MICRO' };
+    const inv = { id: 'e2e-mf-inv', invoice_number: 'INV/FY26-27/0901', doc_type: 'INVOICE', status: 'Sent', issue_date: today, due_date: today, sender: seller, client: { name: 'E2E Buyer', gstin: '27AAPFU0939F1ZV' }, items: [{ id: 'l1', name: 'E2E Bracket', quantity: 1, rate: 100, tax_rate: 18, amount: 100 }], mf: { header: { customer_po: 'PO-77' }, lines: { l1: { drawing: '1145-B', rev: 'C' } } } };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv]);
+    await page.goto(srv.origin + '/invoice/e2e-mf-inv');
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Document preview' });
+    await dlg.waitFor();
+    await dlg.locator('[data-mfg-block]').first().waitFor({ timeout: 15000 });
+    const paper = await dlg.innerText();
+    check(/Udyam: UDYAM-MH-26-0012345 \(Micro\)/.test(paper) && /MSMED Act 2006 Sec 15/.test(paper) && /Drg\. 1145-B rev C/.test(paper), 'the invoice prints the Udyam line, the MSE clause and the drawing sub-line');
+    await page.keyboard.press('Escape');
+    await dlg.waitFor({ state: 'detached' });
+    const plain = (prev.invoices ?? []).find((i) => i.doc_type === 'INVOICE' && !i.mf && i.status !== 'Cancelled');
+    if (plain) {
+      await page.goto(srv.origin + '/invoice/' + plain.id);
+      await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+      const d2 = page.getByRole('dialog', { name: 'Document preview' });
+      await d2.waitFor();
+      check(await d2.locator('[data-mfg-block], [data-mfg-annexure]').count() === 0 && !/Udyam: |MSMED Act 2006/.test(await d2.innerText()), 'a plain invoice prints unchanged (no manufacturing part)');
+      await page.keyboard.press('Escape');
+      await d2.waitFor({ state: 'detached' });
+    }
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('job cards');
+    await palette.getByRole('option', { name: /Job cards/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "job cards" finds Manufacturing → Floor → Job cards');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/manufacturing?tab=floor&view=cards');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="manufacturing:floor"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a floor topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {

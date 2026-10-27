@@ -17,7 +17,7 @@
  *
  * Pure above the "Storage" divider (tests/production-orders.test.ts).
  */
-import type { Bom, ManufacturingVoucher, StockJournal, VoucherOutputLine, VoucherStockLine } from '../../types/manufacturing';
+import type { AdditionalCost, Bom, ManufacturingVoucher, StockJournal, VoucherOutputLine, VoucherStockLine } from '../../types/manufacturing';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import { MAIN_GODOWN_ID, type Godown, type StockTransfer, type StockTransferLine } from '../../types/stock';
 import type { ProductionMaterial, ProductionOrder, ProductionOrderLog, ProductionOrderStatus } from '../../types/production-r4';
@@ -34,6 +34,7 @@ import { nextSeriesNumberFor, numberFitsFy, recordSeries } from '../series-count
 import { withTablesRollback } from '../table-txn';
 import { godownsDb, transfersDb } from '../godowns';
 import { MFG_TABLE, SJ_TABLE, consumptionShortfalls, manufacturingDb, saveConsumeOnlyJournal } from '../manufacturing';
+import { opsForRelease } from '../mfg/mf-ops'; // R13 (MF-A2): copies the default routing at release (shopfloor pack only)
 
 export const ORDERS_TABLE = 'production_orders';
 export const ORDER_PREFIX = 'WO';
@@ -285,6 +286,7 @@ export interface OutputDraftOptions {
  */
 export function buildOutputVoucher(
   order: ProductionOrder, p: OrderProgress, bom: Pick<Bom, 'batch_qty' | 'outputs'> | undefined, opts: OutputDraftOptions, newId: () => string = generateId,
+  extra?: { scrapLines?: VoucherOutputLine[]; conversion?: AdditionalCost[] }, // R13 (MF-A3 / MF-D5): job-card scrap, conversion cost
 ): Omit<ManufacturingVoucher, 'id' | 'number'> {
   const wip = order.wip_godown_id;
   const components: VoucherStockLine[] = [];
@@ -318,7 +320,7 @@ export function buildOutputVoucher(
     ...(opts.batch_no?.trim() ? { batch_no: opts.batch_no.trim(), mfg_date: opts.date } : {}),
     ...(opts.expiry_date ? { expiry_date: opts.expiry_date } : {}),
     ...(opts.serials?.length ? { serials: opts.serials } : {}),
-    components, outputs, costs: [], production_order_id: order.id, narration: `Output against ${order.number}`,
+    components, outputs: extra?.scrapLines?.length ? [...outputs, ...extra.scrapLines] : outputs, costs: extra?.conversion?.length ? [...extra.conversion] : [], production_order_id: order.id, narration: `Output against ${order.number}`,
   };
 }
 
@@ -547,7 +549,8 @@ export const productionOrdersDb = {
     if (!bom) throw new Error('This item has no bill of materials any more.');
     const saved = withTablesRollback([ORDERS_TABLE, 'godowns'], () => {
       const wip = ensureWipGodown();
-      return persist({ ...o, status: 'released', bom_id: bom.id, wip_godown_id: wip.id, materials: explodeOrder(bom, num(o.planned_qty)) }, logRow('release', undefined, actorName()));
+      const ops = opsForRelease(o); // R13 (MF-A2): snapshot of the default routing, shopfloor pack only
+      return persist({ ...o, status: 'released', bom_id: bom.id, wip_godown_id: wip.id, materials: explodeOrder(bom, num(o.planned_qty)), ...(ops ? { mf: { ...o.mf, ops } } : {}) }, logRow('release', undefined, actorName()));
     });
     logAudit(saved, 'update', `Released production order ${o.number}: ${saved.materials?.length ?? 0} material line(s) for ${saved.planned_qty} unit(s)`);
     return saved;
