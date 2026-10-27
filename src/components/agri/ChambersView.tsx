@@ -27,7 +27,7 @@ export default function ChambersView({ onDone }: { onDone: Done }) {
         <B p k="add" on={add} data-agd-b="add-chamber" />
       </Form>
       <Tbl head={['chamber', 'capacity', 'stored', '']} rows={chamberUse(loadLots(), chambers).map((u) => [u.chamber.name, u.chamber.capacity_bags, `${u.bags} (${u.pct}%)`, !u.bags && <B key="d" k="delete" on={() => run(() => { saveAgriSettings({ chambers: chambers.filter((x) => x.id !== u.chamber.id) }); return agdT('deleted'); })} />])} />
-      <Form v={t} set={setT} f={[['receipt_terms', 'terms'], ['release_ltv_pct', 'releaseLtv', 'n', 160]]}>
+      <Form v={t} set={setT} f={[['receipt_terms', 'terms']]}>
         <B k="save" on={() => run(() => { saveAgriSettings({ cold: t }); return agdT('saved'); })} />
       </Form>
     </>

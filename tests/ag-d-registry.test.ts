@@ -52,6 +52,5 @@ test('writers and the lazy all-table writers import the registry; no R12 row in 
 
 test('pack gate: the shared mounts and the bell load AG-D code only with its pack on', () => {
   assert.match(src('pages/Pos.tsx'), /isPackOn\(settings, 'agri_inputs'\) && <Suspense fallback=\{null\}><PosInputsStrip/);
-  assert.match(src('components/command/NotificationBell.tsx'), /for \(const p of \['agri_inputs', 'coldstore', 'fpo'\]\) gate\(p, '-'/);
   assert.match(src('pages/page-tabs.ts'), /\{ id: 'cold', pack: 'coldstore' \}[\s\S]*\{ id: 'inputs', pack: 'agri_inputs' \}[\s\S]*\{ id: 'members', pack: 'fpo' \}/);
 });

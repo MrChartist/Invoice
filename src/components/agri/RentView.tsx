@@ -19,9 +19,8 @@ export default function RentView({ onDone }: { onDone: Done }) {
   const set = (v: typeof f) => setF(v.commodity !== f.commodity || v.space !== f.space ? { ...v, class: suggestClass(v.commodity ?? '', v.space) ?? v.class } : v);
   const save = () => run(() => {
     const p = savePlan({
-      name: f.name, basis: f.basis, rate: f.rate, season: { from: f.from, to: f.to }, part_month: f.part_month, class: f.class, bill_at: f.bill_at, min_months: f.min_months, space: f.space,
+      name: f.name, basis: f.basis, rate: f.rate, season: { from: f.from, to: f.to }, part_month: f.part_month, class: f.class, bill_at: f.bill_at, space: f.space,
       charges: f.c1 ? [{ name: f.c1, basis: 'bag', rate: f.c1rate, when: f.c1when }] : [],
-      ...(f.late && f.lateRate > 0 ? { late: { after: f.late, rate_per_bag_month: f.lateRate } } : {}), ...(f.nRate > 0 && f.nRef ? { notified: { rate: f.nRate, order_ref: f.nRef } } : {}),
     });
     setF(blank);
     return agdT('planSaved', { n: p.name });
@@ -30,8 +29,8 @@ export default function RentView({ onDone }: { onDone: Done }) {
   const bill = (occ: Parameters<typeof raiseRentBill>[1]) => run(() => { const i = raiseRentBill(lot!, occ); return agdT('billRaised', { n: i.invoice_number, total: i.total }); });
   return (
     <>
-      <Form v={f} set={set} f={[['name', 'planName'], ['commodity', 'commodity', 't', 140], ['basis', 'basis', o(['bag_season', 'bag_month', 'qtl_season', 'qtl_month', 'flat'], 'b.')], ['rate', 'rate', 'n', 100], ['from', 'seasonFrom', 't', 90], ['to', 'seasonTo', 't', 90], ['min_months', 'minMonths', 'n', 90], ['part_month', 'partMonth', o(['full', 'days'], 'pm.')], ['class', 'class', o(['storage_agri', 'storage_other'], 'c.')], ['bill_at', 'billAt', o(['out', 'in', 'monthly', 'season_end'], 'at.')], ['space', 'space', 'c'],
-        ['c1', 'charge', 't', 140], ['c1rate', 'perBag', 'n', 90], ['c1when', 'when', o(['in', 'out'], 'w.')], ['late', 'lateAfter', 't', 90], ['lateRate', 'lateRate', 'n', 110], ['nRate', 'notifiedRate', 'n', 110], ['nRef', 'orderRef', 't', 160]]}>
+      <Form v={f} set={set} f={[['name', 'planName'], ['commodity', 'commodity', 't', 140], ['basis', 'basis', o(['bag_season', 'bag_month', 'qtl_season', 'qtl_month', 'flat'], 'b.')], ['rate', 'rate', 'n', 100], ['from', 'seasonFrom', 't', 90], ['to', 'seasonTo', 't', 90], ['class', 'class', o(['storage_agri', 'storage_other'], 'c.')], ['bill_at', 'billAt', o(['out', 'in', 'monthly', 'season_end'], 'at.')], ['space', 'space', 'c'],
+        ['c1', 'charge', 't', 140], ['c1rate', 'perBag', 'n', 90], ['c1when', 'when', o(['in', 'out'], 'w.')]]}>
         <B p k="savePlan" on={save} data-agd-b="save-plan" />
       </Form>
       <Hint k={f.space ? 'spaceNote' : f.class === 'storage_agri' ? 'clsAgri' : 'clsOther'} />

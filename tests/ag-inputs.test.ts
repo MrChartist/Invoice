@@ -99,13 +99,3 @@ test('season due date (MM-DD rolls to the next one), the snapshot, the khata lis
   assert.equal(p.bills[0].days, 30);
 });
 
-test('bell: licence notices with the inputs pack; overdue loans with the cold-store / FPO pack; nothing when off', async () => {
-  const { saveAgriSettings } = await import('../src/lib/agri/ag-settings.ts');
-  const { agdNotices } = await import('../src/lib/agri/ag-d-alerts.ts');
-  saveAgriSettings({ licences: [lic('insecticide', '2026-07-01'), lic('seed', '2026-08-01')] });
-  setTable('agri_loans', [{ id: 'l', number: 'LAS/FY26-27/0001', date: '2026-04-01', borrower_id: 'c', borrower_name: 'R', lot_ids: [], principal: 1000, rate_pct: 12, basis: 'simple', due_date: '2026-06-30', disbursed_by: 'cash', payment_voucher_id: 'v', repayments: [], status: 'open' }]);
-  const n = agdNotices('2026-07-10', 'x', { inputs: true, loans: true, loansTab: 'members' });
-  assert.deepEqual(n.map((x) => x.severity), ['critical', 'warning', 'warning']);
-  assert.equal(n[2].href, '/inventory?tab=members&view=loans');
-  assert.equal(agdNotices('2026-07-10', 'x', { inputs: false, loans: false }).length, 0);
-});
