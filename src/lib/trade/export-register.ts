@@ -21,7 +21,7 @@ import { generateId, getTable, peekTable, setTable } from '../storage';
 import { parseTable } from '../csv';
 import { isExportDoc, isSupplyDocType } from './exporter';
 import { linkedCredits, type CreditLinkRow } from '../amount-due';
-import { exportRealisationMonths } from './trade-rules';
+import { EXPORT_REALISATION_INR_MONTHS_RULES, exportRealisationInrMonths, exportRealisationMonths } from './trade-rules';
 
 export const IRMS_TABLE = 'export_irms';
 export const WRITEOFFS_TABLE = 'export_writeoffs';
@@ -69,6 +69,10 @@ export interface RealisationRow {
   dueDate: string;
   daysLeft: number;
   status: RealisationStatus;
+  /** R14 PS-C2: a services-only export — the clock runs from the invoice date (Reg 5(1)(a)), never flagged. */
+  services?: boolean;
+  /** R14 PS-C2: the INR rule applied (invoiced in INR, first proviso to Reg 5(1)). */
+  inrRule?: boolean;
   writeOffReason?: string;
   irms: { id: string; irm_no: string; date: string; fcy: number; ebrc_no?: string; ebrc_status?: string }[];
 }
@@ -89,6 +93,13 @@ const n = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 // receivable, a credit note reduces its invoice (F15).
 const live = (i: Partial<InvoiceRecord>) =>
   i.status !== 'Draft' && i.status !== 'Cancelled' && isSupplyDocType(i.doc_type) && i.doc_type !== 'CREDIT_NOTE' && i.doc_type !== 'DEBIT_NOTE';
+
+/**
+ * R14 PS-C2: a services-only document — at least one line and every line a service (type `Service` or a SAC, `99…`).
+ * Mixed documents keep the shipping-bill clock.
+ */
+export const isServicesExport = (i: Partial<Pick<InvoiceRecord, 'items'>>): boolean =>
+  !!i.items?.length && i.items.every((l) => l?.type === 'Service' || String(l?.hsn ?? '').trim().startsWith('99'));
 
 /** Issued export invoices the register follows. */
 export const exportInvoices = (invoices: readonly Partial<InvoiceRecord>[]) => invoices.filter((i) => i && i.id && live(i) && isExportDoc(i as InvoiceRecord));
@@ -118,9 +129,11 @@ export function buildRegister(input: RegisterInput): RealisationRow[] {
     const id = String(inv.id);
     const sbDate = isoDay(inv.shipping_bill_date);
     const invoiceDate = isoDay(inv.issue_date);
-    const shipDate = sbDate || invoiceDate;
+    const services = isServicesExport(inv); // R14 PS-C2
+    const shipDate = services ? invoiceDate : sbDate || invoiceDate;
     if (!shipDate) continue;
-    const months = exportRealisationMonths(shipDate);
+    const inrRule = String(inv.currency || 'INR').toUpperCase() === 'INR' && shipDate >= EXPORT_REALISATION_INR_MONTHS_RULES[0].from;
+    const months = inrRule ? exportRealisationInrMonths(shipDate) : exportRealisationMonths(shipDate);
     const dueDate = addMonths(shipDate, months);
     const fcy = round2(Math.max(n(inv.total) - (credits.get(id) ?? 0), 0)); // net of live credit notes (QA6 F15)
     const receivedFcy = round2(received.get(id) ?? 0);
@@ -141,7 +154,7 @@ export function buildRegister(input: RegisterInput): RealisationRow[] {
       currency: String(inv.currency || 'INR').toUpperCase(),
       sbNo: String(inv.shipping_bill_no ?? ''),
       sbDate,
-      sbMissing: !sbDate || !String(inv.shipping_bill_no ?? '').trim(),
+      sbMissing: !services && (!sbDate || !String(inv.shipping_bill_no ?? '').trim()),
       shipDate,
       fcy,
       receivedFcy,
@@ -153,6 +166,8 @@ export function buildRegister(input: RegisterInput): RealisationRow[] {
       dueDate,
       daysLeft,
       status,
+      ...(services ? { services } : {}),
+      ...(inrRule ? { inrRule } : {}),
       ...(w ? { writeOffReason: w.reason } : {}),
       irms,
     });

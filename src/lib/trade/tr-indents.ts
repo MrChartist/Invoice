@@ -5,7 +5,8 @@
  *
  * "Bill commission" makes ONE services invoice per principal for the chosen dispatched / paid indents: SAC 996111 at
  * 18%, place of supply = the principal's location (Sec 12(2) IGST Act), with the 194H TDS the principal is expected to
- * deduct preset (TR21). A principal outside India is an intermediary service, not an export (Sec 13(8)(b)) — the
+ * deduct preset (TR21). A principal outside India is an intermediary service, not an export (Sec 13(8)(b), to 29 Mar 2026;
+ * R14 PS4: from 30 Mar 2026 Sec 13(2), an export if Sec 2(6) is met) — the
  * invoice carries that warning. Working paper — verify with your CA.
  */
 import './tr-registry';
@@ -23,6 +24,7 @@ import { isValidGstin } from '../gstin';
 import { tdsSections } from '../tax-rules';
 import { AgencyError } from './tr-arrivals';
 import { TR_SERIES, TR_TABLES } from './tr-shared';
+import { intermediaryPos } from '../prof/ps-c-rules'; // R14 PS-C1
 
 export const INDENTS_TABLE = TR_TABLES.indents;
 export const COMMISSION_SAC = '996111';
@@ -113,7 +115,8 @@ export function buildCommissionInvoice(rows: readonly Indent[], ctx: { principal
     ...(h194 ? { tds_enabled: true, tds_section: '194H', tds_rate: h194.rate, tds_on_taxable: true } : {}),
     notes: [
       `Commission as indenting agent on ${rows.length} indent(s).`,
-      ...(foreign ? ['Principal outside India: an intermediary service (Sec 13(8)(b) IGST Act), not an export — verify with your CA.'] : []),
+      // R14 PS-C1 (PS4): Sec 13(8)(b) was omitted from 30 Mar 2026 — the dated rule decides the note.
+      ...(foreign ? [intermediaryPos(ctx.date) === 'supplier' ? 'Principal outside India: an intermediary service (Sec 13(8)(b) IGST Act), not an export — verify with your CA.' : 'Principal outside India: an intermediary service, place of supply Sec 13(2) from 30 Mar 2026 — an export if Sec 2(6) is met — verify with your CA.'] : []),
     ].join('\n'),
   };
   const t = calculateInvoice(calcInputFromRecord(rec, { amount_paid: 0 }));
