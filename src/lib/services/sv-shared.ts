@@ -12,6 +12,12 @@ export const SV_TABLES = {
   plans: 'commission_plans',
   payouts: 'staff_payouts',
   claims: 'payer_claims',
+  // SV-C: membership plans, memberships (MEM/FY…), check-ins (one row per day), classes / batches, class attendance
+  memberPlans: 'member_plans',
+  memberships: 'memberships',
+  checkins: 'checkins',
+  classes: 'class_schedules',
+  attendance: 'class_attendance',
   // SV-B: clinic_visits, admissions, lab_tests, lab_orders — SV-C: member_plans, memberships, checkins, class_schedules,
   // class_attendance — SV-D: service_assets, labour_ops (each package adds its own rows)
   // SV-D: vehicles / appliances, labour operations
@@ -29,10 +35,11 @@ export const SV_OBJECTS = {
 /** New Indian-FY series (`<PREFIX>/FY<yy-yy>/<seq>`, through `series-counters.ts`; never reused after a delete). */
 export const SV_SERIES = {
   claims: 'CLM', // SV-A5
+  memberships: 'MEM', // SV-C1
   // Reserved for their packages (one commit, §5): OPD (SV-B1), IPD (SV-B2), LAB (SV-B3), MEM (SV-C1)
 } as const;
 /** Series prefixes reserved for SV-B / SV-C (written as strings there; listed here so nothing else takes them). */
-export const SV_RESERVED_SERIES = ['OPD', 'IPD', 'LAB', 'MEM'] as const;
+export const SV_RESERVED_SERIES = ['OPD', 'IPD', 'LAB'] as const; // SV-C: MEM taken (SV_SERIES.memberships)
 
 /** The four Round 10 packs (`industry-packs.ts`). */
 export const SV_PACKS = ['clinic', 'salon', 'fitness', 'workshop'] as const;

@@ -47,6 +47,7 @@ const EditorJewel = lazy(() => import('../retail-r9/JewelleryDesk').then((m) => 
 // R10 (SV-A3 / A4): staff, service class and exempt column per line; the Rule 46A note (service profile / pack, lazy).
 const SvLineRow = lazy(() => import('../services-r10/SvEditor').then((m) => ({ default: m.SvLineRow })));
 const EditorService = lazy(() => import('../services-r10/SvEditor').then((m) => ({ default: m.EditorService })));
+const RedeemChip = lazy(() => import('../services-r10/SvRedeem').then((m) => ({ default: m.RedeemChip }))); // R10 (SV-C1) "Use package"
 import { impliedPacks } from '../../lib/shop-mode';
 import styles from './ItemsTable.module.css';
 
@@ -213,6 +214,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
               {item.band_rate && <Suspense fallback={null}><BandChip item={item} date={issueDate} /></Suspense>}
               {(jewelOn || !!item.jw) && priced && <Suspense fallback={null}><JewelLineRow item={item} date={issueDate} /></Suspense>}
               {(svOn || !!item.sv) && <Suspense fallback={null}><SvLineRow item={item} index={index} date={issueDate} /></Suspense>}
+              {(svOn || !!item.sv?.redeem) && <Suspense fallback={null}><RedeemChip item={item} date={issueDate} /></Suspense>}
               {agencyOn && (docType === 'INVOICE' || docType === 'TAX_INVOICE' || docType === 'BILL_OF_SUPPLY') && <Suspense fallback={null}><LotPicker item={item} index={index} /></Suspense>}
               {docType === 'QUOTATION' && <QuoteLineFlags item={item} index={index} />}
               {showTax && priced && !(item.cess_rate || item.cess_per_unit || cessOpen[item.id]) && (
