@@ -151,7 +151,7 @@ export function saveSubBill(woId: string, i: SubBillInput): { measurement: SubMe
   const tdsIn = { ...billTdsInputFor(null, vendor), section: subTdsCode(wo, vendor) };
   const tds = resolveBillTds(tdsIn, { date: i.date, taxable: t.taxable, prior: priorCreditsFor(purchases, { id: vendor?.id, name: wo.vendor_name, pan: vendor?.pan }) }).fields;
   const advances = openAdvances(wo.vendor_id);
-  const hire = i.recoverHire === false ? { logs: [], amount: 0 } : hireRecoveryFor(wo.vendor_id, i.date, loadLogs(), machines());
+  const hire = i.recoverHire === false ? { logs: [], amount: 0 } : hireRecoveryFor(wo.vendor_id, i.date, loadLogs(), machines(), localDb.invoices.getAll());
   const deds = subDeductions(wo, t.taxable, { material: i.material, hire: hire.amount + num(i.hire), advanceOpen: advances.reduce((s, a) => s + a.open, 0) });
   const net = round2(t.total - num(tds.tds_amount) - deds.reduce((s, d) => s + d.amount, 0));
   if (net < 0) throw new Error('The deductions are more than the bill.');
@@ -188,7 +188,7 @@ export function saveSubBill(woId: string, i: SubBillInput): { measurement: SubMe
       adjustAgainstBill(a.v.id, bill.id, amt, i.date < a.v.date ? a.v.date : i.date);
       left = round2(left - amt);
     }
-    if (hire.logs.length) setTable(SD.logs, loadLogs().map((l) => (hire.logs.some((h) => h.id === l.id) ? { ...l, recovered_in: number } : l)));
+    if (hire.logs.length) setTable(SD.logs, loadLogs().map((l) => (hire.logs.some((h) => h.id === l.id) ? { ...l, recovered_in: number, recovered_invoice_id: undefined } : l)));
     const m: SubMeasurement = { id, number, wo_id: wo.id, date: i.date, ...(i.period_from ? { period_from: i.period_from } : {}), ...(i.period_to ? { period_to: i.period_to } : {}), lines, purchase_id: bill.id, ...(jvId ? { jv_id: jvId } : {}), status: 'billed', created_at: new Date().toISOString() };
     put(SD.bills, m);
     recordSeries(number);

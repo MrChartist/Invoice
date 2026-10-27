@@ -27,8 +27,8 @@ import { recordSecured, deleteSecured } from '../src/lib/construction/cn-secured
 import { fromBoq, saveWorkOrder } from '../src/lib/construction/cn-subcon.ts';
 import { cancelSubBill, loadSubBills, saveSubBill } from '../src/lib/construction/cn-subcon-bill.ts';
 import { loadMuster, markDay, saveLabour, settleWeek, undoSettlement } from '../src/lib/construction/cn-muster.ts';
-import { saveHired, saveLog } from '../src/lib/construction/cn-plant.ts';
-import { bookHireIn } from '../src/lib/construction/cn-plant-hire.ts';
+import { deleteLog, hireRecoveryFor, loadLogs, machines, saveHired, saveLog, setEquipment } from '../src/lib/construction/cn-plant.ts';
+import { bookHireIn, hireOutInvoice } from '../src/lib/construction/cn-plant-hire.ts';
 import { gatherSitePnl, sitePnl } from '../src/lib/construction/cn-site-pnl.ts';
 import { recordReceipt } from '../src/lib/construction/cn-bookings.ts';
 import { cancelBooking } from '../src/lib/construction/cn-cancellations.ts';
@@ -201,4 +201,17 @@ test('C11: delay interest is simple — never on interest billed by an earlier d
   assert.equal(r.days, 30);
   assert.ok(Math.abs(r.amount - (431250 * 10.85 * 30) / 36500) < 0.05, `interest on the 4,31,250 instalment owed only (${r.amount})`);
   assert.equal(delayInterest([d1, d2], 1181250 * 2, '2026-10-16', 10.85), undefined, 'unpaid interest alone earns none');
+});
+
+test('C13: deleting the hire-out draft invoice gives its log sheets back (recoverable again, deletable)', () => {
+  const w = siteWorld();
+  setTable('fixed_assets', [{ id: 'fa1', name: 'Roller', block: 'PLANT_MACHINERY', account_id: 'fa_plant', cost: 2500000, acquired_on: '2025-04-01', put_to_use: '2025-04-01', paid_from: '', created_at: '' }]);
+  setEquipment('fa1', { kind: 'Roller', internal_rate: 900, hire_rate: 1200 });
+  saveLog({ date: '2026-07-01', equipment_ref: 'fa:fa1', site_id: w.site.id, hours_worked: 8, idle_hours: 0, breakdown_hours: 0, fuel_litres: 0, sub_contractor_id: SUB.id });
+  const inv = hireOutInvoice(SUB.id, DEPT.id, '2026-07-31');
+  assert.equal(hireRecoveryFor(SUB.id, '2026-07-31', loadLogs(), machines(), localDb.invoices.getAll()).amount, 0, 'billed on the draft');
+  localDb.invoices.remove(inv.id);
+  assert.equal(hireRecoveryFor(SUB.id, '2026-07-31', loadLogs(), machines(), localDb.invoices.getAll()).amount, 9600, 'open again');
+  deleteLog(loadLogs()[0].id);
+  assert.equal(loadLogs().length, 0);
 });

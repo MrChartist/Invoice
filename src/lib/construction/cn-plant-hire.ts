@@ -23,7 +23,7 @@ import { withTablesRollback } from '../table-txn';
 import { PLANT_HIRE_SAC_RULES } from '../construction-rules';
 import { SD, noItcCentre } from './cn-subcon';
 import { subTdsCode } from './cn-subcon-bill';
-import { loadHired, loadLogs, machines } from './cn-plant';
+import { isRecovered, loadHired, loadLogs, machines } from './cn-plant';
 
 export interface HireProposal {
   equipment: HiredEquipment;
@@ -101,7 +101,7 @@ export function draftInvoice(clientId: string, items: Omit<InvoiceItem, 'id' | '
 /** Hire out by invoice: open logs charged to `vendorId` → a draft invoice to `clientId` (the logs are marked). */
 export function hireOutInvoice(vendorId: string, clientId: string, date: string): InvoiceRecord {
   const list = machines();
-  const open = loadLogs().filter((l) => l.sub_contractor_id === vendorId && !l.recovered_in && l.date <= date);
+  const open = loadLogs().filter((l) => l.sub_contractor_id === vendorId && !isRecovered(l, localDb.invoices.getAll()) && l.date <= date);
   if (!open.length) throw new Error('No open log sheets charged to this party.');
   const r = ruleAt(PLANT_HIRE_SAC_RULES, date);
   const by = new Map<string, number>();
@@ -112,7 +112,7 @@ export function hireOutInvoice(vendorId: string, clientId: string, date: string)
   });
   return withTablesRollback(['invoices', SD.logs, 'series_counters'], () => {
     const inv = draftInvoice(clientId, items, 'Hire of plant with operator (SAC per PLANT_HIRE_SAC_RULES — verify with your CA, CN17).', date);
-    setTable(SD.logs, loadLogs().map((l) => (open.some((o) => o.id === l.id) ? { ...l, recovered_in: inv.invoice_number || 'invoice' } : l)));
+    setTable(SD.logs, loadLogs().map((l) => (open.some((o) => o.id === l.id) ? { ...l, recovered_in: inv.invoice_number || 'invoice', recovered_invoice_id: inv.id } : l)));
     return inv;
   });
 }

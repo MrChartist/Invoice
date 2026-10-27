@@ -795,6 +795,8 @@ export interface PlantLog {
   sub_contractor_id?: string;
   /** The sub-contractor bill (SCB number) that recovered it. */
   recovered_in?: string;
+  /** QA11 C13: the hire-out invoice that billed it (the log is open again once that invoice is deleted or cancelled). */
+  recovered_invoice_id?: string;
 }
 
 /** `FixedAsset.cn_equipment` (D3). */
