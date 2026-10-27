@@ -56,7 +56,7 @@ test('TemplateEngine mounts the works parts lazily, gated by the snapshot, never
   assert.match(engine, /const worksPaper = \(\) => import\('\.\/parts\/WorksPaper'\);/);
   assert.match(engine, /const cnDoc = layout !== 'receipt' && \(invoice\.boq_terms\?\.cn \|\| invoice\.ra_no\)/);
   for (const part of ['LazyWorksHeader', 'LazyRaItems', 'LazyWorksDeds', 'LazyWorksAbstract', 'LazyPvPage', 'LazyDemand']) assert.ok((engine.match(new RegExp(`<${part} `, 'g')) ?? []).length >= 1, `${part} mounted`);
-  assert.match(engine, /cnDoc\?\.paper === 'pwd' \? <Suspense fallback=\{null\}><LazyRaItems/);
+  assert.match(engine, /works=\{cnDoc\?\.paper === 'pwd' && <Suspense fallback=\{null\}><LazyRaItems/);
   assert.match(engine, /<GstBody [^>]*works=\{worksHead\}/, 'contract box inside the gst grid, under the parties');
   assert.match(engine, /\{cnDoc\?\.abstract && <Suspense fallback=\{null\}><LazyWorksAbstract/);
   assert.ok(!/from '\.\/parts\/Works(HeaderBlock|DeductionsBlock|AbstractPage)'/.test(engine), 'no eager import of a works part');

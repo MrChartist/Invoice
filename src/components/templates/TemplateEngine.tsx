@@ -187,7 +187,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
         <CustomFieldsBlock invoice={invoice} />
         <TransportBlock invoice={invoice} skipEway={irn?.ewayNo} />
         <ProposalSections invoice={invoice} place="before" />
-        {hideAmounts ? <ChallanQtyTable invoice={invoice} /> : cnDoc?.paper === 'pwd' ? <Suspense fallback={null}><LazyRaItems invoice={invoice} totals={totals} lineText={worksLineText} /></Suspense> : <PaperItemsTable invoice={invoice} totals={totals} tableStyle={effMeta.tableStyle} />}
+        {hideAmounts ? <ChallanQtyTable invoice={invoice} /> : <PaperItemsTable invoice={invoice} totals={totals} tableStyle={effMeta.tableStyle} works={cnDoc?.paper === 'pwd' && <Suspense fallback={null}><LazyRaItems invoice={invoice} totals={totals} lineText={worksLineText} /></Suspense>} />}
         {!hideAmounts && <TaxSummary invoice={invoice} totals={totals} />}
         <OptionalItemsBlock invoice={invoice} />
         <ProposalSections invoice={invoice} place="after" />

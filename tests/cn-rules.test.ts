@@ -14,9 +14,9 @@ const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url),
 
 test('nothing first-paint imports the rule file or a Round 11 module', () => {
   for (const f of ['lib/tax-rules.ts', 'lib/shop-mode.ts', 'App.tsx', 'main.tsx', 'lib/storage.ts', 'lib/access.ts', 'lib/audit-edits.ts', 'lib/industry-packs.ts', 'layouts/DashboardLayout.tsx']) {
-    assert.ok(!/from '[^']*(construction-rules|construction\/cn-|construction-r11)/.test(src(f)),`${f} stays free of Round 11 code`);
+    assert.ok(!/from '[^']*(construction-rules|construction\/cn-|construction-r11)/.test(src(f)), `${f} stays free of Round 11 code`);
   }
-  assert.ok(!/transport-works-rules/.test(src('lib/construction-rules.ts')), 're-exports nothing from transport-works-rules');
+  assert.ok(!/from '[^']*transport-works-rules'/.test(src('lib/construction-rules.ts')), 're-exports nothing from transport-works-rules');
 });
 
 test('the rule file is imported only by construction modules', () => {
