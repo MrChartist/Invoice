@@ -63,5 +63,27 @@ export function mfgExtras(ctx: ProfileContext): DemoExtras {
     };
     tables.print_estimates = [est];
   }
+  // MF-C (garments): a kurta style in 5 sizes × 3 colours, a cut plan of 60 plies in 10 bundles, 2 karigars with rate cards.
+  if (packs.includes('garments')) {
+    const fy = getIndianFY(today).label;
+    const sizes = ['S', 'M', 'L', 'XL', 'XXL'];
+    const colours = ['Blue', 'Green', 'Maroon'];
+    const item = (id: string, name: string, extra: Record<string, unknown>) => ({ id, demo: true, name, track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra }) as never;
+    tables.stock_items = [
+      ...(tables.stock_items ?? []),
+      item('demo-fab-cambric', 'Cotton cambric 44" (demo)', { unit: 'MTR', hsn: '5208', opening_qty: 800, opening_rate: 95, tax_rate: 5 }),
+      item('demo-style-kt22', 'Kurta KT-22 (demo)', { unit: 'PCS', hsn: '6211', sale_rate: 899, tax_rate: 5, mf_class: 'garment', variant_axes: [{ name: 'Size', values: sizes }, { name: 'Colour', values: colours }], mf: { style: { fabric_items: [{ item_id: 'demo-fab-cambric', per_piece_m: 1.25 }], size_ratio_default: { S: 1, M: 1, L: 1, XL: 1, XXL: 1 } } } }),
+      ...sizes.flatMap((s) => colours.map((c) => item(`demo-kt22-${s}-${c}`, `Kurta KT-22 ${s} ${c} (demo)`, { unit: 'PCS', hsn: '6211', sale_rate: 899, tax_rate: 5, mf_class: 'garment', variant_of: 'demo-style-kt22', variant_attrs: { Size: s, Colour: c } }))),
+    ];
+    const lot = `CUT/${fy}/9001`;
+    const bundles = sizes.flatMap((s, i) => [1, 2].map((j) => ({ no: i * 2 + j, size: s, colour: 'Blue', pieces: 30, at: { where: 'floor' }, history: [] })));
+    tables.cut_plans = [{
+      id: 'demo-cut-1', demo: true, number: lot, date: shiftDay(today, -2), style_id: 'demo-style-kt22', colour: 'Blue', fabric_item_id: 'demo-fab-cambric',
+      lays: [{ plies: 60, marker_ratio: { S: 1, M: 1, L: 1, XL: 1, XXL: 1 }, marker_length_m: 6.1 }], cut: { S: 60, M: 60, L: 60, XL: 60, XXL: 60 },
+      fabric_issued_m: 370, end_bits_m: 3.5, bundle_size: 30, bundles,
+    }] as never;
+    const karigar = (id: string, name: string, kind: string, rate: number) => ({ id, demo: true, name, mf: { karigar: { kind, rates: [{ op: 'Stitching', rate, from: `${today.slice(0, 4)}-04-01` }, { op: 'Finishing', rate: 4, from: `${today.slice(0, 4)}-04-01` }] } } }) as never;
+    tables.vendors = [...(tables.vendors ?? []), karigar('demo-karigar-1', 'Rehmat Tailors (demo)', 'fabricator', 38), karigar('demo-karigar-2', 'Shabana (home karigar, demo)', 'home', 36)];
+  }
   return { tables };
 }

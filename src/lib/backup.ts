@@ -501,6 +501,8 @@ const RECORD_TABLES = [
   'work_centres', 'routings', 'job_cards',
   // R13-B: drawings, inspection reports (FAI/FY…), job quotes, moulding runs, print estimates (PES/FY…)
   'drawings', 'inspection_reports', 'job_quotes', 'process_runs', 'print_estimates',
+  // R13-C: cut plans / lots (CUT/FY…, bundles inside)
+  'cut_plans',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -599,6 +601,8 @@ const ID_TABLES = new Set([
   'work_centres', 'routings', 'job_cards',
   // R13-B: drawings, inspection reports (FAI/FY…), job quotes, moulding runs, print estimates (PES/FY…)
   'drawings', 'inspection_reports', 'job_quotes', 'process_runs', 'print_estimates',
+  // R13-C: cut plans / lots (CUT/FY…, bundles inside)
+  'cut_plans',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

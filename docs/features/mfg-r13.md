@@ -128,7 +128,57 @@ BUNDLE_PLACEHOLDER
 
 ## MF-C — Textiles and garments (pack `garments`)
 
-(MF-C fills this section.)
+### What shipped
+
+| Item | Where |
+|---|---|
+| C1 styles, cut plans | A style is a variant parent (size × colour `variant_axes`, 8.85) with `StockItem.mf.style` (fabric per piece, by colour through `colour_map`, trims, default ratio) and `mf_class` (C5) — `mfg/mf-styles.ts` (`styleOf`, `styleAxes`, `childFor`, `fabricFor`, `gridChildren` refuses an order grid that does not sum to the planned quantity, `saveStyle` `master.edit`). Table **`cut_plans`** (`CUT/FY…` = the lot, `doc.create`, audited, dated `date`, numbered; bundles inside): `mfg/mf-cutplans.ts` — pieces = Σ plies × marker ratio, laid metres, consumption = (issued − end bits) ÷ pieces vs the style standard (variance m / %), `suggestLays` (plies = ⌈left ÷ marker capacity⌉, ratio = ⌊size qty ÷ plies⌋, repeated; never more than ordered). Stock through R4-A only: `issueCutFabric` (STR to the order's WIP godown), `returnEndBits` (return), `writeCutWaste` (stock journal tagged with the order: wasted fabric metres → the waste item's kg at its scrap rate). Garments → Styles / Cut plans (suggest from the order grid, cut report print). |
+| C2 lots, bundles | `mfg/mf-bundles.ts`: `makeBundles` (bundle size a field, sizes in the style's order), bundle id `<lot>/<no>`, `recordStep` / `scanStep` (good = live pieces unless typed; rejects leave the bundle with a reason; last operation = finished), `lotStatus` (by place / operation, WIP by size, finished, rejected, open = cut − finished − rejected), `reportFinished` (one R4-A manufacturing journal **per variant child**, tagged with the order, consuming the order's materials per piece; a bundle is reported once). Garments → Bundles: the existing `ScanField` (USB scanner or camera), bundle tickets (QR `qrcode.react`, 8 or 12 per A4, tear-off coupons per operation and rate). |
+| C3 CMT, e-way, ITC-04 | `mfg/mf-cmt.ts`: **CMT out = the existing Material Out** (`JWC`) — one line of the lot's fabric from the WIP godown (else Main), metres = pieces × metres a piece, `JobWorkLine.mf = { lot, bundles, pieces }`; **CMT in = Material In by bundle**: good pieces → the style's variant children (processed), the fabric of good pieces consumed at the fabricator, rejected cut pieces → fabric returned, the rest short (pending on the challan, listed per bundle); job charges = good × rate (rate card, else typed); "scrap kept by him (m)" → a loss line tagged `mf.scrap_at_jw` taken out of the consumed fabric. `mfg/mf-eway-jw.ts` (built with `buildJobWorkEway`, whose sub-type 4 output is unchanged): **sub-type 6** from a principal-register return (`JWP`, values of the principal's goods, MF11), job worker → job worker (5B: our challan dispatched from the first job worker, transaction type 3 / 4), `dispatchFrom` for a 5C invoice e-way, `jwEwayNeeded` (inter-State always; intra-State > ₹50,000 unless `mfg_settings.eway_jw_intra_exempt`). `job-work.ts`: **one additive tag** in the settlement switch — a loss line with `mf.scrap_at_jw` settles as `lost` with `scrap_at_jw: true` (ITC-04 reports it once as losses and wastes; `itc04.ts` untouched). `mfg/mf-itc04-extra.ts`: reconciliation per job worker / challan (sent, consumed, returned, lost, scrap, supplied, balance, oldest open, clock), scrap at job workers in the period, challans with no movement. Material In panel: one checkbox "kept or sold by the job worker" on the losses grid. Garments → CMT. |
+| C4 karigars | Karigars are **vendors** with `Vendor.mf.karigar` (`home` / `floor` / `fabricator`, rate card by operation and style from a date, deduct-rejects switch; PAN / bank from the vendor master); payroll piece-rate employees are never karigars. `mfg/mf-karigar.ts`: `rateFor` (style row wins, latest `from`), `pieceLines` (job-card entries with a karigar operator — rejects deducted; bundle coupons not already on a job card or a CMT receipt; CMT Material In good pieces), `karigarBalance` (bills through `readPurchase`, advance from the vouchers). `mfg/mf-piece-bill.ts`: **`KPB/FY…` piece bill = one `purchases` row** (SAC 9988 lines, `PurchaseRecord.mf = { kind: 'piece_bill', piece }`), no GST / no RCM for an unregistered karigar, `jw_textile` 5% for a registered fabricator; TDS 194C by `resolveBillTds` (individual / HUF `194C-1`, others `194C-2`; thresholds, 206AA) with the Sec 393 label (`sectionText`); advances = payment voucher Dr "Karigar advances" (created on first use); recovery = journal Dr Sundry creditors | Cr Karigar advances (no receipt), rolled into `amount_paid` (R11 / R12 precedent); bank rows through R12's `cycleUploadRows` (`bank-upload.ts` not edited); WhatsApp slip. Deleting a bill goes through `purchasesDb.remove` (recycle bin) with its journal; the KPB number stays used. Garments → Karigars. |
+| C5 classes, Rule 89(5) | `mfg-rules.ts` `TEXTILE_CLASS_RULES` (`mmf_fibre` 18 → 5%, `mmf_yarn` 12 → 5% from 2025-09-22, `cotton_yarn`, `fabric` 5%, `garment` / `made_up` → the R9 band, `textile_waste`, `jw_textile` 5%, `jw_print_ch48_49` 12 → 5%, `jw_other` 18%; all `verified: false`) and `RULE_89_5_RULES` (the N 14/2022 ratio from 2022-07-05). `mfg/mf-textile-tax.ts` (`classRate`, `classNotice` — a typed rate wins, `bandMemo` — sizes whose list price falls in the 18% band). Editor band hook (`pricing-actions.ts` `markBand`): an item whose `mf_class` is `garment` / `made_up` marks the sale line for the R9 band even without the apparel pack. `mfg/mf-inverted.ts`: outward lines by rate (credit notes negative; financial notes, bills of supply, drafts out), inward lines through `readPurchase` / `readPurchaseLines` (services, expense and capital bills out of net ITC), `rule895`, `suggestInvertedRates`, `prefillInvertedClaim` (DRAFT `INVERTED_DUTY` row through `saveRefund`). Garments → Inverted duty (own lazy chunk). |
+| Registrations | `mf-shared.ts` `MF_TABLES.cutPlans`, `MF_SERIES.cutPlans` `CUT` / `pieceBills` `KPB` (moved out of the reserved list), `MF_DATED` / `MF_NUMBERED`; `mf-registry.ts` `cut_plans` (`doc.create`, audit label "Cut plan"); backup `RECORD_TABLES` / `ID_TABLES`, sync `DATED` / `NUMBERED`, open-export row, `DEMO_EXTRA_TABLES`. Every MF-C writer imports `./mf-registry`. Purchase readers (`mf-karigar`, `mf-inverted`) are in `tests/purchase-contract.test.ts`; stock quantities through `lineFactor`; no cash reader added (advance recovery is a journal). |
+| Strings, help, demo | `i18n/areas/mfg-r13c.ts` (desk) and `mfg-r13c-inv.ts` (inverted view), English + Hindi; help topic `manufacturing:garments:inverted` and palette label `r13.garments.inverted` (+ `PACK_TABS` row); demo garments block in `demo/profile-mfg.ts` (a kurta in 5 sizes × 3 colours, a lot of 60 plies in 10 bundles, 2 karigars). CA items MF50–MF54 (`docs/CA_REVIEW.md` §13.6). |
+
+Tests: `mf-cutplans`, `mf-bundles`, `mf-cmt`, `mf-eway-jw`, `mf-itc04`, `mf-karigar`, `mf-textile-tax`, `mf-inverted` (+ the contract
+test row; `mf-registry` counts `CUT` / `KPB` once). E2E: step "R13-C garments desk".
+
+### Deviations from the PRD (MF-C)
+
+- **Inverted-duty view** sits on the Garments desk (`view=inverted`, its own lazy chunk), not on the Statutory desk (MF-D's file);
+  it is not linked from the R4-C refund register screen — the pre-filled DRAFT claim appears there.
+- **Shared type edits**: MF-A's inline `mf` types were widened in place (`Vendor.mf.karigar` → `MfKarigar`, `StockItem.mf.style`
+  → `MfStyle`, `PurchaseRecord.mf.piece`, `JobWorkLine.mf.pieces / scrap_at_jw`) — an inline object type cannot be merged from
+  another block. `TextileClass` / `TextileClassId` live in `mfg-rules.ts` beside the rules.
+- **Material Out grid**: no bundle column — bundles go out from Garments → CMT (which writes the ordinary Material Out); the
+  Material In panel gets only the "kept or sold by the job worker" checkbox.
+- **CMT fabric**: cut pieces travel as the lot's fabric metres (MF51); rejected cut pieces come back as fabric.
+- **Karigar PAN / bank** come from the vendor master (not duplicated in `mf.karigar`); UPI is a field on the card.
+- **Bundle scan** is on the Bundles view (operation, karigar, rejects, last step), not inside MF-A's operator screen;
+  `jc_entry_id` on a bundle step links it to a job-card entry when one is typed, so a piece is never counted twice.
+- **Garment output**: `reportFinished` writes one journal per variant child; the order's own output dialog (R4-A) is unchanged.
+- **Job charges class suggestion on the Job Work In service invoice** (C3-4) is not wired into the editor; the classes are in
+  `TEXTILE_CLASS_RULES` and the piece bill uses `jw_textile`.
+- **5C e-way**: `dispatchFrom` exists for the invoice e-way; no button on the invoice e-way dialog yet.
+- **Demo**: no CMT challan (it needs job-worker godowns and stock moves); 10 bundles of 30 rather than 12.
+
+### Bundle (MF-C)
+
+Measured with `vite build` + gzip -9 per JS asset; before = `claude/elegant-cannon-cwapiv` at `31a83db` (MF-A merged), after =
+this branch.
+
+| Budget | Before | After | Delta | Share |
+|---|---|---|---|---|
+| Initial JS (first paint) | 189,186 B | 189,201 B | **+15 B** | ≤ +0.02 kB ✓ |
+| Total JS | 3,270,891 B (3194.2 kB) | 3,299,901 B (3222.6 kB) | **+29,010 B (+28.3 kB)** | 14 kB aim ✗ (lead's cap ~25 kB ✗) |
+
+Breakdown (gz): Garments desk chunk 22.1 kB (five views + bundle tickets ≈ 9 kB, engines for styles / cut plans / bundles /
+CMT / karigars / piece bills / e-way / ITC-04 depth / classes ≈ 10 kB, `mfg-r13c` English + Hindi ≈ 3 kB); Inverted-duty view
+3.3 kB (engine, view, strings); `eway-job-work` split into a shared chunk +1.5 kB (−1.0 kB from the job-work tab, net +0.5);
+`mfg-rules.ts` split into a shared chunk 1.1 kB (MF-A's rules moved with it: `mf-settings` −0.1); demo block +0.6 kB;
+Manufacturing chunk +0.3 kB (registry / shared names); help / palette / open-export / Material In checkbox / band hook ≈ 0.5 kB.
+Trimming options for the lead: drop the job worker → job worker e-way form and the ITC-04 reconciliation table from the CMT
+view (≈ −1.5 kB), the bundle-ticket coupons and the cut-report print (≈ −1 kB), or the inverted-duty view (−3.3 kB).
 
 ## MF-D — Food / FMCG and the statutory desk (packs `foodmfg`, `shopfloor`)
 

@@ -448,6 +448,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}job_quotes`]: 'date',
   [`${DB_PREFIX}process_runs`]: 'date',
   [`${DB_PREFIX}print_estimates`]: 'date',
+  // R13-C: cut plans (the cutting day)
+  [`${DB_PREFIX}cut_plans`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -1067,6 +1069,8 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   // R13-B: inspection reports (FAI/FY…), print estimates (PES/FY…)
   [`${DB_PREFIX}inspection_reports`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}print_estimates`]: { num: 'number', date: 'date' },
+  // R13-C: cut plans / lots (CUT/FY…)
+  [`${DB_PREFIX}cut_plans`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };

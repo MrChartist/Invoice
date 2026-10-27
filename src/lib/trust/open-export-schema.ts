@@ -264,6 +264,8 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   job_quotes: 'Weight-based job quotes: blank shape and density, net kg, material and scrap rates, operations, outside work, overhead, margin, quantity breaks, quotations made (R13).',
   process_runs: 'Moulding / extrusion runs: mould, hours, cycle, cavities, inputs (virgin / regrind / masterbatch / additive kg), good, rejects, runners, purge, regrind made, the journal posted (R13).',
   print_estimates: 'Print estimates (PES/FY…): size, colours, sheet, GSM, press, paper and plate rates, finishing, margin, quantity breaks, quotations and job ticket (R13).',
+  // R13-C
+  cut_plans: 'Cut plans / lots (CUT/FY…): style, colour, fabric, lays (plies × marker ratio, length), pieces cut by size, fabric issued / end bits / waste, bundles with their operation history (R13).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';

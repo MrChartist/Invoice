@@ -48,10 +48,12 @@ test('every writer, the sync engine and the recycle bin import the registry; dat
 
 test('series: JCD written once (mf-shared); the reserved B–D prefixes unused elsewhere', () => {
   assert.equal(MF_SERIES.jobCards, 'JCD');
-  assert.deepEqual([...MF_RESERVED_SERIES].filter((p) => p === 'CUT' || p === 'KPB'), ['CUT', 'KPB']); // MF-B moved FAI / PES into MF_SERIES
+  for (const p of MF_RESERVED_SERIES) assert.ok(['FAI', 'PES', 'CUT', 'KPB'].includes(p), p); // each package moves its prefix into MF_SERIES
+  for (const p of ['CUT', 'KPB']) assert.ok((Object.values(MF_SERIES) as string[]).includes(p), `${p} moved (MF-C)`);
+  for (const p of ['FAI', 'PES']) assert.ok((Object.values(MF_SERIES) as string[]).includes(p), `${p} moved (MF-B)`);
   const all = readdirSync(new URL('../src/lib/', import.meta.url), { recursive: true }).filter((f) => String(f).endsWith('.ts') && !String(f).startsWith('help')).map((f) => readFileSync(new URL(`../src/lib/${f}`, import.meta.url), 'utf8')).join('\n');
   assert.equal((all.match(/'JCD'/g) ?? []).length, 1, 'JCD');
-  for (const p of MF_RESERVED_SERIES) assert.equal((all.match(new RegExp(`'${p}'`, 'g')) ?? []).length, 1, `${p} only in the reserved list`);
+  for (const p of [...MF_RESERVED_SERIES, 'CUT', 'KPB']) assert.equal((all.match(new RegExp(`'${p}'`, 'g')) ?? []).length, 1, `${p} only in the reserved list`);
 });
 
 test('MF-B block: rights, audit labels, backup / sync / open export, FAI and PES series, writers import the registry, restore rules', () => {

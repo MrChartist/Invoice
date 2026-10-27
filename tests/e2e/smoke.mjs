@@ -4584,6 +4584,67 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R13-C garments desk: a style S–XL × 2 colours; a cut plan of 20 plies → 80 pieces and consumption vs standard; 8 bundle tickets; 4 bundles out to a fabricator → 3 back, 1 short; the karigar piece bill for the good pieces with a bank row; a job-work return → e-way JSON sub-type 6', async () => {
+    const keys = ['settings', 'stock_items', 'vendors', 'cut_plans', 'job_work_out', 'job_work_in', 'job_work_principal', 'godowns', 'purchases', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'manufacturer', modules: undefined, mfg_kind: 'textile', mfg_sub: 'garments', industry_packs: ['shopfloor', 'garments'], lock_until: undefined });
+    const item = (id, name, extra) => ({ id, name, unit: 'PCS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    const sizes = ['S', 'M', 'L', 'XL'];
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []),
+      item('e2e-g-fab', 'E2E Cambric', { unit: 'MTR', opening_qty: 500, opening_rate: 90 }),
+      item('e2e-g-kt', 'E2E Kurta', { variant_axes: [{ name: 'Size', values: sizes }, { name: 'Colour', values: ['Blue', 'Green'] }], mf: { style: { fabric_items: [{ item_id: 'e2e-g-fab', per_piece_m: 1.25 }] } }, mf_class: 'garment' }),
+      ...sizes.flatMap((s) => ['Blue', 'Green'].map((c) => item(`e2e-g-kt-${s}-${c}`, `E2E Kurta ${s} ${c}`, { variant_of: 'e2e-g-kt', variant_attrs: { Size: s, Colour: c } })))]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-g-rehmat', name: 'E2E Rehmat Tailors', bank_account_no: '50100012345678', bank_ifsc: 'HDFC0001234', mf: { karigar: { kind: 'fabricator', rates: [{ op: 'Stitching', rate: 38, from: '2026-04-01' }] } } }]);
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await writeJson(page, 'job_work_principal', [...(prev.job_work_principal ?? []), { id: 'e2e-g-jwp', number: 'JWP/FY26-27/0901', date: today, kind: 'return', party_name: 'E2E Surat Mills', party_gstin: '24AAACS1234A1Z5', lines: [{ id: 'l1', name: 'Dyed fabric', qty: 1200, unit: 'MTR', hsn: '5407', value: 96000, processed: true }] }]);
+    await page.goto(srv.origin + '/manufacturing?tab=garments&view=cutplans');
+    await page.locator('[data-garments-desk]').waitFor({ timeout: 15000 });
+    await page.locator('[data-mfc="cut-new"]').click();
+    await page.locator('[data-mfc="cut-style"]').selectOption('e2e-g-kt');
+    await page.locator('[data-mfc="cut-colour"]').selectOption('Blue');
+    await page.locator('[data-mfc="lay-plies-0"]').fill('20');
+    await page.locator('[data-mfc="lay-ratio-0"]').fill('S1 M1 L1 XL1');
+    await page.locator('[data-mfc="lay-len-0"]').fill('4.9');
+    await page.locator('[data-mfc="cut-issued"]').fill('96');
+    await page.locator('[data-mfc="cut-save"]').click();
+    const plan = (await readJson(page, 'cut_plans', [], (v) => v.some((p) => p.style_id === 'e2e-g-kt'))).find((p) => p.style_id === 'e2e-g-kt');
+    check(/^CUT\/FY\d\d-\d\d\/\d+$/.test(plan?.number ?? '') && Object.values(plan?.cut ?? {}).reduce((a, q) => a + q, 0) === 80, `cut plan ${plan?.number}: 20 plies × 4 = 80 pieces`);
+    check(/1\.2 m \/ 1\.25 m \(-4%\)/.test(await page.locator('[data-mfc-grid="cutplans"]').innerText()), 'consumption 1.2 m a piece against 1.25 m (−4%)');
+    await page.goto(srv.origin + '/manufacturing?tab=garments&view=bundles');
+    await page.locator('[data-mfc="b-lot"]').selectOption(plan.id, { timeout: 15000 });
+    await page.locator('[data-mfc-bundles] input[inputmode="numeric"]').first().fill('10');
+    await page.locator('[data-mfc="b-make"]').click();
+    await readJson(page, 'cut_plans', [], (v) => v.some((p) => p.id === plan.id && p.bundles?.length === 8));
+    await page.locator('[data-mfc="b-tickets"]').click();
+    check(await page.locator('[data-mfc-ticket]').count() === 8, '8 bundle tickets with their QR');
+    await page.goto(srv.origin + '/manufacturing?tab=garments&view=cmt');
+    await page.locator('[data-mfc="cmt-lot"]').selectOption(plan.id, { timeout: 15000 });
+    await page.locator('[data-mfc="cmt-vendor"]').selectOption('e2e-g-rehmat');
+    for (const n of [1, 2, 3, 4]) await page.locator(`[data-mfc-b="${n}"]`).check();
+    await page.locator('[data-mfc="cmt-send"]').click();
+    const out = (await readJson(page, 'job_work_out', [], (v) => v.some((o) => o.vendor_id === 'e2e-g-rehmat'))).find((o) => o.vendor_id === 'e2e-g-rehmat');
+    check(out?.lines?.[0]?.mf?.bundles?.length === 4 && out.lines[0].mf.pieces === 40 && out.lines[0].qty === 48, `Material Out by bundle: 4 bundles, 40 pieces, 48 m (${out?.lines?.[0]?.qty})`);
+    await page.locator('[data-mfc="cmt-recv"]').selectOption(`${out.id}|${out.lines[0].id}`);
+    await page.locator('[data-mfc-good="4"]').fill('0');
+    await page.locator('[data-mfc="cmt-receive"]').click();
+    await page.getByText(/JWR\/FY\d\d-\d\d\/\d+: 30 good, 10 short\./).waitFor({ timeout: 10000 });
+    check(true, 'Material In by bundle: 30 good, 10 short (bundle 4 pending with the fabricator)');
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('[data-mfc-eway="JWP/FY26-27/0901"]').click()]);
+    const ew = JSON.parse(readFileSync(await dl.path(), 'utf8'));
+    check(ew.billLists?.[0]?.subSupplyType === 6 && ew.billLists[0].docType === 'CHL' && ew.billLists[0].totInvValue === 96000, 'job-work return e-way JSON: sub-type 6, CHL, the principal\'s value');
+    await page.goto(srv.origin + '/manufacturing?tab=garments&view=karigars');
+    await page.locator('[data-mfc="kb-karigar"]').selectOption('e2e-g-rehmat', { timeout: 15000 });
+    await page.locator('[data-mfc="kb-load"]').click();
+    check(await page.locator('[data-mfc="kb-pcs-0"]').inputValue() === '30', 'piece bill loads the 30 good pieces from the CMT receipt');
+    const [bank] = await Promise.all([page.waitForEvent('download'), page.locator('[data-mfc="kb-save"]').click()]);
+    const kpb = (await readJson(page, 'purchases', [], (v) => v.some((p) => p.vendor_id === 'e2e-g-rehmat'))).find((p) => p.vendor_id === 'e2e-g-rehmat');
+    check(/^KPB\/FY\d\d-\d\d\/\d+$/.test(kpb?.bill_number ?? '') && kpb.total === 1140 && !(kpb.cgst + kpb.sgst + kpb.igst), `piece bill ${kpb?.bill_number}: 30 × ₹38 = ₹1,140, no GST (unregistered)`);
+    check(/E2E Rehmat Tailors.*1140\.00/.test(readFileSync(await bank.path(), 'utf8')), 'bank upload row for the karigar');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {

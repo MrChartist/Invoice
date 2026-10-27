@@ -280,6 +280,7 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'garments', path: '/manufacturing?tab=garments&view=bundles', labelKey: 'r13.garments.bundles' },
   { pack: 'garments', path: '/manufacturing?tab=garments&view=cmt', labelKey: 'r13.garments.cmt' },
   { pack: 'garments', path: '/manufacturing?tab=garments&view=karigars', labelKey: 'r13.garments.karigars' },
+  { pack: 'garments', path: '/manufacturing?tab=garments&view=inverted', labelKey: 'r13.garments.inverted' }, // MF-C5 Rule 89(5) paper
   { pack: 'foodmfg', path: '/manufacturing?tab=food', labelKey: 'r13.food' },
   { pack: 'foodmfg', path: '/manufacturing?tab=food&view=costcards', labelKey: 'r13.food.costcards' },
   { pack: 'foodmfg', path: '/manufacturing?tab=food&view=shelflife', labelKey: 'r13.food.shelflife' },

@@ -22,7 +22,8 @@ export const MF_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   job_quotes: 'doc.create',
   process_runs: 'doc.create',
   print_estimates: 'doc.create',
-  // MF-C: cut_plans (doc.create)
+  // MF-C: cut plans (lots, bundles inside) are documents
+  cut_plans: 'doc.create',
   // MF-D: cost_cards (master.edit), export_authorisations, incentive_claims (books.edit)
 };
 
@@ -39,6 +40,7 @@ export const MF_WATCHED: Readonly<Record<string, WatchedTable>> = {
   process_runs: { entity: 'stock_transfer', label: 'Moulding run' },
   print_estimates: { entity: 'invoice', label: 'Print estimate' },
   // MF-C
+  cut_plans: { entity: 'stock_transfer', label: 'Cut plan' },
   // MF-D
 };
 
