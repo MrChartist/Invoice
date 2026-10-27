@@ -36,14 +36,14 @@ export default function RealisationSvcView({ notify }: { notify: Notify }) {
   const byId = new Map(d.rows.map((r) => [r.invoiceId, r]));
   return (
     <>
-      <Tbl tag="real" head={[pcT('invoice'), pcT('date'), pcT('party'), pcT('value'), pcT('realised'), pcT('charges'), pcT('unrealised'), pcT('due'), pcT('status'), pcT('fira'), pcT('ebrc')]}
+      <Tbl tag="real" head={[pcT('invoice'), pcT('date'), pcT('party'), pcT('value'), pcT('realised'), pcT('charges'), pcT('unrealised'), pcT('due'), pcT('status'), pcT('fira'), 'e-BRC']}
         rows={d.brc.map((b) => {
           const r = byId.get(b.invoiceId)!;
           return [b.number, b.date, b.party, `${b.currency} ${b.fcy}`, `${b.realisedFcy} · ₹${b.realisedInr}`, b.chargesFcy ? `${b.chargesFcy} (${pcT(`ch.${b.chargesReason || 'bank'}`)})${b.chargesOver ? ' ⚠' : ''}` : '—', b.unrealisedFcy,
             <span key="d" data-ps-real-due={b.dueDate}>{b.dueDate} · {pcT('months', { n: r.months })}{r.inrRule ? ` · ${pcT('inrRule')}` : ''}</span>, b.status, b.fira.join(', '), b.ebrc.map((e) => e.no).join(', ')];
         })} />
       <div className={css.bar}>
-        <Fld l={pcT('irm')}><select className={controls.select} value={f.irm} onChange={(e) => setF({ irm: e.target.value, fira: d.irms.find((m) => m.id === e.target.value)?.ps?.fira_no ?? '' })}><option value="">—</option>{d.irms.map((m) => <option key={m.id} value={m.id}>{`${m.irm_no} · ${m.currency} ${m.fcy}`}</option>)}</select></Fld>
+        <Fld l="IRM"><select className={controls.select} value={f.irm} onChange={(e) => setF({ irm: e.target.value, fira: d.irms.find((m) => m.id === e.target.value)?.ps?.fira_no ?? '' })}><option value="">—</option>{d.irms.map((m) => <option key={m.id} value={m.id}>{`${m.irm_no} · ${m.currency} ${m.fcy}`}</option>)}</select></Fld>
         <Fld l={pcT('fira')}><input className={controls.input} value={f.fira} onChange={(e) => setF({ ...f, fira: e.target.value.slice(0, 40) })} /></Fld>
         <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!f.irm} onClick={() => run(() => {
           const m = d.irms.find((x) => x.id === f.irm)!;

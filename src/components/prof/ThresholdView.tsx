@@ -28,13 +28,8 @@ export default function ThresholdView({ compact }: { compact?: boolean }) {
         <p>{thT('of', { turnover: m(k.turnover), limit: m(k.limit), pct: k.pct, exports: m(k.exports) })}</p>
         <progress className={css.meter} max={100} value={Math.min(k.pct, 100)} />
         <p className={k.level === 'ok' ? css.ok : css.bad}>{k.level === 'over' ? thT('over', { date: k.crossedOn ?? '' }) : k.level === 'warn' ? thT('warn', { pct: k.pct }) : thT('ok')}</p>
-        {!compact && (
-          <>
-            {k.level !== 'ok' && !c.registered && <p data-ps-threshold-steps>{thT('steps')}</p>}
-            {!c.registered && <p className={controls.hint}>{thT('unreg')}</p>}
-            <p className={controls.hint}>{thT('notes')}</p>
-          </>
-        )}
+        {k.level !== 'ok' && !c.registered && <p data-ps-threshold-steps>{thT('steps')}</p>}
+        {!compact && <p className={controls.hint}>{thT('notes')}</p>}
       </div>
     </section>
   );

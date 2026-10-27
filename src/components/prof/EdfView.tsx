@@ -1,7 +1,7 @@
 /**
  * R14 PS-C2 EDF view: "Prepare EDF for <month>" (the month's services exports by kind and currency → draft rows), the
- * register (EDF no. and date typed after the AD bank / STPI files it, authority, small-value declaration) and SOFTEX
- * history rows for months before 1 Oct 2026. No portal.
+ * register (EDF no. and date typed after the AD bank / STPI files it, authority, small-value declaration). Months before
+ * 1 Oct 2026 were SOFTEX (history rows only, `edfDb.addSoftex`). No portal.
  */
 import { useMemo, useState } from 'react';
 import { localDb } from '../../lib/localDb';
@@ -24,7 +24,6 @@ export default function EdfView({ notify }: { notify: Notify }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const rows = useMemo(() => edfDb.all().sort((a, b) => b.period.localeCompare(a.period)), [tick]);
   const drafts = useMemo(() => prepareEdf(month, localDb.invoices.getAll()), [month]);
-  const [sx, setSx] = useState({ period: '', currency: 'USD', fc: '', inr: '', no: '' });
   return (
     <>
       <div className={css.bar}>
@@ -36,17 +35,6 @@ export default function EdfView({ notify }: { notify: Notify }) {
         <Tbl tag="edf-draft" head={[pcT('kind'), pcT('currency'), pcT('invoices'), pcT('value'), '₹', pcT('due')]} rows={drafts.map((d) => [pcT(`k.${d.kind}`), d.currency, d.numbers.join(', '), d.value_fc, formatCurrency(d.value_inr, 'INR'), <span key="d" data-ps-edf-due={d.due}>{d.due}{d.small ? ` · ${pcT('small')}` : ''}</span>])} />
       )}
       <Tbl tag="edf" head={[pcT('month'), pcT('kind'), pcT('value'), pcT('due'), pcT('status'), '']} rows={rows.map((r) => [r.period, pcT(`k.${r.kind}`), `${r.currency} ${r.value_fc}`, r.due, pcT(`st.${r.status}`), <RowEdit key={`${r.id}${tick}`} r={r} run={run} />])} />
-      <details>
-        <summary className={controls.label}>{pcT('softex')}</summary>
-        <div className={css.bar}>
-          <Fld l={pcT('month')}><input type="month" className={controls.input} value={sx.period} onChange={(e) => setSx({ ...sx, period: e.target.value })} /></Fld>
-          <Fld l={pcT('currency')}><input className={controls.input} value={sx.currency} onChange={(e) => setSx({ ...sx, currency: e.target.value.toUpperCase().slice(0, 3) })} /></Fld>
-          <Fld l={pcT('value')}><input type="number" className={controls.input} value={sx.fc} onChange={(e) => setSx({ ...sx, fc: e.target.value })} /></Fld>
-          <Fld l="₹"><input type="number" className={controls.input} value={sx.inr} onChange={(e) => setSx({ ...sx, inr: e.target.value })} /></Fld>
-          <Fld l={pcT('edfNo')}><input className={controls.input} value={sx.no} onChange={(e) => setSx({ ...sx, no: e.target.value })} /></Fld>
-          <button type="button" className={sm} disabled={!sx.period} onClick={() => run(() => void edfDb.addSoftex({ period: sx.period, currency: sx.currency || 'USD', value_fc: Number(sx.fc) || 0, value_inr: Number(sx.inr) || 0, edf_no: sx.no.trim() || undefined }))}>{pcT('save')}</button>
-        </div>
-      </details>
     </>
   );
 }

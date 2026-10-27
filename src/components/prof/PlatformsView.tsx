@@ -3,7 +3,6 @@
  * non-resident), the default purpose code (PS39) and the open foreign-currency invoices with "Receive via platform".
  */
 import { lazy, Suspense, useMemo, useState } from 'react';
-import type { InvoiceRecord } from '../../types/invoice';
 import { localDb } from '../../lib/localDb';
 import { formatCurrency } from '../../lib/utils';
 import { pickableBankAccounts } from '../../lib/bank-accounts';
@@ -23,7 +22,6 @@ export default function PlatformsView({ notify }: { notify: Notify }) {
   const run = runner(notify, () => setTick((n) => n + 1));
   const [list, setList] = useState<Platform[]>(() => loadPlatforms());
   const [code, setCode] = useState(() => readPurposeCode() ?? PURPOSE_BY_KIND[String((localDb.settings.get() as { prof_kind?: string }).prof_kind ?? 'other')] ?? '');
-  const [recv, setRecv] = useState<InvoiceRecord | null>(null);
   const banks = useMemo(() => pickableBankAccounts('any'), []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const open = useMemo(() => localDb.invoices.getAll().filter((i) => String(i.currency || 'INR').toUpperCase() !== 'INR' && i.status !== 'Draft' && i.status !== 'Cancelled' && i.status !== 'Paid' && Number(i.balance_due) > 0.005), [tick]);
@@ -44,8 +42,7 @@ export default function PlatformsView({ notify }: { notify: Notify }) {
         <Fld l={pcT('defPurpose')}><select className={controls.select} value={code} onChange={(e) => setCode(e.target.value)}>{PURPOSE_CODE_EXAMPLES.map(([c, l]) => <option key={c} value={c}>{`${c} — ${l}`}</option>)}</select></Fld>
         <button type="button" className={sm} onClick={() => run(() => savePurposeCode(code))}>{pcT('save')}</button>
       </div>
-      <Tbl tag="plat-open" head={[pcT('invoice'), pcT('date'), pcT('party'), pcT('value'), '']} rows={open.map((i) => [i.invoice_number, i.issue_date, i.client?.name ?? '', formatCurrency(i.balance_due ?? 0, i.currency), <button key="r" type="button" className={sm} onClick={() => setRecv(i)} data-ps-plat-receive>{pcT('receive')}</button>])} />
-      {recv && <Suspense fallback={null}><PlatformReceiptDialog invoice={recv} notify={notify} onClose={() => setRecv(null)} onDone={() => setTick((n) => n + 1)} /></Suspense>}
+      <Tbl tag="plat-open" head={[pcT('invoice'), pcT('date'), pcT('party'), pcT('value'), '']} rows={open.map((i) => [i.invoice_number, i.issue_date, i.client?.name ?? '', formatCurrency(i.balance_due ?? 0, i.currency), <Suspense key="r" fallback={null}><PlatformReceiptDialog invoice={i} notify={notify} onDone={() => setTick((n) => n + 1)} /></Suspense>])} />
     </>
   );
 }

@@ -21,8 +21,6 @@ import { BankAccountSelect } from '../bank/BankAccountSelect';
 import { tNodes, useT } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
 import { methodLabel } from '../../i18n/labels';
-import { defineArea } from '../../i18n/area';
-import { impliedPacks } from '../../lib/shop-mode';
 import controls from '../../styles/controls.module.css';
 import styles from './PaymentModal.module.css';
 
@@ -39,8 +37,7 @@ const RecoveryOffer = lazy(() => import('../collections/RecoveryOffer'));
 // R5-B5: RA bill deductions / net payable — only for a bill carrying `ra_deductions` (the block checks the works pack).
 const RaReceiptPanel = lazy(() => import('../works/RaReceiptPanel'));
 // R14 PS-C4: "Receive via platform" (gross, fees, rupees credited) on a foreign invoice — `svcexport` pack only.
-const PlatformReceiptDialog = lazy(() => import('../prof/PlatformReceiptDialog'));
-const psT = defineArea({ via: 'Receive via platform…' } as const, { via: 'प्लेटफ़ॉर्म से प्राप्ति…' });
+const PlatformReceipt = lazy(() => import('../prof/PlatformReceiptDialog'));
 
 export interface PaymentModalProps {
   invoice: InvoiceRecord | null;
@@ -83,7 +80,6 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
   const [date, setDate] = useState(todayInput());
   const [reference, setReference] = useState('');
   const [gvCode, setGvCode] = useState(''); // R4-B1
-  const [viaPlatform, setViaPlatform] = useState(false); // R14 PS-C4
   /** Realised rate (₹ per unit) on a foreign-currency receipt (6.19). */
   const [realised, setRealised] = useState('');
   const [error, setError] = useState('');
@@ -316,10 +312,7 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
               </span>
             </label>
           )}
-          {foreign && impliedPacks(localDb.settings.get()).includes('svcexport') && (
-            <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setViaPlatform(true)} data-ps-via-platform>{psT('via')}</button>
-          )}
-          {viaPlatform && <Suspense fallback={null}><PlatformReceiptDialog invoice={{ ...live, balance_due: balance }} onClose={() => setViaPlatform(false)} onDone={() => { setVersion((v) => v + 1); refreshEditor(live.id); onChanged(); }} /></Suspense>}
+          {foreign && <Suspense fallback={null}><PlatformReceipt invoice={{ ...live, balance_due: balance }} onDone={() => { setVersion((v) => v + 1); refreshEditor(live.id); onChanged(); }} /></Suspense>}
           {can('payment.record') && Number(amount) > 0 && Number(amount) < balance - 0.005 && (
             <Suspense fallback={null}>
               <SettleRestFields invoice={live} due={balance} amount={Number(amount)} date={date} value={settle} onChange={setSettle} />

@@ -61,8 +61,8 @@ export default function RefundSvcView({ notify }: { notify: Notify }) {
       {paper.result.notes.map((n, i) => <p key={i} className={controls.hint}>{n}</p>)}
       <Tbl tag="stmt" head={sheet[0].map(String)} rows={sheet.slice(1)} />
       <div className={css.bar}>
-        <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => downloadText(`${name}.csv`, toCsv(sheet), 'text/csv')}>{pcT('csv')}</button>
-        <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => void import('../../lib/xlsx').then((x) => x.downloadXlsx(`${name}.xlsx`, [{ name: 'Statement', rows: sheet }]))}>{pcT('xlsx')}</button>
+        <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => downloadText(`${name}.csv`, toCsv(sheet), 'text/csv')}>CSV</button>
+        <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => void import('../../lib/xlsx').then((x) => x.downloadXlsx(`${name}.xlsx`, [{ name: 'Statement', rows: sheet }]))}>XLSX</button>
         <button type="button" className={controls.btnPrimary} disabled={!(paper.result.total > 0)} onClick={() => run(() => { saveDraftClaim(p.from, p.to, paper, localDb.settings.activeProfile()?.companyGstin || undefined); return pcT('drafted'); })} data-ps-refund-draft>{pcT('draft')}</button>
       </div>
     </>

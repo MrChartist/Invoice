@@ -12,7 +12,7 @@ import type { RealisationRow } from '../trade/export-register';
 import { receiptInr } from '../fx-gain';
 import { fxRate } from '../fx';
 import { mulRound2, round2 } from '../invoice-calc';
-import { movedNoCash } from '../no-cash';
+import { movedNoCash } from '../advance-tax';
 import type { PsExport } from './ps-export-check';
 
 /** `ExportIrm.ps` (PS-C block). */

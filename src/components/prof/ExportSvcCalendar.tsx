@@ -8,7 +8,6 @@ import { edfDb, edfDueList } from '../../lib/prof/ps-edf';
 import { realisationReminders, servicesRows } from '../../lib/prof/ps-fema';
 import { useT } from '../../i18n';
 import { pcT } from '../../i18n/areas/prof-r14c-export';
-import { Tbl } from './pc-ui';
 import surface from '../../styles/surface.module.css';
 
 export default function ExportSvcCalendar({ today }: { today: string }) {
@@ -21,7 +20,7 @@ export default function ExportSvcCalendar({ today }: { today: string }) {
   return (
     <section className={surface.card} data-ps-calendar>
       <div className={surface.cardHead}><span className={surface.cardHeadIcon}>{pcT('v.edf')} · {pcT('v.realisation')}</span></div>
-      <div className={surface.cardBody}><Tbl tag="cal" head={['', pcT('due')]} rows={rows} /></div>
+      <ul className={surface.cardBody}>{rows.map(([l, d], i) => <li key={i} data-ps-cal>{l}: {d}</li>)}</ul>
     </section>
   );
 }

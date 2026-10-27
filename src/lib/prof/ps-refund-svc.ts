@@ -14,7 +14,7 @@ import { exportInvoices, isServicesExport } from '../trade/export-register';
 import { receiptInr } from '../fx-gain';
 import { inrValue } from '../fx';
 import { round2 } from '../invoice-calc';
-import { movedNoCash } from '../no-cash';
+import { movedNoCash } from '../advance-tax';
 import { isRevenueDoc } from '../stats';
 import { loadRefunds, rule894Refund, saveRefund, type GstRefundClaim, type Rule894Result } from '../gst-cash-refunds';
 import type { BrcRow } from './ps-brc';

@@ -12,7 +12,7 @@
 import type { InvoiceRecord, Payment } from '../../types/invoice';
 import type { ExportIrm } from '../../types/trade-r4';
 import { isExportDoc } from '../trade/exporter';
-import { movedNoCash } from '../no-cash';
+import { movedNoCash } from '../advance-tax';
 import { servicePos, type PosClass } from './ps-pos';
 
 export type CheckState = 'ok' | 'fail' | 'pending' | 'unknown';
