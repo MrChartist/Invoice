@@ -398,3 +398,416 @@ All 20 are taken: the lowest-scoring ones are cheap configurations of engines th
 bank stock statement).
 
 ---
+
+## 4. Specifications (20 items)
+
+Conventions for every item:
+- **Logic and tests.** Pure logic in `src/lib/agri/ag-*.ts` (new folder), tested with `node:test` in `tests/ag-*.test.ts`.
+  UI checks are `step(...)` blocks in `tests/e2e/smoke.mjs` (§7). Existing files are edited only where §6 says.
+- **Components** in the new folder `src/components/agri/`. Each desk is one lazy component mounted by `Inventory.tsx`
+  (`FarmDesk`, `DairyDesk`, `MillDesk`, `ColdDesk`, `InputsDesk`, `MembersDesk`); its views are lazy sub-components.
+  Template parts live in `src/components/templates/parts/` (`AgriBlock.tsx`, `AgriStatementPage.tsx`), each lazy.
+- **Strings.** Each package has its own i18n area (`defineArea(en, hi)`): `src/i18n/areas/agri-r12a.ts` … `r12d.ts`.
+  Hindi uses the trade's words (किसान, सदस्य, दूध संग्रह, पाली / सुबह-शाम, फैट, एसएनएफ, दर तालिका, दूध बिल, पखवाड़ा /
+  दस दिनी भुगतान, पशु आहार, कटौती, धान, चावल, टूटा, भूसी, कना / चोकर, आउटटर्न, कस्टम मिलिंग, मंडी शुल्क, नमी, कांटा पर्ची,
+  शीतगृह, लॉट, बोरी, किराया, गेट पास, गिरवी ऋण, खाद, बीज, कीटनाशक, लाइसेंस, सब्सिडी, अंश / शेयर, लाभांश, संरक्षण बोनस).
+- **Storage.** New company tables `mrchartist_inv_<table>` go through `getTable` / `setTable`. Each is registered in:
+  - `backup.ts` (`RECORD_TABLES` / `ID_TABLES`);
+  - the open-export schema (`trust/open-export-schema.ts`);
+  - `sync-engine.ts` `DATED` / `NUMBERED`, when dated or numbered;
+  - **`src/lib/agri/ag-registry.ts`** (`AG_TABLE_ACTIONS`, `AG_WATCHED`), registered at runtime, never in first-paint
+    `access.ts` / `audit-edits.ts`. Every writer module and the two all-table lazy writers (`sync-engine.ts`,
+    `trust/recycle-bin.ts`) import it for its side effect (`tests/ag-registry.test.ts`).
+
+  Each table gets one row in `docs/ARCHITECTURE.md` (lead). Additive record fields come by declaration merging in
+  `src/types/agri-r12.ts`: one file, one `declare module` block per package. Table and series names live in
+  `src/lib/agri/ag-shared.ts` (the `tr-shared.ts` / `rt-shared.ts` pattern).
+- **Volume.** Collection data is large (a 200-farmer centre makes ≈146,000 entries a year). **No table holds one row per
+  farmer per shift**: `milk_shifts` holds one row per centre per shift with an `entries` array, and farmer bills are
+  pooled per cycle (A4). A test builds a year of a 300-farmer centre and checks that loading the dairy desk reads at
+  most 2 rows per day.
+- **Invoice snapshots.** Everything Round 12 stores on an invoice lives under the record key **`ag`** (one object; each
+  package owns its sub-fields, §6) and the existing line key `wt`. Templates read them from the record only.
+  Purchases rows (farmer vouchers, pooled cycle bills) carry their agri fields as `PurchaseRecord.ag` (declaration
+  merging; purchases are normalised outside first paint, `readPurchase` passes unknown keys through — A checks and
+  adds `ag` to the purchase keep-list if it does not).
+- **Numbers.** New series go through `series-counters.ts` (`nextSeriesNumberFor` + `recordSeries`) as
+  `XXX/FY<yy-yy>/<seq>`, never reused after a delete: `FPV` (farmer purchase vouchers), `CYB` (pooled cycle bills),
+  `WBS` (weighbridge slips), `MDS` (milk dispatches), `CMR` (custom-milled rice deliveries), `CSR` (cold-storage
+  receipts), `GPO` (gate passes out), `LAS` (loans against stock), `SHC` (share certificates). None of these prefixes
+  is in use today (checked by grep of `XXX/FY` patterns; A adds a test).
+- **Guards.** Destructive calls use `requireAccess`. Writes in a locked period use `assertUnlocked`. Money goes through
+  `round2`, quantities (litres, kg, bags) through a 3-decimal round, fat / SNF % through 2 decimals. Every delete goes
+  through `setTable` on a watched table, so the recycle bin gets the row.
+- **Packs.** A desk tab is listed only when its pack is on (its URL still opens it). Tables are not read while their
+  pack is off (`tests/ag-pack-gate.test.ts`, like `tests/transport-works-pack-gate.test.ts`).
+- **Help.** Every new tab / view gets a topic (`tests/help-registry.test.ts` fails otherwise) and a Ctrl+K title in
+  `src/i18n/areas/discover-r6-tabs.ts`. Statutory topics cite the AG ids. The CA-id regexes in
+  `tests/help-registry.test.ts`, `tests/help-glossary.test.ts` and `tests/docs-links.test.ts` (the `cited` regex) gain
+  `AG` (owner A).
+- **Cash readers.** **No new receipt marker.** A farmer's feed / input invoice settled out of his milk or produce
+  money reuses the R9 marker **`exchange_purchase_id`** ("settled against a purchase voucher of the same party": the
+  receipt clears debtor against creditor) pointing at the pooled cycle bill (A4); the cycle's posting moves the set-off
+  total from the pooled payable to "Sundry creditors — exchange" so both sides clear. Loans, rent and interest move
+  real money (ordinary receipts and payments). `tests/no-cash-readers.test.ts` is unchanged; `movedNoCash` is not
+  edited.
+- **Purchases contract.** Every new module that reads `purchases` (A3, A4, B3, B4, C1, C2, C5, D4) is added to
+  `tests/purchase-contract.test.ts` and reads bills through `readPurchase`.
+- **Personal data.** Farmer bank details, Aadhaar last four digits and KCC numbers are personal data (DPDP Act 2023): they
+  stay on the device and in the user's own backups like every other table; **the full Aadhaar number is never stored**
+  (the field accepts four digits only).
+
+### AG-A — Agri profile and shared farm pieces
+
+#### AG-A1 Agri profile (agri picker) and farm batches
+
+**User story.** When I set up the app I pick "Farm, dairy & food processing", then *Dairy / milk collection centre*.
+The app turns on the farm and dairy desks, lands me on Inventory → Dairy → Collection, sets 10-day farmer cycles, and
+the checklist asks for my rate chart and my first farmers.
+
+**Acceptance criteria.**
+1. `PackId` gains `agri`, `dairy`, `mill`, `coldstore`, `agri_inputs`, `fpo` (appended to `PACK_IDS`). `PACK_OF_TYPE`,
+   `PACK_OF_TYPE_INLINE` and `PACK_ROUTES` are unchanged.
+2. Settings fields `agri_kind?: 'fpo' | 'coop' | 'dairy' | 'mill' | 'cold' | 'inputs' | 'farm' | 'other'`,
+   `mill_kind?: 'rice' | 'flour' | 'dal' | 'oil'` (additive) and object `agri_settings` (`settings.manage`, audited,
+   synced as a singleton). `applyAgriKind(kind, { registered, mill_kind })` (`shop-presets.ts`, R9 / R11 pattern) returns
+   business type, modules, packs, defaults and switches (`registered` adds `gst`):
+
+   | kind | business_type | modules | industry_packs | landing | due days | template | switches turned on |
+   |---|---|---|---|---|---|---|---|
+   | fpo | `manufacturer` | `PRESETS.manufacturer` + `pos` | `agri`, `fpo`, `commodity` | `/inventory?tab=members` | 15 | `gst_tax_invoice` | farmer vouchers; quality cuts; cycles (weekly); members & shares; patronage; input sales to members; weighing lines |
+   | coop | `manufacturer` | `PRESETS.manufacturer` + `pos` | `agri`, `fpo` | `/inventory?tab=members` | 15 | `gst_tax_invoice` | members & shares; dividend cap from settings; cycles; input sales |
+   | dairy | `manufacturer` | `purchases`, `inventory`, `accounts`, `banking`, `reports`, `pos`, `recurring` | `agri`, `dairy` | `/inventory?tab=dairy&view=collection` | 0 | `retail_receipt` | 10-day cycles; feed set-off; analyser; dispatch; Rule 6DD(e) cash |
+   | mill | `manufacturer` | `PRESETS.manufacturer` | `agri`, `mill`, `commodity` | `/inventory?tab=mill&view=intake` | 15 | `gst_tax_invoice` | weighbridge; moisture cut; outturn standards by `mill_kind`; CMR (rice); packing rule |
+   | cold | `manufacturer` | `purchases`, `inventory`, `accounts`, `banking`, `reports`, `gst`, `tds` | `agri`, `coldstore` | `/inventory?tab=cold&view=lots` | 0 | `gst_tax_invoice` | lots and gate passes; season rent; loans against lots; exempt agri storage |
+   | inputs | `kirana` (+ `retail_kind: 'general'`) | `PRESETS.kirana` + `accounts`, `banking` | `agri`, `agri_inputs` | `/pos` | 0 | `gst_tax_invoice` | licences; principal certificates; subsidy PoS ref; expiry block; MRP guard `block`; credit till harvest |
+   | farm | `manufacturer` | `purchases`, `inventory`, `accounts`, `banking`, `reports` | `agri` | `/inventory?tab=farm&view=batches` | 7 | `classic_orange` | batches (flock / pond / herd); agricultural income ledger |
+   | other | — (type unchanged) | unchanged | `agri` | `/inventory?tab=farm` | — | — | farmers and vouchers only |
+
+3. Wizard: one more card "Farm, dairy & food processing" (lazy, inside the wizard chunk) opens a second choice with the
+   seven kinds; *Mill* asks rice / flour / dal / oil; every kind asks "Are you registered under GST?". Settings →
+   Features shows "Agriculture profile" for every company with the same choices plus "Custom" (switches kept as set).
+   Changing the profile never deletes data; switches turned off only hide views.
+4. Existing companies are unchanged (no `agri_kind`, no step). Companies that pick a kind get checklist steps
+   (`checklist-steps.ts`, append-only): every kind → `farmers` (first farmer / member / depositor); dairy → `rateChart`,
+   `firstShift`; mill → `millBom` (outturn BOM), `cmrAgreement` (rice only, skippable); cold → `chambers`, `rentPlan`;
+   inputs → `agriLicence`; fpo / coop → `shareCapital`; farm → `batch`.
+5. Desk tabs (`INVENTORY_PACK_TABS`, appended): `farm` (pack `agri`; views `farmers`, `vouchers`, `cycles`, `quality`,
+   `batches`), `dairy` (views `charts`, `collection`, `bills`, `dispatch`, `products`, `cards`), `mill` (views `intake`,
+   `batches`, `cmr`, `yield`), `cold` (pack `coldstore`; views `lots`, `gatepasses`, `rent`, `loans`, `chambers`), `inputs`
+   (pack `agri_inputs`; views `licences`, `subsidy`, `credit`), `members` (pack `fpo`; views `register`, `shares`,
+   `patronage`, `papers`). `PACK_TABS` rows in block `// R12`. If a view's package has not merged yet, A commits a
+   one-line stub (`R12Stub.tsx`) that the package replaces.
+6. **Farm batches** (view `batches`, table `farm_batches`): a flock, pond, herd or crop batch `{ id, kind: 'flock' |
+   'pond' | 'herd' | 'crop', name, start, end?, placed (birds / seed / animals / acres), unit, cost_centre_id, events:
+   [{ date, kind: 'mortality' | 'feed' | 'harvest' | 'medicine' | 'weight', qty, unit, note }], status }`. A batch
+   creates its cost centre on first save (existing `cost-centres.ts`, kind `project`) so purchase bills and sales tagged
+   to it give the batch P&L the existing reports already show. Memo figures: mortality %, feed kg, live weight / harvest
+   kg, **FCR** = feed kg ÷ weight gained kg, cost per kg. No posting from events.
+7. **Agricultural income** (farm kind): a ledger "Agricultural income (exempt)" under Other income is created on first
+   use; sales of own produce can be tagged to it; the help topic says income from poultry, fishery, a mill, a dairy or
+   a cold store is business income, not agricultural income (AG15).
+8. Features catalogue (`features-catalog.ts`): one row per new pack and one "Agriculture profile" row with `PACK_HREF`.
+9. **Sample data** (R6-B4): a new `src/lib/demo/profile-agri.ts`, only in the Demo company, dispatched by `agri_kind`;
+   each package adds its own block (§6): dairy — 12 farmers, a rate chart, 20 days of shifts, one cycle bill, one
+   dispatch; mill — a paddy intake with moisture cut, a milling batch, a CMR agreement with one delivery; cold — 6 lots,
+   a rent plan, one gate pass, one loan; inputs — 3 licences, a subsidised-urea sale, a credit sale due at harvest;
+   fpo — 20 members with shares, an aggregation cycle, a patronage run; farm — a broiler flock with FCR.
+
+**Files.** New: `src/lib/agri/{ag-profile,ag-registry,ag-settings,ag-shared,ag-batches}.ts`, `src/lib/agri-rules.ts`
+(scaffold with one section per package), `src/types/agri-r12.ts` (scaffold), `src/components/agri/{AgriKindPicker,
+FarmDesk,BatchesView,R12Stub}.tsx`, `src/lib/demo/profile-agri.ts`. Edit: `industry-packs.ts`, `shop-presets.ts`,
+`features-catalog.ts`, `checklist-steps.ts`, `SetupWizard.tsx`, `FeaturesPanel.tsx`, `page-tabs.ts`
+(`INVENTORY_PACK_TABS`), `Inventory.tsx` (one lazy mount per desk), the demo dispatcher.
+
+**Storage.** Settings fields `agri_kind`, `mill_kind`, `agri_settings` (object). Table `farm_batches`.
+
+**Tests.** `tests/ag-profile.test.ts`: each kind's type / modules / packs / landing / switches; `registered` adds `gst`;
+`inputs` sets `retail_kind: 'general'` so R9's step does not fire; `PACK_OF_TYPE` / `PACK_ROUTES` unchanged; existing
+`manufacturer` / `kirana` companies unchanged; checklist steps by kind. `tests/ag-batches.test.ts`: FCR, mortality %,
+cost centre created once. `tests/industry-packs.test.ts` extended with the six ids.
+
+#### AG-A2 Farmers and members master
+
+**User story.** As a collection-centre secretary I add 200 farmers from an Excel sheet with their village, member no.,
+bank account and UPI ID; each gets a short code (F-0042) that I type at the can, and a printable card with a QR.
+
+**Acceptance criteria.**
+1. Farmers are **vendors** (they sell to us); a cold-storage depositor or a dealer's farmer customer is a **client**; one
+   person may be both, linked by the same `ag.code`. Additive sub-object `ag` on `Vendor` and `Client`
+   (declaration merging): `code` (unique per company, default `F-0001` sequence), `village?`, `centre_id?` (dairy
+   centre / FPO cluster / collection point), `route?`, `member_no?`, `member_since?`, `member: boolean`,
+   `land_acres?`, `crops?: string[]`, `animals?: { cows?, buffaloes? }`, `bank?: { name, account, ifsc }` (reuses the
+   vendor bank fields when present), `upi?`, `aadhaar_last4?` (exactly 4 digits), `kcc_no?`, `phone?`, `language?`,
+   `status: 'active' | 'inactive'`. `principal_kind: 'agriculturist'` (R8) is set on every farmer vendor so the RCM
+   prompt and the patti code see them.
+2. View Farm → Farmers: list by centre / village with balances (payable from cycles and vouchers, receivable from input
+   sales), search by code / phone / name, import CSV / XLSX through the existing import pipeline (one mapping preset
+   "Farmers"), export, and a **farmer card** print (A6, code + QR of the code via `qrcode.react`, name, village, member
+   no.) — 8 per A4 sheet.
+3. Centres (`agri_settings.centres: [{ id, name, kind: 'milk' | 'cluster' | 'mill_gate' | 'cold', godown_id? }]`): a milk
+   centre maps to a godown so collected milk is stock there (B2).
+4. Duplicate guard: same phone or same bank account on two farmers → soft warning.
+
+**Files.** New: `src/lib/agri/ag-farmers.ts`, `src/components/agri/FarmersView.tsx`, `FarmerCard.tsx`. Edit: the import
+mapping presets (one row), the vendor / client form (one lazy "Farmer" section, mounted only with the `agri` pack).
+
+**Tests.** `tests/ag-farmers.test.ts`: code sequence and uniqueness; Aadhaar field rejects anything but 4 digits;
+import mapping; `principal_kind` set; balances from vouchers and cycles; duplicate warnings.
+
+#### AG-A3 Farmer purchase voucher, quality cuts, agri tax classes and declarations
+
+*Seen in:* every mill, FPO and trader buying from farmers; N 2/2017, 6/2022, 4/2017; Rule 6DD(e); 194Q.
+
+**User story.** As a rice miller I buy 52 bags of paddy from a farmer: gross 2,640 kg, tare 0.5 kg a bag, moisture 19%
+against a 17% norm, so 2% is cut; mandi fee 2% and RDF 2% are on me; the voucher prints in my own series with "Purchased
+from an agriculturist — exempt; no reverse charge", and I pay him by NEFT.
+
+**Acceptance criteria.**
+1. **Farmer purchase voucher** = an ordinary `purchases` row with `bill_number` from the `FPV/FY…` series (the R9 URD
+   pattern), vendor = a farmer, `ag.voucher: { centre_id?, vehicle?, wbs_id?, quality: [...], cut_kg, accepted_kg }`.
+   Lines carry `wt` (R8 weighing: gross, packages, tare, dhalta) on purchase lines; the net accepted weight is the line
+   quantity, so the stock engine, purchase register and GSTR-3B Table 5 (exempt inward) read it unchanged.
+2. **Quality cuts** (view `quality`, table `quality_cut_tables`): per commodity `{ commodity, params: [{ key: 'moisture'
+   | 'foreign' | 'damaged' | 'immature' | 'broken' | 'custom', norm_pct, mode: 'weight' | 'price', per_point_pct,
+   max_pct?, reject_above? }] }`. A reading above the norm cuts weight (kg) or price (₹ / qtl) by `per_point_pct` per
+   point; above `reject_above` the voucher warns "reject or treat as lower grade". The cut is printed per parameter.
+   No preset values (they are contract / agency terms); starter rows in help only.
+3. **Charges** reuse R8 charge heads (`tr-charges.ts`) on purchase vouchers: market fee, RDF, commission, hamali,
+   bardana, with `in_value` / `own_rate` / `outside` and *paid by us* vs *recovered from the farmer*. No preset rate
+   (TR6); the help topic shows reported examples (Punjab 3% + 3%, Haryana 2% + 2% on paddy) marked "verify — AG20".
+4. **Agri tax classes** (`agri-rules.ts` `AGRI_CLASS_RULES`, date-keyed, append-only, `source` + `verified` per row):
+   an item gets `ag_class` (additive, catalog items) — `milk_fresh`, `milk_uht`, `curd_loose`, `curd_packed`, `paneer`,
+   `ghee_butter`, `cheese`, `milk_powder`, `cereal_loose`, `cereal_packed_25`, `paddy`, `rice_husk`, `rice_bran_feed`,
+   `rice_bran_other`, `dorb`, `broken_rice`, `oil_cake_feed`, `oil_cake_other`, `edible_oil`, `pulses_loose`,
+   `pulses_packed_25`, `flour_loose`, `flour_packed_25`, `veg_fruit_fresh`, `potato`, `seed_sowing`, `fertiliser`,
+   `fert_input`, `pesticide_chem`, `biopesticide`, `micronutrient`, `cattle_feed`, `tractor`, `farm_machine`,
+   `live_poultry`, `eggs`, `fish_fresh`, `storage_agri`, `storage_other`, `milling_pds`, `job_milling`, `interest`.
+   The class **suggests** HSN / SAC and rate by document date (22 Sep 2025 rows per §2.3a); a typed rate always wins
+   (`gst-guards` shows "rate differs from the class (AGn)" as a soft notice).
+5. **Declarations** (lazy, via `SupplyDeclaration`): a voucher from an agriculturist prints "Purchased from an
+   agriculturist — agricultural produce; exempt; reverse charge not applicable" unless a line hits the R8 notified-goods
+   prompt (TR17), which then prints its RCM line. An exempt-only sale is a bill of supply (existing) with "Agricultural
+   produce — not pre-packaged and labelled" when a `*_loose` / `paddy` class is on it; a mixed bill is an
+   invoice-cum-bill of supply (Rule 46A, existing behaviour).
+6. **194Q hint**: when our turnover test passes (`BUYER_194Q_TURNOVER_RULES`) and a farmer's FY purchases cross
+   ₹50 lakh, the voucher shows the existing 194Q prompt (agricultural produce is "goods" — AG13).
+7. Payment of a voucher uses the existing payment dialog; cash above ₹10,000 to a farmer vendor (`principal_kind:
+   'agriculturist'`) passes the A4 Rule 6DD(e) check.
+
+**Files.** New: `src/lib/agri/{ag-vouchers,ag-quality,ag-tax}.ts`, `src/components/agri/{VouchersView,QualityView,
+VoucherAgriPanel}.tsx`. Edit (one lazy line each, §6): `BillModal.tsx` (mount `VoucherAgriPanel` with the `agri` pack),
+`gst-guards.ts` (class-rate notice), `paper-helpers.ts` (`agriDeclaration`).
+
+**Tests.** `tests/ag-vouchers.test.ts`: FPV numbering survives delete; net weight → quantity; moisture cut by weight and
+by price; reject warning; charges paid vs recovered; Table 5 value; 194Q prompt threshold. `tests/ag-tax.test.ts`: class
+→ rate before / after 22 Sep 2025; typed rate wins; declarations by line mix; RCM line only for notified goods.
+
+#### AG-A4 Farmer payment cycles: pooled bills, deductions, bank file, slips, Rule 6DD(e)
+
+**User story.** As a dairy society I close the 11–20 Oct cycle: one bill for 186 farmers, each line with litres, fat-kg,
+SNF-kg and amount, less cattle feed bought on credit, an advance instalment and ₹50 share money; I download the NEFT
+file, send each farmer his slip on WhatsApp, and pay the five farmers without bank accounts in cash without a 40A(3)
+warning.
+
+**Acceptance criteria.**
+1. **Cycle settings** (`agri_settings.cycles`): `{ length: 'weekly' | '10day' | 'fortnight' | 'monthly', start_day?,
+   pay_lag_days }`, per centre overridable. Periods are local-day ranges (1–10, 11–20, 21–end for `10day`).
+2. **Pooled cycle bill** (table `farmer_cycles`, `CYB/FY…`): `{ id, number, centre_id, period_from, period_to, source:
+   'milk' | 'produce', lines: [{ farmer_id, qty, unit, kg_fat?, kg_snf?, amount, bonus?, deductions: [{ kind: 'feed' |
+   'input' | 'advance' | 'loan' | 'share' | 'insurance' | 'union' | 'other', ref_id?, amount }], net }], purchase_id,
+   journal_id?, payment_file?, status: 'draft' | 'closed' | 'paid' }`. **Close** writes **one `purchases` row** per
+   cycle (vendor = the centre's pooled vendor "Milk producers — <centre>" / "Farmers — <cluster>", created on first
+   use; lines per item class: cow milk / buffalo milk / produce; `bill_number` = the CYB number), so stock, Table 5 and
+   the purchase register see it once. Farmer-wise balances are the cycle lines (the farmer ledger view sums cycles,
+   vouchers and payments).
+3. **Deductions.** `feed` / `input` lines come from the farmer's unpaid input invoices (A2 links the client and vendor
+   by `ag.code`): on close each is settled by a receipt with `exchange_purchase_id = purchase_id` (existing no-cash
+   marker), and one journal moves the set-off total Dr pooled vendor | Cr "Sundry creditors — exchange". `advance` /
+   `loan` reduce the farmer's advance (a payment voucher made earlier, Dr Farmer advances) through the same journal;
+   `share` credits "Share application money — members" (D5); `insurance` / `union` / `other` credit a named ledger
+   (created on first use). Net never goes below zero: the excess carries to the next cycle as a farmer receivable line.
+4. **Payment.** "Pay cycle" builds a `bank-upload.ts` file (existing presets; one row per farmer with a bank account)
+   and records **one payment voucher** per mode (bank, cash) Dr pooled vendor | Cr bank / cash, with the per-farmer
+   split stored on the cycle. Nothing is sent; the user records it after the bank confirms (existing rule).
+5. **Rule 6DD(e) cash check** (`ag-cash.ts`, lazy, called by the existing cash guards with one guarded line): a cash
+   payment to a vendor with `principal_kind: 'agriculturist'` or a pooled farmer cycle is **not** warned under Sec
+   40A(3); the guard shows instead "Cash to a cultivator / producer — Rule 6DD(e); keep the farmer's acknowledgement
+   (AG14)". Payments to a company, a trader or a processor keep the warning.
+6. **Slips.** Per farmer: a payment slip (A5 paper, 80 mm or A6) and a WhatsApp message via `wa.me` (Hindi or English by
+   the farmer's `language`). A bulk "send all" queue walks the farmers one tap at a time (no automation).
+7. **Bonus / price difference** (year-end, dairy / FPO): a run computing ₹ per kg fat / per litre / per quintal on the
+   year's cycles; posted as a draft journal to "Price difference to members" (default, AG25) or, when the user picks
+   "patronage" (D5), to the appropriation account. Never automatic.
+
+**Files.** New: `src/lib/agri/{ag-cycles,ag-cycle-post,ag-cash,ag-slips}.ts`, `src/components/agri/CyclesView.tsx`.
+Edit: `rt-cash-guard.ts` and `cn-muster.ts` cash checks (one lazy guarded line each), `bank-upload.ts` (accepts a cycle as
+a source: one adapter function, no format change).
+
+**Tests.** `tests/ag-cycles.test.ts`: periods by length; one purchases row per cycle; Σ lines = purchase total; feed
+set-off receipts carry `exchange_purchase_id` and the cash book ignores them; the set-off journal balances; negative net
+carries forward; bank file rows; 6DD(e) suppresses the warning only for agriculturists; reopening a cycle (draft only)
+recomputes and deletes its vouchers through their guards.
+
+#### AG-A5 Agri documents on paper
+
+**User story.** As a cold-storage owner my rent bill shows lot no., receipt no., commodity, bags, season and rate per bag;
+as a dealer my urea memo shows my fertiliser licence, the PoS transaction no. and batch; as a dairy my farmer's slip
+shows each shift's litres, fat and SNF — all in the PDF and on WhatsApp.
+
+**Acceptance criteria.**
+1. **Snapshot** `ag` on invoices (one record key, §1): `{ kind: 'milk_sale' | 'rent' | 'inputs' | 'cmr' | 'produce' |
+   'job_milling', header?: {...}, lines?: Record<lineId, {...}> }`; each package writes its sub-object through one
+   `agSnapshot(kind, …)` helper (B: milk sale fat / SNF per line; C: CMR / job milling header; D: lot, season, licence,
+   PoS ref). Old documents without `ag` print unchanged.
+2. **Paper block** (`AgriBlock.tsx`, lazy; mounted by `TemplateEngine` after `PartyPanel`, before `GstBody`, never on
+   `receipt` unless the kind is `inputs`): a ruled box per kind — *Storage particulars* (lot / receipt no., commodity,
+   variety, bags in / out / balance, chamber, date in, season, rate basis); *Dealer particulars* (licence nos. by type,
+   principal certificate ref, PoS transaction no., farmer ID last 4, bags under subsidy); *Milk particulars* (tanker,
+   shift, kg fat, kg SNF, rate chart); *Custom milling* (agency, season, lot / ACK no., paddy, outturn %, rice due /
+   delivered). Accent variable only.
+3. **Line sub-line**: `trackingText` gains one helper call `agriLineText(item, ag)` → "Fat 6.8% · SNF 9.0% · 412.5 L" /
+   "Lot CSR/26-27/0042 · 120 bags × ₹180 (season 2026)" / "Batch UR2611 · Exp 03/2028 · MRP ₹266.50 / bag" printed under
+   the line name in **both** item tables. Without `ag` it returns ''.
+4. **Statement pages** (`AgriStatementPage.tsx`, lazy, the R3-B4 annexure pattern, following page): the farmer slip
+   (shift-wise table, A4 / B3), the voucher's weighment and quality-cut table (A3), the CMR statement (C3), the rent
+   working (D2). Each prints from the snapshot or the cycle row only — never recomputed.
+5. **Small papers** (HTML print pages, the `abstractHtml` pattern, also CSV): farmer card (A2), collection slip 58 / 80
+   mm (B2), weighbridge slip (C1), storage receipt and gate pass (D1), share certificate (D5). Each carries "working
+   paper — verify" only where it states a tax or a statutory figure.
+6. **Declarations**: `agriDeclaration` in `paper-helpers.ts` (A3 texts), plus "Exempt — storage of agricultural produce
+   (N 12/2017 entry 54(e); verify AG8)" on an exempt rent bill and "Interest on loan — exempt" on an interest bill.
+7. Print copies, the share link and PDF export carry the same paper (they render `TemplateEngine`).
+
+**Files.** New: `src/components/templates/parts/{AgriBlock,AgriStatementPage}.tsx` + `agri-paper.module.css`,
+`src/lib/agri/{ag-snapshot,ag-print}.ts`. Edit: `TemplateEngine.tsx` (two lazy mounts, §6), `paper-helpers.ts`
+(`agriLineText`, `agriDeclaration`), `invoice-defaults.ts` (`R12_RECORD_KEYS`, one spread token).
+
+**Tests.** `tests/ag-print.test.ts`: block rows per kind; sub-line texts; old invoices without `ag` render byte-identical
+(snapshot of the paper HTML for a fixture); `ag` survives `normalizeRecord` (load → edit → save); statement pages read
+the snapshot only.
+
+### AG-B — Dairy and milk collection (pack `dairy`)
+
+#### AG-B1 Fat / SNF rate charts
+
+**User story.** As a society secretary I load the union's chart for cow milk (fat 3.0–5.5 × SNF 7.5–9.0, ₹ per litre)
+and the buffalo chart (₹ per kg fat), effective from 1 Nov; old shifts keep their old rate.
+
+**Acceptance criteria.**
+1. Table `milk_rate_charts`: `{ id, name, milk: 'cow' | 'buffalo' | 'mixed', basis: 'matrix' | 'fat_kg' | 'ts_kg' |
+   'two_axis' | 'flat', unit: 'L' | 'KG', effective_from, effective_to?, matrix?: { fat_steps: number[], snf_steps:
+   number[], rates: number[][] }, fat_rate?, snf_rate?, ts_rate?, flat_rate?, min_fat?, min_snf?, below_min:
+   'reject' | 'flat' | 'deduct', incentives?: [{ kind: 'shift' | 'category' | 'quantity', key, add }], centre_ids? }`.
+   - `matrix`: rate per unit at (fat, SNF), nearest lower step (default; "nearest" option);
+   - `fat_kg`: ₹ per kg fat × kg fat;
+   - `ts_kg`: ₹ per kg total solids (fat + SNF);
+   - `two_axis`: kg fat × fat rate + kg SNF × SNF rate (the common union formula).
+2. Chart lookup is by shift date (`effective_from` ≤ date, latest wins; append-only — a change is a new chart row, the
+   old one gets `effective_to`). The applied chart id and rate are **stored on each entry** (B2), so a later chart never
+   reprices old milk.
+3. Import / export the matrix as CSV / XLSX (rows = fat, columns = SNF); a preview heat-table; a "test a sample" box.
+4. kg conversion: litres ↔ kg by CLR / density (`kg = L × (1 + CLR/1000)`, default CLR 28 cow / 30 buffalo when not
+   read; setting) — kg fat = kg × fat %.
+
+**Files.** New: `src/lib/agri/{ag-rate-chart}.ts`, `src/components/agri/RateChartsView.tsx`.
+
+**Tests.** `tests/ag-rate-chart.test.ts`: each basis; nearest-lower vs nearest; below-minimum modes; effective dating and
+no repricing; litres ↔ kg; CSV round trip.
+
+#### AG-B2 Shift collection sheet with analyser and scale
+
+**User story.** At 6 a.m. the operator types farmer code 42, the can weighs 8.40 kg on the scale, the analyser sends fat
+6.9 and SNF 9.1; the line fills its rate and amount, prints a 58 mm slip, and moves to the next farmer. At 8:30 the
+morning shift is closed: 186 farmers, 1,642 L, average fat 5.8.
+
+**Acceptance criteria.**
+1. Table `milk_shifts`: **one row per centre per date per shift** `{ id, centre_id, date, shift: 'M' | 'E', entries:
+   [{ id, farmer_id, milk, qty, unit, fat, snf, clr?, water_pct?, chart_id, rate, amount, sample_only?, rejected?,
+   reason?, at }], closed_at?, closed_by?, cycle_id? }`. Totals are derived. A closed shift is read-only unless reopened
+   (audited); a shift inside a closed cycle cannot reopen.
+2. **Entry screen** (keyboard-first: code → qty → fat → SNF → Enter; big numerals; works on a phone): farmer by code /
+   name / QR (camera, existing scanner); duplicate entry for the same farmer in the shift warns; rejected milk (sour,
+   adulterated, below minimum) records qty with zero amount and a reason.
+3. **Devices** (lazy, feature-detected Web Serial, the `scale-serial.ts` pattern): the existing scale reader for can
+   weight; a new **analyser frame parser** `ag-analyser.ts` for plain ASCII lines carrying fat / SNF / CLR / water
+   (configurable field order and separators; presets "generic CSV" and "key=value"); device profile in device-local key
+   `mrchartist_milk_analyser` (not backed up). Nothing is sent to the devices. Typing always works.
+4. **Slip**: 58 / 80 mm print (existing ESC/POS path when a printer is set) and an optional `wa.me` message per entry
+   (off by default).
+5. **Stock**: on close, the shift's accepted litres post as a stock receipt into the centre's godown at the shift's
+   value (a stock journal input to the engine, `production`-style, no ledger posting — the ledger posting is the cycle
+   purchase in A4/B3). A test proves stock is not counted twice when the cycle purchase is written: the cycle purchase
+   row carries `ag.stock_by_shift: true`, and the stock engine skips purchase lines with it (one guarded line in the
+   purchase stock reader, §6).
+6. Shift summary: farmers, litres, kg fat, kg SNF, average fat / SNF, amount, rejected; morning vs evening.
+
+**Files.** New: `src/lib/agri/{ag-shifts,ag-analyser}.ts`, `src/components/agri/{CollectionView,CollectionEntry}.tsx`.
+Edit: the purchase stock reader (one guarded line, §6), the device settings panel (one lazy row).
+
+**Tests.** `tests/ag-shifts.test.ts`: rate from chart at shift date; duplicates; rejection; close / reopen rules;
+stock posted once; 300 farmers × 365 days × 2 shifts loads as 730 rows. `tests/ag-analyser.test.ts`: frame parsing
+presets, partial frames, units.
+
+#### AG-B3 Milk bill per cycle
+
+**User story.** On the 11th I click "Make bills 1–10 Oct": every farmer's shifts become one line with litres, kg fat, kg
+SNF and amount; feed and advances come off; I review and close.
+
+**Acceptance criteria.**
+1. `buildMilkCycle(centre, from, to)` reads closed shifts in the range and fills an A4 cycle (`source: 'milk'`): per
+   farmer qty, kg fat, kg SNF, amount, incentives (shift / quantity add-ons from the chart), deductions (A4).
+   Unclosed shifts in the range block "close" with a list.
+2. **Farmer milk bill** (A5 statement page): shift-wise table (date, M / E, qty, fat, SNF, rate, amount), totals, deductions,
+   net, payment mode / bank last 4; printable per farmer or all (one PDF, existing batch PDF).
+3. Cycle summary report: litres and amount by farmer, village, route; top / bottom fat; farmers with no supply.
+4. GST: milk lines use class `milk_fresh` (nil); the pooled purchase is exempt inward (Table 5).
+
+**Files.** New: `src/lib/agri/ag-milk-cycle.ts`, `src/components/agri/MilkBillsView.tsx`.
+
+**Tests.** `tests/ag-milk-cycle.test.ts`: Σ entries = cycle amount; incentives; unclosed shift blocks; bill pages from
+the cycle row only.
+
+#### AG-B4 Dispatch to union / plant and fat-SNF reconciliation
+
+**User story.** Twice a day the tanker takes the milk to the union's chilling centre; the union's acknowledgement comes
+back with its own quantity, fat and SNF. I see the shortage in kg fat and kg SNF per dispatch and per month, and the
+union's 10-day payment matches my sale invoices.
+
+**Acceptance criteria.**
+1. Table `milk_dispatches` (`MDS/FY…`): `{ id, number, date, shift, centre_id, buyer_id, tanker?, sent: { qty, unit,
+   fat, snf, temp? }, received?: { qty, fat, snf, ack_no, date }, invoice_id? }`.
+2. On save the dispatch moves stock out of the centre godown (stock journal input); "Bill" raises a **sale invoice** to
+   the buyer at the buyer's rate (the union's chart, B1 chart with `buyer_id`) — class `milk_fresh` (bill of supply),
+   with `ag` lines (fat, SNF, kg fat, kg SNF) printed by A5.
+3. **Reconciliation** view: collected (shifts) vs dispatched vs received per day / cycle / month in litres, kg fat and kg
+   SNF; shortage / gain and %; local sales and products (B5) as outflows; closing stock in the centre. A tolerance
+   setting (default 0.5% kg fat, "practice") flags days beyond it.
+4. Union payment receipts are ordinary receipts against the dispatch invoices; the union's deductions (feed supplied
+   by the union, cess) as typed deductions on the receipt (existing short-payment handling).
+
+**Files.** New: `src/lib/agri/{ag-dispatch,ag-milk-reco}.ts`, `src/components/agri/DispatchView.tsx`.
+
+**Tests.** `tests/ag-dispatch.test.ts`: stock out; invoice from received or sent figures (setting, default received);
+reconciliation sums; tolerance flags; invoice snapshot unchanged after a later chart.
+
+#### AG-B5 Dairy products and household milk cards
+
+**User story.** I convert 200 L of milk into 40 kg paneer and whey, sell paneer at the counter (nil GST since 22 Sep
+2025) and ghee at 5%; 60 households take 1 L a day on a monthly card, and I bill them on the 1st.
+
+**Acceptance criteria.**
+1. **Product starters**: BOM templates (existing `boms`) for paneer, khoa, curd, ghee (via cream / butter), buttermilk,
+   with by-products (whey, ghee residue) and typical yields as editable values ("practice — adjust"), and the item classes
+   of A3 (`paneer`, `ghee_butter`, `curd_loose` / `curd_packed`, `cheese`, `milk_uht`). Making uses the existing
+   manufacturing journal / production order; fat accounting memo: kg fat in vs kg fat in products.
+2. **Milk cards** (table `milk_cards`, one row per customer per month): `{ id, client_id, month, milk, rate, default_qty,
+   days: Record<day, qty>, delivered_by?, invoice_id? }`; a grid to mark daily quantity (default fills, tap to change /
+   skip); "Bill month" raises one invoice per card (bill of supply for nil milk) with an `ag` line "31 days · 29.5 L";
+   receivables, reminders and UPI links are the existing ones.
+3. Local counter sales of milk use POS with the scale (existing).
+
+**Files.** New: `src/lib/agri/{ag-dairy-products,ag-milk-cards}.ts`, `src/components/agri/{ProductsView,MilkCardsView}.tsx`.
+
+**Tests.** `tests/ag-milk-cards.test.ts`: month grid, defaults, skips, invoice totals, one invoice per card per month
+(re-billing refused); `tests/ag-dairy-products.test.ts`: starter BOMs valid; class rates by date.
