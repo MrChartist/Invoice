@@ -34,6 +34,8 @@ export interface StatementLine {
   /** `12.5%` or `₹50 × 2`. */
   rate: string;
   amount: number;
+  /** A tip passed through in full (SV-A follow-up): outside the commission, the base and the slab. */
+  tip?: boolean;
 }
 
 export interface Statement {
@@ -42,6 +44,8 @@ export interface Statement {
   serviceBase: number;
   commission: number;
   uplift: number;
+  /** Tips passed through (inside `total`). */
+  tips: number;
   total: number;
 }
 
@@ -74,6 +78,11 @@ export function documentCommission(inv: InvoiceRecord, staff: Pick<ServiceStaff,
   for (const l of inv.items ?? []) {
     const sv = l?.sv;
     if (!sv || (sv.staff_id !== staff.id && sv.assist_id !== staff.id)) continue;
+    if (sv.tip) {
+      // A tip goes to its staff member in full (no assistant split, no rule).
+      if (sv.staff_id === staff.id) out.push({ invoice_id: inv.id, number: inv.invoice_number, date: isoDay(inv.issue_date), item: l.name, kind: 'service', role: 'staff', base: 0, rate: 'tip', amount: round2(sign * (taxable.get(l.id) ?? 0)), tip: true });
+      continue;
+    }
     const assistPct = sv.assist_id ? Math.min(100, Math.max(0, num(sv.assist_pct))) : 0;
     const share = (sv.staff_id === staff.id ? 100 - assistPct : 0) + (sv.assist_id === staff.id ? assistPct : 0);
     if (!share) continue;
@@ -114,9 +123,10 @@ export function commissionFor(staff: Pick<ServiceStaff, 'id' | 'plan_id'>, month
       const day = isoDay(p.date);
       if (day.slice(0, 7) !== month) continue;
       const f = (upto - before) / total;
-      if (f > 0) for (const l of documentCommission(inv, staff, data)) if (l.kind !== 'package_redemption') lines.push({ ...l, date: day, base: round2(l.base * f), amount: round2(l.amount * f) });
+      if (f > 0) for (const l of documentCommission(inv, staff, data)) if (l.kind !== 'package_redemption' && !l.tip) lines.push({ ...l, date: day, base: round2(l.base * f), amount: round2(l.amount * f) });
     }
-    for (const inv of byInv.values()) if (isoDay(inv.issue_date).slice(0, 7) === month) lines.push(...documentCommission(inv, staff, data).filter((l) => l.kind === 'package_redemption'));
+    // A prepaid redemption and a tip (collected with the bill) count on the bill's date.
+    for (const inv of byInv.values()) if (isoDay(inv.issue_date).slice(0, 7) === month) lines.push(...documentCommission(inv, staff, data).filter((l) => l.kind === 'package_redemption' || l.tip));
     // Credit notes take back in the month they are issued.
     for (const inv of data.invoices) if (inv?.doc_type === 'CREDIT_NOTE' && counts(inv) && isoDay(inv.issue_date).slice(0, 7) === month) lines.push(...documentCommission(inv, staff, data));
   } else {
@@ -125,25 +135,27 @@ export function commissionFor(staff: Pick<ServiceStaff, 'id' | 'plan_id'>, month
   lines.sort((a, b) => a.date.localeCompare(b.date) || a.number.localeCompare(b.number));
   const base = round2(lines.reduce((s, l) => s + l.base, 0));
   const serviceBase = round2(lines.filter((l) => l.kind === 'service' || l.kind === 'package_redemption').reduce((s, l) => s + l.base, 0));
-  const commission = round2(lines.reduce((s, l) => s + l.amount, 0));
+  const commission = round2(lines.reduce((s, l) => s + (l.tip ? 0 : l.amount), 0));
+  const tips = round2(lines.reduce((s, l) => s + (l.tip ? l.amount : 0), 0));
   let uplift = 0;
   const slab = plan?.slab;
   if (slab) {
     const slabBase = slab.base === 'service' ? serviceBase : base;
     const excess = slabBase - slab.target;
     if (excess > 0) {
-      const earnedOnSlabBase = lines.filter((l) => slab.base === 'all' || l.kind === 'service' || l.kind === 'package_redemption').reduce((s, l) => s + l.amount, 0);
+      const earnedOnSlabBase = lines.filter((l) => !l.tip && (slab.base === 'all' || l.kind === 'service' || l.kind === 'package_redemption')).reduce((s, l) => s + l.amount, 0);
       const normalRate = slabBase > 0 ? earnedOnSlabBase / slabBase : 0;
       uplift = round2(slab.mode === 'add' ? (excess * slab.pct) / 100 : excess * (slab.pct / 100 - normalRate));
     }
   }
-  return { lines, base, serviceBase, commission, uplift, total: round2(commission + uplift) };
+  return { lines, base, serviceBase, commission, uplift, tips, total: round2(commission + uplift + tips) };
 }
 
 /** Statement CSV rows (header first). */
 export const statementRows = (st: Statement): (string | number)[][] => [
   ['Date', 'Bill', 'Item', 'Kind', 'Role', 'Base (taxable)', 'Rate', 'Commission'],
-  ...st.lines.map((l) => [l.date, l.number, l.item, l.kind, l.role, l.base, l.rate, l.amount]),
+  ...st.lines.map((l) => [l.date, l.number, l.item, l.tip ? 'tip' : l.kind, l.role, l.base, l.rate, l.amount]),
   ['', '', '', '', '', st.base, 'Slab uplift', st.uplift],
+  ...(st.tips ? [['', '', '', '', '', '', 'Tips passed through', st.tips]] : []),
   ['', '', '', '', '', '', 'Total', st.total],
 ];

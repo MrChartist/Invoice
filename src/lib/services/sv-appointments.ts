@@ -16,7 +16,7 @@ import { localDb } from '../localDb';
 import { buildBillDraft } from '../timesheets';
 import { serviceClassAt } from '../service-rules';
 import { SV_TABLES } from './sv-shared';
-import { DEFAULT_MESSAGES } from './sv-settings';
+import { DEFAULT_MESSAGES, readServiceSettings } from './sv-settings';
 import { durationOf, nextToken, toMin } from './sv-slots';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -106,6 +106,7 @@ export const shownStatus = (a: Appointment, billed: ReadonlyMap<string, InvoiceR
 /** Bill lines for an appointment: each service a line, priced by its snapshot, the staff on each (`sv.staff_id`). */
 export function billLines(a: Appointment, staff: readonly Pick<ServiceStaff, 'id' | 'name'>[], date = a.date): InvoiceItem[] {
   const nameOf = (id?: string) => staff.find((s) => s.id === id)?.name;
+  const print = !!readServiceSettings().print_staff; // SV-A follow-up: the printed-name snapshot
   return a.services.map((s) => {
     const staffId = s.staff_id || a.staff_id;
     const cls = s.sv_class ? serviceClassAt(s.sv_class, date) : undefined;
@@ -121,7 +122,7 @@ export function billLines(a: Appointment, staff: readonly Pick<ServiceStaff, 'id
       amount: s.price,
       sv: {
         appointment_id: a.id,
-        ...(staffId ? { staff_id: staffId, staff_name: nameOf(staffId) } : {}),
+        ...(staffId ? { staff_id: staffId, staff_name: nameOf(staffId), ...(print && nameOf(staffId) ? { staff_print: nameOf(staffId) } : {}) } : {}),
         ...(s.sv_class ? { cls: s.sv_class } : {}),
         ...(rate === 0 && cls?.exempt ? { exempt: cls.exempt } : {}),
       },

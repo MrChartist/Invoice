@@ -188,6 +188,8 @@ export interface StaffPayout {
   voucher_number?: string;
   tds?: number;
   tds_row_id?: string;
+  /** SV-A follow-up: tips inside `amount` (passed through in full, outside the TDS base — SV70). */
+  tips?: number;
   created_at: string;
 }
 
@@ -247,6 +249,10 @@ export interface SvLine {
   recipe_qty?: Record<string, number>;
   /** SV-D2: labour operation / part issued for a job. */
   labour_op_id?: string;
+  /** SV-A follow-up: the staff name printed under the line (snapshot taken while "staff names on the bill" is on). */
+  staff_print?: string;
+  /** SV-A follow-up: a tip line passed through to `staff_id` (0%, non-GST — SV70); never earns commission. */
+  tip?: boolean;
 }
 
 /** Record snapshot `invoice.sv` (every package's sub-objects, declared once by SV-A). */

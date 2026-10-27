@@ -54,3 +54,21 @@ test('balances: own vouchers payable, closed cycles net, receivable from the lin
   const b = farmerBalances(loadFarmers(), purchases, cycles, clients as never, invoices as never, [{ id: 'r', invoice_id: 'i1', amount: 100, method: 'Cash', date: '2026-10-02' }]);
   assert.deepEqual(b.get(f.id), { payable: 1100, receivable: 200 });
 });
+
+test('QA13: a farmer\'s negative carry shows on his receivable until a later cycle recovers it', () => {
+  const ram = saveFarmer({ name: 'Ram', ag: { code: 'F-0001', centre_id: 'k1' } });
+  const sita = saveFarmer({ name: 'Sita', ag: { code: 'F-0002', centre_id: 'k1' } });
+  const line = (farmer_id: string, o: Record<string, unknown>) => ({ farmer_id, qty: 1, unit: 'L', amount: 1000, deductions: [], net: 0, ...o });
+  const c1 = { id: 'c1', number: 'CYB/1', centre_id: 'k1', period_from: '2026-10-01', period_to: '2026-10-10', source: 'milk', status: 'paid', lines: [line(ram.id, { carry_out: -500, deductions: [{ kind: 'advance', amount: 1500 }] }), line(sita.id, { net: 1000 })] } as FarmerCycle;
+  const b1 = farmerBalances(loadFarmers(), [], [c1], [], [], []);
+  assert.deepEqual(b1.get(ram.id), { payable: 0, receivable: 500, carry: 500 });
+  assert.deepEqual(b1.get(sita.id), { payable: 0, receivable: 0 }, 'no carry, no field');
+  // A draft next cycle does not recover it yet; a closed one does (its own carry_out, if any, is the new figure).
+  const c2 = { ...c1, id: 'c2', number: 'CYB/2', period_from: '2026-10-11', period_to: '2026-10-20', status: 'draft', lines: [line(ram.id, { carried: -500, net: 500 })] } as FarmerCycle;
+  assert.equal(farmerBalances(loadFarmers(), [], [c1, c2], [], [], []).get(ram.id)?.carry, 500);
+  const b3 = farmerBalances(loadFarmers(), [], [c1, { ...c2, status: 'closed' }], [], [], []);
+  assert.deepEqual(b3.get(ram.id), { payable: 500, receivable: 0 });
+  // Another centre's cycles are independent.
+  const other = { ...c1, id: 'c3', centre_id: 'k2', period_to: '2026-10-30', lines: [] } as FarmerCycle;
+  assert.equal(farmerBalances(loadFarmers(), [], [c1, other], [], [], []).get(ram.id)?.carry, 500);
+});

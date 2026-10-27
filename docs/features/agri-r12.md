@@ -466,3 +466,26 @@ typed dates, share entries); ColdDesk +1,203 (transfer, statement, rent tables, 
 `ag-licences` +932 and `ag-coop-papers` +882 (now shared chunks: POS strip / bell / compliance card); InputsDesk +673;
 MembersCalendar +509; `ag-loans` +495 (statement print); topics +467; LoansView +437; `ag-cold-lots` +339; others ≤ 260
 each (GST reports +218, bell +206, POS strip +118).
+
+### QA13 follow-up — shipped
+
+- **CMR milling-charges bills are tied to deliveries** (`ag-cmr.ts`): the bill's `ag.cmr` snapshot carries
+  `agreement_id`, `delivery_ids` and `billed_qtl`; `cmrBilling` reads the live (not cancelled / deleted) bills of an
+  agreement. `millingChargesInvoice` bills the chosen deliveries (default: every delivery not on a live bill; the
+  quantity defaults to their rice) and refuses a delivery already billed, more rice than is delivered and not billed, or
+  a bill when nothing is left. A delivery on a live bill cannot be removed; a cancelled bill frees its deliveries. The
+  desk shows the bill per delivery and the unbilled rice. An edit of the quantity in the editor is not re-read (the
+  snapshot `billed_qtl` counts).
+- **A farmer's negative carry is on his receivable** (`ag-farmers.ts` `farmerBalances`): the `carry_out` of his line in
+  his centre's latest closed / paid cycle (the cycle `carriedIn` reads) is added to the receivable and shown next to it
+  on the Farmers view ("incl. ₹… carried to the next cycle") until a later closed cycle recovers it (AG80).
+- **Allotment from application money checks the balance** (`ag-members.ts` `allotShares`, pure `applicationAvailable`):
+  refused above the "Share application money — members" credit balance on the allotment date; other members' unused
+  cycle share deductions are held back, receipts not tied to a cycle are open to any member (AG90).
+- **Milk shift sync is unchanged** (two devices entering cans into the same shift still list a row conflict): the
+  sync engine keeps version vectors and hashes per row, not the common ancestor, so a per-entry merge cannot tell a can
+  deleted on one device from a can added on the other (a union would bring deleted or corrected cans back), and a closed
+  shift owns a stock journal and may be billed in a cycle, which a silent merge would put out of step. Not safe without
+  a base copy per row; one counter per centre and shift stays the documented use.
+
+Tests: `tests/ag-cmr.test.ts`, `tests/ag-farmers.test.ts`, `tests/ag-members.test.ts` (QA13 cases).

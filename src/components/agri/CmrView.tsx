@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { CmrAgreement } from '../../types/agri-r12';
 import { localDb } from '../../lib/localDb';
-import { addDelivery, addPaddyLot, cmrAccount, defaultOutturn, deleteAgreement, jobMillingInvoice, jobMillingRate, loadAgreements, millingChargesInvoice, pdsTest, removeDelivery, removePaddyLot, saveAgreement } from '../../lib/agri/ag-cmr';
+import { addDelivery, addPaddyLot, cmrAccount, cmrBilling, defaultOutturn, deleteAgreement, jobMillingInvoice, jobMillingRate, loadAgreements, millingChargesInvoice, pdsTest, removeDelivery, removePaddyLot, saveAgreement } from '../../lib/agri/ag-cmr';
 import { B, fmtMoney, today } from '../transport/shared';
 import { Num, Sel, Table, Txt } from './mill-ui';
 import { T, W, n, opt, row, useRun, type Done } from './mill-kit';
@@ -24,6 +24,8 @@ export default function CmrView({ onDone }: { onDone: Done }) {
   const [made, setMade] = useState('');
   const a = d.list.find((x) => x.id === sel);
   const acc = a ? cmrAccount(a, today()) : null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const billing = useMemo(() => (a ? cmrBilling(a, localDb.invoices.getAll()) : null), [a, tick]);
   const service = n(bill.qty) * (a?.milling_rate ?? 0);
   const test = pdsTest(n(bill.goods), service + n(bill.goods));
   const edit = (x: CmrAgreement) => setF({ id: x.id, agency: x.agency_id, season: x.season, kind: x.kind, outturn: String(x.outturn_pct), rate: String(x.milling_rate ?? ''), recBasis: x.byproduct_recovery?.basis ?? 'per_qtl_paddy', rec: String(x.byproduct_recovery?.rate ?? ''), due: x.due_by ?? '' });
@@ -77,14 +79,15 @@ export default function CmrView({ onDone }: { onDone: Done }) {
             <label className={controls.check}><input type="checkbox" checked={dl.fort} onChange={(e) => setDl({ ...dl, fort: e.target.checked })} /> {T('fortified')}</label>
             <button type="button" className={B.o} data-ml-deliver onClick={() => run(() => { const r = addDelivery(a.id, { date: dl.date, qty: n(dl.qty), lot_no: dl.lot, ack_no: dl.ack, fortified: dl.fort }); setDl({ ...dl, qty: '', lot: '', ack: '' }); return T('deliverySaved', { n: r.number }); })}>{T('deliver')}</button>
           </div>
-          <Table d="deliveries" head={['CMR', W('date'), T('qtl'), W('lot'), T('ackNo'), '']} rows={a.deliveries.map((x) => [x.number, x.date, x.qty, x.lot_no, x.ack_no ?? '—', <button key="x" type="button" className={B.gs} onClick={() => run(() => { removeDelivery(a.id, x.id); })}>{T('del')}</button>])} />
+          <Table d="deliveries" head={['CMR', W('date'), T('qtl'), W('lot'), T('ackNo'), T('billedOn'), '']} rows={a.deliveries.map((x) => [x.number, x.date, x.qty, x.lot_no, x.ack_no ?? '—', billing?.billedBy.get(x.id) ?? '—', <button key="x" type="button" className={B.gs} onClick={() => run(() => { removeDelivery(a.id, x.id); })}>{T('del')}</button>])} />
           <h4>{T('chargesInvoice')}</h4>
+          <p className={controls.hint} data-ml-unbilled={billing?.unbilled ?? 0}>{T('unbilledRice', { q: billing?.unbilled ?? 0 })}</p>
           <div style={row}>
             <Txt l={W('date')} v={bill.date} set={(x) => setBill({ ...bill, date: x })} type="date" x={170} />
             <Num l={`${W('qty')} (${T('qtl')})`} v={bill.qty} set={(x) => setBill({ ...bill, qty: x })} d="bill-qty" />
             <Num l={T('goodsValue')} v={bill.goods} set={(x) => setBill({ ...bill, goods: x })} x={260} d="goods" />
             <span>{T('millingRate')}: {fmtMoney(service)}</span>
-            <button type="button" className={B.p} data-ml-bill onClick={() => run(() => { const r = millingChargesInvoice(a.id, { date: bill.date, qty: n(bill.qty), goods_value: n(bill.goods) }); setMade(r.invoice.id); return T('draftMade', { n: r.invoice.invoice_number || '—' }); })}>{T('makeDraft')}</button>
+            <button type="button" className={B.p} data-ml-bill onClick={() => run(() => { const r = millingChargesInvoice(a.id, { date: bill.date, ...(n(bill.qty) > 0 ? { qty: n(bill.qty) } : {}), goods_value: n(bill.goods) }); setMade(r.invoice.id); return T('draftMade', { n: r.invoice.invoice_number || '—' }); })}>{T('makeDraft')}</button>
             {made && <Link to={`/invoice/${made}`}>{T('openDraft')}</Link>}
           </div>
           {service > 0 && <p className={controls.hint} data-ml-pds={test.exempt ? 'exempt' : '5'}>{T(test.exempt ? 'pdsExempt' : 'pdsTaxable', { pct: test.goodsPct, limit: test.limit })}</p>}
