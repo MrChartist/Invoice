@@ -261,7 +261,8 @@ export interface MfSnapshot {
 export interface MfOrder {
   ops?: MfOrderOp[];
   grid?: { colour: string; qty: number[] }[];
-  food?: { shelf_life_days?: number };
+  /** D1: food batch record (output batches take its number, packed date and best-before / use-by). */
+  food?: { shelf_life_days?: number; batch_no?: string; packed_on?: string; best_before?: string; use_by?: string; fssai_label?: string };
 }
 
 declare module './invoice' {
@@ -279,7 +280,7 @@ declare module './invoice' {
   }
   interface Client {
     /** C / D: EPR registration of a brand owner (B4), minimum remaining shelf life % at dispatch (D2). */
-    mf?: { epr_no?: string; min_shelf_pct?: number };
+    mf?: { epr_no?: string; min_shelf_pct?: number; min_shelf_days?: number };
   }
 }
 
@@ -290,7 +291,7 @@ declare module './purchases' {
   }
   interface PurchaseRecord {
     /** B3 scrap bought, C4 karigar piece bills. */
-    mf?: { kind?: 'scrap' | 'piece_bill'; ref_id?: string; piece?: MfPieceBill };
+    mf?: { kind?: 'scrap' | 'piece_bill'; ref_id?: string; piece?: MfPieceBill; authorisation_id?: string; duty_foregone?: number }; // D4: AA / EPCG import
   }
 }
 
@@ -687,3 +688,15 @@ export interface MfPieceBill {
 
 /* ════════════════════════════════════════ MF-D ════════════════════════════════════════ */
 // MF-D: cost_cards, export_authorisations, incentive_claims; `mf.food`, `mf.export_aa`. Declare the row shapes here.
+
+/** D2 / D3 / D4 / D5 additive fields (interfaces merge with MF-A's declarations above). */
+export interface MfExportAaSnap {
+  /** D4: `export_authorisations` row the export counts against (EO register). */
+  authorisation_id?: string;
+}
+export interface MfgSettings {
+  /** D3: MSME Form-1 reason for delay, per bill id. */
+  form1_reasons?: Record<string, string>;
+  /** D5: absorb job-card conversion into output journals from `from` (dated, audited; absent / off = material only). */
+  absorb?: { on: boolean; from: string; changed_at?: string }[];
+}

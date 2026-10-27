@@ -24,7 +24,10 @@ export const MF_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   print_estimates: 'doc.create',
   // MF-C: cut plans (lots, bundles inside) are documents
   cut_plans: 'doc.create',
-  // MF-D: cost_cards (master.edit), export_authorisations, incentive_claims (books.edit)
+  // MF-D: cost cards are masters; the AA / EPCG register and incentive claims are books (claims post journals)
+  cost_cards: 'master.edit',
+  export_authorisations: 'books.edit',
+  incentive_claims: 'books.edit',
 };
 
 /** Audited tables (every row change logged; deletes go to the recycle bin). `mfg_settings` is audited on save. */
@@ -42,6 +45,9 @@ export const MF_WATCHED: Readonly<Record<string, WatchedTable>> = {
   // MF-C
   cut_plans: { entity: 'stock_transfer', label: 'Cut plan' },
   // MF-D
+  cost_cards: { entity: 'item', label: 'Food cost card' },
+  export_authorisations: { entity: 'item', label: 'Export authorisation (AA / EPCG)' },
+  incentive_claims: { entity: 'payment', label: 'Incentive claim' },
 };
 
 /** Idempotent: adds the rows once (never overwrites a row another module set). */

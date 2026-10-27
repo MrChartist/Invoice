@@ -55,6 +55,8 @@ export default function AnnualPackTab({ period, today, notify }: { period: Perio
     return `Branch: ${b?.name ?? ledger.branchId}`;
   }, [ledger.branchId]);
 
+  // MF-D5: Schedule III inventory sub-heads (lazy; company-wide stock, so not on a branch-scoped pack).
+  const [invRows, setInvRows] = useState<{ label: string; cur: number; prev: number }[]>([]);
   const pack = useMemo(
     () =>
       buildAnnualPack({
@@ -71,9 +73,17 @@ export default function AnnualPackTab({ period, today, notify }: { period: Perio
         generatedOn: today,
         // QA-3 F18: a running year is drawn to the report period's end (never past today), labelled interim.
         asAt: period.end,
+        inventoryRows: ledger.branchId || stock?.mode !== 'inventory' ? undefined : invRows,
       }),
-    [ledger, stock, fy, company, entity, stored, scopeLabel, today, period.end],
+    [ledger, stock, fy, company, entity, stored, scopeLabel, today, period.end, invRows],
   );
+  const { asAt: invAt, prev: { end: invPrev } } = pack;
+  useEffect(() => {
+    let live = true;
+    if (ledger.branchId || stock?.mode !== 'inventory') return;
+    void import('../../../lib/mfg/mf-inventories-live').then((m) => { if (live) setInvRows(m.liveNoteRows(invAt, invPrev)); });
+    return () => { live = false; };
+  }, [ledger.branchId, stock, invAt, invPrev]);
   const body = useMemo(() => annualPackBody(pack), [pack]);
 
   // The preview is our own escaped markup (annual-pack.ts escapes every value; no scripts).

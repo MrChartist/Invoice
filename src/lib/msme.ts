@@ -35,6 +35,12 @@ export function validateUdyam(s: string | undefined): string {
 export const isMse = (v: Pick<Vendor, 'msme_category'> | undefined): boolean =>
   v?.msme_category === 'MICRO' || v?.msme_category === 'SMALL';
 
+/**
+ * MF-D3 (MF21): a supplier the buyer flagged as a trader (`Vendor.mf.msme_trader`; Udyam for traders is for
+ * priority-sector lending only, OM of 2 Jul 2021 as reported) is left out of the Sec 43B(h) totals. Off by default.
+ */
+export const traderExcluded = (v: unknown): boolean => !!(v as { mf?: { msme_trader?: boolean } } | undefined)?.mf?.msme_trader;
+
 /** Last day the bill may be paid: agreed due date capped at 45 days, or 15 days without one. */
 export function paymentLimit(billDate: string, dueDate?: string): string {
   if (!dueDate || dueDate < billDate) return shiftDay(billDate, MSME_PAYMENT_DAYS.noAgreement);
@@ -166,6 +172,8 @@ export interface Disallowance43Bh {
   /** Still avoidable if paid by the limit (or by 31 March). */
   atRisk: number;
   rows: DisallowanceRow[];
+  /** MF21: micro / small suppliers flagged as traders with bills this year, left out of the totals (absent = none). */
+  excludedTraders?: string[];
 }
 
 /** Sec 43B(h) disallowance for the financial year starting `fyStart`, as known on `asOf`. */
@@ -184,7 +192,7 @@ export function disallowance43Bh(
   const byBill = new Map<string, PurchasePayment[]>();
   for (const p of payments) byBill.set(p.purchase_id, [...(byBill.get(p.purchase_id) ?? []), p]);
   // Reuse msmeBills for vendor matching; payments are re-read against the cut-off below.
-  for (const b of msmeBills(inYear, vendors, payments, end)) {
+  for (const b of msmeBills(inYear, vendors.filter((v) => !traderExcluded(v)), payments, end)) {
     const bill = inYear.find((p) => p.id === b.id)!;
     const cutoff = b.limit > end ? b.limit : end;
     const known = cutoff < asOf ? cutoff : asOf;
@@ -196,5 +204,7 @@ export function disallowance43Bh(
     if (final) res.total = round2(res.total + disallowed);
     else res.atRisk = round2(res.atRisk + disallowed);
   }
+  const traders = vendors.filter((v) => traderExcluded(v) && isMse(v) && inYear.some((p) => p.vendor_id === v.id)).map((v) => v.name);
+  if (traders.length) res.excludedTraders = traders;
   return res;
 }

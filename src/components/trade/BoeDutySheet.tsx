@@ -4,7 +4,7 @@
  * "Apply to bill" hands the snapshot back to the bill form (saved with the bill); "Post duty" posts the journal for
  * a saved sheet. Working paper — verify with your CA.
  */
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Calculator } from 'lucide-react';
 import type { BoeDuty } from '../../types/trade-r4';
 import type { PurchaseLine, PurchaseRecord } from '../../types/purchases';
@@ -20,6 +20,11 @@ import { useT } from '../../i18n';
 import { trErr, trT } from '../../i18n/areas/trade-trust-r4';
 import controls from '../../styles/controls.module.css';
 import styles from './trade.module.css';
+import { isPackOn } from '../../lib/industry-packs';
+import { localDb } from '../../lib/localDb';
+
+// R13 (MF-D4): import under an Advance Authorisation / EPCG — duty foregone memo (shopfloor pack only, lazy).
+const AaBoeSwitch = lazy(() => import('../mfg/AaBoeSwitch'));
 
 interface Props {
   lines: readonly PurchaseLine[];
@@ -128,6 +133,7 @@ export default function BoeDutySheet({ lines, date, bill, initial, onApply, onCl
             <strong>{trT('boeDutyTotal', { duty: inr(duty.totals.duty), total: inr(duty.totals.total) })}</strong>
           </div>
         )}
+        {isPackOn(localDb.settings.get(), 'shopfloor') && <Suspense fallback={null}><AaBoeSwitch bill={bill} duty={duty} /></Suspense>}
         <p className={styles.note} role="note">{trT('boeBooksNote')}</p>
         {posted && <p className={styles.ok} role="status">{posted}</p>}
         {(error || result.problem) && <p className={controls.error} role="alert">{error || result.problem}</p>}

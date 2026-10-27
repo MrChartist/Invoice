@@ -36,7 +36,7 @@ test('MF-A block: rights, audit labels, registered at runtime; first-paint maps 
 });
 
 test('every writer, the sync engine and the recycle bin import the registry; dated / numbered rows in the sync engine', () => {
-  for (const f of ['mf-settings', 'mf-centres', 'mf-routings', 'mf-jobcards']) assert.match(src(`lib/mfg/${f}.ts`), /import '\.\/mf-registry';/, f);
+  for (const f of ['mf-settings', 'mf-centres', 'mf-routings', 'mf-jobcards', 'mf-costcards', 'mf-authorisations', 'mf-incentives']) assert.match(src(`lib/mfg/${f}.ts`), /import '\.\/mf-registry';/, f);
   assert.match(src('lib/sync-engine.ts'), /import '\.\/mfg\/mf-registry';/);
   assert.match(src('lib/trust/recycle-bin.ts'), /import '\.\.\/mfg\/mf-registry';/);
   const sync = src('lib/sync-engine.ts');

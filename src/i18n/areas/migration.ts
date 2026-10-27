@@ -108,6 +108,8 @@ export const migT = defineArea(
     s_carry_forward: 'Carry-forward report',
     s_auditor_pack: 'Auditor pack generated', // R4-C5
     s_agency_lots: 'Unsettled agency lots (bikri patti)', // QA8 T10
+    s_wip_statement: 'Year-end WIP statement', // MF-D5
+    wipDownload: 'Download WIP statement (CSV)',
     agencyOpen: 'Open Distribution → Agency',
     showIssues: 'Show problems ({n})',
     markReviewed: 'Mark reviewed',
@@ -242,6 +244,8 @@ export const migT = defineArea(
     s_carry_forward: 'आगे ले जाने की रिपोर्ट',
     s_auditor_pack: 'ऑडिटर पैक बनाया गया',
     s_agency_lots: 'बिना निपटाए आढ़त लॉट (बिक्री पट्टी)',
+    s_wip_statement: 'वर्षांत WIP विवरण (अर्ध-निर्मित माल)',
+    wipDownload: 'WIP विवरण डाउनलोड (CSV)',
     agencyOpen: 'वितरण → आढ़त खोलें',
     showIssues: 'समस्याएँ दिखाएँ ({n})',
     markReviewed: 'जाँचा हुआ चिह्नित करें',

@@ -19,6 +19,8 @@ import type { InvoiceRecord } from '../types/invoice';
 import { agencySales, loadArrivals } from './trade/tr-arrivals';
 import { loadPattis, unsettledLots } from './trade/tr-patti';
 import { rxRetainedInYear } from './retail/rt-pharmacy-retention';
+import { isPackOn } from './industry-packs';
+import { liveWipStatement } from './mfg/mf-inventories-live';
 import {
   CLOSING_STOCK_CLASS,
   YEAR_END_TABLE,
@@ -108,6 +110,15 @@ export function loadYearEnd(fyStart: number): YearEndState {
   const old = loadOpeningBills().filter((b) => b.date < fyBegin && (b.side === 'payable' ? cred : debt).has(b.party_name));
   const manual = loadVouchers();
   const agencyLots = loadAgencyLots(end);
+  let wipStatement: YearEndInput['wipStatement'];
+  if (isPackOn(localDb.settings.get(), 'shopfloor' as never)) {
+    try {
+      const w = liveWipStatement(end);
+      wipStatement = { orders: w.rows.length, value: w.total };
+    } catch {
+      /* no inventory */
+    }
+  }
   const rxRetained = rxRetainedInYear(localDb.invoices.getAll() as InvoiceRecord[], fyBegin, end, today); // R9 (RT-B2)
   const steps = yearEndChecklist({
     fyStart,
@@ -122,6 +133,7 @@ export function loadYearEnd(fyStart: number): YearEndState {
     record: loadYearEndRecord(fyStart),
     today,
     ...(agencyLots ? { agencyLots } : {}),
+    ...(wipStatement ? { wipStatement } : {}),
     ...(rxRetained ? { rxRetained } : {}),
   });
   return { steps, ledger, integrity, manual, ...(valuation ? { valuation } : {}) };

@@ -84,6 +84,8 @@ export interface AnnualPackInput {
    * always drawn to 31 March. While it runs, the statements stop at this date (or `generatedOn`) and say "interim".
    */
   asAt?: string;
+  /** MF-D5 (optional): Schedule III inventory sub-heads for the note (paise; `mfg/mf-inventories.ts` `noteRows`). */
+  inventoryRows?: readonly { label: string; cur: number; prev: number }[];
 }
 
 /** The date the pack's statements run to: the FY end once the FY has ended, else the picked as-at date (or today) inside the FY. */
@@ -136,7 +138,7 @@ export function buildAnnualPack(input: AnnualPackInput): AnnualPack {
   const plPrev = ledgerProfitAndLoss(input.ledger, prevP, input.stock);
   const cf = cashFlowStatement(input.ledger, curP, input.stock);
   const tb = trialBalance(input.ledger, curP);
-  const notes = buildNotes({ ledger: input.ledger, fy: { ...fy, end: asAt }, prev, bs, bsPrev, pl, plPrev, stock: input.stock, assets: input.assets, vendors: input.vendors, invoices: input.invoices, entity, stored: input.notes ?? null });
+  const notes = buildNotes({ ledger: input.ledger, fy: { ...fy, end: asAt }, prev, bs, bsPrev, pl, plPrev, stock: input.stock, assets: input.assets, vendors: input.vendors, invoices: input.invoices, entity, stored: input.notes ?? null, ...(input.inventoryRows?.length ? { inventoryRows: input.inventoryRows } : {}) });
   return {
     fy, prev, company: input.company, entity, scopeLabel: input.scopeLabel, generatedOn, asAt, interim,
     bs, bsPrev, pl, plPrev, cf, tb, notes, difference: bs.difference,

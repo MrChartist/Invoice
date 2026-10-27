@@ -5,12 +5,13 @@ import { cn, todayInput } from '../../lib/utils';
 import { num } from '../../lib/invoice-calc';
 import { buildOutputVoucher, defaultOutputBatch, loadOrderDocs, orderProgress, productionOrdersDb } from '../../lib/production/orders';
 import { ensureQcGodown } from '../../lib/production/qc';
-import type { Bom, VoucherOutputLine, VoucherStockLine } from '../../types/manufacturing';
+import type { AdditionalCost, Bom, VoucherOutputLine, VoucherStockLine } from '../../types/manufacturing';
 import type { ProductionOrder } from '../../types/production-r4';
 import { pT } from '../../i18n/areas/production-r4';
 import { defineArea } from '../../i18n/area';
 import { qtyText, type MfgContext } from '../manufacturing/context';
 import { parseSerials } from '../../lib/stock-tracking';
+import { foodOutputDefaults } from '../../lib/mfg/mf-food';
 import controls from '../../styles/controls.module.css';
 import mfg from '../manufacturing/manufacturing.module.css';
 
@@ -31,8 +32,10 @@ export function OutputDialog({ ctx, order, boms, onClose }: { ctx: MfgContext; o
   const left = Math.max(0, Math.round((num(order.planned_qty) - progress.output) * 1000) / 1000);
   const [date, setDate] = useState(todayInput());
   const [qty, setQty] = useState(String(left || ''));
-  const [batch, setBatch] = useState(item?.track_batches ? defaultOutputBatch(order, progress.outputs.length + 1) : '');
-  const [expiry, setExpiry] = useState('');
+  // MF-D1 / D2: a food order's batch, packed date and best-before (packed + shelf life) fill in; typed values win.
+  const [food] = useState(() => foodOutputDefaults(order, item, todayInput()));
+  const [batch, setBatch] = useState(item?.track_batches ? food.batch_no ?? defaultOutputBatch(order, progress.outputs.length + 1) : '');
+  const [expiry, setExpiry] = useState(food.expiry_date ?? '');
   const [serialText, setSerialText] = useState('');
   const [labour, setLabour] = useState('');
   const draftFor = (q: number) => buildOutputVoucher(order, progress, bom, { qty: q, date });
@@ -47,14 +50,22 @@ export function OutputDialog({ ctx, order, boms, onClose }: { ctx: MfgContext; o
     void import('../../lib/mfg/mf-jobcards').then((m) => live && setJc(m.outputExtras(order, ctx.items)), () => undefined);
     return () => { live = false; };
   }, [order, ctx.items]);
+  // MF-D5: with the dated absorption switch on, the cards' conversion (hours × rate, AS 2 cap) goes into this journal.
+  const [conv, setConv] = useState<{ date: string; lines?: AdditionalCost[] } | null>(null);
+  useEffect(() => {
+    if (!order.mf?.ops?.length) return;
+    let live = true;
+    void import('../../lib/mfg/mf-conversion').then((m) => live && setConv({ date, lines: m.outputConversion(order, date) }), () => undefined);
+    return () => { live = false; };
+  }, [order, date]);
   const name = (id: string) => ctx.items.find((i) => i.id === id)?.name ?? '?';
 
   const submit = () => {
     try {
       const godown = order.output_to_qc ? ensureQcGodown().id : undefined;
       const serials = parseSerials(serialText);
-      const base = buildOutputVoucher(order, progress, bom, { qty: num(qty), date, batch_no: batch, expiry_date: expiry || undefined, serials: serials.length ? serials : undefined, godown_id: godown }, undefined, jc?.replaceScrapOf.length ? { scrapLines: jc.scrapLines, replaceScrapOf: jc.replaceScrapOf } : undefined);
-      const v = productionOrdersDb.reportOutput(order.id, { ...base, components: components.filter((c) => num(c.qty) > 0), costs: num(labour) > 0 ? [{ id: 'labour', label: pT('additionalCosts'), mode: 'amount', value: num(labour) }] : [] }, ctx.items, ctx.inputs);
+      const base = buildOutputVoucher(order, progress, bom, { qty: num(qty), date, batch_no: batch, expiry_date: expiry || undefined, serials: serials.length ? serials : undefined, godown_id: godown }, undefined, jc?.replaceScrapOf.length || conv?.lines?.length ? { ...(jc?.replaceScrapOf.length ? { scrapLines: jc.scrapLines, replaceScrapOf: jc.replaceScrapOf } : {}), ...(conv?.date === date && conv.lines?.length ? { conversion: conv.lines } : {}) } : undefined);
+      const v = productionOrdersDb.reportOutput(order.id, { ...base, ...(base.batch_no && food.mfg_date ? { mfg_date: food.mfg_date } : {}), components: components.filter((c) => num(c.qty) > 0), costs: [...base.costs, ...(num(labour) > 0 ? [{ id: 'labour', label: pT('additionalCosts'), mode: 'amount' as const, value: num(labour) }] : [])] }, ctx.items, ctx.inputs);
       onClose();
       ctx.changed(pT('outputSaved', { number: v.number, qty: qtyText(v.qty) }));
     } catch (e) {
