@@ -211,3 +211,55 @@ export function applyConstructionKind(kind: ConstructionKindId, opts: { register
   return { business_type: 'contractor', modules, construction_kind: kind, industry_packs: p.packs ? [...p.packs] : undefined };
 }
 
+/* ── R10 (SV-A1): service profile under the `services` business type ── */
+
+/** The service picker's nine choices (stored as `settings.service_kind`); the business type stays `services`. */
+export const SERVICE_KINDS = ['clinic', 'lab', 'salon', 'fitness', 'coaching', 'workshop', 'appliance', 'professional', 'other'] as const;
+export type ServiceKindId = (typeof SERVICE_KINDS)[number];
+type ServicePackId = 'clinic' | 'salon' | 'fitness' | 'workshop' | 'fees' | 'pharmacy';
+
+export interface ServiceProfile {
+  /** Without `gst`: a registered business adds it (`applyServiceKind(…, { registered })`). Every kind keeps `time`. */
+  modules: readonly ModuleId[];
+  /** Explicit `industry_packs` list (an empty list = none). */
+  packs: readonly ServicePackId[];
+  landing: string;
+  defaultDueDays: number;
+  templateId: string;
+  /** Clinic: ask "Do you sell medicines from the clinic?" */
+  asksPharmacy?: boolean;
+}
+
+const CLINIC_MODULES: readonly ModuleId[] = ['time', 'recurring', 'purchases', 'reports', 'accounts', 'banking', 'tds'];
+const WORKSHOP_MODULES: readonly ModuleId[] = ['time', 'recurring', 'purchases', 'inventory', 'accounts', 'banking', 'reports', 'tds'];
+export const SERVICE_PROFILES: Readonly<Record<ServiceKindId, ServiceProfile>> = {
+  clinic: { modules: CLINIC_MODULES, packs: ['clinic'], landing: '/time?tab=appointments', defaultDueDays: 0, templateId: 'freelancer_light', asksPharmacy: true },
+  lab: { modules: CLINIC_MODULES, packs: ['clinic'], landing: '/time?tab=clinic&view=lab', defaultDueDays: 0, templateId: 'freelancer_light' },
+  salon: { modules: ['pos', 'time', 'purchases', 'inventory', 'reports', 'payroll'], packs: ['salon'], landing: '/time?tab=appointments', defaultDueDays: 0, templateId: 'retail_receipt' },
+  fitness: { modules: ['pos', 'time', 'recurring', 'purchases', 'reports', 'payroll'], packs: ['fitness'], landing: '/time?tab=members', defaultDueDays: 0, templateId: 'retail_receipt' },
+  coaching: { modules: ['time', 'recurring', 'purchases', 'reports', 'accounts', 'payroll'], packs: ['fees'], landing: '/recurring?tab=fees&view=batches', defaultDueDays: 10, templateId: 'freelancer_light' },
+  workshop: { modules: WORKSHOP_MODULES, packs: ['workshop'], landing: '/time?tab=workshop', defaultDueDays: 0, templateId: 'gst_tax_invoice' },
+  appliance: { modules: WORKSHOP_MODULES, packs: ['workshop'], landing: '/time?tab=workshop', defaultDueDays: 0, templateId: 'gst_tax_invoice' },
+  professional: { modules: PRESETS.services, packs: [], landing: '/invoice', defaultDueDays: 15, templateId: 'freelancer_light' },
+  other: { modules: [...PRESETS.services, 'pos'], packs: [], landing: '/invoice', defaultDueDays: 7, templateId: 'freelancer_light' },
+};
+
+export const isServiceKind = (v: unknown): v is ServiceKindId => typeof v === 'string' && (SERVICE_KINDS as readonly string[]).includes(v);
+
+/**
+ * Settings patch for a service profile: business type `services`, its modules (`registered` adds `gst`; `pharmacy`
+ * — clinic only — adds `inventory` and the R9 `pharmacy` pack), the explicit packs and the kind. The profile's switches
+ * (`service_settings`) are written by `services/sv-profile.ts`.
+ */
+export function applyServiceKind(kind: ServiceKindId, opts: { registered?: boolean; pharmacy?: boolean } = {}): ShopModeSettings & { service_kind: ServiceKindId; industry_packs: ServicePackId[] } {
+  const p = SERVICE_PROFILES[kind];
+  const modules: ModuleId[] = [...p.modules];
+  const packs: ServicePackId[] = [...p.packs];
+  if (opts.registered && !modules.includes('gst')) modules.push('gst');
+  if (opts.pharmacy && p.asksPharmacy) {
+    if (!modules.includes('inventory')) modules.push('inventory');
+    packs.push('pharmacy');
+  }
+  return { business_type: 'services', modules, service_kind: kind, industry_packs: packs };
+}
+

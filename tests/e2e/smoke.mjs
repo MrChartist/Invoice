@@ -3715,6 +3715,83 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+  await step('R10-A service desk: Services → Salon (salon pack, staff required, ITC caution); a plan at 10% and a stylist; a booking from the day grid with a 9997 service (5% after 22 Sep 2025); arrived → Bill → the POS has the line with the stylist; the appointment shows Billed; the statement shows her commission; Ctrl+K "appointment"; help', async () => {
+    const keys = ['settings', 'service_settings', 'service_staff', 'commission_plans', 'appointments', 'invoices', 'transactions', 'series_counters', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', modules: undefined, industry_packs: undefined, service_kind: undefined, construction_kind: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'service_settings', null);
+    // SV-A1: the service picker in Settings → Features.
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-service-kind-card="salon"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.service_kind === 'salon');
+    const ss = await readJson(page, 'service_settings', {}, (v) => v?.staff_required === true);
+    check(st.industry_packs?.includes('salon') && st.modules?.includes('pos') && st.modules?.includes('time') && ss.itc_caution === true, 'Salon: salon pack, POS + Time modules, staff required and the ITC caution on');
+    // SV-A3: a plan (services 10%) and a stylist on it.
+    await page.goto(srv.origin + '/time?tab=commission&view=plans');
+    await page.locator('[data-plan-name]').fill('E2E Stylist 10%', { timeout: 15000 });
+    await page.locator('[data-plan-save]').click();
+    await readJson(page, 'commission_plans', [], (v) => v.some((p) => p.name === 'E2E Stylist 10%'));
+    await page.goto(srv.origin + '/time?tab=commission&view=staff');
+    await page.locator('[data-staff-name]').fill('E2E Priya', { timeout: 15000 });
+    await page.locator('[data-staff-plan]').selectOption({ label: 'E2E Stylist 10%' });
+    await page.locator('[data-staff-save]').click();
+    const staff = (await readJson(page, 'service_staff', [], (v) => v.some((x) => x.name === 'E2E Priya'))).find((x) => x.name === 'E2E Priya');
+    check(!!staff?.plan_id, 'the stylist is saved with her plan');
+    // SV-A2: book from the day grid (Priya's column, 11:00), a beauty (9997) service.
+    await page.goto(srv.origin + '/time?tab=appointments');
+    await page.locator('[data-slot="E2E Priya@11:00"]').click({ timeout: 15000 });
+    await page.locator('[data-appt-client]').fill('E2E Salon Client');
+    await page.locator('[data-appt-add-service]').click();
+    await page.locator('[data-appt-service="0"]').fill('E2E Haircut');
+    const row = page.locator('[data-appt-service="0"]').locator('xpath=ancestor::tr');
+    await row.locator('td').nth(2).locator('input').fill('500');
+    await row.locator('td').nth(3).locator('select').selectOption('beauty_9997');
+    await page.locator('[data-appt-save]').click();
+    const appt = (await readJson(page, 'appointments', [], (v) => v.some((a) => a.client_name === 'E2E Salon Client'))).find((a) => a.client_name === 'E2E Salon Client');
+    check(appt?.start === '11:00' && appt.staff_id === staff.id && appt.services[0]?.sv_class === 'beauty_9997', 'booked at 11:00 with the stylist and a 9997 service');
+    await page.locator('[data-appt-chip="E2E Salon Client"]').click();
+    await page.locator('[data-appt-status="arrived"]').click();
+    await readJson(page, 'appointments', [], (v) => v.some((a) => a.id === appt.id && a.status === 'arrived'));
+    await page.locator('[data-appt-chip="E2E Salon Client"]').click();
+    await page.locator('[data-appt-bill]').click();
+    await page.waitForURL(/\/pos/, { timeout: 15000 });
+    await page.getByText('E2E Haircut').first().waitFor({ timeout: 15000 });
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.waitForFunction(() => /[1-9]/.test(document.querySelector('[data-pos-total]')?.textContent ?? ''), null, { timeout: 15000 });
+    const due = (await page.locator('[data-pos-total]').innerText()).replace(/[^\d.]/g, '');
+    await page.locator('#pos-Cash').fill(due); // paid in cash
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    const fresh = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id)))).filter((i) => !beforeIds.has(i.id));
+    const bill = fresh.find((i) => i.items?.some((l) => l.sv?.appointment_id === appt.id));
+    check(!!bill, `the POS bill carries the appointment on its line (new bills: ${fresh.map((i) => i.invoice_number).join(', ') || 'none'})`);
+    const line = bill?.items.find((l) => l.sv?.appointment_id === appt.id);
+    check(line?.sv?.staff_id === staff.id && line.sv.cls === 'beauty_9997' && Number(line.tax_rate) === 5, `the POS bill ${bill?.invoice_number} carries the stylist and the 5% class rate`);
+    await page.goto(srv.origin + '/time?tab=appointments');
+    await page.locator('[data-appt-chip="E2E Salon Client"]').waitFor({ timeout: 15000 });
+    check(/Billed/.test(await page.locator('[data-appt-chip="E2E Salon Client"]').innerText()), 'the appointment shows Billed');
+    // The month's statement.
+    await page.goto(srv.origin + '/time?tab=commission&view=statement');
+    await page.locator('[data-statement-staff]').selectOption({ label: 'E2E Priya' }, { timeout: 15000 });
+    check(/50\.00/.test(await page.locator('[data-statement-total]').innerText()), 'the statement shows 10% of the ₹500 taxable value');
+    // Ctrl+K and help.
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('appointment');
+    await palette.getByRole('option', { name: /Appointments/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "appointment" finds Time → Appointments');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/time?tab=appointments');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help="time:appointments"]').waitFor({ timeout: 15000 });
+    check(true, 'Help opens on the Appointments topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 } catch {
   /* already reported */
 } finally {

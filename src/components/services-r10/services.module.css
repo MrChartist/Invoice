@@ -1,0 +1,140 @@
+/* R10 (SV-A) front desk: appointment grid, dialog, commission and claims views. Tokens only. */
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: 0.5rem 0.75rem;
+}
+
+.lines {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0 0.5rem;
+  font-size: var(--text-sm);
+}
+
+.lines th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  padding: 0.25rem;
+}
+
+.lines td {
+  padding: 0.125rem 0.25rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.gridWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+}
+
+.grid {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-size: var(--text-sm);
+}
+
+.grid th,
+.grid td {
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 0.125rem 0.25rem;
+  vertical-align: top;
+  min-width: 9rem;
+}
+
+.grid th:first-child,
+.grid td:first-child {
+  min-width: 3.5rem;
+  color: var(--muted-foreground);
+  position: sticky;
+  left: 0;
+  background: var(--card);
+}
+
+.cell {
+  height: 1.75rem;
+  cursor: pointer;
+}
+
+.cell:hover {
+  background: var(--secondary);
+}
+
+.chip {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-sm);
+  background: var(--brand-soft);
+  color: var(--foreground);
+  padding: 0.125rem 0.375rem;
+  margin: 1px 0;
+  font: inherit;
+  cursor: grab;
+}
+
+.chip[data-status='arrived'],
+.chip[data-status='in_service'] {
+  border-left-color: var(--warning);
+}
+
+.chip[data-status='done'],
+.chip[data-status='billed'] {
+  border-left-color: var(--profit);
+  opacity: 0.8;
+}
+
+.chip[data-status='no_show'],
+.chip[data-status='cancelled'] {
+  border-left-color: var(--loss);
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.now {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--primary);
+  margin: 0.5rem 0;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0.25rem 0 1rem;
+  display: grid;
+  gap: 0.375rem;
+}
+
+.list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.muted {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}

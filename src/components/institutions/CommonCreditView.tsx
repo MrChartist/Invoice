@@ -33,9 +33,15 @@ export default function CommonCreditView({ notify }: { notify: Notify }) {
   // Loaded from the hotel pack's chunk only with the pack on.
   const hotel = isPackOn(localDb.settings.get(), 'hotel');
   const [xl, setXl] = useState<null | ((inv: readonly InvoiceRecord[], from: string, to: string) => number)>(null);
+  // R10 (SV-A4): a clinic / salon / gym's 5%-without-ITC service turnover is exempt-like too (setting, default on; SV12).
+  const sv = ['clinic', 'salon', 'fitness'].some((p) => isPackOn(localDb.settings.get(), p as never));
   useEffect(() => {
-    if (hotel) void import('../hotel/hotel-lazy').then((l) => l.hotelChunk()).then((m) => setXl(() => m.exemptLike));
-  }, [hotel]);
+    type X = (inv: readonly InvoiceRecord[], from: string, to: string) => number;
+    const loads: Promise<X>[] = [];
+    if (hotel) loads.push(import('../hotel/hotel-lazy').then((l) => l.hotelChunk()).then((m) => m.exemptLike));
+    if (sv) loads.push(Promise.all([import('../../lib/services/sv-tax'), import('../../lib/services/sv-settings')]).then(([t, st]) => (inv, f, to) => t.svExemptLike(inv, f, to, st.readServiceSettings())));
+    if (loads.length) void Promise.all(loads).then((fns) => setXl(() => (inv: readonly InvoiceRecord[], f: string, to: string) => fns.reduce((n, fn) => n + fn(inv, f, to), 0)));
+  }, [hotel, sv]);
   const ef = (p: ReportPeriod) => {
     const r = turnoverOf(buildGstReport(data.inv, data.pur, { period: p }).gstr3b);
     const m = p.kind === 'month' ? `${p.month! < 4 ? p.fyStart + 1 : p.fyStart}-${String(p.month).padStart(2, '0')}` : '';

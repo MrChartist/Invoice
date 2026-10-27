@@ -136,3 +136,14 @@ export function worksLineText(item: Pick<InvoiceItem, 'id'> | undefined, cn: { l
 /** R11 (CN-A3): "Tax Invoice — Running Account Bill No. 4" / "… — Final Bill" for an RA bill; '' otherwise. */
 export const raDocTitle = (inv: Pick<InvoiceRecord, 'ra_no' | 'ra_final'>, label: string): string =>
   inv.ra_no ? `${label} — ${inv.ra_final ? 'Final Bill' : `Running Account Bill No. ${inv.ra_no}`}` : '';
+
+/**
+ * R10 (SV-A4): Rule 46A — "Invoice-cum-Bill of Supply" for a tax invoice to a recipient without a GSTIN that carries
+ * taxable and 0% (exempt / nil) lines, when the switch was on at save (`sv.rule46a`, a snapshot); '' otherwise.
+ * Same test as `services/sv-tax.ts` `rule46aApplies` (kept inline so the paper chunk loads no Round 10 code).
+ */
+export function svDocTitle(inv: Pick<InvoiceRecord, 'doc_type' | 'client' | 'items' | 'sv'>): string {
+  if (!inv.sv?.rule46a || (inv.doc_type !== 'INVOICE' && inv.doc_type !== 'TAX_INVOICE') || String(inv.client?.gstin ?? '').trim()) return '';
+  const items = (inv.items ?? []).filter((i) => i && (Number(i.rate) || Number(i.quantity)));
+  return items.some((i) => Number(i.tax_rate) > 0) && items.some((i) => Number(i.tax_rate) === 0) ? 'Invoice-cum-Bill of Supply' : '';
+}

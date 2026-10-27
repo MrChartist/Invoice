@@ -63,6 +63,7 @@ import './trade/tr-registry'; // R8-C: Round 8 tables' rights and audit labels (
 import './hotel/hotel-registry'; // R7: hotel tables' rights and audit labels (lazy registration)
 import './retail/rt-registry'; // R9: retail tables' rights and audit labels (lazy registration)
 import './construction/cn-registry'; // R11: construction tables' rights and audit labels (lazy registration)
+import './services/sv-registry'; // R10: service tables' rights and audit labels (lazy registration)
 
 export const [SYNC_STATE_KEY, SYNC_CONFLICTS_KEY, SYNC_AUDIT_KEY] = SYNC_META_KEYS;
 
@@ -408,6 +409,10 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}realty_bookings`]: 'date',
   [`${DB_PREFIX}stage_certificates`]: 'certified_on',
   [`${DB_PREFIX}rera_withdrawals`]: 'date',
+  // R10-A: appointments, staff payouts, payer claims
+  [`${DB_PREFIX}appointments`]: 'date',
+  [`${DB_PREFIX}staff_payouts`]: 'date',
+  [`${DB_PREFIX}payer_claims`]: 'date',
   // R11-D: work orders, sub-contractor bills, muster days, plant log sheets
   [`${DB_PREFIX}sub_work_orders`]: 'date',
   [`${DB_PREFIX}sub_measurements`]: 'date',
@@ -1006,6 +1011,8 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}price_variations`]: { num: 'number', date: 'date' },
   // R11-C: bookings (BKG/FY…)
   [`${DB_PREFIX}realty_bookings`]: { num: 'number', date: 'date' },
+  // R10-A: payer claims (CLM/FY…)
+  [`${DB_PREFIX}payer_claims`]: { num: 'number', date: 'date' },
   // R11-D: work orders (SWO/FY…), sub-contractor bills (SCB/FY…), plant log sheets (PLG/FY…)
   [`${DB_PREFIX}sub_work_orders`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}sub_measurements`]: { num: 'number', date: 'date' },

@@ -108,6 +108,16 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   `apparel` / `electronics` / `jewellery` (one desk tab each on `/inventory`; `PACK_OF_TYPE` / `PACK_ROUTES` unchanged).
   Rule values in `src/lib/retail-rules.ts` (lazy only). `PurchaseLine.free_qty`: stock = paid + free, cost spread over
   both, GST / ITC on the paid value (`readPurchaseLines` `quantity` / `paidQty` / `freeQty`, docs/features/retail-r9.md).
+- Round 10 (services) company data: names in `src/lib/services/sv-shared.ts` (SV-A tables `appointments`,
+  `service_staff`, `commission_plans`, `staff_payouts`, `payer_claims` (series `CLM`; `OPD` / `IPD` / `LAB` / `MEM` reserved),
+  object `service_settings`), all backed up and synced; settings `service_kind` (profile under business type `services`,
+  packs `clinic` / `salon` / `fitness` / `workshop` — desk tabs on `/time`; `PACK_OF_TYPE` / `PACK_ROUTES` unchanged).
+  Rights and audit labels are registered at runtime by `src/lib/services/sv-registry.ts`: **every module that writes a
+  Round 10 table must `import './sv-registry'`** (`tests/sv-registry.test.ts`). Round 10 document snapshots live under ONE
+  record key `sv` and ONE line key `sv` (`src/types/services-r10.ts`, appended to `R9_RECORD_KEYS` / `R9_LINE_KEYS`) —
+  never add keys. A 0% line with `sv.exempt` is reported in its own Table 8 column (exempt / nil / non-GST); without it,
+  nil-rated as before. Rule values in `src/lib/service-rules.ts` (lazy only, `tests/sv-rules.test.ts`). Notes:
+  `docs/features/services-r10.md`.
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 - Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,

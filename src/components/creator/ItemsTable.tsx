@@ -44,6 +44,9 @@ const EditorDevices = lazy(() => import('../retail-r9/DevicesDesk').then((m) => 
 // R9 (RT-E2 / E3): jewellery line breakdown and the PAN / HUID notes (jewellery pack, or a document with jewellery lines; lazy).
 const JewelLineRow = lazy(() => import('../retail-r9/JewelleryDesk').then((m) => ({ default: m.JewelLineRow })));
 const EditorJewel = lazy(() => import('../retail-r9/JewelleryDesk').then((m) => ({ default: m.EditorJewel })));
+// R10 (SV-A3 / A4): staff, service class and exempt column per line; the Rule 46A note (service profile / pack, lazy).
+const SvLineRow = lazy(() => import('../services-r10/SvEditor').then((m) => ({ default: m.SvLineRow })));
+const EditorService = lazy(() => import('../services-r10/SvEditor').then((m) => ({ default: m.EditorService })));
 import { impliedPacks } from '../../lib/shop-mode';
 import styles from './ItemsTable.module.css';
 
@@ -63,6 +66,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const apparelOn = useMemo(() => impliedPacks(localDb.settings.get()).includes('apparel'), []); // R9 (RT-C)
   const devicesOn = useMemo(() => impliedPacks(localDb.settings.get()).includes('electronics'), []); // R9 (RT-D)
   const jewelOn = useMemo(() => impliedPacks(localDb.settings.get()).includes('jewellery'), []); // R9 (RT-E)
+  const svOn = useMemo(() => ((s) => !!s.service_kind || impliedPacks(s).some((p) => p === 'clinic' || p === 'salon' || p === 'fitness' || p === 'workshop'))(localDb.settings.get()), []); // R10 (SV-A)
   // Batch / serial / godown pickers (null for simple users: nothing tracked, one godown).
   // `stockTick` re-reads live stock when an item name gains focus (another tab may have sold some).
   const [stockTick, setStockTick] = useState(0);
@@ -208,6 +212,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
               {(weighOn || !!item.wt) && <Suspense fallback={null}><LineWeightRow item={item} index={index} /></Suspense>}
               {item.band_rate && <Suspense fallback={null}><BandChip item={item} date={issueDate} /></Suspense>}
               {(jewelOn || !!item.jw) && priced && <Suspense fallback={null}><JewelLineRow item={item} date={issueDate} /></Suspense>}
+              {(svOn || !!item.sv) && <Suspense fallback={null}><SvLineRow item={item} index={index} date={issueDate} /></Suspense>}
               {agencyOn && (docType === 'INVOICE' || docType === 'TAX_INVOICE' || docType === 'BILL_OF_SUPPLY') && <Suspense fallback={null}><LotPicker item={item} index={index} /></Suspense>}
               {docType === 'QUOTATION' && <QuoteLineFlags item={item} index={index} />}
               {showTax && priced && !(item.cess_rate || item.cess_per_unit || cessOpen[item.id]) && (
@@ -342,6 +347,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
         {(apparelOn || items.some((i) => i.band_rate)) && <Suspense fallback={null}><EditorApparel gridOn={apparelOn && priced} /></Suspense>}
         {devicesOn && priced && <Suspense fallback={null}><EditorDevices /></Suspense>}
         {(jewelOn || items.some((i) => i.jw)) && <Suspense fallback={null}><EditorJewel /></Suspense>}
+        {svOn && <Suspense fallback={null}><EditorService /></Suspense>}
         <span className={styles.keyHint}>
           {tNodes('items.keyHint', { enter: <kbd>Enter</kbd>, alt: <kbd>Alt</kbd>, arrows: <><kbd>↑</kbd>/<kbd>↓</kbd></>, ctrl: <kbd>Ctrl</kbd> })}
         </span>

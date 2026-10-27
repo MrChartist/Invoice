@@ -478,6 +478,8 @@ const RECORD_TABLES = [
   'works_contracts', 'secured_advances', 'price_variations', 'bank_guarantees',
   // R11-C: builders — projects, units, bookings (BKG/FY…), payment plans, stage certificates, RERA account entries
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
+  // R10-A: appointments, service staff, commission plans, staff payouts, payer claims (CLM/FY…)
+  'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
   // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
   // (MUS settlements), hired equipment, plant log sheets (PLG)
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
@@ -556,6 +558,8 @@ const ID_TABLES = new Set([
   'works_contracts', 'secured_advances', 'price_variations', 'bank_guarantees',
   // R11-C: builders — projects, units, bookings (BKG/FY…), payment plans, stage certificates, RERA account entries
   'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
+  // R10-A: appointments, service staff, commission plans, staff payouts, payer claims (CLM/FY…)
+  'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
   // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
   // (MUS settlements), hired equipment, plant log sheets (PLG)
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',

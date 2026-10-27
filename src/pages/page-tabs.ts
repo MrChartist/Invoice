@@ -105,6 +105,12 @@ export const TIME_TABS = [
   { id: 'retainers' },
   { id: 'settings' },
   { id: 'works', pack: 'works' }, // R5-B
+  // R10: service desks (listed through `visiblePackTabs`; views in `&view=`)
+  { id: 'appointments', pack: 'clinic', alsoPacks: ['salon', 'fitness', 'workshop'] }, // SV-A2: views day / week / queue / birthdays
+  { id: 'commission', pack: 'salon', alsoPacks: ['fitness', 'clinic', 'workshop'] }, // SV-A3: views staff / plans / statement
+  { id: 'clinic', pack: 'clinic' }, // SV-B: views patients / opd / ipd / lab / tests / referrals / rates
+  { id: 'members', pack: 'fitness', alsoPacks: ['salon'] }, // SV-C: views plans / members / checkin / classes / recipes
+  { id: 'workshop', pack: 'workshop' }, // SV-D: views jobs / estimates / claims / reminders / labour / vehicles
 ] as const;
 export type TimeTab = (typeof TIME_TABS)[number]['id'];
 /* ── Recurring ── */

@@ -11,7 +11,9 @@ import { LANGUAGES, isLang, setLanguage, useT } from '../../i18n';
 import { setupT } from '../../i18n/areas/setup';
 import { reachT } from '../../i18n/areas/reach';
 import { SHOP_MODE_EVENT, type BusinessType } from '../../lib/shop-mode';
-import { BUSINESS_DEFAULTS, BUSINESS_TYPES, CONSTRUCTION_PROFILES, RETAIL_PROFILES, TRADE_PROFILES, applyBusinessDefaults, applyConstructionKind, applyRetailKind, applyTradeKind, isConstructionKind, isRetailKind, isTradeKind, type ConstructionKindId, type RetailKindId, type TradeKindId } from '../../lib/shop-presets';
+import { BUSINESS_DEFAULTS, BUSINESS_TYPES, CONSTRUCTION_PROFILES, RETAIL_PROFILES, SERVICE_PROFILES, TRADE_PROFILES, applyBusinessDefaults, applyConstructionKind, applyRetailKind, applyServiceKind, applyTradeKind, isConstructionKind, isRetailKind, isServiceKind, isTradeKind, type ConstructionKindId, type RetailKindId, type ServiceKindId, type TradeKindId } from '../../lib/shop-presets';
+import { ServiceKindPicker } from '../services-r10/ServiceKindPicker'; // R10 (SV-A1)
+import { svPickT } from '../../i18n/areas/services-r10-pick';
 import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
 import { cnPickT } from '../../i18n/areas/construction-r11-pick';
 import { TradeKindPicker } from '../trade/TradeKindPicker'; // R8-C (TR-C5)
@@ -55,6 +57,13 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
     setCnKind(k);
     if (k) setA((prev) => ({ ...prev, templateId: CONSTRUCTION_PROFILES[k].templateId }));
   };
+  // R10 (SV-A1): the service business under "Services" (business type stays `services`).
+  const [svKind, setSvKind] = useState<ServiceKindId | ''>(() => (isServiceKind(localDb.settings.get().service_kind) ? (localDb.settings.get().service_kind as ServiceKindId) : ''));
+  const [svPharmacy, setSvPharmacy] = useState(false);
+  const pickService = (k: ServiceKindId | '') => {
+    setSvKind(k);
+    if (k) setA((prev) => ({ ...prev, templateId: SERVICE_PROFILES[k].templateId }));
+  };
   const { lang } = useT();
   const pickBusiness = (b: BusinessType) => {
     setBusiness(b);
@@ -93,17 +102,20 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
       const trade = business === 'wholesale' && tradeKind ? tradeKind : null; // R8-C
       const retail = business === 'kirana' && retailKind ? retailKind : null; // R9 (RT-A1)
       const cons = business === 'contractor' && cnKind ? cnKind : null; // R11 (CN-A1)
+      const svc = business === 'services' && svKind ? svKind : null; // R10 (SV-A1)
       localDb.settings.save({
         ...applyBusinessDefaults(applyAnswers(localDb.settings.get(), a), business),
         ...(trade ? { ...applyTradeKind(trade), defaultDueDays: TRADE_PROFILES[trade].defaultDueDays } : {}),
         ...(retail ? { ...applyRetailKind(retail, { registered: a.gstRegistered }), defaultDueDays: RETAIL_PROFILES[retail].defaultDueDays } : {}),
         ...(cons ? { ...applyConstructionKind(cons, { registered: a.gstRegistered }), defaultDueDays: CONSTRUCTION_PROFILES[cons].defaultDueDays } : {}),
+        ...(svc ? { ...applyServiceKind(svc, { registered: a.gstRegistered, pharmacy: svPharmacy }), defaultDueDays: SERVICE_PROFILES[svc].defaultDueDays } : {}),
       });
+      if (svc) void import('../../lib/services/sv-profile').then((m) => m.applyServiceSwitches(svc)).catch(() => undefined);
       if (cons) void import('../../lib/construction/cn-profile').then((m) => m.applyConstructionSwitches(cons, { government: cnGov })).catch(() => undefined);
       if (retail) void import('../../lib/retail/rt-profile').then((m) => m.applyRetailSwitches(retail)).catch(() => undefined);
       window.dispatchEvent(new Event(SHOP_MODE_EVENT));
       localDb.template.set(a.templateId);
-      onClose(trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : BUSINESS_DEFAULTS[business].landing);
+      onClose(trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : svc ? SERVICE_PROFILES[svc].landing : BUSINESS_DEFAULTS[business].landing);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -224,6 +236,13 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
                 <span className={controls.label}>{cnPickT('title')}</span>
                 <span className={controls.hint}>{cnPickT('lede')}</span>
                 <ConstructionKindPicker value={cnKind} onPick={pickConstruction} government={cnGov} onGovernment={setCnGov} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
+              </div>
+            )}
+            {business === 'services' && (
+              <div className={controls.field} data-wizard-service>
+                <span className={controls.label}>{svPickT('title')}</span>
+                <span className={controls.hint}>{svPickT('lede')}</span>
+                <ServiceKindPicker value={svKind} onPick={pickService} pharmacy={svPharmacy} onPharmacy={setSvPharmacy} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
               </div>
             )}
             {/* QA-3 F20: the demo choice belongs on the first step, before any required field. */}

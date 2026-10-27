@@ -56,6 +56,13 @@ function gtaItcCaution(input: BillInput): string {
 
 const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
+// R10 (SV-A4): the 5%-without-ITC caution of a service company — one lazy check registered by `services/sv-hooks.ts`.
+let svBillCaution: ((bill: BillInput) => string) | null = null;
+export const setSvBillCaution = (fn: (bill: BillInput) => string): void => { svBillCaution = fn; };
+// R10 (SV-A4): a service company (profile or pack) loads the service hooks once — no shared chunk, nothing for others.
+const svOn = ((s) => !!s?.service_kind || (Array.isArray(s?.industry_packs) && s.industry_packs.some((p) => p === 'clinic' || p === 'salon' || p === 'fitness' || p === 'workshop')))(getJson<{ service_kind?: unknown; industry_packs?: unknown } | null>(SINGLETON_KEYS.settings, null));
+if (svOn) void import('./services/sv-hooks').then((m) => { svBillCaution ??= m.billCaution; }, () => undefined);
+
 export type GuardedSave =
   | { kind: 'warn'; message: string }
   | { kind: 'held'; draft: PurchaseDraft }
@@ -78,6 +85,8 @@ export function billWarnings(input: BillInput, purchases: readonly PurchaseRecor
   if (gta) out.push(gta);
   const realty = realtyItcCaution(input); // QA11 C9
   if (realty) out.push(realty);
+  const sv = svBillCaution?.(input); // R10 (SV-A4)
+  if (sv) out.push(sv);
   return out;
 }
 

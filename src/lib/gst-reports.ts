@@ -574,6 +574,8 @@ interface PLine {
   sgst: number;
   cess: number;
   lineTotal: number;
+  /** R10 (SV-A4): Table 8 / 3.1 column of an untaxed line on a tax invoice (`item.sv.exempt`); absent = nil-rated. */
+  exempt?: 'NIL' | 'EXEMPT' | 'NON_GST';
 }
 
 export interface PDoc {
@@ -763,9 +765,11 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     push('warning', 'TOTAL_MISMATCH', `stored total ${recorded} differs from recomputed ${docCalc.total}; the report uses the recomputed tax split.`);
   }
 
+  const svExempt = new Map((rec.items ?? []).filter((i) => i?.sv?.exempt).map((i) => [i.id, i.sv!.exempt!])); // R10 (SV-A4)
   const toPLine = (l: (typeof calc.lines)[number]): PLine => {
     const hq = hsnLineQty(l, opts);
     return {
+      ...(svExempt.has(l.id) ? { exempt: svExempt.get(l.id) } : {}),
       // Zero-rated supplies keep the slab they were priced at (GSTR-1 reports txval against it).
       rate: mode === 'NONE' ? 0 : zeroRated ? l.nominal_rate : l.tax_rate,
       hsn: l.hsn,
@@ -1226,8 +1230,9 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
         const k = nilKey(d);
         const n = nilMap.get(k) ?? { type: k, nil: 0, exempt: 0, nonGst: 0 };
         // No GSTIN on the sender means the supply is outside GST altogether; a Bill of Supply names its column.
-        if (!d.senderGstin || d.exemptKind === 'NON_GST') n.nonGst = round2(n.nonGst + d.sign * l.taxable);
-        else if (d.exemptKind === 'EXEMPT') n.exempt = round2(n.exempt + d.sign * l.taxable);
+        const kind = l.exempt ?? d.exemptKind; // R10 (SV-A4): a line's own column wins (Rule 46A mixed bills)
+        if (!d.senderGstin || kind === 'NON_GST') n.nonGst = round2(n.nonGst + d.sign * l.taxable);
+        else if (kind === 'EXEMPT') n.exempt = round2(n.exempt + d.sign * l.taxable);
         else n.nil = round2(n.nil + d.sign * l.taxable);
         nilMap.set(k, n);
       }
@@ -1627,7 +1632,7 @@ export function buildGstr3b(
         continue;
       }
       if (isNilLine(l)) {
-        if (!d.senderGstin || d.exemptKind === 'NON_GST') nonGst = round2(nonGst + s * l.taxable);
+        if (!d.senderGstin || (l.exempt ?? d.exemptKind) === 'NON_GST') nonGst = round2(nonGst + s * l.taxable); // R10: line column
         else if (d.supply === 'INTER') nil.inter = round2(nil.inter + s * l.taxable);
         else nil.intra = round2(nil.intra + s * l.taxable);
         continue;

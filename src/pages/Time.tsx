@@ -47,7 +47,7 @@ import { timeT } from '../i18n/areas/time';
 import { areaNodes } from '../i18n/areas/nodes';
 import { svcT } from '../i18n/areas/service-r3'; // R3-B
 import { WorkTypesCard } from '../components/time/WorkTypesCard';
-import { visibleTabs, type PackId } from '../lib/industry-packs'; // R5-B
+import { visiblePackTabs, type PackId } from '../lib/industry-packs'; // R5-B; R10: tabs shared by packs (`alsoPacks`)
 import { defineArea } from '../i18n/area';
 import { TIME_TABS, type TimeTab } from './page-tabs'; // R6-B1
 
@@ -57,6 +57,14 @@ const RetainersTab = lazy(() => import('../components/time/RetainersTab'));
 // R5-B: works-contract pack (BOQ, RA bills, retention, sites, GST TDS credit) — listed only with the pack on.
 const WorksTab = lazy(() => import('../components/works/WorksTab'));
 const wkT = defineArea({ tab: 'Works' } as const, { tab: 'वर्क्स' });
+// R10: service desks — each a lazy chunk; a package that has not merged yet shows `R10Stub` (one line, replaced by it).
+const FrontDesk = lazy(() => import('../components/services-r10/FrontDesk')); // SV-A2 / A3 (appointments, commission)
+const ClaimsView = lazy(() => import('../components/services-r10/ClaimsView')); // SV-A5 (workshop claims until SV-D)
+const R10Stub = lazy(() => import('../components/services-r10/R10Stub')); // SV-B clinic, SV-C members, SV-D workshop
+const r10T = defineArea(
+  { appointments: 'Appointments', commission: 'Staff & commission', clinic: 'Clinic', members: 'Members', workshop: 'Workshop' } as const,
+  { appointments: 'अपॉइंटमेंट', commission: 'स्टाफ और कमीशन', clinic: 'क्लिनिक', members: 'सदस्य', workshop: 'वर्कशॉप' },
+);
 
 type Tab = TimeTab;
 // R6-B1: the ids (and packs) live in time-tabs.ts; the labels stay here.
@@ -68,8 +76,9 @@ const TAB_LABEL: Record<Tab, () => string> = {
   retainers: () => svcT('tabRetainers'),
   settings: () => timeT('tabSettings'),
   works: () => wkT('tab'), // R5-B
+  appointments: () => r10T('appointments'), commission: () => r10T('commission'), clinic: () => r10T('clinic'), members: () => r10T('members'), workshop: () => r10T('workshop'), // R10
 };
-const TABS: { id: Tab; label: () => string; pack?: PackId }[] = TIME_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
+const TABS: { id: Tab; label: () => string; pack?: PackId; alsoPacks?: readonly PackId[] }[] = TIME_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 /** Weekday column head: English as before, Hindi weekday names for a Hindi interface. */
 const dayName = (ymd: string, i: number, lang: string) =>
@@ -240,7 +249,7 @@ export function Time() {
       </div>
 
       <div className={controls.segment} role="tablist" aria-label={timeT('sections')}>
-        {visibleTabs(TABS, localDb.settings.get(), tab).map((t) => (
+        {visiblePackTabs(TABS, localDb.settings.get(), tab).map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
             className={tab === t.id ? controls.segmentBtnActive : controls.segmentBtn}
             onClick={() => setParams(t.id === 'timesheet' ? {} : { tab: t.id }, { replace: true })}>
@@ -415,6 +424,10 @@ export function Time() {
 
       {tab === 'settings' && <WorkTypesCard notify={notify} />}
       {tab === 'works' && <Suspense fallback={null}><WorksTab notify={notify} /></Suspense>}
+      {/* R10: service desks (lazy) */}
+      {(tab === 'appointments' || tab === 'commission') && <Suspense fallback={null}><FrontDesk tab={tab} view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
+      {tab === 'workshop' && params.get('view') === 'claims' && <Suspense fallback={null}><ClaimsView notify={notify} /></Suspense>}
+      {(tab === 'clinic' || tab === 'members' || (tab === 'workshop' && params.get('view') !== 'claims')) && <Suspense fallback={null}><R10Stub title={TAB_LABEL[tab]()} /></Suspense>}
 
       {tab === 'settings' && (
         <section className={cn(surface.card, styles.prefs)}>
