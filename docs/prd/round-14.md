@@ -833,3 +833,496 @@ IBAN — lazy row).
 **Tests.** `tests/ps-print.test.ts`: header by snapshot; sub-line texts per kind; declarations; old invoices without `ps`
 render byte-identical (paper HTML fixture); `ps` survives `normalizeRecord` (load → edit → save); SWIFT / IBAN only on
 export documents.
+
+### PS-B — Disbursements, legal and trade specifics (packs `practice`, `legal`, `design`, `media`)
+
+#### PS-B1 Disbursements and pure agent (the GSTR fix)
+
+*Seen in:* Clio / Bill4Time (hard and soft costs), every Indian advocate's and CA's fee note (court fee, stamp, ROC fee
+"at actuals").
+
+**User story.** I pay ₹2,450 court fee and ₹500 e-stamp for a client in cash, tag them to the matter as disbursements on
+behalf of the client, and bill them with my fee. GSTR-1 shows only my fee; the disbursements are listed on the fee note
+as recovered at actual; the WIP view tells me ₹38,000 of disbursements are unrecovered for more than 60 days.
+
+**Acceptance criteria.**
+1. **Disbursement entry** (lazy row in the expense modal and a "Disbursement" quick button on the matter): an expense row
+   with additive `PurchaseRecord.ps = { disb: 'court_fee' | 'stamp' | 'govt_fee' | 'filing' | 'notary' | 'travel' |
+   'courier' | 'other', on_behalf: boolean, wo? }`, the matter as `cost_centre_id`, `billable_to_client_id` and
+   `pure_agent` as today. Court fees, stamp duty and government fees default to `on_behalf: true`, `pure_agent: true`, no
+   GST, no ITC; travel and courier default to "part of my fee" (taxable, markup 0 %) — PS3.
+2. **The GSTR fix**: a pure-agent line built by the timesheet flow (`expenseLine`) or the pre-bill now carries the
+   existing R8 line key `charge_head_id: 'rule33'` and the shared `PURE_AGENT_CHARGE` text as its description (the label
+   stays in the line name), so `isPureAgentLine` — read by `gst-reports.ts`, `einvoice.ts` and `eway.ts` since QA8 T9 —
+   leaves it out of Table 8, the HSN summary, 3.1(c), the e-Invoice item list (kept in `OthChrg`) and the e-Way item list
+   (kept in `otherValue`). The document total is unchanged. **Old invoices are not rewritten** (Critical Rule 3): their
+   pure-agent lines stay nil-rated in GSTR-1; a GST-guard finding lists them per period with "verify with your CA (PS3)".
+3. **Recovery**: the fee note groups disbursements under "Disbursements (recovered at actual)" with date, kind and
+   receipt / challan no.; the annexure carries the schedule (A5). Unrecovered disbursements age in the WIP view (A4) and
+   can be written off (`ps.wo`).
+4. **Ledger**: unchanged (gross: the cost is an expense, the recovery income — T25); a firm that wants a recoverable
+   asset instead keeps using a typed journal until the CA answers PS3 (§8 Q9).
+5. **TDS base** for the expected 194J (D3) excludes pure-agent lines and GST (PS25).
+
+**Files.** New: `src/lib/prof/{ps-disb,ps-disb-guard}.ts`, `src/components/prof/DisbursementRow.tsx`. Edit:
+`timesheets.ts` (`expenseLine`: two fields on the pure-agent branch — §6, reviewed by the lead), the expense modal (one
+lazy row), `gst-guard-alerts.ts` or the GST guards source list (one lazy legacy check).
+
+**Tests.** `tests/ps-disb.test.ts`: kinds and defaults; new pure-agent lines satisfy `isPureAgentLine`; GSTR-1 Table 8 /
+HSN, e-Invoice and e-Way leave them out with the document total unchanged; an old invoice with the 0 % line reports as
+before; TDS base excludes them; ageing and write-off. `tests/timesheets.test.ts` updated only for the two new fields.
+
+#### PS-B2 Advocates: reverse charge or exemption by client type; the fee memo
+
+**User story.** I am an advocate, not registered under GST. My fee memo to a company says "Legal services — GST payable
+by the recipient under reverse charge (N 13/2017-CT(R), entry 2)"; my memo to a salaried individual says "Exempt — N
+12/2017-CT(R), entry 45". A company paying an advocate gets a prompt to raise its RCM self-invoice.
+
+**Acceptance criteria.**
+1. `legalRegime({ client, line, supplier, date })` (pure, `prof-rules.ts` `LEGAL_SERVICES_RULES`, dated from 2017-07-01,
+   the entry 45 threshold wording row from 2019-10-01, `verified: false` where §2.3 says so) returns `'rcm' | 'exempt' |
+   'taxable'` with the reason:
+   - recipient a **business entity** (client has a GSTIN, or `Client.ps.entity === 'business'`) above the threshold
+     (`Client.ps.small_business` not ticked) → `rcm`;
+   - recipient another advocate / firm of advocates (`Client.ps.advocate`), a non-business person, or a business entity
+     with turnover up to the registration threshold in the preceding FY → `exempt` (a senior advocate's supply to an
+     advocate is not exempted — PS1);
+   - a non-legal line (SAC outside 9982, e.g. a law firm's tax filing service) → `taxable` (forward charge).
+2. The editor applies it once per line on a new fee note in a `legal` profile (a chip "Legal services: reverse charge —
+   because the client has a GSTIN · change"), using existing mechanisms only: `rcm` → the existing outward reverse-charge
+   flag (tax shown, not collected, `rcm.ts`); `exempt` → the line's existing R10 exempt marker (`item.sv.exempt =
+   'EXEMPT'`, Table 8 exempt column); a document with only exempt lines from a registered advocate → Bill of Supply.
+   The snapshot `ps.legal = { regime, entry }` prints the sentence (A5).
+3. **Unregistered advocate** (no GSTIN on the profile): the document is titled "Fee memo", carries no tax columns, prints
+   "Not registered under GST — legal services under reverse charge / exempt as stated" and never reaches GSTR-1 (the
+   existing unregistered behaviour). The profile shows a help note on Sec 23(2) / N 5/2017-CT (PS2).
+4. **Fee-memo particulars**: enrolment no. and State Bar Council under the name (from `prof_settings.legal`, snapshotted
+   in `ps`), court / case no. from the matter, appearances as per-item fees: additive `WorkType.ps.unit: 'hour' |
+   'appearance' | 'item'` (an appearance work type bills per entry, not per minute; time still logged for realisation).
+5. **Inward side** (any company): a purchase bill from a vendor flagged `Vendor.ps.advocate` with a legal SAC (9982…)
+   shows the RCM prompt and the self-invoice action (existing `rcm-self-invoice.ts`), unless the company marks itself
+   below the threshold (entry 45) — one lazy lookup row beside the R13 scrap lookup in `RcmGoodsNotice.tsx`.
+6. Arbitral tribunals and senior advocates' representational services are covered by the same rule rows (entry 2 covers
+   "individual advocate including a senior advocate"); the app asks nothing more.
+
+**Files.** New: `src/lib/prof/{ps-legal,ps-legal-paper}.ts`, `src/components/prof/LegalRegimeChip.tsx`. Edit:
+`RcmGoodsNotice.tsx` (one lazy lookup row), the client form (one lazy "Legal-services status" row), the vendor form (one
+lazy "Advocate / firm of advocates" tick), the work-type form (one lazy unit select).
+
+**Tests.** `tests/ps-legal.test.ts`: each regime by client and line; threshold wording by date; registered vs
+unregistered paper; Bill of Supply for all-exempt; RCM tax excluded from receivable (existing `receivableTotal`);
+GSTR-1 rows (RCM `rchrg: 'Y'`, exempt in Table 8); per-appearance billing; inward prompt.
+
+#### PS-B3 Client money (trust / escrow) ledger
+
+*Seen in:* Clio, PracticePanther (client- and matter-level trust ledgers, three-way reconciliation), Bill4Time (earned vs
+retainer funds). India has no IOLTA-type statute; Bar Council Rules 25–28 require accounts of client money, and the
+CA Act forbids mixing a client's money with the CA's own (PS27).
+
+**User story.** A client deposits ₹50,000 "for court fees and expenses" into our client account. I pay ₹12,000 of
+stamp duty from it, then — with the client's written approval — transfer ₹20,000 to fees against my invoice. The client
+statement shows ₹18,000 held; the month-end three-way reconciliation agrees bank, ledger and client balances.
+
+**Acceptance criteria.**
+1. **Client-money bank account**: additive `BankAccount.client_money?: true` (the R5-A `clearing` / R11
+   `rera_project_id` / R5-C `fcra` precedent). It stays a real bank (BRS, statements, imports work); `isClientMoneyAccount`
+   keeps it out of the firm's own cash views and pickers for fee receipts and supplier payments (§4 conventions).
+2. Table `client_money` (`CMV/FY…`, dated, numbered; `books.edit`): `{ id, number, date, kind: 'receipt' | 'payment' |
+   'to_fees' | 'refund' | 'transfer' | 'interest', client_id, matter_id?, amount, bank_account_id, purpose: 'expenses' |
+   'fees' | 'other', ref, narration, invoice_id? (to_fees), authority?: { date, mode: 'written' | 'email' | 'engagement',
+   ref }, voucher_ids[] }`.
+3. **Postings** (one all-or-nothing write with `withTablesRollback`):
+   - receipt: Dr client-money bank / Cr "Client money held" (liability; one sub-ledger per client);
+   - payment on behalf (stamp, court fee, counsel's fee paid for the client): Dr Client money held / Cr client-money bank
+     — not a firm expense, never billed again (the statement shows it);
+   - to fees: Dr Client money held / Cr client-money bank, and a **normal receipt** (`transactions` row) into the office
+     bank against the invoice (the money becomes the firm's; cash readers see it then) — refused without an issued
+     invoice, above its balance, or without `authority` (owner may override with a reason, audited);
+   - refund to the client; transfer between two clients' balances (both named); interest (credited to the client or to
+     the firm by `prof_settings.client_money.interest_to`, asked the first time — PS27).
+4. **Guards**: no client's (or matter's) balance may go negative; a payment from a client-money account must name a
+   client; a receipt asks "for fees or for expenses?" (BCI Rule 26) — "fees" sends the user to the ordinary advance flow
+   (GST on advances for services, 5.3) instead (PS10).
+5. **Three-way reconciliation** (`reconcile` view): (1) the bank's statement balance on the date (from the BRS / imported
+   statement, or typed), (2) the ledger balance of the client-money bank accounts, (3) Σ client balances; every
+   difference listed (uncleared items from the BRS, unallocated entries); printable, with "working paper" wording.
+6. **Statements** (`statements` view): per client / matter, the period's entries and balance; PDF / `wa.me`; the
+   ledger and statements are available to the client on request (BCI Rule 28 as reported).
+7. Balance sheet: the client-money bank sits in cash and bank with a note "of which held for clients ₹…", and "Client
+   money held" in other current liabilities (PS32). The year-end pack lists balances by client.
+
+**Files.** New: `src/lib/prof/{ps-client-money,ps-cm-post,ps-cm-reco}.ts`, `src/components/prof/{ClientMoneyDesk,
+CmLedgerView,CmReconcileView,CmStatementsView}.tsx`. Edit: `bank-accounts.ts` family (`isClientMoneyAccount` beside
+`pickableBankAccounts` — one export, reviewed by the lead), the bank-account form (one lazy tick), the cash views that
+use `pickableBankAccounts` already (no edit) and the three that do not (Today, payment modes, collection lag — one
+filter call each, reviewed by the lead).
+
+**Tests.** `tests/ps-client-money.test.ts`: postings per kind; negative balance refused; to-fees needs invoice and
+authority, settles the invoice, office-bank receipt created once; interest by setting; rollback on failure; locked
+period refused. `tests/ps-cm-reco.test.ts`: three-way agreement and each kind of difference. `tests/ps-client-money-readers.test.ts`:
+Today / payment modes / collection lag / cash forecast leave client-money accounts out; BRS includes them.
+
+#### PS-B4 Architects and interior designers: stage fees on project cost, fit-out pass-through
+
+**User story.** We design a ₹4.2 crore house for 6 % of the project cost, in five stages. After the tender the cost is
+revised to ₹4.6 crore; the stage-3 bill picks up the difference on stages 1–2. The client lives in Dubai but the house
+is in Pune, so the app tells me the place of supply is Maharashtra and this is not an export.
+
+**Acceptance criteria.**
+1. An engagement with model `milestone` may take a **project-cost basis**: `engagement.stage = { fee_pct, cost_basis:
+   'estimate' | 'tender' | 'actual', revisions: [{ date, cost, note }], stages: [{ id, label, cum_pct }], extra_pct?
+   (documentation / site-visit charges), property: { state, city?, country } }`.
+2. Stage bill = fee_pct × current project cost × stage cum_pct − already billed on the engagement (live stage invoices
+   less their credit notes, through `progress-billing.ts`'s helpers). A cost revision recomputes every later bill; a
+   downward revision that makes the next bill negative suggests a credit note for the excess (never automatic).
+3. **Stage template** (`prof_settings.design.stages`): the app seeds an editable 5-stage example labelled "example —
+   agree with your client; the COA scale is recommendatory" (PS30); no percentage is presented as a rule.
+4. **Place of supply** (PS6): services directly in relation to immovable property → the property's State (Sec 12(3)
+   IGST); for property in India the invoice is not an export whatever the client's country (C1 reads `property`); for
+   property outside India, the location of the recipient. The suggestion fills the invoice's place of supply once; the
+   user can change it.
+5. **Interior designers**: two engagement lines kept apart — design fee (taxable service) and execution / fit-out
+   (a works contract when it results in immovable property — PS11); materials bought for the client re-bill with markup
+   (part of my supply) unless bought in the client's name and paid as pure agent (B1).
+6. The stage computation prints on the annexure (A5): cost basis and revisions, fee %, stage %, cumulative, billed, this
+   bill.
+
+**Files.** New: `src/lib/prof/{ps-stages,ps-property-pos}.ts`, `src/components/prof/StagesView.tsx` (a view of the
+`matters` desk). Edit: none outside `prof/` (progress helpers are imported, not edited).
+
+**Tests.** `tests/ps-stages.test.ts`: stage maths, revisions up / down, credit-note suggestion, extra %, rounding to the
+rupee; `tests/ps-property-pos.test.ts`: property in India for a foreign client → POS State, not export; property abroad
+→ recipient's location.
+
+#### PS-B5 Media and digital agencies: pass-through, release orders, commission
+
+**User story.** We book ₹3 lakh of newspaper space and ₹1.2 lakh of Meta ads for a client in October. The newspaper
+space is in our name; the Meta account is the client's own and we only manage it. The bill shows the newspaper cost with
+our 15 % service fee (all taxable), the Meta spend as recovered at actual (pure agent), and our monthly retainer.
+
+**Acceptance criteria.**
+1. Media purchase bills carry `PurchaseRecord.ps.media = { client_id, engagement_id?, ro_no?, medium: 'print' | 'tv' |
+   'radio' | 'outdoor' | 'digital' | 'other', insert_from?, insert_to?, mode: 'principal' | 'agent', commission_pct? }`.
+2. **Mode** decides the re-bill (PS12): `principal` (space bought in our name and resold — the default) → the cost is part
+   of our taxable supply (line at our service rate unless the user picks the media class), with the agency fee / markup;
+   `agent` (the client contracts with the media or platform, Rule 33 conditions met) → a pure-agent line (B1 sentinel)
+   plus our fee line. The pre-bill (A3) shows media lines grouped by medium.
+3. **Release orders**: the existing purchase-order document prints as "Release order" (title, publication / slot
+   schedule, size / duration, rate, client reference) when `ps.media` is present; RO numbers use the PO series. B5 confirms
+   the PO storage path and puts the fields on that row by declaration merging (no new table).
+4. **Media commission** received from a publisher is billed as our service to the publisher (an ordinary invoice); TDS
+   by the client on our bill defaults to **194C** (Circular 715), on publisher commission per PS18.
+5. The media schedule prints on the annexure (A5): date, medium, publication / platform, size or slots, cost, mode.
+6. Foreign ad platforms: bills from a non-resident platform use the existing import-of-services RCM on purchases; the
+   help notes the equalisation levy ended (6 % from 1 Apr 2025) — PS38.
+
+**Files.** New: `src/lib/prof/{ps-media,ps-ro}.ts`, `src/components/prof/MediaRows.tsx` (lazy rows in the bill modal and
+the pre-bill). Edit: the purchase-order print path (one lazy title / schedule part, reviewed by the lead).
+
+**Tests.** `tests/ps-media.test.ts`: principal vs agent lines and GSTR effect; commission line; RO print fields;
+194C default; import-RCM unchanged.
+
+### PS-C — Export of services and multi-currency (pack `svcexport`)
+
+#### PS-C1 Export-of-services check (Sec 2(6), place of supply, intermediary)
+
+**User story.** I bill a US client for software consultancy under LUT. The invoice shows a green "Export of services:
+5 / 5 conditions" — supplier in India, recipient outside India, place of supply outside India (Sec 13(2)), paid in USD
+(after the receipt), not a branch of ours. A UK client's Indian subsidiary would have shown "recipient in India — not an
+export".
+
+**Acceptance criteria.**
+1. `exportCheck({ invoice, client, engagement, receipts, date })` (pure) returns the five Sec 2(6) conditions with `ok |
+   fail | pending | unknown` and the reason:
+   - (i) supplier location (profile in India);
+   - (ii) recipient location — additive `Client.ps.country` (else billing address country), `Client.ps.fixed_estab_in_india`
+     (a recipient with an Indian establishment receiving the service there fails);
+   - (iii) place of supply — Sec 13(2) by default; exceptions flagged by the engagement / line class: immovable property
+     (13(4), B4), services needing physical presence or on goods made available (13(3)), events (13(5)); **intermediary**
+     by the dated rule `INTERMEDIARY_POS_RULES` (`prof-rules.ts`): to 29 Mar 2026 → supplier's location (not an export);
+     from 30 Mar 2026 → Sec 13(2) (PS4);
+   - (iv) payment — `pending` until receipts / IRMs exist, then `ok` when in convertible foreign exchange or INR through a
+     route the user marks as RBI-permitted (SRVA, Circular 202/14/2023), else `fail`;
+   - (v) distinct person — `Client.ps.relation: 'unrelated' | 'own_branch' | 'group'`; `own_branch` fails (Explanation 1
+     to Sec 8).
+2. The editor shows the result on any document with supply type export / place of supply 96–97 when `svcexport` is on;
+   the GST preflight raises a **soft** warning for an LUT export with a failing condition and an info line while (iv) is
+   pending. The supply type is never changed automatically.
+3. The result is snapshotted as `ps.export.checks` (A5 prints a one-line summary on the export block).
+4. `tr-indents.ts`'s TR21 note reads the same dated rule (one line, owner C, reviewed by the lead), so an indent agent's
+   foreign-principal commission from 30 Mar 2026 shows "export if Sec 2(6) is met" instead of "not an export".
+5. Purpose code (A5): `prof_settings.export.purpose_code` default by `prof_kind` (a short editable list of RBI purpose
+   codes for services; the user's choice, PS39).
+
+**Files.** New: `src/lib/prof/{ps-export-check,ps-pos}.ts`, `src/components/prof/{ExportSvcDesk,ExportCheckView,
+ExportCheckChip}.tsx`. Edit: `trade/tr-indents.ts` (one dated lookup), the GST preflight source list (one lazy check).
+
+**Tests.** `tests/ps-export-check.test.ts`: each condition; intermediary before / on / after 30 Mar 2026; immovable
+property; own branch; INR via SRVA; pending until receipt; snapshot.
+
+#### PS-C2 FEMA 2026: EDF register, realisation from the invoice date
+
+**User story.** On 25 November I see that my October software invoices need an EDF by 30 November (30 days after the
+month end), and that a ₹6 lakh invoice to a German client is due for realisation by 14 July 2027 (9 months from the
+invoice date), not 15 months as before.
+
+**Acceptance criteria.**
+1. **Rule rows appended** (never edited) to `trade/trade-rules.ts` (owner C, reviewed by the lead): in
+   `EXPORT_REALISATION_MONTHS_RULES` a row `{ from: '2026-10-01', value: 9, source: 'FEMA 23(R)/2026-RB Reg 5(1)(a), as
+   amended by FEMA 23(R)(1)/2026-RB of 22 Sep 2026 — verify transition (PS15)' }`; a new
+   `EXPORT_REALISATION_INR_MONTHS_RULES` (INR-invoiced or settled: 12 from 2026-10-01; earlier dates fall back to the FX
+   rule). Goods exports read the same rows (the regulations apply to goods too; X1 is cross-referenced).
+2. **Services clock**: the export register (R4-C2) starts a services export's clock on the **invoice date** without the
+   "no shipping bill" flag (one helper `isServicesExport` in `trade/export-register.ts`: no goods lines, or every line a
+   SAC — owner C, reviewed by the lead). Mixed documents keep the shipping-bill clock.
+3. Table `edf_register` (dated; `books.edit`): `{ id, kind: 'software' | 'services' | 'softex', period (YYYY-MM) or
+   invoice_ids[], edf_no?, filed_on?, authority: 'ad_bank' | 'stpi' | 'sez', value_fc, currency, value_inr, due,
+   small_value_declared?: boolean, status: 'due' | 'filed' | 'closed', notes }`. Due dates from `prof-rules.ts`
+   `EDF_RULES` (from 2026-10-01: 30 days after the end of the invoice month; services other than software may file by
+   the receipt date; ≤ ₹10 lakh per invoice may be closed on the exporter's declaration); before 2026-10-01 rows of kind
+   `softex` record history only.
+4. **Builder**: "Prepare EDF for October" lists the month's export-of-services invoices by kind (software / other,
+   from `Client.ps` / engagement / SAC 9983…), totals by currency, and writes a draft row; the EDF number and date are
+   typed after the bank / STPI files it (no portal).
+5. Due list and a lazy compliance-calendar group ("EDF due", "realisation due in 30 days", "past due — ask the AD bank
+   for an extension (Reg 5(1) second proviso)").
+6. INR-invoiced exports (currency INR, place of supply outside India) take the INR rule; the register shows which rule
+   applied.
+
+**Files.** New: `src/lib/prof/{ps-edf,ps-fema}.ts`, `src/components/prof/EdfView.tsx`, `RealisationSvcView.tsx`. Edit:
+`trade/trade-rules.ts` (appended rows + one rule), `trade/export-register.ts` (one helper), the compliance-calendar source
+(one lazy group).
+
+**Tests.** `tests/ps-edf.test.ts`: due dates (month-end + 30, receipt-date option, ≤ ₹10 lakh), software vs services,
+SOFTEX history. `tests/ps-fema.test.ts`: services clock from the invoice date; 9 months from 2026-10-01, 15 for an
+invoice of 2026-09-15, INR 12; goods rows unchanged for older shipments; `tests/export-register*.test.ts` pass unchanged
+except the new dated cases.
+
+#### PS-C3 IRM / FIRA / e-BRC per services invoice; the refund statement
+
+**User story.** I export services under LUT and claim a refund of accumulated ITC every quarter. The app lists each
+invoice with its FIRA and e-BRC numbers and the amount realised in the quarter, and fills the refund working paper.
+
+**Acceptance criteria.**
+1. The export register's services view shows per invoice: IRMs allocated (existing `export_irms`), the bank's FIRA /
+   e-FIRC reference (additive `ExportIrm.ps.fira_no`), e-BRC no. and date (existing fields), realised foreign currency
+   and INR, **short realisation** split into foreign bank charges (a reduction the exporter may declare — Reg 6 proviso,
+   ≤ ₹10 lakh) and unrealised (Rule 96A clock, X2).
+2. **Refund working paper** for export of services without payment of tax (Rule 89(4)): turnover of zero-rated supply of
+   services for the period = payments received in the period for services exported (+ earlier advances for services
+   completed in the period, − advances for services not yet completed), net ITC, adjusted total turnover, maximum refund;
+   the statement rows (invoice no. / date, value, FIRA / e-BRC no. / date, realised value). It pre-fills a draft row of
+   the existing refund register (`gst-cash-refunds.ts` `saveRefund`, category for exports under LUT) — PS14.
+3. CSV / XLSX of the statement; nothing is filed.
+
+**Files.** New: `src/lib/prof/{ps-brc,ps-refund-svc}.ts`, `src/components/prof/RefundSvcView.tsx`. Edit: none outside
+`prof/` (`saveRefund` and the export register are imported).
+
+**Tests.** `tests/ps-refund-svc.test.ts`: Rule 89(4) maths with advances; statement rows; short-realisation split;
+draft refund row written once.
+
+#### PS-C4 Multi-currency rate cards and platform receipts
+
+**User story.** My client card says USD 55 an hour. I bill 40 hours on 31 October; the invoice is in USD with the
+currency master's rate for 31 October and the Rule 34(2) note. Payoneer pays me USD 2,145 after a USD 55 fee; the app
+records the full receipt against the invoice, the fee as an expense (with import RCM because Payoneer bills from abroad),
+and the exchange difference.
+
+**Acceptance criteria.**
+1. **Rate currency**: rate-card rates (task, staff, project, client, work type, engagement) carry an optional currency
+   (additive `ps.currency`; absent = INR). `resolveRate` returns `{ rate, currency }` through the same optional argument as
+   A4 (§6). Billing into another currency converts at the currency master's rate on the bill date (`rateOn`), shows "USD
+   55/h ≈ ₹4,620/h (RBI ref. 31-10-2026)" and snapshots nothing new (the line carries the converted rate as today).
+2. **Rule 34(2)** hint on foreign-currency service documents: "Value in INR at the rate under generally accepted
+   accounting principles on the date of time of supply — verify with your CA (PS7)"; the user may type the bank's rate
+   instead of the master's (existing behaviour).
+3. **Platforms** (`prof_settings.platforms[]`: name, kind (`paypal` / `wise` / `payoneer` / `upwork` / `skydo` /
+   `stripe` / `razorpay` / `other`), payout bank, fee ledger, vendor id, non-resident?). "Receive via platform" on a
+   foreign invoice: gross amount (FC), platform fee (FC), conversion fee, INR credited → one receipt of the gross at the
+   realised rate (existing receipt + `fx-gain.ts`), one expense row for the fees (vendor = the platform; import-of-
+   services RCM through the existing bill logic when the platform is non-resident and the company is registered — PS8),
+   and the short realisation reason "platform fee" for the export register (C3).
+4. Year-end: unbilled foreign-currency WIP shown at the closing rate in the year-end paper (A4) as a memo (PS37).
+
+**Files.** New: `src/lib/prof/{ps-fx-rates,ps-platforms}.ts`, `src/components/prof/PlatformsView.tsx`,
+`PlatformReceiptDialog.tsx`. Edit: `rate-cards.ts` (the same optional argument as A4 — A adds it, C fills currency),
+the receipt dialog (one lazy "via platform" link).
+
+**Tests.** `tests/ps-fx-rates.test.ts`: currency resolution and conversion; `tests/ps-platforms.test.ts`: gross receipt,
+fee expense, RCM flag for a non-resident platform, fx gain, short-realisation reason.
+
+#### PS-C5 Freelancer's registration threshold; unregistered export invoice
+
+**User story.** I am a freelance designer, not registered. The threshold card shows ₹14.2 lakh of the ₹20 lakh limit
+this year, exports included, and warns at 80 %. My dollar invoices say "Supplier not registered under GST".
+
+**Acceptance criteria.**
+1. **Threshold card** (`firm` desk → `threshold`, also a Dashboard insight when `prof_kind = freelancer`): aggregate
+   turnover for the FY (taxable + exempt + exports + inter-State, at INR value; excluding inward RCM), against
+   `REGISTRATION_THRESHOLD_RULES` (`prof-rules.ts`: services ₹20 lakh, special-category States ₹10 lakh, dated); warnings
+   at 80 % and 100 %; notes on N 10/2017-IT (inter-State services below the threshold) and on compulsory registration
+   cases the user must check (PS13).
+2. An **unregistered** company's documents print "Supplier not registered under GST" (A5 declaration), carry no tax
+   columns, hide LUT text and stay out of GST returns (existing unregistered behaviour); exports still reach the FEMA
+   register (C2) and the realisation clock.
+3. Crossing the threshold opens a checklist: register, then LUT (existing register), then switch invoices to tax invoices
+   from the registration date (the profile's GSTIN with an effective date — existing field).
+
+**Files.** New: `src/lib/prof/ps-threshold.ts`, `src/components/prof/ThresholdView.tsx`. Edit: the dashboard insights
+list (one lazy card, guarded by `prof_kind`).
+
+**Tests.** `tests/ps-threshold.test.ts`: turnover parts (exports in, RCM inward out), special-category limit, warnings,
+FY boundary (local days).
+
+### PS-D — The firm's statutory desk (packs `partners`, `practice`, `cafirm`)
+
+#### PS-D1 Partners: capital and current accounts, Sec 40(b) / Sec 35, appropriation
+
+**User story.** We are three partners (40 / 30 / 30). At the year end the app computes book profit, allowable
+remuneration under Sec 40(b) (₹3 lakh or 90 % of the first ₹6 lakh, 60 % of the rest), interest on capital at 12 %, and
+posts remuneration and interest to the current accounts, then shares the rest in the ratio. Each partner gets a
+statement of capital and current account.
+
+**Acceptance criteria.**
+1. Table `partners` (`settings.manage`): `{ id, name, pan, kind: 'working' | 'non_working', designated?: boolean (LLP),
+   joined, left?, capital_account_id, current_account_id, terms: [{ from, share_pct, remuneration: { mode: 'fixed' |
+   'pct_book_profit' | 'max_allowable', amount?, pct? }, interest_pct, interest_on_drawings_pct?, deed_ref }], vendor_id?
+   (for TDS, D2) }`. Ledger accounts "Capital — <name>" and "Current — <name>" (group `CAPITAL`) are created on save;
+   shares must total 100 % on every date (validation).
+2. **Drawings**: a payment helper posts Dr Current — <partner> / Cr bank or cash; interest on drawings (by the deed's
+   rate, product method by month) is computed at the year end (income of the firm).
+3. **Year-end run** — table `partner_runs` (dated, `books.edit`): for an FY, book profit = net profit per the ledger
+   before partners' remuneration (+ user adjustments, listed), interest on capital (rate ≤ the cap in
+   `PARTNER_INTEREST_CAP_RULES`, 12 %; on opening capital or on daily balances — setting), **allowable remuneration** from
+   `PARTNER_REMUNERATION_RULES` (`prof-rules.ts`, dated by the FY start: from 2009-04-01 ₹1.5 lakh / 90 % of the first
+   ₹3 lakh / 60 %; from 2024-04-01 ₹3 lakh / 90 % of the first ₹6 lakh / 60 %), remuneration per the deed, the excess
+   disallowed (a note for the computation, not a journal), and the residual profit by ratio. 2025 Act label Sec 35 by
+   `ita2025.ts` for TY 2026-27 on (PS20).
+4. **Postings** (one run, all-or-nothing, reversible by the owner while the period is open): Dr "Partners' remuneration"
+   and "Interest on partners' capital" (expenses) / Cr current accounts; residual profit: Dr "Profit & loss appropriation"
+   (group `CAPITAL`) / Cr current accounts in the ratio (PS33). Interest on drawings: Dr current accounts / Cr "Interest
+   on drawings" (income). TDS u/s 194T on remuneration / interest through D2.
+5. A firm on presumptive taxation (D4) sees "remuneration and interest are not deductible under 44ADA / Sec 58 — verify
+   (PS22)".
+6. Statements per partner (opening, contributions, drawings, interest, remuneration, share, closing) and the annual pack's
+   "Partners' capital accounts" note filled from them (`notes-auto.ts` reads `partners` through one optional lazy source,
+   reviewed by the lead).
+
+**Files.** New: `src/lib/prof/{ps-partners,ps-partner-run,ps-partner-post}.ts`, `src/components/prof/{FirmDesk,
+PartnersView,AppropriationView}.tsx`. Edit: `ledger/notes-auto.ts` (optional partner rows; unchanged output without them).
+
+**Tests.** `tests/ps-partners.test.ts`: shares 100 % by date; drawings posting; interest on drawings. `tests/ps-partner-run.test.ts`:
+40(b) slabs on both sides of 2024-04-01, loss case (₹3 lakh), interest cap, excess disallowed, residual by ratio, journals
+balance, reversal, locked period refused.
+
+#### PS-D2 TDS u/s 194T on partner payments
+
+**User story.** Our partners' monthly remuneration crosses ₹20,000 in April; the app deducts 10 %, posts it to TDS
+payable, and the quarter's 26Q (Form 140) working paper lists it.
+
+**Acceptance criteria.**
+1. **Rule rows appended** to `tds-rules.ts` (owner D, reviewed by the lead): section code `194T` (family `194T`, label
+   "194T Payments to partners", rate 10 % from 2025-04-01, aggregate threshold ₹20,000 per FY per partner; RPU code
+   marked unverified — PS19); `ita2025.ts` gains the 2025-Act label row when a CA confirms it (until then the old code is
+   shown with the existing "verify" note).
+2. Credits of salary, remuneration, commission, bonus or interest to a partner's current account (monthly entries or the
+   year-end run) create a deduction through the existing `saveManualDeduction` (the R10 payout precedent): Dr Current —
+   partner / Cr TDS payable 194T, in the TDS register, challans and the 26Q paper. Drawings and the residual profit share
+   never.
+3. **Threshold**: aggregated per partner per FY across the five kinds; on the credit that crosses ₹20,000 the TDS is
+   computed on the FY's total so far (catch-up), afterwards on each credit (PS19 asks whether the whole amount or only the
+   excess).
+4. Year-end credits dated 31 March fall under the existing March deposit rule (30 April).
+
+**Files.** New: `src/lib/prof/ps-194t.ts`, `src/components/prof/Tds194tView.tsx`. Edit: `tds-rules.ts` (appended rows),
+`ita2025.ts` (one appended row, pending PS19).
+
+**Tests.** `tests/ps-194t.test.ts`: threshold and catch-up; kinds included / excluded; register rows; 26Q paper code;
+year-end credit deposit due.
+
+#### PS-D3 194J receivable by client: defaults, expected TDS, Form 131 chase
+
+**User story.** My corporate clients deduct 10 % (professional), a SaaS client deducts 2 % (technical), my ad-agency
+work is 194C at 2 %. Each fee note fills the expected TDS; the register tells me which Form 131 (16A) certificates are
+missing for Q2 and drafts the reminder.
+
+**Acceptance criteria.**
+1. Client default `Client.ps.tds = { section: '194J' | '194J-T' | '194C' | '194H' | 'none', rate? }` (lazy row in the
+   client form); profile defaults (A1): `ca`, `legal`, `design` → `194J` (10 %); `consulting` asks per client
+   ("professional 10 % or technical 2 %?" — PS18); `agency` → `194C` (rate by our own entity form: 1 % individual / HUF,
+   2 % others); `freelancer` → `194J`.
+2. A new fee note to that client fills the existing invoice fields `tds_section` / `tds_rate` / `tds_amount` on the
+   **fee base** = taxable value of non-pure-agent lines, GST excluded (PS25), once the client's FY total passes the
+   section's threshold from `tds-rules.ts` (₹50,000 for 194J from 2025-04-01; 194C ₹30,000 single / ₹1 lakh year); below
+   it the editor shows "TDS not expected yet (₹32,000 of ₹50,000)" and leaves the fields empty.
+3. The existing TDS receivable register (`tds-register.ts`) gains a lazy "Certificates" panel: per client × quarter,
+   expected TDS, matched in 26AS / Form 168 (existing match), Form 131 received or not, and a **chase letter** (PDF /
+   `wa.me` / `mailto:`) listing the invoices and amounts, from the date the certificate is due (rule from `tds-rules.ts`
+   if present, else 15 days after the 26Q due date — verify).
+4. Labels follow `ita2025.ts` (Form 16A → 131, 26AS → 168, Sec 393 table item) by date.
+
+**Files.** New: `src/lib/prof/ps-tds-recv.ts`, `src/components/prof/Tds194jView.tsx` (also mounted lazily in
+`TdsTab.tsx`). Edit: `TdsTab.tsx` (one lazy panel), the client form (one lazy row).
+
+**Tests.** `tests/ps-tds-recv.test.ts`: defaults by profile; fee base excludes pure agent and GST; threshold by client
+and FY; 194C rate by entity form; chase list by quarter.
+
+#### PS-D4 44ADA / Sec 58 presumptive working paper
+
+**User story.** I am a freelance architect. The paper shows FY gross receipts of ₹61 lakh, cash 2 % (so the ₹75 lakh
+limit applies), presumptive income ₹30.5 lakh against ₹38 lakh in my books, and reminds me that advance tax is due in
+one instalment by 15 March.
+
+**Acceptance criteria.**
+1. `presumptive({ fy, invoices, receipts, purchases, settings })` (pure): gross receipts of the profession for the FY
+   (issued fee notes' taxable value at INR, pure-agent recoveries out, credit notes in — on the accrual basis; the cash
+   basis shown too), cash share (receipts by cash mode ÷ total receipts), the applicable limit from
+   `PRESUMPTIVE_PROF_RULES` (`prof-rules.ts`: ₹50 lakh from FY 2016-17; ₹75 lakh when cash ≤ 5 % from FY 2023-24; the
+   Sec 58 table row from TY 2026-27), deemed income at 50 %, actual profit per the ledger, the difference.
+2. **Eligibility checklist** the user ticks (resident; individual or partnership firm — not an LLP; a profession under
+   Sec 44AA(1) or notified — legal, medical, engineering, architectural, accountancy, technical consultancy, interior
+   decoration, film artist, company secretary, information technology, authorised representative): the app never decides
+   (PS22). An LLP profile sees "not available to an LLP — verify".
+3. **Advance tax**: one instalment by 15 March (`PRESUMPTIVE_ADVANCE_TAX_RULES`, dated; 2025 Act mapping verify).
+4. Printable paper with "working paper — verify with your CA"; nothing is filed.
+
+**Files.** New: `src/lib/prof/ps-presumptive.ts`, `src/components/prof/PresumptiveView.tsx`. Edit: none outside `prof/`.
+
+**Tests.** `tests/ps-presumptive.test.ts`: limits by FY (₹50 / ₹75 lakh, 5 % cash test at the boundary), deemed 50 %,
+pure-agent recoveries out, credit notes in, LLP note, local-day FY boundaries.
+
+#### PS-D5 CA / CS / CMA desk: compliance billing from the practice desk; UDIN register
+
+**User story.** At month end the CA desk shows, for each client company on this device, what we did: GSTR-1 and 3B
+filed for October, the DSC renewed, two certificates with UDINs. One click per client makes a draft fee note in our
+firm's own company with each item at the client's agreed fee, plus the ₹2,000 late fee we paid on the client's behalf as
+a disbursement.
+
+**Acceptance criteria.**
+1. **Link companies to clients**: `prof_settings.ca.company_clients: [{ company_id, gstin?, client_id }]` — the device's
+   company registry (`realCompanies()`) mapped to the firm's client masters (GSTIN as a fallback key on another device).
+2. **Fee schedule**: catalogue items flagged `ps.fee_event` (`gstr1`, `gstr3b`, `gstr9`, `tds_return`, `itr`,
+   `tax_audit`, `stat_audit`, `roc_annual`, `certificate`, `dsc_renewal`, `checklist`, `retainer`), with per-client rates
+   in `Client.ps.fees`.
+3. **Billable events** (derived, never stored): returns filed per company and period from `peekCompliance` (read-only,
+   unchanged — Critical rule on `/practice`), DSC renewals from `dsc_register`, checklist items done
+   (`client_checklist`), UDIN register rows (below), and typed events (ROC filings for CS firms, cost-audit work for CMA
+   firms). Event key `ca:<client>:<kind>:<period>` — billed state is derived from the invoice lines' `bill_refs`, exactly
+   like time entries (cancel the invoice → the events are unbilled again).
+4. **"Bill from the board"**: select a client and month → a draft fee note in the open (firm) company with one line per
+   event at the agreed fee, events covered by a retainer engagement shown at 0, and the client's disbursements (B1:
+   government / late fees paid on behalf) — through the same draft builder as A3.
+5. **UDIN register** — table `udin_register` (dated; `doc.create`): `{ id, udin, date, client_id, kind: 'certificate' |
+   'tax_audit' | 'gst_audit' | 'stat_audit' | 'other', description, member_no, fy?, pan?, revoked?: { date, reason } }`;
+   format check (18 characters; the year and membership no. parts checked against the member no. — verify, PS29); "UDINs
+   not yet billed" list; the UDIN prints on the billed line (A5). No ICAI / ICSI / ICMAI portal call.
+6. Practice desk link: the `/practice` board gains a lazy "Bill" column link to this desk for the linked client
+   (`Practice.tsx`, one lazy cell, reviewed by the lead); the board stays read-only.
+
+**Files.** New: `src/lib/prof/{ps-ca-events,ps-ca-bill,ps-udin}.ts`, `src/components/prof/{CaDesk,CaFeesView,
+CaEventsView,UdinView}.tsx`. Edit: `pages/Practice.tsx` (one lazy cell), the catalogue item form (one lazy fee-event
+select).
+
+**Tests.** `tests/ps-ca-events.test.ts`: events from a peeked company fixture (filed / not filed), DSC and checklist
+events, billed state through `bill_refs`, cancel frees; `tests/ps-ca-bill.test.ts`: draft lines, retainer cover,
+disbursements included; `tests/ps-udin.test.ts`: format, revoke, unbilled list.
