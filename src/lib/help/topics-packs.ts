@@ -27,6 +27,11 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:works:sites', 'Sites', 'साइट', 'Sites with material issued against the theoretical use per BOQ unit.', 'Weekly on site.'),
   // R11 (CN-A): the RA bill and its paper; the builder desk (screens arrive with CN-C)
   t('time:works:ra', 'RA bills', 'रनिंग बिल', 'Measured running-account bills: the paper prints the contract particulars, BOQ item no. and M-book under each line, deductions down to net payable, the certificate and the abstract of cost as page 2 — snapshotted at save.', 'Each measurement.', { statutory: ca(['CN3', 'CN4', 'CN5', 'CN12', 'CN14']) }),
+  // R11 (CN-B): contractor finance
+  t('time:works:contracts', 'Contracts', 'अनुबंध', 'Contract register: agreement, value, dates and extensions of time, LD clause, retention / SD / water and electricity %, JV share; billed and received to date, delay and LD exposure; the closure checklist.', 'When a contract is signed, extended or closed.', { statutory: ca(['CN11', 'CN27']) }),
+  t('time:works:advances', 'Advances', 'अग्रिम', 'Mobilisation and plant advances recovered from RA bills on the contract schedule with simple interest on the balance; secured advances on materials at site (a liability, recovered as used).', 'At each RA bill.', { statutory: ca(['CN7', 'CN8']) }),
+  t('time:works:escalation', 'Escalation', 'मूल्य परिवर्तन', 'Price variation by the contract formula (CPWD 10CC-type) from typed indices: a supplementary bill or a credit note, with the working printed as a page.', 'Each quarter or as the contract says.', { statutory: ca(['CN6']) }),
+  t('time:works:guarantees', 'Guarantees', 'गारंटी', 'Bank guarantees with expiry alerts, extensions, release and invocation; EMD and security deposits paid to clients.', 'When a guarantee is given, extended or released.', { statutory: ca(['CN13']) }),
   t('receivables:realty', 'Realty', 'रियल्टी', 'Builder desk: projects with RERA details, units, bookings, payment plans, stage demands and the RERA account.', 'Each booking and stage.', { statutory: ca(['CN18', 'CN21', 'CN25']) }),
   // R7 hotel (R7-A topics; R7-C added the HT ids). Working papers — verify with your CA.
   t('tables:frontdesk', 'Front desk', 'फ्रंट डेस्क', 'Hotel pack board: arrivals, in-house guests, due-outs and room status for the business date.', 'All day at the front desk.', {

@@ -11,7 +11,8 @@ import { num, round2 } from '../../lib/invoice-calc';
 import { localDb } from '../../lib/localDb';
 import { peekTable } from '../../lib/storage';
 import { raDueSplit } from '../../lib/works/ra-due';
-import { recordDeductionRow, recoverAdvance, releaseHeld } from '../../lib/works/ra-receivable';
+import { CLEARING_KINDS, recordDeductionRow, recoverAdvance, releaseHeld, type ClearingKind } from '../../lib/works/ra-receivable';
+import type { RaDeductionKind } from '../../types/transport-works-r5';
 import { B, errText, fmtMoney, today, type PanelProps } from '../transport/shared';
 import { F } from '../transport/Field';
 import controls from '../../styles/controls.module.css';
@@ -56,9 +57,9 @@ export function RetentionPanel({ notify, refresh, tick }: PanelProps) {
                     {split.held.length === 0 ? '—' : split.held.map((h) => (
                       <div key={h.kind} className={styles.toolbar}>
                         <span className={own.held} data-ra-held={h.kind}>{h.label}: {fmtMoney(h.amount)}{h.release_on ? ` · ${twT('releaseOn')} ${h.release_on}` : ''}</span>
-                        {(h.kind === 'gst_tds' || h.kind === 'labour_cess') && <button type="button" className={B.gs} onClick={() => run(() => recordDeductionRow(b.id, h.kind as 'gst_tds' | 'labour_cess', { date: f.day }))}>{twT('recordDeducted')}</button>}
+                        {CLEARING_KINDS.includes(h.kind as RaDeductionKind) && <button type="button" className={B.gs} onClick={() => run(() => recordDeductionRow(b.id, h.kind as ClearingKind, { date: f.day }))}>{twT('recordDeducted')}</button>}
                         {h.kind === 'advance_recovery' && <button type="button" className={B.gs} onClick={() => run(() => recoverAdvance(b.id, { date: f.day }))}>{twT('recoverAdvance')}</button>}
-                        {(h.kind === 'retention' || h.kind === 'security_deposit') && <button type="button" className={B.os} onClick={() => run(() => releaseHeld(b.id, h.kind as 'retention' | 'security_deposit', { date: f.day, amount: h.amount, method: f.method }))}><HandCoins size={14} aria-hidden="true" /> {twT('release')}</button>}
+                        {['retention', 'security_deposit', 'withheld', 'ld'].includes(h.kind) && <button type="button" className={B.os} onClick={() => run(() => releaseHeld(b.id, h.kind as 'retention' | 'security_deposit' | 'withheld' | 'ld', { date: f.day, amount: h.amount, method: f.method }))}><HandCoins size={14} aria-hidden="true" /> {twT('release')}</button>}
                       </div>
                     ))}
                   </td>

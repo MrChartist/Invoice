@@ -52,6 +52,8 @@ export function deductionNotes(deds: readonly RaDeduction[] | undefined, money: 
   const out = ['GST is charged on the full bill value; deductions do not reduce it.'];
   if (sum('gst_tds') > 0) out.push(`GST TDS u/s 51 (${money(sum('gst_tds'))}) to be deducted by the recipient — credit after GSTR-7.`);
   if (sum('labour_cess') > 0) out.push(`Labour cess deducted at source (${money(sum('labour_cess'))}).`);
+  // CN-B4: LD is not consideration for a supply (Circular 178/10/2022) — the bill's taxable value is unchanged.
+  if (sum('ld') > 0) out.push(`Liquidated damages (${money(sum('ld'))}) are not a supply (Circular 178/10/2022 — verify with your CA); GST stays on the full value.`);
   return out;
 }
 

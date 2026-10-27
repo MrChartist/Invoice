@@ -7,7 +7,7 @@ export { WorksHeaderBlock } from './WorksHeaderBlock';
 export { RaItemsTable } from './RaItemsTable';
 export { WorksDeductionsBlock } from './WorksDeductionsBlock';
 export { WorksAbstractPage } from './WorksAbstractPage';
+export { PvWorkingPage } from './PvWorkingPage';
 
-/** CN-B3 / CN-C3 placeholders: render nothing until those packages replace them. */
-export const PvWorkingPage = (_: { invoice: unknown }) => null;
+/** CN-C3 placeholder: renders nothing until that package replaces it. */
 export const DemandBlock = (_: { invoice: unknown }) => null;

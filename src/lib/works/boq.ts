@@ -16,7 +16,7 @@ import { localDb } from '../localDb';
 import { ruleAt } from '../tax-rules';
 import { WORKS_CONTRACT_RATE_RULES } from '../transport-works-rules';
 
-export const DEDUCTION_KINDS = ['retention', 'advance_recovery', 'it_tds', 'gst_tds', 'labour_cess', 'security_deposit', 'ld', 'other'] as const;
+export const DEDUCTION_KINDS = ['retention', 'advance_recovery', 'it_tds', 'gst_tds', 'labour_cess', 'security_deposit', 'ld', 'other', 'water_power'] as const; // R11 (CN-B4): water & electricity %
 
 type BoqDoc = Pick<InvoiceRecord, 'id' | 'doc_type' | 'status'>;
 export const isBoqDoc = (d: BoqDoc): boolean => (d.doc_type === 'SALES_ORDER' || d.doc_type === 'QUOTATION') && d.status !== 'Cancelled';

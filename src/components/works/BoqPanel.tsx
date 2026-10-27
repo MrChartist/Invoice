@@ -1,5 +1,6 @@
 /** R5-B4: the BOQ (a sales order) — item numbers, terms and deductions; import a BOQ from CSV / XLSX. */
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { FileSpreadsheet, Ruler } from 'lucide-react';
 import { twT } from '../../i18n/areas/packs-transport-works-r5';
 import type { InvoiceRecord } from '../../types/invoice';
@@ -54,7 +55,7 @@ export function BoqPanel({ boq, notify, refresh, tick, onCreated }: PanelProps &
     <div className={styles.stack}>
       {boq ? (
         <>
-          <h3 className={styles.toolbar}><Ruler size={16} aria-hidden="true" /> {boq.invoice_number} · {boq.client?.name} · {twT('contractValue')} {fmtMoney(contractValue(boq))}</h3>
+          <h3 className={styles.toolbar}><Ruler size={16} aria-hidden="true" /> {boq.invoice_number} · {boq.client?.name} · {twT('contractValue')} {fmtMoney(contractValue(boq))} <Link className={B.gs} to={`/time?tab=works&view=contracts&boq=${boq.id}`} data-boq-contract>{twT('view.contracts')}</Link></h3>
           <div className={surface.tableWrap}>
             <table className={surface.table}>
               <thead><tr><th>{twT('itemNo')}</th><th>{twT('description')}</th><th>{twT('unit')}</th><th className={surface.numeric}>{twT('boqQty')}</th><th className={surface.numeric}>{twT('rate')}</th><th>HSN / SAC</th></tr></thead>
