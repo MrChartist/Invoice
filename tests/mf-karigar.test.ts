@@ -16,7 +16,7 @@ import { loadVouchers } from '../src/lib/ledger/vouchers.ts';
 import { readPurchase, supplierPayable } from '../src/lib/purchase-normalize.ts';
 import { karigarBalance, karigarOf, pieceLines, rateFor } from '../src/lib/mfg/mf-karigar.ts';
 import { advanceLedgerId, advanceOutstanding, draftPieceBill, payAdvance, pieceOf, pieceUploadRows, removePieceBill, savePieceBill, slipText } from '../src/lib/mfg/mf-piece-bill.ts';
-import type { MfKarigar } from '../src/lib/mfg/mf-c-pending.ts';
+import type { MfKarigar } from '../src/types/mfg-r13.ts';
 import type { Vendor } from '../src/types/purchases.ts';
 import type { MaterialIn } from '../src/types/job-work.ts';
 

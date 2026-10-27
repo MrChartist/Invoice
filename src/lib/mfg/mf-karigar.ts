@@ -13,7 +13,7 @@ import type { MaterialIn } from '../../types/job-work';
 import { num, round2 } from '../invoice-calc';
 import { readPurchase, supplierPayable } from '../purchase-normalize';
 import { cmtPieces, cmtTag } from './mf-cmt';
-import type { CutPlan, MfKarigar, MfPieceLine } from './mf-c-pending';
+import type { CutPlan, MfKarigar, MfPieceLine } from '../../types/mfg-r13';
 
 export const ADVANCE_LEDGER = 'Karigar advances';
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase();

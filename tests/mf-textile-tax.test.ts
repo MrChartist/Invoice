@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { bandMemo, classNotice, classRate, textileClassAt, TEXTILE_CLASSES } from '../src/lib/mfg/mf-textile-tax.ts';
-import { TEXTILE_CLASS_RULES } from '../src/lib/mfg/mf-c-pending.ts';
+import { TEXTILE_CLASS_RULES } from '../src/lib/mfg-rules.ts';
 import type { StockItem } from '../src/lib/inventory.ts';
 
 test('MMF fibre 18 → 5 and MMF yarn 12 → 5 from 22 Sep 2025; cotton yarn / fabric 5; job-work classes', () => {

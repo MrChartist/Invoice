@@ -4,7 +4,7 @@
  */
 import { useMemo, useState } from 'react';
 import type { MfgContext } from '../manufacturing/context';
-import type { CutPlan } from '../../lib/mfg/mf-c-pending';
+import type { CutPlan } from '../../types/mfg-r13';
 import { consumption, issueCutFabric, loadCutPlans, piecesTotal, removeCutPlan, returnEndBits, saveCutPlan, suggestLays, writeCutWaste } from '../../lib/mfg/mf-cutplans';
 import { fabricFor, styleAxes, styleItems, styleOf } from '../../lib/mfg/mf-styles';
 import { productionOrdersDb } from '../../lib/production/orders';

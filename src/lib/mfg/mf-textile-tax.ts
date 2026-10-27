@@ -9,7 +9,8 @@ import type { StockItem } from '../inventory';
 import { num } from '../invoice-calc';
 import { ruleAt } from '../tax-rules';
 import { bandAt, bandRate } from '../retail/rt-bands';
-import { TEXTILE_CLASS_RULES, type TextileClass, type TextileClassId } from './mf-c-pending';
+import { TEXTILE_CLASS_RULES } from '../mfg-rules';
+import type { TextileClass, TextileClassId } from '../mfg-rules';
 import { styleAxes } from './mf-styles';
 
 export const TEXTILE_CLASSES = Object.keys(TEXTILE_CLASS_RULES) as TextileClassId[];

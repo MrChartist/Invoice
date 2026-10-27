@@ -4,12 +4,13 @@
  * default size ratio and the routing). A production order of a style takes a size × colour grid (`ProductionOrder.mf.grid`)
  * whose cells sum to the planned quantity; each cell is a variant child. Pure, except `saveStyle` (`master.edit`).
  */
+import './mf-registry';
 import type { StockItem } from '../inventory';
 import { getTable, setTable } from '../storage';
 import { requireAccess } from '../access';
 import { num } from '../invoice-calc';
 import { gridAxes, gridCells } from '../retail/rt-matrix';
-import type { MfStyle } from './mf-c-pending';
+import type { MfStyle } from '../../types/mfg-r13';
 
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase();
 const SIZE = /^(size|साइज़|sz)$/i;

@@ -121,7 +121,7 @@ export default function CmtView({ ctx }: { ctx: MfgContext }) {
         <F label={gT('to')} w={160}><In type="date" v={to} set={setTo} /></F>
         <span>{gT('scrapInPeriod', { q: x.scrapInPeriod })}</span>
       </div>
-      <Grid attr="itc04-recon" head={[gT('party'), gT('sent'), gT('back'), gT('balance'), gT('oldest'), gT('expired')]} rows={x.byParty.map((r) => [r.party, n2(r.sent), n2(r.back), n2(r.balance), r.oldest || '—', r.expired])} />
+      <Grid attr="itc04-recon" head={[gT('party'), gT('sent0'), gT('back'), gT('balance'), gT('oldest'), gT('expired')]} rows={x.byParty.map((r) => [r.party, n2(r.sent), n2(r.back), n2(r.balance), r.oldest || '—', r.expired])} />
       {x.idle.length > 0 && <p data-mfc-idle>{gT('idle')}: {x.idle.map((r) => r.number).join(', ')}</p>}
     </section>
   );

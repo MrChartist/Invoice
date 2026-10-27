@@ -5,6 +5,7 @@
  * place, WIP by size, finished, rejected. Finished bundles are reported as R4-A output journals — one per variant child
  * (size × colour), tagged with the order — so the stock engine sees ordinary manufacturing journals. Pure above "Storage".
  */
+import './mf-registry';
 import type { StockItem, StockInputs } from '../inventory';
 import { generateId } from '../storage';
 import { requireAccess } from '../access';
@@ -14,7 +15,7 @@ import { bomsDb, manufacturingDb, MFG_TABLE } from '../manufacturing';
 import { buildOutputVoucher, loadOrderDocs, orderProgress, productionOrdersDb, ORDERS_TABLE } from '../production/orders';
 import { childFor } from './mf-styles';
 import { cutPlanOf, loadCutPlans as getPlans, putPlan } from './mf-cutplans';
-import type { CutPlan, MfBundle, MfBundleStep } from './mf-c-pending';
+import type { CutPlan, MfBundle, MfBundleStep } from '../../types/mfg-r13';
 
 export const DEFAULT_BUNDLE_SIZE = 12;
 export const bundleId = (lot: string, no: number) => `${lot}/${no}`;

@@ -14,7 +14,7 @@ import { readPurchase, readPurchaseLines } from '../purchase-normalize';
 import { isRevenueDoc } from '../stats';
 import { isNonGstFinancialNote } from '../financial-note';
 import { ruleAt } from '../tax-rules';
-import { RULE_89_5_RULES } from './mf-c-pending';
+import { RULE_89_5_RULES } from '../mfg-rules';
 import { saveRefund, type GstRefundClaim } from '../gst-cash-refunds';
 
 /** Pre-fill a DRAFT refund claim (category `INVERTED_DUTY`) in the existing register; split CGST / SGST — edit the heads there. */

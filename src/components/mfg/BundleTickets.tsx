@@ -1,7 +1,7 @@
 /** MF-C2 bundle tickets: QR of `<lot>/<no>`, lot, style, size, colour, pieces, and tear-off coupons per operation — 8 or 12 per A4. */
 import { useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import type { CutPlan } from '../../lib/mfg/mf-c-pending';
+import type { CutPlan } from '../../types/mfg-r13';
 import { bundleId, livePieces } from '../../lib/mfg/mf-bundles';
 import { printHtmlDocument } from '../../lib/voucher-print';
 import { downloadText } from '../../lib/download';

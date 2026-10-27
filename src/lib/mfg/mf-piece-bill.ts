@@ -11,6 +11,7 @@
  *  - Pay: the existing purchase payment / bank upload file (`cycleUploadRows` shape) and a WhatsApp slip.
  * Deleting a bill goes through `purchasesDb.remove` (recycle bin) with its journal; the KPB number stays used.
  */
+import './mf-registry';
 import type { PurchaseRecord, Vendor } from '../../types/purchases';
 import { generateId } from '../storage';
 import { num, round2 } from '../invoice-calc';
@@ -24,9 +25,11 @@ import { A, chartOf, loadUserAccounts, saveUserAccount } from '../ledger/account
 import { deleteVoucher, loadVouchers, saveVoucher, VOUCHERS_TABLE } from '../ledger/vouchers';
 import { cycleUploadRows, type UploadRow } from '../bank-upload';
 import { ADVANCE_LEDGER, karigarBalance } from './mf-karigar';
-import { MF_C_SERIES, TEXTILE_CLASS_RULES, type MfPieceBill, type MfPieceLine } from './mf-c-pending';
+import { MF_SERIES } from './mf-shared';
+import { TEXTILE_CLASS_RULES } from '../mfg-rules';
+import type { MfPieceBill, MfPieceLine } from '../../types/mfg-r13';
 
-export const KPB = MF_C_SERIES.pieceBills;
+export const KPB = MF_SERIES.pieceBills;
 export const PIECE_CATEGORY = 'Job work charges (karigars)';
 
 /** The piece-bill part of a purchase row. */

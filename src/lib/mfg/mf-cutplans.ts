@@ -6,6 +6,7 @@
  * return, cut waste = a stock journal tagged with the order (fabric metres → the waste item's kg). Cut pieces are not
  * stock until finished (WIP); bundles (`mf-bundles.ts`) track them. Pure above "Storage".
  */
+import './mf-registry';
 import type { StockItem, StockInputs } from '../inventory';
 import { generateId, getTable, setTable } from '../storage';
 import { requireAccess } from '../access';
@@ -15,10 +16,11 @@ import { nextSeriesNumberFor, numberFitsFy, recordSeries } from '../series-count
 import { withTablesRollback } from '../table-txn';
 import { productionOrdersDb, ORDERS_TABLE } from '../production/orders';
 import { SJ_TABLE, stockJournalsDb } from '../manufacturing';
-import { MF_C_SERIES, MF_C_TABLES, type CutPlan, type MfLay } from './mf-c-pending';
+import { MF_SERIES, MF_TABLES } from './mf-shared';
+import type { CutPlan, MfLay } from '../../types/mfg-r13';
 
-export const CUT = MF_C_SERIES.cutPlans;
-const T = MF_C_TABLES.cutPlans;
+export const CUT = MF_SERIES.cutPlans;
+const T = MF_TABLES.cutPlans;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 export const r3 = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000 || 0;
 

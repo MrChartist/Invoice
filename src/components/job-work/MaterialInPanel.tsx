@@ -219,6 +219,7 @@ function InModal({ data, doc, onClose }: { data: JwData; doc: MaterialIn | null;
         )}
         <p className={styles.section}>{jwT('losses')}</p>
         <JwLinesGrid lines={losses} items={tracked} onChange={setLosses} opts={{ label: jwT('losses'), batch: anyBatch, challans, units: data.units, serials: 'out', serialPool }} />
+        {losses.length > 0 && <label className={styles.muted}><input type="checkbox" checked={losses.some((l) => l.mf?.scrap_at_jw)} onChange={(e) => setLosses(losses.map((l) => ({ ...l, mf: { ...l.mf, scrap_at_jw: e.target.checked || undefined } })))} data-jw-scrap-at-jw /> {jwT('scrapAtJw')}</label>}
         <p className={styles.section}>{jwT('supplied')}</p>
         <p className={styles.muted}>{jwT('supplyHint')}</p>
         <JwLinesGrid lines={supplied} items={tracked} onChange={setSupplied} opts={{ ...grid, label: jwT('supplied'), challans, serials: 'out', serialPool }} />

@@ -13,7 +13,7 @@ import { clearOverrides } from '../src/lib/period-lock.ts';
 import { godownsDb } from '../src/lib/godowns.ts';
 import { productionOrdersDb } from '../src/lib/production/orders.ts';
 import { challanBalances, ensureJobWorkerGodown, materialInDb, materialOutDb } from '../src/lib/job-work.ts';
-import { cmtInDraft, cmtOutLine, cmtPieces, challanBundles } from '../src/lib/mfg/mf-cmt.ts';
+import { cmtInDraft, cmtOutLine, cmtPieces, challanBundles, receiveCmt, sendCmt } from '../src/lib/mfg/mf-cmt.ts';
 import { moveBundles, saveBundles } from '../src/lib/mfg/mf-bundles.ts';
 import { cutPlanOf, putPlan } from '../src/lib/mfg/mf-cutplans.ts';
 import { lotWithOrder, SIZES } from './helpers/garments.ts';
@@ -57,4 +57,17 @@ test('CMT in by bundle: good → variant children, rejected → fabric back, sho
   const pos = new Map(loadPositions().map((x) => [x.item.id, x.qty]));
   assert.equal(pos.get('kt-S-Blue'), 34, 'stitched pieces in stock once');
   assert.throws(() => cmtInDraft(out, line.id, cutPlanOf(plan.id)!, stockDb.items().find((i) => i.id === 'kt')!, stockDb.items(), [{ no: 9, good: 1, rejected: 0 }]), /not sent/);
+});
+
+test('sendCmt / receiveCmt: one Material Out and one Material In, bundles at the fabricator then back; scrap kept by him is a tagged loss', () => {
+  const { plan } = lotWithOrder();
+  saveBundles(plan.id, 12, SIZES);
+  const vendor = { id: 'k9', name: 'Salim Fabricators' };
+  const out = sendCmt(plan.id, [5, 6], { date: '2026-10-13', vendor, perPieceM: 1.2 }, stockDb.items());
+  assert.deepEqual(cutPlanOf(plan.id)!.bundles!.filter((b) => b.at.where === 'fabricator').map((b) => b.no), [5, 6]);
+  const { inn, draft } = receiveCmt(out.id, out.lines[0].id, [{ no: 5, good: 12, rejected: 0 }, { no: 6, good: 11, rejected: 1, reason: 'Stain' }], { date: '2026-10-18', rate: 38, scrapM: 0.5 }, stockDb.items());
+  assert.deepEqual([draft.good, draft.charges, inn.losses?.[0].mf?.scrap_at_jw], [23, 874, true]);
+  const p = cutPlanOf(plan.id)!;
+  assert.deepEqual(p.bundles!.filter((b) => [5, 6].includes(b.no)).map((b) => [b.at.where, b.rejected ?? 0]), [['floor', 0], ['floor', 1]]);
+  assert.match(p.bundles![4].history[0].jc_entry_id ?? '', /^cmt:/, 'the step points at the receipt, so the karigar ledger counts it once');
 });

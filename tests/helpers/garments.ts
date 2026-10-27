@@ -5,7 +5,7 @@ import { bomsDb } from '../../src/lib/manufacturing.ts';
 import { productionOrdersDb } from '../../src/lib/production/orders.ts';
 import { liveTrackingInputs } from '../../src/lib/stock-tracking.ts';
 import { issueCutFabric, saveCutPlan } from '../../src/lib/mfg/mf-cutplans.ts';
-import type { CutPlan } from '../../src/lib/mfg/mf-c-pending.ts';
+import type { CutPlan } from '../../src/types/mfg-r13.ts';
 
 export const SIZES = ['S', 'M', 'L', 'XL'];
 export function kurta(): StockItem {

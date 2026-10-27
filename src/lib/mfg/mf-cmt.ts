@@ -7,6 +7,7 @@
  *    short (pending on the challan, flagged per bundle); job charges = good × piece rate.
  * Sec 143 clocks and ITC-04 keep working on the fabric metres. Pure.
  */
+import './mf-registry';
 import type { JobWorkLine, JobWorkReceiptLine, MaterialIn, MaterialOut } from '../../types/job-work';
 import type { Vendor } from '../../types/purchases';
 import type { StockItem } from '../inventory';
@@ -20,7 +21,7 @@ import { productionOrdersDb } from '../production/orders';
 import { bundleId, livePieces, moveBundles, parseBundleId, recordStep } from './mf-bundles';
 import { cutPlanOf, loadCutPlans, putPlan } from './mf-cutplans';
 import { childFor } from './mf-styles';
-import type { CutPlan } from './mf-c-pending';
+import type { CutPlan } from '../../types/mfg-r13';
 
 /** The CMT tag of a job-work line (`JobWorkLine.mf`), read defensively. */
 export interface CmtTag { lot?: string; bundles?: string[]; pieces?: number; scrap_at_jw?: boolean }
@@ -132,6 +133,11 @@ export function receiveCmt(outId: string, lineId: string, receipts: readonly Bun
   if (!out || !p || !parent) throw new Error('CMT challan or lot not found.');
   const d = cmtInDraft(out, lineId, p, parent, items, receipts, { rate: x.rate });
   const line = out.lines.find((l) => l.id === lineId)!;
+  // Scrap the fabricator keeps is part of the fabric the good pieces used: it comes off the consumed line.
+  if (num(x.scrapM) > 0) {
+    if (!d.consumed.length || num(x.scrapM) >= num(d.consumed[0].qty)) throw new Error('Scrap kept by the fabricator must be less than the fabric of the good pieces.');
+    d.consumed[0] = { ...d.consumed[0], qty: r3(num(d.consumed[0].qty) - num(x.scrapM)) };
+  }
   const losses = num(x.scrapM) > 0 ? [{ id: generateId(), item_id: line.item_id, qty: r3(num(x.scrapM)), out_line_id: lineId, mf: { scrap_at_jw: true } } as JobWorkLine] : [];
   return withTablesRollback([JOB_WORK_TABLES.in, 'cut_plans', 'series_counters'], () => {
     const inn = materialInDb.save({ date: x.date, party_name: out.party_name, ...(out.vendor_id ? { vendor_id: out.vendor_id } : {}), ...(out.party_gstin ? { party_gstin: out.party_gstin } : {}), job_worker_godown: out.job_worker_godown, order_id: out.order_id, consumed: d.consumed, received: d.received, ...(losses.length ? { losses } : {}), ...(d.charges ? { charges: d.charges } : {}) }, items);
