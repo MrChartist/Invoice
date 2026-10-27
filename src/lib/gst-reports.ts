@@ -786,9 +786,12 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
   if (charge.size) calc.lines.forEach((l, k) => { if (charge.has(l.id)) lines[k] = { ...lines[k], qty: 0, uqc: lines.find((g, j) => !charge.has(calc.lines[j].id) && g.hsn === l.hsn)?.uqc ?? lines[k].uqc }; });
   // QA8 T9: a pure-agent (Rule 33) reimbursement is not a supply — out of Table 8, 3.1(c) and the HSN summary.
   const agent = new Set((rec.items ?? []).filter(isPureAgentLine).map((i) => i.id));
-  if (agent.size) {
-    for (let k = lines.length - 1; k >= 0; k--) if (agent.has(calc.lines[k].id)) lines.splice(k, 1);
-    push('info', 'PURE_AGENT', 'pure-agent reimbursement line(s) (Rule 33) are left out of the supply value, Table 8 and the HSN summary; they stay in the invoice value — verify with your CA.');
+  // QA10 R4: the margin scheme's purchase-value line (Rule 32(5)) is no supply of its own — only the margin is reported.
+  const marginCost = new Set((rec.items ?? []).filter(isMarginCostLine).map((i) => i.id));
+  if (agent.size || marginCost.size) {
+    for (let k = lines.length - 1; k >= 0; k--) if (agent.has(calc.lines[k].id) || marginCost.has(calc.lines[k].id)) lines.splice(k, 1);
+    if (agent.size) push('info', 'PURE_AGENT', 'pure-agent reimbursement line(s) (Rule 33) are left out of the supply value, Table 8 and the HSN summary; they stay in the invoice value — verify with your CA.');
+    if (marginCost.size) push('info', 'MARGIN_SCHEME', 'margin scheme (Rule 32(5)): the used goods\' purchase value is left out of the supply value, Table 8, 3.1(c), the HSN summary and the Rule 42 exempt turnover; only the margin is reported as a taxable supply — verify with your CA.');
   }
   // Taxable freight / other charges: part of the principal supply's value, so no quantity of its own.
   if (calc.charges_line) lines.push({ ...toPLine(calc.charges_line), qty: 0 });
@@ -850,6 +853,12 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
 
 const taxOf = (l: PLine) => l.igst + l.cgst + l.sgst;
 /** A nil / exempt / non-GST line: no rate, no tax and no cess. */
+/**
+ * QA10 (R4): the purchase-value ("cost") line of a margin-scheme sale (Rule 32(5), RT-D3). The value of supply is the
+ * margin alone, so this line is NOT a nil-rated / exempt supply: it is left out of the rates, Table 8, HSN, 3.1(a) / (c)
+ * and so the Rule 42 / 43 exempt turnover (it stays in the invoice value). Verify with your CA.
+ */
+export const isMarginCostLine = (l: { margin?: { part?: string } } | null | undefined): boolean => l?.margin?.part === 'cost';
 const isNilLine = (l: PLine) => l.rate <= 0 && taxOf(l) === 0 && l.cess === 0;
 
 /**

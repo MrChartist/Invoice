@@ -62,3 +62,6 @@ export function registerRetailTables(): void {
 }
 
 registerRetailTables();
+
+// QA10 (R6 / R8): a bill deleted / cancelled frees its exchange receipts and cancels its finance DO (`voidHook`).
+import './rt-doc-hooks';

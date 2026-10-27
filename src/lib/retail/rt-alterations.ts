@@ -62,9 +62,20 @@ export function billedJobs(jobs: readonly AlterationJob[], invoices: readonly In
   return out;
 }
 
+/**
+ * QA10 R16: a slip's tailor bill still exists (the draft, or the bill it was posted as — same id). A stamp whose draft was
+ * discarded / bill deleted no longer bills the slip: it can be billed again and deleted.
+ */
+export function tailorBilled(j: Pick<AlterationJob, 'tailor_bill_id'>, bills: { drafts: readonly { id: string }[]; purchases: readonly { id: string }[] } = liveBills()): boolean {
+  const id = j.tailor_bill_id;
+  return !!id && (bills.drafts.some((d) => d?.id === id) || bills.purchases.some((p) => p?.id === id));
+}
+const liveBills = () => ({ drafts: getTable<{ id: string }>('purchase_drafts'), purchases: getTable<{ id: string }>('purchases') });
+
 /** The tailor's delivered, unpaid jobs delivered in [from, to], as bill lines at the tailor's rates (no GST). */
 export function tailorJobs(jobs: readonly AlterationJob[], tailorId: string, from: string, to: string): AlterationJob[] {
-  return jobs.filter((j) => j.tailor_id === tailorId && j.status === 'delivered' && !j.tailor_bill_id && num(j.tailor_rate) > 0 && (j.delivered_on ?? j.due) >= from && (j.delivered_on ?? j.due) <= to);
+  const bills = jobs.some((j) => j.tailor_bill_id) ? liveBills() : { drafts: [], purchases: [] };
+  return jobs.filter((j) => j.tailor_id === tailorId && j.status === 'delivered' && !tailorBilled(j, bills) && num(j.tailor_rate) > 0 && (j.delivered_on ?? j.due) >= from && (j.delivered_on ?? j.due) <= to);
 }
 
 export function tailorBillLines(jobs: readonly AlterationJob[], newId: () => string): PurchaseLine[] {
@@ -140,7 +151,7 @@ export function deleteAlteration(id: string): void {
   const all = loadAlterations();
   const job = all.find((j) => j.id === id);
   if (!job) return;
-  if (job.tailor_bill_id) throw new Error('The tailor has been billed for this slip; delete the tailor bill first.');
+  if (tailorBilled(job)) throw new Error('The tailor has been billed for this slip; delete the tailor bill first.');
   assertUnlocked({ id, issue_date: job.date, invoice_number: job.number }, 'delete');
   setTable(ALTERATION_TABLE, all.filter((j) => j.id !== id));
 }

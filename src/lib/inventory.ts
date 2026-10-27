@@ -564,7 +564,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
         batch: line.batchNo || undefined,
         mfg: line.mfgDate || undefined,
         expiry: line.expiryDate || undefined,
-        mrp: line.mrp || undefined,
+        mrp: line.mrp ? line.mrp / line.unitFactor : undefined, // QA10 R11: typed per line unit (strip), kept per base unit
         serials: line.serials.length ? line.serials : undefined,
         refNumber: bill.number,
         party: bill.partyName,

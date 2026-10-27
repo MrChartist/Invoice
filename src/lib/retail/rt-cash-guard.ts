@@ -2,7 +2,7 @@
  * Cash and PAN guards (generic, not pack-gated; `retail_settings.cash_guard`: off / warn / block — the electronics profile
  * sets *warn*, jewellery *block*; `require_pan`). Built by RT-D for the electronics counter and the buy-back cash payment;
  * RT-E adds the PAN prompt, the PMLA note, the live counter / editor guards and the jewellery e-Way note on top of it.
- *  - Receipts: cash tenders on one bill ≥ ₹2 lakh, or cash from the same customer on the same day ≥ ₹2 lakh →
+ *  - Receipts: cash on one bill ≥ ₹2 lakh (whatever the days, QA10), or cash from the same customer on the same day ≥ ₹2 lakh →
  *    "Sec 269ST" (refunds and cash we PAY for a used device / old gold are not receipts).
  *  - Payments: cash paid to one person in a day above ₹10,000 for a buy-back / old gold → "Sec 40A(3)" warning.
  *  - Rule 114B (RT-E): a sale above ₹2 lakh (any mode) needs the customer's PAN or a Form 60 / 97 declaration.
@@ -25,14 +25,16 @@ export const cashReceiptLimit = (date?: string): number => ruleAt(CASH_RECEIPT_L
 export const cashPaymentLimit = (date?: string): number => ruleAt(CASH_PAYMENT_LIMIT_RULES, date);
 
 const isCash = (m: unknown) => String(m ?? '').trim().toLowerCase() === 'cash';
+/** A cash RECEIPT: refunds (negative rows) and no-cash rows (exchange, advance …) never count (QA10 R13: one rule). */
+const isReceipt = (p: Payment) => isCash(p.method) && num(p.amount) > 0 && !movedNoCash(p);
 const who = (c: InvoiceRecord['client'] | undefined) => (c?.id ? `id:${c.id}` : `n:${String(c?.name ?? '').trim().toLowerCase()}|${String(c?.phone ?? '').replace(/\D/g, '')}`);
 
-/** Cash already received on `day` from the bill's customer (other bills; walk-ins without a name never aggregate). */
+/** Cash already received on `day` from the bill's customer (other bills; walk-ins without a name never aggregate). Receipts only (QA10 R13). */
 export function sameDayCash(client: InvoiceRecord['client'] | undefined, day: string, invoices: readonly InvoiceRecord[], payments: readonly Payment[], excludeInvoiceId?: string): number {
   if (!client?.id && !String(client?.name ?? '').trim()) return 0;
   const key = who(client);
   const mine = new Set(invoices.filter((i) => i.id !== excludeInvoiceId && i.status !== 'Cancelled' && who(i.client) === key).map((i) => i.id));
-  return round2(payments.filter((p) => mine.has(p.invoice_id) && p.date === day && isCash(p.method) && !movedNoCash(p)).reduce((s, p) => s + num(p.amount), 0));
+  return round2(payments.filter((p) => mine.has(p.invoice_id) && p.date === day && isReceipt(p)).reduce((s, p) => s + num(p.amount), 0));
 }
 
 /** Sec 269ST check on a bill's cash (`cash`) plus the customer's other cash that day; null when fine or the guard is off. */
@@ -60,12 +62,18 @@ export const maskPan = (s: string): string => s.replace(/^(.{5}).{4}/, '$1****')
 
 const digits = (s: unknown) => String(s ?? '').replace(/\D/g, '').slice(-10);
 
-/** Cash already received on `date` from the customer of `rec` (this bill too, or the same client id / phone) — receipts only. */
+/**
+ * Cash already received that counts with new cash on `rec` (Sec 269ST), the larger of (QA10 R10):
+ *  - the customer's cash on `date` (this bill too, or the same client id / phone) — "from one person in a day";
+ *  - this bill's own cash on ANY day — "in respect of a single transaction".
+ * Receipts only. The POS strip and the payment dialog both use it (QA10 R13).
+ */
 export function cashFromCustomer(payments: readonly Payment[], invoices: readonly InvoiceRecord[], rec: Pick<InvoiceRecord, 'id' | 'client'>, date: string): number {
   const id = rec.client?.id;
   const phone = digits(rec.client?.phone);
   const mine = new Set(invoices.filter((i) => i && ((rec.id && i.id === rec.id) || (id && i.client?.id === id) || (phone.length === 10 && digits(i.client?.phone) === phone))).map((i) => i.id));
-  return round2(payments.filter((p) => mine.has(p.invoice_id) && p.date === date && isCash(p.method) && num(p.amount) > 0 && !movedNoCash(p)).reduce((s, p) => s + num(p.amount), 0));
+  const sum = (pick: (p: Payment) => boolean) => round2(payments.filter((p) => pick(p) && isReceipt(p)).reduce((s, p) => s + num(p.amount), 0));
+  return Math.max(sum((p) => mine.has(p.invoice_id) && p.date === date), rec.id ? sum((p) => p.invoice_id === rec.id) : 0);
 }
 
 /** Sec 269ST (RT-D's check) and the PMLA note on a sale: `cashNow` on this bill + `earlier` cash from the customer that day. */
@@ -77,10 +85,13 @@ export function cashGuards(mode: GuardMode | undefined, date: string, cashNow: n
   return out;
 }
 
+/** Rule 114B: PAN / Form 60 needed — an amount EXCEEDING the limit (a sale, or an old-gold voucher, QA10 R14). */
+export const panNeeded = (amount: number, date?: string): boolean => num(amount) > ruleAt(PAN_SALE_LIMIT_RULES, date);
+
 /** Rule 114B on a sale above the limit: PAN or Form 60 / 97 (an error with *Require PAN*, else a warning). */
 export function panGuard(total: number, date: string, kyc: SaleKyc | undefined, require: boolean): Guard | null {
   const limit = ruleAt(PAN_SALE_LIMIT_RULES, date);
-  if (!(num(total) > limit) || validPan(kyc?.pan) || kyc?.form === '60' || kyc?.form === '97') return null;
+  if (!panNeeded(total, date) || validPan(kyc?.pan) || kyc?.form === '60' || kyc?.form === '97') return null;
   return { level: require ? 'error' : 'warn', message: `A sale above ₹${limit.toLocaleString('en-IN')} needs the customer's PAN or a Form 60 / 97 declaration (Rule 114B) — verify with your CA.` };
 }
 
