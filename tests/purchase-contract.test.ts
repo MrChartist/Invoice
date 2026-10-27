@@ -969,3 +969,16 @@ test('R11 (CN-D) site readers read the real bill shape: labour holds, plant-hire
   const p = sitePnl({ boq, period: { start: '2026-04-01', end: '2027-03-31' }, invoices: [], purchases: [lab, { ...bill, id: 'o', cost_centre_id: 'cc' }, { ...bill, id: 'x' }, { ...bill, id: 'v', status: 'void', cost_centre_id: 'cc' }], vouchers: [], payments: [], measurements: [], material: new Map(), internal: new Map(), sites: [], logs: [], compliance: [] });
   assert.deepEqual([p.costs.labour, p.costs.other], [1000, 1000], 'ITC taken: cost = taxable; untagged and void bills left out');
 });
+
+test('R12 (AG-B2 / B3) pooled milk cycle purchase: the stock reader skips its lines (milk came in per shift); books / GST / exports read it once', async () => {
+  const cyb: PurchaseRecord = {
+    ...bill, id: 'cyb', vendor_gstin: undefined, bill_number: 'CYB/FY26-27/0001', category: 'Milk purchases', itc_eligible: false, cgst: 0, sgst: 0, igst: 0, taxable: 34000, total: 34000,
+    lines: [{ id: 'lm', name: 'Cow milk', hsn: '0401', unit: 'LTR', quantity: 1000, rate: 34, tax_rate: 0 }], ag: { cycle_id: 'c1', stock_by_shift: true },
+  };
+  const items = [{ id: 'm', name: 'Cow milk', hsn: '0401', unit: 'LTR', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }];
+  assert.equal(collectEvents({ items, moves: [], invoices: [], purchases: [cyb] } as never).get('m')?.length ?? 0, 0, 'no second receipt');
+  assert.equal(collectEvents({ items, moves: [], invoices: [], purchases: [{ ...cyb, ag: { cycle_id: 'c1' } }] } as never).get('m')?.[0]?.qty, 1000, 'without the flag it is stock');
+  for (const n of [booksNormalize(cyb as never), exportNormalize(cyb), gstNormalize(cyb, '27')]) assert.equal(n!.taxable, 34000);
+  const { closeMilkCycle } = await import('../src/lib/agri/ag-milk-cycle.ts');
+  assert.equal(typeof closeMilkCycle, 'function');
+});

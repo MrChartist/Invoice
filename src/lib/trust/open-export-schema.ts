@@ -235,6 +235,11 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   labour_compliance: 'Labour-contractor PF / ESI / wage-register proof per month (R11).', site_labour: 'Daily-wage site workers with rates (R11).',
   muster_days: 'Site attendance, one row per site per day, and the weekly settlement (MUS/FY…, R11).', hired_equipment: 'Equipment hired in, with rate, basis and operator flag (R11).',
   plant_logs: 'Daily plant log sheets: hours, idle, breakdown, fuel, hire out (PLG/FY…, R11).',
+  // R12-B
+  milk_rate_charts: 'Fat / SNF milk rate charts: basis (matrix, kg fat, kg solids, two-axis, flat), steps and rates, minimums, add-ons, effective dates, buyer (R12).',
+  milk_shifts: 'Milk collection, one row per centre per date per shift: each can with farmer, quantity, fat, SNF, CLR, chart, rate, amount, rejection (R12).',
+  milk_dispatches: 'Milk dispatches to the union / plant (MDS/FY…): tanker, sent and received quantity / fat / SNF, acknowledgement, bill (R12).',
+  milk_cards: 'Household milk cards, one row per customer per month: rate, daily default, day-wise quantities, bill (R12).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';

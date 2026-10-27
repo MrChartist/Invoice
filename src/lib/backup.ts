@@ -489,6 +489,8 @@ const RECORD_TABLES = [
   // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
   // (MUS settlements), hired equipment, plant log sheets (PLG)
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
+  // R12-B: dairy — rate charts, shift collection (one row per centre per shift), milk dispatches (MDS/FY…), milk cards
+  'milk_rate_charts', 'milk_shifts', 'milk_dispatches', 'milk_cards',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -575,6 +577,8 @@ const ID_TABLES = new Set([
   // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
   // (MUS settlements), hired equipment, plant log sheets (PLG)
   'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
+  // R12-B: dairy — rate charts, shift collection (one row per centre per shift), milk dispatches (MDS/FY…), milk cards
+  'milk_rate_charts', 'milk_shifts', 'milk_dispatches', 'milk_cards',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

@@ -64,6 +64,7 @@ import './hotel/hotel-registry'; // R7: hotel tables' rights and audit labels (l
 import './retail/rt-registry'; // R9: retail tables' rights and audit labels (lazy registration)
 import './construction/cn-registry'; // R11: construction tables' rights and audit labels (lazy registration)
 import './services/sv-registry'; // R10: service tables' rights and audit labels (lazy registration)
+import './agri/ag-registry'; // R12: agri tables' rights and audit labels (lazy registration)
 
 export const [SYNC_STATE_KEY, SYNC_CONFLICTS_KEY, SYNC_AUDIT_KEY] = SYNC_META_KEYS;
 
@@ -426,6 +427,10 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}sub_measurements`]: 'date',
   [`${DB_PREFIX}muster_days`]: 'date',
   [`${DB_PREFIX}plant_logs`]: 'date',
+  // R12-B: rate charts (by effective date), milk shifts, milk dispatches
+  [`${DB_PREFIX}milk_rate_charts`]: 'effective_from',
+  [`${DB_PREFIX}milk_shifts`]: 'date',
+  [`${DB_PREFIX}milk_dispatches`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -1031,6 +1036,8 @@ const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = 
   [`${DB_PREFIX}sub_work_orders`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}sub_measurements`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}plant_logs`]: { num: 'number', date: 'date' },
+  // R12-B: milk dispatches (MDS/FY…)
+  [`${DB_PREFIX}milk_dispatches`]: { num: 'number', date: 'date' },
   // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
   // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };
