@@ -1,6 +1,5 @@
 /**
- * MF-C1 styles: a style is a stock item with size × colour `variant_axes` (8.85 variants, R9 `rt-matrix.ts` grid read
- * only) plus `StockItem.mf.style` (fabric per piece — by colour when the colour map names another fabric — trims, the
+ * MF-C1 styles: a style is a stock item with size × colour `variant_axes` (8.85 variants, the R9 grid's axes) plus `StockItem.mf.style` (fabric per piece — by colour when the colour map names another fabric — trims, the
  * default size ratio and the routing). A production order of a style takes a size × colour grid (`ProductionOrder.mf.grid`)
  * whose cells sum to the planned quantity; each cell is a variant child. Pure, except `saveStyle` (`master.edit`).
  */
@@ -9,8 +8,12 @@ import type { StockItem } from '../inventory';
 import { getTable, setTable } from '../storage';
 import { requireAccess } from '../access';
 import { num } from '../invoice-calc';
-import { gridAxes, gridCells } from '../retail/rt-matrix';
+import { cleanAxes } from '../variants';
 import type { MfStyle } from '../../types/mfg-r13';
+
+const gridAxes = (p: Pick<StockItem, 'variant_axes'>) => cleanAxes(p.variant_axes ?? []);
+/** Variant parents with a grid (as `rt-matrix.ts` `gridParents`, without loading the R9 module). */
+export const gridParents = (all: readonly StockItem[]): StockItem[] => all.filter((i) => !i.variant_of && gridAxes(i).length > 0).sort((a, b) => a.name.localeCompare(b.name));
 
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase();
 const SIZE = /^(size|साइज़|sz)$/i;
@@ -33,7 +36,7 @@ export function styleAxes(parent: Pick<StockItem, 'variant_axes'>): { size: stri
 /** The variant child of a size and colour (undefined when it does not exist yet). */
 export function childFor(parent: StockItem, all: readonly StockItem[], size: string, colour: string): StockItem | undefined {
   const ax = styleAxes(parent);
-  return gridCells(parent, all).find((c) => norm(c.attrs[ax.size]) === norm(size) && (!ax.colour || norm(c.attrs[ax.colour]) === norm(colour)))?.child;
+  return all.find((c) => c.variant_of === parent.id && norm(c.variant_attrs?.[ax.size]) === norm(size) && (!ax.colour || norm(c.variant_attrs?.[ax.colour]) === norm(colour)));
 }
 
 /** Fabric of a colour: its item and the standard metres per piece. */

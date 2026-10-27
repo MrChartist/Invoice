@@ -70,3 +70,13 @@ test('finished bundles → one output journal per variant child, tagged with the
   assert.equal(orderProgress(o, loadOrderDocs()).output, 36);
   assert.throws(() => reportFinished(plan.id, '2026-10-14', stockDb.items(), liveTrackingInputs()), /No finished/);
 });
+
+test('demo garments block: a style with 15 variants, one lot of 300 pieces in 10 bundles, 2 karigars — only with the garments pack', async () => {
+  const { mfgExtras } = await import('../src/lib/demo/profile-mfg.ts');
+  const t = mfgExtras({ today: '2026-10-27', base: {} as never, packs: ['shopfloor', 'garments'] }).tables as Record<string, { id: string; variant_of?: string }[]>;
+  assert.equal(t.stock_items.filter((i) => i.variant_of === 'demo-style-kt22').length, 15);
+  const lot = t.cut_plans[0] as never;
+  assert.deepEqual([lotStatus(lot).cut, lotStatus(lot).bundled, (lot as { bundles: unknown[] }).bundles.length], [300, 300, 10]);
+  assert.equal(t.vendors.length, 2);
+  assert.equal(mfgExtras({ today: '2026-10-27', base: {} as never, packs: ['shopfloor'] }).tables?.cut_plans, undefined);
+});

@@ -3,7 +3,7 @@
  * (good = its pieces unless edited; rejects leave it with a reason), lot status, report finished bundles as output, print
  * the tickets (QR + tear-off coupons per operation).
  */
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { MfgContext } from '../manufacturing/context';
 import { loadCutPlans } from '../../lib/mfg/mf-cutplans';
 import { bundleId, livePieces, lotStatus, reportFinished, saveBundles, scanStep, DEFAULT_BUNDLE_SIZE } from '../../lib/mfg/mf-bundles';
@@ -12,11 +12,11 @@ import { karigars } from '../../lib/mfg/mf-karigar';
 import { vendorsDb } from '../../lib/vendors';
 import { num } from '../../lib/invoice-calc';
 import { ScanField } from '../scan/ScanField';
+import BundleTickets from './BundleTickets';
 import { gT } from '../../i18n/areas/mfg-r13c';
 import { Btn, F, Grid, In, Sel } from './garments-ui';
 import { opts, ratioText, row, run, stack, today } from './garments-util';
 
-const BundleTickets = lazy(() => import('./BundleTickets'));
 
 export default function BundlesView({ ctx }: { ctx: MfgContext }) {
   const plans = useMemo(() => (void ctx.version, loadCutPlans()), [ctx.version]);
@@ -73,7 +73,7 @@ export default function BundlesView({ ctx }: { ctx: MfgContext }) {
           `${gT(`w.${b.at.where}` as 'w.floor')}${b.at.op ? ` · ${b.at.op}` : ''}`, b.history.at(-1) ? `${b.history.at(-1)!.date} ${b.history.at(-1)!.op ?? ''}` : '—',
         ])} />
       </>}
-      {tickets && p && <Suspense fallback={null}><BundleTickets plan={p} styleName={ctx.items.find((i) => i.id === p.style_id)?.name ?? ''} onClose={() => setTickets(false)} /></Suspense>}
+      {tickets && p && <BundleTickets plan={p} styleName={ctx.items.find((i) => i.id === p.style_id)?.name ?? ''} onClose={() => setTickets(false)} />}
     </section>
   );
 }

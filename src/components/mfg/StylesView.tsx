@@ -1,8 +1,7 @@
 /** MF-C1 Garments → Styles: a variant parent's fabric per piece (by colour), default ratio and textile class; the band memo. */
 import { useMemo, useState } from 'react';
 import type { MfgContext } from '../manufacturing/context';
-import { gridParents } from '../../lib/retail/rt-matrix';
-import { saveStyle, styleAxes, styleOf } from '../../lib/mfg/mf-styles';
+import { gridParents, saveStyle, styleAxes, styleOf } from '../../lib/mfg/mf-styles';
 import { bandMemo, TEXTILE_CLASSES } from '../../lib/mfg/mf-textile-tax';
 import { num } from '../../lib/invoice-calc';
 import { todayInput } from '../../lib/utils';
