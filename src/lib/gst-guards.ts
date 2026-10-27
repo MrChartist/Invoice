@@ -227,7 +227,8 @@ export { isOwnGstin } from './gstin';
 
 export type GstExceptionCode = 'IRN_MISSING' | 'IRP_WINDOW_CLOSED' | 'B2B_NO_HSN' | 'POS_STATE_MISMATCH' | 'RATE_NOT_IN_SLABS' | 'B2CL_EDGE' | 'OWN_GSTIN' | 'BAND_RATE' | 'BAND_EDGE' | 'BAND_DISCOUNT'
   | 'SV_RATE_OLD' | 'SV_NIL_NOT_EXEMPT' // R10 (SV-A4)
-  | 'AG_CLASS_RATE'; // R12 (AG-A3)
+  | 'AG_CLASS_RATE' // R12 (AG-A3)
+  | 'PS_PURE_AGENT_OLD'; // R14 (PS-B1)
 
 export interface GstException {
   code: GstExceptionCode;
@@ -272,6 +273,9 @@ export const setSvExceptionCheck = (fn: BandCheck): void => { svCheck = fn; };
 // R10 (SV-A4): a service company (profile or pack) loads the service hooks once — no shared chunk, nothing for others.
 const svOn = ((s) => !!s?.service_kind || (Array.isArray(s?.industry_packs) && s.industry_packs.some((p) => p === 'clinic' || p === 'salon' || p === 'fitness' || p === 'workshop')))(getJson<{ service_kind?: unknown; industry_packs?: unknown } | null>(SINGLETON_KEYS.settings, null));
 if (svOn) void import('./services/sv-hooks').then((m) => { svCheck ??= m.svExceptions; }, () => undefined);
+// R14 (PS-B1): pure-agent lines of invoices issued before the fix (still nil-rated) — service companies only.
+let psCheck: BandCheck | null = null;
+if (svOn || getJson<{ business_type?: unknown } | null>(SINGLETON_KEYS.settings, null)?.business_type === 'services') void import('./prof/ps-disb-guard').then((m) => { psCheck ??= m.psExceptions; }, () => undefined);
 // R12 (AG-A3): agri-class rate notice — one lazy check, loaded for an agri company (profile or `agri` pack) only.
 let agCheck: BandCheck | null = null;
 if (((s) => !!s?.agri_kind || (Array.isArray(s?.industry_packs) && s.industry_packs.includes('agri')))(getJson<{ agri_kind?: unknown; industry_packs?: unknown[] } | null>(SINGLETON_KEYS.settings, null))) void import('./agri/ag-hooks').then((m) => { agCheck ??= m.agExceptions; }, () => undefined);
@@ -324,6 +328,7 @@ export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOp
     for (const b of bandCheck?.(inv) ?? []) push(b.code, 'warning', b.vars);
     for (const b of svCheck?.(inv) ?? []) push(b.code, 'warning', b.vars); // R10 (SV-A4)
     for (const b of agCheck?.(inv) ?? []) push(b.code, 'warning', b.vars); // R12 (AG-A3)
+    for (const b of psCheck?.(inv) ?? []) push(b.code, 'warning', b.vars); // R14 (PS-B1)
   }
   const rank = (e: GstException) => (e.severity === 'error' ? 0 : 1);
   return out.sort((a, b) => rank(a) - rank(b) || a.date.localeCompare(b.date) || a.number.localeCompare(b.number));

@@ -26,6 +26,10 @@ export function psBoxes(ps: PsSnapshot): PsBox[] {
     rows: rows([
       ['Matter', m ? `${m.code} — ${m.name}` : undefined], ['Court / forum', m?.court], ['Case no.', m?.case_no],
       ['Engagement', e ? `${e.number} · ${MODEL_LABEL[e.model] ?? e.model}` : undefined], ['Billing basis', ps.basis],
+      // PS-B: the advocate's enrolment, the design stage and the media commission
+      ['Enrolment no.', ps.legal?.enrolment ? `${ps.legal.enrolment}${ps.legal.bar_council ? ` · ${ps.legal.bar_council}` : ''}` : undefined],
+      ['Stage', ps.stage?.no ? `${ps.stage.no} of ${ps.stage.of}${ps.stage.label ? ` — ${ps.stage.label}` : ''}` : undefined],
+      ['Media commission', ps.media?.commission_pct ? `${ps.media.commission_pct}%` : undefined],
       // PS-C: purpose code and the export check
       ['Purpose code', ps.purpose_code], ['Export check', ps.export?.checks?.length ? `${ps.export.checks.filter((c) => c.ok).length} / ${ps.export.checks.length} conditions` : undefined],
       ['EDF', ps.export?.edf_no ? `${ps.export.edf_no}${ps.export.edf_date ? ` · ${ps.export.edf_date}` : ''}` : undefined],
@@ -52,6 +56,12 @@ export function psAnnexure(inv: Pick<InvoiceRecord, 'ps' | 'annexure'>): PsSecti
     }
     out.push({ title: 'Time by timekeeper', head: ['Timekeeper', 'Hours', 'Rate', 'Amount'], rows: [...by].map(([k, x]) => [k, round2(x.min / 60), x.rates.size === 1 ? [...x.rates][0] : 'Various', round2(x.amt)]) });
   }
-  // PS-B: disbursement schedule, stage computation, media schedule (add their sections here)
+  // PS-B: the stage computation and the media schedule (from the snapshot; the disbursement lines print as items)
+  const st = inv.ps?.stage;
+  if (st?.project_cost) {
+    const cum = round2((num(st.project_cost) * num(st.fee_pct) * num(st.stage_pct)) / 10000);
+    out.push({ title: 'Stage computation', head: ['Project cost', 'Fee %', 'Stage % (cumulative)', 'Cumulative fee', 'Billed before', 'This bill'], rows: [[num(st.project_cost), num(st.fee_pct), num(st.stage_pct), cum, num(st.billed_before), round2(cum - num(st.billed_before))]] });
+  }
+  if (inv.ps?.media?.rows?.length) out.push({ title: 'Media schedule', head: ['RO', 'Medium', 'Publication / platform', 'Date', 'Amount'], rows: inv.ps.media.rows.map((r) => [r.ro, r.media, r.edition ?? '', r.date ?? '', round2(num(r.amount))]) });
   return out;
 }

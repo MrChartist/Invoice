@@ -99,6 +99,7 @@ export const ggT = defineArea(
     exSvRateOld: '{name}: GST {rate}% but this service class is {want}% without ITC on this date (rate looks old) — verify with your CA.', // R10 (SV-A4)
     exAgClass: '{name}: GST {rate}% differs from its agri class ({want}% on this date) — your typed rate is kept; verify with your CA ({ca}).', // R12 (AG-A3)
     exSvNil: '{name}: a 0% line of an exempt service class without the exempt mark is reported as nil-rated — set Exempt on the line.',
+    exPsPureAgent: '{n} pure-agent reimbursement line(s) issued before the fix are reported as nil-rated; the invoice is not changed — verify with your CA (PS3).', // R14 (PS-B1)
     sevError: 'Error',
     sevReview: 'Review',
     colSeverity: 'Severity',
@@ -264,6 +265,7 @@ export const ggT = defineArea(
     exSvRateOld: '{name}: GST {rate}% पर इस तारीख़ को यह सेवा वर्ग {want}% बिना ITC है (दर पुरानी लगती है) — अपने CA से जाँचें।',
     exAgClass: '{name}: GST {rate}% इसके कृषि वर्ग से अलग है (इस तारीख़ को {want}%) — आपकी लिखी दर रहेगी; अपने CA से जाँचें ({ca})।',
     exSvNil: '{name}: छूट वाले सेवा वर्ग की 0% पंक्ति पर "छूट" निशान नहीं है, इसलिए यह निल-रेटेड में जाती है — पंक्ति पर छूट चुनें।',
+    exPsPureAgent: 'सुधार से पहले जारी {n} शुद्ध एजेंट प्रतिपूर्ति पंक्ति(याँ) निल-रेटेड में दिखती हैं; बिल नहीं बदला जाता — अपने CA से जाँचें (PS3)।',
     sevError: 'त्रुटि',
     sevReview: 'जाँचें',
     colSeverity: 'गंभीरता',

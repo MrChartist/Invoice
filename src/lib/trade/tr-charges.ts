@@ -107,7 +107,7 @@ export function withCharges<L extends GoodsLine & { id?: string }>(
 ): L[] {
   const goods = lines.filter((l) => !l.charge_head_id);
   const b = chargeBase(goods);
-  const out = [...goods];
+  const out = [...goods, ...lines.filter((l) => l.charge_head_id === 'rule33')]; // R14 PS-B1: a pure-agent line, no head
   for (const h of [...heads].sort((x, y) => n(x.order) - n(y.order))) {
     if (!on.has(h.id)) continue;
     const c = chargeLine(h, b);
@@ -143,7 +143,7 @@ export function chargeRegister(period: { from: string; to: string }, data: { inv
     if (!date || date < period.from || date > period.to) return;
     const b = chargeBase(lines);
     for (const l of lines) {
-      if (!l.charge_head_id) continue;
+      if (!l.charge_head_id || l.charge_head_id === 'rule33') continue; // R14 PS-B1: a timesheet reimbursement is no charge head
       const h = heads.get(l.charge_head_id);
       rows.push({ side, date, number, party, head_id: l.charge_head_id, head: h?.name ?? l.name ?? '', base: h ? chargeAmount(h, b).base : 0, rate: n(h?.rate), amount: r2(n(l.quantity) * n(l.rate)) });
     }

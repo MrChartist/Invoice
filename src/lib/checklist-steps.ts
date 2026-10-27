@@ -31,7 +31,7 @@ export type StepKind =
   | PsStep;
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'feeSchedule', 'linkCompanies', 'partners', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'clientMoneyBank', 'stageTemplate', 'feeSchedule', 'linkCompanies', 'partners', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -128,7 +128,8 @@ export interface ChecklistFactsV3 {
 
 /** R14 (PS-A1): the professional steps, the kinds that have them and where each opens. */
 type PsStep = 'firstMatter' | 'staffCapacity' | 'enrolment' | 'conflictCheck'
-  | 'feeSchedule' | 'linkCompanies' | 'partners'; // R14 (PS-D): CA fee schedule and company links; partners of a firm
+  | 'feeSchedule' | 'linkCompanies' | 'partners'
+  | 'clientMoneyBank' | 'stageTemplate'; // R14 (PS-D): CA fee schedule and company links; partners of a firm
 const PS_STEPS: Readonly<Record<PsStep, [kinds: string, to: string]>> = {
   firstMatter: ['ca legal design consulting agency freelancer other', '/time?tab=matters&view=matters'],
   staffCapacity: ['ca legal design consulting agency freelancer other', '/time?tab=wip&view=utilisation'],
@@ -138,6 +139,9 @@ const PS_STEPS: Readonly<Record<PsStep, [kinds: string, to: string]>> = {
   feeSchedule: ['ca', '/time?tab=cadesk&view=fees'],
   linkCompanies: ['ca', '/time?tab=cadesk&view=fees'],
   partners: ['ca legal design consulting agency freelancer other', '/time?tab=firm&view=partners'],
+  // PS-B: a client-money account (law firm; skippable) and the stage template (design)
+  clientMoneyBank: ['legal', '/reconcile?tab=statements'],
+  stageTemplate: ['design', '/time?tab=matters&view=stages'],
 };
 const isPsStep = (k: string): k is PsStep => Object.hasOwn(PS_STEPS, k);
 
@@ -432,6 +436,8 @@ function profFacts(): Partial<Record<PsStep, number>> {
     feeSchedule: peekTable<{ ps?: { fee_event?: string } }>('items_catalog').filter((i) => i?.ps?.fee_event).length,
     linkCompanies: (ps as { ca?: { company_clients?: unknown[] } } | null)?.ca?.company_clients?.length ?? 0,
     partners: peekTable('partners').length,
+    clientMoneyBank: peekTable<{ client_money?: boolean }>('bank_accounts').filter((a) => a?.client_money).length, // PS-B
+    stageTemplate: peekTable<{ stage?: unknown }>('engagements').filter((e) => e?.stage).length,
   };
 }
 

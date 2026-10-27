@@ -318,6 +318,12 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'cafirm', path: '/time?tab=cadesk&view=events', labelKey: 'r14.cadesk.events' },
   { pack: 'cafirm', path: '/time?tab=cadesk&view=fees', labelKey: 'r14.cadesk.fees' },
   { pack: 'cafirm', path: '/time?tab=cadesk&view=udin', labelKey: 'r14.cadesk.udin' },
+  // PS-B: the client-money desk (legal; CA firms too) and the design stages view of the Matters desk
+  { pack: 'legal', alsoPacks: ['cafirm'], path: '/time?tab=clientmoney', labelKey: 'r14.cm' },
+  { pack: 'legal', alsoPacks: ['cafirm'], path: '/time?tab=clientmoney&view=ledger', labelKey: 'r14.cm.ledger' },
+  { pack: 'legal', alsoPacks: ['cafirm'], path: '/time?tab=clientmoney&view=reconcile', labelKey: 'r14.cm.reconcile' },
+  { pack: 'legal', alsoPacks: ['cafirm'], path: '/time?tab=clientmoney&view=statements', labelKey: 'r14.cm.statements' },
+  { pack: 'design', path: '/time?tab=matters&view=stages', labelKey: 'r14.matters.stages' },
 ];
 
 /**

@@ -246,6 +246,8 @@ const OWNED_VOUCHERS: readonly { classes: readonly string[]; tables: readonly st
   { classes: ['Karigar advance recovery'], tables: ['purchases'], redo: 'restore the piece bill itself, or make the bill again in Manufacturing → Garments → Karigars' },
   // R14-D: partners' year-end appropriation and monthly credits are undone on their run
   { classes: ['Partners appropriation', 'Partner credit'], tables: ['partner_runs'], redo: 'restore the partner posting itself, or post it again in Time → Firm' },
+  // R14 (PS-B3): client-money journals are undone with their CMV voucher
+  { classes: ['Client money'], tables: ['client_money'], redo: 'record the entry again in Time → Client money' },
 ];
 const RA_CLASS = 'RA deduction';
 /** Journals paired one-to-one with a no-cash receipt row through `ra_journal_id` (R9 RT-D2: the finance transfer). */
@@ -393,6 +395,9 @@ registerRestoreHook('purchases', (row, _e, live, bin) => {
   const piece = isObj(row.mf) && str(row.mf.kind) === 'piece_bill' && isObj(row.mf.piece) ? row.mf.piece : undefined;
   return piece ? companionOr(live, bin, 'vouchers', str(piece.advance_jv_id), 'The advance-recovery journal of this piece bill is gone for good. Make the piece bill again in Manufacturing → Garments → Karigars.') : null;
 });
+// R14 (PS-B3): a client-money voucher's journal and office receipt went with it — record it again (balances move on).
+registerRestoreHook('client_money', () => ({ refuse: 'Its journal (and any office receipt) went with it. Record the entry again in Time → Client money.' }));
+registerRestoreHook('transactions', (row, e, live) => (/^CMV\//.test(str(row.reference)) && !mentions(live('client_money'), e.row_id) ? { refuse: 'This receipt moved client money to fees; that entry was deleted. Record it again in Time → Client money.' } : null));
 registerRestoreHook('process_runs', (row, _e, live, bin) => companionOr(live, bin, 'manufacturing_vouchers', str(row.voucher_id), 'The manufacturing journal of this run is gone for good. Record the run again in Manufacturing → Moulding.'));
 registerRestoreHook('realty_units', (row, _e, live) => (isLive(live, 'realty_projects', str(row.project_id)) ? null : { refuse: 'The project of this unit is gone. Restore the project first.' }));
 // R11 (CN-D): a sub-contractor bill made from a measurement comes back only while that measurement still names it

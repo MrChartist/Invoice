@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { Pencil, Plus, Search, Store, Trash2 } from 'lucide-react';
 import type { MsmeCategory, PurchaseRecord, Vendor } from '../../types/purchases';
 import { INDIAN_STATES, stateByCode } from '../../lib/india-states';
@@ -24,6 +24,9 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import tabStyles from './VendorsTab.module.css';
+
+// R14 (PS-B2): "advocate / firm of advocates" tick (inward reverse charge on legal services) — one lazy row.
+const VendorAdvocateRow = lazy(() => import('../prof/PartyRows').then((m) => ({ default: m.VendorAdvocateRow })));
 
 export interface VendorsTabProps {
   vendors: Vendor[];
@@ -228,6 +231,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
           <input id="v-udyam" className={controls.input} placeholder="UDYAM-MH-01-0000001" value={draft.msme_udyam ?? ''} onChange={(e) => set({ msme_udyam: e.target.value })} />
         </div>
       </div>
+      <Suspense fallback={null}><VendorAdvocateRow value={draft as { ps?: unknown }} onChange={(p) => set(p as Partial<Vendor>)} /></Suspense>
       <fieldset className={tabStyles.bankSet}>
         <legend className={controls.label}>{wireT('vendorBank')}</legend>
         <div className={controls.row}>

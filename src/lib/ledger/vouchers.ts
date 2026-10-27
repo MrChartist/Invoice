@@ -287,6 +287,8 @@ const OWNED_JOURNALS: Readonly<Record<string, readonly [string, (r: Record<strin
   'Secured advance': ['secured_advances', (r, id) => r?.voucher_id === id, 'delete the secured advance in Time → Works → Advances'],
   // QA16 P4: a grant's recognition / receipt journal stays while its incentive claim counts it as posted.
   'Government grant': ['incentive_claims', (r, id) => Array.isArray(r?.voucher_ids) && r.voucher_ids.includes(id), 'the incentive claim in Manufacturing → Statutory → Incentives records it as posted; reverse it with a journal'],
+  // R14 (PS-B3): a client-money journal goes only with its CMV voucher (Time → Client money → Delete).
+  'Client money': ['client_money', (r, id) => Array.isArray(r?.voucher_ids) && r.voucher_ids.includes(id), 'delete the client-money voucher in Time → Client money'],
   'Booking forfeiture': ['advances', (r, id) => Array.isArray(r?.forfeits) && r.forfeits.some((f: { journal_id?: string } | null) => f?.journal_id === id), 'it closed the buyer\'s advance when the booking was cancelled; reverse it with a journal'],
 };
 
