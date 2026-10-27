@@ -46,8 +46,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 11. Construction (Round 11, planned) | CN1–CN35 | 35 | 10 |
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84, AG90 | 65 | 15 |
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF40–MF42, MF50–MF54, MF60–MF65, MF80–MF82, MF90–MF96 | 60 | 12 |
-| 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS40 | 40 | 13 |
-| **Total** | | **464** | **119** |
+| 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS40, PS70–PS80 | 51 | 13 |
+| **Total** | | **475** | **119** |
 
 ---
 
@@ -936,7 +936,7 @@ e-way bills and ITC-04, MSME (Udyam, 43B(h), Form-1), export authorisations, inc
 `MF` ids are counted once here. The ★ items (MF1, MF3, MF5, MF6, MF7, MF9, MF16, MF19, MF20, MF24, MF25) are the ones a
 beta factory's figures depend on first.
 
-## 14. Professional and knowledge-services firms (Round 14, ids PS1–PS40)
+## 14. Professional and knowledge-services firms (Round 14, ids PS1–PS40, PS70–PS80)
 
 Added with `docs/prd/round-14.md`. It covers CA / CS / CMA firms (client billing beside the practice desk), advocates and
 law firms, architects and interior designers, consulting and IT / software agencies (including exports of services),
@@ -1027,6 +1027,22 @@ exports of services under the FEMA 2026 regulations, 194J / 194T, partners and S
 | PS38 | **Equalisation levy and service-export incentives.** The 2 % levy on e-commerce operators ended on 1 Aug 2024 and the 6 % levy on online advertising on 1 Apr 2025; SEIS ended for exports from 1 Apr 2020 and nothing replaced it for services. The app has no module for either and says so in help for agencies and exporters. Agreed? | No module. | `help/topics-*.ts` | 2024-08-01; 2025-04-01 | Business Today, KNAV, Fox Mandal; mondaq, razorpay |
 | PS39 | **Purpose codes on export invoices.** The app prints the RBI purpose code the user picks (an editable short list for services, e.g. software consultancy, legal, accounting, advertising) with SWIFT / IBAN on export documents. Any objection to printing it on the invoice? | As stated; the list is an example. | `prof-rules.ts` `PURPOSE_CODE_EXAMPLES`; `templates/parts/ProfBlock.tsx` | — | Developers' reading |
 | PS40 | **Advocates' document types.** A registered advocate whose fee memo has only exempt lines issues a Bill of Supply; with reverse-charge lines a tax invoice showing "tax payable by the recipient"; an unregistered advocate a plain "Fee memo". Should a registered advocate's RCM invoice also go to e-Invoicing above the turnover limit? | As stated; e-Invoice by the existing rules. | `prof/ps-legal-paper.ts`; `rcm.ts` | — | Developers' reading |
+
+### 14.7 Added while building PS-D (the firm's statutory desk)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| PS70 | **194T codes.** The 26Q (Form 140) working paper shows section code `94T` for 194T rows and, from TY 2026-27, the label "Sec 393(1) [Table: entry to confirm] [old 194T] (verify with your CA)". Which RPU section code and which Sec 393 table entry are right? | Placeholder code `94T`; label marked verify. | `tds-rules.ts` (`194T` rows); `ita2025.ts` | 2025-04-01; 2026-04-01 | Not found in the sources read (PS19) |
+| PS71 | **Interest on drawings, product method.** Each drawing × the months left in the FY counting the month it was drawn (April = 12, March = 1) × the deed's rate ÷ 12. Some deeds count from the date (days) or the average-due-date method. Acceptable as the default? | As stated; the deed's rate per partner. | `prof/ps-partners.ts` `interestOnDrawings` | — | Developers' reading |
+| PS72 | **Interest on capital above 12 %.** When the deed allows more than 12 %, the app credits the deed's rate to the partner and shows the part above 12 % as disallowed (a note for the computation, no journal). Should it credit only 12 % instead? | Deed rate credited; excess shown. | `prof/ps-partner-run.ts` | 1997-04-01 | Sec 40(b)(iv) |
+| PS73 | **Book profit in the run.** Net profit per the ledger for the FY, plus partners' remuneration already credited in the year (monthly credits), less this run's interest on capital, plus interest on drawings, plus the user's listed adjustments (Explanation 3 items the app cannot know). Interest credited monthly stays deducted. Right? | As stated. | `prof/ps-partner-run.ts` `computeRun` | — | taxadda (40(b) conditions) |
+| PS74 | **"Maximum allowable" remuneration.** When the deed says "the maximum allowed under Sec 40(b)", the app gives working partners the allowable amount less any fixed / percentage remuneration of other working partners, shared in their profit-sharing ratio. Is the ratio split the usual reading of such deeds? | As stated; editable per partner by choosing a fixed amount. | `prof/ps-partner-run.ts` | — | Developers' reading |
+| PS75 | **194T at the year end.** The year-end run's remuneration + interest per partner is one credit dated 31 March; with the FY's monthly credits it is tested against ₹20,000 (catch-up on the crossing credit); the partner is treated as an individual deductee (a company or LLP as partner is not modelled). Right? | As stated. | `prof/ps-194t.ts`; `prof/ps-partner-post.ts` | 2025-04-01 | taxmann, L&S, tdsman |
+| PS76 | **Expected TDS on the fee note.** A new fee note to a client with a TDS default gets the section and rate filled once the client's FY fee base passes the threshold; the editor then computes TDS on the taxable value, which includes a pure-agent line, while the hint shows the amount on the fee base only (PS25). Should the editor's amount follow the fee base? | Section and rate filled; the user may adjust. | `components/prof/Tds194jHint.tsx`; `prof/ps-tds-recv.ts` | 2025-04-01 | Recalled (Circular 23/2017) |
+| PS77 | **Chase letters for Form 131 / 16A.** Certificates are chased per client × quarter from the date the certificate is due (15 days after the quarterly return due date: 15 Aug, 15 Nov, 15 Feb, 15 Jun), naming Form 131 from TY 2026-27 and Form 168 for the credit check. Right for the 2025 Act forms? | As stated. | `prof/ps-tds-recv.ts` `chaseList`, `chaseLetter` | 2026-04-01 | Rule 31 (recalled); `ita2025.ts` |
+| PS78 | **Cash share for 44ADA / Sec 58.** Cash receipts ÷ all receipts of the FY, counting receipts that moved money (advance adjustments, write-offs and other no-cash rows left out), foreign-currency receipts at the invoice's rate. Is "receipts in cash" the right base (rather than cash ÷ gross receipts on accrual), and does an advance received in cash count in its own year? | As stated. | `prof/ps-presumptive.ts` | 2023-04-01 | taxguru, cleartax (secondary) |
+| PS79 | **Billable compliance events.** GSTR-1 and IFF bill as "GSTR-1", GSTR-3B and CMP-08 as "GSTR-3B", GSTR-9 and GSTR-4 as "annual return"; a DSC is "renewed" in the month its validity starts; the monthly checklist bills once a month when any item is ticked. Any event a CA firm would bill differently (per GSTIN, per quarter)? | As stated; typed events for the rest. | `prof/ps-ca-events.ts` | — | Developers' reading |
+| PS80 | **UDIN on the fee note.** The UDIN of a certificate billed prints in the line's description and in the document's `ps` snapshot; a revoked UDIN is not offered for billing. Should a revoked UDIN already billed trigger a credit note prompt? | No prompt. | `prof/ps-udin.ts`; `prof/ps-ca-bill.ts` | 2019-02-01 | ICAI UDIN FAQs (Jul 2024) |
 
 `PS` ids are counted once here. The ★ items (PS1, PS3, PS4, PS5, PS6, PS12, PS15, PS18, PS20, PS22, PS23, PS26, PS27)
 are the ones a beta professional firm's figures depend on first.
