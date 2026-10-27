@@ -26,9 +26,25 @@ export const PHARMA_RETENTION_RULES: readonly RtRule<PharmaRetention>[] = [];
 export type PriceBandKind = 'apparel' | 'footwear' | 'made_ups';
 /** One band table: value per piece ≤ `upTo` → `rate`, else `above` (RT1, RT2). */
 export interface PriceBand { upTo: number; rate: number; above: number }
-export const PRICE_BAND_RULES: Readonly<Record<PriceBandKind, readonly RtRule<PriceBand>[]>> = { apparel: [], footwear: [], made_ups: [] };
+/** The comparison is ≤ (exactly ₹2,500 per piece → the lower rate), on the taxable value per piece / pair (RT1, RT2). */
+const APPAREL_BANDS: readonly RtRule<PriceBand>[] = [
+  { from: '2017-07-01', value: { upTo: 1000, rate: 5, above: 12 }, source: 'N 1/2017-CT(R) Sch I / II, chapters 61 / 62 / 63 (sale value ≤ ₹1,000 per piece) — from memory', verified: false },
+  { from: '2025-09-22', value: { upTo: 2500, rate: 5, above: 18 }, source: 'N 9/2025-CT(R) (56th GST Council): ≤ ₹2,500 per piece 5%, above 18% — as reported (accountune), notification not re-read', verified: false },
+];
+export const PRICE_BAND_RULES: Readonly<Record<PriceBandKind, readonly RtRule<PriceBand>[]>> = {
+  apparel: APPAREL_BANDS,
+  footwear: [
+    { from: '2017-07-01', value: { upTo: 500, rate: 5, above: 18 }, source: 'N 1/2017-CT(R), chapter 64 (≤ ₹500 per pair) — from memory', verified: false },
+    { from: '2018-07-27', value: { upTo: 1000, rate: 5, above: 18 }, source: 'N 18/2018-CT(R) (≤ ₹1,000 per pair) — from memory, low confidence', verified: false },
+    { from: '2025-09-22', value: { upTo: 2500, rate: 5, above: 18 }, source: 'N 9/2025-CT(R): ≤ ₹2,500 per pair 5%, above 18% — as reported (bata.com, leatherindia), notification not re-read', verified: false },
+  ],
+  // Made-ups (chapter 63) follow the apparel bands (RT1, unverified).
+  made_ups: APPAREL_BANDS.map((r) => ({ ...r, source: `${r.source}; made-ups as apparel (assumed)` })),
+};
 export interface AlterationRule { sac: string; rate: number }
-export const ALTERATION_RULES: readonly RtRule<AlterationRule>[] = [];
+export const ALTERATION_RULES: readonly RtRule<AlterationRule>[] = [
+  { from: '2017-07-01', value: { sac: '998821', rate: 5 }, source: 'Tailoring service SAC 998821 at 5% — developers\' reading (RT3), not confirmed', verified: false },
+];
 
 /* ── RT-D: electronics and mobiles ── */
 export const IMEI_CHECK_RULES: readonly RtRule<{ resaleCheckDays: number }>[] = [];
