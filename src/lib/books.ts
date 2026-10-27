@@ -507,7 +507,9 @@ export function buildVouchers(data: BooksData): Voucher[] {
       debit: 0,
       credit: amount,
       method: str(t.method) || 'Bank transfer',
-      account: accountForMethod(t.method),
+      // QA10 R3: COD cash a rider collected sits in "Cash with riders" until the rider settles; the settlement journal
+      // (Dr Cash) brings it into the cash book, so the receipt itself is in no cash / bank book.
+      account: t.rider_id && accountForMethod(t.method) === 'cash' ? undefined : accountForMethod(t.method),
       bank_account_id: accountForMethod(t.method) === 'bank' && t.bank_account_id ? t.bank_account_id : undefined,
       invoice_id: inv?.id,
       link: inv ? `/invoice/${inv.id}` : undefined,

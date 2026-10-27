@@ -26,6 +26,7 @@ import { useCreatorKeys, useUnsavedChangesWarning } from '../hooks/useCreatorKey
 import { useBottomBarInset } from '../hooks/useBottomBarInset';
 
 import { localDb } from '../lib/localDb';
+import { ensureRetailHooks } from '../lib/retail/ensure-hooks';
 import { snapshotLineImages } from '../lib/line-images'; // R3-C2
 import { useLivePreviewPane } from '../components/creator/live-preview-gate'; // R3-C1
 import { MetaSummary } from '../components/invoicing-ux/MetaSummary';
@@ -54,6 +55,9 @@ import { docLabel } from '../i18n/labels';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './InvoiceCreator.module.css';
+
+// QA10: release a retail bill's exchange receipts / finance DO on delete or cancel, even before any retail screen opened.
+ensureRetailHooks();
 
 // Lock banner (+ PIN dialog) and the saved toast only matter occasionally: keep them out of the entry chunk.
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
@@ -192,7 +196,7 @@ export function InvoiceCreator() {
           };
           // R9 (RT-A2): the MRP guard runs even without batch / serial / godown tracking (or agency lots).
           const found: ReturnType<typeof liveDocTrackingIssues> = ctx || st.items.some((i) => i.arrival_id) ? liveDocTrackingIssues(doc) : withMrpIssues({ errors: [], expired: [], warnings: [] }, liveMrpIssues(doc));
-          const rxErr = [...rxRequiredErrors({ ...doc, rx: now.rx }), ...[...saveGates].flatMap((g) => g({ ...doc, total: now.total, kyc: now.kyc }))]; // R9 (RT-B1) "Require prescription for H1 / X"; RT-E3 "Require PAN"
+          const rxErr = [...rxRequiredErrors({ ...doc, rx: now.rx }), ...[...saveGates].flatMap((g) => g({ ...doc, total: now.total, kyc: now.kyc, client: now.client }))]; // R9 (RT-B1) "Require prescription for H1 / X"; RT-E3 "Require PAN"
           const issues = rxErr.length ? { ...found, errors: [...found.errors, ...rxErr] } : found;
           // QA8 T15: only agency-lot errors left — the owner may sell anyway, with a reason (audited).
           const lotOnly = !!issues.lots?.length && issues.errors.every((e) => issues.lots!.includes(e));

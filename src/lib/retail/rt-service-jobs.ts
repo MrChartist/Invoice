@@ -24,6 +24,7 @@ import { calcInputFromRecord, calculateInvoice, num, round2 } from '../invoice-c
 import { requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
 import { generateId, getTable, setTable } from '../storage';
+import { withTablesRollback } from '../table-txn';
 import { nextSeriesNumberFor, recordSeries } from '../series-counters';
 import { localDb } from '../localDb';
 import { makeDraft } from '../../store/invoice-defaults';
@@ -162,7 +163,7 @@ export function updateJob(id: string, patch: Partial<Pick<ServiceJob, 'parts' | 
   requireAccess('doc.create');
   const all = loadJobs();
   const j = findJob(all, id);
-  if (j.invoice_id) throw new Error(`${j.number} is billed; edit the bill instead.`);
+  if (j.invoice_id || j.billed_on) throw new Error(`${j.number} is billed; edit the bill instead.`);
   const parts: ServicePart[] | undefined = patch.parts?.map((p) => ({ ...p, id: p.id || generateId(), qty: num(p.qty), rate: round2(num(p.rate)), tax_rate: num(p.tax_rate) }));
   if (parts?.some((p) => !p.name.trim() || !(p.qty > 0) || p.rate < 0)) throw new Error('Each part needs a name, a quantity and a rate.');
   const next: ServiceJob = { ...j, ...patch, ...(parts ? { parts } : {}), ...(patch.labour !== undefined ? { labour: round2(num(patch.labour)) } : {}), updated_at: new Date().toISOString() };
@@ -220,8 +221,10 @@ export function billJob(id: string, date: string): InvoiceRecord | undefined {
   const all = loadJobs();
   const j = findJob(all, id);
   if (j.invoice_id) throw new Error(`${j.number} is already billed (${j.invoice_number}).`);
+  if (j.billed_on) throw new Error(`${j.number} was already billed on ${j.billed_on} (nothing chargeable; warranty parts issued).`); // QA10 R9
   const lines = jobLines(j, date);
-  for (const m of warrantyMoves(j, date)) stockDb.addMove(m);
+  const issued = warrantyMoves(j, date);
+  for (const m of issued) stockDb.addMove(m);
   let saved: InvoiceRecord | undefined;
   if (lines.length) {
     const settings = localDb.settings.get();
@@ -240,7 +243,9 @@ export function billJob(id: string, date: string): InvoiceRecord | undefined {
     }
     saved = localDb.invoices.getById(saved.id) ?? saved;
   }
-  write(loadJobs().map((x) => (x.id === id ? { ...x, ...(saved ? { invoice_id: saved.id, invoice_number: saved.invoice_number } : {}), updated_at: new Date().toISOString() } : x)));
+  // QA10 R9: stamped billed even with nothing chargeable (a zero-value record), so the warranty parts never issue twice.
+  const stamp = { billed_on: date, ...(issued.length ? { warranty_move_ids: issued.map((m) => m.id) } : {}), ...(saved ? { invoice_id: saved.id, invoice_number: saved.invoice_number } : {}) };
+  write(loadJobs().map((x) => (x.id === id ? { ...x, ...stamp, updated_at: new Date().toISOString() } : x)));
   return saved;
 }
 
@@ -252,7 +257,12 @@ export function deleteJob(id: string): void {
   if (!j) return;
   if (j.invoice_id) throw new Error('This job is billed; cancel the bill first.');
   assertUnlocked({ id, issue_date: j.date, invoice_number: j.number }, 'delete');
-  write(all.filter((x) => x.id !== id));
+  if (j.billed_on) assertUnlocked({ id, issue_date: j.billed_on, invoice_number: j.number }, 'delete');
+  // QA10 R9: an all-warranty job's part issues go with it (recycle bin; restored with the job).
+  withTablesRollback([SERVICE_TABLE, 'stock_moves'], () => {
+    for (const mv of j.warranty_move_ids ?? []) stockDb.deleteMove(mv);
+    write(all.filter((x) => x.id !== id));
+  });
 }
 
 /** `wa.me` status update (undefined without a phone); the user taps it, nothing is sent. */

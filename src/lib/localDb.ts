@@ -44,7 +44,7 @@ import { binRows } from './audit-edits';
 import { receivableTotal } from './rcm';
 import { isRevenueDoc } from './stats';
 import { linkedCredits, settledStatus, type CreditLinkRow } from './amount-due';
-import { assertNotPendingApproval, holdIfApprovalNeeded, holdIfCreditBlocked } from './approval-gate';
+import { assertNotPendingApproval, holdIfApprovalNeeded, holdIfCreditBlocked, voidHook } from './approval-gate';
 import {
   PeriodLockedError,
   SETTINGS_OVERRIDE,
@@ -495,6 +495,7 @@ export const localDb = {
       if (stored) requireAccess(isIssued(stored) ? 'doc.deleteIssued' : 'doc.deleteDraft');
       if (stored) checkDocRight(currentActor(), stored.doc_type, 'delete');
       const overridden = stored ? assertUnlocked(stored, 'delete') === 'overridden' : false;
+      voidHook.f?.(stored);
       const payments = getTable<Payment>(KEYS.transactions);
       const own = payments.filter((t) => t.invoice_id === id);
       assertNoBreakage(own);

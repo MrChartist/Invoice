@@ -41,7 +41,7 @@ import { isoDay } from './dates';
 import { depreciationSchedule, loadAssets } from './ledger/assets';
 import { loadVouchers } from './ledger/vouchers';
 import { inBooks, reversalOf } from './ledger/voucher-variants';
-import { inRange, normalizePurchase, toPaise, type DateRange } from './export-shared';
+import { inRange, normalizePurchase, toPaise, urdCreditorLedger, type DateRange } from './export-shared';
 import { PURCHASE_RETURNS_LEDGER } from './tally-debit-notes';
 
 export interface TallyBooksSource {
@@ -227,7 +227,8 @@ export function booksVouchers(
   const bills = new Map<string, ReturnType<typeof normalizePurchase>>();
   for (const raw of base.purchases) {
     const n = normalizePurchase(raw, base.vendors);
-    if (n) bills.set(n.id, n);
+    const urd = n && urdCreditorLedger(raw, base.vendors); // QA10 R5: a URD voucher's own creditor ledger
+    if (n) bills.set(n.id, urd ? { ...n, partyName: urd } : n);
   }
   const seq = new Map<string, number>();
   const rows = (src.purchasePayments ?? [])

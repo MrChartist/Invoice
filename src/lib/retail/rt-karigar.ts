@@ -11,7 +11,9 @@
  *
  * Labour: SAC 9988 job work at 5% when the karigar is registered (GSTIN), nil and no RCM when not (RT20). ITC-04 / the
  * job-work challan stay opt-in through the existing job-work model; this ledger says "ITC-04 may apply". Metal with a
- * karigar stays in stock valuation (wip godown, RT21). Working paper — verify with your CA.
+ * karigar stays in stock valuation (wip godown, RT21); QA10 R2: a receipt brings the pieces (or tags) in at the consumed
+ * metal's average cost, split by fine weight (tags by net weight) — labour stays an expense through its bill. Working
+ * paper — verify with your CA.
  */
 import './rt-registry';
 import type { KarigarLine, KarigarMove } from '../../types/retail-r9';
@@ -21,12 +23,13 @@ import { requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
 import { generateId, getTable, setTable } from '../storage';
 import { nextSeriesNumberFor, recordSeries } from '../series-counters';
-import { stockDb } from '../inventory';
+import { loadPositions, stockDb } from '../inventory';
 import { godownsDb, MAIN_GODOWN_ID } from '../godowns';
 import { draftsDb } from '../purchase-drafts';
 import { RT_SERIES, RT_TABLES } from './rt-shared';
 import { r3 } from './rt-jewel-rates';
 import { addTags, loadTags, type TagInput } from './rt-jewel-tags';
+import type { JewelTag } from '../../types/retail-r9';
 
 export const KARIGAR_TABLE = RT_TABLES.karigarMoves;
 const DAY = 86400000;
@@ -88,10 +91,28 @@ export function karigarGodown(k: Pick<Vendor, 'id' | 'name'>): string {
   return (godownsDb.list().find((g) => g.kind === 'wip' && g.vendor_id === k.id) ?? godownsDb.save({ name: `Karigar — ${k.name}`, kind: 'wip', job_worker: true, vendor_id: k.id })).id;
 }
 
-function move(itemId: string, date: string, qty: number, godown: string, note: string): string {
+function move(itemId: string, date: string, qty: number, godown: string, note: string, rate = 0): string {
   const id = generateId();
-  stockDb.addMove({ id, item_id: itemId, date, qty: r3(qty), rate: 0, kind: 'adjustment', godown_id: godown, note });
+  stockDb.addMove({ id, item_id: itemId, date, qty: r3(qty), rate: rate > 0 ? Number(rate.toFixed(6)) : 0, kind: 'adjustment', godown_id: godown, note });
   return id;
+}
+
+/** Average cost per unit of an item now (the stock engine's position), 0 when unknown. */
+function unitCost(itemId: string | undefined): number {
+  if (!itemId) return 0;
+  const p = loadPositions().find((x) => x.item.id === itemId);
+  return p && p.qty > 0 ? p.value / p.qty : num(p?.avgCost);
+}
+
+/**
+ * QA10 R2: the cost a receipt carries into the finished pieces — the consumed metal (fine received + wastage, in the
+ * issued item's grams) at its average cost — split over the lines by fine weight. Labour is not added: it stays an
+ * expense through its bill. Pure given the unit cost.
+ */
+export function receiptCost(lines: readonly KarigarLine[], consumedQty: number, metalUnitCost: number): number[] {
+  const total = Math.max(num(consumedQty), 0) * Math.max(num(metalUnitCost), 0);
+  const fine = fineSum(lines);
+  return lines.map((l) => (fine > 0 ? round2((total * num(l.fine_wt)) / fine) : 0));
 }
 
 export interface KarigarInput {
@@ -121,19 +142,31 @@ export function recordKarigar(input: KarigarInput): KarigarMove {
   const tag = `${number} ${input.karigar.name}`;
   const fine = fineSum(lines);
   const wastage = input.kind === 'receipt' ? wastageFine(fine, num(input.wastage_pct)) : 0;
+  let tagCost: ((t: JewelTag) => number) | undefined;
   if (input.kind === 'issue' || input.kind === 'return_metal') {
     const [from, to] = input.kind === 'issue' ? [MAIN_GODOWN_ID, wip] : [wip, MAIN_GODOWN_ID];
     for (const l of lines) if (l.item_id) ids.push(move(l.item_id, input.date, -l.net_wt, from, tag), move(l.item_id, input.date, l.net_wt, to, tag));
   } else {
     // Metal used = fine received + wastage, in the issued item's own grams (its issue touch).
     const issueLine = all.filter((m) => m.karigar_id === input.karigar.id && m.kind === 'issue').flatMap((m) => m.lines).reverse().find((l) => l.item_id === input.consume_item_id);
-    if (input.consume_item_id) ids.push(move(input.consume_item_id, input.date, -((fine + wastage) * 100) / (issueLine?.touch_pct || 100), wip, tag));
-    for (const l of lines) if (l.item_id && !input.tags?.length) {
+    const used = ((fine + wastage) * 100) / (issueLine?.touch_pct || 100);
+    // QA10 R2: the pieces come in at the consumed metal's cost (closing stock keeps the metal's value).
+    const cost = input.consume_item_id ? receiptCost(lines, used, unitCost(input.consume_item_id)) : lines.map(() => 0);
+    if (input.consume_item_id) ids.push(move(input.consume_item_id, input.date, -used, wip, tag));
+    lines.forEach((l, k) => {
+      if (!l.item_id || input.tags?.length) return;
       const unit = stockDb.items().find((i) => i.id === l.item_id)?.unit.toUpperCase();
-      ids.push(move(l.item_id, input.date, unit === 'GMS' || unit === 'GM' || unit === 'G' ? l.net_wt : num(l.pieces) || 1, MAIN_GODOWN_ID, tag));
+      const qty = unit === 'GMS' || unit === 'GM' || unit === 'G' ? l.net_wt : num(l.pieces) || 1;
+      ids.push(move(l.item_id, input.date, qty, MAIN_GODOWN_ID, tag, qty > 0 ? cost[k] / qty : 0));
+    });
+    if (input.tags?.length) {
+      // Tags share the receipt's metal cost by net weight.
+      const total = cost.reduce((s, c) => s + c, 0);
+      const net = input.tags.reduce((s, t) => s + Math.max(num(t.gross_wt) - num(t.stone_wt), 0), 0);
+      tagCost = (t) => (net > 0 ? (total * num(t.net_wt)) / net : 0);
     }
   }
-  const made = input.kind === 'receipt' && input.tags?.length ? addTags(input.tags, { date: input.date, toStock: true }) : [];
+  const made = input.kind === 'receipt' && input.tags?.length ? addTags(input.tags, { date: input.date, toStock: true, cost: tagCost }) : [];
   const lab = input.kind === 'receipt' && input.labour && num(input.labour.rate) > 0 ? { ...input.labour, amount: labourAmount(input.labour.basis, input.labour.rate, lines) } : undefined;
   let draftId: string | undefined;
   if (lab) {
