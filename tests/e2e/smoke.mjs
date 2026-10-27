@@ -3758,10 +3758,14 @@ try {
     await page.waitForURL(/\/pos/, { timeout: 15000 });
     await page.getByText('E2E Haircut').first().waitFor({ timeout: 15000 });
     const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.locator('#pos-Cash').fill('0');
+    await page.keyboard.press('F6'); // UPI takes the bill
     await page.getByRole('button', { name: /Save bill/ }).click();
-    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.items?.some((l) => l.sv?.appointment_id === appt.id)))).find((i) => !beforeIds.has(i.id));
-    const line = bill.items.find((l) => l.sv?.appointment_id === appt.id);
-    check(line?.sv?.staff_id === staff.id && line.sv.cls === 'beauty_9997' && Number(line.tax_rate) === 5, `the POS bill ${bill.invoice_number} carries the stylist and the 5% class rate`);
+    await page.getByText(/INV\/FY\d\d-\d\d\/\d{4} saved/).first().waitFor({ timeout: 15000 });
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.items?.some((l) => l.sv?.appointment_id === appt.id)))).find((i) => !beforeIds.has(i.id) && i.items?.some((l) => l.sv?.appointment_id === appt.id));
+    check(!!bill, 'the POS bill carries the appointment on its line');
+    const line = bill?.items.find((l) => l.sv?.appointment_id === appt.id);
+    check(line?.sv?.staff_id === staff.id && line.sv.cls === 'beauty_9997' && Number(line.tax_rate) === 5, `the POS bill ${bill?.invoice_number} carries the stylist and the 5% class rate`);
     await page.goto(srv.origin + '/time?tab=appointments');
     await page.locator('[data-appt-chip="E2E Salon Client"]').waitFor({ timeout: 15000 });
     check(/Billed/.test(await page.locator('[data-appt-chip="E2E Salon Client"]').innerText()), 'the appointment shows Billed');
