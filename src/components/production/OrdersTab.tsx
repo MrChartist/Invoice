@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ClipboardCheck, Factory, Pencil, Plus, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -24,6 +24,10 @@ import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import mfg from '../manufacturing/manufacturing.module.css';
 import styles from './production.module.css';
+import { impliedPacks } from '../../lib/shop-mode';
+import { localDb } from '../../lib/localDb';
+
+const YieldPanel = lazy(() => import('../agri/YieldPanel')); // R12 AG-C2: mill yield on a milling batch (mill pack)
 
 type Dialog = { kind: 'form'; order: ProductionOrder | null } | { kind: 'issue' | 'output' | 'close' | 'return'; order: ProductionOrder } | null;
 
@@ -210,6 +214,7 @@ export function OrdersTab({ ctx }: { ctx: MfgContext }) {
               {pT('vouchers')}: {[...s.p.issues.map((t) => t.transfer_number), ...s.p.returns.map((t) => t.transfer_number), ...s.p.outputs.map((v) => v.number), ...s.p.writeOffs.map((j) => j.number)].join(', ')}
             </p>
           )}
+          {impliedPacks(localDb.settings.get()).includes('mill') && <Suspense fallback={null}><YieldPanel key={s.o.id} order={s.o} items={ctx.items} canEdit={ctx.canBooks && s.status !== 'closed' && s.status !== 'cancelled'} onSaved={(m, bad) => (bad ? ctx.error(m) : ctx.changed(m))} /></Suspense>}
           <details>
             <summary>{pT('history')}</summary>
             <ul className={styles.log}>{[...(s.o.log ?? [])].reverse().map((l, i) => <li key={i}>{formatDate(l.at.slice(0, 10))} · {pT(`log_${l.action}` as 'log_create')}{l.note ? ` — ${l.note}` : ''}{l.by ? ` (${l.by})` : ''}</li>)}</ul>

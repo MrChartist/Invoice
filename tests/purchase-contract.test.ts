@@ -969,3 +969,12 @@ test('R11 (CN-D) site readers read the real bill shape: labour holds, plant-hire
   const p = sitePnl({ boq, period: { start: '2026-04-01', end: '2027-03-31' }, invoices: [], purchases: [lab, { ...bill, id: 'o', cost_centre_id: 'cc' }, { ...bill, id: 'x' }, { ...bill, id: 'v', status: 'void', cost_centre_id: 'cc' }], vouchers: [], payments: [], measurements: [], material: new Map(), internal: new Map(), sites: [], logs: [], compliance: [] });
   assert.deepEqual([p.costs.labour, p.costs.other], [1000, 1000], 'ITC taken: cost = taxable; untagged and void bills left out');
 });
+
+test('R12 (AG-C5) mill report reads the real bill shape: own intake of the batches\' input item (by item id or name), void and expense bills left out', async () => {
+  const { millMonths } = await import('../src/lib/agri/ag-mill-reports.ts');
+  const items = [{ id: 'paddy', name: 'Paper ream', unit: 'KG' }, { id: 'rice', name: 'Rice', unit: 'KG' }] as never[];
+  const mfg = [{ id: 'm', number: 'MFG/1', date: '2026-04-20', item_id: 'rice', qty: 6, production_order_id: 'o', components: [{ id: 'c', item_id: 'paddy', qty: 10 }], outputs: [], costs: [] }] as never[];
+  const purchases = [bill, { ...bill, id: 'v', status: 'void' }, { ...bill, id: 'e', kind: 'EXPENSE' }, { ...bill, id: 'i', lines: [{ ...bill.lines[0], name: 'Other name', item_id: 'paddy' }] }];
+  const [m] = millMonths({ orders: [], mfg, items, purchases, principal: [], agreements: [], invoices: [] });
+  assert.deepEqual([m.month, m.intakeOwn, m.input, m.main], ['2026-04', 20, 10, 6], 'two bills of 10 KG each (by name, by item id)');
+});

@@ -229,6 +229,9 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   labour_compliance: 'Labour-contractor PF / ESI / wage-register proof per month (R11).', site_labour: 'Daily-wage site workers with rates (R11).',
   muster_days: 'Site attendance, one row per site per day, and the weekly settlement (MUS/FY…, R11).', hired_equipment: 'Equipment hired in, with rate, basis and operator flag (R11).',
   plant_logs: 'Daily plant log sheets: hours, idle, breakdown, fuel, hire out (PLG/FY…, R11).',
+  // R12-C
+  weighbridge_slips: 'Weighbridge / gate-entry slips: vehicle, party, commodity, gross and tare with times, net, moisture and other readings, use (WBS/FY…, R12).',
+  cmr_agreements: 'Custom-milling (CMR) agreements with the State agency: season, outturn %, paddy lots (JWP receipts), rice deliveries (CMR/FY…), milling rate, by-product recovery (R12).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';
