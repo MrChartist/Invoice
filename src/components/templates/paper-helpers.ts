@@ -7,6 +7,8 @@ import { shiftDay } from '../../lib/dates';
 import { weightText, wtHolds } from '../../lib/trade/tr-weight';
 import type { JewelLine } from '../../types/retail-r9';
 import type { AgSnapshot } from '../../types/agri-r12';
+import type { MfSnapshot } from '../../types/mfg-r13';
+import { MSME_PAYMENT_DAYS } from '../../lib/tax-rules';
 
 /** R9 (RT-E2) gold fineness by karat, for "22K (916)" on the bill (BIS Reg. 5(11); same table as `rt-jewel-rates.ts`). */
 const KARAT: Readonly<Record<string, number>> = { '24K': 999, '23K': 958, '22K': 916, '21K': 875, '20K': 833, '18K': 750, '14K': 585, '9K': 375 };
@@ -42,7 +44,7 @@ function monthYear(day: string): string {
  * (6.6 / 6.11), e.g. "Batch B12 · Mfg 01/2026 · Exp 06/2027" or "S/N: 3567…, 3567… · Warranty 12 months".
  * '' for untracked lines, so ordinary documents print exactly as before.
  */
-export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw' | 'id'>> & { bin?: string }) | undefined, ag?: AgSnapshot): string {
+export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw' | 'id'>> & { bin?: string }) | undefined, ag?: AgSnapshot, mf?: MfSnapshot): string {
   if (!item) return '';
   if (item.jw) return jewelText(item.jw); // R9 (RT-E2): the BIS sub-line (the tag no. is its serial)
   const parts: string[] = [];
@@ -55,6 +57,7 @@ export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' |
   if (item.serials?.length && item.warranty_months) parts.push(`Warranty ${item.warranty_months} month${item.warranty_months === 1 ? '' : 's'}`);
   if (item.wt && (item.quantity === undefined || wtHolds(item))) parts.push(weightText(item.wt)); // R8-B (TR-B1); QA8 T12 / T16: only while it still gives the quantity
   parts.push(agriLineText(item, ag)); // R12 (AG-A5): '' without the `ag` snapshot
+  parts.push(mfLineText(item, mf)); // R13 (MF-A5): '' without the `mf` snapshot
   return parts.filter(Boolean).join(' · ');
 }
 
@@ -190,4 +193,60 @@ export function visitText(inv: Pick<InvoiceRecord, 'sv'>): string {
 export function svRegText(sender: Pick<SenderProfile, 'sv_regs'>): string {
   const r = sender.sv_regs;
   return r ? [r.cea && `Reg. ${r.cea}`, r.council && `Council reg. ${r.council}`, r.nabl && `NABL ${r.nabl}`, r.pcpndt && `PCPNDT ${r.pcpndt}`].filter(Boolean).join(' · ') : '';
+}
+
+/* ── R13 (MF-A5): the manufacturing paper. Inline (the paper loads no Round 13 code); '' / nothing without the data. ── */
+
+const dm = (d: string | undefined) => (d && /^\d{4}-\d{2}-\d{2}/.test(d) ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(2, 4)}` : d ?? '');
+
+/**
+ * The sub-line under a bill line from the document's `mf` snapshot: "Drg. 1145-B rev C · PO 20 · Heat H2231" /
+ * "Batch NK2610 · Packed 12/10/26 · Best before 11/01/27 · MRP ₹40" / "Style KT-22 · Lot CUT/26-27/0014 · S6 M12 L12 XL6".
+ */
+export function mfLineText(item: { id?: string } | undefined, mf: MfSnapshot | undefined): string {
+  const l = item?.id ? mf?.lines?.[item.id] : undefined;
+  if (!l) return '';
+  return [
+    l.drawing && `Drg. ${l.drawing}${l.rev ? ` rev ${l.rev}` : ''}`, l.po_line && `PO ${l.po_line}`, l.heat && `Heat ${l.heat}`, l.grade && `Grade ${l.grade}`,
+    l.batch && `Batch ${l.batch}`, l.packed_on && `Packed ${dm(l.packed_on)}`, l.best_before && `Best before ${dm(l.best_before)}`, l.use_by && `Use by ${dm(l.use_by)}`,
+    l.mrp !== undefined && `MRP ${rs(l.mrp)}`, l.style && `Style ${l.style}`, l.lot && `Lot ${l.lot}`, l.sizes,
+    l.epr_cat && `EPR ${l.epr_cat}`, l.recycled_pct !== undefined && `Recycled ${l.recycled_pct}%`,
+  ].filter(Boolean).join(' · ');
+}
+
+const CAT: Readonly<Record<string, string>> = { MICRO: 'Micro', SMALL: 'Small', MEDIUM: 'Medium' };
+
+/**
+ * The seller's Udyam and FSSAI lines under the GSTIN, from the SENDER SNAPSHOT: "Udyam: UDYAM-MH-26-0012345 (Micro)"
+ * prints once the profile carries the category (added with Round 13, so a document saved before prints nothing new)
+ * unless "Print Udyam number" is off; "FSSAI Lic. No. …" whenever the snapshot has one (never on e-way JSON).
+ */
+export function mfSellerText(sender: Pick<SenderProfile, 'msme_udyam' | 'msme_category' | 'udyam_print' | 'fssai_no'> | null | undefined): string {
+  if (!sender) return '';
+  return [
+    sender.msme_udyam && sender.msme_category && sender.udyam_print !== false && `Udyam: ${sender.msme_udyam} (${CAT[sender.msme_category] ?? sender.msme_category})`,
+    sender.fssai_no && `FSSAI Lic. No. ${sender.fssai_no}`,
+  ].filter(Boolean).join(' · ');
+}
+
+/**
+ * The declarations of a manufacturing document: the snapshot's own text, else "Waste and scrap — TCS u/s 394(1)
+ * collected" (scrap with TCS), "Goods supplied under Advance Authorisation no. …", "Recycled content x% (PWM Rules)";
+ * plus the MSE payment clause (MSMED Act 2006 Sec 15 / 16) for a micro / small seller billing a GSTIN buyer, from the
+ * document's own sender snapshot. Each sentence whose CA item is open says "verify".
+ */
+export function mfDeclaration(inv: Pick<InvoiceRecord, 'mf' | 'sender' | 'client' | 'doc_type'>): string {
+  const mf = inv.mf;
+  const out: string[] = [];
+  if (mf?.declaration) out.push(mf.declaration);
+  else {
+    if (mf?.scrap?.tcs) out.push('Waste and scrap — TCS u/s 394(1) collected (verify with your CA, MF10).');
+    if (mf?.export_aa?.aa_no) out.push(`Goods supplied under Advance Authorisation no. ${mf.export_aa.aa_no}${mf.export_aa.sion ? `, SION ${mf.export_aa.sion}` : ''} (verify, MF16).`);
+    if (mf?.recycled_pct !== undefined) out.push(`Recycled content ${mf.recycled_pct}% (PWM Rules; verify, MF27).`);
+  }
+  const s = inv.sender;
+  if (s?.msme_udyam && (s.msme_category === 'MICRO' || s.msme_category === 'SMALL') && inv.client?.gstin?.trim() && inv.doc_type !== 'QUOTATION') {
+    out.push(`Payment due within ${MSME_PAYMENT_DAYS.agreed} days of acceptance — MSMED Act 2006 Sec 15; interest u/s 16 beyond (verify, MF22).`);
+  }
+  return out.join(' ');
 }
