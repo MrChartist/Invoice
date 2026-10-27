@@ -5,14 +5,16 @@
  *  - a per-farmer monthly bag counter warns above the cap (`FERT_SUBSIDY_DEFAULTS`, 50 bags reported — verify AG22);
  *  - the PoS stock check: per flagged item and month, book stock at month end (the stock engine's ledger, alternate
  *    units already converted) against the PoS stock typed from the device's report, with the sales missing a PoS no.
- * The full Aadhaar number is never stored (4 digits only). Pure.
+ * The full Aadhaar number is never stored (4 digits only). Pure above "Storage".
  */
 import type { AgInputsSnap, PosStock } from '../../types/agri-r12d';
 import type { InvoiceRecord } from '../../types/invoice';
-import type { StockPosition } from '../inventory';
+import type { StockItem, StockPosition } from '../inventory';
 import { num } from '../invoice-calc';
 import { ruleAt } from '../tax-rules';
 import { lineFactor } from '../units';
+import { requireAccess } from '../access';
+import { getTable, setTable, KEYS } from '../storage';
 import { FERT_SUBSIDY_DEFAULTS } from '../agri-rules';
 
 const SALES = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY']);
@@ -72,4 +74,24 @@ export function posCheck(month: string, positions: readonly StockPosition[], pos
   });
   const missing = invoices.filter((i) => live(i) && i.issue_date.slice(0, 7) === month && subsidisedBags(i, isSub) > 0 && !i.ag?.inputs?.pos_txn?.trim());
   return { rows, missing };
+}
+
+/* ── Storage ── */
+
+/** The `isSub` test the checks take: flagged stock / catalogue items by lower-cased name. */
+export function subsidisedTest(): (name: string) => boolean {
+  const names = new Set<string>();
+  for (const t of ['stock_items', KEYS.items]) for (const i of getTable<{ name?: string; ag_subsidised?: boolean }>(t)) if (i?.ag_subsidised && i.name) names.add(i.name.trim().toLowerCase());
+  return (n) => names.has(n.trim().toLowerCase());
+}
+
+/** Flag / unflag a stock item as subsidised fertiliser (`master.edit`). */
+export function flagSubsidised(id: string, on: boolean): void {
+  requireAccess('master.edit');
+  setTable('stock_items', getTable<StockItem>('stock_items').map((i) => {
+    if (i?.id !== id) return i;
+    const next: StockItem = { ...i, ag_subsidised: true };
+    if (!on) delete next.ag_subsidised;
+    return next;
+  }));
 }
