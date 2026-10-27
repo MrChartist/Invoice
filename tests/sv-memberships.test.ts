@@ -138,7 +138,7 @@ test('wallet: top-up is an advance receipt with GST; bonus is a discount, never 
 
 test('renewal window, renew and auto-renew drafts; delete refused while billed', () => {
   const p = gym({ months: 1, freeze: undefined });
-  const a = sellPlan({ plan_id: p.id, client_name: 'A', start: '2026-05-01', auto_renew: true });
+  sellPlan({ plan_id: p.id, client_name: 'A', start: '2026-05-01', auto_renew: true });
   const b = sellPlan({ plan_id: p.id, client_name: 'B', start: '2026-05-20' });
   assert.deepEqual(renewals(loadMemberships(), '2026-05-25', 7).map((r) => [r.m.client_name, r.left]), [['A', 6]]);
   const auto = autoRenewDue('2026-06-02');

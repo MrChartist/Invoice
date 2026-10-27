@@ -64,11 +64,8 @@ export function addMonths(day: string, n: number): { day: string; clamped: boole
 export function baseEnd(plan: Pick<MemberPlan, 'kind' | 'months' | 'days' | 'validity_days'>, start: string): string {
   if (plan.kind === 'wallet') return '';
   if (plan.kind === 'package') return num(plan.validity_days) > 0 ? shiftDay(start, num(plan.validity_days) - 1) : '';
-  let end = start;
-  if (num(plan.months) > 0) {
-    const a = addMonths(start, num(plan.months));
-    end = a.clamped ? a.day : shiftDay(a.day, -1);
-  } else end = shiftDay(start, -1);
+  const a = addMonths(start, num(plan.months));
+  const end = num(plan.months) > 0 ? (a.clamped ? a.day : shiftDay(a.day, -1)) : shiftDay(start, -1);
   return num(plan.days) > 0 ? shiftDay(end, num(plan.days)) : end;
 }
 
