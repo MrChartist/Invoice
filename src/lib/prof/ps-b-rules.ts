@@ -21,7 +21,7 @@ export const DISB_DEFAULTS: readonly PsRule<{ on_behalf: readonly DisbKind[] }>[
 /* ── B2 legal services ────────────────────────────────────────── */
 
 export interface LegalServicesRule {
-  /** SAC prefix of legal services. */
+  /** SAC prefix of legal services (99821x; 99822x accounting, 99823x tax are not legal). */
   sac: string;
   rcm: string;
   exempt: string;
@@ -29,8 +29,8 @@ export interface LegalServicesRule {
   small: string;
 }
 export const LEGAL_SERVICES_RULES: readonly PsRule<LegalServicesRule>[] = [
-  { from: '2017-07-01', value: { sac: '9982', rcm: 'N 13/2017-CT(R) entry 2', exempt: 'N 12/2017-CT(R) entry 45', small: 'turnover up to ₹20 lakh (₹10 lakh special-category States) in the preceding FY' }, source: 'N 13/2017-CT(R), N 12/2017-CT(R) (PS1)', verified: true },
-  { from: '2019-10-01', value: { sac: '9982', rcm: 'N 13/2017-CT(R) entry 2', exempt: 'N 12/2017-CT(R) entry 45', small: 'aggregate turnover up to the registration threshold in the preceding FY' }, source: 'N 21/2019-CT(R) wording (PS1)', verified: false },
+  { from: '2017-07-01', value: { sac: '99821', rcm: 'N 13/2017-CT(R) entry 2', exempt: 'N 12/2017-CT(R) entry 45', small: 'turnover up to ₹20 lakh (₹10 lakh special-category States) in the preceding FY' }, source: 'N 13/2017-CT(R), N 12/2017-CT(R) (PS1)', verified: true },
+  { from: '2019-10-01', value: { sac: '99821', rcm: 'N 13/2017-CT(R) entry 2', exempt: 'N 12/2017-CT(R) entry 45', small: 'aggregate turnover up to the registration threshold in the preceding FY' }, source: 'N 21/2019-CT(R) wording (PS1)', verified: false },
 ];
 
 /* ── B4 design stages ─────────────────────────────────────────── */

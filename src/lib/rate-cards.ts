@@ -143,7 +143,7 @@ export function normalizeWorkTypes(rows: readonly unknown[]): WorkType[] {
     const name = typeof o.name === 'string' ? o.name.trim() : '';
     if (!id || !name) continue;
     const sac = typeof o.sac === 'string' ? o.sac.replace(/\D/g, '').slice(0, 8) : '';
-    out.push({ id, name, rate: Math.max(round2(num(o.rate)), 0), ...(sac ? { sac } : {}), ...(o.inactive === true ? { inactive: true } : {}) });
+    out.push({ id, name, rate: Math.max(round2(num(o.rate)), 0), ...(sac ? { sac } : {}), ...(o.inactive === true ? { inactive: true } : {}), ...(o.ps && typeof o.ps === 'object' ? { ps: o.ps } : {}) }); // R14 PS-B2: WorkType.ps (unit)
   }
   return out;
 }
