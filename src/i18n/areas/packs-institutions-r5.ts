@@ -18,7 +18,7 @@ export const iT = defineArea(
     'err.trueUpFiled': 'GSTR-3B of that period is marked filed — choose an open month.', trueUpOn: 'Post on',     // C1
     'fees.plans': 'Plans', 'fees.students': 'Students / patients', 'fees.bill': 'Bill instalment', 'fees.dues': 'Dues', 'fees.batches': 'Batches', 'fees.attendance': 'Attendance', 'fees.refunds': 'Refunds', newPlan: 'New plan', noPlans: 'No fee plan yet.', planName: 'Plan', plan: 'Plan',
     yearLabel: 'Academic year', preset: 'Preset', 'preset.education': 'Education (exempt)', 'preset.coaching': 'Coaching (18%)', 'preset.clinic': 'Clinic (exempt)',
-    presetNote: 'Presets set the tax class only — verify with your CA.', head: 'Head', tax: 'Tax', 'tax.exempt': 'Exempt', 'tax.nil': 'Nil', 'tax.taxable': 'Taxable',
+    presetNote: 'Presets set the tax class only — verify with your CA.', feeIncrease: 'Fee increased during the course: {n} enrolled student(s) are on this plan. Their bills not yet made use the new amounts; tell them first and check the refund policy.', head: 'Head', tax: 'Tax', 'tax.exempt': 'Exempt', 'tax.nil': 'Nil', 'tax.taxable': 'Taxable',
     frequency: 'Billed', 'freq.per_instalment': 'Each instalment', 'freq.once': 'Once', sessions: 'Sessions', addHead: 'Add head', instalment: 'Instalment', dueDate: 'Due date', share: 'Share %', nEqual: '{n} equal',
     fine: 'Late fine', 'fine.flat': 'Flat', 'fine.per_day': 'Per day', graceDays: 'Grace days', cap: 'Cap', rollNo: 'Roll no. / UHID', classLabel: 'Class / batch', guardian: 'Guardian', concession: 'Concession',
     enrol: 'Enrol', importCsv: 'Import CSV', csvCols: 'CSV: name, roll no., class, guardian, phone.', visit: 'Visit', preview: 'Preview', issue: 'Issue all',
@@ -79,7 +79,7 @@ export const iT = defineArea(
     'err.balance': 'बैलेंस से अधिक।', 'err.trueUpDate': 'मिलान वर्ष समाप्ति के बाद, सितंबर रिटर्न तक किसी खुले महीने में दर्ज करें — verify with your CA.',
     'err.trueUpFiled': 'उस अवधि का GSTR-3B दाखिल चिह्नित है — खुला महीना चुनें।', trueUpOn: 'पोस्ट तारीख',     'fees.plans': 'प्लान', 'fees.students': 'छात्र / मरीज़', 'fees.bill': 'किस्त बिल', 'fees.dues': 'बकाया', 'fees.batches': 'बैच', 'fees.attendance': 'हाज़िरी', 'fees.refunds': 'रिफ़ंड', newPlan: 'नया प्लान', noPlans: 'अभी कोई फ़ीस प्लान नहीं।', planName: 'प्लान', plan: 'प्लान',
     yearLabel: 'शैक्षणिक वर्ष', preset: 'प्रीसेट', 'preset.education': 'शिक्षा (छूट)', 'preset.coaching': 'कोचिंग (18%)', 'preset.clinic': 'क्लिनिक (छूट)',
-    presetNote: 'प्रीसेट केवल कर श्रेणी तय करते हैं — verify with your CA.', head: 'मद', tax: 'कर', 'tax.exempt': 'छूट', 'tax.nil': 'शून्य', 'tax.taxable': 'कर-योग्य',
+    presetNote: 'प्रीसेट केवल कर श्रेणी तय करते हैं — verify with your CA.', feeIncrease: 'कोर्स के बीच फ़ीस बढ़ी: इस योजना पर {n} नामांकित छात्र हैं। उनके जो बिल अभी नहीं बने, वे नई राशि लेंगे; पहले उन्हें बताएँ और रिफ़ंड नीति देखें।', head: 'मद', tax: 'कर', 'tax.exempt': 'छूट', 'tax.nil': 'शून्य', 'tax.taxable': 'कर-योग्य',
     frequency: 'बिलिंग', 'freq.per_instalment': 'हर किस्त', 'freq.once': 'एक बार', sessions: 'सत्र', addHead: 'मद जोड़ें', instalment: 'किस्त', dueDate: 'देय तारीख', share: 'हिस्सा %', nEqual: '{n} बराबर',
     fine: 'लेट जुर्माना', 'fine.flat': 'एकमुश्त', 'fine.per_day': 'प्रति दिन', graceDays: 'छूट दिन', cap: 'अधिकतम', rollNo: 'रोल नं. / UHID', classLabel: 'कक्षा / बैच', guardian: 'अभिभावक', concession: 'रियायत',
     enrol: 'नामांकन', importCsv: 'CSV इंपोर्ट', csvCols: 'CSV: नाम, रोल नं., कक्षा, अभिभावक, फ़ोन।', visit: 'विज़िट', preview: 'पूर्वावलोकन', issue: 'सब जारी करें',
