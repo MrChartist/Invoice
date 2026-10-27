@@ -136,7 +136,13 @@ export function siteStatement(i: SiteInput): SiteRow[] {
   return [...rows.values()];
 }
 
-export const siteCsvRows = (rows: readonly SiteRow[], name: (id: string) => string): (string | number)[][] => [
+/** R11 (CN-D4): quantity at the site before `day` (transfers in − out − consumption), in base units, per item. */
+export function siteOpening(i: Pick<SiteInput, 'site' | 'transfers' | 'journals'>, day: string): Map<string, number> {
+  const d = new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10) - 1)).toISOString().slice(0, 10);
+  return new Map(siteStatement({ ...i, period: { start: d, end: d }, measurements: [], coefficients: [] }).map((r) => [r.itemId, r.closing]));
+}
+
+export const siteCsvRows =(rows: readonly SiteRow[], name: (id: string) => string): (string | number)[][] => [
   ['Item', 'Issued to site', 'Consumed', 'Theoretical', 'Variance %', 'Closing at site'],
   ...rows.map((r) => [name(r.itemId), r.issued, r.consumed, r.theoretical, r.variancePct ?? '', r.closing]),
 ];

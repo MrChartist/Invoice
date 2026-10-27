@@ -1,5 +1,7 @@
 /** R5-B6: sites of a BOQ — site godowns, book consumption, coefficients, and the issued / consumed / theoretical statement. */
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { siteViewLabel } from './site-views';
 import { Building2, Download } from 'lucide-react';
 import { twT } from '../../i18n/areas/packs-transport-works-r5';
 import type { InvoiceRecord } from '../../types/invoice';
@@ -52,7 +54,7 @@ export function SitesPanel({ boq, notify, refresh, tick }: PanelProps & { boq: I
         <F l={twT('siteName')}><input className={controls.input} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></F>
         <button type="button" className={B.o} onClick={() => run(() => addSite(boq.id, f.name || `${boq.client?.name ?? ''} site`, boq.boq_terms?.cost_centre_id), twT('siteAdded'))}><Building2 size={16} aria-hidden="true" /> {twT('addSite')}</button>
       </div>
-      <p className={styles.note}>{twT('siteHint')}</p>
+      <p className={styles.note}>{twT('siteHint')} <Link to="/time?tab=works&view=reco" data-reco-link>{siteViewLabel('reco')} →</Link></p>
       {site && (
         <section className={styles.box}>
           <h4>{twT('bookConsumption')}</h4>

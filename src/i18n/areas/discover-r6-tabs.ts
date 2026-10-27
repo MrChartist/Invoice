@@ -192,7 +192,7 @@ export const tabsT = defineArea(
     'time.projects': 'Projects',
     'time.retainers': 'Retainers',
     'time.settings': 'Time settings',
-    'time.works': 'Works contracts (BOQ, RA bills)',
+    'time.works': 'Works contracts (BOQ, RA bills, sub-contracts, muster, plant, site P&L)',
     // Recurring
     'recurring.schedules': 'Recurring schedules',
     'recurring.batch': 'Batch invoices',
@@ -386,7 +386,7 @@ export const tabsT = defineArea(
     'time.projects': 'प्रोजेक्ट',
     'time.retainers': 'रिटेनर',
     'time.settings': 'समय सेटिंग्स',
-    'time.works': 'वर्क्स कॉन्ट्रैक्ट (BOQ, RA बिल)',
+    'time.works': 'वर्क्स कॉन्ट्रैक्ट (BOQ, RA बिल, उप-ठेके, हाज़िरी, प्लांट, साइट लाभ-हानि)',
     'recurring.schedules': 'आवर्ती शेड्यूल',
     'recurring.batch': 'बैच इनवॉइस',
     'recurring.fees': 'फ़ीस',

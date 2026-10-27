@@ -169,7 +169,9 @@ export function billwisePayables(input: PayablesInput): PartyPayables[] {
     }
     // amount_paid not backed by rows (legacy / imported): settled on the bill date.
     const legacy = round2(num(bill.amount_paid) - rowsTotal);
-    if (legacy > 0.004) allocations.push({ date: bill.date, amount: legacy, kind: 'payment', ref: 'Paid (recorded on the bill)' });
+    // R11 (CN-D1): on a sub-contractor bill this part is its deductions journal (retention / recoveries), not cash — the
+    // net due is what ages.
+    if (legacy > 0.004) allocations.push({ date: bill.date, amount: legacy, kind: bill.cn_sub?.jv_id ? 'adjustment' : 'payment', ref: bill.cn_sub?.jv_id ? 'Sub-contract deductions (journal)' : 'Paid (recorded on the bill)' });
     allocations.sort((a, b) => a.date.localeCompare(b.date));
     const settled = round2(allocations.reduce((s, a) => s + a.amount, 0));
     const balance = round2(Math.max(payable - settled, 0));
