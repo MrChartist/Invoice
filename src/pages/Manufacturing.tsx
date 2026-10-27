@@ -21,7 +21,9 @@ import { StockReportsTab } from '../components/manufacturing/StockReportsTab';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from '../components/manufacturing/manufacturing.module.css';
-import { MFG_TABS, type MfgTab } from './page-tabs'; // R6-B1
+import { MFG_PACK_TABS, MFG_TABS, type MfgPackTab, type MfgTab } from './page-tabs'; // R6-B1; R13 desks
+import { localDb } from '../lib/localDb';
+import { visibleTabs } from '../lib/industry-packs';
 
 // Phase 7M: job work / ITC-04 and Rejections In load on demand (own chunk).
 const JobWorkTab = lazy(() => import('../components/job-work/JobWorkTab').then((m) => ({ default: m.JobWorkTab })));
@@ -36,6 +38,20 @@ const QcTab = lazy(() => import('../components/production/tabs').then((m) => ({ 
 const LandedVoucherTab = lazy(() => import('../components/production/tabs').then((m) => ({ default: m.LandedVoucherTab })));
 // R4-B5: store replenishment from the warehouse, under Reorder Status (own chunk).
 const ReplenishTab = lazy(() => import('../components/retail/ReplenishTab'));
+// R13: manufacturing desks (one lazy chunk each; MF-A's floor desk, stubs for MF-B / C / D that they replace in place).
+const DESKS = {
+  floor: lazy(() => import('../components/mfg/FloorDesk')),
+  shop: lazy(() => import('../components/mfg/ShopDesk')),
+  moulding: lazy(() => import('../components/mfg/MouldingDesk')),
+  press: lazy(() => import('../components/mfg/PressDesk')),
+  garments: lazy(() => import('../components/mfg/GarmentsDesk')),
+  food: lazy(() => import('../components/mfg/FoodDesk')),
+  statutory: lazy(() => import('../components/mfg/StatutoryDesk')),
+} as const;
+const deskT = defineArea(
+  { floor: 'Floor', shop: 'Shop', moulding: 'Moulding', press: 'Press', garments: 'Garments', food: 'Food', statutory: 'Statutory' } as const,
+  { floor: 'फ़्लोर', shop: 'शॉप', moulding: 'मोल्डिंग', press: 'प्रेस', garments: 'गारमेंट', food: 'खाद्य', statutory: 'वैधानिक' },
+);
 const R4A_TABS =['orders', 'costing', 'trace', 'qc', 'landed'] as const;
 // Tab labels only (inline, so the page does not load the production catalogue before a tab is opened).
 const r4aTabT = defineArea(
@@ -44,8 +60,9 @@ const r4aTabT = defineArea(
 );
 
 type R4aTab = (typeof R4A_TABS)[number];
-type Tab = MfgTab;
-const TABS = MFG_TABS; // R6-B1: list in manufacturing-tabs.ts
+type Tab = MfgTab | MfgPackTab;
+const TABS: readonly Tab[] = [...MFG_TABS, ...MFG_PACK_TABS.map((t) => t.id)]; // R6-B1: list in page-tabs.ts; R13 desks
+const isDesk = (t: Tab): t is MfgPackTab => t in DESKS;
 const isR4a = (t: Tab): t is R4aTab => (R4A_TABS as readonly string[]).includes(t);
 const LABEL = { boms: 'tabBoms', mfg: 'tabMfg', journal: 'tabSj', physical: 'tabPhysical', jobwork: 'tabJobWork', rejections: 'tabRejections', plan: 'tabPlan', reorder: 'tabReorder', reports: 'tabReports' } as const;
 
@@ -74,7 +91,7 @@ export function Manufacturing() {
       canMasters: can('master.edit'),
     };
   }, [version, notify]);
-  const setTab = useCallback((t: Tab) => setParams((p) => { p.set('tab', t); p.delete('jw'); p.delete('order'); return p; }, { replace: true }), [setParams]);
+  const setTab = useCallback((t: Tab) => setParams((p) => { p.set('tab', t); p.delete('jw'); p.delete('order'); p.delete('view'); return p; }, { replace: true }), [setParams]);
   const tracked = ctx.items.filter((i) => i.track_stock);
 
   return (
@@ -87,13 +104,17 @@ export function Manufacturing() {
       <div className={surface.card}>
         <div className={surface.cardBody}>
           <div className={cn(controls.segment, styles.tabs)} role="tablist" aria-label={mfgT('sections')}>
-            {TABS.map((k) => (
-              <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab(k)}>
-                {isR4a(k) ? r4aTabT(k) : mfgT(LABEL[k])}
+            {[...MFG_TABS, ...visibleTabs(MFG_PACK_TABS, localDb.settings.get(), tab).map((t) => t.id)].map((k) => (
+              <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab(k)} data-mfg-tab={k}>
+                {isDesk(k) ? deskT(k) : isR4a(k) ? r4aTabT(k) : mfgT(LABEL[k])}
               </button>
             ))}
           </div>
-          {tracked.length === 0 && tab !== 'reports' ? (
+          {isDesk(tab) ? (
+            <Suspense fallback={<p className={styles.muted}>{mfgT('loading')}</p>}>
+              {(() => { const Desk = DESKS[tab]; return <Desk view={params.get('view') ?? undefined} ctx={ctx} />; })()}
+            </Suspense>
+          ) : tracked.length === 0 && tab !== 'reports' ? (
             <p className={styles.notice}>{mfgT('noItems')} <Link to="/inventory">{mfgT('inventory')}</Link></p>
           ) : (
             <>

@@ -11,7 +11,9 @@ import { applyConstructionKind, applyRetailKind, applyServiceKind, applyTradeKin
 import { ServiceKindPicker } from '../services-r10/ServiceKindPicker'; // R10 (SV-A1)
 import { AgriKindPicker } from '../agri/AgriKindPicker'; // R12 (AG-A1)
 import { agPickT } from '../../i18n/areas/agri-r12-pick';
-import { applyAgriKind } from '../../lib/shop-presets';
+import { applyAgriKind, applyMfgKind } from '../../lib/shop-presets';
+import { MfgKindPicker } from '../mfg/MfgKindPicker'; // R13 (MF-A1)
+import { mfPickT } from '../../i18n/areas/mfg-r13a-pick';
 import { svPickT } from '../../i18n/areas/services-r10-pick';
 import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
 import { DB_PREFIX, getJson } from '../../lib/storage';
@@ -188,6 +190,24 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
               onChange(applyAgriKind(k, { registered, mill_kind: settings.mill_kind, currentPacks: packsOn }) as Partial<typeof settings>);
               // The profile's switches only fill unset ones; changing the profile deletes nothing.
               void import('../../lib/agri/ag-profile').then((m) => m.applyAgriSwitches(k)).catch(() => undefined);
+            }}
+          />
+        </div>
+        {/* R13 (MF-A1): "Manufacturing profile" for every company (a trader who assembles may turn on the shop floor only) */}
+        <div className={controls.field} data-features-mfg>
+          <span className={controls.label}>{mfPickT('title')}</span>
+          <MfgKindPicker
+            value={settings.mfg_kind}
+            custom
+            disabled={!owner}
+            sub={settings.mfg_sub}
+            onSub={(x) => settings.mfg_kind && onChange({ mfg_sub: x as typeof settings.mfg_sub })}
+            onPick={(k) => {
+              if (!k) return onChange({ mfg_kind: undefined });
+              const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
+              onChange(applyMfgKind(k, { registered, sub: settings.mfg_sub, currentPacks: packsOn }) as Partial<typeof settings>);
+              // The profile's switches only fill unset ones; changing the profile deletes nothing.
+              void import('../../lib/mfg/mf-profile').then((m) => m.applyMfgSwitches(k, settings.mfg_sub)).catch(() => undefined);
             }}
           />
         </div>

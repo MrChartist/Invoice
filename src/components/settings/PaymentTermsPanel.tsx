@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { CalendarClock, Plus, Trash2 } from 'lucide-react';
 import { can } from '../../lib/access';
 import { localDb } from '../../lib/localDb';
@@ -13,6 +13,9 @@ import { colT } from '../../i18n/areas/collections';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../collections/collections.module.css';
+
+// R13 (MF-A5): Udyam category, print switch and FSSAI number (lazy row beside the Udyam number).
+const MfProfileRow = lazy(() => import('../mfg/MfProfileRow'));
 
 const OFFSETS: OffsetKind[] = ['days', 'eom', 'day_next_month'];
 const blankTerm = (): PaymentTerm => ({ id: '', name: '', kind: 'net', days: 30 });
@@ -209,6 +212,7 @@ export function PaymentTermsPanel({ notify }: { notify: (m: string, tone?: 'succ
               </span>
               <span className={controls.hint}>{colT('ptUdyamHint')}</span>
             </label>
+            <Suspense fallback={null}><MfProfileRow notify={notify} /></Suspense>
           </div>
         )}
 

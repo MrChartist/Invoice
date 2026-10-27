@@ -24,10 +24,12 @@ export type StepKind =
   // R10 (SV-A1): service profile and the steps of each kind (append-only)
   | 'serviceProfile' | 'doctorProfile' | 'serviceMenu' | 'staff' | 'labTest' | 'memberPlan' | 'batch' | 'labourOp' | 'jobCard'
   // R12 (AG-A1): the steps of each agri kind (append-only; existing companies have no `agri_kind`, so none fire)
-  | 'farmers' | 'rateChart' | 'firstShift' | 'millBom' | 'cmrAgreement' | 'chambers' | 'rentPlan' | 'agriLicence' | 'shareCapital' | 'farmBatch';
+  | 'farmers' | 'rateChart' | 'firstShift' | 'millBom' | 'cmrAgreement' | 'chambers' | 'rentPlan' | 'agriLicence' | 'shareCapital' | 'farmBatch'
+  // R13 (MF-A1): the steps of each manufacturing kind (append-only; only with `mfg_kind`)
+  | MfStep;
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -56,6 +58,8 @@ export interface ChecklistCtx {
   /** R12 (AG-A1): `settings.agri_kind` / `settings.mill_kind`. */
   agriKind?: string;
   millKind?: string;
+  /** R13 (MF-A1): `settings.mfg_kind`. */
+  mfgKind?: string;
 }
 
 export interface ChecklistFactsV3 {
@@ -111,7 +115,26 @@ export interface ChecklistFactsV3 {
   /** R12 (AG-A1): rows per agri step (farmers, rate charts, shifts, BOMs, CMR agreements, chambers, rent plans,
    *  licences, member shares, farm batches) — counted only for the kind that has the step. */
   agri?: Partial<Record<AgriStep, number>>;
+  /** R13 (MF-A1): rows per manufacturing step (work centres, Udyam / FSSAI on the profile, drawings, styles, karigars,
+   *  moulds, presses, items with shelf life) — counted only for the kind that has the step. */
+  mfg?: Partial<Record<MfStep, number>>;
 }
+
+/** R13 (MF-A1): the manufacturing steps, the kinds that have them and where each opens. */
+type MfStep = 'workCentres' | 'udyam' | 'firstDrawing' | 'firstStyle' | 'fabricators' | 'firstMould' | 'pressMaster' | 'fssai' | 'shelfLife';
+const MF_ALL = 'engineering textile plastics printing food other';
+const MF_STEPS: Readonly<Record<MfStep, [kinds: string, to: string]>> = {
+  workCentres: [MF_ALL, '/manufacturing?tab=floor&view=centres'],
+  udyam: [MF_ALL, '/settings?tab=defaults'],
+  firstDrawing: ['engineering', '/manufacturing?tab=shop&view=drawings'],
+  firstStyle: ['textile', '/manufacturing?tab=garments&view=styles'],
+  fabricators: ['textile', '/manufacturing?tab=garments&view=karigars'],
+  firstMould: ['plastics', '/manufacturing?tab=moulding&view=runs'],
+  pressMaster: ['printing', '/manufacturing?tab=press&view=estimates'],
+  fssai: ['food', '/settings?tab=defaults'],
+  shelfLife: ['food', '/manufacturing?tab=food&view=shelflife'],
+};
+const isMfStep = (k: string): k is MfStep => Object.hasOwn(MF_STEPS, k);
 
 /** R12 (AG-A1): the agri steps, the kinds that have them and where each opens. */
 type AgriStep = 'farmers' | 'rateChart' | 'firstShift' | 'millBom' | 'cmrAgreement' | 'chambers' | 'rentPlan' | 'agriLicence' | 'shareCapital' | 'farmBatch';
@@ -210,7 +233,7 @@ function applies(kind: StepKind, ctx: ChecklistCtx): boolean {
     case 'memberPlan': return ctx.serviceKind === 'fitness';
     case 'batch': return ctx.serviceKind === 'coaching';
     case 'labourOp': case 'jobCard': return ctx.serviceKind === 'workshop' || ctx.serviceKind === 'appliance';
-    default: return isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri steps
+    default: return isMfStep(kind) ? !!ctx.mfgKind && MF_STEPS[kind][0].split(' ').includes(ctx.mfgKind) : isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri / R13 mfg steps
   }
 }
 
@@ -263,7 +286,7 @@ function stepsOf(kind: StepKind, f: ChecklistFactsV3, ctx: ChecklistCtx): Omit<C
     case 'batch': return one((f.batches ?? 0) > 0, '/recurring?tab=fees&view=batches');
     case 'labourOp': return one((f.labourOps ?? 0) > 0, '/time?tab=workshop&view=labour');
     case 'jobCard': return one((f.jobCards ?? 0) > 0, '/time?tab=workshop&view=jobs');
-    default: return one((f.agri?.[kind] ?? 0) > 0, AGRI_STEPS[kind][1]); // R12 (AG-A1)
+    default: return isMfStep(kind) ? one((f.mfg?.[kind] ?? 0) > 0, MF_STEPS[kind][1]) : one((f.agri?.[kind] ?? 0) > 0, AGRI_STEPS[kind][1]); // R12 (AG-A1), R13 (MF-A1)
   }
 }
 
@@ -363,6 +386,18 @@ function agriFacts(kind: string): Partial<Record<AgriStep, number>> {
   return out;
 }
 
+/** R13 (MF-A1): rows behind each manufacturing step (B–D tables count once their package writes them). */
+function mfgFacts(kind: string, profile: { msme_udyam?: string; fssai_no?: string } | undefined): Partial<Record<MfStep, number>> {
+  const mf = getJson<{ moulds?: unknown[]; presses?: unknown[] } | null>(`${DB_PREFIX}mfg_settings`, null);
+  const out: Partial<Record<MfStep, number>> = { workCentres: peekTable('work_centres').length, udyam: profile?.msme_udyam ? 1 : 0 };
+  if (kind === 'engineering') out.firstDrawing = peekTable('drawings').length;
+  if (kind === 'textile') Object.assign(out, { firstStyle: peekTable<{ mf?: { style?: string } }>('stock_items').filter((r) => r?.mf?.style).length, fabricators: peekTable<{ mf?: { karigar?: boolean } }>('vendors').filter((r) => r?.mf?.karigar).length });
+  if (kind === 'plastics') out.firstMould = mf?.moulds?.length ?? 0;
+  if (kind === 'printing') out.pressMaster = mf?.presses?.length ?? 0;
+  if (kind === 'food') Object.assign(out, { fssai: profile?.fssai_no ? 1 : 0, shelfLife: peekTable<{ shelf_life_days?: number }>('stock_items').filter((r) => (r?.shelf_life_days ?? 0) > 0).length });
+  return out;
+}
+
 /** Counts only, from the shared parsed rows (PERF-2: never copied). */
 export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: ChecklistCtx } {
   const settings = localDb.settings.get();
@@ -380,6 +415,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
   const cnKind = typeof cnRaw === 'string' ? cnRaw : undefined;
   const svKind = typeof settings.service_kind === 'string' ? settings.service_kind : undefined; // R10 (SV-A1)
   const agKind = typeof settings.agri_kind === 'string' ? settings.agri_kind : undefined; // R12 (AG-A1)
+  const mfKind = typeof settings.mfg_kind === 'string' ? settings.mfg_kind : undefined; // R13 (MF-A1)
   const facts: ChecklistFactsV3 = {
     profileReady: !!settings.onboarded && Boolean(profile?.companyName?.trim()) && Boolean(profile?.upiId || profile?.accountNumber),
     clients: peekTable(KEYS.clients).length,
@@ -417,6 +453,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     ...(cnKind === 'builder' ? { realtyProjects: peekTable('realty_projects').length, realtyUnits: peekTable('realty_units').length, paymentPlans: peekTable('payment_plans').length } : {}),
     // R12 (AG-A1): agri steps (read only for an agri company; B–D tables count once their package writes them)
     ...(agKind ? { agri: agriFacts(agKind) } : {}),
+    ...(mfKind ? { mfg: mfgFacts(mfKind, profile ?? undefined) } : {}), // R13 (MF-A1)
     ...(retailKind === 'grocery' ? { barcodeItems: stock.filter((r) => r?.barcode || r?.sold_by_weight).length + peekTable<{ barcode?: unknown; sold_by_weight?: unknown }>(KEYS.items).filter((r) => r?.barcode || r?.sold_by_weight).length } : {}),
   };
   const ctx: ChecklistCtx = {
@@ -430,6 +467,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     ...(cnKind ? { constructionKind: cnKind } : {}),
     ...(svKind ? { serviceKind: svKind } : {}),
     ...(agKind ? { agriKind: agKind, ...(typeof settings.mill_kind === 'string' ? { millKind: settings.mill_kind } : {}) } : {}),
+    ...(mfKind ? { mfgKind: mfKind } : {}), // R13 (MF-A1)
   };
   return { facts, ctx };
 }

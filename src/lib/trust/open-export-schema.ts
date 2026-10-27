@@ -253,6 +253,11 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   cold_rent_plans: 'Storage rent plans: per bag / quintal, per season / month or lump sum, handling charges, exempt or taxable class, billing time (R12).',
   agri_loans: 'Loans against stored produce (LAS/FY…): borrower, lots under lien, principal, rate, repayments split interest / principal (R12).',
   member_shares: 'Members\' share ledger: allotments with certificates (SHC/FY…), transfers, surrenders, forfeitures (R12).',
+  // R13-A
+  mfg_settings: 'Manufacturing profile settings: switches, reject reasons, scrap item; B–D add moulds, presses, absorption, e-way note (R13).',
+  work_centres: 'Work centres: kind, machine / labour / power / overhead rates per hour, shifts, working days, efficiency, parallel units, holidays (R13).',
+  routings: 'Routings per item: operations with work centre, set-up and run time, batch size, inspection, piece rate (R13).',
+  job_cards: 'Job cards (JCD/FY…): one per production order per operation, with entries (hours, operator, good / rejected / rework, scrap kg) (R13).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';
