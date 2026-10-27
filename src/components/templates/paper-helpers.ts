@@ -1,7 +1,7 @@
 import type { CalcTotals } from '../../lib/invoice-calc';
 import type { InvoiceItem, InvoiceRecord, Payment, SenderProfile } from '../../types/invoice';
 import { getTable } from '../../lib/storage';
-import { noCashKind } from '../../lib/no-cash';
+import { noCashKind } from '../../lib/advance-tax'; // no-cash.ts (QA6-1 F4)
 import { upiLink } from '../../lib/share';
 import { shiftDay } from '../../lib/dates';
 import { weightText, wtHolds } from '../../lib/trade/tr-weight';
