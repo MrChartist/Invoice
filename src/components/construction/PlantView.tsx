@@ -11,7 +11,8 @@ import { sitesOf } from '../../lib/construction/cn-subcon';
 import { deleteHired, deleteLog, loadHired, loadLogs, machines, monthSummary, saveHired, saveLog, setEquipment } from '../../lib/construction/cn-plant';
 import { bookHireIn, hireOutInvoice, hireProposal } from '../../lib/construction/cn-plant-hire';
 import { B, fmtMoney, today, type Notify } from '../transport/shared';
-import { Num, Sel, T, Table, Txt, monthOf, n, opt, row, useRun } from './site-ui';
+import { Num, Sel, Table, Txt } from './site-ui';
+import { T, monthOf, n, opt, row, useRun } from './site-kit';
 import controls from '../../styles/controls.module.css';
 
 export default function PlantView({ notify }: { notify: Notify }) {

@@ -11,7 +11,7 @@ import LabourView from './LabourView';
 import PlantView from './PlantView';
 import RecoView from './RecoView';
 import SitePnlView from './SitePnlView';
-import { T } from './site-ui';
+import { T } from './site-kit';
 import controls from '../../styles/controls.module.css';
 
 export type SiteView = 'subcon' | 'labour' | 'plant' | 'reco' | 'pnl';

@@ -12,7 +12,8 @@ import { boqLines } from '../../lib/works/boq';
 import { deleteWorkOrder, fromBoq, loadWorkOrders, saveWorkOrder, setWoStatus, sitesOf, woValue } from '../../lib/construction/cn-subcon';
 import { cancelSubBill, loadSubBills, previousQty, releaseRetention, retentionPayable, saveSubBill, subBillHtml } from '../../lib/construction/cn-subcon-bill';
 import { B, fmtMoney, printHtml, today, type Notify } from '../transport/shared';
-import { Num, Sel, T, Table, Txt, n, opt, row, useRun } from './site-ui';
+import { Num, Sel, Table, Txt } from './site-ui';
+import { T, n, opt, row, useRun } from './site-kit';
 import controls from '../../styles/controls.module.css';
 
 export default function SubconView({ boq, notify }: { boq?: InvoiceRecord; notify: Notify }) {

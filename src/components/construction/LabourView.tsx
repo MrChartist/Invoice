@@ -14,7 +14,8 @@ import { complianceHtml, deleteCompliance, holdPct, labourBills, loadCompliance,
 import { loadLabour, loadMuster, markDay, saveLabour, settleWeek, settlements, undoSettlement, wageSheet } from '../../lib/construction/cn-muster';
 import { readConstructionSettings, saveConstructionSettings } from '../../lib/construction/cn-settings';
 import { B, errText, fmtMoney, printHtml, today, type Notify } from '../transport/shared';
-import { Num, Sel, T, Table, Txt, monthOf, n, opt, row, useRun } from './site-ui';
+import { Num, Sel, Table, Txt } from './site-ui';
+import { T, monthOf, n, opt, row, useRun } from './site-kit';
 import controls from '../../styles/controls.module.css';
 
 type Files = { pf?: AttachmentRef; esi?: AttachmentRef; reg?: AttachmentRef };

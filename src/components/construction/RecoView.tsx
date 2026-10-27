@@ -8,7 +8,8 @@ import { loadCoefficients, siteGodowns } from '../../lib/works/sites';
 import { loadMeasurements } from '../../lib/works/measurements';
 import { addIssue, materialReco, recoCsvRows, recoHtml, recoTables, removeIssue, saveTerms, starters } from '../../lib/construction/cn-reco';
 import { B, csvDownload, printHtml, today, type Notify } from '../transport/shared';
-import { Num, Sel, T, Table, Txt, n, opt, row, useRun } from './site-ui';
+import { Num, Sel, Table, Txt } from './site-ui';
+import { T, n, opt, row, useRun } from './site-kit';
 import controls from '../../styles/controls.module.css';
 
 export default function RecoView({ boq, notify }: { boq: InvoiceRecord; notify: Notify }) {
