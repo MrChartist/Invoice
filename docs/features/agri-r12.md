@@ -138,9 +138,11 @@ HSN 0401, class `milk_fresh`), CLR, tolerance, bill basis, WhatsApp-per-can swit
 
 - **One chunk, not a sub-chunk per view**: the desk, its six views, engines and strings load as ONE lazy chunk (gzip
   shares their vocabulary: ≈ 6 kB less than a chunk per view), the R9 `JewelleryDesk` pattern.
-- **Device settings row not added**: a lazy analyser row in the POS device settings (`RetailSettings.tsx`) split the
-  dairy strings into a second chunk (+6.6 kB); the analyser profile is set on Dairy → Collection instead (same
-  device-local key).
+- **Device settings row** (PENDING #19): the POS counter settings (`RetailSettings.tsx`, Scale tab) show a "Milk analyser
+  (this device)" block when the dairy pack is on — format, field order, separator, divisor, baud — saved with the
+  counter settings to the same device-local key as Dairy → Collection. A lazy row importing `AnalyserSetup` split the
+  dairy strings into a second chunk (+6.6 kB), so the block uses seven `retail` strings and imports only
+  `ag-analyser.ts` (whose one import, `scale-barcode`, the settings already load).
 - **Slips print as HTML** (58 / 80 mm page) through the print dialog, not through the ESC/POS byte path.
 - **Shift stock journal written directly** (`milkJournal` in `ag-shifts.ts`: role `books.edit`, period lock, `SJ`
   series, audit): `stockJournalsDb.save` requires a source line and a shift receipt has none. Closing a shift therefore

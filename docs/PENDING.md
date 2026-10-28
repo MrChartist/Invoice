@@ -60,7 +60,7 @@ figure, blocks a workflow or makes a vertical unusable at scale · **M** missing
 | 16 | **Done** (`mfg/mf-jw-class.ts`, class picker on the job charges invoice) — Job Work In service invoice: suggest the job-charges class from `TEXTILE_CLASS_RULES` (R16 "left as found") | L | S | `mfg-r13.md` MF-C |
 | 17 | **Done** (Statutory → Incentives: "Credit (capital grant)" picker of fixed-asset ledgers, `grantAssetLedgers`) — Capital-grant form: make `asset_account_id` pickable (default is capital-subsidy reserve, MF63) | L | S | `mfg-r13.md` MF-D |
 | 18 | **Done** (lazy `agri/FarmerPartyRow.tsx` + `agri/ag-party-form.ts` on both forms) — Vendor / client form "Farmer" section (farmers edited only on Farm → Farmers) | L | S | `agri-r12.md` AG-A |
-| 19 | Dairy analyser profile row in POS device settings (set on Dairy → Collection today) | L | S | `agri-r12.md` AG-B |
+| 19 | **Done** (POS → Counter settings → Scale tab, dairy pack; strings in `retail`, no dairy chunk split) — Dairy analyser profile row in POS device settings (set on Dairy → Collection today) | L | S | `agri-r12.md` AG-B |
 | 20 | Services: package-income deferral journal (`defer_package_income`, report only today) | M | M | `services-r10.md` SV-C |
 | 21 | Services: class bookings per occurrence; camera QR check-in; "products used per service" on the item form; staff-required block on POS | M | M | `services-r10.md` SV-A / SV-C |
 | 22 | Construction "settings switches" form (R16 "left as found") | L | S | `construction-r11.md` |

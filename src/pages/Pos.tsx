@@ -1312,6 +1312,7 @@ export function Pos() {
             onClose={() => setSettingsOpen(false)}
             keymap={keymap}
             scale={scale}
+            dairy={isPackOn(settings, 'dairy')}
             onSaved={(k, sc) => { setKeymap(k); setScale(sc); notify(retailT('settingsSaved')); }}
           />
         )}
