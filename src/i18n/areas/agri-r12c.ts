@@ -169,6 +169,10 @@ export const mlT = defineArea(
     'g.packing': 'Packing material',
     'g.other': 'Other stock',
     principalMemo: 'Principals\' material held (excluded): {qtl} qtl',
+
+    // PENDING 10: editor e-Way hint (AG-C4-4)
+    ewExempt: 'e-Way bill may not be needed for exempt goods — verify with your CA (AG12).',
+    ewPrompt: 'Taxable goods worth {v} — above ₹50,000, an e-Way bill is likely needed (Generate after saving).',
   },
   {
     'v.intake': 'आवक',
@@ -327,6 +331,9 @@ export const mlT = defineArea(
     'g.packing': 'पैकिंग सामग्री',
     'g.other': 'अन्य स्टॉक',
     principalMemo: 'माल मालिकों का माल (बाहर): {qtl} क्विंटल',
+
+    ewExempt: 'छूट वाले माल के लिए ई-वे बिल ज़रूरी न हो — अपने CA से जाँच लें (AG12)।',
+    ewPrompt: 'कर योग्य माल {v} — ₹50,000 से ऊपर, ई-वे बिल ज़रूरी होने की संभावना (सेव करने के बाद बनाएँ)।',
   },
 );
 

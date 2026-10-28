@@ -115,6 +115,7 @@ export function cleanContract(i: Partial<WorksContract>): WorksContract {
     cost_centre_id: i.cost_centre_id || undefined,
     notes: txt(i.notes, 600),
     closure: i.closure,
+    attachments: i.attachments?.length ? i.attachments.slice(0, 10) : undefined, // PENDING 14: closure documents
     created_at: i.created_at ?? new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });

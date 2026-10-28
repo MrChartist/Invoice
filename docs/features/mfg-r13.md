@@ -178,7 +178,9 @@ test row; `mf-registry` counts `CUT` / `KPB` once). E2E: step "R13-C garments de
 - **Garment output**: `reportFinished` writes one journal per variant child; the order's own output dialog (R4-A) is unchanged.
 - **Job charges class suggestion on the Job Work In service invoice** (C3-4) is not wired into the editor; the classes are in
   `TEXTILE_CLASS_RULES` and the piece bill uses `jw_textile`.
-- **5C e-way**: `dispatchFrom` exists for the invoice e-way; no button on the invoice e-way dialog yet.
+- **5C e-way**: `dispatchFrom` exists for the invoice e-way; since PENDING 11 the invoice e-Way dialog has a
+  "Dispatched from" job-worker picker (lazy `components/mfg/EwayDispatchFrom.tsx`, manufacturing packs only) — the
+  downloaded / copied JSON is the bill passed through `dispatchFrom`; blank = our own premises.
 - **Demo**: no CMT challan (it needs job-worker godowns and stock moves); 10 bundles of 30 rather than 12.
 
 ### Bundle (MF-C)

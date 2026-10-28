@@ -12,6 +12,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { Appointment, ServiceSettings } from '../../types/services-r10';
 import { getTable } from '../../lib/storage';
+import { openBroadcast } from '../../lib/cross-tab';
+import { SERVING_CHANNEL, isHello, servingMessage } from '../../lib/pos-serving';
 import { localDb } from '../../lib/localDb';
 import { enabledModules } from '../../lib/shop-mode';
 import { shiftDay } from '../../lib/dates';
@@ -124,6 +126,18 @@ function Appointments({ view, notify }: { view: View; notify: Notify }) {
   const weekStart = shiftDay(day, -weekdayOf(day));
   const queue = all.filter((a) => a.date === today && a.token).sort((a, b) => (a.token ?? 0) - (b.token ?? 0));
   const serving = queue.filter((a) => a.queue === 'called').at(-1);
+  const servingToken = serving?.token ?? null;
+  // PENDING 12: the POS customer display shows the queue's "Now serving" line (same-browser BroadcastChannel); it is
+  // sent while the queue view is open, again when a display (re)opens and asks (`hello`).
+  useEffect(() => {
+    if (view !== 'queue') return;
+    const ch = openBroadcast(SERVING_CHANNEL);
+    if (!ch) return;
+    const send = () => ch.postMessage(servingMessage(servingToken));
+    ch.onmessage = (e: MessageEvent) => { if (isHello(e.data)) send(); };
+    send();
+    return () => ch.close();
+  }, [view, servingToken]);
 
   return (
     <section className={surface.card} data-front-desk>

@@ -509,7 +509,8 @@ export interface RealtyBooking {
   registered_on?: string;
   plan_id: string;
   cls: RealtyClass;
-  broker?: { vendor_id?: string; name?: string; pct: number };
+  /** `draft_id`: PENDING 14 — the broker's commission bill (purchase draft), drafted once from the desk. */
+  broker?: { vendor_id?: string; name?: string; pct: number; draft_id?: string };
   loan?: { bank: string; sanction?: number };
   status: BookingStatus;
   /** Interest on delayed payment waived for this booking (audited with the row). */
@@ -860,4 +861,9 @@ declare module './transport-works-r5' {
     /** CN-D5: WIP memo inputs (work not yet measured, cost to complete). */
     site_pnl?: CnSitePnlInputs;
   }
+}
+
+export interface WorksContract {
+  /** PENDING 14 (CN-B5): closure documents — no-claim / completion certificates, release letters (attachments store). */
+  attachments?: AttachmentRef[];
 }
