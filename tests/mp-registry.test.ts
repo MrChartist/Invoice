@@ -38,3 +38,15 @@ test('every writer, the sync engine and the recycle bin import the registry; dat
   const sync = src('lib/sync-engine.ts');
   for (const [t, d] of Object.entries(MP_DATED)) assert.ok(sync.includes(`[\`\${DB_PREFIX}${t}\`]: '${d}'`), `${t} dated`);
 });
+
+test('R17-B block: site_musters (doc.create, audited, backed up, synced by the month end, in the open export); writers import the registry', () => {
+  assert.equal(MP_TABLES.musters, 'site_musters');
+  assert.equal(MP_TABLE_ACTIONS.site_musters, 'doc.create');
+  assert.equal(TABLE_ACTIONS.site_musters, 'doc.create');
+  assert.equal(WATCHED_TABLES.site_musters?.label, 'Site muster');
+  assert.equal(MP_DATED.site_musters, 'date');
+  assert.ok(TABLE_MEANING.site_musters);
+  assert.ok(BACKUP_RECORD_TABLES.includes('site_musters'));
+  for (const f of ['lib/manpower/mp-muster-save.ts', 'lib/manpower/mp-settings.ts']) assert.match(src(f), /import '\.\/mp-registry';/, f);
+  for (const f of ['lib/access.ts', 'lib/audit-edits.ts']) assert.ok(!src(f).includes('site_musters'), `${f}: only at runtime`);
+});
