@@ -150,3 +150,123 @@ Chunks (normalized gz): `f-logistics` 4.05 kB (rules A rows used, job / weight /
 `lg-ui` / `lg-form`), the picker in the wizard pickers chunk 0.41 kB, `profile-logistics` 0.39 kB, LogisticsBlock
 0.32 kB, wiring ≈ 1.9 kB (shop-presets 0.22, wizard 0.20, checklist 0.19, help 0.18, Features 0.17, reach 0.15, Ctrl+K
 0.12, Time 0.11, recycle bin 0.09, packs 0.08, paper mount 0.08, open export 0.06, palette 0.06 …).
+
+## R19-B — Billing, GST and job costing
+
+### What it does
+
+- **Regime per head (B2, `lg-regime.ts`, pure).** `lgRegime(head, job, ctx)` → `{ key, pos, mode, rate, supply?,
+  itc_note?, reason, ca }` by the bill date. Keys: `domestic` (Sec 12(8): registered client → its State, else our State
+  as the hand-over place, LG1), `export_freight` (12(8) proviso from 2019-02-01: goods to a place outside India
+  (`dest_country` ≠ IN) → POS 96, IGST, reason "Place of supply outside India — Sec 12(8) proviso; IGST (Circular
+  184/16/2022-GST)", LG2 / LG18), `cross_border` (client outside India: 13(9) destination of goods to 2023-09-30, 13(2)
+  from 2023-10-01, mail / courier always 13(2); POS 96 → `EXPORT_LUT` when the R14 Sec 2(6) check has no failed
+  condition and an LUT is on record, else `EXPORT_WITH_PAYMENT`, LG3), `intermediary` (commission to a client abroad:
+  our location while the R14 rule says `supplier`, 13(2) from 2026-03-30, LG4), `general` (12(2), LG9), `exempt`
+  (`role: 'exempt'` / `exempt_if` → N 12/2017-CT(R) Sl. 54(e) / 24; Bill of Supply when the whole group is exempt, lines
+  carry `sv.exempt`, LG21) and `pure_agent` (Rule 33, 0 %, LG10). Rates from `LG_RATE_RULES` through `lgRateFor`
+  (multimodal 12 % → 5 % / 18 % with an air leg from 2025-09-22, domestic only — an international multimodal job takes
+  its legs' rate, LG6); kinds without a row take the supporting-services rate; the GTA leg takes the R5-B option's rate
+  for the FY (no row = RCM) through `lg-tax-io.ts` (LG8). The ITC note (vessel / multimodal) is on the chip's hover
+  only, never printed (LG6 / LG7). `regimeHints` adds the ocean-freight RCM line for CIF imports by sea from 2023-10-01
+  (LG16).
+- **Billing a job (B1, `lg-bill.ts`, pure; `lg-issue-io.ts`).** `chargeSheet(job, heads)` = the job's typed lines
+  (`lg_jobs.charges`, saved through A's `saveJob`), else every active head with a default rate, its quantity by unit
+  (`qtyOf`: kg = chargeable, CBM, W/M, containers, packages, else 1). `planJobBills(job, sheet, ctx)` groups by place of
+  supply, document currency, document kind and export supply type. `split: 'single'` makes one document per currency and
+  is refused when the lines need different places of supply (LG9). `composite_with_freight` heads take the freight
+  head's regime and sit on its document. Each draft carries `lg = { job_id, job_no, mode, dir, refs, ports, weights,
+  heads: { [lineId]: headId }, regime, pos_reason, fx? }`. Pure-agent lines get `charge_head_id: 'rule33'` +
+  `PURE_AGENT_CHARGE` (no SAC); own lines get the head's SAC in `hsn` and the regime rate in `tax_rate`. Billed state is
+  derived: a head on a live (not cancelled, not credit-note) document of the job is billed and skipped (`billedHeads`,
+  `billState`), and cancelling a document frees its lines. `billJob(id, { date, fx })` and `billMonth('YYYY-MM', …)`
+  ("Bill delivered jobs": every `delivered` job dated in the month) issue every draft through ONE
+  `localDb.invoices.saveMany` inside `withTablesRollback`, status `Sent`, due by the company's due days. A job whose plan
+  has an error (no exchange rate) is skipped and named; the rest are billed.
+- **FX (B4).** A foreign-currency line uses the typed rate, else the currency master (`rateOn`) on the bill date. A bill
+  to a client in India is in ₹, and the line text keeps "USD 2.00 × 500 = USD 1,000.00 @ ₹84.00". A bill to a client
+  outside India stays in the line's currency with `exchange_rate`. `lg.fx` prints "Exchange rate ₹84.00 / USD (Rule 34(2)
+  CGST Rules — as per accounting standards)" in the job block (`lg-print.ts`, LG13). An LUT supply copies the LUT's ARN
+  and date from the register; without one the document is IGST with payment and the plan hints "No LUT on record".
+- **Readers (LG15).** `gst-reports.ts` / `einvoice.ts` sent every POS-96 document to EXP / 6A. One narrow condition
+  (`freight96`) changes that: POS 96 + `lg.regime === 'export_freight'` + a valid client GSTIN is B2B with POS 96 and
+  IGST (GSTR-1 B2B, 3B 3.1(a), e-Invoice `SupTyp: B2B`, `Pos: 96`). Nothing else changes: LUT bills to an overseas
+  client stay in EXP (WOPAY), and `rule33` lines stay outside GSTR-1 / 3B / e-Invoice as before.
+- **Job costing (B3, `lg-costing.ts`, pure; `lg-books-io.ts`).** Revenue = the taxable value of the job's live documents
+  in ₹ (`inrValue`); credit notes subtract; financial notes and pure-agent recoveries (`recoveryValue`) are left out.
+  Cost = the tagged bills (`PurchaseRecord.lg.job_id`, or by line `lg.lines`) read through `readPurchase` /
+  `readPurchaseLines`: taxable + GST not taken as credit; void / draft bills and C1 disbursements (`lg.on_behalf`) are
+  left out. Flags: `unbilled` (delivered / closed, no live document), `uncosted` (billed, no cost), `low` (below
+  `margin_alert_pct`). `groupPnl` groups by client / lane / salesperson / month. Documents and bills are indexed by job
+  once.
+- **Views.** Shipments → **Billing** (`billing`): the FY's jobs with their billing state and documents (links); a job's
+  charge sheet (head, qty, rate, currency, amount, and the regime chip with its reason / ITC note / CA id on hover); ₹
+  rate inputs per foreign currency; Save; "Bill job"; month + "Bill delivered jobs"; the LG19 pending note.
+  **Costing** (`costing`): per job revenue / cost / margin / % / flags, totals, the margin alert (saved to the settings)
+  and a grouped table. Purchase-bill form: one lazy job-picker row (`components/logistics/JobPick.tsx`, shown with a
+  logistics pack or on a bill that already has `lg`; it keeps C's `lg` fields). Help topics `time:shipments:billing` /
+  `:costing`, Ctrl+K rows `r19.shipments.billing` / `.costing`, synonyms (`freight invoice`, `POS 96`, `job profit`,
+  `house bill margin` …), and the `time.shipments` title extended. Demo: the job carries the seed charge sheet (no demo
+  invoices).
+- **Pending note.** `pending-changes.ts` `lg19_delivery` (area `logistics`): the 57th Council's delivery services
+  through e-commerce operators at 5 % without ITC under Sec 9(5), courier / postal excluded — not applied (LG19).
+
+### Decisions and cuts
+
+- **Cut (PRD §3 cut 2): accrual journals.** No "Accrue expected cost" and no `Logistics accrual` vouchers; `accrue` and
+  `PurchaseRecord.lg.accrual_id` stay declared and unused. Costs count when a bill is tagged (LG34).
+- **Also left out at the cap:** B1 "Share" (the share builder on the invoice page still works); a job-page tab (billing
+  lives on its view); a UI to split one bill over jobs by line (the engine reads `lg.lines`; the picker tags the whole
+  bill); the e-Invoice GTA exemption hint (`EINV_EXEMPT_RULES` unused, tree-shaken); B's demo invoices and co-loader
+  bill (the demo job has its charge sheet); `RegimeChip.tsx` (the chip is the `regimeChip(g)` string in the view). The
+  LUT link (cut 1) was kept: it reuses the R4-C register for a few bytes.
+- **Indian client = ₹ document.** A USD charge billed to a client in India is converted on the line (the USD amount and
+  rate in its text, `lg.fx` printed), so the e2e seed prints ₹99,120.00. Only a client outside India gets a USD
+  document. For an unregistered client, the hand-over place of a transport head is taken as our State (the job's origin
+  is a port code).
+- **Bridges (3 of 4).** `lg-issue-io.ts` (localDb, `makeDraft`, `PURE_AGENT_CHARGE`, the currency master, `saveJob`);
+  `lg-tax-io.ts` (`intermediaryPos` via `prof/ps-pos.ts`, because `prof-rules.ts` is imported only by Round 14 modules;
+  `exportCheck`; `gtaRate`, with the `gta_options` row read directly so the transport chunk is not split; the LUT
+  register); `lg-books-io.ts` (`readPurchase`, `inrValue`, `recoveryValue`). C owns `lg-recv-io.ts`.
+- **The views are static in the desk chunk** (not `lazy`): lazy views split `lg-save` / `lg-ui` / `lg-form` into
+  chunks of their own (+1.6 kB). `JobPick` reads `lg_jobs` with `getTable` for the same reason.
+- **Volume test.** 600 delivered jobs → 1,200 documents in one `saveMany`: ≈ 0.5 s alone (PRD: under 2 s). The test
+  allows 6 s because the full suite runs files in parallel on a shared CPU.
+
+### API for R19-C / D (and QA)
+
+- `billExtras(job, ctx)` (`lg-bill.ts`): return extra `LgCharge` lines in your `// R19-x` block (C: disbursements, with
+  the `head_id` of a pure-agent head; D: agent notes). If you need data, extend `BillCtx` with optional fields and fill
+  them in `lg-issue-io.ts` `planJob`. The lines go through the same regime / grouping / `lg.heads` path.
+- `planJob(job, { date, fx? })`, `billJob(id, opts)`, `billMonth(month, opts)` → `{ invoices, skipped, errors, hints }`
+  and `saveCharges(job, lines)` (`lg-issue-io.ts`); pure `chargeSheet`, `qtyOf`, `planJobBills`, `jobSnapshot`,
+  `jobDocs`, `billedHeads`, `billState` (`lg-bill.ts`); `lgRegime`, `regimeHints`, `regimeChip`, `RegimeCtx`
+  (`lg-regime.ts`); `regimeCtx(date, client, sender)`, `isForeignClient`, `lutOn` (`lg-tax-io.ts`).
+- Costing: `costAlloc(bill)`, `pnlRows(jobs, docs, bills, { inr, recovery }, alertPct?)`, `groupPnl(rows, by)`
+  (`lg-costing.ts`); `costBills(raw)`, `jobPnls(jobs, alertPct?)` (`lg-books-io.ts`). D4's reports can reuse `pnlRows`.
+- A bill's job: `PurchaseRecord.lg.job_id` from `JobPick` (C / D reuse it; it keeps the other `lg` fields).
+- `lg.regime` values: `domestic`, `export_freight`, `cross_border`, `intermediary`, `general`, `exempt`, `pure_agent`
+  (from the document's first own line). Only `export_freight` is read outside Round 19 (GSTR-1 / e-Invoice B2B, above).
+- Strings: `lgbT` (`i18n/areas/logistics-r19b.ts`).
+- Tests: `tests/lg-{regime,bill,costing}.test.ts`, `lg-print` (FX row), `purchase-contract` (lg-costing); e2e step
+  "R19-B billing, GST and job costing".
+
+### Bundle (R19-B)
+
+Baseline: this branch at `97ea776` (`vite build` + `check-bundle-size`): initial 183.0 kB (4 files), entry 89.0 kB, core
+3,211.5 kB, Hindi pack 354.6 kB, Hindi in core 21.6 kB, `lazy-leaves` 17.6 kB. Normalized = chunk hashes stripped from
+names and contents before gzip -9.
+
+| Budget | Before | After | Change (normalized) | Cap |
+|---|---|---|---|---|
+| Initial JS (first paint) | 183.0 kB (4 files) | 183.0 kB (4 files) | 0 | 0 ✓ |
+| Entry chunk | 89.0 kB | 88.9 kB | 0 | — |
+| Core precache (English) | 3,211.5 kB | 3,221.2 kB | **+9,055 B = 8.84 kB** | 10 kB (PRD) / 14 kB (task) ✓ |
+| Hindi pack | 354.6 kB | 355.3 kB | +0.73 kB (`lang-hi-logistics` +0.58, pending +0.11, palette / discover) | 8 kB (round) ✓ |
+| Hindi left in core | 21.6 kB | 21.6 kB | 0 | 0 ✓ |
+| `lazy-leaves` | 17.6 kB | 17.5 kB | 0 | ✓ |
+
+Chunks (normalized gz): `f-logistics` 4.05 → 8.34 kB (+4.29: the regime, bill and costing engines, the B rule rows now
+used, `logistics-r19b` English); ShipmentsDesk 4.13 → 7.67 kB (+3.55: the Billing and Costing views and the three
+bridges); JobPick 0.53 kB (lazy, bill form); pending note 0.13; demo 0.12; wiring ≈ 0.45 (Expenses 0.11, help 0.10,
+Ctrl+K 0.07, readers `einvoice` 0.06 / `gst-reports` 0.04, palette 0.03, packs 0.02, Time 0.02).

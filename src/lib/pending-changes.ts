@@ -10,7 +10,7 @@
  */
 import { pendT } from '../i18n/areas/pending-r16d';
 
-export type PendingArea = 'refund' | 'rule89' | 'latefee' | 'gstr3b' | 'export' | 'rcm_goods' | 'rcm_self' | 'society';
+export type PendingArea = 'refund' | 'rule89' | 'latefee' | 'gstr3b' | 'export' | 'rcm_goods' | 'rcm_self' | 'society' | 'logistics';
 
 export interface PendingChange {
   id: Exclude<Parameters<typeof pendT>[0], 'lead' | 'head'>;
@@ -38,6 +38,8 @@ export const PENDING_CHANGES: readonly PendingChange[] = [
   { id: 'pf8_einv', area: 'rcm_self', recommended_on: ON, source: `${PIB} ¶18`, ca: 'PF8', notified: false },
   // R18-B (HS2): not a Council recommendation — a High Court order under appeal (year only: the order's date was not read).
   { id: 'hs2_valuation', area: 'society', recommended_on: '2021', source: 'Madras HC, TVH Lumbini Square / Greenwood Owners Assn. (single judge); W.A. 2318 / 2321 of 2021 (S)', ca: 'HS2', notified: false },
+  // R19-B (LG19): delivery services through e-commerce operators (courier and postal excluded).
+  { id: 'lg19_delivery', area: 'logistics', recommended_on: ON, source: `${PIB} (S taxscan, maritimegateway)`, ca: 'LG19', notified: false },
 ];
 
 /** `YYYY-MM-DD` + `n` months (local day arithmetic; the day clamps to the month's end). */
