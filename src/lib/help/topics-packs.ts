@@ -265,6 +265,4 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:trips', 'Trips', 'यात्रा फ़ाइलें', 'Trip and event files with their bookings, cost vs sell and margin, billed in the trip\'s GST regime (tour operator without ITC, with ITC, or agent fee + pure agent).', 'Each booking.', { statutory: ca(['TV8', 'TV9', 'TV14']) }),
   t('time:trips:trips', 'Trip files', 'यात्रा फ़ाइल', 'Open a file, add bookings, see the costing; Bill makes a draft in the regime. A no-ITC trip\'s supplier bills default to no ITC; the month list shows overrides.', 'Each trip.', { statutory: ca(['TV8', 'TV28', 'TV29']) }),
   t('time:trips:bookings', 'Bookings', 'बुकिंग', 'Every component of every trip: unconfirmed, unbilled, supplier unpaid or travelling in the next 7 days. Billed means its invoice line still exists.', 'Daily.', { statutory: ca(['TV14']) }),
-  // R15-C: supplier statements, commissions (tickets and cancellations sit on Bookings)
-  t('time:trips:statements', 'Supplier statements', 'आपूर्तिकर्ता विवरण', 'Import a BSP / consolidator / bed-bank file: matched, differences, ADMs, refunds to pass on. Make bill posts it. Commission due: bill the principal.', 'Each statement.', { statutory: ca(['TV11', 'TV15', 'TV16', 'TV17']) }),
 ];
