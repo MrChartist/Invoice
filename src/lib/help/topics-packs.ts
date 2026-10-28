@@ -283,8 +283,8 @@ export const TOPICS: readonly HelpTopic[] = [
   t('recurring:society', 'Society', 'सोसाइटी', 'Societies, apartment associations and RWAs: units, members and the tariff.', 'Each change.', { statutory: ca(['HS1', 'HS28']) }),
   t('recurring:society:units', 'Units', 'यूनिट', 'Flats and shops: areas, cost, owner, tenant, parking.', 'Each new member.', { statutory: ca(['HS8', 'HS34']) }),
   // R18-B
-  t('recurring:society:bills', 'Bills', 'बिल', 'One bill per unit for a period in one batch: exempt Bill of Supply up to ₹7,500 a month, else a tax invoice; undo with a reason.', 'Each billing period.', { statutory: ca(['HS1', 'HS2', 'HS3', 'HS5', 'HS6', 'HS14']) }),
-  t('recurring:society:gst', 'GST', 'GST', 'Turnover vs the ₹20 lakh threshold, units above ₹7,500, both-conditions table, ITC split link.', 'Each month.', { statutory: ca(['HS4', 'HS9', 'HS11', 'HS15']) }),
+  t('recurring:society:bills', 'Bills', 'बिल', 'One bill per unit for a period in one batch: an exempt Bill of Supply up to the monthly limit, else a tax invoice; undo with a reason.', 'Each billing period.', { statutory: ca(['HS1', 'HS2', 'HS3', 'HS5', 'HS6', 'HS14']) }),
+  t('recurring:society:gst', 'GST', 'GST', 'Turnover vs the registration threshold, units above the limit, the both-conditions table and the ITC split link.', 'Each month.', { statutory: ca(['HS4', 'HS9', 'HS11', 'HS15']) }),
   t('recurring:society:heads', 'Tariff', 'शुल्क सूची', 'Charge heads and bases; State defaults are data, checks only hints.', 'When rates change.', { statutory: ca(['HS19', 'HS26', 'HS27', 'HS33']) }),
   t('time:trips:events', 'Event budgets', 'इवेंट बजट', 'Budget heads: approved, booked, billed, paid; over-budget heads in red; client advances, margin, POS by Sec 12(7)(a) and each vendor\'s TDS limb (hint).', 'Each event.', { statutory: ca(['TV21', 'TV22', 'TV23']) }),
 ];

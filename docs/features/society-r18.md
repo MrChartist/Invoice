@@ -237,3 +237,22 @@ the leaves group stays within its 20 kB limit (17.4 kB).
 - Turnover (`hs-turnover.ts`): `fyTurnover(invoices, from, to, recovery)`, `regThreshold(state, date)`,
   `unitsAbove(invoices, period)`, `position(turnover, threshold, above)`, `rcmHint(bill, vendor, registered, rule)`.
 - Strings `society-r18b.ts` (`hsbT`); `components/society/parts/RegimeChip.tsx`.
+
+### Bundle (R18-B)
+
+Before = `claude/elegant-cannon-cwapiv` at `34badc4` / `24d55d4` (same tree), after = this branch; `vite build` + gzip -9.
+Normalized = chunk hashes stripped before gzip.
+
+| Budget | Before | After | Delta | Cap |
+|---|---|---|---|---|
+| Initial JS (first paint) | 182.2 kB (4 files) | 182.2 kB (4 files) | **0 B** normalized (index, runtime, vendor chunks byte-identical) | 0 ✓ |
+| Entry chunk | 88.2 kB | 88.2 kB | 0 B | — |
+| Core precache (English) | 3,148.7 kB | 3,156.2 kB | +7.5 raw; **+8.04 kB normalized** | 10 kB ✓ |
+| Hindi pack | 346.5 kB | 347.6 kB | +1.1 kB (`lang-hi-society` +0.82, pending +0.17, wiring) | — |
+| Hindi left in core | 21.4 kB | 21.5 kB | +0.05 kB rounding: the two help-topic Hindi titles (`topics-packs`, the R18-A pattern) | — |
+| `lazy-leaves` | 17.4 kB | 17.4 kB | +21 B (registry rows) | — |
+
+Chunks (normalized gz): `f-society` 4.52 → 7.69 kB (+3.36: `hs-run`, `hs-regime`, `hs-turnover`, rules, `society-r18b`
+English), SocietyDesk 3.99 → 7.33 kB (+3.52: Bills / GST views, regime chip, `hs-issue-io` bridge), RcmHint 0.32 kB,
+recycle-bin +0.25, pending-changes +0.24, wiring ≈ 0.5 (help 0.15, Ctrl+K 0.14, palette 0.05, open export 0.05, purchase
+form 0.07, checklist 0.02). Both cut items (levy, RCM hint) fit and are kept.
