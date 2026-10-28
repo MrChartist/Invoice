@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { InvoiceRecord } from '../../../../types/invoice';
 import { showTicketAnnexure, ticketAnnexRows, ticketAnnexTotals } from '../../../../lib/travel/tv-annexure';
 import { usePaper } from '../../paper-context';
@@ -12,7 +12,7 @@ import styles from '../annexure-paper.module.css';
 export default function TicketAnnexurePage({ invoice }: { invoice: InvoiceRecord }) {
   const cfg = usePaper();
   const ref = useRef<HTMLDivElement>(null);
-  const [spacer, setSpacer] = useState(0);
+  // The spacer height is written straight to the element (no state: one pass, no re-render loop).
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el || cfg.size.autoHeight) return;
@@ -20,7 +20,7 @@ export default function TicketAnnexurePage({ invoice }: { invoice: InvoiceRecord
     const top = el.offsetTop + (parent?.offsetTop ?? 0);
     const rest = top % cfg.size.height;
     const next = rest === 0 ? 0 : Math.max(cfg.size.height - rest, 0);
-    if (Math.abs(next - spacer) > 1) setSpacer(next);
+    el.style.height = `${next}px`;
   });
   if (!showTicketAnnexure(invoice.items, invoice.tv)) return null;
   const rows = ticketAnnexRows(invoice.items, invoice.tv);
@@ -29,7 +29,7 @@ export default function TicketAnnexurePage({ invoice }: { invoice: InvoiceRecord
   const m = (n: number | undefined) => cfg.money(n ?? 0, invoice.currency);
   return (
     <>
-      <div ref={ref} aria-hidden="true" className={styles.spacer} style={{ height: spacer }} />
+      <div ref={ref} aria-hidden="true" className={styles.spacer} />
       <section className={styles.annexure} data-ticket-annexure={rows.length}>
         <div className={styles.head}>
           <span className={styles.title}>Ticket annexure to {invoice.invoice_number || 'DRAFT'}</span>
