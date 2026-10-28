@@ -630,14 +630,33 @@ export function cashFlowStatement(ledger: Ledger, period: Period, stock?: StockV
 const r = (p: number) => Math.round(p) / 100;
 const drCr = (p: number) => (p === 0 ? '' : `${(Math.abs(p) / 100).toFixed(2)} ${p > 0 ? 'Dr' : 'Cr'}`);
 
-export function trialBalanceCsv(tb: TrialBalance): string {
+/**
+ * PENDING 37: with `prev` (the trial balance of the comparable previous period, `previousPeriod`) a "Closing (previous)"
+ * column follows, ledgers that only had a balance then included.
+ */
+export function trialBalanceCsv(tb: TrialBalance, prev?: TrialBalance): string {
+  const before = new Map((prev?.rows ?? []).map((x) => [x.account.id, x.closing]));
+  const rows = prev ? [...tb.rows, ...prev.rows.filter((x) => !tb.rows.some((y) => y.account.id === x.account.id)).map((x) => ({ ...x, opening: 0, debit: 0, credit: 0, closing: 0 }))] : tb.rows;
+  const p = (paise: number | undefined) => (prev ? [drCr(paise ?? 0)] : []);
   return toCsv([
     ['Trial balance', `${tb.period.start} to ${tb.period.end}`, 'Working paper — verify with your CA'],
-    ['Code', 'Account', 'Group', 'Opening', 'Debit', 'Credit', 'Closing'],
-    ...tb.rows.map((x) => [x.account.code, x.account.name, groupOf(x.account.group).label, drCr(x.opening), r(x.debit), r(x.credit), drCr(x.closing)]),
-    ['', 'Total', '', '', r(tb.totals.debit), r(tb.totals.credit), ''],
-    ['', 'Closing debit / credit balances', '', '', r(tb.totals.closingDr), r(tb.totals.closingCr), ''],
+    ['Code', 'Account', 'Group', 'Opening', 'Debit', 'Credit', 'Closing', ...(prev ? [`Closing ${prev.period.start} to ${prev.period.end}`] : [])],
+    ...rows.map((x) => [x.account.code, x.account.name, groupOf(x.account.group).label, drCr(x.opening), r(x.debit), r(x.credit), drCr(x.closing), ...p(before.get(x.account.id))]),
+    ['', 'Total', '', '', r(tb.totals.debit), r(tb.totals.credit), '', ...(prev ? [''] : [])],
+    ['', 'Closing debit / credit balances', '', '', r(tb.totals.closingDr), r(tb.totals.closingCr), '', ...(prev ? [`${r(prev.totals.closingDr)} Dr / ${r(prev.totals.closingCr)} Cr`] : [])],
   ]);
+}
+
+/** PENDING 37: amounts of a previous balance sheet by line (`section key|label`), section (`section key`) and side total. */
+export function bsPreviousAmounts(prev: LedgerBalanceSheet): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const s of [...prev.equityAndLiabilities, ...prev.assets]) {
+    out.set(s.key, s.total);
+    for (const i of s.items) out.set(`${s.key}|${i.label}`, (out.get(`${s.key}|${i.label}`) ?? 0) + i.amount);
+  }
+  out.set('TOTAL:EL', prev.totalEquityAndLiabilities);
+  out.set('TOTAL:A', prev.totalAssets);
+  return out;
 }
 
 export function accountStatementCsv(s: AccountStatement): string {
@@ -650,19 +669,23 @@ export function accountStatementCsv(s: AccountStatement): string {
   ]);
 }
 
-export function balanceSheetLedgerCsv(b: LedgerBalanceSheet): string {
-  const rows: unknown[][] = [['Balance sheet (Schedule III format)', `As at ${b.asOf}`, 'Working paper — verify with your CA'], ['Particulars', 'Amount']];
-  const section = (title: string, list: BsSection[], total: number) => {
-    rows.push([title, '']);
+/** PENDING 37: `prev` (the balance sheet at the previous period's end) adds its figures as a second column. */
+export function balanceSheetLedgerCsv(b: LedgerBalanceSheet, prev?: LedgerBalanceSheet): string {
+  const before = prev ? bsPreviousAmounts(prev) : undefined;
+  const p = (k: string) => (before ? [r(before.get(k) ?? 0)] : []);
+  const blank = before ? [''] : [];
+  const rows: unknown[][] = [['Balance sheet (Schedule III format)', `As at ${b.asOf}`, 'Working paper — verify with your CA'], ['Particulars', `As at ${b.asOf}`, ...(prev ? [`As at ${prev.asOf}`] : [])]];
+  const section = (title: string, list: BsSection[], total: number, totalKey: string) => {
+    rows.push([title, '', ...blank]);
     for (const s of list) {
-      rows.push([s.label, '']);
-      for (const i of s.items) rows.push([`  ${i.label}`, r(i.amount)]);
-      rows.push([`Total ${s.label.toLowerCase()}`, r(s.total)]);
+      rows.push([s.label, '', ...blank]);
+      for (const i of s.items) rows.push([`  ${i.label}`, r(i.amount), ...p(`${s.key}|${i.label}`)]);
+      rows.push([`Total ${s.label.toLowerCase()}`, r(s.total), ...p(s.key)]);
     }
-    rows.push([`TOTAL`, r(total)]);
+    rows.push([`TOTAL`, r(total), ...p(totalKey)]);
   };
-  section('I. EQUITY AND LIABILITIES', b.equityAndLiabilities, b.totalEquityAndLiabilities);
-  section('II. ASSETS', b.assets, b.totalAssets);
+  section('I. EQUITY AND LIABILITIES', b.equityAndLiabilities, b.totalEquityAndLiabilities, 'TOTAL:EL');
+  section('II. ASSETS', b.assets, b.totalAssets, 'TOTAL:A');
   return toCsv(rows);
 }
 

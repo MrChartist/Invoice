@@ -179,7 +179,11 @@ import { loadLedger, loadStockValuer } from '…/lib/ledger';
   Day Book filter, statistics and registers automatically; a dedicated exception section can read them from `ledger.vouchers`.
 - Stock summary → item → voucher and receivables ageing → bill drill-downs still use their own pages; `DrillStack` can wrap them.
 - Balance sheet stays Schedule III vertical (no Tally horizontal Liabilities | Assets view).
-- Comparative columns: Group Summary and P&L only; TB / BS read one period.
+- ~~Comparative columns: Group Summary and P&L only; TB / BS read one period~~ — done (PENDING 37): the "Previous period
+  column" switch (report prefs `columns: 'previous'`, per report) is on the Trial balance (closing of the comparable
+  previous period per ledger / group, totals, stock memo; `trialBalanceCsv(tb, prev)`) and the Balance sheet (as at the
+  previous period's end, per line / section / total via `bsPreviousAmounts`; `balanceSheetLedgerCsv(bs, prev)`). Monthly /
+  quarterly columns stay on Group Summary. Tests: `tests/reports-comparative.test.ts`.
 - Keys: Alt+F2 (period), Alt+F1 and F12 are handled in the capture phase on Books report screens, so they win over the
   global Tally keys (`src/lib/tally-keys.ts`: Alt+F2 → Gateway period, F12 → Settings) there; elsewhere the global keys apply.
 - The Gateway Display viewer builds its BS / P&L from `ledgerBalanceSheet` / `ledgerProfitAndLoss` with

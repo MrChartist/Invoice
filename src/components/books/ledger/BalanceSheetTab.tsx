@@ -3,6 +3,8 @@ import { Info, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   balanceSheetLedgerCsv,
   blockSummary,
+  bsPreviousAmounts,
+  previousPeriod,
   deleteAsset,
   depreciationSchedule,
   fyLabelOf,
@@ -16,7 +18,7 @@ import {
 import type { Period } from '../../../lib/books';
 import { reportsT } from '../../../i18n/areas/reports-engine';
 import { DrillStack } from './DrillStack';
-import { useDrill, useDrillRows } from './drill-hooks';
+import { useDrill, useDrillRows, useReportPrefs } from './drill-hooks';
 import { groupFrame, ledgerFrame } from './report-frames';
 import { fyStartYearOf } from '../../../lib/books';
 import { DEPRECIATION_BLOCK_LABELS } from '../../../lib/tax-rules';
@@ -45,7 +47,10 @@ interface Props {
   notify: (msg: string, tone?: 'success' | 'error') => void;
 }
 
-function Side({ title, sections, total, index, row, onItem, onAccount }: {
+function Side({ title, sections, total, index, row, onItem, onAccount, prev, totalKey }: {
+  /** PENDING 37: previous balance sheet amounts (`bsPreviousAmounts`); absent = one column. */
+  prev?: ReadonlyMap<string, number>;
+  totalKey: string;
   title: string;
   sections: BsSection[];
   total: number;
@@ -71,7 +76,7 @@ function Side({ title, sections, total, index, row, onItem, onAccount }: {
                   ) : (
                     <span>{i.label}</span>
                   )}
-                  <span className={books.amt}>{money(i.amount)}</span>
+                  <span className={books.amt}>{money(i.amount)}{prev && <span className={styles.prevAmt}>{money(prev.get(`${s.key}|${i.label}`) ?? 0)}</span>}</span>
                 </summary>
                 {i.detail.map((d, n) => (
                   <div key={n} className={books.stmtSub}>
@@ -85,12 +90,12 @@ function Side({ title, sections, total, index, row, onItem, onAccount }: {
                 ))}
               </details>
             ))}
-            <div className={books.stmtRow}><span className={books.muted}>{ledgerT('sectionTotal', { section: s.label.toLowerCase() })}</span><span className={books.amt}>{money(s.total)}</span></div>
+            <div className={books.stmtRow}><span className={books.muted}>{ledgerT('sectionTotal', { section: s.label.toLowerCase() })}</span><span className={books.amt}>{money(s.total)}{prev && <span className={styles.prevAmt}>{money(prev.get(s.key) ?? 0)}</span>}</span></div>
           </li>
         ))}
         <li className={books.stmtTotal}>
           <span>{ledgerT('TOTAL')}</span>
-          <span className={books.amt}>{money(total)}</span>
+          <span className={books.amt}>{money(total)}{prev && <span className={styles.prevAmt}>{money(prev.get(totalKey) ?? 0)}</span>}</span>
         </li>
       </ul>
     </div>
@@ -112,6 +117,12 @@ function BalanceSheetRoot({ ledger, asOf, period, stock, assets, today, onChange
   const bs = useMemo(() => ledgerBalanceSheet(ledger, asOf, stock), [ledger, asOf, stock]);
   // The drill period runs to the balance-sheet date so ledgers show their closing as at that date.
   const drillPeriod = useMemo(() => ({ start: period.start <= asOf ? period.start : asOf, end: asOf }), [period.start, asOf]);
+  // PENDING 37: the balance sheet at the end of the comparable previous period, side by side.
+  const [prefs, setPrefs] = useReportPrefs('bs');
+  const compare = prefs.columns === 'previous';
+  const prevAsOf = useMemo(() => previousPeriod(drillPeriod).end, [drillPeriod]);
+  const prevBs = useMemo(() => (compare ? ledgerBalanceSheet(ledger, prevAsOf, stock) : null), [compare, ledger, prevAsOf, stock]);
+  const prevAmounts = useMemo(() => (prevBs ? bsPreviousAmounts(prevBs) : undefined), [prevBs]);
   const items = useMemo(() => [...bs.equityAndLiabilities, ...bs.assets].flatMap((s) => s.items), [bs]);
   const onItem = (i: BsItem) => i.groupId && drill.push(groupFrame(ledger, i.groupId, drillPeriod));
   const onAccount = (id: string, party?: string) => drill.push(ledgerFrame(ledger, id, drillPeriod, party));
@@ -142,7 +153,11 @@ function BalanceSheetRoot({ ledger, asOf, period, stock, assets, today, onChange
 
   return (
     <div className={books.stack}>
-      <StatementToolbar csv={() => balanceSheetLedgerCsv(bs)} filename={`balance-sheet-${asOf}.csv`}>
+      <StatementToolbar csv={() => balanceSheetLedgerCsv(bs, prevBs ?? undefined)} filename={`balance-sheet-${asOf}.csv`}>
+        <label className={styles.inlineField}>
+          <input type="checkbox" checked={compare} onChange={(e) => setPrefs({ columns: e.target.checked ? 'previous' : 'none' })} data-bs-compare />
+          <span>{reportsT('comparePrevious')}{compare ? ` (${formatDate(prevAsOf)})` : ''}</span>
+        </label>
         <span className={bs.difference === 0 ? styles.tieOk : styles.tieBad}>
           {bs.difference === 0 ? ledgerT('bsTie') : ledgerT('difference', { amount: money(bs.difference) })}
         </span>
@@ -160,8 +175,8 @@ function BalanceSheetRoot({ ledger, asOf, period, stock, assets, today, onChange
       <StockJournalNotice stock={stock} onChanged={onChanged} notify={notify} />
 
       <div className={`${books.twoCol} ${styles.drillTable}`} tabIndex={0} onKeyDown={nav.table.onKeyDown} id={nav.bodyId}>
-        <Side title={ledgerT('bsEquity')} sections={bs.equityAndLiabilities} total={bs.totalEquityAndLiabilities} index={0} row={rowProps} onItem={onItem} onAccount={onAccount} />
-        <Side title={ledgerT('bsAssets')} sections={bs.assets} total={bs.totalAssets} index={liabCount} row={rowProps} onItem={onItem} onAccount={onAccount} />
+        <Side title={ledgerT('bsEquity')} sections={bs.equityAndLiabilities} total={bs.totalEquityAndLiabilities} index={0} row={rowProps} onItem={onItem} onAccount={onAccount} prev={prevAmounts} totalKey="TOTAL:EL" />
+        <Side title={ledgerT('bsAssets')} sections={bs.assets} total={bs.totalAssets} index={liabCount} row={rowProps} onItem={onItem} onAccount={onAccount} prev={prevAmounts} totalKey="TOTAL:A" />
       </div>
       <p className={books.muted}>{reportsT('drillHint')}</p>
 
