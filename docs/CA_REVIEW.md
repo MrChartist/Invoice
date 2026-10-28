@@ -47,7 +47,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84, AG90 | 65 | 15 |
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF40–MF42, MF50–MF54, MF60–MF65, MF80–MF82, MF90–MF96 | 60 | 12 |
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
-| **Total** | | **496** | **119** |
+| 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV33 | 33 | 9 |
+| **Total** | | **529** | **128** |
 
 ---
 
@@ -1083,6 +1084,58 @@ exports of services under the FEMA 2026 regulations, 194J / 194T, partners and S
 
 `PS` ids are counted once here. The ★ items (PS1, PS3, PS4, PS5, PS6, PS12, PS15, PS18, PS20, PS22, PS23, PS26, PS27)
 are the ones a beta professional firm's figures depend on first.
+
+## 15. Travel, tour and event businesses (Round 15, ids TV1–TV33)
+
+Added with `docs/prd/round-15.md` (§9: TV1–TV31) and R15-B (TV32, TV33). It covers tour operators (domestic, outbound,
+inbound / DMCs), travel and ticketing agents (IATA / BSP or through a consolidator) and event / wedding / MICE planners,
+plus the round's cross-cutting items (party netting, the 2026 manpower and tour-package TCS changes).
+
+- Files named under "Where" with a package in brackets are planned by that package (R15-C / R15-D); the others exist
+  since R15-A / R15-B. Every rule row in `src/lib/travel-rules.ts` is `verified: false` unless its value was read in a
+  primary text in Round 15 (stricter than R14).
+- Points already asked elsewhere are not repeated: pure-agent recoveries at 0 % (G7) and their gross presentation (T25),
+  Rule 33 for professionals (PS3), hotel tariff bands (HT items), 194H (T1, T2), Sec 393 labels (T16).
+- ★ = changes what a document prints or a return reports. Sources: §2.8 of the PRD (P = primary text read, S = secondary).
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| TV1 ★ | Confirm the enacted Sec 394(1) Table Sl. No. 8 (Finance Act 2026): 2 % on overseas tour packages from 1 Apr 2026, no threshold. | 2 % flat from 2026-04-01 (`verified: false` until the Act text is read) | `travel-rules.ts` `TOUR_PACKAGE_TCS_RULES` (R15-D) | 2026-04-01 | P Finance Bill 2026 cl. 73(f), Memorandum ¶8 |
+| TV2 | Confirm the history rows: 5 % from 1 Oct 2020; 5 % / 20 % above ₹7 lakh from 1 Oct 2023; ₹10 lakh from 1 Apr 2025; per buyer per FY. | As listed | `travel-rules.ts` `TOUR_PACKAGE_TCS_RULES` (R15-D) | 2020-10-01 | S KPMG, cleartax, taxheal, tdsman; P Memorandum 2026 |
+| TV3 ★ | 2025-Act label for tour packages: Sl. No. 8 (LRS Sl. No. 7). | Sl. 8 for tour packages | `ita2025.ts` `206C1G-tour` (R15-A4) | 2026-04-01 | P Finance Bill 2026 / Memorandum |
+| TV4 | Is a stand-alone international air ticket or a stand-alone overseas hotel booking outside "overseas tour programme package"? Is a package with travel + stay always inside? | No TCS on stand-alone items, with a note | `travel/tv-tcs.ts` (R15-D) | — | S traveltradejournal, taxheal, tdsman |
+| TV5 | Non-resident buyer exclusion (notification and conditions); the 2025-Act no-PAN rate for Sl. 8. | Prompt; no-PAN = max(2 × rate, 5 %) from 2026 | `travel-rules.ts` `TCS_NO_PAN_RULES` (R15-D) | 2020-10-01 | S taxscan, taxheal |
+| TV6 | TCS base: invoice total incl. GST or taxable value? | Total incl. GST (setting) | `travel_settings.tcs.base` (R15-D) | — | Recalled |
+| TV7 ★ | Form 143 / 27EQ collection code for tour packages (and re-check `6CQ` for 1G LRS). | Blank, "to confirm" | `tds-rules.ts` collection-code row (R15-D) | — | — |
+| TV8 ★ | N 11/2017-CT(R) Sl. 23(ii) after N 15/2025-CT(R): rate, ITC condition (input tour-operator services allowed?), invoice wording, definition of tour operator. | 5 %, ITC blocked except input tour-operator services, gross-amount declaration | `travel-rules.ts` `TRAVEL_REGIME_RULES`; `travel/tv-itc.ts`; bill form `TripPick` | 2017-07-01 | S busy.in, taxclue, razorpay, taxaj (CBIC text not reachable) |
+| TV9 | May one operator use 5 % for some packages and 18 % for others? Mixed lines on one invoice? | Per trip; warning on mixing | `travel/tv-regime.ts` `regimeMix`; GST guards `TV_MIX` | — | S taxclue, bajajfinserv, busy.in |
+| TV10 | Exemption for tour-operator services to a foreign tourist for a tour wholly outside India: entry number and conditions. | `exempt_outside` regime, Table 8 exempt column | `travel-rules.ts` `exempt_outside`; R10 `sv.exempt` | 2017-07-01 | S busy.in; recalled |
+| TV11 ★ | Rule 32(3) for air travel agents: 5 % / 10 % of basic fare; "basic fare"; whether the agent's fee above that is also taxable; SAC. | Deemed default; fee inside the deemed value; SAC 998551 | `travel-rules.ts` `AIR_AGENT_VALUE_RULES` (R15-C) | 2017-07-01 | S gstzen, caclub, studycafe, taxaj |
+| TV12 | Air fare rates passed through (economy 5 %, other 18 % from 22 Sep 2025); cut-over by booking or travel date. | Shown on ticket rows as the airline's tax | Ticket rows (R15-C) | 2025-09-22 | S angelone, busy.in, theweek |
+| TV13 | Hotel bands for packages (≤ ₹7,500 5 % no ITC). Cross-ref R7 HT items. | Existing `hotel-rules.ts` | `hotel/hotel-rules.ts` (existing) | 2025-09-22 | S taxguru; R7 sources |
+| TV14 | Rule 33 for visa / embassy fees, insurance premium, airport taxes and venue payments on behalf. Cross-ref PS3. | R14 checklist guard | `travel/tv-bill.ts` (`charge_head_id: 'rule33'`); R14 `ps-disb` guard | — | R14 PS3 sources |
+| TV15 ★ | Cancellation charges (Circular 178/10/2022): rate of the principal supply for our cancellation fee in each regime; supplier charges retained. | As §8 Q16 | `travel/tv-cancel.ts` (R15-C) | 2022-08-03 | S RSM, taxo.online |
+| TV16 | Commission / PLB from airlines and hotels: GST at 18 % to the principal; 194H expected. | As stated | `travel/tv-commission.ts` (R15-C) | 2024-10-01 | Existing T rows |
+| TV17 | Insurance agent's commission: RCM by the insurer; registration of an agent making only RCM supplies. | Outward RCM flag on the insurer's invoice | `travel/tv-commission.ts`, `rcm.ts` (R15-C) | — | Recalled |
+| TV18 | POS for tour-operator services to Indian clients (Sec 12(2)); hotel components (Sec 12(3)); property outside India. | Chip as §4 D2 | `travel/tv-pos.ts` (R15-D) | — | Recalled |
+| TV19 ★ | Inbound tours for foreign tourists performed in India: POS India, not an export? | Taxable, POS India | `travel/tv-pos.ts` (R15-D) | — | Recalled |
+| TV20 | Foreign DMC services performed abroad for an Indian operator: import RCM or out of scope? | Suggest "no RCM"; default unchanged | `travel/tv-pos.ts` (R15-D) | — | Recalled |
+| TV21 ★ | Sec 12(7)(a) for event organisers: registered → recipient; unregistered → venue State; event abroad. | As stated | `travel/tv-events.ts` (R15-D) | — | Recalled; one source differs |
+| TV22 | Event management SAC and rate (998596, 18 %). | As stated | `travel-rules.ts` `EVENT_RULES` (R15-D) | 2017-07-01 | S SAC lists |
+| TV23 ★ | Supply of manpower as "work" from 1 Apr 2026 (Sec 402(47), Sec 393(1) Sl. 6(i)); artists under Sl. 6(iii). | Hints only | `tds-rules.ts` `MANPOWER_WORK_RULES` (R15-A4); vendor hints (R15-D) | 2026-04-01 | P Memorandum cl. 78 |
+| TV24 | e-Invoice thresholds unchanged in 2026 (₹5 crore; 30-day rule at ₹10 crore)? | Existing behaviour | `einvoice*.ts` (existing) | 2025-04-01 | S taxmann, tallysolutions |
+| TV25 | IMS / 3B auto-population status in 2026 (ITC lock?). | No change | `ims-file.ts`, `gstr2b.ts` (existing) | — | S cleartax, EY, GST Council newsletter |
+| TV26 | Netting: any GST or TDS effect when a receivable and a payable of one party are set off by journal (none expected)? Presentation on the ledgers. | Journal via the no-cash receipt; TDS untouched | `netting.ts` (R15-A3) | — | — (design) |
+| TV27 | Netting with a party under RCM or TDS on the bill: allowed after RCM is paid / TDS deducted? | Refused while RCM is unpaid; TDS untouched | `netting.ts` (R15-A3) | — | — (design) |
+| TV28 | ITC override on a 5 % trip: is any input (e.g. office rent) affected, or only the trip's inputs? | Only bills tagged to the trip | `travel/tv-itc.ts` `tripTag`, `itcOverrides` | — | — (design) |
+| TV29 | Trip-margin presentation for a tour operator in the books (gross vs net of pass-through)? | Gross sales and purchases (as invoiced); pure-agent recoveries gross (expense + recovery), as today (R14 PS3 decision) | `travel/tv-costing.ts`; `travel/tv-bill.ts` | — | R14 PS3 decision |
+| TV30 | Cancellation loss vs cost of sales in the P&L. | "Cancellation losses" expense | `travel/tv-costing.ts` (cancellation loss) | — | — (design) |
+| TV31 | (Market) No reliable count of travel agencies / tour operators in India was found; IATA / TAAI / IATO / OTOAI membership numbers if useful. | — | — | — | — |
+| TV32 | **SAC of an agent's service fee.** In the `agent` regime the app bills the agency's fee (sell less what is recovered at actual) on one line with SAC **998552** (reservation services for accommodation, cruises and package tours) at 18 %; air-ticket fees use 998551 (R15-C). Is 998552 right for a mixed hotel / visa / transfer booking fee, or should it be 998559 (other travel arrangement)? | 998552, 18 % | `travel-rules.ts` `TRAVEL_REGIME_RULES` (`agent.sac`) | 2017-07-01 | SAC list (recalled; `verified: false`) |
+| TV33 | **Pure-agent bookings on the agent's bill.** A booking marked "pure agent" is billed at its **cost** (INR at the booking rate) on a Rule 33 line; whatever the agent charges above cost on those bookings is folded into the 18 % fee line (fee = Σ sell − Σ pure-agent cost). Right, or must a mark-up on a pass-through always be shown on the fee line separately per booking? | One fee line | `travel/tv-bill.ts` `tripLines` | — | Rule 33 (R14 PS3 sources) |
+
+`TV` ids are counted once here. The ★ items (TV1, TV3, TV7, TV8, TV11, TV15, TV19, TV21, TV23) are the ones a beta
+travel business's figures depend on first.
 
 ## Answers log
 

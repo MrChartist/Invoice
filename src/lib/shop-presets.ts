@@ -216,7 +216,7 @@ export function applyConstructionKind(kind: ConstructionKindId, opts: { register
 /* ── R10 (SV-A1): service profile under the `services` business type ── */
 
 /** The service picker's nine choices (stored as `settings.service_kind`); the business type stays `services`. */
-export const SERVICE_KINDS = ['clinic', 'lab', 'salon', 'fitness', 'coaching', 'workshop', 'appliance', 'professional', 'other'] as const;
+export const SERVICE_KINDS = ['clinic', 'lab', 'salon', 'fitness', 'coaching', 'workshop', 'appliance', 'professional', 'other', 'travel'] as const; // R15-B1: + travel
 export type ServiceKindId = (typeof SERVICE_KINDS)[number];
 type ServicePackId = 'clinic' | 'salon' | 'fitness' | 'workshop' | 'fees' | 'pharmacy';
 
@@ -244,6 +244,7 @@ export const SERVICE_PROFILES: Readonly<Record<ServiceKindId, ServiceProfile>> =
   appliance: { modules: WORKSHOP_MODULES, packs: ['workshop'], landing: '/time?tab=workshop', defaultDueDays: 0, templateId: 'gst_tax_invoice' },
   professional: { modules: PRESETS.services, packs: [], landing: '/invoice', defaultDueDays: 15, templateId: 'freelancer_light' },
   other: { modules: [...PRESETS.services, 'pos'], packs: [], landing: '/invoice', defaultDueDays: 7, templateId: 'freelancer_light' },
+  travel: { modules: [...PRESETS.services, 'accounts'], packs: [], landing: '/invoice', defaultDueDays: 7, templateId: 'gst_tax_invoice' }, // R15-B1: the kind picker sets packs
 };
 
 export const isServiceKind = (v: unknown): v is ServiceKindId => typeof v === 'string' && (SERVICE_KINDS as readonly string[]).includes(v);
@@ -422,4 +423,30 @@ export function applyProfKind(kind: ProfKindId, opts: { registered?: boolean; su
   if (opts.firmForm === 'partnership' || opts.firmForm === 'llp') packs.add('partners');
   const modules = [...new Set<ModuleId>([...p.modules, 'time', ...(opts.registered ? ['gst' as const] : [])])];
   return { business_type: 'services', modules, service_kind: 'professional', prof_kind: kind, ...(sub ? { prof_sub: sub } : {}), industry_packs: [...packs] };
+}
+
+/* ── R15 (R15-B1): travel profile under `services` / `travel` ── */
+
+/** The travel picker's choices (stored as `settings.travel_kind`); business type stays `services`. */
+export const TRAVEL_KINDS = ['tour_operator', 'agent', 'inbound', 'events', 'other'] as const;
+export type TravelKindId = (typeof TRAVEL_KINDS)[number];
+export const TRAVEL_LANDING: Readonly<Record<TravelKindId, string>> = {
+  tour_operator: '/time?tab=trips&view=trips',
+  agent: '/time?tab=trips&view=bookings',
+  inbound: '/time?tab=trips&view=trips',
+  events: '/time?tab=trips&view=events',
+  other: '/time?tab=trips',
+};
+export const isTravelKind = (v: unknown): v is TravelKindId => typeof v === 'string' && (TRAVEL_KINDS as readonly string[]).includes(v);
+
+/**
+ * Settings patch for a travel profile: business type `services`, `service_kind: 'travel'`, modules (services + accounts
+ * + purchases; `registered` adds `gst`; `time` always kept, so `/time` stays visible and `PACK_ROUTES` is unchanged),
+ * packs in union with the company's (`events` for planners, plus `travel` when they also book travel), due days 7 and
+ * the kind. The regime default and switches (`travel_settings`) are written by `travel/tv-profile.ts`.
+ */
+export function applyTravelKind(kind: TravelKindId, opts: { registered?: boolean; currentPacks?: readonly PackId[]; alsoTravel?: boolean } = {}): ShopModeSettings & { service_kind: 'travel'; travel_kind: TravelKindId; industry_packs: PackId[]; defaultDueDays: number } {
+  const packs = new Set<PackId>([...(opts.currentPacks ?? []), ...(kind === 'events' ? (opts.alsoTravel ? ['events', 'travel'] as const : ['events'] as const) : ['travel'] as const)]);
+  const modules = [...new Set<ModuleId>([...PRESETS.services, 'accounts', 'purchases', 'time', ...(opts.registered ? ['gst' as const] : [])])];
+  return { business_type: 'services', modules, service_kind: 'travel', travel_kind: kind, industry_packs: [...packs], defaultDueDays: 7 };
 }

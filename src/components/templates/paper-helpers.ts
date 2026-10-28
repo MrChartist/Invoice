@@ -9,6 +9,7 @@ import type { JewelLine } from '../../types/retail-r9';
 import type { AgSnapshot } from '../../types/agri-r12';
 import type { MfSnapshot } from '../../types/mfg-r13';
 import type { PsSnapshot } from '../../types/prof-r14';
+import type { TvSnapshot } from '../../types/travel-r15';
 import { MSME_PAYMENT_DAYS } from '../../lib/tax-rules';
 
 /** R9 (RT-E2) gold fineness by karat, for "22K (916)" on the bill (BIS Reg. 5(11); same table as `rt-jewel-rates.ts`). */
@@ -45,7 +46,7 @@ function monthYear(day: string): string {
  * (6.6 / 6.11), e.g. "Batch B12 · Mfg 01/2026 · Exp 06/2027" or "S/N: 3567…, 3567… · Warranty 12 months".
  * '' for untracked lines, so ordinary documents print exactly as before.
  */
-export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw' | 'id' | 'sv'>> & { bin?: string }) | undefined, ag?: AgSnapshot, mf?: MfSnapshot, ps?: PsSnapshot): string {
+export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw' | 'id' | 'sv'>> & { bin?: string }) | undefined, ag?: AgSnapshot, mf?: MfSnapshot, ps?: PsSnapshot, tv?: TvSnapshot): string {
   if (!item) return '';
   if (item.jw) return jewelText(item.jw); // R9 (RT-E2): the BIS sub-line (the tag no. is its serial)
   const parts: string[] = [];
@@ -61,6 +62,7 @@ export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' |
   parts.push(staffText(item)); // R10 (SV-A): '' without the `sv.staff_print` snapshot
   parts.push(mfLineText(item, mf)); // R13 (MF-A5): '' without the `mf` snapshot
   parts.push(psLineText(item, ps)); // R14 (PS-A5): '' without the `ps` snapshot
+  parts.push(tvLineText(item, tv)); // R15-B4: '' without the `tv` snapshot
   return parts.filter(Boolean).join(' · ');
 }
 
@@ -265,6 +267,12 @@ export function psLineText(item: { id?: string } | undefined, ps: PsSnapshot | u
   const l = item?.id ? ps?.lines?.[item.id] : undefined;
   if (!l) return '';
   return [l.matter && `Matter ${l.matter}`, l.udin && `UDIN ${l.udin}`, l.stage, l.ro && `RO ${l.ro}`, l.covered && 'Covered by the agreed fee'].filter(Boolean).join(' · ');
+}
+
+/** R15-B4: ticket particulars under a line from the document's `tv.lines[lineId].tkt` (C1); '' otherwise. */
+export function tvLineText(item: { id?: string } | undefined, tv: TvSnapshot | undefined): string {
+  const k = item?.id ? tv?.lines?.[item.id]?.tkt : undefined;
+  return k ? [k.pax, k.airline, k.ticket_no && `Tkt ${k.ticket_no}`, k.pnr && `PNR ${k.pnr}`, k.sector].filter(Boolean).join(' · ') : '';
 }
 
 /**

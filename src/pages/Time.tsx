@@ -77,6 +77,12 @@ const PS_DESKS = new Map(Object.entries(PS_DESK_OF).flatMap(([tab, file]) => {
 }));
 const r14T = defineArea({ matters: 'Matters', wip: 'WIP & billing', firm: 'Firm', cadesk: 'CA desk', clientmoney: 'Client money', exportsvc: 'Exports of services' } as const, { matters: 'मामले', wip: 'अबिल्ड कार्य और बिलिंग', firm: 'फ़र्म', cadesk: 'CA डेस्क', clientmoney: 'क्लाइंट का पैसा', exportsvc: 'सेवाओं का निर्यात' });
 
+// R15: the Trips desk (B: trips / bookings; C / D add views), one lazy chunk, mounted by file name like the R14 desks.
+const TV_DESK_FILES = import.meta.glob<{ default: ComponentType<{ view?: string; notify: (m: string, tone?: 'success' | 'error' | 'info') => void }> }>('../components/travel/*Desk.tsx');
+const TV_DESK_LOAD = TV_DESK_FILES['../components/travel/TripsDesk.tsx'];
+const TripsDesk = TV_DESK_LOAD ? lazy(TV_DESK_LOAD) : null;
+const r15T = defineArea({ trips: 'Trips' } as const, { trips: 'यात्रा फ़ाइलें' });
+
 type Tab = TimeTab;
 // R6-B1: the ids (and packs) live in time-tabs.ts; the labels stay here.
 const TAB_LABEL: Record<Tab, () => string> = {
@@ -92,6 +98,7 @@ const TAB_LABEL: Record<Tab, () => string> = {
   firm: () => r14T('firm'), cadesk: () => r14T('cadesk'), // R14 (PS-D)
   clientmoney: () => r14T('clientmoney'), // R14 (PS-B)
   exportsvc: () => r14T('exportsvc'), // R14 (PS-C)
+  trips: () => r15T('trips'), // R15
 };
 const TABS: { id: Tab; label: () => string; pack?: PackId; alsoPacks?: readonly PackId[] }[] = TIME_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -445,6 +452,7 @@ export function Time() {
       {tab === 'clinic' && <Suspense fallback={null}><ClinicDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
       {tab === 'members' && <Suspense fallback={null}><MembersDesk notify={notify} /></Suspense>}
       {PS_DESKS.has(tab) && <Suspense fallback={null}><PsDesk tab={tab} view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
+      {tab === 'trips' && TripsDesk && <Suspense fallback={null}><TripsDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
 
       {tab === 'settings' && (
         <section className={cn(surface.card, styles.prefs)}>

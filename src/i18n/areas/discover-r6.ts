@@ -107,6 +107,7 @@ export const discoverT = defineArea(
     'adv.agriProfile': 'Agriculture profile', // R12 (AG-A1)
     'adv.mfgProfile': 'Manufacturing profile', // R13 (MF-A1)
     'adv.profProfile': 'Professional profile', // R14 (PS-A1)
+    'adv.travelProfile': 'Travel profile', // R15-B1
     'awho.batches': 'Lots with expiry (set per stock item)',
     'awho.serials': 'Goods sold by serial / IMEI (per item)',
     'awho.godowns': 'Stock in more than one place',
@@ -133,6 +134,7 @@ export const discoverT = defineArea(
     'awho.agriProfile': 'FPOs, co-operatives, dairies, mills, cold storages, input dealers, farms — farmers, produce vouchers, payment cycles',
     'awho.mfgProfile': 'Job shops, garment units, moulders, presses, food units — work centres, routings, job cards, capacity',
     'awho.profProfile': 'CA firms, advocates, architects, consultants, agencies, freelancers — matters, pre-bill, WIP, realisation',
+    'awho.travelProfile': 'Tour operators, travel agents, DMCs, event planners — trips, bookings, margin, GST regimes',
   } as const,
   {
     learnMore: 'और जानें',
@@ -236,6 +238,7 @@ export const discoverT = defineArea(
     'adv.agriProfile': 'कृषि प्रोफ़ाइल',
     'adv.mfgProfile': 'मैन्युफैक्चरिंग प्रोफ़ाइल',
     'adv.profProfile': 'पेशेवर प्रोफ़ाइल',
+    'adv.travelProfile': 'यात्रा प्रोफ़ाइल',
     'awho.batches': 'एक्सपायरी वाले लॉट (हर स्टॉक आइटम पर)',
     'awho.serials': 'सीरियल / IMEI से बिक्री (हर आइटम पर)',
     'awho.godowns': 'एक से ज़्यादा जगह स्टॉक',
@@ -262,5 +265,6 @@ export const discoverT = defineArea(
     'awho.agriProfile': 'FPO, सहकारी, डेयरी, मिल, शीतगृह, खाद-बीज विक्रेता, फ़ार्म — किसान, उपज वाउचर, भुगतान चक्र',
     'awho.mfgProfile': 'जॉब शॉप, गारमेंट इकाई, मोल्डर, प्रेस, खाद्य इकाई — कार्य केंद्र, रूटिंग, जॉब कार्ड, क्षमता',
     'awho.profProfile': 'CA फ़र्म, वकील, आर्किटेक्ट, कंसल्टेंट, एजेंसी, फ़्रीलांसर — मामले, प्री-बिल, अबिल्ड कार्य, वसूली दर',
+    'awho.travelProfile': 'टूर ऑपरेटर, ट्रैवल एजेंट, DMC, इवेंट प्लानर — यात्रा फ़ाइल, बुकिंग, मार्जिन, GST व्यवस्था',
   },
 );
