@@ -24,7 +24,7 @@ test('Vite 8 rolldown options with codeSplitting.groups, no manualChunks / rollu
 
 test('the groups, in order, with their priorities', () => {
   const families = [...cfg.matchAll(/safeFamilyGroup\(graph, '(f-[a-z]+)', familyRe\([^)]*\), (\d+)\)/g)].map((m) => [m[1], Number(m[2])]);
-  assert.deepEqual(families.map(([n]) => n), ['f-hotel', 'f-trade', 'f-retail', 'f-services', 'f-cn', 'f-agri', 'f-mfg', 'f-prof', 'f-travel', 'f-manpower', 'f-society']); // R17-A: f-manpower; R18-A: f-society
+  assert.deepEqual(families.map(([n]) => n), ['f-hotel', 'f-trade', 'f-retail', 'f-services', 'f-cn', 'f-agri', 'f-mfg', 'f-prof', 'f-travel', 'f-manpower', 'f-society', 'f-logistics']); // R17-A: f-manpower; R18-A: f-society; R19-A: f-logistics
   assert.ok(families.every(([, p]) => p === 12), 'families at priority 12');
   assert.match(cfg, /leafGroup\(graph, 'lazy-leaves', 9, \{ maxModuleSize: 3000 \}\)/);
   const names = groups.map((g) => (typeof g.name === 'string' ? g.name : g.name.name));
@@ -86,6 +86,11 @@ test('R18-A: the f-society family captures the engines, rules and areas; not the
   const re = familyRe('society', 'society-rules', 'society-r18', 'hs-registry');
   assert.ok(re.test('/x/src/lib/society/hs-bill.ts') && re.test('/x/src/lib/society-rules.ts') && re.test('/x/src/i18n/areas/society-r18a.ts'));
   assert.ok(!re.test('/x/src/lib/society/hs-registry.ts') && !re.test('/x/src/i18n/areas/society-r18a-pick.ts'));
+});
+test('R19-A: the f-logistics family captures the engines, rules and areas; not the registry or the -pick areas', () => {
+  const re = familyRe('logistics', 'logistics-rules', 'logistics-r19', 'lg-registry');
+  assert.ok(re.test('/x/src/lib/logistics/lg-job.ts') && re.test('/x/src/lib/logistics-rules.ts') && re.test('/x/src/i18n/areas/logistics-r19a.ts'));
+  assert.ok(!re.test('/x/src/lib/logistics/lg-registry.ts') && !re.test('/x/src/i18n/areas/logistics-r19a-pick.ts'));
 });
 const fam = (id: string) => FAM.test(id);
 

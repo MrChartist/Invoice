@@ -294,6 +294,10 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   // R18-A
   society_settings: 'Society settings: State, cycle, heads (R18).',
   society_units: 'Society units, owners and tenants (R18).',
+  // R19-A
+  logistics_settings: 'Logistics settings: charge heads (kind, role, unit, rate, currency, SAC, POS rule), job prefix, currency; B–D add billing split, deposits, volumetric divisors, zones, storage plans (R19).',
+  lg_jobs: 'Logistics job files: number, date, status, direction, mode, legs, ports, client, agent, refs (MBL / HBL / MAWB / HAWB / SB / BOE), containers, weights, dimensions (R19).',
+  lg_rate_sheets: 'Logistics rate sheets: client, lane (origin, destination, mode), validity, rates by charge head with minimum (R19).',
   society_runs: 'Society billing runs: period, bill / due date, batch, units, counts by document type, totals by charge head, special levy, undone (R18).',
   travel_bookings: 'Travel bookings: trip / event file (cost centre), component, supplier, PNR / ref., dates, cost (currency, rate), sell, pure agent, status, supplier bill, invoice line once billed (R15).',
   // R15-C
