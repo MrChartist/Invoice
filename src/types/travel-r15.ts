@@ -121,6 +121,53 @@ export interface TvTicket {
   airline_gst?: number;
 }
 
+/* ════════════════════════════════════════ R15-C ════════════════════════════════════════ */
+
+/** C1: the air-ticket value method on a document (`tv.air`): Rule 32(3) deemed value or the actual fee (TV11). */
+export interface TvSnapshot {
+  air?: { method: 'deemed' | 'actual'; fee: number; value: number; line_id?: string; note?: string };
+}
+
+export interface TravelBooking {
+  /** C1: tickets entered on an `air` booking (copied to the invoice's `tv.lines` when billed). */
+  tkt?: TvTicket[];
+}
+
+/** C2: one row of a supplier statement (BSP TKTT / RFND / ADMA / ACMA, a consolidator or bed-bank line). */
+export interface StatementRow {
+  doc_no: string;
+  type: string;
+  date?: string;
+  pax?: string;
+  gross: number;
+  taxes: number;
+  commission: number;
+  net: number;
+  match?: { kind: 'invoice_line' | 'booking' | 'bill'; id: string };
+  status?: 'matched' | 'diff' | 'missing' | 'ours_only';
+  /** Our amount less theirs when `diff`. */
+  diff?: number;
+  /** ADM to record / dispute; a refund not yet passed on to the client. */
+  flag?: 'adm' | 'refund';
+  disputed?: boolean;
+}
+
+/** C2: table `supplier_statements` (dated by `period_end`; rows inside, ≤ 2,000 a statement). */
+export interface SupplierStatement {
+  id: string;
+  vendor_id: string;
+  kind: 'bsp' | 'consolidator' | 'bedbank';
+  period_start: string;
+  period_end: string;
+  ref: string;
+  rows: StatementRow[];
+  totals: { gross: number; taxes: number; commission: number; net: number };
+  bill_id?: string;
+  file_name?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
 /* ════════════════════════════════════════ R15-D (declared by B) ════════════════════════════════════════ */
 
 export interface TvEvent {

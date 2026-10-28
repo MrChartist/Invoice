@@ -199,7 +199,7 @@ export const tabsT = defineArea(
     'time.works': 'Works contracts (BOQ, RA bills, sub-contracts, muster, plant, site P&L)',
     // R10: service desks (also "Industry packs" rows)
     'time.matters': 'Matters, engagements, conflict checks, letters', 'time.exportsvc': 'Exports of services: Sec 2(6) check, EDF, realisation, refund, platforms', 'time.wip': 'WIP, pre-bill, realisation, utilisation, year end', // R14 (PS-A)
-    'time.trips': 'Trips: trip and event files, bookings, costing, margin, tour GST regimes', // R15-B
+    'time.trips': 'Trips: trip and event files, bookings, costing, margin, tour GST regimes, air tickets, supplier statements (BSP), cancellations', // R15-B; R15-C appended
     'time.firm': 'Firm: partners, appropriation, 194T, presumptive paper, 194J', 'time.cadesk': 'CA desk: compliance work to bill, fee schedule, UDIN register', // R14 (PS-D)
     'time.clientmoney': 'Client money: trust ledger, three-way reconciliation, statements', // R14 (PS-B)
     'time.appointments': 'Appointments: day book, queue, reminders', 'time.commission': 'Staff & commission', 'time.clinic': 'Clinic: patients, OPD, lab', 'time.members': 'Members: plans, check-in, classes', 'time.workshop': 'Workshop: job cards, estimates, claims',
@@ -400,7 +400,7 @@ export const tabsT = defineArea(
     'time.settings': 'समय सेटिंग्स',
     'time.works': 'वर्क्स कॉन्ट्रैक्ट (BOQ, RA बिल, उप-ठेके, हाज़िरी, प्लांट, साइट लाभ-हानि)',
     'time.matters': 'मामले, नियुक्तियाँ, हितों का टकराव जाँच, नियुक्ति पत्र', 'time.exportsvc': 'सेवाओं का निर्यात: धारा 2(6) जाँच, EDF, वसूली, रिफंड, प्लेटफ़ॉर्म', 'time.wip': 'अबिल्ड कार्य, प्री-बिल, वसूली दर, उपयोग दर, वर्ष अंत',
-    'time.trips': 'यात्रा फ़ाइल: यात्रा और इवेंट, बुकिंग, लागत, मार्जिन, टूर GST व्यवस्था',
+    'time.trips': 'यात्रा फ़ाइल: यात्रा और इवेंट, बुकिंग, लागत, मार्जिन, टूर GST व्यवस्था, हवाई टिकट, आपूर्तिकर्ता विवरण, रद्दीकरण',
     'time.firm': 'फ़र्म: साझेदार, लाभ विभाजन, 194T, अनुमानित आय, 194J', 'time.cadesk': 'CA डेस्क: बिल करने वाला काम, फ़ीस सूची, यूडीआईएन रजिस्टर',
     'time.clientmoney': 'क्लाइंट का पैसा: ट्रस्ट खाता, त्रि-पक्षीय मिलान, विवरण',
     'time.appointments': 'अपॉइंटमेंट: दिन बुक, कतार, रिमाइंडर', 'time.commission': 'स्टाफ और कमीशन', 'time.clinic': 'क्लिनिक: मरीज़, OPD, लैब', 'time.members': 'सदस्य: प्लान, चेक-इन, क्लास', 'time.workshop': 'वर्कशॉप: जॉब कार्ड, एस्टिमेट, क्लेम',

@@ -36,8 +36,17 @@ test('R15-B block: rights, audit labels, registered at runtime; first-paint maps
   for (const p of TV_PACKS) assert.ok(PACK_IDS.includes(p), p);
 });
 
+test('R15-C block: supplier statements (books.edit, audited, dated by period end, open export)', () => {
+  assert.equal(TV_TABLE_ACTIONS.supplier_statements, 'books.edit');
+  assert.equal(TABLE_ACTIONS.supplier_statements, 'books.edit');
+  assert.equal(TV_TABLES.statements, 'supplier_statements');
+  assert.equal(TV_DATED.supplier_statements, 'period_end');
+  assert.ok(TABLE_MEANING.supplier_statements);
+  assert.ok(!src('lib/access.ts').includes('supplier_statements:'));
+});
+
 test('every writer, the sync engine and the recycle bin import the registry; dated rows in the sync engine', () => {
-  for (const f of ['tv-settings', 'tv-bookings', 'tv-bill']) assert.match(src(`lib/travel/${f}.ts`), /import '\.\/tv-registry';/, f);
+  for (const f of ['tv-settings', 'tv-bookings', 'tv-bill', 'tv-air', 'tv-statements', 'tv-statement-bill', 'tv-cancel']) assert.match(src(`lib/travel/${f}.ts`), /import '\.\/tv-registry';/, f);
   assert.match(src('lib/sync-engine.ts'), /import '\.\/travel\/tv-registry';/);
   assert.match(src('lib/trust/recycle-bin.ts'), /import '\.\.\/travel\/tv-registry';/);
   const sync = src('lib/sync-engine.ts');

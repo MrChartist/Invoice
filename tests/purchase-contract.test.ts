@@ -1126,3 +1126,15 @@ test('R15-B trip costing and the ITC override list read the real bill shape', as
   assert.equal(c.unpaid, 2360);
   assert.deepEqual(itcOverrides([tagged, blocked, voided, { ...tagged, id: 'p3', tv: { trip_id: 't2' } }]).map((o) => [o.id, o.tax]), [['p1', 180]]);
 });
+
+// R15-C2 / C3: the statement's bill (fares at actual, ADMs) is a real purchase row; the cancellation's debit note goes
+// through `purchase-returns` (which reads the bill through `readPurchase`).
+test('R15-C statement bill is read back by readPurchase', async () => {
+  const { statementBill } = await import('../src/lib/travel/tv-statement-bill.ts');
+  const st = { id: 's', vendor_id: 'v', kind: 'bsp' as const, period_start: '2026-10-01', period_end: '2026-10-15', ref: 'BSP 2610A', created_at: '',
+    rows: [{ doc_no: 'A', type: 'ADMA', gross: 3500, taxes: 0, commission: 0, net: 3500, flag: 'adm' as const }], totals: { gross: 13500, taxes: 0, commission: 120, net: 13380 } };
+  const c = readPurchase({ ...statementBill(st, { name: 'IATA BSP India' }), id: 'b' });
+  assert.ok(c);
+  assert.deepEqual([c!.date, c!.total, c!.taxable, c!.itcEligible, c!.paid], ['2026-10-15', 13380, 13380, false, 0]);
+  assert.deepEqual(readPurchaseLines({ ...statementBill(st), id: 'b' } as never).map((l) => l.quantity * l.unitCost), [9880, 3500]);
+});

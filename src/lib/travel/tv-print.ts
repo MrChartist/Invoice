@@ -19,6 +19,6 @@ export function tvPaper(tv: TvSnapshot): TvPaper {
     if (t.lead) rows.push(['Lead passenger', t.lead]);
     if (t.pax) rows.push(['Passengers', String(t.pax)]);
   }
-  return { title: t?.kind === 'event' ? 'Event' : 'Trip', rows, decl: tv.decl ?? '' };
+  return { title: t?.kind === 'event' ? 'Event' : 'Trip', rows, decl: [tv.decl, tv.air?.note].filter(Boolean).join(' ') }; // R15-C1: the Rule 32(3) value sentence
 }
 
