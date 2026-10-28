@@ -49,7 +49,7 @@ export function shortfalls(site: Site, m: Pick<SiteMuster, 'month' | 'rows'>, al
   return out;
 }
 
-export interface Hint { k: 'ot' | 'fte' | 'wage' | 'clra'; who: string; ca: string }
+export interface Hint { k: 'ot' | 'fte' | 'wage' | 'clra' | 'clraAll'; who: string; ca: string }
 
 export function labourHints(i: { month: string; lines: readonly RunLine[]; staff: readonly Staff[]; sites: readonly Site[]; musters: readonly SiteMuster[]; licences: readonly MpLicence[] }): Hint[] {
   const end = monthEnd(i.month);
@@ -72,5 +72,11 @@ export function labourHints(i: { month: string; lines: readonly RunLine[]; staff
     const n = new Set(i.musters.filter((m) => m.site_id === s.id && m.month === i.month).flatMap((m) => m.rows.map((r) => r.employee_id))).size;
     if (n >= min && !lic) out.push({ k: 'clra', who: `${s.mp.code} (${n})`, ca: 'MP17' });
   }
+  // QA20 V9: the licence test also reaches the contractor itself — OSH Code Sec 45(1)(ii) "every manpower supply
+  // contractor who has employed, on any day of the preceding twelve months, fifty or more contract labour" (CLRA Act
+  // Sec 1(4)(b): 20 workmen) — so the agency's people across ALL its sites count, not one site's (ten sites of ten
+  // guards never set off the per-site test). Proxy: distinct people on the month's musters (MP45).
+  const all = new Set(i.musters.filter((m) => m.month === i.month).flatMap((m) => m.rows.map((r) => r.employee_id))).size;
+  if (all >= min && !lic && !out.some((h) => h.k === 'clra')) out.push({ k: 'clraAll', who: String(all), ca: 'MP17' });
   return out;
 }

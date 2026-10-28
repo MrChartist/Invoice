@@ -178,3 +178,13 @@ test('V8: muster warnings, licence notices and the GST TDS hint follow the inter
     await setLanguage('en', { persist: false });
   }
 });
+
+test('V9: the contract-labour licence hint counts the agency\'s people across all its sites (OSH Code Sec 45(1)(ii))', async () => {
+  const { labourHints } = await import('../src/lib/manpower/mp-wage-check.ts');
+  const sites = Array.from({ length: 6 }, (_, k): Site => ({ id: `s${k}`, name: `S${k}`, client_id: 'c', mp: info({ code: `S-${k}` }) }));
+  const musters = sites.map((s): SiteMuster => ({ id: `m${s.id}`, site_id: s.id, month: '2026-10', date: '', status: 'locked', updated_at: '', rows: Array.from({ length: 10 }, (_, j) => ({ employee_id: `${s.id}e${j}`, post_id: 'g', duties: 26 })) }));
+  const h = (lic: { id: string; kind: 'osh' | 'psara'; no: string; valid_till: string }[] = [], ms = musters) => labourHints({ month: '2026-10', lines: [], staff: [], sites, musters: ms, licences: lic }).map((x) => [x.k, x.who]);
+  assert.deepEqual(h(), [['clraAll', '60']], 'no site has 50, the agency has 60');
+  assert.deepEqual(h([{ id: 'l', kind: 'osh', no: '1', valid_till: '2027-03-31' }]), []);
+  assert.deepEqual(h([], musters.slice(0, 4)), [], '40 people: below 50');
+});
