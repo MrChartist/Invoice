@@ -97,7 +97,9 @@ const R10_PACKS: readonly string[] = ['clinic', 'salon', 'fitness', 'workshop',
   // R17: the manpower packs too — every manpower kind keeps `time`.
   'manpower', 'security',
   // R18: the society pack too — every society kind keeps `recurring` and `accounts`; common credit needs `gst` anyway.
-  'society'];
+  'society',
+  // R19: the logistics packs too — every logistics kind keeps `time` (the Shipments desk and the exportsvc tab live there).
+  'logistics', 'customs', 'courier', 'warehouse'];
 
 test('R6-B2 pin: the shell copies PACK_ROUTES / PACK_OF_TYPE_INLINE equal PACK_TABS / PACK_OF_TYPE', async () => {
   const { PACK_ROUTES, PACK_OF_TYPE_INLINE, moduleOfPath } = await import('../src/lib/shop-mode.ts');

@@ -89,6 +89,12 @@ const MP_DESK_LOAD = MP_DESK_FILES['../components/manpower/DeployDesk.tsx'];
 const DeployDesk = MP_DESK_LOAD ? lazy(MP_DESK_LOAD) : null;
 const r17T = defineArea({ deploy: 'Deploy' } as const, { deploy: 'तैनाती' });
 
+// R19: the Shipments desk (A: jobs / rates; B–D add views), one lazy chunk, mounted by file name like the R14–R17 desks.
+const LG_DESK_FILES = import.meta.glob<{ default: ComponentType<{ view?: string; notify: (m: string, tone?: 'success' | 'error' | 'info') => void }> }>('../components/logistics/*Desk.tsx');
+const LG_DESK_LOAD = LG_DESK_FILES['../components/logistics/ShipmentsDesk.tsx'];
+const ShipmentsDesk = LG_DESK_LOAD ? lazy(LG_DESK_LOAD) : null;
+const r19T = defineArea({ shipments: 'Shipments' } as const, { shipments: 'शिपमेंट' });
+
 type Tab = TimeTab;
 // R6-B1: the ids (and packs) live in time-tabs.ts; the labels stay here.
 const TAB_LABEL: Record<Tab, () => string> = {
@@ -106,6 +112,7 @@ const TAB_LABEL: Record<Tab, () => string> = {
   exportsvc: () => r14T('exportsvc'), // R14 (PS-C)
   trips: () => r15T('trips'), // R15
   deploy: () => r17T('deploy'), // R17
+  shipments: () => r19T('shipments'), // R19
 };
 const TABS: { id: Tab; label: () => string; pack?: PackId; alsoPacks?: readonly PackId[] }[] = TIME_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -461,6 +468,7 @@ export function Time() {
       {PS_DESKS.has(tab) && <Suspense fallback={null}><PsDesk tab={tab} view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
       {tab === 'trips' && TripsDesk && <Suspense fallback={null}><TripsDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
       {tab === 'deploy' && DeployDesk && <Suspense fallback={null}><DeployDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
+      {tab === 'shipments' && ShipmentsDesk && <Suspense fallback={null}><ShipmentsDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
 
       {tab === 'settings' && (
         <section className={cn(surface.card, styles.prefs)}>

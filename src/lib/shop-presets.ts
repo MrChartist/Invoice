@@ -500,3 +500,26 @@ export function applySocietyKind(kind: SocietyKindId, opts: { registered?: boole
   const modules = [...new Set<ModuleId>([...PRESETS[type], 'recurring', 'accounts', 'banking', ...(opts.registered ? ['gst' as const] : [])])];
   return { business_type: type, modules, society_kind: kind, industry_packs: [...new Set<PackId>([...(opts.currentPacks ?? []), 'society'])], defaultDueDays: 15, templateId: 'gst_tax_invoice' };
 }
+
+/* ── R19 (R19-A1): logistics profile — a wizard card, not a business type (the R12 / R13 / R18 pattern) ── */
+
+/** The logistics picker's choices (stored as `settings.logistics_kind`). */
+export const LOGISTICS_KINDS = ['forwarder', 'cha', 'courier', 'warehouse', 'multi'] as const;
+export type LogisticsKindId = (typeof LOGISTICS_KINDS)[number];
+export const isLogisticsKind = (v: unknown): v is LogisticsKindId => typeof v === 'string' && (LOGISTICS_KINDS as readonly string[]).includes(v);
+const LG_KIND_PACKS: Readonly<Record<LogisticsKindId, readonly PackId[]>> = { forwarder: ['logistics'], cha: ['logistics', 'customs'], courier: ['logistics', 'courier'], warehouse: ['logistics', 'warehouse'], multi: ['logistics', 'customs'] };
+/** Where a kind lands after setup: the Shipments desk on Time (jobs; a courier the courier view, a warehouse storage — D). */
+export const logisticsLanding = (kind: LogisticsKindId): string => `/time?tab=shipments&view=${kind === 'courier' ? 'courier' : kind === 'warehouse' ? 'storage' : 'jobs'}`;
+
+/**
+ * Settings patch for a logistics profile: business type `transport`, modules = the `transport` preset ∪ `time` (so
+ * `/time`, where the Shipments desk lives, is visible without touching `PACK_ROUTES`; an unregistered firm drops `gst`),
+ * packs = the company's ∪ the kind's packs (∪ `courier` / `warehouse` ticked for `multi`) ∪ `transport` only when the
+ * firm also runs its own lorries — written as an EXPLICIT list, so the R5-B `transport` pack the type implies is not
+ * switched on by it. Due days 30, the GST tax-invoice template. Changing the profile deletes nothing.
+ */
+export function applyLogisticsKind(kind: LogisticsKindId, opts: { registered?: boolean; ownLorries?: boolean; extra?: readonly ('courier' | 'warehouse')[]; currentPacks?: readonly PackId[] } = {}): ShopModeSettings & { logistics_kind: LogisticsKindId; industry_packs: PackId[]; defaultDueDays: number; templateId: string } {
+  const modules = [...new Set<ModuleId>([...PRESETS.transport, 'time'])].filter((m) => opts.registered || m !== 'gst');
+  const packs = [...(opts.currentPacks ?? []), ...LG_KIND_PACKS[kind], ...(kind === 'multi' ? opts.extra ?? [] : []), ...(opts.ownLorries ? ['transport' as const] : [])];
+  return { business_type: 'transport', modules, logistics_kind: kind, industry_packs: [...new Set<PackId>(packs)], defaultDueDays: 30, templateId: 'gst_tax_invoice' };
+}

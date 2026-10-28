@@ -51,7 +51,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF23 | 23 | 5 |
 | 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP48 | 48 | 13 |
 | 18. Co-operative housing societies, apartment associations and RWAs (Round 18, planned) | HS1–HS70 | 70 | 19 |
-| **Total** | | **685** | **171** |
+| 19. Freight forwarders, customs brokers, courier and warehouses (Round 19, planned) | LG1–LG44 | 44 | 13 |
+| **Total** | | **729** | **184** |
 
 ---
 
@@ -1367,6 +1368,68 @@ societies and maintenance agencies billing owners.
 
 `HS` ids are counted once here. The ★ items (HS1, HS2, HS3, HS4, HS6, HS8, HS11, HS13, HS20, HS21, HS26, HS33, HS39, HS45, HS46, HS47, HS52, HS59, HS65)
 change what a document prints or a return reports.
+
+## 19. Freight forwarders, customs brokers (CHA), courier franchisees and 3PL warehouses (Round 19, ids LG1–LG44)
+
+Added with `docs/prd/round-19.md` (§9: LG1–LG44) by R19-A. It covers freight forwarders / NVOCC and air-cargo agents,
+customs brokers licensed under the CBLR 2018, courier franchisees and small 3PL / CFS warehouses. `LG` ("logistics")
+ends in `G`: the CA-id patterns read `LG1` whole, never as `G1` (`tests/docs-links.test.ts`).
+
+- Files named under "Where" with a package in brackets are planned by that package (R19-B, R19-C, R19-D); the others
+  exist since R19-A. Every rule row in `src/lib/logistics-rules.ts` is `verified: false` unless its value was read in a
+  primary text in Round 19 (its source then says "Read (R19)"). GTA rates, the intermediary rule, TDS sections and Act
+  labels stay in their own rule files and are not edited.
+- Place-of-supply and pure-agent checks are hints with the reason shown, never blocks; every output is a working paper.
+- ★ = changes what a document prints or a return reports. Sources: §2.8 of the PRD (P = primary text read, S = secondary).
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| LG1 ★ | Sec 12(8) IGST for domestic transport of goods (incl. courier): registered recipient → its location; unregistered → where the goods are handed over. For a forwarder's freight billed to a registered client in another State, IGST. Right? | As stated | `logistics-rules.ts` `LG_POS_RULES` (domestic); `logistics/lg-heads.ts` `posRuleOf`; B2 `lg-regime.ts` (R19-B) | 2017-07-01 | P Circular 184/16/2022-GST (quotes Sec 12(8)) |
+| LG2 ★ | Export freight (air / sea / courier) by an Indian forwarder to an Indian exporter: POS = foreign destination (12(8) proviso from 1 Feb 2019), IGST under Sec 7(5), recipient's ITC allowed (Circular 184/16/2022). Does this also apply when the forwarder only arranges the freight (agent) rather than carrying it? | POS 96, IGST | `LG_POS_RULES` (export); B2 `lg-regime.ts` (R19-B) | 2019-02-01 | P Circular 184/16/2022-GST Sl. 1–4 |
+| LG3 ★ | After Sec 13(9) was omitted (1 Oct 2023), freight and courier billed to a recipient outside India follow 13(2): an export of services when Sec 2(6) is met (LUT). Freight billed by an overseas agent to us: import of services (RCM)? | As stated; RCM hint | `LG_POS_RULES` (cross_border); B2 / D1 (R19-B, R19-D) | 2023-10-01 | P Circular 203/15/2023-GST Sl. A.1 |
+| LG4 ★ | Commission / brokerage from overseas principals and carriers (intermediary): 13(8)(b) until its omission (Finance Act 2026, assent reported 30 Mar 2026); 13(2) after. Confirm the date and treatment of invoices raised before it for services after it. Cross-ref PS4. | By invoice date | `prof-rules.ts` `INTERMEDIARY_POS_RULES` via `lg-tax-io.ts` (R19-B); head kind `commission` | 2026-03-30 | P Finance Bill 2026 cl. 141 (as introduced); S assent / date |
+| LG5 ★ | Classification: when is a forwarder's freight a transport service (sea 5 % / air 18 % / multimodal) and when "supporting services in transport" (996713 C&F, 18 %)? Customs clearance 996712. Multimodal SAC (996799?). | Principal with own HBL / HAWB → mode rate; agent → 996713 | `LG_SAC_RULES`, `logistics/lg-heads.ts` `defaultHeads` / `sacFor` | 2017-07-01 | P N 11/2017-CT(R) annexure rows 108–164 |
+| LG6 ★ | Rates: vessel 5 % (ITC on goods other than ships not taken); air 18 %; multimodal 12 % (to 21 Sep 2025), then 5 % without an air leg / 18 % with one, domestic only; international multimodal → leg rates. Any change after N 15/2025? | As stated | `LG_RATE_RULES`, `lg-heads.ts` `lgRateFor` | 2025-09-22 | P N 11/2017-CT(R) consolidated Sl. 9; P N 15/2025-CT(R) |
+| LG7 | Multimodal 5 % ITC: only on transport inputs and capped at 5 % (N 15/2025 illustration). The app shows the cap as a note on tagged bills; it does not block ITC. Enough? | Note only | `LG_RATE_RULES` (multimodal `itc_note`); B3 (R19-B) | 2025-09-22 | P N 15/2025-CT(R) ¶(1)(a)(iv)(D) illustration |
+| LG8 | GTA option 18 % with ITC from 22 Sep 2025 (N 15/2025, read this round): the R5-B row still says "verify". May it be marked verified? A forwarder re-billing a GTA's road leg: GTA service (RCM / FCM) or part of its own freight? | Lead decision; hint | `transport-works-rules.ts` `GTA_RATE_RULES` (not edited); `lg-tax-io.ts` (R19-B) | 2025-09-22 | P N 15/2025-CT(R) ¶(1)(a)(iv)(A); P Rule 54(3) |
+| LG9 ★ | Origin / destination charges (THC, documentation, DO, BL fee) with freight: separate supplies with their own POS (default) or ancillary to the freight (composite, freight POS 96)? | Separate; composite per head setting | `logistics_settings.split` / `composite_with_freight`; B1 / B2 (R19-B) | — | — (practice) |
+| LG10 ★ | Pure agent (Rule 33): customs duty paid through the CB's ICEGATE account, CFS / port / DO / shipping-line charges invoiced in the importer's name — all four conditions met when the authorisation is in the job file? Duty paid from the importer's own ICEGATE: not on our books at all? | `rule33` lines; checklist | Head role `pure_agent` (`lg-heads.ts`); C1 checklist (R19-C) | 2017-07-01 | P CGST Rule 33 |
+| LG11 | Disbursements gross (expense + recovery) vs net (journal) in the P&L; Sec 44AB turnover; reimbursements outside the registration turnover (as PS82). | Gross; optional net journal | `logistics_settings.disb_posting`; C4 (R19-C) | — | cross-ref PS82 |
+| LG12 | Client duty deposits: not an advance for our supply (no GST on receipt, no Rule 50 receipt voucher tax); presentation as a liability; refund of the excess. | Advance `pass_through`, 0 % | C2 `lg-deposits.ts` / `lg-recv-io.ts` (R19-C) | — | CN-C2 precedent |
+| LG13 | Rule 34(2): exchange rate for services "as per GAAP for the date of time of supply". RBI / FBIL reference rate or bank TT rate? Is a typed rate acceptable? | Currency master or typed | B4 `lg-bill.ts` (R19-B), currency master (8H) | 2017-07-27 | P CGST Rule 34(2) |
+| LG14 ★ | e-Invoice: forwarders / CHAs / couriers / warehouses above the threshold must e-invoice; a GTA's invoice is exempt (N 13/2020 via Rule 54(3)). A forwarder that also issues LRs: mixed? | As stated | `EINV_EXEMPT_RULES` (`verified: false`) | 2020-10-01 | S taxheal (N 13/2020-CT); P Rule 54(3) |
+| LG15 ★ | GSTR-1: export freight billed to an Indian registered recipient with POS 96 reported in B2B with POS "96" (Circular 184 Sl. 4), not Table 6A. Same in e-Invoice (`Pos: 96`, B2B). | As stated | Existing `gst-reports.ts` / `einvoice.ts` readers (no change); tests in R19-B | 2019-02-01 | P Circular 184/16/2022-GST Sl. 4 |
+| LG16 | Ocean freight RCM on imports (entry 10, N 10/2017-IGST(R)) omitted from 1 Oct 2023 (N 11–13/2023 as reported); FOB imports with a foreign line? | Hint | `OCEAN_RCM_RULES` (`verified: false`, hint) | 2023-10-01 | S vjmglobal, taxmann, KPMG flash |
+| LG17 | Overseas agent's destination / handling charges billed to us: import of services, IGST under RCM at the head's rate; ITC. | Existing RCM flow; hint | D1 `lg-agents.ts` (R19-D), existing RCM flow | — | — |
+| LG18 | Courier 18 % (9968); POS 12(8) domestic, 13(2) international (Circular 203); outbound international courier billed to an Indian shipper → 12(8) proviso (POS 96)? | As stated | `LG_RATE_RULES` (courier); D2 `lg-courier.ts` (R19-D) | 2025-09-22 | P N 15/2025-CT(R) ¶(1)(a)(vi); P consolidated Sl. 12 |
+| LG19 | 57th Council: delivery services through e-commerce operators 5 % without ITC under Sec 9(5), courier excluded — notification and date? | Pending note | `pending-changes.ts` note (R19-B) | — | S taxscan, maritimegateway |
+| LG20 | e-Way: a courier agency may furnish Part A on the consignor's authorisation (Rule 138); the franchisee's duty when the consignor does not. | Hint | D2 hint (R19-D) | 2018-04-01 | P CGST Rule 138(1) and 138(7) provisos |
+| LG21 ★ | Warehousing 996729 18 %; storage of agricultural produce exempt (Sl. 54(e)), rice (Sl. 24) — any later amendment? Mixed bills (agri + non-agri): one tax invoice with exempt lines? | As stated | `LG_EXEMPT_RULES`, head `exempt_if`; D3 `lg-storage.ts` (R19-D) | 2017-07-01 | P N 12/2017-CT(R) Sl. 24, 54 (2017 text; amendments not read) |
+| LG22 | 3PL storage: rent of space (194I) or service (194C) for the client's TDS; GST same 18 %? | 194C label | D3 (R19-D); `ita2025.ts` labels | — | — |
+| LG23 ★ | TDS by clients on freight / forwarding / clearing (Sec 393 Sl. 6, old 194C): on reimbursements shown separately (Circular 715/1995 Q30)? | Own charges only | D4 (R19-D) via `lg-tax-io.ts` | 2026-04-01 | not read (Circular 715/1995 as recalled) |
+| LG24 | TDS on our payments: transporters 194C(6); sub-agents 194H; non-resident shipping lines (Sec 172, no 195 — Circular 723/1995); overseas agents / airlines (DTAA, 195 → Sec 393(2)?). | Existing rows; hints | Existing `tds-rules.ts` rows; vendor kind hint (R19-D) | — | existing rows; Circular 723/1995 not read |
+| LG25 | Customs brokerage: 194C or 194J for the client's TDS? | 194C | Existing TDS rows (labels by date) | — | — |
+| LG26 | CBLR Reg 10(k) records: does a register printed from the books meet "orderly and itemised manner as may be specified"? Retention period (five years reported)? | Register print | `CBLR_RULES` (records, retention); C4 `lg-register.ts` (R19-C) | 2018-05-14 | P CESTAT Mumbai C/86165/2024 (quotes Reg 10(k)); S retention |
+| LG27 | CBLR Reg 10(n) KYC: the app stores IEC, GSTIN and a verified-on date / method only. Enough, or must copies be kept (outside the app)? | Dates only | `CBLR_RULES` (kyc, `verified: false`); `Client.lg.kyc` (R19-C) | 2018-05-14 | S taxscan |
+| LG28 | CB's own late-payment interest on unrecovered disbursements: GST (Sec 15(2)(d)) on interest charged on a reimbursement? | Not charged by default | Not charged by default (R19-C) | — | — |
+| LG29 | Agency commission received in foreign currency: export of services under LUT; e-BRC / FIRA; overlap with R14 `svcexport`. | Listed there | R14 `svcexport` desk (`exportsvc` tab now also for `logistics`) | — | — |
+| LG30 ★ | Profit share with overseas agents: consideration for a supply (export of services / import of services) or a mere sharing of margin outside GST? | Debit note as export of services | D1 `lg-agents.ts` (R19-D) | — | — |
+| LG31 | FEMA: set-off of export receivables against import payables with the same overseas party (AD-bank conditions); netting in the books only as a working paper? | Hint | D1 netting hint (R19-D) | — | — |
+| LG32 | Realisation of export-of-services proceeds within the FEMA period; LUT conditions. | R14 realisation list | R14 realisation list (`exportsvc`) | — | — |
+| LG33 | Chargeable-weight conventions (air 6000, courier 5000 cm³ per kg; sea 1 CBM = 1,000 kg): purely commercial — any tax effect? | Settings | `logistics_settings.volumetric`, `logistics/lg-weight.ts` `chargeableWeight` | — | — (commercial conventions) |
+| LG34 | Revenue recognition of a job (on departure / arrival / delivery) and accrual of costs at the period end (AS 9 / Ind AS 115). | Bill on delivery; accrual journal | B3 `lg-costing.ts` / `lg-books-io.ts` (R19-B) | — | — |
+| LG35 | Demurrage / detention recovered from the client: own supply (18 %) or pure agent when the line's invoice is in the client's name? | Own supply | Head `demurrage` default `own` (`lg-heads.ts`) | — | — |
+| LG36 | Cargo insurance arranged for the client: pure agent when the policy is in the client's name; else insurance-agent services (RCM entry for insurance agents)? | Pure agent | Head `insurance` default `pure_agent` (`lg-heads.ts`) | — | — |
+| LG37 | DO charges / BL fees of the shipping line collected by the forwarder: pure agent if invoiced in the client's name; else re-supply at 18 %? | Pure agent | Head `do_charges` default `pure_agent` (`lg-heads.ts`) | — | — |
+| LG38 | "Freight collect" on imports collected from the Indian consignee for the foreign agent: our supply, or collection on behalf (outside turnover)? | Collection on behalf; agent account | D1 agent account (R19-D) | — | — |
+| LG39 | Rate / weight disputes: credit notes under Sec 34 by 30 Nov of the next FY; agent credit notes in USD. | Existing credit notes | Existing credit notes | — | CGST Sec 34 |
+| LG40 | Courier COD collected for shippers: liability, not turnover; any Sec 52 TCS or Sec 194-O issue for a courier franchise? | Liability ledger | D2 COD liability ledger (R19-D) | — | — |
+| LG41 | 3PL warehouse holding client goods: the client must declare it as an additional place of business (Sec 25 / Rule 8)? Our duty? | Hint | D3 hint (R19-D) | — | — |
+| LG42 | Unregistered transporters (TRANSIN) and Part B updates by a forwarder acting as transporter. | Hint | Hint (R19-D) | — | — |
+| LG43 | (Market) ≈ 6,500 customs brokers in FFFAI's associations (as reported); official count? | — | — | — | S FFFAI AGM Sept 2025 |
+| LG44 | Section labels by date on TDS / TCS working papers (194C → Sec 393 Sl. 6 from 1 Apr 2026). | `ita2025.ts` | `ita2025.ts` labels (not edited) | 2026-04-01 | existing rows |
+
+`LG` ids are counted once here. The ★ items (LG1, LG2, LG3, LG4, LG5, LG6, LG9, LG10, LG14, LG15, LG21, LG23, LG30) change what a document prints or a return reports.
 
 ## Answers log
 

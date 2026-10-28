@@ -70,6 +70,7 @@ import './prof/ps-registry'; // R14: professional tables' rights and audit label
 import './travel/tv-registry'; // R15: travel tables' rights and audit labels (lazy registration)
 import './manpower/mp-registry'; // R17: manpower tables' rights and audit labels (lazy registration)
 import './society/hs-registry'; // R18: society tables' rights and audit labels (lazy registration)
+import './logistics/lg-registry'; // R19: logistics tables' rights and audit labels (lazy registration)
 
 export const [SYNC_STATE_KEY, SYNC_CONFLICTS_KEY, SYNC_AUDIT_KEY] = SYNC_META_KEYS;
 
@@ -478,6 +479,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}site_compliance`]: 'date',
   // R18-B: society billing runs (the bill date)
   [`${DB_PREFIX}society_runs`]: 'date',
+  // R19-A: logistics job files (the job date)
+  [`${DB_PREFIX}lg_jobs`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
