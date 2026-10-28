@@ -5,14 +5,14 @@
  */
 import { round2 } from '../invoice-calc';
 import { hsT } from '../../i18n/areas/society-r18a';
-import type { Client } from '../../types/invoice';
+import type { Client, InvoiceRecord } from '../../types/invoice';
 import type { ClientHs, HsOccupancy, HsSlotKind, HsUnitUse, SocietyUnit } from '../../types/society-r18';
 
 export const UNIT_USES: readonly HsUnitUse[] = ['residential', 'commercial', 'garage', 'other'];
 export const OCCUPANCIES: readonly HsOccupancy[] = ['owner', 'tenant', 'vacant'];
 export const SLOT_KINDS: readonly HsSlotKind[] = ['covered', 'open', 'stilt', 'two_wheeler'];
 
-const NUMS = ['carpet_area', 'super_area', 'undivided_pct', 'construction_cost'] as const;
+const NUMS = ['carpet_area', 'super_area', 'undivided_pct', 'construction_cost', 'inlets'] as const;
 const key = (c: string) => c.trim().toLowerCase();
 
 /** The first problem with a unit (code missing / taken, a negative or non-number area or cost), else ''. */
@@ -91,4 +91,14 @@ export function suggestCode(units: readonly Pick<SocietyUnit, 'code'>[], wing = 
   const p = `${wing.trim() || 'U'}-`;
   const max = Math.max(0, ...units.filter((u) => u.code.startsWith(p)).map((u) => Number(u.code.slice(p.length)) || 0));
   return `${p}${max ? max + 1 : wing.trim() ? 101 : 1}`;
+}
+
+/**
+ * Why a unit cannot be deleted (else ''): a document or billing run names it (bills stay with their unit — close it
+ * instead), or a member is still linked (clear the owner / tenant first, so the recycle bin never has to re-link
+ * clients on restore).
+ */
+export function unitDeleteBlock(u: SocietyUnit, invoices: readonly Pick<InvoiceRecord, 'hs'>[], runs: readonly { unit_ids?: readonly string[] }[] = []): string {
+  if (invoices.some((i) => i.hs?.unit?.id === u.id) || runs.some((r) => r.unit_ids?.includes(u.id))) return hsT('delBilled', { c: u.code });
+  return u.owner_id || u.joint_ids?.length || u.tenant_id ? hsT('delLinked', { c: u.code }) : '';
 }

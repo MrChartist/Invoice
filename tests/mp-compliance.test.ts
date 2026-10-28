@@ -73,6 +73,22 @@ test('writer: one row per site × month, refused when proved without refs; reade
   assert.equal(readRunForMonth('2026-10')?.lines.length, 1);
 });
 
+test('PENDING #7: proof files ride on the row and are kept while it refers to them', async () => {
+  const { putAttachment, releaseAttachments, hasAttachment, referencedAttachmentIds } = await import('../src/lib/attachments.ts');
+  const pdf = new TextEncoder().encode('%PDF-1.7\n'.padEnd(200, ' '));
+  const a = putAttachment({ bytes: pdf, name: 'ecr-oct.pdf' });
+  const t = sumShares([line('x', 1000)]);
+  saveCompliance('a', '2026-10', { pf: { trrn: 'T1' }, attachments: [a] }, t);
+  assert.deepEqual(loadCompliance('2026-10')[0].attachments?.map((x) => x.name), ['ecr-oct.pdf']);
+  assert.ok(referencedAttachmentIds().has(a.id), 'site_compliance is an attachment owner table');
+  assert.equal(releaseAttachments([a.id]), 0, 'a referenced proof is never released');
+  assert.ok(hasAttachment(a.id));
+  saveCompliance('a', '2026-10', { attachments: [] }, t);
+  assert.equal(releaseAttachments([a.id]), 1, 'released once no row refers to it');
+  const v = readFileSync(new URL('../src/components/manpower/ComplianceView.tsx', import.meta.url), 'utf8');
+  assert.match(v, /import\('\.\.\/\.\.\/lib\/attachment-upload'\)/, 'the upload code loads on use');
+});
+
 test('the compliance view never reads bank fields; the annexure goes through escHtml', () => {
   const v = readFileSync(new URL('../src/components/manpower/ComplianceView.tsx', import.meta.url), 'utf8');
   assert.ok(!/bank_/.test(v));

@@ -1,7 +1,7 @@
 /**
  * R17-C1 writer of `site_compliance` (one row per site × month): PF TRRN / ESI challan, status, the client's hold.
  * `doc.create`; the period lock by the month's last day; audited through the watched table. `proved` is refused
- * without the TRRN (and the challan when ESI is due).
+ * without the TRRN (and the challan when ESI is due). Proof files ride in `attachments` (owner table in `attachments.ts`).
  */
 import './mp-registry';
 import type { SiteCompliance } from '../../types/manpower-r17';
@@ -14,7 +14,7 @@ import { proofError, type Amounts } from './mp-compliance';
 
 export const loadCompliance = (month?: string): SiteCompliance[] => getTable<SiteCompliance>(MP_TABLES.compliance).filter((c) => c?.id && c.site_id && (!month || c.month === month));
 
-export type CompPatch = Partial<Pick<SiteCompliance, 'pf' | 'esi' | 'status' | 'hold'>>;
+export type CompPatch = Partial<Pick<SiteCompliance, 'pf' | 'esi' | 'status' | 'hold' | 'attachments'>>;
 
 /** Save the proof of a site × month (`totals` = the site's shares, for the ESI-due test). */
 export function saveCompliance(siteId: string, month: string, patch: CompPatch, totals: Amounts): SiteCompliance {

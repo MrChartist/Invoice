@@ -7,6 +7,7 @@
  * an interface re-declared there merges with A's. Aadhaar, bank details and police-verification documents are never
  * stored (DPDP minimisation, PRD §6). Types only (0 bytes). Working papers — verify with your CA (CA_REVIEW §17, MP1–MP32).
  */
+import type { AttachmentRef } from './attachments';
 
 /* ════════════════════════════════════════ R17-A ════════════════════════════════════════ */
 
@@ -191,7 +192,8 @@ export interface SiteCompliance {
   date: string;
   pf: { trrn?: string; paid_on?: string; amount?: number };
   esi: { challan?: string; paid_on?: string; amount?: number };
-  attachments?: string[];
+  /** Proof files (ECR, TRRN receipt, ESI challan; `attachments.ts`, owner table `site_compliance`, PENDING #7). */
+  attachments?: AttachmentRef[];
   /** `proved` needs the PF TRRN and, when ESI is due, the ESI challan (MP18). */
   status: 'pending' | 'proved' | 'waived';
   /** The client's hold on the month's bills (typed % or amount): nothing posts, the receivable stays open (MP27). */

@@ -161,7 +161,10 @@ wiring 0.6 kB (help 0.16, Ctrl+K 0.09, open export 0.09, palette 0.03, checklist
 - **No new bridge**: the purchase read sits in the existing `mp-sites-io.ts` (bridges stay 4); the run read in `mp-payroll-io.ts`.
 - **One table** on the annexure doubles as the wage-register extract (gross / deductions / net) and the ECR extract (PF
   wages, EE, EPF ER, EPS) — built from the run lines, not from `payroll/reports.ts` `pfEcrRows` (that would import the
-  payroll chunk). **No attachments UI** (the `attachments` field is typed; the existing attachments feature is not wired).
+  payroll chunk). Attachments — *closed later* (PENDING #7): "Attach proof (ECR, challan)" stores a photo / PDF
+  through the existing attachments feature (`attachment-upload.ts`, loaded on use) into `SiteCompliance.attachments`
+  (`AttachmentRef[]`, saved with the row); `site_compliance` is in `ATTACHMENT_OWNER_TABLES`, so backups, sync and
+  `releaseAttachments` keep a proof while a row refers to it.
 - `mp.comp` is not written on bills (the proof usually follows the bill); the compliance row is the record.
 - **Rule rows are all `verified: false`**: the PIB / Code texts were read by the PRD author, not re-read in this package.
 - Hints use proxies (8-hour ordinary day, PF wages as "wages", a set leaving date as fixed-term) — MP39.
