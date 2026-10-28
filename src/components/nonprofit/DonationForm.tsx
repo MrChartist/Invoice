@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import type { DonorIdCode } from '../../types/institutions-r5';
 import { localDb } from '../../lib/localDb';
 import { bankAccountsDb } from '../../lib/bank-accounts';
+import { chartOf, loadUserAccounts } from '../../lib/ledger/accounts';
 import { ID_CODES, MODES, SECTIONS, TYPES, donationWarnings, donorIdValid, fyOf, loadDonations, saveDonation, type DonationInput } from '../../lib/nonprofit/donations';
 import { loadFunds } from '../../lib/nonprofit/funds';
 import { donationSectionText } from '../../lib/nonprofit/donation-receipt';
@@ -16,6 +17,8 @@ export function DonationForm({ notify, onSaved }: { notify: Notify; onSaved: () 
   const clients = useMemo(() => localDb.clients.getAll(), []);
   const funds = useMemo(() => loadFunds(), []);
   const banks = useMemo(() => bankAccountsDb.active(), []);
+  // PENDING 29: a gift in kind can be journalised to a goods / asset / expense ledger.
+  const kindAccounts = useMemo(() => chartOf(loadUserAccounts()).filter((a) => !['CAPITAL', 'RESERVES', 'LOANS_LT', 'LOANS_ST', 'TRADE_PAYABLES', 'DUTIES_TAXES', 'OTHER_CL', 'PROVISIONS', 'SALES', 'OTHER_INCOME'].includes(a.group)), []);
   const [d, setD] = useState<DonationInput>({ date: today(), donor_id: '', amount: 0, mode: 'electronic', type: 'others', section: '80G', fund_id: funds[0]?.id });
   const [n, setN] = useState({ name: '', code: 'pan' as DonorIdCode, no: '', address: '' });
   const set = (x: Partial<DonationInput>) => setD({ ...d, ...x });
@@ -41,6 +44,7 @@ export function DonationForm({ notify, onSaved }: { notify: Notify; onSaved: () 
         <T l={iT('amount')} v={d.amount || ''} on={(v) => set({ amount: num(v) })} d="donation-amount" />
         <S l={iT('mode')} v={d.mode} o={opts(MODES, 'mode.')} on={(v) => set({ mode: v as DonationInput['mode'] })} />
         {d.mode !== 'cash' && d.mode !== 'kind' && banks.length > 1 && <S l={iT('bank')} v={d.bank_account_id} o={banks.map((b) => [b.id, `${b.name}${b.fcra ? ' (FCRA)' : ''}`] as const)} on={(v) => set({ bank_account_id: v })} />}
+        {d.mode === 'kind' && <S l={iT('kindAccount')} v={d.kind_account_id ?? ''} o={[['', '—'], ...kindAccounts.map((a) => [a.id, `${a.code} ${a.name}`] as const)]} on={(v) => set({ kind_account_id: v || undefined })} />}
         <T l={iT('ref')} v={d.reference} on={(reference) => set({ reference })} />
         <S l={iT('type')} v={d.type} o={opts(TYPES, 'type.')} on={(v) => set({ type: v as DonationInput['type'] })} />
         <S l={iT('fund')} v={d.fund_id} o={[['', '—'], ...funds.map((f) => [f.id, f.name] as const)]} on={(v) => set({ fund_id: v || undefined })} />

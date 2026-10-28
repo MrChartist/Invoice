@@ -2,8 +2,9 @@
  * R5-C3 donations: numbered receipts (`DON/FY26-27/0001`, Indian FY, series high-water mark), the 80G / 35 checks
  * (cash above the date-keyed limit, gifts in kind, missing donor id, anonymous above the Sec 115BBC limit) and
  * the books entry — ONE receipt voucher per donation: Dr cash / bank | Cr "Donations received" (income) or
- * "Donations — corpus fund" (a fund account), tagged with its fund (cost centre, C4). Gifts in kind post nothing
- * (record the goods by journal). A receipt is never edited once the FY's Form 10BD is marked filed: cancel + new.
+ * "Donations — corpus fund" (a fund account), tagged with its fund (cost centre, C4). A gift in kind posts a JOURNAL
+ * Dr the ledger chosen for the goods (`kind_account_id`, at the value on the receipt) | Cr the same income / corpus
+ * account (PENDING 29); without a ledger it posts nothing, as before. A receipt is never edited once the FY's Form 10BD is marked filed: cancel + new.
  * Working paper — verify with your CA (§7 Q10).
  */
 import type { Client } from '../../types/invoice';
@@ -88,15 +89,18 @@ export function saveDonation(input: DonationInput, donorName: string): Donation 
   assertUnlocked({ id, issue_date: date, invoice_number: number }, prev ? 'edit' : 'create');
   return withTablesRollback([DONATIONS_TABLE, 'vouchers', 'accounts', SERIES_TABLE], () => {
     let voucherId: string | undefined;
-    if (prev?.voucher_id && input.mode === 'kind') deleteVoucher(prev.voucher_id);
-    if (input.mode !== 'kind') {
+    const kindAccount = input.mode === 'kind' ? str(input.kind_account_id) : '';
+    // The voucher type changes with the mode (receipt ↔ journal), so a changed mode replaces the old voucher.
+    const reuse = prev?.voucher_id && (prev.mode === 'kind') === (input.mode === 'kind') ? prev.voucher_id : undefined;
+    if (prev?.voucher_id && !reuse) deleteVoucher(prev.voucher_id);
+    if (input.mode !== 'kind' || kindAccount) {
       const credit = input.type === 'corpus' ? ensureCorpusAccount() : ensureDonationsAccount();
-      const money_ = input.mode === 'cash' ? A.cash : bankLedgerId(input.bank_account_id);
+      const money_ = kindAccount || (input.mode === 'cash' ? A.cash : bankLedgerId(input.bank_account_id));
       const p = paise(amount);
       voucherId = saveVoucher({
-        ...(prev?.voucher_id ? { id: prev.voucher_id } : {}),
-        type: 'RECEIPT', date,
-        narration: `Donation ${number} from ${input.anonymous ? 'anonymous donor' : donorName} — ${input.section === 'none' ? 'no deduction' : input.section}, ${input.type}${input.reference ? `, ref ${input.reference}` : ''}`,
+        ...(reuse ? { id: reuse } : {}),
+        type: kindAccount ? 'JOURNAL' : 'RECEIPT', date,
+        narration: `Donation ${number} from ${input.anonymous ? 'anonymous donor' : donorName} — ${input.section === 'none' ? 'no deduction' : input.section}, ${input.type}${input.reference ? `, ref ${input.reference}` : ''}${kindAccount ? ' — gift in kind' : ''}`,
         lines: [{ account_id: money_, dr: p, cr: 0 }, { account_id: credit, dr: 0, cr: p, ...(input.fund_id ? { cost_centre_id: input.fund_id } : {}) }],
         voucher_class: 'Donation',
       }).id;
@@ -107,7 +111,8 @@ export function saveDonation(input: DonationInput, donorName: string): Donation 
       ...(input.fund_id ? { fund_id: input.fund_id } : {}),
       ...(str(input.purpose) ? { purpose: str(input.purpose) } : {}),
       ...(input.anonymous ? { anonymous: true } : {}),
-      ...(input.bank_account_id && input.mode !== 'cash' ? { bank_account_id: input.bank_account_id } : {}),
+      ...(input.bank_account_id && input.mode !== 'cash' && input.mode !== 'kind' ? { bank_account_id: input.bank_account_id } : {}),
+      ...(kindAccount ? { kind_account_id: kindAccount } : {}),
       ...(voucherId ? { voucher_id: voucherId } : {}),
       created_at: prev?.created_at ?? new Date().toISOString(),
     };

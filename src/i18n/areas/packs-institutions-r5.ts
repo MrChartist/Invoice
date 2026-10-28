@@ -34,7 +34,7 @@ export const iT = defineArea(
     // C3
     'don.receipts': 'Receipts', 'don.form10bd': '10BD / 10BE', newDonation: 'New receipt', donor: 'Donor', newDonor: 'New donor…', idCode: 'ID type', idNo: 'ID no.',
     'id.pan': 'PAN', 'id.aadhaar': 'Aadhaar', 'id.tan': 'TAN', 'id.passport': 'Passport', 'id.voter_id': 'Voter ID', 'id.driving_licence': 'Driving licence', 'id.ration_card': 'Ration card', 'id.foreign_tax_id': 'Foreign tax ID',
-    mode: 'Mode', 'mode.cash': 'Cash', 'mode.electronic': 'Bank / UPI / cheque', 'mode.kind': 'In kind', 'mode.others': 'Others', bank: 'Bank', type: 'Type', 'type.corpus': 'Corpus', 'type.specific_grant': 'Specific grant',
+    mode: 'Mode', 'mode.cash': 'Cash', 'mode.electronic': 'Bank / UPI / cheque', 'mode.kind': 'In kind', 'mode.others': 'Others', bank: 'Bank', kindAccount: 'Goods / asset ledger (journal)', type: 'Type', 'type.corpus': 'Corpus', 'type.specific_grant': 'Specific grant',
     'type.others': 'Others', fund: 'Fund', section: 'Section', anonymous: 'Anonymous', cancelled: 'cancelled',
     'warn.cash': 'Cash above the limit: no 80G deduction.', 'warn.kind': 'In kind: not eligible for 80G / 35.', 'warn.noId': 'No valid donor ID: not reportable in 10BD.', 'warn.anon': 'Anonymous above the Sec 115BBC limit: taxed at 30%.',
     thanks: 'Thank you, {name}, for your donation of {amount} (receipt {number}).', npoNote: '80G / 10BD / 10BE — verify with your CA.',
@@ -93,7 +93,7 @@ export const iT = defineArea(
     trueUp: 'वार्षिक मिलान', trueUpLine: 'वर्ष: {annual}; मासिक रिवर्स: {posted}; अंतर {diff} (+ रिवर्स, − वापसी; धारा 50 ब्याज) — {due} तक।',
     'don.receipts': 'रसीदें', 'don.form10bd': '10BD / 10BE', newDonation: 'नई रसीद', donor: 'दाता', newDonor: 'नया दाता…', idCode: 'ID प्रकार', idNo: 'ID नं.',
     'id.pan': 'PAN', 'id.aadhaar': 'आधार', 'id.tan': 'TAN', 'id.passport': 'पासपोर्ट', 'id.voter_id': 'वोटर ID', 'id.driving_licence': 'ड्राइविंग लाइसेंस', 'id.ration_card': 'राशन कार्ड', 'id.foreign_tax_id': 'विदेशी टैक्स ID',
-    mode: 'माध्यम', 'mode.cash': 'नकद', 'mode.electronic': 'बैंक / UPI / चेक', 'mode.kind': 'वस्तु रूप', 'mode.others': 'अन्य', bank: 'बैंक', type: 'प्रकार', 'type.corpus': 'कॉर्पस', 'type.specific_grant': 'विशिष्ट अनुदान',
+    mode: 'माध्यम', 'mode.cash': 'नकद', 'mode.electronic': 'बैंक / UPI / चेक', 'mode.kind': 'वस्तु रूप', 'mode.others': 'अन्य', bank: 'बैंक', kindAccount: 'वस्तु / संपत्ति लेजर (जर्नल)', type: 'प्रकार', 'type.corpus': 'कॉर्पस', 'type.specific_grant': 'विशिष्ट अनुदान',
     'type.others': 'अन्य', fund: 'फ़ंड', section: 'धारा', anonymous: 'गुमनाम', cancelled: 'रद्द',
     'warn.cash': 'सीमा से अधिक नकद: 80G कटौती नहीं।', 'warn.kind': 'वस्तु रूप: 80G / 35 योग्य नहीं।', 'warn.noId': 'वैध दाता ID नहीं: 10BD में नहीं।', 'warn.anon': 'Sec 115BBC सीमा से ऊपर गुमनाम: 30% कर।',
     thanks: '{name}, {amount} के दान के लिए धन्यवाद (रसीद {number})।', npoNote: '80G / 10BD / 10BE — verify with your CA.',

@@ -61,6 +61,15 @@ test('books: income vs corpus, balanced, fund-tagged; cash into cash; in kind po
   assert.equal(chart.find((x) => x.name === 'Donations — corpus fund')?.group, 'RESERVES');
   for (const v of [va, vb]) assert.equal(v.lines.reduce((s, l) => s + l.dr - l.cr, 0), 0);
   assert.equal(c.voucher_id, undefined);
+  // PENDING 29: with a goods ledger a gift in kind posts a journal Dr goods | Cr donations; back to electronic swaps it for a receipt.
+  const k = give({ donor_id: d, mode: 'kind', amount: 900, kind_account_id: A.office });
+  const vk = loadVouchers().find((v) => v.id === k.voucher_id)!;
+  assert.equal(vk.type, 'JOURNAL');
+  assert.deepEqual([vk.lines[0].account_id, vk.lines[0].dr, name(vk.lines[1].account_id), vk.lines[1].cr], [A.office, 90000, 'Donations received', 90000]);
+  const k2 = saveDonation({ ...k, mode: 'electronic', kind_account_id: undefined }, 'Asha');
+  assert.equal(loadVouchers().some((v) => v.id === vk.id), false, 'the journal is replaced');
+  assert.equal(loadVouchers().find((v) => v.id === k2.voucher_id)?.type, 'RECEIPT');
+  assert.equal(k2.kind_account_id, undefined);
 });
 
 test('receipt page: PAN, URN with validity, donor id, amount in words, the 10BE line; labels by date (ITA 2025)', () => {
