@@ -23,7 +23,6 @@ function start(root: Root): void {
   initCrossTab();
   // R15-A2: audit appends are written once per task; write any still queued before the page goes away.
   addEventListener('pagehide', audit.flush);
-  document.addEventListener('visibilitychange', () => document.hidden && audit.flush());
 
   root.render(
     <React.StrictMode>

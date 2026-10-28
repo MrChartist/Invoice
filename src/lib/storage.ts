@@ -1194,7 +1194,6 @@ export function generateId(): string {
 
 /** Every app-owned key/value pair — the payload for export/import backups. */
 export function collectAppData(): Record<string, string> {
-  pendingFlush();
   const s = store();
   const out: Record<string, string> = {};
   if (s) {

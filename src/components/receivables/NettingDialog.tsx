@@ -86,15 +86,13 @@ export default function NettingDialog({ clientId, vendorId, onClose, onDone }: {
   return (
     <Modal open onClose={onClose} size="md" title={pair ? netT('open', { name: pair.client.name }) : netT('title')}
       footer={<>
-        <button type="button" className={controls.btnOutline} onClick={onClose}>{netT('close')}</button>
         <button type="button" className={controls.btnPrimary} disabled={!pair || !(max > 0)} onClick={post} data-netting-post>{netT('post')}</button>
       </>}>
       <div data-netting-dialog>
         {!pair && <p className={controls.hint}>{netT('none')}</p>}
         {pairs.length > 1 && (
           <label className={controls.field}>
-            <span className={controls.label}>{netT('party')}</span>
-            <select className={controls.select} value={pick} onChange={(e) => { setPick(Number(e.target.value)); setInv(new Set()); setBil(new Set()); }}>
+            <select className={controls.select} aria-label={netT('title')} value={pick} onChange={(e) => { setPick(Number(e.target.value)); setInv(new Set()); setBil(new Set()); }}>
               {pairs.map((p, i) => <option key={p.vendor.id} value={i}>{p.client.name}{p.vendor.name !== p.client.name ? ` / ${p.vendor.name}` : ''}</option>)}
             </select>
           </label>
@@ -107,7 +105,6 @@ export default function NettingDialog({ clientId, vendorId, onClose, onDone }: {
               <label className={controls.field}>
                 <span className={controls.label}>{netT('amount')}</span>
                 <input className={controls.input} type="number" min={0} step="0.01" value={amount} placeholder={max ? String(max) : ''} onChange={(e) => setAmount(e.target.value)} data-netting-amount />
-                {max > 0 && <span className={controls.hint}>{netT('max', { amount: formatCurrency(max) })}</span>}
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{netT('date')}</span>
@@ -121,7 +118,6 @@ export default function NettingDialog({ clientId, vendorId, onClose, onDone }: {
             {error && <p className={controls.error} role="alert">{error}</p>}
             {all.length > 0 && (
               <table className={surface.table}>
-                <caption>{netT('history')}</caption>
                 <tbody>
                   {all.map((n) => (
                     <tr key={n.id} data-netting-row>

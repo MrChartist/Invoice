@@ -23,7 +23,7 @@ import { generateId, getTable, peekTable, setTable } from './storage';
 import { isRevenueDoc } from './stats';
 import { receivableBalance } from './rcm';
 import { withTablesRollback } from './table-txn';
-import { exchangeSettled, ownFlow, syncNettedPaid } from './retail/rt-doc-hooks';
+import { exchangeSettled, ownFlow, syncNettedPaid } from './retail/rt-registry';
 
 /**
  * The generalised roll-up and the bill sync live beside R9's URD sync (`rt-doc-hooks.ts`, already on the registry
@@ -41,7 +41,7 @@ declare module '../types/invoice' {
 
 export const NETTING_METHOD = 'netting';
 /** Approval cap for clerks (₹): any netting above it needs the owner (default 0 = every netting by a clerk). */
-export const NETTING_CLERK_CAP = 0;
+const CLERK_CAP = 0;
 
 const key = (s: unknown) => String(s ?? '').trim().toLowerCase();
 
@@ -52,7 +52,7 @@ export const isNettingRow = (p: Partial<Payment>): boolean => p.method === NETTI
 export function clientOfVendor(v: Vendor, clients: readonly Client[]): Client | undefined {
   if (v.client_id) return clients.find((c) => c.id === v.client_id);
   const g = key(v.gstin);
-  return (g && clients.find((c) => key(c.gstin) === g)) || clients.find((c) => key(c.name) === key(v.name) || (!!c.company && key(c.company) === key(v.name)));
+  return (g && clients.find((c) => key(c.gstin) === g)) || clients.find((c) => key(c.name) === key(v.name));
 }
 
 /** Every customer ↔ supplier pair. */
@@ -119,40 +119,38 @@ export interface NettingInput {
   rcmPaid?: boolean;
 }
 
-export class NettingError extends Error {}
-
 /** Set off: one receipt per (invoice, bill) pair, all or nothing, one audit line (`books.edit`; clerks above the cap → owner). */
 export function postNetting(input: NettingInput): { nettingId: string; receipts: Payment[] } {
   requireAccess('books.edit');
   const amount = round2(num(input.amount));
-  if (!can('doc.approve') && amount > NETTING_CLERK_CAP) throw new NettingError('Netting needs the owner\'s approval: ask the owner to set it off.');
+  if (!can('doc.approve') && amount > CLERK_CAP) throw new Error('Netting needs the owner\'s approval.');
   const date = isoDay(input.date);
-  if (!date) throw new NettingError('Choose the netting date.');
-  if (!(amount > 0)) throw new NettingError('Enter an amount above zero.');
+  if (!date) throw new Error('Choose the date.');
+  if (!(amount > 0)) throw new Error('Enter an amount above zero.');
   assertUnlocked({ id: 'netting', issue_date: date }, 'create');
   const client = localDb.clients.getAll().find((c) => c.id === input.clientId);
   const vendor = getTable<Vendor>('vendors').find((v) => v.id === input.vendorId);
-  if (!client || !vendor || clientOfVendor(vendor, [client])?.id !== client.id) throw new NettingError('This customer and supplier are not one party.');
+  if (!client || !vendor || clientOfVendor(vendor, [client])?.id !== client.id) throw new Error('Not one party.');
   const all = getTable<PurchaseRecord>('purchases');
   for (const id of input.billIds) {
     const b = all.find((x) => x.id === id);
-    if (!b) throw new NettingError('A picked bill was not found.');
-    if (b.used_goods || b.old_metal) throw new NettingError(`${b.bill_number}: a buy-back / old-gold voucher settles through its own exchange.`);
-    if (b.reverse_charge && !input.rcmPaid) throw new NettingError(`${b.bill_number} is under reverse charge: pay the RCM first and confirm it.`);
+    if (!b) throw new Error('Bill not found.');
+    if (b.used_goods || b.old_metal) throw new Error(`${b.bill_number}: a buy-back voucher settles by exchange.`);
+    if (b.reverse_charge && !input.rcmPaid) throw new Error(`${b.bill_number} is under reverse charge: pay the RCM first.`);
   }
   const invs = openInvoices(client, localDb.invoices.getAll()).filter((i) => input.invoiceIds.includes(i.id));
   const bills = openBills(vendor, all).filter((b) => input.billIds.includes(b.id));
-  if (invs.length !== input.invoiceIds.length || bills.length !== input.billIds.length) throw new NettingError('A picked invoice or bill is no longer open.');
-  if (invs.some((i) => i.currency !== 'INR')) throw new NettingError('Invoices and bills are in different currencies.');
+  if (invs.length !== input.invoiceIds.length || bills.length !== input.billIds.length) throw new Error('An invoice or bill is no longer open.');
+  if (invs.some((i) => i.currency !== 'INR')) throw new Error('Invoices and bills are in different currencies.');
   const cap = Math.min(round2(invs.reduce((s, i) => s + i.open, 0)), round2(bills.reduce((s, b) => s + b.open, 0)));
-  if (amount > cap + 0.004) throw new NettingError(`At most ${cap.toFixed(2)} can be set off.`);
+  if (amount > cap + 0.004) throw new Error(`At most ${cap.toFixed(2)} can be set off.`);
   const nettingId = generateId();
   const pairs = pairNetting(invs, bills, amount);
   const no = (id: string) => bills.find((b) => b.id === id)?.number ?? '';
   const receipts = withTablesRollback(['transactions', 'invoices', 'purchases', 'series_counters'], () => {
     const ids: string[] = [];
     for (const p of pairs) {
-      ids.push(localDb.payments.record({ invoiceId: p.invoiceId, amount: p.amount, method: NETTING_METHOD, date, reference: no(p.billId), note: `Netting against bill ${no(p.billId)}` }).id);
+      ids.push(localDb.payments.record({ invoiceId: p.invoiceId, amount: p.amount, method: NETTING_METHOD, date, reference: no(p.billId) }).id);
     }
     const pair = new Map(ids.map((id, n) => [id, pairs[n].billId]));
     const rows = getTable<Payment>('transactions').map((t) => (pair.has(t.id) ? { ...t, exchange_purchase_id: pair.get(t.id), netting_id: nettingId } : t));
@@ -160,7 +158,7 @@ export function postNetting(input: NettingInput): { nettingId: string; receipts:
     syncNettedPaid(bills.map((b) => b.id));
     return rows.filter((t) => pair.has(t.id));
   });
-  audit.record({ entity: 'vendor_payment', entity_id: nettingId, action: 'create', summary: `Netting ${amount.toFixed(2)}: ${client.name} (customer) against ${vendor.name} (supplier), ${pairs.length} set-off(s) on ${date}` });
+  audit.record({ entity: 'vendor_payment', entity_id: nettingId, action: 'create', summary: `Netting ${amount.toFixed(2)}: ${client.name} ↔ ${vendor.name} on ${date}` });
   return { nettingId, receipts };
 }
 
@@ -175,7 +173,7 @@ export function nettings(payments: readonly Payment[] = peekTable<Payment>('tran
 export function reverseNetting(nettingId: string): void {
   requireAccess('books.edit');
   const n = nettings().find((x) => x.id === nettingId);
-  if (!n) throw new NettingError('This netting was not found.');
+  if (!n) throw new Error('Netting not found.');
   assertUnlocked({ id: 'netting', issue_date: n.date }, 'delete');
   withTablesRollback(['transactions', 'invoices', 'purchases'], () => {
     for (const r of n.rows) localDb.payments.remove(r.id);
