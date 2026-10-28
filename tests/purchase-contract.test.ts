@@ -1105,7 +1105,7 @@ test('R15-A3 netting reads the real bill shape', async () => {
   const rows: PurchaseRecord[] = [
     { ...bill, vendor_id: 'v1' },
     { ...bill, id: 'rcm', vendor_id: 'v1', reverse_charge: true },
-    { ...bill, id: 'void', vendor_id: 'v1', status: 'void' } as PurchaseRecord,
+    { ...bill, id: 'void', vendor_id: 'v1', status: 'draft' },
     { ...bill, id: 'paid', vendor_id: 'v1', amount_paid: 1180 },
     { ...bill, id: 'urd', vendor_id: 'v1', used_goods: { kind: 'device' } } as never,
   ];
