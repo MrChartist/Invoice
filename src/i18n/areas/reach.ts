@@ -265,6 +265,9 @@ export const reachT = defineArea(
     // R15 (R15-B1): travel packs
     'pack.travel': 'Travel & tours', 'packDesc.travel': 'Trip files, bookings, costing and margin, 5 % / 18 % / agent regimes.',
     'pack.events': 'Events', 'packDesc.events': 'Event files with vendors and budgets on the Trips desk.',
+    // R17 (R17-A1): manpower packs
+    'pack.manpower': 'Manpower supply', 'packDesc.manpower': 'Sites, posts and rates; reverse charge / exempt / 18 % per bill.',
+    'pack.security': 'Security agency', 'packDesc.security': 'PSARA licences and guard licences on the Deploy desk.',
     'ck.workCentres': 'Add your work centres (machines and their hour rates)',
     'ck.udyam': 'Add your Udyam number (printed on invoices)',
     'ck.firstDrawing': 'Add your first drawing',
@@ -279,6 +282,7 @@ export const reachT = defineArea(
     'ck.clientMoneyBank': 'Mark your client-money bank account', 'ck.stageTemplate': 'Set the stage fees of your first project', // R14 (PS-B)
     'ck.lut': 'Record your LUT for exports', 'ck.edf': 'Prepare your first EDF', // R14 (PS-C)
     'ck.firstTrip': 'Open your first trip', 'ck.firstSupplier': 'Add your first supplier booking', 'ck.regime': 'Choose your GST regime', 'ck.firstStatement': 'Import your first supplier statement', 'ck.firstEvent': 'Open your first event', // R15-B1
+    'ck.firstSite': 'Add your first site with its posts', 'ck.firstBill': 'Make your first manpower bill', // R17-A1
   } as const,
   {
     'title.shop': 'आप क्या काम करते हैं?',
@@ -531,6 +535,8 @@ export const reachT = defineArea(
     'packDesc.partners': 'पूंजी खाता और चालू खाता, धारा 40(b) में पारिश्रमिक, 194T, अनुमानित आय।',
     'pack.travel': 'यात्रा और टूर', 'packDesc.travel': 'यात्रा फ़ाइल, बुकिंग, लागत और मार्जिन, 5 % / 18 % / एजेंट व्यवस्था।',
     'pack.events': 'इवेंट', 'packDesc.events': 'ट्रिप डेस्क पर वेंडर और बजट के साथ इवेंट फ़ाइल।',
+    'pack.manpower': 'मानव-शक्ति आपूर्ति', 'packDesc.manpower': 'साइट, पोस्ट और दरें; हर बिल पर रिवर्स चार्ज / छूट / 18 %।',
+    'pack.security': 'सुरक्षा एजेंसी', 'packDesc.security': 'तैनाती डेस्क पर PSARA लाइसेंस और गार्ड लाइसेंस।',
     'ck.workCentres': 'अपने कार्य केंद्र जोड़ें (मशीनें और उनकी घंटे की दर)',
     'ck.udyam': 'अपना उद्यम पंजीकरण नंबर जोड़ें (इनवॉइस पर छपता है)',
     'ck.firstDrawing': 'पहली ड्रॉइंग जोड़ें',
@@ -545,5 +551,6 @@ export const reachT = defineArea(
     'ck.clientMoneyBank': 'क्लाइंट-पैसे का बैंक खाता चिह्नित करें', 'ck.stageTemplate': 'पहली परियोजना के चरण शुल्क तय करें',
     'ck.lut': 'निर्यात के लिए LUT दर्ज करें', 'ck.edf': 'पहला EDF तैयार करें',
     'ck.firstTrip': 'पहली यात्रा फ़ाइल खोलें', 'ck.firstSupplier': 'पहली आपूर्तिकर्ता बुकिंग जोड़ें', 'ck.regime': 'अपनी GST व्यवस्था चुनें', 'ck.firstStatement': 'पहला आपूर्तिकर्ता विवरण इम्पोर्ट करें', 'ck.firstEvent': 'पहला इवेंट खोलें',
+    'ck.firstSite': 'पोस्ट के साथ पहली साइट जोड़ें', 'ck.firstBill': 'पहला मानव-शक्ति बिल बनाएँ',
   },
 );

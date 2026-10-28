@@ -138,6 +138,8 @@ export const TIME_TABS = [
   { id: 'exportsvc', pack: 'svcexport' }, // PS-C: views checker / edf / realisation / refund / platforms
   // R15: the Trips desk (one lazy chunk; views trips / bookings (B), statements (C), tcs / events (D) in `&view=`)
   { id: 'trips', pack: 'travel', alsoPacks: ['events'] },
+  // R17: the Deploy desk (one lazy chunk; views sites (A), muster / bills (B), compliance / profit (C), statutory (D))
+  { id: 'deploy', pack: 'manpower', alsoPacks: ['security'] },
 ] as const;
 export type TimeTab = (typeof TIME_TABS)[number]['id'];
 /* ── Recurring ── */

@@ -25,10 +25,12 @@ export async function demoExtras(profile: DemoProfile, ctx: ProfileContext): Pro
   const prof = ctx.packs.includes('practice') ? (await import('./profile-prof')).profExtras(ctx) : {};
   // R15: a travel Demo company (pack `travel` / `events`) adds its rows (`profile-travel.ts`, by pack; trip cost centres appended).
   const travel = ctx.packs.some((p) => p === 'travel' || p === 'events') ? (await import('./profile-travel')).travelExtras(ctx) : {};
-  if (!agri.tables && !mfg.tables && !prof.tables && !travel.tables) return base;
+  // R17: a manpower Demo company (pack `manpower` / `security`) adds its sites (`profile-manpower.ts`; cost centres appended).
+  const manpower = ctx.packs.some((p) => p === 'manpower' || p === 'security') ? (await import('./profile-manpower')).manpowerExtras(ctx) : {};
+  if (!agri.tables && !mfg.tables && !prof.tables && !travel.tables && !manpower.tables) return base;
   const stock = [...(base.tables?.stock_items ?? []), ...(agri.tables?.stock_items ?? []), ...(mfg.tables?.stock_items ?? [])];
   const time = [...(base.tables?.time_entries ?? []), ...(prof.tables?.time_entries ?? [])];
-  const centres = [...(prof.tables?.cost_centres ?? []), ...(travel.tables?.cost_centres ?? [])];
+  const centres = [...(prof.tables?.cost_centres ?? []), ...(travel.tables?.cost_centres ?? []), ...(manpower.tables?.cost_centres ?? [])];
   const staff = [...(base.tables?.service_staff ?? []), ...(prof.tables?.service_staff ?? [])];
   // R16-C4: the travel profile also adds a TCS invoice
   return { ...base, ...(travel.invoices ? { invoices: [...(base.invoices ?? []), ...travel.invoices] } : {}), tables: { ...base.tables, ...agri.tables, ...mfg.tables, ...prof.tables, ...travel.tables, ...(centres.length ? { cost_centres: centres } : {}), ...(stock.length ? { stock_items: stock } : {}), ...(time.length ? { time_entries: time } : {}), ...(staff.length ? { service_staff: staff } : {}) } };

@@ -10,8 +10,9 @@ import { join } from 'node:path';
 const read = (p: string) => readFileSync(p, 'utf8');
 
 // R15: TV ids (travel and cross-cutting). TV sits before T so "TV1" is never read as "T" + junk (a digit must follow).
-const CITED_RE = /CA_REVIEW[^\n]*?\b((?:MF|AG|G|TV|T|PS|PF|P|AC|I|X|CN|SV)\d{1,2})\b/g;
-const CA_LIST_RE = /(?:MF|CN|SV|AG|G|TV|T|PS|PF|P|AC|I|X)\d{1,2}/g;
+// R17: MP ids (manpower); MP sits before P so "MP1" is never read as "P1".
+const CITED_RE = /CA_REVIEW[^\n]*?\b((?:MF|MP|AG|G|TV|T|PS|PF|P|AC|I|X|CN|SV)\d{1,2})\b/g;
+const CA_LIST_RE = /(?:MF|MP|CN|SV|AG|G|TV|T|PS|PF|P|AC|I|X)\d{1,2}/g;
 
 test('every docs/features/*.md path named in the roadmap exists', () => {
   const roadmap = read('docs/ROADMAP.md');
@@ -67,4 +68,11 @@ test('R16: CA-id patterns read PF ids whole and never confuse them with P ids', 
   assert.deepEqual("ca: ['PF1', 'P1', 'PF18']".match(CA_LIST_RE), ['PF1', 'P1', 'PF18']);
   const row = /^\| ((?:G|TR|TV|T|PS|PF|P|AC|I|X|HT|RT|CN|SV|AG|MF)\d+)\b/gm;
   assert.deepEqual([...'| PF1 ★ | x |\n| P1 | y |'.matchAll(row)].map((m) => m[1]), ['PF1', 'P1']);
+});
+
+test('R17: CA-id patterns read MP ids whole and never confuse them with P ids', () => {
+  assert.deepEqual([...'see CA_REVIEW MP1 and CA_REVIEW P1'.matchAll(CITED_RE)].map((m) => m[1]), ['MP1', 'P1']);
+  assert.deepEqual("ca: ['MP1', 'P1', 'MP32']".match(CA_LIST_RE), ['MP1', 'P1', 'MP32']);
+  const row = /^\| ((?:G|TR|TV|T|PS|PF|P|AC|I|X|HT|RT|CN|SV|AG|MF|MP)\d+)\b/gm;
+  assert.deepEqual([...'| MP1 ★ | x |\n| P1 | y |'.matchAll(row)].map((m) => m[1]), ['MP1', 'P1']);
 });

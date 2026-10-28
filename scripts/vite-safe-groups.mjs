@@ -179,10 +179,13 @@ export function graphPlugin(g) {
 
 /**
  * A family's files: `src/lib/<dir>/**`, `src/lib/<rules>.ts` and the area files whose name starts with `area`
- * (`-pick` areas excluded: the setup wizard imports those).
+ * (`-pick` areas excluded: the setup wizard imports those). R17-A: `except` = basenames under `src/lib/<dir>/` left out
+ * of the family (the runtime registry, which the sync engine and the recycle bin import: kept out of the family chunk,
+ * it is a small leaf, so a sync run does not load the family and the entry's preload map gains no file).
  */
-export function familyRe(dir, rules, area) {
+export function familyRe(dir, rules, area, except = '') {
   const S = String.raw`[\\/]`;
-  const lib = [`${dir}${S}[^\0]*`, rules].filter(Boolean).join('|');
+  const skip = except ? `(?!(?:${except.split(' ').join('|')})\\.tsx?$)` : '';
+  const lib = [`${dir}${S}${skip}[^\0]*`, rules].filter(Boolean).join('|');
   return new RegExp(String.raw`${S}src${S}(?:lib${S}(?:${lib})\.tsx?|i18n${S}areas${S}${area}(?![^\\/]*-pick)[^\\/]*\.ts)$`);
 }

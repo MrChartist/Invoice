@@ -87,6 +87,7 @@ function projectFields(o: Record<string, unknown>): Partial<CostCentre> {
   if (o.fund && typeof o.fund === 'object') out.fund = o.fund as CostCentre['fund']; // R5-C4: fund details (kind 'fund')
   if (o.ps && typeof o.ps === 'object') out.ps = o.ps as CostCentre['ps']; // R14 (PS-A2): matter fields
   if (o.tv && typeof o.tv === 'object') out.tv = o.tv as CostCentre['tv']; // R15-B2: trip / event fields
+  if (o.mp && typeof o.mp === 'object') out.mp = o.mp as CostCentre['mp']; // R17-A2: site fields
   return out;
 }
 

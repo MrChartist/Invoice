@@ -10,6 +10,7 @@ import type { AgSnapshot } from '../../types/agri-r12';
 import type { MfSnapshot } from '../../types/mfg-r13';
 import type { PsSnapshot } from '../../types/prof-r14';
 import type { TvSnapshot } from '../../types/travel-r15';
+import type { MpSnapshot } from '../../types/manpower-r17';
 import { MSME_PAYMENT_DAYS } from '../../lib/tax-rules';
 
 /** R9 (RT-E2) gold fineness by karat, for "22K (916)" on the bill (BIS Reg. 5(11); same table as `rt-jewel-rates.ts`). */
@@ -46,7 +47,7 @@ function monthYear(day: string): string {
  * (6.6 / 6.11), e.g. "Batch B12 · Mfg 01/2026 · Exp 06/2027" or "S/N: 3567…, 3567… · Warranty 12 months".
  * '' for untracked lines, so ordinary documents print exactly as before.
  */
-export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw' | 'id' | 'sv'>> & { bin?: string }) | undefined, ag?: AgSnapshot, mf?: MfSnapshot, ps?: PsSnapshot, tv?: TvSnapshot): string {
+export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw' | 'id' | 'sv'>> & { bin?: string }) | undefined, ag?: AgSnapshot, mf?: MfSnapshot, ps?: PsSnapshot, tv?: TvSnapshot, mp?: MpSnapshot): string {
   if (!item) return '';
   if (item.jw) return jewelText(item.jw); // R9 (RT-E2): the BIS sub-line (the tag no. is its serial)
   const parts: string[] = [];
@@ -63,6 +64,7 @@ export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' |
   parts.push(mfLineText(item, mf)); // R13 (MF-A5): '' without the `mf` snapshot
   parts.push(psLineText(item, ps)); // R14 (PS-A5): '' without the `ps` snapshot
   parts.push(tvLineText(item, tv)); // R15-B4: '' without the `tv` snapshot
+  parts.push(mpLineText(item, mp)); // R17-A4: '' without the `mp` snapshot
   return parts.filter(Boolean).join(' · ');
 }
 
@@ -273,6 +275,12 @@ export function psLineText(item: { id?: string } | undefined, ps: PsSnapshot | u
 export function tvLineText(item: { id?: string } | undefined, tv: TvSnapshot | undefined): string {
   const k = item?.id ? tv?.lines?.[item.id]?.tkt : undefined;
   return k ? [k.pax, k.airline, k.ticket_no && `Tkt ${k.ticket_no}`, k.pnr && `PNR ${k.pnr}`, k.sector, k.basic && `Basic ${k.basic.toFixed(2)} + taxes ${(k.taxes ?? 0).toFixed(2)}${k.airline_gst ? ` + airline GST ${k.airline_gst.toFixed(2)}` : ''}`].filter(Boolean).join(' · ') : ''; // R15-C1: fare split
+}
+
+/** R17-A4: post particulars under a line from the document's `mp.posts` row of that line (B fills `line_id`); '' otherwise. */
+export function mpLineText(item: { id?: string } | undefined, mp: MpSnapshot | undefined): string {
+  const p = item?.id ? mp?.posts?.find((r) => r.line_id === item.id) : undefined;
+  return p ? [p.site, `${p.post} × ${p.heads}`, p.duties != null && `${p.duties} duties`].filter(Boolean).join(' · ') : '';
 }
 
 /**

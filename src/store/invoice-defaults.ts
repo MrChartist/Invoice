@@ -16,6 +16,7 @@ import type {} from '../types/agri-r12'; // R12: the record snapshot key `ag` (R
 import type {} from '../types/mfg-r13'; // R13: the record snapshot key `mf` (R13_RECORD_KEYS)
 import type {} from '../types/prof-r14'; // R14: the record snapshot key `ps` (R14_RECORD_KEYS)
 import type {} from '../types/travel-r15'; // R15: the record snapshot key `tv` (R15_RECORD_KEYS)
+import type {} from '../types/manpower-r17'; // R17: the record snapshot key `mp` (R17_RECORD_KEYS)
 import { generateId } from '../lib/storage';
 import { deriveGstMode, num } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
@@ -180,7 +181,9 @@ export const R13_RECORD_KEYS = ['mf'] as const;
 export const R14_RECORD_KEYS = ['ps'] as const;
 /** R15 (R15-B, src/types/travel-r15.ts): ONE record key `tv` (the travel snapshot); no line key. */
 export const R15_RECORD_KEYS = ['tv'] as const;
-export const R9_RECORD_KEYS = ['delivery', 'kyc', 'sv', ...R12_RECORD_KEYS, ...R13_RECORD_KEYS, ...R14_RECORD_KEYS, ...R15_RECORD_KEYS] as const; // R12 / R13 / R14 / R15: one spread token each (normalizeRecord, RECORD_KEYS)
+/** R17 (R17-A, src/types/manpower-r17.ts): ONE record key `mp` (the manpower snapshot); no line key. */
+export const R17_RECORD_KEYS = ['mp'] as const;
+export const R9_RECORD_KEYS = ['delivery', 'kyc', 'sv', ...R12_RECORD_KEYS, ...R13_RECORD_KEYS, ...R14_RECORD_KEYS, ...R15_RECORD_KEYS, ...R17_RECORD_KEYS] as const; // R12 / R13 / R14 / R15 / R17: one spread token each (normalizeRecord, RECORD_KEYS)
 export const R9_LINE_KEYS = ['band_rate', 'serial_pairs', 'margin', 'jw', 'sv', 'ag_class'] as const; // QA13 G7: + the R12 line class
 
 function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {

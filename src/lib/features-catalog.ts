@@ -27,7 +27,8 @@ export type AdvancedId =
   | 'agriProfile' // R12 (AG-A1)
   | 'mfgProfile' // R13 (MF-A1)
   | 'profProfile' // R14 (PS-A1)
-  | 'travelProfile'; // R15 (R15-B1)
+  | 'travelProfile' // R15 (R15-B1)
+  | 'manpowerProfile'; // R17 (R17-A1)
 
 export interface FeatureRow {
   /** `mod.<id>`, `pack.<id>` or `adv.<id>`. */
@@ -111,6 +112,8 @@ const ADVANCED: readonly { id: AdvancedId; href: string; isOn: FeatureRow['isOn'
   { id: 'profProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { prof_kind?: unknown }).prof_kind === 'string' },
   // R15 (R15-B1): the travel profile (Settings → Features under Services)
   { id: 'travelProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { travel_kind?: unknown }).travel_kind === 'string' },
+  // R17 (R17-A1): the manpower profile (Settings → Features under Services)
+  { id: 'manpowerProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { manpower_kind?: unknown }).manpower_kind === 'string' },
 ];
 
 /** Where each module's screen is (the first sidebar route that belongs to it). */
@@ -180,6 +183,9 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   // R15 (R15-B1): the Trips desk (tab on Time)
   travel: '/time?tab=trips',
   events: '/time?tab=trips',
+  // R17 (R17-A1): the Deploy desk (tab on Time)
+  manpower: '/time?tab=deploy',
+  security: '/time?tab=deploy',
 };
 
 export const FEATURE_ROWS: readonly FeatureRow[] = [

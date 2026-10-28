@@ -112,7 +112,7 @@ test('every topic has English and Hindi titles, what / when, ≤ 5 steps; statut
 });
 
 test('every caItems id exists in docs/CA_REVIEW.md', () => {
-  const ids = new Set([...src('docs/CA_REVIEW.md').matchAll(/^\| ((?:G|TR|TV|T|PS|PF|P|AC|I|X|HT|RT|CN|SV|AG|MF)\d+)\b/gm)].map((m) => m[1])); // R16: PF ids; R15: TV ids; R8: TR ids; R7: HT ids; R9: RT ids; R11: CN ids; R10: SV ids; R12: AG ids; R13: MF ids
+  const ids = new Set([...src('docs/CA_REVIEW.md').matchAll(/^\| ((?:G|TR|TV|T|PS|PF|P|AC|I|X|HT|RT|CN|SV|AG|MF|MP)\d+)\b/gm)].map((m) => m[1])); // R17: MP ids; R16: PF ids; R15: TV ids; R8: TR ids; R7: HT ids; R9: RT ids; R11: CN ids; R10: SV ids; R12: AG ids; R13: MF ids
   assert.ok(ids.size >= 150, `read ${ids.size} CA ids`);
   for (const x of ALL) for (const id of x.statutory?.caItems ?? []) assert.ok(ids.has(id), `${x.id}: CA item ${id} not in CA_REVIEW.md`);
 });

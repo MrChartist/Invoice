@@ -21,6 +21,9 @@ import { psPickT } from '../../i18n/areas/prof-r14a-pick';
 import { applyTravelKind } from '../../lib/shop-presets';
 import { TravelKindPicker } from '../travel/TravelKindPicker'; // R15-B1
 import { tvT } from '../../i18n/areas/travel-r15b';
+import { applyManpowerKind } from '../../lib/shop-presets';
+import { ManpowerKindPicker } from '../manpower/ManpowerKindPicker'; // R17-A1
+import { mpPickT } from '../../i18n/areas/manpower-r17a-pick';
 import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
 import { DB_PREFIX, getJson } from '../../lib/storage';
 import { cnPickT } from '../../i18n/areas/construction-r11-pick';
@@ -214,6 +217,23 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
                 const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
                 onChange(applyTravelKind(k, { registered, currentPacks: packsOn }) as Partial<typeof settings>);
                 void import('../../lib/travel/tv-profile').then((m) => m.applyTravelSwitches(k)).catch(() => undefined);
+              }}
+            />
+          </div>
+        )}
+        {/* R17-A1: "Manpower profile" for every services company (+ Custom); changing it deletes nothing */}
+        {settings.business_type === 'services' && (
+          <div className={controls.field} data-features-manpower>
+            <span className={controls.label}>{mpPickT('title')}</span>
+            <ManpowerKindPicker
+              value={settings.manpower_kind}
+              custom
+              disabled={!owner}
+              onPick={(k) => {
+                if (!k) return onChange({ manpower_kind: undefined });
+                const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
+                onChange(applyManpowerKind(k, { registered, currentPacks: packsOn }) as Partial<typeof settings>);
+                void import('../../lib/manpower/mp-settings').then((m) => m.applyManpowerDefaults(k)).catch(() => undefined);
               }}
             />
           </div>

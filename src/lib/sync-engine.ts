@@ -68,6 +68,7 @@ import './agri/ag-registry'; // R12: agri tables' rights and audit labels (lazy 
 import './mfg/mf-registry'; // R13: manufacturing tables' rights and audit labels (lazy registration)
 import './prof/ps-registry'; // R14: professional tables' rights and audit labels (lazy registration)
 import './travel/tv-registry'; // R15: travel tables' rights and audit labels (lazy registration)
+import './manpower/mp-registry'; // R17: manpower tables' rights and audit labels (lazy registration)
 
 export const [SYNC_STATE_KEY, SYNC_CONFLICTS_KEY, SYNC_AUDIT_KEY] = SYNC_META_KEYS;
 
