@@ -13,7 +13,9 @@ import { invT } from '../../i18n/areas/inventory';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
 import { EditLogButton } from '../audit/EditLogButton';
-import { catalogueEntryFor, setStockShortCode } from '../../lib/catalog';
+import { catalogueEntryFor, setStockItemFields, setStockShortCode } from '../../lib/catalog';
+import { CustomFieldInputs } from '../custom-fields/CustomFieldInputs';
+import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
 import { retailT } from '../../i18n/areas/retail';
 import { impliedPacks } from '../../lib/shop-mode';
 import { localDb } from '../../lib/localDb';
@@ -85,6 +87,8 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
   // QA-3 F24: the counter short code lives on the catalogue entry of the same name; it is edited here too.
   const [shortCode, setShortCode] = useState(() => catalogueEntryFor(item.name)?.short_code ?? '');
   const [shortError, setShortError] = useState('');
+  // 6.23 (PENDING #25): item custom fields live on the catalogue entry of the same name, edited here too.
+  const [itemFields, setItemFields] = useState(() => catalogueEntryFor(item.name)?.custom_fields);
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((p) => ({ ...p, [k]: v }));
   const name = d.name.trim();
@@ -113,6 +117,11 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
     if (!valid) return;
     const sc = setStockShortCode({ name, hsn: d.hsn, unit: d.unit, sale_rate: d.sale_rate === '' ? undefined : num(d.sale_rate), tax_rate: d.tax_rate === '' ? undefined : num(d.tax_rate) }, shortCode);
     if (!sc.ok) return setShortError(sc.error.message);
+    try {
+      setStockItemFields({ name, hsn: d.hsn, unit: d.unit, sale_rate: d.sale_rate === '' ? undefined : num(d.sale_rate), tax_rate: d.tax_rate === '' ? undefined : num(d.tax_rate) }, cleanValueMap(itemFields, customFieldsDb.all()));
+    } catch (err) {
+      return setShortError((err as Error).message);
+    }
     onSave({
       ...item,
       name,
@@ -299,6 +308,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
         {agOn && <Suspense fallback={null}><PackSizeRow value={ag} unit={d.unit} onChange={setAg} /></Suspense>}
         {svOn && <Suspense fallback={null}><ServiceRecipeRow item={item} onChange={setRecipe} /></Suspense>}
         {touched && recipe?.problem && <span className={controls.error} role="alert">{recipe.problem}</span>}
+        <CustomFieldInputs scope="item" idPrefix={`${uid}-item`} value={itemFields} onChange={setItemFields} />
         <MastersFields
           draft={d.masters}
           onChange={(m) => set('masters', m)}

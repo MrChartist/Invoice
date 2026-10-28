@@ -267,6 +267,33 @@ export function setStockShortCode(
   return { ok: true };
 }
 
+/**
+ * 6.23 (PENDING #25): set the item custom fields (`custom_fields`, already cleaned by the caller with `cleanValueMap`)
+ * of the catalogue entry named like a stock item, from the stock-item form. With no entry yet, one is created from
+ * the stock item (as for the short code); an unchanged map writes nothing.
+ */
+export function setStockItemFields(
+  stock: { name: string; hsn?: string; unit?: string; sale_rate?: number; tax_rate?: number },
+  fields: Record<string, string> | undefined,
+): void {
+  const items = listCatalog();
+  const entry = catalogueEntryFor(stock.name, items);
+  const same = JSON.stringify(entry?.custom_fields ?? {}) === JSON.stringify(fields ?? {});
+  if (same) return;
+  requireAccess('master.edit');
+  if (!entry) {
+    const hsn = (stock.hsn ?? '').replace(/\D/g, '');
+    const r = saveCatalogItem({ name: stock.name.trim(), type: hsn.startsWith('99') ? 'Service' : 'Product', hsn, unit: stock.unit || 'NOS', rate: Number(stock.sale_rate) || 0, tax_rate: Number(stock.tax_rate) || 0, custom_fields: fields });
+    if ('error' in r) throw new Error(r.error.message);
+    return;
+  }
+  setTable(KEYS.items, items.map((i) => {
+    if (i.id !== entry.id) return i;
+    const { custom_fields: _old, ...rest } = i;
+    return fields ? { ...rest, custom_fields: fields } : rest;
+  }));
+}
+
 /* ── Create an item from an unknown code (8E, roadmap 8.149) ─────── */
 
 export interface QuickItemFields {

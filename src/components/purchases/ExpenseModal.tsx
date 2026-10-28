@@ -24,6 +24,8 @@ import { billTdsInputFor, priorCreditsFor, resolveBillTds, type BillTdsInput } f
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 import { localDb } from '../../lib/localDb';
+import { SnapshotFields } from '../custom-fields/SnapshotFields';
+import { customFieldsDb, finalizeValues } from '../../lib/custom-fields';
 
 // R14 PS-B1: the disbursement row (kind, on the client's behalf) — professional companies only, one lazy chunk.
 const DisbursementRow = lazy(() => import('../prof/DisbursementRow'));
@@ -79,6 +81,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
     pure_agent: expense?.pure_agent,
   });
   const [attachments, setAttachments] = useState<AttachmentRef[]>(expense?.attachments ?? seeded ?? []);
+  const [customValues, setCustomValues] = useState(expense?.custom_values); // 6.23 (PENDING #25)
   const [psB, setPsB] = useState(() => (expense as { ps?: Record<string, unknown> } | undefined)?.ps); // R14 PS-B1
   const profOn = useMemo(() => ((s: { prof_kind?: unknown; industry_packs?: unknown }) => !!s.prof_kind || (Array.isArray(s.industry_packs) && s.industry_packs.includes('practice')))(localDb.settings.get() as never), []);
   const [error, setError] = useState('');
@@ -131,6 +134,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
         ...(psB !== (expense as { ps?: unknown } | undefined)?.ps ? { ps: psB && Object.keys(psB).length ? psB : undefined } : {}), // R14 PS-B1
         cost_centre_id: costCentre,
         attachments: attachments.length ? attachments : undefined,
+        custom_values: finalizeValues(customValues, customFieldsDb.all(), !expense?.id), // 6.23 (PENDING #25)
         ...tdsResolved.fields,
       }, { confirmed: !!warning, payNow: !expense && paidNow ? { method, date, ...(tdsPay > 0 ? { tds_amount: tdsPay } : {}) } : undefined });
       if (res.kind === 'warn') {
@@ -253,6 +257,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
         <label className={controls.label} htmlFor="exp-notes">{purT('notes')}</label>
         <textarea id="exp-notes" className={controls.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
+      <SnapshotFields scope="document" idPrefix="exp" values={customValues} onChange={setCustomValues} />
 
       <TdsBillPanel value={tds} onChange={setTds} suggestion={tdsResolved.suggestion} payableNet={totals.total - (tdsResolved.fields.tds_on === 'BILL' ? tdsResolved.fields.tds_amount ?? 0 : 0)} nonResident={vendor?.non_resident} date={date} names={`${category} ${notes}`} />
 
