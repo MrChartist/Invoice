@@ -67,7 +67,7 @@ figure, blocks a workflow or makes a vertical unusable at scale · **M** missing
 | 23 | **Done** (one shared lazy `purchases/SizeGridSlot.tsx` in bill, PO and GRN) — Apparel size grid on PO / GRN editors | L | S | [`features/retail-r9.md`](features/retail-r9.md) |
 | 24 | **Done** (`moveSamplesToDemo` in `onboarding/demo-company.ts`, "Move them to the Demo company" beside "Remove sample data"; refuses rather than guesses) — Discoverability §7 Q6: move samples already loaded into a real company to a Demo company | L | M | [`features/discoverability-r6.md`](features/discoverability-r6.md) |
 | 25 | **Done** (`custom-fields/SnapshotFields.tsx` on bill / expense / recurring editor, lazy `LineFields` per line, `setStockItemFields` in the stock-item form) — Custom fields on purchase bills / expenses / recurring templates; item fields per line and in the stock-item modal | L | M | [`features/attachments-custom-fields.md`](features/attachments-custom-fields.md) |
-| 26 | Netting by a clerk is refused, not queued (`approvals.ts` holds documents only) | L | M | `travel-r15.md` R15-A3 |
+| 26 | **Skipped — `approvals.ts` cannot hold it cleanly** (see `travel-r15.md` A3 deviations: its queue is the invoices' own `approval` state, a netting is a set of receipts across invoices and bills; queueing needs a new synced / backed-up request table and a re-check at approval time). The clerk's refusal stays — Netting by a clerk is refused, not queued (`approvals.ts` holds documents only) | L | M | `travel-r15.md` R15-A3 |
 
 ### 2.3 Data-layer and accounting follow-ups
 

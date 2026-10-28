@@ -66,7 +66,13 @@ palette +0.14, rt-registry +0.15, billwise +0.12, help +0.04 ≈ **4.75 kB** aga
 - A2: `beforeunload` → `pagehide` (fires on mobile and bfcache; the microtask flush already ran before any event).
   `sync-engine.ts` flushes though `audit_log` is not synced (harmless).
 - A3: the "existing approval queue" is document-based (`approvals.ts` holds invoices); a clerk's netting is refused with
-  "needs the owner's approval" instead of being queued. The netting receipts also write the normal per-receipt
+  "needs the owner's approval" instead of being queued. Re-checked for PENDING #26 and left as is: the queue is not a
+  table of requests but the `approval` field of a held draft invoice (`pendingApprovals` filters invoices, `decide`
+  issues one document through `localDb.invoices.save`), and bills wait the same way in `purchase_drafts`. A netting is
+  no document: it writes receipts against several invoices and bills at once, and the open amounts it was sized on can
+  change before the owner looks. Queueing it would need a new request table (backup, sync, `TABLE_ACTIONS`, recycle
+  bin, audit labels) plus a full re-validation in `postNetting` at approval time — a second approval mechanism, not an
+  entry in `approvals.ts`. The clerk asks the owner, who posts it. The netting receipts also write the normal per-receipt
   payment lines (localDb), besides the one netting line. The creditor sub-ledger line uses the client's name (the
   existing exchange posting), so a hand-linked vendor with another name nets in the client's name. **Fixed in R16-D1:**
   a netting row (`netting_id`) now debits the bill's own supplier (`ledger/postings.ts`); R9 / R12 exchange rows unchanged (PF17).
