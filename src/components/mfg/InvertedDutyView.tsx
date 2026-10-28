@@ -10,6 +10,7 @@ import { localDb } from '../../lib/localDb';
 import { useT } from '../../i18n';
 import { iT } from '../../i18n/areas/mfg-r13c-inv';
 import controls from '../../styles/controls.module.css';
+import PendingNote from '../ui/PendingNote';
 
 const q = (d: string) => `${d.slice(0, 5)}${String(Math.floor((Number(d.slice(5, 7)) - 1) / 3) * 3 + 1).padStart(2, '0')}-01`;
 const fmt = (n: number) => n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
@@ -39,6 +40,7 @@ export default function InvertedDutyView({ onDone }: { onDone?: (msg: string, er
   return (
     <section data-mfc-inverted>
       <h3>{iT('title')}</h3>
+      <PendingNote area="refund" day={to} />
       <div style={row}>
         <label className={controls.field}><span className={controls.label}>{iT('from')}</span><input className={controls.input} type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
         <label className={controls.field}><span className={controls.label}>{iT('to')}</span><input className={controls.input} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>

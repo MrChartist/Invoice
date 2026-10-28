@@ -7,6 +7,7 @@ import { plural } from '../../i18n/areas/plural';
 import { gstT } from '../../i18n/areas/gst';
 import { formatMoney } from '../../lib/utils';
 import surface from '../../styles/surface.module.css';
+import PendingNote from '../ui/PendingNote';
 import { o7T } from '../../i18n/areas/gst-tds-7o';
 import { Term } from '../help/Term';
 import type { GlossaryId } from '../../lib/help/glossary';
@@ -97,6 +98,7 @@ export function Gstr3bView({ report: b, onOpenSetOff }: { report: Gstr3bReport; 
 
   return (
     <>
+      <PendingNote area="gstr3b" />
       {block(gvT('b31'), t31, '')}
       {block(gvT('b32'), t32, gvT('b32Empty'))}
       {block(gvT('b4'), t4, '')}

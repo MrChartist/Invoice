@@ -21,6 +21,7 @@ import { todayIso } from '../../lib/tax-rules';
 import { formatDate, formatMoney } from '../../lib/utils';
 import { downloadText } from '../../lib/download';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import PendingNote from '../ui/PendingNote';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import local from './gst-reports.module.css';
@@ -113,6 +114,7 @@ export function RcmDocsPanel({ notify }: RcmDocsPanelProps) {
         <span>{RCM_DISCLAIMER}</span>
       </div>
       <p className={styles.muted}>{o7T('rcmIntro')}</p>
+      <PendingNote area="rcm_self" day={today} />
 
       <div className={styles.bar}>
         <div className={styles.checks}>
