@@ -60,6 +60,9 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
   const [credit, setCredit] = useState<{ limit: string; days: string }>({ limit: '', days: '' });
   // Price levels (6.9): the picker appears only once a level exists.
   const [levels] = useState(() => priceLevelsDb.all());
+  // PENDING #18: the Farmer section (a depositor / a dealer's farmer customer), with an agri pack on.
+  const [agriOn] = useState(() => activePacks(localDb.settings.get() as never).some((p) => (AG_PACKS as readonly string[]).includes(p)));
+  const [farmerProblem, setFarmerProblem] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -74,9 +77,6 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
 
   // R14 (PS-B2): the legal-services status row, for a company with the `legal` pack.
   const [legalOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('legal'))(localDb.settings.get() as never));
-  // PENDING #18: the Farmer section (a depositor / a dealer's farmer customer), with an agri pack on.
-  const [agriOn] = useState(() => activePacks(localDb.settings.get() as never).some((p) => (AG_PACKS as readonly string[]).includes(p)));
-  const [farmerProblem, setFarmerProblem] = useState('');
   const set = <K extends keyof Client>(key: K, value: Client[K]) => setForm((f) => ({ ...f, [key]: value }));
 
   // Characters 3–12 of a GSTIN are the holder's PAN.
