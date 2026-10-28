@@ -27,6 +27,8 @@ import controls from '../../styles/controls.module.css';
 import styles from './recurring.module.css';
 import { dateLocale, getLanguage, useT } from '../../i18n';
 import { recT } from '../../i18n/areas/recurring';
+import { SnapshotFields } from '../custom-fields/SnapshotFields';
+import { customFieldsDb, finalizeValues } from '../../lib/custom-fields';
 import { areaNodes } from '../../i18n/areas/nodes';
 
 export interface RecurringEditorProps {
@@ -184,6 +186,7 @@ function EditorBody({
     const cleaned: RecurringTemplate = {
       ...template,
       items: template.items.filter((i) => i.name.trim() || num(i.rate) > 0),
+      custom_values: finalizeValues(template.custom_values, customFieldsDb.all(), !schedule), // 6.23 (PENDING #25)
     };
     try {
       let saved: RecurringSchedule;
@@ -387,6 +390,8 @@ function EditorBody({
             </div>
           </div>
         </section>
+
+        <SnapshotFields scope="document" idPrefix="rec" values={template.custom_values} onChange={(custom_values) => setTemplate((t) => ({ ...t, custom_values }))} />
 
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>{recT('schedule')}</h3>

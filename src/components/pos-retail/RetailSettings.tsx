@@ -6,6 +6,7 @@ import {
   cleanScaleProfile, makeScaleBarcode, parsePrefixList, parseScaleBarcode, saveScaleProfile, type ScaleProfile,
 } from '../../lib/scale-barcode';
 import { cn } from '../../lib/utils';
+import { cleanAnalyser, loadAnalyser, saveAnalyser, type AnalyserField, type AnalyserProfile } from '../../lib/agri/ag-analyser';
 import { useT } from '../../i18n';
 import { retailT } from '../../i18n/areas/retail';
 import controls from '../../styles/controls.module.css';
@@ -15,15 +16,17 @@ type Tab = 'keys' | 'scale';
 
 /**
  * Counter settings (this device only): function keys for every POS action (press the new key; a key
- * already in use swaps with the old one) and the weighing-scale label profile (+ live scale port).
+ * already in use swaps with the old one) and the weighing-scale label profile (+ live scale port); with the dairy pack,
+ * the milk analyser profile (AG-B2, same device-local key as Dairy → Collection; PENDING #19).
  */
-export function RetailSettings({ open, onClose, keymap, scale, onSaved, initialTab = 'keys' }: {
+export function RetailSettings({ open, onClose, keymap, scale, onSaved, initialTab = 'keys', dairy = false }: {
   open: boolean;
   onClose: () => void;
   keymap: PosKeymap;
   scale: ScaleProfile;
   onSaved: (keymap: PosKeymap, scale: ScaleProfile) => void;
   initialTab?: Tab;
+  dairy?: boolean;
 }) {
   useT();
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -34,6 +37,7 @@ export function RetailSettings({ open, onClose, keymap, scale, onSaved, initialT
   const [prefixText, setPrefixText] = useState(scale.prefixes.join(', '));
   const [testCode, setTestCode] = useState('');
   const [portMsg, setPortMsg] = useState('');
+  const [analyser, setAnalyser] = useState<AnalyserProfile>(loadAnalyser);
   const keys = effectiveKeys(map);
   const conflicts = keymapConflicts(map);
 
@@ -41,6 +45,7 @@ export function RetailSettings({ open, onClose, keymap, scale, onSaved, initialT
     const clean = cleanScaleProfile({ ...profile, prefixes: parsePrefixList(prefixText) });
     saveKeymap(map);
     saveScaleProfile(clean);
+    if (dairy) saveAnalyser(analyser);
     onSaved(map, clean);
     onClose();
   };
@@ -190,6 +195,43 @@ export function RetailSettings({ open, onClose, keymap, scale, onSaved, initialT
               </div>
             </div>
             {portMsg && <p className={styles.muted} role="status">{portMsg}</p>}
+            {dairy && (
+              <div data-pos-analyser>
+                <p className={styles.section}>{retailT('anTitle')}</p>
+                <p className={styles.muted}>{retailT('anHint')}</p>
+                <div className={controls.row}>
+                  <label className={controls.field}>
+                    <span className={controls.label}>{retailT('anFormat')}</span>
+                    <select className={controls.select} value={analyser.preset} onChange={(e) => setAnalyser({ ...analyser, preset: e.target.value === 'kv' ? 'kv' : 'csv' })} data-analyser-preset>
+                      <option value="csv">{retailT('anCsv')}</option>
+                      <option value="kv">key=value</option>
+                    </select>
+                  </label>
+                  <label className={controls.field}>
+                    <span className={controls.label}>{retailT('anOrder')}</span>
+                    <input className={cn(controls.input, controls.inputMono)} value={analyser.order.join(',')} onChange={(e) => setAnalyser(cleanAnalyser({ ...analyser, order: e.target.value.split(',').map((x) => x.trim() as AnalyserField) }))} />
+                  </label>
+                  <label className={controls.field}>
+                    <span className={controls.label}>{retailT('anSep')}</span>
+                    <input className={cn(controls.input, controls.inputMono)} value={analyser.sep} maxLength={1} onChange={(e) => setAnalyser({ ...analyser, sep: e.target.value || ',' })} />
+                  </label>
+                </div>
+                <div className={controls.row}>
+                  <label className={controls.field}>
+                    <span className={controls.label}>{retailT('anDivide')}</span>
+                    <select className={controls.select} value={analyser.div} onChange={(e) => setAnalyser({ ...analyser, div: Number(e.target.value) })}>
+                      {[1, 10, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </label>
+                  <label className={controls.field}>
+                    <span className={controls.label}>{retailT('baud')}</span>
+                    <select className={controls.select} value={analyser.baud} onChange={(e) => setAnalyser({ ...analyser, baud: Number(e.target.value) })} data-analyser-baud>
+                      {[2400, 4800, 9600, 19200].map((b) => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </label>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

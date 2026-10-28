@@ -16,6 +16,9 @@ import { useCostCentres } from '../cost-centres/useCostCentres';
 import { billablePatch, type BillableValue } from '../../lib/purchases';
 import { VendorPicker } from './VendorPicker';
 import { LineItemsEditor } from './LineItemsEditor';
+import { SizeGridSlot } from './SizeGridSlot';
+import { SnapshotFields } from '../custom-fields/SnapshotFields';
+import { customFieldsDb, finalizeValues } from '../../lib/custom-fields';
 import { LandedCostFields, type LandedValue } from './LandedCostFields';
 import { cleanLandedCosts } from '../../lib/landed-cost';
 import { AttachmentsPanel } from '../attachments/AttachmentsPanel';
@@ -51,8 +54,6 @@ const BillRateHints = lazy(() => import('../trade/BillRateHints'));
 const BillTradePanel = lazy(() => import('../trade/tr-b-hub').then((m) => ({ default: m.BillTradePanel })));
 // R9 (RT-B3): batch MRP above the NPPA ceiling + GST (pharmacy pack, warning only, lazy).
 const CeilingNotice = lazy(() => import('../retail-r9/PharmacyDesk').then((m) => ({ default: m.CeilingNotice })));
-// R9 (RT-C2): size × colour grid entry (apparel pack, lazy).
-const BillGrid = lazy(() => import('../retail-r9/ApparelDesk').then((m) => ({ default: m.BillGrid })));
 // R12 (AG-A3): our FPV number and the agriculturist declaration for a farmer's bill (agri pack only).
 const VoucherAgriPanel = lazy(() => import('../agri/VoucherAgriPanel'));
 import { impliedPacks } from '../../lib/shop-mode';
@@ -169,6 +170,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
     pure_agent: purchase?.pure_agent,
   });
   const [attachments, setAttachments] = useState<AttachmentRef[]>(purchase?.attachments ?? []);
+  const [customValues, setCustomValues] = useState(purchase?.custom_values); // 6.23 (PENDING #25)
   const [psB, setPsB] = useState(() => (purchase as { ps?: Record<string, unknown> } | undefined)?.ps); // R14 (PS-B5)
   const [mediaOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('media'))(localDb.settings.get() as never));
   const [tvB, setTvB] = useState(purchase?.tv); // R15-B2 / B3
@@ -289,6 +291,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         cost_centre_id: costCentre,
         branch_id: branchId,
         attachments: attachments.length ? attachments : undefined,
+        custom_values: finalizeValues(customValues, customFieldsDb.all(), !purchase?.id), // 6.23 (PENDING #25)
         broker_id: brokerId, // R8-B
         ...tdsResolved.fields,
       }, { confirmed: !!warning });
@@ -371,7 +374,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
 
       <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
       <LineItemsEditor lines={lines} onChange={changeLines} stock={stock} date={date} freeCells={freeCells || lines.some((l) => l.free_qty || l.discount_percent)} />
-      {impliedPacks(localDb.settings.get()).includes('apparel') && <Suspense fallback={null}><BillGrid lines={lines} onChange={changeLines} date={date} /></Suspense>}
+      <SizeGridSlot lines={lines} onChange={changeLines} date={date} /> {/* R9 (RT-C2): size × colour grid (apparel pack, lazy) */}
+      <SnapshotFields scope="document" idPrefix="bill" values={customValues} onChange={setCustomValues} />
       {vendor && ((x) => !!x.trade_discounts || !!x.industry_packs?.some((p) => p === 'distributor' || p === 'commodity'))(localDb.settings.get()) && <Suspense fallback={null}><BillRateHints lines={lines} vendor={vendor} date={date} onRate={(id, rate) => changeLines(lines.map((l) => (l.id === id ? { ...l, rate } : l)))} /></Suspense>}
       {tradeOn && <Suspense fallback={null}><BillTradePanel lines={lines} onLines={changeLines} vendor={vendor} broker={brokerId} onBroker={setBrokerId} isNew={!purchase} /></Suspense>}
       {localDb.settings.get().industry_packs?.includes('pharmacy') && <Suspense fallback={null}><CeilingNotice lines={lines} date={date} /></Suspense>}

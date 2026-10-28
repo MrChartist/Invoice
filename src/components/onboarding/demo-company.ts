@@ -15,6 +15,7 @@ import { DEFAULT_COMPANY_ID, writeRegistry } from '../../lib/company-registry';
 import { localDb, type AppSettings } from '../../lib/localDb';
 import { SINGLETON_KEYS, readRaw, reloadAfterFlush, removeRaw, writeRaw } from '../../lib/storage';
 import { localDayOf } from '../../lib/dates';
+import { requireAccess } from '../../lib/access';
 import { applyBusinessType } from '../../lib/shop-presets';
 import { demoExtras } from '../../lib/demo/profiles';
 
@@ -152,6 +153,30 @@ export function startDemoCompany(ownName?: string): boolean {
   writeRaw(DEMO_PENDING_KEY, formatPending({ id: entry.id, business_type: s.business_type, packs }));
   switchCompany(entry.id);
   return true;
+}
+
+export type MoveSamplesResult = 'moved' | 'no_companies' | 'in_demo' | 'no_samples' | 'not_removed';
+
+/**
+ * R6 §7 Q6 (PENDING #24): samples an earlier version loaded into a REAL company move to the Demo company. Refused —
+ * nothing changed — when this browser cannot hold a second company (`no_companies`: the samples stay, "Remove sample
+ * data" still works), when the open company is the Demo company (`in_demo`) or holds no sample rows (`no_samples`).
+ * Otherwise exactly the sample rows (`demo: true`, what `removeDemoData` deletes) leave this company, and the Demo
+ * company opens (made and marked only through `startDemoCompany`) with a fresh sample set for the same kind of
+ * business — the sample rows are the app's own, so they are rebuilt there rather than copied between databases. If any
+ * sample row is still here after the removal, nothing moves (`not_removed`).
+ */
+export async function moveSamplesToDemo(deps: { supported?: () => boolean; start?: () => boolean } = {}): Promise<MoveSamplesResult> {
+  const { supported = companiesSupported, start = startDemoCompany } = deps; // injectable for tests (no IndexedDB in node)
+  // Owner only: the Demo company is created by the owner (`createCompany`), so a clerk is refused BEFORE anything is removed.
+  requireAccess('settings.manage');
+  if (!supported()) return 'no_companies';
+  if (isDemoCompanyOpen()) return 'in_demo';
+  const { demoStatus, removeDemoData } = await import('../../lib/demo-data');
+  if (!demoStatus().loaded) return 'no_samples';
+  removeDemoData();
+  if (demoStatus().loaded) return 'not_removed';
+  return start() ? 'moved' : 'no_companies';
 }
 
 /** "Demo", or "Demo 2" … when the user already has a company of that name (never reused for samples, QA7 G2). */

@@ -53,6 +53,8 @@ export function cleanServiceSettings(raw: unknown): ServiceSettings {
   if (r.tips === 'pass-through' || r.tips === 'off') out.tips = r.tips;
   if (r.checkin_gate === 'off' || r.checkin_gate === 'warn' || r.checkin_gate === 'block') out.checkin_gate = r.checkin_gate;
   if (r.upgrade_mode === 'difference' || r.upgrade_mode === 'credit_note') out.upgrade_mode = r.upgrade_mode; // SV-C
+  if (typeof r.defer_package_income === 'boolean') out.defer_package_income = r.defer_package_income; // PENDING #20
+  if (typeof r.defer_package_from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.defer_package_from)) out.defer_package_from = r.defer_package_from;
   if (typeof r.updated_at === 'string') out.updated_at = r.updated_at;
   return out;
 }
@@ -66,7 +68,7 @@ export function readServiceSettings(): ServiceSettings {
 }
 
 const describe = (s: ServiceSettings): string =>
-  [s.slot_step && `slot ${s.slot_step} min`, s.resources?.length && `${s.resources.length} resource(s)`, s.rule46a && 'Rule 46A title', s.itc_caution && 'ITC caution', s.no_itc_as_exempt === false && 'no-ITC turnover taxable in Rule 42', s.staff_required && 'staff required', s.print_staff && 'staff on paper', s.tips === 'pass-through' && 'tips', s.checkin_gate && `check-in ${s.checkin_gate}`].filter(Boolean).join(', ') || 'defaults';
+  [s.slot_step && `slot ${s.slot_step} min`, s.resources?.length && `${s.resources.length} resource(s)`, s.rule46a && 'Rule 46A title', s.itc_caution && 'ITC caution', s.no_itc_as_exempt === false && 'no-ITC turnover taxable in Rule 42', s.staff_required && 'staff required', s.print_staff && 'staff on paper', s.tips === 'pass-through' && 'tips', s.checkin_gate && `check-in ${s.checkin_gate}`, s.defer_package_income && `package income deferred from ${s.defer_package_from ?? '—'}`].filter(Boolean).join(', ') || 'defaults';
 
 /** Owner only: merge `patch` into the service settings (audited). Returns the saved settings. */
 export function saveServiceSettings(patch: Partial<ServiceSettings>): ServiceSettings {

@@ -260,8 +260,9 @@ keep the draft id (a billed slip cannot be deleted). Board by status / due day w
 
 ## 2. Deviations
 
-- PO / GRN editors have no *Size grid* button (each host chunk would carry the desk's ~60-entry preload list, ≈ 0.6 kB
-  each): a purchase order converted to a bill keeps its lines, and the supplier bill has the grid.
+- PO / GRN editors (PENDING #23): the *Size grid* button now sits on the purchase order and GRN editors too. A mount per
+  host would carry the desk's ~60-entry preload list in each chunk (≈ 0.6 kB each), so the three hosts (bill, PO, GRN)
+  share one small slot, `purchases/SizeGridSlot.tsx`, which holds the only lazy import (apparel pack, else nothing).
 - The stock matrix uses the tracking engine's quantity (same numbers as the stock summary, `tests/rt-matrix.test.ts`);
   "sold in 30 days" matches sale lines by item name.
 - A charged alteration is billed on its own new invoice (the sale bill can take the same line by hand); `charge_invoice_id`

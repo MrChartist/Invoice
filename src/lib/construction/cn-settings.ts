@@ -67,5 +67,39 @@ export function saveConstructionSettings(patch: Partial<ConstructionSettings>): 
   return readConstructionSettings();
 }
 
+/** The settings form (PENDING #22): switches as typed (numbers as text). */
+export interface ConstructionForm {
+  ra_paper: RaPaperStyle;
+  mb_column: boolean;
+  government: boolean;
+  certificate: boolean;
+  certificate_text: string;
+  signoff_boxes: boolean;
+  deviation_pct: string;
+  split_caution: boolean;
+  photo_pages: boolean;
+  manpower_preset: boolean;
+  labour_withhold_pct: string;
+}
+
+/**
+ * Pure: the patch the form saves. A blank number or text clears the key (the default applies); a bad number throws.
+ * `views` and `realty` are not touched.
+ */
+export function constructionFormPatch(f: ConstructionForm): Partial<ConstructionSettings> {
+  const pct = (v: string, what: string): number | undefined => {
+    if (!v.trim()) return undefined;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0 || n > 100) throw new Error(`${what} must be between 0 and 100.`);
+    return n;
+  };
+  return {
+    ra_paper: f.ra_paper, mb_column: f.mb_column, government: f.government, certificate: f.certificate,
+    certificate_text: f.certificate_text.trim() || undefined, signoff_boxes: f.signoff_boxes,
+    deviation_pct: pct(f.deviation_pct, 'The deviation limit'), split_caution: f.split_caution, photo_pages: f.photo_pages,
+    manpower_preset: f.manpower_preset, labour_withhold_pct: pct(f.labour_withhold_pct, 'The labour hold'),
+  };
+}
+
 /** Is a Works view listed? (a view whose switch is off is hidden, its URL still opens it). */
 export const worksViewOn = (s: ConstructionSettings, v: CnWorksView): boolean => s.views?.[v] === true;

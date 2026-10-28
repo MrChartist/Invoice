@@ -4,7 +4,7 @@ import { companiesSupported } from '../../lib/companies';
 import { localDb } from '../../lib/localDb';
 import { demoProfileFor, demoStatus, removeDemoData } from '../../lib/demo-data';
 import { reloadAfterFlush } from '../../lib/storage';
-import { isDemoCompanyOpen, startDemoCompany } from '../onboarding/demo-company';
+import { isDemoCompanyOpen, moveSamplesToDemo, startDemoCompany } from '../onboarding/demo-company';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useT } from '../../i18n';
 import { discoverT } from '../../i18n/areas/discover-r6';
@@ -29,6 +29,11 @@ export function SampleDataChooser({ variant = 'inline' }: { variant?: 'inline' |
     setBusy(true);
     if (!startDemoCompany()) setBusy(false);
   };
+  // PENDING #24: move this company's samples to the Demo company (removed here, rebuilt there).
+  const move = () => {
+    setBusy(true);
+    void moveSamplesToDemo().then((r) => { if (r !== 'moved') setBusy(false); }).catch(() => setBusy(false));
+  };
   const remove = () => {
     setConfirm(false);
     removeDemoData();
@@ -52,6 +57,11 @@ export function SampleDataChooser({ variant = 'inline' }: { variant?: 'inline' |
       {legacy && (
         <p className={controls.hint}>
           {discoverT('sampleInThis')}{' '}
+          {supported && (
+            <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={move} disabled={busy} data-sample-move>
+              <Store size={14} aria-hidden="true" /> {discoverT('sampleMove')}
+            </button>
+          )}{' '}
           <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setConfirm(true)}>
             <Trash2 size={14} aria-hidden="true" /> {discoverT('sampleRemove')}
           </button>

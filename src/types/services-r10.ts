@@ -111,6 +111,8 @@ export interface Appointment {
   /** Walk-in queue token of the day (resets daily) and its queue state. */
   token?: number;
   queue?: 'waiting' | 'called' | 'served';
+  /** SV-C3 (PENDING #21): a booking of one meeting of this class (`sv-class-bookings.ts`); no services. */
+  class_id?: string;
   created_at: string;
   updated_at?: string;
 }
@@ -652,6 +654,10 @@ export interface CoachingRefundRecord {
 export interface ServiceSettings {
   /** Upgrade: one invoice for the difference (default) or a credit note on the old bill + a full bill (SV14). */
   upgrade_mode?: 'difference' | 'credit_note';
+  /** Package income kept deferred: a monthly "Package income recognised" journal (`sv-deferral.ts`, PENDING #20). */
+  defer_package_income?: boolean;
+  /** The day the switch went on: packages sold before it are never deferred. */
+  defer_package_from?: string;
 }
 
 declare module './institutions-r5' {

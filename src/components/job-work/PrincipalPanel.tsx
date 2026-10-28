@@ -13,6 +13,7 @@ import { jwT } from '../../i18n/areas/job-work';
 import { s7T } from '../../i18n/areas/inventory-7s';
 import { principalStock } from '../../lib/job-work-principal';
 import { godownName } from '../../lib/godowns';
+import { chargesClassRate, JW_CHARGE_CLASSES, orderChargesClass, type JwChargeClass } from '../../lib/mfg/mf-jw-class';
 import { PartyField } from './shared';
 import { qtyText, type JwData, type PartyValue } from './lines';
 import surface from '../../styles/surface.module.css';
@@ -243,12 +244,18 @@ function PrincipalModal({ data, doc, kind, onClose }: { data: JwData; doc: Princ
   );
 }
 
+const CLASS_LABEL = { jw_textile: 'clsJwTextile', jw_print_ch48_49: 'clsJwPrint', jw_other: 'clsJwOther' } as const;
+
 /** Opens a new tax invoice in the editor with our job charges as a SAC 9988 service line. */
 function ChargesModal({ data, order, onClose }: { data: JwData; order: JobWorkOrder; onClose: () => void }) {
   const navigate = useNavigate();
   const returned = data.principal.filter((r) => r.order_id === order.id && r.kind === 'return').reduce((s, r) => s + r.lines.filter((l) => l.processed !== false).reduce((t, l) => t + num(l.qty), 0), 0);
   const [qty, setQty] = useState(String(returned || num(order.finished_qty) || 1));
-  const [gst, setGst] = useState('18');
+  // MF-C3-4: the class suggested from the principal's goods (HSN chapter) sets the rate; a typed rate wins.
+  const [cls, setCls] = useState<JwChargeClass>(() => orderChargesClass(data.principal, order.id));
+  const suggested = chargesClassRate(cls, todayInput());
+  const [gst, setGst] = useState(() => String(suggested.rate));
+  const pickClass = (c: JwChargeClass) => { setCls(c); setGst(String(chargesClassRate(c, todayInput()).rate)); };
   const create = () => {
     const store = useInvoiceStore.getState();
     store.newDraft('TAX_INVOICE');
@@ -264,6 +271,13 @@ function ChargesModal({ data, order, onClose }: { data: JwData; order: JobWorkOr
       footer={<><button type="button" className={controls.btnOutline} onClick={onClose}>{jwT('cancel')}</button><button type="button" className={controls.btnPrimary} onClick={create}>{jwT('createInvoice')}</button></>}>
       <div className={styles.form}>
         <p className={styles.muted}>{jwT('chargesInvoiceHint')}</p>
+        <div className={controls.field}>
+          <label className={controls.label} htmlFor="jwi-c">{jwT('chargesClass')}</label>
+          <select id="jwi-c" className={controls.select} value={cls} onChange={(e) => pickClass(e.target.value as JwChargeClass)}>
+            {JW_CHARGE_CLASSES.map((c) => <option key={c} value={c}>{jwT(CLASS_LABEL[c])}</option>)}
+          </select>
+          <span className={styles.muted}>{jwT('chargesClassHint', { rate: String(suggested.rate), ca: suggested.ca })}</span>
+        </div>
         <div className={controls.row}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwi-q">{jwT('invoiceQty')}</label>
