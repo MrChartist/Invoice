@@ -16,8 +16,7 @@ import { INDIAN_STATES } from '../../lib/india-states';
 import { ADVANCES_TABLE } from '../../lib/advance-tax';
 import type { AdvanceRecord } from '../../types/advances';
 import { loadTrips, tripLabel, type Trip } from '../../lib/travel/tv-trips';
-import { TV_COMPONENTS, liveLines, loadBookings } from '../../lib/travel/tv-bookings';
-import { tripCosting } from '../../lib/travel/tv-costing';
+import { TV_COMPONENTS, loadBookings } from '../../lib/travel/tv-bookings';
 import { eventBudget, eventMoney, saveEvent, vendorTdsHint } from '../../lib/travel/tv-events';
 import { eventPos } from '../../lib/travel/tv-pos';
 import controls from '../../styles/controls.module.css';
@@ -42,8 +41,9 @@ export default function EventsView({ notify }: TvViewProps) {
   const bk = data.bookings.filter((b) => b.trip_id === sel.id);
   const bills = data.bills.filter((b) => b.tv?.trip_id === sel.id);
   const sheet = eventBudget(sel.tv.event, bk, bills);
-  const c = tripCosting(bk, bills, liveLines(data.invoices));
   const m = eventMoney(sel.id, sel.client_id, data.invoices, localDb.payments.getAll(), getTable<AdvanceRecord>(ADVANCES_TABLE));
+  // Margin = invoiced to the client − cost per head (the vendors' bills, else the booked cost).
+  const margin = m.invoiced - sheet.rows.reduce((s, r) => s + (r.billed || r.booked), 0);
   const client = data.clients.find((x) => x.id === sel.client_id);
   const pos = eventPos(client, sel.tv.event?.state);
   const vendors = new Map(getTable<{ id: string; name: string }>('vendors').map((v) => [v.id, v.name]));
@@ -71,7 +71,7 @@ export default function EventsView({ notify }: TvViewProps) {
           </tbody>
         </table>
       </div>
-      <p className={controls.hint} data-tv-event-money>{tvdT('invoiced')}: {money(m.invoiced)} · {tvdT('received')}: {money(m.received)} · {tvdT('advances')}: {money(m.advances)} · {tvT('margin')}: {money(c.margin)} ({pct(c.pct)})</p>
+      <p className={controls.hint} data-tv-event-money>{tvdT('invoiced')}: {money(m.invoiced)} · {tvdT('received')}: {money(m.received)} · {tvdT('advances')}: {money(m.advances)} · {tvT('margin')}: {money(margin)} ({pct(m.invoiced > 0 ? (margin / m.invoiced) * 100 : null)})</p>
       {bk.length > 0 && (
         <ul data-tv-vendor-tds>
           {bk.filter((b) => b.status !== 'cancelled').map((b) => {

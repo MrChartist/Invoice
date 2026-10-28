@@ -8,7 +8,6 @@ import { Suspense, lazy, type ComponentType, type LazyExoticComponent } from 're
 import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { tvT } from '../../i18n/areas/travel-r15b';
-import { tvdT } from '../../i18n/areas/travel-r15d';
 import controls from '../../styles/controls.module.css';
 import type { Notify, TvViewProps } from './tv-run';
 import TripsView from './TripsView';
@@ -21,8 +20,8 @@ const VIEWS: Record<string, View> = {
   bookings: { label: () => tvT('bookings'), C: BookingsView },
   // R15-C: statements (one `lazy(() => import(…))` entry)
   // R15-D
-  tcs: { label: () => tvT('tcs'), C: lazy(() => import('./TcsView')) },
-  events: { label: () => tvdT('events'), C: lazy(() => import('./EventsView')) },
+  tcs: { label: () => tvT('tcs'), C: lazy(() => import('./r15d-views').then((m) => ({ default: m.TcsView }))) },
+  events: { label: () => tvT('event'), C: lazy(() => import('./r15d-views').then((m) => ({ default: m.EventsView }))) },
 };
 
 export default function TripsDesk({ view, notify }: { view?: string; notify: Notify }) {

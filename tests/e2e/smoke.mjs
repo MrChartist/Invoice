@@ -5112,6 +5112,79 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R15-D outbound TCS, POS and events: Dubai package ₹3,40,000 → TCS 2 % = ₹6,800 "Sec 394(1) Sl. 8", saved and in the TCS view; the same buyer on 10 Feb 2026 for ₹12 lakh → 5 % on ₹10 lakh + 20 % on ₹2 lakh; inbound tour for a foreign agent → "not an export"; wedding: decor over budget, unregistered client with a Jaipur venue → POS Rajasthan; the manpower vendor\'s bill hints the contractor limb', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'cost_centres', 'travel_bookings', 'travel_settings', 'invoices', 'purchases', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'travel', travel_kind: 'tour_operator', industry_packs: ['travel', 'events'], modules: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-d-c', name: 'E2E Shah family', state_code: '27', pan: 'ABCPS1234K' }, { id: 'e2e-d-fa', name: 'E2E Berlin Tours GmbH', state_code: '96', tv: { foreign_tourist: true } }, { id: 'e2e-d-w', name: 'E2E Rao wedding', state_code: '27' }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-d-v', name: 'E2E Helpers Pvt', state_code: '08' }]);
+    const cc = (id, name, client_id, tv) => ({ id, name, kind: 'project', active: true, client_id, status: 'active', start: tv.start, tv: { pax: [{ name: 'A', type: 'adult' }], status: 'confirmed', ...tv } });
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []),
+      cc('e2e-d-dxb', 'E2E Dubai — Shah family', 'e2e-d-c', { code: 'E2E-DXB', kind: 'trip', scope: 'outbound', regime: 'to5', destination: 'Dubai', start: '2026-12-10' }),
+      cc('e2e-d-in', 'E2E Rajasthan — Berlin group', 'e2e-d-fa', { code: 'E2E-IN', kind: 'trip', scope: 'inbound', regime: 'to18', start: '2026-12-01' }),
+      cc('e2e-d-wed', 'E2E Rao wedding', 'e2e-d-w', { code: 'E2E-WED', kind: 'event', scope: 'domestic', regime: 'to18', start: '2026-11-20', event: { venue: 'Rambagh', city: 'Jaipur', state: '08', guests: 400, budget: [{ head: 'venue', approved: 500000 }, { head: 'decor', approved: 200000 }, { head: 'manpower', approved: 80000 }] } }),
+    ]);
+    const b = (id, trip_id, component, cost, sell, o = {}) => ({ id, trip_id, component, start: '2026-11-20', cost, sell, status: 'confirmed', created_at: '2026-10-01T00:00:00Z', ...o });
+    await writeJson(page, 'travel_bookings', [...(prev.travel_bookings ?? []),
+      b('e2e-d-b1', 'e2e-d-dxb', 'air', 100000, 123809.52), b('e2e-d-b2', 'e2e-d-dxb', 'hotel', 150000, 200000),
+      b('e2e-d-b3', 'e2e-d-wed', 'venue', 450000, 0), b('e2e-d-b4', 'e2e-d-wed', 'decor', 260000, 0), b('e2e-d-b5', 'e2e-d-wed', 'manpower', 60000, 0, { vendor_id: 'e2e-d-v' }),
+    ]);
+    // Bill the Dubai package: one gross line at 5 % = ₹3,40,000 with GST.
+    await page.goto(srv.origin + '/time?tab=trips&view=trips');
+    await page.locator('[data-tv-bill="E2E-DXB"]').click({ timeout: 15000 });
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const chip = page.locator('[data-tv-tcs="ok"]');
+    await chip.waitFor({ timeout: 15000 });
+    const calc = await chip.locator('[data-tv-tcs-calc]').innerText();
+    check(/2 %/.test(calc) && /6,800/.test(calc) && /Sec 394\(1\) Sl\. 8/.test(calc), `the outbound chip offers TCS 2 % = ₹6,800 under Sec 394(1) Sl. 8 (${calc})`);
+    await chip.locator('[data-tv-tcs-apply]').click();
+    await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.cost_centre_id === 'e2e-d-dxb' && i.tcs_amount > 0), 15000)).find((i) => i.cost_centre_id === 'e2e-d-dxb');
+    check(inv?.tcs_amount === 6800 && inv.tcs_rate === 2 && /Sl\. 8/.test(inv.tcs_label) && inv.tv?.tcs?.base === 340000 && inv.status !== 'Draft', `saved: TCS ₹6,800 on ₹3,40,000 (${inv?.tcs_amount}, ${inv?.status})`);
+    await page.goto(srv.origin + '/time?tab=trips&view=tcs');
+    const reg = page.locator('[data-tv-tcs-register]');
+    await reg.waitFor({ timeout: 15000 });
+    check(/E2E Shah family/.test(await reg.innerText()) && /6,800/.test(await reg.innerText()), 'the TCS view lists the buyer with ₹6,800');
+    // The same buyer on 10 Feb 2026 for ₹12 lakh (slab year): 5 % on ₹10 lakh + 20 % on ₹2 lakh.
+    const all = await readJson(page, 'invoices', []);
+    const feb = { ...inv, id: 'e2e-d-feb', invoice_number: '', status: 'Draft', issue_date: '2026-02-10', due_date: '2026-02-17', tcs_enabled: false, tcs_rate: 0, tv: { ...inv.tv, tcs: undefined }, items: inv.items.map((l) => ({ ...l, rate: 1142857.14 })) };
+    const inbound = { ...inv, id: 'e2e-d-inb', invoice_number: '', status: 'Draft', cost_centre_id: 'e2e-d-in', client: { id: 'e2e-d-fa', name: 'E2E Berlin Tours GmbH', state_code: '96', tv: { foreign_tourist: true } }, tcs_enabled: false, tcs_rate: 0, tv: { trip: { id: 'e2e-d-in', code: 'E2E-IN', kind: 'trip' }, regime: 'to18' } };
+    const wed = { ...inv, id: 'e2e-d-wedi', invoice_number: '', status: 'Draft', cost_centre_id: 'e2e-d-wed', client: { id: 'e2e-d-w', name: 'E2E Rao wedding', state_code: '27' }, tcs_enabled: false, tcs_rate: 0, tv: { trip: { id: 'e2e-d-wed', code: 'E2E-WED', kind: 'event' }, regime: 'to18' } };
+    await writeJson(page, 'invoices', [...all, feb, inbound, wed]);
+    await page.goto(srv.origin + '/invoice/e2e-d-feb');
+    const febCalc = page.locator('[data-tv-tcs="ok"] [data-tv-tcs-calc]');
+    await febCalc.waitFor({ timeout: 15000 });
+    const ft = await febCalc.innerText();
+    check(/90,000/.test(ft) && /5 % on ₹10,00,000\.00 \+ 20 % on ₹2,00,000\.00/.test(ft) && /206C\(1G\)/.test(ft), `10 Feb 2026, ₹12 lakh: 5 % + 20 % split = ₹90,000 (${ft})`);
+    await page.goto(srv.origin + '/invoice/e2e-d-inb');
+    await page.locator('[data-tv-pos="inbound"]').waitFor({ timeout: 15000 });
+    check(/not an export/.test(await page.locator('[data-tv-pos="inbound"]').innerText()), 'inbound tour for a foreign agent: POS India — not an export');
+    await page.goto(srv.origin + '/invoice/e2e-d-wedi');
+    const wp = page.locator('[data-tv-pos="event_venue"]');
+    await wp.waitFor({ timeout: 15000 });
+    check(/Rajasthan/.test(await wp.innerText()), 'wedding, unregistered client, Jaipur venue: POS Rajasthan (Sec 12(7)(a))');
+    await wp.locator('[data-tv-pos-apply]').click();
+    // Events view: decor over budget.
+    await page.goto(srv.origin + '/time?tab=trips&view=events');
+    await page.locator('[data-tv-events]').waitFor({ timeout: 15000 });
+    await page.locator('[data-tv-event-pick]').selectOption('e2e-d-wed');
+    check(await page.locator('[data-tv-head="decor"][data-over="1"]').count() === 1 && await page.locator('[data-tv-head="venue"][data-over="1"]').count() === 0, 'the events view flags decor over budget (venue within)');
+    check(/Rajasthan/.test(await page.locator('[data-tv-event-pos]').innerText()), 'the events view shows POS Rajasthan');
+    // The manpower vendor's bill hints the contractor limb (service date ≥ 1 Apr 2026).
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Add bill/ }).click();
+    const bd = page.getByRole('dialog', { name: 'Add purchase bill' });
+    await bd.locator('[data-tv-bill-trip]').selectOption('e2e-d-wed', { timeout: 15000 });
+    await bd.locator('[data-tv-bill-booking]').selectOption('e2e-d-b5');
+    const hint = bd.locator('[data-tv-tds-hint="contractor"]');
+    await hint.waitFor({ timeout: 15000 });
+    check(/Sl\. 6\(i\)/.test(await hint.innerText()), 'the manpower bill hints Sec 393(1) Sl. 6(i) (contractor)');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {
