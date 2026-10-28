@@ -19,7 +19,6 @@ import { unitWarnings, validateUnit } from '../src/lib/society/hs-units.ts';
 import { saveUnit } from '../src/lib/society/hs-units-save.ts';
 import { loadVouchers } from '../src/lib/ledger/index.ts';
 import { buildGstReport } from '../src/lib/gst-reports.ts';
-import { nonCashBankLedgerIds } from '../src/lib/bank-ledgers.ts';
 import { gstinChecksumChar } from '../src/lib/gstin.ts';
 import { restoreEntries } from '../src/lib/trust/recycle-bin.ts';
 import { resetI18nForTests, setCatalogueForTests, setLanguage } from '../src/i18n/index.ts';
@@ -134,7 +133,9 @@ test('W6: an interest waiver over several bills is all or nothing', () => {
   assert.equal(getTable('doc_links').length, 0);
 });
 
-test('W7: the Receipts and Payments cash set leaves out clearing accounts even when they are inactive', () => {
+test('W7: the Receipts and Payments cash set leaves out clearing accounts even when they are inactive', async () => {
+  const { nonCashBankLedgerIds } = await import('../src/lib/bank-ledgers.ts');
+  assert.equal(typeof nonCashBankLedgerIds, 'function', 'the annual pack\'s predicate (was `active()` only, in the component)');
   const accts = [{ id: 'main', name: 'Main', active: true }, { id: 'mk', name: 'Marketplace clearing', active: false, clearing: true }, { id: 'hdfc', name: 'HDFC', active: false }] as BankAccount[];
   const off = nonCashBankLedgerIds(accts);
   assert.ok(off.has('bank:mk'));
@@ -189,4 +190,30 @@ test('W10: a marketplace sales import and a freight-bill run write the invoices 
   assert.equal(new Set(bills.map((x) => x.invoice_number)).size, 2);
   const lrs = getTable<{ id: string; bill_id?: string }>('consignment_notes');
   assert.deepEqual([a.id, b.id].map((id) => lrs.find((l) => l.id === id)!.bill_id).sort(), bills.map((x) => x.id).sort());
+});
+
+// Pin (found right in QA21): every issueBatch caller's bulk path equals one save after another — a society run by a
+// clerk under approvals (a held, provisionally numbered bill), dated on both sides of the FY boundary, audit included.
+test('pin: a society run through saveMany equals the one-by-one path (approval holds, FY boundary, audit)', async () => {
+  const { setActorProvider } = await import('../src/lib/access.ts');
+  const { APPROVAL_POLICY_KEY } = await import('../src/lib/approval-gate.ts');
+  const { setJson } = await import('../src/lib/storage.ts');
+  const go = (sequential: boolean) => {
+    resetStorage(); installSettings(); society();
+    setJson(APPROVAL_POLICY_KEY, { enabled: true, mode: 'above', threshold: 9000 });
+    const orig = localDb.invoices.saveMany;
+    if (sequential) localDb.invoices.saveMany = (list) => list.map((x) => orig([x])[0]);
+    setActorProvider(() => ({ id: 'k', name: 'Clerk', role: 'clerk' }));
+    try {
+      issueRun({ period: '2027-03', date: '2027-03-31', due: '2027-04-15' });
+      issueRun({ period: '2027-04', date: '2027-04-01', due: '2027-04-20' });
+    } finally { setActorProvider(null); localDb.invoices.saveMany = orig; }
+    audit.flush();
+    return { docs: inv().map((i) => [i.hs?.unit?.code, i.invoice_number, i.status, i.approval?.state ?? '']), log: audit.all().map((r) => `${r.entity}:${r.action}:${r.summary}`).filter((x) => !/batch|run/i.test(x)) };
+  };
+  const seq = go(true), bulk = go(false);
+  assert.deepEqual(bulk.docs, seq.docs);
+  assert.deepEqual(bulk.log.sort(), seq.log.sort());
+  assert.ok(seq.docs.some((d) => d[3] === 'pending'), 'A-901 held for approval');
+  assert.ok(seq.docs.some((d) => String(d[1]).includes('FY26-27')) && seq.docs.some((d) => String(d[1]).includes('FY27-28')), 'both FY series');
 });
