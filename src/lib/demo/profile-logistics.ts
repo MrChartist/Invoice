@@ -16,5 +16,7 @@ export function logisticsExtras(ctx: ProfileContext): DemoExtras & { logisticsSe
     // R19-B: its charge sheet (Billing → Bill job makes the freight and local-charges documents; type the ₹ rate for USD)
     charges: [['freight_air', 500, 2, 'USD'], ['origin', 1, 5000], ['documentation', 1, 2000], ['clearance', 1, 3500], ['port', 1, 1800]].map(([k, qty, rate, currency = 'INR']) => ({ head_id: `lg-${k}`, qty: +qty, rate: +rate, currency: `${currency}`, amount: +qty * +rate })) };
   const heads = defaultHeads(today).map((h) => (h.kind === 'freight_air' ? { ...h, rate: 2 } : h));
-  return { tables: { lg_jobs: [job] as never[] }, logisticsSettings: { heads } };
+  // R19-C: import job 0002 (sea FCL, 1 × 40HC, NSA → BOM) with the bill of entry; its deposit and duty disbursement are typed on the Customs view.
+  const imp: LgJob = { id: 'demo-lg-job-2', number: `JOB/FY${getIndianFY(today).label}/0002`, date: today, status: 'arrived', dir: 'import', mode: 'sea_fcl', origin: 'NSA', destination: 'BOM', client_id: base.clients[0]?.id ?? '', refs: { boe_no: '7654321', boe_date: today }, containers: [{ no: 'MSCU1234566', size: '40HC' }], auth: { ref: 'Authorisation letter', date: today }, updated_at: today, demo: true };
+  return { tables: { lg_jobs: [job, imp] as never[] }, logisticsSettings: { heads } };
 }

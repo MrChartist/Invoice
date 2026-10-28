@@ -233,7 +233,10 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   (`vite.config.ts`, `familyRe('logistics', 'logistics-rules', 'logistics-r19', 'lg-registry')` — the registry a lazy leaf):
   engines in `src/lib/logistics/` import only first-paint modules, `logistics-rules.ts` and each other; shared lazy code
   goes through bridges `lg-*-io.ts` (≤ 4: issue / tax / books / recv). Batch billers (month-end jobs, courier manifests,
-  storage) use `localDb.invoices.saveMany`. Rule values in `src/lib/logistics-rules.ts` (lazy only, date-keyed, keyed rows
+  storage) use `localDb.invoices.saveMany`. R19-C adds no table: a disbursement is a `purchases` expense with
+  `lg.on_behalf` (0 %, no ITC, pure agent, billable; billed while a live invoice line's `bill_refs` names it), a duty
+  deposit an advance with `pass_through` + `lg.job_id` (applied by the existing `advance_id` row), through the one C
+  bridge `lg-recv-io.ts`; B's "Bill job" bills them through `billExtras` (`disbCharges`, billed by row via `bill_refs`). Rule values in `src/lib/logistics-rules.ts` (lazy only, date-keyed, keyed rows
   read with `keyedAt`, `tests/lg-rules.test.ts`); GTA rates, the intermediary rule, TDS sections and Act labels stay in
   their own files, read through `lg-tax-io.ts`. CA ids `LG1`–`LG44` (`LG` sits before `G` in every CA-id regex). R19-B: job bills via `lg-issue-io.ts`
   (one `saveMany`; regimes `lg-regime.ts`; C / D add lines only through `billExtras` in `lg-bill.ts`); a POS-96 document with

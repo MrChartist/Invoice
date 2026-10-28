@@ -1,6 +1,7 @@
 import type { InvoiceRecord } from '../../../types/invoice';
 import { logisticsPaper } from '../../../lib/logistics/lg-print';
 import styles from './manpower-paper.module.css';
+import DisbSchedule from './logistics/DisbSchedule';
 
 /**
  * R19-A4 job particulars after the parties (after the society block, before the GST grid; never on receipt paper): job
@@ -13,13 +14,14 @@ import styles from './manpower-paper.module.css';
 export default function LogisticsBlock({ invoice }: { invoice: InvoiceRecord }) {
   if (!invoice.lg) return null;
   const p = logisticsPaper(invoice.lg);
-  if (!p.rows.length && !p.reason) return null;
+  if (!p.rows.length && !p.reason && !invoice.lg.disb?.length) return null;
   return (
     <section className={styles.block} aria-label="Shipment" data-logistics-block>
       <dl className={styles.grid}>
         {p.rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
       </dl>
       {p.reason && <p className={styles.decl}>{p.reason}</p>}
+      <DisbSchedule lg={invoice.lg} />
     </section>
   );
 }

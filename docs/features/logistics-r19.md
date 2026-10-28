@@ -270,3 +270,133 @@ Chunks (normalized gz): `f-logistics` 4.05 → 8.34 kB (+4.29: the regime, bill 
 used, `logistics-r19b` English); ShipmentsDesk 4.13 → 7.67 kB (+3.55: the Billing and Costing views and the three
 bridges); JobPick 0.53 kB (lazy, bill form); pending note 0.13; demo 0.12; wiring ≈ 0.45 (Expenses 0.11, help 0.10,
 Ctrl+K 0.07, readers `einvoice` 0.06 / `gst-reports` 0.04, palette 0.03, packs 0.02, Time 0.02).
+
+## R19-C — Customs broker (CHA) desk (disbursements, duty deposits, CB register, KYC)
+
+### What it does
+
+One view `customs` on the Shipments desk (`/time?tab=shipments&view=customs`, pack `customs` — listed only when the
+pack is on; its URL still opens), `CustomsView.tsx` (in the desk chunk: a lazy view of its own split A's form helpers
+into a shared chunk and cost 1.5 kB more). Pick a job; then:
+
+- **Shipping bill / bill of entry from a file.** "Import SB / BOE numbers (CSV)": columns Job, SB / BOE no., Date
+  (`YYYY-MM-DD` or `DD/MM/YYYY`), IGM; an export job takes `refs.sb_no` / `sb_date`, an import job `boe_no` / `boe_date`
+  (+ `igm`). The broker exports the numbers from ICEGATE or its own system — **the app makes no ICEGATE (or any network)
+  call**. All or nothing (`withTablesRollback` over `lg_jobs`), each job through `saveJob` (period lock, hints); refused
+  rows are listed by row number (`docRefsFromTable` in `lg-register.ts`; `importDocRefs` in `lg-recv-io.ts`). Typing
+  them on the job form (A2) is unchanged.
+- **Authorisation and KYC (C1 limb (i), C4).** The job's `auth = { ref, date }` (Rule 33 limb (i)) and the client's
+  `Client.lg = { iec, kyc: { verified_on, by, method } }` — numbers and dates only, no document copies (LG27). A job of a
+  client without `kyc.verified_on` shows the CBLR Reg 10(n) hint.
+- **Disbursements on behalf (C1).** "Add disbursement": paid for (duty / CFS / port / DO / shipping line / insurance /
+  other), paid to, challan / invoice no., amount, date, "paid from our account now" (records the bill payment). The row
+  is an ordinary **expense** in `purchases` (`disbRecord`): one 0 % line, `itc_eligible: false`, `pure_agent: true`,
+  `billable_to_client_id` = the job's client, category "Disbursements on behalf of clients", `lg = { job_id, disb,
+  on_behalf: true, ref?, in_client_name? }`. The ledger stays gross (LG11). The **Rule 33 checklist** shows the four
+  limbs — (i) the job's authorisation, (ii) shown separately (automatic: it bills as a `rule33` line), (iii) in addition
+  to our own services, (iv) actual amount in the client's name — and the save warns (never blocks) for each one not met
+  (`rule33Gaps`, LG10).
+- **Billed state, write-off, ageing (C1 / C3).** A disbursement is billed while a live (not cancelled) invoice line names
+  it in `bill_refs` (the editor's billable-cost rule, re-stated as the pure `billedBy` in `lg-disb.ts`; cancelling frees it). "Write
+  off" stamps `PurchaseRecord.lg.wo = { date, reason, by }` (memo, no journal, refused in a locked period; `books.edit`).
+  The unrecovered list (not billed, not written off) is aged 0–30 / 31–60 / 61–90 / > 90 days per job.
+- **Duty deposits (C2).** "Add deposit" saves an **existing advance receipt** (`ADV/FY…`, Receipt Voucher) through
+  `saveAdvance` with `tax_rate: 0`, `pass_through: true` (CN-C2), `AdvanceRecord.lg = { job_id }` and the description
+  "Deposit towards customs duty and charges payable on the client's behalf — not consideration for our supply" (LG12).
+  "Apply deposit" applies the smaller of the deposit's open amount and what the chosen issued rupee invoice of the job
+  still owes through `applyAdvance` (a payment with `advance_id`, which every cash reader already skips with
+  `movedNoCash`; `no-cash.ts` unchanged); "Refund excess" refunds what is left through `refundAdvance` (Refund Voucher,
+  the job in the note). The **position** per job (`depositPosition`): unapplied deposits against unrecovered
+  disbursements + what the job's invoices still owe → "Excess ₹…" / "Short by ₹…". `deposit_required` (settings) adds
+  the hint "Duty paid beyond the client's deposit by ₹…" on a duty disbursement (`depositShortfall`).
+- **Reimbursement bill (C3).** B's "Bill job" carries them: `planJob` (`lg-issue-io.ts`) fills `BillCtx.disb` with the
+  job's disbursements (`loadDisb`, `lg-recv-io.ts`), and the `// R19-C` block of `billExtras` (`lg-bill.ts`) adds
+  `disbCharges(rows, heads)` — one charge line per unrecovered row under the pure-agent head of its kind (duty → `duty`,
+  CFS → `cfs`, port → `port`, DO / shipping line → `do_charges`, insurance → `insurance`, else the first active
+  pure-agent head; a row with none stays unrecovered), ₹ at actual, with `disb_id` and `disb` (`LgCharge`, C block of the
+  types). `planJobBills` bills such a line even when its head is already on a bill (billed state is per row: the line's
+  `bill_refs: [disb_id]`), and pushes `disb` into the document's `lg.disb`. The lines are pure agent (`rule33`, 0 %), so
+  they go on the job's domestic document with the own charges (POS by B2); job costing already leaves the rows out. The
+  invoice editor's billable costs can still bill the same rows (they are `pure_agent` + `billable_to_client_id`). The paper part
+  `parts/logistics/DisbSchedule.tsx` (inside `LogisticsBlock`) prints the schedule (date, paid for, challan / invoice,
+  paid to, ₹) and "Recoverable at actual (Rule 33, outside the taxable value): ₹…" from `lg.disb` only.
+- **CB register (C4).** For a date range, one row per job: job, date, client, IEC, GSTIN, BOE / SB with date, port (the
+  destination of an import, the origin of an export), live invoices and their total, disbursements, deposits, status;
+  "Print" (escaped, `printHtmlDocument`) under the title from `CBLR_RULES` ("CBLR 2018 Reg 10(k): …", LG26) and "CSV"
+  (formula cells neutralised).
+- **Checklist, help, Ctrl+K, demo.** Step `lgDeposit` (kinds `cha` / `multi`: ≥ 1 advance with `lg.job_id`) opens the
+  customs view; help topic `time:shipments:customs` (LG10–LG12, LG26, LG27); Ctrl+K row `r19.shipments.customs`
+  ("Customs: duty deposits, disbursements, CB register", pack `customs`) with synonyms `duty deposit`, `CHA`,
+  `reimbursement`, `ड्यूटी`; the Demo company gets import job JOB/FY…/0002 (sea FCL, 1 × 40HC, bill of entry,
+  authorisation).
+
+### Storage
+
+No new table, object, series or record key.
+
+| Key / field | Kind | Backed up | Synced | Audited | Right |
+|---|---|---|---|---|---|
+| `PurchaseRecord.lg` (`job_id`, `disb`, `on_behalf`, `ref`, `in_client_name`, `wo`) on `purchases` | additive | yes | yes | yes | `books.edit` |
+| `AdvanceRecord.lg = { job_id }` (+ the existing `pass_through`) on `advances` | additive | yes | yes | yes | `payment.record` |
+| `Client.lg = { iec, kyc }` | additive | yes | yes | yes | client write |
+| `LgJob.auth = { ref, date }`; `refs.sb_*` / `boe_*` / `igm` from the file | additive / existing | yes | yes | yes | `doc.create` |
+| record key `lg.disb` (the printed schedule) | declared by A | yes | yes | yes | — |
+
+`advances.ts` gained one optional input `lg` (kept on edit) and keeps `pass_through` on an edit of an advance without a
+booking, so a deposit edited in the Advances tab stays a deposit.
+
+### Decisions and cuts
+
+- **Cut 1 (PRD §3): no gross / net reclass journal.** It would post through R19-B's `lg-books-io.ts`, which landed while C
+  was being built; the ledger stays gross (`disb_posting: 'gross'`, LG11). `disb_posting: 'net_journal'` is read by nothing yet.
+- **Billing stays B's.** C adds lines only through `billExtras` (+ the optional `BillCtx.disb`, filled in `planJob`) and
+  two small arms in `planJobBills` (row-level billed state, `lg.disb`); no second biller.
+- **Schedule placement.** The schedule prints inside the job block (before the lines), not after them: the block is A's
+  one template mount, and C adds a part rather than a second mount.
+- **Write-off uses `setTable`** on `purchases` (the R14 `writeOffDisbursement` precedent: a memo stamp allowed while the
+  bill's own period is locked; the write-off date is lock-checked), so the bridge imports `lg-registry` (registry test).
+- **Not built:** the demo deposit / disbursement rows (`advances` / `purchases` are not in `DEMO_EXTRA_TABLES`; only the
+  import job is seeded), an `import_runs` row for the SB / BOE import, `register_fields` (the register has fixed
+  columns), `LgJob.kyc_ok` (the hint reads the client), the client-statement change of C3.4 (deposits already show as
+  advances), XLSX for the SB / BOE import (CSV only).
+- **One bridge.** `lg-recv-io.ts` holds every shared lazy call of C (advances, purchases, `readPurchase`,
+  `PURE_AGENT_CHARGE`, `csv.ts`, `lg-save`); the engines `lg-disb.ts`, `lg-deposits.ts`, `lg-register.ts` are pure and in
+  `f-logistics`.
+
+### API for R19-B / D and QA
+
+- Engines (pure): `LG_DISB_KINDS`, `disbLabel`, `DISB_CATEGORY`, `validateDisb`, `disbRecord(input)`,
+  `rule33Gaps({ auth, extra, inName })`, `billedBy(invoices, rebilledIn)`, `disbRows(sources, billed, today)`, `unrecovered`, `sumOf`, `ageBuckets`,
+  `disbCharges(rows, heads)` (B's `billExtras`), `disbSchedule(lg)` (`lg-disb.ts`); `DEPOSIT_TEXT`, `depositInput`,
+  `depositPosition(deps, unrecovered, owed?)`, `depositShortfall`, `applyAmount` (`lg-deposits.ts`); `registerRows`,
+  `registerCsv`, `REGISTER_COLS` / `REGISTER_HEAD`, `registerTitle(date)`, `kycMissing(client)`,
+  `docRefsFromTable(table, jobs)` (`lg-register.ts`).
+- Bridge `lg-recv-io.ts`: `disbSource(raw)`, `loadDisb(today)`, `addDisbursement(input, pay?)`, `writeOffDisb(id, date,
+  reason, by?)`, `loadDeposits()`, `addDeposit(job, receipt)`,
+  `jobOpenInvoices(jobId)`, `applyDeposit(dep, invoiceId, date?)`, `refundDeposit(dep, jobNo, date, method)`,
+  `saveKyc(client, lg)`, `importDocRefs(csvText)`.
+- D's alerts can read `loadDisb` / `unrecovered` for "Job … — disbursements unrecovered" (a cancelled reimbursement bill
+  frees its rows).
+- Tests: `tests/lg-disb.test.ts`, `tests/lg-deposits.test.ts`, `tests/lg-register.test.ts`, the R19-C row of
+  `tests/purchase-contract.test.ts`; `lg-profile` (the `lgDeposit` step, the customs Ctrl+K row); the e2e step "R19-C
+  customs broker desk".
+
+### Bundle (R19-C)
+
+Baseline: the merged base `26aecaf` (R19-A + R19-B + pending 16–25; same tree as `f913864`) built in a separate worktree
+(`vite build` + `check-bundle-size`): initial 183.0 kB (4 files), entry 89.0 kB, core 3,237.7 kB, Hindi pack 356.8 kB,
+Hindi in core 21.6 kB, `lazy-leaves` 17.6 kB. Normalized as in R19-A (chunk hashes stripped, gzip -9, 1 kB = 1,024 B).
+
+| Budget | Before | After | Change (normalized) | Cap |
+|---|---|---|---|---|
+| Initial JS (first paint) | 183.0 kB (4 files) | 183.0 kB (4 files) | +27 B in the entry: its preload file list in another order (the same files; no new chunk or module; any content edit reorders it — the help text alone does, tried on the base) | 0 |
+| Entry chunk | 89.0 kB | 89.0 kB | as above | — |
+| Core precache (English) | 3,237.7 kB | 3,245.8 kB | **+7,626 B = 7.45 kB** | 9 kB (PRD) / 12 kB ✓ |
+| Hindi pack | 356.8 kB | 357.8 kB | +0.96 kB (`lang-hi-logistics` +0.92 kB, wiring areas) | 8 kB (round) ✓ |
+| Hindi left in core | 21.6 kB | 21.7 kB (rounding) | +15 Devanagari characters: the help title `सीमा शुल्क` and the Ctrl+K synonym `ड्यूटी` (the A / B pattern) | — |
+| `lazy-leaves` | 17.6 kB | 17.6 kB | 0 | — |
+
+Chunks (normalized gz): ShipmentsDesk 7.49 → 10.84 kB (+3.34 kB: CustomsView and `lg-recv-io`; a lazy view of its own
+split A's form helpers into a new shared chunk and cost 1.5 kB more), `f-logistics` 8.15 → 11.56 kB (+3.41 kB: the
+three engines, the `billExtras` arm and the `logistics-r19c` English), LogisticsBlock +0.27 kB (`DisbSchedule`), demo
++0.12 kB, wiring ≈ 0.3 kB (help 0.11, checklist 0.06, Ctrl+K 0.06, advances 0.02, reach 0.02, Time 0.01, packs 0.01).

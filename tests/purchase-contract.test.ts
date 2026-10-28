@@ -1172,3 +1172,18 @@ test('R19-B job costing (lg-costing) reads the real bill shape', async () => {
   assert.equal(rows.length, 4, 'untagged bills are not read');
   assert.deepEqual(rows.map((r) => [...costAlloc(r)]), [[['j1', 1000]], [['j2', 1180], ['j1', 1180]], [], []]);
 });
+
+// R19-C1: the customs broker's disbursements are read through `readPurchase` (`lg-recv-io.ts` `disbSource`): the total,
+// the payee, void rows flagged; the engine keeps only rows on the client's behalf tagged to a job; GST readers see no ITC.
+test('R19-C disbursements (lg-disb via lg-recv-io) read the real bill shape', async () => {
+  const { disbSource } = await import('../src/lib/logistics/lg-recv-io.ts');
+  const { disbRecord, disbRows } = await import('../src/lib/logistics/lg-disb.ts');
+  const row = { ...disbRecord({ job: { id: 'j', number: 'JOB/FY26-27/0002', client_id: 'c' }, kind: 'duty', payee: 'Customs', ref: '1234567', amount: 185430, date: '2026-04-12' }), id: 'd' };
+  const s = disbSource(row)!;
+  assert.deepEqual([s.date, s.total, s.payee, s.client_id, s.void, s.lg?.disb], ['2026-04-12', 185430, 'Customs', 'c', false, 'duty']);
+  assert.equal(disbSource({ ...row, status: 'void' })!.void, true);
+  assert.deepEqual(disbRows([s, disbSource({ ...bill, id: 'x' })!], () => false, '2026-04-22').map((r) => [r.id, r.amount, r.age]), [['d', 185430, 10]], 'an ordinary bill is not a disbursement');
+  const g = gstNormalize(row as never, '27');
+  assert.equal(g!.itcEligible, false);
+  assert.equal(g!.cgst + g!.sgst + g!.igst, 0);
+});

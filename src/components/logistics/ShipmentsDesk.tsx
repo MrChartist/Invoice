@@ -10,15 +10,19 @@ import { Suspense, type ComponentType, type LazyExoticComponent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { lgT } from '../../i18n/areas/logistics-r19a';
+import { activePacks, type PackId } from '../../lib/industry-packs';
+import { localDb } from '../../lib/localDb';
 import { lgbT } from '../../i18n/areas/logistics-r19b';
+import { lgcT } from '../../i18n/areas/logistics-r19c';
 import controls from '../../styles/controls.module.css';
 import JobsView from './JobsView';
 import RatesView from './RatesView';
 import BillingView from './BillingView';
 import CostingView from './CostingView';
+import CustomsView from './CustomsView';
 import type { LgViewProps } from './lg-ui';
 
-type View = { label: () => string; C: ComponentType<LgViewProps> | LazyExoticComponent<ComponentType<LgViewProps>> };
+type View = { label: () => string; C: ComponentType<LgViewProps> | LazyExoticComponent<ComponentType<LgViewProps>>; pack?: PackId };
 const VIEWS: Record<string, View> = {
   // R19-A
   jobs: { label: () => lgT('jobs'), C: JobsView },
@@ -26,14 +30,16 @@ const VIEWS: Record<string, View> = {
   // R19-B
   billing: { label: () => lgbT('billing'), C: BillingView },
   costing: { label: () => lgbT('costing'), C: CostingView },
-  // R19-C (customs) · R19-D (agents, courier, storage)
+  // R19-C: the customs broker desk (pack `customs`) · R19-D (agents, courier, storage)
+  customs: { label: () => lgcT('customs'), C: CustomsView, pack: 'customs' },
 };
 
 export default function ShipmentsDesk({ view, notify }: LgViewProps & { view?: string }) {
   useT();
   const [, setParams] = useSearchParams();
   const v = Object.hasOwn(VIEWS, view ?? '') ? view! : 'jobs';
-  const ids = Object.keys(VIEWS);
+  const on = activePacks(localDb.settings.get());
+  const ids = Object.keys(VIEWS).filter((k) => k === v || !VIEWS[k].pack || on.includes(VIEWS[k].pack!));
   const C = VIEWS[v].C;
   return (
     <section data-shipments-desk>

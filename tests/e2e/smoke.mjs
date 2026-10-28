@@ -6144,6 +6144,80 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R19-C customs broker desk: import job 0002 → Customs → deposit ₹2,00,000 (0 %, pass-through) → duty ₹1,85,430 (ICEGATE) + CFS ₹12,000 on behalf → Billing → Bill job (R19-B billExtras) → the paper prints the schedule, total ₹2,04,510.00 → Apply deposit → ₹4,510.00 due, the application is an advance_id row; Ctrl+K "duty deposit"', async () => {
+    const keys = ['settings', 'clients', 'lg_jobs', 'logistics_settings', 'advances', 'purchases', 'purchase_payments', 'invoices', 'transactions', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const today = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
+    const fy0 = +today.slice(5, 7) >= 4 ? +today.slice(0, 4) : +today.slice(0, 4) - 1;
+    const no = `JOB/FY${String(fy0 % 100).padStart(2, '0')}-${String((fy0 + 1) % 100).padStart(2, '0')}/0002`;
+    const job = { id: 'e2e-lg-j2', number: no, date: today, status: 'delivered', dir: 'import', mode: 'sea_fcl', origin: 'NSA', destination: 'BOM', client_id: 'e2e-lg-c2', refs: { boe_no: '7654321', boe_date: today }, containers: [{ no: 'MSCU1234566', size: '40HC' }], charges: [{ head_id: 'lg-clearance', qty: 1, rate: 6000, currency: 'INR', amount: 6000 }], updated_at: today };
+    const st = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...st, business_type: 'transport', modules: undefined, logistics_kind: 'cha', industry_packs: ['logistics', 'customs'], lock_until: undefined, profiles: (st.profiles ?? []).map((p) => (p.id === st.activeProfileId ? { ...p, companyGstin: '27AAPFU0939F1ZV', stateCode: '27', gst_scheme: 'regular' } : p)) });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-lg-c2', name: 'E2E Demo Imports Pvt Ltd', email: '', address: 'Navi Mumbai', gstin: '27AACCD1234E1Z7', state_code: '27' }]);
+    const head = (kind, name, role, o = {}) => ({ id: `lg-${kind}`, name, kind, role, unit: 'per_shipment', pos_rule: 'auto', active: true, ...o });
+    await writeJson(page, 'logistics_settings', { heads: [head('clearance', 'Customs clearance', 'own', { sac: '996712' }), head('duty', 'Customs duty', 'pure_agent', { unit: 'typed' }), head('cfs', 'CFS charges', 'pure_agent', { unit: 'typed' })] });
+    await readJson(page, 'logistics_settings', null, (v) => v?.heads?.length === 3, 15000);
+    await writeJson(page, 'lg_jobs', [job]);
+    await readJson(page, 'lg_jobs', [], (v) => v.length === 1 && v[0].id === job.id, 15000);
+    await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-lg-c2'), 15000);
+    await page.goto(srv.origin + '/time?tab=shipments&view=customs');
+    await page.locator('[data-lg-customs]').waitFor({ timeout: 15000 });
+    check((await page.getByRole('tab').allInnerTexts()).some((t) => /^Customs$/.test(t.trim())), 'the desk lists the Customs view (pack customs)');
+    await page.locator('[data-lg-field="customs-job"]').selectOption(job.id);
+    await page.locator('[data-lg-kyc-hint]').waitFor({ timeout: 15000 });
+    check(true, 'a client without KYC shows the CBLR Reg 10(n) hint');
+    await page.locator('[data-lg-field="dep-amount"]').fill('200000');
+    await page.locator('[data-lg-add-dep]').click();
+    const adv = (await readJson(page, 'advances', [], (v) => v.some((a) => a.lg?.job_id === job.id), 15000)).find((a) => a.lg?.job_id === job.id);
+    check(adv?.pass_through === true && adv.tax_rate === 0 && adv.amount === 200000 && adv.tax?.applies === false && /not consideration for our supply/.test(adv.description ?? ''), `deposit ${adv?.number}: ₹2,00,000, 0 %, pass-through, no GST`);
+    const disb = async (kind, payee, ref, amount, n) => {
+      await page.locator('[data-lg-field="disb-kind"]').selectOption(kind);
+      await page.locator('[data-lg-field="disb-payee"]').fill(payee);
+      await page.locator('[data-lg-field="disb-ref"]').fill(ref);
+      await page.locator('[data-lg-field="disb-amount"]').fill(String(amount));
+      await page.locator('[data-lg-add-disb]').click();
+      return readJson(page, 'purchases', [], (v) => v.filter((p) => p.lg?.on_behalf && p.lg.job_id === job.id).length === n, 15000);
+    };
+    await disb('duty', 'Customs (ICEGATE)', '1234567', 185430, 1);
+    const bills = (await disb('cfs', 'Demo CFS', 'CFS/77', 12000, 2)).filter((p) => p.lg?.job_id === job.id);
+    check(bills.length === 2 && bills.every((p) => p.itc_eligible === false && p.pure_agent === true && p.billable_to_client_id === 'e2e-lg-c2' && p.cgst + p.sgst + p.igst === 0), 'two disbursements on behalf: no GST, no ITC, billable to the client as pure agent');
+    check(/Excess ₹2,570\.00/i.test(await page.locator('[data-lg-position]').innerText()), `position: deposit ₹2,00,000 vs ₹1,97,430 unrecovered → excess ₹2,570 (${await page.locator('[data-lg-position]').innerText()})`);
+    // R19-B's "Bill job": the clearance charge (₹6,000 + GST) and, through billExtras, both disbursements at actual (Rule 33).
+    await page.goto(srv.origin + '/time?tab=shipments&view=billing');
+    await page.locator(`[data-lg-bill-row="${no}"] [data-lg-open-sheet]`).click({ timeout: 15000 });
+    await page.locator('[data-lg-bill-job]').click({ timeout: 15000 });
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.lg?.job_id === job.id), 15000)).find((i) => i.lg?.job_id === job.id);
+    check(inv?.total === 204510 && inv.items.filter((l) => l.charge_head_id === 'rule33' && l.bill_refs?.length === 1).length === 2 && inv.lg?.disb?.length === 2, `Bill job: one bill ₹2,04,510 with two Rule 33 lines naming the disbursements (${inv?.total})`);
+    await page.goto(srv.origin + '/invoice/' + inv.id);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click({ timeout: 15000 });
+    const dlg = page.getByRole('dialog', { name: 'Document preview' });
+    await dlg.locator('[data-lg-disb-schedule]').first().waitFor({ timeout: 15000 });
+    check((await dlg.locator('[data-lg-disb-schedule] tbody tr').count()) === 2 && /1,97,430\.00/.test(await dlg.locator('[data-lg-disb-total]').first().innerText()), 'the paper prints the disbursement schedule (two rows) and ₹1,97,430.00 at actual');
+    check((await dlg.innerText()).includes('2,04,510.00'), 'reimbursement bill total ₹2,04,510.00');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/time?tab=shipments&view=customs');
+    await page.locator('[data-lg-field="customs-job"]').selectOption(job.id, { timeout: 15000 });
+    await page.locator('[data-lg-field="dep-invoice"]').selectOption(inv.id);
+    await page.locator('[data-lg-apply]').click();
+    const pays = await readJson(page, 'transactions', [], (v) => v.some((p) => p.advance_id === adv.id), 15000);
+    const pay = pays.find((p) => p.advance_id === adv.id);
+    check(pay?.amount === 200000 && pay.invoice_id === inv.id && pay.method === 'Advance adjusted', `deposit applied: ₹${pay?.amount} as an advance_id row (cash readers skip it)`);
+    const after = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === inv.id && i.amount_paid === 200000), 15000)).find((i) => i.id === inv.id);
+    check(after?.balance_due === 4510, `₹4,510.00 due after the deposit (${after?.balance_due})`);
+    check(/Short by ₹4,510\.00/i.test(await page.locator('[data-lg-position]').innerText()), 'position: short by ₹4,510.00');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('duty deposit');
+    await palette.getByRole('option', { name: /Customs: duty deposits/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "duty deposit" finds the customs view');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {
