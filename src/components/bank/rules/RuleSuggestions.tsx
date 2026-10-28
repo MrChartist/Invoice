@@ -3,12 +3,13 @@
  * applied as one all-or-nothing batch, plus the "Create rule for similar lines?" offer after a line was
  * categorised by hand. Match suggestions stay in the line list below (labelled there). Lazy chunk.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Wand2 } from 'lucide-react';
 import type { BankLine, BankStatement } from '../../../lib/bank-recon';
 import { buildMemory, ruleDraftFromLine, rulesDb, suggestCategorisations, type RuleAction, type RuleSuggestion } from '../../../lib/bank-rules';
 import { applyBankBatch } from '../../../lib/bank-rules-apply';
 import { can } from '../../../lib/access';
+import { localDb } from '../../../lib/localDb';
 import { cn, formatDate, formatMoney } from '../../../lib/utils';
 import { RuleEditorModal, type RuleDraft } from './BankRulesPanel';
 import { useT } from '../../../i18n';
@@ -54,7 +55,13 @@ export default function RuleSuggestions({ statements, lines, matched, purchases,
   const memory = useMemo(() => buildMemory(statements, purchases as never, purchasePayments), [statements, purchases, purchasePayments]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const rules = useMemo(() => rulesDb.all(), [tick]);
-  const list = useMemo(() => suggestCategorisations(lines, rules, memory, { accountOf }, matched), [lines, rules, memory, accountOf, matched]);
+  // R18-C4: a society's credits naming a unit (A-101, FLAT 101 A) become receipts from its member (lazy, society only).
+  const [hs, setHs] = useState<{ f: (l: readonly BankLine[]) => RuleSuggestion[] } | null>(null);
+  useEffect(() => { if (localDb.settings.get().society_kind) void import('../../../lib/society/hs-bank-io').then((m) => setHs({ f: m.societySuggestions })); }, []);
+  const list = useMemo(() => {
+    const base = suggestCategorisations(lines, rules, memory, { accountOf }, matched), seen = new Set(base.map((s) => s.lineId));
+    return hs ? [...base, ...hs.f(lines.filter((l) => !seen.has(l.id) && !matched.has(l.id) && !l.ignored && !l.matched_to))] : base;
+  }, [lines, rules, memory, accountOf, matched, hs]);
   const byId = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines]);
   const writable = can('books.edit');
   const picked = list.filter((s) => !off.has(s.lineId));

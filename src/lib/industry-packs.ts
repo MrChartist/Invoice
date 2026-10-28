@@ -366,6 +366,11 @@ export const PACK_TABS: readonly PackTab[] = [
   // R18-B
   { pack: 'society', path: '/recurring?tab=society&view=bills', labelKey: 'r18.society.bills' },
   { pack: 'society', path: '/recurring?tab=society&view=gst', labelKey: 'r18.society.gst' },
+  // R18-C
+  { pack: 'society', path: '/recurring?tab=society&view=dues', labelKey: 'r18.society.dues' },
+  // R18-D
+  { pack: 'society', path: '/recurring?tab=society&view=funds', labelKey: 'r18.society.funds' },
+  { pack: 'society', path: '/recurring?tab=society&view=registers', labelKey: 'r18.society.registers' },
 ];
 
 /**

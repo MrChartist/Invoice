@@ -13,6 +13,8 @@ import { cashFlowCsv, trialBalanceCsv, balanceSheetLedgerCsv } from '../../../li
 import { loadBranches } from '../../../lib/branch';
 import { localDb } from '../../../lib/localDb';
 import { getTable } from '../../../lib/storage';
+import { bankAccountsDb, pickableBankAccounts } from '../../../lib/bank-accounts';
+import { bankLedgerId } from '../../../lib/bank-ledgers';
 import { downloadBlob, downloadText } from '../../../lib/download';
 import { printHtmlDocument } from '../../../lib/voucher-print';
 import { safeStem } from '../../../lib/pdf-batch';
@@ -30,7 +32,7 @@ import controls from '../../../styles/controls.module.css';
 import surface from '../../../styles/surface.module.css';
 import books from '../books.module.css';
 
-const ENTITY_KEY = { proprietorship: 'entProp', partnership: 'entFirm', llp: 'entLlp', company: 'entCompany' } as const;
+const ENTITY_KEY = { proprietorship: 'entProp', partnership: 'entFirm', llp: 'entLlp', company: 'entCompany', cooperative: 'entCoop', association: 'entAssoc' } as const;
 
 export default function AnnualPackTab({ period, today, notify }: { period: Period; today: string; notify?: (m: string, tone?: 'success' | 'error') => void }) {
   useT();
@@ -88,6 +90,8 @@ export default function AnnualPackTab({ period, today, notify }: { period: Perio
         asAt: period.end,
         inventoryRows: ledger.branchId || stock?.mode !== 'inventory' ? undefined : invRows,
         partnerRows: ledger.branchId || (entity !== 'partnership' && entity !== 'llp') ? undefined : partnerRows, // PS-D1
+        // R18-D2: the Receipts and Payments account reads cash and the real banks (clearing accounts left out).
+        rpCash: (id: string) => ledger.byId.get(id)?.group === 'CASH_BANK' && !bankAccountsDb.active().some((b) => bankLedgerId(b.id) === id && !pickableBankAccounts('payout', [b]).length),
       }),
     [ledger, stock, fy, company, entity, stored, scopeLabel, today, period.end, invRows, partnerRows],
   );

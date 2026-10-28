@@ -1,6 +1,6 @@
 # Round 18 — co-operative housing societies, apartment owners' associations and RWAs
 
-PRD: `docs/prd/round-18.md`. CA items: `docs/CA_REVIEW.md` §18 (HS1–HS44). Working papers — verify with your CA.
+PRD: `docs/prd/round-18.md`. CA items: `docs/CA_REVIEW.md` §18 (HS1–HS64). Working papers — verify with your CA.
 
 ## R18-A — Society core (profile, units and members, tariff, paper)
 
@@ -209,7 +209,7 @@ the leaves group stays within its 20 kB limit (17.4 kB).
   1.7 s, **2,000 bills ≈ 145 s** on the build machine (O(n²)). A bulk-save path would edit first-paint `storage.ts` /
   `localDb.ts` (0 B first-paint rule), so R18-B does not: the test issues 200 bills in one batch under 3 s, and
   `society_settings.run_limit` splits a large society's run into parts (each run continues where the last stopped);
-  quarterly billing remains the documented answer. **For the lead:** a `localDb.invoices.saveMany` (one `setTable`).
+  quarterly billing remains the documented answer. **For the lead:** a `localDb.invoices.saveMany` (one `setTable`). *Fixed after R18-B: see "Platform fix" below (2,000 bills ≈ 0.6 s).*
 - **Bills / GST views are in the desk chunk** (static imports): five small lazy chunks cost ≈ 2.7 kB more in wrappers.
 - **Common credit link** carries no pre-filled figures: the Rule 42 tab already reads the run's bills through the
   GSTR-3B engine (exempt Bills of Supply in 3.1(c)); the GST view shows the period's exempt / taxable for comparison.
@@ -256,3 +256,172 @@ Chunks (normalized gz): `f-society` 4.52 → 7.69 kB (+3.36: `hs-run`, `hs-regim
 English), SocietyDesk 3.99 → 7.33 kB (+3.52: Bills / GST views, regime chip, `hs-issue-io` bridge), RcmHint 0.32 kB,
 recycle-bin +0.25, pending-changes +0.24, wiring ≈ 0.5 (help 0.15, Ctrl+K 0.14, palette 0.05, open export 0.05, purchase
 form 0.07, checklist 0.02). Both cut items (levy, RCM hint) fit and are kept.
+
+## Platform fix — one write per batch (`localDb.invoices.saveMany`)
+
+R18-B found that issuing N documents in one batch was O(N²): every `localDb.invoices.save` re-serialised the whole
+invoices table (and `clients.upsert` the whole clients table), so 2,000 society bills took ≈ 145 s.
+
+- `localDb.invoices.saveMany(list)` runs, for each document in order, exactly the checks of `save` (roles, rights,
+  period lock, approval and credit holds, the Rule 46 clash) against the rows saved before it, numbers it in its series
+  (a per-call index of the keys in use and the last number given per series keeps it linear; series high-water marks
+  still count), and writes the invoices table **once**; then each document's audit row, credit-note re-settlement and
+  attachment release, and one `clients.upsertMany` / `items.upsertMany` for the parties and lines learnt. `save(x)` is
+  `saveMany([x])[0]`, so a single save is unchanged.
+- `clients.upsertMany` (and `upsert`): the shared parsed rows with only the changed rows replaced; a party learnt again
+  unchanged writes nothing (it still takes the rights check the write would have made).
+- The credit gate (`holdIfCreditBlocked` → `creditGate`) now receives the rows the document is saved against, so the
+  second bill of a party in a batch counts the first (as one save after another did).
+- `withIssueSnapshot` builds the receivables report once per run while the invoices table is unchanged (the party
+  balance before the run, R6-C5).
+- `issueBatch` uses the bulk path for a batch of services (every line `type: 'Service'`, no agency lot); a batch with
+  stock lines keeps one save after another (its stock checks must see the batch's earlier documents).
+- Audit: the same rows; within one batch the documents' rows come first, then the parties learnt (before: interleaved).
+- Timings (one `issueRun`, this machine, `node:test`; before → after): 200 bills 1.11 s → 0.14 s; 600: 7.9 s → 0.14 s;
+  1,000: 25.7 s → 0.20 s; **2,000: ≈ 145 s (R18-B's measurement) → 0.42 s** (the next month, reading 2,000 earlier bills
+  and their receipts for arrears: 0.80 s). Tests: `tests/invoices-save-many.test.ts` (bulk = sequential:
+  numbers, rows, clients, catalogue, audit; one write; a clash fails the batch whole; viewer refused; credit gate;
+  2,000 bills); R18-B's volume test now issues all 2,000 planned bills in one batch under 3 s.
+- First paint: **+204 B** gz normalized (`index` chunk; target ≤ 0.2 kB); core +0.37 kB (khata-actions, batch-invoices).
+
+## R18-C — Dues, interest and collections
+
+### What it does
+
+- **Arrears and interest (C1, `hs-dues.ts`, pure).** For each live society bill of a unit: what it still owes on a day
+  (receipts and credit notes reduce it from their date; inside a bill the interest line first, then the
+  interest-bearing principal, then the pass-through dues — HS53). Simple interest on the open principal from the day
+  after the due date (+ `grace_days`; `from: 'bill'` counts from the bill date) to the day before the next period, at
+  `min(society_settings.interest.pct, State cap on that day)` (`rateOn`; the cap alone when no rate is typed): the MH row
+  change of 2026-06-22 (21 % → 12 %) splits the period by day. The balance segments come from `computeInterest` (passed
+  in by the bridge, 365 days, a receipt counts from the next day); never on interest (HS38) or on `rule33` lines (HS6);
+  on a taxable bill the GST is in the base (HS52). Days up to the latest live bill's `hs.interest.through` were charged
+  and are never charged again; an undone run frees its days. Interest needs an interest rule (`society_settings.interest`;
+  none by default, so R18-B companies see no change).
+- **On the next bill (`runExtras`, `// R18-C`).** `planRun` passes the dues index (all live society bills, receipts,
+  `doc_links` credit notes) and `asOf` = the day before the period: `hs.arrears = { amount, as_of }` (a memo printed under
+  the header — the old bills stay the receivable) and, when ≥ `min_amount`, an "Interest on arrears" row (kind `other`,
+  counted in the ₹7,500 test, takes the bill's regime, HS7; its basis "21 Oct – 31 Oct @ 12 % on ₹5,510" prints under the
+  line) with `hs.interest = { amount, from, to, pct, on, through }`. PRD §7: A-101's November bill ₹6,729.93, exempt
+  (₹5,529.93 counted).
+- **Dues view (`&view=dues`, C1–C3).** As-at date; per unit with open dues: member, months overdue, open dues, billed
+  interest still open, interest to date (not yet billed), the last promise (R2-A4 `collection_notes`); filters by wing and
+  ageing (1+ / 3+ months). Per unit: **Receipt** (amount and date → the split `allocate` suggests, interest first unless
+  `allocation: 'oldest_first'`, each amount editable → `savePartyReceipt`, the khata receipt: one row per bill, the rest
+  on account); **Waive interest** (amount ≤ open interest, reason and general-body resolution → one financial credit note
+  per bill, `createFinancialNote`, no GST, audited — HS55); **Dues certificate** (principal, interest to the date, bills
+  dated after it; `<unit>/DC/<n>`, valid `certificate_validity_days` (30), logged in `society_units.certificates`, shown
+  and printable — HS56); **Transfer** (date, new member, premium, "dues settled" — refused while dues are open without
+  the tick; `transferUnit` + `saveUnit` move the owner and re-link `Client.hs`; later bills go to the new member — HS57);
+  **Statement** (the member's R2-A statement in Receivables, one per member for multi-unit owners); **Remind** (WhatsApp
+  in the society wording). "Notice-board list" prints unit and amount only (no phone numbers). "Use society reminder
+  wording" stores `SOCIETY_TEMPLATES` (English / Hinglish, every scheduled stage) in the R2-A5 reminder schedule.
+- **Reminders never threaten (C3, `hs-reminders.ts`).** No word about water, power, lift, access, parking, gas,
+  disconnection or withholding any service (`tests/hs-reminders.test.ts` greps every text; KA s.20(6) proviso, HS33).
+- **Bank receipts matched by unit (C4 — kept).** `matchUnitInNarration` (pure, `hs-bank-match.ts`): `A-101`, `A101`,
+  `A/101`, `101A`, `FLAT 101 A` (a code without a wing only after FLAT / UNIT / SHOP), exactly one unit; `amountFits` = an
+  open bill or the whole dues. The reconcile strip (`RuleSuggestions.tsx`) lazy-loads `hs-bank-io.ts` only for a society
+  and adds "receipt from the member" suggestions (label `A-101 = open bill`) for credits no rule or match caught; the
+  existing bank-rules apply step settles the oldest bills (HS58).
+
+### Decisions and deviations
+
+- **No new table, no new key.** Certificates and transfers live on the unit (A declared them); interest / arrears under
+  `hs`; receipts are ordinary receipt rows (no marker; `no-cash.ts` untouched).
+- **The receipt form is the Dues view's**, saving through the khata's `savePartyReceipt`; the shared receipt dialogs were
+  not edited (no pre-fill hook in them).
+- **Statement columns.** The member statement is the existing R2-A statement (interest is a line of the bill there); no
+  extra arrears / interest / fund columns were added.
+- **Bank match amounts** compare open bills only (no interest to date), so the bridge needs neither `computeInterest` nor
+  the society settings and stays in `f-society`.
+- **CA items** HS52–HS58.
+
+### API for R18-D
+
+- `duesIndex(invoices, payments, links)`, `billDue(bill, events, asOf)`, `rateOn(settings, day)`,
+  `unitDues(unitId, asOf, ix, settings, computeInterest)` → `{ arrears, interest, on, from, to, pct, bills }`,
+  `allocate(amount, bills, mode)`, `duesRow(...)` (`hs-dues.ts`); bridge `loadDues`, `receiptSplit`, `recordUnitReceipt`,
+  `waiveInterest`, `issueCertificate`, `transferMembership`, `applySocietyWording`, `reminderLink`, `printText`
+  (`hs-dues-io.ts`); `transferError`, `transferUnit`, `nextCertificate` (`hs-transfer.ts`); strings `hscT`.
+
+### Bundle (R18-C)
+
+Before = this branch after the platform fix, after = R18-C; `vite build` + gzip -9, chunk hashes stripped (normalized).
+
+| Budget | Delta | Cap |
+|---|---|---|
+| Initial JS (first paint) | 0 B | 0 ✓ |
+| Core precache (English) | **+6.07 kB** (`f-society` +3.36: dues / transfer / reminders / bank match / strings; SocietyDesk +2.34: Dues view + `hs-dues-io`; RuleSuggestions +0.23; help, palette, Ctrl+K, packs ≈ 0.4) | 9 kB ✓ |
+| Hindi pack | +0.69 kB (`lang-hi-society` +0.65) | — |
+| Hindi left in core | 0 | 0 ✓ |
+
+All four C items fit; nothing was cut.
+
+## R18-D — Funds, accounts and statutory
+
+### What it does
+
+- **Funds (D1, `hs-funds.ts` + bridge `hs-books-io.ts`).** "Map funds" (owner) creates — once, by name — three R5-C4
+  fund cost centres (nature `restricted`) "Sinking fund", "Repair and maintenance fund", "Major repair fund", their reserve
+  ledgers (group Reserves) and `society_settings.funds`. From then on the run tags every fund-head line with its fund's
+  `cost_centre_id` and the bill carries `hs.funds` (`hs-run.ts`, `// R18-D`). "Transfer for <period>" (`books.edit`) posts
+  ONE manual journal (class "Society fund transfer", dated the period end; FY mode `fund_transfer: 'year_end'` → `FY2026`,
+  dated 31 March): per fund Dr Sales (fund-tagged) / Cr the fund's reserve (fund-tagged) for the contributions billed in
+  the period (bills, not receipts — HS39) less what the transfer journals dated in the period already moved — so a re-run
+  posts nothing and a cancelled run is reversed by a new journal. The R5-C4 fund statement still shows the contribution as
+  the fund's receipt (sales −, reserve +). PRD §7: sinking ₹2,250, repair ₹6,750. The Funds view (`&view=funds`) shows per
+  fund for a FY: opening, billed, transferred, spent (utilisation), closing, the State minimum hints (`fundMinimum`, MH
+  0.25 % / 0.75 % a year of the construction cost, HS27/HS60) and a link to Books → Funds.
+- **I&E and R&P (D2).** `EntityType` gains `cooperative` / `association` (`types/books-r2.ts`); the annual pack's entity
+  select offers them. For these the pack prints (same builders, same figures) "Income and Expenditure Account", "Excess of
+  income over expenditure / (expenditure over income)", "I. FUNDS AND LIABILITIES" / "II. PROPERTY AND ASSETS", "Members'
+  funds", share capital / members' contributions and "Reserve fund and other funds" (`notes-auto.ts` titles), and a
+  **Receipts and Payments account** page + XLSX sheet (`hs-rp.ts`, pure over posting lines: opening and closing of the cash
+  and real bank ledgers — clearing accounts left out by `AnnualPackTab` through `pickableBankAccounts` — receipts and
+  payments by the other ledger of each cash voucher; contra nets out). The four existing entity types print exactly as
+  before (`tests/annual-pack.test.ts`). The draft line stays.
+- **Registers and audit (D3, `hs-registers.ts`, `hs-alerts.ts`).** The Registers view (`&view=registers`): List of
+  members (MH "Form J"; elsewhere "Register of members", from the State row's `registers`), I register (MH, with the
+  transfers count), share register, nomination register — printed (`escHtml`); per member the admission date, share
+  certificate and nominees (`name:share %:relation`, no ID numbers) are edited on the unit. Audit tracker per FY
+  (`society_settings.audit`): auditor, appointed, due date (State `audit_due_months` after 31 March — TN 3, KA 6 — else
+  typed, `HsAudit.due_on`), report and (MH) rectification dates, status chip. The bell's `society` gate loads `hs-alerts`
+  (`hsNotices`, explicit pack only): an unreported audit from 30 days before its due date, critical from 7 days / overdue.
+- **Income tax (D4 — kept, `hs-itax.ts`).** Registers → Income tax: the FY's mutual receipts (member heads incl. interest
+  billed to members) vs non-mutual income (non-member heads + interest / dividend income ledgers, read from the ledger),
+  and for a co-operative society the deduction lines by the FY (`INCOME_TAX_SOCIETY_RULES`: Sec 80P(2)(c)(ii) / (2)(d) up
+  to FY 2025-26, Sec 149(2)(c) / (2)(d) of the 2025 Act from 1 Apr 2026; ₹50,000 cap; both `verified: false`), the
+  co-operative-bank flag (HS21) and the TDS note (existing payables rows, HS23). Nothing posts.
+- **Checklist, help, Ctrl+K.** Steps `societyFunds` (funds mapped) / `societyAudit` (an audit row); topics
+  `recurring:society:funds` / `…:registers`; palette labels, PACK_TABS rows, synonyms (`sinking fund`, `J register`,
+  `80P`, `सदस्य सूची` …), the Ctrl+K title extended.
+
+### Decisions and deviations
+
+- **No new table.** Funds are existing cost centres / reserve ledgers / manual vouchers; audit rows sit in
+  `society_settings`; register fields on the unit. `HsAudit.due_on` added in the types' R18-D block.
+- **Idempotence by date range**, not by a reference string: a journal moves billed − already moved in the period; a FY
+  journal counts its periods' journals. Mixing modes in one FY (a period journal for a month after a year-end journal) is
+  not guarded — the view shows one mode at a time.
+- **"Excess only" valuation:** the exempt-portion line is not fund-tagged, so the fund statement then shows only the
+  tagged part (HS59).
+- **R&P lives in the f-society chunk** (`annual-pack.ts` imports `hs-rp.ts` statically): opening the annual pack loads
+  that chunk (no extra precache bytes).
+- **Income tax** reads no purchase bill (so `tests/purchase-contract.test.ts` is unchanged); the alerts / itax tests sit
+  in `tests/hs-registers.test.ts`.
+- **Demo:** no D block (funds are mapped on first use; no sample audit).
+- **CA items** HS59–HS64.
+
+### Bundle (R18-D)
+
+Before = R18-C, after = R18-D (normalized).
+
+| Budget | Delta | Cap |
+|---|---|---|
+| Initial JS (first paint) | 0 B | 0 ✓ |
+| Core precache (English) | **+6.31 kB** (SocietyDesk +2.56: Funds / Registers views; `f-society` +2.10: funds, registers, alerts, itax, R&P, rules, strings; annual pack +0.57; fund-statement split into its own chunk +1.30 / r5c chunks −0.08 net; help, Ctrl+K, checklist, bell ≈ 0.5) | 9 kB ✓ |
+| Hindi pack | +0.90 kB | — |
+| Hindi left in core | 0 | 0 ✓ |
+
+Round 18 after D (raw `check-bundle-size`): initial 182.3 kB (4 files), core 3,168.5 kB, Hindi pack 349.2 kB, Hindi in
+core 21.5 kB, `lazy-leaves` 17.4 kB.

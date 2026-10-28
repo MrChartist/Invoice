@@ -321,6 +321,9 @@ build-time config must use Vite's `VITE_` prefix.
   consignment as non-saleable (a sale line naming its agency lot `arrival_id` may still sell from consignment) — decide
   that for any new kind. R9: `'used'` (second-hand goods bought by exchange / buy-back, old gold) is **saleable**; a sale
   from it is flagged for the margin scheme (`usedGoodsGodowns`, RT-D3 / RT-E3).
+- Batch issuing (R18 platform fix): `localDb.invoices.saveMany(list)` validates, numbers and holds each document exactly
+  like `save` but writes the invoices table once (`save(x)` = `saveMany([x])[0]`); `issueBatch` uses it for service-only
+  batches (stock batches still save one by one). Any new bulk writer must use it, never a loop of `save`.
 - Recurring schedules in draft mode create **unnumbered** drafts; the number is taken on issue (`numberOnIssue` in
   `localDb.ts`), so no gap reaches GSTR-1 Table 13. Drafts numbered before QA round 3 keep their numbers.
 - Financial credit notes (`note_kind: 'financial'`, `FCN/FY…`, R2-A) carry no GST by default: GST / e-Invoice / e-Way

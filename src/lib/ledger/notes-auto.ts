@@ -77,11 +77,13 @@ export function capitalTitle(entity: EntityType): string {
   if (entity === 'company') return 'Share capital';
   if (entity === 'partnership') return "Partners' capital accounts";
   if (entity === 'llp') return "Partners' contribution";
+  if (entity === 'cooperative') return 'Share capital'; // R18-D2
+  if (entity === 'association') return "Members' contributions";
   return "Proprietor's capital account";
 }
 
 export function reservesTitle(entity: EntityType): string {
-  return entity === 'company' ? 'Other equity (reserves & surplus)' : 'Reserves & surplus';
+  return entity === 'company' ? 'Other equity (reserves & surplus)' : entity === 'cooperative' || entity === 'association' ? 'Reserve fund and other funds' : 'Reserves & surplus'; // R18-D2
 }
 
 /** Editable notes and their starter text. */

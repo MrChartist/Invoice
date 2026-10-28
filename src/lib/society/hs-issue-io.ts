@@ -19,6 +19,10 @@ import { hsbT } from '../../i18n/areas/society-r18b';
 import { HS_TABLES } from './hs-shared';
 import { periodBills, planSocietyRun, type RunPlan, type UnitBill } from './hs-run';
 import { periodText } from './hs-print';
+import { periodRange } from './hs-tariff';
+import { duesIndex, type InterestFn } from './hs-dues';
+import { computeInterest } from '../interest';
+import { shiftDay } from '../dates';
 import { readSocietySettings, societyDefaultsFor } from './hs-settings';
 import { loadUnits } from './hs-units-save';
 
@@ -38,6 +42,8 @@ export function planRun(i: RunInput, runId = generateId()): RunPlan & { runId: s
     ...planSocietyRun(i.period, loadUnits(), s.heads ?? [], {
       date: i.date, due: i.due, registered: !!sender()?.companyGstin?.trim(), kind: localDb.settings.get().society_kind, settings: s, clients: localDb.clients.getAll(),
       invoices: i.levy ? inv.filter((x) => x.hs?.unit && x.status !== 'Cancelled') : periodBills(inv, i.period), runId, passText: PURE_AGENT_CHARGE, levy: i.levy,
+      // R18-C1: the bills and receipts before the period carry arrears and interest onto this bill.
+      ...(i.levy || !periodRange(i.period) ? {} : { dues: { ix: duesIndex(inv, getTable('transactions'), getTable('doc_links')), fn: computeInterest as InterestFn, asOf: shiftDay(periodRange(i.period)!.from, -1) } }),
     }),
   };
 }

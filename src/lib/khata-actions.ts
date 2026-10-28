@@ -41,9 +41,17 @@ export function loadKhataReport(now: Date = new Date()): { input: BuildInput; re
 }
 
 /** The balance snapshot for a bill being issued (8.5); see `nextPartyBalanceSnapshot`. */
-export function partyBalanceSnapshotFor(record: InvoiceRecord, opts: SnapshotOptions = {}): PartyBalanceSnapshot | undefined {
-  return computePartyBalanceSnapshot(record, sharedReceivablesInput(), opts);
+export function partyBalanceSnapshotFor(record: InvoiceRecord, opts: SnapshotOptions = {}, run?: object): PartyBalanceSnapshot | undefined {
+  const input = sharedReceivablesInput();
+  // A batch run (`run` = its snapshot cache): the report of the stored tables is built once for all its new bills.
+  if (run && !input.invoices.some((i) => i.id === record.id) && !input.payments.some((p) => p.invoice_id === record.id)) {
+    let report = runReports.get(run);
+    if (!report || report.at !== input.invoices) runReports.set(run, (report = { at: input.invoices, report: buildReceivables(input, { now: opts.today ?? new Date() }) }));
+    return computePartyBalanceSnapshot(record, input, { ...opts, report: report.report });
+  }
+  return computePartyBalanceSnapshot(record, input, opts);
 }
+const runReports = new WeakMap<object, { at: readonly InvoiceRecord[]; report: ReceivablesReport }>();
 
 /**
  * PERF-1 (save path): `loadReceivablesInput` over the SHARED parsed tables — no row copies. Only for
@@ -76,7 +84,7 @@ export function withIssueSnapshot(record: InvoiceRecord, stored?: InvoiceRecord,
       const hit = cache.get(key);
       return hit ? { ...hit, bill: billAmount(record) } : undefined;
     }
-    const fresh = partyBalanceSnapshotFor(record);
+    const fresh = partyBalanceSnapshotFor(record, {}, cache);
     if (cache && key) cache.set(key, fresh ?? null);
     return fresh;
   });

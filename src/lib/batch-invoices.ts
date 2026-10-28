@@ -274,6 +274,16 @@ export function issueBatch(drafts: readonly BatchDraft[], opts: { sourceId: stri
     const saved: InvoiceRecord[] = [];
     const held: IssueResult['held'] = [];
     const snapshots = new Map<string, PartyBalanceSnapshot | null>(); // R6-C5: one balance snapshot per party
+    // A batch of services only (no stock line whose check must see the batch's earlier documents) is saved with one
+    // write of the invoices table (`saveMany`: the same checks, numbers, holds and audit, in order); else one by one.
+    const bulk = drafts.every((d) => (d.record.items ?? []).every((l) => l.type === 'Service' && !l.arrival_id));
+    const recs: InvoiceRecord[] = [];
+    const why: string[] = [];
+    const done = (out: InvoiceRecord, reason: string) => {
+      if (!reason && opts.mode === 'issue' && out.approval?.state === 'pending') reason = out.approval.reason === 'credit' ? 'Held: over the credit limit (owner approval).' : 'Held for approval.';
+      if (reason) held.push({ invoice: out, reason });
+      saved.push(out);
+    };
     for (const d of drafts) {
       // The due date keeps its distance from the issue date when the run is dated differently from the preview.
       const termDays = Math.max(Math.round((Date.parse(`${d.record.due_date}T00:00:00Z`) - Date.parse(`${d.record.issue_date}T00:00:00Z`)) / 864e5) || 0, 0);
@@ -287,13 +297,17 @@ export function issueBatch(drafts: readonly BatchDraft[], opts: { sourceId: stri
           rec.status = 'Draft';
         }
       }
-      // Number on issue (QA5-2 F15): a draft stays unnumbered until it is issued.
-      rec.invoice_number = rec.status === 'Draft' ? '' : localDb.invoices.nextNumber(opts.date, rec.doc_type, rec.sender?.invoicePrefix || undefined);
-      const out = localDb.invoices.save(rec.status === 'Draft' ? rec : withIssueSnapshot(rec, undefined, snapshots));
-      if (!reason && opts.mode === 'issue' && out.approval?.state === 'pending') reason = out.approval.reason === 'credit' ? 'Held: over the credit limit (owner approval).' : 'Held for approval.';
-      if (reason) held.push({ invoice: out, reason });
-      saved.push(out);
+      // Number on issue (QA5-2 F15): a draft stays unnumbered until it is issued; an issued one takes the next number
+      // of its series (the sender's prefix, dated `opts.date`) when it is saved.
+      rec.invoice_number = '';
+      const r = rec.status === 'Draft' ? rec : withIssueSnapshot(rec, undefined, snapshots);
+      if (!bulk) done(localDb.invoices.save(r), reason);
+      else {
+        recs.push(r);
+        why.push(reason);
+      }
     }
+    if (bulk) localDb.invoices.saveMany(recs).forEach((out, k) => done(out, why[k]));
     const run: BatchRun = {
       id: runId, created_at: new Date().toISOString(), date: opts.date, source_id: opts.sourceId, source_kind: opts.sourceKind,
       ...(opts.sourceLabel ? { source_label: opts.sourceLabel } : {}),

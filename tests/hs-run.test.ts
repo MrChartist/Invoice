@@ -156,10 +156,10 @@ test('B4 special levy: shared by carpet area, tested with the month\'s regular b
   assert.equal(inv().filter((i) => i.status !== 'Cancelled').length, 3, 'the regular bills stay');
 });
 
-// Volume (PRD §4): planning 2,000 units is pure and fast; issuing is bounded by `localDb.invoices.save` re-serialising
-// the whole invoices table per document (first-paint storage, O(n²)): 2,000 bills took ≈ 145 s on the R18-B build
-// machine, so the test issues 200 in one batch and `run_limit` splits a large society's run (deviation, see the feature doc).
-test('volume: 2,000 units planned in one pass; 200 issued in one batch under 3 s; run_limit splits a run', () => {
+// Volume (PRD §4): planning 2,000 units is pure and fast, and the run issues all 2,000 in one batch through the bulk
+// save path (`issueBatch` → `localDb.invoices.saveMany`: one write of the invoices table; it was O(n²), ≈ 145 s, in
+// R18-B). `run_limit` still splits a run on request.
+test('volume: 2,000 units planned in one pass and issued in one batch under 3 s (bulk save); run_limit splits a run', () => {
   localDb.settings.save({ ...localDb.settings.get(), society_kind: 'chs' });
   const mk = (n: number) => {
     setTable('clients', Array.from({ length: n }, (_, k) => ({ id: `m${k}`, name: `Member ${k}`, email: '', address: '', city: '', zip: '' })));
@@ -172,12 +172,12 @@ test('volume: 2,000 units planned in one pass; 200 issued in one batch under 3 s
   assert.equal(p.bills.length, 2000);
   assert.deepEqual([p.counts.bos, p.counts.tax], [1800, 200]);
   assert.ok(performance.now() - t < 1500, `plan ${Math.round(performance.now() - t)} ms`);
-  mk(200);
   t = performance.now();
   const r = issueRun(OCT);
   const ms = performance.now() - t;
-  assert.equal(r.invoices.length, 200);
+  assert.equal(r.invoices.length, 2000);
   assert.equal(new Set(r.invoices.map((i) => i.batch_run_id)).size, 1, 'one batch');
+  assert.deepEqual([r.invoices.filter((i) => i.doc_type === 'BILL_OF_SUPPLY').at(-1)?.invoice_number, r.invoices.filter((i) => i.doc_type === 'TAX_INVOICE').length], ['BOS/FY26-27/1800', 200]);
   assert.ok(ms < 3000, `${Math.round(ms)} ms`);
   resetStorage(); installSettings();
   localDb.settings.save({ ...localDb.settings.get(), society_kind: 'chs' });

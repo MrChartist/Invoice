@@ -128,7 +128,7 @@ export interface Deferral {
 
 /* ── Notes to accounts (R2-C1) ────────────────────────────────── */
 
-export type EntityType = 'proprietorship' | 'partnership' | 'llp' | 'company';
+export type EntityType = 'proprietorship' | 'partnership' | 'llp' | 'company' | 'cooperative' | 'association'; // R18-D2: co-operative society / association (I&E, R&P)
 
 export interface NoteText {
   /** Full text of an editable note, or the extra paragraph under an automatic note. */
