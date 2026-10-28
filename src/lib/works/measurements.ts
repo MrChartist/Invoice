@@ -56,8 +56,16 @@ export function billedQty(boq: InvoiceRecord, invoices: readonly InvoiceRecord[]
   return new Map(progressSummary(boq, invoices, links).lines.map((l) => [l.line.id, l.billedQty]));
 }
 
-/** Next RA number of a BOQ: one above the highest live RA bill. */
-export const nextRaNo = (boqId: string, invoices: readonly Inv[]): number => raBills(boqId, invoices).reduce((m, b) => Math.max(m, num(b.ra_no)), 0) + 1;
+/**
+ * Next RA number of a BOQ: one above the highest RA number ever used — live RA bills, cancelled ones (`boq_id` kept)
+ * and their measurement rows (PENDING 28: a cancelled RA bill's number is never issued again, like its invoice number).
+ */
+export const nextRaNo = (boqId: string, invoices: readonly Inv[], measurements: readonly Pick<RaMeasurement, 'boq_id' | 'ra_no'>[] = loadMeasurements(boqId)): number =>
+  Math.max(
+    raBills(boqId, invoices).reduce((m, b) => Math.max(m, num(b.ra_no)), 0),
+    invoices.reduce((m, b) => (b.boq_id === boqId ? Math.max(m, num(b.ra_no)) : m), 0),
+    measurements.reduce((m, r) => (r.boq_id === boqId ? Math.max(m, num(r.ra_no)) : m), 0),
+  ) + 1;
 
 export interface MeasureInput {
   line_id: string;
