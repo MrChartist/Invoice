@@ -10,6 +10,8 @@ import { localDb } from '../../lib/localDb';
 import { isValidPan, isValidTan } from '../../lib/validators';
 import { MAX_FLAT_FEE, sanitizeClientLateFee, type ClientLateFeeMode } from '../../lib/late-fee-rule';
 import { priceLevelsDb } from '../../lib/pricing';
+import { activePacks } from '../../lib/industry-packs';
+import { AG_PACKS } from '../../lib/agri/ag-shared';
 import type { Client } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { salesT } from '../../i18n/areas/sales';
@@ -25,6 +27,7 @@ import { s2T } from '../../i18n/areas/sales-r2';
 const ReminderModeField = lazy(() => import('../collections/ReminderModeField'));
 const DocDefaultsFields = lazy(() => import('../clients/DocDefaultsFields')); // R3-B5
 const ClientLegalRow = lazy(() => import('../prof/PartyRows').then((m) => ({ default: m.ClientLegalRow }))); // R14 (PS-B2)
+const FarmerPartyRow = lazy(() => import('../agri/FarmerPartyRow')); // PENDING #18 (AG-A2)
 
 const BLANK: Client = {
   name: '',
@@ -57,11 +60,15 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
   const [credit, setCredit] = useState<{ limit: string; days: string }>({ limit: '', days: '' });
   // Price levels (6.9): the picker appears only once a level exists.
   const [levels] = useState(() => priceLevelsDb.all());
+  // PENDING #18: the Farmer section (a depositor / a dealer's farmer customer), with an agri pack on.
+  const [agriOn] = useState(() => activePacks(localDb.settings.get() as never).some((p) => (AG_PACKS as readonly string[]).includes(p)));
+  const [farmerProblem, setFarmerProblem] = useState('');
 
   useEffect(() => {
     if (open) {
       setForm({ ...BLANK, ...(client ?? {}) });
       setError('');
+      setFarmerProblem('');
       const f = client?.late_fee;
       setFee(f ? { mode: f.mode, rate: String(f.rate), grace: String(f.graceDays) } : { mode: '', rate: '', grace: '' });
       setCredit({ limit: client?.credit_limit ? String(client.credit_limit) : '', days: client?.credit_days ? String(client.credit_days) : '' });
@@ -82,6 +89,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) return setError(salesT('cf.errName'));
+    if (farmerProblem) return setError(farmerProblem);
     if (form.gstin && !checkGstin(form.gstin).valid) return setError(salesT('cf.errGstin'));
     if (form.email && !/^\S+@\S+\.\S+$/.test(form.email.trim())) return setError(salesT('cf.errEmail'));
     const pan = (form.pan ?? '').trim().toUpperCase();
@@ -297,6 +305,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         <ContactsEditor value={form.contacts ?? []} onChange={(v) => set('contacts', v)} />
         <AddressBookEditor value={form.addresses ?? []} onChange={(v) => set('addresses', v)} />
         <Suspense fallback={null}><DocDefaultsFields value={form.doc_defaults} onChange={(v) => set('doc_defaults', v)} /></Suspense>
+        {open && (agriOn || !!client?.ag) && <Suspense fallback={null}><FarmerPartyRow key={client?.id ?? 'new'} party={client ?? {}} side="client" onChange={(p) => setForm((f) => ({ ...f, ...p }))} onProblem={setFarmerProblem} /></Suspense>}
         {(legalOn || !!(form as { ps?: unknown }).ps) && <Suspense fallback={null}><ClientLegalRow value={form as { ps?: unknown }} onChange={(p) => setForm((f) => ({ ...f, ...p }))} /></Suspense>}
         <label className={controls.field}>
           <span className={controls.label}>{reachT('msgLang')}</span>

@@ -11,6 +11,7 @@ import { Modal } from '../ui/Modal';
 import { NumberInput } from '../ui/NumberInput';
 import { VendorPicker } from './VendorPicker';
 import { LineItemsEditor } from './LineItemsEditor';
+import { SizeGridSlot } from './SizeGridSlot';
 import { useT } from '../../i18n';
 import { prT } from '../../i18n/areas/purchase-returns';
 import controls from '../../styles/controls.module.css';
@@ -134,6 +135,7 @@ function GrnForm({ vendors, orders, purchases, notes, onVendorCreated, onClose, 
       </div>
       <h3 className={styles.sectionTitle}>{prT('goodsReceived')}</h3>
       <LineItemsEditor lines={lines} onChange={setLines} />
+      <SizeGridSlot lines={lines} onChange={setLines} date={date} />
       <div className={controls.field}>
         <label className={controls.label} htmlFor="grn-notes">{prT('narration')}</label>
         <textarea id="grn-notes" className={controls.textarea} value={remarks} onChange={(e) => setRemarks(e.target.value)} />

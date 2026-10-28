@@ -46,7 +46,7 @@ bundle numbers.
   get a payroll adjustment tagged `bonus` (the `AdjustmentTag` union has no `incentive`; payroll types not edited).
 - **Tips** (A3.6): shipped later as a 0% non-GST tip line (see "Deferred items — shipped" below), not a POS tender;
   `Payment.tip_staff` stays unused and there is no "Tips payable" liability (SV70 / SV71).
-- **POS**: the staff picker per POS line shipped later (below); no "staff required" block yet; lines from the appointment carry their
+- **POS**: the staff picker per POS line shipped later (below); with "Staff required on service lines" on, a service line without staff blocks the POS save (`sv-pos.ts` `linesWithoutStaff`, reported by `PosStaff`; PENDING #21); lines from the appointment carry their
   staff. Since PENDING 12 the customer display (`/pos-display`) shows the queue's "Now serving: token N" line: the queue view
   broadcasts `servingMessage` (`pos-serving.ts`, kept out of `pos-display.ts` so that stays a lazy leaf) while open
   and answers a display's `hello`; the queue view still prints it.
@@ -167,13 +167,25 @@ front desk / claims / pharmacy chunks) ≈ +1.5 net.
   `paper-helpers.ts`, so no template change).
 - **Auto-renew** makes the successor and a draft bill when the desk opens (not a `recurring` schedule: a schedule
   cannot create the membership row). No bell notice ("expiring this week"): the renewals list sits on the Members view.
-- **`defer_package_income`** and the "Package income recognised" journal are not built (report only).
-- **Camera QR** check-in is not built: the member card carries the MEM number as a barcode, which any keyboard
-  scanner types into the code box. Member card = barcode, not QR.
-- **Class bookings** per occurrence (appointments with `class_id`) are not built: enrolment with capacity and a
-  wait-list per class. Attendance is taken per class and day for coaching batches; gym check-ins can carry `class_id`.
-- **Item form** sub-row "Products used per service" not added (the existing Kit + BOM screens set the recipe); the
-  bill-line override `sv.recipe_qty` is read by the report only (stock follows the BOM). Variance vs physical count: not built.
+- **`defer_package_income`** (PENDING #20, `services/sv-deferral.ts`): a switch under the forfeited list on Time → Members
+  (owner; stores `defer_package_from` = the day it went on, so packages sold earlier are never touched). The sale bill
+  still credits Sales in full; per ended month ONE journal (class "Package income recognised", dated the month end,
+  `books.edit`) posts the net of packages sold in the month (deferred) less sessions redeemed (bills' `sv.redeem` lines +
+  redeeming check-ins, × price ÷ sessions), packages expired with sessions unused and packages cancelled / upgraded in the
+  month (recognised): net > 0 Dr Sales | Cr "Package income received in advance" (created on first use, other current
+  liabilities), else the reverse. A month posts once (its journal names the month; delete it to post again). Sales is the
+  default ledger: a company that books package income to another ledger adjusts by hand (CA item SV44).
+- **Camera check-in** (PENDING #21): Check-in shows "Scan card with camera" where the browser has BarcodeDetector (the
+  existing `scan/CameraScanner`, no library); one matching member is checked in, else the code fills the box. The member
+  card stays a barcode of the MEM number (BarcodeDetector reads barcodes and QR alike); keyboard scanners still type it.
+- **Class bookings** per occurrence (PENDING #21, `sv-class-bookings.ts`): on Members → Classes pick a day, then *Book*
+  — an appointment on that date / time with `class_id` (additive), the class's staff and resource, no services. Only a
+  meeting day (weekdays, dates, holidays), once per member, capped by the capacity of that day (cancelled / no-show
+  bookings free the place). The term enrolment and its wait-list are unchanged.
+- **Item form** "Products used per service" (PENDING #21): a lazy row on the stock-item form (salon / fitness / clinic /
+  workshop pack, or an item already a kit) — product + quantity per service in its base unit; saving makes the item a
+  kit (not stock itself) and writes the lines as its default BOM (`sv-recipe-form.ts`, `bomsDb.save`; other BOM fields
+  kept). The bill-line override `sv.recipe_qty` is read by the report only (stock follows the BOM). Variance vs physical count: not built.
 - **Fee increase** warning: `FeePlanForm` (R5-C) now calls `feeIncreaseWarning` after saving an edited plan (shipped later, below).
 - **Coaching refund** records the request on the enrolment (no new table) and credits by value: the credited line keeps
   quantity 1 on a new line id, so the R5-C "creditable quantity" tracking is untouched; the total-credit cap still holds.
