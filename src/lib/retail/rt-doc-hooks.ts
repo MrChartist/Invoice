@@ -22,6 +22,7 @@ import { num, round2 } from '../invoice-calc';
 import { getTable, setTable } from '../storage';
 import { localDb } from '../localDb';
 import { recordSeries } from '../series-counters';
+import { exchangeSettled, syncNettedPaid } from '../netting';
 
 /** `RT_TABLES.financeDeals` (rt-shared.ts), named here so this registry-side chunk stays small. */
 const DEALS = 'finance_deals';
@@ -29,9 +30,8 @@ const DEALS = 'finance_deals';
 type Urd = Pick<PurchaseRecord, 'id' | 'total' | 'amount_paid' | 'exchange_paid'>;
 const isUrd = (p: Partial<PurchaseRecord> | undefined): boolean => !!(p?.used_goods || p?.old_metal);
 
-/** Exchange value of a voucher used by LIVE receipt rows. */
-export const exchangedFrom = (purchaseId: string, payments: readonly Payment[]): number =>
-  round2(payments.filter((p) => p.exchange_purchase_id === purchaseId).reduce((s, p) => s + num(p.amount), 0));
+/** Exchange value of a voucher used by LIVE receipt rows (R15-A3: the shared roll-up of `netting.ts`). */
+export const exchangedFrom = (purchaseId: string, payments: readonly Payment[]): number => exchangeSettled(purchaseId, payments);
 
 /** Cash / bank paid on a URD voucher (its `amount_paid` less the exchange part the last sync put in it). */
 export function urdCashPaid(p: Urd, payments: readonly Payment[]): number {
@@ -61,6 +61,8 @@ export function syncUrdPaid(ids?: Iterable<string>): void {
     return { ...p, amount_paid: paid, exchange_paid: ex, updated_at: new Date().toISOString() };
   });
   if (changed) setTable('purchases', rows);
+  // R15-A3: a netting receipt freed (bill cancelled / deleted) or restored settles its supplier bill again.
+  syncNettedPaid(ids && want);
 }
 
 /** Free a bill's exchange receipts (their vouchers are open again). */

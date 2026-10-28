@@ -24,6 +24,9 @@ import { balanceOf, paymentsDb, purchasesDb, type PurchasePayment } from './purc
 import { generateId, getTable, setTable } from './storage';
 import type { OpeningBillInput } from './receivables';
 import { loadPayableOpeningBills } from './opening-bills';
+import { NETTING_METHOD } from './netting';
+import { exchangeVoucherOf } from './no-cash';
+import type { Payment } from '../types/invoice';
 
 export const VENDOR_PAYMENTS_TABLE = 'vendor_payments';
 
@@ -112,6 +115,8 @@ export interface PayablesInput {
   returns?: readonly PurchaseReturn[];
   /** R6-C2: payable opening bills (`loadPayableOpeningBills`); they age from their own date and settle Agst Ref. */
   openingBills?: readonly OpeningBillInput[];
+  /** R15-A3: customer receipts (`transactions`); netting rows settle the bill they name, as dated adjustments. */
+  receipts?: readonly Payment[];
 }
 
 const emptyBuckets = (): Record<AgeBucket, number> => ({ notDue: 0, d0_30: 0, d31_60: 0, d61_90: 0, d90plus: 0 });
@@ -167,6 +172,11 @@ export function billwisePayables(input: PayablesInput): PartyPayables[] {
       rowsTotal += a.amount;
       if (a.date <= asOf) allocations.push({ date: a.date, amount: round2(a.amount), kind: 'adjustment', ref: a.ref });
     }
+    // R15-A3: set off against the party's own invoices (live netting receipts; `exchange_paid` is their part of amount_paid).
+    const nets = (input.receipts ?? []).filter((r) => exchangeVoucherOf(r) === bill.id && r.method === NETTING_METHOD);
+    for (const r of nets) if (isoDay(r.date) && r.date <= asOf) allocations.push({ date: r.date, amount: round2(num(r.amount)), kind: 'adjustment', ref: `Netting ${r.receipt_number ?? ''}`.trim() });
+    // The stored part leaves the "recorded on the bill" remainder, so a netting receipt deleted elsewhere frees the bill here.
+    if (input.receipts && !bill.used_goods && !bill.old_metal) rowsTotal += num(bill.exchange_paid);
     // amount_paid not backed by rows (legacy / imported): settled on the bill date.
     const legacy = round2(num(bill.amount_paid) - rowsTotal);
     // R11 (CN-D1): on a sub-contractor bill this part is its deductions journal (retention / recoveries), not cash — the
