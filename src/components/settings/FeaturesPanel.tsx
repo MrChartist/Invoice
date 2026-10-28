@@ -265,7 +265,7 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
           <div className={controls.field} data-features-logistics>
             <span className={controls.label}>{lgPickT('title')}</span>
             <LogisticsKindPicker
-              value={{ kind: settings.logistics_kind ?? '', extra: packsOn.filter((p): p is 'courier' | 'warehouse' => p === 'courier' || p === 'warehouse'), lorries: packsOn.includes('transport') }}
+              value={{ kind: settings.logistics_kind ?? '', extra: packsOn.filter((p): p is 'courier' | 'warehouse' => p === 'courier' || p === 'warehouse'), lorries: Array.isArray(settings.industry_packs) && packsOn.includes('transport') }}
               custom
               disabled={!owner}
               onPick={(v) => {
