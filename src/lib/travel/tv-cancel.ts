@@ -19,7 +19,7 @@ import { round2 } from '../invoice-calc';
 import { ruleAt } from '../tax-rules';
 import { localDb } from '../localDb';
 import { withTablesRollback } from '../table-txn';
-import { createCreditNote } from '../documents';
+import { buildCreditNote, createCreditNote, readLinks } from '../documents';
 import { purchaseReturnsDb } from '../purchase-returns';
 import { purchasesDb } from '../purchases';
 import { blankClient, makeDraft } from '../../store/invoice-defaults';
@@ -37,11 +37,13 @@ const n = (x: unknown) => round2(Number(x) || 0);
 const gross = (l: InvoiceItem) => round2(n(l.quantity) * n(l.rate) * (1 - n(l.discount_percent) / 100) * (1 + n(l.tax_rate) / 100));
 export const feeRate = (regime: TvRegime, date?: string): number => ruleAt(CANCEL_FEE_RATE_RULES, date)[regime];
 
+const CANCEL_REASON = 'Booking cancelled';
+
 /**
- * Pure: what cancelling `targets` credits and refunds. Throws when a guard fails: a line shared with a booking that
- * stays, a draft invoice, charges above the cost.
+ * Pure (reads the document links unless given): what cancelling `targets` credits and refunds. Throws when a guard
+ * fails: a line shared with a booking that stays, a draft invoice, charges above the cost.
  */
-export function cancelPlan(targets: readonly TravelBooking[], all: readonly TravelBooking[], invoices: readonly InvoiceRecord[], regime: TvRegime, i: CancelInput): CancelPlan {
+export function cancelPlan(targets: readonly TravelBooking[], all: readonly TravelBooking[], invoices: readonly InvoiceRecord[], regime: TvRegime, i: CancelInput, links = readLinks()): CancelPlan {
   const live = liveLines(invoices);
   const ids = new Set(targets.map((b) => b.id));
   const cost = round2(targets.reduce((s, b) => s + costInr(b), 0));
@@ -61,8 +63,12 @@ export function cancelPlan(targets: readonly TravelBooking[], all: readonly Trav
     // A ticket invoice of these bookings only: all its tickets and the agent's service line go with them.
     const tk = [...lines].some((x) => invoice.tv?.lines?.[x]) && !all.some((o) => !ids.has(o.id) && o.status !== 'cancelled' && o.line_ref?.invoice_id === id);
     const items = invoice.items.filter((l) => lines.has(l.id) || (tk && (!!invoice.tv?.lines?.[l.id] || l.id === invoice.tv?.air?.line_id)));
-    billed += items.reduce((s, l) => s + gross(l), 0);
-    return { invoice, lines: items.map((l) => ({ itemId: l.id, quantity: n(l.quantity) })) };
+    const req = items.map((l) => ({ itemId: l.id, quantity: n(l.quantity) }));
+    // QA18 T4: what the client is refunded is what the credit note credits — its own maths (invoice discount share,
+    // cess, the TCS the invoice charged on those lines, round-off), not a per-line sum that left the TCS out.
+    const note = buildCreditNote(invoice, { lines: req, reason: CANCEL_REASON, goodsReturned: false, date: i.date }, links, [...invoices], { id: 'plan', invoice_number: '', today: i.date }).record;
+    billed += note ? n(note.total) : items.reduce((s, l) => s + gross(l), 0);
+    return { invoice, lines: req };
   });
   const rate = feeRate(regime, i.date);
   return { credits, billed: round2(billed), cost, rate, refundOut: round2(Math.max(billed - n(i.fee) * (1 + rate / 100), 0)) };
@@ -87,7 +93,7 @@ export function cancelBookings(bookingIds: readonly string[], i: CancelInput): {
   const invoices = localDb.invoices.getAll();
   const plan = cancelPlan(targets, all, invoices, regime, i);
   return withTablesRollback(['invoices', 'doc_links', 'purchases', 'purchase_returns', 'series_counters', 'cost_centres', TV_TABLES.bookings], () => {
-    const notes = plan.credits.map((c) => createCreditNote(c.invoice, { lines: c.lines, reason: 'Booking cancelled', goodsReturned: false }));
+    const notes = plan.credits.map((c) => createCreditNote(c.invoice, { lines: c.lines, reason: CANCEL_REASON, goodsReturned: false, date: i.date }));
     let fee: InvoiceRecord | undefined;
     if (n(i.fee) > 0) {
       const sender = localDb.settings.activeProfile() ?? null;
