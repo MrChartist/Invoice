@@ -162,6 +162,9 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   // R17-B
   '/time?tab=deploy&view=muster': ['muster', 'duty register', 'guard attendance', 'attendance push'],
   '/time?tab=deploy&view=bills': ['manpower bill', 'security bill', 'cost-plus', 'duty annexure'],
+  // R17-C
+  '/time?tab=deploy&view=compliance': ['compliance pack', 'pf challan', 'trrn', 'esi challan', 'minimum wage', 'अनुपालन'],
+  '/time?tab=deploy&view=profit': ['site profit', 'site p&l', 'margin', 'लाभ'],
 };
 
 /** Words for one href: its own row, else the row of its base tab (`&view=` dropped). */

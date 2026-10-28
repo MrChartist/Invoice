@@ -9,10 +9,13 @@ import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { mpT } from '../../i18n/areas/manpower-r17a';
 import { mbT } from '../../i18n/areas/manpower-r17b';
+import { mcT } from '../../i18n/areas/manpower-r17c';
 import controls from '../../styles/controls.module.css';
 import SitesView from './SitesView';
 import MusterView from './MusterView';
 import BillsView from './BillsView';
+import ComplianceView from './ComplianceView';
+import ProfitView from './ProfitView';
 import type { MpViewProps } from './mp-ui';
 
 type View = { label: () => string; C: ComponentType<MpViewProps> | LazyExoticComponent<ComponentType<MpViewProps>> };
@@ -22,7 +25,9 @@ const VIEWS: Record<string, View> = {
   // R17-B: the duty register (+ payroll push) and the month's bills (static: one desk chunk, as R15-C measured)
   muster: { label: () => mpT('muster'), C: MusterView },
   bills: { label: () => mbT('bills'), C: BillsView },
-  // R17-C: compliance, profit
+  // R17-C: the client compliance pack (+ minimum-wage checks) and the site P&L
+  compliance: { label: () => mpT('compliance'), C: ComplianceView },
+  profit: { label: () => mcT('profit'), C: ProfitView },
   // R17-D: statutory
 };
 

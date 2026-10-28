@@ -1,5 +1,5 @@
 /**
- * R17-B bridge to payroll — the ONE Round 17 module that writes payroll tables (C appends `readRunForMonth`).
+ * R17-B bridge to payroll — the ONE Round 17 module that writes payroll tables; R17-C reads the month's final run.
  *  - B2 "Send to payroll": the month's locked musters → attendance (`attendancePush`) for the people in the musters only,
  *    refused once the month's run is final (the payroll lock);
  *  - A2 criterion 5 (moved to B): deploy / release an employee at a site (`cost_centre_id` + `mp.post_id`).
@@ -15,6 +15,7 @@ import { audit } from '../audit';
 import { attendancePush, type AttendanceNow, type AttendancePush } from './mp-attendance';
 import { loadMusters } from './mp-muster';
 import { readManpowerSettings } from './mp-settings';
+import type { RunLine } from './mp-compliance';
 
 type Row = AttendanceNow & { id: string; updated_at?: string };
 const guard = () => {
@@ -59,4 +60,10 @@ export function deployEmployee(employeeId: string, siteId: string, postId?: stri
   const row = { ...rest, ...(siteId ? { cost_centre_id: siteId } : {}), ...(Object.keys(mp).length ? { mp } : {}), updated_at: new Date().toISOString() };
   setTable('employees', all.map((x) => (x.id === employeeId ? row : x)));
   audit.record({ entity: 'employee', entity_id: e.id, action: 'update', doc_number: e.code, summary: `${siteId ? 'Deployed' : 'Released'} employee ${e.code ?? ''} ${e.name ?? ''}`.trim() });
+}
+
+/** R17-C: the month's FINALISED payroll run (read raw, as the push does; a draft run is not a source). */
+export function readRunForMonth(month: string): { id: string; number?: string; lines: RunLine[] } | null {
+  const r = getTable<{ id: string; month?: string; status?: string; number?: string; lines?: RunLine[] }>('payroll_runs').find((x) => x?.month === month && x.status === 'final');
+  return r ? { id: r.id, number: r.number, lines: r.lines ?? [] } : null;
 }

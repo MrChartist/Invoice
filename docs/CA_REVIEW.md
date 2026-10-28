@@ -49,8 +49,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
 | 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV48 | 48 | 15 |
 | 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF23 | 23 | 5 |
-| 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP36 | 36 | 11 |
-| **Total** | | **603** | **150** |
+| 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP40 | 40 | 11 |
+| **Total** | | **607** | **150** |
 
 ---
 
@@ -1211,9 +1211,9 @@ belong to R16-B / R16-C, PF17–PF18 to R16-D.
 `PF` ids are counted once here. The ★ items (PF1, PF3, PF5, PF7, PF17) change what a document prints or a return
 reports once notified.
 
-## 17. Security, facility-management and manpower-supply agencies (Round 17, ids MP1–MP36)
+## 17. Security, facility-management and manpower-supply agencies (Round 17, ids MP1–MP40)
 
-Added with `docs/prd/round-17.md` (§9: MP1–MP32) by R17-A; MP33–MP36 by R17-B. It covers private security agencies (PSARA licensees),
+Added with `docs/prd/round-17.md` (§9: MP1–MP32) by R17-A; MP33–MP36 by R17-B; MP37–MP40 by R17-C. It covers private security agencies (PSARA licensees),
 housekeeping / facility-management contractors, contract and temporary staffing firms and labour contractors outside
 construction (R11 CN-D2 keeps those).
 
@@ -1261,6 +1261,10 @@ construction (R11 CN-D2 keeps those).
 | MP34 ★ | Monthly-rate posts billed pro-rata (R17-B3): rate × heads × billed duties ÷ (heads × billing days), capped at rate × heads unless "bill extra duties" is ticked; billing days calendar / 26 / 30. Is a short month (absences not relieved) a lower value of the same supply, or a deduction the client makes on its side? | Pro-rata on the bill, capped | `mp-bill.ts` `postLines` | — | — |
 | MP35 | Several sites of one client on one invoice (client + bill group, R17-B3): place of supply and the client's GSTIN when the sites are in other States than the client's registration; one RCM / one forward invoice per group. | Client's registered State (existing POS logic); split by regime | `mp-bill.ts` `billPlans`, `mp-draft-io.ts` | — | Sec 12(2) IGST (recalled) |
 | MP36 | Expected client TDS on a manpower bill (R17-B4): 194C on the taxable value (GST out, nothing charged on an RCM bill), 1 % when our firm is a proprietorship / HUF, else 2 %; thresholds on the client's issued bills of the FY (drafts out). Is the deductee test the agency's form as stated, and is the base right for an RCM bill? | As stated; printed only with "Print expected TDS" | `mp-tds-io.ts` (via R14 `expectedTds`) | 2026-04-01 | P Finance Bill 2026 cl. 78 (MP14) |
+| MP37 | Client compliance pack (R17-C1): each person's PF (EE, EPF ER, EPS, EDLI, admin) and ESI (EE / ER) from the month's FINAL payroll run, apportioned to a site by duties at that site ÷ all their duties that month; "proved" needs the PF TRRN and, when ESI is due, the ESI challan; UAN last four only, no bank details. Is a challan-level proof with the duty-apportioned extract adequate evidence for a principal employer, or must the agency give the full ECR / ESI return? | As stated; a hold is shown, never posted | `mp-compliance.ts`, `mp-comp-save.ts`, `ComplianceView.tsx` | 2025-11-21 | P PIB 21 Nov 2025 (MP18, read by the PRD author) |
+| MP38 | Minimum-wage check (R17-C3): wage paid per duty = (run gross − overtime) ÷ the person's duties across all sites; a monthly minimum counts per 26 days; the latest typed revision on or before the month start matching post / zone / skill applies. Is gross the right comparison (basic + VDA only?), and is ÷ 26 right for a monthly-rated minimum? | As stated; warnings only | `mp-wage-check.ts` `shortfalls` | — | — (typed revisions, MP22) |
+| MP39 | Labour Code hints (R17-C3, from 21 Nov 2025): OT below 2 × the ordinary hourly rate taken as (gross − OT) ÷ payable days ÷ 8; "wages" (PF wages) under 50 % of gross less OT; a fixed-term employee = leaving date already set, gratuity after one year; contract-labour licence expected at 20 (CLRA 1970) / 50 (OSH Code) workers at a site. Are these proxies acceptable until the central / State rules are final? | Hints only; `LABOUR_CODE_RULES`, `CONTRACT_LABOUR_THRESHOLD_RULES` `verified: false` | `mp-wage-check.ts` `labourHints`, `manpower-rules.ts` | 2025-11-21 | S (MP16, MP17, MP19, MP20) |
+| MP40 | Site P&L (R17-C2): billed = taxable value of the service month's bills (a grouped bill by its post rows, service charge left out), arrears debit notes in, credit notes out; purchase bills tagged to a site at taxable value plus the GST when no ITC is taken; relievers shown apart. Right for a management view (not the books)? | As stated; nothing posts | `mp-profit.ts`, `mp-sites-io.ts` `siteBills` | — | — |
 
 `MP` ids are counted once here. The ★ items (MP1, MP2, MP4, MP6, MP7, MP10, MP12, MP14, MP16, MP29, MP34) change what a
 document prints or a return reports.

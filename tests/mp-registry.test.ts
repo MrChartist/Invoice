@@ -50,3 +50,15 @@ test('R17-B block: site_musters (doc.create, audited, backed up, synced by the m
   for (const f of ['lib/manpower/mp-muster-save.ts', 'lib/manpower/mp-settings.ts']) assert.match(src(f), /import '\.\/mp-registry';/, f);
   for (const f of ['lib/access.ts', 'lib/audit-edits.ts']) assert.ok(!src(f).includes('site_musters'), `${f}: only at runtime`);
 });
+
+test('R17-C block: site_compliance (doc.create, audited, backed up, synced by the month end, in the open export); its writer imports the registry', () => {
+  assert.equal(MP_TABLES.compliance, 'site_compliance');
+  assert.equal(MP_TABLE_ACTIONS.site_compliance, 'doc.create');
+  assert.equal(TABLE_ACTIONS.site_compliance, 'doc.create');
+  assert.equal(WATCHED_TABLES.site_compliance?.label, 'Site compliance');
+  assert.equal(MP_DATED.site_compliance, 'date');
+  assert.ok(TABLE_MEANING.site_compliance);
+  assert.ok(BACKUP_RECORD_TABLES.includes('site_compliance'));
+  assert.match(src('lib/manpower/mp-comp-save.ts'), /import '\.\/mp-registry';/);
+  for (const f of ['lib/access.ts', 'lib/audit-edits.ts']) assert.ok(!src(f).includes('site_compliance'), `${f}: only at runtime`);
+});

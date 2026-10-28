@@ -35,7 +35,7 @@ export type StepKind =
   | MpStep;
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'lut', 'edf', 'clientMoneyBank', 'stageTemplate', 'feeSchedule', 'linkCompanies', 'partners', 'firstTrip', 'firstEvent', 'firstSupplier', 'regime', 'firstStatement', 'firstSite', 'firstMuster', 'firstBill', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'lut', 'edf', 'clientMoneyBank', 'stageTemplate', 'feeSchedule', 'linkCompanies', 'partners', 'firstTrip', 'firstEvent', 'firstSupplier', 'regime', 'firstStatement', 'firstSite', 'firstMuster', 'firstBill', 'siteProof', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -150,11 +150,12 @@ const TV_STEPS: Readonly<Record<TvStep, [kinds: string, to: string]>> = {
 const isTvStep = (k: string): k is TvStep => Object.hasOwn(TV_STEPS, k);
 
 /** R17-A1: the manpower steps, the kinds that have them and where each opens (B: firstMuster; C: compliance; D: licence). */
-type MpStep = 'firstSite' | 'firstBill' | 'firstMuster';
+type MpStep = 'firstSite' | 'firstBill' | 'firstMuster' | 'siteProof';
 const MP_STEPS: Readonly<Record<MpStep, [kinds: string, to: string]>> = {
   firstSite: ['security facility staffing labour other', '/time?tab=deploy&view=sites'],
   firstBill: ['security facility staffing labour other', '/time?tab=deploy&view=bills'],
   firstMuster: ['security facility staffing labour other', '/time?tab=deploy&view=muster'], // R17-B
+  siteProof: ['security facility staffing labour other', '/time?tab=deploy&view=compliance'], // R17-C
 };
 const isMpStep = (k: string): k is MpStep => Object.hasOwn(MP_STEPS, k);
 
@@ -497,6 +498,7 @@ function manpowerFacts(): Partial<Record<MpStep, number>> {
     firstSite: peekTable<{ mp?: unknown }>('cost_centres').filter((c) => c?.mp).length,
     firstBill: peekTable<{ mp?: { month?: string } }>(KEYS.invoices).filter((r) => r?.mp?.month).length,
     firstMuster: peekTable('site_musters').length, // R17-B
+    siteProof: peekTable('site_compliance').length, // R17-C
   };
 }
 

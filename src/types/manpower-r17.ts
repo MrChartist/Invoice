@@ -181,4 +181,22 @@ export interface MpSnapshot {
 
 /* ════════════════════════════════════════ R17-C ════════════════════════════════════════ */
 
+/** C1: table `site_compliance` — one row per site × month, dated by the month's last day (`date`). */
+export interface SiteCompliance {
+  id: string;
+  site_id: string;
+  /** `YYYY-MM`. */
+  month: string;
+  /** The month's last day (`YYYY-MM-DD`): the sync / period-lock date. */
+  date: string;
+  pf: { trrn?: string; paid_on?: string; amount?: number };
+  esi: { challan?: string; paid_on?: string; amount?: number };
+  attachments?: string[];
+  /** `proved` needs the PF TRRN and, when ESI is due, the ESI challan (MP18). */
+  status: 'pending' | 'proved' | 'waived';
+  /** The client's hold on the month's bills (typed % or amount): nothing posts, the receivable stays open (MP27). */
+  hold?: { pct?: number; amount?: number; invoice_id?: string };
+  updated_at: string;
+}
+
 /* ════════════════════════════════════════ R17-D ════════════════════════════════════════ */

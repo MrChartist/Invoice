@@ -5627,6 +5627,58 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R17-C compliance and profitability: seed Sunrise (3 guards + a reliever), the locked October muster, a FINAL October run and the October bill ₹1,28,600 → Compliance: PF EE total = the run\'s (one site, 100 %); TRRN + ESI challan → Proved → reload → still proved; the annexure masks the UAN and has no bank number; a ₹6,000 uniform bill tagged to the site → Profit: margin ₹39,620; a ₹900 / duty minimum from 1 Oct → shortfalls listed', async () => {
+    const keys = ['settings', 'clients', 'cost_centres', 'manpower_settings', 'employees', 'site_musters', 'site_compliance', 'payroll_runs', 'invoices', 'purchases'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'manpower', manpower_kind: 'security', industry_packs: ['manpower', 'security'], modules: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'manpower_settings', { shift_hours: 12, billing_days: 'calendar', bill_date: 'month_end', wage_revisions: [{ id: 'e2e-mpc-rev', from: '2026-10-01', wage_day: 900, ref: 'E2E VDA Oct' }] });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-mpc-c1', name: 'E2E-C Sunrise Developers', gstin: '27AAACB2230M1ZW', state_code: '27' }]);
+    const post = { id: 'g', name: 'Guard (12 h)', sac: '998525', heads: 4, shift_hours: 12, basis: 'duty', rate: 800 };
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), { id: 'e2e-mpc-s1', name: 'E2E-C Sunrise Towers', kind: 'project', client_id: 'e2e-mpc-c1', active: true, status: 'active', start: '2026-01-01', mp: { code: 'S-911', contract: { from: '2026-01-01' }, posts: [post], status: 'active' } }]);
+    const emp = (id, code, name) => ({ id, code, name, tax_regime: 'new', pf: true, esi: true, active: true, created_at: '2026-01-01T00:00:00.000Z', cost_centre_id: 'e2e-mpc-s1', mp: { post_id: 'g' } });
+    await writeJson(page, 'employees', [...(prev.employees ?? []), emp('e2e-c1', 'E2E-C01', 'Ramesh C'), emp('e2e-c2', 'E2E-C02', 'Mahesh C'), emp('e2e-c3', 'E2E-C03', 'Dinesh C'), emp('e2e-cr', 'E2E-CR1', 'Suresh C')]);
+    await writeJson(page, 'site_musters', [...(prev.site_musters ?? []), { id: 'e2e-mpc-m1', site_id: 'e2e-mpc-s1', month: '2026-10', date: '2026-10-31', status: 'locked', updated_at: '2026-10-31T00:00:00.000Z', rows: [{ employee_id: 'e2e-c1', post_id: 'g', duties: 30 }, { employee_id: 'e2e-c2', post_id: 'g', duties: 31 }, { employee_id: 'e2e-c3', post_id: 'g', duties: 31 }, { employee_id: 'e2e-cr', post_id: 'g', duties: 3, relief: true }] }]);
+    const ln = (id, code, name, gross, pf, esiEe, esiEr, er) => ({ employee_id: id, code, name, uan: '100200300456', bank_account: '987654321012', tax_regime: 'new', days_in_month: 31, days_employed: 31, lop: 0, payable_days: 31, units: {}, earnings: [], deductions: [], employer: [], gross, total_deductions: pf + esiEe, net: gross - pf - esiEe, taxable_gross: gross, pf_wages: gross / 2, eps_wages: gross / 2, edli_wages: gross / 2, pf_ee: pf, eps: er[1], epf_er: er[0], edli: er[2], pf_admin: er[2], esi_wages: gross, esi_covered: true, esi_ee: esiEe, esi_er: esiEr, pt: 0, tds: 0 });
+    const run = { id: 'e2e-mpc-run', month: '2026-10', number: 'PRL/E2E/1', date: '2026-10-31', status: 'final', created_at: '2026-10-31T00:00:00.000Z', lines: [ln('e2e-c1', 'E2E-C01', 'Ramesh C', 24000, 1800, 180, 780, [550, 1250, 75]), ln('e2e-c2', 'E2E-C02', 'Mahesh C', 24000, 1800, 180, 780, [550, 1250, 75]), ln('e2e-c3', 'E2E-C03', 'Dinesh C', 24000, 1800, 180, 780, [550, 1250, 75]), ln('e2e-cr', 'E2E-CR1', 'Suresh C', 2400, 288, 18, 78, [88, 200, 12])] };
+    await writeJson(page, 'payroll_runs', [...(prev.payroll_runs ?? []).filter((r) => r.month !== '2026-10'), run]);
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-mpc-i1', doc_type: 'INVOICE', status: 'Draft', invoice_number: '', issue_date: '2026-10-31', due_date: '2026-11-07', client: { id: 'e2e-mpc-c1', name: 'E2E-C Sunrise Developers' }, items: [], taxable_value: 128600, total: 128600, reverse_charge: true, mp: { month: '2026-10', site: { id: 'e2e-mpc-s1', code: 'S-911', name: 'E2E-C Sunrise Towers' }, regime: 'rcm' } }]);
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []), { id: 'e2e-mpc-p1', kind: 'PURCHASE', vendor_name: 'E2E Uniforms', bill_number: 'U-1', date: '2026-10-15', taxable: 6000, cgst: 540, sgst: 540, igst: 0, total: 7080, itc_eligible: true, amount_paid: 0, lines: [], mp: { site_id: 'e2e-mpc-s1' } }]);
+    await readJson(page, 'purchases', [], (v) => v.some((p) => p.id === 'e2e-mpc-p1' && p.mp?.site_id === 'e2e-mpc-s1'), 15000);
+    await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === 'e2e-mpc-i1'), 15000);
+    await readJson(page, 'payroll_runs', [], (v) => v.some((r) => r.id === 'e2e-mpc-run'), 15000);
+    await readJson(page, 'site_musters', [], (v) => v.some((m) => m.id === 'e2e-mpc-m1'), 15000);
+    await readJson(page, 'employees', [], (v) => v.some((e) => e.id === 'e2e-cr'), 15000);
+    await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.id === 'e2e-mpc-s1'), 15000);
+    await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-mpc-c1'), 15000);
+    await readJson(page, 'manpower_settings', {}, (v) => v?.wage_revisions?.length === 1, 15000);
+    await readJson(page, 'settings', {}, (v) => v.manpower_kind === 'security' && v.industry_packs?.includes('manpower'), 15000);
+    await page.goto(srv.origin + '/time?tab=deploy&view=compliance&site=e2e-mpc-s1&month=2026-10');
+    const cv = page.locator('[data-mp-compliance]');
+    await cv.locator('[data-mp-comp-row="E2E-C01"]').waitFor({ timeout: 15000 });
+    check(await cv.locator('[data-mp-comp-total] [data-k="pf_ee"]').innerText() === '5688.00' && await cv.locator('[data-mp-comp-row]').count() === 4, 'PF EE total of the site = the run\'s for its four people (₹5,688)');
+    check(await cv.locator('[data-mp-short]').count() >= 3, 'the ₹900 / duty minimum from 1 Oct: shortfalls listed');
+    await cv.locator('[data-mp-comp-trrn]').fill('E2E-TRRN-1');
+    await cv.locator('[data-mp-comp-challan]').fill('E2E-ESI-9');
+    await cv.locator('[data-mp-comp-status]').selectOption('proved');
+    await cv.locator('[data-mp-comp-hold]').fill('10');
+    await cv.locator('[data-mp-comp-save]').click();
+    await readJson(page, 'site_compliance', [], (v) => v.some((c) => c.site_id === 'e2e-mpc-s1' && c.status === 'proved'), 15000);
+    await page.reload();
+    await page.locator('[data-mp-compliance="proved"]').waitFor({ timeout: 15000 });
+    check(/12,860/.test(await page.locator('[data-mp-comp-bill]').first().innerText()), 'the client\'s 10 % hold on the October bill (₹12,860), nothing posted');
+    const [pop] = await Promise.all([page.waitForEvent('popup', { timeout: 15000 }), page.locator('[data-mp-comp-print]').click()]);
+    const annex = await pop.content();
+    check(/••••0456/.test(annex) && !/100200300456|987654321012/.test(annex) && /E2E-TRRN-1/.test(annex) && /MP18/.test(annex), 'the annexure: UAN last four only, no bank number, TRRN and the CA sentence');
+    await pop.close();
+    await page.goto(srv.origin + '/time?tab=deploy&view=profit&month=2026-10');
+    const pr = page.locator('[data-mp-profit-site="S-911"]');
+    await pr.waitFor({ timeout: 15000 });
+    const val = async (k) => Number((await pr.locator(`[data-k="${k}"]`).innerText()).replace(/[^\d.-]/g, ''));
+    check(await val('billed') === 128600 && await val('bills') === 6000 && await val('margin') === 39620, `site P&L: ₹1,28,600 − wages 72,000 − relievers 2,400 − employer PF / ESI 8,580 − uniforms 6,000 = ₹39,620 (${await val('margin')})`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {

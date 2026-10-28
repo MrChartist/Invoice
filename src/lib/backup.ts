@@ -520,6 +520,8 @@ const RECORD_TABLES = [
   'supplier_statements',
   // R17-B: site duty registers (musters; one per site × month, rows inside)
   'site_musters',
+  // R17-C: site compliance proof (PF / ESI challans per site × month)
+  'site_compliance',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -636,6 +638,8 @@ const ID_TABLES = new Set([
   'supplier_statements',
   // R17-B: site duty registers (musters; one per site × month, rows inside)
   'site_musters',
+  // R17-C: site compliance proof (PF / ESI challans per site × month)
+  'site_compliance',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

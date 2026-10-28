@@ -1,12 +1,17 @@
 /**
  * R17-A2 bridge: sites written as project cost centres (`cost-centres.ts`) and the client flags on `Client.mp`. Outside
- * the `f-manpower` group by design (it reaches a shared lazy module); reads and rules are in `mp-sites.ts`.
+ * the `f-manpower` group by design (it reaches a shared lazy module); reads and rules are in `mp-sites.ts`. R17-C2:
+ * the purchase bills tagged to a site (through `readPurchase`).
  */
 import type { ClientMp, SiteInfo } from '../../types/manpower-r17';
 import { loadCostCentres, saveCostCentre } from '../cost-centres';
 import { requireAccess } from '../access';
 import { localDb } from '../localDb';
 import { cleanSite, loadSites, validateSite, type Site } from './mp-sites';
+import type { SiteBill } from './mp-profit';
+import { getTable } from '../storage';
+import { round2 } from '../invoice-calc';
+import { readPurchase } from '../purchase-normalize';
 
 export interface SiteInput { id?: string; name: string; client_id?: string; mp: SiteInfo }
 
@@ -38,4 +43,17 @@ export function saveClientMp(clientId: string, flags: ClientMp): void {
   if (!c) return;
   const mp = Object.fromEntries(Object.entries(flags).filter(([, v]) => v)) as ClientMp;
   localDb.clients.upsert({ ...c, name: c.name, mp: Object.keys(mp).length ? mp : undefined });
+}
+
+/**
+ * R17-C2: the month's purchase bills tagged to a site (`PurchaseRecord.mp.site_id`), read through `readPurchase`
+ * (the purchases contract): cost = taxable value, plus the tax when no ITC is taken; void bills left out.
+ */
+export function siteBills(month: string): SiteBill[] {
+  const out: SiteBill[] = [];
+  for (const raw of getTable<{ mp?: { site_id?: string } }>('purchases')) {
+    const c = raw?.mp?.site_id ? readPurchase(raw) : null;
+    if (c && c.date.startsWith(month) && c.status !== 'void') out.push({ site_id: raw.mp!.site_id!, cost: round2(c.taxable + (c.itcEligible ? 0 : c.tax + c.cess)) });
+  }
+  return out;
 }
