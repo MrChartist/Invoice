@@ -9,12 +9,17 @@ import type { MpBasis, MpPost, SiteInfo, SiteStatus } from '../../types/manpower
 import { ruleAt } from '../tax-rules';
 import { MP_SAC_RULES } from '../manpower-rules';
 import { shiftDay } from '../dates';
+import { getTable } from '../storage';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 export const SITE_STATUSES: readonly SiteStatus[] = ['active', 'paused', 'closed'];
 export const MP_BASES: readonly MpBasis[] = ['month', 'duty', 'hour', 'costplus'];
 /** A site as the desk reads it (the cost centre's id, name and client with its `mp`). */
 export interface Site { id: string; name: string; client_id?: string; mp: SiteInfo }
+
+/** The sites among the cost-centre rows (default: the stored table). */
+export const loadSites = (rows: readonly { id: string; name: string; client_id?: string; mp?: SiteInfo }[] = getTable('cost_centres')): Site[] => rows.filter((c): c is Site => !!c?.mp?.code);
+export const siteLabel = (s: Pick<Site, 'name' | 'mp'>): string => `${s.mp.code} — ${s.name}`;
 
 /** SAC for a post: guards / supervisors / gunmen 998525, housekeeping / cleaning 998533, else by the agency's kind. */
 export function suggestSac(postName: string, kind?: string, date?: string): string {
@@ -55,7 +60,6 @@ export function cleanSite(s: SiteInfo): SiteInfo {
   const contract = Object.fromEntries(Object.entries(s.contract ?? {}).filter(([, x]) => v(x as string))) as SiteInfo['contract'];
   const posts = s.posts.map((p): MpPost => {
     const out: MpPost = { id: p.id, name: p.name.trim(), sac: p.sac.trim(), heads: Number(p.heads), shift_hours: Number(p.shift_hours), basis: p.basis, rate: Math.round(Number(p.rate) * 100) / 100 };
-    for (const k of ['skill', 'zone'] as const) if (v(p[k])) out[k] = v(p[k]);
     if (p.bill_ot) out.bill_ot = true;
     if (p.bill_extra) out.bill_extra = true;
     return out;

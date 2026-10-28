@@ -6,9 +6,11 @@ import { resetStorage } from './helpers/shim.ts';
 import { clientMH, installSettings } from './helpers/world.ts';
 import { loadCostCentres } from '../src/lib/cost-centres.ts';
 import { cleanSite, endsSoon, monthValue, suggestSac, suggestSiteCode, validateSite } from '../src/lib/manpower/mp-sites.ts';
-import { loadSites, saveClientMp, saveSite } from '../src/lib/manpower/mp-sites-io.ts';
-import { deploy, deployedAt } from '../src/lib/manpower/mp-payroll-io.ts';
-import { loadEmployees, saveEmployee } from '../src/lib/payroll/store.ts';
+import { saveClientMp, saveSite } from '../src/lib/manpower/mp-sites-io.ts';
+import { loadSites, siteLabel } from '../src/lib/manpower/mp-sites.ts';
+import { firmForm } from '../src/lib/manpower/mp-regime.ts';
+import { loadEmployees, normalizeEmployees } from '../src/lib/payroll/store.ts';
+import { setTable } from '../src/lib/storage.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import type { MpPost, SiteInfo } from '../src/types/manpower-r17.ts';
 
@@ -51,14 +53,17 @@ test('value a month at full duties; contract end warning', () => {
   assert.equal(endsSoon(info({ contract: {} }), '2027-07-10'), false);
 });
 
-test('client flags on Client.mp; deploy through the payroll store keeps Employee.mp', () => {
+test('client flags on Client.mp; the payroll store keeps Employee.mp; the firm form is the annual pack\'s entity type', () => {
   localDb.clients.upsert(clientMH);
   saveClientMp('c-mh', { school: true, composition: false });
   assert.deepEqual(localDb.clients.getById('c-mh')!.mp, { school: true });
   saveClientMp('c-mh', {});
   assert.equal(localDb.clients.getById('c-mh')!.mp, undefined);
   const s = saveSite({ name: 'Tower', mp: info() });
-  const e = saveEmployee({ code: 'G1', name: 'Ramesh', tax_regime: 'new', pf: true, esi: true, pt: true, active: true });
-  deploy(e.id, s.id, 'p1');
-  assert.deepEqual([deployedAt(s.id).map((x) => x.name), loadEmployees()[0].mp], [['Ramesh'], { post_id: 'p1' }]);
+  assert.equal(siteLabel(loadSites()[0]), 'S-001 — Tower');
+  assert.deepEqual(normalizeEmployees([{ id: 'e', name: 'Ramesh', cost_centre_id: s.id, mp: { post_id: 'p1' } }])[0].mp, { post_id: 'p1' });
+  assert.equal(loadEmployees().length, 0);
+  assert.equal(firmForm(), 'proprietorship');
+  setTable('notes_to_accounts', [{ id: 'FY2025-26', entity_type: 'partnership' }, { id: 'FY2026-27', entity_type: 'llp' }]);
+  assert.equal(firmForm(), 'llp', 'the latest FY wins');
 });

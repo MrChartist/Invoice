@@ -12,10 +12,9 @@ import { useT } from '../../i18n';
 import { mpList, mpT } from '../../i18n/areas/manpower-r17a';
 import { localDb } from '../../lib/localDb';
 import type { MpRegime } from '../../types/manpower-r17';
-import { firmForm, loadSites, siteLabel } from '../../lib/manpower/mp-sites-io';
-import { forcedRegime, mpRegime, mpRegimePatch } from '../../lib/manpower/mp-regime';
+import { loadSites, siteLabel } from '../../lib/manpower/mp-sites';
+import { firmForm, forcedRegime, mpRegime, mpRegimePatch } from '../../lib/manpower/mp-regime';
 import controls from '../../styles/controls.module.css';
-import { RegimeChip } from './mp-ui';
 
 const REGS = ['', 'fwd', 'rcm', 'exempt66', 'manual_exempt'] as const;
 
@@ -60,7 +59,7 @@ export default function ManpowerRows() {
             {REGS.map((r) => <option key={r} value={r}>{mpList('regs', REGS, r)}</option>)}
           </select>
           {forced && <input className={controls.input} aria-label={mpT('note')} placeholder={mpT('note')} value={note} onChange={(e) => setNote(e.target.value)} onBlur={() => apply(forced, note)} data-mp-regime-note />}
-          {!forced && <RegimeChip client={client} sacs={sacs()} date={s.date} entity={entity} />}
+          {!forced && ((r) => <span className={controls.hint} data-mp-regime={r.regime}>{mpT(`reg.${r.regime}`, { r: r.rate })}{r.split ? ` — ${mpT('split')}` : ''}</span>)(mpRegime({ date: s.date, entityType: entity, client }, sacs()))}
         </>
       )}
     </div>

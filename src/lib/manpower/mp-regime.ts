@@ -13,7 +13,11 @@
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { ClientMp, MpRegime, MpSnapshot } from '../../types/manpower-r17';
 import { ruleAt } from '../tax-rules';
+import { getTable } from '../storage';
 import { BODY_CORPORATE_RULES, EDU_EXEMPT_RULES, MP_GST_RATE_RULES, SECURITY_RCM_RULES } from '../manpower-rules';
+
+/** Our firm form: the latest FY's annual-pack entity type (`notes_to_accounts`, the R14 rule); absent = proprietorship. */
+export const firmForm = (): string => getTable<{ id?: string; entity_type?: string }>('notes_to_accounts').filter((r) => r?.entity_type).sort((a, b) => String(b.id).localeCompare(String(a.id)))[0]?.entity_type ?? 'proprietorship';
 
 export const MP_REGIMES: readonly MpRegime[] = ['fwd', 'rcm', 'exempt66', 'manual_exempt'];
 

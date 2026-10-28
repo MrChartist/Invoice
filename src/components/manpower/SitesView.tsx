@@ -1,15 +1,16 @@
 /**
  * R17-A2 / A3 sites view: every site (a project cost centre with `mp`) with its client, posts, heads, value a month at
  * full duties, contract end (red within 30 days) and the GST regime chip (A3); "New site" and a site's own form
- * (posts, contract, client flags, deployed staff).
+ * (posts, contract, client flags).
  */
 import { useMemo, useState } from 'react';
 import { useT } from '../../i18n';
 import { mpT } from '../../i18n/areas/manpower-r17a';
 import { localDb } from '../../lib/localDb';
 import { formatCurrency, todayInput } from '../../lib/utils';
-import { endsSoon, monthValue } from '../../lib/manpower/mp-sites';
-import { firmForm, loadSites, siteLabel, type SiteInput } from '../../lib/manpower/mp-sites-io';
+import { endsSoon, loadSites, monthValue, siteLabel } from '../../lib/manpower/mp-sites';
+import { firmForm } from '../../lib/manpower/mp-regime';
+import type { SiteInput } from '../../lib/manpower/mp-sites-io';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import SiteForm from './SiteForm';

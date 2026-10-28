@@ -184,7 +184,7 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   (`tests/mp-registry.test.ts`). Round 17 invoice snapshots live under ONE record key `mp` (`R17_RECORD_KEYS`, spread
   into `R9_RECORD_KEYS`) — never add keys; Sl. 66 lines reuse the R10 line key `sv.exempt`, RCM bills the existing
   `reverse_charge` / `rcm_tax_excluded` (one regime per invoice: `mp-regime.ts` `splitPosts`). Build group `f-manpower`
-  (`vite.config.ts`): engines in `src/lib/manpower/` import only first-paint modules, `manpower-rules.ts` and each
+  (`vite.config.ts`; `mp-registry.ts` excluded, a lazy leaf, since sync / recycle bin import it): engines in `src/lib/manpower/` import only first-paint modules, `manpower-rules.ts` and each
   other; anything else goes through a bridge `mp-*-io.ts` (≤ 4; `mp-payroll-io.ts` is the only importer of the payroll
   store). Rule values in `src/lib/manpower-rules.ts` (lazy only, `tests/mp-rules.test.ts`; no wage amounts). Notes:
   `docs/features/manpower-r17.md`.

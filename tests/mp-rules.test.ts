@@ -44,7 +44,8 @@ test('engines import only first-paint / family modules; bridges are exactly mp-*
   if (!j.families['f-manpower']) return; // a build from before R17
   const fam = Object.values(j.chunks).find((c) => c.name === 'f-manpower');
   if (!fam) return; // a build from before R17
-  for (const f of LIB.filter((x) => !bridges.includes(x))) assert.ok(fam.modules.includes(`src/lib/manpower/${f}`), `${f} in f-manpower`);
+  for (const f of LIB.filter((x) => !bridges.includes(x) && x !== 'mp-registry.ts')) assert.ok(fam.modules.includes(`src/lib/manpower/${f}`), `${f} in f-manpower`);
+  assert.ok(!fam.modules.includes('src/lib/manpower/mp-registry.ts'), 'the registry stays out (sync / recycle bin load it)');
   assert.ok(fam.modules.includes('src/lib/manpower-rules.ts'));
 });
 

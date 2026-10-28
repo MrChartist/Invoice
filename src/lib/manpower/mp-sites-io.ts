@@ -1,18 +1,12 @@
 /**
- * R17-A2 bridge: sites stored as project cost centres (`cost-centres.ts`), the client flags on `Client.mp`, and the firm
- * form read from the annual pack's entity type (R14 `ps-profile.ts`, never a second field). Outside the `f-manpower`
- * group by design (it reaches shared lazy modules); the pure rules are in `mp-sites.ts` / `mp-regime.ts`.
+ * R17-A2 bridge: sites written as project cost centres (`cost-centres.ts`) and the client flags on `Client.mp`. Outside
+ * the `f-manpower` group by design (it reaches a shared lazy module); reads and rules are in `mp-sites.ts`.
  */
 import type { ClientMp, SiteInfo } from '../../types/manpower-r17';
-import { loadCostCentres, saveCostCentre, type CostCentre } from '../cost-centres';
+import { loadCostCentres, saveCostCentre } from '../cost-centres';
 import { requireAccess } from '../access';
 import { localDb } from '../localDb';
-import { readFirmForm } from '../prof/ps-profile';
-import { cleanSite, validateSite, type Site } from './mp-sites';
-
-export const isSite = (c: Pick<CostCentre, 'mp'> | undefined): c is CostCentre & { mp: SiteInfo } => !!c?.mp?.code;
-export const loadSites = (all: readonly CostCentre[] = loadCostCentres()): Site[] => all.filter(isSite);
-export const siteLabel = (s: Pick<Site, 'name' | 'mp'>): string => `${s.mp.code} — ${s.name}`;
+import { cleanSite, loadSites, validateSite, type Site } from './mp-sites';
 
 export interface SiteInput { id?: string; name: string; client_id?: string; mp: SiteInfo }
 
@@ -45,6 +39,3 @@ export function saveClientMp(clientId: string, flags: ClientMp): void {
   const mp = Object.fromEntries(Object.entries(flags).filter(([, v]) => v)) as ClientMp;
   localDb.clients.upsert({ ...c, name: c.name, mp: Object.keys(mp).length ? mp : undefined });
 }
-
-/** Our firm form for the regime engine (absent = proprietorship). */
-export const firmForm = (): string => readFirmForm() ?? 'proprietorship';

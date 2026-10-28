@@ -17,4 +17,4 @@ export declare function isLeaf(g: Graph, id: string): boolean;
 export declare function safeFamilyGroup(g: Graph, name: string, re: RegExp, priority: number): SafeGroup;
 export declare function leafGroup(g: Graph, name: string, priority: number, opts: { maxModuleSize: number }): SafeGroup;
 export declare function graphPlugin(g: Graph): Plugin;
-export declare function familyRe(dir: string, rules: string | null, area: string): RegExp;
+export declare function familyRe(dir: string, rules: string | null, area: string, except?: string): RegExp;

@@ -1,10 +1,9 @@
 /**
  * R17-A2 site form: name, code (suggested `S-<seq>`), client, address / State, contract, status and the posts grid
  * (name, SAC suggested from the name and kind — a typed SAC wins —, heads, shift hours, basis, rate); the client's
- * regime / TDS flags (`Client.mp`); the deployed staff with "Deploy" (payroll's own save). Saving writes the cost
- * centre; nothing else.
+ * regime flags (`Client.mp`; B4 / D2 add the TDS section). Saving writes the cost centre and the client flags.
  */
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useT } from '../../i18n';
 import { mpList, mpT } from '../../i18n/areas/manpower-r17a';
 import { generateId } from '../../lib/storage';
@@ -14,14 +13,11 @@ import type { Client } from '../../types/invoice';
 import type { ClientMp, MpBasis, MpPost, SiteInfo, SiteStatus } from '../../types/manpower-r17';
 import { MP_BASES, SITE_STATUSES, suggestSac, suggestSiteCode, type Site } from '../../lib/manpower/mp-sites';
 import { saveClientMp, saveSite, type SiteInput } from '../../lib/manpower/mp-sites-io';
-import { deploy, deployable, deployedAt } from '../../lib/manpower/mp-payroll-io';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field as F, RegimeChip, type Notify } from './mp-ui';
 
 const row = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.75rem' } as const;
-const SECS = ['194C', '194J', 'none'] as const;
-const DEDS = ['company', 'other'] as const;
 
 export default function SiteForm({ site, sites, clients, entity, notify, onDone }: { site?: Site; sites: readonly Site[]; clients: readonly Client[]; entity: string; notify: Notify; onDone: (s?: SiteInput) => void }) {
   useT();
@@ -32,8 +28,6 @@ export default function SiteForm({ site, sites, clients, entity, notify, onDone 
   const [mp, setMp] = useState<SiteInfo>(() => site?.mp ?? { code: suggestSiteCode(sites), contract: { from: todayInput() }, posts: [], status: 'active' });
   const client = clients.find((c) => c.id === clientId);
   const [flags, setFlags] = useState<ClientMp>(() => client?.mp ?? {});
-  const [tick, setTick] = useState(0);
-  const staff = useMemo(() => { void tick; return site ? { at: deployedAt(site.id), free: deployable(site.id) } : null; }, [site, tick]);
   const set = (p: Partial<SiteInfo>) => setMp((m) => ({ ...m, ...p }));
   const post = (i: number, p: Partial<MpPost>) => set({ posts: mp.posts.map((x, k) => (k === i ? { ...x, ...p, ...(p.name !== undefined && x.sac === suggestSac(x.name, kind) ? { sac: suggestSac(p.name, kind) } : {}) } : x)) });
   const run = (fn: () => void) => { try { fn(); } catch (e) { notify((e as Error).message, 'error'); } };
@@ -100,34 +94,12 @@ export default function SiteForm({ site, sites, clients, entity, notify, onDone 
           {(['gst_tds_only', 'composition', 'school'] as const).map((k) => (
             <label key={k} className={controls.check}><input type="checkbox" checked={!!flags[k]} onChange={(e) => setFlags({ ...flags, [k]: e.target.checked })} data-mp-flag={k} /> {mpT(k === 'gst_tds_only' ? 'tdsOnly' : k)}</label>
           ))}
-          <F label={mpT('tdsSec')}>
-            <select className={controls.select} value={flags.tds?.section ?? '194C'} onChange={(e) => setFlags({ ...flags, tds: { deductee: flags.tds?.deductee ?? 'other', section: e.target.value as (typeof SECS)[number] } })}>
-              {SECS.map((s) => <option key={s} value={s}>{mpList('secs', SECS, s)}</option>)}
-            </select>
-          </F>
-          <F label={mpT('deductee')}>
-            <select className={controls.select} value={flags.tds?.deductee ?? 'other'} onChange={(e) => setFlags({ ...flags, tds: { section: flags.tds?.section ?? '194C', deductee: e.target.value as (typeof DEDS)[number] } })}>
-              {DEDS.map((s) => <option key={s} value={s}>{mpList('deds', DEDS, s)}</option>)}
-            </select>
-          </F>
         </fieldset>
       )}
       <div style={row}>
         <button type="button" className={controls.btnPrimary} onClick={save} data-mp-save-site>{mpT('save')}</button>
         <button type="button" className={controls.btnGhost} onClick={() => onDone()}>×</button>
       </div>
-      {staff && (
-        <div data-mp-deployed>
-          <span className={controls.label}>{mpT('deployed')}: </span>
-          {staff.at.map((e) => e.name).join(', ') || '—'}
-          {staff.free.length > 0 && (
-            <select className={controls.select} aria-label={mpT('deployEmp')} value="" onChange={(e) => run(() => { deploy(e.target.value, site!.id); setTick((t) => t + 1); })} data-mp-deploy>
-              <option value="">{mpT('deployEmp')} —</option>
-              {staff.free.map((e) => <option key={e.id} value={e.id}>{e.code} {e.name}</option>)}
-            </select>
-          )}
-        </div>
-      )}
     </section>
   );
 }

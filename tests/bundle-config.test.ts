@@ -75,6 +75,13 @@ function graphOf(edges: Record<string, string[]>, entries: string[]) {
   return g;
 }
 const FAM = familyRe('trade', 'trading-rules', 'trade-r8');
+
+test('R17-A: familyRe leaves the named basenames out of the family', () => {
+  const re = familyRe('manpower', 'manpower-rules', 'manpower-r17', 'mp-registry');
+  assert.ok(re.test('/x/src/lib/manpower/mp-regime.ts') && re.test('/x/src/lib/manpower-rules.ts') && re.test('/x/src/i18n/areas/manpower-r17a.ts'));
+  assert.ok(!re.test('/x/src/lib/manpower/mp-registry.ts') && !re.test('/x/src/i18n/areas/manpower-r17a-pick.ts'));
+  assert.ok(re.test('/x/src/lib/manpower/mp-registry-x.ts'), 'only the exact basename');
+});
 const fam = (id: string) => FAM.test(id);
 
 test('$initial = static closure of the entries', () => {
