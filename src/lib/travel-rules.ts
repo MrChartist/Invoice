@@ -88,3 +88,25 @@ export const TCS_NO_PAN_RULES: readonly TvRule<{ floor: number; twice: boolean }
 export const EVENT_RULES: readonly TvRule<{ sac: string; rate: number }>[] = [
   { from: '2017-07-01', value: { sac: '998596', rate: 18 }, source: 'Event management / organisation services, SAC 998596 at 18 % (as reported; TV22)', verified: false },
 ];
+
+/* ── R16-C: commission income to principals, re-issue fee, insurer RCM, 194D (TV16, TV17, TV46–TV48) ─────────── */
+// 194H (rate 2 % from 1 Oct 2024, ₹20,000 from 1 Apr 2025) stays in tax-rules.ts / tds-rules.ts and is read from there.
+
+/** The principal paying our commission. */
+export type TvPrincipal = 'airline' | 'hotel' | 'insurer' | 'other';
+
+/** C1: SAC per principal and the GST rate of our commission invoice; C2's re-issue fee takes the `airline` SAC (TV16, TV47). */
+export const COMMISSION_SAC_RULES: readonly TvRule<{ sac: Readonly<Record<TvPrincipal, string>>; rate: number }>[] = [
+  { from: '2017-07-01', value: { sac: { airline: '998551', hotel: '998552', insurer: '997161', other: '998559' }, rate: 18 }, source: 'SAC 998551 / 998552 / 998559 (reservation services), 997161 (insurance agency) at 18 % (as reported; TV16, TV46)', verified: false },
+];
+
+/** C1: an insurance agent's commission to an insurer — the insurer pays the GST under reverse charge (TV17). */
+export const INSURANCE_AGENT_RCM_RULES: readonly TvRule<boolean>[] = [
+  { from: '2017-07-01', value: true, source: 'N 13/2017-CT(R) Sl. 7: services by an insurance agent to a person carrying on insurance business, recipient pays (as reported; TV17)', verified: false },
+];
+
+/** C1: TDS the insurer deducts on our commission (Sec 194D; Sec 393(1) from 1 Apr 2026): rate by our form, FY threshold (TV48). */
+export const INSURANCE_COMMISSION_TDS_RULES: readonly TvRule<{ company: number; other: number; aggregate: number }>[] = [
+  { from: '2017-07-01', value: { company: 10, other: 5, aggregate: 15000 }, source: 'Sec 194D: 5 % (other than a company), 10 % (company), above ₹15,000 a year (as reported; TV48)', verified: false },
+  { from: '2025-04-01', value: { company: 10, other: 2, aggregate: 20000 }, source: 'Finance (No. 2) Act 2024: 2 % for persons other than a company; Finance Act 2025: threshold ₹20,000 (as reported; TV48)', verified: false },
+];

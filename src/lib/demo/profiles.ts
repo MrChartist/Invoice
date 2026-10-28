@@ -30,7 +30,8 @@ export async function demoExtras(profile: DemoProfile, ctx: ProfileContext): Pro
   const time = [...(base.tables?.time_entries ?? []), ...(prof.tables?.time_entries ?? [])];
   const centres = [...(prof.tables?.cost_centres ?? []), ...(travel.tables?.cost_centres ?? [])];
   const staff = [...(base.tables?.service_staff ?? []), ...(prof.tables?.service_staff ?? [])];
-  return { ...base, tables: { ...base.tables, ...agri.tables, ...mfg.tables, ...prof.tables, ...travel.tables, ...(centres.length ? { cost_centres: centres } : {}), ...(stock.length ? { stock_items: stock } : {}), ...(time.length ? { time_entries: time } : {}), ...(staff.length ? { service_staff: staff } : {}) } };
+  // R16-C4: the travel profile also adds a TCS invoice
+  return { ...base, ...(travel.invoices ? { invoices: [...(base.invoices ?? []), ...travel.invoices] } : {}), tables: { ...base.tables, ...agri.tables, ...mfg.tables, ...prof.tables, ...travel.tables, ...(centres.length ? { cost_centres: centres } : {}), ...(stock.length ? { stock_items: stock } : {}), ...(time.length ? { time_entries: time } : {}), ...(staff.length ? { service_staff: staff } : {}) } };
 }
 
 async function profileExtras(profile: DemoProfile, ctx: ProfileContext): Promise<DemoExtras> {

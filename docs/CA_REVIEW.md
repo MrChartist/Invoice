@@ -47,9 +47,9 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84, AG90 | 65 | 15 |
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF40–MF42, MF50–MF54, MF60–MF65, MF80–MF82, MF90–MF96 | 60 | 12 |
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
-| 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV45 | 45 | 14 |
+| 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV48 | 48 | 15 |
 | 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF18 | 18 | 5 |
-| **Total** | | **559** | **138** |
+| **Total** | | **562** | **139** |
 
 ---
 
@@ -1086,9 +1086,9 @@ exports of services under the FEMA 2026 regulations, 194J / 194T, partners and S
 `PS` ids are counted once here. The ★ items (PS1, PS3, PS4, PS5, PS6, PS12, PS15, PS18, PS20, PS22, PS23, PS26, PS27)
 are the ones a beta professional firm's figures depend on first.
 
-## 15. Travel, tour and event businesses (Round 15, ids TV1–TV45)
+## 15. Travel, tour and event businesses (Round 15, ids TV1–TV48)
 
-Added with `docs/prd/round-15.md` (§9: TV1–TV31), R15-B (TV32, TV33), R15-C (TV34–TV37), R15-D (TV38–TV40) and QA round 18 (TV41–TV45, §15.1). It covers tour operators (domestic, outbound,
+Added with `docs/prd/round-15.md` (§9: TV1–TV31), R15-B (TV32, TV33), R15-C (TV34–TV37), R15-D (TV38–TV40), QA round 18 (TV41–TV45, §15.1) and R16-C (TV46–TV48, §15.2). It covers tour operators (domestic, outbound,
 inbound / DMCs), travel and ticketing agents (IATA / BSP or through a consolidator) and event / wedding / MICE planners,
 plus the round's cross-cutting items (party netting, the 2026 manpower and tour-package TCS changes).
 
@@ -1116,8 +1116,8 @@ plus the round's cross-cutting items (party netting, the 2026 manpower and tour-
 | TV13 | Hotel bands for packages (≤ ₹7,500 5 % no ITC). Cross-ref R7 HT items. | Existing `hotel-rules.ts` | `hotel/hotel-rules.ts` (existing) | 2025-09-22 | S taxguru; R7 sources |
 | TV14 | Rule 33 for visa / embassy fees, insurance premium, airport taxes and venue payments on behalf. Cross-ref PS3. | R14 checklist guard | `travel/tv-bill.ts` (`charge_head_id: 'rule33'`); R14 `ps-disb` guard | — | R14 PS3 sources |
 | TV15 ★ | Cancellation charges (Circular 178/10/2022): rate of the principal supply for our cancellation fee in each regime; supplier charges retained. | As §8 Q16 | `travel-rules.ts` `CANCEL_FEE_RATE_RULES`, `travel/tv-cancel.ts` | 2022-08-03 | S RSM, taxo.online |
-| TV16 | Commission / PLB from airlines and hotels: GST at 18 % to the principal; 194H expected. | As stated | Commission typed on bookings counts in the trip margin; the commission invoice (C4) was cut for size (R15-C cut 1) | 2024-10-01 | Existing T rows |
-| TV17 | Insurance agent's commission: RCM by the insurer; registration of an agent making only RCM supplies. | Outward RCM flag on the insurer's invoice (to set by hand: C4 cut) | `rcm.ts` (existing) | — | Recalled |
+| TV16 | Commission / PLB from airlines and hotels: GST at 18 % to the principal; 194H expected. | As stated | R16-C1: Bookings → Bill commission (`travel/tv-commission.ts`); 194H expected through the R14-D receivable path, on the commission before GST | 2024-10-01 | Existing T rows |
+| TV17 | Insurance agent's commission: RCM by the insurer; registration of an agent making only RCM supplies. | Outward RCM flag on the insurer's commission invoice (R16-C1, `INSURANCE_AGENT_RCM_RULES`) | `travel-rules.ts`, `travel/tv-commission.ts`, `rcm.ts` | — | Recalled |
 | TV18 | POS for tour-operator services to Indian clients (Sec 12(2)); hotel components (Sec 12(3)); property outside India. | Chip as §4 D2 | `travel/tv-pos.ts` (R15-D) | — | Recalled |
 | TV19 ★ | Inbound tours for foreign tourists performed in India: POS India, not an export? | Taxable, POS India | `travel/tv-pos.ts` (R15-D) | — | Recalled |
 | TV20 | Foreign DMC services performed abroad for an Indian operator: import RCM or out of scope? | Suggest "no RCM"; default unchanged | `travel/tv-pos.ts` (R15-D) | — | Recalled |
@@ -1153,7 +1153,15 @@ plus the round's cross-cutting items (party netting, the 2026 manpower and tour-
 | TV44 | **TCS on a ticket-only invoice of a package trip.** The stand-alone test (TV4) reads the trip's bookings, so a separate invoice of only the air tickets of an outbound trip that also has a hotel is offered TCS as a package. Should the test read the invoice's own lines instead? | Trip-level test; the user may untick | `components/travel/TvChips.tsx`, `travel/tv-tcs.ts` `isTourPackage` | 2020-10-01 | CBDT Circular 10/2023 (ticket or hotel alone not a package, as reported) |
 | TV45 | **Date of the cancellation credit note.** The credit note now carries the cancellation date the user enters (same as the fee invoice and the supplier debit note), not the day it is posted. Right for GSTR-1 / Sec 34 (it may fall in an earlier open month)? | Cancellation date | `travel/tv-cancel.ts`, `documents.ts` `createCreditNote` (`date`) | 2017-07-01 | Sec 34 CGST Act |
 
-`TV` ids are counted once here. The ★ items (TV1, TV3, TV7, TV8, TV11, TV15, TV19, TV21, TV23, TV34, TV35, TV38, TV39, TV41) are the ones a beta
+### 15.2 Added by R16-C (`docs/prd/round-16.md` §R16-C)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| TV46 | **SAC of commission billed to principals.** The commission invoice to an airline uses SAC 998551, to a hotel (or bed bank) 998552, to an insurer 997161 (insurance agency services) and to other principals 998559, all at 18 %. The principal is the booking's supplier, or the client linked to it. Right SACs; and is a PLB / incentive from an airline the same supply? | As stated | `travel-rules.ts` `COMMISSION_SAC_RULES`, `travel/tv-commission.ts` | 2017-07-01 | SAC list (recalled; `verified: false`) |
+| TV47 ★ | **Ticket re-issue documents.** A re-issue is billed on a new draft: fare difference and the airline's change penalty as pure-agent lines (Rule 33, outside the value), our re-issue fee at 18 % (SAC 998551). The old ticket's line stays on its invoice; a negative fare difference is credited on that old fare line by a credit note (quantity = difference ÷ fare, 2 decimals). Acceptable, or must the re-issue fee follow Rule 32(3) (deemed value) like the original ticket? | As stated | `travel/tv-reissue.ts` | 2017-07-01 | Rule 32(3) / 33 (as TV11, TV14) |
+| TV48 | **TDS on an insurance agent's commission.** The insurer is expected to deduct Sec 194D (Sec 393(1) from 1 Apr 2026), not 194H: 5 % (other than a company) / 10 % (company) above ₹15,000 a year; 2 % (other than a company) and ₹20,000 from 1 Apr 2025. Confirm the rates, threshold and the 2025-Act row. | As stated, on the commission before GST | `travel-rules.ts` `INSURANCE_COMMISSION_TDS_RULES`, `travel/tv-commission.ts` | 2017-07-01 / 2025-04-01 | Finance Acts 2024 / 2025 (as reported; `verified: false`) |
+
+`TV` ids are counted once here. The ★ items (TV1, TV3, TV7, TV8, TV11, TV15, TV19, TV21, TV23, TV34, TV35, TV38, TV39, TV41, TV47) are the ones a beta
 travel business's figures depend on first.
 
 ## 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16, ids PF1–PF18)

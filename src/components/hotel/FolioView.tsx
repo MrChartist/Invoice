@@ -22,7 +22,7 @@ import { lineDates } from '../../lib/hotel/availability';
 import { LINE_KINDS, POST_KINDS } from '../../lib/hotel/routing';
 import { VoidPinRequired, openHouseFolio, postCharge, splitLine, stayFolios, transferLines, voidLine } from '../../lib/hotel/folio';
 import { TDS_DEFAULTS, billKind, setBillTo, tdsCode, tdsLabel } from '../../lib/hotel/bill-to';
-import { commissionDue } from '../../lib/hotel/agent-commission';
+import { commissionDue, recordCommission } from '../../lib/hotel/agent-commission';
 import { billable, interimDates } from '../../lib/hotel/checkout';
 import { advancesFor, draftFor, nightsToPost, reconcileFolios, saveCheckout } from '../../lib/hotel/checkout-save';
 import { catchUpLine } from '../../lib/hotel/night-audit';
@@ -159,6 +159,7 @@ function BillTo({ ctx, res, clients }: { ctx: Ctx; res: Reservation; clients: re
       </Row>
       {code && <p className={styles.note}>TDS: {tdsLabel(code, ctx.day)}</p>}
       {due && <p className={styles.note}>{bT('commission', { a: money(due.amount) })}</p>}
+      {due && res.bill_to && !res.commission && <button type="button" className={B.o} onClick={() => ctx.run(() => recordCommission(res.id), bT('agentDone'))} data-folio-agent-comm>{bT('agentBill')}</button>}{/* R16-C5 */}
     </div>
   );
 }

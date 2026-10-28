@@ -20,8 +20,8 @@ import { readTravelSettings, saveTravelSettings } from './tv-settings';
 import { TV_TABLES } from './tv-shared';
 
 export type StatementKind = SupplierStatement['kind'];
-/** Presets: BSP and consolidator (the bed-bank preset is cut 2, PRD §3 — map a bed-bank file as a consolidator's). */
-export const STATEMENT_KINDS: readonly StatementKind[] = ['bsp', 'consolidator'];
+/** Presets: BSP, consolidator and (R16-C3) bed bank. */
+export const STATEMENT_KINDS: readonly StatementKind[] = ['bsp', 'consolidator', 'bedbank'];
 export const MAX_ROWS = 2000;
 
 const DOC = ['Document Number', 'Ticket Number', 'Ticket', 'Doc No'];
@@ -32,6 +32,8 @@ const COMM = ['Commission', 'Comm'];
 export const STATEMENT_PRESETS: Readonly<Partial<Record<StatementKind, SynonymTable>>> = {
   bsp: { doc_no: DOC, type: ['Transaction Type', 'TRNC', 'Type'], date: DATE, pax: PAX, gross: ['Gross Fare', 'Fare'], taxes: ['Taxes', 'Tax'], commission: COMM, net: ['Net Remit', 'Balance Payable', 'Net'] },
   consolidator: { doc_no: [...DOC, 'Ref', 'Booking Ref', 'PNR'], type: ['Type'], date: DATE, pax: PAX, gross: ['Gross', 'Amount'], taxes: ['Taxes', 'Tax'], commission: COMM, net: ['Net Payable', 'Net'] },
+  // R16-C3: hotel name, confirmation no., check-in, nights, net (the net amount is what we owe: read as gross, net = gross)
+  bedbank: { doc_no: ['Confirmation No', 'Conf No', 'Booking Ref', 'Voucher'], date: ['Check-in', 'Check In', 'Arrival'], hotel: ['Hotel Name', 'Hotel', 'Property'], nights: ['Nights', 'Room Nights'], pax: ['Guest Name', 'Lead Guest', 'Guest'], gross: ['Net', 'Net Amount', 'Net Rate', 'Amount'] },
 };
 export const REQUIRED = ['doc_no', 'gross'];
 
@@ -43,11 +45,14 @@ export function readStatementRows(t: FileTable, cols: ColumnMap): StatementRow[]
     if (!doc_no) continue;
     const gross = Math.abs(numOf(row, cols, 'gross') ?? 0), taxes = Math.abs(numOf(row, cols, 'taxes') ?? 0), commission = Math.abs(numOf(row, cols, 'commission') ?? 0);
     const net = numOf(row, cols, 'net');
-    const type = (cellOf(row, cols, 'type') || 'TKTT').toUpperCase();
+    const type = (cellOf(row, cols, 'type') || (cols.has('hotel') ? 'HOTEL' : 'TKTT')).toUpperCase();
     const r: StatementRow = { doc_no, type: /^RF|REFUND/.test(type) ? 'RFND' : /^ADM/.test(type) ? 'ADMA' : /^ACM/.test(type) ? 'ACMA' : type.slice(0, 8), gross: round2(gross), taxes: round2(taxes), commission: round2(commission), net: round2(net === null ? gross + taxes - commission : Math.abs(net)) };
     const date = dayOf(row, cols, 'date'), pax = cellOf(row, cols, 'pax');
     if (date) r.date = date;
     if (pax) r.pax = pax.slice(0, 80);
+    const hotel = cellOf(row, cols, 'hotel'), nights = numOf(row, cols, 'nights'); // R16-C3
+    if (hotel) r.hotel = hotel.slice(0, 80);
+    if (nights) r.nights = Math.abs(nights);
     out.push(r);
   }
   return out;

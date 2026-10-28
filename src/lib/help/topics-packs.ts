@@ -91,7 +91,7 @@ export const TOPICS: readonly HelpTopic[] = [
   }),
   t('tables:frontdesk:calendar', 'Room calendar', 'रूम कैलेंडर', 'Rooms by date: bookings as bars; tap an empty cell to book that room.', 'When a guest asks what is free.'),
   t('tables:frontdesk:reservations', 'Reservations', 'बुकिंग', 'Bookings with nightly prices, advances and the confirmation message; arrivals, departures and in-house lists.', 'For every booking, change or cancellation.', { statutory: ca(['HT9', 'HT10', 'HT11']) }),
-  t('tables:frontdesk:folios', 'Folios', 'फ़ोलियो', 'Running accounts of in-house guests and companies. A folio is not a tax invoice.', 'Before check-out.', { statutory: ca(['HT6', 'HT7', 'HT11', 'HT12']) }),
+  t('tables:frontdesk:folios', 'Folios', 'फ़ोलियो', 'Running accounts of in-house guests and companies. A folio is not a tax invoice. Agent commission bill drafts the agent\'s bill with 194H.', 'Before check-out.', { statutory: ca(['HT6', 'HT7', 'HT11', 'HT12']) }), // R16-C5
   t('tables:frontdesk:housekeeping', 'Housekeeping', 'हाउसकीपिंग', 'Room status by floor: clean, dirty, inspected, out of order.', 'After check-outs and through the day.'),
   t('tables:frontdesk:audit', 'Night audit', 'नाइट ऑडिट', 'Closes the business date: posts room nights once, lists no-shows and due-outs, and keeps occupancy, ADR and RevPAR.', 'Every night.', { statutory: ca(['HT11', 'HT17']) }),
   t('tables:frontdesk:guests', 'Guest register', 'गेस्ट रजिस्टर', 'Police / guest register with masked ID numbers, printable and as CSV.', 'When the register is asked for.', { statutory: ca(['HT13']) }),
@@ -264,7 +264,7 @@ export const TOPICS: readonly HelpTopic[] = [
   // R15-B: the Trips desk (C / D add statements, tcs, events). Working papers — verify with your CA.
   t('time:trips', 'Trips', 'यात्रा फ़ाइलें', 'Trip and event files with their bookings, cost vs sell and margin, billed in the trip\'s GST regime (tour operator without ITC, with ITC, or agent fee + pure agent).', 'Each booking.', { statutory: ca(['TV8', 'TV9', 'TV14']) }),
   t('time:trips:trips', 'Trip files', 'यात्रा फ़ाइल', 'Open a file, add bookings, see the costing; Bill makes a draft in the regime. A no-ITC trip\'s supplier bills default to no ITC; the month list shows overrides.', 'Each trip.', { statutory: ca(['TV8', 'TV28', 'TV29']) }),
-  t('time:trips:bookings', 'Bookings', 'बुकिंग', 'Every component of every trip: unconfirmed, unbilled, supplier unpaid or travelling in the next 7 days. Billed means its invoice line still exists.', 'Daily.', { statutory: ca(['TV14']) }),
+  t('time:trips:bookings', 'Bookings', 'बुकिंग', 'Every component of every trip: unconfirmed, unbilled, supplier unpaid or travelling in the next 7 days. Billed means its invoice line still exists. Bill commission invoices the airline / hotel / insurer (TDS expected); Re-issue bills a changed ticket.', 'Daily.', { statutory: ca(['TV14', 'TV16', 'TV17', 'TV46', 'TV47', 'TV48']) }), // R16-C: commission, re-issue
   // R15-D
   t('time:trips:tcs', 'Tour package TCS', 'टूर पैकेज TCS', 'TCS on overseas tour packages per buyer and quarter, at the dated rate as the app applies it (Sec 394(1) Sl. 8 from Apr 2026); PAN missing; challans.', 'Each quarter.', { statutory: ca(['TV1', 'TV2', 'TV4', 'TV5', 'TV6', 'TV7']) }),
   t('time:trips:events', 'Event budgets', 'इवेंट बजट', 'Budget heads: approved, booked, billed, paid; over-budget heads in red; client advances, margin, POS by Sec 12(7)(a) and each vendor\'s TDS limb (hint).', 'Each event.', { statutory: ca(['TV21', 'TV22', 'TV23']) }),

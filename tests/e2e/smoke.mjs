@@ -5398,6 +5398,48 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R16-C commission and re-issue: a booking with ₹1,200 airline commission → Bill commission → a draft to the airline at 18 % (SAC 998551) with 194H expected (the airline is past ₹20,000 this FY); re-issue a ticket: difference ₹800 + penalty ₹1,500 + fee ₹300 → a draft (two pure-agent lines, fee at 18 %); the old ticket is marked', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'cost_centres', 'travel_bookings', 'travel_settings', 'invoices', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const at = new Date().toISOString();
+    const day = at.slice(0, 10);
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'travel', travel_kind: 'agent', modules: undefined, industry_packs: ['travel'], prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'travel_settings', { regime_default: 'agent', air_value: 'deemed' });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-16c-c', name: 'E2E 16C Rao', state_code: '27' }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-16c-air', name: 'E2E 16C Airline', state_code: '27', tv: { kind: 'airline' } }]);
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), { id: 'e2e-16c-trip', name: 'E2E Delhi — Rao', kind: 'project', client_id: 'e2e-16c-c', active: true, status: 'active', start: day, created_at: at, tv: { code: '16C-001', kind: 'trip', scope: 'domestic', start: day, regime: 'agent', status: 'confirmed', pax: [{ name: 'Rao', type: 'adult' }] } }]);
+    const tkt = { pax: 'RAO/K', airline: '6E', ticket_no: '0581234567800', pnr: 'PNR16C', sector: 'DEL-BOM', class: 'economy', basic: 4200, taxes: 940, airline_gst: 210 };
+    await writeJson(page, 'travel_bookings', [...(prev.travel_bookings ?? []),
+      { id: 'e2e-16c-b1', trip_id: 'e2e-16c-trip', component: 'air', vendor_id: 'e2e-16c-air', ref: 'PNR16C', start: day, cost: 5350, sell: 5350, commission: 1200, status: 'confirmed', created_at: at },
+      { id: 'e2e-16c-b2', trip_id: 'e2e-16c-trip', component: 'air', vendor_id: 'e2e-16c-air', ref: 'PNR16D', start: day, cost: 5350, sell: 5350, status: 'confirmed', tkt: [tkt], created_at: at }]);
+    // An earlier issued commission invoice of ₹20,000 to the airline this FY: the next one crosses the 194H threshold.
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-16c-prior', invoice_number: 'E2E/16C/1', doc_type: 'TAX_INVOICE', status: 'Sent', issue_date: day, due_date: day, client: { name: 'E2E 16C Airline', state_code: '27' }, sender: null, items: [{ id: 'p1', name: 'Commission', type: 'Service', hsn: '998551', unit: 'NOS', quantity: 1, rate: 20000, amount: 20000, tax_rate: 18, discount_percent: 0 }], gst_mode: 'CGST_SGST', place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, shipping: 0, other_charges: 0, amount_paid: 0, subtotal: 20000, taxable_value: 20000, tax_amount: 3600, total: 23600, balance_due: 23600, created_at: at }]);
+    await page.goto(srv.origin + '/time?tab=trips&view=bookings');
+    await page.locator('[data-tv-comm="e2e-16c-b1"]').click({ timeout: 15000 });
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.client?.name === 'E2E 16C Airline' && i.id !== 'e2e-16c-prior'))).find((i) => i.client?.name === 'E2E 16C Airline' && i.id !== 'e2e-16c-prior');
+    check(inv?.status === 'Draft' && inv.items[0].hsn === '998551' && inv.items[0].tax_rate === 18 && inv.tax_amount === 216, `commission draft to the airline: ₹1,200 at 18 % (SAC 998551), GST ₹216 (${inv?.tax_amount})`);
+    check(inv?.tds_enabled === true && inv.tds_section === '194H' && inv.tds_rate === 2 && inv.tds_amount === 24, `194H expected at 2 % on the commission before GST (${inv?.tds_section} ${inv?.tds_amount})`);
+    const b1 = (await readJson(page, 'travel_bookings', [])).find((b) => b.id === 'e2e-16c-b1');
+    check(b1?.comm_ref?.invoice_id === inv?.id, 'the booking keeps the commission line reference (billed derived)');
+    await page.goto(srv.origin + '/time?tab=trips&view=bookings');
+    check(await page.locator('[data-tv-comm="e2e-16c-b1"]').count() === 0, 'Bill commission is gone once billed');
+    await page.locator('[data-tv-reissue-open="e2e-16c-b2"]').click({ timeout: 15000 });
+    const re = page.locator('[data-tv-reissue]');
+    await re.locator('[data-tv-re="new_no"]').fill('0581234567801');
+    await re.locator('[data-tv-re="diff"]').fill('800');
+    await re.locator('[data-tv-re="penalty"]').fill('1500');
+    await re.locator('[data-tv-re="fee"]').fill('300');
+    await re.locator('[data-tv-re-go]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const d = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.cost_centre_id === 'e2e-16c-trip' && i.items?.some((l) => l.name === 'Re-issue fee')))).find((i) => i.cost_centre_id === 'e2e-16c-trip' && i.items?.some((l) => l.name === 'Re-issue fee'));
+    check(d?.items.filter((l) => l.charge_head_id === 'rule33').map((l) => l.rate).join() === '800,1500' && d.items.find((l) => l.name === 'Re-issue fee')?.tax_rate === 18 && d.tax_amount === 54, `re-issue draft: ₹800 + ₹1,500 at actual, fee ₹300 at 18 % (GST ${d?.tax_amount})`);
+    const b2 = (await readJson(page, 'travel_bookings', [])).find((b) => b.id === 'e2e-16c-b2');
+    check(b2?.tkt?.[0]?.reissued_by === '0581234567801' && b2.tkt.length === 2, 'the old ticket is marked re-issued; the new ticket is on the booking');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {
