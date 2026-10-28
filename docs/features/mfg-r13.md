@@ -176,8 +176,10 @@ test row; `mf-registry` counts `CUT` / `KPB` once). E2E: step "R13-C garments de
 - **Bundle scan** is on the Bundles view (operation, karigar, rejects, last step), not inside MF-A's operator screen;
   `jc_entry_id` on a bundle step links it to a job-card entry when one is typed, so a piece is never counted twice.
 - **Garment output**: `reportFinished` writes one journal per variant child; the order's own output dialog (R4-A) is unchanged.
-- **Job charges class suggestion on the Job Work In service invoice** (C3-4) is not wired into the editor; the classes are in
-  `TEXTILE_CLASS_RULES` and the piece bill uses `jw_textile`.
+- **Job charges class suggestion on the Job Work In service invoice** (C3-4, PENDING #16): the job charges invoice dialog
+  (Job work → Job work in) pre-picks the class from the HSN chapter of the principal's goods received on the order
+  (`mfg/mf-jw-class.ts`: ch 50–63 `jw_textile`, ch 48 / 49 `jw_print_ch48_49`, else `jw_other`) and fills its dated rate;
+  the user can pick another class or type a rate (typed wins). The piece bill still uses `jw_textile`.
 - **5C e-way**: `dispatchFrom` exists for the invoice e-way; since PENDING 11 the invoice e-Way dialog has a
   "Dispatched from" job-worker picker (lazy `components/mfg/EwayDispatchFrom.tsx`, manufacturing packs only) — the
   downloaded / copied JSON is the bill passed through `dispatchFrom`; blank = our own premises.
@@ -221,7 +223,7 @@ view (≈ −1.5 kB), the bundle-ticket coupons and the cut-report print (≈ �
 ### Deviations from the PRD (MF-D)
 
 - **Desk chunks**: each desk is one lazy chunk with its views (MF-A's finding); the two desks and Floor → WIP share `mfd-ui.tsx` / `mfd-util.ts` (≈ 0.8 kB together).
-- **Capital grant default**: Capital subsidy (reserve) unless the asset's ledger is given (`asset_account_id`, not yet pickable in the form) — PRD said "asset cost" (MF63).
+- **Capital grant default**: Capital subsidy (reserve) unless the asset's ledger is picked on the form (`asset_account_id`: "Credit (capital grant)" lists the fixed-asset ledgers, accumulated depreciation left out, `grantAssetLedgers`; checked on save, fixed once recognised; PENDING #17) — PRD said "asset cost" (MF63).
 - **Schemes preset**: no R8 preset list exists, so the presets live on Food → Schemes and create ordinary R8 schemes; the display claim is a note (settle by FCN).
 - **Destroyed returns (D2.5)**: unchanged existing flow (credit note + QC scrap journal); only the help and MF32 note point to it.
 - **AA tagging**: from the AA register (pick invoice / bill) and the BOE row; the invoice editor has no AA picker. The A5 paper prints `mf.export_aa.aa_no` / `sion`.

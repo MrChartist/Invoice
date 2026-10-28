@@ -118,10 +118,19 @@ Master data stores plain values (the label shown is always the current definitio
   columns unchanged).
 - Limits: 30 fields, 40-character labels, unique label per "applies to".
 
+### Added later (PENDING #25)
+- **Purchase bills / expenses**: document fields as a snapshot `PurchaseRecord.custom_values` (same shape and
+  first-save rule as invoices), entered in `BillModal` / `ExpenseModal` through `custom-fields/SnapshotFields.tsx`.
+  No report reads them.
+- **Recurring templates**: `RecurringTemplate.custom_values` (copied by `templateFromInvoice`, edited in the recurring
+  editor, finalised on save); every generated invoice carries them (line item values ride on the template lines).
+- **Item fields per line**: a lazy `custom-fields/LineFields.tsx` under each editor line (shown when an item field
+  exists or the line has values) edits that line's snapshot; picking a catalogue item still fills it.
+- **Stock-item modal**: item field inputs; the values are written to the catalogue entry of the same name
+  (`catalog.ts` `setStockItemFields`, an entry is created when none exists, as for the short code).
+
 ### Not done (kept modest)
-- No custom fields on purchase bills / expenses, recurring templates, or the GSTR / Tally / e-Invoice outputs.
-- Item fields are not editable per line in the editor (pick the catalogue item again, or edit the catalogue).
-- The inventory "stock item" modal has no inputs for item fields (use Settings → Items & rates; values are kept).
+- No custom fields in the GSTR / Tally / e-Invoice outputs or on the purchase registers.
 - Party fields are not printed separately inside the Bill-to block; they appear in the same "Details" box after the
   document fields.
 

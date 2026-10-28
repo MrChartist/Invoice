@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { sdT } from '../../i18n/areas/mfg-r13d-stat';
 import { todayInput } from '../../lib/utils';
-import { claimFigures, INCENTIVE_SCHEMES, incentiveClaimsDb, pendingClaims, receiveClaim, recogniseClaim, suggestedClaim, type IncentiveClaim } from '../../lib/mfg/mf-incentives';
+import { claimFigures, grantAssetLedgers, INCENTIVE_SCHEMES, incentiveClaimsDb, pendingClaims, receiveClaim, recogniseClaim, suggestedClaim, type IncentiveClaim } from '../../lib/mfg/mf-incentives';
 import { NumberInput } from '../ui/NumberInput';
 import type { MfgContext } from '../manufacturing/context';
 import { Fld, Tbl } from './mfd-ui';
@@ -16,6 +16,7 @@ export default function IncentivesView({ ctx }: { ctx: MfgContext }) {
   const rows = useMemo(() => { void ctx.version; return incentiveClaimsDb.all(); }, [ctx.version]);
   const [f, setF] = useState<Omit<IncentiveClaim, 'id' | 'voucher_ids'>>({ scheme: 'pli', name: '', period_from: '', period_to: '', claimed: 0, kind: 'income' });
   const [act, setAct] = useState({ date: today, amount: 0 });
+  const assets = useMemo(() => { void ctx.version; return grantAssetLedgers(); }, [ctx.version]);
   const bell = pendingClaims(rows, today);
   const n = (k: 'eligible_base' | 'rate_pct' | 'claimed' | 'approved') => <NumberInput className={controls.input} style={{ maxWidth: 120 }} value={f[k] ?? 0} onChange={(v) => setF({ ...f, [k]: v, ...(k === 'eligible_base' || k === 'rate_pct' ? { claimed: suggestedClaim(k === 'eligible_base' ? v : f.eligible_base, k === 'rate_pct' ? v : f.rate_pct) || f.claimed } : {}) })} data-mfd={`inc-${k}`} />;
   return (
@@ -40,6 +41,14 @@ export default function IncentivesView({ ctx }: { ctx: MfgContext }) {
             <option value="capital">{sdT('capital')}</option>
           </select>
         </Fld>
+        {f.kind === 'capital' && (
+          <Fld l={sdT('assetLedger')}>
+            <select className={controls.select} value={f.asset_account_id ?? ''} onChange={(e) => setF({ ...f, asset_account_id: e.target.value || undefined })} data-mfd="inc-asset">
+              <option value="">{sdT('capitalReserve')}</option>
+              {assets.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </Fld>
+        )}
         <button type="button" className={controls.btnPrimary} disabled={!ctx.canBooks} onClick={() => run(ctx, () => { incentiveClaimsDb.save(f); return sdT('saved'); })} data-mfd-b="inc-add">{sdT('add')}</button>
       </div>
       <div style={row}>

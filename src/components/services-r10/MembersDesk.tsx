@@ -4,7 +4,7 @@
  * name, gate, today, churn, peak hours, member cards), classes (timetable, capacity, wait-list) and service recipes.
  * Working papers — verify with your CA.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { ClassSchedule, MemberPlan, MemberPlanKind, Membership, SvClass } from '../../types/services-r10';
 import type { InvoiceRecord } from '../../types/invoice';
@@ -22,11 +22,18 @@ import { mcT, type McKey } from '../../i18n/areas/services-r10c';
 import { svT } from '../../i18n/areas/services-r10a';
 import { SV_CLASSES } from '../../lib/services/sv-tax';
 import { loadStaff } from '../../lib/services/sv-staff';
-import { readServiceSettings } from '../../lib/services/sv-settings';
+import { readServiceSettings, saveServiceSettings } from '../../lib/services/sv-settings';
+import { deferralFor, postedDeferral, postPackageDeferral } from '../../lib/services/sv-deferral';
 import { daysBetween, deleteMemberPlan, forfeited, loadCheckins, loadMemberPlans, loadMemberships, renewals, saveMemberPlan, sessionsUsed, statusOf } from '../../lib/services/sv-members';
 import { autoRenewDue, bonusLeft, cancelMembership, freeze, renew, sellPlan, topUp, transfer, unfreeze, upgrade } from '../../lib/services/sv-memberships';
 import { checkIn, findMembers, footfall, gateFor, notSeen, undoCheckin } from '../../lib/services/sv-checkin';
 import { deleteClass, dropMember, enrolMember, loadClasses, saveClass } from '../../lib/services/sv-classes';
+import { bookingsOf, bookOccurrence, cancelBooking, placesLeft } from '../../lib/services/sv-class-bookings';
+import { cameraScanSupported } from '../scan/camera';
+
+// PENDING #21: camera check-in reads the member card (BarcodeDetector, no library; the card's MEM code).
+const CameraScanner = lazy(() => import('../scan/CameraScanner').then((m) => ({ default: m.CameraScanner })));
+import { loadAppointments } from '../../lib/services/sv-appointments';
 import { recipeReport } from '../../lib/services/sv-recipes';
 import { B, C, S, T, Tbl, Views } from '../institutions/Views';
 import { attempt, csv, printPage, rs, today, useView, type Notify } from '../institutions/ui';
@@ -179,6 +186,32 @@ function Members({ notify, tick, refresh }: P) {
       <h4>{mcT('renewals')}</h4>
       <Tbl h={[mcT('member'), mcT('plan'), mcT('end'), '']} rows={due.map(({ m }) => [m.client_name, m.plan.name, m.end, <span key="a"><a className={styles.note} target="_blank" rel="noreferrer" href={whatsappLink(m.phone, mcT('waRenew', { name: m.client_name, plan: m.plan.name, number: m.number, date: m.end }))}>{mcT('remind')}</a> <B sm l={mcT('renew')} on={() => attempt(notify, () => { renew(m.id, d); refresh(); }, mcT('saved'))} /></span>])} />
       {!!lost.length && <><h4>{mcT('forfeit')}</h4><Tbl h={[mcT('month'), mcT('number'), mcT('member'), mcT('used'), mcT('amount')]} rows={lost.map((x) => [x.month, x.m.number, x.m.client_name, x.unused, rs(x.value)])} /></>}
+      <Deferral notify={notify} tick={tick} refresh={refresh} />
+    </div>
+  );
+}
+
+/** PENDING #20: package income kept deferred — the switch (owner) and the month's journal (books). */
+function Deferral({ notify, tick, refresh }: P) {
+  const d = today();
+  const [month, setMonth] = useState(shiftDay(`${d.slice(0, 7)}-01`, -1).slice(0, 7));
+  const s = useMemo(() => readServiceSettings(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const r = useMemo(() => deferralFor(month, d), [tick, month, s]); // eslint-disable-line react-hooks/exhaustive-deps
+  const done = r ? postedDeferral(month) : undefined;
+  return (
+    <div data-sv-deferral>
+      <h4>{mcT('deferTitle')}</h4>
+      <C l={mcT('deferOn')} v={!!s.defer_package_income} on={(v) => attempt(notify, () => { saveServiceSettings({ defer_package_income: v, ...(v && !s.defer_package_from ? { defer_package_from: d } : {}) }); refresh(); }, mcT('saved'))} />
+      {r && (
+        <>
+          <p className={styles.note}>{mcT('deferHint', { date: s.defer_package_from ?? '—' })}</p>
+          <div className={styles.toolbar}>
+            <T l={mcT('month')} t="month" v={month} on={setMonth} d="sv-defer-month" />
+            <span>{mcT('deferRow', { sold: rs(r.deferred), rec: rs(r.recognised), red: rs(r.redeemed), lost: rs(r.forfeited), closed: rs(r.closed), net: rs(r.net) })}</span>
+            {done ? <span>{mcT('deferPosted', { number: done.number })}</span> : <B l={mcT('deferPost')} dis={!can('books.edit') || !r.net} on={() => attempt(notify, () => { postPackageDeferral(month, d); refresh(); }, mcT('saved'))} d="sv-defer-post" />}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -189,6 +222,7 @@ function Checkin({ notify, tick, refresh }: P) {
   const days = useMemo(() => loadCheckins(), [tick]);
   /* eslint-enable react-hooks/exhaustive-deps */
   const [q, setQ] = useState('');
+  const [cam, setCam] = useState(false);
   const d = today();
   const gate = readServiceSettings().checkin_gate ?? 'warn';
   const invoices = getTable<InvoiceRecord>('invoices');
@@ -210,8 +244,10 @@ function Checkin({ notify, tick, refresh }: P) {
     <div className={styles.stack}>
       <div className={styles.toolbar}>
         <T l={mcT('code')} v={q} on={setQ} d="checkin-code" />
+        {cameraScanSupported() && <B l={mcT('camera')} on={() => setCam(true)} d="checkin-camera" />}
         <B l={mcT('cards')} on={cards} />
       </div>
+      {cam && <Suspense fallback={null}><CameraScanner open onClose={() => setCam(false)} onCode={(code) => { const h = findMembers(code, all); if (h.length === 1) go(h[0]); else setQ(code); }} /></Suspense>}
       {hits.map((m) => (
         <div key={m.id} className={styles.line}>
           <strong>{m.client_name}</strong><span className={styles.note}>{m.number} · {m.plan.name}</span>
@@ -259,12 +295,15 @@ export function Timetable({ classes }: { classes: readonly ClassSchedule[] }) {
 function Classes({ notify, tick, refresh }: P) {
   const classes = useMemo(() => loadClasses().filter((c) => c.kind === 'class'), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pick, setPick] = useState<Record<string, string>>({});
+  const [day, setDay] = useState(today());
+  const appts = useMemo(() => loadAppointments(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const name = (id: string) => localDb.clients.getById(id)?.name ?? id;
   return (
     <div className={styles.stack}>
       <ClassForm notify={notify} onSaved={refresh} />
       <h4>{mcT('timetable')}</h4>
       <Timetable classes={classes} />
+      <T l={mcT('bookOn')} t="date" v={day} on={setDay} d="sv-book-day" />
       {classes.map((c) => (
         <div key={c.id} className={styles.line}>
           <strong>{c.name}</strong>
@@ -273,6 +312,10 @@ function Classes({ notify, tick, refresh }: P) {
           <B sm l={mcT('enrol')} on={() => attempt(notify, () => { const cl = clientByName(pick[c.id] ?? ''); if (!cl) throw new Error(mcT('member')); notify(mcT(enrolMember(c.id, cl.id!) === 'member' ? 'members' : 'waitlist')); refresh(); })} />
           {(c.members ?? []).slice(-1).map((id) => <B key={id} g sm l={`− ${name(id)}`} on={() => attempt(notify, () => { dropMember(c.id, id); refresh(); })} />)}
           <B g sm l={mcT('del')} on={() => attempt(notify, () => { deleteClass(c.id); refresh(); })} />
+          {/* PENDING #21: book one meeting (an appointment with class_id), capped by the capacity of that day. */}
+          <B sm l={mcT('book')} d="sv-book" on={() => attempt(notify, () => { const cl = clientByName(pick[c.id] ?? ''); bookOccurrence(c.id, day, cl ? { id: cl.id, name: cl.name, phone: cl.phone } : { name: (pick[c.id] ?? '').trim() }); refresh(); }, mcT('saved'))} />
+          <span className={styles.note} data-sv-bookings={c.name}>{mcT('booked', { date: day, names: bookingsOf(appts, c.id, day).map((a) => a.client_name).join(', ') || '—' })}{Number.isFinite(placesLeft(c, appts, day)) ? ` · ${mcT('placesLeft', { n: placesLeft(c, appts, day) })}` : ''}</span>
+          {bookingsOf(appts, c.id, day).slice(-1).map((a) => <B key={a.id} g sm l={`${mcT('cancelBooking')} — ${a.client_name}`} on={() => attempt(notify, () => { cancelBooking(a.id); refresh(); })} />)}
         </div>
       ))}
       <ClientList />

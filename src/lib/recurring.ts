@@ -80,6 +80,8 @@ export interface RecurringTemplate {
   charges_taxable?: boolean;
   /** Additive (6.16): cost centre each generated invoice is booked to. */
   cost_centre_id?: string;
+  /** Additive (6.23, PENDING #25): document / party custom fields copied onto every generated invoice. */
+  custom_values?: InvoiceRecord['custom_values'];
 }
 
 export interface RecurringHistoryEntry {
@@ -394,6 +396,7 @@ export function templateFromInvoice(inv: InvoiceRecord): RecurringTemplate {
     tds_on_taxable: inv.tds_on_taxable,
     ...(inv.charges_taxable ? { charges_taxable: true } : {}),
     ...(inv.cost_centre_id ? { cost_centre_id: inv.cost_centre_id } : {}),
+    ...(inv.custom_values?.length ? { custom_values: inv.custom_values.map((v) => ({ ...v })) } : {}),
   };
 }
 

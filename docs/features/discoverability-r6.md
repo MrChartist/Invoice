@@ -171,5 +171,10 @@ mounted in `DashboardStart.tsx` in place of the old inline button) and reads the
 
 ## Open / follow-ups
 
-- §7 Q6 (move samples already loaded into a real company to a Demo company) is not built: such a company sees "Remove
-  sample data" only.
+- §7 Q6 (PENDING #24): a real company still holding samples from an earlier version sees "Move them to the Demo
+  company" beside "Remove sample data" (`SampleDataChooser`). `moveSamplesToDemo` (`onboarding/demo-company.ts`) is owner
+  only and refuses, removing nothing, when this browser cannot hold a second company, when the open company is the Demo
+  company (flag + marker, never the name) or holds no sample rows. Otherwise exactly the sample rows (`demo: true`, what
+  `removeDemoData` deletes) leave this company and `startDemoCompany` opens the Demo company with a fresh sample set for
+  the same business — the rows are the app's own, so they are rebuilt there, never copied between databases, and the
+  Demo marker is still written only by `demo-company.ts`. A row still marked after the removal stops the move.
