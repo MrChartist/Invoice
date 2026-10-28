@@ -234,6 +234,7 @@ export function Pos() {
   const [devPay, setDevPay] = useState<DevPay | null>(null); // R9 (RT-D2/D3) finance + exchange tenders, cash guard
   const [jwPos, setJwPos] = useState<{ kyc?: SaleKyc; errors: string[] } | null>(null); // R9 (RT-E3) cash / PAN guard
   const [agPos, setAgPos] = useState<{ ag: NonNullable<InvoiceRecord['ag']>; due?: string; errors: string[] } | null>(null); // R12 (AG-D4)
+  const [svBlock, setSvBlock] = useState<string[]>([]); // R10 (PENDING #21): staff required on service lines
   const pharmaOn = useMemo(() => readPharmaSettings().enabled, []);
   /** The line the last scan / pick went to (Alt+Q), the quantity field last focused (Alt+W live weight). */
   const lastLine = useRef<string | null>(null);
@@ -582,6 +583,7 @@ export function Pos() {
     if (devPay?.error) return setErrors([devPay.error]); // R9 (RT-D)
     if (jwPos?.errors.length) return setErrors(jwPos.errors); // R9 (RT-E3): cash 269ST / PAN 114B
     if (agPos?.errors.length) return setErrors(agPos.errors); // R12 (AG-D4): subsidised fertiliser needs the PoS txn no.
+    if (svBlock.length) return setErrors(svBlock); // R10 (PENDING #21): staff required on service lines
     // 8E (8.144): an "On account" amount must be what is left unpaid.
     if (onAccount > 0.004 && Math.abs(onAccount - summary.due) > 0.004) {
       setErrors([retailT('accountMismatch', { due: formatCurrency(summary.due) })]);
@@ -1111,7 +1113,7 @@ export function Pos() {
               {retailStrip && <Suspense fallback={null}><PosRetailStrip record={record} query={query} delivery={delivery} onDelivery={setDelivery} onAddLine={(l) => setItems((prev) => [...prev.filter((x) => x.name !== 'Delivery charge'), l])} deliveryOn={!!retailRs.delivery?.enabled} shortBookOn={!!retailRs.short_book?.enabled} notify={notify} /></Suspense>}
               {pharmaOn && <Suspense fallback={null}><RxStrip record={record} value={rxPos} onChange={setRxPos} /></Suspense>}
               {params.get('appt') && <Suspense fallback={null}><PosAppointment id={params.get('appt')!} onLoad={(lines, p) => { setItems(lines); setParty(p); setParams((q) => { q.delete('appt'); return q; }, { replace: true }); }} /></Suspense>}
-              {!!items.length && (['salon', 'fitness', 'clinic', 'workshop'] as const).some((k) => isPackOn(settings, k)) && <Suspense fallback={null}><PosStaff items={items} setItems={setItems} /></Suspense>}
+              {!!items.length && (['salon', 'fitness', 'clinic', 'workshop'] as const).some((k) => isPackOn(settings, k)) && <Suspense fallback={null}><PosStaff items={items} setItems={setItems} onBlock={setSvBlock} /></Suspense>}
               {party.client && (isPackOn(settings, 'salon') || isPackOn(settings, 'fitness')) && <Suspense fallback={null}><PosPackages client={party.client} items={items} setItems={setItems} notify={notify} /></Suspense>}
               {isPackOn(settings, 'apparel') && <Suspense fallback={null}><PosApparel record={record} setItems={setItems} /></Suspense>}
               {isPackOn(settings, 'agri_inputs') && <Suspense fallback={null}><PosInputsStrip key={lastBill?.id} record={record} onChange={setAgPos} /></Suspense>}

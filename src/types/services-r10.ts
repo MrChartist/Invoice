@@ -111,6 +111,8 @@ export interface Appointment {
   /** Walk-in queue token of the day (resets daily) and its queue state. */
   token?: number;
   queue?: 'waiting' | 'called' | 'served';
+  /** SV-C3 (PENDING #21): a booking of one meeting of this class (`sv-class-bookings.ts`); no services. */
+  class_id?: string;
   created_at: string;
   updated_at?: string;
 }
