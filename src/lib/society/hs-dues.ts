@@ -58,9 +58,13 @@ export function rateOn(s: SocietySettings, day: string): number {
 
 export interface UnitDues { arrears: number; interest: number; on: number; from: string; to: string; pct: number; bills: BillDue[] }
 
-/** A unit's dues on `asOf` (inclusive): open bills dated up to it, and interest not yet charged up to it. */
-export function unitDues(unitId: string, asOf: string, ix: DuesIndex, s: SocietySettings, fn: InterestFn): UnitDues {
-  const bills = (ix.bills.get(unitId) ?? []).filter((b) => b.issue_date <= asOf).map((b) => billDue(b, ix.events.get(b.id), asOf));
+/**
+ * A unit's dues on `asOf` (inclusive): open bills dated up to it, and interest not yet charged up to it. `owner` (QA21
+ * W3): only that member's bills — after a transfer the outgoing member's bills stay his receivable and never bring
+ * arrears or interest onto the incoming member's bill, receipt split or dues row (a dues certificate reads them all).
+ */
+export function unitDues(unitId: string, asOf: string, ix: DuesIndex, s: SocietySettings, fn: InterestFn, owner?: string): UnitDues {
+  const bills = (ix.bills.get(unitId) ?? []).filter((b) => b.issue_date <= asOf && (!owner || b.client?.id === owner)).map((b) => billDue(b, ix.events.get(b.id), asOf));
   const through = bills.reduce((t, b) => ((b.bill.hs as HsSnapshot).interest?.through ?? '') > t ? b.bill.hs!.interest!.through : t, '');
   const grace = Math.max(0, s.interest?.grace_days ?? 0);
   let exact = 0, on = 0, from = '';
@@ -94,8 +98,8 @@ export function allocate(amount: number, bills: readonly BillDue[], mode: Societ
 export interface DuesRow { unitId: string; open: number; billed: number; accrued: number; months: number; oldest?: string; first?: InvoiceRecord }
 
 /** Defaulters on `asOf` (C3): open dues, billed interest still open, interest accrued since the last bill, months overdue. */
-export function duesRow(unitId: string, asOf: string, ix: DuesIndex, s: SocietySettings, fn: InterestFn): DuesRow {
-  const d = unitDues(unitId, asOf, ix, s, fn), late = d.bills.filter((b) => b.open > 0 && b.bill.due_date < asOf);
+export function duesRow(unitId: string, asOf: string, ix: DuesIndex, s: SocietySettings, fn: InterestFn, owner?: string): DuesRow {
+  const d = unitDues(unitId, asOf, ix, s, fn, owner), late = d.bills.filter((b) => b.open > 0 && b.bill.due_date < asOf);
   const oldest = late[0]?.bill.due_date;
   const months = oldest ? Math.max(0, (+asOf.slice(0, 4) - +oldest.slice(0, 4)) * 12 + +asOf.slice(5, 7) - +oldest.slice(5, 7) + (asOf.slice(8) > oldest.slice(8) ? 1 : 0)) : 0;
   return { unitId, open: d.arrears, billed: round2(d.bills.reduce((t, b) => t + b.interest, 0)), accrued: d.interest, months, ...(oldest ? { oldest } : {}), first: d.bills.find((b) => b.open > 0)?.bill };

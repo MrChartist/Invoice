@@ -126,6 +126,8 @@ export interface BatchContext {
   /** Credit-limit warning for a draft ('' = none). */
   creditWarning?: (draft: InvoiceRecord) => string;
   newId?: () => string;
+  /** A fixed place of supply (state code) for every party — QA21 W2: a society's services at the building (IGST Act Sec 12(3)). */
+  pos?: string;
 }
 
 export type EInvoiceFlag = 'yes' | 'no' | 'unknown';
@@ -170,8 +172,8 @@ export function buildBatchDrafts(template: RecurringTemplate, parties: readonly 
     const zeroOrExport = template.supply_type && template.supply_type !== 'B2B' && template.supply_type !== 'B2C';
     const own = resolveStateCode({ code: client.state_code, gstin: client.gstin, name: client.state });
     // Never the source party's state for a domestic party (QA5-2 F7); an export keeps the source's.
-    const pos = own || (zeroOrExport ? template.place_of_supply : '') || fromState;
-    const stateWarning = !own && !zeroOrExport ? NO_STATE_WARNING : '';
+    const pos = ctx.pos || own || (zeroOrExport ? template.place_of_supply : '') || fromState;
+    const stateWarning = !ctx.pos && !own && !zeroOrExport ? NO_STATE_WARNING : '';
     const gst_mode = docType === 'BILL_OF_SUPPLY' || template.gst_mode === 'NONE' || template.gst_mode === 'SINGLE' || zeroOrExport
       ? (docType === 'BILL_OF_SUPPLY' ? 'NONE' : template.gst_mode)
       : deriveGstMode({ senderStateCode: fromState, placeOfSupply: pos, senderHasGstin: !!clean(sender?.companyGstin), taxEnabled: true });

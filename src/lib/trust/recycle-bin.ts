@@ -415,6 +415,9 @@ const hsKey = (r: unknown): string => {
   return `${str(h.unit.id)}|${str(h.period)}|${kind}`;
 };
 registerRestoreHook('invoices', (row, e, live) => { const k = hsKey(row); return k && live('invoices').some((x) => str(x?.id) !== e.row_id && hsKey(x) === k) ? { refuse: 'This unit was billed again for the period since; restoring this bill would bill it twice. Cancel the new bill first.' } : null; });
+// QA21 W9: a unit comes back only while no live unit holds its code (case / spaces ignored: the R18-A rule).
+const unitCode = (r: unknown) => (isObj(r) ? str(r.code).trim().toLowerCase() : '');
+registerRestoreHook('society_units', (row, e, live) => (unitCode(row) && live('society_units').some((u) => str(u?.id) !== e.row_id && unitCode(u) === unitCode(row)) ? { refuse: `Unit ${str(row.code)} exists again since; restoring this one would make two. Edit the live unit instead.` } : null));
 registerRestoreHook('society_runs', (row, e, live) => (!row.undone && live('society_runs').some((r) => str(r?.id) !== e.row_id && !r?.undone && str(r?.period) === str(row.period) && str(isObj(r?.levy) ? r.levy.name : '') === str(isObj(row.levy) ? row.levy.name : '')) ? { refuse: 'This period was run again since; restoring this run would list it twice.' } : null));
 // R14 (PS-A): an engagement comes back only while its client lives (its ENG number stays reserved, never reused).
 // R14 PS-C: an EDF row restores only while no live row covers the same month, kind and currency (the builder re-ran).

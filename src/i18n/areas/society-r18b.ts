@@ -16,6 +16,7 @@ export const hsbT = defineArea(
     regHint: 'Registration may be required (Sec 22 / Circular 109 Q2). Verify with your CA.', both: 'GST is due only when the turnover is at or above the threshold and a unit is above the limit (Circular 109 Q2).',
     you: 'Your position', yes: 'Yes', no: 'No', itc: 'ITC split (Rule 42 / 43)',
     rcm: 'Security services from a non-body-corporate supplier: reverse charge (N 13/2017-CT(R) entry 14). Verify with your CA (HS15).',
+    undoHeld: 'Undo refused: {u} have receipts or credit notes against this run\'s bills. Remove or cancel them first.',
   } as const,
   {
     bills: 'बिल', gst: 'GST', period: 'अवधि', billDate: 'बिल तिथि', due: 'देय तिथि', run: 'अवधि का बिल बनाएँ', planned: 'योजना: {n} बिल ({b} आपूर्ति बिल, {t} कर बीजक, {p} साधारण, {o} गैर-सदस्य)।',
@@ -28,5 +29,6 @@ export const hsbT = defineArea(
     regHint: 'पंजीकरण आवश्यक हो सकता है (धारा 22 / परिपत्र 109 प्रश्न 2)। अपने CA से जाँचें।', both: 'GST तभी देय है जब टर्नओवर सीमा पर या उससे ऊपर हो और कोई यूनिट ₹7,500 से ऊपर हो (परिपत्र 109 प्रश्न 2)।',
     you: 'आपकी स्थिति', yes: 'हाँ', no: 'नहीं', itc: 'ITC विभाजन (नियम 42 / 43)',
     rcm: 'गैर-निगमित आपूर्तिकर्ता से सुरक्षा सेवाएँ: रिवर्स चार्ज (N 13/2017-CT(R) प्रविष्टि 14)। अपने CA से जाँचें (HS15)।',
+    undoHeld: 'पूर्ववत नहीं: {u} के इस रन के बिलों पर रसीदें या क्रेडिट नोट हैं। पहले उन्हें हटाएँ या रद्द करें।',
   },
 );

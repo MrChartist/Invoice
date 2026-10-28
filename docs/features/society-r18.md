@@ -401,8 +401,9 @@ All four C items fit; nothing was cut.
 - **No new table.** Funds are existing cost centres / reserve ledgers / manual vouchers; audit rows sit in
   `society_settings`; register fields on the unit. `HsAudit.due_on` added in the types' R18-D block.
 - **Idempotence by date range**, not by a reference string: a journal moves billed − already moved in the period; a FY
-  journal counts its periods' journals. Mixing modes in one FY (a period journal for a month after a year-end journal) is
-  not guarded — the view shows one mode at a time.
+  journal counts its periods' journals. *QA21 W4:* a journal counts by the period in its narration (`— 2026-10`,
+  `— FY2026`); a transfer whose range another transfer only partly covers (a month after the year-end or quarter journal)
+  is refused, so modes cannot be mixed in a way that double-moves or reverses a fund.
 - **"Excess only" valuation:** the exempt-portion line is not fund-tagged, so the fund statement then shows only the
   tagged part (HS59).
 - **R&P lives in the f-society chunk** (`annual-pack.ts` imports `hs-rp.ts` statically): opening the annual pack loads
@@ -425,3 +426,16 @@ Before = R18-C, after = R18-D (normalized).
 
 Round 18 after D (raw `check-bundle-size`): initial 182.3 kB (4 files), core 3,168.5 kB, Hindi pack 349.2 kB, Hindi in
 core 21.5 kB, `lazy-leaves` 17.4 kB.
+
+## QA round 21 (`docs/prd/qa-round-21.md`)
+
+- **Place of supply (W2, HS65):** society bills take the building's State (`BatchContext.pos`), never a member's
+  out-of-State address / GSTIN; `agency` keeps the client's place.
+- **Transfer (W3, HS66):** `unitDues(…, owner)` — the run, the Dues row, the receipt split, the waiver and the bank hint
+  read only the current member's bills; the dues certificate and the transfer check read the whole unit.
+- **Funds (W4, HS67):** overlapping transfer ranges refused (see Decisions above).
+- **Undo / waiver (W5, W6, HS70):** undo refused (naming the units) while a run bill carries a receipt or a live credit
+  note; a waiver over several bills is one rollback.
+- **R&P (W7):** clearing / client-money bank ledgers are left out whether the account is active or not
+  (`nonCashBankLedgerIds`). **Hindi (W8):** unit validation / warnings and the bridges' errors. **Bin (W9):** a unit
+  restores only while no live unit holds its code.
