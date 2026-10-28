@@ -79,8 +79,10 @@ desk stores nothing.
 
 ### Decisions and deviations
 
-- **Cuts at the 11 kB cap (PRD §3, in order).** Cut 1: no "How your bill is worked out" footnote (`hs.explain` is
-  declared but not printed; the heads table carries each basis). Cut 2: no `per_inlet` / `per_lifted_unit` bases
+- **Cuts at the 11 kB cap (PRD §3, in order).** Cut 1: no "How your bill is worked out" footnote — *closed later*
+  (PENDING #6): the run sets `hs.explain` unless Tariff → "Print 'How your bill is worked out'" is off
+  (`society_settings.explain: false`); `explainLines` (`hs-print.ts`) prints each head's basis and amount, the GST test
+  (exempt / taxable regimes), the pass-through note and the interest, from the snapshot only (older bills unchanged). Cut 2: no `per_inlet` / `per_lifted_unit` bases
   — *closed later* (PENDING #5): `per_inlet` = rate × `SocietyUnit.inlets`, `per_lifted_unit` = rate when
   `SocietyUnit.lifted`; the unit form shows "Water inlets" / "Lift building" only when a head uses the basis, and the
   import reads `inlets` / `lifted` (yes / no). The MH State row's default bases are data and stay as dated (pick the

@@ -99,6 +99,8 @@ export interface SocietySettings {
   due_days?: number;
   heads?: HsHead[];
   area_unit?: 'sqft' | 'sqm';
+  /** A4 (PENDING #6): `false` = bills leave out the "How your bill is worked out" footnote (default on). */
+  explain?: boolean;
   /** A3: States whose `in_force: false` rows the user confirmed are in force (the KA Bill, HS33). */
   confirmed?: string[];
   /** B: the ₹7,500 valuation (`whole` default, HS2) and the SAC of non-member income; a society run's batch limit. */
@@ -126,7 +128,7 @@ export interface HsSnapshot {
   /** Due date (`YYYY-MM-DD`). */
   due?: string;
   heads?: HsHeadRow[];
-  /** A4 cut 1: "How your bill is worked out" — not printed in R18-A (the heads table carries each basis). */
+  /** A4: print "How your bill is worked out" (cut 1 of R18-A, added afterwards; set by the run unless switched off). */
   explain?: boolean;
   /** B1 / B2: the run, the ₹7,500 test, the regime and its printed sentence (snapshotted, never re-derived). */
   run_id?: string;
