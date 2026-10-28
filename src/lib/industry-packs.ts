@@ -378,6 +378,7 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'logistics', alsoPacks: ['customs', 'courier', 'warehouse'], path: '/time?tab=shipments', labelKey: 'r19.shipments' },
   { pack: 'logistics', alsoPacks: ['customs', 'courier', 'warehouse'], path: '/time?tab=shipments&view=jobs', labelKey: 'r19.shipments.jobs' },
   { pack: 'logistics', alsoPacks: ['customs', 'courier', 'warehouse'], path: '/time?tab=shipments&view=rates', labelKey: 'r19.shipments.rates' },
+  { pack: 'customs', path: '/time?tab=shipments&view=customs', labelKey: 'r19.shipments.customs' }, // R19-C
 ];
 
 /**

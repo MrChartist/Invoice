@@ -171,6 +171,7 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   '/time?tab=shipments': ['freight forwarder', 'logistics', 'customs broker', 'शिपमेंट'],
   '/time?tab=shipments&view=jobs': ['job file', 'shipment', 'consignment', 'जॉब'],
   '/time?tab=shipments&view=rates': ['charge heads', 'freight rate', 'भाड़ा'],
+  '/time?tab=shipments&view=customs': ['duty deposit', 'CHA', 'reimbursement', 'ड्यूटी'], // R19-C
   // R18-A: the Society desk (B–D add bills / gst / dues / funds / registers)
   '/recurring?tab=society': ['housing society', 'rwa', 'maintenance bill', 'मेंटेनेंस'],
   '/recurring?tab=society&view=units': ['flats', 'members', 'फ़्लैट'],

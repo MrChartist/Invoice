@@ -289,7 +289,7 @@ export const reachT = defineArea(
     'ck.societyRun': 'Run your first maintenance bills', // R18-B
     'ck.societyFunds': 'Map the sinking and repair funds', // R18-D
     'ck.societyAudit': 'Note this year\'s audit', // R18-D
-    'ck.lgHeads': 'Set your freight charge heads', 'ck.lgJob': 'Open your first job file', 'ck.lgBill': 'Bill your first job', // R19-A1
+    'ck.lgHeads': 'Set your freight charge heads', 'ck.lgJob': 'Open your first job file', 'ck.lgBill': 'Bill your first job', 'ck.lgDeposit': 'Record a client\'s duty deposit', // R19-A1, R19-C
   } as const,
   {
     'title.shop': 'आप क्या काम करते हैं?',
@@ -565,6 +565,6 @@ export const reachT = defineArea(
     'ck.societyRun': 'पहले रखरखाव बिल बनाएँ',
     'ck.societyFunds': 'सिंकिंग और मरम्मत निधि जोड़ें',
     'ck.societyAudit': 'इस वर्ष की लेखा परीक्षा दर्ज करें',
-    'ck.lgHeads': 'अपने भाड़ा शुल्क शीर्ष तय करें', 'ck.lgJob': 'पहली जॉब फ़ाइल खोलें', 'ck.lgBill': 'पहली जॉब का बिल बनाएँ',
+    'ck.lgHeads': 'अपने भाड़ा शुल्क शीर्ष तय करें', 'ck.lgJob': 'पहली जॉब फ़ाइल खोलें', 'ck.lgBill': 'पहली जॉब का बिल बनाएँ', 'ck.lgDeposit': 'ग्राहक की ड्यूटी जमा दर्ज करें',
   },
 );

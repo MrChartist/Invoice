@@ -6,28 +6,34 @@
  * opens it). Nothing is read until the tab opens.
  * Working papers — verify with your CA.
  */
-import { Suspense, type ComponentType, type LazyExoticComponent } from 'react';
+import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { lgT } from '../../i18n/areas/logistics-r19a';
+import { activePacks, type PackId } from '../../lib/industry-packs';
+import { localDb } from '../../lib/localDb';
+import { lgcT } from '../../i18n/areas/logistics-r19c';
 import controls from '../../styles/controls.module.css';
 import JobsView from './JobsView';
 import RatesView from './RatesView';
 import type { LgViewProps } from './lg-ui';
 
-type View = { label: () => string; C: ComponentType<LgViewProps> | LazyExoticComponent<ComponentType<LgViewProps>> };
+type View = { label: () => string; C: ComponentType<LgViewProps> | LazyExoticComponent<ComponentType<LgViewProps>>; pack?: PackId };
 const VIEWS: Record<string, View> = {
   // R19-A
   jobs: { label: () => lgT('jobs'), C: JobsView },
   rates: { label: () => lgT('rates'), C: RatesView },
-  // R19-B (billing, costing) · R19-C (customs) · R19-D (agents, courier, storage)
+  // R19-B (billing, costing) · R19-D (agents, courier, storage)
+  // R19-C: the customs broker desk (pack `customs`)
+  customs: { label: () => lgcT('customs'), C: lazy(() => import('./CustomsView')), pack: 'customs' },
 };
 
 export default function ShipmentsDesk({ view, notify }: LgViewProps & { view?: string }) {
   useT();
   const [, setParams] = useSearchParams();
   const v = Object.hasOwn(VIEWS, view ?? '') ? view! : 'jobs';
-  const ids = Object.keys(VIEWS);
+  const on = activePacks(localDb.settings.get());
+  const ids = Object.keys(VIEWS).filter((k) => k === v || !VIEWS[k].pack || on.includes(VIEWS[k].pack!));
   const C = VIEWS[v].C;
   return (
     <section data-shipments-desk>
