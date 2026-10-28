@@ -27,7 +27,6 @@ import { withStandard } from '../annexure';
 import { loadWorkTypes } from '../rate-cards';
 import { appearanceLines } from './ps-legal';
 import { commissionLine } from './ps-media';
-import { foldName } from './ps-conflicts';
 
 export interface EngagementUse { used: number; fees: number; milestones: string[] }
 
@@ -153,7 +152,8 @@ export function createCommissionDraft(publication: string, grossSpace: number, p
   const l = commissionLine(publication.trim(), grossSpace, pct, prefs);
   if (!publication.trim() || !(l.rate > 0)) throw new Error('Type the publication, the gross space and the commission %.');
   const sender = localDb.settings.activeProfile() ?? null;
-  const client = localDb.clients.getAll().find((c) => foldName(c.name ?? '') === foldName(publication)) ?? { ...blankClient(), name: publication.trim() };
+  const key = publication.trim().toLowerCase();
+  const client = localDb.clients.getAll().find((c) => c.name?.trim().toLowerCase() === key) ?? { ...blankClient(), name: publication.trim() };
   const base = makeDraft({ settings: localDb.settings.get(), sender, docType: 'INVOICE', templateId: localDb.template.get() });
   const d = buildBillDraft({ ...base, id: generateId() }, client, [toItem(l)], sender);
   d.invoice_number = localDb.invoices.nextNumber(d.issue_date, d.doc_type, sender?.invoicePrefix || undefined);

@@ -61,7 +61,7 @@ test('B2: two insertions as pure agent with a 15 % fee; snapshot in ps.media; bi
   const buy = (id: string, ro: string, total: number): PurchaseRecord => ({
     id, kind: 'EXPENSE', vendor_name: 'Daily Times', bill_number: ro, date: '2026-06-15', category: 'Media', taxable: total, cgst: 0, sgst: 0, igst: 0, total, itc_eligible: false, amount_paid: total,
     ps: { media: { client_id: clientMH.id!, medium: 'print', mode: 'agent', ro, publication: 'Daily Times', insert_from: '2026-06-14' } },
-  } as PurchaseRecord);
+  } as unknown as PurchaseRecord);
   purchasesDb.save(buy('m1', 'RO-1', 50000));
   purchasesDb.save(buy('m2', 'RO-2', 30000));
   const live = () => currentLiveInvoiceIds();

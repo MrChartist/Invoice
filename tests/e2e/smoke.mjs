@@ -4993,6 +4993,56 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R16-B Round 14 engines: a ₹2,500 court fee aged 70 days sits in 61–90 → Write off → gone; Reverse → back; the pre-bill bills two media insertions as pure agent + 15 % fee and five appearances as one line 5 × ₹15,000; a conflict check is deleted', async () => {
+    const keys = ['settings', 'clients', 'purchases', 'time_entries', 'work_types', 'invoices', 'series_counters', 'conflict_checks', 'recycle_bin'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const day = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'professional', modules: undefined, prof_kind: 'legal', industry_packs: ['practice', 'legal', 'media'], lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-16-c', name: 'E2E Kapoor Advertising Client' }]);
+    const exp = (id, date, total, ps, extra = {}) => ({ id, kind: 'EXPENSE', vendor_name: 'E2E Vendor', bill_number: id.toUpperCase(), date, category: 'Other', taxable: total, cgst: 0, sgst: 0, igst: 0, total, itc_eligible: false, amount_paid: total, ps, ...extra });
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []),
+      exp('e2e-16-d', day(70), 2500, { disb: 'court_fee', on_behalf: true }, { billable_to_client_id: 'e2e-16-c', pure_agent: true }),
+      exp('e2e-16-m1', day(5), 50000, { media: { client_id: 'e2e-16-c', medium: 'print', mode: 'agent', ro: 'RO-1', publication: 'E2E Daily' } }),
+      exp('e2e-16-m2', day(4), 30000, { media: { client_id: 'e2e-16-c', medium: 'print', mode: 'agent', ro: 'RO-2', publication: 'E2E Daily' } })]);
+    await writeJson(page, 'work_types', [...(prev.work_types ?? []), { id: 'e2e-16-w', name: 'E2E Appearance', rate: 15000, ps: { unit: 'appearance' } }]);
+    await writeJson(page, 'time_entries', [...(prev.time_entries ?? []), ...[1, 2, 3, 4, 5].map((k) => ({ id: `e2e-16-t${k}`, client_id: 'e2e-16-c', client_name: 'E2E Kapoor Advertising Client', description: '', date: day(k), minutes: 60, hourly_rate: 4000, billable: true, work_type_id: 'e2e-16-w' }))]);
+    await writeJson(page, 'conflict_checks', [...(prev.conflict_checks ?? []), { id: 'e2e-16-cc', date: day(1), terms: ['E2E Delete Me Ltd'], hits: [], result: 'clear', created_at: day(1) }]);
+    await page.goto(srv.origin + '/time?tab=wip&view=disb');
+    const row = page.locator('[data-disb-row="e2e-16-d"]');
+    await row.waitFor({ timeout: 15000 });
+    check(/2,500/.test(await page.locator('[data-disb-bucket="2"]').innerText()), `₹2,500 aged 70 days in 61–90 (${await page.locator('[data-disb-bucket="2"]').innerText()})`);
+    await page.locator('[data-disb-reason]').fill('Client absconded');
+    await row.locator('[data-disb-wo]').click();
+    await row.waitFor({ state: 'detached', timeout: 10000 });
+    check(await page.locator('[data-disb-off]').innerText().then((t) => /Client absconded/.test(t)), 'written off: gone from the list, in "Written off"');
+    await page.locator('[data-disb-rev]').first().click();
+    await row.waitFor({ timeout: 10000 });
+    check(true, 'Reverse brings it back');
+    await page.goto(srv.origin + '/time?tab=wip&view=prebill&client=e2e-16-c');
+    await page.locator('[data-prebill-media]').waitFor({ timeout: 15000 });
+    check(await page.locator('[data-prebill-media-row]').count() === 2, 'two media insertions on the pre-bill');
+    await page.locator('[data-prebill-media-fee]').fill('15');
+    await page.locator('[data-prebill-appear]').check();
+    await page.locator('[data-prebill-create]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.client?.id === 'e2e-16-c'))).find((i) => i.client?.id === 'e2e-16-c');
+    const agent = (inv?.items ?? []).filter((i) => i.charge_head_id === 'rule33').map((i) => i.rate).sort((a, b) => a - b);
+    const fees = (inv?.items ?? []).filter((i) => /^Agency service fee/.test(i.name)).map((i) => i.rate).sort((a, b) => a - b);
+    const app = (inv?.items ?? []).find((i) => i.name === 'E2E Appearance');
+    check(agent.join() === '2500,30000,50000' && fees.join() === '4500,7500' && inv.ps?.media?.rows?.length === 2, `media as pure agent + 15 % fee, the court fee as pure agent (${agent} / ${fees})`);
+    check(app?.quantity === 5 && app.rate === 15000 && app.bill_refs?.length === 5, `five appearances → one line 5 × ₹15,000 (${app?.quantity} × ${app?.rate})`);
+    await page.goto(srv.origin + '/time?tab=matters&view=conflicts');
+    const cc = page.locator('[data-conflict-checks] tr', { hasText: 'E2E Delete Me Ltd' });
+    await cc.waitFor({ timeout: 15000 });
+    page.once('dialog', (d) => d.accept());
+    await cc.locator('[data-conflict-del]').click();
+    await cc.waitFor({ state: 'detached', timeout: 10000 });
+    const bin = await readJson(page, 'recycle_bin', [], (v) => v.some((r) => r.row_id === 'e2e-16-cc'));
+    check(bin.some((r) => r.table === 'conflict_checks' && r.row_id === 'e2e-16-cc'), 'the conflict check is deleted into the recycle bin');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   await step('R15-A netting: a party who is both client and vendor (receivable ₹65,000, payable ₹1,80,000) → Netting ₹65,000 settles both invoices and reduces the bill, no cash receipt, one audit line; Reverse opens both again; Ctrl+K "Netting"', async () => {
     const keys = ['settings', 'clients', 'vendors', 'invoices', 'transactions', 'purchases'];
     const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));

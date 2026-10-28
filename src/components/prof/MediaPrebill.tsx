@@ -11,7 +11,7 @@ import { psbT } from '../../i18n/areas/prof-r14b';
 import { purchasesDb } from '../../lib/purchases';
 import { currentLiveInvoiceIds, readTimePrefs } from '../../lib/timesheets';
 import { byMedium, mediaLines, mediaSnap, mediaTds, unbilledMedia } from '../../lib/prof/ps-media';
-import { createCommissionDraft, type PrebillInput } from '../../lib/prof/ps-prebill';
+import type { createCommissionDraft, PrebillInput } from '../../lib/prof/ps-prebill';
 import { sectionText } from '../../lib/ita2025';
 import { formatCurrency, todayInput } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
@@ -19,7 +19,8 @@ import surface from '../../styles/surface.module.css';
 import { Field } from './ps-ui';
 import { runWith, type Notify } from './ps-run';
 
-export default function MediaPrebill({ client, onChange, notify }: { client: string; onChange: (x: PrebillInput['extra']) => void; notify: Notify }) {
+/** `bill` is `createCommissionDraft`, passed in so the pre-bill engine stays in the WIP desk chunk. */
+export default function MediaPrebill({ client, onChange, notify, bill }: { client: string; onChange: (x: PrebillInput['extra']) => void; notify: Notify; bill: typeof createCommissionDraft }) {
   useT();
   const run = runWith(notify);
   const prefs = useMemo(() => readTimePrefs(), []);
@@ -63,7 +64,7 @@ export default function MediaPrebill({ client, onChange, notify }: { client: str
       <Field label={r16bT('pub')}><input className={controls.input} value={c.pub} onChange={(e) => setC({ ...c, pub: e.target.value })} /></Field>
       <Field label={r16bT('gross')}><input type="number" min={0} className={controls.input} value={c.gross || ''} onChange={(e) => setC({ ...c, gross: Number(e.target.value) || 0 })} /></Field>
       <Field label={psbT('commission')}><input type="number" min={0} step="0.01" className={controls.input} value={c.pct} onChange={(e) => setC({ ...c, pct: Number(e.target.value) || 0 })} /></Field>
-      <button type="button" className={controls.btnOutline} onClick={() => { const d = run(() => createCommissionDraft(c.pub, c.gross, c.pct, prefs)); if (d) notify(r16bT('commDone', { n: d.invoice_number })); }}>{r16bT('billComm')}</button>
+      <button type="button" className={controls.btnOutline} onClick={() => { const d = run(() => bill(c.pub, c.gross, c.pct, prefs)); if (d) notify(r16bT('commDone', { n: d.invoice_number })); }}>{r16bT('billComm')}</button>
     </fieldset>
   );
 }

@@ -3,7 +3,7 @@ import { lazy, Suspense, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { loadCostCentres } from '../../lib/cost-centres';
 import { clientKey, currentLiveInvoiceIds, readTimePrefs, timeDb, unbilledTime } from '../../lib/timesheets';
-import { createPrebillDraft, prebillFor, type PrebillInput } from '../../lib/prof/ps-prebill';
+import { createCommissionDraft, createPrebillDraft, prebillFor, type PrebillInput } from '../../lib/prof/ps-prebill';
 import { localDb } from '../../lib/localDb';
 import { impliedPacks } from '../../lib/shop-mode';
 import { r16bT } from '../../i18n/areas/prof-r16b';
@@ -104,7 +104,7 @@ export default function PreBillView({ notify }: Pick<PsDeskProps, 'notify'>) {
         </div>
         {typeof plan === 'string' && <p className={controls.error} role="alert">{plan}</p>}
         {plan && typeof plan !== 'string' && <p data-prebill-preview>{plan.basis} · {pwT('preview', { billed: money(billed), standard: money(std), diff: money(round2(billed - std)) })}</p>}
-        {packs.includes('media') && key && <Suspense fallback={null}><MediaPrebill key={key} client={key} onChange={setMedia} notify={notify} /></Suspense>}
+        {packs.includes('media') && key && <Suspense fallback={null}><MediaPrebill key={key} client={key} onChange={setMedia} notify={notify} bill={createCommissionDraft} /></Suspense>}
         {packs.includes('legal') && <label className={controls.check}><input type="checkbox" checked={appear} onChange={(e) => setAppear(e.target.checked)} data-prebill-appear /> {r16bT('appear')}</label>}
         <label className={controls.check}><input type="checkbox" checked={annex} onChange={(e) => setAnnex(e.target.checked)} /> {pwT('annexure')}</label>
         <button type="button" className={controls.btnPrimary} disabled={!key || typeof plan === 'string'} onClick={create} data-prebill-create>{pwT('create')}</button>
