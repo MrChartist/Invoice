@@ -259,18 +259,18 @@ booking, so a deposit edited in the Advances tab stays a deposit.
 
 ### Bundle (R19-C)
 
-Baseline: the merged base `3db213e` built in a separate worktree (`vite build` + `check-bundle-size`): initial
-182.9 kB (4 files), entry 88.9 kB, core 3,217.9 kB, Hindi pack 354.9 kB, Hindi in core 21.6 kB, `lazy-leaves` 17.7 kB.
+Baseline: the merged base `8b3f5a3` built in a separate worktree (`vite build` + `check-bundle-size`): initial
+183.0 kB (4 files), entry 89.0 kB, core 3,217.4 kB, Hindi pack 354.9 kB, Hindi in core 21.6 kB, `lazy-leaves` 17.7 kB.
 Normalized as in R19-A (chunk hashes stripped, gzip -9, 1 kB = 1,024 B).
 
 | Budget | Before | After | Change (normalized) | Cap |
 |---|---|---|---|---|
-| Initial JS (first paint) | 182.9 kB (4 files) | SEE_INIT | +22 B: the entry's preload file list in another order (same files, no new chunk or module; any content edit reorders it — help text alone does) | 0 |
-| Entry chunk | 88.9 kB | SEE_ENTRY | as above | — |
-| Core precache (English) | 3,217.9 kB | SEE_CORE | **+7,779 B = 7.60 kB** | 9 kB (PRD) ✓ |
-| Hindi pack | 354.9 kB | SEE_HI | +1.02 kB (`lang-hi-logistics` +0.98 kB, wiring areas) | 8 kB (round) ✓ |
-| Hindi left in core | 21.6 kB | SEE_HIC | 0 | 0 ✓ |
-| `lazy-leaves` | 17.7 kB | SEE_LL | 0 | — |
+| Initial JS (first paint) | 183.0 kB (4 files) | 183.0 kB (4 files) | +22 B: the entry's preload file list in another order (same files, no new chunk or module; any content edit reorders it — help text alone does) | 0 |
+| Entry chunk | 89.0 kB | 89.0 kB | as above | — |
+| Core precache (English) | 3,217.4 kB | 3,225.8 kB | **+7,779 B = 7.60 kB** | 9 kB (PRD) ✓ |
+| Hindi pack | 354.9 kB | 356.0 kB | +1.02 kB (`lang-hi-logistics` +0.98 kB, wiring areas) | 8 kB (round) ✓ |
+| Hindi left in core | 21.6 kB | 21.6 kB | 0 | 0 ✓ |
+| `lazy-leaves` | 17.7 kB | 17.7 kB | 0 | — |
 
 Chunks (normalized gz): ShipmentsDesk 4.03 → 7.54 kB (+3.51 kB: CustomsView and `lg-recv-io`), `f-logistics` 3.96 →
 7.34 kB (+3.39 kB: the three engines and the `logistics-r19c` English), LogisticsBlock +0.27 kB (`DisbSchedule`), demo

@@ -6111,7 +6111,7 @@ try {
     await disb('duty', 'Customs (ICEGATE)', '1234567', 185430, 1);
     const bills = (await disb('cfs', 'Demo CFS', 'CFS/77', 12000, 2)).filter((p) => p.lg?.job_id === job.id);
     check(bills.length === 2 && bills.every((p) => p.itc_eligible === false && p.pure_agent === true && p.billable_to_client_id === 'e2e-lg-c2' && p.cgst + p.sgst + p.igst === 0), 'two disbursements on behalf: no GST, no ITC, billable to the client as pure agent');
-    check(/Excess ₹2,570\.00/.test(await page.locator('[data-lg-position]').innerText()), `position: deposit ₹2,00,000 vs ₹1,97,430 unrecovered → excess ₹2,570 (${await page.locator('[data-lg-position]').innerText()})`);
+    check(/Excess ₹2,570\.00/i.test(await page.locator('[data-lg-position]').innerText()), `position: deposit ₹2,00,000 vs ₹1,97,430 unrecovered → excess ₹2,570 (${await page.locator('[data-lg-position]').innerText()})`);
     // The reimbursement bill as R19-B's charge sheet (or the editor's billable costs) issues it: agency ₹6,000 + GST, two Rule 33 lines, lg.disb.
     const pa = 'Recovered at actual as a pure agent (Rule 33) — outside the taxable value. Verify with your CA.';
     const line = (p, name) => ({ id: `e2e-l-${p.id}`, type: 'Service', name, description: pa, charge_head_id: 'rule33', unit: 'NOS', quantity: 1, rate: p.total, tax_rate: 0, discount_percent: 0, amount: p.total, bill_refs: [p.id] });
@@ -6129,9 +6129,12 @@ try {
     await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv]);
     await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === inv.id), 15000);
     await page.goto(srv.origin + '/invoice/' + inv.id);
-    await page.locator('[data-lg-disb-schedule]').first().waitFor({ timeout: 15000 });
-    check((await page.locator('[data-lg-disb-schedule] tbody tr').count()) === 2 && /1,97,430\.00/.test(await page.locator('[data-lg-disb-total]').first().innerText()), 'the paper prints the disbursement schedule (two rows) and ₹1,97,430.00 at actual');
-    check((await page.locator('body').innerText()).includes('2,04,510.00'), 'reimbursement bill total ₹2,04,510.00');
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click({ timeout: 15000 });
+    const dlg = page.getByRole('dialog', { name: 'Document preview' });
+    await dlg.locator('[data-lg-disb-schedule]').first().waitFor({ timeout: 15000 });
+    check((await dlg.locator('[data-lg-disb-schedule] tbody tr').count()) === 2 && /1,97,430\.00/.test(await dlg.locator('[data-lg-disb-total]').first().innerText()), 'the paper prints the disbursement schedule (two rows) and ₹1,97,430.00 at actual');
+    check((await dlg.innerText()).includes('2,04,510.00'), 'reimbursement bill total ₹2,04,510.00');
+    await page.keyboard.press('Escape');
     await page.goto(srv.origin + '/time?tab=shipments&view=customs');
     await page.locator('[data-lg-field="customs-job"]').selectOption(job.id, { timeout: 15000 });
     await page.locator('[data-lg-field="dep-invoice"]').selectOption(inv.id);
@@ -6141,7 +6144,7 @@ try {
     check(pay?.amount === 200000 && pay.invoice_id === inv.id && pay.method === 'Advance adjusted', `deposit applied: ₹${pay?.amount} as an advance_id row (cash readers skip it)`);
     const after = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === inv.id && i.amount_paid === 200000), 15000)).find((i) => i.id === inv.id);
     check(after?.balance_due === 4510, `₹4,510.00 due after the deposit (${after?.balance_due})`);
-    check(/Short by ₹4,510\.00/.test(await page.locator('[data-lg-position]').innerText()), 'position: short by ₹4,510.00');
+    check(/Short by ₹4,510\.00/i.test(await page.locator('[data-lg-position]').innerText()), 'position: short by ₹4,510.00');
     await page.goto(srv.origin + '/');
     await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
     await page.keyboard.press('Control+k');
