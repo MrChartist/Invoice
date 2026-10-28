@@ -63,7 +63,7 @@ figure, blocks a workflow or makes a vertical unusable at scale · **M** missing
 | 19 | **Done** (POS → Counter settings → Scale tab, dairy pack; strings in `retail`, no dairy chunk split) — Dairy analyser profile row in POS device settings (set on Dairy → Collection today) | L | S | `agri-r12.md` AG-B |
 | 20 | **Done** (`services/sv-deferral.ts`, switch + monthly journal on Time → Members) — Services: package-income deferral journal (`defer_package_income`, report only today) | M | M | `services-r10.md` SV-C |
 | 21 | **Done** (`sv-class-bookings.ts`, camera check-in via the existing BarcodeDetector scanner, `ServiceRecipeRow` on the stock-item form, `linesWithoutStaff` block on POS) — Services: class bookings per occurrence; camera QR check-in; "products used per service" on the item form; staff-required block on POS | M | M | `services-r10.md` SV-A / SV-C |
-| 22 | Construction "settings switches" form (R16 "left as found") | L | S | `construction-r11.md` |
+| 22 | **Done** (lazy `construction/ConstructionSettingsForm.tsx` under the picker, `constructionFormPatch`) — Construction "settings switches" form (R16 "left as found") | L | S | `construction-r11.md` |
 | 23 | Apparel size grid on PO / GRN editors | L | S | [`features/retail-r9.md`](features/retail-r9.md) |
 | 24 | Discoverability §7 Q6: move samples already loaded into a real company to a Demo company | L | M | [`features/discoverability-r6.md`](features/discoverability-r6.md) |
 | 25 | Custom fields on purchase bills / expenses / recurring templates; item fields per line and in the stock-item modal | L | M | [`features/attachments-custom-fields.md`](features/attachments-custom-fields.md) |

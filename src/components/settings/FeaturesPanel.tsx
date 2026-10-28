@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import type { AppSettings } from '../../lib/localDb';
@@ -28,6 +28,7 @@ import { applySocietyKind } from '../../lib/shop-presets'; // R18-A1
 import { SocietyKindPicker } from '../society/SocietyKindPicker';
 import { hsPickT } from '../../i18n/areas/society-r18a-pick';
 import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
+const ConstructionSettingsForm = lazy(() => import('../construction/ConstructionSettingsForm')); // R11 (CN-A1, PENDING #22)
 import { DB_PREFIX, getJson } from '../../lib/storage';
 import { cnPickT } from '../../i18n/areas/construction-r11-pick';
 import { RetailKindPicker } from '../retail-r9/RetailKindPicker';
@@ -162,6 +163,8 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
                 void import('../../lib/construction/cn-profile').then((m) => m.applyConstructionSwitches(k, { government: cnGov })).catch(() => undefined);
               }}
             />
+            {/* Keyed by the profile: a new profile's switches show when the form is opened again. */}
+            <Suspense fallback={null}><ConstructionSettingsForm key={settings.construction_kind ?? ''} disabled={!owner} /></Suspense>
           </div>
         )}
         {settings.business_type === 'services' && (

@@ -61,8 +61,11 @@ carry the same paper and page 2. Paper strings: `i18n/areas/construction-r11-pap
   project, PF18): the class-rate notice
   shows in the editor's Contract & RA panel; the realty caution belongs with CN-C's classes.
 - Sample data (`demo/profile-works.ts` dispatcher and blocks) not added; existing works sample rows unchanged.
-- Settings switches beyond the picker (paper style, certificate text, deviation %) have no separate Settings form:
-  the profile writes them; per document the paper style is chosen in the editor panel.
+- Settings switches beyond the picker (PENDING #22): Settings → Features → "Construction settings" (a lazy form under the
+  picker, owner only, strings `construction-r11-settings.ts`) edits RA paper style, M-book column, government, certificate
+  and its text, sign-off boxes, deviation %, supply + installation caution, photo pages, manpower preset and the labour
+  hold % (`cn-settings.ts` `constructionFormPatch`: a blank number / text clears the key so the default applies). Works
+  views stay with the profile; per document the paper style is still chosen in the editor panel.
 - `DEDUCTION_KINDS` (BOQ deduction-set editor) is unchanged; CN-B adds rows with their maths.
 - `tests/features-catalog.test.ts`: advanced options 21 → 22 (the construction profile row).
 
