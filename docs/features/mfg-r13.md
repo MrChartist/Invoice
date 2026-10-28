@@ -221,7 +221,7 @@ view (≈ −1.5 kB), the bundle-ticket coupons and the cut-report print (≈ �
 ### Deviations from the PRD (MF-D)
 
 - **Desk chunks**: each desk is one lazy chunk with its views (MF-A's finding); the two desks and Floor → WIP share `mfd-ui.tsx` / `mfd-util.ts` (≈ 0.8 kB together).
-- **Capital grant default**: Capital subsidy (reserve) unless the asset's ledger is given (`asset_account_id`, not yet pickable in the form) — PRD said "asset cost" (MF63).
+- **Capital grant default**: Capital subsidy (reserve) unless the asset's ledger is picked on the form (`asset_account_id`: "Credit (capital grant)" lists the fixed-asset ledgers, accumulated depreciation left out, `grantAssetLedgers`; checked on save, fixed once recognised; PENDING #17) — PRD said "asset cost" (MF63).
 - **Schemes preset**: no R8 preset list exists, so the presets live on Food → Schemes and create ordinary R8 schemes; the display claim is a note (settle by FCN).
 - **Destroyed returns (D2.5)**: unchanged existing flow (credit note + QC scrap journal); only the help and MF32 note point to it.
 - **AA tagging**: from the AA register (pick invoice / bill) and the BOE row; the invoice editor has no AA picker. The A5 paper prints `mf.export_aa.aa_no` / `sion`.
