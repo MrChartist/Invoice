@@ -385,3 +385,13 @@ test('bank rules apply: contra posts once (twin reused), receipt settles a custo
   assert.equal(out.find((s) => s.id === 'sa')!.lines[1].matched_to?.type, 'payment');
   assert.equal(localDb.invoices.getById((inv as { id: string }).id)?.amount_paid, 1180);
 });
+
+test('approval history: two decisions in the same millisecond list the later one first', async () => {
+  const { setTable } = await import('../src/lib/storage.ts');
+  const { APPROVALS_TABLE } = await import('../src/lib/approvals.ts');
+  const at = '2026-05-12T10:30:00.000Z';
+  const row = (id: string, decision: 'approved' | 'rejected') =>
+    ({ id, doc_id: 'b1', doc_type: 'BILL', doc_number: 'AS/22', decision, decided_by: 'owner', decided_at: at });
+  setTable(APPROVALS_TABLE, [row('r1', 'rejected'), row('r2', 'approved')]);
+  assert.deepEqual(purchaseApprovalHistory().map((h) => h.decision), ['approved', 'rejected']);
+});

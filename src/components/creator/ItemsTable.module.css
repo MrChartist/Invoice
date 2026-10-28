@@ -1,6 +1,13 @@
 .wrap {
   display: flex;
   flex-direction: column;
+}
+
+/* The size container is the lines block only (QA18 T1): with the footer inside it, Chromium could leave the footer
+   without a layout box after an in-app navigation (computed display: flex, no box) until its own style changed. */
+.lines {
+  display: flex;
+  flex-direction: column;
   container-type: inline-size;
 }
 

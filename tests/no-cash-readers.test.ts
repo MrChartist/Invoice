@@ -180,6 +180,8 @@ const MARKER_OWNERS = new Set([
   'lib/retail/rt-doc-hooks.ts',
   // R15-A3: party netting writes the R9 exchange marker on its receipts (no new marker) and rolls them into the bill.
   'lib/netting.ts',
+  // QA18 T3: loads the bill hooks when any receipt settles a bill (it moves no money itself).
+  'lib/retail/ensure-hooks.ts',
 ]);
 
 test('guard: the cash / bank readers call movedNoCash', () => {

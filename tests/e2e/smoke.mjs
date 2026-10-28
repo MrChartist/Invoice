@@ -57,6 +57,24 @@ async function closeSendSheet(p) {
   }
 }
 
+/**
+ * QA18 T1: after an in-app jump into the editor (a desk's Bill / Make draft), the items footer (Add line and the pack
+ * rows under it) must have a layout box — it once stayed boxless in Chromium until a reload. Polls up to 5 s.
+ */
+async function footerLaidOut(p, label) {
+  const until = Date.now() + 5000;
+  let n = 0;
+  while (Date.now() < until) {
+    n = await p.evaluate(() => {
+      const add = [...document.querySelectorAll('button')].find((b) => /Add line/.test(b.textContent ?? ''));
+      return add?.parentElement ? add.parentElement.getClientRects().length : -1;
+    });
+    if (n > 0) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  check(n > 0, `${label}: the editor's items footer is laid out without a reload (${n})`);
+}
+
 async function idbGet(p, key) {
   return p.evaluate((k) => new Promise((resolve, reject) => {
     const open = indexedDB.open('mrchartist_inv_kv');
@@ -1916,6 +1934,7 @@ try {
     await page.getByRole('button', { name: /^Bill$/ }).first().click();
     await page.getByRole('button', { name: 'Create draft invoice' }).click();
     await page.waitForURL(/\/invoice\/.+/);
+    await footerLaidOut(page, 'Timesheets → Bill (R3-B)');
     const inv = (await readJson(page, 'invoices', [], (v) => v.length > 0))[0];
     const item = inv?.items?.[0] ?? {};
     check(inv?.status === 'Draft' && item.quantity === 1.5 && item.unit === 'HRS' && item.hsn === '998311',
@@ -3966,6 +3985,7 @@ try {
     }
     await row.locator('[data-ws-bill]').click();
     await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await footerLaidOut(page, 'Workshop job → Bill (R10)');
     const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.sv?.job?.id === job.id && i.doc_type !== 'QUOTATION'))).find((i) => i.sv?.job?.id === job.id && i.doc_type !== 'QUOTATION');
     const lab = bill?.items.find((l) => l.sv?.labour_op_id);
     const pad = bill?.items.find((l) => l.name === 'E2E Brake pads');
@@ -4060,6 +4080,7 @@ try {
     await vrow.locator('select').selectOption('E2E Chemical peel');
     await vrow.locator('[data-visit-bill]').click();
     await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await footerLaidOut(page, 'Clinic visit → Bill (R10)');
     const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.sv?.visit?.id === visit.id))).find((i) => i.sv?.visit?.id === visit.id);
     const consult = bill?.items?.[0];
     check(Number(consult?.tax_rate) === 0 && consult?.sv?.exempt === 'EXEMPT' && Number(bill?.items?.[1]?.tax_rate) === 18, 'the consult is exempt and the peel taxed at 18%');
@@ -4085,6 +4106,7 @@ try {
     await page.locator('[data-discharge]').click();
     await page.locator('[data-final-bill]').click({ timeout: 15000 });
     await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await footerLaidOut(page, 'IPD final bill (R10)');
     const fin = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.sv?.admission?.id === adm.id))).find((i) => i.sv?.admission?.id === adm.id);
     check(Number(fin?.items?.[0]?.tax_rate) === 5 && fin.items[0].sv?.cls === 'hospital_room_high', 'the room above ₹5,000 a day is billed at 5%');
     await page.goto(srv.origin + '/expenses');
@@ -4768,6 +4790,7 @@ try {
     const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.ps?.engagement?.id === 'e2e-ps-e'))).find((i) => i.ps?.engagement?.id === 'e2e-ps-e');
     check(inv?.taxable_value === 40000 && inv.ps.wd?.standard === 58000 && inv.ps.wd.reasons[0]?.reason === 'Cap' && inv.ps.wd.reasons[0]?.amount === -18000, `the draft bills ₹40,000 with an ₹18,000 "Cap" write-down (${JSON.stringify(inv?.ps?.wd)})`);
     await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await footerLaidOut(page, 'Trips → Bill (R15-B)');
     await page.getByRole('button', { name: /Preview & download PDF/ }).click();
     const dlg = page.getByRole('dialog', { name: 'Document preview' });
     await dlg.waitFor();
@@ -5139,6 +5162,7 @@ try {
     check(await tk.locator('[data-tv-fee-high]').count() === 1, 'a fee above the deemed value warns (TV11)');
     await tk.locator('[data-tv-tkt-add]').click();
     await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await footerLaidOut(page, 'Ticket → draft (R15-C)');
     const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.tv?.air))).find((i) => i.tv?.air);
     const svc = inv?.items.find((l) => l.id === inv.tv.air.line_id);
     check(svc?.rate === 420 && svc.tax_rate === 18 && svc.hsn === '998551' && inv.tax_amount === 75.6, `service line ₹420 at 18 % (SAC 998551), GST ₹75.60 (${inv?.tax_amount})`);
@@ -5199,9 +5223,9 @@ try {
     await page.goto(srv.origin + '/time?tab=trips&view=trips');
     await page.locator('[data-tv-bill="E2E-DXB"]').click({ timeout: 15000 });
     await page.waitForURL(/\/invoice\//, { timeout: 15000 });
-    // Known issue (pre-existing, R15-B Bill flow): after the in-app jump from the Trips desk to the editor, Chromium
-    // leaves the items footer (Add line, trip row, chips) without a layout box until the next relayout; a reload shows it.
-    await page.reload();
+    // QA18 T1: no reload — the in-app jump from Bill lays the items footer out (Add line, trip row, chips). It used to
+    // stay without a layout box (Chromium, footer inside the lines' size container) until a reload.
+    await footerLaidOut(page, 'Trips → Bill (R15-D)');
     const chip = page.locator('[data-tv-tcs="ok"]');
     await chip.waitFor({ timeout: 15000 });
     const calc = await chip.locator('[data-tv-tcs-calc]').innerText();
