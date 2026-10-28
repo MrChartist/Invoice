@@ -287,6 +287,9 @@ export const TOPICS: readonly HelpTopic[] = [
   t('recurring:society:gst', 'GST', 'GST', 'Turnover vs the registration threshold, units above the limit, the both-conditions table and the ITC split link.', 'Each month.', { statutory: ca(['HS4', 'HS9', 'HS11', 'HS15']) }),
   // R18-C
   t('recurring:society:dues', 'Dues', 'बकाया', 'Arrears and capped simple interest (receipts settle interest first), defaulters, dues certificate, transfer; reminders never threaten services.', 'Each month.', { statutory: ca(['HS26', 'HS33', 'HS37', 'HS38']) }),
+  // R18-D
+  t('recurring:society:funds', 'Funds', 'निधियाँ', 'Sinking and repair contributions billed move to the fund reserves by one journal per period or year; minimum hints; Books → Funds.', 'Each period or year end.', { statutory: ca(['HS13', 'HS27', 'HS39']) }),
+  t('recurring:society:registers', 'Registers', 'रजिस्टर', 'Member list (Form J), I, share and nomination registers; audit due dates with bell notices; income-tax working paper.', 'Each new member; each year.', { statutory: ca(['HS20', 'HS21', 'HS30', 'HS31']) }),
   t('recurring:society:heads', 'Tariff', 'शुल्क सूची', 'Charge heads and bases; State defaults are data, checks only hints.', 'When rates change.', { statutory: ca(['HS19', 'HS26', 'HS27', 'HS33']) }),
   t('time:trips:events', 'Event budgets', 'इवेंट बजट', 'Budget heads: approved, booked, billed, paid; over-budget heads in red; client advances, margin, POS by Sec 12(7)(a) and each vendor\'s TDS limb (hint).', 'Each event.', { statutory: ca(['TV21', 'TV22', 'TV23']) }),
 ];

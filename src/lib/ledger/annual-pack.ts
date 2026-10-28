@@ -34,9 +34,17 @@ import {
   type TrialBalance,
 } from './reports';
 import { buildNotes, capitalTitle, reservesTitle, TEXT_NOTES, type NoteCell, type PackNote, type PartnerNoteRow } from './notes-auto';
+import { receiptsPayments, type ReceiptsPayments } from '../society/hs-rp';
 
 export const NOTES_TABLE = 'notes_to_accounts';
-export const ENTITY_TYPES: readonly EntityType[] = ['proprietorship', 'partnership', 'llp', 'company'];
+export const ENTITY_TYPES: readonly EntityType[] = ['proprietorship', 'partnership', 'llp', 'company', 'cooperative', 'association'];
+
+/* ── R18-D2: a co-operative society / association prints an Income and Expenditure Account (same figures), its
+ * balance sheet as funds and liabilities / property and assets, and a Receipts and Payments account (HS40). ── */
+const NPO = (e: EntityType) => e === 'cooperative' || e === 'association';
+const L = (e: EntityType) => NPO(e)
+  ? { pl: 'Income and Expenditure Account', net: 'Excess of income over expenditure / (expenditure over income)', el: 'I. FUNDS AND LIABILITIES', as: 'II. PROPERTY AND ASSETS', funds: "Members' funds" }
+  : { pl: 'Statement of profit and loss', net: 'Profit / (loss) for the year', el: 'I. EQUITY AND LIABILITIES', as: 'II. ASSETS', funds: '' };
 export const DRAFT_LINE = 'Draft — prepared from books, verify with your CA';
 
 export const fyId = (startYear: number) => `FY${String(startYear).slice(2)}-${String(startYear + 1).slice(2)}`;
@@ -88,6 +96,8 @@ export interface AnnualPackInput {
   inventoryRows?: readonly { label: string; cur: number; prev: number }[];
   /** PS-D1 (optional): partner-wise capital and current accounts for the note (paise). */
   partnerRows?: readonly PartnerNoteRow[];
+  /** R18-D2: the cash and bank ledgers of the Receipts and Payments account (clearing accounts left out); default Cash & bank. */
+  rpCash?: (accountId: string) => boolean;
 }
 
 /** The date the pack's statements run to: the FY end once the FY has ended, else the picked as-at date (or today) inside the FY. */
@@ -122,6 +132,8 @@ export interface AnnualPack {
   notes: PackNote[];
   /** Balance-sheet difference at the year end (0 when the books tie). */
   difference: number;
+  /** R18-D2: Receipts and Payments (co-operative society / association only). */
+  rp?: ReceiptsPayments;
 }
 
 export function buildAnnualPack(input: AnnualPackInput): AnnualPack {
@@ -144,6 +156,7 @@ export function buildAnnualPack(input: AnnualPackInput): AnnualPack {
   return {
     fy, prev, company: input.company, entity, scopeLabel: input.scopeLabel, generatedOn, asAt, interim,
     bs, bsPrev, pl, plPrev, cf, tb, notes, difference: bs.difference,
+    ...(NPO(entity) ? { rp: receiptsPayments(input.ledger, curP, input.rpCash ?? ((id) => input.ledger.byId.get(id)?.group === 'CASH_BANK')) } : {}),
   };
 }
 
@@ -180,7 +193,7 @@ export function balanceSheetLines(pack: AnnualPack): StatementLine[] {
       const s = cur.find((x) => x.key === k);
       const p = prev.find((x) => x.key === k);
       const label = (s ?? p)!.label;
-      out.push({ label: pack.entity === 'company' && k === 'funds' ? "Shareholders' funds" : label, level: 0 });
+      out.push({ label: pack.entity === 'company' && k === 'funds' ? "Shareholders' funds" : (k === 'funds' && L(pack.entity).funds) || label, level: 0 });
       const items = [...new Set([...(s?.items ?? []).map((i) => i.groupId ?? i.label), ...(p?.items ?? []).map((i) => i.groupId ?? i.label)])];
       for (const id of items) {
         const a = s?.items.find((i) => (i.groupId ?? i.label) === id);
@@ -192,8 +205,8 @@ export function balanceSheetLines(pack: AnnualPack): StatementLine[] {
     }
     out.push({ label: 'TOTAL', cur: total, prev: totalPrev, level: 3 });
   };
-  side('I. EQUITY AND LIABILITIES', pack.bs.equityAndLiabilities, pack.bsPrev.equityAndLiabilities, pack.bs.totalEquityAndLiabilities, pack.bsPrev.totalEquityAndLiabilities);
-  side('II. ASSETS', pack.bs.assets, pack.bsPrev.assets, pack.bs.totalAssets, pack.bsPrev.totalAssets);
+  side(L(pack.entity).el, pack.bs.equityAndLiabilities, pack.bsPrev.equityAndLiabilities, pack.bs.totalEquityAndLiabilities, pack.bsPrev.totalEquityAndLiabilities);
+  side(L(pack.entity).as, pack.bs.assets, pack.bsPrev.assets, pack.bs.totalAssets, pack.bsPrev.totalAssets);
   return out;
 }
 
@@ -215,7 +228,7 @@ export function profitLossLines(pack: AnnualPack): StatementLine[] {
   const change = (pl: LedgerProfitLoss) => pl.trading.openingStock - pl.trading.closingStock;
   if (change(cur) || change(prev)) out.push({ label: 'Changes in inventories (opening − closing)', note: noteNo('inventory'), cur: change(cur), prev: change(prev), level: 1 });
   out.push({ label: 'Total expenses', cur: cur.totalExpenses + change(cur), prev: prev.totalExpenses + change(prev), level: 2 });
-  out.push({ label: 'Profit / (loss) for the year', cur: cur.netProfit, prev: prev.netProfit, level: 3 });
+  out.push({ label: L(pack.entity).net, cur: cur.netProfit, prev: prev.netProfit, level: 3 });
   return out;
 }
 
@@ -298,13 +311,19 @@ function noteHtml(n: PackNote): string {
   return `<div class="note"><h3>${n.no}. ${esc(n.title)}</h3>${n.paragraphs.map((p) => `<p>${esc(p)}</p>`).join('')}${tables}${n.extra ? n.extra.split('\n').map((p) => `<p>${esc(p)}</p>`).join('') : ''}</div>`;
 }
 
-const SECTIONS = ['Balance sheet', 'Statement of profit and loss', 'Cash-flow statement', 'Trial balance', 'Notes to accounts'];
+const SECTIONS = (e: EntityType) => ['Balance sheet', L(e).pl, 'Cash-flow statement', 'Trial balance', 'Notes to accounts', ...(NPO(e) ? ['Receipts and Payments account'] : [])];
+
+/** R18-D2: the Receipts and Payments account rows (rupees). */
+function rpRows(rp: ReceiptsPayments): (string | number)[][] {
+  const r = (p: number) => Math.round(p) / 100;
+  return [['Particulars', 'Amount'], ['Opening cash and bank balances', r(rp.opening)], ['Receipts', ''], ...rp.receipts.map((l) => [l.account, r(l.amount)]), ['Payments', ''], ...rp.payments.map((l) => [l.account, r(l.amount)]), ['Closing cash and bank balances', r(rp.closing)]];
+}
 
 /** The pack's pages as one `.ap-root` fragment (scoped CSS included) — for the PDF capture and the preview. */
 export function annualPackBody(pack: AnnualPack): string {
   const c = pack.company;
   const sub = [c.address, c.gstin ? `GSTIN: ${c.gstin}` : '', c.pan ? `PAN: ${c.pan}` : ''].filter(Boolean).join('\n');
-  const ent = { proprietorship: 'Proprietorship', partnership: 'Partnership firm', llp: 'Limited liability partnership', company: 'Company' }[pack.entity];
+  const ent = { proprietorship: 'Proprietorship', partnership: 'Partnership firm', llp: 'Limited liability partnership', company: 'Company', cooperative: 'Co-operative society', association: 'Association' }[pack.entity];
   const asAt = pack.interim ? `As at ${formatDate(pack.asAt)} (interim — the year ends ${formatDate(pack.fy.end)})` : `As at ${formatDate(pack.fy.end)}`;
   const period = pack.interim ? `For the period ${formatDate(pack.fy.start)} to ${formatDate(pack.asAt)} (interim)` : `For the year ended ${formatDate(pack.fy.end)}`;
   const tie = pack.difference ? `<p class="warn">The balance sheet does not tie: difference ₹${esc(amt(pack.difference))}. Check the Vouchers warnings in Books before sharing.</p>` : '';
@@ -312,14 +331,15 @@ export function annualPackBody(pack: AnnualPack): string {
     `<section class="ap-page"><div class="cover"><h2>${esc(ent)}</h2><h1>${esc(c.name || 'Your business')}</h1>${sub ? `<div class="sub">${esc(sub)}</div>` : ''}
       <h2 style="margin-top:28px">Annual accounts · ${esc(pack.fy.label)}</h2><div class="sub">${esc(`${formatDate(pack.fy.start)} to ${formatDate(pack.interim ? pack.asAt : pack.fy.end)}${pack.interim ? ' · Interim, figures to date' : ''}`)}${pack.scopeLabel ? ` · ${esc(pack.scopeLabel)}` : ''}</div>
       <div class="draft">${esc(DRAFT_LINE)}</div>
-      <h3 style="margin-top:36px">Contents</h3><ol class="index">${SECTIONS.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
+      <h3 style="margin-top:36px">Contents</h3><ol class="index">${SECTIONS(pack.entity).map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
       <p class="foot">Prepared on ${esc(formatDate(pack.generatedOn))} from the books kept in Mr. Chartist Invoice. Figures are the same as Books → Balance sheet / P&amp;L. Not audited.</p></div></section>`,
     `<section class="ap-page">${header(pack, 'Balance sheet', asAt)}${tie}${statementTable(balanceSheetLines(pack), pack.fy.label, pack.prev.label)}
       <div class="sign"><div>For the business</div><div>Prepared by / for the auditor</div></div></section>`,
-    `<section class="ap-page">${header(pack, 'Statement of profit and loss', period)}${statementTable(profitLossLines(pack), pack.fy.label, pack.prev.label)}${pack.pl.stockLabel ? `<p class="foot">Closing stock: ${esc(pack.pl.stockLabel)}.</p>` : ''}</section>`,
+    `<section class="ap-page">${header(pack, L(pack.entity).pl, period)}${statementTable(profitLossLines(pack), pack.fy.label, pack.prev.label)}${pack.pl.stockLabel ? `<p class="foot">Closing stock: ${esc(pack.pl.stockLabel)}.</p>` : ''}</section>`,
     `<section class="ap-page">${header(pack, 'Cash-flow statement (AS 3, indirect method)', period)}${cashFlowHtml(pack.cf)}</section>`,
     `<section class="ap-page">${header(pack, 'Trial balance', asAt)}${trialBalanceHtml(pack.tb)}</section>`,
     `<section class="ap-page">${header(pack, 'Notes to accounts', period)}${pack.notes.map(noteHtml).join('')}<p class="foot">${esc(DRAFT_LINE)}. Schedule III wording for ${esc(ent.toLowerCase())} and the notes required for your entity — verify with your CA.</p></section>`,
+    ...(pack.rp ? [`<section class="ap-page" data-ap-rp>${header(pack, 'Receipts and Payments account', period)}<table><tbody>${rpRows(pack.rp).slice(1).map(([a, b]) => `<tr class="${b === '' ? 'l0' : 'l1'}"><td>${esc(String(a))}</td><td class="n">${b === '' ? '' : esc(formatMoney(Number(b)))}</td></tr>`).join('')}</tbody></table></section>`] : []),
   ];
   return `<div class="ap-root"><style>${PACK_CSS}</style>${pages.join('\n')}</div>`;
 }
@@ -367,10 +387,11 @@ export function annualPackSheets(pack: AnnualPack): { name: string; rows: (strin
   }
   return [
     { name: 'Balance sheet', rows: stmt(balanceSheetLines(pack)) },
-    { name: 'Profit & loss', rows: stmt(profitLossLines(pack)) },
+    { name: NPO(pack.entity) ? 'Income & Expenditure' : 'Profit & loss', rows: stmt(profitLossLines(pack)) },
     { name: 'Cash flow', rows: cfRows },
     { name: 'Trial balance', rows: tb },
     { name: 'Notes', rows: notes, header: false },
+    ...(pack.rp ? [{ name: 'Receipts and Payments', rows: rpRows(pack.rp) }] : []),
   ];
 }
 

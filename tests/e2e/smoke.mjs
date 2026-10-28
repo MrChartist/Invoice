@@ -5873,6 +5873,126 @@ try {
     await readJson(page, 'society_runs', null, (v) => JSON.stringify(v) === JSON.stringify(prev.society_runs), 15000);
   });
 
+  // R18-C / R18-D seed: the R18-B society (MH, registered) with interest on arrears (simple, State cap) and receipts to interest first.
+  const hsSeed = async (tag, extra = {}) => {
+    const keys = ['settings', 'clients', 'society_units', 'society_settings', 'society_runs', 'invoices', 'batch_runs', 'transactions', 'series_counters', 'doc_links', 'cost_centres', 'accounts', 'vouchers', 'notes_to_accounts'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const st = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...st, business_type: 'nonprofit', society_kind: 'chs', industry_packs: ['society'], modules: undefined, service_kind: undefined, manpower_kind: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined, profiles: (st.profiles ?? []).map((p) => (p.id === st.activeProfileId ? { ...p, companyGstin: '27AAPFU0939F1ZV', stateCode: '27', gst_scheme: 'regular' } : p)) });
+    const owners = [['c1', 'Asha'], ['c2', 'Ravi'], ['c3', 'Meena']].map(([id, name]) => ({ id: `e2e-${tag}-${id}`, name: `E2E ${tag} ${name}`, email: '', address: '', city: '', zip: '' }));
+    await writeJson(page, 'clients', [...(prev.clients ?? []), ...owners]);
+    const unit = (id, code, owner, o = {}) => ({ id: `e2e-${tag}-${id}`, code, wing: 'A', use: 'residential', occupancy: 'owner', carpet_area: 600, construction_cost: 2400000, parking: [{ slot: `P${id}`, kind: 'covered' }], owner_id: `e2e-${tag}-${owner}`, typed: { ptx: 1200 }, status: 'active', updated_at: '2026-10-01T00:00:00.000Z', ...o });
+    await writeJson(page, 'society_units', [unit('u1', 'A-101', 'c1'), unit('u2', 'A-102', 'c2', { occupancy: 'tenant' }), unit('u3', 'A-901', 'c3', { carpet_area: 1500, construction_cost: 6000000, parking: [{ slot: 'P1', kind: 'covered' }, { slot: 'P2', kind: 'covered' }], typed: { ptx: 3000 } })]);
+    const H = (id, kind, basis, rate) => ({ id, name: { svc: 'Service charges', snk: 'Sinking fund', rep: 'Repair fund', ptx: 'Property tax', prk: 'Parking', noc: 'Non-occupancy', edu: 'Education' }[id], kind, basis, rate, active: true, ...(kind === 'statutory' ? {} : { sac: '999598' }) });
+    await writeJson(page, 'society_settings', { state: '27', cycle: 'monthly', bill_day: 1, due_days: 19, area_unit: 'sqft', heads: [H('svc', 'service', 'per_unit', 3000), H('snk', 'sinking', 'cost_pct_pa', 0.25), H('rep', 'repair', 'cost_pct_pa', 0.75), H('ptx', 'statutory', 'typed', 0), H('prk', 'parking', 'per_slot', 500), H('noc', 'non_occupancy', 'pct_of_head', 10), H('edu', 'education', 'fixed_member', 10)], interest: { from: 'due', on_interest: false }, allocation: 'interest_first', ...extra });
+    await writeJson(page, 'society_runs', []);
+    await readJson(page, 'society_settings', null, (v) => v?.heads?.length === 7 && v.allocation === 'interest_first', 15000);
+    await readJson(page, 'settings', {}, (v) => v.society_kind === 'chs', 15000);
+    const mine = (v) => (v ?? []).filter((i) => String(i.hs?.unit?.id ?? '').startsWith(`e2e-${tag}`) && i.status !== 'Cancelled');
+    const run = async (period, date, due, n) => {
+      await page.goto(srv.origin + '/recurring?tab=society&view=bills');
+      const bv = page.locator('[data-hs-bills]');
+      await bv.waitFor({ timeout: 15000 });
+      await bv.locator('[data-hs-run-period]').fill(period);
+      await bv.locator('[data-hs-bill-date]').fill(date);
+      await bv.locator('[data-hs-due]').fill(due);
+      await bv.locator('[data-hs-planned="3"]').waitFor({ timeout: 15000 });
+      await bv.locator('[data-hs-run]').click();
+      await readJson(page, 'society_runs', [], (v) => v.some((r) => r.period === period), 15000);
+      return mine(await readJson(page, 'invoices', [], (v) => mine(v).length === n, 15000));
+    };
+    const restore = async () => {
+      await page.goto(srv.origin + '/expenses');
+      for (const k of keys) await writeJson(page, k, prev[k]);
+      await readJson(page, 'society_runs', null, (v) => JSON.stringify(v) === JSON.stringify(prev.society_runs), 15000);
+    };
+    return { run, restore };
+  };
+
+  await step('R18-C society dues: Run 2026-10 and 2026-11 with A-101 unpaid → November bill: arrears ₹6,710 (memo) + "Interest on arrears" ₹19.93 (12 % on ₹5,510, 21–31 Oct; not on the ₹1,200 property tax), still exempt (₹5,529.93 counted) → Dues: receipt ₹6,000 split interest first (₹19.93) → saved → A-101 dues ₹7,439.93 → dues certificate as at 5 Nov names ₹7,439.93 and its number, logged on the unit', async () => {
+    const s = await hsSeed('hsc');
+    await s.run('2026-10', '2026-10-01', '2026-10-20', 3);
+    const invs = await s.run('2026-11', '2026-11-01', '2026-11-20', 6);
+    const nov = invs.find((i) => i.hs.unit.code === 'A-101' && i.hs.period === '2026-11');
+    const line = nov?.items.find((l) => l.name === 'Interest on arrears');
+    check(nov?.hs?.arrears?.amount === 6710 && line?.amount === 19.93 && nov.hs.interest?.on === 5510 && nov.hs.interest?.from === '2026-10-21', `A-101 November: arrears ₹6,710 memo, interest ₹19.93 on ₹5,510 from 21 Oct (${nov?.hs?.arrears?.amount} / ${line?.amount} / ${nov?.hs?.interest?.on})`);
+    check(nov?.doc_type === 'BILL_OF_SUPPLY' && nov.hs.test?.counted === 5529.93 && nov.total === 6729.93, `still exempt, ₹5,529.93 counted, total ₹6,729.93 (${nov?.doc_type} ${nov?.hs?.test?.counted} ${nov?.total})`);
+    await page.goto(srv.origin + '/recurring?tab=society&view=dues');
+    const dv = page.locator('[data-hs-dues]');
+    await dv.waitFor({ timeout: 15000 });
+    await dv.locator('[data-hs-asof]').fill('2026-11-05');
+    const a101 = dv.locator('[data-hs-due="A-101"]');
+    await a101.waitFor({ timeout: 15000 });
+    check(Number(await a101.getAttribute('data-hs-open')) === 13439.93, `A-101 dues before the receipt ₹13,439.93 (${await a101.getAttribute('data-hs-open')})`);
+    await a101.locator('[data-hs-act="receipt"]').click();
+    const form = dv.locator('[data-hs-form="receipt"]');
+    await form.locator('input[type="date"]').fill('2026-11-02');
+    await form.locator('[data-hs-amount]').fill('6000');
+    const novSplit = form.locator(`[data-hs-split="${nov.invoice_number}"]`);
+    await novSplit.waitFor({ timeout: 15000 });
+    check(Number(await novSplit.inputValue()) === 19.93, `the split suggests the ₹19.93 interest first (${await novSplit.inputValue()})`);
+    await form.locator('[data-hs-save-receipt]').click();
+    const paid = await readJson(page, 'transactions', [], (v) => v.filter((p) => p.client_id === 'e2e-hsc-c1').reduce((t, p) => t + p.amount, 0) === 6000, 15000);
+    check(paid.filter((p) => p.client_id === 'e2e-hsc-c1').some((p) => p.invoice_id === nov.id && p.amount === 19.93), 'the receipt settles the interest line first');
+    await page.reload();
+    await dv.waitFor({ timeout: 15000 });
+    await dv.locator('[data-hs-asof]').fill('2026-11-05');
+    await dv.locator('[data-hs-due="A-101"][data-hs-open="7439.93"]').waitFor({ timeout: 15000 });
+    check(true, 'Dues: A-101 ₹6,710 + ₹6,729.93 − ₹6,000 = ₹7,439.93');
+    await dv.locator('[data-hs-due="A-101"] [data-hs-act="cert"]').click();
+    await dv.locator('[data-hs-issue-cert]').click();
+    const cert = (await dv.locator('[data-hs-cert]').innerText({ timeout: 15000 })) ?? '';
+    check(/₹7,439\.93/.test(cert) && /A-101\/DC\/1/.test(cert) && /interest to date/.test(cert), `the certificate states ₹7,439.93 with interest to date and its number (${cert.slice(0, 120)})`);
+    await readJson(page, 'society_units', [], (v) => v.find((u) => u.code === 'A-101')?.certificates?.length === 1, 15000);
+    check(true, 'the certificate is logged on A-101');
+    await s.restore();
+  });
+
+  await step('R18-D society funds, accounts and registers: Map funds → three fund cost centres → Run 2026-10 → "Transfer for 2026-10" → one "Society fund transfer" journal: sinking ₹2,250 (500 + 500 + 1,250), repair ₹6,750 → Funds view shows them moved; annual pack (co-operative society) titled "Income and Expenditure Account" with a Receipts and Payments page; Registers: Form J lists three members; audit due in 20 days → reload → the bell lists the audit', async () => {
+    const s = await hsSeed('hsd');
+    await page.goto(srv.origin + '/recurring?tab=society&view=funds');
+    const fv = page.locator('[data-hs-funds]');
+    await fv.waitFor({ timeout: 15000 });
+    await fv.locator('[data-hs-map]').click();
+    const cc = await readJson(page, 'cost_centres', [], (v) => ['Sinking fund', 'Repair and maintenance fund', 'Major repair fund'].every((n) => v.some((c) => c.kind === 'fund' && c.name === n)), 15000);
+    const ss = await readJson(page, 'society_settings', {}, (v) => Object.keys(v?.funds ?? {}).length === 3, 15000);
+    check(Object.keys(ss.funds ?? {}).length === 3 && cc.filter((c) => c.kind === 'fund').length >= 3, 'three fund cost centres mapped');
+    await s.run('2026-10', '2026-10-01', '2026-10-20', 3);
+    await page.goto(srv.origin + '/recurring?tab=society&view=funds');
+    await fv.waitFor({ timeout: 15000 });
+    await fv.locator('[data-hs-fund-period]').fill('2026-10');
+    await fv.locator('[data-hs-transfer]').click();
+    const vs = (await readJson(page, 'vouchers', [], (v) => (v ?? []).some((x) => x.voucher_class === 'Society fund transfer'), 15000)).filter((x) => x.voucher_class === 'Society fund transfer');
+    const cr = (id) => vs.flatMap((x) => x.lines).filter((l) => l.cost_centre_id === id && l.account_id !== 'sales').reduce((t, l) => t + l.cr, 0);
+    check(vs.length === 1 && cr(ss.funds.sinking) === 225000 && cr(ss.funds.repair) === 675000, `one transfer journal: sinking ₹2,250, repair ₹6,750 (${vs.length} / ${cr(ss.funds.sinking)} / ${cr(ss.funds.repair)})`);
+    await page.reload();
+    await fv.locator('[data-hs-fund="sinking"][data-hs-moved="2250"]').waitFor({ timeout: 15000 });
+    check(true, 'Funds view: sinking ₹2,250 moved');
+    await page.goto(srv.origin + '/books?tab=rpt');
+    await page.getByRole('button', { name: 'Annual pack' }).click();
+    await page.locator('[data-annual-fy]').selectOption('2026');
+    await page.getByLabel('Business type').selectOption('cooperative');
+    await page.locator('[data-annual-preview] [data-ap-rp]').waitFor({ timeout: 15000 });
+    const ap = (await page.locator('[data-annual-preview]').textContent()) ?? '';
+    check(/Income and Expenditure Account/.test(ap) && /Receipts and Payments account/.test(ap) && /FUNDS AND LIABILITIES/.test(ap), 'annual pack (co-operative society): I&E title, funds and liabilities, Receipts and Payments page');
+    await page.goto(srv.origin + '/recurring?tab=society&view=registers');
+    const rv = page.locator('[data-hs-registers]');
+    await rv.waitFor({ timeout: 15000 });
+    check(await rv.locator('[data-hs-members="3"]').count() === 1 && /Form J/.test(await rv.locator('[data-hs-reg]').innerText()), 'List of members (Form J): three members with units');
+    const d = new Date(Date.now() + 20 * 864e5);
+    const due = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await rv.locator('[data-hs-auditor]').fill('E2E Auditors');
+    await rv.locator('[data-hs-audit-field="due_on"]').fill(due);
+    await rv.locator('[data-hs-save-audit]').click();
+    await readJson(page, 'society_settings', {}, (v) => (v?.audit ?? []).some((a) => a.auditor === 'E2E Auditors' && a.due_on === due), 15000);
+    await page.reload();
+    await page.getByRole('button', { name: /^Notifications/ }).click({ timeout: 15000 });
+    await page.getByRole('dialog', { name: 'Notifications' }).getByText(/Society audit .* due on/).first().waitFor({ timeout: 15000 });
+    check(true, 'the bell lists the society audit due in 20 days');
+    await page.keyboard.press('Escape');
+    await s.restore();
+  });
+
 } catch {
   /* already reported */
 } finally {

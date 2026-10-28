@@ -3,8 +3,8 @@
  * society bills by bill date — bills, not receipts, HS39) move out of income into each fund's reserve by one journal
  * (Dr the sales ledger tagged with the fund / Cr the fund's reserve ledger, tagged too, so the R5-C4 fund statement
  * still shows the contribution as the fund's receipt). Idempotent per fund and period: the journal posts only the
- * difference between what is billed and what the earlier journals of that period moved (a cancelled bill is reversed by
- * a new journal). Minimum check: a FY's sinking / repair billed against the State's % of the construction cost (hint,
+ * difference between what is billed and what the transfer journals dated in the period already moved (a cancelled bill
+ * is reversed by a new journal; a year-end journal counts the period journals of its FY). Minimum check: a FY's sinking / repair billed against the State's % of the construction cost (hint,
  * HS27). Working papers — verify with your CA.
  */
 import { round2 } from '../invoice-calc';

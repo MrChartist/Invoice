@@ -102,3 +102,17 @@ export const REG_THRESHOLD_RULES: readonly (HsRule<number> & { state?: string })
 ];
 
 /* ── R18-D: INCOME_TAX_SOCIETY_RULES (D4) ───────────────────────────────────────────────────────────────────── */
+
+/** One deduction line of a co-operative society's income-tax working paper (labels only; nothing is computed as tax). */
+export interface ItaxSocietyLine { code: string; text: string; cap?: number }
+
+/**
+ * Deductions of a co-operative society by the FY (HS20–HS22): Sec 80P of the 1961 Act up to FY 2025-26; Sec 149 of the
+ * Income-tax Act 2025 from 1 Apr 2026 (its successor, as reported — the enacted text was not read: `verified: false`).
+ * Mutuality (member contributions are not income) is a principle, not a row. An association that is not a co-operative
+ * society gets no deduction line.
+ */
+export const INCOME_TAX_SOCIETY_RULES: readonly HsRule<{ act: string; lines: readonly ItaxSocietyLine[] }>[] = [
+  { from: '1968-04-01', value: { act: 'Income-tax Act 1961', lines: [{ code: '80P(2)(c)(ii)', text: 'Other income of a co-operative society', cap: 50000 }, { code: '80P(2)(d)', text: 'Interest / dividend from investments with another co-operative society' }] }, source: 'IT Act 1961 Sec 80P (recalled, HS21)', verified: false },
+  { from: '2026-04-01', value: { act: 'Income-tax Act 2025', lines: [{ code: '149(2)(c)', text: 'Other income of a co-operative society', cap: 50000 }, { code: '149(2)(d)', text: 'Interest / dividend from investments with another co-operative society' }] }, source: 'Income-tax Act 2025 Sec 149, as reported (S, HS21, HS22)', verified: false },
+];

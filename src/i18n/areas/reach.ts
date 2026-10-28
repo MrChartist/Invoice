@@ -286,6 +286,8 @@ export const reachT = defineArea(
     'ck.firstSite': 'Add your first site with its posts', 'ck.firstBill': 'Make your first manpower bill', 'ck.firstMuster': 'Fill your first duty register (muster)', 'ck.siteProof': 'Record a site\'s PF / ESI proof for its client', 'ck.licence': 'Add your PSARA / contract-labour licence and its renewal date', // R17-A1; R17-B; R17-C
     'ck.societyUnits': 'Add your flats and members', 'ck.societyTariff': 'Set your maintenance tariff', // R18-A1
     'ck.societyRun': 'Run your first maintenance bills', // R18-B
+    'ck.societyFunds': 'Map the sinking and repair funds', // R18-D
+    'ck.societyAudit': 'Note this year\'s audit', // R18-D
   } as const,
   {
     'title.shop': 'आप क्या काम करते हैं?',
@@ -558,5 +560,7 @@ export const reachT = defineArea(
     'ck.firstSite': 'पोस्ट के साथ पहली साइट जोड़ें', 'ck.firstBill': 'पहला मानव-शक्ति बिल बनाएँ', 'ck.firstMuster': 'पहला ड्यूटी रजिस्टर (मस्टर) भरें', 'ck.siteProof': 'ग्राहक के लिए साइट का PF / ESI प्रमाण दर्ज करें', 'ck.licence': 'अपना PSARA / ठेका-श्रम लाइसेंस और नवीनीकरण तिथि जोड़ें',
     'ck.societyUnits': 'अपने फ़्लैट और सदस्य जोड़ें', 'ck.societyTariff': 'अपनी रखरखाव शुल्क सूची तय करें',
     'ck.societyRun': 'पहले रखरखाव बिल बनाएँ',
+    'ck.societyFunds': 'सिंकिंग और मरम्मत निधि जोड़ें',
+    'ck.societyAudit': 'इस वर्ष की लेखा परीक्षा दर्ज करें',
   },
 );
