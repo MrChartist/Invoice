@@ -17,10 +17,11 @@ test('PENDING 10: editor lines → exempt-only note, taxable > ₹50,000 prompt,
 test('PENDING 10: the items footer mounts the lazy hint with an agri pack, never for quotes / pro formas', () => {
   const src = readFileSync(new URL('../src/components/creator/ItemsTable.tsx', import.meta.url), 'utf8');
   assert.match(src, /const AgEwayHint = lazy\(\(\) => import\('\.\.\/agri\/AgEwayHint'\)\)/);
-  assert.match(src, /agriOn && docType !== 'QUOTATION' && docType !== 'PROFORMA' && <Suspense fallback=\{null\}><AgEwayHint \/>/);
+  assert.match(src, /agriOn && docType !== 'QUOTATION' && docType !== 'PROFORMA' && <Suspense fallback=\{null\}><AgEwayHint lines=\{totals\.lines\} items=\{items\} \/>/);
   for (const p of ['agri', 'dairy', 'mill', 'coldstore', 'agri_inputs', 'fpo']) assert.ok(src.includes(`'${p}'`), p);
   const hint = readFileSync(new URL('../src/components/agri/AgEwayHint.tsx', import.meta.url), 'utf8');
   assert.match(hint, /editorEwayHint\(lines, items\)/);
+  assert.doesNotMatch(hint, /useInvoiceStore/, 'props only: no store import in the lazy chunk');
   const area = readFileSync(new URL('../src/i18n/areas/agri-r12c.ts', import.meta.url), 'utf8');
   assert.equal((area.match(/ewExempt:/g) ?? []).length, 2, 'English and Hindi');
   assert.equal((area.match(/ewPrompt:/g) ?? []).length, 2);

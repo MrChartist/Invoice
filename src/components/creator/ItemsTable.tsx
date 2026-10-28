@@ -364,7 +364,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
         {legalOn && <Suspense fallback={null}><LegalRegimeChip /></Suspense>}
         {travelOn && <Suspense fallback={null}><TravelRows /></Suspense>}
         {manpowerOn && <Suspense fallback={null}><ManpowerRows /></Suspense>}
-        {agriOn && docType !== 'QUOTATION' && docType !== 'PROFORMA' && <Suspense fallback={null}><AgEwayHint /></Suspense>}
+        {agriOn && docType !== 'QUOTATION' && docType !== 'PROFORMA' && <Suspense fallback={null}><AgEwayHint lines={totals.lines} items={items} /></Suspense>}
         <span className={styles.keyHint}>
           {tNodes('items.keyHint', { enter: <kbd>Enter</kbd>, alt: <kbd>Alt</kbd>, arrows: <><kbd>↑</kbd>/<kbd>↓</kbd></>, ctrl: <kbd>Ctrl</kbd> })}
         </span>
