@@ -1,6 +1,6 @@
 # Upgrade Roadmap
 
-Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 (5.1, 5.2, 5.3, 5.5–5.9 ✅; 5.4 partial: Hindi / Marathi core screens, other languages partial) · Phase 6 ✅ · Phase 7 / 8 ✅ (open follow-ups listed) · Round 2 ✅ · Round 3 ✅ + QA round 3 ✅ · Round 4 ✅ (R4-A / R4-B / R4-C, PERF-1 / PERF-2) + QA round 5 ✅ · Income-tax Act 2025 labels ✅ (23a–23d open) · Round 5 ✅ (R5-A / R5-B / R5-C industry packs) · QA round 6 in progress · Round 6 in progress (R6-C ✅) · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24, updated 2026-10-26
+Status: in progress — Phase 0 ✅ · Phase 1 ✅ · Phase 2 ✅ · Phase 3 ✅ · Phase 4 ✅ · Phase 5 (5.1, 5.2, 5.3, 5.5–5.9 ✅; 5.4 partial: Hindi / Marathi core screens, other languages partial) · Phase 6 ✅ · Phase 7 / 8 ✅ (open follow-ups listed) · Round 2 ✅ · Round 3 ✅ + QA round 3 ✅ · Round 4 ✅ (R4-A / R4-B / R4-C, PERF-1 / PERF-2) + QA round 5 ✅ · Income-tax Act 2025 labels ✅ (23a–23d open) · Round 5 ✅ (R5-A / R5-B / R5-C industry packs) · QA round 6 ✅ (QA6-1 `6747241`, QA6-2 `10a5bc9`) · Round 6 ✅ (R6-A / R6-B / R6-C) · 7Q ✅ (7.116 open) · Rounds 7–18 ✅ (hotel, trading, retail, services, construction, agriculture, manufacturing, professional firms, travel, platform R16, manpower, housing societies) + QA rounds 7–21 ✅ · Round 19 (logistics) PRD drafted, being built · Open code work, owner and CA items: [`PENDING.md`](PENDING.md) · Baseline: v3.1.0 (2026-10-08) · Drafted 2026-10-24, updated 2026-10-28
 
 This roadmap comes from four parallel code reviews of the repository, each from a different angle:
 **GST & compliance**, **product & UX**, **architecture & code health**, **security & data durability**.
@@ -786,11 +786,13 @@ Spec: `docs/prd/round-5.md` (18 items in three packages). Every vertical sits be
 | R5-C6 | ✅ **Security deposits** (adjustment receipts `deposit_adjustment_id`, no money moved); table `security_deposits` | `property/deposits.ts` | done |
 | R5-C7 | ⏳ R5-C follow-ups: ~~GSTR-9 / compliance / report pack do not pass `itcReversals` yet (the GSTR-3B tab does)~~ (✅ R6-C4); gifts in kind create no voucher; FC-4 lists totals, not the portal's line items | — | open |
 
-## QA round 6 · 🟡 in progress
+## QA round 6 · ✅ done
 
-Hands-on audit of Round 4 (R4-B / R4-C), QA round 5 fixes, the Income-tax Act 2025 labels and Round 5.
+Hands-on audit of Round 4 (R4-B / R4-C), QA round 5 fixes, the Income-tax Act 2025 labels and Round 5
+(`docs/prd/qa-round-6.md`). Fixed in two packages: QA6-1 `6747241` (recycle-bin module hooks, one no-cash predicate,
+vouchers in the cash / bank book and BRS) and QA6-2 `10a5bc9` (feature-module findings F2, F3, F6–F10, F12–F15, F18).
 
-## Round 6: consolidation and beta-tester productivity (v6.x) · 🟡 in progress
+## Round 6: consolidation and beta-tester productivity (v6.x) · ✅ done
 
 Spec: `docs/prd/round-6.md` (17 items in three packages: R6-A first run, help and feedback; R6-B discoverability;
 R6-C open-roadmap closures and the docs refresh).
@@ -828,6 +830,50 @@ R6-C open-roadmap closures and the docs refresh).
 | R6-C6 | ✅ **Docs refresh**: stale roadmap rows struck through, BETA_GUIDE known limitations / flows, CA_REVIEW cross-references, feature-doc stale items | `docs/` | done |
 | R6-C7 | ⏳ R6-C follow-ups: issuing a draft from a list row (not the editor) still takes no balance snapshot unless it goes through `issueDraft`; stock opening quantities in the import (PRD §7 Q7); the GSTR-9 7C / 7D split of a combined Rule 42 / 43 journal | — | open (verify with your CA) |
 
+## Rounds 7–19: industry verticals and the platform round (v6.x)
+
+Each round has a PRD in `docs/prd/round-<n>.md` (problem, findings with sources, ranked list, specifications, work
+packages) and a feature doc with what shipped, deviations and cuts. Every round was followed by a QA round (table
+below) whose findings were fixed with regression tests. Rows still open are in [`PENDING.md`](PENDING.md) §2.
+
+| Round | Vertical / theme | Packages | Feature doc | Status |
+|---|---|---|---|---|
+| 7 | Hotels and lodging (pack `hotel`) | R7-A front office, R7-B folio and billing, R7-C compliance and reports | `hotel-r7.md` | ✅ done (QA9) |
+| 8 | Trading: distributors, wholesalers, commodity / mandi traders, agents | TR-A distributor, TR-B commodity / mandi, TR-C agents and tax rules | `trading-r8.md` | ✅ done (QA8) |
+| 9 | Retail shops | RT-A kirana / shared, RT-B pharmacy, RT-C apparel, RT-D electronics, RT-E jewellery | `retail-r9.md` | ✅ done (QA10) |
+| 10 | Service businesses: clinics / labs, salons, gyms, coaching, workshops | SV-A front desk, SV-B clinics, SV-C memberships, SV-D workshops | `services-r10.md` | ✅ done (QA12) |
+| 11 | Construction: contractors, sub-contractors, builders, interiors, MEP, labour | CN-A profile and bill paper, CN-B contractor finance, CN-C builders (`realty`), CN-D site operations | `construction-r11.md` | ✅ done (QA11) |
+| 12 | Agriculture and food processing: FPOs, dairy, mills, cold storage, input dealers | AG-A farm base, AG-B dairy, AG-C mills, AG-D cold storage / inputs / FPO | `agri-r12.md` | ✅ done (QA13) |
+| 13 | Manufacturing MSMEs beyond R4-A | MF-A shop floor, MF-B engineering / plastics / press, MF-C garments, MF-D food / FMCG and statutory desk | `mfg-r13.md` | ✅ done (QA15, QA16) |
+| 14 | Professional firms: CA / CS, law, architects, IT and service exporters, media | PS-A practice core, PS-B disbursements / legal, PS-C export of services, PS-D statutory desk | `prof-r14.md` | ✅ done (QA17) |
+| 15 | Travel, tour and events, plus size recovery and party netting | R15-A size / netting, R15-B travel core, R15-C air tickets and supplier settlement, R15-D outbound TCS and events | `travel-r15.md` | ✅ done (QA18) |
+| 16 | Platform round: size headroom, unwired engines, statutory watch | R16-A size recovery (Hindi packs, safe chunk groups), R16-B Round 14 engines wired, R16-C travel / hotel leftovers, R16-D cross-cutting quality and pending-change notes | `docs/prd/round-16.md`, `prof-r14.md` §R16-B, `travel-r15.md` §R16-C | ✅ done (QA19) |
+| 17 | Security, facility-management and manpower agencies | R17-A manpower core, R17-B duty register and billing, R17-C compliance and profitability, R17-D arrears and renewals | `manpower-r17.md` | ✅ done (QA20) |
+| 18 | Co-operative housing societies, AOAs and RWAs | R18-A society core, R18-B billing run and GST (with `saveMany`), R18-C dues and collections, R18-D funds and statutory | `society-r18.md` | ✅ done (QA21) |
+| 19 | Freight forwarders, customs brokers (CHA), courier franchises, 3PL | LG-A … LG-D (job files, house-bill margin, CHA disbursements, courier dockets, storage billing) | `docs/prd/round-19.md` | 🟡 PRD drafted, being built |
+
+### QA rounds 7–21
+
+| QA round | Scope | Report | Fixes |
+|---|---|---|---|
+| 7 | Round 6 (R6-A help / onboarding, R6-B discoverability and sample data) | `qa-round-7.md` | ✅ G1–G10 (`9013d7d`: Demo company marker, modal stack, report links, palette roles) |
+| 8 | Round 8 trading | `qa-round-8.md` | ✅ T1–T16 (`8283e26`) |
+| 9 | Round 7 hotel | `qa-round-9.md` | ✅ H1–H16 (`df2fcf8`, `tests/hotel-qa9.test.ts`) |
+| 10 | Round 9 retail | `qa-round-10.md` | ✅ R1–R17 (`99ae620`) |
+| 11 | Round 11 construction | `qa-round-11.md` | ✅ fixed in the loop (`tests/qa11-construction.test.ts`) |
+| 12 | Round 10 services | `qa-round-12.md` | ✅ fixed in the loop (`tests/qa12-services.test.ts`) |
+| 13 | Round 12 agriculture | `qa-round-13.md` | ✅ fixed in the loop (`tests/qa13-agri.test.ts`) |
+| 14 | Whole-app regression of a plain company and pack leaks (Rounds 7–12) | `qa-round-14.md` | ✅ fixed in the loop (`tests/qa14-core.test.ts`) |
+| 15 | Round 13 MF-A … MF-C | `qa-round-15.md` | ✅ fixed in the loop (`tests/qa15-mfg.test.ts`) |
+| 16 | MF-D and QA15's open items | `qa-round-16.md` | ✅ fixed in the loop (`tests/qa16-mfg.test.ts`) |
+| 17 | Round 14 professional firms | `qa-round-17.md` | ✅ fixed in the loop (`tests/qa17-prof.test.ts`) |
+| 18 | Round 15 travel and R15-A netting | `qa-round-18.md` | ✅ fixed in the loop (`tests/qa18-travel.test.ts`) |
+| 19 | Round 16 platform (Hindi packs, safe groups, service worker) | `qa-round-19.md` | ✅ fixed in the loop (`tests/qa19-platform.test.ts`) |
+| 20 | Round 17 manpower | `qa-round-20.md` | ✅ fixed in the loop (`tests/qa20-manpower.test.ts`) |
+| 21 | Round 18 housing societies and the bulk save (`saveMany`) | `qa-round-21.md` | ✅ fixed in the loop (`tests/qa21-society.test.ts`) |
+
+Left-as-found items and cut features of these rounds are tracked in [`PENDING.md`](PENDING.md) §2 (closed ones in §6).
+
 ## Summary timeline
 
 | Release | Theme | Approx. duration |
@@ -844,6 +890,12 @@ R6-C open-roadmap closures and the docs refresh).
 | v6.x · Round 4 | Production & traceability (R4-A), stores & chains (R4-B), trade desk & trust (R4-C), scale fixes PERF-1 / PERF-2, then QA round 5 fixes (QA5-1 / QA5-2) | done |
 | v6.x · ITA 2025 | Income-tax Act 2025 section / form labels by date (23); 23a–23d open | done |
 | v6.x · Round 5 | Industry packs: marketplace seller (R5-A), transport & works contracts (R5-B), institutions, non-profits & property (R5-C) | done |
-| v6.x · QA round 6 | Hands-on audit of R4-B / R4-C, QA round 5, ITA 2025 and Round 5 | in progress |
+| v6.x · QA round 6 | Hands-on audit of R4-B / R4-C, QA round 5, ITA 2025 and Round 5 (QA6-1 / QA6-2 fixes) | done |
+| v6.x · Round 6 | Consolidation: first run, help and feedback (R6-A), discoverability and sample data (R6-B), open-roadmap closures (R6-C), then QA round 7 | done |
+| v6.x · 7Q | Voucher types, bill-wise voucher entry, books import (7.110–7.115; 7.116 open) | done |
+| v6.x · Rounds 7–15 | Hotel, trading, retail, services, construction, agriculture, manufacturing, professional firms, travel — each followed by its QA round (8–18) | done |
+| v6.x · Round 16 | Platform round: size headroom (Hindi packs, safe chunk groups), unwired engines, statutory watch (QA19) | done |
+| v6.x · Rounds 17–18 | Manpower agencies (QA20), housing societies and `saveMany` (QA21) | done |
+| v6.x · Round 19 | Logistics: freight forwarders, CHA, couriers, 3PL | in progress |
 
 Phases 2 and 3 can run in parallel if two people work on them; neither depends on the other beyond Phase 1.

@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useId, useMemo, useState, type ReactNode } from 'react';
 import { ClipboardCopy, Download, FileJson, QrCode, Save, Truck } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/useToast';
@@ -15,7 +15,8 @@ import {
   type EInvoiceMeta,
   type EInvoiceSupplyType,
 } from '../../lib/einvoice';
-import { stringifyEway, type EwayTransMode } from '../../lib/eway';
+import { stringifyEway, type EwayBill, type EwayTransMode } from '../../lib/eway';
+import { impliedPacks } from '../../lib/shop-mode';
 import { preflightEInvoice, preflightEway } from '../../lib/einvoice-validate';
 import { localDb } from '../../lib/localDb';
 import { unitsDb } from '../../lib/units';
@@ -36,6 +37,9 @@ export interface EInvoiceModalProps {
 }
 
 type Tab = 'einvoice' | 'eway' | 'portal';
+/** PENDING 11 (MF-C3, ITC-04 5C): dispatch-from a job worker, lazy and only with a manufacturing pack. */
+const EwayDispatchFrom = lazy(() => import('../mfg/EwayDispatchFrom'));
+const MFG_PACKS = ['shopfloor', 'fabrication', 'garments', 'plastics', 'press', 'foodmfg'];
 
 /** Tab / supply-type names: portal terms stay Latin, the rest go through the area translator. */
 const TABS: { id: Tab; label: () => string }[] = [
@@ -157,7 +161,10 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
   const stem = sanitiseFileStem(invoice.invoice_number || invoice.id);
 
   const einvText = useMemo(() => stringifyEInvoice(einv.payload), [einv.payload]);
-  const ewayText = useMemo(() => stringifyEway({ version: '1.0.0621', billLists: [eway.bill] }), [eway.bill]);
+  const mfgOn = useMemo(() => (impliedPacks(localDb.settings.get()) as string[]).some((p) => MFG_PACKS.includes(p)), []);
+  const [jw, setJw] = useState<{ id: string; fix: ((b: EwayBill) => EwayBill) | null }>({ id: '', fix: null });
+  const ewayBill = useMemo(() => (jw.fix ? jw.fix(eway.bill) : eway.bill), [eway.bill, jw]);
+  const ewayText = useMemo(() => stringifyEway({ version: '1.0.0621', billLists: [ewayBill] }), [ewayBill]);
 
   const copy = async (text: string, what: string) => {
     try {
@@ -306,6 +313,7 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
           {tab === 'eway' && (
             <>
               <ReadinessList result={eway} okText={einvT('ewayReady')} />
+              {mfgOn && <Suspense fallback={null}><EwayDispatchFrom value={jw.id} onChange={(id, fix) => setJw({ id, fix })} /></Suspense>}
               <div className={styles.section}>
                 <h3 className={styles.sectionTitle}>
                   <Truck size={14} aria-hidden="true" /> {einvT('transportPartB')}

@@ -12,6 +12,7 @@ import { num } from '../invoice-calc';
 import { raDueSplit } from '../works/ra-due';
 import { contractBills, contractById, plusMonths, saveContract } from './cn-contracts';
 import { isLiveBg } from './cn-guarantees';
+import type { AttachmentRef } from '../../types/attachments';
 
 export const CLOSURE_KEYS: readonly CnClosureKey[] = ['final_bill', 'completion', 'dlp', 'retention', 'sd', 'bgs', 'pv_final', 'no_claim', 'reco'];
 /** Items only a person can tick (the rest follow from the data). */
@@ -61,6 +62,16 @@ export function setClosure(id: string, patch: Partial<CnClosure>): WorksContract
   if (!c) throw new Error('Contract not found.');
   for (const [k, why] of Object.entries(patch.waived ?? {})) if (why !== undefined && !String(why).trim()) throw new Error(`Give a reason to waive "${k}".`);
   return saveContract({ ...c, closure: { ...c.closure, ...patch, ticks: { ...c.closure?.ticks, ...patch.ticks }, waived: { ...c.closure?.waived, ...patch.waived } } });
+}
+
+/**
+ * PENDING 14: the closure documents attached to the contract (`works_contracts` is in `ATTACHMENT_OWNER_TABLES`, so the
+ * files stay referenced; the attachments panel releases files dropped from the list).
+ */
+export function setClosureFiles(id: string, refs: readonly AttachmentRef[]): WorksContract {
+  const c = contractById(id);
+  if (!c) throw new Error('Contract not found.');
+  return saveContract({ ...c, attachments: [...refs] });
 }
 
 /** Close the contract once every checklist item is done or waived. */
