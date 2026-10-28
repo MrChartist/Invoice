@@ -19,7 +19,7 @@ export const lgcT = defineArea(
     wLimb: 'Rule 33 limb {n} not ticked: this recovery may be part of our taxable value.', hDep: 'Duty paid beyond the client\'s deposit by {a}.',
     eAmount: 'Enter an amount above zero.', ePayee: 'Type who was paid.', eDate: 'Choose the date.', noInv: 'No issued rupee invoice of this job is open.', done: 'Saved.',
     importRefs: 'Import SB / BOE numbers (CSV)', imported: '{n} jobs updated.',
-    seam: 'Bill the disbursements from Billing or the invoice editor (billable costs): each goes on as a Rule 33 line.',
+    seam: 'Billing → Bill job puts each unrecovered disbursement on the job\'s bill as a Rule 33 line.',
   } as const,
   {
     customs: 'सीमा शुल्क', job: 'जॉब', pick: 'एक जॉब चुनें।', disb: 'वितरण व्यय (डिस्बर्समेंट)', deps: 'ड्यूटी जमा', register: 'CB रजिस्टर (विनियम 10(k))',
@@ -34,7 +34,7 @@ export const lgcT = defineArea(
     wLimb: 'नियम 33 की शर्त {n} पर टिक नहीं: यह वसूली हमारे कर-योग्य मूल्य में गिनी जा सकती है।', hDep: 'ग्राहक की जमा से {a} अधिक ड्यूटी चुकाई गई।',
     eAmount: 'शून्य से अधिक राशि लिखें।', ePayee: 'किसे भुगतान किया, लिखें।', eDate: 'तिथि चुनें।', noInv: 'इस जॉब का कोई जारी रुपया बिल बकाया नहीं है।', done: 'सहेजा गया।',
     importRefs: 'SB / BOE नंबर आयात करें (CSV)', imported: '{n} जॉब अपडेट हुईं।',
-    seam: 'डिस्बर्समेंट को बिलिंग या बिल संपादक (बिल योग्य लागत) से बिल करें: हर एक नियम 33 पंक्ति के रूप में जुड़ता है।',
+    seam: 'बिलिंग → जॉब का बिल बनाएँ: हर न वसूला डिस्बर्समेंट नियम 33 पंक्ति के रूप में बिल पर जुड़ता है।',
   },
 );
 

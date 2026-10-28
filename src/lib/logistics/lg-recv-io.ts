@@ -2,8 +2,8 @@
  * R19-C bridge (the only one of R19-C, outside the `f-logistics` family): the shared lazy code the customs broker desk
  * needs — advances (duty deposits: `saveAdvance` with `pass_through`, `applyAdvance`, `refundAdvance`,
  * `advanceBalance`), purchases (disbursements: `purchasesDb` / `paymentsDb`, read back through `readPurchase`), live
- * billing (`billedBy`, the billable-cost rule of the invoice editor, over `localDb` invoices) and the Rule 33 line
- * text. Engines take their data as arguments (`lg-disb.ts`, `lg-deposits.ts`, `lg-register.ts`). Rights, period locks
+ * billing (`billedBy`, the billable-cost rule of the invoice editor, over `localDb` invoices; `loadDisb` also feeds
+ * R19-B's `planJob` → `billExtras`), `csv.ts` and `lg-save` (SB / BOE import). Engines take their data as arguments (`lg-disb.ts`, `lg-deposits.ts`, `lg-register.ts`). Rights, period locks
  * and audit are the called modules' own (`books.edit` for bills, `payment.record` for advances). A deposit is money
  * received (it shows once in the cash book); its application is the existing `advance_id` payment every cash reader
  * skips through `movedNoCash` — no new marker. Working papers — verify with your CA (LG10–LG12, LG26, LG27).
@@ -15,7 +15,6 @@ import type { PurchaseRecord } from '../../types/purchases';
 import { advanceBalance, applyAdvance, invoiceOpen, loadAdvances, refundAdvance, saveAdvance, senderSnapshot } from '../advances';
 import { paymentsDb, purchasesDb } from '../purchases';
 import { isVoidStatus, readPurchase } from '../purchase-normalize';
-import { PURE_AGENT_CHARGE } from '../trade/pure-agent';
 import { withTablesRollback } from '../table-txn';
 import { requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
@@ -25,7 +24,7 @@ import { parseTable } from '../csv';
 import { loadJobs, saveJob } from './lg-save';
 import { readLogisticsSettings } from './lg-settings';
 import { docRefsFromTable } from './lg-register';
-import { billedBy, disbBillLines, disbRecord, disbRows, validateDisb, type DisbInput, type DisbSource, type LgDisbRow } from './lg-disb';
+import { billedBy, disbRecord, disbRows, validateDisb, type DisbInput, type DisbSource, type LgDisbRow } from './lg-disb';
 import { applyAmount, depositInput, type DepositBal, type DepositReceipt } from './lg-deposits';
 
 /** One purchases row as the engine reads it (through `readPurchase`), or null when it is not a bill. */
@@ -62,9 +61,6 @@ export function writeOffDisb(id: string, date: string, reason: string, by?: stri
   if (!p?.lg || p.lg.wo) throw new Error('Not an open disbursement.');
   setTable('purchases', rows.map((x) => (x === p ? { ...p, lg: { ...p.lg!, wo: { date, reason: reason.trim(), ...(by ? { by } : {}) } } } : x)));
 }
-
-/** C3 seam for R19-B (`billExtras` through `lg-issue-io`): the job's unrecovered disbursements as Rule 33 lines + `lg.disb`. */
-export const jobDisbExtras = (job: Pick<LgJob, 'id'>, today: string) => disbBillLines(loadDisb(today).filter((r) => r.job_id === job.id), PURE_AGENT_CHARGE);
 
 /** C2: the duty deposits (pass-through advances tied to a job) with their balances. */
 export function loadDeposits(): DepositBal[] {

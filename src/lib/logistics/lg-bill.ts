@@ -13,6 +13,7 @@ import { round2 } from '../invoice-calc';
 import { lgbT } from '../../i18n/areas/logistics-r19b';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { LgCharge, LgHead, LgJob, LgSnapshot, LgUnit, LogisticsSettings } from '../../types/logistics-r19';
+import { disbCharges, type LgDisbRow } from './lg-disb';
 import { posRuleOf } from './lg-heads';
 import { lgRegime, regimeHints, type LgGstMode, type LgRegime, type RegimeCtx } from './lg-regime';
 
@@ -25,6 +26,8 @@ export interface BillCtx extends RegimeCtx {
   billed: ReadonlySet<string>;
   passText: string;
   newId: () => string;
+  /** R19-C: the job's disbursements on behalf (filled by `lg-issue-io.ts` `planJob` from `lg-recv-io.ts`). */
+  disb?: readonly LgDisbRow[];
 }
 
 export interface JobDraft {
@@ -53,9 +56,10 @@ export function chargeSheet(j: LgJob, heads: readonly LgHead[]): LgCharge[] {
 
 /** Extra lines a job's bill carries beyond its charge sheet — the hook C / D fill (empty in B). */
 export function billExtras(j: LgJob, ctx: BillCtx): LgCharge[] {
-  void j; void ctx;
+  void j;
   const out: LgCharge[] = [];
-  // R19-C: disbursement lines (recoveries at actual)
+  // R19-C: the unrecovered disbursements on behalf, one recovery at actual each (billed by row, not by head)
+  out.push(...disbCharges(ctx.disb ?? [], ctx.heads));
   // R19-D: agent notes
   return out;
 }
@@ -91,7 +95,7 @@ export function planJobBills(j: LgJob, sheet: readonly LgCharge[], c: BillCtx): 
   for (const l of [...sheet, ...billExtras(j, c)]) {
     const h = headOf(l.head_id);
     if (!h) { out.errors.push(lgbT('eHead')); continue; }
-    if (c.billed.has(h.id)) { out.skipped.push(h.name); continue; }
+    if (c.billed.has(h.id) && !l.disb_id) { out.skipped.push(h.name); continue; }
     const g = fr && h.role === 'own' && c.settings.composite_with_freight?.includes(h.id) ? fr : lgRegime(h, j, c);
     const cur = (l.currency || 'INR').toUpperCase();
     const docCur = c.recipient.foreign ? cur : 'INR';
@@ -105,7 +109,8 @@ export function planJobBills(j: LgJob, sheet: readonly LgCharge[], c: BillCtx): 
     const d = groups.get(key) ?? { doc_type: kind, pos: g.pos, mode: g.mode, ...(g.supply ? { supply: g.supply } : {}), currency: docCur, ...(docCur !== 'INR' ? { exchange_rate: fx!.rate } : {}), items: [], lg: { ...jobSnapshot(j), heads: {}, ...(fx ? { fx: { currency: cur, rate: fx.rate, source: fx.source } } : {}) }, regimes: [] };
     const id = c.newId();
     const name = `${h.name}${docCur !== cur ? ` (${cur} ${money(l.rate)} × ${l.qty} = ${cur} ${money(l.qty * l.rate)} @ ₹${money(fx!.rate)})` : ''}${l.note ? ` — ${l.note}` : ''}`;
-    d.items.push({ id, name, type: 'Service', ...(h.sac && !pure ? { hsn: h.sac } : {}), quantity: l.qty, rate, amount: round2(l.qty * rate), tax_rate: g.rate, discount_percent: 0, ...(pure ? { charge_head_id: 'rule33', description: c.passText } : {}), ...(g.key === 'exempt' ? { sv: { exempt: 'EXEMPT' } } : {}) } as InvoiceItem);
+    d.items.push({ id, name, type: 'Service', ...(h.sac && !pure ? { hsn: h.sac } : {}), quantity: l.qty, rate, amount: round2(l.qty * rate), tax_rate: g.rate, discount_percent: 0, ...(pure ? { charge_head_id: 'rule33', description: c.passText } : {}), ...(g.key === 'exempt' ? { sv: { exempt: 'EXEMPT' } } : {}), ...(l.disb_id ? { bill_refs: [l.disb_id] } : {}) } as InvoiceItem);
+    if (l.disb) (d.lg.disb ??= []).push(l.disb); // R19-C
     d.lg.heads![id] = h.id;
     if (!d.mode || d.mode === 'NONE') d.mode = g.mode;
     if (!d.lg.fx && fx) d.lg.fx = { currency: cur, rate: fx.rate, source: fx.source };

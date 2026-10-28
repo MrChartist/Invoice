@@ -6141,13 +6141,19 @@ try {
     const cell = async (k) => (await row.locator(`[data-lg-${k}]`).innerText()).trim();
     check(/94,500\.00/.test(await cell('rev')) && /69,700\.00/.test(await cell('cost')) && /24,800\.00/.test(await cell('margin')) && (await cell('pct')) === '26.2 %', `Costing: revenue ₹94,500.00, cost ₹69,700.00, margin ₹24,800.00, 26.2 % (${await cell('rev')} / ${await cell('cost')} / ${await cell('pct')})`);
 
-  await step('R19-C customs broker desk: import job 0002 → Customs → deposit ₹2,00,000 (0 %, pass-through) → duty ₹1,85,430 (ICEGATE) + CFS ₹12,000 on behalf → reimbursement bill prints the schedule, total ₹2,04,510.00 → Apply deposit → ₹4,510.00 due, the application is an advance_id row; Ctrl+K "duty deposit"', async () => {
-    const keys = ['settings', 'clients', 'lg_jobs', 'advances', 'purchases', 'purchase_payments', 'invoices', 'transactions', 'series_counters'];
+  await step('R19-C customs broker desk: import job 0002 → Customs → deposit ₹2,00,000 (0 %, pass-through) → duty ₹1,85,430 (ICEGATE) + CFS ₹12,000 on behalf → Billing → Bill job (R19-B billExtras) → the paper prints the schedule, total ₹2,04,510.00 → Apply deposit → ₹4,510.00 due, the application is an advance_id row; Ctrl+K "duty deposit"', async () => {
+    const keys = ['settings', 'clients', 'lg_jobs', 'logistics_settings', 'advances', 'purchases', 'purchase_payments', 'invoices', 'transactions', 'series_counters'];
     const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
     const today = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
-    const job = { id: 'e2e-lg-j2', number: 'JOB/FY26-27/0002', date: today, status: 'arrived', dir: 'import', mode: 'sea_fcl', origin: 'NSA', destination: 'BOM', client_id: 'e2e-lg-c2', refs: { boe_no: '7654321', boe_date: today }, containers: [{ no: 'MSCU1234566', size: '40HC' }], updated_at: today };
-    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'transport', modules: undefined, logistics_kind: 'cha', industry_packs: ['logistics', 'customs'], lock_until: undefined });
-    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-lg-c2', name: 'E2E Demo Imports Pvt Ltd', email: '', address: 'Navi Mumbai', gstin: '27AAPFU0939F1ZV', state_code: '27' }]);
+    const fy0 = +today.slice(5, 7) >= 4 ? +today.slice(0, 4) : +today.slice(0, 4) - 1;
+    const no = `JOB/FY${String(fy0 % 100).padStart(2, '0')}-${String((fy0 + 1) % 100).padStart(2, '0')}/0002`;
+    const job = { id: 'e2e-lg-j2', number: no, date: today, status: 'delivered', dir: 'import', mode: 'sea_fcl', origin: 'NSA', destination: 'BOM', client_id: 'e2e-lg-c2', refs: { boe_no: '7654321', boe_date: today }, containers: [{ no: 'MSCU1234566', size: '40HC' }], charges: [{ head_id: 'lg-clearance', qty: 1, rate: 6000, currency: 'INR', amount: 6000 }], updated_at: today };
+    const st = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...st, business_type: 'transport', modules: undefined, logistics_kind: 'cha', industry_packs: ['logistics', 'customs'], lock_until: undefined, profiles: (st.profiles ?? []).map((p) => (p.id === st.activeProfileId ? { ...p, companyGstin: '27AAPFU0939F1ZV', stateCode: '27', gst_scheme: 'regular' } : p)) });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-lg-c2', name: 'E2E Demo Imports Pvt Ltd', email: '', address: 'Navi Mumbai', gstin: '27AACCD1234E1Z7', state_code: '27' }]);
+    const head = (kind, name, role, o = {}) => ({ id: `lg-${kind}`, name, kind, role, unit: 'per_shipment', pos_rule: 'auto', active: true, ...o });
+    await writeJson(page, 'logistics_settings', { heads: [head('clearance', 'Customs clearance', 'own', { sac: '996712' }), head('duty', 'Customs duty', 'pure_agent', { unit: 'typed' }), head('cfs', 'CFS charges', 'pure_agent', { unit: 'typed' })] });
+    await readJson(page, 'logistics_settings', null, (v) => v?.heads?.length === 3, 15000);
     await writeJson(page, 'lg_jobs', [job]);
     await readJson(page, 'lg_jobs', [], (v) => v.length === 1 && v[0].id === job.id, 15000);
     await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-lg-c2'), 15000);
@@ -6173,22 +6179,12 @@ try {
     const bills = (await disb('cfs', 'Demo CFS', 'CFS/77', 12000, 2)).filter((p) => p.lg?.job_id === job.id);
     check(bills.length === 2 && bills.every((p) => p.itc_eligible === false && p.pure_agent === true && p.billable_to_client_id === 'e2e-lg-c2' && p.cgst + p.sgst + p.igst === 0), 'two disbursements on behalf: no GST, no ITC, billable to the client as pure agent');
     check(/Excess ₹2,570\.00/i.test(await page.locator('[data-lg-position]').innerText()), `position: deposit ₹2,00,000 vs ₹1,97,430 unrecovered → excess ₹2,570 (${await page.locator('[data-lg-position]').innerText()})`);
-    // The reimbursement bill as R19-B's charge sheet (or the editor's billable costs) issues it: agency ₹6,000 + GST, two Rule 33 lines, lg.disb.
-    const pa = 'Recovered at actual as a pure agent (Rule 33) — outside the taxable value. Verify with your CA.';
-    const line = (p, name) => ({ id: `e2e-l-${p.id}`, type: 'Service', name, description: pa, charge_head_id: 'rule33', unit: 'NOS', quantity: 1, rate: p.total, tax_rate: 0, discount_percent: 0, amount: p.total, bill_refs: [p.id] });
-    const duty = bills.find((p) => p.lg.disb === 'duty');
-    const cfs = bills.find((p) => p.lg.disb === 'cfs');
-    const base = (prev.invoices ?? [])[0] ?? {};
-    const inv = {
-      ...base, id: 'e2e-lg-reimb', invoice_number: 'INV/FY26-27/9019', doc_type: 'INVOICE', issue_date: today, due_date: today, status: 'Sent', currency: 'INR', template_id: base.template_id ?? 'gst_tax_invoice',
-      client: { id: 'e2e-lg-c2', name: 'E2E Demo Imports Pvt Ltd', email: '', address: 'Navi Mumbai', gstin: '27AAPFU0939F1ZV', state_code: '27' },
-      items: [{ id: 'e2e-l-ag', type: 'Service', name: 'Agency charges', hsn: '996712', unit: 'NOS', quantity: 1, rate: 6000, tax_rate: 18, discount_percent: 0, amount: 6000 }, line(duty, 'Customs duty — 1234567 (paid on your behalf)'), line(cfs, 'CFS charges — CFS/77 (paid on your behalf)')],
-      gst_mode: 'CGST_SGST', place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false, amount_paid: 0, notes: '', terms: '',
-      subtotal: 203430, discount_amount: 0, taxable_value: 203430, cgst_amount: 540, sgst_amount: 540, igst_amount: 0, tax_amount: 1080, round_off: 0, total: 204510, balance_due: 204510,
-      lg: { job_id: job.id, job_no: job.number, dir: 'import', mode: 'sea_fcl', refs: job.refs, disb: [{ date: today, kind: 'duty', ref: '1234567', payee: 'Customs (ICEGATE)', amount: 185430 }, { date: today, kind: 'cfs', ref: 'CFS/77', payee: 'Demo CFS', amount: 12000 }] },
-    };
-    await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv]);
-    await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === inv.id), 15000);
+    // R19-B's "Bill job": the clearance charge (₹6,000 + GST) and, through billExtras, both disbursements at actual (Rule 33).
+    await page.goto(srv.origin + '/time?tab=shipments&view=billing');
+    await page.locator(`[data-lg-bill-row="${no}"] [data-lg-open-sheet]`).click({ timeout: 15000 });
+    await page.locator('[data-lg-bill-job]').click({ timeout: 15000 });
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.lg?.job_id === job.id), 15000)).find((i) => i.lg?.job_id === job.id);
+    check(inv?.total === 204510 && inv.items.filter((l) => l.charge_head_id === 'rule33' && l.bill_refs?.length === 1).length === 2 && inv.lg?.disb?.length === 2, `Bill job: one bill ₹2,04,510 with two Rule 33 lines naming the disbursements (${inv?.total})`);
     await page.goto(srv.origin + '/invoice/' + inv.id);
     await page.getByRole('button', { name: /Preview & download PDF/ }).click({ timeout: 15000 });
     const dlg = page.getByRole('dialog', { name: 'Document preview' });

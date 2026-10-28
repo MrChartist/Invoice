@@ -309,11 +309,15 @@ into a shared chunk and cost 1.5 kB more). Pick a job; then:
   the job in the note). The **position** per job (`depositPosition`): unapplied deposits against unrecovered
   disbursements + what the job's invoices still owe → "Excess ₹…" / "Short by ₹…". `deposit_required` (settings) adds
   the hint "Duty paid beyond the client's deposit by ₹…" on a duty disbursement (`depositShortfall`).
-- **Reimbursement bill (C3).** `jobDisbExtras(job, today)` (`lg-recv-io.ts`) returns the job's unrecovered
-  disbursements as Rule 33 lines (`charge_head_id: 'rule33'`, `description: PURE_AGENT_CHARGE`, 0 %, `bill_refs: [id]`,
-  one per row, "Customs duty — 1234567 (paid on your behalf)") and the `lg.disb` schedule — **the seam for R19-B's
-  `billExtras`** (B's charge sheet puts them on the job's domestic document). Until then the invoice editor's billable
-  costs bill the same rows (they are `pure_agent` + `billable_to_client_id`), without the `lg` snapshot. The paper part
+- **Reimbursement bill (C3).** B's "Bill job" carries them: `planJob` (`lg-issue-io.ts`) fills `BillCtx.disb` with the
+  job's disbursements (`loadDisb`, `lg-recv-io.ts`), and the `// R19-C` block of `billExtras` (`lg-bill.ts`) adds
+  `disbCharges(rows, heads)` — one charge line per unrecovered row under the pure-agent head of its kind (duty → `duty`,
+  CFS → `cfs`, port → `port`, DO / shipping line → `do_charges`, insurance → `insurance`, else the first active
+  pure-agent head; a row with none stays unrecovered), ₹ at actual, with `disb_id` and `disb` (`LgCharge`, C block of the
+  types). `planJobBills` bills such a line even when its head is already on a bill (billed state is per row: the line's
+  `bill_refs: [disb_id]`), and pushes `disb` into the document's `lg.disb`. The lines are pure agent (`rule33`, 0 %), so
+  they go on the job's domestic document with the own charges (POS by B2); job costing already leaves the rows out. The
+  invoice editor's billable costs can still bill the same rows (they are `pure_agent` + `billable_to_client_id`). The paper part
   `parts/logistics/DisbSchedule.tsx` (inside `LogisticsBlock`) prints the schedule (date, paid for, challan / invoice,
   paid to, ₹) and "Recoverable at actual (Rule 33, outside the taxable value): ₹…" from `lg.disb` only.
 - **CB register (C4).** For a date range, one row per job: job, date, client, IEC, GSTIN, BOE / SB with date, port (the
@@ -343,10 +347,10 @@ booking, so a deposit edited in the Advances tab stays a deposit.
 
 ### Decisions and cuts
 
-- **Cut 1 (PRD §3): no gross / net reclass journal.** It would post through `lg-books-io.ts` (R19-B's bridge, not on
-  this base); the ledger stays gross (`disb_posting: 'gross'`, LG11). `disb_posting: 'net_journal'` is read by nothing yet.
-- **No billing in C.** C does not issue the reimbursement bill: the PRD puts the charge sheet in R19-B (`lg-bill.ts`
-  `billExtras`, not on this base); `jobDisbExtras` is the seam. The e2e step seeds the invoice B would issue.
+- **Cut 1 (PRD §3): no gross / net reclass journal.** It would post through R19-B's `lg-books-io.ts`, which landed while C
+  was being built; the ledger stays gross (`disb_posting: 'gross'`, LG11). `disb_posting: 'net_journal'` is read by nothing yet.
+- **Billing stays B's.** C adds lines only through `billExtras` (+ the optional `BillCtx.disb`, filled in `planJob`) and
+  two small arms in `planJobBills` (row-level billed state, `lg.disb`); no second biller.
 - **Schedule placement.** The schedule prints inside the job block (before the lines), not after them: the block is A's
   one template mount, and C adds a part rather than a second mount.
 - **Write-off uses `setTable`** on `purchases` (the R14 `writeOffDisbursement` precedent: a memo stamp allowed while the
@@ -363,12 +367,12 @@ booking, so a deposit edited in the Advances tab stays a deposit.
 
 - Engines (pure): `LG_DISB_KINDS`, `disbLabel`, `DISB_CATEGORY`, `validateDisb`, `disbRecord(input)`,
   `rule33Gaps({ auth, extra, inName })`, `billedBy(invoices, rebilledIn)`, `disbRows(sources, billed, today)`, `unrecovered`, `sumOf`, `ageBuckets`,
-  `disbBillLines(rows, charge)`, `disbSchedule(lg)` (`lg-disb.ts`); `DEPOSIT_TEXT`, `depositInput`,
+  `disbCharges(rows, heads)` (B's `billExtras`), `disbSchedule(lg)` (`lg-disb.ts`); `DEPOSIT_TEXT`, `depositInput`,
   `depositPosition(deps, unrecovered, owed?)`, `depositShortfall`, `applyAmount` (`lg-deposits.ts`); `registerRows`,
   `registerCsv`, `REGISTER_COLS` / `REGISTER_HEAD`, `registerTitle(date)`, `kycMissing(client)`,
   `docRefsFromTable(table, jobs)` (`lg-register.ts`).
 - Bridge `lg-recv-io.ts`: `disbSource(raw)`, `loadDisb(today)`, `addDisbursement(input, pay?)`, `writeOffDisb(id, date,
-  reason, by?)`, **`jobDisbExtras(job, today)` (B's seam)**, `loadDeposits()`, `addDeposit(job, receipt)`,
+  reason, by?)`, `loadDeposits()`, `addDeposit(job, receipt)`,
   `jobOpenInvoices(jobId)`, `applyDeposit(dep, invoiceId, date?)`, `refundDeposit(dep, jobNo, date, method)`,
   `saveKyc(client, lg)`, `importDocRefs(csvText)`.
 - D's alerts can read `loadDisb` / `unrecovered` for "Job … — disbursements unrecovered" (a cancelled reimbursement bill

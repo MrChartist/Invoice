@@ -8,17 +8,18 @@ import './helpers/shim.ts';
 import { afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { freezeDate, resetStorage, thawDate } from './helpers/shim.ts';
-import { clientMH, createViaStore, installSettings } from './helpers/world.ts';
+import { clientMH, installSettings } from './helpers/world.ts';
+import { billJob } from '../src/lib/logistics/lg-issue-io.ts';
+import { addDefaultHeads } from '../src/lib/logistics/lg-settings.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { loadAdvances } from '../src/lib/advances.ts';
 import { movedNoCash } from '../src/lib/no-cash.ts';
 import { saveJob } from '../src/lib/logistics/lg-save.ts';
 import { applyAmount, depositInput, depositPosition, depositShortfall, DEPOSIT_TEXT } from '../src/lib/logistics/lg-deposits.ts';
 import { sumOf, unrecovered } from '../src/lib/logistics/lg-disb.ts';
-import { addDeposit, addDisbursement, applyDeposit, jobDisbExtras, jobOpenInvoices, loadDeposits, loadDisb, refundDeposit } from '../src/lib/logistics/lg-recv-io.ts';
+import { addDeposit, addDisbursement, applyDeposit, jobOpenInvoices, loadDeposits, loadDisb, refundDeposit } from '../src/lib/logistics/lg-recv-io.ts';
 
 const D = '2026-11-05';
-const AGENCY = { id: 'ag', type: 'Service', name: 'Agency charges', hsn: '996712', unit: 'NOS', quantity: 1, rate: 6000, tax_rate: 18, discount_percent: 0, amount: 6000 };
 const newJob = (n: string) => saveJob({ date: D, status: 'arrived', dir: 'import', mode: 'sea_fcl', origin: 'NSA', destination: 'BOM', client_id: clientMH.id!, refs: { boe_no: n } }).job;
 beforeEach(() => {
   resetStorage();
@@ -44,8 +45,9 @@ test('seed job 0002: deposit, two disbursements, the reimbursement bill, apply â
   addDisbursement({ job, kind: 'cfs', payee: 'Demo CFS', ref: 'CFS/77', amount: 12000, date: D, in_client_name: true });
   let pos = depositPosition(loadDeposits(), sumOf(unrecovered(loadDisb(D))));
   assert.deepEqual([pos.received, pos.open, pos.unrecovered, pos.gap, pos.state], [200000, 200000, 197430, 2570, 'excess']);
-  const ex = jobDisbExtras(job, D);
-  const inv = createViaStore({ date: D, lines: [{ qty: 1, rate: 6000 }], patch: { items: [AGENCY, ...ex.items], lg: { job_id: job.id, job_no: job.number, disb: ex.disb } } });
+  addDefaultHeads(D);
+  saveJob({ ...job, charges: [{ head_id: 'lg-clearance', qty: 1, rate: 6000, currency: 'INR', amount: 6000 }] });
+  const inv = billJob(job.id, { date: D }).invoices[0];
   assert.equal(inv.total, 204510);
   assert.deepEqual(jobOpenInvoices(job.id).map((i) => i.open), [204510]);
   pos = depositPosition(loadDeposits(), sumOf(unrecovered(loadDisb(D))), 204510);

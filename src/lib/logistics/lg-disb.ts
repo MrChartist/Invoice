@@ -8,8 +8,8 @@
  * stamps `lg.wo`. The ledger stays gross (LG11). Rows come in through `lg-recv-io.ts` (`readPurchase`). Working papers —
  * verify with your CA (LG10, LG11, LG36, LG37).
  */
-import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
-import type { LgJob, LgSnapshot } from '../../types/logistics-r19';
+import type { InvoiceRecord } from '../../types/invoice';
+import type { LgCharge, LgHead, LgHeadKind, LgJob, LgSnapshot } from '../../types/logistics-r19';
 import type { PurchaseRecord } from '../../types/purchases';
 import { generateId } from '../storage';
 import { round2 } from '../invoice-calc';
@@ -77,7 +77,7 @@ export function disbRows(src: readonly DisbSource[], billed: (id: string) => boo
   for (const s of src) {
     const lg = s.lg;
     if (!lg?.on_behalf || !lg.disb || !lg.job_id || s.void) continue;
-    out.push({ id: s.id, job_id: lg.job_id, client_id: s.client_id ?? '', date: s.date, kind: lg.disb, ref: lg.ref ?? '', payee: s.payee, amount: round2(s.total), in_client_name: !!lg.in_client_name, billed: billed(s.id), ...(lg.wo ? { wo: lg.wo } : {}), age: Math.max(Math.round(dayNo(today) - dayNo(s.date)), 0) });
+    out.push({ id: s.id, job_id: lg.job_id, client_id: s.client_id ?? '', date: s.date, kind: lg.disb, ref: lg.ref ?? '', payee: s.payee, amount: round2(s.total), in_client_name: !!lg.in_client_name, billed: billed(s.id), ...(lg.wo ? { wo: lg.wo } : {}), age: Math.max(Math.round(dayNo(today) - dayNo(s.date)), 0) || 0 });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date)); // stable: same-day rows keep their entry order
 }
@@ -112,17 +112,20 @@ export function ageBuckets(rows: readonly Pick<LgDisbRow, 'age' | 'amount'>[]): 
   return out;
 }
 
+/** The pure-agent head a disbursement kind bills under (else any active pure-agent head). */
+const HEAD_KIND: Record<LgDisbKind, LgHeadKind | ''> = { duty: 'duty', cfs: 'cfs', port: 'port', do: 'do_charges', shipping_line: 'do_charges', insurance: 'insurance', other: '' };
+
 /**
- * C3 seam for B's charge sheet (`billExtras`): the job's unrecovered disbursements as pure-agent lines (one per row,
- * `bill_refs: [id]`, 0 %, `charge` = the shared Rule 33 text `PURE_AGENT_CHARGE`) and the `lg.disb` schedule the paper
- * prints. They go on the job's domestic document.
+ * C3 through B's `billExtras` (`lg-bill.ts`): the job's unrecovered disbursements as charge lines of a pure-agent head
+ * (one per row, at actual in rupees, `disb_id` becomes the line's `bill_refs`, `disb` its `lg.disb` row). A row with no
+ * pure-agent head among the heads stays unrecovered.
  */
-export function disbBillLines(rows: readonly LgDisbRow[], charge: string): { items: InvoiceItem[]; disb: NonNullable<LgSnapshot['disb']> } {
-  const open = unrecovered(rows);
-  return {
-    items: open.map((r) => ({ id: generateId(), type: 'Service', name: `${LABEL[r.kind]}${r.ref ? ` — ${r.ref}` : ''} (paid on your behalf)`, description: charge, charge_head_id: 'rule33', unit: 'NOS', quantity: 1, rate: r.amount, tax_rate: 0, discount_percent: 0, amount: r.amount, bill_refs: [r.id] }) as InvoiceItem),
-    disb: open.map((r) => ({ date: r.date, kind: r.kind, ...(r.ref ? { ref: r.ref } : {}), payee: r.payee, amount: r.amount })),
-  };
+export function disbCharges(rows: readonly LgDisbRow[], heads: readonly LgHead[]): LgCharge[] {
+  const pa = heads.filter((h) => h.active && h.role === 'pure_agent');
+  return unrecovered(rows).flatMap((r) => {
+    const h = pa.find((x) => x.kind === HEAD_KIND[r.kind]) ?? pa[0];
+    return h ? [{ head_id: h.id, qty: 1, rate: r.amount, currency: 'INR', amount: r.amount, note: [r.ref, r.payee].filter(Boolean).join(', paid to '), disb_id: r.id, disb: { date: r.date, kind: r.kind, ...(r.ref ? { ref: r.ref } : {}), payee: r.payee, amount: r.amount } }] : [];
+  });
 }
 
 /** The printed schedule (C3): rows with English labels and the total recoverable at actual. */
