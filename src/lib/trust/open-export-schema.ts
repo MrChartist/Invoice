@@ -290,6 +290,9 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   site_musters: 'Site duty registers (musters): site (cost centre), month, rows (employee, post, duties, OT hours, reliever, note), draft / locked (R17).',
   // R17-C
   site_compliance: 'Site compliance proof: site (cost centre), month, PF TRRN / ESI challan (paid on, amount), attachments, pending / proved / waived, the client hold (R17).',
+  // R18-A
+  society_settings: 'Society profile settings: State, billing cycle, bill day, due days, charge heads (kind, basis, rate, SAC, fund), area unit, confirmed State rules; B–D add GST valuation, interest, allocation, funds and audit (R18).',
+  society_units: 'Society units: code, wing, floor, use, carpet / super area, undivided %, construction cost, inlets, lifted, owner and joint owners (clients), occupancy, tenant, parking slots, typed amounts per head, status; C / D add certificates, transfers, share certificate, nominees (R18).',
   travel_bookings: 'Travel bookings: trip / event file (cost centre), component, supplier, PNR / ref., dates, cost (currency, rate), sell, pure agent, status, supplier bill, invoice line once billed (R15).',
   // R15-C
   supplier_statements: 'Supplier statements (BSP / consolidator / bed-bank): supplier, kind, period, ref., rows (document no., type, date, passenger, gross, taxes, commission, net, match, status, ADM / refund flag), totals, bill and commission invoice made (R15).',
