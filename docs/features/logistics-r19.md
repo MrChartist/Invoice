@@ -382,17 +382,18 @@ none of its dockets is on another manifest.
 
 ### Bundle (R19-D)
 
-Baseline: `origin/claude/elegant-cannon-cwapiv` at `f5c9f9b` (R19-A + R19-B), built in this worktree (`vite build` +
-`check-bundle-size`): initial 183.0 kB (4 files), entry 89.0 kB, core 3,226.5 kB, Hindi pack 355.7 kB, Hindi in core
-21.6 kB, `lazy-leaves` 17.6 kB. (Before B merged, against `8b3f5a3`: core 3,218.1 → 3,229.7 kB, +11.6 kB, with D's own
+Baseline: `origin/claude/elegant-cannon-cwapiv` at `26aecaf` (R19-A + R19-B + pending 16–25), built in this worktree
+(`vite build` + `check-bundle-size`): initial 183.0 kB (4 files), entry 89.0 kB, core 3,237.4 kB, Hindi pack 356.8 kB,
+Hindi in core 21.6 kB, `lazy-leaves` 17.6 kB. Against `f5c9f9b` the same package measured +9.3 kB (raw totals move
+±1 kB between builds). (Before B merged, against `8b3f5a3`: core 3,218.1 → 3,229.7 kB, +11.6 kB, with D's own
 margin engine.)
 
 | Budget | Before | After | Change | Cap |
 |---|---|---|---|---|
 | Initial JS (first paint) | 183.0 kB (4 files) | 183.0 kB (4 files) | 0 (entry, runtime, vendor chunks identical after hash normalisation) | 0 ✓ |
 | Entry chunk | 89.0 kB | 89.0 kB | 0 | — |
-| Core precache (English) | 3,226.5 kB | 3,235.8 kB | **+9.3 kB** (`check-bundle-size`); +9,809 B normalized | 12 kB ✓ |
-| Hindi pack | 355.7 kB | 356.9 kB | +1.2 kB (`lang-hi-logistics` +1.19 kB; palette / reach / discover areas) | — |
+| Core precache (English) | 3,237.4 kB | 3,248.5 kB | **+11.1 kB** (`check-bundle-size`); +9,809 B normalized against `f5c9f9b` | 12 kB ✓ |
+| Hindi pack | 356.8 kB | 358.1 kB | +1.3 kB (`lang-hi-logistics` +1.19 kB; palette / reach / discover areas) | — |
 | Hindi left in core | 21.6 kB | 21.6 kB | 0 (rounded; four Hindi help titles) | 0 ✓ |
 | `lazy-leaves` | 17.6 kB | 17.7 kB | +29 B (`lg-registry.ts` D rows) | — |
 
