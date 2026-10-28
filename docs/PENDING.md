@@ -80,7 +80,7 @@ figure, blocks a workflow or makes a vertical unusable at scale · **M** missing
 | 31 | R4-C8: recycle-bin capture of rows replaced by a restore or sync "Use theirs"; 3-way field merge with base rows in `sync_state`; signed PDF in the auditor pack; second dated realisation rule for INR-settled exports | M | L | `ROADMAP.md` R4-C8 |
 | 32 | 7.49 rest: compress audit archive segments; archive old FYs to a "history" company | M | M | `ROADMAP.md` 7.49 |
 | 33 | 7.116 (7Q): voucher types for purchase / stock / payroll series; bill-wise refs when altering a payment voucher and on journals; Excel import of sales / purchase vouchers; batches / serials on Tally item lines | M | M | `ROADMAP.md` 7.116, [`features/voucher-types.md`](features/voucher-types.md) |
-| 34 | GAP P1-6: user ageing slabs, ageing by due date or bill date, interest column (buckets are fixed in `receivables.ts`) | M | S | `GAP_ANALYSIS.md` P1-6 |
+| 34 | ~~GAP P1-6: user ageing slabs, ageing by due date or bill date, interest column~~ — **done** (Aging tab controls, `BuildOptions.ageing`, `receivables.md`) | M | S | `GAP_ANALYSIS.md` P1-6 |
 | 35 | GAP P1-7: ledger-wise interest report (loans given / taken); party-bill interest exists (Receivables → Interest) | L | S | `GAP_ANALYSIS.md` P1-7 |
 | 36 | GAP P1-26: GST reports and Inventory adopt the shared period (`period-context.ts` is Books-only) | L | S | `GAP_ANALYSIS.md` P1-26 |
 | 37 | Reports: comparative columns on TB / BS (Group Summary and P&L only today); Tally horizontal Balance Sheet | L | M | [`features/reports-engine.md`](features/reports-engine.md) |

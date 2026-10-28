@@ -45,6 +45,47 @@ export type ReceiptRow = Payment & { client_id?: string; client_name?: string; c
 export const AGING_BUCKETS = ['Not due', '1–30 days', '31–60 days', '61–90 days', '90+ days'] as const;
 export type AgingBucketLabel = (typeof AGING_BUCKETS)[number];
 
+/**
+ * PENDING 34 (GAP P1-6): the user's ageing slabs (three cut-offs in days; the five bucket keys above stay the ids, only
+ * their ranges and labels move) and the basis — days past the due date (default) or since the bill date. Device-local
+ * viewing preference `mrchartist_ageing_prefs` (never backed up); `interest` shows the Interest column.
+ */
+export interface AgeingPrefs {
+  basis: 'due' | 'bill';
+  slabs: [number, number, number];
+  interest?: boolean;
+}
+export const DEFAULT_AGEING: AgeingPrefs = { basis: 'due', slabs: [30, 60, 90] };
+export const AGEING_PREFS_KEY = 'mrchartist_ageing_prefs';
+
+export function normalizeAgeing(raw: unknown): AgeingPrefs {
+  const o = raw && typeof raw === 'object' ? (raw as Partial<AgeingPrefs>) : {};
+  const sl = Array.isArray(o.slabs) ? o.slabs.map((n) => Math.round(num(n))) : [];
+  const ok = sl.length === 3 && sl[0] > 0 && sl[0] < sl[1] && sl[1] < sl[2] && sl[2] <= 3650;
+  return { basis: o.basis === 'bill' ? 'bill' : 'due', slabs: ok ? (sl as AgeingPrefs['slabs']) : [...DEFAULT_AGEING.slabs], ...(o.interest ? { interest: true } : {}) };
+}
+export function loadAgeingPrefs(): AgeingPrefs {
+  try {
+    return normalizeAgeing(JSON.parse(localStorage.getItem(AGEING_PREFS_KEY) ?? 'null'));
+  } catch {
+    return normalizeAgeing(null);
+  }
+}
+export function saveAgeingPrefs(p: AgeingPrefs): void {
+  try {
+    localStorage.setItem(AGEING_PREFS_KEY, JSON.stringify(normalizeAgeing(p)));
+  } catch { /* viewing preference only */ }
+}
+
+/** Bucket of a bill `days` old under the slabs (0 days = Not due). */
+export function slabBucket(days: number, slabs: readonly number[] = DEFAULT_AGEING.slabs): AgingBucketLabel {
+  if (!(days > 0)) return 'Not due';
+  if (days <= slabs[0]) return '1–30 days';
+  if (days <= slabs[1]) return '31–60 days';
+  if (days <= slabs[2]) return '61–90 days';
+  return '90+ days';
+}
+
 export type LedgerEntryKind = 'invoice' | 'payment' | 'credit_note' | 'advance' | 'opening' | 'refund';
 
 /**
@@ -210,6 +251,8 @@ export interface BuildOptions {
   /** Only documents in this currency. Default 'INR'. */
   currency?: string;
   now?: Date;
+  /** PENDING 34: slabs and basis for the buckets (default 30 / 60 / 90 from the due date). */
+  ageing?: Pick<AgeingPrefs, 'basis' | 'slabs'>;
 }
 
 export interface BuildInput {
@@ -328,6 +371,10 @@ export function currenciesIn(invoices: InvoiceRecord[]): string[] {
 export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): ReceivablesReport {
   const now = opts.now ?? new Date();
   const currency = (opts.currency ?? 'INR').toUpperCase();
+  const ageing = opts.ageing;
+  const ageOf = (due: string, billDate: string): AgingBucketLabel => (ageing
+    ? slabBucket(daysOverdue(ageing.basis === 'bill' ? billDate : due, now), ageing.slabs)
+    : (agingBucket(due, now) as AgingBucketLabel));
   const clients = input.clients ?? [];
   // Indexed once: a per-invoice scan of the client list made this O(invoices x clients).
   const idByName = new Map<string, string>();
@@ -523,7 +570,7 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
         issueDate: issue, dueDate: dateKey(dueOf(inv)) || issue,
         total, paid, outstanding,
         daysOverdue: dueNow ? daysOverdue(dueOf(inv), now) : 0,
-        bucket: (dueNow ? agingBucket(dueOf(inv), now) : 'Not due') as AgingBucketLabel,
+        bucket: (dueNow ? ageOf(dueOf(inv), issue) : 'Not due') as AgingBucketLabel,
         ...(alloc > 0 ? { credited: alloc } : {}),
         ...(held > 0 ? { held } : {}),
       });
@@ -560,7 +607,7 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
         invoiceId: b.id, number: b.ref_no, issueDate: b.date, dueDate: due,
         total: amount, paid, outstanding,
         daysOverdue: daysOverdue(due, now),
-        bucket: agingBucket(due, now) as AgingBucketLabel,
+        bucket: ageOf(due, b.date),
         opening: true,
       });
     }
@@ -766,15 +813,17 @@ export function statementCsv(ledger: Ledger): string {
   return toCsv(rows);
 }
 
-export function agingCsv(report: ReceivablesReport): string {
+/** `labels` = the slab headings shown on screen; `interest` (party key → rupees) adds an Interest column (PENDING 34). */
+export function agingCsv(report: ReceivablesReport, labels?: Partial<Record<AgingBucketLabel, string>>, interest?: ReadonlyMap<string, number>): string {
+  const int = (k: string) => (interest ? [interest.get(k) ?? 0] : []);
   const rows: (string | number)[][] = [
-    ['Party', ...AGING_BUCKETS, 'Bills total', 'Credit notes', 'Advances', 'Net outstanding'],
+    ['Party', ...AGING_BUCKETS.map((b) => labels?.[b] ?? b), 'Bills total', 'Credit notes', 'Advances', 'Net outstanding', ...(interest ? ['Interest'] : [])],
   ];
   for (const p of report.parties) {
-    rows.push([p.name, ...AGING_BUCKETS.map((b) => p.buckets[b]), p.gross, p.creditNotes, p.advances, p.net]);
+    rows.push([p.name, ...AGING_BUCKETS.map((b) => p.buckets[b]), p.gross, p.creditNotes, p.advances, p.net, ...int(p.key)]);
   }
   const t = report.totals;
-  rows.push(['Total', ...AGING_BUCKETS.map((b) => t.buckets[b]), t.gross, t.creditNotes, t.advances, t.net]);
+  rows.push(['Total', ...AGING_BUCKETS.map((b) => t.buckets[b]), t.gross, t.creditNotes, t.advances, t.net, ...(interest ? [round2(report.parties.reduce((a, p) => a + (interest.get(p.key) ?? 0), 0))] : [])]);
   return toCsv(rows);
 }
 

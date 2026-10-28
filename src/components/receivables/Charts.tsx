@@ -16,9 +16,12 @@ export function AgeChip({ bucket, children }: { bucket: AgingBucketLabel; childr
 export function AgingStack({
   buckets,
   currency,
+  ageing,
 }: {
   buckets: Record<AgingBucketLabel, number>;
   currency: string;
+  /** PENDING 34: the user's slabs / basis for the labels. */
+  ageing?: { basis: 'due' | 'bill'; slabs: readonly number[] };
 }) {
   const total = AGING_BUCKETS.reduce((s, b) => s + buckets[b], 0);
   return (
@@ -26,18 +29,18 @@ export function AgingStack({
       <div
         className={styles.stack}
         role="img"
-        aria-label={rcvT('chAgeAria', { list: AGING_BUCKETS.map((b) => `${bucketLabel(b)}: ${formatMoney(buckets[b], currency)}`).join('; ') })}
+        aria-label={rcvT('chAgeAria', { list: AGING_BUCKETS.map((b) => `${bucketLabel(b, ageing)}: ${formatMoney(buckets[b], currency)}`).join('; ') })}
       >
         {AGING_BUCKETS.map((b, i) =>
           buckets[b] > 0 ? (
-            <div key={b} className={`${styles.seg} ${TONE[i]}`} style={{ flexGrow: buckets[b] }} title={`${bucketLabel(b)}: ${formatMoney(buckets[b], currency)}`} />
+            <div key={b} className={`${styles.seg} ${TONE[i]}`} style={{ flexGrow: buckets[b] }} title={`${bucketLabel(b, ageing)}: ${formatMoney(buckets[b], currency)}`} />
           ) : null,
         )}
       </div>
       <ul className={styles.legend}>
         {AGING_BUCKETS.map((b, i) => (
           <li key={b} className={`${styles.legendItem} ${TONE[i]}`}>
-            <span className={styles.legendLabel}><span className={styles.dot} />{bucketLabel(b)}</span>
+            <span className={styles.legendLabel}><span className={styles.dot} />{bucketLabel(b, ageing)}</span>
             <span className={styles.legendValue}>{formatMoney(buckets[b], currency)}</span>
             <span className={styles.legendPct}>{total > 0 ? rcvT('chPctBills', { pct: Math.round((buckets[b] / total) * 100) }) : '—'}</span>
           </li>

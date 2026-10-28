@@ -24,8 +24,8 @@ import { loadReceivableOpeningBills } from '../lib/opening-bills';
 import { createLateFeeInvoice, describeClientLateFee, lateFeeRuleFor, type ClientLateFee } from '../lib/late-fee';
 import {
   AGING_BUCKETS, agingCsv, buildLedger, buildReceivables, buildStatementText, computeDso,
-  currenciesIn, debtorShare, monthlyCollections, overallEfficiency, posRefunds, settlementRefunds, topDebtors,
-  type PartyReceivable, type ReceiptRow,
+  currenciesIn, debtorShare, loadAgeingPrefs, monthlyCollections, normalizeAgeing, overallEfficiency, posRefunds, saveAgeingPrefs, settlementRefunds, topDebtors,
+  type AgeingPrefs, type PartyReceivable, type ReceiptRow,
 } from '../lib/receivables';
 import { formatMoney, formatCurrency, formatDate, todayInput, toDateInput } from '../lib/utils';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -167,7 +167,30 @@ export function Receivables() {
   const currency = currencyPick || currencies[0] || 'INR';
 
   const now = useMemo(() => new Date(), []);
-  const report = useMemo(() => buildReceivables(data, { currency, now }), [data, currency, now]);
+  // PENDING 34: user slabs / basis (device-local) and an Interest column (tr-interest, loaded only when switched on).
+  const [ageing, setAgeingState] = useState<AgeingPrefs>(loadAgeingPrefs);
+  const setAgeing = (p: AgeingPrefs) => { setAgeingState(p); saveAgeingPrefs(p); };
+  const report = useMemo(() => buildReceivables(data, { currency, now, ageing }), [data, currency, now, ageing]);
+  const [interestLib, setInterestLib] = useState<typeof import('../lib/trade/tr-interest') | null>(null);
+  useEffect(() => {
+    if (ageing.interest && !interestLib) import('../lib/trade/tr-interest').then((m) => setInterestLib(m)).catch(() => undefined);
+  }, [ageing.interest, interestLib]);
+  const interest = useMemo(() => {
+    if (!ageing.interest || !interestLib || currency !== 'INR') return undefined;
+    const asOf = toDateInput(now);
+    const list = interestLib.partyInterest(asOf, interestLib.loadInterestSettings(), {
+      invoices: data.invoices, payments: data.payments as Payment[], links: data.links as never, clients: data.clients,
+      openingBills: loadReceivableOpeningBills(data.clients, asOf), runs: interestLib.loadInterestRuns(),
+    });
+    const byId = new Map(report.parties.filter((p) => p.clientId).map((p) => [p.clientId!, p.key]));
+    const byName = new Map(report.parties.map((p) => [p.name.trim().toLowerCase(), p.key]));
+    const out = new Map<string, number>();
+    for (const pi of list) {
+      const k = (pi.party_id && byId.get(pi.party_id)) || byName.get(pi.party.trim().toLowerCase());
+      if (k) out.set(k, Math.round(((out.get(k) ?? 0) + pi.total) * 100) / 100);
+    }
+    return out;
+  }, [ageing.interest, interestLib, currency, now, data, report.parties]);
   const months = useMemo(() => monthlyCollections(report, 12, now), [report, now]);
   const dso = useMemo(() => computeDso(report, 90, now), [report, now]);
   const efficiency = overallEfficiency(months);
@@ -242,7 +265,7 @@ export function Receivables() {
           </label>
         )}
         <button type="button" className={`${controls.btn} ${controls.btnOutline}`}
-          onClick={() => downloadTextFile(`Receivables_aging_${todayInput()}.csv`, agingCsv(report))}>
+          onClick={() => downloadTextFile(`Receivables_aging_${todayInput()}.csv`, agingCsv(report, Object.fromEntries(AGING_BUCKETS.map((b) => [b, bucketLabel(b, ageing)])), interest))}>
           <Download size={16} /> {rcvT('exportCsv')}
         </button>
         <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setBulkOpen(true)} disabled={report.parties.length === 0}>
@@ -322,7 +345,7 @@ export function Receivables() {
         </Suspense>
       )}
       <div role="tabpanel" id={`rcv-panel-${tab}`} aria-labelledby={`rcv-tab-${tab}`}>
-        {tab === 'aging' && <AgingTab report={report} currency={currency} fmt={fmt} lateFeeRules={lateFeeRules} onLateFee={addLateFee} clients={data.clients}
+        {tab === 'aging' && <AgingTab report={report} currency={currency} ageing={ageing} onAgeing={setAgeing} interest={interest} fmt={fmt} lateFeeRules={lateFeeRules} onLateFee={addLateFee} clients={data.clients}
           badge={badge} notify={notify} onChanged={() => setData(loadData())}
           onNetting={(id) => { const n = new URLSearchParams(params); n.set('netting', id); setParams(n, { replace: true }); }}
           onStatement={(p) => { const n = new URLSearchParams(params); n.set('tab', 'statements'); n.set('party', p.key); setParams(n, { replace: true }); }} />}
@@ -411,8 +434,11 @@ function Stat({ label, value, hint, icon, tone }: {
 
 /* ── Aging ────────────────────────────────────────────────────── */
 
-function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee, clients, badge, notify, onChanged, onNetting }: {
+function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee, clients, badge, notify, onChanged, onNetting, ageing, onAgeing, interest }: {
   onNetting: (clientId: string) => void;
+  ageing: AgeingPrefs;
+  onAgeing: (p: AgeingPrefs) => void;
+  interest?: ReadonlyMap<string, number>;
   report: ReturnType<typeof buildReceivables>;
   clients: ReturnType<typeof loadData>['clients'];
   badge: (partyKey: string) => ReactNode;
@@ -447,6 +473,14 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
     for (const c of clients) if (names.has(k(c.name)) || (c.gstin && gstins.has(k(c.gstin)))) out.add(c.id);
     return out;
   }, [clients]);
+  const [slabText, setSlabText] = useState(ageing.slabs.join(' / '));
+  const applySlabs = () => {
+    const slabs = slabText.split(/[^0-9]+/).filter(Boolean).map(Number);
+    const next = normalizeAgeing({ ...ageing, slabs });
+    if (next.slabs.join() !== slabs.join()) { notify(rcvT('ageSlabsBad'), 'error'); setSlabText(ageing.slabs.join(' / ')); return; }
+    onAgeing(next);
+  };
+  const cols = 8 + (interest ? 1 : 0);
   const toggle = (k: string) => setOpen((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const top = topDebtors(report, 5);
   const m = (n: number) => (n ? formatMoney(n, currency) : '—');
@@ -469,7 +503,7 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
     <div className={styles.stack}>
       <div className={surface.card}>
         <div className={surface.cardHead}><h2 className={styles.h2}>{rcvT('byAge')}</h2></div>
-        <div className={surface.cardBody}><AgingStack buckets={report.totals.buckets} currency={currency} /></div>
+        <div className={surface.cardBody}><AgingStack buckets={report.totals.buckets} currency={currency} ageing={ageing} /></div>
       </div>
 
       {top.length > 0 && (
@@ -493,21 +527,34 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
       )}
 
       <div className={surface.card}>
-        <div className={surface.cardHead}><h2 className={styles.h2}>{rcvT('partyWise')}</h2></div>
+        <div className={surface.cardHead}>
+          <h2 className={styles.h2}>{rcvT('partyWise')}</h2>
+          <div className={styles.ageingPrefs} data-ageing-prefs>
+            <label className={styles.inline}><span className={controls.label}>{rcvT('ageBy')}</span>
+              <select className={controls.select} value={ageing.basis} onChange={(e) => onAgeing({ ...ageing, basis: e.target.value === 'bill' ? 'bill' : 'due' })} data-ageing-basis>
+                <option value="due">{rcvT('ageDue')}</option><option value="bill">{rcvT('ageBill')}</option>
+              </select></label>
+            <label className={styles.inline}><span className={controls.label}>{rcvT('ageSlabs')}</span>
+              <input className={controls.input} size={10} value={slabText} onChange={(e) => setSlabText(e.target.value)} onBlur={applySlabs}
+                onKeyDown={(e) => { if (e.key === 'Enter') applySlabs(); }} data-ageing-slabs /></label>
+            {currency === 'INR' && <label className={styles.inline}><input type="checkbox" checked={!!ageing.interest} onChange={(e) => onAgeing({ ...ageing, interest: e.target.checked })} data-ageing-interest /> {rcvT('interestCol')}</label>}
+          </div>
+        </div>
         <div className={surface.tableWrap}>
           <table className={`${surface.table} ${styles.agingTable}`} aria-rowcount={virtual.enabled ? ariaIndex.total : undefined}>
             <caption className={surface.srOnly}>{rcvT('agingCaption')}</caption>
             <thead>
               <tr aria-rowindex={virtual.enabled ? 1 : undefined}>
                 <th scope="col">{rcvT('party')}</th>
-                {AGING_BUCKETS.map((b) => <th key={b} scope="col" className={surface.numeric}>{bucketLabel(b)}</th>)}
+                {AGING_BUCKETS.map((b) => <th key={b} scope="col" className={surface.numeric}>{bucketLabel(b, ageing)}</th>)}
                 <th scope="col" className={surface.numeric}>{rcvT('credits')}</th>
                 <th scope="col" className={surface.numeric}>{rcvT('net')}</th>
+                {interest && <th scope="col" className={surface.numeric}>{rcvT('interestCol')}</th>}
               </tr>
             </thead>
             <tbody {...virtual.bodyProps}>
               {virtual.slots.map((slot) => {
-                if (slot.kind === 'gap') return <VirtualGap key={slot.key} height={slot.height} colSpan={8} />;
+                if (slot.kind === 'gap') return <VirtualGap key={slot.key} height={slot.height} colSpan={cols} />;
                 const p = report.parties[slot.index];
                 const expanded = open.has(p.key);
                 const canExpand = p.bills.length > 0;
@@ -550,10 +597,11 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
                       {AGING_BUCKETS.map((b) => <td key={b} className={surface.numeric}>{m(p.buckets[b])}</td>)}
                       <td className={surface.numeric}>{m(p.creditNotes + p.advances)}</td>
                       <td className={`${surface.numeric} ${p.net < 0 ? styles.credit : ''}`}><strong>{formatMoney(p.net, currency)}</strong></td>
+                      {interest && <td className={surface.numeric} data-ageing-interest-cell>{m(interest.get(p.key) ?? 0)}</td>}
                     </tr>
                     {expanded && (
                       <tr className={styles.billsRow} data-vindex={vrow['data-vindex']} aria-rowindex={rowIndex === undefined ? undefined : rowIndex + 1}>
-                        <td colSpan={8}>
+                        <td colSpan={cols}>
                           <BillsTable party={p} currency={currency} lateFeeRules={lateFeeRules} onLateFee={onLateFee}
                             onWriteOff={currency === 'INR' && can('doc.deleteIssued') ? (bill) => setWriteOff({ party: p, bill }) : undefined} />
                         </td>
@@ -569,6 +617,7 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
                 {AGING_BUCKETS.map((b) => <td key={b} className={surface.numeric}>{m(report.totals.buckets[b])}</td>)}
                 <td className={surface.numeric}>{m(report.totals.creditNotes + report.totals.advances)}</td>
                 <td className={surface.numeric}>{formatMoney(report.totals.net, currency)}</td>
+                {interest && <td className={surface.numeric}>{m(report.parties.reduce((a, p) => a + (interest.get(p.key) ?? 0), 0))}</td>}
               </tr>
             </tfoot>
           </table>
