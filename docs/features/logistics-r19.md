@@ -307,10 +307,9 @@ Ctrl+K 0.07, readers `einvoice` 0.06 / `gst-reports` 0.04, palette 0.03, packs 0
   the docket annexure is a CSV per manifest. Billed state is derived from live bills (`billedManifests`); **"Undo
   month"** cancels the period's bills (never deleted; numbers stay used; a bill with a receipt stops it) and the
   manifests are billable again. A manifest no live bill names can be removed (recycle bin).
-- **Reports (D4, view `reports`).** One FY's jobs: margin by lane / client / salesperson / month (`jobPnl`: revenue =
-  the job's live bills in ₹ at the document rate, Rule 33 lines out; cost = taxable of bills tagged to the job, drafts
-  and disbursements on the client's behalf out — LG11), agent balances, disbursements ageing (unrecovered on-behalf
-  bills, recoveries settle the oldest first; 0–30 / 31–60 / 61–90 / 90+ days) — each with CSV.
+- **Reports (D4, view `reports`).** One FY's jobs: margin by lane / client / salesperson / month (B's job costing:
+  `jobPnls` → `groupPnl`), agent balances, disbursements ageing (unrecovered on-behalf bills, recoveries settle the
+  oldest first; 0–30 / 31–60 / 61–90 / 90+ days) — each on screen and as CSV.
 - **Notices (D4).** `lg-alerts.ts` behind ONE bell gate `gate('logistics', '-', …)` (every logistics kind has the
   pack; `lgNotices` re-checks the packs on every run): a job delivered over 7 days ago (by its last status change,
   `updated_at`) with no live bill; disbursements on the client's behalf (`PurchaseRecord.lg.on_behalf`, C1) older than
@@ -344,13 +343,14 @@ none of its dockets is on another manifest.
   **cut 3 — the TDS-on-receipts view**. Beyond the list: no deposits-position report (C's customs view holds deposits),
   the agent statement is a pasted list (not the R15-C mapping importer, not stored), no D demo rows, no `network`
   column, and "Agent notes" sit in the Agents view (pick the job) rather than on the job page.
-- **No bridge.** D creates no `lg-*-io.ts`. Shared lazy code is reached from the components layer through
-  `components/logistics/lg-d-seam.ts` (`draftBase` = `makeDraft`, `lutOn` — a dynamic import of the R4-C register,
-  `fxOn` = the currency master's rate, `syncNettedPaid`, `downloadCsv`) and passed to the writers as arguments.
-  **Merge note for B:** when `lg-issue-io.ts` exists, `draftBase` / `lutOn` / `fxOn` move behind it, and the agent note
-  can take B's regime engine instead of `agentNote`'s fixed export-of-services rule. **For C:** the notices and the
-  ageing read C's fields as A declared them (`PurchaseRecord.lg.on_behalf` / `disb`, `AdvanceRecord.lg.job_id`,
-  `lg.disb` on the reimbursement bill).
+- **No bridge.** D creates no `lg-*-io.ts`. After B merged, D reads B's `lg-tax-io.ts` `lutOn` (the LUT of an agent
+  note), `lg-books-io.ts` `jobPnls` and `lg-costing.ts` `groupPnl` (the margin rows). The rest of the shared lazy code is
+  reached from the components layer through `components/logistics/lg-d-seam.ts` (`draftBase` = `makeDraft`,
+  `lutOnDay`, `fxOn` = the currency master's rate, `syncNettedPaid`, `downloadCsv`) and passed to the writers as
+  arguments. `lg-bill.ts` `billExtras` stays empty for D: agent notes and courier bills are documents of their own (not
+  lines of a job bill), and storage was cut. Open for a later round: the agent note could take B's regime engine
+  instead of `agentNote`'s export-of-services rule. **For C:** the notices and the ageing read C's fields as A declared
+  them (`PurchaseRecord.lg.on_behalf` / `disb`, `AdvanceRecord.lg.job_id`, `lg.disb` on the reimbursement bill).
 - **Writers.** `lg-d-save.ts` imports the registry (outside the family) and may import `table-txn`
   (`tests/lg-rules.test.ts` names it with `lg-save.ts`). Engines `lg-doc` / `lg-courier` / `lg-agents` / `lg-alerts` /
   `lg-reports` are pure and in `f-logistics`.
@@ -375,28 +375,29 @@ none of its dockets is on another manifest.
   `saveAgentBill`, `settleAgent(agent, { amount, date, rcmPaid }, sync)` (`lg-d-save.ts`).
 - Documents: `lgDoc`, `svcLine`, `partyPos`, `homeOf`, `liveBills`, `periodOf`, `monthEnd`, `prevPeriod`
   (`lg-doc.ts`); `docCtx(base, date)` (`lg-d-save.ts`).
-- Notices / reports: `lgAlerts(today, data)`, `lgNotices(ctx)`, `recoveredByJob` (`lg-alerts.ts`); `jobPnl`, `marginBy`,
-  `MARGIN_BY`, `disbAgeing` (`lg-reports.ts`).
+- Notices / reports: `lgAlerts(today, data)`, `lgNotices(ctx)`, `recoveredByJob` (`lg-alerts.ts`); `disbAgeing`
+  (`lg-reports.ts`).
 - Strings: `lgdT` (`i18n/areas/logistics-r19d.ts`, literal Hindi). Tests: `tests/lg-{courier,agents,alerts}.test.ts`,
   `tests/purchase-contract.test.ts` (R19-D readers); the e2e step "R19-D agents, courier, notices".
 
 ### Bundle (R19-D)
 
-Baseline: `origin/claude/elegant-cannon-cwapiv` at `8b3f5a3`, built in this worktree (`vite build` +
-`check-bundle-size`): initial 183.0 kB (4 files), entry 89.0 kB, core 3,218.1 kB, Hindi pack 354.9 kB, Hindi in core
-21.6 kB, `lazy-leaves` 17.7 kB.
+Baseline: `origin/claude/elegant-cannon-cwapiv` at `f5c9f9b` (R19-A + R19-B), built in this worktree (`vite build` +
+`check-bundle-size`): initial 183.0 kB (4 files), entry 89.0 kB, core 3,226.5 kB, Hindi pack 355.7 kB, Hindi in core
+21.6 kB, `lazy-leaves` 17.6 kB. (Before B merged, against `8b3f5a3`: core 3,218.1 → 3,229.7 kB, +11.6 kB, with D's own
+margin engine.)
 
 | Budget | Before | After | Change | Cap |
 |---|---|---|---|---|
 | Initial JS (first paint) | 183.0 kB (4 files) | 183.0 kB (4 files) | 0 (entry, runtime, vendor chunks identical after hash normalisation) | 0 ✓ |
 | Entry chunk | 89.0 kB | 89.0 kB | 0 | — |
-| Core precache (English) | 3,218.1 kB | 3,229.7 kB | **+11.6 kB** (`check-bundle-size`); +11,519 B normalized | 12 kB ✓ |
-| Hindi pack | 354.9 kB | 356.3 kB | +1.4 kB (`lang-hi-logistics` +1.28 kB; palette / reach / discover areas) | — |
+| Core precache (English) | 3,226.5 kB | 3,235.8 kB | **+9.3 kB** (`check-bundle-size`); +9,809 B normalized | 12 kB ✓ |
+| Hindi pack | 355.7 kB | 356.9 kB | +1.2 kB (`lang-hi-logistics` +1.19 kB; palette / reach / discover areas) | — |
 | Hindi left in core | 21.6 kB | 21.6 kB | 0 (rounded; four Hindi help titles) | 0 ✓ |
-| `lazy-leaves` | 17.7 kB | 17.7 kB | +29 B (`lg-registry.ts` D rows) | — |
+| `lazy-leaves` | 17.6 kB | 17.7 kB | +29 B (`lg-registry.ts` D rows) | — |
 
-Chunks (normalized gz): `f-logistics` +6.34 kB (now 10.39 kB: `lg-doc`, `lg-courier`, `lg-agents`, `lg-alerts`,
-`lg-reports`, `logistics-r19d` English); ShipmentsDesk +4.53 kB (now 8.65 kB: Agents / Courier / Reports views,
+Chunks (normalized gz): `f-logistics` +5.18 kB (now 13.52 kB: `lg-doc`, `lg-courier`, `lg-agents`, `lg-alerts`,
+`lg-reports`, `logistics-r19d` English); ShipmentsDesk +4.01 kB (now 11.68 kB: Agents / Courier / Reports views,
 `lg-d-save`, `lg-d-seam` — static in the desk chunk, which saved ≈ 2 kB of per-chunk overhead over lazy views);
 wiring ≈ 0.65 kB (help 0.17, recycle bin 0.09, palette 0.08, Ctrl+K rows 0.07, checklist 0.04, packs 0.04, bell 0.03,
 open export 0.03 …).
