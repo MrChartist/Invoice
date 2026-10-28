@@ -78,9 +78,11 @@ test('checklist steps only with logistics_kind; facts from the data', () => {
   assert.deepEqual(steps(), []);
   assert.deepEqual(steps('multi'), ['lgHeads', 'lgJob', 'lgBill']);
   assert.deepEqual(steps('courier'), ['lgHeads']);
+  // R19-D: the manifest step needs the courier pack
+  assert.deepEqual(allSteps(f, { businessType: 'transport', packs: ['logistics', 'courier'], modules: null, role: 'owner', logisticsKind: 'courier' } as ChecklistCtx).map((s) => s.kind).filter((k) => k.startsWith('lg')), ['lgHeads', 'lgManifest']);
   assert.equal(readChecklistInputs().facts.logistics, undefined);
   localDb.settings.save({ ...localDb.settings.get(), ...applyLogisticsKind('cha') });
   setTable('lg_jobs', [{ id: 'j', number: 'JOB/FY26-27/0001' }]);
   setTable('invoices', [{ id: 'i', lg: { job_id: 'j' } }, { id: 'k' }]);
-  assert.deepEqual(readChecklistInputs().facts.logistics, { lgHeads: 0, lgJob: 1, lgBill: 1 });
+  assert.deepEqual(readChecklistInputs().facts.logistics, { lgHeads: 0, lgJob: 1, lgBill: 1, lgManifest: 0 }); // R19-D: + manifests
 });

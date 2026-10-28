@@ -13,21 +13,32 @@ import { lgT } from '../../i18n/areas/logistics-r19a';
 import controls from '../../styles/controls.module.css';
 import JobsView from './JobsView';
 import RatesView from './RatesView';
+import AgentsView from './AgentsView';
+import CourierView from './CourierView';
+import ReportsView from './ReportsView';
 import type { LgViewProps } from './lg-ui';
+import { lgdT } from '../../i18n/areas/logistics-r19d';
+import { activePacks } from '../../lib/industry-packs';
+import { localDb } from '../../lib/localDb';
 
-type View = { label: () => string; C: ComponentType<LgViewProps> | LazyExoticComponent<ComponentType<LgViewProps>> };
+type View = { label: () => string; C: ComponentType<LgViewProps> | LazyExoticComponent<ComponentType<LgViewProps>>; pack?: string };
 const VIEWS: Record<string, View> = {
   // R19-A
   jobs: { label: () => lgT('jobs'), C: JobsView },
   rates: { label: () => lgT('rates'), C: RatesView },
-  // R19-B (billing, costing) · R19-C (customs) · R19-D (agents, courier, storage)
+  // R19-B (billing, costing) · R19-C (customs)
+  // R19-D (a view whose pack is off is not listed; its URL still opens it)
+  agents: { label: () => lgdT('agents'), C: AgentsView, pack: 'logistics' },
+  courier: { label: () => lgdT('courier'), C: CourierView, pack: 'courier' },
+  reports: { label: () => lgdT('reports'), C: ReportsView },
 };
 
 export default function ShipmentsDesk({ view, notify }: LgViewProps & { view?: string }) {
   useT();
   const [, setParams] = useSearchParams();
   const v = Object.hasOwn(VIEWS, view ?? '') ? view! : 'jobs';
-  const ids = Object.keys(VIEWS);
+  const on = activePacks(localDb.settings.get()) as string[];
+  const ids = Object.keys(VIEWS).filter((k) => k === v || !VIEWS[k].pack || on.includes(VIEWS[k].pack!));
   const C = VIEWS[v].C;
   return (
     <section data-shipments-desk>

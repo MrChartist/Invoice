@@ -201,7 +201,7 @@ export const tabsT = defineArea(
     'time.matters': 'Matters, engagements, conflict checks, letters', 'time.exportsvc': 'Exports of services: Sec 2(6) check, EDF, realisation, refund, platforms', 'time.wip': 'WIP, pre-bill, realisation, utilisation, year end', // R14 (PS-A)
     'time.trips': 'Trips: trip and event files, bookings, costing, margin, tour GST regimes, air tickets, supplier statements (BSP, bed bank), cancellations, overseas tour TCS, event budgets, commission invoices, ticket re-issue', // R15-B; R15-C, R15-D, R16-C appended
     'time.deploy': 'Deploy: security / housekeeping / manpower sites, posts and rates, reverse charge on guards, school exemption; duty register (muster), payroll attendance, bills from the muster, client TDS; client PF / ESI compliance pack (TRRN, ESI challan, hold), minimum-wage and Labour Code checks, site P&L; wage-revision arrears debit notes, TDS receivable, PSARA / licence renewals', // R17-A (B–D append); R17-B; R17-C; R17-D
-    'time.shipments': 'Shipments: freight job files, chargeable weight, charge heads', // R19-A (B–D append)
+    'time.shipments': 'Shipments: freight job files, chargeable weight, charge heads, overseas agents, courier manifests, reports', // R19-A (B–D append; D: agents … reports)
     'time.firm': 'Firm: partners, appropriation, 194T, presumptive paper, 194J', 'time.cadesk': 'CA desk: compliance work to bill, fee schedule, UDIN register', // R14 (PS-D)
     'time.clientmoney': 'Client money: trust ledger, three-way reconciliation, statements', // R14 (PS-B)
     'time.appointments': 'Appointments: day book, queue, reminders', 'time.commission': 'Staff & commission', 'time.clinic': 'Clinic: patients, OPD, lab', 'time.members': 'Members: plans, check-in, classes', 'time.workshop': 'Workshop: job cards, estimates, claims',
@@ -405,7 +405,7 @@ export const tabsT = defineArea(
     'time.matters': 'मामले, नियुक्तियाँ, हितों का टकराव जाँच, नियुक्ति पत्र', 'time.exportsvc': 'सेवाओं का निर्यात: धारा 2(6) जाँच, EDF, वसूली, रिफंड, प्लेटफ़ॉर्म', 'time.wip': 'अबिल्ड कार्य, प्री-बिल, वसूली दर, उपयोग दर, वर्ष अंत',
     'time.trips': 'यात्रा फ़ाइल: यात्रा और इवेंट, बुकिंग, लागत, मार्जिन, टूर GST व्यवस्था, हवाई टिकट, आपूर्तिकर्ता विवरण, रद्दीकरण, विदेशी टूर TCS, इवेंट बजट, कमीशन बिल, टिकट री-इश्यू',
     'time.deploy': 'तैनाती: सुरक्षा / हाउसकीपिंग / मानव-शक्ति साइट, पोस्ट और दरें, गार्ड सेवा पर रिवर्स चार्ज, स्कूल छूट; ड्यूटी रजिस्टर (मस्टर), पेरोल हाज़िरी, मस्टर से बिल, ग्राहक TDS; ग्राहक PF / ESI अनुपालन पैक (TRRN, ESI चालान, रोक), न्यूनतम वेतन और श्रम संहिता जाँच, साइट का लाभ-हानि; वेतन संशोधन बकाया डेबिट नोट, TDS प्राप्य, PSARA / लाइसेंस नवीनीकरण',
-    'time.shipments': 'शिपमेंट: भाड़ा जॉब फ़ाइलें, देय वज़न, शुल्क शीर्ष',
+    'time.shipments': 'शिपमेंट: भाड़ा जॉब फ़ाइलें, देय वज़न, शुल्क शीर्ष, विदेशी एजेंट, कूरियर मैनिफ़ेस्ट, रिपोर्ट',
     'time.firm': 'फ़र्म: साझेदार, लाभ विभाजन, 194T, अनुमानित आय, 194J', 'time.cadesk': 'CA डेस्क: बिल करने वाला काम, फ़ीस सूची, यूडीआईएन रजिस्टर',
     'time.clientmoney': 'क्लाइंट का पैसा: ट्रस्ट खाता, त्रि-पक्षीय मिलान, विवरण',
     'time.appointments': 'अपॉइंटमेंट: दिन बुक, कतार, रिमाइंडर', 'time.commission': 'स्टाफ और कमीशन', 'time.clinic': 'क्लिनिक: मरीज़, OPD, लैब', 'time.members': 'सदस्य: प्लान, चेक-इन, क्लास', 'time.workshop': 'वर्कशॉप: जॉब कार्ड, एस्टिमेट, क्लेम',

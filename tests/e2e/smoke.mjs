@@ -6080,6 +6080,76 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R19-D agents, courier, notices: Agents → add agent (client + vendor) → Debit agent USD 150 @ ₹84 (export of services, POS 96) → Agent\'s bill USD 60 (RCM, ₹5,040) → net USD 90 → Settle by netting (R15-A markers); Courier → import 3 dockets (40 × 30 × 20 cm, 3 kg → 5 kg) → Bill month → +1 invoice with 3 docket lines; the bell lists unrecovered disbursements; Ctrl+K "docket"', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'lg_jobs', 'lg_manifests', 'logistics_settings', 'invoices', 'purchases', 'transactions', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const day = (n) => { const d = new Date(Date.now() + n * 864e5); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const today = day(0);
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'transport', logistics_kind: 'multi', industry_packs: ['logistics', 'customs', 'courier'], lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-lg-d1', name: 'E2E Demo Traders', email: '', address: 'Pune', city: 'Pune', zip: '411001', gstin: '27AAPFU0939F1ZV', state_code: '27' }]);
+    await writeJson(page, 'lg_jobs', [{ id: 'e2e-lg-dj', number: 'JOB/FY26-27/0901', date: today, status: 'booked', dir: 'export', mode: 'air', origin: 'BOM', destination: 'SIN', dest_country: 'SG', client_id: 'e2e-lg-d1', refs: { hawb: 'E2E-HX1' }, updated_at: `${today}T10:00:00Z` }]);
+    await writeJson(page, 'lg_manifests', []);
+    await writeJson(page, 'logistics_settings', { zones: [{ zone: 'Local', first_500g: 40, addl_500g: 20 }] });
+    await readJson(page, 'logistics_settings', null, (v) => v?.zones?.length === 1, 15000);
+    await readJson(page, 'lg_jobs', [], (v) => v.length === 1 && v[0].id === 'e2e-lg-dj', 15000);
+    await page.goto(srv.origin + '/time?tab=shipments&view=agents');
+    await page.locator('[data-shipments-desk]').waitFor({ timeout: 15000 });
+    check((await page.getByRole('tab').allInnerTexts()).some((t) => /^Courier$/.test(t.trim())), 'the desk lists Courier with the courier pack');
+    await page.locator('[data-lg-field="agent-name"]').fill('E2E Agent Pte Ltd');
+    await page.locator('[data-lg-add-agent]').click();
+    const vs = await readJson(page, 'vendors', [], (v) => (v ?? []).some((x) => x.name === 'E2E Agent Pte Ltd' && x.lg?.kind === 'agent' && x.client_id), 15000);
+    check(vs.some((x) => x.name === 'E2E Agent Pte Ltd' && x.lg?.foreign), 'agent = vendor with lg + its client');
+    await page.locator('[data-lg-agent-desk]').waitFor({ timeout: 15000 });
+    await page.locator('[data-lg-field="agent-job"]').selectOption('e2e-lg-dj');
+    await page.locator('[data-lg-field="agent-amount"]').fill('150');
+    await page.locator('[data-lg-field="agent-rate"]').fill('84');
+    await page.locator('[data-lg-debit-agent]').click();
+    const inv = await readJson(page, 'invoices', [], (v) => (v ?? []).some((x) => x.lg?.agent && x.lg.job_id === 'e2e-lg-dj'), 15000);
+    const note = inv.find((x) => x.lg?.agent && x.lg.job_id === 'e2e-lg-dj');
+    check(note?.currency === 'USD' && note.exchange_rate === 84 && note.place_of_supply === '96' && /^EXPORT_/.test(note.supply_type ?? '') && note.items?.[0]?.rate === 150, `Debit agent: USD 150 @ ₹84, POS 96, export of services (${note?.supply_type})`);
+    await page.locator('[data-lg-field="agent-amount"]').fill('60');
+    await page.locator('[data-lg-field="agent-bill-no"]').fill('E2E-DA-1');
+    await page.locator('[data-lg-agent-bill]').click();
+    const pur = await readJson(page, 'purchases', [], (v) => (v ?? []).some((x) => x.bill_number === 'E2E-DA-1' && x.lg?.fx), 15000);
+    const ab = pur.find((x) => x.bill_number === 'E2E-DA-1');
+    check(ab?.taxable === 5040 && ab.reverse_charge === true && ab.import_type === 'SERVICES' && ab.lg?.fx?.amount === 60, `agent's bill: ₹5,040 under reverse charge, USD 60 kept (${ab?.taxable})`);
+    check(/^90\.00/.test((await page.locator('[data-lg-agent-net]').innerText()).trim()), `statement: net USD 90 (${await page.locator('[data-lg-agent-net]').innerText()})`);
+    await page.locator('[data-lg-rcm-paid]').check();
+    await page.locator('[data-lg-settle]').click();
+    const tx = await readJson(page, 'transactions', [], (v) => (v ?? []).some((x) => x.method === 'netting' && x.exchange_purchase_id === ab?.id), 15000);
+    const nr = tx.find((x) => x.method === 'netting' && x.exchange_purchase_id === ab?.id);
+    check(nr?.amount === 60 && nr.realised_rate === 84 && !!nr.netting_id && nr.invoice_id === note?.id, 'settle by netting: one netting row (USD 60, the bill\'s rate, R15-A markers)');
+    const before = (await readJson(page, 'invoices', [])).length;
+    await page.goto(srv.origin + '/time?tab=shipments&view=courier');
+    await page.locator('[data-lg-dockets-csv]').waitFor({ timeout: 15000 });
+    await page.locator('[data-lg-field="courier-client"]').selectOption('e2e-lg-d1');
+    await page.locator('[data-lg-dockets-csv]').fill(`docket,date,zone,kg,l,w,h\nE2E-D1,${today},Local,3,40,30,20\nE2E-D2,${today},Local,1\nE2E-D3,${today},Local,0.4`);
+    await page.locator('[data-lg-import-dockets]').click();
+    const ms = await readJson(page, 'lg_manifests', [], (v) => (v ?? []).some((m) => m.client_id === 'e2e-lg-d1' && m.dockets.length === 3), 15000);
+    const m = ms.find((x) => x.client_id === 'e2e-lg-d1');
+    check(m?.dockets.find((d) => d.no === 'E2E-D1')?.chargeable_kg === 5 && m.period === today.slice(0, 7), 'one manifest for the customer × month; 40 × 30 × 20 cm at 3 kg → 5 kg');
+    await page.locator('[data-lg-bill-courier]').click();
+    const after = await readJson(page, 'invoices', [], (v) => (v ?? []).length === before + 1, 15000);
+    const cb = after.find((x) => x.lg?.manifest_id === m?.id);
+    check(after.length === before + 1 && cb?.items?.length === 3 && cb.items[0].hsn === '996812' && cb.lg?.count === 3, `Bill month: exactly one more invoice, 3 docket lines, SAC 996812 (${after.length - before})`);
+    await writeJson(page, 'purchases', [...pur, { id: 'e2e-lg-disb', kind: 'EXPENSE', vendor_name: 'E2E CFS', bill_number: 'E2E-CFS-1', date: day(-40), category: 'Disbursements', lines: [], taxable: 12000, cgst: 0, sgst: 0, igst: 0, itc_eligible: false, total: 12000, amount_paid: 0, lg: { job_id: 'e2e-lg-dj', on_behalf: true, disb: 'cfs' } }]);
+    await readJson(page, 'purchases', [], (v) => (v ?? []).some((x) => x.id === 'e2e-lg-disb'), 15000);
+    await page.reload();
+    await page.getByRole('button', { name: /^Notifications/ }).click({ timeout: 15000 });
+    await page.getByRole('dialog', { name: 'Notifications' }).getByText(/JOB\/FY26-27\/0901 — disbursements unrecovered/).first().waitFor({ timeout: 15000 });
+    check(true, 'the bell lists the job\'s unrecovered disbursements');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('docket');
+    await palette.getByRole('option', { name: /Courier manifests/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "docket" finds the courier view');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {

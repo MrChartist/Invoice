@@ -28,6 +28,8 @@ export function logisticsPaper(lg: LgSnapshot): { rows: [string, string][]; reas
     ['Packages', w.pkgs ? String(w.pkgs) : ''],
     ['Gross / chargeable', pair(kg(w.gross_kg), kg(w.chargeable_kg))],
     ['CBM', w.cbm ? String(w.cbm) : ''],
+    // R19-D: a courier / storage month bill
+    ['Period', lg.period ? [lg.period, lg.count && `${lg.count} dockets`, kg(lg.kg)].filter(Boolean).join(' · ') : ''],
   ];
   return { rows: rows.filter(([, v]) => v), reason: lg.pos_reason ?? '' };
 }
