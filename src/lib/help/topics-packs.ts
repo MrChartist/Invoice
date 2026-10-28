@@ -283,6 +283,9 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:shipments', 'Shipments', 'शिपमेंट', 'A job file per shipment; its bills and costs hang on it.', 'Each shipment.', { statutory: ca(['LG1', 'LG2']) }),
   t('time:shipments:jobs', 'Jobs', 'जॉब', 'Mode, ports, bills of lading, containers; chargeable weight.', 'Each booking.', { statutory: ca(['LG33']) }),
   t('time:shipments:rates', 'Rates', 'दरें', 'Charge heads: SAC, role (own or pure agent), unit, rate.', 'When rates change.', { statutory: ca(['LG5', 'LG10']) }),
+  // R19-B
+  t('time:shipments:billing', 'Billing', 'बिलिंग', 'Bill a job: one document per place of supply and currency; recoveries at actual.', 'When a job is delivered.', { statutory: ca(['LG2', 'LG9', 'LG13']) }),
+  t('time:shipments:costing', 'Costing', 'लागत', 'Job margin: revenue less tagged supplier bills.', 'Each month.', { statutory: ca(['LG34']) }),
   // R19-D
   t('time:shipments:agents', 'Agents', 'एजेंट', 'Agent notes in their currency, their bills under reverse charge, statement, netting.', 'Each month.', { statutory: ca(['LG3', 'LG17', 'LG30', 'LG31']) }),
   t('time:shipments:courier', 'Courier', 'कूरियर', 'Zone card, docket import, one bill per customer a month.', 'Each month end.', { statutory: ca(['LG18', 'LG20', 'LG33', 'LG40']) }),

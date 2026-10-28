@@ -1,7 +1,7 @@
 /**
  * R19-D4 reports view (`&view=reports`): margin by lane / client / salesperson / month (one FY's jobs), agent balances
  * and disbursements ageing — each on screen and as CSV (the deposits position is C's customs view). The TDS-on-receipts view was cut (PRD §3
- * cut 3). Margin is this view's own reading of the jobs' bills and tagged costs (B's job costing owns the job P&L).
+ * cut 3). Margin rows are B's job costing (`jobPnls` → `groupPnl`), here as CSV.
  */
 import { useMemo, useState } from 'react';
 import { useT } from '../../i18n';
@@ -11,7 +11,9 @@ import { localDb } from '../../lib/localDb';
 import { getTable } from '../../lib/storage';
 import { getIndianFY } from '../../lib/invoice-number';
 import { todayInput } from '../../lib/utils';
-import { disbAgeing, jobPnl, MARGIN_BY, marginBy, type MarginBy } from '../../lib/logistics/lg-reports';
+import { disbAgeing } from '../../lib/logistics/lg-reports';
+import { jobPnls } from '../../lib/logistics/lg-books-io';
+import { groupPnl, type PnlBy } from '../../lib/logistics/lg-costing';
 import { agentStatement, lgAgents } from '../../lib/logistics/lg-agents';
 import { loadJobs } from '../../lib/logistics/lg-save';
 import type { PurchaseRecord, Vendor } from '../../types/purchases';
@@ -22,6 +24,7 @@ import { row } from './lg-form';
 import { downloadCsv } from './lg-d-seam';
 
 type Rows = (string | number)[][];
+const BY: readonly PnlBy[] = ['lane', 'client', 'salesperson', 'month'];
 function Tbl({ id, rows }: { id: string; rows: Rows }) {
   return (
     <section data-lg-report={id}>
@@ -36,24 +39,24 @@ function Tbl({ id, rows }: { id: string; rows: Rows }) {
 
 export default function ReportsView(_: LgViewProps) {
   useT();
-  const [by, setBy] = useState<MarginBy>('lane');
+  const [by, setBy] = useState<PnlBy>('lane');
   const [fy, setFy] = useState(() => getIndianFY(todayInput()).label);
   const d = useMemo(() => {
     const clients = localDb.clients.getAll(), inv = localDb.invoices.getAll(), pur = getTable<PurchaseRecord>('purchases'), jobs = loadJobs();
-    return { clients, inv, pur, jobs, pnl: jobPnl(inv, pur), agents: lgAgents(getTable<Vendor>('vendors'), clients) };
+    return { clients, inv, pur, jobs, agents: lgAgents(getTable<Vendor>('vendors'), clients) };
   }, []);
   const jobs = d.jobs.filter((j) => getIndianFY(j.date).label === fy);
   const fys = [...new Set([fy, ...d.jobs.map((j) => getIndianFY(j.date).label)])].sort().reverse();
   const name = (id: string) => d.clients.find((c) => c.id === id)?.name ?? id;
   const [h1, h2, h3] = [lgdT('hMargin'), lgdT('hAgents'), lgdT('hAgeing')].map((h) => h.split(','));
-  const margin: Rows = [h1, ...marginBy(by, jobs, d.pnl, name).map((r) => [r.key, r.jobs, r.revenue, r.cost, r.margin, r.pct])];
+  const margin: Rows = [h1, ...groupPnl(jobPnls(jobs.filter((j) => j.status !== 'cancelled')), by).map((r) => [by === 'client' ? name(r.key) : r.key || '—', r.jobs, r.revenue, r.cost, r.margin, r.pct ?? ''])];
   const agents: Rows = [h2, ...d.agents.map((a) => { const s = agentStatement(a, d.inv, d.pur); return [a.vendor.name, s.ours, s.theirs, s.net]; })];
   const ageing: Rows = [h3, ...disbAgeing(jobs, d.inv, d.pur, todayInput()).map((r) => [r.job, ...r.b, r.total])];
   return (
     <>
       <div style={row}>
         <Pick label={lgT('fy')} value={fy} ids={fys} name={(x) => `FY ${x}`} onChange={setFy} />
-        <Pick label={lgdT('by')} value={by} ids={MARGIN_BY} name={(x) => lgdT('byList').split(',')[MARGIN_BY.indexOf(x as MarginBy)] ?? x} onChange={(v) => setBy(v as MarginBy)} attr="report-by" />
+        <Pick label={lgdT('by')} value={by} ids={BY} name={(x) => lgdT('byList').split(',')[BY.indexOf(x as PnlBy)] ?? x} onChange={(v) => setBy(v as PnlBy)} attr="report-by" />
       </div>
       <Tbl id="margin" rows={margin} />
       <Tbl id="agents" rows={agents} />

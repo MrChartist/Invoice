@@ -1,4 +1,4 @@
-/** R19-D4 logistics notices (each condition, the pack gate) and reports (margin by lane / client / salesperson / month, disbursements ageing). */
+/** R19-D4 logistics notices (each condition, the pack gate) and the disbursements ageing report. */
 import './helpers/shim.ts';
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,7 +7,7 @@ import { installSettings } from './helpers/world.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { setTable } from '../src/lib/storage.ts';
 import { lgAlerts, lgNotices, recoveredByJob } from '../src/lib/logistics/lg-alerts.ts';
-import { disbAgeing, jobPnl, marginBy } from '../src/lib/logistics/lg-reports.ts';
+import { disbAgeing } from '../src/lib/logistics/lg-reports.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
 import type { PurchaseRecord } from '../src/types/purchases.ts';
 import type { LgJob, LgManifest } from '../src/types/logistics-r19.ts';
@@ -60,21 +60,8 @@ test('the bell provider reads nothing while the Round 19 packs are off', () => {
   assert.ok(lgNotices({ now })[0].at && lgNotices({ now })[0].href === '/time?tab=shipments&view=jobs');
 });
 
-test('reports: margin by lane / client / salesperson / month without Rule 33 recoveries or disbursements; USD at the document rate; disbursements ageing', () => {
-  const jobs = [job({ salesperson: 'Asha' }), job({ id: 'j2', number: 'JOB/2', origin: 'NSA', destination: 'JEA', client_id: 'c2', date: '2026-12-01' })];
-  const invs = [
-    inv({ lg: { job_id: 'j1' }, items: [{ id: 'a', name: 'Freight', type: 'Service', quantity: 1, rate: 1000, amount: 0 }], currency: 'USD', exchange_rate: 84 }),
-    inv({ id: 'i2', lg: { job_id: 'j1' }, items: [{ id: 'b', name: 'Handling', type: 'Service', quantity: 2, rate: 5000, amount: 0, discount_percent: 5 }, { id: 'c', name: 'Terminal', type: 'Service', quantity: 1, rate: 1800, amount: 0, charge_head_id: 'rule33' }] }),
-    inv({ id: 'i3', lg: { job_id: 'j2' }, status: 'Cancelled', items: [{ id: 'd', name: 'X', type: 'Service', quantity: 1, rate: 999, amount: 0 }] }),
-  ];
-  const purs = [bill({ id: 'p', taxable: 67200, lg: { job_id: 'j1' } }), bill({ id: 'q', taxable: 1800, total: 1800, lg: { job_id: 'j1', on_behalf: true } }), bill({ id: 'r', taxable: 99, status: 'draft', lg: { job_id: 'j1' } })];
-  const pnl = jobPnl(invs, purs);
-  assert.deepEqual(pnl.get('j1'), { revenue: 93500, cost: 67200 });
-  const name = (id: string) => ({ c1: 'Demo Exports', c2: 'Other' })[id] ?? id;
-  assert.deepEqual(marginBy('lane', jobs, pnl, name)[0], { key: 'BOM → SIN', jobs: 1, revenue: 93500, cost: 67200, margin: 26300, pct: 28.13 });
-  assert.deepEqual(marginBy('client', jobs, pnl, name).map((r) => r.key), ['Demo Exports', 'Other']);
-  assert.deepEqual(marginBy('salesperson', jobs, pnl, name).map((r) => r.key), ['Asha', '—']);
-  assert.deepEqual(marginBy('month', jobs, pnl, name).map((r) => r.key), ['2026-11', '2026-12']);
+test('report: disbursements ageing (recoveries settle the oldest first); margin rows are B\'s job costing', () => {
+  const jobs = [job({})];
   const ag = disbAgeing(jobs, [], [bill({ id: 'a', total: 100, date: '2026-07-01', lg: { job_id: 'j1', on_behalf: true } }), bill({ id: 'b', total: 50, date: '2026-11-10', lg: { job_id: 'j1', on_behalf: true } })], '2026-11-20');
   assert.deepEqual(ag, [{ job: 'JOB/FY26-27/0001', b: [50, 0, 0, 100], total: 150 }]);
   const rec = inv({ lg: { job_id: 'j1', disb: [{ date: '', kind: 'cfs', amount: 120 }] } });

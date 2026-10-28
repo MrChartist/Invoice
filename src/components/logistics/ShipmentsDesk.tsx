@@ -10,9 +10,12 @@ import { Suspense, type ComponentType, type LazyExoticComponent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { lgT } from '../../i18n/areas/logistics-r19a';
+import { lgbT } from '../../i18n/areas/logistics-r19b';
 import controls from '../../styles/controls.module.css';
 import JobsView from './JobsView';
 import RatesView from './RatesView';
+import BillingView from './BillingView';
+import CostingView from './CostingView';
 import AgentsView from './AgentsView';
 import CourierView from './CourierView';
 import ReportsView from './ReportsView';
@@ -26,7 +29,10 @@ const VIEWS: Record<string, View> = {
   // R19-A
   jobs: { label: () => lgT('jobs'), C: JobsView },
   rates: { label: () => lgT('rates'), C: RatesView },
-  // R19-B (billing, costing) · R19-C (customs)
+  // R19-B
+  billing: { label: () => lgbT('billing'), C: BillingView },
+  costing: { label: () => lgbT('costing'), C: CostingView },
+  // R19-C (customs)
   // R19-D (a view whose pack is off is not listed; its URL still opens it)
   agents: { label: () => lgdT('agents'), C: AgentsView, pack: 'logistics' },
   courier: { label: () => lgdT('courier'), C: CourierView, pack: 'courier' },

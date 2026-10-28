@@ -21,7 +21,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { In, Pick, type LgViewProps } from './lg-ui';
 import { numIn, row } from './lg-form';
-import { draftBase, fxOn, lutOn, syncNettedPaid } from './lg-d-seam';
+import { draftBase, fxOn, lutOnDay, syncNettedPaid } from './lg-d-seam';
 
 const list = (key: 'agentKinds' | 'noteKinds', ids: readonly string[], id: string) => lgdT(key).split(',')[ids.indexOf(id)] ?? id;
 
@@ -76,7 +76,7 @@ export default function AgentsView({ notify }: LgViewProps) {
             <In label={lgdT('billNo')} value={f.bill} onChange={(v) => setF({ ...f, bill: v })} attr="agent-bill-no" />
           </div>
           <div style={row}>
-            <button type="button" className={controls.btnPrimary} onClick={async () => { const lut = a.vendor.lg?.foreign ? await lutOn(f.date) : null; act(() => issueAgentNote({ agent: a, job, kind: f.kind, amount: f.amount ?? 0, currency: f.cur, rate: rate ?? 0, lut }, f.date, draftBase())); }} data-lg-debit-agent>{lgdT('debit')}</button>
+            <button type="button" className={controls.btnPrimary} onClick={() => act(() => issueAgentNote({ agent: a, job, kind: f.kind, amount: f.amount ?? 0, currency: f.cur, rate: rate ?? 0, lut: a.vendor.lg?.foreign ? lutOnDay(f.date) : null }, f.date, draftBase()))} data-lg-debit-agent>{lgdT('debit')}</button>
             <button type="button" className={controls.btnOutline} onClick={() => act(() => { if (!job) throw new Error(lgT('eNoJob')); saveAgentBill({ agent: a, job, bill_no: f.bill, date: f.date, amount: f.amount ?? 0, currency: f.cur, rate: rate ?? 0 }); })} data-lg-agent-bill>{lgdT('agentBill')}</button>
           </div>
           <p className={controls.hint}>{lgdT('hNote')}</p>
