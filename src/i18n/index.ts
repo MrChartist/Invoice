@@ -247,6 +247,8 @@ export async function initI18n(): Promise<void> {
     window.addEventListener('storage', (e) => {
       if (e.key === LANG_KEY) void setLanguage(isLang(e.newValue) ? e.newValue : 'en', { persist: false }).catch(() => undefined);
     });
+    // QA19 U3: a worker that takes over this page (the first install's claim, an update) never heard the boot message.
+    navigator.serviceWorker?.addEventListener('controllerchange', () => void tellWorker(readStoredLanguage(), false));
   }
   try {
     await setLanguage(readStoredLanguage(), { persist: false });

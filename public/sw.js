@@ -21,6 +21,13 @@
  *   the `mci-lang` cache and caches that language's pack at once (online), replying {complete} on the message port.
  *   Install also caches the pack of the language stored by the previous worker, so a Hindi device stays Hindi
  *   offline across updates. A pack that fails to download never rejects the core install; the next message retries.
+ *   QA19 U1: a device whose worker never recorded a language (it ran a release older than R16-A, where Hindi was
+ *   inside every chunk) gets EVERY pack on that one update, so a Hindi device opened offline after it stays Hindi;
+ *   the packs it does not use are pruned on a later update, once the page has told the worker its language.
+ * - Asset pruning (QA19 U2): activate deletes /assets/ files that neither this build nor the build it replaces lists
+ *   (core files, plus the device's language pack — every pack while the language is unknown). The replaced build is
+ *   kept so a tab still running it can load its lazy chunks. A shell cache without a manifest copy (a pre-R16 build,
+ *   or the no-manifest fallback install) means its files are unknown: nothing is pruned on that activation.
  */
 const BUILD_ID = '__BUILD_ID__';
 const SHELL_CACHE = `mci-shell-${BUILD_ID}`;
@@ -91,8 +98,11 @@ self.addEventListener('install', (event) => {
       const assets = await caches.open(ASSET_CACHE);
       try {
         await precacheManifest(shell, assets);
-        // Keep this device's language pack across the update (best effort: never fails the install).
-        await cacheLangPack(await deviceLang(), shell).catch(() => false);
+        // Keep this device's language pack across the update (best effort: never fails the install). Language not
+        // recorded but an older build installed (U1): its page never told us, so cache every pack this once.
+        const lang = await deviceLang();
+        const older = (await caches.keys()).some((n) => n.startsWith('mci-shell-') && n !== SHELL_CACHE);
+        await cachePacks(lang ? [packOf(lang)] : older ? ['hi', 'regional'] : [], shell).catch(() => false);
         return;
       } catch (err) {
         if (!(err instanceof ManifestMissing)) {
@@ -130,6 +140,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
+      await pruneAssets().catch(() => undefined); // before the old shell (and its manifest copy) is deleted
       const names = await caches.keys();
       await Promise.all(
         names.filter((n) => n.startsWith('mci-') && !KEEP.includes(n)).map((n) => caches.delete(n)),
@@ -142,9 +153,29 @@ self.addEventListener('activate', (event) => {
 /** The language pack a language needs: Hindi has its own; the other regional languages share one. */
 const packOf = (lang) => (lang === 'hi' ? 'hi' : lang && lang !== 'en' ? 'regional' : null);
 
+/** The language the page last told a worker on this device, or null when none was ever recorded. */
 async function deviceLang() {
   const hit = await (await caches.open(LANG_CACHE)).match(LANG_URL);
-  return hit ? (await hit.text()).trim() : 'en';
+  return hit ? (await hit.text()).trim() || null : null;
+}
+
+/**
+ * U2: delete fingerprinted files that neither this build nor the one it replaces lists. Every `mci-shell-*` cache
+ * still present is one of the two; if any of them has no manifest copy its files are unknown, so nothing is deleted.
+ */
+async function pruneAssets() {
+  const lang = await deviceLang();
+  const keep = new Set();
+  for (const name of (await caches.keys()).filter((n) => n.startsWith('mci-shell-'))) {
+    const hit = await (await caches.open(name)).match(MANIFEST_URL);
+    if (!hit) return;
+    const m = await hit.json();
+    for (const url of m.files || []) keep.add(url);
+    for (const [pack, urls] of Object.entries(m.langs || {})) if (!lang || pack === packOf(lang)) for (const url of urls) keep.add(url);
+  }
+  if (!keep.size) return;
+  const assets = await caches.open(ASSET_CACHE);
+  for (const req of await assets.keys()) if (!keep.has(new URL(req.url).pathname)) await assets.delete(req);
 }
 
 /** This build's manifest: the copy kept at install, else the network. */
@@ -156,12 +187,12 @@ async function readManifest(shell) {
   return res.json();
 }
 
-/** Caches the files of `lang`'s pack that are missing. Resolves true when the whole pack is cached. */
-async function cacheLangPack(lang, shell) {
-  const pack = packOf(lang);
-  if (!pack) return true;
+/** Caches the missing files of the given packs. Resolves true when they are all cached. */
+async function cachePacks(packs, shell) {
+  packs = packs.filter(Boolean);
+  if (!packs.length) return true;
   const manifest = await readManifest(shell || (await caches.open(SHELL_CACHE)));
-  const urls = (manifest.langs && manifest.langs[pack]) || [];
+  const urls = packs.flatMap((pack) => (manifest.langs && manifest.langs[pack]) || []);
   const assets = await caches.open(ASSET_CACHE);
   const results = await Promise.allSettled(
     urls.map(async (url) => {
@@ -178,7 +209,7 @@ async function onLang(lang, port) {
   let complete = false;
   try {
     await (await caches.open(LANG_CACHE)).put(LANG_URL, new Response(String(lang), { headers: { 'content-type': 'text/plain' } }));
-    complete = await cacheLangPack(lang);
+    complete = await cachePacks([packOf(lang)]);
   } catch {
     complete = false; // offline with no manifest copy, storage full …: the page decides (offline → stays as it was)
   }
