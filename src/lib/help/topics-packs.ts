@@ -275,7 +275,7 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:deploy:muster', 'Duty register', 'ड्यूटी रजिस्टर', 'Duties, OT and relievers per site and month; lock it, then send attendance (LOP, OT) to payroll and bill from it.', 'Each month end.', { statutory: ca(['MP32', 'MP33']) }),
   t('time:deploy:bills', 'Bills', 'बिल', 'Drafts from locked musters by duty, hour, month pro-rata or cost-plus; one per site or bill group and GST regime; client TDS expected.', 'Each month end.', { statutory: ca(['MP6', 'MP34', 'MP36']) }),
   // R17-C
-  t('time:deploy:compliance', 'Compliance pack', 'अनुपालन पैक', 'PF / ESI of each site\'s people from the final payroll run, shared by duties; TRRN, ESI challan, client hold; minimum-wage and Labour Code checks.', 'Each month after payroll.', { statutory: ca(['MP18', 'MP22', 'MP37', 'MP38', 'MP39']) }),
+  t('time:deploy:compliance', 'Compliance pack', 'अनुपालन पैक', 'PF / ESI of each site\'s people from the final payroll run, shared by duties; TRRN, ESI challan, proof files, client hold; minimum-wage and Labour Code checks.', 'Each month after payroll.', { statutory: ca(['MP18', 'MP22', 'MP37', 'MP38', 'MP39']) }),
   t('time:deploy:profit', 'Site P&L', 'साइट का लाभ-हानि', 'Per site and month: billed less wages, relievers, employer PF / ESI and site-tagged bills; margin %. Nothing posts.', 'Each month.', { statutory: ca(['MP25', 'MP26', 'MP40']) }),
   // R17-D
   t('time:deploy:statutory', 'Statutory', 'वैधानिक', 'Wage-revision arrears as debit notes per original bill; client TDS expected vs booked per quarter; PSARA / OSH / guard licences and contract ends.', 'Each revision; each quarter.', { statutory: ca(['MP9', 'MP12', 'MP41', 'MP42', 'MP43']) }),
