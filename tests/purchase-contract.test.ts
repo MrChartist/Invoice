@@ -1160,3 +1160,15 @@ test('R18-B inward-RCM hint (hs-turnover) reads the real bill shape', async () =
   assert.equal(rcmHint({ ...guard, reverse_charge: true }, { gstin: bill.vendor_gstin }, true, rule), false);
   assert.equal(rcmHint(bill, { gstin: bill.vendor_gstin }, true, rule), false, 'paper is not security');
 });
+
+test('R19-D readers (lg-agents, lg-alerts, lg-reports) read the real purchase shape', async () => {
+  const { agentBills } = await import('../src/lib/logistics/lg-agents.ts');
+  const { lgAlerts } = await import('../src/lib/logistics/lg-alerts.ts');
+  const { jobPnl } = await import('../src/lib/logistics/lg-reports.ts');
+  const rcm: PurchaseRecord = { ...bill, id: 'p9', vendor_id: 'v', taxable: 5040, cgst: 0, sgst: 0, igst: 907.2, total: 5947.2, reverse_charge: true, import_type: 'SERVICES', lg: { job_id: 'j', fx: { currency: 'USD', amount: 60, rate: 84 } } };
+  assert.equal(agentBills({ vendor: { id: 'v', name: 'A' } }, [rcm])[0].open, 60, 'supplier side = total less the RCM tax');
+  assert.equal(jobPnl([], [rcm]).get('j')?.cost, 5040, 'cost = taxable');
+  const duty: PurchaseRecord = { ...bill, id: 'p10', date: '2026-01-01', lg: { job_id: 'j', on_behalf: true, disb: 'duty' } };
+  const job = { id: 'j', number: 'J1', date: '2026-01-01', status: 'booked', dir: 'import', mode: 'sea_fcl', origin: 'NSA', destination: 'BOM', client_id: 'c', refs: {}, updated_at: '' } as const;
+  assert.deepEqual(lgAlerts('2026-04-12', { jobs: [job], invoices: [], purchases: [duty], advances: [], manifests: [] }).map((n) => n.id), ['lg:disb:j']);
+});

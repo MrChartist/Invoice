@@ -33,8 +33,9 @@ const isUrd = (p: Partial<PurchaseRecord> | undefined): boolean => !!(p?.used_go
  * R15-A3: the generalised roll-up — what LIVE receipt rows with `exchange_purchase_id` (R9 exchange, R12 set-off, R15
  * netting) settle on a bill. Re-exported by `netting.ts`.
  */
-export const exchangeSettled = (purchaseId: string, payments: readonly Pick<Payment, 'amount' | 'exchange_purchase_id'>[]): number =>
-  round2(payments.reduce((s, p) => s + (p.exchange_purchase_id === purchaseId ? num(p.amount) : 0), 0));
+export const exchangeSettled = (purchaseId: string, payments: readonly (Pick<Payment, 'amount' | 'exchange_purchase_id'> & Partial<Pick<Payment, 'realised_rate'>>)[]): number =>
+  // R19-D1: a netting row on a foreign-currency note (an overseas agent) settles the ₹ bill at its realised rate.
+  round2(payments.reduce((s, p) => s + (p.exchange_purchase_id === purchaseId ? num(p.amount) * (num(p.realised_rate) || 1) : 0), 0));
 
 /** Exchange value of a voucher used by LIVE receipt rows. */
 export const exchangedFrom = exchangeSettled;
