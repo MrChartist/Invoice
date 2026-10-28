@@ -49,8 +49,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
 | 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV48 | 48 | 15 |
 | 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF23 | 23 | 5 |
-| 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP32 | 32 | 10 |
-| **Total** | | **599** | **149** |
+| 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP36 | 36 | 11 |
+| **Total** | | **603** | **150** |
 
 ---
 
@@ -1211,9 +1211,9 @@ belong to R16-B / R16-C, PF17–PF18 to R16-D.
 `PF` ids are counted once here. The ★ items (PF1, PF3, PF5, PF7, PF17) change what a document prints or a return
 reports once notified.
 
-## 17. Security, facility-management and manpower-supply agencies (Round 17, ids MP1–MP32)
+## 17. Security, facility-management and manpower-supply agencies (Round 17, ids MP1–MP36)
 
-Added with `docs/prd/round-17.md` (§9: MP1–MP32) by R17-A. It covers private security agencies (PSARA licensees),
+Added with `docs/prd/round-17.md` (§9: MP1–MP32) by R17-A; MP33–MP36 by R17-B. It covers private security agencies (PSARA licensees),
 housekeeping / facility-management contractors, contract and temporary staffing firms and labour contractors outside
 construction (R11 CN-D2 keeps those).
 
@@ -1257,8 +1257,12 @@ construction (R11 CN-D2 keeps those).
 | MP30 | 57th GST Council (8 Oct 2026) recommendation to extend e-invoicing to RCM inward supplies from unregistered persons (AATO ≥ ₹5 crore): impact on clients of unregistered proprietor agencies once notified. | Pending note only | `pending-changes.ts` (R17-D) | — | P PIB 8 Oct 2026 ¶18 |
 | MP31 | (Market) PSARA licence counts (16,427 in Jan 2022; 21,835 in Nov 2023, as reported) and any count of FM / housekeeping agencies. | — | — | — | S MHA answers as reported |
 | MP32 | Muster units: a 12-hour shift billed as 1 duty or 1.5 eight-hour duties; half duties; billing days 26 vs calendar. | Post's shift hours; 0.5 steps; calendar default | `MpPost.shift_hours`; `manpower_settings.billing_days` | — | — |
+| MP33 | Muster → payroll (R17-B2): payable days = the calendar days of the month and LOP = payable days − duties across all sites; duties above the payable days paid as "extra duty" units (not OT); a 12-hour duty counted as one day of attendance. Right for wages, PF / ESI wages and the wage register under the Code on Wages? | As stated; extra-duty units only when an attendance type is chosen | `mp-attendance.ts`, `mp-payroll-io.ts` | 2025-11-21 | — |
+| MP34 ★ | Monthly-rate posts billed pro-rata (R17-B3): rate × heads × billed duties ÷ (heads × billing days), capped at rate × heads unless "bill extra duties" is ticked; billing days calendar / 26 / 30. Is a short month (absences not relieved) a lower value of the same supply, or a deduction the client makes on its side? | Pro-rata on the bill, capped | `mp-bill.ts` `postLines` | — | — |
+| MP35 | Several sites of one client on one invoice (client + bill group, R17-B3): place of supply and the client's GSTIN when the sites are in other States than the client's registration; one RCM / one forward invoice per group. | Client's registered State (existing POS logic); split by regime | `mp-bill.ts` `billPlans`, `mp-draft-io.ts` | — | Sec 12(2) IGST (recalled) |
+| MP36 | Expected client TDS on a manpower bill (R17-B4): 194C on the taxable value (GST out, nothing charged on an RCM bill), 1 % when our firm is a proprietorship / HUF, else 2 %; thresholds on the client's issued bills of the FY (drafts out). Is the deductee test the agency's form as stated, and is the base right for an RCM bill? | As stated; printed only with "Print expected TDS" | `mp-tds-io.ts` (via R14 `expectedTds`) | 2026-04-01 | P Finance Bill 2026 cl. 78 (MP14) |
 
-`MP` ids are counted once here. The ★ items (MP1, MP2, MP4, MP6, MP7, MP10, MP12, MP14, MP16, MP29) change what a
+`MP` ids are counted once here. The ★ items (MP1, MP2, MP4, MP6, MP7, MP10, MP12, MP14, MP16, MP29, MP34) change what a
 document prints or a return reports.
 
 ## Answers log

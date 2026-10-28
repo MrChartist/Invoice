@@ -154,6 +154,31 @@ declare module './payroll' {
 
 /* ════════════════════════════════════════ R17-B ════════════════════════════════════════ */
 
+/** B1: one person's month at a site (duties in 0.5 steps; OT in hours; a reliever covers others' offs). */
+export interface MusterRow { employee_id: string; post_id: string; duties: number; ot_hours?: number; relief?: boolean; note?: string }
+
+/** B1: table `site_musters` — one row per site × month (≤ 300 rows inside), dated by the month's last day (`date`). */
+export interface SiteMuster {
+  id: string;
+  site_id: string;
+  /** `YYYY-MM`. */
+  month: string;
+  /** The month's last day (`YYYY-MM-DD`): the sync / period-lock date. */
+  date: string;
+  rows: MusterRow[];
+  status: 'draft' | 'locked';
+  locked_at?: string;
+  updated_at: string;
+}
+
+/** B3 / B4 sub-fields of the `mp` snapshot (interface merging with A's declaration above). */
+export interface MpSnapshot {
+  /** B3: every muster on a grouped (per client + bill group) bill; `muster_id` is the first. */
+  muster_ids?: string[];
+  /** B4: print the expected-TDS footer (the "Print expected TDS" setting when the bill was made). */
+  tds_print?: boolean;
+}
+
 /* ════════════════════════════════════════ R17-C ════════════════════════════════════════ */
 
 /* ════════════════════════════════════════ R17-D ════════════════════════════════════════ */

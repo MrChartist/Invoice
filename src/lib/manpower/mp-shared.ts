@@ -7,7 +7,8 @@
 
 /** Company tables (`mrchartist_inv_<table>`): backed up, synced, audited, rights in `mp-registry.ts`. B / C add theirs. */
 export const MP_TABLES = {
-  // R17-B: musters: 'site_musters' (dated by the month's last day)
+  // R17-B: duty registers, one per site × month (rows inside; dated by the month's last day)
+  musters: 'site_musters',
   // R17-C: compliance: 'site_compliance' (dated by the month's last day)
 } as const;
 
@@ -20,4 +21,6 @@ export const MP_OBJECTS = {
 export const MP_PACKS = ['manpower', 'security'] as const;
 
 /** The date field each dated table is synced / period-locked by (mirrors the `sync-engine.ts` DATED rows). */
-export const MP_DATED: Readonly<Record<string, string>> = {};
+export const MP_DATED: Readonly<Record<string, string>> = {
+  site_musters: 'date', // R17-B
+};

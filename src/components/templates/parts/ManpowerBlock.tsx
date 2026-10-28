@@ -2,6 +2,7 @@ import type { InvoiceRecord } from '../../../types/invoice';
 import { mpPaper } from '../../../lib/manpower/mp-print';
 import { formatMoney } from '../../../lib/utils';
 import styles from './manpower-paper.module.css';
+import DutyAnnex from './manpower/DutyAnnex';
 
 /**
  * R17-A4 manpower particulars after the parties (after the travel block, before the GST grid; never on receipt paper):
@@ -30,6 +31,7 @@ export default function ManpowerBlock({ invoice }: { invoice: InvoiceRecord }) {
         </table>
       )}
       {p.decl && <p className={styles.decl} data-manpower-decl>{p.decl}</p>}
+      <DutyAnnex mp={invoice.mp} />
     </section>
   );
 }

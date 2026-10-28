@@ -471,6 +471,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}travel_bookings`]: 'start',
   // R15-C: supplier statements (by period end)
   [`${DB_PREFIX}supplier_statements`]: 'period_end',
+  // R17-B: site musters (the month's last day)
+  [`${DB_PREFIX}site_musters`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;

@@ -282,7 +282,7 @@ export const reachT = defineArea(
     'ck.clientMoneyBank': 'Mark your client-money bank account', 'ck.stageTemplate': 'Set the stage fees of your first project', // R14 (PS-B)
     'ck.lut': 'Record your LUT for exports', 'ck.edf': 'Prepare your first EDF', // R14 (PS-C)
     'ck.firstTrip': 'Open your first trip', 'ck.firstSupplier': 'Add your first supplier booking', 'ck.regime': 'Choose your GST regime', 'ck.firstStatement': 'Import your first supplier statement', 'ck.firstEvent': 'Open your first event', // R15-B1
-    'ck.firstSite': 'Add your first site with its posts', 'ck.firstBill': 'Make your first manpower bill', // R17-A1
+    'ck.firstSite': 'Add your first site with its posts', 'ck.firstBill': 'Make your first manpower bill', 'ck.firstMuster': 'Fill your first duty register (muster)', // R17-A1; R17-B
   } as const,
   {
     'title.shop': 'आप क्या काम करते हैं?',
@@ -551,6 +551,6 @@ export const reachT = defineArea(
     'ck.clientMoneyBank': 'क्लाइंट-पैसे का बैंक खाता चिह्नित करें', 'ck.stageTemplate': 'पहली परियोजना के चरण शुल्क तय करें',
     'ck.lut': 'निर्यात के लिए LUT दर्ज करें', 'ck.edf': 'पहला EDF तैयार करें',
     'ck.firstTrip': 'पहली यात्रा फ़ाइल खोलें', 'ck.firstSupplier': 'पहली आपूर्तिकर्ता बुकिंग जोड़ें', 'ck.regime': 'अपनी GST व्यवस्था चुनें', 'ck.firstStatement': 'पहला आपूर्तिकर्ता विवरण इम्पोर्ट करें', 'ck.firstEvent': 'पहला इवेंट खोलें',
-    'ck.firstSite': 'पोस्ट के साथ पहली साइट जोड़ें', 'ck.firstBill': 'पहला मानव-शक्ति बिल बनाएँ',
+    'ck.firstSite': 'पोस्ट के साथ पहली साइट जोड़ें', 'ck.firstBill': 'पहला मानव-शक्ति बिल बनाएँ', 'ck.firstMuster': 'पहला ड्यूटी रजिस्टर (मस्टर) भरें',
   },
 );

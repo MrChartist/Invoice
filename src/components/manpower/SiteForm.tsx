@@ -6,6 +6,8 @@
 import { useState } from 'react';
 import { useT } from '../../i18n';
 import { mpList, mpT } from '../../i18n/areas/manpower-r17a';
+import { mbT } from '../../i18n/areas/manpower-r17b';
+import { loadStaff } from '../../lib/manpower/mp-muster';
 import { generateId } from '../../lib/storage';
 import { localDb } from '../../lib/localDb';
 import { todayInput } from '../../lib/utils';
@@ -96,10 +98,44 @@ export default function SiteForm({ site, sites, clients, entity, notify, onDone 
           ))}
         </fieldset>
       )}
+      {site && <DeployList site={site} notify={notify} />}
       <div style={row}>
         <button type="button" className={controls.btnPrimary} onClick={save} data-mp-save-site>{mpT('save')}</button>
         <button type="button" className={controls.btnGhost} onClick={() => onDone()}>×</button>
       </div>
     </section>
+  );
+}
+
+/** R17-B (A2 criterion 5): the people deployed at a saved site, with Deploy / Release (payroll bridge loaded on click). */
+function DeployList({ site, notify }: { site: Site; notify: Notify }) {
+  const [staff, setStaff] = useState(loadStaff);
+  const [pick, setPick] = useState({ e: '', p: site.mp.posts[0]?.id ?? '' });
+  const here = staff.filter((e) => e.cost_centre_id === site.id);
+  const go = async (id: string, siteId: string, postId?: string) => {
+    const io = await import('../../lib/manpower/mp-payroll-io');
+    try {
+      io.deployEmployee(id, siteId, postId);
+      setStaff(loadStaff());
+    } catch (err) { notify((err as Error).message, 'error'); }
+  };
+  return (
+    <fieldset style={row} data-mp-deployed>
+      <legend className={controls.label}>{mbT('staff')}</legend>
+      {here.map((e) => (
+        <span key={e.id} className={controls.hint} data-mp-deployed-row={e.code}>
+          {e.code} {e.name} — {site.mp.posts.find((p) => p.id === e.mp?.post_id)?.name ?? '—'}{' '}
+          <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => void go(e.id, '')}>{mbT('release')}</button>
+        </span>
+      ))}
+      <select className={controls.select} aria-label={mbT('person')} value={pick.e} onChange={(ev) => setPick({ ...pick, e: ev.target.value })} data-mp-deploy-person>
+        <option value="">—</option>
+        {staff.filter((e) => e.cost_centre_id !== site.id && e.active !== false).map((e) => <option key={e.id} value={e.id}>{e.code} {e.name}</option>)}
+      </select>
+      <select className={controls.select} aria-label={mpT('post')} value={pick.p} onChange={(ev) => setPick({ ...pick, p: ev.target.value })}>
+        {site.mp.posts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </select>
+      <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!pick.e} onClick={() => void go(pick.e, site.id, pick.p)} data-mp-deploy>{mbT('deployTo')}</button>
+    </fieldset>
   );
 }
