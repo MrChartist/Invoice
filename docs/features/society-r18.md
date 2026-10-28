@@ -84,8 +84,9 @@ desk stores nothing.
   (water by inlets and lift charges are typed per unit; MH's default bases fall back accordingly). Cut 3: no CSV / XLSX
   unit import — *closed later*: see "Unit import" below. Further trims to
   stay at the cap: the unit grid filters by wing and occupancy (not use), the unit form has no joint-owner, floor or
-  per-slot-kind fields (the shape keeps them), no delete button (a unit is edited; deletes, when added, go through
-  `setTable` on the watched table → recycle bin), the owner is typed / picked by name (no phone field), no bill-day or
+  per-slot-kind fields (the shape keeps them), no delete button — *closed later*: the form has "Delete" and a "Closed"
+  tick; `deleteUnit` refuses while a bill / run names the unit (close it instead) or a member is linked (clear owner /
+  tenant first, so a restore never has to re-link clients), else `setTable` on the watched table → recycle bin, the owner is typed / picked by name (no phone field), no bill-day or
   area-unit input (defaults), no separate paper CSS (the R17 particulars box styles are shared), no glossary terms.
 - **No `hs-profile.ts` / `hs-units-import.ts` / `UnitForm`-level member sub-form.** The profile's defaults live in
   `hs-settings.ts` (`societyDefaultsFor`), read lazily; the wizard and Features write only the settings patch.

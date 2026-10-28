@@ -10,7 +10,7 @@ import { hsList, hsT } from '../../i18n/areas/society-r18a';
 import type { Client } from '../../types/invoice';
 import type { HsHead, HsOccupancy, HsUnitUse, SocietyUnit } from '../../types/society-r18';
 import { OCCUPANCIES, suggestCode, UNIT_USES, validateUnit } from '../../lib/society/hs-units';
-import { addMember, saveUnit } from '../../lib/society/hs-units-save';
+import { addMember, deleteUnit, saveUnit } from '../../lib/society/hs-units-save';
 import controls from '../../styles/controls.module.css';
 import { Field as F, type Notify } from './hs-ui';
 import { numIn, row } from './hs-form';
@@ -59,6 +59,7 @@ export default function UnitForm({ unit, units, clients, heads, notify, onDone }
           </select>
         </F>
         {u.occupancy === 'tenant' && <F label={hsT('tenant')}><input className={controls.input} list="hs-members" value={tenant} onChange={(e) => setTenant(e.target.value)} data-hs-unit-field="tenant" /></F>}
+        <label className={controls.label}><input type="checkbox" checked={u.status === 'closed'} onChange={(e) => set({ status: e.target.checked ? 'closed' : 'active' })} data-hs-unit-field="closed" /> {hsT('closed')}</label>
         {heads.filter((h) => h.basis === 'typed' && h.active !== false).map((h) => (
           <F key={h.id} label={`${h.name} (${hsT('typed')})`}><input type="number" min={0} step="0.01" className={controls.input} value={u.typed?.[h.id] ?? ''} onChange={(e) => set({ typed: { ...u.typed, [h.id]: numIn(e.target.value) ?? 0 } })} data-hs-typed-head={h.kind} /></F>
         ))}
@@ -66,6 +67,7 @@ export default function UnitForm({ unit, units, clients, heads, notify, onDone }
       <div style={row}>
         <button type="button" className={controls.btnPrimary} onClick={save} data-hs-save-unit>{hsT('save')}</button>
         <button type="button" className={controls.btnGhost} onClick={onDone}>{hsT('cancel')}</button>
+        {unit && <button type="button" className={controls.btnDanger} onClick={() => { if (!window.confirm(hsT('delAsk', { c: unit.code }))) return; try { deleteUnit(unit.id); notify(hsT('deleted')); onDone(); } catch (e) { notify((e as Error).message, 'error'); } }} data-hs-delete-unit>{hsT('del')}</button>}
       </div>
     </section>
   );

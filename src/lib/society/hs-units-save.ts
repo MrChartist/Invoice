@@ -11,7 +11,7 @@ import { localDb } from '../localDb';
 import { withTablesRollback } from '../table-txn';
 import type { SocietyUnit } from '../../types/society-r18';
 import { HS_TABLES } from './hs-shared';
-import { cleanUnit, memberLinks, validateUnit } from './hs-units';
+import { cleanUnit, memberLinks, unitDeleteBlock, validateUnit } from './hs-units';
 import { planUnitsImport, type UnitColumns, type UnitTable } from './hs-units-import';
 
 export const loadUnits = (): SocietyUnit[] => getTable<SocietyUnit>(HS_TABLES.units).filter((u) => u && typeof u.id === 'string' && typeof u.code === 'string');
@@ -38,6 +38,21 @@ export function saveUnit(input: Omit<SocietyUnit, 'id' | 'updated_at'> & { id?: 
     relink(next);
     return unit;
   });
+}
+
+/**
+ * Delete a unit (`master.edit`; PENDING #4): refused while a bill / run names it or a member is linked
+ * (`unitDeleteBlock`). The row leaves through `setTable` on the watched table, so the recycle bin keeps a copy (its
+ * restore hook refuses while another live unit holds the code).
+ */
+export function deleteUnit(id: string): void {
+  requireAccess('master.edit');
+  const all = loadUnits();
+  const u = all.find((x) => x.id === id);
+  if (!u) return;
+  const why = unitDeleteBlock(u, localDb.invoices.getAll(), getTable<{ unit_ids?: string[] }>(HS_TABLES.runs));
+  if (why) throw new Error(why);
+  setTable(HS_TABLES.units, all.filter((x) => x.id !== id));
 }
 
 /** The member (client) of a typed name: the existing client of that name, else a new one (`master.edit`). */
