@@ -28,6 +28,8 @@ export function logisticsPaper(lg: LgSnapshot): { rows: [string, string][]; reas
     ['Packages', w.pkgs ? String(w.pkgs) : ''],
     ['Gross / chargeable', pair(kg(w.gross_kg), kg(w.chargeable_kg))],
     ['CBM', w.cbm ? String(w.cbm) : ''],
+    // R19-B4: the rate of a foreign-currency charge (Rule 34(2), LG13)
+    ['Exchange rate', lg.fx ? `₹${lg.fx.rate.toFixed(2)} / ${lg.fx.currency} (Rule 34(2) CGST Rules — as per accounting standards)` : ''],
   ];
   return { rows: rows.filter(([, v]) => v), reason: lg.pos_reason ?? '' };
 }

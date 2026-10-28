@@ -17,6 +17,7 @@ export const pendT = defineArea(
     pf7_rcm: 'RCM on plastic, e-waste and tyre scrap and used cooking oil from unregistered suppliers, and 2 % GST TDS on B2B supplies of these.',
     pf8_einv: 'e-Invoicing for RCM inward supplies from unregistered persons and for import of services (₹5 crore and above); the self-invoice has no IRN yet.',
     hs2_valuation: 'Court order under appeal, not a Council recommendation: the Madras High Court (2021) held that a society above ₹7,500 a month pays GST only on the excess; the app taxes the whole amount (Circular 109/28/2019-GST) unless "excess" is chosen.',
+    lg19_delivery: 'Delivery services through e-commerce operators to be taxed at 5 % without ITC, paid by the operator (Sec 9(5)); courier and postal excluded. Not applied.',
   } as const,
   {
     lead: 'GST परिषद की 8 अक्टूबर 2026 की सिफ़ारिश, अभी अधिसूचित नहीं — अपने CA से जाँचें:',
@@ -30,5 +31,6 @@ export const pendT = defineArea(
     pf7_rcm: 'अपंजीकृत आपूर्तिकर्ता से प्लास्टिक, ई-कचरा, टायर स्क्रैप और प्रयुक्त खाद्य तेल पर RCM, और इनकी B2B आपूर्ति पर 2 % GST TDS।',
     pf8_einv: 'अपंजीकृत व्यक्ति से RCM आवक आपूर्ति और सेवाओं के आयात (₹5 करोड़ और ऊपर) पर ई-इनवॉइस; स्व-बीजक पर अभी IRN नहीं।',
     hs2_valuation: 'अपील में लंबित न्यायालय आदेश, परिषद की सिफ़ारिश नहीं: मद्रास उच्च न्यायालय (2021) के अनुसार ₹7,500 मासिक से ऊपर पर GST केवल अतिरिक्त राशि पर; ऐप पूरी राशि पर कर लगाता है (परिपत्र 109/28/2019-GST) जब तक "अतिरिक्त" न चुना जाए।',
+    lg19_delivery: 'ई-कॉमर्स ऑपरेटर के माध्यम से डिलीवरी सेवाओं पर 5 % GST बिना ITC, ऑपरेटर देगा (धारा 9(5)); कूरियर और डाक शामिल नहीं। लागू नहीं किया गया।',
   },
 );
