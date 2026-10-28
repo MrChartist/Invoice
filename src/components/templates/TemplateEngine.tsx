@@ -56,6 +56,8 @@ const LazyTicketAnnexure = lazy(() => import('./parts/travel/TicketAnnexurePage'
 const LazyManpowerBlock = lazy(() => import('./parts/ManpowerBlock'));
 // R18-A4: society particulars (only with `hs`).
 const LazySocietyBlock = lazy(() => import('./parts/SocietyBlock'));
+// R19-A4: logistics job particulars (only with `lg`).
+const LazyLogisticsBlock = lazy(() => import('./parts/LogisticsBlock'));
 // R11 (CN-A3 … A5): construction paper parts — one lazy chunk, loaded only for documents with the construction snapshot.
 const worksPaper = () => import('./parts/WorksPaper');
 const LazyWorksHeader = lazy(() => worksPaper().then((m) => ({ default: m.WorksHeaderBlock })));
@@ -151,6 +153,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
   const travelBlock = invoice.tv && layout !== 'receipt' && <Suspense fallback={null}><LazyTravelBlock invoice={invoice} /></Suspense>; // R15-B4
   const manpowerBlock = invoice.mp && layout !== 'receipt' && <Suspense fallback={null}><LazyManpowerBlock invoice={invoice} /></Suspense>; // R17-A4
   const societyBlock = invoice.hs && layout !== 'receipt' && <Suspense fallback={null}><LazySocietyBlock invoice={invoice} /></Suspense>; // R18-A4
+  const logisticsBlock = invoice.lg && layout !== 'receipt' && <Suspense fallback={null}><LazyLogisticsBlock invoice={invoice} /></Suspense>; // R19-A4
   const psDecl = psDeclaration(invoice); // R14 (PS-A5): '' without `ps`
   // R12 (AG-A5): the agri box after the parties (before the GST grid); never on receipt paper unless it is a dealer bill.
   const agriBlock = invoice.ag && (layout !== 'receipt' || invoice.ag.kind === 'inputs') && <Suspense fallback={null}><LazyAgriBlock invoice={invoice} /></Suspense>;
@@ -192,6 +195,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           {travelBlock}
           {manpowerBlock}
           {societyBlock}
+          {logisticsBlock}
           {layout === 'gst' ? <GstBody invoice={invoice} sender={sender} totals={totals} skipEway={irn?.ewayNo} works={worksHead} /> : <ReceiptBody invoice={invoice} sender={sender} totals={totals} />}
           {worksDeds}
           {exportBlock}
@@ -222,6 +226,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
         {travelBlock}
         {manpowerBlock}
         {societyBlock}
+        {logisticsBlock}
         {exportBlock}
         <CustomFieldsBlock invoice={invoice} />
         <TransportBlock invoice={invoice} skipEway={irn?.ewayNo} />

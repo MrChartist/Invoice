@@ -29,7 +29,8 @@ export type AdvancedId =
   | 'profProfile' // R14 (PS-A1)
   | 'travelProfile' // R15 (R15-B1)
   | 'manpowerProfile' // R17 (R17-A1)
-  | 'societyProfile'; // R18 (R18-A1)
+  | 'societyProfile' // R18 (R18-A1)
+  | 'logisticsProfile'; // R19 (R19-A1)
 
 export interface FeatureRow {
   /** `mod.<id>`, `pack.<id>` or `adv.<id>`. */
@@ -117,6 +118,8 @@ const ADVANCED: readonly { id: AdvancedId; href: string; isOn: FeatureRow['isOn'
   { id: 'manpowerProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { manpower_kind?: unknown }).manpower_kind === 'string' },
   // R18 (R18-A1): the society profile (Settings → Features under Non-profit and Services)
   { id: 'societyProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { society_kind?: unknown }).society_kind === 'string' },
+  // R19 (R19-A1): the logistics profile (Settings → Features under Transport)
+  { id: 'logisticsProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { logistics_kind?: unknown }).logistics_kind === 'string' },
 ];
 
 /** Where each module's screen is (the first sidebar route that belongs to it). */
@@ -191,6 +194,11 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   security: '/time?tab=deploy',
   // R18 (R18-A1): the Society desk (tab on Recurring)
   society: '/recurring?tab=society',
+  // R19 (R19-A1): the Shipments desk (tab on Time)
+  logistics: '/time?tab=shipments',
+  customs: '/time?tab=shipments',
+  courier: '/time?tab=shipments',
+  warehouse: '/time?tab=shipments',
 };
 
 export const FEATURE_ROWS: readonly FeatureRow[] = [

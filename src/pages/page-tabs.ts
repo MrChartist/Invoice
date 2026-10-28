@@ -135,11 +135,13 @@ export const TIME_TABS = [
   { id: 'firm', pack: 'partners', alsoPacks: ['practice'] }, // PS-D1–D4: views partners / appropriation / tds194t / presumptive / tds194j
   { id: 'cadesk', pack: 'cafirm' }, // PS-D5: views events / fees / udin
   { id: 'clientmoney', pack: 'legal', alsoPacks: ['cafirm'] }, // PS-B3: views ledger / reconcile / statements
-  { id: 'exportsvc', pack: 'svcexport' }, // PS-C: views checker / edf / realisation / refund / platforms
+  { id: 'exportsvc', pack: 'svcexport', alsoPacks: ['logistics'] }, // PS-C; R19-A: + logistics (exports of services): views checker / edf / realisation / refund / platforms
   // R15: the Trips desk (one lazy chunk; views trips / bookings (B), statements (C), tcs / events (D) in `&view=`)
   { id: 'trips', pack: 'travel', alsoPacks: ['events'] },
   // R17: the Deploy desk (one lazy chunk; views sites (A), muster / bills (B), compliance / profit (C), statutory (D))
   { id: 'deploy', pack: 'manpower', alsoPacks: ['security'] },
+  // R19: the Shipments desk (one lazy chunk; views jobs / rates (A), billing / costing (B), customs (C), agents / courier / storage (D))
+  { id: 'shipments', pack: 'logistics', alsoPacks: ['customs', 'courier', 'warehouse'] },
 ] as const;
 export type TimeTab = (typeof TIME_TABS)[number]['id'];
 /* ── Recurring ── */
