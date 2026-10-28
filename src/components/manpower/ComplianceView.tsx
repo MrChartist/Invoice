@@ -13,6 +13,7 @@ import { mdT } from '../../i18n/areas/manpower-r17d';
 import { localDb } from '../../lib/localDb';
 import { can } from '../../lib/access';
 import { generateId } from '../../lib/storage';
+import { releaseAttachments } from '../../lib/attachments';
 import { formatCurrency, todayInput } from '../../lib/utils';
 import { escHtml as esc } from '../../lib/html-esc';
 import { loadSites, siteLabel } from '../../lib/manpower/mp-sites';
@@ -88,8 +89,13 @@ export default function ComplianceView({ notify }: MpViewProps) {
   const t = sumShares(shares);
   const cur: CompPatch = { pf: {}, esi: {}, status: 'pending', ...data.comp, ...p };
   const set = (x: CompPatch) => setP({ ...p, ...x });
-  const go = (q: Record<string, string>) => { setP(null); setParams({ tab: 'deploy', view: 'compliance', site: site.id, month, ...q }, { replace: true }); };
-  const save = () => { try { saveCompliance(site.id, month, cur, t); setP(null); setTick((k) => k + 1); notify(mcT('saved')); } catch (e) { notify((e as Error).message, 'error'); } };
+  const files = cur.attachments ?? [];
+  const drop = () => setTimeout(() => releaseAttachments([...(p?.attachments ?? []), ...(data.comp?.attachments ?? [])].map((a) => a.id)), 0); // only files nothing refers to go
+  const attach = async (f?: File) => {
+    try { if (f) set({ attachments: [...files, await (await import('../../lib/attachment-upload')).attachFile(f)] }); } catch (e) { notify((e as Error).message, 'error'); }
+  };
+  const go = (q: Record<string, string>) => { drop(); setP(null); setParams({ tab: 'deploy', view: 'compliance', site: site.id, month, ...q }, { replace: true }); };
+  const save = () => { try { saveCompliance(site.id, month, cur, t); drop(); setP(null); setTick((k) => k + 1); notify(mcT('saved')); } catch (e) { notify((e as Error).message, 'error'); } };
   const ms = readManpowerSettings();
   const short = m && data.run ? shortfalls(site, m, data.musters, data.run.lines, ms.wage_revisions ?? []) : [];
   const hints = data.run ? labourHints({ month, lines: data.run.lines, staff: data.staff, sites: [site], musters: data.musters, licences: ms.licences ?? [] }) : [];
@@ -121,6 +127,10 @@ export default function ComplianceView({ notify }: MpViewProps) {
         <Field label={mcT('holdAmt')}><input type="number" min={0} className={controls.input} style={{ width: '7rem' }} value={cur.hold?.amount ?? ''} onChange={(e) => set({ hold: { ...cur.hold, amount: n2(e.target.value) } })} /></Field>
         <button type="button" className={controls.btnPrimary} onClick={save} data-mp-comp-save>{mpT('save')}</button>
         {shares.length > 0 && <button type="button" className={controls.btnOutline} onClick={print} data-mp-comp-print>{mcT('print')}</button>}
+      </div>
+      <div style={bar} data-mp-comp-files>
+        <label className={`${controls.btnOutline} ${controls.btnSm}`}>{mcT('proof')}<input type="file" accept="image/*,application/pdf" hidden onChange={(e) => { void attach(e.target.files?.[0]); e.target.value = ''; }} data-mp-comp-file /></label>
+        {files.map((a) => <span key={a.id} className={controls.hint}><button type="button" className={controls.btnGhost} onClick={() => void import('../../lib/attachment-upload').then((u) => u.openAttachment(a))}>{a.name}</button><button type="button" className={controls.btnGhost} aria-label={mpT('remove')} onClick={() => set({ attachments: files.filter((x) => x.id !== a.id) })}>×</button></span>)}
       </div>
       {data.invoices.map((i) => <p key={i.id} className={controls.hint} data-mp-comp-bill>{i.invoice_number || mpT('open')} {formatCurrency(i.total)}{cur.hold?.pct || cur.hold?.amount ? ` · ${mcT('held', { h: formatCurrency(holdOf(cur.hold, i.total)) })}` : ''}</p>)}
       <h4 className={controls.label}>{mcT('mw')}</h4>

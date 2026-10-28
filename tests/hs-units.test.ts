@@ -81,3 +81,23 @@ test('volume: 2,000 units link 2,000 members in one pass', () => {
   assert.ok(performance.now() - t < 1500, 'fast');
   assert.equal(unitTotals(units).slots, 0);
 });
+
+test('delete (PENDING #4): refused while billed or a member is linked; otherwise to the recycle bin, and back', async () => {
+  const { deleteUnit } = await import('../src/lib/society/hs-units-save.ts');
+  const { setTable } = await import('../src/lib/storage.ts');
+  const owner = addMember('Asha Rao');
+  saveUnit({ code: 'A-101', use: 'residential', occupancy: 'owner', parking: [], status: 'active', owner_id: owner });
+  saveUnit({ code: 'A-102', use: 'residential', occupancy: 'owner', parking: [], status: 'active' });
+  const [a101, a102] = sortUnits(loadUnits());
+  assert.throws(() => deleteUnit(a101.id), /member/, 'a linked member blocks');
+  setTable('invoices', [{ id: 'i1', invoice_number: 'BOS/1', hs: { unit: { id: a102.id, code: 'A-102', members: [] }, period: '2026-10' } }]);
+  assert.throws(() => deleteUnit(a102.id), /bills/, 'a bill naming the unit blocks (close it instead)');
+  setTable('invoices', []);
+  deleteUnit(a102.id);
+  assert.deepEqual(loadUnits().map((u) => u.code), ['A-101']);
+  const { restoreEntry } = await import('../src/lib/trust/recycle-bin.ts');
+  const e = getTable<{ id: string; table: string; row_id: string }>('recycle_bin').find((b) => b.table === 'society_units' && b.row_id === a102.id);
+  assert.ok(e, 'the deleted unit is in the recycle bin');
+  restoreEntry(e.id);
+  assert.deepEqual(sortUnits(loadUnits()).map((u) => u.code), ['A-101', 'A-102']);
+});

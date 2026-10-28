@@ -20,10 +20,10 @@ export type HsHeadKind = 'service' | 'sinking' | 'repair' | 'major_repair' | 'st
  * ₹ per sq ft / sq m (`area_carpet`, `area_super`), the monthly total shared by undivided interest (`undivided_pct`),
  * % a year of the construction cost (`cost_pct_pa`), ₹ per slot (`per_slot`, `slot_rates` by kind), % of the
  * `service` head for let units (`pct_of_head`), ₹ per member (`fixed_member`); `typed` reads the unit's own amount
- * (`SocietyUnit.typed[head.id]`). The `per_inlet` / `per_lifted_unit` bases were cut at the R18-A cap (PRD §3 cut 2):
- * water by inlets and lift by lifted units are typed per unit until a later package adds them.
+ * (`SocietyUnit.typed[head.id]`). `per_inlet` = ₹ per water inlet (`SocietyUnit.inlets`); `per_lifted_unit` = ₹ per
+ * unit in a lifted building (`SocietyUnit.lifted`) — cut 2 of R18-A, added afterwards (PENDING #5).
  */
-export type HsBasis = 'per_unit' | 'area_carpet' | 'area_super' | 'undivided_pct' | 'cost_pct_pa' | 'per_slot' | 'pct_of_head' | 'typed' | 'fixed_member';
+export type HsBasis = 'per_unit' | 'area_carpet' | 'area_super' | 'undivided_pct' | 'cost_pct_pa' | 'per_slot' | 'pct_of_head' | 'typed' | 'fixed_member' | 'per_inlet' | 'per_lifted_unit';
 export type HsCycle = 'monthly' | 'quarterly' | 'half_yearly';
 export type HsUnitUse = 'residential' | 'commercial' | 'garage' | 'other';
 export type HsOccupancy = 'owner' | 'tenant' | 'vacant';
@@ -99,6 +99,8 @@ export interface SocietySettings {
   due_days?: number;
   heads?: HsHead[];
   area_unit?: 'sqft' | 'sqm';
+  /** A4 (PENDING #6): `false` = bills leave out the "How your bill is worked out" footnote (default on). */
+  explain?: boolean;
   /** A3: States whose `in_force: false` rows the user confirmed are in force (the KA Bill, HS33). */
   confirmed?: string[];
   /** B: the ₹7,500 valuation (`whole` default, HS2) and the SAC of non-member income; a society run's batch limit. */
@@ -126,7 +128,7 @@ export interface HsSnapshot {
   /** Due date (`YYYY-MM-DD`). */
   due?: string;
   heads?: HsHeadRow[];
-  /** A4 cut 1: "How your bill is worked out" — not printed in R18-A (the heads table carries each basis). */
+  /** A4: print "How your bill is worked out" (cut 1 of R18-A, added afterwards; set by the run unless switched off). */
   explain?: boolean;
   /** B1 / B2: the run, the ₹7,500 test, the regime and its printed sentence (snapshotted, never re-derived). */
   run_id?: string;
