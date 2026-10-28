@@ -7,6 +7,7 @@ import { loadPayableOpeningBills } from '../../../lib/opening-bills';
 import { round2 } from '../../../lib/invoice-calc';
 import { formatDate, formatMoney, todayInput } from '../../../lib/utils';
 import type { PurchaseReturn, VendorPayment } from '../../../types/purchases';
+import type { Payment } from '../../../types/invoice';
 import { getTable } from '../../../lib/storage';
 import { Modal } from '../../ui/Modal';
 import { useCan } from '../../../hooks/useCan';
@@ -36,7 +37,7 @@ export function BillwiseTab({ asOf, notify, onChanged }: { asOf: string; notify:
   const [adjusting, setAdjusting] = useState<{ vp: VendorPayment; party: PartyPayables } | null>(null);
   const parties = useMemo(() => {
     void version;
-    return billwisePayables({ purchases: purchasesDb.all(), payments: paymentsDb.all(), vendorPayments: vendorPaymentsDb.all(), vendors: vendorsDb.all(), asOf, ageBy, includeSettled: settled, returns: getTable<PurchaseReturn>('purchase_returns'), openingBills: loadPayableOpeningBills(vendorsDb.all()) }); // R6-C2: supplier opening bills
+    return billwisePayables({ purchases: purchasesDb.all(), payments: paymentsDb.all(), vendorPayments: vendorPaymentsDb.all(), vendors: vendorsDb.all(), asOf, ageBy, includeSettled: settled, returns: getTable<PurchaseReturn>('purchase_returns'), openingBills: loadPayableOpeningBills(vendorsDb.all()), receipts: getTable<Payment>('transactions') }); // R6-C2: supplier opening bills; R15-A3: netting
   }, [version, asOf, ageBy, settled]);
   const shown = supplier ? parties.filter((p) => partyKey(p) === supplier) : parties;
   const totals = payablesTotals(shown);

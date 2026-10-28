@@ -1096,3 +1096,18 @@ test('R14 (PS-B1 / PS-B5) disbursements and media rows read the real bill shape'
   const media = { ...bill, id: 'm', ps: { media: { client_id: 'c', medium: 'print', mode: 'principal' } } };
   assert.deepEqual(unbilledMedia([media], 'c', () => false).map((r) => [r.date, r.vendor, r.ref, r.cost, r.total]), [['2026-04-12', 'Acme Supplies', 'AS/22', 1000, 1180]]);
 });
+
+// R15-A3: netting reads bills through `supplierPayable` (RCM / import GST is ours, not the supplier's), skips void rows
+// and the bills with their own settlement flow (URD buy-back, R12 cycle bills).
+test('R15-A3 netting reads the real bill shape', async () => {
+  const { openBills } = await import('../src/lib/netting.ts');
+  const v = { id: 'v1', name: 'Acme Supplies' };
+  const rows: PurchaseRecord[] = [
+    { ...bill, vendor_id: 'v1' },
+    { ...bill, id: 'rcm', vendor_id: 'v1', reverse_charge: true },
+    { ...bill, id: 'void', vendor_id: 'v1', status: 'draft' },
+    { ...bill, id: 'paid', vendor_id: 'v1', amount_paid: 1180 },
+    { ...bill, id: 'urd', vendor_id: 'v1', used_goods: { kind: 'device' } } as never,
+  ];
+  assert.deepEqual(openBills(v, rows).map((b) => [b.id, b.open, !!b.rcm]), [['p1', 1180, false], ['rcm', 1000, true]]);
+});

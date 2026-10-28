@@ -337,3 +337,23 @@ unchanged.
 right after first paint, showing a same-sized inert bell meanwhile; the Dashboard imports `RemindersPanel` directly
 instead of through the `components/share` barrel (which pulled `ShareMenu` and the share helpers into the entry).
 Initial JS 178.3 → 173.3 kB gz (entry 68.6 → 64.2).
+
+## Initial-module chunk group (R15-A1, 2026-10-27)
+
+`vite.config.ts` replaces `manualChunks` with rolldown's `output.codeSplitting.groups`: `vendor-react` and `vendor-ui`
+(priority 30, names kept for long-term caching) and **`app-initial`** (`tags: ['$initial']`, priority 20), which puts
+every module statically reachable from the entry into ONE chunk (rolldown folds it into the entry chunk). Before, ten
+small first-paint app modules (`storage`, `dates`, `gstin`, `invoice-calc`, `tax-rules`, `validators`, two CSS-module
+chunks …) shipped as separate chunks that every lazy chunk re-imported one by one.
+
+| Build (gz -9, KiB) | Chunks | Initial | Entry | Total | Initial files | Cross-chunk `import{…}from` |
+|---|---|---|---|---|---|---|
+| Before (`manualChunks`, `d15cae9`) | 997 | 184.8 | 71.2 | 3,425.6 | 13 | 7,234 |
+| After (`codeSplitting.groups`) | 988 | 182.5 | 88.4 | 3,382.2 | 4 | 5,768 |
+
+`check-bundle-size.mjs`: the entry budget is 100 kB (the entry now *is* the first-paint app code, so the 185 kB
+initial budget is the binding limit) and a new check allows at most 5 initial files. `tests/bundle-config.test.ts`
+pins the three groups, the `$initial` tag and that no group can capture `jspdf` / `html-to-image`. Trade-off: any edit
+to a first-paint module now invalidates one ~88 kB chunk instead of one of ten; the PWA precaches the whole release
+anyway. Rejected variants (per-folder groups, a "tiny modules" group, `maxSize` splits) are measured in
+`docs/prd/round-15.md` §2.7.

@@ -65,3 +65,5 @@ registerRetailTables();
 
 // QA10 (R6 / R8): a bill deleted / cancelled frees its exchange receipts and cancels its finance DO (`voidHook`).
 import './rt-doc-hooks';
+// R15-A3: the shared exchange roll-up, re-exported so netting.ts rides on this chunk.
+export { exchangeSettled, ownFlow, syncNettedPaid } from './rt-doc-hooks';

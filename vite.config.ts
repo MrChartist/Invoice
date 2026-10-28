@@ -41,14 +41,17 @@ export default defineConfig({
         // stack (jspdf/html2canvas/html-to-image/dompurify): rolldown hoists shared
         // CJS interop helpers into it, which makes vendor-react import it and defeats
         // lazy loading (measured: +180 kB gz on first paint). Let dynamic import()
-        // split it naturally (see docs/qa/performance.md).
-        manualChunks(id: string) {
-          if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) {
-            return 'vendor-react';
-          }
-          if (/node_modules\/(lucide-react|qrcode\.react|zustand|clsx)\//.test(id)) {
-            return 'vendor-ui';
-          }
+        // split it naturally (see docs/qa/performance.md). `app-initial` captures
+        // `$initial` modules only; never add a group that can capture `jspdf` / `html-to-image`.
+        // Vite 8 / rolldown: keep `rolldownOptions` + `codeSplitting.groups` (not
+        // `rollupOptions` / `manualChunks`).
+        codeSplitting: {
+          groups: [
+            { name: 'vendor-react', test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/, priority: 30 },
+            { name: 'vendor-ui', test: /node_modules[\\/](lucide-react|qrcode\.react|zustand|clsx)[\\/]/, priority: 30 },
+            // R15-A1: every first-paint app module in ONE chunk (measured −43.4 kB total, −2.3 kB initial).
+            { name: 'app-initial', tags: ['$initial'], priority: 20 },
+          ],
         },
       },
     },

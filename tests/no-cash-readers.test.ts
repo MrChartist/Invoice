@@ -27,6 +27,11 @@ import { saveBoqTerms } from '../src/lib/works/boq.ts';
 import { saveRaBill } from '../src/lib/works/measurements.ts';
 import { recordDeductionRow } from '../src/lib/works/ra-receivable.ts';
 import { adjustAgainstInvoice, recordDeposit } from '../src/lib/property/deposits.ts';
+import { postNetting } from '../src/lib/netting.ts';
+import { vendorsDb } from '../src/lib/vendors.ts';
+import { purchasesDb } from '../src/lib/purchases.ts';
+import { cashBook, buildVouchers, loadBooksData } from '../src/lib/books.ts';
+import { clientMH } from './helpers/world.ts';
 import type { Payment } from '../src/types/invoice.ts';
 
 const DAY = '2026-07-20';
@@ -108,6 +113,43 @@ test('F4: RA deduction rows and a deposit adjustment are not bank money in Tally
   assert.equal(lags.reduce((s, l) => s + l.receipts, 0), 1, 'only the bank receipt is a collection');
 });
 
+/* ── R15-A3: party netting reuses `exchange_purchase_id` ── */
+
+function netted() {
+  localDb.clients.upsert(clientMH);
+  const client = localDb.clients.getAll().find((c) => c.name === clientMH.name)!;
+  const vendor = vendorsDb.save({ name: clientMH.name, gstin: clientMH.gstin });
+  const a = createViaStore({ date: DAY, lines: [{ qty: 1, rate: 65000, tax: 0 }], client: { ...clientMH, id: client.id }, status: 'Sent' });
+  const p = purchasesDb.save({
+    kind: 'PURCHASE', vendor_id: vendor.id, vendor_name: vendor.name, bill_number: 'C-9', date: DAY, category: 'Purchases',
+    lines: [{ id: 'l', name: 'Packages', quantity: 1, rate: 180000, tax_rate: 0 }], taxable: 180000, cgst: 0, sgst: 0, igst: 0, itc_eligible: false, total: 180000, amount_paid: 0,
+  });
+  postNetting({ clientId: client.id, vendorId: vendor.id, invoiceIds: [a.id], billIds: [p.id], amount: 65000, date: DAY });
+  return { a };
+}
+
+test('R15-A3: a netting receipt never reaches the cash book, Today or the bank reconciliation', () => {
+  netted();
+  const pays = getTable<Payment>('transactions');
+  const invs = localDb.invoices.getAll();
+  assert.equal(pays.length, 1);
+  assert.ok(movedNoCash(pays[0]));
+  const t = todaySummary({ invoices: invs, payments: pays, purchases: [] }, DAY);
+  assert.deepEqual([t.cash, t.upi, t.bank], [0, 0, 0], 'Today card');
+  assert.equal(receiptCandidates(invs, pays).length, 0, 'BRS candidates');
+  const v = buildVouchers(loadBooksData());
+  for (const acc of ['cash', 'bank'] as const) assert.equal(cashBook(v, [], acc, FY).rows.length, 0, `${acc} book`);
+});
+
+test('R15-A3: Tally, the receipts CSV, payment modes and the collection lag treat netting as no money', () => {
+  netted();
+  const pays = getTable<Payment>('transactions');
+  const invs = localDb.invoices.getAll();
+  assert.equal(paymentModes(pays, invs, FY).count, 0, 'payment modes');
+  assert.equal(collectionLags(invs, pays).size, 0, 'not a collection');
+  for (const r of tallyReceipts()) assert.ok(!debitLedgers(r).includes('Bank Account') && !debitLedgers(r).includes('Cash'), debitLedgers(r).join(','));
+});
+
 /* ── Guard: every cash / bank reader of receipt rows goes through movedNoCash ── */
 
 const SRC = join(import.meta.dirname, '..', 'src');
@@ -136,6 +178,8 @@ const MARKER_OWNERS = new Set([
   'lib/construction/cn-rera.ts', 'lib/construction/cn-bookings.ts', // R11 (CN-C): RERA collections, booking receipts
   // QA10: the URD voucher's settled amount is derived from its exchange rows (and bills free them on delete / cancel).
   'lib/retail/rt-doc-hooks.ts',
+  // R15-A3: party netting writes the R9 exchange marker on its receipts (no new marker) and rolls them into the bill.
+  'lib/netting.ts',
 ]);
 
 test('guard: the cash / bank readers call movedNoCash', () => {

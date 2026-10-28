@@ -1316,6 +1316,7 @@ export interface SyncRunOptions {
 const blobDirName = (device: string) => device;
 
 export function runSync(o: SyncRunOptions): Promise<SyncReport> {
+  audit.flush(); // R15-A2: this device's log is pushed as stored
   return exclusive(async () => {
     const r = await runSyncInner(o);
     recordReport(r);

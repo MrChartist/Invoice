@@ -289,3 +289,28 @@ export const TDS_194T_RULES: readonly Versioned<number | null>[] = [
   { from: '2017-07-01', value: null },
   { from: '2025-04-01', value: 10, source: 'Sec 194T (Finance (No. 2) Act 2024) — taxmann, Lakshmikumaran & Sridharan, tdsman' },
 ];
+
+/**
+ * R15-A4 (TV23): from 1 Apr 2026 "work" includes supply of manpower (Sec 402(47) as amended), so a manpower supplier
+ * falls in the contractor limb — Sec 393(1) Table Sl. 6(i), 1 % individual / HUF, 2 % others — not fees for
+ * professional / technical services. Label row for the payables section picker's hint (null before). Finance Bill 2026
+ * read, the Act not: unverified — verify with your CA. Append-only.
+ */
+export const MANPOWER_WORK_RULES: readonly (Versioned<string | null> & { verified?: boolean })[] = [
+  { from: '2017-07-01', value: null },
+  {
+    from: '2026-04-01',
+    value: 'Sec 393(1) Table Sl. 6(i) — contractor / supply of manpower (Sec 402(47) from 1 Apr 2026)',
+    source: 'Finance Bill 2026 cl. 78; Memorandum ("Application of TDS on supply of manpower")',
+    verified: false,
+  },
+];
+
+/**
+ * The contractor-limb label to hint when a bill naming manpower (item / ledger / notes text) is put under the
+ * professional / technical limb (194J, 194J-T) on or after 1 Apr 2026; null otherwise.
+ */
+export function manpowerHint(text: string, section: string | undefined, date?: string): string | null {
+  if (!section || !/^194J/.test(section) || !/man\s*-?\s*power/i.test(text)) return null;
+  return ruleAt(MANPOWER_WORK_RULES, date);
+}

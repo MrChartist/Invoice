@@ -19,7 +19,7 @@ import type { PurchaseRecord } from '../../types/purchases';
 import type { FinanceDeal } from '../../types/retail-r9';
 import { voidHook } from '../approval-gate';
 import { num, round2 } from '../invoice-calc';
-import { getTable, setTable } from '../storage';
+import { getTable, peekTable, setTable } from '../storage';
 import { localDb } from '../localDb';
 import { recordSeries } from '../series-counters';
 
@@ -29,9 +29,36 @@ const DEALS = 'finance_deals';
 type Urd = Pick<PurchaseRecord, 'id' | 'total' | 'amount_paid' | 'exchange_paid'>;
 const isUrd = (p: Partial<PurchaseRecord> | undefined): boolean => !!(p?.used_goods || p?.old_metal);
 
+/**
+ * R15-A3: the generalised roll-up — what LIVE receipt rows with `exchange_purchase_id` (R9 exchange, R12 set-off, R15
+ * netting) settle on a bill. Re-exported by `netting.ts`.
+ */
+export const exchangeSettled = (purchaseId: string, payments: readonly Pick<Payment, 'amount' | 'exchange_purchase_id'>[]): number =>
+  round2(payments.reduce((s, p) => s + (p.exchange_purchase_id === purchaseId ? num(p.amount) : 0), 0));
+
 /** Exchange value of a voucher used by LIVE receipt rows. */
-export const exchangedFrom = (purchaseId: string, payments: readonly Payment[]): number =>
-  round2(payments.filter((p) => p.exchange_purchase_id === purchaseId).reduce((s, p) => s + num(p.amount), 0));
+export const exchangedFrom = exchangeSettled;
+
+/** R15-A3: bills netting never touches (R9 URD vouchers, R12 pooled cycle bills keep their own flows). */
+export const ownFlow = (b: PurchaseRecord): boolean => !!(isUrd(b) || b.ag?.cycle_id);
+
+/** Re-derive `amount_paid` / `exchange_paid` of netted bills (all, or `ids`) from live rows. URD vouchers are R9's. */
+export function syncNettedPaid(ids?: Iterable<string>): void {
+  const want = ids ? new Set(ids) : undefined;
+  const pays = peekTable<Payment>('transactions');
+  let changed = false;
+  const rows = getTable<PurchaseRecord>('purchases').map((b) => {
+    if (ownFlow(b) || (want ? !want.has(b.id) : typeof b.exchange_paid !== 'number')) return b;
+    const ex = exchangeSettled(b.id, pays);
+    const had = num(b.exchange_paid);
+    if (Math.abs(ex - had) < 0.005 && (typeof b.exchange_paid === 'number' || !ex)) return b;
+    changed = true;
+    return { ...b, amount_paid: Math.max(round2(num(b.amount_paid) - had + ex), 0), exchange_paid: ex, updated_at: new Date().toISOString() };
+  });
+  if (changed) setTable('purchases', rows);
+}
+
+
 
 /** Cash / bank paid on a URD voucher (its `amount_paid` less the exchange part the last sync put in it). */
 export function urdCashPaid(p: Urd, payments: readonly Payment[]): number {
@@ -61,6 +88,8 @@ export function syncUrdPaid(ids?: Iterable<string>): void {
     return { ...p, amount_paid: paid, exchange_paid: ex, updated_at: new Date().toISOString() };
   });
   if (changed) setTable('purchases', rows);
+  // R15-A3: a netting receipt freed (bill cancelled / deleted) or restored settles its supplier bill again.
+  syncNettedPaid(ids && want);
 }
 
 /** Free a bill's exchange receipts (their vouchers are open again). */

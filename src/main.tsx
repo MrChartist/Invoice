@@ -7,6 +7,7 @@ import { initCrossTab } from './lib/cross-tab';
 import { initStorage } from './lib/storage';
 import { initI18n } from './i18n';
 import { installErrorRing } from './lib/error-ring';
+import { audit } from './lib/audit';
 import './fonts.css';
 import './index.css';
 
@@ -20,6 +21,8 @@ function start(root: Root): void {
   else if (migration.status === 'newer') console.warn('This data was saved by a newer version of the app.', migration);
 
   initCrossTab();
+  // R15-A2: audit appends are written once per task; write any still queued before the page goes away.
+  addEventListener('pagehide', audit.flush);
 
   root.render(
     <React.StrictMode>
