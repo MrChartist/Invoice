@@ -239,7 +239,10 @@ export function readRefs(v: unknown): AttachmentRef[] {
 export function attachmentIdsIn(rows: unknown, into: Set<string> = new Set()): Set<string> {
   if (!Array.isArray(rows)) return into;
   for (const row of rows) {
-    for (const r of readRefs((row as { attachments?: unknown } | null)?.attachments)) into.add(r.id); // non-objects carry none
+    const o = row as { attachments?: unknown; pf?: { file?: unknown }; esi?: { file?: unknown }; wage_register?: unknown; table?: unknown; row?: unknown } | null;
+    // non-objects carry none; CN-D2 labour compliance keeps its PF / ESI / wage-register files in nested fields
+    for (const r of readRefs([...(Array.isArray(o?.attachments) ? o.attachments : []), o?.pf?.file, o?.esi?.file, o?.wage_register])) into.add(r.id);
+    if (o?.table === 'labour_compliance') attachmentIdsIn([o.row], into); // a binned row keeps those nested files too
   }
   return into;
 }
