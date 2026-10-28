@@ -11,6 +11,7 @@ import type { MfSnapshot } from '../../types/mfg-r13';
 import type { PsSnapshot } from '../../types/prof-r14';
 import type { TvSnapshot } from '../../types/travel-r15';
 import type { MpSnapshot } from '../../types/manpower-r17';
+import type { HsSnapshot } from '../../types/society-r18';
 import { MSME_PAYMENT_DAYS } from '../../lib/tax-rules';
 
 /** R9 (RT-E2) gold fineness by karat, for "22K (916)" on the bill (BIS Reg. 5(11); same table as `rt-jewel-rates.ts`). */
@@ -47,7 +48,7 @@ function monthYear(day: string): string {
  * (6.6 / 6.11), e.g. "Batch B12 · Mfg 01/2026 · Exp 06/2027" or "S/N: 3567…, 3567… · Warranty 12 months".
  * '' for untracked lines, so ordinary documents print exactly as before.
  */
-export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw' | 'id' | 'sv'>> & { bin?: string }) | undefined, ag?: AgSnapshot, mf?: MfSnapshot, ps?: PsSnapshot, tv?: TvSnapshot, mp?: MpSnapshot): string {
+export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' | 'batch_expiry' | 'serials' | 'serial_pairs' | 'warranty_months' | 'wt'> & Partial<Pick<InvoiceItem, 'disc_chain' | 'disc_per_unit' | 'quantity' | 'unit' | 'jw' | 'id' | 'sv'>> & { bin?: string }) | undefined, ag?: AgSnapshot, mf?: MfSnapshot, ps?: PsSnapshot, tv?: TvSnapshot, mp?: MpSnapshot, hs?: HsSnapshot): string {
   if (!item) return '';
   if (item.jw) return jewelText(item.jw); // R9 (RT-E2): the BIS sub-line (the tag no. is its serial)
   const parts: string[] = [];
@@ -65,6 +66,7 @@ export function trackingText(item: (Pick<InvoiceItem, 'batch_no' | 'batch_mfg' |
   parts.push(psLineText(item, ps)); // R14 (PS-A5): '' without the `ps` snapshot
   parts.push(tvLineText(item, tv)); // R15-B4: '' without the `tv` snapshot
   parts.push(mpLineText(item, mp)); // R17-A4: '' without the `mp` snapshot
+  parts.push(hsLineText(item, hs)); // R18-A4: '' without the `hs` snapshot
   return parts.filter(Boolean).join(' · ');
 }
 
@@ -281,6 +283,12 @@ export function tvLineText(item: { id?: string } | undefined, tv: TvSnapshot | u
 export function mpLineText(item: { id?: string } | undefined, mp: MpSnapshot | undefined): string {
   const p = item?.id ? mp?.posts?.find((r) => r.line_id === item.id) : undefined;
   return p ? [p.site, `${p.post} × ${p.heads}`, p.duties != null && `${p.duties} duties`].filter(Boolean).join(' · ') : '';
+}
+
+/** R18-A4: the basis of a society head under its line, from the document's `hs.heads` row of that line (B fills `line_id`); '' otherwise. */
+export function hsLineText(item: { id?: string } | undefined, hs: HsSnapshot | undefined): string {
+  const h = item?.id ? hs?.heads?.find((r) => r.line_id === item.id) : undefined;
+  return h?.basis ?? '';
 }
 
 /**

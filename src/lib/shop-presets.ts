@@ -478,3 +478,25 @@ export function applyManpowerKind(kind: ManpowerKindId, opts: { registered?: boo
   const modules = [...new Set<ModuleId>([...PRESETS.services, 'payroll', 'accounts', 'banking', 'tds', 'recurring', 'purchases', 'time', ...(opts.registered ? ['gst' as const] : [])])];
   return { business_type: 'services', modules, service_kind: 'manpower', manpower_kind: kind, industry_packs: [...packs], defaultDueDays: 7, templateId: 'gst_tax_invoice' };
 }
+
+/* ── R18 (R18-A1): society profile — a wizard card, not a business type (the R12 / R13 pattern) ── */
+
+/** The society picker's choices (stored as `settings.society_kind`). */
+export const SOCIETY_KINDS = ['chs', 'aoa', 'rwa', 'commercial', 'agency'] as const;
+export type SocietyKindId = (typeof SOCIETY_KINDS)[number];
+export const isSocietyKind = (v: unknown): v is SocietyKindId => typeof v === 'string' && (SOCIETY_KINDS as readonly string[]).includes(v);
+/** Where a kind lands after setup: the Society desk on Recurring (units; a maintenance agency the bills view, B). */
+export const societyLanding = (kind: SocietyKindId): string => `/recurring?tab=society&view=${kind === 'agency' ? 'bills' : 'units'}`;
+
+/**
+ * Settings patch for a society profile: business type `nonprofit` (`services` for a maintenance agency), the type's
+ * modules (`registered` adds `gst`; `recurring` always kept, so `/recurring` stays visible and `PACK_ROUTES` is
+ * unchanged), packs = the company's ∪ `society` written as an EXPLICIT list (so the donations pack the `nonprofit`
+ * type implies is never switched on by it), due days 15 and the GST tax-invoice template. The society's own defaults
+ * (`society_settings`) are written by `society/hs-settings.ts`.
+ */
+export function applySocietyKind(kind: SocietyKindId, opts: { registered?: boolean; currentPacks?: readonly PackId[] } = {}): ShopModeSettings & { society_kind: SocietyKindId; industry_packs: PackId[]; defaultDueDays: number; templateId: string } {
+  const type: BusinessType = kind === 'agency' ? 'services' : 'nonprofit';
+  const modules = [...new Set<ModuleId>([...PRESETS[type], 'recurring', 'accounts', 'banking', ...(opts.registered ? ['gst' as const] : [])])];
+  return { business_type: type, modules, society_kind: kind, industry_packs: [...new Set<PackId>([...(opts.currentPacks ?? []), 'society'])], defaultDueDays: 15, templateId: 'gst_tax_invoice' };
+}

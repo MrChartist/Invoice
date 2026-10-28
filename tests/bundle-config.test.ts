@@ -24,7 +24,7 @@ test('Vite 8 rolldown options with codeSplitting.groups, no manualChunks / rollu
 
 test('the groups, in order, with their priorities', () => {
   const families = [...cfg.matchAll(/safeFamilyGroup\(graph, '(f-[a-z]+)', familyRe\([^)]*\), (\d+)\)/g)].map((m) => [m[1], Number(m[2])]);
-  assert.deepEqual(families.map(([n]) => n), ['f-hotel', 'f-trade', 'f-retail', 'f-services', 'f-cn', 'f-agri', 'f-mfg', 'f-prof', 'f-travel', 'f-manpower']); // R17-A: f-manpower
+  assert.deepEqual(families.map(([n]) => n), ['f-hotel', 'f-trade', 'f-retail', 'f-services', 'f-cn', 'f-agri', 'f-mfg', 'f-prof', 'f-travel', 'f-manpower', 'f-society']); // R17-A: f-manpower; R18-A: f-society
   assert.ok(families.every(([, p]) => p === 12), 'families at priority 12');
   assert.match(cfg, /leafGroup\(graph, 'lazy-leaves', 9, \{ maxModuleSize: 3000 \}\)/);
   const names = groups.map((g) => (typeof g.name === 'string' ? g.name : g.name.name));
@@ -81,6 +81,11 @@ test('R17-A: familyRe leaves the named basenames out of the family', () => {
   assert.ok(re.test('/x/src/lib/manpower/mp-regime.ts') && re.test('/x/src/lib/manpower-rules.ts') && re.test('/x/src/i18n/areas/manpower-r17a.ts'));
   assert.ok(!re.test('/x/src/lib/manpower/mp-registry.ts') && !re.test('/x/src/i18n/areas/manpower-r17a-pick.ts'));
   assert.ok(re.test('/x/src/lib/manpower/mp-registry-x.ts'), 'only the exact basename');
+});
+test('R18-A: the f-society family captures the engines, rules and areas; not the registry or the -pick areas', () => {
+  const re = familyRe('society', 'society-rules', 'society-r18', 'hs-registry');
+  assert.ok(re.test('/x/src/lib/society/hs-bill.ts') && re.test('/x/src/lib/society-rules.ts') && re.test('/x/src/i18n/areas/society-r18a.ts'));
+  assert.ok(!re.test('/x/src/lib/society/hs-registry.ts') && !re.test('/x/src/i18n/areas/society-r18a-pick.ts'));
 });
 const fam = (id: string) => FAM.test(id);
 

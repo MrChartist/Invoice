@@ -50,7 +50,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV48 | 48 | 15 |
 | 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF23 | 23 | 5 |
 | 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP48 | 48 | 13 |
-| **Total** | | **615** | **152** |
+| 18. Co-operative housing societies, apartment associations and RWAs (Round 18, planned) | HS1–HS44 | 44 | 13 |
+| **Total** | | **659** | **165** |
 
 ---
 
@@ -1276,6 +1277,70 @@ construction (R11 CN-D2 keeps those).
 | MP48 | Muster corrections after billing / payroll (QA20 V7): a muster billed by a live bill, or of a month whose payroll run is final, cannot be unlocked — duty corrections go through a credit / debit note on the bill (or cancelling it) and a reopened run. The compliance pack apportions each run line by cumulative duties over the month's locked musters in site order, so the last site absorbs the paisa (QA20 V5). Right? | As stated | `mp-muster-save.ts` `setMusterLock`, `mp-compliance.ts` `siteShares` | — | — (MP26) |
 `MP` ids are counted once here. The ★ items (MP1, MP2, MP4, MP6, MP7, MP10, MP12, MP14, MP16, MP29, MP34, MP41, MP46) change what a
 document prints or a return reports.
+
+## 18. Co-operative housing societies, apartment owners' associations and RWAs (Round 18, ids HS1–HS44)
+
+Added with `docs/prd/round-18.md` (§9: HS1–HS44) by R18-A. It covers co-operative housing societies (State co-op
+Acts), apartment owners' associations (apartment-ownership Acts), resident welfare associations, commercial premises
+societies and maintenance agencies billing owners.
+
+- Files named under "Where" with a package in brackets are planned by that package (R18-B … R18-D); the others exist
+  since R18-A. Every rule row in `src/lib/society-rules.ts` is `verified: false` unless its value was read in a primary
+  text in Round 18 (its source then says "Read (R18)").
+- **State co-operative / apartment rules are data rows keyed by State code and date** (`STATE_SOCIETY_RULES`), never
+  code branches. A bill not yet in force (the Karnataka Bill 2026) is a row with `in_force: false` that applies only
+  after the user confirms it. Bye-law and State checks are hints, never blocks.
+- ★ = changes what a document prints or a return reports. Sources: §2.8 of the PRD (P = primary text read, S = secondary).
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| HS1 ★ | Sl. 77(c) of N 12/2017-CT(R): ₹5,000 to 24 Jan 2018, ₹7,500 from 25 Jan 2018 (N 2/2018-CT(R)); per residential apartment (Circular 109 Q4). Any change on or after 22 Sep 2025 (N 16/2025-CT(R))? | `RWA_LIMIT_RULES` as stated | (R18-B) `society-rules.ts` `RWA_LIMIT_RULES`, `society/hs-regime.ts` | 2018-01-25 | P N 12/2017-CT(R) Sl. 77; P Circular 109/28/2019-GST Q1, Q4; S N 16/2025 summaries |
+| HS2 ★ | Above ₹7,500: whole amount taxable (Circular 109 Q5) vs only the excess (Madras HC 2021, single judge; W.A. 2318 / 2321 of 2021). Outcome of the appeal? Should the app change the default for societies in Tamil Nadu? | Whole; "excess" setting | (R18-B) `society_settings.gst.valuation`, `RWA_VALUATION_RULES`, `pending-changes.ts` | 2019-07-22 | P Circular 109 Q5; P CBIC flyer; S caclubindia, cleartax (judgment not read) |
+| HS3 ★ | Heads counted towards ₹7,500: sinking fund, repair fund, parking, non-occupancy, interest, special levies (counted); property / water / NA tax and electricity collected for the authority (excluded, CBIC flyer). Is a one-off levy in the same month added to that month's contribution? | As stated | `society/hs-tariff.ts` `chargeTotals` (member vs statutory); (R18-B) `hs-regime.ts` | — | P CBIC flyer "GST on Housing Societies" |
+| HS4 ★ | ₹20 lakh: aggregate turnover including exempt maintenance and non-member income; GST only when both conditions hold (Circular 109 Q2). A society registered voluntarily (or for other income) with turnover ≤ ₹20 lakh: must it charge GST on units above ₹7,500? From which point in the FY once ₹20 lakh is crossed? ₹10 lakh special-category States? | Registration decides; monitor hints | (R18-B) `REG_THRESHOLD_RULES`, `hs-turnover.ts` | 2019-07-22 | P Circular 109 Q2 and table; special-category rows not read |
+| HS5 | Quarterly / half-yearly bills: limit = ₹7,500 × months? | Yes | `hs-tariff.ts` `periodRange` (months); (R18-B) `hs-regime.ts` | — | — (developers' reading) |
+| HS6 ★ | Statutory dues on a taxable bill: shown as pure-agent (Rule 33) lines outside value and outside GSTR-1? Or as exempt / non-GST supply in Table 8? | Pure agent, outside | Head kind `statutory`; (R18-B) lines with `charge_head_id: 'rule33'` | — | P CBIC flyer; S cleartax |
+| HS7 | Interest on arrears: part of the value (Sec 15(2)(d)) and taxed with the bill; counted in the month's ₹7,500? | Counted; bill's treatment | (R18-C) `hs-dues.ts`; (R18-B) `hs-regime.ts` | — | Sec 15(2)(d) CGST; CBIC flyer (counting in the test not stated) |
+| HS8 ★ | Commercial units (shops, offices) in a housing society / mixed complex: does Sl. 77(c) apply ("per member … housing society or a residential complex")? | Same test with a hint | `SocietyUnit.use = 'commercial'`; (R18-B) hint | — | P N 12/2017-CT(R) Sl. 77(c) wording |
+| HS9 | Non-member income (mobile tower rent, hoardings, hall hire to outsiders): 18 %, SAC 997212 / others; turnover for ₹20 lakh. | 18 %, separate invoice | Head kind `outsider`, `SOCIETY_SAC_RULES` (997212); (R18-B) separate invoice | 2017-07-01 | P Annexure to N 11/2017-CT(R) |
+| HS10 | Rate and SAC: Heading 9995 Sl. 33 (9 % + 9 %), SAC 999598 "Home owners associations" — unchanged after 22 Sep 2025? | 18 %, 999598 | `SOCIETY_GST_RATE_RULES`, `SOCIETY_SAC_RULES` | 2017-07-01 | P N 11/2017-CT(R) Sl. 33 and annexure (read); 2025 row S |
+| HS11 ★ | ITC: entitled (Circular 109 Q3) but with exempt bills → Rule 42 / 43 reversal; Sec 17(5)(c) / (d) for works capitalised to the building (lifts, waterproofing, painting). | Common-credit tab; no automatic block | GST reports → Common credit (`alsoPacks: ['society']`); (R18-B) `GstView.tsx` | — | P Circular 109 Q3; P CBIC flyer |
+| HS12 | Electricity / water recovered by a society from its generator or sub-meters: part of the maintenance service (taxable, CBIC flyer) or exempt supply of electricity (HSN 2716)? | Counted, taxable with the bill | Head kind `service_supply` | — | P CBIC flyer |
+| HS13 ★ | Sinking / repair fund contributions: consideration for a current supply (taxed with the bill) or a deposit / advance (not supply until used)? | Part of the bill | Head kinds `sinking` / `repair` counted (`hs-tariff.ts`) | — | P CBIC flyer |
+| HS14 | Document: Bill of Supply for an exempt bill by a registered society; a plain "maintenance bill" by an unregistered one. Wording. | As stated | (R18-B) `hs-regime.ts`, `SocietyBlock.tsx` (`hs.decl`) | — | P CBIC flyer (Sec 23(1)(a) as quoted) |
+| HS15 | Inward RCM: security services from a non-body-corporate agency to a registered society (entry 14; cross-ref MP29); GTA (entry 1, "any society"). | Hint only | (R18-B) `hs-books-io.ts` (reads `SECURITY_RCM_RULES`) | 2019-01-01 | Existing R17 row (P in R17); `transport-works-rules.ts` |
+| HS16 | Maintenance agency / builder's maintenance company billing owners: 18 % without Sl. 77(c); SAC 999598 or 9985? | 18 % | `society_kind = 'agency'` (business type `services`); (R18-B) regime `agency` | — | — |
+| HS17 | Builder-maintained period before handover: builder's maintenance charges taxable; corpus / advance maintenance on handover. | Agency kind | `society_kind = 'agency'` | — | — |
+| HS18 | Transfer premium / transfer fee on sale of a flat: GST? MH cap (₹25,000, GR of 2001, unverified)? | Typed; counted only if billed as a head | (R18-C) `hs-transfer.ts` | — | S (GR of 2001 not read) |
+| HS19 | Non-occupancy charges: MH 10 % of service charges (Rule 106C-12, as reported); GST counted (CBIC flyer). | 10 % hint for MH | `STATE_SOCIETY_RULES` (27, `noc_pct`), `hs-tariff.ts` `tariffHints` (`nocHigh`), basis `pct_of_head` | 2026-06-22 | S taxguru, propnewstime |
+| HS20 ★ | Mutuality: member contributions and the surplus not income; non-member income and bank interest taxable. Presentation in the computation. | Split in D4 | (R18-D) `hs-itax.ts` | — | S practitioner articles |
+| HS21 ★ | Sec 149 ITA 2025 (successor of Sec 80P): (2)(c) ₹50,000; (2)(d) interest from investments with another co-operative society — interest from co-operative banks given sub-section (5)? Enacted text confirmation. | Lines by date, `verified: false` | (R18-D) `INCOME_TAX_SOCIETY_RULES`, `hs-itax.ts` | 2026-04-01 | S taxheal reproduction; incometaxindia page 403 |
+| HS22 | Section labels by date (80P up to FY 2025-26; 149 from 1 Apr 2026); the optional Sec 203 regime. | As stated | (R18-D) `INCOME_TAX_SOCIETY_RULES` | 2026-04-01 | S |
+| HS23 | TDS duties of a society (TAN; contractors under Sec 393, audit fee, professionals, rent) and thresholds. | Existing rows; note only | `tds-rules.ts` (existing); (R18-D) note | — | Existing |
+| HS24 | Return form (ITR-5), tax audit vs co-op audit, due dates. | Not modelled | — | — | — |
+| HS25 | TDS deducted by banks on the society's FD interest; Form 15G / 15H not available to a society. | Note | (R18-D) note | — | — |
+| HS26 ★ | MH interest cap: 21 % (model bye-law 72) → 12 % simple (Rule 106C-12, MCS (Amendment) Rules 2026). Which date (18 Jun notification, 22 Jun Gazette, 30 Jun reported)? Does the cap apply to arrears of earlier periods from that date? | Row from 2026-06-22; split by day | `STATE_SOCIETY_RULES` (27: 2014-01-01 cap 21, 2026-06-22 cap 12); (R18-C) `hs-dues.ts` | 2026-06-22 | S taxguru, trilegal, KSandK, FPJ, indiancooperative, moneylife |
+| HS27 | MH sinking ≥ 0.25 % and repair ≥ 0.75 % a year of the architect-certified construction cost; old buildings without a certificate; investment of the sinking fund. | Minimum hints | `STATE_SOCIETY_RULES` (27, `fund_min`), `tariffHints` (`fundLow`), `SocietyUnit.construction_cost` | 2026-06-22 | S taxguru, moneylife |
+| HS28 | MH apportionment bases (Rule 106C-12): service equal per flat; property tax local rate with common share by carpet; water by inlets; lift per lifted flat; insurance / lease by carpet; parking by GB rate. | State defaults | `STATE_SOCIETY_RULES` (27, `default_bases`), "Apply State defaults"; inlet / lift bases cut in R18-A (typed per unit) | 2026-06-22 | S taxguru |
+| HS29 | MH education ₹10 per member per month (Rule 106C-7); entrance fee ₹500; election fund equal. GST on these? | Education counted | `STATE_SOCIETY_RULES` (27, `education_per_month`), head kind `education` (`fixed_member`) | 2026-06-22 | S taxguru |
+| HS30 | MH registers: Form J (Rule 33), I register, share register, nomination register (Rule 32 / 106C-9): which formats must the society keep, and may they be electronic prints? | Prints as stated | (R18-D) `hs-registers.ts` (`STATE_SOCIETY_RULES.registers`) | — | S taxguru |
+| HS31 | MH audit: panel auditor (Sec 81), due date, classification, rectification report and its time limit. | Typed dates | (R18-D) `society_settings.audit`, `hs-alerts.ts` | — | S taxguru, WIRC-ICAI decks |
+| HS32 | MH draft Model Bye-laws 2026: when final, which money rules change? | Pending note only | `pending-changes.ts` (not a rule row) | — | S propnewstime, moneylife |
+| HS33 ★ | KA Apartment (Ownership and Management) Bill / Act 2026: in force? Area base (s.2(t) super built-up vs s.9 private area); prescribed interest rate; dues certificate (s.20(5)); no withholding of essential services (s.20(6)); audit within six months (s.28). | Rows inactive until confirmed | `STATE_SOCIETY_RULES` (29, `in_force: false`, `area_super`, audit 6 months), `pendingStateRule`, "In force for us" (`society_settings.confirmed`) | on commencement | P LA Bill 14 of 2026 (PRS PDF read); commencement not confirmed |
+| HS34 | TN Apartment Ownership Act 2022: commencement date; Rules 2024 interest rate; recovery from the occupier (s.18(3)); audit within three months (s.21). | `undivided_pct`; cap null | `STATE_SOCIETY_RULES` (33, `undivided_pct`, audit 3 months); tenant recorded, never billed | 2024-03-06 | P TN Act 44 of 2022 (PRS PDF read); commencement S JSA |
+| HS35 | Delhi: DCS Act 2003 / Rules 2007 interest on dues (9 % / 15 % reported), sinking fund, audit. | No rows | `STATE_SOCIETY_RULES` (07: no values) | — | S only |
+| HS36 | Other States: anything the app must hold as data? | None | No rows: the user types rates | — | — |
+| HS37 | Receipt allocation: interest first or oldest principal first (MH bye-laws)? | Interest first | (R18-C) `society_settings.allocation`, `hs-dues-io.ts` | — | — (common bye-law practice) |
+| HS38 | Interest on unpaid interest: never (simple only)? | Never | (R18-C) `society_settings.interest.on_interest: false`, `hs-dues.ts` | — | — |
+| HS39 ★ | Fund contributions: credited to the fund through a transfer from I&E on billing (app) or directly to the fund; on billing or on receipt? | Billing-based transfer | (R18-D) `hs-funds.ts`, `society_settings.fund_transfer` | — | — |
+| HS40 | I&E and R&P format for co-operative societies / associations; Schedule III not applicable; State-prescribed formats. | Label swap + R&P | (R18-D) `ledger/annual-pack.ts`, `hs-rp.ts` | — | — |
+| HS41 | Corpus / advance maintenance handed over by the builder (KA Bill: with interest, within 60 days of OC): accounting on receipt. | Typed opening | — | — | P KA Bill (as above) |
+| HS42 | Members' deposits and interest on refunds of surplus. | Not modelled | — | — | — |
+| HS43 | (Market) Number of CHS in Maharashtra (> 1.25 lakh reported) and AOAs / RWAs elsewhere. | — | — | — | S (draft Model Bye-laws 2026 reports) |
+| HS44 | Property tax: paid by the society for the building (MH) vs separate assessment per apartment (TN s.20): pass-through or society expense in the I&E? | Pass-through head | Head kind `statutory`, basis `typed` (`SocietyUnit.typed`) | — | P TN Act s.20 |
+
+`HS` ids are counted once here. The ★ items (HS1, HS2, HS3, HS4, HS6, HS8, HS11, HS13, HS20, HS21, HS26, HS33, HS39)
+change what a document prints or a return reports.
 
 ## Answers log
 

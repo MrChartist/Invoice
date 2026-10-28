@@ -209,6 +209,7 @@ export const tabsT = defineArea(
     'recurring.batch': 'Batch invoices',
     'recurring.fees': 'Fees',
     'recurring.leases': 'Leases',
+    'recurring.society': 'Society: units, members and maintenance tariff', // R18-A (B–D append)
     // Settings
     'settings.business': 'Business profiles',
     'settings.items': 'Items & rates',
@@ -410,6 +411,7 @@ export const tabsT = defineArea(
     'recurring.batch': 'बैच इनवॉइस',
     'recurring.fees': 'फ़ीस',
     'recurring.leases': 'लीज़',
+    'recurring.society': 'सोसाइटी: यूनिट, सदस्य और रखरखाव शुल्क सूची',
     'settings.business': 'बिज़नेस प्रोफ़ाइल',
     'settings.items': 'आइटम और दरें',
     'settings.fields': 'कस्टम फ़ील्ड',

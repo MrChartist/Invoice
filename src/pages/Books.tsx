@@ -27,7 +27,7 @@ import { wireT } from '../i18n/areas/wiring';
 import { useCan } from '../hooks/useCan';
 import controls from '../styles/controls.module.css';
 import { defineArea } from '../i18n/area';
-import { visibleTabs } from '../lib/industry-packs'; // R5-C
+import { visiblePackTabs } from '../lib/industry-packs'; // R5-C; R18-A: shared rows (funds also for society)
 import { localDb } from '../lib/localDb';
 import { BOOKS_TABS, type BooksTab } from './page-tabs'; // R6-B1
 import { EmptyState } from '../components/ui/EmptyState';
@@ -78,7 +78,7 @@ export function Books() {
   const { notify, toastNode } = useToast();
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   // R5-C: pack tabs show only with their pack on (one opened by URL stays listed while shown).
-  const shown = useMemo(() => visibleTabs(TABS, localDb.settings.get(), tab), [tab]);
+  const shown = useMemo(() => visiblePackTabs(TABS, localDb.settings.get(), tab), [tab]);
   const { can } = useCan();
   const openParam = params.get('open');
   const wizard = openParam === 'yearend' && can('books.edit') ? 'yearend' : openParam === 'tally' && can('data.restore') ? 'tally' : null;

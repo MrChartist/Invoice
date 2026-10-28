@@ -74,6 +74,7 @@ export default defineConfig({
             safeFamilyGroup(graph, 'f-prof', familyRe('prof', 'prof-rules', 'prof-r14'), 12),
             safeFamilyGroup(graph, 'f-travel', familyRe('travel', 'travel-rules', 'travel-r15'), 12),
             safeFamilyGroup(graph, 'f-manpower', familyRe('manpower', 'manpower-rules', 'manpower-r17', 'mp-registry'), 12), // R17-A: the registry stays a lazy leaf (sync / recycle bin)
+            safeFamilyGroup(graph, 'f-society', familyRe('society', 'society-rules', 'society-r18', 'hs-registry'), 12), // R18-A: the registry stays a lazy leaf (sync / recycle bin)
             // R16-A2: small lazy src/lib leaves (imports all first-paint / vendor) in one chunk.
             leafGroup(graph, 'lazy-leaves', 9, { maxModuleSize: 3000 }),
           ],

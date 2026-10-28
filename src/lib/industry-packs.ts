@@ -34,7 +34,9 @@ export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit
   // R15 (R15-B1): travel / events packs (one desk tab on /time; switched on by the travel profile, never by a type)
   | 'travel' | 'events'
   // R17 (R17-A1): manpower packs (one desk tab `deploy` on /time; switched on by the manpower profile, never by a type)
-  | 'manpower' | 'security';
+  | 'manpower' | 'security'
+  // R18 (R18-A1): the housing-society pack (one desk tab `society` on /recurring; switched on by the society profile, never by a type)
+  | 'society';
 
 export const PACK_IDS: readonly PackId[] = [
   'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
@@ -48,6 +50,7 @@ export const PACK_IDS: readonly PackId[] = [
   'practice', 'cafirm', 'legal', 'design', 'media', 'svcexport', 'partners', // R14 (PS-A1)
   'travel', 'events', // R15 (R15-B1)
   'manpower', 'security', // R17 (R17-A1)
+  'society', // R18 (R18-A1)
 ];
 
 /** The packs a business type implies when `industry_packs` is absent. */
@@ -111,8 +114,8 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'fees', path: '/recurring?tab=fees', labelKey: 'tab.fees' },
   { pack: 'leases', path: '/recurring?tab=leases', labelKey: 'tab.leases' },
   { pack: 'nonprofit', path: '/receivables?tab=donations', labelKey: 'tab.donations' },
-  { pack: 'nonprofit', path: '/books?tab=funds', labelKey: 'tab.funds' },
-  { pack: 'fees', alsoPacks: ['nonprofit', 'leases', 'hotel', 'clinic', 'salon', 'fitness'], path: '/gst-reports?tab=common-credit', labelKey: 'tab.commonCredit' }, // R10 (SV-A4): + clinic / salon / fitness
+  { pack: 'nonprofit', alsoPacks: ['society'], path: '/books?tab=funds', labelKey: 'tab.funds' }, // R18-A: + society
+  { pack: 'fees', alsoPacks: ['nonprofit', 'leases', 'hotel', 'clinic', 'salon', 'fitness', 'society'], path: '/gst-reports?tab=common-credit', labelKey: 'tab.commonCredit' }, // R10 (SV-A4): + clinic / salon / fitness; R18-A: + society
   // R5-B: transport (Distribution → Transport) and works contracts (Time → Works); labels in `packs-transport-works-r5.ts`
   { pack: 'transport', path: '/distribution?tab=transport', labelKey: 'tab.transport' },
   { pack: 'transport', path: '/distribution?tab=transport&view=trips', labelKey: 'view.trips' },
@@ -356,6 +359,10 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'manpower', alsoPacks: ['security'], path: '/time?tab=deploy&view=profit', labelKey: 'r17.deploy.profit' },
   // R17-D
   { pack: 'manpower', alsoPacks: ['security'], path: '/time?tab=deploy&view=statutory', labelKey: 'r17.deploy.statutory' },
+  // R18: the Society desk on /recurring (A writes units / heads; B–D add bills, gst, dues, funds, registers — labels `r18.*`)
+  { pack: 'society', path: '/recurring?tab=society', labelKey: 'r18.society' },
+  { pack: 'society', path: '/recurring?tab=society&view=units', labelKey: 'r18.society.units' },
+  { pack: 'society', path: '/recurring?tab=society&view=heads', labelKey: 'r18.society.heads' },
 ];
 
 /**

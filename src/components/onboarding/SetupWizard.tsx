@@ -25,6 +25,9 @@ import { TRAVEL_LANDING, applyTravelKind, isTravelKind, type TravelKindId } from
 import { TravelKindPicker } from '../travel/TravelKindPicker';
 import { MANPOWER_LANDING, applyManpowerKind, isManpowerKind, type ManpowerKindId } from '../../lib/shop-presets'; // R17-A1
 import { ManpowerKindPicker } from '../manpower/ManpowerKindPicker';
+import { societyLanding, applySocietyKind, isSocietyKind, type SocietyKindId } from '../../lib/shop-presets'; // R18-A1
+import { SocietyKindPicker } from '../society/SocietyKindPicker';
+import { hsPickT } from '../../i18n/areas/society-r18a-pick';
 import type { ProfIds } from '../../lib/prof/ps-profile';
 import { normalizeUdyam, validateUdyam } from '../../lib/msme';
 import { activePacks } from '../../lib/industry-packs';
@@ -117,10 +120,14 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
     if (p?.type) setBusiness(p.type);
     if (p?.templateId) setA((prev) => ({ ...prev, templateId: p.templateId! }));
   };
+  // R18-A1: the "Housing society / apartment association / RWA" card is not a business type: its kind writes one.
+  const [hsOn, setHsOn] = useState(() => isSocietyKind(localDb.settings.get().society_kind));
+  const [hsKind, setHsKind] = useState<SocietyKindId | ''>(() => (isSocietyKind(localDb.settings.get().society_kind) ? (localDb.settings.get().society_kind as SocietyKindId) : ''));
   const { lang } = useT();
   const pickBusiness = (b: BusinessType) => {
     setAgOn(false); // R12
     setMfOn(false); // R13
+    setHsOn(false); // R18
     setBusiness(b);
     // The design follows the business type until the user picks one on the last step.
     set({ templateId: BUSINESS_DEFAULTS[b].templateId });
@@ -154,13 +161,14 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
     if (problem) return setError(problem);
     if (!last) return setStep((s) => s + 1);
     try {
-      const mfg = mfOn && mfKind ? mfKind : null; // R13 (MF-A1): the manufacturing profile, like the agri card
-      const agri = !mfg && agOn && agKind ? agKind : null; // R12 (AG-A1): the agri profile wins over the type's own picker
+      const soc = hsOn && hsKind ? hsKind : null; // R18-A1: the society profile, like the agri / manufacturing cards
+      const mfg = !soc && mfOn && mfKind ? mfKind : null; // R13 (MF-A1): the manufacturing profile, like the agri card
+      const agri = !soc && !mfg && agOn && agKind ? agKind : null; // R12 (AG-A1): the agri profile wins over the type's own picker
       if (mfg && mfUdyam.no.trim() && validateUdyam(mfUdyam.no)) return setError(validateUdyam(mfUdyam.no));
-      const trade = !agri && !mfg && business === 'wholesale' && tradeKind ? tradeKind : null; // R8-C
-      const retail = !agri && !mfg && business === 'kirana' && retailKind ? retailKind : null; // R9 (RT-A1)
-      const cons = !agri && !mfg && business === 'contractor' && cnKind ? cnKind : null; // R11 (CN-A1)
-      const svc = !agri && !mfg && business === 'services' && svKind ? svKind : null; // R10 (SV-A1)
+      const trade = !soc && !agri && !mfg && business === 'wholesale' && tradeKind ? tradeKind : null; // R8-C
+      const retail = !soc && !agri && !mfg && business === 'kirana' && retailKind ? retailKind : null; // R9 (RT-A1)
+      const cons = !soc && !agri && !mfg && business === 'contractor' && cnKind ? cnKind : null; // R11 (CN-A1)
+      const svc = !soc && !agri && !mfg && business === 'services' && svKind ? svKind : null; // R10 (SV-A1)
       const prof = svc === 'professional' && pfKind ? pfKind : null; // R14 (PS-A1)
       const travel = svc === 'travel' && tvKind ? tvKind : null; // R15-B1
       const manpower = svc === 'manpower' && mpKind ? mpKind : null; // R17-A1
@@ -174,6 +182,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
         ...(manpower ? applyManpowerKind(manpower, { registered: a.gstRegistered, currentPacks: activePacks(localDb.settings.get()) }) : {}),
         ...(prof ? { ...applyProfKind(prof, { registered: a.gstRegistered, sub: pfSub, firmForm: pfForm, currentPacks: activePacks(localDb.settings.get()) }), defaultDueDays: PROF_PROFILES[prof].defaultDueDays } : {}),
         ...(agri ? { ...applyAgriKind(agri, { registered: a.gstRegistered, mill_kind: agMill, currentPacks: activePacks(localDb.settings.get()) }), ...(AGRI_PROFILES[agri].defaultDueDays !== undefined ? { defaultDueDays: AGRI_PROFILES[agri].defaultDueDays } : {}) } : {}),
+        ...(soc ? applySocietyKind(soc, { registered: a.gstRegistered, currentPacks: Array.isArray(localDb.settings.get().industry_packs) ? activePacks(localDb.settings.get()) : [] }) : {}),
         ...(mfg ? { ...applyMfgKind(mfg, { registered: a.gstRegistered, sub: mfSub, currentPacks: activePacks(localDb.settings.get()) }), ...(MFG_PROFILES[mfg].defaultDueDays !== undefined ? { defaultDueDays: MFG_PROFILES[mfg].defaultDueDays } : {}) } : {}),
       };
       // R13 (MF-A1): the Udyam number and category go on the active sender profile (snapshotted on every document).
@@ -189,7 +198,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
       if (retail) void import('../../lib/retail/rt-profile').then((m) => m.applyRetailSwitches(retail)).catch(() => undefined);
       window.dispatchEvent(new Event(SHOP_MODE_EVENT));
       localDb.template.set(a.templateId);
-      onClose(mfg ? MFG_PROFILES[mfg].landing : agri ? AGRI_PROFILES[agri].landing : trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : prof ? PROF_PROFILES[prof].landing : travel ? TRAVEL_LANDING[travel] : manpower ? MANPOWER_LANDING[manpower] : svc ? SERVICE_PROFILES[svc].landing : BUSINESS_DEFAULTS[business].landing);
+      onClose(soc ? societyLanding(soc) : mfg ? MFG_PROFILES[mfg].landing : agri ? AGRI_PROFILES[agri].landing : trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : prof ? PROF_PROFILES[prof].landing : travel ? TRAVEL_LANDING[travel] : manpower ? MANPOWER_LANDING[manpower] : svc ? SERVICE_PROFILES[svc].landing : BUSINESS_DEFAULTS[business].landing);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -285,22 +294,33 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
             <p className={controls.hint}>{reachT('shopLede')}</p>
             <div className={styles.shopGrid} role="radiogroup" aria-label={reachT('title.shop')}>
               {BUSINESS_TYPES.map((b) => (
-                <button key={b} type="button" role="radio" aria-checked={business === b && !agOn && !mfOn} className={styles.shopCard} onClick={() => pickBusiness(b)}>
+                <button key={b} type="button" role="radio" aria-checked={business === b && !agOn && !mfOn && !hsOn} className={styles.shopCard} onClick={() => pickBusiness(b)}>
                   <strong>{reachT(`type.${b}`)}</strong>
                   <span>{reachT(`hint.${b}`)}</span>
                 </button>
               ))}
               {/* R12 (AG-A1): not a business type — its kind writes one */}
-              <button type="button" role="radio" aria-checked={agOn} className={styles.shopCard} onClick={() => { setAgOn(true); setMfOn(false); }} data-wizard-agri-card>
+              <button type="button" role="radio" aria-checked={agOn} className={styles.shopCard} onClick={() => { setAgOn(true); setMfOn(false); setHsOn(false); }} data-wizard-agri-card>
                 <strong>{agPickT('card')}</strong>
                 <span>{agPickT('cardHint')}</span>
               </button>
               {/* R13 (MF-A1): not a business type — its kind writes `manufacturer` */}
-              <button type="button" role="radio" aria-checked={mfOn} className={styles.shopCard} onClick={() => { setMfOn(true); setAgOn(false); }} data-wizard-mfg-card>
+              <button type="button" role="radio" aria-checked={mfOn} className={styles.shopCard} onClick={() => { setMfOn(true); setAgOn(false); setHsOn(false); }} data-wizard-mfg-card>
                 <strong>{mfPickT('card')}</strong>
                 <span>{mfPickT('cardHint')}</span>
               </button>
+              {/* R18-A1: not a business type — its kind writes `nonprofit` (or `services` for an agency) */}
+              <button type="button" role="radio" aria-checked={hsOn} className={styles.shopCard} onClick={() => { setHsOn(true); setAgOn(false); setMfOn(false); }}>
+                <strong>{hsPickT('card')}</strong>
+                <span>{hsPickT('cardHint')}</span>
+              </button>
             </div>
+            {hsOn && (
+              <div className={controls.field}>
+                <span className={controls.label}>{hsPickT('title')}</span>
+                <SocietyKindPicker value={hsKind} onPick={setHsKind} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
+              </div>
+            )}
             {mfOn && (
               <div className={controls.field} data-wizard-mfg>
                 <span className={controls.label}>{mfPickT('title')}</span>
@@ -315,28 +335,28 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
                 <AgriKindPicker value={agKind} onPick={pickAgri} mill={agMill} onMill={setAgMill} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
               </div>
             )}
-            {!agOn && !mfOn && business === 'wholesale' && (
+            {!agOn && !mfOn && !hsOn && business === 'wholesale' && (
               <div className={controls.field} data-wizard-trade>
                 <span className={controls.label}>{trT('tradeTitle')}</span>
                 <span className={controls.hint}>{trT('tradeLede')}</span>
                 <TradeKindPicker value={tradeKind} onPick={setTradeKind} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
               </div>
             )}
-            {!agOn && !mfOn && business === 'kirana' && (
+            {!agOn && !mfOn && !hsOn && business === 'kirana' && (
               <div className={controls.field} data-wizard-retail>
                 <span className={controls.label}>{pickT('retailTitle')}</span>
                 <span className={controls.hint}>{pickT('retailLede')}</span>
                 <RetailKindPicker value={retailKind} onPick={pickRetail} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
               </div>
             )}
-            {!agOn && !mfOn && business === 'contractor' && (
+            {!agOn && !mfOn && !hsOn && business === 'contractor' && (
               <div className={controls.field} data-wizard-construction>
                 <span className={controls.label}>{cnPickT('title')}</span>
                 <span className={controls.hint}>{cnPickT('lede')}</span>
                 <ConstructionKindPicker value={cnKind} onPick={pickConstruction} government={cnGov} onGovernment={setCnGov} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
               </div>
             )}
-            {!agOn && !mfOn && business === 'services' && (
+            {!agOn && !mfOn && !hsOn && business === 'services' && (
               <div className={controls.field} data-wizard-service>
                 <span className={controls.label}>{svPickT('title')}</span>
                 <span className={controls.hint}>{svPickT('lede')}</span>
