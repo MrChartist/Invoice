@@ -13,13 +13,16 @@ import { invT } from '../../i18n/areas/inventory';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
 import { EditLogButton } from '../audit/EditLogButton';
-import { catalogueEntryFor, setStockShortCode } from '../../lib/catalog';
+import { catalogueEntryFor, setStockItemFields, setStockShortCode } from '../../lib/catalog';
+import { CustomFieldInputs } from '../custom-fields/CustomFieldInputs';
+import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
 import { retailT } from '../../i18n/areas/retail';
 import { impliedPacks } from '../../lib/shop-mode';
 import { localDb } from '../../lib/localDb';
 
 const LeadTimeRow = lazy(() => import('../mfg/LeadTimeRow')); // R13 MF-A4: lead / make days (shopfloor pack)
 const PackSizeRow = lazy(() => import('../agri/PackSizeRow')); // R12 AG-C4: agri class, pack size, labelled (mill / agri pack)
+const ServiceRecipeRow = lazy(() => import('../services-r10/ServiceRecipeRow')); // R10 SV-C4 (PENDING #21): products used per service
 
 export interface ItemFormModalProps {
   open: boolean;
@@ -77,10 +80,15 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
   const [lead, setLead] = useState<Pick<StockItem, 'lead_days' | 'make_days'>>(() => ({ lead_days: item.lead_days, make_days: item.make_days })); // R13 MF-A4
   const [mfOn] = useState(() => impliedPacks(localDb.settings.get()).includes('shopfloor') || item.lead_days !== undefined || item.make_days !== undefined);
   const [agOn] = useState(() => impliedPacks(localDb.settings.get()).some((p) => p === 'mill' || p === 'agri') || !!(item.ag_class || item.ag_pack_kg));
+  // R10 SV-C4 (PENDING #21): products used per service, with a services pack (or an item already a kit).
+  const [svOn] = useState(() => impliedPacks(localDb.settings.get()).some((p) => p === 'salon' || p === 'fitness' || p === 'clinic' || p === 'workshop') || !!item.kit);
+  const [recipe, setRecipe] = useState<{ lines: unknown[]; problem: string; commit: (itemId: string) => void } | null>(null);
   const uid = useId();
   // QA-3 F24: the counter short code lives on the catalogue entry of the same name; it is edited here too.
   const [shortCode, setShortCode] = useState(() => catalogueEntryFor(item.name)?.short_code ?? '');
   const [shortError, setShortError] = useState('');
+  // 6.23 (PENDING #25): item custom fields live on the catalogue entry of the same name, edited here too.
+  const [itemFields, setItemFields] = useState(() => catalogueEntryFor(item.name)?.custom_fields);
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((p) => ({ ...p, [k]: v }));
   const name = d.name.trim();
@@ -102,13 +110,18 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
   const serialItem = d.track_stock && d.track_serials;
   const altList = serialItem ? [] : d.masters.alt.map((a) => ({ unit: a.unit, factor: num(a.factor) }));
   const mastersError = validateAltUnits(altList, d.unit) || validatePriceList(d.masters.costs) || validatePriceList(d.masters.prices);
-  const valid = !nameError && !negative && !taxBad && !serialError && !mastersError && num(d.warranty_months) >= 0;
+  const valid = !nameError && !negative && !taxBad && !serialError && !mastersError && num(d.warranty_months) >= 0 && !recipe?.problem;
 
   const submit = () => {
     setTouched(true);
     if (!valid) return;
     const sc = setStockShortCode({ name, hsn: d.hsn, unit: d.unit, sale_rate: d.sale_rate === '' ? undefined : num(d.sale_rate), tax_rate: d.tax_rate === '' ? undefined : num(d.tax_rate) }, shortCode);
     if (!sc.ok) return setShortError(sc.error.message);
+    try {
+      setStockItemFields({ name, hsn: d.hsn, unit: d.unit, sale_rate: d.sale_rate === '' ? undefined : num(d.sale_rate), tax_rate: d.tax_rate === '' ? undefined : num(d.tax_rate) }, cleanValueMap(itemFields, customFieldsDb.all()));
+    } catch (err) {
+      return setShortError((err as Error).message);
+    }
     onSave({
       ...item,
       name,
@@ -138,7 +151,16 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
       sold_by_weight_bags: d.sold_by_weight_bags || undefined, // R8-B
       ...(mfOn ? { lead_days: lead.lead_days, make_days: lead.make_days } : {}), // R13 MF-A4
       ...(agOn ? { ag_class: ag.ag_class || undefined, ag_pack_kg: ag.ag_pack_kg && ag.ag_pack_kg > 0 ? ag.ag_pack_kg : undefined, ag_labelled: ag.ag_labelled || undefined } : {}), // R12 AG-C4
+      // R10 SV-C4: a service with products used is a kit (not stock itself); an emptied list switches the kit off.
+      ...(recipe ? (recipe.lines.length ? { kit: true, track_stock: false } : { kit: undefined }) : {}),
     });
+    if (recipe?.lines.length) {
+      try {
+        recipe.commit(item.id);
+      } catch (err) {
+        window.alert((err as Error).message);
+      }
+    }
   };
 
   return (
@@ -284,6 +306,9 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
         {weighOn && <label className={controls.check}><input type="checkbox" checked={d.sold_by_weight_bags} onChange={(e) => set('sold_by_weight_bags', e.target.checked)} data-sold-by-weight /> {invT('soldByWeight')}</label>}
         {mfOn && d.track_stock && <Suspense fallback={null}><LeadTimeRow value={lead} onChange={setLead} /></Suspense>}
         {agOn && <Suspense fallback={null}><PackSizeRow value={ag} unit={d.unit} onChange={setAg} /></Suspense>}
+        {svOn && <Suspense fallback={null}><ServiceRecipeRow item={item} onChange={setRecipe} /></Suspense>}
+        {touched && recipe?.problem && <span className={controls.error} role="alert">{recipe.problem}</span>}
+        <CustomFieldInputs scope="item" idPrefix={`${uid}-item`} value={itemFields} onChange={setItemFields} />
         <MastersFields
           draft={d.masters}
           onChange={(m) => set('masters', m)}

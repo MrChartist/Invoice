@@ -21,7 +21,7 @@ import { requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
 import { generateId, getTable, setTable } from '../storage';
 import { withTablesRollback } from '../table-txn';
-import { A, chartOf, loadUserAccounts, saveUserAccount, type GroupId } from '../ledger/accounts';
+import { A, chartOf, loadUserAccounts, saveUserAccount, type Account, type GroupId } from '../ledger/accounts';
 import { saveVoucher, type ManualVoucherLine } from '../ledger/vouchers';
 import { INCENTIVE_RULES } from '../mfg-rules';
 
@@ -76,6 +76,11 @@ export function ensureGrantLedger(which: keyof typeof GRANT_LEDGERS): string {
   let code: number = spec.code;
   while (codes.has(String(code))) code++;
   return saveUserAccount({ code: String(code), name: spec.name, group: spec.group }).id;
+}
+
+/** Ledgers a capital grant may reduce (PENDING #17): the fixed-asset ledgers, accumulated depreciation left out. */
+export function grantAssetLedgers(): Account[] {
+  return chartOf(loadUserAccounts()).filter((a) => a.group === 'FIXED_ASSETS' && a.id !== A.accDep);
 }
 
 /* ── Maths (pure) ─────────────────────────────────────────────── */
@@ -151,9 +156,13 @@ export const incentiveClaimsDb = {
     if (prev) assertUnlocked({ issue_date: prev.period_to }, 'edit');
     assertUnlocked({ issue_date: input.period_to }, prev ? 'edit' : 'create');
     if (prev?.recognised_on && (input.kind !== prev.kind || round2(num(input.approved) || num(input.claimed)) !== round2(num(prev.approved) || num(prev.claimed)))) throw new Error('This claim is recognised in the books — its amount and kind can no longer change.');
+    // The asset ledger applies to a capital grant only; it must be a fixed-asset ledger.
+    const asset = input.kind === 'capital' ? input.asset_account_id || undefined : undefined;
+    if (asset && !grantAssetLedgers().some((a) => a.id === asset)) throw new Error('Pick a fixed-asset ledger for the capital grant.');
+    if (prev?.recognised_on && asset !== (prev.asset_account_id || undefined)) throw new Error('This claim is recognised in the books — its asset ledger can no longer change.');
     const now = new Date().toISOString();
     const row: IncentiveClaim = {
-      ...prev, ...input, id: prev?.id ?? generateId(), claimed: round2(num(input.claimed)),
+      ...prev, ...input, asset_account_id: asset, id: prev?.id ?? generateId(), claimed: round2(num(input.claimed)),
       // Recognition and receipt are set only by their own actions.
       recognised_on: prev?.recognised_on, recognised: prev?.recognised, received: prev?.received, received_on: prev?.received_on,
       voucher_ids: prev?.voucher_ids ?? [], created_at: prev?.created_at ?? now, updated_at: now,

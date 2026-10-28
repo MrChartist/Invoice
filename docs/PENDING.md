@@ -57,17 +57,17 @@ figure, blocks a workflow or makes a vertical unusable at scale · **M** missing
 
 | # | Item | Impact | Size | Source |
 |---|---|---|---|---|
-| 16 | Job Work In service invoice: suggest the job-charges class from `TEXTILE_CLASS_RULES` (R16 "left as found") | L | S | `mfg-r13.md` MF-C |
-| 17 | Capital-grant form: make `asset_account_id` pickable (default is capital-subsidy reserve, MF63) | L | S | `mfg-r13.md` MF-D |
-| 18 | Vendor / client form "Farmer" section (farmers edited only on Farm → Farmers) | L | S | `agri-r12.md` AG-A |
-| 19 | Dairy analyser profile row in POS device settings (set on Dairy → Collection today) | L | S | `agri-r12.md` AG-B |
-| 20 | Services: package-income deferral journal (`defer_package_income`, report only today) | M | M | `services-r10.md` SV-C |
-| 21 | Services: class bookings per occurrence; camera QR check-in; "products used per service" on the item form; staff-required block on POS | M | M | `services-r10.md` SV-A / SV-C |
-| 22 | Construction "settings switches" form (R16 "left as found") | L | S | `construction-r11.md` |
-| 23 | Apparel size grid on PO / GRN editors | L | S | [`features/retail-r9.md`](features/retail-r9.md) |
-| 24 | Discoverability §7 Q6: move samples already loaded into a real company to a Demo company | L | M | [`features/discoverability-r6.md`](features/discoverability-r6.md) |
-| 25 | Custom fields on purchase bills / expenses / recurring templates; item fields per line and in the stock-item modal | L | M | [`features/attachments-custom-fields.md`](features/attachments-custom-fields.md) |
-| 26 | Netting by a clerk is refused, not queued (`approvals.ts` holds documents only) | L | M | `travel-r15.md` R15-A3 |
+| 16 | **Done** (`mfg/mf-jw-class.ts`, class picker on the job charges invoice) — Job Work In service invoice: suggest the job-charges class from `TEXTILE_CLASS_RULES` (R16 "left as found") | L | S | `mfg-r13.md` MF-C |
+| 17 | **Done** (Statutory → Incentives: "Credit (capital grant)" picker of fixed-asset ledgers, `grantAssetLedgers`) — Capital-grant form: make `asset_account_id` pickable (default is capital-subsidy reserve, MF63) | L | S | `mfg-r13.md` MF-D |
+| 18 | **Done** (lazy `agri/FarmerPartyRow.tsx` + `agri/ag-party-form.ts` on both forms) — Vendor / client form "Farmer" section (farmers edited only on Farm → Farmers) | L | S | `agri-r12.md` AG-A |
+| 19 | **Done** (POS → Counter settings → Scale tab, dairy pack; strings in `retail`, no dairy chunk split) — Dairy analyser profile row in POS device settings (set on Dairy → Collection today) | L | S | `agri-r12.md` AG-B |
+| 20 | **Done** (`services/sv-deferral.ts`, switch + monthly journal on Time → Members) — Services: package-income deferral journal (`defer_package_income`, report only today) | M | M | `services-r10.md` SV-C |
+| 21 | **Done** (`sv-class-bookings.ts`, camera check-in via the existing BarcodeDetector scanner, `ServiceRecipeRow` on the stock-item form, `linesWithoutStaff` block on POS) — Services: class bookings per occurrence; camera QR check-in; "products used per service" on the item form; staff-required block on POS | M | M | `services-r10.md` SV-A / SV-C |
+| 22 | **Done** (lazy `construction/ConstructionSettingsForm.tsx` under the picker, `constructionFormPatch`) — Construction "settings switches" form (R16 "left as found") | L | S | `construction-r11.md` |
+| 23 | **Done** (one shared lazy `purchases/SizeGridSlot.tsx` in bill, PO and GRN) — Apparel size grid on PO / GRN editors | L | S | [`features/retail-r9.md`](features/retail-r9.md) |
+| 24 | **Done** (`moveSamplesToDemo` in `onboarding/demo-company.ts`, "Move them to the Demo company" beside "Remove sample data"; refuses rather than guesses) — Discoverability §7 Q6: move samples already loaded into a real company to a Demo company | L | M | [`features/discoverability-r6.md`](features/discoverability-r6.md) |
+| 25 | **Done** (`custom-fields/SnapshotFields.tsx` on bill / expense / recurring editor, lazy `LineFields` per line, `setStockItemFields` in the stock-item form) — Custom fields on purchase bills / expenses / recurring templates; item fields per line and in the stock-item modal | L | M | [`features/attachments-custom-fields.md`](features/attachments-custom-fields.md) |
+| 26 | **Skipped — `approvals.ts` cannot hold it cleanly** (see `travel-r15.md` A3 deviations: its queue is the invoices' own `approval` state, a netting is a set of receipts across invoices and bills; queueing needs a new synced / backed-up request table and a re-check at approval time). The clerk's refusal stays — Netting by a clerk is refused, not queued (`approvals.ts` holds documents only) | L | M | `travel-r15.md` R15-A3 |
 
 ### 2.3 Data-layer and accounting follow-ups
 

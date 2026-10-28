@@ -29,6 +29,14 @@ export function withStaff<T extends Pick<InvoiceItem, 'sv'>>(line: T, staff: Sta
 
 export const isTipLine = (l: Pick<InvoiceItem, 'sv'> | undefined): boolean => !!l?.sv?.tip;
 
+/**
+ * "Staff required on service lines" (`service_settings.staff_required`, PENDING #21): the service lines still without a
+ * staff member (tips, free items and modifiers left out). Empty = the bill may be saved.
+ */
+export function linesWithoutStaff(items: readonly InvoiceItem[]): InvoiceItem[] {
+  return items.filter((l) => l.type === 'Service' && !isTipLine(l) && !l.free_of && !l.modifier_of && !l.sv?.staff_id);
+}
+
 /** A tip line for `staff` (0%, non-GST, never discounted). */
 export function tipLine(staff: Staff, amount: number): InvoiceItem {
   const a = round2(Math.max(Number(amount) || 0, 0));

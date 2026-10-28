@@ -6,7 +6,7 @@ import { resetStorage } from './helpers/shim.ts';
 import { installSettings } from './helpers/world.ts';
 import { loadVouchers } from '../src/lib/ledger/index.ts';
 import { chartOf, loadUserAccounts } from '../src/lib/ledger/accounts.ts';
-import { claimFigures, incentiveClaimsDb, pendingClaims, receiveClaim, recogniseClaim, recognitionLines, suggestedClaim } from '../src/lib/mfg/mf-incentives.ts';
+import { claimFigures, grantAssetLedgers, incentiveClaimsDb, pendingClaims, receiveClaim, recogniseClaim, recognitionLines, suggestedClaim } from '../src/lib/mfg/mf-incentives.ts';
 
 beforeEach(() => {
   resetStorage();
@@ -46,4 +46,19 @@ test('bell: pending more than 180 days after the claim', () => {
   assert.equal(pendingClaims([c], '2026-09-27').length, 0);
   assert.equal(pendingClaims([c], '2026-09-28').length, 1);
   assert.equal(pendingClaims([{ ...c, claimed_on: '2026-06-01' }], '2026-09-28').length, 0);
+});
+
+test('PENDING #17: a capital grant credits the fixed-asset ledger picked on the form', () => {
+  const ledgers = grantAssetLedgers();
+  assert.ok(ledgers.some((a) => a.name === 'Plant & machinery'));
+  assert.ok(!ledgers.some((a) => a.name === 'Accumulated depreciation'), 'accumulated depreciation is not offered');
+  const plant = ledgers.find((a) => a.name === 'Plant & machinery')!;
+  const base = { scheme: 'state_capital', name: 'Capital subsidy on press', period_from: '2025-04-01', period_to: '2025-12-31', claimed: 500000, kind: 'capital' } as const;
+  assert.throws(() => incentiveClaimsDb.save({ ...base, asset_account_id: 'sales' }), /fixed-asset ledger/);
+  const inc = incentiveClaimsDb.save({ ...base, kind: 'income', asset_account_id: plant.id });
+  assert.equal(inc.asset_account_id, undefined, 'an income grant keeps no asset ledger');
+  const c = incentiveClaimsDb.save({ ...base, asset_account_id: plant.id });
+  recogniseClaim(c.id, '2026-02-01');
+  assert.equal(nameOf(loadVouchers()[0].lines[1].account_id), 'Plant & machinery');
+  assert.throws(() => incentiveClaimsDb.save({ ...incentiveClaimsDb.all().find((r) => r.id === c.id)!, asset_account_id: undefined }), /asset ledger/);
 });

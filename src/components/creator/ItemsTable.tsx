@@ -52,7 +52,9 @@ const TravelRows = lazy(() => import('../travel/TravelRows')); // R15-B3 trip an
 const ManpowerRows = lazy(() => import('../manpower/ManpowerRows')); // R17-A3 site, month and GST regime
 const AgEwayHint = lazy(() => import('../agri/AgEwayHint')); // PENDING 10 (AG-C4-4) e-Way hint
 const RedeemChip = lazy(() => import('../services-r10/SvRedeem').then((m) => ({ default: m.RedeemChip }))); // R10 (SV-C1) "Use package"
+const LineFields = lazy(() => import('../custom-fields/LineFields')); // 6.23 (PENDING #25): item custom fields per line
 import { impliedPacks } from '../../lib/shop-mode';
+import { customFieldsDb, fieldsFor } from '../../lib/custom-fields';
 import styles from './ItemsTable.module.css';
 
 export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) => void }) {
@@ -74,6 +76,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const legalOn = useMemo(() => (impliedPacks(localDb.settings.get()) as string[]).includes('legal'), []); // R14 (PS-B2)
   const travelOn = useMemo(() => (impliedPacks(localDb.settings.get()) as string[]).some((p) => p === 'travel' || p === 'events'), []); // R15-B3
   const manpowerOn = useMemo(() => (impliedPacks(localDb.settings.get()) as string[]).some((p) => p === 'manpower' || p === 'security'), []); // R17-A3
+  const itemFieldsOn = useMemo(() => fieldsFor(customFieldsDb.all(), 'item').length > 0, []); // 6.23 (PENDING #25)
   const agriOn = useMemo(() => ((s) => !!s.agri_kind || !!s.mill_kind || (impliedPacks(s) as string[]).some((p) => ['agri', 'dairy', 'mill', 'coldstore', 'agri_inputs', 'fpo'].includes(p)))(localDb.settings.get()), []); // PENDING 10 (AG-C4-4)
   const svOn = useMemo(() => ((s) => !!s.service_kind || impliedPacks(s).some((p) => p === 'clinic' || p === 'salon' || p === 'fitness' || p === 'workshop'))(localDb.settings.get()), []); // R10 (SV-A)
   // Batch / serial / godown pickers (null for simple users: nothing tracked, one godown).
@@ -212,11 +215,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                     {item.free_of ? 'Free (scheme)' : `${item.price_basis} price`}
                   </div>
                 ) : null}
-                {item.custom_values?.length ? (
-                  <div className={styles.customLine} title="Item details from the catalogue">
-                    {item.custom_values.map((v) => `${v.label}: ${v.value}`).join(' · ')}
-                  </div>
-                ) : null}
+                {(itemFieldsOn || !!item.custom_values?.length) && <Suspense fallback={null}><LineFields item={item} index={index} /></Suspense>}
                 {stockCtx && <LineTracking item={item} index={index} ctx={stockCtx} />}
                 {/* QA8 T16: a saved line that carries the snapshot keeps its reconciler even with the pack off. */}
                 {(tradeOn || !!item.disc_chain?.length || !!item.disc_per_unit) && priced && <Suspense fallback={null}><LineDiscountCell item={item} index={index} /></Suspense>}

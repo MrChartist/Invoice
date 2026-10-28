@@ -62,8 +62,11 @@ with your CA. One section per package; each package edits only its own section a
 - **Farmer import**: the Farmers view imports CSV through `csv.ts` `parseTable` with its own column mapping
   (`farmersFromRows`) instead of a new entity in the generic import wizard (whose schemas / appliers would need a new
   kind); XLSX: save as CSV.
-- **Vendor / client form "Farmer" section** not added: farmers are created and edited on Farm → Farmers (the vendor form
-  keeps working for their ordinary fields).
+- **Vendor / client form "Farmer" section** (PENDING #18): a lazy row (`components/agri/FarmerPartyRow.tsx`, shown when an
+  agri pack is on or the party already has `ag`) with "This party is a farmer", code (next `F-` code on tick), village,
+  member no., Aadhaar last 4, KCC, UPI and member. `agri/ag-party-form.ts` `farmerPatch` cleans through `cleanParty` (other
+  `ag` fields such as centre, bank, crops are kept) and sets `principal_kind: 'agriculturist'` on a vendor; unticking
+  removes `ag` (and that kind). Centres, bank and crops are still edited on Farm → Farmers.
 - **Bonus / price-difference run** is a CSV working (`bonusRun`); the draft journal is entered by the user (AG38).
 - **Charges paid by us** are a memo on the voucher (booked separately), recovered ones a less-line (AG34, AG35).
 - **AgriBlock on the GST layout** sits just before the GST grid (the GST grid owns its party panel); on the other layouts
@@ -135,9 +138,11 @@ HSN 0401, class `milk_fresh`), CLR, tolerance, bill basis, WhatsApp-per-can swit
 
 - **One chunk, not a sub-chunk per view**: the desk, its six views, engines and strings load as ONE lazy chunk (gzip
   shares their vocabulary: ≈ 6 kB less than a chunk per view), the R9 `JewelleryDesk` pattern.
-- **Device settings row not added**: a lazy analyser row in the POS device settings (`RetailSettings.tsx`) split the
-  dairy strings into a second chunk (+6.6 kB); the analyser profile is set on Dairy → Collection instead (same
-  device-local key).
+- **Device settings row** (PENDING #19): the POS counter settings (`RetailSettings.tsx`, Scale tab) show a "Milk analyser
+  (this device)" block when the dairy pack is on — format, field order, separator, divisor, baud — saved with the
+  counter settings to the same device-local key as Dairy → Collection. A lazy row importing `AnalyserSetup` split the
+  dairy strings into a second chunk (+6.6 kB), so the block uses seven `retail` strings and imports only
+  `ag-analyser.ts` (whose one import, `scale-barcode`, the settings already load).
 - **Slips print as HTML** (58 / 80 mm page) through the print dialog, not through the ESC/POS byte path.
 - **Shift stock journal written directly** (`milkJournal` in `ag-shifts.ts`: role `books.edit`, period lock, `SJ`
   series, audit): `stockJournalsDb.save` requires a source line and a shift receipt has none. Closing a shift therefore

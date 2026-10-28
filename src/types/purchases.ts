@@ -1,4 +1,5 @@
 import type { AttachmentRef } from './attachments';
+import type { CustomFieldValue } from './custom-fields';
 
 /**
  * Shared shapes for the purchase / expense side of the books.
@@ -179,6 +180,8 @@ export interface PurchaseRecord {
   cost_centre_id?: string;
   /** Additive (6.12): receipt photos / PDFs (see src/lib/attachments.ts). Ignored by every report. */
   attachments?: AttachmentRef[];
+  /** Additive (6.23, PENDING #25): document custom fields, a snapshot (label + value + print) as on invoices. */
+  custom_values?: CustomFieldValue[];
   /* ── TDS deducted by us (Tally parity) — additive, all optional; absent = no TDS ── */
   /** Section code (`TDS_PAYABLE_SECTIONS` in src/lib/tds-rules.ts), e.g. `194J`, `194C-2`, `194I-B`. */
   tds_section?: string;

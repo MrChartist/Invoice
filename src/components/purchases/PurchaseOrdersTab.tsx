@@ -30,6 +30,7 @@ import { StatusBadge } from '../ui/StatusBadge';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { VendorPicker } from './VendorPicker';
 import { LineItemsEditor } from './LineItemsEditor';
+import { SizeGridSlot } from './SizeGridSlot';
 import { useT } from '../../i18n';
 import { purT, poStateLabel } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
@@ -355,6 +356,7 @@ function PoForm({
 
       <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
       <LineItemsEditor lines={lines} onChange={setLines} />
+      <SizeGridSlot lines={lines} onChange={setLines} date={date} />
 
       <div className={styles.totals} aria-live="polite">
         <div className={styles.totalRow}><span>{purT('taxable')}</span><span>{formatCurrency(totals.taxable)}</span></div>
