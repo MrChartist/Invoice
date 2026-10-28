@@ -4,6 +4,9 @@ import type { MsmeCategory, PurchaseRecord, Vendor } from '../../types/purchases
 import { INDIAN_STATES, stateByCode } from '../../lib/india-states';
 import { searchVendors, validateVendor, vendorBalances, vendorsDb } from '../../lib/vendors';
 import { formatCurrency } from '../../lib/utils';
+import { localDb } from '../../lib/localDb';
+import { activePacks } from '../../lib/industry-packs';
+import { AG_PACKS } from '../../lib/agri/ag-shared';
 import { Avatar } from '../ui/Avatar';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { EmptyState } from '../ui/EmptyState';
@@ -28,6 +31,7 @@ import tabStyles from './VendorsTab.module.css';
 // R14 (PS-B2): "advocate / firm of advocates" tick (inward reverse charge on legal services) — one lazy row.
 const NettingLinkRow = lazy(() => import('../receivables/NettingDialog').then((m) => ({ default: m.NettingLinkRow }))); // R15-A3
 const VendorAdvocateRow = lazy(() => import('../prof/PartyRows').then((m) => ({ default: m.VendorAdvocateRow })));
+const FarmerPartyRow = lazy(() => import('../agri/FarmerPartyRow')); // PENDING #18 (AG-A2)
 
 export interface VendorsTabProps {
   vendors: Vendor[];
@@ -157,10 +161,14 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
   const [draft, setDraft] = useState<Vendor>(vendor ?? { id: '', name: '' });
   const [error, setError] = useState('');
   const set = (patch: Partial<Vendor>) => setDraft((d) => ({ ...d, ...patch }));
+  // PENDING #18: the Farmer section, for a company with an agri pack or a vendor who already is a farmer.
+  const [agriOn] = useState(() => !!vendor?.ag || activePacks(localDb.settings.get() as never).some((p) => (AG_PACKS as readonly string[]).includes(p)));
+  const [farmerProblem, setFarmerProblem] = useState('');
 
   const submit = () => {
     const problem = validateVendor(draft);
     if (problem) return setError(problem);
+    if (farmerProblem) return setError(farmerProblem);
     if (draft.bank_ifsc?.trim() && !isValidIfsc(draft.bank_ifsc.trim().toUpperCase())) return setError(wireT('ifscInvalid'));
     const tdsProblem = vendorTdsProblem(draft);
     if (tdsProblem) return setError(tdsProblem);
@@ -233,6 +241,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
         </div>
       </div>
       <Suspense fallback={null}><VendorAdvocateRow value={draft as { ps?: unknown }} onChange={(p) => set(p as Partial<Vendor>)} /></Suspense>
+      {agriOn && <Suspense fallback={null}><FarmerPartyRow party={draft} side="vendor" onChange={set} onProblem={setFarmerProblem} /></Suspense>}
       <fieldset className={tabStyles.bankSet}>
         <legend className={controls.label}>{wireT('vendorBank')}</legend>
         <div className={controls.row}>

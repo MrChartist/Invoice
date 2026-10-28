@@ -62,8 +62,11 @@ with your CA. One section per package; each package edits only its own section a
 - **Farmer import**: the Farmers view imports CSV through `csv.ts` `parseTable` with its own column mapping
   (`farmersFromRows`) instead of a new entity in the generic import wizard (whose schemas / appliers would need a new
   kind); XLSX: save as CSV.
-- **Vendor / client form "Farmer" section** not added: farmers are created and edited on Farm → Farmers (the vendor form
-  keeps working for their ordinary fields).
+- **Vendor / client form "Farmer" section** (PENDING #18): a lazy row (`components/agri/FarmerPartyRow.tsx`, shown when an
+  agri pack is on or the party already has `ag`) with "This party is a farmer", code (next `F-` code on tick), village,
+  member no., Aadhaar last 4, KCC, UPI and member. `agri/ag-party-form.ts` `farmerPatch` cleans through `cleanParty` (other
+  `ag` fields such as centre, bank, crops are kept) and sets `principal_kind: 'agriculturist'` on a vendor; unticking
+  removes `ag` (and that kind). Centres, bank and crops are still edited on Farm → Farmers.
 - **Bonus / price-difference run** is a CSV working (`bonusRun`); the draft journal is entered by the user (AG38).
 - **Charges paid by us** are a memo on the voucher (booked separately), recovered ones a less-line (AG34, AG35).
 - **AgriBlock on the GST layout** sits just before the GST grid (the GST grid owns its party panel); on the other layouts
