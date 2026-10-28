@@ -201,9 +201,11 @@ strings area 1.4), `file-read` / `file-map` split out of the marketplace chunks 
   match and the old-Act label "206C(1G) overseas tour package" would otherwise get the LRS code `6CQ`.
 - **Events margin** = invoiced to the client − cost per head (vendor bills, else booked cost); the trips view's costing
   (sell-based) is not reused, to keep the events chunk off `tv-costing`.
-- **Chips not lazy inside `TravelRows`**: a nested `lazy` + `Suspense` for `TvChips` left the editor's items footer
-  (Add line, trip picker, chips) without a layout box after reveal in Chromium (container-query relayout; any style
-  change restored it). `TvChips` is a static import of the already-lazy `TravelRows` chunk.
+- **Chips inside the `TravelRows` chunk** (static import, no nested lazy chunk; smaller in total).
+- **Found, not fixed (for the lead):** after **Bill** on the Trips desk (in-app navigation to `/invoice/<id>`), Chromium
+  leaves the editor's whole items footer (Add line, the trip row, the chips) without a layout box (`getClientRects()`
+  empty, computed `display: flex`; any style change or a reload restores it — likely the `.wrap` size container's
+  relayout on that mount). Opening the draft directly or reloading is fine. The e2e step reloads after Bill.
 - **TDS hint date** = the booking's service date (the bill form has no date in `TripPick`), TV40.
 - **FX** (D2 #4): no change — B's booking form already keeps `cost_currency` / `fx` per booking; the invoice uses its own
   exchange rate. Cut 2 applied (chip only, no POS rows in the trips view); cut 1 (vendor-advance column) not built.

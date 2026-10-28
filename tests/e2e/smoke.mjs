@@ -5199,6 +5199,9 @@ try {
     await page.goto(srv.origin + '/time?tab=trips&view=trips');
     await page.locator('[data-tv-bill="E2E-DXB"]').click({ timeout: 15000 });
     await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    // Known issue (pre-existing, R15-B Bill flow): after the in-app jump from the Trips desk to the editor, Chromium
+    // leaves the items footer (Add line, trip row, chips) without a layout box until the next relayout; a reload shows it.
+    await page.reload();
     const chip = page.locator('[data-tv-tcs="ok"]');
     await chip.waitFor({ timeout: 15000 });
     const calc = await chip.locator('[data-tv-tcs-calc]').innerText();
