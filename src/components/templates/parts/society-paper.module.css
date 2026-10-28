@@ -1,0 +1,64 @@
+/* R18-A4 society particulars on the paper: unit, period, heads with basis, arrears / interest and the regime sentence.
+   Template variables only (accent / muted / line / soft, Critical Rule 5). */
+.block {
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--tpl-line);
+  border-left: 3px solid var(--tpl-accent);
+  background: var(--tpl-soft);
+  border-radius: 4px;
+  break-inside: avoid;
+  font-size: 10px;
+}
+
+.grid {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.grid div {
+  display: flex;
+  gap: 6px;
+}
+
+.grid dt {
+  color: var(--tpl-muted);
+  font-weight: 600;
+}
+
+.grid dd {
+  margin: 0;
+}
+
+.heads {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+}
+
+.heads th,
+.heads td {
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--tpl-line);
+  text-align: left;
+}
+
+.heads td:last-child,
+.heads th:last-child {
+  text-align: right;
+}
+
+.heads th {
+  color: var(--tpl-accent);
+}
+
+.note,
+.decl {
+  margin: 6px 0 0;
+}
+
+.note {
+  color: var(--tpl-muted);
+}

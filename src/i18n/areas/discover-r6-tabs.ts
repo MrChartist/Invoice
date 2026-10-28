@@ -209,6 +209,7 @@ export const tabsT = defineArea(
     'recurring.batch': 'Batch invoices',
     'recurring.fees': 'Fees',
     'recurring.leases': 'Leases',
+    'recurring.society': 'Society: housing society / apartment association / RWA units and members, unit import, maintenance tariff (charge heads, bases, State defaults), monthly bill preview', // R18-A (B–D append)
     // Settings
     'settings.business': 'Business profiles',
     'settings.items': 'Items & rates',
@@ -410,6 +411,7 @@ export const tabsT = defineArea(
     'recurring.batch': 'बैच इनवॉइस',
     'recurring.fees': 'फ़ीस',
     'recurring.leases': 'लीज़',
+    'recurring.society': 'सोसाइटी: आवास सोसाइटी / अपार्टमेंट संघ / RWA की यूनिट और सदस्य, यूनिट आयात, रखरखाव शुल्क सूची (शीर्ष, आधार, राज्य के डिफ़ॉल्ट), मासिक बिल पूर्वावलोकन',
     'settings.business': 'बिज़नेस प्रोफ़ाइल',
     'settings.items': 'आइटम और दरें',
     'settings.fields': 'कस्टम फ़ील्ड',

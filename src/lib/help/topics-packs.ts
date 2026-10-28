@@ -279,5 +279,9 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:deploy:profit', 'Site P&L', 'साइट का लाभ-हानि', 'Per site and month: billed less wages, relievers, employer PF / ESI and site-tagged bills; margin %. Nothing posts.', 'Each month.', { statutory: ca(['MP25', 'MP26', 'MP40']) }),
   // R17-D
   t('time:deploy:statutory', 'Statutory', 'वैधानिक', 'Wage-revision arrears as debit notes per original bill; client TDS expected vs booked per quarter; PSARA / OSH / guard licences and contract ends.', 'Each revision; each quarter.', { statutory: ca(['MP9', 'MP12', 'MP41', 'MP42', 'MP43']) }),
+  // R18-A: the Society desk on Recurring (B–D add bills, gst, dues, funds, registers). Working papers — verify with your CA.
+  t('recurring:society', 'Society', 'सोसाइटी', 'Housing societies, apartment associations and RWAs: units and members, the maintenance tariff by head and basis, then the bills.', 'Each new unit or tariff change.', { statutory: ca(['HS1', 'HS3', 'HS28']) }),
+  t('recurring:society:units', 'Units', 'यूनिट', 'Each flat, shop or garage: wing, areas, construction cost, owner (a client), tenant and parking; import your sheet.', 'Each new member or transfer.', { statutory: ca(['HS8', 'HS27', 'HS34']) }),
+  t('recurring:society:heads', 'Tariff', 'शुल्क सूची', 'Charge heads with a basis (per unit, area, cost %, slot, typed); State defaults as data; hints never block; monthly preview.', 'When the general body changes rates.', { statutory: ca(['HS19', 'HS26', 'HS27', 'HS28', 'HS33']) }),
   t('time:trips:events', 'Event budgets', 'इवेंट बजट', 'Budget heads: approved, booked, billed, paid; over-budget heads in red; client advances, margin, POS by Sec 12(7)(a) and each vendor\'s TDS limb (hint).', 'Each event.', { statutory: ca(['TV21', 'TV22', 'TV23']) }),
 ];

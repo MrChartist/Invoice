@@ -38,7 +38,9 @@ const BatchTab = lazy(() => import('../components/recurring/BatchTab').then((m) 
 // R5-C: fees (institutions) and leases (property) — listed only with their pack on; the URL always opens them.
 const FeesTab = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.FeesTab })));
 const LeasesTab = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.LeasesTab })));
-const r5cTabT = defineArea({ fees: 'Fees', leases: 'Leases' } as const, { fees: 'फ़ीस', leases: 'लीज़' });
+const r5cTabT = defineArea({ fees: 'Fees', leases: 'Leases', society: 'Society' } as const, { fees: 'फ़ीस', leases: 'लीज़', society: 'सोसाइटी' }); // R18-A: + society
+// R18-A: the Society desk (units / tariff; B–D add views) — listed with the `society` pack, one lazy chunk.
+const SocietyDesk = lazy(() => import('../components/society/SocietyDesk'));
 type RecTab = RecurringTab;
 // R6-B1: the ids (and packs) live in recurring-tabs.ts; the labels stay here.
 const TAB_LABEL: Record<RecTab, () => string> = {
@@ -46,6 +48,7 @@ const TAB_LABEL: Record<RecTab, () => string> = {
   batch: () => s2T('rec.tabBatch'),
   fees: () => r5cTabT('fees'), // R5-C
   leases: () => r5cTabT('leases'), // R5-C
+  society: () => r5cTabT('society'), // R18-A
 };
 const REC_TABS: { id: RecTab; label: () => string; pack?: PackId }[] = RECURRING_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
 
@@ -209,9 +212,9 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
         ))}
       </div>
 
-      {tab === 'batch' || tab === 'fees' || tab === 'leases' ? (
+      {tab === 'batch' || tab === 'fees' || tab === 'leases' || tab === 'society' ? (
         <Suspense fallback={null}>
-          {tab === 'batch' ? <BatchTab /> : tab === 'fees' ? <FeesTab notify={notify} /> : <LeasesTab notify={notify} />}
+          {tab === 'batch' ? <BatchTab /> : tab === 'fees' ? <FeesTab notify={notify} /> : tab === 'society' ? <SocietyDesk view={params.get('view') ?? undefined} notify={notify} /> : <LeasesTab notify={notify} />}
         </Suspense>
       ) : (
       <>

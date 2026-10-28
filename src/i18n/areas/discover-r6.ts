@@ -109,6 +109,7 @@ export const discoverT = defineArea(
     'adv.profProfile': 'Professional profile', // R14 (PS-A1)
     'adv.travelProfile': 'Travel profile', // R15-B1
     'adv.manpowerProfile': 'Manpower profile', // R17-A1
+    'adv.societyProfile': 'Society profile', // R18-A1
     'awho.batches': 'Lots with expiry (set per stock item)',
     'awho.serials': 'Goods sold by serial / IMEI (per item)',
     'awho.godowns': 'Stock in more than one place',
@@ -137,6 +138,7 @@ export const discoverT = defineArea(
     'awho.profProfile': 'CA firms, advocates, architects, consultants, agencies, freelancers — matters, pre-bill, WIP, realisation',
     'awho.travelProfile': 'Tour operators, travel agents, DMCs, event planners — trips, bookings, margin, GST regimes',
     'awho.manpowerProfile': 'Security, housekeeping and staffing agencies — sites, posts, reverse charge on guards',
+    'awho.societyProfile': 'Housing societies, apartment associations and RWAs — units, members, maintenance tariff',
   } as const,
   {
     learnMore: 'और जानें',
@@ -242,6 +244,7 @@ export const discoverT = defineArea(
     'adv.profProfile': 'पेशेवर प्रोफ़ाइल',
     'adv.travelProfile': 'यात्रा प्रोफ़ाइल',
     'adv.manpowerProfile': 'मानव-शक्ति प्रोफ़ाइल',
+    'adv.societyProfile': 'सोसाइटी प्रोफ़ाइल',
     'awho.batches': 'एक्सपायरी वाले लॉट (हर स्टॉक आइटम पर)',
     'awho.serials': 'सीरियल / IMEI से बिक्री (हर आइटम पर)',
     'awho.godowns': 'एक से ज़्यादा जगह स्टॉक',
@@ -270,5 +273,6 @@ export const discoverT = defineArea(
     'awho.profProfile': 'CA फ़र्म, वकील, आर्किटेक्ट, कंसल्टेंट, एजेंसी, फ़्रीलांसर — मामले, प्री-बिल, अबिल्ड कार्य, वसूली दर',
     'awho.travelProfile': 'टूर ऑपरेटर, ट्रैवल एजेंट, DMC, इवेंट प्लानर — यात्रा फ़ाइल, बुकिंग, मार्जिन, GST व्यवस्था',
     'awho.manpowerProfile': 'सुरक्षा, हाउसकीपिंग और स्टाफ़िंग एजेंसी — साइट, पोस्ट, गार्ड सेवा पर रिवर्स चार्ज',
+    'awho.societyProfile': 'आवास सोसाइटी, अपार्टमेंट संघ और RWA — यूनिट, सदस्य, रखरखाव शुल्क सूची',
   },
 );

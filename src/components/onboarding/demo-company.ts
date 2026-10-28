@@ -19,6 +19,7 @@ import { applyBusinessType } from '../../lib/shop-presets';
 import { demoExtras } from '../../lib/demo/profiles';
 
 export const DEMO_PENDING_KEY = 'mrchartist_demo_pending';
+const SOCIETY_KEY = 'mrchartist_inv_society_settings'; // R18-A (`society/hs-shared.ts` HS_OBJECTS.settings)
 export const DEMO_COMPANY_NAME = 'Demo';
 
 export interface DemoPending {
@@ -108,6 +109,8 @@ export async function fillDemo(meta: Omit<DemoPending, 'id'> = {}): Promise<void
   const { buildDemoDataset } = await import('../../lib/demo-data');
   const extras = await demoExtras(profile, { today, base: buildDemoDataset(today), packs, businessType: shape.business_type }); // R9: retail rows by shop
   const r = loadDemoData({ confirm: true, today, extras });
+  // R18-A: the society tariff (an object, not a table): written only here, in the Demo company, and only when absent.
+  if (extras.societySettings && r.ok && readRaw(SOCIETY_KEY) === null) writeRaw(SOCIETY_KEY, JSON.stringify(extras.societySettings));
   // (Narrowed by hand: the non-strict test project reads this file too.)
   const reason = r.ok ? '' : (r as { reason: string }).reason;
   if (reason && reason !== 'already_loaded') throw new Error(reason);

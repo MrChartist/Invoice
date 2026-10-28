@@ -172,6 +172,11 @@ export const GLOSSARY = {
     'आवंटियों से मिली राशि का 70% अलग बैंक खाते में, जो केवल ज़मीन और निर्माण पर ख़र्च हो और इंजीनियर, आर्किटेक्ट व CA के प्रमाणपत्र पर निकले (रेरा धारा 4(2)(l)(D))।', 'प्राप्य → रियल्टी → रेरा खाता वसूली के 70% की जमा से तुलना करता है और हर निकासी जाँचता है (जैसा ऐप लागू करता है)।', ['CN25']),
   'deemed-land': g('Land deemed one-third', 'On the sale of a flat before completion, one-third of the total amount is treated as the value of land, so GST at 1.5% / 7.5% on the rest equals 1% / 5% of the whole.', 'Demand letters print the land line, the taxable two-thirds and the CGST / SGST on it (as the app applies it).',
     'निर्माणाधीन फ़्लैट की बिक्री में कुल राशि का एक-तिहाई ज़मीन का मूल्य माना जाता है, इसलिए शेष पर 1.5% / 7.5% GST पूरे का 1% / 5% होता है।', 'माँग पत्र पर ज़मीन की पंक्ति, कर योग्य दो-तिहाई और उस पर CGST / SGST छपते हैं (जैसा ऐप लागू करता है)।', ['CN18']),
+  // R18-A: housing-society terms
+  'sinking-fund': g('Sinking fund', "A society's fund built from members' contributions for major repairs and reconstruction of the building, kept apart from day-to-day income.", 'A head of kind "Sinking fund", usually a share a year of each flat\'s construction cost; the State minimum is a hint (as the app applies it).',
+    'भवन की बड़ी मरम्मत और पुनर्निर्माण के लिए सदस्यों के अंशदान से बनी सोसाइटी की निधि, रोज़ की आय से अलग।', '"सिंकिंग फ़ंड" प्रकार का शीर्ष, प्रायः हर फ़्लैट की निर्माण लागत का वार्षिक हिस्सा; राज्य का न्यूनतम एक संकेत है (जैसा ऐप लागू करता है)।', ['HS27', 'HS39']),
+  'non-occupancy': g('Non-occupancy charges', 'A charge on a member whose flat is let out, usually a share of the service charges, capped by some States.', 'A head of kind "Non-occupancy" on a share of service charges, billed only to units marked let out; a State cap is a hint.',
+    'जिस सदस्य का फ़्लैट किराये पर है उस पर शुल्क, प्रायः सेवा शुल्क का हिस्सा, कुछ राज्यों में सीमा तय।', '"गैर-अधिवास" प्रकार का शीर्ष, सेवा शुल्क के हिस्से पर, केवल किराये पर दी गई यूनिट को; राज्य की सीमा एक संकेत है।', ['HS19']),
 } satisfies Readonly<Record<string, GlossaryTerm>>;
 
 export type GlossaryId = keyof typeof GLOSSARY;

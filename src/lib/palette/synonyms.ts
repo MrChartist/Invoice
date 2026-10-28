@@ -167,6 +167,10 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   '/time?tab=deploy&view=profit': ['site profit', 'site p&l', 'margin', 'लाभ'],
   // R17-D
   '/time?tab=deploy&view=statutory': ['arrears', 'vda', 'wage revision', 'debit note', 'tds receivable', 'psara', 'licence renewal', 'बकाया'],
+  // R18-A: the Society desk (B–D add bills / gst / dues / funds / registers)
+  '/recurring?tab=society': ['society', 'housing society', 'apartment association', 'rwa', 'maintenance bill', 'society bill', 'मेंटेनेंस', 'रखरखाव बिल', 'सोसाइटी'],
+  '/recurring?tab=society&view=units': ['flat', 'flats', 'wing', 'unit register', 'members', 'parking slot', 'फ़्लैट', 'सदस्य'],
+  '/recurring?tab=society&view=heads': ['tariff', 'charge heads', 'sinking fund', 'repair fund', 'non-occupancy', 'property tax', 'सिंकिंग फ़ंड'],
 };
 
 /** Words for one href: its own row, else the row of its base tab (`&view=` dropped). */
