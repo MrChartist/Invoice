@@ -40,6 +40,7 @@ import surface from '../../styles/surface.module.css';
 import styles from './hotel.module.css';
 import FormCView from './FormCView';
 import ReportsView from './ReportsView';
+import { escHtml as esc } from '../../lib/html-esc';
 import FolioView from './FolioView'; // R7-B: in this chunk (a lazy view chunk cost ~2.8 kB gz of split overhead)
 
 /* ── Small kit ─────────────────────────────────────────────────── */
@@ -49,7 +50,6 @@ type Opt = readonly (string | readonly [string, string])[];
 /** [field, label (area key, else the field name), n(umber) | d(ate) | t(ime) | c(heckbox) | select options]. */
 export type Spec = readonly [string, string, ('n' | 'd' | 't' | 'c' | Opt)?];
 const lab = (l: string) => (Object.hasOwn(hT.en, l) ? hT(l as HKey) : l.replace(/_/g, ' '));
-const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const table = (head: string[], rows: unknown[][]) => `<table border="1" cellpadding="4"><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>`;
 
 export function Fields({ v, set, spec, off }: { v: Rec; set: (p: Rec) => void; spec: readonly Spec[]; off?: boolean }) {

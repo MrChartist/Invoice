@@ -12,8 +12,8 @@ import { formatMoney } from '../../lib/utils';
 import { hotelDb } from '../../lib/hotel/hotel-store';
 import { errText, printHtml } from '../transport/shared';
 import controls from '../../styles/controls.module.css';
+import { escHtml as esc } from '../../lib/html-esc';
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export default function RoomPicker({ order, record, onDone, notify }: { order?: string; record?: InvoiceRecord; onDone: () => void; notify: (m: string, tone?: 'success' | 'error') => void }) {
   useT();

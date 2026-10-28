@@ -16,15 +16,22 @@
  *   sent anywhere.
  * - Updates: a new worker waits until the page posts {type:'SKIP_WAITING'} (UpdateToast).
  *   BUILD_ID is stamped at build time so sw.js changes bytes on every deploy.
+ * - Language packs (R16-A1): the manifest's `files` leave out the Hindi / regional chunks (`langs`). The page posts
+ *   {type:'lang', lang} on boot and on every switch; the worker keeps the choice as a synthetic `/__lang__` entry in
+ *   the `mci-lang` cache and caches that language's pack at once (online), replying {complete} on the message port.
+ *   Install also caches the pack of the language stored by the previous worker, so a Hindi device stays Hindi
+ *   offline across updates. A pack that fails to download never rejects the core install; the next message retries.
  */
 const BUILD_ID = '__BUILD_ID__';
 const SHELL_CACHE = `mci-shell-${BUILD_ID}`;
 const ASSET_CACHE = 'mci-assets'; // fingerprinted files never collide, so it survives versions
 const SHARE_CACHE = 'mci-share'; // files shared into the app, until /share-target reads them
-const KEEP = [SHELL_CACHE, ASSET_CACHE, SHARE_CACHE];
+const LANG_CACHE = 'mci-lang'; // `/__lang__`: this device's interface language (survives versions)
+const KEEP = [SHELL_CACHE, ASSET_CACHE, SHARE_CACHE, LANG_CACHE];
+const LANG_URL = '/__lang__';
+const MANIFEST_URL = '/__manifest__'; // this build's precache manifest, kept in its shell cache
 const MAX_SHARED_FILES = 10;
 const MAX_SHARED_BYTES = 200 * 1024 * 1024;
-const MAX_ASSETS = 160;
 const NAV_TIMEOUT_MS = 3500;
 const SHELL_URL = '/index.html';
 const PRECACHE = ['/manifest.json', '/logo.png', '/offline.html'];
@@ -59,7 +66,8 @@ class ManifestMissing extends Error {}
 async function precacheManifest(shell, assets) {
   const res = await fetch('/precache-manifest.json', { cache: 'no-store' });
   if (!res.ok) throw new ManifestMissing('precache manifest ' + res.status);
-  const manifest = await res.json();
+  const manifest = await res.clone().json();
+  await shell.put(MANIFEST_URL, res);
   // allSettled, not all: every fetch/put must have finished before a failed install deletes the
   // half-filled shell cache, or a straggling put could leave it behind.
   const results = await Promise.allSettled(
@@ -83,6 +91,8 @@ self.addEventListener('install', (event) => {
       const assets = await caches.open(ASSET_CACHE);
       try {
         await precacheManifest(shell, assets);
+        // Keep this device's language pack across the update (best effort: never fails the install).
+        await cacheLangPack(await deviceLang(), shell).catch(() => false);
         return;
       } catch (err) {
         if (!(err instanceof ManifestMissing)) {
@@ -129,9 +139,58 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+/** The language pack a language needs: Hindi has its own; the other regional languages share one. */
+const packOf = (lang) => (lang === 'hi' ? 'hi' : lang && lang !== 'en' ? 'regional' : null);
+
+async function deviceLang() {
+  const hit = await (await caches.open(LANG_CACHE)).match(LANG_URL);
+  return hit ? (await hit.text()).trim() : 'en';
+}
+
+/** This build's manifest: the copy kept at install, else the network. */
+async function readManifest(shell) {
+  const hit = await shell.match(MANIFEST_URL);
+  if (hit) return hit.json();
+  const res = await fetch('/precache-manifest.json', { cache: 'no-store' });
+  if (!res.ok) throw new Error('precache manifest ' + res.status);
+  return res.json();
+}
+
+/** Caches the files of `lang`'s pack that are missing. Resolves true when the whole pack is cached. */
+async function cacheLangPack(lang, shell) {
+  const pack = packOf(lang);
+  if (!pack) return true;
+  const manifest = await readManifest(shell || (await caches.open(SHELL_CACHE)));
+  const urls = (manifest.langs && manifest.langs[pack]) || [];
+  const assets = await caches.open(ASSET_CACHE);
+  const results = await Promise.allSettled(
+    urls.map(async (url) => {
+      if (await assets.match(url)) return;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('language pack ' + url + ' ' + r.status);
+      await assets.put(url, r);
+    }),
+  );
+  return results.every((r) => r.status === 'fulfilled');
+}
+
+async function onLang(lang, port) {
+  let complete = false;
+  try {
+    await (await caches.open(LANG_CACHE)).put(LANG_URL, new Response(String(lang), { headers: { 'content-type': 'text/plain' } }));
+    complete = await cacheLangPack(lang);
+  } catch {
+    complete = false; // offline with no manifest copy, storage full …: the page decides (offline → stays as it was)
+  }
+  if (port) port.postMessage({ complete });
+}
+
 self.addEventListener('message', (event) => {
   const d = event.data;
   if (d === 'SKIP_WAITING' || (d && d.type === 'SKIP_WAITING')) self.skipWaiting();
+  else if (d && d.type === 'lang' && typeof d.lang === 'string' && /^[a-z]{2}$/.test(d.lang)) {
+    event.waitUntil(onLang(d.lang, event.ports && event.ports[0]));
+  }
 });
 
 function timeout(ms) {
@@ -157,15 +216,16 @@ async function handleNavigation(request) {
   }
 }
 
-async function cacheFirst(request, cacheName, max) {
+/**
+ * Fingerprinted assets: cache-first, never trimmed at runtime (R16-A1): the asset cache holds the precached build,
+ * and a language-pack chunk fetched on a miss must not evict the precached core.
+ */
+async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
   const hit = await cache.match(request);
   if (hit) return hit;
   const res = await fetch(request);
-  if (res.ok) {
-    await safePut(cache, request, res.clone());
-    trim(cache, max);
-  }
+  if (res.ok) await safePut(cache, request, res.clone());
   return res;
 }
 
@@ -222,7 +282,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (url.pathname.startsWith('/assets/')) {
-    event.respondWith(cacheFirst(request, ASSET_CACHE, MAX_ASSETS));
+    event.respondWith(cacheFirst(request, ASSET_CACHE));
     return;
   }
   // logo, manifest, icons, etc.

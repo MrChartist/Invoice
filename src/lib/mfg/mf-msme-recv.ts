@@ -121,7 +121,7 @@ export function reminderText(seller: { name: string; udyam: string; category: st
   ].join('\n');
 }
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!); // R16-A3: escapes ' too (f-mfg stays self-contained)
 
 /** Interest-claim letter (A4 HTML body) for one buyer. */
 export function interestLetterHtml(seller: { name: string; udyam: string; category: string }, buyer: string, gstin: string, bills: readonly MseReceivable[], asOf: string): string {

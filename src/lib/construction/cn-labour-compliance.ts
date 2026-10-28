@@ -77,7 +77,7 @@ export function manpowerBill(clientId: string, wages: number, statutory: number,
 
 /** Printable compliance annexure of a month. */
 export function complianceHtml(rows: readonly LabourCompliance[], month: string, company: string): string {
-  const e = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+  const e = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   const body = rows.filter((r) => r.month === month).map((r) => `<tr><td>${e(r.vendor_name)}</td><td>${r.headcount}</td><td>${r.wages.toFixed(2)}</td><td>${e(r.pf.trrn)} ${num(r.pf.amount).toFixed(2)}</td><td>${e(r.esi.challan)} ${num(r.esi.amount).toFixed(2)}</td><td>${e(r.licence?.no)} ${e(r.licence?.valid_till)}</td><td>${e(r.status)}</td></tr>`).join('');
   return `<!doctype html><meta charset="utf-8"><title>Labour compliance ${e(month)}</title><style>body{font:12px sans-serif;margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:4px;text-align:left}</style>
 <h2>Labour compliance — ${e(month)}</h2><p>${e(company)}</p><table><tr><th>Contractor</th><th>Headcount</th><th>Wages</th><th>PF (TRRN, ₹)</th><th>ESI (challan, ₹)</th><th>Licence</th><th>Status</th></tr>${body}</table>

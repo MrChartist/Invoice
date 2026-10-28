@@ -12,8 +12,8 @@ import type { Client, Payment } from '../../types/invoice';
 import { Tbl } from './ps-d-ui';
 import { inr, sm } from './ps-desk';
 import controls from '../../styles/controls.module.css';
+import { escHtml as esc } from '../../lib/html-esc';
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** The chase list with letters (Receivables → TDS passes its register; the desk builds one). */
 export default function ChasePanel({ reg, clients }: { reg?: TdsRegister; clients?: readonly Client[] }) {

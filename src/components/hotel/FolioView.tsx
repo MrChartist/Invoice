@@ -34,7 +34,7 @@ import { B, errText, printHtml } from '../transport/shared';
 import styles from './hotel.module.css';
 
 type Rec = Record<string, unknown>;
-const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const sum = (f: Pick<Folio, 'lines'>, all = false) => round2((all ? f.lines.filter((l) => !l.void) : billable(f)).reduce((s, l) => s + l.amount, 0));
 const METHODS = ['UPI', 'Cash', 'Card', 'Bank transfer'];
 const num = (v: unknown) => Number(v) || 0;

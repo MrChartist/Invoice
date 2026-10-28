@@ -7,6 +7,7 @@
 import { barcodeSvg, pickSymbology } from './barcode';
 import { formatCurrency } from './utils';
 import { num } from './invoice-calc';
+import { escHtml as esc } from './html-esc';
 
 export interface LabelLayout {
   id: string;
@@ -100,8 +101,6 @@ export function sheetCount(layout: LabelLayout, count: number, skip = 0): number
   return count <= 0 ? 0 : Math.ceil((count + Math.min(Math.max(skip, 0), per - 1)) / per);
 }
 
-const esc = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 function priceLine(it: LabelItem, shown: PriceShown, currency: string, compact = false): string {
   const parts: string[] = [];

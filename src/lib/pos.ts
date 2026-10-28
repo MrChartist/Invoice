@@ -34,6 +34,7 @@ import { formatCurrency, formatDate } from './utils';
 import { nextPartyBalanceSnapshot } from './party-balance';
 import { partyBalanceSnapshotFor } from './khata-actions';
 import { EXCHANGE_NOTE, applyExchange, openExchange, zReturns, type PosReturn, type ZReturns } from './pos-returns';
+import { escHtml as esc } from './html-esc';
 import { liveRedeemIssue, recordPromoUse, stampVoucherPayment } from './retail/gift-voucher-core'; // R4-B1
 import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
 
@@ -608,8 +609,6 @@ export function zReportCsv(z: ZReport, close?: PosDayClose): string {
   return toCsv(rows);
 }
 
-const esc = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 /** Script-free 80 mm HTML of the Z report, for a print window (or saving as a file). */
 export function zReportHtml(z: ZReport, opts: { business?: string; close?: PosDayClose; printedAt?: string; /** 8E: "X REPORT" / "SHIFT 2 Z REPORT" */ title?: string } = {}): string {

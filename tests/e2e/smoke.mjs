@@ -5278,6 +5278,69 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  // R16-A1: Hindi lives in lang-hi-* chunks now (build transform). Walk the screens in Hindi and prove the strings
+  // arrive (no English label left from an area that has Hindi), on first paint too; then back to English.
+  await step('R16-A Hindi language packs: Settings → हिन्दी; Books, GST reports, Inventory, Time → WIP and Trips render in Hindi; a reload paints Hindi first; back to English', async () => {
+    const prev = await readJson(page, 'settings', null);
+    await writeJson(page, 'settings', { ...(prev ?? {}), business_type: 'services', service_kind: 'professional', industry_packs: ['practice', 'travel', 'events'], modules: undefined, lock_until: undefined });
+    const nav = page.getByRole('navigation', { name: /Primary|मुख्य मेन्यू/ });
+    await page.goto(srv.origin + '/settings');
+    await page.getByLabel('Language / भाषा').first().selectOption('hi');
+    await nav.getByRole('link', { name: 'डैशबोर्ड' }).waitFor({ timeout: 15000 });
+    check((await page.evaluate(() => document.documentElement.lang)) === 'hi', 'Hindi on (<html lang="hi">)');
+    const noEnglish = async (label, english) => {
+      const body = await page.locator('main').first().innerText();
+      const left = english.filter((s) => body.includes(s));
+      check(left.length === 0, `${label}: no English label left (${left.join(', ') || 'none'})`);
+    };
+    // Books (books area → lang-hi-books)
+    await page.goto(srv.origin + '/books');
+    await page.getByRole('heading', { name: 'बही-खाता' }).first().waitFor({ timeout: 15000 });
+    await page.getByText('आपके इनवॉइस, रसीदों और खरीद से बने डबल-एंट्री खाते').first().waitFor();
+    await noEnglish('Books', ['Double-entry books built from your invoices']);
+    // GST reports (gst area → lang-hi-gst)
+    await page.goto(srv.origin + '/gst-reports');
+    await page.getByRole('heading', { name: 'GST रिपोर्ट' }).first().waitFor({ timeout: 15000 });
+    await page.getByText('दाख़िल करने से पहले अपने CA से जाँच करवाएँ।').first().waitFor();
+    await noEnglish('GST reports', ['GSTR-1 sections and GSTR-3B summary, prepared offline']);
+    // Inventory (inventory area → lang-hi-inventory)
+    await page.goto(srv.origin + '/inventory');
+    await page.getByText('आपके इनवॉइस, खरीद और एडजस्टमेंट से लाइव स्टॉक').first().waitFor({ timeout: 15000 });
+    await noEnglish('Inventory', ['Live stock from your invoices, purchases and adjustments']);
+    // Time → WIP (practice pack: pages + prof families) and Trips (travel family)
+    await page.goto(srv.origin + '/time?tab=wip');
+    await page.getByRole('tab', { name: 'अबिल्ड कार्य और बिलिंग' }).waitFor({ timeout: 15000 });
+    await page.getByText('अबिल्ड कार्य', { exact: true }).first().waitFor({ timeout: 15000 });
+    await page.getByText('समय और बिल योग्य खर्च').first().waitFor();
+    await noEnglish('Time → WIP', ['WIP & billing', 'Pre-bill', 'Realisation', 'Track hours, trips and re-billable expenses']);
+    await page.goto(srv.origin + '/time?tab=trips');
+    await page.getByRole('tab', { name: 'यात्रा फ़ाइलें' }).first().waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => /अभी कोई यात्रा नहीं|मार्जिन|बुकिंग/.test(document.querySelector('main')?.innerText ?? ''), null, { timeout: 15000 });
+    check(true, 'Trips desk strings in Hindi (travel family chunk)');
+    await noEnglish('Time → Trips', ['No trips yet.', 'Supplier unpaid']);
+    // A reload on a Hindi device: first-paint areas (sidebar, pwa) are Hindi from the first frame.
+    await page.goto(srv.origin + '/');
+    await nav.getByRole('link', { name: 'डैशबोर्ड' }).waitFor({ timeout: 15000 });
+    const firstFrame = await nav.innerText();
+    check(!/\bDashboard\b/.test(firstFrame), 'reload in Hindi: the shell paints in Hindi (no English sidebar)');
+    // The Dashboard tile picker (gift-voucher tile, R4-B1 area) is in Hindi.
+    const gv = page.getByText('गिफ़्ट वाउचर').first();
+    await page.locator('details:has(input[type="checkbox"]) summary').first().waitFor({ timeout: 15000 }).catch(() => {});
+    const pickers = page.locator('details:has(input[type="checkbox"]) summary');
+    if (await pickers.count()) {
+      await pickers.first().click();
+      check(await gv.isVisible().catch(() => false), 'Dashboard tile picker: gift-voucher tile label in Hindi');
+    }
+    // Back to English.
+    await page.goto(srv.origin + '/settings');
+    await page.getByLabel('Language / भाषा').first().selectOption('en');
+    await nav.getByRole('link', { name: 'Dashboard' }).waitFor({ timeout: 15000 });
+    await page.goto(srv.origin + '/books');
+    await page.getByRole('heading', { name: 'Books' }).first().waitFor({ timeout: 15000 });
+    check((await page.evaluate(() => document.documentElement.lang)) === 'en', 'back to English: Books heading in English');
+    await writeJson(page, 'settings', prev);
+  });
+
 } catch {
   /* already reported */
 } finally {

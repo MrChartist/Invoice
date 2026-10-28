@@ -17,6 +17,7 @@ import type { Cheque } from '../types/cheques';
 import { amountInWords } from './amount-in-words';
 import { round2 } from './invoice-calc';
 import { DB_PREFIX, getJson, setJson } from './storage';
+import { escHtml as esc } from './html-esc';
 
 export const CHEQUE_PREFS_KEY = `${DB_PREFIX}cheque_print`;
 
@@ -185,7 +186,6 @@ export function buildChequePrint(c: Pick<Cheque, 'party_name' | 'amount' | 'cheq
   return { layout, items, accountPayee };
 }
 
-const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch] as string);
 
 /**
  * A printable page for one leaf. `guide` draws the leaf outline and field boxes for a test print

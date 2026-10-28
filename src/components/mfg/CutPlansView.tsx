@@ -14,11 +14,11 @@ import { num } from '../../lib/invoice-calc';
 import { gT } from '../../i18n/areas/mfg-r13c';
 import { Btn, F, Grid, In, Sel } from './garments-ui';
 import { n2, opts, parseRatio, ratioText, row, run, stack, today } from './garments-util';
+import { escHtml as esc } from '../../lib/html-esc';
 
 type Lay = { plies: string; ratio: string; len: string };
 type D = { id?: string; date: string; style: string; colour: string; order: string; fabric: string; lays: Lay[]; issued: string; ends: string; kg: string; wasteItem: string; want: string; cap: string };
 const blank = (): D => ({ date: today(), style: '', colour: '', order: '', fabric: '', lays: [{ plies: '', ratio: '', len: '' }], issued: '', ends: '', kg: '', wasteItem: '', want: '', cap: '6' });
-const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export default function CutPlansView({ ctx }: { ctx: MfgContext }) {
   const plans = useMemo(() => (void ctx.version, loadCutPlans()), [ctx.version]);

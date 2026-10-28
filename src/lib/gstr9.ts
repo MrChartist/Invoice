@@ -65,6 +65,7 @@ import { toCsv, type CsvCell } from './gstr-json';
 import type { PurchaseReturn } from '../types/purchases';
 import { isLiveNote, noteCess, noteTax } from './purchase-returns-gst';
 import { buildGstr9PartV } from './gstr9-partv';
+import { escHtml as esc } from './html-esc';
 
 /* ───────────────────────── Types ───────────────────────── */
 
@@ -882,8 +883,6 @@ export function gstr9Csv(r: Gstr9Report): string {
   return toCsv(rows);
 }
 
-const esc = (s: unknown) =>
-  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 
 const inr = (n: number) => new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 

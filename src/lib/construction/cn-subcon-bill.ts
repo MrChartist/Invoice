@@ -237,7 +237,7 @@ export function releaseRetention(vendor: string, amount: number, date: string, m
 
 /** Printable abstract of a sub-contractor bill ("Sub-contractor bill"). */
 export function subBillHtml(b: PurchaseRecord, company: string): string {
-  const e = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+  const e = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   const cn = b.cn_sub;
   const rows = (cn?.abstract ?? []).map((r) => `<tr><td>${e(r.ref)}</td><td>${e(r.description)}${r.mb ? ` <small>(MB ${e(r.mb)})</small>` : ''}</td><td>${e(r.unit)}</td><td>${r.rate}</td><td>${r.prev_qty}</td><td>${r.this_qty}</td><td>${r.cum_qty}</td><td>${r.amount.toFixed(2)}</td></tr>`).join('');
   const deds = (cn?.deductions ?? []).map((d) => `<tr><td colspan="7">Less: ${e(d.label)}</td><td>${d.amount.toFixed(2)}</td></tr>`).join('');

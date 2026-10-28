@@ -1,5 +1,6 @@
 .wrap {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   color: var(--muted-foreground);
@@ -19,4 +20,11 @@
   min-height: 2rem;
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
+}
+
+/* R16-A1: offline switch to a language pack that is not on this device. */
+.offline {
+  flex-basis: 100%;
+  font-size: 0.8125rem;
+  color: var(--destructive);
 }
