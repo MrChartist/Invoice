@@ -235,7 +235,9 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   goes through bridges `lg-*-io.ts` (≤ 4: issue / tax / books / recv). Batch billers (month-end jobs, courier manifests,
   storage) use `localDb.invoices.saveMany`. Rule values in `src/lib/logistics-rules.ts` (lazy only, date-keyed, keyed rows
   read with `keyedAt`, `tests/lg-rules.test.ts`); GTA rates, the intermediary rule, TDS sections and Act labels stay in
-  their own files, read through `lg-tax-io.ts`. CA ids `LG1`–`LG44` (`LG` sits before `G` in every CA-id regex). Notes:
+  their own files, read through `lg-tax-io.ts`. CA ids `LG1`–`LG44` (`LG` sits before `G` in every CA-id regex). R19-B: job bills via `lg-issue-io.ts`
+  (one `saveMany`; regimes `lg-regime.ts`; C / D add lines only through `billExtras` in `lg-bill.ts`); a POS-96 document with
+  `lg.regime: 'export_freight'` and a valid client GSTIN is B2B, not EXP, in `gst-reports.ts` / `einvoice.ts` (LG15). Notes:
   `docs/features/logistics-r19.md`.
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
