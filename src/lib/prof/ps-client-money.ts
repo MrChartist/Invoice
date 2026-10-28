@@ -153,3 +153,9 @@ export function cmStatement(rows: readonly ClientMoneyVoucher[], clientId: strin
 /** Client money held on a matter today (the Matters list column; read by PS-A through `import.meta.glob`). */
 export const matterBalance = (matterId: string): number =>
   round2(cmBalances(getTable<ClientMoneyVoucher>(CLIENT_MONEY_TABLE)).filter((b) => b.matter === matterId).reduce((s, b) => s + b.balance, 0));
+
+/** QA17 R4: an office receipt made by a to-fees voucher goes only with that voucher (`removeClientMoney`). */
+export function assertNotClientMoneyReceipt(paymentId: string): void {
+  const v = getTable<ClientMoneyVoucher>(CLIENT_MONEY_TABLE).find((r) => r?.payment_id === paymentId);
+  if (v) throw new Error(`This receipt applied client money to fees (${v.number}). Delete that entry in Time → Client money instead — it removes this receipt with it.`);
+}

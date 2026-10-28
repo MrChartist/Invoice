@@ -143,7 +143,9 @@ export function createStageBill(e: StageEngagement, stageId: string, date: strin
     const t = calculateInvoice(calcInputFromRecord({ ...rec, place_of_supply: pos, gst_mode }));
     rec = { ...rec, place_of_supply: pos, gst_mode, cgst_amount: t.cgst_amount, sgst_amount: t.sgst_amount, igst_amount: t.igst_amount, tax_amount: t.tax_amount, round_off: t.round_off, total: t.total, balance_due: t.balance_due };
   }
-  const ps = { kind: 'stage', engagement: { id: e.id, number: e.number, model: e.model }, basis: `Stage ${snap.no} of ${snap.of} on project cost`, stage: snap, lines: { [item.id]: { stage: `Stage ${snap.no} of ${snap.of} — ${snap.label}` } } };
+  // QA17 R6: the property's place of supply also feeds PS-C's Sec 2(6) check (13(4)): a foreign client's Indian house
+  // is not an export, whatever the supply type says.
+  const ps = { kind: 'stage', engagement: { id: e.id, number: e.number, model: e.model }, basis: `Stage ${snap.no} of ${snap.of} on project cost`, stage: snap, ...(pos ? { export: { pos_class: 'property' as const, property_state: pos } } : {}), lines: { [item.id]: { stage: `Stage ${snap.no} of ${snap.of} — ${snap.label}` } } };
   rec = { ...rec, ps } as InvoiceRecord;
   rec.invoice_number = localDb.invoices.nextNumber(rec.issue_date, rec.doc_type, sender?.invoicePrefix || undefined);
   return localDb.invoices.save(rec);

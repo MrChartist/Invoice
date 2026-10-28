@@ -14,6 +14,8 @@ import { ruleAt, todayIso, type Versioned } from '../tax-rules';
 export const EXPORT_REALISATION_MONTHS_RULES: readonly Versioned<number>[] = [
   { from: '2013-04-01', value: 9, source: 'RBI Master Direction — Export of Goods and Services (9 months) — verify' },
   { from: '2025-11-13', value: 15, source: 'RBI FEMA (Export of Goods & Services) amendment, Nov 2025 (15 months) — verify the date' },
+  // QA17 R9: FEMA 23(R)/(8)/2026-RB (First Amendment Regulations 2026, Reg 9), in force 5 Jun 2026: back to 9 months.
+  { from: '2026-06-05', value: 9, source: 'FEMA 23(R)/(8)/2026-RB of 5 Jun 2026 (9 months) — taxmann; verify the transition (PS15)' },
   // R14 PS-C2 (PS15 / X1): FEMA (Export and Import of Goods and Services) Regulations 2026 in force 1 Oct 2026; services
   // count from the invoice date (Reg 5(1)(a)). Goods exports read the same row.
   { from: '2026-10-01', value: 9, source: 'FEMA 23(R)/2026-RB Reg 5(1)(a), as amended by FEMA 23(R)(1)/2026-RB of 22 Sep 2026 — verify transition (PS15)' },

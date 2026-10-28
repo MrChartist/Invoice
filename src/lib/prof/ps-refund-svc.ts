@@ -16,6 +16,7 @@ import { inrValue } from '../fx';
 import { round2 } from '../invoice-calc';
 import { movedNoCash } from '../advance-tax';
 import { isRevenueDoc } from '../stats';
+import { recoveryValue } from '../trade/pure-agent';
 import { loadRefunds, rule894Refund, saveRefund, type GstRefundClaim, type Rule894Result } from '../gst-cash-refunds';
 import type { BrcRow } from './ps-brc';
 
@@ -41,6 +42,8 @@ export interface RefundSvcPaper {
   invoiceIds: string[];
 }
 
+/** Share of the document's value that pays for the service (pure-agent recoveries out). */
+const feeShare = (v: Partial<InvoiceRecord>) => { const t = Number(v.total) || 0; return t > 0 ? Math.max(t - recoveryValue(v), 0) / t : 1; };
 const inPeriod = (d: unknown, from: string, to: string) => { const s = String(d ?? '').slice(0, 10); return s >= from && s <= to; };
 
 export function refundSvcPaper(i: RefundSvcInput): RefundSvcPaper {
@@ -51,7 +54,8 @@ export function refundSvcPaper(i: RefundSvcInput): RefundSvcPaper {
   for (const p of i.payments) {
     const inv = p?.invoice_id ? lut.get(p.invoice_id) : undefined;
     if (!inv || !(Number(p.amount) > 0)) continue;
-    const inr = receiptInr({ amount: Number(p.amount), realised_rate: p.realised_rate }, inv);
+    // QA17 R3: the share of a receipt that recovers pure-agent costs is no payment for the service.
+    const inr = receiptInr({ amount: Number(p.amount) * feeShare(inv), realised_rate: p.realised_rate }, inv);
     if (p.advance_id) {
       const ad = advDate.get(p.advance_id) ?? '';
       if (!inPeriod(inv.issue_date, i.from, i.to) || !ad || ad > i.to) continue;
@@ -63,7 +67,7 @@ export function refundSvcPaper(i: RefundSvcInput): RefundSvcPaper {
   }
   const zeroRated = round2(received + advancesEarlier + advancesNow);
   const domestic = round2(i.invoices.filter((v) => v && !lut.has(String(v.id)) && isRevenueDoc(v as InvoiceRecord) && v.doc_type !== 'CREDIT_NOTE' && v.supply_type !== 'EXPORT_LUT' && v.supply_type !== 'EXPORT_WITH_PAYMENT' && inPeriod(v.issue_date, i.from, i.to))
-    .reduce((s, v) => s + inrValue(Number(v.taxable_value) || 0, v), 0));
+    .reduce((s, v) => s + inrValue((Number(v.taxable_value) || 0) - recoveryValue(v), v), 0));
   const att = i.adjustedTotalTurnover !== undefined && i.adjustedTotalTurnover > 0 ? round2(i.adjustedTotalTurnover) : round2(domestic + zeroRated);
   return {
     received: round2(received), advancesEarlier: round2(advancesEarlier), advancesNow: round2(advancesNow), zeroRated, domestic, adjustedTotalTurnover: att,

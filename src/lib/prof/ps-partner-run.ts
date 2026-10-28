@@ -4,7 +4,8 @@
  *    daily balances of the capital account (setting);
  *  - interest on drawings (product method, the firm's income);
  *  - book profit = net profit per the ledger before partners' remuneration (remuneration already credited added back),
- *    less this run's interest on capital, plus interest on drawings, plus the user's listed adjustments (PS20, Q35);
+ *    less this run's interest on capital, plus the interest above the cap (disallowed), plus interest on drawings,
+ *    plus the user's listed adjustments (PS20, Q35);
  *  - allowable remuneration (Sec 40(b)(v) / 2025 Act Sec 35) from `PARTNER_REMUNERATION_RULES` by the FY start —
  *    working partners only; the deed's remuneration (fixed, % of book profit, or the maximum allowable shared in the
  *    working partners' ratio); the excess is disallowed (a note for the computation, never a journal);
@@ -117,7 +118,8 @@ export function computeRun(input: RunInput): RunResult {
   const drawingsInterestTotal = round2(base.reduce((s, b) => s + b.drawingsInterest, 0));
   const posted = round2(Object.values(input.remunerationPosted ?? {}).reduce((s, x) => s + x, 0));
   const adj = round2((input.adjustments ?? []).reduce((s, a) => s + (Number(a.amount) || 0), 0));
-  const bookProfit = round2(input.netProfit + posted - interestTotal + drawingsInterestTotal + adj);
+  // QA17 R2: interest above the 12 % cap is disallowed, so book profit (computed as Sec 28–44D direct) adds it back.
+  const bookProfit = round2(input.netProfit + posted - interestTotal + interestDisallowed + drawingsInterestTotal + adj);
   const lim = allowableRemuneration(bookProfit, start);
 
   // Remuneration per the deed (working partners only), less what monthly credits already gave.

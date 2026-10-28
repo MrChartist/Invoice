@@ -289,6 +289,9 @@ const OWNED_JOURNALS: Readonly<Record<string, readonly [string, (r: Record<strin
   'Government grant': ['incentive_claims', (r, id) => Array.isArray(r?.voucher_ids) && r.voucher_ids.includes(id), 'the incentive claim in Manufacturing → Statutory → Incentives records it as posted; reverse it with a journal'],
   // R14 (PS-B3): a client-money journal goes only with its CMV voucher (Time → Client money → Delete).
   'Client money': ['client_money', (r, id) => Array.isArray(r?.voucher_ids) && r.voucher_ids.includes(id), 'delete the client-money voucher in Time → Client money'],
+  // QA17 R1: a partner posting's journals (year-end run, monthly credit) go only with the run (Time → Firm → Undo).
+  'Partners appropriation': ['partner_runs', (r, id) => Array.isArray(r?.voucher_ids) && r.voucher_ids.includes(id), 'undo the run in Time → Firm → Appropriation'],
+  'Partner credit': ['partner_runs', (r, id) => Array.isArray(r?.voucher_ids) && r.voucher_ids.includes(id), 'undo the credit in Time → Firm → 194T'],
   'Booking forfeiture': ['advances', (r, id) => Array.isArray(r?.forfeits) && r.forfeits.some((f: { journal_id?: string } | null) => f?.journal_id === id), 'it closed the buyer\'s advance when the booking was cancelled; reverse it with a journal'],
 };
 

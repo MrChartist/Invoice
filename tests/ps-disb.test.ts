@@ -19,9 +19,10 @@ import { withCharges } from '../src/lib/trade/tr-charges.ts';
 import { gstExceptions } from '../src/lib/gst-guards.ts';
 import { psExceptions } from '../src/lib/prof/ps-disb-guard.ts';
 import {
-  ageBuckets, disbursementPatch, disbursementSchedule, DISB_KINDS, feeTdsBase, isLegacyPureAgentLine, onBehalfByDefault,
+  ageBuckets, disbursementPatch, disbursementSchedule, DISB_KINDS, isLegacyPureAgentLine, onBehalfByDefault,
   reverseDisbursementWriteOff, unrecoveredDisbursements, writeOffDisbursement,
 } from '../src/lib/prof/ps-disb.ts';
+import { feeBase as feeTdsBase } from '../src/lib/prof/ps-tds-recv.ts'; // QA17 R3: one fee base (PS-B's duplicate dropped)
 import { DEFAULT_TIME_PREFS } from '../src/types/time.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
 import type { PurchaseRecord } from '../src/types/purchases.ts';

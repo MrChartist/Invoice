@@ -64,9 +64,9 @@ test('run: fixed remuneration above the limit is disallowed (note only); interes
   const r = computeRun({ fy: 2025, partners: ps, netProfit: 500000, capital: Object.fromEntries(ps.map((p) => [p.id, 100000])) });
   assert.equal(r.interestTotal, 27000);
   assert.equal(r.interestDisallowed, 3000);
-  assert.equal(r.bookProfit, 473000);
-  assert.equal(r.allowable, 425700);
-  assert.equal(r.disallowed, 1200000 - 425700);
+  assert.equal(r.bookProfit, 476000, 'QA17 R2: the ₹3,000 above the 12 % cap is added back');
+  assert.equal(r.allowable, 428400);
+  assert.equal(r.disallowed, 1200000 - 428400);
   assert.equal(r.residual, 500000 - 1200000 - 27000, 'a loss shared in the ratio');
   const bad = computeRun({ fy: 2025, partners: ps.slice(0, 1), netProfit: 1, capital: {} });
   assert.match(bad.problems[0], /total 50 %/);
