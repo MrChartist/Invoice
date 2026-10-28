@@ -13,7 +13,6 @@ import { receivableTotal } from './rcm';
 import { isVoidStatus, readPurchase } from './purchase-normalize';
 import { documentMargin, type UnitCost } from './margin';
 import type { Client } from '../types/invoice';
-import { daysBetween } from './day-math';
 import { quietCustomers, type QuietSettings } from './quiet-customers'; // R3-B7
 
 export type InsightId = 'revenue' | 'topCustomers' | 'expenseSpike' | 'dso' | 'slowPayers' | 'margin' | 'stockRisk' | 'gstTrend' | 'quietCustomers';
@@ -70,6 +69,11 @@ export function monthWindow(today: string): { current: string; previous: string[
 const pctChange = (now: number, base: number): number | null => (base > 0 ? round2(((now - base) / base) * 100) : null);
 const avg = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0);
 
+function daysBetween(a: string, b: string): number {
+  const [y1, m1, d1] = a.split('-').map(Number);
+  const [y2, m2, d2] = b.split('-').map(Number);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000);
+}
 
 function shift(day: string, days: number): string {
   const [y, m, d] = day.split('-').map(Number);

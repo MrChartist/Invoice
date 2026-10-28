@@ -25,7 +25,6 @@ import { generateId, getTable, setTable } from './storage';
 import type { OpeningBillInput } from './receivables';
 import { formatMoney } from './utils';
 import { assertOpeningsUnlocked, ensureBooksBegin, loadBooksBegin, loadOpenings, signedOpening } from './ledger/openings';
-import { addDays } from './day-math';
 
 export const OPENING_BILLS_TABLE = 'opening_bills';
 
@@ -116,6 +115,11 @@ export interface OpeningBillDraft {
   dr_cr: 'Dr' | 'Cr';
 }
 
+function addDays(iso: string, n: number): string {
+  const d = new Date(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10) + n);
+  const p = (x: number) => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
 
 /** Problems with a party's bill list (empty = fine). Line numbers are 1-based. */
 export function validateOpeningBills(bills: readonly OpeningBillDraft[]): string[] {

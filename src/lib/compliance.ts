@@ -13,7 +13,6 @@
 
 import { QRMP_3B_CATEGORY_Y, compositionDueDays, returnDueDays } from './tax-rules';
 import { getTable, setTable } from './storage';
-import { daysBetween } from './day-math';
 
 /** `composition` (5.9): CMP-08 every quarter and GSTR-4 every year instead of GSTR-1 / 3B / 9. */
 export type FilerFrequency = 'monthly' | 'qrmp' | 'composition';
@@ -51,7 +50,10 @@ const day = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(Math.min(
 const fyLabel = (fyStart: number) => `FY ${String(fyStart).slice(2)}-${String(fyStart + 1).slice(2)}`;
 
 /** Whole days from `a` to `b` (both `YYYY-MM-DD`; positive when `b` is later). */
-export { daysBetween };
+export function daysBetween(a: string, b: string): number {
+  const t = (s: string) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
+  return Math.round((t(b) - t(a)) / 86400000);
+}
 
 /** QRMP GSTR-3B day for the filer's state (category Y → 24th, else 22nd). */
 export function qrmp3bDay(stateCode: string | undefined, periodStart: string): number {
