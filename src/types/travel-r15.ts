@@ -131,8 +131,6 @@ export interface TvSnapshot {
 export interface TravelBooking {
   /** C1: tickets entered on an `air` booking (copied to the invoice's `tv.lines` when billed). */
   tkt?: TvTicket[];
-  /** C4: the commission invoice that billed `commission` (billed while that invoice is live). */
-  commission_inv?: string;
 }
 
 /** C2: one row of a supplier statement (BSP TKTT / RFND / ADMA / ACMA, a consolidator or bed-bank line). */
@@ -165,8 +163,6 @@ export interface SupplierStatement {
   rows: StatementRow[];
   totals: { gross: number; taxes: number; commission: number; net: number };
   bill_id?: string;
-  /** C4: the commission invoice that billed this statement's commission. */
-  commission_inv?: string;
   file_name?: string;
   created_at: string;
   updated_at?: string;

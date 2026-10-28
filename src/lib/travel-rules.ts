@@ -48,9 +48,9 @@ export const AIR_AGENT_VALUE_RULES: readonly TvRule<{ domestic: number; intl: nu
   { from: '2017-07-01', value: { domestic: 5, intl: 10 }, source: 'Rule 32(3) CGST Rules 2017: 5 % of the basic fare (domestic), 10 % (international), at the agent\'s option (as reported; TV11)', verified: false },
 ];
 
-/** SAC and GST rate of the agent's own services: air-ticket booking, other travel / hotel bookings, insurance agency (TV11, TV16, TV17). */
-export const AIR_SAC_RULES: readonly TvRule<{ air: string; other: string; insurance: string; rate: number }>[] = [
-  { from: '2017-07-01', value: { air: '998551', other: '998552', insurance: '997161', rate: 18 }, source: 'SAC 998551 / 998552 (reservation services), 997161 (insurance agents) at 18 % (as reported; TV11, TV16, TV17)', verified: false },
+/** SAC and GST rate of the agent's own services: air-ticket booking, other travel / hotel bookings (TV11, TV32). */
+export const AIR_SAC_RULES: readonly TvRule<{ air: string; other: string; rate: number }>[] = [
+  { from: '2017-07-01', value: { air: '998551', other: '998552', rate: 18 }, source: 'SAC 998551 / 998552 (reservation services) at 18 % (as reported; TV11, TV32)', verified: false },
 ];
 
 /** Airline GST passed through on a ticket (shown, never our output tax): economy / other classes (TV12). */

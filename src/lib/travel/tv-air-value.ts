@@ -71,7 +71,7 @@ export function mergeTickets(items: readonly InvoiceItem[], tv: TvSnapshot | und
   const svc = value > 0 ? svcLine(o.method === 'deemed' ? 'Air travel agent service — value under Rule 32(3)' : 'Service fee — air tickets', sac.air, value, sac.rate) : null;
   const r = ruleAt(AIR_AGENT_VALUE_RULES, o.date);
   const basic = round2(tickets.reduce((s, t) => s + n(t.basic), 0));
-  const note = o.method === 'deemed' ? `Value of the air travel agent's service: ${r.domestic} % (domestic) / ${r.intl} % (international) of the basic fare ₹${basic.toFixed(2)} = ₹${value.toFixed(2)} (Rule 32(3)); GST ${sac.rate} % on that value. Fares recovered at actual as a pure agent. Verify with your CA.` : '';
+  const note = o.method === 'deemed' ? `Agent's service valued under Rule 32(3) at ${r.domestic} % / ${r.intl} % (domestic / international) of basic fare ₹${basic.toFixed(2)} = ₹${value.toFixed(2)}; fares at actual as pure agent. Verify with your CA.` : '';
   return {
     items: svc ? [...all, svc] : all,
     tv: { ...tv, lines, air: { method: o.method, fee, value, ...(svc ? { line_id: svc.id } : {}), ...(note ? { note } : {}) } },

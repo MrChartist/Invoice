@@ -1,11 +1,10 @@
 /**
- * R15-C2 / C4 statements view (`&view=statements`, lazy): import a BSP / consolidator / bed-bank file (columns guessed
+ * R15-C2 statements view (`&view=statements`, lazy): import a BSP / consolidator / bed-bank file (columns guessed
  * from the preset, the user's fix remembered), the statements with their match counts and totals, one open statement
- * filtered by status (ADM: record or dispute; refunds to pass on), "Make bill" (the only posting) and the commission
- * due by principal with "Bill commission" (194H expected; insurer = reverse charge). Working papers — verify with your CA.
+ * filtered by status (ADM: record or dispute; refunds to pass on) and "Make bill" (the only posting). C4 commission
+ * income: cut 1 (PRD §3, size cap). Working papers — verify with your CA.
  */
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { tvT } from '../../i18n/areas/travel-r15b';
 import { cvList, cvT } from '../../i18n/areas/travel-r15c';
@@ -16,7 +15,6 @@ import { guessColumns, type ColumnMap, type FileTable } from '../../lib/marketpl
 import { readFileTables } from '../marketplace/file-read';
 import { REQUIRED, STATEMENT_KINDS, STATEMENT_PRESETS, importStatement, loadStatements, readStatementRows, removeStatement, updateStatement, type StatementKind } from '../../lib/travel/tv-statements';
 import { makeStatementBill } from '../../lib/travel/tv-statement-bill';
-import { billCommission, loadCommissionDue } from '../../lib/travel/tv-commission';
 import { readTravelSettings } from '../../lib/travel/tv-settings';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -30,17 +28,14 @@ const money = (n: number) => formatCurrency(n);
 
 export default function StatementsView({ notify }: TvViewProps) {
   useT();
-  const go = useNavigate();
   const run = runWith(notify);
   const [tick, setTick] = useState(0);
   const [open, setOpen] = useState('');
   const [filter, setFilter] = useState('');
-  const [month, setMonth] = useState(todayInput().slice(0, 7));
-  const d = useMemo(() => { void tick; return { sts: loadStatements(), vendors: getTable<{ id: string; name: string }>('vendors'), due: loadCommissionDue(`${month}-01`, `${month}-31`) }; }, [tick, month]);
+  const d = useMemo(() => { void tick; return { sts: loadStatements(), vendors: getTable<{ id: string; name: string }>('vendors') }; }, [tick]);
   const refresh = () => setTick((t) => t + 1);
   const vname = (id: string) => d.vendors.find((v) => v.id === id)?.name ?? '—';
   const sel = d.sts.find((s) => s.id === open);
-  const toInvoice = (id?: string) => { if (id) go(`/invoice/${id}`); };
   const flag = (r: StatementRow) => (r.flag === 'adm' ? cvT('adm') : r.flag === 'refund' ? cvT('refundFlag') : '');
   return (
     <>
@@ -85,16 +80,6 @@ export default function StatementsView({ notify }: TvViewProps) {
           </div>
         </section>
       )}
-      <h3>{cvT('due')}</h3>
-      <div style={row}><Field label={tvT('month')}><input type="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} /></Field></div>
-      <ul data-tv-commission>
-        {d.due.map((c) => (
-          <li key={c.vendor_id}>
-            {vname(c.vendor_id)} · {money(c.amount)} · {c.insurance ? cvT('rcm') : cvT('tds')}{' '}
-            <button type="button" className={sm} data-tv-bill-comm onClick={() => { const inv = run(() => billCommission(c.vendor_id, `${month}-01`, `${month}-31`)); if (inv) { refresh(); toInvoice(inv.id); } }}>{cvT('billComm')}</button>
-          </li>
-        ))}
-      </ul>
     </>
   );
 }
@@ -105,7 +90,7 @@ function ImportForm({ vendors, notify, onDone }: { vendors: { id: string; name: 
   const [file, setFile] = useState<{ name: string; t: FileTable; cols: ColumnMap } | null>(null);
   const guess = (t: FileTable, k: StatementKind): ColumnMap => {
     const saved = readTravelSettings().statement_maps?.[k];
-    return guessColumns(t.headers, STATEMENT_PRESETS[k], saved ? { preset: k, columns: Object.entries(saved).map(([field, header]) => ({ field, header })) } : undefined);
+    return guessColumns(t.headers, STATEMENT_PRESETS[k]!, saved ? { preset: k, columns: Object.entries(saved).map(([field, header]) => ({ field, header })) } : undefined);
   };
   const pick = async (fl?: File) => {
     if (!fl) return;
@@ -119,7 +104,7 @@ function ImportForm({ vendors, notify, onDone }: { vendors: { id: string; name: 
     if (!file) return;
     const missing = REQUIRED.filter((x) => !file.cols.has(x));
     if (missing.length) return notify(`Map the columns: ${missing.join(', ')}.`, 'error');
-    const rows = readStatementRows(file.t, file.cols, kind);
+    const rows = readStatementRows(file.t, file.cols);
     const days = rows.map((r) => r.date).filter((x): x is string => !!x).sort();
     const made = runWith(notify)(() => importStatement({ vendor_id: f.vendor_id, kind, ref: f.ref.trim() || file.name, period_start: f.from || days[0] || todayInput(), period_end: f.to || days[days.length - 1] || todayInput(), rows, file_name: file.name, map: Object.fromEntries([...file.cols].map(([k, i]) => [k, file.t.headers[i]])) }), cvT('imported', { n: rows.length }));
     if (made) { setFile(null); onDone(); }
@@ -132,7 +117,7 @@ function ImportForm({ vendors, notify, onDone }: { vendors: { id: string; name: 
       <Field label={tvT('from')}><input type="date" className={controls.input} value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></Field>
       <Field label={tvT('to')}><input type="date" className={controls.input} value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></Field>
       <Field label={cvT('file')}><input type="file" accept=".csv,.xlsx,.xlsm,.txt" onChange={(e) => void pick(e.target.files?.[0])} data-tv-st-file /></Field>
-      {file && Object.keys(STATEMENT_PRESETS[kind]).map((k) => (
+      {file && Object.keys(STATEMENT_PRESETS[kind]!).map((k) => (
         <Field key={k} label={({ doc_no: cvT('doc'), type: cvT('type'), date: tvT('from'), pax: tvT('pax'), gross: cvT('gross'), taxes: cvT('taxes'), commission: tvT('commission'), net: cvT('net') } as Record<string, string>)[k] ?? k}>
           <select className={controls.select} value={file.cols.get(k) ?? ''} onChange={(e) => { const cols = new Map(file.cols); if (e.target.value === '') cols.delete(k); else cols.set(k, Number(e.target.value)); setFile({ ...file, cols }); }}>
             <option value="">—</option>{file.t.headers.map((h, i) => <option key={i} value={i}>{h}</option>)}

@@ -1,5 +1,5 @@
 /**
- * R15-C2 supplier statements: column presets (BSP billing file, consolidator, bed-bank) scored with the importer's
+ * R15-C2 supplier statements: column presets (BSP billing file, consolidator) scored with the importer's
  * header matcher (the R5-A marketplace mapper, `marketplace/file-map.ts`), the user's fixed mapping remembered per
  * preset (`travel_settings.statement_maps`), rows split by month above 2,000, and table `supplier_statements` (dated
  * by `period_end`, synced, audited, `books.edit`, deletes to the recycle bin) with the match stored on each row. One
@@ -20,30 +20,30 @@ import { readTravelSettings, saveTravelSettings } from './tv-settings';
 import { TV_TABLES } from './tv-shared';
 
 export type StatementKind = SupplierStatement['kind'];
-export const STATEMENT_KINDS: readonly StatementKind[] = ['bsp', 'consolidator', 'bedbank'];
+/** Presets: BSP and consolidator (the bed-bank preset is cut 2, PRD §3 — map a bed-bank file as a consolidator's). */
+export const STATEMENT_KINDS: readonly StatementKind[] = ['bsp', 'consolidator'];
 export const MAX_ROWS = 2000;
 
-const DOC = ['Document Number', 'Ticket Number', 'Ticket No', 'Document No', 'Doc No', 'TKT No', 'Ticket'];
-const DATE = ['Issue Date', 'Date of Issue', 'Date', 'Transaction Date'];
-const PAX = ['Passenger Name', 'Passenger', 'Pax Name', 'Pax', 'Guest Name', 'Guest'];
-const COMM = ['Commission', 'Commission Amount', 'Std Comm', 'Comm'];
-/** Field → header spellings, per preset. */
-export const STATEMENT_PRESETS: Readonly<Record<StatementKind, SynonymTable>> = {
-  bsp: { doc_no: DOC, type: ['Transaction Type', 'Trans Type', 'TRNC', 'Type'], date: DATE, pax: PAX, gross: ['Gross Fare', 'Fare Amount', 'Fare', 'Gross'], taxes: ['Taxes', 'Tax Amount', 'Tax'], commission: COMM, net: ['Net Remit', 'Net Remittance', 'Balance Payable', 'Net Amount', 'Net'] },
-  consolidator: { doc_no: [...DOC, 'Booking Ref', 'Reference', 'Ref', 'PNR'], type: ['Type', 'Transaction Type'], date: DATE, pax: PAX, gross: ['Gross', 'Gross Amount', 'Amount', 'Total'], taxes: ['Taxes', 'Tax'], commission: COMM, net: ['Net Payable', 'Net Amount', 'Net'] },
-  bedbank: { doc_no: ['Booking Ref', 'Booking Reference', 'Confirmation No', 'Voucher No', 'Reference'], date: ['Check-in', 'Check In', 'Arrival', 'Date'], pax: PAX, gross: ['Amount', 'Booking Amount', 'Net Rate', 'Total'], net: ['Net Payable', 'Net'] },
+const DOC = ['Document Number', 'Ticket Number', 'Ticket', 'Doc No'];
+const DATE = ['Issue Date', 'Date'];
+const PAX = ['Passenger Name', 'Pax'];
+const COMM = ['Commission', 'Comm'];
+/** Field → header spellings, per preset (scored loosely by `scoreHeader`). */
+export const STATEMENT_PRESETS: Readonly<Partial<Record<StatementKind, SynonymTable>>> = {
+  bsp: { doc_no: DOC, type: ['Transaction Type', 'TRNC', 'Type'], date: DATE, pax: PAX, gross: ['Gross Fare', 'Fare'], taxes: ['Taxes', 'Tax'], commission: COMM, net: ['Net Remit', 'Balance Payable', 'Net'] },
+  consolidator: { doc_no: [...DOC, 'Ref', 'Booking Ref', 'PNR'], type: ['Type'], date: DATE, pax: PAX, gross: ['Gross', 'Amount'], taxes: ['Taxes', 'Tax'], commission: COMM, net: ['Net Payable', 'Net'] },
 };
 export const REQUIRED = ['doc_no', 'gross'];
 
 /** Rows read from a file by the column map (blank document numbers skipped). Net defaults to gross + taxes − commission. */
-export function readStatementRows(t: FileTable, cols: ColumnMap, kind: StatementKind): StatementRow[] {
+export function readStatementRows(t: FileTable, cols: ColumnMap): StatementRow[] {
   const out: StatementRow[] = [];
   for (const row of t.rows) {
     const doc_no = cellOf(row, cols, 'doc_no');
     if (!doc_no) continue;
     const gross = Math.abs(numOf(row, cols, 'gross') ?? 0), taxes = Math.abs(numOf(row, cols, 'taxes') ?? 0), commission = Math.abs(numOf(row, cols, 'commission') ?? 0);
     const net = numOf(row, cols, 'net');
-    const type = (cellOf(row, cols, 'type') || (kind === 'bedbank' ? 'HOTEL' : 'TKTT')).toUpperCase();
+    const type = (cellOf(row, cols, 'type') || 'TKTT').toUpperCase();
     const r: StatementRow = { doc_no, type: /^RF|REFUND/.test(type) ? 'RFND' : /^ADM/.test(type) ? 'ADMA' : /^ACM/.test(type) ? 'ACMA' : type.slice(0, 8), gross: round2(gross), taxes: round2(taxes), commission: round2(commission), net: round2(net === null ? gross + taxes - commission : Math.abs(net)) };
     const date = dayOf(row, cols, 'date'), pax = cellOf(row, cols, 'pax');
     if (date) r.date = date;

@@ -5,19 +5,14 @@
  * it warns (TV11). Working papers — verify with your CA.
  */
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useShallow } from 'zustand/react/shallow';
-import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { useT } from '../../i18n';
 import { cvList, cvT } from '../../i18n/areas/travel-r15c';
 import type { TravelBooking, TvTicket } from '../../types/travel-r15';
-import { formatCurrency, todayInput } from '../../lib/utils';
-import { airlineGst, deemedValue, mergeTickets, validateTicket, type AirMethod } from '../../lib/travel/tv-air-value';
-import { billTickets } from '../../lib/travel/tv-air';
+import { formatCurrency } from '../../lib/utils';
+import { airlineGst, deemedValue, validateTicket, type AirMethod } from '../../lib/travel/tv-air-value';
 import { readTravelSettings } from '../../lib/travel/tv-settings';
 import controls from '../../styles/controls.module.css';
 import { Field } from './tv-ui';
-import type { Notify } from './tv-run';
 
 type Row = Record<'pax' | 'airline' | 'ticket_no' | 'pnr' | 'sector' | 'basic' | 'taxes' | 'airline_gst', string> & { class: 'economy' | 'other'; intl: boolean };
 const CLS = ['economy', 'other'] as const;
@@ -30,35 +25,24 @@ const ticket = (r: Row, date: string): TvTicket => {
   return t;
 };
 
-export default function TicketRows({ booking, notify, onDone }: { booking?: TravelBooking; notify?: Notify; onDone?: () => void }) {
+/** `have`: tickets already on the document (deemed value over all); `onAdd` adds / bills them (throws → shown). */
+export default function TicketRows({ booking, date, have = [], method0, onAdd }: { booking?: TravelBooking; date: string; have?: TvTicket[]; method0?: AirMethod; onAdd: (t: TvTicket[], o: { method: AirMethod; fee: number; date: string }) => void }) {
   useT();
-  const go = useNavigate();
-  const s = useInvoiceStore(useShallow((st) => ({ items: st.items, tv: st.tv, date: st.issue_date })));
-  const date = booking ? todayInput() : s.date;
   const [rows, setRows] = useState<Row[]>(() => [blank(booking)]);
   const [fee, setFee] = useState('');
-  const [method, setMethod] = useState<AirMethod>(s.tv?.air?.method && !booking ? s.tv.air.method : readTravelSettings().air_value ?? 'deemed');
+  const [method, setMethod] = useState<AirMethod>(method0 ?? readTravelSettings().air_value ?? 'deemed');
   const [err, setErr] = useState('');
   const set = (k: number, p: Partial<Row>) => setRows((x) => x.map((r, i) => (i === k ? { ...r, ...p } : r)));
   const tickets = rows.map((r) => ticket(r, date));
-  const have = booking ? [] : Object.entries(s.tv?.lines ?? {}).filter(([id]) => s.items.some((l) => l.id === id)).map(([, v]) => v.tkt!).filter(Boolean);
   const value = method === 'deemed' ? deemedValue([...have, ...tickets], date) : Number(fee) || 0;
   const add = () => {
-    const e = tickets.map(validateTicket).find(Boolean) ?? '';
-    setErr(e);
-    if (e) return;
-    const o = { method, fee: Number(fee) || 0, date };
-    if (booking) {
-      try {
-        const inv = billTickets(booking.id, tickets, o);
-        onDone?.();
-        go(`/invoice/${inv.id}`);
-      } catch (x) { notify?.((x as Error).message, 'error'); }
-      return;
-    }
-    const m = mergeTickets(s.items.filter((l) => l.name?.trim() || Number(l.rate)), s.tv, tickets, o);
-    useInvoiceStore.getState().patch({ items: m.items, tv: m.tv });
-    setRows([blank()]);
+    try {
+      const e = tickets.map(validateTicket).find(Boolean);
+      if (e) throw new Error(e);
+      onAdd(tickets, { method, fee: Number(fee) || 0, date });
+      setErr('');
+      setRows([blank()]);
+    } catch (x) { setErr((x as Error).message); }
   };
   const txt = (k: number, f: keyof Row, label: string, num?: boolean, ph?: string) => <input className={controls.input} aria-label={label} placeholder={ph ?? label} inputMode={num ? 'decimal' : undefined} style={{ width: num ? '6rem' : '8rem' }} value={rows[k][f] as string} onChange={(e) => set(k, { [f]: e.target.value })} data-tv-tkt={f} />;
   return (
