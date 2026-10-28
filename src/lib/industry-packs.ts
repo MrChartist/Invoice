@@ -36,7 +36,9 @@ export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit
   // R17 (R17-A1): manpower packs (one desk tab `deploy` on /time; switched on by the manpower profile, never by a type)
   | 'manpower' | 'security'
   // R18 (R18-A1): the housing-society pack (one desk tab `society` on /recurring; switched on by the society profile, never by a type)
-  | 'society';
+  | 'society'
+  // R19 (R19-A1): logistics packs (one desk tab `shipments` on /time; switched on by the logistics profile, never by a type)
+  | 'logistics' | 'customs' | 'courier' | 'warehouse';
 
 export const PACK_IDS: readonly PackId[] = [
   'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
@@ -51,6 +53,7 @@ export const PACK_IDS: readonly PackId[] = [
   'travel', 'events', // R15 (R15-B1)
   'manpower', 'security', // R17 (R17-A1)
   'society', // R18 (R18-A1)
+  'logistics', 'customs', 'courier', 'warehouse', // R19 (R19-A1)
 ];
 
 /** The packs a business type implies when `industry_packs` is absent. */
@@ -336,7 +339,7 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'legal', alsoPacks: ['cafirm'], path: '/time?tab=clientmoney&view=statements', labelKey: 'r14.cm.statements' },
   { pack: 'design', path: '/time?tab=matters&view=stages', labelKey: 'r14.matters.stages' },
   // PS-C: export-of-services desk
-  { pack: 'svcexport', path: '/time?tab=exportsvc', labelKey: 'r14.exportsvc' },
+  { pack: 'svcexport', alsoPacks: ['logistics'], path: '/time?tab=exportsvc', labelKey: 'r14.exportsvc' }, // R19-A: + logistics (agent commission, freight to overseas agents)
   { pack: 'svcexport', path: '/time?tab=exportsvc&view=checker', labelKey: 'r14.exportsvc.checker' },
   { pack: 'svcexport', path: '/time?tab=exportsvc&view=edf', labelKey: 'r14.exportsvc.edf' },
   { pack: 'svcexport', path: '/time?tab=exportsvc&view=realisation', labelKey: 'r14.exportsvc.realisation' },
@@ -371,6 +374,10 @@ export const PACK_TABS: readonly PackTab[] = [
   // R18-D
   { pack: 'society', path: '/recurring?tab=society&view=funds', labelKey: 'r18.society.funds' },
   { pack: 'society', path: '/recurring?tab=society&view=registers', labelKey: 'r18.society.registers' },
+  // R19: the Shipments desk on /time (A: jobs / rates; B: billing / costing; C: customs; D: agents / courier / storage — labels `r19.*`)
+  { pack: 'logistics', alsoPacks: ['customs', 'courier', 'warehouse'], path: '/time?tab=shipments', labelKey: 'r19.shipments' },
+  { pack: 'logistics', alsoPacks: ['customs', 'courier', 'warehouse'], path: '/time?tab=shipments&view=jobs', labelKey: 'r19.shipments.jobs' },
+  { pack: 'logistics', alsoPacks: ['customs', 'courier', 'warehouse'], path: '/time?tab=shipments&view=rates', labelKey: 'r19.shipments.rates' },
 ];
 
 /**

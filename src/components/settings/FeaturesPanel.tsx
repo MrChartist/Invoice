@@ -27,6 +27,9 @@ import { mpPickT } from '../../i18n/areas/manpower-r17a-pick';
 import { applySocietyKind } from '../../lib/shop-presets'; // R18-A1
 import { SocietyKindPicker } from '../society/SocietyKindPicker';
 import { hsPickT } from '../../i18n/areas/society-r18a-pick';
+import { applyLogisticsKind } from '../../lib/shop-presets'; // R19-A1
+import { LogisticsKindPicker } from '../logistics/LogisticsKindPicker';
+import { lgPickT } from '../../i18n/areas/logistics-r19a-pick';
 import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
 const ConstructionSettingsForm = lazy(() => import('../construction/ConstructionSettingsForm')); // R11 (CN-A1, PENDING #22)
 import { DB_PREFIX, getJson } from '../../lib/storage';
@@ -256,6 +259,23 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
                 if (!k) return onChange({ society_kind: undefined });
                 const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
                 onChange(applySocietyKind(k, { registered, currentPacks: Array.isArray(settings.industry_packs) ? packsOn : [] }) as Partial<typeof settings>); // explicit packs only: the type's implied donations pack is not carried
+              }}
+            />
+          </div>
+        )}
+        {/* R19-A1: "Logistics profile" for every transport company (+ Custom); the ticks follow the packs; changing it deletes nothing */}
+        {(settings.business_type === 'transport' || !!settings.logistics_kind) && (
+          <div className={controls.field} data-features-logistics>
+            <span className={controls.label}>{lgPickT('title')}</span>
+            <LogisticsKindPicker
+              value={{ kind: settings.logistics_kind ?? '', extra: packsOn.filter((p): p is 'courier' | 'warehouse' => p === 'courier' || p === 'warehouse'), lorries: Array.isArray(settings.industry_packs) && packsOn.includes('transport') }}
+              custom
+              disabled={!owner}
+              onPick={(v) => {
+                if (!v.kind) return onChange({ logistics_kind: undefined });
+                const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
+                const keep = (Array.isArray(settings.industry_packs) ? packsOn : []).filter((p) => !['transport', 'customs', 'courier', 'warehouse'].includes(p)); // the picker decides these four
+                onChange(applyLogisticsKind(v.kind, { registered, ownLorries: v.lorries, extra: v.extra, currentPacks: keep }) as Partial<typeof settings>);
               }}
             />
           </div>

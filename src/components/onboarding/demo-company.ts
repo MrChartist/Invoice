@@ -21,6 +21,7 @@ import { demoExtras } from '../../lib/demo/profiles';
 
 export const DEMO_PENDING_KEY = 'mrchartist_demo_pending';
 const SOCIETY_KEY = 'mrchartist_inv_society_settings'; // R18-A (`society/hs-shared.ts` HS_OBJECTS.settings)
+const LOGISTICS_KEY = 'mrchartist_inv_logistics_settings'; // R19-A (`logistics/lg-shared.ts` LG_OBJECTS.settings)
 export const DEMO_COMPANY_NAME = 'Demo';
 
 export interface DemoPending {
@@ -112,6 +113,7 @@ export async function fillDemo(meta: Omit<DemoPending, 'id'> = {}): Promise<void
   const r = loadDemoData({ confirm: true, today, extras });
   // R18-A: the society tariff (an object, not a table): written only here, in the Demo company, and only when absent.
   if (extras.societySettings && r.ok && readRaw(SOCIETY_KEY) === null) writeRaw(SOCIETY_KEY, JSON.stringify(extras.societySettings));
+  if (extras.logisticsSettings && r.ok && readRaw(LOGISTICS_KEY) === null) writeRaw(LOGISTICS_KEY, JSON.stringify(extras.logisticsSettings)); // R19-A: the heads, same rule
   // (Narrowed by hand: the non-strict test project reads this file too.)
   const reason = r.ok ? '' : (r as { reason: string }).reason;
   if (reason && reason !== 'already_loaded') throw new Error(reason);
