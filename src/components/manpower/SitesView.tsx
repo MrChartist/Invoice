@@ -10,7 +10,6 @@ import { localDb } from '../../lib/localDb';
 import { formatCurrency, todayInput } from '../../lib/utils';
 import { endsSoon, loadSites, monthValue, siteLabel } from '../../lib/manpower/mp-sites';
 import { firmForm } from '../../lib/manpower/mp-regime';
-import type { SiteInput } from '../../lib/manpower/mp-sites-io';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import SiteForm from './SiteForm';
@@ -28,7 +27,7 @@ export default function SitesView({ notify }: MpViewProps) {
   const sel = open ? data.sites.find((s) => s.id === open) : undefined;
   const clientOf = (id?: string) => data.clients.find((c) => c.id === id);
   if (open !== null) {
-    return <SiteForm key={open} site={sel} sites={data.sites} clients={data.clients} entity={data.entity} notify={notify} onDone={(s?: SiteInput) => { setTick((t) => t + 1); setOpen(s?.id ?? null); }} />;
+    return <SiteForm key={open} site={sel} sites={data.sites} clients={data.clients} entity={data.entity} notify={notify} onDone={() => { setTick((t) => t + 1); setOpen(null); }} />;
   }
   return (
     <>

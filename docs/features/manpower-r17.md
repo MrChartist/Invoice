@@ -65,9 +65,9 @@ Before = `claude/elegant-cannon-cwapiv` at `a188df9` (QA19 merged), after = this
 
 | Budget | Before | After | Delta | Cap |
 |---|---|---|---|---|
-| Initial JS (first paint) | 186,513 B (182.1 kB) | 186,547 B (182.2 kB) | **+34 B** (entry preload map only: order of `lazy-leaves` / `vendor-ui` in a dependency list; no new file, no Round 17 code) | 0 ✗ (display rounds 182.14 → 182.18) |
-| Entry chunk | 88.1 kB | 88.2 kB | same +34 B | — |
-| Core precache (English) | 3,102.7 kB | 3,114.2 kB | +11.5 raw; **+10.6 kB normalized** | 11 kB ✓ |
+| Initial JS (first paint) | 186,513 B (182.1 kB) | 186,541 B (182.2 kB) | **+28 B** (entry preload map only: order of `lazy-leaves` / `vendor-ui` in a dependency list; no new file, no Round 17 code) | 0 ✗ (display rounds 182.14 → 182.17) |
+| Entry chunk | 88.1 kB | 88.2 kB | same +28 B | — |
+| Core precache (English) | 3,102.7 kB | 3,114.0 kB | +11.3 raw; **+10.6 kB normalized** | 11 kB ✓ |
 | Hindi pack | 340.6 kB | 342.4 kB | +1.8 kB (`lang-hi-manpower` 1.35 kB + wiring areas) | 8 kB ✓ |
 | Hindi left in core | 21.3 kB | 21.3 kB | 0 | 0 ✓ |
 | `lazy-leaves` | 16.1 kB | 16.6 kB | +0.48 kB (`demo/profile-manpower.ts`, `manpower/mp-registry.ts`) | 0.5 kB ✓ |
@@ -80,6 +80,6 @@ editor 0.09, Features 0.07, the rest < 0.07 each).
 
 First paint: the registry is excluded from the family (`familyRe(…, 'mp-registry')`) because `sync-engine.ts` and
 `trust/recycle-bin.ts` import it statically — inside `f-manpower` it made every sync run load the whole family chunk
-and added the chunk's file name to the entry's preload map (+38 B). As a leaf it adds no file; the remaining +34 B is
+and added the chunk's file name to the entry's preload map (+38 B). As a leaf it adds no file; the remaining +28 B is
 the dependency order of one map entry. Not reduced further without dropping the registry import from those two lazy
 writers (AGENTS.md rule) — the lead may accept it as R15-B's +24 B was.

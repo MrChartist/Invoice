@@ -12,14 +12,14 @@ import { todayInput } from '../../lib/utils';
 import type { Client } from '../../types/invoice';
 import type { ClientMp, MpBasis, MpPost, SiteInfo, SiteStatus } from '../../types/manpower-r17';
 import { MP_BASES, SITE_STATUSES, suggestSac, suggestSiteCode, type Site } from '../../lib/manpower/mp-sites';
-import { saveClientMp, saveSite, type SiteInput } from '../../lib/manpower/mp-sites-io';
+import { saveClientMp, saveSite } from '../../lib/manpower/mp-sites-io';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field as F, RegimeChip, type Notify } from './mp-ui';
 
 const row = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.75rem' } as const;
 
-export default function SiteForm({ site, sites, clients, entity, notify, onDone }: { site?: Site; sites: readonly Site[]; clients: readonly Client[]; entity: string; notify: Notify; onDone: (s?: SiteInput) => void }) {
+export default function SiteForm({ site, sites, clients, entity, notify, onDone }: { site?: Site; sites: readonly Site[]; clients: readonly Client[]; entity: string; notify: Notify; onDone: () => void }) {
   useT();
   const kind = localDb.settings.get().manpower_kind;
   const shift = kind === 'security' ? 12 : 8;
@@ -32,10 +32,10 @@ export default function SiteForm({ site, sites, clients, entity, notify, onDone 
   const post = (i: number, p: Partial<MpPost>) => set({ posts: mp.posts.map((x, k) => (k === i ? { ...x, ...p, ...(p.name !== undefined && x.sac === suggestSac(x.name, kind) ? { sac: suggestSac(p.name, kind) } : {}) } : x)) });
   const run = (fn: () => void) => { try { fn(); } catch (e) { notify((e as Error).message, 'error'); } };
   const save = () => run(() => {
-    const s = saveSite({ id: site?.id, name, client_id: clientId || undefined, mp });
+    saveSite({ id: site?.id, name, client_id: clientId || undefined, mp });
     if (clientId) saveClientMp(clientId, flags);
     notify(mpT('saved'));
-    onDone(s);
+    onDone();
   });
   const num = (v: string) => (v === '' ? 0 : Number(v));
   return (
