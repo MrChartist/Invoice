@@ -6,6 +6,7 @@ export interface Graph {
   entries: Set<string>;
   initial: Set<string> | null;
   safe: Map<string, Set<string>>;
+  families: Map<string, RegExp>;
 }
 export interface SafeGroup { name: (id: string) => string | null; priority: number; maxModuleSize?: number }
 export declare function createGraph(opts?: { vendor?: RegExp[]; root?: string }): Graph;

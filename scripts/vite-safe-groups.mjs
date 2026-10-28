@@ -19,7 +19,7 @@ import { join, relative, sep } from 'node:path';
 
 /** Shared graph state between the plugin (writer) and the group functions (readers). */
 export function createGraph({ vendor = [], root = process.cwd() } = {}) {
-  return { vendor, root, imports: new Map(), entries: new Set(), initial: null, safe: new Map() };
+  return { vendor, root, imports: new Map(), entries: new Set(), initial: null, safe: new Map(), families: new Map() };
 }
 
 export const isVendor = (g, id) => g.vendor.some((re) => re.test(id));
@@ -114,10 +114,11 @@ export function isLeaf(g, id) {
   return !initialSet(g).has(id) && (g.imports.get(id) ?? []).every((d) => fixed(g, d));
 }
 
-const rel = (g, id) => relative(g.root, id).split(sep).join('/');
+const rel = (g, id) => (id.startsWith(g.root) ? relative(g.root, id).split(sep).join('/') : id.replace(/\0/g, ''));
 
 /** A family group: `test` matches the family's files; only safe members are captured. */
 export function safeFamilyGroup(g, name, re, priority) {
+  g.families.set(name, re);
   return {
     name: (id) => {
       if (!re.test(id)) return null;
@@ -170,7 +171,8 @@ export function graphPlugin(g) {
       }
       const out = join(g.root, 'build-meta');
       mkdirSync(out, { recursive: true });
-      writeFileSync(join(out, 'chunks.json'), JSON.stringify({ initialModules: initial.size, chunks, imports: modules }, null, 1));
+      const families = Object.fromEntries([...g.families].map(([n, re]) => [n, re.source]));
+      writeFileSync(join(out, 'chunks.json'), JSON.stringify({ initialModules: initial.size, families, chunks, imports: modules }, null, 1));
     },
   };
 }
