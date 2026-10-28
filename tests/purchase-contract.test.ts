@@ -1182,5 +1182,5 @@ test('R19-D readers (lg-agents, lg-alerts, lg-reports) read the real purchase sh
   const duty: PurchaseRecord = { ...bill, id: 'p10', date: '2026-01-01', lg: { job_id: 'j', on_behalf: true, disb: 'duty' } };
   const job = { id: 'j', number: 'J1', date: '2026-01-01', status: 'booked', dir: 'import', mode: 'sea_fcl', origin: 'NSA', destination: 'BOM', client_id: 'c', refs: {}, updated_at: '' } as const;
   assert.deepEqual(lgAlerts('2026-04-12', { jobs: [job], invoices: [], purchases: [duty], advances: [], manifests: [] }).map((n) => n.id), ['lg:disb:j']);
-  assert.deepEqual(disbAgeing([job], [], [duty], '2026-04-12')[0].b, [0, 0, 1180, 0], 'ageing reads total and date as stored');
+  assert.deepEqual(disbAgeing([job], [], [duty], '2026-04-12')[0].b, [0, 0, 0, 1180], 'ageing reads total and date as stored (101 days)');
 });
