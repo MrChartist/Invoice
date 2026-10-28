@@ -254,4 +254,16 @@ stays on the bill form, ≈ −0.3), drop the "near the threshold" list (history
 
 ### Bundle (R16-C)
 
-SIZES
+Before = `claude/elegant-cannon-cwapiv` at `9c7654b` (same tree as `cbfb46c`, R16-A merged), after = this branch;
+`vite build` + gzip -9 (the budget script's method).
+
+| Budget | Before | After | Delta | Cap |
+|---|---|---|---|---|
+| First paint | 182.1 kB | 182.1 kB | 0 | 0 ✓; 4 initial files |
+| Core precache | 3,159,641 B (3,085.6 kB) | 3,165,083 B (3,090.9 kB) | **+5.3 kB** | 8 kB ✓ |
+| Hindi pack | 346,753 B (338.6 kB) | 347,077 B (338.9 kB) | +0.3 kB | 3 kB ✓ |
+
+Breakdown (gz, estimated, not measured per module): the Trips desk chunk (commission and re-issue engines, the re-issue form, bookings actions, strings
+in English) ≈ +3.1 kB, demo rows `profile-travel` ≈ +1.0 kB (over the 0.6 kB line cap: the TCS invoice, the event and
+the statement), rules +0.3, bed-bank preset / labels +0.2, hotel button +0.1, help / Ctrl+K +0.2; `ps-tds-recv` is
+reused from its existing chunk.
