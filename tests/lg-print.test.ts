@@ -22,3 +22,9 @@ test('old invoices print exactly as before; an empty snapshot prints no block', 
   assert.equal(trackingText({ id: 'l1', batch_no: 'B1' } as never), 'Batch B1');
   assert.equal(trackingText({ id: 'l1', charge_head_id: 'rule33' } as never), '', 'a pure-agent line of a non-job document is unchanged');
 });
+
+test('R19-B4: the exchange rate of a foreign-currency charge prints with Rule 34(2) (LG13)', () => {
+  const p = logisticsPaper({ ...air, fx: { currency: 'USD', rate: 84, source: 'RBI' } });
+  assert.deepEqual(p.rows.at(-1), ['Exchange rate', '₹84.00 / USD (Rule 34(2) CGST Rules — as per accounting standards)']);
+  assert.ok(!logisticsPaper(air).rows.some(([k]) => k === 'Exchange rate'));
+});

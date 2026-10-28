@@ -706,8 +706,11 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
 
   const st = rec.supply_type;
   const isSez = st === 'SEZ_WITH_PAYMENT' || st === 'SEZ_WITHOUT_PAYMENT';
+  // R19-B (LG15): export freight billed to a registered Indian recipient (POS 96 under the Sec 12(8) proviso) is B2B
+  // with POS 96 and IGST (Circular 184/16/2022-GST Sl. 4), not an export (Table 6A).
+  const freight96 = posRaw === '96' && rec.lg?.regime === 'export_freight' && checkGstin((rec.client?.gstin ?? '').trim().toUpperCase()).valid;
   const isExport =
-    posRaw === '96' ||
+    (posRaw === '96' && !freight96) ||
     st === 'EXPORT_LUT' ||
     st === 'EXPORT_WITH_PAYMENT' ||
     (!!rec.currency && rec.currency !== 'INR' && !posRaw);
@@ -752,7 +755,7 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     push('error', 'GSTIN_INVALID', `client GSTIN "${gstinRaw}" is invalid (${chk.message}); treated as unregistered.`, '/clients', 'Fix client');
   }
   const registered = chk.valid;
-  if (registered && chk.stateCode && pos && chk.stateCode !== pos && !isExport) {
+  if (registered && chk.stateCode && pos && chk.stateCode !== pos && !isExport && !freight96) {
     push('info', 'POS_VS_GSTIN', `place of supply ${pos} differs from client GSTIN state ${chk.stateCode}; correct only for ship-to / bill-to cases.`);
   }
 

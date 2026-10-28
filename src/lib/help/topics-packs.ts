@@ -283,6 +283,9 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:shipments', 'Shipments', 'शिपमेंट', 'A job file per shipment; its bills and costs hang on it.', 'Each shipment.', { statutory: ca(['LG1', 'LG2']) }),
   t('time:shipments:jobs', 'Jobs', 'जॉब', 'Mode, ports, bills of lading, containers; chargeable weight.', 'Each booking.', { statutory: ca(['LG33']) }),
   t('time:shipments:rates', 'Rates', 'दरें', 'Charge heads: SAC, role (own or pure agent), unit, rate.', 'When rates change.', { statutory: ca(['LG5', 'LG10']) }),
+  // R19-B
+  t('time:shipments:billing', 'Billing', 'बिलिंग', 'Bill a job: one document per place of supply and currency; recoveries at actual.', 'When a job is delivered.', { statutory: ca(['LG2', 'LG9', 'LG13']) }),
+  t('time:shipments:costing', 'Costing', 'लागत', 'Job margin: revenue less tagged supplier bills.', 'Each month.', { statutory: ca(['LG34']) }),
   // R18-A: the Society desk on Recurring (B–D add bills, gst, dues, funds, registers). Working papers — verify with your CA.
   t('recurring:society', 'Society', 'सोसाइटी', 'Societies, apartment associations and RWAs: units, members and the tariff.', 'Each change.', { statutory: ca(['HS1', 'HS28']) }),
   t('recurring:society:units', 'Units', 'यूनिट', 'Flats and shops: areas, cost, owner, tenant, parking. Import a CSV / XLSX sheet (Template button): a preview first, all or nothing, with an undo copy. Delete (to the recycle bin) works only for a unit with no bills and no member; close a billed unit instead.', 'Each new member.', { statutory: ca(['HS8', 'HS34']) }),

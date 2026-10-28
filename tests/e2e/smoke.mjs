@@ -6080,6 +6080,70 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R19-B billing, GST and job costing: job 0001 (export, air, BOM → SIN, delivered) with its charge sheet and USD ₹84.00 on the currency master → Billing → Bill job → two documents: freight POS 96 IGST ₹15,120.00, total ₹99,120.00 (12(8) proviso, USD 1,000.00 @ ₹84.00 printed); local CGST ₹945.00 + SGST ₹945.00, terminal charges outside GST, total ₹14,190.00 → Bill job again: "already billed", still 2; the bill form lists the job; co-loader ₹67,200 + IGST and trucker ₹2,500 tagged → Costing: revenue ₹94,500.00, cost ₹69,700.00, margin ₹24,800.00 (26.2 %)', async () => {
+    const keys = ['settings', 'clients', 'lg_jobs', 'logistics_settings', 'series_counters', 'invoices', 'purchases', 'currency_rates'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const fy0 = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+    const no = `JOB/FY${String(fy0 % 100).padStart(2, '0')}-${String((fy0 + 1) % 100).padStart(2, '0')}/0001`;
+    const st = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...st, business_type: 'transport', logistics_kind: 'multi', industry_packs: ['logistics', 'customs'], modules: undefined, society_kind: undefined, service_kind: undefined, manpower_kind: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined, profiles: (st.profiles ?? []).map((p) => (p.id === st.activeProfileId ? { ...p, companyGstin: '27AAPFU0939F1ZV', stateCode: '27', gst_scheme: 'regular' } : p)) });
+    await writeJson(page, 'clients', [...(prev.clients ?? []).filter((c) => c.id !== 'e2e-lgb-c1'), { id: 'e2e-lgb-c1', name: 'E2E Seabird Exports Pvt Ltd', email: '', address: 'Navi Mumbai', city: 'Navi Mumbai', zip: '400703', gstin: '27AACCD1234E1Z7', state_code: '27' }]);
+    const head = (kind, name, role = 'own', o = {}) => ({ id: `lg-${kind}`, name, kind, role, unit: 'per_shipment', pos_rule: 'auto', active: true, ...o });
+    await writeJson(page, 'logistics_settings', { heads: [head('freight_air', 'Air freight', 'own', { unit: 'per_kg', rate: 2, currency: 'USD', sac: '996531' }), head('origin', 'Origin handling (THC)', 'own', { sac: '996713' }), head('documentation', 'Documentation', 'own', { sac: '996713' }), head('clearance', 'Customs clearance', 'own', { sac: '996712' }), head('port', 'Airline terminal charges', 'pure_agent')] });
+    const charges = [['freight_air', 500, 2, 'USD'], ['origin', 1, 5000], ['documentation', 1, 2000], ['clearance', 1, 3500], ['port', 1, 1800]].map(([k, qty, rate, currency = 'INR']) => ({ head_id: `lg-${k}`, qty, rate, currency, amount: qty * rate }));
+    await writeJson(page, 'lg_jobs', [{ id: 'e2e-lgb-j1', number: no, date: today, status: 'delivered', dir: 'export', mode: 'air', origin: 'BOM', destination: 'SIN', dest_country: 'SG', client_id: 'e2e-lgb-c1', refs: { hawb: 'E2E-HAWB-1', mawb: '176-12345675' }, gross_kg: 480, chargeable_kg: 500, charges, updated_at: `${today}T00:00:00.000Z` }]);
+    await writeJson(page, 'currency_rates', [...(prev.currency_rates ?? []), { id: 'e2e-lgb-usd', currency: 'USD', date: today, rate: 84, source: 'manual' }]);
+    await writeJson(page, 'invoices', (prev.invoices ?? []).filter((i) => !i.lg));
+    await writeJson(page, 'purchases', (prev.purchases ?? []).filter((b) => !b.lg));
+    await readJson(page, 'lg_jobs', [], (v) => v.length === 1 && v[0].id === 'e2e-lgb-j1', 15000);
+    await readJson(page, 'currency_rates', [], (v) => v.some((r) => r.id === 'e2e-lgb-usd'), 15000);
+    await readJson(page, 'settings', {}, (v) => v.logistics_kind === 'multi', 15000);
+    await page.goto(srv.origin + '/time?tab=shipments&view=billing');
+    await page.locator(`[data-lg-bill-row="${no}"] [data-lg-open-sheet]`).click({ timeout: 15000 });
+    await page.locator('[data-lg-bill-job]').click({ timeout: 15000 });
+    const mine = (v) => v.filter((i) => i.lg?.job_id === 'e2e-lgb-j1');
+    const invs = mine(await readJson(page, 'invoices', [], (v) => mine(v).length === 2, 15000));
+    const fr = invs.find((i) => i.place_of_supply === '96'), lc = invs.find((i) => i.place_of_supply === '27');
+    check(fr?.igst_amount === 15120 && fr.total === 99120 && fr.gst_mode === 'IGST' && lc?.cgst_amount === 945 && lc.sgst_amount === 945 && lc.total === 14190, `Bill job: freight POS 96 IGST ₹15,120 / ₹99,120; local CGST + SGST ₹945 each / ₹14,190 (${fr?.total} / ${lc?.total})`);
+    await page.reload();
+    const paper = async (inv) => {
+      await page.goto(srv.origin + `/invoice/${inv.id}`);
+      await page.getByRole('button', { name: /Preview & download PDF/ }).click({ timeout: 15000 });
+      const dlg = page.getByRole('dialog', { name: 'Document preview' });
+      await dlg.locator('[data-logistics-block]').waitFor({ timeout: 15000 });
+      const txt = await dlg.innerText();
+      await page.keyboard.press('Escape');
+      return txt;
+    };
+    const fp = await paper(fr);
+    check(/12\(8\) proviso/.test(fp) && /USD 1,000\.00 @ ₹84\.00/.test(fp) && /₹84\.00 \/ USD/.test(fp) && /15,120\.00/.test(fp) && /99,120\.00/.test(fp), 'the freight paper prints the 12(8) proviso, USD 1,000.00 @ ₹84.00, IGST ₹15,120.00 and ₹99,120.00');
+    const lp = await paper(lc);
+    check(/945\.00/.test(lp) && /14,190\.00/.test(lp) && /Recovered at actual/.test(lp), 'the local paper prints CGST / SGST ₹945.00, the Rule 33 recovery and ₹14,190.00');
+    await page.goto(srv.origin + '/time?tab=shipments&view=billing');
+    await page.locator(`[data-lg-bill-row="${no}"] [data-lg-open-sheet]`).click({ timeout: 15000 });
+    await page.locator('[data-lg-bill-job]').click({ timeout: 15000 });
+    await page.getByText(/Already billed/).first().waitFor({ timeout: 15000 });
+    check(mine(await readJson(page, 'invoices', [])).length === 2, 'Bill job again: already billed, still two documents');
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Add bill/ }).click();
+    const bd = page.getByRole('dialog', { name: 'Add purchase bill' });
+    await bd.locator('[data-lg-bill-job-pick]').selectOption('e2e-lgb-j1', { timeout: 15000 });
+    check(true, 'the purchase-bill form lists the job');
+    await page.keyboard.press('Escape');
+    const bill = (id, o) => ({ id, kind: 'PURCHASE', vendor_name: 'E2E Co-loader', bill_number: id, date: today, category: 'Freight', lines: [{ id: `${id}-l`, name: 'Air freight', hsn: '996531', quantity: 1, rate: 67200, tax_rate: 18 }], taxable: 67200, cgst: 0, sgst: 0, igst: 12096, itc_eligible: true, total: 79296, amount_paid: 0, lg: { job_id: 'e2e-lgb-j1' }, ...o });
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []).filter((b) => !b.lg), bill('E2E-CL-1', {}), bill('E2E-TR-1', { vendor_name: 'E2E Trucker', lines: [{ id: 't', name: 'GTA', hsn: '996791', quantity: 1, rate: 2500, tax_rate: 5 }], taxable: 2500, igst: 0, cgst: 62.5, sgst: 62.5, total: 2625, reverse_charge: true })]);
+    await readJson(page, 'purchases', [], (v) => v.filter((b) => b.lg?.job_id === 'e2e-lgb-j1').length === 2, 15000);
+    await page.goto(srv.origin + '/time?tab=shipments&view=costing');
+    const row = page.locator(`[data-lg-pnl="${no}"]`);
+    await row.waitFor({ timeout: 15000 });
+    const cell = async (k) => (await row.locator(`[data-lg-${k}]`).innerText()).trim();
+    check(/94,500\.00/.test(await cell('rev')) && /69,700\.00/.test(await cell('cost')) && /24,800\.00/.test(await cell('margin')) && (await cell('pct')) === '26.2 %', `Costing: revenue ₹94,500.00, cost ₹69,700.00, margin ₹24,800.00, 26.2 % (${await cell('rev')} / ${await cell('cost')} / ${await cell('pct')})`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {
