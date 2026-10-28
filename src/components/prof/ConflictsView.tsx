@@ -3,12 +3,13 @@ import { useMemo, useState } from 'react';
 import type { ConflictCheck, ConflictHit } from '../../types/prof-r14';
 import { localDb } from '../../lib/localDb';
 import { getTable } from '../../lib/storage';
-import { candidates, loadChecks, saveCheck, searchConflicts } from '../../lib/prof/ps-conflicts';
+import { candidates, deleteCheck, loadChecks, saveCheck, searchConflicts } from '../../lib/prof/ps-conflicts';
 import { loadMatters } from '../../lib/prof/ps-matters';
 import { loadEngagements } from '../../lib/prof/ps-engagements';
 import { can } from '../../lib/access';
 import { todayInput } from '../../lib/utils';
 import { pmT } from '../../i18n/areas/prof-r14a-matters';
+import { r16bT } from '../../i18n/areas/prof-r16b';
 import { psT } from '../../i18n/areas/prof-r14-common';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -56,8 +57,8 @@ export default function ConflictsView({ notify }: Pick<PsDeskProps, 'notify'>) {
         <p className={controls.hint}>{pmT('rule')}</p>
         <div className={surface.tableWrap}>
           <table className={surface.table} data-conflict-checks>
-            <thead><tr><th>{psT('date')}</th><th>{pmT('terms')}</th><th>{psT('status')}</th><th>{psT('reason')}</th></tr></thead>
-            <tbody>{checks.map((c) => <tr key={c.id}><td>{c.date}</td><td>{c.terms.join(', ')}</td><td>{pmT(`res.${c.result}`)}</td><td>{[c.reason, c.consent_note].filter(Boolean).join(' · ')}</td></tr>)}</tbody>
+            <thead><tr><th>{psT('date')}</th><th>{pmT('terms')}</th><th>{psT('status')}</th><th>{psT('reason')}</th><th /></tr></thead>
+            <tbody>{checks.map((c) => <tr key={c.id}><td>{c.date}</td><td>{c.terms.join(', ')}</td><td>{pmT(`res.${c.result}`)}</td><td>{[c.reason, c.consent_note].filter(Boolean).join(' · ')}</td><td>{can('master.edit') && <button type="button" className={controls.btnOutline} onClick={() => window.confirm(r16bT('delAsk', { name: c.terms.join(', ') })) && run(() => (deleteCheck(c.id), true), r16bT('deleted')) && setTick((x) => x + 1)} data-conflict-del>{r16bT('del')}</button>}</td></tr>)}</tbody>
           </table>
         </div>
       </div>

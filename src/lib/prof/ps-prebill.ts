@@ -4,12 +4,14 @@
  * edited selection (so `bill_refs`, the annexure and derived billing are unchanged), then adds the engagement's fee
  * lines, marks covered lines, fills the annexure's `standard` / `billed` row fields and writes the `ps` snapshot
  * (matter, engagement, billing basis, write-up / write-down with its reason).
+ * R16-B2 / B3: optional media lines (`extra`, from `ps-media.ts` `mediaLines`, snapshot in `ps.media`) and, with
+ * `appearances`, entries of appearance / item work types billed as count × fee (`ps-legal.ts`); off = the same draft.
  */
 import './ps-registry';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
-import type { Engagement, PsLine } from '../../types/prof-r14';
+import type { Engagement, PsLine, PsMediaSnap } from '../../types/prof-r14';
 import type { TimeEntry, TimePrefs } from '../../types/time';
-import { billUnbilled, buildBillDraft, currentLiveInvoiceIds, readTimePrefs, unbilledFor, type BillSelection } from '../timesheets';
+import { billUnbilled, buildBillDraft, currentLiveInvoiceIds, readTimePrefs, timeDb, unbilledFor, type BillSelection } from '../timesheets';
 import { generateId } from '../storage';
 import { localDb } from '../localDb';
 import { num, round2 } from '../invoice-calc';
@@ -22,6 +24,10 @@ import { docBilling, lineTaxable } from './ps-writedown';
 import { entryStandard, staffMap } from './ps-staff';
 import { psSnapshot } from './ps-snapshot';
 import { withStandard } from '../annexure';
+import { loadWorkTypes } from '../rate-cards';
+import { appearanceLines } from './ps-legal';
+import { commissionLine } from './ps-media';
+import { foldName } from './ps-conflicts';
 
 export interface EngagementUse { used: number; fees: number; milestones: string[] }
 
@@ -68,7 +74,14 @@ export interface PrebillInput {
   target?: number;
   reason?: string;
   annexure?: boolean;
+  /** R16-B3 (legal): bill entries of appearance / item work types as count × fee. */
+  appearances?: boolean;
+  /** R16-B2 (media): media lines and their snapshot. */
+  extra?: { lines: readonly PrebillLine[]; media?: PsMediaSnap };
 }
+
+export type PrebillLine = Omit<InvoiceItem, 'id' | 'amount' | 'type'> & { charge_head_id?: string };
+const toItem = (l: PrebillLine): InvoiceItem => ({ id: generateId(), type: 'Service', ...l, amount: round2(num(l.quantity) * num(l.rate)) });
 
 const feeItem = (name: string, amount: number, prefs: TimePrefs): InvoiceItem => ({
   id: generateId(), type: 'Service', name, hsn: prefs.sac, unit: 'NOS', quantity: 1, rate: round2(amount), tax_rate: num(prefs.gst_rate), discount_percent: 0, amount: round2(amount),
@@ -80,9 +93,14 @@ export function createPrebillDraft(i: PrebillInput, prefs: TimePrefs = readTimeP
   const eng = view.engagement;
   const plan = planBill(view.sel.time, i.edits ?? {}, eng, { prefs, used: view.use.used, feesBefore: view.use.fees, milestonesBilled: view.use.milestones, milestoneIds: i.milestoneIds, target: i.target, money: (n) => formatCurrency(n, eng?.currency) });
   const defer = new Set(i.deferRows ?? []);
-  const sel: BillSelection = { time: plan.time, expenses: view.sel.expenses.filter((p) => !defer.has(p.id)), mileage: view.sel.mileage.filter((t) => !defer.has(t.id)) };
+  const wts = i.appearances ? loadWorkTypes() : [];
+  const app = i.appearances ? appearanceLines(plan.time, wts) : [];
+  const appIds = new Set(app.flatMap((l) => l.bill_refs ?? []));
+  const extra = [...app.map((l) => toItem({ name: l.name, hsn: prefs.sac, unit: l.unit, quantity: l.quantity, rate: l.rate, tax_rate: num(prefs.gst_rate), discount_percent: 0, bill_refs: l.bill_refs })), ...(i.extra?.lines ?? []).map(toItem)];
+  const extraRefs = new Set(extra.flatMap((l) => l.bill_refs ?? []));
+  const sel: BillSelection = { time: appIds.size ? plan.time.filter((e) => !appIds.has(e.id)) : plan.time, expenses: view.sel.expenses.filter((p) => !defer.has(p.id) && !extraRefs.has(p.id)), mileage: view.sel.mileage.filter((t) => !defer.has(t.id)) };
   const fees = plan.fees.map((f) => ({ f, item: feeItem(f.name, f.amount, prefs) }));
-  if (!sel.time.length && !sel.expenses.length && !sel.mileage.length && !fees.length) throw new Error('Nothing to bill for this matter yet.');
+  if (!sel.time.length && !sel.expenses.length && !sel.mileage.length && !fees.length && !extra.length) throw new Error('Nothing to bill for this matter yet.');
   const centre = i.projectId ? loadCostCentres().find((c) => c.id === i.projectId) : undefined;
   let saved: InvoiceRecord;
   if (sel.time.length || sel.expenses.length || sel.mileage.length) saved = billUnbilled(i.key, sel, prefs, { annexure: i.annexure });
@@ -103,10 +121,12 @@ export function createPrebillDraft(i: PrebillInput, prefs: TimePrefs = readTimeP
     if (isCovered || code) lines[it.id] = { ...(code ? { matter: code } : {}), ...(isCovered ? { covered: true } : {}) };
   }
   for (const { f, item } of fees) lines[item.id] = { fee: true, ...(code ? { matter: code } : {}), ...(f.milestone ? { milestone: f.milestone } : {}) };
-  const items = [...saved.items, ...fees.map((x) => x.item)];
+  if (code) for (const it of extra) lines[it.id] = { matter: code };
+  if (appIds.size) timeDb.markInvoiced([...appIds], saved.id);
+  const items = [...saved.items, ...fees.map((x) => x.item), ...extra];
   const stored = new Map(view.sel.time.map((e) => [e.id, e] as [string, TimeEntry]));
   const b = docBilling({ items, ps: { lines } }, stored, prefs);
-  const standard = round2(view.sel.time.filter((e) => sel.time.some((x) => x.id === e.id)).reduce((s, e) => s + entryStandard(e, prefs), 0));
+  const standard = round2(view.sel.time.filter((e) => plan.time.some((x) => x.id === e.id)).reduce((s, e) => s + entryStandard(e, prefs), 0));
   const billed = b?.billed ?? 0;
   const diff = round2(billed - standard);
   const wd = standard > 0 && Math.abs(diff) >= 0.01 ? { standard, billed, reasons: [{ reason: i.reason || plan.reason || 'Rate override', amount: diff }] } : undefined;
@@ -121,8 +141,21 @@ export function createPrebillDraft(i: PrebillInput, prefs: TimePrefs = readTimeP
     ...(eng ? { engagement: { id: eng.id, number: eng.number, model: eng.model } } : {}),
     basis: plan.basis,
     wd,
+    media: i.extra?.media,
     lines,
   });
   const next = buildBillDraft({ ...saved, ps }, saved.client, items, saved.sender ?? localDb.settings.activeProfile() ?? null, annexure || undefined);
   return localDb.invoices.save(next);
+}
+
+/** R16-B2: media commission a publisher pays us — our service to the publisher, so a separate draft to the publisher. */
+export function createCommissionDraft(publication: string, grossSpace: number, pct: number, prefs: TimePrefs = readTimePrefs()): InvoiceRecord {
+  const l = commissionLine(publication.trim(), grossSpace, pct, prefs);
+  if (!publication.trim() || !(l.rate > 0)) throw new Error('Type the publication, the gross space and the commission %.');
+  const sender = localDb.settings.activeProfile() ?? null;
+  const client = localDb.clients.getAll().find((c) => foldName(c.name ?? '') === foldName(publication)) ?? { ...blankClient(), name: publication.trim() };
+  const base = makeDraft({ settings: localDb.settings.get(), sender, docType: 'INVOICE', templateId: localDb.template.get() });
+  const d = buildBillDraft({ ...base, id: generateId() }, client, [toItem(l)], sender);
+  d.invoice_number = localDb.invoices.nextNumber(d.issue_date, d.doc_type, sender?.invoicePrefix || undefined);
+  return localDb.invoices.save(d);
 }

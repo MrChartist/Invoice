@@ -3,7 +3,10 @@ import { lazy, Suspense, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { loadCostCentres } from '../../lib/cost-centres';
 import { clientKey, currentLiveInvoiceIds, readTimePrefs, timeDb, unbilledTime } from '../../lib/timesheets';
-import { createPrebillDraft, prebillFor } from '../../lib/prof/ps-prebill';
+import { createPrebillDraft, prebillFor, type PrebillInput } from '../../lib/prof/ps-prebill';
+import { localDb } from '../../lib/localDb';
+import { impliedPacks } from '../../lib/shop-mode';
+import { r16bT } from '../../i18n/areas/prof-r16b';
 import { planBill, type RowEdit } from '../../lib/prof/ps-models';
 import { entryStandard } from '../../lib/prof/ps-staff';
 import { wipRules } from '../../lib/prof/ps-settings';
@@ -19,6 +22,8 @@ import { runWith, type PsDeskProps } from './ps-run';
 
 // R14 PS-C4: foreign-currency rate cards converted at the currency master's rate (lazy; nothing without such a card).
 const FxRateRow = lazy(() => import('./FxRateRow'));
+// R16-B2: media rows (`media` pack; lazy).
+const MediaPrebill = lazy(() => import('./MediaPrebill'));
 
 export default function PreBillView({ notify }: Pick<PsDeskProps, 'notify'>) {
   const run = runWith(notify);
@@ -39,6 +44,9 @@ export default function PreBillView({ notify }: Pick<PsDeskProps, 'notify'>) {
   const [target, setTarget] = useState('');
   const [reason, setReason] = useState('');
   const [annex, setAnnex] = useState(true);
+  const packs = useMemo(() => impliedPacks(localDb.settings.get()), []);
+  const [appear, setAppear] = useState(false); // R16-B3 (legal)
+  const [media, setMedia] = useState<PrebillInput['extra']>();
   const view = useMemo(() => (key ? prebillFor(key, project || undefined, prefs) : null), [key, project, prefs]);
   const eng = view?.engagement;
   const money = (n: number) => formatCurrency(n, eng?.currency);
@@ -56,7 +64,7 @@ export default function PreBillView({ notify }: Pick<PsDeskProps, 'notify'>) {
   const billed = plan && typeof plan !== 'string' ? round2(plan.time.reduce((s, e) => s + entryStandard(e, prefs), 0) + plan.fees.reduce((s, f) => s + f.amount, 0)) : 0;
   const std = view ? round2(view.sel.time.filter((e) => !edits[e.id]?.defer).reduce((s, e) => s + entryStandard(e, prefs), 0)) : 0;
   const create = () => {
-    const d = run(() => createPrebillDraft({ key, projectId: project || undefined, edits, milestoneIds: ms, target: target === '' ? undefined : Number(target), reason: reason || undefined, annexure: annex }, prefs));
+    const d = run(() => createPrebillDraft({ key, projectId: project || undefined, edits, milestoneIds: ms, target: target === '' ? undefined : Number(target), reason: reason || undefined, annexure: annex, ...(appear ? { appearances: true } : {}), ...(media ? { extra: media } : {}) }, prefs));
     if (d) go(`/invoice/${d.id}`);
   };
   return (
@@ -96,6 +104,8 @@ export default function PreBillView({ notify }: Pick<PsDeskProps, 'notify'>) {
         </div>
         {typeof plan === 'string' && <p className={controls.error} role="alert">{plan}</p>}
         {plan && typeof plan !== 'string' && <p data-prebill-preview>{plan.basis} · {pwT('preview', { billed: money(billed), standard: money(std), diff: money(round2(billed - std)) })}</p>}
+        {packs.includes('media') && key && <Suspense fallback={null}><MediaPrebill key={key} client={key} onChange={setMedia} notify={notify} /></Suspense>}
+        {packs.includes('legal') && <label className={controls.check}><input type="checkbox" checked={appear} onChange={(e) => setAppear(e.target.checked)} data-prebill-appear /> {r16bT('appear')}</label>}
         <label className={controls.check}><input type="checkbox" checked={annex} onChange={(e) => setAnnex(e.target.checked)} /> {pwT('annexure')}</label>
         <button type="button" className={controls.btnPrimary} disabled={!key || typeof plan === 'string'} onClick={create} data-prebill-create>{pwT('create')}</button>
       </div>
