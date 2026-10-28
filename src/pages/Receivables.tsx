@@ -10,9 +10,7 @@ import {
 } from 'lucide-react';
 import { localDb } from '../lib/localDb';
 import { can } from '../lib/access';
-import { nettingParties } from '../lib/netting';
 import { vendorsDb } from '../lib/vendors';
-import { netT } from '../i18n/areas/netting-r15a';
 import { uxT } from '../i18n/areas/invoicing-ux';
 import { rcv2T as colT } from '../i18n/areas/collections-rcv';
 import { STATEMENT_STYLES, loadStatementPrefs, saveStatementPrefs, type StatementStyle } from '../lib/statement-styles';
@@ -436,7 +434,18 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
     return whatsappLink(c?.phone, buildWhatsAppStatement({ sender, party: p, lang: messageLangOf(c) }));
   };
   // R15-A3: parties that are also suppliers (same name / GSTIN, or linked on the supplier form) offer Netting.
-  const nettable = useMemo(() => (can('books.edit') ? new Set(nettingParties(clients, vendorsDb.all()).map((x) => x.client.id)) : new Set<string | undefined>()), [clients]);
+  // (A quick name / GSTIN / link test kept here so the page does not load netting.ts; the dialog re-checks.)
+  const nettable = useMemo(() => {
+    const out = new Set<string | undefined>();
+    if (!can('books.edit')) return out;
+    const k = (s: unknown) => String(s ?? '').trim().toLowerCase();
+    const vs = vendorsDb.all();
+    const names = new Set(vs.map((v) => k(v.name)));
+    const gstins = new Set(vs.map((v) => k(v.gstin)).filter(Boolean));
+    for (const v of vs) if (v.client_id) out.add(v.client_id);
+    for (const c of clients) if (names.has(k(c.name)) || (c.gstin && gstins.has(k(c.gstin)))) out.add(c.id);
+    return out;
+  }, [clients]);
   const toggle = (k: string) => setOpen((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const top = topDebtors(report, 5);
   const m = (n: number) => (n ? formatMoney(n, currency) : '—');
@@ -524,7 +533,7 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
                           </button>
                         )}
                         {currency === 'INR' && p.clientId && nettable.has(p.clientId) && (
-                          <button type="button" className={controls.btnIcon} aria-label={`${netT('title')}: ${p.name}`} title={netT('title')}
+                          <button type="button" className={controls.btnIcon} aria-label={`${rcvT('netting')}: ${p.name}`} title={rcvT('netting')}
                             onClick={() => onNetting(p.clientId!)} data-netting-open>
                             <Scale size={14} />
                           </button>

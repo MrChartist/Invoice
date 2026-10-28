@@ -20,7 +20,7 @@ import { cashBook, buildVouchers, loadBooksData } from '../src/lib/books.ts';
 import { movedNoCash } from '../src/lib/no-cash.ts';
 import { audit } from '../src/lib/audit.ts';
 import {
-  NETTING_METHOD, clientOfVendor, exchangeSettled, nettingParties, nettings, nettingText, openBills, openInvoices, pairNetting, postNetting, reverseNetting,
+  NETTING_METHOD, clientOfVendor, exchangeSettled, nettingParties, nettings, openBills, openInvoices, pairNetting, postNetting, reverseNetting,
 } from '../src/lib/netting.ts';
 import type { Payment } from '../src/types/invoice.ts';
 import type { PurchaseRecord, Vendor } from '../src/types/purchases.ts';
@@ -94,7 +94,6 @@ test('pick oldest first: ₹65,000 nets both invoices against the bill; receivab
   const bankOrCash = led.vouchers.filter((v) => v.id.startsWith('rcpt:')).flatMap((v) => v.lines).filter((l) => l.account === 'bank' || l.account === 'cash');
   assert.equal(bankOrCash.length, 0, 'no bank / cash line on the netting receipts');
   assert.equal(nettings().length, 1);
-  assert.match(nettingText(client.name, r.receipts, localDb.invoices.getAll()), /Set off: 65000\.00/);
 });
 
 test('partial: a smaller amount settles the oldest invoice first; the cap is min(receivable, payable)', () => {

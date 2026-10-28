@@ -5,9 +5,8 @@ import { localDb } from '../../lib/localDb';
 import { purchasesDb } from '../../lib/purchases';
 import { vendorsDb } from '../../lib/vendors';
 import { round2 } from '../../lib/invoice-calc';
-import { whatsappLink } from '../../lib/share';
 import { formatCurrency, formatDate, todayInput } from '../../lib/utils';
-import { clientOfVendor, nettingParties, nettings, nettingText, openBills, openInvoices, postNetting, reverseNetting, type OpenItem } from '../../lib/netting';
+import { clientOfVendor, nettingParties, nettings, openBills, openInvoices, postNetting, reverseNetting, type OpenItem } from '../../lib/netting';
 import type { Vendor } from '../../types/purchases';
 import { useT } from '../../i18n';
 import { netT } from '../../i18n/areas/netting-r15a';
@@ -129,7 +128,6 @@ export default function NettingDialog({ clientId, vendorId, onClose, onDone }: {
                       <td>{formatDate(n.date)}</td>
                       <td className={surface.numeric}>{formatCurrency(n.amount)}</td>
                       <td>
-                        <a className={controls.btnGhost} target="_blank" rel="noopener noreferrer" href={whatsappLink(pair.client.phone, nettingText(pair.client.name, n.rows, localDb.invoices.getAll()))}>{netT('share')}</a>
                         <button type="button" className={controls.btnGhost} onClick={() => run(() => { reverseNetting(n.id); return netT('reversed'); })} data-netting-reverse>{netT('reverse')}</button>
                       </td>
                     </tr>

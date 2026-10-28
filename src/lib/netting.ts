@@ -23,6 +23,14 @@ import { generateId, getTable, peekTable, setTable } from './storage';
 import { isRevenueDoc } from './stats';
 import { receivableBalance } from './rcm';
 import { withTablesRollback } from './table-txn';
+import { exchangeSettled, ownFlow, syncNettedPaid } from './retail/rt-doc-hooks';
+
+/**
+ * The generalised roll-up and the bill sync live beside R9's URD sync (`rt-doc-hooks.ts`, already on the registry
+ * chunk every lazy screen preloads), so the R9 hooks (bill cancel / delete, recycle-bin restore) re-settle netted bills
+ * too without pulling this module into their preload lists.
+ */
+export { exchangeSettled, syncNettedPaid };
 
 declare module '../types/invoice' {
   interface Payment {
@@ -35,17 +43,10 @@ export const NETTING_METHOD = 'netting';
 /** Approval cap for clerks (₹): any netting above it needs the owner (default 0 = every netting by a clerk). */
 export const NETTING_CLERK_CAP = 0;
 
-type Pay = Pick<Payment, 'amount' | 'exchange_purchase_id'>;
 const key = (s: unknown) => String(s ?? '').trim().toLowerCase();
-
-/** Generalised roll-up: what LIVE receipt rows set off against a bill (`exchange_purchase_id`: netting, R9 exchange, R12). */
-export const exchangeSettled = (purchaseId: string, payments: readonly Pay[]): number =>
-  round2(payments.reduce((s, p) => s + (p.exchange_purchase_id === purchaseId ? num(p.amount) : 0), 0));
 
 export const isNettingRow = (p: Partial<Payment>): boolean => p.method === NETTING_METHOD && !!p.exchange_purchase_id;
 
-/** Bills R15 never nets: void, URD buy-back / old gold (R9 has its own exchange), R12 pooled cycle bills. */
-const ownFlow = (b: PurchaseRecord) => !!(b.used_goods || b.old_metal || b.ag?.cycle_id);
 
 /** The client a vendor stands for: the hand link, else the same GSTIN, else the same name. */
 export function clientOfVendor(v: Vendor, clients: readonly Client[]): Client | undefined {
@@ -105,22 +106,6 @@ export function pairNetting(invs: readonly OpenItem[], bills: readonly OpenItem[
     if (rest <= 0.004) break;
   }
   return out;
-}
-
-/** Re-derive `amount_paid` / `exchange_paid` of netted bills (all, or `ids`) from live rows. URD vouchers are R9's. */
-export function syncNettedPaid(ids?: Iterable<string>): void {
-  const want = ids ? new Set(ids) : undefined;
-  const pays = peekTable<Payment>('transactions');
-  let changed = false;
-  const rows = getTable<PurchaseRecord>('purchases').map((b) => {
-    if (ownFlow(b) || (want ? !want.has(b.id) : typeof b.exchange_paid !== 'number')) return b;
-    const ex = exchangeSettled(b.id, pays);
-    const had = num(b.exchange_paid);
-    if (Math.abs(ex - had) < 0.005 && (typeof b.exchange_paid === 'number' || !ex)) return b;
-    changed = true;
-    return { ...b, amount_paid: Math.max(round2(num(b.amount_paid) - had + ex), 0), exchange_paid: ex, updated_at: new Date().toISOString() };
-  });
-  if (changed) setTable('purchases', rows);
 }
 
 export interface NettingInput {
@@ -197,11 +182,4 @@ export function reverseNetting(nettingId: string): void {
     syncNettedPaid(n.rows.map((r) => r.exchange_purchase_id!));
   });
   audit.record({ entity: 'vendor_payment', entity_id: nettingId, action: 'delete', summary: `Netting of ${n.amount.toFixed(2)} on ${n.date} reversed` });
-}
-
-/** WhatsApp / text statement of one netting. */
-export function nettingText(clientName: string, rows: readonly Payment[], invoices: readonly InvoiceRecord[]): string {
-  const total = round2(rows.reduce((s, r) => s + num(r.amount), 0));
-  const lines = rows.map((r) => `${invoices.find((i) => i.id === r.invoice_id)?.invoice_number ?? ''} ↔ ${r.reference ?? ''}: ${num(r.amount).toFixed(2)}`);
-  return [`Netting statement — ${clientName}`, ...lines, `Set off: ${total.toFixed(2)} (our invoices against your bills; no money moved)`].join('\n');
 }
