@@ -18,11 +18,12 @@ export type HsHeadKind = 'service' | 'sinking' | 'repair' | 'major_repair' | 'st
 /**
  * A3: how a head's monthly amount is worked out for a unit. `rate` means: ₹ per unit (`per_unit`, `per_lifted_unit`),
  * ₹ per sq ft / sq m (`area_carpet`, `area_super`), the monthly total shared by undivided interest (`undivided_pct`),
- * % a year of the construction cost (`cost_pct_pa`), ₹ per slot (`per_slot`, `slot_rates` by kind), ₹ per inlet
- * (`per_inlet`), % of the `service` head for let units (`pct_of_head`), ₹ per member (`fixed_member`); `typed` reads the
- * unit's own amount (`SocietyUnit.typed[head.id]`).
+ * % a year of the construction cost (`cost_pct_pa`), ₹ per slot (`per_slot`, `slot_rates` by kind), % of the
+ * `service` head for let units (`pct_of_head`), ₹ per member (`fixed_member`); `typed` reads the unit's own amount
+ * (`SocietyUnit.typed[head.id]`). The `per_inlet` / `per_lifted_unit` bases were cut at the R18-A cap (PRD §3 cut 2):
+ * water by inlets and lift by lifted units are typed per unit until a later package adds them.
  */
-export type HsBasis = 'per_unit' | 'area_carpet' | 'area_super' | 'undivided_pct' | 'cost_pct_pa' | 'per_slot' | 'per_inlet' | 'per_lifted_unit' | 'pct_of_head' | 'typed' | 'fixed_member';
+export type HsBasis = 'per_unit' | 'area_carpet' | 'area_super' | 'undivided_pct' | 'cost_pct_pa' | 'per_slot' | 'pct_of_head' | 'typed' | 'fixed_member';
 export type HsCycle = 'monthly' | 'quarterly' | 'half_yearly';
 export type HsUnitUse = 'residential' | 'commercial' | 'garage' | 'other';
 export type HsOccupancy = 'owner' | 'tenant' | 'vacant';
@@ -125,7 +126,7 @@ export interface HsSnapshot {
   /** Due date (`YYYY-MM-DD`). */
   due?: string;
   heads?: HsHeadRow[];
-  /** A4: print "How your bill is worked out" (the basis of each head). */
+  /** A4 cut 1: "How your bill is worked out" — not printed in R18-A (the heads table carries each basis). */
   explain?: boolean;
   /** B1 / B2: the run, the ₹7,500 test, the regime and its printed sentence (snapshotted, never re-derived). */
   run_id?: string;

@@ -21,6 +21,3 @@ export const HS_PACKS = ['society'] as const;
 
 /** The date field each dated table is synced / period-locked by (mirrors the `sync-engine.ts` DATED rows; B adds runs). */
 export const HS_DATED: Readonly<Record<string, string>> = {};
-
-/** The `import_runs` kind of the unit import (A2). */
-export const HS_IMPORT_KIND = 'society_units';

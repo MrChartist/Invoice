@@ -25,7 +25,7 @@ import { TRAVEL_LANDING, applyTravelKind, isTravelKind, type TravelKindId } from
 import { TravelKindPicker } from '../travel/TravelKindPicker';
 import { MANPOWER_LANDING, applyManpowerKind, isManpowerKind, type ManpowerKindId } from '../../lib/shop-presets'; // R17-A1
 import { ManpowerKindPicker } from '../manpower/ManpowerKindPicker';
-import { SOCIETY_LANDING, applySocietyKind, isSocietyKind, type SocietyKindId } from '../../lib/shop-presets'; // R18-A1
+import { societyLanding, applySocietyKind, isSocietyKind, type SocietyKindId } from '../../lib/shop-presets'; // R18-A1
 import { SocietyKindPicker } from '../society/SocietyKindPicker';
 import { hsPickT } from '../../i18n/areas/society-r18a-pick';
 import type { ProfIds } from '../../lib/prof/ps-profile';
@@ -123,11 +123,6 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
   // R18-A1: the "Housing society / apartment association / RWA" card is not a business type: its kind writes one.
   const [hsOn, setHsOn] = useState(() => isSocietyKind(localDb.settings.get().society_kind));
   const [hsKind, setHsKind] = useState<SocietyKindId | ''>(() => (isSocietyKind(localDb.settings.get().society_kind) ? (localDb.settings.get().society_kind as SocietyKindId) : ''));
-  const pickSociety = (k: SocietyKindId | '') => {
-    setHsKind(k);
-    if (k) setBusiness(k === 'agency' ? 'services' : 'nonprofit');
-    if (k) setA((prev) => ({ ...prev, templateId: 'gst_tax_invoice' }));
-  };
   const { lang } = useT();
   const pickBusiness = (b: BusinessType) => {
     setAgOn(false); // R12
@@ -193,7 +188,6 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
       // R13 (MF-A1): the Udyam number and category go on the active sender profile (snapshotted on every document).
       const udyam = mfg && normalizeUdyam(mfUdyam.no);
       localDb.settings.save(udyam ? { ...saved, profiles: saved.profiles.map((p) => (p.id === saved.activeProfileId ? { ...p, msme_udyam: udyam, msme_category: mfUdyam.category as 'MICRO' } : p)) } : saved);
-      if (soc) void import('../../lib/society/hs-settings').then((m) => m.applySocietyDefaults(a.gstRegistered ? a.companyGstin.trim().slice(0, 2) : a.stateCode)).catch(() => undefined);
       if (mfg) void import('../../lib/mfg/mf-profile').then((m) => m.applyMfgSwitches(mfg, mfSub || undefined)).catch(() => undefined);
       if (agri) void import('../../lib/agri/ag-profile').then((m) => m.applyAgriSwitches(agri)).catch(() => undefined);
       if (svc) void import('../../lib/services/sv-profile').then((m) => m.applyServiceSwitches(svc)).catch(() => undefined);
@@ -204,7 +198,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
       if (retail) void import('../../lib/retail/rt-profile').then((m) => m.applyRetailSwitches(retail)).catch(() => undefined);
       window.dispatchEvent(new Event(SHOP_MODE_EVENT));
       localDb.template.set(a.templateId);
-      onClose(soc ? SOCIETY_LANDING[soc] : mfg ? MFG_PROFILES[mfg].landing : agri ? AGRI_PROFILES[agri].landing : trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : prof ? PROF_PROFILES[prof].landing : travel ? TRAVEL_LANDING[travel] : manpower ? MANPOWER_LANDING[manpower] : svc ? SERVICE_PROFILES[svc].landing : BUSINESS_DEFAULTS[business].landing);
+      onClose(soc ? societyLanding(soc) : mfg ? MFG_PROFILES[mfg].landing : agri ? AGRI_PROFILES[agri].landing : trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : prof ? PROF_PROFILES[prof].landing : travel ? TRAVEL_LANDING[travel] : manpower ? MANPOWER_LANDING[manpower] : svc ? SERVICE_PROFILES[svc].landing : BUSINESS_DEFAULTS[business].landing);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -316,16 +310,15 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
                 <span>{mfPickT('cardHint')}</span>
               </button>
               {/* R18-A1: not a business type — its kind writes `nonprofit` (or `services` for an agency) */}
-              <button type="button" role="radio" aria-checked={hsOn} className={styles.shopCard} onClick={() => { setHsOn(true); setAgOn(false); setMfOn(false); }} data-wizard-society-card>
+              <button type="button" role="radio" aria-checked={hsOn} className={styles.shopCard} onClick={() => { setHsOn(true); setAgOn(false); setMfOn(false); }}>
                 <strong>{hsPickT('card')}</strong>
                 <span>{hsPickT('cardHint')}</span>
               </button>
             </div>
             {hsOn && (
-              <div className={controls.field} data-wizard-society>
+              <div className={controls.field}>
                 <span className={controls.label}>{hsPickT('title')}</span>
-                <span className={controls.hint}>{hsPickT('lede')}</span>
-                <SocietyKindPicker value={hsKind} onPick={pickSociety} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
+                <SocietyKindPicker value={hsKind} onPick={setHsKind} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
               </div>
             )}
             {mfOn && (

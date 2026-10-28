@@ -251,9 +251,8 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
               disabled={!owner}
               onPick={(k) => {
                 if (!k) return onChange({ society_kind: undefined });
-                const active = settings.profiles?.find((p) => p.id === settings.activeProfileId);
-                onChange(applySocietyKind(k, { registered: Boolean(active?.companyGstin?.trim()), currentPacks: packsOn }) as Partial<typeof settings>);
-                void import('../../lib/society/hs-settings').then((m) => m.applySocietyDefaults(active?.companyGstin?.slice(0, 2) || active?.stateCode)).catch(() => undefined);
+                const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
+                onChange(applySocietyKind(k, { registered, currentPacks: packsOn }) as Partial<typeof settings>);
               }}
             />
           </div>

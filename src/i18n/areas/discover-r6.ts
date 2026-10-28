@@ -138,7 +138,7 @@ export const discoverT = defineArea(
     'awho.profProfile': 'CA firms, advocates, architects, consultants, agencies, freelancers — matters, pre-bill, WIP, realisation',
     'awho.travelProfile': 'Tour operators, travel agents, DMCs, event planners — trips, bookings, margin, GST regimes',
     'awho.manpowerProfile': 'Security, housekeeping and staffing agencies — sites, posts, reverse charge on guards',
-    'awho.societyProfile': 'Housing societies, apartment associations and RWAs — units, members, maintenance tariff',
+    'awho.societyProfile': 'Housing societies, apartment associations and RWAs',
   } as const,
   {
     learnMore: 'और जानें',
@@ -273,6 +273,6 @@ export const discoverT = defineArea(
     'awho.profProfile': 'CA फ़र्म, वकील, आर्किटेक्ट, कंसल्टेंट, एजेंसी, फ़्रीलांसर — मामले, प्री-बिल, अबिल्ड कार्य, वसूली दर',
     'awho.travelProfile': 'टूर ऑपरेटर, ट्रैवल एजेंट, DMC, इवेंट प्लानर — यात्रा फ़ाइल, बुकिंग, मार्जिन, GST व्यवस्था',
     'awho.manpowerProfile': 'सुरक्षा, हाउसकीपिंग और स्टाफ़िंग एजेंसी — साइट, पोस्ट, गार्ड सेवा पर रिवर्स चार्ज',
-    'awho.societyProfile': 'आवास सोसाइटी, अपार्टमेंट संघ और RWA — यूनिट, सदस्य, रखरखाव शुल्क सूची',
+    'awho.societyProfile': 'आवास सोसाइटी, अपार्टमेंट संघ और RWA',
   },
 );

@@ -485,14 +485,8 @@ export function applyManpowerKind(kind: ManpowerKindId, opts: { registered?: boo
 export const SOCIETY_KINDS = ['chs', 'aoa', 'rwa', 'commercial', 'agency'] as const;
 export type SocietyKindId = (typeof SOCIETY_KINDS)[number];
 export const isSocietyKind = (v: unknown): v is SocietyKindId => typeof v === 'string' && (SOCIETY_KINDS as readonly string[]).includes(v);
-/** Where each kind lands after setup (the Society desk on Recurring). */
-export const SOCIETY_LANDING: Readonly<Record<SocietyKindId, string>> = {
-  chs: '/recurring?tab=society&view=units',
-  aoa: '/recurring?tab=society&view=units',
-  rwa: '/recurring?tab=society&view=units',
-  commercial: '/recurring?tab=society&view=units',
-  agency: '/recurring?tab=society&view=bills',
-};
+/** Where a kind lands after setup: the Society desk on Recurring (units; a maintenance agency the bills view, B). */
+export const societyLanding = (kind: SocietyKindId): string => `/recurring?tab=society&view=${kind === 'agency' ? 'bills' : 'units'}`;
 
 /**
  * Settings patch for a society profile: business type `nonprofit` (`services` for a maintenance agency), the type's

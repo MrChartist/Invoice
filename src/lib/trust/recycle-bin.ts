@@ -405,8 +405,6 @@ registerRestoreHook('invoices', (row, e, live) => {
 for (const t of ['site_musters', 'site_compliance']) {
   registerRestoreHook(t, (row, e, live) => (!isLive(live, 'cost_centres', str(row.site_id)) ? { refuse: 'The site of this row is gone. Restore the site first.' } : live(t).some((x) => str(x?.id) !== e.row_id && str(x?.site_id) === str(row.site_id) && str(x?.month) === str(row.month)) ? { refuse: `The site already has a row for ${str(row.month)}; restoring this one would make two.` } : null));
 }
-// R18-A: a society unit comes back only while no live unit holds its code (codes are unique per company).
-registerRestoreHook('society_units', (row, e, live) => (live('society_units').some((u) => str(u?.id) !== e.row_id && str(u?.code).trim().toLowerCase() === str(row.code).trim().toLowerCase()) ? { refuse: `Another unit now has the code ${str(row.code)}; rename it first.` } : null));
 // R14 (PS-A): an engagement comes back only while its client lives (its ENG number stays reserved, never reused).
 // R14 PS-C: an EDF row restores only while no live row covers the same month, kind and currency (the builder re-ran).
 registerRestoreHook('edf_register', (row, _e, live) => (live('edf_register').some((r) => str(r?.period) === str(row.period) && str(r?.kind) === str(row.kind) && str(r?.currency) === str(row.currency)) ? { refuse: `The EDF register already has ${str(row.period)} ${str(row.kind)} ${str(row.currency)}. Delete that row first.` } : null));

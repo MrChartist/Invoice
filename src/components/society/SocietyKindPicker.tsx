@@ -18,10 +18,10 @@ export function SocietyKindPicker({ value, onPick, custom, gridClass, cardClass,
   useT();
   const card = (on: boolean) => cardClass ?? (on ? controls.btnPrimary : controls.btnOutline);
   return (
-    <div className={gridClass} role="radiogroup" aria-label={hsPickT('title')} data-society-kind style={gridClass ? undefined : { display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+    <div className={gridClass} role="radiogroup" aria-label={hsPickT('title')} style={gridClass ? undefined : { display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
       {SOCIETY_KINDS.map((k) => (
         <button key={k} type="button" role="radio" aria-checked={value === k} disabled={disabled} className={card(value === k)} onClick={() => onPick(k)} data-society-kind-card={k}>
-          <strong>{hsPickT(`kind.${k}`)}</strong> <span>{hsPickT(`hint.${k}`)}</span>
+          <strong>{hsPickT(`kind.${k}`)}</strong>
         </button>
       ))}
       {custom && (
