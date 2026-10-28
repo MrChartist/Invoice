@@ -14,6 +14,7 @@ export const hscT = defineArea(
     waive: 'Waive interest', reason: 'Reason', resolution: 'GB resolution', waived: 'Interest waived by a financial credit note.', needWhy: 'Give the reason and the general-body resolution.', tooMuch: 'More than the open interest.',
     statement: 'Statement', notice: 'Notice-board list', wording: 'Use society reminder wording', worded: 'Reminders now use the society wording.', remind: 'Remind',
     e_date: 'Enter the date.', e_to: 'Pick the new member.', e_same: 'The new member already owns the unit.', e_dues: 'Dues are open: settle them or tick "Dues settled".',
+    noUnit: 'Unit not found.', noMember: 'No member.',
   } as const,
   {
     dues: 'बकाया', asOf: 'तिथि तक', open: 'खुला बकाया', interest: 'बिल किया ब्याज', accrued: 'आज तक का ब्याज', months: 'बकाया महीने', promise: 'अंतिम वादा', overdue: 'अतिदेय',
@@ -23,5 +24,6 @@ export const hscT = defineArea(
     waive: 'ब्याज माफ़ करें', reason: 'कारण', resolution: 'आम सभा प्रस्ताव', waived: 'वित्तीय क्रेडिट नोट से ब्याज माफ़।', needWhy: 'कारण और आम सभा का प्रस्ताव लिखें।', tooMuch: 'खुले ब्याज से अधिक।',
     statement: 'विवरण', notice: 'सूचना-पट्ट सूची', wording: 'सोसाइटी की रिमाइंडर भाषा लगाएँ', worded: 'रिमाइंडर अब सोसाइटी की भाषा में।', remind: 'याद दिलाएँ',
     e_date: 'तिथि लिखें।', e_to: 'नया सदस्य चुनें।', e_same: 'नया सदस्य पहले से यूनिट का मालिक है।', e_dues: 'बकाया खुला है: चुकाएँ या "बकाया चुकता" चुनें।',
+    noUnit: 'यूनिट नहीं मिली।', noMember: 'कोई सदस्य नहीं।',
   },
 );

@@ -195,14 +195,13 @@ export function createFreightBills(lrIds: readonly string[], date: string): Invo
     if (st === 'cancelled') throw new LrError(`LR ${lr.number} is cancelled.`);
   }
   return withTablesRollback(['invoices', LR_TABLE, 'clients', 'items_catalog', 'series_counters'], () => {
-    const saved: InvoiceRecord[] = [];
     const options = getTable<GtaOptionRow>('gta_options');
-    for (const g of groupForBills(chosen, { date, options, partyOf: (id) => localDb.clients.getById(id) ?? undefined })) {
-      const bill = localDb.invoices.save(buildFreightBill(g.lrs, liveContext(date, g.partyId)));
-      saved.push(bill);
-      const ids = new Set(g.lrs.map((l) => l.id));
-      setTable(LR_TABLE, getTable<ConsignmentNote>(LR_TABLE).map((l) => (ids.has(l.id) ? { ...l, bill_id: bill.id, status: 'billed' as const, updated_at: new Date().toISOString() } : l)));
-    }
+    const groups = groupForBills(chosen, { date, options, partyOf: (id) => localDb.clients.getById(id) ?? undefined });
+    // QA21 W10: every bill in one write of the invoices table (`saveMany`), the LRs in one write.
+    const saved = localDb.invoices.saveMany(groups.map((g) => buildFreightBill(g.lrs, liveContext(date, g.partyId))));
+    const billOf = new Map(groups.flatMap((g, k) => g.lrs.map((l) => [l.id, saved[k].id] as const)));
+    const at = new Date().toISOString();
+    setTable(LR_TABLE, getTable<ConsignmentNote>(LR_TABLE).map((l) => (billOf.has(l.id) ? { ...l, bill_id: billOf.get(l.id)!, status: 'billed' as const, updated_at: at } : l)));
     return saved;
   });
 }

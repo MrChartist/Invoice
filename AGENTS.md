@@ -323,7 +323,9 @@ build-time config must use Vite's `VITE_` prefix.
   from it is flagged for the margin scheme (`usedGoodsGodowns`, RT-D3 / RT-E3).
 - Batch issuing (R18 platform fix): `localDb.invoices.saveMany(list)` validates, numbers and holds each document exactly
   like `save` but writes the invoices table once (`save(x)` = `saveMany([x])[0]`); `issueBatch` uses it for service-only
-  batches (stock batches still save one by one). Any new bulk writer must use it, never a loop of `save`.
+  batches (stock batches still save one by one); so do the marketplace sales import, freight bills and agency
+  commission bills (QA21 W10). Any new bulk writer must use it, never a loop of `save`. A society bill's place of supply
+  is the building's State (`BatchContext.pos`, QA21 W2).
 - Recurring schedules in draft mode create **unnumbered** drafts; the number is taken on issue (`numberOnIssue` in
   `localDb.ts`), so no gap reaches GSTR-1 Table 13. Drafts numbered before QA round 3 keep their numbers.
 - Financial credit notes (`note_kind: 'financial'`, `FCN/FY…`, R2-A) carry no GST by default: GST / e-Invoice / e-Way

@@ -668,7 +668,9 @@ interface NumberIndex { keys: Set<string>; last: Map<string, string> }
 function putInvoice(invoice: InvoiceRecord, invoices: InvoiceRecord[], ix: NumberIndex): () => InvoiceRecord {
   // The next number of the document's series (the snapshotted sender profile's prefix wins, as in the editor): after
   // the last one this save gave in the same series, else from the rows; never one in use.
+  let given = false;
   const next = (r: InvoiceRecord) => {
+    given = true;
     const p = r.sender?.invoicePrefix || undefined;
     const k = `${r.issue_date}|${r.doc_type}|${p}`;
     let n = ix.last.get(k);
@@ -720,7 +722,10 @@ function putInvoice(invoice: InvoiceRecord, invoices: InvoiceRecord[], ix: Numbe
     const clash = ix.keys.has(numberKey(toSave.invoice_number)) && findNumberClash(invoices, toSave.invoice_number, toSave.id);
     if (clash) throw new DuplicateNumberError(toSave.invoice_number, clash);
   }
-  ix.keys.add(numberKey(toSave.invoice_number));
+  // QA21 W1: a number typed in (not given here) may sit above the last one given: the next is read from the rows again.
+  const key = numberKey(toSave.invoice_number);
+  if (!given && key && !ix.keys.has(key)) ix.last.clear();
+  ix.keys.add(key);
 
   if (stored) {
     // Never let a stale editor copy (opened before a payment was recorded) wipe

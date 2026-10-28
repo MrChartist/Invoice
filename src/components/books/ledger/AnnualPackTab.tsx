@@ -13,8 +13,7 @@ import { cashFlowCsv, trialBalanceCsv, balanceSheetLedgerCsv } from '../../../li
 import { loadBranches } from '../../../lib/branch';
 import { localDb } from '../../../lib/localDb';
 import { getTable } from '../../../lib/storage';
-import { bankAccountsDb, pickableBankAccounts } from '../../../lib/bank-accounts';
-import { bankLedgerId } from '../../../lib/bank-ledgers';
+import { nonCashBankLedgerIds } from '../../../lib/bank-ledgers';
 import { downloadBlob, downloadText } from '../../../lib/download';
 import { printHtmlDocument } from '../../../lib/voucher-print';
 import { safeStem } from '../../../lib/pdf-batch';
@@ -91,7 +90,7 @@ export default function AnnualPackTab({ period, today, notify }: { period: Perio
         inventoryRows: ledger.branchId || stock?.mode !== 'inventory' ? undefined : invRows,
         partnerRows: ledger.branchId || (entity !== 'partnership' && entity !== 'llp') ? undefined : partnerRows, // PS-D1
         // R18-D2: the Receipts and Payments account reads cash and the real banks (clearing accounts left out).
-        rpCash: (id: string) => ledger.byId.get(id)?.group === 'CASH_BANK' && !bankAccountsDb.active().some((b) => bankLedgerId(b.id) === id && !pickableBankAccounts('payout', [b]).length),
+        rpCash: ((off) => (id: string) => ledger.byId.get(id)?.group === 'CASH_BANK' && !off.has(id))(nonCashBankLedgerIds()),
       }),
     [ledger, stock, fy, company, entity, stored, scopeLabel, today, period.end, invRows, partnerRows],
   );

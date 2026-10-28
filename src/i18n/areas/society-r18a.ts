@@ -19,6 +19,7 @@ export const hsT = defineArea(
     bases: 'Per unit,Carpet area,Super area,Undivided %,% a year of cost,Per slot,% of service,Typed,Per member',
     cycles: 'Monthly,Quarterly,Half-yearly',
     wp: 'Working papers — verify with your CA.',
+    eCode: 'Type the unit code (A-101).', eTaken: 'Unit {c} already exists.', eNum: '{f}: 0 or more.', eUndiv: 'Undivided % above 100.', wUndiv: 'Undivided % adds up to {s}, not 100.',
   } as const,
   {
     units: 'यूनिट', heads: 'शुल्क सूची', unit: 'यूनिट', wing: 'विंग', member: 'सदस्य', owner: 'मालिक', tenant: 'किरायेदार', head: 'शीर्ष', total: 'कुल', all: 'सभी',
@@ -33,6 +34,7 @@ export const hsT = defineArea(
     bases: 'प्रति यूनिट,कारपेट क्षेत्र,सुपर क्षेत्र,अविभाजित %,लागत का वार्षिक %,प्रति स्लॉट,सेवा शुल्क का %,यूनिट-वार लिखी राशि,प्रति सदस्य',
     cycles: 'मासिक,तिमाही,छमाही',
     wp: 'कार्य-पत्र — अपने CA से जाँचें।',
+    eCode: 'यूनिट कोड लिखें (A-101)।', eTaken: 'यूनिट {c} पहले से है।', eNum: '{f}: 0 या अधिक।', eUndiv: 'अविभाजित % 100 से अधिक।', wUndiv: 'अविभाजित % का जोड़ {s} है, 100 नहीं।',
   },
 );
 

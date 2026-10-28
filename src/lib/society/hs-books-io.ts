@@ -6,6 +6,7 @@
  * Working papers — verify with your CA.
  */
 import { requireAccess } from '../access';
+import { hsdT } from '../../i18n/areas/society-r18d';
 import { localDb } from '../localDb';
 import { round2 } from '../invoice-calc';
 import { withTablesRollback } from '../table-txn';
@@ -44,10 +45,26 @@ export function mapFunds(): NonNullable<SocietySettings['funds']> {
   });
 }
 
-/** What the transfer journals dated in the range already moved into each fund (rupees; a FY counts its periods'). */
+/** The period / FY a transfer journal was posted for (its narration's `— <period>`), else its own day. */
+const coverOf = (v: Pick<ManualVoucher, 'date' | 'narration'>): { p: string; from: string; to: string } => {
+  const p = /— (\S+)$/.exec(v.narration ?? '')?.[1] ?? '';
+  return { p: p || v.date, ...(rangeOf(p) ?? { from: v.date, to: v.date }) };
+};
+
+/**
+ * What the transfer journals of the range already moved into each fund (rupees; a FY counts its periods'). QA21 W4: a
+ * journal posted for a WIDER or overlapping range (a year-end journal, then a month of that FY; a quarter, then one of
+ * its months) refuses the transfer — counting it by its date double-moved the month or reversed March.
+ */
 function moved(r: { from: string; to: string }, acc: Record<FundKey, string>): Partial<Record<FundKey, number>> {
   const out: Partial<Record<FundKey, number>> = {};
-  for (const v of loadVouchers()) if (v.voucher_class === FUND_CLASS && v.date >= r.from && v.date <= r.to) for (const l of v.lines) for (const k of FUND_KEYS) if (l.account_id === acc[k]) out[k] = round2((out[k] ?? 0) + (l.cr - l.dr) / 100);
+  for (const v of loadVouchers()) {
+    if (v.voucher_class !== FUND_CLASS) continue;
+    const c = coverOf(v);
+    if (c.to < r.from || c.from > r.to) continue;
+    if (c.from < r.from || c.to > r.to) throw new Error(hsdT('covered', { p: c.p }));
+    for (const l of v.lines) for (const k of FUND_KEYS) if (l.account_id === acc[k]) out[k] = round2((out[k] ?? 0) + (l.cr - l.dr) / 100);
+  }
   return out;
 }
 
@@ -55,7 +72,7 @@ function moved(r: { from: string; to: string }, acc: Record<FundKey, string>): P
 export function postFundTransfer(p: string): ManualVoucher | null {
   requireAccess('books.edit');
   const r = rangeOf(p), cc = readSocietySettings().funds;
-  if (!r || !cc) throw new Error('Map the funds first, and pick a period.');
+  if (!r || !cc) throw new Error(hsdT('noFunds'));
   const acc = Object.fromEntries(FUND_KEYS.map((k) => [k, reserve(k)])) as Record<FundKey, string>;
   const d = transferDelta(fundBilled(localDb.invoices.getAll(), r.from, r.to), moved(r, acc));
   const lines = FUND_KEYS.filter((k) => d[k] && cc[k]).flatMap((k) => {
