@@ -198,21 +198,41 @@ test('R15-A2 (PERF-3): a save on a 5,000-invoice company writes the audit log on
   const ls = globalThis.localStorage;
   const real = ls.setItem.bind(ls);
   let writes = 0;
+  // QA19 U6: the cap is on the AUDIT work (every audit.record + the batch's write), not on the saves around it. The saves
+  // rewrite the 5,000-invoice table (≈ 40 ms each: PERF-3 row-level storage is deferred) and have their own cap in the
+  // test above; timing them here failed a loaded full run (4.6 s vs 4 s) while the audit part takes ≈ 10 ms.
+  let auditMs = 0;
   ls.setItem = (k: string, v: string) => {
-    if (k.endsWith('audit_log')) writes++;
+    if (!k.endsWith('audit_log')) return real(k, v);
+    writes++;
+    const t0 = performance.now();
     real(k, v);
+    auditMs += performance.now() - t0;
   };
+  const realRecord = audit.record;
+  audit.record = (input) => {
+    const t0 = performance.now();
+    try {
+      return realRecord(input);
+    } finally {
+      auditMs += performance.now() - t0;
+    }
+  };
+  let saves = 0;
   try {
-    timed('one task recording a batch of audit events (5,000 invoices)', 4000, () => {
-      for (let i = 0; i < 40; i++) {
-        const inv = invoices[3 + i * 11];
-        if (inv.status === 'Sent' && inv.doc_type === 'INVOICE') localDb.payments.record({ invoiceId: inv.id, amount: 1, method: 'UPI', date: '2026-05-02' });
-      }
-    });
-    await Promise.resolve();
+    const t0 = performance.now();
+    for (let i = 0; i < 40; i++) {
+      const inv = invoices[3 + i * 11];
+      if (inv.status === 'Sent' && inv.doc_type === 'INVOICE') localDb.payments.record({ invoiceId: inv.id, amount: 1, method: 'UPI', date: '2026-05-02' });
+    }
+    saves = performance.now() - t0;
+    await new Promise((r) => setTimeout(r, 0)); // the task's microtasks: field-edit rows, then the one write
   } finally {
     ls.setItem = real;
+    audit.record = realRecord;
   }
+  console.log(`# perf the batch's audit work (records + one write, 5,000 invoices): ${auditMs.toFixed(0)} ms of ${saves.toFixed(0)} ms of saves`);
+  assert.ok(auditMs < 1000, `audit work took ${auditMs.toFixed(0)} ms (cap 1000 ms)`);
   const events = audit.count() - before;
   console.log(`# perf audit writes per save: ${writes} for ${events} events (one per event before R15-A2)`);
   assert.ok(events >= 13, `${events} events`);
