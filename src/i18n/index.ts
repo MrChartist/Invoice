@@ -107,8 +107,13 @@ function tellWorker(next: Lang, wait: boolean): Promise<boolean> {
       ch.port1.close();
       resolve(complete);
     };
-    const timer = setTimeout(() => done(true), 20000);
-    ch.port1.onmessage = (e: MessageEvent<{ complete?: boolean }>) => done(e.data?.complete !== false);
+    // QA19 U5: a worker older than R16-A never answers; without its `ack` within 2 s, do not wait the full 20 s.
+    let timer = setTimeout(() => done(true), 2000);
+    ch.port1.onmessage = (e: MessageEvent<{ ack?: boolean; complete?: boolean }>) => {
+      if (!e.data?.ack) return done(e.data?.complete !== false);
+      clearTimeout(timer);
+      timer = setTimeout(() => done(true), 20000);
+    };
     try {
       sw.postMessage(msg, [ch.port2]);
     } catch {

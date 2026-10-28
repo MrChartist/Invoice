@@ -206,6 +206,7 @@ async function cachePacks(packs, shell) {
 }
 
 async function onLang(lang, port) {
+  if (port) port.postMessage({ ack: true }); // U5: "this worker caches packs" — a pre-R16 worker never answers
   let complete = false;
   try {
     await (await caches.open(LANG_CACHE)).put(LANG_URL, new Response(String(lang), { headers: { 'content-type': 'text/plain' } }));

@@ -220,3 +220,34 @@ test('U4: useMemo / useState initialisers that translate area strings depend on 
   }
   assert.deepEqual(bad, []);
 });
+
+test('U5: a language switch under a worker that never answers (pre-R16) waits ~2 s, not 20 s; ours acks first', async () => {
+  const sw = { controller: { postMessage: () => undefined } };
+  const g = globalThis as Record<string, unknown>;
+  const saved = { localStorage: g.localStorage, nav: Object.getOwnPropertyDescriptor(globalThis, 'navigator') };
+  g.localStorage = { getItem: () => null, setItem: () => undefined };
+  Object.defineProperty(globalThis, 'navigator', { value: { serviceWorker: sw, onLine: true }, configurable: true, writable: true });
+  try {
+    const { resetI18nForTests, setCatalogueForTests, setLanguage, getLanguage } = await import('../src/i18n/index.ts');
+    resetI18nForTests();
+    setCatalogueForTests('hi', {});
+    await setLanguage('en', { persist: false });
+    const t0 = Date.now();
+    const slow = new Promise((r) => setTimeout(() => r('slow'), 6000).unref());
+    const won = await Promise.race([setLanguage('hi').then(() => 'done'), slow]);
+    assert.equal(won, 'done', 'resolved without the 20 s wait');
+    assert.ok(Date.now() - t0 < 5000);
+    assert.equal(getLanguage(), 'hi');
+    resetI18nForTests();
+  } finally {
+    g.localStorage = saved.localStorage;
+    if (saved.nav) Object.defineProperty(globalThis, 'navigator', saved.nav);
+  }
+
+  const s = await oldDevice({ manifest: true, lang: 'en' });
+  const w = loadWorker(s);
+  await w.fire('install');
+  const replies: unknown[] = [];
+  await w.fire('message', { data: { type: 'lang', lang: 'hi' }, ports: [{ postMessage: (m: unknown) => replies.push(m) }] });
+  assert.equal(JSON.stringify(replies), JSON.stringify([{ ack: true }, { complete: true }])); // vm realm objects
+});
