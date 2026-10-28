@@ -129,13 +129,13 @@ alone).
 |---|---|---|---|---|
 | Initial JS (first paint) | 182.2 kB (4 files) | 182.2 kB (4 files) | **0 B** normalized (entry, runtime, vendor chunks byte-identical) | 0 ✓ |
 | Entry chunk | 88.2 kB | 88.2 kB | 0 B | — |
-| Core precache (English) | 3,136.9 kB | 3,147.1 kB | +10.2 raw; **+10.99 kB normalized** | 11 kB ✓ |
+| Core precache (English) | 3,136.9 kB | 3,147.1–3,148.7 kB | +10.2 … +11.8 raw across identical-size builds (hash noise); **+11.00 kB normalized** | 11 kB ✓ (at the cap) |
 | Hindi pack | 344.9 kB | 346.5 kB | +1.6 kB (`lang-hi-society` 1.39 kB + wiring areas) | 8 kB ✓ |
 | Hindi left in core | 21.4 kB | 21.4 kB | 0 | 0 ✓ |
 | `lazy-leaves` | 16.8 kB | 17.4 kB | +0.57 kB (`society/hs-registry.ts`, `demo/profile-society.ts`) | 0.3 kB ✗ (see below) |
 
 Chunks (normalized gz): `f-society` 4.52 kB (rules, tariff, units, print, shared, `society-r18a` English), SocietyDesk
-4.00 kB (desk, units view, unit form, tariff view, `hs-units-save`, `hs-settings`, `hs-ui` / `hs-form`), SocietyBlock
+3.99 kB (desk, units view, unit form, tariff view, `hs-units-save`, `hs-settings`, `hs-ui` / `hs-form`), SocietyBlock
 0.45 kB (+0.07 kB: the R17 particulars CSS module now a shared chunk), picker 0.24 kB, wiring ≈ 1.2 kB (help 0.19,
 wizard 0.13, checklist 0.13, presets 0.12, Ctrl+K 0.10, TemplateEngine 0.09, Features 0.07, Recurring 0.07, reach 0.06,
 open export 0.06, demo dispatcher 0.06, palette 0.06, packs 0.04, discover 0.04).

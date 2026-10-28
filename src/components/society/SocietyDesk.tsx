@@ -30,7 +30,7 @@ export default function SocietyDesk({ view, notify }: HsViewProps & { view?: str
     <section data-society-desk>
       <div className={controls.segment} role="tablist" style={{ marginBottom: '0.75rem' }}>
         {ids.map((k) => (
-          <button key={k} type="button" role="tab" aria-selected={k === v} className={k === v ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setParams({ tab: 'society', view: k }, { replace: true })} data-hs-view={k}>{VIEWS[k].label()}</button>
+          <button key={k} type="button" role="tab" aria-selected={k === v} className={k === v ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setParams({ tab: 'society', view: k }, { replace: true })}>{VIEWS[k].label()}</button>
         ))}
       </div>
       <Suspense fallback={null}><C notify={notify} /></Suspense>

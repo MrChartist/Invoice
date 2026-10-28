@@ -66,7 +66,7 @@ export default function HeadsView({ notify }: HsViewProps) {
         </p>
       ))}
       <div className={surface.tableWrap}>
-        <table className={surface.table} data-hs-head-grid>
+        <table className={surface.table}>
           <thead><tr><th>{hsT('head')}</th><th>{hsT('kind')}</th><th>{hsT('basis')}</th><th>{hsT('rate')}</th><th>{hsT('active')}</th><th /></tr></thead>
           <tbody>
             {heads.map((h, i) => (
