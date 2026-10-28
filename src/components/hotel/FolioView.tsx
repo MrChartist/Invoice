@@ -4,7 +4,7 @@
  * invoices, cancellation / no-show charges and OTA payouts. One module, FrontDesk's form kit and strings reused (size).
  */
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeftRight, Receipt, ReceiptText, Split, Wallet, XCircle } from 'lucide-react';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { Folio, FolioLineKind, Reservation } from '../../types/hotel-r7';
@@ -55,7 +55,9 @@ export default function FolioView({ ctx }: { ctx: Ctx }) {
 
 function Folios({ ctx }: { ctx: Ctx }) {
   const d = useMemo(() => (reconcileFolios(), { folios: hotelDb.folios(), clients: localDb.clients.getAll().filter((c) => c.id).map((c) => [c.id!, c.company || c.name] as const) }), [ctx.tick]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [q, setQ] = useState<Rec>({ q: '', house: '', sel: '' });
+  const [params] = useSearchParams(); // PENDING 9: `&folio=<id>&checkout=1` from Reservations / night audit
+  const [q, setQ] = useState<Rec>(() => ({ q: '', house: '', sel: params.get('folio') ?? '' }));
+  const [auto] = useState(() => (params.get('checkout') === '1' ? { id: params.get('folio'), tick: ctx.tick } : null)); // opens once
   const s = String(q.q).trim().toLowerCase();
   const f = d.folios.find((x) => x.id === q.sel);
   return (
@@ -66,18 +68,18 @@ function Folios({ ctx }: { ctx: Ctx }) {
       </Row>
       <Tbl head={[bT('folio'), bT('payer'), hT('total'), bT('toBill')]} rows={d.folios.filter((x) => x.status === 'open' && `${x.name} ${x.payer.name}`.toLowerCase().includes(s)).map((x) => [
         <button type="button" className={B.gs} onClick={() => setQ({ ...q, sel: x.id })} data-folio-open={x.name}>{x.name}</button>, x.payer.name, money(sum(x, true)), money(sum(x))])} />
-      {f && <Panel key={`${f.id}${ctx.tick}`} ctx={ctx} f={f} all={d.folios} clients={d.clients} />}
+      {f && <Panel key={`${f.id}${ctx.tick}`} ctx={ctx} f={f} all={d.folios} clients={d.clients} out0={auto && auto.id === f.id && auto.tick === ctx.tick ? 'final' : ''} />}
     </>
   );
 }
 
-function Panel({ ctx, f, all, clients }: { ctx: Ctx; f: Folio; all: Folio[]; clients: readonly (readonly [string, string])[] }) {
+function Panel({ ctx, f, all, clients, out0 = '' }: { ctx: Ctx; f: Folio; all: Folio[]; clients: readonly (readonly [string, string])[]; out0?: string }) {
   const res = f.reservation_id ? hotelDb.reservation(f.reservation_id) : undefined;
   const items = useMemo(() => localDb.items.getAll(), []);
   const [pick, setPick] = useState<string[]>([]);
   const [op, setOp] = useState<Rec>({ window: '2', to: '' });
   const [c, setC] = useState<Rec>({ kind: 'laundry', qty: 1, item: '' });
-  const [out, setOut] = useState('');
+  const [out, setOut] = useState(out0);
   const run = (fn: () => unknown) => ctx.run(() => { fn(); setPick([]); });
   const post = () => ctx.run(() => {
     const it = items.find((i) => i.id === c.item);

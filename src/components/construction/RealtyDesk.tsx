@@ -33,6 +33,9 @@ import { allotmentHtml, cancellationHtml } from '../../lib/construction/cn-allot
 import { preAgreementWarning } from '../../lib/construction/cn-realty-tax';
 import { readConstructionSettings, saveConstructionSettings } from '../../lib/construction/cn-settings';
 import { purchasesDb } from '../../lib/purchases';
+import { vendorsDb } from '../../lib/vendors';
+import { brokerageDue, recordBrokerage, remindDemand } from '../../lib/construction/cn-realty-extras';
+import { shiftDay } from '../../lib/collections';
 import { NumberInput } from '../ui/NumberInput';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -187,14 +190,16 @@ function Bookings({ run, tick, p }: PBody) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const data = useMemo(() => ({ units: loadUnits().filter((u) => u.project_id === p.id), bookings: loadBookings().filter((b) => b.project_id === p.id), plans: loadPlans(), clients: localDb.clients.getAll(), ...ctx() }), [tick, p.id]);
   const free = data.units.filter((u) => u.status === 'available' || u.status === 'hold');
-  const [f, setF] = useState({ unit_id: '', client_id: '', name: '', co: '', plan_id: '', date: todayInput(), stamp: 0 });
+  const [f, setF] = useState({ unit_id: '', client_id: '', name: '', co: '', plan_id: '', date: todayInput(), stamp: 0, broker: '', bpct: 0 });
+  const vendors = useMemo(() => vendorsDb.all().filter((x) => x.id && x.name), []);
   const unit = free.find((u) => u.id === f.unit_id) ?? free[0];
   const [sheet, setSheet] = useState<CostHead[] | null>(null);
   const heads = sheet ?? (unit ? defaultCostSheet(unit) : []);
   const [r, setR] = useState({ booking: '', amount: 0, date: todayInput(), method: 'Bank transfer', bank: '', pt: false, payer: '' });
   const book = () => run(() => {
     const c = data.clients.find((x) => x.id === f.client_id);
-    const b = createBooking({ date: f.date, unit_id: unit?.id ?? '', client_id: c?.id, client_name: c?.name ?? f.name, co_applicants: f.co || undefined, cost_sheet: heads, stamp_value: f.stamp || undefined, plan_id: f.plan_id || data.plans[0]?.id || '' });
+    const bv = vendors.find((x) => x.id === f.broker);
+    const b = createBooking({ date: f.date, unit_id: unit?.id ?? '', client_id: c?.id, client_name: c?.name ?? f.name, co_applicants: f.co || undefined, cost_sheet: heads, stamp_value: f.stamp || undefined, plan_id: f.plan_id || data.plans[0]?.id || '', ...(bv && f.bpct > 0 ? { broker: { vendor_id: bv.id, name: bv.name, pct: f.bpct } } : {}) });
     setSheet(null);
     return T('booked', { n: b.number });
   });
@@ -215,6 +220,7 @@ function Bookings({ run, tick, p }: PBody) {
           live(b) ? <span key="a" className={controls.row} style={row}>{b.status === 'booked' && st('agreement', 'toAgreement')}{(b.status === 'booked' || b.status === 'agreement') && st('registered', 'toRegistered')}{b.status === 'registered' && st('possession', 'toPossession')}
             <button type="button" className={sm} onClick={() => run(() => setInterestWaived(b.id, !b.interest_waived))}>{T(b.interest_waived ? 'unwaive' : 'waive')}</button>
             <button type="button" className={sm} onClick={() => print(allotmentHtml(b, u, p, data.plans.find((x) => x.id === b.plan_id), acc, company(), readConstructionSettings().realty?.terms), `${b.number}.html`)}>{T('allotment')}</button>
+            {brokerageDue(b) && !b.broker?.draft_id && <button type="button" className={sm} onClick={() => run(() => { recordBrokerage(b.id, todayInput()); return T('brokerDrafted'); })} data-rc-broker-bill>{T('brokerBill')} {rs(brokerageDue(b)!.amount)}</button>}
             <button type="button" className={sm} onClick={() => run(() => deleteBooking(b.id))}>{T('del')}</button></span> : ''];
       })} />
       <h4>{T('book')}</h4>
@@ -226,6 +232,8 @@ function Bookings({ run, tick, p }: PBody) {
         <Sel l={T('plan')} v={f.plan_id || data.plans[0]?.id || ''} set={(x) => setF({ ...f, plan_id: x })} o={data.plans.map((x) => [x.id, x.name] as const)} w={180} />
         <Txt l={T('date')} v={f.date} set={(x) => setF({ ...f, date: x })} type="date" w={160} d="k-date" />
         <Num l={T('stamp')} v={f.stamp} set={(x) => setF({ ...f, stamp: x })} />
+        <Sel l={T('broker')} v={f.broker} set={(x) => setF({ ...f, broker: x })} o={[['', '—'] as const, ...vendors.map((x) => [x.id, x.name] as const)]} w={200} d="k-broker" />
+        {f.broker && <Num l={T('brokerPct')} v={f.bpct} set={(x) => setF({ ...f, bpct: x })} w={120} d="k-bpct" />}
       </div>
       <div className={controls.row} style={row} data-rc-sheet>
         {heads.map((h, i) => <Num key={h.head} l={`${h.head}${h.pass_through ? ` (${T('passThrough')})` : ''}`} v={h.amount} set={(x) => setSheet(heads.map((y, j) => (j === i ? { ...y, amount: x } : y)))} w={170} d={`h-${h.head}`} />)}
@@ -306,7 +314,8 @@ function Demands({ run, tick, p }: PBody) {
       })} />
       {made.length > 0 && <Table d="made" head={[T('v.demands'), T('unit'), T('amount'), '']} rows={made.map((i) => [<Link key="l" to={`/invoice/${i.id}`}>{i.boq_terms?.cn?.demand?.number} · {i.invoice_number}</Link>, i.boq_terms?.cn?.demand?.unit ?? '', rs(i.total), <a key="w" href={wa(i)} target="_blank" rel="noopener noreferrer">{T('share')}</a>])} />}
       <h4>{T('ageing')}</h4>
-      <Table d="ageing" head={[T('v.bookings'), T('unit'), T('tower'), T('open'), T('b0'), T('b1'), T('b2'), T('b3')]} rows={demandAgeing(invoices.filter((i) => i.boq_terms?.cn?.demand?.project === p.name), todayInput()).map((a) => [a.booking, a.unit, a.tower, rs(a.open), ...a.buckets.map(rs)])} />
+      <Table d="ageing" head={[T('v.bookings'), T('unit'), T('tower'), T('open'), T('b0'), T('b1'), T('b2'), T('b3'), '']} rows={demandAgeing(invoices.filter((i) => i.boq_terms?.cn?.demand?.project === p.name), todayInput()).map((a) => [a.booking, a.unit, a.tower, rs(a.open), ...a.buckets.map(rs),
+        <button key="r" type="button" className={sm} onClick={() => run(() => { remindDemand(a.id, a.open, todayInput()); return T('reminded', { d: shiftDay(todayInput(), 7) }); })} data-rc-remind>{T('remind')}</button>])} />
     </>
   );
 }

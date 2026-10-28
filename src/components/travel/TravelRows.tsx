@@ -37,7 +37,12 @@ export default function TravelRows() {
   };
   const [tk, setTk] = useState(false);
   // R15-C1: the ticket rows open on demand (also without a trip)
-  const tickets = <><button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} aria-expanded={tk} onClick={() => setTk(!tk)} data-tv-tickets-open>{cvT('tickets')}</button>{tk && <div style={{ flexBasis: '100%' }}><TicketRows date={s.issue_date} method0={s.tv?.air?.method} have={Object.entries(s.tv?.lines ?? {}).filter(([id]) => s.items.some((l) => l.id === id)).map(([, v]) => v.tkt!).filter(Boolean)} onAdd={(t, o) => { const m = mergeTickets(s.items.filter((l) => l.name?.trim() || Number(l.rate)), s.tv, t, o); useInvoiceStore.getState().patch({ items: m.items, tv: m.tv }); }} /></div>}</>;
+  const have = Object.entries(s.tv?.lines ?? {}).filter(([id]) => s.items.some((l) => l.id === id)).map(([, v]) => v.tkt!).filter(Boolean);
+  // PENDING 13: the ticket list as a following page (off / list / with the fare split), kept in the `tv` snapshot.
+  const annex = have.length > 0 && <select className={`${controls.select} ${controls.btnSm}`} aria-label={cvT('annexPage')} value={s.tv?.ticket_annexure ?? ''} onChange={(e) => useInvoiceStore.getState().patch({ tv: { ...s.tv, ticket_annexure: (e.target.value || undefined) as 'list' | undefined } })} data-tv-ticket-annexure>
+    <option value="">{cvT('annexPage')} —</option><option value="list">{cvT('annexList')}</option><option value="fares">{cvT('annexFares')}</option>
+  </select>;
+  const tickets = <><button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} aria-expanded={tk} onClick={() => setTk(!tk)} data-tv-tickets-open>{cvT('tickets')}</button>{annex}{tk && <div style={{ flexBasis: '100%' }}><TicketRows date={s.issue_date} method0={s.tv?.air?.method} have={have} onAdd={(t, o) => { const m = mergeTickets(s.items.filter((l) => l.name?.trim() || Number(l.rate)), s.tv, t, o); useInvoiceStore.getState().patch({ items: m.items, tv: m.tv }); }} /></div>}</>;
   if (!trips.length && !s.tv) return <div data-tv-rows>{tickets}</div>;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }} data-tv-rows>

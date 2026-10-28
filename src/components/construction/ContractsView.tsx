@@ -13,7 +13,8 @@ import type { SecurityDeposit } from '../../types/institutions-r5';
 import { localDb } from '../../lib/localDb';
 import { peekTable } from '../../lib/storage';
 import { contractSummary, deleteContract, loadContracts, saveContract } from '../../lib/construction/cn-contracts';
-import { closeContract, closureChecklist, HAND_TICKS, setClosure } from '../../lib/construction/cn-closure';
+import { closeContract, closureChecklist, HAND_TICKS, setClosure, setClosureFiles } from '../../lib/construction/cn-closure';
+import { AttachmentsPanel } from '../attachments/AttachmentsPanel';
 import { loadGuarantees } from '../../lib/construction/cn-guarantees';
 import { B, fmtMoney, today, type PanelProps } from '../transport/shared';
 import { Fields, type Spec, type Vals } from './cn-fin-ui';
@@ -124,6 +125,8 @@ export default function ContractsView({ notify, refresh, tick }: PanelProps) {
             <button type="button" className={B.o} disabled={!why.noclaim} onClick={() => run(() => setClosure(c.id, { no_claim_ref: String(why.noclaim), no_claim_date: day }))} data-cn-noclaim>{twT('save')}</button>
             <button type="button" className={B.p} disabled={c.status === 'closed'} onClick={() => run(() => closeContract(c.id, data))} data-cn-close>{cbT('closeContract')}</button>
           </div>
+          {/* PENDING 14: closure documents through the shared attachments panel. */}
+          <AttachmentsPanel value={c.attachments} onChange={(next) => run(() => setClosureFiles(c.id, next))} label={cbT('closureFiles')} />
           <p className={styles.note}>{cbT('closureHint')}</p>
         </section>
       )}

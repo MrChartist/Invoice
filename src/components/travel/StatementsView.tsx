@@ -17,6 +17,8 @@ import { readFileTables } from '../marketplace/file-read';
 import { REQUIRED, STATEMENT_KINDS, STATEMENT_PRESETS, importStatement, loadStatements, readStatementRows, removeStatement, updateStatement, type StatementKind } from '../../lib/travel/tv-statements';
 import { makeStatementBill } from '../../lib/travel/tv-statement-bill';
 import { readTravelSettings } from '../../lib/travel/tv-settings';
+import { statementDiffRows } from '../../lib/travel/tv-annexure';
+import { downloadText, toCsv } from '../../lib/download';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field } from './tv-ui';
@@ -63,7 +65,9 @@ export default function StatementsView({ notify }: TvViewProps) {
       </div>
       {sel && (
         <section data-tv-statement-open>
-          <div style={row}><Field label={tvT('status')}><select className={controls.select} value={filter} onChange={(e) => setFilter(e.target.value)}><option value="">—</option>{STS.map((k) => <option key={k} value={k}>{cvList('sts', STS, k)}</option>)}</select></Field></div>
+          <div style={row}><Field label={tvT('status')}><select className={controls.select} value={filter} onChange={(e) => setFilter(e.target.value)}><option value="">—</option>{STS.map((k) => <option key={k} value={k}>{cvList('sts', STS, k)}</option>)}</select></Field>
+            {/* PENDING 13 (R15-C cut 3): CSV of the rows not plainly matched (diff, missing, ours only, ADM, refund). */}
+            <button type="button" className={sm} onClick={() => downloadText(`statement-differences-${sel.ref.replace(/[^\w-]+/g, '-')}.csv`, '\ufeff' + toCsv(statementDiffRows(sel)), 'text/csv')} data-tv-diff-csv>{cvT('diffCsv')}</button></div>
           <div className={surface.tableWrap}>
             <table className={surface.table}>
               <thead><tr><th>{cvT('doc')}</th><th>{cvT('type')}</th><th>{tvT('from')}</th><th>{tvT('pax')}</th><th className={surface.numeric}>{cvT('gross')}</th><th className={surface.numeric}>{tvT('commission')}</th><th className={surface.numeric}>{cvT('net')}</th><th>{tvT('status')}</th><th /></tr></thead>

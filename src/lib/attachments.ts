@@ -41,7 +41,7 @@ export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 export const MAX_IMAGE_INPUT_BYTES = 20 * 1024 * 1024;
 export const MAX_ATTACHMENTS_PER_RECORD = 10;
 /** Tables whose rows carry `attachments` (8C: draft bills and the unprocessed-documents inbox too). */
-export const ATTACHMENT_OWNER_TABLES = ['invoices', 'purchases', 'purchase_drafts', 'doc_inbox', 'recycle_bin', 'labour_compliance', 'site_compliance'] as const; // R4-C4: kept while binned; R11 (CN-D2) / R17-C: PF / ESI proof
+export const ATTACHMENT_OWNER_TABLES = ['invoices', 'purchases', 'purchase_drafts', 'doc_inbox', 'recycle_bin', 'labour_compliance', 'site_compliance', 'works_contracts'] as const; // R4-C4: kept while binned; R11 (CN-D2) / R17-C: PF / ESI proof; PENDING 14: contract closure documents
 
 export const ACCEPTED_MIMES: readonly AttachmentMime[] = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
 /** `accept` attribute for file inputs (a hint only; content is checked by magic bytes). */
@@ -135,9 +135,8 @@ export function parseStoredAttachment(raw: string | null | undefined): StoredAtt
   } catch {
     return null;
   }
-  if (!v || typeof v !== 'object') return null;
-  const r = v as Partial<StoredAttachment>;
-  if (typeof r.id !== 'string' || !r.id || typeof r.data !== 'string') return null;
+  const r = v as Partial<StoredAttachment> | null; // null / a non-object has no string `id`: refused below
+  if (typeof r?.id !== 'string' || !r.id || typeof r.data !== 'string') return null;
   const parts = splitDataUrl(r.data);
   if (!parts || !(ACCEPTED_MIMES as readonly string[]).includes(parts.mime)) return null;
   // Magic bytes of the payload must agree with the declared type (16 base64 chars = 12 bytes).
@@ -220,7 +219,7 @@ export function readRefs(v: unknown): AttachmentRef[] {
   const seen = new Set<string>();
   const out: AttachmentRef[] = [];
   for (const r of v as Partial<AttachmentRef>[]) {
-    if (!r || typeof r.id !== 'string' || !r.id || seen.has(r.id)) continue;
+    if (typeof r?.id !== 'string' || !r.id || seen.has(r.id)) continue;
     if (!(ACCEPTED_MIMES as readonly string[]).includes(String(r.mime))) continue;
     seen.add(r.id);
     out.push({
@@ -240,7 +239,10 @@ export function readRefs(v: unknown): AttachmentRef[] {
 export function attachmentIdsIn(rows: unknown, into: Set<string> = new Set()): Set<string> {
   if (!Array.isArray(rows)) return into;
   for (const row of rows) {
-    if (row && typeof row === 'object') for (const r of readRefs((row as { attachments?: unknown }).attachments)) into.add(r.id);
+    const o = row as { attachments?: unknown; pf?: { file?: unknown }; esi?: { file?: unknown }; wage_register?: unknown; table?: unknown; row?: unknown } | null;
+    // non-objects carry none; CN-D2 labour compliance keeps its PF / ESI / wage-register files in nested fields
+    for (const r of readRefs([...(Array.isArray(o?.attachments) ? o.attachments : []), o?.pf?.file, o?.esi?.file, o?.wage_register])) into.add(r.id);
+    if (o?.table === 'labour_compliance') attachmentIdsIn([o.row], into); // a binned row keeps those nested files too
   }
   return into;
 }
@@ -271,9 +273,7 @@ export function referencedAttachmentIds(
   // PERF-1: the live store is read through the shared parsed tables (runs on every save that drops a file).
   const get = parsed ?? (read === readRaw ? liveParsed : (k: string) => parseJson(read(k)));
   for (const t of ATTACHMENT_OWNER_TABLES) attachmentIdsIn(get(DB_PREFIX + t), ids);
-  const draft = get(SINGLETON_KEYS.draft);
-  if (draft && typeof draft === 'object') attachmentIdsIn([draft], ids);
-  return ids;
+  return attachmentIdsIn([get(SINGLETON_KEYS.draft)], ids); // a missing / non-object draft is skipped row by row
 }
 
 /** Ids of every stored file. */

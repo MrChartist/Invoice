@@ -27,7 +27,7 @@ import { auditNights, isYearEnd, nightsBetween } from '../../lib/hotel/business-
 import { yearEndInterims } from '../../lib/hotel/checkout-save';
 import { bT } from '../../i18n/areas/hotel-billing-r7';
 import { advanceRate, arrivalsOn, closeReservation, departuresOn, inHouseOn, priceLine, reservationValue, saveReservation, searchReservations, takeAdvance } from '../../lib/hotel/reservations';
-import { NeedsConfirm, checkIn, markCheckedOut, walkIn } from '../../lib/hotel/checkin';
+import { NeedsConfirm, checkIn, folioToBill, markCheckedOut, walkIn } from '../../lib/hotel/checkin';
 import { FORM_C_FIELDS, ID_TYPES, guestRegister, isIndian, matchGuest, shownId, type GuestInput } from '../../lib/hotel/guests';
 import { HK_STATUSES, byFloor, occupiedRooms, readyForCheckIn, setHk, setOoo } from '../../lib/hotel/housekeeping';
 import { preCheck, runAudit, type LineRef } from '../../lib/hotel/night-audit';
@@ -91,7 +91,7 @@ export interface Ctx {
   refresh: () => void;
   notify: (m: string, tone?: 'success' | 'error') => void;
   open: (d: Dialog) => void;
-  go: (view: string) => void;
+  go: (view: string, extra?: Record<string, string>) => void;
   run: (fn: () => unknown, ok?: string) => void;
 }
 /** R7-B / R7-C views (all in this chunk: one chunk for the pack): `folios`, `formc`, `reports`. */
@@ -113,7 +113,7 @@ export default function FrontDesk() {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const refresh = useCallback(() => setTick((n) => n + 1), []);
   const day = useMemo(() => hotelDb.settings().business_date, [tick]); // eslint-disable-line react-hooks/exhaustive-deps
-  const go = (next: string) => setParams({ tab: 'frontdesk', view: next }, { replace: true });
+  const go = (next: string, extra?: Record<string, string>) => setParams({ tab: 'frontdesk', view: next, ...extra }, { replace: true });
   const run = (fn: () => unknown, ok = hT('saved')) => {
     try {
       fn();
@@ -268,11 +268,24 @@ function Bookings({ ctx }: { ctx: Ctx }) {
         hT(`st.${r.status}`), money(reservationValue(r)),
         <>
           {isLiveRes(r) && r.lines.filter((l) => l.status === 'booked').map((l) => <button key={l.id} type="button" className={B.os} onClick={() => ctx.open({ ci: r.id, line: l.id })} data-check-in={r.number}>{hT('checkIn')}</button>)}
-          {r.lines.filter((l) => l.status === 'checked_in').map((l) => <button key={l.id} type="button" className={B.gs} onClick={() => ctx.run(() => markCheckedOut(r.id, l.id))}>{hT('checkOut')} {no(l)}</button>)}
+          {r.lines.filter((l) => l.status === 'checked_in').map((l) => <CheckOutBtn key={l.id} ctx={ctx} res={r} lineId={l.id} cls={B.gs} room={no(l)} />)}
         </>,
       ])} />
     </div>
   );
+}
+
+/**
+ * PENDING 9: check-out from the Reservations list / night audit. A line with unbilled nights or folio lines opens its
+ * folio's check-out (the billing path: posts the missing nights, saves the invoices, then closes the line); a comp or
+ * billed line only changes status.
+ */
+function CheckOutBtn({ ctx, res, lineId, cls, room }: { ctx: Ctx; res: Reservation; lineId: string; cls: string; room?: string }) {
+  const line = res.lines.find((l) => l.id === lineId);
+  const folio = line ? folioToBill(res, line) : '';
+  return folio
+    ? <button type="button" className={cls} onClick={() => ctx.go('folios', { folio, checkout: '1' })} data-bill-folio={res.number}>{hT('billOut')}{room ? ` ${room}` : ''}</button>
+    : <button type="button" className={cls} onClick={() => ctx.run(() => markCheckedOut(res.id, lineId))}>{hT('checkOut')}{room ? ` ${room}` : ''}</button>;
 }
 
 /* ── Booking dialog (A3) ───────────────────────────────────────── */
@@ -485,7 +498,7 @@ function Audit({ ctx }: { ctx: Ctx }) {
     <div className={styles.stack} data-hotel-audit>
       {pc && <>
         {list('dueOuts', pc.dueOuts, (x) => <>
-          <button type="button" className={B.os} onClick={() => ctx.run(() => markCheckedOut(x.res.id, x.lineId))}>{hT('checkOut')}</button>
+          <CheckOutBtn ctx={ctx} res={x.res} lineId={x.lineId} cls={B.os} />
           <button type="button" className={B.gs} onClick={() => ctx.open({ res: x.res.id })}>{hT('extend')}</button>
         </>)}
         {list('arrivals', pc.arrivals, (x) => <>
