@@ -26,6 +26,16 @@ PRD: `docs/prd/round-18.md`. CA items: `docs/CA_REVIEW.md` §18 (HS1–HS64). Wo
   `Client.hs = { unit_ids, role }` (owner / joint / tenant; the owner role wins; a client with no unit left loses `hs`),
   in one `withTablesRollback` over units and clients. The grid filters by wing and occupancy, totals carpet area, cost
   and slots, and warns (never blocks) when undivided interest does not add up to 100 ± 0.01 %.
+- **Unit import (A2 criterion 4, closed after R18).** Units view → "Import CSV / XLSX" (and "Template"): CSV through
+  `csv.ts`, XLSX through the dynamic `xlsx.ts` (`marketplace/file-read.ts`), headers scored by `import-mapping.ts`'s
+  `scoreHeader` (all three, and `backup.ts`, load only when a file is chosen). Template `code, wing, use, carpet_area,
+  super_area, undivided_pct, construction_cost, owner, phone, email, occupancy, tenant, parking` (`tenant` may be a name
+  or yes / no; `parking` a count or slot names). `planUnitsImport` (`hs-units-import.ts`, pure) previews each row: an
+  existing code is updated (only the columns given), a new one created; owners / tenants match clients by name (another
+  phone is a warning; an existing client is never changed), unknown names are listed and created on "Import". Any row
+  error blocks the import; `applyUnitsImport` (`hs-units-save.ts`) re-plans on live data, writes units, new members and
+  links in one `withTablesRollback`, then one `import_runs` row of kind `society_units` (fail-soft). One undo copy
+  (`saveSafetySnapshot('import')`) is taken first; "Undo import" restores it.
 - **Tariff (A3).** `society_settings.heads: HsHead[]` — kind (14 kinds; `statutory` = pass-through dues, `outsider` =
   non-member income), basis (`per_unit`, `area_carpet`, `area_super`, `undivided_pct`, `cost_pct_pa`, `per_slot`
   (+ `slot_rates` by kind), `pct_of_head` (non-occupancy: % of the `service` heads, let units only), `typed`,
@@ -69,13 +79,19 @@ desk stores nothing.
 
 ### Decisions and deviations
 
-- **Cuts at the 11 kB cap (PRD §3, in order).** Cut 1: no "How your bill is worked out" footnote (`hs.explain` is
-  declared but not printed; the heads table carries each basis). Cut 2: no `per_inlet` / `per_lifted_unit` bases
-  (water by inlets and lift charges are typed per unit; MH's default bases fall back accordingly). Cut 3: **no CSV / XLSX
-  unit import** (and so no `import_runs` row of kind `society_units`); units are added one by one. Further trims to
+- **Cuts at the 11 kB cap (PRD §3, in order).** Cut 1: no "How your bill is worked out" footnote — *closed later*
+  (PENDING #6): the run sets `hs.explain` unless Tariff → "Print 'How your bill is worked out'" is off
+  (`society_settings.explain: false`); `explainLines` (`hs-print.ts`) prints each head's basis and amount, the GST test
+  (exempt / taxable regimes), the pass-through note and the interest, from the snapshot only (older bills unchanged). Cut 2: no `per_inlet` / `per_lifted_unit` bases
+  — *closed later* (PENDING #5): `per_inlet` = rate × `SocietyUnit.inlets`, `per_lifted_unit` = rate when
+  `SocietyUnit.lifted`; the unit form shows "Water inlets" / "Lift building" only when a head uses the basis, and the
+  import reads `inlets` / `lifted` (yes / no). The MH State row's default bases are data and stay as dated (pick the
+  basis on the head). Cut 3: no CSV / XLSX
+  unit import — *closed later*: see "Unit import" below. Further trims to
   stay at the cap: the unit grid filters by wing and occupancy (not use), the unit form has no joint-owner, floor or
-  per-slot-kind fields (the shape keeps them), no delete button (a unit is edited; deletes, when added, go through
-  `setTable` on the watched table → recycle bin), the owner is typed / picked by name (no phone field), no bill-day or
+  per-slot-kind fields (the shape keeps them), no delete button — *closed later*: the form has "Delete" and a "Closed"
+  tick; `deleteUnit` refuses while a bill / run names the unit (close it instead) or a member is linked (clear owner /
+  tenant first, so a restore never has to re-link clients), else `setTable` on the watched table → recycle bin, the owner is typed / picked by name (no phone field), no bill-day or
   area-unit input (defaults), no separate paper CSS (the R17 particulars box styles are shared), no glossary terms.
 - **No `hs-profile.ts` / `hs-units-import.ts` / `UnitForm`-level member sub-form.** The profile's defaults live in
   `hs-settings.ts` (`societyDefaultsFor`), read lazily; the wizard and Features write only the settings patch.

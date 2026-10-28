@@ -275,7 +275,7 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:deploy:muster', 'Duty register', 'ड्यूटी रजिस्टर', 'Duties, OT and relievers per site and month; lock it, then send attendance (LOP, OT) to payroll and bill from it.', 'Each month end.', { statutory: ca(['MP32', 'MP33']) }),
   t('time:deploy:bills', 'Bills', 'बिल', 'Drafts from locked musters by duty, hour, month pro-rata or cost-plus; one per site or bill group and GST regime; client TDS expected.', 'Each month end.', { statutory: ca(['MP6', 'MP34', 'MP36']) }),
   // R17-C
-  t('time:deploy:compliance', 'Compliance pack', 'अनुपालन पैक', 'PF / ESI of each site\'s people from the final payroll run, shared by duties; TRRN, ESI challan, client hold; minimum-wage and Labour Code checks.', 'Each month after payroll.', { statutory: ca(['MP18', 'MP22', 'MP37', 'MP38', 'MP39']) }),
+  t('time:deploy:compliance', 'Compliance pack', 'अनुपालन पैक', 'PF / ESI of each site\'s people from the final payroll run, shared by duties; TRRN, ESI challan, proof files, client hold; minimum-wage and Labour Code checks.', 'Each month after payroll.', { statutory: ca(['MP18', 'MP22', 'MP37', 'MP38', 'MP39']) }),
   t('time:deploy:profit', 'Site P&L', 'साइट का लाभ-हानि', 'Per site and month: billed less wages, relievers, employer PF / ESI and site-tagged bills; margin %. Nothing posts.', 'Each month.', { statutory: ca(['MP25', 'MP26', 'MP40']) }),
   // R17-D
   t('time:deploy:statutory', 'Statutory', 'वैधानिक', 'Wage-revision arrears as debit notes per original bill; client TDS expected vs booked per quarter; PSARA / OSH / guard licences and contract ends.', 'Each revision; each quarter.', { statutory: ca(['MP9', 'MP12', 'MP41', 'MP42', 'MP43']) }),
@@ -285,7 +285,7 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:shipments:rates', 'Rates', 'दरें', 'Charge heads: SAC, role (own or pure agent), unit, rate.', 'When rates change.', { statutory: ca(['LG5', 'LG10']) }),
   // R18-A: the Society desk on Recurring (B–D add bills, gst, dues, funds, registers). Working papers — verify with your CA.
   t('recurring:society', 'Society', 'सोसाइटी', 'Societies, apartment associations and RWAs: units, members and the tariff.', 'Each change.', { statutory: ca(['HS1', 'HS28']) }),
-  t('recurring:society:units', 'Units', 'यूनिट', 'Flats and shops: areas, cost, owner, tenant, parking.', 'Each new member.', { statutory: ca(['HS8', 'HS34']) }),
+  t('recurring:society:units', 'Units', 'यूनिट', 'Flats and shops: areas, cost, owner, tenant, parking. Import a CSV / XLSX sheet (Template button): a preview first, all or nothing, with an undo copy. Delete (to the recycle bin) works only for a unit with no bills and no member; close a billed unit instead.', 'Each new member.', { statutory: ca(['HS8', 'HS34']) }),
   // R18-B
   t('recurring:society:bills', 'Bills', 'बिल', 'One bill per unit for a period in one batch: an exempt Bill of Supply up to the monthly limit, else a tax invoice; undo with a reason.', 'Each billing period.', { statutory: ca(['HS1', 'HS2', 'HS3', 'HS5', 'HS6', 'HS14']) }),
   t('recurring:society:gst', 'GST', 'GST', 'Turnover vs the registration threshold, units above the limit, the both-conditions table and the ITC split link.', 'Each month.', { statutory: ca(['HS4', 'HS9', 'HS11', 'HS15']) }),

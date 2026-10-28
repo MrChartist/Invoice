@@ -67,6 +67,7 @@ export default function HeadsView({ notify }: HsViewProps) {
           </select>
         </F>
         <F label={hsT('dueDays')}><input type="number" min={0} max={120} className={controls.input} value={s.due_days ?? 15} onChange={(e) => set({ due_days: numIn(e.target.value) })} /></F>
+        <label className={controls.check}><input type="checkbox" checked={s.explain !== false} onChange={(e) => set({ explain: e.target.checked })} data-hs-explain /> {hsT('explain')}</label>
       </div>
       {tariffHints(heads, rule, !!pendingStateRule(s.state, today, s.confirmed)).map((h) => (
         <p key={h.code + h.value} className={controls.hint} style={{ color: 'var(--warning)' }} data-hs-hint={h.code}>

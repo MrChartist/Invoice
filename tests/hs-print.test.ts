@@ -26,3 +26,21 @@ test('old invoices print exactly as before', () => {
   assert.equal(trackingText({ id: 'l1', batch_no: 'B1' } as never), 'Batch B1');
   assert.deepEqual(societyPaper({}), { rows: [], heads: [] }, 'an empty snapshot prints no block (SocietyBlock returns null)');
 });
+
+test('PENDING #6: "How your bill is worked out" prints from the snapshot when hs.explain is set; the run sets it unless switched off', async () => {
+  const snap: HsSnapshot = { ...hs, explain: true, regime: 'exempt77c', test: { counted: 15000, limit: 7500, months: 3 }, heads: [...hs.heads!, { head_id: 'ptx', name: 'Property tax', kind: 'statutory', basis: 'as assessed', amount: 1200 }], interest: { amount: 50, from: '2026-07-21', to: '2026-09-30', pct: 12, on: 5000, through: '2026-09-30' } };
+  assert.deepEqual(societyPaper(snap).explain, [
+    'Service charges: per unit = ₹3,000.00',
+    'Property tax: as assessed = ₹1,200.00',
+    'GST test: member contributions ₹5,000.00 a month against the ₹7,500.00 a month limit.',
+    'Statutory dues are collected for the authority and passed on, outside GST.',
+    'Interest: 12 % a year, simple, on ₹5,000.00 from 21/07/2026 to 30/09/2026.',
+  ]);
+  assert.equal('explain' in societyPaper(hs), false, 'a bill without the flag prints as before');
+  const { planSocietyRun } = await import('../src/lib/society/hs-run.ts');
+  const unit = { id: 'u1', code: 'A-101', use: 'residential', occupancy: 'owner', parking: [], status: 'active', updated_at: '', owner_id: 'c1' } as const;
+  const heads = [{ id: 'svc', name: 'Service', kind: 'service', basis: 'per_unit', rate: 3000, active: true }] as const;
+  const ctx = (settings = {}) => ({ date: '2026-10-01', due: '2026-10-15', registered: true, settings, clients: [{ id: 'c1', name: 'Asha', email: '', address: '', city: '', zip: '' }], invoices: [], runId: 'r', passText: '' });
+  assert.equal(planSocietyRun('2026-10', [{ ...unit, parking: [] }], [...heads], ctx()).bills[0].hs.explain, true);
+  assert.equal(planSocietyRun('2026-10', [{ ...unit, parking: [] }], [...heads], ctx({ explain: false })).bills[0].hs.explain, undefined);
+});

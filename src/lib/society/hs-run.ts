@@ -139,7 +139,7 @@ export function planSocietyRun(period: string, units: readonly SocietyUnit[], he
       });
       const hs: HsSnapshot = {
         unit: { id: unit.id, code: unit.code, ...(unit.wing ? { wing: unit.wing } : {}), ...(unit.carpet_area ? { area: unit.carpet_area, area_unit: ctx.settings.area_unit ?? 'sqft' } : {}), members: [client.name] },
-        period, due: ctx.due, heads: hsRows, run_id: ctx.runId, test: { counted: regime.counted, limit: regime.limit, months: regime.months }, regime: regime.regime,
+        period, due: ctx.due, heads: hsRows, ...(ctx.settings.explain !== false ? { explain: true } : {}), run_id: ctx.runId, test: { counted: regime.counted, limit: regime.limit, months: regime.months }, regime: regime.regime,
         ...(regime.decl ? { decl: regime.decl } : {}), ...(levy ? { levy } : {}), ...fundsOf(rows), ...(d.kind === 'main' ? 'hs' in ex ? ex.hs : {} : {}),
       };
       plan.bills.push({ unit, client, regime, items, hs });

@@ -167,7 +167,7 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   trips: 'Trip sheets.',
   ra_measurements: 'RA bill measurements per BOQ line.',
   boq_coefficients: 'Material per BOQ unit (theoretical consumption).',
-  import_runs: 'One row per import of suppliers, ledgers or opening balances (R6-C3), stock items and vouchers (7Q); kinds include supplier statements (R15) and site musters (`muster`, R17).',
+  import_runs: 'One row per import of suppliers, ledgers or opening balances (R6-C3), stock items and vouchers (7Q); kinds include supplier statements (R15) and site musters (`muster`, R17) and society units (`society_units`, R18).',
   // R7: hotel pack
   hotel_room_types: 'Hotel room types.', hotel_rooms: 'Hotel rooms with housekeeping status.', hotel_rate_plans: 'Hotel rate plans.',
   hotel_reservations: 'Hotel reservations (RES/FY…) with room lines and nightly price snapshots.', hotel_folios: 'Hotel folios (running accounts; not tax documents).',
