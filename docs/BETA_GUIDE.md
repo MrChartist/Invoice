@@ -145,11 +145,15 @@ and a phone-sized screen.
   Data & backup*) through a folder you already sync (Google Drive, OneDrive, Dropbox …).
 - The 4–6 digit PIN is a lock screen; to encrypt the data at rest, turn on vault mode in *Settings → Security*.
 - Hindi is partial (section 6).
-- Open roadmap items are listed in [`docs/ROADMAP.md`](ROADMAP.md), rows marked ⏳ or 🟡. The ten most likely to
-  affect your testing (please do not report these as bugs, but do tell us if one blocks you):
+- Open items are listed in [`docs/PENDING.md`](PENDING.md) (code work ranked, owner and CA items) and in
+  [`docs/ROADMAP.md`](ROADMAP.md), rows marked ⏳ or 🟡. The ten most likely to affect your testing (please do not
+  report these as bugs, but do tell us if one blocks you):
   1. More languages and screens are still partly English (5.4, 8.130).
-  2. Gateway voucher entry has no bill-wise references or voucher classes (7.19).
-  3. Tally import brings no inventory quantities; no TDS challans in the Tally export (7.49).
+  2. Voucher types cover sales / receipt / payment / contra only; no bill-wise references when altering a payment
+     voucher or on journals; no Excel import of sales / purchase vouchers (7.116). (Bill-wise references on Gateway
+     receipts / payments, voucher classes, Tally inventory quantities and TDS challans in the Tally export came in 7Q.)
+  3. Audit-trail archive segments are not compressed and old FYs cannot be archived to a "history" company (7.49);
+     a society's units are typed one by one (no CSV import yet, PENDING #2).
   4. Form 15CA / 15CB, 27Q extras, ISD postings, GSTR-6 amendments and some GSTR-9 tables are not built (7.131).
   5. The TDS receivable register: credit notes do not reduce the TDS expected (`receivables.md`, CA item T12).
   6. The cash-flow forecast ignores GST, TDS, loans and salaries (`cash-planning.md`).
