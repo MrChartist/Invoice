@@ -9,11 +9,16 @@ import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { hsT } from '../../i18n/areas/society-r18a';
 import { hsbT } from '../../i18n/areas/society-r18b';
+import { hscT } from '../../i18n/areas/society-r18c';
+import { hsdT } from '../../i18n/areas/society-r18d';
 import controls from '../../styles/controls.module.css';
 import UnitsView from './UnitsView';
 import HeadsView from './HeadsView';
 import BillsView from './BillsView';
 import GstView from './GstView';
+import DuesView from './DuesView';
+import FundsView from './FundsView';
+import RegistersView from './RegistersView';
 import type { HsViewProps } from './hs-ui';
 
 type View = { label: () => string; C: ComponentType<HsViewProps> | LazyExoticComponent<ComponentType<HsViewProps>> };
@@ -24,6 +29,11 @@ const VIEWS: Record<string, View> = {
   // R18-B (in the desk chunk: one chunk saves the wrappers of five small ones)
   bills: { label: () => hsbT('bills'), C: BillsView },
   gst: { label: () => hsbT('gst'), C: GstView },
+  // R18-C
+  dues: { label: () => hscT('dues'), C: DuesView },
+  // R18-D
+  funds: { label: () => hsdT('funds'), C: FundsView },
+  registers: { label: () => hsdT('registers'), C: RegistersView },
 };
 
 export default function SocietyDesk({ view, notify }: HsViewProps & { view?: string }) {

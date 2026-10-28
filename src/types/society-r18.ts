@@ -187,6 +187,9 @@ export interface HsTransfer { date: string; from_ids: string[]; to_ids: string[]
 
 /* ════════════════════════════════════════ R18-D ════════════════════════════════════════ */
 
+/** D3: the audit's due date as typed (MH; else `audit_due_months` after the FY end from the State row). */
+export interface HsAudit { due_on?: string }
+
 /** D3: a nominee (name / share / relation only — no ID numbers). */
 export interface HsNominee { name: string; share_pct: number; relation?: string }
 

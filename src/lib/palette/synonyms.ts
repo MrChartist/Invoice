@@ -173,6 +173,11 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   // R18-B
   '/recurring?tab=society&view=bills': ['maintenance bill', 'society bill', 'billing run', 'special levy', 'मेंटेनेंस', 'रखरखाव बिल'],
   '/recurring?tab=society&view=gst': ['7500', 'rwa gst', 'bill of supply', '20 lakh', 'सोसाइटी जीएसटी'],
+  // R18-C
+  '/recurring?tab=society&view=dues': ['NOC', 'dues certificate', 'defaulters', 'arrears', 'transfer of membership', 'बकाया'],
+  // R18-D
+  '/recurring?tab=society&view=funds': ['sinking fund', 'repair fund', 'fund transfer', 'सिंकिंग फ़ंड'],
+  '/recurring?tab=society&view=registers': ['J register', 'member list', 'nomination', 'share register', 'society audit', '80P', 'सदस्य सूची'],
 };
 
 /** Words for one href: its own row, else the row of its base tab (`&view=` dropped). */

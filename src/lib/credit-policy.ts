@@ -123,14 +123,14 @@ const CREDIT_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SU
  * Block party over the limit → a clerk's document is held for the owner (`reason: 'credit'`); the owner's
  * save passes and is audited; a document the owner already approved at this value passes.
  */
-export function creditGate(doc: InvoiceRecord): void {
+export function creditGate(doc: InvoiceRecord, rows?: readonly InvoiceRecord[]): void {
   if (!CREDIT_DOCS.has(doc.doc_type ?? 'INVOICE') || !doc.client?.name) return;
   const master = creditMaster(doc.client);
   const policy = readCreditPolicy();
   if (!master || partyCreditMode(policy, master) !== 'block') return;
   const a = doc.approval;
   if (a?.state === 'approved' && a.doc_id === doc.id && (a.approved_value === undefined || Math.abs(rupeeValue(doc) - a.approved_value) <= 0.004)) return;
-  const credit = creditStatus(doc, { master, policy })?.blocked ?? '';
+  const credit = creditStatus(doc, { master, policy, invoices: rows })?.blocked ?? '';
   // TR-A1: a line below its minimum margin is held too (reason `margin`), once the trade-discount module registered.
   const low = credit || !marginCheck ? '' : marginCheck(doc);
   const reason = credit || low;

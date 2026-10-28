@@ -127,7 +127,8 @@ export function assertNotPendingApproval(doc: Pick<InvoiceRecord, 'invoice_numbe
 
 export const CREDIT_POLICY_KEY = `${DB_PREFIX}credit_policy`;
 
-type CreditGate = (doc: InvoiceRecord) => void;
+/** `rows`: the invoices the document is saved against (a batch's earlier documents included, `saveMany`). */
+type CreditGate = (doc: InvoiceRecord, rows?: readonly InvoiceRecord[]) => void;
 let creditGate: CreditGate | null = null;
 export function registerCreditGate(fn: CreditGate | null): void {
   creditGate = fn;
@@ -152,9 +153,9 @@ export const voidHook: {
 } = {};
 
 /** The data layer's credit branch (next to `holdIfApprovalNeeded` in `localDb.invoices.save` / `setStatus`); runs `voidHook` first. */
-export function holdIfCreditBlocked(doc: InvoiceRecord, stored: InvoiceRecord | undefined): void {
+export function holdIfCreditBlocked(doc: InvoiceRecord, stored: InvoiceRecord | undefined, rows?: readonly InvoiceRecord[]): void {
   voidHook.f?.(stored, doc);
   if (doc.pos || doc.status === 'Draft' || doc.status === 'Cancelled' || (stored && stored.status !== 'Draft')) return;
-  if (creditGate) creditGate(doc);
+  if (creditGate) creditGate(doc, rows);
   else if (!can('doc.approve') && /"block"/.test(readRaw(CREDIT_POLICY_KEY) ?? '')) holdForCredit(doc, 'The credit position could not be checked.');
 }

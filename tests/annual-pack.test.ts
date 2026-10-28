@@ -190,3 +190,28 @@ test('output: script-free HTML with the draft line, escaped text, XLSX sheets', 
   assert.equal(sheets[0].rows[0][2], 'FY 2025-26');
   assert.equal(sheets[0].rows[0][3], 'FY 2024-25');
 });
+
+test('R18-D2: a co-operative society / association prints I&E (same figures), funds and liabilities, and Receipts and Payments; the four existing entity types are unchanged', () => {
+  const { pack: co } = pack({ entity: 'cooperative' });
+  const { pack: prop } = pack({ entity: 'proprietorship' });
+  assert.equal(co.pl.netProfit, prop.pl.netProfit, 'the same builders');
+  const body = annualPackBody(co);
+  assert.match(body, /Income and Expenditure Account/);
+  assert.equal(profitLossLines(co).at(-1)!.label, 'Excess of income over expenditure / (expenditure over income)');
+  assert.deepEqual(balanceSheetLines(co).filter((l) => /^I+\. /.test(l.label)).map((l) => l.label), ['I. FUNDS AND LIABILITIES', 'II. PROPERTY AND ASSETS']);
+  assert.equal((body.match(/class="ap-page"/g) ?? []).length, 7, '+ the R&P page');
+  const rp = co.rp!;
+  const sum = (l: { amount: number }[]) => l.reduce((t, x) => t + x.amount, 0);
+  assert.equal(rp.closing, rp.opening + sum(rp.receipts) - sum(rp.payments), 'closing = opening + receipts − payments');
+  assert.deepEqual([rp.receipts.find((r) => /Sales/.test(r.account))?.amount, rp.receipts.find((r) => /Capital/i.test(r.account))?.amount], [30_000_00, 10_000_00]);
+  assert.deepEqual(annualPackSheets(co).map((s) => s.name), ['Balance sheet', 'Income & Expenditure', 'Cash flow', 'Trial balance', 'Notes', 'Receipts and Payments']);
+  assert.equal(capitalTitle('cooperative'), 'Share capital');
+  assert.notEqual(pack({ entity: 'association' }).pack.rp, undefined);
+  for (const e of ['proprietorship', 'partnership', 'llp', 'company'] as const) {
+    const p = pack({ entity: e }).pack;
+    assert.equal(p.rp, undefined);
+    assert.match(annualPackBody(p), /Statement of profit and loss/);
+    assert.doesNotMatch(annualPackBody(p), /Receipts and Payments|Income and Expenditure/);
+    assert.equal(balanceSheetLines(p)[0].label, 'I. EQUITY AND LIABILITIES');
+  }
+});

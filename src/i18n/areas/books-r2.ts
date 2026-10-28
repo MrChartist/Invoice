@@ -70,6 +70,8 @@ export const br2T = defineArea(
     entFirm: 'Partnership firm',
     entLlp: 'LLP',
     entCompany: 'Company',
+    entCoop: 'Co-operative society', // R18-D2
+    entAssoc: 'Association (AOA / RWA)',
     entityHint: 'Changes the wording (capital account / partners’ capital / share capital). Schedule III wording for companies — verify with your CA.',
     printHtml: 'Print / HTML',
     downloadHtml: 'Download HTML',
@@ -152,6 +154,8 @@ export const br2T = defineArea(
     entFirm: 'साझेदारी फ़र्म',
     entLlp: 'LLP',
     entCompany: 'कंपनी',
+    entCoop: 'सहकारी संस्था',
+    entAssoc: 'संघ (अपार्टमेंट मालिक संघ / RWA)',
     entityHint: 'शब्दावली बदलती है (पूँजी खाता / साझेदारों की पूँजी / शेयर पूँजी)। कंपनियों के लिए अनुसूची III की शब्दावली — अपने CA से जाँचें।',
     printHtml: 'प्रिंट / HTML',
     downloadHtml: 'HTML डाउनलोड',
