@@ -16,6 +16,7 @@ import {
   snooze,
   unreadCount,
   buildContext,
+  registerNotificationProvider,
   collectNotifications,
   type NotifState,
   type NotificationSeverity,
@@ -320,6 +321,7 @@ function ensureTransportWorksAlerts(onReady: () => void): void {
   gate('pharmacy', '-', () => import('../retail-r9/PharmacyDesk').then((m) => m.registerPharmacyAlerts())); // R9 (RT-B): licence expiry, refills due (explicit pack only)
   gate('clinic', '-', () => import('../../lib/services/sv-clinic-alerts')); // R10 (SV-B): registration expiry, long admissions, deposits (registers itself)
   for (const p of ['agri_inputs', 'coldstore', 'fpo']) gate(p, '-', () => import('../../lib/agri/ag-d-alerts')); // R12 (AG-D): dealer licences, liens past due, members' AGM / return dates (registers itself once)
+  gate('manpower', '-', () => import('../../lib/manpower/mp-alerts').then((m) => registerNotificationProvider(m.mpNotices))); // R17-D3: licences, guard licences, contract ends, VDA months (explicit pack)
 }
 
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {

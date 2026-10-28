@@ -42,6 +42,7 @@ const BoeDutySheet = lazy(() => import('../trade/BoeDutySheet'));
 const RcmGoodsNotice = lazy(() => import('../trade/RcmGoodsNotice'));
 const MediaRows = lazy(() => import('../prof/MediaRows')); // R14 (PS-B5): media buy for a client (`media` pack)
 const TripPick = lazy(() => import('../travel/TripPick')); // R15-B2 / B3: the trip of a supplier bill (`travel` / `events` packs)
+const SitePick = lazy(() => import('../manpower/SitePick')); // R17-C2: the site of a supplier bill (`manpower` / `security` packs)
 // R8-A (TR-A1): supplier's special rate and last purchase rate, as hints (trade discounts or a trading pack, lazy).
 const BillRateHints = lazy(() => import('../trade/BillRateHints'));
 // R8-B (TR-B1/B2/B3): bags / weight rows, bill charges and the broker (commodity / agency pack, lazy).
@@ -169,6 +170,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const [psB, setPsB] = useState(() => (purchase as { ps?: Record<string, unknown> } | undefined)?.ps); // R14 (PS-B5)
   const [mediaOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('media'))(localDb.settings.get() as never));
   const [tvB, setTvB] = useState(purchase?.tv); // R15-B2 / B3
+  const [mpB, setMpB] = useState(purchase?.mp); // R17-C2
+  const [manpowerOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.some((p) => p === 'manpower' || p === 'security'))(localDb.settings.get() as never));
   const [travelOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.some((p) => p === 'travel' || p === 'events'))(localDb.settings.get() as never));
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
@@ -276,6 +279,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         ...billablePatch(billable),
         ...(psB !== (purchase as { ps?: unknown } | undefined)?.ps ? { ps: psB } : {}), // R14 (PS-B5)
         tv: tvB, // R15-B2
+        mp: mpB, // R17-C2
         cost_centre_id: costCentre,
         branch_id: branchId,
         attachments: attachments.length ? attachments : undefined,
@@ -498,6 +502,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       <BillableFields idPrefix="bill" value={billable} onChange={setBillable} rebilledIn={purchase?.rebilled_in} />
       {(mediaOn || !!psB?.media) && <Suspense fallback={null}><MediaRows ps={psB} onChange={setPsB} /></Suspense>}
       {(travelOn || !!tvB) && <Suspense fallback={null}><TripPick value={tvB} onChange={setTvB} itc={itc} setItc={setItc} /></Suspense>}
+      {(manpowerOn || !!mpB) && <Suspense fallback={null}><SitePick value={mpB} onChange={setMpB} /></Suspense>}
 
       <AttachmentsPanel value={attachments} onChange={setAttachments} label={purT('attachments')} />
 

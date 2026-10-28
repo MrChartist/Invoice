@@ -5,6 +5,7 @@ import { setTable } from '../../src/lib/storage.ts';
 import { saveSite } from '../../src/lib/manpower/mp-sites-io.ts';
 import type { MpPost, SiteInfo } from '../../src/types/manpower-r17.ts';
 import type { Site } from '../../src/lib/manpower/mp-sites.ts';
+import type { RunLine } from '../../src/lib/manpower/mp-compliance.ts';
 
 export const post = (o: Partial<MpPost> = {}): MpPost => ({ id: 'g', name: 'Guard (12 h)', sac: '998525', heads: 4, shift_hours: 12, basis: 'duty', rate: 800, ...o });
 export const info = (o: Partial<SiteInfo> = {}): SiteInfo => ({ code: 'S-001', contract: { from: '2026-01-01' }, posts: [post(), post({ id: 's', name: 'Supervisor', heads: 1, rate: 1000 })], status: 'active', ...o });
@@ -29,3 +30,9 @@ export const OCT_ROWS = [
   { employee_id: 'e6', post_id: 'g', duties: 3, ot_hours: 12, relief: true },
   { employee_id: 'e5', post_id: 's', duties: 31 },
 ];
+
+/** R17-C: a finalised run line (PF on 60 % of gross; ESI off unless given). */
+export const line = (id: string, gross: number, o: Partial<RunLine> = {}): RunLine => ({
+  employee_id: id, code: id.toUpperCase(), name: `N ${id}`, uan: '100200300456', earnings: [], units: {}, payable_days: 31,
+  gross, pf_wages: gross * 0.6, pf_ee: 1800, epf_er: 550, eps: 1250, edli: 75, pf_admin: 75, esi_ee: 0, esi_er: 0, total_deductions: 1800, net: gross - 1800, ...o,
+});

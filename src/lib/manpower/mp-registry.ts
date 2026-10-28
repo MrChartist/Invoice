@@ -15,14 +15,16 @@ export const MP_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   manpower_settings: 'settings.manage',
   // R17-B: duty registers are documents (lock / unlock too)
   site_musters: 'doc.create',
-  // R17-C: site_compliance: 'doc.create'
+  // R17-C: compliance proof per site × month (status, hold)
+  site_compliance: 'doc.create',
 };
 
 /** Audited tables (every row change logged; deletes go to the recycle bin). `manpower_settings` is audited on save. */
 export const MP_WATCHED: Readonly<Record<string, WatchedTable>> = {
   // R17-B
   site_musters: { entity: 'cost_centre', label: 'Site muster' },
-  // R17-C: site_compliance
+  // R17-C
+  site_compliance: { entity: 'cost_centre', label: 'Site compliance' },
 };
 
 /** Idempotent: adds the rows once (never overwrites a row another module set). */
