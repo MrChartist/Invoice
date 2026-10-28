@@ -135,9 +135,8 @@ export function parseStoredAttachment(raw: string | null | undefined): StoredAtt
   } catch {
     return null;
   }
-  if (!v) return null; // a non-object has no string `id` / `data`, so the next line refuses it
-  const r = v as Partial<StoredAttachment>;
-  if (typeof r.id !== 'string' || !r.id || typeof r.data !== 'string') return null;
+  const r = v as Partial<StoredAttachment> | null; // null / a non-object has no string `id`: refused below
+  if (typeof r?.id !== 'string' || !r.id || typeof r.data !== 'string') return null;
   const parts = splitDataUrl(r.data);
   if (!parts || !(ACCEPTED_MIMES as readonly string[]).includes(parts.mime)) return null;
   // Magic bytes of the payload must agree with the declared type (16 base64 chars = 12 bytes).
@@ -220,7 +219,7 @@ export function readRefs(v: unknown): AttachmentRef[] {
   const seen = new Set<string>();
   const out: AttachmentRef[] = [];
   for (const r of v as Partial<AttachmentRef>[]) {
-    if (!r || typeof r.id !== 'string' || !r.id || seen.has(r.id)) continue;
+    if (typeof r?.id !== 'string' || !r.id || seen.has(r.id)) continue;
     if (!(ACCEPTED_MIMES as readonly string[]).includes(String(r.mime))) continue;
     seen.add(r.id);
     out.push({
