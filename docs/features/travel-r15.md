@@ -201,6 +201,9 @@ strings area 1.4), `file-read` / `file-map` split out of the marketplace chunks 
   match and the old-Act label "206C(1G) overseas tour package" would otherwise get the LRS code `6CQ`.
 - **Events margin** = invoiced to the client − cost per head (vendor bills, else booked cost); the trips view's costing
   (sell-based) is not reused, to keep the events chunk off `tv-costing`.
+- **Chips not lazy inside `TravelRows`**: a nested `lazy` + `Suspense` for `TvChips` left the editor's items footer
+  (Add line, trip picker, chips) without a layout box after reveal in Chromium (container-query relayout; any style
+  change restored it). `TvChips` is a static import of the already-lazy `TravelRows` chunk.
 - **TDS hint date** = the booking's service date (the bill form has no date in `TripPick`), TV40.
 - **FX** (D2 #4): no change — B's booking form already keeps `cost_currency` / `fx` per booking; the invoice uses its own
   exchange rate. Cut 2 applied (chip only, no POS rows in the trips view); cut 1 (vendor-advance column) not built.
@@ -209,15 +212,17 @@ strings area 1.4), `file-read` / `file-map` split out of the marketplace chunks 
 
 ### Bundle (R15-D)
 
-Before = `claude/elegant-cannon-cwapiv` (868e287, same tree as 6ea5407), after = this branch; gzip -9.
+Before = `claude/elegant-cannon-cwapiv` at 707d210 (R15-C merged), after = this branch merged onto it; gzip -9.
 
 | Budget | Before | After | Delta | Cap |
 |---|---|---|---|---|
-| Initial JS | 186,978 B (182.6 kB) | 186,982 B (182.6 kB) | +4 B (lazy-chunk map) | 0 ✓; 4 initial files |
-| Total JS | 3,487,472 B (3,405.7 kB) | 3,502,273 B (3,420.2 kB) | **+14.5 kB** | 9 kB ✗ (+5.5) |
+| Initial JS | 186,985 B (182.6 kB) | 186,990 B (182.6 kB) | +5 B (lazy-chunk map) | 0 ✓; 4 initial files |
+| Total JS | 3,500,191 B (3,418.2 kB) | 3,511,596 B (3,429.3 kB) | **+11.1 kB** | 9 kB ✗ (+2.1) |
 
-Breakdown (gz): POS + events engine with the D strings 3.9 kB, views chunk (TCS + events) 2.7, TCS engine 1.7, editor
-chips 1.7, rules +0.4 (in a now separate `travel-rules` chunk), chunk re-split of B's shared modules (`tv-trips`,
-`tv-run`, `TravelRows` ↔ `tv-ui` / `tv-regime`) ≈ 1.5, bill-form hints 0.2, paper 0.15, help / palette / packs 0.35.
+Breakdown (gz): POS + events engine with the D strings (`tv-events` chunk) 3.8 kB, views chunk (TCS + events) 2.6,
+TCS engine 1.7, editor chips (inside `TravelRows`) ≈ 1.2, rules +0.3 (now a separate `travel-rules` chunk), chunk
+re-split of B's shared modules (`tv-ui` / `tv-regime` → `tv-bookings` / `tv-run` / `TravelRows`) ≈ 0.5, desk 0.4,
+bill-form hints 0.15, paper 0.15, help / palette / packs 0.35. (Measured on the R15-B base before R15-C: +14.5 kB; the
+merge with R15-C's layout and mounting the chips without a nested lazy chunk brought it down.)
 Options for the lead: drop the export-check line in the chip (≈ −0.2), drop the vendor TDS list in the events view (it
 stays on the bill form, ≈ −0.3), drop the "near the threshold" list (history years only, ≈ −0.15).
