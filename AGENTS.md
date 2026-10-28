@@ -214,6 +214,29 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   (lazy only, date-keyed, `tests/hs-rules.test.ts`); **State society rules are data rows (`STATE_SOCIETY_RULES`, by
   State code and date), never code** — a bill not in force (KA 2026) carries `in_force: false` and applies only once the
   user confirms it (`society_settings.confirmed`); State checks are hints. Notes: `docs/features/society-r18.md`.
+- Round 19 (freight forwarders, customs brokers (CHA), courier franchisees & 3PL warehouses) company data: names in
+  `src/lib/logistics/lg-shared.ts` (R19-A table `lg_jobs` (dated by `date`, `doc.create`, series `JOB` — `JOB/FY26-27/0001`,
+  branch prefix `JOB-BOM`), object `logistics_settings` (`settings.manage`, audited on save, a singleton; absent = nothing
+  logistics — `lgDefaultsFor` fills what is not stored); D adds `lg_manifests` / `lg_storage` (dated by the month end)),
+  all backed up and synced. **A job is a `lg_jobs` row, never a cost centre**; documents point at it by `lg.job_id`.
+  Settings `logistics_kind` (`forwarder` / `cha` / `courier` / `warehouse` / `multi`): a wizard card, not a business type —
+  business type `transport` with EXPLICIT `modules` (the transport preset ∪ `time`; unregistered drops `gst`) and an
+  EXPLICIT `industry_packs` list from `logistics` / `customs` / `courier` / `warehouse` (the R5-B `transport` pack only when
+  "We also run our own lorries" is ticked). Desk tab `shipments` on `/time` (`TIME_TABS`, mounted by file name through
+  `import.meta.glob` over `components/logistics/*Desk.tsx`; views in `&view=`: A `jobs` / `rates`; B `billing` / `costing`,
+  C `customs`, D `agents` / `courier` / `storage` — views, never tabs); the R14 `exportsvc` tab takes `logistics` in
+  `alsoPacks`; `PACK_OF_TYPE` / `PACK_ROUTES` unchanged. Rights and audit labels are registered at runtime by
+  `src/lib/logistics/lg-registry.ts`: **every module that writes a Round 19 table must `import './lg-registry'`**, and so do
+  `sync-engine.ts` and `trust/recycle-bin.ts` (`tests/lg-registry.test.ts`). Round 19 invoice snapshots live under ONE
+  record key `lg` (`R19_RECORD_KEYS`, spread into `R9_RECORD_KEYS`) — never add keys; pure-agent recoveries reuse
+  `charge_head_id: 'rule33'`, the SAC sits in `hsn`, each line's head in `lg.heads[lineId]`. Build group `f-logistics`
+  (`vite.config.ts`, `familyRe('logistics', 'logistics-rules', 'logistics-r19', 'lg-registry')` — the registry a lazy leaf):
+  engines in `src/lib/logistics/` import only first-paint modules, `logistics-rules.ts` and each other; shared lazy code
+  goes through bridges `lg-*-io.ts` (≤ 4: issue / tax / books / recv). Batch billers (month-end jobs, courier manifests,
+  storage) use `localDb.invoices.saveMany`. Rule values in `src/lib/logistics-rules.ts` (lazy only, date-keyed, keyed rows
+  read with `keyedAt`, `tests/lg-rules.test.ts`); GTA rates, the intermediary rule, TDS sections and Act labels stay in
+  their own files, read through `lg-tax-io.ts`. CA ids `LG1`–`LG44` (`LG` sits before `G` in every CA-id regex). Notes:
+  `docs/features/logistics-r19.md`.
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 - Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,

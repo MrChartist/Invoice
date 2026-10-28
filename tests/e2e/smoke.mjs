@@ -6023,6 +6023,63 @@ try {
     await s.restore();
   });
 
+  await step('R19-A logistics core: Settings → Logistics profile → Forwarder + customs broker (transport, time module, explicit ["logistics","customs"]); Time → Shipments → Rates → Default heads (≥ 10) → saved; Jobs → New job: export, air, BOM → SIN (SG), gross 480 kg, 5 × 120 × 100 × 50 cm → chargeable 500 kg (volumetric) → saved as JOB/FY26-27/0001 → reload → listed; help; Ctrl+K "job file"', async () => {
+    const keys = ['settings', 'clients', 'lg_jobs', 'logistics_settings', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'transport', modules: undefined, industry_packs: undefined, logistics_kind: undefined, society_kind: undefined, service_kind: undefined, manpower_kind: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-lg-c1', name: 'E2E Demo Exports Pvt Ltd', email: '', address: 'Navi Mumbai', city: 'Navi Mumbai', zip: '400703', gstin: '27AAPFU0939F1ZV', state_code: '27' }]);
+    await writeJson(page, 'lg_jobs', []);
+    await writeJson(page, 'logistics_settings', null);
+    await writeJson(page, 'series_counters', (prev.series_counters ?? []).filter((r) => !String(r?.id ?? '').startsWith('JOB/')));
+    await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-lg-c1'), 15000);
+    await readJson(page, 'lg_jobs', null, (v) => Array.isArray(v) && v.length === 0, 15000);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-lg-kind-card="multi"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.logistics_kind === 'multi', 15000);
+    check(st.business_type === 'transport' && JSON.stringify(st.industry_packs) === '["logistics","customs"]' && st.modules?.includes('time') && !st.industry_packs.includes('transport'), `Forwarder + customs broker: transport + time + explicit ["logistics","customs"] (${st.industry_packs})`);
+    await page.goto(srv.origin + '/time?tab=shipments&view=rates');
+    await page.locator('[data-shipments-desk]').waitFor({ timeout: 15000 });
+    check((await page.getByRole('tab').allInnerTexts()).some((t) => /^Shipments$/.test(t.trim())), 'Time lists the Shipments tab');
+    await page.locator('[data-lg-default-heads]').click();
+    const ls = await readJson(page, 'logistics_settings', {}, (v) => (v?.heads?.length ?? 0) >= 10, 15000);
+    check(ls.heads.find((h) => h.kind === 'clearance')?.sac === '996712' && ls.heads.find((h) => h.kind === 'duty')?.role === 'pure_agent', `default heads: ${ls.heads.length}, clearance 996712, duty pure agent`);
+    await page.getByRole('tab', { name: 'Jobs' }).click();
+    await page.locator('[data-lg-new-job]').click({ timeout: 15000 });
+    await page.locator('[data-lg-field="client"]').selectOption('e2e-lg-c1');
+    await page.locator('[data-lg-field="dir"]').selectOption('export');
+    await page.locator('[data-lg-field="mode"]').selectOption('air');
+    await page.locator('[data-lg-field="origin"]').fill('BOM');
+    await page.locator('[data-lg-field="destination"]').fill('SIN');
+    await page.locator('[data-lg-field="dest_country"]').fill('SG');
+    await page.locator('[data-lg-field="gross_kg"]').fill('480');
+    await page.locator('[data-lg-add-dim]').click();
+    for (const [k, v] of [['l', 120], ['w', 100], ['h', 50], ['n', 5]]) await page.locator(`[data-lg-dim="0${k}"]`).fill(String(v));
+    check(/^500 kg \(volumetric\)$/.test((await page.locator('[data-lg-chargeable]').innerText()).trim()), `chargeable 500 kg (volumetric) (${await page.locator('[data-lg-chargeable]').innerText()})`);
+    await page.locator('[data-lg-save-job]').click();
+    const jobs = await readJson(page, 'lg_jobs', [], (v) => v.length === 1 && v[0].number === 'JOB/FY26-27/0001', 15000);
+    check(jobs[0]?.chargeable_kg === 500 && jobs[0]?.dest_country === 'SG' && jobs[0]?.client_id === 'e2e-lg-c1', 'lg_jobs: JOB/FY26-27/0001, 500 kg chargeable, SG, the client');
+    await page.reload();
+    await page.locator('[data-lg-job="JOB/FY26-27/0001"]').waitFor({ timeout: 15000 });
+    check(/BOM → SIN/.test(await page.locator('[data-lg-job="JOB/FY26-27/0001"]').innerText()), 'after reload the jobs list shows JOB/FY26-27/0001, BOM → SIN');
+    await page.locator('h1').first().click();
+    await page.keyboard.press('F1');
+    await page.locator('[data-screen-help^="time:shipments"]').first().waitFor({ timeout: 15000 });
+    check(true, 'F1 opens the Shipments help');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('job file');
+    await palette.getByRole('option', { name: /Job files/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "job file" finds the jobs view');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {

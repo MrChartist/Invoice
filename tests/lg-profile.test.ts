@@ -6,7 +6,7 @@ import { resetStorage } from './helpers/shim.ts';
 import { installSettings } from './helpers/world.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { PRESETS, LOGISTICS_KINDS, applyLogisticsKind, logisticsLanding } from '../src/lib/shop-presets.ts';
-import { PACK_IDS, PACK_OF_TYPE, PACK_TABS, activePacks, packTabOn, visibleTabs } from '../src/lib/industry-packs.ts';
+import { PACK_IDS, PACK_OF_TYPE, PACK_TABS, activePacks, packTabOn, visiblePackTabs, visibleTabs } from '../src/lib/industry-packs.ts';
 import { PACK_OF_TYPE_INLINE, PACK_ROUTES, isPathVisible } from '../src/lib/shop-mode.ts';
 import { PACK_HREF } from '../src/lib/features-catalog.ts';
 import { allSteps, readChecklistInputs, type ChecklistCtx, type ChecklistFactsV3 } from '../src/lib/checklist-steps.ts';
@@ -48,7 +48,7 @@ test('PACK_OF_TYPE / PACK_OF_TYPE_INLINE / PACK_ROUTES unchanged; /time stays vi
   assert.ok(!Object.values(PACK_ROUTES).some((ps) => ps.some((p) => ['logistics', 'customs', 'courier', 'warehouse'].includes(p))));
   const s = applyLogisticsKind('multi', { registered: true });
   assert.ok(isPathVisible('/time', new Set(s.modules), s.industry_packs));
-  const desk = () => visibleTabs(TIME_TABS, localDb.settings.get()).map((t) => t.id).filter((id) => id === 'shipments' || id === 'exportsvc');
+  const desk = () => visiblePackTabs(TIME_TABS, localDb.settings.get()).map((t) => t.id).filter((id) => id === 'shipments' || id === 'exportsvc');
   localDb.settings.save({ ...localDb.settings.get(), business_type: 'transport' });
   assert.deepEqual(desk(), [], 'a transport company without the profile sees no Shipments tab');
   assert.deepEqual(visibleTabs(TIME_TABS, localDb.settings.get(), 'shipments').map((t) => t.id).filter((id) => id === 'shipments'), ['shipments'], 'URL still opens');
