@@ -255,3 +255,8 @@ export interface StatementRow {
   hotel?: string;
   nights?: number;
 }
+
+export interface TvSnapshot {
+  /** PENDING 13 (R15-C cut 3): print the ticket list as a following page — 'list', or 'fares' with the fare split. */
+  ticket_annexure?: 'list' | 'fares';
+}

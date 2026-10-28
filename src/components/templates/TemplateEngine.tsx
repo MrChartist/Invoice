@@ -50,6 +50,8 @@ const LazyProfBlock = lazy(() => import('./parts/ProfBlock'));
 const LazyProfAnnexure = lazy(() => import('./parts/ProfAnnexurePage'));
 // R15-B4: travel particulars (only with `tv`).
 const LazyTravelBlock = lazy(() => import('./parts/TravelBlock'));
+// PENDING 13 (R15-C cut 3): the ticket annexure page (only with `tv.ticket_annexure`).
+const LazyTicketAnnexure = lazy(() => import('./parts/travel/TicketAnnexurePage'));
 // R17-A4: manpower particulars (only with `mp`).
 const LazyManpowerBlock = lazy(() => import('./parts/ManpowerBlock'));
 // R18-A4: society particulars (only with `hs`).
@@ -300,6 +302,8 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
           {invoice.mf && layout !== 'receipt' && <Suspense fallback={null}><LazyMfgAnnexure invoice={invoice} /></Suspense>}
           {/* R14 (PS-A5): time by timekeeper (B–D: disbursements, stages, media) as a following page. */}
           {invoice.ps && layout !== 'receipt' && <Suspense fallback={null}><LazyProfAnnexure invoice={invoice} /></Suspense>}
+          {/* PENDING 13 (R15-C cut 3): the ticket list as a following page. */}
+          {invoice.tv?.ticket_annexure && layout !== 'receipt' && <Suspense fallback={null}><LazyTicketAnnexure invoice={invoice} /></Suspense>}
           {/* R3-C2: photo pages after the totals / annexure (2 × 2 per page). */}
           {invoice.attachments?.some((a) => a.print) && <Suspense fallback={null}><LazyPhotoPages invoice={invoice} /></Suspense>}
         </div>
