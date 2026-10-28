@@ -26,6 +26,7 @@ import styles from './purchases.module.css';
 import tabStyles from './VendorsTab.module.css';
 
 // R14 (PS-B2): "advocate / firm of advocates" tick (inward reverse charge on legal services) — one lazy row.
+const NettingLinkRow = lazy(() => import('../receivables/NettingDialog').then((m) => ({ default: m.NettingLinkRow }))); // R15-A3
 const VendorAdvocateRow = lazy(() => import('../prof/PartyRows').then((m) => ({ default: m.VendorAdvocateRow })));
 
 export interface VendorsTabProps {
@@ -278,6 +279,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
               {TDS_PAYABLE_SECTIONS.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}
             </select>
           </div>
+          <Suspense fallback={null}><NettingLinkRow vendor={draft} onChange={(client_id) => set({ client_id })} /></Suspense>
           <div className={controls.field}>
             <label className={controls.check}>
               <input type="checkbox" checked={!!draft.tds_non_filer} onChange={(e) => set({ tds_non_filer: e.target.checked })} /> {tdsT('nonFiler')}

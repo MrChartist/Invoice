@@ -20,7 +20,7 @@ export const TOPICS: readonly HelpTopic[] = [
     related: rel(['Receivables', '/receivables'], ['Statements', '/receivables?tab=statements']),
   }),
   t('receivables', 'Receivables', 'प्राप्य', 'Who owes you and since when: ageing, statements, follow-ups and collections.', 'Weekly, to chase overdue money.', { related: rel(['Ageing', '/receivables?tab=aging'], ['Follow-ups', '/receivables?tab=followups']) }),
-  t('receivables:aging', 'Ageing', 'एजिंग', 'Outstanding by customer in 0–30 / 31–60 / 61–90 / 90+ day buckets.', 'To see which dues are getting old.'),
+  t('receivables:aging', 'Ageing', 'एजिंग', 'Outstanding by customer in 0–30 / 31–60 / 61–90 / 90+ day buckets. Netting (scales button) sets off a customer who is also your supplier.', 'To see which dues are getting old.'),
   t('receivables:statements', 'Statements', 'स्टेटमेंट', 'A statement of account per customer for a period, to print or share.', 'Month end, or when a customer asks for their balance.'),
   t('receivables:followups', 'Follow-ups', 'फ़ॉलो-अप', 'Reminders due today, promises to pay and notes per customer.', 'Daily, to work the collection list.'),
   t('receivables:collections', 'Collections', 'वसूली', 'Collection settings, payment terms, write-offs and recoveries.', 'When a debt will not be paid, or to set default terms.', { statutory: ca(['G9', 'T22', 'AC17']) }),
