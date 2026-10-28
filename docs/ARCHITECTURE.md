@@ -74,12 +74,13 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
    floating-point sums for display values.
 6. Pure logic lives in `src/lib/*.ts` with `node:test` tests in `tests/*.test.ts`
    (`npm test`, Node ≥ 22, no browser APIs in tested modules).
-7. Indian FY numbering (`INV/FY25-26/0001`) is fixed — do not change it.
+7. Indian FY numbering (`INV/FY25-26/0001`) is fixed — do not change it. A user voucher type (P1-13) numbers its own
+   `<prefix>/FY<yy-yy>/<seq><suffix>` series only for documents that carry its `voucher_type_id`.
 
 ## Tables (`mrchartist_inv_<table>`, IndexedDB-backed cache or localStorage)
 | table | owner module | shape |
 |---|---|---|
-| `invoices` | core | `InvoiceRecord` (`src/types/invoice.ts`) |
+| `invoices` | core | `InvoiceRecord` (`src/types/invoice.ts`); additive `voucher_type_id` / `print_title` snapshot (7Q, P1-13) |
 | `clients` | core | `Client` |
 | `items_catalog` | core | `InvoiceItem`; additive catalogue-only `barcode` / `sku` / `mrp` (6.7) and `qty_slabs` (6.9) |
 | `transactions` | core | `Payment` (payments received; `advance_id` marks an advance adjusted against the invoice, not new money; additive `receipt_number` stamped at record time) |
@@ -119,7 +120,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `gstr4_manual` | GST reports (composition, 5.9) | `Gstr4Manual` typed-in GSTR-4 Tables 7-9 (TDS/TCS credit rows, tax / interest / late fee paid, refund claimed, GSTR-4 filing date), one row per FY × GSTIN, `id` = `${fyStart}|${GSTIN}` (`src/lib/gstr4-annual.ts`) |
 | `compliance` | compliance (GST) | `FiledReturn` marks: GST return filed per form / period / GSTIN (`docs/features/compliance.md`) |
 | `accounts` | ledger | user-added `Account` rows (`src/lib/ledger/accounts.ts`); default accounts are constants, never stored |
-| `vouchers` | ledger | manual `ManualVoucher` rows, amounts in integer paise (`src/lib/ledger/vouchers.ts`); additive variant fields `variant` (OPTIONAL / MEMO), `post_dated`, `reverse_on`, `voucher_class`, `regularised_at` (Phase 7) |
+| `vouchers` | ledger | manual `ManualVoucher` rows, amounts in integer paise (`src/lib/ledger/vouchers.ts`); additive variant fields `variant` (OPTIONAL / MEMO), `post_dated`, `reverse_on`, `voucher_class`, `regularised_at` (Phase 7); `voucher_type_id` (7Q) |
 | `cheques` | cheques (6.26) | `Cheque` (`src/types/cheques.ts`) — received / issued cheques, lifecycle, linked payment ids (`docs/features/cash-planning.md`) |
 | `advances` | advances (5.3) | `AdvanceRecord` (`src/types/advances.ts`) — advance receipt vouchers `ADV/FY…`, GST snapshot, refunds `RFV/FY…`; adjustments are `transactions` rows with `advance_id` (`docs/features/advances.md`) |
 | `cheque_print` | cheques (6.26) | cheque print layout + mm offsets (object, `src/lib/cheque-print.ts`) |
@@ -165,6 +166,7 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
 | `gst_challans` | GST set-off (WP-6) | `GstChallan` PMT-06: CPIN, CIN / BRN, dates, major × minor head amounts; a paid challan's payment voucher id |
 | `hsn_master` | GST depth (WP-6, `src/lib/hsn-master.ts`) | `HsnMasterRow` code, description, UQC, goods / services, dated `rates` history (append-only by convention) |
 | `stock_groups` / `stock_categories` | inventory masters (WP-8, `src/lib/stock-groups.ts`) | `StockTreeNode {id, name, parent_id?}` (nested); items point via `group_id` / `category_id`; `master.edit` (`docs/features/inventory-masters.md`) |
+| `voucher_types` | voucher types (P1-13, 7Q, `src/lib/voucher-types.ts`; numbering in `voucher-series.ts`) | `VoucherType`: user voucher type under a base (prefix / suffix / start / width / yearly or monthly restart, print title, template, default bank or godown, `use_for_pos`, `inactive`); documents / vouchers point at it via additive `voucher_type_id`; `master.edit` (`docs/features/voucher-types.md`) |
 | `units` | inventory masters (WP-8, `src/lib/units.ts`) | `UnitMaster`: simple unit (symbol, name, UQC, decimals; a built-in symbol is an override) or compound (`first` / `factor` / `second`); `master.edit` |
 
 ### Snapshot images by reference (schema v3)

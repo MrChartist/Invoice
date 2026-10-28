@@ -18,7 +18,6 @@ import {
 import { resolveStateCode } from '../lib/india-states';
 import { addDaysInput } from '../lib/utils';
 import { blankItem, makeDraft, normalizeRecord, senderStateCode } from './invoice-defaults';
-import { baseOfDoc } from '../lib/voucher-series';
 import { customFieldsDb, finalizeValues, mergePartyValues, readValues, snapshotFromMap } from '../lib/custom-fields';
 import type {
   Client,
@@ -297,8 +296,6 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       } else {
         apply({ doc_type });
       }
-      // P1-13: a voucher type belongs to one base (sales / credit / debit note); another base drops it.
-      if (get().voucher_type_id && baseOfDoc(prev) !== baseOfDoc(doc_type)) apply({ voucher_type_id: undefined, print_title: undefined });
     },
     setTemplate: (template_id) => {
       localDb.template.set(template_id);

@@ -90,12 +90,6 @@ test('invoice in a user type: own series, print title snapshot, never reused aft
   assert.equal(localDb.invoices.nextNumber('2026-06-01', 'INVOICE', undefined, t.id), 'EXP/FY26-27/0006');
   // A sales type never numbers a credit note.
   assert.equal(localDb.invoices.nextNumber('2026-06-01', 'CREDIT_NOTE', undefined, t.id), 'CRN/FY26-27/0001');
-  // Changing the document to another base drops the type.
-  st().newDraft('INVOICE');
-  st().patch(documentDefaults(t));
-  st().setDocType('CREDIT_NOTE');
-  assert.equal(st().voucher_type_id, undefined);
-  assert.equal(st().print_title, undefined);
   // A used type cannot be deleted.
   setTable('invoices', [{ ...r1.record!, id: 'x1' }]);
   assert.throws(() => deleteVoucherType(t.id), /inactive/);

@@ -79,7 +79,11 @@ themselves; the button bar offers both.
 - Cost centre column appears once a cost centre exists; kept on income / expense lines only.
 - Saving uses `saveVoucher`: FY numbering (`PV/FY25-26/0001`), period lock (the error is shown), audit log, `books.edit`
   role. Roles without `books.edit` see a message instead of the form, and the menu hides voucher rows.
-- Bill-wise references (Agst Ref / New Ref) are not supported on manual vouchers — they post on account.
+- 7Q (ROADMAP 7.19, `docs/features/voucher-types.md`): **voucher class** (free text, used classes listed), **voucher type**
+  picker when a user type of the base exists, **single-entry mode** for Contra / Payment / Receipt ("Entry mode": an
+  Account plus particulars on one side), and **bill-wise details** — a receipt's customer line takes Agst Ref / New Ref /
+  Advance / On Account rows (saved with the voucher in one step), a new payment's supplier line becomes a supplier
+  payment allocated bill-wise through `billwise.ts` (one rollback).
 
 ## Display reports and drill-down
 | Report (`r=`) | Root frame |
@@ -109,5 +113,4 @@ sits in the report header and is kept in the URL (`b=<branch id>` or `__none__`)
 localStorage (`mrchartist_tally_terms`).
 
 ## Not built yet
-Bill-wise voucher references, single-entry voucher mode and voucher classes on Gateway voucher entry (ROADMAP 7.19);
-`DrillStack` for the Display viewer.
+`DrillStack` for the Display viewer; bill-wise references when altering a saved payment voucher (7.116).

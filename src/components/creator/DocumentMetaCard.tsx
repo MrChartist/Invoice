@@ -81,7 +81,18 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
         <div className={controls.row3}>
           <label className={controls.field}>
             <span className={controls.label}>{t('meta.type')}</span>
-            <select className={controls.select} value={s.doc_type} onChange={(e) => s.setDocType(e.target.value as DocumentType)} disabled={editing && Boolean(s.invoice_number)}>
+            <select
+              className={controls.select}
+              value={s.doc_type}
+              onChange={(e) => {
+                const next = e.target.value as DocumentType;
+                // P1-13: a voucher type belongs to one base (sales / credit / debit note); another base drops it.
+                const drop = !!s.voucher_type_id && baseOfDoc(next) !== baseOfDoc(s.doc_type);
+                s.setDocType(next);
+                if (drop) s.patch({ voucher_type_id: undefined, print_title: undefined });
+              }}
+              disabled={editing && Boolean(s.invoice_number)}
+            >
               {DOC_TYPES.map((d) => (
                 <option key={d} value={d}>
                   {docLabel(d)}

@@ -651,6 +651,34 @@ try {
     await writeJson(page, 'branches', []);
   });
 
+  await step('voucher types (P1-13) + Gateway single entry and voucher class (7.19): a "Receipt – Cash" type numbers its own series', async () => {
+    await page.goto(srv.origin + '/books?tab=coa&m=voucher-types&mid=new');
+    await page.getByTestId('vt-name').fill('Receipt – Cash');
+    await page.getByTestId('vt-base').selectOption('RECEIPT');
+    await page.getByTestId('vt-prefix').fill('RCASH');
+    await page.getByLabel('Default cash / bank ledger').selectOption('cash');
+    await page.getByTestId('vt-save').click();
+    await page.getByTestId('vt-list').waitFor();
+    const types = await readJson(page, 'voucher_types', [], (v) => v.length > 0);
+    check(types.length === 1 && types[0].prefix === 'RCASH' && types[0].bank_account_id === 'cash', 'the voucher type is saved with its prefix and default bank');
+    await page.goto(srv.origin + '/gateway/voucher/receipt');
+    await page.getByRole('heading', { name: 'Receipt voucher' }).waitFor();
+    await page.getByTestId('gw-v-vtype-select').selectOption({ label: 'Receipt – Cash' });
+    await page.getByTestId('gw-v-mode').click();
+    check((await page.getByTestId('gw-v-account').inputValue()) === 'cash', 'single entry: the Account is the type\'s default cash ledger');
+    await page.getByTestId('gw-v-class').fill('Counter');
+    await page.getByTestId('vline-1-ledger').fill('Sales');
+    await page.keyboard.press('Enter');
+    await page.getByTestId('vline-1-amount').fill('500');
+    await page.getByText('Balanced', { exact: true }).waitFor();
+    await page.getByTestId('voucher-accept').click();
+    const saved = await readJson(page, 'vouchers', [], (v) => v.some((x) => x.voucher_type_id === types[0].id));
+    const rv = saved.find((x) => x.voucher_type_id === types[0].id);
+    check(!!rv && /^RCASH\/FY\d{2}-\d{2}\/0001$/.test(rv.number) && rv.voucher_class === 'Counter', `numbered in the type's own series with its class (${rv?.number})`);
+    check(!!rv && rv.lines.some((l) => l.account_id === 'cash' && l.dr === 50000) && rv.lines.some((l) => l.cr === 50000), 'single entry saved as Dr Cash / Cr the particulars');
+    await writeJson(page, 'voucher_types', []);
+  });
+
   await step('integration: the Gateway reaches Accounts Info, banking documents, ratio analysis and the year-end wizard', async () => {
     const gateway = async () => {
       await page.goto(srv.origin + '/gateway');

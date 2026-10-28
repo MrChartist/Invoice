@@ -20,6 +20,8 @@ Schedule III balance sheet with a fixed-asset register, and an AS 3 cash-flow st
 - Automatic vouchers are **not stored**: they are rebuilt from the documents every time (`buildLedger`).
 - Writes go through the period lock (`assertUnlocked` on the old and the new date) and the audit log (entities `voucher`, `account`, `fixed_asset`). No PIN-override button is offered in the voucher editor yet: move the lock date to post into a locked period.
 - Numbering: `JV/FY25-26/0001`, `CV/…` (contra), `PV/…` (payment), `RV/…` (receipt), one series per type per Indian FY.
+  A voucher with a user voucher type (`voucher_type_id`, P1-13) is numbered in that type's series instead
+  (`docs/features/voucher-types.md`).
 
 ## Chart of accounts (codes)
 1xxx owner's funds: 1000 Capital, 1010 Drawings, 1090 Opening balance difference, 1100 Reserves & surplus ·

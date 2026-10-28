@@ -13,8 +13,8 @@
  */
 import { getIndianFY } from './invoice-number';
 import { parseDay } from './dates';
-import { getTable, setTable } from './storage';
-import { SERIES_TABLE, seriesHigh, seriesKey, type SeriesCounter } from './series-counters';
+import { getTable } from './storage';
+import { recordSeries, seriesHigh } from './series-counters';
 
 export const VOUCHER_TYPES_TABLE = 'voucher_types';
 
@@ -47,11 +47,11 @@ export function baseOfDoc(docType: string | undefined): VoucherBase | undefined 
 
 /** Series prefix for `date`: the type's prefix, plus `-MM` (calendar month) when it restarts monthly. */
 export function seriesPrefix(s: Pick<VoucherSeries, 'prefix' | 'restart'>, date?: string): string {
-  if (s.restart !== 'monthly') return s.prefix;
-  const d = parseDay(date || new Date());
-  const m = Number.isNaN(d.getTime()) ? new Date().getMonth() : d.getMonth();
-  return `${s.prefix}-${String(m + 1).padStart(2, '0')}`;
+  return s.restart === 'monthly' ? `${s.prefix}-${String(parseDay(date || new Date()).getMonth() + 1).padStart(2, '0')}` : s.prefix;
 }
+
+/** `<prefix>/FY<yy-yy>/(seq)<suffix>` of the type for `date`. */
+const typedRe = (s: VoucherSeries, date: string | undefined, fy: string) => new RegExp(`^${esc(seriesPrefix(s, date))}/FY${fy}/(\\d+)${esc(s.suffix ?? '')}$`, 'i');
 
 /** Counter key prefix (suffix included, so `INV…-E` and `INV…` keep separate marks). */
 const counterPrefix = (s: VoucherSeries, date?: string) => seriesPrefix(s, date) + (s.suffix ? `~${s.suffix}` : '');
@@ -59,40 +59,25 @@ const counterPrefix = (s: VoucherSeries, date?: string) => seriesPrefix(s, date)
 /** The next number of a user type for `date`, above `existing` numbers, its start and its high-water mark. */
 export function typedNumber(s: VoucherSeries, date: string | undefined, existing: readonly string[], high = seriesHigh(counterPrefix(s, date), getIndianFY(date).label)): string {
   const fy = getIndianFY(date).label;
-  const pre = seriesPrefix(s, date);
-  const suf = s.suffix ?? '';
-  const width = Math.min(Math.max(Math.floor(Number(s.width) || 4), 1), 9);
-  const re = new RegExp(`^${esc(pre)}/FY${esc(fy)}/(\\d+)${esc(suf)}$`, 'i');
-  let max = Math.max(Math.floor(Number(s.start_number) || 1) - 1, high, 0);
-  const taken = new Set<string>();
+  const re = typedRe(s, date, fy);
+  // Every number of this series matches `re`, so one above the highest can never be taken already.
+  let max = Math.max((Number(s.start_number) || 1) - 1, high);
   for (const raw of existing) {
-    const n = String(raw ?? '').trim();
-    taken.add(n.toUpperCase());
-    const m = re.exec(n);
+    const m = re.exec(String(raw ?? '').trim());
     if (m) max = Math.max(max, parseInt(m[1], 10));
   }
-  let seq = max + 1;
-  const build = () => `${pre}/FY${fy}/${String(seq).padStart(width, '0')}${suf}`;
-  while (taken.has(build().toUpperCase())) seq++;
-  return build();
+  return `${seriesPrefix(s, date)}/FY${fy}/${String(max + 1).padStart(Number(s.width) || 4, '0')}${s.suffix ?? ''}`;
 }
 
 /** The active user type `id` when it may number `docType` (else undefined → built-in series). */
 export function seriesTypeFor(id: string | undefined, base: VoucherBase | undefined): VoucherSeries | undefined {
   if (!id || !base) return undefined;
-  return getTable<VoucherSeries>(VOUCHER_TYPES_TABLE).find((t) => t && t.id === id && t.base === base && !t.inactive && !!t.prefix);
+  return getTable<VoucherSeries>(VOUCHER_TYPES_TABLE).find((t) => t?.id === id && t.base === base && !t.inactive);
 }
 
 /** Remember that `number` was issued under type `s` (no-op when it is not in the type's shape). */
 export function recordTypedNumber(s: VoucherSeries, date: string | undefined, number: string | undefined): void {
   const fy = getIndianFY(date).label;
-  const m = new RegExp(`^${esc(seriesPrefix(s, date))}/FY${esc(fy)}/(\\d+)${esc(s.suffix ?? '')}$`, 'i').exec(String(number ?? '').trim());
-  if (!m) return;
-  const seq = parseInt(m[1], 10);
-  const key = seriesKey(counterPrefix(s, date), fy);
-  const rows = getTable<SeriesCounter>(SERIES_TABLE).filter((r) => r && typeof r.id === 'string');
-  const row = rows.find((r) => r.id === key);
-  if (row && Number(row.seq) >= seq) return;
-  const next: SeriesCounter = { id: key, seq, updated_at: new Date().toISOString() };
-  setTable(SERIES_TABLE, row ? rows.map((r) => (r.id === key ? next : r)) : [...rows, next]);
+  const m = typedRe(s, date, fy).exec(String(number ?? '').trim());
+  if (m) recordSeries(`${counterPrefix(s, date)}/FY${fy}/${m[1]}`);
 }

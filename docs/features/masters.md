@@ -107,8 +107,10 @@ party lands on Debtors / Creditors with its name).
   (supplier payments allocate through WIP-C's payment dialog).
 - A customer's TDS is not booked to TDS receivable when the settling receipt is a voucher allocation (only invoice
   receipts book it).
-- **P1-21 import kinds** (ledgers / vendors / openings in the CSV wizard) — not done; the wizard's kinds are wired through
-  `import-mapping.ts` and its UI, larger than "straightforward". `saveOpenings` / `saveOpeningBillsFor` are the write APIs to use.
+- **P1-21 import kinds** — done in 7Q (`docs/features/voucher-types.md` §3): ledgers with group + opening (and the
+  trial-balance template), suppliers, stock items and manual vouchers in the import wizard, through `saveUserAccount`,
+  `saveOpenings`, `vendorsDb.save`, `stockDb.saveItem`, `saveVoucher`. Accounts Info also lists **Voucher types** (P1-13,
+  screen `voucher-types`).
 - **P2 cost categories** — not done.
 - No interest report screen; GST / TDS defaults and party bank details on ledgers are not modelled.
 - The TB tab (WP-2) shows the difference only as the 1090 row; the Tally banner is on the Opening TB screen and the
