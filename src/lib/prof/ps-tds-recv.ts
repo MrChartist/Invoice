@@ -6,11 +6,11 @@
  * Labels follow `ita2025.ts` by date. Pure except `clientsTotals` callers pass the tables. Working paper — verify with
  * your CA (PS18, PS25).
  */
-import type { Client, InvoiceItem, InvoiceRecord } from '../../types/invoice';
+import type { Client, InvoiceRecord } from '../../types/invoice';
 import type { ClientTdsDefault } from '../../types/prof-r14';
 import type { EntityType } from '../../types/books-r2';
-import { num, round2 } from '../invoice-calc';
-import { isPureAgentLine } from '../trade/pure-agent';
+import { calcInputFromRecord, calculateInvoice, num, round2 } from '../invoice-calc';
+import { isRecovery } from '../trade/pure-agent';
 import { isRevenueDoc } from '../stats';
 import { sectionRate, tdsThreshold } from '../tds-rules';
 import { form16aDueDate, type TdsRegister, type Quarter } from '../tds-register';
@@ -38,17 +38,16 @@ export function codeFor(section: Section, ourForm: EntityType): { code: string; 
   return { code: section, family: section };
 }
 
-/** A recovery line (pure agent): the R8 / B1 charge-head line, or a 0 % timesheet reimbursement line. */
-export const isRecoveryLine = (l: Pick<InvoiceItem, 'tax_rate' | 'description'> & { charge_head_id?: string }): boolean =>
-  isPureAgentLine(l) || (num(l.tax_rate) === 0 && /pure agent/i.test(l.description ?? ''));
-
-/** Fee base of a document: its taxable value × the share of fee lines (recoveries out; GST never in). */
-export function feeBase(inv: Pick<InvoiceRecord, 'items' | 'taxable_value'>): number {
+/**
+ * Fee base of a document: the taxable value of its lines worked out again (invoice-calc), pure-agent recoveries out
+ * (QA17 R3: `isRecovery`, the same test as the turnover readers); GST never in.
+ */
+export function feeBase(inv: Partial<InvoiceRecord>): number {
   const items = inv.items ?? [];
-  const all = items.reduce((s, i) => s + num(i.amount), 0);
-  const fees = items.filter((i) => !isRecoveryLine(i)).reduce((s, i) => s + num(i.amount), 0);
-  if (!(all > 0)) return 0;
-  return round2((num(inv.taxable_value) * fees) / all);
+  if (!items.length) return 0;
+  const skip = new Set(items.filter(isRecovery).map((i) => i.id));
+  const calc = calculateInvoice(calcInputFromRecord(inv as InvoiceRecord, { round_off_enabled: false, round_mode: 'none', amount_paid: 0 }));
+  return round2(calc.lines.filter((l) => !skip.has(l.id)).reduce((s, l) => s + num(l.taxable), 0));
 }
 
 /** Indian FY start year of a local day (`YYYY-MM-DD`). */
