@@ -5,6 +5,7 @@
  */
 import type { DemoDataset, DemoExtras, DemoProfile } from '../demo-data';
 import type { SocietySettings } from '../../types/society-r18';
+import type { LogisticsSettings } from '../../types/logistics-r19';
 
 export interface ProfileContext {
   /** Local day the dataset is anchored on (YYYY-MM-DD). */
@@ -16,7 +17,7 @@ export interface ProfileContext {
   businessType?: string;
 }
 
-export async function demoExtras(profile: DemoProfile, ctx: ProfileContext): Promise<DemoExtras & { societySettings?: SocietySettings }> {
+export async function demoExtras(profile: DemoProfile, ctx: ProfileContext): Promise<DemoExtras & { societySettings?: SocietySettings; logisticsSettings?: LogisticsSettings }> {
   const base = await profileExtras(profile, ctx);
   // R12: an agri Demo company (any profile with the `agri` pack) adds its rows (`profile-agri.ts`, by pack).
   const agri = ctx.packs.includes('agri') ? (await import('./profile-agri')).agriExtras(ctx) : {};
@@ -30,13 +31,17 @@ export async function demoExtras(profile: DemoProfile, ctx: ProfileContext): Pro
   const manpower = ctx.packs.some((p) => p === 'manpower' || p === 'security') ? (await import('./profile-manpower')).manpowerExtras(ctx) : {};
   // R18: a society Demo company (pack `society`) adds its units (`profile-society.ts`) and its tariff (written by fillDemo).
   const society = ctx.packs.includes('society') ? (await import('./profile-society')).societyExtras(ctx) : undefined;
-  if (!agri.tables && !mfg.tables && !prof.tables && !travel.tables && !manpower.tables && !society) return base;
+  // R19: a logistics Demo company (pack `logistics`) adds its job and agent (`profile-logistics.ts`) and its heads (written by fillDemo).
+  const logistics = ctx.packs.includes('logistics') ? (await import('./profile-logistics')).logisticsExtras(ctx) : undefined;
+  if (!agri.tables && !mfg.tables && !prof.tables && !travel.tables && !manpower.tables && !society && !logistics) return base;
   const stock = [...(base.tables?.stock_items ?? []), ...(agri.tables?.stock_items ?? []), ...(mfg.tables?.stock_items ?? [])];
   const time = [...(base.tables?.time_entries ?? []), ...(prof.tables?.time_entries ?? [])];
   const centres = [...(prof.tables?.cost_centres ?? []), ...(travel.tables?.cost_centres ?? []), ...(manpower.tables?.cost_centres ?? [])];
   const staff = [...(base.tables?.service_staff ?? []), ...(prof.tables?.service_staff ?? [])];
   // R16-C4: the travel profile also adds a TCS invoice
-  return { ...base, ...(society ? { societySettings: society.societySettings } : {}), ...(travel.invoices ? { invoices: [...(base.invoices ?? []), ...travel.invoices] } : {}), tables: { ...base.tables, ...agri.tables, ...mfg.tables, ...prof.tables, ...travel.tables, ...society?.tables, ...(centres.length ? { cost_centres: centres } : {}), ...(stock.length ? { stock_items: stock } : {}), ...(time.length ? { time_entries: time } : {}), ...(staff.length ? { service_staff: staff } : {}) } };
+  const merged = { ...base.tables, ...agri.tables, ...mfg.tables, ...prof.tables, ...travel.tables, ...society?.tables };
+  const lgT = logistics ? { lg_jobs: logistics.tables!.lg_jobs, vendors: [...(merged.vendors ?? []), ...(logistics.tables!.vendors ?? [])] } : {};
+  return { ...base, ...(society ? { societySettings: society.societySettings } : {}), ...(logistics ? { logisticsSettings: logistics.logisticsSettings } : {}), ...(travel.invoices ? { invoices: [...(base.invoices ?? []), ...travel.invoices] } : {}), tables: { ...merged, ...lgT, ...(centres.length ? { cost_centres: centres } : {}), ...(stock.length ? { stock_items: stock } : {}), ...(time.length ? { time_entries: time } : {}), ...(staff.length ? { service_staff: staff } : {}) } };
 }
 
 async function profileExtras(profile: DemoProfile, ctx: ProfileContext): Promise<DemoExtras> {

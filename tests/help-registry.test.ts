@@ -123,3 +123,9 @@ test('no topic promises a statutory value (₹ / % only "as the app applies it")
     if (/₹\s?\d|\d\s?%/.test(text)) assert.match(text, /as the app applies/, `${x.id}: a value without "as the app applies it"`);
   }
 });
+
+test('R19: the CA-id row pattern reads LG ids whole and never as G ids', () => {
+  const row = /^\| ((?:G|TR|TV|T|PS|PF|P|AC|I|X|HT|RT|CN|SV|AG|MF|MP|HS|LG)\d+)\b/gm;
+  assert.deepEqual([...'| LG1 ★ | x |\n| G1 | y |\n| LG44 | z |'.matchAll(row)].map((m) => m[1]), ['LG1', 'G1', 'LG44']);
+  assert.ok(ALL.some((x) => x.statutory?.caItems?.includes('LG1')), 'a Round 19 topic cites LG1');
+});
