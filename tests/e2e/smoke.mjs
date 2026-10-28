@@ -4768,6 +4768,8 @@ try {
     const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.ps?.engagement?.id === 'e2e-ps-e'))).find((i) => i.ps?.engagement?.id === 'e2e-ps-e');
     check(inv?.taxable_value === 40000 && inv.ps.wd?.standard === 58000 && inv.ps.wd.reasons[0]?.reason === 'Cap' && inv.ps.wd.reasons[0]?.amount === -18000, `the draft bills ₹40,000 with an ₹18,000 "Cap" write-down (${JSON.stringify(inv?.ps?.wd)})`);
     await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await page.locator('[data-tv-rows]').waitFor({ state: 'visible', timeout: 15000 });
+    check(await page.locator('[data-items-footer] button').first().isVisible(), 'QA18 T1: after Bill the trip row and Add line are laid out (no reload)');
     await page.getByRole('button', { name: /Preview & download PDF/ }).click();
     const dlg = page.getByRole('dialog', { name: 'Document preview' });
     await dlg.waitFor();
@@ -5199,9 +5201,10 @@ try {
     await page.goto(srv.origin + '/time?tab=trips&view=trips');
     await page.locator('[data-tv-bill="E2E-DXB"]').click({ timeout: 15000 });
     await page.waitForURL(/\/invoice\//, { timeout: 15000 });
-    // Known issue (pre-existing, R15-B Bill flow): after the in-app jump from the Trips desk to the editor, Chromium
-    // leaves the items footer (Add line, trip row, chips) without a layout box until the next relayout; a reload shows it.
-    await page.reload();
+    // QA18 T1: no reload — the in-app jump from Bill lays the items footer out (Add line, trip row, chips). It used to
+    // stay without a layout box (Chromium, footer inside the lines' size container) until a reload.
+    await page.locator('[data-items-footer]').waitFor({ state: 'visible', timeout: 15000 });
+    check(await page.locator('[data-items-footer] button').first().isVisible(), 'after Bill (in-app navigation) the items footer is laid out: Add line visible without a reload');
     const chip = page.locator('[data-tv-tcs="ok"]');
     await chip.waitFor({ timeout: 15000 });
     const calc = await chip.locator('[data-tv-tcs-calc]').innerText();
