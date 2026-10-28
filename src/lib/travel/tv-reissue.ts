@@ -65,7 +65,7 @@ export function reissueTicket(bookingId: string, i: ReissueInput): { draft: Invo
   const base = makeDraft({ settings: localDb.settings.get(), sender, docType: 'INVOICE', templateId: localDb.template.get() });
   const client = (trip?.client_id && localDb.clients.getById(trip.client_id)) || prev?.client || { ...blankClient(), name: trip?.name ?? '' };
   const tv = { ...(trip ? tvSnapshot(trip, 'agent', i.date) : { regime: 'agent' as const }), ...(items[0] ? { lines: { [items[0].id]: { tkt } } } : {}) };
-  return withTablesRollback(['invoices', 'doc_links', TV_TABLES.bookings], () => {
+  return withTablesRollback(['invoices', 'doc_links', 'series_counters', TV_TABLES.bookings], () => {
     const credit = i.diff < 0 ? createCreditNote(prev!, { lines: [{ itemId: line!.id, quantity: round2(-i.diff / line!.rate) }], reason: 'Ticket re-issued — fare difference refunded', goodsReturned: false, date: i.date }) : null;
     const draft = items.length ? localDb.invoices.save(buildBillDraft({ ...base, id: generateId(), issue_date: i.date, ...(trip ? { cost_centre_id: trip.id } : {}), tv }, client, items, sender)) : null;
     const now = new Date().toISOString();

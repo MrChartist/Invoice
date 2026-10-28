@@ -40,6 +40,21 @@ test('BSP preset guesses every column; rows read with types; totals sign refunds
   assert.deepEqual(['doc_no', 'gross', 'commission', 'net'].map((k) => con.has(k)), [true, true, true, true]);
 });
 
+test('R16-C3 bed-bank preset: hotel, confirmation no., check-in, nights, net — matched against the hotel booking', async () => {
+  const BB = { headers: ['Hotel Name', 'Confirmation No', 'Check-in', 'Nights', 'Guest Name', 'Net Amount'], rows: [['Sea View Resort', 'HB-77881', '05/10/2026', '3', 'MEHTA/RAVI', '18,600']] };
+  const cols = guessColumns(BB.headers, STATEMENT_PRESETS.bedbank!);
+  assert.equal(cols.size, 6);
+  const rows = readStatementRows(BB, cols);
+  assert.deepEqual(rows.map((r) => [r.doc_no, r.type, r.date, r.hotel, r.nights, r.gross, r.net]), [['HB-77881', 'HOTEL', '2026-10-05', 'Sea View Resort', 3, 18600, 18600]]);
+  const { saveTrip } = await import('../src/lib/travel/tv-trips.ts');
+  const { saveBooking } = await import('../src/lib/travel/tv-bookings.ts');
+  const v = vendorsDb.save({ name: 'Hotelbeds (bed bank)' });
+  const t = saveTrip({ name: 'Goa', client_id: 'c-mh', tv: { code: '2610-009', kind: 'trip', scope: 'domestic', start: '2026-10-05', regime: 'agent', status: 'confirmed', pax: [] } });
+  saveBooking({ trip_id: t.id, component: 'hotel', vendor_id: v.id, start: '2026-10-05', cost: 18600, sell: 21000, status: 'confirmed', ref: 'HB-77881' });
+  const [st] = importStatement({ vendor_id: v.id, kind: 'bedbank', ref: 'Oct', period_start: '2026-10-01', period_end: '2026-10-31', rows });
+  assert.equal(st.rows[0].status, 'matched');
+});
+
 test('split by month above 2,000 rows', () => {
   const r = (m: string) => ({ doc_no: 'x', type: 'TKTT', date: `2026-${m}-05`, gross: 1, taxes: 0, commission: 0, net: 1 });
   assert.equal(splitByMonth([r('10'), r('11')]).length, 1);
