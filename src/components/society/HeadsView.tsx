@@ -18,7 +18,8 @@ import { readSocietySettings, saveSocietySettings } from '../../lib/society/hs-s
 import type { HsBasis, HsCycle, HsHead, HsHeadKind, SocietySettings } from '../../types/society-r18';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
-import { Field as F, numIn, row, type HsViewProps } from './hs-ui';
+import { Field as F, type HsViewProps } from './hs-ui';
+import { numIn, row } from './hs-form';
 
 const PREVIEW = 50;
 
@@ -38,11 +39,8 @@ export default function HeadsView({ notify }: HsViewProps) {
   const stName = INDIAN_STATES.find((x) => x.code === s.state)?.name ?? s.state ?? '';
   const hints = tariffHints(heads, rule, !!pending);
   const period = periodOf(today, s.cycle ?? 'monthly');
-  const preview = useMemo(() => {
-    const rows = units.map((u) => ({ u, t: chargeTotals(unitCharges(u, heads, period, { areaUnit: s.area_unit })) }));
-    const all = rows.reduce((a, r) => ({ member: a.member + r.t.member, statutory: a.statutory + r.t.statutory, total: a.total + r.t.total }), { member: 0, statutory: 0, total: 0 });
-    return { rows: rows.slice(0, PREVIEW), all };
-  }, [units, heads, period, s.area_unit]);
+  const previewRows = units.map((u) => ({ u, t: chargeTotals(unitCharges(u, heads, period, { areaUnit: s.area_unit })) }));
+  const preview = { rows: previewRows.slice(0, PREVIEW), all: previewRows.reduce((a, r) => ({ member: a.member + r.t.member, statutory: a.statutory + r.t.statutory, total: a.total + r.t.total }), { member: 0, statutory: 0, total: 0 }) };
   const run = (fn: () => void) => { try { fn(); } catch (e) { notify((e as Error).message, 'error'); } };
   const save = () => run(() => { setS(saveSocietySettings({ state: s.state, cycle: s.cycle ?? 'monthly', bill_day: s.bill_day ?? 1, due_days: s.due_days ?? 15, area_unit: s.area_unit ?? 'sqft', heads, confirmed: s.confirmed })); notify(hsT('savedTariff')); });
   return (

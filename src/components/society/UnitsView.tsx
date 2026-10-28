@@ -16,7 +16,8 @@ import { readFileTables } from '../marketplace/file-read';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import UnitForm from './UnitForm';
-import { Field, row, type HsViewProps } from './hs-ui';
+import { Field, type HsViewProps } from './hs-ui';
+import { row } from './hs-form';
 
 export default function UnitsView({ notify }: HsViewProps) {
   useT();

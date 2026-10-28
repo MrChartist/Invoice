@@ -12,7 +12,8 @@ import type { HsHead, HsOccupancy, HsSlotKind, HsUnitUse, SocietyUnit } from '..
 import { OCCUPANCIES, SLOT_KINDS, suggestCode, UNIT_USES } from '../../lib/society/hs-units';
 import { addMember, deleteUnit, saveUnit } from '../../lib/society/hs-units-save';
 import controls from '../../styles/controls.module.css';
-import { Field as F, numIn, row, type Notify } from './hs-ui';
+import { Field as F, type Notify } from './hs-ui';
+import { numIn, row } from './hs-form';
 
 type Draft = Omit<SocietyUnit, 'id' | 'updated_at'>;
 
