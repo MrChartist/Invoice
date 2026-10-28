@@ -18,7 +18,8 @@ type Tag = PurchaseRecord['tv'];
 export default function TripPick({ value, onChange, itc, setItc }: { value: Tag; onChange: (v: Tag) => void; itc: boolean; setItc: (on: boolean) => void }) {
   useT();
   const trips = useMemo(() => loadTrips(), []);
-  const bookings = useMemo(() => (value?.trip_id ? loadBookings(value.trip_id) : []), [value?.trip_id]);
+  const tripId = value?.trip_id;
+  const bookings = useMemo(() => (tripId ? loadBookings(tripId) : []), [tripId]);
   const pick = (tripId: string, bookingId?: string) => {
     const trip = trips.find((t) => t.id === tripId);
     if (!trip) return onChange(undefined);

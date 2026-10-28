@@ -1,6 +1,6 @@
 /**
  * R15-B3 editor row (lazy, packs `travel` / `events`): pick the trip and the regime — the document takes the trip's
- * cost centre and the `tv` snapshot (trip, regime, printed sentence, itinerary); other `tv` sub-objects (C / D) are
+ * cost centre and the `tv` snapshot (trip, regime, printed sentence); other `tv` sub-objects (C / D) are
  * kept. Only the user's pick writes; an issued document keeps what it was saved with. Mixing the 5 % line with other
  * taxed lines warns (TV9), never blocks. D adds its POS / TCS chips as `switch` arms below.
  */
@@ -11,7 +11,6 @@ import { useT } from '../../i18n';
 import { tvT } from '../../i18n/areas/travel-r15b';
 import type { TvRegime } from '../../types/travel-r15';
 import { loadTrips, tripLabel } from '../../lib/travel/tv-trips';
-import { loadBookings } from '../../lib/travel/tv-bookings';
 import { regimeMix, tvSnapshot } from '../../lib/travel/tv-regime';
 import { TV_REGIMES } from '../../lib/travel/tv-settings';
 import controls from '../../styles/controls.module.css';
@@ -26,7 +25,7 @@ export default function TravelRows() {
     const trip = trips.find((t) => t.id === id);
     if (!trip) return;
     const r = regime ?? s.tv?.regime ?? trip.tv.regime;
-    useInvoiceStore.getState().patch({ cost_centre_id: trip.id, tv: { ...s.tv, ...tvSnapshot(trip, r, s.issue_date, loadBookings(trip.id)) } });
+    useInvoiceStore.getState().patch({ cost_centre_id: trip.id, tv: { ...s.tv, ...tvSnapshot(trip, r, s.issue_date) } });
   };
   if (!trips.length && !s.tv) return null;
   return (

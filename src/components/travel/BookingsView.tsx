@@ -16,7 +16,8 @@ import { TV_COMPONENTS, costInr, isBilled, liveLines, loadBookings, removeBookin
 import { loadTrips } from '../../lib/travel/tv-trips';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
-import { Field, ListSelect, runWith, type TvViewProps } from './tv-ui';
+import { Field, ListSelect } from './tv-ui';
+import { runWith, type TvViewProps } from './tv-run';
 
 const FILTERS = ['all', 'unconfirmed', 'unbilled', 'unpaid', 'next7'] as const;
 const BSTS = ['held', 'confirmed', 'cancelled'] as const;
@@ -37,6 +38,7 @@ export function BookingTable({ tripId, filter = 'all', notify, onChanged }: { tr
   const run = runWith(notify);
   const [tick, setTick] = useState(0);
   const d = useMemo(() => {
+    void tick;
     const bills = getTable<{ id?: string }>('purchases');
     const unpaid = new Set(bills.map((b) => readPurchase(b)).filter((c) => c && c.total - c.paid > 0.5).map((c) => c!.id));
     return { rows: loadBookings(tripId), live: liveLines(localDb.invoices.getAll()), unpaid, codes: new Map(loadTrips().map((t) => [t.id, t.tv.code])), vendors: getTable<{ id: string; name: string }>('vendors') };

@@ -9,7 +9,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { tvT } from '../../i18n/areas/travel-r15b';
 import controls from '../../styles/controls.module.css';
-import type { Notify, TvViewProps } from './tv-ui';
+import type { Notify, TvViewProps } from './tv-run';
 import TripsView from './TripsView';
 import BookingsView from './BookingsView';
 

@@ -21,7 +21,8 @@ import { billTrip } from '../../lib/travel/tv-bill';
 import { TV_REGIMES, readTravelSettings, saveTravelSettings } from '../../lib/travel/tv-settings';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
-import { Field, ListSelect, pct, runWith, type TvViewProps } from './tv-ui';
+import { Field, ListSelect } from './tv-ui';
+import { pct, runWith, type TvViewProps } from './tv-run';
 import { BookingTable } from './BookingsView';
 
 const SCOPES = ['domestic', 'outbound', 'inbound'] as const;
@@ -36,12 +37,12 @@ export default function TripsView({ notify }: TvViewProps) {
   const [status, setStatus] = useState<TripStatus | ''>('');
   const [open, setOpen] = useState('');
   const [month, setMonth] = useState(todayInput().slice(0, 7));
-  const settings = useMemo(() => readTravelSettings(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const data = useMemo(() => {
+    void tick;
     const trips = loadTrips();
     const bookings = loadBookings();
     const bills = getTable<{ tv?: { trip_id?: string } }>('purchases').filter((p) => p?.tv?.trip_id);
-    return { trips, bookings, bills, live: liveLines(localDb.invoices.getAll()), clients: localDb.clients.getAll() };
+    return { trips, bookings, bills, live: liveLines(localDb.invoices.getAll()), clients: localDb.clients.getAll(), settings: readTravelSettings() };
   }, [tick]);
   const refresh = () => setTick((t) => t + 1);
   const costing = (t: Trip) => tripCosting(data.bookings.filter((b) => b.trip_id === t.id), data.bills.filter((b) => b.tv?.trip_id === t.id), data.live);
@@ -61,11 +62,11 @@ export default function TripsView({ notify }: TvViewProps) {
       {can('settings.manage') && (
         <div style={row}>
           <Field label={tvT('regimeDefault')}>
-            <ListSelect list="regs" ids={TV_REGIMES} value={settings.regime_default ?? 'to18'} onChange={(r) => { run(() => saveTravelSettings({ regime_default: r, regime_ok: true })); refresh(); }} attr="data-tv-regime-default" />
+            <ListSelect list="regs" ids={TV_REGIMES} value={data.settings.regime_default ?? 'to18'} onChange={(r) => { run(() => saveTravelSettings({ regime_default: r, regime_ok: true })); refresh(); }} attr="data-tv-regime-default" />
           </Field>
         </div>
       )}
-      <TripForm regime={settings.regime_default ?? 'to18'} clients={data.clients} notify={notify} onSaved={(t) => { refresh(); setOpen(t.id); }} />
+      <TripForm regime={data.settings.regime_default ?? 'to18'} clients={data.clients} notify={notify} onSaved={(t) => { refresh(); setOpen(t.id); }} />
       <div style={row}>
         <Field label={tvT('status')}>
           <select className={controls.select} value={status} onChange={(e) => setStatus(e.target.value as TripStatus | '')}>

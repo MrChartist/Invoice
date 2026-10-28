@@ -9,7 +9,7 @@
 import type { InvoiceRecord } from '../../types/invoice';
 import type { TravelBooking, TvComponent } from '../../types/travel-r15';
 import { peekTable } from '../storage';
-import { readPurchase } from '../purchase-normalize';
+import { isVoidStatus, readPurchase } from '../purchase-normalize';
 import { audit } from '../audit';
 import { regimeMix } from './tv-regime';
 import type { Trip } from './tv-trips';
@@ -31,7 +31,7 @@ export function itcOverrides(bills: readonly unknown[], from = '', to = '9999'):
     const tv = (b as RawBill).tv;
     if (tv?.regime !== 'to5') continue;
     const c = readPurchase(b);
-    if (!c || !c.itcEligible || !(c.tax > 0) || c.date < from || c.date > to) continue;
+    if (!c || isVoidStatus(c.status) || !c.itcEligible || !(c.tax > 0) || c.date < from || c.date > to) continue;
     out.push({ id: c.id, number: c.number, date: c.date, trip_id: tv.trip_id ?? '', tax: c.tax, reason: tv.itc_reason ?? '' });
   }
   return out;

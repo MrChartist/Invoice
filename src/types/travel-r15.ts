@@ -133,14 +133,12 @@ export interface TvEvent {
   budget?: { head: string; approved: number }[];
 }
 
-/** The invoice snapshot `tv` (B: trip, regime, decl, itin; C: lines; D: tcs, event, pos_note). */
+/** The invoice snapshot `tv` (B: trip, regime, decl; C: lines; D: tcs, event, pos_note). */
 export interface TvSnapshot {
   trip?: { id?: string; code: string; destination?: string; start?: string; end?: string; pax?: number; lead?: string; kind?: 'trip' | 'event' };
   regime?: TvRegime;
   /** The printed regime sentence (snapshotted, never re-derived). */
   decl?: string;
-  /** B4: up to 6 itinerary rows (cut 3 drops them). */
-  itin?: { date: string; component: TvComponent; text: string }[];
   lines?: Record<string, { tkt?: TvTicket }>;
   tcs?: { rate: number; base: number; label: string; slab?: string };
   event?: { venue?: string; state?: string; date_from?: string; date_to?: string };

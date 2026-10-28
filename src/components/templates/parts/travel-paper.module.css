@@ -1,4 +1,4 @@
-/* R15-B4 travel particulars on the paper: trip header, regime sentence, itinerary. Template variables only
+/* R15-B4 travel particulars on the paper: trip header and regime sentence. Template variables only
    (accent / muted / line / soft, Critical Rule 5). */
 .block {
   margin: 0 0 14px;
@@ -46,16 +46,4 @@
 
 .decl {
   margin: 6px 0 0;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 6px 0 0;
-}
-
-.table td {
-  border-top: 1px solid var(--tpl-line);
-  padding: 2px 6px 2px 0;
-  text-align: left;
 }

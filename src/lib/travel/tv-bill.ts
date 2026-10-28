@@ -1,7 +1,6 @@
 /**
  * R15-B2 "Bill": a draft invoice of a trip's unbilled, uncancelled bookings in the trip's regime, through the existing
- * draft builder (`buildBillDraft`, the R3-B "Unbilled → Bill" path), with the `tv` snapshot (trip, regime, sentence,
- * itinerary). `to5` / `to18` / `exempt_outside`: one gross package line (SAC and rate from the rule by date; exempt =
+ * draft builder (`buildBillDraft`, the R3-B "Unbilled → Bill" path), with the `tv` snapshot (trip, regime, sentence). `to5` / `to18` / `exempt_outside`: one gross package line (SAC and rate from the rule by date; exempt =
  * the R10 `sv.exempt` column). `agent`: one service-fee line (sell less what is recovered) plus one pure-agent line per
  * pass-through booking (`charge_head_id: 'rule33'`, `PURE_AGENT_CHARGE`, cost at actual). Each booking's `line_ref`
  * points at its line; billed state is derived from it. All or nothing. Working papers — verify with your CA (TV8–TV14).
@@ -64,7 +63,7 @@ export function billTrip(tripId: string, date?: string): InvoiceRecord {
   const { items, refs } = tripLines(`${trip.tv.destination || trip.name} (${trip.tv.code})`, trip.tv.regime, day, open);
   if (!items.length) throw new Error('Nothing to bill on this trip yet.');
   const client = (trip.client_id && localDb.clients.getById(trip.client_id)) || { ...blankClient(), name: trip.name };
-  const draft = buildBillDraft({ ...base, id: generateId(), issue_date: day, cost_centre_id: trip.id, tv: tvSnapshot(trip, trip.tv.regime, day, all) }, client, items, sender);
+  const draft = buildBillDraft({ ...base, id: generateId(), issue_date: day, cost_centre_id: trip.id, tv: tvSnapshot(trip, trip.tv.regime, day) }, client, items, sender);
   return withTablesRollback(['invoices', TV_TABLES.bookings], () => {
     const saved = localDb.invoices.save(draft);
     const rows = getTable<TravelBooking>(TV_TABLES.bookings);
