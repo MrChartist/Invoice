@@ -66,8 +66,10 @@ create row of the APIs. Afterwards `openingCheck` compares Tally's opening per l
 
 **Re-import** of the same file adds nothing (masters matched by name / GSTIN, vouchers by fingerprint).
 
-Not done: inventory quantities of vouchers (stock journals, item lines), Excel "TB as at 31-Mar" template,
-Tally currency / budget / employee masters, payroll vouchers.
+7Q (ROADMAP 7.113, `src/lib/tally-import-stock.ts`): **inventory quantities** of vouchers are imported as stock moves
+where the item matches (status per line in the dry run; quantity-only stock journals plan as `stock_only`), never GST
+documents; the Excel **"TB as at 31-Mar" template** is the ledgers kind of the import wizard (`docs/features/voucher-types.md`).
+Not done: Tally currency / budget / employee masters, payroll vouchers, batches / serials on item lines.
 
 ## 2. MCA audit trail (P0-10)
 
@@ -127,8 +129,12 @@ called from `buildTallyModel`:
 Counts gain `payments`, `journals`, `contras`, `stockJournals` (additive). A source without `books` exports
 byte-identically to before (tested).
 
-Not exported yet: TDS / TCS challans, advance GST adjustments, receipts at the realised FX rate, batch /
-godown allocations on sales and purchase item lines.
+TDS / TCS challans are exported since 7Q (`src/lib/tally-tds.ts`, Payment vouchers from their ledger postings). Not
+exported yet: advance GST adjustments, receipts at the realised FX rate, batch / godown allocations on sales and purchase
+item lines.
+
+**Per-FY auditor export** (7Q, `src/lib/audit-export.ts`, Settings → Activity): the FY's audit rows with `prev` / `hash`,
+the chain head and the whole-chain verification, as CSV and JSON.
 
 ## 4. Year-end wizard (P1-20) and integrity check (P2)
 

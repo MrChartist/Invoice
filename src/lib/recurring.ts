@@ -564,8 +564,9 @@ export function generateInvoiceFromSchedule(
   const issue = issueDate || occurrence;
   // QA-3 F6: a draft takes no number (a deleted draft would leave a hole that GSTR-1 reports as
   // cancelled); it is numbered in its FY series when issued (`localDb` numberOnIssue / the editor).
+  // P1-13: the template's voucher type series numbers an issued run.
   const invoiceNumber = s.mode === 'issue'
-    ? localDb.invoices.nextNumber(issue, s.template.doc_type, s.template.sender?.invoicePrefix || undefined)
+    ? localDb.invoices.nextNumber(issue, s.template.doc_type, s.template.sender?.invoicePrefix || undefined, (s.template as { voucher_type_id?: string }).voucher_type_id)
     : '';
   let built = buildInvoiceFromSchedule(s, occurrence, { invoiceNumber, issueDate: issue, terms: s.payment_terms_id ? loadPaymentTerms() : undefined });
   // Issuing straight away skips the editor, so run its stock checks here; a tracked item that needs a

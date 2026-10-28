@@ -1,8 +1,11 @@
 import { useRef, type Dispatch, type DragEvent } from 'react';
-import { AlertTriangle, BookOpen, Download, Package, ReceiptText, Truck, Upload, Users, Wallet } from 'lucide-react';
+import { AlertTriangle, BookOpen, Boxes, Download, FileStack, Package, ReceiptText, Truck, Upload, Users, Wallet } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { writeCsv } from '../../../lib/csv';
-import { KIND_LABELS, templateFileName, templateRows, type ImportKind } from '../../../lib/import-mapping';
+import { KIND_LABELS, isBooksKind, templateFileName, templateRows, type ImportKind } from '../../../lib/import-mapping';
+import { can } from '../../../lib/access';
+import { useT } from '../../../i18n';
+import { vtT } from '../../../i18n/areas/voucher-types';
 import { download } from '../download';
 import type { WizardAction, WizardState } from '../wizard-state';
 import ctl from '../../../styles/controls.module.css';
@@ -16,7 +19,16 @@ const KIND_META: Record<ImportKind, { icon: typeof Users; text: string }> = {
   vendors: { icon: Truck, text: 'Suppliers with GSTIN, PAN and an opening balance. Customer rows of a party export go to Clients.' },
   ledgers: { icon: BookOpen, text: 'Your opening trial balance: ledger, group and Dr / Cr. The difference is shown before saving.' },
   opening_bills: { icon: Wallet, text: 'Unpaid bills on the day the books begin, party by party, for receivables and payables ageing.' },
+  // P1-21 (7Q): stock items and manual vouchers (owner only — one undo copy is taken first).
+  stock: { icon: Boxes, text: '' },
+  vouchers: { icon: FileStack, text: '' },
 };
+const BOOKS_TEXT = { stock: 'kStockText', vouchers: 'kVouchersText' } as const;
+const BOOKS_LABEL = { stock: 'kStock', vouchers: 'kVouchers' } as const;
+/** Kinds this user may import (books kinds rewrite the books like a restore: owner only). */
+const kindsFor = () => (Object.keys(KIND_LABELS) as ImportKind[]).filter((k) => !isBooksKind(k) || can('data.restore'));
+const kindLabel = (k: ImportKind) => (isBooksKind(k) ? vtT(BOOKS_LABEL[k]) : KIND_LABELS[k]);
+const kindText = (k: ImportKind) => (isBooksKind(k) ? vtT(BOOKS_TEXT[k]) : KIND_META[k].text);
 
 interface Props {
   state: WizardState;
@@ -27,6 +39,7 @@ interface Props {
 
 /** Step 1: what is being imported, and the file (or pasted rows). */
 export function ChooseFileStep({ state, dispatch, onLoadFile, onLoadText }: Props) {
+  useT();
   const { kind, table, fileName, delimiterLabel, dragging, pasteOpen, pasted, loadError } = state;
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -41,7 +54,7 @@ export function ChooseFileStep({ state, dispatch, onLoadFile, onLoadText }: Prop
       <fieldset className={styles.kindSet}>
         <legend className={ctl.label}>What are you importing?</legend>
         <div className={styles.kindGrid}>
-          {(Object.keys(KIND_LABELS) as ImportKind[]).map((k) => {
+          {kindsFor().map((k) => {
             const Icon = KIND_META[k].icon;
             return (
               <label key={k} className={cn(styles.kindCard, kind === k && styles.kindCardOn)}>
@@ -53,8 +66,8 @@ export function ChooseFileStep({ state, dispatch, onLoadFile, onLoadText }: Prop
                   onChange={() => dispatch({ type: 'setKind', kind: k })}
                 />
                 <Icon size={20} aria-hidden />
-                <strong>{KIND_LABELS[k]}</strong>
-                <span>{KIND_META[k].text}</span>
+                <strong>{kindLabel(k)}</strong>
+                <span>{kindText(k)}</span>
               </label>
             );
           })}
@@ -127,14 +140,14 @@ export function ChooseFileStep({ state, dispatch, onLoadFile, onLoadText }: Prop
 
       <div className={styles.templates}>
         <span className={ctl.hint}>Starting from scratch? Download a ready-made template:</span>
-        {(Object.keys(KIND_LABELS) as ImportKind[]).map((k) => (
+        {kindsFor().map((k) => (
           <button
             key={k}
             type="button"
             className={cn(ctl.btn, ctl.btnGhost, ctl.btnSm)}
             onClick={() => download(templateFileName(k), writeCsv(templateRows(k), { bom: true }))}
           >
-            <Download size={14} /> {KIND_LABELS[k]}
+            <Download size={14} /> {kindLabel(k)}
           </button>
         ))}
       </div>

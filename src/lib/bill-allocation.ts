@@ -134,6 +134,8 @@ export function syncVoucherReceipts(
   total: number,
   allocations: readonly ReceiptAllocation[],
   method: string,
+  /** Label of the non-bill remainder row (7.19: "New ref …" / "Advance"); default "On account". */
+  remainderNote = 'On account',
 ): VoucherReceipt[] {
   requireAccess('payment.record');
   const used = allocations.filter((a) => a.amount > 0);
@@ -154,7 +156,7 @@ export function syncVoucherReceipts(
     }
     const rows = stampVoucherTds(getTable<VoucherReceipt>('transactions').map((r) => (ids.has(r.id) ? { ...r, ...tag } : r)), ids);
     const rest = round2(total - used.reduce((s, a) => s + a.amount, 0));
-    if (rest > 0.004) rows.push({ id: generateId(), invoice_id: '', amount: rest, method, reference: voucher.number, note: 'On account', date: voucher.date, ...tag });
+    if (rest > 0.004) rows.push({ id: generateId(), invoice_id: '', amount: rest, method, reference: voucher.number, note: remainderNote, date: voucher.date, ...tag });
     setTable('transactions', rows);
     return voucherReceipts(voucher.id, rows);
   });
@@ -198,6 +200,8 @@ export interface VoucherReceiptsInput {
   total: number;
   allocations: readonly ReceiptAllocation[];
   method: string;
+  /** Additive (7.19): label of the remainder row (New Ref / Advance); default "On account". */
+  remainder_note?: string;
 }
 
 /**
@@ -220,7 +224,7 @@ export function saveReceiptVoucher(input: ManualVoucherInput, chart: readonly Ac
     // Old rows go first, so `saveVoucher` sees a voucher free to change date / party / amount.
     if (input.id) removeVoucherReceiptRows(input.id);
     const saved = saveVoucher(input, chart);
-    if (allocations.length && receipts) syncVoucherReceipts(saved, receipts.party, receipts.total, allocations, receipts.method);
+    if (allocations.length && receipts) syncVoucherReceipts(saved, receipts.party, receipts.total, allocations, receipts.method, receipts.remainder_note);
     return saved;
   });
 }

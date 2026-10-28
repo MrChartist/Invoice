@@ -44,7 +44,7 @@ export function GstBody({ invoice, sender, totals, skipEway, works }: Props) {
   const ship = invoice.ship_to && (invoice.ship_to.address || invoice.ship_to.name) ? invoice.ship_to : null;
   const cur = invoice.currency;
   const symbol = currencySymbol(cur);
-  const title = titled(raDocTitle(invoice, DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice') || svDocTitle(invoice) || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'), invoice.doc_type); // R2-C5 suffix; R11 RA title
+  const title = titled(raDocTitle(invoice, invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice')) || svDocTitle(invoice) || invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'), invoice.doc_type); // R2-C5 suffix; R11 RA title
   const isQuote = invoice.doc_type === 'QUOTATION';
   const cgstSgst = isTaxed(invoice, totals);
   const igst = !cgstSgst && invoice.gst_mode !== 'NONE' && totals.tax_amount > 0;

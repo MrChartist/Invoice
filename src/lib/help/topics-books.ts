@@ -18,7 +18,7 @@ export const TOPICS: readonly HelpTopic[] = [
   t('books:rpt', 'Reports', 'रिपोर्ट', 'More statements: outstanding, interest, groups and schedules.', 'When a CA or lender asks.'),
   t('books:proj', 'Projects', 'प्रोजेक्ट', 'Income and cost per project or cost centre.', 'To see which job made money.', { statutory: ca(['AC15']) }),
   t('books:budget', 'Budgets', 'बजट', 'Budget against actual per ledger or centre.', 'Monthly review.'),
-  t('books:coa', 'Chart of accounts', 'खातों की सूची', 'Groups and ledgers, opening balances and the accounts menu.', 'Once at start, then when you need a new ledger.', { statutory: ca(['AC12']) }),
+  t('books:coa', 'Chart of accounts', 'खातों की सूची', 'Groups and ledgers, opening balances, voucher types (own numbering series) and the accounts menu.', 'Once at start, then when you need a new ledger.', { statutory: ca(['AC12']) }),
   t('books:fcst', 'Forecast', 'पूर्वानुमान', 'Expected cash in and out over the coming weeks.', 'To plan payments.'),
   t('books:fx', 'FX gain / loss', 'विदेशी मुद्रा लाभ / हानि', 'Exchange differences on foreign-currency invoices and bills.', 'When foreign money is received or paid.', { statutory: ca(['AC6', 'X7']) }),
   t('books:billwise', 'Bill-wise payables', 'बिल-वार देय', 'What you owe each supplier, bill by bill, with ageing.', 'Before a payment run.', { statutory: ca(['T20']) }),

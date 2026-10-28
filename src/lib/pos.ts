@@ -30,6 +30,7 @@ import {
 } from './stock-tracking';
 import { rxRequiredErrors } from './pharma-gate';
 import { toCsv } from './csv';
+import { VOUCHER_TYPES_TABLE, baseOfDoc, type VoucherSeries } from './voucher-series';
 import { formatCurrency, formatDate } from './utils';
 import { nextPartyBalanceSnapshot } from './party-balance';
 import { partyBalanceSnapshotFor } from './khata-actions';
@@ -304,7 +305,10 @@ export function savePosBill(input: PosSaveInput): PosSaveResult {
     }),
   };
   if (!rec.invoice_number) {
-    rec.invoice_number = localDb.invoices.nextNumber(rec.issue_date, rec.doc_type, rec.sender?.invoicePrefix || undefined);
+    // P1-13: the sales voucher type marked "use for POS" numbers POS bills (and gives its print title).
+    const posType = !rec.voucher_type_id && baseOfDoc(rec.doc_type) === 'SALES' ? posSeriesType() : undefined;
+    if (posType) rec = { ...rec, voucher_type_id: posType.id, ...(posType.print_title ? { print_title: posType.print_title } : {}) };
+    rec.invoice_number = localDb.invoices.nextNumber(rec.issue_date, rec.doc_type, rec.sender?.invoicePrefix || undefined, rec.voucher_type_id);
   }
 
   // Party balance on the bill (8.5): a saved customer's previous balance, frozen with what was paid now.
@@ -749,4 +753,9 @@ export function posShortcut(e: KeyEventLike, keymap?: Partial<Record<PosAction, 
 export function fillRest(total: number, tenders: readonly Tender[], method: TenderMethod): number {
   const others = tenders.filter((t) => t.method !== method).reduce((s, t) => s + Math.max(num(t.amount), 0), 0);
   return round2(Math.max(num(total) - others, 0));
+}
+
+/** P1-13: the active sales voucher type flagged "use for POS" (read raw: `voucher-types.ts` stays out of the POS chunk). */
+function posSeriesType(): (VoucherSeries & { print_title?: string }) | undefined {
+  return getTable<VoucherSeries & { use_for_pos?: boolean; print_title?: string }>(VOUCHER_TYPES_TABLE).find((t) => t?.base === 'SALES' && t.use_for_pos === true && !t.inactive && !!t.prefix);
 }

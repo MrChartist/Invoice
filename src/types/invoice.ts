@@ -610,6 +610,13 @@ export interface InvoiceRecord {
   branch_transfer_id?: string;
   /** Additive (WP-9): loyalty points redeemed on this bill; `value` (₹) is part of its invoice discount. */
   loyalty_redeem?: { points: number; value: number };
+  /**
+   * Additive (P1-13): user voucher type (`voucher_types` row, e.g. "Sales – Export") that numbered this
+   * document. Absent = the built-in Indian-FY series (`INV/FY25-26/0001`).
+   */
+  voucher_type_id?: string;
+  /** Additive (P1-13): printed document title snapshotted from the voucher type at save (absent = the type's label). */
+  print_title?: string;
   /* ── 7U business extras (additive, all optional) ── */
   /** `sales_agents` row id of the agent who earns commission on this document (`src/lib/sales-commission.ts`). */
   agent_id?: string;

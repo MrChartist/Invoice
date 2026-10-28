@@ -145,6 +145,7 @@ export const RECORD_KEYS = [
   'eco_gstin', 'eco_section', 'challan_purpose', 'challan_hide_amounts', 'challan_returnable', 'challan_return_by',
   'transport',
   'approval', 'branch_id', 'loyalty_redeem', 'branch_transfer_id',
+  'voucher_type_id', 'print_title',
   'agent_id', 'offer', 'rx',
   'party_balance_snapshot',
   'payment_schedule', 'acceptance',
@@ -629,6 +630,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
           record.issue_date,
           record.doc_type,
           record.sender?.invoicePrefix || undefined,
+          record.voucher_type_id,
         );
       }
       if (record.status === 'Draft' && !opts?.asDraft) record.status = 'Sent';

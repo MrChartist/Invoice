@@ -125,7 +125,10 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
     const base = defaultPrefs(detected);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPrefs({ ...base, ...saved, companyName: companyName || saved.companyName || detected });
-    setSource(loadSource());
+    const s = loadSource();
+    setSource(s);
+    // 7.49: TDS / TCS challans in the Tally export (tally-tds.ts reads the ledger's challan postings, lazily).
+    if (s.books) void import('../../lib/tally-tds').then((m) => m.withTdsChallans(s.books!)).then((books) => setSource((cur) => (cur === s ? { ...s, books } : cur)));
   }, [companyName]);
 
   const update = useCallback((patch: Partial<Prefs>) => {

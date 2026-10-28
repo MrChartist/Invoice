@@ -109,7 +109,7 @@ party lands on Debtors / Creditors with its name).
 - ~~A customer's TDS is not booked to TDS receivable when the settling receipt is a voucher allocation~~ — done in
   R6-C2: the allocation row carries `tds_amount` and the ledger posts Dr TDS receivable / Cr the debtor
   (`voucherTdsJournal`).
-- ~~**P1-21 import kinds** (ledgers / vendors / openings in the CSV wizard)~~ — done in R6-C3 (`import-openings.ts`).
+- ~~**P1-21 import kinds** (ledgers / vendors / openings in the CSV wizard)~~ — done in R6-C3 (`import-openings.ts`); stock items and manual vouchers in the same wizard — done in 7Q (`import-books.ts`, `docs/features/voucher-types.md` §3). Accounts Info also lists **Voucher types** (P1-13, screen `voucher-types`).
 - **P2 cost categories** — not done.
 - No interest report screen; GST / TDS defaults and party bank details on ledgers are not modelled.
 - The TB tab (WP-2) shows the difference only as the 1090 row; the Tally banner is on the Opening TB screen and the

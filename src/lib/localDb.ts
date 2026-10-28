@@ -41,6 +41,7 @@ import { clientLogged, settingsLogged } from './audit-events';
 import { releaseAttachments, releaseDropped } from './attachments';
 import { SERIES_TABLE, nextReceiptNumber, recordSeries, type SeriesCounter } from './series-counters';
 import { binRows } from './audit-edits';
+import { baseOfDoc, recordTypedNumber, seriesTypeFor, typedNumber } from './voucher-series';
 import { receivableTotal } from './rcm';
 import { isRevenueDoc } from './stats';
 import { linkedCredits, settledStatus, type CreditLinkRow } from './amount-due';
@@ -382,14 +383,18 @@ export const localDb = {
     },
 
     /** Next number in the series, derived from the highest one already issued. */
-    nextNumber: (dateStr?: string, docType: DocumentType = 'INVOICE', prefix?: string, rows: readonly InvoiceRecord[] = peekTable<InvoiceRecord>(KEYS.invoices)) =>
-      nextInvoiceNumber({
+    nextNumber: (dateStr?: string, docType: DocumentType = 'INVOICE', prefix?: string, voucherTypeId?: string, rows: readonly InvoiceRecord[] = peekTable<InvoiceRecord>(KEYS.invoices)) => {
+      // P1-13: a user voucher type numbers its own series (its high-water mark in `series_counters` counts as issued).
+      const vt = seriesTypeFor(voucherTypeId, baseOfDoc(docType));
+      if (vt) return typedNumber(vt, dateStr, rows.map((i) => i.invoice_number));
+      return nextInvoiceNumber({
         // R4-C4: the series high-water marks (`PREFIX/FYyy-yy` + seq) count as issued, so a deleted number is never reused.
         existingNumbers: [...rows.map((i) => i.invoice_number), ...peekTable<SeriesCounter>(SERIES_TABLE).map((r) => `${r.id}/${r.seq}`)],
         dateStr,
         docType,
         customPrefix: prefix ?? readSettings().invoicePrefix,
-      }),
+      });
+    },
 
     /**
      * Is `number` free for document `selfId`? Also reports the series gap a skipped-ahead
@@ -672,9 +677,9 @@ function putInvoice(invoice: InvoiceRecord, invoices: InvoiceRecord[], ix: Numbe
   const next = (r: InvoiceRecord) => {
     given = true;
     const p = r.sender?.invoicePrefix || undefined;
-    const k = `${r.issue_date}|${r.doc_type}|${p}`;
+    const k = `${r.issue_date}|${r.doc_type}|${p}|${r.voucher_type_id ?? ''}`;
     let n = ix.last.get(k);
-    do n = localDb.invoices.nextNumber(r.issue_date, r.doc_type, p, n ? [{ invoice_number: n } as InvoiceRecord] : invoices);
+    do n = localDb.invoices.nextNumber(r.issue_date, r.doc_type, p, r.voucher_type_id, n ? [{ invoice_number: n } as InvoiceRecord] : invoices);
     while (ix.keys.has(numberKey(n)));
     ix.last.set(k, n);
     return n;
@@ -744,6 +749,9 @@ function putInvoice(invoice: InvoiceRecord, invoices: InvoiceRecord[], ix: Numbe
     if (toSave.doc_type === 'CREDIT_NOTE' || stored?.doc_type === 'CREDIT_NOTE') resettleCreditedInvoices(toSave.id);
     // Files this document no longer lists (6.12) are deleted unless another record uses them.
     if (stored) releaseDropped(stored.attachments, toSave.attachments);
+    // P1-13: remember a user voucher type's number, so a deleted latest number is never issued again.
+    const vt = seriesTypeFor(toSave.voucher_type_id, baseOfDoc(toSave.doc_type));
+    if (vt) recordTypedNumber(vt, toSave.issue_date, toSave.invoice_number);
 
     logSafe(() => (stored ? invoiceUpdated(stored, toSave, overridden ? OVERRIDE_NOTE : '') : invoiceCreated(toSave)));
 
@@ -815,7 +823,7 @@ function isUnnumberedDraft(rec: InvoiceRecord): boolean {
  * Cancelled) takes the next number of its series, dated by its issue date. A document that has a
  * number never changes it, and nothing already issued is touched.
  */
-function numberOnIssue(rec: InvoiceRecord, wasStatus: InvoiceRecord['status'] | undefined, next = (r: InvoiceRecord) => localDb.invoices.nextNumber(r.issue_date, r.doc_type, r.sender?.invoicePrefix || undefined)): InvoiceRecord {
+function numberOnIssue(rec: InvoiceRecord, wasStatus: InvoiceRecord['status'] | undefined, next = (r: InvoiceRecord) => localDb.invoices.nextNumber(r.issue_date, r.doc_type, r.sender?.invoicePrefix || undefined, r.voucher_type_id)): InvoiceRecord {
   if (wasStatus !== 'Draft' || rec.invoice_number?.trim() || rec.status === 'Draft' || rec.status === 'Cancelled') return rec;
   return { ...rec, invoice_number: next(rec) };
 }

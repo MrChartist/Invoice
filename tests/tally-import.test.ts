@@ -178,7 +178,8 @@ test('H1: imported opening stock is counted once on the balance sheet (stock ite
   applyTallyImport(plan());
   const bs = ledgerBalanceSheet(loadLedger(), '2025-04-30', loadStockValuer());
   const inv = bs.assets.flatMap((s) => s.items).find((i) => i.label === 'Inventories');
-  assert.equal(inv?.amount, 2000000, JSON.stringify(inv));
+  // 100 Widgets at ₹200 opening, once; since 7.49 the sales voucher's 10 Widgets leave stock (stock move): 90 × ₹200.
+  assert.equal(inv?.amount, 1800000, JSON.stringify(inv));
   assert.equal(bs.difference, 0);
 });
 
@@ -186,7 +187,7 @@ test('H1: at the year end the imported opening stock is still counted once', () 
   applyTallyImport(plan());
   const bs = ledgerBalanceSheet(loadLedger(), '2026-03-31', loadStockValuer());
   const inv = bs.assets.flatMap((s) => s.items).find((i) => i.label === 'Inventories');
-  assert.equal(inv?.amount, 2000000);
+  assert.equal(inv?.amount, 1800000, 'opening once, less the 10 Widgets sold (7.49)');
   assert.equal(bs.difference, 0);
 });
 
