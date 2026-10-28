@@ -3,7 +3,7 @@
  * LOP = max(payable days − duties, 0) with payable days = the calendar days of the month (the payroll's own rule),
  * `units.ot_hours` = Σ OT hours, and — when the "extra duty" attendance type is set — `units[type]` = max(duties −
  * payable days, 0). Only people in the musters get a row; their other units are kept. The payroll store writes it
- * (`mp-payroll-io.ts`), refused once the month's run is final. Working papers — verify with your CA (MP20, MP32).
+ * (`mp-payroll-io.ts`), refused once the month's run is final. Working papers — verify with your CA (MP20, MP32, MP33).
  */
 import type { SiteMuster } from '../../types/manpower-r17';
 import { daysIn } from './mp-muster';

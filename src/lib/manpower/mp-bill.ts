@@ -8,7 +8,7 @@
  * Grouping: one invoice per site, or per client + `bill_group` (lines per site × post, the site code in the line).
  * Each group is split by the A3 regime of its lines (`splitPosts`), so RCM and forward-charge posts never share an
  * invoice. Billed state is derived from invoices whose `mp.muster_id` / `mp.muster_ids` name the muster (no stored
- * flag). Money in paise (`round2`). Working papers — verify with your CA (MP6, MP10, MP11, MP21, MP32).
+ * flag). Money in paise (`round2`). Working papers — verify with your CA (MP6, MP10, MP11, MP21, MP32, MP34, MP35).
  */
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { ClientMp, ManpowerSettings, MpPost, MpPostRow, MpSnapshot, SiteMuster } from '../../types/manpower-r17';
