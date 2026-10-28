@@ -156,6 +156,17 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   disbursement lines carry `charge_head_id: 'rule33'`. Write-downs are derived from `bill_refs` (`ps-writedown.ts`), never a
   per-entry table; a WIP write-off stamps `TimeEntry.ps.wo` / `PurchaseRecord.ps.wo` (the Unbilled list leaves them out).
   Rule values in `src/lib/prof-rules.ts` (lazy only, `tests/ps-rules.test.ts`). Notes and the B–D API: `docs/features/prof-r14.md`.
+- Round 15 (travel, tour & events) company data: names in `src/lib/travel/tv-shared.ts` (R15-B table `travel_bookings`,
+  object `travel_settings`), all backed up and synced; settings `travel_kind` (a profile under business type `services` +
+  `service_kind: 'travel'`, packs `travel` / `events` — desk tab `trips` on `/time`). A trip / event IS a project cost
+  centre with `CostCentre.tv`; billed state is derived from `line_ref`, never stored. Rights and audit labels are registered
+  at runtime by `src/lib/travel/tv-registry.ts`: **every module that writes a Round 15 table must `import './tv-registry'`**.
+  Round 15 invoice snapshots live under ONE record key `tv` (spread into `R9_RECORD_KEYS`) — never add keys; pass-through
+  bookings reuse the pure-agent `charge_head_id: 'rule33'`. A supplier bill tagged to a 5 % tour-operator trip has ITC
+  unticked; claiming it needs an audited reason. Rule values in `src/lib/travel-rules.ts` (lazy only, date-keyed).
+  R15-A: party netting posts receipts with the existing `exchange_purchase_id` marker + `method: 'netting'`
+  (`src/lib/netting.ts`, `Vendor.client_id`); audit appends are coalesced per task — call `audit.flush()` before reading the
+  raw audit key outside `audit.ts`. Notes: `docs/features/travel-r15.md`.
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 - Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,
