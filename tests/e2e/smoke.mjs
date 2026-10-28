@@ -5733,6 +5733,85 @@ try {
     await page.goto(srv.origin + '/expenses');
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
+  await step('R18-A society core: Settings → Society profile → Co-operative housing society (nonprofit, explicit society pack); Recurring → Society; tariff: Apply State defaults (Maharashtra) → 7 heads, service ₹3,000 and parking ₹500 → saved; units A-101 (600 sq ft, ₹24 lakh, 1 slot, tax ₹1,200), A-102 (let out), A-901 (1,500 sq ft, ₹60 lakh, 2 slots, tax ₹3,000) with owners → reload → total 2,700 sq ft; preview A-101 ₹6,710, A-102 ₹7,010, A-901 ₹12,010; sinking 0.20 % → the Maharashtra minimum hint (HS27); help; Ctrl+K "maintenance bill"', async () => {
+    const keys = ['settings', 'clients', 'society_units', 'society_settings'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'nonprofit', modules: undefined, industry_packs: undefined, society_kind: undefined, service_kind: undefined, manpower_kind: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'society_units', []);
+    await writeJson(page, 'society_settings', null);
+    await readJson(page, 'society_units', null, (v) => Array.isArray(v) && v.length === 0, 15000);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-society-kind-card="chs"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.society_kind === 'chs', 15000);
+    check(st.business_type === 'nonprofit' && JSON.stringify(st.industry_packs) === '["society"]' && st.modules?.includes('recurring') && st.modules?.includes('accounts'), `Co-operative housing society: nonprofit + explicit ["society"] (${st.industry_packs})`);
+    await page.goto(srv.origin + '/recurring?tab=society&view=heads');
+    await page.locator('[data-society-desk]').waitFor({ timeout: 15000 });
+    check((await page.getByRole('tab').allInnerTexts()).some((t) => /^Society$/.test(t.trim())), 'Recurring lists the Society tab');
+    const hv = page.locator('[data-hs-heads]');
+    await hv.getByLabel('State', { exact: true }).selectOption('27');
+    await hv.locator('[data-hs-apply-defaults]').click();
+    await hv.locator('[data-hs-head="service"] [data-hs-head-rate]').fill('3000');
+    await hv.locator('[data-hs-head="parking"] [data-hs-head-rate]').fill('500');
+    check(await hv.locator('[data-hs-head="sinking"] [data-hs-head-rate]').inputValue() === '0.25', 'Maharashtra default: sinking 0.25 % a year of cost');
+    await hv.locator('[data-hs-save-tariff]').click();
+    const ss = await readJson(page, 'society_settings', {}, (v) => v?.heads?.length === 7 && v.heads.some((h) => h.kind === 'service' && h.rate === 3000), 15000);
+    check(ss.state === '27' && ss.heads.find((h) => h.kind === 'non_occupancy')?.rate === 10 && ss.heads.find((h) => h.kind === 'education')?.rate === 10, 'tariff saved: 7 heads, NOC 10 %, education ₹10');
+    await page.goto(srv.origin + '/recurring?tab=society&view=units');
+    const unit = async (o) => {
+      await page.locator('[data-hs-new-unit]').click({ timeout: 15000 });
+      const f = page.locator('[data-hs-unit-form]');
+      await f.locator('[data-hs-unit-field="wing"]').fill('A');
+      await f.locator('[data-hs-unit-field="code"]').fill(o.code);
+      await f.getByLabel('Carpet area').fill(String(o.area));
+      await f.getByLabel('Construction cost').fill(String(o.cost));
+      await f.locator('[data-hs-unit-field="parking"]').fill(String(o.slots));
+      await f.locator('[data-hs-unit-field="owner"]').fill(o.owner);
+      if (o.tenant) {
+        await f.locator('[data-hs-unit-field="occupancy"]').selectOption('tenant');
+        await f.locator('[data-hs-unit-field="tenant"]').fill(o.tenant);
+      }
+      await f.locator('[data-hs-typed-head="statutory"]').fill(String(o.tax));
+      await f.locator('[data-hs-save-unit]').click();
+      await readJson(page, 'society_units', [], (v) => v.some((u) => u.code === o.code), 15000);
+    };
+    await unit({ code: 'A-101', area: 600, cost: 2400000, slots: 1, owner: 'E2E Asha Rao', tax: 1200 });
+    await unit({ code: 'A-102', area: 600, cost: 2400000, slots: 1, owner: 'E2E Ravi Shah', tenant: 'E2E Tenant Iyer', tax: 1200 });
+    await unit({ code: 'A-901', area: 1500, cost: 6000000, slots: 2, owner: 'E2E Meena Kulkarni', tax: 3000 });
+    const units = await readJson(page, 'society_units', [], (v) => v.length === 3, 15000);
+    const clients = await readJson(page, 'clients', [], (v) => ['E2E Asha Rao', 'E2E Ravi Shah', 'E2E Meena Kulkarni'].every((n) => v.some((c) => c.name === n && c.hs?.role === 'owner')), 15000);
+    const a102 = units.find((u) => u.code === 'A-102');
+    check(a102?.occupancy === 'tenant' && clients.some((c) => c.id === a102.tenant_id && c.hs?.role === 'tenant') && units.find((u) => u.code === 'A-901')?.parking.length === 2, 'three units; owners are members (Client.hs), the tenant recorded');
+    await page.reload();
+    await page.locator('[data-hs-units]').waitFor({ timeout: 15000 });
+    check(await page.locator('[data-hs-unit]').count() === 3 && /2700/.test(await page.locator('[data-hs-units] tfoot').innerText()), 'after reload the grid lists 3 units, total 2,700 sq ft');
+    await page.getByRole('tab', { name: 'Tariff' }).click();
+    const pv = page.locator('[data-hs-preview]');
+    await pv.waitFor({ timeout: 15000 });
+    const total = async (code) => Number(await pv.locator(`[data-hs-preview-unit="${code}"]`).getAttribute('data-hs-preview-total'));
+    check(await total('A-101') === 6710 && await total('A-102') === 7010 && await total('A-901') === 12010, `preview: A-101 ₹6,710, A-102 ₹7,010 (NOC), A-901 ₹9,010 + ₹3,000 (${await total('A-101')} / ${await total('A-102')} / ${await total('A-901')})`);
+    await page.locator('[data-hs-head="sinking"] [data-hs-head-rate]').fill('0.2');
+    const hint = page.locator('[data-hs-hint="fundLow"]');
+    await hint.waitFor({ timeout: 15000 });
+    check(/below the Maharashtra minimum 0\.25 % \(HS27\)/.test(await hint.innerText()), 'sinking 0.20 %: "below the Maharashtra minimum 0.25 % (HS27)"');
+    await page.locator('[data-hs-head="sinking"] [data-hs-head-rate]').fill('0.25');
+    check(await hint.count() === 0, 'restored 0.25 %: no hint');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="recurring:society"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a Society topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('maintenance bill');
+    await palette.getByRole('option', { name: /Society desk/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "maintenance bill" finds the Society desk');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 
 } catch {
   /* already reported */

@@ -194,6 +194,26 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   a client hold is shown, never posted). R17-D arrears go through `createDebitNote` (DBN, `doc_links`) with `mp.arrear`
   and no `muster_id`; licence notices come from `mp-alerts.ts` behind the bell's `manpower` gate. Rule values in `src/lib/manpower-rules.ts` (lazy only, `tests/mp-rules.test.ts`; no wage amounts). Notes:
   `docs/features/manpower-r17.md`.
+- Round 18 (co-operative housing societies, apartment owners' associations & RWAs) company data: names in
+  `src/lib/society/hs-shared.ts` (R18-A table `society_units` (not dated, `master.edit`), object `society_settings`
+  (`settings.manage`, audited on save, a singleton; absent = nothing society — `societyDefaultsFor` fills what is not
+  stored); B adds `society_runs`, dated by the bill date), all backed up and synced. Settings `society_kind` (`chs` /
+  `aoa` / `rwa` / `commercial` / `agency`): a wizard card, not a business type — business type `nonprofit` (`services`
+  for `agency`) with an EXPLICIT `industry_packs` list ∪ `society` (the type's donations pack is never switched on by
+  it); desk tab `society` on `/recurring` (`RECURRING_TABS`, lazy `components/society/SocietyDesk.tsx`, views in
+  `&view=`: A `units` / `heads`; B–D add `bills`, `gst`, `dues`, `funds`, `registers` — views, never tabs); Books
+  `funds` and GST `common-credit` take `society` in `alsoPacks`; `PACK_OF_TYPE` / `PACK_ROUTES` unchanged. A unit's
+  member is a client (`Client.hs` = units + role, re-linked by `hs-units-save.ts`); a tenant is recorded, never billed.
+  Rights and audit labels are registered at runtime by `src/lib/society/hs-registry.ts`: **every module that writes a
+  Round 18 table must `import './hs-registry'`**, and so do `sync-engine.ts` and `trust/recycle-bin.ts`
+  (`tests/hs-registry.test.ts`). Round 18 invoice snapshots live under ONE record key `hs` (`R18_RECORD_KEYS`, spread
+  into `R9_RECORD_KEYS`) — never add keys; pass-through statutory dues reuse `charge_head_id: 'rule33'`, the SAC sits in
+  `hsn`. Build group `f-society` (`vite.config.ts`, `familyRe('society', 'society-rules', 'society-r18', 'hs-registry')`
+  — the registry a lazy leaf): engines in `src/lib/society/` import only first-paint modules, `society-rules.ts` and
+  each other; shared lazy code goes through bridges `hs-*-io.ts` (≤ 4). Rule values in `src/lib/society-rules.ts`
+  (lazy only, date-keyed, `tests/hs-rules.test.ts`); **State society rules are data rows (`STATE_SOCIETY_RULES`, by
+  State code and date), never code** — a bill not in force (KA 2026) carries `in_force: false` and applies only once the
+  user confirms it (`society_settings.confirmed`); State checks are hints. Notes: `docs/features/society-r18.md`.
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 - Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,
