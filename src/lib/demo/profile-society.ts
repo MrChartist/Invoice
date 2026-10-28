@@ -15,5 +15,6 @@ export function societyExtras(ctx: ProfileContext): DemoExtras & { societySettin
     id: `demo-hs-${i}`, code, ...(i < 3 ? { wing: 'A' } : {}), use: i < 3 ? 'residential' : 'commercial', carpet_area: area, construction_cost: area * 4000, owner_id: ctx.base.clients[i % ctx.base.clients.length]?.id,
     occupancy: i === 1 ? 'tenant' : 'owner', parking: Array.from({ length: slots }, (_, k) => ({ slot: `P${i}${k}`, kind: 'covered' })), typed: { dh3: tax }, status: 'active', updated_at: `${ctx.today}T09:00:00.000Z`, demo: true,
   }));
+  // R18-B: no sample run (bills are numbered documents); `society_runs` is in DEMO_EXTRA_TABLES so a Demo removal clears it.
   return { tables: { society_units: units as never[] }, societySettings: { state: '27', cycle: 'monthly', due_days: 15, heads } };
 }

@@ -11,7 +11,10 @@ import { INDIAN_STATES } from '../../lib/india-states';
 import { localDb } from '../../lib/localDb';
 import { generateId } from '../../lib/storage';
 import { formatCurrency, todayInput } from '../../lib/utils';
-import { applyStateDefaults, BASES, chargeTotals, CYCLES, HEAD_KINDS, newHead, pendingStateRule, periodOf, sacFor, stateRule, tariffHints, unitCharges } from '../../lib/society/hs-tariff';
+import { applyStateDefaults, BASES, chargeTotals, CYCLES, HEAD_KINDS, newHead, pendingStateRule, periodOf, periodRange, sacFor, stateRule, tariffHints, unitCharges } from '../../lib/society/hs-tariff';
+import { hsRegime } from '../../lib/society/hs-regime';
+import { hsbT } from '../../i18n/areas/society-r18b';
+import RegimeChip from './parts/RegimeChip';
 import { loadUnits } from '../../lib/society/hs-units-save';
 import { sortUnits } from '../../lib/society/hs-units';
 import { readSocietySettings, saveSocietySettings, societyDefaultsFor } from '../../lib/society/hs-settings';
@@ -34,7 +37,8 @@ export default function HeadsView({ notify }: HsViewProps) {
   const rule = stateRule(s.state, today, s.confirmed);
   const stName = INDIAN_STATES.find((x) => x.code === s.state)?.name ?? '';
   const period = periodOf(today, s.cycle);
-  const rows = units.map((u) => ({ u, t: chargeTotals(unitCharges(u, heads, period, { areaUnit: s.area_unit })) }));
+  const reg = { date: today, months: periodRange(period)?.months ?? 1, registered: !!localDb.settings.activeProfile()?.companyGstin?.trim(), kind: localDb.settings.get().society_kind, valuation: s.gst?.valuation }; // R18-B: the ₹7,500 test column
+  const rows = units.map((u) => { const c = unitCharges(u, heads, period, { areaUnit: s.area_unit }); return { u, t: chargeTotals(c), r: hsRegime({ ...reg, rows: c.filter((x) => x.kind !== 'outsider') }).regime }; });
   const all = rows.reduce((a, r) => ({ member: a.member + r.t.member, statutory: a.statutory + r.t.statutory, total: a.total + r.t.total }), { member: 0, statutory: 0, total: 0 });
   const save = () => {
     try {
@@ -55,6 +59,11 @@ export default function HeadsView({ notify }: HsViewProps) {
         <F label={hsT('cycle')}>
           <select className={controls.select} value={s.cycle ?? 'monthly'} onChange={(e) => set({ cycle: e.target.value as HsCycle })}>
             {CYCLES.map((c) => <option key={c} value={c}>{hsList('cycles', CYCLES, c)}</option>)}
+          </select>
+        </F>
+        <F label={hsbT('test')}>
+          <select className={controls.select} value={s.gst?.valuation ?? 'whole'} onChange={(e) => set({ gst: { ...s.gst, valuation: e.target.value as 'whole' | 'excess' } })} data-hs-valuation>
+            {(['whole', 'excess'] as const).map((v, k) => <option key={v} value={v}>{hsbT('regimes').split(',')[3 + k]}</option>)}
           </select>
         </F>
         <F label={hsT('dueDays')}><input type="number" min={0} max={120} className={controls.input} value={s.due_days ?? 15} onChange={(e) => set({ due_days: numIn(e.target.value) })} /></F>
@@ -99,11 +108,11 @@ export default function HeadsView({ notify }: HsViewProps) {
         <div className={surface.tableWrap}>
           <table className={surface.table} data-hs-preview={period}>
             <caption style={{ textAlign: 'left', fontWeight: 600 }}>{hsT('preview')} · {period} · {Math.min(PREVIEW, rows.length)} / {rows.length}</caption>
-            <thead><tr><th>{hsT('unit')}</th><th className={surface.numeric}>{hsT('memberCharges')}</th><th className={surface.numeric}>{hsT('statutory')}</th><th className={surface.numeric}>{hsT('total')}</th></tr></thead>
+            <thead><tr><th>{hsT('unit')}</th><th className={surface.numeric}>{hsT('memberCharges')}</th><th className={surface.numeric}>{hsT('statutory')}</th><th className={surface.numeric}>{hsT('total')}</th><th>{hsbT('test')}</th></tr></thead>
             <tbody>
-              {rows.slice(0, PREVIEW).map(({ u, t }) => <tr key={u.id} data-hs-preview-unit={u.code} data-hs-preview-total={t.total}><td>{u.code}</td>{money(t.member)}{money(t.statutory)}{money(t.total)}</tr>)}
+              {rows.slice(0, PREVIEW).map(({ u, t, r }) => <tr key={u.id} data-hs-preview-unit={u.code} data-hs-preview-total={t.total}><td>{u.code}</td>{money(t.member)}{money(t.statutory)}{money(t.total)}<td><RegimeChip regime={r} /></td></tr>)}
             </tbody>
-            <tfoot><tr><th>{hsT('total')}</th>{money(all.member)}{money(all.statutory)}{money(all.total)}</tr></tfoot>
+            <tfoot><tr><th>{hsT('total')}</th>{money(all.member)}{money(all.statutory)}{money(all.total)}<td /></tr></tfoot>
           </table>
         </div>
       )}

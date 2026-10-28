@@ -83,4 +83,22 @@ export const pendingStateRule = (state: string | undefined, date: string, confir
 
 /* ── R18-B: RWA_LIMIT_RULES, RWA_VALUATION_RULES, REG_THRESHOLD_RULES (B2, B3) ─────────────────────────────── */
 
+/** Sl. 77(c) of N 12/2017-CT(R): the exempt contribution, ₹ per month per member — tested per apartment (HS1). */
+export const RWA_LIMIT_RULES: readonly HsRule<number>[] = [
+  { from: '2017-07-01', value: 5000, source: 'N 12/2017-CT(R) Sl. 77(c). Read (R18) (HS1)', verified: true },
+  { from: '2018-01-25', value: 7500, source: 'N 2/2018-CT(R), as stated by Circular 109/28/2019-GST Q1. Read (R18) (HS1)', verified: true },
+  { from: '2025-09-22', value: 7500, source: 'N 16/2025-CT(R): no Sl. 77 change reported (S, HS1)', verified: false },
+];
+
+/** Above the limit: GST on the whole amount (Circular 109 Q5). "Excess only" (Madras HC 2021, under appeal) is a setting, never a row (HS2). */
+export const RWA_VALUATION_RULES: readonly HsRule<'whole' | 'excess'>[] = [
+  { from: '2019-07-22', value: 'whole', source: 'Circular 109/28/2019-GST Q5. Read (R18) (HS2)', verified: true },
+];
+
+/** Registration threshold for a supplier of services (₹), by State: the special-category rows are not read (HS4). */
+export const REG_THRESHOLD_RULES: readonly (HsRule<number> & { state?: string })[] = [
+  { from: '2017-07-01', value: 2000000, source: 'Circular 109/28/2019-GST Q2 (₹20 lakh). Read (R18) (HS4)', verified: true },
+  ...['13', '14', '15', '16'].map((state) => ({ state, from: '2017-07-01', value: 1000000, source: 'CGST Act Sec 22(1) proviso, special-category States (not read, HS4)', verified: false })),
+];
+
 /* ── R18-D: INCOME_TAX_SOCIETY_RULES (D4) ───────────────────────────────────────────────────────────────────── */

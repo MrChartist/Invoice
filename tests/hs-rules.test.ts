@@ -65,7 +65,7 @@ test('every rule row has a date, a source and `verified`; verified rows are exac
       if (prev) assert.ok(r.from > prev.from, 'append-only, in date order');
     });
   }
-  assert.deepEqual(verified.sort(), ['SOCIETY_GST_RATE_RULES@2017-07-01', 'SOCIETY_SAC_RULES@2017-07-01', 'STATE_SOCIETY_RULES@29:2026-01-01', 'STATE_SOCIETY_RULES@33:2024-03-06']);
+  assert.deepEqual(verified.sort(), ['REG_THRESHOLD_RULES@2017-07-01', 'RWA_LIMIT_RULES@2017-07-01', 'RWA_LIMIT_RULES@2018-01-25', 'RWA_VALUATION_RULES@2019-07-22', 'SOCIETY_GST_RATE_RULES@2017-07-01', 'SOCIETY_SAC_RULES@2017-07-01', 'STATE_SOCIETY_RULES@29:2026-01-01', 'STATE_SOCIETY_RULES@33:2024-03-06'] /* R18-B: the limit, valuation and threshold rows read in Sl. 77(c) / Circular 109 */);
   assert.deepEqual([...new Set(rules.STATE_SOCIETY_RULES.map((r) => r.state))].sort(), ['07', '27', '29', '33'], 'State rows only for MH / KA / TN / DL');
   assert.ok(rules.STATE_SOCIETY_RULES.filter((r) => r.state === '29').every((r) => r.in_force === false), 'the KA Bill is not in force until confirmed');
 });

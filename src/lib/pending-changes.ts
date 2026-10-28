@@ -10,7 +10,7 @@
  */
 import { pendT } from '../i18n/areas/pending-r16d';
 
-export type PendingArea = 'refund' | 'rule89' | 'latefee' | 'gstr3b' | 'export' | 'rcm_goods' | 'rcm_self';
+export type PendingArea = 'refund' | 'rule89' | 'latefee' | 'gstr3b' | 'export' | 'rcm_goods' | 'rcm_self' | 'society';
 
 export interface PendingChange {
   id: Exclude<Parameters<typeof pendT>[0], 'lead' | 'head'>;
@@ -36,6 +36,8 @@ export const PENDING_CHANGES: readonly PendingChange[] = [
   { id: 'pf5_export', area: 'export', recommended_on: ON, source: `${PIB} ¶10`, ca: 'PF5', notified: false },
   { id: 'pf7_rcm', area: 'rcm_goods', recommended_on: ON, source: `${PIB} C1 ¶5`, ca: 'PF7', notified: false },
   { id: 'pf8_einv', area: 'rcm_self', recommended_on: ON, source: `${PIB} ¶18`, ca: 'PF8', notified: false },
+  // R18-B (HS2): not a Council recommendation — a High Court order under appeal (year only: the order's date was not read).
+  { id: 'hs2_valuation', area: 'society', recommended_on: '2021', source: 'Madras HC, TVH Lumbini Square / Greenwood Owners Assn. (single judge); W.A. 2318 / 2321 of 2021 (S)', ca: 'HS2', notified: false },
 ];
 
 /** `YYYY-MM-DD` + `n` months (local day arithmetic; the day clamps to the month's end). */

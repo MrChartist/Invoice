@@ -16,6 +16,7 @@ export const pendT = defineArea(
     pf5_export: 'IGST Sec 2(6)(v) (supply to your own branch abroad) to be deleted; the export check still applies it.',
     pf7_rcm: 'RCM on plastic, e-waste and tyre scrap and used cooking oil from unregistered suppliers, and 2 % GST TDS on B2B supplies of these.',
     pf8_einv: 'e-Invoicing for RCM inward supplies from unregistered persons and for import of services (₹5 crore and above); the self-invoice has no IRN yet.',
+    hs2_valuation: 'Court order under appeal, not a Council recommendation: the Madras High Court (2021) held that a society above ₹7,500 a month pays GST only on the excess; the app taxes the whole amount (Circular 109/28/2019-GST) unless "excess" is chosen.',
   } as const,
   {
     lead: 'GST परिषद की 8 अक्टूबर 2026 की सिफ़ारिश, अभी अधिसूचित नहीं — अपने CA से जाँचें:',
@@ -28,5 +29,6 @@ export const pendT = defineArea(
     pf5_export: 'IGST धारा 2(6)(v) (विदेश में अपनी शाखा को आपूर्ति) हटेगी; निर्यात जाँच अभी इसे लागू करती है।',
     pf7_rcm: 'अपंजीकृत आपूर्तिकर्ता से प्लास्टिक, ई-कचरा, टायर स्क्रैप और प्रयुक्त खाद्य तेल पर RCM, और इनकी B2B आपूर्ति पर 2 % GST TDS।',
     pf8_einv: 'अपंजीकृत व्यक्ति से RCM आवक आपूर्ति और सेवाओं के आयात (₹5 करोड़ और ऊपर) पर ई-इनवॉइस; स्व-बीजक पर अभी IRN नहीं।',
+    hs2_valuation: 'अपील में लंबित न्यायालय आदेश, परिषद की सिफ़ारिश नहीं: मद्रास उच्च न्यायालय (2021) के अनुसार ₹7,500 मासिक से ऊपर पर GST केवल अतिरिक्त राशि पर; ऐप पूरी राशि पर कर लगाता है (परिपत्र 109/28/2019-GST) जब तक "अतिरिक्त" न चुना जाए।',
   },
 );

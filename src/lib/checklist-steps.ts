@@ -37,7 +37,7 @@ export type StepKind =
   | HsStep;
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'lut', 'edf', 'clientMoneyBank', 'stageTemplate', 'feeSchedule', 'linkCompanies', 'partners', 'firstTrip', 'firstEvent', 'firstSupplier', 'regime', 'firstStatement', 'firstSite', 'firstMuster', 'firstBill', 'siteProof', 'licence', 'societyUnits', 'societyTariff', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'lut', 'edf', 'clientMoneyBank', 'stageTemplate', 'feeSchedule', 'linkCompanies', 'partners', 'firstTrip', 'firstEvent', 'firstSupplier', 'regime', 'firstStatement', 'firstSite', 'firstMuster', 'firstBill', 'siteProof', 'licence', 'societyUnits', 'societyTariff', 'societyRun', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -167,10 +167,11 @@ const MP_STEPS: Readonly<Record<MpStep, [kinds: string, to: string]>> = {
 const isMpStep = (k: string): k is MpStep => Object.hasOwn(MP_STEPS, k);
 
 /** R18-A1: the society steps (every kind) and where each opens (B: societyRun; D: societyFunds, societyAudit). */
-type HsStep = 'societyUnits' | 'societyTariff';
+type HsStep = 'societyUnits' | 'societyTariff' | 'societyRun'; // R18-B: societyRun
 const HS_STEPS: Readonly<Record<HsStep, string>> = {
   societyUnits: '/recurring?tab=society&view=units',
   societyTariff: '/recurring?tab=society&view=heads',
+  societyRun: '/recurring?tab=society&view=bills', // R18-B
 };
 const isHsStep = (k: string): k is HsStep => Object.hasOwn(HS_STEPS, k);
 
@@ -523,6 +524,7 @@ function societyFacts(): Partial<Record<HsStep, number>> {
   return {
     societyUnits: peekTable('society_units').length,
     societyTariff: getJson<{ heads?: unknown[] } | null>(`${DB_PREFIX}society_settings`, null)?.heads?.length ?? 0,
+    societyRun: peekTable('society_runs').length, // R18-B
   };
 }
 

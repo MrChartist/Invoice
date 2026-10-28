@@ -1150,3 +1150,13 @@ test('R15-C statement bill is read back by readPurchase', async () => {
   assert.deepEqual([c!.date, c!.total, c!.taxable, c!.itcEligible, c!.paid], ['2026-10-15', 13380, 13380, false, 0]);
   assert.deepEqual(readPurchaseLines({ ...statementBill(st), id: 'b' } as never).map((l) => l.quantity * l.unitCost), [9880, 3500]);
 });
+
+// R18-B3: the society's inward-RCM hint reads the real bill shape (lines' SAC, reverse charge, the supplier's GSTIN).
+test('R18-B inward-RCM hint (hs-turnover) reads the real bill shape', async () => {
+  const { rcmHint } = await import('../src/lib/society/hs-turnover.ts');
+  const guard: PurchaseRecord = { ...bill, lines: [{ ...bill.lines[0], name: 'Security services', hsn: '998525' }] };
+  const rule = { sac: '99852' };
+  assert.equal(rcmHint(guard, { gstin: bill.vendor_gstin }, true, rule), true);
+  assert.equal(rcmHint({ ...guard, reverse_charge: true }, { gstin: bill.vendor_gstin }, true, rule), false);
+  assert.equal(rcmHint(bill, { gstin: bill.vendor_gstin }, true, rule), false, 'paper is not security');
+});

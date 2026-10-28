@@ -15,12 +15,16 @@ export const HS_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // R18-A: the settings object is the owner's; units are a master
   society_settings: 'settings.manage',
   society_units: 'master.edit',
+  // R18-B: a billing run issues documents
+  society_runs: 'doc.create',
 };
 
 /** Audited tables (every row change logged; deletes go to the recycle bin). `society_settings` is audited on save. */
 export const HS_WATCHED: Readonly<Record<string, WatchedTable>> = {
   // R18-A
   society_units: { entity: 'client', label: 'Society unit' },
+  // R18-B
+  society_runs: { entity: 'invoice', label: 'Society run' },
 };
 
 /** Idempotent: adds the rows once (never overwrites a row another module set). */
