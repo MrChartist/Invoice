@@ -115,8 +115,7 @@ function DeployList({ site, notify }: { site: Site; notify: Notify }) {
   const go = async (id: string, siteId: string, postId?: string) => {
     const io = await import('../../lib/manpower/mp-payroll-io');
     try {
-      const e = io.loadEmployees().find((x) => x.id === id);
-      if (e) io.deployEmployee(e, siteId, postId);
+      io.deployEmployee(id, siteId, postId);
       setStaff(loadStaff());
     } catch (err) { notify((err as Error).message, 'error'); }
   };

@@ -4,22 +4,24 @@
  * D (`statutory`) add one lazy entry each in their block of `VIEWS`. Nothing is read until the tab opens.
  * Working papers — verify with your CA.
  */
-import { Suspense, lazy, type ComponentType, type LazyExoticComponent } from 'react';
+import { Suspense, type ComponentType, type LazyExoticComponent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { mpT } from '../../i18n/areas/manpower-r17a';
 import { mbT } from '../../i18n/areas/manpower-r17b';
 import controls from '../../styles/controls.module.css';
 import SitesView from './SitesView';
+import MusterView from './MusterView';
+import BillsView from './BillsView';
 import type { MpViewProps } from './mp-ui';
 
 type View = { label: () => string; C: ComponentType<MpViewProps> | LazyExoticComponent<ComponentType<MpViewProps>> };
 const VIEWS: Record<string, View> = {
   // R17-A
   sites: { label: () => mpT('sites'), C: SitesView },
-  // R17-B: the duty register (+ payroll push) and the month's bills
-  muster: { label: () => mpT('muster'), C: lazy(() => import('./MusterView')) },
-  bills: { label: () => mbT('bills'), C: lazy(() => import('./BillsView')) },
+  // R17-B: the duty register (+ payroll push) and the month's bills (static: one desk chunk, as R15-C measured)
+  muster: { label: () => mpT('muster'), C: MusterView },
+  bills: { label: () => mbT('bills'), C: BillsView },
   // R17-C: compliance, profit
   // R17-D: statutory
 };

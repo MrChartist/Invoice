@@ -55,17 +55,20 @@ test('push writes only the people in the musters; refused while nothing is locke
 
 test('deploy / release an employee at a site (cost centre + post)', () => {
   const { green } = world();
-  const e6 = loadEmployees().find((e) => e.id === 'e6')!;
-  const d = deployEmployee(e6, green.id, 'h');
-  assert.deepEqual([d.cost_centre_id, d.mp?.post_id], [green.id, 'h']);
-  const r = deployEmployee(d, '');
+  deployEmployee('e6', green.id, 'h');
+  const d = loadEmployees().find((e) => e.id === 'e6')!;
+  assert.deepEqual([d.cost_centre_id, d.mp?.post_id, d.name, d.code], [green.id, 'h', 'Suresh', 'R01']);
+  deployEmployee('e6', '');
+  const r = loadEmployees().find((e) => e.id === 'e6')!;
   assert.deepEqual([r.cost_centre_id, r.mp], [undefined, undefined]);
+  assert.throws(() => deployEmployee('nobody', green.id), /no longer/);
 });
 
-test('the payroll bridge is the only Round 17 module importing the payroll store', () => {
+test('no Round 17 module imports the payroll store (it would split the payroll chunk); only the bridge writes payroll tables', () => {
   const dirs = ['src/lib/manpower/', 'src/components/manpower/'];
   for (const d of dirs) for (const f of readdirSync(new URL(`../${d}`, import.meta.url))) {
     const s = readFileSync(new URL(`../${d}${f}`, import.meta.url), 'utf8');
-    if (/from '[^']*payroll\/store'/.test(s)) assert.equal(f, 'mp-payroll-io.ts', f);
+    assert.ok(!/from '[^']*payroll\/store'/.test(s), f);
+    if (/setTable\('(attendance|employees)'/.test(s)) assert.equal(f, 'mp-payroll-io.ts', f);
   }
 });

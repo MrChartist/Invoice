@@ -5557,6 +5557,76 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R17-B duty register and billing: seed Sunrise (Guard 12 h × 4 at ₹800, Supervisor at ₹1,000) + five deployed staff and a reliever → Muster October 2026: Copy last month, duties 30 / 30 / 31 / 28 + reliever 3 (12 h OT), Supervisor 31 → Lock → Send to payroll (LOP 1 / 1 / 0 / 3 / 0, reliever 28 + OT 12) → Bills → Bill: RCM draft 97,600 + 31,000 = ₹1,28,600 without tax, expected TDS ₹1,286 (1 %), entry-14 sentence, duty annexure and TDS line on the paper; Green Park 18 %', async () => {
+    const keys = ['settings', 'clients', 'cost_centres', 'manpower_settings', 'notes_to_accounts', 'employees', 'site_musters', 'attendance', 'payroll_runs', 'invoices'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'manpower', manpower_kind: 'security', industry_packs: ['manpower', 'security'], modules: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'manpower_settings', { shift_hours: 12, billing_days: 'calendar', bill_date: 'month_end', service_charge_pct: 0, print_tds: true });
+    await writeJson(page, 'notes_to_accounts', []); // a proprietorship: entry 14 applies, 194C at 1 %
+    await writeJson(page, 'payroll_runs', (prev.payroll_runs ?? []).filter((r) => r.month !== '2026-10'));
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-mpb-c1', name: 'E2E-B Sunrise Developers', gstin: '27AAACB2230M1ZW', state_code: '27' }, { id: 'e2e-mpb-c2', name: 'E2E-B Green Park RWA', state_code: '27' }]);
+    const p = (id, name, sac, heads, rate) => ({ id, name, sac, heads, shift_hours: 12, basis: 'duty', rate });
+    const site = (id, name, code, client, posts) => ({ id, name, kind: 'project', client_id: client, active: true, status: 'active', start: '2026-01-01', mp: { code, contract: { from: '2026-01-01' }, posts, status: 'active' } });
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), site('e2e-mpb-s1', 'E2E-B Sunrise Towers', 'S-901', 'e2e-mpb-c1', [p('g', 'Guard (12 h)', '998525', 4, 800), p('s', 'Supervisor', '998525', 1, 1000)]), site('e2e-mpb-s2', 'E2E-B Green Park RWA', 'S-902', 'e2e-mpb-c2', [p('g', 'Guard', '998525', 2, 750)])]);
+    const emp = (id, code, name, cc, post) => ({ id, code, name, tax_regime: 'new', pf: true, esi: true, pt: true, active: true, created_at: '2026-01-01T00:00:00.000Z', ...(cc ? { cost_centre_id: cc, mp: { post_id: post } } : {}) });
+    await writeJson(page, 'employees', [...(prev.employees ?? []), emp('e2e-g1', 'E2E-G01', 'Ramesh E2E', 'e2e-mpb-s1', 'g'), emp('e2e-g2', 'E2E-G02', 'Mahesh E2E', 'e2e-mpb-s1', 'g'), emp('e2e-g3', 'E2E-G03', 'Dinesh E2E', 'e2e-mpb-s1', 'g'), emp('e2e-g4', 'E2E-G04', 'Naresh E2E', 'e2e-mpb-s1', 'g'), emp('e2e-s1', 'E2E-S01', 'Vikram E2E', 'e2e-mpb-s1', 's'), emp('e2e-r1', 'E2E-R01', 'Suresh E2E'), emp('e2e-g5', 'E2E-G05', 'Prakash E2E', 'e2e-mpb-s2', 'g')]);
+    await readJson(page, 'employees', [], (v) => v.some((e) => e.id === 'e2e-g5'), 15000);
+    await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.id === 'e2e-mpb-s2'), 15000);
+    await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-mpb-c2'), 15000);
+    await readJson(page, 'settings', {}, (v) => v.manpower_kind === 'security' && v.industry_packs?.includes('manpower'), 15000);
+    await readJson(page, 'manpower_settings', {}, (v) => v?.print_tds === true, 15000);
+    await page.goto(srv.origin + '/time?tab=deploy&view=muster&site=e2e-mpb-s1&month=2026-10');
+    const mv = page.locator('[data-mp-muster]');
+    await mv.waitFor({ timeout: 15000 });
+    await mv.locator('[data-mp-muster-copy]').click();
+    const row = (code) => mv.locator(`[data-mp-muster-row="${code}"]`);
+    await row('E2E-G01').waitFor({ timeout: 15000 });
+    check(await mv.locator('[data-mp-muster-row]').count() === 5, 'Copy last month (none yet): the five deployed people at full duties');
+    for (const [code, d] of [['E2E-G01', 30], ['E2E-G02', 30], ['E2E-G03', 31], ['E2E-G04', 28], ['E2E-S01', 31]]) await row(code).locator('[data-mp-row-duties]').fill(String(d));
+    await mv.locator('[data-mp-muster-add]').click();
+    const last = mv.locator('[data-mp-muster-row]').last();
+    await last.locator('[data-mp-row-person]').selectOption('e2e-r1');
+    await last.locator('[data-mp-row-post]').selectOption('g');
+    await last.locator('[data-mp-row-duties]').fill('3');
+    await last.locator('[data-mp-row-ot]').fill('12');
+    check(/Guard \(12 h\): 122 of 124 duties/.test(await mv.locator('[data-mp-muster-totals]').innerText()), 'totals: Guard 122 of 124 duties');
+    await mv.locator('[data-mp-muster-save]').click();
+    const m1 = (await readJson(page, 'site_musters', [], (v) => v.some((m) => m.site_id === 'e2e-mpb-s1' && m.month === '2026-10' && m.rows?.length === 6), 15000)).find((m) => m.site_id === 'e2e-mpb-s1');
+    check(m1?.status === 'draft' && m1.date === '2026-10-31' && m1.rows.find((r) => r.employee_id === 'e2e-r1')?.relief === true, 'the draft muster is saved (dated 2026-10-31, the reliever ticked)');
+    await mv.locator('[data-mp-muster-lock]').click();
+    await readJson(page, 'site_musters', [], (v) => v.some((m) => m.id === m1?.id && m.status === 'locked'), 15000);
+    await page.locator('[data-mp-muster="locked"]').waitFor({ timeout: 15000 });
+    check(await mv.locator('[data-mp-row-duties]').first().isDisabled(), 'a locked muster is read-only');
+    await mv.locator('[data-mp-push]').click();
+    await page.locator('[data-mp-push-preview]').waitFor({ timeout: 15000 });
+    check(/S-902/.test(await page.locator('[data-mp-push-preview]').innerText()), 'the preview names the site whose muster is not locked');
+    await page.locator('[data-mp-push-confirm]').click();
+    const att = await readJson(page, 'attendance', [], (v) => v.some((a) => a.employee_id === 'e2e-r1' && a.month === '2026-10'), 15000);
+    const lop = (id) => att.find((a) => a.employee_id === id && a.month === '2026-10');
+    check(['e2e-g1', 'e2e-g2', 'e2e-g3', 'e2e-g4', 'e2e-s1'].map((id) => lop(id)?.lop).join() === '1,1,0,3,0' && lop('e2e-r1')?.lop === 28 && lop('e2e-r1')?.units?.ot_hours === 12 && !lop('e2e-g5'), `payroll attendance from the muster: LOP ${['e2e-g1', 'e2e-g2', 'e2e-g3', 'e2e-g4', 'e2e-s1', 'e2e-r1'].map((id) => lop(id)?.lop).join(' / ')}, reliever OT 12; others untouched`);
+    await page.goto(srv.origin + '/time?tab=deploy&view=bills&month=2026-10');
+    await page.locator('[data-mp-bill="S-901"]').click({ timeout: 15000 });
+    const invs = await readJson(page, 'invoices', [], (v) => v.some((i) => i.mp?.month === '2026-10' && i.mp?.site?.code === 'S-901'), 15000);
+    const inv = invs.find((i) => i.mp?.month === '2026-10' && i.mp?.site?.code === 'S-901');
+    check(inv?.status === 'Draft' && inv.issue_date === '2026-10-31' && inv.items.map((l) => `${l.quantity}x${l.rate}=${l.amount}`).join() === '122x800=97600,31x1000=31000', `lines Guard 122 × ₹800 = ₹97,600 and Supervisor 31 × ₹1,000 = ₹31,000 (${inv?.items?.map((l) => l.amount)})`);
+    check(inv?.reverse_charge === true && inv.total === 128600 && inv.mp.regime === 'rcm' && inv.mp.muster_id === m1?.id, `reverse charge, total ₹1,28,600 with no tax added (${inv?.total})`);
+    check(inv?.mp?.tds?.expected === 1286 && inv.mp.tds.rate === 1, `expected client TDS ₹1,286 at 1 % (${inv?.mp?.tds?.expected})`);
+    await page.goto(srv.origin + `/invoice/${inv.id}`);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click({ timeout: 15000 });
+    const dlg = page.getByRole('dialog', { name: 'Document preview' });
+    await dlg.locator('[data-manpower-block]').waitFor({ timeout: 15000 });
+    check(/entry 14/.test(await dlg.locator('[data-manpower-decl]').innerText()) && await dlg.locator('[data-manpower-annex] tbody tr').count() === 6 && /1,286/.test(await dlg.locator('[data-manpower-tds]').innerText()), 'the paper prints the entry-14 sentence, the duty annexure (6 rows) and the expected TDS line');
+    await page.keyboard.press('Escape');
+    await writeJson(page, 'site_musters', [...(await readJson(page, 'site_musters', [])), { id: 'e2e-mpb-m2', site_id: 'e2e-mpb-s2', month: '2026-10', date: '2026-10-31', status: 'locked', updated_at: '2026-10-31T00:00:00.000Z', rows: [{ employee_id: 'e2e-g5', post_id: 'g', duties: 31 }] }]);
+    await readJson(page, 'site_musters', [], (v) => v.some((m) => m.id === 'e2e-mpb-m2'), 15000);
+    await page.goto(srv.origin + '/time?tab=deploy&view=bills&month=2026-10');
+    await page.locator('[data-mp-bill="S-902"]').click({ timeout: 15000 });
+    const gp = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.mp?.site?.code === 'S-902'), 15000)).find((i) => i.mp?.site?.code === 'S-902');
+    check(gp?.reverse_charge === false && gp.taxable_value === 23250 && gp.tax_amount === 4185, `Green Park (no GSTIN): 18 % charged (${gp?.tax_amount})`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {
