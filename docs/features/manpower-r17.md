@@ -134,7 +134,7 @@ normalized = chunk hashes stripped.
 | Budget | Before | After | Delta | Cap |
 |---|---|---|---|---|
 | Initial JS (first paint) | 182.2 kB | 182.2 kB | **0 B** (entry identical after normalizing) | 0 ✓ |
-| Core precache (English) | 3,114.0 kB | 3,124.1 kB | +10.1 raw; **+9.4 kB normalized** | 12 kB ✓ |
+| Core precache (English) | 3,114.0 kB | 3,124.5 kB | +10.5 raw (hash noise ±0.4); **+9.4 kB normalized** | 12 kB ✓ |
 | Hindi pack | 342.4 kB | 343.1 kB | +0.7 kB (`lang-hi-manpower` 1.35 → 2.04) | — |
 | Hindi left in core | 21.3 kB | 21.3 kB | +8 B (two help-topic Hindi titles) | 0 ✓ (display) |
 | `lazy-leaves` | 16.6 kB | 16.7 kB | +32 B (registry rows) | — |
