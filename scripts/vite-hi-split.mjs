@@ -25,7 +25,7 @@ import { parseAst } from 'rolldown/parseAst';
 /** Area files whose `.hi` object is read directly by code (bilingual output): their Hindi stays inline. */
 export const HI_INLINE = [
   'src/i18n/areas/gateway.ts', // GatewayMenu shows the other language beside each item (gwT.hi)
-  'src/i18n/areas/construction-r11a.ts', // works-text.ts prints the bilingual works paper (cnT.hi)
+  'src/i18n/areas/construction-r11-paper.ts', // works-text.ts prints the bilingual works paper (cnPaperT.hi)
 ];
 
 const VIRTUAL = 'virtual:hi/';

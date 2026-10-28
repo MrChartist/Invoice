@@ -87,21 +87,29 @@ async function loadHindiAreas(): Promise<void> {
  */
 function tellWorker(next: Lang, wait: boolean): Promise<boolean> {
   const sw = typeof navigator === 'undefined' ? null : navigator.serviceWorker?.controller;
-  if (!sw) return Promise.resolve(true);
+  const msg = { type: 'lang', lang: next };
+  if (!sw || !wait) {
+    try {
+      sw?.postMessage(msg);
+    } catch {
+      /* a worker that cannot take the message: nothing to cache */
+    }
+    return Promise.resolve(true);
+  }
   return new Promise((resolve) => {
     const ch = new MessageChannel();
-    const timer = setTimeout(() => resolve(true), 20000);
-    ch.port1.onmessage = (e: MessageEvent<{ complete?: boolean }>) => {
+    const done = (complete: boolean) => {
       clearTimeout(timer);
-      resolve(e.data?.complete !== false);
+      ch.port1.close();
+      resolve(complete);
     };
+    const timer = setTimeout(() => done(true), 20000);
+    ch.port1.onmessage = (e: MessageEvent<{ complete?: boolean }>) => done(e.data?.complete !== false);
     try {
-      sw.postMessage({ type: 'lang', lang: next }, [ch.port2]);
+      sw.postMessage(msg, [ch.port2]);
     } catch {
-      clearTimeout(timer);
-      resolve(true);
+      done(true);
     }
-    if (!wait) resolve(true);
   });
 }
 
@@ -244,7 +252,8 @@ export async function initI18n(): Promise<void> {
   }
 }
 
-function subscribe(fn: () => void): () => void {
+/** Subscribe to language changes and to area Hindi arriving (what `useT()` re-renders on). */
+export function subscribe(fn: () => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }

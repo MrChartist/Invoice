@@ -76,7 +76,7 @@ const HI_LEAK_ALLOW = [
   /message-langs\./, // WhatsApp / SMS texts in Hindi, sent from an English interface too
   /keymap\./, // the bilingual shortcut sheet
   /amount-in-words-hi\./, // bilingual amount in words on printed invoices
-  /construction-r11(a|-paper)\.|works-text\./, // the bilingual works paper (HI_INLINE)
+  /construction-r11-paper\.|works-text\./, // the bilingual works paper (HI_INLINE)
   /gateway\./, // the bilingual Gateway menu (HI_INLINE)
   /einvoice-print\./, // bilingual e-invoice print
   /whats-new\./, // What's new (title + hi per row)
