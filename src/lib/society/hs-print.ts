@@ -25,5 +25,7 @@ export function societyPaper(hs: HsSnapshot): { rows: [string, string][]; heads:
   if (u?.members?.length) rows.push(['Member', u.members.join(', ')]);
   if (periodText(hs.period)) rows.push(['Period', periodText(hs.period)]);
   if (hs.due) rows.push(['Due by', hs.due.split('-').reverse().join('/')]);
+  // R18-C1: a memo (the old bills stay the receivable); the interest is a line of this bill.
+  if (hs.arrears) rows.push(['Arrears brought forward (memo)', `₹${hs.arrears.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} as at ${hs.arrears.as_of.split('-').reverse().join('/')}`]);
   return { rows, heads: (hs.heads ?? []).slice(0, 16) };
 }

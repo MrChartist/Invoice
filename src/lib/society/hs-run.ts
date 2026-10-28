@@ -9,6 +9,8 @@
 import { round2 } from '../invoice-calc';
 import { periodRange, sacFor, unitCharges } from './hs-tariff';
 import { hsRegime, regimeLines, type RegimeOut } from './hs-regime';
+import { unitDues, type DuesIndex, type InterestFn } from './hs-dues';
+import { fundOf } from './hs-funds';
 import type { Client, DocumentType, InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type {} from '../../types/services-r10';
 import type { HsHead, HsHeadRow, HsSnapshot, SocietyKind, SocietyRun, SocietySettings, SocietyUnit } from '../../types/society-r18';
@@ -26,6 +28,8 @@ export interface RunCtx {
   /** The pure-agent line text (`PURE_AGENT_CHARGE`, passed by the bridge). */
   passText: string;
   levy?: SocietyRun['levy'];
+  /** R18-C1: the units' bills and receipts before the period (arrears, interest to `asOf` = the day before it). */
+  dues?: { ix: DuesIndex; fn: InterestFn; asOf: string };
 }
 
 export interface UnitBill { unit: SocietyUnit; client: Client; regime: RegimeOut; items: InvoiceItem[]; hs: HsSnapshot }
@@ -40,10 +44,24 @@ export interface RunPlan {
 }
 
 /** R18-C / R18-D hook: rows added to a unit's bill (C1 arrears / interest, D1 fund tags). Empty in R18-B. */
-export function runExtras(_unit: SocietyUnit, _ctx: RunCtx): { rows: HsHeadRow[]; hs?: Partial<HsSnapshot> } {
-  // R18-C
+export function runExtras(unit: SocietyUnit, ctx: RunCtx): { rows: HsHeadRow[]; hs?: Partial<HsSnapshot> } {
+  const rows: HsHeadRow[] = [], hs: Partial<HsSnapshot> = {};
+  // R18-C: arrears brought forward (a memo — the old bills stay the receivable) and the interest line (counted, HS7)
+  const d = ctx.dues && unitDues(unit.id, ctx.dues.asOf, ctx.dues.ix, ctx.settings, ctx.dues.fn);
+  if (d && d.arrears > 0) hs.arrears = { amount: d.arrears, as_of: d.to };
+  if (d && d.interest > 0 && d.interest >= (ctx.settings.interest?.min_amount ?? 0)) {
+    rows.push({ head_id: 'interest', name: 'Interest on arrears', kind: 'other', basis: `${d.from} – ${d.to} @ ${d.pct} % on ₹${d.on.toLocaleString('en-IN')}`, amount: d.interest });
+    hs.interest = { amount: d.interest, from: d.from, to: d.to, pct: d.pct, on: d.on, through: d.to };
+  }
   // R18-D
-  return { rows: [] };
+  return { rows, hs };
+}
+
+/** R18-D1: the fund contributions of a bill's rows (`hs.funds`; none when no fund head). */
+function fundsOf(rows: readonly HsHeadRow[]): Partial<HsSnapshot> {
+  const f: NonNullable<HsSnapshot['funds']> = {};
+  for (const r of rows) { const k = fundOf(r.kind); if (k) f[k] = round2((f[k] ?? 0) + r.amount); }
+  return Object.keys(f).length ? { funds: f } : {};
 }
 
 /** The document kind of a society bill: `main`, `outsider` (non-member income only) or `levy:<name>`. */
@@ -113,15 +131,16 @@ export function planSocietyRun(period: string, units: readonly SocietyUnit[], he
         const id = `t${n + 1}`;
         if (l.row) { const h = hsRows.find((x) => x.head_id === l.row!.head_id && !x.line_id); if (h) h.line_id = id; }
         const sac = l.pass ? undefined : heads.find((h) => h.id === l.row?.head_id)?.sac || sacFor(l.row?.kind ?? 'service', ctx.date);
+        const cc = l.row && ctx.settings.funds?.[fundOf(l.row.kind)!]; // R18-D1: a fund head's line carries its fund
         return {
           id, name: l.name, type: 'Service', quantity: 1, rate: l.amount, amount: l.amount, tax_rate: l.tax, discount_percent: 0,
-          ...(sac ? { hsn: sac } : {}), ...(l.pass ? { description: ctx.passText, charge_head_id: 'rule33' } : {}), ...(l.exempt && regime.regime === 'taxable_excess' ? { sv: { exempt: 'EXEMPT' as const } } : {}),
+          ...(sac ? { hsn: sac } : {}), ...(cc ? { cost_centre_id: cc } : {}), ...(l.pass ? { description: ctx.passText, charge_head_id: 'rule33' } : {}), ...(l.exempt && regime.regime === 'taxable_excess' ? { sv: { exempt: 'EXEMPT' as const } } : {}),
         } as InvoiceItem;
       });
       const hs: HsSnapshot = {
         unit: { id: unit.id, code: unit.code, ...(unit.wing ? { wing: unit.wing } : {}), ...(unit.carpet_area ? { area: unit.carpet_area, area_unit: ctx.settings.area_unit ?? 'sqft' } : {}), members: [client.name] },
         period, due: ctx.due, heads: hsRows, run_id: ctx.runId, test: { counted: regime.counted, limit: regime.limit, months: regime.months }, regime: regime.regime,
-        ...(regime.decl ? { decl: regime.decl } : {}), ...(levy ? { levy } : {}), ...(d.kind === 'main' ? 'hs' in ex ? ex.hs : {} : {}),
+        ...(regime.decl ? { decl: regime.decl } : {}), ...(levy ? { levy } : {}), ...fundsOf(rows), ...(d.kind === 'main' ? 'hs' in ex ? ex.hs : {} : {}),
       };
       plan.bills.push({ unit, client, regime, items, hs });
       plan.counts[d.kind === 'outsider' ? 'outsider' : DOC_COUNT[regime.doc]]++;
