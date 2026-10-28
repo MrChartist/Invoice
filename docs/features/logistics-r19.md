@@ -383,16 +383,16 @@ booking, so a deposit edited in the Advances tab stays a deposit.
 
 ### Bundle (R19-C)
 
-Baseline: the merged base `f5c9f9b` (R19-A + R19-B) built in a separate worktree (`vite build` + `check-bundle-size`):
-initial 183.0 kB (4 files), entry 89.0 kB, core 3,226.0 kB, Hindi pack 355.7 kB, Hindi in core 21.6 kB, `lazy-leaves`
-17.6 kB. Normalized as in R19-A (chunk hashes stripped, gzip -9, 1 kB = 1,024 B).
+Baseline: the merged base `26aecaf` (R19-A + R19-B + pending 16–25; same tree as `f913864`) built in a separate worktree
+(`vite build` + `check-bundle-size`): initial 183.0 kB (4 files), entry 89.0 kB, core 3,237.7 kB, Hindi pack 356.8 kB,
+Hindi in core 21.6 kB, `lazy-leaves` 17.6 kB. Normalized as in R19-A (chunk hashes stripped, gzip -9, 1 kB = 1,024 B).
 
 | Budget | Before | After | Change (normalized) | Cap |
 |---|---|---|---|---|
-| Initial JS (first paint) | 183.0 kB (4 files) | 183.0 kB (4 files) | +22 B in the entry: its preload file list in another order (the same files; no new chunk or module; any content edit reorders it — the help text alone does, tried on the base) | 0 |
+| Initial JS (first paint) | 183.0 kB (4 files) | 183.0 kB (4 files) | +27 B in the entry: its preload file list in another order (the same files; no new chunk or module; any content edit reorders it — the help text alone does, tried on the base) | 0 |
 | Entry chunk | 89.0 kB | 89.0 kB | as above | — |
-| Core precache (English) | 3,226.0 kB | 3,232.7 kB | **+7,625 B = 7.45 kB** | 9 kB (PRD) / 12 kB ✓ |
-| Hindi pack | 355.7 kB | 356.6 kB | +0.96 kB (`lang-hi-logistics` +0.92 kB, wiring areas) | 8 kB (round) ✓ |
+| Core precache (English) | 3,237.7 kB | 3,245.8 kB | **+7,626 B = 7.45 kB** | 9 kB (PRD) / 12 kB ✓ |
+| Hindi pack | 356.8 kB | 357.8 kB | +0.96 kB (`lang-hi-logistics` +0.92 kB, wiring areas) | 8 kB (round) ✓ |
 | Hindi left in core | 21.6 kB | 21.7 kB (rounding) | +15 Devanagari characters: the help title `सीमा शुल्क` and the Ctrl+K synonym `ड्यूटी` (the A / B pattern) | — |
 | `lazy-leaves` | 17.6 kB | 17.6 kB | 0 | — |
 
