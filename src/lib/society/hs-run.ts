@@ -47,7 +47,7 @@ export interface RunPlan {
 export function runExtras(unit: SocietyUnit, ctx: RunCtx): { rows: HsHeadRow[]; hs?: Partial<HsSnapshot> } {
   const rows: HsHeadRow[] = [], hs: Partial<HsSnapshot> = {};
   // R18-C: arrears brought forward (a memo — the old bills stay the receivable) and the interest line (counted, HS7)
-  const d = ctx.dues && unitDues(unit.id, ctx.dues.asOf, ctx.dues.ix, ctx.settings, ctx.dues.fn);
+  const d = ctx.dues && unitDues(unit.id, ctx.dues.asOf, ctx.dues.ix, ctx.settings, ctx.dues.fn, unit.owner_id);
   if (d && d.arrears > 0) hs.arrears = { amount: d.arrears, as_of: d.to };
   if (d && d.interest > 0 && d.interest >= (ctx.settings.interest?.min_amount ?? 0)) {
     rows.push({ head_id: 'interest', name: 'Interest on arrears', kind: 'other', basis: `${d.from} – ${d.to} @ ${d.pct} % on ₹${d.on.toLocaleString('en-IN')}`, amount: d.interest });

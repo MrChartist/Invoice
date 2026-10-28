@@ -15,6 +15,7 @@ import { withTablesRollback } from '../table-txn';
 import { buildBatchDrafts, issueBatch, partyKey, undoBatch } from '../batch-invoices';
 import type { RecurringTemplate } from '../recurring';
 import { PURE_AGENT_CHARGE } from '../trade/pure-agent';
+import { senderStateCode } from '../../store/invoice-defaults';
 import { hsbT } from '../../i18n/areas/society-r18b';
 import { HS_TABLES } from './hs-shared';
 import { periodBills, planSocietyRun, type RunPlan, type UnitBill } from './hs-run';
@@ -64,7 +65,10 @@ export function issueRun(i: RunInput): { run?: SocietyRun; invoices: InvoiceReco
   requireAccess('doc.create');
   const plan = planRun(i);
   if (!plan.bills.length) return { invoices: [], plan, held: 0 };
-  const drafts = plan.bills.flatMap((b) => buildBatchDrafts(template(b), [{ key: partyKey(b.client), client: b.client }], { date: i.date, dueDays: days(i.date, i.due), sender: sender() }).map((d) => ({
+  // QA21 W2 (HS65): the building is the place of supply (IGST Act Sec 12(3)) — never a member's out-of-State address or
+  // GSTIN; an agency (facility manager) keeps the client's place.
+  const pos = localDb.settings.get().society_kind === 'agency' ? undefined : senderStateCode(sender()) || undefined;
+  const drafts = plan.bills.flatMap((b) => buildBatchDrafts(template(b), [{ key: partyKey(b.client), client: b.client }], { date: i.date, dueDays: days(i.date, i.due), sender: sender(), pos }).map((d) => ({
     ...d,
     // The batch builder renumbers the lines: each head row follows its line (`t<n>` → the n-th line's id).
     record: { ...d.record, hs: { ...b.hs, heads: b.hs.heads?.map((h) => ({ ...h, line_id: h.line_id ? d.record.items[Number(h.line_id.slice(1)) - 1]?.id : undefined })) } },
@@ -83,6 +87,13 @@ export function undoRun(id: string, reason: string): { cancelled: number } {
   const run = loadRuns().find((r) => r.id === id);
   if (!run?.batch_run_id || run.undone) throw new Error(hsbT('noRun'));
   if (!reason.trim()) throw new Error(hsbT('noReason'));
+  // QA21 W5: a bill with a receipt or a live credit note (an interest waiver) is never cancelled under it — the note
+  // would stay a credit on a cancelled bill. Named by unit, before anything is written.
+  const ids = new Set(getTable<{ id: string; invoice_ids?: string[] }>('batch_runs').find((b) => b.id === run.batch_run_id)?.invoice_ids ?? []);
+  const all = localDb.invoices.getAll(), live = new Set(all.filter((x) => x.status !== 'Cancelled').map((x) => x.id));
+  const busy = new Set([...getTable<{ invoice_id?: string }>('transactions').map((p) => p.invoice_id), ...getTable<{ from_id: string; to_id: string; relation: string }>('doc_links').filter((l) => l.relation === 'credit_note' && live.has(l.to_id)).map((l) => l.from_id)]);
+  const held = all.filter((x) => ids.has(x.id) && x.status !== 'Cancelled' && busy.has(x.id)).map((x) => x.hs?.unit?.code ?? x.invoice_number);
+  if (held.length) throw new Error(hsbT('undoHeld', { u: [...new Set(held)].join(', ') }));
   return withTablesRollback([HS_TABLES.runs], () => {
     const r = undoBatch(run.batch_run_id!, { cancelReason: reason.trim() });
     const at = new Date().toISOString();

@@ -50,8 +50,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV48 | 48 | 15 |
 | 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF23 | 23 | 5 |
 | 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP48 | 48 | 13 |
-| 18. Co-operative housing societies, apartment associations and RWAs (Round 18, planned) | HS1–HS64 | 64 | 18 |
-| **Total** | | **679** | **170** |
+| 18. Co-operative housing societies, apartment associations and RWAs (Round 18, planned) | HS1–HS70 | 70 | 19 |
+| **Total** | | **685** | **171** |
 
 ---
 
@@ -1358,8 +1358,14 @@ societies and maintenance agencies billing owners.
 | HS62 | (R18-D3) Audit tracker: due date = `audit_due_months` after 31 March (TN 3, KA 6), typed for MH; bell notices from 30 days before (critical from 7 days and when overdue) until the report date is entered. Right, and is the MH rectification report's time limit to be tracked too (HS31)? | As stated | `society/hs-registers.ts` `auditDue`, `hs-alerts.ts` | — | TN Act s.21, KA Bill s.28 (read, R18-A) |
 | HS63 | (R18-D4) Mutuality working paper: member heads billed (interest on arrears from members included) are shown as mutual; non-member heads plus interest / dividend income ledgers as non-mutual. Is interest charged to members on arrears mutual income, or taxable (HS20)? | Mutual | `society/hs-itax.ts` `mutualSplit`, `hs-books-io.ts` `itaxFigures` | — | — |
 | HS64 | (R18-D4) Deduction lines (Sec 80P to FY 2025-26; Sec 149 from 1 Apr 2026, `verified: false`) are shown only for a co-operative housing society (`society_kind: 'chs'`); an apartment owners' association / RWA (AOP) gets mutuality only. Right? | As stated | `society-rules.ts` `INCOME_TAX_SOCIETY_RULES`, `hs-itax.ts` `itaxLines` | 2026-04-01 | Income-tax Act 2025 Sec 149 (S, HS21) |
+| HS65 ★ | (QA21 W2) Place of supply of a society's / association's bill to a member: the building's State (the society's own, IGST Act Sec 12(3) — services directly in relation to immovable property), never the member's out-of-State address or GSTIN; CGST + SGST, GSTR-1 POS = the society's State. A facility-management agency (`agency`) keeps the client's place. Right, and does Sec 12(3) reach every member head (sinking / repair fund, parking, non-occupancy, interest)? | Building's State | `society/hs-issue-io.ts` (`pos`), `batch-invoices.ts` `BatchContext.pos` | 2017-07-01 | IGST Act Sec 12(3) (recalled) |
+| HS66 | (QA21 W3) After a transfer of membership the outgoing member's unpaid bills stay his receivable: the incoming member's bill carries no arrears memo or interest on them, and his Dues row / receipt split read only his own bills; a dues certificate for the unit still lists every open bill. Right (bye-laws: dues of the transferor are settled before transfer)? | As stated | `society/hs-dues.ts` `unitDues(…, owner)` | — | MH model bye-laws (recalled) |
+| HS67 | (QA21 W4) Fund transfers (contributions billed → fund) are posted by one kind of period per FY: a transfer for a month / quarter is refused when a wider journal (quarter, year-end) already covers part of it. Is one mode per FY acceptable for the society's audit? | As stated | `society/hs-books-io.ts` `moved` | — | — (design) |
+| HS68 | (QA21) MCS (Amendment) Rules 2026: the notification is dated 18 Jun 2026; reports give 22 Jun 2026 (Gazette) or 30 Jun 2026 as the effective date (the reproduced text has no commencement clause). Rule 106C-12: interest "at the rate fixed by the general body not exceeding simple interest 12% per annum" (secondary copy). Which date does the 21 % → 12 % cap change from? | 2026-06-22 (row `verified: false`) | `society-rules.ts` `STATE_SOCIETY_RULES` (MH) | 2026-06-22 | taxguru (reproduced text, S); FPJ / ksandk (S) |
+| HS69 | (QA21) Income-tax Act 2025 Sec 149(2)(c): secondary summaries give ₹1,00,000 for a consumers' co-operative society and ₹50,000 for other societies; (2)(d) interest / dividend from other co-operative societies in full; co-operative banks excluded under (5); the deduction forgone under a concessional regime. Confirm for a housing society (the app shows ₹50,000). | ₹50,000 | `society-rules.ts` `INCOME_TAX_SOCIETY_RULES` | 2026-04-01 | taxguru, thetaxcorp (S); incometaxindia.gov.in not reachable (403) |
+| HS70 | (QA21 W5 / W6) An interest waiver is one financial credit note per bill (no GST), all or nothing; a run whose bills carry a waiver note or a receipt cannot be undone until they are removed. On a taxable bill the waived interest included 18 % GST: should the waiver be a GST credit note (Sec 34) reducing output tax instead? | No GST on the note | `society/hs-dues-io.ts` `waiveInterest`, `hs-issue-io.ts` `undoRun` | — | CGST Act Sec 15(2)(d), Sec 34 (recalled) |
 
-`HS` ids are counted once here. The ★ items (HS1, HS2, HS3, HS4, HS6, HS8, HS11, HS13, HS20, HS21, HS26, HS33, HS39, HS45, HS46, HS47, HS52, HS59)
+`HS` ids are counted once here. The ★ items (HS1, HS2, HS3, HS4, HS6, HS8, HS11, HS13, HS20, HS21, HS26, HS33, HS39, HS45, HS46, HS47, HS52, HS59, HS65)
 change what a document prints or a return reports.
 
 ## Answers log

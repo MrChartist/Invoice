@@ -4,6 +4,7 @@
  * total is a warning, never a block. Writes live in `hs-units-save.ts` (which imports the registry).
  */
 import { round2 } from '../invoice-calc';
+import { hsT } from '../../i18n/areas/society-r18a';
 import type { Client } from '../../types/invoice';
 import type { ClientHs, HsOccupancy, HsSlotKind, HsUnitUse, SocietyUnit } from '../../types/society-r18';
 
@@ -16,10 +17,10 @@ const key = (c: string) => c.trim().toLowerCase();
 
 /** The first problem with a unit (code missing / taken, a negative or non-number area or cost), else ''. */
 export function validateUnit(u: Pick<SocietyUnit, 'id' | 'code' | (typeof NUMS)[number]>, units: readonly Pick<SocietyUnit, 'id' | 'code'>[]): string {
-  if (!u.code?.trim()) return 'Type the unit code (A-101).';
-  if (units.some((x) => x.id !== u.id && key(x.code) === key(u.code))) return `Unit ${u.code.trim()} already exists.`;
-  for (const f of NUMS) if (u[f] !== undefined && !(Number(u[f]) >= 0)) return `${f}: 0 or more.`;
-  return (u.undivided_pct ?? 0) > 100 ? 'Undivided % above 100.' : '';
+  if (!u.code?.trim()) return hsT('eCode'); // QA21 W8: translated when called
+  if (units.some((x) => x.id !== u.id && key(x.code) === key(u.code))) return hsT('eTaken', { c: u.code.trim() });
+  for (const f of NUMS) if (u[f] !== undefined && !(Number(u[f]) >= 0)) return hsT('eNum', { f });
+  return (u.undivided_pct ?? 0) > 100 ? hsT('eUndiv') : '';
 }
 
 const live = (u: SocietyUnit) => u.status !== 'closed' && u.status !== 'merged';
@@ -28,7 +29,7 @@ const live = (u: SocietyUnit) => u.status !== 'closed' && u.status !== 'merged';
 export function unitWarnings(units: readonly SocietyUnit[]): string[] {
   const pct = units.filter((u) => live(u) && typeof u.undivided_pct === 'number');
   const sum = round2(pct.reduce((t, u) => t + (u.undivided_pct ?? 0), 0));
-  return pct.length && Math.abs(sum - 100) > 0.01 ? [`Undivided % adds up to ${sum}, not 100.`] : [];
+  return pct.length && Math.abs(sum - 100) > 0.01 ? [hsT('wUndiv', { s: sum })] : [];
 }
 
 /** A clean unit to store: trimmed code, empty optionals dropped, a tenant only on a let unit (use / occupancy come from pickers). */

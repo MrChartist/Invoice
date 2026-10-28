@@ -23,7 +23,7 @@ export function societySuggestions(lines: readonly BankLine[]): RuleSuggestion[]
   return credits.flatMap((l): RuleSuggestion[] => {
     const u = matchUnitInNarration(l.narration, units);
     if (!u) return [];
-    const d = unitDues(u.id, l.date, ix, {}, (() => ({ segments: [] })) as unknown as InterestFn); // open bills only (no interest)
+    const d = unitDues(u.id, l.date, ix, {}, (() => ({ segments: [] })) as unknown as InterestFn, u.owner_id); // open bills only (no interest)
     const fit = amountFits(l.credit, d.bills.filter((b) => b.open > 0).map((b) => b.open), d.arrears);
     return [{ lineId: l.id, source: 'rule', action: { kind: 'receipt', client_id: u.owner_id }, label: `${u.code}${fit === 'bill' ? ' = open bill' : fit === 'dues' ? ' = dues' : ''}` }];
   });
