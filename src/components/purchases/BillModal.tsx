@@ -43,6 +43,7 @@ const RcmGoodsNotice = lazy(() => import('../trade/RcmGoodsNotice'));
 const MediaRows = lazy(() => import('../prof/MediaRows')); // R14 (PS-B5): media buy for a client (`media` pack)
 const TripPick = lazy(() => import('../travel/TripPick')); // R15-B2 / B3: the trip of a supplier bill (`travel` / `events` packs)
 const SitePick = lazy(() => import('../manpower/SitePick')); // R17-C2: the site of a supplier bill (`manpower` / `security` packs)
+const JobPick = lazy(() => import('../logistics/JobPick')); // R19-B3: the job of a supplier bill (logistics packs; C / D reuse it)
 const HsRcmHint = lazy(() => import('../society/parts/RcmHint')); // R18-B3: inward RCM on security services (`society` pack)
 // R8-A (TR-A1): supplier's special rate and last purchase rate, as hints (trade discounts or a trading pack, lazy).
 const BillRateHints = lazy(() => import('../trade/BillRateHints'));
@@ -172,6 +173,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const [mediaOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('media'))(localDb.settings.get() as never));
   const [tvB, setTvB] = useState(purchase?.tv); // R15-B2 / B3
   const [mpB, setMpB] = useState(purchase?.mp); // R17-C2
+  const [lgB, setLgB] = useState(purchase?.lg); // R19-B3
+  const [lgOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.some((p) => ['logistics', 'customs', 'courier', 'warehouse'].includes(p)))(localDb.settings.get() as never));
   const [manpowerOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.some((p) => p === 'manpower' || p === 'security'))(localDb.settings.get() as never));
   const [travelOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.some((p) => p === 'travel' || p === 'events'))(localDb.settings.get() as never));
   const [societyOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('society'))(localDb.settings.get() as never)); // R18-B3
@@ -282,6 +285,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         ...(psB !== (purchase as { ps?: unknown } | undefined)?.ps ? { ps: psB } : {}), // R14 (PS-B5)
         tv: tvB, // R15-B2
         mp: mpB, // R17-C2
+        lg: lgB, // R19-B3
         cost_centre_id: costCentre,
         branch_id: branchId,
         attachments: attachments.length ? attachments : undefined,
@@ -506,6 +510,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       {(travelOn || !!tvB) && <Suspense fallback={null}><TripPick value={tvB} onChange={setTvB} itc={itc} setItc={setItc} /></Suspense>}
       {societyOn && !importType && <Suspense fallback={null}><HsRcmHint lines={lines} vendor={vendor} date={date} rcm={rcm} /></Suspense>}
       {(manpowerOn || !!mpB) && <Suspense fallback={null}><SitePick value={mpB} onChange={setMpB} /></Suspense>}
+      {(lgOn || !!lgB) && <Suspense fallback={null}><JobPick value={lgB} onChange={setLgB} /></Suspense>}
 
       <AttachmentsPanel value={attachments} onChange={setAttachments} label={purT('attachments')} />
 

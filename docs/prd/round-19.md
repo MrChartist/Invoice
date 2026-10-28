@@ -652,6 +652,8 @@ quotation → job copies).
 
 ### R19-B — Billing, GST and job costing
 
+Status: built (R19-B). B1, B2, B4 in full; B3 without the accrual journals (§3 cut 2); B1's "Share" and a job page tab, the e-Invoice GTA hint and B's demo invoices left out — `docs/features/logistics-r19.md` § R19-B.
+
 #### B1 Billing a job
 
 **User story.** Job 0001 is delivered. Its charge sheet shows air freight USD 1,000 (500 kg × USD 2.00) at ₹84.00 =
