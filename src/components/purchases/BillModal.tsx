@@ -213,7 +213,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const supplierPayable = supplierPayableOf({ reverseCharge: rcm && !importType, importType: importType || '', tax: totals.tax, taxable: totals.taxable, total: totals.total, cess: totals.cess, tdsOnBill });
 
   const submit = () => {
-    if (tvB?.regime === 'to5' && itc && !blocked && !tvB.itc_reason?.trim()) return setError('Give the reason for claiming ITC on a 5 % trip, or untick ITC (TV8).'); // R15-B3
+    if (tvB?.regime === 'to5' && itc && !blocked && !tvB.itc_reason?.trim()) return setError('ITC on a 5 % trip needs a reason (TV8).'); // R15-B3
     if (!vendor && !init?.vendor_name) return setError(purT('errVendor'));
     if (!billNumber.trim()) return setError(purT('errBillNo'));
     if (!date) return setError(purT('errBillDate'));
