@@ -12,7 +12,7 @@ export const bT = defineArea(
     house: 'House folio', client: 'Client', item: 'Catalogue item', post: 'Post charge', split: 'Split', transfer: 'Transfer', void: 'Void',
     window: 'Window', toFolio: 'To folio', moved: 'from {f}', pin: 'Owner PIN (above the void limit)', pinBad: 'Wrong PIN.',
     proforma: 'Pro-forma — not a tax invoice', 'bk.guest': 'Guest', 'bk.company': 'Company', 'bk.agent': 'Travel agent',
-    routing: 'Window {w} kinds', tdsDefault: 'TDS deducted', commissionPct: 'Commission %', commission: 'Agent commission due {a} (194H): book it as a bill when the agent invoices — verify with your CA.',
+    routing: 'Window {w} kinds', tdsDefault: 'TDS deducted', commissionPct: 'Commission %', commission: 'Agent commission due {a} (194H): book it as a bill when the agent invoices — verify with your CA.', agentBill: 'Agent commission bill', agentDone: 'Commission bill draft saved with 194H — post it from the bill drafts.', // R16-C5
     interim: 'Interim invoice', interimDue: 'Interim invoice due ({d})', company: 'Guest company',
     adv: 'Advance', pay: 'Payment', credit: 'Payment (else on credit)', rateChip: 'Rate changed on {d} — {n} nights affected',
     saveInvoices: 'Save invoices', saved: 'Saved: {n}', 'band.low': '5% band', 'band.high': '18% band', 'band.mixed': 'Mixed bands',
@@ -29,7 +29,7 @@ export const bT = defineArea(
     house: 'हाउस फ़ोलियो', client: 'ग्राहक', item: 'कैटलॉग आइटम', post: 'शुल्क जोड़ें', split: 'बाँटें', transfer: 'ट्रांसफ़र', void: 'रद्द करें',
     window: 'विंडो', toFolio: 'किस फ़ोलियो में', moved: '{f} से', pin: 'मालिक का PIN (रद्द सीमा से ऊपर)', pinBad: 'गलत PIN।',
     proforma: 'प्रो-फ़ॉर्मा — टैक्स इनवॉइस नहीं', 'bk.guest': 'मेहमान', 'bk.company': 'कंपनी', 'bk.agent': 'ट्रैवल एजेंट',
-    routing: 'विंडो {w} के प्रकार', tdsDefault: 'काटा गया TDS', commissionPct: 'कमीशन %', commission: 'एजेंट कमीशन देय {a} (194H): एजेंट का बिल आने पर बिल दर्ज करें — CA से जाँचें।',
+    routing: 'विंडो {w} के प्रकार', tdsDefault: 'काटा गया TDS', commissionPct: 'कमीशन %', commission: 'एजेंट कमीशन देय {a} (194H): एजेंट का बिल आने पर बिल दर्ज करें — CA से जाँचें।', agentBill: 'एजेंट कमीशन बिल', agentDone: '194H सहित कमीशन बिल ड्राफ़्ट सहेजा — बिल ड्राफ़्ट से पोस्ट करें।',
     interim: 'अंतरिम इनवॉइस', interimDue: 'अंतरिम इनवॉइस देय ({d})', company: 'मेहमान की कंपनी',
     adv: 'एडवांस', pay: 'भुगतान', credit: 'भुगतान (वरना उधार)', rateChip: '{d} को दर बदली — {n} रातें प्रभावित',
     saveInvoices: 'इनवॉइस सेव करें', saved: 'सेव हुआ: {n}', 'band.low': '5% बैंड', 'band.high': '18% बैंड', 'band.mixed': 'मिले-जुले बैंड',
