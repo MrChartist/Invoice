@@ -4,6 +4,8 @@
  * U7 a re-issue whose fare difference is negative credits EXACTLY that difference (the credit note rounded the derived
  *    quantity to 2 decimals: ₹800 on a ₹5,350 fare became ₹802.50), and the note stays out of GSTR-1 values like the
  *    pure-agent fare line it credits.
+ * U8 R16-D1 (netting to a hand-linked vendor's own creditor ledger) was fixed in the app's ledger only: the Tally XML
+ *    journal and the receipts CSV still debited "<client> (Creditor)", leaving the supplier's ledger at the full bill.
  */
 import './helpers/shim.ts';
 import { beforeEach, test } from 'node:test';
@@ -44,4 +46,34 @@ test('U7: a negative re-issue difference credits exactly that amount; the note i
   const g = buildGstReport(localDb.invoices.getAll(), [], { period: { kind: 'fy', fyStart: 2026 }, gstin: '27AAPFU0939F1ZV' });
   const noteRows = [...g.gstr1.cdnr, ...g.gstr1.cdnur, ...g.gstr1.b2b].filter((x) => JSON.stringify(x).includes(cn.invoice_number));
   assert.ok(noteRows.every((x) => !(x as { taxable?: number }).taxable), `CDN rows carry no taxable value: ${JSON.stringify(noteRows)}`);
+});
+
+/* ── U8: R16-D1's netting fix reaches the Tally XML and the receipts CSV ── */
+test('U8: netting with a hand-linked vendor (another name): Tally debits the supplier\'s own ledger (Agst Ref the bill); CSV deposits to it', async () => {
+  const { createViaStore } = await import('./helpers/world.ts');
+  const { vendorsDb } = await import('../src/lib/vendors.ts');
+  const { purchasesDb } = await import('../src/lib/purchases.ts');
+  const { postNetting } = await import('../src/lib/netting.ts');
+  const { buildTallyModel } = await import('../src/lib/tally-xml.ts');
+  const { receipts } = await import('../src/lib/accounting-export.ts');
+  const who = { ...clientMH, name: 'Mehta Tours', gstin: '' };
+  const clientId = localDb.clients.upsert(who);
+  const vendor = vendorsDb.save({ name: 'Mehta Travels Pvt Ltd', client_id: clientId } as never);
+  const a = createViaStore({ date: '2026-05-01', lines: [{ qty: 1, rate: 65000, tax: 0 }], client: { ...who, id: clientId } });
+  const p = purchasesDb.save({
+    kind: 'PURCHASE', vendor_name: 'Mehta Travels Pvt Ltd', vendor_id: vendor.id, bill_number: 'MT-77', date: '2026-05-10', category: 'Purchases',
+    lines: [{ id: 'l1', name: 'Holiday packages', quantity: 1, rate: 180000, tax_rate: 0 }],
+    taxable: 180000, cgst: 0, sgst: 0, igst: 0, itc_eligible: false, total: 180000, amount_paid: 0,
+  } as never);
+  postNetting({ clientId, vendorId: vendor.id, invoiceIds: [a.id], billIds: [p.id], amount: 65000, date: '2026-06-01' });
+  const src = { invoices: localDb.invoices.getAll(), payments: localDb.payments.getAll(), clients: localDb.clients.getAll(), items: [], purchases: purchasesDb.all(), vendors: vendorsDb.all() };
+  const b = buildTallyModel(src as never, { companyName: 'X', includeReceipts: true, includePurchases: true } as never);
+  const bal = (name: string) => b.vouchers.flatMap((v) => v.entries).filter((e) => e.ledger === name).reduce((s, e) => s + (e.side === 'Dr' ? e.paise : -e.paise), 0) / 100;
+  assert.equal(bal('Mehta Travels Pvt Ltd'), -115000, 'supplier ledger: Cr 1,15,000 left (bill 1,80,000 − netted 65,000)');
+  assert.equal(bal('Mehta Tours'), 0, 'client ledger settled');
+  assert.ok(!b.ledgers.some((l) => l.name === 'Mehta Tours (Creditor)'), 'no phantom creditor ledger in the client\'s name');
+  const j = b.vouchers.find((v) => v.type === 'Journal')!;
+  assert.deepEqual(j.entries.map((e) => [e.ledger, e.side]), [['Mehta Travels Pvt Ltd', 'Dr'], ['Mehta Tours', 'Cr']]);
+  const csv = receipts(src as never);
+  assert.equal(csv.rows[0][5], 'Mehta Travels Pvt Ltd', 'receipts CSV: deposited to the supplier\'s ledger');
 });
