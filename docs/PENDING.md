@@ -57,7 +57,7 @@ figure, blocks a workflow or makes a vertical unusable at scale · **M** missing
 
 | # | Item | Impact | Size | Source |
 |---|---|---|---|---|
-| 16 | Job Work In service invoice: suggest the job-charges class from `TEXTILE_CLASS_RULES` (R16 "left as found") | L | S | `mfg-r13.md` MF-C |
+| 16 | **Done** (`mfg/mf-jw-class.ts`, class picker on the job charges invoice) — Job Work In service invoice: suggest the job-charges class from `TEXTILE_CLASS_RULES` (R16 "left as found") | L | S | `mfg-r13.md` MF-C |
 | 17 | Capital-grant form: make `asset_account_id` pickable (default is capital-subsidy reserve, MF63) | L | S | `mfg-r13.md` MF-D |
 | 18 | Vendor / client form "Farmer" section (farmers edited only on Farm → Farmers) | L | S | `agri-r12.md` AG-A |
 | 19 | Dairy analyser profile row in POS device settings (set on Dairy → Collection today) | L | S | `agri-r12.md` AG-B |

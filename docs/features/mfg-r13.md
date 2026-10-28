@@ -176,8 +176,10 @@ test row; `mf-registry` counts `CUT` / `KPB` once). E2E: step "R13-C garments de
 - **Bundle scan** is on the Bundles view (operation, karigar, rejects, last step), not inside MF-A's operator screen;
   `jc_entry_id` on a bundle step links it to a job-card entry when one is typed, so a piece is never counted twice.
 - **Garment output**: `reportFinished` writes one journal per variant child; the order's own output dialog (R4-A) is unchanged.
-- **Job charges class suggestion on the Job Work In service invoice** (C3-4) is not wired into the editor; the classes are in
-  `TEXTILE_CLASS_RULES` and the piece bill uses `jw_textile`.
+- **Job charges class suggestion on the Job Work In service invoice** (C3-4, PENDING #16): the job charges invoice dialog
+  (Job work → Job work in) pre-picks the class from the HSN chapter of the principal's goods received on the order
+  (`mfg/mf-jw-class.ts`: ch 50–63 `jw_textile`, ch 48 / 49 `jw_print_ch48_49`, else `jw_other`) and fills its dated rate;
+  the user can pick another class or type a rate (typed wins). The piece bill still uses `jw_textile`.
 - **5C e-way**: `dispatchFrom` exists for the invoice e-way; no button on the invoice e-way dialog yet.
 - **Demo**: no CMT challan (it needs job-worker godowns and stock moves); 10 bundles of 30 rather than 12.
 
