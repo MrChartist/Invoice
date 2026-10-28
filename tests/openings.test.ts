@@ -22,6 +22,7 @@ import {
   interestOnBalances,
   ledgerBalanceSheet,
   ledgerInterest,
+  ledgerInterestReport,
   loadBooksBegin,
   loadLedgerInput,
   loadOpenings,
@@ -260,6 +261,20 @@ test('interest on a ledger: simple interest on daily balances, by side', () => {
   assert.deepEqual(acc.interest, { rate: 12, on: 'dr' });
   const ledger = buildLedger(input({ userAccounts: [acc], ledgerOpenings: [op(acc.id, 1_00_000_00), op(A.bank, -1_00_000_00)] }));
   assert.equal(ledgerInterest(ledger, acc.id, p, acc.interest!).onDebit, 98630);
+});
+
+test('PENDING 35: ledger-wise interest report lists loans given (own parameters) and taken (loan master rate)', () => {
+  const p = { start: '2026-04-01', end: '2026-04-30' };
+  const given = saveUserAccount({ code: '3601', name: 'Loan to Ravi', group: 'LOANS_ADV_ST', interest: { rate: 12, on: 'dr' } });
+  const taken = saveUserAccount({ code: '2101', name: 'HDFC term loan', group: 'LOANS_LT' });
+  const ledger = buildLedger(input({ userAccounts: [given, taken], ledgerOpenings: [op(given.id, 1_00_000_00), op(taken.id, -73_000_00), op(A.bank, -27_000_00)] }));
+  const rows = ledgerInterestReport(ledger, p, new Map([[taken.id, { rate: 10, on: 'cr' as const }]]));
+  assert.deepEqual(rows.map((r) => [r.account.name, r.source, r.onDebit, r.onCredit]), [
+    ['HDFC term loan', 'loan', 0, 60000], // 73,000 × 10% × 30 / 365 = 600.00
+    ['Loan to Ravi', 'ledger', 98630, 0],
+  ]);
+  assert.equal(rows[1].closing, 1_00_000_00);
+  assert.equal(ledgerInterestReport(ledger, p).length, 1, 'without the loan master only ledgers with parameters');
 });
 
 test('roles: openings need books.edit (viewer refused, clerk allowed)', () => {

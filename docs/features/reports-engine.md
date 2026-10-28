@@ -125,6 +125,11 @@ import { loadLedger, loadStockValuer } from '…/lib/ledger';
   month / quarter (`reportPeriodOfRange`, else the previous month as before) and a period picked there becomes the shared
   one; **Inventory** movement / analysis read and set it (`setPeriodRange` keeps a rolling preset when the range is one).
   Tests: `tests/period-shared.test.ts`.
+- **Interest (ledgers)** (PENDING 35, GAP P1-7): Books → Reports → "Interest (ledgers)" — `ledgerInterestReport(ledger,
+  period, extra)` (`ledger/ledger-interest.ts`): every ledger with interest parameters (Masters → Ledger → Interest: rate,
+  Dr / Cr / both side) plus each business-loan ledger at its loan rate on credit balances, with opening, closing, interest
+  receivable / payable (simple, daily closing balance) and a drill into the balance slices; CSV. Report only: booking the
+  interest stays a journal (or the loan EMI). Test in `tests/openings.test.ts`.
 - **Ratio Analysis** (P1-1): reuses the TDS package's `src/lib/ledger/ratios.ts` / Books → Ratio analysis tab;
   WP-2 added an optional 4th argument `ratioAnalysis(ledger, period, asOf, stock?)` so stock-in-hand, current assets,
   gross / net profit and the stock ratios include the valued closing stock (the tab passes `loadStockValuer()`).
