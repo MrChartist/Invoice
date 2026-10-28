@@ -18,12 +18,13 @@ import type { Client, InvoiceRecord, Payment } from '../types/invoice';
 import { KEYS, getTable, peekTable } from '../lib/storage';
 import type { CreditLinkRow } from '../lib/amount-due';
 import type { PosReturn } from '../lib/pos-returns';
+import type { Settlement } from '../types/marketplace-r5';
 import type { AdvanceRecord } from '../types/advances';
 import { loadReceivableOpeningBills } from '../lib/opening-bills';
 import { createLateFeeInvoice, describeClientLateFee, lateFeeRuleFor, type ClientLateFee } from '../lib/late-fee';
 import {
   AGING_BUCKETS, agingCsv, buildLedger, buildReceivables, buildStatementText, computeDso,
-  currenciesIn, debtorShare, monthlyCollections, overallEfficiency, posRefunds, topDebtors,
+  currenciesIn, debtorShare, monthlyCollections, overallEfficiency, posRefunds, settlementRefunds, topDebtors,
   type PartyReceivable, type ReceiptRow,
 } from '../lib/receivables';
 import { formatMoney, formatCurrency, formatDate, todayInput, toDateInput } from '../lib/utils';
@@ -127,7 +128,7 @@ function loadData() {
     // Bill-wise opening outstandings (WP-1 masters): age and appear in statements like invoices.
     openingBills: loadReceivableOpeningBills(clients),
     // POS refunds / exchanges pay a credit note back (QA-3 F2).
-    refunds: posRefunds(getTable<PosReturn>('pos_returns')),
+    refunds: [...posRefunds(getTable<PosReturn>('pos_returns')), ...settlementRefunds(getTable<Settlement>('settlements'))], // + R5-A7 later-settlement refunds
   };
 }
 

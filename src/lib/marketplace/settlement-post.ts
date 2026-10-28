@@ -20,7 +20,7 @@
  * Working paper — verify with your CA.
  */
 import type { Payment } from '../../types/invoice';
-import type { SalesChannel, Settlement, SettlementBucket, SettlementLine } from '../../types/marketplace-r5';
+import type { SalesChannel, Settlement, SettlementBucket } from '../../types/marketplace-r5';
 import type { PurchaseRecord } from '../../types/purchases';
 import { num, round2 } from '../invoice-calc';
 import { getTable, peekTable, setTable } from '../storage';
@@ -36,6 +36,7 @@ import { readPurchase } from '../purchase-normalize';
 import { senderStateCode } from '../../store/invoice-defaults';
 import { channelById, SETTLEMENTS_TABLE } from './channels';
 import { FEE_BUCKETS, SettlementError } from './settlement-import';
+import { nettedRefundLines } from '../receivables';
 
 export const MARKETPLACE_FEES_ACCOUNT = 'Marketplace fees';
 export const TCS_RECEIVABLE_ACCOUNT = 'GST TCS receivable';
@@ -142,12 +143,10 @@ export function postSettlement(settlementId: string, opts: PostOptions = {}): Se
         if (l.order_id) docOfOrder.set(l.order_id.trim().toLowerCase(), l.doc_id);
       } else onAccount = round2(onAccount + l.amount);
     }
-    const nettedRefund = new Set<SettlementLine>();
-    for (const l of s.lines) {
-      const docId = l.bucket === 'refund' && l.order_id ? docOfOrder.get(l.order_id.trim().toLowerCase()) : undefined;
-      if (!docId) continue;
+    const nettedRefund = nettedRefundLines(s.lines); // the one rule, shared with Receivables (`settlementRefunds`)
+    for (const l of nettedRefund) {
+      const docId = docOfOrder.get(l.order_id.trim().toLowerCase())!;
       saleByDoc.set(docId, round2((saleByDoc.get(docId) ?? 0) + l.amount));
-      nettedRefund.add(l);
     }
     const payment_ids: string[] = [];
     for (const [docId, amount] of saleByDoc) {

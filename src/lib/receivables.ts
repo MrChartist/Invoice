@@ -30,6 +30,7 @@ import { linkedCredits, type CreditLinkRow } from './amount-due';
 import { effectiveDueDate } from './payment-schedule';
 import { FINANCIAL_REASON_LABELS, isFinancialNote } from './financial-note';
 import type { PosReturn } from './pos-returns';
+import type { Settlement, SettlementLine } from '../types/marketplace-r5';
 import { raDueSplit } from './works/ra-due'; // R5-B5 (pure, tiny)
 
 /** 8.100: ageing follows the earliest unpaid instalment of a payment schedule (else the due date). */
@@ -81,6 +82,34 @@ export function posRefunds(rows: readonly PosReturn[] | null | undefined): Credi
       ref: r.credit_note_number,
       method: r.settlement === 'exchange' ? 'Exchange' : methods.join(' + ') || 'Cash',
     });
+  }
+  return out;
+}
+
+/**
+ * R5-A4.5: refund lines a settlement nets off its own sale receipt (same order, sale line with a document in the SAME
+ * settlement). Every other refund line is paid out through the settlement journal (Dr Sundry debtors).
+ */
+export function nettedRefundLines(lines: readonly SettlementLine[]): Set<SettlementLine> {
+  const sold = new Set<string>();
+  for (const l of lines) if ((l.bucket === 'sale' || l.bucket === 'shipping_recovered') && l.doc_id && l.order_id) sold.add(l.order_id.trim().toLowerCase());
+  return new Set(lines.filter((l) => l.bucket === 'refund' && !!l.order_id && sold.has(l.order_id.trim().toLowerCase())));
+}
+
+/**
+ * PENDING 27 (R5-A7): refunds paid out in a POSTED settlement other than the sale's — the journal debits the customer,
+ * so the refund uses up its credit note's credit here too (else the customer shows in credit). Lines whose document
+ * is not a credit note are ignored by `buildReceivables`.
+ */
+export function settlementRefunds(rows: readonly Settlement[] | null | undefined): CreditRefundInput[] {
+  const out: CreditRefundInput[] = [];
+  for (const s of rows ?? []) {
+    if (!s?.posted || !Array.isArray(s.lines)) continue;
+    const netted = nettedRefundLines(s.lines);
+    for (const l of s.lines) {
+      if (l.bucket !== 'refund' || !l.doc_id || netted.has(l) || !(-num(l.amount) > 0)) continue;
+      out.push({ credit_note_id: l.doc_id, date: s.deposit_date, amount: round2(-num(l.amount)), ref: s.settlement_id, method: 'Marketplace settlement' });
+    }
   }
   return out;
 }

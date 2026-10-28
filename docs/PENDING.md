@@ -73,7 +73,7 @@ figure, blocks a workflow or makes a vertical unusable at scale · **M** missing
 
 | # | Item | Impact | Size | Source |
 |---|---|---|---|---|
-| 27 | R5-A7: a marketplace refund paid in a later settlement shows the customer in credit on Receivables; per-order months above 3,000 rows are slow | M | M | `ROADMAP.md` R5-A7, [`features/marketplace-r5.md`](features/marketplace-r5.md) |
+| 27 | ~~R5-A7: a marketplace refund paid in a later settlement shows the customer in credit on Receivables~~ — **done** (`settlementRefunds`); per-order months above 3,000 rows are slow — **already done** (one `saveMany` write, QA21 W10) | M | M | `ROADMAP.md` R5-A7, [`features/marketplace-r5.md`](features/marketplace-r5.md) |
 | 28 | R5-B7: ~~a cancelled RA bill's RA number is issued again~~ — **done** (`nextRaNo`); RA abstract / LR annexure print as own pages, not through the annexure component — **skipped** (a print-path redesign; the own pages work) | M | S | `ROADMAP.md` R5-B7, [`features/transport-works-r5.md`](features/transport-works-r5.md) |
 | 29 | R5-C7: gifts in kind create no voucher; FC-4 lists totals, not the portal's line items | L | S | `ROADMAP.md` R5-C7 |
 | 30 | R6-C7: GSTR-9 7C / 7D split of a combined Rule 42 / 43 journal (CA input first); a list-row issue without `issueDraft` takes no balance snapshot (no user path today) | M | S | `ROADMAP.md` R6-C7, [`features/closures-r6.md`](features/closures-r6.md) |
