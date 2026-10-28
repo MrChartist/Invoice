@@ -6,7 +6,7 @@
  * warns and links the first bill). All or nothing. R17-D1: arrears notes of a wage revision (`makeArrears`). Working papers — verify with your CA (MP6, MP10, MP11, MP14).
  */
 import type { Client, InvoiceRecord } from '../../types/invoice';
-import type { MpSnapshot, WageRevision } from '../../types/manpower-r17';
+import type { MpSnapshot, SiteMuster, WageRevision } from '../../types/manpower-r17';
 import { generateId } from '../storage';
 import { requireAccess } from '../access';
 import { localDb } from '../localDb';
@@ -19,14 +19,25 @@ import { loadMusters, loadStaff, monthEnd } from './mp-muster';
 import { mpArrears, type ArrearNote } from './mp-arrears';
 import { createDebitNote } from '../documents';
 import { todayInput } from '../utils';
+import { round2 } from '../invoice-calc';
 import { billPlans, billsOf, type BillPlan } from './mp-bill';
 import { readManpowerSettings } from './mp-settings';
 import { clientTds, gstTdsHint } from './mp-tds-io';
 
-/** The month's bill plans (nothing written). */
-export function planMonth(month: string): BillPlan[] {
-  return billPlans({ month, sites: loadSites(), musters: loadMusters(month), settings: readManpowerSettings(), clients: localDb.clients.getAll(), entityType: firmForm(), staff: loadStaff(), newId: generateId });
+/**
+ * The month's bill plans (nothing written). `keep` picks the musters to plan from (QA20 V1: billing leaves out a
+ * muster a live bill already covers, so a group bill made after one of its sites was billed never bills it twice).
+ */
+export function planMonth(month: string, keep?: (m: SiteMuster) => boolean): BillPlan[] {
+  const musters = loadMusters(month);
+  return billPlans({ month, sites: loadSites(), musters: keep ? musters.filter(keep) : musters, settings: readManpowerSettings(), clients: localDb.clients.getAll(), entityType: firmForm(), staff: loadStaff(), newId: generateId });
 }
+
+/** QA20 V1: the plans of the musters no live bill covers yet (the view's "Unbilled" column). */
+export const planUnbilled = (month: string): BillPlan[] => {
+  const all = localDb.invoices.getAll();
+  return planMonth(month, (m) => !billsOf(all, m.id).length);
+};
 
 export interface BillResult { invoices: InvoiceRecord[]; skipped: string[]; hints: string[] }
 
@@ -40,15 +51,18 @@ export function billMonth(month: string, siteIds?: readonly string[], again = fa
   const all = localDb.invoices.getAll();
   const ours = firmForm();
   const out: BillResult = { invoices: [], skipped: [], hints: [] };
-  const plans = planMonth(month).filter((p) => !siteIds || p.sites.some((s) => siteIds.includes(s.id)));
-  if (!plans.length) throw new Error('Nothing to bill: lock the month\'s muster first.');
+  const mine = (p: BillPlan) => !siteIds || p.sites.some((s) => siteIds.includes(s.id));
+  if (!planMonth(month).some(mine)) throw new Error('Nothing to bill: lock the month\'s muster first.');
+  // QA20 V1: a muster a live bill covers is planned again only when asked ("Bill again") for its own site; a group
+  // bill made later from the other sites of the group leaves it out (it used to bill the billed site twice).
+  const billed = (m: SiteMuster) => billsOf(all, m.id).length > 0;
+  const keep = (m: SiteMuster) => !billed(m) || (again && (!siteIds || siteIds.includes(m.site_id)));
+  const sites = loadSites();
+  out.skipped.push(...loadMusters(month).filter((m) => billed(m) && !keep(m) && (!siteIds || siteIds.includes(m.site_id))).map((m) => sites.find((s) => s.id === m.site_id)?.mp.code ?? m.site_id));
+  const plans = planMonth(month, keep).filter(mine);
   return withTablesRollback(['invoices', 'series_counters'], () => {
     for (const p of plans) {
       const label = p.sites.map((s) => s.mp.code).join(', ');
-      if (!again && p.musters.every((m) => billsOf(all, m.id).length)) {
-        out.skipped.push(label);
-        continue;
-      }
       const client: Client = { ...blankClient(), ...localDb.clients.getById(p.client_id) };
       const sender = localDb.settings.activeProfile() ?? null;
       const base = makeDraft({ settings: localDb.settings.get(), sender, docType: 'INVOICE', templateId: localDb.template.get() });
@@ -85,10 +99,14 @@ export function makeArrears(revId: string, ofIds?: readonly string[]): InvoiceRe
   const todo = notes.filter((n) => !n.raised.length && (!ofIds || ofIds.includes(n.of.id)));
   if (!rev || !todo.length) throw new Error('No arrears left to raise for this revision.');
   const all = localDb.invoices.getAll();
-  const today = todayInput();
+  const now = todayInput();
   return withTablesRollback(['invoices', 'series_counters', 'doc_links'], () => todo.map((n) => {
     const o = n.of;
+    // QA20 V6: a note never predates its bill (a bill dated the month's end or the 1st of the next month may still be
+    // ahead of today): dated the later of the two, so the client's FY total on that day includes the bill.
+    const today = String(o.issue_date ?? '') > now ? String(o.issue_date) : now;
     const sites = [...new Set(n.lines.map((l) => l.site))];
+    const cc = (k: number) => (sites.length > 1 && n.lines[k] ? { cost_centre_id: n.lines[k].site.id } : {});
     const grouped = !o.mp?.site;
     const mp: MpSnapshot = {
       ...(o.mp?.site ? { site: o.mp.site } : {}), month: o.mp?.month, ...(o.mp?.basis ? { basis: o.mp.basis } : {}), regime: o.mp?.regime, ...(o.mp?.decl ? { decl: o.mp.decl } : {}), ...(o.mp?.regime_note ? { regime_note: o.mp.regime_note } : {}),
@@ -98,18 +116,20 @@ export function makeArrears(revId: string, ofIds?: readonly string[]): InvoiceRe
     };
     const rate = (sac: string) => o.items?.find((x) => x.hsn === sac)?.tax_rate ?? o.items?.[0]?.tax_rate ?? 0;
     const client: Client = { ...blankClient(), ...o.client, ...(o.client?.id ? localDb.clients.getById(o.client.id) : {}) };
-    const tds = clientTds(client, today, n.amount, all, firmForm());
+    // QA20 V6: the bill's own expected TDS (its rate) when the threshold test on the note's day does not see it
+    // (the bill still a draft): the arrears are more consideration under the same contract.
+    const tds = clientTds(client, today, n.amount, all, firmForm()) ?? (o.mp?.tds ? { ...o.mp.tds, expected: round2((n.amount * o.mp.tds.rate) / 100) } : null);
     const exempt = o.mp?.regime === 'exempt66' || o.mp?.regime === 'manual_exempt';
     let saved: InvoiceRecord;
     if (s.arrears_doc === 'invoice') {
       const sender = localDb.settings.activeProfile() ?? null;
       const base = makeDraft({ settings: localDb.settings.get(), sender, docType: 'INVOICE', templateId: localDb.template.get() });
-      const items = n.lines.map((l) => ({ id: generateId(), name: l.name, hsn: l.hsn, unit: l.quantity === 1 && !l.duties ? 'NOS' : 'DUTY', quantity: l.quantity, rate: l.rate, amount: l.amount, type: 'Service', discount_percent: 0, tax_rate: rate(l.hsn) }));
+      const items = n.lines.map((l, k) => ({ id: generateId(), name: l.name, hsn: l.hsn, unit: l.quantity === 1 && !l.duties ? 'NOS' : 'DUTY', quantity: l.quantity, rate: l.rate, amount: l.amount, type: 'Service', discount_percent: 0, tax_rate: rate(l.hsn), ...cc(k) }));
       const patch = mpRegimePatch({ items, mp }, forcedRegime(o.mp?.regime ?? 'fwd', today, o.mp?.regime_note));
       saved = localDb.invoices.save(buildBillDraft({ ...base, ...patch, id: generateId(), issue_date: today, ...(sites.length === 1 ? { cost_centre_id: sites[0].id } : {}) }, client, patch.items ?? items, sender));
     } else {
-      saved = createDebitNote({ ...o, mp, tds_amount: undefined, tds_section: undefined }, { reason: `Wage revision ${rev.ref} from ${rev.from}`, lines: n.lines.map((l) => ({ name: l.name, quantity: l.quantity, rate: l.rate, hsn: l.hsn, unit: l.duties && l.post.basis === 'duty' ? 'DUTY' : 'NOS', tax_rate: rate(l.hsn) })) });
-      if (exempt) saved = localDb.invoices.save({ ...saved, items: saved.items.map((l) => ({ ...l, tax_rate: 0, sv: { ...l.sv, exempt: 'EXEMPT' } })) });
+      saved = createDebitNote({ ...o, mp, tds_amount: undefined, tds_section: undefined }, { date: today, reason: `Wage revision ${rev.ref} from ${rev.from}`, lines: n.lines.map((l) => ({ name: l.name, quantity: l.quantity, rate: l.rate, hsn: l.hsn, unit: l.duties && l.post.basis === 'duty' ? 'DUTY' : 'NOS', tax_rate: rate(l.hsn) })) });
+      if (exempt || sites.length > 1) saved = localDb.invoices.save({ ...saved, items: saved.items.map((l, k) => ({ ...l, ...(exempt ? { tax_rate: 0, sv: { ...l.sv, exempt: 'EXEMPT' } } : {}), ...cc(k) })) });
     }
     return tds ? localDb.invoices.save({ ...saved, mp: { ...saved.mp, tds } }) : saved;
   }));

@@ -235,6 +235,8 @@ export interface CostCentreUsage {
   recurring: number;
   /** R3-B2: project tasks of this project. */
   tasks?: number;
+  /** QA20 V4 (R17): a site's musters / compliance rows, the staff deployed there and purchase bills tagged to it. */
+  sites?: number;
 }
 
 type Row = Record<string, unknown>;
@@ -242,7 +244,7 @@ type Row = Record<string, unknown>;
 /** Pure usage count over raw table rows. */
 export function costCentreUsage(
   id: string,
-  t: { invoices?: Row[]; purchases?: Row[]; vouchers?: Row[]; time?: Row[]; mileage?: Row[]; budgets?: Row[]; centres?: readonly CostCentre[]; recurring?: Row[]; tasks?: Row[] },
+  t: { invoices?: Row[]; purchases?: Row[]; vouchers?: Row[]; time?: Row[]; mileage?: Row[]; budgets?: Row[]; centres?: readonly CostCentre[]; recurring?: Row[]; tasks?: Row[]; musters?: Row[]; compliance?: Row[]; employees?: Row[] },
 ): CostCentreUsage {
   const has = (r: Row) => r.cost_centre_id === id;
   const lines = (r: Row, key: string) => (Array.isArray(r[key]) ? (r[key] as Row[]) : []);
@@ -259,10 +261,12 @@ export function costCentreUsage(
       return has(r) || has(tpl) || lines(tpl, 'items').some(has);
     }).length,
     tasks: (t.tasks ?? []).filter(has).length,
+    sites: [...(t.musters ?? []), ...(t.compliance ?? [])].filter((r) => r?.site_id === id).length + (t.employees ?? []).filter(has).length
+      + (t.purchases ?? []).filter((r) => !has(r) && (r.mp as Row | undefined)?.site_id === id).length,
   };
 }
 
-export const usageTotal = (u: CostCentreUsage) => u.invoices + u.purchases + u.vouchers + u.time + u.mileage + u.budgets + u.children + (u.recurring ?? 0) + (u.tasks ?? 0);
+export const usageTotal = (u: CostCentreUsage) => u.invoices + u.purchases + u.vouchers + u.time + u.mileage + u.budgets + u.children + (u.recurring ?? 0) + (u.tasks ?? 0) + (u.sites ?? 0);
 
 export function readCostCentreUsage(id: string): CostCentreUsage {
   return costCentreUsage(id, {
@@ -275,6 +279,9 @@ export function readCostCentreUsage(id: string): CostCentreUsage {
     centres: loadCostCentres(),
     recurring: getTable<Row>('recurring'),
     tasks: getTable<Row>('project_tasks'), // R3-B2
+    musters: getTable<Row>('site_musters'), // QA20 V4 (R17)
+    compliance: getTable<Row>('site_compliance'),
+    employees: getTable<Row>('employees'),
   });
 }
 
@@ -287,7 +294,7 @@ export function deleteCostCentre(id: string): void {
   const row = all.find((c) => c.id === id);
   if (!row) return;
   if (usageTotal(readCostCentreUsage(id)) > 0) {
-    throw new CostCentreError(`"${row.name}" is used by documents, recurring templates, budgets, project tasks or other cost centres — mark it inactive instead.`);
+    throw new CostCentreError(`"${row.name}" is used by documents, recurring templates, budgets, project tasks, site musters, deployed staff or other cost centres — mark it inactive instead.`);
   }
   setTable(COST_CENTRES_TABLE, all.filter((c) => c.id !== id));
   audit.record({ entity: 'cost_centre', entity_id: id, action: 'delete', summary: `Deleted ${COST_CENTRE_KIND_LABELS[row.kind].toLowerCase()} "${row.name}"` });

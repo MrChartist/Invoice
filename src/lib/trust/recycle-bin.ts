@@ -388,6 +388,22 @@ registerRestoreHook('farmer_cycles', (row, e, live) => (str(row.source) === 'mil
 // default routing only while the item has no other default.
 registerRestoreHook('job_cards', (row, e, live) => (!isLive(live, 'production_orders', str(row.order_id)) ? { refuse: 'The production order of this job card is gone.' } : live('job_cards').some((c) => str(c?.id) !== e.row_id && str(c?.order_id) === str(row.order_id) && str(c?.op_id) === str(row.op_id)) ? { refuse: 'A new job card was opened for this operation since; report the entries on it.' } : null));
 registerRestoreHook('routings', (row, e, live) => (row.is_default && live('routings').some((r) => str(r?.id) !== e.row_id && str(r?.item_id) === str(row.item_id) && r?.is_default) ? { refuse: 'This item has another default routing now: restore after unmarking it, or make this one again.' } : null));
+// QA20 V2 (R17): a muster bill comes back only while no live bill covers its musters (it was billed again since), an
+// arrears note only while no live note raised the same revision on the same bill; a muster / compliance row only
+// while its site lives and no other row holds the same site × month.
+const mpOf = (r: unknown): Row | undefined => (isObj(r) && isObj(r.mp) ? r.mp : undefined);
+const mpMusters = (r: unknown): string[] => { const m = mpOf(r); return m ? [str(m.muster_id), ...(Array.isArray(m.muster_ids) ? m.muster_ids.map(str) : [])].filter(Boolean) : []; };
+const mpLiveBill = (r: unknown) => isObj(r) && str(r.status) !== 'Cancelled' && str(r.doc_type) !== 'CREDIT_NOTE' && str(r.doc_type) !== 'DEBIT_NOTE';
+registerRestoreHook('invoices', (row, e, live) => {
+  const mine = mpLiveBill(row) ? mpMusters(row) : [];
+  if (mine.length && live('invoices').some((x) => str(x?.id) !== e.row_id && mpLiveBill(x) && mpMusters(x).some((id) => mine.includes(id)))) return { refuse: 'This muster was billed again since; restoring this bill would bill the duties twice. Cancel the new bill first.' };
+  const arr = isObj(mpOf(row)?.arrear) ? (mpOf(row)!.arrear as Row) : undefined;
+  if (arr && str(row.status) !== 'Cancelled' && live('invoices').some((x) => { const a = mpOf(x)?.arrear; return str(x?.id) !== e.row_id && str(x?.status) !== 'Cancelled' && isObj(a) && str(a.rev_id) === str(arr.rev_id) && str(a.of) === str(arr.of); })) return { refuse: 'The arrears of this revision were raised again on this bill since; restoring this note would charge them twice.' };
+  return null;
+});
+for (const t of ['site_musters', 'site_compliance']) {
+  registerRestoreHook(t, (row, e, live) => (!isLive(live, 'cost_centres', str(row.site_id)) ? { refuse: 'The site of this row is gone. Restore the site first.' } : live(t).some((x) => str(x?.id) !== e.row_id && str(x?.site_id) === str(row.site_id) && str(x?.month) === str(row.month)) ? { refuse: `The site already has a row for ${str(row.month)}; restoring this one would make two.` } : null));
+}
 // R14 (PS-A): an engagement comes back only while its client lives (its ENG number stays reserved, never reused).
 // R14 PS-C: an EDF row restores only while no live row covers the same month, kind and currency (the builder re-ran).
 registerRestoreHook('edf_register', (row, _e, live) => (live('edf_register').some((r) => str(r?.period) === str(row.period) && str(r?.kind) === str(row.kind) && str(r?.currency) === str(row.currency)) ? { refuse: `The EDF register already has ${str(row.period)} ${str(row.kind)} ${str(row.currency)}. Delete that row first.` } : null));

@@ -62,10 +62,14 @@ export function mpArrears(i: { rev: WageRevision; revs: readonly WageRevision[];
       }
     }
     const pct = Number(i.settings.service_charge_pct) || 0;
-    const base = round2(lines.reduce((t, l) => t + l.amount, 0));
-    if (pct > 0 && base > 0 && inv.items?.some((l) => /^Service charge/.test(l.name))) {
-      const amt = round2((base * pct) / 100);
-      lines.push({ ...lines[0], name: `Service charge ${pct} % on arrears`, quantity: 1, rate: amt, amount: amt, duties: 0, delta: 0 });
+    if (pct > 0 && lines.length && inv.items?.some((l) => /^Service charge/.test(l.name))) {
+      // One service-charge line per site on a note of several sites (QA20 V3: each line keeps its site).
+      const sites = [...new Set(lines.map((l) => l.site))];
+      for (const site of sites) {
+        const mine = lines.filter((l) => l.site === site);
+        const amt = round2((round2(mine.reduce((t, l) => t + l.amount, 0)) * pct) / 100);
+        if (amt > 0) lines.push({ ...mine[0], name: `Service charge ${pct} % on arrears${sites.length > 1 ? ` — ${site.mp.code}` : ''}`, quantity: 1, rate: amt, amount: amt, duties: 0, delta: 0 });
+      }
     }
     if (!lines.length) continue;
     const raised = i.invoices.filter((x) => x.status !== 'Cancelled' && x.mp?.arrear?.rev_id === i.rev.id && x.mp.arrear.of === inv.id);

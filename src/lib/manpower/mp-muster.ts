@@ -5,6 +5,7 @@
  * the people deployed at the site at full duties. A locked muster is read-only until "Unlock"; billing and the payroll
  * push read locked musters only. Pure reads and rules here; writes in `mp-muster-save.ts`. Working papers — verify with your CA (MP32).
  */
+import { mbT } from '../../i18n/areas/manpower-r17b';
 import type { MusterRow, SiteMuster } from '../../types/manpower-r17';
 import type { Site } from './mp-sites';
 import { getTable } from '../storage';
@@ -59,13 +60,13 @@ export function musterWarnings(m: Pick<SiteMuster, 'site_id' | 'month' | 'rows'>
   const name = (id: string) => staff.find((e) => e.id === id)?.name ?? id;
   const seen = new Set<string>();
   for (const r of m.rows) {
-    if (r.duties > days * 2) out.push({ employee_id: r.employee_id, text: `${name(r.employee_id)}: ${r.duties} duties is more than ${days * 2} (two a day).` });
+    if (r.duties > days * 2) out.push({ employee_id: r.employee_id, text: mbT('w.two', { n: name(r.employee_id), d: r.duties, m: days * 2 }) });
     if (seen.has(r.employee_id)) continue;
     seen.add(r.employee_id);
     const all = [m, ...others.filter((o) => o.site_id !== m.site_id && o.month === m.month)].reduce((t, x) => t + x.rows.filter((y) => y.employee_id === r.employee_id).reduce((s, y) => s + (Number(y.duties) || 0), 0), 0);
-    if (all > 31) out.push({ employee_id: r.employee_id, text: `${name(r.employee_id)}: ${all} duties across all sites this month (over 31).` });
+    if (all > 31) out.push({ employee_id: r.employee_id, text: mbT('w.all', { n: name(r.employee_id), d: all }) });
     const dol = staff.find((e) => e.id === r.employee_id)?.dol;
-    if (dol && dol < `${m.month}-01`) out.push({ employee_id: r.employee_id, text: `${name(r.employee_id)} left on ${dol}, before this month.` });
+    if (dol && dol < `${m.month}-01`) out.push({ employee_id: r.employee_id, text: mbT('w.left', { n: name(r.employee_id), d: dol }) });
   }
   return out;
 }

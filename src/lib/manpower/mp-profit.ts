@@ -16,11 +16,24 @@ import { employerCost, siteShares, sumShares, type RunLine } from './mp-complian
 export interface SiteBill { site_id: string; cost: number }
 export interface ProfitRow { site: Site; billed: number; wages: number; relief: number; statutory: number; bills: number; margin: number; pct: number | null }
 
-/** Taxable value a document bills for a site (signed: credit notes out). */
+/**
+ * Taxable value a document bills for a site (signed: credit notes out). A bill of several sites (no `mp.site`) is
+ * shared by its lines' sites (`cost_centre_id`, QA20 V3) — else, on older bills, by the post rows — times the
+ * document's taxable value, so a service-charge line and a partial credit note follow their own amounts (QA20 V3).
+ */
 export function billedFor(i: InvoiceRecord, site: Site): number {
   const mp = i.mp;
   if (!mp || i.status === 'Cancelled') return 0;
-  const v = mp.site ? (mp.site.id === site.id ? Number(i.taxable_value) || 0 : 0) : (mp.posts ?? []).filter((p) => p.site === site.mp.code).reduce((t, p) => t + (p.amount ?? 0), 0);
+  const taxable = Number(i.taxable_value) || 0;
+  let v: number;
+  if (mp.site) v = mp.site.id === site.id ? taxable : 0;
+  else {
+    const items = (i.items ?? []).filter((l) => l.cost_centre_id);
+    const parts: { k: string; a: number }[] = items.length ? items.map((l) => ({ k: l.cost_centre_id!, a: Number(l.amount) || 0 })) : (mp.posts ?? []).map((p) => ({ k: p.site ?? '', a: p.amount ?? 0 }));
+    const key = items.length ? site.id : site.mp.code;
+    const all = parts.reduce((t, p) => t + p.a, 0);
+    v = all ? round2((taxable * parts.filter((p) => p.k === key).reduce((t, p) => t + p.a, 0)) / all) : 0;
+  }
   return i.doc_type === 'CREDIT_NOTE' ? -v : v;
 }
 

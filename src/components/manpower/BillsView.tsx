@@ -15,7 +15,7 @@ import { formatCurrency, todayInput } from '../../lib/utils';
 import { loadSites, siteLabel } from '../../lib/manpower/mp-sites';
 import { loadMusters, musterOf } from '../../lib/manpower/mp-muster';
 import { billsOf } from '../../lib/manpower/mp-bill';
-import { billMonth, planMonth } from '../../lib/manpower/mp-draft-io';
+import { billMonth, planUnbilled } from '../../lib/manpower/mp-draft-io';
 import { readManpowerSettings, saveManpowerSettings } from '../../lib/manpower/mp-settings';
 import type { ManpowerSettings } from '../../types/manpower-r17';
 import controls from '../../styles/controls.module.css';
@@ -62,8 +62,8 @@ export default function BillsView({ notify }: MpViewProps) {
   const month = params.get('month') || todayInput().slice(0, 7);
   const data = useMemo(() => {
     void tick;
-    let plans: ReturnType<typeof planMonth> = [];
-    try { plans = planMonth(month); } catch { /* shown as nothing to bill */ }
+    let plans: ReturnType<typeof planUnbilled> = [];
+    try { plans = planUnbilled(month); } catch { /* shown as nothing to bill */ }
     return { sites: loadSites(), musters: loadMusters(month), invoices: localDb.invoices.getAll(), plans, clients: localDb.clients.getAll() };
   }, [month, tick]);
   const bill = (ids?: string[], again = false) => {
@@ -87,7 +87,7 @@ export default function BillsView({ notify }: MpViewProps) {
             {data.sites.map((s) => {
               const m = musterOf(data.musters, s.id, month);
               const inv = m ? billsOf(data.invoices, m.id) : [];
-              const plan = data.plans.filter((p) => p.sites.some((x) => x.id === s.id)).reduce((t, p) => t + p.taxable, 0);
+              const plan = data.plans.reduce((t, p) => t + (p.sites.length === 1 ? (p.sites[0].id === s.id ? p.taxable : 0) : p.items.filter((l) => l.cost_centre_id === s.id).reduce((a, l) => a + l.amount, 0)), 0);
               return (
                 <tr key={s.id} data-mp-bill-site={s.mp.code}>
                   <td><Link to={`/time?tab=deploy&view=muster&site=${s.id}&month=${month}`}>{siteLabel(s)}</Link></td>
