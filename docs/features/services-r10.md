@@ -165,7 +165,14 @@ front desk / claims / pharmacy chunks) ≈ +1.5 net.
   `paper-helpers.ts`, so no template change).
 - **Auto-renew** makes the successor and a draft bill when the desk opens (not a `recurring` schedule: a schedule
   cannot create the membership row). No bell notice ("expiring this week"): the renewals list sits on the Members view.
-- **`defer_package_income`** and the "Package income recognised" journal are not built (report only).
+- **`defer_package_income`** (PENDING #20, `services/sv-deferral.ts`): a switch under the forfeited list on Time → Members
+  (owner; stores `defer_package_from` = the day it went on, so packages sold earlier are never touched). The sale bill
+  still credits Sales in full; per ended month ONE journal (class "Package income recognised", dated the month end,
+  `books.edit`) posts the net of packages sold in the month (deferred) less sessions redeemed (bills' `sv.redeem` lines +
+  redeeming check-ins, × price ÷ sessions), packages expired with sessions unused and packages cancelled / upgraded in the
+  month (recognised): net > 0 Dr Sales | Cr "Package income received in advance" (created on first use, other current
+  liabilities), else the reverse. A month posts once (its journal names the month; delete it to post again). Sales is the
+  default ledger: a company that books package income to another ledger adjusts by hand (CA item SV44).
 - **Camera QR** check-in is not built: the member card carries the MEM number as a barcode, which any keyboard
   scanner types into the code box. Member card = barcode, not QR.
 - **Class bookings** per occurrence (appointments with `class_id`) are not built: enrolment with capacity and a

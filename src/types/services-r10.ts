@@ -652,6 +652,10 @@ export interface CoachingRefundRecord {
 export interface ServiceSettings {
   /** Upgrade: one invoice for the difference (default) or a credit note on the old bill + a full bill (SV14). */
   upgrade_mode?: 'difference' | 'credit_note';
+  /** Package income kept deferred: a monthly "Package income recognised" journal (`sv-deferral.ts`, PENDING #20). */
+  defer_package_income?: boolean;
+  /** The day the switch went on: packages sold before it are never deferred. */
+  defer_package_from?: string;
 }
 
 declare module './institutions-r5' {

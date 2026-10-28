@@ -22,7 +22,8 @@ import { mcT, type McKey } from '../../i18n/areas/services-r10c';
 import { svT } from '../../i18n/areas/services-r10a';
 import { SV_CLASSES } from '../../lib/services/sv-tax';
 import { loadStaff } from '../../lib/services/sv-staff';
-import { readServiceSettings } from '../../lib/services/sv-settings';
+import { readServiceSettings, saveServiceSettings } from '../../lib/services/sv-settings';
+import { deferralFor, postedDeferral, postPackageDeferral } from '../../lib/services/sv-deferral';
 import { daysBetween, deleteMemberPlan, forfeited, loadCheckins, loadMemberPlans, loadMemberships, renewals, saveMemberPlan, sessionsUsed, statusOf } from '../../lib/services/sv-members';
 import { autoRenewDue, bonusLeft, cancelMembership, freeze, renew, sellPlan, topUp, transfer, unfreeze, upgrade } from '../../lib/services/sv-memberships';
 import { checkIn, findMembers, footfall, gateFor, notSeen, undoCheckin } from '../../lib/services/sv-checkin';
@@ -179,6 +180,32 @@ function Members({ notify, tick, refresh }: P) {
       <h4>{mcT('renewals')}</h4>
       <Tbl h={[mcT('member'), mcT('plan'), mcT('end'), '']} rows={due.map(({ m }) => [m.client_name, m.plan.name, m.end, <span key="a"><a className={styles.note} target="_blank" rel="noreferrer" href={whatsappLink(m.phone, mcT('waRenew', { name: m.client_name, plan: m.plan.name, number: m.number, date: m.end }))}>{mcT('remind')}</a> <B sm l={mcT('renew')} on={() => attempt(notify, () => { renew(m.id, d); refresh(); }, mcT('saved'))} /></span>])} />
       {!!lost.length && <><h4>{mcT('forfeit')}</h4><Tbl h={[mcT('month'), mcT('number'), mcT('member'), mcT('used'), mcT('amount')]} rows={lost.map((x) => [x.month, x.m.number, x.m.client_name, x.unused, rs(x.value)])} /></>}
+      <Deferral notify={notify} tick={tick} refresh={refresh} />
+    </div>
+  );
+}
+
+/** PENDING #20: package income kept deferred — the switch (owner) and the month's journal (books). */
+function Deferral({ notify, tick, refresh }: P) {
+  const d = today();
+  const [month, setMonth] = useState(shiftDay(`${d.slice(0, 7)}-01`, -1).slice(0, 7));
+  const s = useMemo(() => readServiceSettings(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const r = useMemo(() => deferralFor(month, d), [tick, month, s]); // eslint-disable-line react-hooks/exhaustive-deps
+  const done = r ? postedDeferral(month) : undefined;
+  return (
+    <div data-sv-deferral>
+      <h4>{mcT('deferTitle')}</h4>
+      <C l={mcT('deferOn')} v={!!s.defer_package_income} on={(v) => attempt(notify, () => { saveServiceSettings({ defer_package_income: v, ...(v && !s.defer_package_from ? { defer_package_from: d } : {}) }); refresh(); }, mcT('saved'))} />
+      {r && (
+        <>
+          <p className={styles.note}>{mcT('deferHint', { date: s.defer_package_from ?? '—' })}</p>
+          <div className={styles.toolbar}>
+            <T l={mcT('month')} t="month" v={month} on={setMonth} d="sv-defer-month" />
+            <span>{mcT('deferRow', { sold: rs(r.deferred), rec: rs(r.recognised), red: rs(r.redeemed), lost: rs(r.forfeited), closed: rs(r.closed), net: rs(r.net) })}</span>
+            {done ? <span>{mcT('deferPosted', { number: done.number })}</span> : <B l={mcT('deferPost')} dis={!can('books.edit') || !r.net} on={() => attempt(notify, () => { postPackageDeferral(month, d); refresh(); }, mcT('saved'))} d="sv-defer-post" />}
+          </div>
+        </>
+      )}
     </div>
   );
 }
