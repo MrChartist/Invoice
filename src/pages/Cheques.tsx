@@ -48,7 +48,7 @@ const inr = (n: number) => `₹${formatMoney(n)}`;
 
 /** Cheque register & PDC tracking, cheque printing (roadmap 6.26). */
 export function Cheques() {
-  useT(); // re-render on a language switch (5.4)
+  const { lang } = useT(); // re-render on a language switch (5.4); `docLabel` depends on it (QA19 U4)
   const [params, setParams] = useSearchParams();
   const dirParam = params.get('dir');
   const direction: ChequeDirection | 'all' = dirParam === 'received' || dirParam === 'issued' ? dirParam : 'all';
@@ -87,7 +87,7 @@ export function Cheques() {
       : c.purchase_id ? { text: bills.get(c.purchase_id) ?? chqT('deletedBill'), to: bills.has(c.purchase_id) ? '/expenses' : undefined }
       : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [version]);
+  }, [version, lang]);
 
   const setParam = (k: string, v: string) => {
     const next = new URLSearchParams(params);

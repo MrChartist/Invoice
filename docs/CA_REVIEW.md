@@ -48,8 +48,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF40–MF42, MF50–MF54, MF60–MF65, MF80–MF82, MF90–MF96 | 60 | 12 |
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
 | 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV48 | 48 | 15 |
-| 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF21 | 21 | 5 |
-| **Total** | | **565** | **139** |
+| 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF23 | 23 | 5 |
+| **Total** | | **567** | **139** |
 
 ---
 
@@ -1199,6 +1199,13 @@ belong to R16-B / R16-C, PF17–PF18 to R16-D.
 | PF19 | **Per-appearance billing on a fee note.** With "Bill appearances" the entries of an appearance work type become one line "count × fee" (unit NOS, the firm's SAC, no hours, no dates on the line); the legal-services regime (RCM / exempt, PS1, PS2) is read as for any fee line, and the time still counts for realisation. Does a court fee note need each appearance's date (or the hearing list) printed, and is one line per work type and fee acceptable? | One line per work type × fee; dates stay in the app (the timesheet annexure lists hourly rows only). | `prof/ps-legal.ts` `appearanceLines`; `prof/ps-prebill.ts` | — | Developers' reading |
 | PF20 | **Publisher's commission invoice.** The pre-bill's "Bill commission to the publisher" makes a separate draft invoice to the publisher (matched to a client of that name, else a new name) with one line "Media commission n % — publication" at the firm's SAC and GST rate (PS12 (c)). Which SAC (e.g. 998363 / 998365) and is it forward charge at 18 %? Should the expected TDS 194H by the publisher be shown on it? | Firm's SAC and rate from the time preferences; no TDS hint. | `prof/ps-media.ts` `commissionLine`; `prof/ps-prebill.ts` `createCommissionDraft` | — | PS12; developers' reading |
 | PF21 | **Which WIP is foreign for the closing-rate memo.** The year-end memo treats a matter as foreign-currency when its active engagement bills in a foreign currency, and restates the net unbilled figure at the master's rate on the closing date; a work-type rate card in a foreign currency on an INR engagement is not converted. Open foreign invoices use the existing revaluation (balance on the closing date × the master's rate). Is the engagement currency the right test? | Engagement currency; memo only (PF14, PS37). | `components/prof/YearEndWipView.tsx`; `prof/ps-fx-rates.ts` `atClosing`; `fx-gain.ts` `revalueReceivables` | — | AS 11 (recalled) |
+
+### 16.2 Added by QA round 19 (`docs/prd/qa-round-19.md`)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| PF22 | **Re-issue refund as a credit note (QA19 U7).** When a re-issued ticket is cheaper, the fare difference is credited on the original invoice's pure-agent fare line (Rule 33, 0 %) by value: the note's line carries exactly the difference (quantity = difference ÷ fare, e.g. 0.1495 of the ticket). It has no taxable value, so it reaches no GSTR-1 table. Is a credit note against the old invoice the right document for a refunded fare at actual (vs a refund voucher only), and may its quantity be a fraction of the ticket? | Credit note by value on the fare line; no GST; no GSTR-1 value. | `travel/tv-reissue.ts`; `documents.ts` `buildCreditNote` (`CreditLineRequest.amount`) | — | Developers' reading (TV35, PF16) |
+| PF23 | **Netting in the Tally / CSV exports (QA19 U8).** A netting receipt to a hand-linked vendor is exported as a Journal: Dr the supplier's own ledger (Agst Ref the bill no.) / Cr the client's ledger (Agst Ref the invoice no.); the receipts CSV names the supplier's ledger as "Deposit To". Is a Journal (not a Contra / Receipt) what the auditor expects in Tally for a set-off between two ledgers of one party? | Journal, as for R9 exchanges (QA10 R5). | `tally-xml.ts`, `accounting-export.ts` `receipts`, `export-shared.ts` `exchangeCreditorLedger` | — | PF17; developers' reading |
 
 `PF` ids are counted once here. The ★ items (PF1, PF3, PF5, PF7, PF17) change what a document prints or a return
 reports once notified.

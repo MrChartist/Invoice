@@ -65,6 +65,7 @@ import {
   isoDate,
   partyNameOf,
   urdCreditorLedger,
+  exchangeCreditorLedger,
   stateNameOf,
   toPaise,
   voucherKindOf,
@@ -564,7 +565,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
         // QA10 R5: an exchange is a journal — Dr the customer's URD creditor ledger (Agst Ref the voucher) / Cr the
         // customer (Agst Ref the bill), as the app's ledger posts it; no "Sundry creditors — exchange" ledger.
         const raw = (source.purchases ?? []).find((x) => String((x as { id?: unknown })?.id ?? '') === exchangeVoucherOf(p));
-        const creditor = urdLedgerOf(exchangeVoucherOf(p)) ?? `${party} (Creditor)`;
+        const creditor = (exchangeCreditorLedger(p, raw, source.vendors) ?? urdLedgerOf(exchangeVoucherOf(p))) || `${party} (Creditor)`; // QA19 U8
         addLedger({ name: creditor, parent: 'Sundry Creditors', billwise: true });
         const paise = toPaise(inrValue(num(p.amount), inv));
         const invNo = clean(inv.invoice_number) || String(inv.id);

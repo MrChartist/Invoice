@@ -186,7 +186,7 @@ export function Time() {
       r.expenses = round2(r.expenses + expenseLine(p, prefs).amount);
     }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [entries, trips, purchases, live, prefs, cover]);
+  }, [entries, trips, purchases, live, prefs, cover, lang]);
 
   const stats = useMemo(() => {
     const amount = unbilled.reduce((s, u) => s + u.time + u.expenses + u.mileage, 0);

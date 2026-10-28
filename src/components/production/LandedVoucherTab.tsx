@@ -20,7 +20,7 @@ import styles from './production.module.css';
 
 /** /manufacturing?tab=landed — landed-cost voucher `LCV/FY…` spread over earlier bills / GRNs (R4-A5). */
 export function LandedVoucherTab({ ctx }: { ctx: MfgContext }) {
-  useT();
+  const { lang } = useT(); // QA19 U4: `goodsDocs` labels depend on it
   /* eslint-disable react-hooks/exhaustive-deps */
   const purchases = useMemo(() => getTable<unknown>('purchases'), [ctx.version]);
   const receipts = useMemo(() => getTable<ReceiptNote>('receipt_notes'), [ctx.version]);
@@ -45,7 +45,7 @@ export function LandedVoucherTab({ ctx }: { ctx: MfgContext }) {
       .map((b) => ({ key: `bill:${b.id}`, label: `${pT('billWord')} ${b.number} · ${b.partyName} · ${formatDate(b.date)}`, date: b.date }));
     const grns = receipts.filter((g) => g.kind === 'GRN').map((g) => ({ key: `grn:${g.id}`, label: `${g.number} · ${g.vendor_name} · ${formatDate(g.date)}`, date: g.date }));
     return [...bills, ...grns].sort((a, b) => b.date.localeCompare(a.date));
-  }, [purchases, receipts, items]);
+  }, [purchases, receipts, items, lang]);
   const lines = useMemo(() => targetLines(targets, purchases, receipts, items, landedExtras(others, purchases, receipts, items)), [targets, purchases, receipts, items, others]);
   const preview = useMemo(() => allocationRows({ charges, method }, lines), [charges, method, lines]);
   const total = charges.reduce((s, c) => s + num(c.amount), 0);

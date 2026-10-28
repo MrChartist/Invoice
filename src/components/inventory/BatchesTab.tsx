@@ -39,7 +39,7 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
   godowns: Godown[];
   onDownload: (filename: string, csv: string) => void;
 }) {
-  useT(); // re-render on a language switch (5.4)
+  const { lang } = useT(); // re-render on a language switch (5.4); `rows` holds a label (QA19 U4)
   const [view, setView] = useState<View>('all');
   const multi = godowns.length > 1;
 
@@ -61,7 +61,7 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
       }
     }
     return out.sort((a, b) => a.item.localeCompare(b.item) || (a.expiry ?? '9999').localeCompare(b.expiry ?? '9999'));
-  }, [tracking, today, days, view]);
+  }, [tracking, today, days, view, lang]);
 
   const status = (r: Row) => {
     if (!r.expiry) return <span className={styles.muted}>{invT('noExpiry')}</span>;

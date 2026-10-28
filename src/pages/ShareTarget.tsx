@@ -22,7 +22,8 @@ const receive = () => (inflight ??= readSharedFiles().finally(() => setTimeout((
 export function ShareTarget() {
   useT();
   const navigate = useNavigate();
-  const [message, setMessage] = useState(phoneT('inboxReading'));
+  // QA19 U4: null = the default text, translated at render (an initial state would freeze the first language).
+  const [message, setMessage] = useState<string | null>(null);
   // 8E wiring: an image / PDF can be a supplier bill (e-invoice QR → draft bill) or an expense receipt.
   const [choice, setChoice] = useState<File[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -81,7 +82,7 @@ export function ShareTarget() {
           <span className={surface.cardHeadIcon}><FileUp size={16} aria-hidden="true" /> {phoneT('inboxTitle')}</span>
         </div>
         <div className={`${surface.cardBody} ${styles.stack}`}>
-          <p className={styles.note} data-share-inbox>{message}</p>
+          <p className={styles.note} data-share-inbox>{message ?? phoneT('inboxReading')}</p>
           {choice && !busy && (
             <>
               <button type="button" className={controls.btnPrimary} onClick={() => void asBill(choice)} data-share-bill>{retailT('shareBill')}</button>
