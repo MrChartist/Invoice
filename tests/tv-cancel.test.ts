@@ -47,7 +47,9 @@ test('cancel a ticket: credit note, fee at 18 %, debit note to the supplier, tri
   assert.equal(r.fee?.items[0].tax_rate, 18);
   assert.equal(r.fee?.items[0].hsn, '998551');
   assert.equal(r.fee?.total, 590);
-  assert.equal(r.plan.refundOut, Math.round((10700 + 420 + 75.6 - 590) * 100) / 100);
+  // QA18 T4: the refund is what the credit note credits (its total, rounded like the invoice) less our fee with GST.
+  assert.equal(r.plan.refundOut, Math.round((r.notes[0].total - 590) * 100) / 100);
+  assert.equal(r.plan.refundOut, 10606);
   const dn = getTable<{ purchase_id: string; total: number }>('purchase_returns');
   assert.deepEqual(dn.map((n) => [n.purchase_id, n.total]), [[bill.id, 7700]]);
   const after = loadBookings(t.id)[0];

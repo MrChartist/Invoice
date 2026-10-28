@@ -125,6 +125,9 @@ function cancelFinance(inv: InvoiceRecord): void {
 }
 
 /** Deleted (`next` absent) or being cancelled: the DO goes first (it may refuse), then the exchanges. */
+/** QA18 T2: a netting / exchange receipt removed on its own (payment dialog, invoice delete) re-settles its bill. */
+voidHook.paid = (ids) => syncUrdPaid(ids);
+
 voidHook.f = (stored, next) => {
   if (!stored || (next && (stored.status === 'Cancelled' || next.status !== 'Cancelled'))) return;
   cancelFinance(stored);

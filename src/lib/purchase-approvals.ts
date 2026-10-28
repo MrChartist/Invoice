@@ -259,7 +259,10 @@ export const rejectPayment = (id: string, note: string) => decidePayment(id, 're
 
 /** Decision history for purchases (bills, expenses, payments), newest first. */
 export function purchaseApprovalHistory(limit = 30): ApprovalLogRow[] {
+  // Rows are appended in decision order; reverse first so the stable sort keeps the later of two same-millisecond
+  // decisions on top.
   return approvalLog()
+    .reverse()
     .filter((r) => r.doc_type === 'BILL' || r.doc_type === 'EXPENSE' || r.doc_type === 'PAYMENT')
     .sort((a, b) => b.decided_at.localeCompare(a.decided_at))
     .slice(0, limit);

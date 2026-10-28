@@ -698,6 +698,8 @@ export const localDb = {
         setTable(KEYS.transactions, rows);
         throw err;
       }
+      // QA18 T2: the bill a netting / exchange receipt settled is open again by that much.
+      if (row.exchange_purchase_id) voidHook.paid?.([row.exchange_purchase_id]);
       logSafe(() => {
         const entry = paymentLogged('payment_remove', row, target);
         return overridden ? { ...entry, summary: entry.summary + OVERRIDE_NOTE } : entry;

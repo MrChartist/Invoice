@@ -45,7 +45,7 @@ export const TRAVEL_REGIME_RULES: readonly TvRule<Readonly<Record<TvRegime, TvRe
 
 /** Rule 32(3) CGST Rules: the air travel agent's service valued at a % of the basic fare, at the agent's option (TV11). */
 export const AIR_AGENT_VALUE_RULES: readonly TvRule<{ domestic: number; intl: number }>[] = [
-  { from: '2017-07-01', value: { domestic: 5, intl: 10 }, source: 'Rule 32(3) CGST Rules 2017: 5 % of the basic fare (domestic), 10 % (international), at the agent\'s option (as reported; TV11)', verified: false },
+  { from: '2017-07-01', value: { domestic: 5, intl: 10 }, source: 'Rule 32(3) CGST Rules 2017: 5 % of the basic fare (domestic), 10 % (international); Rule 32(1) "at the option of the supplier"; basic fare = the part on which airlines normally pay commission. Read (QA18): CGST Rules Part A as on 01.06.2021, GST Council compilation (TV11)', verified: true },
 ];
 
 /** SAC and GST rate of the agent's own services: air-ticket booking, other travel / hotel bookings (TV11, TV32). */

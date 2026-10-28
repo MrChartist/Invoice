@@ -33,7 +33,9 @@ test('every rule row has a date, a source and `verified`, in date order; nothing
       n++;
       assert.match(r.from, /^\d{4}-\d{2}-\d{2}$/);
       assert.ok(r.source?.trim());
-      assert.equal(r.verified, false, 'no primary text read for the B rows (TV8–TV10)');
+      // QA18: a row is verified only with the primary text it was read in named in its source.
+      if (r.verified) assert.match(r.source ?? '', /Read \(QA\d+\)/, 'a verified row names the text read');
+      else assert.equal(r.verified, false);
       if (i) assert.ok(r.from > v[i - 1].from, 'append-only, in date order');
     });
   }

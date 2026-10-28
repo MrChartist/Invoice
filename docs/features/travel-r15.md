@@ -206,6 +206,8 @@ strings area 1.4), `file-read` / `file-map` split out of the marketplace chunks 
   leaves the editor's whole items footer (Add line, the trip row, the chips) without a layout box (`getClientRects()`
   empty, computed `display: flex`; any style change or a reload restores it — likely the `.wrap` size container's
   relayout on that mount). Opening the draft directly or reloading is fine. The e2e step reloads after Bill.
+  **Fixed in QA round 18 (T1):** the footer sat inside the lines' size container; it now sits outside it (every desk's
+  Bill path was affected). The e2e reload is gone (`docs/prd/qa-round-18.md`).
 - **TDS hint date** = the booking's service date (the bill form has no date in `TripPick`), TV40.
 - **FX** (D2 #4): no change — B's booking form already keeps `cost_currency` / `fx` per booking; the invoice uses its own
   exchange rate. Cut 2 applied (chip only, no POS rows in the trips view); cut 1 (vendor-advance column) not built.
