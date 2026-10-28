@@ -20,6 +20,9 @@ export const hsT = defineArea(
     cycles: 'Monthly,Quarterly,Half-yearly',
     wp: 'Working papers — verify with your CA.',
     eCode: 'Type the unit code (A-101).', eTaken: 'Unit {c} already exists.', eNum: '{f}: 0 or more.', eUndiv: 'Undivided % above 100.', wUndiv: 'Undivided % adds up to {s}, not 100.',
+    imp: 'Import CSV / XLSX', impTpl: 'Template', impNoCode: 'The sheet needs a code (unit / flat no.) column.', impBad: '{f}: "{v}" is not known.', impDup: 'Unit {c} is twice in the sheet.', impPhone: '{n} has another phone; the client is kept.',
+    impSum: '{c} new, {u} updated, {e} with errors. New members: {m}.', impGo: 'Import', impFix: 'Fix the rows with errors in the sheet and choose it again.', impDone: 'Imported: {c} new, {u} updated, {m} new members.',
+    impUndo: 'Undo import', impUndone: 'Import undone.', impNoCopy: 'An undo copy could not be saved. Import anyway?', row: 'Row', error: 'Error',
   } as const,
   {
     units: 'यूनिट', heads: 'शुल्क सूची', unit: 'यूनिट', wing: 'विंग', member: 'सदस्य', owner: 'मालिक', tenant: 'किरायेदार', head: 'शीर्ष', total: 'कुल', all: 'सभी',
@@ -35,6 +38,9 @@ export const hsT = defineArea(
     cycles: 'मासिक,तिमाही,छमाही',
     wp: 'कार्य-पत्र — अपने CA से जाँचें।',
     eCode: 'यूनिट कोड लिखें (A-101)।', eTaken: 'यूनिट {c} पहले से है।', eNum: '{f}: 0 या अधिक।', eUndiv: 'अविभाजित % 100 से अधिक।', wUndiv: 'अविभाजित % का जोड़ {s} है, 100 नहीं।',
+    imp: 'CSV / XLSX इम्पोर्ट', impTpl: 'टेम्पलेट', impNoCode: 'शीट में कोड (यूनिट / फ़्लैट नं.) का कॉलम चाहिए।', impBad: '{f}: "{v}" पहचाना नहीं गया।', impDup: 'यूनिट {c} शीट में दो बार है।', impPhone: '{n} का फ़ोन अलग है; क्लाइंट वही रखा गया।',
+    impSum: '{c} नई, {u} अपडेट, {e} में त्रुटि। नए सदस्य: {m}।', impGo: 'इम्पोर्ट करें', impFix: 'त्रुटि वाली पंक्तियाँ शीट में ठीक करें और फिर से चुनें।', impDone: 'इम्पोर्ट हुआ: {c} नई, {u} अपडेट, {m} नए सदस्य।',
+    impUndo: 'इम्पोर्ट वापस लें', impUndone: 'इम्पोर्ट वापस लिया गया।', impNoCopy: 'वापसी की कॉपी नहीं बन सकी। फिर भी इम्पोर्ट करें?', row: 'पंक्ति', error: 'त्रुटि',
   },
 );
 
