@@ -36,7 +36,7 @@ test('disbursements unrecovered over 30 days (recovered by the schedule, else Ru
   assert.deepEqual(ids(lgAlerts('2026-11-25', d)), ['lg:disb:j1'], 'only the old duty counts; deposits cover the duty');
   const sched = inv({ lg: { job_id: 'j1', disb: [{ date: '2026-09-01', kind: 'duty', amount: 185430 }] } });
   assert.deepEqual(ids(lgAlerts('2026-11-25', { ...d, invoices: [sched] })), []);
-  const r33 = inv({ lg: { job_id: 'j1' }, items: [{ id: 'l', name: 'Duty', type: 'Service', quantity: 1, rate: 185430, charge_head_id: 'rule33' }] });
+  const r33 = inv({ lg: { job_id: 'j1' }, items: [{ id: 'l', name: 'Duty', type: 'Service', quantity: 1, rate: 185430, amount: 0, charge_head_id: 'rule33' }] });
   assert.equal(recoveredByJob([r33]).get('j1'), 185430);
   assert.deepEqual(ids(lgAlerts('2026-11-25', { ...d, invoices: [{ ...sched, status: 'Cancelled' }] })), ['lg:disb:j1'], 'a cancelled reimbursement bill → unrecovered again');
   assert.deepEqual(ids(lgAlerts('2026-11-25', { ...d, advances: [{ amount: 100000, lg: { job_id: 'j1' } }], invoices: [sched] })), ['lg:deposit:j1']);
@@ -63,9 +63,9 @@ test('the bell provider reads nothing while the Round 19 packs are off', () => {
 test('reports: margin by lane / client / salesperson / month without Rule 33 recoveries or disbursements; USD at the document rate; disbursements ageing', () => {
   const jobs = [job({ salesperson: 'Asha' }), job({ id: 'j2', number: 'JOB/2', origin: 'NSA', destination: 'JEA', client_id: 'c2', date: '2026-12-01' })];
   const invs = [
-    inv({ lg: { job_id: 'j1' }, items: [{ id: 'a', name: 'Freight', type: 'Service', quantity: 1, rate: 1000 }], currency: 'USD', exchange_rate: 84 }),
-    inv({ id: 'i2', lg: { job_id: 'j1' }, items: [{ id: 'b', name: 'Handling', type: 'Service', quantity: 2, rate: 5000, discount_percent: 5 }, { id: 'c', name: 'Terminal', type: 'Service', quantity: 1, rate: 1800, charge_head_id: 'rule33' }] }),
-    inv({ id: 'i3', lg: { job_id: 'j2' }, status: 'Cancelled', items: [{ id: 'd', name: 'X', type: 'Service', quantity: 1, rate: 999 }] }),
+    inv({ lg: { job_id: 'j1' }, items: [{ id: 'a', name: 'Freight', type: 'Service', quantity: 1, rate: 1000, amount: 0 }], currency: 'USD', exchange_rate: 84 }),
+    inv({ id: 'i2', lg: { job_id: 'j1' }, items: [{ id: 'b', name: 'Handling', type: 'Service', quantity: 2, rate: 5000, amount: 0, discount_percent: 5 }, { id: 'c', name: 'Terminal', type: 'Service', quantity: 1, rate: 1800, amount: 0, charge_head_id: 'rule33' }] }),
+    inv({ id: 'i3', lg: { job_id: 'j2' }, status: 'Cancelled', items: [{ id: 'd', name: 'X', type: 'Service', quantity: 1, rate: 999, amount: 0 }] }),
   ];
   const purs = [bill({ id: 'p', taxable: 67200, lg: { job_id: 'j1' } }), bill({ id: 'q', taxable: 1800, total: 1800, lg: { job_id: 'j1', on_behalf: true } }), bill({ id: 'r', taxable: 99, status: 'draft', lg: { job_id: 'j1' } })];
   const pnl = jobPnl(invs, purs);
