@@ -6145,7 +6145,7 @@ try {
   });
 
   await step('R19-D agents, courier, notices: Agents → add agent (client + vendor) → Debit agent USD 150 @ ₹84 (export of services, POS 96) → Agent\'s bill USD 60 (RCM, ₹5,040) → net USD 90 → Settle by netting (R15-A markers); Courier → import 3 dockets (40 × 30 × 20 cm, 3 kg → 5 kg) → Bill month → +1 invoice with 3 docket lines; the bell lists unrecovered disbursements; Ctrl+K "docket"', async () => {
-    const keys = ['settings', 'clients', 'vendors', 'lg_jobs', 'lg_manifests', 'logistics_settings', 'invoices', 'purchases', 'transactions', 'series_counters'];
+    const keys = ['settings', 'clients', 'vendors', 'lg_jobs', 'lg_manifests', 'logistics_settings', 'invoices', 'purchases', 'transactions', 'series_counters', 'lut_register'];
     const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
     const day = (n) => { const d = new Date(Date.now() + n * 864e5); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
     const today = day(0);
@@ -6153,6 +6153,9 @@ try {
     await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-lg-d1', name: 'E2E Demo Traders', email: '', address: 'Pune', city: 'Pune', zip: '411001', gstin: '27AAPFU0939F1ZV', state_code: '27' }]);
     await writeJson(page, 'lg_jobs', [{ id: 'e2e-lg-dj', number: 'JOB/FY26-27/0901', date: today, status: 'booked', dir: 'export', mode: 'air', origin: 'BOM', destination: 'SIN', dest_country: 'SG', client_id: 'e2e-lg-d1', refs: { hawb: 'E2E-HX1' }, updated_at: `${today}T10:00:00Z` }]);
     await writeJson(page, 'lg_manifests', []);
+    const fy0 = Number(today.slice(0, 4)) - (Number(today.slice(5, 7)) < 4 ? 1 : 0);
+    await writeJson(page, 'lut_register', [{ id: 'e2e-lg-lut', fy: `FY${String(fy0).slice(2)}-${String(fy0 + 1).slice(2)}`, gstin: '', arn: 'AD2704260012345', filed_on: `${fy0}-03-28`, valid_from: `${fy0}-04-01`, valid_to: `${fy0 + 1}-03-31` }]);
+    await readJson(page, 'lut_register', [], (v) => (v ?? []).some((x) => x.id === 'e2e-lg-lut'), 15000);
     await writeJson(page, 'logistics_settings', { zones: [{ zone: 'Local', first_500g: 40, addl_500g: 20 }] });
     await readJson(page, 'logistics_settings', null, (v) => v?.zones?.length === 1, 15000);
     await readJson(page, 'lg_jobs', [], (v) => v.length === 1 && v[0].id === 'e2e-lg-dj', 15000);
@@ -6170,7 +6173,7 @@ try {
     await page.locator('[data-lg-debit-agent]').click();
     const inv = await readJson(page, 'invoices', [], (v) => (v ?? []).some((x) => x.lg?.agent && x.lg.job_id === 'e2e-lg-dj'), 15000);
     const note = inv.find((x) => x.lg?.agent && x.lg.job_id === 'e2e-lg-dj');
-    check(note?.currency === 'USD' && note.exchange_rate === 84 && note.place_of_supply === '96' && /^EXPORT_/.test(note.supply_type ?? '') && note.items?.[0]?.rate === 150, `Debit agent: USD 150 @ ₹84, POS 96, export of services (${note?.supply_type})`);
+    check(note?.currency === 'USD' && note.exchange_rate === 84 && note.place_of_supply === '96' && note.supply_type === 'EXPORT_LUT' && note.lut_number === 'AD2704260012345' && note.total === 150, `Debit agent: USD 150 @ ₹84, POS 96, export of services under the seeded LUT (${note?.supply_type}, ${note?.total})`);
     await page.locator('[data-lg-field="agent-amount"]').fill('60');
     await page.locator('[data-lg-field="agent-bill-no"]').fill('E2E-DA-1');
     await page.locator('[data-lg-agent-bill]').click();
