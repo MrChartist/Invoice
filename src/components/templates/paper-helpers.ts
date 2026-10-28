@@ -293,9 +293,9 @@ export function hsLineText(item: { id?: string } | undefined, hs: HsSnapshot | u
   return h?.basis ?? '';
 }
 
-/** R19-A4: under a pure-agent line of a job document (`charge_head_id: 'rule33'`), "recovered at actual (Rule 33)"; '' otherwise. */
+/** R19-A4: under a pure-agent line of a job document (`charge_head_id: 'rule33'`), "Recovered at actual (Rule 33)"; '' otherwise. */
 export function lgLineText(item: { charge_head_id?: string } | undefined, lg: LgSnapshot | undefined): string {
-  return lg && item?.charge_head_id === 'rule33' ? 'Paid on your behalf — recovered at actual (Rule 33)' : '';
+  return lg && item?.charge_head_id === 'rule33' ? 'Recovered at actual (Rule 33)' : '';
 }
 
 /**

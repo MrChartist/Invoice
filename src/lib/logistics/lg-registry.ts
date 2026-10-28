@@ -12,23 +12,17 @@ import { WATCHED_TABLES, type WatchedTable } from '../audit-edits';
 
 /** Role needed to write each Round 19 table / object (`requireTableWrite`). */
 export const LG_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
-  // R19-A: the settings object is the owner's; jobs are documents; rate sheets a master
+  // R19-A: the settings object is the owner's; jobs are documents (rate sheets: cut 2)
   logistics_settings: 'settings.manage',
   lg_jobs: 'doc.create',
-  lg_rate_sheets: 'master.edit',
-  // R19-D: manifests and storage months issue documents
-  lg_manifests: 'doc.create',
-  lg_storage: 'doc.create',
+  // R19-D appends lg_manifests / lg_storage ('doc.create') with its tables
 };
 
 /** Audited tables (every row change logged; deletes go to the recycle bin). `logistics_settings` is audited on save. */
 export const LG_WATCHED: Readonly<Record<string, WatchedTable>> = {
   // R19-A
   lg_jobs: { entity: 'invoice', label: 'Job file' },
-  lg_rate_sheets: { entity: 'item', label: 'Rate sheet' },
-  // R19-D
-  lg_manifests: { entity: 'invoice', label: 'Courier manifest' },
-  lg_storage: { entity: 'invoice', label: 'Storage month' },
+  // R19-D appends lg_manifests ('Courier manifest') / lg_storage ('Storage month')
 };
 
 /** Idempotent: adds the rows once (never overwrites a row another module set). */

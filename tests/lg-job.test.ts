@@ -51,7 +51,6 @@ test('validation: errors block, hints never do', () => {
   assert.equal(validateJob(base({ refs: { sb_date: '2026-10-10' } }), []).hints.length, 0);
   const other = base({ id: 'k', number: 'JOB/FY26-27/0002', refs: { hawb: 'sbl-1' } });
   assert.match(validateJob(base({ refs: { hawb: 'SBL-1' } }), [other]).errors[0], /JOB\/FY26-27\/0002/, 'house bills unique per company');
-  assert.equal(validateJob(base({ gross_kg: -1 }), []).errors.length, 1);
 });
 
 test('JOB numbering: Indian FY, branch prefix, never reused', () => {

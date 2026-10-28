@@ -16,21 +16,20 @@ import { BACKUP_RECORD_TABLES } from '../src/lib/backup.ts';
 import { PACK_IDS } from '../src/lib/industry-packs.ts';
 
 const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8');
-const A_TABLES = [LG_TABLES.jobs, LG_TABLES.rates];
+const A_TABLES = [LG_TABLES.jobs];
 
-test('R19-A block: logistics_settings (settings.manage), lg_jobs (doc.create), lg_rate_sheets (master.edit) — audited, backed up, in the open export, at runtime only', () => {
-  assert.deepEqual(LG_TABLE_ACTIONS, { logistics_settings: 'settings.manage', lg_jobs: 'doc.create', lg_rate_sheets: 'master.edit', lg_manifests: 'doc.create', lg_storage: 'doc.create' });
+test('R19-A block: logistics_settings (settings.manage), lg_jobs (doc.create) — audited, backed up, in the open export, at runtime only; rate sheets cut', () => {
+  assert.deepEqual(LG_TABLE_ACTIONS, { logistics_settings: 'settings.manage', lg_jobs: 'doc.create' });
   assert.equal(TABLE_ACTIONS.logistics_settings, 'settings.manage');
   assert.equal(TABLE_ACTIONS.lg_jobs, 'doc.create');
-  assert.equal(TABLE_ACTIONS.lg_rate_sheets, 'master.edit');
+  assert.equal(TABLE_ACTIONS.lg_rate_sheets, undefined, 'cut 2: no rate sheets table');
   assert.equal(WATCHED_TABLES.lg_jobs?.label, 'Job file');
-  assert.equal(WATCHED_TABLES.lg_rate_sheets?.label, 'Rate sheet');
   assert.deepEqual(Object.keys(LG_WATCHED).sort(), (Object.values(LG_TABLES) as string[]).sort());
   assert.equal(LG_OBJECTS.settings, 'logistics_settings');
   for (const t of [...A_TABLES, LG_OBJECTS.settings]) assert.ok(TABLE_MEANING[t], `${t} in the open export`);
   for (const t of A_TABLES) assert.ok(BACKUP_RECORD_TABLES.includes(t), `${t} backed up`);
   for (const t of A_TABLES) assert.ok(src('lib/demo-data.ts').includes(`'${t}'`), `${t} demo-cleared`);
-  for (const f of ['lib/access.ts', 'lib/audit-edits.ts']) assert.ok(!/lg_(jobs|rate_sheets)|logistics_settings/.test(src(f)), `${f}: only at runtime`);
+  for (const f of ['lib/access.ts', 'lib/audit-edits.ts']) assert.ok(!/lg_jobs|logistics_settings/.test(src(f)), `${f}: only at runtime`);
   for (const p of LG_PACKS) assert.ok(PACK_IDS.includes(p), p);
 });
 

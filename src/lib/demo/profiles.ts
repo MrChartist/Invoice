@@ -39,9 +39,7 @@ export async function demoExtras(profile: DemoProfile, ctx: ProfileContext): Pro
   const centres = [...(prof.tables?.cost_centres ?? []), ...(travel.tables?.cost_centres ?? []), ...(manpower.tables?.cost_centres ?? [])];
   const staff = [...(base.tables?.service_staff ?? []), ...(prof.tables?.service_staff ?? [])];
   // R16-C4: the travel profile also adds a TCS invoice
-  const merged = { ...base.tables, ...agri.tables, ...mfg.tables, ...prof.tables, ...travel.tables, ...society?.tables };
-  const lgT = logistics ? { lg_jobs: logistics.tables!.lg_jobs, vendors: [...(merged.vendors ?? []), ...(logistics.tables!.vendors ?? [])] } : {};
-  return { ...base, ...(society ? { societySettings: society.societySettings } : {}), ...(logistics ? { logisticsSettings: logistics.logisticsSettings } : {}), ...(travel.invoices ? { invoices: [...(base.invoices ?? []), ...travel.invoices] } : {}), tables: { ...merged, ...lgT, ...(centres.length ? { cost_centres: centres } : {}), ...(stock.length ? { stock_items: stock } : {}), ...(time.length ? { time_entries: time } : {}), ...(staff.length ? { service_staff: staff } : {}) } };
+  return { ...base, ...(society ? { societySettings: society.societySettings } : {}), ...(logistics ? { logisticsSettings: logistics.logisticsSettings } : {}), ...(travel.invoices ? { invoices: [...(base.invoices ?? []), ...travel.invoices] } : {}), tables: { ...base.tables, ...agri.tables, ...mfg.tables, ...prof.tables, ...travel.tables, ...society?.tables, ...logistics?.tables, ...(centres.length ? { cost_centres: centres } : {}), ...(stock.length ? { stock_items: stock } : {}), ...(time.length ? { time_entries: time } : {}), ...(staff.length ? { service_staff: staff } : {}) } };
 }
 
 async function profileExtras(profile: DemoProfile, ctx: ProfileContext): Promise<DemoExtras> {

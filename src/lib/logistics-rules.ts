@@ -9,7 +9,7 @@
  * A row is `verified: true` only when its value was read in a primary text in Round 19 (PRD §2.4; the source then says
  * "Read (R19)"). A recommendation (57th GST Council) is a `pending-changes.ts` note, never a row here. Rows keyed by
  * `key` are in date order within their key. Sources are short citations; the full list is PRD §2.8 and
- * docs/CA_REVIEW.md §19. One section per package. Working papers — verify with your CA.
+ * docs/CA_REVIEW.md §19 (the full citation of each row). One section per package. Working papers — verify with your CA.
  */
 import type { Versioned } from './tax-rules';
 import type { LgHeadKind } from '../types/logistics-r19';
@@ -37,7 +37,7 @@ export const LG_SAC_RULES: readonly LgRule<Partial<Record<LgHeadKind, string>>>[
       clearance: '996712', forwarding: '996713', origin: '996713', destination: '996713', documentation: '996713', handling: '996713',
       storage: '996729', gta: '996791', commission: '996713', demurrage: '996799', other: '996799',
     },
-    source: 'N 11/2017-CT(R) annexure rows 108–164. Read (R19) (LG5; multimodal 996799 and commission 996713 are LG4 / LG5 questions)',
+    source: 'N 11/2017-CT(R) annexure. Read (R19) (LG5)',
     verified: true,
   },
 ];
@@ -51,14 +51,14 @@ export interface LgRate { rate: number; itc_note?: string; air_rate?: number; do
  * (Sl. 11(ii): cargo handling, CHA, C&F, storage and warehousing). GTA rows stay in `transport-works-rules.ts` (LG8).
  */
 export const LG_RATE_RULES: readonly LgKeyedRule<LgRate>[] = [
-  { key: 'freight_sea', from: '2017-07-01', value: { rate: 5, itc_note: 'ITC on goods other than ships / vessels not taken' }, source: 'N 11/2017-CT(R) Sl. 9(ii) as amended to 1 Apr 2019; not amended by N 15/2025. Read (R19) (LG6)', verified: true },
-  { key: 'freight_air', from: '2018-07-26', value: { rate: 18 }, source: 'N 11/2017-CT(R) Sl. 9(vii) (N 13/2018, footnote 61). Read (R19) (LG6)', verified: true },
-  { key: 'freight_multimodal', from: '2018-07-26', value: { rate: 12 }, source: 'N 11/2017-CT(R) Sl. 9(vi) (N 13/2018, footnote 59). Read (R19) (LG6)', verified: true },
-  { key: 'freight_multimodal', from: '2025-09-22', value: { rate: 5, air_rate: 18, domestic_only: true, itc_note: 'ITC only on transport inputs, capped at 2.5 % + 2.5 %' }, source: 'N 15/2025-CT(R) ¶(1)(a)(iv)(D) with its illustration. Read (R19) (LG6, LG7)', verified: true },
+  { key: 'freight_sea', from: '2017-07-01', value: { rate: 5, itc_note: 'ITC on goods other than ships not taken' }, source: 'N 11/2017-CT(R) Sl. 9(ii). Read (R19) (LG6)', verified: true },
+  { key: 'freight_air', from: '2018-07-26', value: { rate: 18 }, source: 'N 11/2017-CT(R) Sl. 9(vii). Read (R19) (LG6)', verified: true },
+  { key: 'freight_multimodal', from: '2018-07-26', value: { rate: 12 }, source: 'N 11/2017-CT(R) Sl. 9(vi). Read (R19) (LG6)', verified: true },
+  { key: 'freight_multimodal', from: '2025-09-22', value: { rate: 5, air_rate: 18, domestic_only: true, itc_note: 'ITC on transport inputs only, capped at 5 %' }, source: 'N 15/2025-CT(R) ¶(1)(a)(iv)(D). Read (R19) (LG6, LG7)', verified: true },
   { key: 'freight_rail', from: '2025-09-22', value: { rate: 5, alt_rate: 18, itc_note: '5 % without ITC, or 18 %' }, source: 'N 15/2025-CT(R) ¶(1)(a)(iv)(B). Read (R19) (LG6)', verified: true },
-  { key: 'courier', from: '2017-07-01', value: { rate: 18 }, source: 'N 11/2017-CT(R) Sl. 12 (consolidated). Read (R19) (LG18)', verified: true },
+  { key: 'courier', from: '2017-07-01', value: { rate: 18 }, source: 'N 11/2017-CT(R) Sl. 12. Read (R19) (LG18)', verified: true },
   { key: 'courier', from: '2025-09-22', value: { rate: 18 }, source: 'N 15/2025-CT(R) ¶(1)(a)(vi). Read (R19) (LG18)', verified: true },
-  { key: 'support', from: '2017-07-01', value: { rate: 18 }, source: 'N 11/2017-CT(R) Sl. 11(ii); not amended by N 15/2025. Read (R19) (LG5, LG21)', verified: true },
+  { key: 'support', from: '2017-07-01', value: { rate: 18 }, source: 'N 11/2017-CT(R) Sl. 11(ii). Read (R19) (LG5, LG21)', verified: true },
 ];
 
 /** Exempt storage / handling (`exempt_if` of a head): Sl. 54(e) agricultural produce, Sl. 24 rice (LG21). */

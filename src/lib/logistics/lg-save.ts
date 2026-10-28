@@ -1,8 +1,8 @@
 /**
- * R19-A2 / A3 writes of `lg_jobs` (`doc.create`, numbered from `JOB`, period-locked by `date`, audited row by row) and
- * `lg_rate_sheets` (`master.edit`). A row removed by `setTable` goes to the recycle bin (its JOB number stays used). The
- * job and its series counter are written under one `withTablesRollback`. Pure rules live in `lg-job.ts` / `lg-rates.ts`.
- * (The CSV / XLSX job import was cut at the R19-A cap, PRD §3 cut 3.)
+ * R19-A2 writes of `lg_jobs` (`doc.create`, numbered from `JOB`, period-locked by `date`, audited row by row). A row
+ * removed by `setTable` goes to the recycle bin (its JOB number stays used). The job and its series counter are written
+ * under one `withTablesRollback`. Pure rules live in `lg-job.ts`. At the R19-A cap (PRD §3) the lane rate sheets (cut 2;
+ * the table `lg_rate_sheets` is not registered; its type stays declared) and the CSV / XLSX job import (cut 3) were cut.
  */
 import './lg-registry';
 import { generateId, getTable, setTable, KEYS } from '../storage';
@@ -11,13 +11,11 @@ import { assertUnlocked } from '../period-lock';
 import { recordSeries } from '../series-counters';
 import { withTablesRollback } from '../table-txn';
 import { lgT } from '../../i18n/areas/logistics-r19a';
-import type { LgJob, LgRateSheet, LgStatus } from '../../types/logistics-r19';
+import type { LgJob, LgStatus } from '../../types/logistics-r19';
 import { cleanJob, nextJobNumber, validateJob } from './lg-job';
-import { sheetErrors } from './lg-rates';
 import { LG_TABLES } from './lg-shared';
 
 export const loadJobs = (): LgJob[] => getTable<LgJob>(LG_TABLES.jobs).filter((j) => j && typeof j.id === 'string' && typeof j.number === 'string');
-export const loadSheets = (): LgRateSheet[] => getTable<LgRateSheet>(LG_TABLES.rates).filter((s) => s && typeof s.id === 'string' && !!s.lane);
 const lockOf = (j: Pick<LgJob, 'id' | 'date' | 'number'>) => ({ id: j.id, issue_date: j.date, invoice_number: j.number });
 
 /** Add / edit a job (`doc.create`). Throws the first error; returns the job and its hints. A closed job is re-opened by `setJobStatus`. */
@@ -59,20 +57,4 @@ export function deleteJob(id: string): void {
   if (getTable<{ lg?: { job_id?: string }; status?: string }>(KEYS.invoices).some((r) => r?.lg?.job_id === id && r.status !== 'Cancelled')) throw new Error(lgT('eBilled'));
   assertUnlocked(lockOf(j), 'delete');
   setTable(LG_TABLES.jobs, all.filter((x) => x.id !== id));
-}
-
-/** Add / edit a rate sheet (`master.edit`); rows of unknown heads or a negative rate refuse the save. */
-export function saveSheet(input: Omit<LgRateSheet, 'id' | 'updated_at'> & { id?: string }, heads: Parameters<typeof sheetErrors>[1]): LgRateSheet {
-  requireAccess('master.edit');
-  const all = loadSheets();
-  const s: LgRateSheet = { ...input, id: input.id ?? generateId(), lane: { ...input.lane, origin: input.lane.origin.trim().toUpperCase(), destination: input.lane.destination.trim().toUpperCase() }, updated_at: new Date().toISOString() };
-  const e = sheetErrors(s, heads);
-  if (e.length) throw new Error(e[0]);
-  setTable(LG_TABLES.rates, all.some((x) => x.id === s.id) ? all.map((x) => (x.id === s.id ? s : x)) : [...all, s]);
-  return s;
-}
-
-export function deleteSheet(id: string): void {
-  requireAccess('master.edit');
-  setTable(LG_TABLES.rates, loadSheets().filter((s) => s.id !== id));
 }

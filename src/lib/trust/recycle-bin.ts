@@ -421,11 +421,9 @@ const unitCode = (r: unknown) => (isObj(r) ? str(r.code).trim().toLowerCase() : 
 registerRestoreHook('society_units', (row, e, live) => (unitCode(row) && live('society_units').some((u) => str(u?.id) !== e.row_id && unitCode(u) === unitCode(row)) ? { refuse: `Unit ${str(row.code)} exists again since; restoring this one would make two. Edit the live unit instead.` } : null));
 registerRestoreHook('society_runs', (row, e, live) => (!row.undone && live('society_runs').some((r) => str(r?.id) !== e.row_id && !r?.undone && str(r?.period) === str(row.period) && str(isObj(r?.levy) ? r.levy.name : '') === str(isObj(row.levy) ? row.levy.name : '')) ? { refuse: 'This period was run again since; restoring this run would list it twice.' } : null));
 // R19-A: a job file comes back only while its client lives and no live job holds its house bill (HBL / HAWB are
-// unique per company); a rate sheet only while no live sheet has the same client, lane and start date.
+// unique per company).
 const lgHouse = (r: unknown) => (isObj(r) && isObj(r.refs) ? [str(r.refs.hbl), str(r.refs.hawb)].map((x) => x.trim().toUpperCase()).filter(Boolean) : []);
 registerRestoreHook('lg_jobs', (row, e, live) => (!isLive(live, 'clients', str(row.client_id)) ? { refuse: 'The client of this job is gone. Restore the client first.' } : lgHouse(row).some((h) => live('lg_jobs').some((j) => str(j?.id) !== e.row_id && lgHouse(j).includes(h))) ? { refuse: 'Another job now has this house bill number; restoring this one would make two.' } : null));
-const lgLane = (r: unknown) => (isObj(r) && isObj(r.lane) ? `${str(r.client_id)}|${str(r.lane.origin)}|${str(r.lane.destination)}|${str(r.lane.mode)}|${str(r.valid_from)}`.toUpperCase() : '');
-registerRestoreHook('lg_rate_sheets', (row, e, live) => (live('lg_rate_sheets').some((r) => str(r?.id) !== e.row_id && lgLane(r) === lgLane(row)) ? { refuse: 'A live rate sheet has the same client, lane and start date. Edit that one instead.' } : null));
 // R14 (PS-A): an engagement comes back only while its client lives (its ENG number stays reserved, never reused).
 // R14 PS-C: an EDF row restores only while no live row covers the same month, kind and currency (the builder re-ran).
 registerRestoreHook('edf_register', (row, _e, live) => (live('edf_register').some((r) => str(r?.period) === str(row.period) && str(r?.kind) === str(row.kind) && str(r?.currency) === str(row.currency)) ? { refuse: `The EDF register already has ${str(row.period)} ${str(row.kind)} ${str(row.currency)}. Delete that row first.` } : null));

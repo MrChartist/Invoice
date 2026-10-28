@@ -168,9 +168,9 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   // R17-D
   '/time?tab=deploy&view=statutory': ['arrears', 'vda', 'wage revision', 'debit note', 'tds receivable', 'psara', 'licence renewal', 'बकाया'],
   // R19-A: the Shipments desk (B–D add billing / costing / customs / agents / courier / storage)
-  '/time?tab=shipments': ['shipments', 'freight forwarder', 'forwarding', 'logistics', 'cha', 'customs broker', 'शिपमेंट'],
-  '/time?tab=shipments&view=jobs': ['job file', 'shipment', 'consignment', 'hbl', 'mawb', 'container', 'जॉब'],
-  '/time?tab=shipments&view=rates': ['charge heads', 'rate sheet', 'freight rate', 'tariff', 'quotation', 'भाड़ा'],
+  '/time?tab=shipments': ['freight forwarder', 'logistics', 'customs broker', 'शिपमेंट'],
+  '/time?tab=shipments&view=jobs': ['job file', 'shipment', 'consignment', 'जॉब'],
+  '/time?tab=shipments&view=rates': ['charge heads', 'freight rate', 'भाड़ा'],
   // R18-A: the Society desk (B–D add bills / gst / dues / funds / registers)
   '/recurring?tab=society': ['housing society', 'rwa', 'maintenance bill', 'मेंटेनेंस'],
   '/recurring?tab=society&view=units': ['flats', 'members', 'फ़्लैट'],

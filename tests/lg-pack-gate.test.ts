@@ -39,6 +39,6 @@ test('the profile pickers carry only an explicit pack list (the transport type\'
 test('ordinary lines print as before; a pure-agent line of a job document says so', () => {
   assert.equal(lgLineText({ charge_head_id: 'rule33' }, undefined), '');
   assert.equal(lgLineText({}, { job_no: 'JOB/FY26-27/0001' }), '');
-  assert.equal(lgLineText({ charge_head_id: 'rule33' }, { job_no: 'JOB/FY26-27/0001' }), 'Paid on your behalf — recovered at actual (Rule 33)');
+  assert.equal(lgLineText({ charge_head_id: 'rule33' }, { job_no: 'JOB/FY26-27/0001' }), 'Recovered at actual (Rule 33)');
   assert.equal(trackingText({ id: 'l1', batch_no: 'B1' } as never), 'Batch B1');
 });

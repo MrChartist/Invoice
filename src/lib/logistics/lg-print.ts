@@ -1,8 +1,9 @@
 /**
- * R19-A4 job paper (pure; family `f-logistics`): the reference rows (job, shipment, route, house / master bill, vessel or
- * flight, shipping bill / bill of entry, packages, weights, CBM), the containers line (≤ 8, then "+ N more") and the
- * place-of-supply reason B writes (`lg.pos_reason`) — from the document's `lg` snapshot only, so an issued document
- * never changes. C (disbursement schedule) and D (manifest / storage summaries) add `parts/logistics/*.tsx` arms.
+ * R19-A4 job paper (pure; family `f-logistics`): the reference rows (job, shipment, route, house / master bill, vessel
+ * or flight, shipping bill / bill of entry, packages, weights, CBM) and the place-of-supply reason B writes
+ * (`lg.pos_reason`) — from the document's `lg` snapshot only, so an issued document never changes. The containers
+ * table was cut at the R19-A cap (PRD §3 cut 1). C (disbursement schedule) and D (manifest / storage summaries) add
+ * `parts/logistics/*.tsx` arms.
  */
 import type { LgSnapshot } from '../../types/logistics-r19';
 
@@ -12,7 +13,7 @@ const dmy = (d?: string) => (d ? d.split('-').reverse().join('/') : '');
 const pair = (a?: string, b?: string) => [a, b].filter(Boolean).join(' / ');
 const kg = (v?: number) => (v ? `${v.toLocaleString('en-IN')} kg` : '');
 
-export function logisticsPaper(lg: LgSnapshot): { rows: [string, string][]; containers: string; reason: string } {
+export function logisticsPaper(lg: LgSnapshot): { rows: [string, string][]; reason: string } {
   const r = lg.refs ?? {};
   const w = lg.weights ?? {};
   const p = lg.ports;
@@ -28,7 +29,5 @@ export function logisticsPaper(lg: LgSnapshot): { rows: [string, string][]; cont
     ['Gross / chargeable', pair(kg(w.gross_kg), kg(w.chargeable_kg))],
     ['CBM', w.cbm ? String(w.cbm) : ''],
   ];
-  const c = lg.containers ?? [];
-  const containers = c.slice(0, 8).map((x) => `${x.no} (${x.size})`).join(', ') + (c.length > 8 ? ` + ${c.length - 8} more` : '');
-  return { rows: rows.filter(([, v]) => v), containers, reason: lg.pos_reason ?? '' };
+  return { rows: rows.filter(([, v]) => v), reason: lg.pos_reason ?? '' };
 }

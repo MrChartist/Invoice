@@ -183,13 +183,9 @@ const HS_STEPS: Readonly<Record<HsStep, string>> = {
 };
 const isHsStep = (k: string): k is HsStep => Object.hasOwn(HS_STEPS, k);
 
-/** R19-A1: the logistics steps, the kinds that have them and where each opens (C: lgDeposit; D: lgManifest, lgStorage). */
+/** R19-A1: the logistics steps (job steps not for a courier / warehouse kind) and the desk view each opens (C: lgDeposit; D: lgManifest, lgStorage). */
 type LgStep = 'lgHeads' | 'lgJob' | 'lgBill';
-const LG_STEPS: Readonly<Record<LgStep, [kinds: string, to: string]>> = {
-  lgHeads: ['forwarder cha courier warehouse multi', '/time?tab=shipments&view=rates'],
-  lgJob: ['forwarder cha multi', '/time?tab=shipments&view=jobs'],
-  lgBill: ['forwarder cha multi', '/time?tab=shipments&view=jobs'],
-};
+const LG_STEPS: Readonly<Record<LgStep, [jobKindsOnly: boolean, view: string]>> = { lgHeads: [false, 'rates'], lgJob: [true, 'jobs'], lgBill: [true, 'jobs'] };
 const isLgStep = (k: string): k is LgStep => Object.hasOwn(LG_STEPS, k);
 
 /** R14 (PS-A1): the professional steps, the kinds that have them and where each opens. */
@@ -329,7 +325,7 @@ function applies(kind: StepKind, ctx: ChecklistCtx): boolean {
     case 'batch': return ctx.serviceKind === 'coaching';
     case 'labourOp': case 'jobCard': return ctx.serviceKind === 'workshop' || ctx.serviceKind === 'appliance';
     case 'partners': return !!ctx.profKind && (ctx.packs ?? []).includes('partners'); // R14 (PS-D1)
-    default: return isLgStep(kind) ? !!ctx.logisticsKind && LG_STEPS[kind][0].split(' ').includes(ctx.logisticsKind) : isHsStep(kind) ? !!ctx.societyKind : isMpStep(kind) ? !!ctx.manpowerKind && MP_STEPS[kind][0].split(' ').includes(ctx.manpowerKind) : isTvStep(kind) ? !!ctx.travelKind && TV_STEPS[kind][0].split(' ').includes(ctx.travelKind) : isPsStep(kind) ? !!ctx.profKind && (PS_STEPS[kind][0] === '@svcexport' ? ctx.packs.includes('svcexport') : PS_STEPS[kind][0].split(' ').includes(ctx.profKind)) : isMfStep(kind) ? !!ctx.mfgKind && MF_STEPS[kind][0].split(' ').includes(ctx.mfgKind) : isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri / R13 mfg steps
+    default: return isLgStep(kind) ? !!ctx.logisticsKind && (!LG_STEPS[kind][0] || !/courier|warehouse/.test(ctx.logisticsKind)) : isHsStep(kind) ? !!ctx.societyKind : isMpStep(kind) ? !!ctx.manpowerKind && MP_STEPS[kind][0].split(' ').includes(ctx.manpowerKind) : isTvStep(kind) ? !!ctx.travelKind && TV_STEPS[kind][0].split(' ').includes(ctx.travelKind) : isPsStep(kind) ? !!ctx.profKind && (PS_STEPS[kind][0] === '@svcexport' ? ctx.packs.includes('svcexport') : PS_STEPS[kind][0].split(' ').includes(ctx.profKind)) : isMfStep(kind) ? !!ctx.mfgKind && MF_STEPS[kind][0].split(' ').includes(ctx.mfgKind) : isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri / R13 mfg steps
   }
 }
 
@@ -382,7 +378,7 @@ function stepsOf(kind: StepKind, f: ChecklistFactsV3, ctx: ChecklistCtx): Omit<C
     case 'batch': return one((f.batches ?? 0) > 0, '/recurring?tab=fees&view=batches');
     case 'labourOp': return one((f.labourOps ?? 0) > 0, '/time?tab=workshop&view=labour');
     case 'jobCard': return one((f.jobCards ?? 0) > 0, '/time?tab=workshop&view=jobs');
-    default: return isLgStep(kind) ? one((f.logistics?.[kind] ?? 0) > 0, LG_STEPS[kind][1]) : isHsStep(kind) ? one((f.society?.[kind] ?? 0) > 0, HS_STEPS[kind]) : isMpStep(kind) ? one((f.manpower?.[kind] ?? 0) > 0, MP_STEPS[kind][1]) : isTvStep(kind) ? one((f.travel?.[kind] ?? 0) > 0, TV_STEPS[kind][1]) : isPsStep(kind) ? one((f.prof?.[kind] ?? 0) > 0, PS_STEPS[kind][1]) : isMfStep(kind) ? one((f.mfg?.[kind] ?? 0) > 0, MF_STEPS[kind][1]) : one((f.agri?.[kind] ?? 0) > 0, AGRI_STEPS[kind][1]); // R12 (AG-A1), R13 (MF-A1)
+    default: return isLgStep(kind) ? one((f.logistics?.[kind] ?? 0) > 0, `/time?tab=shipments&view=${LG_STEPS[kind][1]}`) : isHsStep(kind) ? one((f.society?.[kind] ?? 0) > 0, HS_STEPS[kind]) : isMpStep(kind) ? one((f.manpower?.[kind] ?? 0) > 0, MP_STEPS[kind][1]) : isTvStep(kind) ? one((f.travel?.[kind] ?? 0) > 0, TV_STEPS[kind][1]) : isPsStep(kind) ? one((f.prof?.[kind] ?? 0) > 0, PS_STEPS[kind][1]) : isMfStep(kind) ? one((f.mfg?.[kind] ?? 0) > 0, MF_STEPS[kind][1]) : one((f.agri?.[kind] ?? 0) > 0, AGRI_STEPS[kind][1]); // R12 (AG-A1), R13 (MF-A1)
   }
 }
 

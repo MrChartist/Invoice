@@ -1,22 +1,21 @@
 /**
  * R19 Shipments desk (`/time?tab=shipments&view=`, packs `logistics` / `customs` / `courier` / `warehouse`): A's views
- * `jobs` (job files) and `rates` (charge heads, rate sheets, quotations) are in this chunk; B (`billing`, `costing`),
+ * `jobs` (job files) and `rates` (charge heads) are in this chunk; B (`billing`, `costing`),
  * C (`customs`, pack `customs`) and D (`agents`, `courier` / `storage` by pack) add one entry each in their block of
- * `VIEWS`. A view whose pack is off is not listed (its URL still opens it). Nothing is read until the tab opens.
+ * `VIEWS` (C / D add the `pack` filter with their pack views: a view whose pack is off is not listed, its URL still
+ * opens it). Nothing is read until the tab opens.
  * Working papers — verify with your CA.
  */
 import { Suspense, type ComponentType, type LazyExoticComponent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { lgT } from '../../i18n/areas/logistics-r19a';
-import { activePacks, type PackId } from '../../lib/industry-packs';
-import { localDb } from '../../lib/localDb';
 import controls from '../../styles/controls.module.css';
 import JobsView from './JobsView';
 import RatesView from './RatesView';
 import type { LgViewProps } from './lg-ui';
 
-type View = { label: () => string; C: ComponentType<LgViewProps> | LazyExoticComponent<ComponentType<LgViewProps>>; pack?: PackId };
+type View = { label: () => string; C: ComponentType<LgViewProps> | LazyExoticComponent<ComponentType<LgViewProps>> };
 const VIEWS: Record<string, View> = {
   // R19-A
   jobs: { label: () => lgT('jobs'), C: JobsView },
@@ -27,9 +26,8 @@ const VIEWS: Record<string, View> = {
 export default function ShipmentsDesk({ view, notify }: LgViewProps & { view?: string }) {
   useT();
   const [, setParams] = useSearchParams();
-  const packs = activePacks(localDb.settings.get());
   const v = Object.hasOwn(VIEWS, view ?? '') ? view! : 'jobs';
-  const ids = Object.keys(VIEWS).filter((k) => k === v || !VIEWS[k].pack || packs.includes(VIEWS[k].pack!));
+  const ids = Object.keys(VIEWS);
   const C = VIEWS[v].C;
   return (
     <section data-shipments-desk>

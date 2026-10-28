@@ -7,12 +7,9 @@
 
 /** Company tables (`mrchartist_inv_<table>`): backed up, synced, audited, rights in `lg-registry.ts`. D adds manifests / storage. */
 export const LG_TABLES = {
-  // R19-A: job files (dated by `date`) and rate sheets (not dated)
+  // R19-A: job files (dated by `date`). The lane rate sheets (`lg_rate_sheets`) were cut at the R19-A cap (PRD §3 cut 2).
   jobs: 'lg_jobs',
-  rates: 'lg_rate_sheets',
-  // R19-D: courier manifests and storage months (dated by the month end)
-  manifests: 'lg_manifests',
-  storage: 'lg_storage',
+  // R19-D adds `manifests: 'lg_manifests'` and `storage: 'lg_storage'` (dated by the month end) with its registry block
 } as const;
 
 /** Company objects (singletons). */
@@ -27,4 +24,4 @@ export const LG_PACKS = ['logistics', 'customs', 'courier', 'warehouse'] as cons
 export const LG_SERIES = { jobs: 'JOB' } as const;
 
 /** The date field each dated table is synced / period-locked by (mirrors the `sync-engine.ts` DATED rows). */
-export const LG_DATED: Readonly<Record<string, string>> = { lg_jobs: 'date', lg_manifests: 'date', lg_storage: 'date' };
+export const LG_DATED: Readonly<Record<string, string>> = { lg_jobs: 'date' }; // R19-D: + lg_manifests / lg_storage

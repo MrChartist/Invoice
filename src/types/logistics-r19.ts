@@ -98,7 +98,7 @@ export interface LgHead {
   active: boolean;
 }
 
-/** A3 (cut 2 at the cap): table `lg_rate_sheets` (not dated, `master.edit`). */
+/** A3: the lane rate sheet shape. Cut at the R19-A cap (PRD §3 cut 2): declared only; no table `lg_rate_sheets` is registered. */
 export interface LgRateRow { head_id: string; rate: number; currency: string; unit: LgUnit; min?: number }
 export interface LgRateSheet {
   id: string;

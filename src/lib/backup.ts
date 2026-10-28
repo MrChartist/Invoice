@@ -526,9 +526,8 @@ const RECORD_TABLES = [
   'society_units',
   // R18-B: society billing runs (one per period / special levy; the batch, counts and totals by head)
   'society_runs',
-  // R19-A: logistics job files (JOB/FY…) and rate sheets
+  // R19-A: logistics job files (JOB/FY…)
   'lg_jobs',
-  'lg_rate_sheets',
   // Voucher types master (P1-13, 7Q)
   'voucher_types',
 ];
@@ -653,9 +652,8 @@ const ID_TABLES = new Set([
   'society_units',
   // R18-B: society billing runs (one per period / special levy; the batch, counts and totals by head)
   'society_runs',
-  // R19-A: logistics job files (JOB/FY…) and rate sheets
+  // R19-A: logistics job files (JOB/FY…)
   'lg_jobs',
-  'lg_rate_sheets',
   'voucher_types',
 ]);
 

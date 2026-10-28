@@ -280,9 +280,9 @@ export const TOPICS: readonly HelpTopic[] = [
   // R17-D
   t('time:deploy:statutory', 'Statutory', 'वैधानिक', 'Wage-revision arrears as debit notes per original bill; client TDS expected vs booked per quarter; PSARA / OSH / guard licences and contract ends.', 'Each revision; each quarter.', { statutory: ca(['MP9', 'MP12', 'MP41', 'MP42', 'MP43']) }),
   // R19-A: the Shipments desk on Time (B–D add billing, costing, customs, agents, courier, storage). Working papers — verify with your CA.
-  t('time:shipments', 'Shipments', 'शिपमेंट', 'Forwarders, customs brokers, courier and warehouses: a job file per shipment; every bill, cost and duty payment hangs on it.', 'Each new shipment.', { statutory: ca(['LG1', 'LG2', 'LG5']) }),
-  t('time:shipments:jobs', 'Jobs', 'जॉब', 'Mode, direction, ports, MBL / HBL or MAWB / HAWB, containers, SB / BOE; chargeable weight from the dimensions.', 'Each booking.', { statutory: ca(['LG33', 'LG26']) }),
-  t('time:shipments:rates', 'Rates', 'दरें', 'Charge heads with SAC, role (own, pure agent, exempt) and unit; rate sheets by client and lane; quote from a sheet.', 'When rates change.', { statutory: ca(['LG5', 'LG6', 'LG10']) }),
+  t('time:shipments', 'Shipments', 'शिपमेंट', 'A job file per shipment; its bills and costs hang on it.', 'Each shipment.', { statutory: ca(['LG1', 'LG2']) }),
+  t('time:shipments:jobs', 'Jobs', 'जॉब', 'Mode, ports, bills of lading, containers; chargeable weight.', 'Each booking.', { statutory: ca(['LG33']) }),
+  t('time:shipments:rates', 'Rates', 'दरें', 'Charge heads: SAC, role (own or pure agent), unit, rate.', 'When rates change.', { statutory: ca(['LG5', 'LG10']) }),
   // R18-A: the Society desk on Recurring (B–D add bills, gst, dues, funds, registers). Working papers — verify with your CA.
   t('recurring:society', 'Society', 'सोसाइटी', 'Societies, apartment associations and RWAs: units, members and the tariff.', 'Each change.', { statutory: ca(['HS1', 'HS28']) }),
   t('recurring:society:units', 'Units', 'यूनिट', 'Flats and shops: areas, cost, owner, tenant, parking.', 'Each new member.', { statutory: ca(['HS8', 'HS34']) }),

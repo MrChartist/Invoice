@@ -5,8 +5,6 @@ import controls from '../../styles/controls.module.css';
 export type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 export interface LgViewProps { notify: Notify }
 
-export const row = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.75rem' } as const;
-
 export const Field = ({ label, children }: { label: string; children: ReactNode }) => <label className={controls.field}><span className={controls.label}>{label}</span>{children}</label>;
 
 /** A labelled select over `ids` (labels by `name`); `blank` adds an empty first option. */
@@ -25,6 +23,3 @@ export function Pick({ label, value, ids, name, onChange, blank, attr }: { label
 export function In({ label, value, onChange, type = 'text', attr }: { label: string; value: string | number | undefined; onChange: (v: string) => void; type?: 'text' | 'number' | 'date'; attr?: string }) {
   return <Field label={label}><input className={controls.input} type={type} min={type === 'number' ? 0 : undefined} step={type === 'number' ? 'any' : undefined} value={value ?? ''} onChange={(e) => onChange(e.target.value)} data-lg-field={attr} /></Field>;
 }
-
-/** A number input's value → a number, or undefined when blank. */
-export const numIn = (v: string): number | undefined => (v.trim() === '' ? undefined : Number(v));

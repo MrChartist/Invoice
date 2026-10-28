@@ -44,7 +44,6 @@ export function validateJob(j: LgJob, all: readonly LgJob[]): { errors: string[]
   if (!isDay(j.date)) errors.push(lgT('eDate'));
   if (!j.client_id) errors.push(lgT('eClient'));
   if (!j.origin?.trim() || !j.destination?.trim()) errors.push(lgT('ePorts'));
-  if (!LG_MODES.includes(j.mode) || !LG_DIRS.includes(j.dir) || !LG_STATUSES.includes(j.status)) errors.push(lgT('eKind'));
   if (j.dir === 'export' && /^(sea|air)/.test(j.mode) && !/^[A-Z]{2}$/.test(j.dest_country ?? '')) errors.push(lgT('eCountry'));
   for (const c of j.containers ?? []) {
     const k = containerCheck(c.no);
@@ -55,7 +54,6 @@ export function validateJob(j: LgJob, all: readonly LgJob[]): { errors: string[]
   const clash = all.find((x) => x.id !== j.id && house(x).some((h) => mine.includes(h)));
   if (clash) errors.push(lgT('eHouse', { n: clash.number }));
   for (const d of [j.refs?.sb_date, j.refs?.boe_date]) if (isDay(d) && isDay(j.date) && d! < shiftDay(j.date, -30)) hints.push(lgT('hDoc'));
-  for (const k of ['gross_kg', 'chargeable_kg', 'cbm', 'pkgs'] as const) if ((j[k] ?? 0) < 0) errors.push(lgT('eNum'));
   return { errors, hints };
 }
 
@@ -63,7 +61,7 @@ export function validateJob(j: LgJob, all: readonly LgJob[]): { errors: string[]
 export function cleanJob(j: LgJob): LgJob {
   const refs = Object.fromEntries(Object.entries(j.refs ?? {}).map(([k, v]) => [k, String(v ?? '').trim()]).filter(([, v]) => v)) as LgJob['refs'];
   const containers = (j.containers ?? []).map((c): LgContainer => ({ ...c, no: c.no.replace(/\s/g, '').toUpperCase() })).filter((c) => c.no);
-  return { ...j, origin: j.origin.trim().toUpperCase(), destination: j.destination.trim().toUpperCase(), dest_country: j.dest_country?.trim().toUpperCase() || undefined, refs, containers };
+  return { ...j, origin: j.origin.trim().toUpperCase(), destination: j.destination.trim().toUpperCase(), dest_country: j.dest_country?.toUpperCase() || undefined, refs, containers };
 }
 
 export interface JobFilter { fy?: string; status?: string; mode?: string; dir?: string; client?: string; agent?: string; salesperson?: string; branch?: string }

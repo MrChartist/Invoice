@@ -269,7 +269,7 @@ export const reachT = defineArea(
     'pack.manpower': 'Manpower supply', 'packDesc.manpower': 'Sites, posts and rates; reverse charge / exempt / 18 % per bill.',
     'pack.security': 'Security agency', 'packDesc.security': 'PSARA licences and guard licences on the Deploy desk.',
     'pack.society': 'Housing society', 'packDesc.society': 'The Society desk on Recurring.', // R18-A1
-    'pack.logistics': 'Freight forwarding', 'packDesc.logistics': 'Job files and freight billing on Time → Shipments.', 'pack.customs': 'Customs broker (CHA)', 'packDesc.customs': 'Duty deposits and disbursements per job.', 'pack.courier': 'Courier franchise', 'packDesc.courier': 'Monthly manifests by chargeable weight.', 'pack.warehouse': 'Warehouse / 3PL', 'packDesc.warehouse': 'Storage billing by pallet, area or CBM.', // R19-A1
+    'pack.logistics': 'Freight forwarding', 'packDesc.logistics': 'Shipments desk.', 'pack.customs': 'Customs broker (CHA)', 'packDesc.customs': 'Duty deposits per job.', 'pack.courier': 'Courier franchise', 'packDesc.courier': 'Courier manifests.', 'pack.warehouse': 'Warehouse / 3PL', 'packDesc.warehouse': 'Storage billing.', // R19-A1
     'ck.workCentres': 'Add your work centres (machines and their hour rates)',
     'ck.udyam': 'Add your Udyam number (printed on invoices)',
     'ck.firstDrawing': 'Add your first drawing',
@@ -545,7 +545,7 @@ export const reachT = defineArea(
     'pack.manpower': 'मानव-शक्ति आपूर्ति', 'packDesc.manpower': 'साइट, पोस्ट और दरें; हर बिल पर रिवर्स चार्ज / छूट / 18 %।',
     'pack.security': 'सुरक्षा एजेंसी', 'packDesc.security': 'तैनाती डेस्क पर PSARA लाइसेंस और गार्ड लाइसेंस।',
     'pack.society': 'आवास सोसाइटी', 'packDesc.society': 'आवर्ती पर सोसाइटी डेस्क।',
-    'pack.logistics': 'फ्रेट फ़ॉरवर्डिंग', 'packDesc.logistics': 'समय → शिपमेंट पर जॉब फ़ाइलें और भाड़ा बिलिंग।', 'pack.customs': 'कस्टम ब्रोकर (CHA)', 'packDesc.customs': 'हर जॉब पर ड्यूटी जमा और डिस्बर्समेंट।', 'pack.courier': 'कूरियर फ़्रैंचाइज़ी', 'packDesc.courier': 'देय वज़न से मासिक मैनिफ़ेस्ट।', 'pack.warehouse': 'वेयरहाउस / 3PL', 'packDesc.warehouse': 'पैलेट, क्षेत्र या CBM से भंडारण बिलिंग।',
+    'pack.logistics': 'फ्रेट फ़ॉरवर्डिंग', 'packDesc.logistics': 'शिपमेंट डेस्क।', 'pack.customs': 'कस्टम ब्रोकर (CHA)', 'packDesc.customs': 'हर जॉब पर ड्यूटी जमा।', 'pack.courier': 'कूरियर फ़्रैंचाइज़ी', 'packDesc.courier': 'कूरियर मैनिफ़ेस्ट।', 'pack.warehouse': 'वेयरहाउस / 3PL', 'packDesc.warehouse': 'भंडारण बिलिंग।',
     'ck.workCentres': 'अपने कार्य केंद्र जोड़ें (मशीनें और उनकी घंटे की दर)',
     'ck.udyam': 'अपना उद्यम पंजीकरण नंबर जोड़ें (इनवॉइस पर छपता है)',
     'ck.firstDrawing': 'पहली ड्रॉइंग जोड़ें',

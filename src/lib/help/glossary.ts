@@ -172,11 +172,6 @@ export const GLOSSARY = {
     'आवंटियों से मिली राशि का 70% अलग बैंक खाते में, जो केवल ज़मीन और निर्माण पर ख़र्च हो और इंजीनियर, आर्किटेक्ट व CA के प्रमाणपत्र पर निकले (रेरा धारा 4(2)(l)(D))।', 'प्राप्य → रियल्टी → रेरा खाता वसूली के 70% की जमा से तुलना करता है और हर निकासी जाँचता है (जैसा ऐप लागू करता है)।', ['CN25']),
   'deemed-land': g('Land deemed one-third', 'On the sale of a flat before completion, one-third of the total amount is treated as the value of land, so GST at 1.5% / 7.5% on the rest equals 1% / 5% of the whole.', 'Demand letters print the land line, the taxable two-thirds and the CGST / SGST on it (as the app applies it).',
     'निर्माणाधीन फ़्लैट की बिक्री में कुल राशि का एक-तिहाई ज़मीन का मूल्य माना जाता है, इसलिए शेष पर 1.5% / 7.5% GST पूरे का 1% / 5% होता है।', 'माँग पत्र पर ज़मीन की पंक्ति, कर योग्य दो-तिहाई और उस पर CGST / SGST छपते हैं (जैसा ऐप लागू करता है)।', ['CN18']),
-  // R19-A: logistics terms
-  'chargeable-weight': g('Chargeable weight', 'The weight freight is charged on: the greater of the gross weight and the volumetric weight worked out from the dimensions.', 'The job form works it out from the dimensions with the divisors in the logistics settings (as the app applies it).',
-    'वह वज़न जिस पर भाड़ा लगता है: कुल वज़न और माप से निकले आयतनी वज़न में से जो अधिक हो।', 'जॉब फ़ॉर्म माप से, लॉजिस्टिक्स सेटिंग के भाजक से इसे निकालता है (जैसा ऐप लागू करता है)।', ['LG33']),
-  'house-bill': g('House bill (HBL / HAWB)', "The forwarder's own bill of lading or air waybill to its client; the carrier's master bill (MBL / MAWB) covers the consolidated shipment.", 'Typed on the job and printed on its documents; the app never prints the negotiable bill itself.',
-    'फ़ॉरवर्डर का अपने ग्राहक को दिया बिल ऑफ़ लैडिंग या एयर वेबिल; कैरियर का मास्टर बिल (MBL / MAWB) पूरे कंसोलिडेटेड शिपमेंट का होता है।', 'जॉब पर लिखा जाता है और उसके दस्तावेज़ों पर छपता है; ऐप परक्राम्य बिल स्वयं नहीं छापता।', ['LG5']),
 } satisfies Readonly<Record<string, GlossaryTerm>>;
 
 export type GlossaryId = keyof typeof GLOSSARY;
