@@ -2,7 +2,7 @@
 
 Spec: `docs/prd/round-17.md`. One section per package; each records its bundle numbers (gzip -9, KiB, the method of
 `scripts/check-bundle-size.mjs`) and the `f-manpower` chunk. Working papers — verify with your CA (`docs/CA_REVIEW.md`
-§17, MP1–MP44).
+§17, MP1–MP48).
 
 ## §A — R17-A: manpower core (A1–A4)
 
@@ -221,3 +221,14 @@ Before = commit `b996116` (R17-C), after = this branch; `vite build` + gzip -9; 
 Chunks (normalized gz): `f-manpower` 9.1 → 11.6 kB (arrears / TDS receivable / alerts engines, `manpower-r17d`
 English), DeployDesk 9.4 → 11.9 kB (statutory view, `makeArrears`), `mp-payroll-io` 1.0 → 1.2 kB, wiring ≈ 0.3 kB.
 Round 17 C + D together: **+11.3 kB** core (caps 9 + 7).
+
+## QA round 20
+
+Fixes in `docs/prd/qa-round-20.md` (V1–V9): billing leaves out a muster a live bill covers (`planMonth(month, keep)`,
+`planUnbilled`); bills of several sites carry each line's site (`InvoiceItem.cost_centre_id`) and a service-charge line per
+site, and `billedFor` shares a bill by its lines; restore hooks for muster bills, arrears notes, `site_musters` and
+`site_compliance`; a site with musters / compliance rows / deployed staff / tagged bills cannot be deleted
+(`CostCentreUsage.sites`); compliance shares cut each run line by cumulative duties over locked musters (paisa-exact);
+an arrears note is dated no earlier than its bill (`createDebitNote` `date`) with the bill's TDS; a billed or
+payroll-final muster cannot be unlocked; muster warnings, licence notices, the GST TDS hint and the RCM-only note are
+translated; the agency-wide contract-labour licence hint (`clraAll`). CA questions MP45–MP48.

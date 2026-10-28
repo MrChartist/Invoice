@@ -16,6 +16,7 @@ export const mcT = defineArea(
     short: '{n} ({p}): paid ₹{a} a duty, minimum ₹{b}: owed ₹{c}', ok: 'No shortfall against the typed revisions.',
     'h.ot': '{w}: overtime paid below twice the ordinary rate', 'h.fte': '{w}: fixed-term past one year: provide gratuity',
     'h.wage': '{w}: PF wages under half of pay (50 % wage rule)', 'h.clra': 'Site {w} workers: no OSH / contract-labour licence on file',
+    'h.clraAll': 'All sites: {w} people deployed this month, at or above the contract-labour threshold for a manpower supply contractor: no OSH / contract-labour licence on file',
     pl: 'Billed,Wages,Relievers,Employer PF / ESI,Site bills,Margin,Margin %',
   } as const,
   {
@@ -29,6 +30,7 @@ export const mcT = defineArea(
     short: '{n} ({p}): ₹{a} प्रति ड्यूटी दिया, न्यूनतम ₹{b}: बकाया ₹{c}', ok: 'लिखे संशोधनों से कोई कमी नहीं।',
     'h.ot': '{w}: ओवरटाइम सामान्य दर के दोगुने से कम', 'h.fte': '{w}: निश्चित-अवधि एक साल से अधिक: ग्रेच्युटी दें',
     'h.wage': '{w}: PF वेतन कुल वेतन के आधे से कम (50 % नियम)', 'h.clra': 'साइट {w} कर्मचारी: OSH / ठेका-श्रम लाइसेंस नहीं',
+    'h.clraAll': 'सभी साइटें: इस महीने {w} लोग तैनात, मैनपावर सप्लाई ठेकेदार की ठेका-श्रम सीमा पर या अधिक: OSH / ठेका-श्रम लाइसेंस नहीं',
     pl: 'बिल,वेतन,रिलीवर,नियोक्ता PF / ESI,साइट बिल,लाभ,लाभ %',
   },
 );

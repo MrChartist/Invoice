@@ -727,9 +727,9 @@ export function buildDebitNote(
 
 export function createDebitNote(
   invoice: InvoiceRecord,
-  input: { lines: DebitLine[]; reason: string },
+  input: { lines: DebitLine[]; reason: string; /** QA20 V6: the note's date (a local day; default today). */ date?: string },
 ): InvoiceRecord {
-  const today = localIsoDate();
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(input.date ?? '') ? input.date! : localIsoDate();
   const rec = buildDebitNote(invoice, input, {
     id: generateId(),
     invoice_number: localDb.invoices.nextNumber(today, 'DEBIT_NOTE'),

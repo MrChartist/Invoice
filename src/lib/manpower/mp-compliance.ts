@@ -16,24 +16,48 @@ export type RunLine = Pick<PayslipLine, 'employee_id' | 'code' | 'name' | 'uan' 
 export type Amounts = Record<ShareKey, number>;
 export interface Share extends Amounts { employee_id: string; name: string; code: string; uan: string; duties: number; relief: boolean; ratio: number }
 
-/** A person's duties across every muster of the month. */
+/** The musters that count for the month's shares: locked ones (a draft is not yet a source — QA20 V5). */
+const counted = (all: readonly Pick<SiteMuster, 'month' | 'rows' | 'status'>[], month: string) => all.filter((m) => m.month === month && m.status !== 'draft');
+
+/** A person's duties across every locked muster of the month (QA20 V5: drafts left out, as the payroll push does). */
 export const dutiesOf = (all: readonly SiteMuster[], month: string, employeeId: string): number =>
-  all.filter((m) => m.month === month).reduce((t, m) => t + m.rows.filter((r) => r.employee_id === employeeId).reduce((s, r) => s + (Number(r.duties) || 0), 0), 0);
+  counted(all, month).reduce((t, m) => t + m.rows.filter((r) => r.employee_id === employeeId).reduce((s, r) => s + (Number(r.duties) || 0), 0), 0);
 
 /** `••••1234` (DPDP minimisation on the client's copy). */
 export const uan4 = (uan?: string): string => (uan && uan.length >= 4 ? `••••${uan.slice(-4)}` : '');
 
-/** One share per muster row (people missing from the run are left out: the run is the source). */
-export function siteShares(m: Pick<SiteMuster, 'month' | 'rows'>, all: readonly SiteMuster[], lines: readonly RunLine[]): Share[] {
+type MusterLike = Pick<SiteMuster, 'month' | 'rows'> & Partial<Pick<SiteMuster, 'id' | 'site_id' | 'status'>>;
+const order = (m: MusterLike) => `${m.site_id ?? ''}|${m.id ?? ''}`;
+
+/**
+ * One share per muster row (people missing from the run are left out: the run is the source). QA20 V5: each person's
+ * run line is cut by cumulative duties over the month's locked musters in a fixed order (site, muster), every share
+ * = round(amount × duties up to this row ÷ all) − round(amount × duties before it ÷ all), so a person's shares over
+ * all sites add up to the run line to the paisa (independent rounding lost a paisa a line: ₹10,000 over three sites
+ * came to ₹9,999.99).
+ */
+export function siteShares(m: MusterLike, all: readonly MusterLike[], lines: readonly RunLine[]): Share[] {
+  const self = (x: MusterLike) => x === m || (!!m.id && x.id === m.id);
+  const list = [...all.filter((x) => x.month === m.month && x.status !== 'draft' && !self(x)), m].sort((a, b) => order(a).localeCompare(order(b)));
   const out: Share[] = [];
-  for (const r of m.rows) {
+  m.rows.forEach((r, j) => {
     const l = lines.find((x) => x.employee_id === r.employee_id);
-    const tot = dutiesOf(all, m.month, r.employee_id);
-    if (!l || !tot || !(r.duties > 0)) continue;
-    const ratio = Math.min(1, r.duties / tot);
-    const amt = Object.fromEntries(SHARE_KEYS.map((k) => [k, round2((Number(l[k]) || 0) * ratio)])) as Amounts;
-    out.push({ ...amt, employee_id: r.employee_id, name: l.name, code: l.code, uan: uan4(l.uan), duties: r.duties, relief: !!r.relief, ratio });
-  }
+    if (!l || !(r.duties > 0)) return;
+    let before = 0;
+    let tot = 0;
+    for (const x of list) {
+      x.rows.forEach((y, k) => {
+        if (y.employee_id !== r.employee_id) return;
+        if (x === m ? k < j : order(x) < order(m)) before += Number(y.duties) || 0;
+        tot += Number(y.duties) || 0;
+      });
+    }
+    if (!tot) return;
+    const upto = Math.min(tot, before + r.duties);
+    const cut = (v: number) => round2(round2((v * upto) / tot) - round2((v * before) / tot));
+    const amt = Object.fromEntries(SHARE_KEYS.map((k) => [k, cut(Number(l[k]) || 0)])) as Amounts;
+    out.push({ ...amt, employee_id: r.employee_id, name: l.name, code: l.code, uan: uan4(l.uan), duties: r.duties, relief: !!r.relief, ratio: Math.min(1, r.duties / tot) });
+  });
   return out;
 }
 

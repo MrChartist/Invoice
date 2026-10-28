@@ -59,7 +59,7 @@ export default function StatutoryView({ notify }: MpViewProps) {
   const due = mpAlerts({ today, settings: s, packs: (localDb.settings.get() as { industry_packs?: string[] }).industry_packs ?? [], sites: d.sites, guards: d.staff });
   return (
     <section data-mp-statutory>
-      {note && <p className={controls.hint} role="note" data-mp-rcm-only>{note}</p>}
+      {note && <p className={controls.hint} role="note" data-mp-rcm-only>{mdT('rcmOnly')}</p>}
       <h4 className={controls.label}>{mdT('arrears')}</h4>
       <div style={bar}>
         <Field label={mdT('rev')}><select className={controls.select} value={revId} onChange={(e) => setRevId(e.target.value)} data-mp-arr-rev>{revs.map((r) => <option key={r.id} value={r.id}>{r.from} · {r.ref}{r.delta_day ? ` · +₹${r.delta_day}` : ''}</option>)}</select></Field>

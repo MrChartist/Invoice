@@ -49,8 +49,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
 | 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV48 | 48 | 15 |
 | 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF23 | 23 | 5 |
-| 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP44 | 44 | 12 |
-| **Total** | | **611** | **151** |
+| 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP48 | 48 | 13 |
+| **Total** | | **615** | **152** |
 
 ---
 
@@ -1211,9 +1211,9 @@ belong to R16-B / R16-C, PF17–PF18 to R16-D.
 `PF` ids are counted once here. The ★ items (PF1, PF3, PF5, PF7, PF17) change what a document prints or a return
 reports once notified.
 
-## 17. Security, facility-management and manpower-supply agencies (Round 17, ids MP1–MP44)
+## 17. Security, facility-management and manpower-supply agencies (Round 17, ids MP1–MP48)
 
-Added with `docs/prd/round-17.md` (§9: MP1–MP32) by R17-A; MP33–MP36 by R17-B; MP37–MP40 by R17-C; MP41–MP44 by R17-D. It covers private security agencies (PSARA licensees),
+Added with `docs/prd/round-17.md` (§9: MP1–MP32) by R17-A; MP33–MP36 by R17-B; MP37–MP40 by R17-C; MP41–MP44 by R17-D; MP45–MP48 by QA round 20 (`docs/prd/qa-round-20.md`). It covers private security agencies (PSARA licensees),
 housekeeping / facility-management contractors, contract and temporary staffing firms and labour contractors outside
 construction (R11 CN-D2 keeps those).
 
@@ -1270,7 +1270,11 @@ construction (R11 CN-D2 keeps those).
 | MP43 | Licences and renewals (R17-D3): PSARA per State (security pack only), OSH / contract-labour, trade and other licences, guards' own licences and contract end dates in the notification bell at 60 / 30 / 7 days (expired = critical); VDA reminder in April and October when no revision of the month is typed. Are these the right windows (PSARA renewal must be applied for before expiry)? | As stated | `mp-alerts.ts`, `VDA_REVISION_RULES` | — | S (MP22, MP23) |
 | MP44 | Registration note (R17-D4): when every client billed in the last 12 months had a reverse-charge (entry 14) bill, the profile shows the N 5/2017-CT note; an RCM bill of an agency without a GSTIN shows the pending PF8 note (e-invoicing of RCM inward supplies). Is the trigger right when the agency also supplies housekeeping (forward charge) to the same clients? | Note only | `mp-regime.ts` `regimeNotes`, `StatutoryView.tsx` | 2017-06-22 | P N 5/2017-CT (MP9), PIB 8 Oct 2026 (MP30) |
 
-`MP` ids are counted once here. The ★ items (MP1, MP2, MP4, MP6, MP7, MP10, MP12, MP14, MP16, MP29, MP34, MP41) change what a
+| MP45 | Contract-labour licence of the agency itself (QA20 V9): OSH Code Sec 45(1)(ii) applies to "every manpower supply contractor who has employed, on any day of the preceding twelve months, fifty or more contract labour" (CLRA Act Sec 1(4)(b): 20 workmen before the Codes). The hint counts distinct people on the month's musters across all sites (no day-wise data). Right proxy? Does a PSARA-licensed security agency also need the OSH contractor licence in each State it deploys in? | Hint only, when no OSH / contract-labour licence is on file | `mp-wage-check.ts` `labourHints` (`clraAll`), `CONTRACT_LABOUR_THRESHOLD_RULES` | 2025-11-21 | P OSH Code 2020 Sec 45(1) and Sec 27 (Gazette of India, Extraordinary, 29 Sep 2020, read in QA20); commencement S.O. 5321(E) not read (labour.gov.in 404) |
+| MP46 ★ | Arrears note date and TDS (QA20 V6): a debit note / supplementary invoice for wage-revision arrears is dated the later of the day it is made and its original bill's date (a bill dated the month end or the 1st of the next month can be ahead of today); its expected client TDS is the threshold test on that day with the bill counted, else the bill's own `mp.tds` rate when the bill is still a draft. Right — or should the note follow the client's actual credit date? | As stated | `mp-draft-io.ts` `makeArrears`, `documents.ts` `createDebitNote` (`date`) | — | Sec 34 CGST Act (recalled); Sec 393(1) Table Sl. 6 (MP14) |
+| MP47 | Bills of several sites (QA20 V3): each line carries its site (cost centre) and the service charge is one line per site, so the cost-centre P&L allocates the whole bill; the site P&L shares a bill's taxable value by its lines (credit notes by their own lines). Payroll cost stays on the employee's home cost centre in the books, while the site P&L apportions it by duties (relievers at other sites differ). Acceptable? | As stated | `mp-bill.ts` `billPlans`, `mp-profit.ts` `billedFor` | — | — (MP25, MP26) |
+| MP48 | Muster corrections after billing / payroll (QA20 V7): a muster billed by a live bill, or of a month whose payroll run is final, cannot be unlocked — duty corrections go through a credit / debit note on the bill (or cancelling it) and a reopened run. The compliance pack apportions each run line by cumulative duties over the month's locked musters in site order, so the last site absorbs the paisa (QA20 V5). Right? | As stated | `mp-muster-save.ts` `setMusterLock`, `mp-compliance.ts` `siteShares` | — | — (MP26) |
+`MP` ids are counted once here. The ★ items (MP1, MP2, MP4, MP6, MP7, MP10, MP12, MP14, MP16, MP29, MP34, MP41, MP46) change what a
 document prints or a return reports.
 
 ## Answers log
