@@ -189,7 +189,10 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   tables — by the store's rules through `storage.ts`, never importing `payroll/store.ts`, which would split the shared
   payroll chunk and grow the entry preload map). R17-B musters: one `site_musters` row per site × month (rows inside,
   dated `date` = month end); billing and the payroll push read locked musters only; billed state is derived from
-  `mp.muster_id` / `mp.muster_ids`. Rule values in `src/lib/manpower-rules.ts` (lazy only, `tests/mp-rules.test.ts`; no wage amounts). Notes:
+  `mp.muster_id` / `mp.muster_ids` (`billsOf` leaves credit / debit notes out). R17-C `site_compliance` (one per site × month,
+  shares of the FINAL payroll run by duties, read by `mp-payroll-io.ts` `readRunForMonth`; UAN last four, never bank fields;
+  a client hold is shown, never posted). R17-D arrears go through `createDebitNote` (DBN, `doc_links`) with `mp.arrear`
+  and no `muster_id`; licence notices come from `mp-alerts.ts` behind the bell's `manpower` gate. Rule values in `src/lib/manpower-rules.ts` (lazy only, `tests/mp-rules.test.ts`; no wage amounts). Notes:
   `docs/features/manpower-r17.md`.
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).

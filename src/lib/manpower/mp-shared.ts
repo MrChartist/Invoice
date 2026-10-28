@@ -9,7 +9,8 @@
 export const MP_TABLES = {
   // R17-B: duty registers, one per site × month (rows inside; dated by the month's last day)
   musters: 'site_musters',
-  // R17-C: compliance: 'site_compliance' (dated by the month's last day)
+  // R17-C: client compliance proof (PF TRRN / ESI challan, hold), one per site × month (dated by the month's last day)
+  compliance: 'site_compliance',
 } as const;
 
 /** Company objects (singletons). */
@@ -23,4 +24,5 @@ export const MP_PACKS = ['manpower', 'security'] as const;
 /** The date field each dated table is synced / period-locked by (mirrors the `sync-engine.ts` DATED rows). */
 export const MP_DATED: Readonly<Record<string, string>> = {
   site_musters: 'date', // R17-B
+  site_compliance: 'date', // R17-C
 };

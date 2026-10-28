@@ -473,6 +473,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}supplier_statements`]: 'period_end',
   // R17-B: site musters (the month's last day)
   [`${DB_PREFIX}site_musters`]: 'date',
+  // R17-C: site compliance proof (the month's last day)
+  [`${DB_PREFIX}site_compliance`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;

@@ -14,7 +14,7 @@ import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { ClientMp, MpRegime, MpSnapshot } from '../../types/manpower-r17';
 import { ruleAt } from '../tax-rules';
 import { getTable } from '../storage';
-import { BODY_CORPORATE_RULES, EDU_EXEMPT_RULES, MP_GST_RATE_RULES, SECURITY_RCM_RULES } from '../manpower-rules';
+import { BODY_CORPORATE_RULES, EDU_EXEMPT_RULES, MP_GST_RATE_RULES, RCM_ONLY_REG_RULES, SECURITY_RCM_RULES } from '../manpower-rules';
 
 /** Our firm form: the latest FY's annual-pack entity type (`notes_to_accounts`, the R14 rule); absent = proprietorship. */
 export const firmForm = (): string => getTable<{ id?: string; entity_type?: string }>('notes_to_accounts').filter((r) => r?.entity_type).sort((a, b) => String(b.id).localeCompare(String(a.id)))[0]?.entity_type ?? 'proprietorship';
@@ -91,4 +91,17 @@ export function mpRegimePatch(rec: Pick<InvoiceRecord, 'items'> & { mp?: MpSnaps
     rcm_tax_excluded: r.regime === 'rcm' ? true : undefined,
     mp: { ...mp, regime: r.regime, ...(r.decl ? { decl: r.decl } : {}), ...(note?.trim() ? { regime_note: note.trim() } : {}) },
   };
+}
+
+/**
+ * R17-D4 note ids (notes only, never a rule): `pf8` — an RCM bill of an agency without a GSTIN (the pending 57th
+ * Council e-invoicing of RCM inward supplies from unregistered persons, `pending-changes.ts` area `rcm_self`, MP30).
+ */
+export const regimeNotes = (regime: MpRegime | undefined, senderGstin?: string): 'pf8'[] => (regime === 'rcm' && !senderGstin?.trim() ? ['pf8'] : []);
+
+/** R17-D4: the N 5/2017-CT note when every manpower bill of the 12 months to `today` was reverse charge (MP9). */
+export function rcmOnlyNote(invoices: readonly Pick<InvoiceRecord, 'issue_date' | 'status' | 'doc_type' | 'mp'>[], today: string): string {
+  const from = `${Number(today.slice(0, 4)) - 1}${today.slice(4, 10)}`;
+  const bills = invoices.filter((i) => i.mp?.regime && i.status !== 'Cancelled' && i.doc_type !== 'CREDIT_NOTE' && i.issue_date > from && i.issue_date <= today);
+  return bills.length && bills.every((i) => i.mp?.regime === 'rcm') ? ruleAt(RCM_ONLY_REG_RULES, today) : '';
 }

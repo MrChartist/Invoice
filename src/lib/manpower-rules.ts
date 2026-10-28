@@ -62,4 +62,32 @@ export const RCM_ONLY_REG_RULES: readonly MpRule<string>[] = [
 
 /* ── R17-C: LABOUR_CODE_RULES, CONTRACT_LABOUR_THRESHOLD_RULES (C3) ──────────────────────────────────────────── */
 
+/**
+ * Labour Codes hints (C3; never a block, the payroll engine is unchanged): OT at least `ot_multiple` × the ordinary rate,
+ * fixed-term gratuity after `fte_years`, "wages" at least `wage_share` of all remuneration (excluded allowances above it
+ * added back). `null` before the codes took effect (MP16, MP19, MP20).
+ */
+export interface LabourCode { ot_multiple: number; fte_years: number; wage_share: number }
+
+export const LABOUR_CODE_RULES: readonly MpRule<LabourCode | null>[] = [
+  { from: '2019-08-08', value: null, source: 'Before the four Labour Codes took effect (Code on Wages assented 8 Aug 2019, not in force)', verified: false },
+  { from: '2025-11-21', value: { ot_multiple: 2, fte_years: 1, wage_share: 0.5 }, source: 'Labour Codes in force 21 Nov 2025 (PIB release, as read by the PRD author: OT at twice the wage rate, FTE gratuity after one year); 50 % wage rule from Code on Wages Sec 2(y) as reported (taxmann, KSandK). Not re-read in R17-C (MP16, MP19, MP20)', verified: false },
+];
+
+/** Contract workers at a site from which a contract-labour / OSH licence is expected (hint only, MP17). */
+export const CONTRACT_LABOUR_THRESHOLD_RULES: readonly MpRule<number>[] = [
+  { from: '1971-02-10', value: 20, source: 'Contract Labour (Regulation and Abolition) Act 1970 Sec 1(4): 20 or more workmen (as recalled)', verified: false },
+  { from: '2025-11-21', value: 50, source: 'OSH Code: contract-labour threshold 50 (EY alert, greytHR, as reported; MP17)', verified: false },
+];
+
 /* ── R17-D: VDA_REVISION_RULES (D1) ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Months in which the central-sphere VDA is revised (reminder only: the amounts are typed by the user, never stored
+ * here) and the days before a licence / contract end at which the bell warns (D3).
+ */
+export interface VdaRevision { months: readonly number[]; alert_days: readonly number[] }
+
+export const VDA_REVISION_RULES: readonly MpRule<VdaRevision>[] = [
+  { from: '2017-01-19', value: { months: [4, 10], alert_days: [60, 30, 7] }, source: 'Central-sphere minimum wages: VDA revised every 1 Apr and 1 Oct (CLC orders as reproduced by gconnect; Gulf News Oct 2024). Secondary only (MP22, MP43)', verified: false },
+];
