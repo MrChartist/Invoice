@@ -132,4 +132,21 @@ PRD: `docs/prd/round-19.md`. CA items: `docs/CA_REVIEW.md` §19 (LG1–LG44). Wo
 
 ### Bundle (R19-A)
 
-BUNDLE_TABLE
+Baseline measured on this branch before the first R19-A commit (`df085ff`, `vite build` + `check-bundle-size`): initial
+182.8 kB (4 files), entry 88.8 kB, core 3,195.3 kB, Hindi pack 351.6 kB, Hindi in core 21.6 kB, `lazy-leaves` 17.4 kB.
+Normalized = chunk hashes stripped from names and contents before gzip -9 (raw totals move ±1 kB between builds).
+
+| Budget | Before | After | Change (normalized) | Cap |
+|---|---|---|---|---|
+| Initial JS (first paint) | 182.8 kB (4 files) | 182.8 kB (4 files) | **−1 B** (entry, runtime, vendor chunks otherwise identical) | 0 ✓ |
+| Entry chunk | 88.8 kB | 88.8 kB | 0 | — |
+| Core precache (English) | 3,195.3 kB | 3,206.9 kB | **+11,259 B = 10.99 kB** | 11 kB ✓ (at the cap) |
+| Hindi pack | 351.6 kB | 354.0 kB | +2.33 kB (`lang-hi-logistics` 1.96 kB + wiring areas) | 8 kB ✓ |
+| Hindi left in core | 21.6 kB | 21.6 kB | 0 | 0 ✓ |
+| `lazy-leaves` | 17.4 kB | 17.6 kB | +124 B (`logistics/lg-registry.ts`) | 0.3 kB ✓ |
+
+Chunks (normalized gz): `f-logistics` 4.05 kB (rules A rows used, job / weight / heads / print engines, shared names,
+`logistics-r19a` English), ShipmentsDesk 4.13 kB (desk, jobs view, job form, rates view, `lg-save`, `lg-settings`,
+`lg-ui` / `lg-form`), the picker in the wizard pickers chunk 0.41 kB, `profile-logistics` 0.39 kB, LogisticsBlock
+0.32 kB, wiring ≈ 1.9 kB (shop-presets 0.22, wizard 0.20, checklist 0.19, help 0.18, Features 0.17, reach 0.15, Ctrl+K
+0.12, Time 0.11, recycle bin 0.09, packs 0.08, paper mount 0.08, open export 0.06, palette 0.06 …).
