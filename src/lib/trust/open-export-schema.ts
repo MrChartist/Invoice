@@ -166,7 +166,7 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   trips: 'Trip sheets.',
   ra_measurements: 'RA bill measurements per BOQ line.',
   boq_coefficients: 'Material per BOQ unit (theoretical consumption).',
-  import_runs: 'One row per import of suppliers, ledgers or opening balances (R6-C3).',
+  import_runs: 'One row per import of suppliers, ledgers or opening balances (R6-C3); kinds include supplier statements (R15) and site musters (`muster`, R17).',
   // R7: hotel pack
   hotel_room_types: 'Hotel room types.', hotel_rooms: 'Hotel rooms with housekeeping status.', hotel_rate_plans: 'Hotel rate plans.',
   hotel_reservations: 'Hotel reservations (RES/FY…) with room lines and nightly price snapshots.', hotel_folios: 'Hotel folios (running accounts; not tax documents).',
@@ -286,6 +286,8 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   travel_settings: 'Travel profile settings: GST regime default, IATA / BSP, consolidators, fee defaults, switches; C / D add theirs (R15).',
   // R17-A
   manpower_settings: 'Manpower profile settings: billing days, shift hours, service charge, bill date; cost-plus %, wage revisions, licences, arrears document (R17).',
+  // R17-B
+  site_musters: 'Site duty registers (musters): site (cost centre), month, rows (employee, post, duties, OT hours, reliever, note), draft / locked (R17).',
   travel_bookings: 'Travel bookings: trip / event file (cost centre), component, supplier, PNR / ref., dates, cost (currency, rate), sell, pure agent, status, supplier bill, invoice line once billed (R15).',
   // R15-C
   supplier_statements: 'Supplier statements (BSP / consolidator / bed-bank): supplier, kind, period, ref., rows (document no., type, date, passenger, gross, taxes, commission, net, match, status, ADM / refund flag), totals, bill and commission invoice made (R15).',

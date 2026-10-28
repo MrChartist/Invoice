@@ -185,8 +185,11 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   into `R9_RECORD_KEYS`) — never add keys; Sl. 66 lines reuse the R10 line key `sv.exempt`, RCM bills the existing
   `reverse_charge` / `rcm_tax_excluded` (one regime per invoice: `mp-regime.ts` `splitPosts`). Build group `f-manpower`
   (`vite.config.ts`; `mp-registry.ts` excluded, a lazy leaf, since sync / recycle bin import it): engines in `src/lib/manpower/` import only first-paint modules, `manpower-rules.ts` and each
-  other; anything else goes through a bridge `mp-*-io.ts` (≤ 4; `mp-payroll-io.ts` is the only importer of the payroll
-  store). Rule values in `src/lib/manpower-rules.ts` (lazy only, `tests/mp-rules.test.ts`; no wage amounts). Notes:
+  other; anything else goes through a bridge `mp-*-io.ts` (≤ 4; `mp-payroll-io.ts` is the only Round 17 writer of payroll
+  tables — by the store's rules through `storage.ts`, never importing `payroll/store.ts`, which would split the shared
+  payroll chunk and grow the entry preload map). R17-B musters: one `site_musters` row per site × month (rows inside,
+  dated `date` = month end); billing and the payroll push read locked musters only; billed state is derived from
+  `mp.muster_id` / `mp.muster_ids`. Rule values in `src/lib/manpower-rules.ts` (lazy only, `tests/mp-rules.test.ts`; no wage amounts). Notes:
   `docs/features/manpower-r17.md`.
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).

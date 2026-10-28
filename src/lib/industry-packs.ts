@@ -349,6 +349,8 @@ export const PACK_TABS: readonly PackTab[] = [
   // R17: the Deploy desk on /time (A writes its views; B–D add muster / bills, compliance / profit, statutory — labels `r17.*`)
   { pack: 'manpower', alsoPacks: ['security'], path: '/time?tab=deploy', labelKey: 'r17.deploy' },
   { pack: 'manpower', alsoPacks: ['security'], path: '/time?tab=deploy&view=sites', labelKey: 'r17.deploy.sites' },
+  { pack: 'manpower', alsoPacks: ['security'], path: '/time?tab=deploy&view=muster', labelKey: 'r17.deploy.muster' }, // R17-B
+  { pack: 'manpower', alsoPacks: ['security'], path: '/time?tab=deploy&view=bills', labelKey: 'r17.deploy.bills' },
 ];
 
 /**

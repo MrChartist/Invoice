@@ -2,7 +2,7 @@
 
 Spec: `docs/prd/round-17.md`. One section per package; each records its bundle numbers (gzip -9, KiB, the method of
 `scripts/check-bundle-size.mjs`) and the `f-manpower` chunk. Working papers — verify with your CA (`docs/CA_REVIEW.md`
-§17, MP1–MP32).
+§17, MP1–MP36).
 
 ## §A — R17-A: manpower core (A1–A4)
 
@@ -83,3 +83,63 @@ First paint: the registry is excluded from the family (`familyRe(…, 'mp-regist
 and added the chunk's file name to the entry's preload map (+38 B). As a leaf it adds no file; the remaining +28 B is
 the dependency order of one map entry. Not reduced further without dropping the registry import from those two lazy
 writers (AGENTS.md rule) — the lead may accept it as R15-B's +24 B was.
+
+## §B — R17-B: duty register and billing (B1–B4)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| B1 muster | Table **`site_musters`** (`MP_TABLES.musters`; `doc.create`; watched — label "Site muster", entity `cost_centre`; backed up, synced and period-locked by `date` = the month's last day; open-export row): `{ id, site_id, month, date, rows: { employee_id, post_id, duties, ot_hours?, relief?, note? }[] (≤ 300), status: 'draft' \| 'locked', locked_at?, updated_at }`, one per site × month (a second is refused). Pure `mp-muster.ts` (`daysIn`, `monthEnd`, `prevMonth`, `loadStaff` — raw `employees` rows —, `loadMusters`, `musterOf`, `deployedAt`, `copyRows`, `postTotals`, `musterWarnings`, `validateRows`); writer `mp-muster-save.ts` (`saveMuster`, `setMusterLock`, `logMusterImport` → `import_runs` kind `muster`). Import `mp-muster-import.ts` (`mapMusterTable`: fixed template `employee_code, duties, ot_hours, post` or a day-wise sheet P / H / HD / DD / A + `OT<n>` columns; unknown codes listed). View `MusterView.tsx` (`view=muster&site=&month=`). Checklist step `firstMuster`. |
+| B2 payroll | Pure `mp-attendance.ts` (`attendancePush`, `unlockedSites`); bridge `mp-payroll-io.ts` (`previewPush`, `pushAttendance`, `deployEmployee`). The push writes only the musters' people, keeps their other units, and is refused once the month's run is final. "Deployed staff" (Deploy / Release) on a saved site's form. |
+| B3 bills | Pure `mp-bill.ts` (`billDate`, `postLines` per basis, `billPlans` grouped per site or client + `bill_group`, split by `splitPosts`, `billsOf`); bridge `mp-draft-io.ts` (`planMonth`, `billMonth(month, siteIds?, again?)`) → drafts through `buildBillDraft` with `mpRegimePatch`. `mp` = `{ site (one site), month, basis, regime, decl, posts (with duties / amount / line_id / site), muster_id, muster_ids (grouped), annex }`. View `BillsView.tsx` (`view=bills&month=`) with the billing settings (billing days, bill date, service charge, extra-duty type, cost-plus %, print TDS). Paper part `templates/parts/manpower/DutyAnnex.tsx` (annexure: name, code, post, duties, OT). |
+| B4 TDS | Bridge `mp-tds-io.ts`: `clientTds` (R14 `expectedTds`, 194C default, rate by our firm form, label by date with `MANPOWER_WORK_RULES`) → `mp.tds`; `mp.tds_print` from "Print expected TDS" (paper line); `gstTdsHint` (`GST_TDS_51_RULES`, TDS-only Government client, never RCM) reported after billing. |
+| Help / Ctrl+K | Topics `time:deploy:muster`, `time:deploy:bills`; `PACK_TABS` rows; palette `r17.deploy.muster`, `r17.deploy.bills`; Ctrl+K text appended to `time.deploy`; synonyms. Strings `i18n/areas/manpower-r17b.ts` (literal Hindi). |
+| Tests / e2e | `mp-muster`, `mp-attendance`, `mp-bill` (incl. GSTR-1 B2B `rchrg: 'Y'`, e-Invoice `RegRev: 'Y'`, 18 % forward bill, volume), `mp-tds`; `mp-registry` (B block), `mp-profile` (step). E2E step "R17-B duty register and billing". |
+
+### API for R17-C / D
+
+- `loadMusters(month)`, `musterOf`, `daysIn`, `monthEnd`, `loadStaff` (`mp-muster.ts`); locked musters are the source of
+  duties per person × site × month (C2 apportions employer PF / ESI by them, MP26).
+- `billsOf(invoices, musterId)` (`mp-bill.ts`): the month's bills of a site (C2 billing, D1 arrears `mp.arrear.of`).
+  `postLines(site, post, muster, settings, newId)` gives the value of a post for a month (D1 recomputes at the revised rate).
+- `mp-payroll-io.ts`: C appends `readRunForMonth` — read `payroll_runs` raw (as `pushAttendance` does) rather than
+  importing `payroll/store.ts` (see Deviations).
+- `clientTds(client, date, base, invoices, ourForm)` (`mp-tds-io.ts`) for D2 / a debit note's expected TDS.
+- `planMonth` / `billMonth` (`mp-draft-io.ts`) and the `mp` snapshot keys above. Desk views are static imports in
+  `DeployDesk.tsx` (one chunk).
+
+### Deviations (R17-B)
+
+- **No payroll-store import.** `mp-payroll-io.ts` writes `attendance` / `employees` by the store's rules (rights
+  `books.edit` + `payroll.view`, final-run refusal, `normalizeAttendance` row shape, audit row) through `storage.ts`.
+  Importing `payroll/store.ts` split the shared payroll chunk (`shared` 30.3 → 9.3 + `store` 21.4 kB, +0.37 kB) and
+  changed the entry's preload map (+4 B first paint). Tests read the result back through the store.
+- **Drafts through `buildBillDraft`** (R3-B / R15-B), not CN-D2 `draftInvoice`: it sets the place of supply and GST mode
+  from the client and takes the reverse-charge fields before totals are worked out.
+- **Writers in their own file** (`mp-muster-save.ts`): a module that imports the registry cannot join `f-manpower`, so
+  the pure muster engine stays in the family and the writer sits in the desk chunk.
+- **Grid**: a plain table (as A), not `LinesGrid`. **Cost-plus** wages come from the post's rate per duty; the
+  finalised-run apportionment is C's (C1 bridge). **Deductee** (1 % / 2 %) follows our firm form (`firmForm()`), not
+  `Client.mp.tds.deductee`.
+- **Grouped bills** carry `mp.muster_ids` (B's sub-field) besides `muster_id`; `site` only on a one-site bill.
+- **Demo**: no sample musters (they need sample employees); the Demo company's sites are A's.
+- **Views static** in `DeployDesk.tsx` (one chunk, −2.3 kB against two lazy views + a split `mp-ui` chunk).
+
+### Bundle (R17-B)
+
+Before = `claude/elegant-cannon-cwapiv` at `72178a1` (R17-A merged), after = this branch; `vite build` + gzip -9;
+normalized = chunk hashes stripped.
+
+| Budget | Before | After | Delta | Cap |
+|---|---|---|---|---|
+| Initial JS (first paint) | 182.2 kB | 182.2 kB | **0 B** (entry identical after normalizing) | 0 ✓ |
+| Core precache (English) | 3,114.0 kB | 3,124.5 kB | +10.5 raw (hash noise ±0.4); **+9.4 kB normalized** | 12 kB ✓ |
+| Hindi pack | 342.4 kB | 343.1 kB | +0.7 kB (`lang-hi-manpower` 1.35 → 2.04) | — |
+| Hindi left in core | 21.3 kB | 21.3 kB | +8 B (two help-topic Hindi titles) | 0 ✓ (display) |
+| `lazy-leaves` | 16.6 kB | 16.7 kB | +32 B (registry rows) | — |
+
+Chunks (normalized gz): `f-manpower` 3.5 → 6.9 kB (muster / attendance / import / bill engines, `manpower-r17b`
+English), DeployDesk 2.8 → 7.0 kB (+ Muster / Bills views, muster writer, deploy list, draft / TDS bridges),
+`mp-payroll-io` 0.9 kB (lazy, on "Send to payroll" / "Deploy"), ManpowerBlock 0.57 → 0.78 kB (annexure + TDS line),
+wiring 0.6 kB (help 0.16, Ctrl+K 0.09, open export 0.09, palette 0.03, checklist / reach / packs 0.07).
