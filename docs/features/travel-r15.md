@@ -139,6 +139,47 @@ Breakdown (gz): Trips desk chunk 5.5 kB (desk, both views, costing, bill), strin
 trips view (≈ −0.5 kB; the costing per file stays), drop the picker hints (≈ −0.3 kB), fold `tv-profile` into
 `tv-settings` (≈ −0.15 kB).
 
+## §C — R15-C: air tickets and supplier settlement (C1–C3; C4 cut)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| C1 tickets | `travel/tv-air-value.ts` (pure): `fareOf` (basic + taxes + the airline's GST — the airline's supply, recovered at actual, never our output tax), `airlineGst` (suggestion by class and date when the ticket does not show it: `AIR_FARE_GST_RULES`, other classes 12 % → 18 % from 2025-09-22, TV12), `deemedValue` (Rule 32(3): 5 % domestic / 10 % international of the basic fare, `AIR_AGENT_VALUE_RULES`, TV11), `validateTicket` (13-digit ticket no. when given), `mergeTickets`: one pure-agent fare line per ticket (`charge_head_id: 'rule33'` + `PURE_AGENT_CHARGE`, so GSTR-1 / HSN / e-Invoice ItemList leave it out and e-Invoice keeps it in `OthChrg`) with its particulars in `tv.lines[lineId].tkt`, plus ONE service line — the deemed value, or the actual fee — at SAC 998551 / 18 % (`AIR_SAC_RULES`); adding tickets again re-makes that line (`tv.air.line_id`). `tv.air` = method, fee, value, line id and the printed Rule 32(3) sentence (snapshotted; `tvPaper` appends it to the declaration). A fee above the deemed value warns and the deemed value is kept (TV11, TV34). `travel/tv-air.ts` `billTickets`: "Ticket" on an `air` booking → a draft in the agent regime through `buildBillDraft`; the booking keeps `tkt` and points at the first fare line (billed is derived, B2). `components/travel/TicketRows.tsx` (pure UI: rows, fee, method — `travel_settings.air_value` default, per document override — live value, warning) is used by the editor's `TravelRows` ("Air tickets" button, also without a trip) and by the bookings table. `paper-helpers.ts` `tvLineText` also prints the fare split (basic + taxes + airline GST). |
+| C2 statements | `travel/tv-statements.ts`: BSP and consolidator presets (synonym tables scored by the importer's `scoreHeader` through the R5-A `marketplace/file-map.ts`), `readStatementRows` (TKTT / RFND / ADMA / ACMA; net defaults to gross + taxes − commission), `totalsOf` / `owed` (refunds and ACMs reduce what we owe; a disputed ADM is left out), `splitByMonth` (≤ 2,000 rows a statement), table **`supplier_statements`** (dated by `period_end`, synced, audited, `books.edit`, recycle bin, period lock; rows inside), one `import_runs` row (`supplier_statement`) per import, the user's column map remembered per preset in `travel_settings.statement_maps` (owner only; a clerk's map is not kept). `travel/tv-match.ts` (pure): by ticket no. (last 10 digits) / PNR / booking ref. within the period ± 45 days — an invoice outside the window is never opened; > ₹1 → `diff`; ADMA → ADM (record / dispute); RFND with no credit note on its invoice → "refund to pass on"; not found → `missing`; our tickets (BSP) or this supplier's bookings in the period missing from the file → `ours_only` rows. `travel/tv-statement-bill.ts` "Make bill" (the only posting): one expense bill of the net remittance, fares at actual (no GST, no ITC) and ADMs on their own line; refused when the supplier owes us, or twice. View `components/travel/StatementsView.tsx` (`&view=statements`): import form with the column fix, list with counts / commission / net, open statement filtered by status, Make bill, Match again, Remove. |
+| C3 cancellations | `travel/tv-cancel.ts`: `cancelPlan` (pure; guards) and `cancelBookings` (all or nothing, `doc.create`, period lock): a credit note through `documents.createCreditNote` for each issued invoice that billed the bookings (their lines in full, GST reversed; for a ticket invoice all its tickets and the service line), a draft invoice of our fee at the principal supply's rate (`CANCEL_FEE_RATE_RULES`: 5 % in `to5`, 18 % in `to18` / `agent`, exempt abroad; TV15, TV35), a value-only debit note (`purchase-returns`) on the booking's bill for the refund due (TV36), `cancel` on each booking (charges split by cost) and the trip set `cancelled` when nothing is left. Refund to the client = billed − fee with its GST (shown before posting). Guards: a booking inside a shared package line is cancelled with its whole trip; a draft invoice must be issued first; charge + refund ≤ cost; cancelled bookings are never billed again (B2). `components/travel/CancelDialog.tsx` from the bookings table (Cancel per booking, Cancel trip inside a file). The trip's loss is B2's (supplier charge not recovered by our fee). |
+| Wiring | `TV_TABLES.statements`, `TV_DATED.supplier_statements = 'period_end'`, registry block (`books.edit`, audit label "Supplier statement"), backup `RECORD_TABLES` / `ID_TABLES`, sync `DATED`, open-export row, `DEMO_EXTRA_TABLES`; types `TvSnapshot.air`, `TravelBooking.tkt`, `StatementRow`, `SupplierStatement` (`// R15-C` block); rules `AIR_AGENT_VALUE_RULES`, `AIR_SAC_RULES`, `AIR_FARE_GST_RULES`, `CANCEL_FEE_RATE_RULES` (all `verified: false`). Strings `i18n/areas/travel-r15c.ts` (shared words from `travel-r15b.ts`). Help `time:trips:statements` (in `topics-sales.ts`: the view has no `PACK_TABS` row, see deviations); Ctrl+K `time.trips` text extended. Tests `tv-air`, `tv-statements`, `tv-match` (+ 20,000-ticket / 26-statement volume), `tv-cancel`, `tv-registry`, `purchase-contract` (statement bill). E2E step "R15-C air tickets and supplier settlement". |
+
+### Deviations (R15-C)
+
+- **Cut 1 applied (C4 commission income)** and **cut 2 (bed-bank preset)**, size (PRD §3). Commission typed on a booking still counts in the trip margin (B2); the commission invoice to principals, 194H expected and the insurer's RCM flag are not built (TV16 / TV17 rows note it). A bed-bank file can be mapped with the consolidator preset (the `bedbank` kind stays in the type).
+- **Cut 3 items not built:** re-issue, the ticket annexure page and the CSV of differences.
+- **Import wizard:** no new `ImportKind`. Statements are read with the R5-A marketplace mapper (`file-map.ts` on top of `import-mapping.ts`'s `scoreHeader`, `file-read.ts` with the dynamic XLSX reader) inside the view: the wizard's kinds write master tables through its sinks, a statement is one row with match results. `import_runs` is written directly (kind `supplier_statement`, the B checklist step).
+- **No `TicketTable.tsx` part:** ticket particulars print under each line (`tvLineText`, now with the fare split) and the Rule 32(3) sentence in the travel block.
+- **Deemed value invoice:** the service line equals the deemed value; the fee typed is used only for the warning (and as the value under "actual"). Asked as TV34.
+- **Cancellation:** full credit of the billed lines + a separate fee invoice instead of a partial credit note (no 2-decimal quantity rounding on package lines); a booking inside a shared package line is cancelled only with its trip (TV35). The supplier refund is a 0 % debit note (TV36). A retained hotel charge billed as principal takes the regime rate, not the hotel band.
+- **Desk views static:** `StatementsView`, `CancelDialog` and `TicketRows` are in the Trips desk chunk (and `TicketRows` shared with `TravelRows`), not `lazy()` entries: each lazy import's preload list cost ≈ 0.4–1 kB, more than the code.
+- **No `PACK_TABS` / palette row for `statements`:** `industry-packs.ts` is first paint (the row cost ≈ +20 B); the view is reached from the desk tab and Ctrl+K "Trips" (text extended). Its help topic therefore lives in `topics-sales.ts` (the `/time` area).
+- **No demo rows** for statements (size); the table is in `DEMO_EXTRA_TABLES` so a Demo removal clears any.
+- CA items **TV34–TV37** (§15, total 529 → 533). R15-D may also number from TV34 — the lead renumbers on merge.
+
+### Bundle (R15-C)
+
+Before = `claude/elegant-cannon-cwapiv` at `6ea5407` (same tree as `868e287`), after = this branch; both built from the
+same kind of checkout. Raw = `scripts/check-bundle-size.mjs` method; normalized = the same with chunk hashes stripped
+from file contents (two builds of one tree differ by ≈ 1 kB raw because hashed chunk names change the gzip stream).
+
+| Budget | Before | After | Delta | Cap |
+|---|---|---|---|---|
+| Initial JS (first paint) | 182.6 kB (186,958 B) | 182.6 kB (186,985 B) | +27 B gz, **0 B raw** (same 561,180 B of normalized source; only the entry's preload-list order moved) | 0 ✓; 4 initial files |
+| Total JS (normalized) | 3,388,040 B | 3,399,269 B | **+11,229 B (10.97 kB)** | 11 kB ✓ |
+| Total JS (raw) | 3,488,481 B (3,406.7 kB) | 3,500,191 B (3,418.2 kB) | +11,710 B (11.4 kB, incl. hash noise) | budget 3,500 kB ✓ |
+
+Breakdown (normalized gz): Trips desk chunk +6.1 kB (statements view + import / match / bill engines 3.3, cancel dialog +
+engine 2.1, bookings actions 0.5, wiring 0.2), `TicketRows` shared chunk 3.5 kB (ticket rows, value engine, the
+strings area 1.4), `file-read` / `file-map` split out of the marketplace chunks +0.4 net, `tv-regime` (rules) +0.3,
+`TravelRows` +0.3, help +0.15, open export +0.1, paper +0.06, the rest < 0.1 each.
+
 ## §D — R15-D: outbound, TCS and events (D1–D3)
 
 ### What shipped
@@ -160,11 +201,11 @@ trips view (≈ −0.5 kB; the costing per file stays), drop the picker hints (�
   match and the old-Act label "206C(1G) overseas tour package" would otherwise get the LRS code `6CQ`.
 - **Events margin** = invoiced to the client − cost per head (vendor bills, else booked cost); the trips view's costing
   (sell-based) is not reused, to keep the events chunk off `tv-costing`.
-- **TDS hint date** = the booking's service date (the bill form has no date in `TripPick`), TV36.
+- **TDS hint date** = the booking's service date (the bill form has no date in `TripPick`), TV40.
 - **FX** (D2 #4): no change — B's booking form already keeps `cost_currency` / `fx` per booking; the invoice uses its own
   exchange rate. Cut 2 applied (chip only, no POS rows in the trips view); cut 1 (vendor-advance column) not built.
 - **Demo**: no event / outbound sample data added (`profile-travel.ts` unchanged; size).
-- **CA ids** TV34–TV36 added (§15 total 529 → 532).
+- **CA ids** TV38–TV40 added after R15-C's TV34–TV37 (§15 total 533 → 536).
 
 ### Bundle (R15-D)
 

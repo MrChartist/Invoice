@@ -12,14 +12,17 @@ import controls from '../../styles/controls.module.css';
 import type { Notify, TvViewProps } from './tv-run';
 import TripsView from './TripsView';
 import BookingsView from './BookingsView';
+import StatementsView from './StatementsView';
+import { cvT } from '../../i18n/areas/travel-r15c';
 
 type View = { label: () => string; C: ComponentType<TvViewProps> | LazyExoticComponent<ComponentType<TvViewProps>> };
 const VIEWS: Record<string, View> = {
   // R15-B
   trips: { label: () => tvT('trips'), C: TripsView },
   bookings: { label: () => tvT('bookings'), C: BookingsView },
-  // R15-C: statements (one `lazy(() => import(…))` entry)
-  // R15-D
+  // R15-C
+  statements: { label: () => cvT('statements'), C: StatementsView }, // in the desk chunk (a lazy entry's preload list cost more)
+  // R15-D (one lazy chunk for both views)
   tcs: { label: () => tvT('tcs'), C: lazy(() => import('./r15d-views').then((m) => ({ default: m.TcsView }))) },
   events: { label: () => tvT('event'), C: lazy(() => import('./r15d-views').then((m) => ({ default: m.EventsView }))) },
 };

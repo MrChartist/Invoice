@@ -468,6 +468,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}edf_register`]: 'date',
   // R15-B: travel bookings (by start)
   [`${DB_PREFIX}travel_bookings`]: 'start',
+  // R15-C: supplier statements (by period end)
+  [`${DB_PREFIX}supplier_statements`]: 'period_end',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
