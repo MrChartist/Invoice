@@ -68,7 +68,8 @@ palette +0.14, rt-registry +0.15, billwise +0.12, help +0.04 ≈ **4.75 kB** aga
 - A3: the "existing approval queue" is document-based (`approvals.ts` holds invoices); a clerk's netting is refused with
   "needs the owner's approval" instead of being queued. The netting receipts also write the normal per-receipt
   payment lines (localDb), besides the one netting line. The creditor sub-ledger line uses the client's name (the
-  existing exchange posting), so a hand-linked vendor with another name nets in the client's name.
+  existing exchange posting), so a hand-linked vendor with another name nets in the client's name. **Fixed in R16-D1:**
+  a netting row (`netting_id`) now debits the bill's own supplier (`ledger/postings.ts`); R9 / R12 exchange rows unchanged (PF17).
 - A3 over its cap by ≈ 0.75 kB (see above).
 - CA ids TV26 / TV27 are cited in code comments only; help / glossary cite no TV id until the lead copies §9 into
   `docs/CA_REVIEW.md` §15 (the CA-id regexes already accept `TV`).
@@ -118,6 +119,7 @@ palette +0.14, rt-registry +0.15, billwise +0.12, help +0.04 ≈ **4.75 kB** aga
 - **GST guards**: the "ITC on 5 % trips" check is an invoice check (`TV_ITC_5` on a 5 % invoice whose trip has a bill
   claiming ITC) plus the month list on the Trips view, since GST guards walk invoices.
 - **ITC reason without a reason**: the bill is refused with an English message (one string in the Expenses chunk).
+  **Fixed in R16-D3:** the message is `tvT('needReason')` (English / Hindi), loaded with the travel strings on refusal.
 - **Agent fee SAC** 998552 and the fee = sell − pure-agent cost rule are asked as **TV32 / TV33** (new; §15 of
   `docs/CA_REVIEW.md`, total 496 → 529).
 

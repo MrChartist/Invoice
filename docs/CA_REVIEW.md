@@ -48,7 +48,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF40–MF42, MF50–MF54, MF60–MF65, MF80–MF82, MF90–MF96 | 60 | 12 |
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
 | 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV45 | 45 | 14 |
-| **Total** | | **541** | **133** |
+| 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF18 | 18 | 5 |
+| **Total** | | **559** | **138** |
 
 ---
 
@@ -1154,6 +1155,37 @@ plus the round's cross-cutting items (party netting, the 2026 manpower and tour-
 
 `TV` ids are counted once here. The ★ items (TV1, TV3, TV7, TV8, TV11, TV15, TV19, TV21, TV23, TV34, TV35, TV38, TV39, TV41) are the ones a beta
 travel business's figures depend on first.
+
+## 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16, ids PF1–PF18)
+
+Added with `docs/prd/round-16.md` (§9). PF1–PF11 are recommendations of the 57th GST Council (8 Oct 2026) that are
+**not yet notified**: the app keeps them in a pending list (`src/lib/pending-changes.ts`, notes only, never rule rows;
+Help → What's new → "Announced, not yet in force") until a notification is issued. PF12–PF13 are help notes, PF14–PF16
+belong to R16-B / R16-C, PF17–PF18 to R16-D.
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| PF1 ★ | **Inverted-duty refund and input services (57th Council ¶8.2–8.3).** From which notification / date does Net ITC for an inverted-duty refund include input services (ITC availed on or after 1 Nov 2026)? Capital goods over 60 months from 1 Apr 2027: per-month apportionment? | Pending note only; formula unchanged (inputs only) | `pending-changes.ts`; Manufacturing → Inverted duty (`mf/mf-inverted.ts`) | — (recommended 2026-11-01 / 2027-04-01) | PIB release 8 Oct 2026 (57th GST Council) ¶8.2–8.3 |
+| PF2 | **Rule 89(4)(C) 1.5× cap removal:** effective date; does it also cover services? | Pending row; cap still applied | `pending-changes.ts`; `gst-cash-refunds.ts`, `prof/ps-refund-svc.ts` | — | PIB release 8 Oct 2026 (57th GST Council) ¶6.2 |
+| PF3 ★ | **Late fee waiver** for turnover ≤ ₹5 crore when the return is filed by the end of the month in which it was due: from which period; GSTR-1 too, or only Sec 39(1) returns? | Pending note on the Compliance tab; late fee still computed | `pending-changes.ts`; `gst-penalties.ts`; GST → Compliance | — | PIB release 8 Oct 2026 (57th GST Council) ¶15 |
+| PF4 | **Alternate mechanism from the April 2027 return** (Rule 61(1A) / (1B), IMS Rule 60(6A), Rules 86C / 86D statements): does our GSTR-1 / 3B working paper need new tables? | Pending note on the GSTR-3B paper | `pending-changes.ts`; GST → GSTR-3B | — (recommended from the April 2027 return) | PIB release 8 Oct 2026 (57th GST Council) ¶5.1–5.2 |
+| PF5 ★ | **Deletion of Sec 2(6)(v) IGST:** from when may a supply to our own foreign branch be zero-rated? | Export check still fails condition (v) for "own branch"; pending row | `pending-changes.ts`; `prof/ps-export-check.ts` | — | PIB release 8 Oct 2026 (57th GST Council) ¶10 |
+| PF6 | **Sec 13(3)(a) IGST omitted:** which of our job-work / repair exports move to Sec 13(2)? | Not modelled (watch) | `prof/ps-pos.ts` | — | PIB release 8 Oct 2026 (57th GST Council) ¶10 |
+| PF7 ★ | **RCM on plastic / e-waste / tyre scrap and used cooking oil** from unregistered suppliers; 2 % GST TDS on B2B supplies of these: who deducts, from when, which return? | Not modelled; pending note on the RCM goods notice | `pending-changes.ts`; `trading-rules.ts` `RCM_NOTIFIED_GOODS_RULES`; `trade/RcmGoodsNotice.tsx` | — | PIB release 8 Oct 2026 (57th GST Council) C1 ¶5 |
+| PF8 | **e-Invoicing for RCM inward supplies from URP and for import of services** (AATO ≥ ₹5 crore): IRN on a self-invoice — which document type? | Self-invoice without IRN; pending note | `pending-changes.ts`; `rcm-self-invoice.ts`; GST → RCM self-invoice | — | PIB release 8 Oct 2026 (57th GST Council) ¶18 |
+| PF9 | **Sec 17(5) relaxations** (outdoor catering, health / life insurance, free samples, goods written off on expiry): effective date; transition for bills before it? | ITC hints unchanged | ITC hints | — | PIB release 8 Oct 2026 (57th GST Council) ¶9 |
+| PF10 | **Same-line ITC** for restaurants, hotels ≤ ₹7,500 and gyms; 5 % option for EV passenger transport / rental; delivery via ECO at 5 % without ITC. | Not modelled | `hotel-rules.ts`, restaurant, `travel-rules.ts` | — | PIB release 8 Oct 2026 (57th GST Council) C2 ¶1, 2, 4 |
+| PF11 | **ARQP scheme** (≤ ₹5 crore, B2C only, concept note): any invoice or record-keeping change? | Watch | — | — | PIB release 8 Oct 2026 (57th GST Council) ¶17 |
+| PF12 | **Ship-to GSTIN / "URP" in e-Invoice and e-Way** (on hold since 29 Jul 2026): do we print or report anything new? | `ShipDtls.Gstin` when the consignee has a GSTIN; no URP; help line | `einvoice.ts`; help `gst-reports:eway-desk` | — | Secondary: taxo.online, lookuptax, busy.in |
+| PF13 | **GSTR-3B Table 5.1 interest** is auto-populated and cannot be edited downward (Jan / Feb 2026 periods): should our interest paper reconcile to the system figure as the minimum payable? | Help line on the Compliance tab | `gst-penalties.ts`; help `gst-reports:compliance` | 2026-01 period | Secondary: GSTN advisories 30 Jan / 19 Feb 2026 as reported (taxmann, Masters India) |
+| PF14 | **FX closing memo on WIP / foreign receivables (R16-B4):** memo only at year-end, or a restatement journal (AS 11 / Ind AS 21)? | Memo only | R16-B (`prof/`) | — | — |
+| PF15 | **Commission invoice to an airline / hotel (R16-C1):** SAC and 18 %; 194H base (gross commission incl. GST?) | SAC per TV16 row; 194H on the commission before GST | R16-C (`travel/tv-commission.ts`) | — | — |
+| PF16 | **Ticket re-issue (R16-C2):** change penalty and fare difference as pure agent; our re-issue fee at 18 %. | As stated | R16-C (`travel/tv-reissue.ts`) | — | — |
+| PF17 ★ | **Netting for a vendor linked by hand (R16-D1).** When a client and a vendor of another name are linked (`Vendor.client_id`), the set-off journal now debits the vendor's own creditor sub-ledger and credits the client's debtor sub-ledger (before: both lines in the client's name, so the vendor's ledger, statement and confirmation kept the full payable). Is the set-off between two differently named ledgers of one party presented right? | Vendor's and client's own sub-ledgers; derived on read, no migration | `ledger/postings.ts` (`receiptVoucher`, netting rows only); `netting.ts` | — | — (design) |
+| PF18 | **Real-estate no-ITC caution (R16-D3).** A builder (realty pack) on the 1 % / 5 % scheme (N 03/2019-CT(R)) is cautioned on every bill that claims ITC, also when the bill is not charged to a project (no caution while a project is on the old 8 % / 12 % option); saving past it is audited with the bill's note as the reason. Which inward supplies stay eligible (e.g. capital goods for a commercial let-out)? | Caution on every ITC claim; override audited | `bill-guard.ts` `realtyItcCaution` | 2019-04-01 | N 03/2019-CT(R) (recalled, CN18 / CN34) |
+
+`PF` ids are counted once here. The ★ items (PF1, PF3, PF5, PF7, PF17) change what a document prints or a return
+reports once notified.
 
 ## Answers log
 

@@ -56,7 +56,9 @@ carry the same paper and page 2. Paper strings: `i18n/areas/construction-r11-pap
   of a budget already over its share; each package adds its own view with its screen. A profile landing on a view that
   does not exist yet opens the BOQ view. The realty tab exists with a one-line stub (builder landing).
 - `sync-engine.ts` / `recycle-bin.ts` registry imports deferred to the first package with a table (first-paint rule).
-- `gst-guards.ts` class-rate notice and `bill-guard.ts` realty no-ITC caution are not wired: the class-rate notice
+- `gst-guards.ts` class-rate notice and `bill-guard.ts` realty no-ITC caution are not wired (**wired in R16-D3**: GST guard
+  `CN_CLASS_RATE` from the lazy `construction/cn-guard.ts`, CN1; the realty caution also covers bills not charged to a
+  project, PF18): the class-rate notice
   shows in the editor's Contract & RA panel; the realty caution belongs with CN-C's classes.
 - Sample data (`demo/profile-works.ts` dispatcher and blocks) not added; existing works sample rows unchanged.
 - Settings switches beyond the picker (paper style, certificate text, deviation %) have no separate Settings form:
@@ -182,7 +184,8 @@ glossary `rera-account`, `deemed-land`. Tests: `cn-units`, `cn-bookings`, `cn-de
   a deleted booking is not restorable from the bin (book the unit again).
 - Broker commission (194H bill) and reminders through follow-ups are not wired from the desk (existing purchase bill /
   follow-up screens apply); the plan table on the demand paper is a one-line stage list.
-- `bill-guard.ts` realty no-ITC caution (left by CN-A) is not wired.
+- `bill-guard.ts` realty no-ITC caution (left by CN-A) is not wired. (QA11 C9 wired it for bills charged to a project;
+  R16-D3 adds every other ITC bill of a builder, with an audited override — PF18.)
 
 ### Budget (CN-C)
 
