@@ -1,4 +1,4 @@
-/** R19-D4 logistics notices (each condition, the pack gate) and the disbursements ageing report. */
+/** R19-D4 logistics notices (each condition, the pack gate) and the disbursements ageing report, on C's disbursement / deposit rows. */
 import './helpers/shim.ts';
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -6,16 +6,19 @@ import { resetStorage } from './helpers/shim.ts';
 import { installSettings } from './helpers/world.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { setTable } from '../src/lib/storage.ts';
-import { lgAlerts, lgNotices, recoveredByJob } from '../src/lib/logistics/lg-alerts.ts';
+import { lgAlerts, lgNotices } from '../src/lib/logistics/lg-alerts.ts';
 import { disbAgeing } from '../src/lib/logistics/lg-reports.ts';
+import * as io from '../src/lib/logistics/lg-recv-io.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
-import type { PurchaseRecord } from '../src/types/purchases.ts';
 import type { LgJob, LgManifest } from '../src/types/logistics-r19.ts';
+import type { LgDisbRow } from '../src/lib/logistics/lg-disb.ts';
+import type { DepositBal } from '../src/lib/logistics/lg-deposits.ts';
 
 const job = (o: Partial<LgJob>): LgJob => ({ id: 'j1', number: 'JOB/FY26-27/0001', date: '2026-11-01', status: 'booked', dir: 'export', mode: 'air', origin: 'BOM', destination: 'SIN', client_id: 'c1', refs: {}, updated_at: '2026-11-01T10:00:00Z', ...o });
 const inv = (o: Partial<InvoiceRecord>): InvoiceRecord => ({ id: 'i1', invoice_number: 'INV/1', doc_type: 'TAX_INVOICE', status: 'Sent', issue_date: '2026-11-10', currency: 'INR', items: [], total: 0, ...o } as InvoiceRecord);
-const bill = (o: Partial<PurchaseRecord> & { lg: PurchaseRecord['lg'] }): PurchaseRecord => ({ id: 'p1', kind: 'EXPENSE', vendor_name: 'CFS', bill_number: 'X', date: '2026-09-01', category: '', lines: [], taxable: 0, cgst: 0, sgst: 0, igst: 0, itc_eligible: false, total: 0, amount_paid: 0, ...o });
-const none = { jobs: [], invoices: [], purchases: [], advances: [], manifests: [] };
+const row = (o: Partial<LgDisbRow>): LgDisbRow => ({ id: 'd', job_id: 'j1', client_id: 'c1', date: '2026-09-01', kind: 'duty', ref: '', payee: 'Customs', amount: 0, in_client_name: true, billed: false, age: 0, ...o });
+const dep = (o: Partial<DepositBal>): DepositBal => ({ id: 'a', job_id: 'j1', number: 'ADV/1', date: '2026-09-01', amount: 0, applied: 0, refunded: 0, open: 0, ...o });
+const none = { jobs: [], invoices: [], disb: [], deposits: [], manifests: [] };
 const ids = (xs: { id: string }[]) => xs.map((x) => x.id);
 
 beforeEach(() => { resetStorage(); installSettings(); });
@@ -28,19 +31,16 @@ test('delivered over 7 days ago and unbilled; a live bill clears it, a cancelled
   assert.deepEqual(ids(lgAlerts('2026-11-08', { ...none, jobs: [j], invoices: [inv({ lg: { job_id: 'j1' }, status: 'Cancelled' })] })), ['lg:unbilled:j1']);
 });
 
-test('disbursements unrecovered over 30 days (recovered by the schedule, else Rule 33 lines); deposit short on a job with a bill of entry', () => {
+test("C's unrecovered disbursements over 30 days; billed or written-off rows do not count; deposit short once the bill of entry is in", () => {
   const j = job({ refs: { boe_no: '1234567' } });
-  const duty = bill({ id: 'd', total: 185430, date: '2026-09-01', lg: { job_id: 'j1', on_behalf: true, disb: 'duty' } });
-  const cfs = bill({ id: 'c', total: 12000, date: '2026-11-20', lg: { job_id: 'j1', on_behalf: true, disb: 'cfs' } });
-  const d = { ...none, jobs: [j], purchases: [duty, cfs], advances: [{ amount: 200000, lg: { job_id: 'j1' } }] };
-  assert.deepEqual(ids(lgAlerts('2026-11-25', d)), ['lg:disb:j1'], 'only the old duty counts; deposits cover the duty');
-  const sched = inv({ lg: { job_id: 'j1', disb: [{ date: '2026-09-01', kind: 'duty', amount: 185430 }] } });
-  assert.deepEqual(ids(lgAlerts('2026-11-25', { ...d, invoices: [sched] })), []);
-  const r33 = inv({ lg: { job_id: 'j1' }, items: [{ id: 'l', name: 'Duty', type: 'Service', quantity: 1, rate: 185430, amount: 0, charge_head_id: 'rule33' }] });
-  assert.equal(recoveredByJob([r33]).get('j1'), 185430);
-  assert.deepEqual(ids(lgAlerts('2026-11-25', { ...d, invoices: [{ ...sched, status: 'Cancelled' }] })), ['lg:disb:j1'], 'a cancelled reimbursement bill → unrecovered again');
-  assert.deepEqual(ids(lgAlerts('2026-11-25', { ...d, advances: [{ amount: 100000, lg: { job_id: 'j1' } }], invoices: [sched] })), ['lg:deposit:j1']);
-  assert.deepEqual(ids(lgAlerts('2026-11-25', { ...d, jobs: [job({})], advances: [], invoices: [sched] })), [], 'no bill of entry yet → no deposit notice');
+  const duty = row({ id: 'd', amount: 185430, age: 85 }), cfs = row({ id: 'c', kind: 'cfs', amount: 12000, age: 5 });
+  const d = { ...none, jobs: [j], disb: [duty, cfs], deposits: [dep({ amount: 200000, open: 200000 })] };
+  assert.deepEqual(ids(lgAlerts('2026-11-25', d)), ['lg:disb:j1'], 'only the old duty counts; the deposit covers both');
+  assert.deepEqual(ids(lgAlerts('2026-11-25', { ...d, disb: [{ ...duty, billed: true }, cfs] })), [], 'on a live invoice line');
+  assert.deepEqual(ids(lgAlerts('2026-11-25', { ...d, disb: [{ ...duty, wo: { date: '2026-11-20', reason: 'x' } }, cfs] })), [], 'written off');
+  assert.deepEqual(ids(lgAlerts('2026-11-25', { ...d, deposits: [dep({ amount: 100000, open: 100000 })] })), ['lg:disb:j1', 'lg:deposit:j1']);
+  assert.match(lgAlerts('2026-11-25', { ...d, deposits: [] })[1].detail, /1,97,430\.00/, 'short by the unrecovered total');
+  assert.deepEqual(ids(lgAlerts('2026-11-25', { ...d, jobs: [job({})], deposits: [] })), ['lg:disb:j1'], 'no bill of entry yet → no deposit notice');
 });
 
 test("last month's manifests unbilled after the 5th", () => {
@@ -51,19 +51,17 @@ test("last month's manifests unbilled after the 5th", () => {
   assert.deepEqual(ids(lgAlerts('2027-01-06', { ...none, manifests: [{ ...m, period: '2026-12' }] })), ['lg:manifests:2026-12'], 'January looks at December');
 });
 
-test('the bell provider reads nothing while the Round 19 packs are off', () => {
+test("the bell provider reads nothing while the Round 19 packs are off; it reads C's rows through lg-recv-io", () => {
   setTable('lg_jobs', [job({ status: 'delivered' })]);
   const now = new Date(2026, 10, 20, 12);
-  assert.deepEqual(lgNotices({ now }), []);
+  assert.deepEqual(lgNotices({ now }, io), []);
   localDb.settings.save({ ...localDb.settings.get(), industry_packs: ['logistics', 'courier'] });
-  assert.deepEqual(lgNotices({ now }).map((n) => n.id), ['lg:unbilled:j1']);
-  assert.ok(lgNotices({ now })[0].at && lgNotices({ now })[0].href === '/time?tab=shipments&view=jobs');
+  assert.deepEqual(lgNotices({ now }, io).map((n) => n.id), ['lg:unbilled:j1']);
+  assert.ok(lgNotices({ now }, io)[0].at && lgNotices({ now }, io)[0].href === '/time?tab=shipments&view=jobs');
 });
 
-test('report: disbursements ageing (recoveries settle the oldest first); margin rows are B\'s job costing', () => {
-  const jobs = [job({})];
-  const ag = disbAgeing(jobs, [], [bill({ id: 'a', total: 100, date: '2026-07-01', lg: { job_id: 'j1', on_behalf: true } }), bill({ id: 'b', total: 50, date: '2026-11-10', lg: { job_id: 'j1', on_behalf: true } })], '2026-11-20');
-  assert.deepEqual(ag, [{ job: 'JOB/FY26-27/0001', b: [50, 0, 0, 100], total: 150 }]);
-  const rec = inv({ lg: { job_id: 'j1', disb: [{ date: '', kind: 'cfs', amount: 120 }] } });
-  assert.deepEqual(disbAgeing(jobs, [rec], [bill({ id: 'a', total: 100, date: '2026-07-01', lg: { job_id: 'j1', on_behalf: true } }), bill({ id: 'b', total: 50, date: '2026-11-10', lg: { job_id: 'j1', on_behalf: true } })], '2026-11-20')[0].b, [30, 0, 0, 0], 'recoveries settle the oldest first');
+test("report: disbursements ageing per job in C's buckets, unrecovered rows only", () => {
+  const jobs = [job({}), job({ id: 'j2', number: 'JOB/2' })];
+  const rows = [row({ id: 'a', amount: 100, age: 142 }), row({ id: 'b', amount: 50, age: 10 }), row({ id: 'c', amount: 70, age: 10, billed: true }), row({ id: 'e', job_id: 'j2', amount: 5, age: 45 })];
+  assert.deepEqual(disbAgeing(jobs, rows), [{ job: 'JOB/FY26-27/0001', b: [50, 0, 0, 100], total: 150 }, { job: 'JOB/2', b: [0, 5, 0, 0], total: 5 }]);
 });

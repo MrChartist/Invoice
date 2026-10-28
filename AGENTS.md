@@ -237,7 +237,10 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   use `localDb.invoices.saveMany`; a manifest's billed state is derived from `lg.manifest_id` (undo = cancel the bills).
   R19-D agents are vendors with `Vendor.lg` + `client_id`; an agent's bill keeps its foreign amount in `PurchaseRecord.lg.fx`
   (booked in ₹); agent netting reuses the R15-A markers on foreign-currency receipts with `realised_rate` = the bill's rate,
-  and `exchangeSettled` values such a row at that rate. Rule values in `src/lib/logistics-rules.ts` (lazy only, date-keyed, keyed rows
+  and `exchangeSettled` values such a row at that rate. R19-C adds no table: a disbursement is a `purchases` expense with
+  `lg.on_behalf` (0 %, no ITC, pure agent, billable; billed while a live invoice line's `bill_refs` names it), a duty
+  deposit an advance with `pass_through` + `lg.job_id` (applied by the existing `advance_id` row), through the one C
+  bridge `lg-recv-io.ts`; B's "Bill job" bills them through `billExtras` (`disbCharges`, billed by row via `bill_refs`). Rule values in `src/lib/logistics-rules.ts` (lazy only, date-keyed, keyed rows
   read with `keyedAt`, `tests/lg-rules.test.ts`); GTA rates, the intermediary rule, TDS sections and Act labels stay in
   their own files, read through `lg-tax-io.ts`. CA ids `LG1`–`LG44` (`LG` sits before `G` in every CA-id regex). R19-B: job bills via `lg-issue-io.ts`
   (one `saveMany`; regimes `lg-regime.ts`; C / D add lines only through `billExtras` in `lg-bill.ts`); a POS-96 document with

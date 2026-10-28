@@ -115,6 +115,8 @@ export interface AdvanceInput {
   bankAccountId?: string;
   /** CN-C2: the realty booking (and a pass-through collection) this receipt is for. */
   booking?: Pick<AdvanceRecord, 'booking_id' | 'pass_through'>;
+  /** R19-C2: the job of a duty deposit (kept on edit). */
+  lg?: AdvanceRecord['lg'];
 }
 
 export function validateAdvance(input: AdvanceInput, today: string = todayIso()): string[] {
@@ -213,7 +215,8 @@ export function saveAdvance(input: AdvanceInput, ctx: Ctx = {}): AdvanceRecord {
     ...(input.reference?.trim() ? { reference: input.reference.trim() } : {}),
     ...(input.description?.trim() ? { description: input.description.trim() } : {}),
     ...(input.note?.trim() ? { note: input.note.trim() } : {}),
-    ...(input.booking ?? (prev?.booking_id ? { booking_id: prev.booking_id, pass_through: prev.pass_through } : {})),
+    ...(input.booking ?? (prev?.booking_id || prev?.pass_through ? { booking_id: prev.booking_id, pass_through: prev.pass_through } : {})),
+    ...(input.lg ?? prev?.lg ? { lg: input.lg ?? prev?.lg } : {}),
     tax: computeAdvanceTax({ amount, rate: tax_rate, supply: input.supply, date, pos, senderState: senderState(sender) }),
     sender,
     refunds: prev?.refunds ?? [],

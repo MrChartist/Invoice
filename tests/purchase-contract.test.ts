@@ -1173,14 +1173,32 @@ test('R19-B job costing (lg-costing) reads the real bill shape', async () => {
   assert.deepEqual(rows.map((r) => [...costAlloc(r)]), [[['j1', 1000]], [['j2', 1180], ['j1', 1180]], [], []]);
 });
 
-test('R19-D readers (lg-agents, lg-alerts, lg-reports) read the real purchase shape', async () => {
+// R19-C1: the customs broker's disbursements are read through `readPurchase` (`lg-recv-io.ts` `disbSource`): the total,
+// the payee, void rows flagged; the engine keeps only rows on the client's behalf tagged to a job; GST readers see no ITC.
+test('R19-C disbursements (lg-disb via lg-recv-io) read the real bill shape', async () => {
+  const { disbSource } = await import('../src/lib/logistics/lg-recv-io.ts');
+  const { disbRecord, disbRows } = await import('../src/lib/logistics/lg-disb.ts');
+  const row = { ...disbRecord({ job: { id: 'j', number: 'JOB/FY26-27/0002', client_id: 'c' }, kind: 'duty', payee: 'Customs', ref: '1234567', amount: 185430, date: '2026-04-12' }), id: 'd' };
+  const s = disbSource(row)!;
+  assert.deepEqual([s.date, s.total, s.payee, s.client_id, s.void, s.lg?.disb], ['2026-04-12', 185430, 'Customs', 'c', false, 'duty']);
+  assert.equal(disbSource({ ...row, status: 'void' })!.void, true);
+  assert.deepEqual(disbRows([s, disbSource({ ...bill, id: 'x' })!], () => false, '2026-04-22').map((r) => [r.id, r.amount, r.age]), [['d', 185430, 10]], 'an ordinary bill is not a disbursement');
+  const g = gstNormalize(row as never, '27');
+  assert.equal(g!.itcEligible, false);
+  assert.equal(g!.cgst + g!.sgst + g!.igst, 0);
+});
+
+test('R19-D readers (lg-agents; lg-alerts / lg-reports through C\'s lg-recv-io) read the real purchase shape', async () => {
   const { agentBills } = await import('../src/lib/logistics/lg-agents.ts');
   const { lgAlerts } = await import('../src/lib/logistics/lg-alerts.ts');
   const { disbAgeing } = await import('../src/lib/logistics/lg-reports.ts');
+  const { disbSource } = await import('../src/lib/logistics/lg-recv-io.ts');
+  const { disbRows } = await import('../src/lib/logistics/lg-disb.ts');
   const rcm: PurchaseRecord = { ...bill, id: 'p9', vendor_id: 'v', taxable: 5040, cgst: 0, sgst: 0, igst: 907.2, total: 5947.2, reverse_charge: true, import_type: 'SERVICES', lg: { job_id: 'j', fx: { currency: 'USD', amount: 60, rate: 84 } } };
   assert.equal(agentBills({ vendor: { id: 'v', name: 'A' } }, [rcm])[0].open, 60, 'supplier side = total less the RCM tax');
   const duty: PurchaseRecord = { ...bill, id: 'p10', date: '2026-01-01', lg: { job_id: 'j', on_behalf: true, disb: 'duty' } };
   const job = { id: 'j', number: 'J1', date: '2026-01-01', status: 'booked', dir: 'import', mode: 'sea_fcl', origin: 'NSA', destination: 'BOM', client_id: 'c', refs: {}, updated_at: '' } as const;
-  assert.deepEqual(lgAlerts('2026-04-12', { jobs: [job], invoices: [], purchases: [duty], advances: [], manifests: [] }).map((n) => n.id), ['lg:disb:j']);
-  assert.deepEqual(disbAgeing([job], [], [duty], '2026-04-12')[0].b, [0, 0, 0, 1180], 'ageing reads total and date as stored (101 days)');
+  const rows = disbRows([disbSource(duty)!], () => false, '2026-04-12');
+  assert.deepEqual(lgAlerts('2026-04-12', { jobs: [job], invoices: [], disb: rows, deposits: [], manifests: [] }).map((n) => n.id), ['lg:disb:j']);
+  assert.deepEqual(disbAgeing([job], rows)[0].b, [0, 0, 0, 1180], 'ageing reads the total and date through readPurchase (101 days)');
 });
