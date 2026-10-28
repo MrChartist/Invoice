@@ -97,7 +97,9 @@ test('pack-off gate: band and exception code read no alteration slips; the POS m
   }
   assert.ok(!seen.has(DB_PREFIX + 'alteration_jobs') && !seen.has('alteration_jobs'));
   assert.match(src('pages/Pos.tsx'), /isPackOn\(settings, 'apparel'\) && <Suspense fallback=\{null\}><PosApparel /);
-  assert.match(src('components/purchases/BillModal.tsx'), /includes\('apparel'\) && <Suspense fallback=\{null\}><BillGrid /);
+  // PENDING #23: the bill, PO and GRN editors share one slot; the apparel gate sits in it.
+  assert.match(src('components/purchases/BillModal.tsx'), /<SizeGridSlot lines=\{lines\}/);
+  assert.match(src('components/purchases/SizeGridSlot.tsx'), /includes\('apparel'\)\) return null;\s+return <Suspense fallback=\{null\}><BillGrid /);
   assert.match(src('components/creator/ItemsTable.tsx'), /\(apparelOn \|\| items\.some\(\(i\) => i\.band_rate\)\) && <Suspense/);
   assert.match(src('lib/retail/rt-alterations.ts'), /^import '\.\/rt-registry';/m);
 });
