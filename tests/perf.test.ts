@@ -19,6 +19,7 @@ import { salesRegister, purchaseRegister, gstSummary as exportGstSummary } from 
 import { filterInvoices } from '../src/lib/export-shared.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { setTable } from '../src/lib/storage.ts';
+import { audit } from '../src/lib/audit.ts';
 import { gstin, SELLER, SELLER_GSTIN } from './helpers/world.ts';
 import type { Client, InvoiceItem, InvoiceRecord, Payment } from '../src/types/invoice.ts';
 import type { PurchaseRecord } from '../src/types/purchases.ts';
@@ -169,7 +170,7 @@ test('storage-backed paths: reading a 5,000-row table repeatedly is not done in 
   setTable('invoices', invoices);
   setTable('transactions', payments);
   // One representative bulk operation per module that reads storage: all must be linear in the table size.
-  timed('localDb.invoices.getAll x 10', 2500, () => {
+  timed('localDb.invoices.getAll x 10', 1200, () => {
     for (let i = 0; i < 10; i++) localDb.invoices.getAll();
   });
   timed('localDb.payments.record x 20 on a 5,000-invoice table', 4000, () => {
@@ -179,10 +180,61 @@ test('storage-backed paths: reading a 5,000-row table repeatedly is not done in 
       localDb.payments.record({ invoiceId: inv.id, amount: 1, method: 'UPI', date: '2026-05-01' });
     }
   });
-  timed('localDb.invoices.nextNumber x 10', 3000, () => {
+  timed('localDb.invoices.nextNumber x 10', 1500, () => {
     for (let i = 0; i < 10; i++) localDb.invoices.nextNumber('2026-06-01');
   });
   timed('calcInputFromRecord + calculateInvoice for every stored invoice (re-derive all)', 4000, () => {
     for (const inv of localDb.invoices.getAll()) calculateInvoice(calcInputFromRecord(inv));
   });
+});
+
+test('R15-A2 (PERF-3): a save on a 5,000-invoice company writes the audit log once (was once per event)', async () => {
+  resetStorage();
+  const { invoices, payments } = makeData();
+  setTable('invoices', invoices);
+  setTable('transactions', payments);
+  audit.flush();
+  const before = audit.count();
+  const ls = globalThis.localStorage;
+  const real = ls.setItem.bind(ls);
+  let writes = 0;
+  // QA19 U6: the cap is on the AUDIT work (every audit.record + the batch's write), not on the saves around it. The saves
+  // rewrite the 5,000-invoice table (≈ 40 ms each: PERF-3 row-level storage is deferred) and have their own cap in the
+  // test above; timing them here failed a loaded full run (4.6 s vs 4 s) while the audit part takes ≈ 10 ms.
+  let auditMs = 0;
+  ls.setItem = (k: string, v: string) => {
+    if (!k.endsWith('audit_log')) return real(k, v);
+    writes++;
+    const t0 = performance.now();
+    real(k, v);
+    auditMs += performance.now() - t0;
+  };
+  const realRecord = audit.record;
+  audit.record = (input) => {
+    const t0 = performance.now();
+    try {
+      return realRecord(input);
+    } finally {
+      auditMs += performance.now() - t0;
+    }
+  };
+  let saves: number;
+  try {
+    const t0 = performance.now();
+    for (let i = 0; i < 40; i++) {
+      const inv = invoices[3 + i * 11];
+      if (inv.status === 'Sent' && inv.doc_type === 'INVOICE') localDb.payments.record({ invoiceId: inv.id, amount: 1, method: 'UPI', date: '2026-05-02' });
+    }
+    saves = performance.now() - t0;
+    await new Promise((r) => setTimeout(r, 0)); // the task's microtasks: field-edit rows, then the one write
+  } finally {
+    ls.setItem = real;
+    audit.record = realRecord;
+  }
+  console.log(`# perf the batch's audit work (records + one write, 5,000 invoices): ${auditMs.toFixed(0)} ms of ${saves.toFixed(0)} ms of saves`);
+  assert.ok(auditMs < 1000, `audit work took ${auditMs.toFixed(0)} ms (cap 1000 ms)`);
+  const events = audit.count() - before;
+  console.log(`# perf audit writes per save: ${writes} for ${events} events (one per event before R15-A2)`);
+  assert.ok(events >= 13, `${events} events`);
+  assert.equal(writes, 1);
 });

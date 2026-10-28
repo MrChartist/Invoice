@@ -1,0 +1,98 @@
+/* R5-C screens (fees, common credit, donations, funds, leases, deposits): shared layout, tokens only. */
+.stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.view {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.viewActive {
+  composes: view;
+  border-color: var(--primary);
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+}
+
+.note {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+
+.warn {
+  margin: 0;
+  color: var(--warning);
+  font-size: 0.8125rem;
+}
+
+.bad {
+  color: var(--loss);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.toolbar > label {
+  min-width: 8rem;
+  flex: 1 1 8rem;
+}
+
+.lines {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  align-items: center;
+}
+
+.line > input,
+.line > select {
+  flex: 1 1 6rem;
+  min-width: 0;
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.5rem;
+}
+
+.figure {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+
+.figure strong {
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

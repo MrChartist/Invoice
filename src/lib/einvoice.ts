@@ -9,6 +9,8 @@
  * under node:test.
  */
 
+import { isNonGstFinancialNote } from './financial-note';
+import { isPureAgentLine } from './trade/pure-agent';
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, round2, type CalcLine } from './invoice-calc';
 import { docCurrency, inrTotals, missingFxRate } from './fx';
@@ -357,9 +359,11 @@ export function sanitiseFileStem(s: string): string {
 }
 
 /** The document types the IRP accepts. Quotes, proformas and challans are not e-invoiceable. */
-export function eInvoiceDocType(record: Pick<InvoiceRecord, 'doc_type'>, override?: EInvoiceDocType) {
+export function eInvoiceDocType(record: Pick<InvoiceRecord, 'doc_type'> & Partial<InvoiceRecord>, override?: EInvoiceDocType) {
   // A Bill of Supply is outside e-invoicing (Rule 48(4) covers tax invoices and notes only), even with an override.
   if (record.doc_type === 'BILL_OF_SUPPLY') return null;
+  // R2-A2: a financial credit note without GST (settlement discount / kasar / bad debt) is not reported to the IRP.
+  if (isNonGstFinancialNote(record)) return null;
   if (override) return override;
   if (record.doc_type === 'CREDIT_NOTE') return 'CRN' as const;
   if (record.doc_type === 'DEBIT_NOTE') return 'DBN' as const;
@@ -485,6 +489,11 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
 
   // ── Items ──
   const noTax = record.gst_mode === 'NONE';
+  // QA8 T9: a pure-agent (Rule 33) reimbursement is not a supply: no item, its amount rides in OthChrg.
+  const agentIds = new Set((record.items ?? []).filter(isPureAgentLine).map((x) => x.id));
+  const agentLines = calc.lines.filter((l) => agentIds.has(l.id));
+  const agentTotal = round2(agentLines.reduce((t, l) => t + l.total, 0));
+  const agentTaxable = round2(agentLines.reduce((t, l) => t + l.taxable, 0));
   const items: EInvItem[] = calc.lines.map((l, i) => {
     const raw = (record.items ?? [])[i];
     const description = clean(raw?.name) || clean(raw?.description) || `Item ${i + 1}`;
@@ -524,6 +533,11 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
       TotItemVal: round2(l.taxable + l.cgst + l.sgst + l.igst + l.cess),
     };
   });
+  if (agentIds.size) {
+    const kept = items.filter((_, i) => !agentIds.has(calc.lines[i].id));
+    items.length = 0;
+    kept.forEach((it, i) => items.push({ ...it, SlNo: String(i + 1) }));
+  }
   // Taxable freight / other charges travel as their own item (ValDtls.OthChrg is outside AssVal and
   // carries no tax), under the principal line's HSN and rate, so AssVal and the tax totals reconcile.
   if (calc.charges_line) items.push(chargesItem(calc.charges_line, items.length + 1, noTax));
@@ -531,9 +545,9 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
   const intra = !!sellerStcd && pos === sellerStcd;
   // The IRP has no TCS field: it travels in "other charges" so TotInvVal still reconciles.
   // Untaxed freight / other charges ride there too; taxed ones are an item above.
-  const othChrg = round2((calc.charges_line ? 0 : calc.shipping + calc.other_charges) + calc.tcs_amount);
+  const othChrg = round2((calc.charges_line ? 0 : calc.shipping + calc.other_charges) + calc.tcs_amount + agentTotal);
   const valDtls: EInvValDtls = {
-    AssVal: calc.taxable_value,
+    AssVal: round2(calc.taxable_value - agentTaxable),
     CgstVal: calc.cgst_amount,
     SgstVal: calc.sgst_amount,
     IgstVal: calc.igst_amount,
@@ -711,6 +725,19 @@ export interface EInvoiceMeta {
   /** Approximate distance in km (0 lets the portal calculate it). */
   distance?: number;
   updated_at?: string;
+  /** Additive (8D, 8.64): IRN / e-Way Bill cancellation prepared or done on the portal (`einvoice-cancel.ts`). */
+  irn_cancel?: PortalCancel;
+  ewb_cancel?: PortalCancel;
+}
+
+/** A portal cancellation step (8D cancel flow). */
+export interface PortalCancel {
+  status: 'prepared' | 'done';
+  reason: 'duplicate' | 'data_entry' | 'order_cancelled' | 'other';
+  remark: string;
+  prepared_at: string;
+  /** Day it was cancelled on the portal (status `done`). */
+  done_on?: string;
 }
 
 export function getAllEInvoiceMeta(): EInvoiceMeta[] {

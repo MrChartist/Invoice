@@ -1,0 +1,123 @@
+/**
+ * Shop mode / business-type presets (8H, roadmap 8.120) — progressive disclosure.
+ *
+ * A company may say what it does (Kirana / retail, wholesale, services, manufacturer, CA / full
+ * accounting). That picks a preset list of MODULES; the sidebar (NAV_ITEMS) and the Dashboard tiles
+ * then show only what that business uses. Nothing is removed: every screen stays reachable through
+ * Ctrl+K and its URL, and Settings → Defaults → "Show all features" turns the filter off.
+ *
+ * Stored on the company settings (`mrchartist_inv_settings`, additive fields `business_type` and
+ * `modules`), so it is backed up and synced with the company. ABSENT `modules` = FULL: existing
+ * companies see exactly what they saw before.
+ *
+ * Data-driven and dependency-free on purpose: this file is part of the shell, so it must stay tiny;
+ * presets, tiles and the business-type list live in `shop-presets.ts` (lazy screens only).
+ * A path or tile this table does not know is always shown (new screens never vanish by accident).
+ */
+
+export type BusinessType =
+  | 'kirana' | 'wholesale' | 'services' | 'manufacturer' | 'full' | 'restaurant'
+  // R5-A1 industry packs (type only; presets in `shop-presets.ts`, packs in `industry-packs.ts`)
+  | 'ecommerce' | 'transport' | 'contractor' | 'institution' | 'nonprofit' | 'property'
+  | 'hotel'; // R7-A
+
+/** Optional modules (invoices, clients, receivables, dashboard and settings are always on). */
+export type ModuleId =
+  | 'pos'
+  | 'recurring'
+  | 'time'
+  | 'purchases'
+  | 'inventory'
+  | 'accounts'
+  | 'banking'
+  | 'tds'
+  | 'payroll'
+  | 'reports'
+  | 'gst'
+  | 'loans'
+  | 'design';
+
+export const ALL_MODULES: readonly ModuleId[] = ['pos', 'recurring', 'time', 'purchases', 'inventory', 'accounts', 'banking', 'tds', 'payroll', 'reports', 'gst', 'loans', 'design'];
+
+/** Route (path without query) → module. Paths not listed are core and always visible. */
+const PATH_MODULE: Readonly<Record<string, ModuleId>> = {
+  '/pos': 'pos',
+  '/tables': 'pos',
+  '/recurring': 'recurring',
+  '/time': 'time',
+  '/expenses': 'purchases',
+  '/inventory': 'inventory',
+  '/manufacturing': 'inventory',
+  '/distribution': 'inventory', // R6-B2
+  '/gateway': 'accounts',
+  '/books': 'accounts',
+  '/reconcile': 'banking',
+  '/cheques': 'banking',
+  '/tds': 'tds',
+  '/payroll': 'payroll',
+  '/reports': 'reports',
+  '/gst-reports': 'gst',
+  '/exports': 'gst',
+  '/loans': 'loans',
+  '/design': 'design',
+};
+
+const isModule = (v: unknown): v is ModuleId => typeof v === 'string' && (ALL_MODULES as readonly string[]).includes(v);
+
+/** What the company settings carry (additive, all optional). */
+export interface ShopModeSettings {
+  business_type?: BusinessType;
+  /** Absent = full (every module). */
+  modules?: ModuleId[];
+}
+
+/** The enabled modules, or null for "everything" (no filter). Unknown ids are dropped. */
+export function enabledModules(s: ShopModeSettings | null | undefined): ReadonlySet<ModuleId> | null {
+  if (!s || !Array.isArray(s.modules)) return null;
+  return new Set(s.modules.filter(isModule));
+}
+
+/** Module a route belongs to (the first path segment), or undefined for core / unknown routes. */
+export function moduleOfPath(path: string): ModuleId | undefined {
+  const seg = '/' + (path.split(/[?#]/)[0].split('/')[1] ?? '');
+  return Object.prototype.hasOwnProperty.call(PATH_MODULE, seg) ? PATH_MODULE[seg] : undefined;
+}
+
+/**
+ * R6-B2: a route that hosts a tab of an active industry pack stays visible when shop mode hides its module. Inline
+ * copy of `PACK_TABS` / `PACK_OF_TYPE` (`industry-packs.ts` stays out of the shell); `tests/industry-packs.test.ts`
+ * pins both copies.
+ */
+export const PACK_ROUTES: Readonly<Record<string, readonly string[]>> = {
+  '/distribution': ['transport', 'distributor', 'commodity', 'agency'], // R8-C
+  '/time': ['works'],
+  '/recurring': ['fees', 'leases'],
+  '/books': ['nonprofit'],
+  '/gst-reports': ['fees', 'nonprofit', 'leases', 'hotel'], // R7-C1: common credit + Hotel GST
+  '/tables': ['hotel'], // R7-A
+};
+export const PACK_OF_TYPE_INLINE: Readonly<Record<string, string>> = { ecommerce: 'marketplace', transport: 'transport', contractor: 'works', institution: 'fees', nonprofit: 'nonprofit', property: 'leases', hotel: 'hotel' }; // R7-A: hotel
+
+/** The company's packs: the explicit `industry_packs` list, else the one its business type implies. */
+export function impliedPacks(s: { business_type?: string; industry_packs?: unknown } | null | undefined): string[] {
+  if (!s) return [];
+  if (Array.isArray(s.industry_packs)) return s.industry_packs.filter((p): p is string => typeof p === 'string');
+  const t = s.business_type;
+  const p = t && Object.prototype.hasOwnProperty.call(PACK_OF_TYPE_INLINE, t) ? PACK_OF_TYPE_INLINE[t] : '';
+  return p ? [p] : [];
+}
+
+export function isPathVisible(path: string, modules: ReadonlySet<ModuleId> | null, packs?: readonly string[]): boolean {
+  if (!modules) return true;
+  const m = moduleOfPath(path);
+  if (!m || modules.has(m)) return true;
+  const hosts = PACK_ROUTES['/' + (path.split(/[?#]/)[0].split('/')[1] ?? '')];
+  return !!packs && !!hosts && hosts.some((p) => packs.includes(p));
+}
+
+/** R6-B2: how many of `paths` (sidebar entries) shop mode hides — the sidebar's "N more features" link. */
+export const countHidden = (paths: readonly string[], modules: ReadonlySet<ModuleId> | null, packs?: readonly string[]): number =>
+  paths.filter((p) => !isPathVisible(p, modules, packs)).length;
+
+/** Fired (on window) after the shop mode changes so the shell re-reads it without a reload. */
+export const SHOP_MODE_EVENT = 'mrc:shop-mode';

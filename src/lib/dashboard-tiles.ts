@@ -18,10 +18,11 @@ import { localDayOf } from './dates';
 
 export const TILE_PREFS_KEY = `${DB_PREFIX}dashboard_tiles`;
 
-export type TileId = 'receivables' | 'payables' | 'cashBank' | 'topItems' | 'lowStock' | 'gstDue' | 'branches' | 'approvals' | 'amcDue' | 'loyalty';
+export type TileId = 'receivables' | 'payables' | 'cashBank' | 'topItems' | 'lowStock' | 'gstDue' | 'branches' | 'approvals' | 'amcDue' | 'loyalty' | 'agents' | 'offers' | 'pharma' | 'today' | 'insights' | 'giftVouchers'; // R4-B1: giftVouchers
 
-export const ALL_TILES: readonly TileId[] = ['receivables', 'payables', 'cashBank', 'gstDue', 'topItems', 'lowStock', 'branches', 'approvals', 'amcDue', 'loyalty'];
-export const DEFAULT_TILES: readonly TileId[] = ['receivables', 'payables', 'cashBank', 'gstDue', 'topItems', 'lowStock'];
+export const ALL_TILES: readonly TileId[] = ['receivables', 'payables', 'cashBank', 'gstDue', 'topItems', 'lowStock', 'branches', 'approvals', 'amcDue', 'loyalty', 'agents', 'offers', 'pharma', 'today', 'insights', 'giftVouchers'];
+// 8G: the Today card and offline insights are on by default for new layouts.
+export const DEFAULT_TILES: readonly TileId[] = ['today', 'receivables', 'payables', 'cashBank', 'gstDue', 'insights', 'topItems', 'lowStock'];
 
 export function loadTilePrefs(userId = 'default'): TileId[] {
   const all = getJson<Record<string, unknown> | null>(TILE_PREFS_KEY, null);
@@ -59,6 +60,7 @@ export function forBranch(data: TileData, branch: string | undefined): TileData 
       purchases: purchases as unknown as BooksData['purchases'],
       purchasePayments: data.books.purchasePayments.filter((p) => !p.purchase_id || pids.has(p.purchase_id)),
       advances: branch ? [] : data.books.advances,
+      manualVouchers: [], // QA6-1 F5: manual vouchers are not split by branch here
     },
   };
 }

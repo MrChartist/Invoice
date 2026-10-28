@@ -5,6 +5,9 @@ import type { TemplateMetadata } from '../registry';
 import { DOC_TITLE_HI } from '../labels';
 import { usePaper } from '../paper-context';
 import styles from '../invoice-paper.module.css';
+import { useHeaderBand } from './header-band';
+import art from './docs-r3-paper.module.css';
+import { mfSellerText, pharmacistText, raDocTitle, svDocTitle, svRegText } from '../paper-helpers';
 
 interface HeaderProps {
   invoice: InvoiceRecord;
@@ -83,6 +86,15 @@ export function SenderIdentity({
             <br />
           </>
         )}
+        {sender.drug_licence && (
+          <>
+            <span className={styles.metaLabel}>DL No.:</span> {sender.drug_licence}
+            <br />
+          </>
+        )}
+        {sender.pharmacist && <>{pharmacistText(sender)}<br /></>}
+        {sender.sv_regs && <>{svRegText(sender)}<br /></>}
+        {mfSellerText(sender) && <>{mfSellerText(sender)}<br /></>}
         {sender.regLine && <>{sender.regLine}</>}
       </div>
     </div>
@@ -90,8 +102,9 @@ export function SenderIdentity({
 }
 
 function DocTitle({ invoice, style }: { invoice: InvoiceRecord; style?: CSSProperties }) {
-  const { bilingual } = usePaper();
-  const title = invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice');
+  const { bilingual, title: titled } = usePaper();
+  // R2-C5: the statutory title always prints; a Design Studio suffix is appended.
+  const title = titled(raDocTitle(invoice, invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice')) || svDocTitle(invoice) || invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'), invoice.doc_type); // R11: RA bill title
   return (
     <>
       <div className={styles.docTitle} style={style}>
@@ -126,12 +139,25 @@ export function StatementStrip({ invoice, due }: { invoice: InvoiceRecord; due: 
 
 /** The header treatments the templates are built from. */
 export function PaperHeader({ invoice, sender, meta }: HeaderProps) {
-  const { logoPosition, bilingual } = usePaper();
+  const { logoPosition, bilingual, title: titled } = usePaper();
   const layout = meta.layout;
-  const title = invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice');
+  const title = titled(raDocTitle(invoice, invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice')) || svDocTitle(invoice) || invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'), invoice.doc_type); // R2-C5 suffix; R11 RA title
   // The Ink skin sets its own serif title face in CSS; don't override it inline.
   const titleStyle = layout === 'ink' ? undefined : { fontFamily: meta.fontFamily };
   const number = invoice.invoice_number || 'DRAFT';
+  // R3-C3: a letterhead header band replaces the template's logo / name block; title + number stay.
+  const headerBand = useHeaderBand();
+  if (headerBand) {
+    return (
+      <>
+        <img className={art.bandHead} src={headerBand} alt="" data-letterhead-band />
+        <div className={art.bandTitle} style={titleStyle}>
+          <span>{title}</span>
+          <span>No. {number}</span>
+        </div>
+      </>
+    );
+  }
 
   const band = layout === 'corporate' || layout === 'ember';
   // An explicit logo position pulls the logo out into its own row above the header

@@ -1,7 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRightLeft, ChevronDown, FilePlus2, FileMinus2 } from 'lucide-react';
-import { allowedConversions, canRaiseNote, convertDocument } from '../../lib/documents';
+import { ArrowRightLeft, ChevronDown, FilePlus2, FileMinus2, History, Layers, ShoppingCart } from 'lucide-react';
+import { menuConversions, canRaiseNote, convertDocument, readLinks } from '../../lib/documents';
+import { reviseBlocked, reviseQuotation } from '../../lib/quote-revisions';
+import { progressBlocked } from '../../lib/progress-billing';
+import { s2T } from '../../i18n/areas/sales-r2';
+
+const ProgressInvoiceDialog = lazy(() => import('./ProgressInvoiceDialog').then((m) => ({ default: m.ProgressInvoiceDialog })));
+const SoToPoDialog = lazy(() => import('./SoToPoDialog').then((m) => ({ default: m.SoToPoDialog })));
 import type { InvoiceRecord } from '../../types/invoice';
 import { useToast } from '../ui/useToast';
 import { useT } from '../../i18n';
@@ -29,7 +35,15 @@ export function ConvertMenu({ invoice, onCreated, onRequestCreditNote, onRequest
   const navigate = useNavigate();
   const { notify, toastNode } = useToast();
 
-  const options = allowedConversions(invoice);
+  // R2-B: revisions, progress billing and back-to-back POs. A superseded quotation converts no further.
+  const links = readLinks();
+  const superseded = invoice.doc_type === 'QUOTATION' && links.some((l) => l.relation === 'revised' && l.from_id === invoice.id);
+  const options = superseded ? [] : menuConversions(invoice);
+  const canRevise = invoice.doc_type === 'QUOTATION' && !reviseBlocked(invoice, links);
+  const canProgress = (invoice.doc_type === 'QUOTATION' || invoice.doc_type === 'SALES_ORDER') && !progressBlocked(invoice, links);
+  const canPo = invoice.doc_type === 'SALES_ORDER' && invoice.status !== 'Draft' && invoice.status !== 'Cancelled' && !invoice.order_closed_on;
+  const [dialog, setDialog] = useState<'progress' | 'po' | null>(null);
+  const extras = canRevise || canProgress || canPo;
   const showCredit = Boolean(onRequestCreditNote) && canRaiseNote(invoice);
 
   useEffect(() => {
@@ -48,7 +62,22 @@ export function ConvertMenu({ invoice, onCreated, onRequestCreditNote, onRequest
     };
   }, [open]);
 
-  if (options.length === 0 && !showCredit) return null;
+  if (options.length === 0 && !showCredit && !extras) return null;
+
+  const revise = () => {
+    setBusy(true);
+    try {
+      const rec = reviseQuotation(invoice);
+      setOpen(false);
+      notify(s2T('q.revised', { number: rec.invoice_number }));
+      if (onCreated) onCreated(rec);
+      else navigate(`/invoice/${rec.id}`);
+    } catch (err) {
+      notify(err instanceof Error ? err.message : salesT('cv.failed'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const run = (target: (typeof options)[number]['target']) => {
     setBusy(true);
@@ -95,9 +124,29 @@ export function ConvertMenu({ invoice, onCreated, onRequestCreditNote, onRequest
               {salesT(invoice.doc_type === 'SALES_ORDER' ? 'cv.toPending' : 'cv.to', { doc: docLabel(o.target) })}
             </button>
           ))}
-          {showCredit && (
+          {extras && (
             <>
               {options.length > 0 && <div className={styles.menuSep} role="separator" />}
+              {canRevise && (
+                <button type="button" role="menuitem" className={styles.menuItem} onClick={revise} disabled={busy} data-revise>
+                  <History size={16} aria-hidden="true" /> {s2T('q.revise')}
+                </button>
+              )}
+              {canProgress && (
+                <button type="button" role="menuitem" className={styles.menuItem} onClick={() => { setOpen(false); setDialog('progress'); }} data-progress-menu>
+                  <Layers size={16} aria-hidden="true" /> {s2T('p.menu')}
+                </button>
+              )}
+              {canPo && (
+                <button type="button" role="menuitem" className={styles.menuItem} onClick={() => { setOpen(false); setDialog('po'); }} data-so-to-po>
+                  <ShoppingCart size={16} aria-hidden="true" /> {s2T('po.menu')}
+                </button>
+              )}
+            </>
+          )}
+          {showCredit && (
+            <>
+              {(options.length > 0 || extras) && <div className={styles.menuSep} role="separator" />}
               <button
                 type="button"
                 role="menuitem"
@@ -130,6 +179,15 @@ export function ConvertMenu({ invoice, onCreated, onRequestCreditNote, onRequest
             <p className={styles.menuNote}>{salesT('cv.note')}</p>
           )}
         </div>
+      )}
+      {dialog && (
+        <Suspense fallback={null}>
+          {dialog === 'progress' ? (
+            <ProgressInvoiceDialog source={invoice} onClose={() => setDialog(null)} onCreated={(rec) => (onCreated ? onCreated(rec) : navigate(`/invoice/${rec.id}`))} />
+          ) : (
+            <SoToPoDialog order={invoice} onClose={() => setDialog(null)} onDone={(msg) => notify(msg)} />
+          )}
+        </Suspense>
       )}
       {toastNode}
     </div>

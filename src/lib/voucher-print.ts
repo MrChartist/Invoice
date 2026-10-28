@@ -10,6 +10,7 @@
 
 import { amountInWords } from './amount-in-words';
 import { formatDate, formatMoney } from './utils';
+import { escHtml as esc } from './html-esc';
 
 export interface VoucherPrintLine {
   account: string;
@@ -58,8 +59,7 @@ export function voucherAmount(lines: readonly VoucherPrintLine[]): { dr: number;
   return lines.reduce((t, l) => ({ dr: t.dr + l.dr, cr: t.cr + l.cr }), { dr: 0, cr: 0 });
 }
 
-export const esc = (s: unknown): string =>
-  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
+export { esc };
 
 const money = (paise: number) => esc(formatMoney(paise / 100));
 

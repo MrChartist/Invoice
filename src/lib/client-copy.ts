@@ -1,3 +1,4 @@
+import { escHtml as esc } from './html-esc';
 /**
  * "Client copy": one self-contained HTML file of a document that the client can open in any
  * browser, print, or pay from (a tappable upi:// link works on phones). It is static — no
@@ -7,6 +8,10 @@
 
 export interface ClientCopyPay {
   amountText: string;
+  /** Label above the amount (default "Amount due"); a statement says "Balance due". */
+  label?: string;
+  /** Accessible name of the pay panel (default "Pay this invoice"). */
+  ariaLabel?: string;
   upiLink: string | null;
   upiId?: string;
   /** PNG data URL of the payment QR, if one was rendered. */
@@ -22,10 +27,19 @@ export interface ClientCopyInput {
   business: string;
   pay?: ClientCopyPay | null;
   generatedOn: string;
+  /** Optional line under the paper (e.g. "Statement as of 25 Oct 2026"). */
+  note?: string;
+  /**
+   * 8.101 (quotations): "Accept" / "Request changes" links — pre-filled wa.me or mailto: links built by
+   * `responseLinks` (quote-acceptance.ts). Anything else is dropped; no script is ever added.
+   */
+  respond?: { accept: string; changes: string } | null;
 }
 
-const esc = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
+/** Only wa.me and mailto: links may be written as response buttons. */
+const safeRespond = (u: string | undefined) =>
+  u && (/^https:\/\/wa\.me\/\d{6,15}\?text=[^"'<>\s]*$/.test(u) || /^mailto:[^"'<>\s]+$/.test(u)) ? u : null;
+
 
 /** Only real UPI deep links and image data URLs may end up in attributes. */
 const safeUpi = (u: string | null | undefined) => (u && /^upi:\/\/pay\?[^"'<>\s]+$/.test(u) ? u : null);
@@ -43,11 +57,20 @@ export function buildClientCopyHtml(input: ClientCopyInput): string {
   const upi = safeUpi(input.pay?.upiLink);
   const qr = safeImg(input.pay?.qrDataUrl);
   const payPanel = input.pay
-    ? `<section class="cc-pay" aria-label="Pay this invoice">
-  <div><div class="cc-label">Amount due</div><div class="cc-amount">${esc(input.pay.amountText)}</div>
+    ? `<section class="cc-pay" aria-label="${esc(input.pay.ariaLabel || 'Pay this invoice')}">
+  <div><div class="cc-label">${esc(input.pay.label || 'Amount due')}</div><div class="cc-amount">${esc(input.pay.amountText)}</div>
   ${input.pay.upiId ? `<div class="cc-label">UPI ID: <strong>${esc(input.pay.upiId)}</strong></div>` : ''}</div>
   ${upi ? `<a class="cc-btn" href="${esc(upi)}">Pay with UPI</a>` : ''}
   ${qr ? `<img class="cc-qr" src="${qr}" alt="UPI payment QR code" width="132" height="132">` : ''}
+</section>`
+    : '';
+  const acceptHref = safeRespond(input.respond?.accept);
+  const changesHref = safeRespond(input.respond?.changes);
+  const respondPanel = acceptHref && changesHref
+    ? `<section class="cc-pay" aria-label="Respond to this quotation">
+  <div><div class="cc-label">Happy with this quotation?</div><div class="cc-label">Tap to reply: your message opens ready to send.</div></div>
+  <a class="cc-btn" href="${esc(acceptHref)}">Accept</a>
+  <a class="cc-btn cc-alt" href="${esc(changesHref)}">Request changes</a>
 </section>`
     : '';
   return `<!doctype html>
@@ -67,12 +90,15 @@ export function buildClientCopyHtml(input: ClientCopyInput): string {
   .cc-amount { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 2px 0 6px; }
   .cc-btn { display: inline-block; background: #1a4d94; color: #fff; text-decoration: none; font-weight: 700;
     padding: 12px 20px; border-radius: 8px; font-size: 16px; }
+  .cc-alt { background: #fff; color: #1a4d94; border: 2px solid #1a4d94; }
   .cc-foot { font: 12px system-ui, sans-serif; color: #666; text-align: center; margin: 12px 0 24px; }
   @media print { html, body { background: #fff; } .cc-wrap { padding: 0; max-width: none; } .cc-pay, .cc-foot { display: none; } .cc-page { box-shadow: none; } }
 </style></head>
 <body><main class="cc-wrap">
 ${payPanel}
+${respondPanel}
 <div class="cc-page">${sanitizePaper(input.paperHtml)}</div>
+${input.note ? `<p class="cc-foot">${esc(input.note)}</p>` : ''}
 <p class="cc-foot">Sent by ${esc(input.business)} · generated ${esc(input.generatedOn)} · print this page for a paper copy</p>
 </main></body></html>`;
 }

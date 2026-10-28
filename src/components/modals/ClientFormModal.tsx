@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { CustomFieldInputs } from '../custom-fields/CustomFieldInputs';
 import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
 import { GstinInput } from '../ui/GstinInput';
+import { ContactPickButton } from './ContactPickButton';
 import { INDIAN_STATES, resolveStateCode, stateByCode } from '../../lib/india-states';
 import { checkGstin } from '../../lib/gstin';
 import { localDb } from '../../lib/localDb';
@@ -12,7 +13,18 @@ import { priceLevelsDb } from '../../lib/pricing';
 import type { Client } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { salesT } from '../../i18n/areas/sales';
+import { reachT } from '../../i18n/areas/reach';
+import { MESSAGE_LANGS, isMessageLang } from '../../lib/message-langs';
 import controls from '../../styles/controls.module.css';
+import { ContactsEditor } from '../clients/ContactsEditor';
+import { AddressBookEditor } from '../clients/AddressBookEditor';
+import { normalizeAddresses, normalizeContacts } from '../../lib/contacts';
+import { s2T } from '../../i18n/areas/sales-r2';
+
+// R2-A: payment term + reminder mode fields, loaded with their own strings.
+const ReminderModeField = lazy(() => import('../collections/ReminderModeField'));
+const DocDefaultsFields = lazy(() => import('../clients/DocDefaultsFields')); // R3-B5
+const ClientLegalRow = lazy(() => import('../prof/PartyRows').then((m) => ({ default: m.ClientLegalRow }))); // R14 (PS-B2)
 
 const BLANK: Client = {
   name: '',
@@ -56,6 +68,8 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
     }
   }, [open, client]);
 
+  // R14 (PS-B2): the legal-services status row, for a company with the `legal` pack.
+  const [legalOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('legal'))(localDb.settings.get() as never));
   const set = <K extends keyof Client>(key: K, value: Client[K]) => setForm((f) => ({ ...f, [key]: value }));
 
   // Characters 3–12 of a GSTIN are the holder's PAN.
@@ -76,6 +90,12 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
     if (tan && !isValidTan(tan)) return setError(salesT('cf.errTan'));
     const late_fee = fee.mode ? sanitizeClientLateFee({ mode: fee.mode, rate: fee.rate, graceDays: fee.grace }) : undefined;
     if (fee.mode && !late_fee) return setError(salesT('cf.errFee'));
+    // R2-B4: contact persons need a name; e-mails must look like e-mails.
+    if ((form.contacts ?? []).some((c) => !c.name.trim() && (c.phone || c.email || c.role))) return setError(s2T('c.errContact'));
+    const badMail = (form.contacts ?? []).find((c) => c.email && !/^\S+@\S+\.\S+$/.test(c.email.trim()));
+    if (badMail) return setError(s2T('c.errEmail', { email: badMail.email ?? '' }));
+    const contacts = normalizeContacts(form.contacts);
+    const addresses = normalizeAddresses(form.addresses);
     const creditLimit = credit.limit.trim() ? Number(credit.limit) : 0;
     const creditDays = credit.days.trim() ? Number(credit.days) : 0;
     if (!Number.isFinite(creditLimit) || creditLimit < 0) return setError(salesT('cf.errLimit'));
@@ -96,6 +116,9 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         credit_limit: creditLimit > 0 ? Math.round(creditLimit * 100) / 100 : undefined,
         credit_days: creditDays > 0 ? creditDays : undefined,
         price_level: form.price_level && levels.some((l) => l.id === form.price_level) ? form.price_level : undefined,
+        // R2-B4 (keys kept as undefined so clearing the lists overwrites the stored ones)
+        contacts: contacts.length ? contacts : undefined,
+        addresses: addresses.length ? addresses : undefined,
         updated_at: new Date().toISOString(),
       };
       const id = localDb.clients.upsert({ ...payload, id: client?.id });
@@ -129,6 +152,20 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
           <p className={controls.error} role="alert" ref={(el) => el?.scrollIntoView?.({ block: 'nearest' })}>
             {error}
           </p>
+        )}
+        {!client && (
+          // 8.24: Android Chrome — fill name / phone / e-mail / address from the phone's contacts (blank fields only).
+          <ContactPickButton
+            onPick={(c) => setForm((f) => ({
+              ...f,
+              name: f.name || c.name,
+              phone: f.phone || c.phone,
+              email: f.email || c.email,
+              address: f.address || c.address,
+              city: f.city || c.city || '',
+              zip: f.zip || c.zip || '',
+            }))}
+          />
         )}
         <div className={controls.row}>
           <label className={controls.field}>
@@ -246,6 +283,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
           </div>
           <span className={controls.hint}>{salesT('cf.creditHint')}</span>
         </fieldset>
+        <Suspense fallback={null}><ReminderModeField client={form} onChange={(p) => setForm((f) => ({ ...f, ...p }))} /></Suspense> {/* R2-A: payment term + reminder mode */}
         {levels.length > 0 && (
           <label className={controls.field}>
             <span className={controls.label}>{salesT('cf.priceLevel')}</span>
@@ -256,6 +294,18 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
             <span className={controls.hint}>{salesT('cf.priceHint')}</span>
           </label>
         )}
+        <ContactsEditor value={form.contacts ?? []} onChange={(v) => set('contacts', v)} />
+        <AddressBookEditor value={form.addresses ?? []} onChange={(v) => set('addresses', v)} />
+        <Suspense fallback={null}><DocDefaultsFields value={form.doc_defaults} onChange={(v) => set('doc_defaults', v)} /></Suspense>
+        {(legalOn || !!(form as { ps?: unknown }).ps) && <Suspense fallback={null}><ClientLegalRow value={form as { ps?: unknown }} onChange={(p) => setForm((f) => ({ ...f, ...p }))} /></Suspense>}
+        <label className={controls.field}>
+          <span className={controls.label}>{reachT('msgLang')}</span>
+          <select className={controls.select} value={form.message_lang ?? ''} onChange={(e) => set('message_lang', isMessageLang(e.target.value) ? e.target.value : undefined)}>
+            <option value="">{reachT('msgLangDefault')}</option>
+            {MESSAGE_LANGS.map((l) => <option key={l.code} value={l.code} lang={l.code === 'hinglish' ? 'en' : l.code}>{l.label}</option>)}
+          </select>
+          <span className={controls.hint}>{reachT('msgLangHint')}</span>
+        </label>
         <label className={controls.field}>
           <span className={controls.label}>{salesT('cf.notes')}</span>
           <textarea className={controls.textarea} rows={2} value={form.notes ?? ''} onChange={(e) => set('notes', e.target.value)} placeholder={salesT('cf.notesPh')} />

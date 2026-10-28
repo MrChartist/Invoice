@@ -17,6 +17,15 @@
  *    un-marked rows) and the demo rows are inserted explicitly.
  *  - Loading refuses when real invoices exist unless the caller passes `confirm: true`, and is
  *    idempotent: a second load changes nothing.
+ *  - QA7 G1/G2: loading refuses outright unless this tab's open database is the Demo company
+ *    (`demoDatabaseOpen`: `settings.demo_company` plus the registry entry's `demo` flag, both written only by
+ *    `demo-company.ts`).
+ *
+ * R6-B4: a dataset per business profile (`DemoProfile`). The trading set above is the base of every profile; the
+ * profile modules in `src/lib/demo/` add their own rows (`DemoExtras`: POS bills and a shift, time and a retainer,
+ * LRs and a trip, a BOQ and an RA bill), each split into its own chunk. Extra rows are marked `demo: true` like the
+ * rest and live in `DEMO_EXTRA_TABLES`, so `removeDemoData` takes them out too. The app loads samples only into the
+ * separate Demo company (`components/onboarding/demo-company.ts`).
  */
 
 import type { Client, InvoiceItem, InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
@@ -26,15 +35,43 @@ import { gstinChecksumChar } from './gstin';
 import { localDayOf, shiftDay } from './dates';
 import { buildInvoiceNumber, getIndianFY } from './invoice-number';
 import { localDb, blankProfile } from './localDb';
-import { DB_PREFIX, KEYS, SINGLETON_KEYS, getTable, readRaw, removeRaw, setTable, writeRaw } from './storage';
+import { DB_PREFIX, KEYS, SINGLETON_KEYS, getTable, peekTable, readRaw, removeRaw, setTable, writeRaw } from './storage';
 import { DOC_LINKS_TABLE, buildCreditNote, type DocLink } from './documents';
 import { PAYMENTS_TABLE, PURCHASES_TABLE, computePurchaseTotals, type PurchasePayment } from './purchases';
 import { VENDORS_TABLE } from './vendors';
 import { RECURRING_TABLE, createSchedule, templateFromInvoice, type RecurringSchedule } from './recurring';
 import { REMINDERS_TABLE } from './reminders';
+import { activeCompanyId, readRegistry } from './company-registry';
 
 /** Marker carried by every demo row. */
 export type Demo<T> = T & { demo?: true };
+
+/** R6-B4: which sample business to build. */
+export type DemoProfile = 'counter' | 'services' | 'trading' | 'transport' | 'works';
+export const DEMO_PROFILES: readonly DemoProfile[] = ['counter', 'services', 'trading', 'transport', 'works'];
+
+/** The profile that fits a company: its industry pack first, then its business type; trading otherwise. */
+export function demoProfileFor(s: { business_type?: string; industry_packs?: unknown } | null | undefined): DemoProfile {
+  const t = s?.business_type ?? '';
+  const packs = Array.isArray(s?.industry_packs) ? (s!.industry_packs as unknown[]) : t === 'transport' ? ['transport'] : t === 'contractor' ? ['works'] : [];
+  if (packs.includes('transport')) return 'transport';
+  if (packs.includes('works')) return 'works';
+  if (t === 'kirana' || t === 'restaurant') return 'counter';
+  if (t === 'services') return 'services';
+  return 'trading';
+}
+
+/** Rows a profile adds to the base dataset (all marked `demo: true`). */
+export interface DemoExtras {
+  invoices?: Demo<InvoiceRecord>[];
+  payments?: Demo<Payment>[];
+  /** Other tables (only those in `DEMO_EXTRA_TABLES`), rows appended as they are. */
+  tables?: Partial<Record<DemoExtraTable, Demo<{ id: string }>[]>>;
+}
+
+/** Tables a profile may add sample rows to; removal filters each by `demo: true`. */
+export const DEMO_EXTRA_TABLES = ['stock_items', 'pos_shifts', 'time_entries', 'retainers', 'vehicles', 'consignment_notes', 'trips', 'ra_measurements', 'doc_links', 'godowns', 'arrivals', 'sale_pattis', 'indents', 'party_rates', 'schemes', 'packaging_types', 'packaging_moves', 'trade_charge_heads', 'sales_agents', 'delivery_riders', 'rider_settlements', 'short_book', 'doctors', 'rx_refills', 'alteration_jobs', 'imei_checks', 'finance_deals', 'service_jobs', 'metal_rates', 'jewel_tags', 'karigar_moves', 'appointments', 'service_staff', 'commission_plans', 'member_plans', 'memberships', 'checkins', 'class_schedules', 'farm_batches', 'vendors', 'milk_rate_charts', 'milk_shifts', 'milk_dispatches', 'milk_cards', 'weighbridge_slips', 'cmr_agreements', 'job_work_principal', 'boms', 'production_orders', 'manufacturing_vouchers', 'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares', 'work_centres', 'routings', 'job_cards', 'drawings', 'print_estimates', 'cut_plans', 'cost_cards', 'export_authorisations', 'incentive_claims', 'cost_centres', 'engagements', 'conflict_checks', 'partners', 'partner_runs', 'udin_register', 'client_money', 'edf_register', 'travel_bookings', 'supplier_statements', 'society_units', 'society_runs'] as const; // R18-B: society runs (none in the sample; listed so a Demo removal clears them) // R18-A: society units (profile-society.ts) // R15-C: statements (none in the sample; listed so a Demo removal clears them) // R15-B: a Goa package with three bookings (profile-travel.ts) // R14-A: matters (cost centres), engagements, a conflict check (profile-prof.ts); R14-D: partners, a UDIN // R13-D: food / statutory rows; // R13-A: floor rows; R13-B: a drawing, a print estimate; R13-C: garments rows (profile-mfg.ts) // R12-C: mill rows; R12-D: cold rows (profile-agri.ts) // R10-A: salon front desk (profile-services.ts); R10-C: members desk // R8-C: agency rows; R8-A: distributor rows; R8-B: charge heads, broker; R9: retail rows (profile-retail.ts)
+export type DemoExtraTable = (typeof DEMO_EXTRA_TABLES)[number];
 
 export const DEMO_PROFILE_ID = 'demo-profile';
 export const DEMO_PROFILE_NAME = 'Sample Studio (demo)';
@@ -54,6 +91,8 @@ export interface DemoCounts {
   vendors: number;
   purchases: number;
   schedules: number;
+  /** R6-B4: rows of the profile tables (`DEMO_EXTRA_TABLES`). */
+  extras: number;
 }
 
 export interface DemoStatus {
@@ -66,7 +105,7 @@ export interface DemoStatus {
 
 export type DemoLoadResult =
   | { ok: true; counts: DemoCounts }
-  | { ok: false; reason: 'already_loaded' | 'has_real_data'; realInvoices?: number };
+  | { ok: false; reason: 'already_loaded' | 'has_real_data' | 'not_demo_company'; realInvoices?: number };
 
 /* ── Deterministic building blocks ────────────────────────────── */
 
@@ -158,7 +197,7 @@ export interface DemoDataset {
   purchasePayments: Demo<PurchasePayment>[];
 }
 
-function applyTotals<T extends InvoiceRecord>(rec: T): T {
+export function applyTotals<T extends InvoiceRecord>(rec: T): T {
   const t = calculateInvoice(calcInputFromRecord(rec));
   return {
     ...rec,
@@ -469,7 +508,7 @@ export function buildDemoDataset(today: string): DemoDataset {
 /* ── Status ───────────────────────────────────────────────────── */
 
 function demoScheduleIds(): Set<string> {
-  return new Set(getTable<Demo<RecurringSchedule>>(RECURRING_TABLE).filter(isDemo).map((s) => s.id));
+  return new Set(peekTable<Demo<RecurringSchedule>>(RECURRING_TABLE).filter(isDemo).map((s) => s.id));
 }
 
 function isDemoInvoice(inv: Demo<InvoiceRecord>, schedules: Set<string>): boolean {
@@ -478,19 +517,20 @@ function isDemoInvoice(inv: Demo<InvoiceRecord>, schedules: Set<string>): boolea
 
 export function demoStatus(): DemoStatus {
   const schedules = demoScheduleIds();
-  const invoices = getTable<Demo<InvoiceRecord>>(KEYS.invoices);
+  const invoices = peekTable<Demo<InvoiceRecord>>(KEYS.invoices);
   const demoInvoices = invoices.filter((i) => isDemoInvoice(i, schedules));
   const settings = localDb.settings.get();
   const counts: DemoCounts = {
     profiles: settings.profiles.filter(isDemo).length,
-    clients: getTable<Demo<Client>>(KEYS.clients).filter(isDemo).length,
-    items: getTable<Demo<InvoiceItem>>(KEYS.items).filter(isDemo).length,
+    clients: peekTable<Demo<Client>>(KEYS.clients).filter(isDemo).length,
+    items: peekTable<Demo<InvoiceItem>>(KEYS.items).filter(isDemo).length,
     invoices: demoInvoices.length,
     creditNotes: demoInvoices.filter((i) => i.doc_type === 'CREDIT_NOTE').length,
-    payments: getTable<Demo<Payment>>(KEYS.transactions).filter(isDemo).length,
-    vendors: getTable<Demo<Vendor>>(VENDORS_TABLE).filter(isDemo).length,
-    purchases: getTable<Demo<PurchaseRecord>>(PURCHASES_TABLE).filter(isDemo).length,
+    payments: peekTable<Demo<Payment>>(KEYS.transactions).filter(isDemo).length,
+    vendors: peekTable<Demo<Vendor>>(VENDORS_TABLE).filter(isDemo).length,
+    purchases: peekTable<Demo<PurchaseRecord>>(PURCHASES_TABLE).filter(isDemo).length,
     schedules: schedules.size,
+    extras: DEMO_EXTRA_TABLES.reduce((n, t) => n + peekTable<unknown>(t).filter(isDemo).length, 0),
   };
   const loaded = Object.values(counts).some((n) => n > 0);
   return { loaded, counts, realInvoices: invoices.length - demoInvoices.length };
@@ -505,11 +545,33 @@ export interface LoadDemoOptions {
   confirm?: boolean;
   /** Anchor for the "last six months" (defaults to now). Tests pass a fixed day. */
   today?: Date | string;
+  /** R6-B4: the profile's own rows (built by `src/lib/demo/profiles.ts` for the same `today`). */
+  extras?: DemoExtras;
 }
 
 const AUDIT_KEY = `${DB_PREFIX}audit_log`;
 
+/** R4-C4: sample rows never go to the recycle bin nor keep numbers reserved — both keys are put back as they were. */
+const binSnapshot = () => ['recycle_bin', 'series_counters'].map((t) => [DB_PREFIX + t, readRaw(DB_PREFIX + t)] as const);
+function putBinSnapshot(snap: ReturnType<typeof binSnapshot>): void {
+  for (const [key, raw] of snap) {
+    if (raw === null) removeRaw(key);
+    else writeRaw(key, raw);
+  }
+}
+
+/**
+ * QA7 G1/G2: the database THIS tab has open is the app-made Demo company: its own marker (`settings.demo_company`)
+ * and the creator's flag on its registry entry. Never a name, never the live registry's `active` (another tab's).
+ */
+export function demoDatabaseOpen(): boolean {
+  const here = activeCompanyId();
+  return localDb.settings.get().demo_company === true && readRegistry().list.some((c) => c.id === here && c.demo);
+}
+
 export function loadDemoData(opts: LoadDemoOptions = {}): DemoLoadResult {
+  // QA7 G1/G2: samples go only into the Demo company's own database; `confirm` never bypasses this.
+  if (!demoDatabaseOpen()) return { ok: false, reason: 'not_demo_company' };
   const status = demoStatus();
   if (status.loaded) return { ok: false, reason: 'already_loaded' };
   if (status.realInvoices > 0 && !opts.confirm) {
@@ -527,13 +589,22 @@ export function loadDemoData(opts: LoadDemoOptions = {}): DemoLoadResult {
   );
   // Sample rows are not real business activity: keep them out of the audit trail entirely.
   const auditBefore = readRaw(AUDIT_KEY);
-  const restoreAudit = () => (auditBefore === null ? removeRaw(AUDIT_KEY) : writeRaw(AUDIT_KEY, auditBefore));
+  const binBefore = binSnapshot();
+  const restoreAudit = () => {
+    putBinSnapshot(binBefore);
+    return auditBefore === null ? removeRaw(AUDIT_KEY) : writeRaw(AUDIT_KEY, auditBefore);
+  };
 
   try {
     // Payments first: `save` keeps the ledger as the floor for what has been received.
-    setTable(KEYS.transactions, [...getTable<Payment>(KEYS.transactions), ...data.payments]);
+    setTable(KEYS.transactions, [...getTable<Payment>(KEYS.transactions), ...data.payments, ...(opts.extras?.payments ?? [])]);
 
     for (const inv of data.invoices) localDb.invoices.save(inv);
+    // R6-B4: the profile's rows (POS bills, freight / RA bills …) and its own tables.
+    for (const inv of opts.extras?.invoices ?? []) localDb.invoices.save(inv);
+    for (const [table, rows] of Object.entries(opts.extras?.tables ?? {})) {
+      if ((DEMO_EXTRA_TABLES as readonly string[]).includes(table) && rows?.length) setTable(table, [...getTable<unknown>(table), ...rows.map((r) => ({ ...r, demo: true }))]);
+    }
 
     // One credit note, raised through the same validator the app uses.
     const saved = localDb.invoices.getAll() as Demo<InvoiceRecord>[];
@@ -629,6 +700,7 @@ export function removeDemoData(): DemoCounts {
   const schedules = demoScheduleIds();
   // Removal itself must not write history either; the audit log is rebuilt at the end without sample rows.
   const auditRaw = readRaw(AUDIT_KEY);
+  const keepRaw = binSnapshot();
 
   const invoices = getTable<Demo<InvoiceRecord>>(KEYS.invoices);
   const goneInvoices = new Set(invoices.filter((i) => isDemoInvoice(i, schedules)).map((i) => i.id));
@@ -652,6 +724,7 @@ export function removeDemoData(): DemoCounts {
   filterTable<Demo<PurchasePayment>>(PAYMENTS_TABLE, (p) => isDemo(p) || gonePurchases.has(p.purchase_id));
   filterTable<Demo<Vendor>>(VENDORS_TABLE, isDemo);
   filterTable<Demo<RecurringSchedule>>(RECURRING_TABLE, isDemo);
+  for (const t of DEMO_EXTRA_TABLES) filterTable<unknown>(t, isDemo); // R6-B4 profile rows
 
   // Profile(s): keep the settings object otherwise untouched; fix the active id if it pointed at demo.
   if (readRaw(SINGLETON_KEYS.settings) !== null) {
@@ -667,6 +740,7 @@ export function removeDemoData(): DemoCounts {
     }
   }
   restoreAuditWithoutDemo(auditRaw, goneInvoices);
+  putBinSnapshot(keepRaw);
   return before;
 }
 

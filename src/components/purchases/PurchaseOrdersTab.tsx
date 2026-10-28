@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { ClipboardList, FilePlus2, Pencil, Printer, ReceiptText, RotateCcw, Trash2, XCircle } from 'lucide-react';
 import type { PurchaseOrder, PurchaseRecord, Vendor } from '../../types/purchases';
 import {
@@ -15,6 +15,12 @@ import {
 } from '../../lib/purchase-orders';
 import { blankPurchaseLine } from '../../lib/purchases';
 import { localDb } from '../../lib/localDb';
+
+// R14 (PS-B5): a media buy turns the PO into a release order (`media` pack) — one lazy row.
+const MediaRows = lazy(() => import('../prof/MediaRows'));
+import { Link } from 'react-router-dom';
+import { getTable } from '../../lib/storage';
+import { s2T } from '../../i18n/areas/sales-r2';
 import { INDIAN_STATES, resolveStateCode } from '../../lib/india-states';
 import { downloadText } from '../../lib/download';
 import { addDaysInput, formatCurrency, formatDate, todayInput } from '../../lib/utils';
@@ -46,12 +52,19 @@ export interface PurchaseOrdersTabProps {
 function printPo(po: PurchaseOrder, vendors: Vendor[]) {
   const p = localDb.settings.activeProfile();
   const v = vendors.find((x) => x.id === po.vendor_id);
-  const html = poHtml(
-    po,
-    { name: p?.companyName || 'Buyer', gstin: p?.companyGstin, address: p?.companyAddress, phone: p?.companyPhone, email: p?.companyEmail },
-    v ? { address: v.address, phone: v.phone, email: v.email } : undefined,
-  );
+  const buyer = { name: p?.companyName || 'Buyer', gstin: p?.companyGstin, address: p?.companyAddress, phone: p?.companyPhone, email: p?.companyEmail };
+  const vend = v ? { address: v.address, phone: v.phone, email: v.email } : undefined;
   const w = window.open('', '_blank');
+  // R14 PS-B5: a PO carrying a media buy prints as a release order (one lazy part).
+  const media = (po as { ps?: { media?: { client_id?: string } } }).ps?.media;
+  if (media) {
+    void import('../../lib/prof/ps-ro').then((m) => show(w, po, m.roHtml(po, buyer, vend, localDb.clients.getById(media.client_id ?? '')?.name ?? '')));
+    return;
+  }
+  show(w, po, poHtml(po, buyer, vend));
+}
+
+function show(w: Window | null, po: PurchaseOrder, html: string) {
   if (w) {
     w.document.open();
     w.document.write(html);
@@ -78,6 +91,12 @@ export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, o
         .sort((a, b) => b.po.date.localeCompare(a.po.date) || b.po.po_number.localeCompare(a.po.po_number)),
     [orders, purchases, stateFilter],
   );
+
+  // R2-B5: back-to-back POs name the sales order they were raised for.
+  const soNumbers = useMemo(() => {
+    if (!orders.some((o) => o.so_id)) return new Map<string, string>();
+    return new Map(getTable<{ id: string; invoice_number: string }>('invoices').map((i) => [i.id, i.invoice_number]));
+  }, [orders]);
 
   const convert = (po: PurchaseOrder) => {
     try {
@@ -144,6 +163,12 @@ export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, o
                   <tr key={po.id}>
                     <td>
                       <div className={tabStyles.name}>{po.po_number}</div>
+                      {po.so_id && (
+                        <div className={tabStyles.sub} data-po-so>
+                          <Link to={`/invoice/${po.so_id}`}>{s2T('po.soRef', { number: soNumbers.get(po.so_id) ?? '—' })}</Link>
+                          {po.drop_ship ? ` · ${s2T('po.dropShipTag')}` : ''}
+                        </div>
+                      )}
                       {f.bills.length > 0 && <div className={tabStyles.sub}>{purT(f.bills.length === 1 ? 'poBillsOne' : 'poBillsMany', { n: f.bills.length, list: f.bills.map((b) => b.bill_number).join(', ') })}</div>}
                     </td>
                     <td>{po.vendor_name || '—'}</td>
@@ -249,6 +274,8 @@ function PoForm({
   const [pos, setPos] = useState(po?.place_of_supply ?? businessState);
   const [lines, setLines] = useState(po?.lines?.length ? po.lines : [blankPurchaseLine()]);
   const [notes, setNotes] = useState(po?.notes ?? '');
+  const [psB, setPsB] = useState(() => (po as { ps?: Record<string, unknown> } | undefined)?.ps); // R14 (PS-B5)
+  const [mediaOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('media'))(localDb.settings.get() as never));
   const [error, setError] = useState('');
   const vendor = vendors.find((v) => v.id === vendorId);
   const totals = useMemo(() => poTotals(lines, pos, businessState), [lines, pos, businessState]);
@@ -277,6 +304,7 @@ function PoForm({
         igst: totals.igst,
         total: totals.total,
         notes: notes.trim() || undefined,
+        ...(psB !== (po as { ps?: unknown } | undefined)?.ps ? { ps: psB } : {}), // R14 (PS-B5)
       });
       onSaved(po ? purT('updated', { name: saved.po_number }) : purT('poSaved', { number: saved.po_number }));
     } catch (err) {
@@ -345,6 +373,7 @@ function PoForm({
         <label className={controls.label} htmlFor="po-notes">{purT('poNotes')}</label>
         <textarea id="po-notes" className={controls.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
+      {(mediaOn || !!psB?.media) && <Suspense fallback={null}><MediaRows ps={psB} onChange={setPsB} /></Suspense>}
 
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>

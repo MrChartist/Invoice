@@ -14,6 +14,7 @@
  */
 
 import type { InvoiceItem, InvoiceRecord } from '../types/invoice';
+import { heldStockGate, pharmaGate, readPharmaSettings, saleLimitGate } from './pharma-gate';
 import { MAIN_GODOWN_ID, type Godown, type StockTransfer, type StockTransferLine } from '../types/stock';
 import type { AppNotification } from './notifications';
 import { num, round2 } from './invoice-calc';
@@ -22,11 +23,33 @@ import {
   buildItemIndex, cleanSerials, collectEvents, invoiceEffect, liveInputs, loadSettings,
   type MoveKind, type StockEvent, type StockInputs, type StockItem,
 } from './inventory';
-import { getTable } from './storage';
+import { DB_PREFIX, KEYS, getJson, getTable } from './storage';
+import { lotIssues } from './trade/lot-gate';
+import type { Arrival } from '../types/trade-r8';
+import { memoOnReads } from './table-memo';
 import { lineFactor } from './units';
+import { agriExpiryGate } from './agri/ag-expiry'; // R12 (AG-D4)
 import { creditNoteReturnsGoods } from './credit-restock';
-import { GODOWNS_TABLE, TRANSFERS_TABLE, godownList } from './godowns';
+import { GODOWNS_TABLE, TRANSFERS_TABLE, consignmentGodowns, godownList, godownName, nonSaleableGodowns } from './godowns';
 import { batchDelta, dayWindow, eventLabel, firstShortAfter, godownDelta, serialDelta } from './stock-timeline';
+import { effectiveMrp, mrpIssues, withMrpIssues, type MrpIssues } from './retail/rt-mrp'; // R9 (RT-A2)
+import type { RetailSettings } from '../types/retail-r9';
+/** R9 (RT-A2): the guard helpers, re-exported so the POS / editor need no extra chunk. */
+export { MRP_TAG, isMrpMessage, recordMrpOverrides, withMrpIssues } from './retail/rt-mrp';
+/**
+ * QA10 (R12): the margin scheme (Rule 32(5), RT-D3): a registered buyer gets no ITC on a margin-scheme sale, so a bill with
+ * margin lines (`InvoiceItem.margin`) to a GSTIN is refused on issue (editor save gate below; the counter: `PosDevices`).
+ */
+export const MARGIN_B2B = 'Margin scheme: this buyer is registered (GSTIN) and gets no ITC on a margin-scheme sale — bill the full value with GST instead, or remove the GSTIN. Verify with your CA.';
+export const marginGate = (rec: Pick<InvoiceRecord, 'client' | 'items'>): string[] =>
+  (rec.items ?? []).some((l) => l?.margin) && String(rec.client?.gstin ?? '').trim() ? [MARGIN_B2B] : [];
+
+/**
+ * R9 (RT-E3): save checks a mounted lazy pack part registers (the jewellery "Require PAN" and metal-rate gates); the editor
+ * runs them on issue. QA10 R12: the margin scheme's "no registered buyer" check is always on.
+ */
+export const saveGates = new Set<(rec: Pick<InvoiceRecord, 'doc_type' | 'total' | 'issue_date' | 'kyc' | 'items' | 'client'>) => string[]>([marginGate]);
+import { can } from './access';
 
 const EPS = 1e-9;
 const roundQty = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000 || 0;
@@ -234,12 +257,13 @@ export function fefoBatch(t: ItemTracking | undefined, day: string, godown?: str
 
 /** Split `qty` across unexpired batches in FEFO order; `short` is what no batch can cover. */
 export function fefoAllocate(
-  t: ItemTracking | undefined, day: string, qty: number, godown?: string,
+  t: ItemTracking | undefined, day: string, qty: number, godown?: string, keep?: (b: BatchOption) => boolean,
 ): { lines: BatchOption[]; short: number } {
   let rest = num(qty);
   const lines: BatchOption[] = [];
   for (const b of batchOptions(t, day, godown)) {
     if (rest <= EPS || b.expired) break;
+    if (keep && !keep(b)) continue; // QA16 P2: a client's minimum shelf life (MF-D2)
     const take = Math.min(rest, b.qty);
     lines.push({ ...b, qty: roundQty(take) });
     rest -= take;
@@ -248,10 +272,10 @@ export function fefoAllocate(
 }
 
 /** Invoice lines for a FEFO split of `line` (first keeps its id; quantities follow the batches). */
-export function splitLineByFefo(line: InvoiceItem, t: ItemTracking | undefined, day: string, newId: () => string): InvoiceItem[] {
+export function splitLineByFefo(line: InvoiceItem, t: ItemTracking | undefined, day: string, newId: () => string, keep?: (b: BatchOption) => boolean): InvoiceItem[] {
   // Batches hold base units; a line typed in an alternate unit (WP-8) is split back into its own unit.
   const f = lineFactor(line);
-  const { lines, short } = fefoAllocate(t, day, num(line.quantity) * f, line.godown_id || undefined);
+  const { lines, short } = fefoAllocate(t, day, num(line.quantity) * f, line.godown_id || undefined, keep);
   if (lines.length === 0) return [line];
   const out = lines.map((b, i) => withBatch({ ...line, id: i === 0 ? line.id : newId(), quantity: roundQty(b.qty / f) }, b));
   if (short > EPS) out[out.length - 1] = { ...out[out.length - 1], quantity: roundQty(out[out.length - 1].quantity + short / f) };
@@ -318,6 +342,8 @@ export interface TrackingIssues {
   expired: string[];
   /** Informational (batch running short). */
   warnings: string[];
+  /** QA8 T15: the agency-lot errors among `errors` (the owner may override them in the editor, with a reason). */
+  lots?: string[];
 }
 
 /**
@@ -329,7 +355,7 @@ export function isOutgoingDoc(docType: string | undefined): boolean {
   return invoiceEffect(docType, 'Sent', true) === 'out';
 }
 
-type DocInput = Pick<InvoiceRecord, 'doc_type' | 'items' | 'issue_date'> & Partial<Pick<InvoiceRecord, 'id' | 'status' | 'goods_returned' | 'notes'>>;
+type DocInput = Pick<InvoiceRecord, 'doc_type' | 'items' | 'issue_date'> & Partial<Pick<InvoiceRecord, 'id' | 'status' | 'goods_returned' | 'notes' | 'invoice_number' | 'discount_type' | 'discount_rate' | 'price_includes_tax'>>;
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -340,7 +366,13 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
  * separately so the editor can ask for confirmation. Credit notes may only take back serials
  * that are currently sold. The document's own saved copy is left out of the balances.
  */
-export function docTrackingIssues(doc: DocInput, input: StockInputs, multiGodown = false): TrackingIssues {
+export function docTrackingIssues(
+  doc: DocInput,
+  input: StockInputs,
+  multiGodown = false,
+  /** PERF-1: the balances without this document, when the caller has them memoised (read-only). */
+  pre?: () => { tracking: TrackingMap; events: Map<string, StockEvent[]> },
+): TrackingIssues {
   const issues: TrackingIssues = { errors: [], expired: [], warnings: [] };
   const docType = doc.doc_type;
   const outgoing = isOutgoingDoc(docType);
@@ -352,10 +384,11 @@ export function docTrackingIssues(doc: DocInput, input: StockInputs, multiGodown
   const tracked = input.items.filter((i) => i.track_stock && (i.track_batches || i.track_serials || multiGodown));
   if (tracked.length === 0) return issues;
   const index = buildItemIndex(input.items.filter((i) => i.track_stock));
-  const tracking = computeTracking({ ...input, excludeInvoiceId: doc.id });
+  const given = pre?.();
+  const tracking = given?.tracking ?? computeTracking({ ...input, excludeInvoiceId: doc.id });
   // Point-in-time checks run on the dated events (stock-timeline.ts): availability at the end of
   // the document's day AND no later document depending on the same units.
-  const events = collectEvents({ ...input, includeTransfers: true, excludeInvoiceId: doc.id });
+  const events = given?.events ?? collectEvents({ ...input, includeTransfers: true, excludeInvoiceId: doc.id });
   // Serials taken out by the challan this invoice was made from belong to this sale.
   const sourceRefs = new Set(
     doc.id ? (input.links ?? []).filter((l) => l.relation === 'converted' && l.to_id === doc.id).map((l) => l.from_id) : [],
@@ -365,6 +398,7 @@ export function docTrackingIssues(doc: DocInput, input: StockInputs, multiGodown
   const batchUse = new Map<string, number>();
 
   for (const line of doc.items ?? []) {
+    if (line.arrival_id) continue; // R8-C (TR-C1): an agency line sells a principal's lot, not our stock
     const item = index.find(line.name, line.hsn);
     const q = num(line.quantity) * lineFactor(line); // base units (WP-8 alternate units)
     if (!item || q <= 0) continue;
@@ -671,7 +705,14 @@ export function liveTrackingInputs(): StockInputs {
   return { ...liveInputs(), transfers: getTable<StockTransfer>(TRANSFERS_TABLE), includeTransfers: true };
 }
 
+/** Live tracking. Without overrides it is memoised on every key it read (PERF-1) and SHARED: read-only. */
+/** PERF-1: `liveTrackingInputs()` memoised on every key it read — SHARED, read-only (internal readers only). */
+function sharedTrackingInputs(): StockInputs {
+  return memoOnReads('stock-tracking:inputs', liveTrackingInputs);
+}
+
 export function loadTracking(overrides: Partial<StockInputs> = {}): TrackingMap {
+  if (Object.keys(overrides).length === 0) return memoOnReads('stock-tracking:all', () => computeTracking(sharedTrackingInputs()));
   return computeTracking({ ...liveTrackingInputs(), ...overrides });
 }
 
@@ -696,12 +737,18 @@ export interface EditorStockContext {
  * document type never moves stock.
  */
 export function editorStockContext(doc: { id?: string; doc_type: string; issue_date: string; status?: string; goods_returned?: boolean }): EditorStockContext | null {
+  // PERF-1: re-read on every item-name focus; recomputed only when a key it read (or the document) changed. Shared, read-only.
+  const key = JSON.stringify([doc.id ?? '', doc.doc_type, doc.issue_date, doc.status ?? '', doc.goods_returned ?? null]);
+  return memoOnReads('stock-tracking:editor', () => buildEditorStockContext(doc), key);
+}
+
+function buildEditorStockContext(doc: { id?: string; doc_type: string; issue_date: string; status?: string; goods_returned?: boolean }): EditorStockContext | null {
   const outgoing = isOutgoingDoc(doc.doc_type);
   const incoming = doc.doc_type === 'CREDIT_NOTE' && doc.goods_returned !== false;
   if (!outgoing && !incoming) return null;
   try {
     const godowns = godownList(getTable<Godown>(GODOWNS_TABLE));
-    const input = liveTrackingInputs();
+    const input = sharedTrackingInputs();
     const items = input.items.filter((i) => i.track_stock);
     const multi = godowns.length > 1;
     if (!multi && !items.some((i) => i.track_batches || i.track_serials)) return null;
@@ -723,12 +770,105 @@ export function editorStockContext(doc: { id?: string; doc_type: string; issue_d
   }
 }
 
+/**
+ * QA5-2 F9: base quantity per item held in non-saleable godowns (QC hold, expiry, WIP, in transit), without
+ * `excludeInvoiceId`. Availability shown to sell (`findLevel` / `stockWarningForInvoice` in inventory.ts) takes
+ * it off. Empty when no such godown exists (nothing is computed). Shared, read-only.
+ */
+export function liveHeldStock(excludeInvoiceId?: string): ReadonlyMap<string, number> {
+  try {
+    const nonSaleable = nonSaleableGodowns(godownList(getTable<Godown>(GODOWNS_TABLE)));
+    if (!nonSaleable.size) return new Map();
+    return memoOnReads('stock-tracking:held', () => {
+      const out = new Map<string, number>();
+      for (const [id, t] of computeTracking({ ...sharedTrackingInputs(), excludeInvoiceId })) {
+        const q = [...nonSaleable].reduce((s, g) => s + (t.byGodown[g] ?? 0), 0);
+        if (q > 1e-9) out.set(id, roundQty(q));
+      }
+      return out;
+    }, excludeInvoiceId ?? '');
+  } catch {
+    return new Map();
+  }
+}
+
 /** Issue checks for the document open in the editor, from live data. */
 export function liveDocTrackingIssues(doc: DocInput): TrackingIssues {
   try {
-    const multi = godownList(getTable<Godown>(GODOWNS_TABLE)).length > 1;
-    return docTrackingIssues(doc, liveTrackingInputs(), multi);
+    const godowns = godownList(getTable<Godown>(GODOWNS_TABLE));
+    const multi = godowns.length > 1;
+    // PERF-1: shared inputs, and the balances without this document memoised per document id.
+    const pre = () => memoOnReads('stock-tracking:withoutDoc', () => {
+      const input = sharedTrackingInputs();
+      return {
+        tracking: computeTracking({ ...input, excludeInvoiceId: doc.id }),
+        events: collectEvents({ ...input, includeTransfers: true, excludeInvoiceId: doc.id }),
+      };
+    }, doc.id ?? '');
+    const tracked = agriExpiryGate(pharmaGate(docTrackingIssues(doc, sharedTrackingInputs(), multi, pre), doc)); // 7U pharma pack (off by default); R12 (AG-D4) expired seeds / pesticides
+    if (doc.status === 'Draft' || doc.status === 'Cancelled') return tracked;
+    // QA8 T15: an agency line may not oversell its lot or sell a cancelled one.
+    const lots = (doc.items ?? []).some((l) => l?.arrival_id) ? lotIssues(doc, getTable<InvoiceRecord>('invoices'), getTable<Arrival>('arrivals')) : [];
+    const issues = lots.length ? { ...tracked, errors: [...tracked.errors, ...lots], lots } : tracked;
+    // 8F: no sale from an expiry godown; optional batch-MRP ceiling (tracking computed only when that is on).
+    const pharma = readPharmaSettings();
+    let tracking: TrackingMap | null = null;
+    const mrpOf = pharma.enabled && pharma.block_above_mrp
+      ? (l: { name: string; batch_no?: string }) => {
+          tracking ??= computeTracking(sharedTrackingInputs());
+          const it = buildItemIndex(sharedTrackingInputs().items.filter((i) => i.track_stock)).find(l.name);
+          const batches = (it && tracking.get(it.id)?.batches) || [];
+          const b = l.batch_no ? batches.find((x) => x.batch.toUpperCase() === l.batch_no!.toUpperCase()) : batches.length === 1 ? batches[0] : undefined;
+          return b?.mrp;
+        }
+      : undefined;
+    const nonSaleable = nonSaleableGodowns(godowns);
+    const named = (id: string) => godownName(godowns, id);
+    // QA5-2 F9: a sale with no godown (or a saleable one) may not draw on stock held in QC / expiry / transit.
+    const held = nonSaleable.size
+      ? heldStockGate(issues, doc, {
+          nonSaleable, godownName: named, mainId: MAIN_GODOWN_ID,
+          itemOf: (l) => buildItemIndex(sharedTrackingInputs().items.filter((i) => i.track_stock)).find(l.name, l.hsn)?.id,
+          byGodown: (id) => pre().tracking.get(id)?.byGodown,
+        })
+      : issues;
+    const limited = saleLimitGate(held, doc, { nonSaleable, godownName: named, mrpOf, settings: pharma, agencyOk: consignmentGodowns(godowns) }); // R8-C
+    // R9 (RT-A2): the MRP guard for every shop (names the pharma option already refused are not reported twice).
+    const already = new Set(limited.errors.filter((e) => / is above the batch MRP /.test(e)).map((e) => e.slice(0, e.indexOf(': price'))));
+    return withMrpIssues(limited, liveMrpIssues(doc, already));
   } catch {
     return { errors: [], expired: [], warnings: [] };
+  }
+}
+
+/**
+ * R9 (RT-A2): the MRP guard on live data — batch MRP (per base unit, from the stock events) else the catalogue MRP,
+ * each lowered by its GST-cut basis (`mrp_tax_basis`). Empty when the guard is off (nothing is read or computed).
+ * Callers without batch / serial / godown tracking (no stock context) call this directly.
+ */
+export function liveMrpIssues(doc: DocInput, already?: ReadonlySet<string>): MrpIssues {
+  const settings = getJson<RetailSettings | null>(`${DB_PREFIX}retail_settings`, null) ?? {};
+  const none: MrpIssues = { errors: [], warnings: [], confirm: [] };
+  if (!settings.mrp_guard || settings.mrp_guard === 'off' || doc.status === 'Draft' || doc.status === 'Cancelled') return none;
+  try {
+    const input = sharedTrackingInputs();
+    const index = buildItemIndex(input.items);
+    const catalog = new Map(getTable<InvoiceItem>(KEYS.items).map((c) => [c.name.trim().toLowerCase(), c]));
+    let tracking: TrackingMap | null = null;
+    const mrpOf = (l: { name: string; batch_no?: string; hsn?: string; tax_rate?: number }): number | undefined => {
+      const it = index.find(l.name, l.hsn);
+      if (it?.track_stock && it.track_batches) {
+        tracking ??= computeTracking(input);
+        const batches = tracking.get(it.id)?.batches ?? [];
+        const b = l.batch_no ? batches.find((x) => x.batch.toUpperCase() === l.batch_no!.toUpperCase()) : batches.length === 1 ? batches[0] : undefined;
+        if (b?.mrp && b.mrp > 0) return effectiveMrp(b.mrp, it.mrp_tax_basis, num(l.tax_rate), b.firstIn);
+      }
+      const c = catalog.get(l.name.trim().toLowerCase());
+      if (c?.mrp && c.mrp > 0) return effectiveMrp(c.mrp, c.mrp_tax_basis ?? it?.mrp_tax_basis, num(l.tax_rate));
+      return undefined;
+    };
+    return mrpIssues(doc, { mode: settings.mrp_guard, mrpOf, owner: can('doc.approve'), already });
+  } catch {
+    return none;
   }
 }

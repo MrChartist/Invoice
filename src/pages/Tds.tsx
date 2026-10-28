@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { fyQuarterOf, loadChallans, loadManualDeductions, loadPayrollTdsChallans, loadReturnMarks, tdsDeductions, type TdsQuarter } from '../lib/tds-payables';
 import { tcsCollections } from '../lib/tds-returns';
 import { purchasesDb, paymentsDb } from '../lib/purchases';
@@ -13,17 +13,35 @@ import { useCan } from '../hooks/useCan';
 import { ChallansTab, DeductionsTab, Form16aTab, OverviewTab, ReturnsTab, type TdsData } from '../components/tds/TdsTabs';
 import { useT } from '../i18n';
 import { tdsT, type TdsKey } from '../i18n/areas/tds';
+import { r7T } from '../i18n/areas/gst-tds-7r';
+import { ita25T } from '../i18n/areas/ita2025';
+import { ITA2025_FROM } from '../lib/ita2025';
+
+// 7R (7.120): Form 27Q (non-residents) and the TRACES justification import — loaded when their tab opens.
+const Form27qTab = lazy(() => import('../components/tds/Tds7rTabs').then((m) => ({ default: m.Form27qTab })));
+const TracesTab = lazy(() => import('../components/tds/Tds7rTabs').then((m) => ({ default: m.TracesTab })));
+// R6-A3 / A6: "About this tab" strip and the one-time tip (lazy).
+const AboutStrip = lazy(() => import('../components/help/AboutStrip'));
+const ScreenTip = lazy(() => import('../components/help/ScreenTip'));
+// R8-C (TR-C2): our preceding-FY turnover for the 194Q buyer test (lazy).
+const Buyer194qCard = lazy(() => import('../components/trade/Buyer194qCard'));
+import { Landmark } from 'lucide-react';
+import { EmptyState } from '../components/ui/EmptyState';
+import { helpT } from '../i18n/areas/help-r6';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Books.module.css';
 
-const TABS: readonly { id: string; key: TdsKey }[] = [
+const TABS: readonly { id: string; key?: TdsKey; label?: () => string }[] = [
   { id: 'overview', key: 'tabOverview' },
   { id: 'deductions', key: 'tabDeductions' },
   { id: 'challans', key: 'tabChallans' },
   { id: 'returns', key: 'tabReturns' },
+  { id: '27q', label: () => r7T('tab27q') },
   { id: 'f16a', key: 'tab16a' },
+  { id: 'traces', label: () => r7T('tabTraces') },
 ];
+const tabText = (t: (typeof TABS)[number]) => (t.key ? tdsT(t.key) : t.label?.() ?? t.id);
 
 function loadData(): TdsData {
   return {
@@ -71,6 +89,7 @@ export function Tds() {
   return (
     <div className={surface.page}>
       <PageHeader title={tdsT('title')} subtitle={tdsT('subtitle')} />
+      <Suspense fallback={null}><ScreenTip id="tds" /></Suspense>
       <div className={`${styles.tabs} no-print`}>
         <label className={controls.field}>
           <span className={controls.label}>{tdsT('fy')}</span>
@@ -78,7 +97,7 @@ export function Tds() {
             {years.map((y) => <option key={y} value={y}>FY {y}-{String(y + 1).slice(2)}</option>)}
           </select>
         </label>
-        {(tab === 'returns' || tab === 'f16a') && (
+        {(tab === 'returns' || tab === 'f16a' || tab === '27q') && (
           <label className={controls.field}>
             <span className={controls.label}>{tdsT('quarter')}</span>
             <select className={controls.select} value={quarter} onChange={(e) => setQuarter(Number(e.target.value) as TdsQuarter)}>
@@ -110,17 +129,31 @@ export function Tds() {
               tabRefs.current[TABS[n].id]?.focus();
             }}
           >
-            {tdsT(t.key)}
+            {tabText(t)}
           </button>
         ))}
       </div>
+      <Suspense fallback={null}><AboutStrip /></Suspense>
       <div role="tabpanel" id={`tds-panel-${tab}`} aria-labelledby={`tds-tab-${tab}`} tabIndex={0} className={styles.panel}>
         {!canEdit && tab !== 'overview' && <p className={controls.hint}>{tdsT('readOnly')}</p>}
+        {tab === 'overview' && data.rows.length === 0 && data.tcs.length === 0 && (
+          <div className={surface.card} data-tds-empty>
+            <EmptyState icon={Landmark} title={helpT('tdsEmptyTitle')} text={helpT('tdsEmptyText')}
+              action={<Link to="/expenses?tab=bills" className={controls.btnOutline}>{helpT('addBillTds')}</Link>} />
+          </div>
+        )}
+        {`${fy + 1}-03-31` >= ITA2025_FROM && <p className={controls.hint} data-ita2025-note>{ita25T('note')}</p>}
         {tab === 'overview' && <OverviewTab data={data} fy={fy} today={today} />}
+        {tab === 'overview' && <Suspense fallback={null}><Buyer194qCard today={today} /></Suspense>}
         {tab === 'deductions' && <DeductionsTab data={data} fy={fy} today={today} canEdit={canEdit} onChanged={refresh} notify={notify} />}
         {tab === 'challans' && <ChallansTab data={data} canEdit={canEdit} onChanged={refresh} notify={notify} />}
         {tab === 'returns' && <ReturnsTab data={data} fy={fy} quarter={quarter} canEdit={canEdit} onChanged={refresh} notify={notify} />}
         {tab === 'f16a' && <Form16aTab data={data} fy={fy} quarter={quarter} />}
+        {(tab === '27q' || tab === 'traces') && (
+          <Suspense fallback={<p className={controls.hint}>{r7T('loading')}</p>}>
+            {tab === '27q' ? <Form27qTab data={data} fy={fy} quarter={quarter} canEdit={canEdit} onChanged={refresh} notify={notify} /> : <TracesTab data={data} canEdit={canEdit} notify={notify} />}
+          </Suspense>
+        )}
       </div>
       {toastNode}
     </div>

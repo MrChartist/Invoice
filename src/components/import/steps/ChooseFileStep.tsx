@@ -1,8 +1,8 @@
 import { useRef, type Dispatch, type DragEvent } from 'react';
-import { AlertTriangle, BookOpen, Boxes, Download, FileStack, Package, ReceiptText, Truck, Upload, Users } from 'lucide-react';
+import { AlertTriangle, BookOpen, Boxes, Download, FileStack, Package, ReceiptText, Truck, Upload, Users, Wallet } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { writeCsv } from '../../../lib/csv';
-import { KIND_LABELS, TB_TEMPLATE_FILE, isBooksKind, templateFileName, templateRows, trialBalanceTemplateRows, type ImportKind } from '../../../lib/import-mapping';
+import { KIND_LABELS, isBooksKind, templateFileName, templateRows, type ImportKind } from '../../../lib/import-mapping';
 import { can } from '../../../lib/access';
 import { useT } from '../../../i18n';
 import { vtT } from '../../../i18n/areas/voucher-types';
@@ -15,14 +15,16 @@ const KIND_META: Record<ImportKind, { icon: typeof Users; text: string }> = {
   clients: { icon: Users, text: 'Customers and parties with GSTIN, state and contact details.' },
   items: { icon: Package, text: 'Products and services with HSN/SAC, rate and GST %.' },
   invoices: { icon: ReceiptText, text: 'Past invoices and outstanding balances, keeping their numbers and amounts.' },
-  // P1-21 (7Q): books kinds (owner only — one undo copy is taken first).
-  ledgers: { icon: BookOpen, text: '' },
-  vendors: { icon: Truck, text: '' },
+  // R6-C3 (P1-21)
+  vendors: { icon: Truck, text: 'Suppliers with GSTIN, PAN and an opening balance. Customer rows of a party export go to Clients.' },
+  ledgers: { icon: BookOpen, text: 'Your opening trial balance: ledger, group and Dr / Cr. The difference is shown before saving.' },
+  opening_bills: { icon: Wallet, text: 'Unpaid bills on the day the books begin, party by party, for receivables and payables ageing.' },
+  // P1-21 (7Q): stock items and manual vouchers (owner only — one undo copy is taken first).
   stock: { icon: Boxes, text: '' },
   vouchers: { icon: FileStack, text: '' },
 };
-const BOOKS_TEXT = { ledgers: 'kLedgersText', vendors: 'kVendorsText', stock: 'kStockText', vouchers: 'kVouchersText' } as const;
-const BOOKS_LABEL = { ledgers: 'kLedgers', vendors: 'kVendors', stock: 'kStock', vouchers: 'kVouchers' } as const;
+const BOOKS_TEXT = { stock: 'kStockText', vouchers: 'kVouchersText' } as const;
+const BOOKS_LABEL = { stock: 'kStock', vouchers: 'kVouchers' } as const;
 /** Kinds this user may import (books kinds rewrite the books like a restore: owner only). */
 const kindsFor = () => (Object.keys(KIND_LABELS) as ImportKind[]).filter((k) => !isBooksKind(k) || can('data.restore'));
 const kindLabel = (k: ImportKind) => (isBooksKind(k) ? vtT(BOOKS_LABEL[k]) : KIND_LABELS[k]);
@@ -148,11 +150,6 @@ export function ChooseFileStep({ state, dispatch, onLoadFile, onLoadText }: Prop
             <Download size={14} /> {kindLabel(k)}
           </button>
         ))}
-        {can('data.restore') && (
-          <button type="button" className={cn(ctl.btn, ctl.btnGhost, ctl.btnSm)} onClick={() => download(TB_TEMPLATE_FILE, writeCsv(trialBalanceTemplateRows(), { bom: true }))} data-testid="import-tb-template">
-            <Download size={14} /> {vtT('tbTemplate')}
-          </button>
-        )}
       </div>
     </div>
   );

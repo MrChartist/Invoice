@@ -17,6 +17,7 @@ import { assertUnlocked } from '../period-lock';
 import { generateId, getTable, setTable } from '../storage';
 import { localDb } from '../localDb';
 import { withTablesRollback } from '../table-txn';
+import { recordSeries, seriesHigh } from '../series-counters';
 import type { Payment } from '../../types/invoice';
 import { formatMoney } from '../utils';
 import { chartOf, loadUserAccounts, type Account } from './accounts';
@@ -151,7 +152,8 @@ export function validateVoucher(v: ManualVoucherInput, chart: readonly Account[]
 export function nextVoucherNumber(existing: readonly Pick<ManualVoucher, 'number'>[], type: ManualVoucherType, date: string): string {
   const prefix = VOUCHER_PREFIX[type];
   const fy = getIndianFY(date).label;
-  return buildInvoiceNumber(prefix, fy, highestSequence(existing.map((v) => v.number), prefix, fy) + 1);
+  // R4-C4: the number of a deleted voucher stays used (series high-water mark, set when it went to the bin).
+  return buildInvoiceNumber(prefix, fy, Math.max(highestSequence(existing.map((v) => v.number), prefix, fy), seriesHigh(prefix, fy)) + 1);
 }
 
 /** Tolerant read of stored rows; malformed ones are skipped (the ledger warns about unbalanced ones). */
@@ -288,11 +290,33 @@ export function saveVoucher(input: ManualVoucherInput, chart: readonly Account[]
 }
 
 /** Delete a manual voucher (period lock applies). */
+/** QA11 C4: journals a construction module posts and undoes itself — table, "names this journal", where to undo it. */
+const OWNED_JOURNALS: Readonly<Record<string, readonly [string, (r: Record<string, unknown> | null, id: string) => boolean, string]>> = {
+  'Sub-contractor deductions': ['sub_measurements', (r, id) => r?.jv_id === id, 'cancel the sub-contractor bill in Time → Works → Sub-contracts'],
+  'Site wages': ['muster_days', (r, id) => r?.voucher_id === id, 'undo the settlement in Time → Works → Labour'],
+  'Secured advance': ['secured_advances', (r, id) => r?.voucher_id === id, 'delete the secured advance in Time → Works → Advances'],
+  // QA16 P4: a grant's recognition / receipt journal stays while its incentive claim counts it as posted.
+  'Government grant': ['incentive_claims', (r, id) => Array.isArray(r?.voucher_ids) && r.voucher_ids.includes(id), 'the incentive claim in Manufacturing → Statutory → Incentives records it as posted; reverse it with a journal'],
+  // R14 (PS-B3): a client-money journal goes only with its CMV voucher (Time → Client money → Delete).
+  'Client money': ['client_money', (r, id) => Array.isArray(r?.voucher_ids) && r.voucher_ids.includes(id), 'delete the client-money voucher in Time → Client money'],
+  // QA17 R1: a partner posting's journals (year-end run, monthly credit) go only with the run (Time → Firm → Undo).
+  'Partners appropriation': ['partner_runs', (r, id) => Array.isArray(r?.voucher_ids) && r.voucher_ids.includes(id), 'undo the run in Time → Firm → Appropriation'],
+  'Partner credit': ['partner_runs', (r, id) => Array.isArray(r?.voucher_ids) && r.voucher_ids.includes(id), 'undo the credit in Time → Firm → 194T'],
+  'Booking forfeiture': ['advances', (r, id) => Array.isArray(r?.forfeits) && r.forfeits.some((f: { journal_id?: string } | null) => f?.journal_id === id), 'it closed the buyer\'s advance when the booking was cancelled; reverse it with a journal'],
+};
+
 export function deleteVoucher(id: string): void {
   const all = loadVouchers();
   const row = all.find((v) => v.id === id);
   if (!row) return;
   requireAccess('books.edit');
+  // QA10 R17: a rider settlement's journal goes only with its settlement (Inventory → Deliveries → Undo settlement).
+  if (row.voucher_class === 'Rider settlement' && getTable<{ voucher_id?: string }>('rider_settlements').some((s) => s?.voucher_id === id)) {
+    throw new Error(`${row.number} settles a delivery rider's cash. Undo the settlement in Inventory → Deliveries instead (it removes this journal with it).`);
+  }
+  // QA11 C4: a construction journal goes only with the row that posted it (its own Cancel / Undo), never orphaning it.
+  const own = OWNED_JOURNALS[row.voucher_class ?? ''];
+  if (own && getTable<Record<string, unknown>>(own[0]).some((r) => own[1](r, id))) throw new Error(`${row.number} (${row.voucher_class}) is posted from its own screen: ${own[2]} instead (it removes this voucher with it).`);
   const lock = assertUnlocked({ id, issue_date: row.date, invoice_number: row.number }, 'delete');
   if (row.reverse_on) assertUnlocked({ id, issue_date: row.reverse_on, invoice_number: row.number }, 'delete');
   // Its bill-wise receipt rows go with it, whichever screen deletes it (M3): all or nothing.
@@ -301,6 +325,7 @@ export function deleteVoucher(id: string): void {
     removeVoucherReceiptRows(id);
     setTable(VOUCHERS_TABLE, all.filter((v) => v.id !== id));
   });
+  recordSeries(row.number); // R4-C4: the deleted voucher (now in the recycle bin) keeps its number
   audit.record({
     entity: 'voucher',
     entity_id: id,

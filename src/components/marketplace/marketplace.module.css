@@ -1,0 +1,81 @@
+.stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.view {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--muted-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+
+.viewActive {
+  composes: view;
+  border-color: var(--primary);
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+}
+
+.note {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+
+.warn {
+  margin: 0;
+  color: var(--warning);
+  font-size: 0.8125rem;
+}
+
+.bad {
+  color: var(--loss);
+}
+
+.good {
+  color: var(--profit);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.75rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.list {
+  margin: 0;
+  padding-left: 1.125rem;
+  font-size: 0.8125rem;
+  max-height: 14rem;
+  overflow: auto;
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.textarea {
+  min-height: 6rem;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}

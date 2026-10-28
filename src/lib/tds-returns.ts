@@ -6,7 +6,7 @@
  *
  * UNVERIFIED: the column order and section / collection codes follow the RPU as we understand it
  * and have not been validated against the current RPU or the FVU. Import through the RPU and
- * validate with the FVU; verify with your CA. Form 27Q (non-residents) is out of scope: payees
+ * validate with the FVU; verify with your CA. Form 27Q (non-residents) is a separate paper (tds-27q.ts): payees
  * flagged non-resident are left out of 26Q and listed as warnings.
  *
  * Pure (node:test).
@@ -31,6 +31,7 @@ import {
   type TdsQuarter,
 } from './tds-payables';
 import { TCS_27EQ_CODES, type DeducteeType } from './tds-rules';
+import { actRef, formText, quarterStart, sectionText } from './ita2025';
 
 export const UNVERIFIED_NOTE = 'UNVERIFIED working paper in NSDL RPU column order — import through the RPU, validate with the FVU and verify with your CA.';
 
@@ -101,7 +102,11 @@ export function tcsCollections(invoices: readonly InvoiceRecord[]): TcsRow[] {
 /* ── Quarterly return ─────────────────────────────────────────── */
 
 export interface ReturnPaper {
+  /** Stored form key (return marks keep it); `formLabel` is the name for the period (Form 140 from Apr 2026). */
   form: '26Q' | '27EQ';
+  formLabel: string;
+  /** Code → statutory reference for the period, when it differs from the code (2025-Act periods). */
+  refs: [string, string][];
   fy: number;
   quarter: TdsQuarter;
   /** Header row first. */
@@ -120,6 +125,8 @@ const COLLECTEE_HEAD_27EQ = ['Sr. No.', 'Challan Sr. No.', 'Collection code', 'C
 type AnyRow = Pick<TdsDeductionRow, 'key' | 'amount' | 'fy' | 'quarter' | 'pan' | 'deducteeType' | 'base' | 'rate' | 'creditedOn' | 'deductedOn'> & {
   name: string;
   code: string;
+  /** Internal section code / TCS label the statutory reference is read from. */
+  refCode: string;
   reason: string;
   certNo: string;
   nonResident?: boolean;
@@ -142,6 +149,8 @@ function buildPaper(form: '26Q' | '27EQ', rows: readonly AnyRow[], challans: rea
   list.forEach((r, i) => {
     const ch = byKey.get(r.key);
     if (ch) deposited += r.amount;
+    // R5-B3: a Sec 194C(6) nil row (reason T) has nothing to deposit; it is reported with its no-deduction reason.
+    else if (r.reason === 'T' && !(r.amount > 0)) warnings.push(`${r.name}: no TDS under a Sec 194C(6) declaration (reason T) — keep the declaration and PAN on file; verify with your CA.`);
     else warnings.push(`${r.name}: ₹${amt(r.amount)} deducted on ${r.deductedOn} is not linked to a challan.`);
     if (!r.pan) warnings.push(`${r.name}: PAN missing — the RPU needs "PANNOTAVBL" and the 20% rate (206AA).`);
     const sr = ch ? srOf.get(ch.id) ?? '' : '';
@@ -154,11 +163,19 @@ function buildPaper(form: '26Q' | '27EQ', rows: readonly AnyRow[], challans: rea
     }
   });
   const deducted = round2(list.reduce((t, r) => t + r.amount, 0));
+  // Income-tax Act 2025 (from 1 Apr 2026): the paper's form and the section references follow the period.
+  const start = quarterStart(fy, quarter);
+  const refs = new Map<string, string>();
+  for (const r of list) {
+    const ref = actRef(r.refCode, r.creditedOn);
+    if (ref.act === 2025) refs.set(r.code, sectionText(r.refCode, r.creditedOn));
+  }
+  if (refs.size) warnings.push(`Income-tax Act 2025 period: the section codes above are the 1961-Act RPU codes the app knows; ${formText(form, start)} uses the 2025-Act section codes of the current RPU — map each code (see "Section references") and verify with your CA.`);
   for (const c of used) {
     const linked = round2(list.filter((r) => byKey.get(r.key)?.id === c.id).reduce((t, r) => t + r.amount, 0));
     if (Math.abs(linked - c.amount) > 0.5) warnings.push(`Challan ${c.bsr_code}/${c.challan_no}: tax ₹${amt(c.amount)} vs ₹${amt(linked)} linked to this quarter (the rest may belong to another quarter).`);
   }
-  return { form, fy, quarter, challanRows, deducteeRows, totals: { deducted, deposited: round2(deposited), challans: used.length }, warnings };
+  return { form, formLabel: formText(form, start), refs: [...refs], fy, quarter, challanRows, deducteeRows, totals: { deducted, deposited: round2(deposited), challans: used.length }, warnings };
 }
 
 /** Form 26Q for a quarter: residents only (non-resident payees are flagged for Form 27Q). */
@@ -166,12 +183,12 @@ export function form26Q(rows: readonly TdsDeductionRow[], challans: readonly Tds
   const resident = rows.filter((r) => !r.nonResident);
   const paper = buildPaper(
     '26Q',
-    resident.map((r) => ({ ...r, name: r.payee, code: r.rpu || r.section })),
+    resident.map((r) => ({ ...r, name: r.payee, code: r.rpu || r.section, refCode: r.code })),
     challans.filter((c) => c.kind !== 'TCS'),
     fy,
     quarter,
   );
-  for (const r of rows) if (r.nonResident && r.fy === fy && r.quarter === quarter) paper.warnings.push(`${r.payee} is non-resident: report in Form 27Q (not prepared by this app).`);
+  for (const r of rows) if (r.nonResident && r.fy === fy && r.quarter === quarter) paper.warnings.push(`${r.payee} is non-resident: report in ${formText('27Q', quarterStart(fy, quarter))} (TDS and TCS page, Form 27Q tab).`);
   return paper;
 }
 
@@ -179,7 +196,8 @@ export function form26Q(rows: readonly TdsDeductionRow[], challans: readonly Tds
 export function form27EQ(rows: readonly TcsRow[], challans: readonly TdsChallan[], fy: number, quarter: TdsQuarter): ReturnPaper {
   return buildPaper(
     '27EQ',
-    rows.map((r) => ({ ...r, name: r.collectee, reason: '', certNo: '' })),
+    // A blank code (to confirm: luxury goods, R15-D tour packages) is mapped by the row's own label.
+    rows.map((r) => ({ ...r, name: r.collectee, reason: '', certNo: '', refCode: (r.code ? TCS_27EQ_CODES.find((c) => c.code === r.code)?.label : '') || r.label })),
     challans.filter((c) => c.kind === 'TCS'),
     fy,
     quarter,
@@ -188,13 +206,19 @@ export function form27EQ(rows: readonly TcsRow[], challans: readonly TdsChallan[
 
 /** CSV of a return paper: a note line, the challan block, a blank line, the deductee block. */
 export function paperCsv(p: ReturnPaper): string {
-  return toCsv([[UNVERIFIED_NOTE], [`Form ${p.form}`, `FY ${p.fy}-${String(p.fy + 1).slice(2)}`, `Q${p.quarter}`], [], ['Challan details'], ...p.challanRows, [], [p.form === '26Q' ? 'Deductee details' : 'Collectee details'], ...p.deducteeRows]);
+  return toCsv([[UNVERIFIED_NOTE], [p.formLabel, `FY ${p.fy}-${String(p.fy + 1).slice(2)}`, `Q${p.quarter}`], [], ['Challan details'], ...p.challanRows, [], [p.form === '26Q' ? 'Deductee details' : 'Collectee details'], ...p.deducteeRows, ...refBlock(p)]);
+}
+
+/** "Section references" block (2025-Act periods only): code in the paper → its 2025-Act reference. */
+function refBlock(p: ReturnPaper): (string | number)[][] {
+  return p.refs.length ? [[], ['Section references (Income-tax Act 2025)'], ['Code', 'Reference'], ...p.refs] : [];
 }
 
 /** Tab-separated text in RPU column order (paste block by block into the RPU grid). */
 export function paperText(p: ReturnPaper): string {
   const tsv = (rows: (string | number)[][]) => rows.map((r) => r.map((c) => String(c).replace(/[\t\r\n]+/g, ' ')).join('\t')).join('\n');
-  return [`# ${UNVERIFIED_NOTE}`, `# Form ${p.form} · FY ${p.fy}-${String(p.fy + 1).slice(2)} · Q${p.quarter}`, '# Challan details', tsv(p.challanRows), '', `# ${p.form === '26Q' ? 'Deductee' : 'Collectee'} details`, tsv(p.deducteeRows), ''].join('\n');
+  const refs = p.refs.length ? ['# Section references (Income-tax Act 2025)', tsv([['Code', 'Reference'], ...p.refs]), ''] : [];
+  return [`# ${UNVERIFIED_NOTE}`, `# ${p.formLabel} · FY ${p.fy}-${String(p.fy + 1).slice(2)} · Q${p.quarter}`, '# Challan details', tsv(p.challanRows), '', `# ${p.form === '26Q' ? 'Deductee' : 'Collectee'} details`, tsv(p.deducteeRows), '', ...refs].join('\n');
 }
 
 /** Sheets for `writeXlsx` (src/lib/xlsx.ts, loaded on demand by the page). */
@@ -202,7 +226,8 @@ export function paperSheets(p: ReturnPaper): { name: string; rows: (string | num
   return [
     { name: 'Challans', rows: p.challanRows },
     { name: p.form === '26Q' ? 'Deductees' : 'Collectees', rows: p.deducteeRows },
-    { name: 'Notes', rows: [['Note'], [UNVERIFIED_NOTE], ...p.warnings.map((w) => [w])] },
+    { name: 'Notes', rows: [['Note'], [UNVERIFIED_NOTE], [p.formLabel], ...p.warnings.map((w) => [w])] },
+    ...(p.refs.length ? [{ name: 'Section references', rows: [['Code', 'Reference (Income-tax Act 2025)'], ...p.refs] }] : []),
   ];
 }
 
@@ -241,10 +266,12 @@ export function form16AData(rows: readonly TdsDeductionRow[], challans: readonly
 }
 
 export function form16ACsv(list: readonly Form16AData[]): string {
-  const rows: (string | number)[][] = [[UNVERIFIED_NOTE], ['Deductee', 'PAN', 'Quarter', 'Section', 'Date of payment / credit', 'Amount paid (₹)', 'TDS (₹)', 'Deposited', 'Challans (BSR / date / serial)']];
+  const first = list[0];
+  const title = first ? `${formText('16A', quarterStart(first.fy, first.quarter))} data` : 'Form 16A data';
+  const rows: (string | number)[][] = [[UNVERIFIED_NOTE], [title], ['Deductee', 'PAN', 'Quarter', 'Section', 'Date of payment / credit', 'Amount paid (₹)', 'TDS (₹)', 'Deposited', 'Challans (BSR / date / serial)']];
   for (const g of list) {
     const ch = g.challans.map((c) => `${c.bsr} / ${rpuDate(c.date)} / ${c.challanNo}`).join('; ');
-    for (const r of g.rows) rows.push([g.payee, g.pan || 'PANNOTAVBL', `Q${g.quarter} FY${g.fy}-${String(g.fy + 1).slice(2)}`, r.code, rpuDate(r.date), amt(r.paid), amt(r.tds), r.deposited ? 'Yes' : 'No', ch]);
+    for (const r of g.rows) rows.push([g.payee, g.pan || 'PANNOTAVBL', `Q${g.quarter} FY${g.fy}-${String(g.fy + 1).slice(2)}`, sectionText(r.code, r.date), rpuDate(r.date), amt(r.paid), amt(r.tds), r.deposited ? 'Yes' : 'No', ch]);
   }
   return toCsv(rows);
 }

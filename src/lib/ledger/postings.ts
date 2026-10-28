@@ -54,7 +54,7 @@ import { inBooks, reversalOf } from './voucher-variants';
 import type { TdsChallan } from '../tds-payables';
 import type { VendorPayment } from '../../types/purchases';
 import { depreciationSchedule, fyLabelOf, type FixedAsset } from './assets';
-import { advanceMovements, isAdvanceAdjustment, type AdvanceMovement } from '../advance-tax';
+import { RIDER_CASH_LEDGER, advanceMovements, isAdvanceAdjustment, type AdvanceMovement } from '../advance-tax';
 import { purchaseReturnPostings } from './postings-returns';
 import { openingVouchers } from './postings-openings';
 import { applyBankLedgers } from './postings-bank';
@@ -62,6 +62,9 @@ import { payrollVouchers } from '../payroll/postings';
 import type { PayrollPayment, PayrollRun } from '../../types/payroll';
 import type { Branch } from '../branch';
 import { voucherBranches } from './branch-books';
+import { FINANCIAL_REASON_LABELS, financialAccountOf, isFinancialNote } from '../financial-note';
+import { gvLiabilityId } from '../retail/gift-voucher-core'; // R4-B1
+import { sectionText } from '../ita2025';
 
 export interface PostingLine {
   account: string;
@@ -235,7 +238,8 @@ function salesVoucher(inv: InvoiceRecord): LedgerVoucher | null {
   l.dr(A.debtors, side * total, party);
   const items = Math.abs(toPaise(a.chargesTaxed ? a.taxable - a.charges : a.taxable));
   // Sec 25(4) branch transfer (WP-9): its own account, so it nets against the receiving branch's bill.
-  const salesAcc = !sale ? A.salesReturns : str(inv.branch_transfer_id) ? A.branchTransferOut : A.sales;
+  // R2-A2: a financial credit note (settlement discount / kasar / bad debt) is an expense, not a sales return.
+  const salesAcc = !sale ? (isFinancialNote(inv) ? financialAccountOf(inv) : A.salesReturns) : str(inv.branch_transfer_id) ? A.branchTransferOut : A.sales;
   for (const [cc, p] of itemsByCostCentre(inv, items)) l.cr(salesAcc, side * p, undefined, cc);
   l.cr(A.freightOut, side * Math.abs(toPaise(a.charges)));
   l.cr(A.outCgst, side * Math.abs(toPaise(a.cgst)));
@@ -246,6 +250,7 @@ function salesVoucher(inv: InvoiceRecord): LedgerVoucher | null {
   l.cr(A.tcsPayable, side * Math.abs(toPaise(a.tcs)));
   l.balanceTo(A.roundOff);
   const kind: LedgerVoucherKind = !sale ? 'Credit Note' : debitNote ? 'Debit Note' : 'Sales';
+  const financial = !sale && isFinancialNote(inv) ? FINANCIAL_REASON_LABELS[inv.financial_reason ?? 'settlement_discount'] : '';
   return {
     id: `${sale ? 'sale' : 'cn'}:${inv.id}`,
     source: 'auto',
@@ -255,6 +260,7 @@ function salesVoucher(inv: InvoiceRecord): LedgerVoucher | null {
     party,
     narration: [
       kind === 'Sales' ? 'Sales invoice' : kind,
+      financial && `${financial} (financial credit note)`,
       fxNarration(num(inv.total), inv),
       // Outward reverse charge: the debtor owes the taxable value; the recipient pays the GST itself.
       a.rcmTax > 0 && `reverse charge: GST ${a.rcmTax.toFixed(2)} payable by the recipient`,
@@ -286,17 +292,23 @@ function tdsSettlements(invoices: InvoiceRecord[], transactions: Payment[]): Map
   return out;
 }
 
-function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number): LedgerVoucher | null {
+function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number, gvAcc?: string, riderAcc?: string, creditor?: string): LedgerVoucher | null {
   const date = toIsoDate(t.date);
   const amount = Math.abs(toPaise(inrValue(num(t.amount), inv)));
   if (!date || amount === 0) return null;
   const party = inv ? partyOfInvoice(inv) : str((t as { client_name?: unknown }).client_name) || 'Unknown customer';
-  const cashAcc = accountForMethod(t.method) === 'cash' ? A.cash : A.bank;
+  // 8.106: a bad-debt write-off never touches cash / bank; R2-A3 debits its own "Bad debts written off" ledger.
+  // R4-B1: a gift-voucher redemption debits the "Gift vouchers outstanding" liability (Other current liabilities if missing).
+  // R9: an exchange (old device / old gold) clears the debtor against the customer's URD voucher (creditor); COD cash
+  // collected by a delivery rider sits in "Cash with riders" until the rider settles (RT-A3).
+  const cash = accountForMethod(t.method) === 'cash';
+  const cashAcc = t.write_off ? A.badDebts : t.gift_voucher_id ? gvAcc || A.otherCl : t.exchange_purchase_id ? A.creditors : cash && t.rider_id && riderAcc ? riderAcc : cash ? A.cash : A.bank;
   // Realised exchange difference (6.19): the bank gets the realised rupees, the debtor is
   // cleared at the invoice rate, the difference is a gain (Cr) or a loss (Dr).
   const fx = realisedFx(t, inv);
   const received = fx ? Math.abs(toPaise(fx.realisedInr)) : amount;
-  const l = new Lines().dr(cashAcc, received);
+  // R16-D1: a netting receipt debits the bill's own supplier (`creditor`), which may be a differently named linked vendor.
+  const l = new Lines().dr(cashAcc, received, t.exchange_purchase_id ? creditor || party : undefined);
   if (tds > 0) l.dr(A.tdsReceivable, tds);
   l.cr(A.debtors, amount + tds, party);
   if (fx) l.cr(A.fxGain, received - amount);
@@ -310,8 +322,8 @@ function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number)
     party,
     narration: [
       `Against ${invNo}`,
-      str(t.method),
-      tds > 0 && `TDS ${(tds / 100).toFixed(2)} withheld${str(inv?.tds_section) ? ` u/s ${str(inv?.tds_section)}` : ''}`,
+      t.write_off ? 'Bad debt written off' : str(t.method),
+      tds > 0 && `TDS ${(tds / 100).toFixed(2)} withheld${str(inv?.tds_section) ? ` u/s ${sectionText(str(inv?.tds_section), str(inv?.issue_date))}` : ''}`,
       inv ? fxNarration(num(t.amount), inv) : '',
       fx && `realised @ ₹${fx.realisedRate} (exchange ${fx.gain >= 0 ? 'gain' : 'loss'} ${Math.abs(fx.gain).toFixed(2)})`,
     ]
@@ -328,6 +340,25 @@ function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number)
  * One voucher per advance movement. For an 'adjusted' movement `inv` is the invoice and `tds` the
  * customer's TDS when that payment row is the one that settles it (exactly as on a cash receipt).
  */
+/** R6-C2: TDS the customer withheld on a bill cleared by a manual receipt voucher's allocation (Dr TDS receivable, Cr the debtor). */
+function voucherTdsJournal(t: Payment, inv: InvoiceRecord | undefined, tds: number): LedgerVoucher | null {
+  const date = toIsoDate(t.date);
+  if (!date || !inv || !(tds > 0)) return null;
+  const party = partyOfInvoice(inv);
+  const l = new Lines().dr(A.tdsReceivable, tds).cr(A.debtors, tds, party);
+  return {
+    id: `rcpt-tds:${t.id}`,
+    source: 'auto',
+    kind: 'Journal',
+    date,
+    number: str(t.reference) || str(inv.invoice_number),
+    party,
+    narration: `TDS ${(tds / 100).toFixed(2)} withheld against ${inv.invoice_number || 'invoice'}${str(inv.tds_section) ? ` u/s ${sectionText(str(inv.tds_section), str(inv.issue_date))}` : ''} (receipt voucher ${str(t.reference)})`,
+    lines: l.lines,
+    link: `/invoice/${inv.id}`,
+  };
+}
+
 function advanceVoucher(m: AdvanceMovement, inv: InvoiceRecord | undefined, tds: number): LedgerVoucher | null {
   const gross = Math.abs(toPaise(m.gross));
   if (!m.date || gross === 0) return null;
@@ -641,7 +672,16 @@ export function buildLedger(input: LedgerInput): Ledger {
   // Advance adjustments are journals from "Advances from customers", not cash (below).
   // WP-1 (P0-11): receipt rows a manual voucher allocated bill-wise are posted by that voucher, not again here.
   const allocatedBy = new Set(input.manual.map((m) => m.id));
-  for (const t of input.transactions) if (!isAdvanceAdjustment(t) && !allocatedBy.has(str((t as { voucher_id?: unknown }).voucher_id))) push(receiptVoucher(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0));
+  const gvAcc = gvLiabilityId(input.userAccounts); // R4-B1
+  const riderAcc = input.userAccounts.find((a) => a.name.trim().toLowerCase() === RIDER_CASH_LEDGER.toLowerCase())?.id; // R9 (RT-A3)
+  // R16-D1 (PF17): netting rows (`netting_id`) post to the bill's supplier; R9 / R12 exchange rows keep the customer's name.
+  const netParty = (t: Payment): string | undefined => {
+    const bill = (t as { netting_id?: unknown }).netting_id && t.exchange_purchase_id ? input.purchases.find((x) => x.id === t.exchange_purchase_id) : undefined;
+    return bill ? normalizePurchase(bill, input.vendors)?.party : undefined;
+  };
+  for (const t of input.transactions) if (!isAdvanceAdjustment(t) && !allocatedBy.has(str((t as { voucher_id?: unknown }).voucher_id))) push(receiptVoucher(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0, gvAcc, riderAcc, netParty(t)));
+  // R6-C2: the voucher posts the money, but the customer's TDS on the bill it clears is booked here, as for an invoice receipt.
+  for (const t of input.transactions) if (allocatedBy.has(str((t as { voucher_id?: unknown }).voucher_id)) && (tds.get(String(t.id)) ?? 0) > 0) push(voucherTdsJournal(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0));
   for (const m of advanceMovements(input.advances ?? [], input.transactions, input.invoices)) {
     push(advanceVoucher(m, m.invoiceId ? invById.get(m.invoiceId) : undefined, m.kind === 'adjusted' ? tds.get(m.sourceId) ?? 0 : 0));
   }

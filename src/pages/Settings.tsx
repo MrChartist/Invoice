@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Check, Copy, Database, ListPlus, Package, Plus, Save, ScrollText, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
+import { Building2, Check, Copy, Database, Layers, ListPlus, Package, Plus, Save, ScrollText, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -8,6 +8,8 @@ import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
 import '../i18n/en-pages'; // page strings (5.4)
 import { setT } from '../i18n/areas/settings';
+import { discoverT } from '../i18n/areas/discover-r6';
+import { SETTINGS_TABS, type SettingsTab } from './page-tabs'; // R6-B1
 import { LanguageSwitch } from '../components/ui/LanguageSwitch';
 import { ProfileEditor } from '../components/settings/ProfileEditor';
 import { DefaultsPanel } from '../components/settings/DefaultsPanel';
@@ -20,6 +22,7 @@ import { CompaniesPanel } from '../components/companies/CompaniesPanel';
 import { AutoBackupPanel } from '../components/pwa/AutoBackupPanel';
 import { can as canDo, type AccessAction } from '../lib/access';
 import { blankProfile, localDb, type AppSettings } from '../lib/localDb';
+import { SHOP_MODE_EVENT } from '../lib/shop-mode';
 import { checkGstin } from '../lib/gstin';
 import { isValidIfsc, isValidPan, isValidUpi } from '../lib/validators';
 import type { SenderProfile } from '../types/invoice';
@@ -31,20 +34,37 @@ import styles from '../components/settings/Settings.module.css';
 const CustomFieldsPanel = lazy(() => import('../components/custom-fields/CustomFieldsPanel').then((m) => ({ default: m.CustomFieldsPanel })));
 // Folder sync (5.7): the panel brings the whole sync engine, so it loads only on the Data tab.
 const SyncPanel = lazy(() => import('../components/sync/SyncPanel').then((m) => ({ default: m.SyncPanel })));
+// Shop mode (8H) and the 8H masters (currency rates) load with the Defaults tab only.
+const ShopModePanel = lazy(() => import('../components/settings/ShopModePanel').then((m) => ({ default: m.ShopModePanel })));
+const CurrencyRatesPanel = lazy(() => import('../components/settings/CurrencyRatesPanel').then((m) => ({ default: m.CurrencyRatesPanel })));
 const ActivityPanel = lazy(() => import('../components/audit/ActivityPanel').then((m) => ({ default: m.ActivityPanel })));
+const DisplayPanel = lazy(() => import('../components/settings/DisplayPanel')); // R2-C6 (Security & device tab)
+// R2-A: payment terms / settlement settings and the reminder schedule, loaded with the Defaults tab.
+const PaymentTermsPanel = lazy(() => import('../components/settings/PaymentTermsPanel'));
+const ReminderSchedulePanel = lazy(() => import('../components/settings/ReminderSchedulePanel'));
 
-type Tab = 'business' | 'items' | 'fields' | 'defaults' | 'data' | 'activity' | 'security';
+// R6-B5: Settings → Features (every module, pack and advanced option in one list) — its own chunk.
+const FeaturesPanel = lazy(() => import('../components/settings/FeaturesPanel'));
+const RetailChecks = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.RetailChecks }))); // R9 (RT-A2)
 
-/** `need`: local roles (6.21) — a clerk or viewer sees only the tabs their role may use. */
-const ALL_TABS: { id: Tab; label: Parameters<typeof setT>[0]; icon: typeof Building2; need: AccessAction }[] = [
-  { id: 'business', label: 'tabBusiness', icon: Building2, need: 'settings.manage' },
-  { id: 'items', label: 'tabItems', icon: Package, need: 'master.edit' },
-  { id: 'fields', label: 'tabFields', icon: ListPlus, need: 'settings.manage' },
-  { id: 'defaults', label: 'tabDefaults', icon: SlidersHorizontal, need: 'settings.manage' },
-  { id: 'data', label: 'tabData', icon: Database, need: 'data.restore' },
-  { id: 'activity', label: 'tabActivity', icon: ScrollText, need: 'view' },
-  { id: 'security', label: 'tabSecurity', icon: ShieldCheck, need: 'view' },
-];
+type Tab = SettingsTab;
+
+// R6-B1: the ids, labels and roles live in settings-tabs.ts (Ctrl+K indexes them); the icons stay here.
+const TAB_ICON: Record<Tab, typeof Building2> = {
+  business: Building2,
+  items: Package,
+  fields: ListPlus,
+  defaults: SlidersHorizontal,
+  features: Layers,
+  data: Database,
+  activity: ScrollText,
+  security: ShieldCheck,
+};
+const ALL_TABS: { id: Tab; label: () => string; icon: typeof Building2; need: AccessAction }[] = SETTINGS_TABS.map((t) => ({
+  ...t,
+  label: () => (t.id === 'features' ? discoverT('tabFeatures') : setT(t.label as Exclude<(typeof t)['label'], 'tabFeatures'>)),
+  icon: TAB_ICON[t.id],
+}));
 
 /** The first problem that should block saving, or '' when the profile is fine. */
 function profileProblem(p: SenderProfile): string {
@@ -66,6 +86,13 @@ export function Settings() {
     const t = params.get('tab');
     return TABS.some((x) => x.id === t) ? (t as Tab) : TABS[0].id;
   });
+  // R6-B2: a link to another tab while Settings is open (the sidebar's "N more features") switches the tab.
+  const urlTab = params.get('tab');
+  const [seenTab, setSeenTab] = useState(urlTab);
+  if (urlTab !== seenTab) {
+    setSeenTab(urlTab);
+    if (TABS.some((x) => x.id === urlTab)) setTab(urlTab as Tab);
+  }
   const [settings, setSettings] = useState<AppSettings>(() => localDb.settings.get());
   const [editingId, setEditingId] = useState(() => localDb.settings.get().activeProfileId);
   const [dirty, setDirty] = useState(false);
@@ -146,6 +173,7 @@ export function Settings() {
       localDb.settings.save({ ...settings, onboarded: true });
       setSettings((s) => ({ ...s, onboarded: true }));
       setDirty(false);
+      window.dispatchEvent(new Event(SHOP_MODE_EVENT)); // 8H: the sidebar re-reads the shop mode
       notify(t('settings.saved'));
     } catch (err) {
       notify((err as Error).message, 'error');
@@ -187,7 +215,7 @@ export function Settings() {
             onClick={() => setTab(id)}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', minHeight: 40 }}
           >
-            <Icon size={14} aria-hidden="true" /> {setT(label)}
+            <Icon size={14} aria-hidden="true" /> {label()}
           </button>
         ))}
       </div>
@@ -253,6 +281,7 @@ export function Settings() {
         <>
           <CatalogPanel notify={notify} />
           <PricingPanel notify={notify} />
+          <Suspense fallback={null}><RetailChecks notify={notify} /></Suspense>
         </>
       )}
       {tab === 'fields' && (
@@ -262,12 +291,28 @@ export function Settings() {
       )}
       {tab === 'defaults' && (
         <>
+          <Suspense fallback={null}>
+            <ShopModePanel settings={settings} onChange={patchSettings} />
+          </Suspense>
           <DefaultsPanel settings={settings} onChange={patchSettings} />
+          <Suspense fallback={null}>
+            <CurrencyRatesPanel notify={notify} />
+          </Suspense>
           <LateFeeSettings
             profileId={settings.activeProfileId}
             profileName={settings.profiles.find((p) => p.id === settings.activeProfileId)?.companyName}
           />
+          {/* R2-A: payment terms master + settlement settings, reminder schedule & templates */}
+          <Suspense fallback={null}>
+            <PaymentTermsPanel notify={notify} />
+            <ReminderSchedulePanel notify={notify} />
+          </Suspense>
         </>
+      )}
+      {tab === 'features' && (
+        <Suspense fallback={null}>
+          <FeaturesPanel settings={settings} onChange={patchSettings} />
+        </Suspense>
       )}
       {tab === 'data' && (
         <>
@@ -288,6 +333,7 @@ export function Settings() {
         </Suspense>
       )}
       {tab === 'security' && <SecurityPanel notify={notify} onLock={() => window.location.reload()} />}
+      {tab === 'security' && <Suspense fallback={null}><DisplayPanel /></Suspense>}
 
       </div>
 

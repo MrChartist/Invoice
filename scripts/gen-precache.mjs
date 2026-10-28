@@ -3,6 +3,10 @@
  * Post-build: emit dist/precache-manifest.json and stamp dist/sw.js with a build id.
  * Every file in dist/assets plus a small allow-list of root files is precached by sw.js,
  * so every route (including lazy chunks never visited online) works offline.
+ *
+ * R16-A1: language packs (dist/lang-manifest.json, written by scripts/vite-hi-split.mjs) are left out of `files`
+ * and listed under `langs: { hi, regional }`. The worker caches a pack only on a device that uses that language
+ * (the page tells it; the choice survives updates), so English installs and updates never download Hindi.
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -51,6 +55,18 @@ if (existsSync(join(dist, 'assets'))) {
   }
 }
 
+// Language packs: { hi: ['assets/…'], regional: [...] } → URLs. Missing manifest = no packs (an older build).
+const langManifest = existsSync(join(dist, 'lang-manifest.json')) ? JSON.parse(readFileSync(join(dist, 'lang-manifest.json'), 'utf8')) : {};
+const langs = {};
+for (const pack of ['hi', 'regional']) langs[pack] = (langManifest[pack] ?? []).map((f) => '/' + f);
+const inPack = new Set(Object.values(langs).flat());
+for (const url of inPack) {
+  if (!entries.some((e) => e.url === url)) {
+    console.error(`gen-precache: language-pack file ${url} is not in dist/`);
+    process.exit(1);
+  }
+}
+
 const hashes = entries.map((e) => ({
   url: e.url,
   hash: createHash('sha256').update(readFileSync(e.file)).digest('hex').slice(0, 16),
@@ -65,7 +81,7 @@ const version = createHash('sha256')
 
 writeFileSync(
   join(dist, 'precache-manifest.json'),
-  JSON.stringify({ version, files: hashes.map((f) => f.url), hashes }, null, 1),
+  JSON.stringify({ version, files: hashes.map((f) => f.url).filter((u) => !inPack.has(u)), langs, hashes }, null, 1),
 );
 
 if (!sw.includes('__BUILD_ID__')) {
@@ -73,4 +89,4 @@ if (!sw.includes('__BUILD_ID__')) {
   process.exit(1);
 }
 writeFileSync(swPath, sw.replace('__BUILD_ID__', version));
-console.log(`gen-precache: ${hashes.length} files, build ${version}`);
+console.log(`gen-precache: ${hashes.length - inPack.size} core files + language packs ${Object.entries(langs).map(([k, v]) => `${k} ${v.length}`).join(', ')}, build ${version}`);

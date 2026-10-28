@@ -3,12 +3,16 @@
  * presets for popular accounting tools. Pure — no browser APIs.
  */
 
-export type ImportKind = 'clients' | 'items' | 'invoices' | BooksImportKind;
+export type ImportKind = 'clients' | 'items' | 'invoices' | 'vendors' | 'ledgers' | 'opening_bills' | BooksImportKind;
 
-/** P1-21 (7Q): books kinds, written through the ledger / masters APIs by `import-books.ts` (owner only, one undo copy). */
-export type BooksImportKind = 'ledgers' | 'vendors' | 'stock' | 'vouchers';
-export const BOOKS_KINDS: readonly BooksImportKind[] = ['ledgers', 'vendors', 'stock', 'vouchers'];
+/** P1-21 (7Q): stock items and manual vouchers, written through the masters / ledger APIs by `import-books.ts` (one undo copy). */
+export type BooksImportKind = 'stock' | 'vouchers';
+export const BOOKS_KINDS: readonly BooksImportKind[] = ['stock', 'vouchers'];
 export const isBooksKind = (k: ImportKind): k is BooksImportKind => (BOOKS_KINDS as readonly string[]).includes(k);
+
+/** R6-C3 (P1-21): kinds written through `import-openings.ts` (suppliers, ledger openings, bill-wise openings). */
+export const OPENINGS_KINDS: readonly ImportKind[] = ['vendors', 'ledgers', 'opening_bills'];
+export const isOpeningsKind = (k: ImportKind): k is 'vendors' | 'ledgers' | 'opening_bills' => OPENINGS_KINDS.includes(k);
 
 export type FieldType = 'text' | 'number' | 'percent' | 'date' | 'gstin' | 'state' | 'email' | 'status';
 
@@ -28,8 +32,9 @@ export const KIND_LABELS: Record<ImportKind, string> = {
   clients: 'Clients / Parties',
   items: 'Items (catalogue)',
   invoices: 'Opening invoices',
+  vendors: 'Suppliers',
   ledgers: 'Ledgers & opening balances',
-  vendors: 'Suppliers (vendors)',
+  opening_bills: 'Opening bills (bill-wise)',
   stock: 'Stock items',
   vouchers: 'Vouchers (journal / payment / receipt)',
 };
@@ -92,6 +97,26 @@ export const IMPORT_SCHEMAS: Record<ImportKind, FieldDef[]> = {
       synonyms: ['Notes', 'Remarks', 'Note', 'Comments', 'Narration', 'Description'],
       example: ['', 'Pays on the 10th'],
     },
+    // R2-B4: first contact person and first delivery address (optional columns).
+    { key: 'contact_name', label: 'Contact person', type: 'text', synonyms: ['contact_name', 'Contact Person', 'Contact Person Name', 'Kind Attn'], example: ['R. Iyer', ''] },
+    { key: 'contact_role', label: 'Contact role', type: 'text', synonyms: ['contact_role', 'Contact Designation', 'Contact Role', 'Designation'], example: ['Accounts', ''] },
+    { key: 'contact_phone', label: 'Contact phone', type: 'text', synonyms: ['contact_phone', 'Contact Person Phone', 'Contact Person Mobile'], example: ['9820012345', ''] },
+    { key: 'contact_email', label: 'Contact e-mail', type: 'email', synonyms: ['contact_email', 'Contact Person Email', 'Contact Person E-mail'], example: ['ap@acme.in', ''] },
+    { key: 'address_label', label: 'Ship-to label', type: 'text', synonyms: ['address_label', 'Shipping Address Label', 'Ship To Label', 'Plant'], example: ['Plant 2', ''] },
+    { key: 'address_line', label: 'Ship-to address', type: 'text', synonyms: ['address_line', 'Shipping Address', 'Ship To Address', 'Delivery Address', 'Shipping Street'], example: ['Plot 7, MIDC Chakan', ''] },
+    { key: 'address_city', label: 'Ship-to city', type: 'text', synonyms: ['address_city', 'Shipping City', 'Ship To City', 'Delivery City'], example: ['Pune', ''] },
+    { key: 'address_pin', label: 'Ship-to PIN', type: 'text', synonyms: ['address_pin', 'Shipping Code', 'Shipping PIN', 'Ship To PIN', 'Delivery PIN'], example: ['410501', ''] },
+    { key: 'address_state', label: 'Ship-to state', type: 'state', synonyms: ['address_state', 'Shipping State', 'Ship To State', 'Delivery State'], example: ['Maharashtra', ''] },
+    { key: 'address_gstin', label: 'Ship-to GSTIN', type: 'gstin', synonyms: ['address_gstin', 'Shipping GSTIN', 'Ship To GSTIN', 'Consignee GSTIN'], example: ['', ''] },
+    // R3-B5: party document defaults (optional columns; src/lib/party-defaults.ts).
+    { key: 'default_template', label: 'Default template', type: 'text', synonyms: ['default_template', 'Default Template', 'Template'], example: ['corporate_navy', ''] },
+    { key: 'default_currency', label: 'Default currency', type: 'text', synonyms: ['default_currency', 'Default Currency', 'Customer Currency', 'Currency Code'], example: ['USD', ''] },
+    { key: 'default_discount_percent', label: 'Default line discount %', type: 'text', synonyms: ['default_discount_percent', 'Default Discount', 'Discount %', 'Customer Discount'], example: ['5', ''] },
+    { key: 'default_notes', label: 'Default notes', type: 'text', synonyms: ['default_notes', 'Default Notes', 'Customer Notes'], example: ['', ''] },
+    { key: 'default_terms', label: 'Default terms', type: 'text', synonyms: ['default_terms', 'Default Terms', 'Terms and Conditions'], example: ['', ''] },
+    { key: 'hourly_rate', label: 'Hourly rate', type: 'text', synonyms: ['hourly_rate', 'Hourly Rate', 'Billing Rate', 'Rate per Hour'], example: ['2500', ''] },
+    { key: 'attach_annexure', label: 'Attach timesheet annexure', type: 'text', synonyms: ['attach_annexure', 'Attach Annexure', 'Timesheet Annexure'], example: ['yes', ''] },
+    { key: 'print_lang', label: 'Print language', type: 'text', synonyms: ['print_lang', 'Print Language', 'Invoice Language'], example: ['', 'hi'] },
   ],
 
   items: [
@@ -225,102 +250,93 @@ export const IMPORT_SCHEMAS: Record<ImportKind, FieldDef[]> = {
     { key: 'item_tax_rate', label: 'Line GST %', type: 'percent', synonyms: ['Item Tax %', 'Item GST %', 'Line Tax %', 'Item Tax Rate'], example: ['', ''] },
     { key: 'item_unit', label: 'Line unit', type: 'text', synonyms: ['Usage unit', 'Item Unit', 'UOM', 'Unit'], example: ['', ''] },
   ],
-
-  /* ── P1-21 (7Q): books kinds ── */
-  ledgers: [
-    {
-      key: 'name', label: 'Ledger name', type: 'text', required: true,
-      synonyms: ['Ledger Name', 'Ledger', 'Name', 'Account Name', 'Account', 'Particulars', 'Head of Account', 'Account Head'],
-      example: ['Office Rent', 'HDFC Bank 0012'],
-    },
-    {
-      key: 'group', label: 'Group (under)', type: 'text', required: true,
-      hint: 'Tally group (Indirect Expenses, Bank Accounts, Sundry Debtors …), a Schedule III head or one of your groups.',
-      synonyms: ['Group', 'Under', 'Parent', 'Group Name', 'Account Group', 'Primary Group', 'Ledger Group', 'Head'],
-      example: ['Indirect Expenses', 'Bank Accounts'],
-    },
-    {
-      key: 'code', label: 'Code', type: 'text',
-      synonyms: ['Code', 'Account Code', 'Ledger Code', 'GL Code', 'A/c Code'],
-      example: ['', ''],
-    },
-    {
-      key: 'alias', label: 'Alias', type: 'text',
-      synonyms: ['Alias', 'Short Name', 'Other Name'],
-      example: ['Rent', 'HDFC'],
-    },
-    {
-      key: 'opening_dr', label: 'Opening debit', type: 'number',
-      synonyms: ['Opening Dr', 'Opening Debit', 'Debit', 'Dr', 'Opening Balance Dr', 'Dr Amount', 'Debit Balance'],
-      example: ['', '250000'],
-    },
-    {
-      key: 'opening_cr', label: 'Opening credit', type: 'number',
-      synonyms: ['Opening Cr', 'Opening Credit', 'Credit', 'Cr', 'Opening Balance Cr', 'Cr Amount', 'Credit Balance'],
-      example: ['', ''],
-    },
-    {
-      key: 'opening', label: 'Opening balance (Dr / Cr)', type: 'number',
-      hint: 'One column with "Dr" / "Cr" (or a minus sign for credit) instead of two columns.',
-      synonyms: ['Opening Balance', 'Opening', 'Balance', 'Closing Balance', 'Op. Balance', 'Opening Bal'],
-      example: ['', ''],
-    },
-    {
-      key: 'gstin', label: 'GSTIN (parties)', type: 'gstin',
-      synonyms: ['GSTIN', 'GSTIN/UIN', 'GST No', 'GST Number'],
-      example: ['', ''],
-    },
-  ],
-
+  // R6-C3 (P1-21): suppliers (with an optional opening balance), ledgers / trial balance, bill-wise opening bills.
   vendors: [
     {
       key: 'name', label: 'Supplier name', type: 'text', required: true,
-      synonyms: ['Supplier Name', 'Vendor Name', 'Name', 'Party Name', 'Supplier', 'Vendor', 'Ledger Name', 'Creditor'],
-      example: ['Rao Packaging Pvt Ltd', 'Sharma Transport'],
+      synonyms: ['Supplier Name', 'Vendor Name', 'Name', 'Party Name', 'Ledger Name', 'Account Name', 'Supplier', 'Vendor', 'Party', 'Creditor Name', 'Display Name'],
+      example: ['Shree Packaging', 'Metro Steel Traders'],
     },
     {
       key: 'gstin', label: 'GSTIN', type: 'gstin',
-      synonyms: ['GSTIN', 'GSTIN/UIN', 'GST No', 'GST Number', 'Supplier GSTIN', 'Vendor GSTIN'],
+      synonyms: ['GSTIN', 'GSTIN/UIN', 'GST No', 'GST Number', 'GST No.', 'GST Identification Number (GSTIN)', 'Supplier GSTIN', 'Vendor GSTIN', 'Party GSTIN', 'TaxNumber'],
       example: ['27AAPFU0939F1ZV', ''],
     },
+    { key: 'pan', label: 'PAN', type: 'text', synonyms: ['PAN', 'PAN No', 'PAN Number', 'Income Tax PAN', 'IT PAN'], example: ['AAPFU0939F', ''] },
+    { key: 'email', label: 'Email', type: 'email', synonyms: ['Email', 'Email ID', 'Email Id', 'E-mail', 'Email Address', 'EmailAddress'], example: ['accounts@shree.in', ''] },
+    { key: 'phone', label: 'Phone', type: 'text', synonyms: ['Phone', 'Phone No', 'Phone No.', 'Mobile', 'Mobile No', 'Mobile Number', 'Contact No', 'Contact No.', 'Contact Number', 'PhoneNumber'], example: ['9820012345', ''] },
+    { key: 'address', label: 'Address', type: 'text', synonyms: ['Address', 'Billing Address', 'Address1', 'Address 1', 'Mailing Address', 'Street'], example: ['Plot 4, MIDC', ''] },
+    { key: 'state', label: 'State', type: 'state', synonyms: ['State', 'State Name', 'Billing State', 'State/UT', 'State Code'], example: ['Maharashtra', ''] },
     {
-      key: 'pan', label: 'PAN', type: 'text',
-      synonyms: ['PAN', 'PAN No', 'PAN Number', 'Income Tax PAN', 'IT PAN'],
-      example: ['AAPFU0939F', ''],
+      key: 'party_type', label: 'Party type', type: 'text',
+      hint: 'Optional. Rows marked customer / debtor go to Clients instead (a party export with both kinds).',
+      synonyms: ['Party Type', 'Customer/Supplier', 'Party Category', 'Account Type', 'Contact Type', 'Type'],
+      example: ['Supplier', ''],
     },
     {
-      key: 'state', label: 'State', type: 'state',
-      synonyms: ['State', 'State Name', 'State Code', 'Place'],
-      example: ['Maharashtra', 'Delhi'],
+      key: 'opening_balance', label: 'Opening balance', type: 'number',
+      hint: 'Optional. "12,500 Cr" or a Dr/Cr column; a supplier balance is usually Cr (you owe it).',
+      synonyms: ['Opening Balance', 'Opening Bal', 'Op. Balance', 'Opening', 'Balance', 'Closing Balance', 'Current Balance'],
+      example: ['12500', ''],
     },
-    {
-      key: 'email', label: 'Email', type: 'email',
-      synonyms: ['Email', 'E-mail', 'Email ID', 'Email Address'],
-      example: ['ap@rao.in', ''],
-    },
-    {
-      key: 'phone', label: 'Phone', type: 'text',
-      synonyms: ['Phone', 'Mobile', 'Phone No', 'Mobile No', 'Contact No'],
-      example: ['9820012345', ''],
-    },
-    {
-      key: 'address', label: 'Address', type: 'text',
-      synonyms: ['Address', 'Billing Address', 'Mailing Address', 'Address 1'],
-      example: ['Plot 7, MIDC', ''],
-    },
-    {
-      key: 'msme_udyam', label: 'Udyam no. (MSME)', type: 'text',
-      synonyms: ['Udyam', 'Udyam No', 'Udyam Registration', 'MSME No', 'MSME Registration'],
-      example: ['', ''],
-    },
-    {
-      key: 'opening', label: 'Opening balance payable', type: 'number',
-      hint: 'What you owe the supplier on the books beginning date (Cr). Write "Dr" for an advance paid.',
-      synonyms: ['Opening Balance', 'Opening', 'Balance', 'Opening Cr', 'Payable', 'Outstanding'],
-      example: ['15000', ''],
-    },
+    { key: 'dr_cr', label: 'Dr / Cr', type: 'text', synonyms: ['Dr/Cr', 'Dr Cr', 'Cr/Dr', 'Balance Type', 'Type of Balance'], example: ['Cr', ''] },
+    { key: 'receivable', label: 'Receivable balance', type: 'number', synonyms: ['Receivable Balance', 'To Receive', 'Receivable', 'You will get'], example: ['', ''] },
+    { key: 'payable', label: 'Payable balance', type: 'number', synonyms: ['Payable Balance', 'To Pay', 'Payable', 'You will give'], example: ['', ''] },
   ],
 
+  ledgers: [
+    {
+      key: 'name', label: 'Ledger name', type: 'text', required: true,
+      synonyms: ['Ledger Name', 'Account Name', 'Name', 'Particulars', 'Ledger', 'Account', 'Account Head', 'Head of Account', 'Full name'],
+      example: ['Capital Account', 'HDFC Bank'],
+    },
+    {
+      key: 'group', label: 'Group', type: 'text',
+      hint: 'Tally / Schedule III group (Sundry Creditors, Bank Accounts, Capital Account …). Unknown groups map to the nearest primary, with a warning.',
+      synonyms: ['Group', 'Under', 'Group Name', 'Account Group', 'Parent Group', 'Primary Group', 'Parent', 'Account Type', 'Type', 'Detail Type'],
+      example: ['Capital Account', 'Bank Accounts'],
+    },
+    { key: 'debit', label: 'Opening debit', type: 'number', synonyms: ['Debit', 'Dr', 'Debit Balance', 'Opening Debit', 'Dr Amount', 'Debit Amount', 'Op. Bal (Dr)', 'Opening Balance (Dr)'], example: ['', '84000'] },
+    { key: 'credit', label: 'Opening credit', type: 'number', synonyms: ['Credit', 'Cr', 'Credit Balance', 'Opening Credit', 'Cr Amount', 'Credit Amount', 'Op. Bal (Cr)', 'Opening Balance (Cr)'], example: ['250000', ''] },
+    {
+      key: 'amount', label: 'Opening balance', type: 'number',
+      hint: 'Use this or the Debit / Credit columns: "1,200 Dr", a negative number for credit, or a Dr/Cr column.',
+      synonyms: ['Opening Balance', 'Amount', 'Balance', 'Closing Balance', 'Opening Bal', 'Op. Balance'],
+      example: ['', ''],
+    },
+    { key: 'dr_cr', label: 'Dr / Cr', type: 'text', synonyms: ['Dr/Cr', 'Dr Cr', 'Cr/Dr', 'Balance Type', 'Type of Balance'], example: ['', ''] },
+    { key: 'gstin', label: 'GSTIN (party ledgers)', type: 'gstin', synonyms: ['GSTIN', 'GSTIN/UIN', 'GST No', 'GST Number'], example: ['', ''] },
+  ],
+
+  opening_bills: [
+    {
+      key: 'party', label: 'Party', type: 'text', required: true,
+      synonyms: ['Party Name', 'Party', "Party's Name", 'Customer Name', 'Supplier Name', 'Vendor Name', 'Customer', 'Supplier', 'Vendor', 'Ledger Name', 'Name', 'ContactName'],
+      example: ['Acme Traders Pvt Ltd', 'Shree Packaging'],
+    },
+    {
+      key: 'side', label: 'Receivable / payable', type: 'text',
+      hint: 'Receivable (customer owes you) or Payable (you owe the supplier). Blank: from the Dr / Cr column, else the party master.',
+      synonyms: ['Side', 'Receivable/Payable', 'Bill Type', 'Nature', 'Party Type', 'Type'],
+      example: ['Receivable', 'Payable'],
+    },
+    {
+      key: 'ref_no', label: 'Bill reference', type: 'text', required: true,
+      synonyms: ['Bill No', 'Bill No.', 'Ref No', 'Ref. No.', 'Reference', 'Ref', 'Invoice No', 'Invoice No.', 'Invoice Number', 'Bill Number', 'Voucher No', 'Bill Ref', 'Num', 'InvoiceNumber'],
+      example: ['INV/24-25/0188', 'SP/1123'],
+    },
+    { key: 'date', label: 'Bill date', type: 'date', required: true, synonyms: ['Bill Date', 'Date', 'Invoice Date', 'Ref Date', 'Voucher Date', 'InvoiceDate'], example: ['2025-02-14', '2025-03-02'] },
+    { key: 'due_date', label: 'Due date', type: 'date', synonyms: ['Due Date', 'Due On', 'Due', 'DueDate'], example: ['2025-03-16', ''] },
+    { key: 'credit_days', label: 'Credit days', type: 'number', synonyms: ['Credit Days', 'Credit Period', 'Days', 'Terms (days)'], example: ['', '45'] },
+    {
+      key: 'amount', label: 'Pending amount', type: 'number', required: true,
+      synonyms: ['Pending Amount', 'Amount', 'Outstanding', 'Balance', 'Bill Amount', 'Pending', 'Closing Balance', 'Opening Amount', 'Open Balance', 'AmountDue'],
+      example: ['59000', '23600'],
+    },
+    { key: 'dr_cr', label: 'Dr / Cr', type: 'text', synonyms: ['Dr/Cr', 'Dr Cr', 'Cr/Dr', 'Balance Type'], example: ['Dr', 'Cr'] },
+  ],
+
+  /* ── P1-21 (7Q): stock items and manual vouchers ── */
   stock: [
     {
       key: 'name', label: 'Item name', type: 'text', required: true,
@@ -514,10 +530,26 @@ export const IMPORT_PRESETS: ImportPreset[] = [
     headers: {},
   },
   {
+    // R6-C3: the 31 March trial balance most tools (and Excel) export: one row per ledger.
+    id: 'trial_balance',
+    label: 'Trial balance (Name, Group, Debit, Credit)',
+    description: 'A trial balance from any tool or Excel: ledger name, its group, and the debit or credit balance.',
+    headers: {
+      ledgers: { name: ['Name', 'Ledger Name', 'Particulars', 'Account'], group: ['Group', 'Under', 'Account Group'], debit: ['Debit', 'Dr'], credit: ['Credit', 'Cr'] },
+    },
+  },
+  {
     id: 'vyapar',
     label: 'Vyapar',
     description: 'Party, Item and Sale reports exported from Vyapar as Excel / CSV.',
     headers: {
+      // R6-C3: the Party report (both kinds) and the Party-wise outstanding report.
+      vendors: {
+        name: ['Party Name', 'Name'], phone: ['Phone No.', 'Phone No', 'Contact No.'], email: ['Email Id', 'Email'], address: ['Billing Address', 'Address'],
+        gstin: ['GSTIN'], state: ['State'], party_type: ['Party Type', 'Party Group'], opening_balance: ['Opening Balance'],
+        receivable: ['Receivable Balance'], payable: ['Payable Balance'],
+      },
+      opening_bills: { party: ['Party Name'], ref_no: ['Invoice No.', 'Ref No.', 'Bill No.'], date: ['Date'], due_date: ['Due Date'], amount: ['Balance', 'Balance Due'], side: ['Type'] },
       clients: {
         name: ['Party Name'], phone: ['Phone No.', 'Contact No.'], email: ['Email Id', 'Email'],
         address: ['Billing Address'], gstin: ['GSTIN'], state: ['State'],
@@ -538,6 +570,12 @@ export const IMPORT_PRESETS: ImportPreset[] = [
     label: 'Zoho Books',
     description: 'Contacts, Items and Invoices export from Zoho Books (line items are merged per invoice).',
     headers: {
+      vendors: {
+        name: ['Display Name', 'Vendor Name'], email: ['EmailID'], phone: ['Phone', 'MobilePhone'], gstin: ['GST Identification Number (GSTIN)'],
+        state: ['Billing State', 'Source of Supply'], address: ['Billing Address'], pan: ['PAN Number'], opening_balance: ['Opening Balance'],
+      },
+      ledgers: { name: ['Account Name'], group: ['Account Type'], debit: ['Debit'], credit: ['Credit'] },
+      opening_bills: { party: ['Vendor Name', 'Customer Name'], ref_no: ['Bill Number', 'Invoice Number'], date: ['Bill Date', 'Invoice Date'], due_date: ['Due Date'], amount: ['Balance'] },
       clients: {
         name: ['Display Name'], company: ['Company Name'], email: ['EmailID'], phone: ['Phone', 'MobilePhone'],
         gstin: ['GST Identification Number (GSTIN)'], state: ['Billing State', 'Place of Supply'],
@@ -562,6 +600,12 @@ export const IMPORT_PRESETS: ImportPreset[] = [
     label: 'Tally Prime / ERP 9',
     description: 'Ledger master, Stock Item and Sales Register CSV exports from Tally.',
     headers: {
+      vendors: {
+        name: ['Ledger Name', 'Name'], gstin: ['GSTIN/UIN', 'GST Registration Number'], state: ['State Name', 'State'], address: ['Address', 'Mailing Address'],
+        pan: ['PAN/IT No.', 'Income Tax Number'], opening_balance: ['Opening Balance'], email: ['E-Mail'], phone: ['Phone No.', 'Mobile No.'],
+      },
+      ledgers: { name: ['Particulars', 'Ledger Name', 'Name'], group: ['Under', 'Group', 'Parent'], debit: ['Debit', 'Opening Balance (Dr)'], credit: ['Credit', 'Opening Balance (Cr)'], amount: ['Opening Balance'] },
+      opening_bills: { party: ["Party's Name", 'Particulars'], ref_no: ['Ref. No.', 'Ref No.'], date: ['Date'], due_date: ['Due on', 'Due On'], amount: ['Pending Amount', 'Pending'] },
       clients: {
         name: ['Ledger Name', 'Name', 'Particulars'], gstin: ['GSTIN/UIN', 'GST Registration Number'],
         state: ['State Name', 'State'], address: ['Address', 'Mailing Address'], zip: ['Pincode', 'PIN Code'],
@@ -583,6 +627,12 @@ export const IMPORT_PRESETS: ImportPreset[] = [
     label: 'Busy Accounting',
     description: 'Account, Item and Sales Bill list exports from BUSY.',
     headers: {
+      vendors: {
+        name: ['Name', 'Account Name'], gstin: ['GSTIN', 'GST No'], address: ['Address1'], state: ['State'], phone: ['Mobile', 'Phone'],
+        email: ['Email'], pan: ['IT PAN', 'PAN'], opening_balance: ['Op. Bal.', 'Opening Balance'], dr_cr: ['Dr/Cr'],
+      },
+      ledgers: { name: ['Name', 'Account Name'], group: ['Group', 'Parent Group'], debit: ['Op. Bal (Dr)', 'Debit'], credit: ['Op. Bal (Cr)', 'Credit'] },
+      opening_bills: { party: ['Party', 'Account', 'Party Name'], ref_no: ['Bill No', 'Ref No'], date: ['Bill Date', 'Date'], due_date: ['Due Date'], amount: ['Pending Amount', 'Balance', 'Amount'] },
       clients: {
         name: ['Name', 'Account Name'], company: ['Print Name'], gstin: ['GSTIN', 'GST No'], address: ['Address1'],
         address2: ['Address2'], city: ['City'], state: ['State'], zip: ['Pincode'], phone: ['Mobile', 'Phone'],
@@ -595,6 +645,128 @@ export const IMPORT_PRESETS: ImportPreset[] = [
       invoices: {
         invoice_number: ['Vch/Bill No', 'Bill No'], issue_date: ['Date'], client_name: ['Party', 'Party Name'],
         client_gstin: ['GSTIN'], taxable_value: ['Net Amount', 'Taxable Amount'], total: ['Bill Amount', 'Net Total'],
+      },
+    },
+  },  // 8H import presets (roadmap 8.126): header spellings of the tools' standard list exports. Best effort —
+  // columns the preset does not know are still matched by name, and the mapping step shows every guess.
+  {
+    id: 'quickbooks',
+    label: 'QuickBooks Online',
+    description: 'Customer, Product/Service and Invoice list exports from QuickBooks Online (India).',
+    headers: {
+      vendors: {
+        name: ['Vendor', 'Display Name', 'Vendor full name'], email: ['Email'], phone: ['Phone', 'Mobile'], address: ['Billing Address', 'Billing street'],
+        state: ['Billing state'], gstin: ['GSTIN'], pan: ['PAN'], opening_balance: ['Opening Balance', 'Balance'],
+      },
+      ledgers: { name: ['Account', 'Full name', 'Account name'], group: ['Type', 'Account type', 'Detail type'], debit: ['Debit'], credit: ['Credit'] },
+      opening_bills: { party: ['Vendor', 'Customer', 'Name'], ref_no: ['Num', 'No.'], date: ['Date'], due_date: ['Due Date', 'Due date'], amount: ['Open Balance'] },
+      clients: {
+        name: ['Customer', 'Customer full name', 'Display Name'], company: ['Company', 'Company name'], email: ['Email'],
+        phone: ['Phone', 'Mobile'], address: ['Billing Address', 'Billing street'], city: ['Billing city'], state: ['Billing state'],
+        zip: ['Billing ZIP', 'Billing postcode'], gstin: ['GSTIN'],
+      },
+      items: {
+        name: ['Product/Service Name', 'Product/Service', 'Name'], description: ['Sales Description', 'Description'],
+        rate: ['Sales Price / Rate', 'Sales price/rate', 'Price'], hsn: ['HSN/SAC', 'SAC/HSN'], type: ['Type'], tax_rate: ['Sales tax', 'Tax'],
+      },
+      invoices: {
+        invoice_number: ['Num', 'No.', 'Invoice no'], issue_date: ['Date', 'Invoice date'], due_date: ['Due Date', 'Due date'],
+        client_name: ['Customer', 'Name'], total: ['Amount', 'Total'], balance_due: ['Open Balance', 'Balance'], po_number: ['P.O. Number'],
+      },
+    },
+  },
+  {
+    id: 'xero',
+    label: 'Xero',
+    description: 'Contacts, Inventory items and Sales invoice CSV exports from Xero (one row per invoice line).',
+    headers: {
+      vendors: {
+        name: ['ContactName', '*ContactName'], email: ['EmailAddress'], phone: ['PhoneNumber', 'MobileNumber'], address: ['POAddressLine1'],
+        state: ['PORegion'], gstin: ['TaxNumber'],
+      },
+      ledgers: { name: ['Account', 'Name', 'Account Name'], group: ['Type', 'Account Type'], debit: ['Debit'], credit: ['Credit'] },
+      opening_bills: { party: ['ContactName', '*ContactName'], ref_no: ['InvoiceNumber', '*InvoiceNumber'], date: ['InvoiceDate', '*InvoiceDate'], due_date: ['DueDate', '*DueDate'], amount: ['AmountDue'] },
+      clients: {
+        name: ['ContactName', '*ContactName'], email: ['EmailAddress'], phone: ['PhoneNumber', 'MobileNumber'],
+        address: ['POAddressLine1', 'SAAddressLine1'], address2: ['POAddressLine2'], city: ['POCity'], state: ['PORegion'],
+        zip: ['POPostalCode'], gstin: ['TaxNumber'],
+      },
+      items: {
+        name: ['ItemName', '*ItemCode', 'ItemCode'], description: ['SalesDescription'], rate: ['SalesUnitPrice'], tax_rate: ['SalesTaxRate'],
+      },
+      invoices: {
+        invoice_number: ['InvoiceNumber', '*InvoiceNumber'], issue_date: ['InvoiceDate', '*InvoiceDate'], due_date: ['DueDate', '*DueDate'],
+        client_name: ['ContactName', '*ContactName'], total: ['Total'], po_number: ['Reference'], item_name: ['Description', '*Description'],
+        item_qty: ['Quantity', '*Quantity'], item_rate: ['UnitAmount', '*UnitAmount'], status: ['Status'],
+      },
+    },
+  },
+  {
+    id: 'refrens',
+    label: 'Refrens',
+    description: 'Clients and Invoices exports from Refrens.',
+    headers: {
+      vendors: {
+        name: ['Vendor Name', 'Business Name'], email: ['Email'], phone: ['Phone', 'Phone Number'], gstin: ['GSTIN', 'GST Number'],
+        address: ['Address', 'Street'], state: ['State'], pan: ['PAN'],
+      },
+      opening_bills: { party: ['Client Name', 'Vendor Name', 'Billed To'], ref_no: ['Invoice No.', 'Invoice Number', 'Bill Number'], date: ['Invoice Date', 'Bill Date'], due_date: ['Due Date'], amount: ['Amount Due', 'Balance Due'] },
+      clients: {
+        name: ['Business Name', 'Client Name'], email: ['Email'], phone: ['Phone', 'Phone Number'], gstin: ['GSTIN', 'GST Number'],
+        address: ['Address', 'Street'], city: ['City'], state: ['State'], zip: ['Pincode', 'Postal Code'],
+      },
+      invoices: {
+        invoice_number: ['Invoice No.', 'Invoice Number'], issue_date: ['Invoice Date'], due_date: ['Due Date'], client_name: ['Client Name', 'Billed To'],
+        client_gstin: ['Client GSTIN'], taxable_value: ['Amount', 'Sub Total'], tax_amount: ['Tax', 'Total Tax'], total: ['Total', 'Total Amount'],
+        amount_paid: ['Amount Received', 'Paid Amount'], balance_due: ['Amount Due', 'Balance Due'], status: ['Status'],
+      },
+    },
+  },
+  {
+    id: 'clearone',
+    label: 'ClearOne (ClearTax)',
+    description: 'Customer, Item and Sales invoice exports from ClearOne / ClearTax billing.',
+    headers: {
+      vendors: {
+        name: ['Vendor Name', 'Supplier Name'], gstin: ['GSTIN', 'Vendor GSTIN', 'Supplier GSTIN'], email: ['Email', 'Email ID'], phone: ['Mobile Number', 'Phone'],
+        address: ['Billing Address', 'Address'], state: ['State'], pan: ['PAN'],
+      },
+      opening_bills: { party: ['Customer Name', 'Vendor Name'], ref_no: ['Invoice Number', 'Document Number'], date: ['Invoice Date', 'Document Date'], due_date: ['Due Date'], amount: ['Balance Due', 'Outstanding Amount'] },
+      clients: {
+        name: ['Customer Name', 'Name'], gstin: ['GSTIN', 'Customer GSTIN'], email: ['Email', 'Email ID'], phone: ['Mobile Number', 'Phone'],
+        address: ['Billing Address'], city: ['City'], state: ['State', 'Billing State'], zip: ['Pincode'],
+      },
+      items: {
+        name: ['Item Name'], hsn: ['HSN/SAC Code', 'HSN/SAC'], rate: ['Selling Price', 'Rate'], tax_rate: ['GST Rate', 'Tax Rate'], unit: ['Unit', 'UQC'],
+      },
+      invoices: {
+        invoice_number: ['Invoice Number', 'Document Number'], issue_date: ['Invoice Date', 'Document Date'], due_date: ['Due Date'],
+        client_name: ['Customer Name'], client_gstin: ['Customer GSTIN'], place_of_supply: ['Place of Supply'], taxable_value: ['Taxable Value'],
+        cgst: ['CGST Amount'], sgst: ['SGST Amount'], igst: ['IGST Amount'], total: ['Invoice Total', 'Invoice Value'],
+      },
+    },
+  },
+  {
+    id: 'marg',
+    label: 'Marg ERP',
+    description: 'Party master, Item master and Sale register exports from Marg ERP 9+.',
+    headers: {
+      vendors: {
+        name: ['Party Name', 'Ledger'], address: ['Address', 'Address 1'], gstin: ['GST No.', 'GSTIN'], phone: ['Mobile', 'Phone'], state: ['State'],
+        email: ['Email'], opening_balance: ['Opening', 'Op. Balance'], dr_cr: ['Dr/Cr'],
+      },
+      ledgers: { name: ['Ledger', 'Ledger Name'], group: ['Group', 'Under'], debit: ['Debit', 'Opening Dr'], credit: ['Credit', 'Opening Cr'] },
+      opening_bills: { party: ['Party Name', 'Ledger'], ref_no: ['Bill No', 'Bill No.'], date: ['Bill Date', 'Date'], due_date: ['Due Date'], amount: ['Balance', 'Pending'] },
+      clients: {
+        name: ['Party Name', 'Ledger'], address: ['Address', 'Address 1'], city: ['Station', 'City'], gstin: ['GST No.', 'GSTIN'],
+        phone: ['Mobile', 'Phone'], state: ['State'], email: ['Email'],
+      },
+      items: {
+        name: ['Product Name', 'Item Name'], hsn: ['HSN', 'HSN Code'], rate: ['Rate', 'Sale Rate'], tax_rate: ['GST %', 'GST'], unit: ['Unit', 'Pack'],
+      },
+      invoices: {
+        invoice_number: ['Bill No', 'Bill No.'], issue_date: ['Bill Date', 'Date'], client_name: ['Party Name'], client_gstin: ['GSTIN', 'GST No.'],
+        taxable_value: ['Taxable', 'Taxable Amt'], cgst: ['CGST'], sgst: ['SGST'], igst: ['IGST'], total: ['Net Amount', 'Bill Amount'],
       },
     },
   },
@@ -695,21 +867,3 @@ export function templateRows(kind: ImportKind): string[][] {
 export function templateFileName(kind: ImportKind): string {
   return `mrchartist-import-template-${kind}.csv`;
 }
-
-/**
- * 7.49: "trial balance as at 31-Mar" template for openings: the ledgers kind with the opening Dr / Cr
- * columns, one row per ledger (parties under Sundry Debtors / Creditors become clients / vendors).
- */
-export function trialBalanceTemplateRows(): string[][] {
-  return [
-    ['Ledger name', 'Group (under)', 'Opening debit', 'Opening credit'],
-    ['Capital Account - Owner', 'Capital Account', '', '500000'],
-    ['HDFC Bank 0012', 'Bank Accounts', '320000', ''],
-    ['Cash', 'Cash-in-Hand', '15000', ''],
-    ['Acme Traders Pvt Ltd', 'Sundry Debtors', '118000', ''],
-    ['Rao Packaging Pvt Ltd', 'Sundry Creditors', '', '45000'],
-    ['Furniture & Fixtures', 'Fixed Assets', '92000', ''],
-  ];
-}
-
-export const TB_TEMPLATE_FILE = 'mrchartist-import-template-trial-balance.csv';

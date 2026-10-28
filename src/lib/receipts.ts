@@ -15,6 +15,7 @@ import { amountInWords } from './amount-in-words';
 import { formatCurrency, formatDate } from './utils';
 import { round2 } from './invoice-calc';
 import { receivableTotal } from './rcm';
+import { escHtml as esc } from './html-esc';
 
 export function receiptNumber(
   payment: Pick<Payment, 'id' | 'date'> & Partial<Pick<Payment, 'receipt_number'>>,
@@ -49,6 +50,11 @@ export interface ReceiptData {
   invoiceTotal: number;
   /** Balance still owed on the invoice once this payment (and every earlier one) is counted. */
   balanceAfter: number;
+  /** Additive (R5-C1): "for" line — the student's / patient's roll no. and class on a fee receipt. */
+  forLine?: string;  /** Additive (R5-C3 / C6): another receipt kind (donation, deposit refund) — its title, rows and notes replace the invoice rows. */
+  title?: string;
+  rows?: [string, string][];
+  notes?: string[];
 }
 
 export function buildReceipt(invoice: InvoiceRecord, payment: Payment, allPayments: readonly Payment[]): ReceiptData {
@@ -76,11 +82,17 @@ export function buildReceipt(invoice: InvoiceRecord, payment: Payment, allPaymen
     // Reverse charge: the recipient's GST is never part of what the receipt settles (src/lib/rcm.ts).
     invoiceTotal: receivableTotal(invoice) || 0,
     balanceAfter: Math.max(round2((receivableTotal(invoice) || 0) - tds - paidSoFar), 0),
+    ...forLineOf(invoice),
   };
 }
 
-const esc = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
+/** R5-C1: "Roll no. 12 · Class 6-A" from the document's party snapshot (fee documents only). */
+function forLineOf(inv: InvoiceRecord): { forLine?: string } {
+  const c = inv.client;
+  const line = inv.fee_plan_id ? [c?.roll_no ? `Roll no. ${c.roll_no}` : '', c?.class_label ? `Class ${c.class_label}` : ''].filter(Boolean).join(' · ') : '';
+  return line ? { forLine: line } : {};
+}
+
 
 /** A complete, script-free HTML document for printing or saving. */
 export function receiptHtml(r: ReceiptData): string {
@@ -105,7 +117,7 @@ export function receiptHtml(r: ReceiptData): string {
 </style></head>
 <body><div class="sheet">
   <div class="head">
-    <div><h1>Payment receipt</h1><div class="muted">${esc(r.number)} · ${esc(formatDate(r.date))}</div></div>
+    <div><h1>${esc(r.title ?? 'Payment receipt')}</h1><div class="muted">${esc(r.number)} · ${esc(formatDate(r.date))}</div></div>
     <div style="text-align:right"><strong>${esc(r.business)}</strong>
       ${r.businessGstin ? `<div class="muted">GSTIN ${esc(r.businessGstin)}</div>` : ''}
       ${r.businessAddress ? `<div class="muted">${esc(r.businessAddress).replace(/\n/g, '<br>')}</div>` : ''}</div>
@@ -113,15 +125,17 @@ export function receiptHtml(r: ReceiptData): string {
   <div class="muted">Received with thanks from</div>
   <div style="font-size:16px;font-weight:600">${esc(r.from)}</div>
   ${r.fromGstin ? `<div class="muted">GSTIN ${esc(r.fromGstin)}</div>` : ''}
+  ${r.forLine ? `<div class="muted">For ${esc(r.forLine)}</div>` : ''}
   <div class="amount">${money(r.amount)}</div>
   <div class="muted">${esc(r.amountWords)}</div>
   <table>
-    ${row('Against', esc(r.against))}
+    ${r.rows ? r.rows.map(([k, v]) => row(k, esc(v))).join('') : `${row('Against', esc(r.against))}
     ${row('Invoice total', money(r.invoiceTotal))}
     ${row('Payment method', esc(r.method))}
     ${row('Reference', esc(r.reference))}
-    ${row('Balance after this payment', money(r.balanceAfter))}
+    ${row('Balance after this payment', money(r.balanceAfter))}`}
   </table>
+  ${(r.notes ?? []).map((n) => `<div class="note">${esc(n)}</div>`).join('')}
   <div class="sign">For ${esc(r.business)}<br><br><br>Authorised signatory</div>
   <div class="note">This receipt was produced on the issuer's device.</div>
 </div></body></html>`;

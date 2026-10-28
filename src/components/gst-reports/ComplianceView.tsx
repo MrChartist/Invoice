@@ -15,10 +15,12 @@ import {
   type ReturnStatus,
 } from '../../lib/compliance';
 import { estimateFor } from '../../lib/gst-penalties';
-import { buildGstReport, periodForDate } from '../../lib/gst-reports';
+import { buildGstReport, journalItcReversals, periodForDate } from '../../lib/gst-reports';
 import { compositionLateInputs } from '../../lib/gstr4-annual';
 import { localDb } from '../../lib/localDb';
+import { isPackOn } from '../../lib/industry-packs';
 import { QRMP_TURNOVER_LIMIT, todayIso } from '../../lib/tax-rules';
+import PendingNote from '../ui/PendingNote';
 import { readLinks } from '../../lib/documents';
 import { formatDate } from '../../lib/utils';
 import type { InvoiceRecord } from '../../types/invoice';
@@ -34,6 +36,16 @@ import { nodes } from '../../i18n/areas/nodes';
 
 // 7O (7.96): TDS deposit / 26Q due dates — loads the TDS engine only when this tab is open.
 const TdsDueCalendar = lazy(() => import('../tds/TdsDueCalendar'));
+// 8D (8.62): returns becoming time-barred (three years from the due date).
+const Gst8dPanel = lazy(() => import('./Gst8dPanel'));
+// R8-C (TR-C2): composition-limit tracker (composition profiles only, lazy).
+const CompositionTracker = lazy(() => import('../trade/CompositionTracker'));
+// R12 (AG-D5): producer company / co-operative reminders (fpo pack only, lazy).
+const MembersCalendar = lazy(() => import('../agri/MembersCalendar'));
+// R13 (MF-D3 / D4): Form-1, export-obligation and incentive reminders (shopfloor pack only, lazy).
+const MfgCalendar = lazy(() => import('../mfg/MfgCalendar'));
+// R14 (PS-C2): EDF and services-realisation reminders (svcexport pack only, lazy).
+const ExportSvcCalendar = lazy(() => import('../prof/ExportSvcCalendar'));
 
 export interface ComplianceViewProps {
   invoices: InvoiceRecord[];
@@ -86,6 +98,8 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
     const links = readLinks();
     // 7O (7.93): supplier notes reduce the month's ITC, so the late-fee / interest base follows the 3B.
     const purchaseNotes = getTable<PurchaseReturn>('purchase_returns');
+    // R6-C4: Rule 42 / 43 common-credit journals raise the 3B tax payable in cash, so the interest base follows.
+    const itcReversals = journalItcReversals(getTable('vouchers'));
     return complianceCalendar({ frequency, stateCode, today, since })
       .map((r) => {
         const filed = filedFor(filedRows, r, gstin);
@@ -95,7 +109,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
         let nil = false;
         if (!r.optional && filedOn > r.due && (r.form === 'GSTR1' || r.form === 'GSTR3B')) {
           const period = periodForDate(r.periodKey.includes('-Q') ? 'quarter' : 'month', r.from);
-          const rep = buildGstReport(invoices, purchases, { period, gstin, filerStateCode: stateCode, links, purchaseNotes });
+          const rep = buildGstReport(invoices, purchases, { period, gstin, filerStateCode: stateCode, links, purchaseNotes, itcReversals });
           const p = rep.gstr3b.payment;
           cashTax = p.cash.igst + p.cash.cgst + p.cash.sgst + (p.cess ?? 0);
           nil = rep.gstr1.counts.included === 0 && (r.form === 'GSTR1' || rep.gstr3b.purchasesConsidered === 0);
@@ -145,6 +159,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
             : gvT('nothingOverdue')}
         </p>
       </div>
+      {open.some((x) => x.lateFee > 0) && <PendingNote area="latefee" day={today} />}
       {frequency === 'qrmp' && turnover > QRMP_TURNOVER_LIMIT && (
         <p className={controls.error} style={{ margin: 0 }}>{gvT('qrmpLimit')}</p>
       )}
@@ -182,8 +197,15 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
         />
       )}
       <Suspense fallback={null}>
+        <Gst8dPanel view="timebar" frequency={frequency} stateCode={stateCode} since={since} gstin={gstin} filed={filedRows} onMark={mark} />
+      </Suspense>
+      <Suspense fallback={null}>
         <TdsDueCalendar today={today} />
       </Suspense>
+      <Suspense fallback={null}><CompositionTracker invoices={invoices} stateCode={stateCode} today={today} /></Suspense>
+      {isPackOn(localDb.settings.get(), 'fpo') && <Suspense fallback={null}><MembersCalendar today={today} /></Suspense>}
+      {isPackOn(localDb.settings.get(), 'shopfloor') && <Suspense fallback={null}><MfgCalendar today={today} /></Suspense>}
+      {isPackOn(localDb.settings.get(), 'svcexport') && <Suspense fallback={null}><ExportSvcCalendar today={today} /></Suspense>}
       <ul className={local.notes}>
         <li><strong>{gvT('ncEstimates')}</strong> {gvT('ncDue')}</li>
         <li>{gvT('ncLateFee')}</li>

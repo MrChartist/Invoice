@@ -45,7 +45,7 @@ const norm = (s: string | undefined) => (s ?? '').trim().toLowerCase();
 
 /** Add / edit a received or issued cheque (6.26). */
 export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: ChequeFormModalProps) {
-  useT(); // re-render on a language switch (5.4)
+  const { lang } = useT(); // re-render on a language switch (5.4); labels below depend on it (QA19 U4)
   const [form, setForm] = useState<Form>(blank);
   const [error, setError] = useState('');
   const dir = cheque?.direction ?? direction;
@@ -96,7 +96,7 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
       .filter((b) => balanceOf(b) > 0 || b.id === cheque?.purchase_id)
       .filter((b) => !party || norm(b.vendor_name) === party || b.id === cheque?.purchase_id)
       .map((b) => ({ id: b.id, due: balanceOf(b), label: chqT('fOption', { number: b.bill_number || chqT('billWord'), party: b.vendor_name, amount: formatMoney(balanceOf(b)) }) }));
-  }, [received, invoices, bills, party, client, cheque]);
+  }, [received, invoices, bills, party, client, cheque, lang]);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -208,7 +208,7 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
             {chqT('fValid', { date: formatDate(validUntil(form.cheque_date)) })}
           </span>
         )}
-        <BankAccountSelect id="cheque-bank-account" label={bnkT('intoAccount')} method="Cheque" value={form.bank_account_id} onChange={(id) => set('bank_account_id', id)} />
+        <BankAccountSelect purpose="cheque" id="cheque-bank-account" label={bnkT('intoAccount')} method="Cheque" value={form.bank_account_id} onChange={(id) => set('bank_account_id', id)} />
         <label className={controls.check}>
           <input type="checkbox" checked={form.multi} disabled={frozen} onChange={(e) => set('multi', e.target.checked)} /> {bnkT('severalDocs')}
         </label>

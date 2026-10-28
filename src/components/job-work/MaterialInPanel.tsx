@@ -10,6 +10,8 @@ import { bomConsumption, materialInDb } from '../../lib/job-work';
 import type { JobWorkReceiptLine, MaterialIn } from '../../types/job-work';
 import { jwT } from '../../i18n/areas/job-work';
 import { JwLinesGrid } from './JwLinesGrid';
+import { collectEvents } from '../../lib/inventory';
+import { serialsAvailable } from '../../lib/serial-vouchers';
 import { blankJwLine, cleanJw, qtyText, type JwData, type JwGridLine } from './lines';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
@@ -103,7 +105,16 @@ function InModal({ data, doc, onClose }: { data: JwData; doc: MaterialIn | null;
   const [narration, setNarration] = useState(doc?.narration ?? '');
   const [error, setError] = useState('');
   const [hint, setHint] = useState('');
-  const tracked = useMemo(() => ctx.items.filter((i) => i.track_stock && !i.track_serials).sort((a, b) => a.name.localeCompare(b.name)), [ctx.items]);
+  // 7S: serial-tracked items come back by serial (returned / consumed / lost from the job worker's godown; processed under new serials).
+  const tracked = useMemo(() => ctx.items.filter((i) => i.track_stock).sort((a, b) => a.name.localeCompare(b.name)), [ctx.items]);
+  const serialPool = useMemo(() => {
+    let events: ReturnType<typeof collectEvents> | null = null;
+    return (id: string) => {
+      const docs = ctx.inputs.jobWorkDocs;
+      events ??= collectEvents({ ...ctx.inputs, includeTransfers: true, jobWorkDocs: docs ? { ...docs, ins: docs.ins.filter((x) => x.id !== doc?.id) } : docs });
+      return serialsAvailable(id, date, godown, events);
+    };
+  }, [ctx.inputs, doc, date, godown]);
   const anyBatch = tracked.some((i) => i.track_batches);
   const challans = data.balances.lines.filter((l) => l.godown === godown && (l.pending > 0 || doc)).map((l) => ({ id: l.lineId, item_id: l.item_id, label: `${l.number} · ${qtyText(l.pending)}` }));
   const orders = data.orders.filter((o) => o.direction === 'out');
@@ -194,23 +205,24 @@ function InModal({ data, doc, onClose }: { data: JwData; doc: MaterialIn | null;
         </div>
         <p className={styles.muted}>{jwT('chargesHint')}</p>
         <p className={styles.section}>{jwT('received')}</p>
-        <JwLinesGrid lines={received} items={tracked} onChange={setReceived} opts={{ ...grid, label: jwT('received'), kinds: true }} />
+        <JwLinesGrid lines={received} items={tracked} onChange={setReceived} opts={{ ...grid, label: jwT('received'), kinds: true, serials: 'byKind', serialPool }} />
         <div className={styles.bar} style={{ padding: 0 }}>
           <p className={styles.section}>{jwT('consumed')}</p>
           <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={fillBom}>{jwT('fillBom')}</button>
         </div>
         {hint && <p className={styles.muted} role="status">{hint}</p>}
-        <JwLinesGrid lines={consumed} items={tracked} onChange={setConsumed} opts={{ label: jwT('consumed'), batch: anyBatch, challans, units: data.units }} />
+        <JwLinesGrid lines={consumed} items={tracked} onChange={setConsumed} opts={{ label: jwT('consumed'), batch: anyBatch, challans, units: data.units, serials: 'out', serialPool }} />
         {preview && (
           <p className={cn(styles.notice, styles.info)} role="status">
             {jwT('costPreview', { inputs: formatMoney(preview.inputs), charges: formatMoney(preview.charges), scrap: formatMoney(preview.scrap), total: formatMoney(preview.total) })}
           </p>
         )}
         <p className={styles.section}>{jwT('losses')}</p>
-        <JwLinesGrid lines={losses} items={tracked} onChange={setLosses} opts={{ label: jwT('losses'), batch: anyBatch, challans, units: data.units }} />
+        <JwLinesGrid lines={losses} items={tracked} onChange={setLosses} opts={{ label: jwT('losses'), batch: anyBatch, challans, units: data.units, serials: 'out', serialPool }} />
+        {losses.length > 0 && <label className={styles.muted}><input type="checkbox" checked={losses.some((l) => l.mf?.scrap_at_jw)} onChange={(e) => setLosses(losses.map((l) => ({ ...l, mf: { ...l.mf, scrap_at_jw: e.target.checked || undefined } })))} data-jw-scrap-at-jw /> {jwT('scrapAtJw')}</label>}
         <p className={styles.section}>{jwT('supplied')}</p>
         <p className={styles.muted}>{jwT('supplyHint')}</p>
-        <JwLinesGrid lines={supplied} items={tracked} onChange={setSupplied} opts={{ ...grid, label: jwT('supplied'), challans }} />
+        <JwLinesGrid lines={supplied} items={tracked} onChange={setSupplied} opts={{ ...grid, label: jwT('supplied'), challans, serials: 'out', serialPool }} />
         {supplied.length > 0 && (
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwr-inv">{jwT('supplyInvoice')}</label>

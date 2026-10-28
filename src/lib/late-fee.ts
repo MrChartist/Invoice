@@ -24,8 +24,9 @@ import type { Client, InvoiceItem, InvoiceRecord, Payment } from '../types/invoi
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { computeInterest, interestInputFor, type InterestInput, type InterestResult, type LateFeeConfig } from './interest';
 import { readLinks, type DocLink } from './documents';
-import { generateId } from './storage';
+import { KEYS, generateId, peekTable } from './storage';
 import { localDb } from './localDb';
+import { withIssueSnapshot } from './khata-actions'; // R6-C5
 import { isoDay, shiftDay } from './dates';
 import { inrValue } from './fx';
 import { isDateLocked, getLockUntil, lockMessage } from './period-lock';
@@ -219,12 +220,56 @@ export function buildLateFeeInvoice(
 /* ── Storage-backed helpers for the UI ─────────────────────────── */
 
 /** The client's rule: the client master (current terms) first, else the snapshot on the invoice. */
-export function lateFeeRuleFor(invoice: InvoiceRecord, clients: readonly Client[] = localDb.clients.getAll()): ClientLateFee | undefined {
+export function lateFeeRuleFor(invoice: InvoiceRecord, clients: readonly Client[] = peekTable<Client>(KEYS.clients)): ClientLateFee | undefined {
   const c = invoice.client;
-  const master =
-    (c?.id && clients.find((x) => x.id === c.id)) ||
-    clients.find((x) => x.name && c?.name && x.name.trim().toLowerCase() === c.name.trim().toLowerCase() && (x.gstin ?? '') === (c.gstin ?? ''));
+  const idx = clientIndex(clients);
+  const master = (c?.id && idx.byId.get(c.id)) || (c?.name ? idx.byNameGstin.get(nameGstinKey(c.name, c.gstin)) : undefined);
   return sanitizeClientLateFee(master ? master.late_fee : c?.late_fee);
+}
+
+const nameGstinKey = (name: string, gstin: string | undefined) => `${name.trim().toLowerCase()}\u0000${gstin ?? ''}`;
+
+/**
+ * PERF-2: id and name+GSTIN lookups of a client list, built once per list (the receivables screen asks for
+ * every overdue bill). The first matching client wins, exactly as the `find`s it replaces.
+ */
+const clientIndexes = new WeakMap<readonly Client[], { byId: Map<string, Client>; byNameGstin: Map<string, Client> }>();
+function clientIndex(clients: readonly Client[]) {
+  let idx = clientIndexes.get(clients);
+  if (!idx) {
+    idx = { byId: new Map(), byNameGstin: new Map() };
+    for (const x of clients) {
+      if (!x) continue;
+      if (x.id && !idx.byId.has(x.id)) idx.byId.set(x.id, x);
+      if (x.name) {
+        const k = nameGstinKey(x.name, x.gstin);
+        if (!idx.byNameGstin.has(k)) idx.byNameGstin.set(k, x);
+      }
+    }
+    clientIndexes.set(clients, idx);
+  }
+  return idx;
+}
+
+type RunLike = { status?: string; invoice_ids?: readonly string[]; bills?: readonly { id: string; to: string; invoice_id?: string }[] };
+
+/**
+ * QA8 T4 / T5: the day each bill is charged to by a LIVE interest run (`interest_runs`, TR-A4). A run's bill counts
+ * only while the interest invoice that charged it is live (not deleted / cancelled) and the run is not undone; a run
+ * saved before the per-bill invoice id counts while any of its invoices is live.
+ */
+export function interestChargedTo(runs: readonly RunLike[], invoices: readonly Pick<InvoiceRecord, 'id' | 'status'>[]): Map<string, string> {
+  const live = new Set(invoices.filter((i) => i && i.status !== 'Cancelled').map((i) => i.id));
+  const out = new Map<string, string>();
+  for (const r of runs) {
+    if (!r || r.status === 'undone') continue;
+    const anyLive = !r.invoice_ids?.length || r.invoice_ids.some((id) => live.has(id));
+    for (const b of r.bills ?? []) {
+      if (!(b.invoice_id ? live.has(b.invoice_id) : anyLive)) continue;
+      if (!out.has(b.id) || b.to > out.get(b.id)!) out.set(b.id, b.to);
+    }
+  }
+  return out;
 }
 
 /** A late-fee invoice already raised for this original (not cancelled), if any. */
@@ -255,12 +300,15 @@ export class LateFeeError extends Error {
  * Throws `LateFeeError` when the client has no rule, nothing is due, one was already raised,
  * or today falls inside the locked period (the save would also refuse it).
  */
-export function createLateFeeInvoice(original: InvoiceRecord, asOf: Date = new Date()): InvoiceRecord {
+export function createLateFeeInvoice(original: InvoiceRecord, asOf: Date = new Date(), opts: { issue?: boolean } = {}): InvoiceRecord {
   const fee = lateFeeRuleFor(original);
   if (!fee) throw new LateFeeError('This client has no late-fee terms. Add them on the client first.');
   const all = localDb.invoices.getAll();
   const already = lateFeeRaisedFor(original.id, all);
   if (already) throw new LateFeeError(`A late fee was already raised on ${already.invoice_number}.`);
+  // QA8 T4: a bill already charged interest in a run (Receivables → Interest) is not charged a late fee for the same days.
+  const charged = interestChargedTo(peekTable<RunLike>('interest_runs'), all).get(original.id);
+  if (charged) throw new LateFeeError(`Interest on ${original.invoice_number} was already charged up to ${charged} (Receivables → Interest). Undo that interest run first.`);
   const quote = quoteLateFee(original, fee, { invoices: all }, asOf);
   const item = buildLateFeeItem(quote, fee, original);
   if (!item) throw new LateFeeError(quote.reason ?? 'No late fee is due.');
@@ -274,5 +322,6 @@ export function createLateFeeInvoice(original: InvoiceRecord, asOf: Date = new D
     today,
     dueDays: num(localDb.settings.get().defaultDueDays, 14),
   });
-  return localDb.invoices.save(rec);
+  // R6-C5 (8.7): issued straight away (not left as a draft), it freezes the party's previous balance like the editor.
+  return localDb.invoices.save(opts.issue ? withIssueSnapshot({ ...rec, status: 'Sent' }) : rec);
 }

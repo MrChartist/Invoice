@@ -18,6 +18,7 @@ import {
   summarizeRecon,
   takenIds,
   unmatchLine,
+  voucherCandidates,
   BULK_CONFIRM_THRESHOLD,
   type BankLine,
   type BankStatement,
@@ -26,12 +27,13 @@ import {
 } from '../lib/bank-recon';
 import { accountBalanceAt, bankAccountBalanceAt, buildVouchers, loadBooksData, type BooksData } from '../lib/books';
 import { StorageWriteError } from '../lib/storage';
-import { DEFAULT_BANK_ID, accountIdOf, bankAccountsDb, type BankAccount } from '../lib/bank-accounts';
+import { DEFAULT_BANK_ID, accountIdOf, bankAccountsDb, pickableBankAccounts, type BankAccount } from '../lib/bank-accounts';
 import { BankAccountsCard } from '../components/bank/BankAccountsCard';
 import { formatDate, formatMoney } from '../lib/utils';
 import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { EmptyState } from '../components/ui/EmptyState';
+import { LearnMore } from '../components/discover';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
 import { ImportPanel } from '../components/bank/ImportPanel';
@@ -49,19 +51,21 @@ import bank from '../components/bank/reconcile.module.css';
 import styles from './Reconcile.module.css';
 import { bnkT } from '../i18n/areas/banking';
 import type { BankDoc } from '../components/bank/docs/BankingDocs';
+import type { RulePrompt } from '../components/bank/rules/RuleSuggestions';
+import { capT } from '../i18n/areas/capture';
+import { paymentsDb, purchasesDb } from '../lib/purchases';
+import { RECONCILE_TABS, type ReconcileTab } from './page-tabs'; // R6-B1
+import { discoverT } from '../i18n/areas/discover-r6';
 
 // WP-5: deposit slip, payment advice, e-payments, cash tally — loaded only when the tab opens.
 const BankingDocs = lazy(() => import('../components/bank/docs/BankingDocs'));
-const BANK_DOCS: readonly BankDoc[] = ['deposit', 'advice', 'epay', 'cash'];
+const BANK_DOCS: readonly BankDoc[] = ['deposit', 'advice', 'epay', 'cash', 'forex'];
+// 8.45: bank rules + memory — the rule list and the suggestions strip load on demand.
+const BankRulesPanel = lazy(() => import('../components/bank/rules/BankRulesPanel'));
+const RuleSuggestions = lazy(() => import('../components/bank/rules/RuleSuggestions'));
 
-const TABS = [
-  { id: 'reconcile', label: 'tabReconcile' },
-  { id: 'brs', label: 'tabBrs' },
-  { id: 'statements', label: 'tabStatements' },
-  { id: 'import', label: 'tabImport' },
-  { id: 'documents', label: 'tabDocuments' },
-] as const;
-type TabId = (typeof TABS)[number]['id'];
+const TABS = RECONCILE_TABS; // R6-B1: list in reconcile-tabs.ts
+type TabId = ReconcileTab;
 
 type Filter = 'review' | 'matched' | 'ignored' | 'all';
 const FILTERS: { id: Filter; label: 'fReview' | 'fMatched' | 'fIgnored' | 'fAll' }[] = [
@@ -81,7 +85,7 @@ export function Reconcile() {
   const [scope, setScope] = useState('all');
   const [accounts, setAccounts] = useState<BankAccount[]>(() => bankAccountsDb.all());
   const [accountId, setAccountId] = useState(DEFAULT_BANK_ID);
-  const multi = accounts.filter((a) => a.active !== false).length > 1;
+  const multi = pickableBankAccounts('brs', accounts.filter((a) => a.active !== false)).length > 1; // R5-A2: clearing accounts never take a statement
   const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
   const [filter, setFilter] = useState<Filter>('review');
   const [query, setQuery] = useState('');
@@ -89,6 +93,7 @@ export function Reconcile() {
   const [receiptLine, setReceiptLine] = useState<BankLine | null>(null);
   const [expenseLine, setExpenseLine] = useState<BankLine | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [rulePrompt, setRulePrompt] = useState<RulePrompt | null>(null);
   const { notify, toastNode } = useToast();
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
@@ -138,16 +143,19 @@ export function Reconcile() {
   // Multi-account BRS: everything below works on the selected bank account's statements and entries.
   const acctStatements = useMemo(() => (multi ? statements.filter((s) => accountIdOf(s) === accountId) : statements), [statements, multi, accountId]);
   const scoped = useMemo(() => (scope === 'all' ? acctStatements : acctStatements.filter((s) => s.id === scope)), [acctStatements, scope]);
+  const vouchers = useMemo(() => buildVouchers(books), [books]);
+  // QA6-1 F5: bank lines of manual vouchers (payout contras, deposits, voucher sales) are book entries too.
+  const fromVouchers = useMemo(() => voucherCandidates(vouchers, new Set(accounts.filter((a) => a.clearing).map((a) => a.id))), [vouchers, accounts]);
   const index = useMemo(
     () => ({
-      payments: new Set(books.transactions.map((t) => t.id)),
-      purchasePayments: new Set(books.purchasePayments.map((p) => String(p.id ?? ''))),
+      payments: new Set([...books.transactions.map((t) => t.id), ...fromVouchers.receipts.map((c) => c.id)]),
+      purchasePayments: new Set([...books.purchasePayments.map((p) => String(p.id ?? '')), ...fromVouchers.payouts.map((c) => c.id)]),
     }),
-    [books],
+    [books, fromVouchers],
   );
   const inAccount = useCallback((c: Candidate) => !multi || accountIdOf(c) === accountId, [multi, accountId]);
-  const receipts = useMemo(() => receiptCandidates(books.invoices, books.transactions).filter(inAccount), [books, inAccount]);
-  const payouts = useMemo(() => payoutCandidates(books.purchases, books.vendors, books.purchasePayments).filter(inAccount), [books, inAccount]);
+  const receipts = useMemo(() => [...receiptCandidates(books.invoices, books.transactions), ...fromVouchers.receipts].filter(inAccount), [books, fromVouchers, inAccount]);
+  const payouts = useMemo(() => [...payoutCandidates(books.purchases, books.vendors, books.purchasePayments), ...fromVouchers.payouts].filter(inAccount), [books, fromVouchers, inAccount]);
   const entries = useMemo(() => new Map<string, Candidate>([...receipts, ...payouts].map((c) => [c.id, c])), [receipts, payouts]);
 
   const allLines = useMemo(
@@ -168,9 +176,11 @@ export function Reconcile() {
     return m;
   }, [suggestionList]);
   const confirmable = useMemo(() => confirmableAll(suggestionList), [suggestionList]);
+  // Rules / memory run after invoice matching: open lines only, minus those with a Match suggestion.
+  const openLines = useMemo(() => lines.filter((l) => { const st = lineState(l, index); return st === 'unmatched' || st === 'orphan'; }).map((l) => (l.matched_to ? { ...l, matched_to: undefined } : l)), [lines, index]);
+  const matchedIds = useMemo(() => new Set(suggestions.keys()), [suggestions]);
 
   const closing = useMemo(() => closingAcross(scoped), [scoped]);
-  const vouchers = useMemo(() => buildVouchers(books), [books]);
   const asOf = closing.asOf;
   const acctBalance = useMemo(
     () => (multi && account && asOf ? bankAccountBalanceAt(vouchers, books.openings, account, asOf) : null),
@@ -254,7 +264,7 @@ export function Reconcile() {
     <div className={controls.field} style={{ maxWidth: 360, marginBottom: '1rem' }}>
       <label className={controls.label} htmlFor="rec-account">{bankT('bankAccount')}</label>
       <select id="rec-account" className={controls.select} value={accountId} onChange={(e) => { setAccountId(e.target.value); setScope('all'); }}>
-        {accounts.filter((a) => a.active !== false || a.id === accountId).map((a) => (
+        {pickableBankAccounts('brs', accounts.filter((a) => a.active !== false || a.id === accountId)).map((a) => (
           <option key={a.id} value={a.id}>{a.name}{a.number ? ` (${a.number})` : ''}</option>
         ))}
       </select>
@@ -273,13 +283,32 @@ export function Reconcile() {
     />
   );
 
-  if (statements.length === 0 && tab !== 'documents') {
+  if (statements.length === 0 && tab !== 'documents' && tab !== 'rules') {
     return (
       <div className={surface.page}>
         {header}
-        {accountsCard}
+        {/* R6-B3: nothing imported yet — what the screen needs, and the two first steps. */}
+        <EmptyState
+          icon={Landmark}
+          title={discoverT('reconTitle')}
+          text={discoverT('reconText')}
+          action={
+            <div className={surface.pageActions} style={{ justifyContent: 'center' }} data-recon-empty>
+              <button type="button" className={controls.btnPrimary} onClick={() => document.querySelector<HTMLElement>('[data-recon-import] input, [data-recon-import] button')?.focus()}>
+                {bankT('importStatement')}
+              </button>
+              <button type="button" className={controls.btnOutline} onClick={() => document.querySelector<HTMLElement>('[data-recon-accounts] button')?.focus()}>
+                {discoverT('reconAccount')}
+              </button>
+              <LearnMore topic="reconcile" />
+            </div>
+          }
+        />
+        <div data-recon-accounts>{accountsCard}</div>
         {accountPicker}
-        <ImportPanel existing={statements} onImport={importStatement} />
+        <div data-recon-import>
+          <ImportPanel existing={statements} onImport={importStatement} />
+        </div>
         {toastNode}
       </div>
     );
@@ -337,7 +366,7 @@ export function Reconcile() {
             onClick={() => selectTab(t.id)}
             onKeyDown={(e) => onTabKey(e, i)}
           >
-            {t.id === 'documents' ? bnkT('tabDocuments') : bankT(t.label as Exclude<typeof t.label, 'tabDocuments'>)}
+            {t.id === 'documents' ? bnkT('tabDocuments') : t.id === 'rules' ? capT('tabRules') : bankT(t.label as Exclude<typeof t.label, 'tabDocuments' | 'tabRules'>)}
           </button>
         ))}
       </div>
@@ -380,6 +409,26 @@ export function Reconcile() {
                 </button>
               </div>
             </div>
+            {openLines.length > 0 && (
+              <Suspense fallback={null}>
+                <RuleSuggestions
+                  statements={statements}
+                  lines={openLines}
+                  matched={matchedIds}
+                  purchases={books.purchases}
+                  purchasePayments={books.purchasePayments}
+                  prompt={rulePrompt}
+                  onPromptDone={() => setRulePrompt(null)}
+                  onApplied={(next, message) => {
+                    setStatements(next);
+                    refreshBooks();
+                    notify(message);
+                  }}
+                  notify={notify}
+                  onManage={() => selectTab('rules')}
+                />
+              </Suspense>
+            )}
             <div className={surface.card}>
               {items.length === 0 ? (
                 <EmptyState
@@ -427,6 +476,11 @@ export function Reconcile() {
 
         {tab === 'import' && <ImportPanel existing={statements} onImport={importStatement} onCancel={() => selectTab('reconcile')} />}
         {tab === 'import' && multi && account && <p className={surface.sectionNote}>{bankT('importsInto', { name: account.name })}</p>}
+        {tab === 'rules' && (
+          <Suspense fallback={null}>
+            <BankRulesPanel notify={notify} />
+          </Suspense>
+        )}
         {tab === 'documents' && (
           <Suspense fallback={null}>
             <BankingDocs
@@ -464,6 +518,12 @@ export function Reconcile() {
         onSettled={(line, paymentId) => {
           matchTo(line, 'purchase_payment', [paymentId]);
           notify(bankT('paymentMatched'));
+          // 8.45: offer a rule for similar lines, pre-filled from this categorisation.
+          const bill = purchasesDb.get(paymentsDb.all().find((p) => p.id === paymentId)?.purchase_id ?? '');
+          if (bill?.kind === 'EXPENSE') {
+            const st = statements.find((x) => x.lines.some((l) => l.id === line.id));
+            setRulePrompt({ line, bankAccountId: st?.bank_account_id, action: { kind: 'expense', category: bill.category, vendor_id: bill.vendor_id, vendor_name: bill.vendor_name, gst_rate: bill.lines.length === 1 ? bill.lines[0].tax_rate : 0, itc: bill.itc_eligible } });
+          }
         }}
       />
       <ConfirmDialog

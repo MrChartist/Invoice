@@ -38,6 +38,8 @@
 
 import type { InvoiceRecord, GstMode } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, isIgstZeroRated, isZeroRated, num, round2 } from './invoice-calc';
+import { isNonGstFinancialNote } from './financial-note';
+import { isPureAgentLine } from './trade/pure-agent';
 import { docCurrency, inrTotals, inrValue, missingFxRate } from './fx';
 import { checkGstin } from './gstin';
 import { stateByCode, stateByName } from './india-states';
@@ -442,6 +444,8 @@ export interface Gstr3bReport {
      * negative credit; the 3B tab shows this figure and flags it for the CA.
      */
     netSigned?: ItcHeads;
+    /** Additive (7R, 7.122): 4A(4) — eligible credit distributed to us by an Input Service Distributor. Absent when none. */
+    isd?: ItcHeads;
   };
   /** 5 — inward supplies from composition / exempt / nil suppliers (value). */
   inwardExempt: { inter: number; intra: number };
@@ -493,6 +497,40 @@ export interface BuildOptions {
    * the line reports as typed (2 at the UQC of BOX). Working paper: verify with your CA.
    */
   items?: ItemIndex;
+  /**
+   * Additive (7R, 7.122): ISD credit received by our unit(s) (`isdInwardRows` in isd.ts). Rows dated in the period
+   * (and of the filer GSTIN, when both are set) go to 4A(4) — ineligible ones to 4D(2) — and into 4C.
+   */
+  isdInward?: readonly { date: string; gstin?: string; igst: number; cgst: number; sgst: number; cess: number; eligible: boolean }[];
+  /**
+   * Additive (R5-C2): ITC reversed by journal — the Rule 42 / 43 common-credit reversals (`journalItcReversals`).
+   * Rows dated in the period go to 4B(1) (a negative row — an annual true-up reclaim — reduces it). Working paper:
+   * verify with your CA.
+   */
+  itcReversals?: readonly { date: string; igst: number; cgst: number; sgst: number; cess: number }[];
+}
+
+/** Voucher class of the Rule 42 / 43 reversal journals (R5-C2, `institutions/common-credit.ts`). */
+export const ITC_REVERSAL_CLASS = 'ITC reversal — Rule 42 / 43';
+const INPUT_HEADS: Readonly<Record<string, 'igst' | 'cgst' | 'sgst' | 'cess'>> = { in_igst: 'igst', in_cgst: 'cgst', in_sgst: 'sgst', in_cess: 'cess' };
+
+/**
+ * R5-C2: the 4B(1) rows of the Rule 42 / 43 reversal journals — per journal, credits less debits on the input-tax
+ * ledgers (rupees). Optional / memorandum vouchers are left out. Pure. Verify with your CA.
+ */
+export function journalItcReversals(vouchers: readonly unknown[]): { date: string; igst: number; cgst: number; sgst: number; cess: number }[] {
+  const out: { date: string; igst: number; cgst: number; sgst: number; cess: number }[] = [];
+  for (const raw of vouchers) {
+    const v = raw as { date?: string; voucher_class?: string; variant?: string; lines?: { account_id?: string; dr?: number; cr?: number }[] } | null;
+    if (!v || v.voucher_class !== ITC_REVERSAL_CLASS || v.variant || !v.date || !Array.isArray(v.lines)) continue;
+    const row = { date: v.date, igst: 0, cgst: 0, sgst: 0, cess: 0 };
+    for (const l of v.lines) {
+      const h = INPUT_HEADS[l?.account_id ?? ''];
+      if (h) row[h] = round2(row[h] + (num(l.cr) - num(l.dr)) / 100);
+    }
+    out.push(row);
+  }
+  return out;
 }
 
 /**
@@ -536,6 +574,8 @@ interface PLine {
   sgst: number;
   cess: number;
   lineTotal: number;
+  /** R10 (SV-A4): Table 8 / 3.1 column of an untaxed line on a tax invoice (`item.sv.exempt`); absent = nil-rated. */
+  exempt?: 'NIL' | 'EXEMPT' | 'NON_GST';
 }
 
 export interface PDoc {
@@ -568,7 +608,14 @@ export interface PDoc {
 export const isEco95 = (d: Pick<PDoc, 'ecoSection' | 'isExport'>) => d.ecoSection === 'PAY_9_5' && !d.isExport;
 
 /** Documents GSTR-1 reports. A Bill of Supply (5.9) is a tax document with no tax: Table 8 + Table 13. */
-const TAX_DOC_TYPES = new Set(['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
+const TAX_DOC_TYPES_BASE = new Set(['INVOICE', 'TAX_INVOICE', 'CREDIT_NOTE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
+/**
+ * R2-A2: a financial credit note without GST (settlement discount / kasar / bad debt) is not a GST
+ * document — never in CDNR / CDNUR, HSN, Table 13 or GSTR-3B. Its GST variant (Sec 15(3)) is reported.
+ */
+const TAX_DOC_TYPES = {
+  has: (t: string, rec?: InvoiceRecord) => TAX_DOC_TYPES_BASE.has(t) && !isNonGstFinancialNote(rec),
+};
 
 /** The sender snapshot is a composition profile: no GSTR-1 / 3B (CMP-08 / GSTR-4 instead). */
 export function isCompositionDoc(rec: Pick<InvoiceRecord, 'sender'>): boolean {
@@ -718,9 +765,11 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     push('warning', 'TOTAL_MISMATCH', `stored total ${recorded} differs from recomputed ${docCalc.total}; the report uses the recomputed tax split.`);
   }
 
+  const svExempt = new Map((rec.items ?? []).filter((i) => i?.sv?.exempt).map((i) => [i.id, i.sv!.exempt!])); // R10 (SV-A4)
   const toPLine = (l: (typeof calc.lines)[number]): PLine => {
     const hq = hsnLineQty(l, opts);
     return {
+      ...(svExempt.has(l.id) ? { exempt: svExempt.get(l.id) } : {}),
       // Zero-rated supplies keep the slab they were priced at (GSTR-1 reports txval against it).
       rate: mode === 'NONE' ? 0 : zeroRated ? l.nominal_rate : l.tax_rate,
       hsn: l.hsn,
@@ -736,6 +785,18 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     };
   };
   const lines: PLine[] = calc.lines.map(toPLine);
+  // R8-B (TR-B2): a bill-charge line (mandi fee, hamali …) adds value to its goods' HSN row, never quantity.
+  const charge = new Set((rec.items ?? []).filter((i) => i.charge_head_id).map((i) => i.id));
+  if (charge.size) calc.lines.forEach((l, k) => { if (charge.has(l.id)) lines[k] = { ...lines[k], qty: 0, uqc: lines.find((g, j) => !charge.has(calc.lines[j].id) && g.hsn === l.hsn)?.uqc ?? lines[k].uqc }; });
+  // QA8 T9: a pure-agent (Rule 33) reimbursement is not a supply — out of Table 8, 3.1(c) and the HSN summary.
+  const agent = new Set((rec.items ?? []).filter(isPureAgentLine).map((i) => i.id));
+  // QA10 R4: the margin scheme's purchase-value line (Rule 32(5)) is no supply of its own — only the margin is reported.
+  const marginCost = new Set((rec.items ?? []).filter(isMarginCostLine).map((i) => i.id));
+  if (agent.size || marginCost.size) {
+    for (let k = lines.length - 1; k >= 0; k--) if (agent.has(calc.lines[k].id) || marginCost.has(calc.lines[k].id)) lines.splice(k, 1);
+    if (agent.size) push('info', 'PURE_AGENT', 'pure-agent reimbursement line(s) (Rule 33) are left out of the supply value, Table 8 and the HSN summary; they stay in the invoice value — verify with your CA.');
+    if (marginCost.size) push('info', 'MARGIN_SCHEME', 'margin scheme (Rule 32(5)): the used goods\' purchase value is left out of the supply value, Table 8, 3.1(c), the HSN summary and the Rule 42 exempt turnover; only the margin is reported as a taxable supply — verify with your CA.');
+  }
   // Taxable freight / other charges: part of the principal supply's value, so no quantity of its own.
   if (calc.charges_line) lines.push({ ...toPLine(calc.charges_line), qty: 0 });
 
@@ -796,6 +857,12 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
 
 const taxOf = (l: PLine) => l.igst + l.cgst + l.sgst;
 /** A nil / exempt / non-GST line: no rate, no tax and no cess. */
+/**
+ * QA10 (R4): the purchase-value ("cost") line of a margin-scheme sale (Rule 32(5), RT-D3). The value of supply is the
+ * margin alone, so this line is NOT a nil-rated / exempt supply: it is left out of the rates, Table 8, HSN, 3.1(a) / (c)
+ * and so the Rule 42 / 43 exempt turnover (it stays in the invoice value). Verify with your CA.
+ */
+export const isMarginCostLine = (l: { margin?: { part?: string } } | null | undefined): boolean => l?.margin?.part === 'cost';
 const isNilLine = (l: PLine) => l.rate <= 0 && taxOf(l) === 0 && l.cess === 0;
 
 /**
@@ -932,7 +999,7 @@ function buildDocIssue(all: InvoiceRecord[], vouchers: readonly AdvanceMovement[
       buckets.set(key, b);
       continue;
     }
-    if (!TAX_DOC_TYPES.has(rec.doc_type)) continue;
+    if (!TAX_DOC_TYPES.has(rec.doc_type, rec)) continue;
     // A draft was never issued. Left out of the range, it is counted as a gap (cancelled) when it sits
     // between issued numbers, and does not stretch the "to" number when it is the latest one.
     if (rec.status === 'Draft') continue;
@@ -989,7 +1056,9 @@ function addLine(target: Acc, l: PLine, sign: number) {
 
 function addHsn(map: Map<string, HsnRow>, l: PLine, sign: number) {
   const hsn = l.hsn || 'NA';
-  const key = `${hsn}|${l.uqc}|${l.rate}`;
+  // A line without HSN has nothing to group on: keep one row per item, so "NA · Steel rack" never also holds
+  // the Banquet chairs (QA-3 F8). Lines with an HSN still group by HSN + UQC + rate as the portal does.
+  const key = `${hsn}|${l.uqc}|${l.rate}${l.hsn ? '' : `|${String(l.desc ?? '').trim().toLowerCase()}`}`;
   const h =
     map.get(key) ??
     { hsn, description: l.desc, uqc: l.uqc, qty: 0, value: 0, taxable: 0, rate: l.rate, igst: 0, cgst: 0, sgst: 0, cess: 0 };
@@ -1028,7 +1097,7 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
 
   const docs: PDoc[] = [];
   for (const rec of inScope) {
-    if (!TAX_DOC_TYPES.has(rec.doc_type)) {
+    if (!TAX_DOC_TYPES.has(rec.doc_type, rec)) {
       counts.notTaxDocs++;
       continue;
     }
@@ -1066,9 +1135,17 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
   // A note follows the invoice it amends: B2CL only if that invoice was B2CL (its value and date
   // decide), so a small credit against a large invoice is reported in CDNUR, not netted into B2CS.
   const byId = new Map(filed.map((r) => [r.id, r]));
+  // First note link per note id (as `links.find` would pick), built once instead of a scan per note.
+  let noteLinks: Map<string, string> | undefined;
   const originalOf = (d: PDoc): InvoiceRecord | undefined => {
-    const link = opts.links?.find((l) => l.to_id === d.rec.id && (l.relation === 'credit_note' || l.relation === 'debit_note'));
-    return link ? byId.get(link.from_id) : undefined;
+    if (!noteLinks) {
+      noteLinks = new Map();
+      for (const l of opts.links ?? []) {
+        if ((l.relation === 'credit_note' || l.relation === 'debit_note') && !noteLinks.has(l.to_id)) noteLinks.set(l.to_id, l.from_id);
+      }
+    }
+    const from = noteLinks.get(d.rec.id);
+    return from !== undefined ? byId.get(from) : undefined;
   };
   const largeB2c = (d: PDoc): boolean => {
     const orig = d.isNote ? originalOf(d) : undefined;
@@ -1153,8 +1230,9 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
         const k = nilKey(d);
         const n = nilMap.get(k) ?? { type: k, nil: 0, exempt: 0, nonGst: 0 };
         // No GSTIN on the sender means the supply is outside GST altogether; a Bill of Supply names its column.
-        if (!d.senderGstin || d.exemptKind === 'NON_GST') n.nonGst = round2(n.nonGst + d.sign * l.taxable);
-        else if (d.exemptKind === 'EXEMPT') n.exempt = round2(n.exempt + d.sign * l.taxable);
+        const kind = l.exempt ?? d.exemptKind; // R10 (SV-A4): a line's own column wins (Rule 46A mixed bills)
+        if (!d.senderGstin || kind === 'NON_GST') n.nonGst = round2(n.nonGst + d.sign * l.taxable);
+        else if (kind === 'EXEMPT') n.exempt = round2(n.exempt + d.sign * l.taxable);
         else n.nil = round2(n.nil + d.sign * l.taxable);
         nilMap.set(k, n);
       }
@@ -1263,7 +1341,7 @@ function buildAmendments(
   const effects: AmendEffect[] = [];
   const periodEnd = periodRange(opts.period).to;
   const amended = invoices.filter(
-    (r) => r?.amends && inPeriod(r.amends.amended_on, opts.period) && TAX_DOC_TYPES.has(r.doc_type) && !isCompositionDoc(r) && sameFiler(r),
+    (r) => r?.amends && inPeriod(r.amends.amended_on, opts.period) && TAX_DOC_TYPES.has(r.doc_type, r) && !isCompositionDoc(r) && sameFiler(r),
   );
   const isB2cs = (d: PDoc) => !d.isExport && !isEco95(d) && !d.registered && !(d.supply === 'INTER' && largeB2c(d));
   const section = (d: PDoc) => (isEco95(d) ? 'ECO 9(5)' : d.isExport ? 'EXP' : d.registered ? 'B2B' : isB2cs(d) ? 'B2CS' : 'B2CL');
@@ -1324,7 +1402,7 @@ function buildAmendments(
     const revised = new Map<string, B2csaRow>();
     const omon = periodFp(month);
     for (const r of invoices) {
-      if (!r || !TAX_DOC_TYPES.has(r.doc_type) || isCompositionDoc(r) || !sameFiler(r)) continue;
+      if (!r || !TAX_DOC_TYPES.has(r.doc_type, r) || isCompositionDoc(r) || !sameFiler(r)) continue;
       const asFiledRec = asFiled(r);
       if (!inPeriod(asFiledRec.issue_date, month)) continue;
       const amendedByNow = !!r.amends && r.amends.amended_on.slice(0, 10) <= periodEnd;
@@ -1554,7 +1632,7 @@ export function buildGstr3b(
         continue;
       }
       if (isNilLine(l)) {
-        if (!d.senderGstin || d.exemptKind === 'NON_GST') nonGst = round2(nonGst + s * l.taxable);
+        if (!d.senderGstin || (l.exempt ?? d.exemptKind) === 'NON_GST') nonGst = round2(nonGst + s * l.taxable); // R10: line column
         else if (d.supply === 'INTER') nil.inter = round2(nil.inter + s * l.taxable);
         else nil.intra = round2(nil.intra + s * l.taxable);
         continue;
@@ -1643,8 +1721,20 @@ export function buildGstr3b(
     }
   }
 
+  // R5-C2: Rule 42 / 43 reversals posted by journal (common credit) — 4B(1). Verify with your CA.
+  for (const r of opts.itcReversals ?? []) if (inPeriod(r.date, opts.period)) add(reversedRules, r);
+
+  // 7R (7.122): ISD credit received (4A(4)); ineligible ISD credit is shown in 4D(2).
+  const isd = zeroHeads();
+  let hasIsd = false;
+  const filerG = (opts.gstin ?? '').trim().toUpperCase();
+  for (const r of opts.isdInward ?? []) {
+    if (!inPeriod(r.date, opts.period) || (filerG && r.gstin && r.gstin.toUpperCase() !== filerG)) continue;
+    hasIsd = true;
+    add(r.eligible ? isd : ineligible, r);
+  }
   const signedHead = (k: 'igst' | 'cgst' | 'sgst' | 'cess') =>
-    round2(impGoods[k] + impServices[k] + availRcm[k] + availOther[k] - reversedRules[k] - reversed[k]);
+    round2(impGoods[k] + impServices[k] + availRcm[k] + isd[k] + availOther[k] - reversedRules[k] - reversed[k]);
   const netSigned: ItcHeads = { igst: signedHead('igst'), cgst: signedHead('cgst'), sgst: signedHead('sgst'), cess: signedHead('cess') };
   const net: ItcHeads = { igst: Math.max(netSigned.igst, 0), cgst: Math.max(netSigned.cgst, 0), sgst: Math.max(netSigned.sgst, 0), cess: Math.max(netSigned.cess, 0) };
   const negativeNet = netSigned.igst < 0 || netSigned.cgst < 0 || netSigned.sgst < 0 || netSigned.cess < 0;
@@ -1683,6 +1773,7 @@ export function buildGstr3b(
       net,
       ineligible,
       ...(negativeNet ? { netSigned } : {}),
+      ...(hasIsd ? { isd } : {}),
     },
     inwardExempt,
     payment,

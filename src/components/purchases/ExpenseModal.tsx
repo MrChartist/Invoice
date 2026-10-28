@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import type { PurchaseRecord, Vendor } from '../../types/purchases';
 import { PURCHASE_CATEGORIES } from '../../types/purchases';
-import { GST_SLABS } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
 import { computePurchaseTotals, expenseLine, paymentsDb, purchasesDb, PAYMENT_METHODS } from '../../lib/purchases';
 import { formatCurrency, todayInput } from '../../lib/utils';
 import { supplierPayable } from '../../lib/purchase-normalize';
@@ -16,10 +16,17 @@ import type { AttachmentRef } from '../../types/attachments';
 import { useT } from '../../i18n';
 import { methodLabel } from '../../i18n/labels';
 import { purT, purCategory } from '../../i18n/areas/purchases';
+import { expenseAmountLabel } from '../../lib/purchases';
 import { TdsBillPanel } from './TdsBillPanel';
-import { priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
+import { saveBillGuarded } from '../../lib/bill-guard';
+import { capT } from '../../i18n/areas/capture';
+import { billTdsInputFor, priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
+import { localDb } from '../../lib/localDb';
+
+// R14 PS-B1: the disbursement row (kind, on the client's behalf) — professional companies only, one lazy chunk.
+const DisbursementRow = lazy(() => import('../prof/DisbursementRow'));
 
 export interface ExpenseModalProps {
   open: boolean;
@@ -28,6 +35,8 @@ export interface ExpenseModalProps {
   vendors: Vendor[];
   businessState: string;
   onSaved: (message: string) => void;
+  /** 8.23: files to start a NEW expense with (a receipt shared into the app). */
+  attachments?: AttachmentRef[];
 }
 
 /** Quick-add for day-to-day spends: amount + category + optional GST, no line items. */
@@ -41,19 +50,20 @@ export function ExpenseModal({ open, onClose, expense, ...rest }: ExpenseModalPr
       title={expense ? purT('expEditTitle') : purT('expAddTitle')}
       subtitle={purT('expSub')}
     >
-      <ExpenseForm key={expense?.id ?? 'new'} expense={expense ?? undefined} onClose={onClose} {...rest} />
+      <ExpenseForm key={expense?.id ?? (rest.attachments?.length ? 'shared' : 'new')} expense={expense ?? undefined} onClose={onClose} {...rest} />
     </Modal>
   );
 }
 
 type FormProps = Omit<ExpenseModalProps, 'open' | 'expense'> & { expense?: PurchaseRecord };
 
-function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: FormProps) {
+function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attachments: seeded }: FormProps) {
   const first = expense?.lines?.[0];
   const [category, setCategory] = useState(expense?.category ?? 'Rent');
   const [amount, setAmount] = useState(first ? first.rate : 0);
   const [taxRate, setTaxRate] = useState(first?.tax_rate ?? 0);
-  const [inclusive, setInclusive] = useState(false);
+  // QA-3 F11: a receipt shows what was paid, so a new expense takes the amount as GST-inclusive (an edit keeps the stored taxable rate).
+  const [inclusive, setInclusive] = useState(!expense);
   const [date, setDate] = useState(expense?.date ?? todayInput());
   const [vendorId, setVendorId] = useState(expense?.vendor_id ?? '');
   const [vendorName, setVendorName] = useState(expense && !expense.vendor_id ? expense.vendor_name : '');
@@ -68,15 +78,13 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
     markup_percent: expense?.markup_percent,
     pure_agent: expense?.pure_agent,
   });
-  const [attachments, setAttachments] = useState<AttachmentRef[]>(expense?.attachments ?? []);
+  const [attachments, setAttachments] = useState<AttachmentRef[]>(expense?.attachments ?? seeded ?? []);
+  const [psB, setPsB] = useState(() => (expense as { ps?: Record<string, unknown> } | undefined)?.ps); // R14 PS-B1
+  const profOn = useMemo(() => ((s: { prof_kind?: unknown; industry_packs?: unknown }) => !!s.prof_kind || (Array.isArray(s.industry_packs) && s.industry_packs.includes('practice')))(localDb.settings.get() as never), []);
   const [error, setError] = useState('');
-  const [tds, setTds] = useState<BillTdsInput>(() => ({
-    section: expense?.tds_section ?? '',
-    on: expense?.tds_on ?? 'BILL',
-    pan: expense?.tds_pan ?? '',
-    lowerCert: expense?.tds_cert_no,
-    ...(expense?.tds_section ? { rate: expense.tds_rate, base: expense.tds_base, amount: expense.tds_amount } : {}),
-  }));
+  const [warning, setWarning] = useState('');
+  // R5-B3: a Sec 194C(6) nil deduction (reason T) keeps following the declaration on edit.
+  const [tds, setTds] = useState<BillTdsInput>(() => billTdsInputFor(expense, { transporter_194c6: vendors.find((v) => v.id === expense?.vendor_id)?.transporter_194c6 }));
 
   const vendor = vendors.find((v) => v.id === vendorId);
   const line = useMemo(() => expenseLine(category, amount, taxRate, inclusive), [category, amount, taxRate, inclusive]);
@@ -97,7 +105,9 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
       return setError(purT('errTotalBelowPaid', { amount: formatCurrency(expense.amount_paid) }));
     }
     try {
-      const saved = purchasesDb.save({
+      // 8C: duplicate warnings (save again to override), approval hold (a "paid now" expense keeps its payment for approval).
+      const tdsPay = tdsResolved.fields.tds_on === 'PAYMENT' ? tdsResolved.fields.tds_amount ?? 0 : 0;
+      const res = saveBillGuarded({
         ...expense,
         kind: 'EXPENSE',
         vendor_id: vendor?.id,
@@ -118,10 +128,21 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
         amount_paid: expense?.amount_paid ?? 0,
         notes: notes.trim() || undefined,
         ...billablePatch(billable),
+        ...(psB !== (expense as { ps?: unknown } | undefined)?.ps ? { ps: psB && Object.keys(psB).length ? psB : undefined } : {}), // R14 PS-B1
         cost_centre_id: costCentre,
         attachments: attachments.length ? attachments : undefined,
         ...tdsResolved.fields,
-      });
+      }, { confirmed: !!warning, payNow: !expense && paidNow ? { method, date, ...(tdsPay > 0 ? { tds_amount: tdsPay } : {}) } : undefined });
+      if (res.kind === 'warn') {
+        setWarning(res.message);
+        return;
+      }
+      if (res.kind === 'held') {
+        onSaved(capT('heldMsg'));
+        onClose();
+        return;
+      }
+      const saved = res.bill;
       if (!expense && paidNow) {
         // TDS deducted when paying: the payment is the net amount, the TDS settles the rest.
         const tdsNow = saved.tds_on === 'PAYMENT' ? saved.tds_amount ?? 0 : 0;
@@ -159,13 +180,13 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
 
       <div className={controls.row}>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="exp-amt">{purT('amountRs')}</label>
+          <label className={controls.label} htmlFor="exp-amt">{purT(expenseAmountLabel(taxRate, inclusive))}</label>
           <NumberInput id="exp-amt" className={controls.inputNumeric} value={amount} placeholder="0.00" onChange={setAmount} autoFocus />
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="exp-tax">{purT('gstRate')}</label>
           <select id="exp-tax" className={controls.select} value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value))}>
-            {GST_SLABS.map((s) => (
+            {gstRateOptions(date, taxRate).map((s) => (
               <option key={s} value={s}>{s === 0 ? purT('noGst') : `${s}%`}</option>
             ))}
           </select>
@@ -233,12 +254,18 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose }: Form
         <textarea id="exp-notes" className={controls.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
 
-      <TdsBillPanel value={tds} onChange={setTds} suggestion={tdsResolved.suggestion} payableNet={totals.total - (tdsResolved.fields.tds_on === 'BILL' ? tdsResolved.fields.tds_amount ?? 0 : 0)} nonResident={vendor?.non_resident} />
+      <TdsBillPanel value={tds} onChange={setTds} suggestion={tdsResolved.suggestion} payableNet={totals.total - (tdsResolved.fields.tds_on === 'BILL' ? tdsResolved.fields.tds_amount ?? 0 : 0)} nonResident={vendor?.non_resident} date={date} names={`${category} ${notes}`} />
 
       <BillableFields idPrefix="exp" value={billable} onChange={setBillable} rebilledIn={expense?.rebilled_in} />
+      {(profOn || !!psB?.disb) && (
+        <Suspense fallback={null}>
+          <DisbursementRow ps={psB} date={date} itc={itc} onChange={(v) => { setPsB(v.ps); setBillable((b) => ({ ...b, pure_agent: v.pure_agent, markup_percent: v.markup_percent })); if (v.itc_eligible === false) setItc(false); }} />
+        </Suspense>
+      )}
 
       <AttachmentsPanel value={attachments} onChange={setAttachments} label={purT('attachments')} />
 
+      {warning && <p className={styles.formError} role="alert">{warning}</p>}
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>
         <button type="button" className={controls.btnOutline} onClick={onClose}>{purT('cancel')}</button>

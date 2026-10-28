@@ -1,6 +1,6 @@
-import { useId, useMemo, useState } from 'react';
+import { lazy, Suspense, useId, useMemo, useState } from 'react';
 import { Modal } from '../ui/Modal';
-import { GST_SLABS } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
 import { cleanAltUnits, compoundUnits, unitSymbols, unitsDb, validateAltUnits } from '../../lib/units';
 import { stockCategoriesDb, stockGroupsDb, treeRows } from '../../lib/stock-groups';
 import { cleanPriceList, validatePriceList } from '../../lib/stock-query';
@@ -13,6 +13,13 @@ import { invT } from '../../i18n/areas/inventory';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
 import { EditLogButton } from '../audit/EditLogButton';
+import { catalogueEntryFor, setStockShortCode } from '../../lib/catalog';
+import { retailT } from '../../i18n/areas/retail';
+import { impliedPacks } from '../../lib/shop-mode';
+import { localDb } from '../../lib/localDb';
+
+const LeadTimeRow = lazy(() => import('../mfg/LeadTimeRow')); // R13 MF-A4: lead / make days (shopfloor pack)
+const PackSizeRow = lazy(() => import('../agri/PackSizeRow')); // R12 AG-C4: agri class, pack size, labelled (mill / agri pack)
 
 export interface ItemFormModalProps {
   open: boolean;
@@ -30,6 +37,8 @@ interface Draft {
   opening_qty: string; opening_rate: string; reorder_level: string;
   sale_rate: string; tax_rate: string; location: string;
   track_batches: boolean; track_serials: boolean; warranty_months: string; opening_serials: string;
+  /** R8-B (TR-B1): bags / weight sub-row on lines. */
+  sold_by_weight_bags: boolean;
   /** WP-8 masters: group / category, alternate units, price lists. */
   masters: MastersDraft;
 }
@@ -40,13 +49,14 @@ function toDraft(i: StockItem): Draft {
     opening_qty: String(i.opening_qty || ''), opening_rate: String(i.opening_rate || ''),
     reorder_level: String(i.reorder_level || ''), sale_rate: i.sale_rate ? String(i.sale_rate) : '',
     tax_rate: i.tax_rate !== undefined ? String(i.tax_rate) : '', location: i.location ?? '',
-    track_batches: !!i.track_batches, track_serials: !!i.track_serials,
+    track_batches: !!i.track_batches, track_serials: !!i.track_serials, sold_by_weight_bags: !!i.sold_by_weight_bags,
     warranty_months: i.warranty_months ? String(i.warranty_months) : '', opening_serials: (i.opening_serials ?? []).join('\n'),
     masters: {
       group_id: i.group_id ?? '', category_id: i.category_id ?? '',
       alt: (i.alt_units ?? []).map((a) => ({ unit: a.unit, factor: String(a.factor) })),
       costs: (i.standard_costs ?? []).map((e) => ({ from: e.from, rate: String(e.rate) })),
       prices: (i.selling_prices ?? []).map((e) => ({ from: e.from, rate: String(e.rate) })),
+      qc: !!i.qc_on_receipt, // R4-A4
     },
   };
 }
@@ -60,8 +70,17 @@ export function ItemFormModal(props: ItemFormModalProps) {
 function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormModalProps & { item: StockItem }) {
   useT(); // re-render on a language switch (5.4)
   const [d, setD] = useState<Draft>(() => toDraft(item));
+  const [weighOn] = useState(() => impliedPacks(localDb.settings.get()).some((p) => p === 'commodity' || p === 'agency') || !!item.sold_by_weight_bags); // R8-B
   const [touched, setTouched] = useState(false);
+  // R12 AG-C4: agri class / pack size / labelled, shown with the mill or agri pack (or when already set on the item).
+  const [ag, setAg] = useState<Pick<StockItem, 'ag_class' | 'ag_pack_kg' | 'ag_labelled'>>(() => ({ ag_class: item.ag_class, ag_pack_kg: item.ag_pack_kg, ag_labelled: item.ag_labelled }));
+  const [lead, setLead] = useState<Pick<StockItem, 'lead_days' | 'make_days'>>(() => ({ lead_days: item.lead_days, make_days: item.make_days })); // R13 MF-A4
+  const [mfOn] = useState(() => impliedPacks(localDb.settings.get()).includes('shopfloor') || item.lead_days !== undefined || item.make_days !== undefined);
+  const [agOn] = useState(() => impliedPacks(localDb.settings.get()).some((p) => p === 'mill' || p === 'agri') || !!(item.ag_class || item.ag_pack_kg));
   const uid = useId();
+  // QA-3 F24: the counter short code lives on the catalogue entry of the same name; it is edited here too.
+  const [shortCode, setShortCode] = useState(() => catalogueEntryFor(item.name)?.short_code ?? '');
+  const [shortError, setShortError] = useState('');
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((p) => ({ ...p, [k]: v }));
   const name = d.name.trim();
@@ -88,6 +107,8 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
   const submit = () => {
     setTouched(true);
     if (!valid) return;
+    const sc = setStockShortCode({ name, hsn: d.hsn, unit: d.unit, sale_rate: d.sale_rate === '' ? undefined : num(d.sale_rate), tax_rate: d.tax_rate === '' ? undefined : num(d.tax_rate) }, shortCode);
+    if (!sc.ok) return setShortError(sc.error.message);
     onSave({
       ...item,
       name,
@@ -113,6 +134,10 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
       alt_units: d.track_stock ? cleanAltUnits(altList, d.unit) : undefined,
       standard_costs: cleanPriceList(d.masters.costs.map((e) => ({ from: e.from, rate: e.rate === '' ? undefined : num(e.rate) }))),
       selling_prices: cleanPriceList(d.masters.prices.map((e) => ({ from: e.from, rate: e.rate === '' ? undefined : num(e.rate) }))),
+      qc_on_receipt: d.track_stock && d.masters.qc ? true : undefined, // R4-A4
+      sold_by_weight_bags: d.sold_by_weight_bags || undefined, // R8-B
+      ...(mfOn ? { lead_days: lead.lead_days, make_days: lead.make_days } : {}), // R13 MF-A4
+      ...(agOn ? { ag_class: ag.ag_class || undefined, ag_pack_kg: ag.ag_pack_kg && ag.ag_pack_kg > 0 ? ag.ag_pack_kg : undefined, ag_labelled: ag.ag_labelled || undefined } : {}), // R12 AG-C4
     });
   };
 
@@ -161,6 +186,11 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
             <input id={`${uid}-barcode`} className={controls.input} value={d.barcode} onChange={(e) => set('barcode', e.target.value)} placeholder={invT('scanOrType')} />
           </div>
           <div className={controls.field}>
+            <label className={controls.label} htmlFor={`${uid}-short`}>{retailT('shortCode')}</label>
+            <input id={`${uid}-short`} className={`${controls.input} ${controls.inputMono}`} value={shortCode} maxLength={12} onChange={(e) => { setShortCode(e.target.value.replace(/\s/g, '')); setShortError(''); }} placeholder={retailT('shortCodePh')} aria-invalid={!!shortError} data-stock-short-code />
+            {shortError && <span className={controls.error} role="alert">{shortError}</span>}
+          </div>
+          <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-hsn`}>{invT('hsn')}</label>
             <input
               id={`${uid}-hsn`} className={controls.input} inputMode="numeric" value={d.hsn}
@@ -190,7 +220,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
               list={`${uid}-slabs`} value={d.tax_rate} onChange={(e) => set('tax_rate', e.target.value)}
               aria-invalid={taxBad}
             />
-            <datalist id={`${uid}-slabs`}>{GST_SLABS.map((s) => <option key={s} value={s} />)}</datalist>
+            <datalist id={`${uid}-slabs`}>{gstRateOptions().map((s) => <option key={s} value={s} />)}</datalist>
             {taxBad && <span className={controls.error} role="alert">{invT('errGst')}</span>}
           </div>
           <div className={controls.field}>
@@ -251,6 +281,9 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
             {touched && serialError && <span className={controls.error} role="alert">{serialError}</span>}
           </>
         )}
+        {weighOn && <label className={controls.check}><input type="checkbox" checked={d.sold_by_weight_bags} onChange={(e) => set('sold_by_weight_bags', e.target.checked)} data-sold-by-weight /> {invT('soldByWeight')}</label>}
+        {mfOn && d.track_stock && <Suspense fallback={null}><LeadTimeRow value={lead} onChange={setLead} /></Suspense>}
+        {agOn && <Suspense fallback={null}><PackSizeRow value={ag} unit={d.unit} onChange={setAg} /></Suspense>}
         <MastersFields
           draft={d.masters}
           onChange={(m) => set('masters', m)}

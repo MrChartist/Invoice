@@ -10,6 +10,9 @@ import { jobChargesLine, principalBalances, principalDb } from '../../lib/job-wo
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import type { JobWorkOrder, PrincipalMovement } from '../../types/job-work';
 import { jwT } from '../../i18n/areas/job-work';
+import { s7T } from '../../i18n/areas/inventory-7s';
+import { principalStock } from '../../lib/job-work-principal';
+import { godownName } from '../../lib/godowns';
 import { PartyField } from './shared';
 import { qtyText, type JwData, type PartyValue } from './lines';
 import surface from '../../styles/surface.module.css';
@@ -27,6 +30,8 @@ export function PrincipalPanel({ data }: { data: JwData }) {
   const [billing, setBilling] = useState<JobWorkOrder | null>(null);
   const rows = [...data.principal].sort((a, b) => b.date.localeCompare(a.date) || b.number.localeCompare(a.number, undefined, { numeric: true }));
   const balances = principalBalances(data.principal);
+  // 7S: the principal's goods by godown / batch (shown once any line records a godown or batch).
+  const byGodown = data.principal.some((r) => r.lines.some((l) => l.godown_id || l.batch_no)) ? principalStock(data.principal) : [];
   const inOrders = data.orders.filter((o) => o.direction === 'in');
 
   return (
@@ -85,6 +90,29 @@ export function PrincipalPanel({ data }: { data: JwData }) {
           </tbody>
         </table>
       </div>
+      {byGodown.length > 0 && (
+        <>
+          <h3 className={styles.heading}>{s7T('byGodown')}</h3>
+          <p className={styles.muted}>{s7T('byGodownNote')}</p>
+          <div className={surface.tableWrap}>
+            <table className={surface.table} data-testid="jw-principal-godown">
+              <thead><tr><th>{s7T('principal')}</th><th>{s7T('item')}</th><th>{s7T('godown')}</th><th>{s7T('batch')}</th><th className={styles.num}>{s7T('received')}</th><th className={styles.num}>{s7T('returned')}</th><th className={styles.num}>{s7T('withUs')}</th></tr></thead>
+              <tbody>
+                {byGodown.map((b) => (
+                  <tr key={`${b.party}|${b.name}|${b.godown}|${b.batch}`}>
+                    <td>{b.party}</td><td>{b.name}</td>
+                    <td>{b.godown ? godownName(ctx.godowns, b.godown) : <span className={styles.muted}>{s7T('notRecorded')}</span>}</td>
+                    <td>{b.batch || '—'}</td>
+                    <td className={styles.num}>{qtyText(b.received)} {b.unit ?? ''}</td>
+                    <td className={styles.num}>{qtyText(b.returned)}</td>
+                    <td className={styles.num}><strong>{qtyText(b.pending)}</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
       {inOrders.length > 0 && ctx.canBooks && (
         <>
           <h3 className={styles.heading}>{jwT('chargesInvoice')}</h3>
@@ -182,7 +210,7 @@ function PrincipalModal({ data, doc, kind, onClose }: { data: JwData; doc: Princ
         </div>
         <div className={styles.wrap}>
           <table className={styles.grid}>
-            <thead><tr><th>{jwT('description')}</th><th className={styles.num}>{jwT('qty')}</th><th>{jwT('unit')}</th><th>{jwT('hsn')}</th><th className={styles.num}>{jwT('value')}</th><th><span className={surface.srOnly}>{jwT('actions')}</span></th></tr></thead>
+            <thead><tr><th>{jwT('description')}</th><th className={styles.num}>{jwT('qty')}</th><th>{jwT('unit')}</th><th>{jwT('hsn')}</th><th className={styles.num}>{jwT('value')}</th><th>{s7T('godown')}</th><th>{s7T('batch')}</th><th><span className={surface.srOnly}>{jwT('actions')}</span></th></tr></thead>
             <tbody>
               {lines.map((l, i) => (
                 <tr key={l.id}>
@@ -191,6 +219,13 @@ function PrincipalModal({ data, doc, kind, onClose }: { data: JwData; doc: Princ
                   <td><input className={controls.input} aria-label={jwT('lineUnit', { label, n: i + 1 })} value={l.unit ?? ''} onChange={(e) => patch(l.id, { unit: e.target.value.toUpperCase() || undefined })} /></td>
                   <td><input className={controls.input} aria-label={`${label} ${i + 1} ${jwT('hsn')}`} value={l.hsn ?? ''} onChange={(e) => patch(l.id, { hsn: e.target.value || undefined })} /></td>
                   <td><input className={cn(controls.input, controls.inputNumeric)} inputMode="decimal" aria-label={jwT('lineValue', { label, n: i + 1 })} value={l.value ? String(l.value) : ''} onChange={(e) => patch(l.id, { value: num(e.target.value) || undefined })} /></td>
+                  <td>
+                    <select className={controls.select} aria-label={`${label} ${i + 1} ${s7T('godown')}`} value={l.godown_id ?? ''} onChange={(e) => patch(l.id, { godown_id: e.target.value || undefined })}>
+                      <option value="">—</option>
+                      {data.ownGodowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                  </td>
+                  <td><input className={controls.input} aria-label={`${label} ${i + 1} ${s7T('batch')}`} value={l.batch_no ?? ''} onChange={(e) => patch(l.id, { batch_no: e.target.value || undefined })} /></td>
                   <td><button type="button" className={controls.btnIcon} aria-label={`${label} ${jwT('removeLine', { n: i + 1 })}`} onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}><Trash2 size={15} aria-hidden="true" /></button></td>
                 </tr>
               ))}

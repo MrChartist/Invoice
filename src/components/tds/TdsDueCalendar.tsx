@@ -10,6 +10,8 @@ import { formatDate, formatMoney } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { tdsT } from '../../i18n/areas/tds';
 import { o7T } from '../../i18n/areas/gst-tds-7o';
+import { ita25Words } from '../../i18n/areas/ita2025';
+import { formText, periodStart } from '../../lib/ita2025';
 import surface from '../../styles/surface.module.css';
 import local from '../gst-reports/gst-reports.module.css';
 
@@ -47,7 +49,7 @@ export function TdsDueCalendar({ today }: { today: string }) {
                   {d.what === 'deposit'
                     ? tdsT('whatDeposit', { kind: d.kind, period: d.period })
                     : d.what === 'return'
-                      ? tdsT('whatReturn', { form: '26Q', period: d.period })
+                      ? tdsT('whatReturn', { form: formText('26Q', periodStart(d.period), ita25Words()), period: d.period })
                       : tdsT('whatCert', { period: d.period })}
                 </td>
                 <td>{formatDate(d.due)}</td>

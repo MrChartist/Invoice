@@ -70,8 +70,11 @@ backgrounds, watermark and letterhead footer, and offsets the content by a top s
 
 ## Gaps / follow-ups
 
-- The e-Invoice modal does not yet read `invoice.transport` when building the e-Way JSON (owned by the e-Invoice module).
+- ~~The e-Invoice modal does not yet read `invoice.transport` when building the e-Way JSON (owned by the e-Invoice module).~~ Done in 7.56: `EwbDtls` from `invoice.transport` (stale note struck by R6-C6).
 - The Design Studio panel has no copies / pre-printed controls yet; they are set from the preview.
 - Bills on the confirmation letter ignore advance adjustments dated before the closing date (their amount is not on
   the ledger entry); the reconciling line keeps the closing balance correct.
 - Dot-matrix text mode is not built.
+
+## 8G additions
+- `AcceptanceBlock` prints a document's own payment schedule and a quotation's acceptance snapshot (signer, time, amount, signature) — accent variable only, legacy documents print nothing.

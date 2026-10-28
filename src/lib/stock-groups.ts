@@ -140,6 +140,7 @@ function makeTreeDb(table: string, kind: TreeKind) {
       const row: StockTreeNode = {
         id: existing?.id ?? generateId(), name: input.name.trim(),
         ...(input.parent_id ? { parent_id: input.parent_id } : {}),
+        ...(existing?.min_margin_percent ? { min_margin_percent: existing.min_margin_percent } : {}), // TR-A1 keeps the floor
         created_at: existing?.created_at ?? now(), updated_at: now(),
       };
       setTable(table, existing ? rows.map((n) => (n.id === row.id ? row : n)) : [...rows, row]);
@@ -149,6 +150,11 @@ function makeTreeDb(table: string, kind: TreeKind) {
         /* logging never breaks a save */
       }
       return row;
+    },
+    /** TR-A1: set (or clear with 0) a group's minimum margin %. */
+    setMinMargin(id: string, pct: number): void {
+      requireAccess('master.edit');
+      setTable(table, db.all().map((n) => (n.id !== id ? n : pct > 0 ? { ...n, min_margin_percent: Math.min(pct, 100), updated_at: now() } : { ...n, min_margin_percent: undefined, updated_at: now() })));
     },
     /** Refused while sub-nodes or stock items point at it. */
     remove(id: string, items: readonly Pick<StockItem, 'group_id' | 'category_id'>[]): void {

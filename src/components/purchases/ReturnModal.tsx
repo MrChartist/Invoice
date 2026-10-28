@@ -4,6 +4,7 @@ import { GST_NOTE_REASONS } from '../../types/purchases';
 import {
   noteGstMode,
   noteLineFrom,
+  freeUnitsReturned,
   noteTotals,
   notedValue,
   purchaseReturnsDb,
@@ -15,7 +16,7 @@ import { generateId } from '../../lib/storage';
 import { isVoidStatus, readPurchase } from '../../lib/purchase-normalize';
 import { num, round2 } from '../../lib/invoice-calc';
 import { formatCurrency, formatDate, todayInput } from '../../lib/utils';
-import { GST_SLABS } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
 import { Modal } from '../ui/Modal';
 import { NumberInput } from '../ui/NumberInput';
 import { useT } from '../../i18n';
@@ -24,6 +25,9 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import local from './returns.module.css';
+import { defineArea } from '../../i18n/area';
+
+const freeRetT = defineArea({ msg: '{n} free unit(s) go back at zero value.' } as const, { msg: '{n} फ़्री इकाई शून्य मूल्य पर वापस जाएँगी।' }); // R9 (RT-A4)
 
 export interface ReturnModalProps {
   /** Which entry to record; null = closed. */
@@ -33,6 +37,8 @@ export interface ReturnModalProps {
   notes: PurchaseReturn[];
   /** Pre-select a bill. */
   billId?: string;
+  /** R6-C1: quantities to return per bill line id (a QC reject's pre-filled debit note). */
+  initialQty?: Record<string, number>;
   onClose: () => void;
   onSaved: (message: string) => void;
 }
@@ -55,7 +61,7 @@ export function ReturnModal({ kind, onClose, ...rest }: ReturnModalProps) {
 
 type FormProps = Omit<ReturnModalProps, 'kind'> & { kind: PurchaseNoteKind };
 
-function ReturnForm({ kind, purchases, vendors, notes, billId, onClose, onSaved }: FormProps) {
+function ReturnForm({ kind, purchases, vendors, notes, billId, initialQty, onClose, onSaved }: FormProps) {
   const bills = useMemo(
     () =>
       purchases
@@ -71,7 +77,7 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, onClose, onSaved 
   const [date, setDate] = useState(todayInput());
   const [reason, setReason] = useState<NoteReasonCode>(kind === 'DEBIT_NOTE' ? '01' : '02');
   const [goods, setGoods] = useState(kind === 'DEBIT_NOTE');
-  const [qty, setQty] = useState<Record<string, number>>({});
+  const [qty, setQty] = useState<Record<string, number>>(() => ({ ...(initialQty ?? {}) }));
   const [rates, setRates] = useState<Record<string, number>>({});
   const [valueName, setValueName] = useState('');
   const [value, setValue] = useState(0);
@@ -86,6 +92,8 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, onClose, onSaved 
   const returnable = useMemo(() => (bill ? returnableLines(bill, notes) : []), [bill, notes]);
   const room = bill ? round2(num(bill.total) - notedValue(bill, notes)) : 0;
   const vendor = vendors.find((v) => v.id === vendorId);
+  // R9 (RT-A4): free units in this return go back at zero value (paid units go first).
+  const freeBack = useMemo(() => returnable.reduce((s, r) => s + freeUnitsReturned(r, num(qty[r.line.id])), 0), [returnable, qty]);
 
   const lines: PurchaseReturnLine[] = useMemo(() => {
     if (goods && bill) {
@@ -280,7 +288,7 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, onClose, onSaved 
           <div className={controls.field}>
             <label className={controls.label} htmlFor="rn-rate">{prT('gstRate')}</label>
             <select id="rn-rate" className={controls.select} value={valueRate} onChange={(e) => setValueRate(Number(e.target.value))}>
-              {GST_SLABS.map((s) => (
+              {gstRateOptions(date, valueRate).map((s) => (
                 <option key={s} value={s}>{s}%</option>
               ))}
             </select>
@@ -307,6 +315,7 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, onClose, onSaved 
       </div>
       <p className={styles.note}>{prT('effectNote')}</p>
 
+      {goods && freeBack > 0 && <p className={styles.formError} role="status" data-return-free>{freeRetT('msg', { n: freeBack })}</p>}
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>
         <button type="button" className={controls.btnOutline} onClick={onClose}>{prT('cancel')}</button>

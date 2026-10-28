@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarClock, Pause, Plus, Repeat, TrendingUp } from 'lucide-react';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -14,17 +14,43 @@ import {
   recurringDb,
   resumeSchedule,
   runNow,
+  runNowIsEarly,
   scheduleStatus,
   skipNext,
   stopSchedule,
   type RecurringSchedule,
 } from '../lib/recurring';
 import { formatCurrency, formatDate, todayInput } from '../lib/utils';
+import { RECURRING_RAN_EVENT, RECURRING_RUN_EVENT } from '../hooks/useRecurringRunner';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Recurring.module.css';
 import { useT } from '../i18n';
 import { recT } from '../i18n/areas/recurring';
+import { s2T } from '../i18n/areas/sales-r2';
+import { defineArea } from '../i18n/area';
+import { visibleTabs, type PackId } from '../lib/industry-packs'; // R5-C
+import { localDb } from '../lib/localDb';
+import { RECURRING_TABS, type RecurringTab } from './page-tabs'; // R6-B1
+
+// R2-B1: batch invoices (one template, many parties), loaded on demand.
+const BatchTab = lazy(() => import('../components/recurring/BatchTab').then((m) => ({ default: m.BatchTab })));
+// R5-C: fees (institutions) and leases (property) — listed only with their pack on; the URL always opens them.
+const FeesTab = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.FeesTab })));
+const LeasesTab = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.LeasesTab })));
+const r5cTabT = defineArea({ fees: 'Fees', leases: 'Leases', society: 'Society' } as const, { fees: 'फ़ीस', leases: 'लीज़', society: 'सोसाइटी' }); // R18-A: + society
+// R18-A: the Society desk (units / tariff; B–D add views) — listed with the `society` pack, one lazy chunk.
+const SocietyDesk = lazy(() => import('../components/society/SocietyDesk'));
+type RecTab = RecurringTab;
+// R6-B1: the ids (and packs) live in recurring-tabs.ts; the labels stay here.
+const TAB_LABEL: Record<RecTab, () => string> = {
+  schedules: () => s2T('rec.tabSchedules'),
+  batch: () => s2T('rec.tabBatch'),
+  fees: () => r5cTabT('fees'), // R5-C
+  leases: () => r5cTabT('leases'), // R5-C
+  society: () => r5cTabT('society'), // R18-A
+};
+const REC_TABS: { id: RecTab; label: () => string; pack?: PackId }[] = RECURRING_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
 
 export interface RecurringPageProps {
   /** Open the create modal prefilled from this saved invoice. */
@@ -35,6 +61,7 @@ type Confirm =
   | { kind: 'delete'; schedule: RecurringSchedule }
   | { kind: 'stop'; schedule: RecurringSchedule }
   | { kind: 'skip'; schedule: RecurringSchedule }
+  | { kind: 'early'; schedule: RecurringSchedule }
   | null;
 
 export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
@@ -42,6 +69,7 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
   const [params, setParams] = useSearchParams();
   const queryFrom = params.get('from') ?? undefined;
   const prefillId = fromInvoiceId ?? queryFrom;
+  const tab: RecTab = REC_TABS.find((t) => t.id === params.get('tab'))?.id ?? 'schedules';
 
   const [schedules, setSchedules] = useState<RecurringSchedule[]>(() => recurringDb.getAll());
   const [editorOpen, setEditorOpen] = useState(Boolean(prefillId));
@@ -54,7 +82,12 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
   useEffect(() => {
     const onFocus = () => reload();
     window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+    // QA-3 F6: the shell's runner generated documents (e.g. the first run of a schedule just saved).
+    window.addEventListener(RECURRING_RAN_EVENT, onFocus);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener(RECURRING_RAN_EVENT, onFocus);
+    };
   }, [reload]);
 
   const today = todayInput();
@@ -97,16 +130,25 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
     }
   };
 
-  const onRunNow = (s: RecurringSchedule) =>
+  const runAndTell = (id: string, early: boolean) =>
     guard(() => {
-      const res = runNow(s.id, today);
+      const res = runNow(id, today, { early });
       if (!res) notify(recT('ended'), 'error');
-      else notify(res.created ? recT('created', { number: res.invoice.invoice_number }) : recT('exists'), res.created ? 'success' : 'info');
+      else notify(res.created ? recT('created', { number: res.invoice.invoice_number || recT('draftShort') }) : recT('exists'), res.created ? 'success' : 'info');
     });
+  // QA-3 F6: judged on the stored schedule (the card may be stale); a period not due yet asks first.
+  const onRunNow = (s: RecurringSchedule) => {
+    const fresh = recurringDb.getById(s.id) ?? s;
+    if (runNowIsEarly(fresh, today)) {
+      reload();
+      setConfirm({ kind: 'early', schedule: fresh });
+    } else runAndTell(s.id, false);
+  };
 
   const runConfirmed = () => {
     if (!confirm) return;
     const { kind, schedule } = confirm;
+    if (kind === 'early') return runAndTell(schedule.id, true);
     guard(() => {
       if (kind === 'delete') {
         recurringDb.remove(schedule.id);
@@ -134,6 +176,12 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
       label: recT('stopLabel'),
       destructive: true,
     },
+    early: {
+      title: recT('earlyTitle'),
+      message: recT('earlyMsg', { date: formatDate(confirm.schedule.next_run) }),
+      label: recT('earlyLabel'),
+      destructive: false,
+    },
     skip: {
       title: recT('skipTitle'),
       message: recT('skipMsg', { date: formatDate(confirm.schedule.next_run) }),
@@ -154,6 +202,22 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
         }
       />
 
+      {/* R2-B1: Schedules | Batch invoices */}
+      <div className={controls.segment} role="tablist" aria-label={recT('title')}>
+        {visibleTabs(REC_TABS, localDb.settings.get(), tab).map(({ id: k, label }) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? controls.segmentBtnActive : controls.segmentBtn}
+            onClick={() => { const next = new URLSearchParams(params); next.delete('view'); if (k !== 'schedules') next.set('tab', k); else next.delete('tab'); setParams(next, { replace: true }); }}>
+            {label()}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'batch' || tab === 'fees' || tab === 'leases' || tab === 'society' ? (
+        <Suspense fallback={null}>
+          {tab === 'batch' ? <BatchTab /> : tab === 'fees' ? <FeesTab notify={notify} /> : tab === 'society' ? <SocietyDesk view={params.get('view') ?? undefined} notify={notify} /> : <LeasesTab notify={notify} />}
+        </Suspense>
+      ) : (
+      <>
       <section className={surface.statGrid} aria-label={recT('summary')}>
         <StatCard label={recT('active')} value={stats.active} hint={recT('nPaused', { n: stats.paused })} icon={Repeat} tone="profit" />
         <StatCard label={recT('nextRun')} value={stats.next ? formatDate(stats.next) : '—'} hint={recT('nextRunHint')} icon={CalendarClock} />
@@ -192,6 +256,9 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
         </div>
       )}
 
+      </>
+      )}
+
       <RecurringEditor
         open={editorOpen}
         onClose={closeEditor}
@@ -200,6 +267,8 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
         onSaved={(s) => {
           notify(editing ? recT('updated') : recT('createdSchedule', { name: s.name }));
           reload();
+          // A schedule due today runs now; the list re-reads when the runner reports back.
+          if (s.next_run <= today) window.dispatchEvent(new Event(RECURRING_RUN_EVENT));
         }}
       />
 

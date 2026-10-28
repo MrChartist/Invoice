@@ -44,13 +44,29 @@ function sums(ledger: Ledger, keep: (v: LedgerVoucher) => boolean, party?: strin
 const net = (s: { dr: number; cr: number } | undefined) => (s ? s.dr - s.cr : 0);
 
 /**
+ * PERF-1 (H10): a Ledger is never changed after it is built, so the per-account sums of everything
+ * dated before a day (per party, or all) and the party balances of control accounts as at a day are
+ * computed once per (ledger, day) and reused — the annual pack, notes and balance sheet ask for the
+ * same few dates many times. Internal maps; callers always get a fresh Map.
+ */
+const prefixCache = new WeakMap<Ledger, Map<string, Map<string, { dr: number; cr: number }>>>();
+function sumsBefore(ledger: Ledger, before: string, party?: string): Map<string, { dr: number; cr: number }> {
+  let byKey = prefixCache.get(ledger);
+  if (!byKey) prefixCache.set(ledger, (byKey = new Map()));
+  const key = `${before}\u0000${party === undefined ? '\u0001' : party}`;
+  let m = byKey.get(key);
+  if (!m) byKey.set(key, (m = sums(ledger, (v) => v.date < before, party)));
+  return m;
+}
+
+/**
  * Balances after everything dated before `before`, with the FY rule applied for the FY that
  * starts on `fyStart`: income/expense accounts only count from `fyStart`, and the profit of
  * all earlier FYs is added to Reserves & surplus.
  */
 function balancesBefore(ledger: Ledger, before: string, fyStart: string, party?: string): Map<string, number> {
-  const all = sums(ledger, (v) => v.date < before, party);
-  const prior = party === undefined ? sums(ledger, (v) => v.date < fyStart) : new Map<string, { dr: number; cr: number }>();
+  const all = sumsBefore(ledger, before, party);
+  const prior = party === undefined ? sumsBefore(ledger, fyStart) : new Map<string, { dr: number; cr: number }>();
   const out = new Map<string, number>();
   let carried = 0;
   for (const a of ledger.accounts) {
@@ -78,17 +94,26 @@ export function closingBalances(ledger: Ledger, date: string, party?: string): M
 
 /** Closing balance of each party on a control account at the end of `date`. */
 function partyBalances(ledger: Ledger, accountId: string, date: string): Map<string, number> {
-  const out = new Map<string, number>();
-  for (const v of ledger.vouchers) {
-    if (v.date > date) continue;
-    for (const l of v.lines) {
-      if (l.account !== accountId) continue;
-      const p = l.party || '(no party)';
-      out.set(p, (out.get(p) ?? 0) + l.dr - l.cr);
+  let byDate = partyCache.get(ledger);
+  if (!byDate) partyCache.set(ledger, (byDate = new Map()));
+  let all = byDate.get(date);
+  if (!all) {
+    // One pass for every account (same voucher order, so each account's parties keep their order).
+    all = new Map();
+    for (const v of ledger.vouchers) {
+      if (v.date > date) continue;
+      for (const l of v.lines) {
+        let out = all.get(l.account);
+        if (!out) all.set(l.account, (out = new Map()));
+        const p = l.party || '(no party)';
+        out.set(p, (out.get(p) ?? 0) + l.dr - l.cr);
+      }
     }
+    byDate.set(date, all);
   }
-  return out;
+  return new Map(all.get(accountId) ?? []);
 }
+const partyCache = new WeakMap<Ledger, Map<string, Map<string, Map<string, number>>>>();
 
 function nextDay(iso: string): string {
   const d = new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10) + 1));
@@ -435,7 +460,7 @@ export function ledgerBalanceSheet(ledger: Ledger, asOf: string, stock?: StockVa
   for (const a of ledger.accounts) if (isPnl(a)) profitForYear -= bal.get(a.id) ?? 0;
   // `closingBalances` folded prior years' profit into the reserves balance; split it back out for display.
   const fyStart = fyStartOf(asOf);
-  const prior = sums(ledger, (v) => v.date < fyStart);
+  const prior = sumsBefore(ledger, fyStart); // read-only (shared per ledger)
   let ledgerBf = 0;
   for (const a of ledger.accounts) if (isPnl(a)) ledgerBf -= net(prior.get(a.id));
   // Stock (report-time): this year's change is profit; earlier years' change is surplus b/f; opening

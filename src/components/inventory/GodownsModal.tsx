@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { skT } from '../../i18n/areas/stock-depth';
 import { Edit3, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { godownTree, godownsDb, liveGodownReferences } from '../../lib/godowns';
@@ -9,7 +10,15 @@ import { godownInUse, type TrackingMap } from '../../lib/stock-tracking';
 import { MAIN_GODOWN_ID, type Godown } from '../../types/stock';
 import { useT } from '../../i18n';
 import { invT } from '../../i18n/areas/inventory';
+import { getTable, setTable } from '../../lib/storage';
+import { defineArea } from '../../i18n/area';
 import controls from '../../styles/controls.module.css';
+
+// R4-B5: replenishment source (inline labels).
+const replT = defineArea(
+  { label: 'Refill from (replenishment)', none: 'Not refilled from a godown', hint: 'Reorder → Replenish fills this store from that godown first and buys only the rest.', transit: 'In transit' } as const,
+  { label: 'यहाँ से भरें (पुनःपूर्ति)', none: 'किसी गोदाम से नहीं', hint: 'रीऑर्डर → पुनःपूर्ति पहले उस गोदाम से भरती है, बाकी ही ख़रीदती है।', transit: 'रास्ते में' },
+);
 import surface from '../../styles/surface.module.css';
 import styles from './inventory.module.css';
 
@@ -27,7 +36,7 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
   onChanged: (message: string) => void;
 }) {
   useT(); // re-render on a language switch (5.4)
-  const [editing, setEditing] = useState<{ id?: string; name: string; address: string; parent_id: string } | null>(null);
+  const [editing, setEditing] = useState<{ id?: string; name: string; address: string; parent_id: string; kind?: Godown['kind'] | ''; replenish_from?: string } | null>(null);
   // WP-8: godowns may sit inside another godown (warehouse → store room); shown as a tree.
   const tree = godownTree(godowns);
   const blocked = editing?.id ? descendantIds(editing.id, godowns) : new Set<string>();
@@ -36,7 +45,14 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
   const save = () => {
     if (!editing) return;
     try {
-      godownsDb.save({ id: editing.id, name: editing.name, address: editing.address, parent_id: editing.parent_id || undefined });
+      const saved = godownsDb.save({ id: editing.id, name: editing.name, address: editing.address, parent_id: editing.parent_id || undefined, kind: editing.kind ?? '' });
+      // R4-B5: the godown this store is refilled from first (Main is implicit: stored only when it carries a field).
+      if ((saved.replenish_from ?? '') !== (editing.replenish_from ?? '')) {
+        const rows = getTable<Godown>('godowns');
+        const next = { ...saved, ...(editing.replenish_from ? { replenish_from: editing.replenish_from } : {}) };
+        if (!editing.replenish_from) delete next.replenish_from;
+        setTable('godowns', rows.some((g) => g.id === saved.id) ? rows.map((g) => (g.id === saved.id ? next : g)) : [...rows, next]);
+      }
       onChanged(editing.id ? invT('godownRenamed') : invT('godownAdded', { name: editing.name.trim() }));
       setEditing(null);
       setError('');
@@ -74,11 +90,11 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
           <tbody>
             {tree.map(({ node, depth }) => ({ g: godowns.find((x) => x.id === node.id) ?? { id: node.id, name: node.name }, depth })).map(({ g, depth }) => (
               <tr key={g.id}>
-                <td><span className={depthClass(depth)}>{g.name}</span>{g.id === MAIN_GODOWN_ID && <span className={styles.muted}>{invT('defaultTag')}</span>}</td>
+                <td><span className={depthClass(depth)}>{g.name}</span>{g.id === MAIN_GODOWN_ID && <span className={styles.muted}>{invT('defaultTag')}</span>}{g.kind && <span className={styles.muted}> · {g.kind === 'transit' ? replT('transit') : skT(g.kind === 'van' ? 'kindVan' : 'kindExpiry')}</span>}</td>
                 <td className={styles.muted}>{g.address || '—'}</td>
                 <td>
                   <span className={surface.rowActions}>
-                    <button type="button" className={controls.btnIcon} aria-label={invT('rename', { name: g.name })} onClick={() => setEditing({ id: g.id, name: g.name, address: g.address ?? '', parent_id: g.parent_id ?? '' })}>
+                    <button type="button" className={controls.btnIcon} aria-label={invT('rename', { name: g.name })} onClick={() => setEditing({ id: g.id, name: g.name, address: g.address ?? '', parent_id: g.parent_id ?? '', kind: g.kind ?? '', replenish_from: g.replenish_from ?? getTable<Godown>('godowns').find((x) => x.id === g.id)?.replenish_from ?? '' })}>
                       <Edit3 size={16} />
                     </button>
                     {g.id !== MAIN_GODOWN_ID && (
@@ -112,6 +128,24 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
                 {tree.filter((r) => !blocked.has(r.node.id)).map((r) => <option key={r.node.id} value={r.node.id}>{r.path}</option>)}
               </select>
             </div>
+            <div className={controls.field}>
+              <label className={controls.label} htmlFor="gd-kind">{skT('godownKind')}</label>
+              <select id="gd-kind" className={controls.select} value={editing.kind ?? ''} onChange={(e) => setEditing({ ...editing, kind: e.target.value as Godown['kind'] | '' })} disabled={editing.id === MAIN_GODOWN_ID}>
+                <option value="">{skT('kindNormal')}</option>
+                <option value="van">{skT('kindVan')}</option>
+                <option value="expiry">{skT('kindExpiry')}</option>
+              </select>
+            </div>
+            {editing.kind !== 'transit' && (
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="gd-replenish">{replT('label')}</label>
+                <select id="gd-replenish" className={controls.select} value={editing.replenish_from ?? ''} onChange={(e) => setEditing({ ...editing, replenish_from: e.target.value })}>
+                  <option value="">{replT('none')}</option>
+                  {godowns.filter((x) => x.id !== editing.id && !x.kind).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                </select>
+                <span className={controls.hint}>{replT('hint')}</span>
+              </div>
+            )}
             <div className={surface.pageActions}>
               <button type="button" className={controls.btnOutline} onClick={() => { setEditing(null); setError(''); }}>{invT('cancel')}</button>
               <button type="submit" className={controls.btnPrimary}>{editing.id ? invT('save') : invT('addGodown')}</button>

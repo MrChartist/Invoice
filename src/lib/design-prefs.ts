@@ -11,9 +11,11 @@
  * design at all.
  */
 
-import { getTable, setTable } from './storage';
+import { DB_PREFIX, getTable, readRaw, setTable, writeRaw } from './storage';
+import { ASSET_TABLE, internImage, parseAssets, serializeAssets } from './assets';
 import { formatMoney } from './utils';
 import { sanitizeCopies, type CopySetting } from './print-copies';
+import type { DocumentType } from '../types/invoice';
 
 export const DESIGN_TABLE = 'design_prefs';
 /** `profile_id` of the row that applies to every profile without its own row. */
@@ -72,7 +74,206 @@ export interface DesignPrefs {
   copies?: CopySetting;
   /** Additive (P2): print on pre-printed stationery — no letterhead / backgrounds, content offset. */
   preprinted?: PreprintedPrefs;
+  /**
+   * Additive (8.5): print "Previous balance + This bill = Total due" from the bill's own
+   * `party_balance_snapshot`. Absent / false = off (legacy look).
+   */
+  show_party_balance?: boolean;
+  /**
+   * Additive (R2-C5): printed label overrides keyed by `LabelKey` (`src/components/templates/labels.ts`).
+   * Blank / absent = the default label. Layered key by key: global ← profile.
+   */
+  labels?: LabelOverrides;
+  /** Additive (R2-C5): label overrides for one document type only (win over `labels`). */
+  labels_by_type?: Partial<Record<DocumentType, LabelOverrides>>;
+  /**
+   * Additive (R2-C5): text appended to the printed document title per type ("Tax Invoice — Professional
+   * Services"). The statutory title itself always prints and cannot be replaced.
+   */
+  title_suffix?: Partial<Record<DocumentType, string>>;
+  /**
+   * Additive (R3-C2): print the catalogue photo (16 mm) beside lines that snapshotted one. Off by default;
+   * the GST grid and thermal paper never print them.
+   */
+  show_item_images?: boolean;
+  /** Additive (R3-C3): page margins in mm (0–30). Absent = the template's own padding. */
+  margins_mm?: MarginsMm;
+  /** Additive (R3-C3): letterhead artwork (header band or full-page background). Off while pre-printed is on. */
+  letterhead?: LetterheadPrefs;
+  /** Additive (R3-C3): footer band artwork (`asset:<id>`), printed at the foot of the page. */
+  footer_image?: string;
   updated_at?: string;
+}
+
+/* ── Page margins and letterhead artwork (R3-C3) ──────────────── */
+
+export interface MarginsMm {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export type LetterheadMode = 'header' | 'background';
+
+export interface LetterheadPrefs {
+  /** `asset:<id>` reference (or a raster data URL before it is interned). */
+  image: string;
+  mode: LetterheadMode;
+  /** Header band on every PDF page (true) or on page 1 only (false). */
+  every_page: boolean;
+}
+
+export const MARGIN_MAX_MM = 30;
+/** Today's template padding in mm (44 px top, 48 px sides, 36 px bottom at 96 dpi), the panel's starting values. */
+export const TEMPLATE_MARGINS_MM: MarginsMm = { top: 11.6, right: 12.7, bottom: 9.5, left: 12.7 };
+/** Largest letterhead / footer image accepted (bytes of the decoded image, ~400 kB). */
+export const MAX_LETTERHEAD_BYTES = 400 * 1024;
+/** Raster images only — an SVG may carry script (same rule as catalogue photos). */
+const SAFE_ART = /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+=*$/;
+
+/** A stored artwork value: an asset reference or a safe raster data URL; anything else is dropped. */
+export function sanitizeArt(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  if (/^asset:[A-Za-z0-9~_-]+$/.test(v)) return v;
+  return SAFE_ART.test(v) && v.length <= Math.ceil((MAX_LETTERHEAD_BYTES * 4) / 3) + 32 ? v : undefined;
+}
+
+/** Approximate decoded size of a base64 data URL, in bytes. */
+export function dataUrlBytes(dataUrl: string): number {
+  const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  return Math.floor((b64.length * 3) / 4) - (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
+}
+
+/**
+ * Store letterhead / footer artwork once in the `assets` table and return its `asset:<id>` reference.
+ * Throws a readable Error for a non-raster image or one over 400 kB.
+ */
+export function storeArtwork(dataUrl: string): string {
+  if (!SAFE_ART.test(dataUrl)) throw new Error('Choose a PNG or JPEG image.');
+  if (dataUrlBytes(dataUrl) > MAX_LETTERHEAD_BYTES) throw new Error('That image is over 400 kB. Pick a smaller one.');
+  const key = DB_PREFIX + ASSET_TABLE;
+  const idx = parseAssets(readRaw(key));
+  const before = idx.byId.size;
+  const ref = internImage(idx, dataUrl);
+  if (idx.byId.size !== before) writeRaw(key, serializeAssets(idx));
+  return ref;
+}
+
+/** Clamp margins to 0–30 mm (half-mm steps); undefined when absent or malformed. */
+export function sanitizeMargins(v: unknown): MarginsMm | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const o = v as Record<string, unknown>;
+  const c = (n: unknown, d: number) => {
+    const x = typeof n === 'number' && Number.isFinite(n) ? n : d;
+    return Math.min(MARGIN_MAX_MM, Math.max(0, Math.round(x * 2) / 2));
+  };
+  return { top: c(o.top, TEMPLATE_MARGINS_MM.top), right: c(o.right, TEMPLATE_MARGINS_MM.right), bottom: c(o.bottom, TEMPLATE_MARGINS_MM.bottom), left: c(o.left, TEMPLATE_MARGINS_MM.left) };
+}
+
+export function sanitizeLetterhead(v: unknown): LetterheadPrefs | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const o = v as Record<string, unknown>;
+  const image = sanitizeArt(o.image);
+  if (!image) return undefined;
+  return { image, mode: o.mode === 'background' ? 'background' : 'header', every_page: o.every_page === true };
+}
+
+/** Letterhead and footer artwork to print, or null: pre-printed stationery excludes them. */
+export function activeArt(d: Pick<DesignPrefs, 'preprinted' | 'letterhead' | 'footer_image' | 'paper'> | null | undefined): { letterhead?: LetterheadPrefs; footer?: string } | null {
+  if (!d || d.preprinted?.on || d.paper === 'thermal80') return null;
+  const letterhead = sanitizeLetterhead(d.letterhead);
+  const footer = sanitizeArt(d.footer_image);
+  return letterhead || footer ? { ...(letterhead ? { letterhead } : {}), ...(footer ? { footer } : {}) } : null;
+}
+
+/**
+ * CSS variables for the paper (the template padding in mm) and the right-hand padding of the content.
+ * Empty without margins, so a design without them renders exactly as before.
+ */
+export function marginVars(d: Pick<DesignPrefs, 'margins_mm'> | null | undefined): Record<string, string> {
+  const m = sanitizeMargins(d?.margins_mm);
+  if (!m) return {};
+  return { '--tpl-pt': `${m.top}mm`, '--tpl-px': `${m.left}mm`, '--tpl-pr': `${m.right}mm`, '--tpl-pb': `${m.bottom}mm` };
+}
+
+/* ── Label overrides (R2-C5) ──────────────────────────────────── */
+
+/** Every printed label a user may rename — the keys of `labels.ts` (checked there at compile time). */
+export const LABEL_KEYS = [
+  'billTo', 'shipTo', 'preparedFor', 'issueDate', 'quoteDate', 'dueDate', 'validUntil', 'deliveryBy', 'poRef',
+  'placeOfSupply', 'currency', 'reverseCharge', 'document', 'invoiceNo', 'desc', 'hsn', 'qty', 'rate', 'disc',
+  'taxable', 'gst', 'gstRate', 'amount', 'subtotal', 'discount', 'cgst', 'sgst', 'igst', 'tax', 'shipping', 'other',
+  'roundOff', 'total', 'balanceDue', 'words', 'payDetails', 'notes', 'terms', 'notesTerms', 'signatory', 'scanToPay',
+  'account', 'acNo', 'ifsc', 'bank', 'upi',
+] as const;
+export type OverridableLabel = (typeof LABEL_KEYS)[number];
+export type LabelOverrides = Partial<Record<OverridableLabel, string>>;
+
+export const LABEL_DOC_TYPES: readonly DocumentType[] = [
+  'TAX_INVOICE', 'INVOICE', 'BILL_OF_SUPPLY', 'QUOTATION', 'PROFORMA', 'SALES_ORDER', 'DELIVERY_CHALLAN', 'CREDIT_NOTE', 'DEBIT_NOTE',
+];
+const LABEL_MAX = 40;
+const SUFFIX_MAX = 60;
+
+/** Clean one override map: known keys only, trimmed text, blanks dropped. Undefined when empty. */
+export function sanitizeLabels(value: unknown, base?: LabelOverrides): LabelOverrides | undefined {
+  const out: LabelOverrides = { ...(base ?? {}) };
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const v = value as Record<string, unknown>;
+    for (const k of LABEL_KEYS) {
+      if (!(k in v)) continue;
+      const t = typeof v[k] === 'string' ? text(v[k], LABEL_MAX).trim() : '';
+      if (t) out[k] = t;
+      else delete out[k];
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+function sanitizeByType<T>(value: unknown, base: Partial<Record<DocumentType, T>> | undefined, clean: (v: unknown, b?: T) => T | undefined): Partial<Record<DocumentType, T>> | undefined {
+  const out: Partial<Record<DocumentType, T>> = { ...(base ?? {}) };
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const v = value as Record<string, unknown>;
+    for (const dt of LABEL_DOC_TYPES) {
+      if (!(dt in v)) continue;
+      const c = clean(v[dt], out[dt]);
+      if (c === undefined) delete out[dt];
+      else out[dt] = c;
+    }
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+const cleanSuffix = (v: unknown): string | undefined => {
+  const t = typeof v === 'string' ? text(v, SUFFIX_MAX).trim() : '';
+  return t || undefined;
+};
+
+/**
+ * The label to print for `key` on a `docType` document, or undefined for the default. Resolution:
+ * document type → profile → global → default (profile and global are already layered in `design`).
+ */
+export function labelOverride(design: Pick<DesignPrefs, 'labels' | 'labels_by_type'> | null | undefined, key: string, docType?: DocumentType): string | undefined {
+  if (!design) return undefined;
+  const k = key as OverridableLabel;
+  return (docType ? design.labels_by_type?.[docType]?.[k] : undefined) || design.labels?.[k] || undefined;
+}
+
+/**
+ * The design to hand to the template engine for one document: the type's own label overrides are
+ * flattened into `labels`, so every part reads one map. Unchanged object when there is nothing to flatten.
+ */
+export function designForDoc<T extends Pick<DesignPrefs, 'labels' | 'labels_by_type'>>(design: T, docType: DocumentType | undefined): T {
+  const own = docType ? design.labels_by_type?.[docType] : undefined;
+  if (!own || !Object.keys(own).length) return design;
+  return { ...design, labels: { ...(design.labels ?? {}), ...own } };
+}
+
+/** "TAX INVOICE — PROFESSIONAL SERVICES": the statutory title always leads; the suffix is appended. */
+export function docTitleText(baseTitle: string, design: Pick<DesignPrefs, 'title_suffix'> | null | undefined, docType: DocumentType | undefined): string {
+  const suffix = docType ? design?.title_suffix?.[docType]?.trim() : '';
+  return suffix ? `${baseTitle} — ${suffix}` : baseTitle;
 }
 
 export interface PreprintedPrefs {
@@ -239,6 +440,25 @@ export function sanitizeDesign(input: unknown, base: DesignPrefs = DEFAULT_DESIG
       const pp = 'preprinted' in src ? sanitizePreprinted(src.preprinted) : base.preprinted;
       return pp ? { preprinted: pp } : {};
     })(),
+    ...(() => {
+      const on = 'show_party_balance' in src ? src.show_party_balance === true : base.show_party_balance === true;
+      return on ? { show_party_balance: true } : {};
+    })(),
+    // R2-C5 labels / title suffix: merged key by key over the base (global ← profile).
+    ...(() => {
+      const labels = sanitizeLabels(src.labels, base.labels);
+      const byType = sanitizeByType<LabelOverrides>(src.labels_by_type, base.labels_by_type, (v, b) => sanitizeLabels(v, b));
+      const suffix = sanitizeByType<string>(src.title_suffix, base.title_suffix, (v) => cleanSuffix(v));
+      return { ...(labels ? { labels } : {}), ...(byType ? { labels_by_type: byType } : {}), ...(suffix ? { title_suffix: suffix } : {}) };
+    })(),
+    // R3-C2 / C3 (additive): item photos, page margins, letterhead / footer artwork.
+    ...(() => {
+      const photos = 'show_item_images' in src ? src.show_item_images === true : base.show_item_images === true;
+      const margins = 'margins_mm' in src ? sanitizeMargins(src.margins_mm) : base.margins_mm;
+      const letterhead = 'letterhead' in src ? sanitizeLetterhead(src.letterhead) : base.letterhead;
+      const footer = 'footer_image' in src ? sanitizeArt(src.footer_image) : base.footer_image;
+      return { ...(photos ? { show_item_images: true } : {}), ...(margins ? { margins_mm: margins } : {}), ...(letterhead ? { letterhead } : {}), ...(footer ? { footer_image: footer } : {}) };
+    })(),
     updated_at: typeof src.updated_at === 'string' ? src.updated_at : base.updated_at,
   };
 }
@@ -307,17 +527,18 @@ export const presets: DesignPreset[] = [
     patch: {
       density: 'compact',
       logo_size: 's',
-      show_columns: { hsn: true, unit: true, discount: false, tax_rate: true, taxable: true },
-      show_qr: false,
+      // QA-3 F17: the discount column prints only when a line has a discount, so it stays on (rows must add up), and
+      // the UPI QR stays — "compact" is about spacing, not about dropping how the customer pays.
+      show_columns: { hsn: true, unit: true, discount: true, tax_rate: true, taxable: true },
     },
   },
   {
     id: 'minimal',
     name: 'Minimal',
-    description: 'Only the essentials, generous whitespace',
+    description: 'Only the essentials (no HSN, unit or GST-rate columns), generous whitespace',
     patch: {
       density: 'spacious',
-      show_columns: { hsn: false, unit: false, discount: false, tax_rate: false, taxable: false },
+      show_columns: { hsn: false, unit: false, discount: true, tax_rate: false, taxable: false },
       show_qr: false,
       show_terms: false,
       show_place_of_supply: false,
@@ -332,7 +553,7 @@ export const presets: DesignPreset[] = [
       paper: 'thermal80',
       density: 'compact',
       logo_size: 's',
-      show_columns: { hsn: false, unit: true, discount: false, tax_rate: false, taxable: false },
+      show_columns: { hsn: false, unit: true, discount: true, tax_rate: false, taxable: false },
       show_signature: false,
       show_terms: false,
     },
@@ -353,6 +574,14 @@ export function applyPreset(current: DesignPrefs, presetId: string): DesignPrefs
     // Print-job settings are not part of the look: a preset keeps them.
     ...(current.copies !== undefined ? { copies: current.copies } : {}),
     ...(current.preprinted ? { preprinted: current.preprinted } : {}),
+    // R2-C5: labels and title suffixes are wording, not look — a preset keeps them.
+    ...(current.labels ? { labels: current.labels } : {}),
+    ...(current.labels_by_type ? { labels_by_type: current.labels_by_type } : {}),
+    ...(current.title_suffix ? { title_suffix: current.title_suffix } : {}),
+    // R3-C3: page setup and artwork are stationery, not look — a preset keeps them.
+    ...(current.margins_mm ? { margins_mm: current.margins_mm } : {}),
+    ...(current.letterhead ? { letterhead: current.letterhead } : {}),
+    ...(current.footer_image ? { footer_image: current.footer_image } : {}),
     updated_at: current.updated_at,
   };
   return sanitizeDesign(preset.patch, base);
@@ -383,19 +612,42 @@ export function paperSize(design?: Pick<DesignPrefs, 'paper'> | null): PaperSize
   return PAPERS[design?.paper ?? 'A4'] ?? PAPERS.A4;
 }
 
+/** R3-C3: artwork bands repeated on PDF pages, heights in CSS px at the paper width. */
+export interface PageBands {
+  /** Header band height; repeated on pages 2+ only when `everyPage`. Page 1 carries it in the paper itself. */
+  header?: number;
+  everyPage?: boolean;
+  /** Footer band height, reserved at the foot of every page. */
+  footer?: number;
+}
+
 /**
  * Where to slice a tall rendered paper into pages (canvas → jsPDF export).
  * Returns [top, height] of each page in CSS px. A thermal roll is one page.
+ * With artwork bands (R3-C3) each page's content slice is shortened by the bands drawn on it, and
+ * `offset` is where the slice sits on the page (below a repeated header band).
  */
 export function pageSlices(
   contentHeight: number,
   design?: Pick<DesignPrefs, 'paper'> | null,
-): { top: number; height: number }[] {
+  bands?: PageBands | null,
+): { top: number; height: number; offset?: number }[] {
   const size = paperSize(design);
   const total = Math.max(1, Math.ceil(contentHeight));
   if (size.autoHeight) return [{ top: 0, height: total }];
-  const slices: { top: number; height: number }[] = [];
-  for (let top = 0; top < total; top += size.height) slices.push({ top, height: size.height });
+  const slices: { top: number; height: number; offset?: number }[] = [];
+  const footer = Math.max(0, bands?.footer ?? 0);
+  const header = bands?.everyPage ? Math.max(0, bands?.header ?? 0) : 0;
+  if (!footer && !header) {
+    for (let top = 0; top < total; top += size.height) slices.push({ top, height: size.height });
+    return slices;
+  }
+  for (let top = 0, page = 0; top < total; page++) {
+    const offset = page === 0 ? 0 : header;
+    const height = Math.max(40, size.height - offset - footer);
+    slices.push({ top, height, offset });
+    top += height;
+  }
   return slices;
 }
 

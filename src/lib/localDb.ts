@@ -7,6 +7,7 @@
  * it and appends a row to the `transactions` table.
  */
 
+import type {} from '../types/docs-r3'; // R3-C2: InvoiceRecord.delivery_proof
 import type {
   Client,
   DocumentType,
@@ -17,7 +18,9 @@ import type {
 } from '../types/invoice';
 import { round2 } from './invoice-calc';
 import { localDayOf } from './dates';
-import { requireAccess } from './access';
+import { currentActor, requireAccess, requireTableWrite } from './access';
+import type { BusinessType, ModuleId } from './shop-mode';
+import { checkDocRight } from './rights';
 import {
   DuplicateNumberError,
   findNumberClash,
@@ -36,10 +39,13 @@ import {
 } from './audit';
 import { clientLogged, settingsLogged } from './audit-events';
 import { releaseAttachments, releaseDropped } from './attachments';
-import { nextReceiptNumber, recordSeries } from './series-counters';
+import { SERIES_TABLE, nextReceiptNumber, recordSeries, type SeriesCounter } from './series-counters';
+import { binRows } from './audit-edits';
 import { baseOfDoc, recordTypedNumber, seriesTypeFor, typedNumber } from './voucher-series';
 import { receivableTotal } from './rcm';
-import { assertNotPendingApproval, holdIfApprovalNeeded } from './approval-gate';
+import { isRevenueDoc } from './stats';
+import { linkedCredits, settledStatus, type CreditLinkRow } from './amount-due';
+import { assertNotPendingApproval, holdIfApprovalNeeded, holdIfCreditBlocked, voidHook } from './approval-gate';
 import {
   PeriodLockedError,
   SETTINGS_OVERRIDE,
@@ -55,6 +61,7 @@ import {
   generateId,
   getJson,
   getTable,
+  peekTable,
   setJson,
   setTable,
 } from './storage';
@@ -84,6 +91,15 @@ export interface AppSettings {
    * Additive field — absent means monthly.
    */
   gst_filing_frequency?: 'monthly' | 'qrmp' | 'composition';
+  /** Additive (8H shop mode, `shop-mode.ts`): what the business does. */
+  business_type?: BusinessType;
+  /** Additive (8H): modules shown in the sidebar / dashboard. Absent = everything (existing companies). */
+  modules?: ModuleId[];
+  /**
+   * Additive (QA7 G1/G2): this database is the app-made Demo company. Written once, by the Demo-company flow, into
+   * that company's own database; sample data loads only where it is set (`loadDemoData`).
+   */
+  demo_company?: true;
 }
 
 export const DEFAULT_TERMS =
@@ -92,6 +108,15 @@ export const DEFAULT_TERMS =
 /** A document counts as issued once it has left Draft (6.21: only the owner may delete one). */
 export function isIssued(inv: Pick<InvoiceRecord, 'status'>): boolean {
   return inv.status !== 'Draft';
+}
+
+/**
+ * QA6-1 F11: a gift-voucher receipt may not be removed once the voucher's unredeemed balance was recognised (breakage
+ * journal, `gift_vouchers` row): the value would be stranded in "Gift vouchers outstanding". Undo the breakage first.
+ */
+function assertNoBreakage(rows: readonly Payment[]): void {
+  const v = peekTable<{ id: string; number: string; breakage_voucher_id?: string }>('gift_vouchers').find((x) => x.breakage_voucher_id && rows.some((p) => p.gift_voucher_id === x.id));
+  if (v) throw new Error(`Undo the breakage of gift voucher ${v.number} first`);
 }
 
 export function blankProfile(): SenderProfile {
@@ -115,6 +140,16 @@ export function blankProfile(): SenderProfile {
     invoicePrefix: '',
     defaultTerms: '',
   };
+}
+
+/**
+ * Catalogue type of a line learnt from a saved invoice (QA-3 F24): a goods HSN (not chapter 99) is a Product, a SAC
+ * (99…) a Service; with no HSN the line's own type is kept.
+ */
+export function catalogueItemType(item: { hsn?: string; type?: string }): string | undefined {
+  const code = String(item.hsn ?? '').replace(/\s/g, '');
+  if (/^\d{2,8}$/.test(code)) return code.startsWith('99') ? 'Service' : 'Product';
+  return item.type || undefined;
 }
 
 /** Reads settings, upgrading the pre-2.1 flat shape to the profiles array. */
@@ -186,11 +221,11 @@ function readSettings(): AppSettings {
  * Run an audit write that can never break the mutation that triggered it:
  * building the row, formatting the diff and writing it are all best-effort.
  */
-function logSafe(make: () => AuditInput | AuditInput[] | null): void {
+function logSafe(make: () => AuditInput | (AuditInput | null)[] | null): void {
   try {
     const rows = make();
     if (!rows) return;
-    for (const row of Array.isArray(rows) ? rows : [rows]) audit.record(row);
+    for (const row of Array.isArray(rows) ? rows : [rows]) if (row) audit.record(row);
   } catch {
     /* logging must never break a save */
   }
@@ -199,6 +234,8 @@ function logSafe(make: () => AuditInput | AuditInput[] | null): void {
 const OVERRIDE_NOTE = ' (period-lock override)';
 
 /** Copy of `obj` without undefined / null / empty-string fields. */
+const PARTY_KEYS = 'id name email address city zip company gstin phone state state_code pan tan'.split(' ') as (keyof Client)[];
+
 function keepFilled<T extends object>(obj: T): Partial<T> {
   const out: Partial<T> = {};
   for (const [k, v] of Object.entries(obj)) {
@@ -243,26 +280,37 @@ export const localDb = {
      *  An explicit id match is an EDIT (every field is taken, so a field can be cleared).
      *  A name-only match is "same party typed again" — blank fields in the typed copy must
      *  NOT wipe what the CRM already knows (GSTIN, phone, address). */
-    upsert: (client: Partial<Client> & { name: string }): string => {
-      const clients = getTable<Client>(KEYS.clients);
-      const name = client.name.trim().toLowerCase();
-      const byId = client.id ? clients.findIndex((c) => c.id === client.id) : -1;
-      const idx =
-        byId >= 0 ? byId : clients.findIndex((c) => c.name?.trim().toLowerCase() === name);
-      if (idx >= 0) {
-        const incoming = byId >= 0 ? client : keepFilled(client);
-        const previous = clients[idx];
-        clients[idx] = { ...previous, ...incoming, id: previous.id };
-        setTable(KEYS.clients, clients);
-        logSafe(() => clientLogged('update', previous, clients[idx]));
-        return clients[idx].id!;
-      }
-      const id = client.id ?? generateId();
-      const created = { ...(client as Client), id, created_at: new Date().toISOString() } as Client;
-      clients.push(created);
-      setTable(KEYS.clients, clients);
-      logSafe(() => clientLogged('create', undefined, created));
-      return id;
+    upsert: (client: Partial<Client> & { name: string }): string => localDb.clients.upsertMany([client])[0],
+    /** `upsert` for several parties in order, with one write (only if something changed). PERF-1: shared rows. */
+    upsertMany: (list: readonly (Partial<Client> & { name: string })[]): string[] => {
+      const clients = peekTable<Client>(KEYS.clients).slice();
+      const logs: (AuditInput | null)[] = [];
+      const ids = list.map((client) => {
+        const name = client.name.trim().toLowerCase();
+        const byId = client.id ? clients.findIndex((c) => c.id === client.id) : -1;
+        const idx =
+          byId >= 0 ? byId : clients.findIndex((c) => c.name?.trim().toLowerCase() === name);
+        if (idx >= 0) {
+          const incoming = byId >= 0 ? client : keepFilled(client);
+          const previous = clients[idx];
+          const next = { ...previous, ...incoming, id: previous.id };
+          if (JSON.stringify(next) !== JSON.stringify(previous)) {
+            clients[idx] = next;
+            logs.push(clientLogged('update', previous, next));
+          }
+          return previous.id!;
+        }
+        const id = client.id ?? generateId();
+        const created = { ...(client as Client), id, created_at: new Date().toISOString() } as Client;
+        clients.push(created);
+        logs.push(clientLogged('create', undefined, created));
+        return id;
+      });
+      // A party learnt again unchanged writes nothing, but takes the rights check the write would have made.
+      if (logs.length) setTable(KEYS.clients, clients);
+      else requireTableWrite(KEYS.clients);
+      logSafe(() => logs);
+      return ids;
     },
     remove: (id: string) => {
       requireAccess('master.edit');
@@ -302,6 +350,8 @@ export const localDb = {
           const next = opts.fillOnly
             ? { ...keepFilled(item), ...keepFilled(items[idx]) } as InvoiceItem
             : { ...items[idx], ...keepFilled(item) };
+          // QA-3 F24: an item learnt before as "Service" although its own HSN is goods is corrected when learnt again.
+          if (opts.fillOnly && item.type === 'Product' && next.type === 'Service' && catalogueItemType({ hsn: next.hsn }) === 'Product') next.type = 'Product';
           if (JSON.stringify(next) !== JSON.stringify(items[idx])) {
             items[idx] = next;
             changed = true;
@@ -326,15 +376,24 @@ export const localDb = {
 
   invoices: {
     getAll: () => getTable<InvoiceRecord>(KEYS.invoices),
-    getById: (id: string) => getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === id),
+    /** A private copy of one document (the table is parsed once per stored version, not per lookup). */
+    getById: (id: string): InvoiceRecord | undefined => {
+      const found = peekTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === id);
+      return found ? structuredClone(found) : undefined;
+    },
 
     /** Next number in the series, derived from the highest one already issued. */
-    nextNumber: (dateStr?: string, docType: DocumentType = 'INVOICE', prefix?: string, voucherTypeId?: string) => {
-      const existingNumbers = getTable<InvoiceRecord>(KEYS.invoices).map((i) => i.invoice_number);
-      // P1-13: a user voucher type numbers its own series; without one the Indian-FY default applies.
+    nextNumber: (dateStr?: string, docType: DocumentType = 'INVOICE', prefix?: string, voucherTypeId?: string, rows: readonly InvoiceRecord[] = peekTable<InvoiceRecord>(KEYS.invoices)) => {
+      // P1-13: a user voucher type numbers its own series (its high-water mark in `series_counters` counts as issued).
       const vt = seriesTypeFor(voucherTypeId, baseOfDoc(docType));
-      if (vt) return typedNumber(vt, dateStr, existingNumbers);
-      return nextInvoiceNumber({ existingNumbers, dateStr, docType, customPrefix: prefix ?? readSettings().invoicePrefix });
+      if (vt) return typedNumber(vt, dateStr, rows.map((i) => i.invoice_number));
+      return nextInvoiceNumber({
+        // R4-C4: the series high-water marks (`PREFIX/FYyy-yy` + seq) count as issued, so a deleted number is never reused.
+        existingNumbers: [...rows.map((i) => i.invoice_number), ...peekTable<SeriesCounter>(SERIES_TABLE).map((r) => `${r.id}/${r.seq}`)],
+        dateStr,
+        docType,
+        customPrefix: prefix ?? readSettings().invoicePrefix,
+      });
     },
 
     /**
@@ -345,92 +404,40 @@ export const localDb = {
       number: string,
       selfId?: string,
     ): { ok: boolean; clash?: InvoiceRecord; gap: SeriesGap | null } => {
-      const all = getTable<InvoiceRecord>(KEYS.invoices);
+      const all = peekTable<InvoiceRecord>(KEYS.invoices); // read-only (PERF-1)
       const trimmed = (number ?? '').trim();
       if (!trimmed) return { ok: true, gap: null };
       const own = selfId ? all.find((i) => i.id === selfId) : undefined;
       // A document keeps its own number valid, even if legacy data already duplicated it.
       if (own && numberKey(own.invoice_number) === numberKey(trimmed)) return { ok: true, gap: null };
       const clash = findNumberClash(all, trimmed, selfId);
-      if (clash) return { ok: false, clash, gap: null };
+      if (clash) return { ok: false, clash: { ...clash }, gap: null };
       return { ok: true, gap: gapsIfIssued(all.filter((i) => i.id !== selfId).map((i) => i.invoice_number), trimmed) };
     },
 
-    save: (invoice: InvoiceRecord): InvoiceRecord => {
-      const invoices = getTable<InvoiceRecord>(KEYS.invoices);
-      const idx = invoices.findIndex((i) => i.id === invoice.id);
-      const stored = idx >= 0 ? invoices[idx] : undefined;
-      // Local roles (6.21): a viewer cannot write documents.
-      requireAccess(stored ? 'doc.edit' : 'doc.create');
-      const now = new Date().toISOString();
-      const toSave: InvoiceRecord = { ...invoice, updated_at: now };
-
-      // Period lock: the stored version must be open, and so must the date it is moving to.
-      let overridden = false;
-      const cancelling = stored && stored.status !== 'Cancelled' && toSave.status === 'Cancelled';
-      const reinstating = stored && stored.status === 'Cancelled' && toSave.status !== 'Cancelled';
-      const action: LockAction = !stored ? 'create' : cancelling ? 'cancel' : reinstating ? 'reinstate' : 'edit';
-      if (stored && assertUnlocked(stored, action) === 'overridden') overridden = true;
-      if (assertUnlocked({ ...toSave, id: toSave.id || stored?.id }, stored ? 'edit' : 'create') === 'overridden') overridden = true;
-
-      if (stored) {
-        toSave.created_at = stored.created_at ?? now;
-      } else {
-        toSave.id = invoice.id || generateId();
-        toSave.created_at = now;
-        if (!toSave.invoice_number) {
-          // The snapshotted sender profile's prefix wins, as in the editor (`saveInvoice`).
-          toSave.invoice_number = localDb.invoices.nextNumber(
-            toSave.issue_date,
-            toSave.doc_type,
-            toSave.sender?.invoicePrefix || undefined,
-            toSave.voucher_type_id,
-          );
-        }
-      }
-
-      // WP-9 maker-checker: a clerk's document that needs the owner's approval is held as a pending draft.
-      holdIfApprovalNeeded(toSave, stored);
-
-      // GST Rule 46: one number, one document (a document may keep its own legacy number).
-      if (toSave.invoice_number && !(stored && numberKey(stored.invoice_number) === numberKey(toSave.invoice_number))) {
-        const clash = findNumberClash(invoices, toSave.invoice_number, toSave.id);
-        if (clash) throw new DuplicateNumberError(toSave.invoice_number, clash);
-      }
-
-      if (stored) {
-        // Never let a stale editor copy (opened before a payment was recorded) wipe
-        // receipts: the ledger rows are the floor for what has been received.
-        const ledgerPaid = localDb.payments.totalFor(toSave.id);
-        if (ledgerPaid > round2(Number(toSave.amount_paid) || 0) + 0.004) {
-          const was = round2(Number(stored.amount_paid) || 0);
-          Object.assign(toSave, withPaid(toSave, Math.max(was, ledgerPaid)));
-        }
-        invoices[idx] = toSave;
-      } else {
-        invoices.push(toSave);
-      }
+    save: (invoice: InvoiceRecord): InvoiceRecord => localDb.invoices.saveMany([invoice])[0],
+    /**
+     * Save several documents with ONE write of the invoices table (a batch run): each goes through the same checks,
+     * numbering, holds and audit as `save`, in order, against the rows saved before it. PERF-1: the shared parsed
+     * rows with only the saved rows replaced (never mutated); setTable reuses the untouched rows for the next version.
+     */
+    saveMany: (list: readonly InvoiceRecord[]): InvoiceRecord[] => {
+      const invoices = peekTable<InvoiceRecord>(KEYS.invoices).slice();
+      const ix: NumberIndex = { keys: new Set(invoices.map((i) => numberKey(i.invoice_number))), last: new Map() };
+      const done = list.map((i) => putInvoice(i, invoices, ix));
       setTable(KEYS.invoices, invoices);
-      const vt = seriesTypeFor(toSave.voucher_type_id, baseOfDoc(toSave.doc_type));
-      if (vt) recordTypedNumber(vt, toSave.issue_date, toSave.invoice_number); // never reuse a type's number
-      // Files this document no longer lists (6.12) are deleted unless another record uses them.
-      if (stored) releaseDropped(stored.attachments, toSave.attachments);
-
-      logSafe(() => (stored ? invoiceUpdated(stored, toSave, overridden ? OVERRIDE_NOTE : '') : invoiceCreated(toSave)));
-
-      // Grow the local CRM / catalogue from real usage.
-      if (toSave.client?.name?.trim()) {
-        // Credit terms (6.25) live on the client master only: an old snapshot must never reset them.
-        const { credit_limit: _limit, credit_days: _days, ...snapshot } = toSave.client;
-        localDb.clients.upsert(snapshot);
-      }
+      const out = done.map((f) => f());
+      // Grow the local CRM / catalogue from real usage. QA12 S1: only the party's identity is learnt from a document;
+      // everything else on the master (credit terms, distribution fields, contacts, defaults …) is the master's own.
+      const parties = out.map((r) => r.client).filter((c) => c?.name?.trim());
+      if (parties.length) localDb.clients.upsertMany(parties.map((c) => Object.fromEntries(PARTY_KEYS.filter((k) => k in c).map((k) => [k, c[k]])) as unknown as Client));
       localDb.items.upsertMany(
-        (toSave.items ?? [])
+        out.flatMap((r) => r.items ?? [])
           .filter((item) => item.name?.trim())
-          .map((item) => ({ name: item.name, type: item.type, rate: item.rate, hsn: item.hsn, unit: item.unit, tax_rate: item.tax_rate })),
+          .map((item) => ({ name: item.name, type: catalogueItemType(item), rate: item.rate, hsn: item.hsn, unit: item.unit, tax_rate: item.tax_rate })),
         { fillOnly: true },
       );
-      return toSave;
+      return out;
     },
 
     remove: (id: string) => {
@@ -438,11 +445,21 @@ export const localDb = {
       const stored = all.find((i) => i.id === id);
       // Local roles (6.21): only the owner deletes an issued document; a clerk may delete drafts.
       if (stored) requireAccess(isIssued(stored) ? 'doc.deleteIssued' : 'doc.deleteDraft');
+      if (stored) checkDocRight(currentActor(), stored.doc_type, 'delete');
       const overridden = stored ? assertUnlocked(stored, 'delete') === 'overridden' : false;
+      voidHook.f?.(stored);
       const payments = getTable<Payment>(KEYS.transactions);
-      const mine = payments.filter((t) => t.invoice_id === id).length;
+      const own = payments.filter((t) => t.invoice_id === id);
+      assertNoBreakage(own);
+      const mine = own.length;
       setTable(KEYS.invoices, all.filter((i) => i.id !== id));
       setTable(KEYS.transactions, payments.filter((t) => t.invoice_id !== id));
+      // R4-C4: to the recycle bin (before its files are released); its number stays used.
+      if (stored) {
+        binRows('invoices', [stored as unknown as Record<string, unknown>]);
+        recordSeries(stored.invoice_number);
+      }
+      if (stored?.doc_type === 'CREDIT_NOTE') resettleCreditedInvoices(id);
       if (stored?.attachments?.length) releaseAttachments(stored.attachments.map((a) => a.id));
       if (stored) logSafe(() => invoiceDeleted(stored, mine, overridden ? OVERRIDE_NOTE : ''));
     },
@@ -465,8 +482,10 @@ export const localDb = {
       if (status !== 'Draft' && status !== 'Cancelled') assertNotPendingApproval(before, 'it can be issued or marked paid');
       const next: InvoiceRecord = { ...before, status, updated_at: new Date().toISOString() };
       holdIfApprovalNeeded(next, before);
-      invoices[idx] = next;
+      holdIfCreditBlocked(next, before);
+      invoices[idx] = numberOnIssue(next, before.status);
       setTable(KEYS.invoices, invoices);
+      if (next.doc_type === 'CREDIT_NOTE') resettleCreditedInvoices(id);
       logSafe(() => invoiceUpdated(before, invoices[idx], overridden ? OVERRIDE_NOTE : ''));
     },
 
@@ -502,18 +521,20 @@ export const localDb = {
 
   payments: {
     getAll: () => getTable<Payment>(KEYS.transactions),
-    listFor: (invoiceId: string) =>
-      getTable<Payment>(KEYS.transactions).filter((t) => t.invoice_id === invoiceId),
+    // PERF-1: filter the shared rows, copy only the matches (same top-level copies `getTable` gives).
+    listFor: (invoiceId: string): Payment[] =>
+      peekTable<Payment>(KEYS.transactions).filter((t) => t.invoice_id === invoiceId).map((t) => ({ ...t })),
     totalFor: (invoiceId: string) =>
       round2(
-        getTable<Payment>(KEYS.transactions)
+        peekTable<Payment>(KEYS.transactions)
           .filter((t) => t.invoice_id === invoiceId)
           .reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
       ),
 
     /** Appends a payment and re-derives amount_paid / balance_due / status. */
-    record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string; realisedRate?: number; bankAccountId?: string; advanceId?: string }): Payment => {
+    record: (input: { invoiceId: string; amount: number; method: string; reference?: string; note?: string; date?: string; realisedRate?: number; bankAccountId?: string; advanceId?: string; writeOff?: boolean }): Payment => {
       requireAccess('payment.record');
+      checkDocRight(currentActor(), 'payment', 'create', input.date);
       const amount = round2(Number(input.amount) || 0);
       // A zero / negative / NaN "payment" would silently corrupt amount_paid and every report built on it.
       if (!(amount > 0)) throw new Error('Enter a payment amount above zero.');
@@ -532,7 +553,17 @@ export const localDb = {
       if (input.bankAccountId && (input.method || '').toLowerCase() !== 'cash') payment.bank_account_id = input.bankAccountId;
       // An advance adjusted against the invoice (5.3): settles the bill, but is not new money.
       if (input.advanceId) payment.advance_id = input.advanceId;
-      const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === input.invoiceId);
+      // 8.106: a bad-debt write-off settles the bill without money (no receipt number).
+      if (input.writeOff) payment.write_off = true;
+      // Read-only lookup: the payment never changes this row (syncPaymentState writes a copy).
+      const target = peekTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === input.invoiceId);
+      // QA-3 F3: money is received only against a revenue document type. A receipt on a quotation,
+      // proforma or delivery challan would be missing from every total (an advance against a quote goes
+      // through Advances). Only the type is judged here: a receipt on a cancelled bill stays tracked and a
+      // pending draft gets the approval message below. Opening bills have no invoice row.
+      if (target && !isRevenueDoc({ doc_type: target.doc_type, status: 'Sent' })) {
+        throw new Error('Payments are recorded against invoices only. For money received against this document, record an advance receipt for the customer.');
+      }
       // Realised rate (6.19): only on a foreign-currency invoice; amount stays in that currency.
       const realised = Number(input.realisedRate);
       if (realised > 0 && Number.isFinite(realised) && (target?.currency || 'INR').toUpperCase() !== 'INR') {
@@ -542,7 +573,7 @@ export const localDb = {
       assertNotPendingApproval(target, 'record payments');
       const before = getTable<Payment>(KEYS.transactions);
       // Receipt voucher number, fixed at record time (never reused after a delete / cheque bounce).
-      if (!payment.advance_id) payment.receipt_number = nextReceiptNumber(payment.date, before);
+      if (!payment.advance_id && !payment.write_off) payment.receipt_number = nextReceiptNumber(payment.date, before);
       setTable(KEYS.transactions, [...before, payment]);
       try {
         syncPaymentState(input.invoiceId, payment.amount);
@@ -604,6 +635,9 @@ export const localDb = {
       const row = rows.find((t) => t.id === paymentId);
       if (!row) return;
       requireAccess('payment.record');
+      // QA5 F12: removing a write-off row reverses an owner-only, PIN-confirmed write-off (`reverseWriteOff`).
+      if (row.write_off) requireAccess('doc.deleteIssued');
+      assertNoBreakage([row]);
       const target = getTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === row.invoice_id);
       const overridden = target ? assertUnlocked(target, 'unpay') === 'overridden' : false;
       setTable(KEYS.transactions, rows.filter((t) => t.id !== paymentId));
@@ -613,6 +647,8 @@ export const localDb = {
         setTable(KEYS.transactions, rows);
         throw err;
       }
+      // QA18 T2: the bill a netting / exchange receipt settled is open again by that much.
+      if (row.exchange_purchase_id) voidHook.paid?.([row.exchange_purchase_id]);
       logSafe(() => {
         const entry = paymentLogged('payment_remove', row, target);
         return overridden ? { ...entry, summary: entry.summary + OVERRIDE_NOTE } : entry;
@@ -626,33 +662,165 @@ export const localDb = {
  * received so far. TDS the customer withholds is settled with the tax office,
  * so it is never "owed" to us. A cancelled document stays cancelled: recording
  * (or removing) a payment must not resurrect it into revenue — the money is
- * still tracked in amount_paid.
+ * still tracked in amount_paid. Live credit notes linked to the invoice settle
+ * it too (`src/lib/amount-due.ts`): the status says Paid once receipts + credits
+ * cover it, while `balance_due` keeps its stored meaning (total − TDS − received).
  */
+/** One document of `save` into `invoices` (checked, numbered, placed); the returned step runs once the table is written. */
+/** `saveMany`'s number index: the number keys in use, and the last number it gave per series (date | type | prefix). */
+interface NumberIndex { keys: Set<string>; last: Map<string, string> }
+
+function putInvoice(invoice: InvoiceRecord, invoices: InvoiceRecord[], ix: NumberIndex): () => InvoiceRecord {
+  // The next number of the document's series (the snapshotted sender profile's prefix wins, as in the editor): after
+  // the last one this save gave in the same series, else from the rows; never one in use.
+  const next = (r: InvoiceRecord) => {
+    const p = r.sender?.invoicePrefix || undefined;
+    const k = `${r.issue_date}|${r.doc_type}|${p}|${r.voucher_type_id ?? ''}`;
+    let n = ix.last.get(k);
+    do n = localDb.invoices.nextNumber(r.issue_date, r.doc_type, p, r.voucher_type_id, n ? [{ invoice_number: n } as InvoiceRecord] : invoices);
+    while (ix.keys.has(numberKey(n)));
+    ix.last.set(k, n);
+    return n;
+  };
+  const idx = invoices.findIndex((i) => i.id === invoice.id);
+  const stored = idx >= 0 ? invoices[idx] : undefined;
+  // Local roles (6.21): a viewer cannot write documents.
+  requireAccess(stored ? 'doc.edit' : 'doc.create');
+  // Finer user rights (8H): per-document right, back-dated window, discount cap (clerks / viewers only).
+  checkDocRight(currentActor(), invoice.doc_type, stored ? 'alter' : 'create', invoice.issue_date, invoice);
+  const now = new Date().toISOString();
+  const toSave: InvoiceRecord = { ...invoice, updated_at: now };
+
+  // Period lock: the stored version must be open, and so must the date it is moving to.
+  let overridden = false;
+  const cancelling = stored && stored.status !== 'Cancelled' && toSave.status === 'Cancelled';
+  const reinstating = stored && stored.status === 'Cancelled' && toSave.status !== 'Cancelled';
+  const action: LockAction = !stored ? 'create' : cancelling ? 'cancel' : reinstating ? 'reinstate' : 'edit';
+  if (stored && assertUnlocked(stored, action) === 'overridden') overridden = true;
+  if (assertUnlocked({ ...toSave, id: toSave.id || stored?.id }, stored ? 'edit' : 'create') === 'overridden') overridden = true;
+
+  // R3-C2: the receiver signature is written only by setDeliveryProof — kept from the stored row, never copied to a new one.
+  toSave.delivery_proof = stored?.delivery_proof;
+  if (!toSave.delivery_proof) delete toSave.delivery_proof;
+  if (stored) {
+    toSave.created_at = stored.created_at ?? now;
+    // 8.101: a signed acceptance is a snapshot — an edit of the quote never rewrites or drops it.
+    if (stored.acceptance) toSave.acceptance = stored.acceptance;
+    else delete toSave.acceptance;
+  } else {
+    toSave.id = invoice.id || generateId();
+    toSave.created_at = now;
+    if (!toSave.invoice_number && !isUnnumberedDraft(toSave)) toSave.invoice_number = next(toSave);
+  }
+
+  // QA-3 F6: an unnumbered (recurring) draft takes the next number of its series when it is issued.
+  if (stored) Object.assign(toSave, numberOnIssue(toSave, stored.status, next));
+
+  // WP-9 maker-checker: a clerk's document that needs the owner's approval is held as a pending draft.
+  holdIfApprovalNeeded(toSave, stored);
+  holdIfCreditBlocked(toSave, stored, invoices); // 8.80 credit limit: Block -> owner approval (audited override)
+
+  // GST Rule 46: one number, one document (a document may keep its own legacy number).
+  if (toSave.invoice_number && !(stored && numberKey(stored.invoice_number) === numberKey(toSave.invoice_number))) {
+    const clash = ix.keys.has(numberKey(toSave.invoice_number)) && findNumberClash(invoices, toSave.invoice_number, toSave.id);
+    if (clash) throw new DuplicateNumberError(toSave.invoice_number, clash);
+  }
+  ix.keys.add(numberKey(toSave.invoice_number));
+
+  if (stored) {
+    // Never let a stale editor copy (opened before a payment was recorded) wipe
+    // receipts: the ledger rows are the floor for what has been received.
+    const ledgerPaid = localDb.payments.totalFor(toSave.id);
+    if (ledgerPaid > round2(Number(toSave.amount_paid) || 0) + 0.004) {
+      const was = round2(Number(stored.amount_paid) || 0);
+      Object.assign(toSave, withPaid(toSave, Math.max(was, ledgerPaid)));
+    }
+    invoices[idx] = toSave;
+  } else {
+    invoices.push(toSave);
+  }
+  return () => {
+    // A credit note edited / cancelled / reinstated changes what its invoice still owes.
+    if (toSave.doc_type === 'CREDIT_NOTE' || stored?.doc_type === 'CREDIT_NOTE') resettleCreditedInvoices(toSave.id);
+    // Files this document no longer lists (6.12) are deleted unless another record uses them.
+    if (stored) releaseDropped(stored.attachments, toSave.attachments);
+    // P1-13: remember a user voucher type's number, so a deleted latest number is never issued again.
+    const vt = seriesTypeFor(toSave.voucher_type_id, baseOfDoc(toSave.doc_type));
+    if (vt) recordTypedNumber(vt, toSave.issue_date, toSave.invoice_number);
+
+    logSafe(() => (stored ? invoiceUpdated(stored, toSave, overridden ? OVERRIDE_NOTE : '') : invoiceCreated(toSave)));
+
+    return toSave;
+  };
+}
+
 function withPaid(inv: InvoiceRecord, paidRaw: number): InvoiceRecord {
   const paid = round2(Math.max(paidRaw, 0));
   // Outward reverse charge: the GST is the recipient's to pay, so it is never part of what is owed
   // (an older record's stored total includes it — src/lib/rcm.ts).
   const total = Math.max(receivableTotal(inv) - (Number(inv.tds_amount) || 0), 0);
-  let status = inv.status;
-  if (status !== 'Cancelled') {
-    if (paid >= total && total > 0) status = 'Paid';
-    else if (paid > 0) status = 'Partially Paid';
-    else if (status === 'Paid' || status === 'Partially Paid') status = 'Sent';
-  }
+  const status = settledStatus(inv.status, total, paid, creditedOn(inv.id));
   return { ...inv, amount_paid: paid, balance_due: round2(total - paid), status };
+}
+
+/** Σ live credit notes linked to `invoiceId` (shared parsed tables, nothing copied). */
+function creditedOn(invoiceId: string | undefined): number {
+  if (!invoiceId) return 0;
+  const mine = peekTable<CreditLinkRow>('doc_links').filter((l) => l.relation === 'credit_note' && l.from_id === invoiceId);
+  if (!mine.length) return 0;
+  return linkedCredits(mine, peekTable<InvoiceRecord>(KEYS.invoices)).get(invoiceId) ?? 0;
+}
+
+/**
+ * Re-derive the money status of the invoice(s) a credit note is linked to, after the note was
+ * issued, edited, cancelled, reinstated or deleted. Writes only when a status actually changes
+ * (a credit covering the rest makes the invoice Paid; cancelling it brings the balance back).
+ */
+export function resettleCreditedInvoices(noteId: string | undefined): void {
+  if (!noteId) return;
+  const targets = new Set(
+    peekTable<CreditLinkRow>('doc_links').filter((l) => l.relation === 'credit_note' && l.to_id === noteId).map((l) => l.from_id),
+  );
+  for (const id of targets) {
+    const inv = peekTable<InvoiceRecord>(KEYS.invoices).find((i) => i.id === id);
+    if (!inv || inv.status === 'Draft' || inv.status === 'Cancelled') continue;
+    if (withPaid(inv, Number(inv.amount_paid) || 0).status !== inv.status) syncPaymentState(id, 0);
+  }
 }
 
 /** Apply a delta to an invoice's paid amount and re-derive its money status. */
 function syncPaymentState(invoiceId: string, delta: number): void {
-  const invoices = getTable<InvoiceRecord>(KEYS.invoices);
-  const idx = invoices.findIndex((i) => i.id === invoiceId);
+  // Perf: the shared parsed table (usually already read by the caller) with ONE row replaced by a
+  // copy; the shared rows themselves are never mutated.
+  const shared = peekTable<InvoiceRecord>(KEYS.invoices);
+  const idx = shared.findIndex((i) => i.id === invoiceId);
   if (idx < 0) return;
-  const inv = invoices[idx];
-  invoices[idx] = {
+  const inv = shared[idx];
+  const invoices = shared.slice();
+  invoices[idx] = numberOnIssue({
     ...withPaid(inv, (Number(inv.amount_paid) || 0) + delta),
     updated_at: new Date().toISOString(),
-  };
+  }, inv.status);
   setTable(KEYS.invoices, invoices);
+}
+
+/**
+ * QA-3 F6: a recurring draft is saved without a number, so a draft that is deleted (or never issued)
+ * leaves no hole in the GST series (GSTR-1 Table 13 would report it as cancelled). A batch-run draft
+ * (QA5-2 F15) follows the same rule. Every other document keeps the old behaviour: numbered when first saved.
+ */
+function isUnnumberedDraft(rec: InvoiceRecord): boolean {
+  return rec.status === 'Draft' && !!(rec.recurring_id || rec.batch_run_id);
+}
+
+/**
+ * An unnumbered draft that is being issued (`wasStatus` Draft, new status anything but Draft /
+ * Cancelled) takes the next number of its series, dated by its issue date. A document that has a
+ * number never changes it, and nothing already issued is touched.
+ */
+function numberOnIssue(rec: InvoiceRecord, wasStatus: InvoiceRecord['status'] | undefined, next = (r: InvoiceRecord) => localDb.invoices.nextNumber(r.issue_date, r.doc_type, r.sender?.invoicePrefix || undefined, r.voucher_type_id)): InvoiceRecord {
+  if (wasStatus !== 'Draft' || rec.invoice_number?.trim() || rec.status === 'Draft' || rec.status === 'Cancelled') return rec;
+  return { ...rec, invoice_number: next(rec) };
 }
 
 /**
@@ -661,7 +829,7 @@ function syncPaymentState(invoiceId: string, delta: number): void {
  */
 export function generateInvoiceNumber(dateStr?: string): string {
   return nextInvoiceNumber({
-    existingNumbers: getTable<InvoiceRecord>(KEYS.invoices).map((i) => i.invoice_number),
+    existingNumbers: peekTable<InvoiceRecord>(KEYS.invoices).map((i) => i.invoice_number),
     dateStr,
     docType: 'INVOICE',
     customPrefix: 'INV',

@@ -1,7 +1,7 @@
 /**
  * 7Q strings: Voucher Types master (P1-13), the voucher-type picker, Gateway bill-wise references /
  * voucher classes / single-entry mode (7.19), the books import kinds (P1-21) and the 7.49 follow-ups
- * (Tally stock quantities, auditor export). Imported only by lazy chunks.
+ * (Tally stock quantities). Imported only by lazy chunks.
  */
 import { defineArea } from '../area';
 
@@ -83,15 +83,10 @@ export const vtT = defineArea(
     refNeedsBill: 'Reference {n}: choose the bill.',
 
     /* Import kinds (P1-21) */
-    kLedgers: 'Ledgers & opening balances',
-    kLedgersText: 'Chart of accounts with group and opening Dr / Cr — also the trial-balance template for openings.',
-    kVendors: 'Suppliers (vendors)',
-    kVendorsText: 'Suppliers with GSTIN, PAN, state, credit days and opening balance.',
     kStock: 'Stock items',
     kStockText: 'Inventory items with group, unit, HSN, GST % and opening quantity / rate.',
     kVouchers: 'Vouchers (journal / payment / receipt / contra)',
     kVouchersText: 'Manual vouchers, one line per row, grouped by voucher number. Never invoices or bills.',
-    tbTemplate: 'Trial balance template (openings)',
     undoHint: 'A safety copy is taken before the import: Settings → Data → "Undo last import" puts everything back in one step.',
     undo: 'Undo this import',
     undone: 'The import was undone.',
@@ -100,14 +95,6 @@ export const vtT = defineArea(
     stockMoves: 'Stock quantities',
     stockMovesHint: 'Quantities of sales, purchase, note and stock-journal vouchers become stock moves where the item matches — never GST documents.',
     stockMovesCount: '{ok} stock moves to add · {skip} skipped',
-    auditorExport: 'Auditor export (FY)',
-    auditorExportHint: 'Every audit-trail row of the financial year with the chain head, as CSV and JSON (Companies (Accounts) Rules, rule 3(1)).',
-    auditorCsv: 'Download CSV',
-    auditorJson: 'Download JSON',
-    fy: 'Financial year',
-    auditorRows: '{n} rows · chain {state}',
-    chainOk: 'verified',
-    chainBroken: 'NOT verified — see Verify integrity',
   } as const,
   {
     title: 'वाउचर प्रकार',
@@ -182,15 +169,10 @@ export const vtT = defineArea(
     refsExceed: 'संदर्भों का जोड़ पार्टी पंक्ति से अधिक है।',
     refNeedsBill: 'संदर्भ {n}: बिल चुनें।',
 
-    kLedgers: 'लेजर और प्रारंभिक शेष',
-    kLedgersText: 'समूह और प्रारंभिक Dr / Cr के साथ खातों का चार्ट — प्रारंभिक शेष के लिए ट्रायल बैलेंस टेम्पलेट भी।',
-    kVendors: 'आपूर्तिकर्ता (वेंडर)',
-    kVendorsText: 'GSTIN, PAN, राज्य, क्रेडिट दिन और प्रारंभिक शेष के साथ आपूर्तिकर्ता।',
     kStock: 'स्टॉक आइटम',
     kStockText: 'समूह, इकाई, HSN, GST % और प्रारंभिक मात्रा / दर के साथ इन्वेंटरी आइटम।',
     kVouchers: 'वाउचर (जर्नल / भुगतान / प्राप्ति / कॉन्ट्रा)',
     kVouchersText: 'मैनुअल वाउचर, हर पंक्ति में एक लाइन, वाउचर संख्या से समूहित। कभी इनवॉइस या बिल नहीं।',
-    tbTemplate: 'ट्रायल बैलेंस टेम्पलेट (प्रारंभिक शेष)',
     undoHint: 'आयात से पहले सुरक्षा प्रति ली जाती है: सेटिंग्स → डेटा → "अंतिम आयात पूर्ववत करें" एक कदम में सब वापस कर देता है।',
     undo: 'यह आयात पूर्ववत करें',
     undone: 'आयात पूर्ववत किया गया।',
@@ -198,14 +180,6 @@ export const vtT = defineArea(
     stockMoves: 'स्टॉक मात्रा',
     stockMovesHint: 'बिक्री, खरीद, नोट और स्टॉक जर्नल वाउचरों की मात्राएँ, जहाँ आइटम मिलता है, स्टॉक मूव बनती हैं — कभी GST दस्तावेज़ नहीं।',
     stockMovesCount: '{ok} स्टॉक मूव जोड़े जाएँगे · {skip} छोड़े गए',
-    auditorExport: 'ऑडिटर निर्यात (वित्त वर्ष)',
-    auditorExportHint: 'वित्त वर्ष की हर ऑडिट-ट्रेल पंक्ति, चेन हेड के साथ, CSV और JSON में (कंपनी (लेखा) नियम, नियम 3(1))।',
-    auditorCsv: 'CSV डाउनलोड करें',
-    auditorJson: 'JSON डाउनलोड करें',
-    fy: 'वित्त वर्ष',
-    auditorRows: '{n} पंक्तियाँ · चेन {state}',
-    chainOk: 'सत्यापित',
-    chainBroken: 'सत्यापित नहीं — अखंडता जाँच देखें',
   },
 );
 

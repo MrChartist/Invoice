@@ -5,7 +5,7 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
-import { buildUpiUrl, isRcmTotals, isTaxed } from '../paper-helpers';
+import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText, staffText, svDocTitle, svRegText, visitText, mfSellerText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { CustomFieldsBlock, ItemCustomLine } from './CustomFieldsBlock';
 import { TransportBlock } from './TransportBlock';
@@ -30,10 +30,10 @@ function Row({ label, value, strong, tone }: { label: string; value: string; str
  * forced for every template when the paper is the 80 mm thermal roll.
  */
 export function ReceiptBody({ invoice, sender, totals }: Props) {
-  const { money, currency, date, col, show, footerText, headerNote } = usePaper();
+  const { money, currency, date, col, show, footerText, headerNote, title: titled } = usePaper();
   const cur = invoice.currency;
   const c = invoice.client;
-  const title = invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice');
+  const title = titled(svDocTitle(invoice) || invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'), invoice.doc_type); // R2-C5 suffix; R10 Rule 46A title
   // Reverse charge: the tax is printed in the recipient-pays note, never added up here.
   const rcm = isRcmTotals(totals);
   const cgstSgst = isTaxed(invoice, totals) && !rcm;
@@ -50,6 +50,10 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
           <AddressLines sender={sender} />
           {sender.companyPhone && <>Ph: {sender.companyPhone}<br /></>}
           {sender.companyGstin && <>GSTIN: {sender.companyGstin}</>}
+          {sender.drug_licence && <><br />DL No.: {sender.drug_licence}</>}
+          {sender.pharmacist && <><br />{pharmacistText(sender)}</>}
+          {sender.sv_regs && <><br />{svRegText(sender)}</>}
+          {mfSellerText(sender) && <><br />{mfSellerText(sender)}</>}
         </div>
       </div>
 
@@ -66,6 +70,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
           {c.gstin && <> · GSTIN {c.gstin}</>}
         </div>
       )}
+      {visitText(invoice) && <div className={styles.rcSmall} data-visit>{visitText(invoice)}</div>}
       <CustomFieldsBlock invoice={invoice} compact />
       <TransportBlock invoice={invoice} compact />
       <hr className={styles.rcRule} />
@@ -80,6 +85,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
                 {col.hsn && line.hsn && <span className={styles.rcSmall}> [{line.hsn}]</span>}
               </div>
               <ItemCustomLine values={src?.custom_values} />
+              {staffText(src) && <div className={styles.rcSmall}>{staffText(src)}</div>}
               <div className={styles.rcRow}>
                 <span>
                   {formatQuantity(line.quantity)}

@@ -3,8 +3,9 @@
  * denomination, printed for the bank counter, numbered `PIS/FY<yy-yy>/<seq>` (Indian FY of the slip
  * date) and kept in table `deposit_slips` for a reprint. Saving a slip marks its cheques deposited
  * (through `transitionCheque`, so the cheque register, reminders and audit behave as usual) into the
- * chosen bank account. The cash on a slip is printed only — record the cash deposit itself as a
- * Contra voucher (Dr the bank | Cr Cash); the Books cash book is not changed by a slip.
+ * chosen bank account. The cash on a slip posts a Contra voucher automatically (7U): Dr the slip's
+ * bank ledger | Cr Cash on the slip date (`cash_voucher_id`; untick "Post the cash as a Contra" to
+ * leave it out, e.g. when the deposit was already entered by hand).
  *
  * The slip prints the full account number: the bank needs it. Lists elsewhere mask it.
  * Pure above the "Storage" divider.
@@ -22,6 +23,10 @@ import { generateId, getTable, setTable } from './storage';
 import { requireAccess } from './access';
 import { CHEQUES_TABLE, loadCheques, transitionCheque } from './cheques';
 import { audit } from './audit';
+import { bankLedgerId } from './bank-ledgers';
+import { A } from './ledger/accounts';
+import { saveVoucher, type ManualVoucher } from './ledger/vouchers';
+import { withTablesRollback } from './table-txn';
 
 export { DENOMINATIONS, cashTotal, denominationRows, normalizeCounts, type DenominationCounts, type DenominationRow } from './denominations';
 
@@ -47,6 +52,9 @@ export interface DepositSlip {
   total: number;
   /** Depositor name printed on the slip. */
   depositor?: string;
+  /** 7U: the Contra voucher (Dr bank | Cr Cash) posted for the slip's cash. */
+  cash_voucher_id?: string;
+  cash_voucher_number?: string;
   created_at: string;
 }
 
@@ -134,46 +142,66 @@ export function loadDepositSlips(): DepositSlip[] {
   return getTable<DepositSlip>(DEPOSIT_SLIPS_TABLE).filter((s) => s && typeof s.id === 'string');
 }
 
+/** Every table a slip save may touch (review L6). */
+const DEPOSIT_SLIP_TABLES = [CHEQUES_TABLE, 'transactions', 'invoices', 'purchases', 'purchase_payments', 'vouchers', DEPOSIT_SLIPS_TABLE, 'series_counters'] as const;
+
 /**
- * Save a slip and mark its cheques deposited into the account on the slip date. If a cheque cannot
- * be moved (e.g. a period lock), the cheques already moved stay deposited and the error is thrown
- * before the slip is stored, so nothing claims a deposit that did not happen.
+ * Save a slip and mark its cheques deposited into the account on the slip date — all or nothing: if a
+ * cheque cannot be moved (expired, a period lock), no cheque moves, no Contra stays and no slip is stored.
  */
-export function saveDepositSlip(input: { date: string; bank_account_id?: string; cheque_ids: string[]; cash: DenominationCounts; depositor?: string }, today: string): DepositSlip {
+export function saveDepositSlip(input: { date: string; bank_account_id?: string; cheque_ids: string[]; cash: DenominationCounts; depositor?: string; post_cash_contra?: boolean }, today: string): DepositSlip {
   requireAccess('books.edit');
   const all = loadCheques();
   const picked = input.cheque_ids.map((id) => all.find((c) => c.id === id)).filter((c): c is Cheque => !!c);
   const cash = normalizeCounts(input.cash);
   const errors = validateDepositSlip({ date: input.date, cheques: picked, cash }, today);
   if (errors.length) throw new DepositSlipError(errors[0]);
-  const slips = getTable<DepositSlip>(DEPOSIT_SLIPS_TABLE);
-  const id = generateId();
-  const bankId = input.bank_account_id && input.bank_account_id !== DEFAULT_BANK_ID ? input.bank_account_id : undefined;
-  // Tag the cheques with the account and slip first (in hand: no payment recorded yet), then deposit them.
-  const ids = new Set(picked.map((c) => c.id));
-  setTable(CHEQUES_TABLE, all.map((c) => (ids.has(c.id) ? { ...c, bank_account_id: bankId, deposit_slip_id: id } : c)));
-  for (const c of picked) transitionCheque(c.id, 'deposited', { date: input.date, today });
-  const chequeTotal = round2(picked.reduce((s, c) => s + num(c.amount), 0));
-  const ct = cashTotal(cash);
-  const slip: DepositSlip = {
-    id,
-    number: nextSlipNumber(slips, input.date),
-    date: input.date,
-    ...(bankId ? { bank_account_id: bankId } : {}),
-    cheque_ids: picked.map((c) => c.id),
-    cash,
-    cheque_total: chequeTotal,
-    cash_total: ct,
-    total: round2(chequeTotal + ct),
-    ...(input.depositor?.trim() ? { depositor: input.depositor.trim() } : {}),
-    created_at: new Date().toISOString(),
-  };
-  setTable(DEPOSIT_SLIPS_TABLE, [...slips, slip]);
-  recordSeries(slip.number);
-  try {
-    audit.record({ entity: 'cheque', entity_id: slip.id, action: 'create', doc_number: slip.number, summary: `Deposit slip ${slip.number} dated ${slip.date}: ${picked.length} cheque(s) ₹${chequeTotal.toFixed(2)} + cash ₹${ct.toFixed(2)}` });
-  } catch {
-    /* logging never breaks a save */
-  }
-  return slip;
+  // Review L6: the whole slip is one change — Contra, cheque moves, any payment roll-ups, the slip and its
+  // number. If any cheque cannot move (expired, period lock, role) every table goes back as it was.
+  return withTablesRollback(DEPOSIT_SLIP_TABLES, () => {
+    const slips = getTable<DepositSlip>(DEPOSIT_SLIPS_TABLE);
+    const id = generateId();
+    const bankId = input.bank_account_id && input.bank_account_id !== DEFAULT_BANK_ID ? input.bank_account_id : undefined;
+    const number = nextSlipNumber(slips, input.date);
+    const ct = cashTotal(cash);
+    // 7U: the cash goes in as a Contra (Dr bank | Cr Cash) on the slip date — posted first, so a
+    // period lock refuses the slip before any cheque moves; rolled back with the rest if a cheque cannot move.
+    let contra: ManualVoucher | undefined;
+    if (ct > 0 && input.post_cash_contra !== false) {
+      const paise = Math.round(ct * 100);
+      contra = saveVoucher({
+        type: 'CONTRA',
+        date: input.date,
+        narration: `Cash deposited in the bank — pay-in slip ${number}`,
+        lines: [{ account_id: bankLedgerId(bankId), dr: paise, cr: 0 }, { account_id: A.cash, dr: 0, cr: paise }],
+      });
+    }
+    // Tag the cheques with the account and slip first (in hand: no payment recorded yet), then deposit them.
+    const ids = new Set(picked.map((c) => c.id));
+    setTable(CHEQUES_TABLE, all.map((c) => (ids.has(c.id) ? { ...c, bank_account_id: bankId, deposit_slip_id: id } : c)));
+    for (const c of picked) transitionCheque(c.id, 'deposited', { date: input.date, today });
+    const chequeTotal = round2(picked.reduce((s, c) => s + num(c.amount), 0));
+    const slip: DepositSlip = {
+      id,
+      number,
+      date: input.date,
+      ...(bankId ? { bank_account_id: bankId } : {}),
+      cheque_ids: picked.map((c) => c.id),
+      cash,
+      cheque_total: chequeTotal,
+      cash_total: ct,
+      total: round2(chequeTotal + ct),
+      ...(input.depositor?.trim() ? { depositor: input.depositor.trim() } : {}),
+      ...(contra ? { cash_voucher_id: contra.id, cash_voucher_number: contra.number } : {}),
+      created_at: new Date().toISOString(),
+    };
+    setTable(DEPOSIT_SLIPS_TABLE, [...slips, slip]);
+    recordSeries(slip.number);
+    try {
+      audit.record({ entity: 'cheque', entity_id: slip.id, action: 'create', doc_number: slip.number, summary: `Deposit slip ${slip.number} dated ${slip.date}: ${picked.length} cheque(s) ₹${chequeTotal.toFixed(2)} + cash ₹${ct.toFixed(2)}${contra ? ` (Contra ${contra.number})` : ''}` });
+    } catch {
+      /* logging never breaks a save */
+    }
+    return slip;
+  });
 }

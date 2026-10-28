@@ -41,6 +41,10 @@
   margin-top: 0.5rem;
 }
 
+/* 8G A4: Save + remembered "then" choice. */
+.splitSave { display: flex; gap: 0.375rem; align-items: stretch; }
+.splitPick { flex: 0 0 auto; width: auto; max-width: 9.5rem; }
+
 .muted {
   font-family: var(--font-body);
   font-size: var(--text-sm);
@@ -230,4 +234,21 @@ fieldset.main {
 /* Reserves the lock banner's height while its chunk loads, so the page does not jump. */
 .bannerSlot {
   min-height: 4.25rem;
+}
+
+/* R3-C1: live paper preview pane beside the form (≥ 1280 px, toggle). */
+.paneBar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -0.5rem;
+}
+
+@media (min-width: 1280px) {
+  .layoutWithPane {
+    grid-template-columns: minmax(0, 1fr) 340px minmax(320px, 0.9fr);
+  }
+}
+
+.paneSlot {
+  min-height: 20rem;
 }

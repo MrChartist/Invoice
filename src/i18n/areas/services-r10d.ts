@@ -1,0 +1,46 @@
+/** R10 (SV-D) workshop desk strings: job cards, estimates, motor claims, reminders, labour, vehicles. Lazy (desk chunk). */
+import { defineArea } from '../area';
+
+export const wsT = defineArea(
+  {
+    'v.jobs': 'Job cards', 'v.estimates': 'Estimates', 'v.claims': 'Claims', 'v.reminders': 'Reminders', 'v.labour': 'Labour', 'v.vehicles': 'Vehicles',
+    wp: 'Working papers — verify with your CA (SAC, rates, claims).',
+    asset: 'Vehicle / appliance', odometer: 'Odometer (km)', fuel: 'Fuel', complaints: 'Customer voice (one per line)', checklist: 'Inspection', promised: 'Promised', bay: 'Bay', technicians: 'Technicians',
+    visit_at: 'Site visit', site: 'Site address', open: 'Open job card', all: 'Show delivered', last: 'Last service: {number} on {date}', none: 'Nothing here yet.',
+    age: '{n} d', bill: 'Bill job', print: 'Job card', gate: 'Gate pass', ready: 'Your {what} is ready for delivery. — {shop}', claim: 'Insurance claim',
+    item: 'Part', qty: 'Qty', issue: 'Issue to job', back: 'Return unused', issued: 'Issued {issued} · estimated {est}', clockIn: 'Clock in {name}', clockOut: 'Clock out {name}', odoOut: 'Odometer at delivery (km)',
+    job: 'Job card', cls: 'Vehicle class', op: 'Labour operation', sublet: 'Outside work', cost: 'Cost ₹', markup: 'Markup %', lines: 'Estimate lines', estimate: 'Save estimate',
+    approve: 'Log approval', by: 'Approved by', how: 'How', note: 'Note', 'h.signature': 'Signature', 'h.phone': 'Phone', 'h.whatsapp': 'WhatsApp', 'h.in person': 'In person',
+    approved: 'Approved', waEst: 'Estimate {number} for {what}: {total}. Reply YES to approve. — {shop}', ask: 'Ask on WhatsApp',
+    insurer: 'Insurer', policy: 'Policy no.', claimNo: 'Claim no.', surveyor: 'Surveyor', survey: 'Survey date', mode: 'Mode', 'm.cashless': 'Cashless', 'm.reimbursement': 'Reimbursement',
+    est: 'Estimate ₹', apr: 'Approved ₹ (incl. GST)', salvage: 'Salvage (note)', ownInv: 'The insurer wants its own invoice', 'b.survey': 'Survey pending', 'b.approval': 'Approval pending', 'b.unpaid': 'Delivered, unpaid', 'b.short': 'Short-paid',
+    split: 'Split the job bill', perLine: 'Approved taxable per line (blank = per head)', cat: 'Part category', excess: 'Excess ₹', ageM: 'Vehicle age (months)', needDraft: 'Bill the job first: it becomes a draft for the split.',
+    service: 'Service due', insurance: 'Insurance expires', book: 'Book', remind: 'WhatsApp', amc: 'AMC visits due', mkJob: 'Create job', overdue: 'overdue',
+    code: 'Code', name: 'Description', sac: 'SAC', hours: 'Hours {cls}', price: 'Flat price ₹', interval_days: 'Next service (days)', interval_km: 'Next service (km)', save: 'Save', del: 'Delete',
+    settings: 'Workshop settings', rate: 'Labour ₹ / hour {cls}', terms: 'Job-card terms', warranty: 'Parts warranty (months)', eff: 'Technician efficiency (this month)', billed: 'Billed h', clocked: 'Clocked h',
+    kind: 'Kind', 'k.vehicle': 'Vehicle', 'k.appliance': 'Appliance', reg_no: 'Registration no.', make: 'Make / brand', model: 'Model', variant: 'Variant', year: 'Year', vin: 'VIN / chassis', engine_no: 'Engine no.', colour: 'Colour',
+    serial: 'Serial no.', owner: 'Owner (saved client)', owner_name: 'Owner name', phone: 'Phone', policy_expiry: 'Policy expiry', history: 'History', readings: 'Odometer readings',
+    sign: 'Customer signature', gateNote: 'Allowed to leave the premises.',
+  } as const,
+  {
+    'v.jobs': 'जॉब कार्ड', 'v.estimates': 'एस्टिमेट', 'v.claims': 'क्लेम', 'v.reminders': 'रिमाइंडर', 'v.labour': 'लेबर', 'v.vehicles': 'वाहन',
+    wp: 'कार्य-पत्र — अपने CA से पुष्टि करें (SAC, दरें, क्लेम)।',
+    asset: 'वाहन / उपकरण', odometer: 'ओडोमीटर (km)', fuel: 'ईंधन', complaints: 'ग्राहक की शिकायत (हर लाइन में एक)', checklist: 'जाँच', promised: 'वादा किया समय', bay: 'बे', technicians: 'टेक्नीशियन',
+    visit_at: 'साइट विज़िट', site: 'साइट का पता', open: 'जॉब कार्ड खोलें', all: 'डिलीवर हुए भी दिखाएँ', last: 'पिछली सर्विस: {number}, {date}', none: 'अभी कुछ नहीं।',
+    age: '{n} दिन', bill: 'जॉब का बिल', print: 'जॉब कार्ड', gate: 'गेट पास', ready: 'आपकी {what} डिलीवरी के लिए तैयार है। — {shop}', claim: 'बीमा क्लेम',
+    item: 'पार्ट', qty: 'मात्रा', issue: 'जॉब को दें', back: 'बचे हुए लौटाएँ', issued: 'दिए {issued} · एस्टिमेट {est}', clockIn: '{name} क्लॉक-इन', clockOut: '{name} क्लॉक-आउट', odoOut: 'डिलीवरी पर ओडोमीटर (km)',
+    job: 'जॉब कार्ड', cls: 'वाहन श्रेणी', op: 'लेबर काम', sublet: 'बाहर का काम', cost: 'लागत ₹', markup: 'मार्कअप %', lines: 'एस्टिमेट की लाइनें', estimate: 'एस्टिमेट सेव करें',
+    approve: 'मंज़ूरी दर्ज करें', by: 'किसने मंज़ूर किया', how: 'कैसे', note: 'नोट', 'h.signature': 'हस्ताक्षर', 'h.phone': 'फ़ोन', 'h.whatsapp': 'WhatsApp', 'h.in person': 'खुद आकर',
+    approved: 'मंज़ूर', waEst: '{what} का एस्टिमेट {number}: {total}। मंज़ूरी के लिए YES लिखें। — {shop}', ask: 'WhatsApp पर पूछें',
+    insurer: 'बीमा कंपनी', policy: 'पॉलिसी नं.', claimNo: 'क्लेम नं.', surveyor: 'सर्वेयर', survey: 'सर्वे की तारीख़', mode: 'तरीका', 'm.cashless': 'कैशलेस', 'm.reimbursement': 'रीइम्बर्समेंट',
+    est: 'एस्टिमेट ₹', apr: 'मंज़ूर ₹ (GST सहित)', salvage: 'साल्वेज (नोट)', ownInv: 'बीमा कंपनी को अपना अलग बिल चाहिए', 'b.survey': 'सर्वे बाकी', 'b.approval': 'मंज़ूरी बाकी', 'b.unpaid': 'डिलीवर, भुगतान बाकी', 'b.short': 'कम भुगतान',
+    split: 'जॉब का बिल बाँटें', perLine: 'हर लाइन का मंज़ूर कर-योग्य मूल्य (खाली = कुल पर)', cat: 'पार्ट श्रेणी', excess: 'एक्सेस ₹', ageM: 'वाहन की उम्र (महीने)', needDraft: 'पहले जॉब का बिल बनाएँ: बाँटने के लिए वह ड्राफ़्ट बनेगा।',
+    service: 'सर्विस देय', insurance: 'बीमा ख़त्म', book: 'बुक करें', remind: 'WhatsApp', amc: 'देय AMC विज़िट', mkJob: 'जॉब बनाएँ', overdue: 'बकाया',
+    code: 'कोड', name: 'विवरण', sac: 'SAC', hours: 'घंटे {cls}', price: 'तय कीमत ₹', interval_days: 'अगली सर्विस (दिन)', interval_km: 'अगली सर्विस (km)', save: 'सेव करें', del: 'हटाएँ',
+    settings: 'वर्कशॉप सेटिंग', rate: 'लेबर ₹ / घंटा {cls}', terms: 'जॉब कार्ड की शर्तें', warranty: 'पार्ट्स वारंटी (महीने)', eff: 'टेक्नीशियन दक्षता (इस महीने)', billed: 'बिल किए घंटे', clocked: 'दर्ज घंटे',
+    kind: 'प्रकार', 'k.vehicle': 'वाहन', 'k.appliance': 'उपकरण', reg_no: 'रजिस्ट्रेशन नं.', make: 'मेक / ब्रांड', model: 'मॉडल', variant: 'वेरिएंट', year: 'वर्ष', vin: 'VIN / चेसिस', engine_no: 'इंजन नं.', colour: 'रंग',
+    serial: 'सीरियल नं.', owner: 'मालिक (सेव ग्राहक)', owner_name: 'मालिक का नाम', phone: 'फ़ोन', policy_expiry: 'पॉलिसी समाप्ति', history: 'इतिहास', readings: 'ओडोमीटर रीडिंग',
+    sign: 'ग्राहक के हस्ताक्षर', gateNote: 'परिसर से जाने की अनुमति।',
+  },
+);
+export type WsKey = Parameters<typeof wsT>[0];

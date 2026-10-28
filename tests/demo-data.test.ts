@@ -13,7 +13,9 @@ import {
   removeDemoData,
 } from '../src/lib/demo-data.ts';
 import { localDb } from '../src/lib/localDb.ts';
+import { writeRegistry } from '../src/lib/company-registry.ts';
 import { KEYS, getTable } from '../src/lib/storage.ts';
+import { audit } from '../src/lib/audit.ts';
 import { checkGstin } from '../src/lib/gstin.ts';
 import { summarize, isRevenueDoc } from '../src/lib/stats.ts';
 import { buildReceivables } from '../src/lib/receivables.ts';
@@ -27,7 +29,19 @@ import type { InvoiceRecord } from '../src/types/invoice.ts';
 const TODAY = '2026-10-07';
 const NOW = new Date(2026, 9, 7);
 
-beforeEach(() => resetStorage());
+/**
+ * QA7 G1/G2: sample data loads only into the app-made Demo company's own database (registry flag + database marker).
+ * Every scenario below runs in one; the guard itself is pinned in tests/qa7-demo-company.test.ts.
+ */
+function openDemoDb(): void {
+  writeRegistry({ active: 'demo1', list: [{ id: 'default', name: 'Main business', created: '' }, { id: 'demo1', name: 'Demo', created: '', demo: true }] });
+  localDb.settings.save({ ...localDb.settings.get(), demo_company: true });
+}
+
+beforeEach(() => {
+  resetStorage();
+  openDemoDb();
+});
 
 function realInvoice(id = 'real-1'): InvoiceRecord {
   const base = {
@@ -61,7 +75,8 @@ function realInvoice(id = 'real-1'): InvoiceRecord {
   return { ...base, subtotal: t.subtotal, tax_amount: t.tax_amount, total: t.total, balance_due: t.balance_due };
 }
 
-const snapshot = () => dumpStorage();
+// R15-A2: audit appends are written once per task; flush before reading storage directly.
+const snapshot = () => (audit.flush(), dumpStorage());
 /** Storage minus nothing: exact equality of every key/value. */
 const assertSameStorage = (a: Record<string, string>, b: Record<string, string>) => {
   assert.deepEqual(Object.keys(a).sort(), Object.keys(b).sort());
@@ -332,4 +347,133 @@ test('a real client that merely shares nothing with the demo set survives remova
   assert.equal(getTable(KEYS.clients).length, 7);
   removeDemoData();
   assert.deepEqual(getTable(KEYS.clients), before);
+});
+
+/* ── R6-B4: sample data per business profile ───────────────── */
+
+const PACKS_ON: Record<string, string[]> = { transport: ['transport'], works: ['works'] };
+
+async function loadProfile(profile: 'counter' | 'services' | 'trading' | 'transport' | 'works', today = TODAY, packs = PACKS_ON[profile] ?? []) {
+  const { demoExtras } = await import('../src/lib/demo/profiles.ts');
+  const extras = await demoExtras(profile, { today, base: buildDemoDataset(today), packs });
+  const r = loadDemoData({ today, confirm: true, extras });
+  assert.ok(r.ok, `${profile} loaded`);
+  return extras;
+}
+
+test('R6-B4: demoProfileFor picks the profile from the pack, then the business type', async () => {
+  const { demoProfileFor } = await import('../src/lib/demo-data.ts');
+  assert.equal(demoProfileFor({ business_type: 'kirana' }), 'counter');
+  assert.equal(demoProfileFor({ business_type: 'restaurant' }), 'counter');
+  assert.equal(demoProfileFor({ business_type: 'services' }), 'services');
+  assert.equal(demoProfileFor({ business_type: 'transport' }), 'transport');
+  assert.equal(demoProfileFor({ business_type: 'contractor' }), 'works');
+  assert.equal(demoProfileFor({ business_type: 'wholesale' }), 'trading');
+  assert.equal(demoProfileFor({ business_type: 'transport', industry_packs: [] }), 'trading', 'pack switched off');
+  assert.equal(demoProfileFor({ business_type: 'full', industry_packs: ['works'] }), 'works');
+  assert.equal(demoProfileFor(undefined), 'trading');
+});
+
+test('R6-B4: every profile builds and balances (TB debit = credit), stock never negative, all rows removable', async () => {
+  const { buildLedger, loadLedgerInput, trialBalance } = await import('../src/lib/ledger/index.ts');
+  const { loadPositions } = await import('../src/lib/inventory.ts');
+  const { DEMO_EXTRA_TABLES } = await import('../src/lib/demo-data.ts');
+  for (const profile of ['counter', 'services', 'trading', 'transport', 'works'] as const) {
+    resetStorage();
+    openDemoDb();
+    const seriesBefore = getTable('series_counters');
+    const extras = await loadProfile(profile);
+    const tb = trialBalance(buildLedger(loadLedgerInput(undefined, TODAY)), { start: '2000-01-01', end: TODAY });
+    assert.ok(Math.abs(tb.totals.debit - tb.totals.credit) < 0.01, `${profile}: TB ${tb.totals.debit} vs ${tb.totals.credit}`);
+    assert.ok(Math.abs(tb.totals.closingDr - tb.totals.closingCr) < 0.01, `${profile}: closing TB`);
+    assert.ok(loadPositions().every((p) => !p.isNegative), `${profile}: negative stock`);
+    assert.deepEqual(getTable('series_counters'), seriesBefore, `${profile}: no series number reserved`);
+    for (const inv of extras.invoices ?? []) assert.ok(localDb.invoices.getById(inv.id), `${profile}: ${inv.id} saved`);
+    removeDemoData();
+    assert.equal(demoStatus().loaded, false, `${profile}: everything removed`);
+    for (const t of DEMO_EXTRA_TABLES) assert.equal(getTable<{ demo?: boolean }>(t).filter((r) => r.demo).length, 0, `${profile}: ${t}`);
+    assert.equal(getTable('recycle_bin').length, 0, `${profile}: nothing in the recycle bin`);
+  }
+});
+
+test('R6-B4: the counter profile has stock, paid POS bills and a closed shift; services has time and a retainer', async () => {
+  await loadProfile('counter');
+  const pos = localDb.invoices.getAll().filter((i) => (i as { pos?: boolean }).pos);
+  assert.equal(pos.length, 6);
+  assert.ok(pos.every((b) => b.status === 'Paid' && b.balance_due === 0));
+  const shift = getTable<{ bill_ids: string[]; closed_at?: string; totals?: { net: number } }>('pos_shifts')[0];
+  assert.ok(shift.closed_at && shift.bill_ids.length === 2);
+  assert.ok(getTable('stock_items').length >= 4);
+  removeDemoData();
+  await loadProfile('services');
+  assert.ok(getTable('time_entries').length >= 6);
+  assert.equal(getTable('retainers').length, 1);
+});
+
+test('R6-B4: transport / works rows only with their pack on', async () => {
+  const { demoExtras } = await import('../src/lib/demo/profiles.ts');
+  const base = buildDemoDataset(TODAY);
+  assert.deepEqual(await demoExtras('transport', { today: TODAY, base, packs: [] }), {});
+  assert.deepEqual(await demoExtras('works', { today: TODAY, base, packs: ['transport'] }), {});
+  const tr = await demoExtras('transport', { today: TODAY, base, packs: ['transport'] });
+  assert.equal(tr.tables?.consignment_notes?.length, 2);
+  assert.equal(tr.tables?.trips?.length, 1);
+  assert.deepEqual((tr.invoices?.[0] as { lr_ids?: string[] }).lr_ids, ['demo-lr-1']);
+  const wk = await demoExtras('works', { today: TODAY, base, packs: ['works'] });
+  const ra = wk.invoices!.find((i) => i.id === 'demo-ra-1')!;
+  const retention = ra.ra_deductions?.find((d) => d.kind === 'retention');
+  assert.ok(retention && Math.abs(retention.amount - round2(ra.taxable_value * 0.05)) < 0.02, 'retention 5% of the taxable value');
+});
+
+test('R6-B4 pin: the sample freight bill and LR match the transport pack builders; plusMonths = addMonthsDay', async () => {
+  const { demoExtras } = await import('../src/lib/demo/profiles.ts');
+  const { derivedLiable } = await import('../src/lib/transport/consignment-notes.ts');
+  const { buildFreightBill } = await import('../src/lib/transport/freight-bill.ts');
+  const { addMonthsDay } = await import('../src/lib/works/measurements.ts');
+  const { plusMonths } = await import('../src/lib/demo/profile-works.ts');
+  const base = buildDemoDataset(TODAY);
+  const tr = await demoExtras('transport', { today: TODAY, base, packs: ['transport'] });
+  const lrs = tr.tables!.consignment_notes as unknown as import('../src/types/transport-works-r5.ts').ConsignmentNote[];
+  for (const lr of lrs) assert.equal(lr.liable, derivedLiable(lr, base.clients, undefined, []), lr.number);
+  const ours = tr.invoices![0];
+  const theirs = buildFreightBill([{ ...lrs[0], status: 'delivered' }], { settings: localDb.settings.get(), sender: base.profile, party: { ...base.clients[0] }, date: ours.issue_date, options: [] });
+  assert.equal(ours.items[0].hsn, theirs.items[0].hsn);
+  assert.equal(ours.items[0].tax_rate, theirs.items[0].tax_rate);
+  assert.equal(ours.items[0].amount, theirs.items[0].amount);
+  assert.equal(ours.reverse_charge, theirs.reverse_charge);
+  assert.equal(ours.place_of_supply, theirs.place_of_supply);
+  assert.equal(ours.gst_mode, theirs.gst_mode);
+  assert.equal(ours.total, theirs.total);
+  for (const [d, n] of [['2026-01-31', 1], ['2026-10-16', 12], ['2024-02-29', 12], ['2026-12-31', 2]] as const) assert.equal(plusMonths(d, n), addMonthsDay(d, n), `${d} + ${n}`);
+  // The RA bill's retention equals what the works pack computes for the BOQ's own rule.
+  const { computeDeductions, withDeductions } = await import('../src/lib/works/deductions.ts');
+  const wk = await demoExtras('works', { today: TODAY, base, packs: ['works'] });
+  const boq = wk.invoices!.find((i) => i.id === 'demo-boq-1')!;
+  const ra = wk.invoices!.find((i) => i.id === 'demo-ra-1')!;
+  const rules = boq.boq_terms!.deductions!;
+  const deds = computeDeductions(ra, rules, { contractValue: boq.taxable_value, previousGross: 0, previousRetention: 0, gstTdsDeductor: false, intraState: ra.gst_mode !== 'IGST' });
+  const theirsRa = withDeductions({ ...ra, ra_deductions: undefined, ra_net_payable: undefined }, deds, rules);
+  assert.deepEqual(ra.ra_deductions, theirsRa.ra_deductions);
+  assert.equal(ra.ra_net_payable, theirsRa.ra_net_payable);
+});
+
+test('R6-B4: reset leaves no row of the old run (dates move to the new day)', async () => {
+  await loadProfile('counter', '2026-06-15');
+  removeDemoData();
+  await loadProfile('counter', TODAY);
+  const demoDates = localDb.invoices.getAll().filter(isDemo).map((i) => i.issue_date);
+  assert.ok(demoDates.every((d) => d <= TODAY));
+  assert.ok(demoDates.some((d) => d > '2026-06-15'), 'rebuilt with the new dates');
+  const pos = localDb.invoices.getAll().filter((i) => (i as { pos?: boolean }).pos);
+  assert.ok(pos.every((b) => b.issue_date >= '2026-10-05'), 'no POS bill of the old run');
+  assert.equal(getTable('pos_shifts').length, 1);
+});
+
+test('R6-B4: the pending flag carries the business type and packs (old plain ids still read)', async () => {
+  const { parsePending, formatPending } = await import('../src/components/onboarding/demo-company.ts');
+  assert.deepEqual(parsePending('abc'), { id: 'abc' });
+  assert.deepEqual(parsePending(formatPending({ id: 'abc', business_type: 'transport', packs: ['transport'] })), { id: 'abc', business_type: 'transport', packs: ['transport'] });
+  assert.deepEqual(parsePending(formatPending({ id: 'abc', business_type: 'kirana' })), { id: 'abc', business_type: 'kirana' });
+  assert.equal(parsePending(null), null);
+  assert.equal(parsePending(''), null);
 });

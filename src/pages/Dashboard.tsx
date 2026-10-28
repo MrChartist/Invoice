@@ -1,11 +1,10 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowRight,
   Banknote,
   CheckCircle2,
-  Circle,
   FilePlus2,
   FileText,
   Hourglass,
@@ -17,10 +16,10 @@ import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
-import { RemindersPanel } from '../components/share/RemindersPanel';
 import { localDb } from '../lib/localDb';
 import { shouldShowWizard } from '../lib/onboarding';
-import { getTable } from '../lib/storage';
+import { KEYS, getTable, peekTable } from '../lib/storage';
+import type { InvoiceRecord } from '../types/invoice';
 import { pendingReminders, type ReminderRecord } from '../lib/reminders';
 import type { CreditLink } from '../lib/stats';
 import { getCurrentUser, getUser } from '../lib/auth';
@@ -33,7 +32,7 @@ import { dateLocale, useT, type MessageKey } from '../i18n';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Dashboard.module.css';
-import { receivableBalance } from '../lib/rcm';
+import { amountDue, linkedCredits } from '../lib/amount-due';
 
 function greeting(hour: number): MessageKey {
   if (hour < 12) return 'dash.morning';
@@ -46,7 +45,13 @@ const SetupWizard = lazy(() => import('../components/onboarding/SetupWizard').th
 // WP-9: configurable tiles (receivables, payables, cash / bank, GST, top items, stock, branches,
 // approvals, AMC, loyalty) — their own chunk, mounted after first paint.
 const DashboardTiles = lazy(() => import('../components/dashboard/DashboardTiles').then((m) => ({ default: m.DashboardTiles })));
+const DashboardStart = lazy(() => import('../components/dashboard/DashboardStart').then((m) => ({ default: m.DashboardStart })));
+// R2-A: the reminders card now follows the reminder schedule, party modes, promises and payment grades; it loads
+// right after first paint with that logic instead of sitting in the shell bundle.
+const RemindersPanel = lazy(() => import('../components/share/RemindersPanel').then((m) => ({ default: m.RemindersPanel })));
 const DemoNotice = lazy(() => import('../components/demo').then((m) => ({ default: m.DemoNotice })));
+// 8.20: "Backed up 2 h ago ✓ / Not backed up — tap to save" where folder backups cannot run (phones).
+const BackupStatusLine = lazy(() => import('../components/pwa/BackupStatusLine').then((m) => ({ default: m.BackupStatusLine })));
 
 /** "2026-10" → "Oct" / "अक्टू॰" in the interface language (5.4). */
 function monthName(key: string): string {
@@ -62,15 +67,16 @@ export function Dashboard() {
   const { can } = useCan();
   // Brand-new account: walk through the essentials once (existing users never see it).
   const [wizardOpen, setWizardOpen] = useState(
-    () => can('settings.manage') && shouldShowWizard(localDb.settings.get(), localDb.invoices.getAll().length),
+    () => can('settings.manage') && shouldShowWizard(localDb.settings.get(), peekTable<InvoiceRecord>(KEYS.invoices).length),
   );
+  // PERF-2: one shared, parsed-once read of each table (read-only here: everything below derives new arrays).
   const [{ invoices, clientCount, profileReady, links }] = useState(() => {
     const settings = localDb.settings.get();
     const profile = localDb.settings.activeProfile();
     return {
-      invoices: localDb.invoices.getAll(),
-      clientCount: localDb.clients.getAll().length,
-      links: getTable<CreditLink>('doc_links'),
+      invoices: peekTable<InvoiceRecord>(KEYS.invoices),
+      clientCount: peekTable(KEYS.clients).length,
+      links: peekTable<CreditLink>('doc_links'),
       profileReady:
         settings.onboarded && Boolean(profile?.companyName?.trim()) && Boolean(profile?.upiId || profile?.accountNumber),
     };
@@ -97,31 +103,33 @@ export function Dashboard() {
   const lowStock = extras?.lowStock ?? 0;
   const profit = extras?.profit;
 
-  // Derived values are cheap at this scale; recomputing keeps them honest after edits elsewhere.
+  // PERF-2: derived once per data snapshot and day (the rows above are read once per mount), not per render.
   const now = new Date();
   const fy = getIndianFY();
-  const summary = summarize(invoices, now, links, 'INR');
-  const months = monthlyBilled(invoices, 6, now, 'INR');
-  // Foreign-currency documents count in rupees at their exchange rate; without a rate they are left out.
-  const noRate = foreignWithoutRate(invoices);
-  // The reminders panel already lists invoices that deserve a nudge today; don't repeat them here.
-  const chasing = new Set(pendingReminders(invoices, now, getTable<ReminderRecord>('reminders')).map((p) => p.invoice.id));
-  const attention = attentionList(invoices, 50, now)
-    .filter((inv) => !chasing.has(inv.id))
-    .slice(0, 5);
-  const recent = [...invoices]
-    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-    .slice(0, 6);
+  const day = now.toDateString();
+  const { summary, months, noRate, credits, attention, recent, chasing } = useMemo(() => {
+    const at = new Date();
+    const summary = summarize(invoices as InvoiceRecord[], at, links as CreditLink[], 'INR');
+    const months = monthlyBilled(invoices as InvoiceRecord[], 6, at, 'INR');
+    // Foreign-currency documents count in rupees at their exchange rate; without a rate they are left out.
+    const noRate = foreignWithoutRate(invoices as InvoiceRecord[]);
+    // The reminders panel already lists invoices that deserve a nudge today; don't repeat them here.
+    // What credit notes settled is never chased (src/lib/amount-due.ts).
+    const credits = linkedCredits(links, invoices as InvoiceRecord[]);
+    const chasing = new Set(pendingReminders(invoices as InvoiceRecord[], at, getTable<ReminderRecord>('reminders'), { credits }).map((p) => p.invoice.id));
+    const attention = attentionList(invoices as InvoiceRecord[], 50, at, credits)
+      .filter((inv) => !chasing.has(inv.id))
+      .slice(0, 5);
+    const byCreated = new Intl.Collator(); // same order as localeCompare() with no arguments
+    const recent = [...invoices]
+      .sort((a, b) => byCreated.compare(b.created_at || '', a.created_at || ''))
+      .slice(0, 6);
+    return { summary, months, noRate, credits, attention, recent, chasing };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoices, links, day]);
   const peak = Math.max(...months.map((m) => m.billed), 1);
   const collectedPct = summary.billed > 0 ? Math.round((summary.received / summary.billed) * 100) : 0;
   const hasData = invoices.some(isRevenueDoc);
-
-  const checklist = [
-    { done: profileReady, label: t('dash.stepProfile'), to: '/settings' },
-    { done: clientCount > 0, label: t('dash.stepClient'), to: '/clients' },
-    { done: invoices.length > 0, label: t('dash.stepInvoice'), to: '/invoice' },
-  ];
-  const showChecklist = can('settings.manage') && checklist.some((c) => !c.done);
 
   return (
     <div className={surface.page}>
@@ -140,6 +148,7 @@ export function Dashboard() {
       <Suspense fallback={null}>
         <DemoNotice />
       </Suspense>
+      <Suspense fallback={null}>{can('data.backup') && !('showDirectoryPicker' in window) && <BackupStatusLine />}</Suspense>
 
       {wizardOpen && (
         <Suspense fallback={null}>
@@ -147,31 +156,16 @@ export function Dashboard() {
             open
             onClose={(finished) => {
               setWizardOpen(false);
-              if (finished) navigate('/invoice');
+              if (finished) navigate(typeof finished === 'string' ? finished : '/invoice');
             }}
           />
         </Suspense>
       )}
 
-      {showChecklist && (
-        <section className={styles.checklist} aria-label={t('dash.gettingStarted')}>
-          <div className={styles.checklistHead}>
-            <h2>{t('dash.getSetUp')}</h2>
-            <span>{t('dash.doneOf', { done: checklist.filter((c) => c.done).length, total: checklist.length })}</span>
-          </div>
-          <ul>
-            {checklist.map((c) => (
-              <li key={c.label}>
-                <Link to={c.to} className={c.done ? styles.stepDone : styles.step}>
-                  {c.done ? <CheckCircle2 size={18} /> : <Circle size={18} />}
-                  <span>{c.label}</span>
-                  {!c.done && <ArrowRight size={14} className={styles.stepArrow} />}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {/* 8H: quick actions, checklist v2 and "Try with sample data" — lazy, after first paint. */}
+      <Suspense fallback={null}>
+        <DashboardStart profileReady={profileReady} />
+      </Suspense>
 
       <div className={surface.statGrid}>
         <StatCard label={t('dash.billed')} value={formatCurrency(summary.billed)} hint={`${summary.count === 1 ? t('dash.issuedOne') : t('dash.issuedMany', { n: summary.count })}${noRate ? t('dash.noRate', { n: noRate }) : ''}`} icon={Receipt} />
@@ -186,7 +180,9 @@ export function Dashboard() {
         />
       </div>
 
-      <RemindersPanel />
+      <Suspense fallback={null}>
+        <RemindersPanel />
+      </Suspense>
 
       <div className={styles.grid}>
         <section className={surface.card}>
@@ -243,7 +239,7 @@ export function Dashboard() {
                           {late ? (late === 1 ? t('dash.lateOne') : t('dash.lateMany', { n: late })) : t('dash.due', { date: formatDate(inv.due_date) })}
                         </span>
                       </div>
-                      <span className={styles.amount}>{formatCurrency(receivableBalance(inv), inv.currency)}</span>
+                      <span className={styles.amount}>{formatCurrency(amountDue(inv, credits.get(inv.id)), inv.currency)}</span>
                     </Link>
                   </li>
                 );

@@ -5,15 +5,26 @@
  */
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { localDb } from '../../lib/localDb';
-import { generateId, getTable } from '../../lib/storage';
+import { KEYS, generateId, getTable, peekTable } from '../../lib/storage';
 import { num } from '../../lib/invoice-calc';
 import { TABLES, type StockItem } from '../../lib/inventory';
 import { addScannedLine, findByCode } from '../../lib/scan';
+import { binForName } from '../../lib/bins';
 import {
-  catalogItemFor, levelForClient, loadPricing, masterClient, pricingInUse, resolvePrice, syncSchemeLines,
-  type PriceLevel, type PricingData,
+  PRICE_LEVELS_TABLE, SCHEMES_TABLE, catalogItemFor, levelForClient, masterClient, pricingInUse, resolvePrice, syncSchemeLines,
+  type PriceLevel, type PricingData, type Scheme,
 } from '../../lib/pricing';
-import type { InvoiceItem } from '../../types/invoice';
+import type { Client, InvoiceItem, InvoiceRecord } from '../../types/invoice';
+import { LAST_RATE_BASIS, lastRateFor, lastRateToApply } from '../../lib/last-rate';
+import { PRICE_LIST_BASIS, priceListRate } from '../../lib/price-list';
+import { BRANCH_PRICES_TABLE, branchContext, storePricingInUse } from '../../lib/retail/store-prices'; // R4-B3
+import { BRANCHES_TABLE, branchOfInvoice, type Branch } from '../../lib/branch';
+import type { BranchPrice } from '../../types/stores-r4';
+import type { ScopeCtx } from '../../lib/trade/tr-pricing';
+
+// TR-A1 / A2: party rates and scoped schemes, loaded with the editor as their own chunk (until then: none apply).
+let tr: typeof import('../../lib/trade/tr-pricing') | null = null;
+import('../../lib/trade/tr-pricing').then((m) => { tr = m; }, () => {});
 
 /** Notes don't take part: a credit / debit note re-states an earlier price. */
 const pricedDoc = () => {
@@ -24,50 +35,129 @@ const pricedDoc = () => {
 export interface EditorPricing {
   data: PricingData;
   level: PriceLevel | null;
+  /** R4-B3: the document's store (branch) when it has a price list or store overrides. */
+  store?: { branch: Branch; prices: readonly BranchPrice[] };
+}
+
+/** R4-B3: the document's branch (its own, else the branch of its business profile) when store pricing applies. */
+function editorStore(): EditorPricing['store'] {
+  const prices = peekTable<BranchPrice>(BRANCH_PRICES_TABLE);
+  const branches = peekTable<Branch>(BRANCHES_TABLE);
+  if (!branches.length || !storePricingInUse(branches, prices)) return undefined;
+  const st = useInvoiceStore.getState();
+  const id = branchOfInvoice({ branch_id: st.branch_id, sender: st.sender }, branches);
+  const branch = branches.find((b) => b.id === id);
+  return branch ? { branch, prices } : undefined;
 }
 
 /** Pricing data and the current party's level, or null when the user has not set pricing up. */
 export function editorPricing(): EditorPricing | null {
-  const data = loadPricing();
-  if (!pricingInUse(data) || !pricedDoc()) return null;
+  const data = editorPricingData();
+  const store = pricedDoc() ? editorStore() : undefined;
+  if ((!pricingInUse(data) && !store) || !pricedDoc()) return null;
   const st = useInvoiceStore.getState();
-  const level = levelForClient(masterClient(localDb.clients.getAll(), st.client), data.levels);
-  return { data, level };
+  const level = levelForClient(masterClient(peekTable<Client>(KEYS.clients), st.client), data.levels);
+  return { data, level, ...(store ? { store } : {}) };
 }
 
-/** Re-price one line from its catalogue row (level + slab) and keep scheme free lines in step. */
-function reprice(lineId: string, ctx: EditorPricing, force = false): void {
+/**
+ * `loadPricing()` as read-only views (perf: this runs on every quantity keystroke, and the tables
+ * only change on other screens). Nothing here mutates them: lines copy the fields they need.
+ */
+function editorPricingData(): PricingData {
+  return {
+    levels: peekTable<PriceLevel>(PRICE_LEVELS_TABLE) as PriceLevel[],
+    schemes: peekTable<Scheme>(SCHEMES_TABLE) as Scheme[],
+    catalog: peekTable<InvoiceItem>(KEYS.items) as InvoiceItem[],
+  };
+}
+
+/** 7S (7.66): the stock item's selling price-list rate on the document date, for a line (read-only view, no re-parse). */
+function listRateFor(line: Pick<InvoiceItem, 'name' | 'hsn'>): number | undefined {
+  if (!pricedDoc()) return undefined;
+  const items = peekTable<StockItem>(TABLES.items);
+  if (!items.some((i) => i.selling_prices?.length)) return undefined;
+  return priceListRate(items, line.name, line.hsn, useInvoiceStore.getState().issue_date);
+}
+
+/**
+ * Re-price one line from its catalogue row (level + slab) and keep scheme free lines in step. 7S: a selling
+ * price list in force replaces the catalogue's base rate; a customer level's own rate still wins.
+ */
+function reprice(lineId: string, ctx: EditorPricing | null, force = false): void {
   const st = useInvoiceStore.getState();
   const line = st.items.find((i) => i.id === lineId);
   if (!line || line.free_of) return;
-  const cat = catalogItemFor(ctx.data.catalog, line.name);
-  if (!cat) return;
+  // 8.104: a last-rate line keeps its rate when the quantity changes (re-pricing on demand still applies).
+  if (!force && line.price_basis === LAST_RATE_BASIS) return;
+  const cat = ctx ? catalogItemFor(ctx.data.catalog, line.name) : undefined;
+  const list = listRateFor(line);
+  // TR-A1: the party's special rate / discount for this item wins over levels, lists and slabs.
+  const pr = pricedDoc() && tr ? tr.partyRateFor(tr.loadPartyRates(), 'sale', st.client, { id: cat?.id, name: line.name }, st.issue_date) : undefined;
+  if (!cat && list === undefined && !pr) return;
+  const base = list ?? (cat ? num(cat.rate) : num(line.rate));
   // A typed rate (no basis) is the user's choice: leave it, unless asked to re-price.
-  if (!force && !line.price_basis && num(line.rate) !== num(cat.rate)) return;
-  const quote = resolvePrice(cat, num(line.quantity), ctx.level);
-  if (quote.rate !== num(line.rate) || quote.basis !== line.price_basis) {
-    st.patchItem(lineId, { rate: quote.rate, price_basis: quote.basis });
+  if (!force && !line.price_basis && num(line.rate) !== base) return;
+  const branch = ctx?.store ? branchContext(ctx.store.branch, cat?.id ?? '', st.issue_date, ctx.store.prices, ctx.data.levels) : null; // R4-B3
+  const quote = resolvePrice({ id: cat?.id ?? '', rate: base, qty_slabs: cat?.qty_slabs, mrp: cat?.mrp }, num(line.quantity), ctx?.level, branch, pr?.rate); // 8E: an MRP level reads the MRP
+  const basis = quote.source === 'base' && list !== undefined ? PRICE_LIST_BASIS : quote.source === 'base' && pr ? 'Party rate' : quote.basis;
+  const disc = pr && (pr.disc_chain?.length || pr.disc_per_unit) ? { disc_chain: pr.disc_chain, disc_per_unit: pr.disc_per_unit, discount_percent: tr!.effectivePercent(pr.disc_chain, pr.disc_per_unit, quote.rate) } : {};
+  if (quote.rate !== num(line.rate) || basis !== line.price_basis || ('discount_percent' in disc && disc.discount_percent !== line.discount_percent)) {
+    st.patchItem(lineId, { rate: quote.rate, price_basis: basis, ...disc });
   }
 }
 
 function syncSchemes(ctx: EditorPricing | null): void {
   const st = useInvoiceStore.getState();
   if (!ctx && !st.items.some((i) => i.free_of)) return;
-  const next = syncSchemeLines(st.items, ctx?.data.schemes ?? [], st.issue_date, generateId);
+  const scoped = tr && ctx?.data.schemes.some((x) => x.scope) ? scopeCtx(ctx) : null; // TR-A2
+  const next = syncSchemeLines(st.items, ctx?.data.schemes ?? [], st.issue_date, generateId, ctx?.data.catalog ?? [], scoped ? (after, before) => tr!.applyScopedSchemes(after, before, ctx!.data.schemes, st.issue_date, scoped, generateId, ctx!.data.catalog) : undefined);
   if (next !== st.items) st.patch({ items: next });
+}
+
+/** TR-A2: what a scoped scheme needs to know about the party and the items. */
+function scopeCtx(ctx: EditorPricing): ScopeCtx {
+  return { clientId: masterClient(peekTable<Client>(KEYS.clients), useInvoiceStore.getState().client)?.id, levelId: ctx.level?.id, ...tr!.liveScopeItems(ctx.data.catalog) };
+}
+
+/**
+ * R9 (RT-C1): a picked / scanned item with a price band (`gst_band` on the catalogue row or its stock item) marks the
+ * line for the band (decided by the lazy band hook); any other pick clears an old band. Credit notes keep their rate.
+ */
+function markBand(lineId: string, source: Partial<InvoiceItem>): void {
+  const st = useInvoiceStore.getState();
+  const stock = pricedDoc() && !source.gst_band ? peekTable<StockItem>(TABLES.items).find((s) => s.name === source.name) : undefined;
+  // MF-C5: a textile `mf_class` garment / made-up turns the band on, even without the apparel pack.
+  const cls = (stock as { mf_class?: string } | undefined)?.mf_class;
+  const kind = pricedDoc() ? source.gst_band ?? stock?.gst_band ?? (cls === 'garment' ? 'apparel' : cls === 'made_up' ? 'made_ups' : undefined) : undefined;
+  if (kind || st.items.find((i) => i.id === lineId)?.band_rate) st.patchItem(lineId, { band_rate: kind ? { kind, value_per_piece: 0 } : undefined });
 }
 
 /** Catalogue pick (typeahead or picker): fills the line, then applies level / slab / scheme. */
 export function pickCatalogItem(lineId: string, source: Partial<InvoiceItem>): void {
   const st = useInvoiceStore.getState();
   st.applyCatalogItem(lineId, source);
-  const ctx = editorPricing();
-  if (!ctx) {
-    syncSchemes(null);
-    return;
+  markBand(lineId, source); // R9 (RT-C1)
+  // 8.86: a delivery challan line remembers the bin / rack it is picked from (printed on the challan).
+  if (st.doc_type === 'DELIVERY_CHALLAN' && source.name) {
+    const bin = binForName(getTable<StockItem>('stock_items'), source.name);
+    if (bin) st.patchItem(lineId, { bin });
   }
-  reprice(lineId, ctx, true);
+  const ctx = editorPricing();
+  reprice(lineId, ctx, true); // 7S: also applies a selling price list without levels / slabs
+  applyLastRate(lineId);
   syncSchemes(ctx);
+}
+
+/** 8.104: below price levels / lists, the rate last billed to this party wins over the catalogue rate. */
+function applyLastRate(lineId: string): void {
+  if (!pricedDoc()) return;
+  const st = useInvoiceStore.getState();
+  const line = st.items.find((i) => i.id === lineId);
+  if (!line || line.free_of || !line.name?.trim()) return;
+  const last = lastRateFor(peekTable<InvoiceRecord>(KEYS.invoices), st.client, line.name, { excludeId: st.id, currency: st.currency });
+  const rate = lastRateToApply(line, last);
+  if (rate !== null) st.patchItem(lineId, { rate, price_basis: LAST_RATE_BASIS });
 }
 
 /** Quantity typed on a line: slabs may change the rate; schemes follow. */
@@ -125,8 +215,9 @@ export function addScannedCode(code: string): { ok: boolean; message: string } {
   } else {
     st.patch({ items: r.items });
     st.applyCatalogItem(r.lineId, match.item); // same fields (and item custom fields) as a catalogue pick
+    markBand(r.lineId, match.item); // R9 (RT-C1)
     const ctx = editorPricing();
-    if (ctx) reprice(r.lineId, ctx, true);
+    reprice(r.lineId, ctx, true);
     syncSchemes(ctx);
   }
   const line = useInvoiceStore.getState().items.find((i) => i.id === r.lineId);

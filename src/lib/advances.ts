@@ -34,6 +34,7 @@ import { formatCurrency, formatDate } from './utils';
 import { ADVANCES_TABLE, advanceBalance, computeAdvanceTax, liveAdjustments, taxTotal, type AdvanceBalance } from './advance-tax';
 import { receivableTotal } from './rcm';
 import { recordSeries, seriesHigh } from './series-counters';
+import { escHtml as esc } from './html-esc';
 
 export { ADVANCES_TABLE, advanceBalance, computeAdvanceTax, isAdvanceAdjustment, liveAdjustments } from './advance-tax';
 export type { AdvanceBalance } from './advance-tax';
@@ -112,6 +113,8 @@ export interface AdvanceInput {
   note?: string;
   /** Multi-account BRS: the bank account it went into (ignored for cash). */
   bankAccountId?: string;
+  /** CN-C2: the realty booking (and a pass-through collection) this receipt is for. */
+  booking?: Pick<AdvanceRecord, 'booking_id' | 'pass_through'>;
 }
 
 export function validateAdvance(input: AdvanceInput, today: string = todayIso()): string[] {
@@ -183,7 +186,7 @@ export function saveAdvance(input: AdvanceInput, ctx: Ctx = {}): AdvanceRecord {
   const nowIso = (ctx.now ?? new Date()).toISOString();
   if (prev) {
     const bal = advanceBalance(prev, ctxPayments(ctx), ctxInvoices(ctx));
-    if (bal.adjusted > 0 || bal.refunded > 0) {
+    if (bal.adjusted > 0 || bal.refunded > 0 || num(bal.forfeited) > 0) {
       throw new AdvanceError(`${prev.number} has been adjusted or refunded; remove those entries before editing it.`);
     }
     assertUnlocked(lockOf(prev.id, prev.date, prev.number), 'edit');
@@ -210,6 +213,7 @@ export function saveAdvance(input: AdvanceInput, ctx: Ctx = {}): AdvanceRecord {
     ...(input.reference?.trim() ? { reference: input.reference.trim() } : {}),
     ...(input.description?.trim() ? { description: input.description.trim() } : {}),
     ...(input.note?.trim() ? { note: input.note.trim() } : {}),
+    ...(input.booking ?? (prev?.booking_id ? { booking_id: prev.booking_id, pass_through: prev.pass_through } : {})),
     tax: computeAdvanceTax({ amount, rate: tax_rate, supply: input.supply, date, pos, senderState: senderState(sender) }),
     sender,
     refunds: prev?.refunds ?? [],
@@ -229,7 +233,7 @@ export function deleteAdvance(id: string, ctx: Ctx = {}): void {
   const adv = rows.find((a) => a.id === id);
   if (!adv) return;
   const bal = advanceBalance(adv, ctxPayments(ctx), ctxInvoices(ctx));
-  if (bal.adjusted > 0 || bal.refunded > 0) {
+  if (bal.adjusted > 0 || bal.refunded > 0 || num(bal.forfeited) > 0) {
     throw new AdvanceError(`${adv.number} has been adjusted or refunded; remove those entries first.`);
   }
   assertUnlocked(lockOf(adv.id, adv.date, adv.number), 'delete');
@@ -430,8 +434,6 @@ export function advancesCsv(rows: readonly AdvanceRow[]): string {
 
 /* ── Printable vouchers (script-free HTML) ──────────────────── */
 
-const esc = (s: unknown) =>
-  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 const VOUCHER_STYLE = `
   body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 32px; }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, ShieldCheck, X } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
@@ -12,6 +12,9 @@ import { approvalsT } from '../../i18n/areas/extras';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from './approvals.module.css';
+
+// 8.44: bills, expenses and supplier payments sent for approval — own lazy chunk.
+const PurchaseApprovals = lazy(() => import('./PurchaseApprovals'));
 
 /**
  * Maker-checker (WP-9): the owner's approval queue and the policy switch. Shown on the Dashboard
@@ -79,6 +82,10 @@ export function ApprovalsPanel({ notify }: { notify?: (m: string, tone?: 'succes
             ))}
           </ul>
         )}
+
+        <Suspense fallback={null}>
+          <PurchaseApprovals notify={notify} />
+        </Suspense>
 
         {mayConfigure && (
           <details className={own.settings}>

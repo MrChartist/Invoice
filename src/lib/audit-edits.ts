@@ -17,7 +17,8 @@
  */
 
 import type { AuditAction, AuditChange, AuditEntity } from '../types/audit';
-import { DB_PREFIX, readRaw } from './storage';
+import { DB_PREFIX, generateId, peekTable, readRaw, setTable } from './storage';
+import { currentActor } from './access';
 
 export interface WatchedTable {
   entity: AuditEntity;
@@ -25,7 +26,10 @@ export interface WatchedTable {
   label: string;
 }
 
-/** Books / masters tables whose every row change reaches the audit log. */
+/**
+ * Books / masters tables whose every row change reaches the audit log. R8-C: the Round 8 tables are added at runtime
+ * by `src/lib/trade/tr-registry.ts` (lazy; this map ships with first paint).
+ */
 export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   transactions: { entity: 'payment', label: 'Receipt' },
   clients: { entity: 'client', label: 'Client' },
@@ -55,6 +59,11 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   budgets: { entity: 'budget', label: 'Budget' },
   cheques: { entity: 'cheque', label: 'Cheque' },
   deposit_slips: { entity: 'cheque', label: 'Deposit slip' },
+  fx_bank_moves: { entity: 'voucher', label: 'Forex bank entry' },
+  epay_batches: { entity: 'vendor_payment', label: 'e-Payment batch' },
+  commission_postings: { entity: 'voucher', label: 'Commission posting' },
+  business_loans: { entity: 'voucher', label: 'Business loan' },
+  currency_rates: { entity: 'settings', label: 'Currency reference rate' },
   advances: { entity: 'advance', label: 'Advance' },
   recurring: { entity: 'recurring', label: 'Recurring schedule' },
   bank_statements: { entity: 'bank_statement', label: 'Bank statement line' },
@@ -62,10 +71,85 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   tds_deductions: { entity: 'tds', label: 'TDS deduction' },
   tds_returns: { entity: 'tds', label: 'TDS return mark' },
   rcm_documents: { entity: 'gst', label: 'RCM self-invoice / payment voucher' },
+  // 7R
+  gst_pmt09: { entity: 'gst', label: 'PMT-09 transfer' },
+  gst_refunds: { entity: 'gst', label: 'GST refund claim' },
+  isd_documents: { entity: 'gst', label: 'ISD document' },
+  tds_justifications: { entity: 'tds', label: 'TRACES justification import' },
+  // 8D
+  gst_followups: { entity: 'gst', label: 'Supplier follow-up (2B)' },
+  gstr2b_itc: { entity: 'gst', label: '2B ITC pushed to 3B' },
+  gstr1_snapshots: { entity: 'gst', label: 'GSTR-1 as filed' },
   pos_day_close: { entity: 'pos_day_close', label: 'POS day close' },
+  pos_shifts: { entity: 'pos_day_close', label: 'POS cashier shift' },
   pos_returns: { entity: 'invoice', label: 'POS return' },
   doc_links: { entity: 'invoice', label: 'Document link' },
   year_end: { entity: 'settings', label: 'Year-end checklist' },
+  // R2-C: notes to accounts, deferral schedules, packing lists, package types
+  notes_to_accounts: { entity: 'settings', label: 'Notes to accounts' },
+  deferrals: { entity: 'voucher', label: 'Deferral schedule' },
+  packing_lists: { entity: 'invoice', label: 'Packing list' },
+  package_types: { entity: 'item', label: 'Package type' },
+  // R2-A
+  payment_terms: { entity: 'settings', label: 'Payment term' },
+  collection_notes: { entity: 'payment', label: 'Collection follow-up' },
+  write_off_recoveries: { entity: 'payment', label: 'Bad debt recovery' },
+  // R2-B: batch invoice runs, proposal section snippets
+  batch_runs: { entity: 'invoice', label: 'Batch invoice run' },
+  proposal_snippets: { entity: 'settings', label: 'Proposal snippet' },
+  // R3-A: restaurant dining areas / tables, running orders (KOTs, cancellations), modifier groups
+  dining_areas: { entity: 'settings', label: 'Dining area' },
+  dining_tables: { entity: 'settings', label: 'Dining table' },
+  table_orders: { entity: 'invoice', label: 'Table order' },
+  modifier_groups: { entity: 'item', label: 'Modifier group' },
+  // R3-B: work types (rate cards), project tasks, retainers
+  work_types: { entity: 'item', label: 'Work type' },
+  project_tasks: { entity: 'cost_centre', label: 'Project task' },
+  retainers: { entity: 'client', label: 'Retainer' },
+  // R3-C: GSTR-1 portal file imports, DSC register, monthly client checklist
+  gst_portal_files: { entity: 'gst', label: 'Portal file' },
+  dsc_register: { entity: 'settings', label: 'DSC' },
+  client_checklist: { entity: 'settings', label: 'Checklist' },
+  // R4-A: production orders, QC decisions, recall notices (stock side), landed-cost vouchers (purchase side)
+  production_orders: { entity: 'manufacturing', label: 'Production order' },
+  qc_results: { entity: 'manufacturing', label: 'QC decision' },
+  recall_notices: { entity: 'manufacturing', label: 'Recall notice' },
+  landed_cost_vouchers: { entity: 'purchase', label: 'Landed-cost voucher' },
+  // R4-B: gift vouchers (customer liability), store price overrides (master), transfer requests (stock side)
+  gift_vouchers: { entity: 'payment', label: 'Gift voucher' },
+  branch_prices: { entity: 'item', label: 'Store price' },
+  transfer_requests: { entity: 'stock_transfer', label: 'Transfer request' },
+  // R4-C: LUT register, export IRMs (realisation), incentives, realisation write-offs
+  lut_register: { entity: 'settings', label: 'LUT' },
+  export_irms: { entity: 'payment', label: 'IRM' },
+  export_incentives: { entity: 'voucher', label: 'Export incentive' },
+  export_writeoffs: { entity: 'payment', label: 'Export write-off' },
+  // R5-A: marketplace channels / SKU map (masters), imports, settlements, GST TCS / TDS credit rows, returns desk
+  sales_channels: { entity: 'client', label: 'Sales channel' },
+  channel_skus: { entity: 'item', label: 'Channel SKU' },
+  marketplace_imports: { entity: 'invoice', label: 'Marketplace import' },
+  settlements: { entity: 'payment', label: 'Marketplace settlement' },
+  eco_credits: { entity: 'gst', label: 'GST TCS / TDS credit' },
+  marketplace_returns: { entity: 'invoice', label: 'Marketplace return' },
+  // R5-C: fee plans, fee runs, Rule 42 / 43 reversals, donations, 10BD / 10BE, properties, leases, security deposits
+  fee_plans: { entity: 'item', label: 'Fee plan' },
+  fee_runs: { entity: 'invoice', label: 'Fee run' },
+  common_credit_runs: { entity: 'gst', label: 'ITC reversal' },
+  donations: { entity: 'payment', label: 'Donation' },
+  form_10bd_filings: { entity: 'settings', label: '10BD' },
+  form_10be: { entity: 'settings', label: '10BE' },
+  properties: { entity: 'item', label: 'Property' },
+  leases: { entity: 'client', label: 'Lease' },
+  security_deposits: { entity: 'payment', label: 'Deposit' },
+  // R5-B: consignment notes, GTA option per FY, vehicles, trip sheets, RA measurements, BOQ coefficients
+  consignment_notes: { entity: 'invoice', label: 'LR' },
+  gta_options: { entity: 'gst', label: 'GTA option' },
+  vehicles: { entity: 'item', label: 'Vehicle' },
+  trips: { entity: 'invoice', label: 'Trip' },
+  ra_measurements: { entity: 'invoice', label: 'RA bill' },
+  boq_coefficients: { entity: 'item', label: 'BOQ coefficient' },
+  // R6-C3: import runs
+  import_runs: { entity: 'voucher', label: 'Import run' },
 };
 
 /** More row changes than this in one write (and not logged by the module) → one summary row. */
@@ -74,7 +158,7 @@ const MAX_CHANGES = 15;
 const EXCERPT = 60;
 
 /** Never copied into the log, only flagged as changed. */
-const HIDDEN = /(email|phone|mobile|address|account_no|accountnumber|ifsc|^bank_|beneficiary|upi|notes?$|narration_private|^pan$|password|pin_hash|logo|signature|^data$|serials)/i;
+const HIDDEN = /(email|phone|mobile|address|account_no|accountnumber|ifsc|^bank_|beneficiary|upi|notes?$|narration_private|^pan$|password|pin_hash|logo|signature|^data$|serials|^id_doc$|^foreign$|^dob$)/i; // R7-A: guest ID / passport / visa
 /** Bookkeeping fields that change on every save and say nothing. */
 const IGNORED = new Set(['id', 'created_at', 'updated_at']);
 /** Fields shown on a create / delete row (the rest of the record is in the backup). */
@@ -118,7 +202,7 @@ function show(v: unknown): string | null {
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
   if (typeof v === 'number' || typeof v === 'string') return excerpt(String(v).replace(/\s+/g, ' ').trim()) || null;
   if (Array.isArray(v)) return linesText(v) ?? `${v.length} ${v.length === 1 ? 'entry' : 'entries'}`;
-  return excerpt(JSON.stringify(v));
+  return excerpt(JSON.stringify(v, (k, x) => (HIDDEN.test(k) ? void 0 : x))); // QA9 H14: nested phone / email too
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -257,8 +341,15 @@ export function observeTableWrite(name: string, prevRaw: string | null, rows: re
     if (old === undefined) queue(name, id, null, r as Row);
     else if (old !== s) queue(name, id, parse(old), r as Row);
   }
-  for (const [id, s] of before) if (!next.has(id)) queue(name, id, parse(s), null);
+  const gone: Row[] = [];
+  for (const [id, s] of before) if (!next.has(id)) {
+    const r = parse(s);
+    queue(name, id, r, null);
+    if (r) gone.push(r);
+  }
   seen.set(name, { raw: readRaw(DB_PREFIX + name), byId: next });
+  // R4-C4: whole deleted rows go to the recycle bin (bookkeeping tables aside).
+  if (gone.length && !/^(doc_l|year_e|books_b|gstr)/.test(name)) binRows(name, gone);
   if (pending.size && !scheduled) {
     scheduled = true;
     queueMicrotask(drainEdits);
@@ -334,6 +425,25 @@ export function drainEdits(): void {
     } catch {
       /* best effort */
     }
+  }
+}
+
+/* ── R4-C4 recycle bin capture ─────────────────────────────────── */
+
+export const BIN_TABLE = 'recycle_bin';
+
+/**
+ * Keep whole deleted rows in the recycle bin (restored from Settings → Data → Recently deleted; purged after the
+ * retention period by `trust/recycle-bin.ts`). `attachments` is copied so the files are kept while binned.
+ * Never throws: the bin never breaks a delete.
+ */
+export function binRows(table: string, rows: readonly Row[]): void {
+  try {
+    const deleted_by = currentActor()?.name;
+    const deleted_at = new Date().toISOString();
+    setTable(BIN_TABLE, [...peekTable(BIN_TABLE), ...rows.map((row) => ({ id: generateId(), table, row_id: rowId(row), deleted_at, deleted_by, row, attachments: row.attachments }))]);
+  } catch {
+    /* best effort */
   }
 }
 

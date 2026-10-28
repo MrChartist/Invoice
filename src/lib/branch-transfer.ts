@@ -15,7 +15,8 @@
  *  - Lines keep their HSN but carry the transfer number in the name, so the stock engine (which
  *    matches lines by item id or name + HSN) does not move the goods a second time: the transfer
  *    voucher already moved the quantity.
- *  - `raiseTransferPair` — saves both (period lock, roles and numbering apply); refuses a second pair.
+ *  - `raiseTransferPair` — saves both or neither (period lock, roles and numbering apply); refuses a second pair
+ *    (a live invoice or bill) and a clerk's invoice that approvals would hold as a draft.
  *
  * The value is the user's (Rule 28: open market value, or the value declared on the invoice when the
  * recipient branch can take full credit). Working papers — verify with your CA.
@@ -26,7 +27,8 @@ import type { Godown, StockTransfer } from '../types/stock';
 import { localDb, type AppSettings } from './localDb';
 import { stockDb, type StockItem } from './inventory';
 import { purchasesDb } from './purchases';
-import { godownsDb } from './godowns';
+import { godownsDb, transferPairOf } from './godowns';
+import { withTablesRollback } from './table-txn';
 import { generateId } from './storage';
 import { loadBranches, type Branch } from './branch';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
@@ -59,6 +61,12 @@ export function transferTaxPair(t: Pick<StockTransfer, 'from_godown' | 'to_godow
   const b = gstinOf(to);
   return a && b && a !== b ? { from, to } : null;
 }
+
+/**
+ * QA14 Q1: a transfer line's quantity in the item's base unit. A line typed in an alternate unit (10 BOX of 12) is billed
+ * as 120 NOS at the per-base-unit rate the dialog suggests (average cost), never 10 × the per-piece cost.
+ */
+export const transferBaseQty = (l: StockTransfer['lines'][number]): number => Math.round(num(l.qty) * (num(l.unit_factor) > 0 ? num(l.unit_factor) : 1) * 1000) / 1000;
 
 /** The live tax invoice already raised for a transfer, if any. */
 export function transferInvoiceOf(transferId: string, invoices: readonly Pick<InvoiceRecord, 'id' | 'branch_transfer_id' | 'status' | 'invoice_number'>[]) {
@@ -113,10 +121,10 @@ export function buildTransferPair(x: TransferPairInput): { invoice: InvoiceRecor
         type: 'goods',
         ...(it?.hsn ? { hsn: it.hsn } : {}),
         unit: it?.unit || 'NOS',
-        quantity: num(l.qty),
+        quantity: transferBaseQty(l),
         rate,
         tax_rate: num(it?.tax_rate ?? x.settings.defaultTaxRate),
-        amount: round2(num(l.qty) * rate),
+        amount: round2(transferBaseQty(l) * rate),
       };
     });
   const note = `Stock transfer ${t.transfer_number} from ${x.from.name} (${gstinOf(x.from)}) to ${x.to.name} (${gstinOf(x.to)}). ${BRANCH_TRANSFER_CA_NOTE}`;
@@ -207,9 +215,10 @@ export class BranchTransferError extends Error {
 export function raiseTransferPair(t: StockTransfer, rates: Readonly<Record<string, number>>): { invoice: InvoiceRecord; bill: PurchaseRecord } {
   const pair = transferTaxPair(t, loadBranches(), godownsDb.list());
   if (!pair) throw new BranchTransferError('Both godowns must belong to branches with different GSTINs.');
-  const invoices = localDb.invoices.getAll();
-  const already = transferInvoiceOf(t.id, invoices);
-  if (already) throw new BranchTransferError(`Tax invoice ${already.invoice_number} was already raised for this transfer.`);
+  // Review M2: a live bill counts too (an invoice is ignored once cancelled, its bill is not).
+  const already = transferPairOf(t.id);
+  if (already?.invoice) throw new BranchTransferError(`Tax invoice ${already.invoice} was already raised for this transfer.`);
+  if (already?.bill) throw new BranchTransferError(`Purchase bill ${already.bill} was already raised for this transfer. Delete it before raising the pair again.`);
   const settings = localDb.settings.get();
   const profile = (pair.from.profile_id && settings.profiles.find((p) => p.id === pair.from.profile_id)) || localDb.settings.activeProfile();
   const built = buildTransferPair({
@@ -225,7 +234,14 @@ export function raiseTransferPair(t: StockTransfer, rates: Readonly<Record<strin
     newId: generateId,
   });
   if (!(built.invoice.total > 0)) throw new BranchTransferError('Enter a value for the goods transferred.');
-  const invoice = localDb.invoices.save(built.invoice);
-  const bill = purchasesDb.save({ ...built.bill, bill_number: invoice.invoice_number });
-  return { invoice, bill };
+  // Review M2: both or neither. A clerk's invoice held for approval (kept as a Draft) is not a supply
+  // document yet, so the pair is refused and the owner raises it.
+  return withTablesRollback(['invoices', 'purchases'], () => {
+    const invoice = localDb.invoices.save(built.invoice);
+    if (invoice.status === 'Draft' || invoice.approval?.state === 'pending') {
+      throw new BranchTransferError('Approvals are on, so this tax invoice would wait as a draft for approval. Ask the owner to raise the branch-transfer invoice and bill.');
+    }
+    const bill = purchasesDb.save({ ...built.bill, bill_number: invoice.invoice_number });
+    return { invoice, bill };
+  });
 }

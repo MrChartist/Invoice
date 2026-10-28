@@ -89,7 +89,8 @@ Gateway `buildFrame` (`FrameOptions.branchId`). `scopeLedger(ledger, { branchId 
   depreciation, payroll, challans, advances received and on-account supplier payments are company level ("No branch"),
   as is a row tagged with a deleted branch — so the branches plus "No branch" always add up to the company books, and each
   branch trial balance balances on its own (`tests/branch-books.test.ts`).
-- Report-time closing stock is company-wide and is left out of a branch view (the screens say so).
+- Report-time closing stock in a branch view is the stock lying in the branch's godowns (7S, `branch-stock.ts`); see
+  reports-engine.md.
 - UI: branch filter (`BranchFilter`, shown once a branch exists) in the Books statements toolbar (Day book, P&L, Reports,
   TB, Ledger, BS, Cash flow), on Gateway Display (kept in the URL as `b=`), Transactions and the purchase list; branch
   select on manual vouchers (Books voucher editor, Gateway voucher entry).
@@ -142,6 +143,25 @@ unit, SKU, price incl. GST (or + GST), MRP strike-through, stock status for trac
 (`wa.me/<phone>?text=Order: …` from the profile phone, else `mailto:`). The app makes no network call; the file is
 downloaded for sharing / hosting.
 
+**Catalogue v2 (8H, roadmap 8.122)** — `buildCatalogue` / `catalogue-export.ts`:
+
+- **Photos**: catalogue items (and stock items) carry an additive `image: 'asset:<id>'`; the picture is stored once in
+  the existing `assets` table (content-hash interning, backed up / synced) and inlined as a data URI in the export.
+  Only raster data URIs (PNG / JPEG / WebP / GIF) are accepted — never SVG. Set in Settings → Items (Photo).
+- **Categories**: the catalogue item's `group_id`, else its stock item's stock group; one section per category with a
+  category bar.
+- **Badges**: "N% off MRP" when the MRP is above the price; an optional offer text badge.
+- **Cart**: the buyer adds items and quantities and sends **one** WhatsApp (or e-mail) order message with every line,
+  the total and their name (`cartMessage`, unit-tested; the inline script builds the same text). The file carries one
+  small inline script under a **hash-pinned CSP in a `<meta>` tag**: `default-src 'none'; img-src data:;
+  style-src 'sha256-…'; script-src 'sha256-…'; form-action 'none'; base-uri 'none'`. Why that is safe: no
+  `unsafe-inline`, no network, and the only script allowed is the exact constant whose hash is computed at export
+  (`cataloguePolicy`, tested against node's SHA-256); item data travels in a non-executed JSON block with `<`, `>`, `&`
+  escaped, and the script writes only `textContent` / `href`. Every value in the HTML is escaped.
+- **Script-free fallback**: "Catalogue without cart" exports under `script-src 'none'`; either file keeps an Order link
+  per item and an "Order from this category" link (the category's items listed for the buyer to fill in quantities), so
+  it works with JavaScript off.
+
 ## Wiring
 
 Done in the integration pass: `ApprovalBanner` in the invoice editor (lazy, only for pending / rejected documents);
@@ -154,11 +174,74 @@ and `amcReminders` (`src/lib/business-alerts.ts`, loaded lazily); palette destin
 vouchers, branch-wise books and the Sec 25(4) transfer pair (above). The bell's GST set-off reminder now reaches every
 regular (non-composition) GSTIN filer, even before the set-off screen was first used.
 
+## 7U: sales commission, offers, ESC/POS, pharma pack (roadmap 7.43, 7.154–7.157)
+
+All opt-in; strings in `src/i18n/areas/extras-7u.ts` (`x7T`, English + Hindi). New Dashboard tiles (not on by
+default, *Customise tiles*): **Sales agents & commission**, **Offers & schemes**, **Pharma pack** (each its own lazy
+chunk under `src/components/extras7u/`). The invoice editor's summary panel mounts the lazy `EditorExtras` only once
+an agent, a bill-value offer or the pharma pack exists.
+
+| Piece | Pure logic | Data (additive) | Tests |
+|---|---|---|---|
+| Sales commission | `src/lib/sales-commission.ts` | table `sales_agents` (`master.edit`), table `commission_postings` (`books.edit`, DATED), `InvoiceRecord.agent_id` | `tests/extras-7u.test.ts` |
+| Offers | `src/lib/offers.ts`, `pricing.ts` (`Scheme.kind`, `free_item_*`, `slabs`, `label`) | `schemes` rows, `InvoiceRecord.offer {scheme_id, label, value}` | same |
+| ESC/POS / raw receipt | `src/lib/escpos.ts`, `components/extras7u/{PosPrinter.tsx,pos-raw-print.ts}` | device-local `mrchartist_pos_printer` (localStorage, never backed up) | same |
+| Pharma pack | `src/lib/pharma.ts`, `src/lib/pharma-gate.ts` | key `pharma_settings`, `stock_items.drug_schedule`, `SenderProfile.drug_licence`, `InvoiceRecord.rx` | same |
+
+**Sales commission.** Agent master: name, phone, PAN, flat % of taxable value, % per stock group (covers
+sub-groups, nearest group wins), basis **on invoice** (bill date; credit notes naming the agent take it back) or **on
+receipt** (pro rata to money received in the period, capped at the bill). Base = line taxable value in rupees
+(foreign documents at the invoice rate), so GST / cess / TCS / freight earn nothing. Statement + CSV per agent and
+period; **Post payable journal**: Dr "Sales commission" (a user ledger created on first use under Indirect expenses,
+code 6195+) | Cr Sundry creditors with the agent as party, via `saveVoucher` (period lock, audit, roles); periods of
+one agent cannot overlap; *Undo* deletes the journal. TDS u/s 194H is not computed — verify with your CA.
+
+**Offers.** Schemes gain `kind`: absent / `same` (unchanged buy X get Y of the same item), `buy_get` (buy A get B:
+the ₹0 free line is item B with B's HSN / unit / GST rate from the catalogue — `syncSchemeLines` takes the catalogue as
+an optional fifth argument, passed by the editor and the POS) and `bill_value` (slabs `{min_value, percent | amount}`,
+best slab reached wins). The bill value is the items after line discounts, before the invoice discount, **after the
+price level / slab / price list rate was chosen** (schemes run on the priced lines). The offer joins the invoice's
+AMOUNT discount (like loyalty) and is stored as `offer`; the editor applies it automatically with a clear line and a
+*Not on this bill* switch; the POS applies it after the loyalty redemption and shows its own totals line; the raw
+receipt prints it. A % invoice discount blocks the offer. GST is on the value after the discount (Sec 15(3)(a)); free
+goods follow Circular 92/11/2019-GST — **verify the treatment with your CA** (especially buy A get B where B has a
+higher GST rate than A).
+
+**ESC/POS.** POS header → *Printer* (per device, default **browser** print unchanged): *raw text receipt* (32 columns
+for 58 mm, 48 for 80 mm, monospaced, script-free print window) or *ESC/POS over Web Serial* (feature-detected; the
+user picks the port in the browser's chooser; `ESC @`, text, feed, partial cut; with "open the cash drawer" a cash bill
+adds `ESC p 0 25 250`). No network. In browser mode a drawer opens only through the printer driver's "open drawer on
+print" setting. A failed raw / serial print falls back to the browser print.
+
+**Pharma pack.** Pharma tile → switch on. Drug licence number(s) on the business profile (Settings), printed under the
+GSTIN (standard / GST / receipt layouts and the raw receipt). Schedule **H / H1 / X** per stock item (tile list).
+Editor: patient, address, prescriber, registration no. (`rx`), with a warning when H1 / X items lack them. **Schedule
+H1 register** (H1, optionally X) per period: date, bill no., patient, prescriber, drug, batch, quantity, rows without
+prescription flagged; CSV. Near-expiry / expired batches in stock. Sale gate (`pharmaGate`, one call in
+`liveDocTrackingIssues`, so editor, POS and recurring runs): *block expired batches* (no "Sell anyway"), near-expiry
+warning within N days (default 90), optionally blocking. Verify the register format with the drug inspector / your CA.
+
+**Pharma operations (8F, `docs/features/distribution.md`).** Inventory → *Breakage / expiry*: Breakage / Expiry Issue
+(near-expiry / expired batches traced to the supplier who sold each batch, debit notes per supplier bill + one claim
+per supplier in one all-or-nothing pass), claim tracking (pending / credit received with the supplier's credit note /
+rejected), Breakage / Expiry Receive into a non-saleable *Expiry* godown with optional replacement, destruction with an
+ITC-reversal reminder (Sec 17(5)(h), verify with your CA). Salt / composition on stock items with substitute search in
+the editor item picker and the POS; optional *block sale above batch MRP* (`block_above_mrp`). Agent on POS bills (8F).
+
 ## Not built / gaps
 
-- Sales commission per agent, bill-value and "buy A get B" offers, ESC/POS cash drawer (Web Serial), pharma pack.
+- Commission: TDS 194H deduction, agent ledger with its own balance screen, commission on credit notes in receipt
+  basis (agent on POS bills: 8F).
+- Offers: per-customer / per-category offers, combo prices, offers in recurring runs, conversions and importers.
+- ESC/POS: no QR / logo raster, no character code pages beyond ASCII (₹ prints as "Rs."), no network printers.
+- Pharma: Schedule X separate register book format, narcotics (NDPS) records, prescription scan attachment link
+  (batch-wise MRP check: 8F).
 - Receivables statements read invoices / payments only, so a refund voucher does not appear there: a refunded walk-in
   return shows as a credit on the Walk-in customer statement (the ledger / TB / Books are right).
-- The refund voucher has no bank-account tag (multi-account BRS sees it under the main bank).
-- Branch-wise closing stock (per-godown valuation) is not apportioned; a branch view shows no report-time stock.
-- The Sec 25(4) pair is raised by hand from the transfer list; the e-invoice / e-way JSON for it is the normal one.
+- ~~The refund voucher has no bank-account tag (multi-account BRS sees it under the main bank).~~ Done in R6-C2: each
+  non-cash tender carries `bank_account_id` (the original receipt's account) and credits that bank's own ledger.
+- ~~Branch-wise closing stock is not apportioned~~ — 7S: per-godown valuation (`docs/features/reports-engine.md`).
+- ~~The Sec 25(4) pair is raised by hand from the transfer list~~ — 7S: saving a transfer between godowns of two branches
+  with different GSTINs opens the "Tax invoice + bill" dialog at once (the list button stays for later); the e-invoice /
+  e-way JSON for it is the normal one.
+- Alt+C on the bill line godown select creates a godown (7S).

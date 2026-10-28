@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ban, FileClock, Lock, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Ban, FileClock, IndianRupee, Lock, Pencil, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { receivableBalance } from '../../lib/rcm';
+import { can, currentRole } from '../../lib/access';
 import { StatusBadge } from '../ui/StatusBadge';
 import { quoteState, quoteTone } from '../../lib/quote-status';
 import { getTable } from '../../lib/storage';
@@ -21,12 +23,27 @@ import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { edT } from '../../i18n/areas/editor';
+import { uxT } from '../../i18n/areas/invoicing-ux';
 import { stateLabel } from '../../i18n/areas/sales';
 import styles from './DocumentActions.module.css';
+import { PackingListButton } from '../dispatch/PackingListButton'; // R2-C4
+import { d3T } from '../../i18n/areas/docs-r3'; // R3-C2
+
+/** R3-C2: "Get signature" applies to issued invoices / bills of supply / challans; replacing is owner-only. */
+const proofAllowed = (d: InvoiceRecord) =>
+  ['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY', 'DELIVERY_CHALLAN'].includes(d.doc_type) && d.status !== 'Draft' && d.status !== 'Cancelled'
+  && (d.delivery_proof ? currentRole() === 'owner' : can('doc.edit'));
 
 const OrderFulfilment = lazy(() => import('../documents/OrderFulfilment').then((m) => ({ default: m.OrderFulfilment })));
 const AmendDialog = lazy(() => import('../documents/AmendDialog').then((m) => ({ default: m.AmendDialog })));
+// 8.101: counter acceptance with an on-canvas signature.
+// A2: record a payment straight from the editor.
+const PaymentModal = lazy(() => import('../modals/PaymentModal').then((m) => ({ default: m.PaymentModal })));
+const AcceptQuoteDialog = lazy(() => import('../invoicing-ux/AcceptQuoteDialog'));
+// R3-C2: receiver signature / proof of delivery (dialog + signature pad load on click).
+const DeliveryProofDialog = lazy(() => import('./DeliveryProofDialog'));
 const ActivityTimeline = lazy(() => import('../audit/ActivityTimeline').then((m) => ({ default: m.ActivityTimeline })));
+const AnnexureActions = lazy(() => import('./AnnexureActions')); // R3-B4
 
 /** Everything you can do with an already-saved document, in one place. */
 export function DocumentActions({
@@ -46,6 +63,9 @@ export function DocumentActions({
   const [debitOpen, setDebitOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [amendOpen, setAmendOpen] = useState(false);
+  const [acceptOpen, setAcceptOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const [proofOpen, setProofOpen] = useState(false); // R3-C2
   const [saved, setSaved] = useState<InvoiceRecord | undefined>(() => localDb.invoices.getById(invoiceId));
 
   // Re-read the stored row whenever the editor saves or an action changes it.
@@ -76,9 +96,16 @@ export function DocumentActions({
   const locked = isLocked(saved);
   const isOrder = saved.doc_type === 'SALES_ORDER';
 
+  const payable = canCredit && !cancelled && saved.status !== 'Draft' && saved.status !== 'Paid' && receivableBalance(saved) > 0.004 && can('payment.record');
+
   return (
     <div className={styles.wrap}>
       <div className={styles.row}>
+        {payable && (
+          <button type="button" className={`${controls.btnPrimary} ${controls.btnSm}`} onClick={() => setPayOpen(true)} data-record-payment>
+            <IndianRupee size={16} /> {uxT('raRecord')}
+          </button>
+        )}
         <span data-share-anchor>
           <ShareMenu invoice={saved} hideReminder={saved.doc_type === 'QUOTATION' || saved.doc_type === 'SALES_ORDER' || saved.status === 'Paid'} />
         </span>
@@ -105,7 +132,22 @@ export function DocumentActions({
             <FileClock size={16} /> {edT('daAmend')}
           </button>
         )}
+        <PackingListButton invoice={saved} />
+        {/* R3-B4: download / refresh the timesheet annexure (last action, §6). */}
+        {saved.annexure && <Suspense fallback={null}><AnnexureActions invoice={saved} onChanged={reloadEditor} /></Suspense>}
+        {/* R3-C2: Get signature (proof of delivery) — issued invoices / delivery challans; owner may replace. */}
+        {proofAllowed(saved) && (
+          <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setProofOpen(true)} disabled={locked} data-get-signature>
+            <Pencil size={16} /> {saved.delivery_proof ? d3T('pf.replaceButton') : d3T('pf.button')}
+          </button>
+        )}
       </div>
+      {saved.delivery_proof && <p className={styles.row} data-proof-done>{d3T('pf.done', { name: saved.delivery_proof.receiver })}</p>}
+      {proofOpen && (
+        <Suspense fallback={null}>
+          <DeliveryProofDialog invoice={saved} onClose={() => setProofOpen(false)} onDone={reloadEditor} />
+        </Suspense>
+      )}
 
       {saved.doc_type === 'QUOTATION' && (() => {
         const q = quoteState(saved, getTable<{ from_id: string; relation: string }>('doc_links'));
@@ -130,7 +172,18 @@ export function DocumentActions({
                   onClick={() => setOutcome(saved.quote_status === 'Declined' ? undefined : 'Declined')}>
                   <ThumbsDown size={15} /> {edT('daDeclined')}
                 </button>
+                {!saved.acceptance && saved.status !== 'Draft' && (
+                  <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={locked} onClick={() => setAcceptOpen(true)} data-sign-accept>
+                    <Pencil size={15} /> {uxT('accButton')}
+                  </button>
+                )}
               </>
+            )}
+            {saved.acceptance && <span className={styles.row}>{uxT('accDone', { signer: saved.acceptance.signer })}</span>}
+            {acceptOpen && (
+              <Suspense fallback={null}>
+                <AcceptQuoteDialog quote={saved} open={acceptOpen} onClose={() => setAcceptOpen(false)} onDone={reloadEditor} />
+              </Suspense>
             )}
           </div>
         );
@@ -152,6 +205,12 @@ export function DocumentActions({
           <ActivityTimeline invoiceId={invoiceId} refreshKey={tick + refreshKey} />
         </Suspense>
       </section>
+
+      {payOpen && (
+        <Suspense fallback={null}>
+          <PaymentModal invoice={saved} onClose={() => { setPayOpen(false); reloadEditor(); }} onChanged={() => reloadEditor()} />
+        </Suspense>
+      )}
 
       <CreditNoteModal
         invoice={saved}

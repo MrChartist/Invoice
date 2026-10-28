@@ -1,0 +1,79 @@
+/* Phone backup (8.20): share dialog, status line, share-target page. Loaded with those lazy components only. */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--foreground);
+}
+
+.muted {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+.warn {
+  padding: 0.75rem;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--warning);
+}
+
+.warn p {
+  margin: 0 0 0.5rem;
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 0 0 1rem;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-md);
+  text-align: left;
+  cursor: pointer;
+}
+
+.line:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.compact {
+  margin: 0;
+  border-radius: 0;
+  border-width: 0 0 1px;
+  font-size: var(--text-sm);
+}
+
+.ok {
+  color: var(--profit);
+}
+
+.due {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.page {
+  max-width: 32rem;
+  margin: 2rem auto;
+}

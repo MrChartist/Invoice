@@ -17,7 +17,8 @@ export interface PeriodBarProps {
   onChange: (preset: PeriodPreset, period: Period) => void;
 }
 
-const PRESETS: PeriodPreset[] = ['this_month', 'last_month', 'this_quarter', 'this_fy', 'last_fy', 'custom'];
+// 8.107: MTD / QTD / YTD run from the start of the period to today.
+const PRESETS: PeriodPreset[] = ['mtd', 'qtd', 'ytd', 'this_month', 'last_month', 'this_quarter', 'this_fy', 'last_fy', 'custom'];
 
 export function PeriodBar({ preset, period, onChange }: PeriodBarProps) {
   useT();

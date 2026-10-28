@@ -1,4 +1,7 @@
+import { lazy, Suspense, useEffect, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { loadRates, rateOn } from '../../lib/currency-rates';
+import { reachT } from '../../i18n/areas/reach';
 import { NumberInput } from '../ui/NumberInput';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { formatCurrency } from '../../lib/utils';
@@ -6,6 +9,9 @@ import { inrValue } from '../../lib/fx';
 import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { edT } from '../../i18n/areas/editor';
+
+// R4-C1: Incoterms / ports / countries / marks — lazy, export documents only.
+const ExportDetailsFields = lazy(() => import('../trade/ExportDetailsFields'));
 
 /**
  * Exchange rate (shown when the document currency is not INR) and, for exports, the
@@ -17,6 +23,7 @@ export function ForexFields() {
     useShallow((st) => ({
       currency: st.currency,
       exchange_rate: st.exchange_rate,
+      issue_date: st.issue_date,
       supply_type: st.supply_type,
       place_of_supply: st.place_of_supply,
       shipping_bill_no: st.shipping_bill_no,
@@ -28,6 +35,12 @@ export function ForexFields() {
   );
   const cur = (s.currency || 'INR').toUpperCase();
   const foreign = cur !== 'INR';
+  // Currency master (8H): the reference rate dated on or before the document date.
+  const ref = useMemo(() => (foreign && s.issue_date ? rateOn(loadRates(), cur, s.issue_date) : null), [foreign, cur, s.issue_date]);
+  const { patch, exchange_rate } = s;
+  useEffect(() => {
+    if (ref && !exchange_rate) patch({ exchange_rate: ref.rate });
+  }, [ref, exchange_rate, patch]);
   const exportSupply =
     s.supply_type === 'EXPORT_LUT' || s.supply_type === 'EXPORT_WITH_PAYMENT' || s.place_of_supply === '99' || s.place_of_supply === '96';
   if (!foreign && !exportSupply) return null;
@@ -49,6 +62,7 @@ export function ForexFields() {
             {rate > 0
               ? edT('fxTotal', { amount: formatCurrency(inrValue(s.total, { currency: cur, exchange_rate: rate })) })
               : edT('fxHint')}
+            {ref && <> · {reachT('fxRef', { rate: ref.rate, date: ref.date, source: ref.source })}</>}
           </span>
         </div>
       )}
@@ -68,6 +82,7 @@ export function ForexFields() {
           </label>
         </div>
       )}
+      {exportSupply && <Suspense fallback={null}><ExportDetailsFields /></Suspense>}
     </>
   );
 }

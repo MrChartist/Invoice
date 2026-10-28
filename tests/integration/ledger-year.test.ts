@@ -143,9 +143,9 @@ test('full year: balanced vouchers, trial balance, Schedule III tie-out and AS 3
   const bookBank = cashBook(bv, books.openings, 'bank', FY);
   const ledgerCash = accountStatement(ledger, A.cash, FY)!;
   const ledgerBank = accountStatement(ledger, A.bank, FY)!;
-  // Books' cash/bank books do not know manual vouchers or assets; strip those out to compare.
+  // Books' cash/bank books carry manual vouchers' cash / bank lines (QA6-1 F5) but not assets; strip those out to compare.
   const manualMove = (acc: string) =>
-    ledger.vouchers.filter((v) => v.source === 'manual' || v.kind === 'Fixed Asset').reduce((s, v) => s + v.lines.filter((l) => l.account === acc).reduce((x, l) => x + l.dr - l.cr, 0), 0);
+    ledger.vouchers.filter((v) => v.kind === 'Fixed Asset').reduce((s, v) => s + v.lines.filter((l) => l.account === acc).reduce((x, l) => x + l.dr - l.cr, 0), 0);
   assert.equal((ledgerCash.closing - manualMove(A.cash)) / 100, bookCash.closing);
   assert.equal((ledgerBank.closing - manualMove(A.bank)) / 100, bookBank.closing);
   assert.equal(cf.closingCash, ledgerCash.closing + ledgerBank.closing);

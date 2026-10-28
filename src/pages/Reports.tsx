@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, IndianRupee, Percent, ReceiptText, Wallet } from 'lucide-react';
 import {
   cashBook,
@@ -43,19 +43,21 @@ import styles from './Reports.module.css';
 import { useT } from '../i18n';
 import { repT } from '../i18n/areas/reports';
 import { plural } from '../i18n/areas/plural';
+import { REPORTS_TABS, type ReportsTab } from './page-tabs'; // R6-B1
+import { EmptyState } from '../components/ui/EmptyState';
+import { reportsEmpty } from '../components/discover';
+import { can } from '../lib/access';
+import { discoverT } from '../i18n/areas/discover-r6';
+import controls from '../styles/controls.module.css';
 
-const TABS = [
-  { id: 'customers', label: 'tabCustomers' },
-  { id: 'items', label: 'tabItems' },
-  { id: 'monthly', label: 'tabMonthly' },
-  { id: 'top', label: 'tabTop' },
-  { id: 'tax', label: 'tabTax' },
-  { id: 'payments', label: 'tabPayments' },
-  { id: 'expenses', label: 'tabExpenses' },
-  { id: 'profit', label: 'tabProfit' },
-  { id: 'party', label: 'tabParty' },
-] as const;
-type TabId = (typeof TABS)[number]['id'];
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
+const StockStatementTab = lazy(() => import('../components/trade/StockStatementTab')); // R8-C (TR-C4)
+
+// 8.109: saved views + month-end packs (own chunk).
+const ReportViewsBar = lazy(() => import('../components/invoicing-ux/ReportViewsBar'));
+
+const TABS = REPORTS_TABS; // R6-B1: list in reports-tabs.ts
+type TabId = ReportsTab;
 
 const inr = (v: string | undefined) => (v || 'INR').toUpperCase() === 'INR';
 
@@ -69,6 +71,7 @@ export function Reports() {
   const [period, setPeriod] = useState<Period>(() => periodForPreset('this_fy'));
   const [version, setVersion] = useState(0);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const periodRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const refresh = () => setVersion((v) => v + 1);
@@ -110,6 +113,7 @@ export function Reports() {
       ...books,
       invoices: books.invoices.filter((i) => inr(i.currency)),
       transactions: books.transactions.filter((t) => !foreign.has(t.invoice_id)),
+      manualVouchers: [], // receipts against receipts (payment modes): manual vouchers are not receipts
     };
     const inPeriodInr = invoices.filter((i) => inr(i.currency) && inPeriod(isoDay(i.issue_date), period));
     const dash = summarize(inPeriodInr);
@@ -149,19 +153,53 @@ export function Reports() {
   const t = customers.totals;
   return (
     <div className={surface.page}>
+      <Suspense fallback={null}><ScreenTip id="reports" /></Suspense>
       <PageHeader
         title={repT('title')}
         subtitle={repT('subtitle')}
       />
 
-      <PeriodBar
-        preset={preset}
-        period={period}
-        onChange={(p, range) => {
-          setPreset(p);
-          setPeriod(range);
-        }}
-      />
+      <Suspense fallback={null}>
+        <ReportViewsBar
+          current={{ route: '/reports', tab, preset, period }}
+          initialViewId={params.get('view')}
+          openPacks={params.get('packs') === '1'}
+          initialMonth={params.get('month')}
+          onApply={(v) => {
+            setPreset(v.preset);
+            setPeriod(v.preset === 'custom' && v.period ? v.period : periodForPreset(v.preset));
+            if (TABS.some((t) => t.id === v.tab)) selectTab(v.tab as TabId);
+          }}
+        />
+      </Suspense>
+
+      <div ref={periodRef}>
+        <PeriodBar
+          preset={preset}
+          period={period}
+          onChange={(p, range) => {
+            setPreset(p);
+            setPeriod(range);
+          }}
+        />
+      </div>
+
+      {/* R6-B3: no sales in the period — say what fills the reports and offer the next step. */}
+      {tab !== 'expenses' && reportsEmpty(docs.map((d) => d.date), period) && (
+        <EmptyState
+          icon={ReceiptText}
+          title={discoverT('reportsTitle')}
+          text={discoverT('reportsText')}
+          action={
+            <div className={surface.pageActions} style={{ justifyContent: 'center' }} data-reports-empty>
+              <button type="button" className={controls.btnPrimary} onClick={() => periodRef.current?.querySelector<HTMLElement>('select, button, input')?.focus()}>
+                {discoverT('changePeriod')}
+              </button>
+              {can('doc.create') && <Link to="/invoice" className={controls.btnOutline}>{discoverT('reportsNew')}</Link>}
+            </div>
+          }
+        />
+      )}
 
       <div className={surface.statGrid}>
         <StatCard label={repT('statNetSales')} icon={IndianRupee} value={`₹${formatMoney(t.taxable)}`} hint={repT('statNetSalesHint')} />
@@ -215,6 +253,7 @@ export function Reports() {
         {tab === 'expenses' && <ExpensesTab rep={expenses} period={period} />}
         {tab === 'profit' && <ItemProfitTab rep={itemProfit} period={period} />}
         {tab === 'party' && <PartyProfitTab rep={partyProfit} period={period} />}
+        {tab === 'stockstatement' && <Suspense fallback={null}><StockStatementTab /></Suspense>}
       </div>
 
       <CrossChecks checks={checks} />

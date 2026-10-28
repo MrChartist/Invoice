@@ -1,15 +1,18 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowDown,
   ArrowUp,
   Banknote,
+  BellRing,
   CheckCheck,
   Copy,
   Download,
+  Ban,
   Eye,
   FilePlus2,
   FileText,
+  Layers,
   Lock,
   Pencil,
   Search,
@@ -17,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
+import { uxT } from '../i18n/areas/invoicing-ux';
 import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { wireT } from '../i18n/areas/wiring';
@@ -36,14 +40,20 @@ import { useVirtualRows } from '../hooks/useVirtualRows';
 
 import { PaymentModal } from '../components/modals/PaymentModal';
 import { localDb, generateId, isIssued } from '../lib/localDb';
+import { ensureRetailHooks } from '../lib/retail/ensure-hooks';
 import { useCan } from '../hooks/useCan';
 import { isLocked } from '../lib/period-lock';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { quoteState, quoteTone } from '../lib/quote-status';
+import { supersededIds } from '../lib/quote-revisions';
+import { s2T } from '../i18n/areas/sales-r2';
+import type {} from '../types/sales-r2';
 import { buildOrderIndex, fulfilmentFromIndex, ORDER_STATES, orderTone, type OrderState } from '../lib/sales-orders';
-import { bulkMarkPaid, canMarkPaid, matchesListFilter, sortInvoices, type SortDir, type SortKey } from '../lib/invoice-list';
+import { amountDue, linkedCredits } from '../lib/amount-due';
+import { bulkMarkPaid, bulkPaidTotal, canMarkPaid, matchesListFilter, sortInvoices, type SortDir, type SortKey } from '../lib/invoice-list';
 import { effectiveStatus } from '../lib/invoice-status';
-import { getTable } from '../lib/storage';
+import { getTable, peekTable } from '../lib/storage';
+import type { BinEntry } from '../types/trade-r4';
 import type { CreditLink } from '../lib/stats';
 import { isRevenueDoc, summarize } from '../lib/stats';
 import { downloadText, toCsv } from '../lib/download';
@@ -54,13 +64,21 @@ import surface from '../styles/surface.module.css';
 import styles from './Transactions.module.css';
 import { receivableBalance, receivableTotal } from '../lib/rcm';
 
+// QA10: release a retail bill's exchange receipts / finance DO on delete or cancel, even before any retail screen opened.
+ensureRetailHooks();
+
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
+
 // The preview pulls in the template engine and QR code; load it only when opened.
 const InvoicePreviewModal = lazy(() =>
   import('../components/preview/InvoicePreview').then((m) => ({ default: m.InvoicePreviewModal })),
 );
 
 // Batch PDF / ZIP (WP-4): the PDF stack and template engine load only when used.
+const BulkCollectDialog = lazy(() => import('../components/invoicing-ux/BulkCollectDialog'));
 const BatchPdfModal = lazy(() => import('../components/preview/BatchPdfModal').then((m) => ({ default: m.BatchPdfModal })));
+// R2-B2: progress billing summary (by party / quotation), loaded on demand.
+const ProgressReportModal = lazy(() => import('../components/documents/ProgressReportModal').then((m) => ({ default: m.ProgressReportModal })));
 
 type Filter = 'all' | 'unpaid' | 'overdue' | 'paid' | 'draft' | 'approval';
 
@@ -134,15 +152,9 @@ export function Transactions() {
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: 'date', dir: 'desc' });
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [bulkPay, setBulkPay] = useState<{ method: string; date: string } | null>(null);
+  // 8.106: bulk remind / bulk write-off on the selected (filtered) rows.
+  const [bulkCollect, setBulkCollect] = useState<'remind' | 'writeoff' | null>(null);
   const [batchPdf, setBatchPdf] = useState<InvoiceRecord[] | null>(null);
-  // Deletes wait a few seconds behind an Undo toast before they touch storage.
-  const [pendingDelete, setPendingDelete] = useState<Set<string>>(() => new Set());
-  const deleteTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const pendingRef = useRef<Set<string>>(pendingDelete);
-  useEffect(() => {
-    pendingRef.current = pendingDelete;
-  }, [pendingDelete]);
-
   const reload = () => setVersion((v) => v + 1);
 
   useEffect(() => {
@@ -156,6 +168,8 @@ export function Transactions() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const links = useMemo(() => getTable<CreditLink & { relation: string }>('doc_links'), [version]);
   const summary = useMemo(() => summarize(invoices, now, links, 'INR'), [invoices, links]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Amount due per row is net of linked credit notes (src/lib/amount-due.ts).
+  const credits = useMemo(() => linkedCredits(links, invoices), [invoices, links]);
   // One pass over every document gives each sales order its fulfilment state.
   const orderStates = useMemo(() => {
     const out = new Map<string, OrderState>();
@@ -165,24 +179,31 @@ export function Transactions() {
     return out;
   }, [invoices, links]);
 
+  const superseded = useMemo(() => supersededIds(links), [links]);
+  const hasStages = useMemo(() => invoices.some((i) => i.progress_of?.source_id), [invoices]);
+  const [showSuperseded, setShowSuperseded] = useState(false);
+  const [progressOpen, setProgressOpen] = useState(false);
+  // PERF-2: sort once per data / sort change; the filters below keep that order (the sort is stable, so
+  // filtering the sorted list equals sorting the filtered one). Typing filters a deferred query.
+  const sorted = useMemo(() => sortInvoices(invoices, sort.key, sort.dir), [invoices, sort]);
+  const searchText = useMemo(() => {
+    const m = new Map<InvoiceRecord, string[]>();
+    for (const inv of invoices) m.set(inv, [inv.invoice_number, inv.client?.name, inv.client?.company, inv.client?.gstin].filter((f): f is string => !!f).map((f) => f.toLowerCase()));
+    return m;
+  }, [invoices]);
+  const searchQuery = useDeferredValue(query);
   const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
     const inBranch = branchPredicates(branch).invoice;
-    const list = invoices
-      .filter((inv) => !pendingDelete.has(inv.id))
+    return sorted
       .filter((inv) => matchesFilter(inv, filter, now))
       .filter((inv) => matchesListFilter(inv, { docType, from, to }))
       .filter((inv) => !branch || inBranch(inv))
       .filter((inv) => docType !== 'SALES_ORDER' || !orderState || orderStates.get(inv.id) === orderState)
-      .filter(
-        (inv) =>
-          !q ||
-          [inv.invoice_number, inv.client?.name, inv.client?.company, inv.client?.gstin].some((f) =>
-            f?.toLowerCase().includes(q),
-          ),
-      );
-    return sortInvoices(list, sort.key, sort.dir);
-  }, [invoices, query, filter, docType, orderState, orderStates, from, to, branch, sort, pendingDelete]); // eslint-disable-line react-hooks/exhaustive-deps
+      // R2-B3: quotations replaced by a later revision are hidden unless asked for.
+      .filter((inv) => showSuperseded || !superseded.has(inv.id))
+      .filter((inv) => !q || (searchText.get(inv) ?? []).some((f) => f.includes(q)));
+  }, [sorted, searchText, searchQuery, filter, docType, orderState, orderStates, from, to, branch, superseded, showSuperseded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Long lists mount only the rows in view (see useVirtualRows); 100 rows or fewer render as before.
   const rowKeys = useMemo(() => rows.map((r) => r.id), [rows]);
@@ -240,6 +261,8 @@ export function Transactions() {
         ...(inv.reverse_charge ? { rcm_tax_excluded: true, total: receivableTotal(inv) } : {}),
         balance_due: receivableTotal(inv),
         late_fee_for: undefined,
+        party_balance_snapshot: undefined, // 8.5: a copy takes its own balance when issued
+        acceptance: undefined, // 8.101: a signature belongs to the quote that was signed
         // Files stay with the original document (6.12); custom field values are copied like any other field.
         attachments: undefined,
         // An amendment marker belongs to the amended document only (5.9).
@@ -252,7 +275,12 @@ export function Transactions() {
         // A copy is a fresh document: it fulfils no sales order and is not closed.
         sales_order_id: undefined,
         order_closed_on: undefined,
-        items: (inv.items ?? []).map(({ order_line_id: _drop, ...item }) => item),
+        // R2-B: a copy is not a revision, a stage invoice or a milestone tick of another document.
+        revision_of: undefined,
+        revision_no: undefined,
+        progress_of: undefined,
+        milestones: inv.milestones?.map((m) => ({ id: m.id, name: m.name, percent: m.percent, ...(m.expected_date ? { expected_date: m.expected_date } : {}) })),
+        items: (inv.items ?? []).map(({ order_line_id: _drop, progress_line_of: _p, ...item }) => (void _p, item)),
       };
       const saved = localDb.invoices.save(clone);
       reload();
@@ -261,27 +289,6 @@ export function Transactions() {
       notify((err as Error).message, 'error');
     }
   };
-
-  /** Actually remove whatever is waiting; errors (e.g. a lock set meanwhile) are reported, the rest still go. */
-  const flushDeletes = (ids: Set<string>) => {
-    clearTimeout(deleteTimer.current);
-    const failed: string[] = [];
-    for (const id of ids) {
-      try {
-        localDb.invoices.remove(id);
-      } catch (err) {
-        failed.push((err as Error).message);
-      }
-    }
-    setPendingDelete(new Set());
-    reload();
-    if (failed.length) notify(failed[0], 'error');
-  };
-
-  // Leaving the page commits any delete still waiting for its Undo window.
-  useEffect(() => () => {
-    if (pendingRef.current.size) flushDeletes(pendingRef.current);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = async (docs: InvoiceRecord[]) => {
     // Deleting a goods-returning credit note takes its goods out of stock again: refuse when a later
@@ -295,19 +302,37 @@ export function Transactions() {
         if (issues.warnings.length && !window.confirm(`${n.invoice_number}: ${issues.warnings.join(' ')}\n\nDelete anyway?`)) return;
       }
     }
-    const ids = new Set([...pendingDelete, ...docs.map((d) => d.id)]);
-    clearTimeout(deleteTimer.current);
-    setPendingDelete(ids);
+    // QA6-1 F16: the delete is committed at once (to the recycle bin), so a reload, a closed tab or a crash cannot bring
+    // it back and no report counts it meanwhile; Undo restores it from the bin (rights, period lock, module checks).
+    const done: string[] = [];
+    for (const d of docs) {
+      try {
+        localDb.invoices.remove(d.id);
+        done.push(d.id);
+      } catch (err) {
+        notify((err as Error).message, 'error');
+      }
+    }
     setSelected(new Set());
-    deleteTimer.current = setTimeout(() => flushDeletes(ids), 6000);
-    const label = docs.length === 1 ? docs[0].invoice_number : salesT('tx.nDocuments', { n: docs.length });
+    reload();
+    if (!done.length) return;
+    const gone = docs.filter((d) => done.includes(d.id));
+    const label = gone.length === 1 ? gone[0].invoice_number : salesT('tx.nDocuments', { n: gone.length });
     notify(salesT('tx.deleted', { label }), 'success', {
-      duration: 6000,
       action: {
         label: salesT('tx.undo'),
         onClick: () => {
-          clearTimeout(deleteTimer.current);
-          setPendingDelete(new Set());
+          void import('../lib/trust/recycle-bin').then(({ BIN_TABLE, restoreEntries }) => {
+            const ids = new Set(done);
+            const entries = [...peekTable<BinEntry>(BIN_TABLE)].reverse().filter((e) => e.table === 'invoices' && ids.has(e.row_id));
+            const latest = [...new Map(entries.map((e) => [e.row_id, e.id])).values()];
+            try {
+              restoreEntries(latest, { withChildren: true });
+            } catch (err) {
+              notify((err as Error).message, 'error');
+            }
+            reload();
+          });
         },
       },
     });
@@ -361,6 +386,7 @@ export function Transactions() {
 
   return (
     <div className={surface.page}>
+      <Suspense fallback={null}><ScreenTip id="invoices" /></Suspense>
       <PageHeader
         title={salesT('tx.title')}
         subtitle={salesT('tx.subtitle')}
@@ -372,6 +398,11 @@ export function Transactions() {
             <button type="button" className={controls.btnOutline} onClick={() => void exportXlsx()} disabled={rows.length === 0}>
               <Download size={16} /> {salesT('exportXlsx')}
             </button>
+            {hasStages && (
+              <button type="button" className={controls.btnOutline} onClick={() => setProgressOpen(true)} data-progress-report-open>
+                <Layers size={16} /> {s2T('p.report')}
+              </button>
+            )}
             {can('doc.create') && (
               <Link to="/invoice" className={controls.btnPrimary}>
                 <FilePlus2 size={16} /> {salesT('tx.newInvoice')}
@@ -438,6 +469,11 @@ export function Transactions() {
             <input type="date" className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label={salesT('tx.toDate')} />
           </label>
           <BranchFilter value={branch} onChange={setBranch} testId="tx-branch" />
+          {superseded.size > 0 && (
+            <label className={styles.range}>
+              <input type="checkbox" checked={showSuperseded} onChange={(e) => setShowSuperseded(e.target.checked)} data-show-superseded /> <span>{s2T('q.showSuperseded')}</span>
+            </label>
+          )}
           {(docType || from || to || branch) && (
             <button type="button" className={controls.btnGhost} onClick={() => { setDocType(''); setFrom(''); setTo(''); setBranch(''); }}>
               {salesT('tx.clearFilters')}
@@ -452,11 +488,21 @@ export function Transactions() {
               <button
                 type="button"
                 className={controls.btnOutline}
-                disabled={!visibleSelected.some(canMarkPaid)}
+                disabled={!visibleSelected.some((i) => canMarkPaid(i, credits))}
                 onClick={() => setBulkPay({ method: 'Bank Transfer', date: todayInput() })}
               >
                 <CheckCheck size={16} /> {salesT('tx.markPaid')}
               </button>
+            )}
+            {can('payment.record') && (
+              <>
+                <button type="button" className={controls.btnOutline} onClick={() => setBulkCollect('remind')} data-bulk-remind-open>
+                  <BellRing size={16} /> {uxT('bkRemind')}
+                </button>
+                <button type="button" className={controls.btnOutline} onClick={() => setBulkCollect('writeoff')} data-bulk-writeoff-open>
+                  <Ban size={16} /> {uxT('bkWriteOff')}
+                </button>
+              </>
             )}
             <button type="button" className={controls.btnOutline} onClick={() => exportCsv(visibleSelected)}>
               <Download size={16} /> {salesT('exportCsv')}
@@ -529,7 +575,8 @@ export function Transactions() {
                   if (slot.kind === 'gap') return <VirtualGap key={slot.key} height={slot.height} colSpan={8} />;
                   const inv = rows[slot.index];
                   const status = effectiveStatus(inv, now);
-                  const canPay = isRevenueDoc(inv) && receivableBalance(inv) > 0;
+                  const due = isRevenueDoc(inv) ? amountDue(inv, credits.get(inv.id)) : 0;
+                  const canPay = due > 0;
                   const locked = isLocked(inv); // period lock: read-only, no edit / delete / payment
                   const lockedTitle = salesT('tx.lockedTitle');
                   const num = { number: inv.invoice_number };
@@ -554,7 +601,7 @@ export function Transactions() {
                       <td className={cn(styles.nowrap, styles.cDate)}>
                         {formatDate(inv.issue_date)}
                         <div className={cn(styles.docType, status === 'Overdue' && styles.overdueText)}>
-                          {salesT('tx.due', { date: formatDate(inv.due_date) || '—' })}
+                          {salesT(inv.doc_type === 'QUOTATION' ? 'tx.validUntil' : 'tx.due', { date: formatDate(inv.due_date) || '—' })}
                         </div>
                       </td>
                       <td className={styles.cStatus}>
@@ -578,13 +625,14 @@ export function Transactions() {
                       </td>
                       <td className={cn(surface.numeric, styles.cTotal)}>{formatCurrency(inv.total, inv.currency)}</td>
                       <td className={cn(surface.numeric, styles.cBal)}>
-                        {isRevenueDoc(inv) ? formatCurrency(receivableBalance(inv), inv.currency) : '—'}
+                        {isRevenueDoc(inv) ? formatCurrency(due, inv.currency) : '—'}
                       </td>
                       <td className={styles.cAct}>
                         <div className={surface.rowActions}>
                           {canPay && can('payment.record') && (
                             <button type="button" className={controls.btnIcon} onClick={() => setPayFor(inv)} disabled={locked} title={locked ? lockedTitle : salesT('tx.recordPayment')} aria-label={salesT('tx.recordPaymentFor', num)}>
                               <Banknote size={16} />
+                              <span className={styles.payLabel} aria-hidden>₹ {salesT('tx.received')}</span>
                             </button>
                           )}
                           <button type="button" className={controls.btnIcon} onClick={() => handlePreview(inv)} title={salesT('tx.previewPdf')} aria-label={salesT('tx.previewOf', num)}>
@@ -643,12 +691,22 @@ export function Transactions() {
           <BatchPdfModal invoices={batchPdf} onClose={() => setBatchPdf(null)} />
         </Suspense>
       )}
+      {progressOpen && (
+        <Suspense fallback={null}>
+          <ProgressReportModal onClose={() => setProgressOpen(false)} />
+        </Suspense>
+      )}
+      {bulkCollect && (
+        <Suspense fallback={null}>
+          <BulkCollectDialog mode={bulkCollect} invoices={visibleSelected} onClose={() => setBulkCollect(null)} onDone={(m) => { notify(m, 'success'); setSelected(new Set()); reload(); }} />
+        </Suspense>
+      )}
       <Modal
         open={!!bulkPay}
         onClose={() => setBulkPay(null)}
         size="sm"
-        title={salesT('tx.bulkTitle', { n: visibleSelected.filter(canMarkPaid).length })}
-        subtitle={salesT('tx.bulkSub', { amount: formatCurrency(visibleSelected.filter(canMarkPaid).reduce((s, i) => s + (Number(receivableBalance(i)) || 0), 0)) })}
+        title={salesT('tx.bulkTitle', { n: visibleSelected.filter((i) => canMarkPaid(i, credits)).length })}
+        subtitle={salesT('tx.bulkSub', { amount: formatCurrency(bulkPaidTotal(visibleSelected, credits)) })}
         footer={
           <>
             <button type="button" className={controls.btnOutline} onClick={() => setBulkPay(null)}>{salesT('cancel')}</button>

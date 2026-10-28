@@ -13,11 +13,12 @@
  * still pending goes onto the new challan / invoice (see `sales-orders.ts`).
  */
 
-import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
+import { calcInputFromRecord, calculateInvoice, isExcludedLine, num, round2 } from './invoice-calc';
+import type {} from '../types/sales-r2';
 import { generateId, getTable, setTable } from './storage';
 import { receivableTotal } from './rcm';
 import { reasonReturnsGoods } from './credit-restock';
-import { localDb } from './localDb';
+import { localDb, resettleCreditedInvoices } from './localDb';
 import { getLockUntil, isPeriodLockedError } from './period-lock';
 import { amendmentCheck, buildAmendment, canAmend } from './amendments';
 import { loadFiled } from './compliance';
@@ -27,6 +28,7 @@ import { liveRemovalIssues, assertRemovable } from './stock-timeline';
 import { ADVANCES_TABLE, advanceBalance } from './advance-tax';
 import { doubleBilledRows, liveInvoiceIds, mileageDb, timeDb } from './timesheets';
 import { purchasesDb } from './purchases';
+import { withIssueSnapshot } from './khata-actions'; // R6-C5
 import { REJECTIONS_IN_TABLE, rejectedByLine } from './rejections-in';
 import type { RejectionIn } from '../types/job-work';
 import type { AdvanceRecord } from '../types/advances';
@@ -40,7 +42,8 @@ import {
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
-export type DocRelation = 'converted' | 'credit_note' | 'debit_note' | 'cancelled';
+/** `progress` (R2-B2): stage invoice raised from a quotation / sales order; `revised` (R2-B3): old quote → its revision. */
+export type DocRelation = 'converted' | 'credit_note' | 'debit_note' | 'cancelled' | 'progress' | 'revised' | 'price_drop'; // price_drop: TR-A3 (run note ← bill, provenance only)
 
 export interface DocLink {
   id: string;
@@ -54,6 +57,8 @@ export interface DocLink {
   prev_status?: InvoiceStatus;
   /** `cancelled` only: user acknowledged recorded payments. */
   payments_acknowledged?: boolean;
+  /** `progress` only (R2-B2): the "remaining balance" invoice that closed the source. */
+  final?: boolean;
   created_at: string;
 }
 
@@ -116,6 +121,29 @@ export function allowedConversions(
   }));
 }
 
+/**
+ * The conversions the Convert menu lists (QA-3 F22). The matrix allows both "Invoice" and "Tax Invoice" targets (old
+ * flows and imports may use either), but a menu offering both is confusing: a GST-registered sender gets "Tax
+ * Invoice", an unregistered one "Invoice". Bill of Supply stays for a registered sender (exempt supplies, composition).
+ */
+export function menuConversions(
+  source: Pick<InvoiceRecord, 'doc_type' | 'status'> & Partial<Pick<InvoiceRecord, 'order_closed_on' | 'sender'>>,
+): ConversionOption[] {
+  const registered = !!String(source.sender?.companyGstin ?? '').trim();
+  const composition = registered && source.sender?.gst_scheme === 'composition';
+  return allowedConversions(source).filter((o) => {
+    if (o.target === 'INVOICE') return !registered;
+    if (o.target === 'TAX_INVOICE') return registered && !composition;
+    if (o.target === 'BILL_OF_SUPPLY') return registered;
+    return true;
+  });
+}
+
+/** Sales documents a recurring schedule may start from (QA-3 F22: never a credit / debit note, quote, order or challan). */
+export function isRecurringSource(t: DocumentType): boolean {
+  return isInvoiceType(t) || t === 'PROFORMA';
+}
+
 export function canConvert(
   source: Pick<InvoiceRecord, 'doc_type' | 'status'> & Partial<Pick<InvoiceRecord, 'order_closed_on'>>,
   target: DocumentType,
@@ -168,6 +196,16 @@ function recompute(input: InvoiceRecord): InvoiceRecord {
     tcs_amount: t.tcs_amount,
     tds_amount: t.tds_amount,
   };
+}
+
+/** R2-B3: drop unselected optional / alternative lines and clear the flags on the ones kept. */
+export function keepSelectedLines(items: readonly InvoiceItem[]): InvoiceItem[] {
+  return (items ?? []).filter((i) => !isExcludedLine(i)).map((i) => {
+    if (!i.optional && !i.alt_group && i.selected === undefined) return i;
+    const { optional: _o, selected: _s, alt_group: _g, ...rest } = i;
+    void [_o, _s, _g];
+    return rest;
+  });
 }
 
 function cloneItems(items: InvoiceItem[]): InvoiceItem[] {
@@ -295,6 +333,7 @@ export function buildConvertedDraft(
     recurring_id: undefined,
     recurring_date: undefined,
     late_fee_for: undefined,
+    party_balance_snapshot: undefined, // 8.5: a new document takes its own balance at issue
     // Attachments belong to the source document (its signed copy, its receipts), not the new one.
     attachments: undefined,
     created_at: undefined,
@@ -313,7 +352,16 @@ export function buildConvertedDraft(
     ...(target === 'BILL_OF_SUPPLY' ? { gst_mode: 'NONE' as const, reverse_charge: false } : {}),
     ...(source.doc_type === 'SALES_ORDER' ? orderPart(source, ctx) : {}),
     ...(source.doc_type === 'DELIVERY_CHALLAN' && ctx.rejected && target !== 'DELIVERY_CHALLAN' ? challanPart(source, ctx.rejected) : {}),
+    // R2-B3: a revision / proposal belongs to the quotation; R2-B2: stage marks belong to the stage invoice.
+    revision_of: undefined,
+    revision_no: undefined,
+    proposal_sections: undefined,
+    progress_of: undefined,
+    milestones: target === 'SALES_ORDER' && source.milestones?.length ? source.milestones.map((m) => ({ id: m.id, name: m.name, percent: m.percent, ...(m.expected_date ? { expected_date: m.expected_date } : {}) })) : undefined,
   };
+  // R2-B3: only the optional / alternative lines the client selected go onto the next document, as plain lines.
+  draft.items = keepSelectedLines(draft.items);
+  if (draft.items.length === 0) throw new DocumentError('No lines are left once unselected optional items are dropped.');
   return recompute(draft);
 }
 
@@ -328,7 +376,7 @@ export function statusAfterConversion(
 }
 
 /** Creates, saves and links a new draft. Returns the saved record. */
-export function convertDocument(source: InvoiceRecord, target: DocumentType): InvoiceRecord {
+export function convertDocument(source: InvoiceRecord, target: DocumentType, opts: { issue?: boolean } = {}): InvoiceRecord {
   const today = localIsoDate();
   const settings = localDb.settings.get();
   let order: Pick<ConvertContext, 'pending' | 'carryCharges'> = {};
@@ -355,7 +403,8 @@ export function convertDocument(source: InvoiceRecord, target: DocumentType): In
     dueDays: num(settings.defaultDueDays, 14),
     ...order,
   });
-  const saved = localDb.invoices.save(draft);
+  // R6-C5 (8.7): converted straight to an issued invoice, it freezes the party's previous balance at this moment.
+  const saved = localDb.invoices.save(opts.issue && isInvoiceType(target) ? withIssueSnapshot({ ...draft, status: 'Sent' }) : draft);
   addLink({ from_id: source.id, to_id: saved.id, relation: 'converted' });
 
   const nextStatus = statusAfterConversion(source);
@@ -376,6 +425,12 @@ export interface CreditLineRequest {
   /** Original item id. */
   itemId: string;
   quantity: number;
+  /**
+   * QA19 U7: credit this VALUE of the line (a fare / price difference) instead of a quantity. The note's line carries
+   * exactly this amount; its quantity is amount ÷ rate, not rounded (a rounded quantity of a ₹12,345 fare line turned an
+   * ₹800 refund into ₹740.70), and still counts against the line's creditable quantity.
+   */
+  amount?: number;
 }
 
 export interface CreditLineStatus {
@@ -406,7 +461,7 @@ export function creditedQuantities(
 ): Record<string, number> {
   const out: Record<string, number> = {};
   for (const cn of creditNotesFor(invoiceId, links, allInvoices)) {
-    for (const it of cn.items ?? []) out[it.id] = round2((out[it.id] ?? 0) + num(it.quantity));
+    for (const it of cn.items ?? []) out[it.id] = Math.round(((out[it.id] ?? 0) + num(it.quantity)) * 1e6) / 1e6; // QA19 U7
   }
   return out;
 }
@@ -424,7 +479,8 @@ export function creditableLines(
       item,
       originalQty,
       creditedQty,
-      remainingQty: Math.max(0, round2(originalQty - creditedQty)),
+      // QA19 U7: 6 decimals — a value credit (amount ÷ rate) leaves an exact remainder, not one rounded to 0.01 of a unit.
+      remainingQty: Math.max(0, Math.round((originalQty - creditedQty) * 1e6) / 1e6),
     };
   });
 }
@@ -445,6 +501,8 @@ export interface CreditInput {
    * on for a sales return, off for a discount / rate difference / GST correction / cancelled service.
    */
   goodsReturned?: boolean;
+  /** QA18 T5: the note's date (a local day; default today) — e.g. the date a travel booking was cancelled. */
+  date?: string;
 }
 
 export interface CreditDraftResult {
@@ -483,9 +541,10 @@ export function buildCreditNote(
   }
   const picked: InvoiceItem[] = [];
   for (const req of input.lines) {
-    const qty = round2(num(req.quantity));
-    if (qty <= 0) continue;
+    const byValue = req.amount !== undefined && num(req.amount) > 0;
     const line = status.find((s) => s.item.id === req.itemId);
+    const qty = byValue && line && num(line.item.rate) > 0 ? num(req.amount) / num(line.item.rate) : round2(num(req.quantity));
+    if (qty <= 0) continue;
     if (!line) {
       errors.push('A selected line does not exist on the original invoice.');
       continue;
@@ -500,7 +559,9 @@ export function buildCreditNote(
     picked.push({
       ...line.item,
       quantity: qty,
-      amount: round2(qty * num(line.item.rate)),
+      amount: byValue ? round2(num(req.amount)) : round2(qty * num(line.item.rate)),
+      // QA8 T12: the weighing describes the whole sale; a partial credit does not print it.
+      ...(line.item.wt && Math.abs(qty - num(line.item.quantity)) > 0.0005 ? { wt: undefined } : {}),
       // A partial credit returns only as many serials as units: the first ones NOT already returned on an
       // earlier credit note against this line (edit the note to choose others).
       ...(line.item.serials?.length
@@ -544,6 +605,7 @@ export function buildCreditNote(
     recurring_id: undefined,
     recurring_date: undefined,
     late_fee_for: undefined,
+    party_balance_snapshot: undefined, // 8.5: a new document takes its own balance at issue
     created_at: undefined,
     updated_at: undefined,
     amends: undefined,
@@ -583,7 +645,7 @@ export function buildCreditNote(
 export function createCreditNote(invoice: InvoiceRecord, input: CreditInput): InvoiceRecord {
   const links = readLinks();
   const all = localDb.invoices.getAll();
-  const today = localIsoDate();
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(input.date ?? '') ? input.date! : localIsoDate();
   const { record, errors } = buildCreditNote(invoice, input, links, all, {
     id: generateId(),
     invoice_number: localDb.invoices.nextNumber(today, 'CREDIT_NOTE'),
@@ -595,6 +657,8 @@ export function createCreditNote(invoice: InvoiceRecord, input: CreditInput): In
   if (stock.errors.length) throw new DocumentError(stock.errors.join(' '));
   const saved = localDb.invoices.save(record);
   addLink({ from_id: invoice.id, to_id: saved.id, relation: 'credit_note', reason: input.reason.trim() });
+  // The note may settle the rest of the invoice (status Paid) — see src/lib/amount-due.ts.
+  resettleCreditedInvoices(saved.id);
   return saved;
 }
 
@@ -653,6 +717,7 @@ export function buildDebitNote(
     recurring_id: undefined,
     recurring_date: undefined,
     late_fee_for: undefined,
+    party_balance_snapshot: undefined, // 8.5: a new document takes its own balance at issue
     created_at: undefined,
     updated_at: undefined,
     amends: undefined,
@@ -668,9 +733,9 @@ export function buildDebitNote(
 
 export function createDebitNote(
   invoice: InvoiceRecord,
-  input: { lines: DebitLine[]; reason: string },
+  input: { lines: DebitLine[]; reason: string; /** QA20 V6: the note's date (a local day; default today). */ date?: string },
 ): InvoiceRecord {
-  const today = localIsoDate();
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(input.date ?? '') ? input.date! : localIsoDate();
   const rec = buildDebitNote(invoice, input, {
     id: generateId(),
     invoice_number: localDb.invoices.nextNumber(today, 'DEBIT_NOTE'),
@@ -867,12 +932,12 @@ export function startAmendment(invoice: InvoiceRecord, reason = ''): InvoiceReco
 
 export interface ChainNode {
   doc: InvoiceRecord;
-  relation: DocRelation | 'origin';
+  relation: Exclude<DocRelation, 'price_drop'> | 'origin';
   parentId: string | null;
   depth: number;
 }
 
-const CHAIN_RELATIONS: DocRelation[] = ['converted', 'credit_note', 'debit_note'];
+const CHAIN_RELATIONS: DocRelation[] = ['converted', 'credit_note', 'debit_note', 'progress', 'revised'];
 
 /**
  * Pure: every document connected to `id` through conversion / credit / debit
@@ -910,7 +975,7 @@ export function buildDocumentChain(
     edges
       .filter((e) => e.from_id === docId)
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
-      .forEach((e) => walk(e.to_id, e.relation, docId, depth + 1));
+      .forEach((e) => walk(e.to_id, e.relation as ChainNode['relation'], docId, depth + 1));
   };
   walk(root, 'origin', null, 0);
   return out;

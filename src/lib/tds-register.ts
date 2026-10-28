@@ -27,6 +27,7 @@ import { scoreHeader } from './import-mapping';
 import { parseDate, parseNumber } from './importers';
 import { isValidTan } from './validators';
 import { receivableTotal } from './rcm';
+import { oldCodeOf } from './ita2025';
 
 /* ── Periods ──────────────────────────────────────────────────── */
 
@@ -175,7 +176,15 @@ export interface TdsInput {
   payments?: Payment[];
   clients?: Client[];
   certificates?: TdsCertificate[];
+  /**
+   * Additive (R5-A5): expected TDS that is not on an invoice — e.g. 194-O deducted by an e-commerce operator, from
+   * imported settlements (`marketplace/tcs-credit.ts`). Register and 26AS reconciliation treat them like invoice lines.
+   */
+  extraExpected?: TdsExpectedLine[];
 }
+
+/** R5-A5: a non-invoice expected TDS line (`invoiceId` = the source record id, `number` = its reference). */
+export type TdsExpectedLine = TdsInvoiceLine;
 
 export function tdsInvoiceLines(input: TdsInput): TdsInvoiceLine[] {
   const clients = input.clients ?? [];
@@ -220,6 +229,7 @@ export function tdsInvoiceLines(input: TdsInput): TdsInvoiceLine[] {
       settled,
     });
   }
+  for (const l of input.extraExpected ?? []) if (l && l.tds > 0 && tdsPeriodOf(l.date)) out.push(l); // R5-A5
   return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.number.localeCompare(b.number)));
 }
 
@@ -487,6 +497,9 @@ const TAN_IN_TEXT = /\b([A-Z]{4}[0-9]{5}[A-Z])\b/;
 
 /** "194J - Fees for professional services", "Sec 194-C", "194JB" → "194J" / "194C" / "194JB". */
 export function sectionCode(raw: string): string {
+  // Income-tax Act 2025 reference in a Form 168 / AIS export ("393(1) Table Sl. No. 6(iii)") → its 1961 family.
+  const old = oldCodeOf(raw);
+  if (old) return old;
   const m = /\b(19\d|206)\s*-?\s*([A-Z]{0,3})\b/i.exec(raw ?? '');
   if (m) return `${m[1]}${m[2]}`.toUpperCase();
   return (raw ?? '').trim().split(/\s+/)[0] ?? '';

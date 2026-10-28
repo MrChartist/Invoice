@@ -19,6 +19,7 @@ import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
 import { nextSeriesNumberFor, numberFitsFy, recordSeries } from './series-counters';
 import { assertRemovable, liveRemovalIssues } from './stock-timeline';
+import { isVoidStatus } from './purchase-normalize';
 import { descendantIds, treeRows, type TreeRow } from './stock-groups';
 
 export const GODOWNS_TABLE = 'godowns';
@@ -66,6 +67,18 @@ export function isMultiGodown(stored: readonly Godown[]): boolean {
   return godownList(stored).length > 1;
 }
 
+/** 8F: godowns stock may not be sold from (kind 'expiry': expired / breakage stock). */
+const NON_SALEABLE: ReadonlySet<string> = new Set(['expiry', 'wip', 'qc', 'transit', 'site', 'consignment']); // R4-A: shop floor, QC hold, in transit; R5-B6: works site; R8-C: consignment
+export const nonSaleableGodowns = (list: readonly Godown[]): Set<string> => new Set(list.filter((g) => !!g.kind && NON_SALEABLE.has(g.kind)).map((g) => g.id));
+/** R8-C (TR-C1): consignment godowns (principals' goods) — the one non-saleable kind an agency line may sell from. */
+export const consignmentGodowns = (list: readonly Godown[]): Set<string> => new Set(list.filter((g) => g.kind === 'consignment').map((g) => g.id));
+/**
+ * R9 (RT-A decision for the append-only `Godown.kind` union): 'used' (second-hand goods taken in exchange / bought from
+ * customers) is SALEABLE — it is deliberately not in `NON_SALEABLE` — but a sale line drawn from it is offered the
+ * margin scheme (Rule 32(5), RT12) by the RT-D3 / RT-E3 screens through this set.
+ */
+export const usedGoodsGodowns = (list: readonly Godown[]): Set<string> => new Set(list.filter((g) => g.kind === 'used').map((g) => g.id));
+
 export function godownName(list: readonly Godown[], id: string | undefined): string {
   const key = id || MAIN_GODOWN_ID;
   return list.find((g) => g.id === key)?.name ?? (key === MAIN_GODOWN_ID ? 'Main' : 'Unknown godown');
@@ -91,6 +104,33 @@ export function validateTransferShape(t: Pick<StockTransfer, 'date' | 'from_godo
 /* ── Storage ──────────────────────────────────────────────────── */
 
 const now = () => new Date().toISOString();
+
+/**
+ * Review M2: the live Sec 25(4) tax invoice / purchase bill raised for a transfer (`branch_transfer_id`),
+ * if any. A cancelled invoice no longer counts; a bill counts while it exists and is not void.
+ */
+type PairInvoice = { branch_transfer_id?: string; status?: string; invoice_number?: string };
+type PairBill = { branch_transfer_id?: string; status?: unknown; bill_number?: string };
+
+export function transferPairOf(
+  transferId: string,
+  data: { invoices?: readonly PairInvoice[]; purchases?: readonly PairBill[] } = {},
+): { invoice?: string; bill?: string } | null {
+  if (!transferId) return null;
+  const inv = (data.invoices ?? getTable<PairInvoice>('invoices')).find((i) => i?.branch_transfer_id === transferId && i.status !== 'Cancelled');
+  const bill = (data.purchases ?? getTable<PairBill>('purchases')).find(
+    (b) => b?.branch_transfer_id === transferId && !isVoidStatus(b.status),
+  );
+  if (!inv && !bill) return null;
+  return { ...(inv ? { invoice: inv.invoice_number || 'invoice' } : {}), ...(bill ? { bill: bill.bill_number || 'bill' } : {}) };
+}
+
+function assertNoTransferPair(t: Pick<StockTransfer, 'id' | 'transfer_number'>, what: 'edit' | 'delete'): void {
+  const pair = transferPairOf(t.id);
+  if (!pair) return;
+  const docs = [pair.invoice && `tax invoice ${pair.invoice}`, pair.bill && `purchase bill ${pair.bill}`].filter(Boolean).join(' and ');
+  throw new Error(`Stock transfer ${t.transfer_number} has a branch-transfer ${docs} (Sec 25(4)). Cancel the invoice and delete the bill before you ${what} the transfer.`);
+}
 
 const lockSubject = (t: Pick<StockTransfer, 'id' | 'date' | 'transfer_number'>) => ({
   id: t.id,
@@ -176,7 +216,7 @@ export const godownsDb = {
   isMulti: (): boolean => isMultiGodown(godownsDb.stored()),
 
   /** Add or rename a godown. Names are unique (case-insensitive). */
-  save(input: { id?: string; name: string; address?: string; parent_id?: string; job_worker?: boolean; vendor_id?: string }): Godown {
+  save(input: { id?: string; name: string; address?: string; parent_id?: string; job_worker?: boolean; vendor_id?: string; kind?: Godown['kind'] | '' }): Godown {
     const name = input.name.trim();
     if (!name) throw new Error('Enter a godown name.');
     const rows = godownsDb.stored();
@@ -187,7 +227,7 @@ export const godownsDb = {
     const existing = input.id ? rows.find((g) => g.id === input.id) : undefined;
     const parentIssue = godownParentIssue(input.id, input.parent_id, list);
     if (parentIssue) throw new Error(parentIssue);
-    const { parent_id: _oldParent, job_worker: oldJw, vendor_id: oldVendor, ...base } = existing ?? ({} as Partial<Godown>);
+    const { parent_id: _oldParent, job_worker: oldJw, vendor_id: oldVendor, kind: oldKind, ...base } = existing ?? ({} as Partial<Godown>);
     void _oldParent;
     // 7M: a job worker's premises (absent in the input = unchanged on an edit).
     const jw = input.job_worker ?? oldJw;
@@ -200,6 +240,8 @@ export const godownsDb = {
       ...(input.parent_id ? { parent_id: input.parent_id } : {}),
       ...(jw ? { job_worker: true } : {}),
       ...(vendor ? { vendor_id: vendor } : {}),
+      // 8F: van / expiry godown (absent in the input = unchanged; '' = ordinary).
+      ...((input.kind ?? oldKind) ? { kind: (input.kind ?? oldKind) as Godown['kind'] } : {}),
       created_at: existing?.created_at ?? now(),
       updated_at: now(),
     };
@@ -235,6 +277,7 @@ export const transfersDb = {
     if (shape) throw new Error(shape);
     const rows = transfersDb.all();
     const existing = input.id ? rows.find((r) => r.id === input.id) : undefined;
+    if (existing) assertNoTransferPair(existing, 'edit');
     if (existing) assertUnlocked(lockSubject(existing), 'edit');
     const asked = (input.transfer_number ?? '').trim();
     // An edit that moves the date into another FY takes a number from that FY's series (as advances do).
@@ -274,6 +317,7 @@ export const transfersDb = {
   remove(id: string, opts: { confirmStock?: boolean } = {}): void {
     const t = transfersDb.get(id);
     if (!t) return;
+    assertNoTransferPair(t, 'delete');
     assertUnlocked(lockSubject(t), 'delete');
     assertRemovable(liveRemovalIssues({ refType: 'transfer', refId: id }), opts.confirmStock);
     setTable(TRANSFERS_TABLE, transfersDb.all().filter((r) => r.id !== id));

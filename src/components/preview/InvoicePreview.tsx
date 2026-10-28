@@ -7,7 +7,7 @@ import { localDb, blankProfile } from '../../lib/localDb';
 import { TEMPLATES, templateById } from '../templates/registry';
 import { TemplateEngine } from '../templates/TemplateEngine';
 import { ShareMenu } from '../share';
-import { paperSize, resolve as resolveDesign, saveDesign, loadDesign, sanitizePreprinted, type PreprintedPrefs } from '../../lib/design-prefs';
+import { designForDoc, paperSize, resolve as resolveDesign, saveDesign, loadDesign, sanitizePreprinted, type PreprintedPrefs } from '../../lib/design-prefs';
 import { printCopies, sanitizeCopies, supplyNature, type CopySetting } from '../../lib/print-copies';
 import { invoicePdfName, PdfBuilder } from '../../lib/pdf-batch';
 import { PrintOptions } from './PrintOptions';
@@ -16,15 +16,20 @@ import { cn, formatCurrency, formatDate } from '../../lib/utils';
 import { downloadBlob } from '../../lib/download';
 import { canShareFiles, invoiceSummaryText, invoiceUpiLink, shareFile } from '../../lib/share';
 import { buildClientCopyHtml } from '../../lib/client-copy';
+import { responseLinks } from '../../lib/quote-acceptance';
 import { FOCUSABLE } from '../ui/Modal';
 import controls from '../../styles/controls.module.css';
 import styles from './InvoicePreview.module.css';
 import { receivableBalance } from '../../lib/rcm';
+import { canDocRight } from '../../lib/user-rights';
+import { rPosT } from '../../i18n/areas/restaurant-pos';
 
 
 interface InvoicePreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** A1 / A4: run Print or Share PDF once the paper has rendered (post-save sheet, Save & print). */
+  autoAction?: 'print' | 'share';
 }
 
 /** Full-screen, scale-to-fit A4 preview with print and multi-page PDF export. */
@@ -33,7 +38,7 @@ export const InvoicePreviewModal = (props: InvoicePreviewModalProps) =>
   // editor does not re-render a closed preview.
   props.isOpen ? <PreviewBody {...props} /> : null;
 
-const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
+const PreviewBody = ({ isOpen, onClose, autoAction }: InvoicePreviewModalProps) => {
   const invoice = useInvoiceStore();
   const paperRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -63,7 +68,7 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
   // Print-job options (P0-9 copies, P2 pre-printed): start from the profile's default, change per job.
   const [copySetting, setCopySetting] = useState<CopySetting>(() => sanitizeCopies(design.copies));
   const [preprinted, setPreprinted] = useState<PreprintedPrefs>(() => design.preprinted ?? { on: false, top_mm: 40, left_mm: 0 });
-  const jobDesign = useMemo(() => ({ ...design, preprinted }), [design, preprinted]);
+  const jobDesign = useMemo(() => designForDoc({ ...design, preprinted }, invoice.doc_type), [design, preprinted, invoice.doc_type]); // R2-C5 per-type labels
   const nature = supplyNature(invoice);
   const copies = printCopies(invoice, copySetting);
 
@@ -132,7 +137,7 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  // (PreviewBody is only mounted while open — see InvoicePreviewModal.)
 
   const idx = Math.max(0, TEMPLATES.findIndex((t) => t.id === invoice.template_id));
   const meta = templateById(invoice.template_id);
@@ -211,11 +216,34 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
       business: rec.sender?.companyName ?? '',
       pay: due > 0 && rec.doc_type !== 'QUOTATION' && rec.doc_type !== 'SALES_ORDER' ? { amountText: formatCurrency(due, rec.currency), upiLink: invoiceUpiLink(rec), upiId: rec.sender?.upiId, qrDataUrl } : null,
       generatedOn: formatDate(new Date()),
+      // 8.101: a quotation's copy carries pre-filled "Accept" / "Request changes" replies.
+      respond: responseLinks(rec, formatCurrency(rec.total, rec.currency)),
     });
     const name = pdfFilename().replace(/\.pdf$/, '.html');
     const file = new File([html], name, { type: 'text/html' });
     const result = canShareFiles(file) ? await shareFile(file, { title: name }) : 'unsupported';
     if (result === 'unsupported' || result === 'failed' || result === 'blocked') downloadBlob(name, file);
+  };
+
+  /** R3-A5: the first copy as image(s) — shared as files, else downloaded (ZIP for several pages); or copied. */
+  const handleShareImage = async (copy = false) => {
+    if (busy) return;
+    const node = paperRef.current?.querySelector<HTMLElement>('[data-print-copy]') ?? paperRef.current;
+    if (!node) return;
+    setBusy(true);
+    setError('');
+    try {
+      const m = await import('../../lib/share-image');
+      const files = await m.renderBillImages(node, invoice.invoice_number, design);
+      if (copy) {
+        if (!(await m.copyBillImage(files[0]))) await m.shareOrDownloadImages(files.slice(0, 1), invoice.invoice_number);
+      } else await m.shareOrDownloadImages(files, invoice.invoice_number, `${DOCUMENT_LABELS[invoice.doc_type]} ${invoice.invoice_number}`.trim());
+    } catch (err) {
+      console.error('Image share failed', err);
+      setError(rPosT('imageFailed'));
+    } finally {
+      setBusy(false);
+    }
   };
 
   /** Share the PDF itself (e.g. into a WhatsApp chat); browsers without file sharing get a download. */
@@ -244,6 +272,19 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
       setBusy(false);
     }
   };
+
+  // A1 / A4: one automatic Print / Share PDF after the paper has laid out.
+  const autoDone = useRef(false);
+  useEffect(() => {
+    if (!autoAction || autoDone.current) return;
+    autoDone.current = true;
+    const id = setTimeout(() => {
+      if (autoAction === 'print') window.print();
+      else void handleSharePDF();
+    }, 350);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAction]);
 
   return createPortal(
     <div ref={overlayRef} className={cn(styles.overlay, 'print-host')} role="dialog" aria-modal="true" aria-label="Document preview">
@@ -288,7 +329,7 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
             <Palette size={18} />
           </Link>
           {invoice.id && (
-            <ShareMenu invoice={invoice as unknown as InvoiceRecord} onDownloadPdf={handleExportPDF} onSharePdf={canShareFiles() ? handleSharePDF : undefined} onClientCopy={handleClientCopy} />
+            <ShareMenu invoice={invoice as unknown as InvoiceRecord} onDownloadPdf={handleExportPDF} onSharePdf={canShareFiles() ? handleSharePDF : undefined} onShareImage={() => void handleShareImage()} onCopyImage={typeof ClipboardItem !== 'undefined' ? () => void handleShareImage(true) : undefined} onClientCopy={handleClientCopy} />
           )}
           {readyToShare && (
             <button type="button" className={controls.btnPrimary} onClick={() => shareReady(readyToShare)}>
@@ -303,10 +344,10 @@ const PreviewBody = ({ isOpen, onClose }: InvoicePreviewModalProps) => {
             onPreprinted={setPreprinted}
             onSaveDefault={saveJobDefaults}
           />
-          <button type="button" className={controls.btnOutline} onClick={() => window.print()}>
+          <button type="button" className={controls.btnOutline} onClick={() => window.print()} disabled={!canDocRight(invoice.doc_type ?? '', 'print')}>
             <Printer size={16} /> <span className={styles.hideSm}>Print</span>
           </button>
-          <button type="button" className={controls.btnPrimary} onClick={handleExportPDF} disabled={busy}>
+          <button type="button" className={controls.btnPrimary} onClick={handleExportPDF} disabled={busy || !canDocRight(invoice.doc_type ?? '', 'print')}>
             {busy ? <Loader2 size={16} className={styles.spin} /> : <Download size={16} />} PDF
           </button>
           <button type="button" className={controls.btnIcon} onClick={onClose} aria-label="Close preview">

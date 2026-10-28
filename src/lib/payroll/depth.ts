@@ -25,6 +25,7 @@ import type {
   PayrollRun,
   PayslipLine,
   Perquisite,
+  Relief89Record,
   SalaryStructure,
   TaxRegime,
 } from '../../types/payroll';
@@ -127,6 +128,9 @@ export function computeArrears(input: ArrearsComputeInput): ArrearsMonth[] {
       esi_wages: esiWages,
       esi_ee: esiWages > 0 ? rupeeUp((esiWages * esiR.employee_pct) / 100) : 0,
       esi_er: esiWages > 0 ? rupeeUp((esiWages * esiR.employer_pct) / 100) : 0,
+      // 7T: wage differences for the EPFO arrear ECR.
+      eps_wages: round2(fresh.eps_wages - old.eps_wages),
+      edli_wages: round2(fresh.edli_wages - old.edli_wages),
     });
   }
   return out;
@@ -609,6 +613,8 @@ export interface DepthData {
   adjustments: readonly PayrollAdjustment[];
   perquisites: readonly Perquisite[];
   fnf: readonly FnfSettlement[];
+  /** Additive (7T): relief u/s 89 workings (Form 10E); those marked `apply_tds` reduce the year's TDS. */
+  relief89?: readonly Relief89Record[];
 }
 
 export const EMPTY_DEPTH: DepthData = { arrears: [], loans: [], leaveTypes: [], leaveEntries: [], adjustments: [], perquisites: [], fnf: [] };
@@ -664,7 +670,10 @@ export function extrasFor(employee: Employee, month: string, depth: DepthData, b
   const laterAvg = later.length ? round2(later.reduce((s, m) => s + perquisiteFor(depth.perquisites, employee.id, m), 0) / later.length + loanPerquisite(mineLoans, month, base.runs)) : 0;
 
   const arrears = depth.arrears.filter((r) => r.employee_id === employee.id && r.pay_month === month);
+  const fyYear = Number(fyStartOfMonth(month).slice(0, 4));
+  const relief89 = round2((depth.relief89 ?? []).filter((r) => r.employee_id === employee.id && r.fy === fyYear && r.apply_tds).reduce((s, r) => s + r.relief, 0));
   return {
+    ...(relief89 > 0 ? { relief89 } : {}),
     ...(arrears.length ? { arrears } : {}),
     ...(items.length ? { items } : {}),
     ...(now ? { perquisites: now } : {}),

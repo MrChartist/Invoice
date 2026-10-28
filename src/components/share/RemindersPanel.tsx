@@ -1,7 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { BellRing, CheckCircle2 } from 'lucide-react';
 import type { InvoiceRecord } from '../../types/invoice';
-import { localDb } from '../../lib/localDb';
 import { formatCurrency, formatDate, cn } from '../../lib/utils';
 import {
   pendingReminders,
@@ -13,9 +12,11 @@ import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './share.module.css';
 import { useReminderLog } from './useReminderLog';
-import { receivableBalance } from '../../lib/rcm';
+import { KEYS, peekTable } from '../../lib/storage';
+import { linkedCredits, type CreditLinkRow } from '../../lib/amount-due';
 import { useT } from '../../i18n';
 import { remindT } from '../../i18n/areas/reminders';
+import { panelOptions } from '../../lib/reminder-context';
 
 // The dialog (and its strings) loads only when a reminder is opened, off the Dashboard's first paint.
 const ReminderModal = lazy(() => import('./ReminderModal').then((m) => ({ default: m.ReminderModal })));
@@ -54,15 +55,17 @@ export function RemindersPanel({ invoices, limit = 5, today, className }: Remind
   useT(); // re-render on a language switch (5.4)
   const { log, reload } = useReminderLog();
   const [active, setActive] = useState<InvoiceRecord | null>(null);
-  const [all] = useState<InvoiceRecord[]>(() => invoices ?? (localDb.invoices.getAll() as InvoiceRecord[]));
+  // PERF-2: shared parsed rows (read-only: the reminder logic derives new arrays).
+  const [all] = useState<InvoiceRecord[]>(() => invoices ?? (peekTable<InvoiceRecord>(KEYS.invoices) as InvoiceRecord[]));
   const source = invoices ?? all;
-
   const pending = useMemo(
-    () => pendingReminders(source, today ?? new Date(), log),
+    // Credit notes linked to an invoice settle part of it: never chased (src/lib/amount-due.ts).
+    // R2-A4/A5/A7: company schedule, party reminder mode, promises-to-pay (hold / firm) and payment grades.
+    () => pendingReminders(source, today ?? new Date(), log, { credits: linkedCredits(peekTable<CreditLinkRow>('doc_links'), source), ...panelOptions(source, today) }),
     [source, today, log],
   );
   const shown = pending.slice(0, limit);
-  const outstanding = pending.reduce((sum, p) => sum + receivableBalance(p.invoice), 0);
+  const outstanding = pending.reduce((sum, p) => sum + p.balance, 0);
 
   return (
     <section className={cn(surface.card, className)} aria-label={remindT('aria')}>
@@ -115,7 +118,7 @@ export function RemindersPanel({ invoices, limit = 5, today, className }: Remind
                   {remindT(p.stage === 'upcoming' ? 'upcoming' : p.stage === 'due_today' ? 'due' : 'overdue')}
                 </span>
                 <span className={styles.amount}>
-                  {formatCurrency(receivableBalance(p.invoice), p.invoice.currency)}
+                  {formatCurrency(p.balance, p.invoice.currency)}
                 </span>
                 <button
                   type="button"

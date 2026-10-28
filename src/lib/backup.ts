@@ -17,7 +17,7 @@
  * unrelated site data.
  */
 
-import { DB_PREFIX, SYNC_META_KEYS, collectAppData, readRaw, registerVaultTransition, removeRaw, vaultEnabled, vaultSeal, vaultUnseal, writeRaw } from './storage';
+import { DB_PREFIX, DEVICE_DRAFT_KEYS, SYNC_META_KEYS, collectAppData, readRaw, registerVaultTransition, removeRaw, vaultEnabled, vaultSeal, vaultUnseal, writeRaw } from './storage';
 import { idbDel, idbGet, idbSet } from './idb-kv';
 import { LATEST_SCHEMA_VERSION, SCHEMA_VERSION_KEY } from './migrations';
 import { DEVICE_LOCAL_KEYS } from './auth';
@@ -65,7 +65,7 @@ const LOCAL_ONLY = new Set<string>(DEVICE_LOCAL_KEYS);
  * Never exported, restored or kept in the undo copy, but removed by a wipe (unlike LOCAL_ONLY): folder-sync
  * bookkeeping describes what this device last exchanged with the sync folder (docs/features/sync.md).
  */
-const NOT_BACKED_UP = new Set<string>(SYNC_META_KEYS);
+const NOT_BACKED_UP = new Set<string>([...SYNC_META_KEYS, ...DEVICE_DRAFT_KEYS]); // + POS bills on hold (8.21)
 const leaveOut = (key: string) => LOCAL_ONLY.has(key) || NOT_BACKED_UP.has(key);
 
 export interface BackupFile {
@@ -85,6 +85,23 @@ export interface BackupSummary {
   missingAttachments?: number;
   /** Damaged or disallowed attachment files left out of the restore. */
   droppedAttachments?: number;
+  /** Business name of the active profile in the backup (QA-3 F14: the restore confirm names it). */
+  business?: string;
+  /** When the backup file was made (ISO), if it says. */
+  exportedAt?: string;
+}
+
+/** The active sender profile's business name in a backup's settings ('' when there is none). */
+export function backupBusinessName(data: Record<string, string>): string {
+  try {
+    const s = JSON.parse(data[`${DB_PREFIX}settings`] ?? 'null') as { profiles?: { id?: string; companyName?: string }[]; activeProfileId?: string; companyName?: string } | null;
+    if (!s || typeof s !== 'object') return '';
+    const profiles = Array.isArray(s.profiles) ? s.profiles : [];
+    const active = profiles.find((p) => p?.id === s.activeProfileId) ?? profiles[0];
+    return String(active?.companyName ?? s.companyName ?? '').trim().slice(0, 120);
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -105,6 +122,7 @@ export function attachmentRestoreNote(summary: BackupSummary | undefined | null)
 }
 
 function collectBackup(now: Date): BackupFile {
+  audit.flush(); // R15-A2: this task's audit appends belong in the file
   const data = collectAppData();
   for (const key of Object.keys(data)) if (leaveOut(key)) delete data[key];
   return { app: BACKUP_APP_ID, version: 1, exportedAt: now.toISOString(), data };
@@ -141,9 +159,44 @@ export const VAULT_PLAIN_BACKUP_MESSAGE =
 
 /** Text of a plain (unencrypted) full backup for a manual download. Owner only; refused in vault mode. */
 export function exportPlainBackup(now: Date = new Date()): string {
+  return plainBackupParts(now).join('');
+}
+
+/**
+ * PERF-1 (H11): the same file as a Blob built from parts, so the 60–70 MB text is never materialised
+ * as one string (the download / save-to-disk paths). Byte-for-byte equal to `exportPlainBackup`.
+ */
+export function exportPlainBackupBlob(now: Date = new Date(), type = 'application/json;charset=utf-8'): Blob {
+  return new Blob(plainBackupParts(now), { type });
+}
+
+function plainBackupParts(now: Date): string[] {
   requireAccess('data.backup');
   if (!plainBackupAllowed()) throw new Error(VAULT_PLAIN_BACKUP_MESSAGE);
-  return JSON.stringify(collectBackup(now), null, 2);
+  return backupTextParts(collectBackup(now));
+}
+
+/** `JSON.stringify(file, null, 2)` as a list of parts (one per stored value): same text when joined. */
+export function backupTextParts(file: BackupFile): string[] {
+  const out: string[] = ['{'];
+  let first = true;
+  for (const [k, v] of Object.entries(file)) {
+    if (v === undefined) continue;
+    out.push(`${first ? '' : ','}\n  ${JSON.stringify(k)}: `);
+    first = false;
+    if (k === 'data' && v && typeof v === 'object') {
+      const entries = Object.entries(v as Record<string, string>).filter(([, x]) => x !== undefined);
+      if (!entries.length) {
+        out.push('{}');
+        continue;
+      }
+      out.push('{');
+      entries.forEach(([dk, dv], i) => out.push(`${i ? ',' : ''}\n    ${JSON.stringify(dk)}: `, JSON.stringify(dv)));
+      out.push('\n  }');
+    } else out.push(JSON.stringify(v, null, 2).replace(/\n/g, '\n  '));
+  }
+  out.push(first ? '}' : '\n}');
+  return out;
 }
 
 export function backupFilename(now: Date = new Date(), encrypted = false): string {
@@ -235,11 +288,30 @@ export async function decryptBackup(
   return parseBackup(plain);
 }
 
-function countRows(raw: string | undefined): number {
+/** Parsed values of a backup's keys, each parsed at most once per check (PERF-1, H11). */
+type BackupParser = (fullKey: string) => { ok: boolean; value: unknown };
+function backupParser(data: Record<string, string>): BackupParser {
+  const seen = new Map<string, { ok: boolean; value: unknown }>();
+  return (key) => {
+    let e = seen.get(key);
+    if (!e) {
+      try {
+        e = { ok: true, value: JSON.parse(data[key]) as unknown };
+      } catch {
+        e = { ok: false, value: null };
+      }
+      seen.set(key, e);
+    }
+    return e;
+  };
+}
+
+function countRows(raw: string | undefined, parsed?: unknown): number {
   if (!raw) return 0;
+  if (parsed !== undefined) return Array.isArray(parsed) ? parsed.length : 0;
   try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.length : 0;
+    const value = JSON.parse(raw);
+    return Array.isArray(value) ? value.length : 0;
   } catch {
     return 0;
   }
@@ -273,19 +345,23 @@ export function parseBackup(text: string): { data: Record<string, string>; summa
   if (Object.keys(data).length === 0) {
     throw new Error('No invoice data found in this file.');
   }
-  validateBackupData(data);
+  const parse = backupParser(data);
+  validateBackupData(data, parse);
   // Attachment files are checked by content; bad ones are left out, dangling references reported.
-  const files = checkBackupAttachments(data);
+  const files = checkBackupAttachments(data, (k) => (data[k] ? parse(k).value : null));
+  const rowsOf = (key: string) => countRows(data[key], data[key] ? parse(key).value : undefined);
 
   return {
     data,
     summary: {
-      invoices: countRows(data[`${DB_PREFIX}invoices`]),
-      clients: countRows(data[`${DB_PREFIX}clients`]),
+      invoices: rowsOf(`${DB_PREFIX}invoices`),
+      clients: rowsOf(`${DB_PREFIX}clients`),
       keys: Object.keys(data).length,
       ...(files.files ? { attachments: files.files } : {}),
       ...(files.missing ? { missingAttachments: files.missing } : {}),
       ...(files.dropped ? { droppedAttachments: files.dropped } : {}),
+      ...(backupBusinessName(data) ? { business: backupBusinessName(data) } : {}),
+      ...(typeof root.exportedAt === 'string' && /^\d{4}-\d{2}-\d{2}/.test(root.exportedAt) ? { exportedAt: root.exportedAt } : {}),
     },
   };
 }
@@ -314,6 +390,8 @@ const RECORD_TABLES = [
   'advances',
   // Price levels & schemes (6.9), POS day-close records (6.8)
   'price_levels', 'schemes', 'pos_day_close',
+  // 8E retail speed: cashier shifts (X / Z per shift)
+  'pos_shifts',
   // Tally parity: TDS challans / manual deductions / return marks, supplier advances (bill-wise)
   'tds_challans', 'tds_deductions', 'tds_returns', 'vendor_payments',
   // Series high-water marks: STR / PO / ADV / RFV / RCPT numbers are never reused (integrity review)
@@ -332,27 +410,133 @@ const RECORD_TABLES = [
   'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
   // Payroll depth (7P): arrears, loans, leave, adjustments, perquisites, full & final
   'payroll_arrears', 'employee_loans', 'leave_types', 'leave_entries', 'payroll_adjustments', 'perquisites', 'fnf_settlements',
+  // Payroll follow-ups (7T): relief u/s 89 (Form 10E) workings, actuarial valuations
+  'payroll_relief89', 'actuarial_valuations',
   // Manufacturing & stock vouchers (Phase 7): BOMs, Manufacturing / Stock Journals, Physical Stock
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   // Job work and Rejections In (Phase 7M)
   'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
+  // 7S: production plans (MRP)
+  'production_plans',
   // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master with rate history
   'gst_setoffs', 'gst_challans', 'hsn_master',
   // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52)
   'rcm_documents',
+  // 7R: PMT-09 transfers, GST refund claims, ISD documents, TRACES justification imports
+  'gst_pmt09', 'gst_refunds', 'isd_documents', 'tds_justifications',
   // Migration, audit & year-end (WP-7): reviewed year-end steps per FY
   'year_end',
   // Inventory masters (WP-8): stock groups, stock categories, units of measure
   'stock_groups', 'stock_categories', 'units',
+  // 7U: forex bank moves, e-payment batches, sales agents, commission postings
+  'fx_bank_moves', 'epay_batches', 'sales_agents', 'commission_postings',
+  // 8D GST guards: supplier follow-ups from the 2B match, 2B ITC pushed to the 3B view, GSTR-1 as-filed snapshots
+  'gst_followups', 'gstr2b_itc', 'gstr1_snapshots',
+  // 8C: documents inbox, draft bills, recurring bills, bank rules, supplier payment requests
+  'doc_inbox', 'purchase_drafts', 'recurring_bills', 'bank_rules', 'payment_requests',
+  // 8F: distribution masters, van settlements, order pad, breakage / expiry claims and receipts
+  'dist_areas', 'dist_routes', 'dist_beats', 'van_settlements', 'order_pad_outbox', 'order_pad_imports', 'expiry_claims', 'expiry_receipts',
+  // 8H: business loans & EMIs, currency reference rates
+  'business_loans', 'currency_rates',
+  // Round 2 (R2-C): notes to accounts per FY, deferral schedules, packing lists, package types
+  'notes_to_accounts', 'deferrals', 'packing_lists', 'package_types',
+  // Round 2 (R2-A): payment terms master, collection follow-ups, bad-debt recoveries
+  'payment_terms', 'collection_notes', 'write_off_recoveries',
+  // Round 2 (R2-B): batch invoice runs, proposal section snippets
+  'batch_runs', 'proposal_snippets',
+  // Round 3 (R3-A): restaurant dining areas, tables, running orders, modifier groups
+  'dining_areas', 'dining_tables', 'table_orders', 'modifier_groups',
+  // Round 3 (R3-B): work types (rate cards), project tasks, retainers
+  'work_types', 'project_tasks', 'retainers',
+  // Round 3 (R3-C): GSTR-1 portal file imports, DSC register, monthly client checklist
+  'gst_portal_files', 'dsc_register', 'client_checklist',
+  // Round 4 (R4-A): production orders, QC decisions, recall notices, landed-cost vouchers
+  'production_orders', 'qc_results', 'recall_notices', 'landed_cost_vouchers',
+  // Round 4 (R4-B): gift vouchers, store price overrides, transfer requests
+  'gift_vouchers', 'branch_prices', 'transfer_requests',
+  // Round 4 (R4-C): LUT register, export IRMs / incentives / write-offs, recycle bin
+  'lut_register', 'export_irms', 'export_incentives', 'export_writeoffs', 'recycle_bin',
+  // Round 5 (R5-A): sales channels, channel SKU map, marketplace imports, settlements, GST TCS / TDS credit rows, returns desk
+  'sales_channels', 'channel_skus', 'marketplace_imports', 'settlements', 'eco_credits', 'marketplace_returns',
+  // Round 5 (R5-C): fee plans / runs, common-credit runs, donations, 10BD filings, 10BE, properties, leases, security deposits
+  'fee_plans', 'fee_runs', 'common_credit_runs', 'donations', 'form_10bd_filings', 'form_10be', 'properties', 'leases', 'security_deposits',
+  // Round 5 (R5-B): consignment notes, GTA option per FY, vehicles, trip sheets, RA measurements, BOQ coefficients
+  'consignment_notes', 'gta_options', 'vehicles', 'trips', 'ra_measurements', 'boq_coefficients',
+  // Round 6 (R6-C3): one row per import run of suppliers / ledgers / opening balances
+  'import_runs',
+  // Round 7 (hotel): room types, rooms, rate plans, reservations, folios, guests, night audits
+  'hotel_room_types', 'hotel_rooms', 'hotel_rate_plans', 'hotel_reservations', 'hotel_folios', 'hotel_guests', 'hotel_night_audits',
+  // Round 8 (R8-A): party rates, trade claims, price-drop runs, interest runs, packaging types / moves
+  'party_rates', 'trade_claims', 'price_drops', 'interest_runs', 'packaging_types', 'packaging_moves',
+  // Round 8 (R8-B): bill-charge heads, brokerage postings
+  'trade_charge_heads', 'brokerage_postings',
+  // Round 8 (R8-C): arrivals, bikri pattis, indents
+  'arrivals', 'sale_pattis', 'indents',
+  // Round 9 (R9-A … R9-E): retail riders / settlements / short book; doctors, refills; alterations; IMEI checks, finance
+  // deals, service jobs; metal rates, jewellery tags, karigar moves (names in `retail/rt-shared.ts`)
+  'delivery_riders', 'rider_settlements', 'short_book', 'doctors', 'rx_refills', 'alteration_jobs', 'imei_checks', 'finance_deals', 'service_jobs', 'metal_rates', 'jewel_tags', 'karigar_moves',
+  // R11-B (construction finance): contract register, secured advances, price-variation statements, bank guarantees
+  'works_contracts', 'secured_advances', 'price_variations', 'bank_guarantees',
+  // R11-C: builders — projects, units, bookings (BKG/FY…), payment plans, stage certificates, RERA account entries
+  'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
+  // R10-A: appointments, service staff, commission plans, staff payouts, payer claims (CLM/FY…)
+  'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
+  // R10-B: OPD visits (OPD/FY…), admissions (IPD/FY…), lab test master, lab orders (LAB/FY…)
+  'clinic_visits', 'admissions', 'lab_tests', 'lab_orders',
+  // R10-C: membership plans, memberships (MEM/FY…), check-ins (one row per day), classes / batches, class attendance
+  'member_plans', 'memberships', 'checkins', 'class_schedules', 'class_attendance',
+  // R10-D: vehicles / appliances, labour operations (job cards stay in R9's service_jobs)
+  'service_assets', 'labour_ops',
+  // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
+  // (MUS settlements), hired equipment, plant log sheets (PLG)
+  'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
+  // R12-A: farm batches, quality-cut tables, pooled farmer cycles (CYB/FY…)
+  'farm_batches', 'quality_cut_tables', 'farmer_cycles',
+  // R12-B: dairy — rate charts, shift collection (one row per centre per shift), milk dispatches (MDS/FY…), milk cards
+  'milk_rate_charts', 'milk_shifts', 'milk_dispatches', 'milk_cards',
+  // R12-C (mills): weighbridge slips (WBS/FY…), custom-milling agreements (deliveries CMR/FY…)
+  'weighbridge_slips', 'cmr_agreements',
+  // R12-D: cold-storage lots (CSR / GPO), rent plans, loans against stored produce (LAS), members' share ledger (SHC)
+  'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares',
+  // R13-A: work centres, routings, job cards (JCD/FY…, one row per order per operation)
+  'work_centres', 'routings', 'job_cards',
+  // R13-B: drawings, inspection reports (FAI/FY…), job quotes, moulding runs, print estimates (PES/FY…)
+  'drawings', 'inspection_reports', 'job_quotes', 'process_runs', 'print_estimates',
+  // R13-C: cut plans / lots (CUT/FY…, bundles inside)
+  'cut_plans',
+  // R13-D: food batch cost cards (versions by effective date), AA / EPCG export authorisations, incentive claims
+  'cost_cards', 'export_authorisations', 'incentive_claims',
+  // R14-A: engagements (ENG/FY…), conflict checks
+  'engagements', 'conflict_checks',
+  // R14-D: partners, partner runs (year-end appropriation, monthly 194T credits), UDIN register
+  'partners', 'partner_runs', 'udin_register',
+  // R14-B: client-money (trust) vouchers (CMV/FY…)
+  'client_money',
+  // R14-C: EDF register (export of services, FEMA 2026)
+  'edf_register',
+  // R15-B: travel bookings (components of a trip / event file)
+  'travel_bookings',
+  // R15-C: supplier statements (BSP / consolidator / bed-bank, rows inside)
+  'supplier_statements',
+  // R17-B: site duty registers (musters; one per site × month, rows inside)
+  'site_musters',
+  // R17-C: site compliance proof (PF / ESI challans per site × month)
+  'site_compliance',
+  // R18-A: society units (wing / flat / shop, areas, construction cost, owners, tenant, parking)
+  'society_units',
+  // R18-B: society billing runs (one per period / special levy; the batch, counts and totals by head)
+  'society_runs',
   // Voucher types master (P1-13, 7Q)
   'voucher_types',
 ];
+/** R4-C6: the record tables, for the open-format export's schema guard. */
+export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
 /** Core tables whose rows must also carry an `id`. */
 const ID_TABLES = new Set([
   'invoices', 'clients', 'items_catalog', 'transactions', 'vendors', 'purchases', 'purchase_payments',
   'accounts', 'vouchers', 'fixed_assets', 'time_entries', 'mileage', 'purchase_orders', 'cost_centres', 'budgets', 'cheques', 'bank_accounts', ASSET_TABLE, CUSTOM_FIELDS_TABLE,
   'stock_items', 'godowns', 'stock_transfers', 'advances',
-  'price_levels', 'schemes', 'pos_day_close',
+  'price_levels', 'schemes', 'pos_day_close', 'pos_shifts',
   'tds_challans', 'tds_deductions', 'tds_returns', 'vendor_payments',
   'series_counters',
   'gstr4_manual',
@@ -363,12 +547,109 @@ const ID_TABLES = new Set([
   'employees', 'employee_groups', 'pay_heads', 'salary_structures', 'attendance_types', 'attendance', 'payroll_runs', 'payroll_payments',
   // Payroll depth (7P): arrears, loans, leave, adjustments, perquisites, full & final
   'payroll_arrears', 'employee_loans', 'leave_types', 'leave_entries', 'payroll_adjustments', 'perquisites', 'fnf_settlements',
+  // Payroll follow-ups (7T): relief u/s 89 (Form 10E) workings, actuarial valuations
+  'payroll_relief89', 'actuarial_valuations',
   'boms', 'manufacturing_vouchers', 'stock_journals', 'physical_stock',
   'job_work_orders', 'job_work_out', 'job_work_in', 'job_work_principal', 'rejections_in',
+  'production_plans',
   'gst_setoffs', 'gst_challans', 'hsn_master',
   'rcm_documents',
+  'gst_pmt09', 'gst_refunds', 'isd_documents', 'tds_justifications',
   'year_end',
   'stock_groups', 'stock_categories', 'units',
+  'fx_bank_moves', 'epay_batches', 'sales_agents', 'commission_postings',
+  'gst_followups', 'gstr2b_itc', 'gstr1_snapshots',
+  'doc_inbox', 'purchase_drafts', 'recurring_bills', 'bank_rules', 'payment_requests',
+  'dist_areas', 'dist_routes', 'dist_beats', 'van_settlements', 'order_pad_outbox', 'order_pad_imports', 'expiry_claims', 'expiry_receipts',
+  'business_loans', 'currency_rates',
+  // Round 2 (R2-C)
+  'notes_to_accounts', 'deferrals', 'packing_lists', 'package_types',
+  // Round 2 (R2-A)
+  'payment_terms', 'collection_notes', 'write_off_recoveries',
+  // Round 2 (R2-B): batch invoice runs, proposal section snippets
+  'batch_runs', 'proposal_snippets',
+  // Round 3 (R3-A)
+  'dining_areas', 'dining_tables', 'table_orders', 'modifier_groups',
+  // Round 3 (R3-B): work types (rate cards), project tasks, retainers
+  'work_types', 'project_tasks', 'retainers',
+  // Round 3 (R3-C): GSTR-1 portal file imports, DSC register, monthly client checklist
+  'gst_portal_files', 'dsc_register', 'client_checklist',
+  // Round 4 (R4-A)
+  'production_orders', 'qc_results', 'recall_notices', 'landed_cost_vouchers',
+  // Round 4 (R4-B)
+  'gift_vouchers', 'branch_prices', 'transfer_requests',
+  // Round 4 (R4-C)
+  'lut_register', 'export_irms', 'export_incentives', 'export_writeoffs', 'recycle_bin',
+  // Round 5 (R5-A)
+  'sales_channels', 'channel_skus', 'marketplace_imports', 'settlements', 'eco_credits', 'marketplace_returns',
+  // Round 5 (R5-C)
+  'fee_plans', 'fee_runs', 'common_credit_runs', 'donations', 'form_10bd_filings', 'form_10be', 'properties', 'leases', 'security_deposits',
+  // Round 5 (R5-B)
+  'consignment_notes', 'gta_options', 'vehicles', 'trips', 'ra_measurements', 'boq_coefficients',
+  // Round 6 (R6-C3): one row per import run of suppliers / ledgers / opening balances
+  'import_runs',
+  // Round 7 (hotel): room types, rooms, rate plans, reservations, folios, guests, night audits
+  'hotel_room_types', 'hotel_rooms', 'hotel_rate_plans', 'hotel_reservations', 'hotel_folios', 'hotel_guests', 'hotel_night_audits',
+  // Round 8 (R8-A): party rates, trade claims, price-drop runs, interest runs, packaging types / moves
+  'party_rates', 'trade_claims', 'price_drops', 'interest_runs', 'packaging_types', 'packaging_moves',
+  // Round 8 (R8-B): bill-charge heads, brokerage postings
+  'trade_charge_heads', 'brokerage_postings',
+  // Round 8 (R8-C): arrivals, bikri pattis, indents
+  'arrivals', 'sale_pattis', 'indents',
+  // Round 9 (R9-A … R9-E): retail riders / settlements / short book; doctors, refills; alterations; IMEI checks, finance
+  // deals, service jobs; metal rates, jewellery tags, karigar moves (names in `retail/rt-shared.ts`)
+  'delivery_riders', 'rider_settlements', 'short_book', 'doctors', 'rx_refills', 'alteration_jobs', 'imei_checks', 'finance_deals', 'service_jobs', 'metal_rates', 'jewel_tags', 'karigar_moves',
+  // R11-B (construction finance): contract register, secured advances, price-variation statements, bank guarantees
+  'works_contracts', 'secured_advances', 'price_variations', 'bank_guarantees',
+  // R11-C: builders — projects, units, bookings (BKG/FY…), payment plans, stage certificates, RERA account entries
+  'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals',
+  // R10-A: appointments, service staff, commission plans, staff payouts, payer claims (CLM/FY…)
+  'appointments', 'service_staff', 'commission_plans', 'staff_payouts', 'payer_claims',
+  // R10-B: OPD visits (OPD/FY…), admissions (IPD/FY…), lab test master, lab orders (LAB/FY…)
+  'clinic_visits', 'admissions', 'lab_tests', 'lab_orders',
+  // R10-C: membership plans, memberships (MEM/FY…), check-ins (one row per day), classes / batches, class attendance
+  'member_plans', 'memberships', 'checkins', 'class_schedules', 'class_attendance',
+  // R10-D: vehicles / appliances, labour operations (job cards stay in R9's service_jobs)
+  'service_assets', 'labour_ops',
+  // R11-D: site operations — work orders (SWO), sub-contractor bills (SCB), labour compliance, site workers, muster days
+  // (MUS settlements), hired equipment, plant log sheets (PLG)
+  'sub_work_orders', 'sub_measurements', 'labour_compliance', 'site_labour', 'muster_days', 'hired_equipment', 'plant_logs',
+  // R12-A: farm batches, quality-cut tables, pooled farmer cycles (CYB/FY…)
+  'farm_batches', 'quality_cut_tables', 'farmer_cycles',
+  // R12-B: dairy — rate charts, shift collection (one row per centre per shift), milk dispatches (MDS/FY…), milk cards
+  'milk_rate_charts', 'milk_shifts', 'milk_dispatches', 'milk_cards',
+  // R12-C (mills): weighbridge slips (WBS/FY…), custom-milling agreements (deliveries CMR/FY…)
+  'weighbridge_slips', 'cmr_agreements',
+  // R12-D: cold-storage lots (CSR / GPO), rent plans, loans against stored produce (LAS), members' share ledger (SHC)
+  'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares',
+  // R13-A: work centres, routings, job cards (JCD/FY…, one row per order per operation)
+  'work_centres', 'routings', 'job_cards',
+  // R13-B: drawings, inspection reports (FAI/FY…), job quotes, moulding runs, print estimates (PES/FY…)
+  'drawings', 'inspection_reports', 'job_quotes', 'process_runs', 'print_estimates',
+  // R13-C: cut plans / lots (CUT/FY…, bundles inside)
+  'cut_plans',
+  // R13-D: food batch cost cards (versions by effective date), AA / EPCG export authorisations, incentive claims
+  'cost_cards', 'export_authorisations', 'incentive_claims',
+  // R14-A: engagements (ENG/FY…), conflict checks
+  'engagements', 'conflict_checks',
+  // R14-D: partners, partner runs (year-end appropriation, monthly 194T credits), UDIN register
+  'partners', 'partner_runs', 'udin_register',
+  // R14-B: client-money (trust) vouchers (CMV/FY…)
+  'client_money',
+  // R14-C: EDF register (export of services, FEMA 2026)
+  'edf_register',
+  // R15-B: travel bookings (components of a trip / event file)
+  'travel_bookings',
+  // R15-C: supplier statements (BSP / consolidator / bed-bank, rows inside)
+  'supplier_statements',
+  // R17-B: site duty registers (musters; one per site × month, rows inside)
+  'site_musters',
+  // R17-C: site compliance proof (PF / ESI challans per site × month)
+  'site_compliance',
+  // R18-A: society units (wing / flat / shop, areas, construction cost, owners, tenant, parking)
+  'society_units',
+  // R18-B: society billing runs (one per period / special levy; the batch, counts and totals by head)
+  'society_runs',
   'voucher_types',
 ]);
 
@@ -379,7 +660,7 @@ const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeo
  * (core tables with ids), settings an object, and the schema version not newer than this
  * app understands. Throws a readable Error naming the bad table.
  */
-export function validateBackupData(data: Record<string, string>): void {
+export function validateBackupData(data: Record<string, string>, parse: BackupParser = backupParser(data)): void {
   const version = data[SCHEMA_VERSION_KEY];
   if (version !== undefined) {
     const n = Number(version);
@@ -391,12 +672,9 @@ export function validateBackupData(data: Record<string, string>): void {
   for (const table of RECORD_TABLES) {
     const raw = data[DB_PREFIX + table];
     if (raw === undefined) continue;
-    let rows: unknown;
-    try {
-      rows = JSON.parse(raw);
-    } catch {
-      throw new Error(`The "${table}" table in this backup is damaged (not valid JSON).`);
-    }
+    const p = parse(DB_PREFIX + table);
+    if (!p.ok) throw new Error(`The "${table}" table in this backup is damaged (not valid JSON).`);
+    const rows = p.value;
     if (!Array.isArray(rows)) throw new Error(`The "${table}" table in this backup is not a list.`);
     const needsId = ID_TABLES.has(table);
     // Older versions wrote numeric ids, so a number is fine; a missing id is not.
@@ -407,19 +685,17 @@ export function validateBackupData(data: Record<string, string>): void {
   // Audit archive segments (WP-7, `audit_archive_<n>`): lists of rows like `audit_log` itself.
   for (const key of Object.keys(data)) {
     if (!key.startsWith(`${DB_PREFIX}audit_archive_`)) continue;
-    let rows: unknown;
-    try {
-      rows = JSON.parse(data[key]);
-    } catch {
-      rows = null;
-    }
+    const rows = parse(key).value;
     if (!Array.isArray(rows) || rows.some((r) => !isPlainObject(r))) throw new Error(`The audit archive "${key.slice(DB_PREFIX.length)}" in this backup is damaged.`);
   }
   // Backups are self-contained: every logo/signature reference must resolve inside the file.
   const refs = new Set<string>();
   for (const table of SNAPSHOT_TABLES) {
     const raw = data[DB_PREFIX + table];
-    if (raw !== undefined) referencedAssets(JSON.parse(raw) as unknown[], refs);
+    if (raw === undefined) continue;
+    const p = parse(DB_PREFIX + table);
+    if (!p.ok) JSON.parse(raw); // rethrow the parse error, as before
+    referencedAssets(p.value as unknown[], refs);
   }
   if (refs.size > 0) {
     const assets = parseAssets(data[DB_PREFIX + ASSET_TABLE]);

@@ -4,6 +4,7 @@
  * The checklist from `year-end.ts`, with the actions each step needs.
  */
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { CalendarCheck, Download, Lock, Plus } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useCan } from '../../hooks/useCan';
@@ -137,6 +138,22 @@ export function YearEndWizard({ open, onClose, notify }: YearEndWizardProps) {
         );
       case 'opening_bills':
         return <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => mark('opening_bills')}>{migT('markReviewed')}</button>;
+      case 'agency_lots': // QA8 T10
+        return (
+          <div className={styles.inline}>
+            <Link to="/distribution?tab=agency" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={onClose}>{migT('agencyOpen')}</Link>
+            <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => mark('agency_lots')}>{migT('markReviewed')}</button>
+          </div>
+        );
+      case 'wip_statement': // MF-D5
+        return (
+          <div className={styles.inline}>
+            <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => void import('../../lib/mfg/mf-wip-csv').then((m) => m.downloadWipStatement(fyEndOf(fy)))}>{migT('wipDownload')}</button>
+            <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => mark('wip_statement')}>{migT('markReviewed')}</button>
+          </div>
+        );
+      case 'auditor_pack': // R4-C5
+        return <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => mark('auditor_pack')}>{migT('markReviewed')}</button>;
       case 'lock':
         return can('settings.manage') ? (
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => act(() => migT('locked', { date: lockYear(fy) }))}>

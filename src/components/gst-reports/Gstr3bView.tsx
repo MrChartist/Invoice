@@ -7,7 +7,14 @@ import { plural } from '../../i18n/areas/plural';
 import { gstT } from '../../i18n/areas/gst';
 import { formatMoney } from '../../lib/utils';
 import surface from '../../styles/surface.module.css';
+import PendingNote from '../ui/PendingNote';
 import { o7T } from '../../i18n/areas/gst-tds-7o';
+import { Term } from '../help/Term';
+import type { GlossaryId } from '../../lib/help/glossary';
+
+/** R6-A3: the glossary term behind a 3B table code (3.1, 4(A), 4(B)(1), 4(B)(2), 4(C)). */
+const termOf = (table: string): GlossaryId | null =>
+  table.startsWith('3.1') ? 'gstr3b-31' : table.startsWith('4A') ? 'gstr3b-4a' : table === '4B(1)' ? 'gstr3b-4b1' : table === '4B(2)' ? 'gstr3b-4b2' : table === '4C' ? 'gstr3b-4c' : null;
 
 interface Row {
   table: string;
@@ -27,7 +34,7 @@ const opt = (k: 'taxable' | 'igst' | 'cgst' | 'sgst'): Column<Row> => ({
 
 /** Built per render so the headers follow the interface language. */
 const cols = (): Column<Row>[] => [
-  { key: 'table', label: gvT('colTable'), render: (r) => <span className={styles.tag}>{r.table}</span> },
+  { key: 'table', label: gvT('colTable'), render: (r) => { const id = termOf(r.table); return <span className={styles.tag}>{id ? <Term id={id}>{r.table}</Term> : r.table}</span>; } },
   { key: 'label', label: gvT('colDescription'), render: (r) => r.label },
   opt('taxable'),
   opt('igst'),
@@ -91,6 +98,7 @@ export function Gstr3bView({ report: b, onOpenSetOff }: { report: Gstr3bReport; 
 
   return (
     <>
+      <PendingNote area="gstr3b" />
       {block(gvT('b31'), t31, '')}
       {block(gvT('b32'), t32, gvT('b32Empty'))}
       {block(gvT('b4'), t4, '')}

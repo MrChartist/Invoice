@@ -9,8 +9,13 @@ import { NumberInput } from '../ui/NumberInput';
 import { useT } from '../../i18n';
 import { methodLabel } from '../../i18n/labels';
 import { purT } from '../../i18n/areas/purchases';
-import { num, round2 } from '../../lib/invoice-calc';
+import { round2 } from '../../lib/invoice-calc';
 import { tdsT } from '../../i18n/areas/tds';
+import { r7T } from '../../i18n/areas/gst-tds-7r';
+import { paymentTdsLeft } from '../../lib/tds-payables';
+import { getTable } from '../../lib/storage';
+import { paymentNeedsApproval } from '../../lib/purchase-approval-gate';
+import { capT } from '../../i18n/areas/capture';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 
@@ -38,7 +43,9 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
   const balance = bill ? balanceOf(bill) : 0;
   useT();
   // TDS deducted on payment (bills with tds_on 'PAYMENT'): what is still to deduct on this bill.
-  const tdsLeft = bill && bill.tds_on === 'PAYMENT' ? Math.max(round2(num(bill.tds_amount) - history.reduce((s, p) => s + num(p.tds_amount), 0)), 0) : 0;
+  // 7R (7.120): less the TDS on value taken back by supplier notes / purchase returns against the bill.
+  const tdsCalc = paymentTdsLeft(bill, history, getTable('purchase_returns'));
+  const tdsLeft = tdsCalc.left;
   const [tds, setTds] = useState(Math.min(tdsLeft, balance));
 
   const [amount, setAmount] = useState(round2(balance - Math.min(tdsLeft, balance)));
@@ -51,9 +58,21 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
   if (!bill) return <p className={styles.note}>{purT('billGone')}</p>;
   void version;
 
+  // 8.44: a clerk's payment above the owner's limit becomes a request (nothing is paid yet).
+  const held = paymentNeedsApproval(amount + tds);
   const submit = () => {
     const problem = validatePayment(bill, amount, date, tds);
     if (problem) return setError(problem);
+    if (held) {
+      void import('../../lib/purchase-approvals')
+        .then((m) => {
+          m.requestSupplierPayment({ purchaseId, amount, date, method, reference, bankAccountId: bankAccountId || undefined, tdsAmount: tds });
+          onChanged(capT('payHeld'));
+          onClose();
+        })
+        .catch((err: Error) => setError(err.message));
+      return;
+    }
     try {
       paymentsDb.record(purchaseId, { amount, date, method, reference, bankAccountId: bankAccountId || undefined, tdsAmount: tds });
       setTds(0);
@@ -132,14 +151,15 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
             <div className={controls.field}>
               <label className={controls.label} htmlFor="pp-tds">{tdsT('tdsNow')}</label>
               <NumberInput id="pp-tds" className={controls.inputNumeric} value={tds} onChange={setTds} />
-              <span className={controls.hint}>{tdsT('tdsNowHint', { left: tdsLeft.toFixed(2) })}</span>
+              <span className={controls.hint}>{tdsT('tdsNowHint', { left: tdsLeft.toFixed(2) })}{tdsCalc.returnedTds > 0 ? ` ${r7T('payTdsAfterReturn', { amount: tdsCalc.returnedTds.toFixed(2) })}` : ''}</span>
             </div>
           )}
           <BankAccountSelect id="pp-bank-account" label={purT('paidFrom')} method={method} value={bankAccountId} onChange={setBankAccountId} />
+          {held && <p className={styles.note}>{capT('payNeedsApproval')}</p>}
           {error && <p className={styles.formError} role="alert">{error}</p>}
           <div className={styles.inlineActions}>
             <button type="button" className={controls.btnOutline} onClick={onClose}>{purT('close')}</button>
-            <button type="submit" className={controls.btnPrimary}>{purT('recordPayment')}</button>
+            <button type="submit" className={controls.btnPrimary}>{held ? capT('requestPay') : purT('recordPayment')}</button>
           </div>
         </form>
       )}

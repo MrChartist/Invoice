@@ -1,0 +1,63 @@
+/** R6-A2 help topics: purchases & expenses, inventory, manufacturing and distribution (lazy). */
+import { ca, rel, t, type HelpTopic } from './types';
+
+export const TOPICS: readonly HelpTopic[] = [
+  t('expenses', 'Purchases & expenses', 'ख़रीद और ख़र्च', 'Supplier bills, expenses, purchase orders, returns and the bill inbox. Bills feed ITC, TDS, stock and the books.', 'Whenever a bill or expense comes in.', {
+    steps: ['Add a bill (or Scan bill) with GSTIN, lines and tax.', 'Mark TDS on the bill if you deduct it.', 'Pay it from the bill or in bulk.'],
+    statutory: ca(['G18', 'G37', 'T2']),
+    related: rel(['TDS & TCS', '/tds'], ['GSTR-3B', '/gst-reports?tab=gstr3b']),
+  }),
+  t('expenses:bills', 'Bills & expenses', 'बिल और ख़र्च', 'Every supplier bill and expense with status, ITC and TDS.', 'To enter, find or pay a bill.', { statutory: ca(['G18']) }),
+  t('expenses:orders', 'Purchase orders', 'ख़रीद ऑर्डर', 'Orders to suppliers, received in part or full through GRNs and bills.', 'Before you buy, when you want to track what is pending.'),
+  t('expenses:vendors', 'Suppliers', 'सप्लायर', 'Your suppliers with GSTIN, PAN, TDS section and MSME status.', 'Add a supplier before the first bill.', { statutory: ca(['T20']) }),
+  t('expenses:returns', 'Returns & notes', 'वापसी और नोट', 'Purchase returns, debit notes, GRNs and supplier credit notes.', 'When goods go back or a supplier reduces a bill.', { statutory: ca(['G37', 'T11']) }),
+  t('expenses:inbox', 'Bill inbox', 'बिल इनबॉक्स', 'Bills captured from photos, PDFs or shared files, waiting to be entered.', 'After you scan or share a bill.'),
+  t('inventory', 'Inventory', 'इन्वेंटरी', 'Stock items, quantities by godown, batches, serials, margins and reports.', 'To check stock, add items or move stock between godowns.', {
+    steps: ['Add stock items with unit, HSN and opening stock.', 'Groups and units keep a long list tidy.', 'Sales and bills move stock on their own.'],
+    statutory: ca(['AC1']),
+    related: rel(['Manufacturing', '/manufacturing'], ['Stock journal', '/manufacturing?tab=journal']),
+  }),
+  t('inventory:summary', 'Stock summary', 'स्टॉक सारांश', 'Quantity and value of every item.', 'Any time; value uses the method chosen in settings.', { statutory: ca(['AC1']) }),
+  t('inventory:movement', 'Movement', 'मूवमेंट', 'In and out quantities of each item over a period.', 'To see what is selling.'),
+  t('inventory:dead', 'Dead stock', 'डेड स्टॉक', 'Items with no movement for a long time.', 'Before ordering again or planning a sale.'),
+  t('inventory:margin', 'Margin', 'मार्जिन', 'Sale price against cost per item.', 'To check pricing.'),
+  t('inventory:batches', 'Batches & expiry', 'बैच और एक्सपायरी', 'Stock by batch with expiry dates.', 'For medicines, food and other dated goods.', { statutory: ca(['G38']) }),
+  t('inventory:godowns', 'Godowns', 'गोदाम', 'Stock per location.', 'When you keep stock in more than one place.'),
+  t('inventory:transfers', 'Transfers', 'ट्रांसफ़र', 'Stock moved between godowns.', 'When goods move from one place to another.', { statutory: ca(['G48']) }),
+  t('inventory:serials', 'Serial lookup', 'सीरियल खोज', 'Where a serial number was bought and sold.', 'For warranty or a returned piece.'),
+  t('inventory:query', 'Stock query', 'स्टॉक क्वेरी', "One item's position across godowns, batches and orders.", 'When a customer asks "do you have it?".'),
+  t('inventory:orders', 'Order outstanding', 'बकाया ऑर्डर', 'Sales and purchase orders still to be delivered or received.', 'To plan dispatch and buying.'),
+  t('inventory:analysis', 'Stock analysis', 'स्टॉक विश्लेषण', 'Fast and slow movers, ageing and reorder hints.', 'Monthly review.'),
+  t('inventory:depth', 'Variants, kits & bins', 'वेरिएंट, किट और बिन', 'Item variants, kits sold as one item, and bin locations.', 'When items come in sizes / colours or kits.'),
+  t('inventory:expiry', 'Breakage / expiry', 'टूट-फूट / एक्सपायरी', 'Write off broken or expired stock.', 'When stock is damaged or expires.', { statutory: ca(['G38']) }),
+  t('manufacturing', 'Manufacturing', 'मैन्युफ़ैक्चरिंग', 'Bills of materials, production, job work, MRP, QC and stock reports.', 'If you make or assemble goods.', {
+    related: rel(['Inventory', '/inventory'], ['Production orders', '/manufacturing?tab=orders']),
+  }),
+  t('manufacturing:boms', 'Bills of materials', 'BOM', 'What goes into one unit of a finished item.', 'Once per product, before production.'),
+  t('manufacturing:mfg', 'Manufacturing journal', 'मैन्युफ़ैक्चरिंग जर्नल', 'Consume materials and add finished goods in one voucher.', 'Each time you produce.'),
+  t('manufacturing:orders', 'Production orders', 'उत्पादन ऑर्डर', 'Planned production with materials issued and output received.', 'For production that runs over days.'),
+  t('manufacturing:journal', 'Stock journal', 'स्टॉक जर्नल', 'Move or convert stock without a sale or purchase.', 'For repacking, conversion or corrections.'),
+  t('manufacturing:physical', 'Physical stock', 'फ़िज़िकल स्टॉक', 'Enter counted quantities; the difference is adjusted.', 'After a stock count.'),
+  t('manufacturing:jobwork', 'Job work', 'जॉब वर्क', 'Material sent to or received from job workers, with challans.', 'When someone else processes your goods (or you theirs).', { statutory: ca(['G43', 'G44'], 'ITC-04') }),
+  t('manufacturing:rejections', 'Rejections in', 'रिजेक्शन इन', 'Goods returned by customers as rejected.', 'When a customer rejects goods.'),
+  t('manufacturing:plan', 'MRP plan', 'MRP योजना', 'Materials needed for planned production against stock and orders.', 'Before buying materials.'),
+  t('manufacturing:costing', 'Order costing', 'ऑर्डर लागत', 'Cost of a production order: materials plus conversion.', 'After an order closes.', { statutory: ca(['AC9']) }),
+  t('manufacturing:trace', 'Trace & recall', 'ट्रेस और रिकॉल', 'Which batches went into which output and to which customers.', 'For a quality issue or a recall.', { statutory: ca(['I36']) }),
+  t('manufacturing:qc', 'QC desk', 'QC डेस्क', 'Stock held for quality check, passed or rejected.', 'When goods arrive or production ends.'),
+  t('manufacturing:landed', 'Landed cost', 'लैंडेड कॉस्ट', 'Freight, duty and charges added to the cost of received goods.', 'When an import or freight bill comes in later.', { statutory: ca(['AC10', 'X5', 'X6']) }),
+  t('manufacturing:reorder', 'Reorder', 'रीऑर्डर', 'Items below their reorder level, with suggested quantities.', 'Before placing purchase orders.'),
+  t('manufacturing:reports', 'Stock reports', 'स्टॉक रिपोर्ट', 'Stock registers and valuation reports.', 'Month end and for audit.', { statutory: ca(['AC1']) }),
+  t('distribution', 'Distribution', 'डिस्ट्रीब्यूशन', 'Areas, beats and routes, salesman reports, van sales, order pad and credit control.', 'If salesmen visit shops on fixed beats.'),
+  t('distribution:masters', 'Masters', 'मास्टर', 'Areas, beats, salesmen and which party is on which beat.', 'Once, then when routes change.'),
+  t('distribution:reports', 'Salesman reports', 'सेल्समैन रिपोर्ट', 'Sales, outstanding and collections by salesman, beat and area.', 'Weekly review.'),
+  t('distribution:plan', 'Beat plan', 'बीट प्लान', "The day's beats with each party's outstanding.", 'Each morning.'),
+  t('distribution:van', 'Van & pick list', 'वैन और पिक लिस्ट', 'Load a van godown, sell from it and settle at day end.', 'For van sales.'),
+  t('distribution:orders', 'Orders', 'ऑर्डर', 'Orders taken on the order pad, to confirm and bill.', 'After the beat.'),
+  t('distribution:credit', 'Credit control', 'क्रेडिट नियंत्रण', 'Credit limits and days per party, and who is over them.', 'Before billing a party with old dues.'),
+  // R8-C (TR-C4)
+  t('inventory:hsn', 'HSN stock', 'HSN अनुसार स्टॉक', 'Closing quantity and value at cost by HSN code and godown on a date.', 'For the bank, the annual return or a stock audit.', { statutory: ca(['TR19']) }),
+  // R9 (RT-A4)
+  t('inventory:shortbook', 'Short book', 'शॉर्ट बुक', 'Items customers asked for that were not in stock. Make draft purchase orders from them, grouped by the item\'s last supplier; rows close when the stock comes in.', 'Daily at the counter; before you place orders.', {
+    steps: ['At the counter, type the item; if it is not found, add it to the short book.', 'Here, check the open rows.', 'Make draft PO, then check quantities and rates on the order.', 'When the stock comes in, tell the customer on WhatsApp.'],
+  }),
+];

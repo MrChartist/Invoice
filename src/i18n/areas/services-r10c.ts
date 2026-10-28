@@ -1,0 +1,46 @@
+/** R10 (SV-C) members desk, coaching views and the redeem chip. Lazy (desk chunks only). */
+import { defineArea } from '../area';
+
+export const mcT = defineArea(
+  {
+    'v.plans': 'Plans & packages', 'v.members': 'Members', 'v.checkin': 'Check-in', 'v.classes': 'Classes', 'v.recipes': 'Service recipes',
+    name: 'Name', kind: 'Kind', 'k.membership': 'Membership', 'k.package': 'Package', 'k.wallet': 'Wallet', 'k.combo': 'Membership + sessions',
+    months: 'Months', days: 'Days', sessions: 'Sessions', validity: 'Valid (days)', covers: 'Covers (items)', price: 'Price before GST', cls: 'Tax class',
+    fMax: 'Freeze max days', fTimes: 'Freezes max', fMin: 'Freeze min days', fFee: 'Freeze fee', tFee: 'Transfer fee', refund: 'Refund on cancel', 'r.none': 'None', 'r.pro_rata': 'Pro rata',
+    bonus: 'Bonus %', onCheckin: 'Check-in uses a session', trainer: 'Trainer', save: 'Save', saved: 'Saved', edit: 'Edit', del: 'Delete',
+    sell: 'Sell plan', plan: 'Plan', member: 'Member', phone: 'Phone', start: 'Start', autoRenew: 'Auto-renew', topup: 'Top-up',
+    number: 'Number', end: 'End', status: 'Status', used: 'Used', 's.active': 'Active', 's.frozen': 'Frozen', 's.expired': 'Expired', 's.cancelled': 'Cancelled', 's.transferred': 'Transferred', 's.upgraded': 'Upgraded',
+    act: 'Action', freeze: 'Freeze', unfreeze: 'Unfreeze today', upgrade: 'Upgrade', transfer: 'Transfer', cancel: 'Cancel with refund', renew: 'Renew', from: 'From', to: 'To', reason: 'Reason', amount: 'Amount', refundAmt: 'Refund (blank = plan rule)', bill: 'Bill', go: 'Go',
+    renewals: 'Renewals', remind: 'WhatsApp', waRenew: 'Hello {name}, your {plan} ({number}) ends on {date}. Renew to keep going!', forfeit: 'Forfeited sessions (no GST)', bonusLeft: 'Bonus {amount}', autoDone: '{n} auto-renewal draft bill(s) made.',
+    code: 'Member code, phone or name', checkIn: 'Check in', in: 'Checked in', till: 'Active till {date}', exp: 'Expired {n} day(s) ago — renew?', frozenNow: 'Frozen', blocked: 'Blocked: renew first', today: 'Today: {n}', notSeen: 'Not seen in 14 days', peak: 'Peak hours', cards: 'Member cards', undo: 'Undo',
+    time: 'Time', minutes: 'Minutes', capacity: 'Capacity', staff: 'Teacher / trainer', dateFrom: 'Start date', dateTo: 'End date', holidays: 'Holidays (dates, comma separated)', enrol: 'Enrol', waitlist: 'Wait-list', members: 'Members', timetable: 'Timetable',
+    month: 'Month', product: 'Product', service: 'Service', qty: 'Qty used', cost: 'Product cost', revenue: 'Service revenue', csv: 'CSV',
+    recipesNote: 'Services sold as kits (item marked Kit, with a BOM) take their products out of stock.',
+    note: 'Plans are taxed when sold; a redeemed session is a ₹0 line. Verify with your CA.',
+    batch: 'Batch', put: 'Batch', present: 'Present', all: 'All present', P: 'P', A: 'A', L: 'Late', pct: 'This month',
+    student: 'Student', leave: 'Last day attended', request: 'Request date', basis: 'Pro rata by', 'b.days': 'Days', 'b.months': 'Months', preview: 'Preview', refundIt: 'Refund', due: 'Due', overdue: 'Overdue', paid: 'Mark paid', paidOn: 'Paid {date}',
+    calc: 'Course {course}, paid {paid}, used {used} / {total}: refund {amount}, due {due}', courseEnd: 'Give the batch an end date.',
+    use: 'Use {number} ({left} left)', redeemed: 'Session {n} of {of}',
+  } as const,
+  {
+    'v.plans': 'प्लान और पैकेज', 'v.members': 'सदस्य', 'v.checkin': 'चेक-इन', 'v.classes': 'क्लास', 'v.recipes': 'सेवा रेसिपी',
+    name: 'नाम', kind: 'प्रकार', 'k.membership': 'सदस्यता', 'k.package': 'पैकेज', 'k.wallet': 'वॉलेट', 'k.combo': 'सदस्यता + सेशन',
+    months: 'महीने', days: 'दिन', sessions: 'सेशन', validity: 'वैधता (दिन)', covers: 'किन सेवाओं पर', price: 'GST से पहले मूल्य', cls: 'टैक्स वर्ग',
+    fMax: 'फ़्रीज़ अधिकतम दिन', fTimes: 'फ़्रीज़ अधिकतम बार', fMin: 'फ़्रीज़ न्यूनतम दिन', fFee: 'फ़्रीज़ शुल्क', tFee: 'ट्रांसफ़र शुल्क', refund: 'रद्द पर रिफ़ंड', 'r.none': 'नहीं', 'r.pro_rata': 'अनुपात में',
+    bonus: 'बोनस %', onCheckin: 'चेक-इन पर सेशन घटे', trainer: 'ट्रेनर', save: 'सहेजें', saved: 'सहेजा गया', edit: 'बदलें', del: 'हटाएँ',
+    sell: 'प्लान बेचें', plan: 'प्लान', member: 'सदस्य', phone: 'फ़ोन', start: 'शुरुआत', autoRenew: 'स्वतः नवीनीकरण', topup: 'टॉप-अप',
+    number: 'नंबर', end: 'समाप्ति', status: 'स्थिति', used: 'उपयोग', 's.active': 'सक्रिय', 's.frozen': 'फ़्रीज़', 's.expired': 'समाप्त', 's.cancelled': 'रद्द', 's.transferred': 'ट्रांसफ़र', 's.upgraded': 'अपग्रेड',
+    act: 'कार्य', freeze: 'फ़्रीज़', unfreeze: 'आज फ़्रीज़ हटाएँ', upgrade: 'अपग्रेड', transfer: 'ट्रांसफ़र', cancel: 'रिफ़ंड सहित रद्द', renew: 'नवीनीकरण', from: 'से', to: 'तक', reason: 'कारण', amount: 'राशि', refundAmt: 'रिफ़ंड (खाली = प्लान नियम)', bill: 'बिल', go: 'करें',
+    renewals: 'नवीनीकरण', remind: 'WhatsApp', waRenew: 'नमस्ते {name}, आपका {plan} ({number}) {date} को समाप्त होगा। नवीनीकरण करें!', forfeit: 'बेकार गए सेशन (GST नहीं)', bonusLeft: 'बोनस {amount}', autoDone: '{n} स्वतः नवीनीकरण ड्राफ़्ट बिल बने।',
+    code: 'सदस्य कोड, फ़ोन या नाम', checkIn: 'चेक-इन', in: 'चेक-इन हुआ', till: '{date} तक सक्रिय', exp: '{n} दिन पहले समाप्त — नवीनीकरण?', frozenNow: 'फ़्रीज़', blocked: 'रुका: पहले नवीनीकरण', today: 'आज: {n}', notSeen: '14 दिन से नहीं आए', peak: 'व्यस्त घंटे', cards: 'सदस्य कार्ड', undo: 'वापस',
+    time: 'समय', minutes: 'मिनट', capacity: 'क्षमता', staff: 'शिक्षक / ट्रेनर', dateFrom: 'शुरू तारीख', dateTo: 'अंतिम तारीख', holidays: 'छुट्टियाँ (तारीखें, कॉमा से)', enrol: 'नामांकन', waitlist: 'प्रतीक्षा सूची', members: 'सदस्य', timetable: 'समय-सारणी',
+    month: 'महीना', product: 'उत्पाद', service: 'सेवा', qty: 'प्रयुक्त मात्रा', cost: 'उत्पाद लागत', revenue: 'सेवा आय', csv: 'CSV',
+    recipesNote: 'किट के रूप में बिकी सेवाएँ (किट आइटम और BOM) अपने उत्पाद स्टॉक से घटाती हैं।',
+    note: 'प्लान बिक्री पर कर-योग्य; उपयोग हुआ सेशन ₹0 पंक्ति। CA से पुष्टि करें।',
+    batch: 'बैच', put: 'बैच', present: 'उपस्थित', all: 'सभी उपस्थित', P: 'उ', A: 'अ', L: 'देर', pct: 'इस महीने',
+    student: 'छात्र', leave: 'आख़िरी उपस्थिति', request: 'अनुरोध तारीख', basis: 'अनुपात आधार', 'b.days': 'दिन', 'b.months': 'महीने', preview: 'पूर्वावलोकन', refundIt: 'रिफ़ंड', due: 'देय', overdue: 'अतिदेय', paid: 'भुगतान हुआ', paidOn: '{date} को भुगतान',
+    calc: 'कोर्स {course}, भुगतान {paid}, उपयोग {used} / {total}: रिफ़ंड {amount}, देय {due}', courseEnd: 'बैच की अंतिम तारीख दें।',
+    use: '{number} उपयोग ({left} बचे)', redeemed: '{of} में से सेशन {n}',
+  },
+);
+export type McKey = Parameters<typeof mcT>[0];

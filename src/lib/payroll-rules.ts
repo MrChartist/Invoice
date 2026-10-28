@@ -486,3 +486,160 @@ export function pfLateRule(date: string): PfLateRule {
 
 /** Age at which EPS membership ends (EPS 1995, para 6): no EPS share after the month of the 58th birthday. */
 export const EPS_EXIT_AGE = 58;
+
+/* ════════════════════════════════════════════════════════════════
+   7T — payroll follow-ups: relief u/s 89 (earlier-year slabs), Rule 3 perquisite tables,
+   s. 17(2)(vii) limit, ESI low daily-wage exemption, TDS interest u/s 201(1A).
+   Appended: date-keyed, add versions, never overwrite. UNVERIFIED = confirm with your CA.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Earlier FY slabs (relief u/s 89 / Form 10E reaches back) ───────── */
+
+const OLD_2017: RegimeRule = { ...OLD_REGIME, standard_deduction: 0, rebate_limit: 350000, rebate_max: 2500, surcharge: [{ above: 5000000, rate: 10 }, { above: 10000000, rate: 15 }], cess_pct: 3 };
+const OLD_2018: RegimeRule = { ...OLD_2017, standard_deduction: 40000, cess_pct: 4 };
+const OLD_2019: RegimeRule = { ...OLD_REGIME };
+const NEW_2020: RegimeRule = {
+  slabs: [
+    { up_to: 250000, rate: 0 }, { up_to: 500000, rate: 5 }, { up_to: 750000, rate: 10 }, { up_to: 1000000, rate: 15 },
+    { up_to: 1250000, rate: 20 }, { up_to: 1500000, rate: 25 }, { up_to: null, rate: 30 },
+  ],
+  standard_deduction: 0,
+  rebate_limit: 500000,
+  rebate_max: 12500,
+  rebate_marginal: false,
+  surcharge: OLD_REGIME.surcharge,
+  cess_pct: 4,
+  allows_deductions: false,
+};
+
+/**
+ * Slabs of the years before `TDS_SALARY_RULES` starts (FY 2017-18 to 2022-23), used only when
+ * an arrear is spread back over its year (relief u/s 89). Before FY 2020-21 there was no
+ * s. 115BAC regime, so `new` repeats the old one. UNVERIFIED summary of the Finance Acts — the
+ * Form 10E figures must be checked against the employee's returns of those years.
+ */
+export const TDS_SALARY_EARLIER_RULES: readonly Versioned<{ new: RegimeRule; old: RegimeRule }>[] = [
+  { from: '2017-04-01', value: { old: OLD_2017, new: OLD_2017 }, source: 'Finance Act 2017 (87A ₹2,500 up to ₹3.5 lakh; cess 3%) — UNVERIFIED' },
+  { from: '2018-04-01', value: { old: OLD_2018, new: OLD_2018 }, source: 'Finance Act 2018 (standard deduction ₹40,000; cess 4%) — UNVERIFIED' },
+  { from: '2019-04-01', value: { old: OLD_2019, new: OLD_2019 }, source: 'Finance (No. 2) Act 2019 (₹50,000; 87A ₹12,500 up to ₹5 lakh) — UNVERIFIED' },
+  { from: '2020-04-01', value: { old: OLD_2019, new: NEW_2020 }, source: 'Finance Act 2020 (s. 115BAC optional regime) — UNVERIFIED' },
+];
+
+/** Rates for any FY start (`YYYY-04-01`), reaching into the earlier table before FY 2023-24. */
+export function tdsSalaryRuleAnyYear(regime: 'new' | 'old', fyStart: string, dob?: string): RegimeRule {
+  if (fyStart >= TDS_SALARY_RULES[0].from) return tdsSalaryRuleFor(regime, fyStart, dob);
+  const noNewRegime = fyStart < '2020-04-01';
+  const base = ruleAt(TDS_SALARY_EARLIER_RULES, fyStart)[regime];
+  const band = regime === 'old' || noNewRegime ? ageBand(dob, fyStart) : 'normal';
+  return band === 'normal' ? base : { ...base, slabs: ruleAt(TDS_OLD_REGIME_AGE_RULES, fyStart)[band] };
+}
+
+/* ── Rule 3 perquisite valuation ─────────────────────────────────── */
+
+export interface CarPerqRule {
+  /** Engine capacity (cc) up to which the smaller-car amount applies. */
+  small_cc: number;
+  /** Per month, car partly for private use, running costs met by the employer. */
+  employer_small: number;
+  employer_large: number;
+  /** Per month, private running costs met by the employee. */
+  employee_small: number;
+  employee_large: number;
+  /** Per month for a chauffeur paid by the employer. */
+  chauffeur: number;
+}
+
+/** Rule 3(2) Table II — motor car owned / hired by the employer, used partly for private purposes. */
+export const CAR_PERQ_RULES: readonly Versioned<CarPerqRule>[] = [
+  { from: '2008-04-01', value: { small_cc: 1600, employer_small: 1800, employer_large: 2400, employee_small: 600, employee_large: 900, chauffeur: 900 }, source: 'Rule 3(2) Table II (₹1,800 / ₹2,400, chauffeur ₹900)' },
+  { from: '2025-04-01', value: { small_cc: 1600, employer_small: 8000, employer_large: 10000, employee_small: 3000, employee_large: 4000, chauffeur: 3000 }, source: 'Income-tax amendment rules 2025 (₹8,000 / ₹10,000, chauffeur ₹3,000) — UNVERIFIED: confirm the notification and its effective date' },
+];
+
+export function carPerqRule(date: string): CarPerqRule {
+  return ruleAt(CAR_PERQ_RULES, date);
+}
+
+export interface AccommodationPerqRule {
+  /** Employer-owned, unfurnished: % of salary by population of the city (highest band first). */
+  owned: { min_population: number; pct: number }[];
+  /** Census the population bands refer to. */
+  census: string;
+  /** Leased / rented by the employer: the lower of the rent and this % of salary. */
+  leased_pct: number;
+  /** Furnished: furniture owned by the employer, % a year of its cost (or the hire charges). */
+  furniture_pct: number;
+}
+
+/** Rule 3(1) Table I — accommodation provided by a private-sector employer. */
+export const ACCOMMODATION_PERQ_RULES: readonly Versioned<AccommodationPerqRule>[] = [
+  { from: '2001-04-01', value: { owned: [{ min_population: 2500000, pct: 15 }, { min_population: 1000000, pct: 10 }, { min_population: 0, pct: 7.5 }], census: '2001', leased_pct: 15, furniture_pct: 10 }, source: 'Rule 3(1) Table I (15% / 10% / 7.5%, 2001 census)' },
+  { from: '2023-09-01', value: { owned: [{ min_population: 4000000, pct: 10 }, { min_population: 1500000, pct: 7.5 }, { min_population: 0, pct: 5 }], census: '2011', leased_pct: 15, furniture_pct: 10 }, source: 'Notification 65/2023 (10% / 7.5% / 5%, 2011 census); leased 15% kept — UNVERIFIED' },
+];
+
+export function accommodationPerqRule(date: string): AccommodationPerqRule {
+  return ruleAt(ACCOMMODATION_PERQ_RULES, date);
+}
+
+/** Rule 3(7)(iii) free meals (per meal exempt) and 3(7)(iv) gifts (aggregate a year below which exempt). */
+export const MEAL_GIFT_PERQ_RULES: readonly Versioned<{ meal_exempt: number; gift_exempt_below: number }>[] = [
+  { from: '2001-04-01', value: { meal_exempt: 50, gift_exempt_below: 5000 }, source: 'Rule 3(7)(iii) ₹50 a meal; 3(7)(iv) gifts below ₹5,000 a year — the whole value taxable at ₹5,000 or more (UNVERIFIED reading)' },
+];
+
+export function mealGiftRule(date: string): { meal_exempt: number; gift_exempt_below: number } {
+  return ruleAt(MEAL_GIFT_PERQ_RULES, date);
+}
+
+/** The `source` note of the version in force (screens print it beside a computed value). */
+export function ruleSource<T>(versions: readonly Versioned<T>[], date: string): string {
+  let hit = versions[0];
+  for (const v of versions) if (v.from <= date) hit = v;
+  return hit?.source ?? '';
+}
+
+/* ── s. 17(2)(vii): employer's retirement contributions above the limit ─ */
+
+export const S17_2_VII_RULES: readonly Versioned<{ limit: number }>[] = [
+  { from: '2020-04-01', value: { limit: 750000 }, source: 'Finance Act 2020: employer PF + NPS + superannuation above ₹7.5 lakh a year is a perquisite' },
+];
+
+/** Limit for the FY starting `fyStart`, or null before s. 17(2)(vii) applied. */
+export function s17viiLimit(fyStart: string): number | null {
+  return fyStart < S17_2_VII_RULES[0].from ? null : ruleAt(S17_2_VII_RULES, fyStart).limit;
+}
+
+/* ── ESI: employee share not deducted on low daily wages ─────────────── */
+
+/**
+ * Employees whose average daily wage is within this limit pay no employee share; the employer
+ * still pays its share. UNVERIFIED dates of the ₹137 / ₹176 revisions — confirm with your CA.
+ */
+export const ESI_LOW_WAGE_RULES: readonly Versioned<{ daily_limit: number }>[] = [
+  { from: '2010-05-01', value: { daily_limit: 100 }, source: 'ESI (Central) Rules r. 51 — ₹100 a day (UNVERIFIED)' },
+  { from: '2017-01-01', value: { daily_limit: 137 }, source: 'ESI (Central) Amendment — ₹137 a day (UNVERIFIED date)' },
+  { from: '2019-01-01', value: { daily_limit: 176 }, source: 'ESI (Central) Amendment — ₹176 a day (UNVERIFIED date)' },
+];
+
+export function esiLowWageLimit(date: string): number {
+  return ruleAt(ESI_LOW_WAGE_RULES, date).daily_limit;
+}
+
+/* ── TDS on salary: interest u/s 201(1A), Rule 30 due dates ──────────── */
+
+export interface Tds201Rule {
+  /** % a month (or part) from the date tax was deductible to the date it was deducted. */
+  late_deduction_pct: number;
+  /** % a month (or part) from the date of deduction to the date of deposit. */
+  late_deposit_pct: number;
+  /** Deposit due by this day of the next month (Rule 30(2)). */
+  due_day: number;
+  /** Tax deducted in March: due by this day of April. */
+  march_due_day: number;
+}
+
+export const TDS_201_RULES: readonly Versioned<Tds201Rule>[] = [
+  { from: '2010-07-01', value: { late_deduction_pct: 1, late_deposit_pct: 1.5, due_day: 7, march_due_day: 30 }, source: 's. 201(1A) (Finance Act 2010: 1.5% a month for late deposit); Rule 30(2). Calendar-month counting as TRACES does — UNVERIFIED' },
+];
+
+export function tds201Rule(date: string): Tds201Rule {
+  return ruleAt(TDS_201_RULES, date);
+}

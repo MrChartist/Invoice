@@ -47,6 +47,34 @@ const LOGO_PNG = (() => {
  * app's BroadcastChannel so open tabs refresh their cache. Reads poll until `ok(value)` holds,
  * because the app commits its writes a moment after the screen updates.
  */
+/** 8G A1: close the post-save success sheet when a step goes on working in the editor. */
+async function closeSendSheet(p) {
+  const sheet = p.locator('[data-send-sheet]');
+  await sheet.waitFor({ timeout: 10000 }).catch(() => {});
+  if (await sheet.count()) {
+    await p.keyboard.press('Escape');
+    await sheet.waitFor({ state: 'detached' });
+  }
+}
+
+/**
+ * QA18 T1: after an in-app jump into the editor (a desk's Bill / Make draft), the items footer (Add line and the pack
+ * rows under it) must have a layout box — it once stayed boxless in Chromium until a reload. Polls up to 5 s.
+ */
+async function footerLaidOut(p, label) {
+  const until = Date.now() + 5000;
+  let n = 0;
+  while (Date.now() < until) {
+    n = await p.evaluate(() => {
+      const add = [...document.querySelectorAll('button')].find((b) => /Add line/.test(b.textContent ?? ''));
+      return add?.parentElement ? add.parentElement.getClientRects().length : -1;
+    });
+    if (n > 0) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  check(n > 0, `${label}: the editor's items footer is laid out without a reload (${n})`);
+}
+
 async function idbGet(p, key) {
   return p.evaluate((k) => new Promise((resolve, reject) => {
     const open = indexedDB.open('mrchartist_inv_kv');
@@ -100,9 +128,11 @@ const step = async (name, fn) => {
     await fn();
   } catch (err) {
     check(false, `${name}: ${err?.message?.split('\n')[0] ?? err}`);
+    // Always print where the page was, so a CI-only failure can be diagnosed from the log alone.
+    const seen = await page.evaluate(() => (document.body?.innerText ?? '').replace(/\s+/g, ' ').slice(0, 600)).catch(() => '');
+    console.log(`      url: ${page.url()}\n      ${(err?.message ?? '').split('\n').slice(0, 8).join('\n      ')}\n      page: ${seen}`);
     if (process.env.E2E_SHOTS) {
       await page.screenshot({ path: join(process.env.E2E_SHOTS, `${name.replace(/\W+/g, '-')}.png`), fullPage: true }).catch(() => {});
-      console.log(`      url: ${page.url()}\n      ${(err?.message ?? '').split('\n').slice(0, 6).join('\n      ')}`);
     }
     throw err;
   }
@@ -132,6 +162,11 @@ try {
   });
 
   await step('first-run setup wizard', async () => {
+    // 8H step 0: language + "What do you do?" (CA / full accounting keeps every module for the journey).
+    const start = page.getByRole('dialog', { name: 'What do you do?' });
+    await start.waitFor();
+    await start.getByRole('radio', { name: /CA \/ full accounting/ }).click();
+    await page.getByRole('button', { name: /Next/ }).click();
     const wizard = page.getByRole('dialog', { name: 'Your business' });
     await wizard.waitFor();
     await page.getByRole('button', { name: /Next/ }).click();
@@ -194,6 +229,64 @@ try {
     check((await page.evaluate(() => document.documentElement.lang)) === 'en', 'back to English (<html lang="en">)');
   });
 
+  await step('8H: Marathi interface, shop-mode sidebar (Kirana) and the phone "+" quick-create sheet', async () => {
+    const nav = page.getByRole('navigation', { name: /Primary|मुख्य/ });
+    await page.goto(srv.origin + '/settings');
+    await page.getByLabel('Language / भाषा').first().selectOption('mr');
+    await nav.getByRole('link', { name: 'डॅशबोर्ड' }).waitFor();
+    await nav.getByRole('link', { name: 'ग्राहक' }).waitFor();
+    check((await page.evaluate(() => document.documentElement.lang)) === 'mr', 'Marathi sets <html lang="mr"> and the sidebar is in Marathi');
+    await page.getByLabel('Language / भाषा').first().selectOption('en');
+    await nav.getByRole('link', { name: 'Dashboard' }).waitFor();
+
+    // Shop mode: Kirana hides Books / Payroll from the sidebar, keeps POS; "Show all features" brings them back.
+    await page.goto(srv.origin + '/settings?tab=defaults');
+    await page.getByLabel('Business type').selectOption('kirana');
+    await page.getByRole('button', { name: 'Save settings' }).click();
+    await nav.getByRole('link', { name: 'POS' }).waitFor();
+    await nav.getByRole('link', { name: 'Books' }).waitFor({ state: 'detached' });
+    const hidden = (await nav.getByRole('link', { name: 'Payroll' }).count()) === 0 && (await nav.getByRole('link', { name: 'GST reports' }).count()) === 0;
+    check(hidden, 'Kirana shop mode narrows the sidebar (no Books, Payroll, GST reports; POS shown)');
+    await page.getByRole('button', { name: 'Show all features' }).click();
+    await page.getByRole('button', { name: 'Save settings' }).click();
+    await nav.getByRole('link', { name: 'Books' }).waitFor();
+    check(true, '"Show all features" restores every module');
+
+    // Phone "+" opens the quick-create sheet; Expense opens the quick-expense form.
+    await page.setViewportSize({ width: 390, height: 844 });
+    try {
+      await page.goto(srv.origin + '/');
+      await page.getByRole('navigation', { name: 'Quick navigation' }).getByRole('button', { name: 'New' }).click();
+      const sheet = page.getByRole('dialog', { name: 'Create new' });
+      await sheet.waitFor();
+      await sheet.getByRole('link', { name: 'Expense' }).click();
+      await page.waitForURL(/\/expenses\?new=expense/);
+      await page.getByRole('dialog', { name: 'Quick add expense' }).waitFor();
+      check(true, '390 px: "+" → Create new → Expense opens the quick-expense form');
+    } finally {
+      await page.setViewportSize({ width: 1280, height: 900 });
+    }
+  });
+
+  await step('beta: badge next to the logo; Help -> Report a problem builds a local diagnostic', async () => {
+    await page.goto(srv.origin + '/');
+    const badge = page.getByRole('img', { name: 'Beta version (private test build)' }).first();
+    await badge.waitFor();
+    check(/^beta$/i.test((await badge.innerText()).trim()), 'Beta badge next to the logo, with an accessible label');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.getByRole('button', { name: /Report a problem/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Report a problem' });
+    await dlg.waitFor();
+    await page.waitForFunction(() => /Recent errors/.test(document.querySelector('[data-report-problem]')?.value ?? ''));
+    const text = await dlg.locator('[data-report-problem]').inputValue();
+    check(
+      /Version: \d+\.\d+\.\d+/.test(text) && /\[Storage health\]/.test(text) && /Screen: \/$/m.test(text) && !/E2E Trader|e2e@okhdfcbank/.test(text),
+      `diagnostic report: version, screen, storage health, no business data (${text.split('\n')[5]})`,
+    );
+    await page.keyboard.press('Escape');
+    await dlg.waitFor({ state: 'detached' });
+  });
+
   await step('create and save an invoice', async () => {
     await page.goto(srv.origin + '/invoice');
     await page.getByLabel('Client name').fill('Acme Buyers');
@@ -207,6 +300,15 @@ try {
     check(/^INV\/FY\d{2}-\d{2}\/0001$/.test(stored[0]?.invoice_number ?? ''), `Indian-FY number (${stored[0]?.invoice_number})`);
     check(stored[0]?.status === 'Sent', `Save issues the document (${stored[0]?.status})`);
     check(Math.abs((stored[0]?.total ?? 0) - 3540) < 0.01, `total with 18% GST = 3540 (${stored[0]?.total})`);
+    // A1: the post-save sheet stays (no 10 s timeout) and its WhatsApp link carries the UPI pay link.
+    const sheet = page.locator('[data-send-sheet]');
+    await sheet.waitFor();
+    await page.waitForTimeout(12000);
+    check(await sheet.isVisible(), 'post-save success sheet is still open after 12 s');
+    const wa = (await sheet.locator('[data-send-whatsapp]').getAttribute('href')) ?? '';
+    check(wa.includes('wa.me') && wa.includes('upi%3A'), `sheet WhatsApp link has wa.me + the UPI link (${wa.slice(0, 60)}…)`);
+    await page.keyboard.press('Escape');
+    await sheet.waitFor({ state: 'detached' });
     const assets = await readJson(page, 'assets', []);
     const lsData = await page.evaluate(() => Object.keys(localStorage).filter((k) => /^mrchartist_inv_(invoices|settings|clients|assets)$/.test(k)));
     const marker = await page.evaluate(() => localStorage.getItem('mrchartist_inv_storage_backend'));
@@ -271,6 +373,7 @@ try {
     await page.goto(srv.origin + '/invoice/' + id);
     await page.getByLabel(/^Vehicle no\./).fill('MH12AB1234');
     await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
     const inv = (await readJson(page, 'invoices', [], (v) => v[0]?.custom_values?.length === 1))[0];
     check(inv.custom_values?.[0]?.label === 'Vehicle no.' && inv.custom_values[0].value === 'MH12AB1234',
       `the invoice snapshots label + value (${inv.custom_values?.[0]?.label}: ${inv.custom_values?.[0]?.value})`);
@@ -288,10 +391,12 @@ try {
   await step('transport details print; preview with 3 copies downloads a PDF with 3x the pages', async () => {
     const id = (await readJson(page, 'invoices', []))[0].id;
     await page.goto(srv.origin + '/invoice/' + id);
+    await page.locator('[data-meta-edit]').click(); // A5: transport sits in the document details
     await page.getByText('Transport / dispatch details').click();
     await page.getByLabel('Vehicle number').fill('ka01ab0001');
     await page.getByLabel('Transporter name').fill('Speedy Roadways');
     await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
     const inv = (await readJson(page, 'invoices', [], (v) => v[0]?.transport?.vehicle_no))[0];
     check(/^KA01AB0001$/i.test(inv.transport?.vehicle_no ?? ''), `transport details are saved on the invoice (${inv.transport?.vehicle_no})`);
     await page.getByRole('button', { name: /Preview & download PDF/ }).click();
@@ -302,7 +407,8 @@ try {
 
     const pdfPages = async () => {
       await dialog.getByRole('button', { name: /^Share/ }).click();
-      const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /Download PDF/ }).click()]);
+      // A 3-copy capture can take over 10 s on a loaded box (seen at load average 7 on 4 cores).
+      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('menuitem', { name: /Download PDF/ }).click()]);
       const body = readFileSync(await dl.path()).toString('latin1');
       return (body.match(/\/Type\s*\/Page(?![s\w])/g) ?? []).length;
     };
@@ -400,6 +506,63 @@ try {
     await page.keyboard.press('Escape');
   });
 
+  await step('khata (8A): Clients shows the balance, ₹ Received drops it, the WhatsApp statement carries a upi:// link', async () => {
+    await page.goto(srv.origin + '/clients');
+    const row = page.locator('tr[data-client-row="Acme Buyers"]');
+    await row.getByText('To collect ₹2,540.00').waitFor();
+    check(true, 'balance-first Clients list: Acme Buyers shows "To collect ₹2,540.00"');
+    const wa = (await row.locator('a[data-wa-statement]').getAttribute('href')) ?? '';
+    const text = decodeURIComponent(wa.split('?text=')[1] ?? '');
+    check(wa.startsWith('https://wa.me/') && /upi:\/\/pay\?pa=e2e@okhdfcbank/.test(text) && /am=2540\.00/.test(text),
+      `WhatsApp statement link carries a upi:// link for the net due (${text.replace(/\s+/g, ' ').slice(0, 90)}…)`);
+    await row.getByRole('button', { name: 'Record money received from Acme Buyers' }).click();
+    const dlg = page.getByRole('dialog', { name: /Received from Acme Buyers/ });
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Amount (₹)', null, { timeout: 5000 });
+    check(true, 'the amount field is focused when the sheet opens');
+    await dlg.getByLabel('Amount (₹)', { exact: true }).fill('500');
+    await dlg.getByRole('radio', { name: 'UPI' }).click();
+    await dlg.getByLabel(/UTR/).fill('UPI-E2E-1');
+    const firstBill = await dlg.getByLabel(/^Amount for INV/).first().inputValue();
+    check(firstBill === '500', `the ₹500 is allocated to the oldest open bill first (${firstBill})`);
+    await dlg.getByRole('button', { name: 'Save' }).click();
+    await row.getByText('To collect ₹2,040.00').waitFor();
+    const tx = (await readJson(page, 'transactions', [], (v) => v.some((t) => t.reference === 'UPI-E2E-1'))).filter((t) => t.reference === 'UPI-E2E-1');
+    check(tx.length === 1 && tx[0].amount === 500 && tx[0].method === 'UPI' && tx[0].client_name === 'Acme Buyers' && !!tx[0].invoice_id,
+      `₹ Received saved one UPI receipt against the bill, tagged with the party (${tx.length} row, ₹${tx[0]?.amount})`);
+  });
+
+  await step('R2-A: a receipt ₹10 short settles the rest as kasar — FCN financial credit note, bill Paid', async () => {
+    // Later steps expect one open invoice: snapshot the tables this step writes and put them back afterwards.
+    const keys = ['invoices', 'transactions', 'doc_links', 'series_counters', 'audit_log'].map((n) => `mrchartist_inv_${n}`);
+    const before = await Promise.all(keys.map((k) => idbGet(page, k)));
+    await page.goto(srv.origin + '/transactions');
+    await page.getByRole('button', { name: /^Record payment for INV/ }).first().click();
+    const dlg = page.getByRole('dialog', { name: 'Record payment' });
+    const amount = dlg.getByLabel('Amount', { exact: true });
+    // The dialog pre-fills the balance after it opens: wait for it rather than reading an empty field.
+    let due = 0;
+    for (let i = 0; i < 50 && !(due > 10); i++) {
+      due = Number(await amount.inputValue());
+      if (!(due > 10)) await page.waitForTimeout(100);
+    }
+    check(due > 10, `the payment dialog pre-fills the balance (${due})`);
+    await amount.fill(String(Math.round((due - 10) * 100) / 100));
+    await dlg.locator('[data-settle-rest]').waitFor({ timeout: 15000 });
+    await dlg.locator('[data-settle-choice="short_payment"]').check();
+    check((await dlg.locator('[data-settle-amount]').inputValue()) === '10', 'Settle the rest pre-fills the ₹10 left open');
+    await dlg.getByRole('button', { name: 'Record payment' }).click();
+    const notes = await readJson(page, 'invoices', [], (v) => v.some((i) => i.note_kind === 'financial'));
+    const fcn = notes.filter((i) => i.note_kind === 'financial');
+    check(fcn.length === 1 && /^FCN\/FY\d{2}-\d{2}\/0001$/.test(fcn[0].invoice_number) && fcn[0].total === 10 && fcn[0].financial_reason === 'short_payment' && !fcn[0].tax_amount,
+      `financial credit note ${fcn[0]?.invoice_number} for ₹${fcn[0]?.total}, no GST`);
+    const bill = notes.find((i) => i.invoice_number === fcn[0]?.po_number);
+    check(bill?.status === 'Paid', `the bill is settled (${bill?.status})`);
+    await page.keyboard.press('Escape');
+    for (let i = 0; i < keys.length; i++) await idbPut(page, keys[i], before[i]);
+    await page.goto(srv.origin + '/transactions');
+    await page.getByRole('button', { name: /^Record payment for INV/ }).first().waitFor();
+  });
+
   await step('bulk mark paid, then delete with undo', async () => {
     await page.goto(srv.origin + '/transactions');
     await page.getByLabel('Select INV/FY', { exact: false }).first().check();
@@ -412,7 +575,9 @@ try {
 
     await page.getByRole('button', { name: /^Delete INV/ }).first().click();
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
-    await page.getByRole('button', { name: 'Undo' }).click();
+    // R4-C4: Alt+Z runs the latest Undo while its toast is shown.
+    await page.getByRole('button', { name: 'Undo' }).waitFor();
+    await page.keyboard.press('Alt+KeyZ');
     await page.waitForTimeout(6500);
     const after = (await readJson(page, 'invoices', [])).length;
     check(after === 1, `Undo keeps the deleted invoice (${after} stored after the undo window)`);
@@ -458,6 +623,42 @@ try {
     check(await edit.getByText(ref?.name ?? 'receipt').count() > 0, 'after a reload the expense still shows its receipt');
     await page.keyboard.press('Escape');
     await edit.waitFor({ state: 'detached' });
+  });
+
+  await step('8I: Scan bill in the Expenses header opens the capture chooser; GST filing steps, grouped tabs and the JSON check', async () => {
+    await page.goto(srv.origin + '/expenses');
+    await page.getByTestId('scan-bill').click();
+    const chooser = page.getByRole('dialog', { name: 'Scan a supplier bill' });
+    await chooser.waitFor();
+    check(await chooser.getByRole('button', { name: 'Choose a photo or PDF' }).isVisible() && await chooser.getByRole('button', { name: 'Take a photo of the bill' }).isVisible(),
+      'Scan bill opens the chooser (photo / file; camera QR where BarcodeDetector exists)');
+    await page.keyboard.press('Escape');
+    await chooser.waitFor({ state: 'detached' });
+
+    // An old deep link still lands on its tab inside the grouped tab strip.
+    await page.goto(srv.origin + '/gst-reports?tab=setoff');
+    await page.locator('[data-filing-strip]').waitFor();
+    const setoff = page.getByRole('tab', { name: /Set-off/ });
+    check((await setoff.getAttribute('aria-selected')) === 'true', '?tab=setoff still opens Set-off & payment');
+    check(await page.locator('[data-tab-group]').count() === 4, 'tabs grouped into GSTR-1 / GSTR-3B / Reconcile / Tools');
+    await setoff.focus();
+    await page.keyboard.press('ArrowRight');
+    check((await page.getByRole('tab', { name: /Cash ledger/ }).getAttribute('aria-selected')) === 'true', 'arrow key moves to the next tab');
+    await page.locator('[data-filing-check]').click();
+    const pf = page.getByRole('dialog', { name: 'Check before filing' });
+    await pf.waitFor();
+    check(await pf.getByText(/verify with your CA/).count() > 0, 'the check keeps the "verify with your CA" wording');
+    await page.keyboard.press('Escape');
+    await pf.waitFor({ state: 'detached' });
+    const json = page.locator('[data-gstr1-json]');
+    if ((await page.locator('[data-gstr1-json] [data-json-badge]').count()) > 0 && await json.isEnabled()) {
+      await json.click();
+      const dl = page.getByRole('dialog', { name: 'Check before you download GSTR-1 JSON' });
+      await dl.waitFor();
+      check(await dl.getByRole('button', { name: 'Download anyway' }).isVisible(), 'GSTR-1 JSON with problems stops at the check first');
+      await page.keyboard.press('Escape');
+      await dl.waitFor({ state: 'detached' });
+    }
   });
 
   await step('TDS on payables: a 194J bill with TDS, payment of the net amount, the deduction in Form 26Q', async () => {
@@ -676,6 +877,8 @@ try {
     const rv = saved.find((x) => x.voucher_type_id === types[0].id);
     check(!!rv && /^RCASH\/FY\d{2}-\d{2}\/0001$/.test(rv.number) && rv.voucher_class === 'Counter', `numbered in the type's own series with its class (${rv?.number})`);
     check(!!rv && rv.lines.some((l) => l.account_id === 'cash' && l.dr === 50000) && rv.lines.some((l) => l.cr === 50000), 'single entry saved as Dr Cash / Cr the particulars');
+    // Leave the books as they were: later steps (project budget vs actual) read Sales.
+    await writeJson(page, 'vouchers', saved.filter((x) => x.voucher_type_id !== types[0].id));
     await writeJson(page, 'voucher_types', []);
   });
 
@@ -934,6 +1137,108 @@ try {
     await writeJson(page, 'stock_items', prevStock);
   });
 
+  await step('production plan (7S): 2 tables → MRP buys the missing legs, saves the plan, raises the PO, Manufacture opens a filled journal', async () => {
+    const prev = { stock: await readJson(page, 'stock_items', null), boms: await readJson(page, 'boms', null), vendors: await readJson(page, 'vendors', null), pos: await readJson(page, 'purchase_orders', null) };
+    const item = (id, name, extra) => ({ id, name, unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    await writeJson(page, 'stock_items', [
+      item('e2e-leg', 'E2E Leg', { opening_qty: 3, opening_rate: 30 }),
+      item('e2e-top', 'E2E Top', { opening_qty: 5, opening_rate: 200 }),
+      item('e2e-table', 'E2E Table'),
+    ]);
+    await writeJson(page, 'boms', [{ id: 'e2e-bom', item_id: 'e2e-table', name: 'Standard', batch_qty: 1, is_default: true, components: [{ id: 'c1', item_id: 'e2e-leg', qty: 4 }, { id: 'c2', item_id: 'e2e-top', qty: 1 }] }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-v', name: 'E2E Timber' }]);
+    await page.goto(srv.origin + '/manufacturing?tab=plan');
+    await page.getByLabel('Finished item 1').selectOption({ label: 'E2E Table ★' });
+    await page.getByLabel('Quantity 1').fill('2');
+    const table = page.getByTestId('mrp-table');
+    const mrpRow = (name) => table.getByRole('row').filter({ hasText: name });
+    await mrpRow('E2E Leg').waitFor();
+    check(/Buy/.test(await mrpRow('E2E Leg').innerText()) && /\b5\b/.test(await mrpRow('E2E Leg').innerText()), 'MRP: 8 legs needed, 3 in stock → buy 5');
+    check(/Covered/.test(await mrpRow('E2E Top').innerText()), 'MRP: tops are covered by stock');
+    await page.getByTestId('mrp-save').click();
+    await page.getByText(/Plan PP\/FY\d\d-\d\d\/0001 saved/).waitFor();
+    await readJson(page, 'production_plans', [], (v) => v.length === 1);
+    await page.getByLabel('Vendor', { exact: true }).selectOption({ label: 'E2E Timber' });
+    await page.getByTestId('mrp-po').click();
+    await page.getByText(/Purchase order PO\/FY\d\d-\d\d\/\d+ created/).waitFor();
+    const pos = await readJson(page, 'purchase_orders', [], (v) => v.some((p) => p.vendor_name === 'E2E Timber'));
+    const po = pos.find((p) => p.vendor_name === 'E2E Timber');
+    check(po?.lines?.length === 1 && po.lines[0].item_id === 'e2e-leg' && po.lines[0].quantity === 5, 'the PO orders 5 legs');
+    await mrpRow('E2E Table').getByRole('link', { name: 'Manufacture' }).click();
+    await page.getByLabel('Component Line 1 quantity').waitFor();
+    check((await page.getByLabel('Component Line 1 quantity').inputValue()) === '8', 'Manufacture opens a journal for 2 tables, components filled from the BOM');
+    await page.keyboard.press('Escape');
+
+    await writeJson(page, 'production_plans', null);
+    await writeJson(page, 'purchase_orders', prev.pos);
+    await writeJson(page, 'vendors', prev.vendors);
+    await writeJson(page, 'boms', prev.boms);
+    await writeJson(page, 'stock_items', prev.stock);
+  });
+
+  await step('R4-A: production order from a sales order → issue → partial output → close with write-off → variance report', async () => {
+    const keys = ['stock_items', 'boms', 'invoices', 'godowns', 'stock_transfers', 'manufacturing_vouchers', 'stock_journals', 'production_orders', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const item = (id, name, extra) => ({ id, name, unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    await writeJson(page, 'stock_items', [
+      item('e2e-leg', 'E2E Leg', { opening_qty: 20, opening_rate: 30 }),
+      item('e2e-top', 'E2E Top', { opening_qty: 5, opening_rate: 200 }),
+      item('e2e-table', 'E2E Table'),
+    ]);
+    await writeJson(page, 'boms', [{ id: 'e2e-bom', item_id: 'e2e-table', name: 'Standard', batch_qty: 1, is_default: true, components: [{ id: 'c1', item_id: 'e2e-leg', qty: 4 }, { id: 'c2', item_id: 'e2e-top', qty: 1 }] }]);
+    const so = {
+      id: 'e2e-wo-so', invoice_number: 'SO/FY26-27/0099', doc_type: 'SALES_ORDER', status: 'Sent', issue_date: '2026-04-01', due_date: '2026-04-30',
+      client: { name: 'E2E Furniture Buyer' }, items: [{ id: 'e2e-wo-line', name: 'E2E Table', quantity: 2, rate: 1500, amount: 3000 }],
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), so]);
+    await page.goto(srv.origin + '/manufacturing?tab=orders');
+    await page.getByRole('button', { name: 'Make to order' }).click();
+    await page.locator('#mto-so').selectOption('e2e-wo-so');
+    await page.getByTestId('mto-create').click();
+    await page.getByText(/1 production order\(s\) created for SO\/FY26-27\/0099/).waitFor();
+    const detail = page.getByTestId('wo-detail');
+    await detail.getByRole('button', { name: 'Release', exact: true }).click();
+    await page.getByText(/^Released WO\/FY\d\d-\d\d\/0001/).waitFor();
+    check(/\b8\b/.test(await detail.getByTestId('wo-materials').getByRole('row').filter({ hasText: 'E2E Leg' }).innerText()), 'release explodes the BOM: 8 legs required for 2 tables');
+
+    await detail.getByRole('button', { name: 'Issue materials' }).click();
+    await page.getByTestId('wo-issue-save').click();
+    await page.getByText(/Materials issued on STR\/FY\d\d-\d\d\/\d+/).waitFor();
+    const strs = await readJson(page, 'stock_transfers', [], (v) => v.some((t) => t.production_order_id));
+    const issue = strs.find((t) => t.production_order_id);
+    check(issue?.lines?.length === 2 && issue.lines.some((l) => l.item_id === 'e2e-leg' && l.qty === 8), 'the issue is a normal stock transfer into the shop-floor godown, tagged with the order');
+
+    await detail.getByRole('button', { name: 'Report output' }).click();
+    const made = page.getByLabel(/Quantity made/);
+    await made.fill('1');
+    await made.blur();
+    await page.getByTestId('wo-output-save').click();
+    await page.getByText(/MFG\/FY\d\d-\d\d\/\d+ saved: 1 made/).waitFor();
+    const mfgRows = await readJson(page, 'manufacturing_vouchers', [], (v) => v.some((m) => m.production_order_id));
+    const out = mfgRows.find((m) => m.production_order_id);
+    check(out?.qty === 1 && out.components.some((c) => c.item_id === 'e2e-leg' && c.qty === 4 && c.godown_id === issue?.to_godown), 'partial output: a manufacturing journal consuming 4 legs from the shop floor');
+    await detail.getByText('In progress').first().waitFor();
+
+    await detail.getByRole('button', { name: 'Close order' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel(/Write off as scrap/).check();
+    await dialog.getByRole('button', { name: 'Close order' }).click();
+    await page.getByText(/WO\/FY\d\d-\d\d\/0001 closed/).waitFor();
+    const orders = await readJson(page, 'production_orders', [], (v) => v.some((o) => o.status === 'closed'));
+    const journals = await readJson(page, 'stock_journals', [], (v) => v.some((j) => j.production_order_id));
+    check(orders[0]?.status === 'closed' && journals.some((j) => j.production_order_id === orders[0]?.id && j.produce.length === 0), 'close writes the shop-floor balance off (consume-only stock journal) and closes the order');
+
+    await page.goto(srv.origin + '/manufacturing?tab=costing');
+    const costRow = page.getByTestId('costing-table').getByRole('row').filter({ hasText: orders[0].number });
+    await costRow.waitFor();
+    check(/50%/.test(await costRow.innerText()), 'variance report: 1 of 2 made → yield 50%');
+    await costRow.getByRole('button', { name: /Details/ }).click();
+    await page.getByText('Yield variance').first().waitFor();
+    check(true, 'the order drill-down shows the variance split');
+
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   await step('POS: typed barcode, split cash + UPI, bill saved Paid, Z report shows the totals', async () => {
     const prevCatalog = await readJson(page, 'items_catalog', []);
     const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
@@ -986,6 +1291,202 @@ try {
     await writeJson(page, 'pos_day_close', null);
   });
 
+  await step('R4-B: sell a gift voucher, redeem it as a POS tender; transfer request → dispatch → receive with a shortage', async () => {
+    const keys = ['items_catalog', 'invoices', 'transactions', 'gift_vouchers', 'vouchers', 'accounts', 'series_counters', 'godowns', 'stock_items', 'stock_transfers', 'transfer_requests'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    // 1. Sell one ₹500 voucher: a receipt voucher to the liability ledger, no invoice.
+    await page.goto(srv.origin + '/receivables?tab=giftvouchers');
+    await page.locator('[data-gv-face]').fill('500');
+    await page.locator('[data-gv-face]').blur();
+    await page.locator('[data-gv-sell-save]').click();
+    await page.getByText(/1 voucher\(s\) sold — receipt RV\/FY\d\d-\d\d\/\d+/).waitFor();
+    const [gv] = await readJson(page, 'gift_vouchers', [], (v) => v.length > 0);
+    const rv = (await readJson(page, 'vouchers', [], (v) => v.some((x) => x.voucher_class === 'Gift voucher sale'))).find((x) => x.voucher_class === 'Gift voucher sale');
+    check(/^GV\/FY\d\d-\d\d\/0001$/.test(gv?.number ?? '') && /^\d{11}-[A-Z2-9]{4}$/.test(gv?.code ?? '') && rv?.lines?.[0]?.dr === 50000, `voucher sold as a liability (${gv?.number} ${gv?.code})`);
+    await page.locator('[data-gv-register]').getByText(gv.number).waitFor();
+
+    // 2. Redeem it at the counter for a ₹236 bill: the voucher pays, ₹264 stays on it.
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-gv-soap', name: 'E2E GV Soap', type: 'Product', hsn: '3401', unit: 'PCS', quantity: 1, rate: 200, tax_rate: 18, amount: 0, barcode: '8901030865299' }]);
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.fill('8901030865299');
+    await scan.press('Enter');
+    await page.getByLabel('Quantity of E2E GV Soap (line 1)').waitFor();
+    await page.locator('[data-gv-code]').fill(gv.code);
+    await page.locator('[data-gv-code]').press('Enter');
+    await page.getByText(/^GV\/FY\d\d-\d\d\/0001$/).waitFor();
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    await page.getByText(/INV\/FY\d\d-\d\d\/\d{4} saved/).first().waitFor();
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.pos))).find((i) => !beforeIds.has(i.id) && i.pos);
+    const pay = (await readJson(page, 'transactions', [], (v) => v.some((t) => t.invoice_id === bill?.id))).find((t) => t.invoice_id === bill?.id);
+    check(bill?.status === 'Paid' && pay?.method === 'Gift voucher' && pay.gift_voucher_id === gv.id && pay.amount === 236, `POS bill paid by the voucher (${bill?.status}, ${pay?.method} ${pay?.amount})`);
+
+    // 3. A store asks the warehouse (Main) for 10; 10 go into transit; 9 arrive, 1 short.
+    await writeJson(page, 'godowns', [{ id: 'e2e-mall', name: 'E2E Mall' }]);
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), { id: 'e2e-tee', name: 'E2E Tee', unit: 'PCS', track_stock: true, opening_qty: 20, opening_rate: 150, reorder_level: 0 }]);
+    await page.goto(srv.origin + '/inventory?tab=transfers&view=requests');
+    await page.locator('[data-trq-new]').click();
+    await page.locator('[data-trq-to]').selectOption('e2e-mall');
+    await page.locator('[data-trq-item]').selectOption('e2e-tee');
+    await page.locator('[data-trq-qty]').fill('10');
+    await page.locator('[data-trq-qty]').blur();
+    await page.locator('[data-trq-save]').click();
+    await page.getByText(/Transfer request TRQ\/FY\d\d-\d\d\/0001 raised/).waitFor();
+    await page.locator('[data-trq-dispatch]').click();
+    await page.locator('[data-trq-dispatch-save]').click();
+    await page.getByText(/Dispatched on STR\/FY\d\d-\d\d\/\d+/).waitFor();
+    await page.locator('[data-trq-receive]').click();
+    await page.locator('[data-trq-received]').fill('9');
+    await page.locator('[data-trq-short]').fill('1');
+    await page.locator('[data-trq-short]').blur();
+    await page.locator('[data-trq-receive-save]').click();
+    await page.getByText(/1 shortage\(s\) to resolve/).waitFor();
+    const strs = await readJson(page, 'stock_transfers', [], (v) => v.filter((t) => t.request_id).length === 2);
+    const out = strs.find((t) => t.leg === 'out');
+    const got = strs.find((t) => t.leg === 'in');
+    const [req] = await readJson(page, 'transfer_requests', [], (v) => v[0]?.exceptions?.length === 1);
+    check(out?.lines?.[0]?.qty === 10 && got?.lines?.[0]?.qty === 9 && got.to_godown === 'e2e-mall' && out.to_godown === got.from_godown, 'dispatch into transit, receipt out of transit into the store');
+    check(req?.exceptions?.[0]?.kind === 'short' && req.exceptions[0].qty === 1 && req.exceptions[0].status === 'open', 'the short unit stays in transit as an open exception');
+    await page.locator('[data-trq-detail]').waitFor();
+    check(await page.locator('[data-trq-exception="open"]').count() === 1, 'the request details offer write-off / claim / found');
+
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('8B: POS calculator qty, hold & recall across a reload, UPI QR for the exact amount with the bill number', async () => {
+    const prevCatalog = await readJson(page, 'items_catalog', []);
+    await writeJson(page, 'items_catalog', [...prevCatalog, {
+      id: 'e2e-hold', name: 'E2E Hold Soap', type: 'Product', hsn: '3401', unit: 'PCS', quantity: 1, rate: 100, tax_rate: 18, amount: 0, barcode: '8901030865305',
+    }]);
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor();
+    await scan.fill('8901030865305');
+    await scan.press('Enter');
+    const qty = page.getByLabel('Quantity of E2E Hold Soap (line 1)');
+    await qty.waitFor();
+    // 8.25: a sum typed into a number field is worked out (no eval).
+    await qty.fill('2*3');
+    await qty.press('Tab');
+    check((await qty.inputValue()) === '6', `calculator: "2*3" → ${await qty.inputValue()}`);
+
+    // 8.21: Shift+F8 parks the bill; it survives a reload (company store) and F1 → 1 recalls it.
+    await page.keyboard.press('Shift+F8');
+    await page.getByText(/Bill parked \(1 on hold\)/).first().waitFor();
+    check((await page.getByText('Scan an item or search by name to start the bill.').count()) === 1, 'hold starts a new bill');
+    const held = await readJson(page, 'pos_held', [], (v) => v.length === 1);
+    check(held.length === 1 && held[0].items?.[0]?.name === 'E2E Hold Soap' && held[0].items[0].quantity === 6, `held cart stored (${held.length})`);
+    await page.reload();
+    await scan.waitFor();
+    check(/1/.test(await page.locator('[data-pos-held]').innerText()), 'held count shown after a reload');
+    await page.keyboard.press('F1');
+    const dlg = page.getByRole('dialog', { name: 'Bills on hold' });
+    await dlg.waitFor();
+    await page.keyboard.press('1');
+    await qty.waitFor();
+    check((await qty.inputValue()) === '6', 'recalled bill keeps its lines');
+    const after = await readJson(page, 'pos_held', [], (v) => v.length === 0);
+    check(after.length === 0, 'recalled bill leaves the hold list');
+
+    // 8.22: UPI tender → customer-facing QR for the exact amount, bill number as the reference.
+    await page.keyboard.press('F6');
+    const qr = page.locator('[data-pos-upi-qr]');
+    await qr.waitFor();
+    check((await qr.getAttribute('data-pos-upi-qr')) === '708.00', `UPI QR amount (${await qr.getAttribute('data-pos-upi-qr')})`);
+    check((await qr.locator('svg').count()) > 0 && /INV\/FY\d\d-\d\d\/\d{4}/.test(await qr.innerText()), 'QR drawn with the bill number');
+    await qr.getByRole('button', { name: 'Show to customer' }).click();
+    const full = page.getByRole('dialog', { name: 'Pay by UPI' });
+    await full.waitFor();
+    await full.locator('#pos-utr-full').fill('UTR123456');
+    await full.getByRole('button', { name: 'Done' }).click();
+    check((await page.locator('#pos-utr').inputValue()) === 'UTR123456', 'UTR typed on the customer screen is kept');
+
+    await page.keyboard.press('F8');
+    await writeJson(page, 'pos_held', null);
+    await writeJson(page, 'items_catalog', prevCatalog);
+  });
+
+  await step('8E: weighed scale label + qty prefix / short code, shift X report, change strip, WhatsApp href, create item from an unknown EAN', async () => {
+    const ean = (body) => {
+      const s = [...body].reduce((sum, d, i) => sum + Number(d) * (i % 2 ? 3 : 1), 0);
+      return body + ((10 - (s % 10)) % 10);
+    };
+    const prevCatalog = await readJson(page, 'items_catalog', []);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await writeJson(page, 'items_catalog', [...prevCatalog,
+      { id: 'e2e-tomato', name: 'E2E Tomato', type: 'Product', hsn: '0702', unit: 'KG', quantity: 1, rate: 80, tax_rate: 0, amount: 0, plu: '123', sold_by_weight: true },
+      { id: 'e2e-bar', name: 'E2E Bar', type: 'Product', hsn: '1704', unit: 'PCS', quantity: 1, rate: 10, tax_rate: 0, amount: 0, short_code: 'EB' },
+    ]);
+    await page.evaluate(() => localStorage.setItem('mrchartist_pos_scale', JSON.stringify({ enabled: true, prefixes: ['21'], pluLength: 5, value: 'weight', decimals: 3, checkDigit: true })));
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor();
+
+    // Cashier shift with a float (8.142).
+    await page.locator('[data-pos-shift]').click();
+    await page.locator('#shift-float').fill('500');
+    await page.locator('[data-shift-open]').click();
+    await page.locator('[data-x-report]').waitFor();
+    await page.keyboard.press('Escape');
+
+    // Weighing-scale label: PLU 00123, 1.250 kg → qty 1.25 × ₹80.
+    await scan.fill(ean('210012301250'));
+    await scan.press('Enter');
+    const tq = page.getByLabel('Quantity of E2E Tomato (line 1)');
+    await tq.waitFor();
+    check((await tq.inputValue()) === '1.25', `scale label weight → quantity (${await tq.inputValue()})`);
+    // Quantity prefix + short code.
+    await scan.fill('3*EB');
+    await scan.press('Enter');
+    const bq = page.getByLabel('Quantity of E2E Bar (line 2)');
+    await bq.waitFor();
+    check((await bq.inputValue()) === '3', `3*EB adds three of the short-code item (${await bq.inputValue()})`);
+    const total = await page.locator('[data-pos-total]').innerText();
+    check(/130\.00/.test(total), `1.25 kg × 80 + 3 × 10 (${total})`);
+
+    await page.getByLabel('Walk-in phone').fill('9876543210');
+    await page.locator('#pos-Cash').fill('200');
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    const strip = page.locator('[data-pos-change-strip]');
+    await strip.waitFor({ timeout: 5000 });
+    check(/70\.00/.test(await strip.innerText()), `change strip (${await strip.innerText()})`);
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.pos))).find((i) => !beforeIds.has(i.id) && i.pos);
+    check(bill?.total === 130, `scale bill saved (${bill?.total})`);
+    const wa = await page.locator('a[data-pos-whatsapp]').getAttribute('href');
+    check(/^https:\/\/wa\.me\/919876543210\?text=/.test(wa ?? ''), `WhatsApp this bill (${(wa ?? '').slice(0, 40)})`);
+
+    // X report of the shift: the one bill, its cash.
+    await page.locator('[data-pos-shift]').click();
+    await page.locator('[data-x-report]').waitFor();
+    const xNet = await page.locator('[data-x="net"]').innerText();
+    const xBills = await page.locator('[data-x="bills"]').innerText();
+    check(/130\.00/.test(xNet) && /\b1\b/.test(xBills), `shift X report (${xBills.replace(/\s+/g, ' ')}, ${xNet.replace(/\s+/g, ' ')})`);
+    const shifts = await readJson(page, 'pos_shifts', [], (v) => v.length === 1 && v[0].bill_ids?.length === 1);
+    check(shifts[0]?.opening_float === 500 && shifts[0]?.bill_ids?.[0] === bill?.id, 'shift row holds the bill');
+    await page.keyboard.press('Escape');
+
+    // Unknown EAN → create-item sheet → the new item lands on the bill (8.149).
+    const unknown = ean('890103086531');
+    await scan.fill(unknown);
+    await scan.press('Enter');
+    const sheet = page.locator(`[data-quick-item="${unknown}"]`);
+    await sheet.waitFor();
+    await page.locator('#qi-name').fill('E2E New Item');
+    await page.locator('#qi-rate').fill('50');
+    await page.locator('[data-qi-save]').click();
+    await page.getByLabel('Quantity of E2E New Item (line 1)').waitFor();
+    const cat = await readJson(page, 'items_catalog', [], (v) => v.some((i) => i.barcode === unknown));
+    check(cat.some((i) => i.barcode === unknown && i.name === 'E2E New Item'), 'item created with the scanned barcode');
+
+    await page.keyboard.press('F8');
+    await writeJson(page, 'transactions', (await readJson(page, 'transactions', [])).filter((t) => t.invoice_id !== bill?.id));
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => i.id !== bill?.id));
+    await writeJson(page, 'items_catalog', prevCatalog);
+    await writeJson(page, 'pos_shifts', null);
+    await page.evaluate(() => localStorage.removeItem('mrchartist_pos_scale'));
+  });
+
   await step('POS return: bill → return one item → refund cash; Z report shows the return (WP-9)', async () => {
     const prevCatalog = await readJson(page, 'items_catalog', []);
     const before = await readJson(page, 'invoices', []);
@@ -1013,7 +1514,10 @@ try {
     await dlg.getByRole('button', { name: 'Find' }).click();
     await dlg.getByLabel('Return quantity of E2E Return Soap (line 1)').fill('1');
     await page.waitForFunction(() => /118\.00/.test(document.querySelector('[data-ret-total]')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
-    check((await dlg.locator('#ret-Cash').inputValue()) === '118', `refund defaults to cash 118 (${await dlg.locator('#ret-Cash').inputValue()})`);
+    // The refund tender fills in after the total settles; wait for it instead of reading it once.
+    await page.waitForFunction(() => document.querySelector('#ret-Cash')?.value === '118', null, { timeout: 5000 }).catch(() => {});
+    const cash = await dlg.locator('#ret-Cash').inputValue();
+    check(cash === '118', `refund defaults to cash 118 (${cash})`);
     await dlg.getByRole('button', { name: 'Save return' }).click();
     await page.getByText(/CRN\/FY\d\d-\d\d\/\d{4} saved — refund/).first().waitFor();
     const cn = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'CREDIT_NOTE' && !beforeIds.has(i.id)))).find((i) => i.doc_type === 'CREDIT_NOTE' && !beforeIds.has(i.id));
@@ -1037,7 +1541,93 @@ try {
     await writeJson(page, 'items_catalog', prevCatalog);
   });
 
+  await step('7U: a bill-value offer applies on the POS with its own line; the Forex bank tab opens', async () => {
+    const prevCatalog = await readJson(page, 'items_catalog', []);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await writeJson(page, 'items_catalog', [...prevCatalog, {
+      id: 'e2e-offer', name: 'E2E Offer Soap', type: 'Product', hsn: '3401', unit: 'PCS', quantity: 1, rate: 100, tax_rate: 18, amount: 0, barcode: '8901030865299',
+    }]);
+    await writeJson(page, 'schemes', [{ id: 'e2e-bv', kind: 'bill_value', item_id: '', item_name: '', buy_qty: 0, free_qty: 0, label: 'E2E offer', slabs: [{ min_value: 150, percent: 10 }] }]);
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor();
+    await scan.fill('8901030865299');
+    await scan.press('Enter');
+    await page.getByLabel('Quantity of E2E Offer Soap (line 1)').fill('2');
+    const offer = page.locator('[data-pos-offer]');
+    await offer.waitFor({ timeout: 5000 });
+    const offerText = await offer.innerText();
+    const total = await page.locator('[data-pos-total]').innerText();
+    check(/E2E offer: 10% off/.test(offerText) && /20\.00/.test(offerText), `offer line on the POS (${offerText})`);
+    check(/212\.(40|00)/.test(total), `GST on the value after the offer: 180 + 18% (${total})`);
+    await page.keyboard.press('F4');
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    await page.getByText(/INV\/FY\d\d-\d\d\/\d{4} saved/).first().waitFor();
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.pos))).find((i) => !beforeIds.has(i.id) && i.pos);
+    check(bill?.offer?.value === 20 && bill.taxable_value === 180 && Math.abs(bill.total - 212.4) < 0.5, `offer saved on the bill (${JSON.stringify(bill?.offer)}, ${bill?.total})`);
+    check((await page.locator('[data-pos-printer]').count()) === 1, 'printer settings button on the POS');
+
+    await page.goto(srv.origin + '/reconcile?tab=documents&doc=forex');
+    await page.getByRole('button', { name: 'Forex bank' }).waitFor();
+    const forex = page.getByText(/main account stays in rupees|EEFC \/ foreign-currency accounts/).first();
+    await forex.waitFor({ timeout: 10000 }).catch(() => {});
+    check((await forex.count()) > 0, 'Forex bank panel renders');
+
+    await writeJson(page, 'transactions', (await readJson(page, 'transactions', [])).filter((t) => t.invoice_id !== bill?.id));
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => i.id !== bill?.id));
+    await writeJson(page, 'items_catalog', prevCatalog);
+    await writeJson(page, 'schemes', null);
+  });
+
   let backupPath = '';
+  await step('R3-A: open table 1 → add items → Send KOT → split by item → two bills settled with the order link', async () => {
+    const prevCatalog = await readJson(page, 'items_catalog', []);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await writeJson(page, 'items_catalog', [...prevCatalog,
+      { id: 'e2e-tikka', name: 'E2E Paneer Tikka', type: 'Product', hsn: '996331', unit: 'NOS', quantity: 1, rate: 200, tax_rate: 5, amount: 0 },
+      { id: 'e2e-naan', name: 'E2E Butter Naan', type: 'Product', hsn: '996331', unit: 'NOS', quantity: 1, rate: 50, tax_rate: 5, amount: 0 },
+    ]);
+    await page.goto(srv.origin + '/tables');
+    await page.locator('[data-print-tickets]').uncheck(); // no print pop-up in the smoke run
+    await page.locator('[data-table="1"]').click();
+    await page.locator('[data-open-order]').click();
+    const search = page.locator('#order-search');
+    await search.waitFor();
+    for (const name of ['E2E Paneer Tikka', 'E2E Butter Naan']) {
+      await search.fill(name);
+      await search.press('Enter');
+      await page.locator(`[data-order-line="${name}"]`).waitFor();
+    }
+    await page.locator('[data-send-kot]').click();
+    await page.getByText(/K\d+ Kitchen sent to the kitchen/).first().waitFor();
+    const sent = await readJson(page, 'table_orders', [], (v) => v.some((o) => o.status === 'open' && o.kots?.length));
+    const order = sent.find((o) => o.status === 'open' && o.kots?.length);
+    check(order?.kots.length === 1 && order.kots[0].number.startsWith('K') && order.kots[0].lines.length === 2, `KOT stored on the order (${order?.kots?.[0]?.number})`);
+    check((await page.locator('[data-table="1"]').getAttribute('data-state')) === 'occupied', 'table 1 shows occupied');
+
+    await page.locator('[data-split]').click();
+    const dlg = page.getByRole('dialog', { name: 'Split the bill' });
+    await dlg.waitFor();
+    await dlg.getByRole('tab', { name: 'By item' }).click();
+    await dlg.locator('[data-split-recon]').waitFor();
+    check((await dlg.locator('[data-recon-exact]').getAttribute('data-recon-exact')) === '1', 'reconciliation strip: GST adds up');
+    await dlg.locator('[data-split-save]').click();
+    await page.getByText(/order settled/).first().waitFor();
+    const bills = (await readJson(page, 'invoices', [], (v) => v.filter((i) => !beforeIds.has(i.id) && i.table_order_id).length === 2))
+      .filter((i) => !beforeIds.has(i.id) && i.table_order_id);
+    check(bills.length === 2 && bills.every((b) => b.pos && b.status === 'Paid' && b.table_order_id === order?.id && b.split_of?.parts === 2),
+      `two POS bills, paid, linked to the order (${bills.map((b) => `${b.invoice_number} ${b.split_of?.part}/${b.split_of?.parts}`).join(', ')})`);
+    const done = (await readJson(page, 'table_orders', [], (v) => v.some((o) => o.id === order?.id && o.status === 'settled'))).find((o) => o.id === order?.id);
+    check(done?.status === 'settled' && done.invoice_ids?.length === 2, 'order settled with both invoice ids');
+    check((await page.locator('[data-table="1"]').getAttribute('data-state')) === 'free', 'table 1 is free again');
+
+    const ids = new Set(bills.map((b) => b.id));
+    await writeJson(page, 'transactions', (await readJson(page, 'transactions', [])).filter((t) => !ids.has(t.invoice_id)));
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).filter((i) => !ids.has(i.id)));
+    await writeJson(page, 'table_orders', null);
+    await writeJson(page, 'items_catalog', prevCatalog);
+  });
+
   await step('download a backup', async () => {
     await page.goto(srv.origin + '/settings?tab=data');
     const [download] = await Promise.all([
@@ -1068,13 +1658,243 @@ try {
     check(true, 'an undo copy of the replaced data is offered');
   });
 
-  await step('delete without undo really deletes', async () => {
+  await step('delete without undo really deletes, even when the tab is reloaded with the Undo toast still up', async () => {
     await page.goto(srv.origin + '/transactions');
     await page.getByRole('button', { name: /^Delete INV/ }).first().click();
     await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+    // R4-C4: an Undo toast waits for the user (no auto-dismiss). QA6-1 F16: the delete is committed at once (to the
+    // recycle bin), so a reload that never touches the toast cannot bring the invoice back.
     await page.waitForTimeout(6500);
+    const undo = page.getByRole('button', { name: 'Undo' });
+    check(await undo.isVisible(), 'the Undo toast is still there after 6.5 s (no auto-dismiss)');
+    const gone = (await readJson(page, 'invoices', [], (v) => v.length === 0)).length;
+    check(gone === 0, `the delete is committed while the toast is up (${gone} left)`);
+    await page.reload();
+    await page.getByRole('heading', { level: 1 }).first().waitFor();
+    await page.waitForTimeout(500);
     const left = (await readJson(page, 'invoices', [], (v) => v.length === 0)).length;
-    check(left === 0, `the delete is committed after the undo window (${left} left)`);
+    check(left === 0, `still deleted after a reload (${left} left)`);
+    check(await page.getByRole('button', { name: /^Delete INV/ }).count() === 0, 'the list does not show it after the reload');
+  });
+
+  await step('R4-C4: the deleted invoice is in Recently deleted; restoring it brings it back with the same number', async () => {
+    // Later steps expect the books as the delete left them: put invoices / receipts back afterwards.
+    const before = { invoices: await readJson(page, 'invoices', []), transactions: await readJson(page, 'transactions', []) };
+    const binned = await readJson(page, 'recycle_bin', [], (v) => v.some((e) => e.table === 'invoices'));
+    const entry = binned.find((e) => e.table === 'invoices');
+    const number = entry?.row?.invoice_number;
+    check(!!number && binned.some((e) => e.table === 'transactions' && e.row?.invoice_id === entry.row_id), `the invoice ${number} and its receipt are in the recycle bin`);
+    await page.goto(srv.origin + '/settings?tab=data&bin=1');
+    const dlg = page.getByRole('dialog', { name: /Recently deleted/ });
+    await dlg.waitFor();
+    const row = dlg.locator(`[data-bin-row="${number}"]`);
+    await row.waitFor();
+    const linked = binned.filter((e) => e.table === 'transactions' && e.row?.invoice_id === entry.row_id).length;
+    await row.getByRole('button', { name: new RegExp(`Restore with ${linked} linked row`) }).click();
+    const back = await readJson(page, 'invoices', [], (v) => v.length === 1);
+    check(back[0]?.invoice_number === number && back[0]?.id === entry.row_id, `restored with the same number and id (${back[0]?.invoice_number})`);
+    const pays = await readJson(page, 'transactions', [], (v) => v.filter((t) => t.invoice_id === entry.row_id).length === linked);
+    check(pays.filter((t) => t.invoice_id === entry.row_id).length === linked, `its ${linked} receipt(s) came back with it`);
+    check((await readJson(page, 'recycle_bin', [], (v) => !v.some((e) => e.row_id === entry.row_id))).every((e) => e.row_id !== entry.row_id), 'the bin entry is gone');
+    const audit = await readJson(page, 'audit_log', [], (v) => v.some((e) => e.action === 'restore'));
+    check(audit.some((e) => e.action === 'restore' && /recycle bin/.test(e.summary)), 'the restore is in the edit log');
+    await page.keyboard.press('Escape');
+    await writeJson(page, 'invoices', before.invoices);
+    await writeJson(page, 'transactions', before.transactions);
+  });
+
+  await step('R4-C1/C2: an export without an LUT is flagged before filing; LUT added; an IRM realises the shipping bill', async () => {
+    const keys = ['invoices', 'lut_register', 'export_irms'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 10);
+    const pad = (n) => String(n).padStart(2, '0');
+    const day = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-10`;
+    const fyStart = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+    const fy = `FY${String(fyStart).slice(2)}-${String(fyStart + 1).slice(2)}`;
+    const exp = {
+      id: 'e2e-exp', invoice_number: `EXP/${fy}/0001`, doc_type: 'INVOICE', status: 'Sent', issue_date: day, due_date: day, currency: 'USD', exchange_rate: 83,
+      supply_type: 'EXPORT_LUT', place_of_supply: '96', gst_mode: 'IGST', total: 1000, amount_paid: 0, balance_due: 1000, lut_number: '', lut_date: '',
+      shipping_bill_no: '7654321', shipping_bill_date: day, incoterm: 'FOB', country_of_destination: 'AE',
+      sender: { companyName: 'E2E Trader', companyGstin: '27AAPFU0939F1ZV', stateCode: '27', iec: 'AAPFU0939F' },
+      client: { name: 'E2E Gulf Buyer LLC', state: 'Other country' }, items: [{ id: 'x1', name: 'Spice export', hsn: '0904', quantity: 1, rate: 1000, tax_rate: 0, amount: 1000 }],
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), exp]);
+    await page.goto(srv.origin + '/gst-reports');
+    await page.locator('[data-filing-check]').click();
+    await page.locator('[data-preflight-group="issue:LUT_MISSING"]').waitFor();
+    check(/without an LUT/.test(await page.locator('[data-preflight-group="issue:LUT_MISSING"]').innerText()), 'preflight: LUT_MISSING for the zero-rated export');
+    await page.keyboard.press('Escape');
+
+    await page.goto(srv.origin + '/settings');
+    const panel = page.locator('[data-export-settings]');
+    await panel.waitFor();
+    await panel.getByLabel('Financial year').selectOption(fy);
+    await panel.getByLabel('ARN').fill('AD2704260012345');
+    await panel.getByLabel('Filed on').fill(`${fyStart}-03-20`);
+    await panel.getByRole('button', { name: 'Add LUT' }).click();
+    const lut = await readJson(page, 'lut_register', [], (v) => v.length === 1);
+    check(lut[0]?.fy === fy && lut[0]?.arn === 'AD2704260012345', `LUT register row for ${fy}`);
+
+    await page.goto(srv.origin + '/gst-reports?tab=export-desk&view=irms');
+    await page.getByRole('button', { name: 'Add IRM' }).click();
+    const form = page.getByRole('dialog');
+    await form.getByLabel('IRM / FIRC no.').fill('E2EIRM0001');
+    await form.getByLabel('Amount (FCY)').fill('1000');
+    await form.getByLabel('Amount (FCY)').blur();
+    await form.getByRole('button', { name: new RegExp(`^Add ${exp.invoice_number}`) }).click();
+    await form.getByTestId('irm-save').click();
+    const irms = await readJson(page, 'export_irms', [], (v) => v.length === 1);
+    check(irms[0]?.allocations?.[0]?.invoice_id === 'e2e-exp' && irms[0]?.allocations?.[0]?.fcy === 1000, 'the IRM is matched to the export invoice');
+    await page.goto(srv.origin + '/gst-reports?tab=export-desk&view=register');
+    const reg = page.locator(`[data-realisation-row="${exp.invoice_number}"]`);
+    await reg.waitFor();
+    check(/Realised/.test(await reg.innerText()), 'the realisation register shows the shipping bill as realised');
+
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R5-A: e-commerce pack on → channel → import an Amazon MTR and a settlement → post → clearing nets to ₹0.00', async () => {
+    const keys = ['settings', 'invoices', 'transactions', 'vouchers', 'items_catalog', 'clients', 'bank_accounts', 'accounts', 'doc_links', 'series_counters',
+      'sales_channels', 'channel_skus', 'marketplace_imports', 'settlements', 'marketplace_returns'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const settings = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...settings, industry_packs: ['marketplace'], lock_until: undefined });
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-mug', name: 'E2E Red Mug', sku: 'MUG-RED', hsn: '6912', unit: 'NOS', tax_rate: 18, rate: 500, type: 'Product', quantity: 1, amount: 0 }]);
+    await page.goto(srv.origin + '/receivables');
+    await page.getByRole('tab', { name: 'Marketplace' }).click();
+    await page.locator('[data-mkt-view="channels"]').click();
+    await page.locator('[data-mkt-ch-name]').fill('E2E Amazon');
+    await page.locator('[data-mkt-ch-gstins]').fill('27AAICA3918J1CT');
+    await page.locator('[data-mkt-ch-save]').click();
+    const ch = await readJson(page, 'sales_channels', [], (v) => v.length === 1);
+    const banks = await readJson(page, 'bank_accounts', [], (v) => v.some((b) => b.clearing));
+    check(!!ch[0]?.clearing_bank_id && banks.some((b) => b.id === ch[0].clearing_bank_id && b.clearing), 'the channel has its own clearing account');
+    // The pack-of-3 listing maps to the mug (SKU map row).
+    await writeJson(page, 'channel_skus', [{ id: 'e2e-sku', channel_id: ch[0].id, channel_sku: 'MUG-3PK', listing_id: 'B0MUG3', item_id: 'e2e-mug', qty_per_unit: 3 }]);
+    const fx = (n) => decodeURIComponent(new URL(`../fixtures/marketplace/${n}`, import.meta.url).pathname);
+
+    await page.goto(srv.origin + '/receivables?tab=marketplace&view=import');
+    await page.locator('[data-mkt-sales-file]').setInputFiles(fx('amazon-mtr.csv'));
+    await page.locator('[data-mkt-preview]').waitFor();
+    check(/3 invoices and 1 credit notes/.test(await page.locator('[data-mkt-preview]').innerText()), 'preview: 3 invoices and 1 credit note');
+    await page.locator('[data-mkt-sales-import]').click();
+    const docs = await readJson(page, 'invoices', [], (v) => v.filter((d) => d.channel_id === ch[0].id).length === 4);
+    check(docs.filter((d) => d.channel_id === ch[0].id && d.eco_gstin === '27AAICA3918J1CT').length === 4, 'four documents with the marketplace numbers, tagged to the operator GSTIN');
+
+    await page.goto(srv.origin + '/receivables?tab=marketplace&view=settlements');
+    await page.locator('[data-mkt-settlement-file]').setInputFiles(fx('amazon-settlement-v2.csv'));
+    await page.locator('[data-mkt-settlement-import]').click();
+    await readJson(page, 'settlements', [], (v) => v.length === 1);
+    await page.locator('[data-mkt-post]').click();
+    await readJson(page, 'settlements', [], (v) => !!v[0]?.posted);
+    await page.locator('[data-mkt-clearing-total]').waitFor();
+    const total = await page.locator('[data-mkt-clearing-total]').innerText();
+    check(/₹0\.00/.test(total), `clearing account nets to zero (${total.trim()})`);
+
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R5-B: contractor pack on → BOQ → RA bill with retention and 194C → the receivable splits into due now and held', async () => {
+    const keys = ['settings', 'invoices', 'transactions', 'clients', 'doc_links', 'series_counters', 'ra_measurements', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const settings = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...settings, industry_packs: ['works'], lock_until: undefined });
+    const dept = { id: 'e2e-pwd', name: 'E2E PWD Division', email: '', address: 'Mumbai', city: 'Mumbai', zip: '', state_code: '27' };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), dept]);
+    // The BOQ is an ordinary issued sales order (the editor flow is covered by the earlier steps).
+    const boq = {
+      id: 'e2e-boq', invoice_number: 'SO/E2E/0001', doc_type: 'SALES_ORDER', issue_date: '2026-05-01', due_date: '2026-05-31', status: 'Sent', currency: 'INR', template_id: 'classic_orange',
+      client: dept, sender: (settings.profiles ?? [])[0] ?? null,
+      items: [
+        { id: 'e2e-l1', name: 'Earthwork excavation', boq_ref: '2.1', type: 'Service', hsn: '995411', unit: 'CUM', quantity: 1000, rate: 250, tax_rate: 18, discount_percent: 0, amount: 250000 },
+        { id: 'e2e-l2', name: 'PCC 1:4:8', boq_ref: '2.2', type: 'Service', hsn: '995411', unit: 'CUM', quantity: 200, rate: 4500, tax_rate: 18, discount_percent: 0, amount: 900000 },
+      ],
+      gst_mode: 'CGST_SGST', place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false,
+      amount_paid: 0, notes: '', terms: '', subtotal: 1150000, discount_amount: 0, taxable_value: 1150000, cgst_amount: 103500, sgst_amount: 103500, igst_amount: 0, tax_amount: 207000, round_off: 0, total: 1357000, balance_due: 1357000,
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), boq]);
+    await page.goto(srv.origin + '/time');
+    await page.getByRole('tab', { name: 'Works' }).click();
+    await page.locator('[data-works-boq]').selectOption('e2e-boq');
+    await page.locator('[data-ded-on="retention"]').check();
+    await page.locator('[data-ded-rate="retention"]').fill('5');
+    await page.locator('[data-ded-on="it_tds"]').check();
+    await page.locator('[data-ded-save]').click();
+    await readJson(page, 'invoices', [], (v) => (v.find((d) => d.id === 'e2e-boq')?.boq_terms?.deductions ?? []).length === 2);
+    await page.locator('[data-tw-view="ra"]').click();
+    await page.locator('[data-ra-cum="2.1"]').fill('400');
+    await page.locator('[data-ra-save]').click();
+    const docs = await readJson(page, 'invoices', [], (v) => v.some((d) => d.boq_id === 'e2e-boq' && d.ra_no === 1));
+    const ra = docs.find((d) => d.boq_id === 'e2e-boq' && d.ra_no === 1);
+    check(!!ra && ra.total === 118000 && ra.taxable_value === 100000, `RA bill 1: ₹1,00,000 + GST = ₹1,18,000 (${ra?.total})`);
+    const kinds = (ra?.ra_deductions ?? []).map((d) => `${d.kind}:${d.amount}`).join(',');
+    check(kinds === 'retention:5000,it_tds:2000' && ra.tds_amount === 2000 && ra.ra_net_payable === 111000, `deductions retention 5% and 194C 2%, net payable ₹1,11,000 (${kinds})`);
+    await page.locator('[data-ra-register]').waitFor();
+    await page.locator('[data-tw-view="retention"]').click();
+    const row = page.locator(`[data-ra-split="${ra.invoice_number}"]`);
+    await row.waitFor();
+    const due = (await row.locator('[data-ra-due]').innerText()).trim();
+    const held = (await row.locator('[data-ra-held="retention"]').innerText()).trim();
+    check(/1,11,000\.00/.test(due), `due now ₹1,11,000.00 (${due})`);
+    check(/5,000\.00/.test(held), `held: retention ₹5,000.00 (${held})`);
+
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  // R7-C: hotel stay. R7-B (folios / check-out) is not on this base yet, so the step stops after the night audit and
+  // Form C; R7-B adds "post laundry → charge to room → check out → one invoice" here.
+  await step('R7 hotel stay: pack on → walk-in a foreign guest (Form C due) → night audit posts 1 night → Form C filed → GST → Hotel "specified" at ₹7,600', async () => {
+    const keys = ['settings', 'invoices', 'advances', 'series_counters', 'audit_log', 'hotel_room_types', 'hotel_rooms', 'hotel_rate_plans', 'hotel_reservations', 'hotel_folios', 'hotel_guests', 'hotel_night_audits', 'hotel_settings'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const today = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), industry_packs: ['hotel'], lock_until: undefined });
+    await writeJson(page, 'hotel_room_types', [{ id: 'e2e-dlx', name: 'Deluxe', code: 'DLX', base_occupancy: 2, max_occupancy: 3, max_extra_beds: 1, sac: '996311' }]);
+    await writeJson(page, 'hotel_rooms', [101, 102].map((n) => ({ id: `e2e-r${n}`, number: String(n), room_type_id: 'e2e-dlx', floor: '1', active: true, hk_status: 'clean' })));
+    await writeJson(page, 'hotel_rate_plans', [{ id: 'e2e-ep', name: 'Room only', code: 'EP', meal_plan: 'EP', audience: 'public', active: true, rates: [{ room_type_id: 'e2e-dlx', single: 3000, double: 3000, extra_adult: 0, extra_child: 0, extra_bed: 0 }] }]);
+    await writeJson(page, 'hotel_settings', { business_date: today });
+    for (const k of ['hotel_reservations', 'hotel_folios', 'hotel_guests', 'hotel_night_audits']) await writeJson(page, k, []);
+
+    await page.goto(srv.origin + '/tables?tab=frontdesk');
+    await page.locator('[data-walk-in]').click();
+    const dlg = page.getByRole('dialog');
+    await dlg.locator('[data-f="name"]').first().fill('Jane Doe');
+    await dlg.locator('[data-f="nationality"]').first().fill('GB');
+    await dlg.locator('[data-f="passport_no"]').fill('P1234567');
+    await dlg.locator('[data-check-in-go]').click();
+    const res = await readJson(page, 'hotel_reservations', [], (v) => v.some((r) => r.lines?.[0]?.status === 'checked_in'));
+    const line = res[0].lines[0];
+    check(!!line.form_c?.due_at && Date.parse(line.form_c.due_at) - Date.parse(line.checked_in_at) === 24 * 3600e3, 'a foreign guest starts the 24-hour Form C clock');
+    await page.locator('[data-formc-chip]').first().waitFor();
+    check(true, 'the board shows the Form C countdown chip');
+
+    await page.locator('[data-hotel-view="audit"]').click();
+    await page.locator('[data-run-audit]').click();
+    const audits = await readJson(page, 'hotel_night_audits', [], (v) => v.length === 1);
+    const folios = await readJson(page, 'hotel_folios', []);
+    const room = folios.flatMap((f) => f.lines).filter((l) => l.kind === 'room');
+    check(audits[0].business_date === today && room.length === 1 && room[0].amount === 3000, `night audit posts 1 room night at ₹3,000 (${room.map((l) => l.amount)})`);
+
+    await page.locator('[data-hotel-view="formc"]').click();
+    const row = page.locator('[data-formc-row]').first();
+    check(await row.getAttribute('data-formc-status') === 'due', 'Form C desk lists the guest as due');
+    await row.locator('[data-formc-sheet]').click();
+    check(/P1234567/.test(await row.locator('[data-formc-data]').innerText()), 'the data sheet shows the passport number');
+    await row.locator(`[data-f="${line.id}"]`).fill('FRRO-E2E-1');
+    await row.locator('[data-formc-filed]').click();
+    const filed = await readJson(page, 'hotel_reservations', [], (v) => !!v[0]?.lines?.[0]?.form_c?.filed_at);
+    check(filed[0].lines[0].form_c.ref === 'FRRO-E2E-1', 'Form C marked filed with the reference');
+
+    await page.goto(srv.origin + '/gst-reports?tab=hotel-gst');
+    const card = page.locator('[data-premises]').first();
+    await card.waitFor();
+    check(await card.getAttribute('data-specified') === 'no', 'no previous-FY value: not specified premises');
+    await page.locator('[data-hotel-gst] [data-f="prev"]').fill('7600');
+    await page.locator('[data-prev-save]').click();
+    await page.locator('[data-premises][data-specified="yes"]').first().waitFor();
+    check(await card.locator('[data-fnb-rate]').getAttribute('data-fnb-rate') === '18', 'previous-FY ₹7,600 → specified premises, F&B 18%');
+
+    for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
   await step('composition profile issues a Bill of Supply with the Rule 49 declaration', async () => {
@@ -1086,6 +1906,7 @@ try {
     check(s.profiles?.find((p) => p.id === s.activeProfileId)?.gst_scheme === 'composition', 'profile switched to the composition scheme');
 
     await page.goto(srv.origin + '/invoice');
+    await page.locator('[data-meta-edit]').click(); // A5: document details are one line until edited
     const type = await page.getByRole('combobox', { name: /^Type/ }).first().inputValue();
     check(type === 'BILL_OF_SUPPLY', `a composition profile opens a Bill of Supply (${type})`);
     await page.getByLabel('Client name').fill('Corner Shop');
@@ -1095,6 +1916,7 @@ try {
     check((await page.getByLabel('Item 1 GST rate').count()) === 0, 'no GST rate column on a Bill of Supply');
     await page.keyboard.press('Control+s');
     await page.getByText(/saved/i).first().waitFor();
+    await closeSendSheet(page);
     const bos = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'BILL_OF_SUPPLY'))).find((i) => i.doc_type === 'BILL_OF_SUPPLY');
     check(!!bos && /^BOS\/FY\d{2}-\d{2}\/0001$/.test(bos.invoice_number) && bos.tax_amount === 0 && Math.abs(bos.total - 1000) < 0.01 && bos.sender?.gst_scheme === 'composition',
       `bill of supply ${bos?.invoice_number}: total ${bos?.total}, tax ${bos?.tax_amount}, scheme snapshotted (${bos?.sender?.gst_scheme})`);
@@ -1120,6 +1942,9 @@ try {
     await page.getByRole('button', { name: /Start timer/ }).click();
     const pill = page.getByRole('link', { name: /Timer running for Acme Buyers/ }).first();
     await pill.waitFor();
+    // Reload only once the running timer has reached IndexedDB (the write is flushed asynchronously; a
+    // reload a few ms after the click can beat it on a fast runner).
+    await readJson(page, 'timer', null, (v) => !!v && v.started_at !== null);
     await page.reload();
     await pill.waitFor();
     check(true, 'timer pill shows in the header and survives a reload');
@@ -1139,6 +1964,7 @@ try {
     await page.getByRole('button', { name: /^Bill$/ }).first().click();
     await page.getByRole('button', { name: 'Create draft invoice' }).click();
     await page.waitForURL(/\/invoice\/.+/);
+    await footerLaidOut(page, 'Timesheets → Bill (R3-B)');
     const inv = (await readJson(page, 'invoices', [], (v) => v.length > 0))[0];
     const item = inv?.items?.[0] ?? {};
     check(inv?.status === 'Draft' && item.quantity === 1.5 && item.unit === 'HRS' && item.hsn === '998311',
@@ -1158,6 +1984,7 @@ try {
     check(centres.length === 1 && centres[0].kind === 'project', `cost centre stored (${centres.length})`);
 
     await page.goto(srv.origin + '/invoice');
+    await page.locator('[data-meta-edit]').click();
     await page.locator('#doc-cost-centre').selectOption({ label: 'Website revamp · Project' });
     await page.getByLabel('Client name').fill('Acme Buyers');
     await page.getByLabel('Item 1 name').fill('Design sprint');
@@ -1202,6 +2029,74 @@ try {
     await rep.waitFor();
     const row = await rep.getByRole('row', { name: /Sales/ }).first().textContent();
     check(/1,20,000\.00/.test(row ?? '') && /10,000\.00/.test(row ?? ''), `budget vs actual row (${row})`);
+  });
+
+  await step('R3-B: project with an hours budget → log time on its task → bill the project with the timesheet annexure → print', async () => {
+    await page.goto(srv.origin + '/time?tab=projects');
+    await page.locator('[data-new-project]').click();
+    const pdlg = page.getByRole('dialog', { name: 'New project' });
+    await pdlg.locator('#pj-name').fill('Mobile app');
+    await pdlg.locator('#pj-client').selectOption({ label: 'Acme Buyers' });
+    await pdlg.locator('#pj-hours').fill('2');
+    await pdlg.locator('[data-save-project]').click();
+    await pdlg.waitFor({ state: 'detached' });
+    const centres = await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.name === 'Mobile app'));
+    const proj = centres.find((c) => c.name === 'Mobile app');
+    check(proj?.budget_minutes === 120 && proj?.kind === 'project', `project stored with a 2 h budget (${proj?.budget_minutes})`);
+    await page.locator('[data-project-select]').selectOption(proj.id);
+    await page.locator('[data-add-task]').click();
+    const tdlg = page.getByRole('dialog', { name: 'Add task' });
+    await tdlg.locator('#tk-title').fill('Wireframes');
+    await tdlg.locator('#tk-est').fill('1');
+    await tdlg.locator('[data-save-task]').click();
+    await tdlg.waitFor({ state: 'detached' });
+    await page.locator('[data-task-id]').filter({ hasText: 'Wireframes' }).waitFor();
+
+    // Log 1:45 on the task: picking the task sets the project.
+    await page.getByRole('button', { name: /Add time/ }).click();
+    await page.locator('#te-client').selectOption({ label: 'Acme Buyers' });
+    await page.locator('#te-task').selectOption({ label: 'Wireframes' });
+    await page.getByLabel('Description').fill('Wireframes v1');
+    await page.getByLabel('Time (h:mm)').fill('1:45');
+    await page.getByLabel('Rate / hour').fill('1200');
+    await page.getByRole('button', { name: 'Add entry' }).click();
+    const logged = await readJson(page, 'time_entries', [], (v) => v.some((e) => e.description === 'Wireframes v1'));
+    const te = logged.find((e) => e.description === 'Wireframes v1');
+    check(!!te?.task_id && te?.cost_centre_id === proj?.id, `entry carries the task and its project (${te?.cost_centre_id === proj?.id})`);
+    await page.reload();
+    await page.locator('[data-project-select]').selectOption(proj.id);
+    const header = await page.locator('[data-project-header]').innerText();
+    check(/1h 45m of 2h 00m/.test(header) && /87% of the hours budget/.test(header), `header: tracked vs budget and the 80% warning (${header.replace(/\s+/g, ' ').slice(0, 120)})`);
+
+    // Bill the project with the annexure.
+    await page.locator('[data-bill-project]').click();
+    await page.locator('[data-attach-annexure]').check();
+    await page.getByRole('button', { name: 'Create draft invoice' }).click();
+    await page.waitForURL(/\/invoice\/.+/);
+    const id = page.url().split('/invoice/')[1];
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === id && i.annexure))).find((i) => i.id === id);
+    check(inv?.annexure?.rows?.length === 1 && inv.annexure.rows[0].task === 'Wireframes' && inv.annexure.rows[0].billed_minutes === 105,
+      `annexure snapshot on the invoice (${inv?.annexure?.rows?.length} row, task ${inv?.annexure?.rows?.[0]?.task})`);
+    check(inv?.items?.length === 1 && inv.items[0].quantity === 1.75, `one time line of 1.75 h (${inv?.items?.[0]?.quantity})`);
+
+    // Issue it, dismiss the post-save sheet, then print: the annexure is a following page.
+    await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
+    await page.locator('[data-annexure-actions]').waitFor();
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.waitFor();
+    const annex = dialog.locator('[data-annexure]').first();
+    await annex.waitFor();
+    const text = await annex.innerText();
+    check(/Annexure to INV\/FY\d{2}-\d{2}\/\d{4}/i.test(text) && /Wireframes v1/.test(text), `preview prints the annexure (${text.replace(/\s+/g, ' ').slice(0, 60)}…)`);
+    await dialog.getByRole('button', { name: /^Share/ }).click();
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.getByRole('menuitem', { name: /Download PDF/ }).click()]);
+    const body = readFileSync(await dl.path()).toString('latin1');
+    const pages = (body.match(/\/Type\s*\/Page(?![s\w])/g) ?? []).length;
+    check(pages >= 2, `the PDF carries the annexure on a following page (${pages} pages)`);
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
   });
 
   await step('cheque register: record a post-dated cheque, see the reminder, clear it against the invoice', async () => {
@@ -1395,6 +2290,48 @@ try {
     check(true, 'Table 11B is reported in the month of adjustment, not the month received');
   });
 
+  await step('8G: 390 px editor layout, Record payment in the editor, palette finds by amount, insights tile', async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(srv.origin + '/invoice');
+    // A5: document details as one line, party extras behind "More details".
+    await page.locator('[data-meta-summary]').waitFor();
+    check((await page.locator('#due-date').count()) === 0, 'document details are collapsed to one line at 390 px');
+    check((await page.getByLabel('Billing address').count()) === 0 && (await page.locator('[data-party-more]').count()) === 1, 'billing address sits behind More details');
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    check(overflow <= 1, `no horizontal scroll in the editor at 390 px (${overflow})`);
+    await page.getByLabel('Client name').fill('Gamma Eight');
+    await page.getByLabel('Item 1 name').fill('Audit 8G');
+    await page.getByLabel('Item 1 quantity').fill('1');
+    await page.getByLabel('Item 1 rate').fill('1000');
+    await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    // A2: Record payment from the editor settles the invoice.
+    await page.locator('[data-record-payment]').click();
+    const dlg = page.getByRole('dialog', { name: 'Record payment' });
+    await dlg.waitFor();
+    const amount = dlg.getByLabel('Amount');
+    if (!(await amount.inputValue())) await amount.fill('1180');
+    await dlg.getByRole('button', { name: 'Record payment' }).click();
+    const paid = (await readJson(page, 'invoices', [], (v) => v.some((x) => x.client?.name === 'Gamma Eight' && x.status === 'Paid'))).find((x) => x.client?.name === 'Gamma Eight');
+    check(paid?.status === 'Paid', `Record payment in the editor marks it Paid (${paid?.status})`);
+    await page.keyboard.press('Escape');
+    // 8.103 SmartFind: an amount range finds it in the palette.
+    await page.goto(srv.origin + '/transactions');
+    await page.getByText('Every document you have issued').first().waitFor();
+    await page.getByRole('button', { name: /Search invoices/ }).first().click();
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('gamma 1.1k-1.2k');
+    await palette.getByRole('option', { name: new RegExp(paid?.invoice_number.replace(/[/]/g, '\\/') ?? 'INV') }).first().waitFor();
+    check(true, 'palette finds the invoice by party + amount range');
+    await page.keyboard.press('Escape');
+    // 8.108 insights tile on the dashboard.
+    await page.goto(srv.origin + '/');
+    await page.locator('[data-tile="insights"] [data-insight="revenue"]').waitFor({ timeout: 15000 });
+    check(true, 'dashboard shows the offline insights tile');
+  });
+
   await step('an existing localStorage user moves to IndexedDB on first load', async () => {
     // A device last used by a pre-4.x build: data in localStorage, schema v1, logo inline in the snapshot.
     const logo = `data:image/png;base64,${LOGO_PNG}`;
@@ -1502,6 +2439,463 @@ try {
     check(true, 'an unused account can be deleted; the picker goes away with one account');
   });
 
+  await step('8F distribution: add an area and a beat, beat plan and reports render, stock analysis tab loads', async () => {
+    await page.goto(srv.origin + '/distribution?tab=masters');
+    await page.locator('[data-area-name]').fill('E2E North');
+    await page.locator('[data-area-name]').press('Enter');
+    await readJson(page, 'dist_areas', [], (v) => v.some((a) => a.name === 'E2E North'));
+    await page.locator('[data-beat-name]').fill('E2E Market Rd');
+    await page.getByRole('checkbox', { name: 'Mon' }).check();
+    await page.getByRole('button', { name: 'Add beat' }).click();
+    const beats = await readJson(page, 'dist_beats', [], (v) => v.some((b) => b.name === 'E2E Market Rd'));
+    check(beats.find((b) => b.name === 'E2E Market Rd')?.days?.includes(1), 'beat saved with its visiting weekday');
+    await page.getByRole('tab', { name: 'Reports' }).click();
+    await page.locator('[data-dist-reports]').waitFor({ timeout: 15000 });
+    await page.getByRole('tab', { name: 'Beat plan' }).click();
+    await page.locator('[data-beat-plan]').waitFor({ timeout: 15000 });
+    const prevStock = await readJson(page, 'stock_items', []);
+    await writeJson(page, 'stock_items', [...prevStock, { id: 'e2e-8f', name: 'E2E Soap', unit: 'NOS', track_stock: true, opening_qty: 5, opening_rate: 10, reorder_level: 0 }]);
+    await page.goto(srv.origin + '/inventory?tab=analysis');
+    await page.locator('[data-stock-analysis]').waitFor({ timeout: 15000 });
+    check(await page.locator('[data-move-class="non"]').filter({ hasText: 'E2E Soap' }).count() === 1, 'stock analysis: an item with no outward is non-moving');
+    await writeJson(page, 'stock_items', prevStock.length ? prevStock : null);
+    await writeJson(page, 'dist_beats', null);
+    await writeJson(page, 'dist_areas', null);
+  });
+
+  await step('R2-C: text size 130% applies before paint, no sideways scroll at 360 px; annual pack renders its pages', async () => {
+    await page.goto(srv.origin + '/settings?tab=security');
+    await page.locator('[data-display-prefs]').waitFor({ timeout: 15000 });
+    await page.locator('[data-text-scale="130"]').click();
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_display_prefs') ?? 'null'));
+    check(stored?.text_scale === 130 && (await idbGet(page, 'mrchartist_display_prefs')) === null, 'display prefs: device-local key in localStorage only');
+    await page.setViewportSize({ width: 360, height: 780 });
+    await page.goto(srv.origin + '/');
+    await page.waitForLoadState('domcontentloaded');
+    const fs = await page.evaluate(() => getComputedStyle(document.documentElement).fontSize);
+    check(fs === '20.8px', `130% text applied from theme-init.js before the app boots (${fs})`);
+    await page.locator('main').first().waitFor({ timeout: 15000 });
+    const overflow = await page.evaluate(() => Math.max(0, ...[document.documentElement, ...document.querySelectorAll('main')].map((e) => e.scrollWidth - e.clientWidth)));
+    check(overflow <= 1, `no horizontal scroll at 360 px and 130% (${overflow}px)`);
+    await page.evaluate(() => localStorage.removeItem('mrchartist_display_prefs'));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(srv.origin + '/books?tab=rpt');
+    await page.getByRole('button', { name: 'Annual pack' }).click();
+    await page.locator('[data-annual-preview] .ap-page').first().waitFor({ timeout: 15000 });
+    check(await page.locator('[data-annual-preview] .ap-page').count() === 6, 'annual pack: cover, balance sheet, P&L, cash flow, trial balance, notes');
+    check(/verify with your CA/.test((await page.locator('[data-annual-preview]').textContent()) ?? ''), 'annual pack carries the "verify with your CA" draft line');
+    // QA-3 F18: a year still running is an interim pack to date, never "As at 31 Mar" of a year that has not ended.
+    const packText = (await page.locator('[data-annual-preview]').textContent()) ?? '';
+    const fyEnd = await page.evaluate(() => { const d = new Date(); return d.getMonth() === 2 && d.getDate() === 31; });
+    check(fyEnd || (/interim/i.test(packText) && !/For the year ended/.test(packText)), 'annual pack during the year is labelled interim, to date');
+  });
+
+  await step('R2-B batch invoices: one saved invoice billed to two parties as drafts, numbered in order; undo deletes them', async () => {
+    const prevInvoices = await readJson(page, 'invoices', []);
+    const prevClients = await readJson(page, 'clients', []);
+    const src = prevInvoices.find((i) => (i.doc_type === 'INVOICE' || i.doc_type === 'TAX_INVOICE') && i.status !== 'Cancelled');
+    check(!!src, 'a saved invoice to use as the source');
+    if (!src) return;
+    await writeJson(page, 'clients', [...prevClients,
+      { id: 'e2e-b1', name: 'E2E Member One', email: '', address: '', city: 'Pune', zip: '', state_code: '27' },
+      { id: 'e2e-b2', name: 'E2E Member Two', email: '', address: '', city: 'Bengaluru', zip: '', state_code: '29' }]);
+    await page.goto(srv.origin + '/recurring?tab=batch');
+    await page.locator('[data-batch-tab]').waitFor({ timeout: 15000 });
+    await page.locator('[data-batch-source]').selectOption(src.id);
+    await page.locator('[data-batch-search]').fill('E2E Member');
+    await page.locator('[data-batch-select-all]').click();
+    await page.locator('[data-batch-preview]').waitFor();
+    check((await page.locator('[data-batch-preview]').textContent())?.includes('IGST') === true, 'the Karnataka party is billed IGST in the preview');
+    await page.locator('[data-batch-issue]').click();
+    await page.locator('[data-batch-result]').waitFor();
+    const after = await readJson(page, 'invoices', [], (v) => v.length === prevInvoices.length + 2);
+    const made = after.filter((i) => !prevInvoices.some((p) => p.id === i.id));
+    check(made.length === 2 && made.every((i) => i.status === 'Draft'), 'two draft invoices saved');
+    const runs = await readJson(page, 'batch_runs', [], (v) => v.length > 0);
+    check(runs[0]?.invoice_ids?.length === 2, 'the run is recorded');
+    await page.locator('[data-batch-runs] button').first().click();
+    await page.locator('[data-batch-undo]').click();
+    await readJson(page, 'invoices', [], (v) => v.length === prevInvoices.length);
+    check(true, 'undo removed the run\'s drafts');
+    await writeJson(page, 'clients', prevClients);
+    await writeJson(page, 'batch_runs', null);
+  });
+
+  await step('QA-3 QA-2: document strip first with the type inline; a quotation offers no payment; one invoice target in Convert; quote "Valid until"; bill Esc asks first', async () => {
+    const prevInvoices = await readJson(page, 'invoices', []);
+    const prevClients = await readJson(page, 'clients', []);
+    const prevItems = await readJson(page, 'items_catalog', []);
+    await page.goto(srv.origin + '/invoice');
+    const type = page.locator('[data-meta-type]');
+    await type.waitFor({ timeout: 15000 });
+    const stripFirst = await page.evaluate(() => {
+      const strip = document.querySelector('[data-meta-summary]');
+      const client = document.querySelector('input[aria-label="Client name"], input[placeholder="Client name *"]');
+      return !!strip && !!client && !!(strip.compareDocumentPosition(client) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    check(stripFirst, 'F21: "1 · Document" strip comes before the parties');
+    check((await page.locator('[data-save-choice] option').allInnerTexts()).join('|') === 'Just save|Then print|Then WhatsApp', 'F21: the after-save picker does not read as another Save');
+    await type.selectOption('QUOTATION');
+    await page.getByLabel('Client name').fill('E2E Quote Party');
+    await page.getByLabel('Item 1 name').fill('E2E Chairs');
+    await page.getByLabel('Item 1 rate').fill('1000');
+    await page.keyboard.press('Control+s');
+    const sheet = page.locator('[data-send-sheet]');
+    await sheet.waitFor({ timeout: 10000 });
+    const sheetText = await sheet.innerText();
+    check((await sheet.locator('[data-send-pay]').count()) === 0 && !/Balance on this bill/.test(sheetText), 'F3: the quotation sheet shows no balance and no Record payment');
+    const mail = decodeURIComponent((await sheet.locator('a[href^="mailto:"]').getAttribute('href')) ?? '');
+    check(mail.includes('Quotation') && !mail.includes('*'), 'F23: the e-mail body has no WhatsApp *bold* markers');
+    await page.keyboard.press('Escape');
+    await sheet.waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: /^Convert/ }).click();
+    const items = await page.getByRole('menuitem').allInnerTexts();
+    check(items.some((t) => /Convert to Tax Invoice/.test(t)) && !items.some((t) => /Convert to Invoice$/.test(t.trim())), `F22: one invoice target in the Convert menu (${items.filter((t) => /Invoice/.test(t)).join(', ')})`);
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/transactions');
+    const row = page.locator('tr', { hasText: 'E2E Quote Party' }).first();
+    await row.waitFor({ timeout: 10000 });
+    check(/Valid until/.test(await row.innerText()), 'F22: the ledger shows a quotation as "Valid until"');
+    await writeJson(page, 'invoices', prevInvoices);
+    await writeJson(page, 'clients', prevClients);
+    await writeJson(page, 'items_catalog', prevItems);
+    // F12: a purchase bill with a typed line asks before Esc throws it away.
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Add bill/ }).first().click();
+    const bill = page.getByRole('dialog');
+    await bill.waitFor();
+    await bill.getByLabel(/Line 1 item|line 1/i).first().fill('E2E Steel');
+    let asked = '';
+    page.once('dialog', async (d) => { asked = d.message(); await d.dismiss(); });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    check(/Discard this bill/.test(asked) && (await bill.isVisible()), 'F12: Esc on a filled bill asks, and Cancel keeps it open');
+    page.once('dialog', (d) => d.accept());
+    await page.keyboard.press('Escape');
+    await bill.waitFor({ state: 'detached' });
+  });
+
+  await step('QA-3 F6: recurring from an invoice starts after it; the list refreshes after the first run; Run now asks before billing early; drafts take no number', async () => {
+    const prevInvoices = await readJson(page, 'invoices', []);
+    const prevSchedules = await readJson(page, 'recurring', []);
+    const src = prevInvoices.find((i) => (i.doc_type === 'INVOICE' || i.doc_type === 'TAX_INVOICE') && i.status !== 'Cancelled' && i.status !== 'Draft');
+    check(!!src, 'a saved invoice to make recurring');
+    if (!src) return;
+    const today = await page.evaluate(() => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; });
+    await page.goto(srv.origin + '/recurring?from=' + src.id);
+    const first = page.locator('#rec-start');
+    await first.waitFor({ timeout: 15000 });
+    check((await first.inputValue()) > src.issue_date, `the first date defaults to after the invoice (${src.issue_date} -> ${await first.inputValue()})`);
+    await first.fill(today);
+    await page.getByRole('button', { name: 'Create schedule' }).click();
+    const after = await readJson(page, 'invoices', [], (v) => v.some((i) => i.recurring_id && !prevInvoices.some((p) => p.id === i.id)), 15000);
+    const made = after.filter((i) => !prevInvoices.some((p) => p.id === i.id));
+    check(made.length === 1 && made[0].status === 'Draft' && made[0].invoice_number === '', `the first run made one unnumbered draft (${made.map((i) => `${i.status}:${i.invoice_number || '-'}`).join(', ')})`);
+    const card = page.locator('article').filter({ has: page.getByRole('button', { name: 'Run now' }) }).last();
+    await card.getByText('Run history (1)').waitFor({ timeout: 15000 });
+    check(true, 'the schedule card shows the run without a reload');
+    await card.getByRole('button', { name: 'Run now' }).click();
+    const ask = page.getByRole('dialog', { name: 'Bill the next period early?' });
+    await ask.waitFor();
+    await ask.getByRole('button', { name: 'Cancel' }).click();
+    const still = await readJson(page, 'invoices', []);
+    check(still.length === after.length, 'Run now on a period not yet due bills nothing until confirmed');
+    await writeJson(page, 'recurring', prevSchedules);
+    await writeJson(page, 'invoices', prevInvoices);
+  });
+
+  await step('QA-3 F4 / F5: "Explore with sample data instead" fills a Demo company; the Dashboard chooser opens a separate Demo company (R6-B4)', async () => {
+    const tableIn = (p, name) => p.evaluate((k) => new Promise((resolve) => {
+      const reg = JSON.parse(localStorage.getItem('mrchartist_inv_companies') || 'null');
+      const db = reg?.active && reg.active !== 'default' ? `mrchartist_inv_kv__${reg.active}` : 'mrchartist_inv_kv';
+      const open = indexedDB.open(db);
+      open.onsuccess = () => {
+        const d = open.result;
+        if (!d.objectStoreNames.contains('data')) { d.close(); resolve(null); return; }
+        const req = d.transaction('data', 'readonly').objectStore('data').get(`mrchartist_inv_${k}`);
+        req.onsuccess = () => { d.close(); resolve(req.result ? JSON.parse(req.result) : null); };
+      };
+      open.onerror = () => resolve(null);
+    }), name);
+    const waitRows = async (p, name, min, timeout = 15000) => {
+      const until = Date.now() + timeout;
+      for (;;) {
+        // The demo flow reloads (twice for the wizard path): a poll caught mid-navigation just retries.
+        const rows = (await tableIn(p, name).catch(() => null)) ?? [];
+        if (rows.length >= min || Date.now() > until) return rows;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    };
+    // QA16: the demo flow reloads TWICE (switch to the Demo company, then reload after the sample data is flushed). A
+    // check that ran between the two hit "Execution context was destroyed". Count the page loads and settle only after
+    // the second one; in-page reads retry across a navigation.
+    const loads = new WeakMap();
+    const settled = async (p, want, timeout = 30000) => {
+      const until = Date.now() + timeout;
+      while ((loads.get(p) ?? 0) < want && Date.now() < until) await new Promise((r) => setTimeout(r, 100));
+      await p.waitForLoadState('load');
+      await p.locator('#company-switch').waitFor({ timeout: 20000 });
+    };
+    const stable = async (p, fn) => {
+      for (let i = 0; ; i++) {
+        try {
+          return await fn();
+        } catch (e) {
+          if (i >= 5 || !/context was destroyed|navigat/i.test(String(e?.message ?? e))) throw e;
+          await p.waitForLoadState('load').catch(() => undefined);
+        }
+      }
+    };
+    const fresh = async () => {
+      const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1280, height: 900 } });
+      const p = await ctx.newPage();
+      p.on('load', () => loads.set(p, (loads.get(p) ?? 0) + 1));
+      watch(p, errors);
+      p.setDefaultTimeout(Number(process.env.E2E_TIMEOUT) || 10000);
+      await p.goto(srv.origin + '/');
+      await p.getByLabel('Full name').fill('E2E Demo');
+      await p.locator('#login-pin').fill('482916');
+      await p.locator('#login-confirm').fill('482916');
+      await p.getByRole('button', { name: /Create account/ }).click();
+      await p.getByRole('dialog', { name: 'What do you do?' }).waitFor({ timeout: 15000 });
+      return { ctx, p };
+    };
+    // F4: the wizard's demo choice, from its last step.
+    const a = await fresh();
+    await a.p.getByRole('radio', { name: /CA \/ full accounting/ }).click();
+    await a.p.getByRole('button', { name: /Next/ }).click();
+    await a.p.getByLabel('Name on invoices *').fill('E2E Demo Traders');
+    await a.p.getByRole('button', { name: /Next/ }).click();
+    await a.p.getByRole('radio', { name: 'I have a GSTIN' }).click();
+    await a.p.getByLabel('GSTIN', { exact: true }).fill('27AAPFU0939F1ZV');
+    await a.p.getByRole('button', { name: /Next/ }).click();
+    await a.p.getByRole('dialog', { name: 'How clients pay you' }).waitFor();
+    await a.p.getByRole('button', { name: /Next/ }).click();
+    await a.p.getByRole('dialog', { name: /Logo/ }).waitFor();
+    const aLoads = loads.get(a.p) ?? 0;
+    await a.p.getByRole('button', { name: 'Explore with sample data instead' }).click();
+    await settled(a.p, aLoads + 2);
+    const demoInv = await waitRows(a.p, 'invoices', 1);
+    check(demoInv.length > 0, `the Demo company holds the sample invoices (${demoInv.length})`);
+    await a.p.waitForTimeout(500);
+    check(await stable(a.p, () => a.p.getByRole('dialog', { name: 'What do you do?' }).count()) === 0, 'the wizard does not start again in the Demo company');
+    await a.ctx.close();
+    // F5: skip the wizard, then the Dashboard card.
+    const b = await fresh();
+    await b.p.getByRole('button', { name: /Skip for now/ }).first().click();
+    await b.p.getByRole('dialog', { name: 'What do you do?' }).waitFor({ state: 'detached' });
+    // QA7 G1: a second tab stays open on the real company while the first one opens the Demo company.
+    const other = await b.ctx.newPage();
+    watch(other, errors);
+    other.setDefaultTimeout(Number(process.env.E2E_TIMEOUT) || 10000);
+    await other.goto(srv.origin + '/');
+    await other.locator('#login-pin, [data-testid="demo-notice"], button:has-text("Open a separate Demo company")').first().waitFor({ timeout: 15000 });
+    if (await other.locator('#login-pin').count()) {
+      await other.locator('#login-pin').fill('482916');
+      await other.keyboard.press('Enter');
+    }
+    await other.getByRole('button', { name: 'Open a separate Demo company (recommended)' }).waitFor({ timeout: 15000 });
+    await b.p.bringToFront();
+    const cta = b.p.getByRole('button', { name: 'Open a separate Demo company (recommended)' });
+    await cta.waitFor({ timeout: 15000 });
+    const bLoads = loads.get(b.p) ?? 0;
+    await cta.click();
+    await settled(b.p, bLoads + 2);
+    const sample = await waitRows(b.p, 'invoices', 1, 20000);
+    const activeId = await stable(b.p, () => b.p.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_companies') || 'null')?.active ?? 'default'));
+    check(sample.length > 0 && activeId !== 'default', `the Dashboard chooser filled a separate Demo company (${sample.length} invoices in ${activeId})`);
+    await b.p.locator('[data-demo-company]').getByRole('button', { name: /Switch to/ }).waitFor({ timeout: 15000 });
+    check(true, 'the Demo banner offers the way back to the company the user came from');
+    await other.bringToFront();
+    await other.locator('[data-company-moved]').waitFor({ timeout: 15000 });
+    check(/another company/i.test(await other.locator('[data-company-moved]').innerText()), 'the stale tab says "This tab is on another company — reload"');
+    await other.evaluate(() => { history.pushState({}, '', '/transactions'); dispatchEvent(new PopStateEvent('popstate')); });
+    await other.evaluate(() => { history.pushState({}, '', '/'); dispatchEvent(new PopStateEvent('popstate')); });
+    await other.waitForTimeout(1500);
+    check(await other.locator('[data-demo-company]').count() === 0, 'the stale tab (real company) shows no Demo banner / Reset samples');
+    const mainInvoices = await other.evaluate(() => new Promise((resolve) => {
+      const open = indexedDB.open('mrchartist_inv_kv');
+      open.onsuccess = () => {
+        const d = open.result;
+        const req = d.transaction('data', 'readonly').objectStore('data').get('mrchartist_inv_invoices');
+        req.onsuccess = () => { d.close(); resolve(req.result ? JSON.parse(req.result).length : 0); };
+        req.onerror = () => { d.close(); resolve(-1); };
+      };
+      open.onerror = () => resolve(-1);
+    }));
+    check(mainInvoices === 0, `the real company holds no sample invoice (${mainInvoices})`);
+    await Promise.all([other.waitForEvent('load', { timeout: 20000 }), other.locator('[data-company-moved]').getByRole('button', { name: 'Reload' }).click()]);
+    await other.locator('#company-switch').waitFor({ timeout: 20000 });
+    check(await other.locator('#company-switch').inputValue() === activeId, 'Reload opens the company the device switched to');
+    await b.ctx.close();
+  });
+
+  await step('R3-C: live preview pane at 1366 px follows typing (not loaded at 390 px); GSTR-1 error file round trip', async () => {
+    // C1: the pane is a device toggle on wide screens; typing a line reaches the paper.
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto(srv.origin + '/invoice');
+    await page.locator('[data-live-preview-toggle]').click();
+    const pane = page.locator('[data-live-preview]');
+    await pane.waitFor({ timeout: 15000 });
+    await page.getByLabel('Client name').fill('Pane Client R3C');
+    await page.getByLabel('Item 1 name').fill('Pane line R3C');
+    await page.getByLabel('Item 1 quantity').fill('1');
+    await page.getByLabel('Item 1 rate').fill('500');
+    await pane.getByText('Pane line R3C').first().waitFor({ timeout: 10000 });
+    check(true, 'typing a line updates the live preview pane');
+    await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
+    // Phones never request the pane chunk, even with the toggle remembered on.
+    const asked = [];
+    const onReq = (r) => { if (/LivePreviewPane/.test(r.url())) asked.push(r.url()); };
+    await page.setViewportSize({ width: 390, height: 844 });
+    page.on('request', onReq);
+    await page.goto(srv.origin + '/invoice');
+    await page.locator('[data-meta-summary]').waitFor();
+    await page.waitForTimeout(500);
+    page.off('request', onReq);
+    check(asked.length === 0 && (await page.locator('[data-live-preview]').count()) === 0, `no pane chunk requested at 390 px (${asked.length})`);
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto(srv.origin + '/invoice');
+    await page.locator('[data-live-preview-toggle]').click(); // back off for the steps that follow
+    await page.locator('[data-live-preview]').waitFor({ state: 'detached' });
+
+    // C4: a B2B invoice of last month, the portal's error report for it (fixture), corrected JSON of the failed document.
+    const now = new Date();
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 10);
+    const mm = String(prev.getMonth() + 1).padStart(2, '0');
+    const day = `${prev.getFullYear()}-${mm}-10`;
+    const fp = `${mm}${prev.getFullYear()}`;
+    const before = await readJson(page, 'invoices', []);
+    const num = 'INV/R3C/0007';
+    await writeJson(page, 'invoices', [...before, {
+      id: 'r3c-b2b', invoice_number: num, doc_type: 'TAX_INVOICE', status: 'Sent', issue_date: day, due_date: day, currency: 'INR',
+      template_id: 'classic_orange', client: { name: 'Portal Buyer', gstin: '27AAACB2230M1ZW', email: '', address: '', city: 'Pune', zip: '', state: 'Maharashtra' },
+      sender: { companyName: 'E2E Trader', companyGstin: '27AAPFU0939F1ZV', stateCode: '27' },
+      items: [{ id: 'l1', name: 'Pump', type: 'Goods', hsn: '8413', quantity: 1, rate: 1000, tax_rate: 18, amount: 1000 }], gst_mode: 'CGST_SGST',
+      place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 18, shipping: 0, other_charges: 0,
+      round_off_enabled: false, amount_paid: 0, notes: '', terms: '', subtotal: 1000, discount_amount: 0, taxable_value: 1000, cgst_amount: 90,
+      sgst_amount: 90, igst_amount: 0, tax_amount: 180, round_off: 0, total: 1180, balance_due: 1180,
+    }]);
+    let fixture = readFileSync(new URL('../fixtures/gstr1-error-report.json', import.meta.url), 'utf8');
+    const vals = { GSTIN: '', FP: fp, CTIN: '27AAACB2230M1ZW', INUM: num.toLowerCase(), IDT: `10-${mm}-${prev.getFullYear()}` };
+    for (const [k, v] of Object.entries(vals)) fixture = fixture.replaceAll(`{{${k}}}`, v);
+    await page.goto(srv.origin + '/gst-reports?tab=portal-files');
+    await page.locator('[data-portal-files]').waitFor({ timeout: 15000 });
+    const upload = () => page.locator('[data-portal-file-input]').setInputFiles({ name: 'GSTR1_error_report.json', mimeType: 'application/json', buffer: Buffer.from(fixture) });
+    await upload();
+    const findings = page.locator('[data-portal-findings]');
+    await findings.waitFor({ timeout: 10000 });
+    check(await findings.getByRole('link', { name: num }).count() > 0, 'the portal error is matched to our invoice (normalised number + GSTIN + date)');
+    const saved = await readJson(page, 'gst_portal_files', [], (v) => v.length === 1);
+    check(saved[0]?.kind === 'gstr1_error' && saved[0].findings.some((f) => f.invoice_id === 'r3c-b2b'), 'the import is saved with its findings');
+    const dlP = page.waitForEvent('download');
+    await page.locator('[data-portal-corrected]').click();
+    if (await page.locator('[data-portal-preflight]').count()) await page.getByRole('button', { name: 'Download anyway' }).click();
+    const dl = await dlP;
+    const body = JSON.parse(readFileSync(await dl.path(), 'utf8'));
+    const invs = (body.b2b ?? []).flatMap((g) => g.inv);
+    check(invs.length === 1 && invs[0].inum === num && body.fp === fp && !body.b2cs, `corrected JSON holds only the failed document (${invs.map((i) => i.inum).join(',')})`);
+    check(await page.locator('[data-filing-portal-errors]').count() === 1, 'the filing strip shows the "Portal files (n)" step');
+    await upload();
+    await page.locator('[data-portal-status]').getByText(/already read/).waitFor();
+    check((await readJson(page, 'gst_portal_files', [])).length === 1, 're-importing the same file is detected, not saved twice');
+    await writeJson(page, 'invoices', before);
+    await writeJson(page, 'gst_portal_files', null);
+  });
+
+  await step('R5-C non-profit pack: turn it on, issue a donation receipt, see its Form 10BD CSV row and the fund statement', async () => {
+    await page.goto(srv.origin + '/settings?tab=defaults');
+    const box = page.locator('[data-industry-packs] label', { hasText: 'Non-profit' }).locator('input');
+    await box.waitFor({ timeout: 15000 });
+    if (!(await box.isChecked())) await box.check();
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => Array.isArray(v.industry_packs) && v.industry_packs.includes('nonprofit'));
+    check(st.industry_packs?.includes('nonprofit'), 'the non-profit pack is on');
+    const before = await readJson(page, 'donations', []);
+    await page.goto(srv.origin + '/receivables?tab=donations');
+    await page.locator('[data-donation-new]').click({ timeout: 15000 });
+    await page.locator('[data-donor-name]').fill('E2E Donor Trust');
+    await page.locator('[data-donor-id]').fill('ABCPD1234F');
+    await page.locator('[data-donation-amount]').fill('5000');
+    await page.locator('[data-donation-save]').click();
+    const after = await readJson(page, 'donations', [], (v) => v.length === before.length + 1);
+    const don = after.find((d) => !before.some((b) => b.id === d.id));
+    check(/^DON\/FY\d{2}-\d{2}\/\d{4}$/.test(don?.number ?? '') && !!don?.voucher_id, `donation receipt ${don?.number} with its receipt voucher`);
+    await page.locator('[data-r5c-view="form10bd"]').click();
+    const t = new Date();
+    const fy = t.getMonth() >= 3 ? t.getFullYear() : t.getFullYear() - 1;
+    await page.locator('[data-10bd-panel] select').first().selectOption(String(fy));
+    await page.locator('[data-10bd-rows]', { hasText: 'E2E Donor Trust' }).waitFor();
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('[data-10bd-csv]').click()]);
+    const csv = readFileSync(await dl.path(), 'utf8');
+    check(/Unique Identification Number/.test(csv) && /Permanent Account Number,ABCPD1234F,Section 80G,.*E2E Donor Trust.*,5000/.test(csv), 'the 10BD CSV has the donor row in template column order');
+    await page.goto(srv.origin + '/books?tab=funds&view=statement');
+    const stmt = page.locator('[data-fund-statement]');
+    await stmt.waitFor({ timeout: 15000 });
+    const text = await stmt.textContent();
+    check(/General fund/.test(text ?? '') && /Donations received/.test(text ?? '') && /5,000\.00/.test(text ?? ''), 'the General fund statement shows the donation');
+  });
+
+  await step('R6-B discoverability: Ctrl+K "3b" opens GSTR-3B; kirana "more features" opens Features; empty Books / Inventory say what to do', async () => {
+    // B1: a tab found by its portal short form.
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.locator('[data-palette-try]').waitFor();
+    check(true, 'the empty palette shows the "Try: GSTR-3B · …" line');
+    await palette.getByRole('combobox').fill('3b');
+    await palette.getByRole('option', { name: /GSTR-3B/ }).first().waitFor();
+    await page.keyboard.press('Enter');
+    await page.waitForURL(/\/gst-reports\?tab=gstr3b/);
+    check(true, 'Ctrl+K "3b" → Enter opens GST reports → GSTR-3B');
+
+    // B2 / B5: kirana shop mode hides features; the sidebar says so and the link opens Settings → Features.
+    const nav = page.getByRole('navigation', { name: /Primary/ });
+    await nav.getByRole('link', { name: 'Distribution' }).waitFor();
+    await nav.getByRole('link', { name: 'Manufacturing' }).waitFor();
+    check(true, 'the sidebar lists Distribution and Manufacturing');
+    await page.goto(srv.origin + '/settings?tab=defaults');
+    await page.getByLabel('Business type').selectOption('kirana');
+    await page.getByRole('button', { name: 'Save settings' }).click();
+    const more = nav.getByRole('link', { name: /more features — Show/ });
+    await more.waitFor();
+    await more.click();
+    await page.waitForURL(/\/settings\?tab=features/);
+    await page.locator('[data-features-panel]').waitFor();
+    check((await page.locator('[data-feature="mod.payroll"]').count()) === 1 && (await page.locator('[data-feature="adv.batches"]').count()) === 1, 'Settings → Features lists modules and advanced options');
+    await page.locator('[data-features-panel]').getByRole('button', { name: 'Show all features' }).click();
+    await page.getByRole('button', { name: 'Save settings' }).click();
+    await nav.getByRole('link', { name: 'Books' }).waitFor();
+    check((await nav.getByRole('link', { name: /more features/ }).count()) === 0, '"Show all features" from Features brings every module back; the hint goes');
+
+    // B3: a fresh company's Books and Inventory say what fills them.
+    const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1280, height: 900 } });
+    try {
+      const p = await ctx.newPage();
+      watch(p, errors);
+      p.setDefaultTimeout(Number(process.env.E2E_TIMEOUT) || 10000);
+      await p.goto(srv.origin + '/');
+      await p.getByLabel('Full name').fill('E2E Empty');
+      await p.locator('#login-pin').fill('482916');
+      await p.locator('#login-confirm').fill('482916');
+      await p.getByRole('button', { name: /Create account/ }).click();
+      await p.getByRole('dialog', { name: 'What do you do?' }).waitFor({ timeout: 15000 });
+      await p.getByRole('button', { name: /Skip for now/ }).first().click();
+      await p.goto(srv.origin + '/books?tab=tb');
+      await p.locator('[data-books-empty]').getByRole('link', { name: 'Opening balances' }).waitFor();
+      check(true, 'empty Books shows "Opening balances"');
+      await p.goto(srv.origin + '/inventory');
+      await p.getByRole('button', { name: 'Add first item' }).waitFor();
+      await p.locator('[data-inv-import]').waitFor();
+      check(true, 'empty Inventory shows "Add first item" and "Import items"');
+    } finally {
+      await ctx.close();
+    }
+  });
+
   await step('folder sync: the panel offers setup, or says "not supported" without the File System Access API', async () => {
     // The folder picker cannot be driven headless; the merge itself is covered by tests/sync.test.ts.
     await page.goto(srv.origin + '/settings?tab=data');
@@ -1531,6 +2925,3104 @@ try {
     const local = await p3.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_inv_sync_device') ?? 'null'));
     check(typeof local?.id === 'string' && (await idbGet(p3, 'mrchartist_inv_sync_device')) === null, 'the device id lives in localStorage only (never in the data store or a backup)');
   });
+
+  await step('R6-A help: "On this screen", About strip, glossary term, version', async () => {
+    await page.goto(srv.origin + '/gst-reports?tab=cdnur');
+    const strip = page.locator('[data-about-strip="gst-reports:cdnur"]');
+    await strip.waitFor({ timeout: 15000 });
+    check(/credit and debit notes/i.test(await strip.innerText()), 'GST → CDNUR shows its "About this tab" strip');
+    // F1 is wired by the shell (R6-B); the Help button opens the same dialog.
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    const help = page.locator('[data-screen-help="gst-reports:cdnur"]');
+    await help.waitFor({ timeout: 15000 });
+    check(/On this screen: CDNUR/.test(await help.innerText()), 'Help opens on "On this screen: CDNUR"');
+    check(/CA checklist: G8/.test(await help.innerText()), 'the statutory topic names its CA checklist ids');
+    check(/Version \d+\.\d+\.\d+/.test(await page.locator('[data-app-version]').innerText()), 'Help shows the package.json version');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/gst-reports?tab=b2cl');
+    await page.locator('[data-term="b2cl"]').first().click();
+    const pop = page.locator('[data-term-pop="b2cl"]');
+    await pop.waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => /In this app/.test(document.querySelector('[data-term-pop="b2cl"]')?.textContent ?? ''));
+    check(/unregistered/i.test(await pop.innerText()), 'tapping B2CL opens its glossary popover');
+  });
+
+  await step('QA7 G3: F1 over a form opens nothing; Help stacked over a form closes alone on Escape, the form keeps its text', async () => {
+    await page.goto(srv.origin + '/clients?new=1');
+    const form = page.getByRole('dialog').first();
+    await form.waitFor({ timeout: 15000 });
+    await form.locator('input').first().fill('Asha Stack Test');
+    await form.locator('h2').first().click();
+    await page.keyboard.press('F1');
+    await page.waitForTimeout(800);
+    check(await page.getByRole('dialog').count() === 1, 'F1 does not stack Help over an open dialog');
+    // Help can still be stacked from inside a dialog (a "Learn more" link): one Escape closes only Help.
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('mrchartist:open-help', { detail: {} })));
+    await page.locator('[data-app-version]').waitFor({ timeout: 15000 });
+    check(await page.getByRole('dialog').count() === 2, 'Help is open over the form');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(800);
+    check(await page.getByRole('dialog').count() === 1, 'one Escape closes only the top dialog');
+    check(await page.getByRole('dialog').first().locator('input').first().inputValue() === 'Asha Stack Test', 'the form keeps what was typed');
+  });
+
+  await step('R6-C import openings: a pasted trial balance shows the 1090 difference in the dry run and saves the openings', async () => {
+    await page.goto(srv.origin + '/settings?tab=data&import=ledgers');
+    // Earlier steps may have left openings in this company: the dry run shows the difference after the import.
+    const before = await readJson(page, 'ledger_openings', [], () => true);
+    const diff = before.reduce((s, o) => s + (o.dr || 0) - (o.cr || 0), 0) - 10000;
+    const want = `Difference in opening balances: ₹${(Math.abs(diff) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${diff > 0 ? 'Dr' : 'Cr'}`;
+    await page.getByRole('button', { name: 'Paste instead' }).click({ timeout: 15000 });
+    await page.locator('#import-paste').fill('Name,Group,Debit,Credit\nE2E Partner Capital,Capital Account,,1000\nE2E Current Account,Bank Accounts,900,');
+    await page.getByRole('button', { name: 'Use pasted data' }).click();
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /^Next/ }).click();
+    const note = await page.getByTestId('import-openings-note').textContent({ timeout: 15000 });
+    check(diff !== 0 && (note ?? '').includes(want), `the dry run shows the difference in opening balances (${want}; shown: ${note})`);
+    await page.getByRole('button', { name: /^Import 2 records/ }).click();
+    const rows = await readJson(page, 'ledger_openings', [], (v) => v.length >= before.length + 2, 10000);
+    check(rows.length >= before.length + 2, `the openings are saved (${rows.length})`);
+    const runs = await readJson(page, 'import_runs', [], (v) => v.some((r) => r.kind === 'ledgers'));
+    check(runs.some((r) => r.kind === 'ledgers'), 'the import run is recorded');
+  });
+  await step('R8-C trade profile + agency: Wholesale → Commission agent, an arrival of 80 bags, an agency sale from the lot, a bikri patti with its net payable; Ctrl+K "patti"; F1 help', async () => {
+    const keys = ['settings', 'vendors', 'clients', 'invoices', 'arrivals', 'sale_pattis', 'godowns', 'vouchers', 'accounts', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const settings = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...settings, business_type: 'wholesale', modules: undefined, industry_packs: undefined, trade_kind: undefined, lock_until: undefined });
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-trade-kind-card="agent"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.trade_kind === 'agent');
+    check(st.trade_kind === 'agent' && st.business_type === 'wholesale' && st.industry_packs?.includes('agency') && !st.modules?.includes('pos'), 'Commission agent: wholesale, agency + commodity packs, no POS module');
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-farmer', name: 'E2E Ram Singh', principal_kind: 'agriculturist' }]);
+    await page.goto(srv.origin + '/distribution?tab=agency');
+    await page.locator('[data-agency-tab]').waitFor({ timeout: 15000 });
+    check((await page.locator('a[href="/pos"]').count()) === 0, 'the sidebar has no POS entry');
+    await page.locator('[data-arrival-form] summary').click();
+    await page.locator('[data-arrival-principal]').selectOption('e2e-farmer');
+    await page.locator('[data-arrival-lot]').fill('E2E-L1');
+    await page.locator('[data-arrival-item]').fill('E2E Mustard');
+    await page.locator('[data-arrival-packages]').fill('80');
+    await page.locator('[data-arrival-qty]').fill('40');
+    await page.locator('[data-arrival-save]').click();
+    const arrivals = await readJson(page, 'arrivals', [], (v) => v.some((a) => a.lot_no === 'E2E-L1'));
+    const arr = arrivals.find((a) => a.lot_no === 'E2E-L1');
+    const godowns = await readJson(page, 'godowns', []);
+    check(/^ARR\/FY\d{2}-\d{2}\/\d+$/.test(arr?.number ?? '') && godowns.some((g) => g.id === arr.godown_id && g.kind === 'consignment'), `arrival ${arr?.number} in the consignment godown`);
+    // The editor offers the lot on a sale line (the sale itself is saved directly; the editor flow is covered above).
+    await page.goto(srv.origin + '/invoice');
+    const picker = page.locator('[data-lot-picker="0"]');
+    await picker.waitFor({ timeout: 15000 });
+    check((await picker.locator('option', { hasText: 'E2E-L1' }).count()) === 1, 'the editor line offers the lot');
+    const buyer = { id: 'e2e-buyer', name: 'E2E Grain Buyer', email: '', address: 'Jaipur', city: 'Jaipur', zip: '', state_code: '08' };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), buyer]);
+    const sale = {
+      id: 'e2e-agency-sale', invoice_number: 'INV/E2E/AG1', doc_type: 'INVOICE', issue_date: arr.date, due_date: arr.date, status: 'Sent', currency: 'INR', template_id: 'classic_orange', client: buyer, sender: (settings.profiles ?? [])[0] ?? null,
+      items: [{ id: 'e2e-ag-l1', name: 'E2E Mustard', type: 'Goods', hsn: '1207', unit: 'QTL', quantity: 25, rate: 5800, tax_rate: 0, discount_percent: 0, amount: 145000, arrival_id: arr.id, godown_id: arr.godown_id }],
+      gst_mode: 'CGST_SGST', place_of_supply: '08', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false, amount_paid: 0, agency: true,
+      subtotal: 145000, discount_amount: 0, taxable_value: 145000, cgst_amount: 0, sgst_amount: 0, igst_amount: 0, tax_amount: 0, round_off: 0, total: 145000, balance_due: 145000,
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), sale]);
+    await page.goto(srv.origin + '/distribution?tab=agency&view=pattis');
+    await page.locator('[data-patti-principal]').selectOption('e2e-farmer', { timeout: 15000 });
+    await page.locator('[data-patti-lot="E2E-L1"]').check();
+    await page.locator('[data-patti-rate="0"]').fill('2.5');
+    await page.locator('[data-patti-make]').click();
+    const pattis = await readJson(page, 'sale_pattis', [], (v) => v.some((p) => p.principal_id === 'e2e-farmer'));
+    const pt = pattis.find((p) => p.principal_id === 'e2e-farmer');
+    check(pt?.gross === 145000 && pt?.net_payable === 141375, `patti ${pt?.number}: gross ₹1,45,000 less aadat 2.5% = ₹1,41,375 (${pt?.net_payable})`);
+    await page.locator(`[data-patti="${pt.number}"] [data-patti-view]`).click();
+    const print = await page.locator('[data-patti-print]').innerText();
+    check(/Net payable/.test(print) && /1,41,375/.test(print), 'the patti print shows the net payable');
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('patti');
+    await palette.getByRole('option', { name: /Bikri patti/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "patti" finds Agency → Bikri patti');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help="distribution:agency:pattis"]').waitFor({ timeout: 15000 });
+    check(true, 'Help opens on the Bikri patti topic');
+    await page.keyboard.press('Escape');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R8-A discounts + claims: a party rate prices the line, "18+4" → 21.28 % printed as "18 + 4 %", a price-drop run makes one financial note, Receivables → Interest lists the party', async () => {
+    const keys = ['settings', 'clients', 'items_catalog', 'invoices', 'party_rates', 'price_drops', 'doc_links', 'series_counters', 'interest_settings'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const ymd = (offset) => page.evaluate((o) => { const d = new Date(); d.setDate(d.getDate() + o); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; }, offset);
+    const [today, tomorrow, old] = [await ymd(0), await ymd(1), await ymd(-75)];
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'wholesale', trade_kind: 'distributor', industry_packs: ['distributor'], trade_discounts: true, modules: undefined, lock_until: undefined });
+    const buyer = { id: 'e2e-dist-buyer', name: 'E2E Sharma Traders', email: '', address: 'Pune', city: 'Pune', zip: '', state_code: '27' };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), buyer]);
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-mcb', name: 'E2E Havells MCB', type: 'Product', hsn: '8536', unit: 'NOS', quantity: 1, rate: 1000, tax_rate: 18, amount: 0 }]);
+    await writeJson(page, 'party_rates', [{ id: 'e2e-pr', side: 'sale', party_id: buyer.id, party_name: buyer.name, item_id: 'e2e-mcb', item_name: 'E2E Havells MCB', rate: 900, valid_from: old }]);
+    const before = new Set((prev.invoices ?? []).map((i) => i.id));
+    await page.goto(srv.origin + '/invoice');
+    await page.getByLabel('Client name').fill(buyer.name);
+    await page.getByLabel('Item 1 name').fill('E2E Havells');
+    await page.getByRole('option', { name: /E2E Havells MCB/ }).first().click({ timeout: 15000 });
+    await page.getByText('Party rate price').first().waitFor({ timeout: 15000 });
+    // The "Party rate" label can paint a frame before the rate input takes the new value: wait for the value itself.
+    let rateNow = '';
+    for (let i = 0; i < 150 && !rateNow.startsWith('900'); i++) {
+      rateNow = await page.getByLabel('Item 1 rate').inputValue();
+      if (!rateNow.startsWith('900')) await new Promise((r) => setTimeout(r, 100));
+    }
+    check(rateNow.startsWith('900'), `the party rate prices the line (${rateNow})`);
+    await page.locator('[data-disc-chain="0"]').fill('18+4');
+    await page.locator('[data-disc-eff="0"]').waitFor({ timeout: 15000 });
+    check(/21\.28%/.test(await page.locator('[data-disc-eff="0"]').innerText()), 'the line shows the effective 21.28 %');
+    await page.getByLabel('Item 1 quantity').fill('10');
+    await page.keyboard.press('Control+s');
+    await page.getByText(/saved/i).first().waitFor();
+    await closeSendSheet(page);
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => !before.has(i.id) && i.client?.name === buyer.name))).find((i) => !before.has(i.id) && i.client?.name === buyer.name);
+    check(inv?.items?.[0]?.discount_percent === 21.28 && inv.items[0].disc_chain?.join('+') === '18+4', `the line stores 21.28 % and the chain (${inv?.items?.[0]?.discount_percent})`);
+    await page.getByRole('button', { name: /Preview/ }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.getByText('Disc 18 + 4 %').first().waitFor({ timeout: 15000 });
+    check(true, 'the preview prints "Disc 18 + 4 %"');
+    await page.keyboard.press('Escape');
+    await writeJson(page, 'invoices', [...(await readJson(page, 'invoices', [])).map((i) => (i.id === inv.id ? { ...i, status: 'Sent', issue_date: today } : i)), { ...inv, id: 'e2e-old-bill', invoice_number: 'INV/E2E/OLD', status: 'Sent', issue_date: old, due_date: old, items: [{ ...inv.items[0], name: 'E2E Old cable', disc_chain: undefined, discount_percent: 0 }] }]);
+    await page.goto(srv.origin + '/distribution?tab=claims&view=pricedrop');
+    await page.locator('[data-drop-items]').fill('E2E Havells MCB, 50', { timeout: 15000 });
+    await page.locator('input[type="date"]').first().fill(tomorrow);
+    await page.locator('[data-drop-rows]').waitFor({ timeout: 15000 });
+    await page.locator('[data-drop-issue]').click();
+    const notes = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.price_drop_id))).filter((i) => i.price_drop_id);
+    check(notes.length === 1 && notes[0].note_kind === 'financial' && notes[0].total === 500 && /^FCN\//.test(notes[0].invoice_number), `one financial credit note of ₹500 (${notes.map((n) => `${n.invoice_number} ${n.total}`).join(', ')})`);
+    await page.goto(srv.origin + '/receivables?tab=interest');
+    await page.locator('[data-interest-rate]').fill('18', { timeout: 15000 });
+    await page.locator(`[data-interest-party="${buyer.name}"]`).waitFor({ timeout: 15000 });
+    check(true, 'Receivables → Interest lists the party with the overdue bill');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R8-B weight + charges: a weighed line (120 bags / 6,072 kg / tare 0.6 / dhalta 1 kg a qtl → 59.400 QTL), the market fee line added by itself, the broker; Mandi register and Brokers statement', async () => {
+    const keys = ['settings', 'stock_items', 'trade_charge_heads', 'sales_agents', 'invoices', 'draft'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'wholesale', industry_packs: ['commodity'], trade_kind: 'commodity', modules: undefined, lock_until: undefined });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), { id: 'e2e-wheat', name: 'E2E Wheat', hsn: '1001', unit: 'KG', track_stock: true, opening_qty: 10000, opening_rate: 20, reorder_level: 0, alt_units: [{ unit: 'QTL', factor: 100 }], sold_by_weight_bags: true }]);
+    await writeJson(page, 'trade_charge_heads', [{ id: 'e2e-mfee', name: 'Market fee', side: 'both', basis: 'percent', rate: 1, gst: 'in_value', payable: true, auto: true, order: 0 }]);
+    await writeJson(page, 'sales_agents', [...(prev.sales_agents ?? []), { id: 'e2e-broker', name: 'E2E Dalal', rate: 0, basis: 'invoice', kind: 'broker', brokerage_basis: 'per_qtl', brokerage_rate: 5 }]);
+    await writeJson(page, 'draft', null);
+    await page.goto(srv.origin + '/invoice');
+    const line = page.locator('[data-line]').first();
+    await line.locator('[data-field="name"]').fill('E2E Wheat', { timeout: 15000 });
+    await page.keyboard.press('Escape');
+    await line.locator('[data-field="unit"]').selectOption('QTL'); // unit first: a later unit change rescales the rate
+    await line.locator('[data-field="rate"]').fill('2450');
+    await line.locator('[data-weigh]').click({ timeout: 15000 });
+    await line.locator('[data-wt="packages"]').fill('120');
+    await line.locator('[data-wt="gross"]').fill('6072');
+    await line.locator('[data-wt="tare"]').fill('0.6');
+    await line.locator('[data-wt="ded"]').fill('1');
+    await page.waitForFunction(() => document.querySelector('[data-line] [data-field="quantity"]')?.value === '59.4', null, { timeout: 15000 });
+    check(true, 'net 5,940 kg becomes the quantity 59.4 QTL');
+    await page.locator('[data-line] [data-field="name"]').nth(1).waitFor({ timeout: 15000 });
+    check((await page.locator('[data-line] [data-field="name"]').nth(1).inputValue()) === 'Market fee', 'the market-fee head adds its line by itself');
+    await page.locator('[data-broker]').selectOption('e2e-broker');
+    const draft = await readJson(page, 'draft', null, (v) => v?.broker_id === 'e2e-broker' && v?.items?.some((l) => l.charge_head_id), 10000);
+    const fee = draft?.items?.find((l) => l.charge_head_id === 'e2e-mfee');
+    check(draft?.items?.[0]?.wt?.packages === 120 && fee?.rate === 1455.3 && fee?.hsn === draft.items[0].hsn && fee?.tax_rate === draft.items[0].tax_rate, `the draft keeps the weighing and a ₹1,455.30 market-fee line at the goods' HSN / rate (${fee?.rate})`);
+    const day = draft?.issue_date;
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { ...draft, id: 'e2e-cm-sale', invoice_number: 'INV/E2E/CM1', status: 'Sent' }]);
+    await page.goto(srv.origin + `/distribution?tab=mandi`);
+    const reg = page.locator('[data-mandi-register]');
+    await reg.waitFor({ timeout: 15000 });
+    check(/Market fee[\s\S]*1,455\.30/.test(await reg.innerText()) && /1,455\.30/.test(await page.locator('[data-mandi-payable]').innerText()), `Mandi shows the register row and the payable (${day})`);
+    await page.goto(srv.origin + '/distribution?tab=brokers');
+    const st = page.locator('[data-brokerage]');
+    await st.waitFor({ timeout: 15000 });
+    check((await st.getAttribute('data-brokerage')) === '297', `Brokers lists the brokerage ₹297 (59.4 qtl × ₹5): ${await st.getAttribute('data-brokerage')}`);
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R9-A retail profile: Kirana → Grocery (MRP warn on), ₹48 over a ₹45 MRP warns at the counter, a COD delivery bill delivered and the rider settled (Z "Cash with riders" ₹0), short book → draft PO, a 10 + 1 bill line → stock 11', async () => {
+    const keys = ['settings', 'items_catalog', 'invoices', 'transactions', 'retail_settings', 'pharma_settings', 'delivery_riders', 'rider_settlements', 'short_book', 'purchase_orders', 'purchases', 'stock_items', 'accounts', 'vouchers', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const settings = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...settings, business_type: 'kirana', modules: undefined, industry_packs: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'retail_settings', null);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-retail-kind-card="grocery"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.retail_kind === 'grocery');
+    const rs = await readJson(page, 'retail_settings', {}, (v) => v?.mrp_guard === 'warn');
+    check(st.retail_kind === 'grocery' && st.business_type === 'kirana' && Array.isArray(st.industry_packs) && st.industry_packs.length === 0 && st.modules?.includes('pos'), 'Grocery: kirana, no pack, POS module');
+    check(rs?.mrp_guard === 'warn' && rs?.delivery?.enabled && rs?.short_book?.enabled && rs?.free_qty, 'Grocery turns on the MRP warning, deliveries, short book and free quantity');
+    // MRP ₹45, typed rate ₹48 → the counter warns.
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-biscuit', name: 'E2E Biscuit', type: 'Product', hsn: '1905', unit: 'PCS', quantity: 1, rate: 48, mrp: 45, tax_rate: 0, amount: 0, barcode: '8901063010011' }]);
+    await writeJson(page, 'delivery_riders', [{ id: 'e2e-rider', name: 'E2E Raju', active: true }]);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor({ timeout: 15000 });
+    await scan.fill('8901063010011');
+    await scan.press('Enter');
+    await page.locator('[data-pos-mrp]').waitFor({ timeout: 15000 });
+    check(/above the MRP ₹45\.00/.test(await page.locator('[data-pos-mrp]').innerText()), 'the counter warns: above the MRP');
+    // A COD delivery bill (nothing tendered: the rider collects).
+    await page.locator('[data-pos-delivery]').check();
+    await page.locator('[data-delivery-address]').fill('12 E2E Lane');
+    await page.locator('[data-delivery-rider]').selectOption('e2e-rider');
+    await page.locator('[data-delivery-cod]').check();
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.delivery))).find((i) => !beforeIds.has(i.id) && i.delivery);
+    check(bill?.delivery?.status === 'packed' && bill.delivery.cod && bill.balance_due === 48, `delivery bill ${bill?.invoice_number} saved packed, ₹48 to collect`);
+    await page.goto(srv.origin + '/receivables?tab=deliveries');
+    await page.locator(`[data-delivery-order="${bill.invoice_number}"] [data-delivery-next="out"]`).click({ timeout: 15000 });
+    await page.locator(`[data-delivery-order="${bill.invoice_number}"] [data-delivery-next="delivered"]`).click({ timeout: 15000 });
+    const pays = await readJson(page, 'transactions', [], (v) => v.some((p) => p.invoice_id === bill.id && p.rider_id === 'e2e-rider'));
+    check(pays.some((p) => p.invoice_id === bill.id && p.rider_id === 'e2e-rider' && p.method === 'Cash' && p.amount === 48), 'delivered COD: a cash receipt with the rider');
+    await page.locator('[data-settle] summary').click();
+    await page.locator('[data-settle-rider]').selectOption('e2e-rider');
+    await page.locator('[data-settle-save]').click();
+    const sets = await readJson(page, 'rider_settlements', [], (v) => v.length > 0);
+    check(sets.length === 1 && sets[0].expected === 48 && sets[0].counted === 48, 'the rider settled ₹48');
+    await page.goto(srv.origin + '/pos');
+    await page.getByRole('button', { name: 'Z report' }).click({ timeout: 15000 });
+    const z = page.getByRole('dialog', { name: 'Day-end Z report' });
+    await z.locator('[data-z="riders"]').waitFor({ timeout: 15000 });
+    check(/0\.00/.test(await z.locator('[data-z="riders"]').innerText()), 'Z report: Cash with riders ₹0 after settling');
+    await page.keyboard.press('Escape');
+    // Short book → draft purchase order.
+    const poBefore = (await readJson(page, 'purchase_orders', [])).length;
+    await page.goto(srv.origin + '/inventory?tab=shortbook');
+    await page.locator('[data-sb-name]').fill('E2E Ghee', { timeout: 15000 });
+    await page.locator('[data-sb-add]').click();
+    await page.locator('[data-sb-row="E2E Ghee"]').waitFor({ timeout: 15000 });
+    await page.locator('[data-sb-po]').click();
+    const pos = await readJson(page, 'purchase_orders', [], (v) => v.length > poBefore);
+    check(pos.length === poBefore + 1 && pos[pos.length - 1].lines.some((l) => l.name === 'E2E Ghee'), 'Make draft PO creates a purchase order');
+    // A supplier bill line 10 + 1 free at ₹80 less 5% → stock + 11.
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), { id: 'e2e-strip', name: 'E2E Strip', hsn: '3004', unit: 'STRIP', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }]);
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []), { id: 'e2e-free-bill', kind: 'PURCHASE', vendor_name: 'E2E Distributor', bill_number: 'FREE-1', date: bill.issue_date, status: 'unpaid', lines: [{ id: 'e2e-fl', name: 'E2E Strip', hsn: '3004', unit: 'STRIP', quantity: 10, free_qty: 1, rate: 80, discount_percent: 5, tax_rate: 5, item_id: 'e2e-strip' }], taxable: 760, cgst: 19, sgst: 19, igst: 0, total: 798, amount_paid: 0, itc_eligible: true }]);
+    await page.goto(srv.origin + '/inventory');
+    const row = page.locator('tr', { hasText: 'E2E Strip' }).first();
+    await row.waitFor({ timeout: 15000 });
+    check(/\b11\b/.test(await row.innerText()), `stock of the 10 + 1 line is 11 (${(await row.innerText()).replace(/\s+/g, ' ').slice(0, 80)})`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R9-C apparel: Garments profile, a ₹2,799 kurta less 15% → 5% band, no discount → 18%; a 4 × 3 size grid on a supplier bill makes 12 lines; alteration slip ALT/FY…/0001 prints', async () => {
+    const keys = ['settings', 'items_catalog', 'stock_items', 'alteration_jobs', 'series_counters', 'retail_settings', 'invoices'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'kirana', modules: undefined, industry_packs: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-retail-kind-card="apparel"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.retail_kind === 'apparel');
+    check(st.retail_kind === 'apparel' && st.industry_packs?.includes('apparel'), 'Garments: the apparel pack is on');
+    const sizes = ['S', 'M', 'L', 'XL'];
+    const colours = ['Red', 'Blue', 'Green'];
+    const style = { id: 'e2e-krt', name: 'E2E KRT-104', hsn: '6211', unit: 'PCS', track_stock: true, opening_qty: 0, opening_rate: 1400, reorder_level: 0, sale_rate: 2799, tax_rate: 18, gst_band: 'apparel', variant_axes: [{ name: 'Size', values: sizes }, { name: 'Colour', values: colours }] };
+    const kids = sizes.flatMap((sz) => colours.map((c) => ({ id: `e2e-krt-${sz}-${c}`, name: `E2E KRT-104 - ${sz} / ${c}`, hsn: '6211', unit: 'PCS', track_stock: true, opening_qty: 0, opening_rate: 1400, reorder_level: 0, sale_rate: 2799, tax_rate: 18, gst_band: 'apparel', variant_of: 'e2e-krt', variant_attrs: { Size: sz, Colour: c } })));
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), style, ...kids]);
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-kurta', name: 'E2E Kurta KRT-104', type: 'Product', hsn: '6211', unit: 'PCS', quantity: 1, rate: 2799, tax_rate: 18, amount: 0, gst_band: 'apparel' }]);
+    // RT-C1: the band follows the price per piece after the discount.
+    await page.goto(srv.origin + '/invoice');
+    await page.getByLabel('Item 1 name').fill('E2E Kurta');
+    await page.getByRole('option', { name: /E2E Kurta KRT-104/ }).first().click({ timeout: 15000 });
+    await page.locator('[data-band-chip="18"]').waitFor({ timeout: 15000 });
+    await page.getByLabel('Item 1 discount percent').fill('15');
+    await page.locator('[data-band-chip="5"]').waitFor({ timeout: 15000 });
+    check(await page.getByLabel('Item 1 GST rate').inputValue() === '5', '₹2,799 less 15% = ₹2,379.15 a piece → GST 5%');
+    await page.getByLabel('Item 1 discount percent').fill('0');
+    await page.locator('[data-band-chip="18"]').waitFor({ timeout: 15000 });
+    check(await page.getByLabel('Item 1 GST rate').inputValue() === '18', 'without the discount → GST 18%');
+    // RT-C2: one 4 × 3 grid on a supplier bill → 12 lines.
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Add bill/ }).click({ timeout: 15000 });
+    const dlg = page.getByRole('dialog', { name: 'Add purchase bill' });
+    await dlg.locator('[data-grid-open]').click({ timeout: 15000 });
+    const grid = page.getByRole('dialog', { name: /Size × colour grid/ });
+    await grid.locator('[data-grid-style]').selectOption('e2e-krt', { timeout: 15000 });
+    const cells = grid.locator('[data-grid-cell]');
+    await cells.first().waitFor({ timeout: 15000 });
+    check(await cells.count() === 12, `the grid has 12 cells (${await cells.count()})`);
+    for (let i = 0; i < 12; i++) await cells.nth(i).fill(String(1 + (i % 3)));
+    await grid.locator('[data-grid-apply]').click();
+    await grid.waitFor({ state: 'detached' });
+    const names = await dlg.getByLabel(/^Line \d+ item$/).evaluateAll((els) => els.map((e) => e.value));
+    check(names.length === 12 && names.every((n) => n.startsWith('E2E KRT-104 - ')), `the grid made 12 bill lines (${names.length})`);
+    await page.keyboard.press('Escape');
+    // RT-C3: an alteration slip ALT/FY…/0001 prints.
+    await writeJson(page, 'alteration_jobs', []);
+    await writeJson(page, 'series_counters', (prev.series_counters ?? []).filter((r) => !String(r?.id ?? '').startsWith('ALT')));
+    await page.goto(srv.origin + '/inventory?tab=apparel&view=alterations');
+    await page.locator('[data-alt-customer]').fill('E2E Ravi', { timeout: 15000 });
+    await page.locator('[data-alt-garment]').fill('Trousers — shorten 2 cm');
+    await page.locator('[data-alt-save]').click();
+    const slip = page.locator('[data-alt-slip]');
+    await slip.waitFor({ timeout: 15000 });
+    const number = await slip.getAttribute('data-alt-slip');
+    check(/^ALT\/FY\d{2}-\d{2}\/0001$/.test(number ?? ''), `the slip is numbered ${number}`);
+    await page.evaluate(() => { window.__slipHtml = ''; window.open = () => ({ document: { write: (h) => { window.__slipHtml += h; }, close() {} }, print() {} }); });
+    await slip.locator('[data-alt-print]').click();
+    const printed = await page.evaluate(() => window.__slipHtml);
+    check(printed.includes(number) && /Customer copy/.test(printed) && /Shop copy/.test(printed), 'the slip prints with the customer and shop copies');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R9-B pharmacy: Medical store → an H1 item at the POS needs doctor + patient (blocked, then saved with a picked doctor), Registers lists the bill, a refill shows in the due list, Ctrl+K "doctor" and F1 help', async () => {
+    const keys = ['settings', 'items_catalog', 'invoices', 'transactions', 'retail_settings', 'pharma_settings', 'stock_items', 'doctors', 'rx_refills', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'kirana', modules: undefined, industry_packs: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'retail_settings', null);
+    await writeJson(page, 'pharma_settings', null);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-retail-kind-card="pharmacy"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.retail_kind === 'pharmacy');
+    const ph = await readJson(page, 'pharma_settings', {}, (v) => v?.require_rx === true);
+    check(st.industry_packs?.includes('pharmacy') && ph?.enabled && ph?.require_rx, 'Medical store: pharmacy pack, pharma switches and "Require prescription" on');
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), { id: 'e2e-azi', name: 'E2E Azithro 500', hsn: '3004', unit: 'TAB', track_stock: false, opening_qty: 0, opening_rate: 0, reorder_level: 0, drug_schedule: 'H1' }]);
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-azi-c', name: 'E2E Azithro 500', type: 'Product', hsn: '3004', unit: 'TAB', quantity: 1, rate: 100, mrp: 100, tax_rate: 0, amount: 0, barcode: '8901063099001' }]);
+    await writeJson(page, 'doctors', [{ id: 'e2e-doc', name: 'E2E Dr Mehta', reg_no: 'MMC 9', active: true }]);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor({ timeout: 15000 });
+    await scan.fill('8901063099001');
+    await scan.press('Enter');
+    await page.locator('[data-rx-strip]').waitFor({ timeout: 15000 });
+    await page.locator('#pos-Cash').fill('100');
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    await page.getByText(/patient and prescriber needed/).first().waitFor({ timeout: 15000 });
+    check((await readJson(page, 'invoices', [])).every((i) => beforeIds.has(i.id)), 'no prescription: the bill is not saved');
+    await page.locator('[data-rx-doctor]').selectOption('e2e-doc');
+    await page.locator('[data-rx-patient]').fill('E2E Asha');
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id)))).find((i) => !beforeIds.has(i.id));
+    check(bill?.rx?.doctor_id === 'e2e-doc' && bill.rx.prescriber === 'E2E Dr Mehta' && bill.rx.prescriber_reg === 'MMC 9' && bill.rx.patient === 'E2E Asha', `bill ${bill?.invoice_number} keeps the doctor snapshot`);
+    await page.goto(srv.origin + '/inventory?tab=pharmacy&view=registers');
+    await page.locator('[data-rtb-row]', { hasText: bill.invoice_number }).first().waitFor({ timeout: 15000 });
+    check(true, 'Pharmacy → Registers (H1) lists the bill');
+    await page.goto(srv.origin + '/inventory?tab=pharmacy&view=rx');
+    await page.getByLabel('Every (days)').fill('3', { timeout: 15000 });
+    await page.locator('[data-rtb-make-refill]').first().click();
+    const refills = await readJson(page, 'rx_refills', [], (v) => v.length > 0);
+    check(refills.length === 1 && refills[0].every_days === 3 && refills[0].name === 'E2E Asha', 'Make refill saves the schedule');
+    await page.goto(srv.origin + '/inventory?tab=pharmacy&view=refills');
+    const due = page.locator('[data-rtb-row]', { hasText: 'E2E Asha' }).first();
+    await due.waitFor({ timeout: 15000 });
+    check(/in 3 day\(s\)/.test(await due.innerText()), 'the due list shows the refill 3 days ahead');
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('doctor');
+    await palette.getByRole('option', { name: /Doctors/ }).first().click({ timeout: 15000 });
+    await page.locator('[data-pharmacy-desk="doctors"]').waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "doctor" opens Pharmacy → Doctors');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help="inventory:pharmacy:doctors"]').waitFor({ timeout: 15000 });
+    check(true, 'Help opens on the Doctors topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R9-D electronics: Electronics profile; two phones bought with IMEI pairs, scanning IMEI 2 at the POS adds the phone with IMEI 1; a finance tender → Devices → Finance lists the DO; a buy-back exchange settles a bill with no cash moved', async () => {
+    const keys = ['settings', 'items_catalog', 'stock_items', 'purchases', 'invoices', 'transactions', 'finance_deals', 'vouchers', 'bank_accounts', 'vendors', 'godowns', 'series_counters', 'retail_settings', 'imei_checks'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'kirana', modules: undefined, industry_packs: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'retail_settings', null);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-retail-kind-card="electronics"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.retail_kind === 'electronics');
+    check(st.industry_packs?.includes('electronics'), 'Electronics: the electronics pack is on');
+    const [A1, A2, B1] = ['490154203237518', '356938035643809', '353918052034572'];
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), { id: 'e2e-ph', name: 'E2E Phone X', hsn: '8517', unit: 'NOS', track_stock: true, track_serials: true, serial_kind: 'imei', warranty_months: 12, opening_qty: 0, opening_rate: 0, reorder_level: 0, sale_rate: 20000, tax_rate: 0 },
+      { id: 'e2e-chg', name: 'E2E Charger', hsn: '8504', unit: 'NOS', track_stock: false, opening_qty: 0, opening_rate: 0, reorder_level: 0, sale_rate: 6000, tax_rate: 0 }]);
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-chg-c', name: 'E2E Charger', type: 'Product', hsn: '8504', unit: 'NOS', quantity: 1, rate: 6000, tax_rate: 0, amount: 0, barcode: '8901063099777' }]);
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []), { id: 'e2e-ph-bill', kind: 'PURCHASE', vendor_name: 'E2E Distributor', bill_number: 'E2E-D1', date: '2026-01-02', category: 'Purchases', lines: [{ id: 'l1', name: 'E2E Phone X', item_id: 'e2e-ph', hsn: '8517', quantity: 2, rate: 15000, tax_rate: 0, serials: [A1, B1], serial_pairs: { [A1]: A2 } }], taxable: 30000, cgst: 0, sgst: 0, igst: 0, total: 30000, amount_paid: 0, itc_eligible: true }]);
+    // RT-D1: scanning IMEI 2 adds the phone with IMEI 1 picked; RT-D2: the finance tender leaves ₹15,000 to the financier.
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor({ timeout: 15000 });
+    await page.locator('[data-pos-devices]').waitFor({ timeout: 15000 });
+    await scan.fill(A2);
+    await scan.press('Enter');
+    await page.locator('[data-pos-finance-on]').check({ timeout: 15000 });
+    await page.locator('[data-pos-financier]').fill('E2E Finserv');
+    await page.locator('[data-pos-loan]').fill('15000');
+    await page.locator('[data-pos-do]').fill('E2E-DO-1');
+    await page.locator('#pos-Cash').fill('5000');
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id)))).find((i) => !beforeIds.has(i.id));
+    const line = bill?.items?.[0];
+    check(line?.name === 'E2E Phone X' && line.serials?.[0] === A1 && line.serial_pairs?.[A1] === A2, `IMEI 2 scan → the phone with IMEI 1 and its pair (${JSON.stringify(line?.serials)})`);
+    const deals = await readJson(page, 'finance_deals', [], (v) => v.length > 0);
+    check(deals[0]?.do_no === 'E2E-DO-1' && deals[0].loan === 15000 && deals[0].invoice_id === bill.id, 'the finance deal (DO) is recorded on the bill');
+    check((await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === bill.id && i.status === 'Paid'))).some((i) => i.id === bill.id), 'the customer\'s bill is settled (the loan moved to the financier)');
+    await page.goto(srv.origin + '/inventory?tab=devices&view=finance');
+    await page.locator('[data-dev-deal="E2E-DO-1"]').waitFor({ timeout: 15000 });
+    check(true, 'Devices → Finance lists the DO');
+    // RT-D3: a buy-back (URD voucher) settles ₹5,000 of a ₹6,000 bill; only ₹1,000 cash moves.
+    await page.goto(srv.origin + '/inventory?tab=devices&view=buyback');
+    await page.locator('[data-dev-customer]').fill('E2E Ravi', { timeout: 15000 });
+    await page.locator('[data-dev-model]').fill('Old phone');
+    await page.locator('[data-dev-imei]').fill('358240051111110');
+    await page.locator('[data-dev-value]').fill('5000');
+    await page.locator('[data-dev-save]').click();
+    const urd = (await readJson(page, 'purchases', [], (v) => v.some((p) => p.used_goods))).find((p) => p.used_goods);
+    check(/^URD\/FY\d{2}-\d{2}\/0001$/.test(urd?.bill_number ?? '') && urd.cgst + urd.sgst + urd.igst === 0 && urd.itc_eligible === false, `buy-back voucher ${urd?.bill_number}: no GST / ITC`);
+    const before2 = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/pos');
+    await page.locator('#pos-scan').waitFor({ timeout: 15000 });
+    await page.getByLabel('Walk-in name').fill('E2E Ravi');
+    await page.locator('#pos-scan').fill('8901063099777');
+    await page.locator('#pos-scan').press('Enter');
+    await page.locator('[data-pos-exchange-pick]').selectOption(urd.id, { timeout: 15000 });
+    await page.locator('#pos-Cash').fill('1000');
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    const sale = (await readJson(page, 'invoices', [], (v) => v.some((i) => !before2.has(i.id)))).find((i) => !before2.has(i.id));
+    const rows = (await readJson(page, 'transactions', [], (v) => v.some((p) => p.invoice_id === sale.id && p.exchange_purchase_id))).filter((p) => p.invoice_id === sale.id);
+    const cash = rows.filter((p) => p.method === 'Cash').reduce((s, p) => s + p.amount, 0);
+    const ex = rows.find((p) => p.exchange_purchase_id === urd.id);
+    check(sale.total === 6000 && ex?.amount === 5000 && cash === 1000, `bill ₹${sale.total}: exchange ₹${ex?.amount} (no cash), cash ₹${cash}`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R9-E jewellery: Jewellery profile, 22K rate ₹9,350, a tag 6.420 / 0.380 g with HUID billed to the paisa (₹66,374.48), the paper shows net weight, "22K (916)", HUID and the BIS line; old gold settles part by exchange (no cash); ₹2,00,000 cash is refused', async () => {
+    const keys = ['settings', 'retail_settings', 'stock_items', 'stock_moves', 'metal_rates', 'jewel_tags', 'invoices', 'transactions', 'purchases', 'vendors', 'godowns', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'kirana', modules: undefined, industry_packs: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'retail_settings', null);
+    for (const k of ['metal_rates', 'jewel_tags']) await writeJson(page, k, []);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-retail-kind-card="jewellery"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.retail_kind === 'jewellery');
+    const rs = await readJson(page, 'retail_settings', {}, (v) => v?.cash_guard === 'block');
+    check(st.industry_packs?.includes('jewellery') && rs.cash_guard === 'block' && rs.require_pan === true, 'Jewellery: pack on, cash guard block, Require PAN');
+    // RT-E1: today's rate, then a tagged ring.
+    await page.goto(srv.origin + '/inventory?tab=jewellery&view=rates');
+    await page.locator('[data-rate-sale="gold:22K"]').fill('9350', { timeout: 15000 });
+    await page.locator('[data-rates-save]').click();
+    const rates = await readJson(page, 'metal_rates', [], (v) => v.length > 0);
+    check(rates.some((r) => r.metal === 'gold' && r.purity === '22K' && r.sale === 9350), 'the 22K sale rate is on today\'s board');
+    await page.goto(srv.origin + '/inventory?tab=jewellery&view=tags');
+    const fill = async (k, v) => page.locator(`[data-tag-form] [data-jw="${k}"]`).fill(String(v), { timeout: 15000 });
+    await fill('item', 'E2E Rings');
+    for (const [k, v] of [['gross', 6.42], ['stone', 0.38], ['stones', 4800], ['wastage', 2], ['making', 650], ['hallmark', 45], ['huid', 'AB12CD']]) await fill(k, v);
+    await page.locator('[data-tag-save]').click();
+    const [tag] = await readJson(page, 'jewel_tags', [], (v) => v.length === 1);
+    check(tag.net_wt === 6.04 && tag.huid === 'AB12CD', `tag ${tag.tag}: net 6.040 g, HUID AB12CD`);
+    await page.locator(`[data-tag-row="${tag.tag}"]`).waitFor({ timeout: 15000 });
+    // RT-E2: bill it in the editor.
+    const before = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/invoice');
+    await page.getByLabel('Client name').fill('E2E Mrs Rao');
+    await page.getByLabel('Item 1 name').fill('E2E Rings');
+    const row = page.locator('[data-jewel-row]').first();
+    await row.locator('[data-jw="tag"]').selectOption(tag.tag, { timeout: 15000 });
+    await row.locator('[data-jw-amount]', { hasText: '66,374.48' }).waitFor({ timeout: 15000 });
+    check(await page.getByLabel('Item 1 rate').inputValue() === '66374.48', 'the line amount equals the ring example (₹66,374.48)');
+    await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
+    const sale = (await readJson(page, 'invoices', [], (v) => v.some((i) => !before.has(i.id)))).find((i) => !before.has(i.id));
+    check(sale?.items?.[0]?.jw?.tag === tag.tag && sale.items[0].tax_rate === 3 && sale.items[0].serials?.[0] === tag.tag, `${sale?.invoice_number}: the jw snapshot, GST 3%, the tag as its serial`);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.getByText(/BIS-recognised A&H centre/).first().waitFor({ timeout: 15000 });
+    const paper = await dialog.innerText();
+    check(/Net 6\.040 g/.test(paper) && paper.includes('22K (916)') && paper.includes('HUID AB12CD') && /Hallmarking ₹45/.test(paper), 'the paper shows net weight, 22K (916), HUID, hallmarking and the BIS line');
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+    // RT-E3: old gold settles part of the bill by exchange (no cash).
+    await page.goto(srv.origin + '/inventory?tab=jewellery&view=oldgold');
+    const og = (k, v) => page.locator(`[data-og-form] [data-og="${k}"], [data-og-form] [data-jw="${k}"]`).first().fill(String(v), { timeout: 15000 });
+    await og('name', 'E2E Mrs Rao');
+    for (const [k, v] of [['og-gross', 2], ['og-touch', 84], ['og-melt', 2], ['og-rate', 10000], ['bill', sale.invoice_number]]) await og(k, v);
+    await page.locator('[data-og-value]', { hasText: '16,464' }).waitFor({ timeout: 15000 });
+    await page.locator('[data-og-save]').click();
+    const urd = (await readJson(page, 'purchases', [], (v) => v.some((p) => p.old_metal))).find((p) => p.old_metal);
+    const ex = (await readJson(page, 'transactions', [], (v) => v.some((t) => t.exchange_purchase_id))).find((t) => t.exchange_purchase_id === urd.id);
+    check(/^URD\/FY\d{2}-\d{2}\/0001$/.test(urd.bill_number) && urd.cgst === 0 && urd.itc_eligible === false && urd.total === 16464, `${urd.bill_number}: 2 g @ 84% less 2% = 1.646 g fine, ₹16,464, no GST / ITC`);
+    check(ex?.invoice_id === sale.id && ex.amount === 16464 && ex.method === 'Exchange', 'the exchange receipt settles ₹16,464 of the bill (no cash moved)');
+    // RT-E3: a ₹2,00,000 cash tender is refused at the counter.
+    await writeJson(page, 'jewel_tags', [...(await readJson(page, 'jewel_tags', [])), { ...tag, id: 'e2e-tag-2', tag: 'E2E-BIG', gross_wt: 25, stone_wt: 0, net_wt: 25, stone_value: 0 }]);
+    await writeJson(page, 'stock_moves', [...(await readJson(page, 'stock_moves', [])), { id: 'e2e-mv-big', item_id: tag.item_id, date: rates[0].date, qty: 1, rate: 0, kind: 'adjustment', serials: ['E2E-BIG'] }]);
+    const posBefore = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/pos');
+    await page.locator('[data-pos-tag]').fill('E2E-BIG', { timeout: 15000 });
+    await page.locator('[data-pos-tag]').press('Enter');
+    await page.locator('#pos-Cash').fill('200000');
+    await page.locator('[data-pos-cash-guard], [data-guard="error"]', { hasText: /269ST/ }).first().waitFor({ timeout: 15000 }); // RT-D's counter guard (cash guard on)
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    await page.getByText(/cannot be accepted from one person in a day/).first().waitFor({ timeout: 15000 });
+    check((await readJson(page, 'invoices', [])).every((i) => posBefore.has(i.id)), '₹2,00,000 in cash is refused (Sec 269ST): no bill saved');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R11-A RA bill paper: Contractor → Civil / EPC + government; a BOQ with its site in Karnataka; RA 1 with MB refs → the paper shows "Running Account Bill No. 1", the contract box, "Item 2.1 · MB 112/45-47", Net payable and the sign-off boxes, the abstract page; a plain invoice is unchanged; Ctrl+K "RA bill"; help', async () => {
+    const keys = ['settings', 'construction_settings', 'invoices', 'transactions', 'clients', 'doc_links', 'series_counters', 'ra_measurements', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'contractor', modules: undefined, industry_packs: undefined, construction_kind: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'construction_settings', null);
+    // CN-A1: the construction picker in Settings → Features.
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-construction-kind-card="civil"]').click({ timeout: 15000 });
+    await page.locator('[data-construction-government] input').check();
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.construction_kind === 'civil');
+    const cs = await readJson(page, 'construction_settings', {}, (v) => v?.ra_paper === 'pwd' && v?.signoff_boxes === true);
+    check(st.industry_packs?.includes('works') && cs.government === true && cs.views?.contracts === true, 'Civil + government: works pack, PWD paper, sign-off boxes, contract views switched on');
+    // A BOQ whose site is in another State (place of supply = site, Sec 12(3)) with typed contract particulars.
+    const dept = { id: 'e2e-cn-dept', name: 'E2E PWD Division 7', email: '', address: 'Mumbai', city: 'Mumbai', zip: '', state_code: '27', gst_tds_deductor: true };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), dept]);
+    const boq = {
+      id: 'e2e-cn-boq', invoice_number: 'SO/E2E/0011', doc_type: 'SALES_ORDER', issue_date: '2026-05-01', due_date: '2026-05-31', status: 'Sent', currency: 'INR', template_id: 'classic_orange',
+      client: dept, sender: (prev.settings?.profiles ?? [])[0] ?? null,
+      items: [
+        { id: 'e2e-cn-l1', name: 'Earthwork excavation', boq_ref: '2.1', type: 'Service', hsn: '995411', unit: 'CUM', quantity: 1000, rate: 250, tax_rate: 18, discount_percent: 0, amount: 250000 },
+        { id: 'e2e-cn-l2', name: 'PCC 1:4:8', boq_ref: '2.2', type: 'Service', hsn: '995411', unit: 'CUM', quantity: 200, rate: 4500, tax_rate: 18, discount_percent: 0, amount: 900000 },
+      ],
+      gst_mode: 'CGST_SGST', place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false,
+      amount_paid: 0, notes: '', terms: '', subtotal: 1150000, discount_amount: 0, taxable_value: 1150000, cgst_amount: 103500, sgst_amount: 103500, igst_amount: 0, tax_amount: 207000, round_off: 0, total: 1357000, balance_due: 1357000,
+      boq_terms: {
+        work_order: 'WO/E2E/7', deductions: [{ kind: 'retention', rate: 5 }, { kind: 'it_tds', section: '194C-2' }, { kind: 'gst_tds' }, { kind: 'labour_cess' }],
+        header: { name_of_work: 'E2E widening of SH-12', agreement_no: '12/EE/2026-27', engineer: 'Executive Engineer', site: { address: 'Km 4–9, Belagavi', state_code: '29' } },
+      },
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), boq]);
+    await page.goto(srv.origin + '/time?tab=works&view=ra&boq=e2e-cn-boq');
+    await page.locator('[data-ra-cum="2.1"]').fill('400', { timeout: 15000 });
+    await page.locator('[data-ra-cum="2.1"]').locator('xpath=../following-sibling::td[2]/input').fill('112/45-47');
+    await page.locator('[data-ra-save]').click();
+    const ra = (await readJson(page, 'invoices', [], (v) => v.some((d) => d.boq_id === 'e2e-cn-boq' && d.ra_no === 1))).find((d) => d.boq_id === 'e2e-cn-boq' && d.ra_no === 1);
+    check(ra.place_of_supply === '29' && ra.gst_mode === 'IGST' && ra.boq_terms?.cn?.paper === 'pwd', `place of supply = site State (Karnataka, IGST), PWD paper (${ra.place_of_supply} ${ra.gst_mode})`);
+    check((ra.boq_terms?.cn?.abstract ?? []).some((r) => r.mb === '112/45-47'), 'the abstract snapshot carries the MB ref');
+    await page.goto(srv.origin + '/invoice/' + ra.id);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.locator('[data-works-abstract]').first().waitFor({ timeout: 15000 });
+    const paper = await dialog.innerText();
+    check(/RUNNING ACCOUNT BILL NO\. 1/i.test(paper), 'the title reads "Running Account Bill No. 1"');
+    check(await dialog.locator('[data-works-header]').count() > 0 && paper.includes('E2E widening of SH-12') && paper.includes('12/EE/2026-27') && /Karnataka/.test(paper), 'the contract particulars box: name of work, agreement, site and its State');
+    check(paper.includes('Item 2.1 · MB 112/45-47'), 'the line sub-line shows the BOQ item no. and the M-book ref');
+    check(await dialog.locator('[data-net-payable]').count() > 0 && /Net payable/.test(paper) && /GST TDS u\/s 51/.test(paper), 'the deductions block runs down to Net payable with the GST TDS note');
+    check(await dialog.locator('[data-signoff="measuredBy"]').count() > 0 && /Passed for payment/i.test(paper) && /Measured by/i.test(paper), 'the measured / checked / passed boxes print');
+    check(/Abstract of cost/i.test(paper) && /A\. BOQ items/i.test(paper), 'page 2 is the abstract of cost');
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+    // A plain invoice prints no construction part.
+    const plain = (prev.invoices ?? []).find((i) => !['SALES_ORDER', 'QUOTATION', 'DELIVERY_CHALLAN'].includes(i.doc_type) && !i.ra_no && !i.boq_terms?.cn && i.status !== 'Cancelled');
+    check(!!plain, `a plain invoice to compare (${plain?.invoice_number})`);
+    if (plain) {
+      await page.goto(srv.origin + '/invoice/' + plain.id);
+      await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+      const d2 = page.getByRole('dialog', { name: 'Document preview' });
+      await d2.waitFor();
+      check(await d2.locator('[data-works-header], [data-works-deductions], [data-works-abstract], [data-works-line]').count() === 0, 'a plain invoice prints unchanged (no construction part)');
+      await page.keyboard.press('Escape');
+      await d2.waitFor({ state: 'detached' });
+    }
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('RA bill');
+    await palette.getByRole('option', { name: /RA bills/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "RA bill" finds Time → Works → RA bills');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/time?tab=works&view=ra');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help="time:works:ra"]').waitFor({ timeout: 15000 });
+    check(true, 'Help opens on the RA bills topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R11-C builder desk: Contractor → Builder; a project with RERA no. and a tower of 4 units; book A-101 with stamp duty as pass-through, a 12% receipt before the agreement warns; certify Plinth → the demand shows land one-third and CGST 3.75% + SGST 3.75%, the RERA account and the plan; after the CC date the next demand is non-GST; RERA view shows 70% required', async () => {
+    const keys = ['settings', 'construction_settings', 'invoices', 'transactions', 'clients', 'doc_links', 'series_counters', 'advances', 'bank_accounts', 'cost_centres', 'realty_projects', 'realty_units', 'realty_bookings', 'payment_plans', 'stage_certificates', 'rera_withdrawals', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'contractor', modules: undefined, industry_packs: undefined, construction_kind: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'construction_settings', null);
+    await writeJson(page, 'bank_accounts', [...(prev.bank_accounts ?? []), { id: 'e2e-rera', name: 'E2E RERA account', account_no: '50100099887', ifsc: 'HDFC0000123', active: true }]);
+    // Settings → Features: the Builder profile switches the realty pack on.
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-construction-kind-card="builder"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.construction_kind === 'builder');
+    check(st.industry_packs?.includes('realty'), 'Builder profile: the realty pack is on');
+    // C1: project + units.
+    await page.goto(srv.origin + '/receivables?tab=realty&view=projects');
+    const pf = page.locator('[data-rc-project-form]');
+    await pf.locator('[data-rc="p-name"]').fill('E2E Green Heights', { timeout: 15000 });
+    await pf.locator('[data-rc="p-rera"]').fill('P52100099999');
+    await pf.locator('[data-rc="p-towers"]').fill('A:1:20');
+    await pf.locator('[data-rc="p-rera-acc"]').selectOption('e2e-rera');
+    await page.locator('[data-rc-save-project]').click();
+    const proj = (await readJson(page, 'realty_projects', [], (v) => v?.some((p) => p.name === 'E2E Green Heights'))).find((p) => p.name === 'E2E Green Heights');
+    check(proj?.rera_no === 'P52100099999' && proj?.towers?.[0]?.name === 'A', 'project saved with its RERA no. and tower A');
+    await page.goto(srv.origin + '/receivables?tab=realty&view=units');
+    const bulk = page.locator('[data-rc-bulk]');
+    await bulk.locator('[data-rc="b-carpet"]').fill('100', { timeout: 15000 });
+    await bulk.locator('[data-rc="b-rate"]').fill('5000');
+    await page.locator('[data-rc-add-units]').click();
+    await page.locator('[data-rc-unit="A-104"]').waitFor({ timeout: 15000 });
+    check(await page.locator('[data-rc-unit]').count() === 4, 'a tower of 4 units (A-101 … A-104)');
+    // The units must reach IndexedDB before the next page load reads them back.
+    await readJson(page, 'realty_units', [], (v) => v?.filter((u) => u.project_id === proj?.id).length >= 4, 15000);
+    // C3: a construction-linked plan.
+    await page.goto(srv.origin + '/receivables?tab=realty&view=plans');
+    await page.locator('[data-rc="plan-name"]').fill('E2E CLP', { timeout: 15000 });
+    await page.locator('[data-rc-plan-save]').click();
+    await readJson(page, 'payment_plans', [], (v) => v?.length > 0);
+    // C2: book A-101 with stamp duty as pass-through, then a 12% receipt before the agreement.
+    await page.goto(srv.origin + '/receivables?tab=realty&view=bookings');
+    await page.locator('[data-rc="k-name"]').fill('E2E Buyer Asha', { timeout: 15000 });
+    await page.locator('[data-rc="h-Stamp duty"]').fill('400000');
+    await page.locator('[data-rc-book-save]').click();
+    const bk = (await readJson(page, 'realty_bookings', [], (v) => v?.length > 0))[0];
+    check(/^BKG\/FY\d\d-\d\d\/0001$/.test(bk?.number ?? '') && bk.cost_sheet.some((h) => h.head === 'Stamp duty' && h.pass_through && h.amount === 400000) && bk.agreement_value === 5381950, `booking ${bk?.number}: stamp duty outside the agreement value (${bk?.agreement_value})`);
+    await page.locator('[data-rc="r-amount"]').fill(String(Math.round(bk.agreement_value * 0.12)));
+    await page.locator('[data-rc-receipt-save]').click();
+    await page.locator('[data-rc-warn10]').waitFor({ timeout: 15000 });
+    check(true, 'a 12% receipt before the registered agreement shows the RERA Sec 13 10% warning');
+    const adv = (await readJson(page, 'advances', [], (v) => v?.some((a) => a.booking_id === bk.id))).find((a) => a.booking_id === bk.id);
+    check(adv?.tax_rate === 5, 'the receipt is an advance tagged with the booking, GST 5%');
+    check(await page.locator('[data-rc-tds]').count() > 0, '194-IA hint shows for a booking of ₹50 lakh or more');
+    // C3: certify Plinth → raise the demand.
+    await page.goto(srv.origin + '/receivables?tab=realty&view=demands');
+    await page.locator('[data-rc="c-stage"]').selectOption('Plinth', { timeout: 15000 });
+    await page.locator('[data-rc-certify-save]').click();
+    await page.locator('[data-rc-raise]').click({ timeout: 15000 });
+    const dm = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.boq_terms?.cn?.demand?.booking_id === bk.id))).find((i) => i.boq_terms?.cn?.demand?.booking_id === bk.id);
+    check(dm.doc_type === 'TAX_INVOICE' && dm.boq_terms.cn.demand.land?.notif === 7.5 && Math.abs(dm.tax_amount - dm.taxable_value * 0.05) < 0.02, `demand ${dm.boq_terms.cn.demand.number}: 7.5% on two-thirds = 5% (${dm.tax_amount})`);
+    await page.goto(srv.origin + '/invoice/' + dm.id);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.locator('[data-demand]').first().waitFor({ timeout: 15000 });
+    const paper = await dialog.innerText();
+    check(/Value of land deemed one-third/.test(paper) && /CGST 3\.75% \+ SGST 3\.75%/.test(paper), 'the demand paper shows land one-third and CGST 3.75% + SGST 3.75% on two-thirds');
+    check(/Pay only to this account: E2E RERA account/.test(paper) && /Payment plan/.test(paper) && paper.includes('P52100099999'), 'the RERA account, the stage table and the RERA no. print');
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+    // CC date → the next stage is a non-GST "not a supply" demand.
+    const projects = await readJson(page, 'realty_projects', []);
+    const today = dm.issue_date;
+    await writeJson(page, 'realty_projects', projects.map((p) => (p.id === proj.id ? { ...p, cc_date: today } : p)));
+    await page.goto(srv.origin + '/receivables?tab=realty&view=demands');
+    await page.locator('[data-rc="c-stage"]').selectOption('1st slab', { timeout: 15000 });
+    await page.locator('[data-rc-certify-save]').click();
+    await page.locator('[data-rc-raise]').click({ timeout: 15000 });
+    const dm2 = (await readJson(page, 'invoices', [], (v) => v.filter((i) => i.boq_terms?.cn?.demand?.booking_id === bk.id).length > 1)).filter((i) => i.boq_terms?.cn?.demand?.booking_id === bk.id).find((i) => i.id !== dm.id);
+    check(dm2?.doc_type === 'BILL_OF_SUPPLY' && dm2.tax_amount === 0 && dm2.boq_terms.cn.demand.cc_after === true && /not a supply/.test(dm2.notes), 'after the completion certificate the demand is non-GST (Sch III para 5(b))');
+    // C4: the RERA view shows 70% required vs deposited.
+    await page.goto(srv.origin + '/receivables?tab=realty&view=rera');
+    const rera = page.locator('[data-rc-table="rera"]');
+    await rera.waitFor({ timeout: 15000 });
+    check(/70% required/i.test(await rera.innerText()) && /Deposited/i.test(await rera.innerText()), 'RERA view: 70% required vs deposited');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R11-B contractor finance: a contract with water + electricity, a mobilisation advance at 10% and a secured advance on 100 bags; RA 2 recovers advance + interest + secured + client material; Advances balance ₹0; escalation → supplementary bill with the working page; recovery receipts move no cash; a PBG expiring in 20 days rings the bell', async () => {
+    const keys = ['settings', 'construction_settings', 'invoices', 'transactions', 'clients', 'advances', 'vouchers', 'accounts', 'bank_accounts', 'doc_links', 'series_counters', 'ra_measurements', 'works_contracts', 'secured_advances', 'price_variations', 'bank_guarantees', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const day = (n) => page.evaluate((x) => { const d = new Date(); d.setDate(d.getDate() + x); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }, n);
+    const today = await day(0);
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'contractor', modules: undefined, industry_packs: ['works'], construction_kind: 'civil', lock_until: undefined });
+    await writeJson(page, 'construction_settings', { views: { contracts: true, advances: true, escalation: true, guarantees: true } });
+    const dept = { id: 'e2e-cnb-dept', name: 'E2E CPWD Division 2', email: '', address: 'Mumbai', city: 'Mumbai', zip: '', state_code: '27' };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), dept]);
+    const boq = {
+      id: 'e2e-cnb-boq', invoice_number: 'SO/E2E/0021', doc_type: 'SALES_ORDER', issue_date: await day(-90), due_date: await day(-60), status: 'Sent', currency: 'INR', template_id: 'classic_orange',
+      client: dept, sender: (prev.settings?.profiles ?? [])[0] ?? null,
+      items: [
+        { id: 'e2e-cnb-l1', name: 'Earthwork excavation', boq_ref: '2.1', type: 'Service', hsn: '995411', unit: 'CUM', quantity: 1000, rate: 250, tax_rate: 18, discount_percent: 0, amount: 250000 },
+        { id: 'e2e-cnb-l2', name: 'PCC 1:4:8', boq_ref: '2.2', type: 'Service', hsn: '995411', unit: 'CUM', quantity: 200, rate: 4500, tax_rate: 18, discount_percent: 0, amount: 900000 },
+      ],
+      gst_mode: 'CGST_SGST', place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false,
+      amount_paid: 0, notes: '', terms: '', subtotal: 1150000, discount_amount: 0, taxable_value: 1150000, cgst_amount: 103500, sgst_amount: 103500, igst_amount: 0, tax_amount: 207000, round_off: 0, total: 1357000, balance_due: 1357000,
+      boq_terms: { deductions: [{ kind: 'retention', rate: 5 }] },
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), boq]);
+    const adv = { id: 'e2e-cnb-adv', number: 'ADV/E2E/0001', date: await day(-60), client: { id: dept.id, name: dept.name }, place_of_supply: '27', supply: 'services', tax_rate: 18, amount: 115000, method: 'Bank transfer', tax: { applies: true, supply_type: 'INTRA', taxable: 97457.63, igst: 0, cgst: 8771.19, sgst: 8771.18 }, created_at: new Date().toISOString() };
+    await writeJson(page, 'advances', [...(prev.advances ?? []), adv]);
+    // B1: the contract.
+    await page.goto(srv.origin + '/time?tab=works&view=contracts');
+    await page.locator('[data-cn-new-contract]').click({ timeout: 15000 });
+    await page.locator('[data-cn-f="client_id"]').selectOption(dept.id);
+    await page.locator('[data-cn-f="boq_id"]').selectOption(boq.id);
+    for (const [k, v] of [['name_of_work', 'E2E road SH-4'], ['agreement_no', 'AG/E2E/4'], ['contract_value', '1150000'], ['water_pct', '1'], ['power_pct', '1']]) await page.locator(`[data-cn-f="${k}"]`).fill(v);
+    await page.locator('[data-cn-save-contract]').click();
+    const contract = (await readJson(page, 'works_contracts', [], (v) => v?.some((c) => c.boq_id === boq.id))).find((c) => c.boq_id === boq.id);
+    check(contract?.agreement_no === 'AG/E2E/4' && contract?.water_pct === 1, 'the contract is saved against its BOQ');
+    await page.locator('[data-cn-row="AG/E2E/4"]').waitFor();
+    // B2: link the advance (10% interest) and record a secured advance on 100 bags.
+    await page.locator('[data-tw-view="advances"]').click();
+    await page.locator('[data-cn-f="advance_id"]').selectOption(adv.id, { timeout: 15000 });
+    await page.locator('[data-cn-adv-link]').click();
+    await readJson(page, 'works_contracts', [], (v) => v?.some((c) => c.advance_terms?.length));
+    for (const [k, v] of [['description0', 'Cement'], ['qty0', '100'], ['unit0', 'bag'], ['rate0', '400']]) await page.locator(`[data-cn-f="${k}"]`).fill(v);
+    await page.locator('[data-cn-sa-save]').click();
+    const sa = (await readJson(page, 'secured_advances', [], (v) => v?.length > 0))[0];
+    check(sa?.amount === 30000, `secured advance 75% of ₹40,000 = ₹30,000 (${sa?.amount})`);
+    // RA 1 and RA 2 (RA 2 recovers the advance on schedule, interest, the secured advance and client cement).
+    await page.locator('[data-tw-view="ra"]').click();
+    await page.locator('[data-ra-cum="2.1"]').fill('400', { timeout: 15000 });
+    await page.locator('[data-ra-save]').click();
+    await readJson(page, 'invoices', [], (v) => v.some((d) => d.boq_id === boq.id && d.ra_no === 1));
+    await page.locator('[data-ra-cum="2.2"]').fill('100');
+    await page.locator('[data-cn-recoveries] summary').click();
+    await page.locator('[data-cn-f="kind0"]').selectOption('secured_advance');
+    await page.locator('[data-cn-f="ref0"]').selectOption(sa.id);
+    await page.locator('[data-cn-f="qty0"]').fill('100');
+    await page.locator('[data-cn-rec-add]').click();
+    await page.locator('[data-cn-f="kind1"]').selectOption('material_recovery');
+    await page.locator('[data-cn-f="qty1"]').fill('10');
+    await page.locator('[data-cn-f="rate1"]').fill('450');
+    await page.locator('[data-ra-save]').click();
+    const ra2 = (await readJson(page, 'invoices', [], (v) => v.some((d) => d.boq_id === boq.id && d.ra_no === 2))).find((d) => d.boq_id === boq.id && d.ra_no === 2);
+    const by = (k) => (ra2?.ra_deductions ?? []).find((d) => d.kind === k)?.amount ?? 0;
+    const ra1 = (await readJson(page, 'invoices', [])).find((d) => d.boq_id === boq.id && d.ra_no === 1);
+    const interest = (ra1?.ra_deductions ?? []).find((d) => d.kind === 'advance_interest')?.amount ?? 0;
+    check(by('advance_recovery') > 0 && interest > 0, `mobilisation advance: RA 2 recovers ${by('advance_recovery')} (10%→80% schedule), interest ${interest} on the balance`);
+    check(by('secured_advance') === 30000 && by('material_recovery') === 4500 && by('water_power') === 9000, `RA 2: secured ₹30,000, cement ₹4,500, water + electricity 2% ₹9,000 (${by('secured_advance')} ${by('material_recovery')} ${by('water_power')})`);
+    check(ra2?.total === 531000, 'GST on the full value (₹4,50,000 + 18%)');
+    await page.locator('[data-tw-view="advances"]').click();
+    const bal = (await page.locator('[data-cn-sa-balance]').first().innerText({ timeout: 15000 })).trim();
+    check(/₹0\.00/.test(bal), `Works → Advances: secured advance balance ${bal}`);
+    // B3: escalation → supplementary bill with the working page.
+    await page.locator('[data-tw-view="escalation"]').click();
+    await page.locator('[data-cn-f="s0"]').fill('100', { timeout: 15000 });
+    await page.locator('[data-cn-f="b0"]').fill('400');
+    await page.locator('[data-cn-pv-clause]').click();
+    await readJson(page, 'works_contracts', [], (v) => v?.some((c) => c.escalation?.components?.length === 1));
+    await page.locator('[data-cn-f="from"]').fill(await day(-1), { timeout: 15000 });
+    await page.locator('[data-cn-f="to"]').fill(today);
+    await page.locator('[data-cn-f="i:cement"]').fill('440');
+    await page.locator('[data-cn-pv-save]').click();
+    await page.locator('[data-cn-pv-bill]').click({ timeout: 15000 });
+    const pv = (await readJson(page, 'price_variations', [], (v) => v?.[0]?.status === 'billed'))[0];
+    check(pv?.amount === 46750, `PV = 0.85 × ₹5,50,000 × 10% = ₹46,750 (${pv?.amount})`);
+    await page.goto(srv.origin + '/invoice/' + pv.invoice_id);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Document preview' });
+    await dialog.locator('[data-pv-working]').first().waitFor({ timeout: 15000 });
+    check(/Price variation statement PVB\/FY/i.test(await dialog.innerText()) && /46,750/.test(await dialog.innerText()), 'the working prints as the following page (PVB number, ₹46,750)');
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+    // B4: recovery receipts (cement, water + electricity …) are recorded through the clearing account — no cash.
+    await page.goto(srv.origin + '/time?tab=works&view=retention');
+    const row = page.locator(`[data-ra-split="${ra2.invoice_number}"]`);
+    await row.waitFor({ timeout: 15000 });
+    for (let i = 0; i < 4; i++) {
+      const btn = row.getByRole('button', { name: 'Record deducted' }).first();
+      if (!(await btn.count())) break;
+      await btn.click();
+      await page.waitForTimeout(300);
+    }
+    const rows = (await readJson(page, 'transactions', [], (v) => v.filter((p) => p.invoice_id === ra2.id && p.ra_journal_id).length >= 3)).filter((p) => p.invoice_id === ra2.id);
+    check(rows.some((p) => p.ra_kind === 'material_recovery') && rows.some((p) => p.ra_kind === 'water_power') && rows.every((p) => p.ra_journal_id || p.advance_id), 'recovery receipts carry their journal (no cash moved)');
+    // B5: a performance guarantee expiring in 20 days rings the bell.
+    await page.goto(srv.origin + '/time?tab=works&view=guarantees');
+    for (const [k, v] of [['bank', 'E2E Bank'], ['bg_no', 'PBG/E2E/1'], ['amount', '57500'], ['expires_on', await day(20)]]) await page.locator(`[data-cn-f="${k}"]`).fill(v, { timeout: 15000 });
+    await page.locator('[data-cn-bg-save]').click();
+    await page.locator('[data-cn-bg-row="PBG/E2E/1"]').waitFor();
+    await page.getByRole('button', { name: /^Notifications/ }).click();
+    await page.getByRole('dialog', { name: 'Notifications' }).getByText(/Bank guarantee PBG\/E2E\/1/).first().waitFor({ timeout: 15000 });
+    check(true, 'the bell lists the guarantee expiring in 20 days');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R11-D site desk: a work order back-to-back at 90% of the BOQ rate; measuring 100 sqm makes the purchase bill with 194C on the value before GST and 5% retention by journal; a muster day settles as MUS with a payment voucher; the site P&L shows the sub-contractor cost and the margin', async () => {
+    const keys = ['settings', 'construction_settings', 'invoices', 'vendors', 'godowns', 'cost_centres', 'purchases', 'vouchers', 'accounts', 'series_counters', 'sub_work_orders', 'sub_measurements', 'site_labour', 'muster_days', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'contractor', modules: undefined, industry_packs: ['works'], construction_kind: 'civil', retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'construction_settings', { views: { subcon: true, labour: true, plant: true, reco: true, pnl: true } });
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), { id: 'e2e-sd-cc', name: 'E2E SH-14 project', kind: 'project', active: true }]);
+    await writeJson(page, 'godowns', [...(prev.godowns ?? []), { id: 'e2e-sd-site', name: 'E2E SH-14 site', kind: 'site', boq_id: 'e2e-sd-boq', cost_centre_id: 'e2e-sd-cc' }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-sd-sub', name: 'E2E Kumar Plasterers', pan: 'ABCPK1234L', state_code: '27' }]);
+    const client = { id: 'e2e-sd-dept', name: 'E2E PWD Division 9', email: '', address: 'Pune', city: 'Pune', zip: '', state_code: '27' };
+    const boq = {
+      id: 'e2e-sd-boq', invoice_number: 'SO/E2E/0014', doc_type: 'SALES_ORDER', issue_date: '2026-05-01', due_date: '2026-05-31', status: 'Sent', currency: 'INR', template_id: 'classic_orange', client, sender: (prev.settings?.profiles ?? [])[0] ?? null,
+      items: [{ id: 'e2e-sd-l1', name: 'Plaster 12 mm', boq_ref: '5.1', type: 'Service', hsn: '995411', unit: 'SQM', quantity: 1000, rate: 400, tax_rate: 18, discount_percent: 0, amount: 400000 }],
+      gst_mode: 'CGST_SGST', place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false,
+      amount_paid: 0, notes: '', terms: '', subtotal: 400000, discount_amount: 0, taxable_value: 400000, cgst_amount: 36000, sgst_amount: 36000, igst_amount: 0, tax_amount: 72000, round_off: 0, total: 472000, balance_due: 472000,
+      boq_terms: { cost_centre_id: 'e2e-sd-cc' },
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), boq]);
+    // D1: work order from the BOQ at 90%, 5% retention.
+    await page.goto(srv.origin + '/time?tab=works&view=subcon&boq=e2e-sd-boq');
+    await page.locator('[data-sd="wo-vendor"]').selectOption('e2e-sd-sub', { timeout: 15000 });
+    await page.locator('[data-sd-save-wo]').click();
+    const wo = (await readJson(page, 'sub_work_orders', [], (v) => v?.length > 0))[0];
+    check(/^SWO\/FY\d\d-\d\d\/0001$/.test(wo?.number ?? '') && wo.lines[0].rate === 360 && wo.lines[0].ref === '5.1', `work order ${wo?.number}: back-to-back at 90% (${wo?.lines?.[0]?.rate})`);
+    // Measure 100 sqm → the purchase bill.
+    await page.locator('[data-sd-cum]').first().fill('100');
+    await page.locator('[data-sd-save-bill]').click();
+    const bill = (await readJson(page, 'purchases', [], (v) => v?.some((p) => p.cn_sub?.kind === 'subcon'))).find((p) => p.cn_sub?.kind === 'subcon');
+    check(bill?.taxable === 36000 && bill.tds_section === '194C-1' && bill.tds_amount === 360 && bill.cn_sub.deductions.some((d) => d.kind === 'retention' && d.amount === 1800) && bill.amount_paid === 1800, `sub-contractor bill ${bill?.bill_number}: 194C 1% on ₹36,000 and 5% retention by journal`);
+    const jv = (await readJson(page, 'vouchers', [], (v) => v?.some((x) => x.id === bill?.cn_sub?.jv_id))).find((x) => x.id === bill?.cn_sub?.jv_id);
+    check(jv?.voucher_class === 'Sub-contractor deductions', 'the deductions journal is posted');
+    // D2: a worker, a muster day, the weekly settlement.
+    await page.goto(srv.origin + '/time?tab=works&view=labour');
+    await page.locator('[data-sd="w-name"]').fill('E2E Ramu', { timeout: 15000 });
+    await page.locator('[data-sd="w-rate"]').fill('800');
+    await page.locator('[data-sd-add-worker]').click();
+    await page.locator('[data-sd-mark]').click({ timeout: 15000 });
+    await readJson(page, 'muster_days', [], (v) => v?.length > 0);
+    await page.locator('[data-sd-settle]').click({ timeout: 15000 });
+    const days = await readJson(page, 'muster_days', [], (v) => v?.some((d) => d.mus_no));
+    check(/^MUS\/FY\d\d-\d\d\/0001$/.test(days[0]?.mus_no ?? '') && !!days[0].voucher_id, `muster settled ${days[0]?.mus_no} with a payment voucher`);
+    // D5: the site P&L.
+    await page.goto(srv.origin + '/time?tab=works&view=pnl&boq=e2e-sd-boq');
+    const pnl = page.locator('[data-sd-table="pnl"]');
+    await pnl.waitFor({ timeout: 15000 });
+    const text = await pnl.innerText();
+    check(/Sub-contractor bills/.test(text) && /36,000/.test(text) && /Site wages/.test(text) && /800/.test(text) && (await page.locator('[data-sd-margin]').count()) === 1, 'site P&L: sub-contractor bill and muster wages as costs, a margin line');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R10-A service desk: Services → Salon (salon pack, staff required, ITC caution); a plan at 10% and a stylist; a booking from the day grid with a 9997 service (5% after 22 Sep 2025); arrived → Bill → the POS has the line with the stylist; the appointment shows Billed; the statement shows her commission; Ctrl+K "appointment"; help', async () => {
+    const keys = ['settings', 'service_settings', 'service_staff', 'commission_plans', 'appointments', 'invoices', 'transactions', 'series_counters', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', modules: undefined, industry_packs: undefined, service_kind: undefined, construction_kind: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'service_settings', null);
+    // SV-A1: the service picker in Settings → Features.
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-service-kind-card="salon"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.service_kind === 'salon');
+    const ss = await readJson(page, 'service_settings', {}, (v) => v?.staff_required === true);
+    check(st.industry_packs?.includes('salon') && st.modules?.includes('pos') && st.modules?.includes('time') && ss.itc_caution === true, 'Salon: salon pack, POS + Time modules, staff required and the ITC caution on');
+    // SV-A3: a plan (services 10%) and a stylist on it.
+    await page.goto(srv.origin + '/time?tab=commission&view=plans');
+    await page.locator('[data-plan-name]').fill('E2E Stylist 10%', { timeout: 15000 });
+    await page.locator('[data-plan-save]').click();
+    await readJson(page, 'commission_plans', [], (v) => v.some((p) => p.name === 'E2E Stylist 10%'));
+    await page.goto(srv.origin + '/time?tab=commission&view=staff');
+    await page.locator('[data-staff-name]').fill('E2E Priya', { timeout: 15000 });
+    await page.locator('[data-staff-plan]').selectOption({ label: 'E2E Stylist 10%' });
+    await page.locator('[data-staff-save]').click();
+    const staff = (await readJson(page, 'service_staff', [], (v) => v.some((x) => x.name === 'E2E Priya'))).find((x) => x.name === 'E2E Priya');
+    check(!!staff?.plan_id, 'the stylist is saved with her plan');
+    // SV-A2: book from the day grid (Priya's column, 11:00), a beauty (9997) service.
+    await page.goto(srv.origin + '/time?tab=appointments');
+    await page.locator('[data-slot="E2E Priya@11:00"]').click({ timeout: 15000 });
+    await page.locator('[data-appt-client]').fill('E2E Salon Client');
+    await page.locator('[data-appt-add-service]').click();
+    await page.locator('[data-appt-service="0"]').fill('E2E Haircut');
+    const row = page.locator('[data-appt-service="0"]').locator('xpath=ancestor::tr');
+    await row.locator('td').nth(2).locator('input').fill('500');
+    await row.locator('td').nth(3).locator('select').selectOption('beauty_9997');
+    await page.locator('[data-appt-save]').click();
+    const appt = (await readJson(page, 'appointments', [], (v) => v.some((a) => a.client_name === 'E2E Salon Client'))).find((a) => a.client_name === 'E2E Salon Client');
+    check(appt?.start === '11:00' && appt.staff_id === staff.id && appt.services[0]?.sv_class === 'beauty_9997', 'booked at 11:00 with the stylist and a 9997 service');
+    await page.locator('[data-appt-chip="E2E Salon Client"]').click();
+    await page.locator('[data-appt-status="arrived"]').click();
+    await readJson(page, 'appointments', [], (v) => v.some((a) => a.id === appt.id && a.status === 'arrived'));
+    await page.locator('[data-appt-chip="E2E Salon Client"]').click();
+    await page.locator('[data-appt-bill]').click();
+    await page.waitForURL(/\/pos/, { timeout: 15000 });
+    await page.getByText('E2E Haircut').first().waitFor({ timeout: 15000 });
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.waitForFunction(() => /[1-9]/.test(document.querySelector('[data-pos-total]')?.textContent ?? ''), null, { timeout: 15000 });
+    const due = (await page.locator('[data-pos-total]').innerText()).replace(/[^\d.]/g, '');
+    await page.locator('#pos-Cash').fill(due); // paid in cash
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    const fresh = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id)))).filter((i) => !beforeIds.has(i.id));
+    const bill = fresh.find((i) => i.items?.some((l) => l.sv?.appointment_id === appt.id));
+    check(!!bill, `the POS bill carries the appointment on its line (new bills: ${fresh.map((i) => i.invoice_number).join(', ') || 'none'})`);
+    const line = bill?.items.find((l) => l.sv?.appointment_id === appt.id);
+    check(line?.sv?.staff_id === staff.id && line.sv.cls === 'beauty_9997' && Number(line.tax_rate) === 5, `the POS bill ${bill?.invoice_number} carries the stylist and the 5% class rate`);
+    await page.goto(srv.origin + '/time?tab=appointments');
+    await page.locator('[data-appt-chip="E2E Salon Client"]').waitFor({ timeout: 15000 });
+    check(/Billed/.test(await page.locator('[data-appt-chip="E2E Salon Client"]').innerText()), 'the appointment shows Billed');
+    // The month's statement.
+    await page.goto(srv.origin + '/time?tab=commission&view=statement');
+    await page.locator('[data-statement-staff]').selectOption({ label: 'E2E Priya' }, { timeout: 15000 });
+    check(/50\.00/.test(await page.locator('[data-statement-total]').innerText()), 'the statement shows 10% of the ₹500 taxable value');
+    // Ctrl+K and help.
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('appointment');
+    await palette.getByRole('option', { name: /Appointments/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "appointment" finds Time → Appointments');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/time?tab=appointments');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help="time:appointments"]').waitFor({ timeout: 15000 });
+    check(true, 'Help opens on the Appointments topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R10-C members desk: Gym — sell a 6-month plan (5%), freeze 20 days → the end moves 20 days; check-in by member code shows "Active till", an expired member the renew prompt; a 6-facial package redeemed at the POS is a ₹0 line "Session 1 of 6"; coaching: Fees → Batches timetable, a refund after 3 of 10 months → a credit note', async () => {
+    const keys = ['settings', 'service_settings', 'member_plans', 'memberships', 'checkins', 'class_schedules', 'class_attendance', 'appointments', 'clients', 'fee_plans', 'fee_runs', 'batch_runs', 'invoices', 'transactions', 'doc_links', 'series_counters', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const ymd = (t) => `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(t.getUTCDate()).padStart(2, '0')}`;
+    const now = new Date();
+    const today = ymd(new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())));
+    const addDays = (s, n) => { const [y, m, d] = s.split('-').map(Number); return ymd(new Date(Date.UTC(y, m - 1, d + n))); };
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', modules: undefined, industry_packs: ['fitness', 'salon', 'fees'], service_kind: 'fitness', construction_kind: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'service_settings', { checkin_gate: 'warn' });
+    for (const k of ['member_plans', 'memberships', 'checkins', 'class_schedules', 'class_attendance', 'fee_runs']) await writeJson(page, k, null);
+    const base = { email: '', address: '', city: '', zip: '' };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { ...base, id: 'e2e-meera', name: 'E2E Meera' }, { ...base, id: 'e2e-kiran', name: 'E2E Kiran', enrolments: [{ plan_id: 'e2e-fp', from: '2026-06-01', concessions: [] }] }]);
+    await writeJson(page, 'fee_plans', [{ id: 'e2e-fp', name: 'E2E JEE', year_label: '2026-27', preset: 'coaching', heads: [{ name: 'Tuition', amount: 100000, tax: 'taxable', gst_rate: 18, sac: '999293', frequency: 'per_instalment' }], instalments: [{ label: 'Full', due_date: today, share: 100 }] }]);
+    // C1: plans.
+    await page.goto(srv.origin + '/time?tab=members&view=plans');
+    await page.locator('[data-mp-name]').fill('E2E 6 months', { timeout: 15000 });
+    await page.locator('[data-mp-months]').fill('6');
+    await page.locator('[data-mp-price]').fill('9000');
+    await page.locator('[data-mp-cls]').selectOption('fitness_9997');
+    await page.locator('[data-mp-save]').click();
+    await readJson(page, 'member_plans', [], (v) => v?.some((p) => p.name === 'E2E 6 months'));
+    await page.locator('[data-mp-name]').fill('E2E 6 facials');
+    await page.locator('[data-mp-kind]').selectOption('package');
+    await page.locator('[data-mp-sessions]').fill('6');
+    await page.locator('[data-mp-price]').fill('9000');
+    await page.locator('[data-mp-covers]').fill('Facial');
+    await page.locator('[data-mp-save]').click();
+    await readJson(page, 'member_plans', [], (v) => v?.length === 2);
+    // C1: sell, freeze.
+    await page.goto(srv.origin + '/time?tab=members&view=members');
+    const sell = async (name, plan, start) => {
+      await page.locator('[data-mem-client]').first().fill(name, { timeout: 15000 });
+      await page.locator('[data-mem-plan]').selectOption({ label: plan });
+      await page.locator('[data-mem-start]').fill(start);
+      await page.locator('[data-mem-sell]').click();
+      return (await readJson(page, 'memberships', [], (v) => v?.some((m) => m.client_name === name))).find((m) => m.client_name === name);
+    };
+    const rahul = await sell('E2E Rahul', 'E2E 6 months', today);
+    const sale = (await readJson(page, 'invoices', [])).find((i) => i.id === rahul?.invoice_ids?.[0]);
+    check(/^MEM\/FY\d\d-\d\d\/\d{4}$/.test(rahul?.number ?? '') && sale?.status === 'Sent' && Number(sale.items[0].tax_rate) === 5 && sale.items[0].rate === 9000, `plan sold: ${rahul?.number} with one issued 5% invoice for the whole price`);
+    const old = await sell('E2E Old', 'E2E 6 months', '2025-04-01');
+    const meera = await sell('E2E Meera', 'E2E 6 facials', today);
+    check(meera?.client_id === 'e2e-meera', 'the package is on the saved customer');
+    await page.locator('tr', { hasText: rahul.number }).locator('[data-mem-act-row]').click();
+    await page.locator('[data-mem-act]').selectOption('freeze');
+    await page.locator('[data-mem-from]').fill(addDays(today, 10));
+    await page.locator('[data-mem-to]').fill(addDays(today, 29));
+    await page.locator('[data-mem-go]').click();
+    const frozen = (await readJson(page, 'memberships', [], (v) => v.some((m) => m.id === rahul.id && m.freezes?.length))).find((m) => m.id === rahul.id);
+    check(frozen?.end === addDays(rahul.end, 20), `freeze 20 days: end ${rahul.end} → ${frozen?.end}`);
+    // C2: check-in by member code; an expired member gets the renew prompt (warn).
+    await page.goto(srv.origin + '/time?tab=members&view=checkin');
+    await page.locator('[data-checkin-code]').fill(rahul.number, { timeout: 15000 });
+    await page.locator('[data-checkin-status]').first().waitFor({ timeout: 15000 });
+    check(/Active till/.test(await page.locator('[data-checkin-status]').first().innerText()), 'check-in by code shows "Active till …"');
+    await page.locator('[data-checkin-go]').first().click();
+    const days = await readJson(page, 'checkins', [], (v) => v?.some((d) => d.entries?.some((e) => e.membership_id === rahul.id)));
+    check(days.length === 1 && days[0].date === today, 'one check-in row for the day');
+    await page.locator('[data-checkin-code]').fill(old.number);
+    await page.waitForFunction(() => /renew\?/.test(document.querySelector('[data-checkin-status]')?.textContent ?? ''), null, { timeout: 15000 });
+    check(true, 'an expired member shows "Expired … — renew?"');
+    // C1: the package redeemed at the POS (the appointment brings the customer and the Facial line).
+    await writeJson(page, 'appointments', [...(prev.appointments ?? []), { id: 'e2e-appt-c', date: today, start: '10:00', minutes: 45, client_id: 'e2e-meera', client_name: 'E2E Meera', services: [{ name: 'Facial', minutes: 45, price: 1500 }], status: 'arrived', created_at: `${today}T09:00:00.000Z` }]);
+    await page.goto(srv.origin + '/pos?appt=e2e-appt-c');
+    await page.locator('[data-pos-redeem]').first().click({ timeout: 15000 });
+    await page.waitForFunction(() => /5 left/.test(document.querySelector('[data-pos-redeem]')?.textContent ?? ''), null, { timeout: 15000 });
+    check(!/[1-9]/.test(await page.locator('[data-pos-total]').innerText()), 'the POS line becomes the ₹0 redemption "Session 1 of 6" (5 left)');
+    // C3: coaching — bill the instalment, a batch with its timetable, the student on it, a refund after 3 of 10 months.
+    await page.goto(srv.origin + '/recurring?tab=fees&view=bill');
+    await page.locator('[data-fee-preview]').click({ timeout: 15000 });
+    await page.locator('[data-fee-issue]').click({ timeout: 15000 });
+    await readJson(page, 'invoices', [], (v) => v.some((i) => i.fee_plan_id === 'e2e-fp' && i.status !== 'Draft'));
+    await page.goto(srv.origin + '/recurring?tab=fees&view=batches');
+    const batches = page.locator('[data-fees-r10="batches"]');
+    await page.locator('[data-class-name]').fill('E2E Batch B', { timeout: 15000 });
+    for (const d of ['Mon', 'Wed', 'Fri']) await batches.getByLabel(d, { exact: true }).check();
+    await batches.getByLabel('Start date').fill('2026-06-01');
+    await page.locator('[data-class-to]').fill('2027-03-31');
+    await page.locator('[data-class-save]').click();
+    await page.locator('[data-timetable]').getByText(/E2E Batch B/).first().waitFor({ timeout: 15000 });
+    check(true, 'Fees → Batches shows the batch on the timetable');
+    await batches.locator('select[aria-label="Batch"]').first().selectOption({ label: 'E2E Batch B' });
+    await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-kiran' && c.enrolments?.[0]?.class_id));
+    await page.goto(srv.origin + '/recurring?tab=fees&view=refunds');
+    await page.locator('[data-refund-leave]').fill('2026-08-31', { timeout: 15000 });
+    await page.locator('[data-refund-basis]').selectOption('months');
+    await page.locator('[data-refund-preview]').click();
+    const calc = await page.locator('[data-refund-calc]').innerText({ timeout: 15000 });
+    check(/used 3 \/ 10/.test(calc) && /70,000/.test(calc), `refund preview: ${calc.slice(0, 120)}`);
+    await page.locator('[data-refund-issue]').click();
+    const notes = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'CREDIT_NOTE' && i.client?.id === 'e2e-kiran'))).filter((i) => i.doc_type === 'CREDIT_NOTE' && i.client?.id === 'e2e-kiran');
+    check(notes.length === 1 && Number(notes[0].taxable_value) === 70000 && Number(notes[0].tax_amount) === 12600, `credit note ${notes[0]?.invoice_number}: ₹70,000 taxable with 18% reversed`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R10-D workshop desk: Services → Vehicle workshop; vehicle MH12AB1234 and a labour op; job card with the odometer; estimate (pads + labour) approved by phone; Bill job → parts and labour lines at their own rates; a ₹50,000 accident job with a cashless claim approved ₹42,000 → two invoices (insurer, owner) totalling the job; Reminders shows the next service; help', async () => {
+    const keys = ['settings', 'workshop_settings', 'service_assets', 'labour_ops', 'service_jobs', 'invoices', 'stock_items', 'clients', 'payer_claims', 'series_counters', 'audit_log', 'doc_links', 'transactions', 'appointments'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', modules: undefined, industry_packs: ['workshop'], service_kind: 'workshop', construction_kind: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), { id: 'e2e-pads', name: 'E2E Brake pads', unit: 'NOS', hsn: '8708', track_stock: true, opening_qty: 10, opening_rate: 1500, reorder_level: 0, sale_rate: 2150, tax_rate: 18 }]);
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-acko', name: 'E2E ACKO General', email: '', address: '', city: 'Mumbai', zip: '', state_code: '27' }]);
+    // SV-D1 vehicle; SV-D2 labour op, rates and the interval.
+    await page.goto(srv.origin + '/time?tab=workshop&view=vehicles');
+    await page.locator('[data-ws-reg_no]').fill('mh12 ab 1234', { timeout: 15000 });
+    await page.locator('[data-ws-make]').fill('Maruti');
+    await page.locator('[data-ws-model]').fill('Swift');
+    await page.locator('[data-ws-owner_name]').fill('E2E Mr Patil');
+    await page.locator('[data-ws-cls]').selectOption('hatch');
+    await page.locator('[data-ws-asset-save]').click();
+    const asset = (await readJson(page, 'service_assets', [], (v) => v.some((a) => a.reg_no === 'MH12AB1234'))).find((a) => a.reg_no === 'MH12AB1234');
+    check(asset?.vclass === 'hatch', 'the vehicle is saved with its registration no. normalised');
+    await page.goto(srv.origin + '/time?tab=workshop&view=labour');
+    await page.locator('[data-ws-code]').fill('BRK01', { timeout: 15000 });
+    await page.locator('[data-ws-name]').fill('Front brake pad replace');
+    await page.locator('[data-ws-hhatch]').fill('0.8');
+    await page.locator('[data-ws-op-save]').click();
+    await readJson(page, 'labour_ops', [], (v) => v.some((o) => o.code === 'BRK01'));
+    await page.locator('[data-ws-rhatch]').fill('900');
+    await page.locator('[data-ws-interval_days]').last().fill('20');
+    await page.locator('[data-ws-settings-save]').click();
+    await readJson(page, 'workshop_settings', {}, (v) => v?.labour_rate?.hatch === 900);
+    // Job card with the odometer.
+    await page.goto(srv.origin + '/time?tab=workshop&view=jobs');
+    await page.locator('[data-ws-asset]').selectOption(asset.id, { timeout: 15000 });
+    await page.locator('[data-ws-odometer]').fill('48210');
+    await page.locator('[data-ws-complaints]').fill('Brake noise');
+    await page.locator('[data-ws-open]').click();
+    const job = (await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.asset_id === asset.id))).find((j) => j.asset_id === asset.id);
+    check(job?.odometer_in === 48210 && /^SVC\//.test(job.number), `job card ${job?.number} with the odometer`);
+    // Estimate: pads + labour, approved by phone.
+    await page.goto(srv.origin + '/time?tab=workshop&view=estimates');
+    await page.locator('[data-ws-job]').selectOption(job.id, { timeout: 15000 });
+    await page.locator('[data-ws-op]').selectOption({ label: 'BRK01 · Front brake pad replace' });
+    await page.locator('[data-ws-add-op]').click();
+    await page.locator('[data-ws-item]').selectOption('e2e-pads');
+    await page.locator('[data-ws-qty]').fill('1');
+    await page.locator('[data-ws-add-part]').click();
+    await page.locator('[data-ws-estimate]').click();
+    const quote = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.sv?.job?.id === job.id && i.doc_type === 'QUOTATION'))).find((i) => i.sv?.job?.id === job.id && i.doc_type === 'QUOTATION');
+    check(quote?.items?.length === 2, 'the estimate is a quotation on the job');
+    await page.locator('[data-ws-quote]').selectOption(quote.id);
+    await page.locator('[data-ws-by]').fill('E2E Mr Patil');
+    await page.locator('[data-ws-approve]').click();
+    await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.id === job.id && j.approvals?.[0]?.how === 'phone'));
+    // Board: move to ready, Bill job.
+    await page.goto(srv.origin + '/time?tab=workshop&view=jobs');
+    const row = page.locator(`[data-ws-job="${job.number}"]`);
+    for (const s of ['diagnosed', 'approved', 'in_repair', 'ready']) {
+      await row.locator(`[data-ws-move="${s}"]`).click({ timeout: 15000 });
+      await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.id === job.id && j.status === s));
+    }
+    await row.locator('[data-ws-bill]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await footerLaidOut(page, 'Workshop job → Bill (R10)');
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.sv?.job?.id === job.id && i.doc_type !== 'QUOTATION'))).find((i) => i.sv?.job?.id === job.id && i.doc_type !== 'QUOTATION');
+    const lab = bill?.items.find((l) => l.sv?.labour_op_id);
+    const pad = bill?.items.find((l) => l.name === 'E2E Brake pads');
+    check(lab?.quantity === 0.8 && lab.rate === 900 && lab.hsn === '998714' && Number(lab.tax_rate) === 18 && pad?.rate === 2150 && pad.hsn === '8708', `bill ${bill?.invoice_number}: labour 0.8 h × ₹900 (SAC 998714, 18%) and the pads at their own HSN`);
+    // Claim: a ₹50,000 job, cashless, approved ₹42,000.
+    await page.goto(srv.origin + '/time?tab=workshop&view=jobs');
+    await page.locator('[data-ws-asset]').selectOption(asset.id, { timeout: 15000 });
+    await page.locator('[data-ws-odometer]').fill('48300');
+    await page.locator('[data-ws-complaints]').fill('Accident repair');
+    await page.locator('[data-ws-open]').click();
+    const job2 = (await readJson(page, 'service_jobs', [], (v) => v.filter((j) => j.asset_id === asset.id).length === 2)).find((j) => j.asset_id === asset.id && j.id !== job.id);
+    await page.goto(srv.origin + '/time?tab=workshop&view=estimates');
+    await page.locator('[data-ws-job]').selectOption(job2.id, { timeout: 15000 });
+    await page.locator('[data-ws-sublet]').fill('Body work');
+    await page.locator('[data-ws-cost]').fill('42372.88');
+    await page.getByRole('button', { name: /Outside work \+/ }).click();
+    await page.locator('[data-ws-estimate]').click();
+    const q2 = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.sv?.job?.id === job2.id))).find((i) => i.sv?.job?.id === job2.id);
+    await page.locator('[data-ws-quote]').selectOption(q2.id);
+    await page.locator('[data-ws-by]').fill('E2E Surveyor');
+    await page.locator('[data-ws-approve]').click();
+    await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.id === job2.id && j.approvals?.length));
+    await page.goto(srv.origin + '/time?tab=workshop&view=claims');
+    await page.locator('[data-ws-job]').first().selectOption(job2.id, { timeout: 15000 });
+    await page.locator('[data-ws-insurer]').selectOption('e2e-acko');
+    await page.locator('[data-ws-apr]').first().fill('42000');
+    await page.locator('[data-ws-claim]').click();
+    await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.id === job2.id && j.claim_id));
+    await page.goto(srv.origin + '/time?tab=workshop&view=jobs');
+    const row2 = page.locator(`[data-ws-job="${job2.number}"]`);
+    for (const s of ['diagnosed', 'approved', 'in_repair', 'ready']) {
+      await row2.locator(`[data-ws-move="${s}"]`).click({ timeout: 15000 });
+      await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.id === job2.id && j.status === s));
+    }
+    await row2.locator('[data-ws-bill]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    // The split picker lists the job only once its draft bill and job link reach IndexedDB.
+    const billed2 = (await readJson(page, 'service_jobs', [], (v) => v.some((j) => j.id === job2.id && j.invoice_id), 15000)).find((j) => j.id === job2.id);
+    await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === billed2?.invoice_id), 15000);
+    await page.goto(srv.origin + '/time?tab=workshop&view=claims');
+    await page.locator('[data-ws-job]').last().selectOption(job2.id, { timeout: 15000 });
+    await page.locator('[data-ws-apr]').last().fill('42000');
+    await page.locator('[data-ws-split]').click();
+    const claim = (await readJson(page, 'payer_claims', [], (v) => v.some((c) => c.source?.id === job2.id && c.payer_invoice_id))).find((c) => c.source?.id === job2.id);
+    const invs = await readJson(page, 'invoices', []);
+    const payer = invs.find((i) => i.id === claim?.payer_invoice_id);
+    const owner = invs.find((i) => i.id === claim?.beneficiary_invoice_id);
+    check(payer?.client?.name === 'E2E ACKO General' && Math.abs(Number(payer.total) - 42000) <= 1 && Math.abs(Number(payer.total) + Number(owner?.total) - 50000) <= 1, `two invoices: insurer ${payer?.total}, owner ${owner?.total} (job ₹50,000)`);
+    // Reminders: next service within 20 days.
+    await page.goto(srv.origin + '/time?tab=workshop&view=reminders');
+    await page.locator('[data-ws-due="service"]').first().waitFor({ timeout: 15000 });
+    check(/MH12AB1234/.test(await page.locator('[data-ws-due="service"]').first().innerText()), 'Reminders shows the next service');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="time:workshop"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a workshop topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R10-B clinic desk: Clinic profile; a patient gets a UHID; OPD token 1 for Dr Shah; consult (exempt) + a cosmetic peel (18%) → "Invoice-cum-Bill of Supply" with UHID and reg. no.; a lab order with a high Hb shows "H"; a ₹6,000 / day private room bills at 5%', async () => {
+    const keys = ['settings', 'service_settings', 'clinic_settings', 'doctors', 'clients', 'items_catalog', 'clinic_visits', 'lab_tests', 'lab_orders', 'admissions', 'invoices', 'series_counters', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'clinic', industry_packs: ['clinic'], modules: undefined, lock_until: undefined });
+    await writeJson(page, 'service_settings', { rule46a: true });
+    await writeJson(page, 'clinic_settings', { uhid_prefix: 'E2E', rooms: [{ id: 'rp', name: 'Deluxe', kind: 'private', rate: 6000 }] });
+    await writeJson(page, 'doctors', [{ id: 'dr-shah', name: 'Dr Shah', council: 'MMC', reg_no: '2011/04/1234', consult_fee: 600, active: true }]);
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'peel', name: 'E2E Chemical peel', type: 'Service', hsn: '9993', unit: 'NOS', quantity: 1, rate: 2000, tax_rate: 18, amount: 2000, sv_class: 'health_cosmetic' }]);
+    await writeJson(page, 'lab_tests', [{ id: 'cbc', code: 'CBC', name: 'CBC', dept: 'Haematology', sample: 'EDTA', price: 400, params: [{ code: 'HB', name: 'Haemoglobin', unit: 'g/dL', kind: 'numeric', ranges: [{ sex: 'F', low: 12, high: 15 }] }], created_at: '2026-01-01T00:00:00.000Z' }]);
+    // B1: register a patient.
+    await page.goto(srv.origin + '/time?tab=clinic&view=patients');
+    await page.locator('[data-patient-name]').fill('E2E Mrs Rao', { timeout: 15000 });
+    await page.locator('[data-patient-sex]').selectOption('F');
+    await page.locator('[data-patient-save]').click();
+    const said = await page.locator('[role=status], [role=alert]').allInnerTexts().catch(() => []);
+    let pt = (await readJson(page, 'clients', [], (v) => v.some((c) => c.name === 'E2E Mrs Rao' && c.patient?.uhid), 15000)).find((c) => c.name === 'E2E Mrs Rao' && c.patient?.uhid);
+    if (!pt) { // the desk chunk may still be settling on a loaded machine: type and save once more
+      await page.locator('[data-patient-name]').fill('E2E Mrs Rao');
+      await page.locator('[data-patient-save]').click();
+      pt = (await readJson(page, 'clients', [], (v) => v.some((c) => c.name === 'E2E Mrs Rao' && c.patient?.uhid), 15000)).find((c) => c.name === 'E2E Mrs Rao' && c.patient?.uhid);
+    }
+    const toast = pt?.patient?.uhid ? '' : `${said.join(' | ')} / ${(await page.locator('[data-clinic-desk]').innerText().catch(() => '')).slice(0, 300)}`;
+    check(/^E2E\d{2}-\d{4}$/.test(pt?.patient?.uhid ?? ''), `the patient gets a UHID (${pt?.patient?.uhid ?? (JSON.stringify((await readJson(page, 'clients', [])).filter((c) => c.name === 'E2E Mrs Rao')) + toast)})`);
+    // OPD token 1, then the bill with a cosmetic peel.
+    await page.goto(srv.origin + '/time?tab=clinic&view=opd');
+    await page.locator('[data-patient-pick]').selectOption(pt.id, { timeout: 15000 });
+    await page.locator('[data-doctor-pick="doctor"]').selectOption('dr-shah');
+    await page.locator('[data-visit-new]').click();
+    const visit = (await readJson(page, 'clinic_visits', [], (v) => v.length > 0))[0];
+    check(visit?.token === 1 && visit.fee === 600 && /^OPD\/FY/.test(visit.number), `OPD token 1 with the ₹600 fee (${visit?.number})`);
+    const vrow = page.locator(`[data-visit="${visit.number}"]`);
+    await vrow.locator('select').selectOption('E2E Chemical peel');
+    await vrow.locator('[data-visit-bill]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await footerLaidOut(page, 'Clinic visit → Bill (R10)');
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.sv?.visit?.id === visit.id))).find((i) => i.sv?.visit?.id === visit.id);
+    const consult = bill?.items?.[0];
+    check(Number(consult?.tax_rate) === 0 && consult?.sv?.exempt === 'EXEMPT' && Number(bill?.items?.[1]?.tax_rate) === 18, 'the consult is exempt and the peel taxed at 18%');
+    check(bill?.sv?.rule46a === true && bill.sv.visit.uhid === pt.patient.uhid && bill.sv.visit.doctor_reg === 'MMC 2011/04/1234', 'Rule 46A title and the UHID / registration snapshot on the bill');
+    // B3: a lab order with a high haemoglobin → "H" on the report preview.
+    await page.goto(srv.origin + '/time?tab=clinic&view=lab');
+    await page.locator('[data-patient-pick]').selectOption(pt.id, { timeout: 15000 });
+    await page.locator('[data-lab-test="CBC"]').check();
+    await page.locator('[data-lab-order]').click();
+    const order = (await readJson(page, 'lab_orders', [], (v) => v.length > 0))[0];
+    await page.locator(`[data-order="${order.number}"]`).click();
+    await page.locator('[data-result="HB"]').fill('16.4');
+    await page.locator('[data-results-save]').click();
+    await page.locator('[data-report-preview]').click();
+    check((await page.locator('[data-lab-report] [data-flag]').first().innerText({ timeout: 15000 })).trim() === 'H', 'the report preview flags the high haemoglobin "H"');
+    // B2: admission in the ₹6,000 / day private room → the final bill has a 5% room line.
+    await page.goto(srv.origin + '/time?tab=clinic&view=ipd');
+    await page.locator('[data-patient-pick]').selectOption(pt.id, { timeout: 15000 });
+    await page.locator('[data-admit-room]').selectOption('rp');
+    await page.locator('[data-admit]').click();
+    const adm = (await readJson(page, 'admissions', [], (v) => v.length > 0))[0];
+    await page.locator(`[data-admission="${adm.number}"]`).click();
+    await page.locator('[data-discharge]').click();
+    await page.locator('[data-final-bill]').click({ timeout: 15000 });
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await footerLaidOut(page, 'IPD final bill (R10)');
+    const fin = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.sv?.admission?.id === adm.id))).find((i) => i.sv?.admission?.id === adm.id);
+    check(Number(fin?.items?.[0]?.tax_rate) === 5 && fin.items[0].sv?.cls === 'hospital_room_high', 'the room above ₹5,000 a day is billed at 5%');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R12-A agri desk: Settings → Agriculture profile → Mill (rice) → agri + mill packs, the Farm and Mill desks; a farmer F-0001 (Aadhaar refuses 5 digits); a Paddy cut table; an FPV voucher of 52 bags with moisture 19% on a 17% norm prints the 2% cut row and "Purchased from an agriculturist"; ₹15,000 cash to the farmer shows Rule 6DD(e), not 40A(3); a plain invoice is unchanged; Ctrl+K "farmers"; help', async () => {
+    const keys = ['settings', 'agri_settings', 'vendors', 'purchases', 'purchase_payments', 'quality_cut_tables', 'series_counters', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'manufacturer', modules: undefined, industry_packs: undefined, agri_kind: undefined, mill_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'agri_settings', null);
+    await writeJson(page, 'vendors', (prev.vendors ?? []).filter((v) => !v.ag));
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-agri-kind-card="mill"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.agri_kind === 'mill');
+    check(st.agri_kind === 'mill' && st.mill_kind === 'rice' && st.business_type === 'manufacturer' && ['agri', 'mill', 'commodity'].every((x) => st.industry_packs?.includes(x)), `Mill (rice): manufacturer + agri / mill packs (${st.industry_packs})`);
+    await page.goto(srv.origin + '/inventory?tab=farm&view=farmers');
+    await page.locator('[data-farm-desk]').waitFor({ timeout: 15000 });
+    const tabs = await page.locator('body').innerText();
+    check(/\bFarm\b/.test(tabs) && /\bMill\b/.test(tabs) && !/\bDairy\b/.test(tabs), 'Inventory shows the Farm and Mill desks, not Dairy');
+    await page.locator('[data-ag-add-farmer]').click();
+    await page.locator('[data-ag-farmer-name]').fill('E2E Ram Lal');
+    await page.locator('[data-ag-aadhaar]').fill('12345');
+    await page.locator('[data-ag-warn]').first().waitFor({ timeout: 5000 });
+    await page.locator('[data-ag-save-farmer]').click();
+    check((await readJson(page, 'vendors', [])).every((v) => v.name !== 'E2E Ram Lal'), 'five Aadhaar digits are refused');
+    await page.locator('[data-ag-aadhaar]').fill('1234');
+    await page.locator('[data-ag-save-farmer]').click();
+    const farmer = (await readJson(page, 'vendors', [], (v) => v.some((x) => x.name === 'E2E Ram Lal'))).find((x) => x.name === 'E2E Ram Lal');
+    check(farmer?.ag?.code === 'F-0001' && farmer.ag.aadhaar_last4 === '1234' && farmer.principal_kind === 'agriculturist', `farmer F-0001 saved as an agriculturist (${farmer?.ag?.code})`);
+    await page.goto(srv.origin + '/inventory?tab=farm&view=quality');
+    await page.locator('[data-ag-q-commodity]').fill('Paddy', { timeout: 15000 });
+    await page.locator('[data-ag-q-norm]').fill('17');
+    await page.locator('[data-ag-q-per]').fill('1');
+    await page.locator('[data-ag-q-save]').click();
+    const qt = (await readJson(page, 'quality_cut_tables', [], (v) => v.length > 0))[0];
+    check(qt?.commodity === 'Paddy', 'the Paddy cut table is saved');
+    await page.goto(srv.origin + '/inventory?tab=farm&view=vouchers');
+    await page.locator('[data-ag-v-farmer]').selectOption(farmer.id, { timeout: 15000 });
+    await page.locator('[data-ag-v-table]').selectOption(qt.id);
+    await page.locator('[data-ag-v-item]').fill('Paddy');
+    await page.locator('[data-ag-v-bags]').fill('52');
+    await page.locator('[data-ag-v-gross]').fill('2640');
+    await page.locator('[data-ag-v-tare]').fill('0.5');
+    await page.locator('[data-ag-v-rate]').fill('2300');
+    await page.locator('[data-ag-v-reading="moisture"]').fill('19');
+    await page.locator('[data-ag-cut-row]').first().waitFor({ timeout: 5000 });
+    check(/19% \(\S+ 17%\) → 2% = 52\.28 kg/.test(await page.locator('[data-ag-cut-row]').first().innerText()), 'the moisture cut row: 19% on a 17% norm → 2% = 52.28 kg');
+    check(/Purchased from an agriculturist/.test(await page.locator('[data-ag-declaration]').innerText()), 'the agriculturist declaration');
+    await page.locator('[data-ag-save-voucher]').click();
+    const bill = (await readJson(page, 'purchases', [], (v) => v.some((b) => b.ag?.voucher))).find((b) => b.ag?.voucher);
+    check(/^FPV\/FY\d\d-\d\d\/0001$/.test(bill?.bill_number ?? '') && bill.lines[0].quantity === 25.617 && bill.cgst === 0, `FPV voucher in our series, accepted weight as quantity, no GST (${bill?.bill_number} ${bill?.lines?.[0]?.quantity})`);
+    await page.locator('[data-ag-pay]').first().click();
+    await page.locator('[data-ag-pay-amount]').fill('15000');
+    const note = await page.locator('[data-ag-cash-note]').innerText({ timeout: 5000 });
+    check(/Rule 6DD\(e\)/.test(note) && !/40A\(3\)/.test(note), 'cash ₹15,000 to the farmer: Rule 6DD(e) note, no 40A(3) warning');
+    await page.locator('[data-ag-pay-save]').click();
+    check((await readJson(page, 'purchase_payments', [], (v) => v.some((x) => x.purchase_id === bill.id))).some((x) => x.purchase_id === bill.id && x.amount === 15000), 'the payment is recorded');
+    // A plain invoice prints no agri part.
+    const plain = (await readJson(page, 'invoices', [])).find((i) => i.doc_type === 'INVOICE' && !i.ag && i.status !== 'Cancelled');
+    if (plain) {
+      await page.goto(srv.origin + '/invoice/' + plain.id);
+      await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+      const d2 = page.getByRole('dialog', { name: 'Document preview' });
+      await d2.waitFor();
+      check(await d2.locator('[data-agri-block], [data-agri-statement]').count() === 0, 'a plain invoice prints unchanged (no agri part)');
+      await page.keyboard.press('Escape');
+      await d2.waitFor({ state: 'detached' });
+    }
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('farmers');
+    await palette.getByRole('option', { name: /Farmers/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "farmers" finds Inventory → Farm → Farmers');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/inventory?tab=farm&view=vouchers');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="inventory:farm"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a farm topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R12-B dairy desk: Dairy profile; a 3 × 3 cow chart and the union\'s two-axis chart; a morning shift of 3 farmers (one rejected) closed into stock; Make bills → one CYB purchase (stock by shift) with a feed bill set off (no cash); dispatch 40 L, acknowledged and billed → a bill of supply with kg fat; the reconciliation shows the shortage', async () => {
+    const keys = ['settings', 'agri_settings', 'vendors', 'clients', 'milk_rate_charts', 'milk_shifts', 'milk_dispatches', 'milk_cards', 'farmer_cycles', 'purchases', 'purchase_payments', 'invoices', 'transactions', 'vouchers', 'accounts', 'stock_items', 'stock_journals', 'series_counters', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'manufacturer', modules: undefined, industry_packs: ['agri', 'dairy'], agri_kind: 'dairy', service_kind: undefined, construction_kind: undefined, retail_kind: undefined, trade_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'agri_settings', { centres: [{ id: 'e2e-c1', name: 'E2E Centre', kind: 'milk' }] });
+    for (const k of ['milk_rate_charts', 'milk_shifts', 'milk_dispatches', 'milk_cards', 'farmer_cycles']) await writeJson(page, k, null);
+    const base = { email: '', address: '', city: '', zip: '' };
+    const farmer = (n, over = {}) => ({ id: `e2e-f${n}`, name: `E2E Farmer ${n}`, principal_kind: 'agriculturist', ag: { code: `F-900${n}`, centre_id: 'e2e-c1', status: 'active' }, ...over });
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), farmer(1, { bank_account_no: '50100123456789' }), farmer(2), farmer(3)]);
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { ...base, id: 'e2e-union', name: 'E2E Milk Union' }, { ...base, id: 'e2e-fc1', name: 'E2E Farmer 1', ag: { code: 'F-9001' } }]);
+    const feedLine = { id: 'e2e-feed-l', name: 'Cattle feed', description: '', type: 'Goods', hsn: '2309', unit: 'BAG', quantity: 1, rate: 500, amount: 500, tax_rate: 0, discount_percent: 0, ag_class: 'cattle_feed' };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-feed', invoice_number: 'E2E-FEED-1', doc_type: 'INVOICE', status: 'Sent', issue_date: today, due_date: today, client: { ...base, id: 'e2e-fc1', name: 'E2E Farmer 1', company: '', gstin: '' }, items: [feedLine], subtotal: 500, taxable_value: 500, tax_amount: 0, total: 500, balance_due: 500, amount_paid: 0, currency: 'INR', gst_mode: 'NONE' }]);
+    // B1: the society's 3 × 3 cow matrix (the form's sample) and the union's two-axis chart.
+    await page.goto(srv.origin + '/inventory?tab=dairy&view=charts');
+    await page.locator('[data-dairy="chart-name"]').fill('E2E Cow', { timeout: 15000 });
+    await page.locator('[data-dairy="chart-from"]').fill(today);
+    await page.locator('[data-dairy="chart-save"]').click();
+    await readJson(page, 'milk_rate_charts', [], (v) => v?.some((c) => c.name === 'E2E Cow' && c.matrix?.rates?.length === 3));
+    await page.locator('[data-dairy="chart-name"]').fill('E2E Union');
+    await page.locator('[data-dairy="chart-basis"]').selectOption('two_axis');
+    await page.locator('[data-dairy="chart-unit"]').selectOption('KG');
+    await page.locator('[data-dairy="chart-buyer"]').selectOption('e2e-union');
+    await page.locator('[data-dairy="chart-fat"]').fill('500');
+    await page.locator('[data-dairy="chart-snf"]').fill('300');
+    await page.locator('[data-dairy="chart-save"]').click();
+    const charts = await readJson(page, 'milk_rate_charts', [], (v) => v?.length === 2);
+    check(charts.some((c) => c.buyer_id === 'e2e-union' && c.basis === 'two_axis'), 'two charts: the cow matrix and the union\'s kg fat + kg SNF chart');
+    // B2: a morning shift — 3 farmers, one rejected — then close it.
+    await page.goto(srv.origin + '/inventory?tab=dairy&view=collection');
+    await page.locator('[data-dairy="shift"]').selectOption('M', { timeout: 15000 });
+    await page.locator('[data-dairy="date"]').fill(today);
+    const can = async (code, qty, fat, snf, reject = '') => {
+      await page.locator('[data-dairy="code"]').fill(code);
+      await page.locator('[data-dairy="qty"]').fill(String(qty));
+      await page.locator('[data-dairy="fat"]').fill(String(fat));
+      await page.locator('[data-dairy="snf"]').fill(String(snf));
+      await page.locator('[data-dairy="reject"]').fill(reject);
+      await page.locator('[data-dairy="add"]').click();
+      await readJson(page, 'milk_shifts', [], (v) => v?.[0]?.entries?.some((e) => e.code === code));
+    };
+    await can('F-9001', 20, 3.7, 8.6);
+    await can('9002', 30, 4.1, 8.6);
+    await can('F-9003', 5, 3.7, 8.6, 'Sour');
+    await page.locator('[data-dairy="close-shift"]').click();
+    const [shift] = await readJson(page, 'milk_shifts', [], (v) => v?.[0]?.closed_at);
+    check(shift.entries.length === 3 && shift.entries.filter((e) => e.rejected).length === 1 && shift.entries[0].amount === 680 && !!shift.sj_id, `one shift row with 3 cans (one rejected), ₹34 a litre at fat 3.7 / SNF 8.6, closed into stock (${shift.sj_id ? 'journal' : 'no journal'})`);
+    check(/50 L/.test(await page.locator('[data-dairy="total-M"]').innerText()), 'the shift summary shows 50 L accepted');
+    // B3: Make bills → close → one pooled purchase marked stock_by_shift; the feed bill is set off without cash.
+    await page.goto(srv.origin + '/inventory?tab=dairy&view=bills');
+    await page.locator('[data-dairy="cycle-day"]').fill(today, { timeout: 15000 });
+    await page.locator('[data-dairy="make-bills"]').click();
+    const [cyc] = await readJson(page, 'farmer_cycles', [], (v) => v?.length === 1);
+    check(cyc.source === 'milk' && cyc.lines.length === 2 && cyc.lines.find((l) => l.farmer_id === 'e2e-f1')?.deductions?.[0]?.kind === 'feed', `${cyc.number}: two farmers, the feed bill deducted from Farmer 1`);
+    await page.locator('[data-dairy="close-cycle"]').click();
+    const bill = (await readJson(page, 'purchases', [], (v) => v?.some((p) => p.bill_number === cyc.number))).find((p) => p.bill_number === cyc.number);
+    check(bill?.ag?.stock_by_shift === true && Number(bill.total) === 680 + 30 * 37, `one CYB purchase ₹${bill?.total} marked stock-by-shift (milk is not counted twice)`);
+    const setOff = (await readJson(page, 'transactions', [], (v) => v?.some((p) => p.invoice_id === 'e2e-feed'))).filter((p) => p.invoice_id === 'e2e-feed');
+    check(setOff.length === 1 && setOff[0].exchange_purchase_id === bill.id, 'the feed bill is settled by a no-cash set-off receipt');
+    // B4: dispatch 40 L to the union, its acknowledgement, the bill and the reconciliation.
+    await page.goto(srv.origin + '/inventory?tab=dairy&view=dispatch');
+    await page.locator('[data-dairy="buyer"]').selectOption('e2e-union', { timeout: 15000 });
+    await page.locator('[data-dairy="tanker"]').fill('MH12 AB 1234');
+    await page.locator('[data-dairy="d-qty"]').fill('40');
+    await page.locator('[data-dairy="d-fat"]').fill('4');
+    await page.locator('[data-dairy="d-snf"]').fill('8.6');
+    await page.locator('[data-dairy="dispatch-save"]').click();
+    await readJson(page, 'milk_dispatches', [], (v) => v?.length === 1);
+    await page.locator('[data-dairy="ack-qty"]').fill('39.5');
+    await page.locator('[data-dairy="ack-fat"]').fill('3.9');
+    await page.locator('[data-dairy="ack-no"]').fill('ACK-1');
+    await page.locator('[data-dairy="ack-save"]').click();
+    await readJson(page, 'milk_dispatches', [], (v) => v?.[0]?.received?.ack_no === 'ACK-1');
+    await page.locator('[data-dairy="bill"]').click();
+    const [d] = await readJson(page, 'milk_dispatches', [], (v) => v?.[0]?.invoice_id);
+    const inv = (await readJson(page, 'invoices', [])).find((i) => i.id === d.invoice_id);
+    check(/^MDS\/FY\d\d-\d\d\/\d{4}$/.test(d.number) && inv?.doc_type === 'BILL_OF_SUPPLY' && inv.ag?.milk?.kg_fat > 1.5 && inv.ag?.milk?.tanker === 'MH12 AB 1234', `${d.number} billed as ${inv?.invoice_number}: a bill of supply with kg fat ${inv?.ag?.milk?.kg_fat}`);
+    check(/\d\.\d+ \([1-9]/.test(await page.locator('[data-dairy="short"]').first().innerText()), 'the reconciliation shows the kg fat shortage and its %');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R12-C mill desk: Mill (rice) profile; a weighbridge slip 9,000 / 4,000 kg → net 5,000 kg done; a 100 qtl milling batch → the yield panel shows outturn 68% against 67%; a CMR agreement on 50 qtl paddy → rice due 33.5 qtl, a delivery CMR/FY…/0001; the 25% test: goods 16.7% → exempt, 33.3% → 5%', async () => {
+    const keys = ['settings', 'clients', 'weighbridge_slips', 'cmr_agreements', 'job_work_principal', 'stock_items', 'boms', 'production_orders', 'manufacturing_vouchers', 'invoices', 'series_counters', 'audit_log'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'manufacturer', agri_kind: 'mill', mill_kind: 'rice', industry_packs: ['agri', 'mill', 'commodity'], modules: undefined, lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-agency', name: 'E2E State Civil Supplies', email: '', phone: '', address: '', gstin: '', state_code: '27' }]);
+    // C1: first weighing, then the tare → net = gross − tare.
+    await page.goto(srv.origin + '/inventory?tab=mill&view=intake');
+    await page.locator('[data-ml="vehicle"]').fill('PB10AB1234', { timeout: 15000 });
+    await page.locator('[data-ml="gross"]').fill('9000');
+    await page.locator('[data-ml="moisture"]').fill('19.2');
+    await page.locator('[data-ml-open-slip]').click();
+    await page.locator('[data-ml="tare"]').first().fill('4000', { timeout: 15000 });
+    await page.locator('[data-ml-tare]').first().click();
+    const slip = (await readJson(page, 'weighbridge_slips', [], (v) => v.some((s) => s.status === 'done'), 15000)).find((s) => s.status === 'done');
+    check(/^WBS\/FY/.test(slip?.number ?? '') && slip.net_kg === 5000 && slip.readings?.moisture === 19.2, `weighbridge slip done: net ${slip?.net_kg} kg (${slip?.number})`);
+    // C2: a batch of 100 qtl paddy → 64 rice + 4 broken + 7 bran + 22 husk; the yield panel on the order.
+    const items = [['e2e-paddy', 'E2E Paddy', 'paddy'], ['e2e-rice', 'E2E Rice', 'cereal_loose'], ['e2e-broken', 'E2E Broken', 'broken_rice'], ['e2e-bran', 'E2E Bran', 'rice_bran_feed'], ['e2e-husk', 'E2E Husk', 'rice_husk']]
+      .map(([id, name, ag_class]) => ({ id, name, unit: 'QTL', track_stock: true, opening_qty: id === 'e2e-paddy' ? 500 : 0, opening_rate: 2300, reorder_level: 0, ag_class }));
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), ...items]);
+    await writeJson(page, 'production_orders', [...(prev.production_orders ?? []), { id: 'e2e-wo', number: 'WO/FY26-27/9001', date: '2026-10-27', item_id: 'e2e-rice', planned_qty: 64, wip_godown_id: '', status: 'in_progress', log: [], ag: { mill: { standard_outturn_pct: 67, std_source: 'cmr', input_moisture: 14, output_moisture: 13 } } }]);
+    await writeJson(page, 'manufacturing_vouchers', [...(prev.manufacturing_vouchers ?? []), {
+      id: 'e2e-mfg', number: 'MFG/FY26-27/9001', date: '2026-10-27', item_id: 'e2e-rice', qty: 64, production_order_id: 'e2e-wo', costs: [],
+      components: [{ id: 'c1', item_id: 'e2e-paddy', qty: 100 }],
+      outputs: [{ id: 'o1', item_id: 'e2e-broken', qty: 4, kind: 'co_product', cost_pct: 5 }, { id: 'o2', item_id: 'e2e-bran', qty: 7, kind: 'by_product', rate: 1500 }, { id: 'o3', item_id: 'e2e-husk', qty: 22, kind: 'by_product', rate: 400 }],
+    }]);
+    await page.goto(srv.origin + '/manufacturing?tab=orders&order=e2e-wo');
+    const outturn = await page.locator('[data-ml-yield]').getAttribute('data-ml-yield', { timeout: 15000 });
+    check(outturn === '68', `the yield panel shows outturn 68% (${outturn})`);
+    check((await page.locator('[data-ml-yield]').innerText()).includes('67'), 'against the 67% standard');
+    // C3: CMR agreement, 50 qtl paddy → 33.5 qtl rice due; one delivery; the Circular 153 test.
+    await page.goto(srv.origin + '/inventory?tab=mill&view=cmr');
+    await page.locator('[data-ml="agency"]').selectOption('e2e-agency', { timeout: 15000 });
+    await page.locator('[data-ml="season"]').fill('Kharif 2026-27');
+    await page.locator('[data-ml="milling-rate"]').fill('40');
+    await page.locator('[data-ml-save-agreement]').click();
+    await page.locator('[data-ml="paddy-qty"]').fill('50', { timeout: 15000 });
+    await page.locator('[data-ml-add-lot]').click();
+    check((await page.locator('[data-ml-account]').getAttribute('data-ml-account', { timeout: 15000 })) === '33.5', 'rice due 33.5 qtl on 50 qtl paddy at 67%');
+    await page.locator('[data-ml="deliver-qty"]').fill('10');
+    await page.locator('[data-ml="lot-no"]').fill('L-1');
+    await page.locator('[data-ml-deliver]').click();
+    const agr = (await readJson(page, 'cmr_agreements', [], (v) => v.some((a) => a.deliveries?.length), 15000))[0];
+    check(/^CMR\/FY\d{2}-\d{2}\/0001$/.test(agr?.deliveries?.[0]?.number ?? ''), `delivery numbered ${agr?.deliveries?.[0]?.number}`);
+    const jwp = await readJson(page, 'job_work_principal', []);
+    check(jwp.some((r) => r.kind === 'receipt') && jwp.some((r) => r.kind === 'return'), 'paddy in and rice out on the principal\'s register (never our stock)');
+    await page.locator('[data-ml="bill-qty"]').fill('10');
+    await page.locator('[data-ml="goods"]').fill('80');
+    check((await page.locator('[data-ml-pds]').getAttribute('data-ml-pds', { timeout: 15000 })) === 'exempt', 'goods 16.7% of the value → exempt');
+    await page.locator('[data-ml="goods"]').fill('200');
+    check((await page.locator('[data-ml-pds]').getAttribute('data-ml-pds')) === '5', 'goods 33.3% of the value → 5%');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R12-D cold store desk: a lot of 240 bags at ₹180 / bag-season; a ₹50,000 loan against it blocks the gate pass for 60 bags; repaid → the pass is allowed and its rent bill is a bill of supply with the lot snapshot; a licence due in 30 days shows on the dealer desk; the depositor statement shows 180 bags left and prints; FPO: 10 shares allotted with certificate SHC/FY…; the patronage view drafts a ₹25,000 reserve as an optional journal; the 80PA paper for FY 2025-26 says "no deduction found"', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'invoices', 'vouchers', 'accounts', 'series_counters', 'agri_settings', 'cold_lots', 'cold_rent_plans', 'agri_loans', 'member_shares'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const day = new Date();
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const in30 = iso(new Date(day.getFullYear(), day.getMonth(), day.getDate() + 30));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), industry_packs: ['agri', 'coldstore', 'agri_inputs', 'fpo'], lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-dep', name: 'E2E Ram Singh', state_code: '09' }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-mem', name: 'E2E Asha Devi', ag: { code: 'F-0901', member: true, member_no: 'M-901' } }]);
+    await writeJson(page, 'agri_settings', { chambers: [{ id: 'e2e-ch', name: 'Chamber 3', capacity_bags: 5000 }], licences: [{ kind: 'insecticide', number: 'INS/E2E/1', issued_by: 'DAO', valid_to: in30 }] });
+    await writeJson(page, 'cold_rent_plans', [{ id: 'e2e-plan', name: 'Potato season', basis: 'bag_season', rate: 180, part_month: 'full', charges: [], class: 'storage_agri', bill_at: 'out' }]);
+    for (const t of ['cold_lots', 'agri_loans', 'member_shares']) await writeJson(page, t, []);
+    await writeJson(page, 'series_counters', (prev.series_counters ?? []).filter((r) => !/^(CSR|GPO|LAS|SHC)/.test(String(r?.id ?? ''))));
+    // D1: receive the lot.
+    await page.goto(srv.origin + '/inventory?tab=cold&view=lots');
+    await page.locator('[data-agd="depositor_id"]').selectOption('e2e-dep', { timeout: 15000 });
+    await page.locator('[data-agd="commodity"]').fill('Potato');
+    await page.locator('[data-agd="bags"]').fill('240');
+    await page.locator('[data-agd="chamber_id"]').selectOption('e2e-ch');
+    await page.locator('[data-agd="rent_plan_id"]').selectOption('e2e-plan');
+    await page.locator('[data-agd-b="add-lot"]').click();
+    const lot = (await readJson(page, 'cold_lots', [], (v) => v.length === 1))[0];
+    check(/^CSR\/FY\d{2}-\d{2}\/0001$/.test(lot?.number ?? ''), `the storage receipt is ${lot?.number}`);
+    // D3: a loan against the lot.
+    await page.goto(srv.origin + '/inventory?tab=cold&view=loans');
+    await page.locator('[data-agd="borrower_id"]').selectOption('e2e-dep', { timeout: 15000 });
+    await page.locator('[data-agd-loan-lot]').first().check();
+    await page.locator('[data-agd="principal"]').fill('50000');
+    await page.locator('[data-agd-b="give-loan"]').click();
+    const loan = (await readJson(page, 'agri_loans', [], (v) => v.length === 1))[0];
+    check(loan?.principal === 50000, 'the loan of ₹50,000 is recorded');
+    // D1: the lien blocks the gate pass.
+    await page.goto(srv.origin + '/inventory?tab=cold&view=gatepasses');
+    await page.locator('[data-agd="lot"]').selectOption(lot.id, { timeout: 15000 });
+    await page.locator('[data-agd="bags"]').fill('60');
+    await page.locator('[data-agd-pass-check]').first().waitFor({ timeout: 15000 });
+    check(/lien/.test(await page.locator('[data-agd-pass-check]').first().innerText()), 'the gate pass shows the lien');
+    await page.locator('[data-agd-b="issue-pass"]').click();
+    await page.waitForTimeout(300);
+    check(((await readJson(page, 'cold_lots', []))[0]?.outs ?? []).length === 0, 'the gate pass for 60 bags is refused');
+    // Repay in full → the pass goes and raises the rent bill.
+    await page.goto(srv.origin + '/inventory?tab=cold&view=loans');
+    await page.locator('[data-agd="loan"]').selectOption(loan.id, { timeout: 15000 });
+    await page.locator('[data-agd-b="repay"]').click();
+    check((await readJson(page, 'agri_loans', [], (v) => v[0]?.status === 'closed'))[0]?.status === 'closed', 'the loan is repaid and closed');
+    await page.goto(srv.origin + '/inventory?tab=cold&view=gatepasses');
+    await page.locator('[data-agd="lot"]').selectOption(lot.id, { timeout: 15000 });
+    await page.locator('[data-agd="bags"]').fill('60');
+    await page.locator('[data-agd-b="issue-pass"]').click();
+    const outs = ((await readJson(page, 'cold_lots', [], (v) => v[0]?.outs?.length === 1))[0]?.outs ?? []);
+    check(/^GPO\/FY\d{2}-\d{2}\/0001$/.test(outs[0]?.number ?? ''), `gate pass ${outs[0]?.number} issued`);
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.ag?.rent?.lot_id === lot.id))).find((i) => i.ag?.rent?.lot_id === lot.id);
+    check(bill?.doc_type === 'BILL_OF_SUPPLY' && bill.total === 10800 && bill.ag.rent.bags === 60 && bill.ag.rent.lot_no === lot.number, `the rent bill is a bill of supply for 60 bags × ₹180 with the lot snapshot (${bill?.doc_type} ₹${bill?.total})`);
+    // D1: the depositor statement after the pass, and its print.
+    await page.goto(srv.origin + '/inventory?tab=cold&view=lots');
+    await page.locator('[data-agd="who"]').selectOption('e2e-dep', { timeout: 15000 });
+    const stText = await page.locator('[data-agd-statement]').innerText({ timeout: 15000 });
+    check(/1 lots · in 240 · out 60 · balance 180 bags/.test(stText) && /rent billed ₹10,800/.test(stText), `the depositor statement shows the lot after the pass (${stText})`);
+    const [pop] = await Promise.all([page.waitForEvent('popup', { timeout: 15000 }), page.locator('[data-agd-b="print-statement"]').click()]);
+    check(/Depositor statement — E2E Ram Singh[\s\S]*in 240 · out 60 · balance 180 bags/.test(await pop.content()), 'the depositor statement prints with the lot');
+    await pop.close();
+    // D4: the licence due in 30 days.
+    await page.goto(srv.origin + '/inventory?tab=inputs&view=licences');
+    await page.getByText('Expires within 45 days').first().waitFor({ timeout: 15000 });
+    check(true, 'the insecticide licence due in 30 days is flagged');
+    // D5: allot 10 shares; the 80PA paper for FY 2025-26.
+    await page.goto(srv.origin + '/inventory?tab=members&view=shares');
+    await page.locator('[data-agd="member"]').selectOption('e2e-mem', { timeout: 15000 });
+    await page.locator('[data-agd="shares"]').fill('10');
+    await page.locator('[data-agd="paid"]').selectOption('bank'); // QA13: no application money is recorded here
+    await page.locator('[data-agd-b="save-share"]').click();
+    const sh = (await readJson(page, 'member_shares', [], (v) => v.length === 1))[0];
+    check(/^SHC\/FY\d{2}-\d{2}\/0001$/.test(sh?.certificate_no ?? '') && sh.shares === 10, `10 shares allotted, certificate ${sh?.certificate_no}`);
+    // D5: the patronage view — the distribution paper and its optional draft journal.
+    await page.goto(srv.origin + '/inventory?tab=members&view=patronage');
+    await page.locator('[data-agd-patronage]').waitFor({ timeout: 15000 });
+    for (const [k, v] of [['pat', '100000'], ['reservePct', '25']]) { await page.locator(`[data-agd="${k}"]`).fill(v); await page.locator(`[data-agd="${k}"]`).blur(); }
+    await page.getByText('25,000').first().waitFor({ timeout: 15000 });
+    await page.locator('[data-agd-b="post-draft"]').click();
+    const draft = (await readJson(page, 'vouchers', [], (v) => v.some((x) => x.voucher_class === 'Appropriation (draft)'))).find((x) => x.voucher_class === 'Appropriation (draft)');
+    check(draft?.variant === 'OPTIONAL' && draft.lines?.some((l) => l.cr === 2500000), `the patronage view posts a draft appropriation journal with the ₹25,000 reserve (${draft?.variant})`);
+    await page.goto(srv.origin + '/inventory?tab=members&view=papers');
+    const fyBox = page.getByLabel('FY starting');
+    await fyBox.fill('2025', { timeout: 15000 });
+    await fyBox.blur();
+    check(/No deduction found after AY 2024-25/.test(await page.locator('[data-agd-80pa]').innerText({ timeout: 15000 })), 'the 80PA paper for FY 2025-26 computes nothing');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R13-A shop floor: Settings → Manufacturing profile → Engineering → shop-floor + fabrication packs, the Floor / Shop / Statutory desks; two work centres and a routing; release an order → planned hours; two job-card entries with 1.2 kg scrap → the output journal carries the scrap once; an invoice with the Udyam category prints the Udyam line and the MSE clause; a plain invoice is unchanged; Ctrl+K "job cards"; help', async () => {
+    const keys = ['settings', 'mfg_settings', 'work_centres', 'routings', 'job_cards', 'stock_items', 'boms', 'production_orders', 'godowns', 'stock_transfers', 'manufacturing_vouchers', 'invoices', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'manufacturer', modules: undefined, industry_packs: undefined, mfg_kind: undefined, mfg_sub: undefined, agri_kind: undefined, lock_until: undefined });
+    for (const k of ['mfg_settings', 'work_centres', 'routings', 'job_cards']) await writeJson(page, k, null);
+    const item = (id, name, extra) => ({ id, name, unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), item('e2e-mf-steel', 'E2E MS sheet', { unit: 'KG', opening_qty: 100, opening_rate: 60 }), item('e2e-mf-br', 'E2E Bracket'), item('e2e-mf-scrap', 'E2E MS off-cuts', { unit: 'KG', sale_rate: 28 })]);
+    await writeJson(page, 'boms', [...(prev.boms ?? []), { id: 'e2e-mf-bom', item_id: 'e2e-mf-br', name: 'Standard', batch_qty: 1, is_default: true, components: [{ id: 'c1', item_id: 'e2e-mf-steel', qty: 0.5 }] }]);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-mfg-kind-card="engineering"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.mfg_kind === 'engineering');
+    check(st.business_type === 'manufacturer' && st.mfg_sub === 'drawing' && ['shopfloor', 'fabrication'].every((x) => st.industry_packs?.includes(x)), `Engineering: manufacturer + shopfloor / fabrication packs (${st.industry_packs})`);
+    await page.goto(srv.origin + '/manufacturing?tab=floor&view=centres');
+    await page.locator('[data-floor-desk]').waitFor({ timeout: 15000 });
+    const tabs = (await page.locator('[data-mfg-tab]').allInnerTexts()).join('|');
+    check(/Floor/.test(tabs) && /Shop/.test(tabs) && /Statutory/.test(tabs) && !/Moulding/.test(tabs), `Manufacturing shows the Floor, Shop and Statutory desks only (${tabs})`);
+    for (const [name, rate] of [['E2E Laser', '1800'], ['E2E Brake', '900']]) {
+      await page.locator('[data-mf-centre-new]').click();
+      await page.locator('[data-mf="c-name"]').fill(name);
+      await page.locator('[data-mf="c-rate"]').fill(rate);
+      await page.locator('[data-mf="c-save"]').click();
+      await page.getByText(`Work centre ${name} saved.`).waitFor({ timeout: 10000 });
+    }
+    const centres = await readJson(page, 'work_centres', [], (v) => v.length === 2);
+    check(centres.length === 2, 'two work centres saved');
+    await page.goto(srv.origin + '/manufacturing?tab=floor&view=routings');
+    await page.locator('[data-mf-routing-new]').click({ timeout: 15000 });
+    await page.locator('[data-mf="r-item"]').selectOption('e2e-mf-br');
+    await page.locator('[data-mf="op-name-0"]').fill('Cut');
+    await page.locator('[data-mf="op-centre-0"]').selectOption(centres.find((c) => c.name === 'E2E Laser').id);
+    await page.locator('[data-mf="op-run-0"]').fill('3');
+    await page.locator('[data-mf="r-save"]').click();
+    await readJson(page, 'routings', [], (v) => v.some((r) => r.item_id === 'e2e-mf-br'));
+    await writeJson(page, 'production_orders', [...(prev.production_orders ?? []), { id: 'e2e-mf-wo', number: 'WO/FY26-27/0901', date: today, item_id: 'e2e-mf-br', planned_qty: 10, status: 'planned', wip_godown_id: '', log: [] }]);
+    await page.goto(srv.origin + '/manufacturing?tab=orders');
+    await page.getByRole('button', { name: /Open\s+WO\/FY26-27\/0901/ }).click({ timeout: 15000 });
+    const detail = page.getByTestId('wo-detail');
+    await detail.getByRole('button', { name: 'Release', exact: true }).click();
+    const wo = (await readJson(page, 'production_orders', [], (v) => v.some((o) => o.id === 'e2e-mf-wo' && o.mf?.ops))).find((o) => o.id === 'e2e-mf-wo');
+    check(wo?.mf?.ops?.[0]?.planned_hours === 0.5, `release copies the routing: Cut 10 × 3 min = 0.5 h (${wo?.mf?.ops?.[0]?.planned_hours})`);
+    await page.goto(srv.origin + '/manufacturing?tab=floor&view=cards');
+    await page.locator('[data-mf="order"]').selectOption('e2e-mf-wo', { timeout: 15000 });
+    for (const [good, kg] of [['6', '0.7'], ['4', '0.5']]) {
+      await page.locator('[data-mf="report-10"]').click();
+      await page.locator('[data-mf="e-hours"]').fill('1');
+      await page.locator('[data-mf="e-good"]').fill(good);
+      await page.locator('[data-mf="e-scrap"]').fill(kg);
+      await page.locator('[data-mf="e-scrap-item"]').selectOption('e2e-mf-scrap');
+      await page.locator('[data-mf="e-save"]').click();
+      await page.getByText(/Saved on JCD\/FY\d\d-\d\d\/\d+/).first().waitFor({ timeout: 10000 });
+    }
+    const cards = await readJson(page, 'job_cards', [], (v) => v.some((c) => c.entries?.length === 2));
+    check(cards.length === 1 && cards[0].entries.length === 2 && /^JCD\//.test(cards[0].number), 'one job card per order per operation, with two entries');
+    await page.goto(srv.origin + '/manufacturing?tab=orders');
+    await page.getByRole('button', { name: /Open\s+WO\/FY26-27\/0901/ }).click({ timeout: 15000 });
+    await detail.getByRole('button', { name: 'Issue materials' }).click();
+    await page.getByTestId('wo-issue-save').click();
+    await page.getByText(/Materials issued on STR\/FY\d\d-\d\d\/\d+/).waitFor();
+    await detail.getByRole('button', { name: 'Report output' }).click();
+    await page.locator('[data-mf-output]').waitFor({ timeout: 10000 });
+    await page.getByTestId('wo-output-save').click();
+    const mv = (await readJson(page, 'manufacturing_vouchers', [], (v) => v.some((m) => m.production_order_id === 'e2e-mf-wo'))).filter((m) => m.production_order_id === 'e2e-mf-wo');
+    const scrapLines = mv.flatMap((m) => m.outputs ?? []).filter((o) => o.item_id === 'e2e-mf-scrap');
+    check(scrapLines.length === 1 && scrapLines[0].qty === 1.2 && scrapLines[0].mf_jc, `the output journal carries the job cards' 1.2 kg scrap once (${JSON.stringify(scrapLines.map((x) => x.qty))})`);
+    // The Udyam line and the MSE clause print from the sender snapshot; a plain invoice prints none of it.
+    const seller = { ...((st.profiles ?? [])[0] ?? {}), msme_udyam: 'UDYAM-MH-26-0012345', msme_category: 'MICRO' };
+    const inv = { id: 'e2e-mf-inv', invoice_number: 'INV/FY26-27/0901', doc_type: 'INVOICE', status: 'Sent', issue_date: today, due_date: today, sender: seller, client: { name: 'E2E Buyer', gstin: '27AAPFU0939F1ZV' }, items: [{ id: 'l1', name: 'E2E Bracket', quantity: 1, rate: 100, tax_rate: 18, amount: 100 }], mf: { header: { customer_po: 'PO-77' }, lines: { l1: { drawing: '1145-B', rev: 'C' } } } };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv]);
+    await page.goto(srv.origin + '/invoice/e2e-mf-inv');
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Document preview' });
+    await dlg.waitFor();
+    await dlg.locator('[data-mfg-block]').first().waitFor({ timeout: 15000 });
+    const paper = await dlg.innerText();
+    check(/Udyam: UDYAM-MH-26-0012345 \(Micro\)/.test(paper) && /MSMED Act 2006 Sec 15/.test(paper) && /Drg\. 1145-B rev C/.test(paper), 'the invoice prints the Udyam line, the MSE clause and the drawing sub-line');
+    await page.keyboard.press('Escape');
+    await dlg.waitFor({ state: 'detached' });
+    const plain = (prev.invoices ?? []).find((i) => i.doc_type === 'INVOICE' && !i.mf && i.status !== 'Cancelled');
+    if (plain) {
+      await page.goto(srv.origin + '/invoice/' + plain.id);
+      await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+      const d2 = page.getByRole('dialog', { name: 'Document preview' });
+      await d2.waitFor();
+      check(await d2.locator('[data-mfg-block], [data-mfg-annexure]').count() === 0 && !/Udyam: |MSMED Act 2006/.test(await d2.innerText()), 'a plain invoice prints unchanged (no manufacturing part)');
+      await page.keyboard.press('Escape');
+      await d2.waitFor({ state: 'detached' });
+    }
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('job cards');
+    await palette.getByRole('option', { name: /Job cards/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "job cards" finds Manufacturing → Floor → Job cards');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/manufacturing?tab=floor&view=cards');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="manufacturing:floor"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a floor topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R13-B engineering desk: drawing rev B → C and a draft line naming rev B warns; a weight quote → two quotation drafts; 300 kg of MS turnings → the 2% scrap TCS preset, dropped by the buyer\'s declaration; plastics: one run → balance and one journal; printing: an estimate → sheets / kg / impressions → quotation', async () => {
+    const keys = ['settings', 'mfg_settings', 'drawings', 'job_quotes', 'process_runs', 'print_estimates', 'inspection_reports', 'stock_items', 'manufacturing_vouchers', 'invoices', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const s0 = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...s0, business_type: 'manufacturer', mfg_kind: 'engineering', industry_packs: ['shopfloor', 'fabrication', 'plastics', 'press'], lock_until: undefined });
+    for (const k of ['mfg_settings', 'drawings', 'job_quotes', 'process_runs', 'print_estimates', 'inspection_reports']) await writeJson(page, k, null);
+    const item = (id, name, extra) => ({ id, name, unit: 'KG', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []),
+      item('e2e-b-br', 'E2E-B Bracket', { unit: 'NOS', hsn: '7326', tax_rate: 18 }), item('e2e-b-turn', 'E2E-B MS turnings', { hsn: '7204', tax_rate: 18, sale_rate: 32, opening_qty: 500, mf_scrap_class: 'metal_ferrous' }),
+      item('e2e-b-pp', 'E2E-B PP resin', { opening_qty: 200, opening_rate: 100 }), item('e2e-b-rg', 'E2E-B PP regrind', { opening_qty: 50, opening_rate: 40, sale_rate: 40 }), item('e2e-b-cap', 'E2E-B Cap', { unit: 'NOS' })]);
+    // B1: drawing at rev B, then rev C; a draft line naming rev B warns.
+    await page.goto(srv.origin + '/manufacturing?tab=shop&view=drawings');
+    await page.locator('[data-shop-desk="drawings"]').waitFor({ timeout: 15000 });
+    await page.locator('[data-mfb="dwg-no"]').fill('E2E-1145');
+    await page.locator('[data-mfb="dwg-title"]').fill('Bracket');
+    await page.locator('[data-mfb="dwg-rev"]').fill('B');
+    await page.locator('[data-mfb-save-drawing]').click();
+    await readJson(page, 'drawings', [], (v) => v.length === 1);
+    await page.locator('[data-mfb="new-rev"]').fill('C');
+    await page.locator('[data-mfb-add-rev]').click();
+    const dw = await readJson(page, 'drawings', [], (v) => v[0]?.revisions?.length === 2);
+    check(dw[0].revisions.map((r) => `${r.rev}:${r.status}`).join() === 'B:superseded,C:current', 'rev C supersedes rev B');
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-b-draft', invoice_number: '', doc_type: 'INVOICE', status: 'Draft', issue_date: today, client: { name: 'E2E-B Buyer' }, items: [{ id: 'l1', name: 'E2E-B Bracket', quantity: 1, rate: 100, amount: 100 }], mf: { lines: { l1: { drawing: 'E2E-1145', rev: 'B' } } } }]);
+    await page.reload();
+    await page.locator('[data-mfb="stamp-doc"]').selectOption('e2e-b-draft', { timeout: 15000 });
+    await page.locator('[data-mfb-rev-warning]').getByText('PO says rev B; current is rev C').waitFor({ timeout: 10000 });
+    check(true, 'a draft line naming rev B warns');
+    // B2: weight quote with two breaks → two quotation drafts.
+    await page.goto(srv.origin + '/manufacturing?tab=shop&view=quotes');
+    await page.locator('[data-mfb="q-part"]').fill('E2E-B Flange', { timeout: 15000 });
+    await page.locator('[data-mfb="q-shape"]').selectOption('ring');
+    await page.locator('[data-mfb="q-od"]').fill('300');
+    await page.locator('[data-mfb="q-id"]').fill('160');
+    await page.locator('[data-mfb="q-t"]').fill('20');
+    await page.locator('[data-mfb="q-net"]').fill('2.9');
+    await page.locator('[data-mfb="q-mrate"]').fill('62');
+    await page.locator('[data-mfb="q-srate"]').fill('32');
+    await page.locator('[data-mfb="q-op"]').fill('VMC');
+    await page.locator('[data-mfb="q-hours"]').fill('0.4');
+    await page.locator('[data-mfb="q-rate"]').fill('900');
+    await page.locator('[data-mfb="q-breaks"]').fill('100, 500');
+    check(await page.locator('[data-mfb-price]').count() === 2, 'the quote shows two price breaks');
+    await page.locator('[data-mfb-save-quote]').click();
+    await readJson(page, 'job_quotes', [], (v) => v.length === 1);
+    await page.locator('[data-mfb-make-quotation]').click();
+    const qs = await readJson(page, 'invoices', [], (v) => v.filter((i) => i.doc_type === 'QUOTATION' && i.items?.[0]?.name === 'E2E-B Flange').length === 2);
+    check(qs.filter((i) => i.doc_type === 'QUOTATION' && i.items?.[0]?.name === 'E2E-B Flange').length === 2, 'two quotation drafts made');
+    // B3: scrap sale with the 2% TCS preset, dropped by the declaration.
+    await page.goto(srv.origin + '/manufacturing?tab=shop&view=scrap');
+    await page.locator('[data-mfb="scrap-name"]').fill('E2E-B Kabadi', { timeout: 15000 });
+    await page.locator('[data-mfb="scrap-item"]').selectOption('e2e-b-turn');
+    await page.locator('[data-mfb="scrap-net"]').fill('300');
+    await page.locator('[data-mfb-tcs="on"]').getByText(/206C\(1\) scrap 2%/).waitFor({ timeout: 10000 });
+    check(true, 'the 2% scrap TCS preset is suggested');
+    await page.locator('[data-mfb="scrap-declaration"]').fill('Form 127 dt 01-10-2026');
+    await page.locator('[data-mfb-tcs="off"]').waitFor({ timeout: 10000 });
+    await page.locator('[data-mfb-scrap-sale]').click();
+    const sc = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.mf?.kind === 'scrap'))).find((i) => i.mf?.kind === 'scrap');
+    check(sc && !sc.tcs_enabled && sc.mf.scrap.declaration === 'Form 127 dt 01-10-2026', 'the declaration drops the TCS on the scrap invoice');
+    // B4: one moulding run → material balance, one journal.
+    await page.goto(srv.origin + '/manufacturing?tab=moulding&view=runs');
+    await page.locator('[data-mfb="run-item"]').selectOption('e2e-b-cap', { timeout: 15000 });
+    await page.locator('[data-mfb="run-hours"]').fill('10');
+    await page.locator('[data-mfb="run-cycle"]').fill('22');
+    await page.locator('[data-mfb="run-cav"]').fill('4');
+    await page.locator('[data-mfb="run-part"]').fill('15');
+    await page.locator('[data-mfb="run-input"]').selectOption('e2e-b-pp');
+    await page.locator('[data-mfb="run-kg"]').fill('100');
+    await page.locator('[data-mfb="run-good"]').fill('6000');
+    await page.locator('[data-mfb="run-runner"]').fill('3');
+    await page.locator('[data-mfb="run-rgout"]').fill('3');
+    await page.locator('[data-mfb="run-rgitem"]').selectOption('e2e-b-rg');
+    await page.locator('[data-mfb-run-preview]').getByText(/yield 90%/).waitFor({ timeout: 10000 });
+    await page.locator('[data-mfb-save-run]').click();
+    const runs = await readJson(page, 'process_runs', [], (v) => v.length === 1 && v[0].voucher_id);
+    const mv = await readJson(page, 'manufacturing_vouchers', [], (v) => v.some((m) => m.id === runs[0].voucher_id));
+    check(mv.filter((m) => m.id === runs[0].voucher_id).length === 1, 'the run posts one manufacturing journal');
+    await page.goto(srv.origin + '/manufacturing?tab=moulding&view=balance');
+    check((await page.locator('[data-mfb-loss]').first().innerText({ timeout: 15000 })).trim() === '7', 'the balance closes: 100 kg in = 90 good + 3 runners + 7 unaccounted');
+    // B5: an estimate → sheets / kg / impressions → quotation.
+    await page.goto(srv.origin + '/manufacturing?tab=press&view=estimates');
+    await page.locator('[data-mfb="est-job"]').fill('E2E-B Carton', { timeout: 15000 });
+    await page.locator('[data-mfb="est-w"]').fill('350');
+    await page.locator('[data-mfb="est-h"]').fill('230');
+    await page.locator('[data-mfb="est-breaks"]').fill('10000');
+    await page.locator('[data-mfb="est-sw"]').fill('762');
+    await page.locator('[data-mfb="est-sh"]').fill('508');
+    await page.locator('[data-mfb="est-gsm"]').fill('300');
+    await page.locator('[data-mfb="est-prate"]').fill('80');
+    const row = await page.locator('[data-mfb-table="est-preview"] tbody tr').first().innerText({ timeout: 10000 });
+    check(/2,500 \+ 50 = 2,550/.test(row) && /296\.1/.test(row), `the estimate shows 4 ups → 2,550 sheets ≈ 296 kg (${row.replace(/\s+/g, ' ')})`);
+    await page.locator('[data-mfb-save-estimate]').click();
+    await readJson(page, 'print_estimates', [], (v) => v.length === 1 && /^PES\//.test(v[0].number));
+    await page.locator('[data-mfb-print-quotation]').click();
+    const pq = await readJson(page, 'invoices', [], (v) => v.some((i) => i.mf?.kind === 'print'));
+    check(pq.some((i) => i.doc_type === 'QUOTATION' && i.mf?.print?.sheets === 2550), 'the print quotation carries the job particulars');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R13-C garments desk: a style S–XL × 2 colours; a cut plan of 20 plies → 80 pieces and consumption vs standard; 8 bundle tickets; 4 bundles out to a fabricator → 3 back, 1 short; the karigar piece bill for the good pieces with a bank row; a job-work return → e-way JSON sub-type 6', async () => {
+    const keys = ['settings', 'stock_items', 'vendors', 'cut_plans', 'job_work_out', 'job_work_in', 'job_work_principal', 'godowns', 'purchases', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'manufacturer', modules: undefined, mfg_kind: 'textile', mfg_sub: 'garments', industry_packs: ['shopfloor', 'garments'], lock_until: undefined });
+    const item = (id, name, extra) => ({ id, name, unit: 'PCS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    const sizes = ['S', 'M', 'L', 'XL'];
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []),
+      item('e2e-g-fab', 'E2E Cambric', { unit: 'MTR', opening_qty: 500, opening_rate: 90 }),
+      item('e2e-g-kt', 'E2E Kurta', { variant_axes: [{ name: 'Size', values: sizes }, { name: 'Colour', values: ['Blue', 'Green'] }], mf: { style: { fabric_items: [{ item_id: 'e2e-g-fab', per_piece_m: 1.25 }] } }, mf_class: 'garment' }),
+      ...sizes.flatMap((s) => ['Blue', 'Green'].map((c) => item(`e2e-g-kt-${s}-${c}`, `E2E Kurta ${s} ${c}`, { variant_of: 'e2e-g-kt', variant_attrs: { Size: s, Colour: c } })))]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-g-rehmat', name: 'E2E Rehmat Tailors', bank_account_no: '50100012345678', bank_ifsc: 'HDFC0001234', mf: { karigar: { kind: 'fabricator', rates: [{ op: 'Stitching', rate: 38, from: '2026-04-01' }] } } }]);
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await writeJson(page, 'job_work_principal', [...(prev.job_work_principal ?? []), { id: 'e2e-g-jwp', number: 'JWP/FY26-27/0901', date: today, kind: 'return', party_name: 'E2E Surat Mills', party_gstin: '24AAACS1234A1Z5', lines: [{ id: 'l1', name: 'Dyed fabric', qty: 1200, unit: 'MTR', hsn: '5407', value: 96000, processed: true }] }]);
+    await page.goto(srv.origin + '/manufacturing?tab=garments&view=cutplans');
+    await page.locator('[data-garments-desk]').waitFor({ timeout: 15000 });
+    await page.locator('[data-mfc="cut-new"]').click();
+    await page.locator('[data-mfc="cut-style"]').selectOption('e2e-g-kt');
+    await page.locator('[data-mfc="cut-colour"]').selectOption('Blue');
+    await page.locator('[data-mfc="lay-plies-0"]').fill('20');
+    await page.locator('[data-mfc="lay-ratio-0"]').fill('S1 M1 L1 XL1');
+    await page.locator('[data-mfc="lay-len-0"]').fill('4.9');
+    await page.locator('[data-mfc="cut-issued"]').fill('96');
+    await page.locator('[data-mfc="cut-save"]').click();
+    const plan = (await readJson(page, 'cut_plans', [], (v) => v.some((p) => p.style_id === 'e2e-g-kt'))).find((p) => p.style_id === 'e2e-g-kt');
+    check(/^CUT\/FY\d\d-\d\d\/\d+$/.test(plan?.number ?? '') && Object.values(plan?.cut ?? {}).reduce((a, q) => a + q, 0) === 80, `cut plan ${plan?.number}: 20 plies × 4 = 80 pieces`);
+    check(/1\.2 m \/ 1\.25 m \(-4%\)/.test(await page.locator('[data-mfc-grid="cutplans"]').innerText()), 'consumption 1.2 m a piece against 1.25 m (−4%)');
+    await page.goto(srv.origin + '/manufacturing?tab=garments&view=bundles');
+    await page.locator('[data-mfc="b-lot"]').selectOption(plan.id, { timeout: 15000 });
+    await page.locator('[data-mfc-bundles] input[inputmode="numeric"]').first().fill('10');
+    await page.locator('[data-mfc="b-make"]').click();
+    await readJson(page, 'cut_plans', [], (v) => v.some((p) => p.id === plan.id && p.bundles?.length === 8));
+    await page.locator('[data-mfc="b-tickets"]').click();
+    check(await page.locator('[data-mfc-ticket]').count() === 8, '8 bundle tickets with their QR');
+    await page.goto(srv.origin + '/manufacturing?tab=garments&view=cmt');
+    await page.locator('[data-mfc="cmt-lot"]').selectOption(plan.id, { timeout: 15000 });
+    await page.locator('[data-mfc="cmt-vendor"]').selectOption('e2e-g-rehmat');
+    for (const n of [1, 2, 3, 4]) await page.locator(`[data-mfc-b="${n}"]`).check();
+    await page.locator('[data-mfc="cmt-send"]').click();
+    const out = (await readJson(page, 'job_work_out', [], (v) => v.some((o) => o.vendor_id === 'e2e-g-rehmat'))).find((o) => o.vendor_id === 'e2e-g-rehmat');
+    check(out?.lines?.[0]?.mf?.bundles?.length === 4 && out.lines[0].mf.pieces === 40 && out.lines[0].qty === 48, `Material Out by bundle: 4 bundles, 40 pieces, 48 m (${out?.lines?.[0]?.qty})`);
+    await page.locator('[data-mfc="cmt-recv"]').selectOption(`${out.id}|${out.lines[0].id}`);
+    await page.locator('[data-mfc-good="4"]').fill('0');
+    await page.locator('[data-mfc="cmt-receive"]').click();
+    await page.getByText(/JWR\/FY\d\d-\d\d\/\d+: 30 good, 10 short\./).waitFor({ timeout: 10000 });
+    check(true, 'Material In by bundle: 30 good, 10 short (bundle 4 pending with the fabricator)');
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('[data-mfc-eway="JWP/FY26-27/0901"]').click()]);
+    const ew = JSON.parse(readFileSync(await dl.path(), 'utf8'));
+    check(ew.billLists?.[0]?.subSupplyType === 6 && ew.billLists[0].docType === 'CHL' && ew.billLists[0].totInvValue === 96000, 'job-work return e-way JSON: sub-type 6, CHL, the principal\'s value');
+    await page.goto(srv.origin + '/manufacturing?tab=garments&view=karigars');
+    await page.locator('[data-mfc="kb-karigar"]').selectOption('e2e-g-rehmat', { timeout: 15000 });
+    await page.locator('[data-mfc="kb-load"]').click();
+    check(await page.locator('[data-mfc="kb-pcs-0"]').inputValue() === '30', 'piece bill loads the 30 good pieces from the CMT receipt');
+    const [bank] = await Promise.all([page.waitForEvent('download'), page.locator('[data-mfc="kb-save"]').click()]);
+    const kpb = (await readJson(page, 'purchases', [], (v) => v.some((p) => p.vendor_id === 'e2e-g-rehmat'))).find((p) => p.vendor_id === 'e2e-g-rehmat');
+    check(/^KPB\/FY\d\d-\d\d\/\d+$/.test(kpb?.bill_number ?? '') && kpb.total === 1140 && !(kpb.cgst + kpb.sgst + kpb.igst), `piece bill ${kpb?.bill_number}: 30 × ₹38 = ₹1,140, no GST (unregistered)`);
+    check(/E2E Rehmat Tailors.*1140\.00/.test(readFileSync(await bank.path(), 'utf8')), 'bank upload row for the karigar');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R13-D food & statutory desk: a cost card from the BOM → cost per 200 g pack; an MSE receivable past 45 days with Sec 16 interest; the Form-1 paper lists the supplier; an AA → EO balance and duty at risk; an incentive claim recognised after assurance (journal); the inventories split; absorption OFF by default', async () => {
+    const keys = ['settings', 'stock_items', 'boms', 'cost_cards', 'invoices', 'vendors', 'purchases', 'export_authorisations', 'incentive_claims', 'vouchers', 'accounts'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const s0 = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...s0, business_type: 'manufacturer', modules: undefined, mfg_kind: 'food', industry_packs: ['shopfloor', 'foodmfg'], lock_until: undefined,
+      profiles: (s0.profiles ?? []).map((p) => (p.id === s0.activeProfileId ? { ...p, companyName: 'E2E Namkeen Private Limited', msme_udyam: 'UDYAM-MH-26-0012345', msme_category: 'MICRO', fssai_no: '12345678901234' } : p)) });
+    const day = (n) => { const d = new Date(Date.now() - n * 86400000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const item = (id, name, extra) => ({ id, name, unit: 'KG', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, ...extra });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), item('e2e-d-besan', 'E2E Besan', { opening_qty: 500, opening_rate: 80 }), item('e2e-d-bhujia', 'E2E Bhujia', { shelf_life_days: 90 })]);
+    await writeJson(page, 'boms', [...(prev.boms ?? []), { id: 'e2e-d-bom', item_id: 'e2e-d-bhujia', name: 'Std', batch_qty: 100, is_default: true, components: [{ id: 'c1', item_id: 'e2e-d-besan', qty: 100 }] }]);
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-d-inv', invoice_number: 'E2E/MSE/1', doc_type: 'INVOICE', status: 'Sent', issue_date: day(100), due_date: '', total: 50000, amount_paid: 0, balance_due: 50000, client: { name: 'E2E Modern Trade', gstin: '27AAPFU0939F1ZV' }, items: [] }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-d-mill', name: 'E2E Besan Mill', msme_category: 'MICRO', msme_udyam: 'UDYAM-MH-01-0000001', pan: 'AAAPM1234C' }]);
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []), { id: 'e2e-d-bill', kind: 'PURCHASE', vendor_id: 'e2e-d-mill', vendor_name: 'E2E Besan Mill', bill_number: 'BM/77', date: day(300), lines: [], taxable: 20000, total: 20000, amount_paid: 0 }]);
+    await page.goto(srv.origin + '/manufacturing?tab=food&view=costcards');
+    await page.locator('[data-food-desk]').waitFor({ timeout: 15000 });
+    await page.locator('[data-mfd="card-item"]').selectOption('e2e-d-bhujia');
+    await page.locator('[data-mfd-b="bom"]').click();
+    await page.locator('[data-mfd-b="pack"]').click();
+    await page.locator('[data-mfd="pack-label"]').fill('200 g');
+    await page.locator('[data-mfd="pack-kg"]').fill('0.2');
+    await page.locator('[data-mfd="pack-cost"]').fill('1.6');
+    check((await page.locator('[data-mfd-perpack]').innerText()).trim() === '17.6', 'cost per 200 g pack: 0.2 kg × ₹80 + ₹1.60 packing = ₹17.60');
+    await page.locator('[data-mfd-b="save-card"]').click();
+    await readJson(page, 'cost_cards', [], (v) => v.some((c) => c.item_id === 'e2e-d-bhujia'));
+    check(true, 'cost card version saved');
+    await page.goto(srv.origin + '/manufacturing?tab=statutory&view=msme');
+    await page.locator('[data-statutory-desk]').waitFor({ timeout: 15000 });
+    const buyer = await page.locator('[data-mfd-buyer]').first().innerText();
+    check(/E2E Modern Trade/.test(buyer) && /E2E\/MSE\/1/.test(buyer) && !/interest u\/s 16 ₹\s*0\b/i.test(buyer), 'MSE receivable past the Sec 15 limit with Sec 16 interest');
+    check(await page.locator('[data-mfd="form1-reason"]').count() >= 1 && /E2E Besan Mill/.test(await page.locator('[data-statutory-desk]').innerText()), 'Form-1 paper lists the micro supplier unpaid beyond 45 days');
+    await page.goto(srv.origin + '/manufacturing?tab=statutory&view=authorisations');
+    await page.locator('[data-mfd="aa-number"]').fill('E2E-AA-1', { timeout: 15000 });
+    await page.locator('[data-mfd="aa-duty"]').fill('100000');
+    await page.locator('[data-mfd="aa-exp"]').selectOption('e2e-d-bhujia');
+    await page.locator('[data-mfd="aa-expQty"]').fill('1000');
+    await page.locator('[data-mfd="aa-fob"]').fill('500000');
+    await page.locator('[data-mfd-b="aa-add"]').click();
+    await readJson(page, 'export_authorisations', [], (v) => v.some((a) => a.number === 'E2E-AA-1'));
+    check(/AA E2E-AA-1[\s\S]*1,00,000/.test(await page.locator('[data-statutory-desk]').innerText()), 'AA register: EO balance 0 / 1000, duty at risk ₹1,00,000 (memo)');
+    await page.goto(srv.origin + '/manufacturing?tab=statutory&view=incentives');
+    await page.locator('[data-mfd="inc-name"]').fill('E2E PLI', { timeout: 15000 });
+    await page.locator('[data-mfd="inc-from"]').fill(day(200));
+    await page.locator('[data-mfd="inc-to"]').fill(day(20));
+    await page.locator('[data-mfd="inc-claimed"]').fill('25000');
+    await page.locator('[data-mfd-b="inc-add"]').click();
+    await readJson(page, 'incentive_claims', [], (v) => v.some((c) => c.name === 'E2E PLI'));
+    check(!(await readJson(page, 'vouchers', [])).some((v) => v.voucher_class === 'Government grant'), 'claim lodged: nothing booked before assurance');
+    await page.locator('[data-mfd-b="inc-recognise"]').first().click();
+    const claim = (await readJson(page, 'incentive_claims', [], (v) => v.some((c) => c.name === 'E2E PLI' && c.recognised_on))).find((c) => c.name === 'E2E PLI');
+    check(!!claim?.recognised_on && claim.voucher_ids?.length === 1, 'recognised after reasonable assurance: one grant journal');
+    await page.goto(srv.origin + '/manufacturing?tab=statutory&view=inventories');
+    await page.locator('[data-mfd-inv-total]').waitFor({ timeout: 15000 });
+    check(/Raw materials/.test(await page.locator('[data-statutory-desk]').innerText()), 'inventories split: besan under raw materials');
+    await page.goto(srv.origin + '/manufacturing?tab=floor&view=wip');
+    check(/OFF/.test(await page.locator('[data-mfd-absorb]').innerText({ timeout: 15000 })), 'conversion absorption is off by default (stock values as today)');
+    // QA16: a 375 px pass over the MF-D desks — wide tables scroll inside their own box, never the page.
+    await page.setViewportSize({ width: 375, height: 800 });
+    const wide = [];
+    for (const v of ['food&view=costcards', 'food&view=shelf', 'food&view=schemes', 'statutory&view=msme', 'statutory&view=authorisations', 'statutory&view=incentives', 'statutory&view=inventories', 'floor&view=wip']) {
+      await page.goto(srv.origin + `/manufacturing?tab=${v}`);
+      await page.locator('[data-food-desk], [data-statutory-desk], [data-floor-desk]').first().waitFor({ timeout: 15000 }).catch(() => undefined);
+      await page.waitForTimeout(300);
+      const over = await page.evaluate(() => Math.max(0, ...[document.documentElement, ...document.querySelectorAll('main')].map((e) => e.scrollWidth - e.clientWidth)));
+      if (over > 1) wide.push(`${v} ${over}px`);
+    }
+    check(wide.length === 0, `MF-D desks at 375 px: no horizontal page scroll (${wide.join(', ') || 'none'})`);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R14-A practice desk: Settings → Professional profile → Consulting → practice pack, the Matters and WIP desks; a conflict check finds the party; a capped engagement (₹40,000) on matter RSK/014 with 14.5 h at ₹4,000 → the pre-bill shows ₹58,000 → the draft bills ₹40,000 with a ₹18,000 "Cap" write-down → realisation 68.97%; the draft prints the matter and engagement; Ctrl+K "pre-bill"; help', async () => {
+    const keys = ['settings', 'clients', 'cost_centres', 'engagements', 'conflict_checks', 'time_entries', 'invoices', 'series_counters', 'prof_settings', 'service_staff'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'professional', modules: undefined, industry_packs: undefined, prof_kind: undefined, prof_sub: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-prof-kind-card="consulting"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.prof_kind === 'consulting');
+    check(st.business_type === 'services' && st.service_kind === 'professional' && st.industry_packs?.includes('practice'), `Consulting: services / professional + practice pack (${st.industry_packs})`);
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-ps-c', name: 'E2E Rajesh Sharma & Kumar' }]);
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), { id: 'e2e-ps-m', name: 'E2E Sec 138 NI Act', kind: 'project', client_id: 'e2e-ps-c', active: true, created_at: today, ps: { code: 'RSK/014', kind: 'matter', opened: today, court: 'Saket', parties: [{ name: 'Shree Traders', role: 'opposite' }] } }]);
+    await writeJson(page, 'engagements', [{ id: 'e2e-ps-e', number: 'ENG/FY26-27/0901', client_id: 'e2e-ps-c', matter_ids: ['e2e-ps-m'], title: 'Defence', model: 'capped', cap: 40000, currency: 'INR', disb_policy: 'agent', start: today, status: 'active', created_at: today }]);
+    const te = (id, minutes) => ({ id, client_id: 'e2e-ps-c', client_name: 'E2E Rajesh Sharma & Kumar', description: 'Work', date: today, minutes, hourly_rate: 4000, billable: true, cost_centre_id: 'e2e-ps-m' });
+    await writeJson(page, 'time_entries', [...(prev.time_entries ?? []), te('e2e-ps-t1', 300), te('e2e-ps-t2', 330), te('e2e-ps-t3', 240)]);
+    await page.goto(srv.origin + '/time?tab=matters&view=conflicts');
+    await page.locator('[data-matters-desk]').waitFor({ timeout: 15000 });
+    const tabs = (await page.getByRole('tab').allInnerTexts()).join('|');
+    check(/Matters/.test(tabs) && /WIP/.test(tabs), `Time lists the Matters and WIP desks (${tabs})`);
+    await page.locator('[data-conflict-terms]').fill('M/s Shree Traders Pvt Ltd');
+    await page.locator('[data-conflict-search]').click();
+    check(Number(await page.locator('[data-conflict-hits]').getAttribute('data-conflict-hits', { timeout: 10000 })) >= 1, 'the conflict check finds the matter party');
+    await page.goto(srv.origin + '/time?tab=wip&view=prebill&client=e2e-ps-c&matter=e2e-ps-m');
+    const pre = page.locator('[data-prebill-preview]');
+    await pre.waitFor({ timeout: 15000 });
+    check(/Capped at/.test(await pre.innerText()) && /58,000/.test(await pre.innerText()), `the pre-bill shows ₹58,000 of time against the cap (${await pre.innerText()})`);
+    await page.locator('[data-prebill-create]').click();
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.ps?.engagement?.id === 'e2e-ps-e'))).find((i) => i.ps?.engagement?.id === 'e2e-ps-e');
+    check(inv?.taxable_value === 40000 && inv.ps.wd?.standard === 58000 && inv.ps.wd.reasons[0]?.reason === 'Cap' && inv.ps.wd.reasons[0]?.amount === -18000, `the draft bills ₹40,000 with an ₹18,000 "Cap" write-down (${JSON.stringify(inv?.ps?.wd)})`);
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await footerLaidOut(page, 'Trips → Bill (R15-B)');
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Document preview' });
+    await dlg.waitFor();
+    await dlg.locator('[data-prof-block]').first().waitFor({ timeout: 15000 });
+    const paper = await dlg.innerText();
+    check(/RSK\/014/.test(paper) && /ENG\/FY26-27\/0901/.test(paper) && !/Write-up|58,000/.test(paper), 'the draft prints the matter and the engagement (never the write-down)');
+    await page.keyboard.press('Escape');
+    await dlg.waitFor({ state: 'detached' });
+    await page.goto(srv.origin + '/time?tab=wip&view=realisation');
+    const real = page.locator('[data-realisation]');
+    await real.waitFor({ timeout: 15000 });
+    check(/68\.97%/.test(await real.innerText()), 'realisation: billed ÷ standard 68.97%');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('pre-bill');
+    await palette.getByRole('option', { name: /Pre-bill/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "pre-bill" finds Time → WIP & billing → Pre-bill');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/time?tab=wip&view=wip');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="time:wip"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a WIP topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R14-B legal desk: a law firm (legal pack) with a client-money account; receipt ₹50,000 → stamp duty ₹12,000 paid on the client\'s behalf → ₹20,000 moved to fees against the fee memo with the client\'s e-mail authority → held ₹18,000; the office receipt settles the memo; the three-way reconciliation agrees at ₹18,000; the statement closes at ₹18,000; Ctrl+K "client money"; help', async () => {
+    const keys = ['settings', 'clients', 'bank_accounts', 'invoices', 'transactions', 'client_money', 'vouchers', 'accounts', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'professional', modules: undefined, prof_kind: 'legal', industry_packs: ['practice', 'legal'], lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-lg-c', name: 'E2E Bharat Traders (legal)', gstin: '27AAPFU0939F1ZV', state_code: '27' }]);
+    await writeJson(page, 'bank_accounts', [...(prev.bank_accounts ?? []), { id: 'e2e-lg-cm', name: 'E2E Client account', active: true, client_money: true }]);
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-lg-inv', invoice_number: 'E2E/LG/1', doc_type: 'INVOICE', status: 'Sent', issue_date: today, due_date: today, client: { id: 'e2e-lg-c', name: 'E2E Bharat Traders (legal)' }, items: [{ id: 'l1', name: 'Professional fees', quantity: 1, rate: 20000, tax_rate: 0, amount: 20000 }], subtotal: 20000, taxable_value: 20000, tax_amount: 0, total: 20000, amount_paid: 0, balance_due: 20000, gst_mode: 'NONE' }]);
+    await page.goto(srv.origin + '/time?tab=clientmoney&view=ledger');
+    await page.locator('[data-ps-desk="clientmoney"]').waitFor({ timeout: 15000 });
+    const tabs = (await page.getByRole('tab').allInnerTexts()).join('|');
+    check(/Client money/.test(tabs), `Time lists the Client money desk (${tabs})`);
+    const rec = async (kind, amount, more) => {
+      await page.locator('[data-cm="kind"]').selectOption(kind);
+      await page.locator('[data-cm="client"]').selectOption('e2e-lg-c');
+      if (more) await more();
+      await page.locator('[data-cm="amount"]').fill(String(amount));
+      await page.locator('[data-cm-b="record"]').click();
+      await readJson(page, 'client_money', [], (v) => v.some((r) => r.kind === kind && r.amount === amount));
+    };
+    await rec('receipt', 50000);
+    await rec('payment', 12000);
+    await rec('to_fees', 20000, async () => {
+      await page.locator('[data-cm="invoice"]').selectOption('e2e-lg-inv');
+      await page.locator('[data-cm="auth"]').selectOption('email');
+      await page.locator('[data-cm="auth-ref"]').fill('Mail of today');
+    });
+    check(/18,000/.test(await page.locator('[data-cm-total]').innerText()), 'held for the client: ₹18,000');
+    const pays = await readJson(page, 'transactions', [], (v) => v.some((p) => p.invoice_id === 'e2e-lg-inv'));
+    check(pays.filter((p) => p.invoice_id === 'e2e-lg-inv').length === 1 && (await readJson(page, 'invoices', [])).find((i) => i.id === 'e2e-lg-inv')?.balance_due === 0, 'one office receipt settles the fee memo');
+    await page.goto(srv.origin + '/time?tab=clientmoney&view=reconcile');
+    await page.locator('[data-cm="stmt"]').fill('18000', { timeout: 15000 });
+    check((await page.locator('[data-cm-agreed]').getAttribute('data-cm-agreed')) === 'yes', 'three-way reconciliation: bank, ledger and clients agree at ₹18,000');
+    await page.goto(srv.origin + '/time?tab=clientmoney&view=statements');
+    await page.locator('[data-cm="st-client"]').selectOption('e2e-lg-c', { timeout: 15000 });
+    await page.locator('[data-cm="st-from"]').fill(`${today.slice(0, 8)}01`);
+    check((await page.locator('[data-cm-closing]').getAttribute('data-cm-closing')) === '18000', 'the client statement closes at ₹18,000');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('client money');
+    await palette.getByRole('option', { name: /Client money/i }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "client money" finds the desk');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/time?tab=clientmoney&view=reconcile');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="time:clientmoney"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a client-money topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R14-D firm desk: three partners 40 / 30 / 30 → the year-end run (Sec 40(b) allowable, journals balance); a 194T credit in the TDS register; a 194J client default; the presumptive paper; CA desk: a linked company\'s filed GSTR-3B → Bill from the board → a draft with the fee; cancelling it frees the work; Ctrl+K "UDIN"; help', async () => {
+    const keys = ['settings', 'clients', 'items_catalog', 'partners', 'partner_runs', 'vouchers', 'accounts', 'tds_deductions', 'invoices', 'compliance', 'prof_settings', 'udin_register', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const fy = d.getMonth() + 1 >= 4 ? d.getFullYear() : d.getFullYear() - 1;
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'professional', modules: undefined, prof_kind: 'ca', industry_packs: ['practice', 'partners', 'cafirm'], lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-psd-c', name: 'E2E Vertex Pvt Ltd' }]);
+    await writeJson(page, 'items_catalog', [...(prev.items_catalog ?? []), { id: 'e2e-psd-i', name: 'E2E GSTR-3B filing', hsn: '998231', rate: 1500, tax_rate: 18, quantity: 1, amount: 1500 }]);
+    await page.goto(srv.origin + '/time?tab=firm&view=partners');
+    await page.locator('[data-firm-desk]').waitFor({ timeout: 15000 });
+    const tabs = (await page.getByRole('tab').allInnerTexts()).join('|');
+    check(/Firm/.test(tabs) && /CA desk/.test(tabs), `Time lists the Firm and CA desks (${tabs})`);
+    for (const [name, pan, share] of [['E2E Asha', 'AAAPA1234A', '40'], ['E2E Bala', 'AAAPB1234B', '30'], ['E2E Chitra', 'AAAPC1234C', '30']]) {
+      await page.locator('[data-ps="p-name"]').fill(name);
+      await page.locator('[data-ps="p-pan"]').fill(pan);
+      await page.locator('[data-ps="p-joined"]').fill(`${fy - 1}-04-01`);
+      await page.locator('[data-ps="p-share"]').fill(share);
+      await page.locator('[data-ps-b="p-add"]').click();
+      await readJson(page, 'partners', [], (v) => v.some((p) => p.name === name));
+    }
+    check((await page.locator('[data-ps-shares]').count()) === 0, 'shares total 100 %');
+    await page.goto(srv.origin + '/time?tab=firm&view=appropriation');
+    await page.locator('[data-ps-b="a-compute"]').click({ timeout: 15000 });
+    check(/Allowable remuneration/.test(await page.locator('[data-firm-desk]').innerText()), 'the run shows the Sec 40(b) allowable remuneration');
+    await page.locator('[data-ps-b="a-post"]').click();
+    const run = (await readJson(page, 'partner_runs', [], (v) => v.some((r) => r.kind === 'year_end'))).find((r) => r.kind === 'year_end');
+    const vs = (await readJson(page, 'vouchers', [])).filter((v) => run?.voucher_ids?.includes(v.id));
+    check(vs.length >= 1 && vs.every((v) => v.lines.reduce((s, l) => s + l.dr - l.cr, 0) === 0), `year-end run posted with balanced journals (${vs.length})`);
+    await page.goto(srv.origin + '/time?tab=firm&view=tds194t');
+    await page.locator('[data-ps="t-partner"]').selectOption({ label: 'E2E Asha' }, { timeout: 15000 });
+    await page.locator('[data-ps="t-amount"]').fill('25000');
+    await page.locator('[data-ps="t-date"]').fill(today);
+    await page.locator('[data-ps-b="t-credit"]').click();
+    const t194 = (await readJson(page, 'tds_deductions', [], (v) => v.some((r) => r.section === '194T' && r.date === today))).find((r) => r.section === '194T' && r.date === today);
+    check(t194?.amount === 2500, `194T on the crossing credit in the TDS register (${t194?.amount})`);
+    await page.goto(srv.origin + '/time?tab=firm&view=tds194j');
+    await page.locator('[data-ps-row]').filter({ hasText: 'E2E Vertex Pvt Ltd' }).locator('[data-ps="j-section"]').selectOption('194J', { timeout: 15000 });
+    check((await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-psd-c' && c.ps?.tds?.section === '194J'))).length > 0, 'the client\'s 194J default is saved');
+    await page.locator('[data-ps-chase]').waitFor();
+    await page.goto(srv.origin + '/time?tab=firm&view=presumptive');
+    check(/Limit that applies/.test(await page.locator('[data-firm-desk]').innerText({ timeout: 15000 })) && (await page.locator('[data-ps-elig]').count()) === 1, 'the presumptive paper shows the limit and the eligibility ticks');
+    // CA desk
+    await writeJson(page, 'compliance', [...(prev.compliance ?? []), { id: `GSTR3B:${today.slice(0, 7)}:`, form: 'GSTR3B', period_key: today.slice(0, 7), gstin: '', filed_on: today, marked_at: `${today}T10:00:00.000Z` }]);
+    await page.goto(srv.origin + '/time?tab=cadesk&view=fees');
+    await page.locator('[data-ca-desk]').waitFor({ timeout: 15000 });
+    await page.locator('[data-ps="fee-item-gstr3b"]').selectOption('e2e-psd-i');
+    await page.locator('[data-ps="link-client"]').first().selectOption('e2e-psd-c');
+    await readJson(page, 'prof_settings', {}, (v) => (v.ca?.company_clients ?? []).some((l) => l.client_id === 'e2e-psd-c'));
+    await page.goto(srv.origin + '/time?tab=cadesk&view=events');
+    const block = page.locator('[data-ps-client="e2e-psd-c"]');
+    await block.waitFor({ timeout: 15000 });
+    await block.locator('[data-ps-b="ca-bill"]').click();
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.items?.some((it) => (it.bill_refs ?? []).some((r) => r.startsWith('ca:e2e-psd-c:gstr3b')))))).find((i) => i.items?.some((it) => (it.bill_refs ?? []).some((r) => r.startsWith('ca:e2e-psd-c:gstr3b'))));
+    check(inv?.status === 'Draft' && inv.items.some((it) => it.rate === 1500), 'Bill from the board: a draft fee note with the GSTR-3B fee');
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).map((i) => (i.id === inv?.id ? { ...i, status: 'Cancelled' } : i)));
+    await page.goto(srv.origin + '/time?tab=cadesk&view=udin');
+    await page.goto(srv.origin + '/time?tab=cadesk&view=events');
+    await block.waitFor({ timeout: 15000 });
+    check(!/Billed/.test(await block.innerText()), 'cancelling the draft frees the work');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('UDIN');
+    await palette.getByRole('option', { name: /UDIN register/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "UDIN" finds Time → CA desk → UDIN register');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/time?tab=firm&view=partners');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="time:firm"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a Firm topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R14-C export desk: a USD invoice under LUT to a US client → export check 4 / 5 (payment pending); a platform receipt with a fee → 5 / 5, a fee bill under import RCM; "Prepare EDF" for October → due 30 Nov; realisation 9 months from the invoice date, 15 for a 15 Sep 2026 invoice', async () => {
+    const keys = ['settings', 'clients', 'invoices', 'transactions', 'purchases', 'purchase_payments', 'edf_register', 'prof_settings'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const s0 = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...s0, business_type: 'services', modules: undefined, service_kind: 'professional', prof_kind: 'consulting', industry_packs: ['practice', 'svcexport'], lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-c-us', name: 'E2E Acme Inc', address: 'San Francisco', state_code: '96', ps: { country: 'US' } }]);
+    const line = { id: 'l1', name: 'Software development', type: 'Service', hsn: '998314', unit: 'HRS', quantity: 40, rate: 55, tax_rate: 0, amount: 2200 };
+    const inv = (id, number, date) => ({ id, invoice_number: number, doc_type: 'INVOICE', status: 'Sent', supply_type: 'EXPORT_LUT', place_of_supply: '96', currency: 'USD', exchange_rate: 84, issue_date: date, due_date: date, sender: { ...((s0.profiles ?? []).find((p) => p.id === s0.activeProfileId) ?? {}), stateCode: '27' }, subtotal: 2200, taxable_value: 2200, total: 2200, amount_paid: 0, balance_due: 2200, client: { id: 'e2e-c-us', name: 'E2E Acme Inc', state_code: '96' }, items: [line] });
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv('e2e-c-oct', 'E2E/EXP/1', '2026-10-15'), inv('e2e-c-sep', 'E2E/EXP/0', '2026-05-15')]);
+    await writeJson(page, 'prof_settings', { platforms: [{ name: 'E2E Payoneer', kind: 'payoneer', non_resident: true }] });
+    await page.goto(srv.origin + '/time?tab=exportsvc&view=checker');
+    await page.locator('[data-ps-desk="checker"]').waitFor({ timeout: 15000 });
+    const row = page.locator('[data-ps-check]', { hasText: 'E2E/EXP/1' }).first();
+    check(/4 \/ 5/.test(await row.innerText()), 'export check 4 / 5 while the payment is pending');
+    await page.goto(srv.origin + '/time?tab=exportsvc&view=platforms');
+    await page.locator('[data-ps-plat-open]', { hasText: 'E2E/EXP/1' }).locator('[data-ps-via-platform]').click({ timeout: 15000 });
+    await page.locator('[data-ps-plat-gross]').fill('2200');
+    await page.locator('[data-ps-plat-fee]').fill('55');
+    await page.locator('[data-ps-plat-inr]').fill('182325');
+    await page.locator('[data-ps-plat-save]').click();
+    const pays = await readJson(page, 'transactions', [], (v) => v.some((p) => p.invoice_id === 'e2e-c-oct'));
+    check(pays.some((p) => p.invoice_id === 'e2e-c-oct' && p.amount === 2200 && p.realised_rate === 85), 'gross USD 2,200 received at the realised ₹85');
+    const bills = await readJson(page, 'purchases', [], (v) => v.some((b) => b.vendor_name === 'E2E Payoneer'));
+    check(bills.some((b) => b.vendor_name === 'E2E Payoneer' && b.import_type === 'SERVICES' && b.taxable === 4675), 'fee bill ₹4,675 under import-of-services RCM');
+    await page.goto(srv.origin + '/time?tab=exportsvc&view=checker');
+    check(/5 \/ 5/.test(await page.locator('[data-ps-check]', { hasText: 'E2E/EXP/1' }).first().innerText({ timeout: 15000 })), 'export check 5 / 5 after the receipt');
+    await page.goto(srv.origin + '/time?tab=exportsvc&view=edf');
+    await page.locator('[data-ps-edf-month]').fill('2026-10', { timeout: 15000 });
+    check(await page.locator('[data-ps-edf-due="2026-11-30"]').count() >= 1, 'EDF for October due 30 Nov 2026');
+    await page.locator('[data-ps-edf-save]').click();
+    await readJson(page, 'edf_register', [], (v) => v.some((r) => r.period === '2026-10' && r.due === '2026-11-30'));
+    await page.goto(srv.origin + '/time?tab=exportsvc&view=realisation');
+    await page.locator('[data-ps-desk="realisation"]').waitFor({ timeout: 15000 });
+    check(await page.locator('[data-ps-real-due="2027-07-15"]').count() === 1, 'realisation due 9 months from the invoice date (15 Jul 2027)');
+    check(await page.locator('[data-ps-real-due="2027-08-15"]').count() === 1, 'an invoice of 15 May 2026 keeps 15 months (QA17 R9: 9 from 5 Jun 2026)');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R16-B Round 14 engines: a ₹2,500 court fee aged 70 days sits in 61–90 → Write off → gone; Reverse → back; the pre-bill bills two media insertions as pure agent + 15 % fee and five appearances as one line 5 × ₹15,000; a conflict check is deleted', async () => {
+    const keys = ['settings', 'clients', 'purchases', 'time_entries', 'work_types', 'invoices', 'series_counters', 'conflict_checks', 'recycle_bin'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const day = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'professional', modules: undefined, prof_kind: 'legal', industry_packs: ['practice', 'legal', 'media'], lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-16-c', name: 'E2E Kapoor Advertising Client' }]);
+    const exp = (id, date, total, ps, extra = {}) => ({ id, kind: 'EXPENSE', vendor_name: 'E2E Vendor', bill_number: id.toUpperCase(), date, category: 'Other', taxable: total, cgst: 0, sgst: 0, igst: 0, total, itc_eligible: false, amount_paid: total, ps, ...extra });
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []),
+      exp('e2e-16-d', day(70), 2500, { disb: 'court_fee', on_behalf: true }, { billable_to_client_id: 'e2e-16-c', pure_agent: true }),
+      exp('e2e-16-m1', day(5), 50000, { media: { client_id: 'e2e-16-c', medium: 'print', mode: 'agent', ro: 'RO-1', publication: 'E2E Daily' } }),
+      exp('e2e-16-m2', day(4), 30000, { media: { client_id: 'e2e-16-c', medium: 'print', mode: 'agent', ro: 'RO-2', publication: 'E2E Daily' } })]);
+    await writeJson(page, 'work_types', [...(prev.work_types ?? []), { id: 'e2e-16-w', name: 'E2E Appearance', rate: 15000, ps: { unit: 'appearance' } }]);
+    await writeJson(page, 'time_entries', [...(prev.time_entries ?? []), ...[1, 2, 3, 4, 5].map((k) => ({ id: `e2e-16-t${k}`, client_id: 'e2e-16-c', client_name: 'E2E Kapoor Advertising Client', description: '', date: day(k), minutes: 60, hourly_rate: 4000, billable: true, work_type_id: 'e2e-16-w' }))]);
+    await writeJson(page, 'conflict_checks', [...(prev.conflict_checks ?? []), { id: 'e2e-16-cc', date: day(1), terms: ['E2E Delete Me Ltd'], hits: [], result: 'clear', created_at: day(1) }]);
+    await page.goto(srv.origin + '/time?tab=wip&view=disb');
+    const row = page.locator('[data-disb-row="e2e-16-d"]');
+    await row.waitFor({ timeout: 15000 });
+    check(/2,500/.test(await page.locator('[data-disb-bucket="2"]').innerText()), `₹2,500 aged 70 days in 61–90 (${await page.locator('[data-disb-bucket="2"]').innerText()})`);
+    await page.locator('[data-disb-reason]').fill('Client absconded');
+    await row.locator('[data-disb-wo]').click();
+    await row.waitFor({ state: 'detached', timeout: 10000 });
+    check(await page.locator('[data-disb-off]').innerText().then((t) => /Client absconded/.test(t)), 'written off: gone from the list, in "Written off"');
+    await page.locator('[data-disb-rev]').first().click();
+    await row.waitFor({ timeout: 10000 });
+    // The pre-bill below is a fresh page load: wait until the reversal has reached IndexedDB first.
+    const unstamped = (v) => v.some((p) => p.id === 'e2e-16-d' && !p.ps?.wo);
+    check(unstamped(await readJson(page, 'purchases', [], unstamped, 15000)), 'Reverse brings it back (stored)');
+    await page.goto(srv.origin + '/time?tab=wip&view=prebill&client=e2e-16-c');
+    await page.locator('[data-prebill-media]').waitFor({ timeout: 15000 });
+    check(await page.locator('[data-prebill-media-row]').count() === 2, 'two media insertions on the pre-bill');
+    await page.locator('[data-prebill-media-fee]').fill('15');
+    await page.locator('[data-prebill-appear]').check();
+    await page.locator('[data-prebill-create]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.client?.id === 'e2e-16-c'))).find((i) => i.client?.id === 'e2e-16-c');
+    const agent = (inv?.items ?? []).filter((i) => i.charge_head_id === 'rule33').map((i) => i.rate).sort((a, b) => a - b);
+    const fees = (inv?.items ?? []).filter((i) => /^Agency service fee/.test(i.name)).map((i) => i.rate).sort((a, b) => a - b);
+    const app = (inv?.items ?? []).find((i) => i.name === 'E2E Appearance');
+    check(agent.join() === '2500,30000,50000' && fees.join() === '4500,7500' && inv.ps?.media?.rows?.length === 2, `media as pure agent + 15 % fee, the court fee as pure agent (${agent} / ${fees})`);
+    check(app?.quantity === 5 && app.rate === 15000 && app.bill_refs?.length === 5, `five appearances → one line 5 × ₹15,000 (${app?.quantity} × ${app?.rate})`);
+    await page.goto(srv.origin + '/time?tab=matters&view=conflicts');
+    const cc = page.locator('[data-conflict-checks] tr', { hasText: 'E2E Delete Me Ltd' });
+    await cc.waitFor({ timeout: 15000 });
+    page.once('dialog', (d) => d.accept());
+    await cc.locator('[data-conflict-del]').click();
+    await cc.waitFor({ state: 'detached', timeout: 10000 });
+    const bin = await readJson(page, 'recycle_bin', [], (v) => v.some((r) => r.row_id === 'e2e-16-cc'));
+    check(bin.some((r) => r.table === 'conflict_checks' && r.row_id === 'e2e-16-cc'), 'the conflict check is deleted into the recycle bin');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R15-A netting: a party who is both client and vendor (receivable ₹65,000, payable ₹1,80,000) → Netting ₹65,000 settles both invoices and reduces the bill, no cash receipt, one audit line; Reverse opens both again; Ctrl+K "Netting"', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'invoices', 'transactions', 'purchases'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const s0 = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...s0, lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-net-c', name: 'E2E Consolidator', state_code: '27' }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-net-v', name: 'E2E Consolidator' }]);
+    const sender = { ...((s0.profiles ?? []).find((p) => p.id === s0.activeProfileId) ?? {}), stateCode: '27' };
+    const inv = (id, number, amt, date) => ({ id, invoice_number: number, doc_type: 'INVOICE', status: 'Sent', place_of_supply: '27', currency: 'INR', issue_date: date, due_date: date, sender, gst_mode: 'NONE', subtotal: amt, taxable_value: amt, total: amt, amount_paid: 0, balance_due: amt, client: { id: 'e2e-net-c', name: 'E2E Consolidator', state_code: '27' }, items: [{ id: 'l1', name: 'Tour package', type: 'Service', hsn: '998555', unit: 'NOS', quantity: 1, rate: amt, tax_rate: 0, amount: amt }] });
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv('e2e-net-1', 'E2E/NET/1', 40000, '2026-09-01'), inv('e2e-net-2', 'E2E/NET/2', 25000, '2026-09-05')]);
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []), { id: 'e2e-net-b', kind: 'PURCHASE', vendor_id: 'e2e-net-v', vendor_name: 'E2E Consolidator', bill_number: 'CON/77', date: '2026-09-10', category: 'Purchases', lines: [{ id: 'l1', name: 'Air tickets', quantity: 1, rate: 180000, tax_rate: 0 }], taxable: 180000, cgst: 0, sgst: 0, igst: 0, itc_eligible: false, total: 180000, amount_paid: 0 }]);
+    const auditBefore = (await readJson(page, 'audit_log', [])).length;
+    await page.goto(srv.origin + '/receivables?tab=aging');
+    await page.locator('[data-netting-open]').first().waitFor({ timeout: 15000 });
+    check(await page.locator('[data-netting-open][aria-label*="E2E Consolidator"]').count() === 1, 'the party row offers Netting');
+    await page.locator('[data-netting-open][aria-label*="E2E Consolidator"]').click();
+    const dlg = page.locator('[data-netting-dialog]');
+    await dlg.waitFor({ timeout: 15000 });
+    for (const n of ['E2E/NET/1', 'E2E/NET/2']) await dlg.locator('[data-netting-side="in"] label', { hasText: n }).locator('input').check();
+    await dlg.locator('[data-netting-side="out"] label', { hasText: 'CON/77' }).locator('input').check();
+    check((await dlg.locator('[data-netting-amount]').getAttribute('placeholder')) === '65000', 'the amount defaults to min(receivable, payable) = ₹65,000');
+    await page.locator('[data-netting-post]').click();
+    const pays = await readJson(page, 'transactions', [], (v) => v.filter((p) => p.method === 'netting').length === 2);
+    const nets = pays.filter((p) => p.method === 'netting');
+    check(nets.length === 2 && nets.every((p) => p.exchange_purchase_id === 'e2e-net-b'), 'two netting receipts on the existing exchange marker');
+    check(!pays.some((p) => p.method !== 'netting' && ['e2e-net-1', 'e2e-net-2'].includes(p.invoice_id)), 'no cash / bank receipt');
+    const bills = await readJson(page, 'purchases', [], (v) => v.some((b) => b.id === 'e2e-net-b' && b.amount_paid === 65000));
+    check(bills.some((b) => b.id === 'e2e-net-b' && b.amount_paid === 65000 && b.exchange_paid === 65000), 'the bill is reduced by ₹65,000 (₹1,15,000 left)');
+    const invs = await readJson(page, 'invoices', [], (v) => v.filter((i) => i.id.startsWith('e2e-net-') && i.status === 'Paid').length === 2);
+    check(invs.filter((i) => i.id.startsWith('e2e-net-') && i.status === 'Paid').length === 2, 'both invoices settled');
+    const log = await readJson(page, 'audit_log', [], (v) => v.some((e) => /^Netting 65000\.00/.test(e.summary ?? '')));
+    check(log.filter((e) => /^Netting 65000\.00/.test(e.summary ?? '')).length === 1 && log.length > auditBefore, 'one netting line in the edit log (appends written in one batch)');
+    await dlg.locator('[data-netting-reverse]').first().click();
+    await readJson(page, 'transactions', [], (v) => !v.some((p) => p.method === 'netting' && p.invoice_id?.startsWith('e2e-net-')));
+    const back = await readJson(page, 'purchases', [], (v) => v.some((b) => b.id === 'e2e-net-b' && b.amount_paid === 0));
+    check(back.some((b) => b.id === 'e2e-net-b' && b.amount_paid === 0), 'Reverse opens the bill again');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('Netting');
+    await palette.getByRole('option', { name: /Netting/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "Netting" finds it');
+    await page.keyboard.press('Escape');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R15-B travel core: Settings → Travel profile → Tour operator (travel pack, regime 5 %); the Trips desk; trip "Goa — Mehta family", 4 pax, a hotel (₹42,000) and a cab → sell ₹60,000, margin 20%; Bill → one package line at 5 % with the declaration on the paper; the hotel\'s bill tagged to the trip → ITC unticked; Ctrl+K "trips"; help', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'cost_centres', 'travel_bookings', 'travel_settings', 'invoices', 'purchases', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: undefined, modules: undefined, industry_packs: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'travel_settings', null);
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-tv-c', name: 'E2E Mehta family', state_code: '27' }]);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-travel-kind-card="tour_operator"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.travel_kind === 'tour_operator');
+    check(st.business_type === 'services' && st.service_kind === 'travel' && st.industry_packs?.includes('travel') && st.modules?.includes('time'), `Tour operator: services / travel + travel pack (${st.industry_packs})`);
+    const ts = await readJson(page, 'travel_settings', {}, (v) => v?.regime_default === 'to5');
+    check(ts?.regime_default === 'to5' && ts.switches?.itc_block === true, 'the profile sets the 5 % regime default and the ITC block');
+    await page.goto(srv.origin + '/time?tab=trips&view=trips');
+    await page.locator('[data-trips-desk]').waitFor({ timeout: 15000 });
+    check(/Trips/.test((await page.getByRole('tab').allInnerTexts()).join('|')), 'Time lists the Trips desk');
+    await page.locator('[data-tv-new-trip] summary').click();
+    await page.locator('[data-tv-trip-name]').fill('E2E Goa — Mehta family');
+    await page.locator('[data-tv-trip-client]').selectOption('e2e-tv-c');
+    await page.locator('[data-tv-trip-dest]').fill('Goa');
+    await page.locator('[data-tv-trip-pax]').fill('Ravi, Asha, Kabir, Mira');
+    check(await page.locator('[data-tv-trip-regime]').inputValue() === 'to5', 'a new trip takes the 5 % regime default');
+    await page.locator('[data-tv-trip-save]').click();
+    const cc = (await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.name === 'E2E Goa — Mehta family'))).find((c) => c.name === 'E2E Goa — Mehta family');
+    check(cc?.kind === 'project' && cc.tv?.pax?.length === 4 && cc.tv.regime === 'to5' && /^\d{4}-\d{3}$/.test(cc.tv.code), `the trip is a project cost centre with 4 pax (${cc?.tv?.code})`);
+    const file = page.locator(`[data-tv-file="${cc.tv.code}"]`);
+    await file.waitFor({ timeout: 15000 });
+    const add = async (comp, cost, sell) => {
+      await file.locator('[data-tv-b-comp]').selectOption(comp);
+      await file.locator('[data-tv-b-cost]').fill(String(cost));
+      await file.locator('[data-tv-b-sell]').fill(String(sell));
+      await file.locator('[data-tv-b-add]').click();
+    };
+    await add('hotel', 42000, 50000);
+    await readJson(page, 'travel_bookings', [], (v) => v.length === 1);
+    await add('transfer', 6000, 10000);
+    await readJson(page, 'travel_bookings', [], (v) => v.length === 2);
+    await file.locator('[data-tv-file-margin]').filter({ hasText: '20.0%' }).waitFor({ timeout: 15000 });
+    check(/12,000/.test(await file.locator('[data-tv-file-margin]').innerText()), 'the file shows sell ₹60,000 vs cost ₹48,000: margin ₹12,000, 20.0%');
+    check(await file.locator('[data-tv-itc-note]').count() === 1, 'the 5 % trip notes that input ITC is blocked');
+    await page.locator(`[data-tv-bill="${cc.tv.code}"]`).click();
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.tv?.trip?.id === cc.id))).find((i) => i.tv?.trip?.id === cc.id);
+    check(inv?.status === 'Draft' && inv.items.length === 1 && inv.items[0].rate === 60000 && inv.items[0].tax_rate === 5 && inv.items[0].hsn === '998555' && inv.cost_centre_id === cc.id, 'Bill → a draft with one gross package line at 5 % (SAC 998555) on the trip');
+    check(/without ITC/.test(inv?.tv?.decl ?? ''), 'the declaration is snapshotted on the draft');
+    const bk = await readJson(page, 'travel_bookings', []);
+    check(bk.every((b) => b.line_ref?.invoice_id === inv.id), 'both bookings point at the package line (billed)');
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Document preview' });
+    await dlg.waitFor();
+    await dlg.locator('[data-travel-block]').waitFor({ timeout: 15000 });
+    const paper = await dlg.locator('[data-travel-block]').innerText();
+    check(paper.includes(cc.tv.code) && /Goa/.test(paper) && /Ravi/.test(paper) && /without ITC/.test(paper), 'the paper prints the trip, lead passenger and the 5 % declaration');
+    await page.keyboard.press('Escape');
+    await dlg.waitFor({ state: 'detached' });
+    // The hotel's bill tagged to the trip: ITC prefilled "not eligible".
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Add bill/ }).click();
+    const bd = page.getByRole('dialog', { name: 'Add purchase bill' });
+    await bd.getByRole('button', { name: /New vendor/ }).click();
+    await bd.locator('#bill-vendor-vname').fill('E2E Sea View Resort');
+    await bd.getByRole('button', { name: 'Save vendor' }).click();
+    await bd.locator('#bill-no').fill('SVR/9');
+    await bd.getByLabel('Line 1 item').fill('Rooms, 5 nights');
+    await bd.getByLabel('Line 1 rate').fill('42000');
+    const itcBox = bd.getByLabel('Claim input tax credit on this bill');
+    await itcBox.check();
+    await bd.locator('[data-tv-bill-trip]').selectOption(cc.id);
+    await bd.locator('[data-tv-itc-blocked]').waitFor({ timeout: 15000 });
+    check(!(await itcBox.isChecked()), 'tagging the bill to the 5 % trip unticks ITC');
+    await bd.getByRole('button', { name: 'Save bill' }).click();
+    await bd.waitFor({ state: 'detached' });
+    const bill = (await readJson(page, 'purchases', [], (v) => v.some((p) => p.bill_number === 'SVR/9'))).find((p) => p.bill_number === 'SVR/9');
+    check(bill?.itc_eligible === false && bill.tv?.trip_id === cc.id && bill.tv.regime === 'to5', 'the bill is saved with ITC not eligible and the trip tag');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('trip and event files');
+    await palette.getByRole('option', { name: /Trip and event files/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K finds Time → Trips');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/time?tab=trips&view=bookings');
+    await page.locator('[data-tv-bookings]').waitFor({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="time:trips"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a Trips topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R15-C air tickets and supplier settlement: agent profile; Ticket on an air booking — two economy tickets (basic ₹4,200 each) + ₹600 fee, deemed → service ₹420, GST ₹75.60, fares as pure-agent lines; a 4-row BSP file → 2 matched, 1 ADM ₹3,500, 1 refund to pass on → Make bill; cancel the ticket (airline keeps ₹3,000, our fee ₹500) → credit note + fee at 18 %, trip loss', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'cost_centres', 'travel_bookings', 'travel_settings', 'supplier_statements', 'invoices', 'purchases', 'purchase_returns', 'doc_links', 'import_runs', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const at = new Date().toISOString();
+    const day = at.slice(0, 10);
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'travel', travel_kind: 'agent', modules: undefined, industry_packs: ['travel'], prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'travel_settings', { regime_default: 'agent', air_value: 'deemed' });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-c15-c', name: 'E2E C15 Shah', state_code: '27' }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-c15-bsp', name: 'E2E IATA BSP India' }]);
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), { id: 'e2e-c15-trip', name: 'E2E Mumbai — Shah', kind: 'project', client_id: 'e2e-c15-c', active: true, status: 'active', start: day, created_at: at, tv: { code: 'C15-001', kind: 'trip', scope: 'domestic', start: day, regime: 'agent', status: 'confirmed', pax: [{ name: 'Shah', type: 'adult' }] } }]);
+    await writeJson(page, 'travel_bookings', [...(prev.travel_bookings ?? []), { id: 'e2e-c15-air', trip_id: 'e2e-c15-trip', component: 'air', vendor_id: 'e2e-c15-bsp', ref: 'PNRC15', start: day, cost: 10700, sell: 10700, status: 'confirmed', created_at: at }]);
+    await page.goto(srv.origin + '/time?tab=trips&view=bookings');
+    await page.locator('[data-tv-ticket="e2e-c15-air"]').click({ timeout: 15000 });
+    const tk = page.locator('[data-tv-tickets]');
+    await tk.getByRole('button', { name: 'Add ticket' }).click();
+    for (const [i, no] of [[0, '0581234567890'], [1, '0581234567891']]) {
+      await tk.locator('[data-tv-tkt="ticket_no"]').nth(i).fill(no);
+      await tk.locator('[data-tv-tkt="sector"]').nth(i).fill('DEL-BOM');
+      await tk.locator('[data-tv-tkt="basic"]').nth(i).fill('4200');
+      await tk.locator('[data-tv-tkt="taxes"]').nth(i).fill('940');
+      await tk.locator('[data-tv-tkt="airline_gst"]').nth(i).fill('210');
+    }
+    await tk.locator('[data-tv-tkt-fee]').fill('600');
+    check(/420\.00/.test(await tk.locator('[data-tv-tkt-value]').innerText()), 'deemed value 5 % of ₹8,400 = ₹420 shown');
+    check(await tk.locator('[data-tv-fee-high]').count() === 1, 'a fee above the deemed value warns (TV11)');
+    await tk.locator('[data-tv-tkt-add]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    await footerLaidOut(page, 'Ticket → draft (R15-C)');
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.tv?.air))).find((i) => i.tv?.air);
+    const svc = inv?.items.find((l) => l.id === inv.tv.air.line_id);
+    check(svc?.rate === 420 && svc.tax_rate === 18 && svc.hsn === '998551' && inv.tax_amount === 75.6, `service line ₹420 at 18 % (SAC 998551), GST ₹75.60 (${inv?.tax_amount})`);
+    check(inv.items.filter((l) => l.charge_head_id === 'rule33' && l.tax_rate === 0 && l.rate === 5350).length === 2 && Object.keys(inv.tv.lines).length === 2, 'two fares as pure-agent lines with the ticket particulars (no nil-rated supply)');
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).map((i) => (i.id === inv.id ? { ...i, status: 'Sent' } : i)));
+    // BSP statement: two tickets, an ADM and a refund of ticket 1 (no credit note yet).
+    await page.goto(srv.origin + '/time?tab=trips&view=statements');
+    const imp = page.locator('[data-tv-import]');
+    await imp.locator('[data-tv-st-vendor]').selectOption('e2e-c15-bsp');
+    await imp.locator('[data-tv-st-ref]').fill('E2E BSP C15');
+    const csv = `Document Number,Transaction Type,Issue Date,Passenger Name,Gross Fare,Taxes,Commission,Net Remit\n0581234567890,TKTT,${day},SHAH,4200,1150,0,5350\n0581234567891,TKTT,${day},SHAH,4200,1150,0,5350\nADM-C15,ADMA,${day},,3500,0,0,3500\n0581234567890,RFND,${day},SHAH,4200,1150,0,5350\n`;
+    await imp.locator('[data-tv-st-file]').setInputFiles({ name: 'bsp.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+    await imp.locator('[data-tv-st-import]').click({ timeout: 15000 });
+    const st = (await readJson(page, 'supplier_statements', [], (v) => v.some((s) => s.ref === 'E2E BSP C15'))).find((s) => s.ref === 'E2E BSP C15');
+    const by = (f) => st?.rows.filter(f).length;
+    check(by((r) => r.status === 'matched' && r.type === 'TKTT') === 2 && by((r) => r.flag === 'adm' && r.net === 3500) === 1 && by((r) => r.flag === 'refund') === 1, 'the BSP file: 2 matched, 1 ADM ₹3,500, 1 refund to pass on');
+    const run = (await readJson(page, 'import_runs', [])).filter((r) => r.kind === 'supplier_statement');
+    check(run.length >= 1, 'one import run recorded (setup checklist)');
+    await page.locator('[data-tv-statement="E2E BSP C15"] [data-tv-make-bill]').click();
+    const bill = (await readJson(page, 'purchases', [], (v) => v.some((p) => p.bill_number === 'E2E BSP C15'))).find((p) => p.bill_number === 'E2E BSP C15');
+    check(bill?.total === 8850 && bill.itc_eligible === false && bill.vendor_id === 'e2e-c15-bsp', `Make bill → the supplier bill of the net remittance (${bill?.total})`);
+    // Cancel the ticket: airline keeps ₹3,000, our fee ₹500.
+    await page.goto(srv.origin + '/time?tab=trips&view=bookings');
+    await page.locator('[data-tv-cancel-open="e2e-c15-air"]').click({ timeout: 15000 });
+    const cd = page.locator('[data-tv-cancel-dialog]');
+    await cd.locator('[data-tv-cancel="supplier_charge"]').fill('3000');
+    await cd.locator('[data-tv-cancel="fee"]').fill('500');
+    await cd.locator('[data-tv-cancel-plan]').waitFor({ timeout: 15000 });
+    await cd.locator('[data-tv-cancel-go]').click();
+    const docs = await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'CREDIT_NOTE' && i.cost_centre_id === 'e2e-c15-trip'));
+    const cn = docs.find((i) => i.doc_type === 'CREDIT_NOTE' && i.cost_centre_id === 'e2e-c15-trip');
+    const fee = docs.find((i) => i.id !== inv.id && i.doc_type !== 'CREDIT_NOTE' && i.cost_centre_id === 'e2e-c15-trip');
+    check(cn?.taxable_value === 11120 && fee?.items[0].rate === 500 && fee.items[0].tax_rate === 18, `credit note of the ticket invoice + fee draft at 18 % (${cn?.taxable_value}, ${fee?.items[0]?.tax_rate})`);
+    const bk = (await readJson(page, 'travel_bookings', [])).find((b) => b.id === 'e2e-c15-air');
+    check(bk?.status === 'cancelled' && bk.cancel?.supplier_charge === 3000 && bk.cancel.fee === 500, 'the booking is cancelled with the charges: the trip shows ₹2,500 cancellation loss');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R15-D outbound TCS, POS and events: Dubai package ₹3,40,000 → TCS 2 % = ₹6,800 "Sec 394(1) Sl. 8", saved and in the TCS view; the same buyer on 10 Feb 2026 for ₹12 lakh → 5 % on ₹10 lakh + 20 % on ₹2 lakh; inbound tour for a foreign agent → "not an export"; wedding: decor over budget, unregistered client with a Jaipur venue → POS Rajasthan; the manpower vendor\'s bill hints the contractor limb', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'cost_centres', 'travel_bookings', 'travel_settings', 'invoices', 'purchases', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'travel', travel_kind: 'tour_operator', industry_packs: ['travel', 'events'], modules: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-d-c', name: 'E2E Shah family', state_code: '27', pan: 'ABCPS1234K' }, { id: 'e2e-d-fa', name: 'E2E Berlin Tours GmbH', state_code: '96', tv: { foreign_tourist: true } }, { id: 'e2e-d-w', name: 'E2E Rao wedding', state_code: '27' }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-d-v', name: 'E2E Helpers Pvt', state_code: '08' }]);
+    const cc = (id, name, client_id, tv) => ({ id, name, kind: 'project', active: true, client_id, status: 'active', start: tv.start, tv: { pax: [{ name: 'A', type: 'adult' }], status: 'confirmed', ...tv } });
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []),
+      cc('e2e-d-dxb', 'E2E Dubai — Shah family', 'e2e-d-c', { code: 'E2E-DXB', kind: 'trip', scope: 'outbound', regime: 'to5', destination: 'Dubai', start: '2026-12-10' }),
+      cc('e2e-d-in', 'E2E Rajasthan — Berlin group', 'e2e-d-fa', { code: 'E2E-IN', kind: 'trip', scope: 'inbound', regime: 'to18', start: '2026-12-01' }),
+      cc('e2e-d-wed', 'E2E Rao wedding', 'e2e-d-w', { code: 'E2E-WED', kind: 'event', scope: 'domestic', regime: 'to18', start: '2026-11-20', event: { venue: 'Rambagh', city: 'Jaipur', state: '08', guests: 400, budget: [{ head: 'venue', approved: 500000 }, { head: 'decor', approved: 200000 }, { head: 'manpower', approved: 80000 }] } }),
+    ]);
+    const b = (id, trip_id, component, cost, sell, o = {}) => ({ id, trip_id, component, start: '2026-11-20', cost, sell, status: 'confirmed', created_at: '2026-10-01T00:00:00Z', ...o });
+    await writeJson(page, 'travel_bookings', [...(prev.travel_bookings ?? []),
+      b('e2e-d-b1', 'e2e-d-dxb', 'air', 100000, 123809.52), b('e2e-d-b2', 'e2e-d-dxb', 'hotel', 150000, 200000),
+      b('e2e-d-b3', 'e2e-d-wed', 'venue', 450000, 0), b('e2e-d-b4', 'e2e-d-wed', 'decor', 260000, 0), b('e2e-d-b5', 'e2e-d-wed', 'manpower', 60000, 0, { vendor_id: 'e2e-d-v' }),
+    ]);
+    // Bill the Dubai package: one gross line at 5 % = ₹3,40,000 with GST.
+    await page.goto(srv.origin + '/time?tab=trips&view=trips');
+    await page.locator('[data-tv-bill="E2E-DXB"]').click({ timeout: 15000 });
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    // QA18 T1: no reload — the in-app jump from Bill lays the items footer out (Add line, trip row, chips). It used to
+    // stay without a layout box (Chromium, footer inside the lines' size container) until a reload.
+    await footerLaidOut(page, 'Trips → Bill (R15-D)');
+    const chip = page.locator('[data-tv-tcs="ok"]');
+    await chip.waitFor({ timeout: 15000 });
+    const calc = await chip.locator('[data-tv-tcs-calc]').innerText();
+    check(/2 %/.test(calc) && /6,800/.test(calc) && /Sec 394\(1\) Sl\. 8/.test(calc), `the outbound chip offers TCS 2 % = ₹6,800 under Sec 394(1) Sl. 8 (${calc})`);
+    await chip.locator('[data-tv-tcs-apply]').click();
+    await page.keyboard.press('Control+s');
+    await closeSendSheet(page);
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.cost_centre_id === 'e2e-d-dxb' && i.tcs_amount > 0), 15000)).find((i) => i.cost_centre_id === 'e2e-d-dxb');
+    check(inv?.tcs_amount === 6800 && inv.tcs_rate === 2 && /Sl\. 8/.test(inv.tcs_label) && inv.tv?.tcs?.base === 340000 && inv.status !== 'Draft', `saved: TCS ₹6,800 on ₹3,40,000 (${inv?.tcs_amount}, ${inv?.status})`);
+    await page.goto(srv.origin + '/time?tab=trips&view=tcs');
+    const reg = page.locator('[data-tv-tcs-register]');
+    await reg.waitFor({ timeout: 15000 });
+    check(/E2E Shah family/.test(await reg.innerText()) && /6,800/.test(await reg.innerText()), 'the TCS view lists the buyer with ₹6,800');
+    // The same buyer on 10 Feb 2026 for ₹12 lakh (slab year): 5 % on ₹10 lakh + 20 % on ₹2 lakh.
+    const all = await readJson(page, 'invoices', []);
+    const feb = { ...inv, id: 'e2e-d-feb', invoice_number: '', status: 'Draft', issue_date: '2026-02-10', due_date: '2026-02-17', tcs_enabled: false, tcs_rate: 0, tv: { ...inv.tv, tcs: undefined }, items: inv.items.map((l) => ({ ...l, rate: 1142857.14 })) };
+    const inbound = { ...inv, id: 'e2e-d-inb', invoice_number: '', status: 'Draft', cost_centre_id: 'e2e-d-in', client: { id: 'e2e-d-fa', name: 'E2E Berlin Tours GmbH', state_code: '96', tv: { foreign_tourist: true } }, tcs_enabled: false, tcs_rate: 0, tv: { trip: { id: 'e2e-d-in', code: 'E2E-IN', kind: 'trip' }, regime: 'to18' } };
+    const wed = { ...inv, id: 'e2e-d-wedi', invoice_number: '', status: 'Draft', cost_centre_id: 'e2e-d-wed', client: { id: 'e2e-d-w', name: 'E2E Rao wedding', state_code: '27' }, tcs_enabled: false, tcs_rate: 0, tv: { trip: { id: 'e2e-d-wed', code: 'E2E-WED', kind: 'event' }, regime: 'to18' } };
+    await writeJson(page, 'invoices', [...all, feb, inbound, wed]);
+    await page.goto(srv.origin + '/invoice/e2e-d-feb');
+    const febCalc = page.locator('[data-tv-tcs="ok"] [data-tv-tcs-calc]');
+    await febCalc.waitFor({ timeout: 15000 });
+    const ft = await febCalc.innerText();
+    check(/90,000/.test(ft) && /5 % on ₹10,00,000\.00 \+ 20 % on ₹2,00,000\.00/.test(ft) && /206C\(1G\)/.test(ft), `10 Feb 2026, ₹12 lakh: 5 % + 20 % split = ₹90,000 (${ft})`);
+    await page.goto(srv.origin + '/invoice/e2e-d-inb');
+    await page.locator('[data-tv-pos="inbound"]').waitFor({ timeout: 15000 });
+    check(/not an export/.test(await page.locator('[data-tv-pos="inbound"]').innerText()), 'inbound tour for a foreign agent: POS India — not an export');
+    await page.goto(srv.origin + '/invoice/e2e-d-wedi');
+    const wp = page.locator('[data-tv-pos="event_venue"]');
+    await wp.waitFor({ timeout: 15000 });
+    check(/Rajasthan/.test(await wp.innerText()), 'wedding, unregistered client, Jaipur venue: POS Rajasthan (Sec 12(7)(a))');
+    await wp.locator('[data-tv-pos-apply]').click();
+    // Events view: decor over budget.
+    await page.goto(srv.origin + '/time?tab=trips&view=events');
+    await page.locator('[data-tv-events]').waitFor({ timeout: 15000 });
+    await page.locator('[data-tv-event-pick]').selectOption('e2e-d-wed');
+    check(await page.locator('[data-tv-head="decor"][data-over="1"]').count() === 1 && await page.locator('[data-tv-head="venue"][data-over="1"]').count() === 0, 'the events view flags decor over budget (venue within)');
+    check(/Rajasthan/.test(await page.locator('[data-tv-event-pos]').innerText()), 'the events view shows POS Rajasthan');
+    // The manpower vendor's bill hints the contractor limb (service date ≥ 1 Apr 2026).
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Add bill/ }).click();
+    const bd = page.getByRole('dialog', { name: 'Add purchase bill' });
+    await bd.locator('[data-tv-bill-trip]').selectOption('e2e-d-wed', { timeout: 15000 });
+    await bd.locator('[data-tv-bill-booking]').selectOption('e2e-d-b5');
+    const hint = bd.locator('[data-tv-tds-hint="contractor"]');
+    await hint.waitFor({ timeout: 15000 });
+    check(/Sl\. 6\(i\)/.test(await hint.innerText()), 'the manpower bill hints Sec 393(1) Sl. 6(i) (contractor)');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  // R16-A1: Hindi lives in lang-hi-* chunks now (build transform). Walk the screens in Hindi and prove the strings
+  // arrive (no English label left from an area that has Hindi), on first paint too; then back to English.
+  await step('R16-A Hindi language packs: Settings → हिन्दी; Books, GST reports, Inventory, Time → WIP and Trips render in Hindi; a reload paints Hindi first; back to English', async () => {
+    const prev = await readJson(page, 'settings', null);
+    await writeJson(page, 'settings', { ...(prev ?? {}), business_type: 'services', service_kind: 'professional', industry_packs: ['practice', 'travel', 'events'], modules: undefined, lock_until: undefined });
+    const nav = page.getByRole('navigation', { name: /Primary|मुख्य मेन्यू/ });
+    await page.goto(srv.origin + '/settings');
+    await page.getByLabel('Language / भाषा').first().selectOption('hi');
+    await nav.getByRole('link', { name: 'डैशबोर्ड' }).waitFor({ timeout: 15000 });
+    check((await page.evaluate(() => document.documentElement.lang)) === 'hi', 'Hindi on (<html lang="hi">)');
+    const noEnglish = async (label, english) => {
+      const body = await page.locator('main').first().innerText();
+      const left = english.filter((s) => body.includes(s));
+      check(left.length === 0, `${label}: no English label left (${left.join(', ') || 'none'})`);
+    };
+    // Books (books area → lang-hi-books)
+    await page.goto(srv.origin + '/books');
+    await page.getByRole('heading', { name: 'बही-खाता' }).first().waitFor({ timeout: 15000 });
+    await page.getByText('आपके इनवॉइस, रसीदों और खरीद से बने डबल-एंट्री खाते').first().waitFor();
+    await noEnglish('Books', ['Double-entry books built from your invoices']);
+    // GST reports (gst area → lang-hi-gst)
+    await page.goto(srv.origin + '/gst-reports');
+    await page.getByRole('heading', { name: 'GST रिपोर्ट' }).first().waitFor({ timeout: 15000 });
+    await page.getByText('दाख़िल करने से पहले अपने CA से जाँच करवाएँ।').first().waitFor();
+    await noEnglish('GST reports', ['GSTR-1 sections and GSTR-3B summary, prepared offline']);
+    // Inventory (inventory area → lang-hi-inventory)
+    await page.goto(srv.origin + '/inventory');
+    await page.getByText('आपके इनवॉइस, खरीद और एडजस्टमेंट से लाइव स्टॉक').first().waitFor({ timeout: 15000 });
+    await noEnglish('Inventory', ['Live stock from your invoices, purchases and adjustments']);
+    // Time → WIP (practice pack: pages + prof families) and Trips (travel family)
+    await page.goto(srv.origin + '/time?tab=wip');
+    await page.getByRole('tab', { name: 'अबिल्ड कार्य और बिलिंग' }).waitFor({ timeout: 15000 });
+    await page.getByText('अबिल्ड कार्य', { exact: true }).first().waitFor({ timeout: 15000 });
+    await page.getByText('समय और बिल योग्य खर्च').first().waitFor();
+    await noEnglish('Time → WIP', ['WIP & billing', 'Pre-bill', 'Realisation', 'Track hours, trips and re-billable expenses']);
+    await page.goto(srv.origin + '/time?tab=trips');
+    await page.getByRole('tab', { name: 'यात्रा फ़ाइलें' }).first().waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => /अभी कोई यात्रा नहीं|मार्जिन|बुकिंग/.test(document.querySelector('main')?.innerText ?? ''), null, { timeout: 15000 });
+    check(true, 'Trips desk strings in Hindi (travel family chunk)');
+    await noEnglish('Time → Trips', ['No trips yet.', 'Supplier unpaid']);
+    // A reload on a Hindi device: first-paint areas (sidebar, pwa) are Hindi from the first frame.
+    await page.goto(srv.origin + '/');
+    await nav.getByRole('link', { name: 'डैशबोर्ड' }).waitFor({ timeout: 15000 });
+    const firstFrame = await nav.innerText();
+    check(!/\bDashboard\b/.test(firstFrame), 'reload in Hindi: the shell paints in Hindi (no English sidebar)');
+    // The Dashboard tile picker (gift-voucher tile, R4-B1 area) is in Hindi.
+    const gv = page.getByText('गिफ़्ट वाउचर').first();
+    await page.locator('details:has(input[type="checkbox"]) summary').first().waitFor({ timeout: 15000 }).catch(() => {});
+    const pickers = page.locator('details:has(input[type="checkbox"]) summary');
+    if (await pickers.count()) {
+      await pickers.first().click();
+      check(await gv.isVisible().catch(() => false), 'Dashboard tile picker: gift-voucher tile label in Hindi');
+    }
+    // Back to English.
+    await page.goto(srv.origin + '/settings');
+    await page.getByLabel('Language / भाषा').first().selectOption('en');
+    await nav.getByRole('link', { name: 'Dashboard' }).waitFor({ timeout: 15000 });
+    await page.goto(srv.origin + '/books');
+    await page.getByRole('heading', { name: 'Books' }).first().waitFor({ timeout: 15000 });
+    check((await page.evaluate(() => document.documentElement.lang)) === 'en', 'back to English: Books heading in English');
+    await writeJson(page, 'settings', prev);
+  });
+
+  await step('R16-D quality: client "Mehta Tours" ↔ vendor "Mehta Travels Pvt Ltd" linked by hand → Netting ₹65,000 → the vendor\'s own creditor ledger shows the debit (₹1,15,000 Cr left), TB balanced; a builder\'s bill claiming ITC → caution (PF18), saved past it → audited; the inverted-duty paper shows the pending input-services note (PF1)', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'invoices', 'transactions', 'purchases'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const s0 = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...s0, lock_until: undefined });
+    const client = { id: 'e2e-mt-c', name: 'Mehta Tours', state_code: '27' };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), client]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-mt-v', name: 'Mehta Travels Pvt Ltd', client_id: 'e2e-mt-c' }]);
+    const sender = { ...((s0.profiles ?? []).find((p) => p.id === s0.activeProfileId) ?? {}), stateCode: '27' };
+    const inv = (id, number, amt, date) => ({ id, invoice_number: number, doc_type: 'INVOICE', status: 'Sent', place_of_supply: '27', currency: 'INR', issue_date: date, due_date: date, sender, gst_mode: 'NONE', subtotal: amt, taxable_value: amt, total: amt, amount_paid: 0, balance_due: amt, client, items: [{ id: 'l1', name: 'Tour package', type: 'Service', hsn: '998555', unit: 'NOS', quantity: 1, rate: amt, tax_rate: 0, amount: amt }] });
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv('e2e-mt-1', 'E2E/MT/1', 40000, '2026-09-01'), inv('e2e-mt-2', 'E2E/MT/2', 25000, '2026-09-05')]);
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []), { id: 'e2e-mt-b', kind: 'PURCHASE', vendor_id: 'e2e-mt-v', vendor_name: 'Mehta Travels Pvt Ltd', bill_number: 'MTP/9', date: '2026-09-10', category: 'Purchases', lines: [{ id: 'l1', name: 'Air tickets', quantity: 1, rate: 180000, tax_rate: 0 }], taxable: 180000, cgst: 0, sgst: 0, igst: 0, itc_eligible: false, total: 180000, amount_paid: 0 }]);
+    await page.goto(srv.origin + '/receivables?tab=aging');
+    await page.locator('[data-netting-open][aria-label*="Mehta Tours"]').waitFor({ timeout: 15000 });
+    await page.locator('[data-netting-open][aria-label*="Mehta Tours"]').click();
+    const dlg = page.locator('[data-netting-dialog]');
+    await dlg.waitFor({ timeout: 15000 });
+    for (const n of ['E2E/MT/1', 'E2E/MT/2']) await dlg.locator('[data-netting-side="in"] label', { hasText: n }).locator('input').check();
+    await dlg.locator('[data-netting-side="out"] label', { hasText: 'MTP/9' }).locator('input').check();
+    await page.locator('[data-netting-post]').click();
+    await readJson(page, 'transactions', [], (v) => v.filter((p) => p.method === 'netting' && p.exchange_purchase_id === 'e2e-mt-b').length === 2);
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/books?tab=ledger&acct=creditors&party=' + encodeURIComponent('Mehta Travels Pvt Ltd'));
+    await page.getByText(/Air tickets|MTP\/9/).first().waitFor({ timeout: 15000 });
+    const led = await page.locator('main').first().innerText();
+    check(/1,15,000\.00\s*Cr/.test(led), 'the vendor\'s own creditor ledger: ₹1,80,000 bill − ₹65,000 netting = ₹1,15,000 Cr');
+    await page.goto(srv.origin + '/books?tab=tb');
+    await page.getByText('Debits = credits').waitFor({ timeout: 15000 });
+    check(true, 'TB balanced');
+    // Real-estate builder: a bill claiming ITC, not charged to a project → caution; saved past it → audited.
+    await writeJson(page, 'settings', { ...s0, lock_until: undefined, industry_packs: ['realty', 'works'] });
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Add bill/ }).click();
+    const bd = page.getByRole('dialog', { name: 'Add purchase bill' });
+    await bd.getByRole('button', { name: /New vendor/ }).click();
+    await bd.locator('#bill-vendor-vname').fill('E2E Cement Co');
+    await bd.getByRole('button', { name: 'Save vendor' }).click();
+    await bd.locator('#bill-no').fill('CEM/16');
+    await bd.getByLabel('Line 1 item').fill('Cement, 200 bags');
+    await bd.getByLabel('Line 1 rate').fill('100000');
+    await bd.getByLabel('Line 1 GST rate').selectOption('18');
+    await bd.getByLabel('Claim input tax credit on this bill').check();
+    await bd.getByRole('button', { name: 'Save bill' }).click();
+    await bd.getByRole('alert').filter({ hasText: 'PF18' }).waitFor({ timeout: 15000 });
+    check(true, 'the builder\'s bill claiming ITC is cautioned (PF18)');
+    await bd.getByRole('button', { name: 'Save bill' }).click();
+    await bd.waitFor({ state: 'detached' });
+    const log = await readJson(page, 'audit_log', [], (v) => v.some((e) => e.action === 'override' && /CEM\/16.*PF18/.test(e.summary ?? '')));
+    check(log.some((e) => e.action === 'override' && /CEM\/16.*PF18/.test(e.summary ?? '')), 'saving past the caution is an audited override');
+    // Pending changes: the inverted-duty refund paper shows the 57th Council note (input services from 1 Nov 2026).
+    await writeJson(page, 'settings', { ...s0, business_type: 'manufacturer', modules: undefined, mfg_kind: 'textile', mfg_sub: 'garments', industry_packs: ['shopfloor', 'garments'], lock_until: undefined });
+    await page.goto(srv.origin + '/manufacturing?tab=garments&view=inverted');
+    await page.locator('[data-pending="refund"]').filter({ hasText: 'PF1' }).waitFor({ timeout: 15000 });
+    check(/not yet notified/.test(await page.locator('[data-pending="refund"]').innerText()), 'the refund paper: "Recommended … not yet notified" with PF1');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R16-C commission and re-issue: a booking with ₹1,200 airline commission → Bill commission → a draft to the airline at 18 % (SAC 998551) with 194H expected (the airline is past ₹20,000 this FY); re-issue a ticket: difference ₹800 + penalty ₹1,500 + fee ₹300 → a draft (two pure-agent lines, fee at 18 %); the old ticket is marked', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'cost_centres', 'travel_bookings', 'travel_settings', 'invoices', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const at = new Date().toISOString();
+    const day = at.slice(0, 10);
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'travel', travel_kind: 'agent', modules: undefined, industry_packs: ['travel'], prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'travel_settings', { regime_default: 'agent', air_value: 'deemed' });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-16c-c', name: 'E2E 16C Rao', state_code: '27' }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-16c-air', name: 'E2E 16C Airline', state_code: '27', tv: { kind: 'airline' } }]);
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), { id: 'e2e-16c-trip', name: 'E2E Delhi — Rao', kind: 'project', client_id: 'e2e-16c-c', active: true, status: 'active', start: day, created_at: at, tv: { code: '16C-001', kind: 'trip', scope: 'domestic', start: day, regime: 'agent', status: 'confirmed', pax: [{ name: 'Rao', type: 'adult' }] } }]);
+    const tkt = { pax: 'RAO/K', airline: '6E', ticket_no: '0581234567800', pnr: 'PNR16C', sector: 'DEL-BOM', class: 'economy', basic: 4200, taxes: 940, airline_gst: 210 };
+    await writeJson(page, 'travel_bookings', [...(prev.travel_bookings ?? []),
+      { id: 'e2e-16c-b1', trip_id: 'e2e-16c-trip', component: 'air', vendor_id: 'e2e-16c-air', ref: 'PNR16C', start: day, cost: 5350, sell: 5350, commission: 1200, status: 'confirmed', created_at: at },
+      { id: 'e2e-16c-b2', trip_id: 'e2e-16c-trip', component: 'air', vendor_id: 'e2e-16c-air', ref: 'PNR16D', start: day, cost: 5350, sell: 5350, status: 'confirmed', tkt: [tkt], created_at: at }]);
+    // An earlier issued commission invoice of ₹20,000 to the airline this FY: the next one crosses the 194H threshold.
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-16c-prior', invoice_number: 'E2E/16C/1', doc_type: 'TAX_INVOICE', status: 'Sent', issue_date: day, due_date: day, client: { name: 'E2E 16C Airline', state_code: '27' }, sender: null, items: [{ id: 'p1', name: 'Commission', type: 'Service', hsn: '998551', unit: 'NOS', quantity: 1, rate: 20000, amount: 20000, tax_rate: 18, discount_percent: 0 }], gst_mode: 'CGST_SGST', place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, shipping: 0, other_charges: 0, amount_paid: 0, subtotal: 20000, taxable_value: 20000, tax_amount: 3600, total: 23600, balance_due: 23600, created_at: at }]);
+    await page.goto(srv.origin + '/time?tab=trips&view=bookings');
+    await page.locator('[data-tv-comm="e2e-16c-b1"]').click({ timeout: 15000 });
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.client?.name === 'E2E 16C Airline' && i.id !== 'e2e-16c-prior'))).find((i) => i.client?.name === 'E2E 16C Airline' && i.id !== 'e2e-16c-prior');
+    check(inv?.status === 'Draft' && inv.items[0].hsn === '998551' && inv.items[0].tax_rate === 18 && inv.tax_amount === 216, `commission draft to the airline: ₹1,200 at 18 % (SAC 998551), GST ₹216 (${inv?.tax_amount})`);
+    check(inv?.tds_enabled === true && inv.tds_section === '194H' && inv.tds_rate === 2 && inv.tds_amount === 24, `194H expected at 2 % on the commission before GST (${inv?.tds_section} ${inv?.tds_amount})`);
+    const b1 = (await readJson(page, 'travel_bookings', [])).find((b) => b.id === 'e2e-16c-b1');
+    check(b1?.comm_ref?.invoice_id === inv?.id, 'the booking keeps the commission line reference (billed derived)');
+    await page.goto(srv.origin + '/time?tab=trips&view=bookings');
+    check(await page.locator('[data-tv-comm="e2e-16c-b1"]').count() === 0, 'Bill commission is gone once billed');
+    await page.locator('[data-tv-reissue-open="e2e-16c-b2"]').click({ timeout: 15000 });
+    const re = page.locator('[data-tv-reissue]');
+    await re.locator('[data-tv-re="new_no"]').fill('0581234567801');
+    await re.locator('[data-tv-re="diff"]').fill('800');
+    await re.locator('[data-tv-re="penalty"]').fill('1500');
+    await re.locator('[data-tv-re="fee"]').fill('300');
+    await re.locator('[data-tv-re-go]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const d = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.cost_centre_id === 'e2e-16c-trip' && i.items?.some((l) => l.name === 'Re-issue fee')))).find((i) => i.cost_centre_id === 'e2e-16c-trip' && i.items?.some((l) => l.name === 'Re-issue fee'));
+    check(d?.items.filter((l) => l.charge_head_id === 'rule33').map((l) => l.rate).join() === '800,1500' && d.items.find((l) => l.name === 'Re-issue fee')?.tax_rate === 18 && d.tax_amount === 54, `re-issue draft: ₹800 + ₹1,500 at actual, fee ₹300 at 18 % (GST ${d?.tax_amount})`);
+    const b2 = (await readJson(page, 'travel_bookings', [])).find((b) => b.id === 'e2e-16c-b2');
+    check(b2?.tkt?.[0]?.reissued_by === '0581234567801' && b2.tkt.length === 2, 'the old ticket is marked re-issued; the new ticket is on the booking');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R17-A manpower core: Settings → Manpower profile → Security agency (manpower + security packs, 12 h shifts); Time → Deploy → Sites; "E2E Sunrise Towers" for a registered client: Guard (12 h) × 4 at ₹800 (SAC 998525 suggested) and Supervisor × 1 at ₹1,000 → reload → chip "Reverse charge — client pays GST"; "E2E Green Park RWA" (no GSTIN) → forward charge 18 %; help; Ctrl+K', async () => {
+    const keys = ['settings', 'clients', 'cost_centres', 'manpower_settings', 'notes_to_accounts'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: undefined, modules: undefined, industry_packs: undefined, manpower_kind: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'manpower_settings', null);
+    await writeJson(page, 'notes_to_accounts', []); // firm form not set: a proprietorship (entry 14 applies)
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-mp-c1', name: 'E2E Sunrise Developers', gstin: '27AAACB2230M1ZW', state_code: '27' }, { id: 'e2e-mp-c2', name: 'E2E Green Park RWA', state_code: '27' }]);
+    await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-mp-c2'), 15000);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-manpower-kind-card="security"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.manpower_kind === 'security', 15000);
+    check(st.service_kind === 'manpower' && st.industry_packs?.includes('manpower') && st.industry_packs?.includes('security') && st.modules?.includes('time') && st.modules?.includes('payroll'), `Security agency: services / manpower + packs (${st.industry_packs})`);
+    const ms = await readJson(page, 'manpower_settings', {}, (v) => v?.shift_hours === 12, 15000);
+    check(ms?.shift_hours === 12 && ms.billing_days === 'calendar', 'the profile sets 12-hour shifts and calendar-day pro-rata');
+    await page.goto(srv.origin + '/time?tab=deploy&view=sites');
+    await page.locator('[data-deploy-desk]').waitFor({ timeout: 15000 });
+    check(/Deploy/.test((await page.getByRole('tab').allInnerTexts()).join('|')), 'Time lists the Deploy desk');
+    const newSite = async (name, client, posts) => {
+      await page.locator('[data-mp-new-site]').click();
+      const f = page.locator('[data-mp-site-form]');
+      await f.locator('[data-mp-site-name]').fill(name);
+      await f.locator('[data-mp-site-client]').selectOption(client);
+      for (const [i, [n, heads, rate]] of posts.entries()) {
+        await f.locator('[data-mp-add-post]').click();
+        const r = f.locator(`[data-mp-post="${i}"]`);
+        await r.locator('[data-mp-post-name]').fill(n);
+        await r.locator('[data-mp-post-heads]').fill(String(heads));
+        await r.locator('[data-mp-post-rate]').fill(String(rate));
+      }
+      return f;
+    };
+    const f1 = await newSite('E2E Sunrise Towers', 'e2e-mp-c1', [['Guard (12 h)', 4, 800], ['Supervisor', 1, 1000]]);
+    check(await f1.locator('[data-mp-post="0"] [data-mp-post-sac]').inputValue() === '998525', 'SAC 998525 suggested for a guard post');
+    await f1.locator('[data-mp-save-site]').click();
+    const cc = await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.name === 'E2E Sunrise Towers' && c.mp?.posts?.length === 2), 15000);
+    const s1 = cc.find((c) => c.name === 'E2E Sunrise Towers');
+    check(s1?.kind === 'project' && s1.mp.posts[0].shift_hours === 12 && s1.mp.posts[0].rate === 800 && s1.mp.posts[1].heads === 1 && /^S-\d{3}$/.test(s1.mp.code), `the site is a project cost centre with two posts (${s1?.mp?.code})`);
+    await page.reload();
+    await page.locator('[data-mp-sites]').waitFor({ timeout: 15000 });
+    const chip1 = page.locator(`[data-mp-site="${s1.mp.code}"] [data-mp-regime]`);
+    check(await chip1.getAttribute('data-mp-regime') === 'rcm' && /Reverse charge — client pays GST/.test(await chip1.innerText()), 'after reload the site shows "Reverse charge — client pays GST"');
+    const f2 = await newSite('E2E Green Park RWA', 'e2e-mp-c2', [['Guard', 2, 750]]);
+    await f2.locator('[data-mp-save-site]').click();
+    const s2 = (await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.name === 'E2E Green Park RWA' && c.mp), 15000)).find((c) => c.name === 'E2E Green Park RWA');
+    const chip2 = page.locator(`[data-mp-site="${s2.mp.code}"] [data-mp-regime]`);
+    await chip2.waitFor({ timeout: 15000 });
+    check(await chip2.getAttribute('data-mp-regime') === 'fwd' && /Forward charge 18 %/.test(await chip2.innerText()), 'a client without GSTIN: forward charge 18 %');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="time:deploy"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a Deploy topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('manpower sites');
+    await palette.getByRole('option', { name: /Manpower sites and posts/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K finds Time → Deploy → Sites');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R17-B duty register and billing: seed Sunrise (Guard 12 h × 4 at ₹800, Supervisor at ₹1,000) + five deployed staff and a reliever → Muster October 2026: Copy last month, duties 30 / 30 / 31 / 28 + reliever 3 (12 h OT), Supervisor 31 → Lock → Send to payroll (LOP 1 / 1 / 0 / 3 / 0, reliever 28 + OT 12) → Bills → Bill: RCM draft 97,600 + 31,000 = ₹1,28,600 without tax, expected TDS ₹1,286 (1 %), entry-14 sentence, duty annexure and TDS line on the paper; Green Park 18 %', async () => {
+    const keys = ['settings', 'clients', 'cost_centres', 'manpower_settings', 'notes_to_accounts', 'employees', 'site_musters', 'attendance', 'payroll_runs', 'invoices'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'manpower', manpower_kind: 'security', industry_packs: ['manpower', 'security'], modules: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'manpower_settings', { shift_hours: 12, billing_days: 'calendar', bill_date: 'month_end', service_charge_pct: 0, print_tds: true });
+    await writeJson(page, 'notes_to_accounts', []); // a proprietorship: entry 14 applies, 194C at 1 %
+    await writeJson(page, 'payroll_runs', (prev.payroll_runs ?? []).filter((r) => r.month !== '2026-10'));
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-mpb-c1', name: 'E2E-B Sunrise Developers', gstin: '27AAACB2230M1ZW', state_code: '27' }, { id: 'e2e-mpb-c2', name: 'E2E-B Green Park RWA', state_code: '27' }]);
+    const p = (id, name, sac, heads, rate) => ({ id, name, sac, heads, shift_hours: 12, basis: 'duty', rate });
+    const site = (id, name, code, client, posts) => ({ id, name, kind: 'project', client_id: client, active: true, status: 'active', start: '2026-01-01', mp: { code, contract: { from: '2026-01-01' }, posts, status: 'active' } });
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), site('e2e-mpb-s1', 'E2E-B Sunrise Towers', 'S-901', 'e2e-mpb-c1', [p('g', 'Guard (12 h)', '998525', 4, 800), p('s', 'Supervisor', '998525', 1, 1000)]), site('e2e-mpb-s2', 'E2E-B Green Park RWA', 'S-902', 'e2e-mpb-c2', [p('g', 'Guard', '998525', 2, 750)])]);
+    const emp = (id, code, name, cc, post) => ({ id, code, name, tax_regime: 'new', pf: true, esi: true, pt: true, active: true, created_at: '2026-01-01T00:00:00.000Z', ...(cc ? { cost_centre_id: cc, mp: { post_id: post } } : {}) });
+    await writeJson(page, 'employees', [...(prev.employees ?? []), emp('e2e-g1', 'E2E-G01', 'Ramesh E2E', 'e2e-mpb-s1', 'g'), emp('e2e-g2', 'E2E-G02', 'Mahesh E2E', 'e2e-mpb-s1', 'g'), emp('e2e-g3', 'E2E-G03', 'Dinesh E2E', 'e2e-mpb-s1', 'g'), emp('e2e-g4', 'E2E-G04', 'Naresh E2E', 'e2e-mpb-s1', 'g'), emp('e2e-s1', 'E2E-S01', 'Vikram E2E', 'e2e-mpb-s1', 's'), emp('e2e-r1', 'E2E-R01', 'Suresh E2E'), emp('e2e-g5', 'E2E-G05', 'Prakash E2E', 'e2e-mpb-s2', 'g')]);
+    await readJson(page, 'employees', [], (v) => v.some((e) => e.id === 'e2e-g5'), 15000);
+    await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.id === 'e2e-mpb-s2'), 15000);
+    await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-mpb-c2'), 15000);
+    await readJson(page, 'settings', {}, (v) => v.manpower_kind === 'security' && v.industry_packs?.includes('manpower'), 15000);
+    await readJson(page, 'manpower_settings', {}, (v) => v?.print_tds === true, 15000);
+    await page.goto(srv.origin + '/time?tab=deploy&view=muster&site=e2e-mpb-s1&month=2026-10');
+    const mv = page.locator('[data-mp-muster]');
+    await mv.waitFor({ timeout: 15000 });
+    await mv.locator('[data-mp-muster-copy]').click();
+    const row = (code) => mv.locator(`[data-mp-muster-row="${code}"]`);
+    await row('E2E-G01').waitFor({ timeout: 15000 });
+    check(await mv.locator('[data-mp-muster-row]').count() === 5, 'Copy last month (none yet): the five deployed people at full duties');
+    for (const [code, d] of [['E2E-G01', 30], ['E2E-G02', 30], ['E2E-G03', 31], ['E2E-G04', 28], ['E2E-S01', 31]]) await row(code).locator('[data-mp-row-duties]').fill(String(d));
+    await mv.locator('[data-mp-muster-add]').click();
+    const last = mv.locator('[data-mp-muster-row]').last();
+    await last.locator('[data-mp-row-person]').selectOption('e2e-r1');
+    await last.locator('[data-mp-row-post]').selectOption('g');
+    await last.locator('[data-mp-row-duties]').fill('3');
+    await last.locator('[data-mp-row-ot]').fill('12');
+    check(/Guard \(12 h\): 122 of 124 duties/.test(await mv.locator('[data-mp-muster-totals]').innerText()), 'totals: Guard 122 of 124 duties');
+    await mv.locator('[data-mp-muster-save]').click();
+    const m1 = (await readJson(page, 'site_musters', [], (v) => v.some((m) => m.site_id === 'e2e-mpb-s1' && m.month === '2026-10' && m.rows?.length === 6), 15000)).find((m) => m.site_id === 'e2e-mpb-s1');
+    check(m1?.status === 'draft' && m1.date === '2026-10-31' && m1.rows.find((r) => r.employee_id === 'e2e-r1')?.relief === true, 'the draft muster is saved (dated 2026-10-31, the reliever ticked)');
+    await mv.locator('[data-mp-muster-lock]').click();
+    await readJson(page, 'site_musters', [], (v) => v.some((m) => m.id === m1?.id && m.status === 'locked'), 15000);
+    await page.locator('[data-mp-muster="locked"]').waitFor({ timeout: 15000 });
+    check(await mv.locator('[data-mp-row-duties]').first().isDisabled(), 'a locked muster is read-only');
+    await mv.locator('[data-mp-push]').click();
+    await page.locator('[data-mp-push-preview]').waitFor({ timeout: 15000 });
+    check(/S-902/.test(await page.locator('[data-mp-push-preview]').innerText()), 'the preview names the site whose muster is not locked');
+    await page.locator('[data-mp-push-confirm]').click();
+    const att = await readJson(page, 'attendance', [], (v) => v.some((a) => a.employee_id === 'e2e-r1' && a.month === '2026-10'), 15000);
+    const lop = (id) => att.find((a) => a.employee_id === id && a.month === '2026-10');
+    check(['e2e-g1', 'e2e-g2', 'e2e-g3', 'e2e-g4', 'e2e-s1'].map((id) => lop(id)?.lop).join() === '1,1,0,3,0' && lop('e2e-r1')?.lop === 28 && lop('e2e-r1')?.units?.ot_hours === 12 && !lop('e2e-g5'), `payroll attendance from the muster: LOP ${['e2e-g1', 'e2e-g2', 'e2e-g3', 'e2e-g4', 'e2e-s1', 'e2e-r1'].map((id) => lop(id)?.lop).join(' / ')}, reliever OT 12; others untouched`);
+    await page.goto(srv.origin + '/time?tab=deploy&view=bills&month=2026-10');
+    await page.locator('[data-mp-bill="S-901"]').click({ timeout: 15000 });
+    const invs = await readJson(page, 'invoices', [], (v) => v.some((i) => i.mp?.month === '2026-10' && i.mp?.site?.code === 'S-901'), 15000);
+    const inv = invs.find((i) => i.mp?.month === '2026-10' && i.mp?.site?.code === 'S-901');
+    check(inv?.status === 'Draft' && inv.issue_date === '2026-10-31' && inv.items.map((l) => `${l.quantity}x${l.rate}=${l.amount}`).join() === '122x800=97600,31x1000=31000', `lines Guard 122 × ₹800 = ₹97,600 and Supervisor 31 × ₹1,000 = ₹31,000 (${inv?.items?.map((l) => l.amount)})`);
+    check(inv?.reverse_charge === true && inv.total === 128600 && inv.mp.regime === 'rcm' && inv.mp.muster_id === m1?.id, `reverse charge, total ₹1,28,600 with no tax added (${inv?.total})`);
+    check(inv?.mp?.tds?.expected === 1286 && inv.mp.tds.rate === 1, `expected client TDS ₹1,286 at 1 % (${inv?.mp?.tds?.expected})`);
+    await page.goto(srv.origin + `/invoice/${inv.id}`);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click({ timeout: 15000 });
+    const dlg = page.getByRole('dialog', { name: 'Document preview' });
+    await dlg.locator('[data-manpower-block]').waitFor({ timeout: 15000 });
+    check(/entry 14/.test(await dlg.locator('[data-manpower-decl]').innerText()) && await dlg.locator('[data-manpower-annex] tbody tr').count() === 6 && /1,286/.test(await dlg.locator('[data-manpower-tds]').innerText()), 'the paper prints the entry-14 sentence, the duty annexure (6 rows) and the expected TDS line');
+    await page.keyboard.press('Escape');
+    await writeJson(page, 'site_musters', [...(await readJson(page, 'site_musters', [])), { id: 'e2e-mpb-m2', site_id: 'e2e-mpb-s2', month: '2026-10', date: '2026-10-31', status: 'locked', updated_at: '2026-10-31T00:00:00.000Z', rows: [{ employee_id: 'e2e-g5', post_id: 'g', duties: 31 }] }]);
+    await readJson(page, 'site_musters', [], (v) => v.some((m) => m.id === 'e2e-mpb-m2'), 15000);
+    await page.goto(srv.origin + '/time?tab=deploy&view=bills&month=2026-10');
+    await page.locator('[data-mp-bill="S-902"]').click({ timeout: 15000 });
+    const gp = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.mp?.site?.code === 'S-902'), 15000)).find((i) => i.mp?.site?.code === 'S-902');
+    check(gp?.reverse_charge === false && gp.taxable_value === 23250 && gp.tax_amount === 4185, `Green Park (no GSTIN): 18 % charged (${gp?.tax_amount})`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R17-C compliance and profitability: seed Sunrise (3 guards + a reliever), the locked October muster, a FINAL October run and the October bill ₹1,28,600 → Compliance: PF EE total = the run\'s (one site, 100 %); TRRN + ESI challan → Proved → reload → still proved; the annexure masks the UAN and has no bank number; a ₹6,000 uniform bill tagged to the site → Profit: margin ₹39,620; a ₹900 / duty minimum from 1 Oct → shortfalls listed', async () => {
+    const keys = ['settings', 'clients', 'cost_centres', 'manpower_settings', 'employees', 'site_musters', 'site_compliance', 'payroll_runs', 'invoices', 'purchases'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'manpower', manpower_kind: 'security', industry_packs: ['manpower', 'security'], modules: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'manpower_settings', { shift_hours: 12, billing_days: 'calendar', bill_date: 'month_end', wage_revisions: [{ id: 'e2e-mpc-rev', from: '2026-10-01', wage_day: 900, ref: 'E2E VDA Oct' }] });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-mpc-c1', name: 'E2E-C Sunrise Developers', gstin: '27AAACB2230M1ZW', state_code: '27' }]);
+    const post = { id: 'g', name: 'Guard (12 h)', sac: '998525', heads: 4, shift_hours: 12, basis: 'duty', rate: 800 };
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), { id: 'e2e-mpc-s1', name: 'E2E-C Sunrise Towers', kind: 'project', client_id: 'e2e-mpc-c1', active: true, status: 'active', start: '2026-01-01', mp: { code: 'S-911', contract: { from: '2026-01-01' }, posts: [post], status: 'active' } }]);
+    const emp = (id, code, name) => ({ id, code, name, tax_regime: 'new', pf: true, esi: true, active: true, created_at: '2026-01-01T00:00:00.000Z', cost_centre_id: 'e2e-mpc-s1', mp: { post_id: 'g' } });
+    await writeJson(page, 'employees', [...(prev.employees ?? []), emp('e2e-c1', 'E2E-C01', 'Ramesh C'), emp('e2e-c2', 'E2E-C02', 'Mahesh C'), emp('e2e-c3', 'E2E-C03', 'Dinesh C'), emp('e2e-cr', 'E2E-CR1', 'Suresh C')]);
+    await writeJson(page, 'site_musters', [...(prev.site_musters ?? []), { id: 'e2e-mpc-m1', site_id: 'e2e-mpc-s1', month: '2026-10', date: '2026-10-31', status: 'locked', updated_at: '2026-10-31T00:00:00.000Z', rows: [{ employee_id: 'e2e-c1', post_id: 'g', duties: 30 }, { employee_id: 'e2e-c2', post_id: 'g', duties: 31 }, { employee_id: 'e2e-c3', post_id: 'g', duties: 31 }, { employee_id: 'e2e-cr', post_id: 'g', duties: 3, relief: true }] }]);
+    const ln = (id, code, name, gross, pf, esiEe, esiEr, er) => ({ employee_id: id, code, name, uan: '100200300456', bank_account: '987654321012', tax_regime: 'new', days_in_month: 31, days_employed: 31, lop: 0, payable_days: 31, units: {}, earnings: [], deductions: [], employer: [], gross, total_deductions: pf + esiEe, net: gross - pf - esiEe, taxable_gross: gross, pf_wages: gross / 2, eps_wages: gross / 2, edli_wages: gross / 2, pf_ee: pf, eps: er[1], epf_er: er[0], edli: er[2], pf_admin: er[2], esi_wages: gross, esi_covered: true, esi_ee: esiEe, esi_er: esiEr, pt: 0, tds: 0 });
+    const run = { id: 'e2e-mpc-run', month: '2026-10', number: 'PRL/E2E/1', date: '2026-10-31', status: 'final', created_at: '2026-10-31T00:00:00.000Z', lines: [ln('e2e-c1', 'E2E-C01', 'Ramesh C', 24000, 1800, 180, 780, [550, 1250, 75]), ln('e2e-c2', 'E2E-C02', 'Mahesh C', 24000, 1800, 180, 780, [550, 1250, 75]), ln('e2e-c3', 'E2E-C03', 'Dinesh C', 24000, 1800, 180, 780, [550, 1250, 75]), ln('e2e-cr', 'E2E-CR1', 'Suresh C', 2400, 288, 18, 78, [88, 200, 12])] };
+    await writeJson(page, 'payroll_runs', [...(prev.payroll_runs ?? []).filter((r) => r.month !== '2026-10'), run]);
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-mpc-i1', doc_type: 'INVOICE', status: 'Draft', invoice_number: '', issue_date: '2026-10-31', due_date: '2026-11-07', client: { id: 'e2e-mpc-c1', name: 'E2E-C Sunrise Developers' }, items: [], taxable_value: 128600, total: 128600, reverse_charge: true, mp: { month: '2026-10', site: { id: 'e2e-mpc-s1', code: 'S-911', name: 'E2E-C Sunrise Towers' }, regime: 'rcm' } }]);
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []), { id: 'e2e-mpc-p1', kind: 'PURCHASE', vendor_name: 'E2E Uniforms', bill_number: 'U-1', date: '2026-10-15', taxable: 6000, cgst: 540, sgst: 540, igst: 0, total: 7080, itc_eligible: true, amount_paid: 0, lines: [], mp: { site_id: 'e2e-mpc-s1' } }]);
+    await readJson(page, 'purchases', [], (v) => v.some((p) => p.id === 'e2e-mpc-p1' && p.mp?.site_id === 'e2e-mpc-s1'), 15000);
+    await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === 'e2e-mpc-i1'), 15000);
+    await readJson(page, 'payroll_runs', [], (v) => v.some((r) => r.id === 'e2e-mpc-run'), 15000);
+    await readJson(page, 'site_musters', [], (v) => v.some((m) => m.id === 'e2e-mpc-m1'), 15000);
+    await readJson(page, 'employees', [], (v) => v.some((e) => e.id === 'e2e-cr'), 15000);
+    await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.id === 'e2e-mpc-s1'), 15000);
+    await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-mpc-c1'), 15000);
+    await readJson(page, 'manpower_settings', {}, (v) => v?.wage_revisions?.length === 1, 15000);
+    await readJson(page, 'settings', {}, (v) => v.manpower_kind === 'security' && v.industry_packs?.includes('manpower'), 15000);
+    await page.goto(srv.origin + '/time?tab=deploy&view=compliance&site=e2e-mpc-s1&month=2026-10');
+    const cv = page.locator('[data-mp-compliance]');
+    await cv.locator('[data-mp-comp-row="E2E-C01"]').waitFor({ timeout: 15000 });
+    check(await cv.locator('[data-mp-comp-total] [data-k="pf_ee"]').innerText() === '5688.00' && await cv.locator('[data-mp-comp-row]').count() === 4, 'PF EE total of the site = the run\'s for its four people (₹5,688)');
+    check(await cv.locator('[data-mp-short]').count() >= 3, 'the ₹900 / duty minimum from 1 Oct: shortfalls listed');
+    await cv.locator('[data-mp-comp-trrn]').fill('E2E-TRRN-1');
+    await cv.locator('[data-mp-comp-challan]').fill('E2E-ESI-9');
+    await cv.locator('[data-mp-comp-status]').selectOption('proved');
+    await cv.locator('[data-mp-comp-hold]').fill('10');
+    await cv.locator('[data-mp-comp-save]').click();
+    await readJson(page, 'site_compliance', [], (v) => v.some((c) => c.site_id === 'e2e-mpc-s1' && c.status === 'proved'), 15000);
+    await page.reload();
+    await page.locator('[data-mp-compliance="proved"]').waitFor({ timeout: 15000 });
+    check(/12,860/.test(await page.locator('[data-mp-comp-bill]').first().innerText()), 'the client\'s 10 % hold on the October bill (₹12,860), nothing posted');
+    const [pop] = await Promise.all([page.waitForEvent('popup', { timeout: 15000 }), page.locator('[data-mp-comp-print]').click()]);
+    const annex = await pop.content();
+    check(/••••0456/.test(annex) && !/100200300456|987654321012/.test(annex) && /E2E-TRRN-1/.test(annex) && /MP18/.test(annex), 'the annexure: UAN last four only, no bank number, TRRN and the CA sentence');
+    await pop.close();
+    await page.goto(srv.origin + '/time?tab=deploy&view=profit&month=2026-10');
+    const pr = page.locator('[data-mp-profit-site="S-911"]');
+    await pr.waitFor({ timeout: 15000 });
+    const val = async (k) => Number((await pr.locator(`[data-k="${k}"]`).innerText()).replace(/[^\d.-]/g, ''));
+    check(await val('billed') === 128600 && await val('bills') === 6000 && await val('margin') === 39620, `site P&L: ₹1,28,600 − wages 72,000 − relievers 2,400 − employer PF / ESI 8,580 − uniforms 6,000 = ₹39,620 (${await val('margin')})`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R17-D arrears, receivables and renewals: seed Sunrise (VDA pass-through) with its locked October muster (Guard 122 + Supervisor 31 duties) and the issued RCM bill (₹1,28,600, TDS ₹1,286 expected) → Statutory: revision +₹26 / duty from 1 Oct → Sunrise 153 duties × ₹26 = ₹3,978 → Make debit notes → a DEBIT_NOTE with mp.arrear.of = the bill, reverse charge carried, doc_links row; TDS: Sunrise Q3 expected ₹1,286; a PSARA licence valid for 20 more days → reload → the bell lists the renewal', async () => {
+    const keys = ['settings', 'clients', 'cost_centres', 'manpower_settings', 'notes_to_accounts', 'employees', 'site_musters', 'invoices', 'doc_links'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'manpower', manpower_kind: 'security', industry_packs: ['manpower', 'security'], modules: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'manpower_settings', { shift_hours: 12, billing_days: 'calendar', bill_date: 'month_end' });
+    await writeJson(page, 'notes_to_accounts', []);
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-mpd-c1', name: 'E2E-D Sunrise Developers', gstin: '27AAACB2230M1ZW', state_code: '27' }]);
+    const p = (id, name, rate) => ({ id, name, sac: '998525', heads: id === 'g' ? 4 : 1, shift_hours: 12, basis: 'duty', rate });
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), { id: 'e2e-mpd-s1', name: 'E2E-D Sunrise Towers', kind: 'project', client_id: 'e2e-mpd-c1', active: true, status: 'active', start: '2026-01-01', mp: { code: 'S-921', contract: { from: '2026-01-01', escalation: 'vda_pass_through' }, posts: [p('g', 'Guard (12 h)', 800), p('s', 'Supervisor', 1000)], status: 'active' } }]);
+    await writeJson(page, 'site_musters', [...(prev.site_musters ?? []), { id: 'e2e-mpd-m1', site_id: 'e2e-mpd-s1', month: '2026-10', date: '2026-10-31', status: 'locked', updated_at: '2026-10-31T00:00:00.000Z', rows: [['d1', 30], ['d2', 30], ['d3', 31], ['d4', 28], ['dr', 3]].map(([e, d]) => ({ employee_id: `e2e-${e}`, post_id: 'g', duties: d, ...(e === 'dr' ? { relief: true } : {}) })).concat([{ employee_id: 'e2e-ds', post_id: 's', duties: 31 }]) }]);
+    const item = (id, name, q, r) => ({ id, name, hsn: '998525', unit: 'DUTY', quantity: q, rate: r, amount: q * r, type: 'Service', discount_percent: 0, tax_rate: 18 });
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-mpd-i1', doc_type: 'INVOICE', status: 'Sent', invoice_number: 'INV/E2E-D/0001', issue_date: '2026-10-31', due_date: '2026-11-07', client: { id: 'e2e-mpd-c1', name: 'E2E-D Sunrise Developers', gstin: '27AAACB2230M1ZW', state_code: '27' }, items: [item('l1', 'Guard (12 h)', 122, 800), item('l2', 'Supervisor', 31, 1000)], tax_rate: 18, discount_type: 'PERCENT', discount_rate: 0, shipping: 0, other_charges: 0, amount_paid: 0, currency: 'INR', taxable_value: 128600, tax_amount: 23148, total: 128600, reverse_charge: true, rcm_tax_excluded: true, cost_centre_id: 'e2e-mpd-s1', mp: { month: '2026-10', site: { id: 'e2e-mpd-s1', code: 'S-921', name: 'E2E-D Sunrise Towers' }, regime: 'rcm', basis: 'duty', muster_id: 'e2e-mpd-m1', posts: [{ post: 'Guard (12 h)', sac: '998525', heads: 4, duties: 122, rate: 800, amount: 97600 }, { post: 'Supervisor', sac: '998525', heads: 1, duties: 31, rate: 1000, amount: 31000 }], tds: { section: '194C-1', rate: 1, expected: 1286 } } }]);
+    await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === 'e2e-mpd-i1'), 15000);
+    await readJson(page, 'site_musters', [], (v) => v.some((m) => m.id === 'e2e-mpd-m1'), 15000);
+    await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.id === 'e2e-mpd-s1'), 15000);
+    await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-mpd-c1'), 15000);
+    await readJson(page, 'manpower_settings', {}, (v) => v?.shift_hours === 12 && !v.wage_revisions, 15000);
+    await readJson(page, 'settings', {}, (v) => v.manpower_kind === 'security' && v.industry_packs?.includes('security'), 15000);
+    await page.goto(srv.origin + '/time?tab=deploy&view=statutory');
+    const sv = page.locator('[data-mp-statutory]');
+    await sv.waitFor({ timeout: 15000 });
+    await sv.locator('[data-mp-st="from"]').fill('2026-10-01');
+    await sv.locator('[data-mp-st="delta"]').fill('26');
+    await sv.locator('[data-mp-st="ref"]').fill('E2E VDA Oct 2026');
+    await sv.locator('[data-mp-arr-add]').click();
+    await readJson(page, 'manpower_settings', {}, (v) => v?.wage_revisions?.some((r) => r.delta_day === 26), 15000);
+    const amt = sv.locator('[data-mp-arr-amt="e2e-mpd-i1"]');
+    await amt.waitFor({ timeout: 15000 });
+    check(/122 × ₹26 \+ 31 × ₹26 = ₹3,978/.test(await amt.innerText()), `Sunrise October: 153 duties × ₹26 = ₹3,978 (${await amt.innerText()})`);
+    await sv.locator('[data-mp-arr-make]').click();
+    const dn = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'DEBIT_NOTE' && i.mp?.arrear?.of === 'e2e-mpd-i1'), 15000)).find((i) => i.doc_type === 'DEBIT_NOTE' && i.mp?.arrear?.of === 'e2e-mpd-i1');
+    check(dn?.reverse_charge === true && dn.taxable_value === 3978 && dn.total === 3978 && /^DBN\//.test(dn.invoice_number) && !dn.mp.muster_id, `the debit note: DBN, ₹3,978, reverse charge carried, no tax added (${dn?.invoice_number} ${dn?.total})`);
+    const links = await readJson(page, 'doc_links', [], (v) => v.some((l) => l.from_id === 'e2e-mpd-i1' && l.to_id === dn?.id), 15000);
+    check(links.some((l) => l.from_id === 'e2e-mpd-i1' && l.to_id === dn?.id && l.relation === 'debit_note'), 'linked to the October bill (doc_links)');
+    await sv.locator('[data-mp-arr-raised]').first().waitFor({ timeout: 15000 });
+    check(await sv.locator('[data-mp-arr-make]').count() === 0, 're-running shows the note raised (no second "Make")');
+    // QA20 V6: the note is dated no earlier than its bill (31 Oct) and carries its own 1 % (₹39.78): 1,286 + 39.78.
+    check(dn?.issue_date >= '2026-10-31', `the note never predates its bill (${dn?.issue_date})`);
+    check(/1,325\.78/.test(await sv.locator('[data-mp-tds-exp="E2E-D Sunrise Developers"]').first().innerText()), 'TDS receivable: Sunrise Q3 expected ₹1,325.78 (the bill ₹1,286 + the note\'s ₹39.78)');
+    await sv.locator('[data-mp-st="kind"]').selectOption('psara');
+    await sv.locator('[data-mp-st="state"]').fill('MH');
+    await sv.locator('[data-mp-st="no"]').fill('PSARA/E2E/7');
+    await sv.locator('[data-mp-st="till"]').fill(day(20));
+    await sv.locator('[data-mp-lic-add]').click();
+    await readJson(page, 'manpower_settings', {}, (v) => v?.licences?.some((l) => l.no === 'PSARA/E2E/7'), 15000);
+    await page.reload();
+    await page.getByRole('button', { name: /^Notifications/ }).click({ timeout: 15000 });
+    await page.getByRole('dialog', { name: 'Notifications' }).getByText(/PSARA licence PSARA\/E2E\/7/).first().waitFor({ timeout: 15000 });
+    check(true, 'the bell lists the PSARA licence expiring in 20 days');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+  await step('R18-A society core: Settings → Society profile → Co-operative housing society (nonprofit, explicit society pack); Recurring → Society; tariff: Apply State defaults (Maharashtra) → 7 heads, service ₹3,000 and parking ₹500 → saved; units A-101 (600 sq ft, ₹24 lakh, 1 slot, tax ₹1,200), A-102 (let out), A-901 (1,500 sq ft, ₹60 lakh, 2 slots, tax ₹3,000) with owners → reload → total 2,700 sq ft; preview A-101 ₹6,710, A-102 ₹7,010, A-901 ₹12,010; sinking 0.20 % → the Maharashtra minimum hint (HS27); help; Ctrl+K "maintenance bill"', async () => {
+    const keys = ['settings', 'clients', 'society_units', 'society_settings'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'nonprofit', modules: undefined, industry_packs: undefined, society_kind: undefined, service_kind: undefined, manpower_kind: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'society_units', []);
+    await writeJson(page, 'society_settings', null);
+    await readJson(page, 'society_units', null, (v) => Array.isArray(v) && v.length === 0, 15000);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-society-kind-card="chs"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.society_kind === 'chs', 15000);
+    check(st.business_type === 'nonprofit' && JSON.stringify(st.industry_packs) === '["society"]' && st.modules?.includes('recurring') && st.modules?.includes('accounts'), `Co-operative housing society: nonprofit + explicit ["society"] (${st.industry_packs})`);
+    await page.goto(srv.origin + '/recurring?tab=society&view=heads');
+    await page.locator('[data-society-desk]').waitFor({ timeout: 15000 });
+    check((await page.getByRole('tab').allInnerTexts()).some((t) => /^Society$/.test(t.trim())), 'Recurring lists the Society tab');
+    const hv = page.locator('[data-hs-heads]');
+    await hv.locator('select').first().selectOption('27');
+    await hv.locator('[data-hs-apply-defaults]').click();
+    await hv.locator('[data-hs-head="service"] [data-hs-head-rate]').fill('3000');
+    await hv.locator('[data-hs-head="parking"] [data-hs-head-rate]').fill('500');
+    check(await hv.locator('[data-hs-head="sinking"] [data-hs-head-rate]').inputValue() === '0.25', 'Maharashtra default: sinking 0.25 % a year of cost');
+    await hv.locator('[data-hs-save-tariff]').click();
+    const ss = await readJson(page, 'society_settings', {}, (v) => v?.heads?.length === 7 && v.heads.some((h) => h.kind === 'service' && h.rate === 3000), 15000);
+    check(ss.state === '27' && ss.heads.find((h) => h.kind === 'non_occupancy')?.rate === 10 && ss.heads.find((h) => h.kind === 'education')?.rate === 10, 'tariff saved: 7 heads, NOC 10 %, education ₹10');
+    await page.goto(srv.origin + '/recurring?tab=society&view=units');
+    const unit = async (o) => {
+      await page.locator('[data-hs-new-unit]').click({ timeout: 15000 });
+      const f = page.locator('[data-hs-unit-form]');
+      await f.locator('[data-hs-unit-field="wing"]').fill('A');
+      await f.locator('[data-hs-unit-field="code"]').fill(o.code);
+      await f.getByLabel('Carpet area').fill(String(o.area));
+      await f.getByLabel('Construction cost').fill(String(o.cost));
+      await f.locator('[data-hs-unit-field="parking"]').fill(String(o.slots));
+      await f.locator('[data-hs-unit-field="owner"]').fill(o.owner);
+      if (o.tenant) {
+        await f.locator('[data-hs-unit-field="occupancy"]').selectOption('tenant');
+        await f.locator('[data-hs-unit-field="tenant"]').fill(o.tenant);
+      }
+      await f.locator('[data-hs-typed-head="statutory"]').fill(String(o.tax));
+      await f.locator('[data-hs-save-unit]').click();
+      await readJson(page, 'society_units', [], (v) => v.some((u) => u.code === o.code), 15000);
+    };
+    await unit({ code: 'A-101', area: 600, cost: 2400000, slots: 1, owner: 'E2E Asha Rao', tax: 1200 });
+    await unit({ code: 'A-102', area: 600, cost: 2400000, slots: 1, owner: 'E2E Ravi Shah', tenant: 'E2E Tenant Iyer', tax: 1200 });
+    await unit({ code: 'A-901', area: 1500, cost: 6000000, slots: 2, owner: 'E2E Meena Kulkarni', tax: 3000 });
+    const units = await readJson(page, 'society_units', [], (v) => v.length === 3, 15000);
+    const clients = await readJson(page, 'clients', [], (v) => ['E2E Asha Rao', 'E2E Ravi Shah', 'E2E Meena Kulkarni'].every((n) => v.some((c) => c.name === n && c.hs?.role === 'owner')), 15000);
+    const a102 = units.find((u) => u.code === 'A-102');
+    check(a102?.occupancy === 'tenant' && clients.some((c) => c.id === a102.tenant_id && c.hs?.role === 'tenant') && units.find((u) => u.code === 'A-901')?.parking.length === 2, 'three units; owners are members (Client.hs), the tenant recorded');
+    await page.reload();
+    await page.locator('[data-hs-units]').waitFor({ timeout: 15000 });
+    check(await page.locator('[data-hs-unit]').count() === 3 && /2700/.test(await page.locator('[data-hs-units] tfoot').innerText()), 'after reload the grid lists 3 units, total 2,700 sq ft');
+    await page.getByRole('tab', { name: 'Tariff' }).click();
+    const pv = page.locator('[data-hs-preview]');
+    await pv.waitFor({ timeout: 15000 });
+    const total = async (code) => Number(await pv.locator(`[data-hs-preview-unit="${code}"]`).getAttribute('data-hs-preview-total'));
+    check(await total('A-101') === 6710 && await total('A-102') === 7010 && await total('A-901') === 12010, `preview: A-101 ₹6,710, A-102 ₹7,010 (NOC), A-901 ₹9,010 + ₹3,000 (${await total('A-101')} / ${await total('A-102')} / ${await total('A-901')})`);
+    await page.locator('[data-hs-head="sinking"] [data-hs-head-rate]').fill('0.2');
+    const hint = page.locator('[data-hs-hint="fundLow"]');
+    await hint.waitFor({ timeout: 15000 });
+    check(/below the Maharashtra minimum 0\.25 % \(HS27\)/.test(await hint.innerText()), 'sinking 0.20 %: "below the Maharashtra minimum 0.25 % (HS27)"');
+    await page.locator('[data-hs-head="sinking"] [data-hs-head-rate]').fill('0.25');
+    check(await hint.count() === 0, 'restored 0.25 %: no hint');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="recurring:society"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a Society topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('maintenance bill');
+    await palette.getByRole('option', { name: /Society desk/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "maintenance bill" finds the Society desk');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R18-B society billing run: seed MH society (registered) with A-101 / A-102 (let out) / A-901 → GST view turnover T1 → Bills → Run 2026-10 (bill 1 Oct, due 20 Oct) → one run, 3 bills → reload; A-101 Bill of Supply ₹6,710 with the Sl. 77(c) sentence and property tax as a pure-agent line; A-901 tax invoice GST ₹1,621.80, ₹13,631.80, Circular 109 sentence; run again → "Already billed: 3", no new bill; GST view turnover T1 + ₹20,330 (pass-through ₹5,400 out)', async () => {
+    const keys = ['settings', 'clients', 'society_units', 'society_settings', 'society_runs', 'invoices', 'batch_runs'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const st = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...st, business_type: 'nonprofit', society_kind: 'chs', industry_packs: ['society'], modules: undefined, service_kind: undefined, manpower_kind: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined, profiles: (st.profiles ?? []).map((p) => (p.id === st.activeProfileId ? { ...p, companyGstin: '27AAPFU0939F1ZV', stateCode: '27', gst_scheme: 'regular' } : p)) });
+    const owners = [['e2e-hsb-c1', 'E2E Hsb Asha'], ['e2e-hsb-c2', 'E2E Hsb Ravi'], ['e2e-hsb-c3', 'E2E Hsb Meena']].map(([id, name]) => ({ id, name, email: '', address: '', city: '', zip: '' }));
+    await writeJson(page, 'clients', [...(prev.clients ?? []), ...owners]);
+    const unit = (id, code, owner, o = {}) => ({ id, code, wing: 'A', use: 'residential', occupancy: 'owner', carpet_area: 600, construction_cost: 2400000, parking: [{ slot: `P${id}`, kind: 'covered' }], owner_id: owner, typed: { ptx: 1200 }, status: 'active', updated_at: '2026-10-01T00:00:00.000Z', ...o });
+    await writeJson(page, 'society_units', [unit('e2e-hsb-u1', 'A-101', 'e2e-hsb-c1'), unit('e2e-hsb-u2', 'A-102', 'e2e-hsb-c2', { occupancy: 'tenant' }), unit('e2e-hsb-u3', 'A-901', 'e2e-hsb-c3', { carpet_area: 1500, construction_cost: 6000000, parking: [{ slot: 'P1', kind: 'covered' }, { slot: 'P2', kind: 'covered' }], typed: { ptx: 3000 } })]);
+    const H = (id, kind, basis, rate) => ({ id, name: { svc: 'Service charges', snk: 'Sinking fund', rep: 'Repair fund', ptx: 'Property tax', prk: 'Parking', noc: 'Non-occupancy', edu: 'Education' }[id], kind, basis, rate, active: true, ...(kind === 'statutory' ? {} : { sac: '999598' }) });
+    await writeJson(page, 'society_settings', { state: '27', cycle: 'monthly', bill_day: 1, due_days: 19, area_unit: 'sqft', heads: [H('svc', 'service', 'per_unit', 3000), H('snk', 'sinking', 'cost_pct_pa', 0.25), H('rep', 'repair', 'cost_pct_pa', 0.75), H('ptx', 'statutory', 'typed', 0), H('prk', 'parking', 'per_slot', 500), H('noc', 'non_occupancy', 'pct_of_head', 10), H('edu', 'education', 'fixed_member', 10)] });
+    await writeJson(page, 'society_runs', []);
+    await readJson(page, 'society_settings', null, (v) => v?.heads?.length === 7, 15000);
+    await readJson(page, 'settings', {}, (v) => v.society_kind === 'chs', 15000);
+    await page.goto(srv.origin + '/recurring?tab=society&view=gst');
+    await page.locator('[data-hs-gst]').waitFor({ timeout: 15000 });
+    const t1 = Number(await page.locator('[data-hs-gst]').getAttribute('data-hs-turnover'));
+    await page.goto(srv.origin + '/recurring?tab=society&view=bills');
+    const bv = page.locator('[data-hs-bills]');
+    await bv.waitFor({ timeout: 15000 });
+    await bv.locator('[data-hs-run-period]').fill('2026-10');
+    await bv.locator('[data-hs-bill-date]').fill('2026-10-01');
+    await bv.locator('[data-hs-due]').fill('2026-10-20');
+    await bv.locator('[data-hs-planned="3"]').waitFor({ timeout: 15000 });
+    await bv.locator('[data-hs-run]').click();
+    const mine = (v) => (v ?? []).filter((i) => String(i.hs?.unit?.id ?? '').startsWith('e2e-hsb') && i.hs.period === '2026-10' && i.status !== 'Cancelled');
+    await readJson(page, 'society_runs', [], (v) => v.length === 1 && v[0].period === '2026-10', 15000);
+    const invs = mine(await readJson(page, 'invoices', [], (v) => mine(v).length === 3, 15000));
+    check(invs.length === 3, `one run, three bills (${invs.length})`);
+    await page.reload();
+    const a = invs.find((i) => i.hs.unit.code === 'A-101'), c = invs.find((i) => i.hs.unit.code === 'A-901');
+    check(a?.doc_type === 'BILL_OF_SUPPLY' && a.total === 6710 && a.items.some((l) => l.charge_head_id === 'rule33' && l.amount === 1200 && !(l.tax_rate > 0)), `A-101: Bill of Supply ₹6,710, property tax a pure-agent line (${a?.doc_type} ${a?.total})`);
+    check(c?.doc_type === 'TAX_INVOICE' && c.tax_amount === 1621.8 && c.total === 13631.8, `A-901: tax invoice, GST ₹1,621.80, total ₹13,631.80 (${c?.tax_amount} / ${c?.total})`);
+    const paper = async (inv, re, regime) => {
+      await page.goto(srv.origin + `/invoice/${inv.id}`);
+      await page.getByRole('button', { name: /Preview & download PDF/ }).click({ timeout: 15000 });
+      const dlg = page.getByRole('dialog', { name: 'Document preview' });
+      await dlg.locator(`[data-society-block="${regime}"]`).waitFor({ timeout: 15000 });
+      const txt = await dlg.locator('[data-society-block]').innerText();
+      await page.keyboard.press('Escape');
+      return re.test(txt);
+    };
+    check(await paper(a, /Sl\. 77\(c\)/, 'exempt77c'), 'A-101 prints the Sl. 77(c) declaration');
+    check(await paper(c, /Circular 109\/28\/2019-GST/, 'taxable_whole'), 'A-901 prints the Circular 109 declaration');
+    await page.goto(srv.origin + '/recurring?tab=society&view=bills');
+    await bv.locator('[data-hs-run-period]').fill('2026-10');
+    await bv.locator('[data-hs-bill-date]').fill('2026-10-01');
+    const pl = bv.locator('[data-hs-planned="0"][data-hs-already="3"]');
+    await pl.waitFor({ timeout: 15000 });
+    check(/Already billed: 3/.test(await pl.innerText()) && await bv.locator('[data-hs-run]').isDisabled(), 'run 2026-10 again: "Already billed: 3", nothing to issue');
+    check(mine(await readJson(page, 'invoices', [])).length === 3, 'still three bills');
+    await page.goto(srv.origin + '/recurring?tab=society&view=gst');
+    await page.locator('[data-hs-gst]').waitFor({ timeout: 15000 });
+    const t2 = Number(await page.locator('[data-hs-gst]').getAttribute('data-hs-turnover'));
+    check(Math.round((t2 - t1) * 100) / 100 === 20330, `GST view: FY turnover + ₹20,330 (exempt 11,320 + taxable 9,010; pass-through ₹5,400 out) (${t2 - t1})`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+    await readJson(page, 'society_runs', null, (v) => JSON.stringify(v) === JSON.stringify(prev.society_runs), 15000);
+  });
+
+  // R18-C / R18-D seed: the R18-B society (MH, registered) with interest on arrears (simple, State cap) and receipts to interest first.
+  const hsSeed = async (tag, extra = {}) => {
+    const keys = ['settings', 'clients', 'society_units', 'society_settings', 'society_runs', 'invoices', 'batch_runs', 'transactions', 'series_counters', 'doc_links', 'cost_centres', 'accounts', 'vouchers', 'notes_to_accounts'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const st = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...st, business_type: 'nonprofit', society_kind: 'chs', industry_packs: ['society'], modules: undefined, service_kind: undefined, manpower_kind: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined, profiles: (st.profiles ?? []).map((p) => (p.id === st.activeProfileId ? { ...p, companyGstin: '27AAPFU0939F1ZV', stateCode: '27', gst_scheme: 'regular' } : p)) });
+    const owners = [['c1', 'Asha'], ['c2', 'Ravi'], ['c3', 'Meena']].map(([id, name]) => ({ id: `e2e-${tag}-${id}`, name: `E2E ${tag} ${name}`, email: '', address: '', city: '', zip: '' }));
+    await writeJson(page, 'clients', [...(prev.clients ?? []), ...owners]);
+    const unit = (id, code, owner, o = {}) => ({ id: `e2e-${tag}-${id}`, code, wing: 'A', use: 'residential', occupancy: 'owner', carpet_area: 600, construction_cost: 2400000, parking: [{ slot: `P${id}`, kind: 'covered' }], owner_id: `e2e-${tag}-${owner}`, typed: { ptx: 1200 }, status: 'active', updated_at: '2026-10-01T00:00:00.000Z', ...o });
+    await writeJson(page, 'society_units', [unit('u1', 'A-101', 'c1'), unit('u2', 'A-102', 'c2', { occupancy: 'tenant' }), unit('u3', 'A-901', 'c3', { carpet_area: 1500, construction_cost: 6000000, parking: [{ slot: 'P1', kind: 'covered' }, { slot: 'P2', kind: 'covered' }], typed: { ptx: 3000 } })]);
+    const H = (id, kind, basis, rate) => ({ id, name: { svc: 'Service charges', snk: 'Sinking fund', rep: 'Repair fund', ptx: 'Property tax', prk: 'Parking', noc: 'Non-occupancy', edu: 'Education' }[id], kind, basis, rate, active: true, ...(kind === 'statutory' ? {} : { sac: '999598' }) });
+    await writeJson(page, 'society_settings', { state: '27', cycle: 'monthly', bill_day: 1, due_days: 19, area_unit: 'sqft', heads: [H('svc', 'service', 'per_unit', 3000), H('snk', 'sinking', 'cost_pct_pa', 0.25), H('rep', 'repair', 'cost_pct_pa', 0.75), H('ptx', 'statutory', 'typed', 0), H('prk', 'parking', 'per_slot', 500), H('noc', 'non_occupancy', 'pct_of_head', 10), H('edu', 'education', 'fixed_member', 10)], interest: { from: 'due', on_interest: false }, allocation: 'interest_first', ...extra });
+    await writeJson(page, 'society_runs', []);
+    await readJson(page, 'society_settings', null, (v) => v?.heads?.length === 7 && v.allocation === 'interest_first', 15000);
+    await readJson(page, 'settings', {}, (v) => v.society_kind === 'chs', 15000);
+    const mine = (v) => (v ?? []).filter((i) => String(i.hs?.unit?.id ?? '').startsWith(`e2e-${tag}`) && i.status !== 'Cancelled');
+    const run = async (period, date, due, n) => {
+      await page.goto(srv.origin + '/recurring?tab=society&view=bills');
+      const bv = page.locator('[data-hs-bills]');
+      await bv.waitFor({ timeout: 15000 });
+      await bv.locator('[data-hs-run-period]').fill(period);
+      await bv.locator('[data-hs-bill-date]').fill(date);
+      await bv.locator('[data-hs-due]').fill(due);
+      await bv.locator('[data-hs-planned="3"]').waitFor({ timeout: 15000 });
+      await bv.locator('[data-hs-run]').click();
+      await readJson(page, 'society_runs', [], (v) => v.some((r) => r.period === period), 15000);
+      return mine(await readJson(page, 'invoices', [], (v) => mine(v).length === n, 15000));
+    };
+    const restore = async () => {
+      await page.goto(srv.origin + '/expenses');
+      for (const k of keys) await writeJson(page, k, prev[k]);
+      await readJson(page, 'society_runs', null, (v) => JSON.stringify(v) === JSON.stringify(prev.society_runs), 15000);
+    };
+    return { run, restore };
+  };
+
+  await step('R18-C society dues: Run 2026-10 and 2026-11 with A-101 unpaid → November bill: arrears ₹6,710 (memo) + "Interest on arrears" ₹19.93 (12 % on ₹5,510, 21–31 Oct; not on the ₹1,200 property tax), still exempt (₹5,529.93 counted) → Dues: receipt ₹6,000 split interest first (₹19.93) → saved → A-101 dues ₹7,439.93 → dues certificate as at 5 Nov names ₹7,439.93 and its number, logged on the unit', async () => {
+    const s = await hsSeed('hsc');
+    await s.run('2026-10', '2026-10-01', '2026-10-20', 3);
+    const invs = await s.run('2026-11', '2026-11-01', '2026-11-20', 6);
+    const nov = invs.find((i) => i.hs.unit.code === 'A-101' && i.hs.period === '2026-11');
+    const line = nov?.items.find((l) => l.name === 'Interest on arrears');
+    check(nov?.hs?.arrears?.amount === 6710 && line?.amount === 19.93 && nov.hs.interest?.on === 5510 && nov.hs.interest?.from === '2026-10-21', `A-101 November: arrears ₹6,710 memo, interest ₹19.93 on ₹5,510 from 21 Oct (${nov?.hs?.arrears?.amount} / ${line?.amount} / ${nov?.hs?.interest?.on})`);
+    check(nov?.doc_type === 'BILL_OF_SUPPLY' && nov.hs.test?.counted === 5529.93 && nov.total === 6729.93, `still exempt, ₹5,529.93 counted, total ₹6,729.93 (${nov?.doc_type} ${nov?.hs?.test?.counted} ${nov?.total})`);
+    await page.goto(srv.origin + '/recurring?tab=society&view=dues');
+    const dv = page.locator('[data-hs-dues]');
+    await dv.waitFor({ timeout: 15000 });
+    await dv.locator('[data-hs-asof]').fill('2026-11-05');
+    const a101 = dv.locator('[data-hs-due="A-101"]');
+    await a101.waitFor({ timeout: 15000 });
+    check(Number(await a101.getAttribute('data-hs-open')) === 13439.93, `A-101 dues before the receipt ₹13,439.93 (${await a101.getAttribute('data-hs-open')})`);
+    await a101.locator('[data-hs-act="receipt"]').click();
+    const form = dv.locator('[data-hs-form="receipt"]');
+    await form.locator('input[type="date"]').fill('2026-11-02');
+    await form.locator('[data-hs-amount]').fill('6000');
+    const novSplit = form.locator(`[data-hs-split="${nov.invoice_number}"]`);
+    await novSplit.waitFor({ timeout: 15000 });
+    check(Number(await novSplit.inputValue()) === 19.93, `the split suggests the ₹19.93 interest first (${await novSplit.inputValue()})`);
+    await form.locator('[data-hs-save-receipt]').click();
+    const paid = await readJson(page, 'transactions', [], (v) => v.filter((p) => p.client_id === 'e2e-hsc-c1').reduce((t, p) => t + p.amount, 0) === 6000, 15000);
+    check(paid.filter((p) => p.client_id === 'e2e-hsc-c1').some((p) => p.invoice_id === nov.id && p.amount === 19.93), 'the receipt settles the interest line first');
+    await page.reload();
+    await dv.waitFor({ timeout: 15000 });
+    await dv.locator('[data-hs-asof]').fill('2026-11-05');
+    await dv.locator('[data-hs-due="A-101"][data-hs-open="7439.93"]').waitFor({ timeout: 15000 });
+    check(true, 'Dues: A-101 ₹6,710 + ₹6,729.93 − ₹6,000 = ₹7,439.93');
+    await dv.locator('[data-hs-due="A-101"] [data-hs-act="cert"]').click();
+    await dv.locator('[data-hs-issue-cert]').click();
+    const cert = (await dv.locator('[data-hs-cert]').innerText({ timeout: 15000 })) ?? '';
+    check(/₹7,439\.93/.test(cert) && /A-101\/DC\/1/.test(cert) && /interest to date/.test(cert), `the certificate states ₹7,439.93 with interest to date and its number (${cert.slice(0, 120)})`);
+    await readJson(page, 'society_units', [], (v) => v.find((u) => u.code === 'A-101')?.certificates?.length === 1, 15000);
+    check(true, 'the certificate is logged on A-101');
+    await s.restore();
+  });
+
+  await step('R18-D society funds, accounts and registers: Map funds → three fund cost centres → Run 2026-10 → "Transfer for 2026-10" → one "Society fund transfer" journal: sinking ₹2,250 (500 + 500 + 1,250), repair ₹6,750 → Funds view shows them moved; annual pack (co-operative society) titled "Income and Expenditure Account" with a Receipts and Payments page; Registers: Form J lists three members; audit due in 20 days → reload → the bell lists the audit', async () => {
+    const s = await hsSeed('hsd');
+    await page.goto(srv.origin + '/recurring?tab=society&view=funds');
+    const fv = page.locator('[data-hs-funds]');
+    await fv.waitFor({ timeout: 15000 });
+    await fv.locator('[data-hs-map]').click();
+    const cc = await readJson(page, 'cost_centres', [], (v) => ['Sinking fund', 'Repair and maintenance fund', 'Major repair fund'].every((n) => v.some((c) => c.kind === 'fund' && c.name === n)), 15000);
+    const ss = await readJson(page, 'society_settings', {}, (v) => Object.keys(v?.funds ?? {}).length === 3, 15000);
+    check(Object.keys(ss.funds ?? {}).length === 3 && cc.filter((c) => c.kind === 'fund').length >= 3, 'three fund cost centres mapped');
+    await s.run('2026-10', '2026-10-01', '2026-10-20', 3);
+    await page.goto(srv.origin + '/recurring?tab=society&view=funds');
+    await fv.waitFor({ timeout: 15000 });
+    await fv.locator('[data-hs-fund-period]').fill('2026-10');
+    await fv.locator('[data-hs-transfer]').click();
+    const vs = (await readJson(page, 'vouchers', [], (v) => (v ?? []).some((x) => x.voucher_class === 'Society fund transfer'), 15000)).filter((x) => x.voucher_class === 'Society fund transfer');
+    const cr = (id) => vs.flatMap((x) => x.lines).filter((l) => l.cost_centre_id === id && l.account_id !== 'sales').reduce((t, l) => t + l.cr, 0);
+    check(vs.length === 1 && cr(ss.funds.sinking) === 225000 && cr(ss.funds.repair) === 675000, `one transfer journal: sinking ₹2,250, repair ₹6,750 (${vs.length} / ${cr(ss.funds.sinking)} / ${cr(ss.funds.repair)})`);
+    await page.reload();
+    await fv.locator('[data-hs-fund="sinking"][data-hs-moved="2250"]').waitFor({ timeout: 15000 });
+    check(true, 'Funds view: sinking ₹2,250 moved');
+    await page.goto(srv.origin + '/books?tab=rpt');
+    await page.getByRole('button', { name: 'Annual pack' }).click();
+    await page.locator('[data-annual-fy]').selectOption('2026');
+    await page.getByLabel('Business type').selectOption('cooperative');
+    await page.locator('[data-annual-preview] [data-ap-rp]').waitFor({ timeout: 15000 });
+    const ap = (await page.locator('[data-annual-preview]').textContent()) ?? '';
+    check(/Income and Expenditure Account/.test(ap) && /Receipts and Payments account/.test(ap) && /FUNDS AND LIABILITIES/.test(ap), 'annual pack (co-operative society): I&E title, funds and liabilities, Receipts and Payments page');
+    await page.goto(srv.origin + '/recurring?tab=society&view=registers');
+    const rv = page.locator('[data-hs-registers]');
+    await rv.waitFor({ timeout: 15000 });
+    check(await rv.locator('[data-hs-members="3"]').count() === 1 && /Form J/.test(await rv.locator('[data-hs-reg]').innerText()), 'List of members (Form J): three members with units');
+    const d = new Date(Date.now() + 20 * 864e5);
+    const due = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    await rv.locator('[data-hs-auditor]').fill('E2E Auditors');
+    await rv.locator('[data-hs-audit-field="due_on"]').fill(due);
+    await rv.locator('[data-hs-save-audit]').click();
+    await readJson(page, 'society_settings', {}, (v) => (v?.audit ?? []).some((a) => a.auditor === 'E2E Auditors' && a.due_on === due), 15000);
+    await page.reload();
+    await page.getByRole('button', { name: /^Notifications/ }).click({ timeout: 15000 });
+    await page.getByRole('dialog', { name: 'Notifications' }).getByText(/Society audit .* due on/).first().waitFor({ timeout: 15000 });
+    check(true, 'the bell lists the society audit due in 20 days');
+    await page.keyboard.press('Escape');
+    await s.restore();
+  });
+
 } catch {
   /* already reported */
 } finally {

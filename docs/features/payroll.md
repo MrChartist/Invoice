@@ -7,12 +7,12 @@ Everything is a **working paper — verify with your CA**.
 
 | | |
 |---|---|
-| Route | `/payroll` (lazy, nav under Accounts, owner only; Gateway: Create / Alter → Employee, Vouchers → Payroll voucher, Statutory reports → Payroll via `GATEWAY_EXTENSIONS`) — tabs `?tab=employees · heads · structures · attendance · leave · run · arrears · extras · loans · payments · fnf · reports`, month in `?month=YYYY-MM` (the five 7P tabs are `React.lazy`) |
+| Route | `/payroll` (lazy, nav under Accounts, owner only; Gateway: Create / Alter → Employee, Vouchers → Payroll voucher, Statutory reports → Payroll via `GATEWAY_EXTENSIONS`) — tabs `?tab=employees · heads · structures · attendance · leave · run · arrears · extras · loans · payments · fnf · reports · more`, month in `?month=YYYY-MM` (the five 7P tabs and the 7T `more` tab are `React.lazy`) |
 | UI | `src/pages/Payroll.tsx`, `src/components/payroll/*` (CSS module `Payroll.module.css`) |
-| Lib | `src/lib/payroll/` — `statutory.ts` (PF / ESI / PT / income-tax engines), `compute.ts` (payslip computation, default pay heads), `store.ts` (tables, CRUD, runs, payments), `records.ts` (run / payment readers used by the ledger), `postings.ts` (ledger vouchers), `reports.ts` (payslip HTML, registers, ECR, 24Q, Form 16); 7P: `depth.ts` (pure engines: arrears, loans, leave, gratuity, bonus, F&F, reimbursements, perquisites, PF 7Q / 14B), `depth-records.ts` (readers), `depth-store.ts` (writes, provision journals), `depth-reports.ts` (F&F statement, registers), `books-link.ts` (Books cash book / P&L), `tds-link.ts` (/tds challan list); `src/lib/tally-payroll.ts` (Tally export fragment) |
+| Lib | `src/lib/payroll/` — `statutory.ts` (PF / ESI / PT / income-tax engines), `compute.ts` (payslip computation, default pay heads), `store.ts` (tables, CRUD, runs, payments), `records.ts` (run / payment readers used by the ledger), `postings.ts` (ledger vouchers), `reports.ts` (payslip HTML, registers, ECR, 24Q, Form 16); 7P: `depth.ts` (pure engines: arrears, loans, leave, gratuity, bonus, F&F, reimbursements, perquisites, PF 7Q / 14B), `depth-records.ts` (readers), `depth-store.ts` (writes, provision journals), `depth-reports.ts` (F&F statement, registers), `books-link.ts` (Books cash book / P&L), `tds-link.ts` (/tds challan list); 7T: `followups.ts` (pure: arrear ECR, relief u/s 89, Rule 3 valuation, 17(2)(vii), 201(1A), actuarial journal), `followups-records.ts` / `followups-store.ts`, `grants.ts` (per-user payroll access); `src/lib/tally-payroll.ts` (Tally export fragment) |
 | Statutory values | `src/lib/payroll-rules.ts` — same `Versioned` shape / `ruleAt` as `tax-rules.ts`, kept in its own file so the first-paint bundle (where `tax-rules.ts` lives) does not grow |
-| Strings | `src/i18n/areas/payroll.ts` (English + Hindi, `defineArea`) |
-| Tests | `tests/payroll.test.ts`, `tests/payroll-depth.test.ts` (7P: arrears case, F&F case, loans, leave, gratuity, bonus, EPS at 58, ESI period, senior slabs, 206AA, 80CCD(2), Books / Tally / TDS links, backup, roles); e2e step "payroll: add an employee with a salary structure, run the month, see the payslip net pay" |
+| Strings | `src/i18n/areas/payroll.ts` (English + Hindi, `defineArea`); 7T tab: `src/i18n/areas/payroll-more.ts` |
+| Tests | `tests/payroll.test.ts`, `tests/payroll-depth.test.ts` (7P: arrears case, F&F case, loans, leave, gratuity, bonus, EPS at 58, ESI period, senior slabs, 206AA, 80CCD(2), Books / Tally / TDS links, backup, roles), `tests/payroll-followups.test.ts` (7T: Form 10E case, 17(2)(vii) case, arrear ECR, Rule 3, ESI low wage, PT option, 201(1A), actuarial journal, payroll grant, tables); e2e step "payroll: add an employee with a salary structure, run the month, see the payslip net pay" |
 
 ## Tables (all additive, in backups — `RECORD_TABLES` / `ID_TABLES` in `backup.ts`)
 | table | shape (`src/types/payroll.ts`) |
@@ -32,13 +32,20 @@ Everything is a **working paper — verify with your CA**.
 | `leave_entries` (7P) | `LeaveEntry`: employee, type, kind opening / taken / encash / adjust, date, days, `month` (encashment pay month), optional amount |
 | `payroll_adjustments` (7P) | `PayrollAdjustment`: one-off earning / deduction for a payroll month — tag `reimb` (with `head`; exempt by head + regime unless `taxable_amount` is typed), `bonus`, `adjust` |
 | `perquisites` (7P) | `Perquisite`: employee, accommodation / car / other, `from_month` – `to_month`, taxable value per month |
+| `payroll_relief89` (7T) | `Relief89Record`: employee, FY of receipt, regime, total income incl. arrears, earlier `years[]` (FY, regime, income, arrears), relief (snapshot, recomputed on display), `apply_tds` |
+| `actuarial_valuations` (7T) | `ActuarialValuation`: `ACT/FY…` number, kind gratuity / leave, standard AS-15 / Ind AS 19, valuation date, actuary, report ref, discount / escalation %, opening, current service cost, interest cost, past service cost, benefits paid, actuarial loss (gain negative), closing, plan assets, book balance, posted `voucher_id` / `voucher_number` |
 | `fnf_settlements` (7P) | `FnfSettlement`: `FNF/FY…` number, employee, reason, `pay_month`, notice (none / recover / pay, days, optional amount), leave days / amount, gratuity override, `recover_loans`, other items |
 
 Additive fields (7P): `Employee.dob`, `Employee.notice_days`; `PayHead.nps` (employer NPS, 80CCD(2));
 `PayslipAmount.tag / ref_id / taxable / interest`; `PayslipLine.arrears / perquisites / nps_er / fnf_id / age_band / notes`;
 `PayrollPayment.bsr_code / challan_no / loan_id` and payment kind `loan`.
 
-All tables (the 7P ones too) are in `TABLE_ACTIONS` (`access.ts`) under `payroll.view` and in both backup lists
+Additive fields (7T): `PayHead.superannuation` (employer heads); `ArrearsMonth.eps_wages / edli_wages`; `Perquisite.basis` and
+kinds `meals` / `gift`; `PayslipLine.super_er / esi_low_wage`; `tds_working.relief89 / er_contrib_year / s17_vii`; key
+`payroll_settings.pt_extra_states`; device-local user record `grants` (`mrchartist_inv_auth_users`, never backed up).
+`actuarial_valuations` is in the sync engine's DATED / NUMBERED maps.
+
+All tables (the 7P and 7T ones too) are in `TABLE_ACTIONS` (`access.ts`) under `payroll.view` and in both backup lists
 (`RECORD_TABLES` / `ID_TABLES` in `backup.ts`); companies, vault and folder sync handle them like any other key.
 
 ## Computation (Auto fill)
@@ -78,14 +85,61 @@ All tables (the 7P ones too) are in `TABLE_ACTIONS` (`access.ts`) under `payroll
   `loan:<id>`; leave encashment `leave:<entry>`; adjustments `adj:<id>`; settlement `fnf:notice` / `fnf:leave` /
   `fnf:gratuity` / `fnf:o<n>`. They are not PF / ESI wages, and PT stays on the regular gross.
 
+## 7T — payroll follow-ups (tab "Form 10E · Rule 3 · actuarial", Reports)
+- **EPFO arrear ECR** (Reports → monthly): for the arrears paid with the month, one line per UAN — arrear EPF / EPS / EDLI
+  wages, EE share, EPS share, ER (EPF − EPS) share — as `#~#` text (8 fields) and a working sheet. Arrears saved from 7T on
+  keep their EPS / EDLI wage differences; older records derive them from the EPS / EDLI amounts. *Layout not validated
+  against the portal.*
+- **Relief u/s 89(1) — Form 10E** (Rule 21A, Annexure I Table A): year of receipt — tax on total income with and without the
+  arrears; each earlier year the arrears relate to — tax on that year's total income with and without its share (that
+  year's slabs, rebate, surcharge, cess: `tdsSalaryRuleAnyYear`, earlier table FY 2017-18 to 2022-23 in
+  `TDS_SALARY_EARLIER_RULES`); relief = the first difference − the sum of the others, nil if negative. "Fill from payroll"
+  suggests the earlier-FY arrears (taxable part, by year) and each year's income from its last payslip projection; the
+  incomes must be checked against the employee's returns. A working marked **allow in TDS** (s. 192(2A), Form 10E furnished)
+  reduces the year's tax in the TDS projection from the next auto fill (`tds_working.relief89`, payslip note). Export:
+  Form 10E sheet. The employee must still file Form 10E online.
+- **Rule 3 perquisite valuation** (calculator → saved as a perquisite with its `basis`): motor car (Rule 3(2) Table II) —
+  official only nil, private only actual cost − recovery, mixed by cc (≤ 1,600) and who meets running costs + chauffeur
+  (recoveries not deducted); accommodation (Rule 3(1)) — employer-owned % of salary by city population (10 / 7.5 / 5% on the
+  2011 census from 1 Sep 2023; 15 / 10 / 7.5% on 2001 before), leased the lower of rent and 15% of salary, + furniture 10% a
+  year of cost (or hire), − rent recovered; free meals — cost above ₹50 a meal; gifts — nil below ₹5,000 for the year, the
+  whole year's gifts once it is reached. Interest-free loans stay on the Loans tab (7P).
+- **s. 17(2)(vii)**: employer PF (EPF + EPS), NPS (80CCD(2) heads) and superannuation (employer heads marked
+  "superannuation") for the year — actual FINAL months + this month + the full-month rate for the rest — above ₹7.5 lakh is
+  added to the year's taxable salary in the TDS projection (`tds_working.s17_vii`, payslip note; never in the month's
+  `taxable_gross`, so it is not counted twice). Reports → annual working per employee. 17(2)(viia) accretion is noted only.
+- **ESI low daily wage**: when ESI wages ÷ paid days is within the notified limit (₹176 from 2019, date-keyed), no employee
+  share is deducted; the employer share is still paid (`esi_low_wage`, payslip note).
+- **Interest u/s 201(1A) on salary TDS** (Reports → annual): per final month, TDS deducted on the payroll voucher date vs
+  TDS-on-salary payments with that challan period; each late part bears 1.5% a month or part (calendar months, from the
+  deduction date) when paid after the due date (7th of the next month, 30 April for March), on tax rounded down to ₹100
+  (Rule 119A); unpaid parts run to today. Late deduction (1%) is a pure helper only (`tds201Interest`, `deductibleOn`).
+- **PT on arrears / one-off items** (option per state): for the states ticked, arrears and one-off salary items (tags
+  arrear, bonus, leave, adjust) join the month's gross for the PT slab; reimbursements, gratuity and notice pay never do;
+  the ₹2,500 cap still applies. Off by default (unchanged behaviour).
+- **Per-user payroll access**: the owner ticks a named clerk / viewer; `payroll.view` is stored on that device-local user
+  (`grants`), honoured by `can` / `requireAccess` / `useCan` through `actorCan` (only `GRANTABLE_ACTIONS` count, so a grant can
+  never lift any other permission), audited ("Payroll access granted to …"), and every open tab re-checks at once (the shell
+  remounts on a grant change). A clerk with the grant can run payroll (has `books.edit`); a viewer only looks.
+- **Actuarial valuation entry** (`ACT/FY…`, series counters, period lock on its date): the actuary's figures under AS-15 or
+  Ind AS 19 — opening obligation, current service cost, interest cost, past service cost, benefits paid, actuarial loss
+  (gain negative), closing obligation, plan assets, and the provision already in the books (defaults to the last valuation's
+  net liability, else the opening). The roll-forward must agree within ₹1 before posting. The journal moves the provision to
+  closing − plan assets: Dr Gratuity 6006 / Leave encashment 6007 (P&L part) [Dr / Cr Reserves 1100 — Ind AS 19 gratuity
+  remeasurement in OCI; leave remeasurement stays in P&L] | Cr Provisions 2500 (reversed for a release), through
+  `saveVoucher` (voucher class "Payroll provision"). Benefits paid during the year were already expensed through payroll,
+  which is why only the movement is posted. A posted valuation cannot change or be deleted until its journal is deleted in
+  Books. **The valuation itself (projected unit credit method, assumptions) must come from a qualified actuary — the app
+  does not compute it.**
+
 ## Arrears (back-dated revisions)
 Save the revised structure with its effective date, then Arrears → employee, "effective from" and the pay month →
 Compute → Save. Every FINAL month in between is recomputed with today's structures (same attendance, grid overrides and
 history); the difference per pay head is the arrear. PF follows the recomputed month (its ceiling / EPS rules); ESI is
 worked on the arrear ESI wages at that month's rate only if the employee was covered then (arrears never change
 coverage). The arrears are paid with the pay month's run, **shown in their own table on the payslip**, and taxed in the
-year paid; arrears of an earlier FY add the **relief u/s 89 (Form 10E)** note (not computed). The PF on arrears is in
-the PF payable; an EPFO arrear ECR is not produced. Arrears cannot change once the pay month is final.
+year paid; arrears of an earlier FY add the **relief u/s 89 (Form 10E)** note (computed on the 7T tab). The PF on arrears is
+in the PF payable; the EPFO arrear ECR is in Reports (7T). Arrears cannot change once the pay month is final.
 
 ## Loans & advances
 `LOAN/FY…` (series counters), paid out through a payroll payment of kind `loan` (Dr 3615 Loans & advances to employees
@@ -170,8 +224,8 @@ the run.
 - **Decision: a new access action `payroll.view`, owner only.** Salaries are confidential, so clerks and viewers do not
   see the Payroll screen or nav entry and the payroll tables refuse their writes (`TABLE_ACTIONS`). Writes need both
   `books.edit` and `payroll.view`. The month's Payroll voucher (totals by account) is still visible in the ledger to
-  anyone who can open Books; with one employee that reveals the salary. A per-user grant for a trusted clerk is a
-  possible follow-up.
+  anyone who can open Books; with one employee that reveals the salary. **7T:** the owner may grant `payroll.view` to a
+  named trusted user (see § 7T); still convenience control, not security.
 
 ## Outputs (Reports tab; CSV / Excel through `toCsv` / `downloadXlsx`)
 - **Payslip**: script-free printable HTML (`payslipHtml`, opened with `openPrintable`; every value escaped) with the
@@ -205,14 +259,23 @@ not deducted from taxable salary.
 Gujarat (₹200 from ₹12,000; effective date approximate), Andhra Pradesh / Telangana (₹150 / ₹200) · income tax FY
 2023-24, 2024-25 and 2025-26 slabs (later years reuse FY 2025-26 until a new version is added).
 
+**7T** (all in `payroll-rules.ts`, date-keyed; UNVERIFIED where marked): earlier slabs FY 2017-18 to 2022-23 for Form 10E
+(UNVERIFIED summary) · motor car ₹1,800 / ₹2,400 (+ ₹900 chauffeur), ₹600 / ₹900 when the employee runs it, and the 2025
+revision ₹8,000 / ₹10,000 / ₹3,000 / ₹4,000 (+ ₹3,000) from 1 Apr 2025 (UNVERIFIED notification and effective date) ·
+accommodation 15 / 10 / 7.5% (2001 census) and 10 / 7.5 / 5% (2011 census) from 1 Sep 2023, leased 15% kept after 2023
+(UNVERIFIED), furniture 10% a year · meals ₹50 · gifts ₹5,000 with the whole value taxable once reached (UNVERIFIED reading)
+· s. 17(2)(vii) ₹7.5 lakh from FY 2020-21, EPS share counted in employer PF (UNVERIFIED) · ESI low daily wage ₹100 / ₹137 /
+₹176 (UNVERIFIED dates) · 201(1A) 1% / 1.5% a month or part, calendar-month counting, Rule 119A rounding, due 7th / 30 April
+(UNVERIFIED counting) · arrear ECR layout · PT-on-arrears state rules (you choose the states) · actuarial journal treatment
+(benefits paid expensed through payroll; Ind AS 19 OCI to Reserves 1100).
+
 ## Known gaps
-- Arrears: no EPFO arrear ECR file, no relief u/s 89 computation (noted only), PT not charged on arrears.
-- Gratuity / leave provisions are simple accrual workings (no actuarial valuation); the provision journal posts the
-  amount you type. Leave encashment exemption limbs simplified; no leave calendar, half-day / maternity rules.
-- Perquisite valuation (Rule 3 accommodation / car tables) is typed, not computed; s. 17(2)(vii) (employer PF + NPS +
-  superannuation above ₹7.5 lakh) is not computed.
-- ESI: no exemption of the employee share for low daily wages.
+- 7T: 17(2)(viia) accretion (Rule 3B) not computed; the 17(2)(vii) excess is in the TDS projection only (not yet in Form 16 /
+  24Q Annexure II perquisite lines or a Form 12BA); 201(1A) late deduction is not detected; arrear ECR not validated against
+  the portal; funded gratuity plan-asset movements (contributions, return on assets) are not split; hotel accommodation,
+  EV cars and other Rule 3 variants are typed as "other".
+- The gratuity provision working on the F&F tab is a simple accrual (use the actuarial valuation entry for AS-15 / Ind AS 19).
+  Leave encashment exemption limbs simplified; no leave calendar, half-day / maternity rules.
 - PF: no international workers, no voluntary PF, no EPS proration in the 58th-birthday month.
 - PT for other states must be typed in the grid; PT registration / challans are not produced.
-- TDS 201(1A) interest on salary TDS is not computed (the /tds module computes it for 26Q deductions).
 - The Books cash-basis P&L approximates payroll cost by payments.

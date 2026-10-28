@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, FileUp, Upload } from 'lucide-react';
 import {
   COLUMN_FIELD_LABELS,
@@ -11,6 +11,7 @@ import {
   type ParsedStatement,
 } from '../../lib/bank-recon';
 import { formatDate, formatMoney } from '../../lib/utils';
+import { takeShared } from '../../lib/share-inbox';
 import { useT } from '../../i18n';
 import { bankT } from '../../i18n/areas/bank';
 import controls from '../../styles/controls.module.css';
@@ -65,6 +66,13 @@ export function ImportPanel({ existing, onImport, onCancel }: ImportPanelProps) 
       setReadError(err instanceof Error && (err.name === 'ZipError' || err.name === 'TableLimitError') ? err.message : bankT('errRead'));
     }
   };
+
+  // 8.23: a CSV / Excel statement shared into the app (share target) loads straight away.
+  useEffect(() => {
+    const shared = takeShared('statement')?.[0];
+    if (shared) void load(shared);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const reset = () => {
     setText('');

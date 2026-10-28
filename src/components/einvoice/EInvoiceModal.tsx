@@ -22,6 +22,12 @@ import { unitsDb } from '../../lib/units';
 import { readLinks } from '../../lib/documents';
 import { useT } from '../../i18n';
 import { einvT } from '../../i18n/areas/einvoice';
+import { IrpWindowNote } from './IrpWindowNote';
+import { cancelState } from '../../lib/einvoice-cancel';
+import { ggT } from '../../i18n/areas/gst-guards';
+import { computeValidity, effectiveValidity, parseLocal } from '../../lib/eway-validity'; // R3-C5
+import type { EwayCargo } from '../../types/docs-r3';
+import { dkT } from '../../i18n/areas/desks-r3';
 
 export interface EInvoiceModalProps {
   invoice: InvoiceRecord;
@@ -99,7 +105,7 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
   }, [invoice.id]);
   const [precNo, setPrecNo] = useState(original?.invoice_number ?? '');
   const [precDate, setPrecDate] = useState(original?.issue_date?.slice(0, 10) ?? '');
-  const [countryCode, setCountryCode] = useState('');
+  const [countryCode, setCountryCode] = useState(() => /^[A-Z]{2}\b/i.test(invoice.country_of_destination ?? '') ? invoice.country_of_destination!.slice(0, 2).toUpperCase() : ''); // R4-C1: from the export fields (= cntCodeOf)
   const [portCode, setPortCode] = useState(invoice.port_code ?? '');
   const [dirty, setDirty] = useState(false);
 
@@ -228,11 +234,13 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
             ))}
           </div>
           {meta.irn && <span className={styles.pillOk}>{einvT('irnRecorded')}</span>}
+          {cancelState(meta) !== 'none' && <span className={styles.pill}>{cancelState(meta) === 'done' ? ggT('cnlAllDone') : ggT('cnlPending')}</span>}
         </div>
 
         <div role="tabpanel" id={`${tabsId}-panel`} aria-labelledby={`${tabsId}-${tab}`} className={styles.stack}>
           {tab === 'einvoice' && (
             <>
+              <IrpWindowNote invoice={invoice} hasIrn={!!meta.irn} />
               <ReadinessList result={einv} okText={einvT('einvReady')} />
               <div className={styles.section}>
                 <h3 className={styles.sectionTitle}>{einvT('options')}</h3>
@@ -424,6 +432,34 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                     <input className={controls.input} type="date" value={meta.eway_valid_upto ?? ''} onChange={(e) => patch({ eway_valid_upto: e.target.value })} />
                   </Field>
                 </div>
+                {/* R3-C5: generation time, cargo and distance → Rule 138(10) validity beside the typed value. */}
+                <div className={styles.grid3}>
+                  <Field label={dkT('ev.generatedAt')}>
+                    <input className={controls.input} type="datetime-local" value={(meta.eway_generated_at ?? '').slice(0, 16)} onChange={(e) => patch({ eway_generated_at: e.target.value || undefined })} data-eway-generated />
+                  </Field>
+                  <Field label={dkT('ev.cargo')}>
+                    <select className={controls.select} value={meta.eway_cargo ?? 'normal'} onChange={(e) => patch({ eway_cargo: e.target.value === 'normal' ? undefined : (e.target.value as EwayCargo) })}>
+                      <option value="normal">{dkT('ev.cargo.normal')}</option>
+                      <option value="odc">{dkT('ev.cargo.odc')}</option>
+                      <option value="multimodal_ship">{dkT('ev.cargo.ship')}</option>
+                    </select>
+                  </Field>
+                  <Field label={dkT('ev.distance')}>
+                    <input className={controls.input} type="number" min={0} inputMode="numeric" value={meta.eway_distance_km ?? meta.distance ?? ''} onChange={(e) => patch({ eway_distance_km: e.target.value === '' ? undefined : Math.max(0, Number(e.target.value) || 0) })} />
+                  </Field>
+                </div>
+                {(() => {
+                  const v = effectiveValidity(meta);
+                  const gen = parseLocal(meta.eway_generated_at) ?? parseLocal(meta.eway_date);
+                  if (!gen) return <p className={controls.hint}>{dkT('ev.needGen')}</p>;
+                  const c = computeValidity(gen, Number(meta.eway_distance_km ?? meta.distance) || 0, meta.eway_cargo);
+                  return (
+                    <p className={controls.hint} data-eway-computed>
+                      {dkT('ev.computed', { day: c.day, n: c.days })}
+                      {v.differs ? ` ${dkT('ev.differs', { typed: v.typedDay ?? '' })}` : ''} {dkT('ev.verify')}
+                    </p>
+                  );
+                })()}
               </div>
               {metaIssues.length > 0 && (
                 <ReadinessList

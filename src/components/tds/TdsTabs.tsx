@@ -33,9 +33,12 @@ import { formatDate, formatMoney, todayInput } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
 import { StatCard } from '../ui/StatCard';
 import { EmptyState } from '../ui/EmptyState';
+import { Term } from '../help/Term';
 import { useT } from '../../i18n';
 import { tdsT } from '../../i18n/areas/tds';
 import { o7T } from '../../i18n/areas/gst-tds-7o';
+import { ita25T, ita25Words } from '../../i18n/areas/ita2025';
+import { formText, periodStart, quarterStart, sectionText, withActRef } from '../../lib/ita2025';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import books from '../books/books.module.css';
@@ -63,14 +66,15 @@ export function OverviewTab({ data, fy, today }: { data: TdsData; fy: number; to
   const sum = (list: typeof tds, k: 'deducted' | 'deposited' | 'undeposited' | 'interest') => round2(list.reduce((s, q) => s + q[k], 0));
   const stText = { filed: tdsT('stFiled'), overdue: tdsT('stOverdue'), due: tdsT('stDue'), empty: tdsT('stEmpty') } as const;
   const dueText = { done: tdsT('stDone'), late: tdsT('stLate'), overdue: tdsT('stOverdue'), upcoming: tdsT('stUpcoming') } as const;
-  const table = (title: string, list: typeof tds, word: string) => (
+  // R6-A3: the TDS / TCS heading cells explain themselves (glossary popover).
+  const table = (title: string, list: typeof tds, word: string, term: 'tds' | 'tcs') => (
     <div className={surface.card}>
       <div className={surface.tableWrap}>
         <table className={surface.table}>
           <caption className={surface.srOnly}>{title}</caption>
           <thead>
             <tr>
-              <th scope="col">{title}</th>
+              <th scope="col"><Term id={term}>{title}</Term></th>
               <th scope="col" className={surface.numeric}>{word}</th>
               <th scope="col" className={surface.numeric}>{tdsT('deposited')}</th>
               <th scope="col" className={surface.numeric}>{tdsT('undeposited')}</th>
@@ -104,8 +108,8 @@ export function OverviewTab({ data, fy, today }: { data: TdsData; fy: number; to
         <StatCard label={tdsT('undeposited')} value={inr(sum(tds, 'undeposited'))} icon={CalendarClock} tone={sum(tds, 'undeposited') > 0 ? 'warning' : 'default'} />
         <StatCard label={tdsT('interest')} value={inr(sum(tds, 'interest') + sum(tcs, 'interest'))} icon={FileText} />
       </div>
-      {table(tdsT('kindTds'), tds, tdsT('deducted'))}
-      {table(tdsT('kindTcs'), tcs, tdsT('collected'))}
+      {table(tdsT('kindTds'), tds, tdsT('deducted'), 'tds')}
+      {table(tdsT('kindTcs'), tcs, tdsT('collected'), 'tcs')}
       <div className={surface.card}>
         <div className={surface.tableWrap}>
           <table className={surface.table}>
@@ -128,7 +132,7 @@ export function OverviewTab({ data, fy, today }: { data: TdsData; fy: number; to
                     {d.what === 'deposit'
                       ? tdsT('whatDeposit', { kind: d.kind, period: d.period })
                       : d.what === 'return'
-                        ? tdsT('whatReturn', { form: d.kind === 'TDS' ? '26Q' : '27EQ', period: d.period })
+                        ? tdsT('whatReturn', { form: formText(d.kind === 'TDS' ? '26Q' : '27EQ', periodStart(d.period), ita25Words()), period: d.period })
                         : tdsT('whatCert', { period: d.period })}
                   </td>
                   <td>{formatDate(d.due)}</td>
@@ -190,7 +194,7 @@ export function DeductionsTab({ data, fy, today, canEdit, onChanged, notify }: {
                   return (
                     <tr key={r.key}>
                       <td>{r.payee}<div className={styles.alloc}>{r.pan || 'PANNOTAVBL'}</div></td>
-                      <td>{r.section}</td>
+                      <td>{sectionText(r.section, r.creditedOn, ita25Words())}</td>
                       <td className={surface.mono}>{r.billNumber}</td>
                       <td>{formatDate(r.creditedOn)}</td>
                       <td>{formatDate(r.deductedOn)}</td>
@@ -285,7 +289,7 @@ function ManualModal({ row, onClose, onSaved }: { row: ManualTdsDeduction | null
         <div className={controls.field}>
           <label className={controls.label} htmlFor="md-sec">{tdsT('section')}</label>
           <select id="md-sec" className={controls.select} value={v.section} onChange={(e) => set({ section: e.target.value })}>
-            {TDS_PAYABLE_SECTIONS.map((s) => <option key={s.code} value={s.code}>{s.label}</option>)}
+            {TDS_PAYABLE_SECTIONS.map((s) => <option key={s.code} value={s.code}>{withActRef(s.label, s.code, v.date, ita25Words())}</option>)}
           </select>
         </div>
         <div className={controls.field}>
@@ -522,7 +526,7 @@ export function ReturnsTab({ data, fy, quarter, canEdit, onChanged, notify }: { 
       <div className={`${books.toolbar} no-print`}>
         <div className={styles.subTabs} role="group" aria-label={tdsT('tabReturns')}>
           {(['26Q', '27EQ'] as const).map((f) => (
-            <button key={f} type="button" className={form === f ? books.chipActive : books.chip} aria-pressed={form === f} onClick={() => setForm(f)}>{f === '26Q' ? tdsT('kindTds') : tdsT('kindTcs')}</button>
+            <button key={f} type="button" className={form === f ? books.chipActive : books.chip} aria-pressed={form === f} onClick={() => setForm(f)}>{ita25T(f === '26Q' ? 'kindTds' : 'kindTcs', { form: formText(f, quarterStart(fy, quarter), ita25Words()) })}</button>
           ))}
         </div>
         <div className={books.toolbarGroup}>
@@ -573,7 +577,7 @@ export function Form16aTab({ data, fy, quarter }: { data: TdsData; fy: number; q
   return (
     <div className={books.stack}>
       <div className={`${books.toolbar} no-print`}>
-        <p className={books.muted}>{tdsT('f16aNote')}</p>
+        <p className={books.muted}><strong>{ita25T('formData', { form: formText('16A', quarterStart(fy, quarter), ita25Words()) })}</strong> · {tdsT('f16aNote')}</p>
         <button type="button" className={controls.btnOutline} onClick={() => downloadText(`form-16A-data-${fy}-Q${quarter}.csv`, form16ACsv(list), 'text/csv')}><Download size={16} /> {tdsT('csv')}</button>
       </div>
       {list.length === 0 && <p className={books.muted}>{tdsT('noRows')}</p>}
@@ -597,7 +601,7 @@ export function Form16aTab({ data, fy, quarter }: { data: TdsData; fy: number; q
                 <tbody>
                   {g.rows.map((r, i) => (
                     <tr key={i}>
-                      <td>{r.code}</td>
+                      <td>{sectionText(r.code, r.date, ita25Words())}</td>
                       <td>{formatDate(r.date)}</td>
                       <td className={surface.numeric}>{formatMoney(r.paid)}</td>
                       <td className={surface.numeric}>{formatMoney(r.tds)}</td>

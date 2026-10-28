@@ -19,6 +19,8 @@ import { audit } from './audit';
 import { numberKey } from './invoice-number';
 import { getLockUntil, isDateLocked, prettyDay } from './period-lock';
 import { blankClient, normalizeRecord } from '../store/invoice-defaults';
+import { mergeImported, normalizeAddresses, normalizeContacts } from './contacts';
+import { docDefaultsFromCells } from './party-defaults'; // R3-B5
 
 /* ══════════════════════════════════════════════════════════════
    Scalar parsers
@@ -460,6 +462,17 @@ function buildClientRecord(row: string[], ctx: RowCtx): ClientDraft | null {
   }
   const notes = c('notes');
   if (notes) rec.notes = notes;
+  // R2-B4: first contact person / delivery address (optional columns).
+  const contacts = normalizeContacts([{ name: c('contact_name'), role: c('contact_role'), phone: cleanDigitsCell(c('contact_phone')), email: c('contact_email'), primary: true }]);
+  if (contacts.length) rec.contacts = contacts;
+  const shipState = c('address_state') ? readState(ctx, c('address_state'), '', 'address_state') : undefined;
+  const addresses = normalizeAddresses([{
+    label: c('address_label'), address: c('address_line'), city: c('address_city'), zip: cleanDigitsCell(c('address_pin')),
+    state_code: shipState?.code, gstin: c('address_gstin'), default_ship_to: true,
+  }]);
+  if (addresses.length) rec.addresses = addresses;
+  const docDefaults = docDefaultsFromCells(c); // R3-B5 optional columns
+  if (docDefaults) rec.doc_defaults = docDefaults;
   return rec;
 }
 
@@ -1085,7 +1098,8 @@ export function createLocalSink(): ImportSink {
       for (const { record, matchId } of rows) {
         const at = matchId ? all.findIndex((c) => c.id === matchId) : -1;
         if (at >= 0) {
-          all[at] = { ...all[at], ...record, name: all[at].name, id: all[at].id, updated_at: now };
+          // R2-B4: imported contacts / addresses are added to the party's, never replace them.
+          all[at] = { ...all[at], ...record, ...mergeImported(all[at], record), name: all[at].name, id: all[at].id, updated_at: now };
         } else {
           all.push({ ...blankClient(), ...record, id: generateId(), created_at: now } as Client);
         }

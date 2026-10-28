@@ -2,8 +2,10 @@
  * Books → Reports (WP-2): Tally's "Display More Reports" list — Group Summary, voucher registers, exception reports, statistics and funds flow. Every report drills down
  * through the shared DrillStack (Enter / Esc) to ledgers and vouchers.
  */
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { buildReceivables } from '../../../lib/receivables';
+import { getTable } from '../../../lib/storage';
+import type { CreditLinkRow } from '../../../lib/amount-due';
 import {
   REGISTER_LABELS,
   columnarRegister,
@@ -19,6 +21,10 @@ import type { BooksData, Period } from '../../../lib/books';
 import type { StockPosition } from '../../../lib/inventory';
 import { formatDate } from '../../../lib/utils';
 import { reportsT } from '../../../i18n/areas/reports-engine';
+import { br2T } from '../../../i18n/areas/books-r2';
+import { capT } from '../../../i18n/areas/capture';
+import { duplicateBillPairs } from '../../../lib/bill-duplicates';
+import type { PurchaseRecord } from '../../../types/purchases';
 import { useT } from '../../../i18n';
 import { DrillStack } from './DrillStack';
 import { useDrill, useDrillRows } from './drill-hooks';
@@ -33,14 +39,17 @@ import books from '../books.module.css';
 import styles from './ledger.module.css';
 
 // Ratio Analysis lives in the Books → Ratio analysis tab (src/components/books/tally/RatioTab.tsx), with closing stock.
-export type ReportId = 'group' | 'registers' | 'exceptions' | 'stats' | 'funds';
-const REPORTS: ReportId[] = ['group', 'registers', 'exceptions', 'stats', 'funds'];
+export type ReportId = 'group' | 'registers' | 'exceptions' | 'stats' | 'funds' | 'annual';
+const REPORTS: ReportId[] = ['group', 'registers', 'exceptions', 'stats', 'funds', 'annual'];
+// R2-C1: annual accounts pack with notes to accounts (own lazy chunk).
+const AnnualPackTab = lazy(() => import('./AnnualPackTab'));
 
 interface Props {
   period: Period;
   data: BooksData;
   today: string;
   positions: () => StockPosition[];
+  notify?: (msg: string, tone?: 'success' | 'error') => void;
 }
 
 export function ReportsHub(props: Props) {
@@ -52,6 +61,7 @@ export function ReportsHub(props: Props) {
     exceptions: reportsT('exceptions'),
     stats: reportsT('statistics'),
     funds: reportsT('fundsFlow'),
+    annual: br2T('annual'),
   };
   return (
     <div className={books.stack}>
@@ -62,6 +72,12 @@ export function ReportsHub(props: Props) {
           </button>
         ))}
       </div>
+      {report === 'annual' && (
+        <Suspense fallback={null}>
+          <AnnualPackTab period={props.period} today={props.today} notify={props.notify} />
+        </Suspense>
+      )}
+      {report !== 'annual' && (
       <DrillStack rootTitle={title[report]} resetKey={`${report}:${props.period.start}:${props.period.end}`}>
         {report === 'group' && <GroupSummaryView groupId={null} period={props.period} />}
         {report === 'registers' && <RegistersView period={props.period} />}
@@ -69,6 +85,7 @@ export function ReportsHub(props: Props) {
         {report === 'stats' && <StatisticsView period={props.period} />}
         {report === 'funds' && <FundsFlowView period={props.period} />}
       </DrillStack>
+      )}
     </div>
   );
 }
@@ -180,11 +197,11 @@ function ExceptionsView({ period, data, today, positions }: Props) {
   const drill = useDrill();
   const openVoucher = useOpenVoucher();
   const ex = useMemo(() => {
-    const rec = buildReceivables({ invoices: data.invoices, payments: data.transactions, advances: data.advances });
+    const rec = buildReceivables({ invoices: data.invoices, payments: data.transactions, advances: data.advances, links: getTable<CreditLinkRow>('doc_links') });
     const overdue = rec.parties.flatMap((p) =>
       p.bills.filter((b) => b.daysOverdue > 0).map((b) => ({ party: p.name, number: b.number, dueDate: b.dueDate, outstanding: Math.round(b.outstanding * 100), daysOverdue: b.daysOverdue, invoiceId: b.invoiceId })),
     );
-    return exceptionReport(ledger, period, today, { positions: positions(), overdue });
+    return exceptionReport(ledger, period, today, { positions: positions(), overdue, duplicateBills: duplicateBillPairs(data.purchases as unknown as PurchaseRecord[]) });
   }, [ledger, period, today, data, positions]);
   const reasons: Record<string, string> = {
     cash_negative: reportsT('exCash'),
@@ -251,6 +268,20 @@ function ExceptionsView({ period, data, today, positions }: Props) {
                 <td>{formatDate(v.date)}</td>
                 <td><button type="button" className={styles.rowButton} onClick={() => openVoucher(v)}>{v.kind} {v.number}</button></td>
                 <td>{v.narration}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ))}
+      {section(capT('exDupTitle'), ex.duplicateBills.length, (
+        <table className={surface.table}>
+          <tbody>
+            {ex.duplicateBills.slice(0, 200).map((d) => (
+              <tr key={`${d.a.id}-${d.b.id}`}>
+                <td>{d.b.vendor_name}</td>
+                <td className={surface.mono}>{d.a.bill_number || '—'} / {d.b.bill_number || '—'}</td>
+                <td>{formatDate(d.a.date)} / {formatDate(d.b.date)} · {d.kind === 'exact' ? capT('exDupExact') : capT('exDupNear')}</td>
+                <td className={surface.numeric}>{money(Math.round(d.b.total * 100))}</td>
               </tr>
             ))}
           </tbody>

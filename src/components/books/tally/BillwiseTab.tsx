@@ -3,14 +3,19 @@ import { Info, Trash2, Wallet } from 'lucide-react';
 import { AGE_BUCKETS, adjustAgainstBill, billwisePayables, deleteVendorPayment, payablesTotals, planAllocation, recordSupplierPayment, vendorPaymentsDb, type AgeBucket, type PartyPayables } from '../../../lib/billwise';
 import { PAYMENT_METHODS, paymentsDb, purchasesDb } from '../../../lib/purchases';
 import { vendorsDb } from '../../../lib/vendors';
+import { loadPayableOpeningBills } from '../../../lib/opening-bills';
 import { round2 } from '../../../lib/invoice-calc';
 import { formatDate, formatMoney, todayInput } from '../../../lib/utils';
 import type { PurchaseReturn, VendorPayment } from '../../../types/purchases';
+import type { Payment } from '../../../types/invoice';
 import { getTable } from '../../../lib/storage';
 import { Modal } from '../../ui/Modal';
 import { useCan } from '../../../hooks/useCan';
 import { useT } from '../../../i18n';
 import { tallyT } from '../../../i18n/areas/tally';
+import { c6T } from '../../../i18n/areas/closures-r6';
+import { paymentNeedsApproval } from '../../../lib/purchase-approval-gate';
+import { capT } from '../../../i18n/areas/capture';
 import surface from '../../../styles/surface.module.css';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
@@ -32,7 +37,7 @@ export function BillwiseTab({ asOf, notify, onChanged }: { asOf: string; notify:
   const [adjusting, setAdjusting] = useState<{ vp: VendorPayment; party: PartyPayables } | null>(null);
   const parties = useMemo(() => {
     void version;
-    return billwisePayables({ purchases: purchasesDb.all(), payments: paymentsDb.all(), vendorPayments: vendorPaymentsDb.all(), vendors: vendorsDb.all(), asOf, ageBy, includeSettled: settled, returns: getTable<PurchaseReturn>('purchase_returns') });
+    return billwisePayables({ purchases: purchasesDb.all(), payments: paymentsDb.all(), vendorPayments: vendorPaymentsDb.all(), vendors: vendorsDb.all(), asOf, ageBy, includeSettled: settled, returns: getTable<PurchaseReturn>('purchase_returns'), openingBills: loadPayableOpeningBills(vendorsDb.all()), receipts: getTable<Payment>('transactions') }); // R6-C2: supplier opening bills; R15-A3: netting
   }, [version, asOf, ageBy, settled]);
   const shown = supplier ? parties.filter((p) => partyKey(p) === supplier) : parties;
   const totals = payablesTotals(shown);
@@ -119,7 +124,7 @@ export function BillwiseTab({ asOf, notify, onChanged }: { asOf: string; notify:
                     {p.bills.map((b) => (
                       <tr key={b.purchaseId}>
                         <td className={surface.mono}>
-                          {b.number || '—'}
+                          {b.number || '—'}{b.opening ? ` · ${c6T('openingRef')}` : ''}
                           {b.allocations.length > 0 && (
                             <div className={styles.alloc}>
                               {b.allocations.map((a, i) => (
@@ -146,7 +151,7 @@ export function BillwiseTab({ asOf, notify, onChanged }: { asOf: string; notify:
                         <td />
                         <td className={surface.numeric}>−{rs(a.unallocated)}</td>
                         <td colSpan={2}>
-                          {canEdit && !a.noteId /* WP-3: a debit note's on-account part is managed on the Returns tab */ && (
+                          {canEdit && !a.noteId /* WP-3: a debit note's on-account part is managed on the Returns tab */ && !a.openingId /* R6-C2: on the party's opening bills */ && (
                             <span className={books.toolbarGroup}>
                               {a.unallocated > 0 && p.bills.some((b) => b.balance > 0) && (
                                 <button type="button" className={controls.btnOutline} onClick={() => setAdjusting({ vp: vendorPaymentsDb.get(a.id)!, party: p })}>{tallyT('adjust')}</button>
@@ -206,6 +211,8 @@ function PayBillsModal({ parties, onClose, onSaved }: { parties: PartyPayables[]
     setAlloc(Object.fromEntries(plan.lines.map((l) => [l.purchaseId, String(l.amount)])));
   };
   const save = () => {
+    // 8.44: above the owner's limit a clerk asks for approval per bill (bill's payment dialog) instead.
+    if (paymentNeedsApproval(paid)) return setError(capT('payBillwiseHeld'));
     try {
       recordSupplierPayment({
         vendorId: vendor?.id,

@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { AlertTriangle, Split } from 'lucide-react';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import type { InvoiceItem } from '../../types/invoice';
 import { num } from '../../lib/invoice-calc';
-import { generateId } from '../../lib/storage';
+import { generateId, getTable, KEYS } from '../../lib/storage';
+import { lineFactor } from '../../lib/units';
+import { floorBatches, floorOf, meetsFloor } from '../../lib/mfg/mf-shelf-floor';
 import { formatDate } from '../../lib/utils';
 import {
   batchOptions, fefoBatch, isExpired, serialKey, serialsInStock, serialsSold, splitLineByFefo, withBatch,
@@ -28,7 +30,12 @@ export function LineTracking({ item, index, ctx }: { item: InvoiceItem; index: n
   const godown = item.godown_id || ctx.defaultGodown;
   const where = ctx.multi ? godown : undefined;
   const options = stock?.track_batches && ctx.outgoing ? batchOptions(t, ctx.day, where) : [];
-  const fefo = stock?.track_batches && ctx.outgoing ? fefoBatch(t, ctx.day, where) : undefined;
+  // MF-D2: a client with a minimum remaining shelf life gets FEFO from the batches that meet it (none set = as before).
+  const clientId = useInvoiceStore((s) => s.client?.id);
+  const batchOut = !!stock?.track_batches && ctx.outgoing;
+  const floor = useMemo(() => (clientId && batchOut ? floorOf(getTable<{ id?: string }>(KEYS.clients).find((c) => c.id === clientId)) : undefined), [clientId, batchOut]);
+  const fl = floor ? floorBatches(options, ctx.day, floor, num(item.quantity) * lineFactor(item)) : undefined;
+  const fefo = fl ? fl.ok[0] : stock?.track_batches && ctx.outgoing ? fefoBatch(t, ctx.day, where) : undefined;
 
   // New outgoing line of a batch item: pre-select the batch that expires first (FEFO), once.
   useEffect(() => {
@@ -129,13 +136,14 @@ export function LineTracking({ item, index, ctx }: { item: InvoiceItem; index: n
           <AlertTriangle size={14} aria-hidden="true" /> {edT('ltExpiredAlert', { batch: item.batch_no ?? '', date: formatDate(expiry as string) })}
         </p>
       )}
+      {fl?.message && <p className={styles.trackNote} data-shelf-floor>{fl.message}</p>}
       {short && (
         <p className={styles.trackNote}>
           {edT('ltShort', { n: current.qty, batch: current.batch })}
           <button
             type="button"
             className={`${controls.btnGhost} ${controls.btnSm}`}
-            onClick={() => replaceItem(item.id, splitLineByFefo({ ...withBatch(item, undefined), ...(ctx.multi ? { godown_id: godown } : {}) }, t, ctx.day, generateId))}
+            onClick={() => replaceItem(item.id, splitLineByFefo({ ...withBatch(item, undefined), ...(ctx.multi ? { godown_id: godown } : {}) }, t, ctx.day, generateId, floor ? (b) => meetsFloor(b, ctx.day, floor) : undefined))}
           >
             <Split size={14} aria-hidden="true" /> {edT('ltSplit')}
           </button>

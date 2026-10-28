@@ -3,28 +3,40 @@ import { Link } from 'react-router-dom';
 import { Boxes, Download, IndianRupee, Landmark, Receipt, Store, TrendingUp, Wallet } from 'lucide-react';
 import { useCan } from '../../hooks/useCan';
 import { useToast } from '../ui/useToast';
+import { enabledModules } from '../../lib/shop-mode';
+import { isTileVisible } from '../../lib/shop-presets';
 import { ALL_TILES, computeTiles, forBranch, loadTilePrefs, saveTilePrefs, type TileId } from '../../lib/dashboard-tiles';
 import { loadBooksData } from '../../lib/books';
 import { loadPositions } from '../../lib/inventory';
 import { UNASSIGNED, branchesDb } from '../../lib/branch';
 import { getTable } from '../../lib/storage';
 import { localDb } from '../../lib/localDb';
-import { buildCatalogueHtml } from '../../lib/catalogue-html';
+import { reachT } from '../../i18n/areas/reach';
 import { downloadText } from '../../lib/download';
 import type { CreditLink } from '../../lib/stats';
 import { cn, formatCurrency } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { tilesT } from '../../i18n/areas/extras';
+import { uxT } from '../../i18n/areas/invoicing-ux';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from './tiles.module.css';
+import { defineArea } from '../../i18n/area';
 
 const ApprovalsPanel = lazy(() => import('../approvals/ApprovalsPanel').then((m) => ({ default: m.ApprovalsPanel })));
 const BranchesPanel = lazy(() => import('../branches/BranchesPanel').then((m) => ({ default: m.BranchesPanel })));
 const AmcPanel = lazy(() => import('../amc/AmcPanel').then((m) => ({ default: m.AmcPanel })));
 const LoyaltyPanel = lazy(() => import('../loyalty/LoyaltyPanel').then((m) => ({ default: m.LoyaltyPanel })));
+// 7U business extras (each its own chunk, only when the tile is on).
+const AgentsPanel = lazy(() => import('../extras7u/AgentsPanel').then((m) => ({ default: m.AgentsPanel })));
+const OffersPanel = lazy(() => import('../extras7u/OffersPanel').then((m) => ({ default: m.OffersPanel })));
+// 8G: Today card + offline insights (own chunks).
+const TodayPanel = lazy(() => import('../invoicing-ux/TodayPanel'));
+const InsightsPanel = lazy(() => import('../invoicing-ux/InsightsPanel'));
+const PharmaPanel = lazy(() => import('../extras7u/PharmaPanel').then((m) => ({ default: m.PharmaPanel })));
+const GiftVoucherTile = lazy(() => import('../retail/GiftVoucherTile')); // R4-B1
 
-const TILE_LABEL: Record<TileId, Parameters<typeof tilesT>[0]> = {
+const TILE_LABEL: Record<Exclude<TileId, 'today' | 'insights' | 'giftVouchers'>, Parameters<typeof tilesT>[0]> = {
   receivables: 'receivables',
   payables: 'payables',
   cashBank: 'cashBank',
@@ -35,7 +47,12 @@ const TILE_LABEL: Record<TileId, Parameters<typeof tilesT>[0]> = {
   approvals: 'approvals',
   amcDue: 'amcDue',
   loyalty: 'loyalty',
+  agents: 'agents',
+  offers: 'offers',
+  pharma: 'pharma',
 };
+const gvTileT = defineArea({ tile: 'Gift vouchers' } as const, { tile: 'गिफ़्ट वाउचर' }); // R4-B1
+const tileLabel = (t: TileId) => (t === 'today' ? uxT('tdTitle') : t === 'insights' ? uxT('inTitle') : t === 'giftVouchers' ? gvTileT('tile') : tilesT(TILE_LABEL[t]));
 
 /**
  * Configurable dashboard tiles (WP-9, P1-17). Mounted lazily below the dashboard's own content,
@@ -52,10 +69,10 @@ export function DashboardTiles() {
   const branches = useMemo(() => branchesDb.all(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const data = useMemo(() => {
     const showStock = tiles.includes('lowStock');
-    let stock: { name: string; qty: number; unit: string; reorder: number; isLow: boolean }[] = [];
-    if (showStock) {
+    let stock: { name: string; qty: number; unit: string; reorder: number; isLow: boolean; tracked?: boolean }[] = [];
+    if (showStock || tiles.includes('insights')) {
       try {
-        stock = loadPositions().map((p) => ({ name: p.item.name, qty: p.qty, unit: p.item.unit || '', reorder: Number(p.item.reorder_level) || 0, isLow: p.isLow }));
+        stock = loadPositions().map((p) => ({ name: p.item.name, qty: p.qty, unit: p.item.unit || '', reorder: Number(p.item.reorder_level) || 0, isLow: p.isLow, tracked: !!p.item.track_stock }));
       } catch {
         stock = [];
       }
@@ -63,7 +80,9 @@ export function DashboardTiles() {
     return { books: loadBooksData(), links: getTable<CreditLink>('doc_links'), branches, stock };
   }, [tiles, branches]);
   const v = useMemo(() => computeTiles(forBranch(data, branch)), [data, branch]);
-  const on = (t: TileId) => tiles.includes(t);
+  // Shop mode (8H): tiles of modules this company does not use are hidden (and left out of the picker).
+  const modules = useMemo(() => enabledModules(localDb.settings.get()), []);
+  const on = (t: TileId) => tiles.includes(t) && isTileVisible(t, modules);
 
   const toggle = (t: TileId) => {
     const next = on(t) ? tiles.filter((x) => x !== t) : [...tiles, t];
@@ -75,24 +94,28 @@ export function DashboardTiles() {
     }
   };
 
-  const exportCatalogue = () => {
-    const p = localDb.settings.activeProfile();
+  // Catalogue v2 (8H): photos, categories, MRP badges and a one-message WhatsApp cart (or script-free).
+  const exportCatalogue = async (cart: boolean) => {
     const stock = new Map<string, number>();
     try {
       for (const s of loadPositions()) if (s.item.track_stock) stock.set(s.item.name.trim().toLowerCase(), s.qty);
     } catch {
       /* no stock */
     }
-    const html = buildCatalogueHtml(localDb.items.getAll(), { business: p?.companyName || '', phone: p?.companyPhone, email: p?.companyEmail, address: p?.companyAddress, gstin: p?.companyGstin, stock });
-    downloadText('catalogue.html', html, 'text/html');
-    notify(tilesT('catalogueDone'));
+    try {
+      const { exportCatalogueHtml } = await import('../../lib/catalogue-export');
+      downloadText('catalogue.html', await exportCatalogueHtml({ cart, stock }), 'text/html');
+      notify(tilesT('catalogueDone'));
+    } catch (err) {
+      notify((err as Error).message, 'error');
+    }
   };
 
   const money = (n: number) => formatCurrency(n);
   const stat = (id: TileId, icon: ReactNode, value: string, hint: string, to?: string) => (
     <div className={surface.stat} data-tile={id} key={id}>
       <div className={surface.statTop}>
-        <span className={surface.statLabel}>{tilesT(TILE_LABEL[id])}</span>
+        <span className={surface.statLabel}>{tileLabel(id)}</span>
         <span className={surface.statIcon}>{icon}</span>
       </div>
       <div className={surface.statValue}>{to ? <Link to={to}>{value}</Link> : value}</div>
@@ -115,14 +138,19 @@ export function DashboardTiles() {
           <details className={own.picker}>
             <summary>{tilesT('customise')}</summary>
             <div className={own.pickerBody}>
-              {ALL_TILES.map((t) => (
+              {ALL_TILES.filter((t) => isTileVisible(t, modules)).map((t) => (
                 <label key={t} className={controls.check}>
-                  <input type="checkbox" checked={on(t)} onChange={() => toggle(t)} /> {tilesT(TILE_LABEL[t])}
+                  <input type="checkbox" checked={on(t)} onChange={() => toggle(t)} /> {tileLabel(t)}
                 </label>
               ))}
               {can('view') && (
-                <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={exportCatalogue}>
+                <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => void exportCatalogue(true)}>
                   <Download size={14} /> {tilesT('catalogue')}
+                </button>
+              )}
+              {can('view') && (
+                <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => void exportCatalogue(false)}>
+                  <Download size={14} /> {reachT('catPlain')}
                 </button>
               )}
             </div>
@@ -163,6 +191,8 @@ export function DashboardTiles() {
           </div>
         )}
         <Suspense fallback={null}>
+          {on('today') && <TodayPanel books={data.books} />}
+          {on('insights') && <InsightsPanel books={data.books} stock={data.stock.filter((x) => x.tracked)} />}
           {on('branches') && (
             <div data-tile="branches">
               <BranchesPanel rows={v.branches} canEdit={can('master.edit')} onChanged={() => setTick((t) => t + 1)} notify={notify} icon={<Store size={16} />} />
@@ -171,6 +201,10 @@ export function DashboardTiles() {
           {on('approvals') && <div data-tile="approvals"><ApprovalsPanel notify={notify} /></div>}
           {on('amcDue') && <div data-tile="amcDue"><AmcPanel notify={notify} icon={<Boxes size={16} />} /></div>}
           {on('loyalty') && <div data-tile="loyalty"><LoyaltyPanel notify={notify} /></div>}
+          {on('agents') && <div data-tile="agents"><AgentsPanel notify={notify} icon={<TrendingUp size={16} />} /></div>}
+          {on('offers') && <div data-tile="offers"><OffersPanel notify={notify} icon={<Receipt size={16} />} /></div>}
+          {on('pharma') && <div data-tile="pharma"><PharmaPanel notify={notify} icon={<Boxes size={16} />} /></div>}
+          {on('giftVouchers') && <div data-tile="giftVouchers"><GiftVoucherTile /></div>}
         </Suspense>
       </div>
       <p className={controls.hint}>{tilesT('footnote')}</p>

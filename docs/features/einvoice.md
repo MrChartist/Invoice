@@ -105,3 +105,30 @@ Exported symbols: `bulkCandidates`, `buildBulkEInvoice`, `buildBulkEway`, `parse
 - NIC may change schema details; version strings are in `EInvoicePayload.Version` and `EWAY_VERSION`.
 - WP-6 (`gst-setoff.md`): `ShipDtls` from `invoice.ship_to`, `DispDtls` from the `dispatch` option, `PayDtls` from the sender's bank details / terms / due date (opt out: `withPayment: false`) and `EwbDtls` from `invoice.transport` (opt out: `withEwb: false`) are now generated. Field names / limits per NIC schema v1.1 as best known — verify. The e-Invoice modal has no dispatch-from form yet (option only).
 - Not generated: advance/ref docs other than preceding invoice.
+- 7R (7.126): **consolidated e-Way Bill (EWB-02)** JSON from several EWB numbers for one vehicle — GST reports tab "Consolidated e-Way" (`src/lib/eway-consolidated.ts`; numbers picked from `einvoice_meta.eway_no` or pasted, 12-digit check, vehicle / transport document checks, expired bills flagged). Layout unverified — see `gst-setoff.md`.
+
+## 8D: IRP 30-day window and the cancel flow (8.60, 8.64)
+
+**Reporting window** (`src/lib/gst-guards.ts`, lazy). `IRP_REPORTING_WINDOW_RULES` is keyed by the reporting day:
+
+| From | AATO | Days | Documents | Source |
+| --- | --- | --- | --- | --- |
+| 1 Nov 2023 | ≥ ₹100 crore | 30 | invoices | GSTN advisory 13 Sep 2023 (notes exclusion unverified) |
+| 1 Apr 2025 | ≥ ₹10 crore | 30 | invoices, credit and debit notes | GSTN advisory 5 Nov 2024 |
+
+Day 1 is the document date, so a document of 1 April must be reported by 30 April (GSTN's own example); `irpWindow(doc, aato, today)` returns `{ deadline, day, daysLeft, stage: open | day20 | day27 | closed }`.
+The AATO is the additive profile field `SenderProfile.einvoice_aato` (₹), entered in the e-Invoice dialog (shown when unknown) or on GST reports → GST guards; the live profile matching the document's sender GSTIN wins over the snapshot (AATO changes every year). Unknown AATO = no window shown.
+
+- e-Invoice dialog: countdown banner on the e-Invoice tab (`IrpWindowNote`); bulk list: a "N d left" / "window closed" pill next to the date (`IrpWindowPill`).
+- Bell (`src/lib/gst-guard-alerts.ts`, loaded lazily by `NotificationBell` once an AATO, an e-invoice row or a tax invoice older than two years exists): documents still without an IRN on **day 20** (warning) and **day 27** (critical), and for 7 days after the window closed.
+- e-invoicing mandate thresholds (`EINVOICE_MANDATE_RULES`, by document date, "exceeds"): ₹500 cr (1 Oct 2020) → 100 → 50 → 20 → 10 → ₹5 crore from 1 Aug 2023 (Notification 10/2023-CT). Used by the exceptions list.
+
+**Cancel flow** (`src/lib/einvoice-cancel.ts`, `src/components/einvoice/EinvCancelPanel.tsx`). The cancel dialog of a document with an IRN or e-Way Bill loads the panel lazily:
+
+- deadlines: IRN = Ack date + 24 h; e-Way Bill = e-Way date (+ time when known; date only → counted from 00:00, flagged approximate) + 24 h;
+- "Prepare e-Way + IRN cancel JSON" downloads `ewb_cancel_<no>.json` (`{ ewbNo, cancelRsnCode, cancelRmrk }`) then `irn_cancel_<no>.json` (`{ Irn, CnlRsn, CnlRem }`) in the NIC API shape (the app never calls a portal) — the e-Way Bill first, since an active EWB generated with the IRN blocks the IRN cancellation;
+- after the window: IRN → issue a credit note (it stays valid); EWB → the recipient may reject within 72 h;
+- status on the meta row (additive): `irn_cancel` / `ewb_cancel` = `{ status: prepared | done, reason, remark, prepared_at, done_on? }`; the e-Invoice dialog header shows "portal cancellation pending / cancelled on the portals" (`cancelState`).
+- Reason codes: IRN 1 duplicate, 2 data entry mistake, 3 order cancelled, 4 others; EWB 1 duplicate, 2 order cancelled, 3 data entry mistake, 4 others. Field names / codes as best known — verify.
+
+Tests: `tests/gst-guards-8d.test.ts`.

@@ -11,18 +11,21 @@
  * notice once a fourth falls overdue.
  */
 
-import type { Client, InvoiceRecord, SenderProfile } from '../types/invoice';
+import type { Client, InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
 import { round2 } from './invoice-calc';
 import { effectiveStatus } from './invoice-status';
 import { localDb } from './localDb';
-import { KEYS, appDataSize, generateId, getTable, readRaw, setTable, writeRaw } from './storage';
+import { KEYS, appDataSize, generateId, getTable, peekTable, readRaw, setTable, storageVersion, writeRaw } from './storage';
+import { memoOnReads } from './table-memo';
 import { formatCurrency, formatDate } from './utils';
 import { parseDay } from './dates';
 import { COMPLIANCE_TABLE, FORM_LABELS, pendingReturns, type FiledReturn, type FilerFrequency, type ReturnDue } from './compliance';
 import { todayIso } from './tax-rules';
 import { pdcReminders, validUntil, type PdcKind } from './cheque-reminders';
 import type { Cheque } from '../types/cheques';
-import { receivableBalance } from './rcm';
+import { amountDue, linkedCredits, type CreditLinkRow, type CreditMap } from './amount-due';
+import { COLLECTION_NOTES_TABLE, promiseNotices, receiptsByParty, type CollectionNote, type PartyReceipt } from './collections';
+import { localDayOf } from './dates';
 
 /* ── Types ──────────────────────────────────────────────────── */
 
@@ -56,6 +59,11 @@ export interface NotificationContext {
   gstFrequency?: FilerFrequency;
   /** Cheque register (6.26) — post-dated cheque reminders. */
   cheques?: Cheque[];
+  /** Live credit notes per invoice (`linkedCredits`, src/lib/amount-due.ts): what they settle is not chased. */
+  credits?: CreditMap;
+  /** R2-A4: collection follow-ups (promises-to-pay) and the money received per party. */
+  collectionNotes?: CollectionNote[];
+  partyReceipts?: PartyReceipt[];
 }
 
 export type NotificationProvider = (ctx: NotificationContext) => AppNotification[];
@@ -105,10 +113,9 @@ function parseDate(value?: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function outstanding(inv: InvoiceRecord): number {
-  const v =
-    receivableBalance(inv);
-  return round2(Math.max(0, v));
+/** Amount due after receipts and linked credit notes (src/lib/amount-due.ts). */
+function outstanding(inv: InvoiceRecord, ctx: Pick<NotificationContext, 'credits'>): number {
+  return amountDue(inv, ctx.credits?.get(inv.id));
 }
 
 const isReceivable = (inv: InvoiceRecord) =>
@@ -123,10 +130,10 @@ function plural(n: number, one: string, many = `${one}s`): string {
 
 export const overdueProvider: NotificationProvider = (ctx) => {
   const rows = ctx.invoices.filter(
-    (i) => isReceivable(i) && effectiveStatus(i, ctx.now) === 'Overdue' && outstanding(i) > 0,
+    (i) => isReceivable(i) && effectiveStatus(i, ctx.now) === 'Overdue' && outstanding(i, ctx) > 0,
   );
   if (!rows.length) return [];
-  const total = round2(rows.reduce((s, i) => s + outstanding(i), 0));
+  const total = round2(rows.reduce((s, i) => s + outstanding(i, ctx), 0));
   return [
     {
       id: `overdue:${rows.length}:${total}`,
@@ -143,14 +150,14 @@ export const overdueProvider: NotificationProvider = (ctx) => {
 export const dueSoonProvider: NotificationProvider = (ctx) => {
   const rows = ctx.invoices.filter((i) => {
     if (!isReceivable(i) || i.status === 'Draft' || i.status === 'Paid') return false;
-    if (outstanding(i) <= 0) return false;
+    if (outstanding(i, ctx) <= 0) return false;
     const due = parseDate(i.due_date);
     if (!due) return false;
     const d = dayDiff(ctx.now, due);
     return d >= 0 && d <= DUE_SOON_DAYS;
   });
   if (!rows.length) return [];
-  const total = round2(rows.reduce((s, i) => s + outstanding(i), 0));
+  const total = round2(rows.reduce((s, i) => s + outstanding(i, ctx), 0));
   return [
     {
       id: `due-soon:${rows.length}:${total}`,
@@ -342,6 +349,41 @@ export const chequeProvider: NotificationProvider = (ctx) => {
   });
 };
 
+/**
+ * R2-A4: "3 promises due today" / "2 promises broken". The id fingerprints the promises, so dismissing one
+ * notice does not hide a new promise falling due.
+ */
+export const promiseProvider: NotificationProvider = (ctx) => {
+  if (!ctx.collectionNotes?.length) return [];
+  const today = localDayOf(ctx.now);
+  const { due, broken } = promiseNotices(ctx.collectionNotes, ctx.partyReceipts ?? [], today);
+  const names = (rows: CollectionNote[]) => rows.slice(0, 3).map((n) => n.party_name || 'party').join(', ') + (rows.length > 3 ? ` +${rows.length - 3} more` : '');
+  const out: AppNotification[] = [];
+  if (due.length) {
+    out.push({
+      id: `promise-due:${today}:${due.map((n) => n.id).join('|')}`,
+      severity: 'warning',
+      title: `${plural(due.length, 'promise')} to pay due today`,
+      detail: `${names(due)} promised ${formatCurrency(round2(due.reduce((s, n) => s + (n.promise?.amount ?? 0), 0)))} by today.`,
+      href: '/receivables?tab=followups',
+      cta: 'Open follow-ups',
+      at: ctx.now.toISOString(),
+    });
+  }
+  if (broken.length) {
+    out.push({
+      id: `promise-broken:${broken.map((n) => n.id).join('|')}`,
+      severity: 'critical',
+      title: `${plural(broken.length, 'promise')} to pay broken`,
+      detail: `${names(broken)} did not pay what was promised. The next reminder suggests the firm wording.`,
+      href: '/receivables?tab=followups',
+      cta: 'Open follow-ups',
+      at: ctx.now.toISOString(),
+    });
+  }
+  return out;
+};
+
 export const BUILTIN_PROVIDERS: NotificationProvider[] = [
   overdueProvider,
   dueSoonProvider,
@@ -352,6 +394,7 @@ export const BUILTIN_PROVIDERS: NotificationProvider[] = [
   missingGstinProvider,
   gstReturnsProvider,
   chequeProvider,
+  promiseProvider, // R2-A4
 ];
 
 /* ── Registry ───────────────────────────────────────────────── */
@@ -486,25 +529,65 @@ export function recordBackup(now: Date = new Date()): void {
   }
 }
 
+/**
+ * PERF-1: the context holds the SHARED parsed tables (`peekTable`) — providers only read them (they
+ * are deep-frozen in dev / tests) — and the derived maps are memoised on the tables they read.
+ */
 export function buildContext(now: Date = new Date()): NotificationContext {
+  const invoices = peekTable<InvoiceRecord>(KEYS.invoices) as InvoiceRecord[];
   return {
     now,
-    invoices: getTable<InvoiceRecord>(KEYS.invoices),
-    clients: getTable<Client>(KEYS.clients),
+    invoices,
+    credits: memoOnReads('notifications:credits', () => linkedCredits(peekTable<CreditLinkRow>('doc_links'), peekTable<InvoiceRecord>(KEYS.invoices))),
+    clients: peekTable<Client>(KEYS.clients) as Client[],
     profile: localDb.settings.activeProfile(),
-    gstFiled: getTable<FiledReturn>(COMPLIANCE_TABLE),
+    gstFiled: peekTable<FiledReturn>(COMPLIANCE_TABLE) as FiledReturn[],
     gstFrequency: localDb.settings.get().gst_filing_frequency,
-    cheques: getTable<Cheque>('cheques'),
+    cheques: peekTable<Cheque>('cheques') as Cheque[],
+    ...promiseContext(),
     lastBackup: getLastBackup(),
     storageUsedBytes: appDataSize() * 2,
     storageQuotaBytes: STORAGE_QUOTA_BYTES,
   };
 }
 
+/** R2-A4: follow-ups and receipts per party, only read when there are follow-ups at all. */
+function promiseContext(): Pick<NotificationContext, 'collectionNotes' | 'partyReceipts'> {
+  const collectionNotes = peekTable<CollectionNote>(COLLECTION_NOTES_TABLE).filter((n) => n?.promise);
+  if (!collectionNotes.length) return {};
+  const partyReceipts = memoOnReads('notifications:partyReceipts', () =>
+    receiptsByParty(peekTable<InvoiceRecord>(KEYS.invoices), peekTable<Payment>(KEYS.transactions), peekTable<Client>(KEYS.clients)));
+  return { collectionNotes, partyReceipts };
+}
+
 /** Convenience for the bell: current visible notifications from live data. */
 export function loadVisibleNotifications(now: Date = new Date()): VisibleNotification[] {
   const all = collectNotifications(buildContext(now));
   return applyState(all, loadNotifState(), now);
+}
+
+/**
+ * PERF-1 (the bell's poll / focus / cross-tab refresh): the providers' result is reused while nothing
+ * stored through `storage.ts` changed (`storageVersion`), the local day is the same and less than
+ * `NOTIF_RECOMPUTE_MS` passed; read / snooze state is applied fresh every time. `force` recomputes.
+ */
+export const NOTIF_RECOMPUTE_MS = 5 * 60_000;
+let reused: { key: string; at: number; list: AppNotification[] } | null = null;
+
+export function reusableVisibleNotifications(now: Date = new Date(), force = false): VisibleNotification[] {
+  const day = localDayOf(now);
+  const t = now.getTime();
+  if (force || !reused || reused.key !== `${storageVersion()}|${day}` || t - reused.at >= NOTIF_RECOMPUTE_MS || t < reused.at) {
+    const list = collectNotifications(buildContext(now));
+    // Keyed on the version after the run, in case a provider wrote while running.
+    reused = { key: `${storageVersion()}|${day}`, at: t, list };
+  }
+  return applyState(reused.list, loadNotifState(), now);
+}
+
+/** Tests: forget the reused provider result. */
+export function resetNotificationReuse(): void {
+  reused = null;
 }
 
 /** Unique id helper for custom providers that need one-off notices. */

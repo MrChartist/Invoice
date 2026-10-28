@@ -15,6 +15,8 @@ import { assertUnlocked, type LockAction } from './period-lock';
 import { releaseAttachments, releaseDropped } from './attachments';
 import { supplierPayable } from './purchase-normalize';
 import { assertRemovable, liveRemovalIssues } from './stock-timeline';
+import { assertBillApproval } from './purchase-approval-gate';
+import { applyQcHold } from './receipt-notes'; // R6-C1: QC hold on bill-only receipts
 
 export const PURCHASES_TABLE = 'purchases';
 export const PAYMENTS_TABLE = 'purchase_payments';
@@ -74,7 +76,9 @@ function toItem(l: PurchaseLine): InvoiceItem {
     quantity: num(l.quantity),
     rate: num(l.rate),
     tax_rate: num(l.tax_rate),
-    amount: round2(num(l.quantity) * num(l.rate)),
+    // R9 (RT-A4): the line discount typed on the bill reduces the taxable value; free units (`free_qty`) add none.
+    ...(num(l.discount_percent) > 0 ? { discount_percent: Math.min(num(l.discount_percent), 100) } : {}),
+    amount: round2(num(l.quantity) * num(l.rate) * (1 - Math.min(Math.max(num(l.discount_percent), 0), 100) / 100)),
   };
 }
 
@@ -102,6 +106,23 @@ export function computePurchaseTotals(
     tax: calc.tax_amount,
     total: calc.total,
   };
+}
+
+/**
+ * What a bill form holds that the user typed (QA-3 F12): the vendor, bill no., notes and every line with a name or
+ * amount. Blank lines are ignored, so an untouched "add bill" form equals its starting snapshot.
+ */
+export function billFormSnapshot(f: { vendorId: string; billNumber: string; lines: readonly Pick<PurchaseLine, 'name' | 'quantity' | 'rate' | 'tax_rate' | 'hsn'>[]; notes: string }): string {
+  const lines = f.lines
+    .filter((l) => String(l.name ?? '').trim() || Number(l.rate) > 0)
+    .map((l) => [String(l.name ?? '').trim(), Number(l.quantity) || 0, Number(l.rate) || 0, Number(l.tax_rate) || 0, String(l.hsn ?? '').trim()]);
+  return JSON.stringify([f.vendorId || '', f.billNumber.trim(), f.notes.trim(), lines]);
+}
+
+/** Label key for the quick-expense amount (QA-3 F11): it says whether the typed amount includes GST. */
+export function expenseAmountLabel(taxRate: number, inclusive: boolean): 'amountRs' | 'amountInclGst' | 'amountExGst' {
+  if (!(taxRate > 0)) return 'amountRs';
+  return inclusive ? 'amountInclGst' : 'amountExGst';
 }
 
 /**
@@ -331,7 +352,8 @@ function writeBill(input: Omit<PurchaseRecord, 'id'> & { id?: string }): Purchas
     ...existing,
     ...input,
     id: existing?.id ?? input.id ?? generateId(),
-    amount_paid: round2(num(input.amount_paid)),
+    // QA10 R15: a bill settled in full by a journal (a financier's withheld fee) is never shown as due.
+    amount_paid: input.settled_by_voucher ? Math.max(round2(num(input.amount_paid)), supplierPayable(input)) : round2(num(input.amount_paid)),
     created_at: existing?.created_at ?? now(),
     updated_at: now(),
   };
@@ -339,6 +361,43 @@ function writeBill(input: Omit<PurchaseRecord, 'id'> & { id?: string }): Purchas
   // Receipts this bill no longer lists (6.12) are deleted unless another record uses them.
   if (existing) releaseDropped(existing.attachments, record.attachments);
   return record;
+}
+
+/**
+ * R6-C1: a goods bill booked without a GRN receives its stock itself, so its new stock lines follow the GRN rule
+ * (`applyQcHold`: a `qc_on_receipt` item with no godown goes to the QC hold godown). Lines that bill a GRN line
+ * (goods came in on the GRN) and lines already on the bill before this edit are left alone, so an edit never moves
+ * goods that were held or released.
+ */
+export function withBillQcHold<B extends { kind?: string; lines?: PurchaseLine[] }>(bill: B, existing?: { lines?: PurchaseLine[] }): B {
+  if (bill.kind === 'EXPENSE' || !bill.lines?.length) return bill;
+  const before = new Set((existing?.lines ?? []).map((l) => l.id).filter(Boolean));
+  const fresh = bill.lines.filter((l) => !l.grn_line_id && !before.has(l.id));
+  if (!fresh.length) return bill;
+  const held = new Map(applyQcHold(fresh).map((l, i) => [fresh[i], l]));
+  return { ...bill, lines: bill.lines.map((l) => held.get(l) ?? l) };
+}
+
+/* ── R6-C1: QC reject → pre-filled debit note ───────────────────── */
+
+/** `/expenses?tab=returns&new=dn&bill=<id>&lines=<lineId>:<qty>,…` — a debit note on the bill with the rejected lines. */
+export function debitNotePrefillHref(billId: string, lines: readonly { id: string; quantity: number }[]): string {
+  const spec = lines.filter((l) => l.id && num(l.quantity) > 0).map((l) => `${l.id}:${round2(num(l.quantity))}`).join(',');
+  return `/expenses?tab=returns&new=dn&bill=${encodeURIComponent(billId)}${spec ? `&lines=${encodeURIComponent(spec)}` : ''}`;
+}
+
+/** Reads `bill` / `lines` back (unknown or malformed parts are dropped; quantities must be positive). */
+export function parseDebitNotePrefill(params: { get(name: string): string | null }): { billId?: string; qty: Record<string, number> } {
+  const billId = (params.get('bill') ?? '').trim() || undefined;
+  const qty: Record<string, number> = {};
+  for (const part of (params.get('lines') ?? '').split(',')) {
+    const at = part.lastIndexOf(':');
+    if (at <= 0) continue;
+    const id = part.slice(0, at).trim();
+    const q = Number(part.slice(at + 1));
+    if (id && Number.isFinite(q) && q > 0) qty[id] = round2(q);
+  }
+  return { billId, qty };
 }
 
 export const purchasesDb = {
@@ -351,7 +410,13 @@ export const purchasesDb = {
     const existing = input.id ? purchasesDb.get(input.id) : undefined;
     if (existing) assertBillUnlocked(existing, 'edit');
     assertBillUnlocked({ id: input.id ?? '', date: input.date, bill_number: input.bill_number }, existing ? 'edit' : 'create');
-    return writeBill(input);
+    assertBillApproval(input, existing); // 8.44: a clerk's bill above the threshold waits in purchase_drafts
+    // A posted draft (8C) never carries its draft envelope into the books.
+    const { draft: _draft, ...rest } = input as typeof input & { draft?: unknown };
+    void _draft;
+    const bill = { ...rest };
+    if ((bill as { status?: unknown }).status === 'draft') delete bill.status; // other legacy statuses (cancelled) are kept
+    return writeBill(withBillQcHold(bill, existing));
   },
 
   /**
@@ -378,6 +443,8 @@ export const purchasesDb = {
     if (bill) assertBillUnlocked(bill, 'delete');
     // WP-3: a debit note / supplier credit note is adjusted against this bill — delete the note first.
     if (getTable<{ purchase_id?: string }>('purchase_returns').some((n) => n?.purchase_id === id)) throw new Error('A debit note or supplier credit note is recorded against this bill. Delete the note first.');
+    // QA11 C5: a measured sub-contractor bill goes with its measurement (and deductions journal), from its own screen.
+    if (getTable<{ purchase_id?: string; status?: string }>('sub_measurements').some((m) => m?.purchase_id === id && m.status !== 'cancelled')) throw new Error('This sub-contractor bill was made from a measurement. Cancel it in Time → Works → Sub-contracts (its deductions journal goes with it).');
     if (bill) assertRemovable(liveRemovalIssues({ refType: 'purchase', refId: id }), opts.confirmStock);
     setTable(PURCHASES_TABLE, purchasesDb.all().filter((p) => p.id !== id));
     setTable(PAYMENTS_TABLE, paymentsDb.all().filter((p) => p.purchase_id !== id));

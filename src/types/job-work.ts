@@ -39,6 +39,8 @@ export interface JobWorkLine {
   goods_kind?: JobWorkGoodsKind;
   /** Material In: the Material Out challan line this line settles (absent = oldest open line, FIFO). */
   out_line_id?: string;
+  /** Additive (7S): serials of a serial-tracked item sent / received, one per unit (count = qty, base unit). */
+  serials?: string[];
 }
 
 /** What a Material In line is. */
@@ -98,6 +100,11 @@ export interface MaterialOut {
   lines: JobWorkLine[];
   /** e-Way bill number, when one was generated (Rule 138). */
   eway_bill_no?: string;
+  /** Additive (7S): transport details for the e-Way bill JSON (sub-type job work). */
+  vehicle_no?: string;
+  transporter_id?: string;
+  transporter_name?: string;
+  distance_km?: number;
   /** Commissioner's extension of the return period (Sec 143(1) proviso), yyyy-mm-dd. */
   extended_until?: string;
   narration?: string;
@@ -156,7 +163,11 @@ export interface PrincipalMovement {
   /** The principal's challan number / date (receipt) or our challan (return). */
   challan_no?: string;
   challan_date?: string;
-  lines: { id: string; name: string; qty: number; unit?: string; hsn?: string; value?: number; processed?: boolean }[];
+  /**
+   * `godown_id` / `batch_no` (additive, 7S): where the principal's goods lie with us and under which batch — a
+   * register only; they never enter our stock.
+   */
+  lines: { id: string; name: string; qty: number; unit?: string; hsn?: string; value?: number; processed?: boolean; godown_id?: string; batch_no?: string }[];
   narration?: string;
   created_at?: string;
   updated_at?: string;

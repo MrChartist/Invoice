@@ -145,7 +145,12 @@ import { loadLedger, loadStockValuer } from '…/lib/ledger';
   `buildFrame(…, { branchId })`. `''` = company, a branch id, or `UNASSIGNED` ("No branch").
 - Whole vouchers are kept or dropped (`scopeLedger`, cached per ledger), using the branch `buildLedger` recorded for each
   voucher from its source row (`Ledger.voucherBranch`, set when `LedgerInput.branches` is given — `loadLedgerInput` does).
-  Branch TBs balance and add up to the company TB (tested). A branch view passes no stock valuer (stock is company-wide).
+  Branch TBs balance and add up to the company TB (tested). **Branch closing stock (7S, `src/lib/ledger/branch-stock.ts`)**:
+  a branch view passes `loadBranchStockValuer(branchId)` — Σ items max(quantity in the branch's godowns, 0) × the item's
+  company-wide unit cost that day (godowns by `Branch.godown_id` and the godowns inside it; every godown move counted);
+  `openingIn` = opening stock placed there. "No branch" takes company valuation − Σ branches, so branch statements add up
+  to the company (journal / Stock-in-hand opening netting stays with "No branch"). Typed (manual) closing stock is not
+  split: branch views then show no stock, as before. Books and Gateway Display both use it.
 - UI: `LedgerPanel` keeps the full ledger for the chart / vouchers / planning tabs and gives the statements the scoped one
   (branch filter above the report, with a note); Gateway Display keeps the branch in the URL (`b=`).
 
@@ -172,4 +177,7 @@ import { loadLedger, loadStockValuer } from '…/lib/ledger';
 - The Gateway Display viewer builds its BS / P&L from `ledgerBalanceSheet` / `ledgerProfitAndLoss` with
   `loadStockValuer()` (same figures as Books, tested) and its heads drill into the same Schedule III detail as Books; it
   keeps its own URL-based frame model (Back / Esc walk the path) rather than mounting `DrillStack`.
-- Closing stock per godown / cost centre and "lower of cost or NRV" are not modelled.
+- ~~Closing stock per godown~~ — 7S (branch scope above); per cost centre and "lower of cost or NRV" are not modelled.
+
+## 8G additions
+- **MTD / QTD / YTD** period presets; **saved views** (device-local: tab + period + every report's F12 options) and **month-end packs** (ZIP of P&L, BS, ageing, GSTR-1 / 3B papers; bell-offered schedule). See `docs/features/invoicing-ux.md` § 8.107 / 8.109.

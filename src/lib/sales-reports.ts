@@ -6,13 +6,16 @@
  *
  *   sum(customer.total)          == stats.summarize(period docs).billed   (gross of GST, net of credit notes)
  *   sum(customer.income)         == books.profitAndLoss(period).income    (taxable + charges + round-off)
- *   sum(tax-by-rate cgst+sgst+igst) == books.gstSummary(period).outputTotal
+ *   sum(tax-by-rate cgst+sgst+igst) == books.gstSummary(period).outputTotal  (except the tax of a GST-variant FCN, below)
  *   sum(payment modes)           == cash + bank receipts in the Books cash book
  *   sum(expense rows)            == books.profitAndLoss(period).totalExpenses (accrual)
  *
  * Rules shared with Books: sales = INVOICE / TAX_INVOICE that are not Draft / Cancelled;
  * credit notes (live) are netted off on their own issue date; quotations / proformas / challans
- * never count. Only INR documents are summed (amounts in different currencies are never added);
+ * never count. A financial credit note (FCN: settlement discount, kasar, bad debt — `financial-note.ts`) is
+ * NOT a sales return: like the P&L (Discount allowed / Bad debts, an indirect expense) and the Dashboard, these
+ * reports leave it out, so sales by customer / item / month keep the billed value (QA5 F13). The tax of the
+ * optional GST variant (Sec 15(3)) is in the GST reports (GSTR-1 CDNR / CDNUR), not in "Tax by rate". Only INR documents are summed (amounts in different currencies are never added);
  * `excludedForeign` says how many were left out.
  *
  * Dates are ISO `YYYY-MM-DD` strings compared lexically — never `new Date('YYYY-MM-DD')`.
@@ -30,6 +33,9 @@ import {
 import { isoDay, localDayOf } from './dates';
 import { isOutwardRcm, supplierView } from './rcm';
 import { toCsv } from './csv';
+import { isFinancialNote } from './financial-note';
+import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
+import { bankAccountsDb, isClientMoneyAccount } from './bank-accounts'; // R14 PS-B3
 import {
   inPeriod,
   monthLabel,
@@ -41,6 +47,7 @@ import {
 } from './books';
 import type { ItemIndex, StockPosition } from './inventory';
 import type { InvoiceRecord, Payment } from '../types/invoice';
+import type { ProgressReportRow } from './progress-billing';
 
 /* ════════════════════════════════════════════════════════════════
    Documents
@@ -199,6 +206,8 @@ export function salesDocs(invoices: readonly InvoiceRecord[], currency = 'INR'):
   for (const inv of invoices) {
     const sale = isSaleDoc(inv);
     if (!sale && !isCreditNoteDoc(inv)) continue;
+    // QA5 F13: a financial note is a discount / bad debt (expense in the P&L), never a reduction of sales.
+    if (isFinancialNote(inv)) continue;
     if ((inv.currency || 'INR').toUpperCase() !== want) {
       excludedForeign++;
       continue;
@@ -624,11 +633,13 @@ export function canonicalMethod(raw: unknown): string {
 export function paymentModes(payments: readonly Payment[], invoices: readonly InvoiceRecord[], period: Period): { rows: PaymentModeRow[]; total: number; count: number } {
   const foreign = new Set(invoices.filter((i) => (i.currency || 'INR').toUpperCase() !== 'INR').map((i) => i.id));
   const map = new Map<string, PaymentModeRow>();
+  const banks = bankAccountsDb.all();
   for (const p of payments) {
     const date = isoDay(p.date);
+    if (isClientMoneyAccount(p.bank_account_id, banks)) continue; // R14 PS-B3: clients' money, not the firm's
     const amount = round2(Math.abs(num(p.amount)));
     // Advance adjustments (5.3) are not money received in the period.
-    if (!date || amount === 0 || !inPeriod(date, period) || foreign.has(p.invoice_id) || p.advance_id) continue;
+    if (!date || amount === 0 || !inPeriod(date, period) || foreign.has(p.invoice_id) || movedNoCash(p)) continue; // QA6-1 F4: no money moved (`no-cash.ts`)
     const method = canonicalMethod(p.method);
     const r = map.get(method) ?? { method, count: 0, amount: 0, share: 0 };
     r.count++;
@@ -814,6 +825,18 @@ export function sortRows<T>(rows: readonly T[], get: (r: T) => string | number |
       return String(av).localeCompare(String(bv), 'en', { numeric: true, sensitivity: 'base' }) * mult || a.i - b.i;
     })
     .map((x) => x.r);
+}
+
+/**
+ * R2-B2: Progress billing summary (rows from `progressReport` in progress-billing.ts), by party then
+ * quotation / sales order. Taxable values, before GST.
+ */
+export function progressSummaryCsv(rows: readonly ProgressReportRow[]): string {
+  return toCsv([
+    ['Progress billing summary (taxable value, before GST)'],
+    ['Party', 'Document', 'Date', 'Quoted', 'Invoiced', 'Credited', 'Remaining', '% complete', 'Stages', 'Closed'],
+    ...rows.map((r) => [r.party, r.number, r.date, r.quoted, r.invoiced, r.credited, r.remaining, r.percent, r.stages, r.closed ? 'Yes' : 'No']),
+  ]);
 }
 
 export function customersCsv(rep: CustomerReport, period: Period): string {

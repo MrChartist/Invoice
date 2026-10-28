@@ -117,6 +117,63 @@ try {
   const pageErrs = errors.filter((e) => e.kind === 'pageerror');
   check(pageErrs.length === 0, `no uncaught page errors (${pageErrs.length})${pageErrs[0] ? ': ' + pageErrs[0].text.slice(0, 200) : ''}`);
 
+  // ── R16-A1: language packs ──────────────────────────────────────────
+  // English install: no Hindi / regional chunk in any cache; the manifest lists them under `langs` only.
+  const hiPack = manifest.langs?.hi ?? [];
+  const allPacks = [...hiPack, ...(manifest.langs?.regional ?? [])];
+  check(hiPack.length > 0 && hiPack.every((u) => !manifest.files.includes(u)), `manifest: Hindi pack (${hiPack.length} files) listed under langs, not in files`);
+  check(allPacks.every((u) => !cached.urls.includes(u)), 'English install: no language-pack file precached');
+  const cachedUrls = () => page.evaluate(async () => {
+    const urls = [];
+    for (const n of (await caches.keys()).filter((k) => k.startsWith('mci-'))) urls.push(...(await (await caches.open(n)).keys()).map((r) => new URL(r.url).pathname));
+    return urls;
+  });
+  const htmlLang = () => page.evaluate(() => document.documentElement.lang);
+  const langPicker = () => page.getByLabel('Language / भाषा').first();
+
+  // Offline, pack not on the device: switching to Hindi shows the message and the interface stays English.
+  await page.goto(srv.origin + '/');
+  await langPicker().waitFor({ timeout: 10000 });
+  await context.setOffline(true);
+  srv.state.offline = true;
+  await langPicker().selectOption('hi');
+  const offlineMsg = page.locator('[data-lang-offline]');
+  await offlineMsg.waitFor({ timeout: 15000 }).catch(() => {});
+  const msgText = (await offlineMsg.count()) ? await offlineMsg.innerText() : '';
+  check(/Hindi needs one online visit/.test(msgText) && /इंटरनेट/.test(msgText), `offline switch to Hindi without the pack: message shown (${msgText.slice(0, 60) || 'none'})`);
+  check((await htmlLang()) === 'en' && (await langPicker().inputValue()) === 'en', 'offline switch: the interface stays English');
+  check(await page.evaluate(() => localStorage.getItem('mrchartist_inv_lang') !== 'hi'), 'offline switch: Hindi is not saved as the device language');
+  await context.setOffline(false);
+  srv.state.offline = false;
+
+  // Online switch: the worker caches the whole Hindi pack and remembers the language (/__lang__).
+  await langPicker().selectOption('hi');
+  await until(page, () => document.documentElement.lang === 'hi', 20000);
+  let urls = await cachedUrls();
+  const missingHi = hiPack.filter((u) => !urls.includes(u));
+  check(missingHi.length === 0, `online switch to Hindi: the Hindi pack is cached (${hiPack.length - missingHi.length}/${hiPack.length})`);
+  const regionalCached = (manifest.langs?.regional ?? []).filter((u) => urls.includes(u));
+  check(regionalCached.length === 0, `the regional pack is not downloaded for Hindi (${regionalCached.join(', ') || 'none'}; fetched: ${srv.state.log.filter((p) => /lang-regional/.test(p)).length})`);
+  const storedLang = await page.evaluate(async () => {
+    const hit = await (await caches.open('mci-lang')).match('/__lang__');
+    return hit ? hit.text() : null;
+  });
+  check(storedLang === 'hi', `the worker keeps the device language (/__lang__ = ${storedLang})`);
+
+  // Reload offline: Hindi from the cache, first paint included.
+  await context.setOffline(true);
+  srv.state.offline = true;
+  await page.goto(srv.origin + '/');
+  await rendered(page, 'offline / (Hindi)');
+  await page.getByText('खोलने के लिए अपना PIN डालें।').first().waitFor({ timeout: 10000 }).catch(() => {});
+  check((await htmlLang()) === 'hi' && (await page.getByText('खोलने के लिए अपना PIN डालें।').count()) > 0, 'offline reload after the switch: the app opens in Hindi');
+  await context.setOffline(false);
+  srv.state.offline = false;
+
+  // A Hindi device whose pack lost a file (evicted / older build): the next update's install brings it back.
+  const dropped = hiPack[hiPack.length - 1];
+  await page.evaluate(async (u) => { await (await caches.open('mci-assets')).delete(u); }, dropped);
+
   // ── update: new build -> new cache, old cache removed ───────────────
   const tmp = mkdtempSync(join(tmpdir(), 'mci-dist-'));
   try {
@@ -132,6 +189,8 @@ try {
     await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); await r.update(); });
     await until(page, async () => !!(await navigator.serviceWorker.getRegistration()).waiting);
     check(true, 'updated worker installs and WAITS (running page keeps its chunks)');
+    urls = await cachedUrls();
+    check(urls.includes(dropped), `a Hindi device keeps its pack across the update: install re-cached ${dropped}`);
     const shellNames = () => page.evaluate(async () => (await caches.keys()).filter((k) => k.startsWith('mci-shell-')));
     let names = await shellNames();
     check(names.length === 2, `old + new shell caches coexist while waiting (${names.join(',')})`);
@@ -161,6 +220,95 @@ try {
       return { active: !!r.active, waiting: !!r.waiting, caches: (await caches.keys()).filter((k) => k.startsWith('mci-shell-')) };
     });
     check(st.active && !st.waiting && st.caches.length === 1 && st.caches[0] === 'mci-shell-v2test000000', `broken deploy rejected, old worker/cache intact (${JSON.stringify(st)})`);
+
+    // ── QA19 U1: a Hindi device upgrading from a release older than R16-A ──
+    // That worker kept no `/__lang__` and no manifest copy, and its chunks (Hindi inside) had other names. Recreate
+    // that state, deploy a new build, take it over and open the app OFFLINE: it must still be Hindi.
+    const regionalPack = manifest.langs?.regional ?? [];
+    const deploy = (name, patch = () => {}) => {
+      const dir = join(tmp, name);
+      cpSync(v2, dir, { recursive: true });
+      writeFileSync(join(dir, 'sw.js'), readFileSync(join(dir, 'sw.js'), 'utf8').replace('v2test000000', name));
+      const m = JSON.parse(readFileSync(join(dir, 'precache-manifest.json'), 'utf8'));
+      m.version = name;
+      patch(dir, m);
+      writeFileSync(join(dir, 'precache-manifest.json'), JSON.stringify(m));
+      srv.setDist(dir);
+    };
+    const takeOver = async (name) => {
+      await page.evaluate(async () => { await (await navigator.serviceWorker.getRegistration()).update(); });
+      await until(page, async () => !!(await navigator.serviceWorker.getRegistration()).waiting, 30000);
+      await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).waiting.postMessage('SKIP_WAITING'));
+      await until(page, async () => (await caches.keys()).filter((k) => k.startsWith('mci-shell-')).length === 1, 20000);
+      check((await shellNames())[0] === 'mci-shell-' + name, `${name} active`);
+    };
+    // The running (R16) page tells its worker the language on boot, which would re-cache the pack: let that land
+    // first, then wipe what a pre-R16 worker never had.
+    await page.goto(srv.origin + '/');
+    await until(page, async () => !!(await (await caches.open('mci-lang')).match('/__lang__')), 10000).catch(() => {});
+    await page.waitForTimeout(500);
+    await page.evaluate(async ([pack, stale]) => {
+      await caches.delete('mci-lang');
+      for (const n of (await caches.keys()).filter((k) => k.startsWith('mci-shell-'))) await (await caches.open(n)).delete('/__manifest__');
+      const assets = await caches.open('mci-assets');
+      for (const u of pack) await assets.delete(u);
+      await assets.put(stale, new Response('/* a pre-R16 chunk */', { headers: { 'content-type': 'text/javascript' } }));
+    }, [[...hiPack, ...regionalPack], '/assets/zz-pre-r16-stale.js']);
+    deploy('v4upgrade000', (dir, m) => {
+      // A file only this build lists: the next update must keep it (a tab may still run this build).
+      writeFileSync(join(dir, 'assets', 'zz-v4-only.js'), '/* v4 */');
+      m.files.push('/assets/zz-v4-only.js');
+    });
+    await takeOver('v4upgrade000');
+    urls = await cachedUrls();
+    check(hiPack.every((u) => urls.includes(u)), `U1: upgrade from a worker with no recorded language caches the Hindi pack (${hiPack.filter((u) => urls.includes(u)).length}/${hiPack.length})`);
+    check(urls.includes('/assets/zz-pre-r16-stale.js'), 'U2: the replaced build had no manifest copy, so nothing is pruned on this activation');
+    await context.setOffline(true);
+    srv.state.offline = true;
+    await page.goto(srv.origin + '/');
+    await rendered(page, 'U1: offline / after the upgrade');
+    await page.getByText('खोलने के लिए अपना PIN डालें।').first().waitFor({ timeout: 10000 }).catch(() => {});
+    check((await htmlLang()) === 'hi', `U1: first launch after the upgrade is OFFLINE and still Hindi (<html lang="${await htmlLang()}">)`);
+    await context.setOffline(false);
+    srv.state.offline = false;
+
+    // ── QA19 U2: stale build assets are pruned on activate; current core, the device's pack and the replaced build stay ──
+    await until(page, async () => !!(await (await caches.open('mci-lang')).match('/__lang__')), 10000).catch(() => {});
+    deploy('v5prune00000');
+    await page.goto(srv.origin + '/');
+    await takeOver('v5prune00000');
+    urls = await cachedUrls();
+    check(!urls.includes('/assets/zz-pre-r16-stale.js'), 'U2: an asset no current or replaced build lists is pruned');
+    check(urls.includes('/assets/zz-v4-only.js'), 'U2: the replaced build\'s files stay (an open tab may still need them)');
+    const coreMissing = manifest.files.filter((u) => u.startsWith('/assets/') && !urls.includes(u));
+    check(coreMissing.length === 0, `U2: every core asset survives pruning (${coreMissing.length} missing)`);
+    check(hiPack.every((u) => urls.includes(u)), 'U2: the Hindi device keeps its Hindi pack');
+    check(regionalPack.every((u) => !urls.includes(u)), `U2: the regional pack it does not use is pruned (${regionalPack.filter((u) => urls.includes(u)).length} left)`);
+    await context.setOffline(true);
+    srv.state.offline = true;
+    await page.goto(srv.origin + '/invoice');
+    await rendered(page, 'U2: offline /invoice after pruning');
+    check((await htmlLang()) === 'hi', 'U2: offline after pruning, still Hindi');
+    await context.setOffline(false);
+    srv.state.offline = false;
+
+    // ── QA19 U3: first visit on a Hindi device: the worker that claims the page learns the language and caches the pack ──
+    const ctx3 = await browser.newContext({ serviceWorkers: 'allow' });
+    await seedAuth(ctx3, { mrchartist_inv_lang: 'hi' });
+    const p3 = await ctx3.newPage();
+    watch(p3, errors);
+    await p3.goto(srv.origin + '/');
+    await p3.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 30000 });
+    const p3Has = () => p3.evaluate(async (pack) => {
+      const a = await caches.open('mci-assets');
+      let n = 0;
+      for (const u of pack) if (await a.match(u)) n++;
+      return n;
+    }, hiPack);
+    const end3 = Date.now() + 20000;
+    while (Date.now() < end3 && (await p3Has()) < hiPack.length) await p3.waitForTimeout(200);
+    check((await p3Has()) === hiPack.length, `U3: first visit in Hindi — once the worker claims the page, the Hindi pack is cached (${await p3Has()}/${hiPack.length})`);
+    await ctx3.close();
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

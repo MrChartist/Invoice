@@ -1,20 +1,24 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BellOff, Copy, Mail, MessageCircle, MessageSquare } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/useToast';
 import type { InvoiceRecord } from '../../types/invoice';
 import {
   STAGE_ORDER,
-  buildReminder,
   lastReminder,
   remindersFor,
   suggestStage,
   type ReminderChannel,
-  type ReminderLanguage,
   type ReminderRecord,
   type ReminderStage,
 } from '../../lib/reminders';
 import { interestForReminder } from '../../lib/interest';
+import { MESSAGE_LANGS, buildReminderIn, isMessageLang, messageLangOf, type MessageLang } from '../../lib/message-langs';
+import { localDb } from '../../lib/localDb';
+
+/** The party's message language: from the document's client snapshot, else the client record. */
+const partyLang = (invoice: InvoiceRecord): MessageLang =>
+  messageLangOf(invoice.client) ?? messageLangOf(invoice.client?.id ? localDb.clients.getById(invoice.client.id) : undefined) ?? 'en';
 import { isValidEmail, mailtoLink, normalizePhone, smsLink, whatsappLink } from '../../lib/share';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { cn } from '../../lib/utils';
@@ -22,7 +26,8 @@ import controls from '../../styles/controls.module.css';
 import styles from './share.module.css';
 import { copyText, openLink } from './clipboard';
 import { useReminderLog } from './useReminderLog';
-import { receivableBalance } from '../../lib/rcm';
+import { amountDue, linkedCredits, type CreditLinkRow } from '../../lib/amount-due';
+import { getTable } from '../../lib/storage';
 import { useT } from '../../i18n';
 import { shareT } from '../../i18n/areas/share';
 import { remindT } from '../../i18n/areas/reminders';
@@ -63,11 +68,37 @@ function ReminderModalBody({
   const [channel, setChannel] = useState<Composer>(() =>
     normalizePhone(invoice.client?.phone) || !isValidEmail(invoice.client?.email) ? 'whatsapp' : 'email',
   );
-  const [stage, setStage] = useState<ReminderStage>(() => suggestStage(invoice));
-  const [lang, setLang] = useState<ReminderLanguage>('en');
-  const [message, setMessage] = useState(() =>
-    buildReminder(invoice, suggestStage(invoice), 'en', new Date(), { interestAccrued: interestForReminder(invoice) }),
+  // Credit notes raised against the invoice are never asked for (src/lib/amount-due.ts).
+  const [credited] = useState(() =>
+    linkedCredits(getTable<CreditLinkRow>('doc_links').filter((l) => l.from_id === invoice.id), localDb.invoices.getAll()).get(invoice.id) ?? 0,
   );
+  // R2-A5: the company schedule decides the suggested stage; edited templates replace the built-in wording.
+  // Loaded after the dialog opens (dynamic import) so the payment / dashboard bundles stay small.
+  const [schedule, setSchedule] = useState<{ resolve: (stage: ReminderStage, lang: MessageLang) => { subject: string; body: string } | undefined } | null>(null);
+  const [stage, setStage] = useState<ReminderStage>(() => suggestStage(invoice, new Date(), credited));
+  // 8H: the party's own message language when it has one (Client form), else English.
+  const [lang, setLang] = useState<MessageLang>(() => partyLang(invoice));
+  const [message, setMessage] = useState(() =>
+    buildReminderIn(invoice, suggestStage(invoice, new Date(), credited), partyLang(invoice), new Date(), { interestAccrued: interestForReminder(invoice), credited }),
+  );
+  const edited = useRef(false);
+  useEffect(() => {
+    let live = true;
+    void import('../../lib/reminder-settings').then((m) => {
+      if (!live) return;
+      const s = m.loadReminderSchedule();
+      setSchedule({ resolve: (st, l) => m.editedTemplate(s, st, l) });
+      if (edited.current) return;
+      const st = suggestStage(invoice, new Date(), credited, s);
+      setStage(st);
+      const l = partyLang(invoice);
+      setMessage(buildReminderIn(invoice, st, l, new Date(), { interestAccrued: interestForReminder(invoice), credited, template: m.editedTemplate(s, st, l) }));
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [phone, setPhone] = useState(invoice.client?.phone ?? '');
   const [email, setEmail] = useState(invoice.client?.email ?? '');
 
@@ -77,11 +108,12 @@ function ReminderModalBody({
   );
   const last = lastReminder(log, invoice.id);
 
-  const regenerate = (nextStage: ReminderStage, nextLang: ReminderLanguage) => {
+  const regenerate = (nextStage: ReminderStage, nextLang: MessageLang) => {
+    edited.current = true;
     setStage(nextStage);
     setLang(nextLang);
     setMessage(
-      buildReminder(invoice, nextStage, nextLang, new Date(), { interestAccrued: interestForReminder(invoice) }),
+      buildReminderIn(invoice, nextStage, nextLang, new Date(), { interestAccrued: interestForReminder(invoice), credited, template: schedule?.resolve(nextStage, nextLang) }),
     );
   };
 
@@ -166,7 +198,7 @@ function ReminderModalBody({
           <div className={styles.summaryLine}>
             <span><strong>{invoice.client?.name || shareT('rmClient')}</strong></span>
             <span>{invoice.invoice_number}</span>
-            <span>{areaNodes(shareT('rmBalance'), { amount: <strong>{formatCurrency(receivableBalance(invoice), cur)}</strong> })}</span>
+            <span>{areaNodes(shareT('rmBalance'), { amount: <strong>{formatCurrency(amountDue(invoice, credited), cur)}</strong> })}</span>
             <span>{shareT('rmDue', { date: formatDate(invoice.due_date) })}</span>
             {last && <span>{shareT('rmLast', { date: formatDate(last.sent_at), n: history.length })}</span>}
           </div>
@@ -207,24 +239,9 @@ function ReminderModalBody({
             </div>
             <div className={controls.field}>
               <span className={controls.label}>{shareT('rmLanguage')}</span>
-              <div className={controls.segment} role="group" aria-label={shareT('rmLanguage')}>
-                <button
-                  type="button"
-                  className={lang === 'en' ? controls.segmentBtnActive : controls.segmentBtn}
-                  aria-pressed={lang === 'en'}
-                  onClick={() => regenerate(stage, 'en')}
-                >
-                  English
-                </button>
-                <button
-                  type="button"
-                  className={lang === 'hinglish' ? controls.segmentBtnActive : controls.segmentBtn}
-                  aria-pressed={lang === 'hinglish'}
-                  onClick={() => regenerate(stage, 'hinglish')}
-                >
-                  Hinglish
-                </button>
-              </div>
+              <select className={controls.select} aria-label={shareT('rmLanguage')} value={lang} onChange={(e) => isMessageLang(e.target.value) && regenerate(stage, e.target.value)}>
+                {MESSAGE_LANGS.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
+              </select>
             </div>
           </div>
 
@@ -269,7 +286,7 @@ function ReminderModalBody({
                 id="rm-subject"
                 className={controls.input}
                 value={message.subject}
-                onChange={(e) => setMessage((m) => ({ ...m, subject: e.target.value }))}
+                onChange={(e) => { edited.current = true; setMessage((m) => ({ ...m, subject: e.target.value })); }}
               />
             </div>
           )}
@@ -280,7 +297,7 @@ function ReminderModalBody({
               id="rm-body"
               className={cn(controls.textarea, styles.messageArea)}
               value={message.body}
-              onChange={(e) => setMessage((m) => ({ ...m, body: e.target.value }))}
+              onChange={(e) => { edited.current = true; setMessage((m) => ({ ...m, body: e.target.value })); }}
             />
             <div className={cn(styles.counter, smsLong && styles.counterWarn)}>
               {shareT('rmChars', { n: message.body.length })}{smsLong ? shareT('rmLong') : ''}

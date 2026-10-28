@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import {
   BellRing,
+  Camera,
   ChevronDown,
   Copy,
   Download,
@@ -15,7 +16,7 @@ import {
 import type { InvoiceRecord } from '../../types/invoice';
 import { useToast } from '../ui/useToast';
 import { cn } from '../../lib/utils';
-import { invoiceSummaryText, invoiceUpiLink, mailtoLink, smsLink, whatsappLink } from '../../lib/share';
+import { emailText, invoiceSummaryText, invoiceUpiLink, mailtoLink, smsLink, whatsappLink } from '../../lib/share';
 import controls from '../../styles/controls.module.css';
 import styles from './share.module.css';
 import { copyText, openLink } from './clipboard';
@@ -23,12 +24,16 @@ import { ReminderModal } from './ReminderModal';
 import { receivableBalance } from '../../lib/rcm';
 import { useT } from '../../i18n';
 import { shareT } from '../../i18n/areas/share';
+import { rPosT } from '../../i18n/areas/restaurant-pos';
 
 export interface ShareMenuProps {
   invoice: InvoiceRecord;
   onDownloadPdf?: () => void;
   /** Share the PDF file through the OS share sheet (only passed where the browser supports it). */
   onSharePdf?: () => void;
+  /** R3-A5: share the rendered paper as an image (JPG / PNG); copy it to the clipboard where supported. */
+  onShareImage?: () => void;
+  onCopyImage?: () => void;
   /** Send a self-contained HTML copy with a pay button (the preview supplies it). */
   onClientCopy?: () => void;
   /** Hide the "Payment reminder" entry (e.g. for quotations). */
@@ -36,7 +41,7 @@ export interface ShareMenuProps {
   className?: string;
 }
 
-export function ShareMenu({ invoice, onDownloadPdf, onSharePdf, onClientCopy, hideReminder, className }: ShareMenuProps) {
+export function ShareMenu({ invoice, onDownloadPdf, onSharePdf, onShareImage, onCopyImage, onClientCopy, hideReminder, className }: ShareMenuProps) {
   useT(); // re-render on a language switch (5.4)
   const [open, setOpen] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
@@ -112,6 +117,20 @@ export function ShareMenu({ invoice, onDownloadPdf, onSharePdf, onClientCopy, hi
                 <FileText size={16} className={styles.menuIcon} /> {shareT('sharePdf')}
                 <span className={styles.menuHint}>{shareT('sharePdfHint')}</span>
               </button>
+              {!onShareImage && <div className={styles.menuSep} role="separator" />}
+            </>
+          )}
+          {onShareImage && (
+            <>
+              <button type="button" role="menuitem" className={styles.menuItem} onClick={run(onShareImage)} data-share-image>
+                <Camera size={16} className={styles.menuIcon} /> {rPosT('shareImage')}
+                <span className={styles.menuHint}>{rPosT('imageHint')}</span>
+              </button>
+              {onCopyImage && (
+                <button type="button" role="menuitem" className={styles.menuItem} onClick={run(onCopyImage)}>
+                  <Copy size={16} className={styles.menuIcon} /> {rPosT('copyImage')}
+                </button>
+              )}
               <div className={styles.menuSep} role="separator" />
             </>
           )}
@@ -127,7 +146,7 @@ export function ShareMenu({ invoice, onDownloadPdf, onSharePdf, onClientCopy, hi
             type="button"
             role="menuitem"
             className={styles.menuItem}
-            onClick={run(() => openLink(mailtoLink({ to: client?.email, subject, body: summary })))}
+            onClick={run(() => openLink(mailtoLink({ to: client?.email, subject, body: emailText(summary) })))}
           >
             <Mail size={16} className={styles.menuIcon} /> {shareT('email')}
           </button>

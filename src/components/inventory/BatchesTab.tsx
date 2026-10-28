@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Download, ListTree } from 'lucide-react';
 import { cn, formatDate } from '../../lib/utils';
 import { toCsv } from '../../lib/csv';
 import { shiftDay } from '../../lib/dates';
@@ -8,6 +9,7 @@ import { godownName } from '../../lib/godowns';
 import type { Godown } from '../../types/stock';
 import { useT } from '../../i18n';
 import { invT } from '../../i18n/areas/inventory';
+import { pLinkT } from '../../i18n/areas/production-r4-links'; // R4-A3
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
@@ -16,6 +18,8 @@ type View = 'all' | 'expiring' | 'expired';
 
 interface Row {
   key: string;
+  /** R4-A3: for the Trace link. */
+  itemId: string;
   item: string;
   unit: string;
   batch: string;
@@ -35,7 +39,7 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
   godowns: Godown[];
   onDownload: (filename: string, csv: string) => void;
 }) {
-  useT(); // re-render on a language switch (5.4)
+  const { lang } = useT(); // re-render on a language switch (5.4); `rows` holds a label (QA19 U4)
   const [view, setView] = useState<View>('all');
   const multi = godowns.length > 1;
 
@@ -43,7 +47,7 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
     if (view !== 'all') {
       return expiringBatches(tracking, today, days)
         .filter((r) => (view === 'expired' ? r.daysLeft < 0 : true))
-        .map((r) => ({ key: `${r.item.id}|${r.batch}`, item: r.item.name, unit: r.item.unit, batch: r.batch, expiry: r.expiry, qty: r.qty, byGodown: r.byGodown }));
+        .map((r) => ({ key: `${r.item.id}|${r.batch}`, itemId: r.item.id, item: r.item.name, unit: r.item.unit, batch: r.batch, expiry: r.expiry, qty: r.qty, byGodown: r.byGodown }));
     }
     const out: Row[] = [];
     for (const t of tracking.values()) {
@@ -51,13 +55,13 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
       for (const b of t.batches) {
         if (Math.abs(b.qty) < 1e-9) continue;
         out.push({
-          key: `${t.item.id}|${b.batch}`, item: t.item.name, unit: t.item.unit, batch: b.batch || invT('noBatch'),
+          key: `${t.item.id}|${b.batch}`, itemId: t.item.id, item: t.item.name, unit: t.item.unit, batch: b.batch || invT('noBatch'),
           mfg: b.mfg, expiry: b.expiry, mrp: b.mrp, qty: b.qty, byGodown: b.byGodown,
         });
       }
     }
     return out.sort((a, b) => a.item.localeCompare(b.item) || (a.expiry ?? '9999').localeCompare(b.expiry ?? '9999'));
-  }, [tracking, today, days, view]);
+  }, [tracking, today, days, view, lang]);
 
   const status = (r: Row) => {
     if (!r.expiry) return <span className={styles.muted}>{invT('noExpiry')}</span>;
@@ -92,6 +96,7 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
             <th>{invT('thItem')}</th><th>{invT('thBatch')}</th><th>{invT('thMfg')}</th><th>{invT('thExpiry')}</th><th className={surface.numeric}>{invT('thQty')}</th>
             {multi && <th>{invT('thByGodown')}</th>}
             <th>{invT('thStatus')}</th>
+            <th><span className={surface.srOnly}>{pLinkT('trace')}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -108,10 +113,11 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
                 </td>
               )}
               <td>{status(r)}</td>
+              <td>{r.batch && r.batch !== invT('noBatch') ? <Link className={cn(controls.btnGhost, controls.btnSm)} to={`/manufacturing?tab=trace&dir=back&item=${encodeURIComponent(r.itemId)}&batch=${encodeURIComponent(r.batch)}`} aria-label={pLinkT('traceBatch', { batch: r.batch })}><ListTree size={14} aria-hidden="true" /> {pLinkT('trace')}</Link> : null}</td>
             </tr>
           ))}
           {rows.length === 0 && (
-            <tr><td colSpan={multi ? 7 : 6} className={styles.muted}>
+            <tr><td colSpan={multi ? 8 : 7} className={styles.muted}>
               {view === 'all' ? invT('noBatchStock') : invT('wellStocked')}
             </td></tr>
           )}

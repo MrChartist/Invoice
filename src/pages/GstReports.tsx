@@ -1,13 +1,14 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
 import { CalendarRange, Download, FileJson, FileSpreadsheet, Files, Printer, ShieldAlert } from 'lucide-react';
-import { getTable, readRaw, writeRaw } from '../lib/storage';
+import { getTable, peekTable, readRaw, writeRaw } from '../lib/storage';
 import { localDb } from '../lib/localDb';
 import { formatDate, formatMoney } from '../lib/utils';
 import { stateByCode } from '../lib/india-states';
 import { readLinks } from '../lib/documents';
+import { loadIsdInward } from '../lib/isd';
 import { seriesGaps } from '../lib/invoice-number';
 import {
   buildGstReport,
@@ -51,6 +52,20 @@ const CompositionView = lazy(() => import('../components/gst-reports/Composition
 // E-commerce operators (GSTR-1 Table 14, 3B 3.1.1): loaded when the tab is opened.
 const EcoView = lazy(() => import('../components/gst-reports/EcoView'));
 import { checkGstin } from '../lib/gstin';
+import { journalItcReversals } from '../lib/gst-reports'; // R5-C2
+import { GST_TABS, GST_TAB_GROUPS, PACK_GST_TABS, resolveGstTab, tabForKey, type GstTabGroupId, type GstTabId } from '../lib/gst-tabs';
+import { activePacks } from '../lib/industry-packs'; // R5-C
+import { defineArea } from '../i18n/area';
+import { buildPreflight, needsPreflight, preflightCount, type PreflightForm } from '../lib/gst-preflight';
+import type { LutIssue } from '../lib/trade/lut-register';
+import type { LutRow } from '../types/trade-r4';
+import { aatoFor, gstExceptions, loadBandCheck } from '../lib/gst-guards';
+import { impliedPacks } from '../lib/shop-mode';
+import { rememberDownload, stripReturn, type FilerFrequency } from '../lib/compliance';
+import { FilingStrip } from '../components/gst-reports/FilingStrip'; // R6-C4
+import { todayIso } from '../lib/tax-rules';
+import { fiT } from '../i18n/areas/filing';
+import filing from '../components/gst-reports/filing.module.css';
 import { parseCsv } from '../lib/csv';
 import type { HsnRow } from '../lib/gst-reports';
 import surface from '../styles/surface.module.css';
@@ -59,9 +74,16 @@ import styles from './GstReports.module.css';
 import local from '../components/gst-reports/gst-reports.module.css';
 import { useT } from '../i18n';
 import { gstT } from '../i18n/areas/gst';
+import { dkT } from '../i18n/areas/desks-r3'; // R3-C4 / C5 tab names
 import { nodes } from '../i18n/areas/nodes';
+import { helpT } from '../i18n/areas/help-r6';
+import { Term } from '../components/help/Term';
+import { EmptyState } from '../components/ui/EmptyState';
+import type { GlossaryId } from '../lib/help/glossary';
 
 const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
+// Same table as `EINVOICE_META_TABLE` in einvoice.ts — read directly so the e-invoice builder stays out of this chunk.
+const EINVOICE_META_TABLE = 'einvoice_meta';
 
 // Annual GSTR-9 working paper (5.2) and bulk e-Invoice / e-Way + IRP response import (6.24): loaded on open.
 const Gstr9Modal = lazy(() => import('../components/gst-reports/Gstr9Modal'));
@@ -74,37 +96,34 @@ const HsnMasterPanel = lazy(() => import('../components/gst-reports/HsnMasterPan
 const Gstr9cView = lazy(() => import('../components/gst-reports/Gstr9cView'));
 // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52); IFF B2B working paper.
 const RcmDocsPanel = lazy(() => import('../components/gst-reports/RcmDocsPanel'));
+// 7R: cash ledger / PMT-09 / refunds, ISD + GSTR-6, consolidated e-Way Bill, GSTR-1 / 3B per GSTIN (one lazy chunk).
+const Gst7rPanel = lazy(() => import('../components/gst-reports/Gst7rPanel'));
+// 8D: GST guards 2025-26 (IRP window, exceptions, GSTR-1A, Table 3.2, pushed 2B ITC).
+const Gst8dPanel = lazy(() => import('../components/gst-reports/Gst8dPanel'));
 
-type TabId = 'overview' | 'compliance' | 'b2b' | 'b2cl' | 'b2cs' | 'cdnr' | 'cdnur' | 'exp' | 'nil' | 'at' | 'txpd' | 'hsn' | 'docs' | 'amend' | 'eco' | 'gstr3b' | 'gstr2b' | 'composition' | 'setoff' | 'purhsn' | 'recon' | 'hsnmaster' | 'gstr9c' | 'rcmdocs';
+type TabId = GstTabId;
+const TABS = GST_TABS;
+const GROUP_LABEL: Record<GstTabGroupId, Parameters<typeof fiT>[0]> = { gstr1: 'groupGstr1', gstr3b: 'groupGstr3b', recon: 'groupRecon', tools: 'groupTools' };
+// 8I: the check before a JSON download — loaded when there is something to show.
+// R3-C4 / C5: GSTR-1 portal files and the e-Way desk (lazy tabs; working papers).
+const PortalFilesView = lazy(() => import('../components/gst-reports/PortalFilesView'));
+const EwayDesk = lazy(() => import('../components/gst-reports/EwayDesk'));
+const PreflightDialog = lazy(() => import('../components/gst-reports/PreflightDialog'));
 
-/** `label` stays English (Excel sheet names); `key` is the on-screen name when it is not a portal term. */
-const TABS: { id: TabId; label: string; key?: Parameters<typeof gstT>[0] }[] = [
-  { id: 'overview', label: 'Overview', key: 'tabOverview' },
-  { id: 'b2b', label: 'B2B' },
-  { id: 'b2cl', label: 'B2CL' },
-  { id: 'b2cs', label: 'B2CS' },
-  { id: 'cdnr', label: 'CDNR' },
-  { id: 'cdnur', label: 'CDNUR' },
-  { id: 'exp', label: 'Exports', key: 'tabExp' },
-  { id: 'nil', label: 'Nil / Exempt', key: 'tabNil' },
-  { id: 'at', label: 'Advances 11A', key: 'tabAt' },
-  { id: 'txpd', label: 'Adjusted 11B', key: 'tabTxpd' },
-  { id: 'hsn', label: 'HSN' },
-  { id: 'docs', label: 'Documents', key: 'tabDocs' },
-  { id: 'amend', label: 'Amendments', key: 'tabAmend' },
-  { id: 'eco', label: 'E-commerce 14', key: 'tabEco' },
-  { id: 'gstr3b', label: 'GSTR-3B' },
-  { id: 'setoff', label: 'Set-off & payment', key: 'tabSetoff' },
-  { id: 'gstr2b', label: '2B match', key: 'tab2b' },
-  { id: 'purhsn', label: 'Purchase HSN', key: 'tabPurHsn' },
-  { id: 'recon', label: '1 vs 3B vs Books', key: 'tabRecon' },
-  { id: 'compliance', label: 'Compliance', key: 'tabCompliance' },
-  { id: 'composition', label: 'Composition (CMP-08 / GSTR-4)', key: 'tabComposition' },
-  { id: 'hsnmaster', label: 'HSN master', key: 'tabHsnMaster' },
-  { id: 'gstr9c', label: 'GSTR-9C', key: 'tab9c' },
-  { id: 'rcmdocs', label: 'RCM self-invoice', key: 'tabRcm' },
-];
-const tabLabel = (x: { label: string; key?: Parameters<typeof gstT>[0] } | undefined) => (x?.key ? gstT(x.key) : x?.label);
+const tabLabel = (x: { id?: string; label: string; key?: Parameters<typeof gstT>[0]; desk?: 'tab.portal' | 'tab.eway' } | undefined) => (x?.desk ? dkT(x.desk) : x?.key ? gstT(x.key) : x?.id === 'common-credit' || x?.id === 'hotel-gst' ? ccTabT(x.id === 'hotel-gst' ? 'hotel' : 'tab') : x?.label);
+// R4-C2: export desk tab (its own lazy chunk).
+const ExportDesk = lazy(() => import('../components/trade/ExportDesk'));
+// R5-C2: Rule 42 / 43 common-credit working (fees / non-profit / leases packs; its own lazy chunk).
+const CommonCreditView = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.CommonCreditView })));
+const HotelGstTab = lazy(() => import('../components/hotel/hotel-lazy').then((l) => l.hotelChunk()).then((m) => ({ default: m.HotelGstTab }))); // R7-C1 (the pack's chunk)
+const ccTabT = defineArea({ tab: 'Common credit (Rule 42 / 43)', hotel: 'Hotel GST' } as const, { tab: 'साझा क्रेडिट (Rule 42 / 43)', hotel: 'होटल GST' });
+// R6-A3 / A6: "About this tab" strip and the one-time tip (lazy); glossary terms on section headings.
+const AboutStrip = lazy(() => import('../components/help/AboutStrip'));
+const ScreenTip = lazy(() => import('../components/help/ScreenTip'));
+const TAB_TERM: Partial<Record<GstTabId, GlossaryId>> = {
+  b2b: 'b2b', b2cl: 'b2cl', b2cs: 'b2cs', cdnr: 'cdnr', cdnur: 'cdnur', exp: 'exp', nil: 'nil', hsn: 'hsn',
+  setoff: 'setoff', gstr2b: 'gstr2b', isd: 'isd', 'eway-desk': 'eway-b', 'export-desk': 'lut',
+};
 
 function download(name: string, mime: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: `${mime};charset=utf-8` }));
@@ -126,11 +145,12 @@ const pos = (code: string) => {
 export function GstReports() {
   useT();
   const { notify, toastNode } = useToast();
-  const invoices = useMemo(() => getTable<InvoiceRecord>('invoices'), []);
-  const purchases = useMemo(() => getTable<unknown>('purchases'), []);
+  // PERF-2: shared, parsed-once rows. The report builders and panels only read them (never mutate).
+  const invoices = useMemo(() => peekTable<InvoiceRecord>('invoices') as InvoiceRecord[], []);
+  const purchases = useMemo(() => peekTable<unknown>('purchases') as unknown[], []);
   // Advance receipts (5.3): GSTR-1 Table 11 and their effect on 3B 3.1(a).
   const advances = useMemo(
-    () => advanceTaxEvents(getTable<AdvanceRecord>('advances'), getTable<Payment>('transactions'), invoices),
+    () => advanceTaxEvents(getTable<AdvanceRecord>('advances'), peekTable<Payment>('transactions') as Payment[], invoices),
     [invoices],
   );
   const profiles = useMemo<SenderProfile[]>(() => localDb.settings.get().profiles, []);
@@ -156,18 +176,25 @@ export function GstReports() {
     return periodForDate('month', new Date(now.getFullYear(), now.getMonth() - 1, 1));
   });
   const [gstin, setGstin] = useState<string>(() => gstins[0] ?? '');
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   // A composition profile files CMP-08 / GSTR-4, not GSTR-1 / 3B (Sec 10; Rule 62).
   const compositionProfile = useMemo(() => {
     const prof = gstin ? profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin) : localDb.settings.activeProfile();
     return prof?.gst_scheme === 'composition' ? prof : null;
   }, [profiles, gstin]);
   const [tab, setTab] = useState<TabId>(() => {
-    const t = params.get('tab');
-    if (TABS.some((x) => x.id === t)) return t as TabId;
+    const t = resolveGstTab(params.get('tab'));
+    if (t) return t;
     const prof = gstins[0] ? profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstins[0]) : localDb.settings.activeProfile();
     return prof?.gst_scheme === 'composition' ? 'composition' : 'overview';
   });
+  // R6-A2: keep `?tab=` in step with the shown tab, so Help (F1), the About strip and a copied link follow it.
+  useEffect(() => {
+    if (params.get('tab') === tab) return;
+    const next = new URLSearchParams(params);
+    next.set('tab', tab);
+    setParams(next, { replace: true });
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   // Aggregate turnover for the JSON header — entered by the filer, remembered on this device.
   const [turnover, setTurnover] = useState<{ gt: string; curGt: string }>(() => {
     try {
@@ -210,6 +237,10 @@ export function GstReports() {
     return buildGstReport(invoices, purchases, {
       period, gstin, filerStateCode: prof?.stateCode, links: readLinks(), turnover: lastFyTurnover, advances,
       purchaseNotes: getTable<PurchaseReturn>('purchase_returns'),
+      // 7R: ISD credit received by our unit(s) — 3B 4A(4).
+      isdInward: loadIsdInward(),
+      // R5-C2: Rule 42 / 43 common-credit reversal journals → 4B(1).
+      itcReversals: journalItcReversals(getTable('vouchers')),
       // WP-8: user-defined UQCs, and alternate-unit lines summarised in the item's base unit.
       units: unitsDb.stored(),
       items: buildItemIndex(stockDb.items()),
@@ -222,6 +253,99 @@ export function GstReports() {
   const am = g1.amendments;
   const amendCount = am ? (am.expa?.length ?? 0) + am.b2ba.length + am.b2cla.length + am.cdnra.length + am.cdnura.length + am.b2csa.length : 0;
   const hasData = g1.counts.included > 0 || amendCount > 0 || !!g1.at?.length || !!g1.txpd?.length;
+
+  // 8I (8.161): what to look at before the JSON leaves the app — GST exceptions, the report's errors / warnings
+  // and the Rule 46 series gaps, grouped. Same data as the guards tab, the recon banner and the Documents tab.
+  // R4-C1: zero-rated exports of the period without a live LUT (register in Settings → Business → Export); the LUT
+  // module loads on demand, only when the period has such a supply.
+  const [lutFindings, setLutFindings] = useState<LutIssue[]>([]);
+  // R9 (RT-C1): the lazy price-band check; re-run the exceptions once it has loaded.
+  const [bandTick, setBandTick] = useState(0);
+  useEffect(() => { loadBandCheck(invoices, impliedPacks(localDb.settings.get()).includes('apparel'), () => import('../lib/retail/rt-bands')).then((n) => n && setBandTick((x) => x + 1)); }, [invoices]);
+  useEffect(() => {
+    const { from, to } = periodRange(period);
+    const docs = invoices.filter((i) => (i.supply_type === 'EXPORT_LUT' || i.supply_type === 'SEZ_WITHOUT_PAYMENT') && (i.issue_date ?? '') >= from && (i.issue_date ?? '').slice(0, 10) <= to && (!gstin || (i.sender?.companyGstin ?? '').toUpperCase() === gstin));
+    let live = true;
+    if (!docs.length) setLutFindings((x) => (x.length ? [] : x));
+    else import('../lib/trade/lut-register').then((m) => live && setLutFindings(m.lutIssues(docs, getTable<LutRow>('lut_register'))), () => undefined);
+    return () => {
+      live = false;
+    };
+  }, [invoices, period, gstin]);
+  // R14 PS-C1: soft Sec 2(6) findings on LUT exports of the period (svcexport pack only; the check loads on demand).
+  const [psIssues, setPsIssues] = useState<Parameters<typeof buildPreflight>[0]['issues']>([]);
+  useEffect(() => {
+    const { from, to } = periodRange(period);
+    const docs = impliedPacks(localDb.settings.get()).includes('svcexport') ? invoices.filter((i) => i.supply_type === 'EXPORT_LUT' && (i.issue_date ?? '') >= from && (i.issue_date ?? '').slice(0, 10) <= to) : [];
+    let live = true;
+    if (!docs.length) setPsIssues((x) => (x.length ? [] : x));
+    else import('../lib/prof/ps-export-check').then((m) => live && setPsIssues(m.preflightIssues(docs, { clients: localDb.clients.getAll(), receipts: getTable('transactions'), irms: getTable('export_irms') })), () => undefined);
+    return () => {
+      live = false;
+    };
+  }, [invoices, period]);
+  const preflightInput = useMemo(() => {
+    const irnIds = new Set(getTable<{ invoice_id?: string; irn?: string }>(EINVOICE_META_TABLE).filter((m) => m?.irn && m.invoice_id).map((m) => m.invoice_id as string));
+    const s = localDb.settings.get();
+    const active = s.profiles.find((p) => p.id === s.activeProfileId) ?? null;
+    const exceptions = gstExceptions(invoices, { ...periodRange(period), irnIds, aato: (inv) => aatoFor(inv, s.profiles, active), today: todayIso(), gstin });
+    return { exceptions, issues: psIssues.length ? [...issues, ...psIssues] : issues, gaps, lut: lutFindings, bandTick };
+  }, [invoices, period, gstin, issues, gaps, lutFindings, bandTick, psIssues]);
+  const preflight = useMemo(() => buildPreflight(preflightInput), [preflightInput]);
+  const checkCount = preflightCount(preflight);
+  // R3-C4: unresolved portal errors of this period × GSTIN add an optional step to the filing strip.
+  // Same count as `openPortalErrors` (gst-portal-files.ts), inlined so the reader stays in its lazy tab chunk.
+  const portalErrors = (() => getTable<{ kind?: string; period?: string; gstin?: string; findings?: { key: string }[]; resolved?: Record<string, true> }>('gst_portal_files')
+      .filter((r) => r?.kind === 'gstr1_error' && r.period === g1.fp && (!gstin || !r.gstin || r.gstin === gstin))
+      .reduce((n, r) => n + (r.findings ?? []).filter((f) => !r.resolved?.[f.key]).length, 0))();
+  const navigate = useNavigate();
+  const [pending, setPending] = useState<null | { form: PreflightForm | null; run?: () => boolean }>(null);
+  const FORM_NAME: Record<PreflightForm, string> = { GSTR1: 'GSTR-1 JSON', GSTR3B: 'GSTR-3B JSON', IFF: 'IFF JSON', CMP08: 'CMP-08' };
+  // R6-C4: the filing strip (FilingStrip.tsx) keeps "downloaded" / "filed" on the period's compliance rows.
+  const filerFrequency: FilerFrequency = compositionProfile ? 'composition' : (localDb.settings.get().gst_filing_frequency ?? 'monthly');
+  const [stripVersion, setStripVersion] = useState(0);
+  const downloaded = (form: PreflightForm) => {
+    rememberDownload(stripReturn(period, form, filerFrequency, periodRange(period), label), gstin);
+    setStripVersion((v) => v + 1);
+  };
+  const downloadGstr1 = () => {
+    download(`${fileBase}.json`, 'application/json', JSON.stringify(buildGstr1Json(g1, { gt: Number(turnover.gt) || 0, curGt: Number(turnover.curGt) || 0 }), null, 2));
+    return true;
+  };
+  const downloadIff = () => {
+    // 7O (7.98): IFF for QRMP months 1–2 — B2B / CDNR only, ₹50 lakh a month (working paper).
+    const chk = iffCheck(g1, period, periodRange(period).from);
+    if (chk.warnings.includes('OVER_LIMIT')) notify(o7T('iffOver', { value: formatMoney(chk.value) }), 'error');
+    else if (chk.warnings.includes('EMPTY')) {
+      notify(o7T('iffEmpty'), 'info');
+      return false;
+    }
+    download(`IFF_${gstin}_${g1.fp}.json`, 'application/json', JSON.stringify(buildIffJson(g1), null, 2));
+    return true;
+  };
+  const downloadGstr3b = () => {
+    download(`GSTR3B_${gstin}_${g1.fp}.json`, 'application/json', JSON.stringify(buildGstr3bJson(g3, gstin, g1.fp), null, 2));
+    return true;
+  };
+  /** Clean → download now; otherwise show the grouped problems first ("Download anyway" / "Review"). R6-C4: per form. */
+  const guarded = (form: PreflightForm, run: () => boolean) => {
+    if (needsPreflight(buildPreflight(preflightInput, form))) return setPending({ form, run });
+    if (run()) downloaded(form);
+  };
+  const badge = checkCount > 0 ? <span className={filing.badge} title={fiT('badgeTitle', { n: checkCount })} data-json-badge>· {checkCount} ⚠</span> : null;
+
+  // Arrow keys move between section tabs across the groups (Tab still walks every tab button).
+  // R5-C: a pack tab is listed only with one of its packs on (or while it is the open tab).
+  const packs = activePacks(localDb.settings.get());
+  const listed = (id: GstTabId) => !PACK_GST_TABS[id] || id === tab || PACK_GST_TABS[id]!.some((p) => packs.includes(p));
+  const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    let next = tabForKey(tab, e.key);
+    while (next && !listed(next)) next = tabForKey(next, e.key === 'Home' ? 'ArrowRight' : e.key === 'End' ? 'ArrowLeft' : e.key);
+    if (!next) return;
+    e.preventDefault();
+    setTab(next);
+    requestAnimationFrame(() => document.getElementById(`gst-tab-${next}`)?.focus());
+  };
 
   const counts: Partial<Record<TabId, number>> = {
     b2b: g1.b2b.length, b2cl: g1.b2cl.length, b2cs: g1.b2cs.length, cdnr: g1.cdnr.length,
@@ -466,7 +590,18 @@ export function GstReports() {
           </Suspense>
         );
       case 'gstr3b':
-        return <Gstr3bView report={g3} onOpenSetOff={() => setTab('setoff')} />;
+        return (
+          <>
+            <Gstr3bView report={g3} onOpenSetOff={() => setTab('setoff')} />
+            <Suspense fallback={null}><Gst8dPanel view="3b" period={period} gstin={gstin} g1={g1} g3={g3} /></Suspense>
+          </>
+        );
+      case 'guards':
+        return (
+          <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
+            <Gst8dPanel key={bandTick} view="guards" period={period} gstin={gstin} g1={g1} g3={g3} invoices={invoices} notify={notify} />
+          </Suspense>
+        );
       case 'setoff':
       case 'purhsn':
       case 'recon':
@@ -483,10 +618,42 @@ export function GstReports() {
             {tab === 'gstr9c' && <Gstr9cView fyStart={period.fyStart} gstin={gstin} filerStateCode={filerStateCode} turnover={Number(turnover.curGt) || 0} />}
           </Suspense>
         );
+      case 'cashref':
+      case 'isd':
+      case 'ewbcons':
+      case 'bygstin':
+        return (
+          <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
+            <Gst7rPanel view={tab} period={period} gstin={gstin} g1={g1} g3={g3} invoices={invoices} purchases={purchases} notify={notify} />
+          </Suspense>
+        );
       case 'gstr2b':
         return (
           <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
             <Gstr2bView period={period} gstin={gstin} filerStateCode={filerStateCode} notify={notify} />
+          </Suspense>
+        );
+      case 'portal-files':
+      case 'eway-desk':
+        return (
+          <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
+            {tab === 'portal-files'
+              ? <PortalFilesView g1={g1} period={period} gstin={gstin} turnover={{ gt: Number(turnover.gt) || 0, curGt: Number(turnover.curGt) || 0 }} notify={notify} />
+              : <EwayDesk notify={notify} />}
+          </Suspense>
+        );
+      case 'common-credit':
+        return (
+          <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
+            <CommonCreditView notify={notify} />
+          </Suspense>
+        );
+      case 'hotel-gst':
+        return <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}><HotelGstTab notify={notify} /></Suspense>;
+      case 'export-desk':
+        return (
+          <Suspense fallback={<p className={controls.hint}>{gstT('loading')}</p>}>
+            <ExportDesk notify={notify} />
           </Suspense>
         );
       case 'compliance':
@@ -526,19 +693,13 @@ export function GstReports() {
         actions={
           <>
           <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} disabled={!hasData || !gstin} title={!gstin ? gstT('needGstin1') : undefined}
-            onClick={() => download(`${fileBase}.json`, 'application/json', JSON.stringify(buildGstr1Json(g1, { gt: Number(turnover.gt) || 0, curGt: Number(turnover.curGt) || 0 }), null, 2))}>
-            <FileJson size={16} aria-hidden /> GSTR-1 JSON
+            onClick={() => guarded('GSTR1', downloadGstr1)} data-gstr1-json>
+            <FileJson size={16} aria-hidden /> GSTR-1 JSON {badge}
           </button>
           {period.kind === 'month' && isIffMonth(period) && (
             <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData || !gstin} title={o7T('iffTitle')} data-iff-json
-              onClick={() => {
-                // 7O (7.98): IFF for QRMP months 1–2 — B2B / CDNR only, ₹50 lakh a month (working paper).
-                const chk = iffCheck(g1, period, periodRange(period).from);
-                if (chk.warnings.includes('OVER_LIMIT')) notify(o7T('iffOver', { value: formatMoney(chk.value) }), 'error');
-                else if (chk.warnings.includes('EMPTY')) return notify(o7T('iffEmpty'), 'info');
-                download(`IFF_${gstin}_${g1.fp}.json`, 'application/json', JSON.stringify(buildIffJson(g1), null, 2));
-              }}>
-              <FileJson size={16} aria-hidden /> IFF JSON
+              onClick={() => guarded('IFF', downloadIff)}>
+              <FileJson size={16} aria-hidden /> IFF JSON {badge}
             </button>
           )}
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData}
@@ -546,8 +707,8 @@ export function GstReports() {
             <FileSpreadsheet size={16} aria-hidden /> GSTR-3B CSV
           </button>
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData || !gstin} title={!gstin ? gstT('needGstin3b') : gstT('json3bTitle')}
-            onClick={() => download(`GSTR3B_${gstin}_${g1.fp}.json`, 'application/json', JSON.stringify(buildGstr3bJson(g3, gstin, g1.fp), null, 2))}>
-            <FileJson size={16} aria-hidden /> GSTR-3B JSON
+            onClick={() => guarded('GSTR3B', downloadGstr3b)} data-gstr3b-json>
+            <FileJson size={16} aria-hidden /> GSTR-3B JSON {badge}
           </button>
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData} onClick={printSummary}>
             <Printer size={16} aria-hidden /> {gstT('printSummary')}
@@ -572,7 +733,27 @@ export function GstReports() {
         </Suspense>
       )}
 
-      <section className={`${surface.card} ${styles.filters}`} aria-label={gstT('filters')}>
+      {pending && (
+        <Suspense fallback={null}>
+          <PreflightDialog
+            form={pending.form ? FORM_NAME[pending.form] : null}
+            groups={pending.form ? buildPreflight(preflightInput, pending.form) : preflight}
+            onClose={() => setPending(null)}
+            onDownload={pending.run ? () => {
+              const { run, form } = pending;
+              setPending(null);
+              if (run?.() && form) downloaded(form);
+            } : undefined}
+            onReview={() => {
+              setPending(null);
+              setTab('guards');
+              navigate('/gst-reports?tab=guards', { replace: true });
+            }}
+          />
+        </Suspense>
+      )}
+
+      <section className={`${surface.card} ${styles.filters}`} aria-label={gstT('filters')} data-gst-filters>
         <PeriodPicker value={period} onChange={setPeriod} fyOptions={fyOptions} />
         <label className={local.periodField}>
           <span className={controls.label}>{gstT('filerGstin')}</span>
@@ -603,12 +784,31 @@ export function GstReports() {
         )}
       </section>
 
-      <div className={`${surface.card} ${local.disclaimer}`} role="note">
+      {/* R6-A3: one fixed line; the scope / limits text moved behind "Scope and limits" and into Help on this screen. */}
+      <div className={`${surface.card} ${local.disclaimer}`} role="note" data-gst-working-paper>
         <ShieldAlert size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
-        <span>
-          <strong>{gstT('disclaimerStrong')}</strong> {gstT('disclaimer')}
-        </span>
+        <details>
+          <summary>{helpT('workingPaper')} <strong>{gstT('disclaimerStrong')}</strong> {helpT('scope')}</summary>
+          {gstT('disclaimer')}
+        </details>
       </div>
+      <Suspense fallback={null}><ScreenTip id="gst" /></Suspense>
+      {!hasData && !g3.purchasesConsidered && (
+        <div className={surface.card} data-gst-empty>
+          <EmptyState
+            icon={Files}
+            title={helpT('gstEmptyTitle', { period: label })}
+            text={helpT('gstEmptyText')}
+            action={
+              <span style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center' }}>
+                <button type="button" className={controls.btnOutline} onClick={() => document.querySelector<HTMLElement>('[data-gst-filters] select, [data-gst-filters] input')?.focus()}>{helpT('changePeriod')}</button>
+                <Link to="/invoice" className={controls.btnOutline}>{helpT('newInvoice')}</Link>
+                <Link to="/expenses?tab=bills" className={controls.btnOutline}>{helpT('addBill')}</Link>
+              </span>
+            }
+          />
+        </div>
+      )}
 
       {compositionProfile && (
         <div className={`${surface.card} ${local.disclaimer}`} role="note" data-composition-banner>
@@ -618,6 +818,11 @@ export function GstReports() {
           </span>
         </div>
       )}
+
+      <FilingStrip period={period} label={label} gstin={gstin} frequency={filerFrequency} checkCount={checkCount} onCheck={() => setPending({ form: null })}
+        portalErrors={portalErrors} portalLabel={dkT('tab.portal')} onPortalErrors={() => setTab('portal-files')} canDownload={hasData && !!gstin}
+        onDownload={(f) => guarded(f, f === 'GSTR1' ? downloadGstr1 : f === 'IFF' ? downloadIff : downloadGstr3b)} version={stripVersion}
+        needGstinTitle={!gstin ? { GSTR1: gstT('needGstin1'), IFF: gstT('needGstin1'), GSTR3B: gstT('needGstin3b') } : undefined} onError={(m) => notify(m, 'error')} />
 
       <ReconBanner issues={issues} />
 
@@ -632,26 +837,45 @@ export function GstReports() {
       </div>
 
       <section className={surface.card} aria-label={gstT('sections')}>
-        <div className={local.tabs} role="tablist" aria-label={gstT('sections')}>
-          {TABS.map((x) => (
-            <button
-              key={x.id}
-              type="button"
-              role="tab"
-              id={`gst-tab-${x.id}`}
-              aria-selected={tab === x.id}
-              aria-controls="gst-panel"
-              className={tab === x.id ? local.tabActive : local.tab}
-              onClick={() => setTab(x.id)}
-            >
-              {tabLabel(x)}
-              {counts[x.id] ? <span className={local.tabCount}>{counts[x.id]}</span> : null}
-            </button>
+        <div className={filing.tabGroups}>
+          {GST_TAB_GROUPS.map((g) => (
+            <div key={g.id} className={filing.tabGroup} role="tablist" aria-label={fiT(GROUP_LABEL[g.id])} data-tab-group={g.id}>
+              <span className={filing.groupLabel} aria-hidden>{fiT(GROUP_LABEL[g.id])}</span>
+              {g.tabs.filter(listed).map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  id={`gst-tab-${id}`}
+                  aria-selected={tab === id}
+                  aria-controls="gst-panel"
+                  className={tab === id ? local.tabActive : local.tab}
+                  onClick={() => setTab(id)}
+                  onKeyDown={onTabKey}
+                >
+                  {tabLabel(TABS.find((x) => x.id === id))}
+                  {counts[id] ? <span className={local.tabCount}>{counts[id]}</span> : null}
+                </button>
+              ))}
+            </div>
           ))}
         </div>
+        <label className={filing.tabSelect}>
+          <span className={controls.label}>{fiT('sectionSelect')}</span>
+          <select className={controls.select} value={tab} onChange={(e) => setTab(resolveGstTab(e.target.value) ?? 'overview')} data-gst-tab-select>
+            {GST_TAB_GROUPS.map((g) => (
+              <optgroup key={g.id} label={fiT(GROUP_LABEL[g.id])}>
+                {g.tabs.filter(listed).map((id) => (
+                  <option key={id} value={id}>{tabLabel(TABS.find((x) => x.id === id))}{counts[id] ? ` (${counts[id]})` : ''}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+        <Suspense fallback={null}><AboutStrip /></Suspense>
         <div className={local.tabBody} role="tabpanel" id="gst-panel" aria-labelledby={`gst-tab-${tab}`}>
           <div className={local.toolbar}>
-            <h2 className={local.tbHeading}>{tabLabel(TABS.find((x) => x.id === tab))}{tab === 'compliance' || tab === 'hsnmaster' || tab === 'rcmdocs' ? '' : tab === 'recon' || tab === 'gstr9c' ? ` · FY ${String(period.fyStart).slice(2)}-${String(period.fyStart + 1).slice(2)}` : ` · ${label}`}</h2>
+            <h2 className={local.tbHeading}>{TAB_TERM[tab] ? <Term id={TAB_TERM[tab]!}>{tabLabel(TABS.find((x) => x.id === tab))}</Term> : tabLabel(TABS.find((x) => x.id === tab))}{tab === 'compliance' || tab === 'hsnmaster' || tab === 'rcmdocs' || tab === 'isd' || tab === 'ewbcons' ? '' : tab === 'recon' || tab === 'gstr9c' ? ` · FY ${String(period.fyStart).slice(2)}-${String(period.fyStart + 1).slice(2)}` : ` · ${label}`}</h2>
             {isCsvTab && (
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`}
                 onClick={() => download(`${fileBase}_${tab}.csv`, 'text/csv', sectionCsv(g1, tab as SectionId))}>

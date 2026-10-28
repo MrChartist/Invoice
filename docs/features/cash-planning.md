@@ -95,9 +95,12 @@ outputs keep the "working paper — verify with your CA" wording.
 - New default ledger account `fx_gain` (code 4930) — constants, nothing stored.
 
 ## Known gaps
-- Cheques link to one document; a cheque covering several invoices must be recorded unlinked and payments entered by hand.
+- ~~Cheques link to one document; a cheque covering several invoices must be recorded unlinked and payments entered by hand.~~ Done in WP-5: `Cheque.allocations` (`types/cheques.ts`) — stale note struck by R6-C6.
 - Clearing does not auto-record against foreign-currency invoices (record the receipt in that currency from the invoice).
 - No bank charges on bounce; post them as an expense / journal.
 - Bank-specific leaf positions are not known exactly — the offsets exist for that.
 - Forecast ignores taxes payable (GST/TDS deposits), loans and salaries unless they are bills; credit notes not yet
   set off are not deducted from receivables.
+
+## 8G additions
+- A document with a `payment_schedule` is expected instalment by instalment (open balance spread pro rata over the unpaid instalments), each shifted by the client's usual lag. See `docs/features/invoicing-ux.md` § 8.100.

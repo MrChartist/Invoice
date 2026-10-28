@@ -34,6 +34,7 @@ export const en = {
   'common.notSaved': 'Not saved: {message}',
   'common.createInvoice': 'Create an invoice',
   'common.language': 'Language',
+  'common.validGstin': 'Valid GSTIN',
 
   // ── Document types / statuses / payment methods ───────────────────
   'doc.INVOICE': 'Invoice',
@@ -56,6 +57,7 @@ export const en = {
   'method.Cash': 'Cash',
   'method.Cheque': 'Cheque',
   'method.Card': 'Card',
+  'method.Gift voucher': 'Gift voucher', // R4-B1
   'method.Other': 'Other',
   'role.owner': 'Owner',
   'role.clerk': 'Clerk',
@@ -65,6 +67,8 @@ export const en = {
   'nav.dashboard': 'Dashboard',
   'nav.newInvoice': 'New invoice',
   'nav.pos': 'POS',
+  'nav.tables': 'Tables',
+  'nav.frontDesk': 'Front desk', // R7-A
   'nav.invoices': 'Invoices',
   'nav.clients': 'Clients',
   'nav.recurring': 'Recurring',
@@ -72,17 +76,22 @@ export const en = {
   'nav.receivables': 'Receivables',
   'nav.expenses': 'Expenses',
   'nav.inventory': 'Inventory',
+  'nav.manufacturing': 'Manufacturing', // R6-B2
+  'nav.distribution': 'Distribution', // R6-B2
+  'nav.moreFeatures': '{n} more features — Show',
   'nav.books': 'Books',
   'nav.reconcile': 'Reconcile',
   'nav.cheques': 'Cheques',
   'nav.tds': 'TDS & TCS',
   'nav.payroll': 'Payroll',
+  'nav.loans': 'Loans & EMIs',
   'nav.reports': 'Reports',
   'nav.gstReports': 'GST reports',
   'nav.exports': 'Exports',
   'nav.gateway': 'Gateway',
   'nav.accountsInfo': 'Accounts Info',
   'nav.designStudio': 'Design studio',
+  'nav.practice': 'Practice desk',
   'nav.settings': 'Settings',
   'nav.groupSales': 'Sales',
   'nav.groupPurchases': 'Purchases & stock',
@@ -94,6 +103,8 @@ export const en = {
   'shell.closeMenu': 'Close menu',
   'shell.home': 'Mr. Chartist Invoice home',
   'shell.search': 'Search',
+  'shell.notifications': 'Notifications',
+  'shell.notificationsUnread': 'Notifications, {n} unread',
   'shell.searchPlaceholder': 'Search invoices, clients, pages…',
   'shell.lightMode': 'Light mode',
   'shell.darkMode': 'Dark mode',
@@ -111,6 +122,8 @@ export const en = {
   'shell.tabHome': 'Home',
   'shell.tabNew': 'New',
   'shell.tabMore': 'More',
+  'shell.beta': 'Beta',
+  'shell.betaAria': 'Beta version (private test build)',
   'shell.backupSaved': 'Backup saved ({file})',
   'shell.backupDownloaded': 'Backup downloaded',
   'palette.newInvoice': 'New invoice',
@@ -248,6 +261,12 @@ export const en = {
   'dash.manageDirectory': 'Manage your directory',
   'dash.profilesBackup': 'Profiles & backup',
   'dash.profilesBackupHint': 'Business details, bank, UPI',
+
+  // ── Missing page (404 inside the shell) ──
+  'notFound.docTitle': 'Page not found — Mr. Chartist Invoice',
+  'notFound.title': 'We can’t find that page',
+  'notFound.text': 'Nothing lives at {path}. It may have moved, or the link is mistyped.',
+  'notFound.back': 'Back to dashboard',
 } as const;
 
 /** Every key: the shell catalogue above plus the page catalogue (en-pages.ts, loaded with the pages). */

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Gift } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
 import { useCan } from '../../hooks/useCan';
@@ -11,7 +11,11 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from '../dashboard/tiles.module.css';
 
-/** Loyalty programme (WP-9): top balances, programme settings and manual adjustments. */
+// R4-B2: tiers / expiry editor and the liability report (own chunks, loaded when shown).
+const LoyaltyTiers = lazy(() => import('../retail/LoyaltyTiers'));
+const LoyaltyLiability = lazy(() => import('../retail/LoyaltyLiability'));
+
+/** Loyalty programme (WP-9): top balances, programme settings and manual adjustments (R4-B2: tiers, expiry, liability). */
 export function LoyaltyPanel({ notify }: { notify: (m: string, tone?: 'success' | 'error' | 'info') => void }) {
   useT();
   const { can } = useCan();
@@ -57,9 +61,11 @@ export function LoyaltyPanel({ notify }: { notify: (m: string, tone?: 'success' 
               </div>
               <p className={controls.hint}>{loyaltyT('hint')}</p>
               <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => run(() => saveProgram(form, today), loyaltyT('saved'))}>{loyaltyT('save')}</button>
+              <Suspense fallback={null}><LoyaltyTiers key={tick} notify={notify} onSaved={() => setTick((t) => t + 1)} /></Suspense>
             </div>
           </details>
         )}
+        {program.enabled && <Suspense fallback={null}><LoyaltyLiability key={tick} /></Suspense>}
         {can('master.edit') && program.enabled && (
           <details>
             <summary>{loyaltyT('adjust')}</summary>

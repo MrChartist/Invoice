@@ -16,7 +16,10 @@ import type { PurchaseReturn } from '../types/purchases';
 import { checkGstin } from './gstin';
 import { num } from './invoice-calc';
 import { inRange, stateNameOf, toPaise, type DateRange } from './export-shared';
-import { isLiveNote, noteSelfTax, noteTdsReversed } from './purchase-returns-gst';
+import { isLiveNote, noteCess, noteSelfTax, noteTdsReversed } from './purchase-returns-gst';
+
+/** 7R (7.123): ledger for cess reversed on a note — same name the Tally export uses for purchase cess. */
+const INPUT_CESS_LEDGER = 'Input Cess';
 import type { TallyEntry, TallyVoucher } from './tally-xml';
 
 export const PURCHASE_RETURNS_LEDGER = 'Purchase Returns';
@@ -49,8 +52,9 @@ export function debitNoteVouchers(notes: readonly PurchaseReturn[] | undefined, 
     const cgst = toPaise(num(n.cgst));
     const sgst = toPaise(num(n.sgst));
     const igst = toPaise(num(n.igst));
+    const cess = toPaise(noteCess(n));
     const gst = cgst + sgst + igst;
-    const self = noteSelfTax(n) > 0 ? gst : 0;
+    const self = noteSelfTax(n) > 0 ? gst + cess : 0;
     const party = String(n.vendor_name ?? '').trim() || 'Unknown vendor';
     const gstin = String(n.vendor_gstin ?? '').trim().toUpperCase();
     const stateName = stateNameOf(checkGstin(gstin).stateCode ?? n.place_of_supply ?? '');
@@ -63,11 +67,13 @@ export function debitNoteVouchers(notes: readonly PurchaseReturn[] | undefined, 
       addLedger({ name: tdsLedger, parent: 'Duties & Taxes' });
     }
     push(entries, party, 'Dr', total - self - tds, n.purchase_id && n.bill_number ? { name: n.bill_number, type: 'Agst Ref' } : { name: n.note_number, type: 'New Ref' });
-    push(entries, PURCHASE_RETURNS_LEDGER, 'Cr', n.itc_eligible ? taxable : taxable + gst);
+    push(entries, PURCHASE_RETURNS_LEDGER, 'Cr', n.itc_eligible ? taxable : taxable + gst + cess);
     if (n.itc_eligible) {
       push(entries, o.inputCgst, 'Cr', cgst);
       push(entries, o.inputSgst, 'Cr', sgst);
       push(entries, o.inputIgst, 'Cr', igst);
+      push(entries, INPUT_CESS_LEDGER, 'Cr', cess);
+      if (cess > 0) addLedger({ name: INPUT_CESS_LEDGER, parent: 'Duties & Taxes', duty: 'Cess' });
     }
     const selfLedger = n.import_type === 'GOODS' ? o.customsIgstLedger : o.rcmPayableLedger;
     if (self) push(entries, selfLedger, 'Dr', self);

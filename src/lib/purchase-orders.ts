@@ -19,6 +19,7 @@ import { formatCurrency, formatDate } from './utils';
 import { nextSeriesNumberFor, numberFitsFy, recordSeries } from './series-counters';
 import { audit } from './audit';
 import { requireAccess } from './access';
+import { escHtml as esc } from './html-esc';
 
 export const PURCHASE_ORDERS_TABLE = 'purchase_orders';
 export const PO_PREFIX = 'PO';
@@ -133,8 +134,6 @@ export function poTotals(lines: PurchaseOrderLine[], placeOfSupply?: string, bus
   return computePurchaseTotals(lines, { placeOfSupply, businessState });
 }
 
-const esc = (s: unknown) =>
-  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 export interface PoBuyer {
   name: string;
@@ -188,7 +187,11 @@ export function poHtml(po: PurchaseOrder, buyer: PoBuyer, vendor?: { address?: s
   <div class="parties"><div><div class="muted">To (supplier)</div><strong>${esc(po.vendor_name)}</strong>
     ${po.vendor_gstin ? `<div class="muted">GSTIN ${esc(po.vendor_gstin)}</div>` : ''}
     ${vendor?.address ? `<div class="muted">${esc(vendor.address).replace(/\n/g, '<br>')}</div>` : ''}
-    ${vendor?.phone ? `<div class="muted">${esc(vendor.phone)}</div>` : ''}</div></div>
+    ${vendor?.phone ? `<div class="muted">${esc(vendor.phone)}</div>` : ''}</div>
+    ${po.drop_ship && po.ship_to ? `<div><div class="muted">Deliver to (drop-ship)</div><strong>${esc(po.ship_to.name ?? '')}</strong>
+    ${po.ship_to.address ? `<div class="muted">${esc(po.ship_to.address).replace(/\n/g, '<br>')}</div>` : ''}
+    ${po.ship_to.city || po.ship_to.zip ? `<div class="muted">${esc([po.ship_to.city, po.ship_to.zip].filter(Boolean).join(' '))}</div>` : ''}
+    ${po.ship_to.gstin ? `<div class="muted">GSTIN ${esc(po.ship_to.gstin)}</div>` : ''}</div>` : ''}</div>
   <table><thead><tr><th>#</th><th>Item</th><th>HSN/SAC</th><th class="n">Qty</th><th class="n">Rate</th><th class="n">GST</th><th class="n">Amount</th></tr></thead>
   <tbody>${rows}</tbody></table>
   <div class="totals">
@@ -199,6 +202,11 @@ export function poHtml(po: PurchaseOrder, buyer: PoBuyer, vendor?: { address?: s
   ${po.notes ? `<p class="muted" style="margin-top:16px">${esc(po.notes).replace(/\n/g, '<br>')}</p>` : ''}
   <div class="sign">For ${esc(buyer.name)}<br><br><br>Authorised signatory</div>
 </div></body></html>`;
+}
+
+/** R2-B5: purchase orders raised back-to-back from a sales order. */
+export function posForSalesOrder(soId: string, orders: readonly PurchaseOrder[]): PurchaseOrder[] {
+  return orders.filter((po) => po?.so_id === soId).sort((a, b) => a.date.localeCompare(b.date) || a.po_number.localeCompare(b.po_number));
 }
 
 // ── Storage ──────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { Pencil, Plus, Search, Store, Trash2 } from 'lucide-react';
 import type { MsmeCategory, PurchaseRecord, Vendor } from '../../types/purchases';
 import { INDIAN_STATES, stateByCode } from '../../lib/india-states';
@@ -18,11 +18,16 @@ import { isValidIfsc } from '../../lib/validators';
 import { cleanVendorTds, deducteeTypeFromPan, vendorTdsProblem } from '../../lib/tds-payables';
 import { DEDUCTEE_TYPES, TDS_PAYABLE_SECTIONS, type DeducteeType } from '../../lib/tds-rules';
 import { o7T } from '../../i18n/areas/gst-tds-7o';
+import { r7T } from '../../i18n/areas/gst-tds-7r';
 import { tdsT } from '../../i18n/areas/tds';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import tabStyles from './VendorsTab.module.css';
+
+// R14 (PS-B2): "advocate / firm of advocates" tick (inward reverse charge on legal services) — one lazy row.
+const NettingLinkRow = lazy(() => import('../receivables/NettingDialog').then((m) => ({ default: m.NettingLinkRow }))); // R15-A3
+const VendorAdvocateRow = lazy(() => import('../prof/PartyRows').then((m) => ({ default: m.VendorAdvocateRow })));
 
 export interface VendorsTabProps {
   vendors: Vendor[];
@@ -227,6 +232,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
           <input id="v-udyam" className={controls.input} placeholder="UDYAM-MH-01-0000001" value={draft.msme_udyam ?? ''} onChange={(e) => set({ msme_udyam: e.target.value })} />
         </div>
       </div>
+      <Suspense fallback={null}><VendorAdvocateRow value={draft as { ps?: unknown }} onChange={(p) => set(p as Partial<Vendor>)} /></Suspense>
       <fieldset className={tabStyles.bankSet}>
         <legend className={controls.label}>{wireT('vendorBank')}</legend>
         <div className={controls.row}>
@@ -273,12 +279,16 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
               {TDS_PAYABLE_SECTIONS.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}
             </select>
           </div>
+          <Suspense fallback={null}><NettingLinkRow vendor={draft} onChange={(client_id) => set({ client_id })} /></Suspense>
           <div className={controls.field}>
             <label className={controls.check}>
               <input type="checkbox" checked={!!draft.tds_non_filer} onChange={(e) => set({ tds_non_filer: e.target.checked })} /> {tdsT('nonFiler')}
             </label>
             <label className={controls.check}>
               <input type="checkbox" checked={!!draft.non_resident} onChange={(e) => set({ non_resident: e.target.checked })} /> {o7T('vNonResident')}
+            </label>
+            <label className={controls.check}>
+              <input type="checkbox" checked={!!draft.rcm_maker} onChange={(e) => set({ rcm_maker: e.target.checked || undefined })} /> {purT('rcmMaker')}
             </label>
           </div>
         </div>
@@ -307,6 +317,48 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
           </div>
         </div>
         <span className={controls.hint}>{o7T('vTdsHint')}</span>
+        {draft.non_resident && (
+          // 7R (7.120): non-resident details for Form 27Q / DTAA (the treaty rate needs a TRC and Form 10F).
+          <div data-vendor-nr>
+            <div className={controls.row}>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="v-nr-country">{r7T('vNrCountry')}</label>
+                <input id="v-nr-country" className={controls.input} maxLength={60} value={draft.nr_country ?? ''} onChange={(e) => set({ nr_country: e.target.value })} />
+              </div>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="v-nr-tin">{r7T('vNrTin')}</label>
+                <input id="v-nr-tin" className={`${controls.input} ${controls.inputMono}`} maxLength={40} autoComplete="off" value={draft.nr_tin ?? ''} onChange={(e) => set({ nr_tin: e.target.value })} />
+              </div>
+            </div>
+            <div className={controls.row}>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="v-nr-trc">{r7T('vNrTrc')}</label>
+                <input id="v-nr-trc" className={`${controls.input} ${controls.inputMono}`} maxLength={40} autoComplete="off" value={draft.nr_trc_no ?? ''} onChange={(e) => set({ nr_trc_no: e.target.value })} />
+              </div>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="v-nr-trc-to">{r7T('vNrTrcTo')}</label>
+                <input id="v-nr-trc-to" type="date" className={controls.input} value={draft.nr_trc_to ?? ''} onChange={(e) => set({ nr_trc_to: e.target.value || undefined })} />
+              </div>
+            </div>
+            <div className={controls.row}>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="v-nr-dtaa">{r7T('vNrDtaaRate')}</label>
+                <input id="v-nr-dtaa" type="number" min={0} max={100} step="0.01" className={controls.input} value={draft.nr_dtaa_rate ?? ''} onChange={(e) => set({ nr_dtaa_rate: e.target.value === '' ? undefined : Number(e.target.value) })} />
+              </div>
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="v-nr-art">{r7T('vNrDtaaArticle')}</label>
+                <input id="v-nr-art" className={controls.input} maxLength={40} value={draft.nr_dtaa_article ?? ''} onChange={(e) => set({ nr_dtaa_article: e.target.value })} />
+              </div>
+            </div>
+            <label className={controls.check}>
+              <input type="checkbox" checked={!!draft.nr_form10f} onChange={(e) => set({ nr_form10f: e.target.checked })} /> {r7T('vNr10f')}
+            </label>
+            <label className={controls.check}>
+              <input type="checkbox" checked={!!draft.nr_no_pe} onChange={(e) => set({ nr_no_pe: e.target.checked })} /> {r7T('vNrNoPe')}
+            </label>
+            <span className={controls.hint}>{r7T('vNrHint')}</span>
+          </div>
+        )}
       </fieldset>
       <div className={controls.field}>
         <label className={controls.label} htmlFor="v-addr">{purT('address')}</label>

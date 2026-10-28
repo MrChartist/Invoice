@@ -30,8 +30,19 @@ const Time = lazy(() => import('./pages/Time').then((m) => ({ default: m.Time })
 const Payroll = lazy(() => import('./pages/Payroll').then((m) => ({ default: m.Payroll })));
 const Cheques = lazy(() => import('./pages/Cheques').then((m) => ({ default: m.Cheques })));
 const Tds = lazy(() => import('./pages/Tds').then((m) => ({ default: m.Tds })));
+const Loans = lazy(() => import('./pages/Loans').then((m) => ({ default: m.Loans })));
 const Pos = lazy(() => import('./pages/Pos').then((m) => ({ default: m.Pos })));
+const Tables = lazy(() => import('./pages/Tables')); // R3-A restaurant floor
 const Gateway = lazy(() => import('./pages/Gateway').then((m) => ({ default: m.Gateway })));
+// 8.20 / 8.23: files shared into the installed app (Web Share Target, POSTed to the service worker).
+const ShareTarget = lazy(() => import('./pages/ShareTarget').then((m) => ({ default: m.ShareTarget })));
+// 8F distribution: masters / reports / van / order-pad import, and the salesman order pad.
+const Distribution = lazy(() => import('./pages/Distribution').then((m) => ({ default: m.Distribution })));
+const OrderPad = lazy(() => import('./pages/OrderPad').then((m) => ({ default: m.OrderPad })));
+// 8.143: customer-facing display window (no shell; shows only what the POS tab broadcasts).
+const CustomerDisplay = lazy(() => import('./components/pos-retail/CustomerDisplay').then((m) => ({ default: m.CustomerDisplay })));
+// R3-C6: practice desk (all companies, DSC register, monthly checklist) — owner only.
+const Practice = lazy(() => import('./pages/Practice'));
 const DesignStudio = lazy(() => import('./components/design/DesignStudio').then((m) => ({ default: m.DesignStudio })));
 
 function PageFallback() {
@@ -45,7 +56,7 @@ function PageFallback() {
 /** Who is signed in and with which role: a change remounts the shell so every screen re-reads it. */
 const actorSignature = () => {
   const u = getCurrentUser();
-  return u ? `${u.id}:${u.role}` : '';
+  return u ? `${u.id}:${u.role}:${u.grants?.join(',') ?? ''}:${u.rights ? JSON.stringify(u.rights) : ''}` : '';
 };
 
 function App() {
@@ -89,16 +100,20 @@ function App() {
           <IdleLock onLock={() => setAuthed(false)} />
           <Suspense fallback={<PageFallback />}>
             <Routes>
+              <Route path="/pos-display" element={<CustomerDisplay />} />
               <Route element={<DashboardLayout onLogout={() => setAuthed(false)} />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/invoice" element={<RequireAccess action="doc.create" fallback="/transactions"><InvoiceCreator /></RequireAccess>} />
                 <Route path="/invoice/:id" element={<RequireAccess action="doc.edit" fallback="/transactions"><InvoiceCreator /></RequireAccess>} />
                 <Route path="/pos" element={<RequireAccess action="doc.create" fallback="/transactions"><Pos /></RequireAccess>} />
+                <Route path="/tables" element={<RequireAccess action="doc.create" fallback="/transactions"><Tables /></RequireAccess>} />
                 <Route path="/transactions" element={<Transactions />} />
                 <Route path="/clients" element={<Clients />} />
                 <Route path="/recurring" element={<RequireAccess action="books.edit"><Recurring /></RequireAccess>} />
                 <Route path="/time" element={<RequireAccess action="books.edit"><Time /></RequireAccess>} />
                 <Route path="/receivables" element={<Receivables />} />
+                <Route path="/distribution" element={<Distribution />} />
+                <Route path="/order-pad" element={<RequireAccess action="doc.create" fallback="/transactions"><OrderPad /></RequireAccess>} />
                 <Route path="/expenses" element={<Expenses />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/manufacturing" element={<Manufacturing />} />
@@ -106,14 +121,17 @@ function App() {
                 <Route path="/reconcile" element={<RequireAccess action="books.edit"><Reconcile /></RequireAccess>} />
                 <Route path="/cheques" element={<RequireAccess action="books.edit"><Cheques /></RequireAccess>} />
                 <Route path="/tds" element={<Tds />} />
+                <Route path="/loans" element={<Loans />} />
                 <Route path="/payroll" element={<RequireAccess action="payroll.view"><Payroll /></RequireAccess>} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/gst-reports" element={<GstReports />} />
                 <Route path="/exports" element={<Exports />} />
                 <Route path="/gateway/*" element={<Gateway />} />
+                <Route path="/practice" element={<RequireAccess action="settings.manage"><Practice /></RequireAccess>} />
                 <Route path="/design" element={<RequireAccess action="settings.manage"><DesignStudio /></RequireAccess>} />
                 {/* Settings opens for every role and shows each role only the tabs it may use (6.21). */}
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/share-target" element={<ShareTarget />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>

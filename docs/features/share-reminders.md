@@ -33,17 +33,17 @@ A `snooze` row stores its resume date (`YYYY-MM-DD`) in `note`. It is part of th
 `normalizePhone(raw, cc='91')` (digits only, `+91` default; handles `+91`, `0`, `00`, spaces, 10-digit; null if invalid),
 `formatPhoneDisplay`, `whatsappLink(phone, text)`, `mailtoLink({to, cc, bcc, subject, body})` (CRLF body, invalid addresses dropped),
 `smsLink`, `telLink`, `isValidEmail`, `isValidUpiId`, `upiLink({pa, pn, amount, note, tr})`,
-`invoiceUpiLink(invoice)` (INR only, balance due, note "Payment for <number>"),
+`invoiceUpiLink(invoice, amount?)` (INR only, balance due — or `amount` when the caller passes the amount due net of credit notes — note "Payment for <number>"),
 `invoiceSummaryText(invoice)`, `truncateForUrl`, `MAX_URL_LENGTH` (1900 encoded chars; longer text is trimmed with an ellipsis, never splitting emoji).
 
 ## lib/reminders.ts exports
 
 `ReminderStage` = `upcoming | due_today | overdue_polite | overdue_firm | overdue_final | thank_you`.
-Boundaries: upcoming = 1 to 3 days before due, due_today = 0, polite = 1 to 7 days late, firm = 8 to 30, final = 31+. `stageForDays(n)`, `suggestStage(invoice, today)`,
-`buildReminder(invoice, stage, 'en'|'hinglish', today)` returns `{subject, body}` using `{client} {number} {amount} {balance} {due} {days} {upi} {business} {phone}`.
+Boundaries: upcoming = 1 to 3 days before due, due_today = 0, polite = 1 to 7 days late, firm = 8 to 30, final = 31+. `stageForDays(n)`, `suggestStage(invoice, today, credited?)`,
+`buildReminder(invoice, stage, 'en'|'hinglish', today, {interestAccrued?, credited?})` returns `{subject, body}` using `{client} {number} {amount} {balance} {due} {days} {upi} {business} {phone}`.
 The final notice mentions late-payment charges only when `termsMentionInterest` finds interest/late fee/penalty wording in the invoice's own terms or notes; no legal claims are invented.
 Log helpers: `remindersFor`, `reminderCount`, `lastReminder`, `snoozedUntil`, `isSnoozed`, `makeLogEntry`, `makeSnooze`.
-`pendingReminders(invoices, today, log, {cooldownDays})`: unpaid, non-draft INVOICE/TAX_INVOICE/PROFORMA with balance, in a stage, not snoozed, not reminded within the cooldown (3 days; 7 for final notices). Sorted by chase priority (`reminderPriority`, 0–100, ties most overdue first): days overdue up to 50 (linear to 90 days; not-yet-due 0–5), balance in ₹ up to 30 (log scale, ₹1,000 → 0, ₹10 lakh+ → 30; foreign documents converted at their exchange rate), the client's other overdue bills 5 each up to 10 (client matched by GSTIN, else name), reminders already sent 5 each up to 10. Level: high ≥ 50, medium ≥ 25, else low; the Dashboard card shows the level with the reasons as a tooltip.
+`pendingReminders(invoices, today, log, {cooldownDays, credits})`: unpaid, non-draft INVOICE/TAX_INVOICE/PROFORMA with an amount due (`amountDue`, net of the linked credit notes in `credits` = `linkedCredits(doc_links, invoices)`, `src/lib/amount-due.ts`; each row carries it as `balance`), in a stage, not snoozed, not reminded within the cooldown (3 days; 7 for final notices). Sorted by chase priority (`reminderPriority`, 0–100, ties most overdue first): days overdue up to 50 (linear to 90 days; not-yet-due 0–5), balance in ₹ up to 30 (log scale, ₹1,000 → 0, ₹10 lakh+ → 30; foreign documents converted at their exchange rate), the client's other overdue bills 5 each up to 10 (client matched by GSTIN, else name), reminders already sent 5 each up to 10. Level: high ≥ 50, medium ≥ 25, else low; the Dashboard card shows the level with the reasons as a tooltip.
 
 ## Components
 
@@ -86,3 +86,37 @@ rules are inlined, and an on-screen pay panel adds the amount due, a tappable **
 the UPI ID and QR. It carries its own `default-src 'none'` CSP, no scripts (`sanitizePaper` strips any), and opens
 offline in any browser; printing hides the pay panel. Shared as a file where supported, otherwise downloaded.
 Fonts fall back to the system font outside the app.
+
+## Party-level reminders (8.4, `docs/features/khata.md`)
+
+`src/lib/khata.ts` adds reminders per **party** rather than per invoice: `buildPartyReminder({party, sender, kind, lang})`
+(`kind` `overdue` = total overdue + oldest bill + UPI link for the overdue amount; `balance` = the monthly "your balance
+is ₹X"), in `en`, `hinglish` or `hi` (Devanagari). `partyReminderQueue(report, clients, log, {kind, today, cooldownDays})`
+lists who to message (overdue: oldest first; balance: biggest first), leaving out snoozed parties and those reminded
+inside the cool-down (3 days; 20 for the monthly balance).
+
+The stepper (`src/components/khata/RemindQueue.tsx`, lazy) opens WhatsApp for one party per tap and advances; Skip,
+Snooze 3 days and Copy too. **One tap per party** is a browser rule (a new window needs a user gesture) — the app never
+sends anything itself.
+
+Log rows use the existing `reminders` table with an additive `party_key` and an empty `invoice_id`
+(`makePartyLogEntry`, `makePartySnooze`, `partyReminderRows`, `lastPartyReminder`, `partySnoozedUntil`), so the
+per-invoice helpers above (`remindersFor`, `pendingReminders` …) never count them.
+
+## WhatsApp statement and statement web page (8.3)
+
+`buildWhatsAppStatement({sender, party})` — open bills, credits / advances, net due and a `upi://pay` link for the net
+— goes into `whatsappLink(phone, text)` from Clients rows, Receivables aging rows, the Statements tab and the statement
+viewer. The viewer's **Share PDF** uses `shareFile` (blocked → "Share PDF now", unsupported → download) and **Web page**
+uses the generalised `buildClientCopyHtml` (`pay.label`, `pay.ariaLabel`, `note`) with `freezePaper` / `documentCss`
+from `src/lib/client-copy-dom.ts`.
+
+## 8G additions
+- Reminders chase the earliest unpaid instalment of a payment schedule. The post-save success sheet (WhatsApp with UPI link and party outstanding) and quotation Accept / Request changes links in the client copy are described in `docs/features/invoicing-ux.md` § 8.101 / 8.105.
+
+## Message language (8H)
+
+Reminders can also be written in Hindi (Devanagari), Marathi, Gujarati and Tamil (`buildReminderIn`,
+`src/lib/message-langs.ts`), next to English and Hinglish. The reminder dialog has a language picker that defaults to the
+party's **message language** (additive `Client.message_lang`, set in the client form); khata party reminders and the
+WhatsApp statement follow it too. Amounts, dates and the UPI pay link are the same facts as in English.

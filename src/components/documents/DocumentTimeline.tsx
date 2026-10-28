@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Ban, FileMinus2, FilePlus2, FileText, ArrowRightLeft } from 'lucide-react';
+import { Ban, FileMinus2, FilePlus2, FileText, ArrowRightLeft, History, Layers } from 'lucide-react';
 import { StatusBadge } from '../ui/StatusBadge';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { activeCancellation, buildDocumentChain, readLinks, type ChainNode } from '../../lib/documents';
@@ -10,6 +10,7 @@ import { cn } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { salesT } from '../../i18n/areas/sales';
 import { docLabel } from '../../i18n/labels';
+import { s2T } from '../../i18n/areas/sales-r2';
 import styles from './documents.module.css';
 
 export interface DocumentTimelineProps {
@@ -27,12 +28,40 @@ function RelIcon({ node }: { node: ChainNode }) {
   if (node.relation === 'credit_note') return <FileMinus2 {...p} />;
   if (node.relation === 'debit_note') return <FilePlus2 {...p} />;
   if (node.relation === 'converted') return <ArrowRightLeft {...p} />;
+  if (node.relation === 'progress') return <Layers {...p} />;
+  if (node.relation === 'revised') return <History {...p} />;
   return <FileText {...p} />;
 }
 
-/** Vertical timeline of a document and everything derived from it. */
+/**
+ * Vertical timeline of a document and everything derived from it. Quotations / sales orders also show
+ * progress billing (R2-B2) and quotations their revisions (R2-B3), both loaded on demand.
+ */
 export function DocumentTimeline({ invoiceId, refreshKey, className }: DocumentTimelineProps) {
   useT(); // re-render on a language switch (5.4)
+  const doc = useMemo(() => {
+    void refreshKey;
+    return localDb.invoices.getById(invoiceId);
+  }, [invoiceId, refreshKey]);
+  const progress = !!doc && (doc.doc_type === 'QUOTATION' || doc.doc_type === 'SALES_ORDER') && doc.status !== 'Draft';
+  const revisions = !!doc && doc.doc_type === 'QUOTATION';
+  return (
+    <>
+      {(progress || revisions) && doc && (
+        <Suspense fallback={null}>
+          {progress && <ProgressPanel source={doc} refreshKey={refreshKey} />}
+          {revisions && <RevisionsPanel quote={doc} refreshKey={refreshKey} />}
+        </Suspense>
+      )}
+      <ChainTimeline invoiceId={invoiceId} refreshKey={refreshKey} className={className} />
+    </>
+  );
+}
+
+const ProgressPanel = lazy(() => import('./ProgressPanel').then((m) => ({ default: m.ProgressPanel })));
+const RevisionsPanel = lazy(() => import('./RevisionsPanel').then((m) => ({ default: m.RevisionsPanel })));
+
+function ChainTimeline({ invoiceId, refreshKey, className }: DocumentTimelineProps) {
   const { chain, links } = useMemo(() => {
     void refreshKey;
     const l = readLinks();
@@ -63,7 +92,7 @@ export function DocumentTimeline({ invoiceId, refreshKey, className }: DocumentT
             </span>
             <div className={styles.nodeBody}>
               <div className={styles.nodeTitle}>
-                <span className={styles.relTag}>{salesT(`tl.${node.relation}`)}</span>
+                <span className={styles.relTag}>{node.relation === 'progress' || node.relation === 'revised' ? s2T(`tl.${node.relation}`) : salesT(`tl.${node.relation}`)}</span>
                 {current ? (
                   <strong aria-current="true">{node.doc.invoice_number}</strong>
                 ) : (

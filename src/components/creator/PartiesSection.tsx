@@ -1,18 +1,26 @@
-import { useCallback, useState } from 'react';
+import { Suspense, lazy, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { GstinInput } from '../ui/GstinInput';
 import { Typeahead } from '../ui/Typeahead';
 import { localDb } from '../../lib/localDb';
-import { suggest } from '../../lib/suggest';
+import { DB_PREFIX, KEYS, readRaw } from '../../lib/storage';
+import { clientExtras, makeSuggester } from '../../lib/suggest';
+import { PartyBookPickers } from '../clients/PartyBookPickers';
+import { applyPartyDefaults } from '../clients/party-defaults';
 import { clientToParty } from '../../store/invoice-defaults';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
+import { WALK_IN_NAME } from '../../lib/counter-receipt';
+import { uxT } from '../../i18n/areas/invoicing-ux';
 import { INDIAN_STATES, formatPlaceOfSupply, stateByCode } from '../../lib/india-states';
 import type { Client, SenderProfile } from '../../types/invoice';
 import { useT } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
 import controls from '../../styles/controls.module.css';
 import styles from './PartiesSection.module.css';
+
+// R3-B5 / B6: party defaults (once, with Undo) + repeat last bill / usual items — lazy, loads on a party pick.
+const PartyHabitsStrip = lazy(() => import('./PartyHabitsStrip'));
 
 interface Props {
   profiles: SenderProfile[];
@@ -31,17 +39,34 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
   const { setSender, setClient, setPlaceOfSupply } = useInvoiceStore.getState();
   // Directory snapshot, refreshed whenever the name field gains focus.
   const [directory, setDirectory] = useState<Client[]>([]);
-  const clientSuggestions = useCallback(
-    (q: string) =>
-      suggest(q, directory, {
+  const [picked, setPicked] = useState<{ client: Client; seq: number } | null>(null); // R3-B
+  // PERF-2: the directory is folded once per snapshot, not per keystroke; an unchanged table keeps its snapshot.
+  const directoryRaw = useRef<string | null | undefined>(undefined);
+  const refreshDirectory = () => {
+    const raw = readRaw(DB_PREFIX + KEYS.clients);
+    if (raw === directoryRaw.current) return;
+    directoryRaw.current = raw;
+    setDirectory(localDb.clients.getAll());
+  };
+  const clientSuggestions = useMemo(
+    () =>
+      makeSuggester(directory, {
         label: (c) => c.name,
-        extra: (c) => [c.company, c.gstin, c.city],
+        extra: clientExtras, // R2-B4: also contact persons' names / phones
         sub: (c) => [c.city, c.gstin].filter(Boolean).join(' · '),
       }),
     [directory],
   );
 
   const missingSender = !sender?.companyName?.trim();
+  // A5: address, company, e-mail and ship-to sit behind "More details" (open when a ship-to is set).
+  const [more, setMore] = useState(() => !!shipTo);
+  // A6: walk-in cash sale — the POS walk-in name, no address, fully paid in cash.
+  const cashSale = () => {
+    setClient({ id: undefined, name: WALK_IN_NAME, company: '', address: '', city: '', zip: '', gstin: '', email: '', phone: '' });
+    useInvoiceStore.setState({ pay_mode: 'Cash', fully_paid: true });
+    setMore(false);
+  };
 
   return (
     <div className={styles.grid}>
@@ -109,12 +134,35 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
             className={controls.input}
             value={client.name}
             onChange={(name) => setClient({ name })}
-            onFocus={() => setDirectory(localDb.clients.getAll())}
+            onFocus={refreshDirectory}
             getSuggestions={clientSuggestions}
-            onPick={(c) => setClient(clientToParty(c))}
+            onPick={(c) => {
+              setClient(clientToParty(c));
+              applyPartyDefaults(c); // R2-B4: default ship-to + primary contact on a new document
+              setPicked((p) => ({ client: c, seq: (p?.seq ?? 0) + 1 })); // R3-B5 / B6
+            }}
             placeholder={t('parties.clientNamePh')}
             aria-label={t('parties.clientName')}
           />
+          {/* A6: walk-in counter sale — no address, paid in cash in full. */}
+          <div className={controls.row}>
+            <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} aria-pressed={client.name === WALK_IN_NAME} onClick={cashSale} data-cash-sale>
+              {uxT('cashSale')}
+            </button>
+          </div>
+          <div className={controls.field}>
+            <GstinInput value={client.gstin ?? ''} onChange={(v) => setClient({ gstin: v })} placeholder={t('parties.clientGstinPh')} ariaLabel={t('parties.clientGstinPh')} />
+          </div>
+          <input className={controls.input} type="tel" value={client.phone ?? ''} onChange={(e) => setClient({ phone: e.target.value })} placeholder={t('parties.phone')} aria-label={t('parties.clientPhone')} />
+          {/* R2-B4: Kind attn. + ship-to from the party's address book */}
+          <PartyBookPickers />
+          {picked && <Suspense fallback={null}><PartyHabitsStrip key={picked.seq} party={picked.client} /></Suspense>}
+          {/* A5: name, GSTIN and phone first; the rest behind "More details". */}
+          <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} aria-expanded={more} onClick={() => setMore((m) => !m)} data-party-more>
+            {more ? uxT('lessDetails') : uxT('moreDetails')}
+          </button>
+          {more && (
+            <>
           <input className={controls.input} value={client.company ?? ''} onChange={(e) => setClient({ company: e.target.value })} placeholder={t('parties.companyPh')} aria-label={t('parties.company')} />
           <textarea className={controls.textarea} rows={2} value={client.address} onChange={(e) => setClient({ address: e.target.value })} placeholder={t('parties.billingAddress')} aria-label={t('parties.billingAddress')} />
           <div className={controls.row}>
@@ -133,13 +181,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
               ))}
             </select>
           </div>
-          <div className={controls.field}>
-            <GstinInput value={client.gstin ?? ''} onChange={(v) => setClient({ gstin: v })} placeholder={t('parties.clientGstinPh')} />
-          </div>
-          <div className={controls.row}>
-            <input className={controls.input} type="email" value={client.email} onChange={(e) => setClient({ email: e.target.value })} placeholder={t('parties.email')} aria-label={t('parties.clientEmail')} />
-            <input className={controls.input} type="tel" value={client.phone ?? ''} onChange={(e) => setClient({ phone: e.target.value })} placeholder={t('parties.phone')} aria-label={t('parties.clientPhone')} />
-          </div>
+          <input className={controls.input} type="email" value={client.email} onChange={(e) => setClient({ email: e.target.value })} placeholder={t('parties.email')} aria-label={t('parties.clientEmail')} />
           <label className={styles.shipToggle}>
             <input
               type="checkbox"
@@ -167,6 +209,8 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
               </select>
               <GstinInput value={shipTo.gstin ?? ''} onChange={(v) => setShip({ gstin: v })} placeholder={t('parties.consigneeGstinPh')} />
             </fieldset>
+          )}
+            </>
           )}
         </div>
       </div>

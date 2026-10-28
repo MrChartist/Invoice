@@ -8,7 +8,9 @@ import type { InvoiceRecord } from '../types/invoice';
 import { DOCUMENT_LABELS } from '../types/invoice';
 import { formatCurrency, formatDate } from './utils';
 import { invoiceUpiLink } from './share';
-import { receivableBalance, receivableTotal } from './rcm';
+import { receivableTotal } from './rcm';
+import { amountDue, type CreditMap } from './amount-due';
+import { effectiveDueDate } from './payment-schedule';
 
 export const REMINDERS_TABLE = 'reminders';
 
@@ -31,6 +33,12 @@ export interface ReminderRecord {
   tone: ReminderStage;
   sent_at: string;
   note?: string;
+  /**
+   * Additive (8.4): a party-level reminder (the "Remind all overdue" queue / monthly balance) is
+   * logged with the party key (client id, else `name:<lower-cased name>`) and an empty `invoice_id`,
+   * so the per-invoice helpers above never count it. See `src/lib/khata.ts`.
+   */
+  party_key?: string;
 }
 
 export const STAGE_LABELS: Record<ReminderStage, string> = {
@@ -48,6 +56,44 @@ export const STAGE_ORDER: ReminderStage[] = [
 
 /** Days before the due date at which the "upcoming" nudge starts. */
 export const UPCOMING_WINDOW_DAYS = 3;
+
+/* ── Schedule (R2-A5) ─────────────────────────────────────────── */
+
+/** Stages a reminder can be sent at (the thank-you is not scheduled). */
+export type ScheduledStage = Exclude<ReminderStage, 'thank_you'>;
+export const SCHEDULED_STAGES: readonly ScheduledStage[] = ['upcoming', 'due_today', 'overdue_polite', 'overdue_firm', 'overdue_final'];
+
+/** One stage's message override; blank = the built-in text. */
+export interface ReminderTemplate {
+  subject?: string;
+  body?: string;
+}
+export type ReminderTemplates = Partial<Record<ReminderLanguage, Partial<Record<ReminderStage, ReminderTemplate>>>>;
+
+/**
+ * R2-A5 company reminder schedule (object key `reminder_settings`): when each stage starts and how long to
+ * wait between two reminders of a stage. The defaults reproduce the original behaviour exactly.
+ *  - `upcoming_days`: the friendly nudge starts this many days before the due date (0 = none);
+ *  - `polite_after`: overdue days still worded as "due" before the polite stage (0 = polite from day 1);
+ *  - `firm_after` / `final_after`: the firm stage starts after this many days overdue, the final after that.
+ */
+export interface ReminderSchedule {
+  upcoming_days: number;
+  polite_after: number;
+  firm_after: number;
+  final_after: number;
+  cooldowns: Record<ScheduledStage, number>;
+  templates?: ReminderTemplates;
+}
+
+export const DEFAULT_REMINDER_SCHEDULE: ReminderSchedule = {
+  upcoming_days: UPCOMING_WINDOW_DAYS,
+  polite_after: 0,
+  firm_after: 7,
+  final_after: 30,
+  cooldowns: { upcoming: 3, due_today: 3, overdue_polite: 3, overdue_firm: 3, overdue_final: 7 },
+};
+
 
 /* ── Dates ────────────────────────────────────────────────────── */
 
@@ -71,21 +117,28 @@ export function daysUntil(due: string | undefined, today: Date): number {
 
 /* ── Stage ────────────────────────────────────────────────────── */
 
-/** Stage for an unpaid invoice, or null when it is too early to nudge. */
-export function stageForDays(daysToDue: number): ReminderStage | null {
+/** Stage for an unpaid invoice, or null when it is too early to nudge. `schedule` (R2-A5) defaults to the original offsets. */
+export function stageForDays(daysToDue: number, schedule: ReminderSchedule = DEFAULT_REMINDER_SCHEDULE): ReminderStage | null {
   if (!Number.isFinite(daysToDue)) return null;
-  if (daysToDue > UPCOMING_WINDOW_DAYS) return null;
+  if (daysToDue > schedule.upcoming_days) return null;
   if (daysToDue > 0) return 'upcoming';
   if (daysToDue === 0) return 'due_today';
   const late = -daysToDue;
-  if (late <= 7) return 'overdue_polite';
-  if (late <= 30) return 'overdue_firm';
+  if (late <= schedule.polite_after) return 'due_today';
+  if (late <= schedule.firm_after) return 'overdue_polite';
+  if (late <= schedule.final_after) return 'overdue_firm';
   return 'overdue_final';
 }
 
-export function suggestStage(invoice: InvoiceRecord, today: Date = new Date()): ReminderStage {
-  if (invoice.status === 'Paid' || receivableBalance(invoice) <= 0) return 'thank_you';
-  return stageForDays(daysUntil(invoice.due_date, today)) ?? 'upcoming';
+/** `credited`: live credit notes linked to the invoice (`linkedCredits`, src/lib/amount-due.ts). */
+export function suggestStage(invoice: InvoiceRecord, today: Date = new Date(), credited = 0, schedule: ReminderSchedule = DEFAULT_REMINDER_SCHEDULE): ReminderStage {
+  if (amountDue(invoice, credited) <= 0) return 'thank_you';
+  return stageForDays(daysUntil(effectiveDueDate(invoice), today), schedule) ?? 'upcoming';
+}
+
+/** The firmer of two stages (used after a broken promise, R2-A4). */
+export function firmerStage(a: ReminderStage, b: ReminderStage): ReminderStage {
+  return STAGE_ORDER.indexOf(a) >= STAGE_ORDER.indexOf(b) ? a : b;
 }
 
 /* ── Templates ────────────────────────────────────────────────── */
@@ -190,6 +243,18 @@ export interface ReminderExtras {
    * into the message when the invoice's own terms mention interest / late fees.
    */
   interestAccrued?: number;
+  /** Live credit notes linked to the invoice: the balance asked for (and the UPI amount) is net of them. */
+  credited?: number;
+  /**
+   * R2-A5: the company's edited wording for THIS stage and language, already checked (`templateFor` in
+   * `reminder-schedule.ts`); absent = the built-in text.
+   */
+  template?: { subject: string; body: string };
+}
+
+/** The built-in wording of a stage (shown in the template editor). */
+export function builtInTemplate(stage: ReminderStage, lang: ReminderLanguage): { subject: string; body: string } {
+  return T[lang][stage];
 }
 
 export function reminderVars(
@@ -202,7 +267,8 @@ export function reminderVars(
   const cur = invoice.currency || 'INR';
   const s = invoice.sender;
   const upi = s?.upiId?.trim() ?? '';
-  const payLink = stage === 'thank_you' ? null : invoiceUpiLink(invoice);
+  const due = amountDue(invoice, extras.credited);
+  const payLink = stage === 'thank_you' ? null : invoiceUpiLink(invoice, due > 0 ? due : undefined);
   const upiLine =
     stage === 'thank_you' || !upi
       ? ''
@@ -225,7 +291,7 @@ export function reminderVars(
     document: DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice',
     // Reverse charge: the GST is the recipient's to pay, never asked for (src/lib/rcm.ts).
     amount: formatCurrency(receivableTotal(invoice), cur),
-    balance: formatCurrency(receivableBalance(invoice) > 0 ? receivableBalance(invoice) : receivableTotal(invoice), cur),
+    balance: formatCurrency(due > 0 ? due : receivableTotal(invoice), cur),
     due: invoice.due_date ? formatDate(invoice.due_date) : 'the due date',
     days: daysPhrase(daysUntil(invoice.due_date, today), lang),
     upi,
@@ -253,7 +319,7 @@ export function buildReminder(
   today: Date = new Date(),
   extras: ReminderExtras = {},
 ): ReminderMessage {
-  const t = T[lang][stage];
+  const t = extras.template ?? T[lang][stage];
   const vars = reminderVars(invoice, stage, lang, today, extras);
   return { subject: tidy(fillTemplate(t.subject, vars)), body: tidy(fillTemplate(t.body, vars)) };
 }
@@ -321,6 +387,8 @@ export interface PendingReminder {
   stage: ReminderStage;
   /** Signed days to due (negative = overdue). */
   daysToDue: number;
+  /** Amount due (after receipts and linked credit notes), in the invoice's currency. */
+  balance: number;
   count: number;
   lastSentAt: string | null;
   /** Who to chase first, 0–100 (see `reminderPriority`). The list is sorted by this. */
@@ -340,6 +408,8 @@ export interface PriorityInput {
   otherOverdue: number;
   /** Reminders already sent for this invoice. */
   remindersSent: number;
+  /** R2-A7: the party's payment grade (absent / null = no history, no weight). */
+  grade?: 'A' | 'B' | 'C' | 'D' | null;
 }
 
 /**
@@ -347,7 +417,8 @@ export interface PriorityInput {
  *  - days overdue: up to 50 (linear to 90 days; not-yet-due bills score 0–5),
  *  - balance in ₹: up to 30 (₹1,000 → 0, ₹10k → 10, ₹1 lakh → 20, ₹10 lakh+ → 30),
  *  - the client's other overdue bills: 5 each, up to 10,
- *  - reminders already ignored: 5 each, up to 10.
+ *  - reminders already ignored: 5 each, up to 10,
+ *  - R2-A7 payment grade of the party: C +5, D +10 (A / B / no history: 0).
  */
 export function reminderPriority(p: PriorityInput): { score: number; level: PriorityLevel; reasons: string[] } {
   const parts: Array<[number, string]> = [];
@@ -359,6 +430,9 @@ export function reminderPriority(p: PriorityInput): { score: number; level: Prio
   if (amountPts > 0) parts.push([amountPts, `₹${Math.round(amount).toLocaleString('en-IN')} outstanding`]);
   if (p.otherOverdue > 0) parts.push([Math.min(10, p.otherOverdue * 5), `${p.otherOverdue} other overdue bill${p.otherOverdue === 1 ? '' : 's'}`]);
   if (p.remindersSent > 0) parts.push([Math.min(10, p.remindersSent * 5), `${p.remindersSent} reminder${p.remindersSent === 1 ? '' : 's'} without payment`]);
+  // R2-A7: a slow payer is chased earlier (grade C +5, D +10); A / B add nothing.
+  if (p.grade === 'D') parts.push([10, 'usually pays very late (grade D)']);
+  else if (p.grade === 'C') parts.push([5, 'often pays late (grade C)']);
   const score = Math.round(Math.min(100, parts.reduce((t, [n]) => t + n, 0)));
   const level: PriorityLevel = score >= 50 ? 'high' : score >= 25 ? 'medium' : 'low';
   return { score, level, reasons: parts.filter(([n]) => n > 0).sort((a, b) => b[0] - a[0]).map(([, r]) => r) };
@@ -369,16 +443,27 @@ function clientKey(inv: InvoiceRecord): string {
   return (c?.gstin || c?.name || '').trim().toUpperCase();
 }
 
-function balanceInr(inv: InvoiceRecord): number {
-  const bal = receivableBalance(inv) || 0;
+function toInr(inv: InvoiceRecord, bal: number): number {
   const cur = (inv.currency || 'INR').toUpperCase();
   const fx = Number(inv.exchange_rate);
   return cur !== 'INR' && fx > 0 ? bal * fx : bal;
 }
 
 export interface PendingOptions {
-  /** Minimum days between reminders (default 3; 7 once past 30 days overdue). */
+  /** Minimum days between reminders (default: the schedule's cooldown for the stage — 3; 7 for the final notice). */
   cooldownDays?: number;
+  /** Live credit notes per invoice (`linkedCredits`): an invoice they settle is never chased. */
+  credits?: CreditMap;
+  /** R2-A5: the company reminder schedule (default = the original offsets). */
+  schedule?: ReminderSchedule;
+  /** R2-A5: the party's reminder mode; `manual` and `never` keep the invoice out of the queue. */
+  modeOf?: (invoice: InvoiceRecord) => 'auto' | 'manual' | 'never' | undefined;
+  /** R2-A4: an open promise-to-pay covers the invoice — don't remind until the promise date. */
+  isHeld?: (invoice: InvoiceRecord) => boolean;
+  /** R2-A4: the party broke a promise — suggest at least the firm stage. */
+  isFirm?: (invoice: InvoiceRecord) => boolean;
+  /** R2-A7: the party's payment grade, weighted into the priority. */
+  gradeOf?: (invoice: InvoiceRecord) => 'A' | 'B' | 'C' | 'D' | null | undefined;
 }
 
 const COLLECTIBLE = new Set(['INVOICE', 'TAX_INVOICE', 'PROFORMA', 'BILL_OF_SUPPLY']);
@@ -395,16 +480,24 @@ export function pendingReminders(
   for (const invoice of invoices) {
     if (!COLLECTIBLE.has(invoice.doc_type)) continue;
     if (invoice.status === 'Paid' || invoice.status === 'Cancelled' || invoice.status === 'Draft') continue;
-    if (!(receivableBalance(invoice) > 0)) continue;
-    const daysToDue = daysUntil(invoice.due_date, today);
+    // What is still owed after receipts AND linked credit notes (src/lib/amount-due.ts).
+    const balance = amountDue(invoice, opts.credits?.get(invoice.id));
+    if (!(balance > 0)) continue;
+    // 8.100: a payment schedule's earliest unpaid instalment is the date to chase.
+    const daysToDue = daysUntil(effectiveDueDate(invoice), today);
     if (daysToDue < 0) overdueByClient.set(clientKey(invoice), (overdueByClient.get(clientKey(invoice)) ?? 0) + 1);
-    const stage = stageForDays(daysToDue);
+    const schedule = opts.schedule ?? DEFAULT_REMINDER_SCHEDULE;
+    let stage = stageForDays(daysToDue, schedule);
     if (!stage) continue;
+    const mode = opts.modeOf?.(invoice);
+    if (mode === 'never' || mode === 'manual') continue;
     if (isSnoozed(log, invoice.id, today)) continue;
+    if (opts.isHeld?.(invoice)) continue;
+    if (daysToDue < 0 && opts.isFirm?.(invoice)) stage = firmerStage(stage, 'overdue_firm');
 
     const last = lastReminder(log, invoice.id);
     if (last) {
-      const cooldown = opts.cooldownDays ?? (stage === 'overdue_final' ? 7 : 3);
+      const cooldown = opts.cooldownDays ?? schedule.cooldowns[stage as ScheduledStage] ?? (stage === 'overdue_final' ? 7 : 3);
       const since = Math.round((dayStart(today) - dayStart(last.sent_at)) / 86400000);
       if (since < cooldown) continue;
     }
@@ -412,6 +505,7 @@ export function pendingReminders(
       invoice,
       stage,
       daysToDue,
+      balance,
       count: reminderCount(log, invoice.id),
       lastSentAt: last?.sent_at ?? null,
     });
@@ -422,9 +516,10 @@ export function pendingReminders(
       const own = r.daysToDue < 0 ? 1 : 0;
       const pr = reminderPriority({
         daysToDue: r.daysToDue,
-        balanceInr: balanceInr(r.invoice),
+        balanceInr: toInr(r.invoice, r.balance),
         otherOverdue: key ? Math.max(0, (overdueByClient.get(key) ?? 0) - own) : 0,
         remindersSent: r.count,
+        grade: opts.gradeOf?.(r.invoice) ?? null,
       });
       return { ...r, priority: pr.score, priorityLevel: pr.level, priorityReasons: pr.reasons };
     })

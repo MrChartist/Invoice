@@ -38,6 +38,15 @@ export const TDS_PAYABLE_SECTIONS: readonly TdsPayableSection[] = [
   { code: '194O', family: '194O', section: '194-O', label: '194-O E-commerce operator (participant’s sales)', rpu: '94O' },
   { code: '194R', family: '194R', section: '194R', label: '194R Business perquisite / benefit', rpu: '94R' },
   { code: '194S', family: '194S', section: '194S', label: '194S Virtual digital asset', rpu: '94S' },
+  // 7R (7.120): Sec 195 — payments to non-residents, reported in Form 27Q (not 26Q). Act rate by nature from
+  // `NR_ACT_RATE_RULES` below; RPU section code '195' UNVERIFIED.
+  { code: '195-R', family: '195', section: '195', label: '195 Non-resident — royalty', rpu: '195' },
+  { code: '195-F', family: '195', section: '195', label: '195 Non-resident — fees for technical services', rpu: '195' },
+  { code: '195-I', family: '195', section: '195', label: '195 Non-resident — interest', rpu: '195' },
+  { code: '195-O', family: '195', section: '195', label: '195 Non-resident — other sums', rpu: '195' },
+  // R14 (PS-D2): Sec 194T — salary, remuneration, commission, bonus or interest to a partner of a firm / LLP, from
+  // 1 Apr 2025 (rate `TDS_194T_RULES`, threshold below). RPU / Form 140 code NOT confirmed (PS19) — verify with your CA.
+  { code: '194T', family: '194T', section: '194T', label: '194T Payments to partners', rpu: '94T' },
 ];
 
 export function payableSection(code: string | undefined): TdsPayableSection | undefined {
@@ -58,6 +67,8 @@ export const TDS_194A_RATE_RULES: readonly Versioned<number>[] = [
  */
 export function sectionRate(code: string, date?: string, deductee?: DeducteeType): number | null {
   if (code === '194A') return ruleAt(TDS_194A_RATE_RULES, date);
+  if (code === '194T') return ruleAt(TDS_194T_RULES, date); // R14 (PS-D2)
+  if (code.startsWith('195-')) return nrActRate(nrNatureOf(code), date, deductee).rate;
   let c = code;
   if (code === '194C-1' || code === '194C-2') c = deductee === 'INDIVIDUAL' || deductee === 'HUF' ? '194C-1' : deductee ? '194C-2' : code;
   const hit = tdsSections(date).find((s) => s.section === c);
@@ -121,6 +132,8 @@ export function tdsThreshold(family: string, date?: string): TdsThreshold | unde
 export const TDS_EXTRA_THRESHOLD_RULES: Readonly<Record<string, readonly Versioned<TdsThreshold | null>[]>> = {
   '194R': [{ from: '2022-07-01', value: { aggregate: 20000 }, source: 'Sec 194R — verify' }],
   '194S': [{ from: '2022-07-01', value: { aggregate: 10000 }, source: 'Sec 194S (other than a specified person) — verify' }],
+  // R14 (PS-D2): 194T — ₹20,000 per FY per partner across salary, remuneration, commission, bonus and interest.
+  '194T': [{ from: '2025-04-01', value: { aggregate: 20000 }, source: 'Finance (No. 2) Act 2024 (Sec 194T) — taxmann, L&S, tdsman' }],
 };
 
 /** Sec 206AA: payee without a valid PAN — at least 20% (5% for 194Q from 1 Jul 2021). */
@@ -190,5 +203,118 @@ export function tdsDueDays(periodStart?: string): TdsDueDays {
  */
 export const TCS_27EQ_CODES: readonly { match: RegExp; code: string; label: string }[] = [
   { match: /1H/i, code: '6CR', label: '206C(1H) sale of goods' },
+  // R15-D1 (TV7): TCS on an overseas tour programme package (labels of `travel/tv-tcs.ts` `tourTcsLabel`: "206C(1G)
+  // overseas tour package 5 %", "Sec 394(1) Sl. 8 — overseas tour package 2 %"). The collection code is not confirmed:
+  // left blank — verify with your CA. Placed before the LRS row, whose /1G/ would otherwise take the old-Act label.
+  { match: /overseas tour/i, code: '', label: '206C(1G) overseas tour programme package (code to confirm — verify with your CA)' },
   { match: /1G/i, code: '6CQ', label: '206C(1G) remittance under LRS' },
+  // R8-C (TR-C2): 206C(1) specified goods and 206C(1F) — labels of `tradingTcsPresets` (trade/tr-statutory.ts). The
+  // luxury-goods code is not confirmed: left blank (TR15) — verify with your CA.
+  { match: /206C\(1\) alcoholic liquor/i, code: '6CA', label: '206C(1) alcoholic liquor' },
+  { match: /206C\(1\) timber \(forest lease\)/i, code: '6CB', label: '206C(1) timber under a forest lease' },
+  { match: /206C\(1\) timber \(other mode\)/i, code: '6CC', label: '206C(1) timber by any other mode' },
+  { match: /206C\(1\) other forest produce/i, code: '6CD', label: '206C(1) other forest produce' },
+  { match: /206C\(1\) scrap/i, code: '6CE', label: '206C(1) scrap' },
+  { match: /206C\(1\) tendu/i, code: '6CI', label: '206C(1) tendu leaves' },
+  { match: /206C\(1\) coal/i, code: '6CJ', label: '206C(1) coal / lignite / iron ore' },
+  { match: /206C\(1F\) motor vehicle/i, code: '6CL', label: '206C(1F) motor vehicle' },
+  { match: /206C\(1F\) notified luxury/i, code: '', label: '206C(1F) notified luxury goods (code to confirm — verify with your CA)' },
 ];
+
+/* ── 7R (7.120): Form 27Q — payments to non-residents (Sec 195) ───────────── */
+
+/** Nature of a payment to a non-resident (drives the Act rate). */
+export type NrNature = 'ROYALTY' | 'FTS' | 'INTEREST' | 'OTHER';
+
+export const NR_NATURES: readonly NrNature[] = ['ROYALTY', 'FTS', 'INTEREST', 'OTHER'];
+
+/** `195-R` → ROYALTY … (`OTHER` for anything else). */
+export function nrNatureOf(code: string | undefined): NrNature {
+  const c = String(code ?? '');
+  if (c === '195-R') return 'ROYALTY';
+  if (c === '195-F' || c === '194J-T') return 'FTS';
+  if (c === '195-I' || c === '194A') return 'INTEREST';
+  return 'OTHER';
+}
+
+/**
+ * Rates in force under the Act (Part II of the First Schedule / Sec 115A) for TDS u/s 195, % before surcharge,
+ * and the health & education cess added on top (`cessPct`). UNVERIFIED working-paper values — verify with your CA:
+ *  - royalty / FTS (Sec 115A): 10% from 1 Apr 2015; 20% from 1 Apr 2023 (Finance Act 2023);
+ *  - interest (other than Sec 194LB / 194LC / 194LD concessional cases, not modelled): 20%;
+ *  - other sums: 30% (non-company), 40% (foreign company); 35% for a foreign company from 1 Apr 2024
+ *    (Finance (No. 2) Act 2024 — read as applying to TDS of FY 2024-25 on);
+ *  - cess 3% (education + SHE cess) to 31 Mar 2018, 4% health & education cess from 1 Apr 2018.
+ * Surcharge (by income slab) is not modelled. Append new versions; never edit an old one.
+ */
+export interface NrActRates { ROYALTY: number; FTS: number; INTEREST: number; OTHER: number; OTHER_COMPANY: number; cessPct: number }
+
+export const NR_ACT_RATE_RULES: readonly Versioned<NrActRates>[] = [
+  { from: '2017-07-01', value: { ROYALTY: 10, FTS: 10, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 40, cessPct: 3 }, source: 'Sec 115A / First Schedule Part II — verify' },
+  { from: '2018-04-01', value: { ROYALTY: 10, FTS: 10, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 40, cessPct: 4 }, source: 'Finance Act 2018 (health & education cess 4%) — verify' },
+  { from: '2023-04-01', value: { ROYALTY: 20, FTS: 20, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 40, cessPct: 4 }, source: 'Finance Act 2023 (Sec 115A royalty / FTS 20%) — verify' },
+  { from: '2024-04-01', value: { ROYALTY: 20, FTS: 20, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 35, cessPct: 4 }, source: 'Finance (No. 2) Act 2024 (foreign company 35%) — verify' },
+];
+
+/** Act rate for a non-resident payment: the base rate and the effective rate with cess (2 decimals). */
+export function nrActRate(nature: NrNature, date?: string, deductee?: DeducteeType): { rate: number; base: number; cessPct: number } {
+  const r = ruleAt(NR_ACT_RATE_RULES, date);
+  const base = nature === 'OTHER' && deductee === 'COMPANY' ? r.OTHER_COMPANY : r[nature];
+  return { base, cessPct: r.cessPct, rate: Math.round(base * (100 + r.cessPct)) / 100 };
+}
+
+/**
+ * 194-O (7R, 7.120): the ₹5 lakh FY exemption for an e-commerce participant who is an individual / HUF and has
+ * furnished PAN or Aadhaar (Sec 194-O(2)), and the Sec 206AA rate when no PAN / Aadhaar is furnished (5%, the
+ * Sec 206AA(1A)-type cap for 194-O as understood). From 1 Oct 2020. UNVERIFIED — verify with your CA. Append-only.
+ */
+export const TDS_194O_RULES: readonly Versioned<{ individualExemption: number; noPanRate: number } | null>[] = [
+  { from: '2017-07-01', value: null },
+  { from: '2020-10-01', value: { individualExemption: 500000, noPanRate: 5 }, source: 'Sec 194-O(2) and Sec 206AA for 194-O (Finance Act 2020) — verify' },
+];
+
+/**
+ * R5-B3: Sec 194C(6) — no TDS on payments to a contractor in the business of plying, hiring or leasing goods carriages
+ * who owns ten or fewer goods carriages at any time in the year and furnishes a declaration with PAN. The limit is
+ * date-keyed; the 26Q no-deduction reason code is `T` (as understood). From 1 Apr 2026 the 2025-Act table item applies
+ * (labels via `ita2025.ts`). Verify with your CA. Append-only.
+ */
+export const TDS_194C6_RULES: readonly Versioned<{ maxVehicles: number; reason: string } | null>[] = [
+  { from: '2015-06-01', value: { maxVehicles: 10, reason: 'T' }, source: 'Sec 194C(6) as amended by Finance Act 2015 (≤ 10 goods carriages, PAN + declaration) — verify' },
+];
+
+/**
+ * R14 (PS-D2): Sec 194T — a firm (incl. an LLP) deducts 10% on salary, remuneration, commission, bonus or interest
+ * credited / paid to a partner from 1 Apr 2025 (Finance (No. 2) Act 2024; none before: null). Drawings and the exempt
+ * share of profit are outside. Rate and date verified in secondary sources; the 2025-Act table entry and the RPU code
+ * are not (PS19) — verify with your CA. Append-only.
+ */
+export const TDS_194T_RULES: readonly Versioned<number | null>[] = [
+  { from: '2017-07-01', value: null },
+  { from: '2025-04-01', value: 10, source: 'Sec 194T (Finance (No. 2) Act 2024) — taxmann, Lakshmikumaran & Sridharan, tdsman' },
+];
+
+/**
+ * R15-A4 (TV23): from 1 Apr 2026 "work" includes supply of manpower (Sec 402(47) as amended), so a manpower supplier
+ * falls in the contractor limb — Sec 393(1) Table Sl. 6(i), 1 % individual / HUF, 2 % others — not fees for
+ * professional / technical services. Label row for the payables section picker's hint (null before). Finance Bill 2026
+ * read, the Act not: unverified — verify with your CA. Append-only.
+ */
+export const MANPOWER_WORK_RULES: readonly (Versioned<string | null> & { verified?: boolean })[] = [
+  { from: '2017-07-01', value: null },
+  {
+    from: '2026-04-01',
+    value: 'Sec 393(1) Table Sl. 6(i) — contractor / supply of manpower (Sec 402(47) from 1 Apr 2026)',
+    source: 'Finance Bill 2026 cl. 78; Memorandum ("Application of TDS on supply of manpower")',
+    verified: false,
+  },
+];
+
+/**
+ * The contractor-limb label to hint when a bill naming manpower (item / ledger / notes text) is put under the
+ * professional / technical limb (194J, 194J-T) on or after 1 Apr 2026; null otherwise.
+ */
+export function manpowerHint(text: string, section: string | undefined, date?: string): string | null {
+  if (!section || !/^194J/.test(section) || !/man\s*-?\s*power/i.test(text)) return null;
+  return ruleAt(MANPOWER_WORK_RULES, date);
+}

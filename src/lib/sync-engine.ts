@@ -15,6 +15,9 @@
  *    client never sees two writers on one file.
  */
 
+import { mergeRows as mergeFields, validateMerged, type FieldPicks } from './trust/field-merge';
+// R4-C7: the conflict screen reads the merge helpers through this module, so they stay in the sync chunk.
+export * as fieldMerge from './trust/field-merge';
 import { AUDIT_MAX_ROWS, audit, canonical } from './audit';
 import { noteExternalChange } from './cross-tab';
 import { attachmentKey, parseStoredAttachment, referencedAttachmentIds, storedAttachmentIds, ATTACHMENT_KEY_PREFIX } from './attachments';
@@ -31,6 +34,7 @@ import {
   DEVICE_LOCAL_KEYS,
   SINGLETON_KEYS,
   SYNC_META_KEYS,
+  DEVICE_DRAFT_KEYS,
   isLocalOnlyKey,
   listKeys,
   readRaw,
@@ -55,6 +59,17 @@ import {
   type SyncKey,
 } from './sync-files';
 import type { AuditEntry } from '../types/audit';
+import './trade/tr-registry'; // R8-C: Round 8 tables' rights and audit labels (lazy registration)
+import './hotel/hotel-registry'; // R7: hotel tables' rights and audit labels (lazy registration)
+import './retail/rt-registry'; // R9: retail tables' rights and audit labels (lazy registration)
+import './construction/cn-registry'; // R11: construction tables' rights and audit labels (lazy registration)
+import './services/sv-registry'; // R10: service tables' rights and audit labels (lazy registration)
+import './agri/ag-registry'; // R12: agri tables' rights and audit labels (lazy registration)
+import './mfg/mf-registry'; // R13: manufacturing tables' rights and audit labels (lazy registration)
+import './prof/ps-registry'; // R14: professional tables' rights and audit labels (lazy registration)
+import './travel/tv-registry'; // R15: travel tables' rights and audit labels (lazy registration)
+import './manpower/mp-registry'; // R17: manpower tables' rights and audit labels (lazy registration)
+import './society/hs-registry'; // R18: society tables' rights and audit labels (lazy registration)
 
 export const [SYNC_STATE_KEY, SYNC_CONFLICTS_KEY, SYNC_AUDIT_KEY] = SYNC_META_KEYS;
 
@@ -249,8 +264,10 @@ const sameVersion = (a: RowMeta | null | undefined, b: RowMeta | null | undefine
 
 /** Per-device data and bookkeeping that must not travel between devices. */
 const EXCLUDED = new Set<string>([
-  ...['draft', 'schema_version', 'audit_log', 'timer', 'backup_snooze', 'auto_backup', 'install_dismissed', 'notif_state', 'export_prefs', '__probe'].map((k) => DB_PREFIX + k),
+  // R4-C4: `recycle_bin` — a delete already syncs as a tombstone and a restore as a new version.
+  ...['draft', 'schema_version', 'audit_log', 'recycle_bin', 'timer', 'backup_snooze', 'auto_backup', 'install_dismissed', 'notif_state', 'export_prefs', '__probe'].map((k) => DB_PREFIX + k),
   ...SYNC_META_KEYS,
+  ...DEVICE_DRAFT_KEYS, // POS bills on hold (8.21) belong to this counter
   ...DEVICE_LOCAL_KEYS,
 ]);
 
@@ -289,6 +306,7 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}job_work_in`]: 'date',
   [`${DB_PREFIX}job_work_principal`]: 'date',
   [`${DB_PREFIX}rejections_in`]: 'date',
+  [`${DB_PREFIX}production_plans`]: 'date',
   [`${DB_PREFIX}advances`]: 'date',
   [`${DB_PREFIX}fixed_assets`]: 'acquired_on',
   [`${DB_PREFIX}purchase_returns`]: 'date',
@@ -297,14 +315,169 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}tds_challans`]: 'date',
   [`${DB_PREFIX}gst_setoffs`]: 'date',
   [`${DB_PREFIX}gst_challans`]: (r) => str(r.deposited_on) || str(r.generated_on) || undefined,
+  // 7R: PMT-09 transfers (filing day), refund claims (filing day, else the period end), ISD documents.
+  [`${DB_PREFIX}gst_pmt09`]: 'date',
+  [`${DB_PREFIX}gst_refunds`]: (r) => str(r.filed_on) || str(r.period_to) || undefined,
+  [`${DB_PREFIX}isd_documents`]: 'date',
+  // Review L2: RCM self-invoices / payment vouchers (7O) post to the ledger on their date.
+  [`${DB_PREFIX}rcm_documents`]: 'date',
   [`${DB_PREFIX}payroll_runs`]: 'date',
   [`${DB_PREFIX}payroll_payments`]: 'date',
+  [`${DB_PREFIX}actuarial_valuations`]: 'date',
+  [`${DB_PREFIX}employee_loans`]: 'date',
   [`${DB_PREFIX}deposit_slips`]: 'date',
+  [`${DB_PREFIX}fx_bank_moves`]: 'date',
+  [`${DB_PREFIX}epay_batches`]: 'date',
+  [`${DB_PREFIX}commission_postings`]: 'date',
+  // 8F: van settlements, breakage / expiry claims and receipts
+  [`${DB_PREFIX}van_settlements`]: 'date',
+  [`${DB_PREFIX}expiry_claims`]: 'date',
+  [`${DB_PREFIX}expiry_receipts`]: 'date',
+  [`${DB_PREFIX}business_loans`]: 'date',
   [`${DB_PREFIX}pos_returns`]: 'day',
+  [`${DB_PREFIX}pos_shifts`]: 'day', // 8E cashier shifts
   [`${DB_PREFIX}cheques`]: chequeDay,
   [`${DB_PREFIX}ledger_openings`]: openingDay,
   [`${DB_PREFIX}opening_bills`]: openingDay,
   [`${DB_PREFIX}books_begin`]: (r) => (str(r.date) ? openingDayFor(str(r.date)) : undefined),
+  // R2-C: deferral schedules (their journals are `vouchers` rows, locked on their own dates) and packing lists
+  [`${DB_PREFIX}deferrals`]: (r) => str((r.source as Record<string, unknown> | undefined)?.date) || str(r.start) || undefined,
+  [`${DB_PREFIX}packing_lists`]: 'date',
+  // R2-A: collection follow-ups (the day logged) and bad-debt recoveries (the day the money came in)
+  [`${DB_PREFIX}collection_notes`]: 'date',
+  [`${DB_PREFIX}write_off_recoveries`]: 'date',
+  // R2-B: batch invoice runs (issue date of the run's invoices)
+  [`${DB_PREFIX}batch_runs`]: 'date',
+  // R3-A: running table orders, dated by the local day they were opened (`day`, else the `opened_at` date)
+  [`${DB_PREFIX}table_orders`]: (r) => str(r.day) || str(r.opened_at).slice(0, 10) || undefined,
+  // R3-B: retainers (start day; their period closes stamp time entries)
+  [`${DB_PREFIX}retainers`]: 'start',
+  // R4-A: production orders (order date), QC decisions, recall notices, landed-cost vouchers
+  [`${DB_PREFIX}production_orders`]: 'date',
+  [`${DB_PREFIX}qc_results`]: 'date',
+  [`${DB_PREFIX}recall_notices`]: 'date',
+  [`${DB_PREFIX}landed_cost_vouchers`]: 'date',
+  // R4-B: gift vouchers (sale / issue date) and transfer requests (request date)
+  [`${DB_PREFIX}gift_vouchers`]: 'issued_on',
+  [`${DB_PREFIX}transfer_requests`]: 'date',
+  // R4-C: export IRMs (remittance date), incentives (claim date), realisation write-offs
+  [`${DB_PREFIX}export_irms`]: 'date',
+  [`${DB_PREFIX}export_incentives`]: 'date',
+  [`${DB_PREFIX}export_writeoffs`]: 'date',
+  // R5-A: marketplace imports (import day), settlements (deposit date), GST TCS / TDS credit rows (month), returns desk
+  [`${DB_PREFIX}marketplace_imports`]: (r) => str(r.imported_at).slice(0, 10) || undefined,
+  [`${DB_PREFIX}settlements`]: 'deposit_date',
+  [`${DB_PREFIX}eco_credits`]: (r) => (/^\d{4}-\d{2}$/.test(str(r.month)) ? `${str(r.month)}-01` : undefined),
+  [`${DB_PREFIX}marketplace_returns`]: (r) => str(r.expected_on) || str(r.created_at).slice(0, 10) || undefined,
+  // R5-C: fee runs (issue date), common-credit runs (journal date), donations, leases (start), security deposits
+  [`${DB_PREFIX}fee_runs`]: 'date',
+  [`${DB_PREFIX}common_credit_runs`]: 'date',
+  [`${DB_PREFIX}donations`]: 'date',
+  [`${DB_PREFIX}leases`]: 'start',
+  [`${DB_PREFIX}security_deposits`]: 'date',
+  // R5-B: consignment notes, trip sheets (start day), RA measurements
+  [`${DB_PREFIX}consignment_notes`]: 'date',
+  [`${DB_PREFIX}trips`]: 'start_date',
+  [`${DB_PREFIX}ra_measurements`]: 'date',
+  // R6-C3: import runs (the day the file was imported)
+  [`${DB_PREFIX}import_runs`]: (r) => str(r.at).slice(0, 10) || undefined,
+  // R7-A: hotel bookings (arrival), folios (opened on), night audits (business date)
+  [`${DB_PREFIX}hotel_reservations`]: 'arrival',
+  [`${DB_PREFIX}hotel_folios`]: 'opened_on',
+  [`${DB_PREFIX}hotel_night_audits`]: 'business_date',
+  // R8-A: trade claims, price-drop runs, interest runs, packaging movements
+  [`${DB_PREFIX}trade_claims`]: 'date',
+  [`${DB_PREFIX}price_drops`]: 'date',
+  [`${DB_PREFIX}interest_runs`]: 'date',
+  [`${DB_PREFIX}packaging_moves`]: 'date',
+  // R8-B: brokerage postings (period end)
+  [`${DB_PREFIX}brokerage_postings`]: 'to',
+  // R8-C: arrivals, bikri pattis, indents
+  [`${DB_PREFIX}arrivals`]: 'date',
+  [`${DB_PREFIX}sale_pattis`]: 'date',
+  [`${DB_PREFIX}indents`]: 'date',
+  // R9-A: rider settlements, short book; R9-B: refills (next due); R9-C: alterations; R9-D: IMEI checks, finance deals,
+  // service jobs; R9-E: metal rates, karigar moves (RT_DATED in retail/rt-shared.ts)
+  [`${DB_PREFIX}rider_settlements`]: 'date',
+  [`${DB_PREFIX}short_book`]: 'date',
+  [`${DB_PREFIX}rx_refills`]: 'next_due',
+  [`${DB_PREFIX}alteration_jobs`]: 'date',
+  [`${DB_PREFIX}imei_checks`]: 'date',
+  [`${DB_PREFIX}finance_deals`]: 'date',
+  [`${DB_PREFIX}service_jobs`]: 'date',
+  [`${DB_PREFIX}metal_rates`]: 'date',
+  [`${DB_PREFIX}karigar_moves`]: 'date',
+  // R11-B: secured advances, price-variation statements, bank guarantees (issued on)
+  [`${DB_PREFIX}secured_advances`]: 'date',
+  [`${DB_PREFIX}price_variations`]: 'date',
+  [`${DB_PREFIX}bank_guarantees`]: 'issued_on',
+  // R11-C: bookings, stage certificates, RERA account entries
+  [`${DB_PREFIX}realty_bookings`]: 'date',
+  [`${DB_PREFIX}stage_certificates`]: 'certified_on',
+  [`${DB_PREFIX}rera_withdrawals`]: 'date',
+  // R10-A: appointments, staff payouts, payer claims
+  [`${DB_PREFIX}appointments`]: 'date',
+  [`${DB_PREFIX}staff_payouts`]: 'date',
+  [`${DB_PREFIX}payer_claims`]: 'date',
+  // R10-B: OPD visits, admissions (admitted on), lab orders
+  [`${DB_PREFIX}clinic_visits`]: 'date',
+  [`${DB_PREFIX}admissions`]: 'admit_date',
+  [`${DB_PREFIX}lab_orders`]: 'date',
+  // R10-C: memberships (by start), check-ins, class attendance
+  [`${DB_PREFIX}memberships`]: 'start',
+  [`${DB_PREFIX}checkins`]: 'date',
+  [`${DB_PREFIX}class_attendance`]: 'date',
+  // R11-D: work orders, sub-contractor bills, muster days, plant log sheets
+  [`${DB_PREFIX}sub_work_orders`]: 'date',
+  [`${DB_PREFIX}sub_measurements`]: 'date',
+  [`${DB_PREFIX}muster_days`]: 'date',
+  [`${DB_PREFIX}plant_logs`]: 'date',
+  // R12-A: farm batches (by start), pooled farmer cycles (by period end)
+  [`${DB_PREFIX}farm_batches`]: 'start',
+  [`${DB_PREFIX}farmer_cycles`]: 'period_to',
+  // R12-B: rate charts (by effective date), milk shifts, milk dispatches
+  [`${DB_PREFIX}milk_rate_charts`]: 'effective_from',
+  [`${DB_PREFIX}milk_shifts`]: 'date',
+  [`${DB_PREFIX}milk_dispatches`]: 'date',
+  // R12-C: weighbridge slips
+  [`${DB_PREFIX}weighbridge_slips`]: 'date',
+  // R12-D: cold-storage lots (by date in), loans against stored produce, members' share ledger
+  [`${DB_PREFIX}cold_lots`]: 'date_in',
+  [`${DB_PREFIX}agri_loans`]: 'date',
+  [`${DB_PREFIX}member_shares`]: 'date',
+  // R13-A: job cards (by the first entry's day)
+  [`${DB_PREFIX}job_cards`]: 'date',
+  // R13-B: inspection reports, job quotes, moulding runs, print estimates
+  [`${DB_PREFIX}inspection_reports`]: 'date',
+  [`${DB_PREFIX}job_quotes`]: 'date',
+  [`${DB_PREFIX}process_runs`]: 'date',
+  [`${DB_PREFIX}print_estimates`]: 'date',
+  // R13-C: cut plans (the cutting day)
+  [`${DB_PREFIX}cut_plans`]: 'date',
+  // R13-D: cost cards (by effective date), export authorisations (by issue date), incentive claims (by period end)
+  [`${DB_PREFIX}cost_cards`]: 'effective_from',
+  [`${DB_PREFIX}export_authorisations`]: 'date',
+  [`${DB_PREFIX}incentive_claims`]: 'period_to',
+  // R14-A: engagements (by start), conflict checks (by date)
+  [`${DB_PREFIX}engagements`]: 'start',
+  [`${DB_PREFIX}conflict_checks`]: 'date',
+  // R14-D: partner runs (year-end and monthly credits), UDIN register
+  [`${DB_PREFIX}partner_runs`]: 'date',
+  [`${DB_PREFIX}udin_register`]: 'date',
+  // R14-B: client-money vouchers
+  [`${DB_PREFIX}client_money`]: 'date',
+  // R14-C: EDF register (the end of the invoice month)
+  [`${DB_PREFIX}edf_register`]: 'date',
+  // R15-B: travel bookings (by start)
+  [`${DB_PREFIX}travel_bookings`]: 'start',
+  // R15-C: supplier statements (by period end)
+  [`${DB_PREFIX}supplier_statements`]: 'period_end',
+  // R17-B: site musters (the month's last day)
+  [`${DB_PREFIX}site_musters`]: 'date',
+  // R17-C: site compliance proof (the month's last day)
+  [`${DB_PREFIX}site_compliance`]: 'date',
+  // R18-B: society billing runs (the bill date)
+  [`${DB_PREFIX}society_runs`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
@@ -837,7 +1010,7 @@ function safeParse(s: string): unknown {
 }
 
 /** Numbered documents: table → number / date fields. Two devices can issue the same serial in each. */
-const NUMBERED: Record<string, { num: string; date: string }> = {
+const NUMBERED: Record<string, { num: string; date: string; scope?: string }> = {
   [INVOICES_KEY]: { num: 'invoice_number', date: 'issue_date' },
   [`${DB_PREFIX}advances`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}vouchers`]: { num: 'number', date: 'date' },
@@ -850,14 +1023,102 @@ const NUMBERED: Record<string, { num: string; date: string }> = {
   [`${DB_PREFIX}job_work_in`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}job_work_principal`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}rejections_in`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}production_plans`]: { num: 'number', date: 'date' },
+  // 8F: van settlements (VST) and breakage / expiry receipts (BER)
+  [`${DB_PREFIX}van_settlements`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}expiry_receipts`]: { num: 'number', date: 'date' },
   // M5: every other numbered series (DN / GRN / RJO / PIS / PRL / PYP / PO).
   [`${DB_PREFIX}purchase_returns`]: { num: 'note_number', date: 'date' },
   [`${DB_PREFIX}receipt_notes`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}deposit_slips`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}epay_batches`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}payroll_runs`]: { num: 'number', date: 'date' },
   [`${DB_PREFIX}payroll_payments`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}actuarial_valuations`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}employee_loans`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}business_loans`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}fnf_settlements`]: { num: 'number', date: 'pay_month' },
   [`${DB_PREFIX}purchase_orders`]: { num: 'po_number', date: 'date' },
+  // Review L2: RCM self-invoices (RCM/…) and payment vouchers (RPV/…) are two series in one table.
+  [`${DB_PREFIX}rcm_documents`]: { num: 'number', date: 'date', scope: 'kind' },
+  // R2-C: packing lists (PKL/FY…)
+  [`${DB_PREFIX}packing_lists`]: { num: 'number', date: 'date' },
+  // R4-A: production orders (WO/FY…) and landed-cost vouchers (LCV/FY…)
+  [`${DB_PREFIX}production_orders`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}landed_cost_vouchers`]: { num: 'number', date: 'date' },
+  // R4-B: gift vouchers (GV/FY…) and transfer requests (TRQ/FY…)
+  [`${DB_PREFIX}gift_vouchers`]: { num: 'number', date: 'issued_on' },
+  [`${DB_PREFIX}transfer_requests`]: { num: 'number', date: 'date' },
+  // R5-C3: donation receipts (DON/FY…)
+  [`${DB_PREFIX}donations`]: { num: 'number', date: 'date' },
+  // R5-B: consignment notes (LR/FY…) and trip sheets (TRP/FY…)
+  [`${DB_PREFIX}consignment_notes`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}trips`]: { num: 'number', date: 'start_date' },
+  // R7-A: hotel reservations (RES/FY…)
+  [`${DB_PREFIX}hotel_reservations`]: { num: 'number', date: 'booked_on' },
+  // R8-A: trade claims (TCL/FY…) and price-drop runs (PDR/FY…)
+  [`${DB_PREFIX}trade_claims`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}price_drops`]: { num: 'number', date: 'date' },
+  // R8-C: arrivals (ARR/FY…), bikri pattis (PAT/FY…), indents (IND/FY…)
+  [`${DB_PREFIX}arrivals`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}sale_pattis`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}indents`]: { num: 'number', date: 'date' },
+  // R9: alteration slips (ALT/FY…), service jobs (SVC/FY…), karigar issue / receipt (KAR/FY…)
+  [`${DB_PREFIX}alteration_jobs`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}service_jobs`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}karigar_moves`]: { num: 'number', date: 'date' },
+  // R11-B: price-variation statements (PVB/FY…)
+  [`${DB_PREFIX}price_variations`]: { num: 'number', date: 'date' },
+  // R11-C: bookings (BKG/FY…)
+  [`${DB_PREFIX}realty_bookings`]: { num: 'number', date: 'date' },
+  // R10-A: payer claims (CLM/FY…)
+  [`${DB_PREFIX}payer_claims`]: { num: 'number', date: 'date' },
+  // R10-B: OPD visits (OPD/FY…), admissions (IPD/FY…), lab orders (LAB/FY…)
+  [`${DB_PREFIX}clinic_visits`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}admissions`]: { num: 'number', date: 'admit_date' },
+  [`${DB_PREFIX}lab_orders`]: { num: 'number', date: 'date' },
+  // R10-C: memberships (MEM/FY…)
+  [`${DB_PREFIX}memberships`]: { num: 'number', date: 'start' },
+  // R11-D: work orders (SWO/FY…), sub-contractor bills (SCB/FY…), plant log sheets (PLG/FY…)
+  [`${DB_PREFIX}sub_work_orders`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}sub_measurements`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}plant_logs`]: { num: 'number', date: 'date' },
+  // R12-A: pooled farmer cycle bills (CYB/FY…)
+  [`${DB_PREFIX}farmer_cycles`]: { num: 'number', date: 'period_to' },
+  // R12-B: milk dispatches (MDS/FY…)
+  [`${DB_PREFIX}milk_dispatches`]: { num: 'number', date: 'date' },
+  // R12-C: weighbridge slips (WBS/FY…); CMR delivery numbers live inside `cmr_agreements` (guarded by series_counters)
+  [`${DB_PREFIX}weighbridge_slips`]: { num: 'number', date: 'date' },
+  // R12-D: cold-storage receipts (CSR/FY…), loans against stored produce (LAS/FY…)
+  [`${DB_PREFIX}cold_lots`]: { num: 'number', date: 'date_in' },
+  [`${DB_PREFIX}agri_loans`]: { num: 'number', date: 'date' },
+  // R13-A: job cards (JCD/FY…)
+  [`${DB_PREFIX}job_cards`]: { num: 'number', date: 'date' },
+  // R13-B: inspection reports (FAI/FY…), print estimates (PES/FY…)
+  [`${DB_PREFIX}inspection_reports`]: { num: 'number', date: 'date' },
+  [`${DB_PREFIX}print_estimates`]: { num: 'number', date: 'date' },
+  // R13-C: cut plans / lots (CUT/FY…)
+  [`${DB_PREFIX}cut_plans`]: { num: 'number', date: 'date' },
+  // R14-A: engagements (ENG/FY…)
+  [`${DB_PREFIX}engagements`]: { num: 'number', date: 'start' },
+  // R14-B: client-money vouchers (CMV/FY…)
+  [`${DB_PREFIX}client_money`]: { num: 'number', date: 'date' },
+  // 7R: `isd_documents` is NOT listed: its `number` mixes our ISD/FY… series with suppliers' / distributors' own
+  // invoice numbers, which may legitimately repeat across parties (the ISD series itself is guarded by series_counters).
 };
+
+/**
+ * The key two rows of `table` collide on: the normalised document number, within the row's series
+ * (`scope` field) when the table holds several. '' when the table is not numbered or the row has no number.
+ */
+export function docNumberKey(table: string, row: unknown): string {
+  const f = own(NUMBERED, table);
+  if (!f || !row || typeof row !== 'object') return '';
+  const r = row as Record<string, unknown>;
+  const k = typeof r[f.num] === 'string' ? numberKey(r[f.num] as string) : '';
+  if (!k || !f.scope) return k;
+  return `${String(r[f.scope] ?? '')}|${k}`;
+}
 
 /** Duplicate document numbers (two devices issuing the same serial): listed, never renumbered. */
 function flagDuplicates(ctx: MergeCtx): void {
@@ -867,7 +1128,7 @@ function flagDuplicates(ctx: MergeCtx): void {
     if (w?.mode !== 'rows') continue;
     const groups = new Map<string, string[]>();
     for (const id of w.ids) {
-      const k = numberKey((w.rows.get(id) as Record<string, string> | undefined)?.[f.num]);
+      const k = docNumberKey(table, w.rows.get(id));
       if (!k) continue;
       const g = groups.get(k);
       if (g) g.push(id);
@@ -1068,6 +1329,7 @@ export interface SyncRunOptions {
 const blobDirName = (device: string) => device;
 
 export function runSync(o: SyncRunOptions): Promise<SyncReport> {
+  audit.flush(); // R15-A2: this device's log is pushed as stored
   return exclusive(async () => {
     const r = await runSyncInner(o);
     recordReport(r);
@@ -1352,7 +1614,11 @@ export function recordReport(r: SyncReport): void {
 
 /* ── Conflict resolution ───────────────────────────────────────── */
 
-export type Resolution = 'mine' | 'theirs' | 'ack';
+/**
+ * R4-C7: `{ merge }` keeps both versions field by field (masters) or group by group (documents): `merge` maps a
+ * field / group to the side it comes from (`field-merge.ts`). Only for concurrent edits of a row that exists on both.
+ */
+export type Resolution = 'mine' | 'theirs' | 'ack' | { merge: FieldPicks };
 
 export interface ResolveResult {
   ok: boolean;
@@ -1430,7 +1696,17 @@ export function resolveConflict(id: string, choice: Resolution, device: { id: st
       saveMeta(state, rest);
       return { ok: true };
     }
-    const pick = choice === 'theirs' ? c.remote : c.local;
+    // R4-C7: a field-level merge becomes the picked version (validated first; the vector covers both sides as below).
+    let pick: ConflictSide = choice === 'theirs' ? c.remote : c.local;
+    const merge = typeof choice === 'object' ? choice.merge : null;
+    if (merge) {
+      if (c.kind !== 'row' || c.reason !== 'concurrent' || !curValue || !c.remote.value) return { ok: false, message: 'Only a row edited on both devices can be merged field by field.' };
+      const table = c.key.slice(DB_PREFIX.length);
+      const merged = mergeFields(table, curValue, c.remote.value, merge);
+      const bad = validateMerged(table, merged, curValue as Record<string, unknown>, c.remote.value as Record<string, unknown>, merge);
+      if (bad) return { ok: false, message: bad === 'mergeTotals' ? 'The merged document no longer adds up: choose lines and totals from one side.' : 'The merged voucher does not balance: choose its lines from one side.' };
+      pick = { meta: null, value: merged };
+    }
     const settingsW = work.get(SINGLETON_KEYS.settings);
     const lock = lockOf(settingsW?.mode === 'single' ? settingsW.value : null);
     const writesData = c.kind === 'row'
@@ -1485,7 +1761,9 @@ export function resolveConflict(id: string, choice: Resolution, device: { id: st
         ? c.kind === 'row'
           ? `Applied a synced version from ${choice === 'theirs' ? c.device_name || 'another device' : 'this device'} to a ${label} in a locked period`
           : `Took the period-lock change from ${choice === 'theirs' ? c.device_name || 'another device' : 'this device'}`
-        : `Sync conflict on ${label}: kept ${choice === 'theirs' ? `the version from ${c.device_name || 'another device'}` : "this device's version"}`,
+        : merge
+          ? `Sync conflict on ${label}: merged field by field with the version from ${c.device_name || 'another device'} (${Object.entries(merge).filter(([, v]) => v === 'theirs').map(([k]) => k).join(', ') || 'all mine'} from theirs)`
+          : `Sync conflict on ${label}: kept ${choice === 'theirs' ? `the version from ${c.device_name || 'another device'}` : "this device's version"}`,
     });
     noteHighWater(state.clock);
     state.last_written_hash = ''; // the new version must be written out even if no data text changed

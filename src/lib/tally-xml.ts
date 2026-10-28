@@ -40,16 +40,20 @@
  * Working papers: verify with your CA before importing.
  */
 
+import { financialAccountOf, isFinancialNote } from './financial-note';
+
 import type { InvoiceItem, InvoiceRecord, Payment } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { fxNarration, inrTotals, inrValue } from './fx';
 import { receivableTotal } from './rcm';
-import { advanceMovements } from './advance-tax';
+import { NO_CASH_LEDGER, RIDER_CASH_LEDGER, exchangeVoucherOf, advanceMovements, movedNoCash, noCashKind, type NoCashKind } from './advance-tax'; // no-cash.ts
 import { debitNoteVouchers } from './tally-debit-notes';
 import { tallyBankResolver } from './tally-bank';
 import { booksVouchers, groupMasters, openingLedgers } from './tally-books';
 import { payrollTallyVouchers } from './tally-payroll';
 import { tdsChallanTallyVouchers } from './tally-tds';
+import { sectionText } from './ita2025';
+
 import {
   clean,
   emptySource,
@@ -61,12 +65,22 @@ import {
   invoiceStateCode,
   isoDate,
   partyNameOf,
+  urdCreditorLedger,
+  exchangeCreditorLedger,
   stateNameOf,
   toPaise,
   voucherKindOf,
   type DateRange,
   type ExportSource,
 } from './export-shared';
+
+/** R2-A2: Tally ledger names for the accounts a financial credit note is debited to. */
+const FINANCIAL_TALLY_LEDGERS: Readonly<Record<string, string>> = {
+  discount_allowed: 'Discount Allowed',
+  bad_debts: 'Bad Debts Written Off',
+  round_off: 'Round Off',
+  other_exp: 'Other Expenses',
+};
 
 /* ── XML primitives ───────────────────────────────────────────── */
 
@@ -334,16 +348,24 @@ function balanceWithRoundOff(entries: TallyEntry[], roundOffLedger: string): num
   return net;
 }
 
-function lineItems(inv: InvoiceRecord): TallyInventoryLine[] {
+/**
+ * Stock lines of a document, plus (QA8 T13) the paise of lines that are not our stock: bill-charge lines (market fee,
+ * hamali … → the other-charges ledger) and agency lines (a principal's goods → the sales ledger as an accounting line).
+ */
+function lineItems(inv: InvoiceRecord): { stock: TallyInventoryLine[]; charges: number; agency: number } {
   const items: InvoiceItem[] = Array.isArray(inv.items) ? inv.items : [];
-  if (!items.length) return [];
+  const none = { stock: [], charges: 0, agency: 0 };
+  if (!items.length) return none;
   try {
     const calc = inrTotals(
       calculateInvoice(calcInputFromRecord(inv, { round_off_enabled: false, round_mode: 'none', amount_paid: 0 })),
       inv,
     );
-    return calc.lines
-      .filter((l) => clean(l.name))
+    const byId = new Map(items.map((i) => [i.id, i]));
+    const kind = (id: string) => (byId.get(id)?.charge_head_id ? 'charges' : byId.get(id)?.arrival_id ? 'agency' : '');
+    const sum = (k: string) => calc.lines.filter((l) => kind(l.id) === k).reduce((t, l) => t + toPaise(l.taxable), 0);
+    const stock = calc.lines
+      .filter((l) => clean(l.name) && !kind(l.id))
       .map((l) => ({
         item: clean(l.name),
         hsn: clean(l.hsn),
@@ -353,8 +375,9 @@ function lineItems(inv: InvoiceRecord): TallyInventoryLine[] {
         gstRate: num(l.tax_rate),
         paise: toPaise(l.taxable),
       }));
+    return { stock, charges: sum('charges'), agency: sum('agency') };
   } catch {
-    return [];
+    return none;
   }
 }
 
@@ -376,6 +399,13 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
   const centreName = new Map((source.books?.costCentres ?? []).map((c) => [c.id, c.name]));
   const ccLedgers = new Set<string>();
   const allocatedBy = new Set((source.books?.manualVouchers ?? []).map((v) => v.id));
+
+  const urdLedgers = new Map<string, string>();
+  for (const raw of source.purchases ?? []) {
+    const name = urdCreditorLedger(raw, source.vendors);
+    if (name) urdLedgers.set(String((raw as { id?: unknown }).id ?? ''), name);
+  }
+  const urdLedgerOf = (id: string) => urdLedgers.get(id);
 
   const registerParty = (inv: InvoiceRecord, name: string) => {
     const c = inv.client ?? ({} as InvoiceRecord['client']);
@@ -414,8 +444,12 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     const party = partyNameOf(inv.client);
     registerParty(inv, party);
 
-    const inventory = o.includeInventory ? lineItems(inv) : [];
-    const salesLedger = credit ? o.creditNoteLedger : o.salesLedger;
+    // R2-A2: a financial credit note posts to its expense ledger (Discount Allowed / Bad Debts), with no stock and,
+    // without the GST variant, no GST ledgers at all.
+    const financial = credit && isFinancialNote(inv);
+    const split = o.includeInventory && !financial ? lineItems(inv) : { stock: [], charges: 0, agency: 0 };
+    const inventory = split.stock;
+    const salesLedger = financial ? FINANCIAL_TALLY_LEDGERS[financialAccountOf(inv)] ?? 'Discount Allowed' : credit ? o.creditNoteLedger : o.salesLedger;
     const entries: TallyEntry[] = [];
     const abs = (n: number) => Math.abs(n);
     const absA = {
@@ -428,10 +462,14 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
 
     // Party: Dr on a sale, Cr on a credit note.
     push(entries, party, credit ? 'Cr' : 'Dr', total, { name: number, type: 'New Ref' });
-    const taxable = inventory.length
+    const ledgerLines = split.charges + split.agency;
+    const taxable = inventory.length || ledgerLines
       ? inventory.reduce((s, l) => s + l.paise, 0)
       : Math.abs(toPaise(a.chargesTaxed ? round2(a.taxable - a.charges) : a.taxable));
     push(entries, salesLedger, credit ? 'Dr' : 'Cr', taxable);
+    // QA8 T13: charge lines and agency lines are ledger lines, never our stock items.
+    push(entries, o.otherChargesLedger, credit ? 'Dr' : 'Cr', split.charges);
+    push(entries, salesLedger, credit ? 'Dr' : 'Cr', split.agency);
     // WP-7 (P1-22): the document's cost centre on its sales entry.
     const cc = inv.cost_centre_id ? centreName.get(inv.cost_centre_id) : undefined;
     const salesEntry = entries.find((e) => e.ledger === salesLedger && !e.bill);
@@ -446,7 +484,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     push(entries, o.tcsLedger, credit ? 'Dr' : 'Cr', Math.abs(toPaise(a.tcs)));
     balanceWithRoundOff(entries, o.roundOffLedger);
 
-    std(salesLedger, 'Sales Accounts');
+    std(salesLedger, financial ? (financialAccountOf(inv) === 'bad_debts_recovered' ? 'Indirect Incomes' : 'Indirect Expenses') : 'Sales Accounts');
     std(o.otherChargesLedger, 'Sales Accounts');
     std(o.roundOffLedger, 'Indirect Expenses');
     std(o.outputCgst, 'Duties & Taxes', 'Central Tax');
@@ -521,7 +559,31 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       const inv = byId.get(p.invoice_id)!;
       const party = partyNameOf(inv.client);
       registerParty(inv, party);
-      const { ledger: bank, parent: bankParent } = bankOf(p); // WP-5: one ledger per bank (tally-bank.ts)
+      // QA6-1 F4: a row that moved no money debits its own ledger, never the bank (as the app's ledger posts it); an RA
+      // deduction row goes through its clearing account, which its journal clears.
+      const kind = noCashKind(p);
+      if (kind === 'exchange') {
+        // QA10 R5: an exchange is a journal — Dr the customer's URD creditor ledger (Agst Ref the voucher) / Cr the
+        // customer (Agst Ref the bill), as the app's ledger posts it; no "Sundry creditors — exchange" ledger.
+        const raw = (source.purchases ?? []).find((x) => String((x as { id?: unknown })?.id ?? '') === exchangeVoucherOf(p));
+        const creditor = (exchangeCreditorLedger(p, raw, source.vendors) ?? urdLedgerOf(exchangeVoucherOf(p))) || `${party} (Creditor)`; // QA19 U8
+        addLedger({ name: creditor, parent: 'Sundry Creditors', billwise: true });
+        const paise = toPaise(inrValue(num(p.amount), inv));
+        const invNo = clean(inv.invoice_number) || String(inv.id);
+        const urdNo = clean((raw as { bill_number?: unknown } | undefined)?.bill_number) || clean(p.reference) || creditor;
+        const entries: TallyEntry[] = [];
+        push(entries, creditor, 'Dr', paise, { name: urdNo, type: 'Agst Ref' });
+        push(entries, party, 'Cr', paise, { name: invNo, type: 'Agst Ref' });
+        vouchers.push({
+          type: 'Journal', date: isoDate(p.date), number: `${invNo}/X${seqOf.get(p) ?? 1}`, party, partyGstin: '', stateName: '',
+          narration: [`Exchange: ${urdNo} adjusted against ${invNo}`, clean(p.note)].filter(Boolean).join(' | '),
+          reference: urdNo, entries, inventory: [], inventoryLedger: '',
+        });
+        continue;
+      }
+      // R9 (RT-A3): COD cash a delivery rider collected sits in "Cash with riders" (Cash-in-Hand) until settled.
+      const riderCash = !!p.rider_id && /^\s*cash\s*$/i.test(String(p.method ?? ''));
+      const { ledger: bank, parent: bankParent } = movedNoCash(p) && kind !== 'ra_deduction' ? { ledger: NO_CASH_LEDGER[kind as NoCashKind], parent: kind === 'write_off' ? 'Indirect Expenses' : 'Current Liabilities' } : riderCash ? { ledger: RIDER_CASH_LEDGER, parent: 'Cash-in-Hand' } : bankOf(p); // WP-5: one ledger per bank (tally-bank.ts)
       std(bank, bankParent);
       const paise = toPaise(inrValue(num(p.amount), inv));
       const invNo = clean(inv.invoice_number) || String(inv.id);
@@ -544,7 +606,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
           clean(p.method),
           clean(p.reference) && `Ref ${clean(p.reference)}`,
           `Against ${invNo}`,
-          tds > 0 && `TDS ${fixed2(tds / 100)} withheld${clean(inv.tds_section) ? ` u/s ${clean(inv.tds_section)}` : ''}`,
+          tds > 0 && `TDS ${fixed2(tds / 100)} withheld${clean(inv.tds_section) ? ` u/s ${clean(sectionText(inv.tds_section, inv.issue_date))}` : ''}`,
           fxNarration(num(p.amount), inv),
         ]
           .filter(Boolean)
@@ -613,7 +675,10 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
 
   /* Purchases */
   if (o.includePurchases) {
-    for (const p of filterPurchases(source.purchases, source.vendors, o.range)) {
+    for (const np of filterPurchases(source.purchases, source.vendors, o.range)) {
+      // QA10 R5: a URD voucher's customer is credited in their own creditor ledger (never merged with their debtor one).
+      const urd = urdLedgerOf(np.id);
+      const p = urd ? { ...np, partyName: urd } : np;
       const total = Math.abs(toPaise(p.total));
       if (total === 0) continue;
       const entries: TallyEntry[] = [];

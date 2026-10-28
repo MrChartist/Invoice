@@ -4,7 +4,9 @@
  */
 
 import {
+  activeCompanyId,
   DEFAULT_COMPANY_ID,
+  DEFAULT_COMPANY_NAME,
   companyDbName,
   readRegistry,
   writeRegistry,
@@ -15,7 +17,7 @@ import { generateId, reloadAfterFlush, storageBackend } from './storage';
 import { requireAccess } from './access';
 
 export type { CompanyEntry, CompanyRegistry };
-export { activeCompanyId, readRegistry } from './company-registry';
+export { activeCompanyId, readRegistry, realCompanies } from './company-registry';
 
 /** Companies need IndexedDB (each one is its own database). */
 export function companiesSupported(): boolean {
@@ -49,10 +51,26 @@ export function renameCompany(id: string, name: string): void {
   writeRegistry({ ...reg, list: reg.list.map((c) => (c.id === id ? { ...c, name: n } : c)) });
 }
 
+/**
+ * QA-3 F27: while the main company is open and still carries the placeholder label, label it with
+ * its business profile name (what the user knows it by). A label only: never renames a company the
+ * user named, and skips a name another company already has. Returns true when it changed.
+ */
+export function labelMainCompany(profileName: string | null | undefined): boolean {
+  const reg = readRegistry();
+  const n = (profileName ?? '').trim().replace(/\s+/g, ' ').slice(0, 80);
+  if (!n || activeCompanyId() !== DEFAULT_COMPANY_ID) return false; // the tab's open company (QA7 G1)
+  const main = reg.list.find((c) => c.id === DEFAULT_COMPANY_ID);
+  if (!main || main.name !== DEFAULT_COMPANY_NAME) return false;
+  if (reg.list.some((c) => c.id !== DEFAULT_COMPANY_ID && c.name.toLowerCase() === n.toLowerCase())) return false;
+  writeRegistry({ ...reg, list: reg.list.map((c) => (c.id === DEFAULT_COMPANY_ID ? { ...c, name: n } : c)) });
+  return true;
+}
+
 /** Save pending writes, make `id` the active company and reload into it. */
 export function switchCompany(id: string): void {
   const reg = readRegistry();
-  if (!reg.list.some((c) => c.id === id) || reg.active === id) return;
+  if (!reg.list.some((c) => c.id === id) || (reg.active === id && activeCompanyId() === id)) return;
   writeRegistry({ ...reg, active: id });
   reloadAfterFlush();
 }
@@ -65,7 +83,7 @@ export async function deleteCompany(id: string): Promise<boolean> {
   requireAccess('settings.manage');
   const reg = readRegistry();
   if (id === DEFAULT_COMPANY_ID) throw new Error('The main company cannot be deleted; erase its data instead.');
-  if (id === reg.active) throw new Error('Switch to another company first.');
+  if (id === reg.active || id === activeCompanyId()) throw new Error('Switch to another company first.');
   const ok = await new Promise<boolean>((resolve) => {
     try {
       const req = indexedDB.deleteDatabase(companyDbName(id));

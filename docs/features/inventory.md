@@ -193,9 +193,10 @@ Every check runs on the dated event list, never on the end state:
   new sale), so auto-issued recurring invoices of batch items reduce the unbatched bucket.
 - Bill lines picked from the stock list carry `item_id` and match on it first (WP-8); typed / older lines still match by
   name + HSN. Invoice lines match by name + HSN only.
-- **Tally XML does not export batch or godown allocations** (`BATCHALLOCATIONS.LIST` / `GODOWNNAME` need godown and
+- ~~**Tally XML does not export batch or godown allocations** (`BATCHALLOCATIONS.LIST` / `GODOWNNAME` need godown and
   batch-enabled stock-item masters we do not export); Tally books everything to its main location. Stock transfers are
-  not exported (they would be Stock Journal vouchers).
+  not exported (they would be Stock Journal vouchers).~~ Done in 7.46: `BATCHALLOCATIONS.LIST` and transfers as Stock
+  Journal vouchers (stale note struck by R6-C6).
 - Godown pickers on purchase-order lines are not offered (a PO is not a stock document).
 
 ## Barcodes (6.7)
@@ -221,3 +222,13 @@ Stock groups / categories, units master and alternate units, group-wise summary,
 Stock Query, Sales Order Outstanding and landed cost: `docs/features/inventory-masters.md`. Engine changes here are
 one conversion per concern: `lineFactor` on invoice lines, `item_id` / `unitFactor` / `landedUnit` on bill lines
 (`readPurchaseLines`), and the same factor in `events-returns.ts` (GRN / rejection / purchase return lines).
+
+## 8F stock depth (`docs/features/distribution.md`)
+
+- Inventory tabs *Fast / slow · ABC* (`stock-analysis.ts`), *Variants, kits & bins* (variants grid → child items,
+  kit flag over the item's default BOM, bin per item / batch, salt) and *Breakage / expiry* (pharma operations).
+- Kits are a stock event source (`events-kits.ts`, one line in `collectEvents`; `liveInputs.kitBoms` reads `boms`).
+- Godown kinds (additive `Godown.kind`): `van` (van load / settlement) and `expiry` (sales from it are refused by
+  `saleLimitGate` in `liveDocTrackingIssues`).
+- Delivery challan lines snapshot the bin (`InvoiceItem.bin`); pick lists sort by bin.
+- Thermal roll label presets and raw TSPL / EPL / ZPL (`label-raw.ts`).

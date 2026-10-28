@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { TemplateEngine } from '../templates/TemplateEngine';
 import { DEFAULT_TEMPLATE_ID, templateById } from '../templates/registry';
@@ -25,6 +25,12 @@ import {
   type ShowColumns,
 } from '../../lib/design-prefs';
 import { calculateInvoice } from '../../lib/invoice-calc';
+import { designForDoc, GLOBAL_PROFILE_ID } from '../../lib/design-prefs';
+import { localDb } from '../../lib/localDb';
+import { DesignLabels, LogoAccentSuggest } from './DesignLabels';
+// R3-C2 / C3: page margins, letterhead artwork and the item-photo toggle (lazy, with their own strings).
+const PagePanel = lazy(() => import('./PagePanel'));
+import { dlT } from '../../i18n/areas/design-r2';
 import { cn } from '../../lib/utils';
 import type { InvoiceRecord, SenderProfile } from '../../types/invoice';
 import { SAMPLE_SENDER, buildSampleInvoice } from './sample';
@@ -158,10 +164,16 @@ function LivePreview({
   return (
     <div ref={stageRef} className={styles.stage} style={{ height: height || undefined }} data-testid="design-preview">
       <div ref={paperRef} className={styles.scaler} style={{ transform: `scale(${scale})`, width: size.width }}>
-        <TemplateEngine invoice={invoice} sender={sender} totals={totals} templateId={templateId} design={design} />
+        <TemplateEngine invoice={invoice} sender={sender} totals={totals} templateId={templateId} design={designForDoc(design, invoice.doc_type)} />
       </div>
     </div>
   );
+}
+
+const PRESET_KEYS = ['classic', 'compact', 'minimal', 'receipt'] as const;
+/** Preset card text in the interface language (the preset table itself stays English data). */
+function presetText(id: string, part: 'name' | 'desc', fallback: string): string {
+  return (PRESET_KEYS as readonly string[]).includes(id) ? desT(`preset.${id as (typeof PRESET_KEYS)[number]}.${part}`) : fallback;
 }
 
 /**
@@ -194,6 +206,17 @@ export function DesignPanel({
 
   const sample = useMemo(() => previewInvoice ?? buildSampleInvoice(), [previewInvoice]);
   const sender = previewSender ?? SAMPLE_SENDER;
+  // R2-C5: the logo the accent is suggested from — the preview's sender, else this profile's own logo.
+  const logo = useMemo(() => {
+    if (previewSender?.logo) return previewSender.logo;
+    try {
+      const s = localDb.settings.get();
+      const p = profileId === GLOBAL_PROFILE_ID ? localDb.settings.activeProfile() : s.profiles.find((x) => x.id === profileId);
+      return p?.logo || undefined;
+    } catch {
+      return undefined;
+    }
+  }, [previewSender, profileId]);
   const watermarkMode =
     design.watermark === WATERMARK_NONE ? 'none' : design.watermark === WATERMARK_AUTO ? 'auto' : 'custom';
 
@@ -216,8 +239,8 @@ export function DesignPanel({
           <div className={styles.presets}>
             {presets.map((p) => (
               <button key={p.id} type="button" className={styles.preset} onClick={() => onChange(applyPreset(design, p.id))}>
-                <span className={styles.presetName}>{p.name}</span>
-                <span className={styles.presetDesc}>{p.description}</span>
+                <span className={styles.presetName}>{presetText(p.id, 'name', p.name)}</span>
+                <span className={styles.presetDesc}>{presetText(p.id, 'desc', p.description)}</span>
               </button>
             ))}
           </div>
@@ -266,6 +289,7 @@ export function DesignPanel({
                 spellCheck={false}
               />
             </div>
+            <LogoAccentSuggest logo={logo} active={design.accent} onPick={(hex) => set({ accent: hex })} />
           </div>
 
           <div className={controls.field}>
@@ -345,6 +369,11 @@ export function DesignPanel({
           </div>
         </Section>
 
+        {/* R3-C2 / C3: margins, letterhead / footer artwork, item photos on lines. */}
+        <Suspense fallback={null}>
+          <PagePanel design={design} onChange={set} sectionClass={styles.section} titleClass={styles.sectionTitle} />
+        </Suspense>
+
         <Section title={desT('itemColumns')}>
           <div className={styles.checks}>
             {COLUMNS.map((key) => (
@@ -360,6 +389,10 @@ export function DesignPanel({
           <p className={controls.hint}>{desT('columnsHint')}</p>
         </Section>
 
+        <Section title={dlT('labels')}>
+          <DesignLabels design={design} onChange={set} />
+        </Section>
+
         <Section title={desT('sections')}>
           <div className={styles.checks}>
             <Check checked={design.show_bank} onChange={(v) => set({ show_bank: v })}>{desT('bank')}</Check>
@@ -369,6 +402,7 @@ export function DesignPanel({
             <Check checked={design.show_amount_in_words} onChange={(v) => set({ show_amount_in_words: v })}>{desT('words')}</Check>
             <Check checked={design.show_place_of_supply} onChange={(v) => set({ show_place_of_supply: v })}>{desT('pos')}</Check>
             <Check checked={design.show_tracking} onChange={(v) => set({ show_tracking: v })}>{desT('tracking')}</Check>
+            <Check checked={design.show_party_balance === true} onChange={(v) => set({ show_party_balance: v })}>{desT('partyBalance')}</Check>
           </div>
         </Section>
 

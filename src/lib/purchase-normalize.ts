@@ -315,9 +315,18 @@ export function splitLumpTax(
 export interface PurchaseLineCore {
   name: string;
   hsn: string;
+  /** Units received into stock: the paid quantity plus any free units (R9 RT-A4 `free_qty`). */
   quantity: number;
-  /** Unit cost after the line discount, before tax. */
+  /**
+   * Unit cost after the line discount, before tax — spread over every unit received, free ones included (R9 RT-A4:
+   * 10 + 1 at ₹80 less 5% → ₹760 ÷ 11 = ₹69.09). `quantity × unitCost` is always the line's taxable value.
+   */
   unitCost: number;
+  /** R9 (RT-A4): the paid quantity (GST / ITC value is on these only) and the free units received with them. */
+  paidQty: number;
+  freeQty: number;
+  /** R9 (RT-A4): rate per PAID unit after the line discount (the rate the supplier charged), before tax. */
+  netRate: number;
   /* Stock tracking (6.6 / 6.10 / 6.11); '' / [] when the line carries none. */
   batchNo: string;
   /** yyyy-mm-dd or ''. */
@@ -337,24 +346,42 @@ export interface PurchaseLineCore {
   unitFactor: number;
   /** Additive (WP-8): landed cost per line unit from the bill's `landed_costs` (stock cost only; 0 = none). */
   landedUnit: number;
+  /** Additive (R4-A5): the bill line's own `id`, or '' (older / imported lines). */
+  lineId: string;
 }
 
-/** The lines of a bill (`lines`, else legacy `items`), with unit cost resolved. */
-export function readPurchaseLines(raw: unknown): PurchaseLineCore[] {
+/**
+ * Engine-only key (R4-A5): a COPY of a bill handed to the stock engine may carry `{ [lineId]: extra per line unit }`
+ * from landed-cost vouchers (`landed-voucher.ts` `applyLandedVouchers`). It is never written to storage.
+ */
+export const LANDED_EXTRA_KEY = '__landed_extra';
+
+/**
+ * The lines of a bill (`lines`, else legacy `items`), with unit cost resolved. `extra` (R4-A5) is an optional
+ * per-line map (line id → landed cost per line unit) added on top of the bill's own `landed_costs`; absent, the map a
+ * landed-cost voucher left on an engine copy of the bill (`LANDED_EXTRA_KEY`) is used.
+ */
+export function readPurchaseLines(raw: unknown, extra?: Readonly<Record<string, number>>): PurchaseLineCore[] {
   const r = asRec(raw);
   const lines = Array.isArray(r.lines) ? r.lines : Array.isArray(r.items) ? r.items : [];
   const out: PurchaseLineCore[] = [];
   for (const l of lines) {
     const line = asRec(l);
-    const quantity = num(line.quantity ?? line.qty);
+    const paidQty = num(line.quantity ?? line.qty);
     let rate = num(line.rate ?? line.unit_price);
-    if (!rate && num(line.amount)) rate = num(line.amount) / (quantity || 1);
+    if (!rate && num(line.amount)) rate = num(line.amount) / (paidQty || 1);
     rate *= 1 - Math.min(Math.max(num(line.discount_percent), 0), 100) / 100;
+    // R9 (RT-A4): free units come into stock at no value; the paid value is spread over paid + free.
+    const freeQty = paidQty > 0 ? Math.max(num(line.free_qty), 0) : 0;
+    const quantity = paidQty + freeQty;
     out.push({
       name: pickStr(line, ['name', 'description']),
       hsn: pickStr(line, ['hsn']),
       quantity,
-      unitCost: rate,
+      unitCost: freeQty > 0 ? (rate * paidQty) / quantity : rate,
+      paidQty,
+      freeQty,
+      netRate: rate,
       batchNo: pickStr(line, ['batch_no', 'batch']),
       mfgDate: isoDay(pickStr(line, ['mfg_date'])),
       expiryDate: isoDay(pickStr(line, ['expiry_date', 'expiry'])),
@@ -367,12 +394,15 @@ export function readPurchaseLines(raw: unknown): PurchaseLineCore[] {
       itemId: pickStr(line, ['item_id']),
       unitFactor: num(line.unit_factor) > 0 ? num(line.unit_factor) : 1,
       landedUnit: 0,
+      lineId: pickStr(line, ['id']),
     });
   }
   if (Array.isArray(r.landed_costs) && r.landed_costs.length) {
-    const extra = allocateLandedCost(out, r.landed_costs, r.landed_basis === 'qty' ? 'qty' : 'value');
-    out.forEach((l, i) => { l.landedUnit = extra[i]; });
+    const own = allocateLandedCost(out, r.landed_costs, r.landed_basis === 'qty' ? 'qty' : 'value');
+    out.forEach((l, i) => { l.landedUnit = own[i]; });
   }
+  const more = extra ?? (asRec(r[LANDED_EXTRA_KEY]) as Record<string, number>);
+  if (more) for (const l of out) if (l.lineId && num(more[l.lineId]) > 0) l.landedUnit += num(more[l.lineId]);
   return out;
 }
 

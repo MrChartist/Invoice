@@ -337,3 +337,73 @@ unchanged.
 right after first paint, showing a same-sized inert bell meanwhile; the Dashboard imports `RemindersPanel` directly
 instead of through the `components/share` barrel (which pulled `ShareMenu` and the share helpers into the entry).
 Initial JS 178.3 → 173.3 kB gz (entry 68.6 → 64.2).
+
+## Initial-module chunk group (R15-A1, 2026-10-27)
+
+`vite.config.ts` replaces `manualChunks` with rolldown's `output.codeSplitting.groups`: `vendor-react` and `vendor-ui`
+(priority 30, names kept for long-term caching) and **`app-initial`** (`tags: ['$initial']`, priority 20), which puts
+every module statically reachable from the entry into ONE chunk (rolldown folds it into the entry chunk). Before, ten
+small first-paint app modules (`storage`, `dates`, `gstin`, `invoice-calc`, `tax-rules`, `validators`, two CSS-module
+chunks …) shipped as separate chunks that every lazy chunk re-imported one by one.
+
+| Build (gz -9, KiB) | Chunks | Initial | Entry | Total | Initial files | Cross-chunk `import{…}from` |
+|---|---|---|---|---|---|---|
+| Before (`manualChunks`, `d15cae9`) | 997 | 184.8 | 71.2 | 3,425.6 | 13 | 7,234 |
+| After (`codeSplitting.groups`) | 988 | 182.5 | 88.4 | 3,382.2 | 4 | 5,768 |
+
+`check-bundle-size.mjs`: the entry budget is 100 kB (the entry now *is* the first-paint app code, so the 185 kB
+initial budget is the binding limit) and a new check allows at most 5 initial files. `tests/bundle-config.test.ts`
+pins the three groups, the `$initial` tag and that no group can capture `jspdf` / `html-to-image`. Trade-off: any edit
+to a first-paint module now invalidates one ~88 kB chunk instead of one of ten; the PWA precaches the whole release
+anyway. Rejected variants (per-folder groups, a "tiny modules" group, `maxSize` splits) are measured in
+`docs/prd/round-15.md` §2.7.
+
+## R16-A — size recovery (2026-10-28)
+
+Four levers (`docs/prd/round-16.md` §4 R16-A), measured with `npx vite build` + `scripts/check-bundle-size.mjs`
+(gzip -9, KiB). "Core" = every JS file except the language packs in `dist/lang-manifest.json`: what an English device
+installs and updates.
+
+| Build | Chunks | Initial | Entry | Core precache | Hindi pack | Regional pack | Initial files |
+|---|---|---|---|---|---|---|---|
+| Baseline `0521a90` | 1,009 | 182.6 | 88.6 | 3,429.3 (all JS, Hindi inside) | — | — | 4 |
+| A1 + A2 (hi-split, packs, safe groups, leaves) | 1,004 | 182.1 | 88.0 | 3,086.0 | 338.9 (93 files) | 20.7 | 4 |
+| + A3 (`escHtml` only, cut 1) and QA18 merge | 1,004 | 182.1 | 88.1 | **3,085.6 (−343.7)** | **338.6** | **20.7** | 4 |
+
+- **A1 Hindi split.** `scripts/vite-hi-split.mjs` (build only) rewrites the `hi` argument of all 212 `defineArea(en, hi)`
+  calls into `() => import('virtual:hi/<family>/<file>~<hash>')`; the `lang-hi-<family>` group collects them (92
+  family chunks + `lang-hi-core` = `hi.ts`, `lang-regional` = `regional.ts`). Hindi left in English chunks: 21.3 kB
+  (help glossary / topics, keymap, WhatsApp texts, bilingual prints — allow-listed), cap 36.
+- **A2 safe groups.** `scripts/vite-safe-groups.mjs`: nine `f-*` family chunks (6.6–19.7 kB) and `lazy-leaves`
+  (16.7 kB, src/lib modules ≤ 3,000 B whose imports are all first paint / vendor). Safety is computed over strongly
+  connected components; `check-bundle-size.mjs` re-checks every `f-*` module against its family regex and every
+  leaves module's imports from `build-meta/chunks.json`.
+- **A3 shared helpers.** `escHtml` (`src/lib/html-esc.ts`, escapes `'` too) replaced 25 local copies; 5 family-local
+  copies that missed `'` were fixed in place (a family module importing a lazy helper would no longer be "safe").
+  Measured +1.2 kB core for the esc unification and +0.1 kB more for the day-maths call sites, so per the stop rule
+  only the escape was kept; `src/lib/day-math.ts` ships as a tested lazy module with no migrated call sites yet.
+- **A4 budgets.** Core precache 3,300 (was "total JS" 3,500), Hindi pack 400, regional 25, Hindi-in-core 36 (1 kB per
+  chunk unless allow-listed), lazy-leaves 20, initial 185 / entry 100 / ≤ 5 initial files unchanged.
+
+Service worker: English devices never download a language pack. The page posts `{type:'lang'}` on boot and on every
+switch; the worker caches the pack and keeps the choice in `mci-lang` `/__lang__`, and each install re-caches the
+pack of a Hindi device. Asset cache-first no longer trims at runtime (a pack chunk fetched on a miss used to be able
+to evict the precached core: `trim(…, 160)`). `scripts/verify-offline.mjs` covers the English install (no pack), the
+offline switch (message, stays English), the online switch (93 / 93 cached), the offline Hindi reload and the update
+re-caching a dropped pack file.
+
+### QA round 19 (2026-10-28)
+
+- **Stale build assets.** R16-A stopped the runtime trim of `mci-assets`, so every release used to add ≈ 3.1 MB that was
+  never removed. `activate` now prunes `/assets/` files that neither the new build nor the one it replaces lists (core +
+  the device's language pack; every pack while the language is unknown); a replaced shell without a manifest copy (a
+  pre-R16 build) means nothing is pruned on that activation (`docs/prd/qa-round-19.md` U2, `verify-offline.mjs`).
+- **One-time cost of U1.** A device upgrading from a pre-R16 worker downloads the language packs once (Hindi 340.6 kB +
+  regional 20.7 kB) because that worker never recorded the language; an English device drops them on its next update.
+- **`perf.test.ts` audit cap.** The R15-A2 test timed 13–16 `payments.record` calls on a 5,000-invoice table (each
+  rewrites the invoices table, ≈ 40–80 ms; PERF-3 row-level storage is deferred) and capped them at 4 s; under a loaded
+  parallel run it measured 4.6 s. Profiled: `audit.record` + the batch write take ≈ 6–10 ms of ≈ 1.2 s, identical on the
+  R16 baseline (`0521a90`: 1,112–1,149 ms; head: 1,137–1,185 ms) — CI noise, not a regression. The test now caps the
+  audit work itself (1 s) and still asserts one write per task; the saves keep their own cap in the test above (U6).
+- Size: first paint 182.1 → 182.2 kB (the `controllerchange` listener and the ack wait in `src/i18n/index.ts`), entry
+  88.1 → 88.2 kB, core 3,103.0 → 3,104.1 kB, Hindi pack 340.6 kB unchanged.

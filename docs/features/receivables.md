@@ -38,7 +38,7 @@ Optional cross-links:
 
 | Export | Purpose |
 | --- | --- |
-| `buildReceivables({invoices, payments, clients}, {currency?, now?})` | Returns `ReceivablesReport`: `parties[]` (bills, buckets, gross, creditNotes, advances, net, entries) and `totals`. |
+| `buildReceivables({invoices, payments, clients, advances?, openingBills?, links?}, {currency?, now?})` | Returns `ReceivablesReport`: `parties[]` (bills, buckets, gross, creditNotes, advances, net, entries) and `totals`. |
 | `buildLedger(party, from?, to?)` | `Ledger` with opening balance (everything before `from`), in-range entries with running balance, totals, closing. |
 | `topDebtors(report, n)`, `debtorShare(report, party)` | Ranking of parties with a positive net. |
 | `monthlyCollections(report, months, now)`, `overallEfficiency(rows)` | Billed vs credited vs received per month, with efficiency %. |
@@ -52,10 +52,13 @@ Optional cross-links:
 - Draft, Cancelled, Quotation, Proforma and Delivery Challan are excluded (a Draft credit note too — the dashboard's outstanding skips it as well). Payments pointing at an excluded or unknown invoice are ignored.
 - **Outward reverse charge:** a bill on which the recipient pays the GST is receivable at `receivableTotal(inv)` (`src/lib/rcm.ts`) — the taxable value (+ untaxed charges / TCS); an older record whose stored total includes the tax is read without it. The same figure drives aging, the dashboard, payment "balance", reminders, share / UPI amounts, interest and the credit-limit check; recording a payment of the taxable value marks the bill Paid.
 - Party key is the client `id`, else the case-folded name (so "Beta Co" and "beta co" merge).
-- **Legacy rows:** an invoice with `status: 'Paid'` or `amount_paid` greater than its payment rows gets a derived receipt for the difference. It is dated `updated_at` and flagged `derived: true`. This matches how the Transactions page marks invoices paid.
+- **Legacy rows:** an invoice with `status: 'Paid'` or `amount_paid` greater than its payment rows gets a derived receipt for the difference. It is dated `updated_at` and flagged `derived: true`. This matches how the Transactions page marks invoices paid. A Paid invoice is settled by receipts **and** its linked credit notes, so the derived receipt is at most total − credited (a credit note never invents a receipt).
+- **Amount due (`src/lib/amount-due.ts`, the one definition):** due = receivable total − TDS − received − live credit notes linked through `doc_links` (`linkedCredits`, `amountDue`). The invoice status follows it (`settledStatus`, used by `localDb` on every payment change and when a linked credit note is issued, edited, cancelled, reinstated or deleted): Paid once due ≤ 0.005, Partially Paid once a receipt or a credit note settled part of it. `balance_due` keeps its stored meaning (total − TDS − received). Reminders, due-soon / overdue notifications, the dashboard (outstanding and attention list), the Transactions balance column, record-payment and bulk "mark paid" amounts all read `amountDue`. A debit note is its own receivable document (own due date, payments and status), so it is never added to the original's due.
+- **Bill-wise credit notes (`BuildInput.links`):** a live credit note linked to a live invoice of the same party is allocated to that bill: the bill's `outstanding` is net of it (`Bill.credited`), aging and the khata queue chase only the rest, and only the unallocated part (credit beyond what receipts left open, or an unlinked note) counts in `creditNotes`. Ledger entries and `net` do not change. Every app caller passes the `doc_links` table.
 - **Advances:** an overpayment on an invoice, and any payment row with no `invoice_id` but a `client_id` or `client_name`, becomes an advance. These are optional additive fields on the payment row. Other modules may write them, and `ReceiptRow` documents the shape.
+- **POS refunds (QA-3 F2, `BuildInput.refunds`, `posRefunds(pos_returns)`):** money paid back against a live credit note (a refund by tender, or an applied exchange whose voucher debits the whole credit) is a debit to the party and uses up that much of the note's credit before it is allocated to its bill or kept as a credit. Only returns whose refund voucher was booked count. A Paid bill's settled part still uses the gross credit, so no receipt is invented.
 - **Advance receipts (5.3, `advances` table, `BuildInput.advances`):** the advance voucher is a credit when received, a refund a debit; the payment row with `advance_id` that applies it settles the bill but is shown as an information line with no amount (the money already came in with the advance). The unadjusted balance counts in `advances`. The **Advances** tab (`?tab=advances`) records, prints, applies and refunds them — see `advances.md`.
-- **Net** = open bills − credit notes − advances. It always equals the ledger closing balance over the full history (tested). A negative net means the party is in credit.
+- **Net** = open bills − unallocated credit notes − advances. It always equals the ledger closing balance over the full history (tested). A negative net means the party is in credit.
 - Aging buckets come from `agingBucket()` (`Not due`, `1–30`, `31–60`, `61–90`, `90+ days`) and cover bills only. Credits are shown in their own column, as Tally does.
 - Reports are per currency. The page shows a currency picker only when more than one is in use.
 
@@ -189,3 +192,21 @@ Maths (`src/lib/late-fee.ts`, reusing `computeInterest` from `src/lib/interest.t
 
 Tests: `tests/late-fee.test.ts`. The older Settings-level interest estimate (`late-fee-irn-demo.md` §2) is unchanged and
 separate: it informs reminders; this rule creates the invoice line.
+
+## Daily khata loop (8A, `docs/features/khata.md`)
+
+- **Clients** leads with the party balance from `buildReceivables` (incl. opening bills and advances): *To collect* /
+  *Advance* / *Settled*, overdue line, sort by balance, **Overdue only** chip, header totals *You'll get / You'll give*.
+- **₹ Received** (Clients row, Statements tab): one receipt split over the open bills oldest first (editable), the rest
+  on account, saved all or nothing by `savePartyReceipt` (`bill-allocation.ts`) — `localDb.payments.record` rows tagged
+  `client_id` / `client_name` plus one invoice-less on-account row with its own `RCPT/FY…` number. Books now names the
+  party on such on-account rows (it used to say "Unknown customer").
+- **₹ Given**: one-line Bill of Supply (composition) / non-GST bill (no GSTIN), or the invoice editor prefilled with
+  the party (`/invoice?party=<client id>`) for a GST registrant.
+- **WhatsApp statement** on the aging rows, the Statements tab and the statement viewer; the viewer also has **Share
+  PDF** (Web Share Level 2, download fallback) and **Web page** (static statement page with a Pay-with-UPI panel + QR).
+- **Remind all overdue** / **Send everyone their balance** in the page header open the party reminder stepper.
+
+## 8G additions
+- Ageing uses `effectiveDueDate` (earliest unpaid instalment of a `payment_schedule`, else the due date).
+- **Bulk actions** (ageing bucket filter): bulk remind and bulk bad-debt write-off (`write-off.ts`). See `docs/features/invoicing-ux.md` § 8.100 / 8.106.

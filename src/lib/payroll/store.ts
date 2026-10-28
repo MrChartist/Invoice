@@ -102,6 +102,7 @@ export function normalizeEmployees(rows: unknown[]): Employee[] {
     const dob = day(o.dob);
     if (dob) e.dob = dob;
     if (num(o.notice_days) > 0) e.notice_days = Math.round(num(o.notice_days));
+    if (o.mp && typeof o.mp === 'object') e.mp = o.mp as Employee['mp']; // R17-A2: post / guard licence (types/manpower-r17.ts)
     out.push(e);
   }
   return out;
@@ -137,6 +138,7 @@ export function normalizePayHeads(rows: unknown[]): PayHead[] {
     if (str(o.account_id)) h.account_id = str(o.account_id);
     if (o.order !== undefined) h.order = num(o.order);
     if (o.nps === true && h.kind === 'employer') h.nps = true;
+    if (o.superannuation === true && h.kind === 'employer') h.superannuation = true;
     out.push(h);
   }
   return out;
@@ -414,10 +416,12 @@ export interface PayrollData {
   runs: PayrollRun[];
   /** Additive (7P): arrears, loans, leave, adjustments, perquisites, F&F. Absent = none. */
   depth?: DepthData;
+  /** Additive (7T): PT states whose rule adds arrears / one-off salary items to the month's gross. */
+  ptExtraStates?: readonly string[];
 }
 
 export function loadPayrollData(): PayrollData {
-  return { employees: loadEmployees(), heads: loadPayHeads(), structures: loadStructures(), attendance: loadAttendance(), runs: loadRuns(), depth: loadDepth() };
+  return { employees: loadEmployees(), heads: loadPayHeads(), structures: loadStructures(), attendance: loadAttendance(), runs: loadRuns(), depth: loadDepth(), ptExtraStates: loadPayrollSettings().pt_extra_states ?? [] };
 }
 
 /**
@@ -471,6 +475,7 @@ export function computeRun(month: string, data: PayrollData, overrides: Record<s
         overrides: overrides[e.id],
         extras: extrasFor(e, month, depth, data),
         esiPeriodCovered: esiPeriodDecision(e, month, data),
+        ...(e.state && data.ptExtraStates?.includes(e.state) ? { ptOnExtras: true } : {}),
       });
       if (line) lines.push(line);
     } catch (err) {
@@ -488,18 +493,22 @@ export interface PayrollSettings {
   pf_code?: string;
   esi_code?: string;
   tan?: string;
+  /** Additive (7T): GST state codes whose PT rule charges arrears / one-off salary items with the month. */
+  pt_extra_states?: string[];
 }
 
 export function loadPayrollSettings(): PayrollSettings {
   const o = obj(getJson<unknown>(PAYROLL_SETTINGS_KEY, {})) ?? {};
-  return { pf_code: opt(o.pf_code), esi_code: opt(o.esi_code), tan: opt(o.tan) };
+  const pt = Array.isArray(o.pt_extra_states) ? (o.pt_extra_states as unknown[]).map(str).filter((x) => /^\d{2}$/.test(x)) : [];
+  return { pf_code: opt(o.pf_code), esi_code: opt(o.esi_code), tan: opt(o.tan), ...(pt.length ? { pt_extra_states: pt } : {}) };
 }
 
 export function savePayrollSettings(input: PayrollSettings): void {
   guard();
   const tan = str(input.tan).toUpperCase();
   if (tan && !/^[A-Z]{4}\d{5}[A-Z]$/.test(tan)) throw new PayrollError('TAN must look like MUMA12345B.');
-  setJson(PAYROLL_SETTINGS_KEY, { pf_code: str(input.pf_code).toUpperCase(), esi_code: str(input.esi_code), tan });
+  const prev = obj(getJson<unknown>(PAYROLL_SETTINGS_KEY, {})) ?? {};
+  setJson(PAYROLL_SETTINGS_KEY, { ...prev, pf_code: str(input.pf_code).toUpperCase(), esi_code: str(input.esi_code), tan });
   audit.record({ entity: 'payroll', entity_id: 'settings', action: 'update', summary: 'Payroll registration numbers (PF / ESI / TAN) updated' });
 }
 
@@ -711,10 +720,11 @@ export function recordPayrollPayment(input: PaymentInput): PayrollPayment {
   const [row] = normalizePayments([{ ...input, amount, id, number, paid_from: str(input.paid_from) || 'bank', created_at: now() }]);
   setTable(PAYROLL_TABLES.payments, [...all, row]);
   recordSeries(number);
-  audit.record({ entity: 'payroll', entity_id: id, action: 'payment_add', doc_number: number, summary: `${PAYMENT_LABELS[row.kind]} paid ₹${formatMoney(amount)} on ${row.date} (${number})${row.period ? ` for ${row.period}` : ''}${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
+  audit.record({ entity: 'payroll', entity_id: id, action: 'payment_add', doc_number: number, summary: `${PAYMENT_LABELS[row.kind]} paid${row.kind === 'loan' ? '' : ` ₹${formatMoney(amount)}`} on ${row.date} (${number})${row.period ? ` for ${row.period}` : ''}${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
   return row;
 }
 
+/** Review H1: a loan disbursement is one employee's amount, so its audit summary leaves the amount out. */
 export function deletePayrollPayment(id: string): void {
   guard();
   const all = loadPayrollPayments();
@@ -723,5 +733,5 @@ export function deletePayrollPayment(id: string): void {
   if (row.kind === 'loan' && row.loan_id && getTable<{ id?: string }>(PAYROLL_TABLES.loans).some((l) => l?.id === row.loan_id)) throw new PayrollError('This payment books a loan; delete the loan instead.');
   const lock = assertUnlocked({ id, issue_date: row.date, invoice_number: row.number }, 'delete');
   setTable(PAYROLL_TABLES.payments, all.filter((p) => p.id !== id));
-  audit.record({ entity: 'payroll', entity_id: id, action: 'payment_remove', doc_number: row.number, summary: `${PAYMENT_LABELS[row.kind]} payment ${row.number} (₹${formatMoney(row.amount)}) deleted${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
+  audit.record({ entity: 'payroll', entity_id: id, action: 'payment_remove', doc_number: row.number, summary: `${PAYMENT_LABELS[row.kind]} payment ${row.number}${row.kind === 'loan' ? '' : ` (₹${formatMoney(row.amount)})`} deleted${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
 }

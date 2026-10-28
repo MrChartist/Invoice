@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { getTable } from '../../lib/storage';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { DB_PREFIX, getJson, getTable } from '../../lib/storage';
 import type { HsnMasterRow } from '../../lib/hsn-master';
 import type { ImportType, ItcReversalReason, PurchaseRecord, Vendor } from '../../types/purchases';
 import { ITC_REVERSAL_REASONS, PURCHASE_CATEGORIES } from '../../types/purchases';
 import { INDIAN_STATES, resolveStateCode } from '../../lib/india-states';
-import { blankPurchaseLine, computePurchaseTotals, purchasesDb } from '../../lib/purchases';
+import { billFormSnapshot, blankPurchaseLine, computePurchaseTotals, purchasesDb } from '../../lib/purchases';
 import { supplierPayableOf } from '../../lib/purchase-normalize';
 import type { BillSeed } from '../../lib/purchase-orders';
 import { addDaysInput, formatCurrency, todayInput } from '../../lib/utils';
@@ -28,11 +28,33 @@ import { MAIN_GODOWN_ID } from '../../types/stock';
 import { useT } from '../../i18n';
 import { purT, purCategory } from '../../i18n/areas/purchases';
 import { TdsBillPanel } from './TdsBillPanel';
+import { saveBillGuarded } from '../../lib/bill-guard';
+import { capT } from '../../i18n/areas/capture';
 import { BranchSelect } from '../branches/BranchSelect';
 import { EditLogButton } from '../audit/EditLogButton';
-import { priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
+import { billTdsInputFor, priorCreditsFor, resolveBillTds, type BillTdsInput } from '../../lib/tds-payables';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
+
+// R4-C3: Bill of Entry duty sheet — lazy, import-of-goods bills only.
+const BoeDutySheet = lazy(() => import('../trade/BoeDutySheet'));
+// R8-C (TR-C2): notified goods from an agriculturist / unregistered supplier → reverse charge prompt (lazy).
+const RcmGoodsNotice = lazy(() => import('../trade/RcmGoodsNotice'));
+const MediaRows = lazy(() => import('../prof/MediaRows')); // R14 (PS-B5): media buy for a client (`media` pack)
+const TripPick = lazy(() => import('../travel/TripPick')); // R15-B2 / B3: the trip of a supplier bill (`travel` / `events` packs)
+const SitePick = lazy(() => import('../manpower/SitePick')); // R17-C2: the site of a supplier bill (`manpower` / `security` packs)
+const HsRcmHint = lazy(() => import('../society/parts/RcmHint')); // R18-B3: inward RCM on security services (`society` pack)
+// R8-A (TR-A1): supplier's special rate and last purchase rate, as hints (trade discounts or a trading pack, lazy).
+const BillRateHints = lazy(() => import('../trade/BillRateHints'));
+// R8-B (TR-B1/B2/B3): bags / weight rows, bill charges and the broker (commodity / agency pack, lazy).
+const BillTradePanel = lazy(() => import('../trade/tr-b-hub').then((m) => ({ default: m.BillTradePanel })));
+// R9 (RT-B3): batch MRP above the NPPA ceiling + GST (pharmacy pack, warning only, lazy).
+const CeilingNotice = lazy(() => import('../retail-r9/PharmacyDesk').then((m) => ({ default: m.CeilingNotice })));
+// R9 (RT-C2): size × colour grid entry (apparel pack, lazy).
+const BillGrid = lazy(() => import('../retail-r9/ApparelDesk').then((m) => ({ default: m.BillGrid })));
+// R12 (AG-A3): our FPV number and the agriculturist declaration for a farmer's bill (agri pack only).
+const VoucherAgriPanel = lazy(() => import('../agri/VoucherAgriPanel'));
+import { impliedPacks } from '../../lib/shop-mode';
 
 export interface BillModalProps {
   open: boolean;
@@ -51,23 +73,30 @@ export interface BillModalProps {
 /** Supplier bill with line items, GST split by place of supply, and ITC flag. */
 export function BillModal({ open, onClose, purchase, seed, ...rest }: BillModalProps) {
   useT(); // re-render on a language switch (5.4)
+  // QA-3 F12: Esc, the backdrop and × ask before throwing away typed lines (the form's Cancel button is explicit).
+  const dirty = useRef(false);
+  const guardedClose = useCallback(() => {
+    if (dirty.current && !window.confirm(purT('discardBill'))) return;
+    dirty.current = false;
+    onClose();
+  }, [onClose]);
   // Re-mount the form per bill so state initialises from props without effects.
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={guardedClose}
       size="xl"
       title={purchase ? purT('billEditTitle') : purT('billAddTitle')}
       subtitle={seed && !purchase ? purT('billSeedSub') : purT('billSub')}
     >
-      <BillForm key={purchase?.id ?? (seed ? `po-${seed.po_id}` : 'new')} purchase={purchase ?? undefined} seed={purchase ? undefined : seed ?? undefined} onClose={onClose} {...rest} />
+      <BillForm key={purchase?.id ?? (seed ? `po-${seed.po_id}` : 'new')} purchase={purchase ?? undefined} seed={purchase ? undefined : seed ?? undefined} onClose={onClose} dirtyRef={dirty} {...rest} />
     </Modal>
   );
 }
 
-type FormProps = Omit<BillModalProps, 'open' | 'purchase' | 'seed'> & { purchase?: PurchaseRecord; seed?: BillSeed };
+type FormProps = Omit<BillModalProps, 'open' | 'purchase' | 'seed'> & { purchase?: PurchaseRecord; seed?: BillSeed; dirtyRef?: RefObject<boolean> };
 
-function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onSaved, onClose }: FormProps) {
+function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onSaved, onClose, dirtyRef }: FormProps) {
   const init = purchase ?? seed;
   const [vendorId, setVendorId] = useState(init?.vendor_id ?? '');
   const [billNumber, setBillNumber] = useState(purchase?.bill_number ?? '');
@@ -76,6 +105,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const [pos, setPos] = useState(init?.place_of_supply ?? businessState);
   const [category, setCategory] = useState(purchase?.category ?? 'Purchases');
   const [lines, setLines] = useState(init?.lines?.length ? init.lines : [blankPurchaseLine()]);
+  // R9 (RT-A4): Free / Disc % cells on bill lines (Settings → Items → Retail checks, on for grocery and pharmacy shops).
+  const freeCells = useMemo(() => getJson<{ free_qty?: boolean } | null>(`${DB_PREFIX}retail_settings`, null)?.free_qty === true, []);
   // WP-6: a line's GST rate follows the HSN master when its HSN is typed (LineItemsEditor untouched).
   const hsn = useRef<{ master: HsnMasterRow[]; mod: typeof import('../../lib/hsn-defaults') } | null>(null);
   useEffect(() => {
@@ -98,6 +129,13 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   };
   const [itc, setItc] = useState(purchase?.itc_eligible ?? (seed ? !!seed.vendor_gstin : true));
   const [notes, setNotes] = useState(init?.notes ?? '');
+  const [brokerId, setBrokerId] = useState(purchase?.broker_id); // R8-B
+  const tradeOn = useMemo(() => impliedPacks(localDb.settings.get()).some((p) => p === 'commodity' || p === 'agency'), []); // R8-B
+  // What the dialog opened with, to tell whether closing would lose typed work (QA-3 F12).
+  const [openedWith] = useState(() => billFormSnapshot({ vendorId: init?.vendor_id ?? '', billNumber: purchase?.bill_number ?? '', lines: init?.lines?.length ? init.lines : [], notes: init?.notes ?? '' }));
+  useEffect(() => {
+    if (dirtyRef) dirtyRef.current = billFormSnapshot({ vendorId, billNumber, lines, notes }) !== openedWith;
+  });
   // WP-8: landed cost (freight, loading …) loads the goods' stock cost only.
   const [landed, setLanded] = useState<LandedValue>(() => ({
     costs: (purchase?.landed_costs ?? []).map((c) => ({ label: c.label, amount: String(c.amount) })),
@@ -114,6 +152,10 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const [boeNumber, setBoeNumber] = useState(purchase?.boe_number ?? '');
   const [boeDate, setBoeDate] = useState(purchase?.boe_date ?? '');
   const [portCode, setPortCode] = useState(purchase?.port_code ?? '');
+  // R4-C3: the applied BOE duty sheet (IGST / cess into the tax fields, BCD / SWS / other duties into landed costs).
+  const [boeDuty, setBoeDuty] = useState(purchase?.boe_duty);
+  const [boeOpen, setBoeOpen] = useState(false);
+
   const wasBlocked = purchase?.itc_eligible === false && purchase.itc_reversal_reason === 'SEC_17_5';
   const [blocked, setBlocked] = useState(wasBlocked);
   const [reversed, setReversed] = useState(wasBlocked ? 0 : purchase?.itc_reversed ?? 0);
@@ -126,23 +168,18 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
     pure_agent: purchase?.pure_agent,
   });
   const [attachments, setAttachments] = useState<AttachmentRef[]>(purchase?.attachments ?? []);
+  const [psB, setPsB] = useState(() => (purchase as { ps?: Record<string, unknown> } | undefined)?.ps); // R14 (PS-B5)
+  const [mediaOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('media'))(localDb.settings.get() as never));
+  const [tvB, setTvB] = useState(purchase?.tv); // R15-B2 / B3
+  const [mpB, setMpB] = useState(purchase?.mp); // R17-C2
+  const [manpowerOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.some((p) => p === 'manpower' || p === 'security'))(localDb.settings.get() as never));
+  const [travelOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.some((p) => p === 'travel' || p === 'events'))(localDb.settings.get() as never));
+  const [societyOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('society'))(localDb.settings.get() as never)); // R18-B3
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
   // TDS deducted by us (Tally parity). Undefined rate / base / amount follow the suggestion.
-  const [tds, setTds] = useState<BillTdsInput>(() => {
-    const v = vendors.find((x) => x.id === init?.vendor_id);
-    return {
-      section: purchase?.tds_section ?? '',
-      on: purchase?.tds_on ?? 'BILL',
-      pan: purchase?.tds_pan ?? v?.pan ?? '',
-      lowerCert: purchase?.tds_cert_no ?? v?.tds_lower_cert,
-      lowerRate: v?.tds_lower_rate,
-      lowerFrom: v?.tds_lower_from,
-      lowerTo: v?.tds_lower_to,
-      lowerLimit: v?.tds_lower_limit,
-      nonFiler: v?.tds_non_filer,
-      ...(purchase?.tds_section ? { rate: purchase.tds_rate, base: purchase.tds_base, amount: purchase.tds_amount } : {}),
-    };
-  });
+  // R5-B3: `billTdsInputFor` keeps a Sec 194C(6) nil deduction (reason T) on edit.
+  const [tds, setTds] = useState<BillTdsInput>(() => billTdsInputFor(purchase, vendors.find((x) => x.id === init?.vendor_id)));
   // Batch / serial / godown fields appear only for items that opted in, or once a second godown exists.
   const [stock] = useState<BillStockContext | undefined>(() => {
     try {
@@ -162,10 +199,12 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   // Imports always carry IGST (customs IGST for goods, reverse-charge IGST for services); '96' = other country.
   const taxPos = importType ? '96' : pos;
   const totals = useMemo(() => {
-    const t = computePurchaseTotals(lines, { placeOfSupply: taxPos, businessState });
+    const t0 = computePurchaseTotals(lines, { placeOfSupply: taxPos, businessState });
+    // R4-C3: an applied Bill of Entry sheet sets the customs IGST (on AV + BCD + SWS), not line value × rate.
+    const t = importType === 'GOODS' && boeDuty ? { ...t0, cgst: 0, sgst: 0, igst: boeDuty.totals.igst, tax: boeDuty.totals.igst, total: Math.round((t0.taxable + boeDuty.totals.igst) * 100) / 100 } : t0;
     const c = Math.round(Math.max(cess, 0) * 100) / 100;
     return { ...t, cess: c, total: Math.round((t.total + c) * 100) / 100 };
-  }, [lines, taxPos, businessState, cess]);
+  }, [lines, taxPos, businessState, cess, importType, boeDuty]);
   const interState = !!importType || (!!pos && !!businessState && pos !== businessState);
   const advancedSet = rcm || !!importType || blocked || reversed > 0 || cess > 0;
 
@@ -179,6 +218,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const supplierPayable = supplierPayableOf({ reverseCharge: rcm && !importType, importType: importType || '', tax: totals.tax, taxable: totals.taxable, total: totals.total, cess: totals.cess, tdsOnBill });
 
   const submit = () => {
+    // R15-B3 / R16-D3: the refusal is translated (the travel strings load with the trip picker).
+    if (tvB?.regime === 'to5' && itc && !blocked && !tvB.itc_reason?.trim()) return void import('../../i18n/areas/travel-r15b').then((m) => setError(m.tvT('needReason')), () => setError('TV8'));
     if (!vendor && !init?.vendor_name) return setError(purT('errVendor'));
     if (!billNumber.trim()) return setError(purT('errBillNo'));
     if (!date) return setError(purT('errBillDate'));
@@ -195,7 +236,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
     let saveLines = real;
     if (stock) {
       const live = liveTrackingInputs();
-      const issues = billTrackingIssues(real, { ...live, purchases: (live.purchases ?? []).filter((p) => p.id !== purchase?.id) }, date);
+      // R9 (RT-A4): free units come in too (one serial per unit received, paid + free).
+      const issues = billTrackingIssues(real.map((l) => (l.free_qty ? { ...l, quantity: l.quantity + l.free_qty } : l)), { ...live, purchases: (live.purchases ?? []).filter((p) => p.id !== purchase?.id) }, date);
       if (issues.length) return setError(issues[0]);
       // Tracked lines left on the godown picker's default are stored with it.
       if (stock.godowns.length > 1) {
@@ -203,7 +245,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       }
     }
     try {
-      purchasesDb.save({
+      // 8C: duplicate warnings (save again to override), approval hold, draft clean-up (bill-guard.ts).
+      const res = saveBillGuarded({
         ...purchase,
         kind: 'PURCHASE',
         vendor_id: vendor?.id ?? init?.vendor_id,
@@ -234,13 +277,24 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         notes: notes.trim() || undefined,
         landed_costs: cleanLandedCosts(landed.costs.map((c) => ({ label: c.label, amount: Number(c.amount) }))),
         landed_basis: landed.basis === 'qty' && landed.costs.length ? 'qty' : undefined,
+        boe_duty: importType === 'GOODS' ? boeDuty : undefined, // R4-C3
         ...billablePatch(billable),
+        ...(psB !== (purchase as { ps?: unknown } | undefined)?.ps ? { ps: psB } : {}), // R14 (PS-B5)
+        tv: tvB, // R15-B2
+        mp: mpB, // R17-C2
         cost_centre_id: costCentre,
         branch_id: branchId,
         attachments: attachments.length ? attachments : undefined,
+        broker_id: brokerId, // R8-B
         ...tdsResolved.fields,
-      });
-      onSaved(purchase ? purT('billUpdated') : purT('billSaved', { number: billNumber.trim() }));
+      }, { confirmed: !!warning });
+      if (res.kind === 'warn') {
+        setWarning(res.message);
+        return;
+      }
+      const why = tvB?.regime === 'to5' && itc && !blocked ? tvB.itc_reason?.trim() : undefined; // R15-B3: ITC claimed on a 5 % trip (audited)
+      if (why && res.kind === 'saved' && why !== purchase?.tv?.itc_reason) void import('../../lib/travel/tv-itc').then((m) => m.auditItcOverride(res.bill.id, res.bill.bill_number, why)).catch(() => undefined);
+      onSaved(res.kind === 'held' ? capT('heldMsg') : purchase ? purT('billUpdated') : purT('billSaved', { number: billNumber.trim() }));
       onClose();
     } catch (err) {
       setError((err as Error).message);
@@ -266,7 +320,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
           const vendorState = v ? resolveStateCode({ code: v.state_code, gstin: v.gstin }) : '';
           if (vendorState) setPos(vendorState);
           if (v) setItc(!!v.gstin);
-          if (v) setTds((t) => ({ ...t, pan: t.pan || v.pan || '', section: t.section || v.tds_section || '', nonFiler: v.tds_non_filer, lowerCert: v.tds_lower_cert, lowerRate: v.tds_lower_rate, lowerFrom: v.tds_lower_from, lowerTo: v.tds_lower_to, lowerLimit: v.tds_lower_limit }));
+          if (v) setTds((t) => ({ ...t, pan: t.pan || v.pan || '', section: t.section || v.tds_section || '', nonFiler: v.tds_non_filer, lowerCert: v.tds_lower_cert, lowerRate: v.tds_lower_rate, lowerFrom: v.tds_lower_from, lowerTo: v.tds_lower_to, lowerLimit: v.tds_lower_limit, transporter194c6: v.transporter_194c6 }));
         }}
       />
 
@@ -312,7 +366,13 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       <BranchSelect id="bill-branch" value={branchId} onChange={setBranchId} />
 
       <h3 className={styles.sectionTitle}>{purT('lineItems')}</h3>
-      <LineItemsEditor lines={lines} onChange={changeLines} stock={stock} />
+      <LineItemsEditor lines={lines} onChange={changeLines} stock={stock} date={date} freeCells={freeCells || lines.some((l) => l.free_qty || l.discount_percent)} />
+      {impliedPacks(localDb.settings.get()).includes('apparel') && <Suspense fallback={null}><BillGrid lines={lines} onChange={changeLines} date={date} /></Suspense>}
+      {vendor && ((x) => !!x.trade_discounts || !!x.industry_packs?.some((p) => p === 'distributor' || p === 'commodity'))(localDb.settings.get()) && <Suspense fallback={null}><BillRateHints lines={lines} vendor={vendor} date={date} onRate={(id, rate) => changeLines(lines.map((l) => (l.id === id ? { ...l, rate } : l)))} /></Suspense>}
+      {tradeOn && <Suspense fallback={null}><BillTradePanel lines={lines} onLines={changeLines} vendor={vendor} broker={brokerId} onBroker={setBrokerId} isNew={!purchase} /></Suspense>}
+      {localDb.settings.get().industry_packs?.includes('pharmacy') && <Suspense fallback={null}><CeilingNotice lines={lines} date={date} /></Suspense>}
+      {vendor?.principal_kind === 'agriculturist' && localDb.settings.get().industry_packs?.includes('agri') && <Suspense fallback={null}><VoucherAgriPanel vendor={vendor} lines={lines} date={date} billNumber={billNumber} onNumber={setBillNumber} /></Suspense>}
+      {!rcm && !importType && vendor && <Suspense fallback={null}><RcmGoodsNotice lines={lines} date={date} vendor={vendor} onApply={() => setRcm(true)} /></Suspense>}
       <LandedCostFields value={landed} onChange={setLanded} />
 
       <div className={styles.totals} aria-live="polite">
@@ -382,6 +442,24 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
               </div>
             </div>
           )}
+          {importType === 'GOODS' && (
+            <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} style={{ alignSelf: 'flex-start' }} onClick={() => setBoeOpen(true)} data-boe-open>
+              {purT('boeDuty')}{boeDuty ? ` ✓ ${formatCurrency(boeDuty.totals.duty)}` : ''}
+            </button>
+          )}
+          {boeOpen && (
+            <Suspense fallback={null}>
+              <BoeDutySheet lines={lines} date={boeDate || date} bill={purchase} initial={boeDuty} onClose={() => setBoeOpen(false)} onApply={(d) => {
+                setBoeDuty(d);
+                setCess(d.totals.cess);
+                // Duty rows replace earlier ones; other charges stay (memo amounts: stock cost only).
+                const keep = landed.costs.filter((c) => !['BCD', 'SWS', 'Other customs duties'].includes(c.label));
+                const add = [['BCD', d.totals.bcd], ['SWS', d.totals.sws], ['Other customs duties', d.totals.other]].filter(([, a]) => Number(a) > 0).map(([label, a]) => ({ label: String(label), amount: String(a) }));
+                setLanded({ ...landed, costs: [...keep, ...add] });
+                setBoeOpen(false);
+              }} />
+            </Suspense>
+          )}
           <div className={controls.field}>
             <label className={controls.label} htmlFor="bill-cess">{purT('cessAmount')}</label>
             <input id="bill-cess" type="number" min={0} step="0.01" className={controls.input} value={cess || ''} onChange={(e) => setCess(Math.max(Number(e.target.value) || 0, 0))} />
@@ -412,7 +490,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         </div>
       </details>
 
-      <TdsBillPanel value={tds} onChange={setTds} suggestion={tdsResolved.suggestion} payableNet={supplierPayable} nonResident={vendor?.non_resident} />
+      <TdsBillPanel value={tds} onChange={setTds} suggestion={tdsResolved.suggestion} payableNet={supplierPayable} nonResident={vendor?.non_resident} date={date} names={`${category} ${lines.map((l) => l.name).join(' ')} ${notes}`} />
 
       {itc && !rcm && !importType && totals.tax > 0 && vendor && !vendor.gstin && (
         <p className={styles.note}>{purT('noGstinNote')}</p>
@@ -424,9 +502,14 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       </div>
 
       <BillableFields idPrefix="bill" value={billable} onChange={setBillable} rebilledIn={purchase?.rebilled_in} />
+      {(mediaOn || !!psB?.media) && <Suspense fallback={null}><MediaRows ps={psB} onChange={setPsB} /></Suspense>}
+      {(travelOn || !!tvB) && <Suspense fallback={null}><TripPick value={tvB} onChange={setTvB} itc={itc} setItc={setItc} /></Suspense>}
+      {societyOn && !importType && <Suspense fallback={null}><HsRcmHint lines={lines} vendor={vendor} date={date} rcm={rcm} /></Suspense>}
+      {(manpowerOn || !!mpB) && <Suspense fallback={null}><SitePick value={mpB} onChange={setMpB} /></Suspense>}
 
       <AttachmentsPanel value={attachments} onChange={setAttachments} label={purT('attachments')} />
 
+      {warning && <p className={styles.formError} role="alert">{warning}</p>}
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <div className={styles.inlineActions}>
         {purchase && <EditLogButton recordId={purchase.id} name={purchase.bill_number} />}

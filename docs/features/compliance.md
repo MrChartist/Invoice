@@ -50,3 +50,12 @@ The calendar covers periods from the month of the first issued tax invoice (of t
 ## Notifications
 
 `gstReturnsProvider` shows nothing until the active profile has a GSTIN and at least one non-draft, non-cancelled tax invoice exists. After that it raises up to two notices: **N GST returns overdue** (critical) and **N GST returns due within 3 days** (warning), linking to `/gst-reports?tab=compliance`. Each id fingerprints the return ids it covers, so a dismissed notice comes back when the set changes. The context gains the optional `gstFiled` and `gstFrequency` fields (read in `buildContext`).
+
+## 8D: three-year time bar (8.62)
+
+Sec 37(5), 39(11), 44(2) and 52(13) CGST Act (Finance Act 2023, in force 1 Oct 2023 by Notification 28/2023-CT): a return cannot be furnished after three years from its due date; the portal enforces it from the July 2025 tax period, i.e. **1 Aug 2025** (GSTN advisories 29 Oct 2024 and 7 Jun 2025). `RETURN_TIME_BAR_RULES` in `src/lib/gst-guards.ts` (keyed by the evaluation day): GSTR-1, GSTR-3B, GSTR-4, GSTR-9 (CMP-08 / IFF / PMT-06 are not on the advisory's list).
+
+- `timeBarFor(r, today)`: last day = due date + 3 years (29 Feb → 28 Feb); barred from the next day, never before 1 Aug 2025 (so GSTR-1 June 2022, due 11 Jul 2022, is barred from 1 Aug 2025 as in the advisory).
+- The Compliance tab lists unfiled returns (from the first tax invoice, up to six years back) that are barred or become barred within a year — "becomes barred on …" — with a "mark filed" box (`Gst8dPanel view="timebar"`, lazy).
+- Bell: one notice when unfiled returns become barred within 90 days (critical within 30), linking to the Compliance tab.
+- One-off due-date extensions are not tracked, so the bar date may be later on the portal. Verify with your CA.

@@ -29,7 +29,7 @@ An offline working paper for the GSTR-9 annual return, built from the app's own 
 | 4G | GSTR-3B 3.1(d): purchases under reverse charge and imports of services |
 | 4I / 4J | CDNR + CDNUR (EXPWP) credit / debit notes on 4B-4E |
 | 4K / 4L, 5J / 5K | In-year amendments (`gstr1.amendments.effects`): revised − original of each amendment made in the FY, the same deltas GSTR-3B takes — an increase goes to 4K / 5J, a decrease to 4L / 5K (5J / 5K: zero-rated-without-payment, reverse-charge and nil lines). 4M = −I + J + K − L and 5L = −H + I + J − K, so 4N agrees with Table 9 |
-| Pt V (10-14) | Amendments of this FY's supplies made in the next FY: not modelled, 0 with a note |
+| Pt V (10-14) | 7R (7.128, `src/lib/gstr9-partv.ts`, `opts.nextFy` — the modal turns it on): documents dated 1 Apr of the next FY up to the cut-off (`nextFyCutoff`: 30 Nov from FY 2021-22, 20 Oct before — date-keyed in `gst-penalties.ts`, unverified). 10 = debit notes linked to this FY's invoices + upward amendments of documents first reported in this FY; 11 = credit notes / downward amendments; 12 = supplier notes on this FY's bills that claimed ITC (cess included); 13 = 0 (ITC of this FY availed next FY is not known to the app); 14 = payable (10 − 11) per head. Unlinked notes netted in B2CS cannot be attributed (note). Off = zeros with a note, as before |
 | 5C | Outward invoices flagged reverse charge (value only) |
 | 5C1 | Supplies through an e-commerce operator that pays tax u/s 9(5) (GSTR-1 Table 14(b), value only); row shown only when non-zero; on the form from FY 2024-25 (note for earlier years) |
 | 5D / 5E / 5F | GSTR-1 Table 8: exempt (always 0, the app has no exempt flag) / nil / non-GST |
@@ -39,7 +39,8 @@ An offline working paper for the GSTR-9 annual return, built from the app's own 
 | 6B | Bills in 3B 4A(5), split inputs / capital goods / input services: by line SAC (99xxxx = services, by value share), else by expense category (Rent, Professional fees, Software, Travel, Utilities, Marketing, Bank charges), else inputs. Capital goods only for a bill carrying `capital_goods: true` (the bill form has no such flag yet) |
 | 6C / 6D | Reverse-charge bills: supplier without / with a valid GSTIN |
 | 6E / 6F | Imports of goods (Bill of Entry IGST) / services |
-| 6G, 6H, 6K-6M | ISD, reclaims, TRAN credit: 0 |
+| 6G | 7R: ISD credit received (`opts.isdInward`, ISD tab "received by our unit") = the months' 3B 4A(4) |
+| 6H, 6K-6M | Reclaims, TRAN credit: 0 |
 | 6J | 6I − 6A (0 when every bill is in the monthly 3B) |
 | 7A / 7C / 7D / 7E / 7H | Reversals by reason: Rule 37 / Rule 42 / Rule 43 / Sec 17(5) (blocked credit in full, plus partial 17(5) reversals) / other (incl. Rule 38). 7I equals the monthly 3B 4B(1) + 4B(2) |
 | 8A | **Manual** (annual GSTR-2B ITC; the 2B matcher, 5.1, works per period and does not store the 2B file) |
@@ -72,4 +73,4 @@ GSTR-9 is optional for a registered person whose aggregate turnover in the FY is
 
 ## Limits
 
-Built from the app's monthly papers, not from the returns actually filed. Advances (Table 11), Part V amendments, ISD, TRAN credit, 8C/8E, Pt VI Tables 15-16, interest and late fee are not modelled. A month whose credit notes exceed its sales is not carried to later months in Table 9.
+Built from the app's monthly papers, not from the returns actually filed. TRAN credit, 8C/8E, Table 13 of Part V, Pt VI Tables 15-16, interest and late fee are not modelled; Part V and ISD (6G) came in 7R. A month whose credit notes exceed its sales is not carried to later months in Table 9.

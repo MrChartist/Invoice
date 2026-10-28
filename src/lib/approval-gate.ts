@@ -13,7 +13,7 @@
  */
 import type { ApprovalInfo, InvoiceRecord } from '../types/invoice';
 import { can, currentActor } from './access';
-import { DB_PREFIX, getJson } from './storage';
+import { DB_PREFIX, getJson, readRaw } from './storage';
 
 export const APPROVAL_POLICY_KEY = `${DB_PREFIX}approval_policy`;
 
@@ -115,4 +115,47 @@ export function assertNotPendingApproval(doc: Pick<InvoiceRecord, 'invoice_numbe
   if (doc?.approval?.state === 'pending') {
     throw new ApprovalRequiredError(`${doc.invoice_number || 'This document'} is waiting for the owner's approval; ${what} after it is approved.`);
   }
+}
+
+/* ── Credit-limit gate (8.80, BUSY / Marg / Zoho "credit limit: block") ──────────────────────────
+ * The policy, figures and decision live in `credit-policy.ts` (lazy editor / POS chunks), which
+ * registers itself here; this is only the data layer's hook, kept tiny for first paint. A document
+ * being issued (new, or leaving Draft; POS bills exempt) goes through the registered gate. Until it is
+ * loaded (the editor chunk is prefetched on idle), a clerk's issue under a company Block policy is held
+ * for the owner (fail-safe).
+ */
+
+export const CREDIT_POLICY_KEY = `${DB_PREFIX}credit_policy`;
+
+/** `rows`: the invoices the document is saved against (a batch's earlier documents included, `saveMany`). */
+type CreditGate = (doc: InvoiceRecord, rows?: readonly InvoiceRecord[]) => void;
+let creditGate: CreditGate | null = null;
+export function registerCreditGate(fn: CreditGate | null): void {
+  creditGate = fn;
+}
+
+/** Hold `doc` as a draft pending the owner's approval because of its credit position. */
+export function holdForCredit(doc: InvoiceRecord, note: string): void {
+  doc.approval = { state: 'pending', doc_id: doc.id, requested_status: doc.status, requested_by: currentActor()?.name ?? '', requested_at: new Date().toISOString(), reason: 'credit', note };
+  doc.status = 'Draft';
+}
+
+/**
+ * QA10 (R6 / R8): a lazy module's say on a bill right before it is deleted (`localDb.invoices.remove`: `next` absent) or
+ * saved (`localDb.invoices.save` / `setStatus`, from `holdIfCreditBlocked`: it acts on a cancel). Set by
+ * `retail/rt-doc-hooks.ts` (an exchange receipt frees its URD voucher, a finance DO is cancelled with its transfer
+ * journal); it may refuse (throw). One slot, kept tiny for first paint.
+ */
+export const voidHook: {
+  f?: (stored: InvoiceRecord | undefined, next?: InvoiceRecord) => void;
+  /** QA18 T2: a receipt that settled a bill (`exchange_purchase_id`: R9 exchange, R15 netting) was removed — re-settle the bill. */
+  paid?: (purchaseIds: string[]) => void;
+} = {};
+
+/** The data layer's credit branch (next to `holdIfApprovalNeeded` in `localDb.invoices.save` / `setStatus`); runs `voidHook` first. */
+export function holdIfCreditBlocked(doc: InvoiceRecord, stored: InvoiceRecord | undefined, rows?: readonly InvoiceRecord[]): void {
+  voidHook.f?.(stored, doc);
+  if (doc.pos || doc.status === 'Draft' || doc.status === 'Cancelled' || (stored && stored.status !== 'Draft')) return;
+  if (creditGate) creditGate(doc, rows);
+  else if (!can('doc.approve') && /"block"/.test(readRaw(CREDIT_POLICY_KEY) ?? '')) holdForCredit(doc, 'The credit position could not be checked.');
 }

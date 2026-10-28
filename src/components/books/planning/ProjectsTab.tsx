@@ -3,7 +3,7 @@
  * costs, margin and net result per cost centre for the selected period, plus an Unallocated column,
  * reconciling to the overall P&L.
  */
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, lazy, Suspense, useMemo, useState } from 'react';
 import { FolderKanban, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   costCentrePnl,
@@ -17,6 +17,7 @@ import {
 } from '../../../lib/ledger';
 import {
   COST_CENTRE_KINDS,
+  COST_CENTRE_KIND_LABELS,
   deleteCostCentre,
   loadCostCentres,
   saveCostCentre,
@@ -25,6 +26,9 @@ import {
   type CostCentreKind,
 } from '../../../lib/cost-centres';
 import { localDb } from '../../../lib/localDb';
+import { Link } from 'react-router-dom';
+import { isPackOn } from '../../../lib/industry-packs';
+import { siteViewLabel } from '../../works/site-views';
 import type { Period } from '../../../lib/books';
 import { formatDate } from '../../../lib/utils';
 import { EmptyState } from '../../ui/EmptyState';
@@ -37,10 +41,17 @@ import books from '../books.module.css';
 import styles from './planning.module.css';
 import { useT } from '../../../i18n';
 import { planT } from '../../../i18n/areas/books-planning';
+import { peekTable } from '../../../lib/storage';
+
+// R4-A2: memo row "materials used (stock, not posted)" from production orders tagged with a cost centre (lazy).
+const ProjectMaterialsRow = lazy(() => import('../../production/ProjectMaterialsRow'));
+// R5-B6: memo row "material consumed at works sites" from stock journals tagged with a cost centre (lazy).
+const SiteMaterialsRow = lazy(() => import('../../works/SiteMaterialsRow'));
 
 const SECTION_KEY = { income: 'secIncome', direct: 'secDirect', indirect: 'secIndirect' } as const;
-const KIND_KEY = { project: 'kindProject', department: 'kindDepartment', branch: 'kindBranch' } as const;
-const kindLabel = (k: CostCentreKind) => planT(KIND_KEY[k]);
+const KIND_KEY = { project: 'kindProject', department: 'kindDepartment', branch: 'kindBranch', fund: 'kindFund' } as const;
+// R5-B kind (vehicle) shows the master's English label until this area names them.
+const kindLabel = (k: CostCentreKind) => (k in KIND_KEY ? planT(KIND_KEY[k as keyof typeof KIND_KEY]) : COST_CENTRE_KIND_LABELS[k]);
 /** Engine column labels: centre names pass through; the two fixed columns are translated. */
 const columnLabel = (label: string) => (label === 'Unallocated' ? planT('unallocated') : label === 'Deleted cost centre' ? planT('deletedCc') : label);
 
@@ -208,6 +219,12 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
                     </tr>
                     {totalsRow(planT('secIndirect'), (t) => t.indirectExpenses)}
                     {totalsRow(planT('netProfitLoss'), (t) => t.netProfit, true)}
+                    {peekTable<{ cost_centre_id?: string }>('production_orders').some((o) => o?.cost_centre_id) && (
+                      <Suspense fallback={null}><ProjectMaterialsRow columns={pnl.columns} period={period} cellClass={styles.sticky} /></Suspense>
+                    )}
+                    {peekTable<{ cost_centre_id?: string }>('stock_journals').some((j) => j?.cost_centre_id) && (
+                      <Suspense fallback={null}><SiteMaterialsRow columns={pnl.columns} period={period} cellClass={styles.sticky} /></Suspense>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -215,6 +232,8 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
           </section>
           <p className={books.muted}>
             {planT('projectNote')}
+            {/* R11 (CN-D5): the works site P&L (memo working paper) sits next to this ledger-based P&L. */}
+            {isPackOn(localDb.settings.get(), 'works') && <> <Link to="/time?tab=works&view=pnl" data-site-pnl-link>{siteViewLabel('pnl')} →</Link></>}
           </p>
         </>
       )}

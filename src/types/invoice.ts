@@ -175,8 +175,21 @@ export interface InvoiceItem {
   sku?: string;
   /** Additive (6.7), catalogue rows only: maximum retail price printed on shelf labels. */
   mrp?: number;
+  /** Additive (8H catalogue v2), catalogue rows only: photo as an `asset:<id>` reference (assets table). */
+  image?: string;
+  /** Additive (8H), catalogue rows only: `stock_groups` row shown as the catalogue category. */
+  group_id?: string;
   /** Additive (6.9), catalogue rows only: quantity slabs — a line of at least `min_qty` gets `rate`. */
   qty_slabs?: QtySlab[];
+  /* ── Retail speed (8E) — catalogue rows only, never copied to invoice lines ── */
+  /** Additive (8.141): short code typed at the counter / in the editor ("SB" for soap bar); matched exactly. */
+  short_code?: string;
+  /** Additive (8.140): sold loose by weight (rate per kg); a scale label's weight becomes the quantity. */
+  sold_by_weight?: boolean;
+  /** Additive (8.140): PLU number the weighing scale prints in its EAN-13 label (`scale-barcode.ts`). */
+  plu?: string;
+  /** Additive (8.145): "MRP less %" pricing — the rate is MRP less this percent (recomputed when the item is saved). */
+  mrp_less_percent?: number;
   /**
    * Additive (6.9), invoice lines only: why the rate is what it is when it was set automatically
    * (a price level name such as "Wholesale", or "Qty ≥ 10"). Absent = typed or the catalogue's base rate.
@@ -192,6 +205,11 @@ export interface InvoiceItem {
    * quantity × unit_factor; the rate stays per line unit (`src/lib/units.ts`).
    */
   unit_factor?: number;
+  /**
+   * Additive (8F, 8.86), invoice lines only: bin / rack the goods were picked from (snapshot of the stock
+   * item's or batch's bin when the line was picked), printed on delivery challans and pick lists.
+   */
+  bin?: string;
 }
 
 /** A quantity slab on a catalogue item (6.9). */
@@ -234,6 +252,11 @@ export interface Client {
   credit_limit?: number;
   /** Additive (6.25): credit period in days; bills older than this with a balance raise the same warning. */
   credit_days?: number;
+  /**
+   * Additive (8H): language for reminders and WhatsApp statements to this party
+   * (`src/lib/message-langs.ts`). Absent = the interface language.
+   */
+  message_lang?: 'en' | 'hinglish' | 'hi' | 'mr' | 'gu' | 'ta';
   /** Additive (6.9): id of the `price_levels` row this party buys at (e.g. Wholesale). Absent = base rates. */
   price_level?: string;
   /**
@@ -242,6 +265,20 @@ export interface Client {
    * The party's opening balance lives in `ledger_openings`, its bill-wise breakup in `opening_bills`.
    */
   group_id?: string;
+  /* ── Distribution (8F, docs/features/distribution.md); additive, master only (never on a snapshot decision) ── */
+  /** `dist_areas` row of this party. */
+  area_id?: string;
+  /** `dist_beats` row (the salesman's visiting round) of this party. */
+  beat_id?: string;
+  /** Default `sales_agents` row: new sales documents for this party name this agent. */
+  agent_id?: string;
+  /** Per-party credit policy (8.80); absent = the company policy (`credit_policy`). */
+  credit_policy?: 'off' | 'warn' | 'block';
+  /* ── Round 2 (R2-A, docs/features/collections-r2.md); additive, master only ── */
+  /** R2-A5: how reminders treat this party — `auto` (default, in the queues), `manual` (on demand only), `never`. */
+  reminder_mode?: ReminderMode;
+  /** R2-A1: default `payment_terms` row for new documents of this party (falls back to `credit_days`). */
+  payment_terms_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -264,6 +301,8 @@ export interface SenderProfile {
   pin?: string;
   /** Free line for a professional registration, e.g. "SEBI RA INH000015297". */
   regLine?: string;
+  /** Additive (7U pharma pack): drug licence number(s), e.g. "20B: KA-B12-123456, 21B: KA-B12-123457" — printed under the GSTIN. */
+  drug_licence?: string;
   logo?: string;
   signature?: string;
   bankName: string;
@@ -282,6 +321,13 @@ export interface SenderProfile {
   gst_scheme?: GstScheme;
   /** Additive: what kind of composition taxpayer — decides the rate (`compositionRate` in tax-rules). */
   composition_category?: CompositionCategory;
+  /**
+   * Additive (8D, 8.60): aggregate annual turnover (AATO, ₹) for e-invoicing — drives the e-invoice mandate check and
+   * the 30-day IRP reporting window (AATO ≥ ₹10 crore from 1 Apr 2025). Absent = unknown (no window shown).
+   */
+  einvoice_aato?: number;
+  /** Additive (R2-A1): the seller's Udyam registration number — enables the MSME 45-day (Sec 43B(h)) note on long terms. */
+  msme_udyam?: string;
 }
 
 /** GST registration type of a sender profile. */
@@ -358,6 +404,12 @@ export interface Payment {
    * the date-order number (`receipts.ts`). Absent on advance adjustments.
    */
   receipt_number?: string;
+  /**
+   * Additive (8G, 8.106): the balance was written off as a bad debt, not received. Settles the bill like
+   * a payment, but cash books, receipts numbering and bank matching skip it; the ledger debits
+   * "Other expenses" (bad debts) instead of cash / bank (`src/lib/write-off.ts`).
+   */
+  write_off?: boolean;
 }
 
 /** Outcome the user records on a quotation (Expired / Converted are derived, never stored). */
@@ -429,6 +481,12 @@ export interface InvoiceRecord {
    * correction notes move no stock and take no cost of goods back.
    */
   goods_returned?: boolean;
+  /** Additive (8H), delivery challans: print without rates, amounts, tax or totals (quantities only). */
+  challan_hide_amounts?: boolean;
+  /** Additive (8H), delivery challans: goods sent to come back (job work, approval, repair) — printed as returnable. */
+  challan_returnable?: boolean;
+  /** Additive (8H): expected return date of a returnable challan (YYYY-MM-DD). */
+  challan_return_by?: string;
 
   /* ── Money knobs ───────────────────────────────────────────── */
   discount_type: DiscountType;
@@ -466,6 +524,8 @@ export interface InvoiceRecord {
   /** Set on invoices generated by a recurring schedule (idempotency stamp). */
   recurring_id?: string;
   recurring_date?: string;
+  /** Set on invoices saved by a batch run (QA5-2 F15): its drafts stay unnumbered until issued. */
+  batch_run_id?: string;
 
   /* ── Computed, persisted for fast ledger reads ──────────────── */
   subtotal: number;
@@ -557,6 +617,105 @@ export interface InvoiceRecord {
   voucher_type_id?: string;
   /** Additive (P1-13): printed document title snapshotted from the voucher type at save (absent = the type's label). */
   print_title?: string;
+  /* ── 7U business extras (additive, all optional) ── */
+  /** `sales_agents` row id of the agent who earns commission on this document (`src/lib/sales-commission.ts`). */
+  agent_id?: string;
+  /** Bill-value offer applied (`src/lib/offers.ts`); `value` (₹) is part of the invoice's amount discount. */
+  offer?: { scheme_id: string; label: string; value: number };
+  /** Pharma pack: prescription details for Schedule H / H1 / X sales (Schedule H1 register). */
+  rx?: {
+    patient: string; patient_address?: string; prescriber: string; prescriber_reg?: string;
+    /* R9 (RT-B1), additive: doctors-master row (prescriber / reg. are its snapshot), patient age / gender, the
+     * prescription's number and date, Schedule X "prescription retained", and the Rx photo (an `attachments` ref id,
+     * never printed). `client_id` = the patient is a saved client (else walk-in text). */
+    doctor_id?: string; age?: number; gender?: 'M' | 'F' | 'O'; rx_no?: string; rx_date?: string; retained?: boolean; image_id?: string; client_id?: string;
+  };
+  /**
+   * Additive (8.5, daily khata loop): the party's balance frozen when the bill was first issued, so
+   * "Previous balance + This bill = Total due" prints the same on every reprint (Critical Rule 3).
+   * Absent on legacy documents (nothing is printed). See `src/lib/party-balance.ts`.
+   */
+  party_balance_snapshot?: PartyBalanceSnapshot;
+  /**
+   * Additive (8G, 8.100): deposit / milestone instalments (quote, proforma, sales order, invoice). Feeds
+   * reminders, ageing and the cash forecast through `src/lib/payment-schedule.ts`. Absent = one due date.
+   */
+  payment_schedule?: PaymentInstalment[];
+  /**
+   * Additive (8G, 8.101): the client's acceptance of a quotation, snapshotted once (signature, signer,
+   * timestamp) and printed on the quote. Never rewritten by later edits (`src/lib/quote-acceptance.ts`).
+   */
+  acceptance?: QuoteAcceptance;
+  /* ── Round 2 (R2-A, docs/features/collections-r2.md); additive, never copied to a new document ── */
+  /**
+   * R2-A2: a FINANCIAL credit note (settlement discount / short payment / bad debt) — it settles a bill
+   * without being a GST credit note (`src/lib/financial-note.ts`). Only on `CREDIT_NOTE` rows, series `FCN`.
+   */
+  note_kind?: 'financial';
+  /** R2-A2: why the financial note was raised (with `note_kind`). */
+  financial_reason?: FinancialReason;
+  /**
+   * R2-A2: ledger account the note is debited to (snapshot of the company setting at issue, so a later
+   * change of setting never re-posts an old note). Absent = the default for the reason.
+   */
+  financial_account?: string;
+  /**
+   * R2-A1: snapshot of the named payment term picked on the document (`payment_terms` master), taken on save.
+   * Its instalment dates live in `payment_schedule` (8G, generated from the term); this keeps the term's
+   * name and the early-payment offer as issued, so editing the master never changes a saved document.
+   */
+  payment_terms?: PaymentTermsSnapshot;
+}
+
+/** 8.100: one instalment. Exactly one of `percent` (of the document total) or `amount` is used. */
+export interface PaymentInstalment {
+  id: string;
+  /** e.g. "Deposit", "On delivery". */
+  label?: string;
+  /** Local day (YYYY-MM-DD). */
+  due_date: string;
+  percent?: number;
+  amount?: number;
+}
+
+/** 8.101: acceptance snapshot. `signature` is a PNG data URL drawn on the counter (absent for a remote "Accept"). */
+export interface QuoteAcceptance {
+  signer: string;
+  /** ISO timestamp. */
+  signed_at: string;
+  signature?: string;
+  /** `counter` = signed on this device; `remote` = the client accepted by WhatsApp / e-mail. */
+  method: 'counter' | 'remote';
+  /** Total accepted (document currency), frozen with the signature. */
+  amount: number;
+  note?: string;
+}
+
+/** R2-A1: payment term frozen on a document. Amounts are in the document currency. */
+export interface PaymentTermsSnapshot {
+  /** `payment_terms` row id ('' for a custom schedule). */
+  id: string;
+  name: string;
+  /** Early-payment discount offered: pay `amount` less by `until` (local day). */
+  early_discount?: { percent: number; until: string; amount: number };
+}
+
+/** R2-A5: per-party reminder mode. */
+export type ReminderMode = 'auto' | 'manual' | 'never';
+
+/** R2-A2: reason of a financial credit note. */
+export type FinancialReason = 'settlement_discount' | 'short_payment' | 'bad_debt' | 'price_drop'; // price_drop: TR-A3
+
+/** 8.5: rupee figures frozen on the bill at issue (INR only). Total due = previous + bill − paid. */
+export interface PartyBalanceSnapshot {
+  /** Party ledger balance up to the bill date, without this bill (negative = advance / credit). */
+  previous: number;
+  /** What this bill adds to the party's account (receivable total less TDS). */
+  bill: number;
+  /** Paid at the counter when the bill was issued (optional). */
+  paid?: number;
+  /** Local day (YYYY-MM-DD) the snapshot was taken. */
+  as_of: string;
 }
 
 /** WP-9: maker-checker state kept on the document itself. */
@@ -576,4 +735,6 @@ export interface ApprovalInfo {
    * changes the value has to ask again; absent on approvals made before this field existed.
    */
   approved_value?: number;
+  /** Additive (8.80): why the document was held — absent = the approval policy; 'credit' = over the credit limit; 'margin' = below the minimum margin (TR-A1). */
+  reason?: 'credit' | 'margin';
 }

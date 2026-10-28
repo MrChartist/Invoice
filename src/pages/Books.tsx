@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { BookOpen } from 'lucide-react';
 import {
   buildVouchers,
   loadBooksData,
@@ -9,7 +10,8 @@ import {
   type CashAccount,
 } from '../lib/books';
 import { setPeriodContext, usePeriodContext } from '../lib/period-context';
-import { StorageWriteError } from '../lib/storage';
+import { getAllReportPrefs, setAllReportPrefs } from '../lib/report-prefs';
+import { StorageWriteError, getTable } from '../lib/storage';
 import { useToast } from '../components/ui/useToast';
 import { PageHeader } from '../components/ui/PageHeader';
 import { PeriodBar } from '../components/books/PeriodBar';
@@ -20,42 +22,45 @@ import surface from '../styles/surface.module.css';
 import styles from './Books.module.css';
 import { useT } from '../i18n';
 import { booksT } from '../i18n/areas/books';
+import { br2T } from '../i18n/areas/books-r2';
 import { wireT } from '../i18n/areas/wiring';
 import { useCan } from '../hooks/useCan';
 import controls from '../styles/controls.module.css';
+import { defineArea } from '../i18n/area';
+import { visiblePackTabs } from '../lib/industry-packs'; // R5-C; R18-A: shared rows (funds also for society)
+import { localDb } from '../lib/localDb';
+import { BOOKS_TABS, type BooksTab } from './page-tabs'; // R6-B1
+import { EmptyState } from '../components/ui/EmptyState';
+import { LearnMore, booksEmpty } from '../components/discover';
+import { discoverT } from '../i18n/areas/discover-r6';
+
+const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
+// R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
+const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
 // The double-entry tabs (6.1–6.4) live in their own lazy chunk with the ledger engine.
 const LedgerPanel = lazy(() => import('../components/books/ledger/LedgerPanel'));
 // Cash-flow forecast (6.18) and exchange gain/loss (6.19): their own small lazy chunks.
 const ForecastTab = lazy(() => import('../components/books/planning/ForecastTab'));
 const FxTab = lazy(() => import('../components/books/planning/FxTab'));
+// R2-C2: deferred revenue / prepaid expense schedules (own lazy chunk).
+const DeferralsTab = lazy(() => import('../components/books/planning/DeferralsTab'));
+// R5-C4: funds, fund statement, FCRA / FC-4 (non-profit pack) — listed only with the pack on.
+const FundsTab = lazy(() => import('../components/institutions/r5c-lazy').then((l) => l.r5c()).then((m) => ({ default: m.FundsTab })));
+const fundsTabT = defineArea({ tab: 'Funds' } as const, { tab: 'फ़ंड' });
 // Tally parity: bill-wise payables, voucher registers, ratio analysis (their own lazy chunk).
+// 8.109: saved views (period + tab + every report's F12 options) and month-end packs.
+const ReportViewsBar = lazy(() => import('../components/invoicing-ux/ReportViewsBar'));
 const TallyPanel = lazy(() => import('../components/books/tally/TallyPanel'));
 // WP-7 entry points (also in Settings → Data and the Gateway): `?open=yearend` / `?open=tally`.
 const TallyImport = lazy(() => import('../components/import/TallyImport').then((m) => ({ default: m.TallyImport })));
 const YearEndWizard = lazy(() => import('../components/year-end/YearEndWizard').then((m) => ({ default: m.YearEndWizard })));
 
-const TABS = [
-  { id: 'day', label: 'tabDay' },
-  { id: 'cash', label: 'tabCash' },
-  { id: 'vch', label: 'tabVch' },
-  { id: 'ledger', label: 'tabLedger' },
-  { id: 'tb', label: 'tabTb' },
-  { id: 'pnl', label: 'tabPnl' },
-  { id: 'bs', label: 'tabBs' },
-  { id: 'cf', label: 'tabCf' },
-  { id: 'rpt', label: 'tabRpt' },
-  { id: 'proj', label: 'tabProj' },
-  { id: 'budget', label: 'tabBudget' },
-  { id: 'coa', label: 'tabCoa' },
-  { id: 'fcst', label: 'tabFcst' },
-  { id: 'fx', label: 'tabFx' },
-  { id: 'billwise', label: 'tabBillwise' },
-  { id: 'vreg', label: 'tabVreg' },
-  { id: 'ratio', label: 'tabRatio' },
-] as const;
-type TabId = (typeof TABS)[number]['id'];
+const TABS = BOOKS_TABS; // R6-B1: the list lives in books-tabs.ts (Ctrl+K indexes it)
+type TabId = BooksTab;
 // Day book and P&L read the ledger too (WP-2: one accounting truth); `rpt` = group summary, ratios, registers …
+// R6-B3: tabs that read the books for the period (an empty company sees the first step there).
+const STATEMENT_TABS = new Set<TabId>(['day', 'cash', 'vch', 'ledger', 'tb', 'pnl', 'bs', 'cf', 'rpt', 'billwise', 'vreg', 'ratio']);
 const LEDGER_TABS = new Set<TabId>(['day', 'pnl', 'rpt', 'vch', 'ledger', 'tb', 'bs', 'cf', 'coa', 'proj', 'budget']);
 
 export function Books() {
@@ -66,10 +71,14 @@ export function Books() {
 
   // Shared report period (Alt+F2), remembered on this device for every ledger report.
   const { preset, period } = usePeriodContext();
+  // 8.109: re-mount the report after a saved view restores its F12 options.
+  const [viewTick, setViewTick] = useState(0);
   const [data, setData] = useState<BooksData>(() => loadBooksData());
   const [openingOpen, setOpeningOpen] = useState(false);
   const { notify, toastNode } = useToast();
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  // R5-C: pack tabs show only with their pack on (one opened by URL stays listed while shown).
+  const shown = useMemo(() => visiblePackTabs(TABS, localDb.settings.get(), tab), [tab]);
   const { can } = useCan();
   const openParam = params.get('open');
   const wizard = openParam === 'yearend' && can('books.edit') ? 'yearend' : openParam === 'tally' && can('data.restore') ? 'tally' : null;
@@ -89,6 +98,22 @@ export function Books() {
   }, []);
 
   const vouchers = useMemo(() => buildVouchers(data), [data]);
+  // R6-B3: a statement tab with nothing to show says what fills it (vouchers, manual entries, openings).
+  const empty = useMemo(
+    () =>
+      STATEMENT_TABS.has(tab) &&
+      booksEmpty(
+        {
+          voucherDates: vouchers.map((v) => v.date),
+          manualVouchers: getTable<{ date?: string }>('vouchers'),
+          openings: data.openings,
+          ledgerOpenings: getTable('ledger_openings').length,
+          openingBills: getTable('opening_bills').length,
+        },
+        period,
+      ),
+    [tab, vouchers, data, period],
+  );
 
   const todayIso = toIsoDate(new Date());
   const asOf = period.end > todayIso ? todayIso : period.end;
@@ -117,16 +142,16 @@ export function Books() {
 
   const onTabKey = (e: React.KeyboardEvent, index: number) => {
     const target: Record<string, number> = {
-      ArrowRight: (index + 1) % TABS.length,
-      ArrowLeft: (index - 1 + TABS.length) % TABS.length,
+      ArrowRight: (index + 1) % shown.length,
+      ArrowLeft: (index - 1 + shown.length) % shown.length,
       Home: 0,
-      End: TABS.length - 1,
+      End: shown.length - 1,
     };
     const next = target[e.key];
     if (next === undefined) return;
     e.preventDefault();
-    selectTab(TABS[next].id);
-    tabRefs.current[TABS[next].id]?.focus();
+    selectTab(shown[next].id);
+    tabRefs.current[shown[next].id]?.focus();
   };
 
   const saveOpenings = (values: Record<CashAccount, { amount: number; as_of: string }>) => {
@@ -143,6 +168,7 @@ export function Books() {
 
   return (
     <div className={surface.page}>
+      <Suspense fallback={null}><ScreenTip id="books" /></Suspense>
       <PageHeader
         title={booksT('title')}
         subtitle={booksT('subtitle')}
@@ -168,6 +194,19 @@ export function Books() {
       )}
 
       <div className="no-print">
+      <Suspense fallback={null}>
+        <ReportViewsBar
+          current={{ route: '/books', tab, preset, period, prefs: getAllReportPrefs() }}
+          initialViewId={params.get('view')}
+          onApply={(v) => {
+            if (v.prefs) setAllReportPrefs(v.prefs);
+            setPeriodContext(v.preset, v.preset === 'custom' ? v.period : undefined);
+            if (TABS.some((t) => t.id === v.tab)) selectTab(v.tab as TabId);
+            setViewTick((n) => n + 1);
+          }}
+        />
+      </Suspense>
+
       <PeriodBar
         preset={preset}
         period={period}
@@ -176,7 +215,7 @@ export function Books() {
       </div>
 
       <div className={`${styles.tabs} no-print`} role="tablist" aria-label={booksT('tablist')}>
-        {TABS.map((t, i) => (
+        {shown.map((t, i) => (
           <button
             key={t.id}
             ref={(el) => {
@@ -192,13 +231,28 @@ export function Books() {
             onClick={() => selectTab(t.id)}
             onKeyDown={(e) => onTabKey(e, i)}
           >
-            {booksT(t.label)}
+            {t.id === 'defer' ? br2T('tabDefer') : t.id === 'funds' ? fundsTabT('tab') : booksT(t.label as Parameters<typeof booksT>[0])}
           </button>
         ))}
       </div>
 
+      {empty && (
+        <EmptyState
+          icon={BookOpen}
+          title={discoverT('booksTitle')}
+          text={discoverT('booksText')}
+          action={
+            <div className={surface.pageActions} style={{ justifyContent: 'center' }} data-books-empty>
+              {can('books.edit') && <Link to="/books?tab=coa&m=opening-tb" className={controls.btnPrimary}>{discoverT('booksOpenings')}</Link>}
+              {can('data.restore') && <button type="button" className={controls.btnOutline} onClick={() => setWizard('tally')}>{discoverT('booksTally')}</button>}
+              <LearnMore topic="books" />
+            </div>
+          }
+        />
+      )}
       <div
         role="tabpanel"
+        key={viewTick}
         id={`books-panel-${tab}`}
         aria-labelledby={`books-tab-${tab}`}
         tabIndex={0}
@@ -211,6 +265,16 @@ export function Books() {
             period={period}
             onEditOpening={() => setOpeningOpen(true)}
           />
+        )}
+        {tab === 'funds' && (
+          <Suspense fallback={<p className={styles.loading} role="status">{booksT('loading')}</p>}>
+            <FundsTab period={period} notify={notify} />
+          </Suspense>
+        )}
+        {tab === 'defer' && (
+          <Suspense fallback={<p className={styles.loading} role="status">{booksT('loading')}</p>}>
+            <DeferralsTab period={period} notify={notify} />
+          </Suspense>
         )}
         {(tab === 'fcst' || tab === 'fx') && (
           <Suspense fallback={<p className={styles.loading} role="status">{booksT('loading')}</p>}>
@@ -250,6 +314,7 @@ export function Books() {
         defaultAsOf={period.start}
       />
       {toastNode}
+      <Suspense fallback={null}><UndoDeleted /></Suspense>
     </div>
   );
 }

@@ -6,7 +6,8 @@
 import '../helpers/shim.ts';
 import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resetStorage, dumpStorage } from '../helpers/shim.ts';
+import { resetStorage, dumpStorage as dumpRaw } from '../helpers/shim.ts';
+import { audit } from '../../src/lib/audit.ts';
 import {
   clientKA,
   createViaStore,
@@ -32,6 +33,8 @@ import { createSchedule, recurringDb, templateFromInvoice } from '../../src/lib/
 import { createCreditNote } from '../../src/lib/documents.ts';
 import { saveEInvoiceMeta } from '../../src/lib/einvoice.ts';
 import { freezeDate, thawDate } from '../helpers/shim.ts';
+// R15-A2: audit appends are written once per task; flush before reading storage directly.
+const dumpStorage = () => (audit.flush(), dumpRaw());
 
 beforeEach(() => {
   resetStorage();

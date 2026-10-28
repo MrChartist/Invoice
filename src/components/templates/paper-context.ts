@@ -1,16 +1,20 @@
 import { createContext, useContext } from 'react';
 import { currencySymbol, formatCurrency, formatDate, formatMoney } from '../../lib/utils';
 import {
+  activeArt,
   fontCss,
   formatDatePref,
+  docTitleText,
   formatNumberPref,
   paperSize,
   type DesignPrefs,
+  type LetterheadPrefs,
   type PaperKind,
   type PaperSize,
 } from '../../lib/design-prefs';
 import { makeLabels, type Labeller } from './labels';
 import type { TemplateLayout } from './registry';
+import type { DocumentType } from '../../types/invoice';
 
 /**
  * Everything a part needs to know about the active design, resolved once by
@@ -30,12 +34,18 @@ export interface PaperConfig {
   currency: (amount: number, currency?: string) => string;
   date: (value: string | Date) => string;
   col: { hsn: boolean; unit: boolean; discount: boolean; taxRate: boolean; taxable: boolean };
-  show: { qr: boolean; signature: boolean; bank: boolean; terms: boolean; words: boolean; place: boolean; tracking: boolean };
+  show: { qr: boolean; signature: boolean; bank: boolean; terms: boolean; words: boolean; place: boolean; tracking: boolean; partyBalance: boolean };
   logoSize: 's' | 'm' | 'l';
   logoPosition: 'auto' | 'left' | 'right' | 'center';
   headerNote: string;
   footerText: string;
   fontOverride?: string;
+  /** R2-C5: printed title for a document type — the statutory title plus the design's suffix, if any. */
+  title: (baseTitle: string, docType?: DocumentType) => string;
+  /** R3-C2: print catalogue photos on item lines (design toggle; never the GST grid / thermal roll). */
+  itemImages: boolean;
+  /** R3-C3: letterhead / footer artwork to print (null without it, or on pre-printed stationery). */
+  art: { letterhead?: LetterheadPrefs; footer?: string } | null;
 }
 
 export function buildPaperConfig(
@@ -50,7 +60,7 @@ export function buildPaperConfig(
     layout,
     paper: d?.paper ?? 'A4',
     size: paperSize(d),
-    t: makeLabels(bilingual),
+    t: makeLabels(bilingual, d?.labels),
     bilingual,
     money: international
       ? (n, cur = 'INR') => formatNumberPref(n, cur, 'international')
@@ -78,12 +88,17 @@ export function buildPaperConfig(
       words: d ? d.show_amount_in_words : true,
       place: d ? d.show_place_of_supply : true,
       tracking: d ? d.show_tracking !== false : true,
+      // 8.5: off unless the design turns it on (legacy and no-design renders never print it).
+      partyBalance: d?.show_party_balance === true,
     },
     logoSize: d?.logo_size ?? 'm',
     logoPosition: d?.logo_position ?? 'auto',
     headerNote: d?.header_note?.trim() ?? '',
     footerText: d?.footer_text?.trim() ?? '',
     fontOverride: fontCss(d?.font),
+    title: (baseTitle, docType) => docTitleText(baseTitle, d, docType),
+    itemImages: d?.show_item_images === true && layout !== 'gst' && layout !== 'receipt' && d.paper !== 'thermal80',
+    art: activeArt(d),
   };
 }
 

@@ -21,6 +21,7 @@ import { purchaseOrderOutstanding } from './receipt-notes';
 import { lineFactor } from './units';
 import { loadTracking, type TrackingMap } from './stock-tracking';
 import { getTable } from './storage';
+import { memoOnReads } from './table-memo';
 
 const EPS = 1e-9;
 const roundQty = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000 || 0;
@@ -159,9 +160,72 @@ export function reorderNotices(rows: readonly ReorderRow[], at: string): AppNoti
 
 /** Live Reorder Status. */
 export function loadReorderStatus(): ReorderRow[] {
+  // PERF-1: memoised on every key it read; shared, read-only.
+  return memoOnReads('reorder:status', computeReorderStatus);
+}
+
+function computeReorderStatus(): ReorderRow[] {
   const positions = loadPositions();
   const items = positions.map((p) => p.item);
   const pending = pendingPoQty(getTable<PurchaseOrder>('purchase_orders'), getTable<PurchaseRecord>('purchases'), items, getTable<ReceiptNote>('receipt_notes'));
   const needsGodowns = items.some((i) => i.reorder_by_godown && Object.keys(i.reorder_by_godown).length);
   return reorderStatus(positions, pending, needsGodowns ? loadTracking() : undefined);
+}
+
+/* ── R4-B5: store replenishment from the warehouse ─────────────── */
+
+export interface ReplenishRow {
+  item: StockItem;
+  /** The store godown being refilled and the godown it is refilled from (`Godown.replenish_from`). */
+  store: string;
+  source: string;
+  shortfall: number;
+  /** Still to dispatch on open transfer requests to the store, and goods in transit to it. */
+  pendingRequests: number;
+  inTransit: number;
+  /** Fill from the source first … */
+  transfer: number;
+  /** … and buy the rest (raised to the item's MOQ). */
+  purchase: number;
+  rate: number;
+  vendor?: string;
+}
+
+/**
+ * R4-B5 pass over the per-godown Reorder Status rows: for each store godown with `replenish_from`, the shortfall less
+ * pending requests and goods in transit is filled from the source's FREE stock (closing above the source's own reorder
+ * level for the item), and the remainder becomes a purchase suggestion with the MOQ. Several stores competing for one
+ * source are served in godown-name order, then item name (each store takes what is left). `open` keys are
+ * `${storeGodown}|${itemId}` (transfer-requests.ts `openQtyByStore`). Pure.
+ */
+export function replenishPlan(
+  rows: readonly ReorderRow[], godowns: readonly { id: string; name: string; replenish_from?: string }[], tracking: TrackingMap,
+  open: { pending: ReadonlyMap<string, number>; transit: ReadonlyMap<string, number> },
+): ReplenishRow[] {
+  const byId = new Map(godowns.map((g) => [g.id, g]));
+  const free = new Map<string, number>();
+  const out: ReplenishRow[] = [];
+  const src = (r: ReorderRow) => (r.godown ? byId.get(r.godown)?.replenish_from : undefined);
+  const stores = rows
+    .filter((r) => r.godown && src(r) && src(r) !== r.godown)
+    .sort((a, b) => (byId.get(a.godown!)?.name ?? '').localeCompare(byId.get(b.godown!)?.name ?? '') || a.item.name.localeCompare(b.item.name));
+  for (const r of stores) {
+    const store = r.godown!;
+    const source = src(r)!;
+    const k = `${store}|${r.item.id}`;
+    const pendingRequests = roundQty(open.pending.get(k) ?? 0);
+    const inTransit = roundQty(open.transit.get(k) ?? 0);
+    const need = roundQty(Math.max(r.shortfall - pendingRequests - inTransit, 0));
+    if (need <= EPS) continue;
+    const fk = `${source}|${r.item.id}`;
+    if (!free.has(fk)) {
+      const closing = tracking.get(r.item.id)?.byGodown[source || MAIN_GODOWN_ID] ?? 0;
+      free.set(fk, roundQty(Math.max(closing - Math.max(num(r.item.reorder_by_godown?.[source]), 0), 0)));
+    }
+    const transfer = roundQty(Math.min(need, free.get(fk) ?? 0));
+    free.set(fk, roundQty((free.get(fk) ?? 0) - transfer));
+    const rest = roundQty(need - transfer);
+    out.push({ item: r.item, store, source, shortfall: r.shortfall, pendingRequests, inTransit, transfer, purchase: rest > EPS ? roundQty(Math.max(rest, r.minOrderQty)) : 0, rate: r.rate, vendor: r.vendor });
+  }
+  return out;
 }

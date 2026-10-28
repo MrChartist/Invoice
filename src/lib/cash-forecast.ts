@@ -32,6 +32,22 @@ import { isMse, paymentLimit } from './msme';
 import { isVoidStatus, pickStr, readPurchase, supplierPayableOf } from './purchase-normalize';
 import { previewOccurrences, scheduleStatus, templateTotals, type RecurringSchedule } from './recurring';
 import { receivableBalance } from './rcm';
+import { openInstalments } from './payment-schedule';
+import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
+import { bankAccountsDb, isClientMoneyAccount } from './bank-accounts'; // R14 PS-B3
+
+/** Open receivable `inr` split over a document's unpaid instalments (one part on `due_date` without a schedule). */
+function scheduledParts(inv: InvoiceRecord, inr: number): { due: string; label: string; amount: number }[] {
+  const open = openInstalments(inv);
+  const sum = open.reduce((s, o) => s + o.open, 0);
+  if (!open.length || sum <= 0) return [{ due: '', label: '', amount: inr }];
+  let left = inr;
+  return open.map((o, i) => {
+    const amount = i === open.length - 1 ? round2(left) : round2((inr * o.open) / sum);
+    left = round2(left - amount);
+    return { due: o.instalment.due_date, label: o.instalment.label ?? '', amount };
+  });
+}
 
 export const HORIZONS = [30, 90, 180] as const;
 export type Horizon = (typeof HORIZONS)[number];
@@ -119,12 +135,15 @@ const partyName = (c: Pick<Client, 'name' | 'company'> | null | undefined) => St
 export function collectionLags(invoices: readonly InvoiceRecord[], payments: readonly Payment[]): Map<string, { days: number; receipts: number; party: string }> {
   const byId = new Map(invoices.map((i) => [i.id, i]));
   const acc = new Map<string, { w: number; sum: number; n: number; party: string }>();
+  const banks = bankAccountsDb.all();
   for (const p of payments) {
+    if (isClientMoneyAccount(p.bank_account_id, banks)) continue; // R14 PS-B3: clients' money, not the firm's
     const inv = byId.get(p.invoice_id);
     const due = isoDay(inv?.due_date);
     const paid = isoDay(p.date);
-    // An advance adjustment (5.3) is not a collection: it says nothing about how late the client pays.
-    if (!inv || !due || !paid || p.advance_id) continue;
+    // A row that moved no money (advance adjustment, write-off, gift voucher, deposit, RA deduction — `no-cash.ts`) is
+    // not a collection: it says nothing about how late the client pays.
+    if (!inv || !due || !paid || movedNoCash(p)) continue;
     const amt = Math.abs(num(p.amount)) * (fxRate(inv) ?? 1);
     if (!(amt > 0)) continue;
     const k = clientKey(inv.client);
@@ -203,21 +222,25 @@ export function buildForecast(input: ForecastInput): Forecast {
     let inr = rate === 1 ? balance : mulRound2(balance, rate);
     inr = round2(inr - (pendingIn.get(inv.id) ?? 0));
     if (inr <= 0.004) continue;
-    const due = isoDay(inv.due_date) || isoDay(inv.issue_date) || today;
-    if (input.skipOverdueAfter !== undefined && daysFrom(due, today) > input.skipOverdueAfter) continue;
-    const lag = lagFor(inv.client);
-    const expected = lag === undefined ? due : shiftDay(due, lag);
-    push({
-      date: clamp(expected),
-      kind: 'receivable',
-      direction: 'in',
-      party: partyName(inv.client),
-      ref: inv.invoice_number || 'Invoice',
-      amount: inr,
-      basis: lag === undefined ? `due ${fmtDay(due)} (no payment history)` : `due ${fmtDay(due)} ${lag >= 0 ? '+' : '−'} ${Math.abs(lag)} days usual ${lag >= 0 ? 'delay' : 'early payment'}`,
-      overdue: expected < today,
-      link: `/invoice/${inv.id}`,
-    });
+    // 8.100: a payment schedule expects each unpaid instalment on its own date (in rupees, pro rata).
+    const parts = scheduledParts(inv, inr);
+    for (const part of parts) {
+      const due = part.due || isoDay(inv.due_date) || isoDay(inv.issue_date) || today;
+      if (input.skipOverdueAfter !== undefined && daysFrom(due, today) > input.skipOverdueAfter) continue;
+      const lag = lagFor(inv.client);
+      const expected = lag === undefined ? due : shiftDay(due, lag);
+      push({
+        date: clamp(expected),
+        kind: 'receivable',
+        direction: 'in',
+        party: partyName(inv.client),
+        ref: `${inv.invoice_number || 'Invoice'}${part.label ? ` · ${part.label}` : ''}`,
+        amount: part.amount,
+        basis: lag === undefined ? `due ${fmtDay(due)} (no payment history)` : `due ${fmtDay(due)} ${lag >= 0 ? '+' : '−'} ${Math.abs(lag)} days usual ${lag >= 0 ? 'delay' : 'early payment'}`,
+        overdue: expected < today,
+        link: `/invoice/${inv.id}`,
+      });
+    }
   }
 
   // Recurring schedules.
@@ -360,7 +383,8 @@ function shiftMonthKey(key: string, months: number): string {
 
 /** Today's cash + bank, as the Books cash and bank books show it. */
 export function openingCash(books: BooksData, today: string): number {
-  const vouchers = buildVouchers(books);
+  const banks = bankAccountsDb.all();
+  const vouchers = buildVouchers(books).filter((v) => !isClientMoneyAccount(v.bank_account_id, banks)); // R14 PS-B3
   return round2(accountBalanceAt(vouchers, books.openings, 'cash', today) + accountBalanceAt(vouchers, books.openings, 'bank', today));
 }
 

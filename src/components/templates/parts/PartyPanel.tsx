@@ -4,6 +4,7 @@ import { formatPlaceOfSupply, stateByCode } from '../../../lib/india-states';
 import { DOCUMENT_LABELS, type InvoiceRecord } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import styles from '../invoice-paper.module.css';
+import { AttentionLine } from './AttentionLine';
 
 interface PartyPanelProps {
   invoice: InvoiceRecord;
@@ -85,9 +86,10 @@ export function PartyPanel({ invoice, plain, skipDates }: PartyPanelProps) {
             </>
           )}
         </div>
+        <AttentionLine invoice={invoice} />
         {ship && (
           <div className={styles.shipTo}>
-            <div className={styles.eyebrow}>{t('shipTo')}</div>
+            <div className={styles.eyebrow}>{invoice.boq_terms?.cn ? 'Site' : t('shipTo')}</div>
             <div className={styles.meta}>
               {ship.name && (
                 <>

@@ -29,6 +29,7 @@ export const hi: Messages = {
   'common.notSaved': 'सेव नहीं हुआ: {message}',
   'common.createInvoice': 'इनवॉइस बनाएँ',
   'common.language': 'भाषा',
+  'common.validGstin': 'मान्य GSTIN',
 
   // ── Document types / statuses / payment methods ───────────────────
   'doc.INVOICE': 'इनवॉइस',
@@ -51,6 +52,7 @@ export const hi: Messages = {
   'method.Cash': 'नकद',
   'method.Cheque': 'चेक',
   'method.Card': 'कार्ड',
+  'method.Gift voucher': 'गिफ़्ट वाउचर',
   'method.Other': 'अन्य',
   'role.owner': 'मालिक',
   'role.clerk': 'क्लर्क',
@@ -60,6 +62,8 @@ export const hi: Messages = {
   'nav.dashboard': 'डैशबोर्ड',
   'nav.newInvoice': 'नया इनवॉइस',
   'nav.pos': 'POS बिलिंग',
+  'nav.tables': 'टेबल',
+  'nav.frontDesk': 'फ्रंट डेस्क', // R7-A
   'nav.invoices': 'इनवॉइस',
   'nav.clients': 'ग्राहक',
   'nav.recurring': 'आवर्ती बिल',
@@ -67,10 +71,14 @@ export const hi: Messages = {
   'nav.receivables': 'वसूली',
   'nav.expenses': 'खर्च',
   'nav.inventory': 'स्टॉक',
+  'nav.manufacturing': 'उत्पादन',
+  'nav.distribution': 'वितरण',
+  'nav.moreFeatures': '{n} और सुविधाएँ — दिखाएँ',
   'nav.books': 'बही-खाता',
   'nav.reconcile': 'बैंक मिलान',
   'nav.cheques': 'चेक',
   'nav.tds': 'TDS और TCS',
+  'nav.loans': 'लोन और EMI',
   'nav.payroll': 'पेरोल',
   'nav.reports': 'रिपोर्ट',
   'nav.gstReports': 'GST रिपोर्ट',
@@ -78,6 +86,7 @@ export const hi: Messages = {
   'nav.gateway': 'गेटवे',
   'nav.accountsInfo': 'खाता जानकारी',
   'nav.designStudio': 'डिज़ाइन स्टूडियो',
+  'nav.practice': 'प्रैक्टिस डेस्क',
   'nav.settings': 'सेटिंग्स',
   'nav.groupSales': 'बिक्री',
   'nav.groupPurchases': 'खरीद और स्टॉक',
@@ -89,6 +98,8 @@ export const hi: Messages = {
   'shell.closeMenu': 'मेन्यू बंद करें',
   'shell.home': 'Mr. Chartist Invoice होम',
   'shell.search': 'खोजें',
+  'shell.notifications': 'सूचनाएँ',
+  'shell.notificationsUnread': 'सूचनाएँ, {n} बिना पढ़ी',
   'shell.searchPlaceholder': 'इनवॉइस, ग्राहक, पेज खोजें…',
   'shell.lightMode': 'लाइट मोड',
   'shell.darkMode': 'डार्क मोड',
@@ -106,6 +117,8 @@ export const hi: Messages = {
   'shell.tabHome': 'होम',
   'shell.tabNew': 'नया',
   'shell.tabMore': 'और',
+  'shell.beta': 'बीटा',
+  'shell.betaAria': 'बीटा वर्ज़न (निजी टेस्ट बिल्ड)',
   'shell.backupSaved': 'बैकअप सेव हुआ ({file})',
   'shell.backupDownloaded': 'बैकअप डाउनलोड हुआ',
   'palette.newInvoice': 'नया इनवॉइस',
@@ -243,6 +256,12 @@ export const hi: Messages = {
   'dash.manageDirectory': 'ग्राहक सूची संभालें',
   'dash.profilesBackup': 'प्रोफ़ाइल और बैकअप',
   'dash.profilesBackupHint': 'व्यवसाय विवरण, बैंक, UPI',
+
+  // ── Missing page (404 inside the shell) ──
+  'notFound.docTitle': 'पेज नहीं मिला — Mr. Chartist Invoice',
+  'notFound.title': 'यह पेज नहीं मिला',
+  'notFound.text': '{path} पर कुछ नहीं है। हो सकता है यह हट गया हो या लिंक ग़लत लिखा हो।',
+  'notFound.back': 'डैशबोर्ड पर वापस',
 
   // ── Invoice editor ────────────────────────────────────────────────
   'editor.newDoc': 'नया दस्तावेज़: {doc}',

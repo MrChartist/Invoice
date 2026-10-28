@@ -1,0 +1,654 @@
+/**
+ * Round 9 (retail shops) — persisted shapes and additive fields of the five packages.
+ * `src/types/invoice.ts`, `purchases.ts`, `localDb.ts` and `inventory.ts` are not edited: the new optional fields arrive
+ * here by declaration merging (additive, snake_case). One block per package (§6 of docs/prd/round-9.md), marked
+ * `// RT-A` … `// RT-E`: each package edits only its own block. Record keys are listed in `R9_RECORD_KEYS` and line
+ * keys in `R9_LINE_KEYS` (`src/store/invoice-defaults.ts`, owned by RT-A), so the editor and `normalizeRecord` keep
+ * them. Everything here is a working paper — verify with your CA.
+ */
+import type { PriceBandKind } from '../lib/retail-rules';
+
+/* ════════════════════════════════════════ RT-A ════════════════════════════════════════ */
+
+/** The shop picked under the `kirana` business type (settings `retail_kind`; absent = not chosen). */
+export type RetailKind = 'grocery' | 'pharmacy' | 'apparel' | 'electronics' | 'jewellery' | 'general';
+
+export type GuardMode = 'off' | 'warn' | 'block';
+
+/** Company object `mrchartist_inv_retail_settings` (`settings.manage`, audited on save, synced as a singleton). */
+export interface RetailSettings {
+  /** RT-A2: no sale above MRP (Legal Metrology Rule 18(2)). Absent = off (existing companies). */
+  mrp_guard?: GuardMode;
+  /** RT-A3: home-delivery orders and riders (the "Delivery" switch on the POS / editor). */
+  delivery?: { enabled?: boolean };
+  /** RT-A4: the short book offered at the counter when an item is not found / out of stock. */
+  short_book?: { enabled?: boolean };
+  /** RT-A4: Free and Disc % cells on supplier bill lines. */
+  free_qty?: boolean;
+  /** RT-E3 (generic): cash receipts of ₹2 lakh or more (Sec 269ST) — warn / block. */
+  cash_guard?: GuardMode;
+  /** RT-E3: a sale above the PAN limit needs PAN or a Form 60 / 97 declaration (block when on). */
+  require_pan?: boolean;
+  updated_at?: string;
+}
+
+/** RT-A2: "this MRP was printed for GST at `rate` %" (stock items received up to `until`, local day; absent = all). */
+export interface MrpTaxBasis {
+  rate: number;
+  until?: string;
+}
+
+/** RT-A3 delivery status flow: new → packed → out → delivered, or returned / cancelled. */
+export type DeliveryStatus = 'new' | 'packed' | 'out' | 'delivered' | 'returned' | 'cancelled';
+
+/** RT-A3: home-delivery details on a sale record (snapshot; the bill itself is a normal invoice). */
+export interface DeliveryInfo {
+  address: string;
+  phone?: string;
+  /** Free text slot ("6–8 pm"). */
+  slot?: string;
+  rider_id?: string;
+  status: DeliveryStatus;
+  /** Delivery charge put on the bill as a normal service line (G5 / RT6). */
+  charge?: number;
+  /** Cash on delivery: the rider collects; receipts are tagged `rider_id`. */
+  cod?: boolean;
+  note?: string;
+  /** Local day the order was delivered / returned. */
+  done_on?: string;
+  /** The credit note made for a returned order. */
+  credit_note_id?: string;
+}
+
+/** RT-A3 riders master (table `delivery_riders`, `master.edit`). */
+export interface DeliveryRider {
+  id: string;
+  name: string;
+  phone?: string;
+  active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** RT-A3 rider cash settlement (table `rider_settlements`, `payment.record`, dated `date`). */
+export interface RiderSettlement {
+  id: string;
+  date: string;
+  rider_id: string;
+  rider_name: string;
+  /** COD receipts (`transactions` ids) this settlement clears. */
+  payment_ids: string[];
+  expected: number;
+  counted: number;
+  /** counted − expected (negative = shortage). */
+  difference: number;
+  /** Ledger a shortage / excess goes to (chosen by the user; never silent). */
+  difference_account_id?: string;
+  /** Orders that came back (invoice ids). */
+  returned_ids?: string[];
+  voucher_id?: string;
+  voucher_number?: string;
+  note?: string;
+  created_at: string;
+}
+
+/** RT-A4 short book (table `short_book`, `doc.create`, dated `date`). */
+export interface ShortBookEntry {
+  id: string;
+  date: string;
+  /** Stock item id when known; free text otherwise. */
+  item_id?: string;
+  name: string;
+  qty: number;
+  unit?: string;
+  customer?: string;
+  phone?: string;
+  note?: string;
+  status: 'open' | 'ordered' | 'closed';
+  /** The draft purchase order made from it. */
+  po_id?: string;
+  closed_on?: string;
+  closed_how?: 'arrived' | 'manual';
+  created_at: string;
+  updated_at?: string;
+}
+
+/** RT-E3 (declared here because the record key list is RT-A's): PAN / Form 60 / 97 on a big sale. */
+export interface SaleKyc {
+  pan?: string;
+  form?: '60' | '97';
+  ref?: string;
+}
+
+declare module './invoice' {
+  interface InvoiceRecord {
+    /** RT-A3: home delivery (POS / editor "Delivery" switch). */
+    delivery?: DeliveryInfo;
+    /** RT-E3: PAN or Form 60 / 97 taken on a sale above the PAN limit (masked in lists). */
+    kyc?: SaleKyc;
+  }
+  interface InvoiceItem {
+    /** RT-A2, catalogue rows: the MRP was printed for an older GST rate (effective MRP after a cut). */
+    mrp_tax_basis?: MrpTaxBasis;
+    /** RT-A2, catalogue rows: when a shelf label was last printed, and the rate / MRP it showed (relabel queue). */
+    label_printed_at?: string;
+    label_price?: { rate: number; mrp: number };
+  }
+  interface Payment {
+    /** RT-A3: cash collected by a delivery rider (held in "Cash with riders" until settled). */
+    rider_id?: string;
+    /** RT-D3 / RT-E3: settled by the customer's old goods (a URD purchase voucher) — no cash moved (`movedNoCash`). */
+    exchange_purchase_id?: string;
+  }
+}
+declare module './purchases' {
+  interface PurchaseLine {
+    /** RT-A4: free units received with the line ("10 + 1"); no value and no GST; stock = paid + free. */
+    free_qty?: number;
+    /** RT-A4: line discount % (already read by `readPurchaseLines`; now typed in the bill line editor). */
+    discount_percent?: number;
+  }
+}
+declare module '../lib/localDb' {
+  interface AppSettings {
+    /** RT-A1: shop profile under the `kirana` business type; absent = not chosen (existing companies unchanged). */
+    retail_kind?: RetailKind;
+  }
+}
+declare module '../lib/inventory' {
+  interface StockItem {
+    /** RT-A2: the MRP of stock received up to `until` was printed for GST at `rate` %. */
+    mrp_tax_basis?: MrpTaxBasis;
+    /** RT-A2: last label print and what it showed (relabel queue). */
+    label_printed_at?: string;
+    label_price?: { rate: number; mrp: number };
+  }
+}
+
+/* ════════════════════════════════════════ RT-B ════════════════════════════════════════
+ * Doctors, refills, registers, licences, ceiling prices. Note: `InvoiceRecord.rx` is an inline object type in
+ * invoice.ts, which declaration merging cannot widen — RT-B widens it there (one edit) or keeps the additions
+ * (`doctor_id`, `age`, `gender`, `rx_no`, `rx_date`, `retained`) in its own shape. RT-B widened it in invoice.ts. */
+
+/**
+ * RT-B1 doctors master (table `doctors`, `master.edit`, audited "Doctor"). Round 10 SV-B adds clinic fields
+ * (`in_house`, `speciality`, `consult_fee`, `follow_up_fee`, `follow_up_days`, `staff_id`) by declaration merging
+ * on this interface — keep it an interface. No referral / commission field (RT9).
+ */
+export interface Doctor {
+  id: string;
+  name: string;
+  qualification?: string;
+  /** Registration number with the medical council (printed on the H1 / X registers as "reg. no."). */
+  reg_no?: string;
+  council?: string;
+  clinic?: string;
+  phone?: string;
+  address?: string;
+  active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** RT-B1 refill schedule (table `rx_refills`, `doc.create`, dated `next_due`). */
+export interface RxRefill {
+  id: string;
+  /** Saved client (patient) when known; else the name / phone typed. */
+  client_id?: string;
+  name: string;
+  phone?: string;
+  items: { name: string; quantity: number; unit?: string }[];
+  every_days: number;
+  /** Local day the next purchase is due. */
+  next_due: string;
+  /** Local day of the last bill that refilled it (absent = only the bill it was made from). */
+  last_billed?: string;
+  /** Bill it was made from. */
+  invoice_id?: string;
+  doctor_id?: string;
+  active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+/** RT-B2 drug licence forms (Drugs Rules 1945): 20 / 21 retail, 20B / 21B wholesale, 20F / 21G Schedule X, 21C restricted. */
+export type DrugLicenceForm = '20' | '21' | '20B' | '21B' | '20F' | '21G' | '21C' | 'other';
+export interface DrugLicence {
+  form: DrugLicenceForm;
+  number: string;
+  valid_from?: string;
+  valid_to?: string;
+  premises?: string;
+}
+export interface Pharmacist {
+  name: string;
+  reg_no: string;
+  council?: string;
+}
+
+/** RT-B1: the POS prescription strip's state (merged into the bill; `errors` stop the save). */
+export interface PosRx {
+  rx?: NonNullable<import('./invoice').InvoiceRecord['rx']>;
+  /** The Rx photo(s) stored as attachments of the bill. */
+  att?: import('./attachments').AttachmentRef[];
+  errors: string[];
+}
+
+declare module '../lib/pharma-gate' {
+  interface PharmaSettings {
+    /** RT-B2: drug licences on file (printed licence line; expiry alerts; Schedule X needs 20F / 21G). */
+    licences?: DrugLicence[];
+    /** RT-B2: registered pharmacist printed on the bill. */
+    pharmacist?: Pharmacist;
+    /** RT-B1: H1 / X without patient + prescriber is an error (pharmacy profile) instead of a warning. */
+    require_rx?: boolean;
+  }
+}
+declare module '../lib/inventory' {
+  interface StockItem {
+    /** RT-B3: NPPA ceiling price per unit, ex-GST, dated (append-only). */
+    ceiling_prices?: { from: string; price_per_unit: number; unit?: string }[];
+    /** RT-B2: narcotic / psychotropic item (own register). */
+    narcotic?: boolean;
+    /** RT-B3: price to stockist, typed (margin view only). */
+    pts?: number;
+  }
+}
+declare module './invoice' {
+  interface SenderProfile {
+    /** RT-B2: "name (reg. no.)" of the registered pharmacist, written from the pharmacy desk (snapshotted with the profile). */
+    pharmacist?: string;
+  }
+}
+
+/* ════════════════════════════════════════ RT-C ════════════════════════════════════════ */
+/** RT-C1 line snapshot: the band that set `tax_rate`, the value per piece it was decided on and the rate it gave. */
+export interface BandRate {
+  kind: PriceBandKind;
+  value_per_piece: number;
+  /** The rate the band gave (absent = not decided yet). A line `tax_rate` that differs = typed by hand. */
+  rate?: number;
+  /** The user typed the GST rate: the band no longer sets it (the exceptions view still compares it). */
+  manual?: true;
+}
+
+export type AlterationStatus = 'received' | 'with_tailor' | 'ready' | 'delivered' | 'cancelled';
+
+/** RT-C3 alteration slip (table `alteration_jobs`, `doc.create`, dated `date`, numbered `ALT/FY…`). */
+export interface AlterationJob {
+  id: string;
+  number: string;
+  date: string;
+  customer: string;
+  phone?: string;
+  invoice_id?: string;
+  invoice_number?: string;
+  garment: string;
+  /** Alteration notes and measurements (free text). */
+  notes?: string;
+  /** Tailor (a `vendors` row) and the name snapshot. */
+  tailor_id?: string;
+  tailor_name?: string;
+  due: string;
+  /** Charge to the customer (₹, incl. nothing else; 0 = free alteration). */
+  charge: number;
+  /** What the tailor is paid for this job (₹). */
+  tailor_rate: number;
+  status: AlterationStatus;
+  /** Local days the status changed. */
+  ready_on?: string;
+  delivered_on?: string;
+  /** The bill that charged the alteration (its own draft or a sale bill line). */
+  charge_invoice_id?: string;
+  /** The tailor bill draft (purchase_drafts) that paid the tailor. */
+  tailor_bill_id?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+declare module './invoice' {
+  interface InvoiceItem {
+    /** RT-C1, catalogue rows: GST by sale value per piece. */
+    gst_band?: PriceBandKind;
+    /** RT-C1, lines: the band that set `tax_rate` and the value per piece it was decided on (snapshot). */
+    band_rate?: BandRate;
+  }
+}
+declare module '../lib/inventory' {
+  interface StockItem {
+    gst_band?: PriceBandKind;
+  }
+}
+
+/* ════════════════════════════════════════ RT-D ════════════════════════════════════════ */
+/** RT-D3: what a buy-back voucher (URD purchase) received. */
+export interface UsedGoods {
+  serial?: string;
+  model?: string;
+  condition?: string;
+  accessories?: string;
+  id_type?: string;
+  id_last4?: string;
+  photo_ref?: string;
+  imei_check_id?: string;
+  /** Stock item the device was taken into (`second_hand`, serial-tracked) and the `'used'` godown. */
+  item_id?: string;
+  godown_id?: string;
+}
+
+/** RT-D1 blocked-IMEI check log (table `imei_checks`, `doc.create`, dated `date`). The app never calls the portal. */
+export interface ImeiCheck {
+  id: string;
+  date: string;
+  imei: string;
+  result: 'clear' | 'blocked';
+  /** Portal reference / request id typed by the user. */
+  portal_ref?: string;
+  /** Screenshot (attachment id). */
+  attachment?: string;
+  by?: string;
+  note?: string;
+  created_at: string;
+}
+
+/** RT-D2 one disbursement from the financier: bank receipt (net) + its fee (subvention / processing, incl. GST). */
+export interface FinanceDisbursement {
+  id: string;
+  date: string;
+  /** Money that reached the bank. */
+  amount: number;
+  /** Subvention + processing fee withheld (incl. GST), billed to us by the financier. */
+  fee: number;
+  method: string;
+  bank_account_id?: string;
+  /** The receipt voucher (Dr bank + Dr financier as creditor | Cr financier as debtor). */
+  voucher_id: string;
+  voucher_number?: string;
+  /** The financier's fee bill (purchase draft, SAC 997119, 18%). */
+  draft_id?: string;
+}
+
+/** RT-D2 consumer-finance deal / DO (table `finance_deals`, `doc.create`, dated `date`). */
+export interface FinanceDeal {
+  id: string;
+  date: string;
+  invoice_id: string;
+  invoice_number: string;
+  customer: string;
+  /** The financier (a client row with `financier: true`) and its name snapshot (its party ledger). */
+  financier_id?: string;
+  financier: string;
+  /** Loan amount = the finance part of the bill (owed by the financier). */
+  loan: number;
+  do_no: string;
+  /** "6/0" no-cost, "9/1" … */
+  scheme?: string;
+  /** Paid by the customer on the bill (the other tenders). */
+  down_payment: number;
+  /** Expected subvention + processing fee (₹, incl. GST). */
+  expected_fee?: number;
+  /** Customer's loan account, last 4 only. */
+  loan_account?: string;
+  /** The receipt row on the customer's bill (into the finance clearing account) and its transfer journal. */
+  transfer_payment_id: string;
+  transfer_voucher_id: string;
+  disbursements: FinanceDisbursement[];
+  created_at: string;
+  updated_at?: string;
+}
+
+/** RT-D4 / SV-D: job status flow. `at_service_centre` = sent to the brand / authorised centre. */
+export type ServiceStatus = 'received' | 'diagnosed' | 'approved' | 'in_repair' | 'at_service_centre' | 'ready' | 'delivered' | 'returned'
+  // R10 SV-D (workshops): additive steps of the same engine (rt-service-jobs `canMove`)
+  | 'estimate_sent' | 'awaiting_parts' | 'awaiting_insurer' | 'quality_check';
+
+/** RT-D4: one part issued on a job (out of stock when billed); `warranty` = replaced free under warranty (no GST). */
+export interface ServicePart {
+  id: string;
+  item_id?: string;
+  name: string;
+  hsn?: string;
+  qty: number;
+  rate: number;
+  tax_rate: number;
+  serials?: string[];
+  warranty?: boolean;
+}
+
+/** RT-D4: warranty claim to the brand / service centre (a vendor). */
+export interface WarrantyClaim {
+  vendor_id?: string;
+  vendor_name: string;
+  claim_no?: string;
+  status: 'sent' | 'approved' | 'rejected' | 'settled';
+  date: string;
+  note?: string;
+}
+
+/**
+ * RT-D4 repair job sheet (table `service_jobs`, `doc.create`, dated `date`, numbered `SVC/FY…`). Generic over the
+ * asset (`kind`: phone, computer, appliance, vehicle, other) so Round 10 SV-D (workshops) can build on it.
+ */
+export interface ServiceJob {
+  id: string;
+  number: string;
+  date: string;
+  kind: import('../lib/retail-rules').RepairKind;
+  customer: string;
+  client_id?: string;
+  phone?: string;
+  /** What came in: model, serial / IMEI (or registration no. for a vehicle), our stock item and sale, if any. */
+  asset: { model: string; serial?: string; item_id?: string; sale_invoice_id?: string; reg_no?: string; odometer?: number };
+  complaint: string;
+  accessories?: string;
+  condition?: string;
+  estimate: number;
+  /** A normal advance receipt (`advances`), adjusted on the bill. */
+  advance_id?: string;
+  status: ServiceStatus;
+  technician?: string;
+  due?: string;
+  /** Warranty status from the serial (`lookupSerial`) when the job was taken, or set by hand. */
+  warranty?: { status: 'none' | 'active' | 'expired'; until?: string };
+  claim?: WarrantyClaim;
+  parts: ServicePart[];
+  /** Labour / service charge (ex-GST). */
+  labour: number;
+  /** SAC override (absent = `REPAIR_SERVICE_RULES` for the kind). */
+  sac?: string;
+  invoice_id?: string;
+  invoice_number?: string;
+  /** Stock journal moves of a warranty unit swap. */
+  swap_move_ids?: string[];
+  /** QA10 R9: billed (local day) — set even when nothing was chargeable (all parts under warranty): billed once only. */
+  billed_on?: string;
+  /** QA10 R9: the warranty part issues `billJob` made (removed with the job, restored with it). */
+  warranty_move_ids?: string[];
+  history: { status: ServiceStatus; date: string }[];
+  created_at: string;
+  updated_at?: string;
+}
+
+declare module './invoice' {
+  interface InvoiceItem {
+    /** RT-D1: IMEI 1 → IMEI 2 pairs of the serials on the line (snapshot). */
+    serial_pairs?: Record<string, string>;
+    /**
+     * RT-D3: margin-scheme resale (Rule 32(5)): the buy-back it was bought on and its value. A margin sale is two lines:
+     * `part: 'cost'` (purchase value, no GST) and `part: 'margin'` (the margin, GST inside it).
+     */
+    margin?: { purchase_id: string; purchase_value: number; part?: 'cost' | 'margin' };
+  }
+  interface Client {
+    /** RT-D2: a consumer-finance company (Bajaj Finserv, HDFC …). */
+    financier?: boolean;
+  }
+}
+declare module './purchases' {
+  interface PurchaseLine {
+    serial_pairs?: Record<string, string>;
+  }
+  interface PurchaseRecord {
+    used_goods?: UsedGoods;
+    /**
+     * QA10 R1/R6/R7: the exchange part of `amount_paid` at the last sync (`syncUrdPaid`, rt-doc-hooks.ts). A URD voucher's
+     * settled amount is derived: cash / bank paid (`amount_paid − exchange_paid`) + its LIVE exchange receipt rows.
+     */
+    exchange_paid?: number;
+    /** QA10 R15: settled in full by this journal / receipt voucher (a financier's withheld fee): never paid again. */
+    settled_by_voucher?: string;
+  }
+}
+declare module '../lib/inventory' {
+  interface StockItem {
+    serial_kind?: 'imei' | 'serial';
+    second_hand?: boolean;
+  }
+}
+
+/* ════════════════════════════════════════ RT-E ════════════════════════════════════════ */
+export type Metal = 'gold' | 'silver' | 'platinum';
+export type MakingBasis = 'per_gram' | 'percent' | 'fixed';
+
+/** RT-E2: jewellery line breakdown (snapshot); `rate` = amount ÷ quantity so calc readers are unchanged. */
+export interface JewelLine {
+  /** Tag no. (= the piece's serial); absent = a loose sale by net weight (quantity = net g). */
+  tag?: string;
+  metal: Metal;
+  /** Purity key: '22K', '18K' … for gold, '925' … for silver / platinum (`rt-jewel-rates.ts` PURITIES). */
+  purity: string;
+  gross_wt: number;
+  stone_wt: number;
+  net_wt: number;
+  /** Sale rate per gram of the bill date (snapshot). */
+  rate: number;
+  wastage_pct: number;
+  /** Wastage in grams instead of % (valued at the rate). */
+  wastage_g?: number;
+  making: { basis: MakingBasis; value: number };
+  stone_value: number;
+  hallmark_charge: number;
+  huid?: string;
+  rate_locked?: boolean;
+  /** The rate was typed by the owner on a day with no rate on the board (audited). */
+  override?: true;
+  /** Job work on the customer's own metal: no metal value; making etc. at the job-work rate (SAC 9988); net wt = memo. */
+  job_work?: true;
+  /** The BIS verification line in force on the bill date (printed under the totals; Reg. 5(11)). */
+  bis?: string;
+}
+/** RT-E3: old metal bought / taken in exchange (URD purchase voucher). */
+export interface OldMetal {
+  metal: Metal;
+  gross_wt: number;
+  stone_wt: number;
+  net_wt: number;
+  /** Touch (purity found by test), %. */
+  purity_pct: number;
+  melt_loss_pct: number;
+  /** Fine weight in 24K grams = net × touch% × (1 − melt%), 3 decimals. */
+  fine_wt: number;
+  /** The buy rate used (24K, or the stated purity's when `basis` is 'purity'). */
+  rate_24k: number;
+  basis?: 'fine' | 'purity';
+  value: number;
+  test_method?: string;
+  /** Customer's PAN / Form 60 / ID snapshot (value ≥ the PAN limit). */
+  kyc?: SaleKyc & { id_type?: string; id_last4?: string };
+  /** Sale invoices this voucher settled by exchange. */
+  settled?: { invoice_id: string; number: string; amount: number; payment_id: string }[];
+}
+
+/** RT-E1 metal rate board row (table `metal_rates`, `master.edit`, dated `date`; append-only — the latest row of a day wins). */
+export interface MetalRate {
+  id: string;
+  date: string;
+  metal: Metal;
+  purity: string;
+  /** Sale rate per gram. */
+  sale: number;
+  /** Buy rate per gram (old metal). */
+  buy: number;
+  created_at: string;
+}
+
+/** RT-E1 tagged piece (table `jewel_tags`, `master.edit`): the tag no. is the serial of its stock item. */
+export interface JewelTag {
+  id: string;
+  tag: string;
+  item_id: string;
+  item_name: string;
+  metal: Metal;
+  purity: string;
+  gross_wt: number;
+  stone_wt: number;
+  net_wt: number;
+  stones?: { type: string; carat?: number; count?: number; value: number }[];
+  stone_value: number;
+  wastage_pct: number;
+  making: { basis: MakingBasis; value: number };
+  hallmark_charge: number;
+  huid?: string;
+  design_no?: string;
+  image?: string;
+  /** The stock move that brought it in (tags added on the desk), when not a bill / karigar receipt. */
+  move_id?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+/** RT-E4 karigar line: weights in grams; fine = net × touch%. */
+export interface KarigarLine {
+  item_id?: string;
+  item_name: string;
+  metal: Metal;
+  purity: string;
+  gross_wt: number;
+  net_wt: number;
+  touch_pct: number;
+  fine_wt: number;
+  pieces?: number;
+}
+/** RT-E4 karigar issue / receipt / metal return (table `karigar_moves`, `books.edit`, numbered `KAR/FY…`, dated `date`). */
+export interface KarigarMove {
+  id: string;
+  number: string;
+  date: string;
+  karigar_id: string;
+  karigar_name: string;
+  kind: 'issue' | 'receipt' | 'return_metal';
+  lines: KarigarLine[];
+  /** Receipt: wastage allowed, % of the fine weight received. */
+  wastage_pct?: number;
+  wastage_fine?: number;
+  /** Receipt: labour charge. */
+  labour?: { basis: 'per_gram' | 'per_piece'; rate: number; amount: number };
+  /** Draft purchase bill (labour) made for a receipt. */
+  bill_draft_id?: string;
+  /** Stock moves written (issue to / receipt from the karigar's wip godown). */
+  move_ids?: string[];
+  /** Tags created on a receipt. */
+  tags?: string[];
+  note?: string;
+  created_at: string;
+}
+declare module './invoice' {
+  interface InvoiceItem {
+    jw?: JewelLine;
+  }
+}
+declare module './purchases' {
+  interface PurchaseRecord {
+    old_metal?: OldMetal;
+  }
+  interface Vendor {
+    /** RT-E4: a karigar (goldsmith job worker): fine-weight metal account. */
+    karigar?: boolean;
+  }
+}
+declare module '../lib/inventory' {
+  interface StockItem {
+    /** RT-E2: lines of this item carry the jewellery breakdown. */
+    jewel?: boolean;
+  }
+}

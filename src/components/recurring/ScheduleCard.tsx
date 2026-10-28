@@ -6,6 +6,7 @@ import {
   type RecurringSchedule,
 } from '../../lib/recurring';
 import { cn, formatCurrency, formatDate, todayInput } from '../../lib/utils';
+import { localDb } from '../../lib/localDb';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './recurring.module.css';
@@ -147,7 +148,8 @@ export function ScheduleCard({
             {recent.map((h) => (
               <li key={`${h.date}-${h.invoice_id}`} className={styles.historyRow}>
                 <span>{formatDate(h.date)}</span>
-                <span className={styles.mono}>{h.invoice_number || '—'}</span>
+                {/* QA-3 F6: a draft is numbered when issued, so read the live number. */}
+                <span className={styles.mono}>{h.invoice_number || localDb.invoices.getById(h.invoice_id)?.invoice_number || recT('unnumbered')}</span>
               </li>
             ))}
           </ul>

@@ -13,11 +13,13 @@
  * does not nag the other.
  */
 
-import { DB_PREFIX, DEVICE_LOCAL_KEYS, SYNC_META_KEYS, subscribeStorageChanges } from './storage';
+import { DB_PREFIX, DEVICE_DRAFT_KEYS, DEVICE_LOCAL_KEYS, SYNC_META_KEYS, subscribeStorageChanges } from './storage';
+import { COMPANY_REGISTRY_KEY, activeCompanyId, readRegistry } from './company-registry';
 
 /** Keys that change often without being shared data (autosave draft, PIN session, bookkeeping). */
 const IGNORED = new Set([
   ...DEVICE_LOCAL_KEYS,
+  ...DEVICE_DRAFT_KEYS, // POS bills on hold (8.21)
   ...SYNC_META_KEYS, // folder-sync bookkeeping; the data keys a sync changes are announced on their own
   ...['draft', 'backup_snooze', 'auto_backup', 'notif_state', 'install_dismissed', 'export_prefs'].map((k) => DB_PREFIX + k),
 ]);
@@ -32,9 +34,12 @@ export function isSharedDataKey(key: string | null): boolean {
   return key.startsWith(DB_PREFIX) && !IGNORED.has(key);
 }
 
+/** QA7 G1: another tab made a different company the active one; this tab still holds its own company's data. */
+export const companyMoved = (): boolean => readRegistry().active !== activeCompanyId();
+
 /** Record an external change (exported for tests; the `storage` listener calls it). */
 export function noteExternalChange(key: string | null, now: number = Date.now()): void {
-  if (!isSharedDataKey(key)) return;
+  if (!isSharedDataKey(key) && !(key === COMPANY_REGISTRY_KEY && companyMoved())) return;
   version++;
   changedAt.set(key ?? '*', now);
   for (const fn of listeners) fn();
@@ -63,6 +68,18 @@ export function initCrossTab(): void {
     if (e.storageArea && typeof localStorage !== 'undefined' && e.storageArea !== localStorage) return;
     noteExternalChange(e.key);
   });
+}
+
+/**
+ * A same-origin BroadcastChannel (8E customer display: the counter tab talks to the display window), or
+ * null where the browser has none. Messages stay inside this browser: nothing is stored or sent out.
+ */
+export function openBroadcast(name: string): BroadcastChannel | null {
+  try {
+    return typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(name);
+  } catch {
+    return null;
+  }
 }
 
 /** Test seam. */

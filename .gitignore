@@ -1,9 +1,11 @@
 # Dependencies
-node_modules/
+node_modules
 
 # Build output
 dist/
 dist-ssr/
+# R16-A: chunk meta for scripts/check-bundle-size.mjs (written by vite-safe-groups.mjs)
+build-meta/
 
 # Environment
 .env

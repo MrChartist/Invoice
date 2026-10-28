@@ -13,8 +13,9 @@
  */
 
 import type { InvoiceItem, InvoiceRecord } from '../types/invoice';
-import { round2, num } from './invoice-calc';
-import { DB_PREFIX, generateId, getJson, getTable, readRaw, setJson, setTable } from './storage';
+import { isExcludedLine, round2, num } from './invoice-calc';
+import { DB_PREFIX, generateId, getJson, getTable, peekTable, setJson, setTable } from './storage';
+import { memoOnReads } from './table-memo';
 import { isVoidStatus, readPurchase, readPurchaseLines } from './purchase-normalize';
 import { toCsv } from './csv';
 import { creditNoteReturnsGoods } from './credit-restock';
@@ -24,10 +25,12 @@ import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
 import { grnCoverage, loadReturnStockDocs, returnStockEvents, type ReturnStockDocs } from './events-returns';
 import { jobWorkStockEvents, loadJobWorkStockDocs, type JobWorkStockDocs } from './events-job-work';
+import { kitStockEvents } from './events-kits';
 import { lineFactor } from './units';
 import { itemVoucherReferences } from './item-references';
+import { applyLandedVouchers, loadLandedVouchers } from './landed-voucher'; // R4-A5
 import type {
-  ManufacturingVoucher, PhysicalStockVoucher, StockJournal, VoucherOutputLine, VoucherStockLine,
+  Bom, ManufacturingVoucher, PhysicalStockVoucher, StockJournal, VoucherOutputLine, VoucherStockLine,
 } from '../types/manufacturing';
 
 /* ── Types ───────────────────────────────────────────────────── */
@@ -53,6 +56,7 @@ export interface StockItem {
   reorder_level: number;
   sale_rate?: number;
   tax_rate?: number;
+  /** Shelf / bin / rack location (8F: printed on pick lists and delivery challans). */
   location?: string;
   created_at?: string;
   /* ── Opt-in tracking (6.6 / 6.11); absent = off ── */
@@ -78,11 +82,25 @@ export interface StockItem {
   /** `stock_groups` row (absent = Primary) and `stock_categories` row (absent = not categorised). */
   group_id?: string;
   category_id?: string;
+  /** Additive (8H catalogue v2): photo as an `asset:<id>` reference (`item-images.ts`). */
+  image?: string;
   /** Alternate units: 1 `unit` = `factor` base units (`src/lib/units.ts`). Lines snapshot `unit_factor`. */
   alt_units?: { unit: string; factor: number }[];
   /** Standard cost and selling price lists, each rate effective from `from` (yyyy-mm-dd) until the next entry. */
   standard_costs?: { from: string; rate: number }[];
   selling_prices?: { from: string; rate: number }[];
+  /* ── 8F (docs/features/distribution.md, inventory.md); absent = none ── */
+  /** Salt / composition (pharma), e.g. "Paracetamol 500mg": the editor and POS find substitutes by it. */
+  salt?: string;
+  /** Variant child: the parent (template) item id; `variant_attrs` holds its values, e.g. {Size: 'L', Colour: 'Red'}. */
+  variant_of?: string;
+  variant_attrs?: Record<string, string>;
+  /** Variant parent: the attribute grid the children were generated from. */
+  variant_axes?: { name: string; values: string[] }[];
+  /** Kit: sold as one line; its default BOM's components leave stock on the sale (`events-kits.ts`). Not stocked itself. */
+  kit?: boolean;
+  /** Bin / rack per batch (key: batch number, upper case); the item's own bin is `location`. */
+  batch_bins?: Record<string, string>;
 }
 
 export interface StockMove {
@@ -232,6 +250,8 @@ export interface StockInputs {
   vouchers?: StockVoucherInput[];
   /** 7M event source (events-job-work.ts): Material Out / In with job workers, Rejections In. */
   jobWorkDocs?: JobWorkStockDocs;
+  /** 8.85: BOMs, read for kit items (`events-kits.ts`): a kit sale issues its components. */
+  kitBoms?: Bom[];
 }
 
 /**
@@ -474,9 +494,13 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     if (!effect) continue;
     // A discount / rate-difference / GST-correction credit note brings no goods back.
     if (effect === 'in' && !creditNoteReturnsGoods(inv, input.links)) continue;
+    const ag = (inv as { ag?: { kind?: string; milk?: unknown } }).ag;
+    if (ag?.kind === 'milk_sale' && ag.milk) continue; // QA13 G4: a milk dispatch bill — the dispatch's stock journal took the milk out
     const date = dayOf(inv.issue_date);
     const clientName = inv.client?.name ? ` · ${inv.client.name}` : '';
     for (const line of inv.items ?? []) {
+      if (isExcludedLine(line)) continue; // QA5-2 F10: an unselected optional / alternative line is not supplied
+      if ((line as { arrival_id?: string }).arrival_id) continue; // R8-C (TR-C1): agency line — the principal's goods, never our stock
       const it = index.find(line.name, line.hsn);
       const factor = lineFactor(line); // WP-8: a line typed in an alternate unit (2 BOX = 24 NOS)
       const q = num(line.quantity) * factor;
@@ -523,6 +547,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     // expenses (rent, fees ...) never move stock.
     const bill = readPurchase(p);
     if (!bill || isVoidStatus(bill.status) || bill.isExpense) continue;
+    if ((p as { ag?: { stock_by_shift?: boolean } }).ag?.stock_by_shift) continue; // AG-B2: milk entered stock per closed shift (AG28)
     for (const line of readPurchaseLines(p)) {
       // WP-8: the picked stock item (`item_id`) first, name + HSN for older lines; quantity in base units.
       const byItemId = line.itemId ? byId.get(line.itemId) : undefined;
@@ -542,7 +567,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
         batch: line.batchNo || undefined,
         mfg: line.mfgDate || undefined,
         expiry: line.expiryDate || undefined,
-        mrp: line.mrp || undefined,
+        mrp: line.mrp ? line.mrp / line.unitFactor : undefined, // QA10 R11: typed per line unit (strip), kept per base unit
         serials: line.serials.length ? line.serials : undefined,
         refNumber: bill.number,
         party: bill.partyName,
@@ -555,6 +580,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     return it?.track_stock ? it : undefined;
   });
   pushVoucherEvents(input.vouchers ?? [], byId, push);
+  kitStockEvents(invoices, items, input.kitBoms, (d) => ((excludeInvoiceId && d.id === excludeInvoiceId) || (d.id && fromChallan.has(d.id)) ? null : ((e) => (e === 'in' && !creditNoteReturnsGoods(d, input.links) ? null : e))(invoiceEffect(d.doc_type, d.status, includeChallans))), push); // 8.85 kits
   jobWorkStockEvents(input.jobWorkDocs, { byId: (id) => (byId.get(id)?.track_stock ? byId.get(id) : undefined), index, invoices, links: input.links, includeChallans, includeTransfers: !!input.includeTransfers }, push); // 7M event source
 
   if (input.includeTransfers) {
@@ -616,7 +642,7 @@ function pushVoucherEvents(vouchers: readonly StockVoucherInput[], byId: Map<str
       if (!tracked(l.item_id) || q <= 0) continue;
       push(l.item_id, {
         ...base, kind: 'consumption', qty: -q, particulars: `${label} (consumed)`, voucher: v.id,
-        godown: l.godown_id, batch: l.batch_no || undefined,
+        godown: l.godown_id, batch: l.batch_no || undefined, serials: cleanSerials(l.serials), // 7S: serial items
       });
     }
     const produce = v.produce.filter((l) => tracked(l.item_id) && num(l.qty) > 0);
@@ -628,6 +654,7 @@ function pushVoucherEvents(vouchers: readonly StockVoucherInput[], byId: Map<str
         ...base, kind: 'production', qty: num(l.qty), particulars: `${label} (produced)`, voucher: v.id,
         rate: shares[i] === undefined ? num(l.rate) : undefined, share: shares[i], pool,
         godown: l.godown_id, batch: l.batch_no || undefined, mfg: l.mfg_date || undefined, expiry: l.expiry_date || undefined,
+        serials: cleanSerials(l.serials), // 7S
       });
     });
     for (const a of v.adjust ?? []) {
@@ -1116,7 +1143,7 @@ export function shortfallsFor(
 }
 
 /** `shortfallsFor` over positions already computed without the document. */
-export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, positions: StockPosition[]): StockShortfall[] {
+export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, positions: StockPosition[], held?: HeldStock): StockShortfall[] {
   const index = buildItemIndex(positions.map((p) => p.item).filter((i) => i.track_stock));
   const byId = new Map(positions.map((p) => [p.item.id, p]));
   const wanted = new Map<string, number>();
@@ -1129,7 +1156,7 @@ export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, posit
   for (const [id, requested] of wanted) {
     const p = byId.get(id);
     if (!p) continue;
-    const available = Math.max(p.qty, 0);
+    const available = Math.max(p.qty - (held?.get(id) ?? 0), 0);
     if (requested > available + EPS) {
       out.push({
         itemId: id, name: p.item.name, unit: p.item.unit, requested: roundQty(requested),
@@ -1197,7 +1224,7 @@ export function stockVoucherInputs(
       id: m.id, number: m.number ?? '', date: m.date, type: 'manufacturing',
       consume: (m.components ?? []).map(baseLine),
       produce: [
-        { id: `${m.id}:main`, item_id: m.item_id, qty: num(m.qty), godown_id: m.godown_id, batch_no: m.batch_no, mfg_date: m.mfg_date, expiry_date: m.expiry_date },
+        { id: `${m.id}:main`, item_id: m.item_id, qty: num(m.qty), godown_id: m.godown_id, batch_no: m.batch_no, mfg_date: m.mfg_date, expiry_date: m.expiry_date, serials: m.serials },
         ...(m.outputs ?? []).map(baseLine),
       ],
       ...extraOf(m.costs),
@@ -1317,16 +1344,27 @@ export function blankStockItem(partial: Partial<StockItem> = {}): StockItem {
 
 export function liveInputs(): StockInputs {
   const settings = loadSettings();
+  const items = stockDb.items();
+  let purchases = getTable<PurchaseLike>('purchases');
+  let returnDocs = loadReturnStockDocs();
+  // R4-A5: landed-cost vouchers restate the target bills' / GRNs' stock cost from their receipt date (engine copies only).
+  const lcv = loadLandedVouchers();
+  if (lcv.length) {
+    const applied = applyLandedVouchers(lcv, purchases, returnDocs.receipts, items);
+    purchases = applied.purchases;
+    returnDocs = { ...returnDocs, receipts: applied.receipts };
+  }
   return {
-    items: stockDb.items(),
+    items,
     moves: stockDb.moves(),
     invoices: getTable<InvoiceRecord>('invoices'),
-    purchases: getTable<PurchaseLike>('purchases'),
+    purchases,
     method: settings.method,
     includeChallans: settings.includeChallans,
     links: getTable<{ from_id: string; to_id: string; relation: string; reason?: string }>('doc_links'),
-    returnDocs: loadReturnStockDocs(),
+    returnDocs,
     jobWorkDocs: loadJobWorkStockDocs(),
+    kitBoms: getTable<Bom>(VOUCHER_TABLES.boms),
     vouchers: stockVoucherInputs(
       getTable<ManufacturingVoucher>(VOUCHER_TABLES.manufacturing),
       getTable<StockJournal>(VOUCHER_TABLES.stockJournals),
@@ -1335,8 +1373,12 @@ export function liveInputs(): StockInputs {
   };
 }
 
-/** Load everything from localStorage and compute positions. */
+/**
+ * Load everything from storage and compute positions. Without overrides the result is memoised on
+ * every key the engine read (PERF-1) and SHARED: read-only (pass overrides for a private copy).
+ */
 export function loadPositions(overrides: Partial<StockInputs> = {}): StockPosition[] {
+  if (Object.keys(overrides).length === 0) return memoOnReads('inventory:positions', () => computeStock(liveInputs()));
   return computeStock({ ...liveInputs(), ...overrides });
 }
 
@@ -1348,23 +1390,32 @@ export interface StockLevel {
   value: number;
   reorderLevel: number;
   status: StockStatus;
+  /** QA5-2 F9: quantity held in non-saleable godowns (QC hold, expiry …), already taken off `qty`. */
+  held?: number;
 }
 
-/** Find a level in a pre-computed list (use this in loops instead of getStockLevel). */
-export function findLevel(positions: StockPosition[], itemName: string, hsn?: string): StockLevel | null {
+/** Item id → quantity held in non-saleable godowns (`liveHeldStock` in stock-tracking.ts). */
+export type HeldStock = ReadonlyMap<string, number>;
+
+/**
+ * Find a level in a pre-computed list (use this in loops instead of getStockLevel). With `held`, `qty` is
+ * what is available to sell (QA5-2 F9: stock in QC hold / expiry / transit godowns is not).
+ */
+export function findLevel(positions: StockPosition[], itemName: string, hsn?: string, held?: HeldStock): StockLevel | null {
   const it = buildItemIndex(positions.map((p) => p.item).filter((i) => i.track_stock)).find(itemName, hsn);
   const p = it && positions.find((x) => x.item.id === it.id);
   if (!p) return null;
+  const h = held?.get(p.item.id) ?? 0;
   return {
-    itemId: p.item.id, qty: p.qty, unit: p.item.unit, avgCost: p.avgCost, value: p.value,
-    reorderLevel: num(p.item.reorder_level), status: p.status,
+    itemId: p.item.id, qty: h ? roundQty(p.qty - h) : p.qty, unit: p.item.unit, avgCost: p.avgCost, value: p.value,
+    reorderLevel: num(p.item.reorder_level), status: p.status, ...(h ? { held: h } : {}),
   };
 }
 
-/** Current stock level for an item name (null when not a tracked stock item). */
-export function getStockLevel(itemName: string, hsn?: string): StockLevel | null {
+/** Current stock level for an item name (null when not a tracked stock item); `held` as in `findLevel`. */
+export function getStockLevel(itemName: string, hsn?: string, held?: HeldStock): StockLevel | null {
   try {
-    return findLevel(loadPositions(), itemName, hsn);
+    return findLevel(loadPositions(), itemName, hsn, held);
   } catch {
     return null;
   }
@@ -1380,20 +1431,9 @@ export function lowStockCount(): number {
 }
 
 /** Positions without one document, re-computed only when a stock input changed (the editor asks per keystroke). */
-let positionsCache: { key: (string | null)[]; positions: StockPosition[] } | null = null;
-
 function cachedPositionsWithout(docId: string | undefined): StockPosition[] {
-  const key = [
-    docId ?? '',
-    ...['invoices', 'purchases', TABLES.items, TABLES.moves, 'doc_links', 'job_work_in', 'rejections_in'].map((t) => readRaw(DB_PREFIX + t)),
-    readRaw(SETTINGS_KEY),
-  ];
-  if (positionsCache && positionsCache.key.length === key.length && positionsCache.key.every((k, i) => k === key[i])) {
-    return positionsCache.positions;
-  }
-  const positions = computeStock({ ...liveInputs(), excludeInvoiceId: docId });
-  positionsCache = { key, positions };
-  return positions;
+  // Memoised on every key `liveInputs` read (PERF-1), so no stock input can be missed; shared, read-only.
+  return memoOnReads('inventory:positionsWithout', () => computeStock({ ...liveInputs(), excludeInvoiceId: docId }), docId ?? '');
 }
 
 /**
@@ -1403,15 +1443,17 @@ function cachedPositionsWithout(docId: string | undefined): StockPosition[] {
  */
 export function stockWarningForInvoice(
   invoice: Pick<InvoiceRecord, 'doc_type' | 'items'> & Partial<Pick<InvoiceRecord, 'id'>>,
+  held?: HeldStock,
 ): StockShortfall[] {
   try {
     if (invoiceEffect(invoice.doc_type, 'Sent', true) !== 'out') return [];
-    const tracked = stockDb.items().filter((i) => i.track_stock);
+    // Read-only view: the stock master is parsed once per stored version, not on every keystroke.
+    const tracked = peekTable<StockItem>(TABLES.items).filter((i) => i.track_stock);
     if (!tracked.length) return [];
     const index = buildItemIndex(tracked);
     if (!(invoice.items ?? []).some((l) => num(l.quantity) > 0 && index.find(l.name, l.hsn))) return [];
     if (invoice.doc_type === 'DELIVERY_CHALLAN' && !loadSettings().includeChallans) return [];
-    return shortfallsFromPositions(invoice, cachedPositionsWithout(invoice.id));
+    return shortfallsFromPositions(invoice, cachedPositionsWithout(invoice.id), held);
   } catch {
     return [];
   }

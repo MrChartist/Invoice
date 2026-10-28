@@ -1,0 +1,62 @@
+/* R2-B4 contact persons / address book editors (tokens only). */
+
+.block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+  padding-bottom: 0.625rem;
+  border-bottom: 1px dashed var(--border);
+}
+
+.row:last-of-type {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.flags {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+.flags label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.removeBtn {
+  margin-left: auto;
+}
+
+.empty {
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+  margin: 0;
+}

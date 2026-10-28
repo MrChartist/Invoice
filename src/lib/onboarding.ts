@@ -8,7 +8,8 @@ import type { SenderProfile } from '../types/invoice';
 import { checkGstin } from './gstin';
 import { isValidIfsc, isValidUpi } from './validators';
 
-export const WIZARD_STEPS = ['business', 'gst', 'payment', 'look'] as const;
+/** `start` (8H): language + "What do you do?" (business type, applied with `shop-presets.ts`). */
+export const WIZARD_STEPS = ['start', 'business', 'gst', 'payment', 'look'] as const;
 export type WizardStep = (typeof WIZARD_STEPS)[number];
 
 export interface WizardAnswers {
@@ -19,6 +20,8 @@ export interface WizardAnswers {
   companyPhone: string;
   companyEmail: string;
   gstRegistered: boolean;
+  /** 8H: registered under the composition scheme — issues Bills of Supply (no tax). */
+  composition?: boolean;
   companyGstin: string;
   /** Used when not GST-registered (with a GSTIN, the state comes from it). */
   stateCode: string;
@@ -40,6 +43,7 @@ export function answersFrom(profile: SenderProfile | null, templateId: string): 
     companyPhone: profile?.companyPhone ?? '',
     companyEmail: profile?.companyEmail ?? '',
     gstRegistered: Boolean(profile?.companyGstin),
+    composition: profile?.gst_scheme === 'composition',
     companyGstin: profile?.companyGstin ?? '',
     stateCode: profile?.stateCode ?? '',
     upiId: profile?.upiId ?? '',
@@ -71,6 +75,7 @@ export function stepProblem(step: WizardStep, a: WizardAnswers): string {
       if (a.ifsc && !isValidIfsc(a.ifsc)) return 'The IFSC code should look like HDFC0001234.';
       if (a.accountNumber && !/^\d{6,18}$/.test(a.accountNumber.replace(/\s/g, ''))) return 'An account number has 6 to 18 digits.';
       return '';
+    case 'start':
     case 'look':
       return '';
   }
@@ -95,10 +100,24 @@ export function applyAnswers(settings: AppSettings, a: WizardAnswers): AppSettin
     accountNumber: a.accountNumber.replace(/\s/g, ''),
     ifsc: a.ifsc.trim().toUpperCase(),
     ...(a.logo !== undefined ? { logo: a.logo } : {}),
+    // 8H: a composition dealer's new invoices default to a Bill of Supply (the editor switches on gst_scheme).
+    ...(gstin && a.composition ? { gst_scheme: 'composition' as const } : {}),
   };
   const activeId = settings.activeProfileId || settings.profiles[0]?.id;
   const profiles = settings.profiles.map((p) => (p.id === activeId ? { ...p, ...patch } : p));
-  return { ...settings, profiles, onboarded: true };
+  const frequency = gstin && a.composition ? 'composition' : settings.gst_filing_frequency === 'composition' ? undefined : settings.gst_filing_frequency;
+  return { ...settings, profiles, onboarded: true, gst_filing_frequency: frequency };
+}
+
+/**
+ * What the wizard keeps when the user leaves it for the Demo company (QA-3 F20): everything typed so far goes into the
+ * active profile, but the account is NOT marked as set up, so the wizard opens again (prefilled) back in this company.
+ * Returns null when nothing was typed (no write needed).
+ */
+export function wizardDraft(settings: AppSettings, a: WizardAnswers): AppSettings | null {
+  const typed = [a.companyName, a.companyAddress, a.city, a.pin, a.companyPhone, a.companyEmail, a.companyGstin, a.upiId, a.bankName, a.accountNumber, a.ifsc].some((v) => String(v ?? '').trim());
+  if (!typed && !a.logo) return null;
+  return { ...applyAnswers(settings, a), onboarded: settings.onboarded };
 }
 
 /** Show the wizard only to a brand-new account: not set up, no invoices yet. */

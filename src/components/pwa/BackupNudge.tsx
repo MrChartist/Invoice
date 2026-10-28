@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { ShieldAlert, X } from 'lucide-react';
-import { getLastBackup, getSnooze, hasBackupWorthyData, shouldNudge, snoozeNudge } from '../../lib/auto-backup-schedule';
+import { getLastBackup, getSnooze, hasBackupWorthyData, neverBackedUp, shouldNudge, snoozeNudge } from '../../lib/auto-backup-schedule';
 // The backup builder / folder writer loads only when the user acts on the nudge.
 import type { BackupResult } from '../../lib/auto-backup';
 import { useT } from '../../i18n';
 import { pwaT } from '../../i18n/areas/pwa';
 import controls from '../../styles/controls.module.css';
 import styles from './Pwa.module.css';
+
+// 8.20: phones cannot write folder backups — their nudge (10 new documents or 3 days → Share backup) is a lazy chunk.
+const PhoneBackupNudge = lazy(() => import('./PhoneBackupNudge').then((m) => ({ default: m.PhoneBackupNudge })));
 
 export interface BackupNudgeProps {
   /** Optional hook so the host can show its own toast, e.g. notify(msg, tone). */
@@ -22,8 +25,14 @@ function due(): boolean {
   });
 }
 
+export function BackupNudge(props: BackupNudgeProps) {
+  return typeof window !== 'undefined' && !('showDirectoryPicker' in window)
+    ? <Suspense fallback={null}><PhoneBackupNudge /></Suspense>
+    : <FolderBackupNudge {...props} />;
+}
+
 /** Non-blocking banner: shown when data exists and the last backup is over 7 days old. */
-export function BackupNudge({ onResult }: BackupNudgeProps) {
+function FolderBackupNudge({ onResult }: BackupNudgeProps) {
   useT(); // re-render on a language switch (5.4)
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -62,7 +71,7 @@ export function BackupNudge({ onResult }: BackupNudgeProps) {
         </span>
         <div className={styles.text}>
           <p className={styles.title}>{pwaT('backupTitle')}</p>
-          <p className={styles.desc}>{pwaT('backupDesc')}</p>
+          <p className={styles.desc}>{pwaT(neverBackedUp(getLastBackup()) ? 'backupDescNever' : 'backupDesc')}</p>
           <div className={styles.actions}>
             <button
               type="button"

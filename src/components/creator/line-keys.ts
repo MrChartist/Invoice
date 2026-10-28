@@ -4,7 +4,11 @@
  *  - Enter in the LAST field of a line  -> next line's first field (a new line when it was the last line)
  *  - Alt+↑ / Alt+↓                      -> move the current line up / down
  *  - Ctrl/⌘+Enter                       -> save (handled by the page, not here)
+ *  - Alt+R                              -> repeat the party's last bill (R3-B6, new documents only)
  */
+
+import type { Suggestion } from '../../lib/suggest';
+import { findByShortCode } from '../../lib/scan';
 
 export interface KeyLike {
   key: string;
@@ -36,7 +40,23 @@ export function lineKeyAction(e: KeyLike, ctx: LineKeyContext): LineKeyAction {
   return null;
 }
 
+/** R3-B6: Alt+R repeats the picked party's last bill (handled by PartyHabitsStrip). */
+export function isRepeatShortcut(e: KeyLike): boolean {
+  return Boolean(e.altKey) && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.key === 'r' || e.key === 'R' || e.key === '®');
+}
+
 /** Ctrl/⌘+Enter anywhere on the page means "save". */
 export function isSaveShortcut(e: KeyLike): boolean {
   return e.key === 'Enter' && Boolean(e.ctrlKey || e.metaKey) && !e.altKey;
+}
+
+/**
+ * 8E (8.141): an item whose short code is exactly what was typed in the item name ("SB") goes to the top
+ * of the suggestions, marked `exact` so Enter picks it.
+ */
+export function shortCodeFirst<T extends { name: string; short_code?: string }>(query: string, rows: readonly T[], list: Suggestion<T>[]): Suggestion<T>[] {
+  const hit = findByShortCode(query.trim(), rows);
+  if (!hit) return list;
+  const top = list.find((s) => s.row === hit);
+  return [{ ...(top ?? { row: hit, label: hit.name, score: 0 }), exact: true }, ...list.filter((s) => s.row !== hit)];
 }

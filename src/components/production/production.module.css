@@ -1,0 +1,148 @@
+/* Production, costing & traceability (R4-A). Tokens only; the manufacturing module supplies grids and bars. */
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card-inner);
+}
+
+.detailHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.detailTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 700;
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.status {
+  display: inline-block;
+  padding: 0.0625rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.planned { background: var(--muted); color: var(--muted-foreground); }
+.released { background: var(--brand-soft); color: var(--brand-text); }
+.in_progress { background: var(--brand-soft); color: var(--brand-strong); }
+.completed { background: var(--secondary); color: var(--profit); }
+.closed { background: var(--secondary); color: var(--foreground); }
+.cancelled { background: var(--muted); color: var(--loss); text-decoration: line-through; }
+
+.over { color: var(--warning); font-weight: 600; }
+.adverse { color: var(--loss); }
+.favourable { color: var(--profit); }
+
+.panel {
+  padding: 0.75rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.inline > * {
+  min-width: 0;
+}
+
+.log {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+
+.tree {
+  margin: 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+  font-size: var(--text-base);
+}
+.tree .tree {
+  margin-top: 0.25rem;
+}
+.tree li {
+  margin: 0.2rem 0;
+}
+
+.mixed {
+  display: inline-block;
+  margin-left: 0.375rem;
+  padding: 0 0.375rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  background: var(--warning);
+  color: var(--foreground);
+}
+
+.paper {
+  /* Printed paper: always ink on white, whatever the theme (local paper tokens, as the statement paper does). */
+  --paper-ink: #16181d;
+  --paper-line: #dcdfe4;
+  --paper-bg: #ffffff;
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 794px;
+  padding: 48px;
+  background: var(--paper-bg);
+  color: var(--paper-ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.paper h2 {
+  font-family: var(--font-display);
+  margin: 0 0 0.5rem;
+}
+.paper table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+}
+.paper th,
+.paper td {
+  border: 1px solid var(--paper-line);
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+@media (max-width: 640px) {
+  .detail {
+    padding: 0.75rem;
+  }
+}

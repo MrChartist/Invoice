@@ -25,9 +25,13 @@ import { isoDay } from './dates';
 import { num, round2 } from './invoice-calc';
 import { assertUnlocked } from './period-lock';
 import { readPurchase, isVoidStatus } from './purchase-normalize';
-import { generateId, getTable, setTable } from './storage';
+import { DB_PREFIX, generateId, getJson, getTable, setTable } from './storage';
+import { buyer194q } from './trade/tr-statutory'; // R8-C (TR-C2)
+import type { TdsSettings } from '../types/trade-r8';
 import { ruleAt } from './tax-rules';
 import {
+  TDS_194C6_RULES,
+  TDS_194O_RULES,
   TDS_206AB_RULES,
   TDS_NO_PAN_RULES,
   payableSection,
@@ -129,6 +133,19 @@ export interface Payee {
   lowerLimit?: number;
   /** Credits already covered by this certificate (₹, same FY) — from `certificateUsed`. */
   lowerUsed?: number;
+  /** Additive (R5-B3): Sec 194C(6) declaration of a transporter (vendor master `transporter_194c6`). */
+  transporter194c6?: { declared_on?: string; vehicles_owned?: number; pan?: string };
+}
+
+/**
+ * R5-B3: Sec 194C(6) — a transporter who declared ≤ the date-keyed number of goods carriages (10) with a valid PAN
+ * suffers no 194C deduction; 26Q reason `T`. Unverified — verify with your CA.
+ */
+export function transporter194c6Exempt(code: string, date: string, payee: Payee): boolean {
+  const d = payee.transporter194c6;
+  const rule = ruleAt(TDS_194C6_RULES, date);
+  if (!d || !rule || !code.startsWith('194C')) return false;
+  return isValidPan(d.pan || payee.pan) && num(d.vehicles_owned) >= 0 && num(d.vehicles_owned) <= rule.maxVehicles && !!d.declared_on && d.declared_on <= date;
 }
 
 /** Is the Sec 197 certificate in force on `date` (number present, inside its validity)? */
@@ -174,7 +191,9 @@ export function tdsRateFor(code: string, date: string, payee: Payee = {}): TdsRa
   const sec = payableSection(code)?.section ?? code;
   if (!panValid) {
     const r = ruleAt(TDS_NO_PAN_RULES, date);
-    const floor = r.overrides[sec] ?? r.rate;
+    // 7R (7.120): 194-O without PAN / Aadhaar — 5% instead of 20% (TDS_194O_RULES, unverified).
+    const o194 = sec === '194-O' ? ruleAt(TDS_194O_RULES, date) : null;
+    const floor = o194 ? o194.noPanRate : r.overrides[sec] ?? r.rate;
     if (floor > rate) {
       rate = floor;
       reason = 'C';
@@ -247,9 +266,16 @@ export interface ThresholdResult {
  * Single and aggregate (same payee, same Indian FY, same section family) threshold check for a new
  * credit of `base` on `date`. 194Q: only the part above ₹50 lakh is taxed.
  */
-export function thresholdCheck(code: string, date: string, base: number, prior: readonly PriorCredit[], excludeId?: string): ThresholdResult {
+export function thresholdCheck(code: string, date: string, base: number, prior: readonly PriorCredit[], excludeId?: string, payee?: Payee): ThresholdResult {
   const family = payableSection(code)?.family ?? code;
-  const th = tdsThreshold(family, date);
+  let th = tdsThreshold(family, date);
+  // 7R (7.120): 194-O — no TDS while an individual / HUF participant who furnished a PAN stays within ₹5 lakh
+  // gross in the FY (Sec 194-O(2)); crossing it brings the whole FY amount in (catch-up). Unverified.
+  if (family === '194O' && payee) {
+    const o = ruleAt(TDS_194O_RULES, date);
+    const type = payee.deducteeType ?? deducteeTypeFromPan(payee.pan);
+    if (o && isValidPan(payee.pan) && (type === 'INDIVIDUAL' || type === 'HUF')) th = { aggregate: o.individualExemption };
+  }
   const amt = round2(Math.max(num(base), 0));
   const fq = fyQuarterOf(date);
   const same = prior.filter((p) => {
@@ -298,17 +324,30 @@ export interface TdsSuggestion {
   rate: number;
   base: number;
   amount: number;
-  reason: '' | 'A' | 'C' | 'Y';
+  /** 'T' (R5-B3): no deduction under a Sec 194C(6) transporter declaration. */
+  reason: '' | 'A' | 'C' | 'Y' | 'T';
   deducteeType: DeducteeType;
   notes: string[];
   threshold: ThresholdResult;
+  /** R8-C (TR-C2): the section does not apply to us at all (194Q under the buyer's ₹10 crore test): nothing is saved. */
+  refused?: boolean;
 }
+
+/** R8-C (TR-C2): company TDS settings (object `tds_settings`, additive). */
+export const TDS_SETTINGS_KEY = `${DB_PREFIX}tds_settings`;
+export const readTdsSettings = (): TdsSettings => getJson<TdsSettings>(TDS_SETTINGS_KEY, {}) ?? {};
 
 /** Everything the bill form shows: rate after 206AA / 206AB / 197, threshold, base and amount. */
 export function suggestTds(code: string, date: string, base: number, payee: Payee, prior: readonly PriorCredit[], excludeId?: string): TdsSuggestion | null {
   const r = tdsRateFor(code, date, payee);
   if (!r) return null;
-  const t = thresholdCheck(code, date, base, prior, excludeId);
+  const t = thresholdCheck(code, date, base, prior, excludeId, payee);
+  // R5-B3: 194C(6) declaration → nil TDS with reason T (one guarded branch).
+  if (transporter194c6Exempt(code, date, payee)) return { applies: false, code, rate: 0, base: round2(Math.max(num(base), 0)), amount: 0, reason: 'T', deducteeType: r.deducteeType, notes: ['No TDS: Sec 194C(6) declaration (≤ 10 goods carriages, PAN furnished).'], threshold: t };
+  // R8-C (TR-C2): 194Q binds only a buyer whose turnover of the preceding FY was above ₹10 crore (`tds_settings`).
+  const q = (payableSection(code)?.family ?? code) === '194Q' ? buyer194q(date, readTdsSettings().turnover_by_fy) : null;
+  if (q?.status === 'below') return { applies: false, code, rate: 0, base: round2(Math.max(num(base), 0)), amount: 0, reason: '', deducteeType: r.deducteeType, notes: [q.message], threshold: t, refused: true };
+  if (q?.status === 'unknown') r.notes.push(q.message);
   let amount = t.applies ? roundTds((t.taxableBase * r.rate) / 100) : 0;
   let rate = r.rate;
   // 7O (7.95): a Sec 197 certificate covers credits only up to its limit; the excess is taxed at the normal
@@ -349,6 +388,8 @@ export interface BillTdsInput {
   rate?: number;
   base?: number;
   amount?: number;
+  /** Additive (R5-B3): the vendor's Sec 194C(6) declaration. */
+  transporter194c6?: Payee['transporter194c6'];
 }
 
 export type BillTdsFields = Pick<PurchaseRecordTds, 'tds_section' | 'tds_rate' | 'tds_base' | 'tds_amount' | 'tds_on' | 'tds_pan' | 'tds_deductee_type' | 'tds_reason' | 'tds_cert_no'>;
@@ -375,8 +416,10 @@ export function resolveBillTds(v: BillTdsInput, ctx: { date: string; taxable: nu
   if (!v.section) return { suggestion: null, fields: NO_TDS };
   const pan = v.pan.trim().toUpperCase();
   const lowerUsed = v.lowerCert?.trim() ? certificateUsed(ctx.prior, v.lowerCert, ctx.date, ctx.excludeId) : 0;
-  const suggestion = suggestTds(v.section, ctx.date, ctx.taxable, { pan, nonFiler: v.nonFiler, lowerCert: v.lowerCert, lowerRate: v.lowerRate, lowerFrom: v.lowerFrom, lowerTo: v.lowerTo, lowerLimit: v.lowerLimit, lowerUsed }, ctx.prior, ctx.excludeId);
-  if (!suggestion) return { suggestion: null, fields: NO_TDS };
+  const suggestion = suggestTds(v.section, ctx.date, ctx.taxable, { pan, nonFiler: v.nonFiler, lowerCert: v.lowerCert, lowerRate: v.lowerRate, lowerFrom: v.lowerFrom, lowerTo: v.lowerTo, lowerLimit: v.lowerLimit, lowerUsed, transporter194c6: v.transporter194c6 }, ctx.prior, ctx.excludeId);
+  if (!suggestion || suggestion.refused) return { suggestion, fields: NO_TDS }; // R8-C: 194Q refused below ₹10 crore
+  // R5-B3: a 194C(6) nil deduction is kept on the bill (reason T) so the 26Q paper reports it.
+  if (suggestion.reason === 'T' && !(num(v.rate) > 0) && !(num(v.amount) > 0)) return { suggestion, fields: { ...NO_TDS, tds_section: v.section, tds_rate: 0, tds_base: suggestion.base, tds_amount: 0, tds_on: v.on, tds_pan: pan || undefined, tds_deductee_type: suggestion.deducteeType, tds_reason: 'T' } };
   const rate = v.rate ?? suggestion.rate;
   const base = v.base ?? suggestion.base;
   const amount = v.amount ?? (v.rate !== undefined || v.base !== undefined ? roundTds((base * rate) / 100) : suggestion.amount);
@@ -394,6 +437,43 @@ export function resolveBillTds(v: BillTdsInput, ctx: { date: string; taxable: nu
       tds_reason: (v.rate === undefined && suggestion.reason !== 'Y' ? suggestion.reason : '') || undefined,
       tds_cert_no: v.lowerCert?.trim() || undefined,
     },
+  };
+}
+
+/** The vendor-master fields the bill / expense form's TDS block starts from. */
+export interface VendorTdsSource {
+  pan?: string;
+  tds_section?: string;
+  tds_non_filer?: boolean;
+  tds_lower_cert?: string;
+  tds_lower_rate?: number;
+  tds_lower_from?: string;
+  tds_lower_to?: string;
+  tds_lower_limit?: number;
+  transporter_194c6?: Payee['transporter194c6'];
+}
+
+/**
+ * The TDS block of the bill / expense form for a stored bill (or a new one) and its vendor. A stored rate / base /
+ * amount is kept as typed, except for a Sec 194C(6) nil deduction (reason `T`, R5-B3): that one keeps following the
+ * declaration — the vendor's, or (when the vendor master lost it) the one the bill was saved under — so an edit keeps
+ * reason `T` and nil TDS.
+ */
+export function billTdsInputFor(p: (Partial<PurchaseRecordTds> & { date?: string }) | null | undefined, v?: VendorTdsSource): BillTdsInput {
+  const nilT = p?.tds_reason === 'T';
+  const decl = v?.transporter_194c6 ?? (nilT && p?.date ? { declared_on: p.date, vehicles_owned: 0, pan: p.tds_pan || v?.pan } : undefined);
+  return {
+    section: p?.tds_section ?? '',
+    on: p?.tds_on ?? 'BILL',
+    pan: p?.tds_pan ?? v?.pan ?? '',
+    lowerCert: p?.tds_cert_no ?? v?.tds_lower_cert,
+    lowerRate: v?.tds_lower_rate,
+    lowerFrom: v?.tds_lower_from,
+    lowerTo: v?.tds_lower_to,
+    lowerLimit: v?.tds_lower_limit,
+    nonFiler: v?.tds_non_filer,
+    ...(decl ? { transporter194c6: decl } : {}),
+    ...(p?.tds_section && !nilT ? { rate: p.tds_rate, base: p.tds_base, amount: p.tds_amount } : {}),
   };
 }
 
@@ -436,6 +516,19 @@ export interface VendorTdsFields {
   tds_lower_from?: string;
   tds_lower_to?: string;
   non_resident?: boolean;
+  /**
+   * Additive (7R, 7.120) — non-resident payee details for Form 27Q / DTAA: country of residence, tax identification
+   * number there, Tax Residency Certificate number and validity end, Form 10F furnished, no PE in India declared,
+   * DTAA rate (%) and article. The DTAA rate applies only with a TRC in force and Form 10F (Sec 90(4) / 90(5)).
+   */
+  nr_country?: string;
+  nr_tin?: string;
+  nr_trc_no?: string;
+  nr_trc_to?: string;
+  nr_form10f?: boolean;
+  nr_no_pe?: boolean;
+  nr_dtaa_rate?: number;
+  nr_dtaa_article?: string;
 }
 
 /** Problems with the vendor form's TDS block: '' when fine. Messages are English (the form shows them as is). */
@@ -453,6 +546,11 @@ export function vendorTdsProblem(v: VendorTdsFields): string {
     const to = isoDay(v.tds_lower_to);
     if ((v.tds_lower_from && !from) || (v.tds_lower_to && !to)) return 'Enter valid certificate dates.';
     if (from && to && to < from) return 'The certificate ends before it starts.';
+  }
+  if (v.non_resident) {
+    const raw = v.nr_dtaa_rate as unknown;
+    if (raw !== undefined && raw !== null && raw !== '' && !(Number(raw) >= 0 && Number(raw) <= 100)) return 'Enter the DTAA rate as 0–100%.';
+    if (v.nr_trc_to && !isoDay(v.nr_trc_to)) return 'Enter a valid TRC validity date.';
   }
   return '';
 }
@@ -473,6 +571,15 @@ export function cleanVendorTds(v: VendorTdsFields): VendorTdsFields {
     tds_lower_from: cert ? isoDay(v.tds_lower_from) || undefined : undefined,
     tds_lower_to: cert ? isoDay(v.tds_lower_to) || undefined : undefined,
     non_resident: v.non_resident ? true : undefined,
+    // 7R: non-resident details are kept only while the payee is flagged non-resident.
+    nr_country: v.non_resident ? String(v.nr_country ?? '').trim().slice(0, 60) || undefined : undefined,
+    nr_tin: v.non_resident ? String(v.nr_tin ?? '').trim().slice(0, 40) || undefined : undefined,
+    nr_trc_no: v.non_resident ? String(v.nr_trc_no ?? '').trim().slice(0, 40) || undefined : undefined,
+    nr_trc_to: v.non_resident ? isoDay(v.nr_trc_to) || undefined : undefined,
+    nr_form10f: v.non_resident && v.nr_form10f ? true : undefined,
+    nr_no_pe: v.non_resident && v.nr_no_pe ? true : undefined,
+    nr_dtaa_rate: v.non_resident ? n(v.nr_dtaa_rate) : undefined,
+    nr_dtaa_article: v.non_resident ? String(v.nr_dtaa_article ?? '').trim().slice(0, 40) || undefined : undefined,
   };
 }
 
@@ -504,6 +611,28 @@ export function tdsReversalForReturn(bill: ReturnTdsInput | undefined | null, no
   if (!(base > 0) || !(value > 0)) return 0;
   const left = Math.max(round2(tds - Math.max(num(earlierReversed), 0)), 0);
   return Math.min(roundTds((tds * Math.min(value / base, 1))), left);
+}
+
+/**
+ * 7R (7.120): TDS still to deduct on a bill with TDS on PAYMENT: the bill's TDS, less the TDS on the value taken
+ * back by supplier notes / purchase returns against it (pro rata to the TDS base, rupee-rounded), less what earlier
+ * payments deducted. Never negative. Bills with TDS on the bill → 0 (the return reverses it, `tdsReversalForReturn`).
+ */
+export function paymentTdsLeft(bill: (ReturnTdsInput & { id?: unknown }) | undefined | null, payments: readonly unknown[], returns: readonly unknown[] = []): { left: number; returnedTds: number; deducted: number } {
+  if (!bill || s(bill.tds_on).toUpperCase() !== 'PAYMENT') return { left: 0, returnedTds: 0, deducted: 0 };
+  const tds = round2(Math.max(num(bill.tds_amount), 0));
+  const id = s(bill.id);
+  const base = Math.max(num(bill.tds_base, num(bill.taxable)), 0);
+  const returned = round2(returns.reduce<number>((t, raw) => {
+    const n = (raw ?? {}) as Record<string, unknown>;
+    return id && s(n.purchase_id) === id && isoDay(n.date) && num(n.total) > 0 ? t + Math.max(num(n.taxable), 0) : t;
+  }, 0));
+  const returnedTds = tds > 0 && base > 0 && returned > 0 ? Math.min(roundTds(tds * Math.min(returned / base, 1)), tds) : 0;
+  const deducted = round2(payments.reduce<number>((t, raw) => {
+    const p = (raw ?? {}) as Record<string, unknown>;
+    return !id || s(p.purchase_id) === id ? t + Math.max(num(p.tds_amount), 0) : t;
+  }, 0));
+  return { left: Math.max(round2(tds - returnedTds - deducted), 0), returnedTds, deducted };
 }
 
 /* ── Register ─────────────────────────────────────────────────── */
@@ -594,7 +723,7 @@ export function tdsDeductions(input: RegisterInput): TdsDeductionRow[] {
   }
   const push = (row: Omit<TdsDeductionRow, 'fy' | 'quarter' | 'section' | 'rpu' | 'payeeKey'>) => {
     const fq = fyQuarterOf(row.deductedOn);
-    if (!fq || !(row.amount > 0)) return;
+    if (!fq || !(row.amount > 0 || row.reason === 'T')) return; // R5-B3: 194C(6) nil rows are reported (reason T)
     const sec = payableSection(row.code);
     out.push({ ...row, section: sec?.section ?? row.code, rpu: sec?.rpu ?? '', payeeKey: payeeKeyOf({ pan: row.pan, vendorId: row.vendorId, name: row.payee }), ...fq });
   };
@@ -603,7 +732,7 @@ export function tdsDeductions(input: RegisterInput): TdsDeductionRow[] {
     if (!c || isVoidStatus(c.status)) continue;
     const r = raw as Record<string, unknown>;
     bills.set(c.id, r);
-    if (!(c.tdsAmount > 0) || s(r.tds_on).toUpperCase() === 'PAYMENT') continue;
+    if ((!(c.tdsAmount > 0) && s(r.tds_reason) !== 'T') || s(r.tds_on).toUpperCase() === 'PAYMENT') continue;
     const vendor = vendors.get(s(r.vendor_id));
     const pan = (s(r.tds_pan) || s(vendor?.pan)).toUpperCase();
     const rev = reversed.get(c.id);
@@ -891,6 +1020,8 @@ export function quarterSummaries(rows: readonly RowLike[], challans: readonly Td
 export interface DueItem {
   id: string;
   kind: 'TDS' | 'TCS';
+  /** Additive (7R): the return form when it is not the kind's default (26Q / 27EQ) — '27Q' for non-residents. */
+  form?: TdsForm;
   what: 'deposit' | 'return' | 'certificate';
   /** 'YYYY-MM' for deposits, 'FY-Qn' for returns / certificates. */
   period: string;
@@ -900,7 +1031,7 @@ export interface DueItem {
 }
 
 /** Deposit (per month with deductions) and return / certificate due dates for `fy`, by due date. */
-export function dueCalendar(rows: readonly RowLike[], challans: readonly TdsChallan[], marks: readonly TdsReturnMark[], fy: number, today: string, kind: 'TDS' | 'TCS' = 'TDS'): DueItem[] {
+export function dueCalendar(rows: readonly RowLike[], challans: readonly TdsChallan[], marks: readonly TdsReturnMark[], fy: number, today: string, kind: 'TDS' | 'TCS' = 'TDS', formOverride?: TdsForm): DueItem[] {
   const byKey = challanByKey(challans);
   const out: DueItem[] = [];
   const months = new Map<string, RowLike[]>();
@@ -913,16 +1044,17 @@ export function dueCalendar(rows: readonly RowLike[], challans: readonly TdsChal
     const late = dates.some((d) => d && d > due);
     out.push({ id: `${kind}:dep:${month}`, kind, what: 'deposit', period: month, due, amount, status: all ? (late ? 'late' : 'done') : today > due ? 'overdue' : 'upcoming' });
   }
-  const form: TdsForm = kind === 'TDS' ? '26Q' : '27EQ';
+  const form: TdsForm = formOverride ?? (kind === 'TDS' ? '26Q' : '27EQ');
+  const tag = formOverride ? `${formOverride}:` : '';
   for (const q of [1, 2, 3, 4] as TdsQuarter[]) {
     const list = rows.filter((r) => r.fy === fy && r.quarter === q);
     if (!list.length) continue;
     const mark = marks.find((m) => m.id === returnMarkId(form, fy, q));
     const due = returnDueDate(fy, q, kind);
     const amount = round2(list.reduce((t, r) => t + r.amount, 0));
-    out.push({ id: `${kind}:ret:${fy}-Q${q}`, kind, what: 'return', period: `${fy}-Q${q}`, due, amount, status: mark ? (mark.filed_on > due ? 'late' : 'done') : today > due ? 'overdue' : 'upcoming' });
+    out.push({ id: `${kind}:${tag}ret:${fy}-Q${q}`, kind, ...(formOverride ? { form } : {}), what: 'return', period: `${fy}-Q${q}`, due, amount, status: mark ? (mark.filed_on > due ? 'late' : 'done') : today > due ? 'overdue' : 'upcoming' });
     const cdue = certificateDueDate(fy, q, kind);
-    out.push({ id: `${kind}:cert:${fy}-Q${q}`, kind, what: 'certificate', period: `${fy}-Q${q}`, due: cdue, amount, status: today > cdue ? 'done' : 'upcoming' });
+    out.push({ id: `${kind}:${tag}cert:${fy}-Q${q}`, kind, ...(formOverride ? { form } : {}), what: 'certificate', period: `${fy}-Q${q}`, due: cdue, amount, status: today > cdue ? 'done' : 'upcoming' });
   }
   return out.sort((a, b) => a.due.localeCompare(b.due) || a.id.localeCompare(b.id));
 }
@@ -1051,6 +1183,8 @@ export function deleteManualDeduction(id: string): void {
   const row = all.find((m) => m.id === id);
   if (!row) return;
   requireAccess('books.edit');
+  // QA17 R8: a 194T row of a partner posting goes only with that posting (its journal credits TDS payable).
+  if (getTable<{ tds_row_id?: string; lines?: { tds_row_id?: string }[] }>('partner_runs').some((r) => r?.tds_row_id === id || r?.lines?.some((l) => l?.tds_row_id === id))) throw new Error('This 194T deduction was posted with a partner credit or the year-end run. Undo it in Time → Firm instead.');
   assertUnlocked({ id, issue_date: row.date }, 'delete');
   setTable(TDS_DEDUCTIONS_TABLE, all.filter((m) => m.id !== id));
   audit.record({ entity: 'tds', entity_id: id, action: 'delete', doc_number: row.section, summary: `Deleted manual TDS deduction u/s ${row.section} from ${row.vendor_name} (${money(row.amount)})` });
@@ -1084,7 +1218,56 @@ export function loadTdsDue(today: string): DueItem[] {
   if (!rows.length) return [];
   const challans = loadChallans();
   const marks = loadReturnMarks();
-  return [fq.fy - 1, fq.fy].flatMap((fy) => dueCalendar(rows, challans, marks, fy, today, 'TDS')).sort((a, b) => a.due.localeCompare(b.due));
+  // 7R (7.120): deposits cover every deduction; returns split into 26Q (residents) and 27Q (non-residents).
+  const resident = rows.filter((r) => !r.nonResident);
+  const nonResident = rows.filter((r) => r.nonResident);
+  return [fq.fy - 1, fq.fy]
+    .flatMap((fy) => [
+      ...dueCalendar(rows, challans, marks, fy, today, 'TDS').filter((d) => d.what === 'deposit'),
+      ...dueCalendar(resident, challans, marks, fy, today, 'TDS').filter((d) => d.what !== 'deposit'),
+      ...(nonResident.length ? dueCalendar(nonResident, challans, marks, fy, today, 'TDS', '27Q').filter((d) => d.what !== 'deposit') : []),
+    ])
+    .sort((a, b) => a.due.localeCompare(b.due) || a.id.localeCompare(b.id));
+}
+
+/**
+ * 7R (7.120): TCS (Form 27EQ) deposit / return due items from the TCS charged on live sales invoices — a light
+ * reader (no Books import) so the lazy bell chunk stays small. INR value = `tcs_amount × exchange_rate` for a
+ * foreign-currency document. Same calendar as `dueCalendar(…, 'TCS')`.
+ */
+export function tcsRowsLite(invoices: readonly unknown[]): RowLike[] {
+  const out: RowLike[] = [];
+  for (const raw of invoices) {
+    const inv = (raw ?? {}) as Record<string, unknown>;
+    const tcs = num(inv.tcs_amount);
+    if (!(tcs > 0)) continue;
+    const type = s(inv.doc_type).toUpperCase();
+    if (!['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(type)) continue;
+    const status = s(inv.status).toLowerCase();
+    if (status === 'draft' || status === 'cancelled') continue;
+    const day = isoDay(inv.issue_date);
+    const fq = fyQuarterOf(day);
+    if (!fq) continue;
+    const fx = s(inv.currency) && s(inv.currency).toUpperCase() !== 'INR' && num(inv.exchange_rate) > 0 ? num(inv.exchange_rate) : 1;
+    out.push({ key: `tcs:${s(inv.id)}`, amount: round2(tcs * fx), creditedOn: day, deductedOn: day, ...fq });
+  }
+  return out;
+}
+
+/** TCS (27EQ) deposit / return / certificate due items of the current and previous Indian FY (7R, bell). */
+export function loadTcsDue(today: string): DueItem[] {
+  const fq = fyQuarterOf(today);
+  if (!fq) return [];
+  const rows = tcsRowsLite(getTable('invoices'));
+  if (!rows.length) return [];
+  const challans = loadChallans().filter((c) => c.kind === 'TCS');
+  const marks = loadReturnMarks();
+  return [fq.fy - 1, fq.fy].flatMap((fy) => dueCalendar(rows, challans, marks, fy, today, 'TCS')).sort((a, b) => a.due.localeCompare(b.due));
+}
+
+/** Cheap check for the bell: does any invoice carry TCS? */
+export function usesTcs(): boolean {
+  return getTable('invoices').some((r) => !!r && typeof r === 'object' && Number((r as { tcs_amount?: unknown }).tcs_amount) > 0);
 }
 
 /** Cheap check: does this company deduct TDS at all (a bill / payment with TDS, a manual deduction, a challan)? */

@@ -1,3 +1,4 @@
+import { cleanReference, fullyPaidAmount, splitCounterReceipt, type PayMode } from '../lib/counter-receipt';
 import { create } from 'zustand';
 import { localDb } from '../lib/localDb';
 import { issuingProfile } from '../lib/sync-device';
@@ -10,6 +11,7 @@ import {
   deriveGstMode,
   effectiveGstMode,
   EMPTY_TOTALS,
+  isExcludedLine,
   isIgstZeroRated,
   num,
   round2,
@@ -17,8 +19,14 @@ import {
 } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
 import { addDaysInput } from '../lib/utils';
-import { blankItem, makeDraft, normalizeRecord, senderStateCode } from './invoice-defaults';
+import { blankItem, makeDraft, normalizeRecord, R5B_RECORD_KEYS, R7_RECORD_KEYS, R8_RECORD_KEYS, R9_RECORD_KEYS, senderStateCode } from './invoice-defaults';
+import { nextPartyBalanceSnapshot } from '../lib/party-balance';
+import { partyBalanceSnapshotFor } from '../lib/khata-actions';
 import { customFieldsDb, finalizeValues, mergePartyValues, readValues, snapshotFromMap } from '../lib/custom-fields';
+import '../types/sales-r2'; // R2-B: declaration-merged record fields (RECORD_KEYS below)
+import type {} from '../types/restaurant'; // R3-A: declaration-merged record fields (type-only, erased)
+import type {} from '../types/marketplace-r5'; // R5-A: declaration-merged record fields (type-only, erased)
+import type {} from '../types/transport-works-r5'; // R5-B: declaration-merged record fields (type-only, erased)
 import type {
   Client,
   DiscountType,
@@ -45,6 +53,8 @@ export interface SaveResult {
   locked?: boolean;
   /** A hand-typed number that skipped ahead of the series: the numbers left unused (a hint, not an error). */
   gap?: SeriesGap | null;
+  /** Saved, but something after the save did not go through (e.g. the counter receipt). */
+  warning?: string;
 }
 
 export interface InvoiceState extends InvoiceRecord {
@@ -52,6 +62,12 @@ export interface InvoiceState extends InvoiceRecord {
   totals: CalcTotals;
   /** True once the user has edited an unsaved draft. */
   dirty: boolean;
+  /** Store-only (A3): how "Amount received" came in; on save the unbacked part becomes a receipt row. */
+  pay_mode?: PayMode | null;
+  /** Store-only (A3): UTR / reference for a UPI or bank receipt. */
+  pay_ref?: string;
+  /** Store-only (A3 / A6): keep "Amount received" equal to total − TDS until saved. */
+  fully_paid?: boolean;
 
   patch: (patch: Partial<InvoiceRecord>) => void;
   setClient: (client: Partial<Client>) => void;
@@ -108,10 +124,12 @@ export interface InvoiceState extends InvoiceRecord {
  * added to the record type but not here — otherwise the editor would silently drop it on save.
  */
 export const RECORD_KEYS = [
+  // R2-B sales documents (declared in src/types/sales-r2.ts / contacts.ts)
+  'milestones', 'progress_of', 'revision_of', 'revision_no', 'proposal_sections', 'attention',
   'id', 'invoice_number', 'doc_type', 'issue_date', 'due_date', 'status', 'currency', 'template_id',
   'client', 'sender', 'items', 'gst_mode', 'place_of_supply', 'reverse_charge', 'discount_type',
   'discount_rate', 'tax_rate', 'shipping', 'other_charges', 'round_off_enabled', 'amount_paid', 'notes',
-  'terms', 'po_number', 'recurring_id', 'recurring_date', 'subtotal', 'discount_amount', 'taxable_value',
+  'terms', 'po_number', 'recurring_id', 'recurring_date', 'batch_run_id', 'subtotal', 'discount_amount', 'taxable_value',
   'cgst_amount', 'sgst_amount', 'igst_amount', 'tax_amount', 'round_off', 'total', 'balance_due',
   'supply_type', 'lut_number', 'lut_date', 'price_includes_tax', 'round_mode', 'tcs_enabled', 'tcs_rate',
   'tcs_base', 'tcs_label', 'tds_enabled', 'tds_section', 'tds_rate', 'tds_on_taxable', 'cess_amount',
@@ -124,10 +142,26 @@ export const RECORD_KEYS = [
   'pos',
   'rcm_tax_excluded',
   'goods_returned',
-  'eco_gstin', 'eco_section', 'challan_purpose',
+  'eco_gstin', 'eco_section', 'challan_purpose', 'challan_hide_amounts', 'challan_returnable', 'challan_return_by',
   'transport',
   'approval', 'branch_id', 'loyalty_redeem', 'branch_transfer_id',
   'voucher_type_id', 'print_title',
+  'agent_id', 'offer', 'rx',
+  'party_balance_snapshot',
+  'payment_schedule', 'acceptance',
+  // Round 2 (R2-A): financial credit notes
+  'note_kind', 'financial_reason', 'financial_account', 'payment_terms',
+  // R3-A
+  'table_order_id', 'split_of',
+  'annexure', // R3-B (src/types/service-r3.ts)
+  'delivery_proof', // R3-C
+  'incoterm', 'port_of_loading', 'port_of_discharge', 'country_of_origin', 'country_of_destination', 'pre_carriage', 'vessel_flight', 'marks_numbers', 'export_payment_terms', // R4-C
+  'channel_id', 'channel_order_id', 'channel_import_id', 'channel_order_ids', // R5-A, QA6 F2
+  'fee_plan_id', 'fee_instalment', // R5-C
+  ...R5B_RECORD_KEYS, // R5-B (src/types/transport-works-r5.ts)
+  ...R7_RECORD_KEYS, // R7 hotel (src/types/hotel-r7.ts)
+  ...R8_RECORD_KEYS, // R8-C (src/types/trade-r8.ts)
+  ...R9_RECORD_KEYS, // R9 (src/types/retail-r9.ts)
 ] as const satisfies readonly (keyof InvoiceRecord)[];
 
 type UnlistedRecordKey = Exclude<keyof InvoiceRecord, (typeof RECORD_KEYS)[number]>;
@@ -248,6 +282,14 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         const merged = mergePartyValues(own, partyMap, customFieldsDb.all());
         partyPatch.custom_values = merged.length ? merged : undefined;
       }
+      // A client picked from the master (it brings its party map) on a new document: its default
+      // credit period (6.25 `credit_days`) sets the due date (8.6). Typing a name never does.
+      if (partyMap !== undefined && !get().id && client.name?.trim()) {
+        const key = client.name.trim().toLowerCase();
+        const master = localDb.clients.getAll().find((c) => (c.name ?? '').trim().toLowerCase() === key);
+        const days = Math.round(Number(master?.credit_days) || 0);
+        if (days > 0) partyPatch.due_date = addDaysInput(days, get().issue_date);
+      }
       // A client's GSTIN/state decides the place of supply, which decides the split.
       const place_of_supply =
         resolveStateCode({ code: client.state_code, gstin: client.gstin, name: client.state }) ||
@@ -278,6 +320,16 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
     setStatus: (status) => apply({ status }),
     setDocType: (doc_type) => {
       const prev = get().doc_type;
+      // QA5-2 F10: optional / alternative lines exist only on a quotation. Leaving it keeps the selected
+      // lines (flags cleared) and drops the rest, as conversion does (`keepSelectedLines` in documents.ts).
+      if (prev === 'QUOTATION' && doc_type !== 'QUOTATION' && get().items.some((i) => i.optional || i.alt_group || i.selected !== undefined)) {
+        const kept = get().items.filter((i) => !isExcludedLine(i)).map((i) => {
+          const { optional: _o, selected: _s, alt_group: _g, ...rest } = i;
+          void [_o, _s, _g];
+          return rest;
+        });
+        apply({ items: kept.length ? kept : [blankItem(get().tax_rate)] });
+      }
       if (doc_type === 'BILL_OF_SUPPLY') {
         // No tax on a Bill of Supply (Rule 49); reverse charge does not arise either.
         apply({ doc_type, gst_mode: 'NONE', reverse_charge: false, rcm_tax_excluded: undefined });
@@ -531,7 +583,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
     newDraft: (docType) => {
       cancelDraftSave();
       removeRaw(SINGLETON_KEYS.draft);
-      set({ ...wholeRecord(freshDraft(docType)), totals: EMPTY_TOTALS, dirty: false });
+      set({ ...wholeRecord(freshDraft(docType)), totals: EMPTY_TOTALS, dirty: false, pay_mode: null, pay_ref: '', fully_paid: false });
       get().recalculate();
     },
 
@@ -539,7 +591,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
       const found = localDb.invoices.getById(id);
       if (!found) return false;
       loadedAt = Date.now();
-      set({ ...wholeRecord(normalizeRecord(found, localDb.template.get())), dirty: false });
+      set({ ...wholeRecord(normalizeRecord(found, localDb.template.get())), dirty: false, pay_mode: null, pay_ref: '', fully_paid: false });
       get().recalculate();
       return true;
     },
@@ -582,15 +634,36 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         );
       }
       if (record.status === 'Draft' && !opts?.asDraft) record.status = 'Sent';
+      // Party balance on the bill (8.5): frozen at first issue, kept on later saves; legacy stays without.
+      const storedCopy = state.id ? localDb.invoices.getById(state.id) : undefined;
+      const snapshot = nextPartyBalanceSnapshot(record, storedCopy, () => partyBalanceSnapshotFor(record));
+      if (snapshot) record.party_balance_snapshot = snapshot;
+      else delete record.party_balance_snapshot;
 
+      // A3 / A6: "Fully paid" follows the final total (lines may have changed after it was ticked).
+      if (state.fully_paid) {
+        record.amount_paid = fullyPaidAmount(record);
+        record.balance_due = 0;
+      }
+      // A3: the part of "Amount received" not yet in the ledger becomes a receipt with the chosen mode.
+      const split = splitCounterReceipt(record, state.id ? localDb.payments.totalFor(state.id) : 0, state.pay_mode);
       try {
-        const saved = localDb.invoices.save(record);
+        let saved = localDb.invoices.save(split.record);
+        let warning: string | undefined;
+        if (split.amount > 0 && state.pay_mode) {
+          try {
+            localDb.payments.record({ invoiceId: saved.id, amount: split.amount, method: state.pay_mode, reference: cleanReference(state.pay_mode, state.pay_ref), date: saved.issue_date, note: 'Received at billing' });
+            saved = localDb.invoices.getById(saved.id) ?? saved;
+          } catch (err) {
+            warning = (err as Error).message;
+          }
+        }
         loadedAt = Date.now();
         cancelDraftSave();
         removeRaw(SINGLETON_KEYS.draft);
-        set({ ...saved, dirty: false });
+        set({ ...saved, dirty: false, pay_ref: '', fully_paid: false });
         get().recalculate();
-        return { ok: true, errors: [], record: saved, gap };
+        return { ok: true, errors: [], record: saved, gap, warning };
       } catch (err) {
         return { ok: false, errors: [(err as Error).message], locked: isPeriodLockedError(err) };
       }

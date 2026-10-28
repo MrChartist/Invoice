@@ -1,0 +1,235 @@
+# Round 14 — professional and knowledge-services firms (feature notes and the API for PS-B / PS-C / PS-D)
+
+PRD: `docs/prd/round-14.md` (it names this file `professional-r14.md`; the round's doc is `prof-r14.md`). CA items:
+`docs/CA_REVIEW.md` §14 (PS1–PS40 from the PRD; PS41–PS44 added by PS-A in §14.7; PS-B, PS-C and PS-D number
+theirs from 50, 60 and 70). Every GST / TDS / FEMA / accounting figure here is a working paper — verify with your CA. One section per package;
+each package edits only its own section and records its own bundle numbers.
+
+## PS-A — Professional profile and the practice core
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| A1 profile | Settings `prof_kind` (`ca`, `legal`, `design`, `consulting`, `agency`, `freelancer`, `other`) and `prof_sub` (CA `icai` / `icsi` / `icmai`; legal `litigation` / `advisory` / `both`; design `architect` / `interior` / `engineer`; consulting / freelancer `domestic` / `exports`; agency `creative` / `media_buying`) — additive, `types/prof-r14.ts`. **No new business type**: `shop-presets.ts` `PROF_KINDS` / `PROF_SUBS` / `PROF_PROFILES` / `applyProfKind(kind, { registered, sub, firmForm, exports, currentPacks })` writes `services` + `service_kind: 'professional'`, modules (`registered` adds `gst`; `time` always kept, so `/time` stays visible and `PACK_ROUTES` is unchanged) and packs **in union with the packs the company has** (`exports` / sub `exports` add `svcexport`; a partnership or LLP adds `partners`). Seven packs `practice`, `cafirm`, `legal`, `design`, `media`, `svcexport`, `partners` (`industry-packs.ts`; `PACK_OF_TYPE` unchanged). The **firm form** is the annual pack's entity type — `prof/ps-profile.ts` `writeFirmForm` writes the current FY's `notes_to_accounts.entity_type` (one value, never a second field). Switches in the company object `prof_settings` (`prof/ps-settings.ts`: owner only, audited on save, backed up, synced as a singleton; object-valued keys of B–D kept as stored) via `ps-profile.ts` (`psSwitchesOf`, `profSwitchesFor`, `applyProfSwitches` — fills only unset switches; the advocate's enrolment / Bar Council and the CA's membership / FRN go in `prof_settings.legal` / `.ca`). Wizard: Services → Professional opens `ProfKindPicker` (kind, sub-choice, firm form, ids; inside the wizard chunk); Settings → Features "Professional profile" for every `services` company (+ "Custom"); Features row `adv.profProfile`, `PACK_HREF` rows. Checklist steps (`checklist-steps.ts`, append-only, only with `prof_kind`): `firstMatter`, `staffCapacity` (every kind), legal `enrolment`, `conflictCheck`. |
+| Desks | `TIME_TABS` rows `matters` and `wip` (pack `practice`). `Time.tsx` mounts **all six desks** lazily through `import.meta.glob('../components/prof/*Desk.tsx')` keyed `matters → MattersDesk`, `wip → WipDesk`, `clientmoney → ClientMoneyDesk`, `exportsvc → ExportSvcDesk`, `firm → FirmDesk`, `cadesk → CaDesk`: a desk whose package has not merged has no file and no `TIME_TABS` row, so it is never mounted (no stubs, and `Time.tsx` is not edited again). Each desk is ONE lazy chunk with its views; a shared chunk carries `ps-ui.tsx` / `ps-run.ts` and the libs both desks use. Every tab and view has a help topic (`topics-packs.ts`, `time:matters:*`, `time:wip:*`), a palette label (`r14.*` in `palette-destinations.ts`) and a Ctrl+K title (`time.matters`, `time.wip` in `discover-r6-tabs.ts`); glossary terms `realisation`, `write-down`, `unbilled-work`. |
+| A2 matters | `prof/ps-matters.ts`: a matter IS a project cost centre with `CostCentre.ps` (code, kind, practice area, court / forum, case no., parties with role / PAN / GSTIN, responsible / originating timekeeper, opened / closed, conflict check, engagement); `cost-centres.ts` keeps `ps` (one line in `projectFields`). Code unique per company, `<client code>/<seq>` suggested (`Client.ps.code`, else initials). In a `legal` profile a new matter needs a conflict check, or the owner's skip reason (audited). Matters view: list with unbilled WIP / billed / received / last activity, CSV; the client-money column appears when PS-B's `ps-client-money.ts` exports `matterBalance` (read through `import.meta.glob`, never a hard dependency). The R3-B project board, budgets and bell work unchanged. |
+| A2 engagements | `prof/ps-engagements.ts` (table `engagements`, `ENG/FY…`, dated by `start`, numbered, `doc.create`): model `hourly` / `fixed` / `milestone` / `retainer` / `capped` / `success` / `blended`, fee / cap / blended rate / milestones (≤ 100 %) / success event, R3-B3 retainer link, disbursement policy, TDS section, letter quote, acceptance, renewal. A success fee (or a milestone on a share of recovery) in a `legal` / `ca` profile warns with `prof-rules.ts` `SUCCESS_FEE_PROMPT_RULES` and needs the owner's `ethics_reason` (audited, PS26). An unwaived conflict on the client or a matter party warns on a new engagement (never blocks). Delete is refused once a fee note names the engagement; the number stays used. |
+| A2 letters | `prof/ps-letters.ts`: "Make letter" drafts a QUOTATION with the engagement's fee lines (`letterLines`), the profession's starter proposal sections (`LETTER_SECTIONS`: CA SA 210 headings with a UDIN note; legal; design; consulting / agency) and `ps.engagement`; the quote's 8G acceptance makes the engagement `active` (`syncAcceptances` on desk load). |
+| A2 conflicts | `prof/ps-conflicts.ts` (table `conflict_checks`, dated, `master.edit`): folded names (case, punctuation, M/s, Pvt Ltd / Private Limited / LLP / & Co), PAN / GSTIN exact (a PAN also inside a GSTIN), token overlap ≥ 0.8; searches clients, suppliers, every matter's parties (closed too) and engagement titles; result clear / conflict / waived (owner, reason, consent note, audited). 5,000 parties well under 50 ms. |
+| A3 pre-bill | `prof/ps-models.ts` `planBill` (pure) applies the reviewer's row edits (hours, rate, exclude = billed at 0, later = deferred) and the model: hourly with an optional target, blended, capped (date order, the crossing entry cut, the rest covered), fixed (fee less fees billed), milestone (picked, not yet billed), success (only after its event), retainer (monthly fee unless an hour-block retainer is linked). `prof/ps-prebill.ts` `createPrebillDraft` goes through **`billUnbilled`** with the edited selection (so `bill_refs`, the annexure and derived billing are unchanged), then adds fee lines (`ps.lines[id].fee`, `milestone`), marks covered lines (`covered`), fills the annexure's `standard` / `billed` row fields (`annexure.ts` `withStandard`; the timekeeper as `who`) and writes `ps` (matter, engagement, basis, `wd`). `prof/ps-writedown.ts` `docBilling` re-derives per entry what a note billed (fee lines spread by standard value; rounding to the largest entry). The bill dialog has an "Open the pre-bill" link. |
+| A4 timekeepers | R10 `service_staff` + additive `ServiceStaff.ps` (weekly capacity, dated standard / cost rates, target, local-user hint). "Who" on the time form and the timer (`WhoRow`, lazy, with the pack); the rate card gains the **timekeeper level** after the task and before the project (`rate-cards.ts` optional `{ staffRate, currency }` argument; without it the result is identical). Capacity / rates on Utilisation and as a lazy row on the R10 staff form. |
+| A4 reports | `ps-wip.ts` (ageing buckets from `prof_settings.wip.buckets`, write-off stamps `TimeEntry.ps.wo` / `PurchaseRecord.ps.wo` — the Unbilled list leaves them out, `timesheets.ts` one condition each; owner reverses; locked period refused), `ps-realisation.ts` (definitions printed under the table; reads only the entries the period's notes bill, dated or written off in it), `ps-utilisation.ts` (leave = payroll attendance LOP days at capacity ÷ 5), `ps-profit.ts` (cost rates never print), `ps-yearend.ts` (unbilled on the closing date less the client's 12-month billing realisation, editable; completed-service rows at nil; optional dated accrual Dr "Unbilled revenue (WIP)" Cr "Professional fees — unbilled", reversed the next day, once per closing date). |
+| A5 paper | Record key **`ps`** (`R14_RECORD_KEYS = ['ps']`, spread into `R9_RECORD_KEYS` — the round's only first-paint token). `prof/ps-snapshot.ts` `psSnapshot(kind, parts)` (drops empty parts) and `mergePs`. `paper-helpers.ts`: `psLineText` inside `trackingText(item, ag, mf, ps)` (both item tables) and `psDeclaration` (B2 regime sentence, pure-agent disbursements, C1 export check, C5 unregistered — each "verify" with its PS id). `TemplateEngine.tsx`: lazy `ProfBlock` (after the parties and the R12 / R13 blocks, before the GST grid, never on receipt paper; boxes from `ps-print.ts` `psBoxes`) and lazy `ProfAnnexurePage` (after the R3-B4 annexure and the R11–R13 pages; sections from `psAnnexure`). SWIFT / IBAN / intermediary bank on the sender profile (lazy row with `practice` or `svcexport`) print in the export block of export documents only (`trade/exporter.ts`, from the sender snapshot). |
+| Registrations | `prof/ps-registry.ts` (`PS_TABLE_ACTIONS`, `PS_WATCHED`, runtime), `prof/ps-shared.ts` (`PS_TABLES`, `PS_OBJECTS`, `PS_SERIES` `ENG`, `PS_RESERVED_SERIES` `CMV`, `PS_PACKS`, `PS_DATED`, `PS_NUMBERED`), `prof-rules.ts` (`WIP_DEFAULTS`, `SUCCESS_FEE_PROMPT_RULES`; sections for B–D). Backup `RECORD_TABLES` / `ID_TABLES`, sync `DATED` / `NUMBERED`, open-export rows, recycle-bin restore hook (an engagement only while its client lives). |
+| Demo | `demo/profile-prof.ts` (dispatched from `demo/profiles.ts` for a Demo company with `practice`): two timekeepers with capacity and rates, a capped and a fixed-fee engagement on two matters, a waived conflict check, 14.5 h of WIP. `cost_centres`, `engagements`, `conflict_checks` in `DEMO_EXTRA_TABLES`. |
+| Tests / e2e | `ps-profile`, `ps-matters`, `ps-engagements`, `ps-conflicts`, `ps-prebill`, `ps-wip`, `ps-realisation` (incl. two years of a 25-person firm), `ps-utilisation`, `ps-profit`, `ps-yearend`, `ps-print`, `ps-registry`, `ps-rules`, `ps-pack-gate`; purchase contract (A's readers). E2E step "R14-A practice desk". |
+
+### API for PS-B / PS-C / PS-D
+
+- **Types** (`src/types/prof-r14.ts`): PS-A declared, for everyone, the `ps` sub-objects `legal` (`PsLegalSnap`), `stage`
+  (`PsStageSnap`), `media` (`PsMediaSnap`), `export` (`PsExportSnap`), `udin`, `purpose_code`, `unregistered` and the per-line
+  map `ps.lines[lineId]` (`PsLine`: `udin`, `stage`, `ro`); `Client.ps` (`entity`, `small_business`, `advocate`, `country`,
+  `fixed_estab_in_india`, `relation`, `tds`, `fees`); `Vendor.ps.advocate`; `PurchaseRecord.ps` (`disb`, `on_behalf`,
+  `media`); `WorkType.ps` (`unit`, `currency`); `BankAccount.client_money`; `ExportIrm.ps.fira_no`; catalogue
+  `InvoiceItem.ps.fee_event` (catalogue rows only). Re-declare an interface in your block to add fields (interfaces merge).
+  **Do not add record or line keys** (B1's disbursement lines reuse `charge_head_id: 'rule33'`).
+- **Names** (`prof/ps-shared.ts`): add your tables to `PS_TABLES` / `PS_DATED` / `PS_NUMBERED`; PS-B moves `CMV` from
+  `PS_RESERVED_SERIES` into `PS_SERIES` (write it once — `tests/ps-registry.test.ts` counts `'CMV'` literals).
+- **Registry** (`prof/ps-registry.ts`): add rows in your block; every writer `import './ps-registry'`. `sync-engine.ts` and
+  `trust/recycle-bin.ts` already import it. Add backup / sync / open-export rows in `// R14-B` … blocks, and your tables to
+  `DEMO_EXTRA_TABLES` with sample rows (`demo/profile-prof.ts`, your block).
+- **Desks**: create `src/components/prof/ClientMoneyDesk.tsx` (B), `ExportSvcDesk.tsx` (C), `FirmDesk.tsx` / `CaDesk.tsx`
+  (D) with a default export taking `PsDeskProps` (`components/prof/ps-run.ts`: `{ view?: string; notify }`), and add your
+  `TIME_TABS` row (`page-tabs.ts`), its `TAB_LABEL` entry (`Time.tsx` `r14T`, one key each), `PACK_TABS` rows, help topics,
+  palette labels (`r14T` in `palette-destinations.ts`) and the Ctrl+K title in the same commit. `Time.tsx` already mounts
+  the desk by file name. Point your pack's `PACK_HREF` row at your desk. B adds the `stages` view to `MattersDesk`. Shared
+  bits: `ps-ui.tsx` (`Views`, `Field`), `ps-run.ts` (`runWith`, `pct`), `use-period.tsx`; strings — your own area per
+  desk (`i18n/areas/prof-r14b-*.ts` …) plus the common words in `prof-r14-common.ts` (`psT`).
+- **Settings**: `readProfSettings` / `saveProfSettings` (`prof/ps-settings.ts`); keep your sub-objects as object-valued keys
+  (`legal`, `ca.company_clients`, `design`, `export`, `platforms`, `client_money` …) — `cleanProfSettings` keeps them.
+- **Rules** (`prof-rules.ts`): your section; dated rows with `source` and `verified`, append-only; import only from
+  `lib/prof/*` (`tests/ps-rules.test.ts`).
+- **Snapshot / paper**: write documents through `psSnapshot(kind, …)` / `mergePs(prev, parts)`. Add your arm to
+  `ps-print.ts` `psBoxes` (purpose code, export check, EDF and UDIN rows are already there) and your annexure section to
+  `psAnnexure`; `psLineText` already prints `udin`, `stage`, `ro`; `psDeclaration` already prints the legal regime, the
+  pure-agent sentence, the export check and the unregistered sentence from the snapshot.
+- **Pre-bill (C4, D5)**: `createPrebillDraft({ key, projectId, edits, milestoneIds, target, reason, annexure })` and
+  `planBill` are the draft builder; C4 passes `{ currency }` to `resolveEntryRate` / `rateFor` (the argument exists).
+- **Cash**: no new no-cash marker; client-money vouchers are not `transactions` rows (PRD §4).
+
+### Deviations from the PRD (PS-A)
+
+- **Doc name**: this file is `docs/features/prof-r14.md` (as asked by the lead), not `professional-r14.md`.
+- **Desk mounts**: one `import.meta.glob` over `components/prof/*Desk.tsx` instead of six named `lazy(import(…))` lines —
+  named imports of files that do not exist yet would not compile; with the glob B / C / D never edit `Time.tsx`'s mounts.
+- **PACK_TABS / steps / landings for B–D**: only A's desks and views are in `PACK_TABS`; checklist steps of B–D
+  (`clientMoneyBank`, `feeSchedule`, `linkCompanies`, `stageTemplate`, `partners`, `lut`, `edf`) and the landings
+  `cadesk&view=events` (CA) and `matters&view=stages` (design) wait for their packages (no stubs): CA and design land on
+  Matters until then; `PACK_HREF` of `cafirm` / `legal` / `design` / `media` points at Matters, `svcexport` / `partners` at WIP.
+- **Matter picker label** on the time form: the matter's code is not added to the cost-centre picker (the project name
+  shows); "Matter details" on the project form is a link to the Matters desk, where matters are edited.
+- **Letter snippets**: the starter sections are written onto the quotation (`LETTER_SECTIONS`), not seeded into the
+  `proposal_snippets` table.
+- **Multi-currency pre-bill** (A3.6): standard and billed values are compared in the document currency; conversion of
+  a foreign rate card is C4's (the resolver argument is there).
+- **Write-offs** stamp the row through the table (`setTable`, the `setRebilled` pattern) — refused in a locked period,
+  audited — rather than through the purchase editor.
+- **Utilisation leave** comes from payroll attendance loss-of-pay days (the only leave the payroll store keeps).
+
+### Bundle (PS-A)
+
+Measured with `vite build` + gzip -9 (the budget script's method); before = `claude/elegant-cannon-cwapiv` at `fad67a3`
+(with QA16), after = this branch merged with it.
+
+| Budget | Before | After | Delta | Share |
+|---|---|---|---|---|
+| Initial JS (first paint) | 189,212 B (184.78 kB) | 189,217 B (184.78 kB) | **+5 B** (the `ps` token) | ≤ +0.03 kB ✓ |
+| Total JS | 3,375,024 B (3295.9 kB) | 3,419,591 B (3339.4 kB) | **+43.5 kB** | ≤ 18 kB (PRD) / ≈ 20 kB (lead) ✗ |
+
+**Overrun: ≈ +23.5 kB over the lead's ≈ 20 kB** (total budget 3,500 kB: 160 kB headroom left). Breakdown (gz): WIP desk 13.5 kB (six views; strings EN + HI ≈ 3 kB;
+`ps-wip`, `ps-realisation`, `ps-utilisation`, `ps-profit`, `ps-yearend`, `ps-models`, `ps-prebill`), Matters desk 9.6 kB
+(four views; strings ≈ 2.5 kB; `ps-matters`, `ps-letters`), the chunk the two desks share 3.4 kB (`ps-ui`, `ps-run`,
+`ps-conflicts`, `ps-engagements`, `ps-writedown`, `ps-staff` parts), the picker in the wizard / Features chunk 1.4 kB,
+common strings 1.4 kB, help topics 1.1 kB, demo 1.1 kB, reach strings (packs, checklist) 1.0 kB, `ps-profile` +
+`ps-settings` 1.8 kB, lazy rows (`ProfRows`, `WhoRow`) 1.4 kB, paper parts (`ProfBlock`, `ProfAnnexurePage`, `ps-print`,
+helpers, TemplateEngine wiring) 2.0 kB, glossary 0.7 kB, `ps-staff` 0.75 kB, `prof-rules` 0.5 kB, Time mounts 0.8 kB,
+registry / shared / presets / packs / features / sync / bin / export rows ≈ 2.5 kB. Trimming options for the lead: drop
+the profitability view (≈ −1.5 kB), the year-end accrual posting (keep the paper, ≈ −0.8 kB), the letters view (the
+engagement list already makes letters, ≈ −0.8 kB), the CSV buttons (≈ −0.6 kB), the WIP write-off reversal (≈ −0.4 kB),
+shorten the Hindi / English desk strings (≈ −1.5 kB).
+
+## PS-B — Disbursements, legal and trade specifics (packs `practice`, `legal`, `design`, `media`)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| B1 the GSTR fix | `timesheets.ts` `expenseLine`: a pure-agent row now bills as a line with the R8 key `charge_head_id: 'rule33'` and the shared `PURE_AGENT_CHARGE` description (the label stays in the line name), so `isPureAgentLine` leaves it out of GSTR-1 Table 8 / HSN / 3.1(c), the e-Invoice item list (kept in `OthChrg`) and the e-Way item list (kept in `OthValue`); the document total is unchanged. Regression test `tests/ps-disb.test.ts` fails on the old code (the line was reported as nil-rated). The R8 charge strip keeps a `rule33` line on recompute (`tr-charges.ts` `withCharges`, one filter), it does not open the strip (`SummaryPanel` `hasCharges`) and is not a charge-register row. **Old invoices are not rewritten**: `prof/ps-disb-guard.ts` (lazy, loaded by `gst-guards.ts` for service companies) lists their 0 % lines as `PS_PURE_AGENT_OLD` on GST → Guards (PS3). |
+| B1 disbursements | `prof/ps-disb.ts`: kinds (court fee, stamp, government / ROC, filing, notary, travel, courier, other) on `PurchaseRecord.ps = { disb, on_behalf, wo? }`; court fee / stamp / government / filing default to *on the client's behalf* (pure agent, no GST, no ITC — `prof-rules.ts` `DISB_DEFAULTS`), travel and courier to part of the fee (0 % markup). `unrecoveredDisbursements` (read through `readPurchase`, purchase contract test) + `ageBuckets`, `writeOffDisbursement` / owner `reverseDisbursementWriteOff` (stamp `ps.wo`, locked period refused), `disbursementSchedule`, `feeTdsBase` (fees only: GST and pure-agent lines out — PS25). Expense form: lazy `DisbursementRow` with the `practice` pack. |
+| B2 advocates | `prof/ps-legal.ts` `legalRegime` (`LEGAL_SERVICES_RULES`, dated, entry-45 wording row from 2019-10-01 `verified: false`): legal SAC 99821x (empty SAC on a fee memo counts) → GSTIN or `Client.ps.entity === 'business'` → RCM; small business (entry 45), individual, government, an advocate → exempt; a senior advocate to an advocate → RCM (verify, PS54); other SACs → forward charge. `ps-legal-paper.ts` `legalPatch` applies it with existing mechanisms only (outward RCM flag + `rcm_tax_excluded`; the R10 `sv.exempt = 'EXEMPT'`; all-exempt from a registered advocate → Bill of Supply; unregistered → `gst_mode: 'NONE'`, `ps.kind: 'memo'`, `ps.unregistered`) and snapshots `ps.legal = { regime, entry, enrolment, bar_council }` (PS-A's paper prints the sentence and the enrolment row). Editor: lazy `LegalRegimeChip` (`legal` pack) applies it once per client on a new fee note, shows the reason, "Change" cycles RCM → exempt → forward. Client form: lazy legal-status row (entity, small business); vendor form: "advocate" tick → the bill's RCM notice adds the entry-2 line (lazy lookup beside R13's scrap row); work types: "bills per hour / appearance / item" (`WorkType.ps.unit`, kept by `normalizeWorkTypes`), `appearanceLines` for per-appearance billing. |
+| B3 client money | `bank-accounts.ts` `isClientMoneyAccount` (+ `client_money` kept by the normaliser); `pickableBankAccounts` offers such an account only for statements (`brs`), never for receipts, supplier payments, cheques or e-payments. Firm cash views leave it out: payment modes (`sales-reports.ts`), collection lag and the cash-forecast opening (`cash-forecast.ts`) call the predicate; **Today** applies the same rule inline (importing the bank module there grew the first-paint lazy-import map by 30 B). Table `client_money` (`CMV/FY…`, dated, numbered, `books.edit`, audited, backed up, synced, open export): `prof/ps-client-money.ts` (effects, balances by client / matter, no negative balance at any date, statements, `matterBalance` for PS-A's Matters list), `ps-cm-post.ts` `recordClientMoney` / `removeClientMoney` (one all-or-nothing write; one "Client money held" ledger under other current liabilities; to-fees = journal + a normal office-bank receipt against the issued invoice, refused without the invoice / above its balance / without the client's authority unless the owner overrides with a reason — audited; a deposit "for fees" is refused to Advances, BCI Rule 26 / PS10; interest to the client or to the firm), `ps-cm-reco.ts` `threeWay`. Desk `ClientMoneyDesk` (tab `clientmoney`, pack `legal`, also `cafirm`): ledger, three-way reconciliation, statements (print / WhatsApp). Bank-account form: client-money tick (law / CA firms). Journals of class "Client money" are deleted only with their voucher (`OWNED_JOURNALS`); the recycle bin refuses to restore a voucher or its office receipt alone. |
+| B4 design | `prof/ps-stages.ts`: `Engagement.stage` (`PsStagePlan`: fee %, cost basis, dated revisions, cumulative stages, extra %, property); `stageBill` = fee % × cost on the date × (1 + extra %) × cumulative % − billed (live stage bills less credit notes, `progress-billing` `stageCredits`), rounded to the rupee; a downward revision suggests a credit note (never automatic); `stageSnap` / `createStageBill` (draft with the line "Professional fees — stage n of N", `ps.stage`, `ps.lines[id].stage`). `ps-property-pos.ts`: property in India → its State (a Dubai client's Pune house is a Maharashtra supply, not an export); abroad → the recipient's location (the export check reads the snapshot `ps.export.pos_class: 'property'`, QA17 R6; the old `isPropertyExport` helper was removed in R16-B). `StagesView` (Matters desk, `design` pack; design profiles land there). Example stages in `prof-rules.ts` `DESIGN_STAGE_EXAMPLE` ("example — agree with your client", PS30). |
+| B5 media | `prof/ps-media.ts`: `PurchaseRecord.ps.media` (client, medium, mode principal / agent, publication, RO, client ref, insertion dates, commission %), `unbilledMedia` (through `readPurchase`), `mediaLines` (principal: cost at our rate or the media class + agency fee; agent: pure-agent line with the B1 key + fee), `byMedium`, `commissionLine`, `mediaTds` (194C; levy ended 1 Apr 2025 — `MEDIA_RULES`), `mediaSnap`. Bill and PO forms: lazy `MediaRows` (`media` pack). `ps-ro.ts`: a PO with `ps.media` prints as a **Release order** (PO series; lazy part of the PO print). |
+| Paper | `ps-print.ts` arms: enrolment, stage, media commission rows; annexure sections "Stage computation" and "Media schedule". |
+| Wiring | `ps-shared.ts` (`clientMoney` table / `CMV` series, `PS_RESERVED_SERIES` now empty), `ps-registry.ts` block, backup / sync / open-export rows, help topics `time:clientmoney*` and `time:matters:stages`, palette `r14.cm*` / `r14.matters.stages`, Ctrl+K `time.clientmoney`, checklist steps `clientMoneyBank` (legal) and `stageTemplate` (design), `TIME_TABS` row and label, `PACK_TABS` rows, demo block (design: a ₹4.2 crore house at 6 % in five stages). Strings: `prof-r14b.ts` (rows, stages), `prof-r14b-cm.ts` (desk), one key each in `banking.ts` and `gst-guards.ts`. CA items PS50–PS56 (§14.9). |
+| Tests / e2e | `ps-disb` (incl. the regression), `ps-legal`, `ps-client-money`, `ps-cm-reco`, `ps-client-money-readers`, `ps-stages`, `ps-property-pos`, `ps-media`; purchase contract (B1 / B5 readers); `ps-registry` (PS-B block, CMV once). E2E step "R14-B legal desk". |
+
+### Deviations (PS-B)
+
+- **One "Client money held" ledger** with the client / matter sub-ledger in the `client_money` register (not one ledger per client) — asked as PS50.
+- **Transfers between clients** post no journal (one ledger); interest kept by the firm stays in the account and is a reconciling item (PS51).
+- **Today** reads the client-money accounts inline (same rule as `isClientMoneyAccount`) to keep first paint at +0 B; the static guard in `tests/ps-client-money-readers.test.ts` checks both forms.
+- **Shared-file edits beyond §6**: `tr-charges.ts` (a `rule33` line survives the charge recompute and stays out of the charge register), `SummaryPanel.tsx` (a `rule33` line does not open the trade strip), `rate-cards.ts` (`normalizeWorkTypes` keeps `ps`), `ledger/vouchers.ts` (`OWNED_JOURNALS` row), `recycle-bin.ts` (restore hooks), `MattersDesk.tsx` (the `stages` view), `prof-r14.ts` (`PsStagePlan`, `Engagement.stage`).
+- **No sample client-money rows** in the Demo company (a client-money bank account cannot be marked as demo data); the design block seeds a stage plan.
+- **Per-appearance billing** is a helper (`appearanceLines`) for the pre-bill; the timesheet flow itself is unchanged (§6 allows only the two pure-agent fields there).
+- **Disbursement write-off** posts no journal (gross posting already expensed it) — PS56.
+
+### Bundle (PS-B)
+
+Before = `claude/elegant-cannon-cwapiv` at `3aec1e8` (master, PS-A + PS-D); after = this branch (gzip -9).
+
+| Budget | Before | After | Delta |
+|---|---|---|---|
+| Initial JS | 189,217 B | 189,217 B | **0 B** |
+| Total JS | 3,452,287 B | 3,480,242 B | **+27.3 kB** (aim 15 kB ✗) |
+
+Breakdown (gz): client-money desk 7.6 kB (three views + strings ≈ 2.3 kB), stages view 3.4 kB, rows / stages strings 2.9 kB, `LegalRegimeChip` + `ps-legal-paper` 1.5 kB, `ps-client-money` 1.3 kB (own chunk: PS-A's Matters list reads it), `MediaRows` 0.9 kB, `ps-legal` 0.8 kB, `PartyRows` 0.7 kB, `ps-ro` 0.6 kB, `DisbursementRow` 0.6 kB, `ps-disb` + guard 0.7 kB, host-page wiring ≈ 3.5 kB (PO form / print 0.8, expense form 0.4, bill form, RCM notice 0.25, GST guards 0.25, bank form, client / vendor / work-type forms, editor items table, Time), help / palette / Ctrl+K / checklist ≈ 1.2 kB, rules / registry / shared / backup / sync / bin / export rows / paper arms ≈ 1.2 kB. Trimming options: drop the statements view's print / WhatsApp (≈ −0.6 kB), the release-order print (≈ −0.6 kB), merge `ps-client-money` into the desk by dropping the Matters column (≈ −0.3 kB), shorten EN / HI strings (≈ −1.5 kB), drop per-appearance billing and the work-type unit (≈ −0.5 kB).
+
+## PS-C — Export of services and multi-currency (pack `svcexport`)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| C1 export check | `prof/ps-export-check.ts` `exportCheck({ invoice, client, engagement, receipts, irms, date })` — the five Sec 2(6) IGST conditions, each `ok / fail / pending / unknown` with a reason key: (i) the sender's State / GSTIN; (ii) `Client.ps.country` (else place of supply 96), an Indian establishment receiving it fails; (iii) `prof/ps-pos.ts` `servicePos` — Sec 13(2) by default, 13(4) property (State code), 13(3) / 13(5) performed / held abroad, intermediary by the dated `INTERMEDIARY_POS_RULES` (supplier's location to 29 Mar 2026, Sec 13(2) from 30 Mar 2026, PS4); (iv) pending until a receipt (`movedNoCash` skipped, an adjusted advance counts) or an IRM, then foreign exchange, or INR only when the document is marked RBI-permitted (SRVA); (v) `Client.ps.relation: 'distinct_person'` (our own branch) fails. `verdict`, `withChecks` / `snapChecks` (→ `ps.export.checks` `{ key, ok }[]` + `checked_on`, printed by PS-A's paper as "n / 5"). Editor: lazy `ExportCheckChip` under the supply type (AdvancedTaxPanel) for an export / POS 96–97 document, `svcexport` only: chip with the reasons, the purpose code (`ps.purpose_code`, default `prof_settings.export.purpose_code`, else `PURPOSE_BY_KIND[prof_kind]`), the Rule 34(2) note on a foreign document; a draft snapshots, an issued document is never rewritten; the supply type is never changed. GST preflight: `preflightIssues` loads on demand (GstReports, LUT exports of the period, `svcexport` only) — a failing condition is a **warning**, (iv) pending an info line. Desk view *checker*: every export with its result, the party's facts (country, relation, Indian establishment → `Client.ps`) and the document's (place-of-supply class, property State, abroad, INR route / settled → `ps.export`). R8 indent note (TR21): `trade/tr-indents.ts` reads the same dated rule through `ps-pos.ts` — "not an export" only before 30 Mar 2026. |
+| C2 FEMA 2026 | **Appended** to `trade/trade-rules.ts`: `EXPORT_REALISATION_MONTHS_RULES` row `2026-10-01 → 9` (old 9 / 15 rows untouched; goods read it too — X1 / PS15) and `EXPORT_REALISATION_INR_MONTHS_RULES` (`2026-10-01 → 12`; earlier dates fall back to the FX rule, `exportRealisationInrMonths`). `trade/export-register.ts`: `isServicesExport` (≥ 1 line, every line a service or SAC `99…`) starts the clock on the invoice date, never flagged; INR documents take the INR rule; rows carry `services` / `inrRule` (additive). `prof/ps-fema.ts`: `realisationRule`, `servicesRows` (a document marked "settled in INR" takes 12 months, PS15 (c)), `realisationReminders`. `prof/ps-edf.ts`: table `edf_register` (dated by `date` = the month end, `books.edit`, audited, backed up, synced, open export, recycle bin restore only while no live row covers the same month × kind × currency) — `prepareEdf(month, invoices)` groups the month's issued services exports by kind (software = SAC 998313–998319 / 997331) and currency, due `EDF_RULES` (30 days after the month end; services may file by the receipt date; small-value declaration only when every invoice ≤ ₹10 lakh); `edfDb.saveDrafts` writes once per month × kind × currency; `save` (EDF no. + filed day → filed; declaration → closed); `addSoftex` (history rows before 1 Oct 2026 only); `edfDueList`. Compliance: lazy `ExportSvcCalendar` on GST → Compliance (`svcexport`): EDF due, realisation due in 30 days, past due (ask the AD bank). |
+| C3 IRM / FIRA / refund | `prof/ps-brc.ts` `brcRows`: per services export the IRMs, FIRA (`ExportIrm.ps.fira_no`, typed on the realisation view), e-BRC no. / date, realised FC / ₹, charges deducted abroad (receipts not reaching the IRMs, the fee a platform receipt noted, or a write-off naming charges; flagged above ₹10 lakh) apart from the unrealised rest. `prof/ps-refund-svc.ts` `refundSvcPaper` (Rule 89(4)(C) from the payment rows: receipts dated in the period + advance adjustments on services invoices of the period by advance date; adjusted total turnover worked out or typed; maths by the existing `rule894Refund`), `statementSheet` (CSV / XLSX), `saveDraftClaim` — one DRAFT `EXPORT_LUT_ITC` row of the existing refund register, updated in place. |
+| C4 FX and platforms | `prof/ps-fx-rates.ts`: `cardCurrency`, `convertRate` (via the currency master's `rateOn`, ₹ per unit), `entryConversions` (pre-bill: entries whose work type's `ps.currency` differs from the fee note's currency), `atClosing` (year-end memo, PS37). Pre-bill: lazy `FxRateRow` ("USD 55/h ≈ ₹4,620/h = INR 4620 (ref. 31-10-2026)", "Convert at the master rate" fills the rows' rates through PS-A's `edits`; the line carries the converted rate as today, nothing new is snapshotted; Rule 34(2) note). `prof/ps-platforms.ts`: `prof_settings.platforms[]` (through `readProfSettings` / `saveProfSettings`), `planPlatformReceipt` (realised rate = ₹ credited ÷ net FC), `receiveViaPlatform` — one receipt of the gross at the realised rate (existing receipt + `fx-gain.ts`), one fee bill (SAC 997159; import of services RCM IGST 18 % when the platform is non-resident and the company registered) paid from the payout bank, note "Platform: … (fees …)" (the short reason), all or nothing (`withTablesRollback`). "Receive via platform" is a lazy self-contained button in the receipt dialog (foreign invoice, `svcexport`) and on the platforms view; default purpose code there. |
+| C5 threshold | `prof/ps-threshold.ts` `thresholdCard` (FY turnover at ₹: taxable, exempt, export, inter-State, net of credit notes; RCM purchases never; `REGISTRATION_THRESHOLD_RULES` ₹20 lakh / ₹10 lakh in 13, 14, 15, 16; warn 80 %, over 100 % with the crossing day). `components/prof/ThresholdView.tsx` (default export, `compact` prop): Time → Firm → Threshold (lazy in `FirmDesk`), and the Dashboard insight for `prof_kind = freelancer` (InsightsPanel, lazy). Crossing shows the register → LUT → tax invoices steps. The unregistered sentence prints from PS-A's `psDeclaration`. |
+| Wiring | `TIME_TABS` `exportsvc` (pack `svcexport`), `Time.tsx` label, `PACK_TABS` (desk + five views, palette labels `r14.exportsvc*`), `PACK_HREF.svcexport → /time?tab=exportsvc`, Ctrl+K `time.exportsvc`, help topics `time:exportsvc[:view]`, checklist steps `lut` / `edf` (any professional kind with `svcexport`), demo: last month's filed EDF (`edf_register` in `DEMO_EXTRA_TABLES`). Rules in `prof-rules.ts` §PS-C (`INTERMEDIARY_POS_RULES`, `EDF_RULES`, `REGISTRATION_THRESHOLD_RULES`, `PURPOSE_CODE_EXAMPLES` as a dated row, `PURPOSE_BY_KIND`). Strings `i18n/areas/prof-r14c-export.ts`, `prof-r14c-threshold.ts`. |
+| Tests / e2e | `ps-export-check` (incl. the TR21 note by date), `ps-fema` (rows append-only, services clock, INR rule, goods from 1 Oct 2026, older shipments unchanged), `ps-edf` (due dates, kinds, declaration, SOFTEX, registry), `ps-refund-svc`, `ps-fx-rates`, `ps-platforms`, `ps-threshold`; `export-register.test.ts` and `tr-agency.test.ts` unchanged. E2E "R14-C export desk". CA items **PS60–PS64** (`CA_REVIEW.md` §14.2). |
+
+### Deviations (PS-C)
+
+- `ps.export.checks` uses PS-A's declared shape `{ key, ok }[]` (+ `checked_on`); the purpose code lives at `ps.purpose_code` (PS-A's), not under `export`. `Client.ps.relation` uses PS-A's `'distinct_person'` for "our own branch" (the PRD said `own_branch`).
+- Rate-card currency is read from the work type (`WorkType.ps.currency`, the only card PS-A declared it on); conversion happens on the pre-bill (where PS-A left it), not in `resolveRate` (callers can still pass `{ currency }`).
+- The platform receipt's short reason is the receipt note ("Platform: …"), not a stored field; platforms and the default purpose code live in `prof_settings` (`platforms`, `export`).
+- The threshold card is a view of PS-D's Firm desk (`firm&view=threshold`, one lazy mount + one `PACK_TABS` row / help topic / palette label added by PS-C after PS-D merged).
+- No glossary terms (bytes); EDF / FIRA are spelled out in the help topics.
+
+### Bundle (PS-C)
+
+Before = `claude/elegant-cannon-cwapiv` at `f723ad1` (PS-A, PS-B, PS-D merged); after = this branch. `vite build` + gzip -9.
+
+| Budget | Before | After | Delta |
+|---|---|---|---|
+| Initial JS | 189,217 B | 189,230 B | **+13 B** (lazy-import map churn) |
+| Total JS | 3,480,242 B (3398.7 kB) | 3,506,471 B (3424.3 kB) | **+25.6 kB** (aim 15, PRD 13) ✗ |
+
+Breakdown (gz): desk with five views + `ps-brc` / `ps-refund-svc` 6.8 kB; strings EN + HI 3.9 kB; threshold card (+ strings,
+engine) 1.9 kB; `ps-edf` + `ps-fema` 1.7 kB; `ps-platforms` 1.5 kB; `ps-export-check` 1.4 kB; platform dialog 1.4 kB; editor
+chip 1.2 kB; pre-bill FX row 1.0 kB; help topics 0.7 kB; `prof-rules` §PS-C 0.6 kB; compliance card 0.55 kB; `ps-pos` 0.3 kB;
+host wiring (Firm desk threshold view, Time label, Insights, receipt dialog, GST preflight, editor, export register, trade
+rules, palette, demo, open export) ≈ 2.9 kB. Trim options: the platform list editor and the refund XLSX (≈ −0.5 kB each),
+the dashboard threshold card (≈ −0.4 kB), shorter Hindi / English strings (≈ −1 kB).
+
+## PS-D — The firm's statutory desk (packs `partners`, `practice`, `cafirm`)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| Desks | `TIME_TABS` rows `firm` (pack `partners`, also `practice`: views `partners`, `appropriation`, `tds194t`, `presumptive`, `tds194j`) and `cadesk` (pack `cafirm`: views `events`, `fees`, `udin`); `components/prof/FirmDesk.tsx`, `CaDesk.tsx` (mounted by PS-A's glob), `PACK_TABS` rows, palette labels `r14.firm.*` / `r14.cadesk.*`, Ctrl+K titles `time.firm` / `time.cadesk`, help topics `time:firm*` / `time:cadesk*`, strings `prof-r14d-firm.ts`, `prof-r14d-ca.ts`, `prof-r14d-tds.ts` (EN + HI). CA landing `/time?tab=cadesk&view=events`; `PACK_HREF` of `cafirm` → CA desk, `partners` → Firm. Checklist steps `feeSchedule`, `linkCompanies` (ca), `partners` (with the partners pack). |
+| D1 partners | Table `partners` (`settings.manage`): deed terms by date (share, remuneration fixed / % of book profit / maximum allowable, interest on capital and drawings, deed ref); "Capital — <name>" / "Current — <name>" ledgers (group Capital) made on save; shares above 100 % refused, ≠ 100 % flagged (`shareProblems`); a new ratio from a date for all partners at once (`saveRatio`); drawings (payment voucher class "Partner drawings"); interest on drawings by the product method (`prof/ps-partners.ts`). |
+| D1 year-end run | `prof/ps-partner-run.ts` `computeRun` (pure): interest on opening capital or daily balances at the deed rate (part above `PARTNER_INTEREST_CAP_RULES` 12 % shown as disallowed), book profit = ledger net profit + remuneration already credited − this run's interest + interest on drawings + listed adjustments, allowable remuneration from `PARTNER_REMUNERATION_RULES` (₹1.5 / 3 lakh slabs from 2009, ₹3 / 6 lakh from FY 2024-25, Sec 35 row from TY 2026-27 `verified: false`), remuneration per deed (working partners), excess disallowed (note, no journal), residual by ratio. `prof/ps-partner-post.ts` `postRun` (all or nothing, one per FY, journals class "Partners appropriation", 194T through D2), `reverseRun` (owner), `partnerStatements` (feeds the annual pack's partners' note through `notes-auto.ts` optional `partnerRows`, loaded lazily by `AnnualPackTab` for a partnership / LLP). Book profit / net profit via `loadStockValuer`, like every statement. |
+| D2 194T | `tds-rules.ts` appended: `TDS_PAYABLE_SECTIONS` row `194T` (RPU `94T`, unverified), `TDS_194T_RULES` (10 % from 2025-04-01, none before), threshold `TDS_EXTRA_THRESHOLD_RULES['194T']` ₹20,000 FY aggregate; `ita2025.ts` rows `194T` (Sec 393, entry to confirm, verify), `40B` (Sec 35(e)), `44ADA` (Sec 58), all `verified: false`. `prof/ps-194t.ts`: monthly credits (`partner_runs` `kind: 'credit'`, Dr Partners' remuneration / Interest on partners' capital, Cr Current, Cr TDS payable) and the year-end lines share one FY aggregate per partner; catch-up on the crossing credit through `suggestTds`; the deduction goes to the register through `saveManualDeduction` (26Q / Form 140 paper, challans; 31 March → 30 April). |
+| D3 194J | `prof/ps-tds-recv.ts`: client default (`Client.ps.tds`, set on Firm → 194J), profile defaults (ca / legal / design / freelancer 194J, agency 194C, consulting asked), fee base (pure-agent lines and GST out), expected TDS after the client's FY threshold; 194C rate by our firm form; chase list per client × quarter and the chase letter (Form 131 / 168 by date). Editor: lazy `Tds194jHint` in the tax panel fills section and rate once on a new note; Receivables → TDS gains the lazy `TdsChasePanel` (print / `wa.me` / `mailto:`). |
+| D4 presumptive | `prof/ps-presumptive.ts` + `PRESUMPTIVE_PROF_RULES` / `PRESUMPTIVE_ADVANCE_TAX_RULES` (`prof-rules.ts`): accrual and cash bases, cash share (no-cash rows skipped with `movedNoCash`), limit, deemed 50 %, books' profit, LLP / company / firm notes; eligibility ticked by the user; printable. |
+| D5 CA desk | `prof/ps-ca-events.ts` (derived events: filed returns / TDS returns / DSC renewals / checklist from `peekCompliance` — unchanged and read-only — or the open company's tables; UDINs; monthly retainer when an active retainer engagement exists; billed state from `bill_refs`), `prof/ps-ca-bill.ts` (fee schedule: catalogue `ps.fee_event`, `Client.ps.fees`; `billFromBoard` through the timesheet draft builder `buildBillDraft`, retainer-covered events at 0, unbilled pure-agent disbursements via `expenseLine`; typed events), `prof/ps-udin.ts` (table `udin_register`, format check `UDIN_FORMAT_RULES` verify, revoke, unbilled list, delete refused while billed), company links in `prof_settings.ca.company_clients` (`prof/ps-d-settings.ts`). Practice board: lazy "Bill" link per linked company (`PracticeBillLink`, board unchanged otherwise). |
+| Registrations | `ps-registry.ts` / `ps-shared.ts` D blocks (`partners` settings.manage, `partner_runs` books.edit dated, `udin_register` doc.create dated; `PS_D_CLASSES`, `PS_D_ACCOUNTS`), backup / sync / open-export rows (`// R14-D`), recycle bin: restore hooks (`partner_runs` comes back with its journals and 194T rows or is refused; duplicate UDIN / partner refused) and `OWNED_VOUCHERS` for the two classes. `DEMO_EXTRA_TABLES` + a demo UDIN (`demo/profile-prof.ts`). |
+| Tests / e2e | `ps-partners`, `ps-partner-run`, `ps-194t`, `ps-tds-recv`, `ps-presumptive`, `ps-udin`, `ps-ca-events`, `ps-ca-bill`, `ps-d-registry`. E2E step "R14-D firm desk". CA items PS70–PS80 (`CA_REVIEW.md` §14.8). |
+
+### Deviations (PS-D)
+
+- **Client TDS default and fee events** are set in the desks (Firm → 194J, CA desk → Fee schedule), not as lazy rows in the client / catalogue forms (keeps PS-B's client row untouched).
+- **Expected TDS** fills section and rate; the editor still computes the amount on its own base (taxable value), the hint shows the fee-base figure (PS76).
+- **Monthly partner credits** are `partner_runs` rows `kind: 'credit'` (no extra table), so the 194T aggregate reads one table.
+- **Draft builder (D5)** is the timesheet `buildBillDraft` (the one `billUnbilled` and PS-A's pre-bill use), not `createPrebillDraft` (which bills time of one matter).
+- **UDIN on the line** prints in the line description; `ps.udin` / `ps.lines[id].udin` are written too.
+- **Demo**: a UDIN only; partners need ledgers created by the data layer, so no demo partners.
+- Views of each desk are in the desk's chunk (R13 pattern), not separate lazy chunks.
+
+### Bundle (PS-D)
+
+Before = `claude/elegant-cannon-cwapiv` at `36881db`; after = this branch (gzip -9).
+
+| Budget | Before | After | Delta |
+|---|---|---|---|
+| Initial JS | 189,217 B | 189,217 B | **0 B** |
+| Total JS | 3,419,591 B | 3,452,287 B | **+32.7 kB** (aim 15 kB ✗) |
+
+Breakdown (gz): Firm desk 7.8 kB (five views + strings ≈ 2.5 kB), partner engines 5.7 kB (`ps-partners`, `ps-partner-run`, `ps-partner-post`, `ps-194t`), CA desk 4.4 kB (three views + strings ≈ 1.8 kB), CA engines 3.2 kB (`ps-ca-bill`, `ps-ca-events`, `ps-udin`), `ps-tds-recv` 1.7 kB, chase panel 1.1 kB, editor hint 0.8 kB, small strings 0.7 kB, rules 0.7 kB, help 0.9 kB, desk helpers / settings 1.3 kB, palette / Ctrl+K / checklist / packs 0.9 kB, host-page wiring (Time, TdsTab, Practice, AnnualPackTab, InvoiceCreator) ≈ 2.0 kB, registry / backup / sync / bin / export / tds-rules / ita2025 rows ≈ 1.0 kB. Trimming options: drop the daily-balance capital mode and partner statements (≈ −1.2 kB), the editor hint (≈ −0.8 kB), typed CA events (≈ −0.3 kB), shorten EN / HI strings (≈ −1.5 kB).
+
+## R16-B — The engines wired into the desks (`docs/prd/round-16.md` §R16-B)
+
+- **B1 Disbursements** (`/time?tab=wip&view=disb`, `components/prof/DisbView.tsx`, lazy): `unrecoveredDisbursements` by
+  client / matter (`prof/ps-disb-view.ts` `disbView` / `writtenOff`, tested in `tests/ps-disb-view.test.ts`), buckets
+  0–30 / 31–60 / 61–90 / 90+, **Write off** (`writeOffDisbursement`: `books.edit`, period lock, no journal, PS56) and the
+  owner's **Reverse**; a fee note's `disbursementSchedule` prints through `printHtmlDocument` with `escHtml`.
+- **B2 Media** (pack `media`, `MediaPrebill.tsx` lazy on the pre-bill): the client's `unbilledMedia` by medium, ticked rows
+  billed through `mediaLines` (principal: cost + fee; agent: Rule 33 recovery + fee) passed to `createPrebillDraft` as
+  `extra`, snapshot `mediaSnap` in `ps.media`; the expected client TDS (`mediaTds`, labelled through `ita2025.ts`). The
+  publisher's commission is **its own draft invoice to the publisher** (`createCommissionDraft`, PS12 (c), PF20) — not a
+  line on the client's fee note. `mediaSchedule` print not wired (cut 1).
+- **B3 Appearances** (pack `legal`): `createPrebillDraft({ appearances: true })` turns entries of appearance / item work
+  types into `appearanceLines` (count × fee) carrying the entries' `bill_refs` (added to the engine), so they are billed
+  and still count for realisation; off gives the same draft (`tests/ps-prebill-r16b.test.ts`). PF19.
+- **B4 FX memo** (`YearEndWipView`): "At closing rate" column for matters whose engagement bills in a foreign currency
+  (`atClosing` with the currency master's rate on the closing date) and open foreign invoices (`revalueReceivables` with
+  the master's rates). Memo only (PF14, PS37, PF21).
+- **B5 Deletes**: Firm → Partners → Delete (`deletePartner`, `settings.manage`, refused while a partner run or a voucher
+  line names the partner); Matters → Conflicts → Delete (`deleteCheck`, `master.edit`; a waived check needs the owner;
+  unknown id refused; `tests/ps-conflicts-delete.test.ts`). Both rows go to the recycle bin (watched tables).
+  `isPropertyExport` removed (superseded by QA17 R6's `ps.export.pos_class: 'property'`).
+

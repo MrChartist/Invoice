@@ -6,6 +6,8 @@
  * Form 24Q (Payroll → Reports). Working papers — verify with your CA / TRACES.
  */
 
+import { can } from '../access';
+import { round2 } from '../invoice-calc';
 import { getTable } from '../storage';
 import type { TdsChallan } from '../tds-payables';
 import { PAYROLL_TABLES, normalizePayments } from './records';
@@ -15,8 +17,31 @@ export const PAYROLL_CHALLAN_PREFIX = 'prp:';
 /** True for a challan row that comes from a payroll TDS payment (read-only in /tds). */
 export const isPayrollChallan = (c: Pick<TdsChallan, 'id'>): boolean => c.id.startsWith(PAYROLL_CHALLAN_PREFIX);
 
-/** Payroll TDS (192) payments as challan rows. */
-export function payrollTdsChallans(rawPayments: readonly unknown[]): TdsChallan[] {
+/**
+ * Payroll TDS (192) payments as challan rows. Review L8: without `payroll.view` the rows of one day
+ * are folded into a single "Payroll (n entries)" row with the total (no challan details).
+ */
+export function payrollTdsChallans(rawPayments: readonly unknown[], detail: boolean = can('payroll.view')): TdsChallan[] {
+  const rows = payrollTdsDetail(rawPayments);
+  if (detail) return rows;
+  const byDay = new Map<string, TdsChallan[]>();
+  for (const c of rows) byDay.set(c.date, [...(byDay.get(c.date) ?? []), c]);
+  return [...byDay.entries()].map(([date, g]) => ({
+    id: `${PAYROLL_CHALLAN_PREFIX}agg:${date}`,
+    kind: 'TDS' as const,
+    date,
+    bsr_code: '',
+    challan_no: '',
+    amount: round2(g.reduce((s, c) => s + c.amount, 0)),
+    minor_head: '200' as const,
+    method: g[0].method,
+    deduction_keys: [],
+    notes: `Section 192 — Payroll (${g.length} ${g.length === 1 ? 'entry' : 'entries'})`,
+    created_at: g[0].created_at,
+  }));
+}
+
+function payrollTdsDetail(rawPayments: readonly unknown[]): TdsChallan[] {
   return normalizePayments([...rawPayments])
     .filter((p) => p.kind === 'tds')
     .map((p) => ({

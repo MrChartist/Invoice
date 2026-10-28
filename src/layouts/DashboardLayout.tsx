@@ -6,15 +6,21 @@ import {
   BookOpen,
   Boxes,
   ScanBarcode,
+  Store,
   FileDown,
   FilePlus2,
   FileSpreadsheet,
   FileText,
   FolderTree,
+  HandCoins,
   HelpCircle,
   IdCard,
   Keyboard,
   Landmark,
+  Layers,
+  Truck,
+  Eye,
+  Building2,
   LayoutDashboard,
   Lock,
   Menu,
@@ -36,7 +42,7 @@ import { Logo } from '../components/brand/Logo';
 import { CompanySwitcher } from '../components/companies/CompanySwitcher';
 import { Avatar } from '../components/ui/Avatar';
 import { useToast } from '../components/ui/useToast';
-import { storageFailure, subscribeStorageFailure } from '../lib/storage';
+import { readRaw, storageFailure, subscribeStorageFailure } from '../lib/storage';
 import type { PaletteAction } from '../components/command/CommandPalette';
 import { NotificationBellSlot } from '../components/command/NotificationBellSlot';
 import { InstallPrompt } from '../components/pwa/InstallPrompt';
@@ -56,12 +62,18 @@ import { useCan } from '../hooks/useCan';
 import type { DeniedState } from '../components/security/RequireAccess';
 import { useTheme } from '../hooks/useTheme';
 import { getLanguage, setLanguage, useT, type MessageKey } from '../i18n';
+import { localDb } from '../lib/localDb';
+import { enabledModules, impliedPacks, isPathVisible, SHOP_MODE_EVENT } from '../lib/shop-mode';
+import { OPEN_HELP_EVENT } from '../lib/help-event';
+import { pushRoute } from '../lib/route-trail';
+import { realCompanies } from '../lib/companies';
 import { roleLabel } from '../i18n/labels';
 import styles from './DashboardLayout.module.css';
 
 // Overlays that only appear on demand are split out of the entry chunk and mounted on first use.
 const HelpModal = lazy(() => import('../components/layout/HelpModal').then((m) => ({ default: m.HelpModal })));
 const ShortcutsOverlay = lazy(() => import('../components/command/ShortcutsOverlay').then((m) => ({ default: m.ShortcutsOverlay })));
+const QuickCreateSheet = lazy(() => import('../components/layout/QuickCreateSheet').then((m) => ({ default: m.QuickCreateSheet })));
 const CommandPalette = lazy(() => import('../components/command/CommandPalette').then((m) => ({ default: m.CommandPalette })));
 
 interface NavEntry {
@@ -83,11 +95,13 @@ const NAV_GROUPS: { title?: MessageKey; items: NavEntry[] }[] = [
     items: [
       { label: 'nav.newInvoice', path: '/invoice', icon: FilePlus2, end: true, need: 'doc.create' },
       { label: 'nav.pos', path: '/pos', icon: ScanBarcode, need: 'doc.create' },
+      { label: 'nav.tables', path: '/tables', icon: Store, need: 'doc.create' }, // R3-A
       { label: 'nav.invoices', path: '/transactions', icon: FileText, match: (p) => p.startsWith('/transactions') || /^\/invoice\/.+/.test(p) },
       { label: 'nav.clients', path: '/clients', icon: Users },
       { label: 'nav.recurring', path: '/recurring', icon: Repeat, need: 'books.edit' },
       { label: 'nav.time', path: '/time', icon: Timer, need: 'books.edit' },
       { label: 'nav.receivables', path: '/receivables', icon: Scale },
+      { label: 'nav.distribution', path: '/distribution', icon: Truck }, // R6-B2
     ],
   },
   {
@@ -95,6 +109,7 @@ const NAV_GROUPS: { title?: MessageKey; items: NavEntry[] }[] = [
     items: [
       { label: 'nav.expenses', path: '/expenses', icon: Receipt },
       { label: 'nav.inventory', path: '/inventory', icon: Boxes },
+      { label: 'nav.manufacturing', path: '/manufacturing', icon: Layers }, // R6-B2
     ],
   },
   {
@@ -107,6 +122,7 @@ const NAV_GROUPS: { title?: MessageKey; items: NavEntry[] }[] = [
       { label: 'nav.reconcile', path: '/reconcile', icon: Landmark, need: 'books.edit' },
       { label: 'nav.cheques', path: '/cheques', icon: Banknote, need: 'books.edit' },
       { label: 'nav.tds', path: '/tds', icon: Percent },
+      { label: 'nav.loans', path: '/loans', icon: HandCoins },
       { label: 'nav.payroll', path: '/payroll', icon: IdCard, need: 'payroll.view' },
       { label: 'nav.reports', path: '/reports', icon: BarChart3 },
       { label: 'nav.gstReports', path: '/gst-reports', icon: FileSpreadsheet },
@@ -115,7 +131,10 @@ const NAV_GROUPS: { title?: MessageKey; items: NavEntry[] }[] = [
   },
   {
     title: 'nav.groupSetup',
-    items: [{ label: 'nav.designStudio', path: '/design', icon: Palette, need: 'settings.manage' }],
+    items: [
+      { label: 'nav.designStudio', path: '/design', icon: Palette, need: 'settings.manage' },
+      { label: 'nav.practice', path: '/practice', icon: Building2, need: 'settings.manage' }, // R3-C6
+    ],
   },
 ];
 
@@ -131,11 +150,44 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   const current = getCurrentUser();
   const user = current ?? getUser();
   const { can, role } = useCan();
-  const navGroups = useMemo(
-    () => NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => !i.need || can(i.need)) })).filter((g) => g.items.length > 0),
+  // Shop mode (8H): the company's modules narrow the sidebar; Ctrl+K and URLs still reach everything.
+  const [modeTick, setModeTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setModeTick((n) => n + 1);
+    window.addEventListener(SHOP_MODE_EVENT, bump);
+    return () => window.removeEventListener(SHOP_MODE_EVENT, bump);
+  }, []);
+  // Finer user rights (8H): load the rules for a clerk / viewer who has some (document writes wait for them).
+  const hasRights = !!current?.rights;
+  useEffect(() => {
+    // Once the rules are in, re-filter the sidebar (POS-only cashier, per-document rights).
+    if (hasRights) void import('../lib/user-rights').then(() => setModeTick((n) => n + 1)).catch(() => undefined);
+  }, [hasRights]);
+  const [navGroups, hidden] = useMemo(() => {
+    const s = localDb.settings.get();
+    const modules = enabledModules(s);
+    // R6-B2: a route hosting an active pack's tab stays; the practice desk (a CA tool) needs several companies or "full".
+    const packs = impliedPacks(s);
+    const practice = !s.business_type || s.business_type === 'full' || realCompanies().length > 1; // QA7 G7: the Demo company does not count
+    const posOnly = !!current && current.role !== 'owner' && !!current.rights?.pos_only;
+    // R6-B2 "N more features": entries this role may use that shop mode hides.
+    let hidden = 0;
+    const show = (i: NavEntry) => {
+      if (i.need && !can(i.need)) return false;
+      if (!isPathVisible(i.path, modules, packs)) return !++hidden;
+      return (practice || i.path !== '/practice') && (!posOnly || i.path === '/' || i.path === '/pos');
+    };
+    // R7-A: a hotel's /tables row reads "Front desk"
+    const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.filter(show).map((i) => (i.path === '/tables' && s.business_type === 'hotel' ? { ...i, label: 'nav.frontDesk' as const } : i)) })).filter((g) => g.items.length > 0);
+    return [groups, posOnly || role === 'viewer' ? 0 : hidden] as const;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [role],
-  );
+  }, [role, modeTick]);
+  // QA-3 F26: a kirana shop bills at the counter, so its phone tab bar offers POS in place of Invoices.
+  const posTab = useMemo(() => {
+    const s = localDb.settings.get();
+    return s.business_type === 'kirana' && can('doc.create') && isPathVisible('/pos', enabledModules(s));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, modeTick]);
   const { theme, toggle } = useTheme();
   const { t, lang } = useT();
   const { notify, toastNode } = useToast();
@@ -143,6 +195,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   // Bumped by "Refresh" on the cross-tab notice to remount the page with fresh data.
   const [refreshKey, setRefreshKey] = useState(0);
   const [loaded, setLoaded] = useState({ help: false, palette: false, shortcuts: false });
@@ -179,6 +232,14 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => setMenuOpen(false), [location.pathname]);
+  // R6-A5 route trail (for "Report a problem").
+  useEffect(() => pushRoute(location), [location]);
+  // R6-B2: empty states and tips open Help through a window event (`help-event.ts`).
+  useEffect(() => {
+    const on = () => openHelp();
+    window.addEventListener(OPEN_HELP_EVENT, on);
+    return () => window.removeEventListener(OPEN_HELP_EVENT, on);
+  }, []);
 
   // Mobile drawer: focus trap, Esc to close, scroll lock, focus restore.
   const drawerActive = isMobile && menuOpen;
@@ -261,6 +322,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     'g t': () => navigate('/transactions'),
     'g c': () => navigate('/clients'),
     'g s': () => navigate('/settings'),
+    // 8E (8.146): Alt+P opens the POS counter from anywhere (even while typing in a field).
+    'alt+p': { handler: () => navigate('/pos'), allowInInput: true }, // the route itself needs doc.create
+    // R6-B2: F1 opens Help (R6-A2's "On this screen"), except on the POS counter (F1 = recall held bills there) and
+    // the Gateway (Tally keys); never while typing in a field (useHotkeys skips plain keys in inputs).
+    // QA7 G3: F1 does nothing while a dialog is open (Help stacked over a form lost it on Escape).
+    ...(/^\/(pos|gateway)(\/|$)/.test(location.pathname) ? {} : { f1: () => { if (!document.querySelector('[aria-modal]')) openHelp(); } }),
   });
   // Tally keys (Phase 7): F2, F4–F9, Ctrl+F8/F9, F11, F12, Alt+G / Ctrl+G, Ctrl+/ — off on /pos and in fields.
   useTallyKeys(navigate, openShortcuts);
@@ -279,7 +346,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
       { id: 'brs', title: t('palette.brs'), keywords: ['bank', 'brs', 'reconcile', 'statement'], run: () => navigate('/reconcile?tab=brs'), need: 'books.edit' },
       { id: 'top-customers', title: t('palette.topCustomers'), keywords: ['sales', 'customers', 'concentration'], run: () => navigate('/reports?tab=top') },
       { id: 'settings', title: t('palette.settings'), run: () => navigate('/settings') },
-      { id: 'language', title: t('palette.language'), keywords: ['language', 'hindi', 'english', 'भाषा', 'हिन्दी'], run: () => void setLanguage(getLanguage() === 'hi' ? 'en' : 'hi').catch(() => undefined) },
+      { id: 'language', title: t('palette.language'), keywords: ['language', 'hindi', 'english', 'भाषा', 'हिन्दी'], run: () => void setLanguage(getLanguage() === 'en' ? 'hi' : 'en').catch(() => undefined) },
       { id: 'theme', title: theme === 'dark' ? t('shell.switchLight') : t('shell.switchDark'), keywords: ['dark', 'light', 'theme'], run: toggle },
       {
         id: 'backup',
@@ -303,6 +370,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   );
 
   const themeLabel = theme === 'dark' ? t('shell.switchLight') : t('shell.switchDark');
+  // Private beta marker next to the logo (the visible word is short; the label says what it means).
+  const beta = (
+    <span className={styles.beta} role="img" aria-label={t('shell.betaAria')} title={t('shell.betaAria')}>
+      {t('shell.beta')}
+    </span>
+  );
 
   return (
     <div className={styles.layout}>
@@ -321,9 +394,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         >
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <Link to="/" aria-label={t('shell.home')}>
-          <Logo height={30} product={false} />
-        </Link>
+        <span className={styles.brandRow}>
+          <Link to="/" aria-label={t('shell.home')}>
+            <Logo height={30} product={false} />
+          </Link>
+          {beta}
+        </span>
         <div className={styles.topActions}>
           <TimerPill />
           <button type="button" className={styles.iconBtn} aria-label={t('shell.search')} onClick={() => openPalette()}>
@@ -341,9 +417,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         className={cn(styles.sidebar, menuOpen && styles.sidebarOpen, 'no-print')}
         inert={isMobile && !menuOpen}
       >
-        <Link to="/" className={styles.brand} aria-label={t('shell.home')}>
-          <Logo height={40} />
-        </Link>
+        <div className={styles.brandRow}>
+          <Link to="/" className={styles.brand} aria-label={t('shell.home')}>
+            <Logo height={40} />
+          </Link>
+          {beta}
+        </div>
         <CompanySwitcher />
 
         <nav className={styles.nav} aria-label={t('nav.primary')}>
@@ -365,6 +444,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
               ))}
             </div>
           ))}
+          {hidden > 0 && (
+            <Link to="/settings?tab=features" className={styles.navItem}>
+              <Eye className={styles.navIcon} size={18} />
+              <span>{t('nav.moreFeatures', { n: hidden })}</span>
+            </Link>
+          )}
         </nav>
 
         <div className={styles.bottom}>
@@ -438,15 +523,29 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
             <LayoutDashboard size={20} aria-hidden="true" />
             <span>{t('shell.tabHome')}</span>
           </NavLink>
-          <NavLink to="/transactions" className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)}>
-            <FileText size={20} aria-hidden="true" />
-            <span>{t('nav.invoices')}</span>
-          </NavLink>
+          {posTab ? (
+            <NavLink to="/pos" className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)} data-tab-pos>
+              <ScanBarcode size={20} aria-hidden="true" />
+              <span>{t('nav.pos')}</span>
+            </NavLink>
+          ) : (
+            <NavLink to="/transactions" className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)}>
+              <FileText size={20} aria-hidden="true" />
+              <span>{t('nav.invoices')}</span>
+            </NavLink>
+          )}
           {can('doc.create') && (
-            <Link to="/invoice" className={cn(styles.tab, styles.tabNew)} aria-label={t('nav.newInvoice')}>
+            // 8H: "+" opens the quick-create sheet; the device preference `PLUS_ONE_TAP_KEY` keeps the old one tap.
+            <button
+              type="button"
+              className={cn(styles.tab, styles.tabNew)}
+              aria-label={t('shell.tabNew')}
+              aria-haspopup="dialog"
+              onClick={() => (readRaw('mrchartist_plus_one_tap') === '1' ? navigate('/invoice') : setQuickOpen(true))}
+            >
               <FilePlus2 size={22} aria-hidden="true" />
               <span>{t('shell.tabNew')}</span>
-            </Link>
+            </button>
           )}
           <NavLink to="/clients" className={({ isActive }) => cn(styles.tab, isActive && styles.tabActive)}>
             <Users size={20} aria-hidden="true" />
@@ -463,6 +562,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
       <SyncRunner />
       <UpdateToast />
       <Suspense fallback={null}>
+        {quickOpen && <QuickCreateSheet onClose={() => setQuickOpen(false)} />}
         {loaded.help && <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />}
         {loaded.shortcuts && <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />}
         {loaded.palette && (

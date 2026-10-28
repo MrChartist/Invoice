@@ -35,6 +35,11 @@ export interface BankAccount {
   account_no?: string;
   ifsc?: string;
   branch?: string;
+  /* ── 7U forex bank ledgers (EEFC / foreign-currency accounts) — additive ── */
+  /** ISO currency of a foreign-currency account (USD, EUR…); absent = INR. Never on the main account. */
+  currency?: string;
+  /** Opening balance in that currency on `opening_as_of` (`opening` stays the rupee value). */
+  fcy_opening?: number;
 }
 
 const MAIN: BankAccount = { id: DEFAULT_BANK_ID, name: 'Main bank account', active: true };
@@ -70,6 +75,12 @@ function clean(rows: unknown[]): BankAccount[] {
       ...(typeof o.account_no === 'string' && o.account_no.trim() ? { account_no: o.account_no.replace(/\s+/g, '') } : {}),
       ...(typeof o.ifsc === 'string' && o.ifsc.trim() ? { ifsc: o.ifsc.trim().toUpperCase() } : {}),
       ...(typeof o.branch === 'string' && o.branch.trim() ? { branch: o.branch.trim() } : {}),
+      ...(id !== DEFAULT_BANK_ID && typeof o.currency === 'string' && /^[A-Za-z]{3}$/.test(o.currency.trim()) && o.currency.trim().toUpperCase() !== 'INR' ? { currency: o.currency.trim().toUpperCase() } : {}),
+      ...(Number.isFinite(Number(o.fcy_opening)) && o.fcy_opening !== undefined && o.fcy_opening !== '' ? { fcy_opening: round2(Number(o.fcy_opening)) } : {}),
+      ...(id !== DEFAULT_BANK_ID && o.clearing === true ? { clearing: true } : {}), // R5-A2: marketplace settlement clearing
+      ...(o.fcra === 'designated' || o.fcra === 'utilisation' ? { fcra: o.fcra } : {}), // R5-C4: FCRA account
+      ...(typeof o.rera_project_id === 'string' && o.rera_project_id ? { rera_project_id: o.rera_project_id } : {}), // R11 (CN-C4): RERA 70% account
+      ...(id !== DEFAULT_BANK_ID && o.client_money === true ? { client_money: true } : {}), // R14 (PS-B3): client-money (trust) account
     });
   }
   if (!seen.has(DEFAULT_BANK_ID)) out.unshift({ ...MAIN });
@@ -109,6 +120,28 @@ export function liveBankAccountUsage(id: string): string[] {
     cheques: getTable('cheques'),
     statements: getTable('bank_statements'),
   });
+}
+
+/**
+ * R5-A2: accounts a picker may offer. A marketplace settlement clearing account (`clearing`) is not a real bank: it
+ * never prints cheques, never pays suppliers by bulk e-payment and never receives a bank statement. R14 PS-B3: a
+ * client-money account (`isClientMoneyAccount`) is offered only for statements ('brs').
+ */
+export type BankPickPurpose = 'cheque' | 'epay' | 'brs' | 'payout' | 'any'; // QA17 R5: 'payout' = the firm's own real bank
+export function pickableBankAccounts(purpose: BankPickPurpose, accounts: readonly BankAccount[] = bankAccountsDb.active()): BankAccount[] {
+  // R14 PS-B3: a client-money account takes statements (BRS) but never a fee receipt, supplier payment or cheque.
+  return accounts.filter((a) => (purpose === 'any' || !(a as { clearing?: boolean }).clearing) && (purpose === 'brs' || !isClientMoneyAccount(a)));
+}
+
+/**
+ * R14 PS-B3: a client-money (trust / escrow) account holds clients' money, not the firm's. It stays a real bank (BRS,
+ * statements, imports), but the firm's own cash views (Today, payment modes, collection lag, cash forecast) and the
+ * fee-receipt / supplier-payment pickers leave it out. Takes an account or an account id (main account: never).
+ */
+export function isClientMoneyAccount(a: string | { id?: string; client_money?: boolean } | null | undefined, accounts?: readonly BankAccount[]): boolean {
+  if (!a) return false;
+  if (typeof a !== 'string') return (a as { client_money?: boolean }).client_money === true;
+  return a !== DEFAULT_BANK_ID && (accounts ?? bankAccountsDb.all()).some((x) => x.id === a && (x as { client_money?: boolean }).client_money === true);
 }
 
 export const bankAccountsDb = {

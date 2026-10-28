@@ -9,6 +9,8 @@ import { isLocked } from './period-lock';
 import { isRevenueDoc } from './stats';
 import { round2 } from './invoice-calc';
 import { receivableBalance } from './rcm';
+import { getTable } from './storage';
+import { amountDue, linkedCredits, type CreditLinkRow, type CreditMap } from './amount-due';
 
 export type SortKey = 'date' | 'due' | 'number' | 'client' | 'total' | 'balance';
 export type SortDir = 'asc' | 'desc';
@@ -30,6 +32,10 @@ export function matchesListFilter(inv: InvoiceRecord, f: ListFilter): boolean {
 
 const balanceOf = (i: InvoiceRecord) => (isRevenueDoc(i) ? Number(receivableBalance(i)) || 0 : 0);
 
+/* PERF-2: the collators `localeCompare` would build on every call, built once (same order). */
+let numericCollator: Intl.Collator | null = null;
+let defaultCollator: Intl.Collator | null = null;
+
 export function sortInvoices(rows: readonly InvoiceRecord[], key: SortKey, dir: SortDir): InvoiceRecord[] {
   const sign = dir === 'asc' ? 1 : -1;
   const val = (i: InvoiceRecord): string | number => {
@@ -42,18 +48,42 @@ export function sortInvoices(rows: readonly InvoiceRecord[], key: SortKey, dir: 
       case 'balance': return balanceOf(i);
     }
   };
-  return [...rows].sort((a, b) => {
-    const x = val(a);
-    const y = val(b);
-    const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'en', { numeric: true });
+  const numeric = (numericCollator ??= new Intl.Collator('en', { numeric: true })).compare;
+  const plain = (defaultCollator ??= new Intl.Collator()).compare;
+  // Sort keys computed once per row (not twice per comparison); the comparator is unchanged, and the
+  // sort is stable, so the order is exactly what it was.
+  const keyed = rows.map((row) => ({ row, k: val(row), created: String(row.created_at ?? '') }));
+  keyed.sort((a, b) => {
+    const x = a.k;
+    const y = b.k;
+    const c = typeof x === 'number' && typeof y === 'number' ? x - y : numeric(String(x), String(y));
     // Stable tie-break: newest first, so equal keys keep a predictable order.
-    return c * sign || String(b.created_at ?? '').localeCompare(String(a.created_at ?? ''));
+    return c * sign || plain(b.created, a.created);
   });
+  return keyed.map((e) => e.row);
 }
 
-/** Can this document take a "mark paid" (open revenue document with a balance, not locked)? */
-export function canMarkPaid(inv: InvoiceRecord): boolean {
-  return isRevenueDoc(inv) && balanceOf(inv) > 0 && inv.status !== 'Cancelled' && !isLocked(inv);
+/** Live credit notes per invoice, read from `doc_links` (src/lib/amount-due.ts). */
+export function loadCredits(invoices: readonly InvoiceRecord[] = localDb.invoices.getAll()): Map<string, number> {
+  return linkedCredits(getTable<CreditLinkRow>('doc_links'), invoices);
+}
+
+/** What "mark paid" records for `inv`: the amount due after receipts and linked credit notes. */
+export function markPaidAmount(inv: InvoiceRecord, credits?: CreditMap): number {
+  return isRevenueDoc(inv) ? amountDue(inv, credits?.get(inv.id)) : 0;
+}
+
+/**
+ * Can this document take a "mark paid" (open revenue document with something still due, not locked)?
+ * Without `credits` linked credit notes are not looked at (the amount is checked again when paying).
+ */
+export function canMarkPaid(inv: InvoiceRecord, credits?: CreditMap): boolean {
+  return isRevenueDoc(inv) && balanceOf(inv) > 0 && markPaidAmount(inv, credits) > 0 && !isLocked(inv);
+}
+
+/** Σ what "mark paid" would record for the documents that can take it (the bulk dialog's subtitle). */
+export function bulkPaidTotal(rows: readonly InvoiceRecord[], credits?: CreditMap): number {
+  return round2(rows.reduce((s, i) => s + (canMarkPaid(i, credits) ? markPaidAmount(i, credits) : 0), 0));
 }
 
 export interface BulkPaidResult {
@@ -62,17 +92,20 @@ export interface BulkPaidResult {
   total: number;
 }
 
-/** Record the full balance of each document as received on `date`. One failure never stops the rest. */
+/** Record the balance of each document (net of credit notes) as received on `date`. One failure never stops the rest. */
 export function bulkMarkPaid(ids: readonly string[], opts: { method: string; date: string; reference?: string }): BulkPaidResult {
   const out: BulkPaidResult = { paid: [], skipped: [], total: 0 };
+  const credits = loadCredits();
   for (const id of ids) {
     const inv = localDb.invoices.getById(id);
     if (!inv) continue;
-    if (!canMarkPaid(inv)) {
+    // What the customer still owes: credit notes raised against the invoice are not collected in cash
+    // (the same balance the Record payment dialog offers).
+    const amount = canMarkPaid(inv, credits) ? markPaidAmount(inv, credits) : 0;
+    if (amount <= 0) {
       out.skipped.push({ number: inv.invoice_number, reason: isLocked(inv) ? 'locked period' : 'nothing to collect' });
       continue;
     }
-    const amount = round2(balanceOf(inv));
     try {
       localDb.payments.record({ invoiceId: id, amount, method: opts.method, date: opts.date, reference: opts.reference, note: 'Marked paid from the invoice list' });
       out.paid.push(inv.invoice_number);

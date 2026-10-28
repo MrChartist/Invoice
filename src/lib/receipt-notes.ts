@@ -25,7 +25,8 @@ import { nextSeriesNumberFor, recordSeries } from './series-counters';
 import { num, round2 } from './invoice-calc';
 import { isVoidStatus, readPurchase } from './purchase-normalize';
 import type { BillSeed } from './purchase-orders';
-import { generateId, getTable, setTable } from './storage';
+import { DB_PREFIX, generateId, getJson, getTable, peekTable, setTable } from './storage';
+import { godownsDb } from './godowns'; // R4-A4 default-godown hook
 
 export const RECEIPT_NOTES_TABLE = 'receipt_notes';
 export const GRN_PREFIX = 'GRN';
@@ -283,6 +284,28 @@ export function purchaseOrderOutstanding(orders: readonly PurchaseOrder[], purch
 
 /* ── Storage ──────────────────────────────────────────────────── */
 
+/**
+ * R4-A4 default-godown hook: GRN lines with no godown whose stock item is held for QC (`qc_on_receipt`, or
+ * `qc_settings.hold_all`) go to the QC hold godown (kind 'qc', created on first use). A line naming a godown keeps it.
+ * The QC desk itself is src/lib/production/qc.ts.
+ */
+export function applyQcHold<L extends { godown_id?: string; item_id?: string; name?: string }>(lines: L[]): L[] {
+  const holdAll = !!getJson<{ hold_all?: boolean }>(`${DB_PREFIX}qc_settings`, {}).hold_all;
+  const items = peekTable<{ id: string; name?: string; track_stock?: boolean; qc_on_receipt?: boolean }>('stock_items');
+  if (!holdAll && !items.some((i) => i.qc_on_receipt)) return lines;
+  const key = (s: unknown) => String(s ?? '').trim().toLowerCase();
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const byName = new Map(items.map((i) => [key(i.name), i]));
+  const held = (l: L) => {
+    const it = (l.item_id ? byId.get(l.item_id) : undefined) ?? byName.get(key(l.name));
+    return !l.godown_id && !!it?.track_stock && (holdAll || !!it.qc_on_receipt);
+  };
+  if (!lines.some(held)) return lines;
+  const list = godownsDb.list();
+  const qc = list.find((g) => g.kind === 'qc') ?? godownsDb.save({ name: list.some((g) => key(g.name) === 'qc hold') ? 'QC hold 2' : 'QC hold', kind: 'qc' });
+  return lines.map((l) => (held(l) ? { ...l, godown_id: qc.id } : l));
+}
+
 export class ReceiptNoteError extends Error {
   constructor(message: string) {
     super(message);
@@ -304,7 +327,9 @@ export const receiptNotesDb = {
     const all = receiptNotesDb.all();
     const existing = input.id ? all.find((n) => n.id === input.id) : undefined;
     if (existing) receiptNotesDb.assertEditable(existing, purchases);
-    const lines = (input.lines ?? []).filter((l) => l.name.trim() || num(l.quantity) > 0).map((l) => ({ ...l, id: l.id || generateId(), quantity: round2(num(l.quantity)), rate: round2(num(l.rate)) }));
+    const typed = (input.lines ?? []).filter((l) => l.name.trim() || num(l.quantity) > 0).map((l) => ({ ...l, id: l.id || generateId(), quantity: round2(num(l.quantity)), rate: round2(num(l.rate)) }));
+    // R4-A4: default-godown hook — goods held for QC go to the QC hold godown unless the line names a godown.
+    const lines = input.kind === 'GRN' && !existing ? applyQcHold(typed) : typed;
     const draft = { ...input, lines };
     const problem = validateReceiptNote(draft, { purchases, notes: all, excludeId: existing?.id });
     if (problem) throw new ReceiptNoteError(problem);

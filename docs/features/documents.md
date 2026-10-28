@@ -63,7 +63,7 @@ const reloadAfterDoc = () => { setDocTick((t) => t + 1); /* reload invoice from 
 
 Dashboard/Transactions row actions can reuse `ConvertMenu` and `CancelDialog` unchanged.
 
-Receivables / stats: replace `inv.balance_due` with `effectiveOutstanding(inv, readLinks(), allInvoices)` and exclude `CREDIT_NOTE` from sales totals (or subtract `totalCredited`).
+Receivables / stats: what an invoice still owes is `amountDue(inv, linkedCredits(links, invoices).get(inv.id))` (`src/lib/amount-due.ts`, see `receivables.md` → Amount due), never `inv.balance_due` alone; exclude `CREDIT_NOTE` from sales totals. Issuing, editing, cancelling, reinstating or deleting a credit note re-derives the original's status (`resettleCreditedInvoices` in `localDb.ts`): a note that covers the rest makes it Paid without any receipt.
 
 Backup: add `doc_links` to the backup table list (`src/lib/backup.ts`) so links round-trip.
 

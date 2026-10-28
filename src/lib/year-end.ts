@@ -35,8 +35,14 @@ export { CLOSING_STOCK_CLASS } from './ledger/closing-stock';
 import { CLOSING_STOCK_CLASS, type ClosingStockMode } from './ledger/closing-stock';
 export const PROVISION_CLASS = 'Year-end provision';
 
-export type YearEndStepId = 'integrity' | 'closing_stock' | 'depreciation' | 'provisions' | 'opening_bills' | 'lock' | 'carry_forward';
-export const YEAR_END_STEPS: readonly YearEndStepId[] = ['integrity', 'closing_stock', 'depreciation', 'provisions', 'opening_bills', 'lock', 'carry_forward'];
+export type YearEndStepId = 'integrity' | 'closing_stock' | 'depreciation' | 'provisions' | 'opening_bills' | 'lock' | 'carry_forward'
+  // R4-C5: "Auditor pack generated" (mark only; Settings → Activity → Auditor pack marks it)
+  | 'auditor_pack'
+  // QA8 T10 (TR22): agency lots whose sales are not settled on a posted bikri patti (shown whenever arrivals exist)
+  | 'agency_lots'
+  // MF-D5: year-end WIP statement reviewed (shown when the `shopfloor` pack is on)
+  | 'wip_statement';
+export const YEAR_END_STEPS: readonly YearEndStepId[] = ['integrity', 'closing_stock', 'depreciation', 'provisions', 'opening_bills', 'agency_lots', 'wip_statement', 'lock', 'carry_forward', 'auditor_pack'];
 
 export type StepStatus = 'done' | 'todo' | 'warn';
 
@@ -80,6 +86,16 @@ export interface YearEndInput {
   oldOpenBills: { count: number; amount: number };
   record?: YearEndRecord;
   today: string;
+  /**
+   * QA8 T10: lots of principals' goods (TR-C1 arrivals) with agency sales up to 31 March not settled on a posted
+   * bikri patti — their sales still sit in Sales. Absent when the company has no arrivals (the step is left out),
+   * whatever the agency pack's state.
+   */
+  agencyLots?: readonly { number: string; lot_no: string; principal: string }[];
+  /** MF-D5: open production orders and their WIP (paise) at the year end — absent unless the `shopfloor` pack is on. */
+  wipStatement?: { orders: number; value: number };
+  /** R9 (RT-B2): bills of the year with Schedule H1 / X lines still inside the Drugs Rules retention (pharma features on). */
+  rxRetained?: { count: number; until: string };
 }
 
 const rs = (p: number) => `₹${(Math.abs(p) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -188,12 +204,40 @@ export function yearEndChecklist(input: YearEndInput): YearEndStep[] {
     ],
   });
 
+  /* 5a. Unsettled agency lots (QA8 T10, TR22) */
+  if (input.agencyLots) {
+    const lots = input.agencyLots;
+    steps.push({
+      id: 'agency_lots',
+      status: !lots.length ? 'done' : marks.agency_lots ? 'done' : 'warn',
+      facts: lots.length
+        ? [`${lots.length} agency lot${lots.length === 1 ? ' has' : 's have'} sales not settled on a posted bikri patti: ${lots.slice(0, 10).map((l) => `${l.lot_no} (${l.number}, ${l.principal})`).join(', ')}${lots.length > 10 ? ' …' : ''}. Their sales still sit in Sales: post the pattis in Distribution → Agency (turn the agency pack on if it is off) — verify with your CA.`]
+        : ['Every agency lot sold up to the year end is settled on a posted bikri patti.'],
+    });
+  }
+
+  /* 5b. Year-end WIP statement (MF-D5) */
+  if (input.wipStatement) {
+    const w = input.wipStatement;
+    steps.push({
+      id: 'wip_statement',
+      status: !w.orders || marks.wip_statement ? 'done' : 'todo',
+      amount: w.value,
+      facts: w.orders
+        ? [`${w.orders} open production order${w.orders === 1 ? '' : 's'} hold ${rs(w.value)} of work-in-progress at the year end (material; conversion is a memo unless absorption is on). Download the WIP statement for the auditor (Schedule III, AS 2) — verify MF24 / MF25 with your CA.`]
+        : ['No production order holds work-in-progress at the year end.'],
+    });
+  }
+
   /* 6. Lock */
   const locked = !!input.lockUntil && input.lockUntil >= end;
-  steps.push({ id: 'lock', status: locked ? 'done' : 'todo', facts: [locked ? `Books are locked up to ${input.lockUntil}.` : input.lockUntil ? `Locked only up to ${input.lockUntil}.` : 'The year is not locked.'] });
+  steps.push({ id: 'lock', status: locked ? 'done' : 'todo', facts: [locked ? `Books are locked up to ${input.lockUntil}.` : input.lockUntil ? `Locked only up to ${input.lockUntil}.` : 'The year is not locked.', ...(input.rxRetained ? [`${input.rxRetained.count} bill(s) with Schedule H1 / X drugs must be kept until ${input.rxRetained.until} (Drugs Rules retention, RT7) — do not delete them; verify with your drug inspector / CA.`] : [])] });
 
   /* 7. Carry forward */
   steps.push({ id: 'carry_forward', status: marks.carry_forward ? 'done' : 'todo', facts: ['Opening balances of the new year = closing balances of this year (the profit moves to Reserves & surplus).'] });
+
+  /* 8. Auditor pack (R4-C5, mark only) */
+  steps.push({ id: 'auditor_pack', status: marks.auditor_pack ? 'done' : 'todo', facts: [marks.auditor_pack ? `Auditor pack generated on ${marks.auditor_pack.slice(0, 10)}.` : 'Generate the auditor pack (edit log, deletions, back-dated entries, integrity) in Settings → Activity — Rule 11(g), verify with your CA.'] });
   return steps;
 }
 

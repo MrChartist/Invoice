@@ -22,6 +22,19 @@ export interface Godown {
   job_worker?: boolean;
   /** The job worker (`vendors` row) whose premises this is. */
   vendor_id?: string;
+  /**
+   * Additive (8F): what the godown is for. 'van' = a delivery van (stock loaded by transfer, settled daily);
+   * 'expiry' = non-saleable expired / breakage stock (sales from it are refused). Absent = an ordinary godown.
+   * Round 4 (set once by R4-A, B's value included): 'wip' = shop floor of production orders (R4-A1), 'qc' = goods
+   * held for a quality check (R4-A4), 'transit' = goods on the way between stores (R4-B4). All three are non-saleable.
+   */
+  kind?: 'van' | 'expiry' | 'wip' | 'qc' | 'transit' | 'site' // R5-B6: 'site' = material at a works site (non-saleable)
+    // R8-C (TR-C1): 'consignment' = principals' goods held by a commission agent (arrivals). Non-saleable for our own
+    // sales; an agency line (one naming its arrival, `arrival_id`) may sell from it. Not in our stock valuation.
+    | 'consignment'
+    // R9 (RT-A, used by RT-D3 / RT-E3): 'used' = second-hand goods bought from customers (buy-back devices, old gold).
+    // SALEABLE (`nonSaleableGodowns` leaves it out); a sale from it is flagged for the margin scheme (`isUsedGodown`).
+    | 'used';
   created_at?: string;
   updated_at?: string;
 }

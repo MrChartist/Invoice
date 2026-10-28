@@ -4,11 +4,10 @@ import { Modal } from '../ui/Modal';
 import { cn } from '../../lib/utils';
 import { localDb } from '../../lib/localDb';
 import { parseTable } from '../../lib/csv';
-import { invoiceAmountMapped, isBooksKind, missingRequired, type ImportKind } from '../../lib/import-mapping';
+import { invoiceAmountMapped, isBooksKind, isOpeningsKind, missingRequired, type ImportKind } from '../../lib/import-mapping';
 import { reloadAfterFlush } from '../../lib/storage';
 import { useT } from '../../i18n';
 import { vtT } from '../../i18n/areas/voucher-types';
-import { migT } from '../../i18n/areas/migration';
 import {
   applyImport,
   buildPreview,
@@ -18,6 +17,8 @@ import {
   type PreviewRow,
 } from '../../lib/importers';
 import { senderStateCode } from '../../store/invoice-defaults';
+import { applyOpeningsImport, buildOpeningsPreview, differenceNote, loadOpeningsContext, recordImportRun, type OpeningsContext } from '../../lib/import-openings';
+import { clearSafetySnapshot, getSafetySnapshot, restoreBackup, saveSafetySnapshot } from '../../lib/backup';
 import { initialWizardState, wizardReducer, type ExistingData } from './wizard-state';
 import { ChooseFileStep } from './steps/ChooseFileStep';
 import { MapColumnsStep } from './steps/MapColumnsStep';
@@ -55,10 +56,10 @@ export function ImportWizard(props: ImportWizardProps) {
 function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
   // Existing data is re-read when the review step opens so the duplicate check is current.
   const [state, dispatch] = useReducer(wizardReducer, initialKind, (k) => initialWizardState(k, readExisting()));
-  useT();
   const { step, kind, table, mapping, existing, duplicateMode, strictGstin, skipped, filter, running, report } = state;
+  useT();
   const cancelRef = useRef(false);
-  // P1-21 (7Q): books kinds (ledgers / suppliers / stock / vouchers) use import-books.ts, loaded on demand.
+  // P1-21 (7Q): stock items / vouchers use import-books.ts, loaded on demand.
   const books = isBooksKind(kind);
   const [booksLib, setBooksLib] = useState<typeof import('../../lib/import-books') | null>(null);
   const [undo, setUndo] = useState<'none' | 'ready' | 'busy'>('none');
@@ -88,13 +89,26 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
     };
   }, [duplicateMode, strictGstin]);
 
+  // R6-C3: suppliers / ledgers / opening bills read their own context (re-read with `existing`, i.e. per review).
+  const openingsCtx = useMemo<OpeningsContext | null>(() => {
+    void existing; // re-read when the review step opens (as `existing` is)
+    return isOpeningsKind(kind) ? { ...loadOpeningsContext(), strictGstin, duplicateMode } : null;
+  }, [kind, existing, strictGstin, duplicateMode]);
+  const openingsPreview = useMemo(
+    () => (table && step >= 2 && openingsCtx && isOpeningsKind(kind) ? buildOpeningsPreview({ kind, table, mapping, ctx: openingsCtx, skipped }) : null),
+    [table, step, kind, mapping, openingsCtx, skipped],
+  );
   const preview = useMemo(() => {
-    if (!table || step < 2) return null;
-    if (isBooksKind(kind)) {
-      return booksLib && booksExisting ? booksLib.buildBooksPreview({ kind, table, mapping, existing: booksExisting, options: { duplicateMode, strictGstin }, skipped }) : null;
-    }
+    if (openingsPreview) return openingsPreview;
+    if (!table || step < 2 || isOpeningsKind(kind)) return null;
+    if (isBooksKind(kind)) return booksLib && booksExisting ? booksLib.buildBooksPreview({ kind, table, mapping, existing: booksExisting, options: { duplicateMode }, skipped }) : null;
     return buildPreview({ kind, table, mapping, existing, options, skipped });
-  }, [table, step, kind, mapping, existing, options, skipped, booksLib, booksExisting, duplicateMode, strictGstin]);
+  }, [openingsPreview, table, step, kind, mapping, existing, options, skipped, booksLib, booksExisting, duplicateMode]);
+  const openingsNote = openingsPreview
+    ? [openingsPreview.locked ? `The opening day (${openingsPreview.openingDay}) is locked.` : '', differenceNote(openingsPreview), openingsPreview.summary.error ? 'All or nothing: fix or skip the rows with errors first.' : '']
+        .filter(Boolean)
+        .join(' ')
+    : '';
 
   const missing = missingRequired(kind, mapping);
   const amountMissing = kind === 'invoices' && !invoiceAmountMapped(mapping);
@@ -163,22 +177,34 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
     cancelRef.current = false;
     try {
       let result: ImportReport;
-      if (isBooksKind(preview.kind)) {
+      if (openingsPreview) {
+        // R6-C3: one undo copy first (like the Tally import), then all or nothing.
+        if (!(await saveSafetySnapshot('import')) && !window.confirm('An undo copy could not be saved. Import anyway?')) {
+          dispatch({ type: 'runEnded' });
+          return;
+        }
+        result = applyOpeningsImport(openingsPreview, { fileName: state.fileName });
+      } else if (isBooksKind(preview.kind as ImportKind)) {
         if (!booksLib) throw new Error('The importer is still loading — try again.');
-        // One undo copy for the whole import (owner only), like the Tally import.
-        const { saveSafetySnapshot } = await import('../../lib/backup');
-        if (!(await saveSafetySnapshot('import')) && !window.confirm(migT('noUndoCopy'))) return;
+        // P1-21 (7Q): one undo copy for the whole import (owner only), like the Tally import.
+        if (!(await saveSafetySnapshot('import')) && !window.confirm('An undo copy could not be saved. Import anyway?')) {
+          dispatch({ type: 'runEnded' });
+          return;
+        }
         result = await booksLib.applyBooksImport(preview, {
           onProgress: (done) => dispatch({ type: 'runProgress', done }),
           shouldCancel: () => cancelRef.current,
         });
         setUndo('ready');
+        recordImportRun({ kind, ...(state.fileName ? { file_name: state.fileName } : {}), created: result.created, updated: result.updated, skipped: result.skipped, errors: result.errors.length });
       } else {
         result = await applyImport(preview, createLocalSink(), {
           chunkSize: 250,
           onProgress: (done) => dispatch({ type: 'runProgress', done }),
           shouldCancel: () => cancelRef.current,
         });
+        // R6-C3: every import run is recorded (the setup checklist's "import" step reads it).
+        recordImportRun({ kind, ...(state.fileName ? { file_name: state.fileName } : {}), created: result.created, updated: result.updated, skipped: result.skipped, errors: result.errors.length });
       }
       dispatch({ type: 'runSucceeded', report: result, existing: readExisting() });
       onDone?.(result, kind);
@@ -192,7 +218,6 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
   const undoImport = async () => {
     setUndo('busy');
     try {
-      const { clearSafetySnapshot, getSafetySnapshot, restoreBackup } = await import('../../lib/backup');
       const snap = await getSafetySnapshot();
       if (snap) {
         restoreBackup(snap.data);
@@ -244,7 +269,7 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
           <button type="button" className={cn(ctl.btn, ctl.btnOutline)} disabled={running} onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className={cn(ctl.btn, ctl.btnPrimary)} disabled={running || writable === 0} onClick={run}>
+          <button type="button" className={cn(ctl.btn, ctl.btnPrimary)} disabled={running || writable === 0 || (openingsPreview?.summary.error ?? 0) > 0} onClick={run}>
             <Upload size={15} /> {running ? 'Importing…' : `Import ${writable.toLocaleString('en-IN')} record${writable === 1 ? '' : 's'}`}
           </button>
         </>
@@ -262,7 +287,7 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
           <FileSpreadsheet size={18} /> Import data
         </>
       }
-      subtitle="Bring clients, items and opening invoices over from Excel, Vyapar, Zoho Books, Tally or Busy. Everything stays in this browser."
+      subtitle="Bring clients, suppliers, items, stock items, opening invoices, ledgers, opening balances and vouchers over from Excel, Vyapar, Zoho Books, Tally or Busy. Everything stays in this browser."
       footer={footer}
     >
       {books && <p className={ctl.hint}>{vtT('undoHint')}</p>}
@@ -311,6 +336,7 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
           progress={state.progress}
           writable={writable}
           saveError={state.saveError}
+          note={openingsNote}
         />
       )}
     </Modal>

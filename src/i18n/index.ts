@@ -17,27 +17,118 @@ import { LANG_KEY } from '../lib/storage';
 import { en, type MessageKey, type Messages } from './en';
 
 export type { MessageKey, Messages };
-export type Lang = 'en' | 'hi';
+export type Lang = 'en' | 'hi' | 'mr' | 'gu' | 'ta' | 'bn' | 'te' | 'kn';
 export type MessageVars = Record<string, string | number>;
 
-export const LANGUAGES: readonly { code: Lang; label: string; native: string }[] = [
-  { code: 'en', label: 'English', native: 'English' },
-  { code: 'hi', label: 'Hindi', native: 'हिन्दी' },
-];
+/** Interface languages (native names only: the picker is labelled "Language / भाषा"). */
+export const LANGUAGES: readonly { code: Lang; native: string }[] = [
+  { code: 'en', native: 'English' },
+  { code: 'hi', native: 'हिन्दी' },
+  { code: 'mr', native: 'मराठी' },
+  { code: 'gu', native: 'ગુજરાતી' },
+  { code: 'ta', native: 'தமிழ்' },
+  { code: 'bn', native: 'বাংলা' },
+  { code: 'te', native: 'తెలుగు' },
+  { code: 'kn', native: 'ಕನ್ನಡ' },
+]
 
-/** Lazy catalogue loaders: each becomes its own chunk. */
-const LOADERS: Record<Exclude<Lang, 'en'>, () => Promise<Partial<Messages>>> = {
-  hi: () => import('./hi').then((m) => m.hi),
-};
+/**
+ * A lazily loaded language (8H): keyed strings plus a phrase glossary (English text → translation)
+ * that per-area catalogues (`defineArea`) consult, so a language can cover any screen's strings
+ * without editing that screen's area file. Anything missing falls back to English.
+ */
+export interface Catalogue {
+  messages: Partial<Messages>;
+  phrases?: Readonly<Record<string, string>>;
+}
+
+/**
+ * Lazy catalogue loaders. Hindi is its own chunk; the other regional catalogues share ONE small chunk
+ * (`regional.ts`) so the first-paint bundle carries a single loader for all of them (8H).
+ * R16-A1: two separate statements on purpose — Vite's preload wrapper gives a conditional `import()` ONE dependency
+ * list, which made a Hindi switch also download (and cache) the regional pack.
+ */
+async function load(code: Exclude<Lang, 'en'>): Promise<Catalogue> {
+  if (code === 'hi') return { messages: (await import('./hi')).hi };
+  return (await import('./regional')).REGIONAL[code];
+}
 
 let lang: Lang = 'en';
 /** English: the shell catalogue now, page catalogues (en-pages.ts) as their chunks load. */
 const english: Partial<Messages> = { ...en };
 const loaded: Partial<Record<Lang, Partial<Messages>>> = {};
+const glossary: Partial<Record<Lang, Readonly<Record<string, string>>>> = {};
 const listeners = new Set<() => void>();
+/** Bumped on every change (language, or an area's Hindi arriving): `useT()` re-renders on it. */
+let version = 0;
+/** R16-A1: loaders of area Hindi chunks not loaded yet (see area.ts). */
+const hiLoaders = new Set<() => Promise<void>>();
+
+/** The `setLanguage` rejection when a language pack is not on this device and the device is offline. */
+export const LANG_PACK_OFFLINE = 'lang-pack-offline';
+
+/** Called by `defineArea` for an area whose Hindi is a separate build chunk. Loads at once when Hindi is on. */
+export function registerHindi(load: () => Promise<void>): void {
+  hiLoaders.add(load);
+  if (lang === 'hi') {
+    load().then(() => {
+      hiLoaders.delete(load);
+      emit();
+    }, () => undefined);
+  }
+}
+
+async function loadHindiAreas(): Promise<void> {
+  await Promise.all([...hiLoaders].map(async (load) => {
+    await load();
+    hiLoaders.delete(load);
+  }));
+}
+
+/**
+ * R16-A1: tell the service worker this device's language, so it caches that language pack (and keeps it across
+ * updates). With `wait`, resolves with whether the pack is complete in the cache; true without a worker.
+ */
+function tellWorker(next: Lang, wait: boolean): Promise<boolean> {
+  const sw = typeof navigator === 'undefined' ? null : navigator.serviceWorker?.controller;
+  const msg = { type: 'lang', lang: next };
+  if (!sw || !wait) {
+    try {
+      sw?.postMessage(msg);
+    } catch {
+      /* a worker that cannot take the message: nothing to cache */
+    }
+    return Promise.resolve(true);
+  }
+  return new Promise((resolve) => {
+    const ch = new MessageChannel();
+    const done = (complete: boolean) => {
+      clearTimeout(timer);
+      ch.port1.close();
+      resolve(complete);
+    };
+    // QA19 U5: a worker older than R16-A never answers; without its `ack` within 2 s, do not wait the full 20 s.
+    let timer = setTimeout(() => done(true), 2000);
+    ch.port1.onmessage = (e: MessageEvent<{ ack?: boolean; complete?: boolean }>) => {
+      if (!e.data?.ack) return done(e.data?.complete !== false);
+      clearTimeout(timer);
+      timer = setTimeout(() => done(true), 20000);
+    };
+    try {
+      sw.postMessage(msg, [ch.port2]);
+    } catch {
+      done(true);
+    }
+  });
+}
 
 export function isLang(value: unknown): value is Lang {
-  return value === 'en' || value === 'hi';
+  return LANGUAGES.some((l) => l.code === value);
+}
+
+/** The active language's translation of an English phrase, if its glossary has one. */
+export function phrase(text: string): string | undefined {
+  return lang === 'en' ? undefined : glossary[lang]?.[text];
 }
 
 /** Fill `{name}` placeholders; an unknown placeholder is left as written. */
@@ -49,7 +140,8 @@ export function interpolate(message: string, vars?: MessageVars): string {
 /** Translate `key` into the active language (English when the key is missing there). */
 export function t(key: MessageKey, vars?: MessageVars): string {
   const active = lang === 'en' ? undefined : loaded[lang]?.[key];
-  return interpolate(active || english[key] || key, vars);
+  const base = english[key];
+  return interpolate(active || (base && phrase(base)) || base || key, vars);
 }
 
 /** Called by a page catalogue (en-pages.ts) when its chunk loads. */
@@ -87,7 +179,7 @@ export function getLanguage(): Lang {
 
 /** Locale for dates written in words (weekday / month names). Digits stay Latin. */
 export function dateLocale(l: Lang = lang): string {
-  return l === 'hi' ? 'hi-IN-u-nu-latn' : 'en-IN';
+  return l === 'en' ? 'en-IN' : `${l}-IN-u-nu-latn`;
 }
 
 /** The language saved on this device ('en' when unset, unreadable or unknown). */
@@ -105,20 +197,35 @@ function applyDocumentLang(): void {
 }
 
 function emit(): void {
+  version++;
   for (const fn of listeners) fn();
 }
 
 async function ensureCatalogue(next: Lang): Promise<void> {
   if (next === 'en' || loaded[next]) return;
-  loaded[next] = await LOADERS[next]();
+  const c = await load(next);
+  glossary[next] = c.phrases ?? {};
+  loaded[next] = c.messages;
 }
 
 /**
  * Switch the interface language. Loads the catalogue first (so nothing flashes half-translated),
  * then saves the choice on this device unless `persist` is false.
+ *
+ * R16-A1: languages other than English are language packs the service worker caches only on devices that use them.
+ * A user's switch (`persist`) waits for the worker to cache the pack; offline without the pack it rejects with
+ * `LANG_PACK_OFFLINE` and the language stays as it was. Hindi also awaits every loaded area's Hindi chunk.
  */
 export async function setLanguage(next: Lang, { persist = true }: { persist?: boolean } = {}): Promise<void> {
-  await ensureCatalogue(next);
+  const ready = await tellWorker(next, persist && next !== 'en');
+  const offline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+  if (!ready && offline()) throw new Error(LANG_PACK_OFFLINE);
+  try {
+    await ensureCatalogue(next);
+    if (next === 'hi') await loadHindiAreas();
+  } catch (e) {
+    throw offline() ? new Error(LANG_PACK_OFFLINE) : e;
+  }
   if (persist) {
     try {
       localStorage.setItem(LANG_KEY, next);
@@ -145,6 +252,8 @@ export async function initI18n(): Promise<void> {
     window.addEventListener('storage', (e) => {
       if (e.key === LANG_KEY) void setLanguage(isLang(e.newValue) ? e.newValue : 'en', { persist: false }).catch(() => undefined);
     });
+    // QA19 U3: a worker that takes over this page (the first install's claim, an update) never heard the boot message.
+    navigator.serviceWorker?.addEventListener('controllerchange', () => void tellWorker(readStoredLanguage(), false));
   }
   try {
     await setLanguage(readStoredLanguage(), { persist: false });
@@ -154,25 +263,36 @@ export async function initI18n(): Promise<void> {
   }
 }
 
-function subscribe(fn: () => void): () => void {
+/** Subscribe to language changes and to area Hindi arriving (what `useT()` re-renders on). */
+export function subscribe(fn: () => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
 
-/** `const { t, lang } = useT();` — re-renders the caller when the language changes. */
+const getVersion = (): number => version;
+
+/** `const { t, lang } = useT();` — re-renders the caller when the language changes (or an area's Hindi arrives). */
 export function useT(): { t: typeof t; lang: Lang } {
-  const current = useSyncExternalStore(subscribe, getLanguage, getLanguage);
-  return { t, lang: current };
+  useSyncExternalStore(subscribe, getVersion, getVersion);
+  return { t, lang };
 }
 
 /** Test hook: forget loaded catalogues and return to English without touching storage. */
 export function resetI18nForTests(): void {
   lang = 'en';
+  hiLoaders.clear();
   for (const k of Object.keys(loaded) as Lang[]) delete loaded[k];
+  for (const k of Object.keys(glossary) as Lang[]) delete glossary[k];
 }
 
 /** Test hook: make `catalogue` the active one (e.g. a partial catalogue to prove the fallback). */
-export function setCatalogueForTests(code: Exclude<Lang, 'en'>, catalogue: Partial<Messages>): void {
+export function setCatalogueForTests(code: Exclude<Lang, 'en'>, catalogue: Partial<Messages>, phrases: Record<string, string> = {}): void {
   loaded[code] = catalogue;
+  glossary[code] = phrases;
   lang = code;
+}
+
+/** Test hook: load a language's real catalogue (as `setLanguage` would) without touching storage. */
+export async function loadLanguageForTests(code: Lang): Promise<void> {
+  await setLanguage(code, { persist: false });
 }

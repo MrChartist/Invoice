@@ -10,6 +10,7 @@ import {
   parseYmd,
   previewOccurrences,
   recurringDb,
+  startAfterInvoice,
   templateFromInvoice,
   templateTotals,
   type Frequency,
@@ -19,7 +20,9 @@ import {
 } from '../../lib/recurring';
 import { blankItem, makeDraft, senderStateCode } from '../../store/invoice-defaults';
 import { cn, formatCurrency, formatDate, todayInput } from '../../lib/utils';
-import { GST_SLABS, type InvoiceRecord } from '../../types/invoice';
+import { type InvoiceRecord } from '../../types/invoice';
+import { gstRateOptions } from '../../lib/tax-rules';
+import { isRecurringSource } from '../../lib/documents';
 import controls from '../../styles/controls.module.css';
 import styles from './recurring.module.css';
 import { dateLocale, getLanguage, useT } from '../../i18n';
@@ -81,7 +84,7 @@ function EditorBody({
   useT(); // re-render on a language switch (5.4)
   const today = todayInput();
   const savedInvoices = useMemo(
-    () => localDb.invoices.getAll().filter((i) => i.doc_type !== 'QUOTATION' && i.doc_type !== 'DELIVERY_CHALLAN' && i.doc_type !== 'SALES_ORDER'),
+    () => localDb.invoices.getAll().filter((i) => isRecurringSource(i.doc_type)),
     [],
   );
   const clients = useMemo(() => localDb.clients.getAll(), []);
@@ -99,13 +102,17 @@ function EditorBody({
   const [sourceId, setSourceId] = useState(initialSource?.id ?? '');
   const [frequency, setFrequency] = useState<Frequency>(schedule?.frequency ?? 'monthly');
   const [interval, setIntervalValue] = useState(String(schedule?.interval ?? 1));
-  const [startDate, setStartDate] = useState(schedule?.start_date ?? today);
+  // QA-3 F6: from an invoice, the first date defaults to the next occurrence after it (not today, which
+  // would bill the invoice's own period again); a date the user picks wins.
+  const [startPick, setStartPick] = useState(schedule?.start_date ?? '');
   const [endDate, setEndDate] = useState(schedule?.end_date ?? '');
   const [maxRuns, setMaxRuns] = useState(schedule?.max_runs ? String(schedule.max_runs) : '');
   const [dueIn, setDueIn] = useState(String(schedule?.due_in_days ?? localDb.settings.get().defaultDueDays ?? 14));
   const [mode, setMode] = useState<RecurringMode>(schedule?.mode ?? 'draft');
   const [errors, setErrors] = useState<string[]>([]);
 
+  const sourceDate = (savedInvoices.find((i) => i.id === sourceId) ?? initialSource)?.issue_date;
+  const startDate = startPick || (sourceDate ? startAfterInvoice({ frequency, interval: Math.max(1, Math.floor(num(interval, 1))) }, sourceDate, today) : today);
   const rule = {
     frequency,
     interval: Math.max(1, Math.floor(num(interval, 1))),
@@ -347,7 +354,7 @@ function EditorBody({
                   value={item.tax_rate ?? 0}
                   onChange={(e) => patchItem(item.id, { tax_rate: num(e.target.value) })}
                 >
-                  {GST_SLABS.map((s) => (
+                  {gstRateOptions(undefined, item.tax_rate ?? 0).map((s) => (
                     <option key={s} value={s}>{s}%</option>
                   ))}
                 </select>
@@ -415,7 +422,7 @@ function EditorBody({
           <div className={controls.row}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="rec-start">{recT('firstDate')}</label>
-              <input id="rec-start" className={controls.input} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <input id="rec-start" className={controls.input} type="date" value={startDate} onChange={(e) => setStartPick(e.target.value)} />
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="rec-due">{recT('dueAfter')}</label>

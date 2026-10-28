@@ -143,8 +143,10 @@ export const GLOBAL_SHORTCUTS: ShortcutInfo[] = [
   { combo: 'g t', label: 'Go to Invoices', group: 'Go to' },
   { combo: 'g c', label: 'Go to Clients', group: 'Go to' },
   { combo: 'g s', label: 'Go to Settings', group: 'Go to' },
+  { combo: 'alt+p', label: 'Go to POS counter', group: 'Go to' },
   { combo: 'mod+s', label: 'Save invoice', group: 'Invoice editor', external: true },
   { combo: 'mod+p', label: 'Open preview (print or PDF)', group: 'Invoice editor', external: true },
+  { combo: 'alt+r', label: 'Repeat the party\'s last bill', group: 'Invoice editor', external: true }, // R3-B6
 ];
 
 interface Entry {

@@ -553,3 +553,56 @@ test('M5: duplicate serials are flagged for debit notes and payroll runs too', a
     assert.deepEqual(keys, [`${DB_PREFIX}payroll_runs`, `${DB_PREFIX}purchase_returns`]);
   });
 });
+
+/* ── R4-C7 field-level merge ──────────────────────────────────── */
+
+test('R4-C7: a client edited on both devices is merged field by field and both devices converge', async () => {
+  await on(A, () => setTable('clients', [client('c1', 'Acme', { phone: '1', gstin: '27AAPFU0939F1ZV' })]));
+  await sync(A);
+  await sync(B);
+  await on(A, () => setTable('clients', [client('c1', 'Acme', { phone: '2', gstin: '27AAPFU0939F1ZV' })]));
+  await on(B, () => setTable('clients', [client('c1', 'Acme', { phone: '1', gstin: '29AAACB2230M1ZQ' })]));
+  await sync(A);
+  assert.equal((await sync(B)).conflicts, 1);
+  await on(B, async () => {
+    const c = loadConflicts()[0] as RowConflict;
+    assert.equal(c.reason, 'concurrent');
+    // Stale listing: the row changed again here after it was listed → refused, listing refreshed.
+    setTable('clients', [client('c1', 'Acme', { phone: '1', gstin: '29AAACB2230M1ZQ', city: 'Bengaluru' })]);
+    const stale = await resolveConflict(c.id, { merge: { phone: 'theirs' } }, { id: B.id, name: B.name });
+    assert.equal(stale.stale, true);
+    const r = await resolveConflict(c.id, { merge: { phone: 'theirs' } }, { id: B.id, name: B.name });
+    assert.deepEqual(r, { ok: true });
+    assert.deepEqual([byId('c1')?.city, (byId('c1') as { phone?: string }).phone, (byId('c1') as { gstin?: string }).gstin], ['Bengaluru', '2', '29AAACB2230M1ZQ']);
+    assert.equal(loadConflicts().length, 0);
+    assert.ok(getTable<AuditEntry>(AUDIT_TABLE).some((e) => /merged field by field/.test(e.summary)));
+  });
+  await sync(B);
+  await sync(A);
+  await on(A, () => {
+    assert.deepEqual([(byId('c1') as { phone?: string }).phone, (byId('c1') as { gstin?: string }).gstin], ['2', '29AAACB2230M1ZQ'], 'the merged version wins everywhere');
+    assert.equal(loadConflicts().length, 0);
+  });
+});
+
+test('R4-C7: merging a document into a locked period needs the PIN override; only concurrent row conflicts merge', async () => {
+  const inv = { id: 'i1', invoice_number: 'INV/FY26-27/0001', issue_date: '2026-05-10', status: 'Sent', total: 100, notes: 'a', client: { name: 'Acme' } };
+  await on(A, () => setTable('invoices', [inv]));
+  await sync(A);
+  await sync(B);
+  await on(A, () => setTable('invoices', [{ ...inv, notes: 'from A' }]));
+  await on(B, () => setTable('invoices', [{ ...inv, status: 'Paid' }]));
+  await sync(A);
+  await sync(B);
+  await on(B, async () => {
+    const c = loadConflicts().find((x) => x.kind === 'row') as RowConflict;
+    assert.equal(c.reason, 'concurrent');
+    setJson(SINGLETON_KEYS.settings, { lock_until: '2026-05-31' });
+    const locked = await resolveConflict(c.id, { merge: { notes: 'theirs' } }, { id: B.id, name: B.name });
+    assert.equal(locked.needsOverride, true);
+    const ok = await resolveConflict(c.id, { merge: { notes: 'theirs' } }, { id: B.id, name: B.name }, { override: true });
+    assert.equal(ok.ok, true);
+    const row = getTable<{ notes: string; status: string }>('invoices')[0];
+    assert.deepEqual([row.notes, row.status], ['from A', 'Paid']);
+  });
+});

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo } from 'react';
 import { NumberInput } from '../ui/NumberInput';
-import { DB_PREFIX, getJson } from '../../lib/storage';
+import { DB_PREFIX, getJson, getTable } from '../../lib/storage';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { pick } from '../../store/pick';
 import { useShallow } from 'zustand/react/shallow';
@@ -8,14 +8,31 @@ import { amountInWords } from '../../lib/amount-in-words';
 import { cn, currencySymbol, formatCurrency } from '../../lib/utils';
 import type { GstMode } from '../../types/invoice';
 import { amountInWordsHi } from '../../lib/amount-in-words-hi';
+import { amountInWordsIn, isWordsLang } from '../../lib/amount-in-words-in';
 import { useT, type MessageKey } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
+import { ita25Words } from '../../i18n/areas/ita2025';
+import { sectionText } from '../../lib/ita2025';
 import controls from '../../styles/controls.module.css';
 import styles from './SummaryPanel.module.css';
 
 // WP-9: loyalty redemption, loaded only while the programme is switched on.
 const EditorLoyalty = lazy(() => import('../loyalty/EditorLoyalty'));
 const LOYALTY_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY']);
+// 7U: sales agent, bill-value offer, prescription — loaded only once one of them is in use.
+const EditorExtras = lazy(() => import('../extras7u/EditorExtras'));
+// 8.102: live gross margin (hidden from viewers, never printed) — its own chunk.
+const MarginChip = lazy(() => import('../invoicing-ux/MarginChip'));
+// A3: payment mode + "Fully paid" on Amount received.
+const PayModeChips = lazy(() => import('../invoicing-ux/PayModeChips'));
+// R8-A (TR-A1 / A5): cash-discount term + returnable packaging strip (trade settings or a trading pack, lazy).
+const PackagingStrip = lazy(() => import('../trade/PackagingStrip'));
+import { localDb } from '../../lib/localDb';
+import { impliedPacks } from '../../lib/shop-mode';
+// R8-B (TR-B2/B3): bill charges, broker and weight slip (commodity / agency pack, lazy).
+const ChargesStrip = lazy(() => import('../trade/tr-b-hub').then((m) => ({ default: m.ChargesStrip })));
+// R9 (RT-A3): home delivery (Retail checks "Home delivery" on, or a document that carries one; lazy).
+const DeliveryStrip = lazy(() => import('../retail-r9/rt-a-hub').then((m) => ({ default: m.DeliveryStrip })));
 
 const GST_MODES: { id: GstMode; label: MessageKey }[] = [
   { id: 'CGST_SGST', label: 'summary.modeCgstSgst' },
@@ -36,7 +53,7 @@ function Row({ label, children, tone, strong }: { label: React.ReactNode; childr
 export function SummaryPanel() {
   const { t: tr, lang } = useT();
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['amount_paid', 'charges_taxable', 'patch', 'currency', 'discount_rate', 'discount_type', 'doc_type', 'gst_mode', 'other_charges', 'round_off_enabled', 'setAmountPaid', 'setDiscount', 'setGstMode', 'setOtherCharges', 'setRoundOff', 'setShipping', 'shipping', 'tcs_label', 'tds_section', 'totals'])),
+    useShallow((st) => pick(st, ['amount_paid', 'charges_taxable', 'patch', 'currency', 'discount_rate', 'discount_type', 'doc_type', 'gst_mode', 'issue_date', 'other_charges', 'round_off_enabled', 'setAmountPaid', 'setDiscount', 'setGstMode', 'setOtherCharges', 'setRoundOff', 'setShipping', 'shipping', 'tcs_label', 'tds_section', 'totals'])),
   );
   const t = s.totals;
   const cur = s.currency;
@@ -45,6 +62,16 @@ export function SummaryPanel() {
   const challan = s.doc_type === 'DELIVERY_CHALLAN';
   // Cheap check of the stored programme flag; the loyalty module itself loads only when it is on.
   const loyaltyOn = useMemo(() => getJson<{ enabled?: boolean } | null>(`${DB_PREFIX}loyalty_program`, null)?.enabled === true, []);
+  const trOn = useMemo(() => ((x) => !!x.trade_discounts || !!x.returnable_packaging || impliedPacks(x).some((p) => p === 'distributor' || p === 'commodity' || p === 'agency'))(localDb.settings.get()), []); // R8-A
+  const hasDelivery = useInvoiceStore((st) => !!st.delivery);
+  const deliveryOn = useMemo(() => getJson<{ delivery?: { enabled?: boolean } } | null>(`${DB_PREFIX}retail_settings`, null)?.delivery?.enabled === true, []) || hasDelivery; // R9
+  const packOn = useMemo(() => impliedPacks(localDb.settings.get()).some((p) => p === 'commodity' || p === 'agency'), []); // R8-B
+  const hasCharges = useInvoiceStore((st) => st.items.some((i) => !!i.charge_head_id && i.charge_head_id !== 'rule33')); // QA8 T16: saved charge lines stay live (R14: not a pure-agent line)
+  const tradeOn = packOn || hasCharges;
+  const extrasOn = useMemo(
+    () => getTable('sales_agents').length > 0 || getTable<{ kind?: string }>('schemes').some((x) => x?.kind === 'bill_value') || getJson<{ enabled?: boolean } | null>(`${DB_PREFIX}pharma_settings`, null)?.enabled === true,
+    [],
+  );
 
   return (
     <div className={styles.panel}>
@@ -74,6 +101,13 @@ export function SummaryPanel() {
           <EditorLoyalty />
         </Suspense>
       )}
+      {extrasOn && (
+        <Suspense fallback={null}>
+          <EditorExtras />
+        </Suspense>
+      )}
+      {tradeOn && <Suspense fallback={null}><ChargesStrip /></Suspense>}
+      {deliveryOn && <Suspense fallback={null}><DeliveryStrip /></Suspense>}
       {t.invoice_discount_amount > 0 && (
         <Row label={tr('summary.discountApplied')} tone="good">
           −{money(t.invoice_discount_amount)}
@@ -143,15 +177,28 @@ export function SummaryPanel() {
             <span>{tr('editor.total')}</span>
             <span>{money(t.total)}</span>
           </div>
-          <p className={styles.words}>{amountInWords(t.total, cur)}</p>
-          {lang === 'hi' && <p className={styles.words} lang="hi">{amountInWordsHi(t.total, cur)}</p>}
+          <Suspense fallback={null}>
+            <MarginChip />
+          </Suspense>
+          {trOn && <Suspense fallback={null}><PackagingStrip /></Suspense>}
+          {/* QA-3 F21: no bare "Zero" under an empty bill — words appear once there is an amount. */}
+          {t.total !== 0 && (
+            <>
+              <p className={styles.words}>{amountInWords(t.total, cur)}</p>
+              {lang === 'hi' && <p className={styles.words} lang="hi">{amountInWordsHi(t.total, cur)}</p>}
+              {isWordsLang(lang) && <p className={styles.words} lang={lang}>{amountInWordsIn(lang, t.total, cur)}</p>}
+            </>
+          )}
 
           <div className={styles.inputRow}>
             <span>{tr('summary.amountReceived')}</span>
             <NumberInput className={cn(controls.input, controls.inputNumeric, styles.small)} value={s.amount_paid} onChange={s.setAmountPaid} placeholder="0.00" aria-label={tr('summary.amountReceived')} />
           </div>
+          <Suspense fallback={null}>
+            <PayModeChips />
+          </Suspense>
           {t.tds_amount > 0 && (
-            <Row label={tr('summary.lessTds', { section: s.tds_section && s.tds_section !== 'CUSTOM' ? ` (${s.tds_section})` : '' })} tone="good">
+            <Row label={tr('summary.lessTds', { section: s.tds_section && s.tds_section !== 'CUSTOM' ? ` (${sectionText(s.tds_section, s.issue_date, ita25Words())})` : '' })} tone="good">
               −{money(t.tds_amount)}
             </Row>
           )}

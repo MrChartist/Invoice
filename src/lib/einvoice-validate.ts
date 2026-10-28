@@ -6,6 +6,7 @@
  * are structural + checksum only, not a registration lookup.
  */
 
+import { isNonGstFinancialNote } from './financial-note';
 import type { InvoiceRecord } from '../types/invoice';
 import { checkGstin } from './gstin';
 import { stateByCode } from './india-states';
@@ -34,6 +35,7 @@ import {
   type EwayOptions,
 } from './eway';
 import { rcmTaxOf } from './rcm';
+import { ewayChapterNote } from './retail/rt-cash-guard'; // R9 (RT-E2 / RT22)
 
 export interface PreflightResult {
   errors: PreflightIssue[];
@@ -123,7 +125,9 @@ export function validateEInvoice(
 
   // ── Source document ──
   if (record) {
-    if (!eInvoiceDocType(record)) {
+    if (isNonGstFinancialNote(record)) {
+      out.push(issue('error', 'DOC_TYPE', 'Document', 'A financial credit note (settlement discount, short payment or bad debt) carries no GST and is not reported to the IRP.'));
+    } else if (!eInvoiceDocType(record)) {
       out.push(issue('error', 'DOC_TYPE', 'Document', `${record.doc_type.replace(/_/g, ' ').toLowerCase()} documents are not reported to the IRP. Only tax invoices and credit/debit notes are.`));
     }
     if (record.status === 'Cancelled') {
@@ -321,6 +325,8 @@ export function preflightEInvoice(
 
 export function validateEway(bill: EwayBill, record?: InvoiceRecord, opts: { now?: Date; skippedServiceLines?: number } = {}): PreflightIssue[] {
   const out: PreflightIssue[] = [];
+  // R2-A2: a financial credit note moves no goods.
+  if (record && isNonGstFinancialNote(record)) out.push(issue('error', 'DOC_TYPE', 'Document', 'A financial credit note moves no goods: no e-Way bill.'));
   const now = opts.now ?? new Date();
 
   if (record && (record.doc_type === 'QUOTATION' || record.doc_type === 'PROFORMA' || record.doc_type === 'SALES_ORDER')) {
@@ -358,7 +364,11 @@ export function validateEway(bill: EwayBill, record?: InvoiceRecord, opts: { now
     out.push(issue('warning', 'EWB_SERVICES_SKIPPED', 'Items', `${opts.skippedServiceLines} service line(s) were left out of the e-Way file; it covers goods only.`));
   }
   if (!(bill.totInvValue > 0)) out.push(issue('error', 'EWB_VALUE', 'Value', 'Consignment value must be greater than zero.'));
-  if (bill.totInvValue <= EWAY_THRESHOLD && bill.itemList.length > 0) {
+  const ch71 = ewayChapterNote(bill.itemList.map((i) => String(i.hsnCode)), record?.issue_date); // R9 (RT-E2): chapter 71 needs no e-Way bill
+  if (ch71) out.push(issue('warning', 'EWB_CH71', 'Items', ch71));
+  // QA13 G5 (AG-C4, AG12): only nil / exempt goods — the same note as `ag-packing.ts` EXEMPT_EWAY_NOTE.
+  else if (bill.itemList.length > 0 && bill.itemList.every((i) => !(Number(i.igstRate) || Number(i.cgstRate) || Number(i.cessRate)))) out.push(issue('warning', 'EWB_EXEMPT', 'Items', 'e-Way bill may not be needed for exempt goods — verify with your CA (AG12).'));
+  else if (bill.totInvValue <= EWAY_THRESHOLD && bill.itemList.length > 0) {
     out.push(issue('warning', 'EWB_BELOW_THRESHOLD', 'Value', `Consignment value is ₹${bill.totInvValue.toLocaleString('en-IN')}, at or below the ₹50,000 threshold. An e-Way Bill is not mandatory for it (some states and goods differ).`));
   }
   const parts = bill.totalValue + bill.cgstValue + bill.sgstValue + bill.igstValue + bill.cessValue + bill.TotNonAdvolVal + bill.OthValue;

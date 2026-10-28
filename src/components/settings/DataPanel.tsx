@@ -6,7 +6,7 @@ import { Modal } from '../ui/Modal';
 import {
   backupFilename,
   clearSafetySnapshot,
-  exportPlainBackup,
+  exportPlainBackupBlob,
   plainBackupAllowed,
   VAULT_PLAIN_BACKUP_MESSAGE,
   getLastBackup,
@@ -25,13 +25,15 @@ import { forgetDeviceData } from '../../lib/auto-backup';
 import { requireAccess } from '../../lib/access';
 import { useCan } from '../../hooks/useCan';
 import { ImportWizard } from '../import/ImportWizard';
+import { KIND_LABELS, type ImportKind } from '../../lib/import-mapping';
+import { c6T } from '../../i18n/areas/closures-r6';
 import { SampleDataCard } from '../demo/SampleDataCard';
 import { assessStorage, formatChars, measureStorage } from '../../lib/storage-health';
 import { cleanupUnusedAttachments } from '../../lib/attachments';
 import { isIosSafari, isStandalone, requestPersistentStorage } from '../../lib/pwa';
 import { localDb } from '../../lib/localDb';
-import { downloadText } from '../../lib/download';
-import { formatCurrency } from '../../lib/utils';
+import { downloadBlob } from '../../lib/download';
+import { formatCurrency, formatDate } from '../../lib/utils';
 import type { InvoiceItem } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { setT } from '../../i18n/areas/settings';
@@ -40,6 +42,11 @@ import { migT } from '../../i18n/areas/migration';
 // WP-7: Tally import and the year-end wizard are separate lazy chunks, loaded on first open.
 const TallyImport = lazy(() => import('../import/TallyImport').then((m) => ({ default: m.TallyImport })));
 const YearEndWizard = lazy(() => import('../year-end/YearEndWizard').then((m) => ({ default: m.YearEndWizard })));
+// R4-C4 / C6: recently deleted (recycle bin) and the open-format export — lazy dialogs; their strings come with them.
+const RecycleBinPanel = lazy(() => import('../trust/RecycleBinPanel'));
+const OpenExportDialog = lazy(() => import('../trust/OpenExportDialog'));
+const TrustCard = lazy(() => import('../trust/TrustCard'));
+const RetentionNote = lazy(() => import('../trust/TrustCard').then((m) => ({ default: m.RetentionNote })));
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Settings.module.css';
@@ -54,14 +61,32 @@ interface PendingRestore {
   fileName: string;
 }
 
+/** QA-3 F14: name the backup by its business and date (the file name only when the backup carries neither). */
+function restoreSummaryText(p: PendingRestore | null): string {
+  if (!p) return '';
+  const counts = { invoices: p.summary.invoices, clients: p.summary.clients };
+  const date = p.summary.exportedAt ? formatDate(p.summary.exportedAt.slice(0, 10)) : '';
+  if (p.summary.business) return setT(date ? 'restoreContainsNamed' : 'restoreContainsName', { name: p.summary.business, date, ...counts });
+  return setT('restoreContains', { file: p.fileName, ...counts });
+}
+
 export function DataPanel({ notify }: Props) {
   useT(); // re-render on a language switch (5.4)
   const fileInput = useRef<HTMLInputElement>(null);
   const [version, setVersion] = useState(0);
   const [pending, setPending] = useState<PendingRestore | null>(null);
   const [wipeOpen, setWipeOpen] = useState(false);
-  const [importKind, setImportKind] = useState<'clients' | 'items' | 'invoices' | null>(null);
+  // R6-C3: `?import=1` (setup checklist) opens the wizard; `?import=<kind>` picks the kind.
+  const [importKind, setImportKind] = useState<ImportKind | null>(() => {
+    const v = new URLSearchParams(window.location.search).get('import');
+    return !v ? null : v === '1' ? 'clients' : (Object.keys(KIND_LABELS) as ImportKind[]).includes(v as ImportKind) ? (v as ImportKind) : null;
+  });
   const [wp7, setWp7] = useState<'tally' | 'yearEnd' | null>(null);
+  // R4-C: `?bin=1` / `?export=1` (command palette) open the dialog directly.
+  const [trust, setTrust] = useState<'bin' | 'export' | null>(() => {
+    const q = new URLSearchParams(window.location.search);
+    return q.get('bin') === '1' ? 'bin' : q.get('export') === '1' ? 'export' : null;
+  });
   const [safety, setSafety] = useState<SafetySnapshot | null>(null);
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [browserQuota, setBrowserQuota] = useState<number | null>(null);
@@ -105,11 +130,12 @@ export function DataPanel({ notify }: Props) {
 
   const exportBackup = () => {
     try {
-      downloadText(backupFilename(), exportPlainBackup(), 'application/json');
+      downloadBlob(backupFilename(), exportPlainBackupBlob()); // PERF-1: parts, never one 70 MB string
     } catch (err) {
       return notify((err as Error).message, 'error');
     }
     markBackupDone();
+    setVersion((v) => v + 1); // QA-3 F13: the status line re-reads the last-backup time now, not after a reload
     notify(setT('backupDownloaded'));
   };
 
@@ -117,15 +143,16 @@ export function DataPanel({ notify }: Props) {
     const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<{ createWritable: () => Promise<{ write: (b: Blob) => Promise<void>; close: () => Promise<void> }> }> }).showSaveFilePicker;
     if (!picker) return notify(setT('noFolderSave'), 'info');
     try {
-      const text = exportPlainBackup(); // owner only; refused in vault mode — before any file is created
+      const blob = exportPlainBackupBlob(undefined, 'application/json'); // owner only; refused in vault mode — before any file is created
       const handle = await picker({
         suggestedName: backupFilename(),
         types: [{ description: 'Invoice backup', accept: { 'application/json': ['.json'] } }],
       });
       const writable = await handle.createWritable();
-      await writable.write(new Blob([text], { type: 'application/json' }));
+      await writable.write(blob);
       await writable.close();
       markBackupDone();
+      setVersion((v) => v + 1);
       notify(setT('backupSaved'));
     } catch (err) {
       if ((err as Error).name !== 'AbortError') notify(setT('couldNotSave', { message: (err as Error).message }), 'error');
@@ -261,7 +288,7 @@ export function DataPanel({ notify }: Props) {
             </button>
             )}
           </div>
-          <input ref={fileInput} type="file" accept="application/json,.json" hidden onChange={(e) => onFile(e.target.files?.[0])} />
+          <input ref={fileInput} type="file" accept="application/json,.json,text/plain,.txt" hidden onChange={(e) => onFile(e.target.files?.[0])} />
           {safety && mayRestore && (
             <div className={styles.actionGrid}>
               <button type="button" className={styles.action} onClick={() => setUndoOpen(true)}>
@@ -296,6 +323,10 @@ export function DataPanel({ notify }: Props) {
               <strong>{setT('impInvoices')}</strong>
               <span>{setT('impInvoicesText')}</span>
             </button>
+            <button type="button" className={styles.action} onClick={() => setImportKind('ledgers')} data-import-openings>
+              <strong>{c6T('impOpenings')}</strong>
+              <span>{c6T('impOpeningsText')}</span>
+            </button>
           </div>
         </div>
       </section>
@@ -329,6 +360,15 @@ export function DataPanel({ notify }: Props) {
           ) : (
             <YearEndWizard open onClose={() => setWp7(null)} notify={notify} />
           )}
+        </Suspense>
+      )}
+
+      <Suspense fallback={null}>
+        <TrustCard onOpen={setTrust} canExport={mayBackup} />
+      </Suspense>
+      {trust && (
+        <Suspense fallback={null}>
+          {trust === 'bin' ? <RecycleBinPanel onClose={() => setTrust(null)} notify={notify} /> : <OpenExportDialog onClose={() => setTrust(null)} />}
         </Suspense>
       )}
 
@@ -380,6 +420,7 @@ export function DataPanel({ notify }: Props) {
         </div>
         <div className={surface.cardBody}>
           <p className={surface.sectionNote}>{setT('dangerText')}</p>
+          <Suspense fallback={null}><RetentionNote /></Suspense>
           <button type="button" className={controls.btnOutline} style={{ alignSelf: 'flex-start', color: 'var(--destructive)' }} onClick={() => setWipeOpen(true)}>
             <Trash2 size={16} /> {setT('eraseAll')}
           </button>
@@ -409,7 +450,7 @@ export function DataPanel({ notify }: Props) {
         }
       >
         <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--muted-foreground)', margin: 0 }}>
-          {setT('restoreContains', { file: pending?.fileName ?? '', invoices: pending?.summary.invoices ?? 0, clients: pending?.summary.clients ?? 0 })}
+          {restoreSummaryText(pending)}
           {' '}{attachmentRestoreNote(pending?.summary)}{' '}
           {setT('restoreWarn')}
         </p>

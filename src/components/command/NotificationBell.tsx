@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { AlertOctagon, AlertTriangle, Bell, BellOff, CheckCheck, Clock, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { getTable, subscribeStorageChanges } from '../../lib/storage';
+import { t } from '../../i18n';
+import { DB_PREFIX, SINGLETON_KEYS, getJson, peekTable, readRaw, subscribeStorageChanges } from '../../lib/storage';
 import { readApprovalPolicy } from '../../lib/approval-gate';
 import { can } from '../../lib/access';
 import {
   dismiss,
   loadNotifState,
-  loadVisibleNotifications,
+  reusableVisibleNotifications,
   markAllRead,
   markRead,
   pruneState,
@@ -15,12 +16,14 @@ import {
   snooze,
   unreadCount,
   buildContext,
+  registerNotificationProvider,
   collectNotifications,
   type NotifState,
   type NotificationSeverity,
   type SnoozeDays,
   type VisibleNotification,
 } from '../../lib/notifications';
+import { BackupStatusLine } from '../pwa/BackupStatusLine';
 import styles from './NotificationBell.module.css';
 
 export interface NotificationBellProps {
@@ -39,11 +42,11 @@ let expiryAlerts: 'off' | 'loading' | 'on' = 'off';
 function ensureExpiryAlerts(onReady: () => void): void {
   if (expiryAlerts !== 'off') return;
   try {
-    const items = getTable<{ track_stock?: boolean; track_batches?: boolean; reorder_level?: number; reorder_by_godown?: Record<string, number> }>('stock_items');
+    const items = peekTable<{ track_stock?: boolean; track_batches?: boolean; reorder_level?: number; reorder_by_godown?: Record<string, number> }>('stock_items');
     // Batch expiry (6.6) and reorder-level (Phase 7) alerts share one lazily loaded provider.
     const wants = (i: (typeof items)[number]) =>
       i.track_batches || Number(i.reorder_level) > 0 || Object.values(i.reorder_by_godown ?? {}).some((v) => Number(v) > 0);
-    if (!items.some((i) => i.track_stock && wants(i))) return;
+    if (!items.some((i) => i.track_stock && wants(i)) && !peekTable('job_work_out').length) return; // 7S: job-work clocks
   } catch {
     return;
   }
@@ -69,8 +72,10 @@ function ensureBusinessAlerts(onReady: () => void): void {
   try {
     // 7O: TDS deposit / 26Q reminders once TDS is in use (a challan, or a bill / payment carrying TDS).
     const tds = (r: unknown) => Number((r as { tds_amount?: unknown } | null)?.tds_amount) > 0;
-    const used = getTable('amc_contracts').length > 0 || getTable('gst_setoffs').length > 0 || getTable('gst_challans').length > 0
-      || getTable('tds_challans').length > 0 || getTable('purchases').some(tds) || getTable('purchase_payments').some(tds);
+    const used = peekTable('amc_contracts').length > 0 || peekTable('gst_setoffs').length > 0 || peekTable('gst_challans').length > 0
+      || peekTable('tds_challans').length > 0 || peekTable('purchases').some(tds) || peekTable('purchase_payments').some(tds)
+      // 7R: TCS (27EQ) reminders once an invoice carries TCS.
+      || peekTable('invoices').some((r) => Number((r as { tcs_amount?: unknown } | null)?.tcs_amount) > 0);
     if (!used && !(readApprovalPolicy().enabled && can('doc.approve'))) return;
   } catch {
     return;
@@ -87,6 +92,239 @@ function ensureBusinessAlerts(onReady: () => void): void {
     });
 }
 
+/**
+ * 8D GST guards (IRP 30-day window, return time bar): lazily, once an AATO is entered on a profile, an IRN /
+ * e-Way Bill is recorded, or a tax invoice is more than two years old.
+ */
+let guardAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensureGstGuardAlerts(onReady: () => void): void {
+  if (guardAlerts !== 'off') return;
+  try {
+    const old = `${new Date().getFullYear() - 2}-12-31`;
+    const aato = (getJson<{ profiles?: { einvoice_aato?: number }[] } | null>(SINGLETON_KEYS.settings, null)?.profiles ?? []).some((p) => Number(p?.einvoice_aato) > 0);
+    if (!aato && !peekTable('einvoice_meta').length
+      && !peekTable<{ issue_date?: string; status?: string }>('invoices').some((i) => i?.status !== 'Draft' && String(i?.issue_date ?? '9') < old)) return;
+  } catch {
+    return;
+  }
+  guardAlerts = 'loading';
+  import('../../lib/gst-guard-alerts')
+    .then((m) => {
+      m.registerGstGuardAlerts();
+      guardAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      guardAlerts = 'off';
+    });
+}
+
+/**
+ * 8C notices (bills due this week, recurring / draft bills, inbox documents, purchase approvals): lazy,
+ * and only once an unpaid bill with a due date or one of the 8C tables has rows.
+ */
+let captureAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensureCaptureAlerts(onReady: () => void): void {
+  if (captureAlerts !== 'off') return;
+  try {
+    const due = (r: unknown) => { const p = r as { due_date?: string; total?: number; amount_paid?: number } | null; return !!p?.due_date && Number(p.amount_paid) < Number(p.total); };
+    if (!['doc_inbox', 'purchase_drafts', 'recurring_bills', 'payment_requests'].some((t) => peekTable(t).length) && !peekTable('purchases').some(due)) return;
+  } catch {
+    return;
+  }
+  captureAlerts = 'loading';
+  import('../../lib/capture-alerts')
+    .then((m) => {
+      m.registerCaptureAlerts();
+      captureAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      captureAlerts = 'off';
+    });
+}
+
+/** 8.109: month-end pack schedule (device-local) — its provider loads only once a schedule is set. */
+let packAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensurePackAlerts(onReady: () => void): void {
+  if (packAlerts !== 'off') return;
+  try {
+    if (!(Number(JSON.parse(globalThis.localStorage?.getItem('mrchartist_report_pack') ?? '{}')?.day) > 0)) return;
+  } catch {
+    return;
+  }
+  packAlerts = 'loading';
+  import('../../lib/report-pack-alerts')
+    .then((m) => {
+      m.registerPackAlerts(onReady);
+      packAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      packAlerts = 'off';
+    });
+}
+
+// R3-B2: project budget warnings (80% / 100%) — the provider loads only once `project_tasks` has rows.
+let projectAlerts: 'off' | 'loading' | 'on' = 'off';
+function ensureProjectAlerts(onReady: () => void): void {
+  if (projectAlerts !== 'off') return;
+  try {
+    if (!peekTable('project_tasks').length) return;
+  } catch {
+    return;
+  }
+  projectAlerts = 'loading';
+  import('../../lib/project-alerts')
+    .then((m) => {
+      m.registerProjectAlerts();
+      projectAlerts = 'on';
+      onReady();
+    })
+    .catch(() => {
+      projectAlerts = 'off';
+    });
+}
+
+// R3-C: e-Way Bill expiry (only once `einvoice_meta` holds an e-Way Bill number) and DSC expiry (only once
+// `dsc_register` has rows) — each provider loads lazily on its own.
+const r3cAlerts: Record<string, 'off' | 'loading' | 'on'> = {};
+function ensureR3cAlerts(onReady: () => void): void {
+  const gate = (id: string, wants: () => boolean, load: () => Promise<void>) => {
+    if (r3cAlerts[id] && r3cAlerts[id] !== 'off') return;
+    try {
+      if (!wants()) return;
+    } catch {
+      return;
+    }
+    r3cAlerts[id] = 'loading';
+    load().then(() => { r3cAlerts[id] = 'on'; onReady(); }, () => { r3cAlerts[id] = 'off'; });
+  };
+  gate('eway', () => peekTable<{ eway_no?: string }>('einvoice_meta').some((m) => !!m?.eway_no), () => import('../../lib/eway-alerts').then((m) => m.registerEwayAlerts()));
+  gate('dsc', () => peekTable('dsc_register').length > 0, () => import('../../lib/dsc-alerts').then((m) => m.registerDscAlerts()));
+}
+
+function runBell(force: boolean, setItems: (list: VisibleNotification[]) => void, reload: () => void): void {
+  try {
+    setItems(reusableVisibleNotifications(new Date(), force));
+  } catch {
+    setItems([]);
+  }
+  ensureExpiryAlerts(reload);
+  ensureBusinessAlerts(reload);
+  ensureGstGuardAlerts(reload);
+  ensureCaptureAlerts(reload);
+  ensurePackAlerts(reload);
+  ensureProjectAlerts(reload); // R3-B
+  ensureR3cAlerts(reload); // R3-C
+  ensureProductionAlerts(reload); // R4-A
+  ensureTransferAlerts(reload); // R4-B
+  ensureTradeAlerts(reload); // R4-C
+  ensureTrustAlerts(reload); // R4-C
+  ensureMarketplaceAlerts(reload); // R5-A
+  ensureR5cAlerts(reload); // R5-C
+  ensureTransportWorksAlerts(reload); // R5-B
+}
+
+/** Coalesces refresh requests into one run on the next task (a forced request wins). */
+function bellScheduler(setItems: (list: VisibleNotification[]) => void) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let force = false;
+  const s = {
+    schedule(f = false): void {
+      force ||= f;
+      if (timer !== null) return;
+      timer = setTimeout(() => {
+        const ff = force;
+        timer = null;
+        force = false;
+        s.run(ff);
+      }, 0);
+    },
+    run(f: boolean): void {
+      runBell(f, setItems, () => s.schedule(true));
+    },
+    cancel(): void {
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      force = false;
+    },
+  };
+  return s;
+}
+
+// R4-A: production orders past due / completed-not-closed and stock aged in QC — lazy, once an order or a QC godown exists.
+let productionAlerts = 0;
+function ensureProductionAlerts(onReady: () => void): void {
+  if (productionAlerts || !(peekTable('production_orders').length || peekTable<{ kind?: string }>('godowns').some((g) => g?.kind === 'qc'))) return;
+  productionAlerts = 1;
+  import('../../lib/production/order-alerts').then((m) => { m.registerProductionAlerts(onReady); onReady(); }, () => { productionAlerts = 0; });
+}
+
+// R4-B: goods in transit too long and transfer requests past their needed-by date — lazy, once a request exists.
+let transferAlerts = 0;
+function ensureTransferAlerts(onReady: () => void): void {
+  if (transferAlerts || !peekTable('transfer_requests').length) return;
+  transferAlerts = 1;
+  import('../../lib/retail/transfer-alerts').then((m) => { m.registerTransferAlerts(); onReady(); }, () => { transferAlerts = 0; });
+}
+
+// R4-C: export desk (LUT + realisation) — lazy, once an LUT row or an export invoice exists.
+let tradeAlerts = 0;
+function ensureTradeAlerts(onReady: () => void): void {
+  if (tradeAlerts || !(peekTable('lut_register').length || peekTable<{ supply_type?: string; place_of_supply?: string }>('invoices').some((i) => /^EXPORT/.test(i?.supply_type ?? '') || /^9[67]$/.test(i?.place_of_supply ?? '')))) return;
+  tradeAlerts = 1;
+  import('../../lib/trade/export-alerts').then((m) => { m.registerTradeAlerts(); onReady(); }, () => { tradeAlerts = 0; });
+}
+
+// R4-C: recycle-bin purge after first paint and the 8-FY edit-log retention notice — lazy, once the bin has rows or the log is old.
+let trustAlerts = 0;
+function ensureTrustAlerts(onReady: () => void): void {
+  if (trustAlerts || !(peekTable('recycle_bin').length || +(/"at":"(\d{4})/.exec(readRaw(DB_PREFIX + 'audit_log')?.slice(0, 400) ?? '')?.[1] ?? 1e4) < new Date().getFullYear() - 8)) return;
+  trustAlerts = 1;
+  import('../../lib/trust/trust-alerts').then((m) => { m.registerTrustAlerts(); onReady(); }, () => { trustAlerts = 0; });
+}
+
+// R5-A: marketplace notices — lazy, only with the marketplace pack on (same rule as `industry-packs.ts`) and a channel.
+let marketplaceAlerts = 0;
+function ensureMarketplaceAlerts(onReady: () => void): void {
+  if (marketplaceAlerts || !peekTable('sales_channels').length) return;
+  const s = getJson<{ industry_packs?: unknown; business_type?: string } | null>(SINGLETON_KEYS.settings, null);
+  if (!(Array.isArray(s?.industry_packs) ? s.industry_packs.includes('marketplace') : s?.business_type === 'ecommerce')) return;
+  marketplaceAlerts = 1;
+  import('../../lib/marketplace/marketplace-alerts').then((m) => { m.registerMarketplaceAlerts(); onReady(); }, () => { marketplaceAlerts = 0; });
+}
+
+// R5-C: fee / donation / lease notices — lazy, only with the fees / nonprofit / leases pack on and its table in use.
+let r5cAlerts = 0;
+function ensureR5cAlerts(onReady: () => void): void {
+  if (r5cAlerts) return;
+  const s = getJson<{ industry_packs?: unknown; business_type?: string } | null>(SINGLETON_KEYS.settings, null);
+  const on = Array.isArray(s?.industry_packs) ? s.industry_packs : [({ institution: 'fees', nonprofit: 'nonprofit', property: 'leases' } as Record<string, string>)[s?.business_type ?? '']];
+  if (!(['fee_plans', 'donations', 'leases'] as const).some((t, i) => on.includes(['fees', 'nonprofit', 'leases'][i]) && peekTable(t).length)) return;
+  r5cAlerts = 1;
+  import('../institutions/r5c-lazy').then((l) => l.r5c()).then((m) => { m.registerR5cAlerts(); onReady(); }, () => { r5cAlerts = 0; });
+}
+
+// R5-B: transport / works notices — each loads lazily, only with its pack on (same rule as `industry-packs.ts`).
+const twAlerts: Record<string, number> = {};
+function ensureTransportWorksAlerts(onReady: () => void): void {
+  const s = getJson<{ industry_packs?: unknown; business_type?: string } | null>(SINGLETON_KEYS.settings, null);
+  const gate = (p: string, type: string, load: () => Promise<unknown>) => {
+    if (twAlerts[p] || !(Array.isArray(s?.industry_packs) ? s.industry_packs.includes(p) : s?.business_type === type)) return;
+    twAlerts[p] = 1;
+    load().then(onReady, () => { twAlerts[p] = 0; });
+  };
+  gate('transport', 'transport', () => import('../../lib/transport/transport-alerts')); // registers itself on load
+  gate('works', 'contractor', () => import('../../lib/works/works-alerts'));
+  gate('hotel', 'hotel', () => import('../hotel/hotel-lazy').then((l) => l.hotelChunk()).then((m) => m.registerHotelAlerts())); // R7-C2 ensureHotelAlerts (the pack's chunk)
+  gate('pharmacy', '-', () => import('../retail-r9/PharmacyDesk').then((m) => m.registerPharmacyAlerts())); // R9 (RT-B): licence expiry, refills due (explicit pack only)
+  gate('clinic', '-', () => import('../../lib/services/sv-clinic-alerts')); // R10 (SV-B): registration expiry, long admissions, deposits (registers itself)
+  for (const p of ['agri_inputs', 'coldstore', 'fpo']) gate(p, '-', () => import('../../lib/agri/ag-d-alerts')); // R12 (AG-D): dealer licences, liens past due, members' AGM / return dates (registers itself once)
+  gate('manpower', '-', () => import('../../lib/manpower/mp-alerts').then((m) => registerNotificationProvider(m.mpNotices))); // R17-D3: licences, guard licences, contract ends, VDA months (explicit pack)
+  gate('society', '-', () => import('../../lib/society/hs-alerts').then((m) => registerNotificationProvider(m.hsNotices))); // R18-D3: society audit due dates (explicit pack)
+}
+
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {
   critical: AlertOctagon,
   warning: AlertTriangle,
@@ -101,43 +339,42 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
   const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
 
-  const refresh = useCallback(() => {
-    try {
-      setItems(loadVisibleNotifications(new Date()));
-    } catch {
-      setItems([]);
-    }
-    const reload = () => {
-      try {
-        setItems(loadVisibleNotifications(new Date()));
-      } catch {
-        /* keep what is shown */
-      }
-    };
-    ensureExpiryAlerts(reload);
-    ensureBusinessAlerts(reload);
-  }, []);
+  // PERF-1: every trigger (poll, focus, cross-tab change, a provider that finished loading) is coalesced
+  // into ONE run on the next task; unchanged data reuses the providers' last result (`reusableVisibleNotifications`).
+  const [bell] = useState(() => bellScheduler(setItems));
+  /** Immediate, fresh refresh (the bell is opened, a notice was acted on). */
+  const refresh = useCallback(() => bell.run(true), [bell]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    refresh();
-    const timer = setInterval(refresh, pollMs);
-    window.addEventListener('focus', refresh);
-    window.addEventListener('storage', refresh);
-    const unsubscribe = subscribeStorageChanges(refresh);
+    const schedule = (f = false) => bell.schedule(f);
+    // First run after first paint, in idle time (never in the boot critical path).
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    const idle = w.requestIdleCallback ? w.requestIdleCallback(() => schedule(), { timeout: 2000 }) : null;
+    const boot = idle === null ? setTimeout(() => schedule(), 0) : null;
+    const tick = () => schedule();
+    // Another tab's localStorage write (device-local keys) is invisible to `storageVersion`: recompute.
+    const onStorage = () => schedule(true);
+    const timer = setInterval(tick, pollMs);
+    window.addEventListener('focus', tick);
+    window.addEventListener('storage', onStorage);
+    const unsubscribe = subscribeStorageChanges(tick);
     return () => {
       unsubscribe();
       clearInterval(timer);
-      window.removeEventListener('focus', refresh);
-      window.removeEventListener('storage', refresh);
+      if (idle !== null) w.cancelIdleCallback?.(idle);
+      if (boot !== null) clearTimeout(boot);
+      bell.cancel();
+      window.removeEventListener('focus', tick);
+      window.removeEventListener('storage', onStorage);
     };
-  }, [refresh, pollMs]);
+  }, [bell, pollMs]);
 
   // Close on outside click / Escape; return focus to the bell.
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      // A dialog opened from the panel (Share backup) is portalled outside it: keep the panel open.
+      if (!rootRef.current?.contains(e.target as Node) && !(e.target as Element | null)?.closest?.('[aria-modal="true"]')) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -173,7 +410,7 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
     }
   };
 
-  const label = unread ? `Notifications, ${unread} unread` : 'Notifications';
+  const label = unread ? t('shell.notificationsUnread', { n: unread }) : t('shell.notifications');
 
   return (
     <div ref={rootRef} className={cn(styles.root, className)}>
@@ -218,6 +455,8 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
               </button>
             )}
           </div>
+          {/* 8.20: persistent backup line for whoever may back up (owner). */}
+          {can('data.backup') && <BackupStatusLine compact />}
 
           {items.length === 0 ? (
             <div className={styles.empty}>

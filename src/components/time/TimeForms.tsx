@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import type { Client } from '../../types/invoice';
 import type { MileageEntry, TimeEntry, TimePrefs } from '../../types/time';
 import { formatMinutes, mileageDb, parseDuration, timeDb } from '../../lib/timesheets';
@@ -11,6 +11,13 @@ import controls from '../../styles/controls.module.css';
 import styles from './time.module.css';
 import { useT } from '../../i18n';
 import { timeT } from '../../i18n/areas/time';
+import { RateSourceTag, TaskSelect, WorkTypeSelect } from './rate-ui'; // R3-B1 / B2
+import { rateFor, useRateMasters } from './rate-masters';
+import { isPackOn } from '../../lib/industry-packs';
+import { localDb } from '../../lib/localDb';
+
+// R14 (PS-A4): "Who" (the timekeeper) while the `practice` pack is on.
+const WhoRow = lazy(() => import('../prof/WhoRow'));
 
 /** Client dropdown over CRM rows with an id (billing links by id). */
 export function ClientSelect({ id, clients, value, onChange }: {
@@ -57,11 +64,28 @@ function EntryForm({ entry, clients, prefs, onClose, onSaved }: {
   const [description, setDescription] = useState(entry?.description ?? '');
   const [date, setDate] = useState(entry?.date ?? todayInput());
   const [duration, setDuration] = useState(entry ? `${Math.floor(entry.minutes / 60)}:${String(Math.round(entry.minutes % 60)).padStart(2, '0')}` : '');
-  const [rate, setRate] = useState(entry?.hourly_rate ?? prefs.default_rate);
   const [billable, setBillable] = useState(entry?.billable ?? true);
   const centres = useCostCentres();
   const [costCentre, setCostCentre] = useState<string | undefined>(entry?.cost_centre_id ?? matchCostCentre(entry?.project, centres));
   const [error, setError] = useState('');
+  // R3-B1 / B2: task + work type; a new entry takes the rate the cards resolve until a rate is typed.
+  // An existing entry keeps its captured rate (shown as typed) — "Re-rate unbilled" is the bulk way.
+  const masters = useRateMasters();
+  const [taskId, setTaskId] = useState(entry?.task_id ?? '');
+  const [workTypeId, setWorkTypeId] = useState(entry?.work_type_id ?? '');
+  const [typedRate, setTypedRate] = useState<number | null>(entry ? entry.hourly_rate : null);
+  const [who, setWho] = useState<{ id?: string; rate?: number }>({ id: entry?.staff_id });
+  const resolved = rateFor({ client_id: clientId || entry?.client_id, task_id: taskId || undefined, cost_centre_id: costCentre, work_type_id: workTypeId || undefined }, masters, clients, prefs, { staffRate: who.rate });
+  const rate = typedRate ?? resolved.rate;
+  const setRate = (v: number) => setTypedRate(v);
+  const pickTask = (id: string) => {
+    setTaskId(id);
+    const t = masters.tasks.find((x) => x.id === id);
+    if (!t) return;
+    setCostCentre(t.cost_centre_id);
+    const cc = centres.find((c) => c.id === t.cost_centre_id);
+    if (cc && !project.trim()) setProject(cc.name);
+  };
 
   const submit = () => {
     const minutes = parseDuration(duration);
@@ -79,6 +103,9 @@ function EntryForm({ entry, clients, prefs, onClose, onSaved }: {
       hourly_rate: Math.max(Number(rate) || 0, 0),
       billable,
       cost_centre_id: costCentre,
+      task_id: taskId || undefined,
+      work_type_id: workTypeId || undefined,
+      staff_id: who.id ?? entry?.staff_id,
     });
     onSaved(entry ? timeT('entryUpdated') : timeT('logged', { time: formatMinutes(minutes) }));
     onClose();
@@ -109,6 +136,11 @@ function EntryForm({ entry, clients, prefs, onClose, onSaved }: {
         }}
         hint={timeT('ccHint')}
       />
+      <div className={controls.row}>
+        <TaskSelect id="te-task" masters={masters} clientId={clientId} value={taskId} onChange={pickTask} />
+        <WorkTypeSelect id="te-wt" workTypes={masters.workTypes} value={workTypeId} onChange={setWorkTypeId} />
+      </div>
+      {isPackOn(localDb.settings.get(), 'practice') && <Suspense fallback={null}><WhoRow value={who.id} date={date} onChange={(id, r) => setWho({ id, rate: r })} /></Suspense>}
       <div className={controls.field}>
         <label className={controls.label} htmlFor="te-desc">{timeT('description')}</label>
         <input id="te-desc" className={controls.input} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={timeT('descPh')} />
@@ -123,7 +155,7 @@ function EntryForm({ entry, clients, prefs, onClose, onSaved }: {
           <input id="te-dur" className={controls.input} value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="1:30" autoFocus />
         </div>
         <div className={controls.field}>
-          <label className={controls.label} htmlFor="te-rate">{timeT('ratePerHour')}</label>
+          <label className={controls.label} htmlFor="te-rate">{timeT('ratePerHour')} <RateSourceTag source={typedRate === null ? resolved.source : 'manual'} /></label>
           <input id="te-rate" type="number" min={0} step="0.01" className={controls.input} value={rate || ''} onChange={(e) => setRate(Number(e.target.value) || 0)} />
         </div>
       </div>

@@ -6,6 +6,18 @@
  * exact total it was issued with (flat `tax_rate` + a single "Tax" line).
  */
 
+import type {} from '../types/docs-r3'; // R3-C2: delivery_proof (RECORD_KEYS)
+import type {} from '../types/trade-r4'; // R4-C1: export document fields (RECORD_KEYS)
+import type {} from '../types/hotel-r7'; // R7: folio_id / reservation_id / stay / hotel_band (RECORD_KEYS)
+import type {} from '../types/trade-r8'; // R8: trading record / line fields (R8_RECORD_KEYS, R8_LINE_KEYS)
+import type {} from '../types/retail-r9'; // R9: retail record / line fields (R9_RECORD_KEYS, R9_LINE_KEYS)
+import type {} from '../types/services-r10'; // R10: the record / line snapshot key `sv` (appended to R9's lists)
+import type {} from '../types/agri-r12'; // R12: the record snapshot key `ag` (R12_RECORD_KEYS)
+import type {} from '../types/mfg-r13'; // R13: the record snapshot key `mf` (R13_RECORD_KEYS)
+import type {} from '../types/prof-r14'; // R14: the record snapshot key `ps` (R14_RECORD_KEYS)
+import type {} from '../types/travel-r15'; // R15: the record snapshot key `tv` (R15_RECORD_KEYS)
+import type {} from '../types/manpower-r17'; // R17: the record snapshot key `mp` (R17_RECORD_KEYS)
+import type {} from '../types/society-r18'; // R18: the record snapshot key `hs` (R18_RECORD_KEYS)
 import { generateId } from '../lib/storage';
 import { deriveGstMode, num } from '../lib/invoice-calc';
 import { resolveStateCode } from '../lib/india-states';
@@ -13,6 +25,9 @@ import { addDaysInput, todayInput } from '../lib/utils';
 import { readValues } from '../lib/custom-fields';
 import { readRefs } from '../lib/attachments';
 import { normalizeTransport } from '../lib/transport';
+import { sanitizePartyBalance } from '../lib/party-balance';
+import { normalizeSchedule, sanitizeAcceptance } from '../lib/doc-snapshots';
+import type {} from '../types/sales-r2';
 import type { AppSettings } from '../lib/localDb';
 import type {
   AmendmentInfo,
@@ -152,6 +167,28 @@ export function advancedTaxDefaults(): Partial<InvoiceRecord> {
   };
 }
 
+/**
+ * R8-C (shared for TR-A / TR-B / TR-C, src/types/trade-r8.ts): additive record and line keys, kept as stored when
+ * present (snapshots — never recomputed here).
+ */
+export const R8_RECORD_KEYS = ['cash_discount', 'price_drop_id', 'interest_run_id', 'broker_id', 'agency'] as const;
+export const R8_LINE_KEYS = ['disc_chain', 'disc_per_unit', 'wt', 'charge_head_id', 'arrival_id'] as const;
+/** R9 (owner RT-A, every package's keys — src/types/retail-r9.ts): delivery / KYC on the record; band, IMEI pairs, margin, jewellery breakdown on lines. R10: `sv` (src/types/services-r10.ts). */
+/** R12 (AG-A, src/types/agri-r12.ts): ONE record key `ag` (the agri snapshot); weighing reuses the R8 line key `wt`. */
+export const R12_RECORD_KEYS = ['ag'] as const;
+/** R13 (MF-A, src/types/mfg-r13.ts): ONE record key `mf` (the manufacturing snapshot); no line key. */
+export const R13_RECORD_KEYS = ['mf'] as const;
+/** R14 (PS-A, src/types/prof-r14.ts): ONE record key `ps` (the professional snapshot); no line key. */
+export const R14_RECORD_KEYS = ['ps'] as const;
+/** R15 (R15-B, src/types/travel-r15.ts): ONE record key `tv` (the travel snapshot); no line key. */
+export const R15_RECORD_KEYS = ['tv'] as const;
+/** R17 (R17-A, src/types/manpower-r17.ts): ONE record key `mp` (the manpower snapshot); no line key. */
+export const R17_RECORD_KEYS = ['mp'] as const;
+/** R18 (R18-A, src/types/society-r18.ts): ONE record key `hs` (the housing-society snapshot); no line key. */
+export const R18_RECORD_KEYS = ['hs'] as const;
+export const R9_RECORD_KEYS = ['delivery', 'kyc', 'sv', ...R12_RECORD_KEYS, ...R13_RECORD_KEYS, ...R14_RECORD_KEYS, ...R15_RECORD_KEYS, ...R17_RECORD_KEYS, ...R18_RECORD_KEYS] as const; // R12 / R13 / R14 / R15 / R17 / R18: one spread token each (normalizeRecord, RECORD_KEYS)
+export const R9_LINE_KEYS = ['band_rate', 'serial_pairs', 'margin', 'jw', 'sv', 'ag_class'] as const; // QA13 G7: + the R12 line class
+
 function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
   const item = (raw ?? {}) as Partial<InvoiceItem>;
   const quantity = num(item.quantity, 1);
@@ -171,6 +208,12 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(num(item.cess_per_unit) > 0 ? { cess_per_unit: num(item.cess_per_unit) } : {}),
     amount: num(item.amount, quantity * rate),
     ...(item.order_line_id ? { order_line_id: String(item.order_line_id) } : {}),
+    // R2-B (additive): optional / alternative quotation lines, the source line a stage invoice bills.
+    ...(item.optional ? { optional: true } : {}),
+    ...(typeof item.selected === 'boolean' && (item.optional || item.alt_group) ? { selected: item.selected } : {}),
+    ...(typeof item.alt_group === 'string' && item.alt_group.trim() ? { alt_group: item.alt_group.trim() } : {}),
+    ...(item.progress_line_of ? { progress_line_of: String(item.progress_line_of) } : {}),
+    ...(item.boq_ref ? { boq_ref: String(item.boq_ref) } : {}), // R5-B4: BOQ item no.
     ...(typeof item.cost_centre_id === 'string' && item.cost_centre_id ? { cost_centre_id: item.cost_centre_id } : {}),
     ...(Array.isArray(item.bill_refs) && item.bill_refs.length ? { bill_refs: item.bill_refs.map(String) } : {}),
     ...(readValues(item.custom_values).length ? { custom_values: readValues(item.custom_values) } : {}),
@@ -187,6 +230,9 @@ function normalizeItem(raw: unknown, fallbackTaxRate: number): InvoiceItem {
     ...(item.free_of ? { free_of: String(item.free_of) } : {}),
     // Alternate unit (WP-8): only on lines typed in one, so base-unit lines keep their exact shape.
     ...(num(item.unit_factor) > 0 && num(item.unit_factor) !== 1 ? { unit_factor: num(item.unit_factor) } : {}),
+    // R3-C2 (additive): the catalogue photo reference the line snapshotted at save.
+    ...(typeof item.image === 'string' && item.image.startsWith('asset:') ? { image: item.image } : {}),
+    ...Object.fromEntries([...R8_LINE_KEYS, ...R9_LINE_KEYS].filter((k) => item[k] != null).map((k) => [k, item[k]])), // R8-C, R9
   };
 }
 
@@ -218,6 +264,11 @@ function ecoFields(gstin: unknown, section: unknown): { eco_gstin?: string; eco_
 }
 
 /** Upgrade any stored record (old or new) to the current `InvoiceRecord` shape. */
+/** R5-B additive record keys: kept by `normalizeRecord`, listed in `RECORD_KEYS` (one spread line). */
+export const R5B_RECORD_KEYS = ['lr_ids', 'ra_no', 'ra_final', 'boq_id', 'ra_deductions', 'ra_net_payable', 'retention_release_on', 'boq_terms'] as const;
+/** R7 hotel additive record keys (src/types/hotel-r7.ts): kept by `normalizeRecord`, listed in `RECORD_KEYS`. */
+export const R7_RECORD_KEYS = ['folio_id', 'reservation_id', 'stay', 'hotel_band'] as const;
+
 export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_orange'): InvoiceRecord {
   const r = (raw ?? {}) as Partial<InvoiceRecord> & Record<string, unknown>;
   const flatTaxRate = num(r.tax_rate);
@@ -266,6 +317,57 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     // P1-13 (additive): user voucher type and its print title snapshot.
     ...(typeof r.voucher_type_id === 'string' && r.voucher_type_id ? { voucher_type_id: r.voucher_type_id } : {}),
     ...(typeof r.print_title === 'string' && r.print_title.trim() ? { print_title: r.print_title.trim() } : {}),
+    // 7U (additive): sales agent, bill-value offer, prescription (pharma pack).
+    ...(typeof r.agent_id === 'string' && r.agent_id ? { agent_id: r.agent_id } : {}),
+    ...(r.offer && typeof r.offer === 'object' && Number((r.offer as { value?: unknown }).value) > 0 ? { offer: r.offer as InvoiceRecord['offer'] } : {}),
+    ...(r.rx && typeof r.rx === 'object' ? { rx: r.rx as InvoiceRecord['rx'] } : {}),
+    // 8.5 (additive): party balance frozen on the bill at first issue.
+    ...(() => {
+      const snap = sanitizePartyBalance(r.party_balance_snapshot);
+      return snap ? { party_balance_snapshot: snap } : {};
+    })(),
+    // 8G (additive): instalments and the quote acceptance snapshot.
+    ...(() => {
+      const sched = normalizeSchedule(r.payment_schedule);
+      return sched.length ? { payment_schedule: sched } : {};
+    })(),
+    ...(() => {
+      const acc = sanitizeAcceptance(r.acceptance);
+      return acc ? { acceptance: acc } : {};
+    })(),
+    // Round 2 (R2-A, additive): financial credit notes and the payment-term snapshot.
+    ...(r.note_kind === 'financial' ? { note_kind: 'financial' as const } : {}),
+    ...(typeof r.financial_reason === 'string' && r.financial_reason ? { financial_reason: r.financial_reason as InvoiceRecord['financial_reason'] } : {}),
+    ...(typeof r.financial_account === 'string' && r.financial_account ? { financial_account: r.financial_account } : {}),
+    ...(r.payment_terms && typeof r.payment_terms === 'object' && typeof (r.payment_terms as { name?: unknown }).name === 'string'
+      ? { payment_terms: r.payment_terms as InvoiceRecord['payment_terms'] }
+      : {}),
+
+    // R2-B (additive): milestones, stage marks, quotation revisions / proposal sections, Kind attn.
+    ...(Array.isArray(r.milestones) && r.milestones.length ? { milestones: r.milestones as InvoiceRecord['milestones'] } : {}),
+    ...(r.progress_of && typeof r.progress_of === 'object' ? { progress_of: r.progress_of as InvoiceRecord['progress_of'] } : {}),
+    ...(typeof r.revision_of === 'string' && r.revision_of ? { revision_of: r.revision_of } : {}),
+    ...(num(r.revision_no) > 0 ? { revision_no: num(r.revision_no) } : {}),
+    ...(Array.isArray(r.proposal_sections) && r.proposal_sections.length ? { proposal_sections: r.proposal_sections as InvoiceRecord['proposal_sections'] } : {}),
+    ...(r.attention && typeof r.attention === 'object' && (r.attention as { name?: unknown }).name ? { attention: r.attention as InvoiceRecord['attention'] } : {}),
+    // R3-A (additive): the table order a POS bill settled, and its split part.
+    ...(typeof r.table_order_id === 'string' && r.table_order_id ? { table_order_id: r.table_order_id } : {}),
+    ...(r.split_of && typeof r.split_of === 'object' ? { split_of: r.split_of as InvoiceRecord['split_of'] } : {}),
+    // R3-B4 (additive): the timesheet annexure snapshot travels with the document unchanged (Critical Rule 3).
+    ...(r.annexure && typeof r.annexure === 'object' && Array.isArray((r.annexure as { rows?: unknown }).rows) ? { annexure: r.annexure as InvoiceRecord['annexure'] } : {}),
+    // R3-C2 (additive): receiver signature snapshot (proof of delivery).
+    ...(r.delivery_proof && typeof r.delivery_proof === 'object' && (r.delivery_proof as { receiver?: unknown }).receiver ? { delivery_proof: r.delivery_proof as InvoiceRecord['delivery_proof'] } : {}),
+    // R4-C1 (additive): export document fields, absent on legacy rows.
+    ...Object.fromEntries((['incoterm', 'port_of_loading', 'port_of_discharge', 'country_of_origin', 'country_of_destination', 'pre_carriage', 'vessel_flight', 'marks_numbers', 'export_payment_terms'] as const).filter((k) => typeof r[k] === 'string' && r[k]).map((k) => [k, r[k]])),
+    // R5-A3 (additive): marketplace order link survives an edit (idempotent re-import).
+    ...(typeof r.channel_id === 'string' ? { channel_id: r.channel_id, channel_order_id: r.channel_order_id as string, channel_import_id: r.channel_import_id as string } : {}),
+    ...(Array.isArray(r.channel_order_ids) ? { channel_order_ids: (r.channel_order_ids as unknown[]).filter((x): x is string => typeof x === 'string') } : {}),
+    // R5-C1 (additive): fee plan / instalment of a fee document (idempotency of a billing run).
+    ...(typeof r.fee_plan_id === 'string' ? { fee_plan_id: r.fee_plan_id, fee_instalment: r.fee_instalment as number } : {}),
+    // R5-B (additive): freight-bill LRs, RA bill number / deductions / retention day, BOQ terms survive an edit.
+    ...Object.fromEntries(R5B_RECORD_KEYS.filter((k) => r[k] != null).map((k) => [k, r[k]])),
+    ...Object.fromEntries(R7_RECORD_KEYS.filter((k) => r[k] != null).map((k) => [k, r[k]])), // R7
+    ...Object.fromEntries([...R8_RECORD_KEYS, ...R9_RECORD_KEYS].filter((k) => r[k] != null).map((k) => [k, r[k]])), // R8-C, R9
 
     discount_type: r.discount_type ?? 'PERCENT',
     discount_rate: num(r.discount_rate),
@@ -296,6 +398,7 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     po_number: r.po_number ?? '',
     recurring_id: r.recurring_id,
     recurring_date: r.recurring_date,
+    batch_run_id: r.batch_run_id,
 
     subtotal: num(r.subtotal),
     discount_amount: num(r.discount_amount),
@@ -330,6 +433,10 @@ export function normalizeRecord(raw: unknown, fallbackTemplateId = 'classic_oran
     ...(r.pos === true ? { pos: true } : {}),
     ...ecoFields(r.eco_gstin, r.eco_section),
     ...(CHALLAN_PURPOSES.has(String(r.challan_purpose)) ? { challan_purpose: r.challan_purpose as ChallanPurpose } : {}),
+    // 8H delivery challan toggles (additive).
+    ...(r.challan_hide_amounts === true ? { challan_hide_amounts: true } : {}),
+    ...(r.challan_returnable === true ? { challan_returnable: true } : {}),
+    ...(typeof r.challan_return_by === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.challan_return_by) ? { challan_return_by: r.challan_return_by } : {}),
     ...(() => {
       const transport = normalizeTransport(r.transport);
       return transport ? { transport } : {};

@@ -11,6 +11,8 @@ export interface Vendor {
   id: string;
   name: string;
   gstin?: string;
+  /** R15-A3: the client this supplier also is (netting), when name / GSTIN do not match. */
+  client_id?: string;
   state_code?: string;
   email?: string;
   phone?: string;
@@ -42,8 +44,20 @@ export interface Vendor {
   tds_lower_limit?: number;
   tds_lower_from?: string;
   tds_lower_to?: string;
-  /** Non-resident payee: TDS goes in Form 27Q (flagged only — not computed by this app). */
+  /** Non-resident payee: TDS goes in Form 27Q (7R: working paper `src/lib/tds-27q.ts`). */
   non_resident?: boolean;
+  /**
+   * Additive (7R, 7.120): non-resident details for Form 27Q / DTAA — country, foreign tax id, Tax Residency
+   * Certificate number and last valid day, Form 10F furnished, no PE in India, DTAA rate (%) and article.
+   */
+  nr_country?: string;
+  nr_tin?: string;
+  nr_trc_no?: string;
+  nr_trc_to?: string;
+  nr_form10f?: boolean;
+  nr_no_pe?: boolean;
+  nr_dtaa_rate?: number;
+  nr_dtaa_article?: string;
   /**
    * Additive (WP-1 masters): id of a user sub-group under Sundry Creditors (`groups` table).
    * Absent = directly under Sundry Creditors. Opening balance: `ledger_openings`; bills: `opening_bills`.
@@ -186,6 +200,18 @@ export interface PurchaseRecord {
   tds_reason?: string;
   /** Sec 197 certificate number snapshot. */
   tds_cert_no?: string;
+  /* ── Capture, recurring bills, approvals (8C) — additive, all optional ── */
+  /**
+   * 'draft' only on rows of `purchase_drafts` (captured / recurring / held-for-approval bills). A bill in
+   * `purchases` never carries it; if one ever did, every reader skips it (`isVoidStatus`).
+   */
+  status?: 'draft';
+  /** IRN (64 hex) and IRN date of the supplier's e-invoice, from its signed QR (signature not verified). */
+  einvoice_irn?: string;
+  einvoice_irn_date?: string;
+  /** `recurring_bills` schedule and occurrence day this bill was drafted from. */
+  recurring_bill_id?: string;
+  recurring_date?: string;
 }
 
 /**
@@ -208,8 +234,11 @@ export interface VendorPayment {
   kind: 'ADVANCE' | 'ON_ACCOUNT' | 'NEW_REF';
   /** Reference name for a New Ref (e.g. the supplier's proforma number). */
   ref_name?: string;
-  /** Adjustments against bills (Agst Ref), oldest first. */
-  allocations?: { purchase_id: string; amount: number; date: string }[];
+  /**
+   * Adjustments against bills (Agst Ref), oldest first. Additive (R6-C2): `opening_bill_id` = an `opening_bills` row
+   * (or `onacc:<vendorId>`, the typed opening not split into bills) settled by this payment; `purchase_id` is '' then.
+   */
+  allocations?: { purchase_id: string; amount: number; date: string; opening_bill_id?: string }[];
   /** Groups the rows of one multi-bill payment (the `purchase_payments` rows carry the same id). */
   group_id?: string;
   created_at?: string;
@@ -227,6 +256,8 @@ export interface PurchaseOrderLine {
   /** Additive (WP-8): the stock item picked on the line, and base units per line unit (absent = 1). */
   item_id?: string;
   unit_factor?: number;
+  /** Additive (R2-B5): the sales-order line this back-to-back PO line was raised for. */
+  so_line_id?: string;
 }
 
 /**
@@ -255,6 +286,12 @@ export interface PurchaseOrder {
   notes?: string;
   /** yyyy-mm-dd the user closed a partly received order. */
   closed_on?: string;
+  /** Additive (R2-B5): the sales order this back-to-back PO was raised from. */
+  so_id?: string;
+  /** Additive (R2-B5): drop-ship — the supplier delivers straight to the customer at `ship_to`. */
+  drop_ship?: boolean;
+  /** Additive (R2-B5): delivery address printed on a drop-ship PO (the customer's). */
+  ship_to?: { name?: string; address?: string; city?: string; zip?: string; state_code?: string; gstin?: string };
   created_at?: string;
   updated_at?: string;
 }
@@ -344,6 +381,12 @@ export interface PurchaseReturn {
   tds_reversed?: number;
   /** Section code of that TDS (snapshot of the bill's `tds_section`). */
   tds_section?: string;
+  /**
+   * Additive (7R, 7.123): compensation cess reversed with the note (₹, inside `total`, outside cgst / sgst / igst) —
+   * the bill's `cess_amount` pro rata to the note's taxable value (`noteCessFor`). Cess credit (Input cess 2353)
+   * falls with it when the bill claimed ITC; on reverse-charge / import bills the self-assessed cess is reversed.
+   */
+  cess_amount?: number;
   cost_centre_id?: string;
   notes?: string;
   created_at?: string;

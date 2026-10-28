@@ -7,11 +7,12 @@ import type { CalcTotals } from '../../../lib/invoice-calc';
 import { DOCUMENT_LABELS, type InvoiceRecord, type SenderProfile } from '../../../types/invoice';
 import { usePaper } from '../paper-context';
 import { AddressLines, Logo } from './PaperHeader';
-import { buildUpiUrl, isRcmTotals, isTaxed, trackingText } from '../paper-helpers';
+import { buildUpiUrl, isRcmTotals, isTaxed, pharmacistText, raDocTitle, svDocTitle, svRegText, trackingText, worksLineText, mfSellerText } from '../paper-helpers';
 import styles from '../invoice-paper.module.css';
 import { formatCustomValue, printableValues } from '../../../lib/custom-fields';
 import { ItemCustomLine } from './CustomFieldsBlock';
 import { transportRows } from '../../../lib/transport';
+import { AttentionLine } from './AttentionLine';
 
 interface Props {
   invoice: InvoiceRecord;
@@ -19,6 +20,8 @@ interface Props {
   totals: CalcTotals;
   /** e-Way number the IRN block already prints (not repeated in the dispatch cells). */
   skipEway?: string;
+  /** R11 (CN-A3): the contract-particulars box, printed under the parties (construction documents only). */
+  works?: ReactNode;
 }
 
 function Cell({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
@@ -35,13 +38,13 @@ function Cell({ label, children, className }: { label: string; children: ReactNo
  * document facts on top, the item grid with tax ledgers as rows, an HSN/SAC
  * tax summary, then bank/declaration and the signatory box.
  */
-export function GstBody({ invoice, sender, totals, skipEway }: Props) {
-  const { money, currency, date, col, show, footerText, headerNote } = usePaper();
+export function GstBody({ invoice, sender, totals, skipEway, works }: Props) {
+  const { money, currency, date, col, show, footerText, headerNote, title: titled } = usePaper();
   const c = invoice.client;
   const ship = invoice.ship_to && (invoice.ship_to.address || invoice.ship_to.name) ? invoice.ship_to : null;
   const cur = invoice.currency;
   const symbol = currencySymbol(cur);
-  const title = invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice');
+  const title = titled(raDocTitle(invoice, invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice')) || svDocTitle(invoice) || invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'), invoice.doc_type); // R2-C5 suffix; R11 RA title
   const isQuote = invoice.doc_type === 'QUOTATION';
   const cgstSgst = isTaxed(invoice, totals);
   const igst = !cgstSgst && invoice.gst_mode !== 'NONE' && totals.tax_amount > 0;
@@ -90,6 +93,15 @@ export function GstBody({ invoice, sender, totals, skipEway }: Props) {
                 <br />
               </>
             )}
+            {sender.drug_licence && (
+              <>
+                <b>D.L. No.:</b> {sender.drug_licence}
+                <br />
+              </>
+            )}
+            {sender.pharmacist && <>{pharmacistText(sender)}<br /></>}
+            {sender.sv_regs && <>{svRegText(sender)}<br /></>}
+            {mfSellerText(sender) && <>{mfSellerText(sender)}<br /></>}
             {sender.companyPhone && <>Contact: {sender.companyPhone}<br /></>}
             {sender.companyEmail && <>E-Mail: {sender.companyEmail}<br /></>}
             {sender.regLine}
@@ -127,11 +139,12 @@ export function GstBody({ invoice, sender, totals, skipEway }: Props) {
             {c.email && <>{c.email}<br /></>}
             {c.gstin && <><b>GSTIN/UIN:</b> {c.gstin}</>}
           </div>
+          <AttentionLine invoice={invoice} />
         </div>
         <div className={styles.gCell}>
           {ship && (
             <div style={{ marginBottom: 8 }}>
-              <div className={styles.gLabel}>Consignee (Ship to)</div>
+              <div className={styles.gLabel}>{invoice.boq_terms?.cn ? 'Site' : 'Consignee (Ship to)'}</div>
               {ship.name && <div className={styles.gName} style={{ fontSize: 13 }}>{ship.name}</div>}
               <div className={styles.meta}>
                 {(ship.address ?? '').split('\n').filter(Boolean).map((l, i) => <span key={i}>{l}<br /></span>)}
@@ -152,6 +165,7 @@ export function GstBody({ invoice, sender, totals, skipEway }: Props) {
         </div>
       </div>
 
+      {works}
       <table className={styles.gItems}>
         <thead>
           <tr>
@@ -175,7 +189,8 @@ export function GstBody({ invoice, sender, totals, skipEway }: Props) {
                   <div className={styles.itemName}>{line.name || '—'}</div>
                   {src?.description && <div className={styles.itemDesc}>{src.description}</div>}
                   <ItemCustomLine values={src?.custom_values} />
-                  {show.tracking && trackingText(src) && <div className={styles.itemDesc}>{trackingText(src)}</div>}
+                  {show.tracking && trackingText(src, invoice.ag, invoice.mf, invoice.ps, invoice.tv, invoice.mp, invoice.hs) && <div className={styles.itemDesc}>{trackingText(src, invoice.ag, invoice.mf, invoice.ps, invoice.tv, invoice.mp, invoice.hs)}</div>}
+                  {worksLineText(src, invoice.boq_terms?.cn) && <div className={styles.itemDesc} data-works-line>{worksLineText(src, invoice.boq_terms?.cn)}</div>}
                 </td>
                 {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '—'}</td>}
                 <td className={cn(styles.right, styles.num)}>{formatQuantity(line.quantity)}</td>

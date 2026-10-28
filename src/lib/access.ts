@@ -6,13 +6,15 @@
  * checks. They stop a colleague from deleting an issued invoice or erasing the books by mistake;
  * vault mode (src/lib/vault.ts) and separate OS accounts are the real protection.
  *
- * This module imports nothing, so the data layer (localDb, backup, period-lock, audit) can ask
+ * This module imports only the pure `rights.ts` (which imports nothing), so the data layer (localDb, backup, period-lock, audit) can ask
  * `can()` / `requireAccess()` without import cycles. `auth.ts` registers who is signed in through
  * `setActorProvider()`; with no provider, or with no PIN set up, every check passes (single-user
  * installs, tests, and boot code such as migrations, which run inside `asSystem`, behave exactly as
  * before). Once a PIN is set up, a tab whose signed-in user cannot be resolved (locked, or the user was
  * removed in another tab) is SIGNED OUT: it gets the least privileged role, never the owner's.
  */
+
+import { rightsCan, type UserRights } from './rights';
 
 export type Role = 'owner' | 'clerk' | 'viewer';
 
@@ -100,6 +102,27 @@ export interface Actor {
   id: string;
   name: string;
   role: Role;
+  /**
+   * Additive (7T): actions the owner granted this user on top of the role. Only `GRANTABLE_ACTIONS`
+   * are honoured (a trusted clerk may be given `payroll.view`); everything else stays role-based.
+   */
+  grants?: readonly string[];
+  /**
+   * Additive (8H): finer per-user rights (`rights.ts`) — per-document create / alter / delete / print,
+   * back-dated window, discount cap, POS-only. They only NARROW the role; the owner never has them.
+   */
+  rights?: UserRights;
+}
+
+/** Actions the owner may grant to a named clerk / viewer (7T). Payroll stays owner-only by default. */
+export const GRANTABLE_ACTIONS: readonly AccessAction[] = ['payroll.view'];
+
+/** Role matrix plus the owner's per-user grants. */
+export function actorCan(actor: Actor | null, role: Role, action: AccessAction): boolean {
+  // Finer rights (8H) narrow a clerk / viewer only; checked separately so grants and approvals stay as they were.
+  if (actor && actor.role !== 'owner' && actor.role === role && !rightsCan(actor.rights, action)) return false;
+  if (roleCan(role, action)) return true;
+  return !!actor && actor.role === role && GRANTABLE_ACTIONS.includes(action) && !!actor.grants?.includes(action);
 }
 
 let provider: (() => Actor | null) | null = null;
@@ -148,7 +171,7 @@ export function currentRole(): Role {
 
 /** May the signed-in user do `action`? */
 export function can(action: AccessAction): boolean {
-  return roleCan(currentRole(), action);
+  return actorCan(currentActor(), currentRole(), action);
 }
 
 const DENIED_TEXT: Partial<Record<AccessAction, string>> = {
@@ -193,7 +216,7 @@ export function isAccessDeniedError(err: unknown): err is AccessDeniedError {
 /** Throws `AccessDeniedError` unless the signed-in user may do `action`. Used by the data layer. */
 export function requireAccess(action: AccessAction): void {
   const role = currentRole();
-  if (!roleCan(role, action)) throw new AccessDeniedError(action, role);
+  if (!actorCan(currentActor(), role, action)) throw new AccessDeniedError(action, role);
 }
 
 /* ── Table-level guard (defence in depth) ─────────────────────────
@@ -204,7 +227,12 @@ export function requireAccess(action: AccessAction): void {
  * compliance marks, reminder log) and the ones whose APIs already guard each operation with finer
  * rules (invoices, payments) are deliberately not listed.
  */
-const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
+/** Payroll tables (review L1): a write is a books change AND needs payroll access, like the payroll APIs. */
+const PAYROLL_WRITE: readonly AccessAction[] = ['books.edit', 'payroll.view'];
+
+// R8-C: exported so the Round 8 tables register their rights from `src/lib/trade/tr-registry.ts` (a lazy chunk —
+// this map ships with first paint).
+export const TABLE_ACTIONS: Readonly<Record<string, AccessAction | readonly AccessAction[]>> = {
   // masters
   items_catalog: 'master.edit',
   clients: 'master.edit',
@@ -264,37 +292,72 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // Banking (WP-5)
   deposit_slips: 'books.edit',
   cash_tally: 'books.edit',
+  // 7U banking: forex bank moves (revaluation / conversion journals), e-payment batches
+  fx_bank_moves: 'books.edit',
+  epay_batches: 'books.edit',
   // GST set-off & payment (WP-6): set-off journals, PMT-06 challans, HSN master
   gst_setoffs: 'books.edit',
   gst_challans: 'books.edit',
+  // 8D GST guards
+  gst_followups: 'books.edit',
+  gstr2b_itc: 'books.edit',
+  gstr1_snapshots: 'books.edit',
   hsn_master: 'master.edit',
   // 7O: RCM self-invoices (Rule 46(f)) and payment vouchers (Rule 52)
   rcm_documents: 'books.edit',
+  // 7R: PMT-09 transfers, GST refund claims, ISD documents, TRACES justification imports
+  gst_pmt09: 'books.edit',
+  gst_refunds: 'books.edit',
+  isd_documents: 'books.edit',
+  tds_justifications: 'books.edit',
   // business extras (WP-9)
   pos_returns: 'doc.create',
+  // 8E: cashier shifts — a clerk opens / closes their own shift at the counter
+  pos_shifts: 'doc.create',
   branches: 'master.edit',
   amc_contracts: 'master.edit',
   loyalty_adjustments: 'master.edit',
+  // 7U: sales agents (master) and the commission payable journals posted for them
+  sales_agents: 'master.edit',
+  commission_postings: 'books.edit',
+  // 8C: documents inbox, draft bills (out of the books), recurring bills, bank rules, payment requests
+  doc_inbox: 'books.edit',
+  purchase_drafts: 'books.edit',
+  recurring_bills: 'books.edit',
+  bank_rules: 'books.edit',
+  payment_requests: 'books.edit',
+  // 8F: distribution masters, van settlements, order pad, breakage / expiry claims and receipts
+  dist_areas: 'master.edit',
+  dist_routes: 'master.edit',
+  dist_beats: 'master.edit',
+  van_settlements: 'books.edit',
+  order_pad_outbox: 'doc.create',
+  order_pad_imports: 'doc.create',
+  expiry_claims: 'books.edit',
+  expiry_receipts: 'books.edit',
   // approvals decision log: only the owner's decision writes it (approvals.ts `decide`); a clerk's
   // request lives on the document itself, so a clerk can never forge a decision row (review L5)
   approvals: 'doc.approve',
   // payroll (Phase 7): owner-only, salaries are confidential
-  employees: 'payroll.view',
-  employee_groups: 'payroll.view',
-  pay_heads: 'payroll.view',
-  salary_structures: 'payroll.view',
-  attendance_types: 'payroll.view',
-  attendance: 'payroll.view',
-  payroll_runs: 'payroll.view',
-  payroll_payments: 'payroll.view',
+  employees: PAYROLL_WRITE,
+  employee_groups: PAYROLL_WRITE,
+  pay_heads: PAYROLL_WRITE,
+  salary_structures: PAYROLL_WRITE,
+  attendance_types: PAYROLL_WRITE,
+  attendance: PAYROLL_WRITE,
+  payroll_runs: PAYROLL_WRITE,
+  payroll_payments: PAYROLL_WRITE,
   // payroll depth (7P)
-  payroll_arrears: 'payroll.view',
-  employee_loans: 'payroll.view',
-  leave_types: 'payroll.view',
-  leave_entries: 'payroll.view',
-  payroll_adjustments: 'payroll.view',
-  perquisites: 'payroll.view',
-  fnf_settlements: 'payroll.view',
+  payroll_arrears: PAYROLL_WRITE,
+  employee_loans: PAYROLL_WRITE,
+  leave_types: PAYROLL_WRITE,
+  leave_entries: PAYROLL_WRITE,
+  payroll_adjustments: PAYROLL_WRITE,
+  perquisites: PAYROLL_WRITE,
+  fnf_settlements: PAYROLL_WRITE,
+  // payroll follow-ups (7T): Form 10E workings, actuarial valuations
+  payroll_relief89: PAYROLL_WRITE,
+  actuarial_valuations: PAYROLL_WRITE,
   // Phase 7 (Tally parity): manufacturing and stock vouchers
   manufacturing_vouchers: 'books.edit',
   stock_journals: 'books.edit',
@@ -305,8 +368,84 @@ const TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   job_work_in: 'books.edit',
   job_work_principal: 'books.edit',
   rejections_in: 'books.edit',
+  // 7S: production plans (MRP)
+  production_plans: 'books.edit',
   // WP-7: year-end checklist marks (locking the year itself needs settings.manage, in year-end-store.ts)
   year_end: 'books.edit',
+  // 8H: business loans & EMIs (vouchers go through saveVoucher) and the currency reference-rate master
+  business_loans: 'books.edit',
+  currency_rates: 'master.edit',
+  // R2-C: notes to accounts and deferral schedules are books; packing lists are documents; package types a master
+  notes_to_accounts: 'books.edit',
+  deferrals: 'books.edit',
+  packing_lists: 'doc.create',
+  package_types: 'master.edit',
+  // R2-A: payment terms (master), collection follow-ups (logged with receipts), bad-debt recoveries (owner, in write-off.ts)
+  payment_terms: 'master.edit',
+  collection_notes: 'payment.record',
+  write_off_recoveries: 'books.edit',
+  // R2-B: batch invoice runs (written with the invoices they issue), proposal section snippets
+  batch_runs: 'doc.create',
+  proposal_snippets: 'doc.create',
+  // R3-A: restaurant masters (areas, tables, modifier groups) are masters; running table orders are documents
+  dining_areas: 'master.edit',
+  dining_tables: 'master.edit',
+  modifier_groups: 'master.edit',
+  table_orders: 'doc.create',
+  // R3-B: work types are a master; project tasks and retainers are time books (like time_entries)
+  work_types: 'master.edit',
+  project_tasks: 'books.edit',
+  retainers: 'books.edit',
+  // R3-C: GSTR-1 portal file imports, DSC register, monthly client checklist
+  gst_portal_files: 'books.edit',
+  dsc_register: 'books.edit',
+  client_checklist: 'books.edit',
+  // R4-A: production orders, QC decisions, recall notices and landed-cost vouchers are books
+  production_orders: 'books.edit',
+  qc_results: 'books.edit',
+  recall_notices: 'books.edit',
+  landed_cost_vouchers: 'books.edit',
+  // R4-B: gift vouchers are sold at the counter (cancel checks doc.deleteIssued itself); store prices are a master;
+  // transfer requests are raised by stores (dispatch / receive check books.edit, approve doc.approve)
+  gift_vouchers: 'doc.create',
+  branch_prices: 'master.edit',
+  transfer_requests: 'doc.create',
+  // R4-C: the LUT register is a settings master; export IRMs / incentives / write-offs are books. `recycle_bin` is
+  // written by every delete (capture) and checked per target table on restore, so it has no entry here.
+  lut_register: 'settings.manage',
+  export_irms: 'books.edit',
+  export_incentives: 'books.edit',
+  export_writeoffs: 'books.edit',
+  // R5-A: channels and the SKU map are masters; imports / settlements / returns are documents (posting checks
+  // books.edit itself); GST TCS / TDS credit decisions post journals
+  sales_channels: 'master.edit',
+  channel_skus: 'master.edit',
+  marketplace_imports: 'doc.create',
+  settlements: 'doc.create',
+  eco_credits: 'books.edit',
+  marketplace_returns: 'doc.create',
+  // R5-C: plans / properties / leases are masters; fee runs and donations are documents; reversals, 10BD / 10BE
+  // filings and deposits are books
+  fee_plans: 'master.edit',
+  fee_runs: 'doc.create',
+  common_credit_runs: 'books.edit',
+  donations: 'doc.create',
+  form_10bd_filings: 'books.edit',
+  form_10be: 'books.edit',
+  properties: 'master.edit',
+  leases: 'master.edit',
+  security_deposits: 'books.edit',
+  // R5-B: LRs, trips and RA measurements are documents; vehicles and BOQ coefficients are masters; the GTA option is a setting
+  consignment_notes: 'doc.create',
+  gta_options: 'settings.manage',
+  vehicles: 'master.edit',
+  trips: 'doc.create',
+  ra_measurements: 'doc.create',
+  boq_coefficients: 'master.edit',
+  // R6-A1: setup-checklist skips / hidden card (company object, viewing state; owner and clerk)
+  setup_progress: 'doc.create',
+  // R6-C3: import runs (suppliers / ledgers / opening balances)
+  import_runs: 'books.edit',
 };
 
 let systemDepth = 0;
@@ -329,5 +468,6 @@ export function asSystem<T>(fn: () => T): T {
 export function requireTableWrite(name: string): void {
   if (systemDepth > 0) return;
   const action = TABLE_ACTIONS[name];
-  if (action) requireAccess(action);
+  if (typeof action === 'string') requireAccess(action);
+  else if (action) for (const a of action) requireAccess(a);
 }

@@ -1,5 +1,13 @@
-import { useMemo, useState } from 'react';
-import { Gift, Pencil, Plus, Tags, Trash2 } from 'lucide-react';
+import { lazy, Suspense, useMemo, useState } from 'react';
+import { Gift, Pencil, Plus, Store, Tags, Trash2 } from 'lucide-react';
+import { defineArea } from '../../i18n/area';
+
+// R4-B3: store price grid (own chunk).
+const StorePricesGrid = lazy(() => import('../retail/StorePricesGrid'));
+const storeBtnT = defineArea({ open: 'Store prices' } as const, { open: 'स्टोर मूल्य' });
+// R8-A (TR-A1): trade discounts, minimum margins, party-item special rates (own chunk, opened on demand).
+const PartyRatesEditor = lazy(() => import('../trade/PartyRatesEditor'));
+const tradeT = defineArea({ open: 'Trade terms & party rates' } as const, { open: 'ट्रेड शर्तें और पार्टी रेट' });
 import { Modal } from '../ui/Modal';
 import { NumberInput } from '../ui/NumberInput';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -10,6 +18,7 @@ import type { Client } from '../../types/invoice';
 import { cn, formatDate } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { setT } from '../../i18n/areas/settings';
+import { retailT } from '../../i18n/areas/retail';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './CatalogPanel.module.css';
@@ -38,6 +47,9 @@ export function PricingPanel({ notify }: { notify: Notify }) {
   }, [version]);
   const catalog = useMemo(() => listCatalog().sort((a, b) => a.name.localeCompare(b.name)), []);
 
+  const hasBranches = useMemo(() => getTable('branches').length > 0, []);
+  const [tradeOpen, setTradeOpen] = useState(false); // R8-A
+  const [gridOpen, setGridOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('storeprices') === '1');
   const [level, setLevel] = useState<PriceLevel | null>(null);
   const [scheme, setScheme] = useState<Scheme | null>(null);
   const [error, setError] = useState('');
@@ -75,6 +87,12 @@ export function PricingPanel({ notify }: { notify: Notify }) {
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => { setError(''); setScheme(blankScheme()); }} disabled={catalog.length === 0}>
             <Gift size={14} /> {setT('addScheme')}
           </button>
+          {/* R4-B3: item × store price grid (lazy), when the business has branches. */}
+          {hasBranches && (
+            <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setGridOpen(true)} data-store-prices>
+              <Store size={14} /> {storeBtnT('open')}
+            </button>
+          )}
         </div>
       </div>
       <p className={cn(surface.sectionNote, styles.note)}>
@@ -97,7 +115,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
               {levels.map((l) => (
                 <tr key={l.id}>
                   <td className={styles.name}>{l.name}</td>
-                  <td className={surface.numeric}>{l.percent_off ? `${l.percent_off}%` : '—'}</td>
+                  <td className={surface.numeric}>{l.percent_off ? `${l.percent_off}%${l.basis === 'mrp' ? ` ${retailT('offMrp')}` : ''}` : '—'}</td>
                   <td className={surface.numeric}>{Object.keys(l.rates ?? {}).length}</td>
                   <td className={surface.numeric}>{usage.get(l.id) ?? 0}</td>
                   <td>
@@ -191,6 +209,14 @@ export function PricingPanel({ notify }: { notify: Notify }) {
               <NumberInput className={cn(controls.input, controls.inputNumeric)} value={level.percent_off ?? 0} onChange={(n) => setLevel({ ...level, percent_off: n })} placeholder="0" />
               <span className={controls.hint}>{setT('pctOffHint')}</span>
             </label>
+            {/* 8E (8.145): "MRP less %" levels take the percent off the item's MRP. */}
+            <label className={controls.field}>
+              <span className={controls.label}>{retailT('levelBasis')}</span>
+              <select className={controls.select} value={level.basis ?? 'rate'} onChange={(e) => setLevel({ ...level, basis: e.target.value === 'mrp' ? 'mrp' : undefined })} data-level-basis>
+                <option value="rate">{retailT('basisRate')}</option>
+                <option value="mrp">{retailT('basisMrp')}</option>
+              </select>
+            </label>
             {error && <p className={controls.error} role="alert">{error}</p>}
           </div>
         )}
@@ -268,6 +294,8 @@ export function PricingPanel({ notify }: { notify: Notify }) {
         }}
         onClose={() => setRemoving(null)}
       />
+      {gridOpen && <Suspense fallback={null}><StorePricesGrid onClose={() => setGridOpen(false)} notify={notify} /></Suspense>}
+      <details className={surface.cardBody} onToggle={(e) => setTradeOpen((e.target as HTMLDetailsElement).open)} data-trade-terms><summary>{tradeT('open')}</summary>{tradeOpen && <Suspense fallback={null}><PartyRatesEditor onDone={(m, e) => notify(m, e ? 'error' : 'success')} /></Suspense>}</details>
     </section>
   );
 }

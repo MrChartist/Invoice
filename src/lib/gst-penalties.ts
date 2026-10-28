@@ -183,3 +183,64 @@ export const RCM_SELF_INVOICE_DAYS_RULES: readonly Versioned<number | null>[] = 
 export function rcmSelfInvoiceDays(receivedOn?: string): number | null {
   return ruleAt(RCM_SELF_INVOICE_DAYS_RULES, receivedOn);
 }
+
+/* ── 7R (7.121–7.126): refunds, ISD, next-FY cut-off ─────────────────── */
+
+/**
+ * GST refund (RFD-01) time values, keyed by the RELEVANT DATE of the claim. UNVERIFIED — verify with your CA:
+ *  - `limitYears`: Sec 54(1) — apply before the expiry of two years from the relevant date;
+ *  - `provisionalPct`: Sec 54(6) / Rule 91 — provisional refund of zero-rated supplies (90%);
+ *  - `sanctionDays`: Sec 54(7) — order within 60 days of a complete application;
+ *  - `delayInterestPct`: Sec 56 — interest (% p.a.) when the refund is paid after `sanctionDays`
+ *    (6%; 9% on an order in appeal, not modelled).
+ * Append new versions; never edit an old one.
+ */
+export const REFUND_TIME_RULES: readonly Versioned<{ limitYears: number; provisionalPct: number; sanctionDays: number; delayInterestPct: number }>[] = [
+  { from: '2017-07-01', value: { limitYears: 2, provisionalPct: 90, sanctionDays: 60, delayInterestPct: 6 }, source: 'Sec 54(1), 54(6), 54(7), Sec 56; Rule 91; Notification 13/2017-CT — verify' },
+];
+
+export function refundTimeRules(relevantDate?: string) {
+  return ruleAt(REFUND_TIME_RULES, relevantDate);
+}
+
+/**
+ * GSTR-6 (Input Service Distributor) due day of the month after the tax period, keyed by the period's first day.
+ * UNVERIFIED: 13th (Sec 39(4) / Rule 65). Append-only.
+ */
+export const GSTR6_DUE_RULES: readonly Versioned<{ dueDay: number }>[] = [
+  { from: '2017-07-01', value: { dueDay: 13 }, source: 'Sec 39(4), Rule 65 — verify' },
+];
+
+/** GSTR-6 due date for the month starting `periodStart` (`YYYY-MM-01`). */
+export function gstr6DueDate(periodStart: string): string {
+  const [y, m] = periodStart.split('-').map(Number);
+  const ny = m === 12 ? y + 1 : y;
+  const nm = m === 12 ? 1 : m + 1;
+  return `${ny}-${String(nm).padStart(2, '0')}-${String(ruleAt(GSTR6_DUE_RULES, periodStart).dueDay).padStart(2, '0')}`;
+}
+
+/**
+ * Last day (MM-DD in the calendar year after the FY ends) up to which credit notes, amendments and ITC of an FY can
+ * still be declared — GSTR-9 Part V (Tables 10–13), keyed by the FY's first day. UNVERIFIED:
+ *  - FY 2017-18 to 2020-21: the due date of the September return (20 October, `10-20`);
+ *  - FY 2021-22 on: 30 November (Sec 16(4) / 34(2) / 37(3) / 39(9) as amended by Finance Act 2022, from 1 Oct 2022).
+ * Append-only.
+ */
+export const NEXT_FY_CUTOFF_RULES: readonly Versioned<string>[] = [
+  { from: '2017-07-01', value: '10-20', source: 'Sec 16(4) / 34(2): due date of the September return — verify' },
+  { from: '2021-04-01', value: '11-30', source: 'Finance Act 2022 (30 November) — verify' },
+];
+
+/** Last day (local `YYYY-MM-DD`) of the next-FY window for the FY that starts in April of `fyStart`. */
+export function nextFyCutoff(fyStart: number): string {
+  return `${fyStart + 1}-${ruleAt(NEXT_FY_CUTOFF_RULES, `${fyStart}-04-01`)}`;
+}
+
+/**
+ * ISD becomes mandatory for common input services received on behalf of distinct persons (Sec 2(61) / Sec 20 as
+ * substituted by Finance Act 2024) from 1 Apr 2025 (Notification 16/2024-CT as understood). UNVERIFIED.
+ */
+export const ISD_MANDATORY_RULES: readonly Versioned<boolean>[] = [
+  { from: '2017-07-01', value: false, source: 'Sec 20 as enacted: ISD optional' },
+  { from: '2025-04-01', value: true, source: 'Finance Act 2024, Sec 20 substituted (Notification 16/2024-CT) — verify' },
+];

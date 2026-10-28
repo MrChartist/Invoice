@@ -43,7 +43,7 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     id: 'x1', invoice_number: 'INV/FY26-27/0042', doc_type: 'QUOTATION', issue_date: '2026-04-10', due_date: '2026-04-20',
     status: 'Sent', currency: 'INR', template_id: 'minimal_clean', gst_mode: 'IGST', place_of_supply: '29', reverse_charge: true,
     discount_type: 'FLAT', discount_rate: 5, tax_rate: 0, shipping: 10, other_charges: 2, round_off_enabled: true, amount_paid: 1,
-    notes: 'n', terms: 't', po_number: 'PO1', recurring_id: 'r1', recurring_date: '2026-04-10', supply_type: 'B2B', lut_number: 'L',
+    notes: 'n', terms: 't', po_number: 'PO1', recurring_id: 'r1', recurring_date: '2026-04-10', batch_run_id: 'run1', supply_type: 'B2B', lut_number: 'L',
     lut_date: '2026-01-01', price_includes_tax: true, round_mode: 'up', tcs_enabled: true, tcs_rate: 1, tcs_base: 'taxable',
     tcs_label: 'TCS x', tds_enabled: true, tds_section: '194C-1', tds_rate: 1, tds_on_taxable: false, quote_status: 'Declined',
     ship_to: { name: 'WH', address: 'A', city: 'C', zip: '400001', state_code: '27' }, charges_taxable: true, exchange_rate: 83.25,
@@ -55,6 +55,7 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     rcm_tax_excluded: true,
     goods_returned: false,
     eco_gstin: '07AAACZ1234A1C5', eco_section: 'PAY_9_5', challan_purpose: 'JOB_WORK',
+    challan_hide_amounts: true, challan_returnable: true, challan_return_by: '2026-11-30',
     transport: { mode: 'ROAD', vehicle_no: 'MH12AB1234', transporter_name: 'Speedy', transporter_id: '27AAACS1234A1Z5', lr_no: 'LR1', lr_date: '2026-04-11', eway_bill_no: '321000123456', distance_km: 40 },
     approval: { state: 'pending', doc_id: 'full', requested_status: 'Sent', requested_by: 'Asha', requested_at: '2026-01-01T00:00:00.000Z' },
     branch_id: 'br1',
@@ -62,8 +63,53 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     branch_transfer_id: 'str1',
     voucher_type_id: 'vt1',
     print_title: 'Export Invoice',
+    agent_id: 'ag1',
+    offer: { scheme_id: 'sc1', label: 'Bill offer: 5% off on ₹1000+', value: 50 },
+    rx: { patient: 'P', prescriber: 'Dr. Q' },
+    party_balance_snapshot: { previous: 1250.5, bill: 999, paid: 100, as_of: '2026-04-10' },
+    payment_schedule: [{ id: 'i1', label: 'Deposit', due_date: '2026-04-10', percent: 30 }, { id: 'i2', due_date: '2026-05-10', percent: 70 }],
+    acceptance: { signer: 'Ravi', signed_at: '2026-04-11T05:30:00.000Z', method: 'counter', amount: 1, signature: 'data:image/png;base64,iVBORw0KGgo=' },
+    note_kind: 'financial', financial_reason: 'settlement_discount', financial_account: 'discount_allowed',
+    payment_terms: { id: 'pt_net30', name: 'Net 30', early_discount: { percent: 2, until: '2026-04-17', amount: 20 } },
     amends: { original_number: 'INV/FY26-27/0041', original_date: '2026-04-09', period: '042026', amended_on: '2026-05-02', reason: 'GSTIN typo', original: { id: 'x1', invoice_number: 'INV/FY26-27/0041' } },
     created_at: '2026-04-10T00:00:00Z', updated_at: '2026-04-11T00:00:00Z',
+    // R2-B
+    milestones: [{ id: 'm1', name: 'Plinth', percent: 30, expected_date: '2026-05-01' }],
+    progress_of: { source_id: 'q0', basis: 'percent', value: 30, stage: 1 },
+    revision_of: 'q0', revision_no: 2,
+    proposal_sections: [{ id: 's1', place: 'cover', title: 'Scope', body: 'Two floors' }],
+    attention: { name: 'R. Iyer', role: 'Accounts' },
+    // R3-A
+    table_order_id: 'ord1',
+    split_of: { order_id: 'ord1', part: 2, parts: 3 },
+    // R3-B
+    annexure: { kind: 'timesheet', rows: [{ date: '2026-04-09', description: 'Drafting', minutes: 50, billed_minutes: 60, rate: 2000, amount: 2000, ref: 't1' }], taken_at: '2026-04-10T00:00:00Z' },
+    // R3-C
+    delivery_proof: { receiver: 'Ravi', remark: 'Received in good condition', signed_at: '2026-04-12T05:30:00.000Z', signature: 'asset:abc' },
+    // R4-C1 export document fields
+    incoterm: 'FOB', port_of_loading: 'INNSA1 Nhava Sheva', port_of_discharge: 'Jebel Ali', country_of_origin: 'IN', country_of_destination: 'AE',
+    pre_carriage: 'Road', vessel_flight: 'MSC ANNA V.123', marks_numbers: 'ACME/DXB/1-10', export_payment_terms: 'DA 60 days',
+    // R5-A marketplace order link
+    channel_id: 'ch1', channel_order_id: '402-111', channel_import_id: 'imp1', channel_order_ids: ['402-111', '402-222'],
+    // R5-B freight bill LRs, RA bill fields and BOQ terms
+    lr_ids: ['lr1', 'lr2'], ra_no: 3, ra_final: true, boq_id: 'so1', ra_deductions: [{ kind: 'retention', label: 'Retention 5%', base: 1000, rate: 5, amount: 50 }],
+    ra_net_payable: 1130, retention_release_on: '2027-06-30', boq_terms: { deductions: [{ kind: 'retention', rate: 5 }], dlp_months: 12, work_order: 'WO/1' },
+    // R7 hotel
+    folio_id: 'fo1', reservation_id: 'res1', stay: { arrival: '2026-10-20', departure: '2026-10-22', rooms: ['101'], nights: 2, adults: 2, children: 0 }, hotel_band: 'low',
+    // R5-C1 fee plan / instalment
+    fee_plan_id: 'fp1', fee_instalment: 2,
+    // R8 (src/types/trade-r8.ts)
+    cash_discount: { percent: 2, days: 7 }, price_drop_id: 'pd1', interest_run_id: 'ir1', broker_id: 'b1', agency: true,
+    // R9 (src/types/retail-r9.ts)
+    delivery: { address: '12 Park Lane', status: 'packed', cod: true, rider_id: 'r1' }, kyc: { form: '60', ref: 'F60-1' },
+    // R10 (src/types/services-r10.ts): the record snapshot key `sv`
+    sv: { rule46a: true, claim: { id: 'c1', number: 'CLM/FY26-27/0001', role: 'payer' } },
+    ag: { kind: 'rent', rent: { lot_no: 'CSR/FY26-27/0001', bags_out: 60, exempt: true }, lines: { l1: { lot: 'CSR/FY26-27/0001', bags: 60, rate_bag: 180 } } }, // R12 (AG-A5)
+    mf: { kind: 'drawing', header: { customer_po: 'PO-77' }, lines: { l1: { drawing: '1145-B', rev: 'C' } } }, // R13 (MF-A5)
+    ps: { kind: 'fee', matter: { id: 'cc1', code: 'RSK/014', name: 'Sec 138' }, engagement: { id: 'e1', number: 'ENG/26-27/0001', model: 'capped' }, basis: 'Capped at ₹40,000', wd: { standard: 58000, billed: 40000, reasons: [{ reason: 'Cap', amount: -18000 }] }, lines: { l1: { matter: 'RSK/014' } } }, // R14 (PS-A5)
+    tv: { trip: { id: 'cc2', code: '2611-001', pax: 4 }, regime: 'to5', decl: 'Tour operator service' }, // R15-B
+    mp: { site: { id: 'cc3', code: 'S-001', name: 'Sunrise Towers' }, month: '2026-10', regime: 'rcm', decl: 'Tax payable on reverse charge' }, // R17-A
+    hs: { unit: { id: 'u1', code: 'A-101', wing: 'A', area: 600, members: ['Asha Rao'] }, period: '2026-10', due: '2026-10-20', heads: [{ head_id: 'h1', name: 'Service charges', kind: 'service', basis: 'Per unit', amount: 3000 }] }, // R18-A
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

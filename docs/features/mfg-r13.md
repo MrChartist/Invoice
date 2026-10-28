@@ -1,0 +1,240 @@
+# Round 13 — manufacturing MSMEs (feature notes and the API for MF-B / MF-C / MF-D)
+
+PRD: `docs/prd/round-13.md` (it names this file `manufacturing-r13.md`; the round's doc is `mfg-r13.md`). CA items:
+`docs/CA_REVIEW.md` §13 (MF1–MF32 from the PRD; MF33–MF36 added by MF-A; MF-B uses MF40+, MF-C MF50+, MF-D MF60+). Every
+GST / MSME / valuation figure here is a working paper — verify with your CA. One section per package; each package edits
+only its own section and records its own bundle numbers.
+
+## MF-A — Manufacturing profile and the shop-floor core
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| A1 profile | Settings `mfg_kind` (`engineering`, `textile`, `plastics`, `printing`, `food`, `other`) and `mfg_sub` (engineering `drawing` / `catalogue`; textile `garments` / `yarn` / `fabric` / `processing`; plastics `moulding` / `extrusion` / `film` / `corrugation`) — additive, `types/mfg-r13.ts`. **No new business type**: `shop-presets.ts` `MFG_KINDS` / `MFG_SUBS` / `MFG_PROFILES` / `applyMfgKind(kind, { registered, sub, currentPacks })` writes `manufacturer` (`other` keeps type and modules), modules (`registered` adds `gst`; `inventory` and `payroll` always kept, so `/manufacturing` stays visible and `PACK_ROUTES` is unchanged) and packs **in union with the packs the company has** (an agri mill that packs namkeen keeps its agri desks). Six packs `shopfloor`, `fabrication`, `garments`, `plastics`, `press`, `foodmfg` (`industry-packs.ts`; `PACK_OF_TYPE` unchanged). Switches in the company object `mfg_settings` (`mfg/mf-settings.ts`: owner only, audited on save, backed up, synced as a singleton; object-valued keys of B–D kept as stored) via `mfg/mf-profile.ts` (`mfSwitchesOf`, `mfgSwitchesFor`, `applyMfgSwitches` — fills only unset switches). Wizard: one more card "Factory / manufacturing" → `MfgKindPicker` (+ sub-choice, Udyam number and category written on the active sender profile); Settings → Features "Manufacturing profile" for every company (+ "Custom"); Features row `adv.mfgProfile`, `PACK_HREF` rows. Checklist steps (`checklist-steps.ts`, append-only, only with `mfg_kind`): `workCentres`, `udyam` (every kind), engineering `firstDrawing`, textile `firstStyle` / `fabricators`, plastics `firstMould`, printing `pressMaster`, food `fssai` / `shelfLife` (B–D tables / `mfg_settings` keys count once their package writes them). |
+| Desks | `MFG_PACK_TABS` (`page-tabs.ts`): `floor` (pack `shopfloor`), `shop` (`fabrication`), `moulding` (`plastics`), `press` (`press`), `garments` (`garments`), `food` (`foodmfg`), `statutory` (`shopfloor`); `Manufacturing.tsx` lists them after `MFG_TABS` when their pack is on (the URL still opens a desk whose pack is off) and mounts one lazy desk each (`components/mfg/*Desk.tsx`). Shop / Moulding / Press / Garments / Food / Statutory and Floor → WIP are **stubs** (`R13Stub.tsx`, `WipView.tsx`) that B / C / D replace in place — `Manufacturing.tsx` is not edited again. Every desk and view of the PRD (34 `PACK_TABS` rows) has a help topic (`topics-packs.ts`), a palette label (`r13.*` in `palette-destinations.ts`) and a Ctrl+K title (`mfg.*` in `discover-r6-tabs.ts`); synonyms for job cards / work centres / routings / load. |
+| A2 centres, routings | `mfg/mf-centres.ts` (table `work_centres`, `master.edit`): kind machine / line / manual / outside (vendor = job worker), rates machine + labour + power + overhead (`machineHourRate` = the sum, shown as a breakdown), shifts, working weekdays, efficiency, parallel units, holidays, typed `normal_hours` (D5); `availableHours(centre, day)`. `mfg/mf-routings.ts` (table `routings`, `master.edit`): operations (seq, centre, set-up, run min / unit or units / hour, batch size, move, inspection, piece rate), one default per item, validation, CSV export / CSV or XLSX import (one row per operation), `standardConversion`. `mfg/mf-ops.ts` (small, imported by `production/orders.ts`): `plannedHours` = (set-up + run) ÷ efficiency, `opsForQty`, `opsForRelease` — **release copies the default routing onto the order** (`ProductionOrder.mf.ops`, snapshot with planned hours and the centre's rate) only while the `shopfloor` pack is on; `makeDaysOf`. Floor → Work centres / Routings. An `outside` operation's "Send to job worker" opens Material Out pre-filled (`mfout=vendor~item~qty~process`). |
+| A3 job cards | `mfg/mf-jobcards.ts` (table `job_cards`, `JCD/FY…`, `doc.create`, dated by the first entry): **one row per order per operation** with `entries` (date, start / stop or hours, set-up flag, operator employee / karigar, machine, good, rejected + reason, rework, scrap kg + scrap item). Flow rule (`goodLimit`: previous operation's good + this card's rework; the routing's "allow out of sequence" lifts it), overlap warnings per machine, period lock, totals derived. `outputExtras` → R4-A's output dialog (lazy, only for an order with `mf.ops`): the last operation's good units and the scrap lines still due — `buildOutputVoucher(…, newId, { scrapLines, conversion })` appends them (`mf_jc: true`, fixed value = the scrap item's sale rate, else opening rate); lines already posted are subtracted on read, so scrap reaches stock once (MF34). Rejected / rework are reported; the QC desk stays R4-A's. `unitsByEmployee` → Payroll → Attendance "Import production units from job cards" (lazy row with the pack; good units only, MF35). `mfg/mf-floor-report.ts` day report per centre (available, run, set-up, idle, good, rejected, scrap kg) and per operator. Floor → Job cards with the operator screen (phone mode: centre → open operations → Start / Stop → report; order no. typed or scanned by a scanner that types). |
+| A4 MRP, load | `mfg/mf-mrp-dated.ts` (`runDatedMrp`: day / week buckets, low-level-code order, projected on hand, planned receipts offset by `lead_days` / `make_days` (else `makeDaysOf`), past-due and late flags; equals `runMrp` over one bucket) and `datedSources` (open sales-order lines by due date, released orders' materials still to issue, open orders' output by due date, open PO lines by expected date through `purchaseOrderOutstanding`; base units via `lineFactor`). MRP tab: a lazy "By date" toggle (with the pack) shows `DatedPlanView`. Item form: lazy "Lead time / make days" row (`LeadTimeRow`, with the pack). `mfg/mf-capacity.ts`: infinite backward loading of open orders' remaining hours from their due dates, buckets by day / week vs available hours (over 100% red), promise date by forward loading into free hours, a centre with no hours refused. Floor → Load (move an order's due date through `productionOrdersDb.save`, audited; nothing rescheduled automatically). |
+| A5 paper | Record key **`mf`** (`R13_RECORD_KEYS = ['mf']`, spread into `R9_RECORD_KEYS` — the round's only first-paint token). `mfg/mf-snapshot.ts` `mfSnapshot(kind, parts)` (drops empty parts). `paper-helpers.ts`: `mfLineText` inside `trackingText(item, ag, mf)` (both item tables), `mfSellerText` under the seller's GSTIN (classic / corporate / minimal / ink / letterhead header, GST grid, receipt) — "Udyam: … (Micro)" from the **sender snapshot** once it carries `msme_category` (so older documents print nothing new; `udyam_print: false` hides it) and "FSSAI Lic. No. …" from `fssai_no`; `mfDeclaration` (snapshot text, scrap TCS, AA, recycled content, and the MSMED Sec 15 / 16 clause for micro / small sellers to GSTIN buyers, MF33). `TemplateEngine.tsx`: lazy `MfgBlock` (after the parties / before the GST grid, never on receipt paper; boxes from `mf-print.ts` `mfBoxes`) and lazy `MfgAnnexurePage` (size × colour grid, inspection summary, scrap weighment). Settings → Defaults → Payment terms: lazy `MfProfileRow` (category, "Print Udyam number", FSSAI number, validated 14 digits). |
+| Registrations | `mfg/mf-registry.ts` (`MF_TABLE_ACTIONS`, `MF_WATCHED`, runtime), `mfg/mf-shared.ts` (`MF_TABLES`, `MF_OBJECTS`, `MF_SERIES` `JCD`, `MF_RESERVED_SERIES` `FAI` / `PES` / `CUT` / `KPB`, `MF_PACKS`, `MF_DATED`, `MF_NUMBERED`), `mfg-rules.ts` (`WORK_DEFAULTS`, `PAPER_RULES`; sections for B–D). Backup `RECORD_TABLES` / `ID_TABLES`, sync `DATED` / `NUMBERED` (`job_cards`), open-export rows, recycle-bin restore hooks (a job card only while its order lives and no new card was opened for the operation; a default routing only while the item has no other default). |
+| Demo | `demo/profile-mfg.ts` (dispatched from `demo/profiles.ts` for a Demo company with `shopfloor`): four work centres, the bracket routing, a released order with two job cards (3.4 kg off-cuts). `work_centres`, `routings`, `job_cards` in `DEMO_EXTRA_TABLES`. |
+
+### API for MF-B / MF-C / MF-D
+
+- **Types** (`src/types/mfg-r13.ts`): MF-A declared, for everyone, the `mf` sub-objects `drawing` (`MfDrawingSnap.inspection`),
+  `print` (`MfPrintSnap`), `scrap` (`MfScrapSnap`: rows, `tcs`), `cmt` (`MfCmtSnap`: sizes, grid), `food` (`MfFoodSnap`),
+  `export_aa` (`MfExportAaSnap`) and per-line `mf.lines[lineId]` (`MfLineSnap`: drawing / rev / po_line / heat / grade,
+  batch / packed_on / best_before / use_by / mrp, style / lot / sizes, epr_cat / recycled_pct); `ProductionOrder.mf`
+  (`ops`, `grid`, `food`); `StockItem` `lead_days`, `make_days`, `mf_scrap_class`, `mf_class`, `mf_epr`, `shelf_life_days`,
+  `mf_inv_class`, `mf.style`; `Vendor.mf` (`karigar`, `msme_trader`); `Client.mf` (`epr_no`, `min_shelf_pct`);
+  `PurchaseRecord.mf`; `JobWorkLine.mf`; `SenderProfile.msme_category` / `udyam_print` / `fssai_no`. Re-declare an
+  interface in your block to add fields (interfaces merge). **Do not add record or line keys.**
+- **Names** (`mfg/mf-shared.ts`): add your tables to `MF_TABLES` / `MF_DATED` / `MF_NUMBERED`; move your prefix from
+  `MF_RESERVED_SERIES` into `MF_SERIES` (write it once — `tests/mf-registry.test.ts` counts `'XXX'` literals).
+- **Registry** (`mfg/mf-registry.ts`): add rows in your block; every writer `import './mf-registry'`. `sync-engine.ts`
+  and `trust/recycle-bin.ts` already import it. Add backup / sync / open-export rows in `// R13-B` … blocks, and your tables
+  to `DEMO_EXTRA_TABLES` when you add sample rows.
+- **Rules** (`mfg-rules.ts`): your section; dated rows with `source` and `verified`, append-only; import only from
+  `lib/mfg/*` (`tests/mf-rules.test.ts`).
+- **Desks**: replace your stub file (`ShopDesk.tsx`, `MouldingDesk.tsx`, `PressDesk.tsx`, `GarmentsDesk.tsx`,
+  `FoodDesk.tsx`, `StatutoryDesk.tsx`; D also `WipView.tsx`) with the same default export and props
+  (`MfDeskProps` in `components/mfg/desk-props.ts`: `{ view?: string; ctx: MfgContext }` — `ctx.changed(msg)` /
+  `ctx.error(msg)` report back). Strings: your own area per desk (`i18n/areas/mfg-r13b*.ts` …); no shared desk kit (the
+  floor's `floor-ui.tsx` / `floor-util.ts` are the Floor desk's own). Help topics, palette labels and Ctrl+K titles for
+  your desk and views exist (`manufacturing:<desk>:<view>`, `r13.<desk>.<view>`, `mfg.<desk>`); correct their wording.
+- **Settings**: `readMfgSettings` / `saveMfgSettings` (`mfg/mf-settings.ts`); keep your sub-objects as object-valued keys
+  (`moulds`, `presses`, `absorb`, `eway` …) — `cleanMfgSettings` keeps them; the checklist reads `moulds` / `presses` arrays.
+- **Snapshot / paper**: write documents through `mfSnapshot(kind, { header | drawing | print | scrap | cmt | food |
+  export_aa, lines, declaration, recycled_pct })`. `MfgBlock` boxes come from `mf-print.ts` `mfBoxes` (add your arm there);
+  `MfgAnnexurePage` already prints the size grid, inspection summary and scrap weighment; `mfLineText` and
+  `mfDeclaration` print every line / declaration field above.
+- **Job cards (C, D)**: `loadCards`, `cardTotals`, `unitsByEmployee`; entries with a `karigar` operator carry the vendor id
+  (C4 piece bills); routing operations carry `piece_rate`. D5 conversion: pass `{ conversion: AdditionalCost[] }` as the
+  last argument of `buildOutputVoucher` (without it the journal is byte-identical); job-card hours × `MfOrderOp.rate` give
+  the conversion; `WorkCentre.normal_hours` is typed for the AS 2 cap.
+- **Scrap (B3)**: job-card scrap enters stock through the output journal (`mf_jc` lines); a scrap sale reads stock as usual.
+- **Cash**: no new no-cash marker (PRD §4).
+
+### Deviations from the PRD (MF-A)
+
+- **Doc name**: this file is `docs/features/mfg-r13.md` (as asked by the lead), not `manufacturing-r13.md`.
+- **Udyam line**: printed by an inline helper (`mfSellerText`, the R10 `svRegText` pattern) at the GSTIN line of each
+  layout, not a lazy `UdyamLine.tsx` part — a text line is cheaper than a lazy chunk. It needs `msme_category` on the
+  snapshot (MF33) so that documents saved before Round 13 print nothing new. The centered layout's short header shows no
+  registration lines (as for `sv_regs`).
+- **One chunk for the Floor desk**: the desk and its four views load as one lazy chunk (AG-B's finding: a chunk per view
+  costs more); the dated plan is its own lazy chunk on the MRP tab.
+- **Rejects to QC**: rejected and rework quantities are reported on the card; posting a reject to the QC hold is still
+  R4-A's QC desk (no automatic journal from the card).
+- **Order QR scan**: the operator screen takes the order number from a scanner that types; no camera scanner on it.
+- **Plans saved with `dated: true`**: the type is declared; the dated view runs on the open plan and is not stored.
+- **Demo**: no Udyam number / MSE receivable sample (it would change the Demo company's sender profile); the floor block only.
+- **Wizard Udyam**: written on the active sender profile with its category; FSSAI is typed in Settings → Defaults.
+
+### Bundle (MF-A)
+
+Measured with `vite build` + gzip -9 (the budget script's method); before = `claude/elegant-cannon-cwapiv` at `166d7d7`,
+after = this branch merged with it.
+
+| Budget | Before | After | Delta | Share |
+|---|---|---|---|---|
+| Initial JS (first paint) | 189,182 B (184.75 kB) | 189,186 B (184.75 kB) | **+4 B** | ≤ +0.03 kB ✓ |
+| Total JS | 3,228,040 B (3152.4 kB) | 3,270,891 B (3194.2 kB) | **+42,851 B (+41.8 kB)** | ≤ 18 kB ✗ |
+
+**Overrun: +23.8 kB over MF-A's 18 kB share** (total stays well under 3400 kB). Breakdown (gz): Floor desk and views
+14.5 kB (FloorDesk chunk 8.2 kB: centres, routings, job cards + operator screen, load; its shared chunk 6.4 kB: the
+`mfg-r13a` strings in English + Hindi, `floor-ui`, `mf-routings` + CSV, `mf-centres`), job-card engine 2.5 kB (shared by
+the desk, the output dialog and payroll), dated plan 2.4 kB + the `mrp.ts` split into a shared chunk 0.8 kB net;
+help topics for all 34 R13 desk / view rows 2.8 kB, palette labels 1.1 kB, Ctrl+K titles / synonyms 1.1 kB, reach strings
+(packs, checklist) 1.1 kB, glossary 0.7 kB; picker + wizard / features wiring 2.4 kB; profile row 1.5 kB; paper parts
+(block, annexure, helpers, TemplateEngine wiring) 2.3 kB; settings / profile / registry / shared / rules 1.8 kB; demo
+1.1 kB; lazy rows (payroll units, lead time) 1.4 kB; stubs 1.7 kB; production chunk (release hook `mf-ops`) 0.6 kB;
+the rest (checklist, presets, packs, Manufacturing mounts, sync / bin / export rows) ≈ 2.5 kB. Trimming options for the
+lead: drop the operator screen and the day report (≈ −2 kB), the dated plan view (≈ −3 kB with the `mrp` split), the
+routing CSV import / export (≈ −0.8 kB), or shorten the B–D help topics until their packages land (≈ −1.5 kB).
+
+## MF-B — Engineering, plastics and printing (packs `fabrication`, `plastics`, `press`)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| B1 drawings | `mfg/mf-drawings.ts` (table `drawings`, `master.edit`): number, title, customer, item, material grade, revisions (a new revision is `current`, every earlier one `superseded`; `hold` on the live one), characteristics (nominal, − / + tolerance, unit, critical). `revWarning` / `docRevWarnings`: "Drawing 1145-B: PO says rev B; current is rev C." `stampDocLines` puts drawing / rev / PO line / heat no. on a **draft**'s lines (`mf.lines`, A5 prints them); heat nos. come from `PurchaseLine.mf_heat` on the bills whose batches the output batch consumed (`heatsForBatch`: the order's batch-wise issues and journal lines → bill lines, read through `readPurchase` / `readPurchaseLines`). **Hold blocks release**: `mf-drawing-hold.ts` (tiny, no heavy imports) is called from MF-A's `opsForRelease` (`mf-ops.ts`, the one plug-in line) and throws "Drawing … is on hold" while the `fabrication` pack is on; the owner may override that revision (`overrideHold`, `settings.manage`, audited). Shop → Drawings. |
+| B1 inspection | `mfg/mf-inspection.ts` (table `inspection_reports`, `FAI/FY…`, `doc.create`, dated): first-article / lot / final against a drawing revision, readings per characteristic, out-of-tolerance values marked, result suggested (all in → pass; a critical one out → fail; only non-critical out → deviation; the inspector may record another). A4 print; `attachToInvoice` writes the summary into a draft's `mf.drawing.inspection` (A5's annexure page prints it). Shop → Inspection. |
+| B2 weight quotes | `mfg/mf-weight.ts` (plate, round bar, tube, ring / flange, section by kg / m; densities `DENSITY_DEFAULTS` MS 7.85, SS 7.93, Al 2.70, brass 8.50, copper 8.96, editable) and `mfg/mf-quotes.ts` (table `job_quotes`, `doc.create`, dated): material on gross kg, operations (hours / piece × ₹ / hour, set-up hours spread over the break), outside work ₹ / kg net or ₹ / piece, packing, freight, scrap credit (gross − net kg × scrap rate), overhead %, margin %; 1–4 breaks. "Make quotation" saves one `QUOTATION` draft per break with the drawing / revision on the line (`mf.kind = 'drawing'`; conversions keep `mf`). "Won" dates the material rate into the material item's `standard_costs`. Shop → Quotes. |
+| B3 scrap | `mfg/mf-scrap.ts`: register by scrap item × month — made (manufacturing-journal scrap lines incl. MF-A's `mf_jc` job-card lines, stock-journal scrap destinations), "on job cards" (card scrap kg not yet posted, counted once against the `mf_jc` lines), sold (sales net of credit notes, base units by `lineFactor`), in stock (stock engine), value at the scrap rate, average realisation. Scrap sale: `scrapSaleDraft` → a draft invoice with weighment rows (`mf.scrap.rows`, A5 annexure), the class rate / HSN where the item has none, the `206C(1) scrap` preset from `trading-rules.ts` (1% → 2% from 1 Apr 2026) unless the buyer's declaration (typed, or `Client.tcs_declaration`) — then no TCS and the reference in the notes — and the GST TDS u/s 51 note for a registered buyer of metal scrap above ₹2.5 lakh. `mfg/mf-scrap-tax.ts`: classes `SCRAP_CLASS_RULES` (metal 18%; paper waste 12% → 5% from 22 Sep 2025; plastic waste **no suggestion**, MF8; textile waste 5% unverified), `SCRAP_TAX_RULES` (RCM and GST TDS from 10 Oct 2024), `scrapRcm` — the bill modal's `RcmGoodsNotice` imports it lazily, only for an unregistered supplier, and shows "RCM: N 6/2024-CT(R)" for metal scrap. The GST TDS a buyer deducts is a typed short payment on the receipt ("GST TDS receivable"): no new no-cash marker. Item scrap class set on Shop → Scrap. |
+| B4 runs | `mfg/mf-runs.ts` (table `process_runs`, `doc.create`, dated; moulds in `mfg_settings.moulds`, owner): expected output = hours × 3600 ÷ cycle × cavities, efficiency, part weight (typed or (shot − runner) ÷ cavities), material balance (input = good + rejects + runners + purge + unaccounted), yield, regrind % against the finished item's `mf_max_regrind_pct`; **one manufacturing journal per run** (`production_order_id` when given): inputs consumed, good parts produced, regrind made as a fixed-value scrap line at the regrind item's rate (MF42). An edit rewrites the same journal; a delete removes both; the recycle bin refuses to restore a run without its journal. Mould shots = typed start + the runs' shots (derived; warning at 90% of life). Moulding → Runs / Balance. |
+| B4 EPR | `mfg/mf-epr.ts`: kg supplied by month × EPR category (item `mf_epr` I–IV) × customer (with `Client.mf.epr_no`) from sales net of credit notes (KG items by quantity, others by `mf_unit_kg`), recycled share of the month's runs (input items flagged `mf_pcr`), CSV for the brand owner; item EPR fields and the customer's EPR number are edited on the view. Moulding → EPR. |
+| B5 estimates | `mfg/mf-paper.ts` (ups in both orientations after gripper / edge / bleed, sheets, make-ready per pass + running %, kg from GSM, reams, sq in) and `mfg/mf-estimates.ts` (table `print_estimates`, `PES/FY…`, `doc.create`, dated; presses in `mfg_settings.presses`, owner): per break — ups, net + waste sheets, kg, plates (front + back + varnish plate), colour passes (colours ÷ press colours per side; a pass per colour without a press), impressions = sheets × passes, press cost (÷ 1000 × rate, not below the minimum), press hours, finishing (₹ / sq in of sheet, / sheet, / piece, / lot), outside work, margin, per piece. Quotation per break with `mf.print` (A5's "Print job" box). **Job ticket**: a BOM "Print job PES/… × qty" (the break's paper, in the paper item's unit) and a planned production order; ticket print with actual sheets issued (order issues − returns). `PRINT_CLASS_RULES` (own-paper goods: product rate; job work ch 48 / 49 12% → 5%; cartons 4819 12% → 5%; paper 4802 12% → 18%; other 18%) shown as suggestions. Press → Estimates / Job tickets / Paper (calculator + paper by GSM with stock). |
+| Registrations | `mf-shared.ts` (`drawings`, `inspection_reports`, `job_quotes`, `process_runs`, `print_estimates`; series `FAI`, `PES` moved out of the reserved list; dated / numbered rows), `mf-registry.ts` MF-B block, backup / sync (`DATED`, `NUMBERED`) / open-export rows (`// R13-B`), recycle-bin restore rules (an inspection report needs its drawing; a run needs its journal), `mfg-rules.ts` MF-B section (`SCRAP_CLASS_RULES`, `SCRAP_TAX_RULES`, `PRINT_CLASS_RULES`, `DENSITY_DEFAULTS`). Types in the MF-B block of `types/mfg-r13.ts` (`PurchaseLine.mf_heat`, `StockItem.mf_max_regrind_pct` / `mf_pcr` / `mf_unit_kg`, `MfgSettings.moulds` / `presses` / `regrind_item_id`, `MfScrapSnap.declaration` / `gst_tds`). |
+| Desks | `ShopDesk`, `MouldingDesk`, `PressDesk` replace MF-A's stubs (same default export and props); one lazy chunk each with its views; small shared UI `mfb-ui.tsx` / `mfb-util.ts`; strings per desk (`i18n/areas/mfg-r13b-shop.ts`, `-mould.ts`, `-press.ts`, English + Hindi). Help topics reworded; CA items MF40–MF42. Demo: drawing 1145-B at rev C and a carton estimate. E2E: "R13-B engineering desk". Tests: `mf-drawings`, `mf-weight`, `mf-quotes`, `mf-scrap`, `mf-runs`, `mf-epr`, `mf-paper`, `mf-estimates`; purchase contract (heat carry); registry (MF-B block). |
+
+### Deviations from the PRD (MF-B)
+
+- **Heat no.** sits on the bill line as `PurchaseLine.mf_heat` (MF-A typed `PurchaseRecord.mf` as `{ kind, ref_id }`, which cannot be widened by merging); it is typed into data, there is no bill-modal field yet.
+- **Drawing attachments**: `attachment_id` is in the type but there is no upload (the attachment store's orphan clean-up only keeps attachments of its listed owner tables).
+- **Drawing / rev / heat on lines** are stamped on drafts from Shop → Drawings (and written by quotations); the editor has no inline field.
+- **Inspection → QC**: the report suggests and records the result; the release / reject of the order's output stays on R4-A's QC desk (link from the view).
+- **Scrap prompts in the editor**: the TCS preset, declaration and GST TDS note are applied when the scrap invoice is made from Shop → Scrap; the editor's own TCS picker (R8) is unchanged, and the receipt dialog has no new GST TDS shortcut (typed short payment).
+- **Job ticket routing**: the finishing steps print on the ticket; no routing is created (finishing lines carry no work centre).
+- **Plastic regrind sale**: no special path — sold as a scrap item with class `plastic_waste` (no rate suggested) or a typed rate.
+- **Run restore**: a deleted run is not restored (its manufacturing journal is not kept by the recycle bin); record it again.
+- **Demo**: no moulding run sample (a run always comes with its stock journal).
+
+### Bundle (MF-B)
+
+Measured with `vite build` + gzip -9 (the budget script's method); before = `claude/elegant-cannon-cwapiv` with MF-A and
+MF-C merged (`87c0c2e`), after = this branch merged with it.
+
+| Budget | Before | After | Delta | Share |
+|---|---|---|---|---|
+| Initial JS (first paint) | 189,201 B (184.8 kB) | 189,216 B (184.8 kB) | **+15 B** (lazy-map churn in the entry) | ≤ +0.02 kB ✓ |
+| Total JS | 3222.6 kB | 3258.5 kB | **+35.9 kB** | ≤ 14 kB (PRD) / ≈ 25 kB (lead) ✗ |
+
+**Overrun: ≈ +11 kB over the lead's ≈ 25 kB (+22 kB over the PRD's 14 kB).** Breakdown (gz): Shop desk 15.4 kB (strings
+EN + HI ≈ 4 kB, drawings / inspection / quotes / scrap views ≈ 6 kB, `mf-drawings` + `mf-inspection` + `mf-quotes` +
+`mf-scrap` + `mf-weight` ≈ 5.5 kB), Press desk 8.5 kB (strings ≈ 2.3 kB, estimates / paper / tickets views ≈ 3 kB,
+`mf-estimates` + `mf-paper` ≈ 3 kB), Moulding desk 7.1 kB (strings ≈ 2 kB, runs / balance / EPR views ≈ 2.6 kB,
+`mf-runs` + `mf-epr` ≈ 2.5 kB), shared desk kit + DB helpers (`mfb-util` chunk) 1.5 kB, scrap tax (shared by the Shop desk
+and the bill modal's RCM notice) 1.0 kB, `mfg-rules` MF-B section 0.8 kB, draft builder `mf-b-docs` 0.7 kB, RCM notice
+lookup 0.6 kB, demo rows 0.5 kB, open-export rows 0.3 kB, help wording 0.3 kB, release hold guard in the production chunk
+0.2 kB, Manufacturing lazy-map churn 0.2 kB, registry / shared / backup / sync / recycle-bin rows ≈ 0.5 kB.
+Trimming options for the lead: drop the A4 inspection report and job-ticket prints (≈ −1.2 kB), the paper-by-GSM table
+(≈ −0.5 kB), the draft-line stamping panel on Drawings (≈ −1 kB), the moulds / presses masters on the views (owner forms,
+≈ −1.2 kB; set them in data), the EPR item / customer field editors (≈ −0.8 kB), share the ~20 common words of the three
+MF-B areas in one area (≈ −0.6 kB, against the per-desk rule).
+
+## MF-C — Textiles and garments (pack `garments`)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| C1 styles, cut plans | A style is a variant parent (size × colour `variant_axes`, 8.85) with `StockItem.mf.style` (fabric per piece, by colour through `colour_map`, trims, default ratio) and `mf_class` (C5) — `mfg/mf-styles.ts` (`styleOf`, `styleAxes`, `childFor`, `fabricFor`, `gridChildren` refuses an order grid that does not sum to the planned quantity, `saveStyle` `master.edit`). Table **`cut_plans`** (`CUT/FY…` = the lot, `doc.create`, audited, dated `date`, numbered; bundles inside): `mfg/mf-cutplans.ts` — pieces = Σ plies × marker ratio, laid metres, consumption = (issued − end bits) ÷ pieces vs the style standard (variance m / %), `suggestLays` (plies = ⌈left ÷ marker capacity⌉, ratio = ⌊size qty ÷ plies⌋, repeated; never more than ordered). Stock through R4-A only: `issueCutFabric` (STR to the order's WIP godown), `returnEndBits` (return), `writeCutWaste` (stock journal tagged with the order: wasted fabric metres → the waste item's kg at its scrap rate). Garments → Styles / Cut plans (suggest from the order grid, cut report print). |
+| C2 lots, bundles | `mfg/mf-bundles.ts`: `makeBundles` (bundle size a field, sizes in the style's order), bundle id `<lot>/<no>`, `recordStep` / `scanStep` (good = live pieces unless typed; rejects leave the bundle with a reason; last operation = finished), `lotStatus` (by place / operation, WIP by size, finished, rejected, open = cut − finished − rejected), `reportFinished` (one R4-A manufacturing journal **per variant child**, tagged with the order, consuming the order's materials per piece; a bundle is reported once). Garments → Bundles: the existing `ScanField` (USB scanner or camera), bundle tickets (QR `qrcode.react`, 8 or 12 per A4, tear-off coupons per operation and rate). |
+| C3 CMT, e-way, ITC-04 | `mfg/mf-cmt.ts`: **CMT out = the existing Material Out** (`JWC`) — one line of the lot's fabric from the WIP godown (else Main), metres = pieces × metres a piece, `JobWorkLine.mf = { lot, bundles, pieces }`; **CMT in = Material In by bundle**: good pieces → the style's variant children (processed), the fabric of good pieces consumed at the fabricator, rejected cut pieces → fabric returned, the rest short (pending on the challan, listed per bundle); job charges = good × rate (rate card, else typed); "scrap kept by him (m)" → a loss line tagged `mf.scrap_at_jw` taken out of the consumed fabric. `mfg/mf-eway-jw.ts` (built with `buildJobWorkEway`, whose sub-type 4 output is unchanged): **sub-type 6** from a principal-register return (`JWP`, values of the principal's goods, MF11), job worker → job worker (5B: our challan dispatched from the first job worker, transaction type 3 / 4), `dispatchFrom` for a 5C invoice e-way, `jwEwayNeeded` (inter-State always; intra-State > ₹50,000 unless `mfg_settings.eway_jw_intra_exempt`). `job-work.ts`: **one additive tag** in the settlement switch — a loss line with `mf.scrap_at_jw` settles as `lost` with `scrap_at_jw: true` (ITC-04 reports it once as losses and wastes; `itc04.ts` untouched). `mfg/mf-itc04-extra.ts`: reconciliation per job worker / challan (sent, consumed, returned, lost, scrap, supplied, balance, oldest open, clock), scrap at job workers in the period, challans with no movement. Material In panel: one checkbox "kept or sold by the job worker" on the losses grid. Garments → CMT. |
+| C4 karigars | Karigars are **vendors** with `Vendor.mf.karigar` (`home` / `floor` / `fabricator`, rate card by operation and style from a date, deduct-rejects switch; PAN / bank from the vendor master); payroll piece-rate employees are never karigars. `mfg/mf-karigar.ts`: `rateFor` (style row wins, latest `from`), `pieceLines` (job-card entries with a karigar operator — rejects deducted; bundle coupons not already on a job card or a CMT receipt; CMT Material In good pieces), `karigarBalance` (bills through `readPurchase`, advance from the vouchers). `mfg/mf-piece-bill.ts`: **`KPB/FY…` piece bill = one `purchases` row** (SAC 9988 lines, `PurchaseRecord.mf = { kind: 'piece_bill', piece }`), no GST / no RCM for an unregistered karigar, `jw_textile` 5% for a registered fabricator; TDS 194C by `resolveBillTds` (individual / HUF `194C-1`, others `194C-2`; thresholds, 206AA) with the Sec 393 label (`sectionText`); advances = payment voucher Dr "Karigar advances" (created on first use); recovery = journal Dr Sundry creditors | Cr Karigar advances (no receipt), rolled into `amount_paid` (R11 / R12 precedent); bank rows through R12's `cycleUploadRows` (`bank-upload.ts` not edited); WhatsApp slip. Deleting a bill goes through `purchasesDb.remove` (recycle bin) with its journal; the KPB number stays used. Garments → Karigars. |
+| C5 classes, Rule 89(5) | `mfg-rules.ts` `TEXTILE_CLASS_RULES` (`mmf_fibre` 18 → 5%, `mmf_yarn` 12 → 5% from 2025-09-22, `cotton_yarn`, `fabric` 5%, `garment` / `made_up` → the R9 band, `textile_waste`, `jw_textile` 5%, `jw_print_ch48_49` 12 → 5%, `jw_other` 18%; all `verified: false`) and `RULE_89_5_RULES` (the N 14/2022 ratio from 2022-07-05). `mfg/mf-textile-tax.ts` (`classRate`, `classNotice` — a typed rate wins, `bandMemo` — sizes whose list price falls in the 18% band). Editor band hook (`pricing-actions.ts` `markBand`): an item whose `mf_class` is `garment` / `made_up` marks the sale line for the R9 band even without the apparel pack. `mfg/mf-inverted.ts`: outward lines by rate (credit notes negative; financial notes, bills of supply, drafts out), inward lines through `readPurchase` / `readPurchaseLines` (services, expense and capital bills out of net ITC), `rule895`, `suggestInvertedRates`, `prefillInvertedClaim` (DRAFT `INVERTED_DUTY` row through `saveRefund`). Garments → Inverted duty (own lazy chunk). |
+| Registrations | `mf-shared.ts` `MF_TABLES.cutPlans`, `MF_SERIES.cutPlans` `CUT` / `pieceBills` `KPB` (moved out of the reserved list), `MF_DATED` / `MF_NUMBERED`; `mf-registry.ts` `cut_plans` (`doc.create`, audit label "Cut plan"); backup `RECORD_TABLES` / `ID_TABLES`, sync `DATED` / `NUMBERED`, open-export row, `DEMO_EXTRA_TABLES`. Every MF-C writer imports `./mf-registry`. Purchase readers (`mf-karigar`, `mf-inverted`) are in `tests/purchase-contract.test.ts`; stock quantities through `lineFactor`; no cash reader added (advance recovery is a journal). |
+| Strings, help, demo | `i18n/areas/mfg-r13c.ts` (desk) and `mfg-r13c-inv.ts` (inverted view), English + Hindi; help topic `manufacturing:garments:inverted` and palette label `r13.garments.inverted` (+ `PACK_TABS` row); demo garments block in `demo/profile-mfg.ts` (a kurta in 5 sizes × 3 colours, a lot of 60 plies in 10 bundles, 2 karigars). CA items MF50–MF54 (`docs/CA_REVIEW.md` §13.6). |
+
+Tests: `mf-cutplans`, `mf-bundles`, `mf-cmt`, `mf-eway-jw`, `mf-itc04`, `mf-karigar`, `mf-textile-tax`, `mf-inverted` (+ the contract
+test row; `mf-registry` counts `CUT` / `KPB` once). E2E: step "R13-C garments desk".
+
+### Deviations from the PRD (MF-C)
+
+- **Inverted-duty view** sits on the Garments desk (`view=inverted`, its own lazy chunk), not on the Statutory desk (MF-D's file);
+  it is not linked from the R4-C refund register screen — the pre-filled DRAFT claim appears there.
+- **Shared type edits**: MF-A's inline `mf` types were widened in place (`Vendor.mf.karigar` → `MfKarigar`, `StockItem.mf.style`
+  → `MfStyle`, `PurchaseRecord.mf.piece`, `JobWorkLine.mf.pieces / scrap_at_jw`) — an inline object type cannot be merged from
+  another block. `TextileClass` / `TextileClassId` live in `mfg-rules.ts` beside the rules.
+- **Material Out grid**: no bundle column — bundles go out from Garments → CMT (which writes the ordinary Material Out); the
+  Material In panel gets only the "kept or sold by the job worker" checkbox.
+- **CMT fabric**: cut pieces travel as the lot's fabric metres (MF51); rejected cut pieces come back as fabric.
+- **Karigar PAN / bank** come from the vendor master (not duplicated in `mf.karigar`); UPI is a field on the card.
+- **Bundle scan** is on the Bundles view (operation, karigar, rejects, last step), not inside MF-A's operator screen;
+  `jc_entry_id` on a bundle step links it to a job-card entry when one is typed, so a piece is never counted twice.
+- **Garment output**: `reportFinished` writes one journal per variant child; the order's own output dialog (R4-A) is unchanged.
+- **Job charges class suggestion on the Job Work In service invoice** (C3-4) is not wired into the editor; the classes are in
+  `TEXTILE_CLASS_RULES` and the piece bill uses `jw_textile`.
+- **5C e-way**: `dispatchFrom` exists for the invoice e-way; no button on the invoice e-way dialog yet.
+- **Demo**: no CMT challan (it needs job-worker godowns and stock moves); 10 bundles of 30 rather than 12.
+
+### Bundle (MF-C)
+
+Measured with `vite build` + gzip -9 per JS asset; before = `claude/elegant-cannon-cwapiv` at `31a83db` (MF-A merged), after =
+this branch.
+
+| Budget | Before | After | Delta | Share |
+|---|---|---|---|---|
+| Initial JS (first paint) | 189,186 B | 189,201 B | **+15 B** | ≤ +0.02 kB ✓ |
+| Total JS | 3,270,891 B (3194.2 kB) | 3,299,901 B (3222.6 kB) | **+29,010 B (+28.3 kB)** | 14 kB aim ✗ (lead's cap ~25 kB ✗) |
+
+Breakdown (gz): Garments desk chunk 22.1 kB (five views + bundle tickets ≈ 9 kB, engines for styles / cut plans / bundles /
+CMT / karigars / piece bills / e-way / ITC-04 depth / classes ≈ 10 kB, `mfg-r13c` English + Hindi ≈ 3 kB); Inverted-duty view
+3.3 kB (engine, view, strings); `eway-job-work` split into a shared chunk +1.5 kB (−1.0 kB from the job-work tab, net +0.5);
+`mfg-rules.ts` split into a shared chunk 1.1 kB (MF-A's rules moved with it: `mf-settings` −0.1); demo block +0.6 kB;
+Manufacturing chunk +0.3 kB (registry / shared names); help / palette / open-export / Material In checkbox / band hook ≈ 0.5 kB.
+Trimming options for the lead: drop the job worker → job worker e-way form and the ITC-04 reconciliation table from the CMT
+view (≈ −1.5 kB), the bundle-ticket coupons and the cut-report print (≈ −1 kB), or the inverted-duty view (−3.3 kB).
+
+## MF-D — Food / FMCG and the statutory desk (packs `foodmfg`, `shopfloor`)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| D1 cost cards, FSSAI | `mfg/mf-costcards.ts` (table `cost_cards`, `master.edit`, versions by `effective_from`; same item + date replaces): recipe from the default BOM at the item's dated standard cost (else opening rate), grossed up by scrap %; input weight (kg / g / L / ml / qtl / t), yield = output kg ÷ input weight, batch cost = (Σ qty × rate + conversion ₹/kg × output) × (1 + overhead %), cost per pack = ₹/kg × pack kg + packing, margin and % at distributor / retailer / MRP; what-if at the latest purchase rate (bills through `readPurchaseLines`, base units). `mfg/mf-food.ts`: `foodOutputDefaults` (order `mf.food` batch no. / packed on / best-before / use-by, else packed + `shelf_life_days` of the order or item) pre-fills R4-A's output dialog (MFG date = packed date); `actualYield`; `fssaiWarning` (soft, pack `foodmfg`), `validateFssai`, `fssaiLicences` (R12 licence register kind `fssai`, read only); `FOOD_CLASSES` / `foodClassRate` / `foodRateNotice` over `mfg-rules.ts` `FOOD_CLASS_RULES` (22 Sep 2025 rows, all `verified: false`, MF6). Food → Cost cards. |
+| D2 shelf life, schemes | `mfg/mf-shelf-floor.ts` (the only part the editor loads): `floorOf` (`Client.mf.min_shelf_pct` / `min_shelf_days`), `remainingLife`, `meetsFloor`, `floorBatches` + "no batch with ≥ 70% life — n units qualify"; `LineTracking.tsx` uses it for the FEFO pick of a batch item (one guarded line; no floor = as before). `mfg/mf-shelf.ts`: near-expiry rows by batch and godown, buckets (expired / < 25 / 25–50 / 50–70 / ≥ 70 % / no MFG date) with an action; `FOOD_SCHEME_PRESETS` (10 + 1, slabs → `schemesDb`; display claim / secondary discount by FCN) and `CIRCULAR_251_NOTE` (MF15). Food → Shelf life (stock, client minimum, shelf-life days per item), Food → Schemes. |
+| D3 MSME both ways | `mfg/mf-msme-recv.ts`: shown when our profile has a Udyam number and category micro / small; sales to GSTIN buyers past `msme.paymentLimit` with `msme.msmedInterest` to date (late-paid bills keep their interest; buyer TDS counted as paid) — equal to the payables maths on mirrored data; 43B(h) note; WhatsApp reminder (MSME Samadhaan optional) and an interest-claim letter; nothing posted. `mfg/mf-msme-form1.ts`: half-years and due dates from `MSME_FORM1_RULES`, rows unpaid at the half-year end beyond 45 days of acceptance (through `msme.msmeBills`), reasons typed (kept in `mfg_settings.form1_reasons`), CSV, company test (annual-pack entity, else the name), `form1Dues`. `msme.ts`: `traderExcluded` (`Vendor.mf.msme_trader`) honoured by `disallowance43Bh`, which lists `excludedTraders` (absent when none — existing results unchanged). Statutory → MSME (receivables, Form-1, unclassified suppliers, trader flags). |
+| D4 incentives, AA / EPCG | `mfg/mf-incentives.ts` (table `incentive_claims`, `books.edit`, dated by `period_to`): nothing posts until `recogniseClaim(date)` (Dr Incentive receivable / Cr Government grant income — capital: Cr Capital subsidy, or the asset's ledger when picked); `receiveClaim` (receipt; refused before recognition); bell after 180 days (`INCENTIVE_RULES`). `mfg/mf-authorisations.ts` (table `export_authorisations`, `books.edit`, dated): default dates (AA import 12 / EO 18 months, EPCG 6 years), exports from invoices tagged `mf.export_aa.authorisation_id` (FOB in ₹, base units), imports from bills tagged `PurchaseRecord.mf.authorisation_id` (`readPurchase`), EO status (AA: lower of quantity and value shares; EPCG: multiple × duty saved, block-wise), duty at risk (memo), bell 90 / 30 days / overdue, ANF 4F CSV, `dutyForegone` for the BOE memo. `trade/export-incentives.ts`: `appendix` 4R / 4RE kept on RoDTEP rows (MF18). Statutory → AA / EPCG and → Incentives; BOE duty sheet: lazy "Under authorisation" row (`AaBoeSwitch`, pack `shopfloor`). GST → Compliance: lazy `MfgCalendar` (Form-1 dues for companies, EO bells, pending claims). |
+| D5 WIP with conversion | `mfg/mf-conversion.ts`: `mfg_settings.absorb` = dated, append-only switch rows, **off by default** (owner; audited). Conversion = Σ job-card hours × `MfOrderOp.rate` (snapshotted at release), the `overhead_rate` part capped at `WorkCentre.normal_hours` per FY (unabsorbed = period cost, shown only). `outputConversion` → one `AdditionalCost` (`mf_conv`, mode `amount`) passed to MF-A's `buildOutputVoucher(…, { conversion })`; absorbed once (earlier `mf_conv` lines subtracted). With the switch off the journal is byte-identical (`tests/mf-conversion.test.ts` compares `JSON.stringify`). The output dialog now keeps `base.costs` before the typed labour line (empty unless conversion). `liveMemoConversion`: memo WIP on open orders (report time only). Floor → WIP (switch, per-order spent / in stock / memo). |
+| D6 Schedule III split | `mfg/mf-inventories.ts`: item class `StockItem.mf_inv_class`, else BOM role (scrap output → scrap, made → finished, component → raw, else stock-in-trade); value per item exactly as `inventoryValuer` (so the split sums to the valuer); WIP-godown stock on the day → WIP at average value; `INVENTORY_HEADS` order; `wipStatement` / `wipSheet`. `mfg/mf-inventories-live.ts` (positions, `computeTracking(asOf)`, orders). `ledger/notes-auto.ts`: optional `inventoryRows` (sub-heads + "Other inventories" balancing row + total = the balance-sheet line); without rows the note is unchanged. Annual pack: rows computed lazily when the `shopfloor` pack is on or any item has a class (company-wide stock, not for a branch scope). Year-end wizard: step `wip_statement` (pack `shopfloor`) with the WIP statement CSV. Statutory → Inventories (split, memo, unabsorbed overhead, class per item). |
+| Storage | Tables `cost_cards`, `export_authorisations`, `incentive_claims` in `MF_TABLES` / `MF_DATED`, `mf-registry.ts` (`master.edit` / `books.edit` / `books.edit`, audit labels), backup `RECORD_TABLES` / `ID_TABLES`, sync `DATED`, open-export rows, `DEMO_EXTRA_TABLES`. Additive fields (types in `types/mfg-r13.ts`): `MfExportAaSnap.authorisation_id`, `MfOrder.food` batch fields, `Client.mf.min_shelf_days`, `PurchaseRecord.mf.authorisation_id` / `duty_foregone`, `MfgSettings.form1_reasons` / `absorb`; `ExportIncentive.appendix` (`types/trade-r4.ts`). No new record / line key, no series. |
+| Rules | `mfg-rules.ts` MF-D section: `FOOD_CLASS_RULES`, `MSME_FORM1_RULES`, `AA_RULES`, `EPCG_RULES`, `INCENTIVE_RULES`, `INVENTORY_HEADS` (dated, `source`, `verified: false`). |
+| Strings, help | `i18n/areas/mfg-r13d-food.ts` (Food desk), `mfg-r13d-stat.ts` (Statutory desk, Floor → WIP, calendar, BOE row); `migration.ts` (+2 keys). Help topics `manufacturing:food:*`, `:statutory:*`, `:floor:wip` reworded with MF60–MF65. Demo: `profile-mfg.ts` food block (besan, oil, a 90-day bhujia pack, a cost card, a 10 + 1 scheme). |
+| Tests | `mf-costcards`, `mf-food`, `mf-shelf`, `mf-msme`, `mf-authorisations`, `mf-incentives`, `mf-conversion`, `mf-inventories`; purchase-contract (D1 / D3 / D4 readers); `mf-registry` (writers). E2E step "R13-D food & statutory desk". |
+
+### Deviations from the PRD (MF-D)
+
+- **Desk chunks**: each desk is one lazy chunk with its views (MF-A's finding); the two desks and Floor → WIP share `mfd-ui.tsx` / `mfd-util.ts` (≈ 0.8 kB together).
+- **Capital grant default**: Capital subsidy (reserve) unless the asset's ledger is given (`asset_account_id`, not yet pickable in the form) — PRD said "asset cost" (MF63).
+- **Schemes preset**: no R8 preset list exists, so the presets live on Food → Schemes and create ordinary R8 schemes; the display claim is a note (settle by FCN).
+- **Destroyed returns (D2.5)**: unchanged existing flow (credit note + QC scrap journal); only the help and MF32 note point to it.
+- **AA tagging**: from the AA register (pick invoice / bill) and the BOE row; the invoice editor has no AA picker. The A5 paper prints `mf.export_aa.aa_no` / `sion`.
+- **Bells**: the reminders sit on GST → Compliance (`MfgCalendar`) and as a status line on the desks, not in the notification bell (keeps the bell chunk unchanged).
+- **Demo**: no batches with best-before and no MSE receivable sample (they need stock moves / a sender change).
+- **E2E**: the min-shelf-life FEFO filter is covered by unit tests, not the smoke step.
+
+### Bundle (MF-D)
+
+`vite build` + gzip -9; before = `claude/elegant-cannon-cwapiv` at `4c2b8e6` (MF-A + MF-B + MF-C), after = this branch.
+
+| Budget | Before | After | Delta |
+|---|---|---|---|
+| Initial JS (first paint) | index 72,843 B + vendor-ui 21,976 B | index 72,840 B + vendor-ui 21,978 B | **−1 B** (the FEFO floor stays inside the editor chunk) |
+| Total JS | 3,337,524 B | 3,374,022 B | **+36,498 B (+35.6 kB)** |
+
+Breakdown (gz): Statutory desk 6.2 kB, Food desk 5.8 kB, statutory strings (en + hi) 3.7 kB, incentives engine 2.9 kB, authorisations engine 2.5 kB, food + cost-card engine 2.2 kB, inventories live 1.8 kB, conversion 1.5 kB, compliance card 0.9 kB, BOE row 0.75 kB, Floor → WIP 0.6 kB, shared desk kit 0.8 kB, WIP CSV 0.2 kB; edits: year-end wizard +1.0 kB, `mfg-rules` +0.8 kB, annual pack +0.6 kB, editor (floor) +0.6 kB, BOE sheet / compliance mounts, help, demo ≈ +1.5 kB.
+

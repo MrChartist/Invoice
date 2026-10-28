@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Download, FolderOpen, HardDrive, Lock, Play, Unplug } from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { AlertTriangle, CheckCircle2, Download, FolderOpen, HardDrive, Lock, Play, Share2, Unplug } from 'lucide-react';
 import {
   RETENTION_OPTIONS,
   chooseBackupFolder,
@@ -27,6 +27,10 @@ import { VAULT_PLAIN_BACKUP_MESSAGE } from '../../lib/backup';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Pwa.module.css';
+import { phoneT } from '../../i18n/areas/phone';
+
+// 8.20: phones have no folder backups; they share an encrypted file instead.
+const ShareBackupDialog = lazy(() => import('./ShareBackupDialog').then((m) => ({ default: m.ShareBackupDialog })));
 
 export interface AutoBackupPanelProps {
   /** Wire to useToast().notify so results surface as toasts. */
@@ -51,6 +55,7 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
   const [encrypted, setEncrypted] = useState<boolean | null>(null);
   const [pass, setPass] = useState('');
   const [pass2, setPass2] = useState('');
+  const [sharing, setSharing] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -296,7 +301,25 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
               <Download size={15} aria-hidden="true" /> {syncT('downloadCopy')}
             </button>
           )}
+          {!supported && (
+            <button type="button" className={controls.btnOutline} onClick={() => setSharing(true)} data-share-backup-open>
+              <Share2 size={15} aria-hidden="true" /> {phoneT('shareNow')}
+            </button>
+          )}
         </div>
+        {sharing && (
+          <Suspense fallback={null}>
+            <ShareBackupDialog
+              open
+              onClose={() => {
+                setSharing(false);
+                setLast(getLastBackup());
+                void hasBackupEncryption().then(setEncrypted);
+              }}
+              onResult={(m, ok) => onNotify?.(m, ok ? 'success' : 'error')}
+            />
+          </Suspense>
+        )}
 
         {storage?.supported && (
           <p className={controls.hint}>

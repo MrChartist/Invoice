@@ -34,7 +34,7 @@ test('parseBackup: accepts the wrapped format and counts rows', () => {
     },
   };
   const { summary } = parseBackup(JSON.stringify(file));
-  assert.deepEqual(summary, { invoices: 2, clients: 1, keys: 2 });
+  assert.deepEqual(summary, { invoices: 2, clients: 1, keys: 2, exportedAt: '2026-04-01T00:00:00Z' });
 });
 
 test('parseBackup: accepts the legacy flat format', () => {

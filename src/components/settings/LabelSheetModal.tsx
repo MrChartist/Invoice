@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Printer, Wand2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+
+const RawLabelButtons = lazy(() => import('../distribution/RawLabelButtons')); // 8.87 thermal rolls
 import { NumberInput } from '../ui/NumberInput';
 import { barRuns, encodeBarcode, nextInStoreEan, pickSymbology } from '../../lib/barcode';
-import { LABEL_LAYOUTS, expandLabels, labelSheetHtml, layoutById, sheetCount, type LabelItem, type PriceShown } from '../../lib/label-sheet';
+import { LABEL_LAYOUTS, attrLine, expandLabels, labelSheetHtml, layoutById, sheetCount, type LabelItem, type PriceShown } from '../../lib/label-sheet';
 import { listCatalog } from '../../lib/catalog';
 import { KEYS, getTable, setTable } from '../../lib/storage';
 import { TABLES, type StockItem } from '../../lib/inventory';
@@ -25,16 +27,19 @@ interface Row {
   code: string;
   rate: number;
   mrp: number;
+  attrs?: string; // R9 (RT-C2) variant attributes
 }
 
 /** Catalogue items plus stock items with a code that are not in the catalogue. */
 function labelRows(): Row[] {
   const cat = listCatalog();
   const names = new Set(cat.map((i) => i.name.trim().toLowerCase()));
-  const rows: Row[] = cat.map((i) => ({ key: i.id, catalogId: i.id, name: i.name, code: i.barcode || i.sku || '', rate: i.rate ?? 0, mrp: i.mrp ?? 0 }));
-  for (const s of getTable<StockItem>(TABLES.items)) {
+  const stock = getTable<StockItem>(TABLES.items);
+  const attrs = new Map(stock.filter((s) => s.variant_attrs).map((s) => [s.name.trim().toLowerCase(), attrLine(s.variant_attrs)])); // R9 (RT-C2)
+  const rows: Row[] = cat.map((i) => ({ key: i.id, catalogId: i.id, name: i.name, code: i.barcode || i.sku || '', rate: i.rate ?? 0, mrp: i.mrp ?? 0, attrs: attrs.get(i.name.trim().toLowerCase()) }));
+  for (const s of stock) {
     if (names.has(s.name.trim().toLowerCase()) || !(s.barcode || s.sku)) continue;
-    rows.push({ key: `stock-${s.id}`, name: s.name, code: s.barcode || s.sku || '', rate: s.sale_rate ?? 0, mrp: 0 });
+    rows.push({ key: `stock-${s.id}`, name: s.name, code: s.barcode || s.sku || '', rate: s.sale_rate ?? 0, mrp: 0, attrs: attrLine(s.variant_attrs) });
   }
   return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -81,7 +86,7 @@ export function LabelSheetModal({ open, onClose, onChanged, preselected }: {
   const [message, setMessage] = useState('');
   const layout = layoutById(layoutId);
 
-  const chosen: LabelItem[] = rows.map((r) => ({ name: r.name, code: r.code, rate: r.rate, mrp: r.mrp, copies: copies[r.key] ?? 0 }));
+  const chosen: LabelItem[] = rows.map((r) => ({ name: r.name, code: r.code, rate: r.rate, mrp: r.mrp, attrs: r.attrs, copies: copies[r.key] ?? 0 }));
   const { labels, skipped } = expandLabels(chosen);
   const pages = sheetCount(layout, labels.length, skip);
   const missing = rows.filter((r) => (copies[r.key] ?? 0) > 0 && r.catalogId && !pickSymbology(r.code));
@@ -108,6 +113,9 @@ export function LabelSheetModal({ open, onClose, onChanged, preselected }: {
 
   const print = () => {
     const html = labelSheetHtml(chosen, { layout, price, skip, business: localDb.settings.activeProfile()?.companyName });
+    // R9 (RT-A2): stamp the print (and the price shown) so the relabel queue knows what is current.
+    const printed = rows.filter((r) => (copies[r.key] ?? 0) > 0).map((r) => r.key);
+    void import('../../lib/retail/rt-mrp-store').then((m) => m.stampLabelsPrinted(printed) && onChanged()).catch(() => undefined);
     const w = window.open('', '_blank');
     if (w) {
       w.document.open();
@@ -130,6 +138,7 @@ export function LabelSheetModal({ open, onClose, onChanged, preselected }: {
       footer={
         <>
           <button type="button" className={controls.btnOutline} onClick={onClose}>{setT('close')}</button>
+          <Suspense fallback={null}><RawLabelButtons items={chosen} layout={layout} onMessage={setMessage} /></Suspense>
           <button type="button" className={controls.btnPrimary} onClick={print} disabled={labels.length === 0}>
             <Printer size={16} /> {setT('printLabels')}
           </button>

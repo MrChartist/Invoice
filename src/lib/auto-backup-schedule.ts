@@ -38,7 +38,7 @@ const FREQUENCIES: BackupFrequency[] = ['daily', 'weekly', 'on-close'];
 
 /* ── Pure logic ────────────────────────────────────────────────── */
 
-function parseTime(iso: string | null | undefined): number | null {
+export function parseTime(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const t = Date.parse(iso);
   return Number.isFinite(t) ? t : null;
@@ -76,6 +76,11 @@ export function shouldNudge(opts: {
   const last = parseTime(opts.lastIso);
   if (last === null) return true;
   return opts.now.getTime() - last > (opts.afterDays ?? NUDGE_AFTER_DAYS) * DAY;
+}
+
+/** No backup has ever been taken on this device: the nudge says so instead of "over a week" (QA-3 F13). */
+export function neverBackedUp(lastIso: string | null | undefined): boolean {
+  return parseTime(lastIso) === null;
 }
 
 /** Short human text: "just now", "3 hours ago", "5 days ago". */

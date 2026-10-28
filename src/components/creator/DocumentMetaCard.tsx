@@ -12,10 +12,12 @@ import { getTable } from '../../lib/storage';
 import { VOUCHER_TYPES_TABLE, baseOfDoc, type VoucherSeries } from '../../lib/voucher-series';
 import { STATUS_OPTIONS } from '../../lib/invoice-status';
 import { addDaysInput, CURRENCIES, cn } from '../../lib/utils';
+import { dueAfterIssueChange } from '../../lib/dates';
 import { DOCUMENT_LABELS, type DocumentType, type InvoiceStatus } from '../../types/invoice';
 import { useT } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
 import { docLabel, statusLabel } from '../../i18n/labels';
+import { khataT } from '../../i18n/areas/khata';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../../pages/InvoiceCreator.module.css';
@@ -24,6 +26,10 @@ import styles from '../../pages/InvoiceCreator.module.css';
 const BranchSelect = lazy(() => import('../branches/BranchSelect').then((m) => ({ default: m.BranchSelect })));
 // P1-13: voucher-type picker, loaded only once a user voucher type exists for this document type.
 const VoucherTypeSelect = lazy(() => import('../voucher-types/VoucherTypeSelect'));
+// R2-A1: payment terms picker (loads the terms master and the collections strings on its own).
+const TermsPicker = lazy(() => import('../collections/TermsPicker'));
+// R11 (CN-A3): Contract & RA bill panel — only with the works pack on or a document carrying the construction snapshot.
+const ContractPanel = lazy(() => import('./ContractPanel'));
 
 const DOC_TYPES = Object.keys(DOCUMENT_LABELS) as DocumentType[];
 const DUE_PRESETS = [0, 7, 15, 30, 45];
@@ -37,8 +43,13 @@ interface Props {
 /** "1 · Document": type, number (with the GST Rule 46 uniqueness/gap check), dates, currency, status. */
 export function DocumentMetaCard({ editing, saveTick }: Props) {
   const { t } = useT();
+  // R11: the works pack (explicit list, else implied by the contractor business type) — inline, no pack module here.
+  const worksOn = useMemo(() => {
+    const st = localDb.settings.get();
+    return Array.isArray(st.industry_packs) ? st.industry_packs.includes('works') : st.business_type === 'contractor';
+  }, []);
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['branch_id', 'voucher_type_id', 'cost_centre_id', 'currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'po_number', 'reverse_charge', 'sender', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
+    useShallow((st) => pick(st, ['balance_due', 'branch_id', 'voucher_type_id', 'cost_centre_id', 'currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'payment_terms', 'po_number', 'reverse_charge', 'sender', 'boq_terms', 'ra_no', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
   );
 
   const nextNumber = useMemo(
@@ -66,6 +77,11 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
   );
   const numberTaken = numberCheck && !numberCheck.ok ? numberCheck.clash : undefined;
   const centres = useCostCentres();
+  // R2-A1: a due date typed by hand turns the payment term into "Custom".
+  const setDue = (due: string) => {
+    s.setDates(s.issue_date, due);
+    if (s.payment_terms) s.patch({ payment_terms: undefined });
+  };
   const hasBranches = useMemo(() => {
     try {
       return getTable('branches').length > 0;
@@ -144,18 +160,27 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
         <div className={controls.row3}>
           <label className={controls.field}>
             <span className={controls.label}>{t('meta.issueDate')}</span>
-            <input className={controls.input} type="date" value={s.issue_date} onChange={(e) => s.setDates(e.target.value, s.due_date)} />
+            <input className={controls.input} type="date" value={s.issue_date} onChange={(e) => s.setDates(e.target.value, dueAfterIssueChange(s.issue_date, s.due_date, e.target.value))} />
           </label>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="due-date">{s.doc_type === 'SALES_ORDER' ? t('meta.deliveryBy') : t('meta.dueDate')}</label>
-            <input id="due-date" className={controls.input} type="date" value={s.due_date} min={s.issue_date} onChange={(e) => s.setDates(s.issue_date, e.target.value)} />
+            <input id="due-date" className={controls.input} type="date" value={s.due_date} min={s.issue_date} onChange={(e) => setDue(e.target.value)} />
+            {/* 8.6: an unpaid bill with no credit period nudges for a due date (ageing / reminders use it). */}
+            {(s.doc_type === 'INVOICE' || s.doc_type === 'TAX_INVOICE' || s.doc_type === 'BILL_OF_SUPPLY') &&
+              s.status !== 'Paid' && s.status !== 'Cancelled' && (Number(s.balance_due) || 0) > 0.004 &&
+              (!s.due_date || s.due_date <= s.issue_date) && (
+                <span className={controls.hint} role="note" data-due-nudge>{khataT('dueNudge')}</span>
+              )}
             <div className={styles.chips}>
               {DUE_PRESETS.map((d) => (
-                <button key={d} type="button" aria-label={d === 0 ? t('meta.dueOnReceipt') : t('meta.dueInDays', { n: d })} className={styles.chip} onClick={() => s.setDates(s.issue_date, addDaysInput(d, s.issue_date))}>
+                <button key={d} type="button" aria-label={d === 0 ? t('meta.dueOnReceipt') : t('meta.dueInDays', { n: d })} className={styles.chip} onClick={() => setDue(addDaysInput(d, s.issue_date))}>
                   {d === 0 ? t('meta.now') : t('meta.daysShort', { n: d })}
                 </button>
               ))}
             </div>
+            <Suspense fallback={null}>
+              <TermsPicker />
+            </Suspense>
           </div>
           <div className={styles.pair}>
             <label className={controls.field}>
@@ -210,6 +235,7 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
         )}
         <ForexFields />
         <TransportFields />
+        {(s.boq_terms?.cn || s.ra_no || worksOn) && <Suspense fallback={null}><ContractPanel /></Suspense>}
       </div>
     </section>
   );

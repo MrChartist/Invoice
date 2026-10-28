@@ -381,6 +381,10 @@ test('integrity review: removal checks, godown and cost-centre usage read bills 
   const sale = { id: 's', invoice_number: 'INV/1', doc_type: 'INVOICE' as const, status: 'Sent' as const, issue_date: '2099-01-01', items: [{ id: 'x', name: 'Widget', hsn: '8471', type: 'Goods', quantity: 1, rate: 1, amount: 1, serials: ['S1'] }] };
   assert.equal(removalIssues({ items: [item], moves: [], invoices: [sale], purchases: [tracked] }, { refType: 'purchase', refId: 'pb' }, false).errors.length, 1);
   assert.deepEqual(godownReferences('g2', { purchases: [tracked] }), ['purchase bills']);
+  // Review M2: the Sec 25(4) pair guard reads `branch_transfer_id` and treats a void bill as gone.
+  const { transferPairOf } = await import('../src/lib/godowns.ts');
+  assert.deepEqual(transferPairOf('str9', { invoices: [], purchases: [{ ...bill, branch_transfer_id: 'str9' }] }), { bill: bill.bill_number });
+  assert.equal(transferPairOf('str9', { invoices: [], purchases: [{ ...bill, branch_transfer_id: 'str9', status: 'void' }] }), null);
   assert.equal(costCentreUsage('cc', { purchases: [tracked as never] }).purchases, 1);
 });
 
@@ -441,6 +445,23 @@ test('reorder status (Phase 7) reads received PO quantity from the real purchase
   const po = { id: 'po1', po_number: 'PO/FY26-27/0001', date: '2026-04-01', vendor_name: 'Acme Supplies', lines: [{ id: 'pl', name: 'Paper ream', hsn: '4802', quantity: 25, rate: 100, tax_rate: 18 }], taxable: 2500, cgst: 0, sgst: 0, igst: 0, total: 2500 };
   const received: PurchaseRecord = { ...bill, po_id: 'po1', lines: [{ ...bill.lines[0], po_line_id: 'pl' }] };
   assert.equal(pendingPoQty([po], [received], items).get('s'), 15);
+});
+
+test('7S readers: MRP nets the quantity still due on POs from the real bill shape; branch stock reads bill lines through the engine', async () => {
+  const { pendingPoQty } = await import('../src/lib/reorder.ts');
+  const { runMrp } = await import('../src/lib/mrp.ts');
+  const { godownSetValuer } = await import('../src/lib/ledger/branch-stock.ts');
+  const { computeStock } = await import('../src/lib/inventory.ts');
+  const items = [{ id: 's', name: 'Paper ream', hsn: '4802', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }];
+  const po = { id: 'po1', po_number: 'PO/FY26-27/0001', date: '2026-04-01', vendor_name: 'Acme Supplies', lines: [{ id: 'pl', name: 'Paper ream', hsn: '4802', quantity: 25, rate: 100, tax_rate: 18 }], taxable: 2500, cgst: 0, sgst: 0, igst: 0, total: 2500 };
+  const received: PurchaseRecord = { ...bill, po_id: 'po1', lines: [{ ...bill.lines[0], po_line_id: 'pl', godown_id: 'g2' }] };
+  const onOrder = pendingPoQty([po], [received], items, []);
+  const inputs = { items, moves: [], invoices: [], purchases: [received] };
+  const stock = new Map(computeStock(inputs).map((p) => [p.item.id, p.qty]));
+  const [row] = runMrp({ plan: [{ item_id: 's', qty: 40 }], items, boms: [], stock, onOrder });
+  assert.deepEqual([row.stock, row.onOrder, row.net, row.action], [10, 15, 15, 'buy']);
+  const valuer = godownSetValuer(computeStock(inputs), collectEvents({ ...inputs, includeTransfers: true }), new Set(['g2']), 'x');
+  assert.equal(valuer.value('2026-04-30'), 100000, '10 reams × ₹100 in the bill line godown');
 });
 
 test('WP-6 readers: cess on bills, purchase HSN register and the monthly 1-vs-3B-vs-books reconciliation', async () => {
@@ -554,4 +575,588 @@ test('branch-wise books and Sec 25(4) transfer bills (WP-9) read the real purcha
   const { buildLedger } = await import('../src/lib/ledger/postings.ts');
   const l = buildLedger({ invoices: [], transactions: [], purchases: [{ ...bill, branch_transfer_id: 'str1' }], vendors: [], purchasePayments: [], openings: [], userAccounts: [], manual: [], assets: [], today: '2026-05-01' } as never);
   assert.ok(l.vouchers[0].lines.some((x) => x.account === 'branch_transfer_in' && x.dr === 100000));
+});
+
+test('7R readers (GSTR-9C rate-wise / Table 14, GSTR-9 Part V, per-GSTIN paper, cess on notes) read the real bill shape', async () => {
+  const { gstr9cRateWise, gstr9cTable14 } = await import('../src/lib/gstr9c-extra.ts');
+  const { buildGstr9PartV } = await import('../src/lib/gstr9-partv.ts');
+  const { buildByGstin } = await import('../src/lib/gst-by-gstin.ts');
+  const { noteCessFor } = await import('../src/lib/purchase-returns-gst.ts');
+  const g9 = buildGstr9([], [bill], { fyStart: 2026, filerStateCode: '27' });
+  // A reverse-charge bill with a lump tax and no split: 5% RC row via splitLumpTax (intra-State → CGST + SGST).
+  const rcm = { ...bill, id: 'rc', reverse_charge: true, cgst: undefined, sgst: undefined, igst: undefined, tax_amount: 50, total: 1050 } as never;
+  const rate = gstr9cRateWise(g9, [rcm], '27');
+  const b = rate.rows.find((r) => r.id === '9B')!;
+  assert.equal(b.taxable, 1000);
+  assert.equal(b.cgst + b.sgst, 50);
+  // Table 14: the real bill (category Purchases, ITC claimed) lands in 14A with its GST; drafts are skipped.
+  const t14 = gstr9cTable14(g9, [bill, { ...bill, id: 'dr', status: 'Draft' } as never], '27');
+  assert.equal(t14.rows.find((r) => r.id === '14A')!.eligible, 180);
+  // Part V reads bill dates through readPurchase.
+  const note = { id: 'n', kind: 'DEBIT_NOTE', note_number: 'DN/1', date: '2026-05-01', purchase_id: 'p1', vendor_name: 'A', reason: 'OTHER', goods_returned: false, lines: [], taxable: 100, cgst: 9, sgst: 9, igst: 0, total: 118, itc_eligible: true, adjusted_amount: 0 } as never;
+  const pv = buildGstr9PartV([], { fyStart: 2025, rawPurchases: [bill], purchaseNotes: [note] });
+  assert.equal(pv.t12.cgst, 0, 'the bill of 12 Apr 2026 is not in FY 2025-26');
+  // Per-GSTIN paper assigns the bill by its place of supply (27).
+  const ka = `29AAPFU0939F1Z${gstinChecksumChar('29AAPFU0939F1Z')}`;
+  const r = buildByGstin([], [bill], { period: { kind: 'fy', fyStart: 2026 }, columns: [{ gstin: '27AAPFU0939F1ZV', label: 'MH' }, { gstin: ka, label: 'KA' }], branches: [] });
+  assert.equal(r.rows.find((x) => x.id === '4a')!.values[0], 180);
+  // Cess on a note is pro rata to the bill's `cess_amount` / `taxable`.
+  assert.equal(noteCessFor({ ...bill, cess_amount: 40 }, 250), 10);
+});
+
+test('7U reader (e-payment confirmation: open bills of a supplier) reads the real bill shape', async () => {
+  const { openBillsOf } = await import('../src/lib/epay-confirm.ts');
+  const withVendor = { ...bill, vendor_id: 'v1', due_date: '2026-05-12' };
+  assert.deepEqual(openBillsOf([withVendor], { id: 'v1', name: 'Acme Supplies' }), [{ purchaseId: 'p1', balance: 1180, due: '2026-05-12' }]);
+  // Legacy rows without vendor_id match by name; paid / void bills drop out.
+  assert.equal(openBillsOf([bill], { id: 'v1', name: 'acme supplies' }).length, 1);
+  assert.equal(openBillsOf([{ ...bill, amount_paid: 1180 }], { name: 'Acme Supplies' }).length, 0);
+  assert.equal(openBillsOf([{ ...bill, status: 'Cancelled' } as never], { name: 'Acme Supplies' }).length, 0);
+});
+
+test('8C: draft bills (status draft, purchase_drafts) are skipped by every reader; capture fields change no figure', async () => {
+  const { isVoidStatus } = await import('../src/lib/purchase-normalize.ts');
+  const draft = { ...bill, id: 'd1', status: 'draft', draft: { source: 'capture', created_at: '' } } as never;
+  // If a draft row ever reached `purchases`, the books, GST papers, exports and stock skip it.
+  assert.equal(isVoidStatus(readPurchase(draft)!.status), true);
+  assert.equal(booksNormalize(draft), null);
+  assert.equal(gstNormalize(draft, '27'), null);
+  const stock = collectEvents({
+    items: [{ id: 's1', name: 'Paper ream', hsn: '4802', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }] as never,
+    moves: [],
+    invoices: [],
+    purchases: [draft] as never,
+  });
+  assert.equal([...stock.values()].flat().length, 0, 'no stock-in from a draft');
+  // e-invoice IRN / recurring links are additive and leave every money figure alone.
+  const captured: PurchaseRecord = { ...bill, id: 'c1', einvoice_irn: 'f'.repeat(64), einvoice_irn_date: '2026-04-12', recurring_bill_id: 'rb1', recurring_date: '2026-04-01' };
+  assert.equal(booksNormalize(captured as never)!.total, 1180);
+  assert.equal(gstNormalize(captured, '27')!.cgst, 90);
+  assert.equal(exportNormalize(captured)!.taxable, 1000);
+  // Posting strips the draft envelope.
+  const { billOfDraft } = await import('../src/lib/purchase-drafts.ts');
+  const posted = billOfDraft(draft) as unknown as Record<string, unknown>;
+  assert.equal(posted.status, undefined);
+  assert.equal(posted.draft, undefined);
+  assert.equal(posted.total, 1180);
+});
+
+test('8C readers (duplicate guard, bank memory, bills due soon) read the real bill shape and skip drafts', async () => {
+  const { findBillDuplicates } = await import('../src/lib/bill-duplicates.ts');
+  const { buildMemory } = await import('../src/lib/bank-rules.ts');
+  const { billsDueSoon } = await import('../src/lib/recurring-bills.ts');
+  assert.equal(findBillDuplicates({ ...bill, id: undefined, bill_number: 'as-22' }, [bill]).exact.length, 1);
+  assert.equal(findBillDuplicates({ ...bill, id: undefined }, [{ ...bill, status: 'draft' }]).exact.length, 0);
+  const expense: PurchaseRecord = { ...bill, id: 'e1', kind: 'EXPENSE', category: 'Rent' };
+  const st = [{ id: 's', imported_at: '', bank_label: '', file_name: '', lines: [{ id: 'l', date: '2026-04-12', narration: 'NEFT ACME SUPPLIES RENT', ref: '', debit: 1180, credit: 0, matched_to: { type: 'purchase_payment' as const, id: 'pp' } }] }];
+  const mem = buildMemory(st, [expense], [{ id: 'pp', purchase_id: 'e1' }]);
+  assert.equal([...mem.values()][0]?.category, 'Rent');
+  assert.equal([...mem.values()][0]?.gst_rate, 18);
+  assert.equal(buildMemory(st, [{ ...expense, status: 'draft' }], [{ id: 'pp', purchase_id: 'e1' }]).size, 0);
+  // Bills due: what the SUPPLIER is owed (supplierPayable via balanceOf), drafts skipped.
+  const due = billsDueSoon([{ ...bill, due_date: '2026-04-15', reverse_charge: true }, { ...bill, id: 'd', due_date: '2026-04-15', status: 'draft' }], [], '2026-04-12', '27');
+  assert.deepEqual(due.bills.map((b) => [b.id, b.balance]), [['p1', 1000]]);
+});
+
+test('8F Breakage / Expiry Issue reads the real purchase shape (batch → supplier bill line)', async () => {
+  const { brkExpCandidates } = await import('../src/lib/expiry-ops.ts');
+  const item = { id: 's1', name: 'Paper ream', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, track_batches: true };
+  const withBatch: PurchaseRecord = { ...bill, lines: [{ ...bill.lines[0], batch_no: 'B1', expiry_date: '2026-05-01' }] };
+  const tracking = new Map([['s1', { item, qty: 10, byGodown: { main: 10 }, serials: [], batches: [{ batch: 'B1', expiry: '2026-05-01', firstIn: '2026-04-12', qty: 10, byGodown: { main: 10 } }] }]]);
+  const { rows } = brkExpCandidates(tracking as never, [withBatch, { ...withBatch, id: 'x', status: 'Draft' } as unknown as PurchaseRecord, { ...withBatch, id: 'e', kind: 'EXPENSE' }], '2026-05-10', '2026-06-01');
+  assert.equal(rows.length, 1, 'drafts and expenses are not supplier stock bills');
+  assert.equal(rows[0].billId, 'p1');
+  assert.equal(rows[0].vendorName, 'Acme Supplies');
+  assert.equal(rows[0].unitCost, 100);
+  assert.equal(rows[0].qty, 10);
+});
+
+test('8G readers (margin chip, insights, Today card, SmartFind) read the real purchase shape', async () => {
+  const { buildUnitCosts } = await import('../src/lib/margin.ts');
+  assert.equal(buildUnitCosts([bill, { ...bill, id: 'v', status: 'cancelled', lines: [{ ...bill.lines[0], rate: 999 }] }], []).get('paper ream')?.cost, 100);
+  const { buildInsights } = await import('../src/lib/insights.ts');
+  const gst = buildInsights({ invoices: [], payments: [], purchases: [bill] }, '2026-04-20').find((c) => c.id === 'gstTrend');
+  assert.equal(gst?.value, -180, 'input tax on the bill reduces the GST estimate');
+  const { todaySummary } = await import('../src/lib/today.ts');
+  const exp: PurchaseRecord = { ...bill, id: 'e1', kind: 'EXPENSE' };
+  assert.equal(todaySummary({ invoices: [], payments: [], purchases: [bill, exp] }, '2026-04-12').expenses, 1180);
+  const { buildIndex } = await import('../src/lib/search.ts');
+  const idx = buildIndex({ invoices: [], clients: [], items: [], bills: [bill as never] });
+  assert.equal(idx[0]?.title, 'AS/22');
+  assert.ok(idx[0]?.ids.includes('27AAPFU0939F1ZV') && idx[0]?.subtitle.includes('Acme Supplies'));
+});
+
+test('R2-C2 deferrals read the real purchase shape (prepaid expense source lines, expense account)', async () => {
+  const { purchaseSourceLines, expenseAccountOf } = await import('../src/lib/deferrals.ts');
+  const lines = purchaseSourceLines(bill);
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].amount, 1000, '10 × ₹100 before tax');
+  assert.equal(lines[0].date, '2026-04-12');
+  assert.equal(lines[0].number, 'AS/22');
+  assert.equal(lines[0].party, 'Acme Supplies');
+  assert.equal(purchaseSourceLines({ ...bill, status: 'cancelled' })[0].cancelled, true);
+  const lump = purchaseSourceLines({ ...bill, kind: 'EXPENSE', category: 'Rent', lines: [] });
+  assert.equal(lump[0].amount, 1000, 'a bill without lines defers its taxable value');
+  assert.equal(expenseAccountOf({ ...bill, kind: 'EXPENSE', category: 'Rent' }, []), 'rent');
+  assert.equal(expenseAccountOf(bill, []), 'purchases');
+});
+
+test('R2-B5 back-to-back reader (backorders, cancel warning) reads bills against PO lines', async () => {
+  const { backorderRows, openLinkedPos } = await import('../src/lib/back-to-back.ts');
+  const po = {
+    id: 'po1', po_number: 'PO/FY26-27/0001', date: '2026-04-05', vendor_name: 'Acme Supplies', so_id: 'so1',
+    lines: [{ id: 'pl1', name: 'Paper ream', quantity: 10, rate: 100, tax_rate: 18, so_line_id: 'L1' }], taxable: 1000, cgst: 90, sgst: 90, igst: 0, total: 1180,
+  };
+  const order = {
+    id: 'so1', invoice_number: 'SO/FY26-27/0001', doc_type: 'SALES_ORDER', status: 'Sent', issue_date: '2026-04-01', due_date: '2026-04-30',
+    client: { name: 'C' }, items: [{ id: 'L1', name: 'Paper ream', type: 'goods', quantity: 10, rate: 150, amount: 1500 }],
+  };
+  const billed = { ...bill, po_id: 'po1', lines: [{ ...bill.lines[0], po_line_id: 'pl1' }] };
+  const rows = backorderRows({ invoices: [order as never], links: [], orders: [po], purchases: [billed], notes: [] });
+  assert.equal(rows[0].pos[0].received, 10, 'the bill against the PO line counts as received');
+  assert.equal(rows[0].status, 'arrived');
+  assert.deepEqual(openLinkedPos('so1', [po], [billed], []), []);
+  assert.equal(openLinkedPos('so1', [po], [], []).length, 1);
+});
+
+// R4-A: genealogy (bill → batch source), QC desk (receipt lots by source document) and the landed-cost voucher read
+// bills through the engine / `readPurchase` + `readPurchaseLines`.
+test('R4-A readers (genealogy, QC desk, landed-cost voucher) read the real purchase shape', async () => {
+  const { buildGenealogy, traceBackward } = await import('../src/lib/production/genealogy.ts');
+  const { qcStock } = await import('../src/lib/production/qc.ts');
+  const { targetLines, chargeCandidates, applyLandedVouchers } = await import('../src/lib/landed-voucher.ts');
+  const item = { id: 's1', name: 'Paper ream', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, track_batches: true };
+  const withBatch: PurchaseRecord = { ...bill, lines: [{ ...bill.lines[0], batch_no: 'B1', godown_id: 'qc' }] };
+  const draft = { ...withBatch, id: 'd', status: 'Draft' } as unknown as PurchaseRecord;
+  const ev = collectEvents({ items: [item], moves: [], invoices: [], purchases: [withBatch, draft] });
+  const t = traceBackward(buildGenealogy(ev), 's1', 'B1');
+  assert.deepEqual(t.sources.map((s) => [s.refNumber, s.party, s.qty]), [['AS/22', 'Acme Supplies', 10]], 'drafts never source a batch');
+  const lots = qcStock(ev, new Set(['qc']), '2026-04-15');
+  assert.deepEqual(lots.map((l) => [l.source.kind, l.source.number, l.qty, l.ageDays]), [['purchase', 'AS/22', 10, 3]]);
+  const lines = targetLines([{ kind: 'bill', id: 'p1' }], [withBatch], [], [item]);
+  assert.deepEqual(lines.map((l) => [l.lineId, l.quantity, l.unitCost, l.date, l.docNumber]), [['l1', 10, 100, '2026-04-12', 'AS/22']]);
+  const exp: PurchaseRecord = { ...bill, id: 'e1', kind: 'EXPENSE', category: 'Freight', lines: [] };
+  assert.deepEqual(chargeCandidates([withBatch, exp], [item], []).map((c) => [c.source.id, c.amount]), [['e1', 1000]], 'a lump expense is a charge; goods lines are not');
+  const lcv = { id: 'v', number: 'LCV/FY26-27/0001', date: '2026-04-20', method: 'value' as const, charges: [{ id: 'c', source: { kind: 'memo' as const }, label: 'CHA', amount: 50 }], targets: [{ kind: 'bill' as const, id: 'p1' }], allocation_snapshot: [] };
+  const applied = applyLandedVouchers([lcv], [withBatch], [], [item]);
+  assert.equal(readPurchaseLines(applied.purchases[0])[0].landedUnit, 5, '₹50 over 10 reams');
+  assert.equal(readPurchaseLines(withBatch)[0].landedUnit, 0, 'the stored bill is untouched');
+});
+
+test('R3-B4 annexure reads the real purchase shape (re-billed cost through expenseLine)', async () => {
+  const { buildAnnexure } = await import('../src/lib/annexure.ts');
+  const billable: PurchaseRecord = { ...bill, id: 'p9', billable_to_client_id: 'c1', markup_percent: 10 };
+  const a = buildAnnexure({ time: [], expenses: [billable, { ...billable, id: 'p10', pure_agent: true }] }, DEFAULT_TIME_PREFS, { tasks: [], centres: [] });
+  assert.deepEqual(a.expenses!.map((x) => [x.ref, x.amount, x.markup_pct, x.pure_agent]), [['p9', 1100, 10, false], ['p10', 1180, 0, true]]);
+  assert.equal(a.expenses![0].amount, expenseLine(billable, DEFAULT_TIME_PREFS).amount, 'same amount as the invoice line');
+});
+
+test('R3-C6 practice board reads the real purchase shape (bill date counts as the last entry)', async () => {
+  const { buildPracticeRow } = await import('../src/lib/practice.ts');
+  const row = buildPracticeRow({ id: 'c', name: 'C', tables: { purchases: [bill, { ...bill, id: 'p2', date: undefined, bill_date: '2026-05-01' }] } }, '2026-06-01');
+  assert.equal(row.lastVoucher, '2026-05-01');
+});
+
+// R4-C: the import register by Bill of Entry reads bills through `readPurchase`; the open-format export flattens
+// the real purchase shape into purchases.csv + purchase_lines.csv keyed by purchase_id.
+test('R4-C readers (import register by BOE, open-format export) read the real purchase shape', async () => {
+  const { computeBoe, applyBoe, importRegister } = await import('../src/lib/trade/boe-duty.ts');
+  const { AssetSink, flattenTable } = await import('../src/lib/trust/open-export.ts');
+  const imp: PurchaseRecord = { ...bill, id: 'imp', vendor_gstin: undefined, place_of_supply: '96', import_type: 'GOODS', boe_number: '7654321', boe_date: '2026-04-13', cgst: 0, sgst: 0, igst: 180, total: 1180 };
+  const d = computeBoe({ date: '2026-04-13', rate: 1, cif: 1000, lines: [{ line_id: 'l1', value: 1000, bcd_pct: 10, igst_pct: 18 }] });
+  const withDuty = { ...imp, ...applyBoe(imp, d) };
+  const rows = importRegister([bill, withDuty]);
+  assert.deepEqual(rows.map((r) => [r.billId, r.boeNo, r.supplier, r.billNo, r.igst, r.duty, r.itcTaken]), [['imp', '7654321', 'Acme Supplies', 'AS/22', 200, 110, 200]], 'domestic bills have no BOE sheet');
+  const [parent, lines] = flattenTable('purchases', [bill], new AssetSink());
+  assert.equal(parent.rows.length, 1);
+  assert.ok(parent.columns.includes('bill_number') && !parent.columns.includes('lines'));
+  assert.deepEqual(lines.columns.slice(0, 3), ['purchase_id', 'line_no', 'id']);
+  assert.deepEqual(lines.rows[0].slice(0, 3), ['p1', 1, 'l1']);
+});
+
+// R5-A: `settlement-post.ts` WRITES fee bills (marketplace fee tax invoice); every reader sees the real shape.
+test('R5-A fee bill written by settlement-post reads back through readPurchase / books / GST / export readers', async () => {
+  await import('./helpers/shim.ts');
+  const { fixture, importMtr, setupWorld } = await import('./helpers/marketplace.ts');
+  const { importSettlement, parseSettlement } = await import('../src/lib/marketplace/settlement-import.ts');
+  const { postSettlement, recordFeeInvoice } = await import('../src/lib/marketplace/settlement-post.ts');
+  const ch = setupWorld();
+  importMtr(ch);
+  const s = importSettlement(ch, parseSettlement([{ name: 'v2', table: fixture('amazon-settlement-v2.csv') }], 'amazon_v2'), 'v2.csv');
+  postSettlement(s.id);
+  const { bill: fee } = recordFeeInvoice(s.id, { bill_number: 'AMZ-FEE-10', date: '2026-10-31', hsn: '9985' });
+  assert.ok(readPurchase(fee));
+  const n = booksNormalize(fee as never);
+  assert.equal(n!.taxable, 220);
+  assert.equal(n!.isExpense, true);
+  assert.equal(n!.itcEligible, true);
+  const g = gstNormalize(fee, '27');
+  assert.equal(Math.round((g!.cgst + g!.sgst + g!.igst) * 100) / 100, 30.6);
+  assert.equal(exportNormalize(fee)!.total, 250.6);
+});
+
+// R5-C: `common-credit.ts` READS bills (Rule 42 / 43 inputs) through readPurchase — ITC by head, the itc_use tag, void bills skipped.
+test('R5-C common-credit reads the real purchase shape', async () => {
+  const { inputsFor, rule42 } = await import('../src/lib/institutions/common-credit.ts');
+  const tagged = { ...bill, id: 'p2', itc_use: 'exempt_only' } as PurchaseRecord;
+  const blocked = { ...bill, id: 'p3', itc_eligible: false } as PurchaseRecord;
+  const draft = { ...bill, id: 'p4', status: 'draft' } as unknown as PurchaseRecord;
+  const i = inputsFor([bill, tagged, blocked, draft], '2026-04-01', '2026-04-30');
+  assert.deepEqual(i.T, { igst: 0, cgst: 270, sgst: 270, cess: 0 });
+  assert.deepEqual(i.T2, { igst: 0, cgst: 90, sgst: 90, cess: 0 });
+  assert.deepEqual(i.T3, { igst: 0, cgst: 90, sgst: 90, cess: 0 });
+  assert.equal(rule42(i, 0, 1, '2026-04').C2.cgst, 90);
+});
+
+// R5-B: `trips.ts` WRITES trip expenses / lorry-hire bills and reads them back (`tripExpenses`); `trip-pnl.ts` reads
+// `purchases` for the trip P&L — both through `readPurchase`, so they understand the real purchase shape.
+test('R5-B trip readers (trip expenses, trip P&L) read the real purchase shape', async () => {
+  const { tripExpenses } = await import('../src/lib/transport/trips.ts');
+  const { tripPnl } = await import('../src/lib/transport/trip-pnl.ts');
+  const exp: PurchaseRecord = { ...bill, id: 'e1', kind: 'EXPENSE', category: 'Trip — Toll', trip_id: 'trp1', itc_eligible: false, cgst: 0, sgst: 0, taxable: 500, total: 500 };
+  const fuel: PurchaseRecord = { ...bill, id: 'e2', kind: 'EXPENSE', category: 'Trip — Diesel', trip_id: 'trp1' };
+  const hire: PurchaseRecord = { ...bill, id: 'h1', kind: 'EXPENSE', category: 'Lorry hire', trip_id: 'trp1', itc_eligible: false, cgst: 0, sgst: 0, taxable: 20000, total: 20000, tds_section: '194C-1', tds_amount: 200 };
+  const rows = tripExpenses('trp1', [bill, exp, fuel, hire]);
+  assert.deepEqual(rows.map((r) => [r.id, r.amount]), [['e1', 500], ['e2', 1000]], 'ITC-eligible cost at taxable value; hire kept apart');
+  const [p] = tripPnl({ trips: [{ id: 'trp1', number: 'TRP/FY26-27/0001', vehicle_id: 'v1', start_date: '2026-04-12', lr_ids: [], advance_ids: [], status: 'open' }], vehicles: [], lrs: [], invoices: [], purchases: [bill, exp, fuel, hire] });
+  assert.deepEqual([p.expenses, p.hire, p.margin], [1500, 20000, -21500]);
+  assert.equal(readPurchase(hire)?.category, 'Lorry hire');
+});
+
+// R6-C1: `margin.ts` (editor margin chip) and `insights.ts` (margin erosion, stock at risk) read purchases through
+// `liveInputs().purchases` (`liveCostPurchases`): the stock engine's copies of the real bill shape, with landed-cost
+// vouchers left on them as `LANDED_EXTRA_KEY`. Totals / tax are the bill's own, so the GST and expense cards agree.
+test('R6-C1 readers (margin chip, insights) read the engine copies of the real bill shape (landed cost included)', async () => {
+  const { buildUnitCosts } = await import('../src/lib/margin.ts');
+  const { buildInsights } = await import('../src/lib/insights.ts');
+  const { LANDED_EXTRA_KEY } = await import('../src/lib/purchase-normalize.ts');
+  const copy = { ...bill, [LANDED_EXTRA_KEY]: { l1: 5 } };
+  assert.equal(buildUnitCosts([bill], []).get('paper ream')?.cost, 100);
+  assert.equal(buildUnitCosts([copy], []).get('paper ream')?.cost, 105, 'landed ₹5 a ream from a voucher');
+  const gst = (purchases: unknown[]) => buildInsights({ invoices: [], payments: [], purchases }, '2026-04-20').find((c) => c.id === 'gstTrend')?.value;
+  assert.equal(gst([copy]), gst([bill]), 'the engine copy keeps the bill\'s tax');
+});
+
+test('R8-C: the bank stock statement counts unpaid goods bills (kind PURCHASE) as creditors for goods, not expenses', async () => {
+  const { resetStorage } = await import('./helpers/shim.ts');
+  const { setTable } = await import('../src/lib/storage.ts');
+  const { creditorsForGoods } = await import('../src/lib/trade/tr-stock-live.ts');
+  resetStorage();
+  setTable('purchases', [bill, { ...bill, id: 'p2', kind: 'EXPENSE', category: 'Rent', bill_number: 'R/1' }]);
+  assert.equal(creditorsForGoods('2026-04-30'), 1180);
+  assert.equal(creditorsForGoods('2026-04-01'), 0, 'a bill dated after the statement date is not owed yet');
+});
+
+// R7-C1: the hotel GST desk's ITC guard reads bills through `readPurchase` (claimed, not RCM, not reversed, not void).
+test('R7-C1: the hotel GST desk reads the real purchase shape for its ITC guard', async () => {
+  const { hotelGuards } = await import('../src/lib/hotel/hotel-gst.ts');
+  const lowRoom = { id: 'h1', invoice_number: 'H/1', doc_type: 'INVOICE', status: 'Sent', issue_date: '2026-04-10', gst_mode: 'CGST_SGST', items: [{ id: 'i', name: 'Room', type: 'Service', hsn: '996311', quantity: 1, rate: 3000, tax_rate: 5, amount: 3000 }] };
+  const itc = (bills: unknown[]) => hotelGuards([lowRoom as never], bills, () => false, '2026-04-01', '2026-04-30').find((g) => g.kind === 'itc')?.amount ?? 0;
+  assert.equal(itc([bill]), 180);
+  assert.equal(itc([{ ...bill, itc_eligible: false }]), 0);
+  assert.equal(itc([{ ...bill, reverse_charge: true }]), 0);
+  assert.equal(itc([{ ...bill, itc_reversed: 180 }]), 0);
+  assert.equal(itc([{ ...bill, status: 'draft' }]), 0);
+});
+
+// R7-B: `agent-commission.ts` and `ota-payout.ts` WRITE commission bills (purchase drafts, posted later as bills); the
+// bill they draft reads back through readPurchase / books / GST / export like any bill.
+test('R7-B commission bills (agent-commission, ota-payout) read back through readPurchase / books / GST / export readers', async () => {
+  const { commissionBill } = await import('../src/lib/hotel/agent-commission.ts');
+  const { billOfDraft } = await import('../src/lib/purchase-drafts.ts');
+  const agentGstin = `29AAPFU0939F1Z${gstinChecksumChar('29AAPFU0939F1Z')}`;
+  const agent = { ...commissionBill({ vendor: { name: 'Travel Co', gstin: agentGstin }, amount: 1000, date: '2026-10-20', home: '27', ref: 'RES/FY26-27/0001', lowBand: false, tds194h: true }), id: 'c1' } as PurchaseRecord;
+  const ota = { ...commissionBill({ vendor: { name: 'Booking.com' }, amount: 500, gst: 90, date: '2026-10-20', home: '27', ref: 'OTA payout', lowBand: true, tds194h: false }), id: 'c2' } as PurchaseRecord;
+  assert.equal(readPurchase(agent)?.total, 1180);
+  assert.equal(booksNormalize(agent as never)!.taxable, 1000);
+  assert.equal(booksNormalize(agent as never)!.itcEligible, true);
+  assert.equal(gstNormalize(agent, '27')!.igst, 180, 'agent in another state → IGST');
+  assert.equal(exportNormalize(agent)!.total, 1180);
+  assert.equal(agent.tds_section, '194H');
+  assert.equal(booksNormalize(ota as never)!.itcEligible, false, 'fully low-band hotel: ITC flagged');
+  const draft = { ...ota, status: 'draft', draft: { source: 'manual', created_at: '' } } as never;
+  assert.equal(readPurchase({ ...billOfDraft(draft), id: 'c3' } as PurchaseRecord)?.total, 590);
+});
+
+test('R8-A: the last purchase rate reads the real bill shape (lines, legacy items, expenses) through readPurchaseLines', async () => {
+  const { lastPurchaseRate } = await import('../src/lib/trade/tr-party-rates.ts');
+  const legacy = { ...bill, id: 'p3', lines: undefined, items: [{ name: 'Paper ream', quantity: 10, rate: 90 }], date: '2026-03-01' };
+  assert.deepEqual(lastPurchaseRate([bill, legacy], { name: 'Acme Supplies' }, 'paper ream'), { rate: 100, date: '2026-04-12', number: 'AS/22' });
+  assert.equal(lastPurchaseRate([{ ...bill, kind: 'EXPENSE' }], { name: 'Acme Supplies' }, 'Paper ream'), null, 'expenses are not goods bought');
+});
+
+// R8-B: the market fee register (`tr-charges.ts`) and the brokerage statement (`tr-brokers.ts`) read goods bills through
+// `readPurchase` (date, number, party, status, kind) and keep the stored lines' `charge_head_id` / `wt`.
+test('R8-B readers (market fee register, brokerage statement) read the real purchase shape', async () => {
+  const { chargeRegister } = await import('../src/lib/trade/tr-charges.ts');
+  const { brokerageStatement } = await import('../src/lib/trade/tr-brokers.ts');
+  const withFee: PurchaseRecord = { ...bill, broker_id: 'b1', lines: [...bill.lines, { id: 'l2', name: 'Market fee', hsn: '4802', unit: 'OTH', quantity: 1, rate: 10, tax_rate: 18, charge_head_id: 'h1' }] };
+  const heads = [{ id: 'h1', name: 'Market fee', side: 'both' as const, basis: 'percent' as const, rate: 1, gst: 'in_value' as const }];
+  const period = { from: '2026-04-01', to: '2026-04-30' };
+  assert.deepEqual(chargeRegister(period, { invoices: [], purchases: [withFee, { ...withFee, id: 'e', kind: 'EXPENSE' }], heads }).map((r) => [r.side, r.number, r.party, r.base, r.amount]), [['purchase', 'AS/22', 'Acme Supplies', 1000, 10]]);
+  const st = brokerageStatement({ id: 'b1', name: 'B', rate: 0, basis: 'invoice', kind: 'broker', brokerage_basis: 'percent', brokerage_rate: 1 }, period, { invoices: [], purchases: [withFee] });
+  assert.deepEqual(st.lines.map((l) => [l.number, l.base, l.brokerage]), [['AS/22', 1000, 10]]);
+});
+
+test('R9 (RT-A4) free quantity / line discount: stock takes paid + free, every money reader keeps the paid value', async () => {
+  // 10 + 1 free at ₹100 less 10%: taxable ₹900, GST ₹162 (on the paid value only).
+  const free: PurchaseRecord = { ...bill, id: 'pf', lines: [{ ...bill.lines[0], id: 'lf', free_qty: 1, discount_percent: 10 }], taxable: 900, cgst: 81, sgst: 81, total: 1062 };
+  for (const n of [booksNormalize(free as never), exportNormalize(free), gstNormalize(free, '27')]) assert.equal(n!.taxable, 900);
+  const c = readPurchase(free)!;
+  assert.deepEqual([c.taxable, c.tax, c.itcEligible], [900, 162, true], 'GSTR-2 / ITC: value only');
+  const [l] = readPurchaseLines(free);
+  assert.deepEqual([l.quantity, l.paidQty, l.freeQty, l.netRate], [11, 10, 1, 90]);
+  assert.equal(Math.round(l.quantity * l.unitCost * 100) / 100, 900);
+  const items = [{ id: 's', name: 'Paper ream', hsn: '4802', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }];
+  const ev = collectEvents({ items, moves: [], invoices: [], purchases: [free] } as never).get('s') ?? [];
+  assert.deepEqual(ev.filter((e) => e.kind === 'purchase').map((e) => e.qty), [11], 'the stock engine receives 11');
+  const { purchaseHsnRegister } = await import('../src/lib/hsn-purchase-register.ts');
+  const reg = purchaseHsnRegister([free], { from: '2026-04-01', to: '2026-04-30' });
+  assert.equal(reg.totals.taxable, 900, 'the purchase HSN register keeps the bill value');
+  const { lastSuppliers } = await import('../src/lib/retail/rt-short-book.ts');
+  const s = lastSuppliers([free]).get('name:paper ream')!;
+  assert.deepEqual([s.vendorName, s.rate], ['Acme Supplies', 90], 'short book: last supplier and the rate per paid unit');
+});
+
+test('R9 (RT-B2 / RT-B3) pharmacy readers (narcotic register, margin view) read the real bill shape', async () => {
+  const free: PurchaseRecord = { ...bill, id: 'pn', lines: [{ ...bill.lines[0], id: 'ln', batch_no: 'B7', free_qty: 1, discount_percent: 10, unit: 'BOX', unit_factor: 2 }] };
+  const { narcoticRegister } = await import('../src/lib/retail/rt-pharmacy-registers.ts');
+  const [n] = narcoticRegister([{ id: 's', name: 'Paper ream', unit: 'NOS', narcotic: true }], [free, { ...free, id: 'void', status: 'void' }], [], { from: '2026-04-01', to: '2026-04-30' });
+  assert.deepEqual([n.batch, n.received], ['B7', 22], 'paid + free, in base units; a void bill is skipped');
+  const { marginRows } = await import('../src/lib/retail/rt-pharmacy-prices.ts');
+  const [m] = marginRows([free], [{ id: 's', name: 'Paper ream' }], [{ name: 'Paper ream', rate: 60 }]);
+  assert.deepEqual([m.ptr, m.cost, m.scheme], [45, 40.91, '10 + 1'], 'PTR per base unit after the line discount; cost spread over the free units');
+});
+
+test('R9 (RT-E3) old-gold voucher reader reads the real bill shape (no GST, value only; void skipped)', async () => {
+  const urd: PurchaseRecord = { ...bill, id: 'pu', vendor_gstin: undefined, bill_number: 'URD/FY26-27/0001', category: 'Old gold purchase (URD)', lines: [{ id: 'lu', name: 'Old gold (fine 24K)', hsn: '7108', unit: 'GMS', quantity: 10.125, rate: 10000.355556, tax_rate: 0 }], taxable: 101253.6, cgst: 0, sgst: 0, total: 101253.6, itc_eligible: false, amount_paid: 50000, old_metal: { metal: 'gold', gross_wt: 12.3, stone_wt: 0, net_wt: 12.3, purity_pct: 84, melt_loss_pct: 2, fine_wt: 10.125, rate_24k: 10000, value: 101253.6 } };
+  const { oldGoldVouchers } = await import('../src/lib/retail/rt-old-gold.ts');
+  const rows = oldGoldVouchers([urd, bill, { ...urd, id: 'pv', status: 'void' } as never], [{ id: 'x', invoice_id: 'i', amount: 50000, method: 'Exchange', date: '2026-04-12', exchange_purchase_id: 'pu' } as never]);
+  assert.deepEqual(rows.map((r) => [r.id, r.exchanged, r.open]), [['pu', 50000, 51253.6]]);
+  const c = readPurchase(urd)!;
+  assert.deepEqual([c.taxable, c.tax, c.itcEligible], [101253.6, 0, false], 'GSTR-2 / ITC: nothing claimed');
+});
+
+test('R9 (RT-D3) buy-back URD voucher: no GST / ITC in every reader, stock 1 serial into the used godown; the margin reader uses the contract', async () => {
+  const urd: PurchaseRecord = {
+    ...bill, id: 'urd1', vendor_gstin: undefined, bill_number: 'URD/FY26-27/0001', category: 'Used goods (buy-back)', itc_eligible: false, cgst: 0, sgst: 0, igst: 0, taxable: 18000, total: 18000,
+    lines: [{ id: 'lu', name: 'iPhone 12 (used)', item_id: 's', hsn: '8517', unit: 'NOS', quantity: 1, rate: 18000, tax_rate: 0, serials: ['356938035643809'], godown_id: 'g-used' }],
+    used_goods: { serial: '356938035643809', model: 'iPhone 12' },
+  };
+  for (const n of [booksNormalize(urd as never), exportNormalize(urd), gstNormalize(urd, '27')]) assert.equal(n!.taxable, 18000);
+  const c = readPurchase(urd)!;
+  assert.deepEqual([c.tax, c.itcEligible], [0, false], 'no GST, no ITC');
+  const ev = collectEvents({ items: [{ id: 's', name: 'iPhone 12 (used)', unit: 'NOS', track_stock: true, track_serials: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }], moves: [], invoices: [], purchases: [urd] } as never).get('s') ?? [];
+  assert.deepEqual(ev.filter((e) => e.kind === 'purchase').map((e) => [e.qty, e.godown, e.serials]), [[1, 'g-used', ['356938035643809']]]);
+  const { buyBackOf } = await import('../src/lib/retail/rt-buyback.ts');
+  assert.equal(buyBackOf('356938035643809', [urd])?.value, 18000);
+  assert.equal(buyBackOf('356938035643809', [{ ...urd, itc_eligible: true }]), undefined, 'ITC taken: no margin scheme');
+  assert.equal(buyBackOf('356938035643809', [{ ...urd, status: 'void' } as never]), undefined, 'a void voucher is skipped');
+});
+
+test('R11 (CN-C5) 80% procurement test reads the real bill shape (registered by GSTIN, line HSN, the project cost centre)', async () => {
+  const { procurement80 } = await import('../src/lib/construction/cn-procurement80.ts');
+  const t = procurement80({ cost_centre_id: 'cc' }, 2026, [{ ...bill, cost_centre_id: 'cc' }, { ...bill, id: 'p2', vendor_gstin: undefined, cost_centre_id: 'cc' }, { ...bill, id: 'p3', status: 'void', cost_centre_id: 'cc' } as never]);
+  assert.deepEqual([t.total, t.registered, t.unregistered, t.pct], [2000, 1000, 1000, 50]);
+});
+
+test('R11 (CN-D) site readers read the real bill shape: labour holds, plant-hire split and site P&L classify each bill once', async () => {
+  const { labourBills } = await import('../src/lib/construction/cn-labour-compliance.ts');
+  const { sitePnl } = await import('../src/lib/construction/cn-site-pnl.ts');
+  const lab = { ...bill, id: 'lab', vendor_id: 'v-lab', category: 'Labour contract', cost_centre_id: 'cc' };
+  assert.equal(labourBills([lab as never], [])[0].hold, 118, '10% of the bill, no pack');
+  const boq = { id: 'boq', items: [], boq_terms: { cost_centre_id: 'cc' } } as never;
+  const p = sitePnl({ boq, period: { start: '2026-04-01', end: '2027-03-31' }, invoices: [], purchases: [lab, { ...bill, id: 'o', cost_centre_id: 'cc' }, { ...bill, id: 'x' }, { ...bill, id: 'v', status: 'void', cost_centre_id: 'cc' }], vouchers: [], payments: [], measurements: [], material: new Map(), internal: new Map(), sites: [], logs: [], compliance: [] });
+  assert.deepEqual([p.costs.labour, p.costs.other], [1000, 1000], 'ITC taken: cost = taxable; untagged and void bills left out');
+});
+
+test('R12 (AG-A) agri readers read the real bill shape: farmer vouchers, FY purchases (194Q base), farmer balances', async () => {
+  const { farmerVouchers, fyPurchasesOf } = await import('../src/lib/agri/ag-vouchers.ts');
+  const { farmerBalances } = await import('../src/lib/agri/ag-farmers.ts');
+  const fpv = { ...bill, id: 'f1', vendor_id: 'v1', vendor_gstin: undefined, bill_number: 'FPV/FY26-27/0001', cgst: 0, sgst: 0, taxable: 1000, total: 1000, itc_eligible: false, ag: { voucher: { quality: [], cut_kg: 0, accepted_kg: 100 } } };
+  const voided = { ...fpv, id: 'f2', status: 'void' } as never;
+  assert.deepEqual(farmerVouchers([fpv, voided, bill]).map((p) => p.id), ['f1'], 'void bills and non-vouchers left out');
+  assert.equal(fyPurchasesOf('v1', '2026-10-01', [fpv, voided, { ...bill, vendor_id: 'v1' }]), 2000, 'taxable of every live bill of the farmer');
+  const b = farmerBalances([{ id: 'v1', name: 'Ram', ag: { code: 'F-0001' } }], [fpv, voided, { ...fpv, id: 'cy', ag: { cycle_id: 'c' } }], [], [], [], []);
+  assert.equal(b.get('v1')!.payable, 1000, 'pooled cycle bills counted from the cycle, not twice');
+});
+
+test('R12 (AG-B2 / B3) pooled milk cycle purchase: the stock reader skips its lines (milk came in per shift); books / GST / exports read it once', async () => {
+  const cyb: PurchaseRecord = {
+    ...bill, id: 'cyb', vendor_gstin: undefined, bill_number: 'CYB/FY26-27/0001', category: 'Milk purchases', itc_eligible: false, cgst: 0, sgst: 0, igst: 0, taxable: 34000, total: 34000,
+    lines: [{ id: 'lm', name: 'Cow milk', hsn: '0401', unit: 'LTR', quantity: 1000, rate: 34, tax_rate: 0 }], ag: { cycle_id: 'c1', stock_by_shift: true },
+  };
+  const items = [{ id: 'm', name: 'Cow milk', hsn: '0401', unit: 'LTR', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }];
+  assert.equal(collectEvents({ items, moves: [], invoices: [], purchases: [cyb] } as never).get('m')?.length ?? 0, 0, 'no second receipt');
+  assert.equal(collectEvents({ items, moves: [], invoices: [], purchases: [{ ...cyb, ag: { cycle_id: 'c1' } }] } as never).get('m')?.[0]?.qty, 1000, 'without the flag it is stock');
+  for (const n of [booksNormalize(cyb as never), exportNormalize(cyb), gstNormalize(cyb, '27')]) assert.equal(n!.taxable, 34000);
+  const { closeMilkCycle } = await import('../src/lib/agri/ag-milk-cycle.ts');
+  assert.equal(typeof closeMilkCycle, 'function');
+});
+
+test('R12 (AG-C5) mill report reads the real bill shape: own intake of the batches\' input item (by item id or name), void and expense bills left out', async () => {
+  const { millMonths } = await import('../src/lib/agri/ag-mill-reports.ts');
+  const items = [{ id: 'paddy', name: 'Paper ream', unit: 'KG' }, { id: 'rice', name: 'Rice', unit: 'KG' }] as never[];
+  const mfg = [{ id: 'm', number: 'MFG/1', date: '2026-04-20', item_id: 'rice', qty: 6, production_order_id: 'o', components: [{ id: 'c', item_id: 'paddy', qty: 10 }], outputs: [], costs: [] }] as never[];
+  const purchases = [bill, { ...bill, id: 'v', status: 'void' }, { ...bill, id: 'e', kind: 'EXPENSE' }, { ...bill, id: 'i', lines: [{ ...bill.lines[0], name: 'Other name', item_id: 'paddy' }] }];
+  const [m] = millMonths({ orders: [], mfg, items, purchases, principal: [], agreements: [], invoices: [] });
+  assert.deepEqual([m.month, m.intakeOwn, m.input, m.main], ['2026-04', 20, 10, 6], 'two bills of 10 KG each (by name, by item id)');
+});
+
+// R12-D: the dealer desk's principal-certificate check and the FPO patronage register read bills through `readPurchase` /
+// `readPurchaseLines` (date, party, lines, void skipped; the vendor id from the row).
+test('R12 (AG-D4 / AG-D5) principal-certificate check and patronage register read the real bill shape', async () => {
+  const { principalWarnings } = await import('../src/lib/agri/ag-licences.ts');
+  const { patronage } = await import('../src/lib/agri/ag-patronage.ts');
+  const urea = { ...bill, vendor_id: 'v-iffco', lines: [{ id: 'l1', name: 'Urea 45 kg', hsn: '3102', unit: 'BAG', quantity: 100, rate: 240, tax_rate: 5 }] };
+  const of = (n: string) => (n === 'urea 45 kg' ? 'fertiliser' : undefined);
+  assert.deepEqual(principalWarnings([urea, { ...urea, id: 'v', status: 'void' } as never], [], of).map((w) => [w.bill, w.vendor, w.kind]), [['AS/22', 'Acme Supplies', 'fertiliser']]);
+  const member = { id: 'v-iffco', name: 'Acme Supplies', kind: 'vendor' as const };
+  const p = patronage(2026, { members: [member], cycles: [], purchases: [urea, { ...urea, id: 'v', status: 'void' } as never], invoices: [], farmerIds: new Set(['v-iffco']) });
+  assert.deepEqual([p.rows[0].suppliedQty, p.rows[0].suppliedValue], [100, 1000], 'taxable value, void skipped');
+});
+
+// R13 (MF-C4 / C5): the karigar ledger and the Rule 89(5) working paper read bills through `readPurchase` /
+// `readPurchaseLines` (vendor id from the row, void skipped, TDS on the bill, lines by HSN / rate).
+test('R13 (MF-C4 / MF-C5) karigar ledger and inverted-duty inputs read the real bill shape', async () => {
+  const { karigarBalance } = await import('../src/lib/mfg/mf-karigar.ts');
+  const { inwardLines } = await import('../src/lib/mfg/mf-inverted.ts');
+  const kb = { ...bill, vendor_id: 'k1', tds_section: '194C-1', tds_amount: 10, tds_on: 'BILL' as const };
+  const b = karigarBalance({ id: 'k1', name: 'Acme Supplies' }, [kb, { ...kb, id: 'v', status: 'void' }, { ...bill, vendor_id: 'other' }], []);
+  assert.deepEqual([b.billed, b.tds, b.payable], [1180, 10, 1170]);
+  const lines = inwardLines([bill, { ...bill, id: 'v', status: 'void' }, { ...bill, id: 'n', itc_eligible: false }], '2026-04-01', '2026-04-30');
+  assert.deepEqual(lines.map((l) => [l.doc, l.rate, l.taxable, l.tax, !!l.service]), [['AS/22', 18, 1000, 180, false]]);
+});
+
+// R13 (MF-A4): the dated MRP reads open purchase orders through `purchaseOrderOutstanding` (bills by `liveBills`): a PO
+// line billed in part leaves the rest as dated supply (expected date), in base units (`lineFactor`).
+test('R13 (MF-A4) dated MRP reads the real bill shape: PO supply less what a bill received, by expected date', async () => {
+  const { resetStorage } = await import('./helpers/shim.ts');
+  const { setTable } = await import('../src/lib/storage.ts');
+  const { datedSources } = await import('../src/lib/mfg/mf-mrp-dated.ts');
+  resetStorage();
+  const po = { id: 'po1', po_number: 'PO/1', vendor_name: 'Acme Supplies', date: '2026-04-01', expected_date: '2026-04-20', lines: [{ id: 'pl1', name: 'Paper ream', hsn: '4802', unit: 'BOX', unit_factor: 5, quantity: 10, rate: 500, tax_rate: 18 }] };
+  setTable('purchase_orders', [po]);
+  setTable('purchases', [{ ...bill, lines: [{ ...bill.lines[0], quantity: 4, po_line_id: 'pl1' }] }, { ...bill, id: 'v', status: 'void', lines: [{ ...bill.lines[0], quantity: 6, po_line_id: 'pl1' }] }]);
+  const items = [{ id: 'paper', name: 'Paper ream', hsn: '4802', unit: 'NOS', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }] as never[];
+  const { supply } = datedSources(items, '2026-04-10');
+  assert.deepEqual(supply.map((x) => [x.item_id, x.date, x.qty]), [['paper', '2026-04-20', 30]], '6 boxes × 5 left; the void bill received nothing');
+});
+
+// R13 (MF-B1): the heat-number carry reads bills through `readPurchase` / `readPurchaseLines` (void and expense bills left
+// out; the line's item id and batch from the real shape, `mf_heat` from the same line).
+test('R13 (MF-B1) heat no. carry reads the real bill shape', async () => {
+  const { heatsForBatch } = await import('../src/lib/mfg/mf-drawings.ts');
+  const line = { ...bill.lines[0], item_id: 'ms', batch_no: 'L1', mf_heat: 'H1' };
+  const purchases = [{ ...bill, lines: [line] }, { ...bill, id: 'v', status: 'void', lines: [{ ...line, mf_heat: 'VOID' }] }, { ...bill, id: 'e', kind: 'EXPENSE', lines: [{ ...line, mf_heat: 'EXP' }] }];
+  const docs = { mfg: [{ item_id: 'br', batch_no: 'B1', components: [{ id: 'c', item_id: 'ms', qty: 1, batch_no: 'L1' }] }], transfers: [], purchases };
+  assert.deepEqual(heatsForBatch('br', 'B1', docs as never), ['H1']);
+});
+
+// R13-D: cost cards (latest purchase rate), the MSME Form-1 paper (through msme.ts) and the AA import register read bills
+// through `readPurchase` / `readPurchaseLines` (void / expense left out, base units with `unit_factor`).
+test('R13 (MF-D1 / D3 / D4) cost-card rates, Form-1 rows and AA imports read the real bill shape', async () => {
+  const { latestPurchaseRates } = await import('../src/lib/mfg/mf-costcards.ts');
+  const { form1Half, form1Rows } = await import('../src/lib/mfg/mf-msme-form1.ts');
+  const { importsAgainst } = await import('../src/lib/mfg/mf-authorisations.ts');
+  const void_ = { ...bill, id: 'v', status: 'void' } as never;
+  const exp = { ...bill, id: 'e', kind: 'EXPENSE' } as never;
+  assert.equal(latestPurchaseRates([bill, void_, exp], [{ id: 's', name: 'Paper ream' }], '2026-12-31').get('s'), 100);
+  const v = [{ id: 'v1', name: 'Acme Supplies', msme_category: 'MICRO' as const }];
+  assert.equal(form1Rows([{ ...bill, vendor_id: 'v1' }], v, [], form1Half('2026-09-30')).length, 1);
+  const tagged = { ...bill, mf: { authorisation_id: 'aa' }, lines: [{ ...bill.lines[0], unit_factor: 500 }] };
+  assert.deepEqual(importsAgainst([tagged, { ...tagged, id: 'v', status: 'void' }, bill], 'aa', () => 's').map((m) => [m.qty, m.value]), [[5000, 1000]]);
+});
+
+// R14 (PS-A4): WIP, profitability and the year-end paper read re-billable bills through `rebillCost` (net of GST when
+// the credit is claimed, else the total — the same values `readPurchase` reports), the same reader as Time → Unbilled.
+test('R14 (PS-A4) WIP, profitability and year-end paper read re-billable bills like Time → Unbilled', async () => {
+  const { wipRows } = await import('../src/lib/prof/ps-wip.ts');
+  const { profitability } = await import('../src/lib/prof/ps-profit.ts');
+  const { yearEndPaper } = await import('../src/lib/prof/ps-yearend.ts');
+  const p = { ...bill, billable_to_client_id: 'c1', cost_centre_id: 'm1' };
+  const n = readPurchase(p as never)!;
+  assert.equal(rebillCost(p), n.taxable, 'ITC claimed: net of GST');
+  assert.equal(rebillCost({ ...p, itc_eligible: false }), n.total);
+  const rows = wipRows([], [p], { prefs: DEFAULT_TIME_PREFS, today: '2026-04-30', buckets: [30], by: 'matter', centres: [] });
+  assert.equal(rows[0].costs, 1000);
+  const wo = { ...p, ps: { wo: { date: '2026-04-20', reason: 'x' } } };
+  assert.equal(profitability({ from: '2026-04-01', to: '2026-04-30', by: 'matter', prefs: DEFAULT_TIME_PREFS, invoices: [], entries: [], costs: [wo], staff: new Map() })[0].unrecovered, 1000);
+  assert.equal(yearEndPaper({ closing: '2026-04-30', prefs: DEFAULT_TIME_PREFS, entries: [], costs: [p], invoices: [], centres: [] }).standard, 1000);
+});
+
+// R14 (PS-B1 / PS-B5): unrecovered disbursements and media re-bills read bills through `readPurchase` (void rows left out;
+// the cost is net of a claimed credit, the full amount on the client's behalf).
+test('R14 (PS-B1 / PS-B5) disbursements and media rows read the real bill shape', async () => {
+  const { unrecoveredDisbursements } = await import('../src/lib/prof/ps-disb.ts');
+  const { unbilledMedia } = await import('../src/lib/prof/ps-media.ts');
+  const disb = { ...bill, id: 'd', kind: 'EXPENSE', billable_to_client_id: 'c', ps: { disb: 'travel', on_behalf: false } };
+  assert.deepEqual(unrecoveredDisbursements([disb, { ...disb, id: 'v', status: 'void' }], () => false, '2026-04-22').map((r) => [r.id, r.amount, r.age]), [['d', 1000, 10]]);
+  assert.equal(unrecoveredDisbursements([{ ...disb, ps: { disb: 'stamp', on_behalf: true } }], () => false, '2026-04-22')[0].amount, 1180);
+  const media = { ...bill, id: 'm', ps: { media: { client_id: 'c', medium: 'print', mode: 'principal' } } };
+  assert.deepEqual(unbilledMedia([media], 'c', () => false).map((r) => [r.date, r.vendor, r.ref, r.cost, r.total]), [['2026-04-12', 'Acme Supplies', 'AS/22', 1000, 1180]]);
+});
+
+// R15-A3: netting reads bills through `supplierPayable` (RCM / import GST is ours, not the supplier's), skips void rows
+// and the bills with their own settlement flow (URD buy-back, R12 cycle bills).
+test('R15-A3 netting reads the real bill shape', async () => {
+  const { openBills } = await import('../src/lib/netting.ts');
+  const v = { id: 'v1', name: 'Acme Supplies' };
+  const rows: PurchaseRecord[] = [
+    { ...bill, vendor_id: 'v1' },
+    { ...bill, id: 'rcm', vendor_id: 'v1', reverse_charge: true },
+    { ...bill, id: 'void', vendor_id: 'v1', status: 'draft' },
+    { ...bill, id: 'paid', vendor_id: 'v1', amount_paid: 1180 },
+    { ...bill, id: 'urd', vendor_id: 'v1', used_goods: { kind: 'device' } } as never,
+  ];
+  assert.deepEqual(openBills(v, rows).map((b) => [b.id, b.open, !!b.rcm]), [['p1', 1180, false], ['rcm', 1000, true]]);
+});
+
+// R15-B2 / B3: trip costing and the 5 % ITC override list read bills through `readPurchase` (cost = taxable when ITC is
+// claimed, else the total; unpaid = total − paid; void rows left out; overrides = bills of 5 % trips still claiming ITC).
+test('R15-B trip costing and the ITC override list read the real bill shape', async () => {
+  const { tripCosting } = await import('../src/lib/travel/tv-costing.ts');
+  const { itcOverrides } = await import('../src/lib/travel/tv-itc.ts');
+  const tagged = { ...bill, tv: { trip_id: 't1', booking_id: 'b1', regime: 'to5' as const } };
+  const blocked = { ...bill, id: 'p2', itc_eligible: false, tv: { trip_id: 't1' } };
+  const voided = { ...bill, id: 'p4', status: 'void', tv: { trip_id: 't1' } } as never;
+  const bk = { id: 'b1', trip_id: 't1', component: 'hotel' as const, start: '2026-04-12', cost: 900, sell: 1500, status: 'confirmed' as const, created_at: '' };
+  const c = tripCosting([bk], [tagged, blocked, voided], new Set());
+  assert.deepEqual(c.rows.map((r) => [r.component, r.cost, r.sell]), [['hotel', 1000, 1500], ['other', 1180, 0]]);
+  assert.equal(c.unpaid, 2360);
+  assert.deepEqual(itcOverrides([tagged, blocked, voided, { ...tagged, id: 'p3', tv: { trip_id: 't2' } }]).map((o) => [o.id, o.tax]), [['p1', 180]]);
+});
+
+// R15-D3: the event budget sheet reads bills through `readPurchase` (billed = total, paid = amount paid; void rows left
+// out; a bill without a booking goes to "other").
+test('R15-D event budget reads the real bill shape', async () => {
+  const { eventBudget } = await import('../src/lib/travel/tv-events.ts');
+  const tagged = { ...bill, tv: { trip_id: 't1', booking_id: 'b1' }, amount_paid: 500 };
+  const loose = { ...bill, id: 'p2', tv: { trip_id: 't1' } };
+  const voided = { ...bill, id: 'p4', status: 'void', tv: { trip_id: 't1', booking_id: 'b1' } } as never;
+  const bk = { id: 'b1', trip_id: 't1', component: 'decor' as const, start: '2026-04-12', cost: 900, sell: 1500, status: 'confirmed' as const, created_at: '' };
+  const s = eventBudget({ budget: [{ head: 'decor', approved: 1000 }] }, [bk], [tagged, loose, voided]);
+  assert.deepEqual(s.rows.map((r) => [r.head, r.approved, r.booked, r.billed, r.paid, r.over]), [['decor', 1000, 900, 1180, 500, true], ['other', 0, 0, 1180, 0, true]]);
+});
+
+// R15-C2 / C3: the statement's bill (fares at actual, ADMs) is a real purchase row; the cancellation's debit note goes
+// through `purchase-returns` (which reads the bill through `readPurchase`).
+test('R15-C statement bill is read back by readPurchase', async () => {
+  const { statementBill } = await import('../src/lib/travel/tv-statement-bill.ts');
+  const st = { id: 's', vendor_id: 'v', kind: 'bsp' as const, period_start: '2026-10-01', period_end: '2026-10-15', ref: 'BSP 2610A', created_at: '',
+    rows: [{ doc_no: 'A', type: 'ADMA', gross: 3500, taxes: 0, commission: 0, net: 3500, flag: 'adm' as const }], totals: { gross: 13500, taxes: 0, commission: 120, net: 13380 } };
+  const c = readPurchase({ ...statementBill(st, { name: 'IATA BSP India' }), id: 'b' });
+  assert.ok(c);
+  assert.deepEqual([c!.date, c!.total, c!.taxable, c!.itcEligible, c!.paid], ['2026-10-15', 13380, 13380, false, 0]);
+  assert.deepEqual(readPurchaseLines({ ...statementBill(st), id: 'b' } as never).map((l) => l.quantity * l.unitCost), [9880, 3500]);
+});
+
+// R18-B3: the society's inward-RCM hint reads the real bill shape (lines' SAC, reverse charge, the supplier's GSTIN).
+test('R18-B inward-RCM hint (hs-turnover) reads the real bill shape', async () => {
+  const { rcmHint } = await import('../src/lib/society/hs-turnover.ts');
+  const guard: PurchaseRecord = { ...bill, lines: [{ ...bill.lines[0], name: 'Security services', hsn: '998525' }] };
+  const rule = { sac: '99852' };
+  assert.equal(rcmHint(guard, { gstin: bill.vendor_gstin }, true, rule), true);
+  assert.equal(rcmHint({ ...guard, reverse_charge: true }, { gstin: bill.vendor_gstin }, true, rule), false);
+  assert.equal(rcmHint(bill, { gstin: bill.vendor_gstin }, true, rule), false, 'paper is not security');
 });

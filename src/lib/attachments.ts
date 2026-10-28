@@ -25,7 +25,8 @@
  * Pure apart from the storage calls; tested in Node (tests/attachments.test.ts).
  */
 
-import { DB_PREFIX, SINGLETON_KEYS, listKeys, readRaw, removeRaw, writeRaw } from './storage';
+import type {} from '../types/docs-r3'; // R3-C2: AttachmentRef.print
+import { DB_PREFIX, SINGLETON_KEYS, listKeys, peekTable, readRaw, removeRaw, writeRaw } from './storage';
 import { hashContent } from './assets';
 import type { AttachmentMime, AttachmentRef } from '../types/attachments';
 
@@ -39,8 +40,8 @@ export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 /** Largest photo accepted for downscaling (phone cameras produce 5–12 MB). */
 export const MAX_IMAGE_INPUT_BYTES = 20 * 1024 * 1024;
 export const MAX_ATTACHMENTS_PER_RECORD = 10;
-/** Tables whose rows carry `attachments`. */
-export const ATTACHMENT_OWNER_TABLES = ['invoices', 'purchases'] as const;
+/** Tables whose rows carry `attachments` (8C: draft bills and the unprocessed-documents inbox too). */
+export const ATTACHMENT_OWNER_TABLES = ['invoices', 'purchases', 'purchase_drafts', 'doc_inbox', 'recycle_bin', 'labour_compliance'] as const; // R4-C4: kept while binned; R11 (CN-D2): PF / ESI proof
 
 export const ACCEPTED_MIMES: readonly AttachmentMime[] = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
 /** `accept` attribute for file inputs (a hint only; content is checked by magic bytes). */
@@ -228,6 +229,8 @@ export function readRefs(v: unknown): AttachmentRef[] {
       mime: r.mime as AttachmentMime,
       size: typeof r.size === 'number' ? r.size : 0,
       added_at: typeof r.added_at === 'string' ? r.added_at : '',
+      // R3-C2 (additive): "Print on document" flag (cleaned by `printablePhotos` when printed; images only).
+      ...(r.print ? { print: r.print } : {}),
     });
   }
   return out;
@@ -242,6 +245,10 @@ export function attachmentIdsIn(rows: unknown, into: Set<string> = new Set()): S
   return into;
 }
 
+/** Live store: tables through the shared parsed rows (`peekTable`, read-only), the small draft parsed as before. */
+const liveParsed = (fullKey: string): unknown =>
+  fullKey === SINGLETON_KEYS.draft ? parseJson(readRaw(fullKey)) : peekTable<unknown>(fullKey.slice(DB_PREFIX.length));
+
 const parseJson = (raw: string | null | undefined): unknown => {
   if (!raw) return null;
   try {
@@ -255,10 +262,16 @@ const parseJson = (raw: string | null | undefined): unknown => {
  * Every attachment id still in use: invoices, purchases and the editor's autosaved draft.
  * `read` defaults to live storage; backup validation passes the file's key/value map.
  */
-export function referencedAttachmentIds(read: (fullKey: string) => string | null | undefined = readRaw): Set<string> {
+export function referencedAttachmentIds(
+  read: (fullKey: string) => string | null | undefined = readRaw,
+  /** Already-parsed values by full key (backup validation parses each table once). */
+  parsed?: (fullKey: string) => unknown,
+): Set<string> {
   const ids = new Set<string>();
-  for (const t of ATTACHMENT_OWNER_TABLES) attachmentIdsIn(parseJson(read(DB_PREFIX + t)), ids);
-  const draft = parseJson(read(SINGLETON_KEYS.draft));
+  // PERF-1: the live store is read through the shared parsed tables (runs on every save that drops a file).
+  const get = parsed ?? (read === readRaw ? liveParsed : (k: string) => parseJson(read(k)));
+  for (const t of ATTACHMENT_OWNER_TABLES) attachmentIdsIn(get(DB_PREFIX + t), ids);
+  const draft = get(SINGLETON_KEYS.draft);
   if (draft && typeof draft === 'object') attachmentIdsIn([draft], ids);
   return ids;
 }
@@ -343,7 +356,7 @@ export interface BackupAttachmentCheck {
  * removed from `data`. Dangling references are counted, not refused: attachments are supporting
  * files, so a backup made without some of them still restores and the records show "file missing".
  */
-export function checkBackupAttachments(data: Record<string, string>): BackupAttachmentCheck {
+export function checkBackupAttachments(data: Record<string, string>, parsed?: (fullKey: string) => unknown): BackupAttachmentCheck {
   let files = 0;
   let dropped = 0;
   const present = new Set<string>();
@@ -359,7 +372,7 @@ export function checkBackupAttachments(data: Record<string, string>): BackupAtta
     files++;
     present.add(id);
   }
-  const refs = referencedAttachmentIds((k) => data[k]);
+  const refs = referencedAttachmentIds((k) => data[k], parsed);
   const missing = [...refs].filter((id) => !present.has(id)).length;
   return { files, dropped, missing };
 }

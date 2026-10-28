@@ -22,6 +22,8 @@ import { PnlTab } from './PnlTab';
 import { ReportsHub } from './ReportsHub';
 import { ReportEnvProvider } from './ReportViews';
 import { branchT } from '../../../i18n/areas/branch-books';
+import { loadBranchStockValuer } from '../../../lib/ledger/branch-stock';
+import { s7mT } from '../../../i18n/areas/inventory-7s-mini';
 import books from '../books.module.css';
 
 // WP-9: branch-wise books. The filter renders nothing until a branch exists.
@@ -65,8 +67,9 @@ export default function LedgerPanel({ tab, data, period, asOf, account, party, o
     return () => (cache ??= loadStockPositions());
   }, [data, version]);
   const companyStock = useMemo(() => loadStockValuer(undefined, positions, input.manual), [positions, input.manual]);
-  // Report-time closing stock is company-wide: not apportioned to a branch.
-  const stock = branchView ? undefined : companyStock;
+  // 7S (7.84): a branch view values the stock in the branch's godowns ("No branch" takes the rest).
+  const branchStock = useMemo(() => (branchView ? loadBranchStockValuer(branchId, positions, companyStock) : undefined), [branchView, branchId, positions, companyStock]);
+  const stock = branchView ? branchStock : companyStock;
   const getPositions = useCallback(() => positions(), [positions]);
 
   const openVoucher = (v: LedgerVoucher) => {
@@ -80,13 +83,13 @@ export default function LedgerPanel({ tab, data, period, asOf, account, party, o
         <Suspense fallback={null}>
           <div className={`${books.toolbar} no-print`}>
             <BranchFilter value={branchId} onChange={setBranchId} testId="books-branch" />
-            {branchView && <span className={books.muted}>{branchT('scopeNote')}</span>}
+            {branchView && <span className={books.muted}>{branchStock ? s7mT('branchStockNote') : branchT('scopeNote')}</span>}
           </div>
         </Suspense>
       )}
       {tab === 'day' && <DayBookTab ledger={ledger} period={period} />}
       {tab === 'pnl' && <PnlTab ledger={ledger} data={data} period={period} stock={stock} onStockChanged={changed} notify={notify} />}
-      {tab === 'rpt' && <ReportsHub period={period} data={data} today={today} positions={getPositions} />}
+      {tab === 'rpt' && <ReportsHub period={period} data={data} today={today} positions={getPositions} notify={notify} />}
       {tab === 'coa' && <ChartTab ledger={ledger} asOf={asOf} onChanged={changed} onOpenAccount={(id) => onOpenAccount(id)} notify={notify} />}
       {tab === 'vch' && <VouchersTab ledger={ledger} period={period} onChanged={changed} onOpenAccount={onOpenAccount} notify={notify} />}
       {tab === 'tb' && <TrialBalanceTab ledger={ledger} period={period} stock={stock} />}

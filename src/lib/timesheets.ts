@@ -27,6 +27,13 @@ import { requireAccess } from './access';
 import { purchasesDb } from './purchases';
 import { blankClient, makeDraft, senderStateCode } from '../store/invoice-defaults';
 import { hoistCostCentre, loadCostCentres, matchCostCentre, type CostCentre } from './cost-centres';
+// R3-B: work-type SAC (rate cards), retainer coverage, project filter, timesheet annexure.
+import type { InvoiceAnnexure } from '../types/service-r3';
+import { loadWorkTypes, sacFor, type WorkType } from './rate-cards';
+import { loadRetainers, retainerCover, type RetainerCover } from './retainers';
+import { buildAnnexure, type AnnexureContext } from './annexure';
+import { loadTasks } from './projects';
+import { PURE_AGENT_CHARGE } from './trade/pure-agent';
 
 export const TIME_TABLE = 'time_entries';
 export const MILEAGE_TABLE = 'mileage';
@@ -123,14 +130,33 @@ export function clientKey(row: { client_id?: string; client_name?: string }): st
   return row.client_id ? row.client_id : `name:${(row.client_name ?? '').trim().toLowerCase()}`;
 }
 
-export const unbilledTime = (entries: TimeEntry[], live: Set<string>): TimeEntry[] =>
-  entries.filter((e) => e.billable && !isBilled(e.invoiced_in, live, e.id));
+/**
+ * Billable entries no live invoice bills. With a retainer `cover` (R3-B3), minutes a retainer covers
+ * are treated as billed: a fully covered entry is left out, a partly covered one comes back as a copy
+ * holding only its overage minutes, and overage entries take the retainer's overage rate.
+ */
+export function unbilledTime(entries: TimeEntry[], live: Set<string>, cover?: RetainerCover, prefs?: TimePrefs): TimeEntry[] {
+  const out: TimeEntry[] = [];
+  for (const e of entries) {
+    if (!e.billable || e.ps?.wo || isBilled(e.invoiced_in, live, e.id)) continue; // R14 (PS-A4): a WIP write-off leaves the list
+    const covered = cover?.covered.get(e.id) ?? 0;
+    const rate = cover?.overageRate.get(e.id);
+    if (!covered && rate === undefined) {
+      out.push(e);
+      continue;
+    }
+    const total = prefs ? billableMinutes(e, prefs) : Math.max(num(e.minutes), 0);
+    if (covered >= total) continue;
+    out.push({ ...e, ...(covered ? { minutes: total - covered } : {}), ...(rate !== undefined ? { hourly_rate: rate } : {}) });
+  }
+  return out;
+}
 
 export const unbilledMileage = (trips: MileageEntry[], live: Set<string>): MileageEntry[] =>
   trips.filter((t) => !isBilled(t.invoiced_in, live, t.id));
 
 export const unbilledExpenses = (purchases: PurchaseRecord[], live: Set<string>): PurchaseRecord[] =>
-  purchases.filter((p) => !!p.billable_to_client_id && !isBilled(p.rebilled_in, live, p.id));
+  purchases.filter((p) => !!p.billable_to_client_id && !p.ps?.wo && !isBilled(p.rebilled_in, live, p.id)); // R14: + WIP write-off
 
 /**
  * Rows an invoice bills that another live invoice bills too (reinstating it would bill them twice).
@@ -290,26 +316,27 @@ function line(partial: Omit<InvoiceItem, 'id' | 'amount' | 'type'> & { type?: st
  * Time → invoice lines, one per project + description + rate. Each entry is rounded to the billing
  * step first, then the group is printed as hours to 2 dp (unit HRS) with the SAC from preferences.
  */
-export function timeLines(entries: TimeEntry[], prefs: TimePrefs, centres: readonly CostCentre[] = []): InvoiceItem[] {
+export function timeLines(entries: TimeEntry[], prefs: TimePrefs, centres: readonly CostCentre[] = [], workTypes: readonly WorkType[] = []): InvoiceItem[] {
   const groups = new Map<string, TimeEntry[]>();
   const ccOf = (e: TimeEntry) => e.cost_centre_id || matchCostCentre(e.project, centres) || '';
   for (const e of entries) {
     if (!e.billable) continue;
-    const key = [(e.project ?? '').trim().toLowerCase(), (e.description ?? '').trim().toLowerCase(), num(e.hourly_rate), ccOf(e)].join('|');
+    // R3-B1: lines also split by work type (its SAC prints on the line).
+    const key = [(e.project ?? '').trim().toLowerCase(), (e.description ?? '').trim().toLowerCase(), num(e.hourly_rate), ccOf(e), e.work_type_id ?? ''].join('|');
     groups.set(key, [...(groups.get(key) ?? []), e]);
   }
   const out: InvoiceItem[] = [];
   for (const group of groups.values()) {
     const first = group[0];
     const project = (first.project ?? '').trim();
-    const desc = (first.description ?? '').trim();
+    const desc = (first.description ?? '').trim() || workTypes.find((w) => w.id === first.work_type_id)?.name || '';
     const minutes = group.reduce((s, e) => s + billableMinutes(e, prefs), 0);
     const hours = toHours(minutes);
     if (hours <= 0) continue;
     out.push(line({
       name: project && desc ? `${project} — ${desc}` : project || desc || 'Professional services',
       description: `${span(group.map((e) => e.date))} · ${group.length} ${group.length === 1 ? 'entry' : 'entries'}`,
-      hsn: prefs.sac,
+      hsn: sacFor(first, workTypes, prefs.sac),
       unit: 'HRS',
       quantity: hours,
       rate: num(first.hourly_rate),
@@ -336,9 +363,12 @@ export function expenseLine(p: PurchaseRecord, prefs: TimePrefs): InvoiceItem {
   const cc = p.cost_centre_id ? { cost_centre_id: p.cost_centre_id } : {};
   const label = [p.category || 'Expense', p.vendor_name].filter(Boolean).join(': ') + (p.bill_number ? ` (#${p.bill_number})` : '');
   if (p.pure_agent) {
+    // R14 PS-B1: the R8 pure-agent line key (sentinel head `rule33` + the shared Rule 33 text), so GSTR-1 / e-Invoice /
+    // e-Way leave the reimbursement out of the supply (`isPureAgentLine`); old invoices keep their nil-rated 0% line.
     return line({
       name: `Reimbursement — ${label}`,
-      description: `${shortDay(p.date)} · ${PURE_AGENT_NOTE}`,
+      description: PURE_AGENT_CHARGE,
+      charge_head_id: 'rule33',
       unit: 'NOS',
       quantity: 1,
       rate: round2(num(p.total)),
@@ -394,8 +424,8 @@ export interface BillSelection {
   mileage: MileageEntry[];
 }
 
-export const buildBillLines = (sel: BillSelection, prefs: TimePrefs, centres: readonly CostCentre[] = []): InvoiceItem[] => [
-  ...timeLines(sel.time, prefs, centres),
+export const buildBillLines = (sel: BillSelection, prefs: TimePrefs, centres: readonly CostCentre[] = [], workTypes: readonly WorkType[] = []): InvoiceItem[] => [
+  ...timeLines(sel.time, prefs, centres, workTypes),
   ...sel.expenses.map((p) => expenseLine(p, prefs)),
   ...mileageLines(sel.mileage, prefs),
 ];
@@ -404,7 +434,7 @@ export const buildBillLines = (sel: BillSelection, prefs: TimePrefs, centres: re
  * Pure: turn a fresh draft into the bill for `client` with `items`. Picks the place of supply from
  * the client and the CGST/SGST vs IGST split from the sender, then recomputes every total.
  */
-export function buildBillDraft(draft: InvoiceRecord, client: Client, items: InvoiceItem[], sender: SenderProfile | null): InvoiceRecord {
+export function buildBillDraft(draft: InvoiceRecord, client: Client, items: InvoiceItem[], sender: SenderProfile | null, annexure?: InvoiceAnnexure): InvoiceRecord {
   const fullClient: Client = { ...blankClient(), ...client };
   const place = resolveStateCode({ code: fullClient.state_code, gstin: fullClient.gstin, name: fullClient.state }) || draft.place_of_supply;
   const gst_mode = deriveGstMode({
@@ -413,7 +443,7 @@ export function buildBillDraft(draft: InvoiceRecord, client: Client, items: Invo
     senderHasGstin: Boolean(sender?.companyGstin?.trim()),
     taxEnabled: items.some((i) => num(i.tax_rate) > 0),
   });
-  const rec: InvoiceRecord = { ...draft, client: fullClient, items, place_of_supply: place, gst_mode, status: 'Draft', amount_paid: 0 };
+  const rec: InvoiceRecord = { ...draft, client: fullClient, items, place_of_supply: place, gst_mode, status: 'Draft', amount_paid: 0, ...(annexure ? { annexure } : {}) };
   const t = calculateInvoice(calcInputFromRecord(rec));
   return {
     ...rec,
@@ -506,13 +536,40 @@ export const mileageDb = crud<MileageEntry>(MILEAGE_TABLE);
 
 export const currentLiveInvoiceIds = (): LiveBilling => liveInvoiceIds(localDb.invoices.getAll());
 
-/** Everything still unbilled for one client (by `clientKey`). */
-export function unbilledFor(key: string, live = currentLiveInvoiceIds()): BillSelection {
-  return {
-    time: unbilledTime(timeDb.all(), live).filter((e) => clientKey(e) === key),
+/** R3-B3: retainer coverage of the stored time today (empty when no retainer exists). */
+export function currentCover(prefs = readTimePrefs(), entries = timeDb.all(), invoices: readonly InvoiceRecord[] = localDb.invoices.getAll()): RetainerCover | undefined {
+  const retainers = loadRetainers();
+  if (!retainers.length) return undefined;
+  return retainerCover(retainers, entries, (e) => billableMinutes(e, prefs), invoices, localDayOf(new Date()));
+}
+
+/** R3-B2: does a row belong to project `id` (its cost centre, or a task of the project)? */
+export function inProject(row: { cost_centre_id?: string; task_id?: string }, id: string, taskIds: ReadonlySet<string>): boolean {
+  return row.cost_centre_id === id || (!!row.task_id && taskIds.has(row.task_id));
+}
+
+/** Everything still unbilled for one client (by `clientKey`), optionally only one project (R3-B2). */
+export function unbilledFor(key: string, live = currentLiveInvoiceIds(), opts: { projectId?: string; prefs?: TimePrefs } = {}): BillSelection {
+  const prefs = opts.prefs ?? readTimePrefs();
+  const entries = timeDb.all();
+  const sel: BillSelection = {
+    time: unbilledTime(entries, live, currentCover(prefs, entries), prefs).filter((e) => clientKey(e) === key),
     mileage: unbilledMileage(mileageDb.all(), live).filter((t) => clientKey(t) === key),
     expenses: unbilledExpenses(purchasesDb.all(), live).filter((p) => p.billable_to_client_id === key),
   };
+  if (!opts.projectId) return sel;
+  const id = opts.projectId;
+  const tasks = new Set(loadTasks().filter((t) => t.cost_centre_id === id).map((t) => t.id));
+  return {
+    time: sel.time.filter((e) => inProject(e, id, tasks)),
+    mileage: sel.mileage.filter((t) => t.cost_centre_id === id),
+    expenses: sel.expenses.filter((p) => p.cost_centre_id === id),
+  };
+}
+
+/** Masters the annexure reads (task titles, project names, assignee names). */
+export function annexureContext(): AnnexureContext {
+  return { tasks: loadTasks(), centres: loadCostCentres() };
 }
 
 export class NothingToBillError extends Error {
@@ -526,8 +583,8 @@ export class NothingToBillError extends Error {
  * Create and save a NEW draft invoice for the selection, then stamp every billed row with its id.
  * The client comes from the CRM (falling back to the name snapshot on the entries).
  */
-export function billUnbilled(key: string, sel: BillSelection, prefs = readTimePrefs()): InvoiceRecord {
-  const lines = buildBillLines(sel, prefs, loadCostCentres());
+export function billUnbilled(key: string, sel: BillSelection, prefs = readTimePrefs(), opts: { annexure?: boolean } = {}): InvoiceRecord {
+  const lines = buildBillLines(sel, prefs, loadCostCentres(), loadWorkTypes());
   if (!lines.length) throw new NothingToBillError();
   // One shared cost centre becomes the document's; mixed ones stay as line overrides.
   const { costCentreId, items } = hoistCostCentre(lines);
@@ -541,7 +598,9 @@ export function billUnbilled(key: string, sel: BillSelection, prefs = readTimePr
   const settings = localDb.settings.get();
   const sender = localDb.settings.activeProfile() ?? null;
   const base = makeDraft({ settings, sender, docType: 'INVOICE', templateId: localDb.template.get() });
-  const draft = buildBillDraft({ ...base, id: generateId(), ...(costCentreId ? { cost_centre_id: costCentreId } : {}) }, client, items, sender);
+  // R3-B4: the annexure is a snapshot of exactly the billed rows (Critical Rule 3).
+  const annexure = opts.annexure ? buildAnnexure(sel, prefs, annexureContext()) : undefined;
+  const draft = buildBillDraft({ ...base, id: generateId(), ...(costCentreId ? { cost_centre_id: costCentreId } : {}) }, client, items, sender, annexure);
   draft.invoice_number = localDb.invoices.nextNumber(draft.issue_date, draft.doc_type, sender?.invoicePrefix || undefined);
   const saved = localDb.invoices.save(draft);
   timeDb.markInvoiced(sel.time.map((e) => e.id), saved.id);

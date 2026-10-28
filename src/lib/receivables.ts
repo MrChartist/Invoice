@@ -13,10 +13,10 @@
  *
  * Consistency guarantees, verified in tests/receivables.test.ts:
  *   party.net === ledger closing balance over the full history
- *   party.net === Σ open bills - credit notes - advances
+ *   party.net === Σ open bills - credit notes (not allocated to a linked bill) - advances
  */
 
-import type { Client, DocumentType, InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
+import type { Client, DocumentType, FinancialReason, InvoiceRecord, Payment, SenderProfile } from '../types/invoice';
 import { round2, num } from './invoice-calc';
 import { agingBucket } from './invoice-status';
 import { daysOverdue, formatMoney, formatDate } from './utils';
@@ -26,6 +26,14 @@ import { csvCell, toCsv } from './csv';
 import type { AdvanceRecord } from '../types/advances';
 import { advanceMovements } from './advance-tax';
 import { receivableTotal } from './rcm';
+import { linkedCredits, type CreditLinkRow } from './amount-due';
+import { effectiveDueDate } from './payment-schedule';
+import { FINANCIAL_REASON_LABELS, isFinancialNote } from './financial-note';
+import type { PosReturn } from './pos-returns';
+import { raDueSplit } from './works/ra-due'; // R5-B5 (pure, tiny)
+
+/** 8.100: ageing follows the earliest unpaid instalment of a payment schedule (else the due date). */
+const dueOf = (inv: InvoiceRecord): string => effectiveDueDate(inv);
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -36,7 +44,46 @@ export type ReceiptRow = Payment & { client_id?: string; client_name?: string; c
 export const AGING_BUCKETS = ['Not due', '1–30 days', '31–60 days', '61–90 days', '90+ days'] as const;
 export type AgingBucketLabel = (typeof AGING_BUCKETS)[number];
 
-export type LedgerEntryKind = 'invoice' | 'payment' | 'credit_note' | 'advance' | 'opening';
+export type LedgerEntryKind = 'invoice' | 'payment' | 'credit_note' | 'advance' | 'opening' | 'refund';
+
+/**
+ * Money paid back against a credit note (QA-3 F2): a POS return refunded by tender, or an exchange
+ * credit used on a new bill (its PAYMENT voucher is Dr Sundry debtors for the whole credit). It is a
+ * debit to the party and uses up that much of the note's credit, as the books do.
+ */
+export interface CreditRefundInput {
+  credit_note_id: string;
+  /** yyyy-mm-dd */
+  date: string;
+  /** Rupees, > 0. */
+  amount: number;
+  ref?: string;
+  method?: string;
+}
+
+/**
+ * Refund rows of the `pos_returns` table: only returns whose refund voucher was booked (a refund
+ * settlement's tenders; an applied exchange's whole credit, which the voucher debits to the party).
+ */
+export function posRefunds(rows: readonly PosReturn[] | null | undefined): CreditRefundInput[] {
+  const out: CreditRefundInput[] = [];
+  for (const r of rows ?? []) {
+    if (!r?.voucher_id || !r.credit_note_id) continue;
+    const amount = r.settlement === 'exchange'
+      ? round2(num(r.amount))
+      : round2((r.refunds ?? []).reduce((s, t) => s + Math.max(num(t.amount), 0), 0));
+    if (!(amount > 0)) continue;
+    const methods = [...new Set((r.refunds ?? []).map((t) => t.method))];
+    out.push({
+      credit_note_id: r.credit_note_id,
+      date: r.day,
+      amount,
+      ref: r.credit_note_number,
+      method: r.settlement === 'exchange' ? 'Exchange' : methods.join(' + ') || 'Cash',
+    });
+  }
+  return out;
+}
 
 /**
  * A bill-wise opening outstanding (WP-1 `opening_bills`, `src/lib/opening-bills.ts`): owed when the
@@ -72,6 +119,10 @@ export interface LedgerEntry {
   invoiceId?: string;
   /** True when derived from invoice.amount_paid / Paid status with no payment row. */
   derived?: boolean;
+  /** Additive (R2-A2): a financial credit note (settlement discount / kasar / bad debt) — not a sales return. */
+  financial?: FinancialReason;
+  /** Additive (R2-A3): a bad-debt write-off row (not money received). */
+  writeOff?: boolean;
 }
 
 export interface Bill {
@@ -86,6 +137,10 @@ export interface Bill {
   bucket: AgingBucketLabel;
   /** Additive (WP-1): an opening bill, not an invoice (`invoiceId` is the opening bill id). */
   opening?: boolean;
+  /** Additive: linked credit notes allocated to this bill (`BuildInput.links`); outstanding is net of it. */
+  credited?: number;
+  /** Additive (R5-B5): part of `outstanding` held back on an RA bill (retention, GST TDS, cess …) — not aged. */
+  held?: number;
 }
 
 export interface PartyReceivable {
@@ -140,6 +195,15 @@ export interface BuildInput {
   advances?: AdvanceRecord[];
   /** Additive (WP-1): bill-wise opening outstandings (INR), see `OpeningBillInput`. */
   openingBills?: OpeningBillInput[];
+  /**
+   * Additive: `doc_links` rows. A live credit note linked to an invoice of the same party is
+   * allocated to that bill (bill-wise, as Tally does): it lowers the bill's outstanding instead of
+   * sitting as an unallocated credit, and a bill it settles (status Paid) gets no invented receipt.
+   * Only the unallocated part counts in `creditNotes`. Ledger entries and `net` are unchanged.
+   */
+  links?: CreditLinkRow[];
+  /** Additive (QA-3 F2): money paid back against live credit notes (`posRefunds`). INR only. */
+  refunds?: CreditRefundInput[];
 }
 
 export interface Ledger {
@@ -199,7 +263,7 @@ function emptyBuckets(): Record<AgingBucketLabel, number> {
   return { 'Not due': 0, '1–30 days': 0, '31–60 days': 0, '61–90 days': 0, '90+ days': 0 };
 }
 
-const KIND_ORDER: Record<LedgerEntryKind, number> = { opening: -1, invoice: 0, credit_note: 1, payment: 2, advance: 2 };
+const KIND_ORDER: Record<LedgerEntryKind, number> = { opening: -1, invoice: 0, credit_note: 1, payment: 2, advance: 2, refund: 3 };
 
 function sortEntries(entries: LedgerEntry[]): LedgerEntry[] {
   return entries
@@ -253,6 +317,43 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
   );
   const docById = new Map(docs.map((d) => [d.id, d]));
 
+  // Live credit notes linked to a live invoice of the same party are allocated to that bill.
+  const allocLinks = (input.links ?? []).filter((l) => {
+    if (l.relation !== 'credit_note') return false;
+    const note = docById.get(l.to_id);
+    const bill = docById.get(l.from_id);
+    return !!note && !!bill && isCreditNote(note) && !isCreditNote(bill) && keyOf(note.client) === keyOf(bill.client);
+  });
+  const creditOf = linkedCredits(allocLinks, docs);
+  const allocatedNotes = new Set(allocLinks.map((l) => l.to_id));
+
+  // Refunds against live credit notes (capped at the note): that part of the note's credit was paid
+  // back, so only the rest is allocated to its bill or kept as a credit.
+  const refundsByNote = new Map<string, CreditRefundInput[]>();
+  const refundedOf = new Map<string, number>();
+  if (currency === 'INR') {
+    for (const r of input.refunds ?? []) {
+      const note = docById.get(r.credit_note_id);
+      if (!note || !isCreditNote(note) || !(num(r.amount) > 0)) continue;
+      const room = round2(receivableTotal(note) - (refundedOf.get(note.id) ?? 0));
+      const amt = round2(Math.min(num(r.amount), room));
+      if (!(amt > 0)) continue;
+      refundedOf.set(note.id, round2((refundedOf.get(note.id) ?? 0) + amt));
+      refundsByNote.set(note.id, [...(refundsByNote.get(note.id) ?? []), { ...r, amount: amt }]);
+    }
+  }
+  // Credit left on each bill after refunds (`creditOf` stays gross: a Paid bill's settled part).
+  const netCreditOf = new Map(creditOf);
+  if (refundedOf.size) {
+    const seenNotes = new Set<string>();
+    for (const l of allocLinks) {
+      if (seenNotes.has(l.to_id)) continue;
+      seenNotes.add(l.to_id);
+      const refunded = refundedOf.get(l.to_id);
+      if (refunded) netCreditOf.set(l.from_id, round2(Math.max((netCreditOf.get(l.from_id) ?? 0) - refunded, 0)));
+    }
+  }
+
   interface Acc {
     key: string;
     clientId?: string;
@@ -305,9 +406,19 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
     if (isCreditNote(inv)) {
       a.entries.push({
         date: issue, kind: 'credit_note', ref: inv.invoice_number,
-        particulars: 'Credit Note', debit: 0, credit: total, balance: 0, invoiceId: inv.id,
+        particulars: isFinancialNote(inv) ? `${FINANCIAL_REASON_LABELS[inv.financial_reason ?? 'settlement_discount']}${inv.po_number ? ` (against ${inv.po_number})` : ''}` : 'Credit Note',
+        debit: 0, credit: total, balance: 0, invoiceId: inv.id,
+        ...(isFinancialNote(inv) ? { financial: inv.financial_reason ?? 'settlement_discount' } : {}),
       });
-      a.creditNotes = round2(a.creditNotes + total);
+      for (const r of refundsByNote.get(inv.id) ?? []) {
+        a.entries.push({
+          date: dateKey(r.date) || issue, kind: 'refund', ref: r.ref || inv.invoice_number,
+          particulars: `Refund – ${r.method || 'Cash'} (against ${inv.invoice_number})`,
+          debit: r.amount, credit: 0, balance: 0, invoiceId: inv.id,
+        });
+      }
+      // An allocated note is settled against its bill below (only an unallocated rest stays a credit).
+      if (!allocatedNotes.has(inv.id)) a.creditNotes = round2(a.creditNotes + total - (refundedOf.get(inv.id) ?? 0));
       continue;
     }
 
@@ -333,8 +444,9 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
       a.entries.push({
         date: dateKey(p.date) || issue, kind: 'payment',
         ref: p.reference || inv.invoice_number,
-        particulars: `Receipt – ${p.method || 'Payment'} (against ${inv.invoice_number})`,
+        particulars: p.write_off ? `Bad debt written off (${inv.invoice_number})` : `Receipt – ${p.method || 'Payment'} (against ${inv.invoice_number})`,
         debit: 0, credit: amt, balance: 0, invoiceId: inv.id,
+        ...(p.write_off ? { writeOff: true } : {}),
       });
     }
     // TDS the customer withholds is settled with the tax office, never paid to us: it
@@ -349,8 +461,12 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
       });
       paid = round2(paid + tds);
     }
-    // Legacy rows: amount_paid or a Paid status with no matching payment rows.
-    const claimed = inv.status === 'Paid' ? total : round2(num(inv.amount_paid) + tds);
+    // Legacy rows: amount_paid or a Paid status with no matching payment rows. A Paid bill is
+    // settled by receipts AND its linked credit notes: the credited part is never a receipt.
+    const credited = creditOf.get(inv.id) ?? 0;
+    const claimed = inv.status === 'Paid'
+      ? round2(Math.max(total - credited, num(inv.amount_paid) + tds))
+      : round2(num(inv.amount_paid) + tds);
     const missing = round2(claimed - paid);
     if (missing > 0.004) {
       a.entries.push({
@@ -361,16 +477,26 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
       paid = round2(paid + missing);
     }
 
-    const outstanding = round2(Math.max(total - paid, 0));
+    const open = round2(Math.max(total - paid, 0));
+    // Linked credit notes (net of refunds) settle what receipts left open; any rest is an unallocated credit.
+    const netCredit = netCreditOf.get(inv.id) ?? 0;
+    const alloc = round2(Math.min(netCredit, open));
+    if (netCredit - alloc > 0.004) a.creditNotes = round2(a.creditNotes + netCredit - alloc);
+    const outstanding = round2(open - alloc);
     const excess = round2(Math.max(paid - total, 0));
     if (excess > 0) a.advances = round2(a.advances + excess);
+    // R5-B5: an RA bill ages only what is due now; retention / GST TDS / cess held back wait (`raDueSplit`).
+    const held = inv.ra_deductions?.length ? raDueSplit(inv, paidByInvoice.get(inv.id) ?? [], outstanding).heldTotal : 0;
+    const dueNow = outstanding - held > 0.004;
     if (outstanding > 0.004) {
       a.bills.push({
         invoiceId: inv.id, number: inv.invoice_number,
-        issueDate: issue, dueDate: dateKey(inv.due_date) || issue,
+        issueDate: issue, dueDate: dateKey(dueOf(inv)) || issue,
         total, paid, outstanding,
-        daysOverdue: daysOverdue(inv.due_date, now),
-        bucket: agingBucket(inv.due_date, now) as AgingBucketLabel,
+        daysOverdue: dueNow ? daysOverdue(dueOf(inv), now) : 0,
+        bucket: (dueNow ? agingBucket(dueOf(inv), now) : 'Not due') as AgingBucketLabel,
+        ...(alloc > 0 ? { credited: alloc } : {}),
+        ...(held > 0 ? { held } : {}),
       });
     }
   }
@@ -462,7 +588,8 @@ export function buildReceivables(input: BuildInput, opts: BuildOptions = {}): Re
     const buckets = emptyBuckets();
     let gross = 0;
     for (const b of bills) {
-      buckets[b.bucket] = round2(buckets[b.bucket] + b.outstanding);
+      buckets[b.bucket] = round2(buckets[b.bucket] + b.outstanding - (b.held ?? 0));
+      if (b.held) buckets['Not due'] = round2(buckets['Not due'] + b.held); // R5-B5: held amounts are not overdue
       gross = round2(gross + b.outstanding);
     }
     return {
@@ -554,7 +681,7 @@ export function monthlyCollections(report: ReceivablesReport, months = 12, now: 
       if (!r) continue;
       if (e.kind === 'invoice') r.billed = round2(r.billed + e.debit);
       else if (e.kind === 'credit_note') r.credited = round2(r.credited + e.credit);
-      else if (e.kind !== 'opening') r.received = round2(r.received + e.credit);
+      else if (e.kind !== 'opening' && !e.writeOff) r.received = round2(r.received + e.credit);
     }
   }
   for (const r of rows) {
@@ -584,7 +711,8 @@ export function computeDso(report: ReceivablesReport, windowDays = 90, now: Date
     for (const e of p.entries) {
       if (e.date < start || e.date > end) continue;
       if (e.kind === 'invoice') sales += e.debit;
-      else if (e.kind === 'credit_note') sales -= e.credit;
+      // R2-A2/A3: settlement discounts and bad debts are expenses, not a reduction of credit sales.
+      else if (e.kind === 'credit_note' && !e.financial) sales -= e.credit;
     }
   }
   if (sales <= 0) return null;

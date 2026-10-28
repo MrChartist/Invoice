@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useId,
   useMemo,
@@ -9,10 +10,9 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRight, CornerDownLeft, FileText, History, Package, Search, Users, Zap } from 'lucide-react';
+import { ArrowRight, Banknote, BookOpen, Building2, CornerDownLeft, FileText, History, Package, Receipt, Search, Truck, Users, Zap } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { KEYS, getTable } from '../../lib/storage';
-import type { Client, InvoiceItem, InvoiceRecord } from '../../types/invoice';
+import { activeCompanyId, companyDbName, readRegistry, realCompanies } from '../../lib/company-registry';
 import {
   GROUP_LABELS,
   clearRecentSearches,
@@ -20,6 +20,8 @@ import {
   groupResults,
   pushRecentSearch,
   searchAll,
+  searchIndex,
+  searchPeek,
   type Range,
   type SearchGroup,
   type SearchResult,
@@ -27,6 +29,18 @@ import {
 } from '../../lib/search';
 import { formatCombo } from '../../hooks/useHotkeys';
 import { tallyDestinations } from './tally-destinations';
+import { distDestinations } from './dist-destinations';
+import { r2cDestinations } from './r2c-destinations'; // R2-C
+import { collectionsDestinations } from './collections-destinations'; // R2-A
+import { salesR2Destinations } from './sales-r2-destinations'; // R2-B
+import { r3aDestinations } from './r3a-destinations'; // R3-A
+import { serviceR3Destinations } from './service-r3-destinations'; // R3-B
+import { desksR3Destinations } from './desks-r3-destinations'; // R3-C
+import { r4aDestinations } from '../production/palette-destinations'; // R4-A
+import { sfT } from '../../i18n/areas/smart-find';
+import { getLanguage } from '../../i18n';
+import type { HelpIndexRow } from './tab-destinations';
+import { openHelp } from '../../lib/help-event';
 import styles from './CommandPalette.module.css';
 
 export interface PaletteAction {
@@ -65,7 +79,12 @@ interface Option {
   kind: 'result' | 'recent';
   result?: SearchResult;
   text?: string;
+  /** R6-B1: the heading of a lazy group (Tabs / Features / Help topics) instead of the result group's. */
+  section?: string;
 }
+
+/** "help gstr" or "? gstr" searches help topics only. */
+const HELP_QUERY = /^(?:help\s+|\?\s*)(.+)$/i;
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -97,6 +116,17 @@ function iconFor(r: SearchResult, action?: PaletteAction, nav?: PaletteNavItem):
       return <Package size={16} />;
     case 'action':
       return <Zap size={16} />;
+    case 'bill':
+      return <Receipt size={16} />;
+    case 'vendor':
+      return <Truck size={16} />;
+    case 'payment':
+    case 'cheque':
+      return <Banknote size={16} />;
+    case 'voucher':
+      return <BookOpen size={16} />;
+    case 'company':
+      return <Building2 size={16} />;
     default:
       return <ArrowRight size={16} />;
   }
@@ -114,15 +144,24 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
   const listId = `${uid}-list`;
   const optionId = (i: number) => `${uid}-opt-${i}`;
 
-  // Snapshot the data once per open — typing must not re-parse localStorage.
-  const data = useMemo(() => {
-    if (!open) return null;
-    return {
-      invoices: getTable<InvoiceRecord>(KEYS.invoices),
-      clients: getTable<Client>(KEYS.clients),
-      items: getTable<Partial<InvoiceItem>>(KEYS.items),
+  // 8.103: the SmartFind index is built once per storage version (cached in search.ts) — typing never
+  // re-parses storage. Warm it on open so the first keystroke is instant.
+  useMemo(() => (open ? searchIndex() : null), [open]);
+  // All companies (read-only peek), offered only when the device has more than one company.
+  const multiCompany = useMemo(() => open && realCompanies().length > 1, [open]); // QA7 G7: not the Demo company
+  const [allCompanies, setAllCompanies] = useState(false);
+  const [peeked, setPeeked] = useState<{ id: string; name: string; data: Parameters<typeof searchPeek>[2] }[] | null>(null);
+  const [notice, setNotice] = useState('');
+  useEffect(() => {
+    if (!allCompanies || peeked) return;
+    let live = true;
+    import('../../lib/company-peek').then((m) => m.peekOtherCompanies({ active: activeCompanyId(), list: realCompanies() }, companyDbName)).then((rows) => {
+      if (live) setPeeked(rows);
+    }).catch(() => live && setPeeked([]));
+    return () => {
+      live = false;
     };
-  }, [open]);
+  }, [allCompanies, peeked]);
 
   const pageEntries = useMemo<StaticEntry[]>(
     () =>
@@ -149,13 +188,59 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
     [actions],
   );
   // Tally-parity screens (Phase 7): searchable, not listed on the empty palette.
-  const tallyEntries = useMemo<StaticEntry[]>(() => (open ? tallyDestinations() : []), [open]);
+  const tallyEntries = useMemo<StaticEntry[]>(() => (open ? [...tallyDestinations(), ...distDestinations()] : []), [open]); // + 8F
+  // R2-C: books & output destinations (annual pack, deferrals, IMS, labels, display, package types)
+  const r2cEntries = useMemo<StaticEntry[]>(() => (open ? r2cDestinations() : []), [open]);
+  // R2-A: collections & settlement destinations (follow-ups, write-off register, payment terms, reminder schedule).
+  const r2aEntries = useMemo<StaticEntry[]>(() => (open ? collectionsDestinations() : []), [open]);
+  // R2-B: round-2 sales screens (batch invoices, backorders)
+  const r2bEntries = useMemo<StaticEntry[]>(() => (open ? salesR2Destinations() : []), [open]);
+  // R3-A: restaurant (tables, KOT register, tables settings)
+  const r3aEntries = useMemo<StaticEntry[]>(() => (open ? r3aDestinations() : []), [open]);
+  // R3-B: Projects / Retainers / work types, customers gone quiet
+  const r3bEntries = useMemo<StaticEntry[]>(() => (open ? serviceR3Destinations() : []), [open]);
+  // R3-C: compliance desks (portal files, e-Way desk, practice desk)
+  const r3cEntries = useMemo<StaticEntry[]>(() => (open ? desksR3Destinations() : []), [open]);
+  // R4-A: production orders, costing, trace & recall, QC desk, landed-cost voucher
+  const r4aEntries = useMemo<StaticEntry[]>(() => (open ? r4aDestinations() : []), [open]);
+  // R4-B: gift vouchers, transfer requests / in transit, store prices, replenishment (loaded on first open)
+  const [r4bEntries, setR4bEntries] = useState<StaticEntry[]>([]);
+  useEffect(() => {
+    if (open && !r4bEntries.length) import('../retail/palette-destinations').then((m) => setR4bEntries(m.r4bDestinations()), () => undefined);
+  }, [open, r4bEntries.length]);
+  // R4-C: export desk, import register, recently deleted, auditor pack, export everything
+  const [r4cEntries, setR4cEntries] = useState<StaticEntry[]>([]);
+  useEffect(() => {
+    if (open && !r4cEntries.length) import('../trust/palette-destinations').then((m) => setR4cEntries(m.r4cDestinations()), () => undefined);
+  }, [open, r4cEntries.length]);
+  // R5-A: the "Industry packs" group — every pack tab (rows of a pack that is off say so), loaded on first open
+  const [rawPackEntries, setPackEntries] = useState<StaticEntry[]>([]);
+  useEffect(() => {
+    if (open) import('../marketplace/palette-destinations').then((m) => setPackEntries(m.packDestinations()), () => undefined);
+  }, [open]); // re-read on every open: a pack switched on / off since shows at once
+  // R6-B1: the "Tabs" and "Features" groups (every page tab, portal terms, feature rows) and help topics (R6-A2).
+  const [disc, setDisc] = useState<typeof import('./tab-destinations') | null>(null);
+  useEffect(() => {
+    if (open && !disc) import('./tab-destinations').then(setDisc, () => undefined);
+  }, [open, disc]);
+  const packEntries = useMemo(() => (disc ? disc.withSynonyms(rawPackEntries) : rawPackEntries), [disc, rawPackEntries]);
+  const tabEntries = useMemo(() => (open && disc ? disc.tabDestinations() : []), [open, disc]); // re-read per open (shop mode)
+  const featureEntries = useMemo(() => (open && disc ? disc.featureDestinations() : []), [open, disc]);
+  const labels = useMemo(() => (disc ? disc.discoverLabels() : null), [disc, open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [helpRaw, setHelpRaw] = useState<HelpIndexRow[]>([]);
+  useEffect(() => {
+    if (open && disc && !helpRaw.length) disc.loadHelpIndex().then(setHelpRaw, () => undefined);
+  }, [open, disc, helpRaw.length]);
+  // QA7 G9: titles follow the language of each open (the raw index is loaded once).
+  const helpEntries = useMemo(() => (open && disc ? disc.helpRows(helpRaw, getLanguage()) : []), [open, disc, helpRaw]);
   const actionById = useMemo(() => new Map(actions.map((a) => [a.id, a])), [actions]);
   const navByHref = useMemo(() => new Map(navItems.map((n) => [n.to, n])), [navItems]);
 
-  const options = useMemo<Option[]>(() => {
+  // PERF-2: the input paints first; scoring 50k+ index rows follows in a deferred (interruptible) render.
+  const searchQuery = useDeferredValue(query);
+  const optionsFor = useCallback((text: string): Option[] => {
     if (!open) return [];
-    const q = query.trim();
+    const q = text.trim();
     if (!q) {
       const base: Option[] = recents.map((text) => ({ key: `recent:${text}`, kind: 'recent', text }));
       const staticRows: SearchResult[] = [
@@ -164,15 +249,31 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
       ];
       return [...base, ...staticRows.map((r) => ({ key: r.id, kind: 'result' as const, result: r }))];
     }
+    const asHelp = q.match(HELP_QUERY);
+    if (asHelp && disc && labels) {
+      // R6-B1: "help <words>" / "? <words>" — help topics only.
+      return disc.searchRows(asHelp[1], helpEntries, 8).map((r) => ({ key: r.id, kind: 'result' as const, result: r, section: labels.help }));
+    }
     const found = searchAll(q, {
-      data: { ...data, pages: [...pageEntries, ...tallyEntries], actions: actionEntries },
+      data: { pages: [...pageEntries, ...tallyEntries, ...r2aEntries, ...r2cEntries, ...r2bEntries, ...r3aEntries, ...r3bEntries, ...r3cEntries, ...r4aEntries, ...r4bEntries, ...r4cEntries, ...packEntries], actions: actionEntries },
       perGroup: 6,
     });
+    if (allCompanies && peeked) for (const c of peeked) found.push(...searchPeek(q, c, c.data));
     // Render order follows group relevance, so flatten through groupResults.
-    return groupResults(found).flatMap((g) =>
-      g.items.map((r) => ({ key: r.id, kind: 'result' as const, result: r })),
-    );
-  }, [open, query, recents, data, pageEntries, tallyEntries, actionEntries]);
+    const groups = groupResults(found).map((g) => g.items.map((r): Option => ({ key: r.id, kind: 'result', result: r })));
+    if (disc && labels) {
+      // R6-B1: Tabs rank below a document that matches better and above the other pages; Features follow.
+      const tabs = disc.searchRows(q, tabEntries).map((r): Option => ({ key: r.id, kind: 'result', result: r, section: labels.tabs }));
+      const feats = disc.searchRows(q, featureEntries, 4).map((r): Option => ({ key: r.id, kind: 'result', result: r, section: labels.features }));
+      const best = tabs[0]?.result?.score ?? 0;
+      let at = groups.findIndex((g) => ['pages', 'actions', 'companies'].includes(g[0].result!.group) || (g[0].result!.score ?? 0) < best);
+      if (at < 0) at = groups.length;
+      if (tabs.length) groups.splice(at, 0, tabs);
+      if (feats.length) groups.push(feats);
+    }
+    return groups.flat();
+  }, [open, recents, pageEntries, tallyEntries, r2aEntries, r2cEntries, r2bEntries, r3aEntries, r3bEntries, r3cEntries, r4aEntries, r4bEntries, r4cEntries, packEntries, actionEntries, allCompanies, peeked, disc, labels, tabEntries, featureEntries, helpEntries]);
+  const options = useMemo(() => optionsFor(searchQuery), [optionsFor, searchQuery]);
 
   // Reset on open; remember and restore focus.
   useEffect(() => {
@@ -208,6 +309,18 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
       }
       const r = opt.result!;
       if (query.trim()) pushRecentSearch(query);
+      if (r.company) {
+        // Read-only peek: another company's record cannot open here.
+        const name = readRegistry().list.find((c) => c.id === r.company)?.name ?? '';
+        setNotice(sfT('switchTo', { name }));
+        return;
+      }
+      if (r.href?.startsWith('help:')) {
+        // R6-B1: a help topic opens Help on it (R6-A2 handles the topic).
+        onClose();
+        setTimeout(() => openHelp(r.href!.slice(5)), 0);
+        return;
+      }
       if (r.actionId) {
         const action = actionById.get(r.actionId);
         onClose();
@@ -245,7 +358,8 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
         break;
       case 'Enter':
         e.preventDefault();
-        choose(options[clampedActive]);
+        // Typed faster than the deferred results: pick the first hit for what is in the box now.
+        choose(searchQuery === query ? options[clampedActive] : optionsFor(query)[0]);
         break;
       case 'Escape':
         e.preventDefault();
@@ -275,7 +389,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
   // Build grouped view over the flat option list (indices stay global).
   const sections: { label: string; id: string; rows: { opt: Option; index: number }[] }[] = [];
   options.forEach((opt, index) => {
-    const label = opt.kind === 'recent' ? 'Recent searches' : GROUP_LABELS[opt.result!.group];
+    const label = opt.kind === 'recent' ? 'Recent searches' : opt.section ?? GROUP_LABELS[opt.result!.group];
     const last = sections[sections.length - 1];
     if (last && last.label === label) last.rows.push({ opt, index });
     else sections.push({ label, id: `${uid}-g${sections.length}`, rows: [{ opt, index }] });
@@ -307,8 +421,8 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
             aria-controls={listId}
             aria-autocomplete="list"
             aria-activedescendant={options.length ? optionId(clampedActive) : undefined}
-            aria-label="Search invoices, clients, pages and actions"
-            placeholder="Search invoices, clients, pages, actions…"
+            aria-label="Search invoices, bills, parties, payments, amounts, pages and actions"
+            placeholder="Find anything: invoices, bills, parties, UTR, ₹12.5k, >50k…"
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
@@ -320,13 +434,20 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
           />
           <kbd className={styles.kbd}>Esc</kbd>
         </div>
+        {multiCompany && (
+          <label className={styles.emptyHint} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.25rem 1rem' }}>
+            <input type="checkbox" checked={allCompanies} onChange={(e) => setAllCompanies(e.target.checked)} /> {sfT('allCompanies')}
+          </label>
+        )}
+        {notice && <p className={styles.emptyHint} role="status" style={{ padding: '0 1rem' }}>{notice}</p>}
 
+        {!query.trim() && labels && <p className={styles.emptyHint} style={{ padding: '0.25rem 1rem' }} data-palette-try>{labels.tryHint}</p>}
         <div ref={listRef} id={listId} className={styles.list} role="listbox" aria-label="Results">
           {options.length === 0 && (
             <div className={styles.empty} role="presentation">
-              <p className={styles.emptyTitle}>No matches for “{query.trim()}”</p>
+              <p className={styles.emptyTitle}>No matches for “{searchQuery.trim()}”</p>
               <p className={styles.emptyHint}>
-                Try an invoice number like <code>0007</code>, a client name, a GSTIN or an HSN code.
+                Try an invoice number like <code>0007</code>, a party, a GSTIN / PAN / UTR, an amount like <code>12.5k</code> or <code>&gt;50k</code>.
               </p>
             </div>
           )}
@@ -394,7 +515,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
           <span><kbd className={styles.kbd}>?</kbd> shortcuts</span>
         </div>
         <div className={styles.srOnly} role="status" aria-live="polite">
-          {query.trim() ? `${options.length} result${options.length === 1 ? '' : 's'}` : ''}
+          {searchQuery.trim() ? `${options.length} result${options.length === 1 ? '' : 's'}` : ''}
         </div>
       </div>
     </div>,

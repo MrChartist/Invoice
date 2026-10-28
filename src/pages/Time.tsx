@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, createElement, lazy, useCallback, useEffect, useMemo, useState, type ComponentType } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Car, ChevronLeft, ChevronRight, Clock, Download, FileSpreadsheet, IndianRupee, Pencil, Plus, ReceiptText, Timer, Trash2 } from 'lucide-react';
 import type { MileageEntry, TimeEntry, TimePrefs } from '../types/time';
@@ -22,6 +22,7 @@ import {
   unbilledTime,
   weekGrid,
   weekStart,
+  currentCover,
 } from '../lib/timesheets';
 import { localDb } from '../lib/localDb';
 import { purchasesDb } from '../lib/purchases';
@@ -44,14 +45,69 @@ import styles from '../components/time/time.module.css';
 import { dateLocale, useT } from '../i18n';
 import { timeT } from '../i18n/areas/time';
 import { areaNodes } from '../i18n/areas/nodes';
+import { svcT } from '../i18n/areas/service-r3'; // R3-B
+import { WorkTypesCard } from '../components/time/WorkTypesCard';
+import { visiblePackTabs, type PackId } from '../lib/industry-packs'; // R5-B; R10: tabs shared by packs (`alsoPacks`)
+import { defineArea } from '../i18n/area';
+import { TIME_TABS, type TimeTab } from './page-tabs'; // R6-B1
 
-type Tab = 'timesheet' | 'mileage' | 'billing' | 'settings';
-const TABS: { id: Tab; label: () => string }[] = [
-  { id: 'timesheet', label: () => timeT('tabTimesheet') },
-  { id: 'mileage', label: () => timeT('tabMileage') },
-  { id: 'billing', label: () => timeT('tabUnbilled') },
-  { id: 'settings', label: () => timeT('tabSettings') },
-];
+// R3-B2 / B3: the projects board and retainers are their own lazy tab chunks.
+const ProjectsBoard = lazy(() => import('../components/time/ProjectsBoard'));
+const RetainersTab = lazy(() => import('../components/time/RetainersTab'));
+// R5-B: works-contract pack (BOQ, RA bills, retention, sites, GST TDS credit) — listed only with the pack on.
+const WorksTab = lazy(() => import('../components/works/WorksTab'));
+const wkT = defineArea({ tab: 'Works' } as const, { tab: 'वर्क्स' });
+// R10: service desks — each a lazy chunk; a package that has not merged yet shows `R10Stub` (one line, replaced by it).
+const FrontDesk = lazy(() => import('../components/services-r10/FrontDesk')); // SV-A2 / A3 (appointments, commission)
+const WorkshopDesk = lazy(() => import('../components/services-r10/WorkshopDesk')); // SV-D (mounts SV-A5's claims view)
+const ClinicDesk = lazy(() => import('../components/services-r10/ClinicDesk')); // SV-B clinic desk
+const MembersDesk = lazy(() => import('../components/services-r10/MembersDesk')); // SV-C members, packages, check-in, classes, recipes
+const r10T = defineArea(
+  { appointments: 'Appointments', commission: 'Staff & commission', clinic: 'Clinic', members: 'Members', workshop: 'Workshop' } as const,
+  { appointments: 'अपॉइंटमेंट', commission: 'स्टाफ और कमीशन', clinic: 'क्लिनिक', members: 'सदस्य', workshop: 'वर्कशॉप' },
+);
+
+// R14: the six professional desks (PS-A matters / wip, PS-B clientmoney, PS-C exportsvc, PS-D firm / cadesk), one lazy chunk
+// each. A desk whose package has not merged has no file and no TIME_TABS row, so it is never mounted (no stubs).
+const PS_DESK_FILES = import.meta.glob<{ default: ComponentType<{ view?: string; notify: (m: string, tone?: 'success' | 'error' | 'info') => void }> }>('../components/prof/*Desk.tsx');
+const PS_DESK_OF: Record<string, string> = { matters: 'MattersDesk', wip: 'WipDesk', clientmoney: 'ClientMoneyDesk', exportsvc: 'ExportSvcDesk', firm: 'FirmDesk', cadesk: 'CaDesk' };
+const PS_DESKS = new Map(Object.entries(PS_DESK_OF).flatMap(([tab, file]) => {
+  const load = PS_DESK_FILES[`../components/prof/${file}.tsx`];
+  return load ? [[tab, lazy(load)] as const] : [];
+}));
+const r14T = defineArea({ matters: 'Matters', wip: 'WIP & billing', firm: 'Firm', cadesk: 'CA desk', clientmoney: 'Client money', exportsvc: 'Exports of services' } as const, { matters: 'मामले', wip: 'अबिल्ड कार्य और बिलिंग', firm: 'फ़र्म', cadesk: 'CA डेस्क', clientmoney: 'क्लाइंट का पैसा', exportsvc: 'सेवाओं का निर्यात' });
+
+// R15: the Trips desk (B: trips / bookings; C / D add views), one lazy chunk, mounted by file name like the R14 desks.
+const TV_DESK_FILES = import.meta.glob<{ default: ComponentType<{ view?: string; notify: (m: string, tone?: 'success' | 'error' | 'info') => void }> }>('../components/travel/*Desk.tsx');
+const TV_DESK_LOAD = TV_DESK_FILES['../components/travel/TripsDesk.tsx'];
+const TripsDesk = TV_DESK_LOAD ? lazy(TV_DESK_LOAD) : null;
+const r15T = defineArea({ trips: 'Trips' } as const, { trips: 'यात्रा फ़ाइलें' });
+
+// R17: the Deploy desk (A: sites; B–D add views), one lazy chunk, mounted by file name like the R14 / R15 desks.
+const MP_DESK_FILES = import.meta.glob<{ default: ComponentType<{ view?: string; notify: (m: string, tone?: 'success' | 'error' | 'info') => void }> }>('../components/manpower/*Desk.tsx');
+const MP_DESK_LOAD = MP_DESK_FILES['../components/manpower/DeployDesk.tsx'];
+const DeployDesk = MP_DESK_LOAD ? lazy(MP_DESK_LOAD) : null;
+const r17T = defineArea({ deploy: 'Deploy' } as const, { deploy: 'तैनाती' });
+
+type Tab = TimeTab;
+// R6-B1: the ids (and packs) live in time-tabs.ts; the labels stay here.
+const TAB_LABEL: Record<Tab, () => string> = {
+  timesheet: () => timeT('tabTimesheet'),
+  mileage: () => timeT('tabMileage'),
+  billing: () => timeT('tabUnbilled'),
+  projects: () => svcT('tabProjects'),
+  retainers: () => svcT('tabRetainers'),
+  settings: () => timeT('tabSettings'),
+  works: () => wkT('tab'), // R5-B
+  appointments: () => r10T('appointments'), commission: () => r10T('commission'), clinic: () => r10T('clinic'), members: () => r10T('members'), workshop: () => r10T('workshop'), // R10
+  matters: () => r14T('matters'), wip: () => r14T('wip'), // R14 (PS-A); B / C / D add their labels
+  firm: () => r14T('firm'), cadesk: () => r14T('cadesk'), // R14 (PS-D)
+  clientmoney: () => r14T('clientmoney'), // R14 (PS-B)
+  exportsvc: () => r14T('exportsvc'), // R14 (PS-C)
+  trips: () => r15T('trips'), // R15
+  deploy: () => r17T('deploy'), // R17
+};
+const TABS: { id: Tab; label: () => string; pack?: PackId; alsoPacks?: readonly PackId[] }[] = TIME_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 /** Weekday column head: English as before, Hindi weekday names for a Hindi interface. */
 const dayName = (ymd: string, i: number, lang: string) =>
@@ -84,7 +140,7 @@ export function Time() {
   const [editEntry, setEditEntry] = useState<TimeEntry | null | undefined>(undefined);
   const [editTrip, setEditTrip] = useState<MileageEntry | null | undefined>(undefined);
   const [confirm, setConfirm] = useState<{ kind: 'entry' | 'trip'; id: string } | null>(null);
-  const [billTarget, setBillTarget] = useState<{ key: string; name: string } | null>(null);
+  const [billTarget, setBillTarget] = useState<{ key: string; name: string; projectId?: string } | null>(null);
 
   const reload = useCallback(() => {
     setEntries(timeDb.all());
@@ -104,6 +160,8 @@ export function Time() {
   const numbers = useMemo(() => new Map(invoices.map((i) => [i.id, i.invoice_number])), [invoices]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const purchases = useMemo(() => purchasesDb.all(), [tick]);
+  // R3-B3: minutes covered by a retainer are not unbilled.
+  const cover = useMemo(() => currentCover(prefs, entries, invoices), [prefs, entries, invoices]);
 
   const grid = useMemo(() => weekGrid(entries, week), [entries, week]);
   const weekEntries = useMemo(
@@ -118,7 +176,7 @@ export function Time() {
       map.set(key, r);
       return r;
     };
-    for (const e of unbilledTime(entries, live)) {
+    for (const e of unbilledTime(entries, live, cover, prefs)) {
       const r = row(clientKey(e), e.client_name);
       r.minutes += e.minutes;
       r.time = round2(r.time + entryAmount(e, prefs));
@@ -135,7 +193,7 @@ export function Time() {
       r.expenses = round2(r.expenses + expenseLine(p, prefs).amount);
     }
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [entries, trips, purchases, live, prefs]);
+  }, [entries, trips, purchases, live, prefs, cover, lang]);
 
   const stats = useMemo(() => {
     const amount = unbilled.reduce((s, u) => s + u.time + u.expenses + u.mileage, 0);
@@ -154,6 +212,7 @@ export function Time() {
     if (by) {
       return <Link to={`/invoice/${by}`} className={cn(surface.badge, surface.badgePaid)}>{timeT('billed', { number: numbers.get(by) ?? '' })}</Link>;
     }
+    if (cover?.covered.has(row.id)) return <span className={cn(surface.badge, surface.badgeSent)}>{svcT('coveredBadge')}</span>;
     return <span className={cn(surface.badge, surface.badgeDraft)}>{timeT('unbilled')}</span>;
   };
 
@@ -219,7 +278,7 @@ export function Time() {
       </div>
 
       <div className={controls.segment} role="tablist" aria-label={timeT('sections')}>
-        {TABS.map((t) => (
+        {visiblePackTabs(TABS, localDb.settings.get(), tab).map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
             className={tab === t.id ? controls.segmentBtnActive : controls.segmentBtn}
             onClick={() => setParams(t.id === 'timesheet' ? {} : { tab: t.id }, { replace: true })}>
@@ -370,6 +429,39 @@ export function Time() {
         </section>
       )}
 
+      {tab === 'projects' && (
+        <Suspense fallback={null}>
+          <ProjectsBoard
+            clients={clients}
+            prefs={prefs}
+            entries={entries}
+            invoices={invoices}
+            projectId={params.get('project') ?? undefined}
+            onSelect={(id) => setParams(id ? { tab: 'projects', project: id } : { tab: 'projects' }, { replace: true })}
+            onBill={(target) => setBillTarget(target)}
+            notify={notify}
+            onChanged={reload}
+          />
+        </Suspense>
+      )}
+
+      {tab === 'retainers' && (
+        <Suspense fallback={null}>
+          <RetainersTab clients={clients} prefs={prefs} entries={entries} invoices={invoices} notify={notify} onChanged={reload} />
+        </Suspense>
+      )}
+
+      {tab === 'settings' && <WorkTypesCard notify={notify} />}
+      {tab === 'works' && <Suspense fallback={null}><WorksTab notify={notify} /></Suspense>}
+      {/* R10: service desks (lazy) */}
+      {(tab === 'appointments' || tab === 'commission') && <Suspense fallback={null}><FrontDesk tab={tab} view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
+      {tab === 'workshop' && <Suspense fallback={null}><WorkshopDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
+      {tab === 'clinic' && <Suspense fallback={null}><ClinicDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
+      {tab === 'members' && <Suspense fallback={null}><MembersDesk notify={notify} /></Suspense>}
+      {PS_DESKS.has(tab) && <Suspense fallback={null}><PsDesk tab={tab} view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
+      {tab === 'trips' && TripsDesk && <Suspense fallback={null}><TripsDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
+      {tab === 'deploy' && DeployDesk && <Suspense fallback={null}><DeployDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
+
       {tab === 'settings' && (
         <section className={cn(surface.card, styles.prefs)}>
           <fieldset disabled={!canPrefs} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
@@ -442,4 +534,10 @@ export function Time() {
       {toastNode}
     </div>
   );
+}
+
+/** R14: mounts the professional desk of `tab` (lazy). */
+function PsDesk({ tab, view, notify }: { tab: string; view?: string; notify: (m: string, tone?: 'success' | 'error' | 'info') => void }) {
+  const Desk = PS_DESKS.get(tab);
+  return Desk ? createElement(Desk, { view, notify }) : null;
 }
