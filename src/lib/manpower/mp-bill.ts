@@ -105,14 +105,20 @@ export function billPlans(i: PlanInput): BillPlan[] {
     const lines = g.flatMap(({ site, m }) => site.mp.posts.flatMap((p) => postLines(site, p, m, i.settings, i.newId, grouped)));
     for (const [, part] of Object.entries(splitPosts(lines, ctx))) {
       if (!part?.length) continue;
-      const items: InvoiceItem[] = part.map((l) => ({ id: l.id, name: l.name, hsn: l.hsn, unit: l.unit, quantity: l.quantity, rate: l.rate, amount: l.amount, type: 'Service', discount_percent: 0, tax_rate: 0 }));
-      const pct = Number(i.settings.service_charge_pct) || 0;
-      const base = round2(part.reduce((t, l) => t + l.amount, 0));
-      if (pct > 0) {
-        const amt = round2((base * pct) / 100);
-        items.push({ id: i.newId(), name: `Service charge ${pct} %`, hsn: part[0].hsn, unit: 'NOS', quantity: 1, rate: amt, amount: amt, type: 'Service', discount_percent: 0, tax_rate: 0 });
-      }
       const ms = g.filter(({ site }) => part.some((l) => l.site.id === site.id));
+      // QA20 V3: a bill of several sites carries each line's site (`InvoiceItem.cost_centre_id`, 6.16) and one
+      // service-charge line per site, so the books' cost-centre P&L and the site P&L both see every rupee.
+      const multi = ms.length > 1;
+      const cc = (siteId: string) => (multi ? { cost_centre_id: siteId } : {});
+      const items: InvoiceItem[] = part.map((l) => ({ id: l.id, name: l.name, hsn: l.hsn, unit: l.unit, quantity: l.quantity, rate: l.rate, amount: l.amount, type: 'Service', discount_percent: 0, tax_rate: 0, ...cc(l.site.id) }));
+      const pct = Number(i.settings.service_charge_pct) || 0;
+      if (pct > 0) {
+        for (const { site } of multi ? ms : [{ site: part[0].site }]) {
+          const mine = multi ? part.filter((l) => l.site.id === site.id) : part;
+          const amt = round2((round2(mine.reduce((t, l) => t + l.amount, 0)) * pct) / 100);
+          if (amt > 0) items.push({ id: i.newId(), name: `Service charge ${pct} %${multi ? ` — ${site.mp.code}` : ''}`, hsn: mine[0].hsn, unit: 'NOS', quantity: 1, rate: amt, amount: amt, type: 'Service', discount_percent: 0, tax_rate: 0, ...cc(site.id) });
+        }
+      }
       const byPost = new Map<string, MpPostRow>();
       for (const l of part) {
         const k = `${l.site.id}|${l.post.id}`;

@@ -10,6 +10,8 @@ import { requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
 import { MP_TABLES } from './mp-shared';
 import { MONTH_RE, loadMusters, monthEnd, musterOf, validateRows } from './mp-muster';
+import { billsOf } from './mp-bill';
+import type { InvoiceRecord } from '../../types/invoice';
 
 const clean = (r: MusterRow): MusterRow => {
   const o: MusterRow = { employee_id: r.employee_id, post_id: r.post_id, duties: Number(r.duties) || 0 };
@@ -45,6 +47,13 @@ export function setMusterLock(id: string, lock: boolean): SiteMuster {
   const m = all.find((x) => x.id === id);
   if (!m) throw new Error('This muster is no longer on the list.');
   lockGuard(m);
+  if (!lock && m.status === 'locked') {
+    // QA20 V7: a locked muster is the source of a final payroll run and of its bills; reopening it would change
+    // duties under both without a trace (the bill stays "billed", the run keeps the old attendance).
+    if (getTable<{ month?: string; status?: string }>('payroll_runs').some((r) => r?.month === m.month && r.status === 'final')) throw new Error(`Payroll for ${m.month} is finalized; reopen it before unlocking this muster.`);
+    const bills = billsOf(getTable<InvoiceRecord>('invoices'), m.id);
+    if (bills.length) throw new Error(`This muster is billed (${bills.map((b) => b.invoice_number || 'draft').join(', ')}): cancel the bill, or raise a credit / debit note for the difference.`);
+  }
   const { locked_at: _l, ...rest } = m;
   void _l;
   const row: SiteMuster = lock ? { ...m, status: 'locked', locked_at: new Date().toISOString() } : { ...rest, status: 'draft' };

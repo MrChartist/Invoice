@@ -6,6 +6,7 @@
  * client's own 194J before 1 Apr 2026 is accepted (MP15). The GST TDS u/s 51 hint for a Government client registered
  * only for TDS (`GST_TDS_51_RULES`), never on a reverse-charge bill (MP13). Working papers — verify with your CA.
  */
+import { mbT } from '../../i18n/areas/manpower-r17b';
 import type { Client, InvoiceRecord } from '../../types/invoice';
 import type { MpRegime, MpSnapshot } from '../../types/manpower-r17';
 import type { EntityType } from '../../types/books-r2';
@@ -28,5 +29,5 @@ export function clientTds(client: Pick<Client, 'id' | 'name' | 'mp'>, date: stri
 export function gstTdsHint(client: Pick<Client, 'mp'> | undefined, regime: MpRegime | undefined, taxable: number, date: string): string {
   const r = ruleAt(GST_TDS_51_RULES, date);
   if (!r || !client?.mp?.gst_tds_only || regime === 'rcm' || taxable <= r.threshold) return '';
-  return `GST TDS u/s 51 expected at ${r.rate} % (contract value above ₹${r.threshold.toLocaleString('en-IN')}) — verify with your CA (MP13).`;
+  return mbT('gstTds', { r: r.rate, t: r.threshold.toLocaleString('en-IN') });
 }

@@ -34,7 +34,8 @@ test('engines import only first-paint / family modules; bridges are exactly mp-*
   for (const f of LIB.filter((x) => !bridges.includes(x))) {
     for (const m of src(`lib/manpower/${f}`).matchAll(/^import (?!type )[^'\n]*'([^']+)'/gm)) {
       const p = m[1];
-      const ok = /^\.\/mp-[a-z-]+$/.test(p) ? !p.endsWith('-io') : FIXED.includes(p.replace(/^\.\.\//, ''));
+      // QA20 V8: a Round 17 string area (in the family chunk) may be read by an engine that builds on-screen text.
+      const ok = /^\.\/mp-[a-z-]+$/.test(p) ? !p.endsWith('-io') : /^\.\.\/\.\.\/i18n\/areas\/manpower-r17[a-d]$/.test(p) || FIXED.includes(p.replace(/^\.\.\//, ''));
       assert.ok(ok, `${f} imports ${p}`);
     }
   }

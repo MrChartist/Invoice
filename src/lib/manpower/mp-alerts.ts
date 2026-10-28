@@ -6,6 +6,7 @@
  * (`CostCentre.mp.contract.to`), at `VDA_REVISION_RULES.alert_days` (60 / 30 / 7) before the date (expired = critical);
  * and the VDA month reminder (April / October) when no revision from that month is typed. Working papers (MP43).
  */
+import { mdT } from '../../i18n/areas/manpower-r17d';
 import type { AppNotification, NotificationContext } from '../notifications';
 import type { ManpowerSettings, MpLicence } from '../../types/manpower-r17';
 import type { Site } from './mp-sites';
@@ -31,15 +32,15 @@ export function mpAlerts(i: MpAlertInput): MpAlert[] {
     const left = dayNo(till) - dayNo(i.today);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(till) || left > max) return;
     const step = r.alert_days.filter((d) => left <= d).sort((a, b) => a - b)[0] ?? 0;
-    out.push({ id: `mp:${id}:${till}:${left < 0 ? 'x' : step}`, severity: left < 0 || left <= Math.min(...r.alert_days) ? 'critical' : left <= 30 ? 'warning' : 'info', title: `${what} ${left < 0 ? 'expired' : 'expires'} ${till}`, detail: left < 0 ? 'Renew it now.' : `${left} days left: start the renewal.`, href: HREF, cta: 'Open' });
+    out.push({ id: `mp:${id}:${till}:${left < 0 ? 'x' : step}`, severity: left < 0 || left <= Math.min(...r.alert_days) ? 'critical' : left <= 30 ? 'warning' : 'info', title: mdT(left < 0 ? 'a.expd' : 'a.exp', { w: what, d: till }), detail: left < 0 ? mdT('a.renew') : mdT('a.left', { n: left }), href: HREF, cta: mdT('a.open') });
   };
-  const lic = (l: MpLicence) => `${l.kind === 'psara' ? 'PSARA' : l.kind.toUpperCase()} licence ${l.no}${l.state ? ` (${l.state})` : ''}`;
+  const lic = (l: MpLicence) => `${mdT('a.lic', { k: l.kind === 'psara' ? 'PSARA' : l.kind.toUpperCase(), no: l.no })}${l.state ? ` (${l.state})` : ''}`;
   for (const l of i.settings.licences ?? []) if (l.kind !== 'psara' || i.packs.includes('security')) due(`lic:${l.id}`, lic(l), l.valid_till);
-  for (const g of i.guards) if (g.mp?.guard_licence?.valid_till) due(`guard:${g.id}`, `Guard licence of ${g.name}`, g.mp.guard_licence.valid_till);
-  for (const s of i.sites) if (s.mp.status !== 'closed' && s.mp.contract?.to) due(`site:${s.id}`, `Contract of ${s.mp.code} ${s.name}`, s.mp.contract.to);
+  for (const g of i.guards) if (g.mp?.guard_licence?.valid_till) due(`guard:${g.id}`, mdT('a.guard', { n: g.name }), g.mp.guard_licence.valid_till);
+  for (const s of i.sites) if (s.mp.status !== 'closed' && s.mp.contract?.to) due(`site:${s.id}`, mdT('a.site', { c: s.mp.code, n: s.name }), s.mp.contract.to);
   const month = i.today.slice(0, 7);
   if (r.months.includes(Number(month.slice(5))) && !(i.settings.wage_revisions ?? []).some((w) => w.from.startsWith(month))) {
-    out.push({ id: `mp:vda:${month}`, severity: 'info', title: 'Minimum wage / VDA revision month', detail: 'Type the revision that applies to your posts when it is notified; arrears follow from it.', href: '/time?tab=deploy&view=compliance', cta: 'Open' });
+    out.push({ id: `mp:vda:${month}`, severity: 'info', title: mdT('a.vda'), detail: mdT('a.vdaD'), href: '/time?tab=deploy&view=compliance', cta: mdT('a.open') });
   }
   return out;
 }

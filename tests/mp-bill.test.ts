@@ -59,7 +59,7 @@ test('plans: drafts skipped, grouping by client + bill group, the regime split, 
   const m = (s: string, status: SiteMuster['status'] = 'locked'): SiteMuster => ({ id: `m-${s}`, site_id: s, month: '2026-10', date: '', status, updated_at: '', rows: [{ employee_id: 'x', post_id: 'g', duties: 31 }, { employee_id: 'y', post_id: 'h', duties: 31 }] });
   const plans = billPlans({ month: '2026-10', sites, musters: [m('a'), m('b'), m('d', 'draft')], settings: { service_charge_pct: 10 }, clients: [{ id: 'c', gstin: '27AAACB2230M1ZX'.slice(0, 15) }], entityType: 'proprietorship', staff: [{ id: 'x', code: 'G1', name: 'Ram' }], newId: id });
   assert.deepEqual(plans.map((p) => [p.regime.regime, p.sites.map((s) => s.id), p.items.map((i) => i.amount)]), [
-    ['rcm', ['a', 'b'], [24800, 24800, 4960]],
+    ['rcm', ['a', 'b'], [24800, 24800, 2480, 2480]], // QA20 V3: one service-charge line per site on a bill of several sites
     ['fwd', ['a'], [18600, 1860]],
   ]);
   assert.match(plans[0].items[0].name, /^S-A Tower A — Guard/);

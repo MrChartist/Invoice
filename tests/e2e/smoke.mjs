@@ -5716,7 +5716,9 @@ try {
     check(links.some((l) => l.from_id === 'e2e-mpd-i1' && l.to_id === dn?.id && l.relation === 'debit_note'), 'linked to the October bill (doc_links)');
     await sv.locator('[data-mp-arr-raised]').first().waitFor({ timeout: 15000 });
     check(await sv.locator('[data-mp-arr-make]').count() === 0, 're-running shows the note raised (no second "Make")');
-    check(/1,286/.test(await sv.locator('[data-mp-tds-exp="E2E-D Sunrise Developers"]').first().innerText()), 'TDS receivable: Sunrise Q3 expected ₹1,286 (+ the note\'s share)');
+    // QA20 V6: the note is dated no earlier than its bill (31 Oct) and carries its own 1 % (₹39.78): 1,286 + 39.78.
+    check(dn?.issue_date >= '2026-10-31', `the note never predates its bill (${dn?.issue_date})`);
+    check(/1,325\.78/.test(await sv.locator('[data-mp-tds-exp="E2E-D Sunrise Developers"]').first().innerText()), 'TDS receivable: Sunrise Q3 expected ₹1,325.78 (the bill ₹1,286 + the note\'s ₹39.78)');
     await sv.locator('[data-mp-st="kind"]').selectOption('psara');
     await sv.locator('[data-mp-st="state"]').fill('MH');
     await sv.locator('[data-mp-st="no"]').fill('PSARA/E2E/7');
