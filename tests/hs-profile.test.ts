@@ -66,9 +66,9 @@ test('checklist steps only with society_kind; facts from the data', () => {
   const f: ChecklistFactsV3 = { profileReady: true, clients: 1, items: 1, invoices: 1, messagesSent: 1, payments: 1 };
   const steps = (societyKind?: string) => allSteps(f, { businessType: 'nonprofit', packs: ['society'], modules: null, role: 'owner', ...(societyKind ? { societyKind } : {}) } as ChecklistCtx).map((s) => s.kind).filter((k) => k.startsWith('society'));
   assert.deepEqual(steps(), []);
-  assert.deepEqual(steps('chs'), ['societyUnits', 'societyTariff']);
+  assert.deepEqual(steps('chs'), ['societyUnits', 'societyTariff', 'societyRun']); // R18-B: societyRun
   assert.equal(readChecklistInputs().facts.society, undefined);
   localDb.settings.save({ ...localDb.settings.get(), ...applySocietyKind('chs') });
   setTable('society_units', [{ id: 'u', code: 'A-101', use: 'residential', occupancy: 'owner', parking: [], status: 'active', updated_at: '' }]);
-  assert.deepEqual(readChecklistInputs().facts.society, { societyUnits: 1, societyTariff: 0 });
+  assert.deepEqual(readChecklistInputs().facts.society, { societyUnits: 1, societyTariff: 0, societyRun: 0 });
 });

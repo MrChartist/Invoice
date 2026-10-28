@@ -405,6 +405,17 @@ registerRestoreHook('invoices', (row, e, live) => {
 for (const t of ['site_musters', 'site_compliance']) {
   registerRestoreHook(t, (row, e, live) => (!isLive(live, 'cost_centres', str(row.site_id)) ? { refuse: 'The site of this row is gone. Restore the site first.' } : live(t).some((x) => str(x?.id) !== e.row_id && str(x?.site_id) === str(row.site_id) && str(x?.month) === str(row.month)) ? { refuse: `The site already has a row for ${str(row.month)}; restoring this one would make two.` } : null));
 }
+// R18-B: a society bill comes back only while no live bill holds the same unit × period × kind (the period was billed
+// again since); a run row only while no live run holds its period / levy.
+const hsKey = (r: unknown): string => {
+  const h = isObj(r) && isObj(r.hs) ? r.hs : undefined;
+  if (!h || !isObj(h.unit) || str((r as Row).status) === 'Cancelled' || /NOTE$/.test(str((r as Row).doc_type))) return '';
+  const heads = Array.isArray(h.heads) ? h.heads : [];
+  const kind = isObj(h.levy) ? `levy:${str(h.levy.name)}` : str(h.regime) === 'outsider' || (heads.length > 0 && heads.every((x) => isObj(x) && x.kind === 'outsider')) ? 'outsider' : 'main';
+  return `${str(h.unit.id)}|${str(h.period)}|${kind}`;
+};
+registerRestoreHook('invoices', (row, e, live) => { const k = hsKey(row); return k && live('invoices').some((x) => str(x?.id) !== e.row_id && hsKey(x) === k) ? { refuse: 'This unit was billed again for the period since; restoring this bill would bill it twice. Cancel the new bill first.' } : null; });
+registerRestoreHook('society_runs', (row, e, live) => (!row.undone && live('society_runs').some((r) => str(r?.id) !== e.row_id && !r?.undone && str(r?.period) === str(row.period) && str(isObj(r?.levy) ? r.levy.name : '') === str(isObj(row.levy) ? row.levy.name : '')) ? { refuse: 'This period was run again since; restoring this run would list it twice.' } : null));
 // R14 (PS-A): an engagement comes back only while its client lives (its ENG number stays reserved, never reused).
 // R14 PS-C: an EDF row restores only while no live row covers the same month, kind and currency (the builder re-ran).
 registerRestoreHook('edf_register', (row, _e, live) => (live('edf_register').some((r) => str(r?.period) === str(row.period) && str(r?.kind) === str(row.kind) && str(r?.currency) === str(row.currency)) ? { refuse: `The EDF register already has ${str(row.period)} ${str(row.kind)} ${str(row.currency)}. Delete that row first.` } : null));

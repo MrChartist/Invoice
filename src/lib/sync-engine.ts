@@ -476,6 +476,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}site_musters`]: 'date',
   // R17-C: site compliance proof (the month's last day)
   [`${DB_PREFIX}site_compliance`]: 'date',
+  // R18-B: society billing runs (the bill date)
+  [`${DB_PREFIX}society_runs`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;

@@ -293,6 +293,7 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   // R18-A
   society_settings: 'Society settings: State, cycle, heads (R18).',
   society_units: 'Society units, owners and tenants (R18).',
+  society_runs: 'Society billing runs: period, bill / due date, batch, units, counts by document type, totals by charge head, special levy, undone (R18).',
   travel_bookings: 'Travel bookings: trip / event file (cost centre), component, supplier, PNR / ref., dates, cost (currency, rate), sell, pure agent, status, supplier bill, invoice line once billed (R15).',
   // R15-C
   supplier_statements: 'Supplier statements (BSP / consolidator / bed-bank): supplier, kind, period, ref., rows (document no., type, date, passenger, gross, taxes, commission, net, match, status, ADM / refund flag), totals, bill and commission invoice made (R15).',

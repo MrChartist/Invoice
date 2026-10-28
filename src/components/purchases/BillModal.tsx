@@ -43,6 +43,7 @@ const RcmGoodsNotice = lazy(() => import('../trade/RcmGoodsNotice'));
 const MediaRows = lazy(() => import('../prof/MediaRows')); // R14 (PS-B5): media buy for a client (`media` pack)
 const TripPick = lazy(() => import('../travel/TripPick')); // R15-B2 / B3: the trip of a supplier bill (`travel` / `events` packs)
 const SitePick = lazy(() => import('../manpower/SitePick')); // R17-C2: the site of a supplier bill (`manpower` / `security` packs)
+const HsRcmHint = lazy(() => import('../society/parts/RcmHint')); // R18-B3: inward RCM on security services (`society` pack)
 // R8-A (TR-A1): supplier's special rate and last purchase rate, as hints (trade discounts or a trading pack, lazy).
 const BillRateHints = lazy(() => import('../trade/BillRateHints'));
 // R8-B (TR-B1/B2/B3): bags / weight rows, bill charges and the broker (commodity / agency pack, lazy).
@@ -173,6 +174,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const [mpB, setMpB] = useState(purchase?.mp); // R17-C2
   const [manpowerOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.some((p) => p === 'manpower' || p === 'security'))(localDb.settings.get() as never));
   const [travelOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.some((p) => p === 'travel' || p === 'events'))(localDb.settings.get() as never));
+  const [societyOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('society'))(localDb.settings.get() as never)); // R18-B3
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   // TDS deducted by us (Tally parity). Undefined rate / base / amount follow the suggestion.
@@ -502,6 +504,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       <BillableFields idPrefix="bill" value={billable} onChange={setBillable} rebilledIn={purchase?.rebilled_in} />
       {(mediaOn || !!psB?.media) && <Suspense fallback={null}><MediaRows ps={psB} onChange={setPsB} /></Suspense>}
       {(travelOn || !!tvB) && <Suspense fallback={null}><TripPick value={tvB} onChange={setTvB} itc={itc} setItc={setItc} /></Suspense>}
+      {societyOn && !importType && <Suspense fallback={null}><HsRcmHint lines={lines} vendor={vendor} date={date} rcm={rcm} /></Suspense>}
       {(manpowerOn || !!mpB) && <Suspense fallback={null}><SitePick value={mpB} onChange={setMpB} /></Suspense>}
 
       <AttachmentsPanel value={attachments} onChange={setAttachments} label={purT('attachments')} />

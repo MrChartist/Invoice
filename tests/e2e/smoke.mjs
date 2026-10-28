@@ -5813,6 +5813,66 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R18-B society billing run: seed MH society (registered) with A-101 / A-102 (let out) / A-901 → GST view turnover T1 → Bills → Run 2026-10 (bill 1 Oct, due 20 Oct) → one run, 3 bills → reload; A-101 Bill of Supply ₹6,710 with the Sl. 77(c) sentence and property tax as a pure-agent line; A-901 tax invoice GST ₹1,621.80, ₹13,631.80, Circular 109 sentence; run again → "Already billed: 3", no new bill; GST view turnover T1 + ₹20,330 (pass-through ₹5,400 out)', async () => {
+    const keys = ['settings', 'clients', 'society_units', 'society_settings', 'society_runs', 'invoices', 'batch_runs'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const st = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...st, business_type: 'nonprofit', society_kind: 'chs', industry_packs: ['society'], modules: undefined, service_kind: undefined, manpower_kind: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined, profiles: (st.profiles ?? []).map((p) => (p.id === st.activeProfileId ? { ...p, companyGstin: '27AAPFU0939F1ZV', stateCode: '27', gst_scheme: 'regular' } : p)) });
+    const owners = [['e2e-hsb-c1', 'E2E Hsb Asha'], ['e2e-hsb-c2', 'E2E Hsb Ravi'], ['e2e-hsb-c3', 'E2E Hsb Meena']].map(([id, name]) => ({ id, name, email: '', address: '', city: '', zip: '' }));
+    await writeJson(page, 'clients', [...(prev.clients ?? []), ...owners]);
+    const unit = (id, code, owner, o = {}) => ({ id, code, wing: 'A', use: 'residential', occupancy: 'owner', carpet_area: 600, construction_cost: 2400000, parking: [{ slot: `P${id}`, kind: 'covered' }], owner_id: owner, typed: { ptx: 1200 }, status: 'active', updated_at: '2026-10-01T00:00:00.000Z', ...o });
+    await writeJson(page, 'society_units', [unit('e2e-hsb-u1', 'A-101', 'e2e-hsb-c1'), unit('e2e-hsb-u2', 'A-102', 'e2e-hsb-c2', { occupancy: 'tenant' }), unit('e2e-hsb-u3', 'A-901', 'e2e-hsb-c3', { carpet_area: 1500, construction_cost: 6000000, parking: [{ slot: 'P1', kind: 'covered' }, { slot: 'P2', kind: 'covered' }], typed: { ptx: 3000 } })]);
+    const H = (id, kind, basis, rate) => ({ id, name: { svc: 'Service charges', snk: 'Sinking fund', rep: 'Repair fund', ptx: 'Property tax', prk: 'Parking', noc: 'Non-occupancy', edu: 'Education' }[id], kind, basis, rate, active: true, ...(kind === 'statutory' ? {} : { sac: '999598' }) });
+    await writeJson(page, 'society_settings', { state: '27', cycle: 'monthly', bill_day: 1, due_days: 19, area_unit: 'sqft', heads: [H('svc', 'service', 'per_unit', 3000), H('snk', 'sinking', 'cost_pct_pa', 0.25), H('rep', 'repair', 'cost_pct_pa', 0.75), H('ptx', 'statutory', 'typed', 0), H('prk', 'parking', 'per_slot', 500), H('noc', 'non_occupancy', 'pct_of_head', 10), H('edu', 'education', 'fixed_member', 10)] });
+    await writeJson(page, 'society_runs', []);
+    await readJson(page, 'society_settings', null, (v) => v?.heads?.length === 7, 15000);
+    await readJson(page, 'settings', {}, (v) => v.society_kind === 'chs', 15000);
+    await page.goto(srv.origin + '/recurring?tab=society&view=gst');
+    await page.locator('[data-hs-gst]').waitFor({ timeout: 15000 });
+    const t1 = Number(await page.locator('[data-hs-gst]').getAttribute('data-hs-turnover'));
+    await page.goto(srv.origin + '/recurring?tab=society&view=bills');
+    const bv = page.locator('[data-hs-bills]');
+    await bv.waitFor({ timeout: 15000 });
+    await bv.locator('[data-hs-run-period]').fill('2026-10');
+    await bv.locator('[data-hs-bill-date]').fill('2026-10-01');
+    await bv.locator('[data-hs-due]').fill('2026-10-20');
+    await bv.locator('[data-hs-planned="3"]').waitFor({ timeout: 15000 });
+    await bv.locator('[data-hs-run]').click();
+    const mine = (v) => (v ?? []).filter((i) => String(i.hs?.unit?.id ?? '').startsWith('e2e-hsb') && i.hs.period === '2026-10' && i.status !== 'Cancelled');
+    await readJson(page, 'society_runs', [], (v) => v.length === 1 && v[0].period === '2026-10', 15000);
+    const invs = mine(await readJson(page, 'invoices', [], (v) => mine(v).length === 3, 15000));
+    check(invs.length === 3, `one run, three bills (${invs.length})`);
+    await page.reload();
+    const a = invs.find((i) => i.hs.unit.code === 'A-101'), c = invs.find((i) => i.hs.unit.code === 'A-901');
+    check(a?.doc_type === 'BILL_OF_SUPPLY' && a.total === 6710 && a.items.some((l) => l.charge_head_id === 'rule33' && l.amount === 1200 && !(l.tax_rate > 0)), `A-101: Bill of Supply ₹6,710, property tax a pure-agent line (${a?.doc_type} ${a?.total})`);
+    check(c?.doc_type === 'TAX_INVOICE' && c.tax_amount === 1621.8 && c.total === 13631.8, `A-901: tax invoice, GST ₹1,621.80, total ₹13,631.80 (${c?.tax_amount} / ${c?.total})`);
+    const paper = async (inv, re, regime) => {
+      await page.goto(srv.origin + `/invoice/${inv.id}`);
+      await page.getByRole('button', { name: /Preview & download PDF/ }).click({ timeout: 15000 });
+      const dlg = page.getByRole('dialog', { name: 'Document preview' });
+      await dlg.locator(`[data-society-block="${regime}"]`).waitFor({ timeout: 15000 });
+      const txt = await dlg.locator('[data-society-block]').innerText();
+      await page.keyboard.press('Escape');
+      return re.test(txt);
+    };
+    check(await paper(a, /Sl\. 77\(c\)/, 'exempt77c'), 'A-101 prints the Sl. 77(c) declaration');
+    check(await paper(c, /Circular 109\/28\/2019-GST/, 'taxable_whole'), 'A-901 prints the Circular 109 declaration');
+    await page.goto(srv.origin + '/recurring?tab=society&view=bills');
+    await bv.locator('[data-hs-run-period]').fill('2026-10');
+    await bv.locator('[data-hs-bill-date]').fill('2026-10-01');
+    const pl = bv.locator('[data-hs-planned="0"][data-hs-already="3"]');
+    await pl.waitFor({ timeout: 15000 });
+    check(/Already billed: 3/.test(await pl.innerText()) && await bv.locator('[data-hs-run]').isDisabled(), 'run 2026-10 again: "Already billed: 3", nothing to issue');
+    check(mine(await readJson(page, 'invoices', [])).length === 3, 'still three bills');
+    await page.goto(srv.origin + '/recurring?tab=society&view=gst');
+    await page.locator('[data-hs-gst]').waitFor({ timeout: 15000 });
+    const t2 = Number(await page.locator('[data-hs-gst]').getAttribute('data-hs-turnover'));
+    check(Math.round((t2 - t1) * 100) / 100 === 20330, `GST view: FY turnover + ₹20,330 (exempt 11,320 + taxable 9,010; pass-through ₹5,400 out) (${t2 - t1})`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+    await readJson(page, 'society_runs', null, (v) => JSON.stringify(v) === JSON.stringify(prev.society_runs), 15000);
+  });
+
 } catch {
   /* already reported */
 } finally {

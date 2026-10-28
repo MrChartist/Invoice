@@ -9,6 +9,8 @@
 export const HS_TABLES = {
   // R18-A: units and their members (not dated)
   units: 'society_units',
+  // R18-B: billing runs (one per period / levy; dated by the bill date)
+  runs: 'society_runs',
 } as const;
 
 /** Company objects (singletons). */
@@ -20,4 +22,4 @@ export const HS_OBJECTS = {
 export const HS_PACKS = ['society'] as const;
 
 /** The date field each dated table is synced / period-locked by (mirrors the `sync-engine.ts` DATED rows; B adds runs). */
-export const HS_DATED: Readonly<Record<string, string>> = {};
+export const HS_DATED: Readonly<Record<string, string>> = { society_runs: 'date' }; // R18-B
