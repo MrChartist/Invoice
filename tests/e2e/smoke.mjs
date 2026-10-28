@@ -4970,6 +4970,55 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R15-A netting: a party who is both client and vendor (receivable ₹65,000, payable ₹1,80,000) → Netting ₹65,000 settles both invoices and reduces the bill, no cash receipt, one audit line; Reverse opens both again; Ctrl+K "Netting"', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'invoices', 'transactions', 'purchases'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const s0 = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...s0, lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-net-c', name: 'E2E Consolidator', state_code: '27' }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-net-v', name: 'E2E Consolidator' }]);
+    const sender = { ...((s0.profiles ?? []).find((p) => p.id === s0.activeProfileId) ?? {}), stateCode: '27' };
+    const inv = (id, number, amt, date) => ({ id, invoice_number: number, doc_type: 'INVOICE', status: 'Sent', place_of_supply: '27', currency: 'INR', issue_date: date, due_date: date, sender, gst_mode: 'NONE', subtotal: amt, taxable_value: amt, total: amt, amount_paid: 0, balance_due: amt, client: { id: 'e2e-net-c', name: 'E2E Consolidator', state_code: '27' }, items: [{ id: 'l1', name: 'Tour package', type: 'Service', hsn: '998555', unit: 'NOS', quantity: 1, rate: amt, tax_rate: 0, amount: amt }] });
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv('e2e-net-1', 'E2E/NET/1', 40000, '2026-09-01'), inv('e2e-net-2', 'E2E/NET/2', 25000, '2026-09-05')]);
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []), { id: 'e2e-net-b', kind: 'PURCHASE', vendor_id: 'e2e-net-v', vendor_name: 'E2E Consolidator', bill_number: 'CON/77', date: '2026-09-10', category: 'Purchases', lines: [{ id: 'l1', name: 'Air tickets', quantity: 1, rate: 180000, tax_rate: 0 }], taxable: 180000, cgst: 0, sgst: 0, igst: 0, itc_eligible: false, total: 180000, amount_paid: 0 }]);
+    const auditBefore = (await readJson(page, 'audit_log', [])).length;
+    await page.goto(srv.origin + '/receivables?tab=aging');
+    await page.locator('[data-netting-open]').first().waitFor({ timeout: 15000 });
+    check(await page.locator('[data-netting-open][aria-label*="E2E Consolidator"]').count() === 1, 'the party row offers Netting');
+    await page.locator('[data-netting-open][aria-label*="E2E Consolidator"]').click();
+    const dlg = page.locator('[data-netting-dialog]');
+    await dlg.waitFor({ timeout: 15000 });
+    for (const n of ['E2E/NET/1', 'E2E/NET/2']) await dlg.locator('[data-netting-side="in"] label', { hasText: n }).locator('input').check();
+    await dlg.locator('[data-netting-side="out"] label', { hasText: 'CON/77' }).locator('input').check();
+    check((await dlg.locator('[data-netting-amount]').getAttribute('placeholder')) === '65000', 'the amount defaults to min(receivable, payable) = ₹65,000');
+    await page.locator('[data-netting-post]').click();
+    const pays = await readJson(page, 'transactions', [], (v) => v.filter((p) => p.method === 'netting').length === 2);
+    const nets = pays.filter((p) => p.method === 'netting');
+    check(nets.length === 2 && nets.every((p) => p.exchange_purchase_id === 'e2e-net-b'), 'two netting receipts on the existing exchange marker');
+    check(!pays.some((p) => p.method !== 'netting' && ['e2e-net-1', 'e2e-net-2'].includes(p.invoice_id)), 'no cash / bank receipt');
+    const bills = await readJson(page, 'purchases', [], (v) => v.some((b) => b.id === 'e2e-net-b' && b.amount_paid === 65000));
+    check(bills.some((b) => b.id === 'e2e-net-b' && b.amount_paid === 65000 && b.exchange_paid === 65000), 'the bill is reduced by ₹65,000 (₹1,15,000 left)');
+    const invs = await readJson(page, 'invoices', [], (v) => v.filter((i) => i.id.startsWith('e2e-net-') && i.status === 'Paid').length === 2);
+    check(invs.filter((i) => i.id.startsWith('e2e-net-') && i.status === 'Paid').length === 2, 'both invoices settled');
+    const log = await readJson(page, 'audit_log', [], (v) => v.some((e) => /^Netting 65000\.00/.test(e.summary ?? '')));
+    check(log.filter((e) => /^Netting 65000\.00/.test(e.summary ?? '')).length === 1 && log.length > auditBefore, 'one netting line in the edit log (appends written in one batch)');
+    await dlg.locator('[data-netting-reverse]').first().click();
+    await readJson(page, 'transactions', [], (v) => !v.some((p) => p.method === 'netting' && p.invoice_id?.startsWith('e2e-net-')));
+    const back = await readJson(page, 'purchases', [], (v) => v.some((b) => b.id === 'e2e-net-b' && b.amount_paid === 0));
+    check(back.some((b) => b.id === 'e2e-net-b' && b.amount_paid === 0), 'Reverse opens the bill again');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('Netting');
+    await palette.getByRole('option', { name: /Netting/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "Netting" finds it');
+    await page.keyboard.press('Escape');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {

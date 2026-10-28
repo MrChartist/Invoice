@@ -80,6 +80,10 @@ export const ACT_REF_RULES: Readonly<Record<string, readonly Versioned<ActRef>[]
   // R14 (PS-D1 / D4): partners' remuneration and interest limits, and presumptive income of professionals (as reported).
   '40B': refRules('40(b)', 'Sec 35(e)', false, 'Income-tax Act 2025 Sec 35 as reported (PS20) — verify'),
   '44ADA': refRules('44ADA', 'Sec 58', false, 'Income-tax Act 2025 Sec 58(2) Table Sl. 3 as reported (PS22) — verify'),
+  // R15-A4 (TV3): TCS on an overseas tour programme package is Sl. No. 8 of the Sec 394(1) Table; LRS stays Sl. No. 7
+  // (the '206C1G' row above). Read in the Bill as introduced. Stored codes are never renamed: labels / codes naming
+  // a tour map here through `actKey`.
+  '206C1G-tour': refRules('206C(1G)', 'Sec 394(1) [Table: Sl. No. 8]', true, 'Finance Bill 2026 cl. 73(f); Memorandum ¶8'),
 };
 
 /** Stored internal codes that are not themselves a section family. */
@@ -94,6 +98,8 @@ const ALIASES: Readonly<Record<string, string>> = {
 export function actKey(code: string | undefined): string {
   const raw = String(code ?? '').trim();
   if (ALIASES[raw]) return ALIASES[raw];
+  // R15-A4: a 206C(1G) code / label (or a TCS / overseas label) that names a tour package → Sl. No. 8.
+  if (/tour/i.test(raw) && /206\s*-?\s*C\s*\(?\s*1\s*G|tcs|overseas/i.test(raw)) return '206C1G-tour';
   // TCS preset labels: "206C(1G) overseas remittance 20%".
   const tcs = /206\s*-?\s*C\s*\(\s*(1[GHF]?)\s*\)/i.exec(raw); // R8-C: 206C(1) and 206C(1F) too
   if (tcs) return `206C${tcs[1].toUpperCase()}`;

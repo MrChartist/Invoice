@@ -26,7 +26,7 @@ import type { Client, InvoiceRecord, Payment, SenderProfile } from '../types/inv
 import { currentActor } from './access';
 import { round2 } from './invoice-calc';
 import { sha256 } from './sha256';
-import { DB_PREFIX, generateId, getTable, listKeys, onTableWrite, setTable } from './storage';
+import { DB_PREFIX, generateId, getTable, listKeys, onPendingKey, onTableWrite, setTable } from './storage';
 import { mergeChanges, observeTableWrite, setEditRecorder, takeEdit } from './audit-edits';
 import { formatCurrency } from './utils';
 
@@ -343,7 +343,27 @@ function archiveOldest(rows: AuditEntry[]): AuditEntry[] | null {
 
 /* ── Store ─────────────────────────────────────────────────────── */
 
+/*
+ * R15-A2 (PERF-3): appends made during one synchronous task (one save records ≈ 13 rows) go to an in-memory working
+ * copy of the log and are written ONCE, in a microtask, or earlier by `audit.flush()`, by any read of the log's key
+ * (`onPendingKey`) or as soon as the batch passes the row limit. Order and the hash chain are exactly those of
+ * one-by-one appends; rollover to archive segments runs on the flushed batch. A raw write of the key by someone else
+ * (restore, demo removal, erase) drops the batch, as before, when its rows were written first and then overwritten.
+ */
+let work: AuditEntry[] | null = null;
+
+function flushAudit(): void {
+  const rows = work;
+  work = null;
+  try {
+    if (rows) writeCapped(rows);
+  } catch {
+    /* the user's save matters more than its log rows */
+  }
+}
+
 function readAll(): AuditEntry[] {
+  flushAudit();
   return getTable<AuditEntry>(AUDIT_TABLE);
 }
 
@@ -371,7 +391,11 @@ export const audit = {
       // WP-7: field-level before → after tracked from the table write this row is about.
       const edit = takeEdit(input.entity_id);
       const changes = edit?.changes.length ? mergeChanges(input.changes, edit.changes) : input.changes;
-      const rows = readAll();
+      if (!work) {
+        work = getTable<AuditEntry>(AUDIT_TABLE);
+        queueMicrotask(flushAudit);
+      }
+      const rows = work;
       const entry = append(rows, {
         at: input.at,
         entity: input.entity,
@@ -384,12 +408,16 @@ export const audit = {
         ...(input.seal ? { seal: input.seal } : {}),
         ...(by ? { by } : {}),
       });
-      writeCapped(rows);
+      // Rollover keeps the rows of one-by-one appends: the batch is written as soon as it passes the row limit.
+      if (rows.length > AUDIT_MAX_ROWS) flushAudit();
       return entry;
     } catch {
       return null;
     }
   },
+
+  /** Write the appends queued in this task now (backup, sync, auditor pack, page hide, tests). Never throws. */
+  flush: flushAudit,
 
   /** Seal unchained (pre-4.5) rows at the end of the log with a `chain_start` anchor. False when there were none. */
   sealLegacy(): boolean {
@@ -454,6 +482,9 @@ setEditRecorder((input) => {
   audit.record(input);
 });
 onTableWrite(observeTableWrite);
+onPendingKey(DB_PREFIX + AUDIT_TABLE, flushAudit, () => {
+  work = null;
+});
 
 /* ── Convenience builders used by localDb ──────────────────────── */
 

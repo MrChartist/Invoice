@@ -11,6 +11,8 @@ export interface Vendor {
   id: string;
   name: string;
   gstin?: string;
+  /** R15-A3: the client this supplier also is (netting), when name / GSTIN do not match. */
+  client_id?: string;
   state_code?: string;
   email?: string;
   phone?: string;

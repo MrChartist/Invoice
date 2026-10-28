@@ -5,7 +5,8 @@
  *             listed in dist/index.html).
  *  - entry:   the entry chunk alone.
  *  - total:   all JS in dist/assets (everything precached for offline).
- * Override with env BUDGET_INITIAL_GZ_KB, BUDGET_ENTRY_GZ_KB, BUDGET_TOTAL_GZ_KB.
+ *  - initial files: how many JS files first paint fetches (entry + runtime + the three named groups).
+ * Override with env BUDGET_INITIAL_GZ_KB, BUDGET_ENTRY_GZ_KB, BUDGET_TOTAL_GZ_KB, BUDGET_INITIAL_FILES.
  */
 import { gzipSync } from 'node:zlib';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -18,7 +19,13 @@ const gz = (file) => gzipSync(readFileSync(file), { level: 9 }).length;
 const env = (k, d) => Number(process.env[k] ?? d);
 
 const BUDGET_INITIAL = env('BUDGET_INITIAL_GZ_KB', 185);
-const BUDGET_ENTRY = env('BUDGET_ENTRY_GZ_KB', 90);
+// Raised from 90 to 100 in R15-A1: since `codeSplitting.groups` gained the `app-initial` ($initial) group, the
+// entry chunk holds ALL first-paint app code (it was ten small shared chunks before). The initial budget (185 kB)
+// above is the binding limit; this one only catches an entry that swallows vendor code.
+const BUDGET_ENTRY = env('BUDGET_ENTRY_GZ_KB', 100);
+// R15-A1: entry + rolldown runtime + vendor-react + vendor-ui (+ one spare). More means a first-paint module
+// escaped the app-initial group.
+const BUDGET_INITIAL_FILES = env('BUDGET_INITIAL_FILES', 5);
 // Raised from 650 in Phase 3 (TDS register, compliance, purchases, FX): all of it is lazily loaded
 // per page, so first paint (the initial budget above) is unchanged; this is the one-time offline
 // precache download. Raised again to 900 in Phase 6 (ledger, orders, inventory tracking, cheques,
@@ -61,6 +68,8 @@ const rows = [
   ['total JS (gz)', kb(totalGz), BUDGET_TOTAL],
 ];
 let bad = false;
+if (initial.length > BUDGET_INITIAL_FILES) bad = true;
+console.log(`${initial.length <= BUDGET_INITIAL_FILES ? 'ok  ' : 'FAIL'} ${'initial files'.padEnd(18)} ${String(initial.length).padStart(7)}    / budget ${BUDGET_INITIAL_FILES}`);
 for (const [name, v, b] of rows) {
   const ok = v <= b;
   if (!ok) bad = true;

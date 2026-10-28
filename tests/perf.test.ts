@@ -19,6 +19,7 @@ import { salesRegister, purchaseRegister, gstSummary as exportGstSummary } from 
 import { filterInvoices } from '../src/lib/export-shared.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { setTable } from '../src/lib/storage.ts';
+import { audit } from '../src/lib/audit.ts';
 import { gstin, SELLER, SELLER_GSTIN } from './helpers/world.ts';
 import type { Client, InvoiceItem, InvoiceRecord, Payment } from '../src/types/invoice.ts';
 import type { PurchaseRecord } from '../src/types/purchases.ts';
@@ -185,4 +186,35 @@ test('storage-backed paths: reading a 5,000-row table repeatedly is not done in 
   timed('calcInputFromRecord + calculateInvoice for every stored invoice (re-derive all)', 4000, () => {
     for (const inv of localDb.invoices.getAll()) calculateInvoice(calcInputFromRecord(inv));
   });
+});
+
+test('R15-A2 (PERF-3): a save on a 5,000-invoice company writes the audit log once (was once per event)', async () => {
+  resetStorage();
+  const { invoices, payments } = makeData();
+  setTable('invoices', invoices);
+  setTable('transactions', payments);
+  audit.flush();
+  const before = audit.count();
+  const ls = globalThis.localStorage;
+  const real = ls.setItem.bind(ls);
+  let writes = 0;
+  ls.setItem = (k: string, v: string) => {
+    if (k.endsWith('audit_log')) writes++;
+    real(k, v);
+  };
+  try {
+    timed('one task recording a batch of audit events (5,000 invoices)', 4000, () => {
+      for (let i = 0; i < 40; i++) {
+        const inv = invoices[3 + i * 11];
+        if (inv.status === 'Sent' && inv.doc_type === 'INVOICE') localDb.payments.record({ invoiceId: inv.id, amount: 1, method: 'UPI', date: '2026-05-02' });
+      }
+    });
+    await Promise.resolve();
+  } finally {
+    ls.setItem = real;
+  }
+  const events = audit.count() - before;
+  console.log(`# perf audit writes per save: ${writes} for ${events} events (one per event before R15-A2)`);
+  assert.ok(events >= 13, `${events} events`);
+  assert.equal(writes, 1);
 });

@@ -186,6 +186,7 @@ test('migration 2 seals legacy rows once and is idempotent', () => {
 
 test('storage full: the oldest half goes, a truncate anchor records it, and verification says so', () => {
   for (let n = 0; n < 20; n++) rec(`row ${n}`);
+  audit.flush(); // R15-A2: appends are written once per task
   const ls = globalThis.localStorage;
   const realSet = ls.setItem.bind(ls);
   let refused = false;
@@ -199,6 +200,7 @@ test('storage full: the oldest half goes, a truncate anchor records it, and veri
   };
   try {
     assert.ok(rec('the one that did not fit'));
+    audit.flush();
   } finally {
     ls.setItem = realSet;
   }
@@ -222,6 +224,7 @@ test('storage full: the oldest half goes, a truncate anchor records it, and veri
 test('truncation that cuts into the legacy segment re-seals the legacy rows that remain', () => {
   setTable(AUDIT_TABLE, Array.from({ length: 6 }, (_, n) => legacyRow(n)));
   rec('chained');
+  audit.flush();
   const ls = globalThis.localStorage;
   const realSet = ls.setItem.bind(ls);
   let refused = false;
@@ -234,6 +237,7 @@ test('truncation that cuts into the legacy segment re-seals the legacy rows that
   };
   try {
     rec('next');
+    audit.flush();
   } finally {
     ls.setItem = realSet;
   }
@@ -252,6 +256,7 @@ test('truncation that cuts into the legacy segment re-seals the legacy rows that
 test('restore: the backup log comes back verifiable and a marker links it, recording both heads', () => {
   rec('backup a');
   rec('backup b');
+  audit.flush();
   const backupLog = localStorage.getItem(DB_PREFIX + AUDIT_TABLE)!;
   const backupHead = audit.head();
   resetStorage();

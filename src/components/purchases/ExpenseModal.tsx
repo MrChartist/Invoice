@@ -254,7 +254,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
         <textarea id="exp-notes" className={controls.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
 
-      <TdsBillPanel value={tds} onChange={setTds} suggestion={tdsResolved.suggestion} payableNet={totals.total - (tdsResolved.fields.tds_on === 'BILL' ? tdsResolved.fields.tds_amount ?? 0 : 0)} nonResident={vendor?.non_resident} date={date} />
+      <TdsBillPanel value={tds} onChange={setTds} suggestion={tdsResolved.suggestion} payableNet={totals.total - (tdsResolved.fields.tds_on === 'BILL' ? tdsResolved.fields.tds_amount ?? 0 : 0)} nonResident={vendor?.non_resident} date={date} names={`${category} ${notes}`} />
 
       <BillableFields idPrefix="exp" value={billable} onChange={setBillable} rebilledIn={expense?.rebilled_in} />
       {(profOn || !!psB?.disb) && (

@@ -171,6 +171,22 @@ test('exports: 27EQ and 27Q follow the period', () => {
   assert.equal(form27Q([{ ...nr, creditedOn: OLD, fy: 2025, quarter: 4 }], [], [], 2025, 4).formLabel, 'Form 27Q');
 });
 
+test('R15-A4 (TV3): tour-package TCS is Sl. No. 8 (verified); LRS keeps Sl. No. 7; old codes parse as before', () => {
+  for (const c of ['206C(1G) overseas tour package 5%', '206C1G-tour', 'TCS overseas tour programme package', '206C (1G) Tour package']) {
+    assert.equal(actKey(c), '206C1G-tour', c);
+  }
+  assert.equal(actKey('206C(1G) overseas remittance 20%'), '206C1G');
+  assert.equal(actKey('206C(1G)'), '206C1G');
+  assert.equal(actKey('194J'), '194J');
+  const tour = actRef('206C(1G) overseas tour package', NEW);
+  assert.equal(tour.ref, 'Sec 394(1) [Table: Sl. No. 8]');
+  assert.equal(tour.verified, true);
+  assert.equal(tour.old, '206C(1G)');
+  assert.equal(actRef('206C(1G) overseas tour package', OLD).ref, '206C(1G)');
+  assert.equal(actRef('206C(1G) LRS', NEW).ref, 'Sec 394(1) [Table: Sl. No. 7]');
+  assert.match(ACT_REF_RULES['206C1G-tour'][1].source ?? '', /Finance Bill 2026 cl\. 73\(f\)/);
+});
+
 test('stored codes are unchanged by labelling', () => {
   const codes = TDS_PAYABLE_SECTIONS.map((s) => s.code);
   for (const c of codes) {

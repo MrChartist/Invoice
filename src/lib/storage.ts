@@ -774,11 +774,25 @@ export function resetStorageBackend(): void {
 
 /* ── Synchronous API ───────────────────────────────────────────── */
 
+/**
+ * R15-A2: a writer holding one key's rows in memory (the audit batch) flushes them before that key is read; a raw
+ * write or removal of the key by anyone else drops them (as if they had been written first and then overwritten).
+ */
+let pendingKey = '';
+let pendingFlush = () => {};
+let pendingDrop = () => {};
+export function onPendingKey(fullKey: string, flush: () => void, drop: () => void): void {
+  pendingKey = fullKey;
+  pendingFlush = flush;
+  pendingDrop = drop;
+}
+
 export function isStorageAvailable(): boolean {
   return backend === 'idb' || store() !== null;
 }
 
 export function readRaw(fullKey: string): string | null {
+  if (fullKey === pendingKey) pendingFlush();
   if (readTrace) readTrace.add(fullKey);
   if (inCache(fullKey)) return cache.get(fullKey) ?? null;
   try {
@@ -789,6 +803,7 @@ export function readRaw(fullKey: string): string | null {
 }
 
 export function writeRaw(fullKey: string, value: string): void {
+  if (fullKey === pendingKey) pendingDrop();
   dataVersion++;
   if (inCache(fullKey)) {
     if (vaultConflict) throw vaultConflict;
@@ -811,6 +826,7 @@ export function writeRaw(fullKey: string, value: string): void {
 }
 
 export function removeRaw(fullKey: string): void {
+  if (fullKey === pendingKey) pendingDrop();
   dataVersion++;
   if (inCache(fullKey)) {
     if (!cache.has(fullKey) && !pending.has(fullKey)) return;
