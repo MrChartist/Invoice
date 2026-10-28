@@ -45,9 +45,13 @@ export interface Catalogue {
 /**
  * Lazy catalogue loaders. Hindi is its own chunk; the other regional catalogues share ONE small chunk
  * (`regional.ts`) so the first-paint bundle carries a single loader for all of them (8H).
+ * R16-A1: two separate statements on purpose — Vite's preload wrapper gives a conditional `import()` ONE dependency
+ * list, which made a Hindi switch also download (and cache) the regional pack.
  */
-const load = (code: Exclude<Lang, 'en'>): Promise<Catalogue> =>
-  code === 'hi' ? import('./hi').then((m) => ({ messages: m.hi })) : import('./regional').then((m) => m.REGIONAL[code]);
+async function load(code: Exclude<Lang, 'en'>): Promise<Catalogue> {
+  if (code === 'hi') return { messages: (await import('./hi')).hi };
+  return (await import('./regional')).REGIONAL[code];
+}
 
 let lang: Lang = 'en';
 /** English: the shell catalogue now, page catalogues (en-pages.ts) as their chunks load. */
