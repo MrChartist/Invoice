@@ -14,6 +14,7 @@ import { atClosing, inrPerUnit } from '../../lib/prof/ps-fx-rates';
 import { loadRates } from '../../lib/currency-rates';
 import { revalueReceivables } from '../../lib/fx-gain';
 import { r16bT } from '../../i18n/areas/prof-r16b';
+import { useT } from '../../i18n';
 import { billingRealisation } from '../../lib/prof/ps-realisation';
 import { accrualOn, postAccrual, yearEndPaper } from '../../lib/prof/ps-yearend';
 import { readProfSettings, saveProfSettings } from '../../lib/prof/ps-settings';
@@ -30,6 +31,7 @@ import { runWith, type PsDeskProps } from './ps-run';
 
 export default function YearEndWipView({ notify }: Pick<PsDeskProps, 'notify'>) {
   const run = runWith(notify);
+  const { lang } = useT(); // QA19 U4: re-render when the Hindi arrives; `fx` holds a label
   const [closing, setClosing] = useState(() => `${getIndianFY(todayInput()).startYear}-03-31`);
   const [over, setOver] = useState<Record<string, number>>({});
   const [accrue, setAccrue] = useState(() => readProfSettings().wip?.accrue_from ?? '');
@@ -59,7 +61,7 @@ export default function YearEndWipView({ notify }: Pick<PsDeskProps, 'notify'>) 
     const cur = new Set(localDb.invoices.getAll().map((i) => (i.currency || 'INR').toUpperCase()).filter((c) => c !== 'INR'));
     const rev = cur.size ? revalueReceivables(localDb.invoices.getAll(), localDb.payments.getAll(), Object.fromEntries([...cur].map((c) => [c, inrPerUnit(c, closing, rates)?.rate])), closing) : null;
     return { rows, inv: rev?.rows ?? [] };
-  }, [paper, closing]);
+  }, [paper, closing, lang]);
   const on = accrualOn(readProfSettings().wip?.accrue_from, closing);
   return (
     <div className={surface.card}>

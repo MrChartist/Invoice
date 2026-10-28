@@ -423,6 +423,12 @@ export interface CreditLineRequest {
   /** Original item id. */
   itemId: string;
   quantity: number;
+  /**
+   * QA19 U7: credit this VALUE of the line (a fare / price difference) instead of a quantity. The note's line carries
+   * exactly this amount; its quantity is amount ÷ rate, not rounded (a rounded quantity of a ₹12,345 fare line turned an
+   * ₹800 refund into ₹740.70), and still counts against the line's creditable quantity.
+   */
+  amount?: number;
 }
 
 export interface CreditLineStatus {
@@ -453,7 +459,7 @@ export function creditedQuantities(
 ): Record<string, number> {
   const out: Record<string, number> = {};
   for (const cn of creditNotesFor(invoiceId, links, allInvoices)) {
-    for (const it of cn.items ?? []) out[it.id] = round2((out[it.id] ?? 0) + num(it.quantity));
+    for (const it of cn.items ?? []) out[it.id] = Math.round(((out[it.id] ?? 0) + num(it.quantity)) * 1e6) / 1e6; // QA19 U7
   }
   return out;
 }
@@ -471,7 +477,8 @@ export function creditableLines(
       item,
       originalQty,
       creditedQty,
-      remainingQty: Math.max(0, round2(originalQty - creditedQty)),
+      // QA19 U7: 6 decimals — a value credit (amount ÷ rate) leaves an exact remainder, not one rounded to 0.01 of a unit.
+      remainingQty: Math.max(0, Math.round((originalQty - creditedQty) * 1e6) / 1e6),
     };
   });
 }
@@ -532,9 +539,10 @@ export function buildCreditNote(
   }
   const picked: InvoiceItem[] = [];
   for (const req of input.lines) {
-    const qty = round2(num(req.quantity));
-    if (qty <= 0) continue;
+    const byValue = req.amount !== undefined && num(req.amount) > 0;
     const line = status.find((s) => s.item.id === req.itemId);
+    const qty = byValue && line && num(line.item.rate) > 0 ? num(req.amount) / num(line.item.rate) : round2(num(req.quantity));
+    if (qty <= 0) continue;
     if (!line) {
       errors.push('A selected line does not exist on the original invoice.');
       continue;
@@ -549,7 +557,7 @@ export function buildCreditNote(
     picked.push({
       ...line.item,
       quantity: qty,
-      amount: round2(qty * num(line.item.rate)),
+      amount: byValue ? round2(num(req.amount)) : round2(qty * num(line.item.rate)),
       // QA8 T12: the weighing describes the whole sale; a partial credit does not print it.
       ...(line.item.wt && Math.abs(qty - num(line.item.quantity)) > 0.0005 ? { wt: undefined } : {}),
       // A partial credit returns only as many serials as units: the first ones NOT already returned on an

@@ -33,7 +33,7 @@ import {
   partyNameOf,
   slug,
   stateNameOf,
-  urdCreditorLedger,
+  exchangeCreditorLedger,
   voucherKindOf,
   type DateFormat,
   type DateRange,
@@ -316,7 +316,7 @@ export function receipts(source: ExportSource, opts: CsvOptions = {}): CsvTable 
       money(p.amount),
       clean(p.method),
       // QA10 R5: an exchange settles against the customer's URD creditor ledger (as the Tally journal does).
-      kind === 'exchange' ? urdCreditorLedger(source.purchases?.find((x) => String((x as { id?: unknown })?.id ?? '') === exchangeVoucherOf(p)), source.vendors) ?? `${partyNameOf(inv.client)} (Creditor)`
+      kind === 'exchange' ? exchangeCreditorLedger(p, source.purchases?.find((x) => String((x as { id?: unknown })?.id ?? '') === exchangeVoucherOf(p)), source.vendors) ?? `${partyNameOf(inv.client)} (Creditor)` // QA19 U8
         : movedNoCash(p) ? NO_CASH_LEDGER[kind as NoCashKind] : cash && p.rider_id ? RIDER_CASH_LEDGER : cash ? 'Cash' : 'Bank', // R9 (RT-A3)
       clean(p.reference),
       clean(p.note),

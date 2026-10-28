@@ -276,6 +276,16 @@ const asRec = (v: unknown): Rec => (v && typeof v === 'object' ? (v as Rec) : {}
  * ledger kept apart from their debtor ledger ("<name> (Creditor)"), and an exchange receipt is a journal between the two.
  * undefined for any other bill.
  */
+/**
+ * QA19 U8 (R16-D1 in the exports): the creditor ledger an exchange-marked receipt debits. A netting row (`netting_id`,
+ * R15-A3) settles the bill's own supplier — the purchase voucher's party ledger, which for a hand-linked vendor is not
+ * the client's name; an R9 / R12 exchange keeps the URD creditor ledger. Undefined → the caller's fallback.
+ */
+export function exchangeCreditorLedger(receipt: unknown, raw: unknown, vendors: unknown[] = []): string | undefined {
+  if (asRec(receipt).netting_id && raw) return normalizePurchase(raw, vendors)?.partyName || undefined;
+  return urdCreditorLedger(raw, vendors);
+}
+
 export function urdCreditorLedger(raw: unknown, vendors: unknown[] = []): string | undefined {
   const r = asRec(raw);
   if (!r.used_goods && !r.old_metal) return undefined;

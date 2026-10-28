@@ -12,6 +12,7 @@ import { requireAccess } from '../access';
 import { round2 } from '../invoice-calc';
 import { chartOf, loadUserAccounts, saveUserAccount, type GroupId } from '../ledger/accounts';
 import { loadVouchers, saveVoucher } from '../ledger/vouchers';
+import { loadOpenings } from '../ledger/openings';
 import { PS_D_CLASSES, PS_TABLES } from './ps-shared';
 import { PARTNER_INTEREST_CAP_RULES, psRuleAt } from '../prof-rules';
 
@@ -126,7 +127,9 @@ export function deletePartner(id: string): void {
   const p = all.find((x) => x.id === id);
   if (!p) return;
   const used = getTable<{ partner_id?: string; lines?: { partner_id: string }[] }>(PS_TABLES.partnerRuns).some((r) => r?.partner_id === id || (r?.lines ?? []).some((l) => l.partner_id === id));
-  if (used || loadVouchers().some((v) => v.lines.some((l) => l.account_id === p.current_account_id || l.account_id === p.capital_account_id))) {
+  const mine = (id: string) => id === p.current_account_id || id === p.capital_account_id;
+  // QA19 U9: an opening balance on the partner's capital / current ledger is a balance too (not only vouchers).
+  if (used || loadVouchers().some((v) => v.lines.some((l) => mine(l.account_id))) || loadOpenings().some((o) => mine(o.ledger_id) && o.dr - o.cr !== 0)) {
     throw new Error(`${p.name} has postings. Enter an exit date instead of deleting.`);
   }
   setTable(T, all.filter((x) => x.id !== id));
