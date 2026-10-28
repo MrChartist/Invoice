@@ -4,8 +4,9 @@ import {
   AlertTriangle, ArrowDownToLine, BookOpen, Boxes, Download, Edit3, FolderTree, PackagePlus, Plus, Ruler,
   Search, SlidersHorizontal, Trash2, TrendingDown, Warehouse,
 } from 'lucide-react';
-import { cn, formatMoney, formatDate, todayInput, addDaysInput } from '../lib/utils';
+import { cn, formatMoney, formatDate, todayInput } from '../lib/utils';
 import { localDb } from '../lib/localDb';
+import { setPeriodRange, usePeriodContext } from '../lib/period-context';
 import {
   blankStockItem, deadStock, loadPositions, loadSettings, marginReport, movementSummary,
   saveSettings, stockDb, stockSummaryCsv, summarize,
@@ -122,8 +123,12 @@ export function Inventory() {
   const [ledgerId, setLedgerId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<StockItem | null>(null);
   const [deadDays, setDeadDays] = useState(90);
-  const [from, setFrom] = useState(() => addDaysInput(-30));
-  const [to, setTo] = useState(todayInput());
+  // PENDING 36: movement / analysis follow the shared report period (Books, GST reports, Alt+F2); a date typed here sets it.
+  const { period: sharedPeriod } = usePeriodContext();
+  const from = sharedPeriod.start;
+  const to = sharedPeriod.end;
+  const setFrom = (v: string) => { if (v) setPeriodRange({ start: v, end: v > to ? v : to }); };
+  const setTo = (v: string) => { if (v) setPeriodRange({ start: v < from ? v : from, end: v }); };
   const { notify, toastNode } = useToast();
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 

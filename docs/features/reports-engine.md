@@ -121,7 +121,10 @@ import { loadLedger, loadStockValuer } from '…/lib/ledger';
 - **Period context** (`period-context.ts`, P1-26): `usePeriodContext()`, `setPeriodContext(preset, period)`,
   `getPeriodContext()`, `subscribePeriodContext()`; device-local `localStorage['mrchartist_report_period']`; presets are
   re-resolved against today, so "This FY" rolls over by itself. Books uses it; **Alt+F2** switches the period bar to a
-  custom range with the cursor in "From". GST / Inventory / Reports pages can adopt it with one hook call.
+  custom range with the cursor in "From". PENDING 36: **GST reports** open on the shared period when it is a return
+  month / quarter (`reportPeriodOfRange`, else the previous month as before) and a period picked there becomes the shared
+  one; **Inventory** movement / analysis read and set it (`setPeriodRange` keeps a rolling preset when the range is one).
+  Tests: `tests/period-shared.test.ts`.
 - **Ratio Analysis** (P1-1): reuses the TDS package's `src/lib/ledger/ratios.ts` / Books → Ratio analysis tab;
   WP-2 added an optional 4th argument `ratioAnalysis(ledger, period, asOf, stock?)` so stock-in-hand, current assets,
   gross / net profit and the stock ratios include the valued closing stock (the tab passes `loadStockValuer()`).

@@ -77,6 +77,21 @@ export function resetPeriodContextForTests(): void {
   current = null;
 }
 
+/**
+ * PENDING 36 (GAP P1-26): set the shared period from a plain date range picked on another screen (GST reports,
+ * Inventory). A range equal to a rolling preset (this / last month, this quarter, this / last FY) keeps that preset,
+ * so it still rolls over; anything else is stored as custom.
+ */
+export function setPeriodRange(period: Period, today: Date = new Date()): PeriodContext {
+  const cur = read();
+  if (cur.period.start === period.start && cur.period.end === period.end) return cur;
+  const preset = (['this_month', 'last_month', 'this_quarter', 'this_fy', 'last_fy'] as const).find((p) => {
+    const r = periodForPreset(p, today);
+    return r.start === period.start && r.end === period.end;
+  });
+  return preset ? setPeriodContext(preset) : setPeriodContext('custom', period);
+}
+
 /** React binding: re-renders when any screen changes the period. */
 export function usePeriodContext(): PeriodContext {
   return useSyncExternalStore(subscribePeriodContext, getPeriodContext, getPeriodContext);
