@@ -23,6 +23,8 @@ import { PROF_PROFILES, applyProfKind, isProfKind, type ProfKindId } from '../..
 import { ProfKindPicker } from '../prof/ProfKindPicker';
 import { TRAVEL_LANDING, applyTravelKind, isTravelKind, type TravelKindId } from '../../lib/shop-presets'; // R15-B1
 import { TravelKindPicker } from '../travel/TravelKindPicker';
+import { MANPOWER_LANDING, applyManpowerKind, isManpowerKind, type ManpowerKindId } from '../../lib/shop-presets'; // R17-A1
+import { ManpowerKindPicker } from '../manpower/ManpowerKindPicker';
 import type { ProfIds } from '../../lib/prof/ps-profile';
 import { normalizeUdyam, validateUdyam } from '../../lib/msme';
 import { activePacks } from '../../lib/industry-packs';
@@ -91,6 +93,9 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
   const [tvKind, setTvKind] = useState<TravelKindId | ''>(() => (isTravelKind(localDb.settings.get().travel_kind) ? (localDb.settings.get().travel_kind as TravelKindId) : ''));
   const [tvBsp, setTvBsp] = useState(false);
   const [tvAlso, setTvAlso] = useState(false);
+  // R17-A1: the manpower kind under Services → Security, housekeeping and manpower supply, and the firm form (entry 14).
+  const [mpKind, setMpKind] = useState<ManpowerKindId | ''>(() => (isManpowerKind(localDb.settings.get().manpower_kind) ? (localDb.settings.get().manpower_kind as ManpowerKindId) : ''));
+  const [mpForm, setMpForm] = useState('proprietorship');
   // R12 (AG-A1): the "Farm, dairy & food processing" card is not a business type: its kind writes one (or none).
   const [agOn, setAgOn] = useState(() => isAgriKind(localDb.settings.get().agri_kind));
   const [agKind, setAgKind] = useState<AgriKindId | ''>(() => (isAgriKind(localDb.settings.get().agri_kind) ? (localDb.settings.get().agri_kind as AgriKindId) : ''));
@@ -158,6 +163,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
       const svc = !agri && !mfg && business === 'services' && svKind ? svKind : null; // R10 (SV-A1)
       const prof = svc === 'professional' && pfKind ? pfKind : null; // R14 (PS-A1)
       const travel = svc === 'travel' && tvKind ? tvKind : null; // R15-B1
+      const manpower = svc === 'manpower' && mpKind ? mpKind : null; // R17-A1
       const saved = {
         ...applyBusinessDefaults(applyAnswers(localDb.settings.get(), a), business),
         ...(trade ? { ...applyTradeKind(trade), defaultDueDays: TRADE_PROFILES[trade].defaultDueDays } : {}),
@@ -165,6 +171,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
         ...(cons ? { ...applyConstructionKind(cons, { registered: a.gstRegistered }), defaultDueDays: CONSTRUCTION_PROFILES[cons].defaultDueDays } : {}),
         ...(svc ? { ...applyServiceKind(svc, { registered: a.gstRegistered, pharmacy: svPharmacy }), defaultDueDays: SERVICE_PROFILES[svc].defaultDueDays } : {}),
         ...(travel ? applyTravelKind(travel, { registered: a.gstRegistered, alsoTravel: tvAlso, currentPacks: activePacks(localDb.settings.get()) }) : {}),
+        ...(manpower ? applyManpowerKind(manpower, { registered: a.gstRegistered, currentPacks: activePacks(localDb.settings.get()) }) : {}),
         ...(prof ? { ...applyProfKind(prof, { registered: a.gstRegistered, sub: pfSub, firmForm: pfForm, currentPacks: activePacks(localDb.settings.get()) }), defaultDueDays: PROF_PROFILES[prof].defaultDueDays } : {}),
         ...(agri ? { ...applyAgriKind(agri, { registered: a.gstRegistered, mill_kind: agMill, currentPacks: activePacks(localDb.settings.get()) }), ...(AGRI_PROFILES[agri].defaultDueDays !== undefined ? { defaultDueDays: AGRI_PROFILES[agri].defaultDueDays } : {}) } : {}),
         ...(mfg ? { ...applyMfgKind(mfg, { registered: a.gstRegistered, sub: mfSub, currentPacks: activePacks(localDb.settings.get()) }), ...(MFG_PROFILES[mfg].defaultDueDays !== undefined ? { defaultDueDays: MFG_PROFILES[mfg].defaultDueDays } : {}) } : {}),
@@ -177,11 +184,12 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
       if (svc) void import('../../lib/services/sv-profile').then((m) => m.applyServiceSwitches(svc)).catch(() => undefined);
       if (prof) void import('../../lib/prof/ps-profile').then((m) => { m.applyProfSwitches(prof, pfSub || undefined, pfIds); m.writeFirmForm(pfForm as 'proprietorship'); }).catch(() => undefined);
       if (travel) void import('../../lib/travel/tv-profile').then((m) => m.applyTravelSwitches(travel, tvBsp)).catch(() => undefined);
+      if (manpower) void Promise.all([import('../../lib/manpower/mp-settings'), import('../../lib/prof/ps-profile')]).then(([m, p]) => { m.applyManpowerDefaults(manpower); p.writeFirmForm(mpForm as 'proprietorship'); }).catch(() => undefined);
       if (cons) void import('../../lib/construction/cn-profile').then((m) => m.applyConstructionSwitches(cons, { government: cnGov })).catch(() => undefined);
       if (retail) void import('../../lib/retail/rt-profile').then((m) => m.applyRetailSwitches(retail)).catch(() => undefined);
       window.dispatchEvent(new Event(SHOP_MODE_EVENT));
       localDb.template.set(a.templateId);
-      onClose(mfg ? MFG_PROFILES[mfg].landing : agri ? AGRI_PROFILES[agri].landing : trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : prof ? PROF_PROFILES[prof].landing : travel ? TRAVEL_LANDING[travel] : svc ? SERVICE_PROFILES[svc].landing : BUSINESS_DEFAULTS[business].landing);
+      onClose(mfg ? MFG_PROFILES[mfg].landing : agri ? AGRI_PROFILES[agri].landing : trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : prof ? PROF_PROFILES[prof].landing : travel ? TRAVEL_LANDING[travel] : manpower ? MANPOWER_LANDING[manpower] : svc ? SERVICE_PROFILES[svc].landing : BUSINESS_DEFAULTS[business].landing);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -335,6 +343,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
                 <ServiceKindPicker value={svKind} onPick={pickService} pharmacy={svPharmacy} onPharmacy={setSvPharmacy} gridClass={styles.shopGrid} cardClass={styles.shopCard} />
                 {svKind === 'professional' && <ProfKindPicker value={pfKind} onPick={pickProf} sub={pfSub} onSub={setPfSub} form={pfForm} onForm={setPfForm} ids={pfIds} onIds={setPfIds} gridClass={styles.shopGrid} cardClass={styles.shopCard} />}
                 {svKind === 'travel' && <TravelKindPicker value={tvKind} onPick={setTvKind} bsp={tvBsp} onBsp={setTvBsp} alsoTravel={tvAlso} onAlsoTravel={setTvAlso} gridClass={styles.shopGrid} cardClass={styles.shopCard} />}
+                {svKind === 'manpower' && <ManpowerKindPicker value={mpKind} onPick={setMpKind} form={mpForm} onForm={setMpForm} gridClass={styles.shopGrid} cardClass={styles.shopCard} />}
               </div>
             )}
             {/* QA-3 F20: the demo choice belongs on the first step, before any required field. */}

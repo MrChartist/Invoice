@@ -49,7 +49,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
 | 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV48 | 48 | 15 |
 | 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF23 | 23 | 5 |
-| **Total** | | **567** | **139** |
+| 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP32 | 32 | 10 |
+| **Total** | | **599** | **149** |
 
 ---
 
@@ -1209,6 +1210,56 @@ belong to R16-B / R16-C, PF17–PF18 to R16-D.
 
 `PF` ids are counted once here. The ★ items (PF1, PF3, PF5, PF7, PF17) change what a document prints or a return
 reports once notified.
+
+## 17. Security, facility-management and manpower-supply agencies (Round 17, ids MP1–MP32)
+
+Added with `docs/prd/round-17.md` (§9: MP1–MP32) by R17-A. It covers private security agencies (PSARA licensees),
+housekeeping / facility-management contractors, contract and temporary staffing firms and labour contractors outside
+construction (R11 CN-D2 keeps those).
+
+- Files named under "Where" with a package in brackets are planned by that package (R17-B … R17-D); the others exist
+  since R17-A. Every rule row in `src/lib/manpower-rules.ts` is `verified: false` unless its value was read in a primary
+  text in Round 17 (its source then says "Read (R17)").
+- No minimum-wage or VDA amounts are stored: the user types each revision (PRD §1.6). Labour-law outputs are hints.
+- ★ = changes what a document prints or a return reports. Sources: §2.8 of the PRD (P = primary text read, S = secondary).
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| MP1 ★ | Entry 14 of N 13/2017-CT(R) (N 29/2018-CT(R), from 1 Jan 2019): security services by a person other than a body corporate to a registered person under RCM, except TDS-only Government registrations and composition recipients. Any later amendment? | `rcm` regime: security SAC 99852x, our firm form not a body corporate, client with a GSTIN, not TDS-only, not composition | `manpower-rules.ts` `SECURITY_RCM_RULES`; `manpower/mp-regime.ts` | 2019-01-01 | P N 29/2018-CT(R) entry 14, para 2 (read) |
+| MP2 ★ | Body corporate for entry 14: company yes; LLP (AAR Haryana: yes; the notification's Explanation treats an LLP as a partnership firm for other entries)? Co-operative society, trust, Section 8 company? Outcome of the Delhi HC petition? | `company`, `llp` forward charge; every other firm form RCM | `BODY_CORPORATE_RULES` (`verified: false`); firm form = `notes_to_accounts.entity_type` | 2019-01-01 | S livelaw (AAR), taxtmi, busy.in |
+| MP3 | POS and IGST under RCM for a client registered in another State; SEZ unit clients (RCM vs zero-rated). | Existing POS logic; SEZ: RCM flag kept, user decides | `CostCentre.mp.state`; invoice POS | — | Sec 12(2) IGST (recalled) |
+| MP4 ★ | Rate for manpower / security / cleaning (Heading 9985 Sl. 23(ii)) after the 22 Sep 2025 changes: still 18 %? | 18 % | `MP_GST_RATE_RULES` (2017 row verified; 2025-09-22 row not) | 2017-07-01 | P N 11/2017-CT(R) Sl. 23(ii) (2017 text) |
+| MP5 | SAC per post: 998525 guards, 998533 cleaning, 998513 contract staffing, 998519 other labour supply. Does the choice matter for any return? | Suggested from the post name and kind, editable | `MP_SAC_RULES`; `manpower/mp-sites.ts` `suggestSac` | 2017-07-01 | P Annexure to N 11/2017-CT(R) (read) |
+| MP6 ★ | Wages and statutory contributions billed by the agency are part of the value of one supply (not pure agent) — cost-plus bills included. Cross-ref CN15. | One supply, one rate | `manpower/mp-bill.ts` (R17-B) | — | CN15 precedent |
+| MP7 ★ | Sl. 66(b)(iii) of N 12/2017-CT(R) (security / cleaning / housekeeping performed in a pre-school to higher-secondary institution): current text after amendments; private schools included; a school run by a trust that also runs a college? | `exempt66` regime for clients flagged `school` (Table 8 exempt via `sv.exempt`) | `EDU_EXEMPT_RULES`; `mp-regime.ts` | 2017-07-01 | P N 12/2017-CT(R) Sl. 66 (2017 text) |
+| MP8 | Sl. 3 (pure services to Government / local authority for Art. 243G / 243W functions): current scope; does it cover security / housekeeping at municipal offices or hospitals? | Manual exempt with typed reason only | `mp-regime.ts` `manual_exempt` | 2017-07-01 | P N 12/2017-CT(R) Sl. 3 (2017 text); later narrowing not read |
+| MP9 | N 5/2017-CT registration exemption for a supplier making only RCM supplies: does it apply to a proprietor agency all of whose clients are registered? Does RCM turnover count for the ₹20 lakh threshold when it also has unregistered clients? | Note only | `RCM_ONLY_REG_RULES`; profile note (R17-D) | 2017-06-22 | P N 5/2017-CT (read) |
+| MP10 ★ | RCM invoice content (Rule 46: "whether tax is payable on reverse charge"); show the tax amount as memo? GSTR-1 B2B with RCM `Y`; e-Invoice `RegRev: 'Y'` for AATO ≥ ₹5 crore. | As stated; posts of different regimes go on separate invoices | `mp-regime.ts` `mpRegimePatch`, `splitPosts`; `rcm.ts` | 2019-01-01 | Rule 46 (recalled) |
+| MP11 | Time of supply / invoice date for monthly contracts (Sec 31(5) continuous supply): last day of the month, or within 30 days of the month end? | Month end (setting `bill_date`) | `manpower_settings.bill_date` | — | Sec 31(5) (recalled) |
+| MP12 ★ | Back-dated minimum wage / VDA arrears passed to clients: debit note (Sec 34) or supplementary tax invoice? Rate and RCM status of the original; time limit (30 Nov after the FY); GSTR-1 period. | Debit note per original invoice | `manpower/mp-arrears.ts` (R17-D) | — | Sec 34 (recalled) |
+| MP13 | GST TDS u/s 51 by Government clients on forward-charge manpower bills (2 % above ₹2.5 lakh); none on RCM bills. | Hint only | `mp-tds-io.ts` (R17-B) | — | existing `GST_TDS_51_RULES` |
+| MP14 ★ | Supply of manpower as "work" from 1 Apr 2026 (Sec 402(47)(f); Sec 393(1) Table Sl. 6(i) 1 % / 2 %): confirm the enacted Finance Act 2026 text (the Budget FAQ cites "402(27)"); TDS base excludes GST shown separately? | Contractor limb by bill date, base = taxable value | `mp-tds-io.ts` (R17-B); `tds-rules.ts` `MANPOWER_WORK_RULES` | 2026-04-01 | P Finance Bill 2026 cl. 78, Memorandum |
+| MP15 | Bills of FY 2025-26 where the client deducted 194J (2 % / 10 %) or 194C: any action for the agency (credit is by Form 16A either way)? | Accepted without alarm | `mp-tds-recv.ts` (R17-D) | — | Memorandum (as MP14) |
+| MP16 ★ | Labour Codes from 21 Nov 2025: does the 50 % wage rule (Code on Wages Sec 2(y)) change PF / ESI / gratuity / bonus bases for payroll now, or only once the central / State rules are final? | Hint only; payroll unchanged | `LABOUR_CODE_RULES` (R17-C) | 2025-11-21 | P PIB 21 Nov 2025; S taxmann, KSandK |
+| MP17 | OSH Code contract-labour threshold (50 workers) and the licence regime under the single licence; does the agency or the client hold it? | Reminder when a licence is entered; hint at ≥ 50 on a site | `CONTRACT_LABOUR_THRESHOLD_RULES` (R17-C) | 2025-11-21 | S EY alert, greytHR |
+| MP18 | Principal employer's duties for contract workers' social security (Code on Social Security): is the client entitled to withhold payment until proof? Is the site annexure adequate evidence? | Compliance pack; hold tracked, no posting | `mp-compliance.ts` (R17-C) | 2025-11-21 | P PIB 21 Nov 2025 |
+| MP19 | Fixed-term employees' gratuity after one year: provisioning in the agency's books and in cost-plus bills. | Hint | `mp-wage-check.ts` (R17-C) | 2025-11-21 | P PIB 21 Nov 2025 |
+| MP20 | Overtime at ≥ 2 × the ordinary rate (Code on Wages / OSH): which "ordinary rate of wages" (basic + DA)? Billing OT to the client at the contract rate. | Hint on the OT pay head | `mp-wage-check.ts` (R17-C) | 2025-11-21 | P PIB 21 Nov 2025 |
+| MP21 | Bonus (8.33 % minimum), leave and relieving charges in cost-plus bills: billed as part of the value; bonus eligibility ceiling under the Code. | Typed percentages | `manpower_settings.costplus` (R17-B) | — | — |
+| MP22 | Minimum wages: does the app need anything beyond typed revisions (central sphere VDA every 1 Apr / 1 Oct; State notifications; national floor wage once notified)? | Typed only | `manpower_settings.wage_revisions` (R17-C / D) | — | S gconnect, Gulf News |
+| MP23 | PSARA licence number on invoices: required by any State rule? | Optional print | `manpower_settings.licences` (R17-D) | — | — |
+| MP24 | Deductions from guards' wages for uniforms / ID cards: permitted limits under the Code on Wages. | Payroll deduction head; no check | payroll | — | — |
+| MP25 | Revenue presentation: the agency as principal (gross billing incl. wages) — AS 9 / Ind AS 115. | Gross | — | — | — |
+| MP26 | Site P&L: apportioning employer PF / ESI by duties across sites; relievers' cost to the site they relieved. | By duties | `mp-profit.ts` (R17-C) | — | — |
+| MP27 | A client's compliance hold: show as receivable (aged) or as retention not yet due? | Receivable, aged | `mp-compliance.ts` (R17-C) | — | — |
+| MP28 | Employees above the EPF / ESI wage ceilings at client sites; contract-worker PF on actual wages when the client demands it. | Existing payroll flags | payroll (`pf_on_actual`) | — | — |
+| MP29 ★ | Housing societies / RWAs as clients: an unregistered RWA → forward charge 18 % even from a proprietor agency? An RWA registered only because its turnover exceeds ₹20 lakh → RCM? | As stated (GSTIN decides) | `mp-regime.ts` | 2019-01-01 | N 29/2018-CT(R) ("registered person") |
+| MP30 | 57th GST Council (8 Oct 2026) recommendation to extend e-invoicing to RCM inward supplies from unregistered persons (AATO ≥ ₹5 crore): impact on clients of unregistered proprietor agencies once notified. | Pending note only | `pending-changes.ts` (R17-D) | — | P PIB 8 Oct 2026 ¶18 |
+| MP31 | (Market) PSARA licence counts (16,427 in Jan 2022; 21,835 in Nov 2023, as reported) and any count of FM / housekeeping agencies. | — | — | — | S MHA answers as reported |
+| MP32 | Muster units: a 12-hour shift billed as 1 duty or 1.5 eight-hour duties; half duties; billing days 26 vs calendar. | Post's shift hours; 0.5 steps; calendar default | `MpPost.shift_hours`; `manpower_settings.billing_days` | — | — |
+
+`MP` ids are counted once here. The ★ items (MP1, MP2, MP4, MP6, MP7, MP10, MP12, MP14, MP16, MP29) change what a
+document prints or a return reports.
 
 ## Answers log
 

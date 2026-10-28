@@ -156,6 +156,9 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   '/receivables?tab=marketplace': ['settlement', 'payout', 'amazon', 'flipkart', 'meesho', 'marketplace'],
   '/receivables?tab=marketplace&view=settlements': ['settlement', 'payout', 'amazon', 'flipkart', 'meesho'],
   '/receivables?tab=marketplace&view=tcs': ['tcs', 'gstr-8', 'section 52'],
+  // R17-A: the Deploy desk (B–D add muster, bills, compliance, profit, statutory)
+  '/time?tab=deploy': ['deploy', 'manpower', 'security agency', 'guard', 'housekeeping', 'तैनाती'],
+  '/time?tab=deploy&view=sites': ['site', 'post', 'guard post', 'contract', 'साइट'],
 };
 
 /** Words for one href: its own row, else the row of its base tab (`&view=` dropped). */

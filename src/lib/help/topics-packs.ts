@@ -268,5 +268,8 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:trips:bookings', 'Bookings', 'बुकिंग', 'Every component of every trip: unconfirmed, unbilled, supplier unpaid or travelling in the next 7 days. Billed means its invoice line still exists. Bill commission invoices the airline / hotel / insurer (TDS expected); Re-issue bills a changed ticket.', 'Daily.', { statutory: ca(['TV14', 'TV16', 'TV17', 'TV46', 'TV47', 'TV48']) }), // R16-C: commission, re-issue
   // R15-D
   t('time:trips:tcs', 'Tour package TCS', 'टूर पैकेज TCS', 'TCS on overseas tour packages per buyer and quarter, at the dated rate as the app applies it (Sec 394(1) Sl. 8 from Apr 2026); PAN missing; challans.', 'Each quarter.', { statutory: ca(['TV1', 'TV2', 'TV4', 'TV5', 'TV6', 'TV7']) }),
+  // R17-A: the Deploy desk (B–D add muster, bills, compliance, profit, statutory). Working papers — verify with your CA.
+  t('time:deploy', 'Deploy', 'तैनाती', 'Security, housekeeping and staffing agencies: client sites with posts and rates; each bill takes the GST regime of its posts and client.', 'Each new site.', { statutory: ca(['MP1', 'MP2', 'MP7']) }),
+  t('time:deploy:sites', 'Sites', 'साइटें', 'A site is a cost centre: posts with SAC, heads, shift and rate; client flags (TDS-only, composition, school) decide reverse charge or exemption.', 'Each contract.', { statutory: ca(['MP1', 'MP5', 'MP29']) }),
   t('time:trips:events', 'Event budgets', 'इवेंट बजट', 'Budget heads: approved, booked, billed, paid; over-budget heads in red; client advances, margin, POS by Sec 12(7)(a) and each vendor\'s TDS limb (hint).', 'Each event.', { statutory: ca(['TV21', 'TV22', 'TV23']) }),
 ];

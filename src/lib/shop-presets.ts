@@ -216,7 +216,7 @@ export function applyConstructionKind(kind: ConstructionKindId, opts: { register
 /* ── R10 (SV-A1): service profile under the `services` business type ── */
 
 /** The service picker's nine choices (stored as `settings.service_kind`); the business type stays `services`. */
-export const SERVICE_KINDS = ['clinic', 'lab', 'salon', 'fitness', 'coaching', 'workshop', 'appliance', 'professional', 'other', 'travel'] as const; // R15-B1: + travel
+export const SERVICE_KINDS = ['clinic', 'lab', 'salon', 'fitness', 'coaching', 'workshop', 'appliance', 'professional', 'other', 'travel', 'manpower'] as const; // R15-B1: + travel; R17-A1: + manpower
 export type ServiceKindId = (typeof SERVICE_KINDS)[number];
 type ServicePackId = 'clinic' | 'salon' | 'fitness' | 'workshop' | 'fees' | 'pharmacy';
 
@@ -245,6 +245,7 @@ export const SERVICE_PROFILES: Readonly<Record<ServiceKindId, ServiceProfile>> =
   professional: { modules: PRESETS.services, packs: [], landing: '/invoice', defaultDueDays: 15, templateId: 'freelancer_light' },
   other: { modules: [...PRESETS.services, 'pos'], packs: [], landing: '/invoice', defaultDueDays: 7, templateId: 'freelancer_light' },
   travel: { modules: [...PRESETS.services, 'accounts'], packs: [], landing: '/invoice', defaultDueDays: 7, templateId: 'gst_tax_invoice' }, // R15-B1: the kind picker sets packs
+  manpower: { modules: [...PRESETS.services, 'payroll', 'accounts'], packs: [], landing: '/time?tab=deploy', defaultDueDays: 7, templateId: 'gst_tax_invoice' }, // R17-A1: the kind picker sets packs
 };
 
 export const isServiceKind = (v: unknown): v is ServiceKindId => typeof v === 'string' && (SERVICE_KINDS as readonly string[]).includes(v);
@@ -449,4 +450,31 @@ export function applyTravelKind(kind: TravelKindId, opts: { registered?: boolean
   const packs = new Set<PackId>([...(opts.currentPacks ?? []), ...(kind === 'events' ? (opts.alsoTravel ? ['events', 'travel'] as const : ['events'] as const) : ['travel'] as const)]);
   const modules = [...new Set<ModuleId>([...PRESETS.services, 'accounts', 'purchases', 'time', ...(opts.registered ? ['gst' as const] : [])])];
   return { business_type: 'services', modules, service_kind: 'travel', travel_kind: kind, industry_packs: [...packs], defaultDueDays: 7 };
+}
+
+/* ── R17 (R17-A1): manpower profile under `services` / `manpower` ── */
+
+/** The manpower picker's choices (stored as `settings.manpower_kind`); business type stays `services`. */
+export const MANPOWER_KINDS = ['security', 'facility', 'staffing', 'labour', 'other'] as const;
+export type ManpowerKindId = (typeof MANPOWER_KINDS)[number];
+export const MANPOWER_LANDING: Readonly<Record<ManpowerKindId, string>> = {
+  security: '/time?tab=deploy&view=sites',
+  facility: '/time?tab=deploy&view=sites',
+  staffing: '/time?tab=deploy&view=muster',
+  labour: '/time?tab=deploy&view=muster',
+  other: '/time?tab=deploy',
+};
+export const isManpowerKind = (v: unknown): v is ManpowerKindId => typeof v === 'string' && (MANPOWER_KINDS as readonly string[]).includes(v);
+
+/**
+ * Settings patch for a manpower profile: business type `services`, `service_kind: 'manpower'`, modules (services +
+ * payroll, accounts, banking, tds, recurring, purchases; `registered` adds `gst`; `time` always kept, so `/time` stays
+ * visible and `PACK_ROUTES` is unchanged), packs in union with the company's (`manpower`; `security` for a security
+ * agency), due days 7 and the GST tax-invoice template. The firm form is the annual pack's entity type (written by the
+ * wizard through `prof/ps-profile.ts`); the defaults in `manpower_settings` by `manpower/mp-profile.ts`.
+ */
+export function applyManpowerKind(kind: ManpowerKindId, opts: { registered?: boolean; currentPacks?: readonly PackId[] } = {}): ShopModeSettings & { service_kind: 'manpower'; manpower_kind: ManpowerKindId; industry_packs: PackId[]; defaultDueDays: number; templateId: string } {
+  const packs = new Set<PackId>([...(opts.currentPacks ?? []), 'manpower', ...(kind === 'security' ? ['security' as const] : [])]);
+  const modules = [...new Set<ModuleId>([...PRESETS.services, 'payroll', 'accounts', 'banking', 'tds', 'recurring', 'purchases', 'time', ...(opts.registered ? ['gst' as const] : [])])];
+  return { business_type: 'services', modules, service_kind: 'manpower', manpower_kind: kind, industry_packs: [...packs], defaultDueDays: 7, templateId: 'gst_tax_invoice' };
 }

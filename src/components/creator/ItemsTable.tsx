@@ -49,6 +49,7 @@ const SvLineRow = lazy(() => import('../services-r10/SvEditor').then((m) => ({ d
 const EditorService = lazy(() => import('../services-r10/SvEditor').then((m) => ({ default: m.EditorService })));
 const LegalRegimeChip = lazy(() => import('../prof/LegalRegimeChip')); // R14 (PS-B2) legal-services regime
 const TravelRows = lazy(() => import('../travel/TravelRows')); // R15-B3 trip and GST regime
+const ManpowerRows = lazy(() => import('../manpower/ManpowerRows')); // R17-A3 site, month and GST regime
 const RedeemChip = lazy(() => import('../services-r10/SvRedeem').then((m) => ({ default: m.RedeemChip }))); // R10 (SV-C1) "Use package"
 import { impliedPacks } from '../../lib/shop-mode';
 import styles from './ItemsTable.module.css';
@@ -71,6 +72,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const jewelOn = useMemo(() => impliedPacks(localDb.settings.get()).includes('jewellery'), []); // R9 (RT-E)
   const legalOn = useMemo(() => (impliedPacks(localDb.settings.get()) as string[]).includes('legal'), []); // R14 (PS-B2)
   const travelOn = useMemo(() => (impliedPacks(localDb.settings.get()) as string[]).some((p) => p === 'travel' || p === 'events'), []); // R15-B3
+  const manpowerOn = useMemo(() => (impliedPacks(localDb.settings.get()) as string[]).some((p) => p === 'manpower' || p === 'security'), []); // R17-A3
   const svOn = useMemo(() => ((s) => !!s.service_kind || impliedPacks(s).some((p) => p === 'clinic' || p === 'salon' || p === 'fitness' || p === 'workshop'))(localDb.settings.get()), []); // R10 (SV-A)
   // Batch / serial / godown pickers (null for simple users: nothing tracked, one godown).
   // `stockTick` re-reads live stock when an item name gains focus (another tab may have sold some).
@@ -359,6 +361,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
         {svOn && <Suspense fallback={null}><EditorService /></Suspense>}
         {legalOn && <Suspense fallback={null}><LegalRegimeChip /></Suspense>}
         {travelOn && <Suspense fallback={null}><TravelRows /></Suspense>}
+        {manpowerOn && <Suspense fallback={null}><ManpowerRows /></Suspense>}
         <span className={styles.keyHint}>
           {tNodes('items.keyHint', { enter: <kbd>Enter</kbd>, alt: <kbd>Alt</kbd>, arrows: <><kbd>↑</kbd>/<kbd>↓</kbd></>, ctrl: <kbd>Ctrl</kbd> })}
         </span>

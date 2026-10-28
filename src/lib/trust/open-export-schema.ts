@@ -284,6 +284,8 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   edf_register: 'EDF register (export of services, FEMA 2026): kind (software / services / SOFTEX history), month, invoices, currency, value FC / ₹, due, EDF no. and filing day, authority (AD bank / STPI / SEZ), small-value declaration, status (R14).',
   // R15-B
   travel_settings: 'Travel profile settings: GST regime default, IATA / BSP, consolidators, fee defaults, switches; C / D add theirs (R15).',
+  // R17-A
+  manpower_settings: 'Manpower profile settings: billing days, shift hours, service charge, bill date; cost-plus %, wage revisions, licences, arrears document (R17).',
   travel_bookings: 'Travel bookings: trip / event file (cost centre), component, supplier, PNR / ref., dates, cost (currency, rate), sell, pure agent, status, supplier bill, invoice line once billed (R15).',
   // R15-C
   supplier_statements: 'Supplier statements (BSP / consolidator / bed-bank): supplier, kind, period, ref., rows (document no., type, date, passenger, gross, taxes, commission, net, match, status, ADM / refund flag), totals, bill and commission invoice made (R15).',

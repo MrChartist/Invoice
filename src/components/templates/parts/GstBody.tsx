@@ -189,7 +189,7 @@ export function GstBody({ invoice, sender, totals, skipEway, works }: Props) {
                   <div className={styles.itemName}>{line.name || '—'}</div>
                   {src?.description && <div className={styles.itemDesc}>{src.description}</div>}
                   <ItemCustomLine values={src?.custom_values} />
-                  {show.tracking && trackingText(src, invoice.ag, invoice.mf, invoice.ps, invoice.tv) && <div className={styles.itemDesc}>{trackingText(src, invoice.ag, invoice.mf, invoice.ps, invoice.tv)}</div>}
+                  {show.tracking && trackingText(src, invoice.ag, invoice.mf, invoice.ps, invoice.tv, invoice.mp) && <div className={styles.itemDesc}>{trackingText(src, invoice.ag, invoice.mf, invoice.ps, invoice.tv, invoice.mp)}</div>}
                   {worksLineText(src, invoice.boq_terms?.cn) && <div className={styles.itemDesc} data-works-line>{worksLineText(src, invoice.boq_terms?.cn)}</div>}
                 </td>
                 {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '—'}</td>}

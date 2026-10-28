@@ -30,10 +30,12 @@ export type StepKind =
   // R14 (PS-A1): the professional steps (append-only; only with `prof_kind`; B–D append theirs)
   | PsStep
   // R15-B1: the travel steps (append-only; only with `travel_kind`)
-  | TvStep;
+  | TvStep
+  // R17-A1: the manpower steps (append-only; only with `manpower_kind`; B–D append theirs)
+  | MpStep;
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'lut', 'edf', 'clientMoneyBank', 'stageTemplate', 'feeSchedule', 'linkCompanies', 'partners', 'firstTrip', 'firstEvent', 'firstSupplier', 'regime', 'firstStatement', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'lut', 'edf', 'clientMoneyBank', 'stageTemplate', 'feeSchedule', 'linkCompanies', 'partners', 'firstTrip', 'firstEvent', 'firstSupplier', 'regime', 'firstStatement', 'firstSite', 'firstBill', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -68,6 +70,8 @@ export interface ChecklistCtx {
   profKind?: string;
   /** R15-B1: `settings.travel_kind`. */
   travelKind?: string;
+  /** R17-A1: `settings.manpower_kind`. */
+  manpowerKind?: string;
 }
 
 export interface ChecklistFactsV3 {
@@ -130,6 +134,8 @@ export interface ChecklistFactsV3 {
   prof?: Partial<Record<PsStep, number>>;
   /** R15-B1: rows per travel step (trip / event files, bookings with a supplier, regime chosen, statement imports). */
   travel?: Partial<Record<TvStep, number>>;
+  /** R17-A1: rows per manpower step (sites, bills with a service month). */
+  manpower?: Partial<Record<MpStep, number>>;
 }
 
 /** R15-B1: the travel steps, the kinds that have them and where each opens. */
@@ -142,6 +148,14 @@ const TV_STEPS: Readonly<Record<TvStep, [kinds: string, to: string]>> = {
   firstEvent: ['events', '/time?tab=trips&view=trips'],
 };
 const isTvStep = (k: string): k is TvStep => Object.hasOwn(TV_STEPS, k);
+
+/** R17-A1: the manpower steps, the kinds that have them and where each opens (B: firstMuster; C: compliance; D: licence). */
+type MpStep = 'firstSite' | 'firstBill';
+const MP_STEPS: Readonly<Record<MpStep, [kinds: string, to: string]>> = {
+  firstSite: ['security facility staffing labour other', '/time?tab=deploy&view=sites'],
+  firstBill: ['security facility staffing labour other', '/time?tab=deploy&view=sites'],
+};
+const isMpStep = (k: string): k is MpStep => Object.hasOwn(MP_STEPS, k);
 
 /** R14 (PS-A1): the professional steps, the kinds that have them and where each opens. */
 type PsStep = 'firstMatter' | 'staffCapacity' | 'enrolment' | 'conflictCheck'
@@ -280,7 +294,7 @@ function applies(kind: StepKind, ctx: ChecklistCtx): boolean {
     case 'batch': return ctx.serviceKind === 'coaching';
     case 'labourOp': case 'jobCard': return ctx.serviceKind === 'workshop' || ctx.serviceKind === 'appliance';
     case 'partners': return !!ctx.profKind && (ctx.packs ?? []).includes('partners'); // R14 (PS-D1)
-    default: return isTvStep(kind) ? !!ctx.travelKind && TV_STEPS[kind][0].split(' ').includes(ctx.travelKind) : isPsStep(kind) ? !!ctx.profKind && (PS_STEPS[kind][0] === '@svcexport' ? ctx.packs.includes('svcexport') : PS_STEPS[kind][0].split(' ').includes(ctx.profKind)) : isMfStep(kind) ? !!ctx.mfgKind && MF_STEPS[kind][0].split(' ').includes(ctx.mfgKind) : isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri / R13 mfg steps
+    default: return isMpStep(kind) ? !!ctx.manpowerKind && MP_STEPS[kind][0].split(' ').includes(ctx.manpowerKind) : isTvStep(kind) ? !!ctx.travelKind && TV_STEPS[kind][0].split(' ').includes(ctx.travelKind) : isPsStep(kind) ? !!ctx.profKind && (PS_STEPS[kind][0] === '@svcexport' ? ctx.packs.includes('svcexport') : PS_STEPS[kind][0].split(' ').includes(ctx.profKind)) : isMfStep(kind) ? !!ctx.mfgKind && MF_STEPS[kind][0].split(' ').includes(ctx.mfgKind) : isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri / R13 mfg steps
   }
 }
 
@@ -333,7 +347,7 @@ function stepsOf(kind: StepKind, f: ChecklistFactsV3, ctx: ChecklistCtx): Omit<C
     case 'batch': return one((f.batches ?? 0) > 0, '/recurring?tab=fees&view=batches');
     case 'labourOp': return one((f.labourOps ?? 0) > 0, '/time?tab=workshop&view=labour');
     case 'jobCard': return one((f.jobCards ?? 0) > 0, '/time?tab=workshop&view=jobs');
-    default: return isTvStep(kind) ? one((f.travel?.[kind] ?? 0) > 0, TV_STEPS[kind][1]) : isPsStep(kind) ? one((f.prof?.[kind] ?? 0) > 0, PS_STEPS[kind][1]) : isMfStep(kind) ? one((f.mfg?.[kind] ?? 0) > 0, MF_STEPS[kind][1]) : one((f.agri?.[kind] ?? 0) > 0, AGRI_STEPS[kind][1]); // R12 (AG-A1), R13 (MF-A1)
+    default: return isMpStep(kind) ? one((f.manpower?.[kind] ?? 0) > 0, MP_STEPS[kind][1]) : isTvStep(kind) ? one((f.travel?.[kind] ?? 0) > 0, TV_STEPS[kind][1]) : isPsStep(kind) ? one((f.prof?.[kind] ?? 0) > 0, PS_STEPS[kind][1]) : isMfStep(kind) ? one((f.mfg?.[kind] ?? 0) > 0, MF_STEPS[kind][1]) : one((f.agri?.[kind] ?? 0) > 0, AGRI_STEPS[kind][1]); // R12 (AG-A1), R13 (MF-A1)
   }
 }
 
@@ -476,6 +490,14 @@ function travelFacts(): Partial<Record<TvStep, number>> {
   };
 }
 
+/** R17-A1: rows behind each manpower step (sites = cost centres with `mp`; bills = invoices with a service month). */
+function manpowerFacts(): Partial<Record<MpStep, number>> {
+  return {
+    firstSite: peekTable<{ mp?: unknown }>('cost_centres').filter((c) => c?.mp).length,
+    firstBill: peekTable<{ mp?: { month?: string } }>(KEYS.invoices).filter((r) => r?.mp?.month).length,
+  };
+}
+
 /** Counts only, from the shared parsed rows (PERF-2: never copied). */
 export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: ChecklistCtx } {
   const settings = localDb.settings.get();
@@ -496,6 +518,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
   const mfKind = typeof settings.mfg_kind === 'string' ? settings.mfg_kind : undefined; // R13 (MF-A1)
   const psKind = typeof settings.prof_kind === 'string' ? settings.prof_kind : undefined; // R14 (PS-A1)
   const tvKind = typeof settings.travel_kind === 'string' ? settings.travel_kind : undefined; // R15-B1
+  const mpKind = typeof settings.manpower_kind === 'string' ? settings.manpower_kind : undefined; // R17-A1
   const facts: ChecklistFactsV3 = {
     profileReady: !!settings.onboarded && Boolean(profile?.companyName?.trim()) && Boolean(profile?.upiId || profile?.accountNumber),
     clients: peekTable(KEYS.clients).length,
@@ -536,6 +559,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     ...(mfKind ? { mfg: mfgFacts(mfKind, profile ?? undefined) } : {}), // R13 (MF-A1)
     ...(psKind ? { prof: profFacts() } : {}), // R14 (PS-A1)
     ...(tvKind ? { travel: travelFacts() } : {}), // R15-B1
+    ...(mpKind ? { manpower: manpowerFacts() } : {}), // R17-A1
     ...(retailKind === 'grocery' ? { barcodeItems: stock.filter((r) => r?.barcode || r?.sold_by_weight).length + peekTable<{ barcode?: unknown; sold_by_weight?: unknown }>(KEYS.items).filter((r) => r?.barcode || r?.sold_by_weight).length } : {}),
   };
   const ctx: ChecklistCtx = {
@@ -552,6 +576,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     ...(mfKind ? { mfgKind: mfKind } : {}), // R13 (MF-A1)
     ...(psKind ? { profKind: psKind } : {}), // R14 (PS-A1)
     ...(tvKind ? { travelKind: tvKind } : {}), // R15-B1
+    ...(mpKind ? { manpowerKind: mpKind } : {}), // R17-A1
   };
   return { facts, ctx };
 }

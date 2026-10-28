@@ -83,6 +83,12 @@ const TV_DESK_LOAD = TV_DESK_FILES['../components/travel/TripsDesk.tsx'];
 const TripsDesk = TV_DESK_LOAD ? lazy(TV_DESK_LOAD) : null;
 const r15T = defineArea({ trips: 'Trips' } as const, { trips: 'यात्रा फ़ाइलें' });
 
+// R17: the Deploy desk (A: sites; B–D add views), one lazy chunk, mounted by file name like the R14 / R15 desks.
+const MP_DESK_FILES = import.meta.glob<{ default: ComponentType<{ view?: string; notify: (m: string, tone?: 'success' | 'error' | 'info') => void }> }>('../components/manpower/*Desk.tsx');
+const MP_DESK_LOAD = MP_DESK_FILES['../components/manpower/DeployDesk.tsx'];
+const DeployDesk = MP_DESK_LOAD ? lazy(MP_DESK_LOAD) : null;
+const r17T = defineArea({ deploy: 'Deploy' } as const, { deploy: 'तैनाती' });
+
 type Tab = TimeTab;
 // R6-B1: the ids (and packs) live in time-tabs.ts; the labels stay here.
 const TAB_LABEL: Record<Tab, () => string> = {
@@ -99,6 +105,7 @@ const TAB_LABEL: Record<Tab, () => string> = {
   clientmoney: () => r14T('clientmoney'), // R14 (PS-B)
   exportsvc: () => r14T('exportsvc'), // R14 (PS-C)
   trips: () => r15T('trips'), // R15
+  deploy: () => r17T('deploy'), // R17
 };
 const TABS: { id: Tab; label: () => string; pack?: PackId; alsoPacks?: readonly PackId[] }[] = TIME_TABS.map((t) => ({ ...t, label: TAB_LABEL[t.id] }));
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -453,6 +460,7 @@ export function Time() {
       {tab === 'members' && <Suspense fallback={null}><MembersDesk notify={notify} /></Suspense>}
       {PS_DESKS.has(tab) && <Suspense fallback={null}><PsDesk tab={tab} view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
       {tab === 'trips' && TripsDesk && <Suspense fallback={null}><TripsDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
+      {tab === 'deploy' && DeployDesk && <Suspense fallback={null}><DeployDesk view={params.get('view') ?? undefined} notify={notify} /></Suspense>}
 
       {tab === 'settings' && (
         <section className={cn(surface.card, styles.prefs)}>
