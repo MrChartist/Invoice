@@ -136,6 +136,8 @@ export const TIME_TABS = [
   { id: 'cadesk', pack: 'cafirm' }, // PS-D5: views events / fees / udin
   { id: 'clientmoney', pack: 'legal', alsoPacks: ['cafirm'] }, // PS-B3: views ledger / reconcile / statements
   { id: 'exportsvc', pack: 'svcexport' }, // PS-C: views checker / edf / realisation / refund / platforms
+  // R15: the Trips desk (one lazy chunk; views trips / bookings (B), statements (C), tcs / events (D) in `&view=`)
+  { id: 'trips', pack: 'travel', alsoPacks: ['events'] },
 ] as const;
 export type TimeTab = (typeof TIME_TABS)[number]['id'];
 /* ── Recurring ── */

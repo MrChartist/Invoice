@@ -1,0 +1,61 @@
+/* R15-B4 travel particulars on the paper: trip header, regime sentence, itinerary. Template variables only
+   (accent / muted / line / soft, Critical Rule 5). */
+.block {
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--tpl-line);
+  border-left: 3px solid var(--tpl-accent);
+  background: var(--tpl-soft);
+  border-radius: 4px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  font-size: 10px;
+}
+
+.title {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tpl-accent);
+}
+
+.grid {
+  margin: 4px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px 16px;
+}
+
+.grid div {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.grid dt {
+  color: var(--tpl-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.decl {
+  margin: 6px 0 0;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0 0;
+}
+
+.table td {
+  border-top: 1px solid var(--tpl-line);
+  padding: 2px 6px 2px 0;
+  text-align: left;
+}

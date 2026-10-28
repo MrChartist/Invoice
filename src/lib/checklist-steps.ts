@@ -28,10 +28,12 @@ export type StepKind =
   // R13 (MF-A1): the steps of each manufacturing kind (append-only; only with `mfg_kind`)
   | MfStep
   // R14 (PS-A1): the professional steps (append-only; only with `prof_kind`; B–D append theirs)
-  | PsStep;
+  | PsStep
+  // R15-B1: the travel steps (append-only; only with `travel_kind`)
+  | TvStep;
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'lut', 'edf', 'clientMoneyBank', 'stageTemplate', 'feeSchedule', 'linkCompanies', 'partners', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'lut', 'edf', 'clientMoneyBank', 'stageTemplate', 'feeSchedule', 'linkCompanies', 'partners', 'firstTrip', 'firstEvent', 'firstSupplier', 'regime', 'firstStatement', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -64,6 +66,8 @@ export interface ChecklistCtx {
   mfgKind?: string;
   /** R14 (PS-A1): `settings.prof_kind`. */
   profKind?: string;
+  /** R15-B1: `settings.travel_kind`. */
+  travelKind?: string;
 }
 
 export interface ChecklistFactsV3 {
@@ -124,7 +128,20 @@ export interface ChecklistFactsV3 {
   mfg?: Partial<Record<MfStep, number>>;
   /** R14 (PS-A1): rows per professional step (matters, timekeepers with capacity, the enrolment no., conflict checks). */
   prof?: Partial<Record<PsStep, number>>;
+  /** R15-B1: rows per travel step (trip / event files, bookings with a supplier, regime chosen, statement imports). */
+  travel?: Partial<Record<TvStep, number>>;
 }
+
+/** R15-B1: the travel steps, the kinds that have them and where each opens. */
+type TvStep = 'firstTrip' | 'firstSupplier' | 'regime' | 'firstStatement' | 'firstEvent';
+const TV_STEPS: Readonly<Record<TvStep, [kinds: string, to: string]>> = {
+  firstTrip: ['tour_operator agent inbound events other', '/time?tab=trips&view=trips'],
+  firstSupplier: ['tour_operator agent inbound events other', '/time?tab=trips&view=trips'],
+  regime: ['tour_operator', '/time?tab=trips&view=trips'],
+  firstStatement: ['agent', '/settings?tab=data&import=1'],
+  firstEvent: ['events', '/time?tab=trips&view=trips'],
+};
+const isTvStep = (k: string): k is TvStep => Object.hasOwn(TV_STEPS, k);
 
 /** R14 (PS-A1): the professional steps, the kinds that have them and where each opens. */
 type PsStep = 'firstMatter' | 'staffCapacity' | 'enrolment' | 'conflictCheck'
@@ -263,7 +280,7 @@ function applies(kind: StepKind, ctx: ChecklistCtx): boolean {
     case 'batch': return ctx.serviceKind === 'coaching';
     case 'labourOp': case 'jobCard': return ctx.serviceKind === 'workshop' || ctx.serviceKind === 'appliance';
     case 'partners': return !!ctx.profKind && (ctx.packs ?? []).includes('partners'); // R14 (PS-D1)
-    default: return isPsStep(kind) ? !!ctx.profKind && (PS_STEPS[kind][0] === '@svcexport' ? ctx.packs.includes('svcexport') : PS_STEPS[kind][0].split(' ').includes(ctx.profKind)) : isMfStep(kind) ? !!ctx.mfgKind && MF_STEPS[kind][0].split(' ').includes(ctx.mfgKind) : isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri / R13 mfg steps
+    default: return isTvStep(kind) ? !!ctx.travelKind && TV_STEPS[kind][0].split(' ').includes(ctx.travelKind) : isPsStep(kind) ? !!ctx.profKind && (PS_STEPS[kind][0] === '@svcexport' ? ctx.packs.includes('svcexport') : PS_STEPS[kind][0].split(' ').includes(ctx.profKind)) : isMfStep(kind) ? !!ctx.mfgKind && MF_STEPS[kind][0].split(' ').includes(ctx.mfgKind) : isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri / R13 mfg steps
   }
 }
 
@@ -316,7 +333,7 @@ function stepsOf(kind: StepKind, f: ChecklistFactsV3, ctx: ChecklistCtx): Omit<C
     case 'batch': return one((f.batches ?? 0) > 0, '/recurring?tab=fees&view=batches');
     case 'labourOp': return one((f.labourOps ?? 0) > 0, '/time?tab=workshop&view=labour');
     case 'jobCard': return one((f.jobCards ?? 0) > 0, '/time?tab=workshop&view=jobs');
-    default: return isPsStep(kind) ? one((f.prof?.[kind] ?? 0) > 0, PS_STEPS[kind][1]) : isMfStep(kind) ? one((f.mfg?.[kind] ?? 0) > 0, MF_STEPS[kind][1]) : one((f.agri?.[kind] ?? 0) > 0, AGRI_STEPS[kind][1]); // R12 (AG-A1), R13 (MF-A1)
+    default: return isTvStep(kind) ? one((f.travel?.[kind] ?? 0) > 0, TV_STEPS[kind][1]) : isPsStep(kind) ? one((f.prof?.[kind] ?? 0) > 0, PS_STEPS[kind][1]) : isMfStep(kind) ? one((f.mfg?.[kind] ?? 0) > 0, MF_STEPS[kind][1]) : one((f.agri?.[kind] ?? 0) > 0, AGRI_STEPS[kind][1]); // R12 (AG-A1), R13 (MF-A1)
   }
 }
 
@@ -447,6 +464,18 @@ function profFacts(): Partial<Record<PsStep, number>> {
   };
 }
 
+/** R15-B1: rows behind each travel step. */
+function travelFacts(): Partial<Record<TvStep, number>> {
+  const trips = peekTable<{ tv?: { kind?: string } }>('cost_centres').filter((c) => c?.tv);
+  return {
+    firstTrip: trips.length,
+    firstEvent: trips.filter((c) => c.tv?.kind === 'event').length,
+    firstSupplier: peekTable<{ vendor_id?: string }>('travel_bookings').filter((b) => b?.vendor_id).length,
+    regime: getJson<{ regime_ok?: boolean } | null>(`${DB_PREFIX}travel_settings`, null)?.regime_ok ? 1 : 0,
+    firstStatement: peekTable<{ kind?: string }>(IMPORT_RUNS_TABLE).filter((r) => r?.kind === 'supplier_statement').length,
+  };
+}
+
 /** Counts only, from the shared parsed rows (PERF-2: never copied). */
 export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: ChecklistCtx } {
   const settings = localDb.settings.get();
@@ -466,6 +495,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
   const agKind = typeof settings.agri_kind === 'string' ? settings.agri_kind : undefined; // R12 (AG-A1)
   const mfKind = typeof settings.mfg_kind === 'string' ? settings.mfg_kind : undefined; // R13 (MF-A1)
   const psKind = typeof settings.prof_kind === 'string' ? settings.prof_kind : undefined; // R14 (PS-A1)
+  const tvKind = typeof settings.travel_kind === 'string' ? settings.travel_kind : undefined; // R15-B1
   const facts: ChecklistFactsV3 = {
     profileReady: !!settings.onboarded && Boolean(profile?.companyName?.trim()) && Boolean(profile?.upiId || profile?.accountNumber),
     clients: peekTable(KEYS.clients).length,
@@ -505,6 +535,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     ...(agKind ? { agri: agriFacts(agKind) } : {}),
     ...(mfKind ? { mfg: mfgFacts(mfKind, profile ?? undefined) } : {}), // R13 (MF-A1)
     ...(psKind ? { prof: profFacts() } : {}), // R14 (PS-A1)
+    ...(tvKind ? { travel: travelFacts() } : {}), // R15-B1
     ...(retailKind === 'grocery' ? { barcodeItems: stock.filter((r) => r?.barcode || r?.sold_by_weight).length + peekTable<{ barcode?: unknown; sold_by_weight?: unknown }>(KEYS.items).filter((r) => r?.barcode || r?.sold_by_weight).length } : {}),
   };
   const ctx: ChecklistCtx = {
@@ -520,6 +551,7 @@ export function readChecklistInputs(): { facts: ChecklistFactsV3; ctx: Checklist
     ...(agKind ? { agriKind: agKind, ...(typeof settings.mill_kind === 'string' ? { millKind: settings.mill_kind } : {}) } : {}),
     ...(mfKind ? { mfgKind: mfKind } : {}), // R13 (MF-A1)
     ...(psKind ? { profKind: psKind } : {}), // R14 (PS-A1)
+    ...(tvKind ? { travelKind: tvKind } : {}), // R15-B1
   };
   return { facts, ctx };
 }

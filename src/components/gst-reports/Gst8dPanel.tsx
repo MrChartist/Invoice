@@ -58,6 +58,7 @@ const EX_KEY = {
   SV_NIL_NOT_EXEMPT: 'exSvNil',
   AG_CLASS_RATE: 'exAgClass', // R12 (AG-A3)
   PS_PURE_AGENT_OLD: 'exPsPureAgent', // R14 (PS-B1)
+  TV_MIX: 'exTvMix', TV_ITC_5: 'exTvItc5', // R15-B3
 } as const;
 
 /** Return-period key used by the compliance calendar for a report period. */

@@ -18,6 +18,9 @@ import { svPickT } from '../../i18n/areas/services-r10-pick';
 import { applyProfKind } from '../../lib/shop-presets';
 import { ProfKindPicker } from '../prof/ProfKindPicker'; // R14 (PS-A1)
 import { psPickT } from '../../i18n/areas/prof-r14a-pick';
+import { applyTravelKind } from '../../lib/shop-presets';
+import { TravelKindPicker } from '../travel/TravelKindPicker'; // R15-B1
+import { tvT } from '../../i18n/areas/travel-r15b';
 import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
 import { DB_PREFIX, getJson } from '../../lib/storage';
 import { cnPickT } from '../../i18n/areas/construction-r11-pick';
@@ -194,6 +197,23 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
                 onChange(applyProfKind(k, { registered, sub: settings.prof_sub, currentPacks: packsOn }) as Partial<typeof settings>);
                 // The profile's switches only fill unset ones; changing the profile deletes nothing.
                 void import('../../lib/prof/ps-profile').then((m) => m.applyProfSwitches(k, settings.prof_sub)).catch(() => undefined);
+              }}
+            />
+          </div>
+        )}
+        {/* R15-B1: "Travel profile" for every services company (+ Custom); changing it deletes nothing */}
+        {settings.business_type === 'services' && (
+          <div className={controls.field} data-features-travel>
+            <span className={controls.label}>{tvT('title')}</span>
+            <TravelKindPicker
+              value={settings.travel_kind}
+              custom
+              disabled={!owner}
+              onPick={(k) => {
+                if (!k) return onChange({ travel_kind: undefined });
+                const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
+                onChange(applyTravelKind(k, { registered, currentPacks: packsOn }) as Partial<typeof settings>);
+                void import('../../lib/travel/tv-profile').then((m) => m.applyTravelSwitches(k)).catch(() => undefined);
               }}
             />
           </div>
