@@ -11,15 +11,19 @@ import {
   columnarRegister,
   exceptionReport,
   fundsFlow,
+  ledgerInterestReport,
   voucherRegister,
   voucherStatistics,
   type Ledger,
+  type LedgerInterestParams,
   type LedgerVoucher,
+  type InterestReportRow,
   type RegisterId,
 } from '../../../lib/ledger';
 import type { BooksData, Period } from '../../../lib/books';
 import type { StockPosition } from '../../../lib/inventory';
 import { formatDate } from '../../../lib/utils';
+import { toCsv } from '../../../lib/csv';
 import { reportsT } from '../../../i18n/areas/reports-engine';
 import { br2T } from '../../../i18n/areas/books-r2';
 import { capT } from '../../../i18n/areas/capture';
@@ -39,8 +43,8 @@ import books from '../books.module.css';
 import styles from './ledger.module.css';
 
 // Ratio Analysis lives in the Books → Ratio analysis tab (src/components/books/tally/RatioTab.tsx), with closing stock.
-export type ReportId = 'group' | 'registers' | 'exceptions' | 'stats' | 'funds' | 'annual';
-const REPORTS: ReportId[] = ['group', 'registers', 'exceptions', 'stats', 'funds', 'annual'];
+export type ReportId = 'group' | 'registers' | 'exceptions' | 'stats' | 'funds' | 'interest' | 'annual';
+const REPORTS: ReportId[] = ['group', 'registers', 'exceptions', 'stats', 'funds', 'interest', 'annual'];
 // R2-C1: annual accounts pack with notes to accounts (own lazy chunk).
 const AnnualPackTab = lazy(() => import('./AnnualPackTab'));
 
@@ -61,6 +65,7 @@ export function ReportsHub(props: Props) {
     exceptions: reportsT('exceptions'),
     stats: reportsT('statistics'),
     funds: reportsT('fundsFlow'),
+    interest: reportsT('intReport'),
     annual: br2T('annual'),
   };
   return (
@@ -84,6 +89,7 @@ export function ReportsHub(props: Props) {
         {report === 'exceptions' && <ExceptionsView {...props} />}
         {report === 'stats' && <StatisticsView period={props.period} />}
         {report === 'funds' && <FundsFlowView period={props.period} />}
+        {report === 'interest' && <InterestView period={props.period} />}
       </DrillStack>
       )}
     </div>
@@ -361,6 +367,87 @@ function FundsFlowView({ period }: { period: Period }) {
       <p className={books.muted}>
         {reportsT('fundsWc', { open: money(f.openingWorkingCapital), close: money(f.closingWorkingCapital), change: money(f.closingWorkingCapital - f.openingWorkingCapital) })}
       </p>
+    </div>
+  );
+}
+
+/** PENDING 35 (GAP P1-7): interest on every ledger with interest parameters, and on business-loan ledgers at the loan rate. */
+function InterestView({ period }: { period: Period }) {
+  useT();
+  const { ledger } = useReportEnv();
+  const drill = useDrill();
+  const rows = useMemo(() => {
+    const loans = new Map<string, LedgerInterestParams>();
+    for (const l of getTable<{ account_id?: string; rate?: number }>('business_loans')) if (l?.account_id && Number(l.rate) > 0) loans.set(l.account_id, { rate: Number(l.rate), on: 'cr' });
+    return ledgerInterestReport(ledger, period, loans);
+  }, [ledger, period]);
+  const onLabel = (r: InterestReportRow) => (r.params.on === 'dr' ? reportsT('intOnDr') : r.params.on === 'cr' ? reportsT('intOnCr') : reportsT('intOnBoth'));
+  const push = (i: number) => {
+    const r = rows[i];
+    drill.push({
+      key: `int:${r.account.id}`, title: r.account.name,
+      render: () => (
+        <div className={surface.card}>
+          <div className={`${surface.tableWrap} ${styles.wrap}`}>
+            <table className={surface.table}>
+              <caption className={surface.srOnly}>{r.account.name}</caption>
+              <thead><tr><th scope="col">{reportsT('date')}</th><th scope="col">{reportsT('to')}</th><th scope="col" className={surface.numeric}>{reportsT('intDays')}</th><th scope="col" className={surface.numeric}>{reportsT('intBalance')}</th><th scope="col" className={surface.numeric}>{reportsT('intReport')}</th></tr></thead>
+              <tbody>{r.slices.map((x) => <tr key={x.from}><td>{formatDate(x.from)}</td><td>{formatDate(x.to)}</td><td className={surface.numeric}>{x.days}</td><td className={surface.numeric}>{drCr(x.balance)}</td><td className={surface.numeric}>{x.interest ? money(x.interest) : ''}</td></tr>)}</tbody>
+            </table>
+          </div>
+        </div>
+      ),
+    });
+  };
+  const nav = useDrillRows(rows.length, push);
+  const csv = () => toCsv([
+    ['Ledger', 'Rate % p.a.', 'On', 'Opening', 'Closing', 'Interest receivable', 'Interest payable'],
+    ...rows.map((r) => [r.account.name, r.params.rate, r.params.on, drCr(r.opening), drCr(r.closing), r.onDebit / 100, r.onCredit / 100]),
+  ]);
+  const dr = rows.reduce((a, r) => a + r.onDebit, 0);
+  const cr = rows.reduce((a, r) => a + r.onCredit, 0);
+  return (
+    <div className={books.stack} data-ledger-interest>
+      <StatementToolbar csv={csv} filename={`interest-${period.start}-${period.end}.csv`} />
+      <PrintTitle title={reportsT('intReport')} sub={`${formatDate(period.start)} – ${formatDate(period.end)}`} />
+      {rows.length === 0 ? <p className={books.muted}>{reportsT('intNone')}</p> : (
+        <div className={surface.card}>
+          <div className={`${surface.tableWrap} ${styles.wrap}`}>
+            <table className={surface.table} {...nav.table}>
+              <caption className={surface.srOnly}>{reportsT('intReport')}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">{reportsT('particulars')}</th>
+                  <th scope="col" className={surface.numeric}>{reportsT('intRate')}</th>
+                  <th scope="col">{reportsT('intOn')}</th>
+                  <th scope="col" className={surface.numeric}>{reportsT('opening')}</th>
+                  <th scope="col" className={surface.numeric}>{reportsT('closing')}</th>
+                  <th scope="col" className={surface.numeric}>{reportsT('intReceivable')}</th>
+                  <th scope="col" className={surface.numeric}>{reportsT('intPayable')}</th>
+                </tr>
+              </thead>
+              <tbody id={nav.bodyId}>
+                {rows.map((r, i) => (
+                  <tr key={r.account.id} {...nav.row(i)}>
+                    <td><button type="button" className={styles.rowButton} onClick={() => push(i)}>{r.account.name}</button>{r.source === 'loan' ? ` (${reportsT('intFromLoan')})` : ''}</td>
+                    <td className={surface.numeric}>{r.params.rate}</td>
+                    <td>{onLabel(r)}</td>
+                    <td className={surface.numeric}>{drCr(r.opening)}</td>
+                    <td className={surface.numeric}>{drCr(r.closing)}</td>
+                    <td className={surface.numeric}>{r.onDebit ? money(r.onDebit) : ''}</td>
+                    <td className={surface.numeric}>{r.onCredit ? money(r.onCredit) : ''}</td>
+                  </tr>
+                ))}
+                <tr className={books.totalRow}>
+                  <td colSpan={5}>{reportsT('total')}</td>
+                  <td className={surface.numeric}>{money(dr)}</td>
+                  <td className={surface.numeric}>{money(cr)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

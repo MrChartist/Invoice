@@ -107,6 +107,8 @@ export interface Donation {
   anonymous?: boolean;
   /** Bank account the money went into (absent = cash for `cash`, main bank otherwise). */
   bank_account_id?: string;
+  /** PENDING 29: a gift in kind — the ledger the goods / asset go to (Dr), journalised at `amount`; absent = no voucher. */
+  kind_account_id?: string;
   voucher_id?: string;
   cancelled?: { on: string; reason: string };
   created_at?: string;

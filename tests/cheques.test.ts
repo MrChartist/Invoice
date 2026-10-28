@@ -115,9 +115,20 @@ test('clearing without recording, over-balance cheques and foreign invoices', ()
 
   setTable(KEYS.invoices, [invoice({ id: 'U', currency: 'USD', exchange_rate: 83 })]);
   const usd = saveCheque(received({ number: '000111', invoice_id: 'U' }));
-  const u = transitionCheque(usd.id, 'cleared', { date: '2026-10-21', today: TODAY });
-  assert.equal(u.payment, undefined);
-  assert.match(u.note!, /USD/);
+  // PENDING 39: a rupee cheque settles ₹ ÷ the rate in the invoice currency; the bank gets exactly the cheque's rupees.
+  const u = transitionCheque(usd.id, 'cleared', { date: '2026-10-21', today: TODAY, realisedRate: 84 });
+  assert.equal(u.payment?.amount, 140.48); // 11,800 / 84
+  assert.equal(Math.round(u.payment!.amount * u.payment!.realised_rate! * 100) / 100, 11800);
+  assert.match(u.note!, /USD 140\.48/);
+  // No typed rate: the invoice rate (83) → USD 142.17.
+  const usd2 = saveCheque(received({ number: '000112', invoice_id: 'U' }));
+  assert.equal(transitionCheque(usd2.id, 'cleared', { date: '2026-10-21', today: TODAY }).payment?.amount, 142.17);
+  // No rate anywhere: nothing recorded, the note says why.
+  setTable(KEYS.invoices, [...getTable<InvoiceRecord>(KEYS.invoices), invoice({ id: 'E', currency: 'EUR' })]);
+  const eur = saveCheque(received({ number: '000113', invoice_id: 'E' }));
+  const e = transitionCheque(eur.id, 'cleared', { date: '2026-10-21', today: TODAY });
+  assert.equal(e.payment, undefined);
+  assert.match(e.note!, /EUR with no exchange rate/);
 });
 
 test('post-dated cheques cannot be deposited before their date; expired ones cannot be deposited', () => {

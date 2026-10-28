@@ -1,6 +1,6 @@
 import { Fragment, useMemo } from 'react';
 import { Scale } from 'lucide-react';
-import { accountGroupId, flattenRows, groupSummary, reportGroups, syncReportGroups, trialBalance, trialBalanceCsv, type Ledger, type StockValuer } from '../../../lib/ledger';
+import { accountGroupId, flattenRows, groupSummary, previousPeriod, reportGroups, syncReportGroups, trialBalance, trialBalanceCsv, type Ledger, type StockValuer } from '../../../lib/ledger';
 import type { Period } from '../../../lib/books';
 import { formatDate } from '../../../lib/utils';
 import { reportsT } from '../../../i18n/areas/reports-engine';
@@ -38,6 +38,15 @@ function TrialBalanceRoot({ ledger, period, stock }: Props) {
   const [prefs, setPrefs] = useReportPrefs('tb', { detailed: true });
   const tb = useMemo(() => trialBalance(ledger, period), [ledger, period]);
   const ok = tb.totals.debit === tb.totals.credit && tb.totals.closingDr === tb.totals.closingCr;
+  // PENDING 37: previous-period closing column (the same "Previous period column" switch as P&L).
+  const compare = prefs.columns === 'previous';
+  const prevPeriod = useMemo(() => previousPeriod(period), [period]);
+  const prevTb = useMemo(() => (compare ? trialBalance(ledger, prevPeriod) : null), [compare, ledger, prevPeriod]);
+  const prevGroups = useMemo(
+    () => (compare && !prefs.detailed ? new Map(flattenRows(groupSummary(ledger, prevPeriod, null, { showZero: true, parties: false }).rows, true).map((r) => [r.id, r.closing])) : null),
+    [compare, prefs.detailed, ledger, prevPeriod],
+  );
+  const prevByAccount = useMemo(() => new Map((prevTb?.rows ?? []).map((r) => [r.account.id, r.closing])), [prevTb]);
 
   // Detailed: groups with their ledgers (Tally ledger-wise TB). Condensed: primary groups → groups (Alt+F1).
   const rows = (() => {
@@ -51,13 +60,14 @@ function TrialBalanceRoot({ ledger, period, stock }: Props) {
       const g = accountGroupId(r.account);
       byGroup.set(g, [...(byGroup.get(g) ?? []), r]);
     }
-    const out: Array<{ kind: 'group' | 'ledger'; id: string; label: string; code?: string; accountId?: string; opening: number; debit: number; credit: number; closing: number; depth: number }> = [];
+    const out: Array<{ kind: 'group' | 'ledger'; id: string; label: string; code?: string; accountId?: string; opening: number; debit: number; credit: number; closing: number; depth: number; prev?: number }> = [];
     for (const g of reportGroups()) {
       const rs = byGroup.get(g.id);
       if (!rs?.length) continue;
       const sum = (k: 'opening' | 'debit' | 'credit' | 'closing') => rs.reduce((s, r) => s + r[k], 0);
       out.push({ kind: 'group', id: g.id, label: g.label, opening: sum('opening'), debit: sum('debit'), credit: sum('credit'), closing: sum('closing'), depth: 0 });
       for (const r of rs) out.push({ kind: 'ledger', id: r.account.id, label: r.account.name, code: r.account.code, accountId: r.account.id, opening: r.opening, debit: r.debit, credit: r.credit, closing: r.closing, depth: 1 });
+      if (compare) out[out.length - rs.length - 1].prev = rs.reduce((t, r) => t + (prevByAccount.get(r.account.id) ?? 0), 0);
     }
     return out;
   })();
@@ -69,12 +79,17 @@ function TrialBalanceRoot({ ledger, period, stock }: Props) {
   };
   const nav = useDrillRows(rows.length, open);
   const cols = 2 + (prefs.showOpening ? 1 : 0) + (prefs.showTransactions ? 2 : 0);
+  const prevOf = (r: (typeof rows)[number]): number => ('prev' in r && r.prev !== undefined ? r.prev : r.kind === 'ledger' ? prevByAccount.get(r.id) ?? 0 : prevGroups?.get(r.id) ?? 0);
 
   return (
     <div className={books.stack}>
-      <StatementToolbar csv={() => trialBalanceCsv(tb)} filename={`trial-balance-${period.start}_to_${period.end}.csv`}>
+      <StatementToolbar csv={() => trialBalanceCsv(tb, prevTb ?? undefined)} filename={`trial-balance-${period.start}_to_${period.end}.csv`}>
         <span className={ok ? styles.tieOk : styles.tieBad}>{ok ? ledgerT('tbTie') : ledgerT('tbOut')}</span>
         <ReportOptions prefs={prefs} onChange={setPrefs} options={['showZero', 'showOpening', 'showTransactions']} />
+        <label className={styles.inlineField}>
+          <input type="checkbox" checked={compare} onChange={(e) => setPrefs({ columns: e.target.checked ? 'previous' : 'none' })} data-tb-compare />
+          <span>{reportsT('comparePrevious')}</span>
+        </label>
       </StatementToolbar>
       <PrintTitle title={ledgerT('tbTitle')} sub={`${formatDate(period.start)} – ${formatDate(period.end)}`} />
 
@@ -93,6 +108,7 @@ function TrialBalanceRoot({ ledger, period, stock }: Props) {
                   {prefs.showTransactions && <th scope="col" className={surface.numeric}>{reportsT('debit')}</th>}
                   {prefs.showTransactions && <th scope="col" className={surface.numeric}>{reportsT('credit')}</th>}
                   <th scope="col" className={surface.numeric}>{reportsT('closing')}</th>
+                  {compare && <th scope="col" className={surface.numeric}>{reportsT('closing')} {formatDate(prevPeriod.end)}</th>}
                 </tr>
               </thead>
               <tbody id={nav.bodyId}>
@@ -107,6 +123,7 @@ function TrialBalanceRoot({ ledger, period, stock }: Props) {
                       {prefs.showTransactions && <td className={surface.numeric}>{r.debit ? money(r.debit) : ''}</td>}
                       {prefs.showTransactions && <td className={surface.numeric}>{r.credit ? money(r.credit) : ''}</td>}
                       <td className={surface.numeric}>{drCr(r.closing)}</td>
+                      {compare && <td className={surface.numeric}>{drCr(prevOf(r))}</td>}
                     </tr>
                   </Fragment>
                 ))}
@@ -116,11 +133,13 @@ function TrialBalanceRoot({ ledger, period, stock }: Props) {
                   {prefs.showTransactions && <td className={surface.numeric}>{money(tb.totals.debit)}</td>}
                   {prefs.showTransactions && <td className={surface.numeric}>{money(tb.totals.credit)}</td>}
                   <td className={surface.numeric}>{money(tb.totals.closingDr)} Dr / {money(tb.totals.closingCr)} Cr</td>
+                  {compare && prevTb && <td className={surface.numeric}>{money(prevTb.totals.closingDr)} Dr / {money(prevTb.totals.closingCr)} Cr</td>}
                 </tr>
                 {stock && (
                   <tr>
                     <td colSpan={cols - 1} className={books.muted}>{reportsT('tbStockMemo', { method: stock.label })}</td>
                     <td className={surface.numeric}>{money(stock.value(period.end))}</td>
+                    {compare && <td className={surface.numeric}>{money(stock.value(prevPeriod.end))}</td>}
                   </tr>
                 )}
               </tbody>

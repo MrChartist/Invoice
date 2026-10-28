@@ -80,7 +80,8 @@ reports. Everything GST-related is a **working paper — verify with your CA**.
 - Editing a note (delete and record again); serial selection on returns of serial-tracked lines (lib supports `serials`, UI does not).
 - ~~TDS on a bill with TDS deducted at booking is not adjusted by a return; GSTR-9 / 9C and the compliance late-fee
   estimate do not read notes yet~~ (done in 7O, 7.93 / 7.94 — stale note struck by R6-C6); cash-basis Books P&L ignores notes.
-- Editing a bill below the quantities already returned is not blocked.
+- ~~Editing a bill below the quantities already returned is not blocked~~ — done (PENDING 38): `purchasesDb.save` refuses an
+  edit that drops a returned line or leaves it below the returned units (`returnedQtyIssue`, purchases.ts).
 - An existing user account with code 5010 would share the code with "Purchase returns".
 
 ## Statutory points to verify with a CA

@@ -116,6 +116,19 @@ export function periodLabel(p: ReportPeriod): string {
   return `${MONTH_NAMES[m - 1]} ${yearOfMonth(p.fyStart, m)}`;
 }
 
+/**
+ * PENDING 36: the GST return period (month, FY quarter or FY) that is exactly the date range `start`..`end`, else null —
+ * GST reports open on the shared report period when it is one of these.
+ */
+export function reportPeriodOfRange(start: string, end: string): ReportPeriod | null {
+  for (const kind of ['month', 'quarter', 'fy'] as const) {
+    const p = periodForDate(kind, start);
+    const r = periodRange(p);
+    if (r.from === start && r.to === end) return p;
+  }
+  return null;
+}
+
 /** The period of the given kind that contains `date` (ISO string or Date). */
 export function periodForDate(kind: PeriodKind, date: string | Date): ReportPeriod {
   const iso =

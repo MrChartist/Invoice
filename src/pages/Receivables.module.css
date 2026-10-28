@@ -123,3 +123,5 @@
 }
 
 .presetOn { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--foreground); font-weight: 700; }
+/* PENDING 34: ageing basis / slabs / interest controls in the party-wise card head */
+.ageingPrefs { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }

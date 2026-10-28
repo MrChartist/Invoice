@@ -23,6 +23,8 @@ import {
   type ExportRow,
   type ReportPeriod,
 } from '../lib/gst-reports';
+import { reportPeriodOfRange } from '../lib/gst-reports';
+import { getPeriodContext, setPeriodRange } from '../lib/books'; // PENDING 36 (the shared report period store)
 import {
   buildGstr1Json,
   buildSummaryHtml,
@@ -169,12 +171,22 @@ export function GstReports() {
     return [...years].sort((a, b) => b - a);
   }, [invoices]);
 
-  const [period, setPeriod] = useState<ReportPeriod>(() => {
+  const [period, setPeriodState] = useState<ReportPeriod>(() => {
+    // PENDING 36: the shared report period (Books, Inventory, Alt+F2) when it is a return month / quarter.
+    const shared = getPeriodContext().period;
+    const fromShared = reportPeriodOfRange(shared.start, shared.end);
+    if (fromShared && fromShared.kind !== 'fy') return fromShared;
     // Default to the previous month — the one that is normally being filed.
     // Build from the 1st: setMonth(-1) on e.g. 31 Oct would overflow into October again.
     const now = new Date();
     return periodForDate('month', new Date(now.getFullYear(), now.getMonth() - 1, 1));
   });
+  // A period picked here becomes the shared report period too.
+  const setPeriod = (p: ReportPeriod) => {
+    setPeriodState(p);
+    const r = periodRange(p);
+    setPeriodRange({ start: r.from, end: r.to });
+  };
   const [gstin, setGstin] = useState<string>(() => gstins[0] ?? '');
   const [params, setParams] = useSearchParams();
   // A composition profile files CMP-08 / GSTR-4, not GSTR-1 / 3B (Sec 10; Rule 62).
