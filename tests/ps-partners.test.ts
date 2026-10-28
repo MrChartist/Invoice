@@ -8,6 +8,7 @@ import { chartOf, loadUserAccounts, A } from '../src/lib/ledger/accounts.ts';
 import { loadVouchers } from '../src/lib/ledger/vouchers.ts';
 import { deletePartner, drawingsOf, interestOnDrawings, loadPartners, postDrawings, savePartner, saveRatio, shareProblems, sharesOn, termOn, validatePartner } from '../src/lib/prof/ps-partners.ts';
 import type { Partner } from '../src/types/prof-r14.ts';
+import { getTable, setTable } from '../src/lib/storage.ts';
 
 beforeEach(() => {
   resetStorage();
@@ -57,4 +58,14 @@ test('interest on drawings by the product method (months left counting the month
   assert.equal(interestOnDrawings([{ date: '2025-04-15', amount: 12000 }, { date: '2025-10-01', amount: 12000 }, { date: '2026-03-31', amount: 12000 }], 10, '2026-03-31'), 1900);
   assert.equal(interestOnDrawings([{ date: '2025-04-15', amount: 12000 }], 0, '2026-03-31'), 0);
   assert.equal(interestOnDrawings([{ date: '2024-04-15', amount: 12000 }], 10, '2026-03-31'), 0, 'outside the FY');
+});
+
+test('R16-B5: delete a partner with no posting (recycle bin); refused while a partner run names the partner', () => {
+  const a = partner('Asha', 60);
+  const b = partner('Bala', 40);
+  setTable('partner_runs', [{ id: 'r1', date: '2026-03-31', lines: [{ partner_id: b.id }] }]);
+  assert.throws(() => deletePartner(b.id), /postings/);
+  deletePartner(a.id);
+  assert.deepEqual(loadPartners().map((p) => p.name), ['Bala']);
+  assert.ok(getTable<{ table: string; row_id: string }>('recycle_bin').some((r) => r.table === 'partners' && r.row_id === a.id), 'in the recycle bin');
 });

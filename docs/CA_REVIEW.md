@@ -48,7 +48,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF40–MF42, MF50–MF54, MF60–MF65, MF80–MF82, MF90–MF96 | 60 | 12 |
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
 | 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV45 | 45 | 14 |
-| **Total** | | **541** | **133** |
+| 16. Platform round (Round 16; PF1–PF18 in `docs/prd/round-16.md` §9, copied by the lead) | PF19–PF21 | 3 | 0 |
+| **Total** | | **544** | **133** |
 
 ---
 
@@ -1154,6 +1155,21 @@ plus the round's cross-cutting items (party netting, the 2026 manpower and tour-
 
 `TV` ids are counted once here. The ★ items (TV1, TV3, TV7, TV8, TV11, TV15, TV19, TV21, TV23, TV34, TV35, TV38, TV39, TV41) are the ones a beta
 travel business's figures depend on first.
+
+## 16. Platform round (Round 16, ids PF…)
+
+PF1–PF18 are listed in `docs/prd/round-16.md` §9 (the lead copies them here). The rows below were raised while wiring
+the Round 14 engines (R16-B).
+
+### 16.1 Added by R16-B (Round 14 engines wired)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| PF19 | **Per-appearance billing on a fee note.** With "Bill appearances" the entries of an appearance work type become one line "count × fee" (unit NOS, the firm's SAC, no hours, no dates on the line); the legal-services regime (RCM / exempt, PS1, PS2) is read as for any fee line, and the time still counts for realisation. Does a court fee note need each appearance's date (or the hearing list) printed, and is one line per work type and fee acceptable? | One line per work type × fee; dates stay in the app (the timesheet annexure lists hourly rows only). | `prof/ps-legal.ts` `appearanceLines`; `prof/ps-prebill.ts` | — | Developers' reading |
+| PF20 | **Publisher's commission invoice.** The pre-bill's "Bill commission to the publisher" makes a separate draft invoice to the publisher (matched to a client of that name, else a new name) with one line "Media commission n % — publication" at the firm's SAC and GST rate (PS12 (c)). Which SAC (e.g. 998363 / 998365) and is it forward charge at 18 %? Should the expected TDS 194H by the publisher be shown on it? | Firm's SAC and rate from the time preferences; no TDS hint. | `prof/ps-media.ts` `commissionLine`; `prof/ps-prebill.ts` `createCommissionDraft` | — | PS12; developers' reading |
+| PF21 | **Which WIP is foreign for the closing-rate memo.** The year-end memo treats a matter as foreign-currency when its active engagement bills in a foreign currency, and restates the net unbilled figure at the master's rate on the closing date; a work-type rate card in a foreign currency on an INR engagement is not converted. Open foreign invoices use the existing revaluation (balance on the closing date × the master's rate). Is the engagement currency the right test? | Engagement currency; memo only (PF14, PS37). | `components/prof/YearEndWipView.tsx`; `prof/ps-fx-rates.ts` `atClosing`; `fx-gain.ts` `revalueReceivables` | — | AS 11 (recalled) |
+
+`PF` ids are counted once here.
 
 ## Answers log
 

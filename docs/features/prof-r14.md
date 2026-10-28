@@ -210,3 +210,26 @@ Before = `claude/elegant-cannon-cwapiv` at `36881db`; after = this branch (gzip 
 | Total JS | 3,419,591 B | 3,452,287 B | **+32.7 kB** (aim 15 kB ✗) |
 
 Breakdown (gz): Firm desk 7.8 kB (five views + strings ≈ 2.5 kB), partner engines 5.7 kB (`ps-partners`, `ps-partner-run`, `ps-partner-post`, `ps-194t`), CA desk 4.4 kB (three views + strings ≈ 1.8 kB), CA engines 3.2 kB (`ps-ca-bill`, `ps-ca-events`, `ps-udin`), `ps-tds-recv` 1.7 kB, chase panel 1.1 kB, editor hint 0.8 kB, small strings 0.7 kB, rules 0.7 kB, help 0.9 kB, desk helpers / settings 1.3 kB, palette / Ctrl+K / checklist / packs 0.9 kB, host-page wiring (Time, TdsTab, Practice, AnnualPackTab, InvoiceCreator) ≈ 2.0 kB, registry / backup / sync / bin / export / tds-rules / ita2025 rows ≈ 1.0 kB. Trimming options: drop the daily-balance capital mode and partner statements (≈ −1.2 kB), the editor hint (≈ −0.8 kB), typed CA events (≈ −0.3 kB), shorten EN / HI strings (≈ −1.5 kB).
+
+## R16-B — The engines wired into the desks (`docs/prd/round-16.md` §R16-B)
+
+- **B1 Disbursements** (`/time?tab=wip&view=disb`, `components/prof/DisbView.tsx`, lazy): `unrecoveredDisbursements` by
+  client / matter (`prof/ps-disb-view.ts` `disbView` / `writtenOff`, tested in `tests/ps-disb-view.test.ts`), buckets
+  0–30 / 31–60 / 61–90 / 90+, **Write off** (`writeOffDisbursement`: `books.edit`, period lock, no journal, PS56) and the
+  owner's **Reverse**; a fee note's `disbursementSchedule` prints through `printHtmlDocument` with `escHtml`.
+- **B2 Media** (pack `media`, `MediaPrebill.tsx` lazy on the pre-bill): the client's `unbilledMedia` by medium, ticked rows
+  billed through `mediaLines` (principal: cost + fee; agent: Rule 33 recovery + fee) passed to `createPrebillDraft` as
+  `extra`, snapshot `mediaSnap` in `ps.media`; the expected client TDS (`mediaTds`, labelled through `ita2025.ts`). The
+  publisher's commission is **its own draft invoice to the publisher** (`createCommissionDraft`, PS12 (c), PF20) — not a
+  line on the client's fee note. `mediaSchedule` print not wired (cut 1).
+- **B3 Appearances** (pack `legal`): `createPrebillDraft({ appearances: true })` turns entries of appearance / item work
+  types into `appearanceLines` (count × fee) carrying the entries' `bill_refs` (added to the engine), so they are billed
+  and still count for realisation; off gives the same draft (`tests/ps-prebill-r16b.test.ts`). PF19.
+- **B4 FX memo** (`YearEndWipView`): "At closing rate" column for matters whose engagement bills in a foreign currency
+  (`atClosing` with the currency master's rate on the closing date) and open foreign invoices (`revalueReceivables` with
+  the master's rates). Memo only (PF14, PS37, PF21).
+- **B5 Deletes**: Firm → Partners → Delete (`deletePartner`, `settings.manage`, refused while a partner run or a voucher
+  line names the partner); Matters → Conflicts → Delete (`deleteCheck`, `master.edit`; a waived check needs the owner;
+  unknown id refused; `tests/ps-conflicts-delete.test.ts`). Both rows go to the recycle bin (watched tables).
+  `isPropertyExport` removed (superseded by QA17 R6's `ps.export.pos_class: 'property'`).
+
