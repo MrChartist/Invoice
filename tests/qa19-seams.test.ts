@@ -6,6 +6,7 @@
  *    pure-agent fare line it credits.
  * U8 R16-D1 (netting to a hand-linked vendor's own creditor ledger) was fixed in the app's ledger only: the Tally XML
  *    journal and the receipts CSV still debited "<client> (Creditor)", leaving the supplier's ledger at the full bill.
+ * U9 R16-B5 delete partner checked vouchers only: a capital / current ledger with an opening balance let it go.
  */
 import './helpers/shim.ts';
 import { beforeEach, test } from 'node:test';
@@ -76,4 +77,18 @@ test('U8: netting with a hand-linked vendor (another name): Tally debits the sup
   assert.deepEqual(j.entries.map((e) => [e.ledger, e.side]), [['Mehta Travels Pvt Ltd', 'Dr'], ['Mehta Tours', 'Cr']]);
   const csv = receipts(src as never);
   assert.equal(csv.rows[0][5], 'Mehta Travels Pvt Ltd', 'receipts CSV: deposited to the supplier\'s ledger');
+});
+
+/* ── U9: a partner whose capital ledger carries an opening balance cannot be deleted (R16-B5) ── */
+test('U9: deletePartner refuses while the capital / current ledger has an opening balance; deletes once it is cleared', async () => {
+  const { savePartner, deletePartner, loadPartners } = await import('../src/lib/prof/ps-partners.ts');
+  const { saveOpenings } = await import('../src/lib/ledger/openings.ts');
+  const term = { from: '2025-04-01', share_pct: 100, remuneration: { mode: 'max_allowable' as const }, interest_pct: 12 };
+  const p = savePartner({ name: 'Asha', kind: 'working', joined: '2025-04-01', terms: [term] });
+  saveOpenings([{ ledger_id: p.capital_account_id, amount: -50000000 }]); // Cr ₹5,00,000 brought in
+  assert.throws(() => deletePartner(p.id), /postings/);
+  assert.equal(loadPartners().length, 1);
+  saveOpenings([{ ledger_id: p.capital_account_id, amount: 0 }]);
+  deletePartner(p.id);
+  assert.equal(loadPartners().length, 0);
 });
