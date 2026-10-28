@@ -159,6 +159,9 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   // R17-A: the Deploy desk (B–D add muster, bills, compliance, profit, statutory)
   '/time?tab=deploy': ['deploy', 'manpower', 'security agency', 'guard', 'housekeeping', 'तैनाती'],
   '/time?tab=deploy&view=sites': ['site', 'post', 'guard post', 'contract', 'साइट'],
+  // R17-B
+  '/time?tab=deploy&view=muster': ['muster', 'duty register', 'guard attendance', 'हाज़िरी'],
+  '/time?tab=deploy&view=bills': ['manpower bill', 'security bill', 'cost-plus', 'बिल'],
 };
 
 /** Words for one href: its own row, else the row of its base tab (`&view=` dropped). */

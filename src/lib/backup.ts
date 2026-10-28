@@ -518,6 +518,8 @@ const RECORD_TABLES = [
   'travel_bookings',
   // R15-C: supplier statements (BSP / consolidator / bed-bank, rows inside)
   'supplier_statements',
+  // R17-B: site duty registers (musters; one per site × month, rows inside)
+  'site_musters',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -632,6 +634,8 @@ const ID_TABLES = new Set([
   'travel_bookings',
   // R15-C: supplier statements (BSP / consolidator / bed-bank, rows inside)
   'supplier_statements',
+  // R17-B: site duty registers (musters; one per site × month, rows inside)
+  'site_musters',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

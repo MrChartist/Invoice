@@ -63,11 +63,11 @@ test('settings defaults by kind; a value the user set is kept; unknown (B–D) k
 
 test('checklist steps only with manpower_kind; facts from the data', () => {
   const f: ChecklistFactsV3 = { profileReady: true, clients: 1, items: 1, invoices: 1, messagesSent: 1, payments: 1 };
-  const steps = (manpowerKind?: string) => allSteps(f, { businessType: 'services', serviceKind: 'manpower', packs: [], modules: null, role: 'owner', ...(manpowerKind ? { manpowerKind } : {}) } as ChecklistCtx).map((s) => s.kind).filter((k) => ['firstSite', 'firstBill'].includes(k));
+  const steps = (manpowerKind?: string) => allSteps(f, { businessType: 'services', serviceKind: 'manpower', packs: [], modules: null, role: 'owner', ...(manpowerKind ? { manpowerKind } : {}) } as ChecklistCtx).map((s) => s.kind).filter((k) => ['firstSite', 'firstMuster', 'firstBill'].includes(k));
   assert.deepEqual(steps(), []);
-  assert.deepEqual(steps('security'), ['firstSite', 'firstBill']);
+  assert.deepEqual(steps('security'), ['firstSite', 'firstMuster', 'firstBill']);
   assert.equal(readChecklistInputs().facts.manpower, undefined);
   localDb.settings.save({ ...localDb.settings.get(), ...applyManpowerKind('facility') });
   setTable('cost_centres', [{ id: 's', name: 'Tower', kind: 'project', active: true, created_at: '', mp: { code: 'S-001', contract: {}, posts: [], status: 'active' } }]);
-  assert.deepEqual(readChecklistInputs().facts.manpower, { firstSite: 1, firstBill: 0 });
+  assert.deepEqual(readChecklistInputs().facts.manpower, { firstSite: 1, firstBill: 0, firstMuster: 0 });
 });

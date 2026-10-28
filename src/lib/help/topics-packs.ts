@@ -271,5 +271,8 @@ export const TOPICS: readonly HelpTopic[] = [
   // R17-A: the Deploy desk (B–D add muster, bills, compliance, profit, statutory). Working papers — verify with your CA.
   t('time:deploy', 'Deploy', 'तैनाती', 'Security, housekeeping and staffing agencies: client sites with posts and rates; each bill takes the GST regime of its posts and client.', 'Each new site.', { statutory: ca(['MP1', 'MP2', 'MP7']) }),
   t('time:deploy:sites', 'Sites', 'साइटें', 'A site is a cost centre: posts with SAC, heads, shift and rate; client flags (TDS-only, composition, school) decide reverse charge or exemption.', 'Each contract.', { statutory: ca(['MP1', 'MP5', 'MP29']) }),
+  // R17-B
+  t('time:deploy:muster', 'Duty register', 'ड्यूटी रजिस्टर', 'Duties, OT and relievers per site and month; lock it, then send attendance (LOP, OT) to payroll and bill from it.', 'Each month end.', { statutory: ca(['MP32', 'MP20']) }),
+  t('time:deploy:bills', 'Bills', 'बिल', 'Drafts from locked musters by duty, hour, month pro-rata or cost-plus; one per site or bill group and GST regime; client TDS expected.', 'Each month end.', { statutory: ca(['MP6', 'MP11', 'MP14']) }),
   t('time:trips:events', 'Event budgets', 'इवेंट बजट', 'Budget heads: approved, booked, billed, paid; over-budget heads in red; client advances, margin, POS by Sec 12(7)(a) and each vendor\'s TDS limb (hint).', 'Each event.', { statutory: ca(['TV21', 'TV22', 'TV23']) }),
 ];
