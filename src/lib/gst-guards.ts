@@ -229,7 +229,8 @@ export type GstExceptionCode = 'IRN_MISSING' | 'IRP_WINDOW_CLOSED' | 'B2B_NO_HSN
   | 'SV_RATE_OLD' | 'SV_NIL_NOT_EXEMPT' // R10 (SV-A4)
   | 'AG_CLASS_RATE' // R12 (AG-A3)
   | 'PS_PURE_AGENT_OLD' // R14 (PS-B1)
-  | 'TV_MIX' | 'TV_ITC_5'; // R15-B3
+  | 'TV_MIX' | 'TV_ITC_5' // R15-B3
+  | 'CN_CLASS_RATE'; // R16-D3
 
 export interface GstException {
   code: GstExceptionCode;
@@ -281,6 +282,9 @@ if (svOn || getJson<{ business_type?: unknown } | null>(SINGLETON_KEYS.settings,
 // R15-B3: travel invoices — rate mix, ITC claimed on a 5 % trip — one lazy check, travel companies only.
 let tvCheck: BandCheck | null = null;
 if (typeof getJson<{ travel_kind?: unknown } | null>(SINGLETON_KEYS.settings, null)?.travel_kind === 'string') void import('./travel/tv-itc').then((m) => { tvCheck ??= m.tvExceptions; }, () => undefined);
+// R16-D3: works-contract class-rate notice — one lazy check, construction companies (profile or `works` pack) only.
+let cnCheck: BandCheck | null = null;
+if (((s) => typeof s?.construction_kind === 'string' || (Array.isArray(s?.industry_packs) && s.industry_packs.includes('works')))(getJson<{ construction_kind?: unknown; industry_packs?: unknown[] } | null>(SINGLETON_KEYS.settings, null))) void import('./construction/cn-guard').then((m) => { cnCheck ??= m.cnExceptions; }, () => undefined);
 let agCheck: BandCheck | null = null;
 if (((s) => !!s?.agri_kind || (Array.isArray(s?.industry_packs) && s.industry_packs.includes('agri')))(getJson<{ agri_kind?: unknown; industry_packs?: unknown[] } | null>(SINGLETON_KEYS.settings, null))) void import('./agri/ag-hooks').then((m) => { agCheck ??= m.agExceptions; }, () => undefined);
 
@@ -334,6 +338,7 @@ export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOp
     for (const b of agCheck?.(inv) ?? []) push(b.code, 'warning', b.vars); // R12 (AG-A3)
     for (const b of psCheck?.(inv) ?? []) push(b.code, 'warning', b.vars); // R14 (PS-B1)
     for (const b of tvCheck?.(inv) ?? []) push(b.code, 'warning', b.vars); // R15-B3
+    for (const b of cnCheck?.(inv) ?? []) push(b.code, 'warning', b.vars); // R16-D3
   }
   const rank = (e: GstException) => (e.severity === 'error' ? 0 : 1);
   return out.sort((a, b) => rank(a) - rank(b) || a.date.localeCompare(b.date) || a.number.localeCompare(b.number));

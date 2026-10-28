@@ -101,6 +101,7 @@ export const ggT = defineArea(
     exSvNil: '{name}: a 0% line of an exempt service class without the exempt mark is reported as nil-rated — set Exempt on the line.',
     exPsPureAgent: '{n} pure-agent reimbursement line(s) issued before the fix are reported as nil-rated; the invoice is not changed — verify with your CA (PS3).', // R14 (PS-B1)
     exTvMix: 'The 5 % tour-operator line is mixed with other taxed lines — one regime per invoice (verify, TV9).', exTvItc5: 'ITC is claimed on a bill of 5 % trip {trip} (verify, TV8).', // R15-B3
+    exCnClass: '{name}: GST {rate}% differs from its works-contract class ({want}% on this date) — your typed rate is kept; verify with your CA (CN1).', // R16-D3
     sevError: 'Error',
     sevReview: 'Review',
     colSeverity: 'Severity',
@@ -268,6 +269,7 @@ export const ggT = defineArea(
     exSvNil: '{name}: छूट वाले सेवा वर्ग की 0% पंक्ति पर "छूट" निशान नहीं है, इसलिए यह निल-रेटेड में जाती है — पंक्ति पर छूट चुनें।',
     exPsPureAgent: 'सुधार से पहले जारी {n} शुद्ध एजेंट प्रतिपूर्ति पंक्ति(याँ) निल-रेटेड में दिखती हैं; बिल नहीं बदला जाता — अपने CA से जाँचें (PS3)।',
     exTvMix: '5 % टूर ऑपरेटर पंक्ति के साथ दूसरी कर-दर वाली पंक्तियाँ हैं — एक इनवॉइस में एक व्यवस्था (जाँचें, TV9)।', exTvItc5: '5 % यात्रा {trip} के बिल पर ITC लिया गया है (जाँचें, TV8)।',
+    exCnClass: '{name}: GST {rate}% इसके वर्क्स-कॉन्ट्रैक्ट वर्ग से अलग है (इस तारीख़ को {want}%) — आपकी लिखी दर रहेगी; अपने CA से जाँचें (CN1)।',
     sevError: 'त्रुटि',
     sevReview: 'जाँचें',
     colSeverity: 'गंभीरता',
