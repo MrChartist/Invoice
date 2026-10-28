@@ -16,6 +16,10 @@
  *             + issued cheques not yet cleared, at their cheque date
  *             + optionally, average monthly direct expenses (last 3 full months) spread per week
  *
+ * PENDING 39: receivables are net of live credit notes (linked ones off their bill, unlinked ones off the party's
+ * first expected receipts), and `commitments` add GST / TDS deposits, loan EMIs and salaries (`gstTdsCommitments`,
+ * `loanCommitments`, `payrollCommitments`).
+ *
  * Foreign documents are converted at their invoice rate; one without a rate is left out (counted).
  * Pure: no storage. Not a statement — it is only as good as the due dates in your data.
  */
@@ -35,6 +39,10 @@ import { receivableBalance } from './rcm';
 import { openInstalments } from './payment-schedule';
 import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
 import { bankAccountsDb, isClientMoneyAccount } from './bank-accounts'; // R14 PS-B3
+import { isLiveCreditNote, linkedCredits, type CreditLinkRow } from './amount-due';
+import { receivableTotal } from './rcm';
+import { isNonGstFinancialNote } from './financial-note';
+import { emiSchedule, type BusinessLoan } from './loans';
 
 /** Open receivable `inr` split over a document's unpaid instalments (one part on `due_date` without a schedule). */
 function scheduledParts(inv: InvoiceRecord, inr: number): { due: string; label: string; amount: number }[] {
@@ -56,7 +64,7 @@ export type Horizon = (typeof HORIZONS)[number];
 export const LAG_MIN = -30;
 export const LAG_MAX = 120;
 
-export type ForecastKind = 'receivable' | 'recurring' | 'cheque_in' | 'payable' | 'cheque_out' | 'expenses';
+export type ForecastKind = 'receivable' | 'recurring' | 'cheque_in' | 'payable' | 'cheque_out' | 'expenses' | 'tax' | 'loan' | 'salary';
 
 export interface ForecastItem {
   date: string;
@@ -112,6 +120,10 @@ export interface ForecastInput {
   includeExpenses?: boolean;
   /** Leave out invoices more than this many days past due (undefined = keep all). */
   skipOverdueAfter?: number;
+  /** PENDING 39: `doc_links` — live credit notes reduce the receivables they settle. */
+  links?: readonly CreditLinkRow[];
+  /** PENDING 39: GST / TDS deposits, loan EMIs, salaries (outflows built by the `*Commitments` helpers). */
+  commitments?: readonly ForecastItem[];
 }
 
 const RECEIVABLE_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
@@ -209,10 +221,22 @@ export function buildForecast(input: ForecastInput): Forecast {
     }
   }
 
+  // PENDING 39: live credit notes. Linked ones come off their bill; the rest (in rupees) off the party's receipts.
+  const credited = linkedCredits(input.links, input.invoices);
+  const linkedNotes = new Set((input.links ?? []).filter((l) => l.relation === 'credit_note').map((l) => l.to_id));
+  const unapplied = new Map<string, number>();
+  for (const n of input.invoices) {
+    if (!isLiveCreditNote(n) || linkedNotes.has(n.id)) continue;
+    const rate = fxRate(n);
+    if (rate === null) continue;
+    const credit = round2(receivableTotal(n) * rate);
+    if (credit > 0) unapplied.set(clientKey(n.client), round2((unapplied.get(clientKey(n.client)) ?? 0) + credit));
+  }
+
   // Open receivables.
   for (const inv of input.invoices) {
     if (!RECEIVABLE_DOCS.has(inv.doc_type ?? 'INVOICE') || inv.status === 'Draft' || inv.status === 'Cancelled') continue;
-    const balance = round2(typeof inv.balance_due === 'number' || inv.reverse_charge ? receivableBalance(inv) : num(inv.total) - num(inv.tds_amount) - num(inv.amount_paid));
+    const balance = round2((typeof inv.balance_due === 'number' || inv.reverse_charge ? receivableBalance(inv) : num(inv.total) - num(inv.tds_amount) - num(inv.amount_paid)) - (credited.get(inv.id) ?? 0));
     if (balance <= 0.004) continue;
     const rate = fxRate(inv);
     if (rate === null) {
@@ -225,6 +249,12 @@ export function buildForecast(input: ForecastInput): Forecast {
     // 8.100: a payment schedule expects each unpaid instalment on its own date (in rupees, pro rata).
     const parts = scheduledParts(inv, inr);
     for (const part of parts) {
+      const credit = unapplied.get(clientKey(inv.client)) ?? 0;
+      const less = Math.min(credit, part.amount);
+      if (less > 0) {
+        unapplied.set(clientKey(inv.client), round2(credit - less));
+        part.amount = round2(part.amount - less);
+      }
       const due = part.due || isoDay(inv.due_date) || isoDay(inv.issue_date) || today;
       if (input.skipOverdueAfter !== undefined && daysFrom(due, today) > input.skipOverdueAfter) continue;
       const lag = lagFor(inv.client);
@@ -312,6 +342,8 @@ export function buildForecast(input: ForecastInput): Forecast {
     });
   }
 
+  for (const c of input.commitments ?? []) push({ ...c, date: clamp(c.date), overdue: c.overdue || c.date < today });
+
   // Average monthly expenses (last 3 full months of expense-type bills).
   const monthStart = `${today.slice(0, 7)}-01`;
   const from = `${shiftMonthKey(today.slice(0, 7), -3)}-01`;
@@ -395,7 +427,92 @@ export const KIND_LABELS: Record<ForecastKind, string> = {
   payable: 'Bill',
   cheque_out: 'Cheque out',
   expenses: 'Expenses',
+  tax: 'GST / TDS',
+  loan: 'Loan EMI',
+  salary: 'Salaries',
 };
+
+/* ── Commitments (PENDING 39) ─────────────────────────────────── */
+
+const monthEnd = (ym: string): string => shiftDay(`${shiftMonthKey(ym, 1)}-01`, -1);
+const monthName = (ym: string): string => `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][+ym.slice(5, 7) - 1]} ${ym.slice(0, 4)}`;
+/** Months whose deposit day (`day` of the next month) falls between today and `end`. */
+function depositMonths(today: string, end: string, day: number): { month: string; due: string }[] {
+  const out: { month: string; due: string }[] = [];
+  for (let m = shiftMonthKey(today.slice(0, 7), -1); `${m}-01` <= end; m = shiftMonthKey(m, 1)) {
+    const due = `${shiftMonthKey(m, 1)}-${String(day).padStart(2, '0')}`;
+    if (due >= today && due <= end) out.push({ month: m, due });
+  }
+  return out;
+}
+
+/**
+ * GST (20th of the next month): output tax of the month's sales documents (credit notes off, non-GST financial notes
+ * left out) less ITC on eligible bills, plus reverse-charge tax (always paid in cash); TDS deducted on bills (7th).
+ * From documents — an estimate before the return; a month already paid shows here until it is due. Rupees.
+ */
+export function gstTdsCommitments(invoices: readonly InvoiceRecord[], purchases: readonly unknown[], vendors: readonly unknown[], today: string, end: string): ForecastItem[] {
+  const out: ForecastItem[] = [];
+  const bills = purchases.map((raw) => readPurchase(raw, vendors)).filter((b): b is NonNullable<typeof b> => !!b && !isVoidStatus(b.status));
+  for (const { month, due } of depositMonths(today, end, 20)) {
+    let tax = 0;
+    for (const inv of invoices) {
+      if (inv.status === 'Draft' || inv.status === 'Cancelled' || String(inv.issue_date).slice(0, 7) !== month || inv.reverse_charge || isNonGstFinancialNote(inv)) continue;
+      const sign = inv.doc_type === 'CREDIT_NOTE' ? -1 : RECEIVABLE_DOCS.has(inv.doc_type ?? 'INVOICE') ? 1 : 0;
+      const rate = fxRate(inv);
+      if (!sign || rate === null) continue;
+      tax += sign * (num(inv.tax_amount) + num(inv.cess_amount)) * rate;
+    }
+    let rcm = 0;
+    for (const b of bills) {
+      if (b.date.slice(0, 7) !== month) continue;
+      if (b.reverseCharge) rcm += b.tax + b.cess;
+      else if (b.itcEligible) tax -= b.tax + b.cess - b.itcReversed;
+    }
+    const gst = round2(Math.max(tax, 0) + rcm);
+    if (gst > 0) out.push({ date: due, kind: 'tax', direction: 'out', party: 'GST', ref: `GST ${monthName(month)}`, amount: gst, basis: `output tax less ITC${rcm ? ' + reverse charge' : ''} of ${monthName(month)}, due ${fmtDay(due)} (estimate)` });
+  }
+  for (const { month, due } of depositMonths(today, end, 7)) {
+    const tds = round2(bills.filter((b) => b.date.slice(0, 7) === month).reduce((s, b) => s + b.tdsAmount, 0));
+    if (tds > 0) out.push({ date: due, kind: 'tax', direction: 'out', party: 'TDS', ref: `TDS ${monthName(month)}`, amount: tds, basis: `TDS on bills of ${monthName(month)}, due ${fmtDay(due)}` });
+  }
+  return out;
+}
+
+/** Unpaid EMIs of business loans (`business_loans`) up to `end`; an EMI already due is expected today. */
+export function loanCommitments(loans: readonly Pick<BusinessLoan, 'number' | 'lender' | 'principal' | 'rate' | 'tenure_months' | 'first_emi' | 'payments'>[], end: string): ForecastItem[] {
+  const out: ForecastItem[] = [];
+  for (const l of loans) {
+    const paid = new Set((l.payments ?? []).map((p) => p.n));
+    for (const r of emiSchedule(l)) {
+      if (r.date > end) break;
+      if (!paid.has(r.n)) out.push({ date: r.date, kind: 'loan', direction: 'out', party: l.lender, ref: `${l.number} EMI ${r.n}`, amount: r.emi, basis: `EMI ${r.n} dated ${fmtDay(r.date)}`, link: '/loans' });
+    }
+  }
+  return out;
+}
+
+interface RunLike { month?: string; status?: string; date?: string; lines?: readonly { net?: number; pf_ee?: number; epf_er?: number; eps?: number; edli?: number; pf_admin?: number; esi_ee?: number; esi_er?: number; pt?: number; tds?: number }[] }
+/**
+ * Salaries: the latest FINAL payroll run repeats each later month (net pay on the month's last day) with its PF / ESI /
+ * PT / TDS on the 15th of the next month; that run's own deposits too unless a payroll payment for its month exists.
+ */
+export function payrollCommitments(runs: readonly RunLike[], payments: readonly { kind?: string; period?: string }[], today: string, end: string): ForecastItem[] {
+  const last = [...runs].filter((r) => r?.status === 'final' && /^\d{4}-\d{2}$/.test(String(r.month))).sort((a, b) => String(b.month).localeCompare(String(a.month)))[0];
+  if (!last) return [];
+  const lines = last.lines ?? [];
+  const net = round2(lines.reduce((s, l) => s + num(l.net), 0));
+  const dues = round2(lines.reduce((s, l) => s + num(l.pf_ee) + num(l.epf_er) + num(l.eps) + num(l.edli) + num(l.pf_admin) + num(l.esi_ee) + num(l.esi_er) + num(l.pt) + num(l.tds), 0));
+  const out: ForecastItem[] = [];
+  const depositDone = payments.some((p) => p?.period === last.month && p.kind !== 'salary' && p.kind !== 'loan');
+  for (let m = last.month!; `${m}-01` <= end; m = shiftMonthKey(m, 1)) {
+    const payDay = monthEnd(m);
+    const depositDay = `${shiftMonthKey(m, 1)}-15`;
+    if (m !== last.month && net > 0 && payDay >= today && payDay <= end) out.push({ date: payDay, kind: 'salary', direction: 'out', party: 'Employees', ref: `Salaries ${monthName(m)}`, amount: net, basis: `net pay of the ${monthName(last.month!)} run, repeated` });
+    if (dues > 0 && depositDay >= today && depositDay <= end && !(m === last.month && depositDone)) out.push({ date: depositDay, kind: 'salary', direction: 'out', party: 'PF / ESI / PT / TDS', ref: `Salary dues ${monthName(m)}`, amount: dues, basis: `statutory dues of the ${monthName(last.month!)} run, due ${fmtDay(depositDay)}` });
+  }
+  return out;
+}
 
 export function forecastCsv(f: Forecast): string {
   return toCsv([
