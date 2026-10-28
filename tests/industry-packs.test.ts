@@ -26,6 +26,7 @@ test('each new type implies its pack; an explicit list (even empty) beats the ty
   for (const p of ['pharmacy', 'apparel', 'electronics', 'jewellery']) assert.ok(PACK_IDS.includes(p as never), p);
   for (const p of ['agri', 'dairy', 'mill', 'coldstore', 'agri_inputs', 'fpo']) assert.ok(PACK_IDS.includes(p as never), p); // R12 (AG-A1)
   for (const p of ['shopfloor', 'fabrication', 'garments', 'plastics', 'press', 'foodmfg']) assert.ok(PACK_IDS.includes(p as never), p); // R13 (MF-A1)
+  for (const p of ['travel', 'events']) assert.ok(PACK_IDS.includes(p as never), p); // R15-B1
   assert.deepEqual(activePacks({ business_type: 'kirana' }), []);
   assert.ok(PACK_TABS.filter((t) => ['pharmacy', 'apparel', 'electronics', 'jewellery'].includes(t.pack)).every((t) => t.path.startsWith('/inventory?tab=')));
 });
@@ -90,7 +91,9 @@ test('the Ctrl+K common-credit row is on for every pack that shows the GST tab (
 
 const R10_PACKS: readonly string[] = ['clinic', 'salon', 'fitness', 'workshop',
   // R14: the professional packs live on /time like R10's — every professional kind keeps `time` (PACK_ROUTES unchanged).
-  'practice', 'cafirm', 'legal', 'design', 'media', 'svcexport', 'partners'];
+  'practice', 'cafirm', 'legal', 'design', 'media', 'svcexport', 'partners',
+  // R15: the travel packs too — every travel kind keeps `time`.
+  'travel', 'events'];
 
 test('R6-B2 pin: the shell copies PACK_ROUTES / PACK_OF_TYPE_INLINE equal PACK_TABS / PACK_OF_TYPE', async () => {
   const { PACK_ROUTES, PACK_OF_TYPE_INLINE, moduleOfPath } = await import('../src/lib/shop-mode.ts');

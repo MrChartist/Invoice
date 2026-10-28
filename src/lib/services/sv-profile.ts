@@ -22,6 +22,7 @@ export const SERVICE_SWITCHES: Readonly<Record<ServiceKindId, Switches>> = {
   appliance: {},
   professional: {},
   other: {},
+  travel: {}, // R15-B1: switches in `travel_settings` (travel/tv-profile.ts)
 };
 
 /** The service settings after applying `kind`'s switches to `current` (pure; a switch already set is kept). */

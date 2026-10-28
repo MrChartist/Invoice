@@ -282,6 +282,9 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   client_money: 'Client-money (trust) vouchers (CMV/FY…): receipt / payment on behalf / to fees / refund / transfer / interest, client, matter, amount, client-money bank account, purpose, invoice and office receipt (to fees), client\'s authority or owner override, journals (R14).',
   // R14-C
   edf_register: 'EDF register (export of services, FEMA 2026): kind (software / services / SOFTEX history), month, invoices, currency, value FC / ₹, due, EDF no. and filing day, authority (AD bank / STPI / SEZ), small-value declaration, status (R14).',
+  // R15-B
+  travel_settings: 'Travel profile settings: GST regime default, IATA / BSP, consolidators, fee defaults, switches; C / D add theirs (R15).',
+  travel_bookings: 'Travel bookings: trip / event file (cost centre), component, supplier, PNR / ref., dates, cost (currency, rate), sell, pure agent, status, supplier bill, invoice line once billed (R15).',
 };
 
 export { PAYROLL_TABLES } from './payroll-tables';

@@ -67,6 +67,7 @@ import './services/sv-registry'; // R10: service tables' rights and audit labels
 import './agri/ag-registry'; // R12: agri tables' rights and audit labels (lazy registration)
 import './mfg/mf-registry'; // R13: manufacturing tables' rights and audit labels (lazy registration)
 import './prof/ps-registry'; // R14: professional tables' rights and audit labels (lazy registration)
+import './travel/tv-registry'; // R15: travel tables' rights and audit labels (lazy registration)
 
 export const [SYNC_STATE_KEY, SYNC_CONFLICTS_KEY, SYNC_AUDIT_KEY] = SYNC_META_KEYS;
 
@@ -465,6 +466,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}client_money`]: 'date',
   // R14-C: EDF register (the end of the invoice month)
   [`${DB_PREFIX}edf_register`]: 'date',
+  // R15-B: travel bookings (by start)
+  [`${DB_PREFIX}travel_bookings`]: 'start',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;

@@ -1111,3 +1111,18 @@ test('R15-A3 netting reads the real bill shape', async () => {
   ];
   assert.deepEqual(openBills(v, rows).map((b) => [b.id, b.open, !!b.rcm]), [['p1', 1180, false], ['rcm', 1000, true]]);
 });
+
+// R15-B2 / B3: trip costing and the 5 % ITC override list read bills through `readPurchase` (cost = taxable when ITC is
+// claimed, else the total; unpaid = total − paid; void rows left out; overrides = bills of 5 % trips still claiming ITC).
+test('R15-B trip costing and the ITC override list read the real bill shape', async () => {
+  const { tripCosting } = await import('../src/lib/travel/tv-costing.ts');
+  const { itcOverrides } = await import('../src/lib/travel/tv-itc.ts');
+  const tagged = { ...bill, tv: { trip_id: 't1', booking_id: 'b1', regime: 'to5' as const } };
+  const blocked = { ...bill, id: 'p2', itc_eligible: false, tv: { trip_id: 't1' } };
+  const voided = { ...bill, id: 'p4', status: 'void', tv: { trip_id: 't1' } } as never;
+  const bk = { id: 'b1', trip_id: 't1', component: 'hotel' as const, start: '2026-04-12', cost: 900, sell: 1500, status: 'confirmed' as const, created_at: '' };
+  const c = tripCosting([bk], [tagged, blocked, voided], new Set());
+  assert.deepEqual(c.rows.map((r) => [r.component, r.cost, r.sell]), [['hotel', 1000, 1500], ['other', 1180, 0]]);
+  assert.equal(c.unpaid, 2360);
+  assert.deepEqual(itcOverrides([tagged, blocked, voided, { ...tagged, id: 'p3', tv: { trip_id: 't2' } }]).map((o) => [o.id, o.tax]), [['p1', 180]]);
+});

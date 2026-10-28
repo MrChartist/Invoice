@@ -30,7 +30,9 @@ export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit
   // R13 (MF-A1): manufacturing packs (desk tabs on /manufacturing; switched on by the manufacturing profile, never by a type)
   | 'shopfloor' | 'fabrication' | 'garments' | 'plastics' | 'press' | 'foodmfg'
   // R14 (PS-A1): professional packs (desk tabs on /time; switched on by the professional profile, never by a type)
-  | 'practice' | 'cafirm' | 'legal' | 'design' | 'media' | 'svcexport' | 'partners';
+  | 'practice' | 'cafirm' | 'legal' | 'design' | 'media' | 'svcexport' | 'partners'
+  // R15 (R15-B1): travel / events packs (one desk tab on /time; switched on by the travel profile, never by a type)
+  | 'travel' | 'events';
 
 export const PACK_IDS: readonly PackId[] = [
   'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
@@ -42,6 +44,7 @@ export const PACK_IDS: readonly PackId[] = [
   'agri', 'dairy', 'mill', 'coldstore', 'agri_inputs', 'fpo', // R12 (AG-A1)
   'shopfloor', 'fabrication', 'garments', 'plastics', 'press', 'foodmfg', // R13 (MF-A1)
   'practice', 'cafirm', 'legal', 'design', 'media', 'svcexport', 'partners', // R14 (PS-A1)
+  'travel', 'events', // R15 (R15-B1)
 ];
 
 /** The packs a business type implies when `industry_packs` is absent. */
@@ -332,6 +335,10 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'svcexport', path: '/time?tab=exportsvc&view=realisation', labelKey: 'r14.exportsvc.realisation' },
   { pack: 'svcexport', path: '/time?tab=exportsvc&view=refund', labelKey: 'r14.exportsvc.refund' },
   { pack: 'svcexport', path: '/time?tab=exportsvc&view=platforms', labelKey: 'r14.exportsvc.platforms' },
+  // R15: the Trips desk on /time (B writes its views; C adds statements, D tcs / events — labels `r15.*` in the palette)
+  { pack: 'travel', alsoPacks: ['events'], path: '/time?tab=trips', labelKey: 'r15.trips' },
+  { pack: 'travel', alsoPacks: ['events'], path: '/time?tab=trips&view=trips', labelKey: 'r15.trips.trips' },
+  { pack: 'travel', alsoPacks: ['events'], path: '/time?tab=trips&view=bookings', labelKey: 'r15.trips.bookings' },
 ];
 
 /**

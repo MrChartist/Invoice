@@ -262,6 +262,9 @@ export const reachT = defineArea(
     'packDesc.svcexport': 'Sec 2(6) check, EDF register, realisation from the invoice date, platform receipts.',
     'pack.partners': 'Partners (firm / LLP)',
     'packDesc.partners': 'Capital and current accounts, remuneration within Sec 40(b), 194T, presumptive paper.',
+    // R15 (R15-B1): travel packs
+    'pack.travel': 'Travel & tours', 'packDesc.travel': 'Trip files, bookings, costing and margin, 5 % / 18 % / agent regimes.',
+    'pack.events': 'Events', 'packDesc.events': 'Event files with vendors and budgets on the Trips desk.',
     'ck.workCentres': 'Add your work centres (machines and their hour rates)',
     'ck.udyam': 'Add your Udyam number (printed on invoices)',
     'ck.firstDrawing': 'Add your first drawing',
@@ -275,6 +278,7 @@ export const reachT = defineArea(
     'ck.feeSchedule': 'Set your fee schedule', 'ck.linkCompanies': 'Link your clients\' companies on this device', 'ck.partners': 'Add your partners and the deed terms', // R14 (PS-D)
     'ck.clientMoneyBank': 'Mark your client-money bank account', 'ck.stageTemplate': 'Set the stage fees of your first project', // R14 (PS-B)
     'ck.lut': 'Record your LUT for exports', 'ck.edf': 'Prepare your first EDF', // R14 (PS-C)
+    'ck.firstTrip': 'Open your first trip', 'ck.firstSupplier': 'Add your first supplier booking', 'ck.regime': 'Choose your GST regime', 'ck.firstStatement': 'Import your first supplier statement', 'ck.firstEvent': 'Open your first event', // R15-B1
   } as const,
   {
     'title.shop': 'आप क्या काम करते हैं?',
@@ -525,6 +529,8 @@ export const reachT = defineArea(
     'packDesc.svcexport': 'धारा 2(6) जाँच, निर्यात घोषणा पत्र, इनवॉइस तारीख़ से वसूली, प्लेटफ़ॉर्म प्राप्तियाँ।',
     'pack.partners': 'साझेदार (फ़र्म / LLP)',
     'packDesc.partners': 'पूंजी खाता और चालू खाता, धारा 40(b) में पारिश्रमिक, 194T, अनुमानित आय।',
+    'pack.travel': 'यात्रा और टूर', 'packDesc.travel': 'यात्रा फ़ाइल, बुकिंग, लागत और मार्जिन, 5 % / 18 % / एजेंट व्यवस्था।',
+    'pack.events': 'इवेंट', 'packDesc.events': 'ट्रिप डेस्क पर वेंडर और बजट के साथ इवेंट फ़ाइल।',
     'ck.workCentres': 'अपने कार्य केंद्र जोड़ें (मशीनें और उनकी घंटे की दर)',
     'ck.udyam': 'अपना उद्यम पंजीकरण नंबर जोड़ें (इनवॉइस पर छपता है)',
     'ck.firstDrawing': 'पहली ड्रॉइंग जोड़ें',
@@ -538,5 +544,6 @@ export const reachT = defineArea(
     'ck.feeSchedule': 'अपनी फ़ीस सूची बनाएँ', 'ck.linkCompanies': 'इस डिवाइस पर क्लाइंट की कंपनियाँ जोड़ें', 'ck.partners': 'साझेदार और साझेदारी विलेख की शर्तें जोड़ें',
     'ck.clientMoneyBank': 'क्लाइंट-पैसे का बैंक खाता चिह्नित करें', 'ck.stageTemplate': 'पहली परियोजना के चरण शुल्क तय करें',
     'ck.lut': 'निर्यात के लिए LUT दर्ज करें', 'ck.edf': 'पहला EDF तैयार करें',
+    'ck.firstTrip': 'पहली यात्रा फ़ाइल खोलें', 'ck.firstSupplier': 'पहली आपूर्तिकर्ता बुकिंग जोड़ें', 'ck.regime': 'अपनी GST व्यवस्था चुनें', 'ck.firstStatement': 'पहला आपूर्तिकर्ता विवरण इम्पोर्ट करें', 'ck.firstEvent': 'पहला इवेंट खोलें',
   },
 );

@@ -41,6 +41,7 @@ const BoeDutySheet = lazy(() => import('../trade/BoeDutySheet'));
 // R8-C (TR-C2): notified goods from an agriculturist / unregistered supplier → reverse charge prompt (lazy).
 const RcmGoodsNotice = lazy(() => import('../trade/RcmGoodsNotice'));
 const MediaRows = lazy(() => import('../prof/MediaRows')); // R14 (PS-B5): media buy for a client (`media` pack)
+const TripPick = lazy(() => import('../travel/TripPick')); // R15-B2 / B3: the trip of a supplier bill (`travel` / `events` packs)
 // R8-A (TR-A1): supplier's special rate and last purchase rate, as hints (trade discounts or a trading pack, lazy).
 const BillRateHints = lazy(() => import('../trade/BillRateHints'));
 // R8-B (TR-B1/B2/B3): bags / weight rows, bill charges and the broker (commodity / agency pack, lazy).
@@ -167,6 +168,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const [attachments, setAttachments] = useState<AttachmentRef[]>(purchase?.attachments ?? []);
   const [psB, setPsB] = useState(() => (purchase as { ps?: Record<string, unknown> } | undefined)?.ps); // R14 (PS-B5)
   const [mediaOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.includes('media'))(localDb.settings.get() as never));
+  const [tvB, setTvB] = useState(purchase?.tv); // R15-B2 / B3
+  const [travelOn] = useState(() => ((s: { industry_packs?: unknown }) => Array.isArray(s.industry_packs) && s.industry_packs.some((p) => p === 'travel' || p === 'events'))(localDb.settings.get() as never));
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   // TDS deducted by us (Tally parity). Undefined rate / base / amount follow the suggestion.
@@ -210,6 +213,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const supplierPayable = supplierPayableOf({ reverseCharge: rcm && !importType, importType: importType || '', tax: totals.tax, taxable: totals.taxable, total: totals.total, cess: totals.cess, tdsOnBill });
 
   const submit = () => {
+    if (tvB?.regime === 'to5' && itc && !blocked && !tvB.itc_reason?.trim()) return setError('ITC on a 5 % trip needs a reason (TV8).'); // R15-B3
     if (!vendor && !init?.vendor_name) return setError(purT('errVendor'));
     if (!billNumber.trim()) return setError(purT('errBillNo'));
     if (!date) return setError(purT('errBillDate'));
@@ -270,6 +274,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         boe_duty: importType === 'GOODS' ? boeDuty : undefined, // R4-C3
         ...billablePatch(billable),
         ...(psB !== (purchase as { ps?: unknown } | undefined)?.ps ? { ps: psB } : {}), // R14 (PS-B5)
+        tv: tvB, // R15-B2
         cost_centre_id: costCentre,
         branch_id: branchId,
         attachments: attachments.length ? attachments : undefined,
@@ -280,6 +285,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         setWarning(res.message);
         return;
       }
+      const why = tvB?.regime === 'to5' && itc && !blocked ? tvB.itc_reason?.trim() : undefined; // R15-B3: ITC claimed on a 5 % trip (audited)
+      if (why && res.kind === 'saved' && why !== purchase?.tv?.itc_reason) void import('../../lib/travel/tv-itc').then((m) => m.auditItcOverride(res.bill.id, res.bill.bill_number, why)).catch(() => undefined);
       onSaved(res.kind === 'held' ? capT('heldMsg') : purchase ? purT('billUpdated') : purT('billSaved', { number: billNumber.trim() }));
       onClose();
     } catch (err) {
@@ -489,6 +496,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
 
       <BillableFields idPrefix="bill" value={billable} onChange={setBillable} rebilledIn={purchase?.rebilled_in} />
       {(mediaOn || !!psB?.media) && <Suspense fallback={null}><MediaRows ps={psB} onChange={setPsB} /></Suspense>}
+      {(travelOn || !!tvB) && <Suspense fallback={null}><TripPick value={tvB} onChange={setTvB} itc={itc} setItc={setItc} /></Suspense>}
 
       <AttachmentsPanel value={attachments} onChange={setAttachments} label={purT('attachments')} />
 
