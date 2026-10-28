@@ -6,7 +6,7 @@
  * opens it). Nothing is read until the tab opens.
  * Working papers — verify with your CA.
  */
-import { lazy, Suspense, type ComponentType, type LazyExoticComponent } from 'react';
+import { Suspense, type ComponentType, type LazyExoticComponent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { lgT } from '../../i18n/areas/logistics-r19a';
@@ -16,6 +16,7 @@ import { lgcT } from '../../i18n/areas/logistics-r19c';
 import controls from '../../styles/controls.module.css';
 import JobsView from './JobsView';
 import RatesView from './RatesView';
+import CustomsView from './CustomsView';
 import type { LgViewProps } from './lg-ui';
 
 type View = { label: () => string; C: ComponentType<LgViewProps> | LazyExoticComponent<ComponentType<LgViewProps>>; pack?: PackId };
@@ -25,7 +26,7 @@ const VIEWS: Record<string, View> = {
   rates: { label: () => lgT('rates'), C: RatesView },
   // R19-B (billing, costing) · R19-D (agents, courier, storage)
   // R19-C: the customs broker desk (pack `customs`)
-  customs: { label: () => lgcT('customs'), C: lazy(() => import('./CustomsView')), pack: 'customs' },
+  customs: { label: () => lgcT('customs'), C: CustomsView, pack: 'customs' },
 };
 
 export default function ShipmentsDesk({ view, notify }: LgViewProps & { view?: string }) {

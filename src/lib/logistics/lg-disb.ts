@@ -8,7 +8,7 @@
  * stamps `lg.wo`. The ledger stays gross (LG11). Rows come in through `lg-recv-io.ts` (`readPurchase`). Working papers —
  * verify with your CA (LG10, LG11, LG36, LG37).
  */
-import type { InvoiceItem } from '../../types/invoice';
+import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { LgJob, LgSnapshot } from '../../types/logistics-r19';
 import type { PurchaseRecord } from '../../types/purchases';
 import { generateId } from '../storage';
@@ -80,6 +80,22 @@ export function disbRows(src: readonly DisbSource[], billed: (id: string) => boo
     out.push({ id: s.id, job_id: lg.job_id, client_id: s.client_id ?? '', date: s.date, kind: lg.disb, ref: lg.ref ?? '', payee: s.payee, amount: round2(s.total), in_client_name: !!lg.in_client_name, billed: billed(s.id), ...(lg.wo ? { wo: lg.wo } : {}), age: Math.max(Math.round(dayNo(today) - dayNo(s.date)), 0) });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date)); // stable: same-day rows keep their entry order
+}
+
+/**
+ * The billed test of a row (the invoice editor's billable-cost rule, `timesheets.ts` `billedBy`): a live (not cancelled)
+ * invoice line names it in `bill_refs`, or — for an invoice without any `bill_refs` — its `rebilled_in` is live.
+ */
+export function billedBy(invoices: readonly Pick<InvoiceRecord, 'id' | 'status' | 'items'>[], rebilled: ReadonlyMap<string, string | undefined>): (id: string) => boolean {
+  const live = new Set<string>();
+  const withRefs = new Set<string>();
+  const refs = new Set<string>();
+  for (const inv of invoices) {
+    if (!inv?.id || inv.status === 'Cancelled') continue;
+    live.add(inv.id);
+    for (const l of inv.items ?? []) for (const r of l.bill_refs ?? []) { refs.add(r); withRefs.add(inv.id); }
+  }
+  return (id) => { const by = rebilled.get(id); return refs.has(id) || (!!by && live.has(by) && !withRefs.has(by)); };
 }
 
 /** Not on a live invoice and not written off. */

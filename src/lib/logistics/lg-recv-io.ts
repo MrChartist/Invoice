@@ -2,7 +2,7 @@
  * R19-C bridge (the only one of R19-C, outside the `f-logistics` family): the shared lazy code the customs broker desk
  * needs — advances (duty deposits: `saveAdvance` with `pass_through`, `applyAdvance`, `refundAdvance`,
  * `advanceBalance`), purchases (disbursements: `purchasesDb` / `paymentsDb`, read back through `readPurchase`), live
- * billing (`currentLiveInvoiceIds` / `billedBy`, the billable-cost rule of the invoice editor) and the Rule 33 line
+ * billing (`billedBy`, the billable-cost rule of the invoice editor, over `localDb` invoices) and the Rule 33 line
  * text. Engines take their data as arguments (`lg-disb.ts`, `lg-deposits.ts`, `lg-register.ts`). Rights, period locks
  * and audit are the called modules' own (`books.edit` for bills, `payment.record` for advances). A deposit is money
  * received (it shows once in the cash book); its application is the existing `advance_id` payment every cash reader
@@ -15,7 +15,6 @@ import type { PurchaseRecord } from '../../types/purchases';
 import { advanceBalance, applyAdvance, invoiceOpen, loadAdvances, refundAdvance, saveAdvance, senderSnapshot } from '../advances';
 import { paymentsDb, purchasesDb } from '../purchases';
 import { isVoidStatus, readPurchase } from '../purchase-normalize';
-import { billedBy, currentLiveInvoiceIds } from '../timesheets';
 import { PURE_AGENT_CHARGE } from '../trade/pure-agent';
 import { withTablesRollback } from '../table-txn';
 import { requireAccess } from '../access';
@@ -26,7 +25,7 @@ import { parseTable } from '../csv';
 import { loadJobs, saveJob } from './lg-save';
 import { readLogisticsSettings } from './lg-settings';
 import { docRefsFromTable } from './lg-register';
-import { disbBillLines, disbRecord, disbRows, validateDisb, type DisbInput, type DisbSource, type LgDisbRow } from './lg-disb';
+import { billedBy, disbBillLines, disbRecord, disbRows, validateDisb, type DisbInput, type DisbSource, type LgDisbRow } from './lg-disb';
 import { applyAmount, depositInput, type DepositBal, type DepositReceipt } from './lg-deposits';
 
 /** One purchases row as the engine reads it (through `readPurchase`), or null when it is not a bill. */
@@ -38,10 +37,8 @@ export function disbSource(raw: unknown): DisbSource | null {
 
 /** Every disbursement on behalf with its billed state (a live invoice line names it, as the editor's billable costs do). */
 export function loadDisb(today: string): LgDisbRow[] {
-  const live = currentLiveInvoiceIds();
   const raw = purchasesDb.all();
-  const ref = new Map(raw.map((p) => [p.id, p.rebilled_in]));
-  return disbRows(raw.map(disbSource).filter((x): x is DisbSource => !!x), (id) => !!billedBy(ref.get(id), live, id), today);
+  return disbRows(raw.map(disbSource).filter((x): x is DisbSource => !!x), billedBy(localDb.invoices.getAll(), new Map(raw.map((p) => [p.id, p.rebilled_in]))), today);
 }
 
 /** C1: save a disbursement (and its payment from our account when `pay` is given) in one rollback. */

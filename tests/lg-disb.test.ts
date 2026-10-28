@@ -11,7 +11,7 @@ import { clientMH, createViaStore, installSettings } from './helpers/world.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { purchasesDb } from '../src/lib/purchases.ts';
 import { loadJobs, saveJob } from '../src/lib/logistics/lg-save.ts';
-import { ageBuckets, disbBillLines, disbRecord, disbRows, disbSchedule, rule33Gaps, unrecovered, validateDisb, type LgDisbRow } from '../src/lib/logistics/lg-disb.ts';
+import { ageBuckets, billedBy, disbBillLines, disbRecord, disbRows, disbSchedule, rule33Gaps, unrecovered, validateDisb, type LgDisbRow } from '../src/lib/logistics/lg-disb.ts';
 import { addDisbursement, importDocRefs, jobDisbExtras, loadDisb, writeOffDisb } from '../src/lib/logistics/lg-recv-io.ts';
 import { isPureAgentLine, PURE_AGENT_CHARGE } from '../src/lib/trade/pure-agent.ts';
 import type { LgJob } from '../src/types/logistics-r19.ts';
@@ -81,4 +81,10 @@ test('SB / BOE import writes the job refs (all or nothing)', () => {
   const r = importDocRefs(`Job No,BOE No,BOE Date,IGM\n${job.number},8889990,04/11/2026,2345\nJOB/FY26-27/0099,1,,\n`);
   assert.deepEqual([r.updated, r.errors], [1, ['Row 3: job not found']]);
   assert.deepEqual(loadJobs()[0].refs, { boe_no: '8889990', boe_date: '2026-11-04', igm: '2345' });
+});
+
+test('billed test: a live line naming the row, or a live rebilled_in invoice without bill_refs; cancelled frees', () => {
+  const inv = (id: string, status: string, refs?: string[]) => ({ id, status, items: [{ bill_refs: refs }] }) as never;
+  const billed = billedBy([inv('i1', 'Sent', ['a']), inv('i2', 'Cancelled', ['b']), inv('i3', 'Sent'), inv('i4', 'Sent', ['z'])], new Map([['c', 'i3'], ['d', 'i4'], ['e', 'gone']]));
+  assert.deepEqual(['a', 'b', 'c', 'd', 'e'].map(billed), [true, false, true, false, false]);
 });
