@@ -427,9 +427,11 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
   const pos = (record.place_of_supply ?? '').trim();
   const st = record.supply_type;
   // "99" is the app's Other-Country code, "96" the GSTN one: both mean an overseas buyer.
+  // R19-B (LG15): export freight to a registered Indian recipient is B2B with Pos 96 (Circular 184/16/2022-GST Sl. 4).
+  const freight96 = pos === '96' && record.lg?.regime === 'export_freight' && /^\d{2}[A-Z0-9]{13}$/i.test(String(client.gstin ?? '').trim());
   const isExport =
     pos === '99' ||
-    pos === '96' ||
+    (pos === '96' && !freight96) ||
     st === 'EXPORT_LUT' ||
     st === 'EXPORT_WITH_PAYMENT' ||
     options.supplyType?.startsWith('EXP') === true;

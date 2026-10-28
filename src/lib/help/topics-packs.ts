@@ -283,6 +283,9 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:shipments', 'Shipments', 'शिपमेंट', 'A job file per shipment; its bills and costs hang on it.', 'Each shipment.', { statutory: ca(['LG1', 'LG2']) }),
   t('time:shipments:jobs', 'Jobs', 'जॉब', 'Mode, ports, bills of lading, containers; chargeable weight.', 'Each booking.', { statutory: ca(['LG33']) }),
   t('time:shipments:rates', 'Rates', 'दरें', 'Charge heads: SAC, role (own or pure agent), unit, rate.', 'When rates change.', { statutory: ca(['LG5', 'LG10']) }),
+  // R19-B
+  t('time:shipments:billing', 'Billing', 'बिलिंग', 'Bill a job: one document per place of supply and currency; recoveries at actual.', 'When a job is delivered.', { statutory: ca(['LG2', 'LG9', 'LG13']) }),
+  t('time:shipments:costing', 'Costing', 'लागत', 'Job margin: revenue less tagged supplier bills.', 'Each month.', { statutory: ca(['LG34']) }),
   // R19-C
   t('time:shipments:customs', 'Customs', 'सीमा शुल्क', 'SB / BOE numbers from a CSV; duty and CFS paid for the client (Rule 33 checks); deposits applied or refunded; ageing; CB register; KYC.', 'Each import / export job.', { statutory: ca(['LG10', 'LG11', 'LG12', 'LG26', 'LG27']) }),
   // R18-A: the Society desk on Recurring (B–D add bills, gst, dues, funds, registers). Working papers — verify with your CA.

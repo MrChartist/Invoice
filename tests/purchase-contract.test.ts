@@ -1161,6 +1161,17 @@ test('R18-B inward-RCM hint (hs-turnover) reads the real bill shape', async () =
   assert.equal(rcmHint(bill, { gstin: bill.vendor_gstin }, true, rule), false, 'paper is not security');
 });
 
+// R19-B3: job costing reads tagged bills through `readPurchase` / `readPurchaseLines` (lg-books-io → lg-costing): taxable
+// plus GST not taken as credit, split by line, drafts / void bills and disbursements on the client's behalf left out.
+test('R19-B job costing (lg-costing) reads the real bill shape', async () => {
+  const { costBills } = await import('../src/lib/logistics/lg-books-io.ts');
+  const { costAlloc } = await import('../src/lib/logistics/lg-costing.ts');
+  const tagged = { ...bill, lg: { job_id: 'j1' } };
+  const split = { ...bill, id: 'p2', itc_eligible: false, lines: [{ ...bill.lines[0], id: 'a' }, { ...bill.lines[0], id: 'b' }], taxable: 2000, cgst: 180, sgst: 180, total: 2360, lg: { job_id: 'j1', lines: { b: 'j2' } } };
+  const rows = costBills([tagged, split, { ...tagged, id: 'p3', status: 'void' }, { ...tagged, id: 'p4', lg: { job_id: 'j1', on_behalf: true } }, bill]);
+  assert.equal(rows.length, 4, 'untagged bills are not read');
+  assert.deepEqual(rows.map((r) => [...costAlloc(r)]), [[['j1', 1000]], [['j2', 1180], ['j1', 1180]], [], []]);
+
 // R19-C1: the customs broker's disbursements are read through `readPurchase` (`lg-recv-io.ts` `disbSource`): the total,
 // the payee, void rows flagged; the engine keeps only rows on the client's behalf tagged to a job; GST readers see no ITC.
 test('R19-C disbursements (lg-disb via lg-recv-io) read the real bill shape', async () => {
