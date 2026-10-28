@@ -41,7 +41,7 @@ export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 export const MAX_IMAGE_INPUT_BYTES = 20 * 1024 * 1024;
 export const MAX_ATTACHMENTS_PER_RECORD = 10;
 /** Tables whose rows carry `attachments` (8C: draft bills and the unprocessed-documents inbox too). */
-export const ATTACHMENT_OWNER_TABLES = ['invoices', 'purchases', 'purchase_drafts', 'doc_inbox', 'recycle_bin', 'labour_compliance'] as const; // R4-C4: kept while binned; R11 (CN-D2): PF / ESI proof
+export const ATTACHMENT_OWNER_TABLES = ['invoices', 'purchases', 'purchase_drafts', 'doc_inbox', 'recycle_bin', 'labour_compliance', 'works_contracts'] as const; // R4-C4: kept while binned; R11 (CN-D2): PF / ESI proof; PENDING 14: contract closure documents
 
 export const ACCEPTED_MIMES: readonly AttachmentMime[] = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
 /** `accept` attribute for file inputs (a hint only; content is checked by magic bytes). */
@@ -135,7 +135,7 @@ export function parseStoredAttachment(raw: string | null | undefined): StoredAtt
   } catch {
     return null;
   }
-  if (!v || typeof v !== 'object') return null;
+  if (!v) return null; // a non-object has no string `id` / `data`, so the next line refuses it
   const r = v as Partial<StoredAttachment>;
   if (typeof r.id !== 'string' || !r.id || typeof r.data !== 'string') return null;
   const parts = splitDataUrl(r.data);
@@ -240,7 +240,7 @@ export function readRefs(v: unknown): AttachmentRef[] {
 export function attachmentIdsIn(rows: unknown, into: Set<string> = new Set()): Set<string> {
   if (!Array.isArray(rows)) return into;
   for (const row of rows) {
-    if (row && typeof row === 'object') for (const r of readRefs((row as { attachments?: unknown }).attachments)) into.add(r.id);
+    for (const r of readRefs((row as { attachments?: unknown } | null)?.attachments)) into.add(r.id); // non-objects carry none
   }
   return into;
 }
@@ -271,9 +271,7 @@ export function referencedAttachmentIds(
   // PERF-1: the live store is read through the shared parsed tables (runs on every save that drops a file).
   const get = parsed ?? (read === readRaw ? liveParsed : (k: string) => parseJson(read(k)));
   for (const t of ATTACHMENT_OWNER_TABLES) attachmentIdsIn(get(DB_PREFIX + t), ids);
-  const draft = get(SINGLETON_KEYS.draft);
-  if (draft && typeof draft === 'object') attachmentIdsIn([draft], ids);
-  return ids;
+  return attachmentIdsIn([get(SINGLETON_KEYS.draft)], ids); // a missing / non-object draft is skipped row by row
 }
 
 /** Ids of every stored file. */
