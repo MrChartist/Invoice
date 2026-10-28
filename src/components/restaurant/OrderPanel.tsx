@@ -65,7 +65,7 @@ type Pending = { kind: 'cancel'; lineId: string; qty: number } | { kind: 'void' 
 
 /** One running order: add items, KOT, print bill, settle / split, move / merge / transfer (R3-A1–A4). */
 export function OrderPanel(p: OrderPanelProps) {
-  useT();
+  const { lang } = useT(); // QA19 U4: `hits` carry a label
   const { order, notify, onChanged } = p;
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -109,7 +109,7 @@ export function OrderPanel(p: OrderPanelProps) {
   /* ── Items ─────────────────────────────────────────────── */
   const hits = useMemo(
     () => suggest(searchTermOf(query), p.menu, { label: (i) => i.name, extra: (i) => [i.hsn, i.sku, i.barcode, i.short_code], sub: (i) => [formatCurrency(num(i.rate)), isUnavailable(i, p.day) && rT('unavailable')].filter(Boolean).join(' · '), limit: 8 }),
-    [query, p.menu, p.day],
+    [query, p.menu, p.day, lang],
   );
 
   const add = (item: MenuItem, qty?: number, picks?: Picks, groups?: ModifierGroup[]) => {
