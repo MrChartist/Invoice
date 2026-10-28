@@ -51,7 +51,7 @@ test('engines import only first-paint / family modules; bridges are exactly mp-*
 test('every rule row has a date, a source and `verified`, in date order; verified rows are exactly those read this round', () => {
   const verified: string[] = [];
   for (const [name, v] of Object.entries(rules).filter(([, x]) => Array.isArray(x))) {
-    (v as { from: string; source?: string; verified?: boolean }[]).forEach((r, i, a) => {
+    (v as readonly { from: string; source?: string; verified?: boolean }[]).forEach((r, i, a) => {
       assert.match(r.from, /^\d{4}-\d{2}-\d{2}$/);
       assert.ok(r.source?.trim());
       if (r.verified) {

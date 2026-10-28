@@ -19,7 +19,7 @@ beforeEach(() => {
 });
 
 test('each kind: modules, packs, landing, template, due days; every kind keeps `time`; coaching keeps `recurring`', () => {
-  assert.deepEqual([...SERVICE_KINDS], ['clinic', 'lab', 'salon', 'fitness', 'coaching', 'workshop', 'appliance', 'professional', 'other', 'travel']); // R15-B1: + travel
+  assert.deepEqual([...SERVICE_KINDS], ['clinic', 'lab', 'salon', 'fitness', 'coaching', 'workshop', 'appliance', 'professional', 'other', 'travel', 'manpower']); // R15-B1: + travel; R17-A1: + manpower
   assert.deepEqual(applyServiceKind('salon'), { business_type: 'services', modules: ['pos', 'time', 'purchases', 'inventory', 'reports', 'payroll'], service_kind: 'salon', industry_packs: ['salon'] });
   assert.deepEqual(applyServiceKind('clinic').industry_packs, ['clinic']);
   assert.deepEqual(applyServiceKind('lab').industry_packs, ['clinic']);

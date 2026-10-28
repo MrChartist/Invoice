@@ -174,6 +174,20 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   R15-A: party netting posts receipts with the existing `exchange_purchase_id` marker + `method: 'netting'`
   (`src/lib/netting.ts`, `Vendor.client_id`); audit appends are coalesced per task — call `audit.flush()` before reading the
   raw audit key outside `audit.ts`. Notes: `docs/features/travel-r15.md`.
+- Round 17 (security, facility-management & manpower agencies) company data: names in `src/lib/manpower/mp-shared.ts`
+  (object `manpower_settings`; B / C add `site_musters` / `site_compliance`), all backed up and synced; settings
+  `manpower_kind` (a profile under business type `services` + `service_kind: 'manpower'`, packs `manpower` / `security` —
+  desk tab `deploy` on `/time`, mounted by file name through `import.meta.glob` over `components/manpower/*Desk.tsx`;
+  `PACK_OF_TYPE` / `PACK_ROUTES` unchanged). A site IS a project cost centre with `CostCentre.mp` (posts inside); the firm
+  form is the annual pack's entity type, never a second field. Rights and audit labels are registered at runtime by
+  `src/lib/manpower/mp-registry.ts`: **every module that writes a Round 17 table must `import './mp-registry'`**
+  (`tests/mp-registry.test.ts`). Round 17 invoice snapshots live under ONE record key `mp` (`R17_RECORD_KEYS`, spread
+  into `R9_RECORD_KEYS`) — never add keys; Sl. 66 lines reuse the R10 line key `sv.exempt`, RCM bills the existing
+  `reverse_charge` / `rcm_tax_excluded` (one regime per invoice: `mp-regime.ts` `splitPosts`). Build group `f-manpower`
+  (`vite.config.ts`): engines in `src/lib/manpower/` import only first-paint modules, `manpower-rules.ts` and each
+  other; anything else goes through a bridge `mp-*-io.ts` (≤ 4; `mp-payroll-io.ts` is the only importer of the payroll
+  store). Rule values in `src/lib/manpower-rules.ts` (lazy only, `tests/mp-rules.test.ts`; no wage amounts). Notes:
+  `docs/features/manpower-r17.md`.
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 - Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,

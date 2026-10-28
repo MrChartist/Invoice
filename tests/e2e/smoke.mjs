@@ -5492,6 +5492,71 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R17-A manpower core: Settings → Manpower profile → Security agency (manpower + security packs, 12 h shifts); Time → Deploy → Sites; "E2E Sunrise Towers" for a registered client: Guard (12 h) × 4 at ₹800 (SAC 998525 suggested) and Supervisor × 1 at ₹1,000 → reload → chip "Reverse charge — client pays GST"; "E2E Green Park RWA" (no GSTIN) → forward charge 18 %; help; Ctrl+K', async () => {
+    const keys = ['settings', 'clients', 'cost_centres', 'manpower_settings', 'notes_to_accounts'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: undefined, modules: undefined, industry_packs: undefined, manpower_kind: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'manpower_settings', null);
+    await writeJson(page, 'notes_to_accounts', []); // firm form not set: a proprietorship (entry 14 applies)
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-mp-c1', name: 'E2E Sunrise Developers', gstin: '27AAACB2230M1ZW', state_code: '27' }, { id: 'e2e-mp-c2', name: 'E2E Green Park RWA', state_code: '27' }]);
+    await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-mp-c2'), 15000);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-manpower-kind-card="security"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.manpower_kind === 'security', 15000);
+    check(st.service_kind === 'manpower' && st.industry_packs?.includes('manpower') && st.industry_packs?.includes('security') && st.modules?.includes('time') && st.modules?.includes('payroll'), `Security agency: services / manpower + packs (${st.industry_packs})`);
+    const ms = await readJson(page, 'manpower_settings', {}, (v) => v?.shift_hours === 12, 15000);
+    check(ms?.shift_hours === 12 && ms.billing_days === 'calendar', 'the profile sets 12-hour shifts and calendar-day pro-rata');
+    await page.goto(srv.origin + '/time?tab=deploy&view=sites');
+    await page.locator('[data-deploy-desk]').waitFor({ timeout: 15000 });
+    check(/Deploy/.test((await page.getByRole('tab').allInnerTexts()).join('|')), 'Time lists the Deploy desk');
+    const newSite = async (name, client, posts) => {
+      await page.locator('[data-mp-new-site]').click();
+      const f = page.locator('[data-mp-site-form]');
+      await f.locator('[data-mp-site-name]').fill(name);
+      await f.locator('[data-mp-site-client]').selectOption(client);
+      for (const [i, [n, heads, rate]] of posts.entries()) {
+        await f.locator('[data-mp-add-post]').click();
+        const r = f.locator(`[data-mp-post="${i}"]`);
+        await r.locator('[data-mp-post-name]').fill(n);
+        await r.locator('[data-mp-post-heads]').fill(String(heads));
+        await r.locator('[data-mp-post-rate]').fill(String(rate));
+      }
+      return f;
+    };
+    const f1 = await newSite('E2E Sunrise Towers', 'e2e-mp-c1', [['Guard (12 h)', 4, 800], ['Supervisor', 1, 1000]]);
+    check(await f1.locator('[data-mp-post="0"] [data-mp-post-sac]').inputValue() === '998525', 'SAC 998525 suggested for a guard post');
+    await f1.locator('[data-mp-save-site]').click();
+    const cc = await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.name === 'E2E Sunrise Towers' && c.mp?.posts?.length === 2), 15000);
+    const s1 = cc.find((c) => c.name === 'E2E Sunrise Towers');
+    check(s1?.kind === 'project' && s1.mp.posts[0].shift_hours === 12 && s1.mp.posts[0].rate === 800 && s1.mp.posts[1].heads === 1 && /^S-\d{3}$/.test(s1.mp.code), `the site is a project cost centre with two posts (${s1?.mp?.code})`);
+    await page.reload();
+    await page.locator('[data-mp-sites]').waitFor({ timeout: 15000 });
+    const chip1 = page.locator(`[data-mp-site="${s1.mp.code}"] [data-mp-regime]`);
+    check(await chip1.getAttribute('data-mp-regime') === 'rcm' && /Reverse charge — client pays GST/.test(await chip1.innerText()), 'after reload the site shows "Reverse charge — client pays GST"');
+    const f2 = await newSite('E2E Green Park RWA', 'e2e-mp-c2', [['Guard', 2, 750]]);
+    await f2.locator('[data-mp-save-site]').click();
+    const s2 = (await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.name === 'E2E Green Park RWA' && c.mp), 15000)).find((c) => c.name === 'E2E Green Park RWA');
+    const chip2 = page.locator(`[data-mp-site="${s2.mp.code}"] [data-mp-regime]`);
+    await chip2.waitFor({ timeout: 15000 });
+    check(await chip2.getAttribute('data-mp-regime') === 'fwd' && /Forward charge 18 %/.test(await chip2.innerText()), 'a client without GSTIN: forward charge 18 %');
+    await page.getByRole('button', { name: 'Help and about' }).first().click();
+    await page.locator('[data-screen-help^="time:deploy"]').first().waitFor({ timeout: 15000 });
+    check(true, 'Help opens on a Deploy topic');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('manpower sites');
+    await palette.getByRole('option', { name: /Manpower sites and posts/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K finds Time → Deploy → Sites');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {
