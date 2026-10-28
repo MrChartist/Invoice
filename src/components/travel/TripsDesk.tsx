@@ -4,10 +4,11 @@
  * (`tcs`, `events`) add one lazy entry each in their block of `VIEWS`. Nothing is read until the tab opens.
  * Working papers — verify with your CA.
  */
-import { Suspense, type ComponentType, type LazyExoticComponent } from 'react';
+import { Suspense, lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { tvT } from '../../i18n/areas/travel-r15b';
+import { tvdT } from '../../i18n/areas/travel-r15d';
 import controls from '../../styles/controls.module.css';
 import type { Notify, TvViewProps } from './tv-run';
 import TripsView from './TripsView';
@@ -18,7 +19,10 @@ const VIEWS: Record<string, View> = {
   // R15-B
   trips: { label: () => tvT('trips'), C: TripsView },
   bookings: { label: () => tvT('bookings'), C: BookingsView },
-  // R15-C: statements; R15-D: tcs, events (one `lazy(() => import(…))` entry each)
+  // R15-C: statements (one `lazy(() => import(…))` entry)
+  // R15-D
+  tcs: { label: () => tvT('tcs'), C: lazy(() => import('./TcsView')) },
+  events: { label: () => tvdT('events'), C: lazy(() => import('./EventsView')) },
 };
 
 export default function TripsDesk({ view, notify }: { view?: string; notify: Notify }) {

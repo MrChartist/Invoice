@@ -196,7 +196,8 @@ export function form26Q(rows: readonly TdsDeductionRow[], challans: readonly Tds
 export function form27EQ(rows: readonly TcsRow[], challans: readonly TdsChallan[], fy: number, quarter: TdsQuarter): ReturnPaper {
   return buildPaper(
     '27EQ',
-    rows.map((r) => ({ ...r, name: r.collectee, reason: '', certNo: '', refCode: TCS_27EQ_CODES.find((c) => c.code === r.code)?.label ?? r.label })),
+    // A blank code (to confirm: luxury goods, R15-D tour packages) is mapped by the row's own label.
+    rows.map((r) => ({ ...r, name: r.collectee, reason: '', certNo: '', refCode: (r.code ? TCS_27EQ_CODES.find((c) => c.code === r.code)?.label : '') || r.label })),
     challans.filter((c) => c.kind === 'TCS'),
     fy,
     quarter,

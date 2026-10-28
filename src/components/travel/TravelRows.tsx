@@ -4,7 +4,7 @@
  * kept. Only the user's pick writes; an issued document keeps what it was saved with. Mixing the 5 % line with other
  * taxed lines warns (TV9), never blocks. D adds its POS / TCS chips as `switch` arms below.
  */
-import { useMemo } from 'react';
+import { Suspense, lazy, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { useT } from '../../i18n';
@@ -16,11 +16,15 @@ import { TV_REGIMES } from '../../lib/travel/tv-settings';
 import controls from '../../styles/controls.module.css';
 import { ListSelect } from './tv-ui';
 
+// R15-D: place-of-supply and outbound TCS chips (lazy; only once a trip / event is picked).
+const TvChips = lazy(() => import('./TvChips'));
+
 export default function TravelRows() {
   useT();
   const s = useInvoiceStore(useShallow((st) => ({ items: st.items, issue_date: st.issue_date, tv: st.tv, cc: st.cost_centre_id })));
   const trips = useMemo(() => loadTrips(), []);
   const tripId = s.tv?.trip?.id ?? (trips.some((t) => t.id === s.cc) ? s.cc : '');
+  const trip = trips.find((t) => t.id === tripId);
   const apply = (id: string, regime?: TvRegime) => {
     const trip = trips.find((t) => t.id === id);
     if (!trip) return;
@@ -36,6 +40,8 @@ export default function TravelRows() {
       </select>
       {tripId && <ListSelect list="regs" ids={TV_REGIMES} value={s.tv?.regime ?? 'to18'} onChange={(r) => apply(tripId, r)} attr="data-tv-pick-regime" />}
       {regimeMix(s.items, s.tv?.regime) && <span className={controls.hint} role="note" data-tv-mix>{tvT('mix')}</span>}
+      {/* R15-D */}
+      {trip && <Suspense fallback={null}><TvChips trip={trip} /></Suspense>}
     </div>
   );
 }

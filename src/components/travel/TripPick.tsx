@@ -12,6 +12,10 @@ import { TV_COMPONENTS, loadBookings } from '../../lib/travel/tv-bookings';
 import { tripTag } from '../../lib/travel/tv-itc';
 import controls from '../../styles/controls.module.css';
 import { Field } from './tv-ui';
+import { getTable } from '../../lib/storage';
+import { tvdT } from '../../i18n/areas/travel-r15d';
+import { vendorTdsHint } from '../../lib/travel/tv-events';
+import { dmcHint } from '../../lib/travel/tv-pos';
 
 type Tag = PurchaseRecord['tv'];
 
@@ -27,6 +31,10 @@ export default function TripPick({ value, onChange, itc, setItc }: { value: Tag;
     if (tag.regime === 'to5') setItc(false);
     onChange(tag);
   };
+  // R15-D: vendor TDS limb by the booking's component (hint only, TV23) and the foreign-DMC RCM hint (TV20).
+  const bk = bookings.find((b) => b.id === value?.booking_id);
+  const tds = bk ? vendorTdsHint(bk.component, bk.start) : null;
+  const dmc = bk?.vendor_id && dmcHint(getTable<{ id: string; state_code?: string; gstin?: string; tv?: { kind?: string } }>('vendors').find((v) => v.id === bk.vendor_id), trips.find((t) => t.id === tripId)?.tv.scope);
   if (!trips.length && !value) return null;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }} data-tv-trip-pick>
@@ -47,6 +55,8 @@ export default function TripPick({ value, onChange, itc, setItc }: { value: Tag;
       {value?.regime === 'to5' && (itc
         ? <Field label={tvT('itcReason')}><input className={controls.input} value={value.itc_reason ?? ''} onChange={(e) => onChange({ ...value, itc_reason: e.target.value })} data-tv-itc-reason /></Field>
         : <span className={controls.hint} data-tv-itc-blocked>{tvT('itcBlocked')}</span>)}
+      {tds && <span className={controls.hint} role="note" data-tv-tds-hint={tds.limb}>{tvdT('tdsHint', { label: tds.label })}</span>}
+      {dmc && <span className={controls.hint} role="note" data-tv-dmc>{tvdT('dmc')}</span>}
     </div>
   );
 }
