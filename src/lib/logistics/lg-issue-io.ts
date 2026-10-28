@@ -26,25 +26,31 @@ import { lutOn, regimeCtx } from './lg-tax-io';
 
 export interface BillOpts { date: string; /** Typed ₹ rates by currency (win over the master). */ fx?: Record<string, number> }
 
-const sender = () => localDb.settings.activeProfile() ?? null;
-const clientOf = (j: LgJob) => ({ ...blankClient(), ...localDb.clients.getById(j.client_id) });
+/** What every plan of one run reads once: settings, heads, rates, the sender, clients and the billed heads by job. */
+function env() {
+  const byJob = new Map<string, InvoiceRecord[]>();
+  for (const d of localDb.invoices.getAll()) if (d.lg?.job_id) byJob.set(d.lg.job_id, [...(byJob.get(d.lg.job_id) ?? []), d]);
+  return { s: lgDefaultsFor(), rates: loadRates(), snd: localDb.settings.activeProfile() ?? null, settings: localDb.settings.get(), tpl: localDb.template.get(), clients: new Map(localDb.clients.getAll().map((c) => [c.id ?? '', c])), byJob };
+}
+type Env = ReturnType<typeof env>;
+const clientOf = (j: LgJob, e: Env) => ({ ...blankClient(), ...e.clients.get(j.client_id) });
 
 /** A job's plan on the date (nothing written). */
-export function planJob(j: LgJob, o: BillOpts, docs: readonly InvoiceRecord[] = localDb.invoices.getAll()): JobPlan {
-  const s = lgDefaultsFor(), rates = loadRates();
-  return planJobBills(j, chargeSheet(j, s.heads ?? []), {
-    ...regimeCtx(o.date, clientOf(j), sender()), heads: s.heads ?? [], settings: s, billed: billedHeads(docs, j.id), passText: PURE_AGENT_CHARGE, newId: generateId,
-    fx: (c) => (o.fx?.[c] ? { rate: o.fx[c], source: 'typed' } : ((r) => (r ? { rate: r.rate, source: r.source } : null))(rateOn(rates, c, o.date))),
+export function planJob(j: LgJob, o: BillOpts, e: Env = env()): JobPlan {
+  const heads = e.s.heads ?? [];
+  return planJobBills(j, chargeSheet(j, heads), {
+    ...regimeCtx(o.date, clientOf(j, e), e.snd), heads, settings: e.s, billed: billedHeads(e.byJob.get(j.id) ?? [], j.id), passText: PURE_AGENT_CHARGE, newId: generateId,
+    fx: (c) => (o.fx?.[c] ? { rate: o.fx[c], source: 'typed' } : ((r) => (r ? { rate: r.rate, source: r.source } : null))(rateOn(e.rates, c, o.date))),
   });
 }
 
-function toRecord(d: JobDraft, j: LgJob, date: string): InvoiceRecord {
-  const settings = localDb.settings.get(), snd = sender(), client = clientOf(j);
+function toRecord(d: JobDraft, j: LgJob, date: string, e: Env): InvoiceRecord {
+  const client = clientOf(j, e);
   const rec: InvoiceRecord = {
-    ...makeDraft({ settings, sender: snd, docType: d.doc_type, templateId: localDb.template.get() }),
-    id: generateId(), issue_date: date, due_date: addDaysInput(Number(settings.defaultDueDays) || 30, date), status: 'Sent', currency: d.currency, client, items: d.items,
+    ...makeDraft({ settings: e.settings, sender: e.snd, docType: d.doc_type, templateId: e.tpl }),
+    id: generateId(), issue_date: date, due_date: addDaysInput(Number(e.settings.defaultDueDays) || 30, date), status: 'Sent', currency: d.currency, client, items: d.items,
     place_of_supply: d.pos, gst_mode: d.mode, supply_type: d.supply ?? (client.gstin?.trim() ? 'B2B' : 'B2C'), notes: `Job ${j.number}`, lg: d.lg,
-    ...(d.exchange_rate ? { exchange_rate: d.exchange_rate } : {}), ...(d.supply === 'EXPORT_LUT' ? lutOn(date, snd?.companyGstin) : {}), ...(d.doc_type === 'BILL_OF_SUPPLY' ? { exempt_kind: 'EXEMPT' as const } : {}),
+    ...(d.exchange_rate ? { exchange_rate: d.exchange_rate } : {}), ...(d.supply === 'EXPORT_LUT' ? lutOn(date, e.snd?.companyGstin) : {}), ...(d.doc_type === 'BILL_OF_SUPPLY' ? { exempt_kind: 'EXEMPT' as const } : {}),
   };
   const t = calculateInvoice(calcInputFromRecord(rec));
   return { ...rec, subtotal: t.subtotal, discount_amount: t.discount_amount, taxable_value: t.taxable_value, cgst_amount: t.cgst_amount, sgst_amount: t.sgst_amount, igst_amount: t.igst_amount, tax_amount: t.tax_amount, cess_amount: t.cess_amount, round_off: t.round_off, total: t.total, balance_due: t.balance_due, tcs_amount: t.tcs_amount, tds_amount: t.tds_amount };
@@ -55,16 +61,16 @@ export interface BillResult { invoices: InvoiceRecord[]; skipped: string[]; erro
 /** Issue the plans of `jobs` in one `saveMany` (`doc.create`). Nothing to bill → nothing written. */
 function issue(jobs: readonly LgJob[], o: BillOpts, label = false): BillResult {
   requireAccess('doc.create');
-  const docs = localDb.invoices.getAll();
+  const e = env();
   const out: BillResult = { invoices: [], skipped: [], errors: [], hints: [] };
   const recs: InvoiceRecord[] = [];
   for (const j of jobs) {
-    const p = planJob(j, o, docs);
+    const p = planJob(j, o, e);
     const tag = (m: string) => (label ? `${j.number}: ${m}` : m);
     out.skipped.push(...p.skipped.map(tag));
     out.hints.push(...p.hints.map(tag));
     if (p.errors.length) { out.errors.push(...p.errors.map(tag)); continue; }
-    recs.push(...p.drafts.map((d) => toRecord(d, j, o.date)));
+    recs.push(...p.drafts.map((d) => toRecord(d, j, o.date, e)));
   }
   if (recs.length) out.invoices = withTablesRollback(['invoices', 'series_counters'], () => localDb.invoices.saveMany(recs));
   return out;

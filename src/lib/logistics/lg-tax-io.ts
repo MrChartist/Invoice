@@ -9,7 +9,7 @@ import type { GtaOptionRow } from '../../types/transport-works-r5';
 import { peekTable } from '../storage';
 import { getIndianFY } from '../invoice-number';
 import { resolveStateCode } from '../india-states';
-import { intermediaryPos } from '../prof-rules';
+import { intermediaryPos } from '../prof/ps-pos';
 import { exportCheck } from '../prof/ps-export-check';
 import { gtaRate } from '../transport-works-rules';
 import { lutDb, pickLut } from '../trade/lut-register';
