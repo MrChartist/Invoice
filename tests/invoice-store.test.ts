@@ -107,6 +107,7 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     ps: { kind: 'fee', matter: { id: 'cc1', code: 'RSK/014', name: 'Sec 138' }, engagement: { id: 'e1', number: 'ENG/26-27/0001', model: 'capped' }, basis: 'Capped at ₹40,000', wd: { standard: 58000, billed: 40000, reasons: [{ reason: 'Cap', amount: -18000 }] }, lines: { l1: { matter: 'RSK/014' } } }, // R14 (PS-A5)
     tv: { trip: { id: 'cc2', code: '2611-001', pax: 4 }, regime: 'to5', decl: 'Tour operator service' }, // R15-B
     mp: { site: { id: 'cc3', code: 'S-001', name: 'Sunrise Towers' }, month: '2026-10', regime: 'rcm', decl: 'Tax payable on reverse charge' }, // R17-A
+    hs: { unit: { id: 'u1', code: 'A-101', wing: 'A', area: 600, members: ['Asha Rao'] }, period: '2026-10', due: '2026-10-20', heads: [{ head_id: 'h1', name: 'Service charges', kind: 'service', basis: 'Per unit', amount: 3000 }] }, // R18-A
   };
   const n = normalizeRecord(sample) as unknown as Record<string, unknown>;
   // Totals are recomputed, so only check the fields a user sets.

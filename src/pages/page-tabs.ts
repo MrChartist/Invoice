@@ -26,7 +26,7 @@ export const BOOKS_TABS = [
   { id: 'vreg', label: 'tabVreg' },
   { id: 'ratio', label: 'tabRatio' },
   { id: 'defer', label: 'tabDefer' }, // R2-C2 (label from the books-r2 area)
-  { id: 'funds', label: 'tabFunds', pack: 'nonprofit' }, // R5-C4 (label in Books.tsx)
+  { id: 'funds', label: 'tabFunds', pack: 'nonprofit', alsoPacks: ['society'] }, // R5-C4 (label in Books.tsx); R18-A: + society
 ] as const;
 export type BooksTab = (typeof BOOKS_TABS)[number]['id'];
 /* ── Manufacturing ── */
@@ -148,6 +148,7 @@ export const RECURRING_TABS = [
   { id: 'batch' },
   { id: 'fees', pack: 'fees' }, // R5-C
   { id: 'leases', pack: 'leases' }, // R5-C
+  { id: 'society', pack: 'society' }, // R18-A: the Society desk (views in `&view=`; packages add views, never tabs)
 ] as const;
 export type RecurringTab = (typeof RECURRING_TABS)[number]['id'];
 /* ── Reconcile ── */

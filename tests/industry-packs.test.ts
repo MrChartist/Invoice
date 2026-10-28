@@ -95,7 +95,9 @@ const R10_PACKS: readonly string[] = ['clinic', 'salon', 'fitness', 'workshop',
   // R15: the travel packs too — every travel kind keeps `time`.
   'travel', 'events',
   // R17: the manpower packs too — every manpower kind keeps `time`.
-  'manpower', 'security'];
+  'manpower', 'security',
+  // R18: the society pack too — every society kind keeps `recurring` and `accounts`; common credit needs `gst` anyway.
+  'society'];
 
 test('R6-B2 pin: the shell copies PACK_ROUTES / PACK_OF_TYPE_INLINE equal PACK_TABS / PACK_OF_TYPE', async () => {
   const { PACK_ROUTES, PACK_OF_TYPE_INLINE, moduleOfPath } = await import('../src/lib/shop-mode.ts');

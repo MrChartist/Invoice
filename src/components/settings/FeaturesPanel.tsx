@@ -24,6 +24,9 @@ import { tvT } from '../../i18n/areas/travel-r15b';
 import { applyManpowerKind } from '../../lib/shop-presets';
 import { ManpowerKindPicker } from '../manpower/ManpowerKindPicker'; // R17-A1
 import { mpPickT } from '../../i18n/areas/manpower-r17a-pick';
+import { applySocietyKind } from '../../lib/shop-presets'; // R18-A1
+import { SocietyKindPicker } from '../society/SocietyKindPicker';
+import { hsPickT } from '../../i18n/areas/society-r18a-pick';
 import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
 import { DB_PREFIX, getJson } from '../../lib/storage';
 import { cnPickT } from '../../i18n/areas/construction-r11-pick';
@@ -234,6 +237,22 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
                 const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
                 onChange(applyManpowerKind(k, { registered, currentPacks: packsOn }) as Partial<typeof settings>);
                 void import('../../lib/manpower/mp-settings').then((m) => m.applyManpowerDefaults(k)).catch(() => undefined);
+              }}
+            />
+          </div>
+        )}
+        {/* R18-A1: "Society profile" for every non-profit and services company (+ Custom); changing it deletes nothing */}
+        {(settings.business_type === 'nonprofit' || settings.business_type === 'services' || !!settings.society_kind) && (
+          <div className={controls.field} data-features-society>
+            <span className={controls.label}>{hsPickT('title')}</span>
+            <SocietyKindPicker
+              value={settings.society_kind}
+              custom
+              disabled={!owner}
+              onPick={(k) => {
+                if (!k) return onChange({ society_kind: undefined });
+                const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
+                onChange(applySocietyKind(k, { registered, currentPacks: Array.isArray(settings.industry_packs) ? packsOn : [] }) as Partial<typeof settings>); // explicit packs only: the type's implied donations pack is not carried
               }}
             />
           </div>

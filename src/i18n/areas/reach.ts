@@ -268,6 +268,7 @@ export const reachT = defineArea(
     // R17 (R17-A1): manpower packs
     'pack.manpower': 'Manpower supply', 'packDesc.manpower': 'Sites, posts and rates; reverse charge / exempt / 18 % per bill.',
     'pack.security': 'Security agency', 'packDesc.security': 'PSARA licences and guard licences on the Deploy desk.',
+    'pack.society': 'Housing society', 'packDesc.society': 'The Society desk on Recurring.', // R18-A1
     'ck.workCentres': 'Add your work centres (machines and their hour rates)',
     'ck.udyam': 'Add your Udyam number (printed on invoices)',
     'ck.firstDrawing': 'Add your first drawing',
@@ -283,6 +284,7 @@ export const reachT = defineArea(
     'ck.lut': 'Record your LUT for exports', 'ck.edf': 'Prepare your first EDF', // R14 (PS-C)
     'ck.firstTrip': 'Open your first trip', 'ck.firstSupplier': 'Add your first supplier booking', 'ck.regime': 'Choose your GST regime', 'ck.firstStatement': 'Import your first supplier statement', 'ck.firstEvent': 'Open your first event', // R15-B1
     'ck.firstSite': 'Add your first site with its posts', 'ck.firstBill': 'Make your first manpower bill', 'ck.firstMuster': 'Fill your first duty register (muster)', 'ck.siteProof': 'Record a site\'s PF / ESI proof for its client', 'ck.licence': 'Add your PSARA / contract-labour licence and its renewal date', // R17-A1; R17-B; R17-C
+    'ck.societyUnits': 'Add your flats and members', 'ck.societyTariff': 'Set your maintenance tariff', // R18-A1
   } as const,
   {
     'title.shop': 'आप क्या काम करते हैं?',
@@ -537,6 +539,7 @@ export const reachT = defineArea(
     'pack.events': 'इवेंट', 'packDesc.events': 'ट्रिप डेस्क पर वेंडर और बजट के साथ इवेंट फ़ाइल।',
     'pack.manpower': 'मानव-शक्ति आपूर्ति', 'packDesc.manpower': 'साइट, पोस्ट और दरें; हर बिल पर रिवर्स चार्ज / छूट / 18 %।',
     'pack.security': 'सुरक्षा एजेंसी', 'packDesc.security': 'तैनाती डेस्क पर PSARA लाइसेंस और गार्ड लाइसेंस।',
+    'pack.society': 'आवास सोसाइटी', 'packDesc.society': 'आवर्ती पर सोसाइटी डेस्क।',
     'ck.workCentres': 'अपने कार्य केंद्र जोड़ें (मशीनें और उनकी घंटे की दर)',
     'ck.udyam': 'अपना उद्यम पंजीकरण नंबर जोड़ें (इनवॉइस पर छपता है)',
     'ck.firstDrawing': 'पहली ड्रॉइंग जोड़ें',
@@ -552,5 +555,6 @@ export const reachT = defineArea(
     'ck.lut': 'निर्यात के लिए LUT दर्ज करें', 'ck.edf': 'पहला EDF तैयार करें',
     'ck.firstTrip': 'पहली यात्रा फ़ाइल खोलें', 'ck.firstSupplier': 'पहली आपूर्तिकर्ता बुकिंग जोड़ें', 'ck.regime': 'अपनी GST व्यवस्था चुनें', 'ck.firstStatement': 'पहला आपूर्तिकर्ता विवरण इम्पोर्ट करें', 'ck.firstEvent': 'पहला इवेंट खोलें',
     'ck.firstSite': 'पोस्ट के साथ पहली साइट जोड़ें', 'ck.firstBill': 'पहला मानव-शक्ति बिल बनाएँ', 'ck.firstMuster': 'पहला ड्यूटी रजिस्टर (मस्टर) भरें', 'ck.siteProof': 'ग्राहक के लिए साइट का PF / ESI प्रमाण दर्ज करें', 'ck.licence': 'अपना PSARA / ठेका-श्रम लाइसेंस और नवीनीकरण तिथि जोड़ें',
+    'ck.societyUnits': 'अपने फ़्लैट और सदस्य जोड़ें', 'ck.societyTariff': 'अपनी रखरखाव शुल्क सूची तय करें',
   },
 );
