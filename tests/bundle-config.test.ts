@@ -24,7 +24,7 @@ test('Vite 8 rolldown options with codeSplitting.groups, no manualChunks / rollu
 
 test('the groups, in order, with their priorities', () => {
   const families = [...cfg.matchAll(/safeFamilyGroup\(graph, '(f-[a-z]+)', familyRe\([^)]*\), (\d+)\)/g)].map((m) => [m[1], Number(m[2])]);
-  assert.deepEqual(families.map(([n]) => n), ['f-hotel', 'f-trade', 'f-retail', 'f-services', 'f-cn', 'f-agri', 'f-mfg', 'f-prof', 'f-travel']);
+  assert.deepEqual(families.map(([n]) => n), ['f-hotel', 'f-trade', 'f-retail', 'f-services', 'f-cn', 'f-agri', 'f-mfg', 'f-prof', 'f-travel', 'f-manpower']); // R17-A: f-manpower
   assert.ok(families.every(([, p]) => p === 12), 'families at priority 12');
   assert.match(cfg, /leafGroup\(graph, 'lazy-leaves', 9, \{ maxModuleSize: 3000 \}\)/);
   const names = groups.map((g) => (typeof g.name === 'string' ? g.name : g.name.name));

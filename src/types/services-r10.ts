@@ -11,7 +11,7 @@
 /* ════════════════════════════════════════ SV-A ════════════════════════════════════════ */
 
 /** The service business picked under the `services` business type (settings `service_kind`). */
-export type ServiceKind = 'clinic' | 'lab' | 'salon' | 'fitness' | 'coaching' | 'workshop' | 'appliance' | 'professional' | 'other' | 'travel'; // R15-B1: travel
+export type ServiceKind = 'clinic' | 'lab' | 'salon' | 'fitness' | 'coaching' | 'workshop' | 'appliance' | 'professional' | 'other' | 'travel' | 'manpower'; // R15-B1: travel; R17-A1: manpower
 
 /** Service tax class of an item / line (suggests rate, SAC and the exempt column by document date; a typed rate wins). */
 export type SvClass =

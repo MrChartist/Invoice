@@ -32,7 +32,9 @@ export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit
   // R14 (PS-A1): professional packs (desk tabs on /time; switched on by the professional profile, never by a type)
   | 'practice' | 'cafirm' | 'legal' | 'design' | 'media' | 'svcexport' | 'partners'
   // R15 (R15-B1): travel / events packs (one desk tab on /time; switched on by the travel profile, never by a type)
-  | 'travel' | 'events';
+  | 'travel' | 'events'
+  // R17 (R17-A1): manpower packs (one desk tab `deploy` on /time; switched on by the manpower profile, never by a type)
+  | 'manpower' | 'security';
 
 export const PACK_IDS: readonly PackId[] = [
   'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
@@ -45,6 +47,7 @@ export const PACK_IDS: readonly PackId[] = [
   'shopfloor', 'fabrication', 'garments', 'plastics', 'press', 'foodmfg', // R13 (MF-A1)
   'practice', 'cafirm', 'legal', 'design', 'media', 'svcexport', 'partners', // R14 (PS-A1)
   'travel', 'events', // R15 (R15-B1)
+  'manpower', 'security', // R17 (R17-A1)
 ];
 
 /** The packs a business type implies when `industry_packs` is absent. */
@@ -343,6 +346,9 @@ export const PACK_TABS: readonly PackTab[] = [
   // R15-D
   { pack: 'travel', alsoPacks: ['events'], path: '/time?tab=trips&view=tcs', labelKey: 'r15.trips.tcs' },
   { pack: 'events', alsoPacks: ['travel'], path: '/time?tab=trips&view=events', labelKey: 'r15.trips.events' },
+  // R17: the Deploy desk on /time (A writes its views; B–D add muster / bills, compliance / profit, statutory — labels `r17.*`)
+  { pack: 'manpower', alsoPacks: ['security'], path: '/time?tab=deploy', labelKey: 'r17.deploy' },
+  { pack: 'manpower', alsoPacks: ['security'], path: '/time?tab=deploy&view=sites', labelKey: 'r17.deploy.sites' },
 ];
 
 /**

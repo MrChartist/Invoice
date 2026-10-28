@@ -73,6 +73,7 @@ export default defineConfig({
             safeFamilyGroup(graph, 'f-mfg', familyRe('mfg', 'mfg-rules', 'mfg-r13'), 12),
             safeFamilyGroup(graph, 'f-prof', familyRe('prof', 'prof-rules', 'prof-r14'), 12),
             safeFamilyGroup(graph, 'f-travel', familyRe('travel', 'travel-rules', 'travel-r15'), 12),
+            safeFamilyGroup(graph, 'f-manpower', familyRe('manpower', 'manpower-rules', 'manpower-r17'), 12), // R17-A
             // R16-A2: small lazy src/lib leaves (imports all first-paint / vendor) in one chunk.
             leafGroup(graph, 'lazy-leaves', 9, { maxModuleSize: 3000 }),
           ],

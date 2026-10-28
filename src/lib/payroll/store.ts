@@ -102,6 +102,7 @@ export function normalizeEmployees(rows: unknown[]): Employee[] {
     const dob = day(o.dob);
     if (dob) e.dob = dob;
     if (num(o.notice_days) > 0) e.notice_days = Math.round(num(o.notice_days));
+    if (o.mp && typeof o.mp === 'object') e.mp = o.mp as Employee['mp']; // R17-A2: post / guard licence (types/manpower-r17.ts)
     out.push(e);
   }
   return out;
