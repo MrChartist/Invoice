@@ -3,7 +3,7 @@ import { defineArea } from '../area';
 
 export const pwT = defineArea(
   {
-    'v.wip': 'WIP', 'v.prebill': 'Pre-bill', 'v.realisation': 'Realisation', 'v.utilisation': 'Utilisation', 'v.profit': 'Profitability', 'v.yearend': 'Year end',
+    'v.wip': 'WIP', 'v.prebill': 'Pre-bill', 'v.realisation': 'Realisation', 'v.utilisation': 'Utilisation', 'v.profit': 'Profitability', 'v.yearend': 'Year end', 'v.disb': 'Disbursements',
     by: 'Group by', 'by.matter': 'Matter', 'by.client': 'Client', 'by.partner': 'Partner', 'by.staff': 'Timekeeper', 'by.work_type': 'Work type', 'by.engagement': 'Engagement',
     oldest: 'Oldest', capLeft: 'Cap left', costs: 'Costs', older: 'Older', days: '≤ {n} days', writeOff: 'Write off selected', reverse: 'Reverse write-off (owner)',
     pick: 'Client', all: 'All matters', desc: 'Work', billH: 'Bill hours', exclude: 'Exclude', defer: 'Later', target: 'Bill this amount for the time', annexure: 'Attach the timesheet annexure',
@@ -16,7 +16,7 @@ export const pwT = defineArea(
     note: 'AS 9 / ICDS IV: service revenue by percentage of completion; an engagement of up to 90 days may use the completed-service method (PS23).', accrueFrom: 'Accrual journal from (owner)', post: 'Post accrual (reversed next day)', posted: 'Posted {n}.',
   } as const,
   {
-    'v.wip': 'अबिल्ड कार्य', 'v.prebill': 'प्री-बिल', 'v.realisation': 'वसूली दर', 'v.utilisation': 'उपयोग दर', 'v.profit': 'लाभप्रदता', 'v.yearend': 'वर्ष अंत',
+    'v.wip': 'अबिल्ड कार्य', 'v.prebill': 'प्री-बिल', 'v.realisation': 'वसूली दर', 'v.utilisation': 'उपयोग दर', 'v.profit': 'लाभप्रदता', 'v.yearend': 'वर्ष अंत', 'v.disb': 'डिस्बर्समेंट',
     by: 'समूह', 'by.matter': 'मामला', 'by.client': 'क्लाइंट', 'by.partner': 'साझेदार', 'by.staff': 'टाइमकीपर', 'by.work_type': 'काम का प्रकार', 'by.engagement': 'नियुक्ति',
     oldest: 'सबसे पुराना', capLeft: 'बची सीमा', costs: 'खर्चे', older: 'पुराना', days: '≤ {n} दिन', writeOff: 'चुने हुए बट्टे खाते डालें', reverse: 'बट्टा खाता वापस (मालिक)',
     pick: 'क्लाइंट', all: 'सभी मामले', desc: 'काम', billH: 'बिल घंटे', exclude: 'छोड़ें', defer: 'बाद में', target: 'समय के लिए यह राशि बिल करें', annexure: 'समय-पत्रक संलग्नक जोड़ें',

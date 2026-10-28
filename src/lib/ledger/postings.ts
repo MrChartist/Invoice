@@ -292,7 +292,7 @@ function tdsSettlements(invoices: InvoiceRecord[], transactions: Payment[]): Map
   return out;
 }
 
-function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number, gvAcc?: string, riderAcc?: string): LedgerVoucher | null {
+function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number, gvAcc?: string, riderAcc?: string, creditor?: string): LedgerVoucher | null {
   const date = toIsoDate(t.date);
   const amount = Math.abs(toPaise(inrValue(num(t.amount), inv)));
   if (!date || amount === 0) return null;
@@ -307,7 +307,8 @@ function receiptVoucher(t: Payment, inv: InvoiceRecord | undefined, tds: number,
   // cleared at the invoice rate, the difference is a gain (Cr) or a loss (Dr).
   const fx = realisedFx(t, inv);
   const received = fx ? Math.abs(toPaise(fx.realisedInr)) : amount;
-  const l = new Lines().dr(cashAcc, received, t.exchange_purchase_id ? party : undefined);
+  // R16-D1: a netting receipt debits the bill's own supplier (`creditor`), which may be a differently named linked vendor.
+  const l = new Lines().dr(cashAcc, received, t.exchange_purchase_id ? creditor || party : undefined);
   if (tds > 0) l.dr(A.tdsReceivable, tds);
   l.cr(A.debtors, amount + tds, party);
   if (fx) l.cr(A.fxGain, received - amount);
@@ -673,7 +674,12 @@ export function buildLedger(input: LedgerInput): Ledger {
   const allocatedBy = new Set(input.manual.map((m) => m.id));
   const gvAcc = gvLiabilityId(input.userAccounts); // R4-B1
   const riderAcc = input.userAccounts.find((a) => a.name.trim().toLowerCase() === RIDER_CASH_LEDGER.toLowerCase())?.id; // R9 (RT-A3)
-  for (const t of input.transactions) if (!isAdvanceAdjustment(t) && !allocatedBy.has(str((t as { voucher_id?: unknown }).voucher_id))) push(receiptVoucher(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0, gvAcc, riderAcc));
+  // R16-D1 (PF17): netting rows (`netting_id`) post to the bill's supplier; R9 / R12 exchange rows keep the customer's name.
+  const netParty = (t: Payment): string | undefined => {
+    const bill = (t as { netting_id?: unknown }).netting_id && t.exchange_purchase_id ? input.purchases.find((x) => x.id === t.exchange_purchase_id) : undefined;
+    return bill ? normalizePurchase(bill, input.vendors)?.party : undefined;
+  };
+  for (const t of input.transactions) if (!isAdvanceAdjustment(t) && !allocatedBy.has(str((t as { voucher_id?: unknown }).voucher_id))) push(receiptVoucher(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0, gvAcc, riderAcc, netParty(t)));
   // R6-C2: the voucher posts the money, but the customer's TDS on the bill it clears is booked here, as for an invoice receipt.
   for (const t of input.transactions) if (allocatedBy.has(str((t as { voucher_id?: unknown }).voucher_id)) && (tds.get(String(t.id)) ?? 0) > 0) push(voucherTdsJournal(t, invById.get(t.invoice_id), tds.get(String(t.id)) ?? 0));
   for (const m of advanceMovements(input.advances ?? [], input.transactions, input.invoices)) {

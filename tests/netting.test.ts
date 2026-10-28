@@ -148,3 +148,26 @@ test('guards: rights, clerk approval, period lock, currency, URD, RCM', () => {
   postNetting({ ...base, billIds: [rcm.id], rcmPaid: true });
   assert.equal(getTable<Payment>('transactions').filter((x) => x.method === NETTING_METHOD).length, 1, 'refusals wrote nothing');
 });
+
+/* ── R16-D1: a vendor linked by hand under another name nets to its OWN creditor sub-ledger (PF17) ── */
+const partyNet = (led: ReturnType<typeof ledgerNow>, account: string, name: string) =>
+  led.vouchers.flatMap((v) => v.lines).filter((l) => l.account === account && l.party === name).reduce((s, l) => s + l.dr - l.cr, 0) / 100;
+
+test('R16-D1: hand-linked vendor with another name — vendor ledger = bill-wise payable, client ledger = receivable, TB balanced, cash unchanged', () => {
+  const who = { ...clientMH, name: 'Mehta Tours', gstin: '' };
+  const clientId = localDb.clients.upsert(who);
+  const vendor = vendorsDb.save({ name: 'Mehta Travels Pvt Ltd', client_id: clientId } as Omit<Vendor, 'id'>);
+  const a = createViaStore({ date: '2026-05-01', lines: [{ qty: 1, rate: 40000, tax: 0 }], client: { ...who, id: clientId } });
+  const b = createViaStore({ date: '2026-05-05', lines: [{ qty: 1, rate: 30000, tax: 0 }], client: { ...who, id: clientId } });
+  const p = purchasesDb.save({ ...bill(), vendor_name: 'Mehta Travels Pvt Ltd', vendor_id: vendor.id });
+  const cashBefore = cashBook(buildVouchers(loadBooksData()), [], 'cash', FY).closing;
+  postNetting({ clientId, vendorId: vendor.id, invoiceIds: [a.id, b.id], billIds: [p.id], amount: 65000, date: '2026-06-01' });
+  const led = ledgerNow();
+  assert.equal(payables()[0].bills[0].balance, 115000);
+  assert.equal(partyNet(led, 'creditors', 'Mehta Travels Pvt Ltd'), -115000, 'vendor ledger shows the debit: Cr 1,15,000 left');
+  assert.equal(partyNet(led, 'creditors', 'Mehta Tours'), 0, 'no creditor balance in the client\'s name');
+  assert.equal(partyNet(led, 'debtors', 'Mehta Tours'), 5000, 'client ledger = the ₹5,000 still receivable');
+  const tb = trialBalance(led, FY);
+  assert.equal(tb.totals.closingDr, tb.totals.closingCr, 'TB balances');
+  assert.equal(cashBook(buildVouchers(loadBooksData()), [], 'cash', FY).closing, cashBefore, 'cash book unchanged');
+});

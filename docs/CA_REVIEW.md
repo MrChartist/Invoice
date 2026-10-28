@@ -47,8 +47,9 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84, AG90 | 65 | 15 |
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF40–MF42, MF50–MF54, MF60–MF65, MF80–MF82, MF90–MF96 | 60 | 12 |
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
-| 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV45 | 45 | 14 |
-| **Total** | | **541** | **133** |
+| 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV48 | 48 | 15 |
+| 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF21 | 21 | 5 |
+| **Total** | | **565** | **139** |
 
 ---
 
@@ -1085,9 +1086,9 @@ exports of services under the FEMA 2026 regulations, 194J / 194T, partners and S
 `PS` ids are counted once here. The ★ items (PS1, PS3, PS4, PS5, PS6, PS12, PS15, PS18, PS20, PS22, PS23, PS26, PS27)
 are the ones a beta professional firm's figures depend on first.
 
-## 15. Travel, tour and event businesses (Round 15, ids TV1–TV45)
+## 15. Travel, tour and event businesses (Round 15, ids TV1–TV48)
 
-Added with `docs/prd/round-15.md` (§9: TV1–TV31), R15-B (TV32, TV33), R15-C (TV34–TV37), R15-D (TV38–TV40) and QA round 18 (TV41–TV45, §15.1). It covers tour operators (domestic, outbound,
+Added with `docs/prd/round-15.md` (§9: TV1–TV31), R15-B (TV32, TV33), R15-C (TV34–TV37), R15-D (TV38–TV40), QA round 18 (TV41–TV45, §15.1) and R16-C (TV46–TV48, §15.2). It covers tour operators (domestic, outbound,
 inbound / DMCs), travel and ticketing agents (IATA / BSP or through a consolidator) and event / wedding / MICE planners,
 plus the round's cross-cutting items (party netting, the 2026 manpower and tour-package TCS changes).
 
@@ -1115,8 +1116,8 @@ plus the round's cross-cutting items (party netting, the 2026 manpower and tour-
 | TV13 | Hotel bands for packages (≤ ₹7,500 5 % no ITC). Cross-ref R7 HT items. | Existing `hotel-rules.ts` | `hotel/hotel-rules.ts` (existing) | 2025-09-22 | S taxguru; R7 sources |
 | TV14 | Rule 33 for visa / embassy fees, insurance premium, airport taxes and venue payments on behalf. Cross-ref PS3. | R14 checklist guard | `travel/tv-bill.ts` (`charge_head_id: 'rule33'`); R14 `ps-disb` guard | — | R14 PS3 sources |
 | TV15 ★ | Cancellation charges (Circular 178/10/2022): rate of the principal supply for our cancellation fee in each regime; supplier charges retained. | As §8 Q16 | `travel-rules.ts` `CANCEL_FEE_RATE_RULES`, `travel/tv-cancel.ts` | 2022-08-03 | S RSM, taxo.online |
-| TV16 | Commission / PLB from airlines and hotels: GST at 18 % to the principal; 194H expected. | As stated | Commission typed on bookings counts in the trip margin; the commission invoice (C4) was cut for size (R15-C cut 1) | 2024-10-01 | Existing T rows |
-| TV17 | Insurance agent's commission: RCM by the insurer; registration of an agent making only RCM supplies. | Outward RCM flag on the insurer's invoice (to set by hand: C4 cut) | `rcm.ts` (existing) | — | Recalled |
+| TV16 | Commission / PLB from airlines and hotels: GST at 18 % to the principal; 194H expected. | As stated | R16-C1: Bookings → Bill commission (`travel/tv-commission.ts`); 194H expected through the R14-D receivable path, on the commission before GST | 2024-10-01 | Existing T rows |
+| TV17 | Insurance agent's commission: RCM by the insurer; registration of an agent making only RCM supplies. | Outward RCM flag on the insurer's commission invoice (R16-C1, `INSURANCE_AGENT_RCM_RULES`) | `travel-rules.ts`, `travel/tv-commission.ts`, `rcm.ts` | — | Recalled |
 | TV18 | POS for tour-operator services to Indian clients (Sec 12(2)); hotel components (Sec 12(3)); property outside India. | Chip as §4 D2 | `travel/tv-pos.ts` (R15-D) | — | Recalled |
 | TV19 ★ | Inbound tours for foreign tourists performed in India: POS India, not an export? | Taxable, POS India | `travel/tv-pos.ts` (R15-D) | — | Recalled |
 | TV20 | Foreign DMC services performed abroad for an Indian operator: import RCM or out of scope? | Suggest "no RCM"; default unchanged | `travel/tv-pos.ts` (R15-D) | — | Recalled |
@@ -1152,8 +1153,55 @@ plus the round's cross-cutting items (party netting, the 2026 manpower and tour-
 | TV44 | **TCS on a ticket-only invoice of a package trip.** The stand-alone test (TV4) reads the trip's bookings, so a separate invoice of only the air tickets of an outbound trip that also has a hotel is offered TCS as a package. Should the test read the invoice's own lines instead? | Trip-level test; the user may untick | `components/travel/TvChips.tsx`, `travel/tv-tcs.ts` `isTourPackage` | 2020-10-01 | CBDT Circular 10/2023 (ticket or hotel alone not a package, as reported) |
 | TV45 | **Date of the cancellation credit note.** The credit note now carries the cancellation date the user enters (same as the fee invoice and the supplier debit note), not the day it is posted. Right for GSTR-1 / Sec 34 (it may fall in an earlier open month)? | Cancellation date | `travel/tv-cancel.ts`, `documents.ts` `createCreditNote` (`date`) | 2017-07-01 | Sec 34 CGST Act |
 
-`TV` ids are counted once here. The ★ items (TV1, TV3, TV7, TV8, TV11, TV15, TV19, TV21, TV23, TV34, TV35, TV38, TV39, TV41) are the ones a beta
+### 15.2 Added by R16-C (`docs/prd/round-16.md` §R16-C)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| TV46 | **SAC of commission billed to principals.** The commission invoice to an airline uses SAC 998551, to a hotel (or bed bank) 998552, to an insurer 997161 (insurance agency services) and to other principals 998559, all at 18 %. The principal is the booking's supplier, or the client linked to it. Right SACs; and is a PLB / incentive from an airline the same supply? | As stated | `travel-rules.ts` `COMMISSION_SAC_RULES`, `travel/tv-commission.ts` | 2017-07-01 | SAC list (recalled; `verified: false`) |
+| TV47 ★ | **Ticket re-issue documents.** A re-issue is billed on a new draft: fare difference and the airline's change penalty as pure-agent lines (Rule 33, outside the value), our re-issue fee at 18 % (SAC 998551). The old ticket's line stays on its invoice; a negative fare difference is credited on that old fare line by a credit note (quantity = difference ÷ fare, 2 decimals). Acceptable, or must the re-issue fee follow Rule 32(3) (deemed value) like the original ticket? | As stated | `travel/tv-reissue.ts` | 2017-07-01 | Rule 32(3) / 33 (as TV11, TV14) |
+| TV48 | **TDS on an insurance agent's commission.** The insurer is expected to deduct Sec 194D (Sec 393(1) from 1 Apr 2026), not 194H: 5 % (other than a company) / 10 % (company) above ₹15,000 a year; 2 % (other than a company) and ₹20,000 from 1 Apr 2025. Confirm the rates, threshold and the 2025-Act row. | As stated, on the commission before GST | `travel-rules.ts` `INSURANCE_COMMISSION_TDS_RULES`, `travel/tv-commission.ts` | 2017-07-01 / 2025-04-01 | Finance Acts 2024 / 2025 (as reported; `verified: false`) |
+
+`TV` ids are counted once here. The ★ items (TV1, TV3, TV7, TV8, TV11, TV15, TV19, TV21, TV23, TV34, TV35, TV38, TV39, TV41, TV47) are the ones a beta
 travel business's figures depend on first.
+
+## 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16, ids PF1–PF18)
+
+Added with `docs/prd/round-16.md` (§9). PF1–PF11 are recommendations of the 57th GST Council (8 Oct 2026) that are
+**not yet notified**: the app keeps them in a pending list (`src/lib/pending-changes.ts`, notes only, never rule rows;
+Help → What's new → "Announced, not yet in force") until a notification is issued. PF12–PF13 are help notes, PF14–PF16
+belong to R16-B / R16-C, PF17–PF18 to R16-D.
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| PF1 ★ | **Inverted-duty refund and input services (57th Council ¶8.2–8.3).** From which notification / date does Net ITC for an inverted-duty refund include input services (ITC availed on or after 1 Nov 2026)? Capital goods over 60 months from 1 Apr 2027: per-month apportionment? | Pending note only; formula unchanged (inputs only) | `pending-changes.ts`; Manufacturing → Inverted duty (`mf/mf-inverted.ts`) | — (recommended 2026-11-01 / 2027-04-01) | PIB release 8 Oct 2026 (57th GST Council) ¶8.2–8.3 |
+| PF2 | **Rule 89(4)(C) 1.5× cap removal:** effective date; does it also cover services? | Pending row; cap still applied | `pending-changes.ts`; `gst-cash-refunds.ts`, `prof/ps-refund-svc.ts` | — | PIB release 8 Oct 2026 (57th GST Council) ¶6.2 |
+| PF3 ★ | **Late fee waiver** for turnover ≤ ₹5 crore when the return is filed by the end of the month in which it was due: from which period; GSTR-1 too, or only Sec 39(1) returns? | Pending note on the Compliance tab; late fee still computed | `pending-changes.ts`; `gst-penalties.ts`; GST → Compliance | — | PIB release 8 Oct 2026 (57th GST Council) ¶15 |
+| PF4 | **Alternate mechanism from the April 2027 return** (Rule 61(1A) / (1B), IMS Rule 60(6A), Rules 86C / 86D statements): does our GSTR-1 / 3B working paper need new tables? | Pending note on the GSTR-3B paper | `pending-changes.ts`; GST → GSTR-3B | — (recommended from the April 2027 return) | PIB release 8 Oct 2026 (57th GST Council) ¶5.1–5.2 |
+| PF5 ★ | **Deletion of Sec 2(6)(v) IGST:** from when may a supply to our own foreign branch be zero-rated? | Export check still fails condition (v) for "own branch"; pending row | `pending-changes.ts`; `prof/ps-export-check.ts` | — | PIB release 8 Oct 2026 (57th GST Council) ¶10 |
+| PF6 | **Sec 13(3)(a) IGST omitted:** which of our job-work / repair exports move to Sec 13(2)? | Not modelled (watch) | `prof/ps-pos.ts` | — | PIB release 8 Oct 2026 (57th GST Council) ¶10 |
+| PF7 ★ | **RCM on plastic / e-waste / tyre scrap and used cooking oil** from unregistered suppliers; 2 % GST TDS on B2B supplies of these: who deducts, from when, which return? | Not modelled; pending note on the RCM goods notice | `pending-changes.ts`; `trading-rules.ts` `RCM_NOTIFIED_GOODS_RULES`; `trade/RcmGoodsNotice.tsx` | — | PIB release 8 Oct 2026 (57th GST Council) C1 ¶5 |
+| PF8 | **e-Invoicing for RCM inward supplies from URP and for import of services** (AATO ≥ ₹5 crore): IRN on a self-invoice — which document type? | Self-invoice without IRN; pending note | `pending-changes.ts`; `rcm-self-invoice.ts`; GST → RCM self-invoice | — | PIB release 8 Oct 2026 (57th GST Council) ¶18 |
+| PF9 | **Sec 17(5) relaxations** (outdoor catering, health / life insurance, free samples, goods written off on expiry): effective date; transition for bills before it? | ITC hints unchanged | ITC hints | — | PIB release 8 Oct 2026 (57th GST Council) ¶9 |
+| PF10 | **Same-line ITC** for restaurants, hotels ≤ ₹7,500 and gyms; 5 % option for EV passenger transport / rental; delivery via ECO at 5 % without ITC. | Not modelled | `hotel-rules.ts`, restaurant, `travel-rules.ts` | — | PIB release 8 Oct 2026 (57th GST Council) C2 ¶1, 2, 4 |
+| PF11 | **ARQP scheme** (≤ ₹5 crore, B2C only, concept note): any invoice or record-keeping change? | Watch | — | — | PIB release 8 Oct 2026 (57th GST Council) ¶17 |
+| PF12 | **Ship-to GSTIN / "URP" in e-Invoice and e-Way** (on hold since 29 Jul 2026): do we print or report anything new? | `ShipDtls.Gstin` when the consignee has a GSTIN; no URP; help line | `einvoice.ts`; help `gst-reports:eway-desk` | — | Secondary: taxo.online, lookuptax, busy.in |
+| PF13 | **GSTR-3B Table 5.1 interest** is auto-populated and cannot be edited downward (Jan / Feb 2026 periods): should our interest paper reconcile to the system figure as the minimum payable? | Help line on the Compliance tab | `gst-penalties.ts`; help `gst-reports:compliance` | 2026-01 period | Secondary: GSTN advisories 30 Jan / 19 Feb 2026 as reported (taxmann, Masters India) |
+| PF14 | **FX closing memo on WIP / foreign receivables (R16-B4):** memo only at year-end, or a restatement journal (AS 11 / Ind AS 21)? | Memo only | R16-B (`prof/`) | — | — |
+| PF15 | **Commission invoice to an airline / hotel (R16-C1):** SAC and 18 %; 194H base (gross commission incl. GST?) | SAC per TV16 row; 194H on the commission before GST | R16-C (`travel/tv-commission.ts`) | — | — |
+| PF16 | **Ticket re-issue (R16-C2):** change penalty and fare difference as pure agent; our re-issue fee at 18 %. | As stated | R16-C (`travel/tv-reissue.ts`) | — | — |
+| PF17 ★ | **Netting for a vendor linked by hand (R16-D1).** When a client and a vendor of another name are linked (`Vendor.client_id`), the set-off journal now debits the vendor's own creditor sub-ledger and credits the client's debtor sub-ledger (before: both lines in the client's name, so the vendor's ledger, statement and confirmation kept the full payable). Is the set-off between two differently named ledgers of one party presented right? | Vendor's and client's own sub-ledgers; derived on read, no migration | `ledger/postings.ts` (`receiptVoucher`, netting rows only); `netting.ts` | — | — (design) |
+| PF18 | **Real-estate no-ITC caution (R16-D3).** A builder (realty pack) on the 1 % / 5 % scheme (N 03/2019-CT(R)) is cautioned on every bill that claims ITC, also when the bill is not charged to a project (no caution while a project is on the old 8 % / 12 % option); saving past it is audited with the bill's note as the reason. Which inward supplies stay eligible (e.g. capital goods for a commercial let-out)? | Caution on every ITC claim; override audited | `bill-guard.ts` `realtyItcCaution` | 2019-04-01 | N 03/2019-CT(R) (recalled, CN18 / CN34) |
+
+### 16.1 Added by R16-B (Round 14 engines wired)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| PF19 | **Per-appearance billing on a fee note.** With "Bill appearances" the entries of an appearance work type become one line "count × fee" (unit NOS, the firm's SAC, no hours, no dates on the line); the legal-services regime (RCM / exempt, PS1, PS2) is read as for any fee line, and the time still counts for realisation. Does a court fee note need each appearance's date (or the hearing list) printed, and is one line per work type and fee acceptable? | One line per work type × fee; dates stay in the app (the timesheet annexure lists hourly rows only). | `prof/ps-legal.ts` `appearanceLines`; `prof/ps-prebill.ts` | — | Developers' reading |
+| PF20 | **Publisher's commission invoice.** The pre-bill's "Bill commission to the publisher" makes a separate draft invoice to the publisher (matched to a client of that name, else a new name) with one line "Media commission n % — publication" at the firm's SAC and GST rate (PS12 (c)). Which SAC (e.g. 998363 / 998365) and is it forward charge at 18 %? Should the expected TDS 194H by the publisher be shown on it? | Firm's SAC and rate from the time preferences; no TDS hint. | `prof/ps-media.ts` `commissionLine`; `prof/ps-prebill.ts` `createCommissionDraft` | — | PS12; developers' reading |
+| PF21 | **Which WIP is foreign for the closing-rate memo.** The year-end memo treats a matter as foreign-currency when its active engagement bills in a foreign currency, and restates the net unbilled figure at the master's rate on the closing date; a work-type rate card in a foreign currency on an INR engagement is not converted. Open foreign invoices use the existing revaluation (balance on the closing date × the master's rate). Is the engagement currency the right test? | Engagement currency; memo only (PF14, PS37). | `components/prof/YearEndWipView.tsx`; `prof/ps-fx-rates.ts` `atClosing`; `fx-gain.ts` `revalueReceivables` | — | AS 11 (recalled) |
+
+`PF` ids are counted once here. The ★ items (PF1, PF3, PF5, PF7, PF17) change what a document prints or a return
+reports once notified.
 
 ## Answers log
 

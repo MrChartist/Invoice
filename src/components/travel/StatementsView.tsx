@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react';
 import { useT } from '../../i18n';
 import { tvT } from '../../i18n/areas/travel-r15b';
 import { cvList, cvT } from '../../i18n/areas/travel-r15c';
+import { r16cT } from '../../i18n/areas/travel-r16c'; // R16-C3 bed-bank columns
 import type { StatementRow } from '../../types/travel-r15';
 import { getTable } from '../../lib/storage';
 import { formatCurrency, todayInput } from '../../lib/utils';
@@ -118,7 +119,7 @@ function ImportForm({ vendors, notify, onDone }: { vendors: { id: string; name: 
       <Field label={tvT('to')}><input type="date" className={controls.input} value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></Field>
       <Field label={cvT('file')}><input type="file" accept=".csv,.xlsx,.xlsm,.txt" onChange={(e) => void pick(e.target.files?.[0])} data-tv-st-file /></Field>
       {file && Object.keys(STATEMENT_PRESETS[kind]!).map((k) => (
-        <Field key={k} label={({ doc_no: cvT('doc'), type: cvT('type'), date: tvT('from'), pax: tvT('pax'), gross: cvT('gross'), taxes: cvT('taxes'), commission: tvT('commission'), net: cvT('net') } as Record<string, string>)[k] ?? k}>
+        <Field key={k} label={({ doc_no: cvT('doc'), type: cvT('type'), date: tvT('from'), pax: tvT('pax'), gross: cvT('gross'), taxes: cvT('taxes'), commission: tvT('commission'), net: cvT('net'), hotel: r16cT('hotel'), nights: r16cT('nights') } as Record<string, string>)[k] ?? k}>
           <select className={controls.select} value={file.cols.get(k) ?? ''} onChange={(e) => { const cols = new Map(file.cols); if (e.target.value === '') cols.delete(k); else cols.set(k, Number(e.target.value)); setFile({ ...file, cols }); }}>
             <option value="">—</option>{file.t.headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
           </select>

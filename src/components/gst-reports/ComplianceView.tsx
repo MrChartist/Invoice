@@ -20,6 +20,7 @@ import { compositionLateInputs } from '../../lib/gstr4-annual';
 import { localDb } from '../../lib/localDb';
 import { isPackOn } from '../../lib/industry-packs';
 import { QRMP_TURNOVER_LIMIT, todayIso } from '../../lib/tax-rules';
+import PendingNote from '../ui/PendingNote';
 import { readLinks } from '../../lib/documents';
 import { formatDate } from '../../lib/utils';
 import type { InvoiceRecord } from '../../types/invoice';
@@ -158,6 +159,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
             : gvT('nothingOverdue')}
         </p>
       </div>
+      {open.some((x) => x.lateFee > 0) && <PendingNote area="latefee" day={today} />}
       {frequency === 'qrmp' && turnover > QRMP_TURNOVER_LIMIT && (
         <p className={controls.error} style={{ margin: 0 }}>{gvT('qrmpLimit')}</p>
       )}

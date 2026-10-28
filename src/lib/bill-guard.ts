@@ -13,6 +13,7 @@
 
 import type { PurchaseRecord } from '../types/purchases';
 import { can } from './access';
+import { audit } from './audit';
 import { findBillDuplicates } from './bill-duplicates';
 import { draftsDb, PURCHASE_DRAFTS_TABLE, type DraftMeta, type PurchaseDraft } from './purchase-drafts';
 import { PURCHASES_TABLE, purchasesDb } from './purchases';
@@ -31,20 +32,27 @@ import { SINGLETON_KEYS, getJson, peekTable } from './storage';
 const gtaT = defineArea(
   {
     warnGta: 'GTA option FY {fy}: 5% without ITC — check the ITC on this bill (verify with your CA).',
-    warnRealty: 'Project {name} pays GST at 1% / 5% without ITC — this bill claims ITC (verify with your CA).',
+    warnRealty: 'Project {name} pays GST at 1% / 5% without ITC — this bill claims ITC (verify with your CA, CN34).',
+    warnRealtyCo: 'Your projects pay GST at 1% / 5% without ITC — this bill claims ITC. Untick it, or save again to claim it (the note is kept as the reason, audited; verify with your CA, PF18).',
   } as const,
   {
     warnGta: 'GTA विकल्प वित्त वर्ष {fy}: 5% बिना ITC — इस बिल का ITC जाँचें (CA से पुष्टि करें)।',
-    warnRealty: 'प्रोजेक्ट {name} पर GST 1% / 5% बिना ITC है — यह बिल ITC ले रहा है (CA से पुष्टि करें)।',
+    warnRealty: 'प्रोजेक्ट {name} पर GST 1% / 5% बिना ITC है — यह बिल ITC ले रहा है (CA से पुष्टि करें, CN34)।',
+    warnRealtyCo: 'आपके प्रोजेक्ट पर GST 1% / 5% बिना ITC है — यह बिल ITC ले रहा है। टिक हटाएँ, या ITC लेने के लिए फिर सहेजें (टिप्पणी कारण के रूप में रहेगी, ऑडिट होगा; CA से पुष्टि करें, PF18)।',
   },
 );
 
-/** QA11 C9: a bill charged to a builder's project on the 1% / 5% scheme (N 03/2019, no ITC) that claims ITC. */
+/**
+ * QA11 C9 / R16-D3: a builder (realty pack) on the 1% / 5% scheme (N 03/2019, no ITC) whose bill claims ITC. A bill
+ * charged to a project names it; any other bill gets the company caution unless a project is on the old option (PF18).
+ */
 function realtyItcCaution(input: BillInput): string {
-  if (!input.itc_eligible || !input.cost_centre_id || !(num(input.cgst) + num(input.sgst) + num(input.igst) > 0)) return '';
+  if (!input.itc_eligible || !(num(input.cgst) + num(input.sgst) + num(input.igst) > 0)) return '';
   if (!isPackOn(getJson(SINGLETON_KEYS.settings, null), 'realty')) return '';
-  const p = peekTable<{ name?: string; cost_centre_id?: string; gst_scheme?: string }>('realty_projects').find((x) => x?.cost_centre_id === input.cost_centre_id && x.gst_scheme !== 'old_option');
-  return p ? gtaT('warnRealty', { name: p.name ?? '' }) : '';
+  const ps = peekTable<{ name?: string; cost_centre_id?: string; gst_scheme?: string }>('realty_projects').filter(Boolean);
+  const p = input.cost_centre_id ? ps.find((x) => x.cost_centre_id === input.cost_centre_id) : undefined;
+  if (p) return p.gst_scheme !== 'old_option' ? gtaT('warnRealty', { name: p.name ?? '' }) : '';
+  return ps.some((x) => x.gst_scheme === 'old_option') ? '' : gtaT('warnRealtyCo');
 }
 
 function gtaItcCaution(input: BillInput): string {
@@ -100,12 +108,18 @@ export function saveBillGuarded(input: BillInput, opts: { confirmed?: boolean; p
   if (billApprovalRequired(input, stored, readPurchaseApprovalPolicy(), can('doc.approve'))) {
     return { kind: 'held', draft: submitBillForApproval(input, { payNow: opts.payNow }) };
   }
-  if (!draft) return { kind: 'saved', bill: purchasesDb.save(input) };
+  // R16-D3 (PF18): ITC claimed past the realty caution is an override — audited, the bill's note is the reason.
+  const why = opts.confirmed && realtyItcCaution(input) ? (input.notes ?? '').trim() || '—' : '';
+  const audited = (b: PurchaseRecord): PurchaseRecord => {
+    if (why) audit.record({ entity: 'purchase', entity_id: b.id, action: 'override', doc_number: b.bill_number, summary: `ITC claimed on ${b.bill_number} despite the 1% / 5% no-ITC scheme (PF18): ${why}` });
+    return b;
+  };
+  if (!draft) return { kind: 'saved', bill: audited(purchasesDb.save(input)) };
   const bill = withTablesRollback([PURCHASES_TABLE, PURCHASE_DRAFTS_TABLE, DOC_INBOX_TABLE], () => {
     const saved = purchasesDb.save(input);
     draftsDb.remove(draft.id, { keepFiles: true });
     settleInboxFor(draft.id, saved.id);
     return saved;
   });
-  return { kind: 'saved', bill };
+  return { kind: 'saved', bill: audited(bill) };
 }

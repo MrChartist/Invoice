@@ -103,8 +103,12 @@ export function saveCheck(i: CheckInput): ConflictCheck {
   return row;
 }
 
-/** Delete a check (the row goes to the recycle bin; a matter that names it keeps the id). */
+/** Delete a check (the row goes to the recycle bin; a matter that names it keeps the id). A waiver is the owner's (R16-B5). */
 export function deleteCheck(id: string): void {
   requireAccess('master.edit');
-  setTable(PS_TABLES.conflicts, loadChecks().filter((c) => c.id !== id));
+  const all = loadChecks();
+  const row = all.find((c) => c.id === id);
+  if (!row) throw new Error('Conflict check not found.');
+  if (row.result === 'waived') requireAccess('settings.manage');
+  setTable(PS_TABLES.conflicts, all.filter((c) => c.id !== id));
 }

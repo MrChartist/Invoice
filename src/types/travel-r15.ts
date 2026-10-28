@@ -232,3 +232,26 @@ declare module './purchases' {
     tv?: { kind: 'airline' | 'consolidator' | 'bsp' | 'hotel' | 'bedbank' | 'dmc' | 'venue' | 'artist' | 'other' };
   }
 }
+
+/* ════════════════════════════════════════ R16-C ════════════════════════════════════════ */
+
+export interface TravelBooking {
+  /**
+   * R16-C1: the commission invoice to the principal and its line. `commission` stays the typed amount (a number in
+   * stored rows); billed is derived from this reference as for `line_ref` (the line must still be on a live invoice).
+   */
+  comm_ref?: { invoice_id: string; line_id: string };
+}
+
+export interface TvTicket {
+  /** R16-C2: on the booking's copy, the ticket no. this ticket was re-issued as (the old invoice keeps its line). */
+  reissued_by?: string;
+  /** R16-C2: on a re-issued ticket, the ticket no. it replaces. */
+  reissue_of?: string;
+}
+
+export interface StatementRow {
+  /** R16-C3 bed-bank preset: hotel name and nights. */
+  hotel?: string;
+  nights?: number;
+}

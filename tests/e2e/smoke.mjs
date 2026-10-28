@@ -4993,6 +4993,58 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R16-B Round 14 engines: a ₹2,500 court fee aged 70 days sits in 61–90 → Write off → gone; Reverse → back; the pre-bill bills two media insertions as pure agent + 15 % fee and five appearances as one line 5 × ₹15,000; a conflict check is deleted', async () => {
+    const keys = ['settings', 'clients', 'purchases', 'time_entries', 'work_types', 'invoices', 'series_counters', 'conflict_checks', 'recycle_bin'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const day = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'professional', modules: undefined, prof_kind: 'legal', industry_packs: ['practice', 'legal', 'media'], lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-16-c', name: 'E2E Kapoor Advertising Client' }]);
+    const exp = (id, date, total, ps, extra = {}) => ({ id, kind: 'EXPENSE', vendor_name: 'E2E Vendor', bill_number: id.toUpperCase(), date, category: 'Other', taxable: total, cgst: 0, sgst: 0, igst: 0, total, itc_eligible: false, amount_paid: total, ps, ...extra });
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []),
+      exp('e2e-16-d', day(70), 2500, { disb: 'court_fee', on_behalf: true }, { billable_to_client_id: 'e2e-16-c', pure_agent: true }),
+      exp('e2e-16-m1', day(5), 50000, { media: { client_id: 'e2e-16-c', medium: 'print', mode: 'agent', ro: 'RO-1', publication: 'E2E Daily' } }),
+      exp('e2e-16-m2', day(4), 30000, { media: { client_id: 'e2e-16-c', medium: 'print', mode: 'agent', ro: 'RO-2', publication: 'E2E Daily' } })]);
+    await writeJson(page, 'work_types', [...(prev.work_types ?? []), { id: 'e2e-16-w', name: 'E2E Appearance', rate: 15000, ps: { unit: 'appearance' } }]);
+    await writeJson(page, 'time_entries', [...(prev.time_entries ?? []), ...[1, 2, 3, 4, 5].map((k) => ({ id: `e2e-16-t${k}`, client_id: 'e2e-16-c', client_name: 'E2E Kapoor Advertising Client', description: '', date: day(k), minutes: 60, hourly_rate: 4000, billable: true, work_type_id: 'e2e-16-w' }))]);
+    await writeJson(page, 'conflict_checks', [...(prev.conflict_checks ?? []), { id: 'e2e-16-cc', date: day(1), terms: ['E2E Delete Me Ltd'], hits: [], result: 'clear', created_at: day(1) }]);
+    await page.goto(srv.origin + '/time?tab=wip&view=disb');
+    const row = page.locator('[data-disb-row="e2e-16-d"]');
+    await row.waitFor({ timeout: 15000 });
+    check(/2,500/.test(await page.locator('[data-disb-bucket="2"]').innerText()), `₹2,500 aged 70 days in 61–90 (${await page.locator('[data-disb-bucket="2"]').innerText()})`);
+    await page.locator('[data-disb-reason]').fill('Client absconded');
+    await row.locator('[data-disb-wo]').click();
+    await row.waitFor({ state: 'detached', timeout: 10000 });
+    check(await page.locator('[data-disb-off]').innerText().then((t) => /Client absconded/.test(t)), 'written off: gone from the list, in "Written off"');
+    await page.locator('[data-disb-rev]').first().click();
+    await row.waitFor({ timeout: 10000 });
+    // The pre-bill below is a fresh page load: wait until the reversal has reached IndexedDB first.
+    const unstamped = (v) => v.some((p) => p.id === 'e2e-16-d' && !p.ps?.wo);
+    check(unstamped(await readJson(page, 'purchases', [], unstamped, 15000)), 'Reverse brings it back (stored)');
+    await page.goto(srv.origin + '/time?tab=wip&view=prebill&client=e2e-16-c');
+    await page.locator('[data-prebill-media]').waitFor({ timeout: 15000 });
+    check(await page.locator('[data-prebill-media-row]').count() === 2, 'two media insertions on the pre-bill');
+    await page.locator('[data-prebill-media-fee]').fill('15');
+    await page.locator('[data-prebill-appear]').check();
+    await page.locator('[data-prebill-create]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.client?.id === 'e2e-16-c'))).find((i) => i.client?.id === 'e2e-16-c');
+    const agent = (inv?.items ?? []).filter((i) => i.charge_head_id === 'rule33').map((i) => i.rate).sort((a, b) => a - b);
+    const fees = (inv?.items ?? []).filter((i) => /^Agency service fee/.test(i.name)).map((i) => i.rate).sort((a, b) => a - b);
+    const app = (inv?.items ?? []).find((i) => i.name === 'E2E Appearance');
+    check(agent.join() === '2500,30000,50000' && fees.join() === '4500,7500' && inv.ps?.media?.rows?.length === 2, `media as pure agent + 15 % fee, the court fee as pure agent (${agent} / ${fees})`);
+    check(app?.quantity === 5 && app.rate === 15000 && app.bill_refs?.length === 5, `five appearances → one line 5 × ₹15,000 (${app?.quantity} × ${app?.rate})`);
+    await page.goto(srv.origin + '/time?tab=matters&view=conflicts');
+    const cc = page.locator('[data-conflict-checks] tr', { hasText: 'E2E Delete Me Ltd' });
+    await cc.waitFor({ timeout: 15000 });
+    page.once('dialog', (d) => d.accept());
+    await cc.locator('[data-conflict-del]').click();
+    await cc.waitFor({ state: 'detached', timeout: 10000 });
+    const bin = await readJson(page, 'recycle_bin', [], (v) => v.some((r) => r.row_id === 'e2e-16-cc'));
+    check(bin.some((r) => r.table === 'conflict_checks' && r.row_id === 'e2e-16-cc'), 'the conflict check is deleted into the recycle bin');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   await step('R15-A netting: a party who is both client and vendor (receivable ₹65,000, payable ₹1,80,000) → Netting ₹65,000 settles both invoices and reduces the bill, no cash receipt, one audit line; Reverse opens both again; Ctrl+K "Netting"', async () => {
     const keys = ['settings', 'clients', 'vendors', 'invoices', 'transactions', 'purchases'];
     const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
@@ -5339,6 +5391,105 @@ try {
     await page.getByRole('heading', { name: 'Books' }).first().waitFor({ timeout: 15000 });
     check((await page.evaluate(() => document.documentElement.lang)) === 'en', 'back to English: Books heading in English');
     await writeJson(page, 'settings', prev);
+  });
+
+  await step('R16-D quality: client "Mehta Tours" ↔ vendor "Mehta Travels Pvt Ltd" linked by hand → Netting ₹65,000 → the vendor\'s own creditor ledger shows the debit (₹1,15,000 Cr left), TB balanced; a builder\'s bill claiming ITC → caution (PF18), saved past it → audited; the inverted-duty paper shows the pending input-services note (PF1)', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'invoices', 'transactions', 'purchases'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const s0 = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...s0, lock_until: undefined });
+    const client = { id: 'e2e-mt-c', name: 'Mehta Tours', state_code: '27' };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), client]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-mt-v', name: 'Mehta Travels Pvt Ltd', client_id: 'e2e-mt-c' }]);
+    const sender = { ...((s0.profiles ?? []).find((p) => p.id === s0.activeProfileId) ?? {}), stateCode: '27' };
+    const inv = (id, number, amt, date) => ({ id, invoice_number: number, doc_type: 'INVOICE', status: 'Sent', place_of_supply: '27', currency: 'INR', issue_date: date, due_date: date, sender, gst_mode: 'NONE', subtotal: amt, taxable_value: amt, total: amt, amount_paid: 0, balance_due: amt, client, items: [{ id: 'l1', name: 'Tour package', type: 'Service', hsn: '998555', unit: 'NOS', quantity: 1, rate: amt, tax_rate: 0, amount: amt }] });
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv('e2e-mt-1', 'E2E/MT/1', 40000, '2026-09-01'), inv('e2e-mt-2', 'E2E/MT/2', 25000, '2026-09-05')]);
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []), { id: 'e2e-mt-b', kind: 'PURCHASE', vendor_id: 'e2e-mt-v', vendor_name: 'Mehta Travels Pvt Ltd', bill_number: 'MTP/9', date: '2026-09-10', category: 'Purchases', lines: [{ id: 'l1', name: 'Air tickets', quantity: 1, rate: 180000, tax_rate: 0 }], taxable: 180000, cgst: 0, sgst: 0, igst: 0, itc_eligible: false, total: 180000, amount_paid: 0 }]);
+    await page.goto(srv.origin + '/receivables?tab=aging');
+    await page.locator('[data-netting-open][aria-label*="Mehta Tours"]').waitFor({ timeout: 15000 });
+    await page.locator('[data-netting-open][aria-label*="Mehta Tours"]').click();
+    const dlg = page.locator('[data-netting-dialog]');
+    await dlg.waitFor({ timeout: 15000 });
+    for (const n of ['E2E/MT/1', 'E2E/MT/2']) await dlg.locator('[data-netting-side="in"] label', { hasText: n }).locator('input').check();
+    await dlg.locator('[data-netting-side="out"] label', { hasText: 'MTP/9' }).locator('input').check();
+    await page.locator('[data-netting-post]').click();
+    await readJson(page, 'transactions', [], (v) => v.filter((p) => p.method === 'netting' && p.exchange_purchase_id === 'e2e-mt-b').length === 2);
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/books?tab=ledger&acct=creditors&party=' + encodeURIComponent('Mehta Travels Pvt Ltd'));
+    await page.getByText(/Air tickets|MTP\/9/).first().waitFor({ timeout: 15000 });
+    const led = await page.locator('main').first().innerText();
+    check(/1,15,000\.00\s*Cr/.test(led), 'the vendor\'s own creditor ledger: ₹1,80,000 bill − ₹65,000 netting = ₹1,15,000 Cr');
+    await page.goto(srv.origin + '/books?tab=tb');
+    await page.getByText('Debits = credits').waitFor({ timeout: 15000 });
+    check(true, 'TB balanced');
+    // Real-estate builder: a bill claiming ITC, not charged to a project → caution; saved past it → audited.
+    await writeJson(page, 'settings', { ...s0, lock_until: undefined, industry_packs: ['realty', 'works'] });
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Add bill/ }).click();
+    const bd = page.getByRole('dialog', { name: 'Add purchase bill' });
+    await bd.getByRole('button', { name: /New vendor/ }).click();
+    await bd.locator('#bill-vendor-vname').fill('E2E Cement Co');
+    await bd.getByRole('button', { name: 'Save vendor' }).click();
+    await bd.locator('#bill-no').fill('CEM/16');
+    await bd.getByLabel('Line 1 item').fill('Cement, 200 bags');
+    await bd.getByLabel('Line 1 rate').fill('100000');
+    await bd.getByLabel('Line 1 GST rate').selectOption('18');
+    await bd.getByLabel('Claim input tax credit on this bill').check();
+    await bd.getByRole('button', { name: 'Save bill' }).click();
+    await bd.getByRole('alert').filter({ hasText: 'PF18' }).waitFor({ timeout: 15000 });
+    check(true, 'the builder\'s bill claiming ITC is cautioned (PF18)');
+    await bd.getByRole('button', { name: 'Save bill' }).click();
+    await bd.waitFor({ state: 'detached' });
+    const log = await readJson(page, 'audit_log', [], (v) => v.some((e) => e.action === 'override' && /CEM\/16.*PF18/.test(e.summary ?? '')));
+    check(log.some((e) => e.action === 'override' && /CEM\/16.*PF18/.test(e.summary ?? '')), 'saving past the caution is an audited override');
+    // Pending changes: the inverted-duty refund paper shows the 57th Council note (input services from 1 Nov 2026).
+    await writeJson(page, 'settings', { ...s0, business_type: 'manufacturer', modules: undefined, mfg_kind: 'textile', mfg_sub: 'garments', industry_packs: ['shopfloor', 'garments'], lock_until: undefined });
+    await page.goto(srv.origin + '/manufacturing?tab=garments&view=inverted');
+    await page.locator('[data-pending="refund"]').filter({ hasText: 'PF1' }).waitFor({ timeout: 15000 });
+    check(/not yet notified/.test(await page.locator('[data-pending="refund"]').innerText()), 'the refund paper: "Recommended … not yet notified" with PF1');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
+  await step('R16-C commission and re-issue: a booking with ₹1,200 airline commission → Bill commission → a draft to the airline at 18 % (SAC 998551) with 194H expected (the airline is past ₹20,000 this FY); re-issue a ticket: difference ₹800 + penalty ₹1,500 + fee ₹300 → a draft (two pure-agent lines, fee at 18 %); the old ticket is marked', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'cost_centres', 'travel_bookings', 'travel_settings', 'invoices', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const at = new Date().toISOString();
+    const day = at.slice(0, 10);
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'travel', travel_kind: 'agent', modules: undefined, industry_packs: ['travel'], prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'travel_settings', { regime_default: 'agent', air_value: 'deemed' });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-16c-c', name: 'E2E 16C Rao', state_code: '27' }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-16c-air', name: 'E2E 16C Airline', state_code: '27', tv: { kind: 'airline' } }]);
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), { id: 'e2e-16c-trip', name: 'E2E Delhi — Rao', kind: 'project', client_id: 'e2e-16c-c', active: true, status: 'active', start: day, created_at: at, tv: { code: '16C-001', kind: 'trip', scope: 'domestic', start: day, regime: 'agent', status: 'confirmed', pax: [{ name: 'Rao', type: 'adult' }] } }]);
+    const tkt = { pax: 'RAO/K', airline: '6E', ticket_no: '0581234567800', pnr: 'PNR16C', sector: 'DEL-BOM', class: 'economy', basic: 4200, taxes: 940, airline_gst: 210 };
+    await writeJson(page, 'travel_bookings', [...(prev.travel_bookings ?? []),
+      { id: 'e2e-16c-b1', trip_id: 'e2e-16c-trip', component: 'air', vendor_id: 'e2e-16c-air', ref: 'PNR16C', start: day, cost: 5350, sell: 5350, commission: 1200, status: 'confirmed', created_at: at },
+      { id: 'e2e-16c-b2', trip_id: 'e2e-16c-trip', component: 'air', vendor_id: 'e2e-16c-air', ref: 'PNR16D', start: day, cost: 5350, sell: 5350, status: 'confirmed', tkt: [tkt], created_at: at }]);
+    // An earlier issued commission invoice of ₹20,000 to the airline this FY: the next one crosses the 194H threshold.
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-16c-prior', invoice_number: 'E2E/16C/1', doc_type: 'TAX_INVOICE', status: 'Sent', issue_date: day, due_date: day, client: { name: 'E2E 16C Airline', state_code: '27' }, sender: null, items: [{ id: 'p1', name: 'Commission', type: 'Service', hsn: '998551', unit: 'NOS', quantity: 1, rate: 20000, amount: 20000, tax_rate: 18, discount_percent: 0 }], gst_mode: 'CGST_SGST', place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, shipping: 0, other_charges: 0, amount_paid: 0, subtotal: 20000, taxable_value: 20000, tax_amount: 3600, total: 23600, balance_due: 23600, created_at: at }]);
+    await page.goto(srv.origin + '/time?tab=trips&view=bookings');
+    await page.locator('[data-tv-comm="e2e-16c-b1"]').click({ timeout: 15000 });
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.client?.name === 'E2E 16C Airline' && i.id !== 'e2e-16c-prior'))).find((i) => i.client?.name === 'E2E 16C Airline' && i.id !== 'e2e-16c-prior');
+    check(inv?.status === 'Draft' && inv.items[0].hsn === '998551' && inv.items[0].tax_rate === 18 && inv.tax_amount === 216, `commission draft to the airline: ₹1,200 at 18 % (SAC 998551), GST ₹216 (${inv?.tax_amount})`);
+    check(inv?.tds_enabled === true && inv.tds_section === '194H' && inv.tds_rate === 2 && inv.tds_amount === 24, `194H expected at 2 % on the commission before GST (${inv?.tds_section} ${inv?.tds_amount})`);
+    const b1 = (await readJson(page, 'travel_bookings', [])).find((b) => b.id === 'e2e-16c-b1');
+    check(b1?.comm_ref?.invoice_id === inv?.id, 'the booking keeps the commission line reference (billed derived)');
+    await page.goto(srv.origin + '/time?tab=trips&view=bookings');
+    check(await page.locator('[data-tv-comm="e2e-16c-b1"]').count() === 0, 'Bill commission is gone once billed');
+    await page.locator('[data-tv-reissue-open="e2e-16c-b2"]').click({ timeout: 15000 });
+    const re = page.locator('[data-tv-reissue]');
+    await re.locator('[data-tv-re="new_no"]').fill('0581234567801');
+    await re.locator('[data-tv-re="diff"]').fill('800');
+    await re.locator('[data-tv-re="penalty"]').fill('1500');
+    await re.locator('[data-tv-re="fee"]').fill('300');
+    await re.locator('[data-tv-re-go]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const d = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.cost_centre_id === 'e2e-16c-trip' && i.items?.some((l) => l.name === 'Re-issue fee')))).find((i) => i.cost_centre_id === 'e2e-16c-trip' && i.items?.some((l) => l.name === 'Re-issue fee'));
+    check(d?.items.filter((l) => l.charge_head_id === 'rule33').map((l) => l.rate).join() === '800,1500' && d.items.find((l) => l.name === 'Re-issue fee')?.tax_rate === 18 && d.tax_amount === 54, `re-issue draft: ₹800 + ₹1,500 at actual, fee ₹300 at 18 % (GST ${d?.tax_amount})`);
+    const b2 = (await readJson(page, 'travel_bookings', [])).find((b) => b.id === 'e2e-16c-b2');
+    check(b2?.tkt?.[0]?.reissued_by === '0581234567801' && b2.tkt.length === 2, 'the old ticket is marked re-issued; the new ticket is on the booking');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
 } catch {

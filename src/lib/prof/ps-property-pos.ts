@@ -3,7 +3,7 @@
  * surveyors): the property's location — Sec 12(3) IGST when the supplier and the property are in India, Sec 13(4) for a
  * foreign recipient — so a house in Pune designed for a client in Dubai is a supply in Maharashtra, not an export. For
  * property outside India: the location of the recipient. The suggestion fills the invoice once; the user can change it.
- * PS-C's export check reads `isPropertyExport`. Working paper — verify with your CA (PS6).
+ * The export check reads the snapshot `ps.export.pos_class: 'property'` (QA17 R6). Working paper — verify with your CA (PS6).
  */
 import { resolveStateCode } from '../india-states';
 
@@ -36,7 +36,3 @@ export function propertyPos(property: PropertyLike, recipient: { state_code?: st
   const pos = foreignRecipient ? '96' : resolveStateCode({ code: recipient.state_code, gstin: recipient.gstin, name: recipient.state });
   return { pos, basis: 'recipient', exportPossible: foreignRecipient };
 }
-
-/** For PS-C's Sec 2(6) check: a property in India means "place of supply in India — not an export". */
-export const isPropertyExport = (property: PropertyLike | null | undefined, recipient: Parameters<typeof propertyPos>[1]): boolean =>
-  !!property && propertyPos(property, recipient).exportPossible;
