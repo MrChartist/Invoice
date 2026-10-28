@@ -5314,7 +5314,7 @@ try {
     await page.getByText('समय और बिल योग्य खर्च').first().waitFor();
     await noEnglish('Time → WIP', ['WIP & billing', 'Pre-bill', 'Realisation', 'Track hours, trips and re-billable expenses']);
     await page.goto(srv.origin + '/time?tab=trips');
-    await page.getByRole('tab', { name: 'यात्रा फ़ाइलें' }).waitFor({ timeout: 15000 });
+    await page.getByRole('tab', { name: 'यात्रा फ़ाइलें' }).first().waitFor({ timeout: 15000 });
     await page.waitForFunction(() => /अभी कोई यात्रा नहीं|मार्जिन|बुकिंग/.test(document.querySelector('main')?.innerText ?? ''), null, { timeout: 15000 });
     check(true, 'Trips desk strings in Hindi (travel family chunk)');
     await noEnglish('Time → Trips', ['No trips yet.', 'Supplier unpaid']);
