@@ -6080,6 +6080,81 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R19-C customs broker desk: import job 0002 → Customs → deposit ₹2,00,000 (0 %, pass-through) → duty ₹1,85,430 (ICEGATE) + CFS ₹12,000 on behalf → reimbursement bill prints the schedule, total ₹2,04,510.00 → Apply deposit → ₹4,510.00 due, the application is an advance_id row; Ctrl+K "duty deposit"', async () => {
+    const keys = ['settings', 'clients', 'lg_jobs', 'advances', 'purchases', 'purchase_payments', 'invoices', 'transactions', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const today = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
+    const job = { id: 'e2e-lg-j2', number: 'JOB/FY26-27/0002', date: today, status: 'arrived', dir: 'import', mode: 'sea_fcl', origin: 'NSA', destination: 'BOM', client_id: 'e2e-lg-c2', refs: { boe_no: '7654321', boe_date: today }, containers: [{ no: 'MSCU1234566', size: '40HC' }], updated_at: today };
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'transport', modules: undefined, logistics_kind: 'cha', industry_packs: ['logistics', 'customs'], lock_until: undefined });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-lg-c2', name: 'E2E Demo Imports Pvt Ltd', email: '', address: 'Navi Mumbai', gstin: '27AAPFU0939F1ZV', state_code: '27' }]);
+    await writeJson(page, 'lg_jobs', [job]);
+    await readJson(page, 'lg_jobs', [], (v) => v.length === 1 && v[0].id === job.id, 15000);
+    await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-lg-c2'), 15000);
+    await page.goto(srv.origin + '/time?tab=shipments&view=customs');
+    await page.locator('[data-lg-customs]').waitFor({ timeout: 15000 });
+    check((await page.getByRole('tab').allInnerTexts()).some((t) => /^Customs$/.test(t.trim())), 'the desk lists the Customs view (pack customs)');
+    await page.locator('[data-lg-field="customs-job"]').selectOption(job.id);
+    await page.locator('[data-lg-kyc-hint]').waitFor({ timeout: 15000 });
+    check(true, 'a client without KYC shows the CBLR Reg 10(n) hint');
+    await page.locator('[data-lg-field="dep-amount"]').fill('200000');
+    await page.locator('[data-lg-add-dep]').click();
+    const adv = (await readJson(page, 'advances', [], (v) => v.some((a) => a.lg?.job_id === job.id), 15000)).find((a) => a.lg?.job_id === job.id);
+    check(adv?.pass_through === true && adv.tax_rate === 0 && adv.amount === 200000 && adv.tax?.applies === false && /not consideration for our supply/.test(adv.description ?? ''), `deposit ${adv?.number}: ₹2,00,000, 0 %, pass-through, no GST`);
+    const disb = async (kind, payee, ref, amount, n) => {
+      await page.locator('[data-lg-field="disb-kind"]').selectOption(kind);
+      await page.locator('[data-lg-field="disb-payee"]').fill(payee);
+      await page.locator('[data-lg-field="disb-ref"]').fill(ref);
+      await page.locator('[data-lg-field="disb-amount"]').fill(String(amount));
+      await page.locator('[data-lg-add-disb]').click();
+      return readJson(page, 'purchases', [], (v) => v.filter((p) => p.lg?.on_behalf && p.lg.job_id === job.id).length === n, 15000);
+    };
+    await disb('duty', 'Customs (ICEGATE)', '1234567', 185430, 1);
+    const bills = (await disb('cfs', 'Demo CFS', 'CFS/77', 12000, 2)).filter((p) => p.lg?.job_id === job.id);
+    check(bills.length === 2 && bills.every((p) => p.itc_eligible === false && p.pure_agent === true && p.billable_to_client_id === 'e2e-lg-c2' && p.cgst + p.sgst + p.igst === 0), 'two disbursements on behalf: no GST, no ITC, billable to the client as pure agent');
+    check(/Excess ₹2,570\.00/.test(await page.locator('[data-lg-position]').innerText()), `position: deposit ₹2,00,000 vs ₹1,97,430 unrecovered → excess ₹2,570 (${await page.locator('[data-lg-position]').innerText()})`);
+    // The reimbursement bill as R19-B's charge sheet (or the editor's billable costs) issues it: agency ₹6,000 + GST, two Rule 33 lines, lg.disb.
+    const pa = 'Recovered at actual as a pure agent (Rule 33) — outside the taxable value. Verify with your CA.';
+    const line = (p, name) => ({ id: `e2e-l-${p.id}`, type: 'Service', name, description: pa, charge_head_id: 'rule33', unit: 'NOS', quantity: 1, rate: p.total, tax_rate: 0, discount_percent: 0, amount: p.total, bill_refs: [p.id] });
+    const duty = bills.find((p) => p.lg.disb === 'duty');
+    const cfs = bills.find((p) => p.lg.disb === 'cfs');
+    const base = (prev.invoices ?? [])[0] ?? {};
+    const inv = {
+      ...base, id: 'e2e-lg-reimb', invoice_number: 'INV/FY26-27/9019', doc_type: 'INVOICE', issue_date: today, due_date: today, status: 'Sent', currency: 'INR', template_id: base.template_id ?? 'gst_tax_invoice',
+      client: { id: 'e2e-lg-c2', name: 'E2E Demo Imports Pvt Ltd', email: '', address: 'Navi Mumbai', gstin: '27AAPFU0939F1ZV', state_code: '27' },
+      items: [{ id: 'e2e-l-ag', type: 'Service', name: 'Agency charges', hsn: '996712', unit: 'NOS', quantity: 1, rate: 6000, tax_rate: 18, discount_percent: 0, amount: 6000 }, line(duty, 'Customs duty — 1234567 (paid on your behalf)'), line(cfs, 'CFS charges — CFS/77 (paid on your behalf)')],
+      gst_mode: 'CGST_SGST', place_of_supply: '27', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false, amount_paid: 0, notes: '', terms: '',
+      subtotal: 203430, discount_amount: 0, taxable_value: 203430, cgst_amount: 540, sgst_amount: 540, igst_amount: 0, tax_amount: 1080, round_off: 0, total: 204510, balance_due: 204510,
+      lg: { job_id: job.id, job_no: job.number, dir: 'import', mode: 'sea_fcl', refs: job.refs, disb: [{ date: today, kind: 'duty', ref: '1234567', payee: 'Customs (ICEGATE)', amount: 185430 }, { date: today, kind: 'cfs', ref: 'CFS/77', payee: 'Demo CFS', amount: 12000 }] },
+    };
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv]);
+    await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === inv.id), 15000);
+    await page.goto(srv.origin + '/invoice/' + inv.id);
+    await page.locator('[data-lg-disb-schedule]').first().waitFor({ timeout: 15000 });
+    check((await page.locator('[data-lg-disb-schedule] tbody tr').count()) === 2 && /1,97,430\.00/.test(await page.locator('[data-lg-disb-total]').first().innerText()), 'the paper prints the disbursement schedule (two rows) and ₹1,97,430.00 at actual');
+    check((await page.locator('body').innerText()).includes('2,04,510.00'), 'reimbursement bill total ₹2,04,510.00');
+    await page.goto(srv.origin + '/time?tab=shipments&view=customs');
+    await page.locator('[data-lg-field="customs-job"]').selectOption(job.id, { timeout: 15000 });
+    await page.locator('[data-lg-field="dep-invoice"]').selectOption(inv.id);
+    await page.locator('[data-lg-apply]').click();
+    const pays = await readJson(page, 'transactions', [], (v) => v.some((p) => p.advance_id === adv.id), 15000);
+    const pay = pays.find((p) => p.advance_id === adv.id);
+    check(pay?.amount === 200000 && pay.invoice_id === inv.id && pay.method === 'Advance adjusted', `deposit applied: ₹${pay?.amount} as an advance_id row (cash readers skip it)`);
+    const after = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === inv.id && i.amount_paid === 200000), 15000)).find((i) => i.id === inv.id);
+    check(after?.balance_due === 4510, `₹4,510.00 due after the deposit (${after?.balance_due})`);
+    check(/Short by ₹4,510\.00/.test(await page.locator('[data-lg-position]').innerText()), 'position: short by ₹4,510.00');
+    await page.goto(srv.origin + '/');
+    await page.getByRole('navigation', { name: /Primary/ }).getByRole('link', { name: 'Dashboard' }).waitFor();
+    await page.keyboard.press('Control+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await palette.waitFor();
+    await palette.getByRole('combobox').fill('duty deposit');
+    await palette.getByRole('option', { name: /Customs: duty deposits/ }).first().waitFor({ timeout: 15000 });
+    check(true, 'Ctrl+K "duty deposit" finds the customs view');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {
