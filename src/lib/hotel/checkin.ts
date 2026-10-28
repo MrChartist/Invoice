@@ -120,6 +120,20 @@ export function lineLeaveDay(res: Reservation, line: RoomLine, at: Date = new Da
 }
 
 /**
+ * PENDING 9: the folio a checked-in line must be billed on before it can close (nights not posted before the day the guest
+ * leaves, or unbilled folio lines) — its window-1 folio, else the first open one with unbilled lines; `''` when nothing
+ * is left to bill (comp or already billed: a status-only check-out is allowed). The Reservations list and the night
+ * audit's due-outs use it to send "Check out" through the folio's check-out (billing) instead of refusing.
+ */
+export function folioToBill(res: Reservation, line: RoomLine, at: Date = new Date()): string {
+  const folios = hotelDb.folios();
+  const open = folios.filter((f) => f.line_id === line.id && f.status === 'open');
+  const unbilled = open.filter((f) => billable(f).length);
+  if (!unbilled.length && !pendingNights(res, line, folios, lineLeaveDay(res, line, at)).length) return '';
+  return (unbilled[0] ?? open.find((f) => f.window === 1) ?? open[0])?.id ?? '';
+}
+
+/**
  * Line out (R7-B3's check-out calls this after billing): `checked_out_at`, room dirty; the booking closes when no line
  * is in. QA9 H1: refused while the line has nights not yet posted before the day the guest leaves, or unbilled folio
  * lines — a line never closes with unbilled nights (bill it on Folios → Check out). An early check-out trims the line (H9).

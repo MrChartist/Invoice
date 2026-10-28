@@ -433,3 +433,19 @@ Source documents still call these open; the code on `df085ff` has them.
 - Price lists on POS (`priceListRate` in `Pos.tsx`), `DrillStack` in Books reports, receivable interest invoices
   (Receivables → Interest).
 - `TODO` / `FIXME` / `XXX` in `src/`: none.
+
+### Closed after the sweep (§2.1 items 9–15)
+
+- **#9** hotel check-out from Reservations / night audit bills through the folio (`folioToBill`, "Bill the folio &
+  check out"; `tests/hotel-checkout-route.test.ts`).
+- **#10** agri e-Way hint in the invoice editor (`components/agri/AgEwayHint.tsx`, `editorEwayHint`;
+  `tests/ag-eway-editor.test.ts`).
+- **#11** garments 5C "Dispatched from" job worker on the invoice e-Way dialog (`components/mfg/EwayDispatchFrom.tsx`;
+  `tests/mf-eway-5c.test.ts`).
+- **#12** "Now serving" line on the POS customer display (`servingMessage` in `pos-serving.ts`;
+  `tests/pos-display-serving.test.ts`).
+- **#13** travel ticket annexure page and CSV of statement differences (`travel/tv-annexure.ts`,
+  `parts/travel/TicketAnnexurePage.tsx`; `tests/tv-annexure.test.ts`).
+- **#14** realty desk broker bill (194H draft), demand reminders through follow-ups, closure documents on works
+  contracts (`construction/cn-realty-extras.ts`, `setClosureFiles`; `tests/cn-realty-extras.test.ts`).
+- **#15** `ROADMAP.md` status line, Rounds 7–19 / QA 7–21 tables and timeline; `BETA_GUIDE.md` §8 list after 7Q.
