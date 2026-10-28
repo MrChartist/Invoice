@@ -55,7 +55,10 @@ test('PACK_OF_TYPE / PACK_OF_TYPE_INLINE / PACK_ROUTES unchanged; /time stays vi
   localDb.settings.save({ ...localDb.settings.get(), ...s });
   assert.deepEqual(activePacks(localDb.settings.get()), ['logistics', 'customs']);
   assert.deepEqual(desk(), ['exportsvc', 'shipments'], 'the R14 exports-of-services tab also for logistics');
-  for (const p of ['customs', 'courier', 'warehouse'] as const) assert.ok(PACK_TABS.filter((t) => t.path.startsWith('/time?tab=shipments')).every((t) => packTabOn(t, [p])), p);
+  const shared = PACK_TABS.filter((t) => t.path.startsWith('/time?tab=shipments') && !/view=(customs|courier|storage)$/.test(t.path)); // C / D: pack views
+  for (const p of ['customs', 'courier', 'warehouse'] as const) assert.ok(shared.every((t) => packTabOn(t, [p])), p);
+  const customs = PACK_TABS.find((t) => t.path === '/time?tab=shipments&view=customs')!; // R19-C
+  assert.deepEqual([packTabOn(customs, ['customs']), packTabOn(customs, ['logistics']), packTabOn(customs, ['courier'])], [true, false, false]);
 });
 
 test('settings defaults: USD, kg, split by POS / currency, accruals, gross, volumetric; heads kept / dropped; defaults never overwrite', () => {
@@ -76,11 +79,13 @@ test('checklist steps only with logistics_kind; facts from the data', () => {
   const f: ChecklistFactsV3 = { profileReady: true, clients: 1, items: 1, invoices: 1, messagesSent: 1, payments: 1 };
   const steps = (logisticsKind?: string) => allSteps(f, { businessType: 'transport', packs: ['logistics'], modules: null, role: 'owner', ...(logisticsKind ? { logisticsKind } : {}) } as ChecklistCtx).map((s) => s.kind).filter((k) => k.startsWith('lg'));
   assert.deepEqual(steps(), []);
-  assert.deepEqual(steps('multi'), ['lgHeads', 'lgJob', 'lgBill']);
+  assert.deepEqual(steps('multi'), ['lgHeads', 'lgJob', 'lgBill', 'lgDeposit']);
+  assert.deepEqual(steps('forwarder'), ['lgHeads', 'lgJob', 'lgBill'], 'R19-C: the deposit step only for a customs broker');
   assert.deepEqual(steps('courier'), ['lgHeads']);
   assert.equal(readChecklistInputs().facts.logistics, undefined);
   localDb.settings.save({ ...localDb.settings.get(), ...applyLogisticsKind('cha') });
   setTable('lg_jobs', [{ id: 'j', number: 'JOB/FY26-27/0001' }]);
   setTable('invoices', [{ id: 'i', lg: { job_id: 'j' } }, { id: 'k' }]);
-  assert.deepEqual(readChecklistInputs().facts.logistics, { lgHeads: 0, lgJob: 1, lgBill: 1 });
+  setTable('advances', [{ id: 'a', lg: { job_id: 'j' } }, { id: 'b' }]);
+  assert.deepEqual(readChecklistInputs().facts.logistics, { lgHeads: 0, lgJob: 1, lgBill: 1, lgDeposit: 1 });
 });

@@ -39,7 +39,7 @@ export type StepKind =
   | LgStep;
 
 /** Catalogue order (the order steps are shown in). */
-export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'lut', 'edf', 'clientMoneyBank', 'stageTemplate', 'feeSchedule', 'linkCompanies', 'partners', 'firstTrip', 'firstEvent', 'firstSupplier', 'regime', 'firstStatement', 'firstSite', 'firstMuster', 'firstBill', 'siteProof', 'licence', 'societyUnits', 'societyTariff', 'societyRun', 'societyFunds', 'societyAudit', 'lgHeads', 'lgJob', 'lgBill', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
+export const STEP_ORDER: readonly StepKind[] = ['profile', 'tradeProfile', 'retailProfile', 'serviceProfile', 'opening', 'import', 'client', 'item', 'drugLicence', 'doctor', 'variantGrid', 'serialItem', 'metalRate', 'jewelTag', 'scaleOrBarcode', 'constructionProfile', 'contract', 'boq', 'realtyProject', 'units', 'paymentPlan', 'labourContract', 'doctorProfile', 'serviceMenu', 'staff', 'labTest', 'memberPlan', 'batch', 'labourOp', 'jobCard', 'farmers', 'rateChart', 'firstShift', 'millBom', 'cmrAgreement', 'chambers', 'rentPlan', 'agriLicence', 'shareCapital', 'farmBatch', 'workCentres', 'udyam', 'firstDrawing', 'firstStyle', 'fabricators', 'firstMould', 'pressMaster', 'fssai', 'shelfLife', 'firstMatter', 'staffCapacity', 'enrolment', 'conflictCheck', 'lut', 'edf', 'clientMoneyBank', 'stageTemplate', 'feeSchedule', 'linkCompanies', 'partners', 'firstTrip', 'firstEvent', 'firstSupplier', 'regime', 'firstStatement', 'firstSite', 'firstMuster', 'firstBill', 'siteProof', 'licence', 'societyUnits', 'societyTariff', 'societyRun', 'societyFunds', 'societyAudit', 'lgHeads', 'lgJob', 'lgBill', 'lgDeposit', 'posbill', 'invoice', 'packFirst', 'principal', 'schemeScope', 'weightItem', 'whatsapp', 'payment', 'gstPeriod', 'backup'];
 
 /** Steps a clerk sees (R6-A1 AC4). */
 export const CLERK_STEPS: readonly StepKind[] = ['client', 'item', 'invoice', 'posbill', 'payment'];
@@ -184,8 +184,8 @@ const HS_STEPS: Readonly<Record<HsStep, string>> = {
 const isHsStep = (k: string): k is HsStep => Object.hasOwn(HS_STEPS, k);
 
 /** R19-A1: the logistics steps (job steps not for a courier / warehouse kind) and the desk view each opens (C: lgDeposit; D: lgManifest, lgStorage). */
-type LgStep = 'lgHeads' | 'lgJob' | 'lgBill';
-const LG_STEPS: Readonly<Record<LgStep, [jobKindsOnly: boolean, view: string]>> = { lgHeads: [false, 'rates'], lgJob: [true, 'jobs'], lgBill: [true, 'jobs'] };
+type LgStep = 'lgHeads' | 'lgJob' | 'lgBill' | 'lgDeposit';
+const LG_STEPS: Readonly<Record<LgStep, [jobKindsOnly: boolean, view: string]>> = { lgHeads: [false, 'rates'], lgJob: [true, 'jobs'], lgBill: [true, 'jobs'], lgDeposit: [true, 'customs'] }; // R19-C: lgDeposit only for a customs broker (cha / multi)
 const isLgStep = (k: string): k is LgStep => Object.hasOwn(LG_STEPS, k);
 
 /** R14 (PS-A1): the professional steps, the kinds that have them and where each opens. */
@@ -325,7 +325,7 @@ function applies(kind: StepKind, ctx: ChecklistCtx): boolean {
     case 'batch': return ctx.serviceKind === 'coaching';
     case 'labourOp': case 'jobCard': return ctx.serviceKind === 'workshop' || ctx.serviceKind === 'appliance';
     case 'partners': return !!ctx.profKind && (ctx.packs ?? []).includes('partners'); // R14 (PS-D1)
-    default: return isLgStep(kind) ? !!ctx.logisticsKind && (!LG_STEPS[kind][0] || !/courier|warehouse/.test(ctx.logisticsKind)) : isHsStep(kind) ? !!ctx.societyKind : isMpStep(kind) ? !!ctx.manpowerKind && MP_STEPS[kind][0].split(' ').includes(ctx.manpowerKind) : isTvStep(kind) ? !!ctx.travelKind && TV_STEPS[kind][0].split(' ').includes(ctx.travelKind) : isPsStep(kind) ? !!ctx.profKind && (PS_STEPS[kind][0] === '@svcexport' ? ctx.packs.includes('svcexport') : PS_STEPS[kind][0].split(' ').includes(ctx.profKind)) : isMfStep(kind) ? !!ctx.mfgKind && MF_STEPS[kind][0].split(' ').includes(ctx.mfgKind) : isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri / R13 mfg steps
+    default: return isLgStep(kind) ? !!ctx.logisticsKind && (!LG_STEPS[kind][0] || !/courier|warehouse/.test(ctx.logisticsKind)) && (kind !== 'lgDeposit' || /cha|multi/.test(ctx.logisticsKind)) : isHsStep(kind) ? !!ctx.societyKind : isMpStep(kind) ? !!ctx.manpowerKind && MP_STEPS[kind][0].split(' ').includes(ctx.manpowerKind) : isTvStep(kind) ? !!ctx.travelKind && TV_STEPS[kind][0].split(' ').includes(ctx.travelKind) : isPsStep(kind) ? !!ctx.profKind && (PS_STEPS[kind][0] === '@svcexport' ? ctx.packs.includes('svcexport') : PS_STEPS[kind][0].split(' ').includes(ctx.profKind)) : isMfStep(kind) ? !!ctx.mfgKind && MF_STEPS[kind][0].split(' ').includes(ctx.mfgKind) : isAgriStep(kind) ? agriApplies(kind, ctx) : true; // profile, item, payment, backup; R12 agri / R13 mfg steps
   }
 }
 
@@ -550,6 +550,7 @@ function logisticsFacts(invoices: readonly { lg?: { job_id?: unknown } }[]): Par
     lgHeads: getJson<{ heads?: unknown[] } | null>(`${DB_PREFIX}logistics_settings`, null)?.heads?.length ?? 0,
     lgJob: peekTable('lg_jobs').length,
     lgBill: invoices.filter((r) => r?.lg?.job_id).length,
+    lgDeposit: peekTable<{ lg?: { job_id?: string } }>('advances').filter((a) => a?.lg?.job_id).length, // R19-C
   };
 }
 

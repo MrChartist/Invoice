@@ -23,6 +23,7 @@ import { billedHeads, chargeSheet, planJobBills, type JobDraft, type JobPlan } f
 import { loadJobs, saveJob } from './lg-save';
 import { lgDefaultsFor } from './lg-settings';
 import { lutOn, regimeCtx } from './lg-tax-io';
+import { loadDisb } from './lg-recv-io';
 
 export interface BillOpts { date: string; /** Typed ₹ rates by currency (win over the master). */ fx?: Record<string, number> }
 
@@ -30,7 +31,7 @@ export interface BillOpts { date: string; /** Typed ₹ rates by currency (win o
 function env() {
   const byJob = new Map<string, InvoiceRecord[]>();
   for (const d of localDb.invoices.getAll()) if (d.lg?.job_id) byJob.set(d.lg.job_id, [...(byJob.get(d.lg.job_id) ?? []), d]);
-  return { s: lgDefaultsFor(), rates: loadRates(), snd: localDb.settings.activeProfile() ?? null, settings: localDb.settings.get(), tpl: localDb.template.get(), clients: new Map(localDb.clients.getAll().map((c) => [c.id ?? '', c])), byJob };
+  return { s: lgDefaultsFor(), rates: loadRates(), snd: localDb.settings.activeProfile() ?? null, settings: localDb.settings.get(), tpl: localDb.template.get(), clients: new Map(localDb.clients.getAll().map((c) => [c.id ?? '', c])), byJob, disb: loadDisb('') };
 }
 type Env = ReturnType<typeof env>;
 const clientOf = (j: LgJob, e: Env) => ({ ...blankClient(), ...e.clients.get(j.client_id) });
@@ -39,7 +40,7 @@ const clientOf = (j: LgJob, e: Env) => ({ ...blankClient(), ...e.clients.get(j.c
 export function planJob(j: LgJob, o: BillOpts, e: Env = env()): JobPlan {
   const heads = e.s.heads ?? [];
   return planJobBills(j, chargeSheet(j, heads), {
-    ...regimeCtx(o.date, clientOf(j, e), e.snd), heads, settings: e.s, billed: billedHeads(e.byJob.get(j.id) ?? [], j.id), passText: PURE_AGENT_CHARGE, newId: generateId,
+    ...regimeCtx(o.date, clientOf(j, e), e.snd), heads, settings: e.s, billed: billedHeads(e.byJob.get(j.id) ?? [], j.id), passText: PURE_AGENT_CHARGE, newId: generateId, disb: e.disb.filter((r) => r.job_id === j.id),
     fx: (c) => (o.fx?.[c] ? { rate: o.fx[c], source: 'typed' } : ((r) => (r ? { rate: r.rate, source: r.source } : null))(rateOn(e.rates, c, o.date))),
   });
 }

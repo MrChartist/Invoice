@@ -235,6 +235,14 @@ export interface LgJob {
   auth?: { ref?: string; date?: string };
 }
 
+/** C3: a disbursement line `billExtras` adds (merged with B's `LgCharge`; never stored on the job). */
+export interface LgCharge {
+  /** The `purchases` row it recovers (the line's `bill_refs`; billed state is derived from it, not from the head). */
+  disb_id?: string;
+  /** Its row of the printed schedule (`lg.disb`). */
+  disb?: NonNullable<LgSnapshot['disb']>[number];
+}
+
 /* ════════════════════════════════════════ R19-D ════════════════════════════════════════ */
 
 /** D2: one courier docket (inside its manifest row). */
