@@ -47,6 +47,16 @@ export function mpRegime(c: RegimeCtx, sacs: readonly (string | undefined)[]): R
   return { ...per[0], ...(per.some((r) => r.regime !== per[0].regime) ? { split: true } : {}) };
 }
 
+/** The user's override (editor chip, with its reason): the regime's rate and sentence on the date. */
+export function forcedRegime(regime: MpRegime, date: string, reason = ''): RegimeResult {
+  if (regime === 'manual_exempt') return postRegime('', { date, manual: reason || 'reason not given' });
+  const d = date.slice(0, 10);
+  const rate = ruleAt(MP_GST_RATE_RULES, d);
+  if (regime === 'exempt66') return { regime, rate: 0, decl: ruleAt(EDU_EXEMPT_RULES, d).decl, ca: ['MP7'] };
+  const rcm = regime === 'rcm' ? ruleAt(SECURITY_RCM_RULES, d) : null;
+  return rcm ? { regime, rate, decl: rcm.decl, ca: ['MP1', 'MP2', 'MP10'] } : { regime: 'fwd', rate, decl: '', ca: ['MP4'] };
+}
+
 /** Posts grouped by regime, one group per invoice (B3). */
 export function splitPosts<T extends { sac?: string }>(posts: readonly T[], c: RegimeCtx): Partial<Record<MpRegime, T[]>> {
   const out: Partial<Record<MpRegime, T[]>> = {};
