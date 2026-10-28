@@ -5749,7 +5749,7 @@ try {
     await page.locator('[data-society-desk]').waitFor({ timeout: 15000 });
     check((await page.getByRole('tab').allInnerTexts()).some((t) => /^Society$/.test(t.trim())), 'Recurring lists the Society tab');
     const hv = page.locator('[data-hs-heads]');
-    await hv.getByLabel('State', { exact: true }).selectOption('27');
+    await hv.locator('select').first().selectOption('27');
     await hv.locator('[data-hs-apply-defaults]').click();
     await hv.locator('[data-hs-head="service"] [data-hs-head-rate]').fill('3000');
     await hv.locator('[data-hs-head="parking"] [data-hs-head-rate]').fill('500');

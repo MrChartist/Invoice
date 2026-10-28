@@ -182,7 +182,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
         ...(manpower ? applyManpowerKind(manpower, { registered: a.gstRegistered, currentPacks: activePacks(localDb.settings.get()) }) : {}),
         ...(prof ? { ...applyProfKind(prof, { registered: a.gstRegistered, sub: pfSub, firmForm: pfForm, currentPacks: activePacks(localDb.settings.get()) }), defaultDueDays: PROF_PROFILES[prof].defaultDueDays } : {}),
         ...(agri ? { ...applyAgriKind(agri, { registered: a.gstRegistered, mill_kind: agMill, currentPacks: activePacks(localDb.settings.get()) }), ...(AGRI_PROFILES[agri].defaultDueDays !== undefined ? { defaultDueDays: AGRI_PROFILES[agri].defaultDueDays } : {}) } : {}),
-        ...(soc ? applySocietyKind(soc, { registered: a.gstRegistered, currentPacks: activePacks(localDb.settings.get()) }) : {}),
+        ...(soc ? applySocietyKind(soc, { registered: a.gstRegistered, currentPacks: Array.isArray(localDb.settings.get().industry_packs) ? activePacks(localDb.settings.get()) : [] }) : {}),
         ...(mfg ? { ...applyMfgKind(mfg, { registered: a.gstRegistered, sub: mfSub, currentPacks: activePacks(localDb.settings.get()) }), ...(MFG_PROFILES[mfg].defaultDueDays !== undefined ? { defaultDueDays: MFG_PROFILES[mfg].defaultDueDays } : {}) } : {}),
       };
       // R13 (MF-A1): the Udyam number and category go on the active sender profile (snapshotted on every document).

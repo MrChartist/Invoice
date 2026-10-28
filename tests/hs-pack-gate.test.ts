@@ -28,3 +28,8 @@ test('hosts load Round 18 code lazily; the paper reads only the snapshot', () =>
   for (const f of ['components/onboarding/SetupWizard.tsx', 'components/settings/FeaturesPanel.tsx']) assert.ok(!/from '[^']*lib\/society\//.test(src(f)), `${f}: no static society engine import`);
   assert.ok(!/society\//.test(src('components/templates/paper-helpers.ts').split('\n').filter((l) => l.startsWith('import') && !l.startsWith('import type')).join('\n')));
 });
+
+test('the profile pickers carry only an explicit pack list (a nonprofit\'s implied donations pack is not switched on)', () => {
+  assert.match(src('components/settings/FeaturesPanel.tsx'), /applySocietyKind\(k, \{ registered, currentPacks: Array\.isArray\(settings\.industry_packs\) \? packsOn : \[\] \}\)/);
+  assert.match(src('components/onboarding/SetupWizard.tsx'), /applySocietyKind\(soc, \{ registered: a\.gstRegistered, currentPacks: Array\.isArray\(localDb\.settings\.get\(\)\.industry_packs\)/);
+});

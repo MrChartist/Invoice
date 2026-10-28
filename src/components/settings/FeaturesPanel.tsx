@@ -252,7 +252,7 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
               onPick={(k) => {
                 if (!k) return onChange({ society_kind: undefined });
                 const registered = Boolean(settings.profiles?.find((p) => p.id === settings.activeProfileId)?.companyGstin?.trim());
-                onChange(applySocietyKind(k, { registered, currentPacks: packsOn }) as Partial<typeof settings>);
+                onChange(applySocietyKind(k, { registered, currentPacks: Array.isArray(settings.industry_packs) ? packsOn : [] }) as Partial<typeof settings>); // explicit packs only: the type's implied donations pack is not carried
               }}
             />
           </div>
