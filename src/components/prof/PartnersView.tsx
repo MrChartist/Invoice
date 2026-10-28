@@ -3,11 +3,13 @@ import { useMemo, useState } from 'react';
 import { fdT } from '../../i18n/areas/prof-r14d-firm';
 import { todayInput } from '../../lib/utils';
 import { A } from '../../lib/ledger/accounts';
-import { loadPartners, postDrawings, savePartner, saveRatio, shareProblems, termOn } from '../../lib/prof/ps-partners';
+import { deletePartner, loadPartners, postDrawings, savePartner, saveRatio, shareProblems, termOn } from '../../lib/prof/ps-partners';
 import type { PartnerRemuneration } from '../../types/prof-r14';
 import { NumberInput } from '../ui/NumberInput';
 import { Fld, Tbl } from './ps-d-ui';
-import { inr, type PsDeskCtx, row } from './ps-desk';
+import { inr, type PsDeskCtx, row, sm } from './ps-desk';
+import { can } from '../../lib/access';
+import { r16bT } from '../../i18n/areas/prof-r16b';
 import controls from '../../styles/controls.module.css';
 
 const num = (v: number, on: (n: number) => void, k: string) => <NumberInput className={controls.input} style={{ maxWidth: 110 }} value={v} onChange={on} data-ps={k} />;
@@ -47,10 +49,12 @@ export default function PartnersView({ ctx }: { ctx: PsDeskCtx }) {
         <Fld l={fdT('deedRef')}><input className={controls.input} style={{ maxWidth: 140 }} value={f.deed} onChange={(e) => setF({ ...f, deed: e.target.value })} /></Fld>
         <button type="button" className={controls.btnPrimary} onClick={add} data-ps-b="p-add">{fdT('add')}</button>
       </div>
-      <Tbl empty={fdT('none')} head={[fdT('name'), fdT('pan'), fdT('kind'), fdT('joined'), fdT('share'), fdT('remMode'), fdT('interestPct'), fdT('ratioFrom')]} rows={partners.map((p) => {
+      <Tbl empty={fdT('none')} head={[fdT('name'), fdT('pan'), fdT('kind'), fdT('joined'), fdT('share'), fdT('remMode'), fdT('interestPct'), fdT('ratioFrom'), '']} rows={partners.map((p) => {
         const t = termOn(p, today) ?? p.terms[0];
         return [p.name, p.pan ?? '—', p.kind === 'working' ? fdT('working') : fdT('nonWorking'), p.joined, `${t?.share_pct ?? 0}`, t ? (t.remuneration.mode === 'fixed' ? inr(t.remuneration.amount ?? 0) : t.remuneration.mode === 'pct_book_profit' ? `${t.remuneration.pct} %` : fdT('maxAllow')) : '—', `${t?.interest_pct ?? 0}`,
-          num(ratio.shares[p.id] ?? t?.share_pct ?? 0, (v) => setRatio({ ...ratio, shares: { ...ratio.shares, [p.id]: v } }), 'r-share')];
+          num(ratio.shares[p.id] ?? t?.share_pct ?? 0, (v) => setRatio({ ...ratio, shares: { ...ratio.shares, [p.id]: v } }), 'r-share'),
+          // R16-B5: refused while a partner posting or a ledger line names the partner (recycle bin)
+          can('settings.manage') && <button type="button" className={sm} onClick={() => window.confirm(r16bT('delAsk', { name: p.name })) && ctx.run(() => deletePartner(p.id), r16bT('deleted'))} data-ps-b="p-del">{r16bT('del')}</button>];
       })} />
       {partners.length > 1 && (
         <div style={row}>

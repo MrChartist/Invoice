@@ -76,10 +76,11 @@ export const workUnitOf = (w: unknown): WorkUnit => {
 
 /**
  * Per-appearance billing: entries of an appearance / item work type become one line of `count` × the fee (the work
- * type's rate, else the entry's rate); time still counts for realisation.
+ * type's rate, else the entry's rate); time still counts for realisation. Entries with an `id` are listed in `bill_refs`.
  */
-export function appearanceLines(entries: readonly { work_type_id?: string; hourly_rate?: number; date: string }[], workTypes: readonly { id: string; name: string; rate?: number; ps?: unknown }[]): { name: string; quantity: number; rate: number; unit: string; work_type_id: string }[] {
-  const out = new Map<string, { name: string; quantity: number; rate: number; unit: string; work_type_id: string }>();
+export type AppearanceLine = { name: string; quantity: number; rate: number; unit: string; work_type_id: string; bill_refs?: string[] };
+export function appearanceLines(entries: readonly { id?: string; work_type_id?: string; hourly_rate?: number; date: string }[], workTypes: readonly { id: string; name: string; rate?: number; ps?: unknown }[]): AppearanceLine[] {
+  const out = new Map<string, AppearanceLine>();
   for (const e of entries) {
     const w = workTypes.find((x) => x.id === e.work_type_id);
     if (!w || workUnitOf(w) === 'hour') continue;
@@ -87,6 +88,7 @@ export function appearanceLines(entries: readonly { work_type_id?: string; hourl
     const k = `${w.id}|${rate}`;
     const row = out.get(k) ?? { name: w.name, quantity: 0, rate, unit: workUnitOf(w) === 'appearance' ? 'NOS' : 'OTH', work_type_id: w.id };
     row.quantity++;
+    if (e.id) (row.bill_refs ??= []).push(e.id); // R16-B3: the entries the line bills (realisation still reads them)
     out.set(k, row);
   }
   return [...out.values()];

@@ -310,6 +310,7 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'practice', path: '/time?tab=wip&view=utilisation', labelKey: 'r14.wip.utilisation' },
   { pack: 'practice', path: '/time?tab=wip&view=profit', labelKey: 'r14.wip.profit' },
   { pack: 'practice', path: '/time?tab=wip&view=yearend', labelKey: 'r14.wip.yearend' },
+  { pack: 'practice', path: '/time?tab=wip&view=disb', labelKey: 'r14.wip.disb' }, // R16-B1
   // R14 PS-D: the firm desk (partners; also practice — the presumptive and 194J views need no partners) and the CA desk
   { pack: 'partners', alsoPacks: ['practice'], path: '/time?tab=firm', labelKey: 'r14.firm' },
   { pack: 'partners', alsoPacks: ['practice'], path: '/time?tab=firm&view=partners', labelKey: 'r14.firm.partners' },

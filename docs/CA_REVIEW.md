@@ -48,8 +48,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF40–MF42, MF50–MF54, MF60–MF65, MF80–MF82, MF90–MF96 | 60 | 12 |
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
 | 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV48 | 48 | 15 |
-| 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF18 | 18 | 5 |
-| **Total** | | **562** | **139** |
+| 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF21 | 21 | 5 |
+| **Total** | | **565** | **139** |
 
 ---
 
@@ -1191,6 +1191,14 @@ belong to R16-B / R16-C, PF17–PF18 to R16-D.
 | PF16 | **Ticket re-issue (R16-C2):** change penalty and fare difference as pure agent; our re-issue fee at 18 %. | As stated | R16-C (`travel/tv-reissue.ts`) | — | — |
 | PF17 ★ | **Netting for a vendor linked by hand (R16-D1).** When a client and a vendor of another name are linked (`Vendor.client_id`), the set-off journal now debits the vendor's own creditor sub-ledger and credits the client's debtor sub-ledger (before: both lines in the client's name, so the vendor's ledger, statement and confirmation kept the full payable). Is the set-off between two differently named ledgers of one party presented right? | Vendor's and client's own sub-ledgers; derived on read, no migration | `ledger/postings.ts` (`receiptVoucher`, netting rows only); `netting.ts` | — | — (design) |
 | PF18 | **Real-estate no-ITC caution (R16-D3).** A builder (realty pack) on the 1 % / 5 % scheme (N 03/2019-CT(R)) is cautioned on every bill that claims ITC, also when the bill is not charged to a project (no caution while a project is on the old 8 % / 12 % option); saving past it is audited with the bill's note as the reason. Which inward supplies stay eligible (e.g. capital goods for a commercial let-out)? | Caution on every ITC claim; override audited | `bill-guard.ts` `realtyItcCaution` | 2019-04-01 | N 03/2019-CT(R) (recalled, CN18 / CN34) |
+
+### 16.1 Added by R16-B (Round 14 engines wired)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| PF19 | **Per-appearance billing on a fee note.** With "Bill appearances" the entries of an appearance work type become one line "count × fee" (unit NOS, the firm's SAC, no hours, no dates on the line); the legal-services regime (RCM / exempt, PS1, PS2) is read as for any fee line, and the time still counts for realisation. Does a court fee note need each appearance's date (or the hearing list) printed, and is one line per work type and fee acceptable? | One line per work type × fee; dates stay in the app (the timesheet annexure lists hourly rows only). | `prof/ps-legal.ts` `appearanceLines`; `prof/ps-prebill.ts` | — | Developers' reading |
+| PF20 | **Publisher's commission invoice.** The pre-bill's "Bill commission to the publisher" makes a separate draft invoice to the publisher (matched to a client of that name, else a new name) with one line "Media commission n % — publication" at the firm's SAC and GST rate (PS12 (c)). Which SAC (e.g. 998363 / 998365) and is it forward charge at 18 %? Should the expected TDS 194H by the publisher be shown on it? | Firm's SAC and rate from the time preferences; no TDS hint. | `prof/ps-media.ts` `commissionLine`; `prof/ps-prebill.ts` `createCommissionDraft` | — | PS12; developers' reading |
+| PF21 | **Which WIP is foreign for the closing-rate memo.** The year-end memo treats a matter as foreign-currency when its active engagement bills in a foreign currency, and restates the net unbilled figure at the master's rate on the closing date; a work-type rate card in a foreign currency on an INR engagement is not converted. Open foreign invoices use the existing revaluation (balance on the closing date × the master's rate). Is the engagement currency the right test? | Engagement currency; memo only (PF14, PS37). | `components/prof/YearEndWipView.tsx`; `prof/ps-fx-rates.ts` `atClosing`; `fx-gain.ts` `revalueReceivables` | — | AS 11 (recalled) |
 
 `PF` ids are counted once here. The ★ items (PF1, PF3, PF5, PF7, PF17) change what a document prints or a return
 reports once notified.
