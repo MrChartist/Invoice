@@ -4,7 +4,7 @@
  * kept. Only the user's pick writes; an issued document keeps what it was saved with. Mixing the 5 % line with other
  * taxed lines warns (TV9), never blocks. D adds its POS / TCS chips as `switch` arms below.
  */
-import { Suspense, lazy, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { useT } from '../../i18n';
@@ -16,8 +16,9 @@ import { TV_REGIMES } from '../../lib/travel/tv-settings';
 import controls from '../../styles/controls.module.css';
 import { ListSelect } from './tv-ui';
 
-// R15-D: place-of-supply and outbound TCS chips (lazy; only once a trip / event is picked).
-const TvChips = lazy(() => import('./TvChips'));
+// R15-D: place-of-supply and outbound TCS chips (in this lazy chunk; a nested Suspense here left the items footer
+// without a layout box after reveal in Chromium — container-query invalidation).
+import TvChips from './TvChips';
 
 export default function TravelRows() {
   useT();
@@ -41,7 +42,7 @@ export default function TravelRows() {
       {tripId && <ListSelect list="regs" ids={TV_REGIMES} value={s.tv?.regime ?? 'to18'} onChange={(r) => apply(tripId, r)} attr="data-tv-pick-regime" />}
       {regimeMix(s.items, s.tv?.regime) && <span className={controls.hint} role="note" data-tv-mix>{tvT('mix')}</span>}
       {/* R15-D */}
-      {trip && <Suspense fallback={null}><TvChips trip={trip} /></Suspense>}
+      {trip && <TvChips trip={trip} />}
     </div>
   );
 }
