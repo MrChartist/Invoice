@@ -8,6 +8,7 @@ import type { InvoiceRecord } from '../types/invoice';
 import { num, round2 } from './invoice-calc';
 import { binForName } from './bins';
 import { lineFactor } from './units';
+import { escHtml as esc } from './html-esc';
 
 interface BinItem { name: string; aliases?: string[]; location?: string; batch_bins?: Record<string, string>; unit?: string }
 
@@ -43,7 +44,6 @@ export function pickRows(docs: readonly Pick<InvoiceRecord, 'invoice_number' | '
   return [...map.values()].sort((a, b) => (a.bin ? 0 : 1) - (b.bin ? 0 : 1) || a.bin.localeCompare(b.bin, undefined, { numeric: true }) || a.item.localeCompare(b.item));
 }
 
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 export function pickListHtml(rows: readonly PickRow[], opts: { title?: string; business?: string; date?: string } = {}): string {
   const body = rows.map((r) => `<tr><td>${esc(r.bin || '—')}</td><td>${esc(r.item)}</td><td>${esc(r.batch)}</td><td class="n">${r.qty}</td><td>${esc(r.unit)}</td><td>${esc(r.docs.join(', '))}</td><td class="tick"></td></tr>`).join('');

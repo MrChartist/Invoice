@@ -105,7 +105,7 @@ export const recoCsvRows = (rows: readonly RecoRow[], name: (id: string) => stri
 
 /** Printable "Material reconciliation statement" (CPWD-style columns). */
 export function recoHtml(rows: readonly RecoRow[], name: (id: string) => string, head: { site: string; from: string; to: string; company: string }): string {
-  const e = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+  const e = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   const [h, ...body] = recoCsvRows(rows, name);
   return `<!doctype html><meta charset="utf-8"><title>Material reconciliation</title><style>body{font:11px sans-serif;margin:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:3px;text-align:right}td:first-child,th:first-child{text-align:left}</style>
 <h2>Material reconciliation statement</h2><p>${e(head.company)} · Site ${e(head.site)} · ${e(head.from)} to ${e(head.to)}</p>

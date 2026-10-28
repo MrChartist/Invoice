@@ -19,6 +19,13 @@
 ## Stack
 - **React 19** + **TypeScript** + **Vite 8** (rolldown bundler — `vite.config.ts` uses
   `rolldownOptions`, which is correct for Vite 8; do not change it to `rollupOptions`).
+  Chunking (R15-A / R16-A): `codeSplitting.groups` = vendor-react, vendor-ui, app-initial (`$initial`), nine "safe" family
+  groups `f-*` and `lazy-leaves` (`scripts/vite-safe-groups.mjs` — a module joins only if nothing it imports can be dragged
+  in). Hindi strings are split out at build time (`scripts/vite-hi-split.mjs`): every `defineArea(en, hi)` must pass a
+  literal Hindi object; Hindi lives in `lang-hi-*` packs (plus `lang-regional`) listed under `langs` in
+  `dist/lang-manifest.json`, precached only on devices set to that language. Budgets: first paint 185 kB, core 3,300 kB,
+  Hindi pack 400 kB, Hindi left in English chunks ≤ 36 kB (`scripts/check-bundle-size.mjs`). HTML escaping: `escHtml`
+  (`src/lib/html-esc.ts`, escapes `'` too).
 - **State**: Zustand — `src/store/useInvoiceStore.ts` is the single live global store.
 - **Styling**: Vanilla CSS + CSS Modules (`*.module.css`); tokens in `src/index.css`.
 - **PDF**: `html-to-image` + `jspdf`. **QR**: `qrcode.react`. **Icons**: `lucide-react`.

@@ -357,3 +357,37 @@ pins the three groups, the `$initial` tag and that no group can capture `jspdf` 
 to a first-paint module now invalidates one ~88 kB chunk instead of one of ten; the PWA precaches the whole release
 anyway. Rejected variants (per-folder groups, a "tiny modules" group, `maxSize` splits) are measured in
 `docs/prd/round-15.md` §2.7.
+
+## R16-A — size recovery (2026-10-28)
+
+Four levers (`docs/prd/round-16.md` §4 R16-A), measured with `npx vite build` + `scripts/check-bundle-size.mjs`
+(gzip -9, KiB). "Core" = every JS file except the language packs in `dist/lang-manifest.json`: what an English device
+installs and updates.
+
+| Build | Chunks | Initial | Entry | Core precache | Hindi pack | Regional pack | Initial files |
+|---|---|---|---|---|---|---|---|
+| Baseline `0521a90` | 1,009 | 182.6 | 88.6 | 3,429.3 (all JS, Hindi inside) | — | — | 4 |
+| A1 + A2 (hi-split, packs, safe groups, leaves) | 1,004 | 182.1 | 88.0 | 3,086.0 | 338.9 (93 files) | 20.7 | 4 |
+| + A3 (`escHtml` only, cut 1) and QA18 merge | 1,004 | 182.1 | 88.1 | **3,085.6 (−343.7)** | **338.6** | **20.7** | 4 |
+
+- **A1 Hindi split.** `scripts/vite-hi-split.mjs` (build only) rewrites the `hi` argument of all 212 `defineArea(en, hi)`
+  calls into `() => import('virtual:hi/<family>/<file>~<hash>')`; the `lang-hi-<family>` group collects them (92
+  family chunks + `lang-hi-core` = `hi.ts`, `lang-regional` = `regional.ts`). Hindi left in English chunks: 21.3 kB
+  (help glossary / topics, keymap, WhatsApp texts, bilingual prints — allow-listed), cap 36.
+- **A2 safe groups.** `scripts/vite-safe-groups.mjs`: nine `f-*` family chunks (6.6–19.7 kB) and `lazy-leaves`
+  (16.7 kB, src/lib modules ≤ 3,000 B whose imports are all first paint / vendor). Safety is computed over strongly
+  connected components; `check-bundle-size.mjs` re-checks every `f-*` module against its family regex and every
+  leaves module's imports from `build-meta/chunks.json`.
+- **A3 shared helpers.** `escHtml` (`src/lib/html-esc.ts`, escapes `'` too) replaced 25 local copies; 5 family-local
+  copies that missed `'` were fixed in place (a family module importing a lazy helper would no longer be "safe").
+  Measured +1.2 kB core for the esc unification and +0.1 kB more for the day-maths call sites, so per the stop rule
+  only the escape was kept; `src/lib/day-math.ts` ships as a tested lazy module with no migrated call sites yet.
+- **A4 budgets.** Core precache 3,300 (was "total JS" 3,500), Hindi pack 400, regional 25, Hindi-in-core 36 (1 kB per
+  chunk unless allow-listed), lazy-leaves 20, initial 185 / entry 100 / ≤ 5 initial files unchanged.
+
+Service worker: English devices never download a language pack. The page posts `{type:'lang'}` on boot and on every
+switch; the worker caches the pack and keeps the choice in `mci-lang` `/__lang__`, and each install re-caches the
+pack of a Hindi device. Asset cache-first no longer trims at runtime (a pack chunk fetched on a miss used to be able
+to evict the precached core: `trim(…, 160)`). `scripts/verify-offline.mjs` covers the English install (no pack), the
+offline switch (message, stays English), the online switch (93 / 93 cached), the offline Hindi reload and the update
+re-caching a dropped pack file.

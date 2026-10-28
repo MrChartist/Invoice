@@ -19,9 +19,9 @@ import type { DeliveryStatus } from '../../types/retail-r9';
 import { NumberInput } from '../ui/NumberInput';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { escHtml as esc } from '../../lib/html-esc';
 
 const STATUSES: DeliveryStatus[] = ['new', 'packed', 'out', 'delivered', 'returned', 'cancelled'];
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 export default function DeliveriesTab({ onDone }: { onDone: (msg: string, error?: boolean) => void }) {
   useT();

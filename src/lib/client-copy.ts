@@ -1,3 +1,4 @@
+import { escHtml as esc } from './html-esc';
 /**
  * "Client copy": one self-contained HTML file of a document that the client can open in any
  * browser, print, or pay from (a tappable upi:// link works on phones). It is static — no
@@ -39,8 +40,6 @@ export interface ClientCopyInput {
 const safeRespond = (u: string | undefined) =>
   u && (/^https:\/\/wa\.me\/\d{6,15}\?text=[^"'<>\s]*$/.test(u) || /^mailto:[^"'<>\s]+$/.test(u)) ? u : null;
 
-const esc = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 /** Only real UPI deep links and image data URLs may end up in attributes. */
 const safeUpi = (u: string | null | undefined) => (u && /^upi:\/\/pay\?[^"'<>\s]+$/.test(u) ? u : null);

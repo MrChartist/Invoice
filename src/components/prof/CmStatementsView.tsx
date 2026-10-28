@@ -10,8 +10,8 @@ import { Fld, Tbl } from '../mfg/mfd-ui';
 import { row, rs, sm } from '../mfg/mfd-util';
 import type { CmCtx } from './ClientMoneyDesk';
 import controls from '../../styles/controls.module.css';
+import { escHtml as esc } from '../../lib/html-esc';
 
-const esc = (v: unknown) => String(v ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export default function CmStatementsView({ ctx }: { ctx: CmCtx }) {
   const [client, setClient] = useState(ctx.clients[0]?.id ?? '');

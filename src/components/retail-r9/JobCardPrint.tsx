@@ -2,8 +2,8 @@
 import type { ServiceJob } from '../../types/retail-r9';
 import { rtdT } from '../../i18n/areas/retail-r9d';
 import { formatCurrency } from '../../lib/utils';
+import { escHtml as esc } from '../../lib/html-esc';
 
-const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export function printJobCard(j: ServiceJob, shop: string): void {
   const rows: [string, unknown][] = [

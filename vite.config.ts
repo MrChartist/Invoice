@@ -4,6 +4,8 @@ import type { Plugin } from 'vite'
 import { fileURLToPath } from 'node:url'
 import { CSP_META } from './scripts/security-headers.mjs'
 import { readFileSync } from 'node:fs'
+import { hiSplit, langChunkName } from './scripts/vite-hi-split.mjs'
+import { createGraph, familyRe, graphPlugin, leafGroup, safeFamilyGroup } from './scripts/vite-safe-groups.mjs'
 
 // R6-A4: the version shown in Help, What's new and the diagnostic report comes from package.json.
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
@@ -23,9 +25,15 @@ function cspMeta(): Plugin {
   }
 }
 
+const VENDOR_REACT = /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/
+const VENDOR_UI = /node_modules[\\/](lucide-react|qrcode\.react|zustand|clsx)[\\/]/
+// R16-A2: the module graph the safe groups read (filled at buildEnd; build-meta/chunks.json for check-bundle-size).
+const graph = createGraph({ vendor: [VENDOR_REACT, VENDOR_UI], root: fileURLToPath(new URL('.', import.meta.url)) })
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), cspMeta()],
+  // R16-A1: hi-split moves defineArea Hindi into lang-hi-* chunks (build only; dev keeps it inline).
+  plugins: [react(), cspMeta(), hiSplit(), graphPlugin(graph)],
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   resolve: {
     // jsPDF's optional imports (doc.html / addSvgAsImage only) are never used: see the stub.
@@ -47,10 +55,26 @@ export default defineConfig({
         // `rollupOptions` / `manualChunks`).
         codeSplitting: {
           groups: [
-            { name: 'vendor-react', test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/, priority: 30 },
-            { name: 'vendor-ui', test: /node_modules[\\/](lucide-react|qrcode\.react|zustand|clsx)[\\/]/, priority: 30 },
+            { name: 'vendor-react', test: VENDOR_REACT, priority: 30 },
+            { name: 'vendor-ui', test: VENDOR_UI, priority: 30 },
+            // R16-A1: language packs — lang-hi-<family> (defineArea Hindi), lang-hi-core (hi.ts), lang-regional.
+            // They import nothing, so nothing is dragged; precached only on devices in that language.
+            { name: langChunkName, priority: 25 },
             // R15-A1: every first-paint app module in ONE chunk (measured −43.4 kB total, −2.3 kB initial).
             { name: 'app-initial', tags: ['$initial'], priority: 20 },
+            // R16-A2: safe family groups (a module joins only if nothing it imports can be dragged along).
+            // A later family adds one row: safeFamilyGroup(graph, 'f-<family>', familyRe(<lib dir>, <rules file>, <area prefix>), 12).
+            safeFamilyGroup(graph, 'f-hotel', familyRe('hotel', null, 'hotel-[a-z]+-r7'), 12),
+            safeFamilyGroup(graph, 'f-trade', familyRe('trade', 'trading-rules', 'trade-r8'), 12),
+            safeFamilyGroup(graph, 'f-retail', familyRe('retail', 'retail-rules', 'retail-r9'), 12),
+            safeFamilyGroup(graph, 'f-services', familyRe('services', 'service-rules', 'services-r10'), 12),
+            safeFamilyGroup(graph, 'f-cn', familyRe('construction', 'construction-rules', 'construction-r11'), 12),
+            safeFamilyGroup(graph, 'f-agri', familyRe('agri', 'agri-rules', 'agri-r12'), 12),
+            safeFamilyGroup(graph, 'f-mfg', familyRe('mfg', 'mfg-rules', 'mfg-r13'), 12),
+            safeFamilyGroup(graph, 'f-prof', familyRe('prof', 'prof-rules', 'prof-r14'), 12),
+            safeFamilyGroup(graph, 'f-travel', familyRe('travel', 'travel-rules', 'travel-r15'), 12),
+            // R16-A2: small lazy src/lib leaves (imports all first-paint / vendor) in one chunk.
+            leafGroup(graph, 'lazy-leaves', 9, { maxModuleSize: 3000 }),
           ],
         },
       },

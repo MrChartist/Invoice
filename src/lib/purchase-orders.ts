@@ -19,6 +19,7 @@ import { formatCurrency, formatDate } from './utils';
 import { nextSeriesNumberFor, numberFitsFy, recordSeries } from './series-counters';
 import { audit } from './audit';
 import { requireAccess } from './access';
+import { escHtml as esc } from './html-esc';
 
 export const PURCHASE_ORDERS_TABLE = 'purchase_orders';
 export const PO_PREFIX = 'PO';
@@ -133,8 +134,6 @@ export function poTotals(lines: PurchaseOrderLine[], placeOfSupply?: string, bus
   return computePurchaseTotals(lines, { placeOfSupply, businessState });
 }
 
-const esc = (s: unknown) =>
-  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 export interface PoBuyer {
   name: string;
