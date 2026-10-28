@@ -47,8 +47,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84, AG90 | 65 | 15 |
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF40–MF42, MF50–MF54, MF60–MF65, MF80–MF82, MF90–MF96 | 60 | 12 |
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
-| 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV40 | 40 | 13 |
-| **Total** | | **536** | **132** |
+| 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV45 | 45 | 14 |
+| **Total** | | **541** | **133** |
 
 ---
 
@@ -1085,9 +1085,9 @@ exports of services under the FEMA 2026 regulations, 194J / 194T, partners and S
 `PS` ids are counted once here. The ★ items (PS1, PS3, PS4, PS5, PS6, PS12, PS15, PS18, PS20, PS22, PS23, PS26, PS27)
 are the ones a beta professional firm's figures depend on first.
 
-## 15. Travel, tour and event businesses (Round 15, ids TV1–TV40)
+## 15. Travel, tour and event businesses (Round 15, ids TV1–TV45)
 
-Added with `docs/prd/round-15.md` (§9: TV1–TV31), R15-B (TV32, TV33), R15-C (TV34–TV37) and R15-D (TV38–TV40). It covers tour operators (domestic, outbound,
+Added with `docs/prd/round-15.md` (§9: TV1–TV31), R15-B (TV32, TV33), R15-C (TV34–TV37), R15-D (TV38–TV40) and QA round 18 (TV41–TV45, §15.1). It covers tour operators (domestic, outbound,
 inbound / DMCs), travel and ticketing agents (IATA / BSP or through a consolidator) and event / wedding / MICE planners,
 plus the round's cross-cutting items (party netting, the 2026 manpower and tour-package TCS changes).
 
@@ -1141,7 +1141,18 @@ plus the round's cross-cutting items (party netting, the 2026 manpower and tour-
 | TV39 ★ | **Crossing invoice and the FY aggregate (2023-26).** The buyer's aggregate is the TCS base of earlier flagged tour-package invoices of the same FY (credit notes not netted, drafts left out); the crossing invoice is charged 5 % up to the threshold and 20 % above, stored as one blended rate with the split printed ("5 % on ₹… + 20 % on ₹…"). Is the aggregate on amounts received or invoiced, and is one blended rate acceptable in Form 27EQ (one row per invoice)? | Invoiced amounts; blended rate | `travel/tv-tcs.ts` `priorTourBase`, `tcsPatch` | 2023-10-01 | Sec 206C(1G) proviso (as reported) |
 | TV40 | **Date of the event-vendor TDS hint.** The contractor / professional hint on a vendor's bill is taken from the booking's service date (manpower = "work" only from 1 Apr 2026). Should the date of credit or payment decide instead (a bill for a March 2026 event paid in April)? | Service date of the booking; hint only | `travel/tv-events.ts` `vendorTdsHint` | 2026-04-01 | Finance Bill 2026 cl. 78 (A4) |
 
-`TV` ids are counted once here. The ★ items (TV1, TV3, TV7, TV8, TV11, TV15, TV19, TV21, TV23, TV34, TV35, TV38, TV39) are the ones a beta
+
+### 15.1 Added by QA round 18 (`docs/prd/qa-round-18.md`)
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| TV41 ★ | **TCS on a cancelled overseas package.** Cancelling a package the app collected TCS on raises a credit note of the whole invoice — the TCS included, so the books reverse TCS payable and the client is refunded the TCS (the refund shown is now that credit, QA18 T4) — while the TCS register, Form 27EQ / 143 and the deposit reminders keep the TCS as collected (credit notes are not netted; correct it in the statement). Should the credit note leave the TCS out (TCS once collected stays deposited; the buyer claims credit), or reverse it (and the 27EQ row be corrected)? Does it matter whether the TCS was already deposited? | Credit note reverses TCS in the books; registers keep it | `travel/tv-cancel.ts`, `documents.ts` `buildCreditNote`, `tds-returns.ts` `tcsCollections` | 2020-10-01 | Sec 206C(1G) / 394(1) Sl. 8 (no refund provision found) |
+| TV42 | **Buyer's FY aggregate after a cancellation (slab years 2023-26).** A cancelled (credit-noted) package still counts in the buyer's FY aggregate for the ₹7 / 10 lakh threshold. Net it off? | Not netted (as TV39) | `travel/tv-tcs.ts` `priorTourBase` | 2023-10-01 | — |
+| TV43 | **Citation of the tour-operator entry.** The printed declaration cites "N 11/2017-CT(R) Sl. 23(ii)"; in the consolidated text to 1 Apr 2019 the tour-operator entry is Sl. 23 item **(i)** of heading 9985 (item (ii) is house-keeping through an e-commerce operator). Which item number is right after N 15/2025-CT(R)? (Snapshotted invoices keep their text.) | Sl. 23(ii) printed (unchanged) | `travel-rules.ts` `TO5_DECL` | 2017-07-01 | N 11/2017-CT(R) as amended to 01.04.2019 (GST Council compilation) |
+| TV44 | **TCS on a ticket-only invoice of a package trip.** The stand-alone test (TV4) reads the trip's bookings, so a separate invoice of only the air tickets of an outbound trip that also has a hotel is offered TCS as a package. Should the test read the invoice's own lines instead? | Trip-level test; the user may untick | `components/travel/TvChips.tsx`, `travel/tv-tcs.ts` `isTourPackage` | 2020-10-01 | CBDT Circular 10/2023 (ticket or hotel alone not a package, as reported) |
+| TV45 | **Date of the cancellation credit note.** The credit note now carries the cancellation date the user enters (same as the fee invoice and the supplier debit note), not the day it is posted. Right for GSTR-1 / Sec 34 (it may fall in an earlier open month)? | Cancellation date | `travel/tv-cancel.ts`, `documents.ts` `createCreditNote` (`date`) | 2017-07-01 | Sec 34 CGST Act |
+
+`TV` ids are counted once here. The ★ items (TV1, TV3, TV7, TV8, TV11, TV15, TV19, TV21, TV23, TV34, TV35, TV38, TV39, TV41) are the ones a beta
 travel business's figures depend on first.
 
 ## Answers log
