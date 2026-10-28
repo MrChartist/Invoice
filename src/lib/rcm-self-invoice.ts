@@ -29,6 +29,7 @@ import { nextSeriesNumberFor, recordSeries } from './series-counters';
 import { generateId, getTable, setTable } from './storage';
 import { amountInWords } from './amount-in-words';
 import { esc } from './voucher-print';
+import { addDays } from './day-math';
 
 export const RCM_DOCS_TABLE = 'rcm_documents';
 export const SELF_INVOICE_PREFIX = 'RCM';
@@ -124,11 +125,6 @@ export interface RcmBill {
   selfInvoiceDue: string;
 }
 
-const addDays = (day: string, n: number): string => {
-  const [y, m, d] = day.split('-').map(Number);
-  const t = new Date(y, m - 1, d + n);
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-};
 
 /** Last day to issue the self-invoice for a supply received on `receivedOn` ('' = no limit in the rules). */
 export function selfInvoiceDueDate(receivedOn: string): string {

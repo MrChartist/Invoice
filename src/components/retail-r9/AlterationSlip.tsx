@@ -8,8 +8,8 @@ import { rtcT } from '../../i18n/areas/retail-r9c';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { escHtml as esc } from '../../lib/html-esc';
 
-const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 /** The lines of one copy (shared by the print and the preview). */
 function slipLines(job: AlterationJob): [string, string][] {

@@ -13,6 +13,7 @@
 
 import type { BookBill, Gstr2bLine, Heads3, ItcEffect, MatchDiff, MatchResult } from './gstr2b';
 import { getTable, setTable } from './storage';
+import { escHtml as esc } from './html-esc';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const taxOf = (h: { igst: number; cgst: number; sgst: number }) => r2(h.igst + h.cgst + h.sgst);
@@ -112,7 +113,6 @@ export function followUpText(f: FollowUp, period: string, ourGstin: string, w: F
   return lines.join('\n');
 }
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string);
 
 /** Printable HTML (browser "Save as PDF") for one supplier's note. */
 export function followUpHtml(title: string, text: string): string {

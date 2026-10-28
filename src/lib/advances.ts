@@ -34,6 +34,7 @@ import { formatCurrency, formatDate } from './utils';
 import { ADVANCES_TABLE, advanceBalance, computeAdvanceTax, liveAdjustments, taxTotal, type AdvanceBalance } from './advance-tax';
 import { receivableTotal } from './rcm';
 import { recordSeries, seriesHigh } from './series-counters';
+import { escHtml as esc } from './html-esc';
 
 export { ADVANCES_TABLE, advanceBalance, computeAdvanceTax, isAdvanceAdjustment, liveAdjustments } from './advance-tax';
 export type { AdvanceBalance } from './advance-tax';
@@ -433,8 +434,6 @@ export function advancesCsv(rows: readonly AdvanceRow[]): string {
 
 /* ── Printable vouchers (script-free HTML) ──────────────────── */
 
-const esc = (s: unknown) =>
-  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 const VOUCHER_STYLE = `
   body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 32px; }

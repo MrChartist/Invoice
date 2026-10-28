@@ -15,6 +15,7 @@ import type { AttendanceRow, AttendanceType, Employee, PayrollRun, PayslipLine }
 import { OT_HOURS_TYPE } from '../../types/payroll';
 import { incomeTax, salaryIncome } from './statutory';
 import { formText, fyStart, sectionText, ITA2025_FROM } from '../ita2025';
+import { escHtml as esc } from '../html-esc';
 
 /** Tax year 2026-27 on (Income-tax Act 2025): the other section numbers in these papers are still the 1961 ones. */
 const ita2025Note = (fyStartYear: number): Row[] =>
@@ -38,8 +39,7 @@ export function maskAccount(acct?: string): string {
 
 /* ── Payslip (printable HTML) ─────────────────────────────────── */
 
-export const escapeHtml = (s: unknown): string =>
-  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
+export const escapeHtml = esc;
 
 const PAYSLIP_STYLE = `
   body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 28px; }

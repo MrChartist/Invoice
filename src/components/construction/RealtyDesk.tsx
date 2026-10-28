@@ -36,6 +36,7 @@ import { purchasesDb } from '../../lib/purchases';
 import { NumberInput } from '../ui/NumberInput';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { fyStartYear } from '../../lib/day-math';
 
 type Done = (msg: string, tone?: 'success' | 'error') => void;
 const VIEWS = [['projects', Building2], ['units', ClipboardList], ['bookings', FileText], ['plans', CalendarDays], ['demands', Receipt], ['rera', Landmark], ['cancellations', XCircle], ['procurement', Scale]] as const;
@@ -47,7 +48,7 @@ const BADGE: Record<string, string> = { available: surface.badgePaid, hold: surf
 const company = () => localDb.settings.activeProfile()?.companyName ?? '';
 const print = (html: string, name: string) => printHtmlDocument(html, (h) => downloadText(name, h, 'text/html'));
 const csv = (name: string, text: string) => downloadText(name, `\uFEFF${text}`, 'text/csv');
-const fyOf = (d: string) => (+d.slice(5, 7) >= 4 ? +d.slice(0, 4) : +d.slice(0, 4) - 1);
+const fyOf = fyStartYear;
 
 const F = ({ l, w, children }: { l: string; w?: number; children: ReactNode }) => <label className={controls.field} style={w ? { maxWidth: w } : undefined}><span className={controls.label}>{l}</span>{children}</label>;
 const Txt = ({ l, v, set, w, type = 'text', d }: { l: string; v: string; set: (s: string) => void; w?: number; type?: string; d?: string }) => <F l={l} w={w}><input type={type} className={controls.input} value={v} onChange={(e) => set(e.target.value)} data-rc={d} /></F>;

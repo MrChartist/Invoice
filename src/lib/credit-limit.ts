@@ -24,6 +24,7 @@ import { fxRate } from './fx';
 import { mulRound2, num, round2 } from './invoice-calc';
 import { isoDay } from './dates';
 import { receivableBalance, receivableTotal, type RcmFields } from './rcm';
+import { daysBetween } from './day-math';
 
 /** Document types the limit applies to (what creates a receivable). */
 const CREDIT_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'DEBIT_NOTE', 'BILL_OF_SUPPLY']);
@@ -68,12 +69,6 @@ export interface CreditCheck {
   bounced: number;
   /** Readable, non-blocking warnings (empty = nothing to say). */
   warnings: string[];
-}
-
-const DAY = 86400000;
-function daysBetween(a: string, b: string): number {
-  const t = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
-  return Math.round((t(b) - t(a)) / DAY);
 }
 
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase();

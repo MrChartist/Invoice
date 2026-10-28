@@ -18,6 +18,7 @@
  */
 import type { InvoiceItem } from '../types/invoice';
 import { num, round2 } from './invoice-calc';
+import { escHtml as esc } from './html-esc';
 
 export interface CatalogueOptions {
   business: string;
@@ -46,8 +47,6 @@ export interface CataloguePolicy {
   script: string;
 }
 
-const esc = (s: unknown) =>
-  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 const inr = (n: number) => `₹${round2(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const SAFE_IMAGE = /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+=*$/;
 const OTHER = 'Other items';

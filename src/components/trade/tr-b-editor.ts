@@ -6,6 +6,7 @@ import { downloadText } from '../../lib/download';
 import { chargeLine, headsFor, loadHeads, withCharges, type GoodsLine } from '../../lib/trade/tr-charges';
 import { weighNet } from '../../lib/trade/tr-weight';
 import type { LineWeight } from '../../types/trade-r8';
+import { escHtml as esc } from '../../lib/html-esc';
 
 /** Is `name` a stock item sold by weight / bags? */
 export const weighItem = (name: string | undefined) => {
@@ -37,7 +38,6 @@ export function useChargeLines<L extends GoodsLine & { id?: string }>(lines: rea
   return { heads, on, toggle };
 }
 
-const esc = (v: unknown) => String(v ?? '').replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** Weight slip for the dispatch: weighed lines only, no prices. */
 export function printWeightSlip(title: string, party: string, lines: readonly { name?: string; wt?: LineWeight }[]) {

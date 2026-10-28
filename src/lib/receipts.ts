@@ -15,6 +15,7 @@ import { amountInWords } from './amount-in-words';
 import { formatCurrency, formatDate } from './utils';
 import { round2 } from './invoice-calc';
 import { receivableTotal } from './rcm';
+import { escHtml as esc } from './html-esc';
 
 export function receiptNumber(
   payment: Pick<Payment, 'id' | 'date'> & Partial<Pick<Payment, 'receipt_number'>>,
@@ -92,8 +93,6 @@ function forLineOf(inv: InvoiceRecord): { forLine?: string } {
   return line ? { forLine: line } : {};
 }
 
-const esc = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
 /** A complete, script-free HTML document for printing or saving. */
 export function receiptHtml(r: ReceiptData): string {

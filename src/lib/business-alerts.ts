@@ -22,6 +22,7 @@ import { o7T } from '../i18n/areas/gst-tds-7o';
 import { ita25Words } from '../i18n/areas/ita2025';
 import { formText, periodStart } from './ita2025';
 import { loadTcsDue, loadTdsDue, usesTcs, usesTds, type DueItem } from './tds-payables';
+import { addDays } from './day-math';
 
 /** 7O (7.96): remind this many days before a TDS deposit / 26Q due date (and keep reminding while overdue). */
 export const TDS_LEAD_DAYS = 5;
@@ -53,11 +54,6 @@ export function tdsDueReminders(items: readonly DueItem[], today: string): DueIt
   return items.filter((d) => d.what !== 'certificate' && (d.status === 'overdue' || (d.status === 'upcoming' && d.due <= soon)));
 }
 
-const addDays = (day: string, n: number) => {
-  const [y, m, d] = day.split('-').map(Number);
-  const t = new Date(y, m - 1, d + n);
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-};
 
 /** The 3B period that closed most recently before `today` (monthly, or the quarter for QRMP). */
 export function lastThreeBPeriod(today: string, frequency: FilerFrequency, stateCode?: string): { key: string; label: string; due: string } | null {

@@ -20,6 +20,7 @@ import { num, round2 } from './invoice-calc';
 import { shiftDay } from './dates';
 import { MSME_43BH_FROM, MSME_PAYMENT_DAYS, rbiBankRate } from './tax-rules';
 import { supplierPayable } from './purchase-normalize';
+import { daysBetween, fyStartYear } from './day-math';
 
 export const UDYAM_RE = /^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/;
 
@@ -49,13 +50,9 @@ export function paymentLimit(billDate: string, dueDate?: string): string {
 }
 
 /** Whole days from `a` to `b` (positive when b is later). */
-export function daysBetween(a: string, b: string): number {
-  const t = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
-  return Math.round((t(b) - t(a)) / 86400000);
-}
+export { daysBetween, fyStartYear };
 
 /** Indian financial year of a day: start year (2025 for 2025-04-01 .. 2026-03-31). */
-export const fyStartYear = (day: string): number => (+day.slice(5, 7) >= 4 ? +day.slice(0, 4) : +day.slice(0, 4) - 1);
 export const fyEnd = (startYear: number): string => `${startYear + 1}-03-31`;
 export const fyLabel = (startYear: number): string => `FY ${startYear}-${String((startYear + 1) % 100).padStart(2, '0')}`;
 

@@ -27,6 +27,7 @@ import type {
   HsnRow,
   RateRow,
 } from './gst-reports';
+import { escHtml as esc } from './html-esc';
 
 /* ───────────────────────── JSON ───────────────────────── */
 
@@ -649,8 +650,6 @@ export function gstr3bCsv(b: Gstr3bReport): string {
 
 /* ───────────────────────── Printable summary ───────────────────────── */
 
-const esc = (s: unknown) =>
-  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 
 const inr = (n: number) =>
   new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);

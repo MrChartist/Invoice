@@ -16,8 +16,8 @@ import type { InvoiceRecord, Payment } from '../../types/invoice';
 import { Fld, Tbl } from './ps-d-ui';
 import { inr, row } from './ps-desk';
 import controls from '../../styles/controls.module.css';
+import { escHtml as esc } from '../../lib/html-esc';
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export default function PresumptiveView() {
   const cur = getIndianFY(todayInput()).startYear;

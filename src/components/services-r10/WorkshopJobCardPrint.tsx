@@ -6,8 +6,8 @@
 import type { ServiceJob } from '../../types/retail-r9';
 import type { ServiceAsset } from '../../types/services-r10';
 import { wsT } from '../../i18n/areas/services-r10d';
+import { escHtml as esc } from '../../lib/html-esc';
 
-const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 export function printWorkshop(kind: 'card' | 'gate', j: ServiceJob, a: ServiceAsset | undefined, shop: string, terms = ''): void {
   const rows: [string, unknown][] = kind === 'gate'
