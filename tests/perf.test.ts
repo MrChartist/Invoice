@@ -218,7 +218,7 @@ test('R15-A2 (PERF-3): a save on a 5,000-invoice company writes the audit log on
       auditMs += performance.now() - t0;
     }
   };
-  let saves = 0;
+  let saves: number;
   try {
     const t0 = performance.now();
     for (let i = 0; i < 40; i++) {
