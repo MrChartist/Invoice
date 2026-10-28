@@ -391,3 +391,19 @@ pack of a Hindi device. Asset cache-first no longer trims at runtime (a pack chu
 to evict the precached core: `trim(…, 160)`). `scripts/verify-offline.mjs` covers the English install (no pack), the
 offline switch (message, stays English), the online switch (93 / 93 cached), the offline Hindi reload and the update
 re-caching a dropped pack file.
+
+### QA round 19 (2026-10-28)
+
+- **Stale build assets.** R16-A stopped the runtime trim of `mci-assets`, so every release used to add ≈ 3.1 MB that was
+  never removed. `activate` now prunes `/assets/` files that neither the new build nor the one it replaces lists (core +
+  the device's language pack; every pack while the language is unknown); a replaced shell without a manifest copy (a
+  pre-R16 build) means nothing is pruned on that activation (`docs/prd/qa-round-19.md` U2, `verify-offline.mjs`).
+- **One-time cost of U1.** A device upgrading from a pre-R16 worker downloads the language packs once (Hindi 340.6 kB +
+  regional 20.7 kB) because that worker never recorded the language; an English device drops them on its next update.
+- **`perf.test.ts` audit cap.** The R15-A2 test timed 13–16 `payments.record` calls on a 5,000-invoice table (each
+  rewrites the invoices table, ≈ 40–80 ms; PERF-3 row-level storage is deferred) and capped them at 4 s; under a loaded
+  parallel run it measured 4.6 s. Profiled: `audit.record` + the batch write take ≈ 6–10 ms of ≈ 1.2 s, identical on the
+  R16 baseline (`0521a90`: 1,112–1,149 ms; head: 1,137–1,185 ms) — CI noise, not a regression. The test now caps the
+  audit work itself (1 s) and still asserts one write per task; the saves keep their own cap in the test above (U6).
+- Size: first paint 182.1 → 182.2 kB (the `controllerchange` listener and the ack wait in `src/i18n/index.ts`), entry
+  88.1 → 88.2 kB, core 3,103.0 → 3,104.1 kB, Hindi pack 340.6 kB unchanged.
