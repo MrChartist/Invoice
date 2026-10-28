@@ -2,7 +2,7 @@
  * R18-A2 society unit import (pure; family `f-society`; PRD A2 criterion 4, the R18-A cut 3 closed later): a sheet
  * already read into headers / rows (CSV through `csv.ts`, XLSX through the dynamic `xlsx.ts`, in the view) → a preview
  * plan. Fixed template `code, wing, use, carpet_area, super_area, undivided_pct, construction_cost, owner, phone, email,
- * occupancy, tenant, parking` (header spellings scored by `import-mapping.ts`'s `scoreHeader`, passed in by the view so
+ * occupancy, tenant, parking, inlets, lifted` (header spellings scored by `import-mapping.ts`'s `scoreHeader`, passed in by the view so
  * the family imports nothing lazy). An existing code is updated (only the columns given), a new one created; owners and
  * tenants are matched to clients by name (a phone that differs is a warning); names with no client are listed and
  * created only when the user confirms. Any row error blocks the whole import (all or nothing). Writes live in
@@ -13,7 +13,7 @@ import type { Client } from '../../types/invoice';
 import type { HsOccupancy, HsUnitUse, SocietyUnit } from '../../types/society-r18';
 import { cleanUnit, validateUnit } from './hs-units';
 
-export type UnitImportField = 'code' | 'wing' | 'use' | 'carpet_area' | 'super_area' | 'undivided_pct' | 'construction_cost' | 'owner' | 'phone' | 'email' | 'occupancy' | 'tenant' | 'parking';
+export type UnitImportField = 'code' | 'wing' | 'use' | 'carpet_area' | 'super_area' | 'undivided_pct' | 'construction_cost' | 'owner' | 'phone' | 'email' | 'occupancy' | 'tenant' | 'parking' | 'inlets' | 'lifted';
 
 /** Header spellings per field (the first is the template's). */
 export const UNIT_IMPORT_FIELDS: Readonly<Record<UnitImportField, readonly string[]>> = {
@@ -30,6 +30,8 @@ export const UNIT_IMPORT_FIELDS: Readonly<Record<UnitImportField, readonly strin
   occupancy: ['occupancy', 'Let out', 'Occupied by', 'Tenanted'],
   tenant: ['tenant', 'Tenant name', 'Occupant'],
   parking: ['parking', 'Parking slots', 'Slots', 'Car parking'],
+  inlets: ['inlets', 'Water inlets', 'Inlets'],
+  lifted: ['lifted', 'Lift', 'Lift building'],
 };
 export const UNIT_IMPORT_TEMPLATE = Object.keys(UNIT_IMPORT_FIELDS).join(',');
 
@@ -77,7 +79,7 @@ export function planUnitsImport(t: UnitTable, cols: UnitColumns, units: readonly
     const prev = byCode.get(k(code));
     const u: Record<string, unknown> = { ...(prev ?? { id: `new:${n}`, use: 'residential', occupancy: 'owner', parking: [], status: 'active' }), code };
     const errs: string[] = [];
-    const num = (f: 'carpet_area' | 'super_area' | 'undivided_pct' | 'construction_cost') => {
+    const num = (f: 'carpet_area' | 'super_area' | 'undivided_pct' | 'construction_cost' | 'inlets') => {
       const v = cell(r, f);
       if (!v) return;
       const x = Number(v.replace(/[₹,\s]/g, ''));
@@ -86,7 +88,9 @@ export function planUnitsImport(t: UnitTable, cols: UnitColumns, units: readonly
     const pick = <T,>(f: UnitImportField, map: Record<string, T>, key: string) => { const v = cell(r, f); if (v) { if (map[k(v)]) u[key] = map[k(v)]; else errs.push(hsT('impBad', { f, v })); } };
     if (cell(r, 'wing')) u.wing = cell(r, 'wing');
     pick('use', USE, 'use');
-    (['carpet_area', 'super_area', 'undivided_pct', 'construction_cost'] as const).forEach(num);
+    (['carpet_area', 'super_area', 'undivided_pct', 'construction_cost', 'inlets'] as const).forEach(num);
+    const lift = cell(r, 'lifted');
+    if (lift) { if (/^(yes|y|no|n)$/i.test(lift)) u.lifted = /^y/i.test(lift); else errs.push(hsT('impBad', { f: 'lifted', v: lift })); }
     let tenant = cell(r, 'tenant');
     pick('occupancy', OCC, 'occupancy');
     if (tenant && /^(yes|no|y|n)$/i.test(tenant)) { if (!cell(r, 'occupancy')) u.occupancy = OCC[k(tenant)]; tenant = ''; } // "tenant: yes / no"

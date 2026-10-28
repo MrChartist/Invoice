@@ -81,7 +81,10 @@ desk stores nothing.
 
 - **Cuts at the 11 kB cap (PRD §3, in order).** Cut 1: no "How your bill is worked out" footnote (`hs.explain` is
   declared but not printed; the heads table carries each basis). Cut 2: no `per_inlet` / `per_lifted_unit` bases
-  (water by inlets and lift charges are typed per unit; MH's default bases fall back accordingly). Cut 3: no CSV / XLSX
+  — *closed later* (PENDING #5): `per_inlet` = rate × `SocietyUnit.inlets`, `per_lifted_unit` = rate when
+  `SocietyUnit.lifted`; the unit form shows "Water inlets" / "Lift building" only when a head uses the basis, and the
+  import reads `inlets` / `lifted` (yes / no). The MH State row's default bases are data and stay as dated (pick the
+  basis on the head). Cut 3: no CSV / XLSX
   unit import — *closed later*: see "Unit import" below. Further trims to
   stay at the cap: the unit grid filters by wing and occupancy (not use), the unit form has no joint-owner, floor or
   per-slot-kind fields (the shape keeps them), no delete button — *closed later*: the form has "Delete" and a "Closed"

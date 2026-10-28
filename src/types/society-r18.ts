@@ -20,10 +20,10 @@ export type HsHeadKind = 'service' | 'sinking' | 'repair' | 'major_repair' | 'st
  * ₹ per sq ft / sq m (`area_carpet`, `area_super`), the monthly total shared by undivided interest (`undivided_pct`),
  * % a year of the construction cost (`cost_pct_pa`), ₹ per slot (`per_slot`, `slot_rates` by kind), % of the
  * `service` head for let units (`pct_of_head`), ₹ per member (`fixed_member`); `typed` reads the unit's own amount
- * (`SocietyUnit.typed[head.id]`). The `per_inlet` / `per_lifted_unit` bases were cut at the R18-A cap (PRD §3 cut 2):
- * water by inlets and lift by lifted units are typed per unit until a later package adds them.
+ * (`SocietyUnit.typed[head.id]`). `per_inlet` = ₹ per water inlet (`SocietyUnit.inlets`); `per_lifted_unit` = ₹ per
+ * unit in a lifted building (`SocietyUnit.lifted`) — cut 2 of R18-A, added afterwards (PENDING #5).
  */
-export type HsBasis = 'per_unit' | 'area_carpet' | 'area_super' | 'undivided_pct' | 'cost_pct_pa' | 'per_slot' | 'pct_of_head' | 'typed' | 'fixed_member';
+export type HsBasis = 'per_unit' | 'area_carpet' | 'area_super' | 'undivided_pct' | 'cost_pct_pa' | 'per_slot' | 'pct_of_head' | 'typed' | 'fixed_member' | 'per_inlet' | 'per_lifted_unit';
 export type HsCycle = 'monthly' | 'quarterly' | 'half_yearly';
 export type HsUnitUse = 'residential' | 'commercial' | 'garage' | 'other';
 export type HsOccupancy = 'owner' | 'tenant' | 'vacant';

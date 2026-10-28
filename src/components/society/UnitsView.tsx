@@ -62,7 +62,7 @@ export default function UnitsView({ notify }: HsViewProps) {
       notify(hsT('impUndone')); setUndo(false); setTimeout(reloadAfterFlush, 600);
     } catch (e) { err(e); }
   };
-  const template = async () => (await import('../../lib/download')).downloadText('society-units-template.csv', `${UNIT_IMPORT_TEMPLATE}\nA-101,A,residential,650,,,2400000,Asha Rao,9820012345,,owner,,1\n`, 'text/csv');
+  const template = async () => (await import('../../lib/download')).downloadText('society-units-template.csv', `${UNIT_IMPORT_TEMPLATE}\nA-101,A,residential,650,,,2400000,Asha Rao,9820012345,,owner,,1,,\n`, 'text/csv');
   if (imp) {
     const p = imp.plan;
     return (

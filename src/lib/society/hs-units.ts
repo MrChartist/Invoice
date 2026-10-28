@@ -12,7 +12,7 @@ export const UNIT_USES: readonly HsUnitUse[] = ['residential', 'commercial', 'ga
 export const OCCUPANCIES: readonly HsOccupancy[] = ['owner', 'tenant', 'vacant'];
 export const SLOT_KINDS: readonly HsSlotKind[] = ['covered', 'open', 'stilt', 'two_wheeler'];
 
-const NUMS = ['carpet_area', 'super_area', 'undivided_pct', 'construction_cost'] as const;
+const NUMS = ['carpet_area', 'super_area', 'undivided_pct', 'construction_cost', 'inlets'] as const;
 const key = (c: string) => c.trim().toLowerCase();
 
 /** The first problem with a unit (code missing / taken, a negative or non-number area or cost), else ''. */

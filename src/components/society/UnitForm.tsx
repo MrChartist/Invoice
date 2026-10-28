@@ -59,6 +59,8 @@ export default function UnitForm({ unit, units, clients, heads, notify, onDone }
           </select>
         </F>
         {u.occupancy === 'tenant' && <F label={hsT('tenant')}><input className={controls.input} list="hs-members" value={tenant} onChange={(e) => setTenant(e.target.value)} data-hs-unit-field="tenant" /></F>}
+        {heads.some((h) => h.basis === 'per_inlet') && <F label={hsT('inlets')}><input type="number" min={0} max={50} className={controls.input} value={u.inlets ?? ''} onChange={(e) => set({ inlets: numIn(e.target.value) })} data-hs-unit-field="inlets" /></F>}
+        {heads.some((h) => h.basis === 'per_lifted_unit') && <label className={controls.label}><input type="checkbox" checked={!!u.lifted} onChange={(e) => set({ lifted: e.target.checked || undefined })} data-hs-unit-field="lifted" /> {hsT('lifted')}</label>}
         <label className={controls.label}><input type="checkbox" checked={u.status === 'closed'} onChange={(e) => set({ status: e.target.checked ? 'closed' : 'active' })} data-hs-unit-field="closed" /> {hsT('closed')}</label>
         {heads.filter((h) => h.basis === 'typed' && h.active !== false).map((h) => (
           <F key={h.id} label={`${h.name} (${hsT('typed')})`}><input type="number" min={0} step="0.01" className={controls.input} value={u.typed?.[h.id] ?? ''} onChange={(e) => set({ typed: { ...u.typed, [h.id]: numIn(e.target.value) ?? 0 } })} data-hs-typed-head={h.kind} /></F>

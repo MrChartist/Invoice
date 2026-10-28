@@ -12,7 +12,7 @@ import type { HsBasis, HsCycle, HsHead, HsHeadKind, HsHeadRow, SocietyUnit } fro
 export { pendingStateRule };
 
 export const HEAD_KINDS: readonly HsHeadKind[] = ['service', 'sinking', 'repair', 'major_repair', 'statutory', 'service_supply', 'parking', 'non_occupancy', 'education', 'election', 'insurance', 'lease_rent', 'outsider', 'other'];
-export const BASES: readonly HsBasis[] = ['per_unit', 'area_carpet', 'area_super', 'undivided_pct', 'cost_pct_pa', 'per_slot', 'pct_of_head', 'typed', 'fixed_member'];
+export const BASES: readonly HsBasis[] = ['per_unit', 'area_carpet', 'area_super', 'undivided_pct', 'cost_pct_pa', 'per_slot', 'pct_of_head', 'typed', 'fixed_member', 'per_inlet', 'per_lifted_unit'];
 export const CYCLES: readonly HsCycle[] = ['monthly', 'quarterly', 'half_yearly'];
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -70,6 +70,8 @@ export function unitCharges(unit: SocietyUnit, heads: readonly HsHead[], period:
       case 'pct_of_head': return unit.occupancy === 'tenant' ? [(live.filter((x) => x.kind === 'service' && x !== h).reduce((t, x) => t + monthly(x)[0], 0) * rate) / 100, `${rate} % of service (let out)`] : [0, ''];
       case 'typed': return [num(unit.typed?.[h.id]), 'as assessed'];
       case 'fixed_member': return [opts.member === false ? 0 : rate, 'per member'];
+      case 'per_inlet': return [rate * num(unit.inlets), `${num(unit.inlets)} inlet(s) × ${money(rate)}`];
+      case 'per_lifted_unit': return [unit.lifted ? rate : 0, 'per lifted unit'];
       default: return [0, ''];
     }
   };
