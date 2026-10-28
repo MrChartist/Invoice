@@ -111,3 +111,12 @@ export function ewayHint(lines: readonly { taxable: number; tax_rate: number; se
   if (taxable === 0) return { kind: 'exempt_note', text: EXEMPT_EWAY_NOTE };
   return taxable > EWAY_THRESHOLD ? { kind: 'prompt', taxable: Math.round(taxable * 100) / 100 } : { kind: 'none' };
 }
+
+/**
+ * PENDING 10: the editor's lines → `ewayHint` (the invoice editor's agri e-Way hint, `components/agri/AgEwayHint.tsx`).
+ * An SAC 99… line or a Service item is a service (no e-Way bill); the line values are the editor's computed taxable.
+ */
+export function editorEwayHint(lines: readonly { id: string; hsn?: string; taxable: number; tax_rate: number }[], items: readonly { id: string; type?: string }[]): EwayHint {
+  const service = new Set(items.filter((i) => i.type === 'Service').map((i) => i.id));
+  return ewayHint(lines.map((l) => ({ taxable: l.taxable, tax_rate: l.tax_rate, service: service.has(l.id) || /^99/.test(String(l.hsn ?? '').trim()) })));
+}

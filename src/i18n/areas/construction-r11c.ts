@@ -157,6 +157,9 @@ export const rcT = defineArea(
     cement: 'Cement (unregistered) at its rate',
     bookRcm: 'Book RCM liability (draft journal)',
     drafted: 'Draft journal {n} saved (optional voucher — make it regular after review).',
+    // PENDING 14
+    broker: 'Broker', brokerPct: 'Brokerage %', brokerBill: 'Broker bill (194H)', brokerDrafted: 'Broker bill drafted — Purchases → Drafts.',
+    remind: 'Remind', reminded: 'Follow-up logged; next action on {d}.',
   } as const,
   {
     'v.projects': 'प्रोजेक्ट',
@@ -310,6 +313,8 @@ export const rcT = defineArea(
     cement: 'सीमेंट (अपंजीकृत) अपनी दर पर',
     bookRcm: 'RCM देनदारी दर्ज करें (ड्राफ़्ट जर्नल)',
     drafted: 'ड्राफ़्ट जर्नल {n} सहेजा (वैकल्पिक वाउचर — जाँच के बाद नियमित करें)।',
+    broker: 'दलाल', brokerPct: 'दलाली %', brokerBill: 'दलाल का बिल (194H)', brokerDrafted: 'दलाल का बिल ड्राफ़्ट हुआ — खरीद → ड्राफ़्ट।',
+    remind: 'याद दिलाएँ', reminded: 'फ़ॉलो-अप दर्ज; अगला काम {d} को।',
   },
 );
 

@@ -167,12 +167,12 @@ export function raiseDemands(certId: string, date: string, today?: string): Invo
 
 /** Ageing per booking: open balance of its demands by days past due (0–30, 31–60, 61–90, 90+). */
 export function demandAgeing(invoices: readonly InvoiceRecord[], asOf: string) {
-  const by = new Map<string, { booking: string; unit: string; tower: string; open: number; buckets: number[] }>();
+  const by = new Map<string, { id: string; booking: string; unit: string; tower: string; open: number; buckets: number[] }>();
   for (const i of invoices) {
     const d = i.boq_terms?.cn?.demand;
     if (!d?.booking_id || i.status === 'Cancelled' || i.doc_type === 'CREDIT_NOTE') continue;
     const open = round2(Math.max(num(i.total) - num(i.amount_paid), 0));
-    const r = by.get(d.booking_id) ?? { booking: String(d.booking_no ?? ''), unit: String(d.unit ?? ''), tower: String(d.tower ?? ''), open: 0, buckets: [0, 0, 0, 0] };
+    const r = by.get(d.booking_id) ?? { id: String(d.booking_id), booking: String(d.booking_no ?? ''), unit: String(d.unit ?? ''), tower: String(d.tower ?? ''), open: 0, buckets: [0, 0, 0, 0] };
     const late = i.due_date ? daysBetween(i.due_date, asOf) : 0;
     r.open = round2(r.open + open);
     r.buckets[late > 90 ? 3 : late > 60 ? 2 : late > 30 ? 1 : 0] += open;

@@ -7,6 +7,7 @@ import { defineArea } from '../area';
 
 export const cvT = defineArea(
   {
+    annexPage: 'Ticket annexure page', annexList: 'Ticket list', annexFares: 'Ticket list with fare split', diffCsv: 'CSV of differences',
     tickets: 'Air tickets', addTicket: 'Add ticket', pax: 'Passenger', airline: 'Airline', tno: 'Ticket no.', pnr: 'PNR', sector: 'Sector', intl: 'International',
     basic: 'Basic fare', taxes: 'Taxes / YQ', agst: 'Airline GST', fee: 'Our fee (all tickets)', value: 'Service value', toInvoice: 'Add to invoice', ticket: 'Ticket',
     feeHigh: 'Your fee is above the deemed value — check with your CA (TV11).',
@@ -16,6 +17,7 @@ export const cvT = defineArea(
     cls: 'Economy,Other', methods: 'Deemed (Rule 32(3)),Actual fee', kinds: 'BSP,Consolidator,Bed bank', sts: 'Matched,Difference,Missing,Ours only',
   } as const,
   {
+    annexPage: 'टिकट अनुलग्नक पेज', annexList: 'टिकट सूची', annexFares: 'किराया विभाजन के साथ टिकट सूची', diffCsv: 'अंतर की CSV',
     tickets: 'हवाई टिकट', addTicket: 'टिकट जोड़ें', pax: 'यात्री', airline: 'एयरलाइन', tno: 'टिकट नं.', pnr: 'PNR', sector: 'सेक्टर', intl: 'अंतरराष्ट्रीय',
     basic: 'मूल किराया', taxes: 'कर व शुल्क', agst: 'एयरलाइन GST', fee: 'हमारा सेवा शुल्क (सभी टिकट)', value: 'सेवा मूल्य', toInvoice: 'बिल में जोड़ें', ticket: 'टिकट',
     feeHigh: 'आपका शुल्क मान्य मूल्य से अधिक है — अपने CA से पूछें (TV11)।',

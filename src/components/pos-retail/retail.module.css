@@ -227,6 +227,19 @@
   font-weight: 700;
 }
 
+.displayServing {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius, 8px);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 .displayIdle {
   grid-column: 1 / -1;
   display: flex;

@@ -226,7 +226,9 @@ rate_plan_id }`, `FolioLine.tax_rate / band_value`, `Reservation.bill_kind / com
   the R5-A5 view's books-expected column still shows it). B4's commission bill is a **note** with the amount on the
   folio (the tested `recordCommission` lib — a purchase-bill draft with 194H — is not wired to a button).
 - `isSpecified` is a stand-in for C1's `premisesStatus` (see above). Rate-change nights are only flagged (D6).
-- Check-out from the Reservations list / audit (R7-A buttons) still only flips status; billing happens on the folio.
+- Check-out from the Reservations list / audit (R7-A buttons) only flips status for a comp or billed stay; since
+  PENDING 9 a stay with anything to bill shows "Bill the folio & check out", which opens that folio's check-out
+  dialog (`folioToBill` in `checkin.ts`; `&folio=<id>&checkout=1` on the folios view).
 
 ## Tests (R7-B)
 

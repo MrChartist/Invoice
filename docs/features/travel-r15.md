@@ -161,7 +161,11 @@ trips view (≈ −0.5 kB; the costing per file stays), drop the picker hints (�
 ### Deviations (R15-C)
 
 - **Cut 1 applied (C4 commission income)** and **cut 2 (bed-bank preset)**, size (PRD §3). Commission typed on a booking still counts in the trip margin (B2); the commission invoice to principals, 194H expected and the insurer's RCM flag are not built (TV16 / TV17 rows note it). A bed-bank file can be mapped with the consolidator preset (the `bedbank` kind stays in the type).
-- **Cut 3 items not built:** re-issue, the ticket annexure page and the CSV of differences.
+- **Cut 3 items not built:** re-issue, the ticket annexure page and the CSV of differences. Re-issue came in R16-C2;
+  the other two in PENDING 13 (`travel/tv-annexure.ts`, pure): the editor's "Ticket annexure page" select (off / ticket
+  list / with fare split, `tv.ticket_annexure`) prints the tickets of `tv.lines` as a following page
+  (`templates/parts/travel/TicketAnnexurePage.tsx`, lazy, never on receipt paper), and an open statement has
+  "CSV of differences" (`statementDiffRows`: diff / missing / ours only / ADM / refund rows, ours less theirs).
 - **Import wizard:** no new `ImportKind`. Statements are read with the R5-A marketplace mapper (`file-map.ts` on top of `import-mapping.ts`'s `scoreHeader`, `file-read.ts` with the dynamic XLSX reader) inside the view: the wizard's kinds write master tables through its sinks, a statement is one row with match results. `import_runs` is written directly (kind `supplier_statement`, the B checklist step).
 - **No `TicketTable.tsx` part:** ticket particulars print under each line (`tvLineText`, now with the fare split) and the Rule 32(3) sentence in the travel block.
 - **Deemed value invoice:** the service line equals the deemed value; the fee typed is used only for the warning (and as the value under "actual"). Asked as TV34.

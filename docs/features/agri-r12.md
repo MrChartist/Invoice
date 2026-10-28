@@ -232,7 +232,8 @@ the 25 kg line from `PACKED_25KG_RULES`.
 ### Deviations from the PRD (AG-C)
 
 - **e-Way note (C4-4)**: `ewayHint` (exempt-only bill → "may not be needed — verify AG12"; taxable lines over ₹50,000 →
-  prompt) is an engine with tests; it is not yet shown in the editor's e-way prompt (that UI is outside AG-C's files).
+  prompt) is an engine with tests; since PENDING 10 the invoice editor shows it under the items (lazy
+  `components/agri/AgEwayHint.tsx`, agri packs only, not on quotes / pro formas; `editorEwayHint` in `ag-packing.ts`).
 - **End-use choice (C4-3)**: `endUseClass` picks feed / other for bran and cake; the editor line has no extra control —
   the class is chosen on the stock item (`PackSizeRow`) and the typed rate wins as usual.
 - **Counter sale from a > 25 kg bag (C4-2)**: `packClass(…, { counterLoose: true })` exists; the POS does not pass it yet.

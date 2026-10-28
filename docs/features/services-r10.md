@@ -47,7 +47,9 @@ bundle numbers.
 - **Tips** (A3.6): shipped later as a 0% non-GST tip line (see "Deferred items — shipped" below), not a POS tender;
   `Payment.tip_staff` stays unused and there is no "Tips payable" liability (SV70 / SV71).
 - **POS**: the staff picker per POS line shipped later (below); with "Staff required on service lines" on, a service line without staff blocks the POS save (`sv-pos.ts` `linesWithoutStaff`, reported by `PosStaff`; PENDING #21); lines from the appointment carry their
-  staff. The customer-display "Now serving" line (`pos-display.ts`) is not wired; the queue view prints it.
+  staff. Since PENDING 12 the customer display (`/pos-display`) shows the queue's "Now serving: token N" line: the queue view
+  broadcasts `servingMessage` (`pos-serving.ts`, kept out of `pos-display.ts` so that stays a lazy leaf) while open
+  and answers a display's `hello`; the queue view still prints it.
 - **Split into a tax invoice and a Bill of Supply** for a registered recipient is a note in the editor (two documents
   recommended), not an automatic split. Staff names on paper (`print_staff`) shipped later (below).
 - **Hours**: the desk settings edit one open / close time for every day plus closed days (the stored shape keeps seven

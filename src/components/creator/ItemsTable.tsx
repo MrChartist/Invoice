@@ -50,6 +50,7 @@ const EditorService = lazy(() => import('../services-r10/SvEditor').then((m) => 
 const LegalRegimeChip = lazy(() => import('../prof/LegalRegimeChip')); // R14 (PS-B2) legal-services regime
 const TravelRows = lazy(() => import('../travel/TravelRows')); // R15-B3 trip and GST regime
 const ManpowerRows = lazy(() => import('../manpower/ManpowerRows')); // R17-A3 site, month and GST regime
+const AgEwayHint = lazy(() => import('../agri/AgEwayHint')); // PENDING 10 (AG-C4-4) e-Way hint
 const RedeemChip = lazy(() => import('../services-r10/SvRedeem').then((m) => ({ default: m.RedeemChip }))); // R10 (SV-C1) "Use package"
 const LineFields = lazy(() => import('../custom-fields/LineFields')); // 6.23 (PENDING #25): item custom fields per line
 import { impliedPacks } from '../../lib/shop-mode';
@@ -76,6 +77,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   const travelOn = useMemo(() => (impliedPacks(localDb.settings.get()) as string[]).some((p) => p === 'travel' || p === 'events'), []); // R15-B3
   const manpowerOn = useMemo(() => (impliedPacks(localDb.settings.get()) as string[]).some((p) => p === 'manpower' || p === 'security'), []); // R17-A3
   const itemFieldsOn = useMemo(() => fieldsFor(customFieldsDb.all(), 'item').length > 0, []); // 6.23 (PENDING #25)
+  const agriOn = useMemo(() => ((s) => !!s.agri_kind || !!s.mill_kind || (impliedPacks(s) as string[]).some((p) => ['agri', 'dairy', 'mill', 'coldstore', 'agri_inputs', 'fpo'].includes(p)))(localDb.settings.get()), []); // PENDING 10 (AG-C4-4)
   const svOn = useMemo(() => ((s) => !!s.service_kind || impliedPacks(s).some((p) => p === 'clinic' || p === 'salon' || p === 'fitness' || p === 'workshop'))(localDb.settings.get()), []); // R10 (SV-A)
   // Batch / serial / godown pickers (null for simple users: nothing tracked, one godown).
   // `stockTick` re-reads live stock when an item name gains focus (another tab may have sold some).
@@ -361,6 +363,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
         {legalOn && <Suspense fallback={null}><LegalRegimeChip /></Suspense>}
         {travelOn && <Suspense fallback={null}><TravelRows /></Suspense>}
         {manpowerOn && <Suspense fallback={null}><ManpowerRows /></Suspense>}
+        {agriOn && docType !== 'QUOTATION' && docType !== 'PROFORMA' && <Suspense fallback={null}><AgEwayHint lines={totals.lines} items={items} /></Suspense>}
         <span className={styles.keyHint}>
           {tNodes('items.keyHint', { enter: <kbd>Enter</kbd>, alt: <kbd>Alt</kbd>, arrows: <><kbd>↑</kbd>/<kbd>↓</kbd></>, ctrl: <kbd>Ctrl</kbd> })}
         </span>

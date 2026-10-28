@@ -180,7 +180,9 @@ test row; `mf-registry` counts `CUT` / `KPB` once). E2E: step "R13-C garments de
   (Job work → Job work in) pre-picks the class from the HSN chapter of the principal's goods received on the order
   (`mfg/mf-jw-class.ts`: ch 50–63 `jw_textile`, ch 48 / 49 `jw_print_ch48_49`, else `jw_other`) and fills its dated rate;
   the user can pick another class or type a rate (typed wins). The piece bill still uses `jw_textile`.
-- **5C e-way**: `dispatchFrom` exists for the invoice e-way; no button on the invoice e-way dialog yet.
+- **5C e-way**: `dispatchFrom` exists for the invoice e-way; since PENDING 11 the invoice e-Way dialog has a
+  "Dispatched from" job-worker picker (lazy `components/mfg/EwayDispatchFrom.tsx`, manufacturing packs only) — the
+  downloaded / copied JSON is the bill passed through `dispatchFrom`; blank = our own premises.
 - **Demo**: no CMT challan (it needs job-worker godowns and stock moves); 10 bundles of 30 rather than 12.
 
 ### Bundle (MF-C)

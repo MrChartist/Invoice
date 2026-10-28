@@ -185,8 +185,11 @@ glossary `rera-account`, `deemed-land`. Tests: `cn-units`, `cn-bookings`, `cn-de
 - Cement from unregistered suppliers is taxed at its rate in full; the 18% applies to the shortfall beyond it.
 - Cancellation refunds of money already adjusted against demands are reported as "still to pay" (paid from Payments);
   a deleted booking is not restorable from the bin (book the unit again).
-- Broker commission (194H bill) and reminders through follow-ups are not wired from the desk (existing purchase bill /
-  follow-up screens apply); the plan table on the demand paper is a one-line stage list.
+- Broker commission (194H bill) and reminders through follow-ups: wired in PENDING 14 (`construction/cn-realty-extras.ts`).
+  The booking form takes a broker (vendor) and brokerage %; "Broker bill (194H)" on a booking drafts a purchase bill
+  (`purchase_drafts`; SAC 997222, 18% GST with a GSTIN, IGST out of State, 194H on the bill) once, linked as
+  `broker.draft_id`; "Remind" on a demand-ageing row logs an R2-A follow-up (WhatsApp, next action in 7 days) for the
+  buyer. The plan table on the demand paper is a one-line stage list.
 - `bill-guard.ts` realty no-ITC caution (left by CN-A) is not wired. (QA11 C9 wired it for bills charged to a project;
   R16-D3 adds every other ITC bill of a builder, with an audited override — PF18.)
 
@@ -248,7 +251,8 @@ rows, palette labels `r11.*`, synonyms, the `time.works` Ctrl+K title. Tests: `c
 - Labour hold: shown on the Labour view with a "pay now" figure; the Purchases payment dialog is not changed.
 - Client-issued material: quantities only in the reconciliation (typed on the site godown, or CN-B4 rows if they ever
   carry an item and quantity — CN-B's rows do not today); no stock inward is booked for it (left by CN-B4; free issue
-  never valued). Attachment to the final-bill closure checklist (B5) is not wired.
+  never valued). Attachments on the final-bill closure checklist (B5): since PENDING 14 the closure box has the shared
+  attachments panel (`WorksContract.attachments`, `setClosureFiles`; `works_contracts` is an attachment owner table).
 - Site P&L is per BOQ (contract) and its project cost centre; other vouchers' expense lines tagged to the cost centre
   are not read (purchases / expenses are); muster wages are read from the "Site wages" vouchers.
 - Minimum wage is typed per worker (not a per-trade table).
