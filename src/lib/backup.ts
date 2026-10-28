@@ -528,6 +528,8 @@ const RECORD_TABLES = [
   'society_runs',
   // R19-A: logistics job files (JOB/FY…)
   'lg_jobs',
+  // R19-D: courier manifests (customer × month, dockets inside)
+  'lg_manifests',
   // Voucher types master (P1-13, 7Q)
   'voucher_types',
 ];
@@ -654,6 +656,8 @@ const ID_TABLES = new Set([
   'society_runs',
   // R19-A: logistics job files (JOB/FY…)
   'lg_jobs',
+  // R19-D: courier manifests (customer × month, dockets inside)
+  'lg_manifests',
   'voucher_types',
 ]);
 

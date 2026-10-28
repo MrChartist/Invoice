@@ -297,6 +297,8 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   // R19-A
   logistics_settings: 'Logistics settings: charge heads, job prefix, currency (R19).',
   lg_jobs: 'Logistics job files: mode, ports, parties, refs, containers, weights (R19).',
+  // R19-D
+  lg_manifests: 'Courier manifests: customer, month, dockets (R19).',
   society_runs: 'Society billing runs: period, bill / due date, batch, units, counts by document type, totals by charge head, special levy, undone (R18).',
   travel_bookings: 'Travel bookings: trip / event file (cost centre), component, supplier, PNR / ref., dates, cost (currency, rate), sell, pure agent, status, supplier bill, invoice line once billed (R15).',
   // R15-C

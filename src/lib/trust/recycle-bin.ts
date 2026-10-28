@@ -423,6 +423,10 @@ registerRestoreHook('society_runs', (row, e, live) => (!row.undone && live('soci
 // R19-A: a job file comes back only while its client lives and no live job holds its house bill (HBL / HAWB are
 // unique per company).
 const lgHouse = (r: unknown) => (isObj(r) && isObj(r.refs) ? [str(r.refs.hbl), str(r.refs.hawb)].map((x) => x.trim().toUpperCase()).filter(Boolean) : []);
+// R19-D: a manifest comes back only while its client lives, no live manifest holds the same customer × month and none
+// of its dockets sits on another manifest (docket numbers are unique per company).
+const lgDockets = (r: unknown) => (isObj(r) && Array.isArray(r.dockets) ? r.dockets.map((d) => (isObj(d) ? str(d.no) : '')).filter(Boolean) : []);
+registerRestoreHook('lg_manifests', (row, e, live) => (!isLive(live, 'clients', str(row.client_id)) ? { refuse: 'The client is gone. Restore the client first.' } : live('lg_manifests').some((x) => str(x?.id) !== e.row_id && str(x?.client_id) === str(row.client_id) && str(x?.period) === str(row.period)) ? { refuse: `The client has a manifest for ${str(row.period)} again.` } : lgDockets(row).some((n) => live('lg_manifests').some((x) => str(x?.id) !== e.row_id && lgDockets(x).includes(n))) ? { refuse: 'A docket is on another manifest now.' } : null));
 registerRestoreHook('lg_jobs', (row, e, live) => (!isLive(live, 'clients', str(row.client_id)) ? { refuse: 'The client of this job is gone. Restore the client first.' } : lgHouse(row).some((h) => live('lg_jobs').some((j) => str(j?.id) !== e.row_id && lgHouse(j).includes(h))) ? { refuse: 'Another job now has this house bill number; restoring this one would make two.' } : null));
 // R14 (PS-A): an engagement comes back only while its client lives (its ENG number stays reserved, never reused).
 // R14 PS-C: an EDF row restores only while no live row covers the same month, kind and currency (the builder re-ran).

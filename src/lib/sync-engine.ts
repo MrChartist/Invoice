@@ -481,6 +481,8 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}society_runs`]: 'date',
   // R19-A: logistics job files (the job date)
   [`${DB_PREFIX}lg_jobs`]: 'date',
+  // R19-D: courier manifests (the month's last day)
+  [`${DB_PREFIX}lg_manifests`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;
