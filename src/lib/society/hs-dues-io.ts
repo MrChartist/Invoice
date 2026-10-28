@@ -10,6 +10,7 @@ import './hs-registry';
 import { getTable } from '../storage';
 import { localDb } from '../localDb';
 import { round2 } from '../invoice-calc';
+import { withTablesRollback } from '../table-txn';
 import { computeInterest } from '../interest';
 import { savePartyReceipt } from '../bill-allocation';
 import { createFinancialNote } from '../settlement';
@@ -30,7 +31,7 @@ import { societySettings } from './hs-issue-io';
 
 const fn = computeInterest as InterestFn;
 const index = (): DuesIndex => duesIndex(localDb.invoices.getAll(), getTable<Payment>('transactions'), getTable('doc_links'));
-const unitOf = (id: string) => { const u = loadUnits().find((x) => x.id === id); if (!u) throw new Error('Unit not found.'); return u; };
+const unitOf = (id: string) => { const u = loadUnits().find((x) => x.id === id); if (!u) throw new Error(hscT('noUnit')); return u; };
 
 export interface DuesLine extends DuesRow { unit: SocietyUnit; member?: Client; promise?: string }
 
@@ -40,38 +41,41 @@ export function loadDues(asOf: string): DuesLine[] {
   const notes = getTable<{ party_key: string; date: string; promise?: { amount: number; date: string } }>('collection_notes').filter((n) => n.promise).sort((a, b) => a.date.localeCompare(b.date));
   return loadUnits().filter((u) => u.status === 'active').map((unit) => {
     const p = notes.filter((n) => n.party_key === unit.owner_id).at(-1)?.promise;
-    return { ...duesRow(unit.id, asOf, ix, s, fn), unit, member: byId.get(unit.owner_id ?? ''), ...(p ? { promise: `${formatCurrency(p.amount)} · ${p.date}` } : {}) };
+    return { ...duesRow(unit.id, asOf, ix, s, fn, unit.owner_id), unit, member: byId.get(unit.owner_id ?? ''), ...(p ? { promise: `${formatCurrency(p.amount)} · ${p.date}` } : {}) };
   });
 }
 
 /** The suggested split of a receipt (interest first unless the society chose oldest first, HS37). */
 export function receiptSplit(unitId: string, amount: number, date: string) {
-  const d = unitDues(unitId, date, index(), societySettings(), fn);
+  const d = unitDues(unitId, date, index(), societySettings(), fn, unitOf(unitId).owner_id);
   return allocate(amount, d.bills, societySettings().allocation).map((a) => ({ ...a, ref: d.bills.find((b) => b.bill.id === a.bill_id)?.bill.invoice_number ?? '' }));
 }
 
 /** Save a unit's receipt (`payment.record`) with the (possibly edited) split; the rest stays on account. */
 export function recordUnitReceipt(unitId: string, amount: number, date: string, method: string, split: readonly { bill_id: string; ref?: string; amount: number }[]) {
   const u = unitOf(unitId), c = localDb.clients.getAll().find((x) => x.id === u.owner_id);
-  if (!c) throw new Error('No member.');
+  if (!c) throw new Error(hscT('noMember'));
   return savePartyReceipt({ client: { id: c.id, name: c.name }, amount, method, date, note: `${u.code} maintenance`, allocations: split.map((a) => ({ bill_id: a.bill_id, ref: a.ref ?? '', amount: a.amount })) });
 }
 
 /** Waive open interest of the unit's bills (oldest first) by financial credit notes with the reason and the GB resolution. */
 export function waiveInterest(unitId: string, amount: number, reason: string, resolution: string, date: string): number {
   if (!reason.trim() || !resolution.trim()) throw new Error(hscT('needWhy'));
-  const open = unitDues(unitId, date, index(), societySettings(), fn).bills.filter((b) => b.interest > 0);
+  const open = unitDues(unitId, date, index(), societySettings(), fn, unitOf(unitId).owner_id).bills.filter((b) => b.interest > 0);
   let left = round2(amount);
   if (left > round2(open.reduce((t, b) => t + b.interest, 0)) + 0.004) throw new Error(hscT('tooMuch'));
-  let n = 0;
-  for (const b of open) {
-    const a = round2(Math.min(left, b.interest));
-    if (!(a > 0)) break;
-    createFinancialNote(b.bill.id, { amount: a, reason: 'settlement_discount', date, note: `Interest on arrears waived: ${reason.trim()} (GB resolution ${resolution.trim()})` });
-    left = round2(left - a);
-    n++;
-  }
-  return n;
+  // QA21 W6: one note per bill, all or nothing (a refusal on the second bill no longer leaves the first note issued).
+  return withTablesRollback(['invoices', 'doc_links', 'series_counters', 'items_catalog'], () => {
+    let n = 0;
+    for (const b of open) {
+      const a = round2(Math.min(left, b.interest));
+      if (!(a > 0)) break;
+      createFinancialNote(b.bill.id, { amount: a, reason: 'settlement_discount', date, note: `Interest on arrears waived: ${reason.trim()} (GB resolution ${resolution.trim()})` });
+      left = round2(left - a);
+      n++;
+    }
+    return n;
+  });
 }
 
 /** Issue and log a dues certificate (`master.edit`); the text states only the books' figures (HS33). */

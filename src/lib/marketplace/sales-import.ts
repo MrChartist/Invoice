@@ -575,8 +575,11 @@ export function applySalesImport(channel: SalesChannel, plan: SalesPlan, fileNam
     const saved: { doc: PlannedDoc; record: InvoiceRecord; originalId?: string }[] = [];
     const ordered = [...plan.docs.filter((d) => d.record.doc_type !== 'CREDIT_NOTE'), ...plan.docs.filter((d) => d.record.doc_type === 'CREDIT_NOTE')];
     const links: { from_id: string; to_id: string }[] = [];
-    for (const d of ordered) {
-      const rec = localDb.invoices.save({ ...d.record, id: '', channel_import_id: importId });
+    // QA21 W10: the whole import in ONE write of the invoices table (`saveMany`: the same checks, numbers and audit, in
+    // order) — a month's marketplace file was one table re-serialisation per order (O(n²)).
+    const recs = localDb.invoices.saveMany(ordered.map((d) => ({ ...d.record, id: '', channel_import_id: importId })));
+    for (const [k, d] of ordered.entries()) {
+      const rec = recs[k];
       byKey.set(d.key, rec);
       const originalId = d.originalId ?? (d.originalKey ? byKey.get(d.originalKey)?.id : undefined);
       if (rec.doc_type === 'CREDIT_NOTE' && originalId) links.push({ from_id: originalId, to_id: rec.id });

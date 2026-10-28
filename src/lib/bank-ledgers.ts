@@ -14,7 +14,7 @@
  */
 
 import { A, registerLedgerSource, type Account } from './ledger/accounts';
-import { DEFAULT_BANK_ID, bankAccountsDb, type BankAccount } from './bank-accounts';
+import { DEFAULT_BANK_ID, bankAccountsDb, pickableBankAccounts, type BankAccount } from './bank-accounts';
 
 export const BANK_LEDGER_PREFIX = 'bank:';
 const MAIN_DEFAULT_NAME = 'Main bank account';
@@ -37,6 +37,13 @@ export const isBankLedgerId = (ledgerId: string): boolean => bankAccountIdOfLedg
 export function isCashOrBankLedger(account: Pick<Account, 'id' | 'group'> | undefined): boolean {
   return !!account && (account.group === 'CASH_BANK' || isBankLedgerId(account.id));
 }
+
+/**
+ * Ledgers of bank accounts that are not the firm's real money (clearing, client money), INACTIVE ones included — their
+ * ledgers keep their postings (QA21 W7: the Receipts and Payments account counted an inactive clearing account as cash).
+ */
+export const nonCashBankLedgerIds = (accounts: readonly BankAccount[] = bankAccountsDb.all()): Set<string> =>
+  new Set(accounts.filter((b) => !pickableBankAccounts('payout', [b]).length).map((b) => bankLedgerId(b.id)));
 
 /** The synthesised ledgers for a list of bank accounts (pure). Inactive accounts keep their ledger. */
 export function bankLedgersFor(accounts: readonly BankAccount[]): Account[] {

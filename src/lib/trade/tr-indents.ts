@@ -194,15 +194,17 @@ export function billCommission(ids: readonly string[], date: string): InvoiceRec
   const byPrincipal = new Map<string, Indent[]>();
   for (const i of chosen) byPrincipal.set(i.principal_id, [...(byPrincipal.get(i.principal_id) ?? []), i]);
   return withTablesRollback(['invoices', INDENTS_TABLE, 'clients', 'items_catalog', 'series_counters'], () => {
-    const out: InvoiceRecord[] = [];
-    for (const [pid, rows] of byPrincipal) {
+    const groups = [...byPrincipal.values()];
+    const built = [...byPrincipal].map(([pid, rows]) => {
       const principal = localDb.clients.getById(pid);
       if (!principal) throw new AgencyError('The principal is not in Clients.');
-      const bill = localDb.invoices.save(buildCommissionInvoice(rows, { principal, date, settings: localDb.settings.get(), sender: localDb.settings.activeProfile(), templateId: localDb.template.get() }));
-      out.push(bill);
-      const set = new Set(rows.map((r) => r.id));
-      setTable(INDENTS_TABLE, getTable<Indent>(INDENTS_TABLE).map((i) => (set.has(i.id) ? { ...i, commission_invoice_id: bill.id, status: 'billed' as const, updated_at: new Date().toISOString() } : i)));
-    }
+      return buildCommissionInvoice(rows, { principal, date, settings: localDb.settings.get(), sender: localDb.settings.activeProfile(), templateId: localDb.template.get() });
+    });
+    // QA21 W10: every commission bill in one write of the invoices table (`saveMany`), the indents in one write.
+    const out = localDb.invoices.saveMany(built);
+    const billOf = new Map(groups.flatMap((rows, k) => rows.map((r) => [r.id, out[k].id] as const)));
+    const at = new Date().toISOString();
+    setTable(INDENTS_TABLE, getTable<Indent>(INDENTS_TABLE).map((i) => (billOf.has(i.id) ? { ...i, commission_invoice_id: billOf.get(i.id)!, status: 'billed' as const, updated_at: at } : i)));
     return out;
   });
 }
