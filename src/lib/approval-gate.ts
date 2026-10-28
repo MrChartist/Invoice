@@ -145,7 +145,11 @@ export function holdForCredit(doc: InvoiceRecord, note: string): void {
  * `retail/rt-doc-hooks.ts` (an exchange receipt frees its URD voucher, a finance DO is cancelled with its transfer
  * journal); it may refuse (throw). One slot, kept tiny for first paint.
  */
-export const voidHook: { f?: (stored: InvoiceRecord | undefined, next?: InvoiceRecord) => void } = {};
+export const voidHook: {
+  f?: (stored: InvoiceRecord | undefined, next?: InvoiceRecord) => void;
+  /** QA18 T2: a receipt that settled a bill (`exchange_purchase_id`: R9 exchange, R15 netting) was removed — re-settle the bill. */
+  paid?: (purchaseIds: string[]) => void;
+} = {};
 
 /** The data layer's credit branch (next to `holdIfApprovalNeeded` in `localDb.invoices.save` / `setStatus`); runs `voidHook` first. */
 export function holdIfCreditBlocked(doc: InvoiceRecord, stored: InvoiceRecord | undefined): void {

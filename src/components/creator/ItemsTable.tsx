@@ -158,195 +158,198 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
 
   return (
     <div className={styles.wrap} ref={wrapRef}>
-      <div className={cn(styles.row, styles.head)} aria-hidden="true">
-        <span>{t('items.colItem')}</span>
-        <span>{t('items.colHsn')}</span>
-        <span className={styles.r}>{t('items.colQty')}</span>
-        <span>{t('items.colUnit')}</span>
-        {priced && <span className={styles.r}>{t('items.colRate')}</span>}
-        {priced && <span className={styles.r}>{t('items.colDisc')}</span>}
-        {priced && showTax && <span className={styles.r}>{t('items.colGst')}</span>}
-        {priced && <span className={styles.r}>{t('items.colAmount')}</span>}
-        <span />
+      {/* QA18 T1: only the lines are the size container; the footer (lazy pack rows) sits outside it. */}
+      <div className={styles.lines} data-items-lines>
+        <div className={cn(styles.row, styles.head)} aria-hidden="true">
+          <span>{t('items.colItem')}</span>
+          <span>{t('items.colHsn')}</span>
+          <span className={styles.r}>{t('items.colQty')}</span>
+          <span>{t('items.colUnit')}</span>
+          {priced && <span className={styles.r}>{t('items.colRate')}</span>}
+          {priced && <span className={styles.r}>{t('items.colDisc')}</span>}
+          {priced && showTax && <span className={styles.r}>{t('items.colGst')}</span>}
+          {priced && <span className={styles.r}>{t('items.colAmount')}</span>}
+          <span />
+        </div>
+
+        {items.map((item, index) => {
+          const line = totals.lines.find((l) => l.id === item.id);
+          const amount = line ? line.gross - line.line_discount : 0;
+          return (
+            <div key={item.id} data-line={item.id} className={cn(styles.row, styles.body)} onKeyDown={(e) => onRowKeyDown(e, item.id, index)}>
+              <div className={cn(styles.cell, styles.cName)} data-label={t('items.colItem')}>
+                <div className={styles.nameWrap}>
+                  <Typeahead
+                    className={controls.ghost}
+                    data-field="name"
+                    value={item.name}
+                    onChange={(name) => updateItem(item.id, 'name', name)}
+                    onFocus={refreshOnNameFocus}
+                    getSuggestions={itemSuggestions}
+                    onBlur={afterLineChange}
+                    onPick={(c) => pickCatalogItem(item.id, c)}
+                    placeholder={t('items.itemPh', { n: index + 1 })}
+                    aria-label={t('items.itemName', { n: index + 1 })}
+                  />
+                  <button type="button" className={styles.catalogBtn} onClick={() => onPickCatalog(item.id)} title={t('items.pickCatalog')} aria-label={t('items.pickCatalog')}>
+                    <Library size={15} />
+                  </button>
+                </div>
+                <input
+                  className={cn(controls.ghost, styles.desc)}
+                  data-field="description"
+                  value={item.description ?? ''}
+                  onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                  placeholder={t('items.descPh')}
+                  aria-label={t('items.itemDesc', { n: index + 1 })}
+                />
+                {item.price_basis || item.free_of ? (
+                  <div className={styles.customLine} title={item.free_of ? 'Free under a scheme' : 'Rate set by the price level / quantity slab — type a rate to override'}>
+                    {item.free_of ? 'Free (scheme)' : `${item.price_basis} price`}
+                  </div>
+                ) : null}
+                {item.custom_values?.length ? (
+                  <div className={styles.customLine} title="Item details from the catalogue">
+                    {item.custom_values.map((v) => `${v.label}: ${v.value}`).join(' · ')}
+                  </div>
+                ) : null}
+                {stockCtx && <LineTracking item={item} index={index} ctx={stockCtx} />}
+                {/* QA8 T16: a saved line that carries the snapshot keeps its reconciler even with the pack off. */}
+                {(tradeOn || !!item.disc_chain?.length || !!item.disc_per_unit) && priced && <Suspense fallback={null}><LineDiscountCell item={item} index={index} /></Suspense>}
+                {(weighOn || !!item.wt) && <Suspense fallback={null}><LineWeightRow item={item} index={index} /></Suspense>}
+                {item.band_rate && <Suspense fallback={null}><BandChip item={item} date={issueDate} /></Suspense>}
+                {(jewelOn || !!item.jw) && priced && <Suspense fallback={null}><JewelLineRow item={item} date={issueDate} /></Suspense>}
+                {(svOn || !!item.sv) && <Suspense fallback={null}><SvLineRow item={item} index={index} date={issueDate} /></Suspense>}
+                {(svOn || !!item.sv?.redeem) && <Suspense fallback={null}><RedeemChip item={item} date={issueDate} /></Suspense>}
+                {agencyOn && (docType === 'INVOICE' || docType === 'TAX_INVOICE' || docType === 'BILL_OF_SUPPLY') && <Suspense fallback={null}><LotPicker item={item} index={index} /></Suspense>}
+                {docType === 'QUOTATION' && <QuoteLineFlags item={item} index={index} />}
+                {showTax && priced && !(item.cess_rate || item.cess_per_unit || cessOpen[item.id]) && (
+                  <button type="button" className={styles.cessToggle} onClick={() => setCessOpen((o) => ({ ...o, [item.id]: true }))}>
+                    + {edT('addCess')}
+                  </button>
+                )}
+                {showTax && priced && (item.cess_rate || item.cess_per_unit || cessOpen[item.id]) ? (
+                  <div className={styles.cessRow}>
+                    <span>Cess %</span>
+                    <NumberInput className={styles.cessInput} value={item.cess_rate ?? 0} onChange={(n) => updateItem(item.id, 'cess_rate', n)} placeholder="0" aria-label={`Item ${index + 1} cess percent`} />
+                    <span>+ per unit</span>
+                    <NumberInput className={styles.cessInput} value={item.cess_per_unit ?? 0} onChange={(n) => updateItem(item.id, 'cess_per_unit', n)} placeholder="0" aria-label={`Item ${index + 1} cess per unit`} />
+                  </div>
+                ) : null}
+                {priced && (
+                  <CostCentreSelect
+                    id={`line-cc-${item.id}`}
+                    className={cn(controls.ghost, styles.desc)}
+                    centres={centres}
+                    value={item.cost_centre_id}
+                    onChange={(v) => updateItem(item.id, 'cost_centre_id', v ?? '')}
+                    emptyLabel="Cost centre: same as document"
+                    ariaLabel={`Item ${index + 1} cost centre`}
+                  />
+                )}
+              </div>
+
+              <div className={styles.cell} data-label={t('items.colHsn')}>
+                <input
+                  className={cn(controls.ghost, styles.mono)}
+                  data-field="hsn"
+                  value={item.hsn ?? ''}
+                  inputMode="numeric"
+                  maxLength={8}
+                  onChange={(e) => updateItem(item.id, 'hsn', e.target.value.replace(/\D/g, ''))}
+                  placeholder="—"
+                  aria-label={t('items.itemHsn', { n: index + 1 })}
+                />
+              </div>
+
+              <div className={styles.cell} data-label={t('items.colQty')}>
+                <NumberInput className={controls.ghostNumeric} data-field="quantity" value={item.quantity} blankZero={false} onChange={(n) => setLineQuantity(item.id, n)} aria-label={t('items.itemQty', { n: index + 1 })} />
+              </div>
+
+              <div className={styles.cell} data-label={t('items.colUnit')}>
+                {(() => {
+                  // An item with alternate units offers its own units; the factor is snapshotted on the line.
+                  const alt = units.pick?.find(item.name, item.hsn);
+                  const current = item.unit || 'NOS';
+                  const options = alt ? alt.choices.map((c) => c.unit) : units.symbols;
+                  const list = options.some((u) => u.toUpperCase() === current.toUpperCase()) ? options : [...options, current];
+                  const f = lineFactor(item);
+                  return (
+                    <>
+                      <select
+                        className={cn(controls.ghost, styles.unit)} data-field="unit" value={current}
+                        onChange={(e) => (alt ? patchItem(item.id, lineUnitPatch(alt.item, item, e.target.value)) : item.unit_factor ? patchItem(item.id, { unit: e.target.value, unit_factor: undefined }) : updateItem(item.id, 'unit', e.target.value))}
+                        aria-label={t('items.itemUnit', { n: index + 1 })}
+                      >
+                        {list.map((u) => (
+                          <option key={u}>{u}</option>
+                        ))}
+                      </select>
+                      {f !== 1 && alt && <span className={styles.unitHint}>{unitT('equals', { qty: Math.round(item.quantity * f * 1000) / 1000, unit: alt.item.unit })}</span>}
+                    </>
+                  );
+                })()}
+              </div>
+
+              {priced && (
+                <div className={styles.cell} data-label={t('items.colRate')}>
+                  <NumberInput className={controls.ghostNumeric} data-field="rate" value={item.rate} onChange={(n) => setLineRate(item.id, n)} placeholder="0.00" aria-label={t('items.itemRate', { n: index + 1 })} />
+                </div>
+              )}
+
+              {priced && (
+                <div className={styles.cell} data-label={t('items.colDisc')}>
+                  <NumberInput className={controls.ghostNumeric} data-field="discount" value={item.discount_percent ?? 0} onChange={(n) => updateItem(item.id, 'discount_percent', Math.min(n, 100))} placeholder="0" aria-label={t('items.itemDisc', { n: index + 1 })} />
+                </div>
+              )}
+
+              {priced && showTax && (
+                <div className={styles.cell} data-label={t('items.colGst')}>
+                  <select
+                    className={cn(controls.ghost, styles.rate)}
+                    data-field="gst"
+                    value={item.tax_rate ?? 0}
+                    onChange={(e) => updateItem(item.id, 'tax_rate', Number(e.target.value))}
+                    aria-label={t('items.itemGst', { n: index + 1 })}
+                  >
+                    {gstRateOptions(issueDate, item.tax_rate).map((r) => (
+                      <option key={r} value={r}>
+                        {r}%
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {priced && (
+                <div className={cn(styles.cell, styles.amount)} data-label={t('items.colAmount')}>
+                  {isExcludedLine(item) ? (
+                    // R2-B3: an unselected optional / alternative line — shown, but outside the total.
+                    <span className={flagStyles.excluded} title={s2T('q.optionalAmount')}>{formatCurrency(lineValue(item), currency)}</span>
+                  ) : formatCurrency(amount, currency)}
+                </div>
+              )}
+
+              <div className={cn(styles.cell, styles.actions)}>
+                <button type="button" className={controls.btnIcon} onClick={() => moveItem(item.id, -1)} disabled={index === 0} aria-label={t('items.moveUp')}>
+                  <ArrowUp size={14} />
+                </button>
+                <button type="button" className={controls.btnIcon} onClick={() => moveItem(item.id, 1)} disabled={index === items.length - 1} aria-label={t('items.moveDown')}>
+                  <ArrowDown size={14} />
+                </button>
+                <button type="button" className={controls.btnIcon} onClick={() => duplicateItem(item.id)} aria-label={t('items.duplicate')}>
+                  <Copy size={14} />
+                </button>
+                <button type="button" className={controls.btnDanger} onClick={() => { removeItem(item.id); afterLineChange(); }} aria-label={t('items.remove')}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {items.map((item, index) => {
-        const line = totals.lines.find((l) => l.id === item.id);
-        const amount = line ? line.gross - line.line_discount : 0;
-        return (
-          <div key={item.id} data-line={item.id} className={cn(styles.row, styles.body)} onKeyDown={(e) => onRowKeyDown(e, item.id, index)}>
-            <div className={cn(styles.cell, styles.cName)} data-label={t('items.colItem')}>
-              <div className={styles.nameWrap}>
-                <Typeahead
-                  className={controls.ghost}
-                  data-field="name"
-                  value={item.name}
-                  onChange={(name) => updateItem(item.id, 'name', name)}
-                  onFocus={refreshOnNameFocus}
-                  getSuggestions={itemSuggestions}
-                  onBlur={afterLineChange}
-                  onPick={(c) => pickCatalogItem(item.id, c)}
-                  placeholder={t('items.itemPh', { n: index + 1 })}
-                  aria-label={t('items.itemName', { n: index + 1 })}
-                />
-                <button type="button" className={styles.catalogBtn} onClick={() => onPickCatalog(item.id)} title={t('items.pickCatalog')} aria-label={t('items.pickCatalog')}>
-                  <Library size={15} />
-                </button>
-              </div>
-              <input
-                className={cn(controls.ghost, styles.desc)}
-                data-field="description"
-                value={item.description ?? ''}
-                onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                placeholder={t('items.descPh')}
-                aria-label={t('items.itemDesc', { n: index + 1 })}
-              />
-              {item.price_basis || item.free_of ? (
-                <div className={styles.customLine} title={item.free_of ? 'Free under a scheme' : 'Rate set by the price level / quantity slab — type a rate to override'}>
-                  {item.free_of ? 'Free (scheme)' : `${item.price_basis} price`}
-                </div>
-              ) : null}
-              {item.custom_values?.length ? (
-                <div className={styles.customLine} title="Item details from the catalogue">
-                  {item.custom_values.map((v) => `${v.label}: ${v.value}`).join(' · ')}
-                </div>
-              ) : null}
-              {stockCtx && <LineTracking item={item} index={index} ctx={stockCtx} />}
-              {/* QA8 T16: a saved line that carries the snapshot keeps its reconciler even with the pack off. */}
-              {(tradeOn || !!item.disc_chain?.length || !!item.disc_per_unit) && priced && <Suspense fallback={null}><LineDiscountCell item={item} index={index} /></Suspense>}
-              {(weighOn || !!item.wt) && <Suspense fallback={null}><LineWeightRow item={item} index={index} /></Suspense>}
-              {item.band_rate && <Suspense fallback={null}><BandChip item={item} date={issueDate} /></Suspense>}
-              {(jewelOn || !!item.jw) && priced && <Suspense fallback={null}><JewelLineRow item={item} date={issueDate} /></Suspense>}
-              {(svOn || !!item.sv) && <Suspense fallback={null}><SvLineRow item={item} index={index} date={issueDate} /></Suspense>}
-              {(svOn || !!item.sv?.redeem) && <Suspense fallback={null}><RedeemChip item={item} date={issueDate} /></Suspense>}
-              {agencyOn && (docType === 'INVOICE' || docType === 'TAX_INVOICE' || docType === 'BILL_OF_SUPPLY') && <Suspense fallback={null}><LotPicker item={item} index={index} /></Suspense>}
-              {docType === 'QUOTATION' && <QuoteLineFlags item={item} index={index} />}
-              {showTax && priced && !(item.cess_rate || item.cess_per_unit || cessOpen[item.id]) && (
-                <button type="button" className={styles.cessToggle} onClick={() => setCessOpen((o) => ({ ...o, [item.id]: true }))}>
-                  + {edT('addCess')}
-                </button>
-              )}
-              {showTax && priced && (item.cess_rate || item.cess_per_unit || cessOpen[item.id]) ? (
-                <div className={styles.cessRow}>
-                  <span>Cess %</span>
-                  <NumberInput className={styles.cessInput} value={item.cess_rate ?? 0} onChange={(n) => updateItem(item.id, 'cess_rate', n)} placeholder="0" aria-label={`Item ${index + 1} cess percent`} />
-                  <span>+ per unit</span>
-                  <NumberInput className={styles.cessInput} value={item.cess_per_unit ?? 0} onChange={(n) => updateItem(item.id, 'cess_per_unit', n)} placeholder="0" aria-label={`Item ${index + 1} cess per unit`} />
-                </div>
-              ) : null}
-              {priced && (
-                <CostCentreSelect
-                  id={`line-cc-${item.id}`}
-                  className={cn(controls.ghost, styles.desc)}
-                  centres={centres}
-                  value={item.cost_centre_id}
-                  onChange={(v) => updateItem(item.id, 'cost_centre_id', v ?? '')}
-                  emptyLabel="Cost centre: same as document"
-                  ariaLabel={`Item ${index + 1} cost centre`}
-                />
-              )}
-            </div>
-
-            <div className={styles.cell} data-label={t('items.colHsn')}>
-              <input
-                className={cn(controls.ghost, styles.mono)}
-                data-field="hsn"
-                value={item.hsn ?? ''}
-                inputMode="numeric"
-                maxLength={8}
-                onChange={(e) => updateItem(item.id, 'hsn', e.target.value.replace(/\D/g, ''))}
-                placeholder="—"
-                aria-label={t('items.itemHsn', { n: index + 1 })}
-              />
-            </div>
-
-            <div className={styles.cell} data-label={t('items.colQty')}>
-              <NumberInput className={controls.ghostNumeric} data-field="quantity" value={item.quantity} blankZero={false} onChange={(n) => setLineQuantity(item.id, n)} aria-label={t('items.itemQty', { n: index + 1 })} />
-            </div>
-
-            <div className={styles.cell} data-label={t('items.colUnit')}>
-              {(() => {
-                // An item with alternate units offers its own units; the factor is snapshotted on the line.
-                const alt = units.pick?.find(item.name, item.hsn);
-                const current = item.unit || 'NOS';
-                const options = alt ? alt.choices.map((c) => c.unit) : units.symbols;
-                const list = options.some((u) => u.toUpperCase() === current.toUpperCase()) ? options : [...options, current];
-                const f = lineFactor(item);
-                return (
-                  <>
-                    <select
-                      className={cn(controls.ghost, styles.unit)} data-field="unit" value={current}
-                      onChange={(e) => (alt ? patchItem(item.id, lineUnitPatch(alt.item, item, e.target.value)) : item.unit_factor ? patchItem(item.id, { unit: e.target.value, unit_factor: undefined }) : updateItem(item.id, 'unit', e.target.value))}
-                      aria-label={t('items.itemUnit', { n: index + 1 })}
-                    >
-                      {list.map((u) => (
-                        <option key={u}>{u}</option>
-                      ))}
-                    </select>
-                    {f !== 1 && alt && <span className={styles.unitHint}>{unitT('equals', { qty: Math.round(item.quantity * f * 1000) / 1000, unit: alt.item.unit })}</span>}
-                  </>
-                );
-              })()}
-            </div>
-
-            {priced && (
-              <div className={styles.cell} data-label={t('items.colRate')}>
-                <NumberInput className={controls.ghostNumeric} data-field="rate" value={item.rate} onChange={(n) => setLineRate(item.id, n)} placeholder="0.00" aria-label={t('items.itemRate', { n: index + 1 })} />
-              </div>
-            )}
-
-            {priced && (
-              <div className={styles.cell} data-label={t('items.colDisc')}>
-                <NumberInput className={controls.ghostNumeric} data-field="discount" value={item.discount_percent ?? 0} onChange={(n) => updateItem(item.id, 'discount_percent', Math.min(n, 100))} placeholder="0" aria-label={t('items.itemDisc', { n: index + 1 })} />
-              </div>
-            )}
-
-            {priced && showTax && (
-              <div className={styles.cell} data-label={t('items.colGst')}>
-                <select
-                  className={cn(controls.ghost, styles.rate)}
-                  data-field="gst"
-                  value={item.tax_rate ?? 0}
-                  onChange={(e) => updateItem(item.id, 'tax_rate', Number(e.target.value))}
-                  aria-label={t('items.itemGst', { n: index + 1 })}
-                >
-                  {gstRateOptions(issueDate, item.tax_rate).map((r) => (
-                    <option key={r} value={r}>
-                      {r}%
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {priced && (
-              <div className={cn(styles.cell, styles.amount)} data-label={t('items.colAmount')}>
-                {isExcludedLine(item) ? (
-                  // R2-B3: an unselected optional / alternative line — shown, but outside the total.
-                  <span className={flagStyles.excluded} title={s2T('q.optionalAmount')}>{formatCurrency(lineValue(item), currency)}</span>
-                ) : formatCurrency(amount, currency)}
-              </div>
-            )}
-
-            <div className={cn(styles.cell, styles.actions)}>
-              <button type="button" className={controls.btnIcon} onClick={() => moveItem(item.id, -1)} disabled={index === 0} aria-label={t('items.moveUp')}>
-                <ArrowUp size={14} />
-              </button>
-              <button type="button" className={controls.btnIcon} onClick={() => moveItem(item.id, 1)} disabled={index === items.length - 1} aria-label={t('items.moveDown')}>
-                <ArrowDown size={14} />
-              </button>
-              <button type="button" className={controls.btnIcon} onClick={() => duplicateItem(item.id)} aria-label={t('items.duplicate')}>
-                <Copy size={14} />
-              </button>
-              <button type="button" className={controls.btnDanger} onClick={() => { removeItem(item.id); afterLineChange(); }} aria-label={t('items.remove')}>
-                <Trash2 size={14} />
-              </button>
-            </div>
-          </div>
-        );
-      })}
-
-      <div className={styles.footer}>
+      <div className={styles.footer} data-items-footer>
         <button type="button" className={controls.btnOutline} onClick={addItem}>
           <Plus size={16} /> {t('items.addLine')}
         </button>

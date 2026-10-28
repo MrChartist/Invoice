@@ -492,6 +492,8 @@ export interface CreditInput {
    * on for a sales return, off for a discount / rate difference / GST correction / cancelled service.
    */
   goodsReturned?: boolean;
+  /** QA18 T5: the note's date (a local day; default today) — e.g. the date a travel booking was cancelled. */
+  date?: string;
 }
 
 export interface CreditDraftResult {
@@ -631,7 +633,7 @@ export function buildCreditNote(
 export function createCreditNote(invoice: InvoiceRecord, input: CreditInput): InvoiceRecord {
   const links = readLinks();
   const all = localDb.invoices.getAll();
-  const today = localIsoDate();
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(input.date ?? '') ? input.date! : localIsoDate();
   const { record, errors } = buildCreditNote(invoice, input, links, all, {
     id: generateId(),
     invoice_number: localDb.invoices.nextNumber(today, 'CREDIT_NOTE'),

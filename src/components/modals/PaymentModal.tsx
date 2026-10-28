@@ -174,6 +174,8 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
       // QA17 R4: a receipt applied from client money goes only with its CMV entry.
       if (/^CMV\//.test(payments.find((p) => p.id === id)?.reference ?? '')) (await import('../../lib/prof/ps-client-money')).assertNotClientMoneyReceipt(id);
       // R5-B5: a GST TDS / cess deduction receipt goes with its journal (all or nothing).
+      // QA18 T2: a netting / exchange receipt re-settles its bill (the hook lives with the R9 hooks).
+      if (payments.find((p) => p.id === id)?.exchange_purchase_id) await import('../../lib/retail/rt-doc-hooks');
       if (payments.find((p) => p.id === id)?.ra_journal_id) (await import('../../lib/works/ra-receivable')).removeDeductionRow(id);
       else localDb.payments.remove(id);
     } catch (err) {
