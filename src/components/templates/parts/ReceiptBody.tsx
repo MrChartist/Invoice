@@ -33,7 +33,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
   const { money, currency, date, col, show, footerText, headerNote, title: titled } = usePaper();
   const cur = invoice.currency;
   const c = invoice.client;
-  const title = titled(svDocTitle(invoice) || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'), invoice.doc_type); // R2-C5 suffix; R10 Rule 46A title
+  const title = titled(svDocTitle(invoice) || invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'), invoice.doc_type); // R2-C5 suffix; R10 Rule 46A title
   // Reverse charge: the tax is printed in the recipient-pays note, never added up here.
   const rcm = isRcmTotals(totals);
   const cgstSgst = isTaxed(invoice, totals) && !rcm;

@@ -285,6 +285,10 @@ export const GATEWAY_EXTENSIONS: Array<{ screen: ScreenId; section: number; entr
   { screen: 'vouchers', section: 0, entry: { id: 'v-payroll', label: 'payrollVoucher', accel: 'l', target: go('/payroll?tab=run'), need: 'payroll.view', keywords: 'payroll salary attendance' } },
   { screen: 'statutory', section: 0, entry: { id: 'sr-payroll', label: 'payrollReports', accel: 'p', target: go('/payroll?tab=reports'), need: 'payroll.view', keywords: 'pf esi ecr pt 24q form 16 payroll' } },
 
+  // P1-13 (7Q): Voucher Types master (Accounts Info screen).
+  { screen: 'create', section: 0, entry: { id: 'c-vtype', label: 'voucherTypes', accel: 'y', target: go(mastersHref('voucher-types', 'new')), need: 'master.edit', keywords: 'voucher type numbering series prefix suffix sales export receipt cash pos' } },
+  { screen: 'alter', section: 0, entry: { id: 'a-vtype', label: 'voucherTypes', accel: 'y', target: go(mastersHref('voucher-types')), keywords: 'voucher type numbering series prefix suffix' } },
+
   /* ── Phase 7 integration pass: every Tally-parity package reachable from the Gateway ── */
   // WP-1 masters ("Accounts Info": groups, ledgers, opening trial balance, bill-wise openings).
   { screen: 'root', section: 0, entry: { id: 'accinfo', label: 'accountsInfo', accel: 'o', target: go(mastersHref('menu')), keywords: 'accounts info masters group ledger opening balance trial balance billwise' } },

@@ -12,7 +12,8 @@ import { GST_SLABS } from './tax-rules';
 import { INDIAN_STATES, stateByCode } from './india-states';
 import { calculateInvoice, deriveGstMode, round2 } from './invoice-calc';
 import { toCsv } from './csv';
-import { fieldsFor, type ColumnMapping, type ImportKind } from './import-mapping';
+import { fieldsFor, isBooksKind, type ColumnMapping, type ImportKind } from './import-mapping';
+import type { BooksImportRecord } from './import-books';
 import { KEYS, generateId, getTable, setTable } from './storage';
 import { audit } from './audit';
 import { numberKey } from './invoice-number';
@@ -214,7 +215,8 @@ export function resolveStateText(raw: string): ResolvedState | undefined {
 
 export type ClientDraft = Partial<Client> & { name: string };
 export type CatalogDraft = Partial<InvoiceItem> & { name: string };
-export type ImportRecord = ClientDraft | CatalogDraft | InvoiceRecord;
+/** P1-21 (7Q): books kinds carry their own record shape (`import-books.ts`, built by `buildBooksPreview`). */
+export type ImportRecord = ClientDraft | CatalogDraft | InvoiceRecord | BooksImportRecord;
 
 export interface RowIssue {
   level: 'error' | 'warning';
@@ -885,6 +887,7 @@ export interface PreviewParams {
 /** Validate every row and decide create / update / skip / error — writes nothing. */
 export function buildPreview(params: PreviewParams): ImportPreview {
   const { kind, table, mapping, existing } = params;
+  if (isBooksKind(kind)) throw new Error('Books imports are previewed by import-books.ts (buildBooksPreview).');
   const options: ImportOptions = { ...DEFAULT_IMPORT_OPTIONS, ...(params.options ?? {}) };
   const skipped = params.skipped ?? new Set<number>();
   const line0 = params.firstDataLine ?? 2;
@@ -1177,6 +1180,7 @@ export async function applyImport(
   sink: ImportSink,
   options: ApplyOptions = {},
 ): Promise<ImportReport> {
+  if (isBooksKind(preview.kind)) throw new Error('Books imports are applied by import-books.ts (applyBooksImport).');
   const chunk = Math.max(1, options.chunkSize ?? 250);
   const yieldToUi = options.yieldToUi ?? nextTask;
   const report: ImportReport = { created: 0, updated: 0, skipped: 0, errors: [] };

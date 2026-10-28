@@ -56,6 +56,7 @@ export const gwT = defineArea(
     costCentre: 'Cost centre',
     priceLevel: 'Price levels',
     employee: 'Employee',
+    voucherTypes: 'Voucher type',
 
     contra: 'Contra',
     payment: 'Payment',
@@ -186,7 +187,7 @@ export const gwT = defineArea(
     vKindAccount: 'Ledger',
     vLine: 'Line {n}',
     vUnallocated: 'Unallocated',
-    vBillRefNote: 'Bill-wise references are kept on invoices and bills; vouchers post on account.',
+    vBillRefNote: 'Bill-wise details open for a customer line on a receipt and a supplier line on a payment (Agst Ref / New Ref / Advance / On Account).',
 
     cTitle: 'Create ledger',
     cName: 'Name',
@@ -285,6 +286,7 @@ export const gwT = defineArea(
     costCentre: 'कॉस्ट सेंटर',
     priceLevel: 'मूल्य स्तर',
     employee: 'कर्मचारी',
+    voucherTypes: 'वाउचर प्रकार',
 
     contra: 'कॉन्ट्रा',
     payment: 'भुगतान',
@@ -415,7 +417,7 @@ export const gwT = defineArea(
     vKindAccount: 'लेजर',
     vLine: 'पंक्ति {n}',
     vUnallocated: 'बिना आवंटन',
-    vBillRefNote: 'बिल-वार संदर्भ इनवॉइस और बिल पर रहते हैं; वाउचर खाते पर पोस्ट होते हैं।',
+    vBillRefNote: 'रसीद पर ग्राहक पंक्ति और भुगतान पर आपूर्तिकर्ता पंक्ति के लिए बिल-वार विवरण खुलता है (Agst Ref / New Ref / अग्रिम / On Account)।',
 
     cTitle: 'लेजर बनाएँ',
     cName: 'नाम',

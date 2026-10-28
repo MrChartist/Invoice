@@ -201,7 +201,7 @@ Share, static catalogue HTML.
 
 ## Phase 7: Tally parity (v5.x)
 
-Numbering: one sequence 7.1–7.61 in the sub-sections below (7L continues at 7.62, 7M at 7.70, 7N at 7.80, 7O at 7.90, 7P at 7.100) (renumbered after the WP merge; the work-package
+Numbering: one sequence 7.1–7.61 in the sub-sections below (7L continues at 7.62, 7M at 7.70, 7N at 7.80, 7O at 7.90, 7P at 7.100, 7Q at 7.110) (renumbered after the WP merge; the work-package
 documents in `docs/features/` keep their own WP ids). Gap ids refer to `docs/GAP_ANALYSIS.md`.
 
 ### 7A · Accounting depth (TDS, voucher variants, bill-wise, masters, payroll)
@@ -234,7 +234,7 @@ For users coming from TallyPrime: the same keyboard conventions on top of the ex
 | 7.16 | ✅ **"Tally terms" toggle** (Party, Sales voucher, Purchase voucher) on Gateway screens only | device-local preference | S |
 | 7.17 | ✅ **Stock journal (Alt+F7) / Physical stock (Ctrl+F7)**: keys and Gateway rows open `/manufacturing?tab=journal` / `?tab=physical` (WIP-B) | `TALLY_KEYS`, `menu.ts` | S |
 | 7.18 | ✅ **Gateway rows for every module** through `GATEWAY_EXTENSIONS`: Employee / Payroll voucher / payroll reports, TDS & TCS payables, GST set-off, Ratio analysis, Accounts Info, banking documents, purchase debit note, receipt note, manufacturing journal, Tally import, Start new year (integration pass, 7.60) | `src/lib/gateway/menu.ts` | S |
-| 7.19 | ⏳ Bill-wise references (7.5) and voucher classes (7.4) on Gateway voucher entry, single-entry mode | needs a voucher schema addition | M |
+| 7.19 | ✅ Bill-wise references (Agst Ref / New Ref / Advance / On Account) and voucher classes on Gateway voucher entry, single-entry mode for Contra / Payment / Receipt — done in 7Q (7.111) | `src/lib/gateway/voucher-refs.ts`, `docs/features/voucher-types.md` | M |
 
 ### 7C · Banking & payments (WP-5, `docs/features/banking.md`)
 
@@ -296,7 +296,7 @@ Details: `docs/features/manufacturing.md`.
 | 7.46 | ✅ **Tally export of every voucher** (WP-7, P0-12 / P1-22): supplier payments (TDS on payment) and advances, manual Journal / Contra / Payment / Receipt with cost-centre allocations and reversals, fixed-asset + depreciation journals, stock transfers as Stock Journal; group / cost-centre / godown masters, ledger openings with bill-wise opening bills (`src/lib/tally-books.ts`) | Tally import of our XML | done |
 | 7.47 | ✅ **Year-end wizard** (WP-7, P1-20): integrity, closing stock (shows the report-time valuation when it is on; a journal reversed on 1 April only when it is off — never both, 7.60), depreciation check, provisions journal, opening bills review, lock the year, carry-forward report / CSV (`src/lib/year-end.ts`, `year-end-store.ts`, `components/year-end/YearEndWizard.tsx`) | "Start new year" / Split Company Data | done |
 | 7.48 | ✅ **Books integrity check** (WP-7, P2): TB and voucher balance, opening difference, orphaned receipts / supplier payments / allocations / document links / opening bills, negative cash days (`src/lib/books-integrity.ts`) | — | done |
-| 7.49 | ⏳ WP-7 follow-ups: Tally import of inventory vouchers (quantities), Excel TB template path, audit segment compression, ~~per-FY auditor export with chain head~~ (✅ R4-C5 auditor pack), archive of old FYs to a "history" company, TDS challans in the Tally export | — | open |
+| 7.49 | 🟡 WP-7 follow-ups: Tally import of inventory vouchers (quantities) and TDS challans in the Tally export — done in 7Q (7.113–7.115); Excel TB template path and per-FY auditor export with chain head — done on master (R6-C3 trial-balance preset, R4-C5 auditor pack); audit segment compression and archive of old FYs to a "history" company still open | — | partly done |
 
 ### 7I · Reports engine & Tally report grammar (WP-2)
 
@@ -389,6 +389,18 @@ Details: `docs/features/manufacturing.md`.
 | 7.148 | ✅ **Actuarial valuation entry** (`ACT/FY…`): the actuary's AS-15 / Ind AS 19 figures (opening, service / interest / past service cost, benefits paid, actuarial loss, closing, plan assets), roll-forward check, provision journal (Ind AS 19 gratuity remeasurement → Reserves / OCI) — the valuation itself must come from an actuary | `followups-store.ts`, `ActuarialPanel.tsx`, table `actuarial_valuations` | done |
 | 7.149 | ⏳ 7T follow-ups: 17(2)(viia) accretion (Rule 3B), Form 12BA / Form 16 perquisite lines for 17(2)(vii), late-deduction 201(1A) detection, arrear ECR upload validation, plan-asset movements for funded gratuity, hotel / furnished-accommodation variants, EV car rates | — | open |
 
+
+### 7Q · Voucher types, bill-wise voucher entry, books import (`docs/features/voucher-types.md`)
+
+| # | Item | Gap ids | Status |
+|---|------|---------|--------|
+| 7.110 | ✅ **Voucher Types master**: user voucher types under a base (Sales – Retail / Export, Receipt – Cash …) with prefix / suffix / starting number / width / yearly or monthly restart, print title, template, default bank (receipt / payment / contra) or godown (sales / notes), "use for POS"; picker in the invoice editor and both voucher editors only when a user type exists; documents without a type keep `INV/FY25-26/0001`; numbers never reused (`series_counters`) (`voucher-series.ts`, `voucher-types.ts`, table `voucher_types`) | P1-13 | done |
+| 7.111 | ✅ **Gateway voucher entry (7.19)**: bill-wise references on a receipt's customer line (Agst Ref / New Ref / Advance / On Account through `saveReceiptVoucher`, all or nothing) and a payment's supplier line (a supplier payment through `billwise.ts`, one rollback, not also a PV); voucher class with the used list; single-entry mode for Contra / Payment / Receipt (Account + particulars) | — | done |
+| 7.112 | ✅ **Excel / CSV import of books data**: ledgers (group + opening, Tally group names), suppliers (GSTIN / PAN / state / opening payable), stock items (group, unit, opening qty / rate), vouchers (journal / payment / receipt / contra as manual vouchers only) in the import wizard with templates, dry-run review, one undo copy, owner only (`import-books.ts`) | P1-21 | done |
+| 7.113 | ✅ **Tally import of inventory quantities**: item lines of sales / purchase / note / stock-journal vouchers as stock moves where the item matches (alternate units, godown by name; quantity-only stock journals import as stock), never GST documents; re-import adds nothing (`tally-import-stock.ts`); Excel **trial-balance template** for openings | 7.49 | done |
+| 7.114 | ✅ **Per-FY auditor export** of the audit trail: the FY's rows with `prev` / `hash`, chain head and whole-chain verification, CSV + JSON (`audit-export.ts`, Settings → Activity) | 7.49 | done |
+| 7.115 | ✅ **TDS / TCS challans in the Tally export** as Payment vouchers from their ledger postings (`tally-tds.ts`) | 7.49 | done |
+| 7.116 | ⏳ 7Q follow-ups: voucher types for purchase / stock / payroll series, bill-wise references when altering a payment voucher and on journals, Excel import of sales / purchase vouchers, batches / serials on imported Tally item lines | — | open |
 
 ### 7N · Branch accounting & integration gaps (`docs/features/business-extras.md`, `docs/features/reports-engine.md`)
 

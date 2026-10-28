@@ -48,6 +48,7 @@ export const WATCHED_TABLES: Readonly<Record<string, WatchedTable>> = {
   vouchers: { entity: 'voucher', label: 'Voucher' },
   accounts: { entity: 'account', label: 'Ledger' },
   groups: { entity: 'account', label: 'Group' },
+  voucher_types: { entity: 'settings', label: 'Voucher type' },
   bank_accounts: { entity: 'account', label: 'Bank account' },
   ledger_openings: { entity: 'opening', label: 'Opening balance' },
   opening_bills: { entity: 'opening', label: 'Opening bill' },

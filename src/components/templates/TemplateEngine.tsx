@@ -202,7 +202,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
       <>
         {preprinted ? (
           <div className={styles.preHead}>
-            <strong>{DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'}</strong>
+            <strong>{invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice')}</strong>
             <span>{invoice.invoice_number || 'DRAFT'}</span>
           </div>
         ) : (

@@ -9,6 +9,7 @@ import { CostCentreSelect } from '../cost-centres/CostCentreSelect';
 import { useCostCentres } from '../cost-centres/useCostCentres';
 import { localDb } from '../../lib/localDb';
 import { getTable } from '../../lib/storage';
+import { VOUCHER_TYPES_TABLE, baseOfDoc, type VoucherSeries } from '../../lib/voucher-series';
 import { STATUS_OPTIONS } from '../../lib/invoice-status';
 import { addDaysInput, CURRENCIES, cn } from '../../lib/utils';
 import { dueAfterIssueChange } from '../../lib/dates';
@@ -23,6 +24,8 @@ import styles from '../../pages/InvoiceCreator.module.css';
 
 // WP-9: branch picker, loaded only once a branch exists (single-location users never download it).
 const BranchSelect = lazy(() => import('../branches/BranchSelect').then((m) => ({ default: m.BranchSelect })));
+// P1-13: voucher-type picker, loaded only once a user voucher type exists for this document type.
+const VoucherTypeSelect = lazy(() => import('../voucher-types/VoucherTypeSelect'));
 // R2-A1: payment terms picker (loads the terms master and the collections strings on its own).
 const TermsPicker = lazy(() => import('../collections/TermsPicker'));
 // R11 (CN-A3): Contract & RA bill panel — only with the works pack on or a document carrying the construction snapshot.
@@ -46,14 +49,24 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
     return Array.isArray(st.industry_packs) ? st.industry_packs.includes('works') : st.business_type === 'contractor';
   }, []);
   const s = useInvoiceStore(
-    useShallow((st) => pick(st, ['balance_due', 'branch_id', 'cost_centre_id', 'currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'payment_terms', 'po_number', 'reverse_charge', 'sender', 'boq_terms', 'ra_no', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
+    useShallow((st) => pick(st, ['balance_due', 'branch_id', 'voucher_type_id', 'cost_centre_id', 'currency', 'doc_type', 'due_date', 'id', 'invoice_number', 'issue_date', 'patch', 'payment_terms', 'po_number', 'reverse_charge', 'sender', 'boq_terms', 'ra_no', 'setCurrency', 'setDates', 'setDocType', 'setInvoiceNumber', 'setReverseCharge', 'setStatus', 'status'])),
   );
 
   const nextNumber = useMemo(
-    () => (s.invoice_number ? '' : localDb.invoices.nextNumber(s.issue_date, s.doc_type, s.sender?.invoicePrefix || undefined)),
+    () => (s.invoice_number ? '' : localDb.invoices.nextNumber(s.issue_date, s.doc_type, s.sender?.invoicePrefix || undefined, s.voucher_type_id)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [s.invoice_number, s.issue_date, s.doc_type, s.sender?.invoicePrefix, s.id],
+    [s.invoice_number, s.issue_date, s.doc_type, s.sender?.invoicePrefix, s.id, s.voucher_type_id],
   );
+  const vtBase = baseOfDoc(s.doc_type);
+  const hasVoucherTypes = useMemo(() => {
+    if (!vtBase) return false;
+    if (s.voucher_type_id) return true;
+    try {
+      return getTable<VoucherSeries>(VOUCHER_TYPES_TABLE).some((t) => t?.base === vtBase && !t.inactive);
+    } catch {
+      return false;
+    }
+  }, [vtBase, s.voucher_type_id]);
 
   // GST Rule 46: live uniqueness check of a hand-typed number (deferred so typing stays snappy).
   const typedNumber = useDeferredValue(s.invoice_number);
@@ -84,7 +97,18 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
         <div className={controls.row3}>
           <label className={controls.field}>
             <span className={controls.label}>{t('meta.type')}</span>
-            <select className={controls.select} value={s.doc_type} onChange={(e) => s.setDocType(e.target.value as DocumentType)} disabled={editing && Boolean(s.invoice_number)}>
+            <select
+              className={controls.select}
+              value={s.doc_type}
+              onChange={(e) => {
+                const next = e.target.value as DocumentType;
+                // P1-13: a voucher type belongs to one base (sales / credit / debit note); another base drops it.
+                const drop = !!s.voucher_type_id && baseOfDoc(next) !== baseOfDoc(s.doc_type);
+                s.setDocType(next);
+                if (drop) s.patch({ voucher_type_id: undefined, print_title: undefined });
+              }}
+              disabled={editing && Boolean(s.invoice_number)}
+            >
               {DOC_TYPES.map((d) => (
                 <option key={d} value={d}>
                   {docLabel(d)}
@@ -191,6 +215,19 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
           onChange={(v) => s.patch({ cost_centre_id: v })}
           hint={t('meta.costCentreHint')}
         />
+        {hasVoucherTypes && vtBase && (
+          <Suspense fallback={null}>
+            <VoucherTypeSelect
+              id="doc-voucher-type"
+              base={vtBase}
+              value={s.voucher_type_id}
+              disabled={editing && Boolean(s.invoice_number)}
+              onChange={(t) =>
+                void import('../../lib/voucher-types').then((m) => s.patch(m.documentDefaults(t)))
+              }
+            />
+          </Suspense>
+        )}
         {hasBranches && (
           <Suspense fallback={null}>
             <BranchSelect id="doc-branch" value={s.branch_id} onChange={(v) => s.patch({ branch_id: v })} />

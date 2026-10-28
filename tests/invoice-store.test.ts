@@ -61,6 +61,8 @@ test('every persisted field survives load → edit → save (normalizeRecord + t
     branch_id: 'br1',
     loyalty_redeem: { points: 10, value: 5 },
     branch_transfer_id: 'str1',
+    voucher_type_id: 'vt1',
+    print_title: 'Export Invoice',
     agent_id: 'ag1',
     offer: { scheme_id: 'sc1', label: 'Bill offer: 5% off on ₹1000+', value: 50 },
     rx: { patient: 'P', prescriber: 'Dr. Q' },

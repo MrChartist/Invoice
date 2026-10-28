@@ -29,6 +29,7 @@ import { sha256 } from './sha256';
 import { resolveStateCode } from './india-states';
 import { isValidGstin } from './gstin';
 import { findAll, kid, kids, textOf, type XmlNode, type XmlParser, parseXmlLite, TallyXmlError } from './tally-xml-read';
+import { planTallyStockMoves, readInventoryLines, type PlannedStockMove, type TallyInvLine } from './tally-import-stock';
 
 export { TallyXmlError };
 
@@ -106,6 +107,8 @@ export interface TallyVoucherRec {
   lines: TallyLineRec[];
   /** Had inventory entries (quantity) — imported for their accounting effect only. */
   hasInventory: boolean;
+  /** Additive (7.49): the item lines, imported as stock moves where the item matches (`tally-import-stock.ts`). */
+  inventory?: TallyInvLine[];
 }
 
 export interface TallyParsed {
@@ -345,6 +348,7 @@ export function parseTallyXml(text: string, parse: XmlParser = parseXmlLite): Ta
         postDated: yes(textOf(e, 'ISPOSTDATED')),
         lines: readLines(e),
         hasInventory,
+        ...(hasInventory ? { inventory: readInventoryLines(e, baseTypeOf(vtype || 'Journal', vtypeParents)) } : {}),
       });
     }
   }
@@ -409,11 +413,13 @@ export interface ExistingBooks {
   vendors: ReadonlyArray<{ id: string; name: string; gstin?: string }>;
   vouchers: ReadonlyArray<{ narration: string }>;
   openings: ReadonlyArray<{ ledger_id: string; dr: number; cr: number }>;
-  stockItems: ReadonlyArray<{ id: string; name: string }>;
+  stockItems: ReadonlyArray<{ id: string; name: string; unit?: string; aliases?: string[]; alt_units?: { unit: string; factor: number }[] }>;
   godowns: ReadonlyArray<{ id: string; name: string }>;
   costCentres: ReadonlyArray<{ id: string; name: string }>;
   /** Period lock date ('' = open). */
   lockUntil: string;
+  /** Additive (7.49): `ref_id`s of stock moves an earlier Tally import added (re-import adds nothing). */
+  stockMoveRefs?: ReadonlySet<string>;
 }
 
 export interface ImportOptions {
@@ -448,7 +454,8 @@ export interface PlannedLedger {
   issues: string[];
 }
 
-export type PlannedVoucherStatus = 'ok' | 'duplicate' | 'locked' | 'cancelled' | 'before_books' | 'error';
+/** `stock_only` (7.49): a quantity-only voucher (stock journal) — no ledger amounts, its quantities come in as stock moves. */
+export type PlannedVoucherStatus = 'ok' | 'duplicate' | 'locked' | 'cancelled' | 'before_books' | 'error' | 'stock_only';
 
 export interface PlannedVoucher {
   rec: TallyVoucherRec;
@@ -492,6 +499,8 @@ export interface ImportPlan {
     stockNew: number; stockExisting: number;
     vouchersOk: number; vouchersDuplicate: number; vouchersSkipped: number; vouchersError: number;
   };
+  /** Additive (7.49): item lines of the vouchers as stock moves, with a status each. */
+  stockMoves?: PlannedStockMove[];
 }
 
 const lower = (s: string | undefined) => (s ?? '').trim().toLowerCase();
@@ -768,7 +777,8 @@ export function planTallyImport(parsed: TallyParsed, existing: ExistingBooks, op
       else if (tagsInFile.has(tag)) fail('duplicate', 'Appears twice in this file.');
       else if (rec.date < opts.booksBegin) fail('before_books', `Dated before the books beginning (${opts.booksBegin}); it is already inside the opening balances.`);
       else if (existing.lockUntil && rec.date <= existing.lockUntil) fail('locked', `Inside the locked period (up to ${existing.lockUntil}).`);
-      else if (!lines.length) fail('error', rec.hasInventory ? 'Quantity only (no ledger amounts): stock journals are not imported.' : 'No ledger entries.');
+      else if (!lines.length && rec.hasInventory) fail('stock_only', 'Quantity only (no ledger amounts): imported as stock moves where the items match.');
+      else if (!lines.length) fail('error', 'No ledger entries.');
       else {
         const missing = [...new Set(lines.map((l) => l.ledger).filter((n) => !resolve(n)))];
         if (missing.length) fail('error', `Ledger${missing.length > 1 ? 's' : ''} not in this file or your books: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}`);
@@ -815,7 +825,7 @@ export function planTallyImport(parsed: TallyParsed, existing: ExistingBooks, op
     stockExisting: stock.filter((s) => s.existingId).length,
     vouchersOk: count('ok'),
     vouchersDuplicate: count('duplicate'),
-    vouchersSkipped: count('cancelled') + count('before_books') + count('locked'),
+    vouchersSkipped: count('cancelled') + count('before_books') + count('locked') + count('stock_only'),
     vouchersError: count('error'),
   };
   return {
@@ -832,6 +842,8 @@ export function planTallyImport(parsed: TallyParsed, existing: ExistingBooks, op
     errors,
     warnings,
     counts,
+    // 7.49: item lines of the vouchers as stock moves (where the item matches; never GST documents).
+    stockMoves: includeStock ? planTallyStockMoves(parsed.vouchers, { stockItems: existing.stockItems, newItems: stock.filter((x) => !x.existingId).map((x) => ({ name: x.rec.name, unit: x.rec.unit })), knownRefs: existing.stockMoveRefs, booksBegin: opts.booksBegin, lockUntil: existing.lockUntil }, voucherTag) : [],
   };
 }
 
