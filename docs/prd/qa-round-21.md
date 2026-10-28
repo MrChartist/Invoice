@@ -70,7 +70,16 @@ No rule row was added or flipped.
 
 ## 4. Size
 
-SIZE_TABLE
+Before = `f95f5e9` (`55d62df` tree), after = this branch; `vite build`, gzip -9 with chunk hashes stripped (normalized).
+
+| Budget | Before | After | Delta |
+|---|---|---|---|
+| Initial JS (first paint) | 182.3 kB, 4 files | 182.4 kB, 4 files | **+34 B** normalized (`index`: W1 in `localDb.ts`; runtime / vendor chunks byte-identical) |
+| Core precache (English) | 3,168.5 kB | 3,169.7 kB | +0.97 kB normalized (SocietyDesk +0.27, `f-society` +0.23, recycle bin +0.08, bank-ledgers +0.06, Agency / Marketplace +0.05, AnnualPackTab −0.04) |
+| Hindi pack | 349.2 kB | 349.4 kB | +0.27 kB (`lang-hi-society`, W8 / W4 / W5 strings) |
+| Hindi left in core / `lazy-leaves` | 21.5 / 17.4 kB | 21.5 / 17.4 kB | 0 |
+
+Every budget stays green (`check-bundle-size`).
 
 ## 5. CA questions
 
