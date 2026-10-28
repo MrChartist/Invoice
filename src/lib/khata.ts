@@ -283,6 +283,8 @@ export interface PartyReminderInput {
   kind?: PartyReminderKind;
   lang?: PartyReminderLang;
   today?: Date;
+  /** The receivables report of `input` itself, when the caller has it (valid only for a bill not in `input`). */
+  report?: ReceivablesReport;
 }
 
 export interface PartyReminder {
@@ -481,6 +483,8 @@ export interface SnapshotOptions {
   /** Paid at the counter with this bill (POS tenders); defaults to the record's `amount_paid`. */
   paid?: number;
   today?: Date;
+  /** The receivables report of `input` itself, when the caller has it (valid only for a bill not in `input`). */
+  report?: ReceivablesReport;
 }
 
 /**
@@ -492,12 +496,11 @@ export function computePartyBalanceSnapshot(record: InvoiceRecord, input: BuildI
   if (!canCarryPartyBalance(record) || !record.client?.name?.trim()) return undefined;
   const today = opts.today ?? new Date();
   const clients = input.clients ?? [];
-  const others: BuildInput = {
+  const report = opts.report ?? buildReceivables({
     ...input,
     invoices: input.invoices.filter((i) => i.id !== record.id),
     payments: input.payments.filter((p) => !record.id || p.invoice_id !== record.id),
-  };
-  const report = buildReceivables(others, { now: today });
+  }, { now: today });
   const key = partyKeyOf(record.client, clients);
   const party = report.parties.find((p) => p.key === key);
   // A walk-in name (no client id, not in the master, no ledger) gets no line at all.
