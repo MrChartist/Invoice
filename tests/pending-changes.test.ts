@@ -22,7 +22,8 @@ test('no rule file (and no lib reader) imports pending-changes.ts', () => {
 test('every row: source, CA id (PF), recommendation date, not notified; ids unique', () => {
   assert.ok(PENDING_CHANGES.length >= 2);
   assert.equal(new Set(PENDING_CHANGES.map((r) => r.id)).size, PENDING_CHANGES.length);
-  for (const r of PENDING_CHANGES) {
+  for (const r of PENDING_CHANGES.filter((x) => x.ca.startsWith('HS'))) assert.ok(r.area === 'society' && /Madras HC/.test(r.source) && r.notified === false, r.id); // R18-B: a court note (HS2)
+  for (const r of PENDING_CHANGES.filter((x) => x.ca.startsWith('PF'))) {
     assert.match(r.source, /^PIB 8 Oct 2026 /, r.id);
     assert.match(r.ca, /^PF\d+$/, r.id);
     assert.equal(r.recommended_on, '2026-10-08');

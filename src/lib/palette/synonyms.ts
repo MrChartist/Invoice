@@ -170,6 +170,9 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   // R18-A: the Society desk (B–D add bills / gst / dues / funds / registers)
   '/recurring?tab=society': ['housing society', 'rwa', 'maintenance bill', 'मेंटेनेंस'],
   '/recurring?tab=society&view=units': ['flats', 'members', 'फ़्लैट'],
+  // R18-B
+  '/recurring?tab=society&view=bills': ['maintenance bill', 'society bill', 'billing run', 'special levy', 'मेंटेनेंस', 'रखरखाव बिल'],
+  '/recurring?tab=society&view=gst': ['7500', 'rwa gst', 'bill of supply', '20 lakh', 'सोसाइटी जीएसटी'],
 };
 
 /** Words for one href: its own row, else the row of its base tab (`&view=` dropped). */

@@ -209,7 +209,7 @@ export const tabsT = defineArea(
     'recurring.batch': 'Batch invoices',
     'recurring.fees': 'Fees',
     'recurring.leases': 'Leases',
-    'recurring.society': 'Society: units, members and maintenance tariff', // R18-A (B–D append)
+    'recurring.society': 'Society: units, members and maintenance tariff; maintenance bills (billing run, Bill of Supply, ₹7,500 test), GST turnover and registration check', // R18-A (B–D append); R18-B
     // Settings
     'settings.business': 'Business profiles',
     'settings.items': 'Items & rates',
@@ -411,7 +411,7 @@ export const tabsT = defineArea(
     'recurring.batch': 'बैच इनवॉइस',
     'recurring.fees': 'फ़ीस',
     'recurring.leases': 'लीज़',
-    'recurring.society': 'सोसाइटी: यूनिट, सदस्य और रखरखाव शुल्क सूची',
+    'recurring.society': 'सोसाइटी: यूनिट, सदस्य और रखरखाव शुल्क सूची; रखरखाव बिल (बिलिंग रन, आपूर्ति बिल, ₹7,500 जाँच), GST टर्नओवर और पंजीकरण जाँच',
     'settings.business': 'बिज़नेस प्रोफ़ाइल',
     'settings.items': 'आइटम और दरें',
     'settings.fields': 'कस्टम फ़ील्ड',

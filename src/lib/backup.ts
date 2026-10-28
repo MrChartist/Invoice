@@ -524,6 +524,8 @@ const RECORD_TABLES = [
   'site_compliance',
   // R18-A: society units (wing / flat / shop, areas, construction cost, owners, tenant, parking)
   'society_units',
+  // R18-B: society billing runs (one per period / special levy; the batch, counts and totals by head)
+  'society_runs',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -644,6 +646,8 @@ const ID_TABLES = new Set([
   'site_compliance',
   // R18-A: society units (wing / flat / shop, areas, construction cost, owners, tenant, parking)
   'society_units',
+  // R18-B: society billing runs (one per period / special levy; the batch, counts and totals by head)
+  'society_runs',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

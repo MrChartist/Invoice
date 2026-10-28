@@ -18,7 +18,7 @@ import { PACK_IDS } from '../src/lib/industry-packs.ts';
 const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8');
 
 test('R18-A block: society_settings (settings.manage) and society_units (master.edit, audited, backed up, in the open export) at runtime only', () => {
-  assert.deepEqual(HS_TABLE_ACTIONS, { society_settings: 'settings.manage', society_units: 'master.edit' });
+  assert.deepEqual(HS_TABLE_ACTIONS, { society_settings: 'settings.manage', society_units: 'master.edit', society_runs: 'doc.create' });
   assert.equal(TABLE_ACTIONS.society_settings, 'settings.manage');
   assert.equal(TABLE_ACTIONS.society_units, 'master.edit');
   assert.equal(WATCHED_TABLES.society_units?.label, 'Society unit');
@@ -28,7 +28,16 @@ test('R18-A block: society_settings (settings.manage) and society_units (master.
   for (const t of Object.values(HS_TABLES) as string[]) assert.ok(BACKUP_RECORD_TABLES.includes(t), `${t} backed up`);
   for (const f of ['lib/access.ts', 'lib/audit-edits.ts']) assert.ok(!/society_(units|settings)/.test(src(f)), `${f}: only at runtime`);
   for (const p of HS_PACKS) assert.ok(PACK_IDS.includes(p), p);
-  assert.deepEqual(HS_DATED, {}, 'A has no dated table (B adds society_runs)');
+});
+
+test('R18-B block: society_runs (doc.create, audited "Society run", backed up, synced by the bill date, in the open export, demo-cleared)', () => {
+  assert.equal(HS_TABLES.runs, 'society_runs');
+  assert.equal(TABLE_ACTIONS.society_runs, 'doc.create');
+  assert.equal(WATCHED_TABLES.society_runs?.label, 'Society run');
+  assert.deepEqual(HS_DATED, { society_runs: 'date' });
+  assert.ok(TABLE_MEANING.society_runs && BACKUP_RECORD_TABLES.includes('society_runs'));
+  assert.ok(src('lib/demo-data.ts').includes("'society_runs'"));
+  assert.match(src('lib/society/hs-issue-io.ts'), /import '\.\/hs-registry';/);
 });
 
 test('every writer, the sync engine and the recycle bin import the registry; dated rows in the sync engine', () => {
