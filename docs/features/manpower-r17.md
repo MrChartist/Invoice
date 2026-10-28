@@ -2,7 +2,7 @@
 
 Spec: `docs/prd/round-17.md`. One section per package; each records its bundle numbers (gzip -9, KiB, the method of
 `scripts/check-bundle-size.mjs`) and the `f-manpower` chunk. Working papers — verify with your CA (`docs/CA_REVIEW.md`
-§17, MP1–MP36).
+§17, MP1–MP44).
 
 ## §A — R17-A: manpower core (A1–A4)
 
@@ -143,3 +143,81 @@ Chunks (normalized gz): `f-manpower` 3.5 → 6.9 kB (muster / attendance / impor
 English), DeployDesk 2.8 → 7.0 kB (+ Muster / Bills views, muster writer, deploy list, draft / TDS bridges),
 `mp-payroll-io` 0.9 kB (lazy, on "Send to payroll" / "Deploy"), ManpowerBlock 0.57 → 0.78 kB (annexure + TDS line),
 wiring 0.6 kB (help 0.16, Ctrl+K 0.09, open export 0.09, palette 0.03, checklist / reach / packs 0.07).
+
+## §C — R17-C: compliance and profitability (C1–C3)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| C1 compliance pack | Table **`site_compliance`** (`MP_TABLES.compliance`; `doc.create`; watched — label "Site compliance", entity `cost_centre`; backed up, synced and period-locked by `date` = the month's last day; open-export row): `{ id, site_id, month, date, pf: { trrn?, paid_on?, amount? }, esi: { challan?, paid_on?, amount? }, attachments?, status: 'pending' \| 'proved' \| 'waived', hold?: { pct?, amount?, invoice_id? }, updated_at }`, one per site × month. Pure `mp-compliance.ts` (`siteShares`: each muster row × the month's FINAL run line × site duties ÷ the person's duties across all sites; `sumShares`, `employerCost`, `pfDue`, `esiDue`, `proofError` — proved needs the TRRN and, when ESI is due, the challan; `uan4`; `holdOf`); writer `mp-comp-save.ts` (`loadCompliance`, `saveCompliance`). `mp-payroll-io.ts` `readRunForMonth` reads `payroll_runs` raw (final runs only). View `ComplianceView.tsx` (`view=compliance&site=&month=`): shares table (name, code, UAN last four, duties, gross, PF wages, PF EE, EPF ER, EPS, ESI EE / ER, deductions, net) with totals, TRRN / challan / paid-on, status, the client's hold (% or ₹) shown against the month's bills ("release expected once proved"; nothing posts), annexure print window (`escHtml`; the same table = wage-register and ECR extract; the MP18 sentence; no bank field is ever read). Checklist step `siteProof`. |
+| C2 site P&L | Pure `mp-profit.ts` (`billedFor`, `siteProfit`): billed = taxable value of the service month's documents naming the site (`mp.site`, or a grouped bill's post rows), debit notes in, credit notes out; wages / relievers / employer PF + ESI from the C1 shares; site-tagged purchase bills; margin and margin %. `mp-sites-io.ts` `siteBills(month)` reads `purchases` through `readPurchase` (taxable + tax when no ITC; void out; purchase contract test). Bill form: lazy `SitePick` row (packs `manpower` / `security`, or a tagged bill) writing `PurchaseRecord.mp = { site_id }`. View `ProfitView.tsx` (`view=profit&month=`). |
+| C3 checks | Pure `mp-wage-check.ts`: `revisionFor` (latest `from` ≤ month start, matching post name / zone / skill, most specific first), `minPerDuty` (monthly minimum ÷ 26), `otPay`, `shortfalls` ((gross − OT) ÷ all duties vs the minimum; owed = shortfall × site duties), `labourHints` (OT below 2 ×, PF wages under half, fixed-term past a year, ≥ 20 / 50 workers without an OSH / contract-labour licence). Rules `LABOUR_CODE_RULES`, `CONTRACT_LABOUR_THRESHOLD_RULES` (`verified: false`). Wage revisions are typed in the compliance view (owner). Warnings only. |
+| Help / Ctrl+K | Topics `time:deploy:compliance`, `time:deploy:profit`; `PACK_TABS` rows; palette `r17.deploy.compliance`, `r17.deploy.profit`; Ctrl+K text appended to `time.deploy`; synonyms. Strings `i18n/areas/manpower-r17c.ts` (literal Hindi). |
+| Tests / e2e | `mp-compliance`, `mp-profit` (incl. volume), `mp-wage-check`; `mp-registry` (C block), `mp-profile` (step), `purchase-contract` (`siteBills`). E2E step "R17-C compliance and profitability". |
+
+### Deviations (R17-C)
+
+- **No new bridge**: the purchase read sits in the existing `mp-sites-io.ts` (bridges stay 4); the run read in `mp-payroll-io.ts`.
+- **One table** on the annexure doubles as the wage-register extract (gross / deductions / net) and the ECR extract (PF
+  wages, EE, EPF ER, EPS) — built from the run lines, not from `payroll/reports.ts` `pfEcrRows` (that would import the
+  payroll chunk). **No attachments UI** (the `attachments` field is typed; the existing attachments feature is not wired).
+- `mp.comp` is not written on bills (the proof usually follows the bill); the compliance row is the record.
+- **Rule rows are all `verified: false`**: the PIB / Code texts were read by the PRD author, not re-read in this package.
+- Hints use proxies (8-hour ordinary day, PF wages as "wages", a set leaving date as fixed-term) — MP39.
+
+### Bundle (R17-C)
+
+Before = `claude/elegant-cannon-cwapiv` at `b3848cc` (R17-B merged), after = commit `b996116`; `vite build` + gzip -9;
+normalized = chunk hashes stripped.
+
+| Budget | Before | After | Delta | Cap |
+|---|---|---|---|---|
+| Initial JS (first paint) | 182.2 kB | 182.2 kB | **0 B** normalized | 0 ✓ |
+| Core precache (English) | 3,124.5 kB | 3,130.2 kB | **+5.8 kB normalized** | 9 kB ✓ |
+| Hindi pack | 343.1 kB | 343.9 kB | +0.7 kB (`lang-hi-manpower` 2.0 → 2.7) | — |
+| Hindi left in core | 21.3 kB | 21.4 kB | help-topic Hindi titles (allow-listed `topics-*`) | — |
+| `lazy-leaves` | 16.8 kB | 16.8 kB | +21 B | — |
+
+Chunks (normalized gz): `f-manpower` 6.9 → 9.1 kB, DeployDesk 7.0 → 9.4 kB, `SitePick` 0.4 kB (bill form, lazy),
+`mp-payroll-io` 0.9 → 1.0 kB, wiring ≈ 0.4 kB.
+
+## §D — R17-D: arrears, receivables and renewals (D1–D4)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| D1 arrears | `WageRevision.delta_day` / `to` / `site_ids` (D block). Pure `mp-arrears.ts`: `deltaFor` (typed increase, else new minimum − the previous matching one), `passesThrough` (`vda_pass_through` or ticked), `postArrear` (duty: duties × increase; hour / month / cost-plus: `postLines` at the revised rate − the original, cost-plus % following), `mpArrears` (one note per original bill of a month in the revision's range; service-charge line when the bill had one; `raised` derived from `mp.arrear`), `staffArrears` (what is owed to staff, all sites; link to Payroll → Arrears, no payroll write). Bridge `mp-draft-io.ts` `planArrears` / `makeArrears`: **`createDebitNote`** (DBN, dated today, `doc_links` `debit_note`) on a copy of the original with `mp = { site, month, basis, regime, decl, posts, arrear: { rev_id, from, to, of }, arrear_rows }` (no `muster_id`, TDS fields cleared) — reverse charge / `rcm_tax_excluded` carried, line SAC and rate from the original, `sv.exempt` on a Sl. 66 note; `mp.tds` = `clientTds` on the note. `arrears_doc: 'invoice'` makes a draft supplementary invoice through `buildBillDraft` instead. `billsOf` now leaves credit / debit notes out (a credit note copies the snapshot). |
+| D2 TDS receivable | Pure `mp-tds-recv.ts` (`fyQuarter`, `tdsReceivable`): per client × FY quarter (bill date) — bills, taxable, expected (`mp.tds` snapshots), booked (`tds_amount`), difference, section label. The R14 Form 16A / 131 chase list and letter (`components/prof/TdsChasePanel`, lazy) below it. |
+| D3 licences | `manpower_settings.licences` (PSARA per State, OSH, contract labour, trade, other) added / removed in the view; guards' licences through `mp-payroll-io.ts` `setGuardLicence` (`Employee.mp.guard_licence`). `mp-alerts.ts` (`mpAlerts` pure, `mpNotices` provider) — 60 / 30 / 7 days (`VDA_REVISION_RULES.alert_days`), expired = critical, PSARA only with `security`, site contract ends, the VDA month reminder (April / October) until a revision of the month is typed. `NotificationBell.tsx`: one `gate('manpower', '-', …)` row registering `mpNotices` (lazy, explicit pack). Checklist step `licence` (security / labour kinds). |
+| D4 notes | `mp-regime.ts` `regimeNotes` (`pf8`: an RCM bill of an agency without a GSTIN → the regime chip shows the pending `rcm_self` note through `PendingNote`) and `rcmOnlyNote` (every manpower bill of the 12 months reverse charge → the N 5/2017-CT note at the top of the statutory view). |
+| View / help | `StatutoryView.tsx` (`view=statutory`): arrears, TDS receivable, licences. Topic `time:deploy:statutory`; `PACK_TABS` row; palette `r17.deploy.statutory`; Ctrl+K text; synonyms. Strings `i18n/areas/manpower-r17d.ts` (literal Hindi). |
+| Tests / e2e | `mp-arrears` (bases, dates, pass-through, DBN + `doc_links` + reverse charge + GSTR-1 CDNR `D` / `Y`, already raised, supplementary invoice, staff side), `mp-tds-recv`, `mp-alerts`, `mp-regime` (D4 notes), `mp-profile` (step). E2E step "R17-D arrears, receivables and renewals". |
+
+### Deviations (R17-D)
+
+- **`pending-changes.ts` unchanged**: PF8 already exists with area `rcm_self`; the chip mounts `PendingNote area="rcm_self"`
+  (there is no per-screen id list to append to). No new pending row (the test requires PIB 8 Oct 2026 sources).
+- The arrears revision form takes the **increase per duty** (the PRD user story); a minimum typed in the compliance view
+  also works (new − previous). Sites without `vda_pass_through` are ticked on the revision (`site_ids`).
+- The debit note's expected TDS uses R14's threshold test; an original dated after the note's date is not counted
+  in the client's FY total (as for any bill).
+- `VDA_REVISION_RULES` also carries the alert windows (60 / 30 / 7), `verified: false`.
+- The RCM-only note shows on the statutory view, not on the Features profile panel (that panel is a shared chunk).
+
+### Bundle (R17-D)
+
+Before = commit `b996116` (R17-C), after = this branch; `vite build` + gzip -9; normalized = chunk hashes stripped.
+
+| Budget | Before | After | Delta | Cap |
+|---|---|---|---|---|
+| Initial JS (first paint) | 182.2 kB | 182.2 kB | **0 B** normalized | 0 ✓ |
+| Core precache (English) | 3,130.2 kB | 3,135.3 kB | **+5.5 kB normalized** | 7 kB ✓ |
+| Hindi pack | 343.9 kB | 344.4 kB | +0.5 kB (`lang-hi-manpower` 2.7 → 3.1) | — |
+| Hindi left in core | 21.4 kB | 21.4 kB | 0 | 0 ✓ |
+| `lazy-leaves` | 16.8 kB | 16.8 kB | 0 | — |
+
+Chunks (normalized gz): `f-manpower` 9.1 → 11.6 kB (arrears / TDS receivable / alerts engines, `manpower-r17d`
+English), DeployDesk 9.4 → 11.9 kB (statutory view, `makeArrears`), `mp-payroll-io` 1.0 → 1.2 kB, wiring ≈ 0.3 kB.
+Round 17 C + D together: **+11.3 kB** core (caps 9 + 7).
