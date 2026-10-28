@@ -265,4 +265,7 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:trips', 'Trips', 'यात्रा फ़ाइलें', 'Trip and event files with their bookings, cost vs sell and margin, billed in the trip\'s GST regime (tour operator without ITC, with ITC, or agent fee + pure agent).', 'Each booking.', { statutory: ca(['TV8', 'TV9', 'TV14']) }),
   t('time:trips:trips', 'Trip files', 'यात्रा फ़ाइल', 'Open a file, add bookings, see the costing; Bill makes a draft in the regime. A no-ITC trip\'s supplier bills default to no ITC; the month list shows overrides.', 'Each trip.', { statutory: ca(['TV8', 'TV28', 'TV29']) }),
   t('time:trips:bookings', 'Bookings', 'बुकिंग', 'Every component of every trip: unconfirmed, unbilled, supplier unpaid or travelling in the next 7 days. Billed means its invoice line still exists.', 'Daily.', { statutory: ca(['TV14']) }),
+  // R15-D
+  t('time:trips:tcs', 'Tour package TCS', 'टूर पैकेज TCS', 'TCS on overseas tour packages per buyer and quarter, at the dated rate as the app applies it (Sec 394(1) Sl. 8 from Apr 2026); PAN missing; challans.', 'Each quarter.', { statutory: ca(['TV1', 'TV2', 'TV4', 'TV5', 'TV6', 'TV7']) }),
+  t('time:trips:events', 'Event budgets', 'इवेंट बजट', 'Budget heads: approved, booked, billed, paid; over-budget heads in red; client advances, margin, POS by Sec 12(7)(a) and each vendor\'s TDS limb (hint).', 'Each event.', { statutory: ca(['TV21', 'TV22', 'TV23']) }),
 ];

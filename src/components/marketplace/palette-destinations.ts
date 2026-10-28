@@ -65,8 +65,8 @@ const r14T = defineArea(
 /** A row's label: a key of this package's area, else (B / C rows until they resolve their own) the key text. */
 // R15 rows (C / D add their keys).
 const r15T = defineArea(
-  { 'r15.trips': 'Trips desk', 'r15.trips.trips': 'Trip and event files', 'r15.trips.bookings': 'Travel bookings' } as const,
-  { 'r15.trips': 'यात्रा डेस्क', 'r15.trips.trips': 'यात्रा और इवेंट फ़ाइलें', 'r15.trips.bookings': 'यात्रा बुकिंग' },
+  { 'r15.trips': 'Trips desk', 'r15.trips.trips': 'Trip and event files', 'r15.trips.bookings': 'Travel bookings', 'r15.trips.tcs': 'TCS on overseas tour packages', 'r15.trips.events': 'Event budgets' } as const,
+  { 'r15.trips': 'यात्रा डेस्क', 'r15.trips.trips': 'यात्रा और इवेंट फ़ाइलें', 'r15.trips.bookings': 'यात्रा बुकिंग', 'r15.trips.tcs': 'विदेशी टूर पैकेज पर TCS', 'r15.trips.events': 'इवेंट बजट' },
 );
 const label = (key: string, pack?: string): string => (Object.hasOwn(r15T.en, key) ? r15T(key as keyof typeof r15T.en) : Object.hasOwn(r14T.en, key) ? r14T(key as keyof typeof r14T.en) : pack === 'hotel' && Object.hasOwn(hT.en, key) ? hT(key as keyof typeof hT.en) : Object.hasOwn(mT.en, key) ? mT(key as keyof typeof mT.en) : Object.hasOwn(twT.en, key) ? twT(key as keyof typeof twT.en) : Object.hasOwn(cT.en, key) ? cT(key as keyof typeof cT.en) : Object.hasOwn(r8T.en, key) ? r8T(key as keyof typeof r8T.en) : Object.hasOwn(r9T.en, key) ? r9T(key as keyof typeof r9T.en) : Object.hasOwn(r11T.en, key) ? r11T(key as keyof typeof r11T.en) : Object.hasOwn(r10T.en, key) ? r10T(key as keyof typeof r10T.en) : Object.hasOwn(r12T.en, key) ? r12T(key as keyof typeof r12T.en) : Object.hasOwn(r13T.en, key) ? r13T(key as keyof typeof r13T.en) : key);
 

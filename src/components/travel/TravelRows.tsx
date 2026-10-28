@@ -19,11 +19,16 @@ import { cvT } from '../../i18n/areas/travel-r15c';
 import { mergeTickets } from '../../lib/travel/tv-air-value';
 import TicketRows from './TicketRows'; // R15-C1 air tickets (Rule 32(3))
 
+// R15-D: place-of-supply and outbound TCS chips (in this lazy chunk; a nested Suspense here left the items footer
+// without a layout box after reveal in Chromium — container-query invalidation).
+import TvChips from './TvChips';
+
 export default function TravelRows() {
   useT();
   const s = useInvoiceStore(useShallow((st) => ({ items: st.items, issue_date: st.issue_date, tv: st.tv, cc: st.cost_centre_id })));
   const trips = useMemo(() => loadTrips(), []);
   const tripId = s.tv?.trip?.id ?? (trips.some((t) => t.id === s.cc) ? s.cc : '');
+  const trip = trips.find((t) => t.id === tripId);
   const apply = (id: string, regime?: TvRegime) => {
     const trip = trips.find((t) => t.id === id);
     if (!trip) return;
@@ -43,6 +48,8 @@ export default function TravelRows() {
       </select>
       {tripId && <ListSelect list="regs" ids={TV_REGIMES} value={s.tv?.regime ?? 'to18'} onChange={(r) => apply(tripId, r)} attr="data-tv-pick-regime" />}
       {regimeMix(s.items, s.tv?.regime) && <span className={controls.hint} role="note" data-tv-mix>{tvT('mix')}</span>}
+      {/* R15-D */}
+      {trip && <TvChips trip={trip} />}
     </div>
   );
 }

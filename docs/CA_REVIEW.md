@@ -47,8 +47,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 12. Agriculture and food processing (Round 12, planned) | AG1–AG45, AG50–AG53, AG60–AG69, AG80–AG84, AG90 | 65 | 15 |
 | 13. Manufacturing MSMEs (Round 13, planned) | MF1–MF36, MF40–MF42, MF50–MF54, MF60–MF65, MF80–MF82, MF90–MF96 | 60 | 12 |
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
-| 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV37 | 37 | 11 |
-| **Total** | | **533** | **130** |
+| 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV40 | 40 | 13 |
+| **Total** | | **536** | **132** |
 
 ---
 
@@ -1085,9 +1085,9 @@ exports of services under the FEMA 2026 regulations, 194J / 194T, partners and S
 `PS` ids are counted once here. The ★ items (PS1, PS3, PS4, PS5, PS6, PS12, PS15, PS18, PS20, PS22, PS23, PS26, PS27)
 are the ones a beta professional firm's figures depend on first.
 
-## 15. Travel, tour and event businesses (Round 15, ids TV1–TV37)
+## 15. Travel, tour and event businesses (Round 15, ids TV1–TV40)
 
-Added with `docs/prd/round-15.md` (§9: TV1–TV31), R15-B (TV32, TV33) and R15-C (TV34–TV37). It covers tour operators (domestic, outbound,
+Added with `docs/prd/round-15.md` (§9: TV1–TV31), R15-B (TV32, TV33), R15-C (TV34–TV37) and R15-D (TV38–TV40). It covers tour operators (domestic, outbound,
 inbound / DMCs), travel and ticketing agents (IATA / BSP or through a consolidator) and event / wedding / MICE planners,
 plus the round's cross-cutting items (party netting, the 2026 manpower and tour-package TCS changes).
 
@@ -1137,8 +1137,11 @@ plus the round's cross-cutting items (party netting, the 2026 manpower and tour-
 | TV35 ★ | **Cancellation documents.** The app credits the billed line(s) in full (GST reversed) and raises a new invoice for our cancellation fee at the principal supply's rate, instead of one partial credit note net of the fee. A booking inside a shared package line is cancelled only with its whole trip. Acceptable for GSTR-1 (CDNR + B2B) and for the client's ITC? | Full credit note + fee invoice | `travel/tv-cancel.ts` | 2022-08-03 | Circular 178/10/2022 (S, as TV15) |
 | TV36 | **Supplier refund due on a cancelled booking.** Recorded as a value-only debit note on the supplier's bill at 0 % GST (no ITC reversed). Where the bill carried GST (a consolidator's service charge, a hotel), should part of the debit note reverse ITC? | 0 % debit note | `travel/tv-cancel.ts` (`purchase-returns`) | — | — (design) |
 | TV37 | **BSP / consolidator statement bill.** "Make bill" books one supplier bill for the net remittance (tickets less refunds / ACMs, ADMs not disputed) with fares at actual (no GST, no ITC) and ADMs as an expense line; the commission netted on a net-remit statement is not booked as income. Is that commission (and PLB) our taxable supply to the airline needing our own invoice (TV16), and are ADMs a cost or a reduction of commission? | As described | `travel/tv-statement-bill.ts` | — | — (design) |
+| TV38 ★ | **No-PAN rate on a slab year.** Without the buyer's PAN the app applies, per slab portion, at least 10 % from 1 Oct 2020 (the 206CC rate for 1G as reported), so in 2023-26 the 5 % portion becomes 10 % and the 20 % portion stays 20 %; from 1 Apr 2026 the higher of twice the rate or 5 % (2 % → 5 %). Right for each period? | As stated | `travel-rules.ts` `TCS_NO_PAN_RULES`; `travel/tv-tcs.ts` `tourTcs` | 2020-10-01 / 2026-04-01 | Sec 206CC (recalled; `verified: false`) |
+| TV39 ★ | **Crossing invoice and the FY aggregate (2023-26).** The buyer's aggregate is the TCS base of earlier flagged tour-package invoices of the same FY (credit notes not netted, drafts left out); the crossing invoice is charged 5 % up to the threshold and 20 % above, stored as one blended rate with the split printed ("5 % on ₹… + 20 % on ₹…"). Is the aggregate on amounts received or invoiced, and is one blended rate acceptable in Form 27EQ (one row per invoice)? | Invoiced amounts; blended rate | `travel/tv-tcs.ts` `priorTourBase`, `tcsPatch` | 2023-10-01 | Sec 206C(1G) proviso (as reported) |
+| TV40 | **Date of the event-vendor TDS hint.** The contractor / professional hint on a vendor's bill is taken from the booking's service date (manpower = "work" only from 1 Apr 2026). Should the date of credit or payment decide instead (a bill for a March 2026 event paid in April)? | Service date of the booking; hint only | `travel/tv-events.ts` `vendorTdsHint` | 2026-04-01 | Finance Bill 2026 cl. 78 (A4) |
 
-`TV` ids are counted once here. The ★ items (TV1, TV3, TV7, TV8, TV11, TV15, TV19, TV21, TV23, TV34, TV35) are the ones a beta
+`TV` ids are counted once here. The ★ items (TV1, TV3, TV7, TV8, TV11, TV15, TV19, TV21, TV23, TV34, TV35, TV38, TV39) are the ones a beta
 travel business's figures depend on first.
 
 ## Answers log

@@ -187,7 +187,12 @@ export interface TvSnapshot {
   /** The printed regime sentence (snapshotted, never re-derived). */
   decl?: string;
   lines?: Record<string, { tkt?: TvTicket }>;
-  tcs?: { rate: number; base: number; label: string; slab?: string };
+  /**
+   * D1: TCS on an overseas tour package as applied (`base` in the document currency; `slab` = the split on a crossing
+   * invoice; `nr` = the buyer is a non-resident not in India — no TCS; `force` = the user ticked "package" over the
+   * stand-alone test; `no_pan` = the no-PAN rate was used).
+   */
+  tcs?: { rate: number; base: number; label: string; slab?: string; nr?: boolean; force?: boolean; no_pan?: boolean };
   event?: { venue?: string; state?: string; date_from?: string; date_to?: string };
   pos_note?: string;
 }

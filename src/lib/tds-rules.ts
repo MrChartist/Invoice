@@ -203,6 +203,10 @@ export function tdsDueDays(periodStart?: string): TdsDueDays {
  */
 export const TCS_27EQ_CODES: readonly { match: RegExp; code: string; label: string }[] = [
   { match: /1H/i, code: '6CR', label: '206C(1H) sale of goods' },
+  // R15-D1 (TV7): TCS on an overseas tour programme package (labels of `travel/tv-tcs.ts` `tourTcsLabel`: "206C(1G)
+  // overseas tour package 5 %", "Sec 394(1) Sl. 8 — overseas tour package 2 %"). The collection code is not confirmed:
+  // left blank — verify with your CA. Placed before the LRS row, whose /1G/ would otherwise take the old-Act label.
+  { match: /overseas tour/i, code: '', label: '206C(1G) overseas tour programme package (code to confirm — verify with your CA)' },
   { match: /1G/i, code: '6CQ', label: '206C(1G) remittance under LRS' },
   // R8-C (TR-C2): 206C(1) specified goods and 206C(1F) — labels of `tradingTcsPresets` (trade/tr-statutory.ts). The
   // luxury-goods code is not confirmed: left blank (TR15) — verify with your CA.
