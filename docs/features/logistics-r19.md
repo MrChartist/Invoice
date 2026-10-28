@@ -383,19 +383,20 @@ booking, so a deposit edited in the Advances tab stays a deposit.
 
 ### Bundle (R19-C)
 
-Baseline: the merged base `8b3f5a3` built in a separate worktree (`vite build` + `check-bundle-size`): initial
-183.0 kB (4 files), entry 89.0 kB, core 3,217.4 kB, Hindi pack 354.9 kB, Hindi in core 21.6 kB, `lazy-leaves` 17.7 kB.
-Normalized as in R19-A (chunk hashes stripped, gzip -9, 1 kB = 1,024 B).
+Baseline: the merged base `f5c9f9b` (R19-A + R19-B) built in a separate worktree (`vite build` + `check-bundle-size`):
+initial 183.0 kB (4 files), entry 89.0 kB, core 3,226.0 kB, Hindi pack 355.7 kB, Hindi in core 21.6 kB, `lazy-leaves`
+17.6 kB. Normalized as in R19-A (chunk hashes stripped, gzip -9, 1 kB = 1,024 B).
 
 | Budget | Before | After | Change (normalized) | Cap |
 |---|---|---|---|---|
-| Initial JS (first paint) | 183.0 kB (4 files) | 183.0 kB (4 files) | +22 B: the entry's preload file list in another order (same files, no new chunk or module; any content edit reorders it — help text alone does) | 0 |
+| Initial JS (first paint) | 183.0 kB (4 files) | 183.0 kB (4 files) | +22 B in the entry: its preload file list in another order (the same files; no new chunk or module; any content edit reorders it — the help text alone does, tried on the base) | 0 |
 | Entry chunk | 89.0 kB | 89.0 kB | as above | — |
-| Core precache (English) | 3,217.4 kB | 3,225.8 kB | **+7,779 B = 7.60 kB** | 9 kB (PRD) ✓ |
-| Hindi pack | 354.9 kB | 356.0 kB | +1.02 kB (`lang-hi-logistics` +0.98 kB, wiring areas) | 8 kB (round) ✓ |
-| Hindi left in core | 21.6 kB | 21.6 kB | 0 | 0 ✓ |
-| `lazy-leaves` | 17.7 kB | 17.7 kB | 0 | — |
+| Core precache (English) | 3,226.0 kB | 3,232.7 kB | **+7,625 B = 7.45 kB** | 9 kB (PRD) / 12 kB ✓ |
+| Hindi pack | 355.7 kB | 356.6 kB | +0.96 kB (`lang-hi-logistics` +0.92 kB, wiring areas) | 8 kB (round) ✓ |
+| Hindi left in core | 21.6 kB | 21.7 kB (rounding) | +15 Devanagari characters: the help title `सीमा शुल्क` and the Ctrl+K synonym `ड्यूटी` (the A / B pattern) | — |
+| `lazy-leaves` | 17.6 kB | 17.6 kB | 0 | — |
 
-Chunks (normalized gz): ShipmentsDesk 4.03 → 7.54 kB (+3.51 kB: CustomsView and `lg-recv-io`), `f-logistics` 3.96 →
-7.34 kB (+3.39 kB: the three engines and the `logistics-r19c` English), LogisticsBlock +0.27 kB (`DisbSchedule`), demo
+Chunks (normalized gz): ShipmentsDesk 7.49 → 10.84 kB (+3.34 kB: CustomsView and `lg-recv-io`; a lazy view of its own
+split A's form helpers into a new shared chunk and cost 1.5 kB more), `f-logistics` 8.15 → 11.56 kB (+3.41 kB: the
+three engines, the `billExtras` arm and the `logistics-r19c` English), LogisticsBlock +0.27 kB (`DisbSchedule`), demo
 +0.12 kB, wiring ≈ 0.3 kB (help 0.11, checklist 0.06, Ctrl+K 0.06, advances 0.02, reach 0.02, Time 0.01, packs 0.01).
