@@ -84,7 +84,7 @@ figure, blocks a workflow or makes a vertical unusable at scale · **M** missing
 | 35 | GAP P1-7: ledger-wise interest report (loans given / taken); party-bill interest exists (Receivables → Interest) | L | S | `GAP_ANALYSIS.md` P1-7 |
 | 36 | GAP P1-26: GST reports and Inventory adopt the shared period (`period-context.ts` is Books-only) | L | S | `GAP_ANALYSIS.md` P1-26 |
 | 37 | Reports: comparative columns on TB / BS (Group Summary and P&L only today); Tally horizontal Balance Sheet | L | M | [`features/reports-engine.md`](features/reports-engine.md) |
-| 38 | Purchase returns: editing a bill below the quantities already returned is not blocked | M | S | [`features/purchase-returns.md`](features/purchase-returns.md) |
+| 38 | ~~Purchase returns: editing a bill below the quantities already returned is not blocked~~ — **done** (`returnedQtyIssue` in `purchasesDb.save`) | M | S | [`features/purchase-returns.md`](features/purchase-returns.md) |
 | 39 | Cheques: clearing does not auto-record against foreign-currency invoices; cash forecast ignores GST / TDS deposits, loans, salaries and unapplied credit notes | L | S | [`features/cash-planning.md`](features/cash-planning.md) |
 
 ### 2.4 Statutory working-paper gaps (build after the CA answers where marked)
