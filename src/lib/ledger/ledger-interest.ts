@@ -6,7 +6,7 @@
  */
 
 import type { Period } from '../books';
-import type { LedgerInterestParams } from './accounts';
+import type { Account, LedgerInterestParams } from './accounts';
 import type { Ledger } from './postings';
 import { accountStatement } from './reports';
 
@@ -74,4 +74,38 @@ export function ledgerInterest(ledger: Ledger, accountId: string, period: Period
   const byDay = new Map<string, number>();
   for (const r of st.rows) byDay.set(r.voucher.date, r.balance);
   return interestOnBalances(st.opening, [...byDay].map(([date, balance]) => ({ date, balance })), period, params);
+}
+
+/* ── Ledger-wise interest report (PENDING 35, GAP P1-7) ─────────── */
+
+export interface InterestReportRow {
+  account: Account;
+  params: LedgerInterestParams;
+  /** 'loan' = rate taken from the business-loan master (the ledger itself has no interest parameters). */
+  source: 'ledger' | 'loan';
+  opening: number;
+  closing: number;
+  onDebit: number;
+  onCredit: number;
+  slices: InterestSlice[];
+}
+
+/**
+ * Every ledger with interest parameters (Tally "Interest Calculation" for loans given / taken), plus `extra` ledgers
+ * (business loans: the loan's rate on credit balances) that carry none of their own, for `period`. Paise. Ledgers with
+ * no balance and no interest are left out.
+ */
+export function ledgerInterestReport(ledger: Ledger, period: Period, extra: ReadonlyMap<string, LedgerInterestParams> = new Map()): InterestReportRow[] {
+  const out: InterestReportRow[] = [];
+  for (const account of ledger.accounts) {
+    const own = account.interest && account.interest.rate > 0 ? account.interest : undefined;
+    const params = own ?? extra.get(account.id);
+    if (!params || !(params.rate > 0)) continue;
+    const st = accountStatement(ledger, account.id, period);
+    if (!st) continue;
+    const res = ledgerInterest(ledger, account.id, period, params);
+    if (!st.opening && !st.closing && !res.onDebit && !res.onCredit) continue;
+    out.push({ account, params, source: own ? 'ledger' : 'loan', opening: st.opening, closing: st.closing, ...res });
+  }
+  return out.sort((a, b) => a.account.name.localeCompare(b.account.name));
 }

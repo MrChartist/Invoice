@@ -132,7 +132,9 @@ Consolidated in `docs/CA_REVIEW.md` (ids I1–I9); answers are logged there with
 
 ## Known limits
 
-- A refund paid in a LATER settlement than the sale is debited to the customer in the journal; the ledger balances, but
-  the receivables screen (which reads invoices / receipts / credit notes) shows that customer in credit.
-- Marketplace documents are saved one by one through `localDb.invoices.save` (guards intact); very large per-order
-  months are slow — summary mode is offered above 3,000 rows.
+- ~~A refund paid in a LATER settlement than the sale shows that customer in credit on Receivables~~ — done (PENDING 27):
+  `settlementRefunds` (receivables.ts) turns each posted settlement's journal-paid refund line (not netted by
+  `nettedRefundLines`, the one rule `postSettlement` also uses) into a refund against its credit note, like a POS
+  refund; Receivables, khata and bill allocation pass it.
+- ~~Marketplace documents are saved one by one~~ — the sales import writes once through `saveMany` (QA21 W10); summary
+  mode is still offered above 3,000 rows.

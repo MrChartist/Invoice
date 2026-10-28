@@ -32,6 +32,7 @@ export function ChequeActionModal({ cheque, to, onClose, onDone }: ChequeActionM
   const [error, setError] = useState('');
   const [charges, setCharges] = useState('');
   const [chargesTo, setChargesTo] = useState<'expense' | 'party'>('expense');
+  const [fxRate, setFxRate] = useState('');
 
   useEffect(() => {
     if (!cheque || !to) return;
@@ -42,6 +43,7 @@ export function ChequeActionModal({ cheque, to, onClose, onDone }: ChequeActionM
     setError('');
     setCharges('');
     setChargesTo('expense');
+    setFxRate('');
   }, [cheque, to]);
 
   if (!cheque || !to) return null;
@@ -50,12 +52,16 @@ export function ChequeActionModal({ cheque, to, onClose, onDone }: ChequeActionM
   const multi = !!cheque.allocations?.length;
   const willRecord = to === 'cleared' && (linkedInvoice || linkedBill || (multi && !cheque.payment_ids?.length && !cheque.purchase_payment_ids?.length));
   const problems = validateTransition(cheque, to, date);
+  // PENDING 39: a foreign-currency invoice is settled at the rate the bank paid (default: the invoice rate).
+  const fxInvoice = willRecord && record && cheque.direction === 'received'
+    ? [linkedInvoice, ...(cheque.allocations ?? []).map((a) => (a.invoice_id ? localDb.invoices.getById(a.invoice_id) : undefined))].find((i) => i && (i.currency || 'INR').toUpperCase() !== 'INR')
+    : undefined;
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (problems.length) return setError(problems[0]);
     try {
-      const r = transitionCheque(cheque.id, to, { date, recordPayment: record, reason: to === 'bounced' || to === 'cancelled' ? reason : undefined, ...(to === 'bounced' && Number(charges) > 0 ? { charges: Number(charges), chargesTo } : {}) });
+      const r = transitionCheque(cheque.id, to, { date, recordPayment: record, reason: to === 'bounced' || to === 'cancelled' ? reason : undefined, ...(to === 'bounced' && Number(charges) > 0 ? { charges: Number(charges), chargesTo } : {}), ...(fxInvoice && Number(fxRate) > 0 ? { realisedRate: Number(fxRate) } : {}) });
       onDone(r);
       onClose();
     } catch (err) {
@@ -92,6 +98,13 @@ export function ChequeActionModal({ cheque, to, onClose, onDone }: ChequeActionM
               : linkedInvoice
               ? chqT('aRecordInv', { amount: formatMoney(cheque.amount), number: linkedInvoice.invoice_number })
               : chqT('aRecordBill', { number: linkedBill?.bill_number ?? '' })}
+          </label>
+        )}
+        {fxInvoice && (
+          <label className={controls.field}>
+            <span className={controls.label}>{chqT('aFxRate', { cur: fxInvoice.currency ?? '' })}</span>
+            <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={fxRate} placeholder={fxInvoice.exchange_rate ? String(fxInvoice.exchange_rate) : ''}
+              onChange={(e) => setFxRate(e.target.value.replace(/[^0-9.]/g, ''))} data-cheque-fx-rate />
           </label>
         )}
         {(to === 'bounced' || to === 'cancelled') && (

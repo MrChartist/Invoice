@@ -118,6 +118,7 @@ export const chqT = defineArea(
     save: 'Save',
     aNothing: '{message} Nothing was changed.',
     aRecordInv: 'Record the payment of ₹{amount} against {number}',
+    aFxRate: 'Rate the bank paid (₹ per {cur})', // PENDING 39
     aRecordBill: 'Record the supplier payment against bill {number}',
     reason: 'Reason',
     aReversed: 'The payment recorded from this cheque will be reversed and the invoice reopened. ',
@@ -263,6 +264,7 @@ export const chqT = defineArea(
     save: 'सेव करें',
     aNothing: '{message} कुछ नहीं बदला।',
     aRecordInv: '{number} के विरुद्ध ₹{amount} का भुगतान दर्ज करें',
+    aFxRate: 'बैंक ने दी दर (₹ प्रति {cur})',
     aRecordBill: 'बिल {number} के विरुद्ध सप्लायर भुगतान दर्ज करें',
     reason: 'कारण',
     aReversed: 'इस चेक से दर्ज भुगतान उलट जाएगा और इनवॉइस फिर से खुल जाएगा। ',

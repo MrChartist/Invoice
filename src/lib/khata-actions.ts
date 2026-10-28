@@ -7,8 +7,9 @@ import type { Client, InvoiceRecord, PartyBalanceSnapshot, SenderProfile } from 
 import type { AdvanceRecord } from '../types/advances';
 import { localDb } from './localDb';
 import { getTable, peekTable, setTable, generateId } from './storage';
-import { buildReceivables, posRefunds, type BuildInput, type ReceiptRow, type ReceivablesReport } from './receivables';
+import { buildReceivables, posRefunds, settlementRefunds, type BuildInput, type ReceiptRow, type ReceivablesReport } from './receivables';
 import type { PosReturn } from './pos-returns';
+import type { Settlement } from '../types/marketplace-r5';
 import type { CreditLinkRow } from './amount-due';
 import { loadReceivableOpeningBills } from './opening-bills';
 import { computePartyBalanceSnapshot, type SnapshotOptions } from './khata';
@@ -31,7 +32,7 @@ export function loadReceivablesInput(): BuildInput {
     links: getTable<CreditLinkRow>('doc_links'),
     openingBills: loadReceivableOpeningBills(clients),
     // POS refunds / exchanges pay a credit note back (QA-3 F2).
-    refunds: posRefunds(getTable<PosReturn>('pos_returns')),
+    refunds: [...posRefunds(getTable<PosReturn>('pos_returns')), ...settlementRefunds(getTable<Settlement>('settlements'))],
   };
 }
 
@@ -66,7 +67,7 @@ function sharedReceivablesInput(): BuildInput {
     advances: peekTable<AdvanceRecord>('advances') as AdvanceRecord[],
     links: peekTable<CreditLinkRow>('doc_links') as CreditLinkRow[],
     openingBills: loadReceivableOpeningBills(clients),
-    refunds: posRefunds(peekTable<PosReturn>('pos_returns') as PosReturn[]),
+    refunds: [...posRefunds(peekTable<PosReturn>('pos_returns') as PosReturn[]), ...settlementRefunds(peekTable<Settlement>('settlements') as Settlement[])],
   };
 }
 

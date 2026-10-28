@@ -63,7 +63,8 @@ FCRA portals and the law are the authority — verify with your CA.
   anonymous. Warnings (never blocks): cash above ₹2,000 (₹10,000 before FY 2017-18, date-keyed), in kind, no valid
   donor id, anonymous above the Sec 115BBC limit.
 - Books: one RECEIPT voucher — Dr cash / bank | Cr "Donations received" (other income) or "Donations — corpus fund"
-  (reserves), the credit line tagged with the fund. Gifts in kind post nothing (record the goods by journal).
+  (reserves), the credit line tagged with the fund. Gifts in kind post nothing unless a goods / asset ledger is picked
+  (PENDING 29, `Donation.kind_account_id`): then a JOURNAL Dr that ledger | Cr the same donations / corpus account at the receipt value.
 - Receipt page: the app's receipt (`receipts.ts`, script-free) with PAN, URN + validity, donor id, amount in words and
   "Form 10BE will be issued after Form 10BD is filed". Labels by date through `ita2025`: 80G → "Sec 133(1)(b)(ii) [old
   80G]" from 1 Apr 2026 (appended `// R5-C` entry in `ACT_REF_RULES`, unverified); 10BD / 10BE → Form 113 / 114 for FY
@@ -220,4 +221,5 @@ Consolidated in `docs/CA_REVIEW.md` (ids I20–I30); answers are logged there wi
   "RA deductions clearing" account and its journal clears it (retention releases, real receipts, are still counted).
 - ~~GSTR-9 / compliance / report pack do not pass `itcReversals` yet (the GSTR-3B tab does).~~ Done in R6-C4: GSTR-9
   (Table 7C and each month's 3B), 9C, the Compliance interest base and the month-end pack pass them.
-- Gifts in kind create no voucher; FC-4 lists totals, not the portal's line items.
+- ~~Gifts in kind create no voucher~~ — done (PENDING 29, a journal when a goods ledger is picked). FC-4 lists totals, not the
+  portal's line items — open (needs the portal's current schedule layout from the CA).

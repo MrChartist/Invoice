@@ -474,7 +474,8 @@ registerRestoreHook('invoices', (_row, e, live) => {
 registerRestoreHook('invoices', (row, e, live) => {
   // QA11 C10: a builder's stage demand never comes back next to a demand raised again for that booking and stage; an
   // RA bill never next to an RA bill of its BOQ made since the delete (its quantities were measured again) — and a
-  // PV bill only while its statement still names it. Each would bill the same work twice.
+  // PV bill only while its statement still names it. Each would bill the same work twice. (PENDING 28: an RA bill made
+  // again takes the next number, so "made since" is by time — the same millisecond counts as since.)
   const cn = isObj(row.boq_terms) && isObj(row.boq_terms.cn) ? row.boq_terms.cn : undefined;
   const d = cn && isObj(cn.demand) ? cn.demand : undefined;
   const liveDocs = live('invoices').filter((x) => str(x?.id) !== e.row_id && str(x?.status) !== 'Cancelled' && str(x?.doc_type) !== 'CREDIT_NOTE');
@@ -485,7 +486,7 @@ registerRestoreHook('invoices', (row, e, live) => {
     });
     if (again) return { refuse: `This stage was demanded again for booking ${str(d.booking_no)}; restoring this demand would bill it twice.` };
   }
-  if (Number(row.ra_no) > 0 && str(row.boq_id) && str(row.doc_type) !== 'CREDIT_NOTE' && liveDocs.some((x) => str(x?.boq_id) === str(row.boq_id) && Number(x?.ra_no) > 0 && (Number(x?.ra_no) === Number(row.ra_no) || str(x?.created_at) > e.deleted_at))) {
+  if (Number(row.ra_no) > 0 && str(row.boq_id) && str(row.doc_type) !== 'CREDIT_NOTE' && liveDocs.some((x) => str(x?.boq_id) === str(row.boq_id) && Number(x?.ra_no) > 0 && (Number(x?.ra_no) === Number(row.ra_no) || str(x?.created_at) >= e.deleted_at))) {
     return { refuse: 'RA bills of this BOQ were measured again since this one was deleted; restoring it would bill the same quantities twice. Measure the work again instead.' };
   }
   const pv = cn && isObj(cn.pv) ? str(cn.pv.statement_id) : '';

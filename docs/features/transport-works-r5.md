@@ -70,8 +70,8 @@ them and Ctrl+K lists them under "Industry packs" (`PACK_TABS` block `// R5-B`, 
 - `lib/works/measurements.ts` — per line cumulative-to-date (or this-bill) quantity, MB ref; previous cumulative = R2-B2
   billed-so-far (live stages net of credit notes). Over the BOQ only with an excess / variation reason → the excess is an
   "Extra item —" line. Save = R2-B2 builder with the new basis `measured` (`progress-billing.ts`: one branch — the
-  quantity is the measured one; HSN / rate / GST stay the BOQ's; over-billing check is R2-B2's). `ra_no` = highest live RA
-  bill + 1 (a cancelled bill's number is issued again), `ra_final`, `boq_id`. A final bill that reaches the BOQ exactly is
+  quantity is the measured one; HSN / rate / GST stay the BOQ's; over-billing check is R2-B2's). `ra_no` = highest RA number
+  ever used + 1 (live, cancelled and measurement rows — PENDING 28: a cancelled bill's number is not issued again), `ra_final`, `boq_id`. A final bill that reaches the BOQ exactly is
   R2-B2's balance bill (paisa-exact). RA bills are saved issued (or as a draft on request). `ra_measurements` rows keep
   the lines.
 - `lib/works/ra-abstract.ts` — abstract per BOQ line (BOQ qty, rate, up to previous / this bill / cumulative qty and
@@ -201,4 +201,5 @@ Consolidated in `docs/CA_REVIEW.md` (ids I10–I19); answers are logged there wi
 - A GST TDS / cess receipt carries `ra_journal_id`; removing it from the payment dialog removes its journal with it
   (`removeDeductionRow`: one `withTablesRollback`, period lock on both, recycle bin through `payments.remove` /
   `deleteVoucher`). Other screens that delete receipts (cheques, write-offs) never hold these rows.
-- RA numbers: a cancelled RA bill's number is issued again (the invoice number is not).
+- ~~RA numbers: a cancelled RA bill's number is issued again~~ — done (PENDING 28, `nextRaNo` counts cancelled bills
+  and measurement rows).

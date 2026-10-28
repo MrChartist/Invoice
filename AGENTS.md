@@ -89,6 +89,7 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   contrast / motion, applied before first paint by `public/theme-init.js`, R2-C), `mrchartist_kot_printers` (KOT printer
   per kitchen station, R3-A), `mrchartist_editor_layout` (live-preview toggle, R3-C) and `mrchartist_checklist_default`
   (practice-desk default checklist, R3-C); `mrchartist_pos_branch` (POS "This counter is branch", R4-B).
+  `mrchartist_ageing_prefs` (Receivables Aging tab: age by due / bill date, user slabs, interest column; PENDING 34).
   Round 6 (R6-A): `mrchartist_help_strips` ("About this tab" strips on / off), `mrchartist_whats_new_seen` (last What's-new
   version shown), `mrchartist_feedback_draft` (unsent "Report a problem" draft), `mrchartist_tips_seen` /
   `mrchartist_tips_off` (one-time screen tips). R6-B: `mrchartist_demo_pending` may carry `id|business_type|pack,pack`

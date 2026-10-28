@@ -400,6 +400,26 @@ export function parseDebitNotePrefill(params: { get(name: string): string | null
   return { billId, qty };
 }
 
+/**
+ * PENDING 38: an edited bill may not fall below what goods notes already returned against it — every returned bill
+ * line must still exist with at least the returned units (paid + free). Returns an error message or ''.
+ */
+export function returnedQtyIssue(bill: { id?: string; lines?: readonly PurchaseLine[] }, notes: readonly { purchase_id?: string; goods_returned?: boolean; lines?: readonly { bill_line_id?: string; quantity?: number }[] }[]): string {
+  if (!bill.id) return '';
+  const back = new Map<string, number>();
+  for (const n of notes) {
+    if (!n || n.purchase_id !== bill.id || !n.goods_returned) continue;
+    for (const l of n.lines ?? []) if (l?.bill_line_id) back.set(l.bill_line_id, round2((back.get(l.bill_line_id) ?? 0) + Math.max(num(l.quantity), 0)));
+  }
+  for (const [lineId, qty] of back) {
+    if (qty <= 0) continue;
+    const line = (bill.lines ?? []).find((l) => l.id === lineId);
+    const has = line ? round2(num(line.quantity) + Math.max(num(line.free_qty), 0)) : 0;
+    if (has + 1e-6 < qty) return `${line?.name || 'A returned line'}: ${qty} already returned on a debit note, so the bill cannot show ${has}. Delete the note first.`;
+  }
+  return '';
+}
+
 export const purchasesDb = {
   all: (): PurchaseRecord[] => getTable<PurchaseRecord>(PURCHASES_TABLE),
   get: (id: string): PurchaseRecord | undefined => purchasesDb.all().find((p) => p.id === id),
@@ -410,6 +430,10 @@ export const purchasesDb = {
     const existing = input.id ? purchasesDb.get(input.id) : undefined;
     if (existing) assertBillUnlocked(existing, 'edit');
     assertBillUnlocked({ id: input.id ?? '', date: input.date, bill_number: input.bill_number }, existing ? 'edit' : 'create');
+    if (existing) {
+      const issue = returnedQtyIssue({ ...input, id: existing.id }, getTable('purchase_returns'));
+      if (issue) throw new Error(issue);
+    }
     assertBillApproval(input, existing); // 8.44: a clerk's bill above the threshold waits in purchase_drafts
     // A posted draft (8C) never carries its draft envelope into the books.
     const { draft: _draft, ...rest } = input as typeof input & { draft?: unknown };

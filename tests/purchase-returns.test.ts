@@ -76,6 +76,15 @@ test('debit note: quantity limited to billed less earlier returns; bill balance 
   assert.equal(purchaseReturnsDb.all().length, 0);
 });
 
+test('PENDING 38: a bill cannot be edited below the quantities already returned', () => {
+  purchasesDb.save(bill());
+  purchaseReturnsDb.create({ kind: 'DEBIT_NOTE', date: '2025-06-05', purchaseId: 'b1', reason: '01', goodsReturned: true, lines: [{ id: 'x', bill_line_id: 'l1', name: 'Paper ream', hsn: '4802', quantity: 4, rate: 100, tax_rate: 18 }] });
+  const b = purchasesDb.get('b1')!;
+  assert.throws(() => purchasesDb.save({ ...b, lines: [{ ...b.lines![0], quantity: 3 }] }), /4 already returned/);
+  assert.throws(() => purchasesDb.save({ ...b, lines: [{ ...b.lines![0], id: 'l9' }] }), /already returned/);
+  assert.equal(purchasesDb.save({ ...b, lines: [{ ...b.lines![0], quantity: 4 }] }).lines![0].quantity, 4);
+});
+
 test('a note on a paid bill stays on account; bill-wise shows the Agst Ref and the open debit', () => {
   purchasesDb.save(bill({ amount_paid: 1000 })); // balance 180
   const cn = purchaseReturnsDb.create({ kind: 'SUPPLIER_CN', date: '2025-06-10', purchaseId: 'b1', supplierNoteNumber: 'CN-9', supplierNoteDate: '2025-06-08', reason: '02', goodsReturned: false, lines: [{ id: 'v', name: 'Discount', quantity: 1, rate: 500, tax_rate: 18 }] });

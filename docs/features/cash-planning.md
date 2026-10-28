@@ -96,11 +96,19 @@ outputs keep the "working paper — verify with your CA" wording.
 
 ## Known gaps
 - ~~Cheques link to one document; a cheque covering several invoices must be recorded unlinked and payments entered by hand.~~ Done in WP-5: `Cheque.allocations` (`types/cheques.ts`) — stale note struck by R6-C6.
-- Clearing does not auto-record against foreign-currency invoices (record the receipt in that currency from the invoice).
+- ~~Clearing does not auto-record against foreign-currency invoices~~ — done (PENDING 39): `chequeReceiptFor` settles
+  cheque ₹ ÷ the rate the bank paid (typed in the clear dialog, else the invoice's `exchange_rate`) in the invoice
+  currency, with `realised_rate` = ₹ ÷ that amount, so the bank gets exactly the cheque's rupees and the difference
+  posts to exchange gain / loss; no rate at all → nothing recorded and the note says why. Allocations work the same way.
 - No bank charges on bounce; post them as an expense / journal.
 - Bank-specific leaf positions are not known exactly — the offsets exist for that.
-- Forecast ignores taxes payable (GST/TDS deposits), loans and salaries unless they are bills; credit notes not yet
-  set off are not deducted from receivables.
+- ~~Forecast ignores taxes payable (GST/TDS deposits), loans and salaries unless they are bills; credit notes not yet
+  set off are not deducted from receivables~~ — done (PENDING 39): live credit notes come off receivables (linked ones
+  off their bill via `doc_links`, unlinked ones off the party's first expected receipts); "Add GST / TDS deposits, loan
+  EMIs and salaries" (on by default) adds `gstTdsCommitments` (output tax − ITC + reverse charge of each month on the
+  20th of the next; TDS on bills on the 7th — from documents, an estimate; a month already paid still shows until its
+  due date), `loanCommitments` (unpaid EMIs of `business_loans`) and `payrollCommitments` (the latest final run's net pay
+  each later month end, its PF / ESI / PT / TDS on the 15th). Tests: `tests/cash-forecast-commitments.test.ts`.
 
 ## 8G additions
 - A document with a `payment_schedule` is expected instalment by instalment (open balance spread pro rata over the unpaid instalments), each shifted by the client's usual lag. See `docs/features/invoicing-ux.md` § 8.100.

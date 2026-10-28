@@ -24,7 +24,7 @@
  */
 
 import type { Cheque, ChequeAllocation, ChequeDirection, ChequeStatus } from '../types/cheques';
-import type { Payment } from '../types/invoice';
+import type { InvoiceRecord, Payment } from '../types/invoice';
 import { requireAccess } from './access';
 import { audit } from './audit';
 import { toCsv } from './csv';
@@ -261,6 +261,24 @@ export interface TransitionOptions {
   charges?: number;
   /** Bounce charges go to Bank charges (default) or are debited to the party (recoverable). */
   chargesTo?: 'expense' | 'party';
+  /** PENDING 39: clearing against a foreign-currency invoice — ₹ per unit the bank paid (default: the invoice rate). */
+  realisedRate?: number;
+}
+
+/**
+ * PENDING 39: the receipt a rupee cheque makes against an invoice. INR: the rupees. Foreign currency: rupees ÷ the
+ * realised rate (typed, else the invoice's `exchange_rate`) in the invoice currency, with `realisedRate` = rupees ÷
+ * that amount, so the bank gets exactly the cheque's rupees and the difference posts to exchange gain / loss
+ * (`fx-gain.ts`). Returns an error message when there is no rate.
+ */
+export function chequeReceiptFor(inv: Pick<InvoiceRecord, 'invoice_number' | 'currency' | 'exchange_rate'>, rupees: number, rate?: number): { amount: number; realisedRate?: number } | string {
+  const cur = (inv.currency || 'INR').toUpperCase();
+  if (cur === 'INR') return { amount: round2(num(rupees)) };
+  const r = num(rate) > 0 ? num(rate) : num(inv.exchange_rate);
+  if (!(r > 0)) return `${inv.invoice_number} is in ${cur} with no exchange rate: enter the rate the bank paid (₹ per ${cur}) to clear it, or record the receipt from the invoice.`;
+  const amount = round2(num(rupees) / r);
+  if (!(amount > 0)) return `The cheque is too small to settle anything of ${inv.invoice_number}.`;
+  return { amount, realisedRate: Math.round((num(rupees) / amount) * 1e6) / 1e6 };
 }
 
 export interface TransitionResult {
@@ -274,7 +292,7 @@ export interface TransitionResult {
  * Clearing a cheque with allocations: one payment per invoice / bill, all or nothing (a later failure
  * removes the ones already recorded). Foreign-currency invoices are refused (record those by hand).
  */
-function clearAllocations(c: Cheque, date: string, bankAccountId: string | undefined): { ids: string[]; first?: Payment; undo: () => void; note: string } {
+function clearAllocations(c: Cheque, date: string, bankAccountId: string | undefined, rate?: number): { ids: string[]; first?: Payment; undo: () => void; note: string } {
   const ids: string[] = [];
   let first: Payment | undefined;
   const undo = () => {
@@ -292,9 +310,10 @@ function clearAllocations(c: Cheque, date: string, bankAccountId: string | undef
     if (c.direction === 'received') {
       const inv = a.invoice_id ? localDb.invoices.getById(a.invoice_id) : undefined;
       if (!inv) throw new ChequeError('An invoice in this cheque\'s allocation no longer exists. Edit the cheque first.');
-      if ((inv.currency || 'INR').toUpperCase() !== 'INR') throw new ChequeError(`${inv.invoice_number} is in ${inv.currency}: record that receipt from the invoice.`);
+      const fc = chequeReceiptFor(inv, num(a.amount), rate);
+      if (typeof fc === 'string') throw new ChequeError(fc);
       const balance = round2(num(receivableBalance(inv)));
-      if (round2(num(a.amount)) > balance + 0.005) throw new ChequeError(`${money(a.amount)} is more than the balance of ${inv.invoice_number} (${money(balance)}).`);
+      if (fc.amount > balance + 0.005) throw new ChequeError(`${money(a.amount)} is more than the balance of ${inv.invoice_number} (${fc.realisedRate ? `${inv.currency} ${balance.toFixed(2)}` : money(balance)}).`);
     } else {
       const bill = a.purchase_id ? purchasesDb.get(a.purchase_id) : undefined;
       if (!bill) throw new ChequeError('A bill in this cheque\'s allocation no longer exists. Edit the cheque first.');
@@ -303,8 +322,9 @@ function clearAllocations(c: Cheque, date: string, bankAccountId: string | undef
   try {
     for (const a of c.allocations ?? []) {
       if (c.direction === 'received') {
+        const fc = chequeReceiptFor(localDb.invoices.getById(a.invoice_id!)!, num(a.amount), rate) as { amount: number; realisedRate?: number };
         const p = localDb.payments.record({
-          invoiceId: a.invoice_id!, amount: round2(num(a.amount)), method: 'Cheque', reference: c.number,
+          invoiceId: a.invoice_id!, amount: fc.amount, ...(fc.realisedRate ? { realisedRate: fc.realisedRate } : {}), method: 'Cheque', reference: c.number,
           note: `Cheque ${c.number} · ${c.bank}`, date, ...(bankAccountId ? { bankAccountId } : {}),
         });
         ids.push(p.id);
@@ -364,7 +384,7 @@ export function transitionCheque(id: string, to: ChequeStatus, opts: TransitionO
     if (c.direction === 'received' && !c.deposited_on) next.deposited_on = date;
     const bankAccountId = c.bank_account_id && c.bank_account_id !== DEFAULT_BANK_ID ? c.bank_account_id : undefined;
     if (opts.recordPayment !== false && c.allocations?.length && !hasPayments(c)) {
-      const r = clearAllocations(c, date, bankAccountId);
+      const r = clearAllocations(c, date, bankAccountId, opts.realisedRate);
       if (c.direction === 'received') next.payment_ids = r.ids;
       else next.purchase_payment_ids = r.ids;
       payment = r.first;
@@ -373,16 +393,19 @@ export function transitionCheque(id: string, to: ChequeStatus, opts: TransitionO
     } else if (opts.recordPayment !== false) {
       if (c.direction === 'received' && c.invoice_id && !c.payment_id) {
         const inv = localDb.invoices.getById(c.invoice_id);
+        const fc = inv ? chequeReceiptFor(inv, c.amount, opts.realisedRate) : '';
         if (!inv) note = 'The linked invoice no longer exists, so no payment was recorded.';
-        else if ((inv.currency || 'INR').toUpperCase() !== 'INR') note = `${inv.invoice_number} is in ${inv.currency}: record the receipt from the invoice in that currency.`;
+        else if (typeof fc === 'string') note = fc;
         else {
           const balance = round2(num(receivableBalance(inv)));
-          if (c.amount > balance + 0.005) {
-            throw new ChequeError(`The cheque (${money(c.amount)}) is more than the balance of ${inv.invoice_number} (${money(balance)}). Unlink the invoice, or clear it without recording the payment.`);
+          if (fc.amount > balance + 0.005) {
+            const bal = fc.realisedRate ? `${inv.currency} ${balance.toFixed(2)}` : money(balance);
+            throw new ChequeError(`The cheque (${money(c.amount)}) is more than the balance of ${inv.invoice_number} (${bal}). Unlink the invoice, or clear it without recording the payment.`);
           }
           payment = localDb.payments.record({
             invoiceId: inv.id,
-            amount: c.amount,
+            amount: fc.amount,
+            ...(fc.realisedRate ? { realisedRate: fc.realisedRate } : {}),
             method: 'Cheque',
             reference: c.number,
             note: `Cheque ${c.number} · ${c.bank}`,
@@ -392,7 +415,9 @@ export function transitionCheque(id: string, to: ChequeStatus, opts: TransitionO
           next.payment_id = payment.id;
           const pid = payment.id;
           undo = () => localDb.payments.remove(pid);
-          note = `Payment of ${money(c.amount)} recorded against ${inv.invoice_number}.`;
+          note = fc.realisedRate
+            ? `Payment of ${inv.currency} ${fc.amount.toFixed(2)} (${money(c.amount)} at ₹${fc.realisedRate}) recorded against ${inv.invoice_number}.`
+            : `Payment of ${money(c.amount)} recorded against ${inv.invoice_number}.`;
         }
       } else if (c.direction === 'issued' && c.purchase_id && !c.purchase_payment_id) {
         const bill = purchasesDb.get(c.purchase_id);

@@ -121,7 +121,15 @@ import { loadLedger, loadStockValuer } from '…/lib/ledger';
 - **Period context** (`period-context.ts`, P1-26): `usePeriodContext()`, `setPeriodContext(preset, period)`,
   `getPeriodContext()`, `subscribePeriodContext()`; device-local `localStorage['mrchartist_report_period']`; presets are
   re-resolved against today, so "This FY" rolls over by itself. Books uses it; **Alt+F2** switches the period bar to a
-  custom range with the cursor in "From". GST / Inventory / Reports pages can adopt it with one hook call.
+  custom range with the cursor in "From". PENDING 36: **GST reports** open on the shared period when it is a return
+  month / quarter (`reportPeriodOfRange`, else the previous month as before) and a period picked there becomes the shared
+  one; **Inventory** movement / analysis read and set it (`setPeriodRange` keeps a rolling preset when the range is one).
+  Tests: `tests/period-shared.test.ts`.
+- **Interest (ledgers)** (PENDING 35, GAP P1-7): Books → Reports → "Interest (ledgers)" — `ledgerInterestReport(ledger,
+  period, extra)` (`ledger/ledger-interest.ts`): every ledger with interest parameters (Masters → Ledger → Interest: rate,
+  Dr / Cr / both side) plus each business-loan ledger at its loan rate on credit balances, with opening, closing, interest
+  receivable / payable (simple, daily closing balance) and a drill into the balance slices; CSV. Report only: booking the
+  interest stays a journal (or the loan EMI). Test in `tests/openings.test.ts`.
 - **Ratio Analysis** (P1-1): reuses the TDS package's `src/lib/ledger/ratios.ts` / Books → Ratio analysis tab;
   WP-2 added an optional 4th argument `ratioAnalysis(ledger, period, asOf, stock?)` so stock-in-hand, current assets,
   gross / net profit and the stock ratios include the valued closing stock (the tab passes `loadStockValuer()`).
@@ -171,7 +179,11 @@ import { loadLedger, loadStockValuer } from '…/lib/ledger';
   Day Book filter, statistics and registers automatically; a dedicated exception section can read them from `ledger.vouchers`.
 - Stock summary → item → voucher and receivables ageing → bill drill-downs still use their own pages; `DrillStack` can wrap them.
 - Balance sheet stays Schedule III vertical (no Tally horizontal Liabilities | Assets view).
-- Comparative columns: Group Summary and P&L only; TB / BS read one period.
+- ~~Comparative columns: Group Summary and P&L only; TB / BS read one period~~ — done (PENDING 37): the "Previous period
+  column" switch (report prefs `columns: 'previous'`, per report) is on the Trial balance (closing of the comparable
+  previous period per ledger / group, totals, stock memo; `trialBalanceCsv(tb, prev)`) and the Balance sheet (as at the
+  previous period's end, per line / section / total via `bsPreviousAmounts`; `balanceSheetLedgerCsv(bs, prev)`). Monthly /
+  quarterly columns stay on Group Summary. Tests: `tests/reports-comparative.test.ts`.
 - Keys: Alt+F2 (period), Alt+F1 and F12 are handled in the capture phase on Books report screens, so they win over the
   global Tally keys (`src/lib/tally-keys.ts`: Alt+F2 → Gateway period, F12 → Settings) there; elsewhere the global keys apply.
 - The Gateway Display viewer builds its BS / P&L from `ledgerBalanceSheet` / `ledgerProfitAndLoss` with

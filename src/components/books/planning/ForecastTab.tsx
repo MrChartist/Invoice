@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Download } from 'lucide-react';
 import type { BooksData } from '../../../lib/books';
-import { HORIZONS, buildForecast, forecastCsv, openingCash, type Forecast } from '../../../lib/cash-forecast';
+import { HORIZONS, buildForecast, forecastCsv, gstTdsCommitments, loanCommitments, openingCash, payrollCommitments, type Forecast } from '../../../lib/cash-forecast';
+import { shiftDay } from '../../../lib/dates';
+import type { CreditLinkRow } from '../../../lib/amount-due';
+import type { BusinessLoan } from '../../../lib/loans';
 import { recurringDb } from '../../../lib/recurring';
 import { getTable } from '../../../lib/storage';
 import { formatDate, formatMoney, todayInput } from '../../../lib/utils';
@@ -23,6 +26,9 @@ const KIND_KEY = {
   payable: 'kindPayable',
   cheque_out: 'kindChequeOut',
   expenses: 'kindExpenses',
+  tax: 'kindTax',
+  loan: 'kindLoan',
+  salary: 'kindSalary',
 } as const;
 
 const inr = (n: number) => `₹${formatMoney(n)}`;
@@ -85,10 +91,21 @@ export default function ForecastTab({ data }: { data: BooksData }) {
   const [horizon, setHorizon] = useState<number>(90);
   const [withExpenses, setWithExpenses] = useState(false);
   const [skipStale, setSkipStale] = useState(false);
+  const [commit, setCommit] = useState(true); // PENDING 39
   const today = todayInput();
   const f = useMemo(() => {
     const opening = openingCash(data, today);
+    const end = shiftDay(today, horizon - 1);
+    const commitments = commit
+      ? [
+        ...gstTdsCommitments(data.invoices, data.purchases, data.vendors, today, end),
+        ...loanCommitments(getTable<BusinessLoan>('business_loans').filter((l) => l && typeof l.id === 'string'), end),
+        ...payrollCommitments(getTable('payroll_runs'), getTable('payroll_payments'), today, end),
+      ]
+      : [];
     return buildForecast({
+      links: getTable<CreditLinkRow>('doc_links'),
+      commitments,
       today,
       horizon,
       opening,
@@ -101,7 +118,7 @@ export default function ForecastTab({ data }: { data: BooksData }) {
       includeExpenses: withExpenses,
       skipOverdueAfter: skipStale ? 90 : undefined,
     });
-  }, [data, today, horizon, withExpenses, skipStale]);
+  }, [data, today, horizon, withExpenses, skipStale, commit]);
 
   return (
     <div className={styles.stack}>
@@ -127,6 +144,9 @@ export default function ForecastTab({ data }: { data: BooksData }) {
           </label>
           <label className={controls.check}>
             <input type="checkbox" checked={skipStale} onChange={(e) => setSkipStale(e.target.checked)} /> {planT('leaveOutOverdue')}
+          </label>
+          <label className={controls.check}>
+            <input type="checkbox" checked={commit} onChange={(e) => setCommit(e.target.checked)} data-forecast-commitments /> {planT('addCommitments')}
           </label>
         </div>
         <button type="button" className={controls.btnOutline} onClick={() => downloadCsv(`cash-forecast-${today}-${horizon}d.csv`, forecastCsv(f))}>

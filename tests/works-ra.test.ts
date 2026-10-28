@@ -66,7 +66,7 @@ test('billed so far is net of a credit note; a cancelled RA bill gives its quant
   assert.equal(billedQty(boq, localDb.invoices.getAll(), links()).get('l1') ?? 0, 0);
   cancelMeasurement(r1.measurement.id);
   const again = saveRaBill(boq.id, { date: '2026-07-01', lines: [{ line_id: 'l1', cumulative_qty: 350 }] });
-  assert.equal(again.invoice.ra_no, 1, 'the RA number of a cancelled bill is issued again');
+  assert.equal(again.invoice.ra_no, 3, 'PENDING 28: the RA numbers of cancelled bills are never issued again');
 });
 
 test('excess with a reason prints as its own "Extra item" line', () => {

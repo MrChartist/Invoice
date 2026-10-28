@@ -31,6 +31,16 @@ export const rcvT = defineArea(
     'bucket.31–60 days': '31–60 days',
     'bucket.61–90 days': '61–90 days',
     'bucket.90+ days': '90+ days',
+    // PENDING 34: user slabs / basis / interest column
+    slabRange: '{from}–{to} days',
+    slabOver: '{n}+ days',
+    slabToday: 'Today',
+    ageBy: 'Age by',
+    ageDue: 'Due date',
+    ageBill: 'Bill date',
+    ageSlabs: 'Slabs (days)',
+    ageSlabsBad: 'Slabs must rise, e.g. 15 / 45 / 90.',
+    interestCol: 'Interest',
 
     // ── Page ────────────────────────────────────────────────────────
     title: 'Receivables',
@@ -314,6 +324,15 @@ export const rcvT = defineArea(
     'bucket.31–60 days': '31–60 दिन',
     'bucket.61–90 days': '61–90 दिन',
     'bucket.90+ days': '90+ दिन',
+    slabRange: '{from}–{to} दिन',
+    slabOver: '{n}+ दिन',
+    slabToday: 'आज',
+    ageBy: 'उम्र किससे',
+    ageDue: 'देय तिथि',
+    ageBill: 'बिल तिथि',
+    ageSlabs: 'स्लैब (दिन)',
+    ageSlabsBad: 'स्लैब बढ़ते क्रम में हों, जैसे 15 / 45 / 90।',
+    interestCol: 'ब्याज',
 
     title: 'वसूली',
     subtitle: 'किस पर आपका कितना बकाया है, कितना पुराना है, और उन्हें भेजने के लिए खाता विवरण।',
@@ -577,8 +596,20 @@ export const refLabel = (method: string): string => {
   return has(key) ? rcvT(key) : en;
 };
 
-/** Aging bucket label for display (the bucket itself stays English). */
-export const bucketLabel = (bucket: string): string => {
+/**
+ * Aging bucket label for display (the bucket itself stays English). PENDING 34: with the user's slabs / bill-date
+ * basis the label shows that range instead.
+ */
+export const bucketLabel = (bucket: string, ageing?: { basis: 'due' | 'bill'; slabs: readonly number[] }): string => {
+  const sl = ageing?.slabs;
+  const custom = !!sl && (sl[0] !== 30 || sl[1] !== 60 || sl[2] !== 90);
+  if (ageing && (custom || ageing.basis === 'bill')) {
+    // Bucket order as AGING_BUCKETS (receivables.ts; not imported so this area stays light).
+    const i = ['Not due', '1–30 days', '31–60 days', '61–90 days', '90+ days'].indexOf(bucket);
+    if (i === 0) return ageing.basis === 'bill' ? rcvT('slabToday') : rcvT('bucket.Not due');
+    if (i === 4) return rcvT('slabOver', { n: sl![2] });
+    if (i > 0) return rcvT('slabRange', { from: i === 1 ? 1 : sl![i - 2] + 1, to: sl![i - 1] });
+  }
   const key = `bucket.${bucket}`;
   return has(key) ? rcvT(key) : bucket;
 };
