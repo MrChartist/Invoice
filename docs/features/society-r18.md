@@ -143,3 +143,97 @@ open export 0.06, demo dispatcher 0.06, palette 0.06, packs 0.04, discover 0.04)
 `lazy-leaves` grows by 0.57 kB against the PRD's 0.3 kB guidance: the registry must stay a leaf (sync / recycle bin
 import it) and the demo profile is a dynamic import from `demo/profiles.ts` (PRD path), so neither can join `f-society`;
 the leaves group stays within its 20 kB limit (17.4 kB).
+
+## R18-B — Billing run and GST
+
+### What it does
+
+- **Billing run (B1).** Society → **Bills** (`&view=bills`): a period (`YYYY-MM`, `YYYY-Qn`, `YYYY-Hn`), bill date (the
+  period's first month, `bill_day`) and due date (`due_days`); the plan line ("Planned: n bills (b bills of supply, t tax
+  invoices, p plain, o non-member). Already billed: k. No member: …"); **Run period** issues every bill in **one
+  `issueBatch`** (`sourceId: 'hs:<period>'`, `sourceKind: 'recurring'`, `mode: 'issue'`, `force: true`), numbered in each
+  document's own FY series (tax invoices; `BOS` for exempt bills), period lock / approvals / sender snapshot intact, and
+  records a `society_runs` row (`id`, `period`, `date`, `due`, `batch_run_id`, `unit_ids`, `counts`, `totals` by head,
+  `levy?`, `undone?`) — all in one `withTablesRollback` over invoices, series counters, batch runs and runs. **Undo run**
+  needs a reason: `undoBatch` cancels the documents (never deleted; numbers stay reserved) and marks the run undone; the
+  period can then run again. The runs table lists period, date, documents by kind, total and status; "Open" lists the
+  run's documents (unit, number → the document, regime chip, total, a WhatsApp link per bill — no bulk sender).
+- **Idempotent.** Per (unit, period, document kind `main` / `outsider` / `levy:<name>`): billed state is derived from the
+  live documents whose `hs.unit.id` / `hs.period` match (`billedKeys`, `billKind`), never stored. A run reads the units,
+  the period's live bills and the society settings only.
+- **One document per unit** (`planSocietyRun`, pure, `hs-run.ts`), units sorted by code; a unit without an owner is
+  skipped ("No member"); a non-member head (`outsider`) goes on its own document, never mixed. A member's second unit
+  pays `fixed_member` heads once (the owner's first unit by code). `run_limit` caps the bills of one run; the next run
+  picks up the rest. Lines per head (SAC in `hsn`: the head's, else 999598 / 997212), no round-off; `hs` = unit, period,
+  due, heads (each with `line_id`, so `hsLineText` prints the basis under its line), `run_id`, `test`, `regime`, `decl`,
+  `levy?` (+ C / D sub-fields through `runExtras`).
+- **GST per unit (B2, `hs-regime.ts`).** `hsRegime({ date, months, rows, registered, kind, valuation, outsider })`:
+  counted = every head but `statutory` and `outsider` (interest and levies counted); limit `RWA_LIMIT_RULES` (₹5,000 from
+  2017-07-01, ₹7,500 from 2018-01-25) × the cycle's months; the test is per unit. Regimes: `unregistered` (sender has no
+  GSTIN → plain `INVOICE`, no tax), `agency` (`society_kind = 'agency'` → tax invoice 18 % on every non-statutory head),
+  `exempt77c` (≤ limit → `BILL_OF_SUPPLY`, `exempt_kind: 'EXEMPT'`), `taxable_whole` (default, Circular 109 Q5 → tax
+  invoice 18 % on the whole counted amount), `taxable_excess` (Tariff → "₹7,500 test" = above the limit; one exempt line
+  `limit × months` with `sv.exempt: 'EXEMPT'` and each counted head's share of the rest at 18 %), `outsider` (18 %).
+  Statutory heads are pure-agent lines on every regime (`charge_head_id: 'rule33'` + `PURE_AGENT_CHARGE`, no SAC).
+  The printed sentence is `hs.decl` (SocietyBlock). The rate is `SOCIETY_GST_RATE_RULES`. No GST reader was changed:
+  tests prove an exempt bill lands in GSTR-1 Table 8 exempt, a taxable one in B2CS 18 % (B2B with a member's GSTIN,
+  e-Invoice with the dues in `OthChrg`), the pass-through dues outside Table 8, B2CS and the HSN summary.
+  The Tariff preview gains the regime chip column.
+- **GST view (B3, `&view=gst`, `hs-turnover.ts`).** FY-to-date turnover of all live issued documents (exempt and
+  taxable; credit notes reduce; pure-agent recoveries out, via `recoveryValue` passed in) against `REG_THRESHOLD_RULES`
+  (₹20 lakh; ₹10 lakh rows for 13 / 14 / 15 / 16 `verified: false`), the units above the limit in the last run's period,
+  the Circular 109 Q2 both-conditions table with the society's row highlighted, the hint "Registration may be required
+  (Sec 22 / Circular 109 Q2). Verify with your CA." for an unregistered society in the taxable row, the period's exempt /
+  taxable turnover with a link to GST reports → Common credit (which reads the same bills through GSTR-3B; no Rule 42
+  change), and the pending Madras HC note (`pending-changes.ts` row `hs2_valuation`, area `society`, HS2).
+- **Inward RCM hint (B3 cut 2 — kept).** Purchases → bill form: one lazy row (`components/society/parts/RcmHint.tsx`,
+  `society` pack only) for a registered society's bill with a 99852x line from a supplier whose PAN is not a company's,
+  not yet marked reverse charge: "Security services from a non-body-corporate supplier: reverse charge (N 13/2017-CT(R)
+  entry 14). Verify with your CA (HS15)." (`rcmHint`, the rule row read from `manpower-rules.ts` by the component).
+- **Special levy (B4 cut 1 — kept).** Bills → "Special levy": name, kind, basis (per unit, carpet / super area,
+  undivided %), total → a one-off run (`society_runs.levy`, documents `hs.levy`) shared by the basis (paise residue on
+  the last unit, `levyShares`), tested with the unit's regular bill of that month (its counted amount per month, HS3);
+  a levy over the limit is taxed on its own whole amount (HS45). Once per unit and levy name; undo as B1.
+- **Storage.** `society_runs`: backed up (both lists), synced (`DATED` by `date`), open export, audited ("Society run"),
+  right `doc.create` (runtime registry), Demo removal clears it (`DEMO_EXTRA_TABLES`; no sample run). Recycle bin:
+  a society bill comes back only while no live bill holds the same unit × period × kind; a run row only while no live
+  run holds its period / levy — a restore never bills twice.
+- **Help, Ctrl+K, checklist.** Topics `recurring:society:bills` / `…:gst`, palette labels `r18.society.bills` / `.gst`,
+  PACK_TABS rows, synonyms (`maintenance bill`, `billing run`, `special levy`, `रखरखाव बिल`; `7500`, `bill of supply`,
+  `20 lakh`), the Ctrl+K title of `recurring.society` extended; checklist step `societyRun` (rows of `society_runs`).
+
+### Decisions and deviations
+
+- **Volume.** Planning 2,000 units is one pure pass (under 1.5 s in the test), but issuing is bounded by `localDb.invoices.save`, which
+  re-serialises the whole invoices table per document (`setTable` → `JSON.stringify`, first-paint storage): 300 bills ≈
+  1.7 s, **2,000 bills ≈ 145 s** on the build machine (O(n²)). A bulk-save path would edit first-paint `storage.ts` /
+  `localDb.ts` (0 B first-paint rule), so R18-B does not: the test issues 200 bills in one batch under 3 s, and
+  `society_settings.run_limit` splits a large society's run into parts (each run continues where the last stopped);
+  quarterly billing remains the documented answer. **For the lead:** a `localDb.invoices.saveMany` (one `setTable`).
+- **Bills / GST views are in the desk chunk** (static imports): five small lazy chunks cost ≈ 2.7 kB more in wrappers.
+- **Common credit link** carries no pre-filled figures: the Rule 42 tab already reads the run's bills through the
+  GSTR-3B engine (exempt Bills of Supply in 3.1(c)); the GST view shows the period's exempt / taxable for comparison.
+- **The document value** (`taxable_value`) of a bill includes the 0 % pass-through line (invoice-calc, unchanged);
+  GSTR-1 / 3B / HSN / e-Invoice and the turnover monitor leave it out (`isPureAgentLine` / `recoveryValue`).
+- **Pending note**: the Madras HC row is a court order, not a Council recommendation; its own sentence says so (What's
+  new prints it under the generic pending heading). `recommended_on` holds the year only (the order date was not read).
+- **Rows `verified: true`** added: `RWA_LIMIT_RULES@2017-07-01` (Sl. 77(c) text), `@2018-01-25` (via Circular 109 Q1),
+  `RWA_VALUATION_RULES@2019-07-22`, `REG_THRESHOLD_RULES` general row (Circular 109 Q2). Not verified: the 2025-09-22
+  limit row and the special-category threshold rows.
+- **CA items** HS45–HS51 (levy with an exempt regular bill, the excess-only invoice shape, B2B members / e-Invoice,
+  non-member heads on a member's unit, special-category thresholds, the PAN body-corporate test, no round-off).
+
+### API for R18-C / D
+
+- Run engine (`hs-run.ts`, pure): `planSocietyRun(period, units, heads, ctx: RunCtx)` → `{ bills: UnitBill[], skipped,
+  counts, totals, commercial }`; **`runExtras(unit, ctx)` → `{ rows: HsHeadRow[]; hs?: Partial<HsSnapshot> }`** — C adds
+  its arrears memo / interest row (kind `other` is counted; give it a `head_id` such as `interest`) and `hs.arrears` /
+  `hs.interest` in its `// R18-C` block, D its fund tags in `// R18-D` (the `hs` part is merged into the main bill only).
+  `billKind(hs)`, `periodBills(invoices, period)`, `billedKeys`, `levyShares`.
+- Regime (`hs-regime.ts`): `hsRegime(RegimeIn) → RegimeOut { regime, doc, counted, limit, months, rate, decl }`,
+  `regimeLines(rows, regime) → HsLine[]`, `isCounted(row)`.
+- Bridge (`hs-issue-io.ts`): `planRun({ period, date, due, levy? }, runId?)`, `issueRun(input) → { run?, invoices, plan,
+  held }`, `undoRun(id, reason)`, `loadRuns()`, `societySettings()` (stored settings with the profile's defaults).
+- Turnover (`hs-turnover.ts`): `fyTurnover(invoices, from, to, recovery)`, `regThreshold(state, date)`,
+  `unitsAbove(invoices, period)`, `position(turnover, threshold, above)`, `rcmHint(bill, vendor, registered, rule)`.
+- Strings `society-r18b.ts` (`hsbT`); `components/society/parts/RegimeChip.tsx`.

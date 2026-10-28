@@ -37,7 +37,7 @@ export default function BillsView({ notify }: HsViewProps) {
   const input = { period: levy ? date.slice(0, 7) : p, date, due, ...(levy ? { levy } : {}) };
   const plan = useMemo(() => { void tick; return periodRange(input.period) ? planRun(input, '') : null; }, [tick, input.period, date, due, levy]); // eslint-disable-line react-hooks/exhaustive-deps
   const runs = useMemo(() => { void tick; return loadRuns().sort((a, b) => b.date.localeCompare(a.date) || b.updated_at.localeCompare(a.updated_at)); }, [tick]);
-  const docs = useMemo(() => (open ? localDb.invoices.getAll().filter((i) => i.hs?.run_id === open) : []), [open, tick]);
+  const docs = useMemo(() => { void tick; return open ? localDb.invoices.getAll().filter((i) => i.hs?.run_id === open) : []; }, [open, tick]);
   const act = (fn: () => string) => { try { notify(fn()); setTick((t) => t + 1); } catch (e) { notify((e as Error).message, 'error'); } };
   const n = (r: string) => plan?.skipped.filter((x) => x.reason === r).map((x) => x.code) ?? [];
   const lv = (o: Partial<NonNullable<SocietyRun['levy']>>) => setLevy((x) => ({ ...x!, ...o }));
