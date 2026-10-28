@@ -119,6 +119,20 @@ function assertNoBreakage(rows: readonly Payment[]): void {
   if (v) throw new Error(`Undo the breakage of gift voucher ${v.number} first`);
 }
 
+/**
+ * PENDING #8 (QA18 left as found): a travel cancellation's credit note (`Booking cancelled` link, R15-C3) stays while
+ * its booking is cancelled — the booking's status is stored, so deleting / cancelling the note would leave it
+ * cancelled with nothing credited.
+ */
+function assertNotTravelCancel(doc?: InvoiceRecord): void {
+  if (doc?.doc_type !== 'CREDIT_NOTE') return;
+  const bk = peekTable<{ ref?: string; status?: string; line_ref?: { invoice_id?: string }; cancel?: { credit_note_id?: string } }>('travel_bookings').filter((b) => b.status === 'cancelled');
+  if (!bk.length) return;
+  const from = new Set(peekTable<{ from_id?: string; to_id?: string; reason?: string }>('doc_links').filter((l) => l.to_id === doc.id && l.reason === 'Booking cancelled').map((l) => l.from_id));
+  const b = bk.find((x) => x.cancel?.credit_note_id === doc.id || from.has(x.line_ref?.invoice_id));
+  if (b) throw new Error(`This credit note records the cancellation of booking ${b.ref ?? ''}, which stays cancelled, so the note stays. If the trip goes ahead, add a new booking and bill it.`);
+}
+
 export function blankProfile(): SenderProfile {
   return {
     id: generateId(),
@@ -447,6 +461,7 @@ export const localDb = {
       if (stored) requireAccess(isIssued(stored) ? 'doc.deleteIssued' : 'doc.deleteDraft');
       if (stored) checkDocRight(currentActor(), stored.doc_type, 'delete');
       const overridden = stored ? assertUnlocked(stored, 'delete') === 'overridden' : false;
+      assertNotTravelCancel(stored);
       voidHook.f?.(stored);
       const payments = getTable<Payment>(KEYS.transactions);
       const own = payments.filter((t) => t.invoice_id === id);
@@ -477,6 +492,7 @@ export const localDb = {
             ? 'reinstate'
             : 'edit';
       const overridden = assertUnlocked(before, action) === 'overridden';
+      if (action === 'cancel') assertNotTravelCancel(before);
       // WP-9 / H3: a pending document is issued only by the owner's decision; a draft issued from
       // here passes the same gate as a save (held as a pending draft when it needs approval).
       if (status !== 'Draft' && status !== 'Cancelled') assertNotPendingApproval(before, 'it can be issued or marked paid');

@@ -59,6 +59,15 @@ test('cancel a ticket: credit note, fee at 18 %, debit note to the supplier, tri
   assert.equal(loadTrips()[0].tv.status, 'cancelled', 'every booking cancelled → the trip is cancelled');
   assert.throws(() => billTrip(t.id), /Nothing to bill/);
   assert.throws(() => cancelBookings([b.id], input), /Nothing to cancel/);
+  // PENDING #8: the cancellation's credit note cannot be deleted or cancelled while the booking stays cancelled.
+  assert.throws(() => localDb.invoices.remove(r.notes[0].id), /records the cancellation of booking ABC123/);
+  assert.throws(() => localDb.invoices.setStatus(r.notes[0].id, 'Cancelled'), /stays cancelled/);
+  assert.ok(localDb.invoices.getById(r.notes[0].id), 'the note is still there');
+  assert.equal(getTable('recycle_bin').filter((e: { table?: string }) => e.table === 'invoices').length, 0);
+  // Any other credit note still deletes as before.
+  const other = localDb.invoices.save({ ...r.notes[0], id: 'cn-other', invoice_number: '' });
+  localDb.invoices.remove(other.id);
+  assert.equal(localDb.invoices.getById(other.id), undefined);
 });
 
 test('a booking inside the package line is cancelled with its whole trip; fee at 5 %', () => {
