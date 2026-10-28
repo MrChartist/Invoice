@@ -230,3 +230,28 @@ bill-form hints 0.15, paper 0.15, help / palette / packs 0.35. (Measured on the 
 merge with R15-C's layout and mounting the chips without a nested lazy chunk brought it down.)
 Options for the lead: drop the export-check line in the chip (≈ −0.2), drop the vendor TDS list in the events view (it
 stays on the bill form, ≈ −0.3), drop the "near the threshold" list (history years only, ≈ −0.15).
+
+## §R16-C — travel and hotel leftovers (C1–C5, `docs/prd/round-16.md` §R16-C)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| C1 commission income | `travel/tv-commission.ts` `billCommission`: on a booking with `commission` (typed in the booking form), **Bill commission** in the bookings table makes a draft invoice **to the principal** — the booking's supplier, or the client linked to it (`Vendor.client_id`) — through `buildBillDraft`: one line at the principal's SAC (`principalOf`: insurance → insurer 997161, air / airline → 998551, hotel / bed bank → 998552, else 998559) and 18 % (`COMMISSION_SAC_RULES`, TV16 / TV46). Expected TDS through the R14-D receivable path (`prof/ps-tds-recv.ts` `expectedTds`): 194H rate and FY threshold from `tax-rules.ts` / `tds-rules.ts` (2 % from 1 Oct 2024, ₹20,000), on the commission before GST; an insurer deducts 194D (`INSURANCE_COMMISSION_TDS_RULES`, rate by our form from the annual pack's entity type, TV48). When it applies the draft carries `tds_enabled` / `tds_section` / `tds_rate` / `tds_on_taxable`, so the issued invoice reaches the TDS receivable register and the 16A / 131 chase list; the notice labels the section by date (`ita2025.ts` `sectionText`). An insurer's invoice carries the outward reverse-charge flag (`reverse_charge` + `rcm_tax_excluded`, `INSURANCE_AGENT_RCM_RULES`, TV17). The booking keeps `comm_ref` (invoice + line); billed is derived (`commBilled`). Trip cost centre on the invoice, `tv.trip` only (no regime sentence). The trip margin is unchanged. |
+| C2 re-issue | `travel/tv-reissue.ts` `reissueTicket`: **Re-issue** on an `air` booking with tickets (`ReissueForm.tsx`, in the desk chunk): new ticket no. (13 digits), fare difference and change penalty as pure-agent lines (`charge_head_id: 'rule33'`), our re-issue fee at 18 % (the C1 airline SAC); a draft through `buildBillDraft` in the agent regime with the new ticket in `tv.lines` (`reissue_of`; no fare split printed). The booking's old ticket gets `reissued_by` and the new one is appended; the old invoice keeps its line. A negative difference → `documents.createCreditNote` on the old fare line (quantity = difference ÷ fare; the old invoice must be issued); no draft when nothing else is billed. All or nothing (TV35, TV47). |
+| C3 bed-bank preset | `tv-statements.ts`: `bedbank` in `STATEMENT_KINDS` and `STATEMENT_PRESETS` (hotel name, confirmation no., check-in, nights, guest, net — the net is read as `gross`, so net = gross), `StatementRow.hotel` / `nights`, type `HOTEL` when no type column. Matching unchanged (booking ref. of this supplier's bookings). |
+| C4 demo rows | `demo/profile-travel.ts` (Demo company only, through `loadDemoData`): the Sharma wedding (event, budget venue / catering / decor, three vendors — one demo vendor added), the Dubai package (outbound, dated after 1 Apr 2026) with a `to5` invoice and TCS 2 % (`tcs_*` + `tv.tcs`), and one 4-row BSP statement (2 matched, 1 ADM, 1 refund). `demo/profiles.ts` passes the travel invoices through. |
+| C5 hotel | `FolioView.tsx` bill-to box: **Agent commission bill** for a reservation billed to an agent with a commission % and none recorded → `hotel/agent-commission.ts` `recordCommission` (purchase-bill draft with 194H). Closes the R7-B deviation. Strings in `hotel-billing-r7.ts`. |
+| Wiring | Types `// R16-C` block in `types/travel-r15.ts` (`TravelBooking.comm_ref`, `TvTicket.reissued_by` / `reissue_of`, `StatementRow.hotel` / `nights`; no record or line key). Rules `// R16-C` rows in `travel-rules.ts` (all `verified: false`). Strings `i18n/areas/travel-r16c.ts` (+ `Bed bank` in `travel-r15c.ts` `kinds`). Help: `time:trips:bookings`, `time:trips:statements`, `tables:frontdesk:folios` texts / CA ids; Ctrl+K `time.trips` text. Tests `tv-commission` (incl. the demo rows), `tv-reissue`, `tv-statements` (bed-bank case). E2E step "R16-C commission and re-issue". CA items TV46–TV48 (§15.2). |
+
+### Deviations (R16-C)
+
+- **`commission.bill_id`** (PRD wording) is `comm_ref: { invoice_id, line_id }`: `commission` is a number in stored rows, and the line reference lets billed be derived like `line_ref`.
+- **194H below the threshold:** a ₹1,200 commission to a principal whose FY total stays under ₹20,000 gets no TDS on the draft (the notice says so, as for 194J); the e2e step seeds an earlier ₹20,000 commission invoice so 194H applies.
+- **Insurer TDS is 194D**, not 194H (TV48).
+- **Demo rows not in e2e:** opening the Demo company with travel packs needs the wizard path; the rows are unit-tested (`tv-commission`). The hotel button has no e2e step (the engine is tested in `hotel-bill-to`).
+- **Re-issue credit** uses a 2-decimal quantity on the old fare line, so the credited amount can differ from the difference by a few paise (TV47).
+
+### Bundle (R16-C)
+
+SIZES

@@ -56,5 +56,5 @@ export const TOPICS: readonly HelpTopic[] = [
     statutory: ca(['RT6']),
   }),
   // R15-C: supplier statements view of the Trips desk (no PACK_TABS row — first paint stays as it was — so it lives in the /time area)
-  t('time:trips:statements', 'Supplier statements', 'आपूर्तिकर्ता विवरण', 'Import a BSP / consolidator / bed-bank file: matched, differences, ADMs, refunds to pass on. Make bill posts it. Commission due: bill the principal.', 'Each statement.', { statutory: ca(['TV11', 'TV35', 'TV37']) }),
+  t('time:trips:statements', 'Supplier statements', 'आपूर्तिकर्ता विवरण', 'Import a BSP / consolidator / bed-bank file: matched, differences, ADMs, refunds to pass on. Make bill posts it. Commission due: bill the principal.', 'Each statement.', { statutory: ca(['TV11', 'TV35', 'TV37', 'TV16']) }), // R16-C3: bed-bank preset
 ];

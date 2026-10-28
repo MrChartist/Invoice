@@ -89,7 +89,7 @@ export const EVENT_RULES: readonly TvRule<{ sac: string; rate: number }>[] = [
   { from: '2017-07-01', value: { sac: '998596', rate: 18 }, source: 'Event management / organisation services, SAC 998596 at 18 % (as reported; TV22)', verified: false },
 ];
 
-/* ── R16-C: commission income to principals, re-issue fee, insurer RCM, 194D (TV16, TV17, TV46–TV49) ─────────── */
+/* ── R16-C: commission income to principals, re-issue fee, insurer RCM, 194D (TV16, TV17, TV46–TV48) ─────────── */
 // 194H (rate 2 % from 1 Oct 2024, ₹20,000 from 1 Apr 2025) stays in tax-rules.ts / tds-rules.ts and is read from there.
 
 /** The principal paying our commission. */
