@@ -6140,6 +6140,9 @@ try {
     await row.waitFor({ timeout: 15000 });
     const cell = async (k) => (await row.locator(`[data-lg-${k}]`).innerText()).trim();
     check(/94,500\.00/.test(await cell('rev')) && /69,700\.00/.test(await cell('cost')) && /24,800\.00/.test(await cell('margin')) && (await cell('pct')) === '26.2 %', `Costing: revenue ₹94,500.00, cost ₹69,700.00, margin ₹24,800.00, 26.2 % (${await cell('rev')} / ${await cell('cost')} / ${await cell('pct')})`);
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
 
   await step('R19-C customs broker desk: import job 0002 → Customs → deposit ₹2,00,000 (0 %, pass-through) → duty ₹1,85,430 (ICEGATE) + CFS ₹12,000 on behalf → Billing → Bill job (R19-B billExtras) → the paper prints the schedule, total ₹2,04,510.00 → Apply deposit → ₹4,510.00 due, the application is an advance_id row; Ctrl+K "duty deposit"', async () => {
     const keys = ['settings', 'clients', 'lg_jobs', 'logistics_settings', 'advances', 'purchases', 'purchase_payments', 'invoices', 'transactions', 'series_counters'];

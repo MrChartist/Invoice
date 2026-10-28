@@ -1171,6 +1171,7 @@ test('R19-B job costing (lg-costing) reads the real bill shape', async () => {
   const rows = costBills([tagged, split, { ...tagged, id: 'p3', status: 'void' }, { ...tagged, id: 'p4', lg: { job_id: 'j1', on_behalf: true } }, bill]);
   assert.equal(rows.length, 4, 'untagged bills are not read');
   assert.deepEqual(rows.map((r) => [...costAlloc(r)]), [[['j1', 1000]], [['j2', 1180], ['j1', 1180]], [], []]);
+});
 
 // R19-C1: the customs broker's disbursements are read through `readPurchase` (`lg-recv-io.ts` `disbSource`): the total,
 // the payee, void rows flagged; the engine keeps only rows on the client's behalf tagged to a job; GST readers see no ITC.
