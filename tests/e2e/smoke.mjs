@@ -5017,7 +5017,9 @@ try {
     check(await page.locator('[data-disb-off]').innerText().then((t) => /Client absconded/.test(t)), 'written off: gone from the list, in "Written off"');
     await page.locator('[data-disb-rev]').first().click();
     await row.waitFor({ timeout: 10000 });
-    check(true, 'Reverse brings it back');
+    // The pre-bill below is a fresh page load: wait until the reversal has reached IndexedDB first.
+    const unstamped = (v) => v.some((p) => p.id === 'e2e-16-d' && !p.ps?.wo);
+    check(unstamped(await readJson(page, 'purchases', [], unstamped, 15000)), 'Reverse brings it back (stored)');
     await page.goto(srv.origin + '/time?tab=wip&view=prebill&client=e2e-16-c');
     await page.locator('[data-prebill-media]').waitFor({ timeout: 15000 });
     check(await page.locator('[data-prebill-media-row]').count() === 2, 'two media insertions on the pre-bill');
