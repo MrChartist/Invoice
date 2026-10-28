@@ -47,7 +47,11 @@ export const TOPICS: readonly HelpTopic[] = [
   t('gst-reports:gstr2b', '2B match', '2B मिलान', 'Matches the GSTR-2B file from the portal with your bills: matched, only in 2B, only in books.', 'Monthly, before claiming ITC in 3B.', { statutory: ca(['G26', 'G37'], 'GSTR-2B') }),
   t('gst-reports:purhsn', 'Purchase HSN', 'ख़रीद HSN', 'Purchases summed by HSN and rate.', 'For annual returns and stock checks.', { statutory: ca(['G16']) }),
   t('gst-reports:recon', '1 vs 3B vs books', '1 बनाम 3B बनाम खाते', 'Month by month: GSTR-1, GSTR-3B and the books side by side, with differences.', 'Before the annual return, or when numbers do not agree.', { statutory: ca(['G40']) }),
-  t('gst-reports:compliance', 'Compliance', 'अनुपालन', 'Due dates of your returns, filed marks, and estimated interest and late fee.', 'Any time, to see what is due or late.', { statutory: ca(['G24', 'G25', 'G30', 'G31'], 'GSTR-1, 3B, IFF, CMP-08, GSTR-9') }),
+  t('gst-reports:compliance', 'Compliance', 'अनुपालन', 'Due dates of your returns, filed marks, and estimated interest and late fee.', 'Any time, to see what is due or late.', {
+    // R16-D5 (PF13)
+    steps: ['GSTR-3B Table 5.1 interest is filled in by the portal and cannot be lowered (from the Jan / Feb 2026 periods): take it as the minimum and reconcile this estimate to it.'],
+    statutory: ca(['G24', 'G25', 'G30', 'G31', 'PF13', 'PF3'], 'GSTR-1, 3B, IFF, CMP-08, GSTR-9'),
+  }),
   t('gst-reports:composition', 'Composition (CMP-08 / GSTR-4)', 'कंपोज़िशन (CMP-08 / GSTR-4)', 'Quarterly statement and annual return for a composition dealer, at the rates as the app applies them.', 'Each quarter and year, if your profile is composition.', { statutory: ca(['G41', 'G42'], 'CMP-08, GSTR-4') }),
   t('gst-reports:hsnmaster', 'HSN master', 'HSN मास्टर', 'Your HSN / SAC codes with default rates, used to fill lines in the editors.', 'Once, then when you add a new kind of item.'),
   t('gst-reports:gstr9c', 'GSTR-9C', 'GSTR-9C', 'Reconciliation of the annual return with audited books.', 'Once a year, if your turnover requires it.', { statutory: ca(['G39', 'G40'], 'GSTR-9 / 9C') }),
@@ -58,7 +62,11 @@ export const TOPICS: readonly HelpTopic[] = [
   t('gst-reports:bygstin', 'By GSTIN', 'GSTIN के अनुसार', 'GSTR-1 and 3B figures per registration when you have more than one GSTIN.', 'For multi-State businesses.', { statutory: ca(['G48']) }),
   t('gst-reports:guards', 'GST guards', 'GST जाँच', 'Checks before filing: rates outside the slab list, missing GSTINs, e-Invoice window, Table 3.2 and more.', 'Before every download.', { statutory: ca(['G2', 'G15', 'G45']) }),
   t('gst-reports:portal-files', 'Portal files', 'पोर्टल फ़ाइलें', 'GSTR-1 JSON files you uploaded and the error files the portal sent back.', 'After an upload, to fix portal errors.', { statutory: ca(['G27']) }),
-  t('gst-reports:eway-desk', 'e-Way desk', 'ई-वे डेस्क', 'e-Way bills to make, extend or close, with validity as the app applies it.', 'Before goods move.', { statutory: ca(['G46'], 'e-Way bill') }),
+  t('gst-reports:eway-desk', 'e-Way desk', 'ई-वे डेस्क', 'e-Way bills to make, extend or close, with validity as the app applies it.', 'Before goods move.', {
+    // R16-D5 (PF12)
+    steps: ['The mandatory Ship-to GSTIN ("URP" for unregistered) in e-Invoice / e-Way is on hold since 29 Jul 2026: nothing changes here. The e-Invoice JSON already writes ShipDtls.Gstin when the consignee has a GSTIN.'],
+    statutory: ca(['G46', 'PF12'], 'e-Way bill'),
+  }),
   t('gst-reports:hotel-gst', 'Hotel GST', 'होटल GST', 'Hotel pack: room-night bands, specified-premises status with its evidence, the declarations register, the band report for the common-credit working, and checks.', 'Monthly before GSTR-1 / 3B; 1 Jan – 31 Mar for declarations.', {
     statutory: ca(['HT1', 'HT2', 'HT3', 'HT4', 'HT5', 'HT6', 'HT14', 'HT16'], 'Annexure VII / VIII / IX'),
     related: rel(['Common credit', '/gst-reports?tab=common-credit'], ['Front desk', '/tables?tab=frontdesk']),

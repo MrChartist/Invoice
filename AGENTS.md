@@ -246,6 +246,9 @@ build-time config must use Vite's `VITE_` prefix.
   Exception: GST interest / late-fee tables live in `src/lib/gst-penalties.ts` (same date-keyed shape) so they
   stay out of the early-loading notifications chunk, and payroll statutory values (EPF / ESI / PT / TDS u/s 192) live in
   `src/lib/payroll-rules.ts` (same shape) so the lazy payroll route does not grow the first-paint bundle.
+- Recommended but not yet notified changes (57th GST Council …) are notes, never rule rows: `src/lib/pending-changes.ts`
+  (R16-D4, lazy, shown by `components/ui/PendingNote.tsx` and Help → What's new). No rule file or reader imports it
+  (`tests/pending-changes.test.ts`); on notification append the dated rule row and set the row's `notified`.
 - Income-tax Act 2025 (from 1 Apr 2026): screens and exports label TDS / TCS sections and forms by the document /
   transaction date through `src/lib/ita2025.ts` (date-keyed, append-only); stored codes (`194C-1`, `26Q:2026-Q1` …)
   are never renamed.

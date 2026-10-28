@@ -7,6 +7,7 @@ import { stockDb } from '../../lib/inventory';
 import { DB_PREFIX, getJson } from '../../lib/storage';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
+import PendingNote from '../ui/PendingNote';
 
 type Line = { hsn?: string; name?: string; description?: string; item_id?: string };
 
@@ -51,6 +52,7 @@ export default function RcmGoodsNotice({ lines, date, vendor, onApply }: { lines
       {hits.map((h) => trT('rcmText', { goods: h.goods, who: trT(`who.${who}`), ref: h.notification })).join(' ')}{' '}
       {adv && legal && <span data-rcm-legal>{legal} </span>}
       {sig && scrap && <span data-rcm-scrap>{trT('rcmText', { goods: 'Metal scrap (ch 72–81 waste)', who: trT('who.unregistered'), ref: scrap })} </span>}
+      {unreg && <PendingNote area="rcm_goods" day={date} />}
       <button type="button" className={controls.btnGhost} onClick={onApply}>{trT('rcmApply')}</button> <small>{trT('workingPaper')}</small>
     </div>
   );

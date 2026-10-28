@@ -5341,6 +5341,63 @@ try {
     await writeJson(page, 'settings', prev);
   });
 
+  await step('R16-D quality: client "Mehta Tours" ↔ vendor "Mehta Travels Pvt Ltd" linked by hand → Netting ₹65,000 → the vendor\'s own creditor ledger shows the debit (₹1,15,000 Cr left), TB balanced; a builder\'s bill claiming ITC → caution (PF18), saved past it → audited; the inverted-duty paper shows the pending input-services note (PF1)', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'invoices', 'transactions', 'purchases'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const s0 = prev.settings ?? {};
+    await writeJson(page, 'settings', { ...s0, lock_until: undefined });
+    const client = { id: 'e2e-mt-c', name: 'Mehta Tours', state_code: '27' };
+    await writeJson(page, 'clients', [...(prev.clients ?? []), client]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-mt-v', name: 'Mehta Travels Pvt Ltd', client_id: 'e2e-mt-c' }]);
+    const sender = { ...((s0.profiles ?? []).find((p) => p.id === s0.activeProfileId) ?? {}), stateCode: '27' };
+    const inv = (id, number, amt, date) => ({ id, invoice_number: number, doc_type: 'INVOICE', status: 'Sent', place_of_supply: '27', currency: 'INR', issue_date: date, due_date: date, sender, gst_mode: 'NONE', subtotal: amt, taxable_value: amt, total: amt, amount_paid: 0, balance_due: amt, client, items: [{ id: 'l1', name: 'Tour package', type: 'Service', hsn: '998555', unit: 'NOS', quantity: 1, rate: amt, tax_rate: 0, amount: amt }] });
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), inv('e2e-mt-1', 'E2E/MT/1', 40000, '2026-09-01'), inv('e2e-mt-2', 'E2E/MT/2', 25000, '2026-09-05')]);
+    await writeJson(page, 'purchases', [...(prev.purchases ?? []), { id: 'e2e-mt-b', kind: 'PURCHASE', vendor_id: 'e2e-mt-v', vendor_name: 'Mehta Travels Pvt Ltd', bill_number: 'MTP/9', date: '2026-09-10', category: 'Purchases', lines: [{ id: 'l1', name: 'Air tickets', quantity: 1, rate: 180000, tax_rate: 0 }], taxable: 180000, cgst: 0, sgst: 0, igst: 0, itc_eligible: false, total: 180000, amount_paid: 0 }]);
+    await page.goto(srv.origin + '/receivables?tab=aging');
+    await page.locator('[data-netting-open][aria-label*="Mehta Tours"]').waitFor({ timeout: 15000 });
+    await page.locator('[data-netting-open][aria-label*="Mehta Tours"]').click();
+    const dlg = page.locator('[data-netting-dialog]');
+    await dlg.waitFor({ timeout: 15000 });
+    for (const n of ['E2E/MT/1', 'E2E/MT/2']) await dlg.locator('[data-netting-side="in"] label', { hasText: n }).locator('input').check();
+    await dlg.locator('[data-netting-side="out"] label', { hasText: 'MTP/9' }).locator('input').check();
+    await page.locator('[data-netting-post]').click();
+    await readJson(page, 'transactions', [], (v) => v.filter((p) => p.method === 'netting' && p.exchange_purchase_id === 'e2e-mt-b').length === 2);
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/books?tab=ledger&acct=creditors&party=' + encodeURIComponent('Mehta Travels Pvt Ltd'));
+    await page.getByText(/Air tickets|MTP\/9/).first().waitFor({ timeout: 15000 });
+    const led = await page.locator('main').first().innerText();
+    check(/1,15,000\.00\s*Cr/.test(led), 'the vendor\'s own creditor ledger: ₹1,80,000 bill − ₹65,000 netting = ₹1,15,000 Cr');
+    await page.goto(srv.origin + '/books?tab=tb');
+    await page.getByText('Debits = credits').waitFor({ timeout: 15000 });
+    check(true, 'TB balanced');
+    // Real-estate builder: a bill claiming ITC, not charged to a project → caution; saved past it → audited.
+    await writeJson(page, 'settings', { ...s0, lock_until: undefined, industry_packs: ['realty', 'works'] });
+    await page.goto(srv.origin + '/expenses');
+    await page.getByRole('button', { name: /Add bill/ }).click();
+    const bd = page.getByRole('dialog', { name: 'Add purchase bill' });
+    await bd.getByRole('button', { name: /New vendor/ }).click();
+    await bd.locator('#bill-vendor-vname').fill('E2E Cement Co');
+    await bd.getByRole('button', { name: 'Save vendor' }).click();
+    await bd.locator('#bill-no').fill('CEM/16');
+    await bd.getByLabel('Line 1 item').fill('Cement, 200 bags');
+    await bd.getByLabel('Line 1 rate').fill('100000');
+    await bd.getByLabel('Line 1 GST rate').selectOption('18');
+    await bd.getByLabel('Claim input tax credit on this bill').check();
+    await bd.getByRole('button', { name: 'Save bill' }).click();
+    await bd.getByRole('alert').filter({ hasText: 'PF18' }).waitFor({ timeout: 15000 });
+    check(true, 'the builder\'s bill claiming ITC is cautioned (PF18)');
+    await bd.getByRole('button', { name: 'Save bill' }).click();
+    await bd.waitFor({ state: 'detached' });
+    const log = await readJson(page, 'audit_log', [], (v) => v.some((e) => e.action === 'override' && /CEM\/16.*PF18/.test(e.summary ?? '')));
+    check(log.some((e) => e.action === 'override' && /CEM\/16.*PF18/.test(e.summary ?? '')), 'saving past the caution is an audited override');
+    // Pending changes: the inverted-duty refund paper shows the 57th Council note (input services from 1 Nov 2026).
+    await writeJson(page, 'settings', { ...s0, business_type: 'manufacturer', modules: undefined, mfg_kind: 'textile', mfg_sub: 'garments', industry_packs: ['shopfloor', 'garments'], lock_until: undefined });
+    await page.goto(srv.origin + '/manufacturing?tab=garments&view=inverted');
+    await page.locator('[data-pending="refund"]').filter({ hasText: 'PF1' }).waitFor({ timeout: 15000 });
+    check(/not yet notified/.test(await page.locator('[data-pending="refund"]').innerText()), 'the refund paper: "Recommended … not yet notified" with PF1');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {

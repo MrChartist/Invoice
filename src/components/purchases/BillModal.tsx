@@ -213,7 +213,8 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
   const supplierPayable = supplierPayableOf({ reverseCharge: rcm && !importType, importType: importType || '', tax: totals.tax, taxable: totals.taxable, total: totals.total, cess: totals.cess, tdsOnBill });
 
   const submit = () => {
-    if (tvB?.regime === 'to5' && itc && !blocked && !tvB.itc_reason?.trim()) return setError('ITC on a 5 % trip needs a reason (TV8).'); // R15-B3
+    // R15-B3 / R16-D3: the refusal is translated (the travel strings load with the trip picker).
+    if (tvB?.regime === 'to5' && itc && !blocked && !tvB.itc_reason?.trim()) return void import('../../i18n/areas/travel-r15b').then((m) => setError(m.tvT('needReason')), () => setError('TV8'));
     if (!vendor && !init?.vendor_name) return setError(purT('errVendor'));
     if (!billNumber.trim()) return setError(purT('errBillNo'));
     if (!date) return setError(purT('errBillDate'));

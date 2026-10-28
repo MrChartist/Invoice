@@ -600,6 +600,11 @@ Folio → **Agent commission bill** for a reservation with an agent: `recordComm
 
 #### D2 Editor footer after in-app navigation
 
+> **Status (R16-D): already fixed by QA round 18 T1** (`docs/prd/qa-round-18.md` §2): the size container is now the
+> lines block (`.lines`), the footer sits outside it in `.wrap`, for every route into the editor (the cause was the
+> shared `ItemsTable`, not the route). Pinned by `tests/qa18-travel.test.ts` T1; the e2e checks `footerLaidOut` after 7
+> in-app jumps, and the R15-D reload is gone. R16-D re-verified it (Trips → Bill, no reload) and adds no code.
+
 1. Reproduce: Trips → Bill → `/invoice/<id>`. The items footer has no layout box (`getClientRects()` empty).
 2. Fix the cause in the editor shell (`.wrap` size container), and check the other in-app routes into the editor:
    - Convert from quotation;
