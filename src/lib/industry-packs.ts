@@ -339,6 +339,7 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'travel', alsoPacks: ['events'], path: '/time?tab=trips', labelKey: 'r15.trips' },
   { pack: 'travel', alsoPacks: ['events'], path: '/time?tab=trips&view=trips', labelKey: 'r15.trips.trips' },
   { pack: 'travel', alsoPacks: ['events'], path: '/time?tab=trips&view=bookings', labelKey: 'r15.trips.bookings' },
+  { pack: 'travel', alsoPacks: ['events'], path: '/time?tab=trips&view=statements', labelKey: 'r15.trips.statements' }, // R15-C
 ];
 
 /**
