@@ -42,7 +42,7 @@ import { bankAccountsDb, isClientMoneyAccount } from './bank-accounts'; // R14 P
 import { isLiveCreditNote, linkedCredits, type CreditLinkRow } from './amount-due';
 import { receivableTotal } from './rcm';
 import { isNonGstFinancialNote } from './financial-note';
-import { emiSchedule, type BusinessLoan } from './loans';
+import type { BusinessLoan } from './loans'; // type only: loans.ts stays in the Loans route chunk
 
 /** Open receivable `inr` split over a document's unpaid instalments (one part on `due_date` without a schedule). */
 function scheduledParts(inv: InvoiceRecord, inr: number): { due: string; label: string; amount: number }[] {
@@ -479,12 +479,39 @@ export function gstTdsCommitments(invoices: readonly InvoiceRecord[], purchases:
   return out;
 }
 
+/**
+ * The EMI dates and amounts of `loans.ts` `emiSchedule` (reducing balance, last EMI closes the loan, day clamped to the
+ * month end). Repeated here so the Books chunk does not share the loans module (a new chunk name in the entry's
+ * preload map); `tests/cash-forecast-commitments.test.ts` checks both agree.
+ */
+export function forecastEmis(l: Pick<BusinessLoan, 'principal' | 'rate' | 'tenure_months' | 'first_emi'>): { n: number; date: string; emi: number }[] {
+  const n = Math.floor(num(l.tenure_months));
+  const p0 = num(l.principal);
+  const r = num(l.rate) / 12 / 100;
+  if (!(p0 > 0) || !(n > 0) || !isoDay(l.first_emi)) return [];
+  const f = Math.pow(1 + r, n);
+  const emi = r > 0 ? round2((p0 * r * f) / (f - 1)) : round2(p0 / n);
+  const [y, m, d] = l.first_emi.split('-').map(Number);
+  const out: { n: number; date: string; emi: number }[] = [];
+  let open = round2(p0);
+  for (let k = 1; k <= n && open > 0; k++) {
+    const interest = round2(open * (r > 0 ? r : 0));
+    let principal = round2(emi - interest);
+    if (k === n || principal > open) principal = open;
+    const t = y * 12 + (m - 1) + k - 1;
+    const last = new Date(Math.floor(t / 12), (t % 12) + 1, 0).getDate();
+    out.push({ n: k, date: `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`, emi: round2(principal + interest) });
+    open = round2(open - principal);
+  }
+  return out;
+}
+
 /** Unpaid EMIs of business loans (`business_loans`) up to `end`; an EMI already due is expected today. */
 export function loanCommitments(loans: readonly Pick<BusinessLoan, 'number' | 'lender' | 'principal' | 'rate' | 'tenure_months' | 'first_emi' | 'payments'>[], end: string): ForecastItem[] {
   const out: ForecastItem[] = [];
   for (const l of loans) {
     const paid = new Set((l.payments ?? []).map((p) => p.n));
-    for (const r of emiSchedule(l)) {
+    for (const r of forecastEmis(l)) {
       if (r.date > end) break;
       if (!paid.has(r.n)) out.push({ date: r.date, kind: 'loan', direction: 'out', party: l.lender, ref: `${l.number} EMI ${r.n}`, amount: r.emi, basis: `EMI ${r.n} dated ${fmtDay(r.date)}`, link: '/loans' });
     }

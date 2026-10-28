@@ -24,7 +24,7 @@ import {
   type ReportPeriod,
 } from '../lib/gst-reports';
 import { reportPeriodOfRange } from '../lib/gst-reports';
-import { getPeriodContext, setPeriodRange } from '../lib/period-context'; // PENDING 36
+import { getPeriodContext, setPeriodRange } from '../lib/books'; // PENDING 36 (the shared report period store)
 import {
   buildGstr1Json,
   buildSummaryHtml,

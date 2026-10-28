@@ -2,8 +2,9 @@
 import './helpers/shim.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildForecast, gstTdsCommitments, loanCommitments, payrollCommitments } from '../src/lib/cash-forecast.ts';
+import { buildForecast, forecastEmis, gstTdsCommitments, loanCommitments, payrollCommitments } from '../src/lib/cash-forecast.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
+import { emiSchedule } from '../src/lib/loans.ts';
 
 const TODAY = '2026-10-24';
 const inv = (over: Partial<InvoiceRecord>) =>
@@ -58,4 +59,12 @@ test('loan EMIs not yet paid, and salaries from the latest final run', () => {
   assert.equal(f.items.find((i) => i.ref === 'LOAN/1 EMI 2')?.date, TODAY, 'an EMI already due is expected today');
   assert.equal(f.items.find((i) => i.ref === 'LOAN/1 EMI 2')?.overdue, true);
   assert.equal(f.totals.outflow, 1000 + 1000 + 60000 + 4800);
+});
+
+test('the forecast EMI schedule matches loans.ts emiSchedule (dates and amounts)', () => {
+  for (const l of [
+    { principal: 500000, rate: 10.5, tenure_months: 36, first_emi: '2026-01-31' },
+    { principal: 12000, rate: 0, tenure_months: 7, first_emi: '2026-05-15' },
+    { principal: 99999.99, rate: 18, tenure_months: 1, first_emi: '2026-02-29' },
+  ]) assert.deepEqual(forecastEmis(l), emiSchedule(l).map((r) => ({ n: r.n, date: r.date, emi: r.emi })));
 });
