@@ -65,3 +65,26 @@ export const CANCEL_FEE_RATE_RULES: readonly TvRule<Readonly<Record<TvRegime, nu
 ];
 
 /* ── R15-D: TCS on overseas tour packages, events (TOUR_PACKAGE_TCS_RULES, TCS_NO_PAN_RULES, EVENT_RULES) ─────── */
+
+/** D1: TCS on an overseas tour programme package — a flat rate, or rate slabs over the buyer's FY aggregate. */
+export type TourTcsRule = null | { rate: number } | { slabs: { upTo?: number; rate: number }[] };
+
+export const TOUR_PACKAGE_TCS_RULES: readonly TvRule<TourTcsRule>[] = [
+  { from: '2017-07-01', value: null, source: 'Not in force: Sec 206C(1G)(b) was inserted by the Finance Act 2020 from 1 Oct 2020', verified: false },
+  { from: '2020-10-01', value: { rate: 5 }, source: 'Finance Act 2020, Sec 206C(1G)(b): 5 %, no threshold (as reported; TV2)', verified: false },
+  { from: '2023-10-01', value: { slabs: [{ upTo: 700000, rate: 5 }, { rate: 20 }] }, source: 'Finance Act 2023: 5 % up to ₹7 lakh per buyer per FY, 20 % above (as reported; TV2)', verified: false },
+  { from: '2025-04-01', value: { slabs: [{ upTo: 1000000, rate: 5 }, { rate: 20 }] }, source: 'Finance Act 2025: threshold ₹10 lakh per buyer per FY (restated as current in the Memorandum to the Finance Bill 2026; TV2)', verified: false },
+  { from: '2026-04-01', value: { rate: 2 }, source: 'Income-tax Act 2025 Sec 394(1) Table Sl. No. 8 — Finance Bill 2026 cl. 73(f), Memorandum ¶8; the enacted Act not read (TV1)', verified: false },
+];
+
+/** D1: rate without the buyer's PAN — at least `floor` %, or the higher of twice the rate and `floor` when `twice`. */
+export const TCS_NO_PAN_RULES: readonly TvRule<{ floor: number; twice: boolean } | null>[] = [
+  { from: '2017-07-01', value: null, source: 'No tour-package TCS before 1 Oct 2020', verified: false },
+  { from: '2020-10-01', value: { floor: 10, twice: false }, source: 'Sec 206CC as amended for 206C(1G) by the Finance Act 2020: 10 % (as reported; TV5)', verified: false },
+  { from: '2026-04-01', value: { floor: 5, twice: true }, source: 'Higher of twice the rate or 5 % (the 2025-Act counterpart of 206CC not checked; TV5)', verified: false },
+];
+
+/** D3: the event-management fee (SAC, GST rate). */
+export const EVENT_RULES: readonly TvRule<{ sac: string; rate: number }>[] = [
+  { from: '2017-07-01', value: { sac: '998596', rate: 18 }, source: 'Event management / organisation services, SAC 998596 at 18 % (as reported; TV22)', verified: false },
+];

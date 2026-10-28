@@ -4,7 +4,7 @@
  * (`tcs`, `events`) add one lazy entry each in their block of `VIEWS`. Nothing is read until the tab opens.
  * Working papers — verify with your CA.
  */
-import { Suspense, type ComponentType, type LazyExoticComponent } from 'react';
+import { Suspense, lazy, type ComponentType, type LazyExoticComponent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { tvT } from '../../i18n/areas/travel-r15b';
@@ -22,7 +22,9 @@ const VIEWS: Record<string, View> = {
   bookings: { label: () => tvT('bookings'), C: BookingsView },
   // R15-C
   statements: { label: () => cvT('statements'), C: StatementsView }, // in the desk chunk (a lazy entry's preload list cost more)
-  // R15-D: tcs, events (one `lazy(() => import(…))` entry each)
+  // R15-D (one lazy chunk for both views)
+  tcs: { label: () => tvT('tcs'), C: lazy(() => import('./r15d-views').then((m) => ({ default: m.TcsView }))) },
+  events: { label: () => tvT('event'), C: lazy(() => import('./r15d-views').then((m) => ({ default: m.EventsView }))) },
 };
 
 export default function TripsDesk({ view, notify }: { view?: string; notify: Notify }) {

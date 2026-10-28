@@ -179,3 +179,52 @@ Breakdown (normalized gz): Trips desk chunk +6.1 kB (statements view + import / 
 engine 2.1, bookings actions 0.5, wiring 0.2), `TicketRows` shared chunk 3.5 kB (ticket rows, value engine, the
 strings area 1.4), `file-read` / `file-map` split out of the marketplace chunks +0.4 net, `tv-regime` (rules) +0.3,
 `TravelRows` +0.3, help +0.15, open export +0.1, paper +0.06, the rest < 0.1 each.
+
+## §D — R15-D: outbound, TCS and events (D1–D3)
+
+### What shipped
+
+| Item | Where |
+|---|---|
+| D1 rules | `travel-rules.ts` `// R15-D`: `TOUR_PACKAGE_TCS_RULES` (none → 5 % from 2020-10-01 → 5 % / 20 % slabs over ₹7 lakh from 2023-10-01 → ₹10 lakh from 2025-04-01 → 2 % flat from 2026-04-01), `TCS_NO_PAN_RULES` (10 % floor from 2020-10-01; higher of 2 × rate or 5 % from 2026-04-01), `EVENT_RULES` (SAC 998596, 18 %). Every row `verified: false` (TV1, TV2, TV5, TV22). `tax-rules.ts` untouched. |
+| D1 engine | `travel/tv-tcs.ts`: `tourTcs` (date, base, buyer FY aggregate, PAN, non-resident, stand-alone test `isTourPackage`: travel + stay or a `package` booking; the user's "overseas tour package" tick overrides, TV4), `priorTourBase` (same buyer, same FY, live flagged invoices on or before the date), `tcsPatch` → the invoice's existing `tcs_enabled` / `tcs_rate` / `tcs_base` / `tcs_label` + `tv.tcs {rate, base, label, slab?, nr?, force?, no_pan?}`; the invoice maths computes `tcs_amount`. A crossing invoice stores the blended rate (6 decimals) and prints the split. Labels: `206C(1G) overseas tour package 5 % / 20 %` before 2026-04-01, `Sec 394(1) Sl. 8 — overseas tour package 2 %` after (A4's `actKey` maps both to `206C1G-tour`). |
+| D1 register | No new reader: `tcsRowsLite` / `tcsCollections` / Form 27EQ / 143 read `tcs_amount` as today. `tds-rules.ts` `TCS_27EQ_CODES`: one row `/overseas tour/` with a **blank code** ("to confirm", TV7), placed before the LRS `/1G/` row (see deviations). `tds-returns.ts` `form27EQ`: a blank code takes its reference from the row's own label (fixes the luxury-goods row too). View `tcs`: per buyer per FY (invoices, base, TCS), quarter totals, PAN missing, near the threshold (≥ 80 %, slab years), the TCS base setting (`travel_settings.tcs.base`, owner, TV6), link to `/tds`. |
+| D1 paper | `parts/travel/TcsLine.tsx` in `TravelBlock`: the TCS label and split, and the POS note, from `tv` only. |
+| D2 POS | `travel/tv-pos.ts` `travelPos`: Indian client Sec 12(2) (GSTIN State, else address on record; hotel hint under the agent regime, Sec 12(3)); foreign tourist / agent (`Client.tv`, state 96 or `ps.country`) inbound or domestic → "POS India, not an export" (13(3)(b)); outbound → offers `exempt_outside`. `tripExportCheck` reuses R14 `ps-export-check.ts` (class `physical`, abroad only when outbound) when the user marked an export. `dmcHint`: a foreign DMC's bill on an outbound trip → "no import RCM? verify" (TV20); the bill's RCM default is unchanged. |
+| D2 / D3 editor | `components/travel/TvChips.tsx` (lazy from `TravelRows` once a trip is picked): POS chip + "Use this POS" (sets the place of supply, snapshots `tv.pos_note`), the exempt button, the export check, the event fee rule, and the TCS chip + "Apply TCS" with the package / non-resident ticks. |
+| D3 events | `travel/tv-events.ts`: `cleanEvent` / `saveEvent` (`CostCentre.tv.event` through `saveTrip`), `eventBudget` (approved / booked / billed / paid per head = component id; an unbudgeted component shows with 0; cancelled bookings left out; bills through `readPurchase`), `eventMoney` (invoiced / received on the event's live invoices, the client's open advances via `advanceBalance`), `eventPos` (Sec 12(7)(a)), `vendorTdsHint` (contract work → 194C / Sl. 6(i); artist → 194J / Sl. 6(iii); manpower → contractor only from 2026-04-01 via A4's `MANPOWER_WORK_RULES`). View `events`: particulars + budget heads form, the sheet (over-budget heads in `--destructive`), money line with the margin, POS, each vendor's TDS hint. `TripPick` (bill form) shows the TDS hint and the DMC hint for the picked booking. |
+| Wiring | `TripsDesk` `VIEWS` `tcs` / `events` (one lazy chunk, `r15d-views.ts`); `PACK_TABS` rows; palette `r15.trips.tcs` / `r15.trips.events`; help `time:trips:tcs`, `time:trips:events`; Ctrl+K `time.trips` text; strings `i18n/areas/travel-r15d.ts`. No new table, key or series. Tests: `tv-tcs`, `tv-pos`, `tv-events`, purchase contract (event budget). E2E step "R15-D". |
+
+### Deviations (R15-D)
+
+- **27EQ row placement**: the tour-package row is inserted before the LRS row, not appended — `find` takes the first
+  match and the old-Act label "206C(1G) overseas tour package" would otherwise get the LRS code `6CQ`.
+- **Events margin** = invoiced to the client − cost per head (vendor bills, else booked cost); the trips view's costing
+  (sell-based) is not reused, to keep the events chunk off `tv-costing`.
+- **Chips inside the `TravelRows` chunk** (static import, no nested lazy chunk; smaller in total).
+- **Found, not fixed (for the lead):** after **Bill** on the Trips desk (in-app navigation to `/invoice/<id>`), Chromium
+  leaves the editor's whole items footer (Add line, the trip row, the chips) without a layout box (`getClientRects()`
+  empty, computed `display: flex`; any style change or a reload restores it — likely the `.wrap` size container's
+  relayout on that mount). Opening the draft directly or reloading is fine. The e2e step reloads after Bill.
+- **TDS hint date** = the booking's service date (the bill form has no date in `TripPick`), TV40.
+- **FX** (D2 #4): no change — B's booking form already keeps `cost_currency` / `fx` per booking; the invoice uses its own
+  exchange rate. Cut 2 applied (chip only, no POS rows in the trips view); cut 1 (vendor-advance column) not built.
+- **Demo**: no event / outbound sample data added (`profile-travel.ts` unchanged; size).
+- **CA ids** TV38–TV40 added after R15-C's TV34–TV37 (§15 total 533 → 536).
+
+### Bundle (R15-D)
+
+Before = `claude/elegant-cannon-cwapiv` at 707d210 (R15-C merged), after = this branch merged onto it; gzip -9.
+
+| Budget | Before | After | Delta | Cap |
+|---|---|---|---|---|
+| Initial JS | 186,985 B (182.6 kB) | 186,990 B (182.6 kB) | +5 B (lazy-chunk map) | 0 ✓; 4 initial files |
+| Total JS | 3,500,191 B (3,418.2 kB) | 3,511,596 B (3,429.3 kB) | **+11.1 kB** | 9 kB ✗ (+2.1) |
+
+Breakdown (gz): POS + events engine with the D strings (`tv-events` chunk) 3.8 kB, views chunk (TCS + events) 2.6,
+TCS engine 1.7, editor chips (inside `TravelRows`) ≈ 1.2, rules +0.3 (now a separate `travel-rules` chunk), chunk
+re-split of B's shared modules (`tv-ui` / `tv-regime` → `tv-bookings` / `tv-run` / `TravelRows`) ≈ 0.5, desk 0.4,
+bill-form hints 0.15, paper 0.15, help / palette / packs 0.35. (Measured on the R15-B base before R15-C: +14.5 kB; the
+merge with R15-C's layout and mounting the chips without a nested lazy chunk brought it down.)
+Options for the lead: drop the export-check line in the chip (≈ −0.2), drop the vendor TDS list in the events view (it
+stays on the bill form, ≈ −0.3), drop the "near the threshold" list (history years only, ≈ −0.15).

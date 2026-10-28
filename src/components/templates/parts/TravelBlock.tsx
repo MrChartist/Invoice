@@ -1,6 +1,7 @@
 import type { InvoiceRecord } from '../../../types/invoice';
 import { tvPaper } from '../../../lib/travel/tv-print';
 import styles from './travel-paper.module.css';
+import TcsLine from './travel/TcsLine'; // R15-D
 
 /**
  * R15-B4 travel particulars after the parties (after the professional block, before the GST grid; never on receipt
@@ -11,7 +12,7 @@ import styles from './travel-paper.module.css';
 export default function TravelBlock({ invoice }: { invoice: InvoiceRecord }) {
   if (!invoice.tv) return null;
   const p = tvPaper(invoice.tv);
-  if (!p.rows.length && !p.decl) return null;
+  if (!p.rows.length && !p.decl && !invoice.tv.tcs && !invoice.tv.pos_note) return null;
   return (
     <section className={styles.block} aria-label={p.title} data-travel-block={invoice.tv.regime ?? ''}>
       <div className={styles.title}>{p.title}</div>
@@ -21,6 +22,7 @@ export default function TravelBlock({ invoice }: { invoice: InvoiceRecord }) {
         </dl>
       )}
       {p.decl && <p className={styles.decl} data-travel-decl>{p.decl}</p>}
+      <TcsLine tv={invoice.tv} />
     </section>
   );
 }
