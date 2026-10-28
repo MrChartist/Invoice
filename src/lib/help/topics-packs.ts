@@ -277,5 +277,7 @@ export const TOPICS: readonly HelpTopic[] = [
   // R17-C
   t('time:deploy:compliance', 'Compliance pack', 'अनुपालन पैक', 'PF / ESI of each site\'s people from the final payroll run, shared by duties; TRRN, ESI challan, client hold; minimum-wage and Labour Code checks.', 'Each month after payroll.', { statutory: ca(['MP18', 'MP22', 'MP37', 'MP38', 'MP39']) }),
   t('time:deploy:profit', 'Site P&L', 'साइट का लाभ-हानि', 'Per site and month: billed less wages, relievers, employer PF / ESI and site-tagged bills; margin %. Nothing posts.', 'Each month.', { statutory: ca(['MP25', 'MP26', 'MP40']) }),
+  // R17-D
+  t('time:deploy:statutory', 'Statutory', 'वैधानिक', 'Wage-revision arrears as debit notes per original bill; client TDS expected vs booked per quarter; PSARA / OSH / guard licences and contract ends.', 'Each revision; each quarter.', { statutory: ca(['MP9', 'MP12', 'MP41', 'MP42', 'MP43']) }),
   t('time:trips:events', 'Event budgets', 'इवेंट बजट', 'Budget heads: approved, booked, billed, paid; over-budget heads in red; client advances, margin, POS by Sec 12(7)(a) and each vendor\'s TDS limb (hint).', 'Each event.', { statutory: ca(['TV21', 'TV22', 'TV23']) }),
 ];

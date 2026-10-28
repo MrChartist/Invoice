@@ -354,6 +354,8 @@ export const PACK_TABS: readonly PackTab[] = [
   // R17-C
   { pack: 'manpower', alsoPacks: ['security'], path: '/time?tab=deploy&view=compliance', labelKey: 'r17.deploy.compliance' },
   { pack: 'manpower', alsoPacks: ['security'], path: '/time?tab=deploy&view=profit', labelKey: 'r17.deploy.profit' },
+  // R17-D
+  { pack: 'manpower', alsoPacks: ['security'], path: '/time?tab=deploy&view=statutory', labelKey: 'r17.deploy.statutory' },
 ];
 
 /**

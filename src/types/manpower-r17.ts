@@ -200,3 +200,17 @@ export interface SiteCompliance {
 }
 
 /* ════════════════════════════════════════ R17-D ════════════════════════════════════════ */
+
+/** D1: a late-notified revision may carry the increase per duty itself, an end date and the sites ticked by hand. */
+export interface WageRevision {
+  /** ₹ more a duty from `from` (else `wage_day` less the previous matching revision's). */
+  delta_day?: number;
+  to?: string;
+  /** Sites that pass it through although their escalation is not `vda_pass_through`. */
+  site_ids?: string[];
+}
+
+/** D1: the arrears note's rows (post, service month, duties × increase) for its annexure. */
+export interface MpSnapshot {
+  arrear_rows?: { post: string; month: string; duties: number; delta: number; amount: number }[];
+}

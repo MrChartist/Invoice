@@ -74,3 +74,15 @@ test('readers unchanged: an rcm bill is B2B reverse charge Y and RegRev Y; an ex
   const t8 = buildGstReport([localDb.invoices.getById(ex.id) as InvoiceRecord], [], { period: { kind: 'month', fyStart: 2026, month: 10 } });
   assert.equal(t8.gstr1.nil.reduce((s: number, n: { exempt: number }) => s + n.exempt, 0), 30000);
 });
+
+// R17-D4: notes only — the PF8 pending note on an RCM bill of an agency without a GSTIN; N 5/2017-CT when every
+// manpower bill of the last 12 months was reverse charge.
+test('R17-D4 note ids: PF8 on an unregistered agency\'s RCM bill; the RCM-only registration note', async () => {
+  const { regimeNotes, rcmOnlyNote } = await import('../src/lib/manpower/mp-regime.ts');
+  assert.deepEqual([regimeNotes('rcm', ''), regimeNotes('rcm', '27AAAAA0000A1Z5'), regimeNotes('fwd', '')], [['pf8'], [], []]);
+  const b = (d: string, regime: 'rcm' | 'fwd', o = {}) => ({ issue_date: d, status: 'Sent', doc_type: 'INVOICE', mp: { regime }, ...o }) as never;
+  assert.match(rcmOnlyNote([b('2026-01-31', 'rcm'), b('2026-09-30', 'rcm')], '2026-10-28'), /N 5\/2017-CT.*MP9/);
+  assert.equal(rcmOnlyNote([b('2026-01-31', 'rcm'), b('2026-09-30', 'fwd')], '2026-10-28'), '');
+  assert.match(rcmOnlyNote([b('2025-09-30', 'fwd'), b('2026-09-30', 'rcm'), b('2026-09-30', 'fwd', { status: 'Cancelled' })], '2026-10-28'), /MP9/, 'older than 12 months / cancelled ignored');
+  assert.equal(rcmOnlyNote([], '2026-10-28'), '');
+});

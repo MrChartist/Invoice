@@ -49,8 +49,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 14. Professional and knowledge-services firms (Round 14, planned) | PS1–PS44, PS50–PS56, PS60–PS64, PS70–PS85 | 72 | 13 |
 | 15. Travel, tour and event businesses (Round 15, planned) | TV1–TV48 | 48 | 15 |
 | 16. Platform round and the Oct 2026 – Apr 2027 statutory watch (Round 16) | PF1–PF23 | 23 | 5 |
-| 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP40 | 40 | 11 |
-| **Total** | | **607** | **150** |
+| 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP44 | 44 | 12 |
+| **Total** | | **611** | **151** |
 
 ---
 
@@ -1211,9 +1211,9 @@ belong to R16-B / R16-C, PF17–PF18 to R16-D.
 `PF` ids are counted once here. The ★ items (PF1, PF3, PF5, PF7, PF17) change what a document prints or a return
 reports once notified.
 
-## 17. Security, facility-management and manpower-supply agencies (Round 17, ids MP1–MP40)
+## 17. Security, facility-management and manpower-supply agencies (Round 17, ids MP1–MP44)
 
-Added with `docs/prd/round-17.md` (§9: MP1–MP32) by R17-A; MP33–MP36 by R17-B; MP37–MP40 by R17-C. It covers private security agencies (PSARA licensees),
+Added with `docs/prd/round-17.md` (§9: MP1–MP32) by R17-A; MP33–MP36 by R17-B; MP37–MP40 by R17-C; MP41–MP44 by R17-D. It covers private security agencies (PSARA licensees),
 housekeeping / facility-management contractors, contract and temporary staffing firms and labour contractors outside
 construction (R11 CN-D2 keeps those).
 
@@ -1265,8 +1265,12 @@ construction (R11 CN-D2 keeps those).
 | MP38 | Minimum-wage check (R17-C3): wage paid per duty = (run gross − overtime) ÷ the person's duties across all sites; a monthly minimum counts per 26 days; the latest typed revision on or before the month start matching post / zone / skill applies. Is gross the right comparison (basic + VDA only?), and is ÷ 26 right for a monthly-rated minimum? | As stated; warnings only | `mp-wage-check.ts` `shortfalls` | — | — (typed revisions, MP22) |
 | MP39 | Labour Code hints (R17-C3, from 21 Nov 2025): OT below 2 × the ordinary hourly rate taken as (gross − OT) ÷ payable days ÷ 8; "wages" (PF wages) under 50 % of gross less OT; a fixed-term employee = leaving date already set, gratuity after one year; contract-labour licence expected at 20 (CLRA 1970) / 50 (OSH Code) workers at a site. Are these proxies acceptable until the central / State rules are final? | Hints only; `LABOUR_CODE_RULES`, `CONTRACT_LABOUR_THRESHOLD_RULES` `verified: false` | `mp-wage-check.ts` `labourHints`, `manpower-rules.ts` | 2025-11-21 | S (MP16, MP17, MP19, MP20) |
 | MP40 | Site P&L (R17-C2): billed = taxable value of the service month's bills (a grouped bill by its post rows, service charge left out), arrears debit notes in, credit notes out; purchase bills tagged to a site at taxable value plus the GST when no ITC is taken; relievers shown apart. Right for a management view (not the books)? | As stated; nothing posts | `mp-profit.ts`, `mp-sites-io.ts` `siteBills` | — | — |
+| MP41 ★ | Wage-revision arrears (R17-D1): one debit note per original invoice (DBN series, dated the day it is made, linked by `doc_links`) in the original's regime, SAC and line rate — reverse charge carried on an RCM bill, `sv.exempt` on a Sl. 66 bill; amount = Σ duties of the month × the increase per duty (duty basis), else the bill engine re-run at the revised rate (hour / month / cost-plus, cost-plus percentages included) + service charge %; expected client TDS on the note. Debit note or supplementary invoice (setting), and GSTR-1 period of the note? | Debit note by default; GSTR-1 CDNR as any debit note | `mp-arrears.ts`, `mp-draft-io.ts` `makeArrears` | — | — (MP12) |
+| MP42 | TDS receivable by client (R17-D2): per client × FY quarter (by bill date), expected TDS = the `mp.tds` snapshot of each manpower bill / arrears note (194C contractor limb from 1 Apr 2026; a client's typed 194J earlier accepted), booked = TDS recorded on the bill; the Form 16A / Form 131 chase list of R14. Right grouping for the 26AS / AIS match? | As stated | `mp-tds-recv.ts`, R14 `TdsChasePanel` | 2026-04-01 | (MP14, MP15) |
+| MP43 | Licences and renewals (R17-D3): PSARA per State (security pack only), OSH / contract-labour, trade and other licences, guards' own licences and contract end dates in the notification bell at 60 / 30 / 7 days (expired = critical); VDA reminder in April and October when no revision of the month is typed. Are these the right windows (PSARA renewal must be applied for before expiry)? | As stated | `mp-alerts.ts`, `VDA_REVISION_RULES` | — | S (MP22, MP23) |
+| MP44 | Registration note (R17-D4): when every client billed in the last 12 months had a reverse-charge (entry 14) bill, the profile shows the N 5/2017-CT note; an RCM bill of an agency without a GSTIN shows the pending PF8 note (e-invoicing of RCM inward supplies). Is the trigger right when the agency also supplies housekeeping (forward charge) to the same clients? | Note only | `mp-regime.ts` `regimeNotes`, `StatutoryView.tsx` | 2017-06-22 | P N 5/2017-CT (MP9), PIB 8 Oct 2026 (MP30) |
 
-`MP` ids are counted once here. The ★ items (MP1, MP2, MP4, MP6, MP7, MP10, MP12, MP14, MP16, MP29, MP34) change what a
+`MP` ids are counted once here. The ★ items (MP1, MP2, MP4, MP6, MP7, MP10, MP12, MP14, MP16, MP29, MP34, MP41) change what a
 document prints or a return reports.
 
 ## Answers log

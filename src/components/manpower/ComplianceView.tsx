@@ -48,7 +48,7 @@ function Revisions({ notify, onSaved }: MpViewProps & { onSaved: () => void }) {
   };
   return (
     <div data-mp-revisions>
-      {rows.map((r) => <p key={r.id} className={controls.hint} data-mp-rev={r.id}>{r.from} · {[r.post_name, r.zone, r.skill].filter(Boolean).join(' / ') || '*'} · ₹{r.wage_day ?? r.wage_month} · {r.ref}</p>)}
+      {rows.map((r) => <p key={r.id} className={controls.hint} data-mp-rev={r.id}>{r.from} · {[r.post_name, r.zone, r.skill].filter(Boolean).join(' / ') || '*'} · ₹{r.wage_day ?? r.wage_month ?? 0}{r.delta_day ? ` (+₹${r.delta_day})` : ''} · {r.ref}</p>)}
       {can('settings.manage') && (
         <div style={bar}>
           {REV.map((k, i) => <Field key={k} label={mcList('rev', i)}><input className={controls.input} style={{ width: i ? '7rem' : undefined }} type={i === 0 ? 'date' : i === 4 || i === 5 ? 'number' : 'text'} value={d[k] ?? ''} onChange={(e) => setD({ ...d, [k]: e.target.value })} data-mp-rev-field={k} /></Field>)}

@@ -5679,6 +5679,59 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R17-D arrears, receivables and renewals: seed Sunrise (VDA pass-through) with its locked October muster (Guard 122 + Supervisor 31 duties) and the issued RCM bill (₹1,28,600, TDS ₹1,286 expected) → Statutory: revision +₹26 / duty from 1 Oct → Sunrise 153 duties × ₹26 = ₹3,978 → Make debit notes → a DEBIT_NOTE with mp.arrear.of = the bill, reverse charge carried, doc_links row; TDS: Sunrise Q3 expected ₹1,286; a PSARA licence valid for 20 more days → reload → the bell lists the renewal', async () => {
+    const keys = ['settings', 'clients', 'cost_centres', 'manpower_settings', 'notes_to_accounts', 'employees', 'site_musters', 'invoices', 'doc_links'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'manpower', manpower_kind: 'security', industry_packs: ['manpower', 'security'], modules: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'manpower_settings', { shift_hours: 12, billing_days: 'calendar', bill_date: 'month_end' });
+    await writeJson(page, 'notes_to_accounts', []);
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-mpd-c1', name: 'E2E-D Sunrise Developers', gstin: '27AAACB2230M1ZW', state_code: '27' }]);
+    const p = (id, name, rate) => ({ id, name, sac: '998525', heads: id === 'g' ? 4 : 1, shift_hours: 12, basis: 'duty', rate });
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), { id: 'e2e-mpd-s1', name: 'E2E-D Sunrise Towers', kind: 'project', client_id: 'e2e-mpd-c1', active: true, status: 'active', start: '2026-01-01', mp: { code: 'S-921', contract: { from: '2026-01-01', escalation: 'vda_pass_through' }, posts: [p('g', 'Guard (12 h)', 800), p('s', 'Supervisor', 1000)], status: 'active' } }]);
+    await writeJson(page, 'site_musters', [...(prev.site_musters ?? []), { id: 'e2e-mpd-m1', site_id: 'e2e-mpd-s1', month: '2026-10', date: '2026-10-31', status: 'locked', updated_at: '2026-10-31T00:00:00.000Z', rows: [['d1', 30], ['d2', 30], ['d3', 31], ['d4', 28], ['dr', 3]].map(([e, d]) => ({ employee_id: `e2e-${e}`, post_id: 'g', duties: d, ...(e === 'dr' ? { relief: true } : {}) })).concat([{ employee_id: 'e2e-ds', post_id: 's', duties: 31 }]) }]);
+    const item = (id, name, q, r) => ({ id, name, hsn: '998525', unit: 'DUTY', quantity: q, rate: r, amount: q * r, type: 'Service', discount_percent: 0, tax_rate: 18 });
+    await writeJson(page, 'invoices', [...(prev.invoices ?? []), { id: 'e2e-mpd-i1', doc_type: 'INVOICE', status: 'Sent', invoice_number: 'INV/E2E-D/0001', issue_date: '2026-10-31', due_date: '2026-11-07', client: { id: 'e2e-mpd-c1', name: 'E2E-D Sunrise Developers', gstin: '27AAACB2230M1ZW', state_code: '27' }, items: [item('l1', 'Guard (12 h)', 122, 800), item('l2', 'Supervisor', 31, 1000)], tax_rate: 18, discount_type: 'PERCENT', discount_rate: 0, shipping: 0, other_charges: 0, amount_paid: 0, currency: 'INR', taxable_value: 128600, tax_amount: 23148, total: 128600, reverse_charge: true, rcm_tax_excluded: true, cost_centre_id: 'e2e-mpd-s1', mp: { month: '2026-10', site: { id: 'e2e-mpd-s1', code: 'S-921', name: 'E2E-D Sunrise Towers' }, regime: 'rcm', basis: 'duty', muster_id: 'e2e-mpd-m1', posts: [{ post: 'Guard (12 h)', sac: '998525', heads: 4, duties: 122, rate: 800, amount: 97600 }, { post: 'Supervisor', sac: '998525', heads: 1, duties: 31, rate: 1000, amount: 31000 }], tds: { section: '194C-1', rate: 1, expected: 1286 } } }]);
+    await readJson(page, 'invoices', [], (v) => v.some((i) => i.id === 'e2e-mpd-i1'), 15000);
+    await readJson(page, 'site_musters', [], (v) => v.some((m) => m.id === 'e2e-mpd-m1'), 15000);
+    await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.id === 'e2e-mpd-s1'), 15000);
+    await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-mpd-c1'), 15000);
+    await readJson(page, 'manpower_settings', {}, (v) => v?.shift_hours === 12 && !v.wage_revisions, 15000);
+    await readJson(page, 'settings', {}, (v) => v.manpower_kind === 'security' && v.industry_packs?.includes('security'), 15000);
+    await page.goto(srv.origin + '/time?tab=deploy&view=statutory');
+    const sv = page.locator('[data-mp-statutory]');
+    await sv.waitFor({ timeout: 15000 });
+    await sv.locator('[data-mp-st="from"]').fill('2026-10-01');
+    await sv.locator('[data-mp-st="delta"]').fill('26');
+    await sv.locator('[data-mp-st="ref"]').fill('E2E VDA Oct 2026');
+    await sv.locator('[data-mp-arr-add]').click();
+    await readJson(page, 'manpower_settings', {}, (v) => v?.wage_revisions?.some((r) => r.delta_day === 26), 15000);
+    const amt = sv.locator('[data-mp-arr-amt="e2e-mpd-i1"]');
+    await amt.waitFor({ timeout: 15000 });
+    check(/122 × ₹26 \+ 31 × ₹26 = ₹3,978/.test(await amt.innerText()), `Sunrise October: 153 duties × ₹26 = ₹3,978 (${await amt.innerText()})`);
+    await sv.locator('[data-mp-arr-make]').click();
+    const dn = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'DEBIT_NOTE' && i.mp?.arrear?.of === 'e2e-mpd-i1'), 15000)).find((i) => i.doc_type === 'DEBIT_NOTE' && i.mp?.arrear?.of === 'e2e-mpd-i1');
+    check(dn?.reverse_charge === true && dn.taxable_value === 3978 && dn.total === 3978 && /^DBN\//.test(dn.invoice_number) && !dn.mp.muster_id, `the debit note: DBN, ₹3,978, reverse charge carried, no tax added (${dn?.invoice_number} ${dn?.total})`);
+    const links = await readJson(page, 'doc_links', [], (v) => v.some((l) => l.from_id === 'e2e-mpd-i1' && l.to_id === dn?.id), 15000);
+    check(links.some((l) => l.from_id === 'e2e-mpd-i1' && l.to_id === dn?.id && l.relation === 'debit_note'), 'linked to the October bill (doc_links)');
+    await sv.locator('[data-mp-arr-raised]').first().waitFor({ timeout: 15000 });
+    check(await sv.locator('[data-mp-arr-make]').count() === 0, 're-running shows the note raised (no second "Make")');
+    check(/1,286/.test(await sv.locator('[data-mp-tds-exp="E2E-D Sunrise Developers"]').first().innerText()), 'TDS receivable: Sunrise Q3 expected ₹1,286 (+ the note\'s share)');
+    await sv.locator('[data-mp-st="kind"]').selectOption('psara');
+    await sv.locator('[data-mp-st="state"]').fill('MH');
+    await sv.locator('[data-mp-st="no"]').fill('PSARA/E2E/7');
+    await sv.locator('[data-mp-st="till"]').fill(day(20));
+    await sv.locator('[data-mp-lic-add]').click();
+    await readJson(page, 'manpower_settings', {}, (v) => v?.licences?.some((l) => l.no === 'PSARA/E2E/7'), 15000);
+    await page.reload();
+    await page.getByRole('button', { name: /^Notifications/ }).click({ timeout: 15000 });
+    await page.getByRole('dialog', { name: 'Notifications' }).getByText(/PSARA licence PSARA\/E2E\/7/).first().waitFor({ timeout: 15000 });
+    check(true, 'the bell lists the PSARA licence expiring in 20 days');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {

@@ -81,3 +81,13 @@ export const CONTRACT_LABOUR_THRESHOLD_RULES: readonly MpRule<number>[] = [
 ];
 
 /* ── R17-D: VDA_REVISION_RULES (D1) ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Months in which the central-sphere VDA is revised (reminder only: the amounts are typed by the user, never stored
+ * here) and the days before a licence / contract end at which the bell warns (D3).
+ */
+export interface VdaRevision { months: readonly number[]; alert_days: readonly number[] }
+
+export const VDA_REVISION_RULES: readonly MpRule<VdaRevision>[] = [
+  { from: '2017-01-19', value: { months: [4, 10], alert_days: [60, 30, 7] }, source: 'Central-sphere minimum wages: VDA revised every 1 Apr and 1 Oct (CLC orders as reproduced by gconnect; Gulf News Oct 2024). Secondary only (MP22, MP43)', verified: false },
+];

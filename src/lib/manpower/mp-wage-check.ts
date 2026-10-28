@@ -21,7 +21,7 @@ const lc = (s?: string) => (s ?? '').trim().toLowerCase();
 
 /** The revision that applies to a post in a month (most specific among the latest). */
 export function revisionFor(revs: readonly WageRevision[], post: Pick<MpPost, 'name' | 'zone' | 'skill'>, month: string): WageRevision | undefined {
-  const ok = revs.filter((r) => r.from <= `${month}-01` && (!r.post_name || lc(r.post_name) === lc(post.name)) && (!r.zone || lc(r.zone) === lc(post.zone)) && (!r.skill || lc(r.skill) === lc(post.skill)));
+  const ok = revs.filter((r) => r.from <= `${month}-01` && (!r.to || r.to >= `${month}-01`) && (!r.post_name || lc(r.post_name) === lc(post.name)) && (!r.zone || lc(r.zone) === lc(post.zone)) && (!r.skill || lc(r.skill) === lc(post.skill)));
   const n = (r: WageRevision) => Number(!!r.post_name) + Number(!!r.zone) + Number(!!r.skill);
   return ok.sort((a, b) => b.from.localeCompare(a.from) || n(b) - n(a))[0];
 }

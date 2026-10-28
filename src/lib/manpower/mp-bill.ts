@@ -71,9 +71,9 @@ export interface BillPlan {
   mp: MpSnapshot;
 }
 
-/** Invoices (not cancelled) that bill a muster. */
+/** Invoices (not cancelled; credit / debit notes that copied the snapshot left out, R17-D) that bill a muster. */
 export const billsOf = (invoices: readonly InvoiceRecord[], musterId: string): InvoiceRecord[] =>
-  invoices.filter((i) => i.status !== 'Cancelled' && (i.mp?.muster_id === musterId || !!i.mp?.muster_ids?.includes(musterId)));
+  invoices.filter((i) => i.status !== 'Cancelled' && i.doc_type !== 'CREDIT_NOTE' && i.doc_type !== 'DEBIT_NOTE' && (i.mp?.muster_id === musterId || !!i.mp?.muster_ids?.includes(musterId)));
 
 export interface PlanInput {
   month: string;
