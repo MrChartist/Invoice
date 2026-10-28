@@ -8,6 +8,8 @@
 export const TV_TABLES = {
   // R15-B: trip / event components (dated by `start`)
   bookings: 'travel_bookings',
+  // R15-C: supplier statements (BSP / consolidator / bed-bank; rows inside; dated by `period_end`)
+  statements: 'supplier_statements',
 } as const;
 
 /** Company objects (singletons). */
@@ -21,4 +23,5 @@ export const TV_PACKS = ['travel', 'events'] as const;
 /** The date field each dated table is synced / period-locked by (mirrors the `sync-engine.ts` DATED rows). */
 export const TV_DATED: Readonly<Record<string, string>> = {
   travel_bookings: 'start',
+  supplier_statements: 'period_end', // R15-C
 };

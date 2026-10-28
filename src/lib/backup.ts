@@ -516,6 +516,8 @@ const RECORD_TABLES = [
   'edf_register',
   // R15-B: travel bookings (components of a trip / event file)
   'travel_bookings',
+  // R15-C: supplier statements (BSP / consolidator / bed-bank, rows inside)
+  'supplier_statements',
 ];
 /** R4-C6: the record tables, for the open-format export's schema guard. */
 export const BACKUP_RECORD_TABLES: readonly string[] = RECORD_TABLES;
@@ -628,6 +630,8 @@ const ID_TABLES = new Set([
   'edf_register',
   // R15-B: travel bookings (components of a trip / event file)
   'travel_bookings',
+  // R15-C: supplier statements (BSP / consolidator / bed-bank, rows inside)
+  'supplier_statements',
 ]);
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

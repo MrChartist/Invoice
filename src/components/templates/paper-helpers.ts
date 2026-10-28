@@ -272,7 +272,7 @@ export function psLineText(item: { id?: string } | undefined, ps: PsSnapshot | u
 /** R15-B4: ticket particulars under a line from the document's `tv.lines[lineId].tkt` (C1); '' otherwise. */
 export function tvLineText(item: { id?: string } | undefined, tv: TvSnapshot | undefined): string {
   const k = item?.id ? tv?.lines?.[item.id]?.tkt : undefined;
-  return k ? [k.pax, k.airline, k.ticket_no && `Tkt ${k.ticket_no}`, k.pnr && `PNR ${k.pnr}`, k.sector].filter(Boolean).join(' · ') : '';
+  return k ? [k.pax, k.airline, k.ticket_no && `Tkt ${k.ticket_no}`, k.pnr && `PNR ${k.pnr}`, k.sector, k.basic && `Basic ${k.basic.toFixed(2)} + taxes ${(k.taxes ?? 0).toFixed(2)}${k.airline_gst ? ` + airline GST ${k.airline_gst.toFixed(2)}` : ''}`].filter(Boolean).join(' · ') : ''; // R15-C1: fare split
 }
 
 /**

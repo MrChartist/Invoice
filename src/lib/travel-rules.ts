@@ -43,4 +43,25 @@ export const TRAVEL_REGIME_RULES: readonly TvRule<Readonly<Record<TvRegime, TvRe
 
 /* ── R15-C: air tickets, cancellations (AIR_AGENT_VALUE_RULES, AIR_SAC_RULES, CANCEL_FEE_RATE_RULES) ─────────── */
 
+/** Rule 32(3) CGST Rules: the air travel agent's service valued at a % of the basic fare, at the agent's option (TV11). */
+export const AIR_AGENT_VALUE_RULES: readonly TvRule<{ domestic: number; intl: number }>[] = [
+  { from: '2017-07-01', value: { domestic: 5, intl: 10 }, source: 'Rule 32(3) CGST Rules 2017: 5 % of the basic fare (domestic), 10 % (international), at the agent\'s option (as reported; TV11)', verified: false },
+];
+
+/** SAC and GST rate of the agent's own services: air-ticket booking, other travel / hotel bookings (TV11, TV32). */
+export const AIR_SAC_RULES: readonly TvRule<{ air: string; other: string; rate: number }>[] = [
+  { from: '2017-07-01', value: { air: '998551', other: '998552', rate: 18 }, source: 'SAC 998551 / 998552 (reservation services) at 18 % (as reported; TV11, TV32)', verified: false },
+];
+
+/** Airline GST passed through on a ticket (shown, never our output tax): economy / other classes (TV12). */
+export const AIR_FARE_GST_RULES: readonly TvRule<{ economy: number; other: number }>[] = [
+  { from: '2017-07-01', value: { economy: 5, other: 12 }, source: 'N 11/2017-CT(R) heading 9964: air passenger transport, economy 5 %, other 12 % (as reported; TV12)', verified: false },
+  { from: '2025-09-22', value: { economy: 5, other: 18 }, source: 'N 15/2025-CT(R): other than economy 18 % from 22 Sep 2025 (as reported; cut-over by booking date to confirm; TV12)', verified: false },
+];
+
+/** Our cancellation fee takes the rate of the principal supply (Circular 178/10/2022-GST; TV15), by regime. */
+export const CANCEL_FEE_RATE_RULES: readonly TvRule<Readonly<Record<TvRegime, number>>>[] = [
+  { from: '2017-07-01', value: { to5: 5, to18: 18, agent: 18, exempt_outside: 0 }, source: 'Circular 178/10/2022-GST (3 Aug 2022): cancellation charges are consideration for the principal supply, at its rate (as reported; TV15)', verified: false },
+];
+
 /* ── R15-D: TCS on overseas tour packages, events (TOUR_PACKAGE_TCS_RULES, TCS_NO_PAN_RULES, EVENT_RULES) ─────── */

@@ -4,6 +4,7 @@
  * C adds two actions here (Cancel, Ticket — one lazy import each).
  */
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { tvList, tvT } from '../../i18n/areas/travel-r15b';
 import type { TravelBooking, TvComponent } from '../../types/travel-r15';
@@ -18,6 +19,12 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field, ListSelect } from './tv-ui';
 import { runWith, type TvViewProps } from './tv-run';
+import { cvT } from '../../i18n/areas/travel-r15c';
+
+// R15-C: Cancel (C3) and Ticket (C1) actions (in the desk chunk: a lazy import each cost more in preload lists than the code)
+import CancelDialog from './CancelDialog';
+import TicketRows from './TicketRows';
+import { billTickets } from '../../lib/travel/tv-air';
 
 const FILTERS = ['all', 'unconfirmed', 'unbilled', 'unpaid', 'next7'] as const;
 const BSTS = ['held', 'confirmed', 'cancelled'] as const;
@@ -51,6 +58,10 @@ export function BookingTable({ tripId, filter = 'all', notify, onChanged }: { tr
     || (filter === 'unpaid' && !!b.bill_id && d.unpaid.has(b.bill_id))
     || (filter === 'next7' && b.start >= today && b.start <= shiftDay(today, 7))).sort((a, b) => a.start.localeCompare(b.start));
   const set = (b: TravelBooking, p: Partial<TravelBooking>) => { if (run(() => saveBooking({ ...b, ...p }))) changed(); };
+  const [act, setAct] = useState<{ k: 'cancel' | 'ticket'; ids: string[] } | null>(null);
+  const targets = d.rows.filter((b) => act?.ids.includes(b.id));
+  const done = () => { setAct(null); changed(); };
+  const go = useNavigate();
   return (
     <>
       <div className={surface.tableWrap}>
@@ -66,12 +77,16 @@ export function BookingTable({ tripId, filter = 'all', notify, onChanged }: { tr
                 <td className={surface.rowActions}>
                   {b.status === 'held' && <button type="button" className={sm} onClick={() => set(b, { status: 'confirmed' })}>{tvT('confirm')}</button>}
                   {!isBilled(b, d.live) && <button type="button" className={sm} onClick={() => { if (run(() => { removeBooking(b.id, d.live); return true; })) changed(); }}>{tvT('remove')}</button>}
+                  {b.component === 'air' && b.status !== 'cancelled' && !isBilled(b, d.live) && <button type="button" className={sm} onClick={() => setAct({ k: 'ticket', ids: [b.id] })} data-tv-ticket={b.id}>{cvT('ticket')}</button>}
+                  {b.status !== 'cancelled' && <button type="button" className={sm} onClick={() => setAct({ k: 'cancel', ids: [b.id] })} data-tv-cancel-open={b.id}>{tvT('cancellation')}</button>}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {tripId && d.rows.some((b) => b.status !== 'cancelled') && <button type="button" className={sm} style={{ marginTop: '0.5rem' }} onClick={() => setAct({ k: 'cancel', ids: d.rows.filter((b) => b.status !== 'cancelled').map((b) => b.id) })} data-tv-cancel-trip>{cvT('cancelTrip')}</button>}
+      {act && targets.length > 0 && (act.k === 'cancel' ? <CancelDialog key={act.ids.join()} targets={targets} notify={notify} onDone={done} /> : <TicketRows key={act.ids[0]} booking={targets[0]} date={today} onAdd={(t, o) => { const inv = billTickets(targets[0].id, t, o); done(); go(`/invoice/${inv.id}`); }} />)}
       {tripId && <BookingForm tripId={tripId} vendors={d.vendors} onAdd={(b) => { if (run(() => saveBooking(b))) changed(); }} />}
     </>
   );

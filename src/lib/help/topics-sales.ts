@@ -55,4 +55,6 @@ export const TOPICS: readonly HelpTopic[] = [
     steps: ['On the POS bill, tick Home delivery and fill the address and rider.', 'Move the order: packed, out for delivery, delivered.', 'Delivered with cash on delivery records the rider\'s cash.', 'At night, settle the rider: count the cash, any shortage goes to a ledger you pick.'],
     statutory: ca(['RT6']),
   }),
+  // R15-C: supplier statements view of the Trips desk (no PACK_TABS row — first paint stays as it was — so it lives in the /time area)
+  t('time:trips:statements', 'Supplier statements', 'आपूर्तिकर्ता विवरण', 'Import a BSP / consolidator / bed-bank file: matched, differences, ADMs, refunds to pass on. Make bill posts it. Commission due: bill the principal.', 'Each statement.', { statutory: ca(['TV11', 'TV35', 'TV37']) }),
 ];

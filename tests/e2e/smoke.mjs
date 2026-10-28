@@ -5112,6 +5112,72 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  await step('R15-C air tickets and supplier settlement: agent profile; Ticket on an air booking — two economy tickets (basic ₹4,200 each) + ₹600 fee, deemed → service ₹420, GST ₹75.60, fares as pure-agent lines; a 4-row BSP file → 2 matched, 1 ADM ₹3,500, 1 refund to pass on → Make bill; cancel the ticket (airline keeps ₹3,000, our fee ₹500) → credit note + fee at 18 %, trip loss', async () => {
+    const keys = ['settings', 'clients', 'vendors', 'cost_centres', 'travel_bookings', 'travel_settings', 'supplier_statements', 'invoices', 'purchases', 'purchase_returns', 'doc_links', 'import_runs', 'series_counters'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const at = new Date().toISOString();
+    const day = at.slice(0, 10);
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'services', service_kind: 'travel', travel_kind: 'agent', modules: undefined, industry_packs: ['travel'], prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'travel_settings', { regime_default: 'agent', air_value: 'deemed' });
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-c15-c', name: 'E2E C15 Shah', state_code: '27' }]);
+    await writeJson(page, 'vendors', [...(prev.vendors ?? []), { id: 'e2e-c15-bsp', name: 'E2E IATA BSP India' }]);
+    await writeJson(page, 'cost_centres', [...(prev.cost_centres ?? []), { id: 'e2e-c15-trip', name: 'E2E Mumbai — Shah', kind: 'project', client_id: 'e2e-c15-c', active: true, status: 'active', start: day, created_at: at, tv: { code: 'C15-001', kind: 'trip', scope: 'domestic', start: day, regime: 'agent', status: 'confirmed', pax: [{ name: 'Shah', type: 'adult' }] } }]);
+    await writeJson(page, 'travel_bookings', [...(prev.travel_bookings ?? []), { id: 'e2e-c15-air', trip_id: 'e2e-c15-trip', component: 'air', vendor_id: 'e2e-c15-bsp', ref: 'PNRC15', start: day, cost: 10700, sell: 10700, status: 'confirmed', created_at: at }]);
+    await page.goto(srv.origin + '/time?tab=trips&view=bookings');
+    await page.locator('[data-tv-ticket="e2e-c15-air"]').click({ timeout: 15000 });
+    const tk = page.locator('[data-tv-tickets]');
+    await tk.getByRole('button', { name: 'Add ticket' }).click();
+    for (const [i, no] of [[0, '0581234567890'], [1, '0581234567891']]) {
+      await tk.locator('[data-tv-tkt="ticket_no"]').nth(i).fill(no);
+      await tk.locator('[data-tv-tkt="sector"]').nth(i).fill('DEL-BOM');
+      await tk.locator('[data-tv-tkt="basic"]').nth(i).fill('4200');
+      await tk.locator('[data-tv-tkt="taxes"]').nth(i).fill('940');
+      await tk.locator('[data-tv-tkt="airline_gst"]').nth(i).fill('210');
+    }
+    await tk.locator('[data-tv-tkt-fee]').fill('600');
+    check(/420\.00/.test(await tk.locator('[data-tv-tkt-value]').innerText()), 'deemed value 5 % of ₹8,400 = ₹420 shown');
+    check(await tk.locator('[data-tv-fee-high]').count() === 1, 'a fee above the deemed value warns (TV11)');
+    await tk.locator('[data-tv-tkt-add]').click();
+    await page.waitForURL(/\/invoice\//, { timeout: 15000 });
+    const inv = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.tv?.air))).find((i) => i.tv?.air);
+    const svc = inv?.items.find((l) => l.id === inv.tv.air.line_id);
+    check(svc?.rate === 420 && svc.tax_rate === 18 && svc.hsn === '998551' && inv.tax_amount === 75.6, `service line ₹420 at 18 % (SAC 998551), GST ₹75.60 (${inv?.tax_amount})`);
+    check(inv.items.filter((l) => l.charge_head_id === 'rule33' && l.tax_rate === 0 && l.rate === 5350).length === 2 && Object.keys(inv.tv.lines).length === 2, 'two fares as pure-agent lines with the ticket particulars (no nil-rated supply)');
+    await writeJson(page, 'invoices', (await readJson(page, 'invoices', [])).map((i) => (i.id === inv.id ? { ...i, status: 'Sent' } : i)));
+    // BSP statement: two tickets, an ADM and a refund of ticket 1 (no credit note yet).
+    await page.goto(srv.origin + '/time?tab=trips&view=statements');
+    const imp = page.locator('[data-tv-import]');
+    await imp.locator('[data-tv-st-vendor]').selectOption('e2e-c15-bsp');
+    await imp.locator('[data-tv-st-ref]').fill('E2E BSP C15');
+    const csv = `Document Number,Transaction Type,Issue Date,Passenger Name,Gross Fare,Taxes,Commission,Net Remit\n0581234567890,TKTT,${day},SHAH,4200,1150,0,5350\n0581234567891,TKTT,${day},SHAH,4200,1150,0,5350\nADM-C15,ADMA,${day},,3500,0,0,3500\n0581234567890,RFND,${day},SHAH,4200,1150,0,5350\n`;
+    await imp.locator('[data-tv-st-file]').setInputFiles({ name: 'bsp.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+    await imp.locator('[data-tv-st-import]').click({ timeout: 15000 });
+    const st = (await readJson(page, 'supplier_statements', [], (v) => v.some((s) => s.ref === 'E2E BSP C15'))).find((s) => s.ref === 'E2E BSP C15');
+    const by = (f) => st?.rows.filter(f).length;
+    check(by((r) => r.status === 'matched' && r.type === 'TKTT') === 2 && by((r) => r.flag === 'adm' && r.net === 3500) === 1 && by((r) => r.flag === 'refund') === 1, 'the BSP file: 2 matched, 1 ADM ₹3,500, 1 refund to pass on');
+    const run = (await readJson(page, 'import_runs', [])).filter((r) => r.kind === 'supplier_statement');
+    check(run.length >= 1, 'one import run recorded (setup checklist)');
+    await page.locator('[data-tv-statement="E2E BSP C15"] [data-tv-make-bill]').click();
+    const bill = (await readJson(page, 'purchases', [], (v) => v.some((p) => p.bill_number === 'E2E BSP C15'))).find((p) => p.bill_number === 'E2E BSP C15');
+    check(bill?.total === 8850 && bill.itc_eligible === false && bill.vendor_id === 'e2e-c15-bsp', `Make bill → the supplier bill of the net remittance (${bill?.total})`);
+    // Cancel the ticket: airline keeps ₹3,000, our fee ₹500.
+    await page.goto(srv.origin + '/time?tab=trips&view=bookings');
+    await page.locator('[data-tv-cancel-open="e2e-c15-air"]').click({ timeout: 15000 });
+    const cd = page.locator('[data-tv-cancel-dialog]');
+    await cd.locator('[data-tv-cancel="supplier_charge"]').fill('3000');
+    await cd.locator('[data-tv-cancel="fee"]').fill('500');
+    await cd.locator('[data-tv-cancel-plan]').waitFor({ timeout: 15000 });
+    await cd.locator('[data-tv-cancel-go]').click();
+    const docs = await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'CREDIT_NOTE' && i.cost_centre_id === 'e2e-c15-trip'));
+    const cn = docs.find((i) => i.doc_type === 'CREDIT_NOTE' && i.cost_centre_id === 'e2e-c15-trip');
+    const fee = docs.find((i) => i.id !== inv.id && i.doc_type !== 'CREDIT_NOTE' && i.cost_centre_id === 'e2e-c15-trip');
+    check(cn?.taxable_value === 11120 && fee?.items[0].rate === 500 && fee.items[0].tax_rate === 18, `credit note of the ticket invoice + fee draft at 18 % (${cn?.taxable_value}, ${fee?.items[0]?.tax_rate})`);
+    const bk = (await readJson(page, 'travel_bookings', [])).find((b) => b.id === 'e2e-c15-air');
+    check(bk?.status === 'cancelled' && bk.cancel?.supplier_charge === 3000 && bk.cancel.fee === 500, 'the booking is cancelled with the charges: the trip shows ₹2,500 cancellation loss');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {
