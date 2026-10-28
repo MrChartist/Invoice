@@ -93,8 +93,9 @@ No rule row was edited or overwritten; no new dated row was needed.
 
 | Budget | Before (`0dad0d9`) | After | Delta |
 |---|---|---|---|
-| Initial JS (first paint) | 182.6 kB | see final report | ≈ +0.1 kB (`voidHook.paid` call in `localDb`) |
-| Total JS | 3,429.4 kB | see final report | |
+| Initial JS (first paint) | 182.6 kB, 4 files | 182.6 kB, 4 files | ≈ 0 (`voidHook.paid` call in `localDb`, a few bytes) |
+| Entry chunk | 88.6 kB | 88.6 kB | 0 |
+| Total JS | 3,429.4 kB | 3,429.2 kB | ≈ 0 (hash noise of ± 1 kB between builds; the fixes add < 0.3 kB) |
 
 ## 6. Regression tests
 
