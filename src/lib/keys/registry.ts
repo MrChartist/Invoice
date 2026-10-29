@@ -15,10 +15,10 @@ export { NEVER_CLAIM, type NeverClaim } from './never-claim';
 /** The package whose merge makes a row live; `have` = existed before Round 20 (always live). */
 export type KeyPkg = 'have' | 'A' | 'B' | 'C' | 'D';
 /** Packages merged so far. B / C / D: add your letter here (one line) in your merge. */
-export const BUILT: ReadonlySet<KeyPkg> = new Set<KeyPkg>(['have', 'A', 'C', 'D']);
-/** Rows of a built package held back until what they call lands (R20-C: report-row delete / cancel / duplicate wait
- * for B's entry-actions.ts; Ctrl+B basis and Ctrl+M share were cut). Remove an id when its handler ships. */
-export const HELD: ReadonlySet<string> = new Set(['dup.row', 'delete.row', 'cancel.row', 'basis', 'share', 'share.alias']);
+export const BUILT: ReadonlySet<KeyPkg> = new Set<KeyPkg>(['have', 'A', 'B', 'C', 'D']);
+/** Rows of a built package held back until their handler ships (R20-C: report-row delete / cancel need a confirm,
+ * Undo and a report refresh not built yet; Ctrl+B basis and Ctrl+M share were cut). Remove an id when it ships. */
+export const HELD: ReadonlySet<string> = new Set(['delete.row', 'cancel.row', 'basis', 'share', 'share.alias']);
 
 /**
  * Where a key works, most specific first: a field (`field:*`, the focused element sits inside
@@ -119,7 +119,7 @@ stockJournal alt+f7 global A g r:/manufacturing?tab=journal n:books.edit l:K
 physicalStock mod+f7 global A g r:/manufacturing?tab=physical n:books.edit l:H
 payroll mod+shift+f4 global A g r:/payroll n:payroll.view l:Y
 rejOut mod+f5 global B g r:/expenses?tab=returns&new=dn n:books.edit l:X u:claim-tally-only
-rejIn mod+f6 global B g n:doc.create l:I
+rejIn mod+f6 global B g r:/invoice?type=CREDIT_NOTE&rej=1 n:doc.create l:I
 # entry keybar
 accept.voucher mod+a voucher h g x f
 accept.editor mod+a editor B f

@@ -13,6 +13,7 @@ import { setVoucherDate } from '../../../lib/gateway/period';
 import { keysOn } from '../../../lib/keys/stub';
 import { rowById } from '../../../lib/keys/registry';
 import { rowRoute } from '../../../lib/keys/engine';
+import { duplicateRoute } from '../../../lib/keys/entry-actions';
 import { liveReport, putLive, useReportKeys, type LiveReport } from '../../../lib/keys/report-keys';
 import {
   NO_TOOLS, addSel, hideRows, invertSel, shownRows, stepShown, toggleSel, toolsActive, unhideAll, unhideLast,
@@ -167,6 +168,15 @@ export function useDrillRows(count: number, onActivate: (index: number) => void,
     if (!to) return false;
     navigate(to);
   };
+  // Alt+2 (R20-B's route): an unsaved copy of the row's manual voucher or sales document; it numbers on save.
+  const dup = () => {
+    const v = opts.voucher?.(sel);
+    const gw = v?.manualId && GW_KIND[v.kind];
+    const inv = /^\/invoice\/([^/?]+)$/.exec(v?.link ?? '')?.[1];
+    const to = gw && can('books.edit') ? duplicateRoute('voucher', v!.manualId!, gw) : inv && can('doc.create') ? duplicateRoute('invoice', decodeURIComponent(inv)) : '';
+    if (!to) return false;
+    navigate(to);
+  };
   const press = (sel: string) => {
     let el: Element | null = table();
     for (let k = 0; el && k < 8; k++, el = el.parentElement) {
@@ -188,6 +198,7 @@ export function useDrillRows(count: number, onActivate: (index: number) => void,
     },
     insert: opts.voucher && insert,
     'insert.alias': opts.voucher && insert,
+    'dup.row': opts.voucher && dup,
   });
   useReportKeys('report', table, {
     filter: () => setSheet('filter'),

@@ -90,13 +90,13 @@ test('saved views: one default per screen + tab, toggled off again; the flag sur
   assert.equal(defaultView('/books', 'pnl'), undefined);
 });
 
-test('C is built; rows waiting for B (report-row delete / cancel / duplicate) and the cut ones stay hidden', () => {
+test('C is built; report-row delete / cancel and the cut rows stay hidden; Alt+2 duplicate is live', () => {
   assert.ok(BUILT.has('C'));
-  for (const id of ['dup.row', 'delete.row', 'cancel.row', 'basis']) {
+  for (const id of ['delete.row', 'cancel.row', 'basis']) {
     assert.ok(HELD.has(id), id);
     assert.ok(!sheetRows(null).some((r) => r.id === id), `${id} not in the cheat sheet`);
   }
-  for (const id of ['filter', 'select', 'hide', 'unhide', 'views', 'saveView', 'stepNext', 'printReport', 'export', 'insert']) {
+  for (const id of ['filter', 'select', 'hide', 'unhide', 'views', 'saveView', 'stepNext', 'printReport', 'export', 'insert', 'dup.row']) {
     assert.ok(isBuilt(KEY_ROWS.find((r) => r.id === id)!), `${id} built`);
   }
   assert.ok(!KEY_ROWS.some((r) => r.pkg === 'C' && r.scope === 'global'), 'C claims no global key (stub unchanged)');

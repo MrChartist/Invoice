@@ -60,4 +60,7 @@ export const TOPICS: readonly HelpTopic[] = [
   t('inventory:shortbook', 'Short book', 'शॉर्ट बुक', 'Items customers asked for that were not in stock. Make draft purchase orders from them, grouped by the item\'s last supplier; rows close when the stock comes in.', 'Daily at the counter; before you place orders.', {
     steps: ['At the counter, type the item; if it is not found, add it to the short book.', 'Here, check the open rows.', 'Make draft PO, then check quantities and rates on the order.', 'When the stock comes in, tell the customer on WhatsApp.'],
   }),
+  // R21-B: fuel views without a PACK_TABS row live here (their area is Inventory's): shifts / day close, daily sales register.
+  t('inventory:fuel:shift', 'Shift', 'शिफ्ट', 'Open a shift with its attendants and nozzles; type closing readings, test litres and collections; close it; Day close bills the counter litres as one non-GST Bill of Supply per shift with receipts by mode; settle a shortage in cash or write it off.', 'Each shift; day close daily.', { statutory: ca(['FU6', 'FU9', 'FU10', 'FU17', 'FU26', 'FU29']) }),
+  t('inventory:fuel:dsr', 'Daily sales', 'दैनिक बिक्री', 'The daily sales register in the oil-company layout: readings per nozzle, sales per product, collections, credit sales and short / excess; print it.', 'Daily.', { statutory: ca(['FU19']) }),
 ];

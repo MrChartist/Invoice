@@ -22,7 +22,8 @@ import { GstExtrasFields } from '../components/creator/GstExtrasFields';
 import { MobileSaveBar } from '../components/creator/MobileSaveBar';
 import { CustomFieldsCard } from '../components/creator/CustomFieldsCard';
 import { AttachmentsPanel } from '../components/attachments/AttachmentsPanel';
-import { useCreatorKeys, useUnsavedChangesWarning } from '../hooks/useCreatorKeys';
+import { useCreatorKeys, useEditorEntryKeys, useUnsavedChangesWarning } from '../hooks/useCreatorKeys';
+import { keysOn } from '../lib/keys/stub';
 import { useBottomBarInset } from '../hooks/useBottomBarInset';
 
 import { localDb } from '../lib/localDb';
@@ -140,6 +141,8 @@ export function InvoiceCreator() {
     setMissing(false);
     if (id) {
       if (store.id !== id && !store.loadInvoice(id)) setMissing(true);
+      // R20-B Alt+2 (entry-actions `duplicateRoute`): an unsaved copy of this document, new number on save.
+      else if (searchParams.get('dup') && duplicateInEditor()) navigate('/invoice', { replace: true });
       setHasDraft(false);
       return;
     }
@@ -155,13 +158,14 @@ export function InvoiceCreator() {
     const requested = searchParams.get('type');
     if (requested && requested in DOCUMENT_LABELS) {
       store.newDraft(requested as DocumentType); // e.g. /invoice?type=QUOTATION from the palette
+      if (searchParams.get('rej')) store.patch({ goods_returned: true }); // R20-B Ctrl+F6 rejection in
       setHasDraft(false);
       return;
     }
     if (store.id) store.newDraft(); // leaving a saved document → start clean
     const draft = getJson<InvoiceRecord | null>(SINGLETON_KEYS.draft, null);
     setHasDraft(Boolean(draft && !draft.id && !useInvoiceStore.getState().dirty));
-  }, [id, searchParams]);
+  }, [id, searchParams, navigate]);
 
   // Keep the sender snapshot populated for brand-new documents.
   useEffect(() => {
@@ -294,7 +298,7 @@ export function InvoiceCreator() {
   // A4 Alt+P: print the current document; Alt+D: duplicate it into a new unsaved document.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented || keysOn()) return; // R20-B: Tally keys: Alt+D deletes, Alt+2 duplicates
       const k = e.key.toLowerCase();
       if (k === 'p') {
         e.preventDefault();
@@ -321,6 +325,7 @@ export function InvoiceCreator() {
   const saveIssued = useCallback(() => save(), [save]);
   // Ctrl/⌘+S saves, Ctrl/⌘+P previews, Esc leaves.
   useCreatorKeys({ onSave: saveIssued, onPreview: openPreview, onExit: exitCreator });
+  const entryNode = useEditorEntryKeys({ id, save: saveIssued, notify, onChanged: () => setLockTick((t) => t + 1) }); // R20-B
 
   const startNew = (docType?: DocumentType) => {
     useInvoiceStore.getState().newDraft(docType);
@@ -458,7 +463,7 @@ export function InvoiceCreator() {
             <div className={surface.cardBody}>
               <label className={controls.field}>
                 <span className={controls.label}>{t('editor.noteToClient')}</span>
-                <textarea className={controls.textarea} rows={2} value={s.notes} onChange={(e) => s.setNotes(e.target.value)} placeholder={t('editor.notePlaceholder')} />
+                <textarea className={controls.textarea} data-key-field="narration" rows={2} value={s.notes} onChange={(e) => s.setNotes(e.target.value)} placeholder={t('editor.notePlaceholder')} />
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{t('editor.terms')}</span>
@@ -567,6 +572,7 @@ export function InvoiceCreator() {
         <ItemSearchModal isOpen={!!itemTarget} onClose={() => setItemTarget(null)} targetItemId={itemTarget ?? ''} />
       </Suspense>
       {toastNode}
+      {entryNode}
       <ConfirmDialog
         open={!!expiredAsk}
         destructive

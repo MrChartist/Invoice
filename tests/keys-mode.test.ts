@@ -67,10 +67,12 @@ test('engine: mode off fires nothing but Gateway keys on /gateway; a screen hand
   const typing = { tagName: 'INPUT', closest: () => null } as unknown as EventTarget;
   assert.equal(candidates('f8', typing).length, 0, 'never while typing');
   const off = registerKeyActions('voucher', { 'contra.voucher': () => true, 'dup.voucher': () => true });
+  const offC = registerKeyActions('reportRow', { 'dup.row': () => true }); // R20-B: B is built; C is the unbuilt one
   const c = candidates('f4', null);
   assert.equal(c[0].row.id, 'contra', 'an ext row (handled by the Gateway itself) is not run by the engine');
-  assert.equal(candidates('alt+2', null).length, 0, 'rows of an unbuilt package (B) never fire, even with a handler');
+  assert.deepEqual(candidates('alt+2', null).map((x) => x.row.id), ['dup.voucher'], 'rows of an unbuilt package (C) never fire, even with a handler');
   off();
+  offC();
   stub.setKeysLayout('erp9');
   assert.equal(candidates('mod+f8', null)[0]?.row.id, 'creditNote', 'ERP 9: Ctrl+F8 credit note');
 });

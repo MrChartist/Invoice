@@ -165,6 +165,41 @@ simple-mode set, layouts, search, "This screen"), `tests/keys-stub.test.ts` (cla
 Tests: `tests/keys-nav.test.ts` (menus → routes / rights / letters / labels, D rows built and claimed, wizard answer,
 Go To search incl. Hindi, de-duplication, list movement), `tests/search.test.ts` (Go To rows), e2e step "R20-D".
 
+## R20-B — voucher and document entry
+
+Built rows (`BUILT` has `B`): every `pkg: 'B'` row except those listed under "Cut". Everything works with Tally keys on
+(Gateway rows also on `/gateway`); simple mode is unchanged.
+
+| Where | Keys | How |
+|---|---|---|
+| Invoice editor (`useEditorEntryKeys` in `src/hooks/useCreatorKeys.ts`, one call in `InvoiceCreator.tsx`) | Ctrl+A accept · Alt+D delete (Y / N) · Alt+X cancel (reason once) · Alt+2 duplicate · F2 date · Alt+A tax break-up · Alt+Q edit log · line: Ctrl+D remove (Undo re-inserts), Alt+S / Ctrl+Shift+S stock query · picker (`data-key-field="picker"` on the party name and the item name cell): Alt+C create (party: Ledger Creation under Sundry debtors with the typed name, which saves the client; item: stock item create-on-the-fly), Ctrl+Enter Ledger Alteration of the party (else save; `CreateMasterRequest.alter`) · notes (`data-key-field="narration"`): Ctrl+R last notes of this document type | `useKeyActions('editor' / 'line' / 'field:picker' / 'field:narration')`. Engine rule: rows without `inField` (Alt+D, Alt+X, Alt+2, F2 …) fire when focus is not in a text field. In Tally mode the editor's old Alt+D (duplicate) yields to the engine: Alt+D deletes, Alt+2 duplicates |
+| Gateway voucher (`VoucherEntry.tsx`, its own capture listener) | Alt+T post-dated · Ctrl+L optional · "Kind" chip next to the date (Regular / Optional / Post-dated / Memorandum, written through `saveVoucher`) · Ctrl+H single / double entry · Alt+2 duplicate (`?dup=<id>`, new number on save, quitting drops it) · Alt+Q edit log · narration: Ctrl+R last narration of the type · Alt+X explains that a voucher is deleted, not cancelled · Alt+D now stays on a fresh voucher with an Undo toast | `rowFor(e, ids, true)` (every key works in a field, as on the Gateway); twins: the Kind chip and Button-bar entries (Duplicate, Edit history). Typed lines of a new voucher left by Go To are kept in `sessionStorage` (`mrchartist_gw_draft:<TYPE>`, this tab) and come back on the next new voucher of the type; quit / save clear it |
+| Bill / PO / GRN forms (dialogs: the engine stays out, `entryKeyDown` on the `<form>`) | Ctrl+A accept, F2 date (all three) · bill: Alt+D delete (Y / N; Expenses' recycle-bin Undo toast), Alt+Q edit log, Alt+S stock query on a line | `LineItemsEditor` rows carry `data-line` |
+| Global | Ctrl+F5 rejection out (purchase-return debit note), Ctrl+F6 rejection in (`/invoice?type=CREDIT_NOTE&rej=1` → a credit note with "goods came back") | `KEY_CLAIMS` regenerated; the `rejIn` row got its route (one token, lead-reviewed) |
+
+`src/lib/keys/entry-actions.ts` (C's report rows and D's list rows call it): `deleteEntry(kind, id)` /
+`undoDelete(kind, id)` (`invoice` / `voucher` / `purchase`; data-layer delete to the recycle bin, Undo through
+`restoreEntries`, so rights, period lock and module checks run again), `cancelEntry(id, reason, ack?)` /
+`undoCancel(id)` (`cancelDocument` / `reinstateDocument`), `duplicateRoute(kind, id, type?)` (the editor / voucher
+opens an unsaved copy), `rowFor` / `entryKeyDown` (screens that read their own keys), `lastText`,
+`withoutLine`, `acceptForm`, `focusFormDate`. Side sheets: `src/components/keys/EntrySheets.tsx` (one lazy chunk; stock
+query via `loadStockQuery`, tax break-up from the editor totals, `EditLog`, the Y / N
+and reason asks), all `Modal`s in the modal stack. Strings: `keys-r20b`.
+
+Cut — the PRD's ranked cuts 1–3, taken at the 7 kB cap: Alt+R party narration, PgUp / PgDn previous / next entry,
+Ctrl+O party facts; then Ctrl+I more details. Their rows stay built but have no handler, so they never fire and never
+show on the Key bar (the cheat sheet's "All" tab still lists them — a lead call whether to drop the rows). Also cut (cap /
+data model): Ctrl+H "item lines / amount only" in the editor (no such mode exists), Ctrl+Enter alter of an item (saves
+instead), Ctrl+D / Ctrl+O / Alt+A / Ctrl+I on bill forms (the line's remove button stays), Alt+X / Alt+2 on bills, voucher
+cancel (no cancelled state for a voucher without a data change). Tests: `tests/keys-entry.test.ts`; e2e step "R20-B".
+
+| | Base (`67ccabd`) | After R20-B | Change |
+|---|---|---|---|
+| First paint | 177.8 kB | 177.8 kB | 0 (`KEY_CLAIMS` + `mod+f5 mod+f6`, a few bytes) |
+| Core precache | 3,277.2 kB | 3,285.5 kB | +8.3 kB: own code +7.1 (`f-keys` +2.1 entry-actions + `keys-r20b` English, `EntrySheets` 1.5, editor hook 1.5, `VoucherEntry` 1.1, bill / PO / GRN forms 0.6, help + palette 0.3); ≈ +1.3 hash churn across ≈ 700 chunks (the first-paint chunk's hash moves with `KEY_CLAIMS`). Cap 7 kB: own code at the cap after the ranked cuts |
+| Hindi pack | 376.6 kB | 377.1 kB | +0.5 kB (`keys-r20b`) |
+| Hindi in core | 21.8 kB | 21.9 kB | +0.1 |
+
 ## R20-C — report keys
 
 Built on every Books report that uses `useDrillRows` (trial balance, P&L, balance sheet, group summary, registers,
@@ -184,7 +219,7 @@ Day Book, group / ledger vouchers, the Reports hub) and on the Gateway Display v
 | Alt+N / Alt+C / Alt+D | Period columns (focus the picker) / next column set / back to none, on reports with the columns picker | `ReportToolbar.tsx` |
 | Shift+Enter | Day Book: one voucher's ledger lines | `DayBookTab.tsx` (`opts.expand`) |
 | Ctrl+Enter | Group summary ledger row: alter the ledger master; elsewhere = Enter | `opts.master` |
-| Alt+I / Alt+A | Day Book, group / ledger vouchers: a new entry of the row's type on its day (Gateway vouchers take the day through `setVoucherDate`; documents open their usual new form) | `opts.voucher` |
+| Alt+I / Alt+A, Alt+2 | Day Book, group / ledger vouchers: Alt+2 opens an unsaved copy of the row's voucher / document (B's `duplicateRoute`); a new entry of the row's type on its day (Gateway vouchers take the day through `setVoucherDate`; documents open their usual new form) | `opts.voucher` |
 | Ctrl+P / Ctrl+E | Print; press the report's own Export (CSV / Excel) button — no new output code | `useDrillRows` |
 
 **API (D and later reports).** `useDrillRows(count, onActivate, opts?)` keeps its signature and behaviour; the optional
@@ -195,10 +230,12 @@ one registration per scope, and a key goes to the visible part holding the focus
 report hidden under a drill level never answers. The strip mounts through `ReportStrip` (`report-keys.ts`;
 DrillStack, Day Book and the Gateway viewer render one).
 
-**Held / cut.** `HELD` in `registry.ts` keeps built-package rows hidden: `dup.row`, `delete.row`, `cancel.row` (Alt+2 /
-Alt+D / Alt+X from a report row) wait for B's `entry-actions.ts` — remove the ids and add three handlers in
-`useDrillRows` when B lands; `basis` (Ctrl+B, cut 3: including optional / post-dated vouchers needs a ledger-build
-change outside C's files) and `share` / `share.alias` (Ctrl+M / Ctrl+Alt+W: no report has a share sheet to press).
+**Held / cut.** `HELD` in `registry.ts` keeps built-package rows hidden: `delete.row`, `cancel.row` (Alt+D / Alt+X from
+a report row: B's `deleteEntry` / `cancelEntry` are there, but a report row needs the Y / N confirm, the reason box, the
+Undo toast and a ledger refresh of the open report — a follow-up; remove the ids when they ship). Alt+2 (`dup.row`) is
+live: it opens B's `duplicateRoute` for a manual voucher or a sales document. Cut: `basis` (Ctrl+B, cut 3: including
+optional / post-dated vouchers needs a ledger-build change outside C's files) and `share` / `share.alias` (Ctrl+M /
+Ctrl+Alt+W: no report has a share sheet to press).
 Also left out: C8 bank / GST report F-keys (cut 1), the red exception count chip, "Show original" in the views sheet,
 long-press ticking on touch (the Key bar's "Tick a row" and Ctrl / ⌘ + click are the twins).
 
