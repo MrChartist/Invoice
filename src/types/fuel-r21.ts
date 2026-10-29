@@ -130,7 +130,19 @@ declare module '../lib/inventory' {
 /* ════════════════════════════════════════ R21-B ════════════════════════════════════════ */
 
 /** B1: one nozzle's meter reading in a shift. */
-export interface FuReading { nozzle_id: string; opening: number; closing?: number; test_l: number; test_returned: true; reason?: string }
+export interface FuReading {
+  nozzle_id: string;
+  opening: number;
+  closing?: number;
+  test_l: number;
+  test_returned: true;
+  /** Why the opening differs from the previous shift's closing (audited). */
+  reason?: string;
+  /** The totaliser's maximum (it wraps to 0 after it); absent = 10⁷. */
+  max?: number;
+  /** FU9: the typed totaliser reading at each price change inside the shift (in order); absent = all at the opening price. */
+  splits?: number[];
+}
 /** B2: one attendant's collections by mode. */
 export interface FuCollection { attendant: number; mode: 'cash' | 'upi' | 'card' | 'fleet' | 'loyalty' | 'credit'; amount: number; ref?: string }
 
@@ -145,6 +157,8 @@ export interface FuelShift {
   readings: FuReading[];
   collections: FuCollection[];
   status: 'open' | 'closed' | 'posted';
+  /** B2: how each attendant's shortage was settled (a cash receipt or a write-off row on the shift's Bill of Supply). */
+  settled?: { attendant: number; how: 'cash' | 'write_off'; payment_id: string; amount: number }[];
 }
 
 /* ════════════════════════════════════════ R21-C ════════════════════════════════════════ */

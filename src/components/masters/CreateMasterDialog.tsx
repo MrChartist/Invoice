@@ -17,6 +17,8 @@ export interface CreateMasterRequest {
   name?: string;
   /** Group to suggest under "Under". */
   under?: string;
+  /** R20-B Ctrl+Enter: a ledger id (`party:debtor:<id>` …) to alter instead of creating. */
+  alter?: string;
 }
 
 export interface CreateMasterDialogProps extends CreateMasterRequest {
@@ -24,7 +26,7 @@ export interface CreateMasterDialogProps extends CreateMasterRequest {
   notify?: (msg: string, tone?: 'success' | 'error') => void;
 }
 
-export default function CreateMasterDialog({ kind, name, under, onClose, notify }: CreateMasterDialogProps) {
+export default function CreateMasterDialog({ kind, name, under, alter, onClose, notify }: CreateMasterDialogProps) {
   if (kind === 'stockItem' || kind === 'godown') {
     return (
       <Suspense fallback={null}>
@@ -33,11 +35,11 @@ export default function CreateMasterDialog({ kind, name, under, onClose, notify 
     );
   }
   return (
-    <Modal open onClose={() => onClose()} title={kind === 'group' ? mastersT('groupCreation') : mastersT('ledgerCreation')} size="lg">
+    <Modal open onClose={() => onClose()} title={kind === 'group' ? mastersT('groupCreation') : alter ? mastersT('ledgerAlteration') : mastersT('ledgerCreation')} size="lg">
       {kind === 'group' ? (
         <GroupForm mode="create" initialName={name} initialParent={under} onDone={(g) => onClose(g ? { id: g.id, name: g.name } : undefined)} onBack={() => onClose()} notify={notify} />
       ) : (
-        <LedgerForm mode="create" initialName={name} initialGroup={under} onDone={(l) => onClose(l)} onBack={() => onClose()} notify={notify} />
+        <LedgerForm mode={alter ? 'alter' : 'create'} ledgerId={alter} initialName={name} initialGroup={under} onDone={(l) => onClose(l)} onBack={() => onClose()} notify={notify} />
       )}
     </Modal>
   );

@@ -15,7 +15,7 @@ export { NEVER_CLAIM, type NeverClaim } from './never-claim';
 /** The package whose merge makes a row live; `have` = existed before Round 20 (always live). */
 export type KeyPkg = 'have' | 'A' | 'B' | 'C' | 'D';
 /** Packages merged so far. B / C / D: add your letter here (one line) in your merge. */
-export const BUILT: ReadonlySet<KeyPkg> = new Set<KeyPkg>(['have', 'A', 'D']);
+export const BUILT: ReadonlySet<KeyPkg> = new Set<KeyPkg>(['have', 'A', 'B', 'D']);
 
 /**
  * Where a key works, most specific first: a field (`field:*`, the focused element sits inside
@@ -116,7 +116,7 @@ stockJournal alt+f7 global A g r:/manufacturing?tab=journal n:books.edit l:K
 physicalStock mod+f7 global A g r:/manufacturing?tab=physical n:books.edit l:H
 payroll mod+shift+f4 global A g r:/payroll n:payroll.view l:Y
 rejOut mod+f5 global B g r:/expenses?tab=returns&new=dn n:books.edit l:X u:claim-tally-only
-rejIn mod+f6 global B g n:doc.create l:I
+rejIn mod+f6 global B g r:/invoice?type=CREDIT_NOTE&rej=1 n:doc.create l:I
 # entry keybar
 accept.voucher mod+a voucher h g x f
 accept.editor mod+a editor B f
