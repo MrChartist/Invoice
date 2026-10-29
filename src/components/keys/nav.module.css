@@ -1,0 +1,35 @@
+/* R20-D: the "Back to …" chip after Go To — above the Key bar and the phone "Keys" pill (tokens only). */
+.back {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(var(--tab-bar-h, 0px) + 3.75rem);
+  z-index: 24;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.25rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0 0.9rem;
+  border: 1px solid var(--ring);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.back:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .back {
+    min-height: 44px;
+  }
+}

@@ -35,6 +35,7 @@ import { s2T } from '../i18n/areas/sales-r2';
 import { svcT } from '../i18n/areas/service-r3';
 import { loadQuietSettings, quietCustomers } from '../lib/quiet-customers';
 import { DOC_DEFAULT_COLUMNS, docDefaultsToCells } from '../lib/party-defaults'; // R3-B5 CSV columns
+import { useListKeys } from '../lib/keys/use-list-keys'; // R20-D5
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
@@ -155,6 +156,8 @@ export function Clients() {
     setEditing(c);
     setFormOpen(true);
   };
+  // R20-D5 (Tally keys): ↑ ↓ move, Enter edits the party, Alt+D = the row's Delete button.
+  const list = useListKeys(filtered.length, (i) => edit && openEdit(filtered[i].client!), { del: (i) => edit && setDeleting(filtered[i].client!) });
 
   return (
     <div className={surface.page}>
@@ -268,14 +271,14 @@ export function Clients() {
                   <th aria-label={salesT('actions')} />
                 </tr>
               </thead>
-              <tbody>
-                {filtered.map((row) => {
+              <tbody id={list.bodyId}>
+                {filtered.map((row, i) => {
                   const c = row.client!;
                   const b = billed.get(c.name?.trim().toLowerCase() ?? '');
                   const adv = (c.id ? advanceOpen.get(c.id) : 0) || advanceOpen.get(`name:${c.name.trim().toLowerCase()}`) || 0;
                   const waHref = row.party ? whatsappLink(c.phone, buildWhatsAppStatement({ sender, party: row.party, lang: messageLangOf(c) })) : null;
                   return (
-                    <tr key={c.id ?? c.name} data-client-row={c.name}>
+                    <tr key={c.id ?? c.name} data-client-row={c.name} {...list.row(i)}>
                       <td className={styles.cWho}>
                         <div className={styles.who}>
                           <Avatar name={c.name} size={34} square />

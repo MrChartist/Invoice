@@ -45,6 +45,8 @@ import { trT } from '../../i18n/areas/trade-r8c';
 import { startDemoCompany, useDemoPending } from './demo-company';
 import { companiesSupported } from '../../lib/companies';
 import { discoverT } from '../../i18n/areas/discover-r6';
+import { applyTallyAnswer } from '../../lib/keys/nav-actions'; // R20-D4
+import { navT } from '../../i18n/areas/keys-r20d';
 import controls from '../../styles/controls.module.css';
 import styles from './SetupWizard.module.css';
 
@@ -62,6 +64,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
   const [step, setStep] = useState(0);
   const [a, setA] = useState<WizardAnswers>(() => answersFrom(localDb.settings.activeProfile(), localDb.template.get()));
   const [error, setError] = useState('');
+  const [tally, setTally] = useState<boolean | null>(null); // R20-D4: "Have you used Tally before?"
   // Shop mode (8H): what the business does; "full" keeps every module (the default).
   const [business, setBusiness] = useState<BusinessType>(() => localDb.settings.get().business_type ?? 'full');
   // R8-C (TR-C5): the trade under "Wholesale" (business type stays `wholesale`).
@@ -212,6 +215,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
       if (retail) void import('../../lib/retail/rt-profile').then((m) => m.applyRetailSwitches(retail)).catch(() => undefined);
       window.dispatchEvent(new Event(SHOP_MODE_EVENT));
       localDb.template.set(a.templateId);
+      applyTallyAnswer(tally);
       if (fuk) return onClose(fuelLanding(fuk)); // R21-A1
       onClose(lgk ? logisticsLanding(lgk) : soc ? societyLanding(soc) : mfg ? MFG_PROFILES[mfg].landing : agri ? AGRI_PROFILES[agri].landing : trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : prof ? PROF_PROFILES[prof].landing : travel ? TRAVEL_LANDING[travel] : manpower ? MANPOWER_LANDING[manpower] : svc ? SERVICE_PROFILES[svc].landing : BUSINESS_DEFAULTS[business].landing);
     } catch (err) {
@@ -491,6 +495,17 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
                 ))}
               </div>
               <span className={controls.hint}>{setupT('designsAvailable', { n: TEMPLATES.length })}</span>
+            </div>
+            <div className={controls.field}>
+              <span className={controls.label} id="wizard-tally">{navT('qTally')}</span>
+              <div className={styles.choice} role="radiogroup" aria-labelledby="wizard-tally">
+                {([true, false] as const).map((v) => (
+                  <button key={String(v)} type="button" role="radio" aria-checked={tally === v} className={tally === v ? controls.btnPrimary : controls.btnOutline} onClick={() => setTally(v)} data-wizard-tally={v ? 'yes' : 'no'}>
+                    {navT(v ? 'qYes' : 'qNo')}
+                  </button>
+                ))}
+              </div>
+              <span className={controls.hint}>{navT('qHint')}</span>
             </div>
             <div className={controls.field}>
               <button type="button" className={controls.btnOutline} onClick={exploreDemo} disabled={demoBusy}>

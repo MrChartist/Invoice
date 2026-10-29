@@ -63,6 +63,7 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Transactions.module.css';
 import { receivableBalance, receivableTotal } from '../lib/rcm';
+import { useListKeys } from '../lib/keys/use-list-keys'; // R20-D5
 
 // QA10: release a retail bill's exchange receipts / finance DO on delete or cancel, even before any retail screen opened.
 ensureRetailHooks();
@@ -223,6 +224,12 @@ export function Transactions() {
       else next.add(id);
       return next;
     });
+  // R20-D5 (Tally keys): ↑ ↓ Enter open, Space ticks, Alt+D / Alt+2 = the row's Delete / Duplicate buttons.
+  const list = useListKeys(rows.length, (i) => navigate(`/invoice/${rows[i].id}`), {
+    tick: (i) => toggle(rows[i].id),
+    del: (i) => mayDelete(rows[i]) && !isLocked(rows[i]) && setDeleting([rows[i]]),
+    dup: (i) => can('doc.create') && handleDuplicate(rows[i]),
+  });
   const sortBy = (key: SortKey) =>
     setSort((prev) => ({ key, dir: prev.key === key ? (prev.dir === 'asc' ? 'desc' : 'asc') : key === 'client' || key === 'number' ? 'asc' : 'desc' }));
   const ariaSort = (key: SortKey) => (sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
@@ -570,7 +577,7 @@ export function Transactions() {
                   <th aria-label={salesT('actions')} />
                 </tr>
               </thead>
-              <tbody {...virtual.bodyProps}>
+              <tbody {...virtual.bodyProps} id={list.bodyId}>
                 {virtual.slots.map((slot) => {
                   if (slot.kind === 'gap') return <VirtualGap key={slot.key} height={slot.height} colSpan={8} />;
                   const inv = rows[slot.index];
@@ -581,7 +588,7 @@ export function Transactions() {
                   const lockedTitle = salesT('tx.lockedTitle');
                   const num = { number: inv.invoice_number };
                   return (
-                    <tr key={inv.id} aria-selected={selected.has(inv.id)} {...virtual.rowProps(slot.index)}>
+                    <tr key={inv.id} aria-selected={selected.has(inv.id)} {...virtual.rowProps(slot.index)} {...list.row(slot.index)}>
                       <td className={styles.cCheck}>
                         <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggle(inv.id)} aria-label={salesT('tx.select', num)} />
                       </td>
