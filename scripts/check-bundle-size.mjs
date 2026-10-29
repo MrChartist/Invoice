@@ -12,7 +12,8 @@
  *  - Hindi leak: Devanagari string bytes left in English chunks (gz estimate: blank them and re-gzip) stay under
  *    the total cap, and under 1 kB per chunk unless the chunk holds an allow-listed bilingual module;
  *  - every module of an `f-*` chunk matches its family; every `lazy-leaves` / `lazy-leaves-ui` module imports only
- *    first-paint / vendor modules (and is no stylesheet), and each leaves chunk stays under its cap; `html-esc` / `day-math` never reach first paint.
+ *    first-paint / vendor modules (and is no stylesheet), and each leaves chunk stays under its cap; `html-esc` / `day-math` never reach first paint;
+ *  - PERF-6: every module of the `css-maps` chunk is a CSS module whose rules are all local (`cssIsLocal`).
  * Override with env BUDGET_INITIAL_GZ_KB, BUDGET_ENTRY_GZ_KB, BUDGET_TOTAL_GZ_KB, BUDGET_INITIAL_FILES,
  * BUDGET_LANG_HI_GZ_KB, BUDGET_LANG_REGIONAL_GZ_KB, BUDGET_HI_LEAK_GZ_KB.
  */
@@ -20,6 +21,7 @@ import { gzipSync } from 'node:zlib';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cssIsLocal, loadEffects } from './vite-safe-groups.mjs';
 
 const dist = fileURLToPath(new URL('../dist/', import.meta.url));
 const kb = (n) => n / 1024;
@@ -68,9 +70,12 @@ const BUDGET_LANG_REGIONAL = env('BUDGET_LANG_REGIONAL_GZ_KB', 25);
 const BUDGET_HI_LEAK = env('BUDGET_HI_LEAK_GZ_KB', 36);
 const HI_LEAK_PER_CHUNK_KB = 1;
 const LEAVES_MAX_KB = 20;
+// PERF-6 (R21-P3, lead-approved): `lazy-leaves-ui` takes leaves up to 2,500 B (was 1,500), so its cap is 28 kB (was 20).
+const LEAVES_UI_MAX_KB = 28;
 /**
  * Modules allowed to keep Hindi in an English chunk above the per-chunk cap, with the reason: text needed in every
- * UI language (WhatsApp messages, bilingual prints), or Hindi still passed positionally (help, Round 17).
+ * UI language (WhatsApp messages, bilingual prints). PERF-6: help topics, glossary and tips left the list (their Hindi
+ * moved to `lang-hi-help`, scripts/vite-hi-split.mjs `splitHelp`).
  */
 const HI_LEAK_ALLOW = [
   /message-langs\./, // WhatsApp / SMS texts in Hindi, sent from an English interface too
@@ -80,8 +85,6 @@ const HI_LEAK_ALLOW = [
   /gateway\./, // the bilingual Gateway menu (HI_INLINE)
   /einvoice-print\./, // bilingual e-invoice print
   /whats-new\./, // What's new (title + hi per row)
-  /lib\/help\/(glossary|topics-)/, // help topics / glossary: positional Hindi (moved in a later round)
-  /ScreenTip\./, // one-time screen tips (en + hi)
 ];
 
 const meta = (() => {
@@ -176,10 +179,25 @@ if (!meta) {
         const bad = (meta.imports[m] ?? []).filter((d) => !d.fixed);
         if (bad.length) fail(`${file} (${c.name}): ${m} imports lazy code ${bad.map((d) => d.id).slice(0, 3).join(', ')}`);
         if (/\.css$/.test(m)) fail(`${file} (${c.name}): ${m} is a stylesheet (its styles would load with the group)`);
+        // PERF-6: a UI leaf with a load effect would run it whenever any screen loads the group.
+        const src = fileURLToPath(new URL(`../${m}`, import.meta.url));
+        if (c.name === 'lazy-leaves-ui' && /\.tsx?$/.test(m) && existsSync(src)) {
+          const fx = loadEffects(readFileSync(src, 'utf8'), m);
+          if (fx.length) fail(`${file} (lazy-leaves-ui): ${m} does something at load (${fx[0]})`);
+        }
       }
       const n = kb(sizes.get(file) ?? 0);
-      console.log(`${n <= LEAVES_MAX_KB ? 'ok  ' : 'FAIL'} ${`${c.name} (gz)`.padEnd(18)} ${n.toFixed(1).padStart(7)} kB / budget ${LEAVES_MAX_KB} kB`);
-      if (n > LEAVES_MAX_KB) bad = true;
+      const cap = c.name === 'lazy-leaves-ui' ? LEAVES_UI_MAX_KB : LEAVES_MAX_KB;
+      console.log(`${n <= cap ? 'ok  ' : 'FAIL'} ${`${c.name} (gz)`.padEnd(18)} ${n.toFixed(1).padStart(7)} kB / budget ${cap} kB`);
+      if (n > cap) bad = true;
+    }
+    // PERF-6: `css-maps` holds only class maps of CSS modules whose every rule is local (its styles load together).
+    if (c.name === 'css-maps') {
+      for (const m of c.modules) {
+        const src = fileURLToPath(new URL(`../${m}`, import.meta.url));
+        if (!/\.module\.css$/.test(m) || !existsSync(src)) fail(`${file} (css-maps): ${m} is not a CSS module`);
+        else if (!cssIsLocal(readFileSync(src, 'utf8'))) fail(`${file} (css-maps): ${m} has a global rule (:global, an element selector or @page); its styles would apply on every screen that loads the group`);
+      }
     }
   }
   if (!Object.keys(families).length) fail('no f-* family group recorded in build-meta/chunks.json');
