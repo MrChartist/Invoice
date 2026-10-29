@@ -6,15 +6,15 @@
  * stores the file in `doc_inbox`, tries the QR, drafts the bill when it can and returns the route of
  * the inbox row (`/expenses?tab=inbox&doc=<id>`) for the caller to navigate to.
  *
- * PDFs: rendering a PDF page needs a PDF engine (pdf.js) that this app does not ship, so a PDF is
- * kept in the inbox as it is and its QR is not read — scan the printed QR or a photo / screenshot of
- * it instead. Images are size-capped before decoding; nothing leaves the device.
+ * PDFs (8.46): no page is rendered (that needs a PDF engine such as pdf.js, which the app does not ship); instead
+ * the images embedded in the PDF are read (`pdf-images.ts`) and the QR is looked for in them. A QR drawn as
+ * vectors is not found — scan the printed QR or a photo / screenshot of it instead. Images are size-capped before decoding; nothing leaves the device.
  */
 
 import type { InboxDoc, InboxSource } from './doc-inbox';
 import { inboxDb } from './doc-inbox';
-import { decodeEinvoiceQr, type EinvoiceQrData } from './einvoice-qr';
-import { draftFromQr, type CaptureContext } from './bill-capture';
+import { decodeEinvoiceJson, decodeEinvoiceQr, MAX_JSON_TEXT, type EinvoiceJsonData, type EinvoiceQrData } from './einvoice-qr';
+import { draftFromEinvoiceJson, draftFromQr, type CaptureContext } from './bill-capture';
 import { draftsDb, type PurchaseDraft } from './purchase-drafts';
 import { attachFile } from './attachment-upload';
 import { MAX_IMAGE_INPUT_BYTES, MAX_PDF_BYTES, sniffMime, type AttachmentRef } from './attachments';
@@ -53,6 +53,27 @@ export async function readQrFromImage(file: Blob): Promise<string | null> {
   };
   // Full resolution first (dense signed QR), then a scaled copy (very large photos can fail to decode).
   return (await tryOnce()) ?? (await tryOnce({ resizeWidth: 1600, resizeQuality: 'high' }));
+}
+
+/** 8.46: the first e-invoice QR found in an image embedded in a PDF (null when none can be read). */
+export async function readQrFromPdf(file: Blob): Promise<string | null> {
+  if (!qrImageSupported() || file.size > MAX_PDF_BYTES) return null;
+  const { pdfImages } = await import('./pdf-images');
+  const Ctor = (window as unknown as { BarcodeDetector: new (o: { formats: string[] }) => Detector }).BarcodeDetector;
+  const detector = new Ctor({ formats: ['qr_code'] });
+  for (const img of await pdfImages(new Uint8Array(await file.arrayBuffer()))) {
+    let bmp: ImageBitmap | undefined;
+    try {
+      bmp = await createImageBitmap(img.kind === 'jpeg' ? new Blob([img.bytes as BlobPart], { type: 'image/jpeg' }) : new ImageData(img.rgba as never, img.width, img.height));
+      const hit = (await detector.detect(bmp)).map((h) => h.rawValue).find((v) => typeof v === 'string' && v.split('.').length === 3);
+      if (hit) return hit;
+    } catch {
+      /* next image */
+    } finally {
+      bmp?.close();
+    }
+  }
+  return null;
 }
 
 /** Storage-backed capture context: vendors, our GSTINs and state, HSN master rates. */
@@ -102,19 +123,27 @@ export interface CaptureOutcome {
  * bill. Throws a readable error for a file that cannot be kept (type / size).
  */
 export async function openCaptureFromFile(file: File, opts: { source?: InboxSource; intent?: 'bill' | 'expense' } = {}): Promise<CaptureOutcome> {
+  // 8.46: the supplier's e-invoice JSON file → a draft with every line and the GST split (the file itself is not kept).
+  if (/\.json$/i.test(file.name) || file.type === 'application/json') {
+    if (file.size > MAX_JSON_TEXT) throw new Error(capT('tooLarge'));
+    const r = captureFromQrText(await file.text(), opts.source === 'share' ? 'share' : 'paste');
+    const inbox = inboxDb.all().find((d) => d.id === r.inboxId);
+    if (!inbox) throw new Error(r.message);
+    return { inbox, draft: inbox.draft_id ? draftsDb.all().find((d) => d.id === inbox.draft_id) : undefined, qr: inbox.qr, note: '', route: r.route ?? '' };
+  }
   if (file.size > Math.max(MAX_IMAGE_INPUT_BYTES, MAX_PDF_BYTES)) throw new Error(capT('tooLarge'));
   const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
   const mime = sniffMime(head);
   if (!mime) throw new Error(capT('badType'));
   // Decode BEFORE storing: the stored copy of a photo is downscaled, which can make a dense QR unreadable.
   let qrText: string | null = null;
-  if (mime !== 'application/pdf' && opts.intent !== 'expense') qrText = await readQrFromImage(file);
+  if (opts.intent !== 'expense') qrText = mime === 'application/pdf' ? await readQrFromPdf(file).catch(() => null) : await readQrFromImage(file);
   const ref = await attachFile(file);
   const decoded = qrText ? decodeEinvoiceQr(qrText) : null;
   const qr = decoded?.ok ? decoded.data : undefined;
   let note = '';
-  if (mime === 'application/pdf') note = capT('notePdf');
-  else if (opts.intent === 'expense') note = '';
+  if (opts.intent === 'expense') note = '';
+  else if (mime === 'application/pdf' && !qrText) note = capT('notePdf');
   else if (!qrImageSupported()) note = capT('noDetector');
   else if (!qrText) note = capT('noQr');
   else if (!qr) note = capT('notEinvoice');
@@ -139,7 +168,13 @@ const QR_WARN_KEY = { sellerGstin: 'wSeller', buyerGstin: 'wBuyer', docDate: 'wD
  * 8I (8.160): a QR read live by the camera ("Scan bill" in the Expenses header) — keep it in the inbox and draft
  * the bill, like the Inbox tab's camera / paste path. Returns the toast text and the inbox route.
  */
-export function captureFromQrText(text: string, source: 'camera' | 'paste' = 'camera'): { message: string; tone: 'success' | 'error' | 'info'; route?: string } {
+type CaptureToast = { message: string; tone: 'success' | 'error' | 'info'; route?: string; inboxId?: string };
+
+export function captureFromQrText(text: string, source: InboxSource = 'camera'): CaptureToast {
+  // 8.46: the full e-invoice JSON (or the IRP's signed invoice) drafts every line with its GST split.
+  const json = decodeEinvoiceJson(text);
+  if (json.ok === true) return captureJson(json.data, json.warnings, source);
+  if (/^\s*[[{]/.test(text)) return { message: capT(json.error === 'tooLong' ? 'e_tooLong' : 'e_json'), tone: 'error' };
   const res = decodeEinvoiceQr(text);
   if (res.ok === false) return { message: capT(`e_${res.error}`), tone: 'error' };
   const preview = draftFromQr(res.data, captureContext());
@@ -158,6 +193,18 @@ export function captureFromQrText(text: string, source: 'camera' | 'paste' = 'ca
     tone: extra.length ? 'info' : 'success',
     route: `/expenses?tab=inbox&doc=${encodeURIComponent(row.id)}`,
   };
+}
+
+function captureJson(j: EinvoiceJsonData, warnings: readonly (keyof typeof QR_WARN_KEY)[], source: InboxSource): CaptureToast {
+  const row = inboxDb.add({ source, qr: j.qr });
+  const res = draftFromEinvoiceJson(j, captureContext(), { inboxId: row.id });
+  if (res.bill) inboxDb.update(row.id, { draft_id: draftsDb.save(res.bill).id });
+  else inboxDb.update(row.id, { note: capT('creditNote') });
+  notifyInbox();
+  const route = `/expenses?tab=inbox&doc=${encodeURIComponent(row.id)}`;
+  if (!res.bill) return { message: capT('creditNote'), tone: 'info', route, inboxId: row.id };
+  const extra = [...warnings.map((w) => capT(QR_WARN_KEY[w])), ...(res.buyerMismatch ? [capT('warnBuyer', { gstin: j.qr.buyerGstin })] : [])];
+  return { message: `${capT('draftedLines', { no: j.qr.docNo || '—', n: j.lines.length })}${extra.length ? ` ${extra.join(' ')}` : ''}`, tone: extra.length ? 'info' : 'success', route, inboxId: row.id };
 }
 
 function notifyInbox() {
