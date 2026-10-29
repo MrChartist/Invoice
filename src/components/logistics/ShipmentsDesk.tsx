@@ -20,7 +20,11 @@ import RatesView from './RatesView';
 import BillingView from './BillingView';
 import CostingView from './CostingView';
 import CustomsView from './CustomsView';
+import AgentsView from './AgentsView';
+import CourierView from './CourierView';
+import ReportsView from './ReportsView';
 import type { LgViewProps } from './lg-ui';
+import { lgdT } from '../../i18n/areas/logistics-r19d';
 
 type View = { label: () => string; C: ComponentType<LgViewProps> | LazyExoticComponent<ComponentType<LgViewProps>>; pack?: PackId };
 const VIEWS: Record<string, View> = {
@@ -30,8 +34,12 @@ const VIEWS: Record<string, View> = {
   // R19-B
   billing: { label: () => lgbT('billing'), C: BillingView },
   costing: { label: () => lgbT('costing'), C: CostingView },
-  // R19-C: the customs broker desk (pack `customs`) · R19-D (agents, courier, storage)
+  // R19-C: the customs broker desk (pack `customs`)
   customs: { label: () => lgcT('customs'), C: CustomsView, pack: 'customs' },
+  // R19-D (a view whose pack is off is not listed; its URL still opens it)
+  agents: { label: () => lgdT('agents'), C: AgentsView, pack: 'logistics' },
+  courier: { label: () => lgdT('courier'), C: CourierView, pack: 'courier' },
+  reports: { label: () => lgdT('reports'), C: ReportsView },
 };
 
 export default function ShipmentsDesk({ view, notify }: LgViewProps & { view?: string }) {

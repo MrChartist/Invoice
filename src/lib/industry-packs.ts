@@ -382,6 +382,10 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'logistics', alsoPacks: ['customs', 'courier', 'warehouse'], path: '/time?tab=shipments&view=billing', labelKey: 'r19.shipments.billing' },
   { pack: 'logistics', alsoPacks: ['customs', 'courier', 'warehouse'], path: '/time?tab=shipments&view=costing', labelKey: 'r19.shipments.costing' },
   { pack: 'customs', path: '/time?tab=shipments&view=customs', labelKey: 'r19.shipments.customs' }, // R19-C
+  // R19-D: agents, courier, reports (every Round 19 pack, as the desk; the desk lists courier only with its pack); storage was cut (PRD §3 cut 1)
+  { pack: 'logistics', alsoPacks: ['customs', 'courier', 'warehouse'], path: '/time?tab=shipments&view=agents', labelKey: 'r19.shipments.agents' },
+  { pack: 'courier', alsoPacks: ['logistics', 'customs', 'warehouse'], path: '/time?tab=shipments&view=courier', labelKey: 'r19.shipments.courier' },
+  { pack: 'logistics', alsoPacks: ['customs', 'courier', 'warehouse'], path: '/time?tab=shipments&view=reports', labelKey: 'r19.shipments.reports' },
 ];
 
 /**

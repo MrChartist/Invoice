@@ -288,6 +288,10 @@ export const TOPICS: readonly HelpTopic[] = [
   t('time:shipments:costing', 'Costing', 'लागत', 'Job margin: revenue less tagged supplier bills.', 'Each month.', { statutory: ca(['LG34']) }),
   // R19-C
   t('time:shipments:customs', 'Customs', 'सीमा शुल्क', 'SB / BOE numbers from a CSV; duty and CFS paid for the client (Rule 33 checks); deposits applied or refunded; ageing; CB register; KYC.', 'Each import / export job.', { statutory: ca(['LG10', 'LG11', 'LG12', 'LG26', 'LG27']) }),
+  // R19-D
+  t('time:shipments:agents', 'Agents', 'एजेंट', 'Agent notes in their currency, their bills under reverse charge, statement, netting.', 'Each month.', { statutory: ca(['LG3', 'LG17', 'LG30', 'LG31']) }),
+  t('time:shipments:courier', 'Courier', 'कूरियर', 'Zone card, docket import, one bill per customer a month.', 'Each month end.', { statutory: ca(['LG18', 'LG20', 'LG33', 'LG40']) }),
+  t('time:shipments:reports', 'Reports', 'रिपोर्ट', 'Margin by lane, client, salesperson, month; disbursements ageing; CSV.', 'Each month.', { statutory: ca(['LG11', 'LG34']) }),
   // R18-A: the Society desk on Recurring (B–D add bills, gst, dues, funds, registers). Working papers — verify with your CA.
   t('recurring:society', 'Society', 'सोसाइटी', 'Societies, apartment associations and RWAs: units, members and the tariff.', 'Each change.', { statutory: ca(['HS1', 'HS28']) }),
   t('recurring:society:units', 'Units', 'यूनिट', 'Flats and shops: areas, cost, owner, tenant, parking. Import a CSV / XLSX sheet (Template button): a preview first, all or nothing, with an undo copy. Delete (to the recycle bin) works only for a unit with no bills and no member; close a billed unit instead.', 'Each new member.', { statutory: ca(['HS8', 'HS34']) }),

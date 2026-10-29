@@ -16,10 +16,10 @@ import { BACKUP_RECORD_TABLES } from '../src/lib/backup.ts';
 import { PACK_IDS } from '../src/lib/industry-packs.ts';
 
 const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8');
-const A_TABLES = [LG_TABLES.jobs];
+const A_TABLES = [LG_TABLES.jobs, LG_TABLES.manifests]; // + R19-D manifests
 
 test('R19-A block: logistics_settings (settings.manage), lg_jobs (doc.create) — audited, backed up, in the open export, at runtime only; rate sheets cut', () => {
-  assert.deepEqual(LG_TABLE_ACTIONS, { logistics_settings: 'settings.manage', lg_jobs: 'doc.create' });
+  assert.deepEqual(LG_TABLE_ACTIONS, { logistics_settings: 'settings.manage', lg_jobs: 'doc.create', lg_manifests: 'doc.create' }); // R19-D: + manifests (storage cut)
   assert.equal(TABLE_ACTIONS.logistics_settings, 'settings.manage');
   assert.equal(TABLE_ACTIONS.lg_jobs, 'doc.create');
   assert.equal(TABLE_ACTIONS.lg_rate_sheets, undefined, 'cut 2: no rate sheets table');
@@ -44,6 +44,8 @@ test('every writer, the sync engine and the recycle bin import the registry; job
   assert.match(src('lib/trust/recycle-bin.ts'), /import '\.\.\/logistics\/lg-registry';/);
   const sync = src('lib/sync-engine.ts');
   assert.ok(sync.includes("[`${DB_PREFIX}lg_jobs`]: 'date'"), 'lg_jobs dated');
+  assert.ok(sync.includes("[`${DB_PREFIX}lg_manifests`]: 'date'"), 'lg_manifests dated (month end)');
+  assert.equal(TABLE_ACTIONS.lg_storage, undefined, 'R19-D cut 1: no storage table');
   assert.equal(LG_DATED.lg_jobs, 'date');
   const bin = src('lib/trust/recycle-bin.ts');
   for (const t of A_TABLES) assert.ok(bin.includes(`registerRestoreHook('${t}'`), `${t} restore hook`);

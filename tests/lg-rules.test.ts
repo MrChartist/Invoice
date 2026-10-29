@@ -35,7 +35,7 @@ test('engines import only first-paint / family modules; bridges are exactly lg-*
   for (const f of LIB.filter((x) => !bridges.includes(x))) {
     for (const m of src(`lib/logistics/${f}`).matchAll(/^import (?!type )[^'\n]*'([^']+)'/gm)) {
       const p = m[1];
-      const ok = /^\.\/lg-[a-z-]+$/.test(p) ? !p.endsWith('-io') : /^\.\.\/\.\.\/i18n\/areas\/logistics-r19[a-d]$/.test(p) || FIXED.includes(p.replace(/^\.\.\//, '')) || (f === 'lg-save.ts' && p === '../table-txn');
+      const ok = /^\.\/lg-[a-z-]+$/.test(p) ? !p.endsWith('-io') : /^\.\.\/\.\.\/i18n\/areas\/logistics-r19[a-d]$/.test(p) || FIXED.includes(p.replace(/^\.\.\//, '')) || (['lg-save.ts', 'lg-d-save.ts'].includes(f) && p === '../table-txn');
       assert.ok(ok, `${f} imports ${p}`);
     }
   }

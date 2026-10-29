@@ -270,7 +270,6 @@ Chunks (normalized gz): `f-logistics` 4.05 → 8.34 kB (+4.29: the regime, bill 
 used, `logistics-r19b` English); ShipmentsDesk 4.13 → 7.67 kB (+3.55: the Billing and Costing views and the three
 bridges); JobPick 0.53 kB (lazy, bill form); pending note 0.13; demo 0.12; wiring ≈ 0.45 (Expenses 0.11, help 0.10,
 Ctrl+K 0.07, readers `einvoice` 0.06 / `gst-reports` 0.04, palette 0.03, packs 0.02, Time 0.02).
-
 ## R19-C — Customs broker (CHA) desk (disbursements, duty deposits, CB register, KYC)
 
 ### What it does
@@ -400,3 +399,136 @@ Chunks (normalized gz): ShipmentsDesk 7.49 → 10.84 kB (+3.34 kB: CustomsView a
 split A's form helpers into a new shared chunk and cost 1.5 kB more), `f-logistics` 8.15 → 11.56 kB (+3.41 kB: the
 three engines, the `billExtras` arm and the `logistics-r19c` English), LogisticsBlock +0.27 kB (`DisbSchedule`), demo
 +0.12 kB, wiring ≈ 0.3 kB (help 0.11, checklist 0.06, Ctrl+K 0.06, advances 0.02, reach 0.02, Time 0.01, packs 0.01).
+
+## R19-D — Agents, courier and reports
+
+### What it does
+
+- **Overseas agents (D1, view `agents`, pack `logistics`).** An agent is a client + vendor pair (`Vendor.client_id`,
+  R15-A) with `Vendor.lg = { kind, foreign }`; "Add agent" creates both (a foreign agent: client `state_code: '96'`,
+  vendor `non_resident`, `nr_country`). For a job: **"Debit agent"** (`agentNote`): our document in the agent's
+  currency (profit share → the `commission` SAC, freight → the mode's SAC and rate), POS 96 by Sec 13(2), export of
+  services — `EXPORT_LUT` (zero-rated, LUT number / date) when the R4-C register covers the day, else
+  `EXPORT_WITH_PAYMENT` (IGST); `lg = { job_id, job_no, agent: { id, name, kind }, regime, fx, pos_reason }` (LG3,
+  LG30). **"Agent's bill"** (`agentBill`): a purchase booked in ₹ at the typed rate as an import of services under
+  reverse charge (IGST 18 %, ITC; `total` = taxable + IGST, the supplier is owed the taxable — `supplierPayable`
+  agrees), the foreign amount in `PurchaseRecord.lg.fx = { currency, amount, rate }` (LG17); one bill number once per
+  agent. **Statement** by month (or all): our open notes vs their open bills in the currency, net (> 0 = the agent owes
+  us). The agent's own statement is pasted as "job or HBL / HAWB, amount (+ we owe them)" and matched by job
+  (`matchStatement`); the differences are listed. **"Settle by netting"** (`settleAgent`): up to min(ours, theirs),
+  only with "reverse-charge IGST paid" ticked (TV27); pairs oldest first; one receipt per (note, bill) on the note in
+  its currency with `method: 'netting'`, `exchange_purchase_id`, `netting_id` (the R15-A markers, so `movedNoCash`,
+  `nettings()` / `reverseNetting` and the ledger already handle them) and `realised_rate` = the bill's rate, so the
+  ledger clears the creditor at the bill's ₹ and books the exchange difference against the note's rate (`fx-gain`).
+  The FEMA hint (LG31) sits under it; the net receipt / payment is the existing Receivables / Purchases flow.
+- **Courier manifests (D2, view `courier`, pack `courier`).** The zone card (`logistics_settings.zones`: first 500 g,
+  each further 500 g, minimum, RTO %). "Import dockets" for one account customer: a CSV pasted or picked (header
+  `docket,date,zone,kg,l,w,h,pcs,service,pin,value,status,intl,fsc,charge`, any order; `docket`, `date`, `zone`
+  required; dd/mm/yyyy or ISO dates; ≤ 5,000 rows; all or nothing — row errors, duplicates, a docket already on any
+  manifest of the company, or a billed month refuse the file). `docketCharge`: chargeable = max(kg, volume ÷ 5000) up
+  to 0.5 kg (`chargeableWeight`; the divisor a setting, LG33); first 500 g + each further 500 g, the minimum, + RTO %
+  on a returned docket, then + FSC %; a typed `charge` column wins. A declared value above ₹50,000 gives the e-Way hint
+  (LG20). Dockets go into **one `lg_manifests` row per customer × month** (dated by the month end). **"Bill month"**
+  (`billCourierMonth`): every manifest of the period without a live bill → one tax invoice per customer (SAC 996812,
+  the courier rate, POS by Sec 12(8): a registered customer's State, else its State on record, else ours);
+  international dockets (`intl`) on their own document with POS 96 (12(8) proviso, IGST, LG18) — all in **ONE
+  `localDb.invoices.saveMany`**. One line per docket ("Courier charges", the docket in the description, so the
+  catalogue learns one item); `lg = { manifest_id, period, count, kg, pos_reason }`; the paper prints a "Period" row;
+  the docket annexure is a CSV per manifest. Billed state is derived from live bills (`billedManifests`); **"Undo
+  month"** cancels the period's bills (never deleted; numbers stay used; a bill with a receipt stops it) and the
+  manifests are billable again. A manifest no live bill names can be removed (recycle bin).
+- **Reports (D4, view `reports`).** One FY's jobs: margin by lane / client / salesperson / month (B's job costing:
+  `jobPnls` → `groupPnl`), agent balances, disbursements ageing (unrecovered on-behalf bills, recoveries settle the
+  oldest first; 0–30 / 31–60 / 61–90 / 90+ days) — each on screen and as CSV.
+- **Notices (D4).** `lg-alerts.ts` behind ONE bell gate `gate('logistics', '-', …)` (every logistics kind has the
+  pack; `lgNotices` re-checks the packs on every run): a job delivered over 7 days ago (by its last status change,
+  `updated_at`) with no live bill; disbursements on the client's behalf (`PurchaseRecord.lg.on_behalf`, C1) older than
+  30 days not recovered on a live bill of the job (its `lg.disb` schedule, else its `rule33` lines) — so cancelling the
+  reimbursement bill brings the notice back; duty paid (`lg.disb: 'duty'`) above the job's deposits
+  (`AdvanceRecord.lg.job_id`, C2) once its bill of entry is in; last month's manifests unbilled after the 5th.
+- **Checklist, help, Ctrl+K.** Step `lgManifest` (only with the `courier` pack; `LG_STEPS` carries an optional pack);
+  help topics `time:shipments:agents` / `:courier` / `:reports`; palette labels `r19.shipments.agents` / `.courier` /
+  `.reports` (the PACK_TABS rows take every Round 19 pack, as the desk does; the desk lists `courier` only with its
+  pack, its URL still opens it); synonyms (`docket`, `manifest`, `AWB`, `overseas agent`, `profit share`, `job margin`
+  …); the Ctrl+K title `time.shipments` names agents, courier manifests, reports.
+
+### Storage
+
+| Key / field | Kind | Backed up | Synced | Audited | Right |
+|---|---|---|---|---|---|
+| `lg_manifests` | table, dated (`date` = month end) | yes | yes | yes (`Courier manifest`) | `doc.create` |
+| `logistics_settings.zones` | object field | yes | yes | on save | `settings.manage` |
+| `Vendor.lg`, `PurchaseRecord.lg.fx` | additive | yes | yes | yes | — |
+| `lg.manifest_id` / `period` / `count` / `kg` / `agent` / `fx` | record key `lg` | yes | yes | yes | — |
+
+Restore hook: a manifest comes back only while its client lives, no live manifest holds the same customer × month and
+none of its dockets is on another manifest.
+
+### Decisions and cuts
+
+- **Cuts at the 12 kB cap.** After merging the views into the desk chunk and trimming, the package still stood at
+  +12.5 kB, so the PRD §3 order was followed: **cut 1 — D3 storage billing** (no `lg_storage` table registered, no
+  Storage view; `LgStorageRow` / `LgStoragePlan` / `storage_plans` stay declared; LG21 / LG22 / LG41 are not used),
+  **cut 2 — COD remittance** (`LgManifest.cod` / `LgDocket.cod_amount` stay declared; the reader does not fill them),
+  **cut 3 — the TDS-on-receipts view**. Beyond the list: no deposits-position report (C's customs view holds deposits),
+  the agent statement is a pasted list (not the R15-C mapping importer, not stored), no D demo rows, no `network`
+  column, and "Agent notes" sit in the Agents view (pick the job) rather than on the job page.
+- **No bridge.** D creates no `lg-*-io.ts`. After B merged, D reads B's `lg-tax-io.ts` `lutOn` (the LUT of an agent
+  note), `lg-books-io.ts` `jobPnls` and `lg-costing.ts` `groupPnl` (the margin rows). The rest of the shared lazy code is
+  reached from the components layer through `components/logistics/lg-d-seam.ts` (`draftBase` = `makeDraft`,
+  `lutOnDay`, `fxOn` = the currency master's rate, `syncNettedPaid`, `downloadCsv`) and passed to the writers as
+  arguments. `lg-bill.ts` `billExtras` stays empty for D: agent notes and courier bills are documents of their own (not
+  lines of a job bill), and storage was cut. Open for a later round: the agent note could take B's regime engine
+  instead of `agentNote`'s export-of-services rule. **For C:** the notices and the ageing read C's fields as A declared
+  them (`PurchaseRecord.lg.on_behalf` / `disb`, `AdvanceRecord.lg.job_id`, `lg.disb` on the reimbursement bill).
+- **Writers.** `lg-d-save.ts` imports the registry (outside the family) and may import `table-txn`
+  (`tests/lg-rules.test.ts` names it with `lg-save.ts`). Engines `lg-doc` / `lg-courier` / `lg-agents` / `lg-alerts` /
+  `lg-reports` are pure and in `f-logistics`.
+- **Netting in a foreign currency.** `postNetting` refuses foreign-currency invoices, and the shared roll-up
+  `exchangeSettled` summed receipt amounts as rupees. R19-D keeps the R15-A markers and makes the roll-up value a row at
+  its `realised_rate` when it has one (`rt-doc-hooks.ts`, one line; INR rows have none, so R9 / R12 / R15 are
+  unchanged), so the bill's `amount_paid` / `exchange_paid`, reversal (`reverseNetting`) and the ledger agree. The
+  Receivables netting list shows such a row's amount in the note's currency.
+- **Purchases are read as stored** (`total`, `taxable`, `cgst` / `sgst` / `igst`, `date`, `lg`); `lg-agents`,
+  `lg-alerts` and `lg-reports` are in `tests/purchase-contract.test.ts`.
+
+### API for QA
+
+- Courier: `docketCharge(d, zones, settings)`, `docketsFromRows(rows, settings)` → `{ dockets, errors, hints }`,
+  `DOCKET_COLS`, `mergeDockets`, `billedManifests(invoices)`, `planCourierRun(period, manifests, invoices, clients)`,
+  `courierBill(group, ctx)`, `manifestTotals`, `docketRows` (`lg-courier.ts`); writers `loadManifests`,
+  `importDockets(clientId, dockets)`, `deleteManifest(id)`, `billCourierMonth(period, date, base)`,
+  `undoCourierMonth(period)` (`lg-d-save.ts`).
+- Agents: `lgAgents(vendors, clients)`, `agentNote(input, ctx)`, `agentBill(input, id)`, `agentNotes`, `agentBills`,
+  `agentStatement(agent, invoices, purchases, period?)`, `matchStatement(rows, statement, jobs)`, `pairAgent`,
+  `AGENT_KINDS`, `NOTE_KINDS` (`lg-agents.ts`); writers `saveAgent`, `issueAgentNote(input, date, base)`,
+  `saveAgentBill`, `settleAgent(agent, { amount, date, rcmPaid }, sync)` (`lg-d-save.ts`).
+- Documents: `lgDoc`, `svcLine`, `partyPos`, `homeOf`, `liveBills`, `periodOf`, `monthEnd`, `prevPeriod`
+  (`lg-doc.ts`); `docCtx(base, date)` (`lg-d-save.ts`).
+- Notices / reports: `lgAlerts(today, data)`, `lgNotices(ctx)`, `recoveredByJob` (`lg-alerts.ts`); `disbAgeing`
+  (`lg-reports.ts`).
+- Strings: `lgdT` (`i18n/areas/logistics-r19d.ts`, literal Hindi). Tests: `tests/lg-{courier,agents,alerts}.test.ts`,
+  `tests/purchase-contract.test.ts` (R19-D readers); the e2e step "R19-D agents, courier, notices".
+
+### Bundle (R19-D)
+
+Baseline: `origin/claude/elegant-cannon-cwapiv` at `26aecaf` (R19-A + R19-B + pending 16–25), built in this worktree
+(`vite build` + `check-bundle-size`): initial 183.0 kB (4 files), entry 89.0 kB, core 3,237.4 kB, Hindi pack 356.8 kB,
+Hindi in core 21.6 kB, `lazy-leaves` 17.6 kB. Against `f5c9f9b` the same package measured +9.3 kB (raw totals move
+±1 kB between builds). (Before B merged, against `8b3f5a3`: core 3,218.1 → 3,229.7 kB, +11.6 kB, with D's own
+margin engine.)
+
+| Budget | Before | After | Change | Cap |
+|---|---|---|---|---|
+| Initial JS (first paint) | 183.0 kB (4 files) | 183.0 kB (4 files) | 0 (entry, runtime, vendor chunks identical after hash normalisation) | 0 ✓ |
+| Entry chunk | 89.0 kB | 89.0 kB | 0 | — |
+| Core precache (English) | 3,237.4 kB | 3,248.5 kB | **+11.1 kB** (`check-bundle-size`); +9,809 B normalized against `f5c9f9b` | 12 kB ✓ |
+| Hindi pack | 356.8 kB | 358.1 kB | +1.3 kB (`lang-hi-logistics` +1.19 kB; palette / reach / discover areas) | — |
+| Hindi left in core | 21.6 kB | 21.6 kB | 0 (rounded; four Hindi help titles) | 0 ✓ |
+| `lazy-leaves` | 17.6 kB | 17.7 kB | +29 B (`lg-registry.ts` D rows) | — |
+
+Chunks (normalized gz): `f-logistics` +5.18 kB (now 13.52 kB: `lg-doc`, `lg-courier`, `lg-agents`, `lg-alerts`,
+`lg-reports`, `logistics-r19d` English); ShipmentsDesk +4.01 kB (now 11.68 kB: Agents / Courier / Reports views,
+`lg-d-save`, `lg-d-seam` — static in the desk chunk, which saved ≈ 2 kB of per-chunk overhead over lazy views);
+wiring ≈ 0.65 kB (help 0.17, recycle bin 0.09, palette 0.08, Ctrl+K rows 0.07, checklist 0.04, packs 0.04, bell 0.03,
+open export 0.03 …).

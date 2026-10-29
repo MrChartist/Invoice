@@ -15,14 +15,16 @@ export const LG_TABLE_ACTIONS: Readonly<Record<string, AccessAction>> = {
   // R19-A: the settings object is the owner's; jobs are documents (rate sheets: cut 2)
   logistics_settings: 'settings.manage',
   lg_jobs: 'doc.create',
-  // R19-D appends lg_manifests / lg_storage ('doc.create') with its tables
+  // R19-D: courier manifests (storage months were cut, PRD §3 cut 1: no `lg_storage` table)
+  lg_manifests: 'doc.create',
 };
 
 /** Audited tables (every row change logged; deletes go to the recycle bin). `logistics_settings` is audited on save. */
 export const LG_WATCHED: Readonly<Record<string, WatchedTable>> = {
   // R19-A
   lg_jobs: { entity: 'invoice', label: 'Job file' },
-  // R19-D appends lg_manifests ('Courier manifest') / lg_storage ('Storage month')
+  // R19-D
+  lg_manifests: { entity: 'invoice', label: 'Courier manifest' },
 };
 
 /** Idempotent: adds the rows once (never overwrites a row another module set). */
