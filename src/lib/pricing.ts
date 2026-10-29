@@ -70,6 +70,16 @@ export interface Scheme {
   slabs?: BillSlab[];
   /** bill_value: printed name, e.g. "Diwali offer". */
   label?: string;
+  /** PENDING 46: bill_value / combo offers only for these customers (client ids); absent = everyone. */
+  client_ids?: string[];
+  /** PENDING 46: a combo price — `kind: 'bill_value'` with these items at `price` per set (instead of slabs). */
+  combo?: ComboOffer;
+}
+
+/** A combo: every set of `items` (each `qty`) on the bill costs `price` (items after line discounts, before GST). */
+export interface ComboOffer {
+  items: { item_id: string; item_name: string; qty: number }[];
+  price: number;
 }
 
 export interface BillSlab {
@@ -180,7 +190,9 @@ export function resolvePrice(
 export function schemeActive(s: Scheme, day: string): boolean {
   if (s.active === false) return false;
   if (s.kind === 'bill_value') {
-    if (!(s.slabs ?? []).some((x) => num(x.min_value) >= 0 && (num(x.percent) > 0 || num(x.amount) > 0))) return false;
+    if (s.combo) {
+      if (!s.combo.items?.length || !(num(s.combo.price) > 0)) return false;
+    } else if (!(s.slabs ?? []).some((x) => num(x.min_value) >= 0 && (num(x.percent) > 0 || num(x.amount) > 0))) return false;
   } else if ((!(num(s.buy_qty) > 0) || !(num(s.free_qty) > 0)) && !s.free_slabs?.length) return false; // TR-A2: or free slabs
   if (s.valid_from && day < s.valid_from) return false;
   if (s.valid_to && day > s.valid_to) return false;
@@ -205,7 +217,8 @@ export function freeQty(s: Pick<Scheme, 'buy_qty' | 'free_qty'>, paidQty: number
   return Math.floor((paidQty + 1e-9) / buy) * num(s.free_qty);
 }
 
-export const schemeLabel = (s: Pick<Scheme, 'buy_qty' | 'free_qty'> & Partial<Pick<Scheme, 'kind' | 'item_name' | 'free_item_name' | 'label' | 'slabs'>>): string => {
+export const schemeLabel = (s: Pick<Scheme, 'buy_qty' | 'free_qty'> & Partial<Pick<Scheme, 'kind' | 'item_name' | 'free_item_name' | 'label' | 'slabs' | 'combo'>>): string => {
+  if (s.kind === 'bill_value' && s.combo) return `${s.label?.trim() || 'Combo'}: ${s.combo.items.map((x) => `${num(x.qty)} × ${x.item_name}`).join(' + ')} for ₹${num(s.combo.price)}`;
   if (s.kind === 'bill_value') {
     const slabs = (s.slabs ?? []).map((x) => `${num(x.percent) > 0 ? `${num(x.percent)}%` : `₹${num(x.amount)}`} off from ₹${num(x.min_value)}`);
     return `${s.label?.trim() || 'Bill offer'}: ${slabs.join(', ')}`;
@@ -304,7 +317,16 @@ export function validateLevel(level: Pick<PriceLevel, 'id' | 'name' | 'percent_o
 }
 
 /** Validation for the scheme form; '' when fine. */
-export function validateScheme(s: Pick<Scheme, 'item_id' | 'item_name' | 'buy_qty' | 'free_qty' | 'valid_from' | 'valid_to'> & Partial<Pick<Scheme, 'kind' | 'free_item_id' | 'free_item_name' | 'slabs' | 'scope' | 'free_slabs'>>): string {
+export function validateScheme(s: Pick<Scheme, 'item_id' | 'item_name' | 'buy_qty' | 'free_qty' | 'valid_from' | 'valid_to'> & Partial<Pick<Scheme, 'kind' | 'free_item_id' | 'free_item_name' | 'slabs' | 'scope' | 'free_slabs' | 'combo'>>): string {
+  if (s.kind === 'bill_value' && s.combo) {
+    const items = s.combo.items ?? [];
+    if (!items.length || items.some((x) => !(x.item_id || x.item_name?.trim()))) return 'Pick the items of the combo.';
+    if (items.some((x) => !(num(x.qty) > 0) || !Number.isInteger(num(x.qty)))) return 'Each combo item needs a whole quantity above zero.';
+    if (items.length === 1 && num(items[0].qty) < 2) return 'A combo needs two items, or two or more of one item.';
+    if (!(num(s.combo.price) > 0)) return 'Enter the combo price.';
+    if (s.valid_from && s.valid_to && s.valid_to < s.valid_from) return 'The scheme ends before it starts.';
+    return '';
+  }
   if (s.kind === 'bill_value') {
     const slabs = s.slabs ?? [];
     if (!slabs.length) return 'Add at least one bill-value slab.';
@@ -440,7 +462,12 @@ export const schemesDb = {
       ...(s.scope ? { scope: s.scope } : {}),
       ...(s.free_slabs?.length ? { free_slabs: s.free_slabs } : {}),
       ...(s.principal_vendor_id ? { principal_vendor_id: s.principal_vendor_id, claim_basis: s.claim_basis, ...(num(s.claim_rate) > 0 ? { claim_rate: num(s.claim_rate) } : {}) } : {}),
-      ...(s.kind === 'bill_value' ? { slabs: (s.slabs ?? []).map((x) => ({ min_value: round2(num(x.min_value)), ...(num(x.percent) > 0 ? { percent: num(x.percent) } : { amount: round2(num(x.amount)) }) })).sort((a, b) => a.min_value - b.min_value), ...(s.label?.trim() ? { label: s.label.trim() } : {}) } : {}),
+      ...(s.kind === 'bill_value' && !s.combo ? { slabs: (s.slabs ?? []).map((x) => ({ min_value: round2(num(x.min_value)), ...(num(x.percent) > 0 ? { percent: num(x.percent) } : { amount: round2(num(x.amount)) }) })).sort((a, b) => a.min_value - b.min_value) } : {}),
+      ...(s.kind === 'bill_value' && s.label?.trim() ? { label: s.label.trim() } : {}),
+      // PENDING 46: combo price and per-customer offers.
+      ...(s.kind === 'bill_value' && s.combo ? { combo: { items: s.combo.items.map((x) => ({ item_id: x.item_id, item_name: x.item_name.trim(), qty: num(x.qty) })), price: round2(num(s.combo.price)) } } : {}),
+      ...(s.kind === 'bill_value' && s.client_ids?.length ? { client_ids: [...new Set(s.client_ids.filter(Boolean))] } : {}),
+
       created_at: s.created_at || new Date().toISOString(),
     };
     const idx = all.findIndex((x) => x.id === row.id);

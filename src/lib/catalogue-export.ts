@@ -37,7 +37,7 @@ export function catalogueMaps(
   return { images, categories };
 }
 
-export async function exportCatalogueHtml(opts: { cart: boolean; stock?: Map<string, number> }): Promise<string> {
+export async function exportCatalogueHtml(opts: { cart: boolean; stock?: Map<string, number>; currency?: { code: string; rate: number } }): Promise<string> {
   const p = localDb.settings.activeProfile();
   const items = localDb.items.getAll();
   const { images, categories } = catalogueMaps(
@@ -56,5 +56,6 @@ export async function exportCatalogueHtml(opts: { cart: boolean; stock?: Map<str
     images,
     categories,
     cart: opts.cart,
+    ...(opts.currency ? { currency: opts.currency } : {}),
   });
 }

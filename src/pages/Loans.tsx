@@ -6,6 +6,7 @@ import { useToast } from '../components/ui/useToast';
 import {
   deleteLoan,
   deleteLoanPayment,
+  interestCertificate,
   loadLoans,
   loanStatement,
   payEmi,
@@ -16,6 +17,7 @@ import {
 import { A, chartOf, loadUserAccounts } from '../lib/ledger/accounts';
 import { isCashOrBankLedger } from '../lib/bank-ledgers';
 import { toCsv } from '../lib/csv';
+import { getIndianFY } from '../lib/invoice-number';
 import { downloadText } from '../lib/download';
 import { useCan } from '../hooks/useCan';
 import { formatCurrency, formatDate, todayInput } from '../lib/utils';
@@ -50,6 +52,9 @@ export function Loans() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const today = todayInput();
   const cashBank = useMemo(() => chartOf(loadUserAccounts()).filter((a) => isCashOrBankLedger(a)), []);
+  // PENDING 52: prepayment with a re-schedule, and the FY interest certificate.
+  const [prepay, setPrepay] = useState({ amount: '', date: today, mode: 'tenure' as '' | 'emi' | 'tenure' });
+  const [fy, setFy] = useState(() => getIndianFY(today).startYear);
   const refresh = () => setTick((n) => n + 1);
   const run = (fn: () => string) => {
     try {
@@ -87,6 +92,25 @@ export function Loans() {
     for (const r of st.schedule) rows.push([r.n, r.date, r.opening, r.emi, r.interest, r.principal, r.closing, paid.get(r.n)?.voucher_number ?? '']);
     for (const p of loan.payments.filter((x) => x.n === 0)) rows.push(['prepayment', p.date, '', p.principal + p.interest, p.interest, p.principal, '', p.voucher_number]);
     downloadText(`${loan.number.replace(/\//g, '-')}-statement.csv`, toCsv(rows), 'text/csv');
+  };
+
+  const certificateCsv = (loan: BusinessLoan) => {
+    const c = interestCertificate(loan, fy);
+    const rows: unknown[][] = [
+      [loansT('certTitle'), `${loan.lender} · ${loan.number}`],
+      [loansT('certPeriod'), `${c.from} – ${c.to}`],
+      [loansT('certOpening'), c.opening],
+      ...(c.disbursed ? [[loansT('date'), c.disbursed]] : []),
+      [],
+      [loansT('colDate'), loansT('colN'), loansT('colPrincipal'), loansT('colInterest'), loansT('colStatus')],
+      ...c.payments.map((p) => [p.date, p.n || loansT('prepayment'), p.principal, p.interest, p.voucher_number]),
+      [],
+      [loansT('certPrincipal'), c.principal],
+      [loansT('certInterest'), c.interest],
+      [loansT('certClosing'), c.closing],
+      [loansT('certNote')],
+    ];
+    downloadText(`${loan.number.replace(/\//g, '-')}-interest-FY${fy}-${String((fy + 1) % 100).padStart(2, '0')}.csv`, toCsv(rows), 'text/csv');
   };
 
   return (
@@ -155,6 +179,10 @@ export function Loans() {
                     <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => run(() => (postDisbursement(loan.id), loansT('disbursed')))}>{loansT('disburse')}</button>
                   )}
                   <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => statementCsv(loan)}><Download size={14} /> {loansT('statement')}</button>
+                  <select className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))} aria-label={loansT('certPeriod')}>
+                    {[0, 1, 2, 3].map((k) => getIndianFY(today).startYear - k).map((y) => <option key={y} value={y}>FY {y}-{String((y + 1) % 100).padStart(2, '0')}</option>)}
+                  </select>
+                  <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => certificateCsv(loan)} data-loan-cert><Download size={14} /> {loansT('certificate')}</button>
                   {editable && loan.payments.length === 0 && (
                     <button type="button" className={controls.btnDanger} onClick={() => run(() => (deleteLoan(loan.id), loansT('delete')))} aria-label={loansT('delete')}><Trash2 size={16} /></button>
                   )}
@@ -188,7 +216,27 @@ export function Loans() {
                     })}
                   </tbody>
                 </table>
+                {editable && !loan.closed && (
+                  <div className={styles.actions} data-loan-prepay>
+                    <label className={controls.field}><span className={controls.label}>{loansT('prepayAmount')}</span>
+                      <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={prepay.amount} onChange={(e) => setPrepay({ ...prepay, amount: e.target.value })} /></label>
+                    <label className={controls.field}><span className={controls.label}>{loansT('colDate')}</span>
+                      <input className={controls.input} type="date" value={prepay.date} onChange={(e) => setPrepay({ ...prepay, date: e.target.value })} /></label>
+                    <label className={controls.field}><span className={controls.label}>{loansT('reschedule')}</span>
+                      <select className={controls.select} value={prepay.mode} onChange={(e) => setPrepay({ ...prepay, mode: e.target.value as '' | 'emi' | 'tenure' })}>
+                        <option value="tenure">{loansT('reTenure')}</option>
+                        <option value="emi">{loansT('reEmi')}</option>
+                        <option value="">{loansT('reNone')}</option>
+                      </select></label>
+                    <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!(Number(prepay.amount) > 0)} onClick={() => run(() => {
+                      const p = payEmi(loan.id, 0, { date: prepay.date, principal: Number(prepay.amount), interest: 0, ...(prepay.mode ? { reschedule: prepay.mode } : {}) });
+                      setPrepay({ ...prepay, amount: '' });
+                      return loansT('prepaid', { voucher: p.voucher_number });
+                    })}>{loansT('prepay')}</button>
+                  </div>
+                )}
                 <p className={controls.hint}>{loansT('note')}</p>
+
               </div>
             )}
           </section>

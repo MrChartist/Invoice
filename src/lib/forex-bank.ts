@@ -14,7 +14,13 @@
  *    the rupees actually received / settled, the bank is relieved at its carrying value and the
  *    difference is the REALISED exchange gain / loss (4930 Foreign exchange gain / loss);
  *  - `revalue` — period-end restatement of the FCY balance at a typed closing rate (AS 11 / Ind AS 21:
- *    monetary items at the closing rate): the UNREALISED difference, Dr / Cr the bank vs 4930.
+ *    monetary items at the closing rate): the UNREALISED difference, Dr / Cr the bank vs 4930. Optional
+ *    `reverse_on` (PENDING 46): the Journal is a reversing journal, mirrored on that day (`reversalOf`), so the
+ *    next period starts again from the carrying value; the FCY statement shows the reversal row.
+ *  - supplier payment (PENDING 46, `payVendorFromForex`): FCY paid to a supplier from the EEFC account. The rupees
+ *    it settles on the supplier's bills go through `recordSupplierPayment` from this account (bill-wise, oldest
+ *    first, rest on account); the bank is relieved at its carrying value, so a Journal posts only the difference
+ *    (realised gain / loss, 4930). Bills stay in rupees.
  *
  * No live rates: every rate is typed. Working papers — verify the rates and the treatment with your CA.
  * Pure above the "Storage" divider.
@@ -36,6 +42,10 @@ import { generateId, getTable, setTable } from './storage';
 import { requireAccess } from './access';
 import { audit } from './audit';
 import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
+import { PAYMENTS_TABLE, PURCHASES_TABLE, paymentsDb, purchasesDb } from './purchases';
+import { VENDOR_PAYMENTS_TABLE, deleteVendorPayment, planAllocation, recordSupplierPayment, vendorPaymentsDb } from './billwise';
+import { openBillsOf } from './epay-confirm';
+
 
 export const FX_BANK_MOVES_TABLE = 'fx_bank_moves';
 
@@ -60,6 +70,12 @@ export interface FxBankMove {
   /** Counter ledger id (`in` / `out`), e.g. another bank, Sundry debtors, Bank charges. */
   counter_account?: string;
   counter_party?: string;
+  /** `revalue`: the day its Journal reverses (YYYY-MM-DD, after `date`). */
+  reverse_on?: string;
+  /** Supplier payment (`payVendorFromForex`): the `group_id` of its purchase / vendor payment rows and the supplier. */
+  payment_group_id?: string;
+  vendor_id?: string;
+  /** Journal of the difference ('' for a supplier payment settled exactly at the carrying value). */
   voucher_id: string;
   voucher_number: string;
   narration?: string;
@@ -68,12 +84,14 @@ export interface FxBankMove {
 
 export interface FxMovementRow {
   date: string;
-  kind: 'opening' | 'receipt' | FxMoveKind;
+  kind: 'opening' | 'receipt' | FxMoveKind | 'reversal';
   /** Signed FCY (+ in, − out). */
   fcy: number;
   /** Signed rupees on the bank ledger (+ Dr, − Cr). */
   inr: number;
   ref: string;
+  /** The `fx_bank_moves` row behind an entry (delete). */
+  move_id?: string;
 }
 
 export interface ForexData {
@@ -109,9 +127,12 @@ export function fxMovements(account: BankAccount, data: ForexData): FxMovementRo
     if (from && m.date < from) continue;
     const fcy = m.kind === 'in' ? num(m.fcy) : m.kind === 'out' ? -num(m.fcy) : 0;
     const inr = m.kind === 'in' ? num(m.inr) : m.kind === 'out' ? -num(m.carrying) : num(m.diff);
-    rows.push({ date: m.date, kind: m.kind, fcy: round2(fcy), inr: round2(inr), ref: m.voucher_number });
+    rows.push({ date: m.date, kind: m.kind, fcy: round2(fcy), inr: round2(inr), ref: m.voucher_number || m.counter_party || '', move_id: m.id });
+    if (m.kind === 'revalue' && m.reverse_on && m.reverse_on > m.date) rows.push({ date: m.reverse_on, kind: 'reversal', fcy: 0, inr: round2(-num(m.diff)), ref: `${m.voucher_number}-R`, move_id: m.id });
   }
-  rows.sort((a, b) => a.date.localeCompare(b.date) || (a.kind === 'revalue' ? 1 : 0) - (b.kind === 'revalue' ? 1 : 0));
+  // A reversal opens its day; a revaluation closes it.
+  const order = (k: FxMovementRow['kind']) => (k === 'reversal' ? -1 : k === 'revalue' ? 1 : 0);
+  rows.sort((a, b) => a.date.localeCompare(b.date) || order(a.kind) - order(b.kind));
   if (account.fcy_opening !== undefined || account.opening !== undefined) {
     rows.unshift({ date: from, kind: 'opening', fcy: round2(num(account.fcy_opening)), inr: round2(num(account.opening)), ref: '' });
   }
@@ -189,8 +210,11 @@ export function moveVoucherLines(move: Pick<FxBankMove, 'kind' | 'inr' | 'carryi
   return lines;
 }
 
-/** Other postings on a forex account that carry no FCY figure (supplier payments, INR receipts…): counted for a warning. */
-export function inrOnlyPostings(accountId: string, t: { transactions?: readonly Payment[]; invoices?: ForexData['invoices']; currency?: string; purchasePayments?: readonly { bank_account_id?: string }[]; vendorPayments?: readonly { bank_account_id?: string }[] }): number {
+/**
+ * Other postings on a forex account that carry no FCY figure (supplier payments, INR receipts…): counted for a warning.
+ * Supplier payments made through `payVendorFromForex` (their `group_id` in `linkedGroups`) carry one and are not counted.
+ */
+export function inrOnlyPostings(accountId: string, t: { transactions?: readonly Payment[]; invoices?: ForexData['invoices']; currency?: string; purchasePayments?: readonly { bank_account_id?: string; group_id?: string }[]; vendorPayments?: readonly { bank_account_id?: string; group_id?: string }[]; linkedGroups?: ReadonlySet<string> }): number {
   const cur = (t.currency ?? '').toUpperCase();
   const byId = new Map((t.invoices ?? []).map((i) => [i.id, i]));
   let n = 0;
@@ -199,7 +223,7 @@ export function inrOnlyPostings(accountId: string, t: { transactions?: readonly 
     const inv = byId.get(p.invoice_id);
     if (!inv || docCurrency(inv) !== cur) n++;
   }
-  for (const r of [...(t.purchasePayments ?? []), ...(t.vendorPayments ?? [])]) if (r?.bank_account_id === accountId) n++;
+  for (const r of [...(t.purchasePayments ?? []), ...(t.vendorPayments ?? [])]) if (r?.bank_account_id === accountId && !(r.group_id && t.linkedGroups?.has(r.group_id))) n++;
   return n;
 }
 
@@ -254,6 +278,8 @@ export interface FxMoveInput {
   counter_account?: string;
   counter_party?: string;
   narration?: string;
+  /** `revalue`: reverse the Journal on this day (e.g. the first day of the next period). */
+  reverse_on?: string;
 }
 
 /** Record an entry: compute it against the live balances, post its Journal and store it (all or nothing). */
@@ -290,25 +316,89 @@ export function recordFxMove(input: FxMoveInput): FxBankMove {
   } else {
     const plan = planRevaluation({ fcyBalance: fcyBal, inrBalance: inrBal, rate });
     if (Math.abs(plan.diff) < 0.005) throw new ForexBankError('Nothing to revalue: the book balance already equals the balance at that rate.');
-    move = { bank_account_id: acc.id, date, kind: 'revalue', fcy: 0, rate, inr: plan.diff, diff: plan.diff };
-    narration = `Revaluation of ${acc.name}: ${cur} ${money(plan.fcy)} @ ₹${rate} closing rate = ₹${money(plan.restated)} against book ₹${money(plan.book)} — unrealised exchange ${plan.diff >= 0 ? 'gain' : 'loss'} (AS 11; verify with your CA)`;
+    const reverseOn = input.reverse_on ? isoDay(input.reverse_on) : '';
+    if (input.reverse_on && !(reverseOn && reverseOn > date)) throw new ForexBankError('Choose a reversal date after the revaluation date.');
+    move = { bank_account_id: acc.id, date, kind: 'revalue', fcy: 0, rate, inr: plan.diff, diff: plan.diff, ...(reverseOn ? { reverse_on: reverseOn } : {}) };
+    narration = `Revaluation of ${acc.name}: ${cur} ${money(plan.fcy)} @ ₹${rate} closing rate = ₹${money(plan.restated)} against book ₹${money(plan.book)} — unrealised exchange ${plan.diff >= 0 ? 'gain' : 'loss'}${reverseOn ? `, reversed on ${reverseOn}` : ''} (AS 11; verify with your CA)`;
   }
   const lines = moveVoucherLines(move, ledger);
   return withTablesRollback([FX_BANK_MOVES_TABLE, 'vouchers'], () => {
-    const v = saveVoucher({ type: 'JOURNAL', date, narration: input.narration?.trim() ? `${input.narration.trim()} | ${narration}` : narration, lines, voucher_class: 'Forex bank' });
+    const v = saveVoucher({ type: 'JOURNAL', date, narration: input.narration?.trim() ? `${input.narration.trim()} | ${narration}` : narration, lines, voucher_class: 'Forex bank', ...(move.reverse_on ? { reverse_on: move.reverse_on } : {}) });
     const row: FxBankMove = { ...move, id: generateId(), voucher_id: v.id, voucher_number: v.number, ...(input.narration?.trim() ? { narration: input.narration.trim() } : {}), created_at: new Date().toISOString() };
     setTable(FX_BANK_MOVES_TABLE, [...loadFxMoves(), row]);
     return row;
   });
 }
 
-/** Delete an entry and its Journal (period lock applies through `deleteVoucher`). */
+export interface FxVendorPaymentInput {
+  bank_account_id: string;
+  date: string;
+  vendor_id?: string;
+  vendor_name: string;
+  /** Foreign-currency amount paid. */
+  fcy: number;
+  /** ₹ per unit on the payment day (the rupee value settled defaults to fcy × rate). */
+  rate: number;
+  /** Rupees this settles on the supplier's bills (e.g. the bill's booked rupee value). */
+  settle?: number;
+  reference?: string;
+  narration?: string;
+}
+
+/**
+ * PENDING 46 (7.158): pay a supplier in foreign currency from an EEFC account. The rupees settled go through
+ * `recordSupplierPayment` from this account (bills oldest first, the rest on account); the bank is relieved at its
+ * carrying value, so a Journal posts only the difference to 4930 (realised). All or nothing.
+ */
+export function payVendorFromForex(input: FxVendorPaymentInput): FxBankMove {
+  requireAccess('books.edit');
+  const acc = bankAccountsDb.all().find((a) => a.id === input.bank_account_id);
+  if (!acc?.currency) throw new ForexBankError('Pick a foreign-currency bank account.');
+  const date = isoDay(input.date);
+  if (!date) throw new ForexBankError('Choose the date.');
+  const vendorName = (input.vendor_name ?? '').trim();
+  if (!vendorName) throw new ForexBankError('Choose the supplier.');
+  const rate = num(input.rate);
+  if (!(rate > 0)) throw new ForexBankError('Enter the rate (₹ per unit) — no live rates are fetched.');
+  const fcy = round2(num(input.fcy));
+  const settle = num(input.settle) > 0 ? round2(num(input.settle)) : round2(fcy * rate);
+  const plan = planOutflow({ fcy, inrReceived: settle, fcyBalance: fcyBalanceAt(acc, liveForexData(), date), inrBalance: ledgerInrBalance(acc.id, date) });
+  if (plan.errors.length) throw new ForexBankError(plan.errors[0]);
+  const cur = acc.currency;
+  return withTablesRollback([FX_BANK_MOVES_TABLE, 'vouchers', PAYMENTS_TABLE, PURCHASES_TABLE, VENDOR_PAYMENTS_TABLE], () => {
+    const bills = openBillsOf(purchasesDb.all(), { id: input.vendor_id, name: vendorName });
+    const paid = recordSupplierPayment({
+      vendorId: input.vendor_id, vendorName, date, amount: settle, method: 'Bank transfer', bankAccountId: acc.id,
+      reference: input.reference?.trim() || `${cur} ${money(fcy)}`, allocations: planAllocation(settle, bills).lines, remainderKind: 'ON_ACCOUNT',
+    });
+    let voucher = { id: '', number: '' };
+    if (Math.abs(plan.diff) >= 0.005) {
+      const text = `${cur} ${money(fcy)} paid to ${vendorName} from ${acc.name}: ₹${money(settle)} settled against carrying value ₹${money(plan.carrying)} — realised exchange ${plan.diff >= 0 ? 'gain' : 'loss'} ₹${money(Math.abs(plan.diff))} (verify with your CA)`;
+      // The payment already credited the bank with `settle`; this Journal brings the credit to the carrying value.
+      voucher = saveVoucher({ type: 'JOURNAL', date, narration: input.narration?.trim() ? `${input.narration.trim()} | ${text}` : text, lines: moveVoucherLines({ kind: 'revalue', inr: plan.diff, diff: plan.diff }, bankLedgerId(acc.id)), voucher_class: 'Forex bank' });
+    }
+    const row: FxBankMove = {
+      id: generateId(), bank_account_id: acc.id, date, kind: 'out', fcy, rate, inr: settle, carrying: plan.carrying, diff: plan.diff,
+      counter_account: A.creditors, counter_party: vendorName, ...(input.vendor_id ? { vendor_id: input.vendor_id } : {}), payment_group_id: paid.groupId,
+      voucher_id: voucher.id, voucher_number: voucher.number, ...(input.narration?.trim() ? { narration: input.narration.trim() } : {}), created_at: new Date().toISOString(),
+    };
+    setTable(FX_BANK_MOVES_TABLE, [...loadFxMoves(), row]);
+    return row;
+  });
+}
+
+/** Delete an entry and its Journal (period lock applies through `deleteVoucher`); a supplier payment's rows go with it. */
 export function deleteFxMove(id: string): void {
   requireAccess('books.edit');
   const row = loadFxMoves().find((m) => m.id === id);
   if (!row) return;
-  withTablesRollback([FX_BANK_MOVES_TABLE, 'vouchers'], () => {
-    deleteVoucher(row.voucher_id);
+  const group = row.payment_group_id;
+  withTablesRollback(group ? [FX_BANK_MOVES_TABLE, 'vouchers', PAYMENTS_TABLE, PURCHASES_TABLE, VENDOR_PAYMENTS_TABLE] : [FX_BANK_MOVES_TABLE, 'vouchers'], () => {
+    if (row.voucher_id) deleteVoucher(row.voucher_id);
+    if (group) {
+      for (const p of paymentsDb.all().filter((x) => x.group_id === group)) paymentsDb.remove(p.id);
+      for (const v of vendorPaymentsDb.all().filter((x) => x.group_id === group)) deleteVendorPayment(v.id);
+    }
     setTable(FX_BANK_MOVES_TABLE, loadFxMoves().filter((m) => m.id !== id));
   });
   try {
@@ -342,8 +432,11 @@ export function forexSummary(account: BankAccount, period: { from: string; to: s
     inr,
     rate: carryingRate(fcy, inr),
     realised: round2(inPeriod.filter((m) => m.kind === 'out').reduce((s, m) => s + num(m.diff), 0)),
-    unrealised: round2(inPeriod.filter((m) => m.kind === 'revalue').reduce((s, m) => s + num(m.diff), 0)),
-    inrOnly: inrOnlyPostings(account.id, { ...data, currency: account.currency, purchasePayments: getTable('purchase_payments'), vendorPayments: getTable('vendor_payments') }),
+    unrealised: round2(
+      inPeriod.filter((m) => m.kind === 'revalue').reduce((s, m) => s + num(m.diff), 0) -
+        data.moves.filter((m) => m.bank_account_id === account.id && m.kind === 'revalue' && !!m.reverse_on && m.reverse_on >= period.from && m.reverse_on <= period.to).reduce((s, m) => s + num(m.diff), 0),
+    ),
+    inrOnly: inrOnlyPostings(account.id, { ...data, currency: account.currency, purchasePayments: getTable('purchase_payments'), vendorPayments: getTable('vendor_payments'), linkedGroups: new Set(data.moves.map((m) => m.payment_group_id ?? '').filter(Boolean)) }),
     rows: rows.filter((r) => r.kind === 'opening' || (r.date >= period.from && r.date <= period.to)),
   };
 }

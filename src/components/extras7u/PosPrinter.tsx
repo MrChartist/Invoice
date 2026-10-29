@@ -94,6 +94,13 @@ export function PosPrinterButton() {
               <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => choosePort().then((ok) => setNote(ok ? x7T('portChosen') : x7T('noSerial'))).catch((err: Error) => setNote(err.message))}>{x7T('choosePort')}</button>
             </>
           )}
+          {(p.mode === 'serial' || p.mode === 'bluetooth') && (
+            <>
+              <label className={controls.check}><input type="checkbox" checked={!!p.qr} onChange={(e) => set({ ...p, qr: e.target.checked })} data-pos-qr /> {x7T('printQr')}</label>
+              <label className={controls.check}><input type="checkbox" checked={!!p.logo} onChange={(e) => set({ ...p, logo: e.target.checked })} /> {x7T('printLogo')}</label>
+              <p className={own.muted}>{x7T('qrNote')}</p>
+            </>
+          )}
           {note && <p className={own.muted}>{note}</p>}
           <div className={own.tools}>
             {p.mode !== 'browser' && <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={test}>{x7T('testPrint')}</button>}
