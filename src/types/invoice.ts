@@ -274,6 +274,12 @@ export interface Client {
   agent_id?: string;
   /** Per-party credit policy (8.80); absent = the company policy (`credit_policy`). */
   credit_policy?: 'off' | 'warn' | 'block';
+  /**
+   * Additive (8.66): the recipient's GST registration kind when it is not a regular taxpayer — `composition`
+   * (Sec 10 dealer, has a GSTIN) or `uin` (UN body / embassy with a Unique Identity Number in `gstin`). Absent = read
+   * from the GSTIN (regular, or unregistered without one). Splits GSTR-3B Table 3.2 (`interStateComp` / `interStateUin`).
+   */
+  gst_reg_type?: 'composition' | 'uin';
   /* ── Round 2 (R2-A, docs/features/collections-r2.md); additive, master only ── */
   /** R2-A5: how reminders treat this party — `auto` (default, in the queues), `manual` (on demand only), `never`. */
   reminder_mode?: ReminderMode;

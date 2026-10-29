@@ -5,8 +5,8 @@
  *
  * Pure date maths on bare `YYYY-MM-DD` strings (never `new Date(str)`, AGENTS.md
  * rule 8); every statutory number comes from the date-keyed rules in
- * `tax-rules.ts`. Due-date extensions notified ad hoc by CBIC are not tracked,
- * so this is a working paper — verify with your CA / the GST portal.
+ * `tax-rules.ts`. One-off extensions notified by CBIC are data rows (`DUE_DATE_EXTENSIONS`, 8.66) and only those
+ * listed are applied, so this is a working paper — verify with your CA / the GST portal.
  *
  * Filed marks live in the `compliance` table (`mrchartist_inv_compliance`).
  */
@@ -16,7 +16,8 @@ import { getTable, setTable } from './storage';
 
 /** `composition` (5.9): CMP-08 every quarter and GSTR-4 every year instead of GSTR-1 / 3B / 9. */
 export type FilerFrequency = 'monthly' | 'qrmp' | 'composition';
-export type ReturnForm = 'GSTR1' | 'IFF' | 'PMT06' | 'GSTR3B' | 'GSTR9' | 'CMP08' | 'GSTR4';
+/** 8.66: GSTR-6 (ISD), GSTR-7 (TDS deductor) and GSTR-8 (e-commerce operator) appear only on the time-bar list. */
+export type ReturnForm = 'GSTR1' | 'IFF' | 'PMT06' | 'GSTR3B' | 'GSTR9' | 'CMP08' | 'GSTR4' | 'GSTR6' | 'GSTR7' | 'GSTR8';
 
 export interface ReturnDue {
   /** `${form}:${periodKey}` */
@@ -31,6 +32,45 @@ export interface ReturnDue {
   due: string;
   /** IFF and PMT-06: shown on the calendar, never overdue and never notified. */
   optional: boolean;
+  /** Additive (8.66): the regular due date when a one-off extension (`DUE_DATE_EXTENSIONS`) moved `due`. */
+  extended_from?: string;
+  /** Additive (8.66): the extension's notification / source. */
+  extension_source?: string;
+}
+
+/**
+ * 8.66: one-off due-date extensions notified by CBIC, as DATA ROWS (never code): matched on form + period key (+ the
+ * filer's frequency and State when given). Append a row when an extension is notified; never edit an old one. A row
+ * only moves a due date later. `verified: false` = written from knowledge of the notification, not re-read from it.
+ */
+export interface DueExtension {
+  form: ReturnForm;
+  /** Same key as `ReturnDue.periodKey` (`2024-12`, `2024-Q3`, `FY2024`). */
+  periodKey: string;
+  frequency?: FilerFrequency;
+  /** Two-digit State codes the extension is limited to (absent = all). */
+  states?: readonly string[];
+  due: string;
+  /** QRMP GSTR-3B: the later day for category-Y States (`QRMP_3B_CATEGORY_Y`). */
+  dueCategoryY?: string;
+  source: string;
+  verified: boolean;
+}
+
+export const DUE_DATE_EXTENSIONS: readonly DueExtension[] = [
+  { form: 'GSTR1', periodKey: '2024-12', frequency: 'monthly', due: '2025-01-13', source: 'GSTR-1 December 2024 (Notification 01/2025-CT as understood)', verified: false },
+  { form: 'GSTR1', periodKey: '2024-Q3', frequency: 'qrmp', due: '2025-01-15', source: 'GSTR-1 Oct–Dec 2024 quarter (Notification 01/2025-CT as understood)', verified: false },
+  { form: 'GSTR3B', periodKey: '2024-12', frequency: 'monthly', due: '2025-01-22', source: 'GSTR-3B December 2024 (Notification 02/2025-CT as understood)', verified: false },
+  { form: 'GSTR3B', periodKey: '2024-Q3', frequency: 'qrmp', due: '2025-01-24', dueCategoryY: '2025-01-26', source: 'GSTR-3B Oct–Dec 2024 quarter (Notification 02/2025-CT as understood)', verified: false },
+];
+
+/** `r` with any one-off extension applied (pure). */
+export function withExtension(r: ReturnDue, frequency: FilerFrequency, stateCode?: string, rows: readonly DueExtension[] = DUE_DATE_EXTENSIONS): ReturnDue {
+  const st = (stateCode ?? '').padStart(2, '0');
+  const x = rows.find((e) => e.form === r.form && e.periodKey === r.periodKey && (!e.frequency || e.frequency === frequency) && (!e.states || e.states.includes(st)));
+  if (!x) return r;
+  const due = x.dueCategoryY && QRMP_3B_CATEGORY_Y.includes(st) ? x.dueCategoryY : x.due;
+  return due > r.due ? { ...r, due, extended_from: r.due, extension_source: x.source } : r;
 }
 
 export const FORM_LABELS: Record<ReturnForm, string> = {
@@ -41,6 +81,9 @@ export const FORM_LABELS: Record<ReturnForm, string> = {
   GSTR9: 'GSTR-9',
   CMP08: 'CMP-08',
   GSTR4: 'GSTR-4',
+  GSTR6: 'GSTR-6',
+  GSTR7: 'GSTR-7',
+  GSTR8: 'GSTR-8',
 };
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -140,7 +183,7 @@ export function complianceCalendar(o: CalendarOptions): ReturnDue[] {
   if (o.since && /^\d{4}-\d{2}/.test(o.since)) idx = Math.max(idx, +o.since.slice(0, 4) * 12 + +o.since.slice(5, 7) - 1);
   const out: ReturnDue[] = [];
   for (; idx <= ty * 12 + tm - 1; idx++) {
-    out.push(...returnsForMonth(Math.floor(idx / 12), (idx % 12) + 1, o.frequency, o.stateCode));
+    out.push(...returnsForMonth(Math.floor(idx / 12), (idx % 12) + 1, o.frequency, o.stateCode).map((r) => withExtension(r, o.frequency, o.stateCode)));
   }
   return out.sort((a, b) => a.due.localeCompare(b.due) || a.form.localeCompare(b.form));
 }

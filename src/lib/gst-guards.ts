@@ -170,7 +170,77 @@ export const RETURN_TIME_BAR_RULES: readonly Versioned<TimeBarRule | null>[] = [
     value: { years: 3, enforcedFrom: '2025-08-01', forms: ['GSTR1', 'GSTR3B', 'GSTR4', 'GSTR9'] },
     source: 'Sec 37(5) / 39(11) / 44(2) / 52(13) (Finance Act 2023; Notification 28/2023-CT); GSTN advisory 7 Jun 2025',
   },
+  {
+    // 8.66: the advisory's list also names GSTR-6 (ISD, Sec 39(4)), GSTR-7 (TDS, Sec 39(3)) and GSTR-8 (TCS, Sec 52(4)).
+    from: '2024-10-29',
+    value: { years: 3, enforcedFrom: '2025-08-01', forms: ['GSTR1', 'GSTR3B', 'GSTR4', 'GSTR9', 'GSTR6', 'GSTR7', 'GSTR8'] },
+    source: 'GSTN advisory 29 Oct 2024 (GSTR-6 / 7 / 8 on the list as understood — verify with your CA)',
+  },
 ];
+
+/* ── GSTR-6 / 7 / 8 (8.66): monthly returns of an ISD, a TDS deductor or an e-commerce operator ── */
+
+export type SpecialReturnForm = 'GSTR6' | 'GSTR7' | 'GSTR8';
+
+/**
+ * Due day of the month after the tax period, keyed by the period's first day. GSTR-6 by the 13th (Sec 39(4) / Rule 65 —
+ * the same value as `GSTR6_DUE_RULES` in gst-penalties.ts, which is not imported here so the bell's chunk stays as it
+ * is; `tests/gst-8d-followups.test.ts` keeps the two equal). GSTR-7 (Rule 66) and GSTR-8 (Rule 67) by the 10th — TDS /
+ * TCS in force from 1 Oct 2018 (Notifications 50/2018-CT and 51/2018-CT). Written from knowledge of the rules, not
+ * re-read: verify with your CA.
+ */
+export const SPECIAL_RETURN_DUE_RULES: readonly Versioned<{ GSTR6: number; GSTR7: number | null; GSTR8: number | null }>[] = [
+  { from: '2017-07-01', value: { GSTR6: 13, GSTR7: null, GSTR8: null }, source: 'Sec 39(4), Rule 65 (GSTR-6); TDS / TCS provisions not in force — verify' },
+  { from: '2018-10-01', value: { GSTR6: 13, GSTR7: 10, GSTR8: 10 }, source: 'Rule 65 / 66 / 67 CGST Rules; Notifications 50/2018-CT, 51/2018-CT — verify' },
+];
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** Monthly GSTR-6 / 7 / 8 rows from `since` (at most 72 months back) to the month of `today`. Pure. */
+export function specialReturnDues(form: SpecialReturnForm, since: string, today: string): ReturnDue[] {
+  const out: ReturnDue[] = [];
+  const start = Math.max(+since.slice(0, 4) * 12 + +since.slice(5, 7) - 1, +today.slice(0, 4) * 12 + +today.slice(5, 7) - 1 - 72);
+  const end = +today.slice(0, 4) * 12 + +today.slice(5, 7) - 1;
+  for (let i = start; i <= end; i++) {
+    const y = Math.floor(i / 12);
+    const m = (i % 12) + 1;
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    const from = `${key}-01`;
+    const dueDay = ruleAt(SPECIAL_RETURN_DUE_RULES, from)[form];
+    if (!dueDay) continue;
+    const ny = m === 12 ? y + 1 : y;
+    const nm = m === 12 ? 1 : m + 1;
+    const due = `${ny}-${String(nm).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
+    out.push({ id: `${form}:${key}`, form, periodKey: key, label: `${MONTH_NAMES[m - 1]} ${y}`, from, to: shiftDay(due.slice(0, 8) + '01', -1), due, optional: false });
+  }
+  return out;
+}
+
+/** Settings shape read here (additive `AppSettings.gst_special_returns`). */
+export interface SpecialReturnSettings { gst_special_returns?: readonly ('GSTR7' | 'GSTR8')[] }
+
+declare module './localDb' {
+  interface AppSettings {
+    /** Additive (8.66): the company also files GSTR-7 (TDS deductor) / GSTR-8 (e-commerce operator) — time-bar list only. */
+    gst_special_returns?: ('GSTR7' | 'GSTR8')[];
+  }
+}
+
+/**
+ * Which special returns the company files: GSTR-6 once it has ISD documents of its own (`isd_documents` INWARD /
+ * DISTRIBUTION, from the first one), GSTR-7 / GSTR-8 when ticked on the Compliance tab (from `since`). Pure.
+ */
+export function specialReturnForms(settings: SpecialReturnSettings | null | undefined, isdDocs: readonly { kind?: string; date?: string }[], since: string): { form: SpecialReturnForm; since: string }[] {
+  const out: { form: SpecialReturnForm; since: string }[] = [];
+  let isdSince = '';
+  for (const d of isdDocs) {
+    const day = day10(d?.date);
+    if ((d?.kind === 'INWARD' || d?.kind === 'DISTRIBUTION') && /^\d{4}-\d{2}-\d{2}$/.test(day) && (!isdSince || day < isdSince)) isdSince = day;
+  }
+  if (isdSince) out.push({ form: 'GSTR6', since: isdSince });
+  for (const f of settings?.gst_special_returns ?? []) if ((f === 'GSTR7' || f === 'GSTR8') && since) out.push({ form: f, since });
+  return out;
+}
 
 /** Same day `years` later (29 Feb → 28 Feb). */
 export function addYears(day: string, years: number): string {
@@ -205,10 +275,14 @@ export interface TimeBarRow {
   bar: TimeBar;
 }
 
-/** Unfiled returns (since the first activity, up to 6 years back) that are barred or become barred within `horizonDays`. */
-export function timeBarList(o: CalendarOptions, filed: readonly FiledReturn[], gstin = '', horizonDays = 365): TimeBarRow[] {
+/**
+ * Unfiled returns (since the first activity, up to 6 years back) that are barred or become barred within `horizonDays`.
+ * 8.66: `special` adds the monthly GSTR-6 / 7 / 8 rows (`specialReturnForms`).
+ */
+export function timeBarList(o: CalendarOptions, filed: readonly FiledReturn[], gstin = '', horizonDays = 365, special: readonly { form: SpecialReturnForm; since: string }[] = []): TimeBarRow[] {
   const out: TimeBarRow[] = [];
-  for (const r of complianceCalendar({ ...o, monthsBack: Math.max(o.monthsBack ?? 0, 72) })) {
+  const extra = special.flatMap((s) => specialReturnDues(s.form, s.since, o.today));
+  for (const r of [...complianceCalendar({ ...o, monthsBack: Math.max(o.monthsBack ?? 0, 72) }), ...extra]) {
     if (filedFor(filed, r, gstin)) continue;
     const bar = timeBarFor(r, o.today);
     if (bar && bar.daysLeft <= horizonDays) out.push({ r, bar });

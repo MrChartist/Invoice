@@ -483,7 +483,7 @@ Statutory values date-keyed and append-only in the lazy `src/lib/gst-guards.ts` 
 | 8.63 | ✅ **Vendor follow-up from the 2B match** (Clear pattern): per-supplier note (not in 2B, value / tax / head / date / number differences, not in books) by WhatsApp / e-mail / PDF, "followed up on" marks (`gst_followups`); **matched ITC pushed** to a Table 4 panel under GSTR-3B (`gstr2b_itc`) | `gst-followup.ts`, `VendorFollowUp.tsx` | done |
 | 8.64 | ✅ **One cancel flow** (TallyPrime 7.0 pattern): cancelling a document with an IRN / EWB prepares the EWB + IRN cancel JSON together, shows the 24-hour deadlines (EWB first; after 24 h → credit note / recipient rejection) and tracks `einvoice_meta.irn_cancel` / `ewb_cancel` | `einvoice-cancel.ts`, `EinvCancelPanel.tsx` (in the cancel dialog) | done |
 | 8.65 | ✅ **GST exceptions** ("uncertain transactions"): missing HSN on B2B lines, POS vs GSTIN state, rate outside the date-keyed slab table (GST 2.0 from 22 Sep 2025), B2CL threshold edge (±5%), missing IRN where e-invoicing is mandatory (date-keyed mandate thresholds) | `gstExceptions`, GST guards tab | done |
-| 8.66 | ⏳ 8D follow-ups: Table 3.2 split for composition dealers / UIN holders; GSTR-1A JSON; IRN cancel from the bulk tool's response; time bar for GSTR-6 / 7 / 8; one-off due-date extensions | — | open |
+| 8.66 | ✅ 8D follow-ups: Table 3.2 split for composition dealers / UIN holders (`Client.gst_reg_type`); GSTR-1A JSON (`gstr1a-json.ts`, unverified layout); IRN cancel from the bulk tool's response; time bar for GSTR-6 / 7 / 8; one-off due-date extensions as data rows (`DUE_DATE_EXTENSIONS`) | `gst-reports.ts`, `gstr1a-json.ts`, `einvoice-bulk.ts`, `gst-guards.ts`, `compliance.ts` | done |
 
 ### 8B · Phone & counter (`docs/features/pwa-backup.md`, `docs/features/pos-barcode-pricing.md`)
 
@@ -538,7 +538,7 @@ From competitor tutorials (myBillBook "Scan invoice" in Purchases, Refrens "Vali
 | 8.85 | ✅ **Item variants** (attribute grid → child items with SKUs / barcodes) and **kits** consuming BOM components on sale (`variants.ts`, `events-kits.ts`) | — | done |
 | 8.86 | ✅ **Bin / rack** on items and batches, snapshotted on delivery challan lines and printed on pick lists (`bins.ts`) | — | done |
 | 8.87 | ✅ **Thermal roll labels**: 50×25, 38×25 2-up, 100×50 presets; raw TSPL / EPL / ZPL over Web Serial or file; weighed-goods EAN-13 with embedded price (`label-sheet.ts`, `label-raw.ts`) | — | done |
-| 8.88 | ⏳ 8F follow-ups: one debit note spanning several bills of a supplier, ~~POS decoding of weighed-goods codes~~ (done in 8.140, `parseScaleBarcode`), kit shortfall warnings, order-pad partial import / camera QR scan | — | open |
+| 8.88 | ✅ 8F follow-ups: one debit note spanning several bills of a supplier (`createMulti`, on account), ~~POS decoding of weighed-goods codes~~ (done in 8.140, `parseScaleBarcode`), kit shortfall warnings (`kitComponentDemand`), order-pad partial import / camera QR scan (existing `CameraScanner`) | `purchase-returns.ts`, `events-kits.ts`, `order-pad.ts` | done |
 ### 8E · Retail speed (`docs/features/pos-barcode-pricing.md` § 8E)
 
 | # | Item | Where | Status |

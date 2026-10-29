@@ -22,7 +22,7 @@ const localToday = () => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
 
-const FORM_TEXT: Record<ReturnForm, string> = { GSTR1: 'GSTR-1', GSTR3B: 'GSTR-3B', IFF: 'IFF', CMP08: 'CMP-08', PMT06: 'PMT-06', GSTR9: 'GSTR-9', GSTR4: 'GSTR-4' };
+const FORM_TEXT: Record<ReturnForm, string> = { GSTR1: 'GSTR-1', GSTR3B: 'GSTR-3B', IFF: 'IFF', CMP08: 'CMP-08', PMT06: 'PMT-06', GSTR9: 'GSTR-9', GSTR4: 'GSTR-4', GSTR6: 'GSTR-6', GSTR7: 'GSTR-7', GSTR8: 'GSTR-8' };
 
 export interface FilingStripProps {
   period: ReportPeriod;

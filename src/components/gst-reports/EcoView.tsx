@@ -1,4 +1,4 @@
-import type { EcoRow, Gstr1Report, Gstr3bReport } from '../../lib/gst-reports';
+import { table14Ab, type EcoRow, type Gstr1Report, type Gstr3bReport } from '../../lib/gst-reports';
 import { DataTable, Money, type Column } from './DataTable';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -24,6 +24,7 @@ const cols = (withTax: boolean): Column<EcoRow>[] => [
 export default function EcoView({ g1, g3 }: { g1: Gstr1Report; g3: Gstr3bReport }) {
   const empty = 'None in this period.';
   const t14a = table14A(g1);
+  const t14ab = table14Ab(g1);
   return (
     <>
       <p className={controls.hint} style={{ margin: 0 }}>
@@ -57,6 +58,20 @@ export default function EcoView({ g1, g3 }: { g1: Gstr1Report; g3: Gstr3bReport 
         ]}
       />
       <p className={controls.hint}>{r7T('eco14aNote')}</p>
+      <h3 className={local.tbHeading}>{r7T('eco14abTitle')}</h3>
+      <DataTable
+        caption="Table 14A(b)"
+        emptyText={empty}
+        rows={t14ab}
+        rowKey={(r) => `${r.etin}${r.origPeriod}`}
+        columns={[
+          { key: 'etin', label: 'Operator GSTIN', render: (r) => <span className={surface.mono}>{r.etin}</span> },
+          { key: 'op', label: r7T('eco14aPeriod'), render: (r) => `${r.origPeriod.slice(0, 2)}/${r.origPeriod.slice(2)}` },
+          { key: 'n', label: 'Documents', numeric: true, render: (r) => r.count },
+          { key: 'v', label: r7T('eco14aValue'), numeric: true, render: (r) => <Money value={r.value} />, total: (r) => r.value },
+        ]}
+      />
+      <p className={controls.hint}>{r7T('eco14abNote')}</p>
     </>
   );
 }

@@ -319,6 +319,7 @@ function BulkBody({ onClose, from, to, periodLabel }: BulkEInvoiceModalProps) {
                     <span className={styles.pillOk}>{einvT('saved', { n: result.result.written.length })}</span>
                     <span className={result.result.unmatched.length ? styles.pillWarn : styles.pill}>{einvT('notMatched', { n: result.result.unmatched.length })}</span>
                     <span className={result.result.failed.length ? styles.pillBad : styles.pill}>{einvT('rejected', { n: result.result.failed.length })}</span>
+                    {result.result.cancelled.length > 0 && <span className={styles.pillWarn} data-irn-cancelled>{einvT('cancelledN', { n: result.result.cancelled.length })}</span>}
                   </div>
                   {result.parsed.errors.map((e) => <p key={e} className={styles.note}>{e}</p>)}
                   <ul className={styles.checklist}>
@@ -326,6 +327,12 @@ function BulkBody({ onClose, from, to, periodLabel }: BulkEInvoiceModalProps) {
                       <li key={`w${w.line}`} className={styles.statusLine}>
                         <span className={styles.pillOk}>{w.number}</span>
                         <span className={styles.mono}>{w.irn.slice(0, 16)}…{w.replaced ? einvT('replaced') : ''}</span>
+                      </li>
+                    ))}
+                    {result.result.cancelled.map((w) => (
+                      <li key={`c${w.line}`} className={styles.statusLine}>
+                        <span className={styles.pillWarn}>{w.number}</span>
+                        <span>{einvT('cancelledLine')}</span>
                       </li>
                     ))}
                     {[...result.result.unmatched, ...result.result.failed].map((u) => (
