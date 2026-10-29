@@ -20,6 +20,7 @@ import { localDb } from '../localDb';
 import { esc } from '../voucher-print';
 import { MF_SERIES, MF_TABLES } from './mf-shared';
 import { DAY, drop, mustGet, nowIso, put, r3, rowsOf } from './mf-b-db';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 export const FAI = MF_SERIES.inspections;
 export const INSPECTIONS_TABLE = MF_TABLES.inspections;
@@ -62,7 +63,7 @@ export function reportHtml(r: InspectionReport, d: Drawing, business: { name?: s
   const ev = evaluate(r.readings, d.characteristics ?? []);
   const rows = ev.rows.map((x) => `<tr><td>${esc(x.char.name)}${x.char.critical ? ' ★' : ''}</td><td>${esc(tolText(x.char))}</td><td>${x.values.map((v) => (inTol(x.char, v) ? esc(v) : `<b>${esc(v)}✗</b>`)).join(', ')}</td><td>${x.ok ? 'OK' : 'NOT OK'}</td></tr>`).join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(r.number)}</title>
-<style>@page{size:A4}body{font-family:system-ui,sans-serif;margin:0;padding:20px;font-size:12px}h1{font-size:16px;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:10px}td,th{border:1px solid;padding:4px 6px;text-align:left}.f{margin-top:24px}</style></head><body>
+<style>${PRINT_FONT_FACE}@page{size:A4}body{font-family:${PRINT_FONT};margin:0;padding:20px;font-size:12px}h1{font-size:16px;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:10px}td,th{border:1px solid;padding:4px 6px;text-align:left}.f{margin-top:24px}</style></head><body>
 <h1>${esc(business.name || 'Your business')} — ${r.kind === 'first_article' ? 'FIRST ARTICLE' : r.kind === 'lot' ? 'LOT' : 'FINAL'} INSPECTION REPORT</h1>
 <div>${esc(r.number)} · ${esc(r.date)} · Drawing ${esc(d.number)} rev ${esc(r.rev)} — ${esc(d.title)}${d.material_grade ? ` · ${esc(d.material_grade)}` : ''} · Sample ${esc(r.sample)}</div>
 <table><thead><tr><th>Characteristic</th><th>Specification</th><th>Readings</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>

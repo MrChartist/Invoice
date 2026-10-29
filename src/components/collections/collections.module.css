@@ -10,7 +10,7 @@
   border-radius: var(--radius-sm);
   background: var(--muted);
 }
-.boxHead { font-weight: 700; font-size: 0.85rem; }
+.boxHead { font-weight: 600; font-size: 0.85rem; }
 .note { font-size: 0.8rem; color: var(--muted-foreground); margin: 0; }
 .warn {
   font-size: 0.8rem;
@@ -32,8 +32,8 @@
   min-width: 1.6em;
   padding: 0 6px;
   border-radius: var(--radius-full);
-  font-size: 0.72rem;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 600;
   line-height: 1.5;
   border: 1px solid currentColor;
 }
@@ -45,7 +45,7 @@
 
 .modeBadge {
   display: inline-block;
-  font-size: 0.7rem;
+  font-size: 12px;
   padding: 0 6px;
   border-radius: var(--radius-full);
   background: var(--muted);
@@ -55,9 +55,9 @@
 
 /* Follow-ups */
 .section { display: grid; gap: 6px; }
-.sectionHead { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.9rem; margin: 0; }
+.sectionHead { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.9rem; margin: 0; }
 .count {
-  font-size: 0.72rem;
+  font-size: 12px;
   padding: 0 6px;
   border-radius: var(--radius-full);
   background: var(--muted);

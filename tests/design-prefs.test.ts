@@ -54,7 +54,7 @@ test('sanitizeDesign: keeps valid values, empty watermark means none', () => {
   assert.equal(d.paper, 'thermal80');
   assert.equal(d.accent, '#aabbcc');
   assert.equal(d.watermark, 'none');
-  assert.equal(d.font, 'mono');
+  assert.equal(d.font, 'flex'); // a font id saved before the type system reads as Chartist Sans Flex
   assert.equal(d.date_format, 'yyyy-MM-dd');
 });
 
@@ -80,12 +80,12 @@ test('resolveDesignFrom: defaults <- global <- profile', () => {
 });
 
 test('presets: every preset yields a valid design and keeps accent/font', () => {
-  const base = { ...DEFAULT_DESIGN, profile_id: 'p9', accent: '#ee6125', font: 'outfit', footer_text: 'Thanks' };
+  const base = { ...DEFAULT_DESIGN, profile_id: 'p9', accent: '#ee6125', font: 'flex', footer_text: 'Thanks' };
   for (const p of presets) {
     const d = applyPreset(base, p.id);
     assert.equal(d.profile_id, 'p9');
     assert.equal(d.accent, '#ee6125');
-    assert.equal(d.font, 'outfit');
+    assert.equal(d.font, 'flex');
     assert.equal(d.footer_text, 'Thanks');
     assert.deepEqual(sanitizeDesign(d), d);
   }

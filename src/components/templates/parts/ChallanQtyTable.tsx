@@ -42,7 +42,7 @@ export function ChallanQtyTable({ invoice }: { invoice: InvoiceRecord }) {
           <td />
           <td className={styles.itemName}>{t('qty')}</td>
           {showHsn && <td />}
-          <td className={cn(styles.right, styles.num)} style={{ fontWeight: 700 }}>{formatQuantity(total)}</td>
+          <td className={cn(styles.right, styles.num)} style={{ fontWeight: 600 }}>{formatQuantity(total)}</td>
         </tr>
       </tbody>
     </table>

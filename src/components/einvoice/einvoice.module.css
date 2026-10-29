@@ -27,7 +27,7 @@
   padding: 0.25rem 0.625rem;
   border-radius: var(--radius-full);
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: 600;
   background: var(--muted);
   color: var(--muted-foreground);
 }
@@ -64,7 +64,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--text-base);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--foreground);
   display: flex;
   align-items: center;
@@ -100,7 +100,7 @@
 .iconWarn { color: var(--warning); }
 
 .checkField {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .actions {
@@ -117,7 +117,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 0.75rem;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
   line-height: 1.55;
   color: var(--foreground);
@@ -152,7 +152,7 @@
 }
 
 .mono {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   word-break: break-all;
 }
 

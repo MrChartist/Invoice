@@ -1,4 +1,5 @@
 import { escHtml as esc } from './html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 /**
  * "Client copy": one self-contained HTML file of a document that the client can open in any
  * browser, print, or pay from (a tappable upi:// link works on phones). It is static — no
@@ -78,20 +79,20 @@ export function buildClientCopyHtml(input: ClientCopyInput): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:">
 <title>${esc(input.title)}</title>
-<style>${input.css.replace(/<\/style/gi, '<\\/style')}</style>
-<style>
+<style>${PRINT_FONT_FACE}${input.css.replace(/<\/style/gi, '<\\/style')}</style>
+<style>${PRINT_FONT_FACE}
   html, body { margin: 0; background: #e9e9ec; }
   .cc-wrap { max-width: 860px; margin: 0 auto; padding: 16px; }
   .cc-page { background: #fff; box-shadow: 0 2px 16px rgba(0,0,0,.12); overflow-x: auto; }
   .cc-pay { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; justify-content: space-between;
     background: #fff; border: 1px solid #d7d7dc; border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
-    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; }
+    font-family: ${PRINT_FONT}; color: #111; }
   .cc-label { font-size: 12px; color: #555; }
-  .cc-amount { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 2px 0 6px; }
-  .cc-btn { display: inline-block; background: #1a4d94; color: #fff; text-decoration: none; font-weight: 700;
+  .cc-amount { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; margin: 2px 0 6px; }
+  .cc-btn { display: inline-block; background: #1a4d94; color: #fff; text-decoration: none; font-weight: 600;
     padding: 12px 20px; border-radius: 8px; font-size: 16px; }
   .cc-alt { background: #fff; color: #1a4d94; border: 2px solid #1a4d94; }
-  .cc-foot { font: 12px system-ui, sans-serif; color: #666; text-align: center; margin: 12px 0 24px; }
+  .cc-foot { font: 12px ${PRINT_FONT}; color: #666; text-align: center; margin: 12px 0 24px; }
   @media print { html, body { background: #fff; } .cc-wrap { padding: 0; max-width: none; } .cc-pay, .cc-foot { display: none; } .cc-page { box-shadow: none; } }
 </style></head>
 <body><main class="cc-wrap">

@@ -37,7 +37,7 @@
 .pos { color: var(--profit); }
 .neg { color: var(--loss); }
 .amt {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -47,7 +47,7 @@
 
 .count {
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   padding: 0.0625rem 0.375rem;
   border-radius: var(--radius-full);
   background: var(--muted);
@@ -87,7 +87,7 @@
 
 .dropTitle {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--text-xl);
   margin: 0;
 }
@@ -125,7 +125,7 @@
   vertical-align: top;
 }
 
-.previewTable td.num { text-align: right; font-family: var(--font-mono); white-space: nowrap; }
+.previewTable td.num { text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .previewScroll { max-height: 280px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-md); }
 
 .mapGrid {
@@ -179,7 +179,7 @@
   display: inline-block;
   margin-top: 0.25rem;
   font-size: var(--text-2xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 0.125rem 0.4375rem;
@@ -202,14 +202,14 @@
   margin-top: 0.1875rem;
   font-size: var(--text-xs);
   color: var(--muted-foreground);
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 
 .amount {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--text-lg);
   text-align: right;
   white-space: nowrap;
@@ -247,7 +247,7 @@
   align-items: center;
   gap: 0.25rem;
   font-size: var(--text-xs);
-  font-weight: 800;
+  font-weight: 600;
   padding: 0.1875rem 0.5rem;
   border-radius: var(--radius-full);
   font-variant-numeric: tabular-nums;
@@ -289,7 +289,7 @@
   align-items: center;
   gap: 0.3125rem;
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   padding: 0.25rem 0.625rem;
@@ -408,13 +408,13 @@
   composes: brsRow;
   background: var(--card-inner);
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .brsTotal {
   composes: brsRow;
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: 600;
   border-top: 2px solid var(--border);
   background: var(--card-inner);
 }

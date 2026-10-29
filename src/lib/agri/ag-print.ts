@@ -7,11 +7,12 @@
 import type { AgQualityReading, FarmerCycle, FarmerCycleLine } from '../../types/agri-r12';
 import type { PurchaseRecord } from '../../types/purchases';
 import { weightText } from '../trade/tr-weight';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 export const esc = (s: unknown): string => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const rs = (n: unknown) => `₹${(Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const CSS = 'body{font:13px system-ui,sans-serif;margin:16px;color:#111}h1{font-size:16px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin:8px 0}td,th{border:1px solid #999;padding:4px 6px;text-align:left}th{background:#eee}.r{text-align:right}.note{font-size:11px;color:#555}';
-const page = (title: string, body: string, extra = '') => `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${CSS}${extra}</style></head><body>${body}</body></html>`;
+const CSS = `body{font:13px ${PRINT_FONT};margin:16px;color:#111}h1{font-size:16px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin:8px 0}td,th{border:1px solid #999;padding:4px 6px;text-align:left}th{background:#eee}.r{text-align:right}.note{font-size:12px;color:#555}`;
+const page = (title: string, body: string, extra = '') => `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${PRINT_FONT_FACE}${CSS}${extra}</style></head><body>${body}</body></html>`;
 const table = (head: readonly string[], rows: readonly (readonly unknown[])[]) =>
   `<table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 
@@ -47,7 +48,7 @@ export function slipHtml(c: FarmerCycle, l: FarmerCycleLine, business: string, c
     table(['', '', ''], [['Quantity', '', `${l.qty} ${l.unit}`], ['Amount', '', rs(l.amount)], ...(l.bonus ? [['Bonus', '', rs(l.bonus)]] : []), ...(l.carried ? [['Carried from last cycle', '', rs(l.carried)]] : []), ...ded.map((d) => [`Less: ${d[0]}`, d[1], d[2]])]),
     `<p><b>Net ${rs(l.net)}</b>${l.carry_out ? ` · carried to next cycle ${rs(l.carry_out)}` : ''} · ${l.mode === 'bank' ? 'Bank transfer' : 'Cash'}</p>`,
   ];
-  return page(`${c.number} ${l.name ?? ''}`, body.join(''), narrow ? '@page{size:80mm auto;margin:3mm}body{margin:0;font-size:11px}' : '@page{size:A6;margin:6mm}');
+  return page(`${c.number} ${l.name ?? ''}`, body.join(''), narrow ? '@page{size:80mm auto;margin:3mm}body{margin:0;font-size:12px}' : '@page{size:A6;margin:6mm}');
 }
 
 /** The cards sheet: `cardsHtml` is the rendered cards (with their QR SVGs), 8 per A4. */

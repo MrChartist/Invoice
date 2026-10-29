@@ -412,7 +412,7 @@ export function JewelLineRow({ item, date }: { item: InvoiceItem; date: string }
   const err = jw.override ? '' : rateGate({ issue_date: date, items: [{ ...item, jw }] }).length ? noRate(jw, date) : '';
   const warn = huidWarning({ name: item.name, jw }, date);
   return (
-    <div className={controls.row} style={{ ...row, fontSize: '0.85em' }} data-jewel-row>
+    <div className={controls.row} style={{ ...row, fontSize: 'var(--text-sm)' }} data-jewel-row>
       <F l={rteT('tag')} w={130}><select className={controls.select} value={jw.tag ?? ''} data-jw="tag" onChange={(e) => {
         const t = stock.find((x) => x.tag === e.target.value);
         if (t) apply(tagJewel(t, jw.rate));

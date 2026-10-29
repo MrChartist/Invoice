@@ -16,6 +16,7 @@ import { OT_HOURS_TYPE } from '../../types/payroll';
 import { incomeTax, salaryIncome } from './statutory';
 import { formText, fyStart, sectionText, ITA2025_FROM } from '../ita2025';
 import { escHtml as esc } from '../html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 /** Tax year 2026-27 on (Income-tax Act 2025): the other section numbers in these papers are still the 1961 ones. */
 const ita2025Note = (fyStartYear: number): Row[] =>
@@ -42,7 +43,7 @@ export function maskAccount(acct?: string): string {
 export const escapeHtml = esc;
 
 const PAYSLIP_STYLE = `
-  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 28px; }
+  body { font-family: ${PRINT_FONT}; color: #111; margin: 0; padding: 28px; }
   .sheet { max-width: 760px; margin: 0 auto; border: 1px solid #bbb; padding: 24px 28px; }
   .head { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 14px; }
   h1 { font-size: 18px; margin: 0; letter-spacing: 0.06em; text-transform: uppercase; }
@@ -52,11 +53,11 @@ const PAYSLIP_STYLE = `
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { border: 1px solid #ccc; padding: 5px 8px; text-align: left; vertical-align: top; }
   td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
-  tfoot td { font-weight: 700; }
-  .net { margin-top: 14px; font-size: 16px; font-weight: 700; }
+  tfoot td { font-weight: 600; }
+  .net { margin-top: 14px; font-size: 16px; font-weight: 600; }
   .words { font-size: 13px; color: #333; }
   .sign { margin-top: 36px; display: flex; justify-content: space-between; font-size: 12px; }
-  .note { margin-top: 18px; font-size: 11px; color: #777; }
+  .note { margin-top: 18px; font-size: 12px; color: #777; }
   h2.sec { font-size: 14px; margin: 16px 0 6px; }
   @media print { body { padding: 0; } .sheet { border: 0; } }`;
 
@@ -98,7 +99,7 @@ export function payslipHtml(run: Pick<PayrollRun, 'month' | 'number' | 'date' | 
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Payslip ${escapeHtml(l.code)} ${escapeHtml(monthLabel(run.month))}</title>
-<style>${PAYSLIP_STYLE}</style></head>
+<style>${PRINT_FONT_FACE}${PAYSLIP_STYLE}</style></head>
 <body><div class="sheet">
   <div class="head">
     <div><strong>${escapeHtml(c?.companyName ?? '')}</strong>

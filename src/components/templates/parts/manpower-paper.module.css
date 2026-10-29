@@ -8,7 +8,7 @@
   background: var(--tpl-soft);
   border-radius: 4px;
   break-inside: avoid;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .grid {

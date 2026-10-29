@@ -35,7 +35,7 @@
 }
 .table:hover { border-color: var(--ring); }
 .table:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.tableName { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700; }
+.tableName { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; }
 .tableMeta { font-size: var(--text-xs); color: var(--muted-foreground); }
 .tableAmt { margin-top: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
 .occupied { border-color: var(--primary); background: var(--brand-soft); }
@@ -57,7 +57,7 @@
 
 .panel { display: flex; flex-direction: column; gap: 12px; }
 .panelHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
-.panelTitle { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 700; margin: 0; }
+.panelTitle { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; margin: 0; }
 .muted { color: var(--muted-foreground); font-size: var(--text-sm); }
 .small { font-size: var(--text-xs); color: var(--muted-foreground); }
 
@@ -126,7 +126,7 @@
 
 .totals { display: flex; flex-direction: column; gap: 4px; font-variant-numeric: tabular-nums; }
 .totals > div { display: flex; justify-content: space-between; gap: 8px; }
-.grand { font-weight: 700; font-size: var(--text-lg); border-top: 1px solid var(--border); padding-top: 6px; }
+.grand { font-weight: 600; font-size: var(--text-lg); border-top: 1px solid var(--border); padding-top: 6px; }
 
 .actions { display: flex; flex-wrap: wrap; gap: 6px; }
 

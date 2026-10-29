@@ -28,7 +28,7 @@
 
 .num {
   text-align: right;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -71,7 +71,7 @@
 .warnings { margin: 0; padding-left: 1.25rem; color: var(--warning); font-size: var(--text-sm); }
 
 .slip { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
-.netPay { font-size: var(--text-lg); font-weight: 700; margin: 1rem 0 0.25rem; }
+.netPay { font-size: var(--text-lg); font-weight: 600; margin: 1rem 0 0.25rem; }
 
 .reports { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
 

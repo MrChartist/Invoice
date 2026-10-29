@@ -3,6 +3,7 @@
    Rulebook: docs/theme/BUTTON-SYSTEM.md (from mrchartist.com). Never hand-style a button with its own background,
    border, radius or shadow: pick the kind, the intent and the size here. tests/button-system.test.ts guards it.
 
+   Labels: Chartist Sans Flex (--font-body) at 600, never below 12px.
    Kinds:   .btn (button)  .join (connected bar)  .seg (segmented control)  .chip  .btn.icon / .btn.round  .lk (link)
    Intents: (secondary, the default)  .primary  .quiet  .glass  .buy  .sell  .danger (= sell, for destructive actions)
    Sizes:   .xs  .sm  (default)  .lg  .xl  .stack      Shape: capsule; .lg .xl .full .rect are rounded rectangles.
@@ -80,7 +81,7 @@ html.dark.a11y-contrast { --btn-edge: rgb(255 255 255 / 0.65); --btn-edge-strong
   background-color: var(--b-bg);
   color: var(--b-fg);
   box-shadow: var(--b-shadow);
-  font-family: var(--font-display);
+  font-family: var(--font-body); /* Chartist Sans Flex at 600, every size */
   font-size: var(--b-fs);
   font-weight: 600;
   line-height: 1.2;
@@ -359,7 +360,7 @@ html.a11y-focus .btn:focus {
   border-radius: 999px;
   background: transparent;
   color: var(--btn-mute);
-  font-family: var(--font-display);
+  font-family: var(--font-body); /* Chartist Sans Flex at 600, every size */
   font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.2;
@@ -417,7 +418,7 @@ html.a11y-focus .btn:focus {
   border-radius: 999px;
   background: color-mix(in srgb, var(--btn-paper) 72%, transparent);
   color: var(--btn-ink);
-  font-family: var(--font-display);
+  font-family: var(--font-body); /* Chartist Sans Flex at 600, every size */
   font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.2;

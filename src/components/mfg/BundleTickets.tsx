@@ -8,9 +8,10 @@ import { downloadText } from '../../lib/download';
 import { gT } from '../../i18n/areas/mfg-r13c';
 import { Btn, F, In, Sel } from './garments-ui';
 import { row } from './garments-util';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../../lib/print-fonts';
 
-const page = (body: string, per: number) => `<!doctype html><html><head><meta charset="utf-8"><title>Bundle tickets</title><style>
-@page{size:A4;margin:8mm}body{font:10px sans-serif;margin:0}.t{display:grid;grid-template-columns:repeat(${per === 12 ? 3 : 2},1fr);gap:4mm}
+const page = (body: string, per: number) => `<!doctype html><html><head><meta charset="utf-8"><title>Bundle tickets</title><style>${PRINT_FONT_FACE}
+@page{size:A4;margin:8mm}body{font:12px ${PRINT_FONT};margin:0}.t{display:grid;grid-template-columns:repeat(${per === 12 ? 3 : 2},1fr);gap:4mm}
 .k{border:1px dashed #555;padding:2mm;break-inside:avoid;height:${per === 12 ? 66 : 68}mm;overflow:hidden}.c{border-top:1px dashed #999;padding-top:1mm;margin-top:1mm}
 </style></head><body>${body}</body></html>`;
 

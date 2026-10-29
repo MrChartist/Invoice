@@ -23,6 +23,7 @@ import '../../i18n/en-pages'; // page strings (5.4)
 import { methodLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import styles from './PaymentModal.module.css';
+import { printWhenReady } from '../../lib/print-fonts';
 
 // R4-B1: 'Gift voucher' pays with a voucher code (no money moves: the ledger debits the voucher liability).
 const GV_METHOD = 'Gift voucher';
@@ -59,7 +60,7 @@ function openReceipt(invoice: InvoiceRecord, payment: Payment) {
     w.document.write(html);
     w.document.close();
     w.focus();
-    w.print();
+    printWhenReady(w);
   } else {
     downloadText(`${data.number.replace(/\//g, '-')}.html`, html, 'text/html');
   }

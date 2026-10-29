@@ -11,6 +11,7 @@ import { num, round2 } from './invoice-calc';
 import { esc } from './voucher-print';
 import { formatDate, formatMoney } from './utils';
 import { returnDeadline } from './job-work';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 
 export interface ChallanCompany {
   name: string;
@@ -22,21 +23,21 @@ export interface ChallanCompany {
 const COPIES = ['Original for consignee', 'Duplicate for transporter', 'Triplicate for consignor'];
 
 const CSS = `
-  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 24px; }
+  body { font-family: ${PRINT_FONT}; color: #111; margin: 0; padding: 24px; }
   .c { max-width: 760px; margin: 0 auto 28px; border: 1px solid #222; break-after: page; page-break-after: always; }
   .c:last-child { break-after: auto; page-break-after: auto; }
   .head { display: flex; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid #222; font-size: 12px; }
   .head h1 { margin: 0 0 4px; font-size: 17px; }
-  .title { text-align: center; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px; border-bottom: 1px solid #222; }
+  .title { text-align: center; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px; border-bottom: 1px solid #222; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #222; font-size: 12px; }
   .grid div { padding: 8px 14px; }
   .grid div:first-child { border-right: 1px solid #222; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   th, td { padding: 5px 8px; text-align: left; border-bottom: 1px solid #ccc; }
-  th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #222; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #222; }
   td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
-  tr.total td { font-weight: 700; border-top: 1px solid #222; }
-  .note { padding: 8px 14px; font-size: 11px; border-top: 1px solid #222; }
+  tr.total td { font-weight: 600; border-top: 1px solid #222; }
+  .note { padding: 8px 14px; font-size: 12px; border-top: 1px solid #222; }
   .sign { display: flex; justify-content: flex-end; padding: 36px 14px 10px; font-size: 12px; }
   @media print { body { padding: 0; } }
 `;
@@ -56,7 +57,7 @@ export function materialOutChallanHtml(o: MaterialOut, items: readonly StockItem
     totalValue += value;
     totalTax += tax;
     const due = returnDeadline(o.date, l.goods_kind, o.extended_until);
-    return `<tr><td>${i + 1}</td><td>${esc(it?.name ?? 'Item')}${l.batch_no ? ` · batch ${esc(l.batch_no)}` : ''}<div style="font-size:10px;color:#555">${esc(l.goods_kind === 'capital_goods' ? 'Capital goods' : l.goods_kind === 'mould_tool' ? 'Mould / die / jig / tool' : 'Inputs')}${due ? ` · return by ${esc(formatDate(due))}` : ''}</div></td>` +
+    return `<tr><td>${i + 1}</td><td>${esc(it?.name ?? 'Item')}${l.batch_no ? ` · batch ${esc(l.batch_no)}` : ''}<div style="font-size:12px;color:#555">${esc(l.goods_kind === 'capital_goods' ? 'Capital goods' : l.goods_kind === 'mould_tool' ? 'Mould / die / jig / tool' : 'Inputs')}${due ? ` · return by ${esc(formatDate(due))}` : ''}</div></td>` +
       `<td>${esc(l.hsn ?? it?.hsn ?? '')}</td><td class="n">${esc(num(l.qty))} ${esc(l.unit || it?.unit || '')}</td>` +
       `<td class="n">${esc(formatMoney(value))}</td><td class="n">${esc(rate)}%</td><td class="n">${esc(formatMoney(tax))}</td></tr>`;
   }).join('');
@@ -73,6 +74,6 @@ export function materialOutChallanHtml(o: MaterialOut, items: readonly StockItem
 </section>`;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(o.number)}</title><style>${CSS}</style></head>
+<title>${esc(o.number)}</title><style>${PRINT_FONT_FACE}${CSS}</style></head>
 <body>${COPIES.map(section).join('\n')}</body></html>`;
 }

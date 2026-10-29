@@ -23,7 +23,7 @@ export function CrossChecks({ checks }: { checks: CrossCheck[] }) {
     <div className={surface.card}>
       <div className={surface.cardHead}>
         <span className={surface.cardHeadIcon}><ShieldCheck size={16} /> {repT('ccTitle')}</span>
-        <span className={ok ? styles.pos : styles.neg} style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+        <span className={ok ? styles.pos : styles.neg} style={{ fontSize: '0.75rem', fontWeight: 600 }}>
           {ok ? repT('ccAllAgree') : repT('ccDiff')}
         </span>
       </div>

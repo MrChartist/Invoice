@@ -50,7 +50,7 @@ export default function GstView(_: HsViewProps) {
         <thead><tr><th>{hsbT('threshold')}</th><th>{hsbT('test')}</th><th>GST</th></tr></thead>
         <tbody>
           {[[false, false], [false, true], [true, false], [true, true]].map(([big, ab]) => (
-            <tr key={`${big}${ab}`} style={big === d.pos.big && ab === d.pos.above ? { fontWeight: 700, outline: '2px solid var(--accent)' } : undefined}>
+            <tr key={`${big}${ab}`} style={big === d.pos.big && ab === d.pos.above ? { fontWeight: 600, outline: '2px solid var(--accent)' } : undefined}>
               <td>{yn(big)}</td><td>{yn(ab)}</td><td>{yn(big && ab)}{big === d.pos.big && ab === d.pos.above ? ` — ${hsbT('you')}` : ''}</td>
             </tr>
           ))}

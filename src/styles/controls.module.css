@@ -13,7 +13,7 @@
 
 .label {
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted-foreground);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -100,7 +100,7 @@
 }
 
 .inputMono {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
@@ -112,7 +112,7 @@
 
 .inputNumeric {
   text-align: right;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
 }
 
@@ -148,14 +148,14 @@
   font-size: var(--text-base);
   color: var(--muted-foreground);
   pointer-events: none;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
 }
 
 .moneyInput {
   composes: input;
   padding-left: 2rem;
   text-align: right;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
 }
 
@@ -185,7 +185,7 @@
 .ghostNumeric {
   composes: ghost;
   text-align: right;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
 }
 

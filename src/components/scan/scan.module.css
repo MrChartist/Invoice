@@ -22,7 +22,7 @@
 
 .input {
   padding-left: 2.1rem !important;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
 }
 
 .status {

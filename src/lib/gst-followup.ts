@@ -14,6 +14,7 @@
 import type { BookBill, Gstr2bLine, Heads3, ItcEffect, MatchDiff, MatchResult } from './gstr2b';
 import { getTable, setTable } from './storage';
 import { escHtml as esc } from './html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const taxOf = (h: { igst: number; cgst: number; sgst: number }) => r2(h.igst + h.cgst + h.sgst);
@@ -116,7 +117,7 @@ export function followUpText(f: FollowUp, period: string, ourGstin: string, w: F
 
 /** Printable HTML (browser "Save as PDF") for one supplier's note. */
 export function followUpHtml(title: string, text: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font:14px/1.5 system-ui,sans-serif;margin:32px;color:#111}pre{white-space:pre-wrap;font:inherit}</style></head><body><h1 style="font-size:18px">${esc(title)}</h1><pre>${esc(text)}</pre></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${PRINT_FONT_FACE}body{font:14px/1.5 ${PRINT_FONT};margin:32px;color:#111}pre{white-space:pre-wrap;font:inherit}</style></head><body><h1 style="font-size:18px">${esc(title)}</h1><pre>${esc(text)}</pre></body></html>`;
 }
 
 /* ── follow-up marks ── */

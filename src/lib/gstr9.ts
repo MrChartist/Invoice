@@ -66,6 +66,7 @@ import type { PurchaseReturn } from '../types/purchases';
 import { isLiveNote, noteCess, noteTax } from './purchase-returns-gst';
 import { buildGstr9PartV } from './gstr9-partv';
 import { escHtml as esc } from './html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 
 /* ───────────────────────── Types ───────────────────────── */
 
@@ -903,12 +904,12 @@ ${rows
 ${rows.length ? rows.map((h) => `<tr><td>${esc(h.hsn)}</td><td>${esc(h.description)}</td><td>${esc(h.uqc)}</td><td class="n">${esc(h.qty)}</td><td class="n">${n(h.taxable)}</td><td class="n">${esc(h.rate)}</td><td class="n">${n(h.igst)}</td><td class="n">${n(h.cgst)}</td><td class="n">${n(h.sgst)}</td><td class="n">${n(h.cess)}</td></tr>`).join('\n') : '<tr><td colspan="10">No rows</td></tr>'}
 </tbody></table>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>GSTR-9 working paper - ${esc(r.fyLabel)}</title>
-<style>
-body{font:12px/1.45 system-ui,sans-serif;color:black;margin:24px;max-width:1000px}
+<style>${PRINT_FONT_FACE}
+body{font:12px/1.45 ${PRINT_FONT};color:black;margin:24px;max-width:1000px}
 h1{font-size:20px;margin:0 0 2px}h2{font-size:14px;margin:22px 0 6px;border-bottom:2px solid black;padding-bottom:3px}
-p.m,div.m{color:dimgray;margin:2px 0;font-size:11px}table{width:100%;border-collapse:collapse}
-td,th{border-bottom:1px solid lightgray;padding:3px 6px;text-align:left;vertical-align:top}th{font-size:10px;text-transform:uppercase;color:dimgray}
-td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}tr.b td{font-weight:700;border-top:1px solid black}
+p.m,div.m{color:dimgray;margin:2px 0;font-size:12px}table{width:100%;border-collapse:collapse}
+td,th{border-bottom:1px solid lightgray;padding:3px 6px;text-align:left;vertical-align:top}th{font-size:12px;text-transform:uppercase;color:dimgray}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}tr.b td{font-weight: 600;border-top:1px solid black}
 .w{margin:16px 0;padding:8px 10px;border:1px solid gray;font-size:12px}
 @media print{body{margin:0}h2{break-after:avoid}tr{break-inside:avoid}}
 </style></head><body>

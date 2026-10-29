@@ -26,6 +26,7 @@ import styles from './gstr9.module.css';
 import { useT } from '../../i18n';
 import { gvT } from '../../i18n/areas/gst-views';
 import { r7T } from '../../i18n/areas/gst-tds-7r';
+import { printWhenReady } from '../../lib/print-fonts';
 
 export interface Gstr9ModalProps {
   open: boolean;
@@ -178,7 +179,7 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
   const print = () => {
     const url = URL.createObjectURL(new Blob([buildGstr9Html(report, filerName)], { type: 'text/html' }));
     const w = window.open(url, '_blank');
-    if (w) w.addEventListener('load', () => w.print());
+    if (w) w.addEventListener('load', () => printWhenReady(w));
     else notify(gvT('popupBlocked'), 'error');
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };

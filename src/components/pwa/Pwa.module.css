@@ -44,7 +44,7 @@
 .title {
   margin: 0;
   font-size: var(--text-md);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .desc {
@@ -151,7 +151,7 @@
 }
 
 .folderName {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-base);
   overflow-wrap: anywhere;
 }

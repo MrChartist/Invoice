@@ -1,7 +1,7 @@
 .h2 {
   font-family: var(--font-display);
   font-size: var(--text-xl);
-  font-weight: 700;
+  font-weight: 600;
   margin: 0;
 }
 
@@ -81,7 +81,7 @@
 .totalRow th, .totalRow td {
   border-top: 2px solid var(--border);
   background-color: var(--card-inner);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* ── Statements ───────────────────────────────────────────────── */
@@ -105,7 +105,7 @@
 .miniValue, .miniStrong {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 1.0625rem;
 }
 .miniStrong { color: var(--brand-text); font-size: 1.1875rem; }
@@ -122,6 +122,6 @@
   .linkBtn { min-height: 40px; display: inline-flex; align-items: center; }
 }
 
-.presetOn { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--foreground); font-weight: 700; }
+.presetOn { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--foreground); font-weight: 600; }
 /* PENDING 34: ageing basis / slabs / interest controls in the party-wise card head */
 .ageingPrefs { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }

@@ -59,7 +59,7 @@ p.muted { margin: 0; }
 }
 
 .statValue {
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
@@ -124,7 +124,7 @@ p.muted { margin: 0; }
   justify-content: space-between;
   align-items: center;
   gap: 0.25rem;
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--text-sm);
 }
 
