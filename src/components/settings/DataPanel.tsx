@@ -422,7 +422,7 @@ export function DataPanel({ notify }: Props) {
         <div className={surface.cardBody}>
           <p className={surface.sectionNote}>{setT('dangerText')}</p>
           <Suspense fallback={null}><RetentionNote /></Suspense>
-          <button type="button" className={controls.btnOutline} style={{ alignSelf: 'flex-start', color: 'var(--destructive)' }} onClick={() => setWipeOpen(true)}>
+          <button type="button" className={controls.btnDestructive} style={{ alignSelf: 'flex-start' }} onClick={() => setWipeOpen(true)}>
             <Trash2 size={16} /> {setT('eraseAll')}
           </button>
         </div>

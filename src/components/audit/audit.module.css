@@ -454,10 +454,7 @@
   transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
-.presetBtn:hover {
-  border-color: var(--brand);
-  background: var(--brand-soft);
-}
+.presetBtn:hover { border-color: var(--foreground); }
 
 .presetBtn small {
   color: var(--muted-foreground);

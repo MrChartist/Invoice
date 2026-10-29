@@ -24,7 +24,6 @@
 }
 
 .bell:focus-visible,
-.cta:focus-visible,
 .textBtn:focus-visible,
 .dismiss:focus-visible {
   outline: 2px solid var(--ring);
@@ -160,7 +159,6 @@
 }
 
 @media (pointer: coarse) {
-  .cta,
   .textBtn {
     min-height: 40px;
   }
@@ -170,21 +168,7 @@
   }
 }
 
-.cta {
-  border: 0;
-  border-radius: var(--radius-sm);
-  padding: 0.3rem 0.65rem;
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--primary-foreground);
-  background: var(--primary);
-  cursor: pointer;
-}
-
-.cta:hover {
-  background: var(--primary-hover);
-}
+.cta { composes: btn xs primary from global; }
 
 .textBtn {
   display: inline-flex;
