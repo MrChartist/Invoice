@@ -14,6 +14,7 @@ import { F } from './Field';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './transport.module.css';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../../lib/print-fonts';
 
 export default function FreightBillDialog({ notify, refresh, tick }: PanelProps) {
   const [range, setRange] = useState({ from: '', to: '' });
@@ -49,7 +50,7 @@ export default function FreightBillDialog({ notify, refresh, tick }: PanelProps)
     const rows = annexureRows(lrs.filter((l) => bill.lr_ids!.includes(l.id)));
     if (kind === 'csv') return csvDownload(`${bill.invoice_number.replace(/\//g, '-')}-annexure.csv`, rows);
     const [head, ...body] = rows;
-    printHtml(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(bill.invoice_number)}</title><style>body{font-family:system-ui,sans-serif;font-size:12px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:4px}</style></head><body><h3>Annexure to ${esc(bill.invoice_number)} — consignment notes</h3><table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table><p>Working paper — verify with your CA.</p></body></html>`, bill.invoice_number);
+    printHtml(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(bill.invoice_number)}</title><style>${PRINT_FONT_FACE}body{font-family:${PRINT_FONT};font-size:12px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:4px}</style></head><body><h3>Annexure to ${esc(bill.invoice_number)} — consignment notes</h3><table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table><p>Working paper — verify with your CA.</p></body></html>`, bill.invoice_number);
   };
   return (
     <div className={styles.stack}>

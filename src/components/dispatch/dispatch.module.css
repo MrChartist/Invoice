@@ -6,7 +6,7 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
   padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card-inner);
 }
-.listItem strong { font-family: var(--font-mono); font-size: var(--text-base); }
+.listItem strong { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: var(--text-base); }
 .muted { color: var(--muted-foreground); font-size: var(--text-sm); }
 .grow { flex: 1 1 auto; }
 .num { width: 5.5rem; }

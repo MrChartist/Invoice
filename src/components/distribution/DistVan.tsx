@@ -14,6 +14,7 @@ import { useT } from '../../i18n';
 import { distT } from '../../i18n/areas/distribution';
 import controls from '../../styles/controls.module.css';
 import own from './dist.module.css';
+import { printWhenReady } from '../../lib/print-fonts';
 
 const blank = (): StockTransferLine => ({ id: generateId(), item_id: '', qty: 0 });
 
@@ -64,7 +65,7 @@ export default function DistVan({ onDone }: { onDone: (msg: string, error?: bool
     w.document.write(html);
     w.document.close();
     w.focus();
-    w.print();
+    printWhenReady(w);
   };
 
   return (

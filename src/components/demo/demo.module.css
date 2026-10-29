@@ -44,7 +44,7 @@
   background: var(--brand-soft);
   color: var(--brand-text);
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }

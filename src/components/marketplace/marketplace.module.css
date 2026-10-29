@@ -76,6 +76,6 @@
 .textarea {
   min-height: 6rem;
   width: 100%;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: 0.8125rem;
 }

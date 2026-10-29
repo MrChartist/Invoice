@@ -45,7 +45,7 @@ export function kotHtml(tickets: readonly { lines: string[]; width: 58 | 80 }[],
     .join('<div class="cut"></div>');
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>
-<style>@page{size:80mm auto;margin:2mm}html,body{margin:0;background:#fff;color:#000}pre{font-family:ui-monospace,"Courier New",monospace;line-height:1.25;margin:0 0 4mm;white-space:pre}.cut{break-after:page;page-break-after:always}</style></head>
+<style>@page{size:80mm auto;margin:2mm}html,body{margin:0;background:#fff;color:#000}pre{font-family:monospace;line-height:1.25;margin:0 0 4mm;white-space:pre}.cut{break-after:page;page-break-after:always}</style></head>
 <body>${body}</body></html>`;
 }
 

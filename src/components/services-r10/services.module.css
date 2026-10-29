@@ -114,7 +114,7 @@
 
 .now {
   font-size: var(--text-xl);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--primary);
   margin: 0.5rem 0;
 }

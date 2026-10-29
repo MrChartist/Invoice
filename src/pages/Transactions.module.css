@@ -39,14 +39,14 @@
 }
 
 .count {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
   opacity: 0.6;
   margin-left: 0.15rem;
 }
 
 .docLink {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-base);
   font-weight: 600;
 }
@@ -105,7 +105,7 @@
   table.ledger td.cClient { grid-area: client; }
   table.ledger td.cDate { grid-area: date; white-space: normal; font-size: var(--text-base); }
   table.ledger td.cStatus { grid-area: status; justify-self: end; }
-  table.ledger td.cTotal { grid-area: total; font-weight: 700; }
+  table.ledger td.cTotal { grid-area: total; font-weight: 600; }
   table.ledger td.cBal { grid-area: bal; font-size: var(--text-base); color: var(--muted-foreground); }
   table.ledger td.cBal::before { content: 'Balance '; font-family: var(--font-body); font-size: var(--text-xs); }
   table.ledger td.cAct { grid-area: act; margin: 0 -0.5rem; }

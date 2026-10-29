@@ -9,7 +9,7 @@
 .depth4 { padding-left: 5rem; }
 
 .groupRow td {
-  font-weight: 700;
+  font-weight: 600;
   background: var(--card-inner);
 }
 
@@ -57,7 +57,7 @@
 .cardTitle {
   font-family: var(--font-display);
   font-size: var(--text-base);
-  font-weight: 700;
+  font-weight: 600;
   margin: 0 0 0.5rem;
 }
 
@@ -78,7 +78,7 @@
 }
 .num {
   text-align: right !important;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

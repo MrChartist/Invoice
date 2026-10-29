@@ -34,6 +34,7 @@ import { MF_SERIES, MF_TABLES } from './mf-shared';
 import { DAY, drop, mustGet, nowIso, put, r2, r3, rowsOf } from './mf-b-db';
 import { DEFAULT_MARGINS, netSheets, paperKg, reams, sqIn, upsOn, wasteSheets } from './mf-paper';
 import { clientOf, mfDraft, mfLine, saveDraft } from './mf-b-docs';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 export const PES = MF_SERIES.estimates;
 export const ESTIMATES_TABLE = MF_TABLES.estimates;
@@ -124,7 +125,7 @@ export const printSnap = (e: PrintEstimate, b: EstimateBreak) => ({
 export function ticketHtml(e: PrintEstimate, b: EstimateBreak, order?: Pick<ProductionOrder, 'number'>, actualSheets?: number): string {
   const row = (k: string, v: string | number) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(order?.number ?? e.number)}</title>
-<style>@page{size:A4}body{font-family:system-ui,sans-serif;margin:0;padding:20px;font-size:13px}h1{font-size:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid;padding:4px 6px;text-align:left}th{width:35%}</style></head><body>
+<style>${PRINT_FONT_FACE}@page{size:A4}body{font-family:${PRINT_FONT};margin:0;padding:20px;font-size:13px}h1{font-size:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid;padding:4px 6px;text-align:left}th{width:35%}</style></head><body>
 <h1>JOB TICKET ${esc(order?.number ?? '')} · ${esc(e.number)}</h1><table><tbody>
 ${row('Job', e.job)}${row('Quantity', b.qty)}${row('Finished size', `${e.size.w} × ${e.size.h} mm`)}${row('Colours', `${e.colours_front} front + ${e.colours_back} back${e.varnish_plate ? ' + varnish' : ''}`)}
 ${row('Sheet', `${e.sheet.w} × ${e.sheet.h} mm · ${e.gsm} GSM · ${b.ups} ups`)}${row('Sheets', `${b.net_sheets} + ${b.waste_sheets} wastage = ${b.sheets} (${b.kg} kg, ${b.reams} reams)`)}

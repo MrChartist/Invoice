@@ -11,6 +11,7 @@
 import { amountInWords } from './amount-in-words';
 import { formatDate, formatMoney } from './utils';
 import { escHtml as esc } from './html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE, printWhenReady } from './print-fonts';
 
 export interface VoucherPrintLine {
   account: string;
@@ -64,25 +65,25 @@ export { esc };
 const money = (paise: number) => esc(formatMoney(paise / 100));
 
 const VOUCHER_CSS = `
-  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 28px; }
+  body { font-family: ${PRINT_FONT}; color: #111; margin: 0; padding: 28px; }
   .v { max-width: 720px; margin: 0 auto 32px; border: 1px solid #222; padding: 0; break-after: page; page-break-after: always; }
   .v:last-child { break-after: auto; page-break-after: auto; }
   .head { text-align: center; padding: 14px 16px 10px; border-bottom: 1px solid #222; }
   .head h1 { margin: 0; font-size: 18px; }
   .head .sub { font-size: 12px; color: #444; white-space: pre-line; }
-  .title { text-align: center; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px; border-bottom: 1px solid #222; }
+  .title { text-align: center; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px; border-bottom: 1px solid #222; }
   .meta { display: flex; justify-content: space-between; padding: 8px 14px; font-size: 13px; border-bottom: 1px solid #222; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { padding: 6px 14px; text-align: left; vertical-align: top; }
-  th { border-bottom: 1px solid #222; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+  th { border-bottom: 1px solid #222; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
   td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; width: 120px; }
-  .party { font-size: 11px; color: #555; }
-  tr.total td { border-top: 1px solid #222; font-weight: 700; }
+  .party { font-size: 12px; color: #555; }
+  tr.total td { border-top: 1px solid #222; font-weight: 600; }
   .narr, .words { padding: 8px 14px; font-size: 12px; border-top: 1px solid #222; }
   .sign { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #222; font-size: 12px; }
   .sign div { padding: 44px 10px 8px; text-align: center; border-right: 1px solid #222; }
   .sign div:last-child { border-right: 0; }
-  .note { max-width: 720px; margin: 0 auto; font-size: 10px; color: #777; }
+  .note { max-width: 720px; margin: 0 auto; font-size: 12px; color: #777; }
   @media print { body { padding: 0; } .note { display: none; } }
 `;
 
@@ -114,7 +115,7 @@ export function voucherHtml(models: readonly VoucherPrintModel[], title = 'Vouch
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
-<style>${VOUCHER_CSS}</style></head>
+<style>${PRINT_FONT_FACE}${VOUCHER_CSS}</style></head>
 <body>
 ${models.map(voucherSection).join('\n')}
 <p class="note">Printed on the issuer's device. Working paper — verify with your CA.</p>
@@ -135,6 +136,6 @@ export function printHtmlDocument(html: string, fallback: (html: string) => void
   w.document.write(html);
   w.document.close();
   w.focus();
-  w.print();
+  printWhenReady(w);
   return true;
 }

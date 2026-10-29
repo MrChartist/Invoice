@@ -11,7 +11,7 @@
   padding-bottom: 6px;
   border-bottom: 2px solid var(--tpl-accent);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -45,13 +45,13 @@
 }
 
 .photo figcaption {
-  font-size: 10.5px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
 .group {
   color: var(--tpl-accent);
-  font-weight: 700;
+  font-weight: 600;
   margin-right: 4px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -69,12 +69,12 @@
 
 .proof p {
   margin: 0;
-  font-size: 10.5px;
+  font-size: 12px;
   line-height: 1.4;
 }
 
 .proofHead {
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   color: var(--tpl-accent);
   text-transform: uppercase;
   letter-spacing: 0.06em;

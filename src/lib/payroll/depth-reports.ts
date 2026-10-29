@@ -36,6 +36,7 @@ import {
   pfLateEstimate,
   type FnfWorking,
 } from './depth';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 type Row = (string | number)[];
 
@@ -64,8 +65,8 @@ export function fnfStatementHtml(fnf: FnfSettlement, employee: Employee, w: FnfW
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Full and final settlement ${escapeHtml(fnf.number)} ${escapeHtml(employee.code)}</title>
-<style>
-  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 28px; }
+<style>${PRINT_FONT_FACE}
+  body { font-family: ${PRINT_FONT}; color: #111; margin: 0; padding: 28px; }
   .sheet { max-width: 780px; margin: 0 auto; border: 1px solid #bbb; padding: 24px 28px; }
   h1 { font-size: 18px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.05em; }
   h2 { font-size: 14px; margin: 18px 0 6px; }
@@ -75,10 +76,10 @@ export function fnfStatementHtml(fnf: FnfSettlement, employee: Employee, w: FnfW
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { border: 1px solid #ccc; padding: 5px 8px; text-align: left; vertical-align: top; }
   td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
-  tfoot td { font-weight: 700; }
-  .net { margin-top: 14px; font-size: 16px; font-weight: 700; }
+  tfoot td { font-weight: 600; }
+  .net { margin-top: 14px; font-size: 16px; font-weight: 600; }
   .sign { margin-top: 40px; display: flex; justify-content: space-between; font-size: 12px; }
-  .note { margin-top: 18px; font-size: 11px; color: #777; }
+  .note { margin-top: 18px; font-size: 12px; color: #777; }
   @media print { body { padding: 0; } .sheet { border: 0; } }
 </style></head>
 <body><div class="sheet">

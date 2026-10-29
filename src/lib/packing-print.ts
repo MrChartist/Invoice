@@ -9,6 +9,7 @@ import { contrastText, sanitizeHex } from './design-prefs';
 import { boxRange, packageFigures, packingTotals } from './packing';
 import { esc } from './voucher-print';
 import { formatDate } from './utils';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 
 export interface PackingPrintCompany {
   name: string;
@@ -52,25 +53,25 @@ export function packingListHtml(pl: PackingList, company: PackingPrintCompany, a
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(`Packing list ${pl.number}`)}</title>
-<style>
+<style>${PRINT_FONT_FACE}
   @page { size: 210mm 297mm; margin: 12mm; }
-  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 24px; font-size: 12px; }
+  body { font-family: ${PRINT_FONT}; color: #111; margin: 0; padding: 24px; font-size: 12px; }
   .sheet { max-width: 780px; margin: 0 auto; }
   .head { display: flex; justify-content: space-between; gap: 16px; border-bottom: 3px solid ${colour}; padding-bottom: 10px; }
   .head h1 { margin: 0; font-size: 18px; }
   .sub { white-space: pre-line; color: #444; }
-  .title { color: ${colour}; font-size: 20px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; text-align: right; }
+  .title { color: ${colour}; font-size: 20px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; text-align: right; }
   .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin: 12px 0; }
-  .meta b { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #555; }
+  .meta b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #555; }
   table { width: 100%; border-collapse: collapse; margin-top: 8px; }
   th, td { border: 1px solid #bbb; padding: 5px 6px; text-align: left; vertical-align: top; }
-  th { background: ${colour}; color: ${contrastText(colour)}; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  th { background: ${colour}; color: ${contrastText(colour)}; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
   td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  tr.total td { font-weight: 700; border-top: 2px solid #222; }
+  tr.total td { font-weight: 600; border-top: 2px solid #222; }
   h2 { font-size: 12px; margin: 16px 0 0; text-transform: uppercase; letter-spacing: 0.06em; color: ${colour}; }
   .sign { margin-top: 36px; display: flex; justify-content: flex-end; }
   .sign div { border-top: 1px solid #222; padding-top: 4px; min-width: 200px; text-align: center; }
-  .note { color: #777; font-size: 10px; margin-top: 12px; }
+  .note { color: #777; font-size: 12px; margin-top: 12px; }
   @media print { body { padding: 0; } }
 </style></head>
 <body><div class="sheet">

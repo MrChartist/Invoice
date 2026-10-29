@@ -77,7 +77,7 @@
   transform: translate(-50%, -50%);
   font-family: var(--font-display);
   font-size: 210px;
-  font-weight: 900;
+  font-weight: 600;
   color: var(--tpl-accent);
   opacity: 0.035;
   pointer-events: none;
@@ -88,8 +88,8 @@
 
 /* ── Type helpers ─────────────────────────────────────────────── */
 .eyebrow {
-  font-size: 9px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--tpl-accent);
@@ -102,7 +102,7 @@
 
 .docTitle {
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.035em;
   line-height: 1;
   color: var(--tpl-accent);
@@ -110,8 +110,8 @@
 }
 
 .docNumber {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-size: 12px;
   color: var(--tpl-muted);
   margin-top: 5px;
   letter-spacing: 0.01em;
@@ -120,13 +120,13 @@
 .orgName {
   font-family: var(--font-display);
   font-size: 19px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.2;
 }
 
 .meta {
-  font-size: 10.5px;
+  font-size: 10.5px; /* type-floor-exempt: running block of the paginated A4 paper; at 12px a 3-line invoice runs onto page 2 */
   color: var(--tpl-body);
   line-height: 1.65;
 }
@@ -196,7 +196,7 @@
   margin-top: 10px;
   font-family: var(--font-display);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.32em;
   color: var(--tpl-ink);
 }
@@ -221,7 +221,7 @@
 
 .partyName {
   font-size: 13.5px;
-  font-weight: 800;
+  font-weight: 600;
   margin: 6px 0 3px;
 }
 
@@ -229,7 +229,7 @@
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 4px 14px;
-  font-size: 10.5px;
+  font-size: 10.5px; /* type-floor-exempt: running block of the paginated A4 paper; at 12px a 3-line invoice runs onto page 2 */
   align-content: start;
 }
 
@@ -241,8 +241,8 @@
 
 .metaVal {
   font-weight: 600;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-size: 10.5px; /* type-floor-exempt: running block of the paginated A4 paper; at 12px a 3-line invoice runs onto page 2 */
   text-align: right;
 }
 
@@ -250,12 +250,12 @@
 .items {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 11px; /* type-floor-exempt: running block of the paginated A4 paper; at 12px a 3-line invoice runs onto page 2 */
 }
 
 .items thead th {
-  font-size: 9px;
-  font-weight: 800;
+  font-size: 9px; /* type-floor-exempt: multi-column printed table, 12px would push columns / the one-page A4 layout */
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: var(--tpl-cell-y) 8px;
@@ -290,7 +290,7 @@
 .center { text-align: center; }
 
 .num {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -301,7 +301,7 @@
 }
 
 .itemDesc {
-  font-size: 9.5px;
+  font-size: 9.5px; /* type-floor-exempt: running block of the paginated A4 paper; at 12px a 3-line invoice runs onto page 2 */
   color: var(--tpl-muted);
   margin-top: 2px;
   line-height: 1.45;
@@ -343,7 +343,7 @@
 }
 
 .payLines {
-  font-size: 10px;
+  font-size: 10px; /* type-floor-exempt: running block of the paginated A4 paper; at 12px a 3-line invoice runs onto page 2 */
   line-height: 1.8;
   color: var(--tpl-body);
 }
@@ -362,15 +362,15 @@
 }
 
 .qrCaption {
-  font-size: 7.5px;
-  font-weight: 700;
+  font-size: 7.5px; /* type-floor-exempt: fixed-size printed slot (caption under the 64 px UPI QR) */
+  font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--tpl-muted);
   margin-top: 3px;
 }
 
 .notesText {
-  font-size: 9.5px;
+  font-size: 9.5px; /* type-floor-exempt: running block of the paginated A4 paper; at 12px a 3-line invoice runs onto page 2 */
   color: var(--tpl-body);
   line-height: 1.6;
   white-space: pre-line;
@@ -391,14 +391,14 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--tpl-body);
 }
 
 .totalRowStrong {
   composes: totalRow;
   color: var(--tpl-ink);
-  font-weight: 700;
+  font-weight: 600;
   border-top: 1px solid var(--tpl-line);
   padding-top: 6px;
   margin-top: 2px;
@@ -420,7 +420,7 @@
 
 .grandLabel {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -428,13 +428,13 @@
 .grandValue {
   font-family: var(--font-display);
   font-size: 22px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
 .words {
-  font-size: 9.5px;
+  font-size: 9.5px; /* type-floor-exempt: running block of the paginated A4 paper; at 12px a 3-line invoice runs onto page 2 */
   font-style: italic;
   color: var(--tpl-muted);
   margin-top: 7px;
@@ -445,8 +445,8 @@
 .balance {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   margin-top: 8px;
   padding: 8px 10px;
   border: 1px dashed var(--tpl-accent);
@@ -458,13 +458,13 @@
 .summary {
   width: 100%;
   border-collapse: collapse;
-  font-size: 9.5px;
+  font-size: 9.5px; /* type-floor-exempt: multi-column printed table, 12px would push columns / the one-page A4 layout */
 }
 
 .summary th {
   text-align: right;
-  font-size: 8.5px;
-  font-weight: 800;
+  font-size: 8.5px; /* type-floor-exempt: multi-column printed table, 12px would push columns / the one-page A4 layout */
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--tpl-muted);
@@ -481,12 +481,12 @@
   padding: 5px 7px;
   border-bottom: 1px solid var(--tpl-line);
   text-align: right;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
 }
 
 .summary tfoot td {
-  font-weight: 800;
+  font-weight: 600;
   border-bottom: none;
   border-top: 1.5px solid var(--tpl-line);
 }
@@ -503,8 +503,8 @@
 }
 
 .signatureLine {
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--tpl-muted);
@@ -522,7 +522,7 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 8.5px;
+  font-size: 12px;
   color: var(--tpl-muted);
 }
 
@@ -579,8 +579,8 @@
 .headerNote {
   align-self: center;
   text-align: center;
-  font-size: 9.5px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--tpl-accent);
@@ -609,7 +609,7 @@
   padding: 4px 26px;
   font-family: var(--font-display);
   font-size: 80px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: 0.08em;
   line-height: 1.1;
   opacity: 0.2;
@@ -625,7 +625,7 @@
 /* ── Bilingual ────────────────────────────────────────────────── */
 .biSub {
   display: block;
-  font-family: 'Noto Sans Devanagari', 'Mukta', var(--font-body), sans-serif;
+  font-family: var(--font-devanagari), var(--font-body);
   font-size: 0.8em;
   font-weight: 500;
   letter-spacing: 0;
@@ -638,15 +638,15 @@
 /* Amount in words, Hindi line (5.4): "रुपये … मात्र" under the English words. */
 .biWords {
   display: block;
-  font-family: 'Noto Sans Devanagari', var(--font-body), sans-serif;
+  font-family: var(--font-devanagari), var(--font-body);
   font-weight: 500;
   margin-top: 2px;
 }
 
 .biTitle {
-  font-family: 'Noto Sans Devanagari', 'Mukta', var(--font-body), sans-serif;
+  font-family: var(--font-devanagari), var(--font-body);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--tpl-muted);
   margin-top: 3px;
 }
@@ -675,7 +675,8 @@
 }
 
 .skinInk .docTitle {
-  font-family: 'DM Serif Display', var(--font-serif), Georgia, serif;
+  font-family: var(--font-accent);
+  font-style: italic;
   font-weight: 400;
   font-size: 50px;
   letter-spacing: -0.015em;
@@ -727,8 +728,8 @@
 
 .emberTag {
   margin-top: 6px;
-  font-size: 9px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--tpl-accent);
@@ -752,9 +753,9 @@
 .letterBrand { display: flex; flex-direction: column; gap: 6px; }
 
 .letterName {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 30px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.1;
   letter-spacing: -0.01em;
   color: var(--tpl-accent);
@@ -767,7 +768,7 @@
   align-items: baseline;
   margin-top: calc(-1 * var(--tpl-gap) / 2);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.3em;
   text-transform: uppercase;
 }
@@ -783,9 +784,9 @@
 }
 
 .statementVal {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   margin-top: 4px;
 }
 
@@ -794,7 +795,7 @@
 .letterFoot {
   background: var(--tpl-accent);
   color: var(--tpl-on-accent);
-  font-size: 8.5px;
+  font-size: 8.5px; /* type-floor-exempt: running block of the paginated A4 paper; at 12px a 3-line invoice runs onto page 2 */
   letter-spacing: 0.06em;
   text-align: center;
   padding: 9px 12px;
@@ -812,14 +813,14 @@
 
 .gFrame {
   border: 1.5px solid var(--tpl-grid);
-  font-size: 10.5px;
+  font-size: 10.5px; /* type-floor-exempt: dense statutory GST grid (Rule 46 fields in one A4 frame) */
   display: flex;
   flex-direction: column;
 }
 
 .gTitle {
   text-align: center;
-  font-weight: 900;
+  font-weight: 600;
   font-size: 15px;
   letter-spacing: 0.32em;
   padding: 7px;
@@ -830,8 +831,8 @@
 
 .gNote {
   text-align: center;
-  font-size: 9px;
-  font-weight: 800;
+  font-size: 9px; /* type-floor-exempt: dense statutory GST grid (Rule 46 fields in one A4 frame) */
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   padding: 4px;
@@ -850,17 +851,17 @@
 .gCell { padding: 8px 10px; min-width: 0; }
 
 .gLabel {
-  font-size: 8.5px;
-  font-weight: 800;
+  font-size: 8.5px; /* type-floor-exempt: dense statutory GST grid (Rule 46 fields in one A4 frame) */
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--tpl-muted);
 }
 
 .gValue {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-size: 11px; /* type-floor-exempt: dense statutory GST grid (Rule 46 fields in one A4 frame) */
+  font-weight: 600;
   margin-top: 2px;
   overflow-wrap: anywhere;
 }
@@ -868,7 +869,7 @@
 .gName {
   font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.2;
 }
@@ -881,11 +882,11 @@
 .gMeta .gCell:nth-child(odd) { border-right: 1px solid var(--tpl-grid); }
 .gMeta .gCell:nth-last-child(-n + 2) { border-bottom: none; }
 
-.gItems { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+.gItems { width: 100%; border-collapse: collapse; font-size: 10.5px; } /* type-floor-exempt: dense statutory GST grid (Rule 46 fields in one A4 frame) */
 
 .gItems thead th {
-  font-size: 8.5px;
-  font-weight: 800;
+  font-size: 8.5px; /* type-floor-exempt: dense statutory GST grid (Rule 46 fields in one A4 frame) */
+  font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   padding: 6px 7px;
@@ -904,7 +905,7 @@
 
 .gTotal td {
   padding: 6px 7px;
-  font-weight: 800;
+  font-weight: 600;
   border-top: 1px solid var(--tpl-grid);
   border-bottom: 1px solid var(--tpl-grid);
   background: var(--tpl-soft);
@@ -916,10 +917,10 @@
   gap: 2px;
   padding: 7px 10px;
   border-bottom: 1px solid var(--tpl-grid);
-  font-size: 10px;
+  font-size: 10px; /* type-floor-exempt: dense statutory GST grid (Rule 46 fields in one A4 frame) */
 }
 
-.gHsn { width: 100%; border-collapse: collapse; font-size: 9.5px; }
+.gHsn { width: 100%; border-collapse: collapse; font-size: 9.5px; } /* type-floor-exempt: dense statutory GST grid (Rule 46 fields in one A4 frame) */
 
 .gHsn th,
 .gHsn td {
@@ -927,13 +928,13 @@
   text-align: right;
   border: 1px solid var(--tpl-grid);
   border-top: none;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
 }
 
 .gHsn th {
   font-family: inherit;
-  font-size: 8.5px;
-  font-weight: 800;
+  font-size: 8.5px; /* type-floor-exempt: dense statutory GST grid (Rule 46 fields in one A4 frame) */
+  font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   background: var(--tpl-soft);
@@ -945,7 +946,7 @@
 .gHsn th:last-child,
 .gHsn td:last-child { border-right: none; }
 .gHsn .left { text-align: left; }
-.gHsn tfoot td { font-weight: 800; background: var(--tpl-soft); }
+.gHsn tfoot td { font-weight: 600; background: var(--tpl-soft); }
 
 .gBank { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 
@@ -955,7 +956,7 @@
 
 .gFoot {
   text-align: center;
-  font-size: 8.5px;
+  font-size: 8.5px; /* type-floor-exempt: dense statutory GST grid (Rule 46 fields in one A4 frame) */
   color: var(--tpl-muted);
   padding: 6px;
 }
@@ -969,7 +970,7 @@
   width: 100%;
   max-width: 360px;
   margin: 0 auto;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.45;
   display: flex;
   flex-direction: column;
@@ -977,15 +978,15 @@
 }
 
 .rcHead { text-align: center; }
-.rcName { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
-.rcSmall { font-size: 9.5px; color: var(--tpl-body); line-height: 1.45; }
+.rcName { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.rcSmall { font-size: 12px; color: var(--tpl-body); line-height: 1.45; }
 .rcCenter { text-align: center; }
-.rcStrong { font-weight: 800; }
+.rcStrong { font-weight: 600; }
 .rcRule { border: 0; border-top: 1px dashed var(--tpl-ink); margin: 6px 0; }
 .rcRow { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .rcItems { display: flex; flex-direction: column; gap: 6px; }
-.rcItemName { font-weight: 700; }
-.rcGrand { font-size: 15px; font-weight: 900; }
+.rcItemName { font-weight: 600; }
+.rcGrand { font-size: 15px; font-weight: 600; }
 .rcWords { font-style: italic; text-align: right; }
 .rcTerms { white-space: pre-line; margin-top: 4px; }
 
@@ -998,10 +999,10 @@
   --tpl-px: 30px;
   --tpl-pt: 28px;
   --tpl-pb: 24px;
-  font-size: 11px;
+  font-size: 11px; /* type-floor-exempt: A5 / 80 mm paper, scaled down on purpose */
 }
 
-.paper[data-paper='a5'] .items { font-size: 10px; }
+.paper[data-paper='a5'] .items { font-size: 10px; } /* type-floor-exempt: A5 / 80 mm paper, scaled down on purpose */
 .paper[data-paper='a5'] .items thead th { padding-left: 5px; padding-right: 5px; }
 .paper[data-paper='a5'] .items tbody td { padding-left: 5px; padding-right: 5px; }
 .paper[data-paper='a5'] .docTitle { font-size: 28px !important; }
@@ -1015,7 +1016,7 @@
 .paper[data-paper='a5'] .stampWrap { padding-top: 250px; }
 .paper[data-paper='a5'] .stampMark { font-size: 54px; border-width: 4px; }
 .paper[data-paper='a5'].skinInk .docTitle { font-size: 34px !important; }
-.paper[data-paper='a5'] .gFrame { font-size: 9.5px; }
+.paper[data-paper='a5'] .gFrame { font-size: 9.5px; } /* type-floor-exempt: A5 / 80 mm paper, scaled down on purpose */
 .paper[data-paper='a5'] .gName { font-size: 13px; }
 
 /* ── 80 mm thermal roll ───────────────────────────────────────── */
@@ -1024,10 +1025,10 @@
   --tpl-pt: 14px;
   --tpl-pb: 18px;
   min-height: 0;
-  font-size: 10.5px;
+  font-size: 10.5px; /* type-floor-exempt: A5 / 80 mm paper, scaled down on purpose */
 }
 
-.paper[data-paper='thermal80'] .rcBody { max-width: none; font-size: 10.5px; }
+.paper[data-paper='thermal80'] .rcBody { max-width: none; font-size: 10.5px; } /* type-floor-exempt: A5 / 80 mm paper, scaled down on purpose */
 .paper[data-paper='thermal80'] .rcName { font-size: 14px; }
 .paper[data-paper='thermal80'] .rcGrand { font-size: 14px; }
 .paper[data-paper='thermal80'] .stampWrap { padding-top: 140px; }
@@ -1061,7 +1062,7 @@
 
 /* A5: let the description column take what the figures leave over */
 .paper[data-paper='a5'] .items thead th { width: auto !important; white-space: nowrap; }
-.paper[data-paper='a5'] .items .num { font-size: 9.5px; }
+.paper[data-paper='a5'] .items .num { font-size: 9.5px; } /* type-floor-exempt: A5 / 80 mm paper, scaled down on purpose */
 .paper[data-paper='a5'][data-density='comfortable'] { --tpl-gap: 15px; --tpl-cell-y: 6px; }
 
 /* ── e-Invoice (IRN + signed QR) — only rendered when details exist ─── */
@@ -1089,23 +1090,23 @@
 
 .irnQr svg { display: block; }
 
-.irnText { min-width: 0; flex: 1; font-size: 9px; line-height: 1.55; }
+.irnText { min-width: 0; flex: 1; font-size: 9px; line-height: 1.55; } /* type-floor-exempt: fixed-size printed slot (IRN hash + ack beside the e-Invoice QR) */
 .irnTitle {
-  font-size: 7.5px;
-  font-weight: 800;
+  font-size: 7.5px; /* type-floor-exempt: fixed-size printed slot (IRN hash + ack beside the e-Invoice QR) */
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--tpl-accent);
   margin-bottom: 2px;
 }
 .irnLine { overflow-wrap: anywhere; word-break: break-all; }
-.irnLine b { color: var(--tpl-ink); font-weight: 700; }
-.irnMono { font-family: var(--font-mono, ui-monospace, monospace); font-size: 8.5px; letter-spacing: 0.01em; }
+.irnLine b { color: var(--tpl-ink); font-weight: 600; }
+.irnMono { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 8.5px; letter-spacing: 0.01em; } /* type-floor-exempt: fixed-size printed slot (IRN hash + ack beside the e-Invoice QR) */
 
 .irnCompact { flex-direction: column; align-items: center; text-align: center; margin-top: 10px; border-top: 1px dashed var(--tpl-ink); }
 .irnCompact .irnText { width: 100%; }
-.paper[data-paper='a5'] .irnText { font-size: 8.5px; }
-.paper[data-paper='a5'] .irnMono { font-size: 8px; }
+.paper[data-paper='a5'] .irnText { font-size: 8.5px; } /* type-floor-exempt: A5 / 80 mm paper, scaled down on purpose */
+.paper[data-paper='a5'] .irnMono { font-size: 8px; } /* type-floor-exempt: A5 / 80 mm paper, scaled down on purpose */
 
 .shipTo {
   margin-top: 12px; /* px, not rem: the interface text size (R2-C6) must not change the paper */
@@ -1142,7 +1143,7 @@
 .extraItem {
   display: flex;
   gap: 6px;
-  font-size: 10px;
+  font-size: 12px;
   min-width: 0;
 }
 
@@ -1169,8 +1170,8 @@
   border: 1px solid var(--tpl-accent);
   border-radius: 4px;
   color: var(--tpl-accent);
-  font-size: 9.5px;
-  font-weight: 700;
+  font-size: 9.5px; /* type-floor-exempt: running block of the paginated A4 paper; at 12px a 3-line invoice runs onto page 2 */
+  font-weight: 600;
   text-align: center;
   letter-spacing: 0.01em;
   break-inside: avoid;
@@ -1181,8 +1182,8 @@
   display: flex;
   justify-content: flex-end;
   margin-bottom: calc(var(--tpl-gap) * -0.5);
-  font-size: 9px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--tpl-accent);
@@ -1207,7 +1208,7 @@
 }
 
 .preHead strong { font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--tpl-ink); }
-.preHead span { font-family: var(--font-mono); font-size: 11px; color: var(--tpl-body); }
+.preHead span { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--tpl-body); }
 
 .paper[data-preprinted] { background: transparent !important; box-shadow: none; }
 .paper[data-preprinted]::before,
@@ -1224,7 +1225,7 @@
   padding: 8px 12px;
   border: 1px solid var(--tpl-accent);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   break-inside: avoid;
 }
@@ -1237,5 +1238,10 @@
   border-radius: 0;
 }
 .partyBalRow { display: flex; justify-content: space-between; gap: 12px; padding: 1px 0; }
-.partyBalTotal { font-weight: 800; border-top: 1px solid var(--tpl-accent); margin-top: 3px; padding-top: 4px; color: var(--tpl-accent); }
+.partyBalTotal { font-weight: 600; border-top: 1px solid var(--tpl-accent); margin-top: 3px; padding-top: 4px; color: var(--tpl-accent); }
 .partyBalCompact .partyBalTotal { color: inherit; border-top-color: var(--tpl-ink); }
+
+/* Type system floor on the Bilingual skin: every label also carries its Hindi line, so at 12px the sample invoice ran
+   onto a second A4 page. These labels keep their earlier sizes there. */
+.skinBi .eyebrow { font-size: 9px; } /* type-floor-exempt: bilingual labels (English + Hindi) on the one-page A4 layout */
+.skinBi .docNumber, .skinBi .totalRow, .skinBi .balance { font-size: 11px; } /* type-floor-exempt: bilingual labels (English + Hindi) on the one-page A4 layout */
