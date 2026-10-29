@@ -13,8 +13,8 @@ import { resetI18nForTests, setLanguage } from '../src/i18n/index.ts';
 import { ratioFormula, ratioLabel, ratioT } from '../src/i18n/areas/tally-ratios.ts';
 import { checklistLabel } from '../src/i18n/areas/desks-checklist.ts';
 import { rT } from '../src/i18n/areas/restaurant.ts';
-import { libT } from '../src/i18n/areas/libmsg.ts';
-import { errText, libMsg, matchLibMsg } from '../src/i18n/lib-msg.ts';
+import { HI_LIB, HI_LIB_BUILT } from '../src/i18n/hi-lib.ts';
+import { errText, libMsg, loadLibHindi } from '../src/i18n/lib-msg.ts';
 import { EMPTY_BOOKS } from '../src/lib/books.ts';
 import { buildLedger, ratioAnalysis } from '../src/lib/ledger/index.ts';
 import { BUILTIN_TEMPLATE } from '../src/lib/client-checklist.ts';
@@ -39,13 +39,13 @@ const DEVANAGARI = /[ऀ-ॿ]/;
 const hindi = async () => {
   resetI18nForTests();
   await setLanguage('hi', { persist: false });
+  await loadLibHindi(); // the reset above drops registered loaders
 };
 afterEach(() => resetI18nForTests());
 
 /** Asserts `en` (a library message) is matched and shown in Hindi; returns the Hindi. */
 function inHindi(en: string): string {
   assert.ok(en, 'the library returned a message');
-  assert.ok(matchLibMsg(en), `no template matches: ${en}`);
   const hi = libMsg(en);
   assert.ok(DEVANAGARI.test(hi) && hi !== en, `not translated: ${en} → ${hi}`);
   return hi;
@@ -180,15 +180,31 @@ test('lib message templates still match their library source (drift guard)', () 
   });
   const source = walk(libDir).map((f) => readFileSync(f, 'utf8')).join('\n');
   // Composed with a plural / kind suffix in the library: checked by behaviour in the tests above.
-  const composed = /^(sg\.|sc\.|age\.(min|hour1|hours|day1|days)|bk\.images|sh\.logosDetail|sh\.unused1?$)/;
-  const built = /^(denied|dn\.|lock|lv\.)/;
-  for (const [key, text] of Object.entries(libT.en)) {
-    if (built.test(key) || composed.test(key)) continue;
-    for (const part of text.split(/\{\w+\}/)) {
+  const composed = /stock (group|category)|^(Enter the|The parent|A) (group|category)|^\{n\} (min|hours|days) ago$|^1 (hour|day) ago$|logo\/signature image|^1 invoice carry|^\{n\} invoices carry|attached files? (is|are) no longer used/;
+  const ph = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',');
+  const seen = new Set<string>();
+  for (const [en, hi] of HI_LIB) {
+    assert.ok(!seen.has(en), `hi-lib: "${en}" listed twice`);
+    seen.add(en);
+    assert.ok(DEVANAGARI.test(hi), `hi-lib: "${en}" has no Hindi`);
+    assert.equal(ph(hi), ph(en), `hi-lib: "${en}" placeholders differ`);
+    if (composed.test(en)) continue;
+    for (const part of en.split(/\{\w+\}/)) {
       if (part.length < 3) continue;
-      assert.ok(source.includes(part), `libmsg ${key}: "${part}" is no longer in src/lib — update src/i18n/areas/libmsg.ts`);
+      assert.ok(source.includes(part), `hi-lib: "${part}" is no longer in src/lib — update src/i18n/hi-lib.ts`);
     }
   }
+  // Every access action the library names has its Hindi phrase (a new action falls back to English until added).
+  const actions = [...readFileSync(join(ROOT, 'src/lib/access.ts'), 'utf8').matchAll(/^ {2}'([\w.]+)': '[a-z][^']*',$/gm)].map((m) => m[1]);
+  assert.ok(actions.length >= 15);
+  for (const a of actions) assert.ok(HI_LIB_BUILT[`dn.${a}`], `hi-lib: no Hindi for access action ${a}`);
+});
+
+test('hi-lib.ts is part of the Hindi pack, never an English chunk', async () => {
+  const { langPackOf } = await import('../scripts/vite-hi-split.mjs');
+  assert.equal(langPackOf(join(ROOT, 'src/i18n/hi-lib.ts')), 'hi');
+  assert.equal(langPackOf(join(ROOT, 'src/i18n/lib-msg.ts')), null);
+  assert.doesNotMatch(readFileSync(join(ROOT, 'src/i18n/lib-msg.ts'), 'utf8'), /^import .*hi-lib/m, 'loaded lazily, not statically');
 });
 
 test('screens that show lib errors pass them through errText (purchases, inventory, settings, security, companies)', () => {
