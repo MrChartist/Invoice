@@ -13,7 +13,6 @@ import { useT } from '../../i18n';
 import { booksT, presetLabel } from '../../i18n/areas/books';
 import { useReportKeys } from '../../lib/keys/report-keys';
 import { stepPeriod } from '../../lib/keys/report-actions';
-import { defaultView, loadViews, viewHref } from '../../lib/report-views';
 
 // R20-C: Ctrl+H / Ctrl+L saved-views sheet (lazy).
 const ViewsSheet = lazy(() => import('../keys/ReportSheets').then((m) => ({ default: m.ViewsSheet })));
@@ -71,10 +70,13 @@ export function PeriodBar({ preset, period, onChange }: PeriodBarProps) {
     saveView: () => setViews(true),
   });
   // A view marked "Open by default" opens when this screen + tab is visited without a view of that tab.
+  // (report-views is loaded here, not imported: a static import adds its chunk to the first-paint preload list.)
   useEffect(() => {
-    const v = defaultView(pathname, tab);
-    const cur = loadViews().find((x) => x.id === params.get('view'));
-    if (v && (!cur || cur.tab !== tab)) navigate(viewHref(v), { replace: true });
+    void import('../../lib/report-views').then(({ defaultView, loadViews, viewHref }) => {
+      const v = defaultView(pathname, tab);
+      const cur = loadViews().find((x) => x.id === params.get('view'));
+      if (v && (!cur || cur.tab !== tab)) navigate(viewHref(v), { replace: true });
+    });
   }, [pathname, tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (p: PeriodPreset) => {

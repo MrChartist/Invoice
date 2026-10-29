@@ -9,7 +9,6 @@ import { getReportPrefs, setReportPrefs, type ReportPrefs } from '../../../lib/r
 import { negativeLedgers, type LedgerVoucher } from '../../../lib/ledger';
 import { getPeriodContext } from '../../../lib/books';
 import { can } from '../../../lib/access';
-import { setVoucherDate } from '../../../lib/gateway/period';
 import { keysOn } from '../../../lib/keys/stub';
 import { rowById } from '../../../lib/keys/registry';
 import { rowRoute } from '../../../lib/keys/engine';
@@ -153,8 +152,11 @@ export function useDrillRows(count: number, onActivate: (index: number) => void,
     const v = opts.voucher?.(sel);
     const gw = v && GW_KIND[v.kind];
     if (gw && can('books.edit')) {
-      setVoucherDate(v.date);
-      navigate(`/gateway/voucher/${gw}`);
+      // Loaded on use: a static import would add the Gateway period chunk to the Books preload list on first paint.
+      void import('../../../lib/gateway/period').then((m) => {
+        m.setVoucherDate(v.date);
+        navigate(`/gateway/voucher/${gw}`);
+      });
       return true;
     }
     const row = v && rowById(ROW_KIND[v.kind] ?? '');
