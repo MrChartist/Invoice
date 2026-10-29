@@ -181,6 +181,86 @@ overhead of four more files). **Over the B cap of 7 kB after both stop-rule cuts
 2 took ≈ 1 kB off; the final +11.5 is measured against `67ccabd` (the chunk sum, +10.2 kB, is the package itself).
 The core total stays under the 3,300 kB budget; no cut beyond the PRD's stop rule was made — the lead decides.
 
+## R21-C — Tanks, dips, density and the stock register
+
+### What it does
+
+- **Dips and density (C1).** Table `fuel_tank_logs` (`doc.create`, dated by `date`, period-locked by it, audited; deletes
+  to the recycle bin) written only by `fuel/fu-dips.ts` (`saveLog`, `removeLog`; imports `./fu-registry`). A `dip` row
+  stores the litres from the tank's chart (`dipLitres` over A's `dipToLitres`, whole mm); the water dip is shown
+  (`water_l`) and **subtracted** from the product litres unless `fuel_settings.dip_water` is `show` (the chart is
+  product-only — FU16 default "subtract"). A CNG cascade (no chart) takes typed stock. A `density` row is per tank or per
+  nozzle, at 15 °C (500–1,100 kg/m³ accepted). The morning checklist (`morningChecklist`, MDG cl. 1.3 / 1.4, FU16 / FU17):
+  every tank dipped, every active nozzle tested (a reading with `test_l > 0` in that day's `fuel_shifts`, B's table), a
+  morning density per product — what is missing is listed, never a block. View `dips` (`DipsView.tsx`): date / time / tank,
+  dip, density, receipt, the checklist and the density register (date, time, tank / nozzle, product, invoice density,
+  observed density, difference; rows outside the tolerance flagged).
+- **Tank-lorry receipt (C2).** A `receipt` row on the same table: the OMC bill (`purchase_id`, picked from the bills that
+  carry the tank's product — `fu-stock-io.ts` `omcBills` reads `purchases` through `readPurchase` / `readPurchaseLines`,
+  litres by item id else name, alternate units converted with `unitFactor`; purchases contract test added), dips before /
+  after (litres from the chart), litres sold while decanting, invoice litres and invoice / observed density.
+  `fu-receipt.ts` (pure): `receiptCheck` flags a density outside **± 3.0 kg/m³** (`densityTol` = `MDG_DENSITY_RULES`, FU15);
+  short receipt = invoice litres − (after − before + sold while decanting); `debitFor` suggests a debit note to the OMC at
+  the bill's rate — shown in the save message, **never posted**.
+- **Daily stock register (C3).** `fu-register.ts` (pure): per tank per day from 1 April of the FY — opening = the day's
+  first dip; receipts = invoice litres of the day's receipt rows; sales = meter litres − test litres of the tank's nozzles
+  in that day's shifts (`meterSales` over B's `soldLitres`: a totaliser that wrapped adds its maximum); book = opening + receipts −
+  sales; physical = the next morning's first dip (else a later dip the same day); variation, % of sales, month-to-date and
+  year-to-date. `mdgBand` (FU18, `MDG_VARIATION_RULES`): evaporation allowance = rate % × litres sold this month (MS 0.75 % /
+  HSD 0.25 %, 0.60 % / 0.20 % when the outlet's annual sales exceed 600 KL — typed `fuel_settings.annual_kl`, else this FY's
+  sales annualised) plus 4 % of tank stock; outside = |month-to-date variation| > allowance + band (a hint with the numbers).
+  "Post the month's loss / gain" (`fu-stock-io.ts` `postVariation`) saves a **Physical Stock voucher** for the tank's
+  product in the tank godown, counted = the month's last physical figure, narration "Normal loss — evaporation /
+  handling: <tank>, <month>" (`FU_LOSS_CLASS`) and `PhysicalStockVoucher.fu = { tank_id, month }`: **one per tank per
+  month** — posting again edits the same voucher (same number). The view shows the stock summary's quantity in the tank
+  beside it (`stockBook`, the engine's book through `physicalLines`), so register and stock summary can be compared. View
+  `stock` (`StockView.tsx`).
+- **Licences and due dates (C4).** `fuel_settings.licences` (`FuLicence`: PESO, W&M, fire NOC, calibration, dealership,
+  other; typed on the stock view, owner only through `saveFuelSettings`). `dueList` lists them with each active nozzle's W&M
+  stamping due and each tank's calibration due, soonest first, with the days left; within `WM_REVERIFY_RULES.alert_days`
+  (30) or past they are flagged ⚠ (FU24, FU25).
+- **Types / names.** C block of `src/types/fuel-r21.ts`: `FuelTankLog` gains `water_l`, `before_mm` / `after_mm`,
+  `before_l` / `after_l`, `sold_l`, `note`, `created_at`; `FuelSettings` gains `dip_water`, `annual_kl`, `licences`;
+  `PhysicalStockVoucher.fu`. C block of `fu-shared.ts`: `FU_LOSS_CLASS`. No new table, series, device key
+  or `Godown.kind`. Help topics `inventory:fuel:dips` / `inventory:fuel:stock` (in `topics-purchase.ts`: the help registry
+  files a topic under `packs` only when it has a `PACK_TABS` row, and C adds none); Ctrl+K words appended to
+  `inventory.fuel`. Strings `src/i18n/areas/fuel-r21c.ts` (literal Hindi, in `lang-hi-fuel`).
+- **Bridge.** `fu-stock-io.ts` is the one C bridge (godowns, stock engine, physical stock vouchers, purchases). Round 21
+  bridges with B's `fu-issue-io.ts`: 2 of 4.
+
+### Cuts and deviations
+
+- **Cut 1 — the bell** (PRD §3): no `fu-alerts.ts` and no `NotificationBell.tsx` gate line; the due dates are a list on
+  the `stock` view (the PRD names the tanks view, which is A's file — the stock view holds the licence form, so the list
+  sits beside it).
+- **Cut 2 — compartments**: one dip pair and one invoice row per receipt. The stored shape keeps A's `compartments` array
+  (one element), and `receiptCheck` / the density register read any number of them, so compartments can return as a
+  view-only change.
+- Register receipts are the **invoice litres** of the receipt rows (what the purchase bill puts into stock); a short
+  receipt therefore shows up as variation as well as on the receipt.
+- The MDG 600 KL step is read as annual sales (PRD §2.4 R16 wording); the base is typed (`annual_kl`) or this FY's
+  sales annualised (FU18).
+- A tank's evaporation band exists for MS / HSD (and branded) only; CNG / auto-LPG show no band.
+
+### Sizes (gz)
+
+| | `67ccabd` (measured) | R21-C on `67ccabd` (measured) |
+|---|---|---|
+| Initial JS / entry | 177.8 / 89.5 kB | 177.8 / 89.5 kB |
+| Core precache | 3,277.0 kB | 3,285.3 kB (**+8.3**, cap 7) |
+| Hindi pack | 376.6 kB | 377.5 kB (`lang-hi-fuel` +0.9) |
+| Hindi in core | 21.9 kB | 21.9 kB |
+| C chunks (gz) | — | `DipsView` 1.8, `StockView` 1.6, `fu-stock-io` 1.4 (bridge + `fu-dips`), `f-fuel` +≈2.2 (`fu-receipt`, `fu-register`, English strings), A's `fu-tank` / `fu-settings` / `fu-ui` now shared with the C views (moved out of `FuelDesk`, ≈ +0.7 of per-chunk overhead), `topics-purchase` +0.2 |
+
+After the merge with R21-B and PERF-6 (`a8d34e7`) the whole build measures 3,284.4 kB core (budget 3,300), Hindi pack
+391.4 kB, Hindi in core 9.8 kB, `lazy-leaves-ui` 27.7 / 28 kB.
+
+The first build (with the bell provider and compartments, on `2737c99`) measured +9.3 kB; cut 1 (bell) and cut 2
+(compartments) plus shorter strings took ≈ 1.0 kB off. **Still over the C cap of 7 kB after both stop-rule cuts**; no
+cut beyond the PRD's stop rule was made — the lead decides. The rest of the overrun is the split of A's shared helpers
+(tank chart, settings, form bits) into their own chunk once a second view uses them; keeping them in the desk chunk
+would need copies of that code in C's files.
+
 ## R21-D — Credit customers and Rule 42 for pumps (OMC account and LPG cut at the D cap)
 
 ### What it does

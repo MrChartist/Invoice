@@ -6601,6 +6601,47 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  // R21-C: dips, a tank-lorry receipt with a density flag, the stock register with its variation and the MDG band.
+  await step('R21-C dips & stock register: dip 1,200 mm → 6,680 L from the chart; receipt 742.0 vs 746.5 kg/m³ → flagged (± 3.0); the stock register shows the variation and the MDG band', async () => {
+    const keys = ['settings', 'stock_items', 'godowns', 'fuel_nozzles', 'fuel_tank_logs'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const [today, yday] = await page.evaluate(() => [0, -1].map((n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'kirana', industry_packs: ['fuel'], fuel_kind: 'pump', lock_until: undefined });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []).filter((s) => s.id !== 'e2e-fc-ms'), { id: 'e2e-fc-ms', name: 'E2E C Petrol', unit: 'LTR', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, fu: { product: 'ms', unit: 'L' } }]);
+    await writeJson(page, 'godowns', [...(prev.godowns ?? []).filter((g) => !g.fu), { id: 'e2e-fc-t1', name: 'E2E C Tank', fu: { product_item_id: 'e2e-fc-ms', capacity_l: 9000, chart: [[0, 0], [500, 2000], [1000, 5200], [1500, 8900]] } }]);
+    await writeJson(page, 'fuel_nozzles', []);
+    await writeJson(page, 'fuel_tank_logs', [{ id: 'e2e-fc-d0', date: yday, time: '06:00', kind: 'dip', tank_id: 'e2e-fc-t1', mm: 1000, litres: 5200 }]);
+    await readJson(page, 'fuel_tank_logs', [], (v) => Array.isArray(v) && v.length === 1, 15000);
+    await readJson(page, 'godowns', [], (v) => v.some((g) => g.id === 'e2e-fc-t1'), 15000);
+    await page.goto(srv.origin + '/inventory?tab=fuel&view=dips');
+    await page.locator('[data-fuel-dips]').waitFor({ timeout: 15000 });
+    await page.locator('[data-fuel-dips] [data-fu-field="tank"]').selectOption('e2e-fc-t1');
+    await page.locator('[data-fu-field="time"]').fill('06:00');
+    await page.locator('[data-fu-field="mm"]').fill('1200');
+    await page.locator('[data-fu-add-dip]').click();
+    const logs = await readJson(page, 'fuel_tank_logs', [], (v) => v.length === 2, 15000);
+    const d = logs.find((l) => l.date === today && l.kind === 'dip');
+    check(d?.litres === 6680, `dip 1,200 mm → 6,680 L from the chart (${d?.litres})`);
+    await page.locator('[data-fuel-dips] [data-fu-field="tank"]').selectOption('e2e-fc-t1');
+    await page.locator('[data-fu-field="l"]').fill('4000');
+    await page.locator('[data-fu-field="id"]').fill('742.0');
+    await page.locator('[data-fu-field="od"]').fill('746.5');
+    await page.locator('[data-fu-add-receipt]').click();
+    await readJson(page, 'fuel_tank_logs', [], (v) => v.some((l) => l.kind === 'receipt'), 15000);
+    await page.locator('[data-fu-flag]').first().waitFor({ timeout: 15000 });
+    check(/4\.5/.test(await page.locator('[data-fu-flag]').first().innerText()), 'the density register flags 742.0 vs 746.5 (+4.5 kg/m³, outside ± 3.0)');
+    check(/E2E C Petrol: no morning density/.test(await page.locator('[data-fu-checklist]').innerText()), 'the morning checklist lists the missing morning density');
+    await page.locator('[data-fuel-view="stock"]').click();
+    await page.locator('[data-fuel-stock]').waitFor({ timeout: 15000 });
+    await page.locator('[data-fuel-stock] [data-fu-field="tank"]').selectOption('e2e-fc-t1');
+    await page.locator('[data-fu-field="month"]').fill(yday.slice(0, 7));
+    await page.locator(`[data-fu-reg="${yday}"]`).waitFor({ timeout: 15000 });
+    check(/1,?480|1480/.test(await page.locator(`[data-fu-reg="${yday}"]`).innerText()), `yesterday: book 5,200, physical 6,680 → variation +1,480 (${await page.locator(`[data-fu-reg="${yday}"]`).innerText()})`);
+    check(/MDG band/.test(await page.locator('[data-fu-band]').innerText()), 'the MDG band is shown with its numbers');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   // R21-D: credit slips → month-end Bill of Supply with the vehicle annexure; Rule 42 duty exclusion (LPG cut at the D cap).
   await step('R21-D credit customers: two slips for one customer → one Bill of Supply with a two-row vehicle annexure; GST → Common credit shows E / F with pump duties left out', async () => {
     const keys = ['settings', 'stock_items', 'fuel_prices', 'fuel_slips', 'clients', 'invoices'];

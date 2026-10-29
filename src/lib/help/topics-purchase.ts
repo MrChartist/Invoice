@@ -65,4 +65,7 @@ export const TOPICS: readonly HelpTopic[] = [
   // R21-B: fuel views without a PACK_TABS row live here (their area is Inventory's): shifts / day close, daily sales register.
   t('inventory:fuel:shift', 'Shift', 'शिफ्ट', 'Open a shift with its attendants and nozzles; type closing readings, test litres and collections; close it; Day close bills the counter litres as one non-GST Bill of Supply per shift with receipts by mode; settle a shortage in cash or write it off.', 'Each shift; day close daily.', { statutory: ca(['FU6', 'FU9', 'FU10', 'FU17', 'FU26', 'FU29']) }),
   t('inventory:fuel:dsr', 'Daily sales', 'दैनिक बिक्री', 'The daily sales register in the oil-company layout: readings per nozzle, sales per product, collections, credit sales and short / excess; print it.', 'Daily.', { statutory: ca(['FU19']) }),
+  // R21-C: fuel desk views (the desk's own topic lives in topics-packs.ts with its PACK_TABS row)
+  t('inventory:fuel:dips', 'Dips & density', 'डिप और घनत्व', 'Morning dips (litres from the chart, water dip shown), density at 15 °C, tank-lorry receipts against the oil company bill (density ± 3.0 kg/m³, short receipt) and the morning checklist.', 'Every morning; each tank-lorry.', { statutory: ca(['FU15', 'FU16', 'FU17']) }),
+  t('inventory:fuel:stock', 'Stock register', 'स्टॉक रजिस्टर', 'Per tank per day: opening dip + receipts − meter sales = book; next dip = physical; variation against the MDG band; post the month\'s loss / gain; licences and due dates.', 'Daily; month end.', { statutory: ca(['FU18', 'FU19', 'FU24', 'FU25']) }),
 ];
