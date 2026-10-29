@@ -6374,6 +6374,60 @@ try {
     await page.evaluate(() => localStorage.setItem('mrchartist_tally_keys', 'off'));
   });
 
+  // R20-D: Go To over the editor and the "Back to …" chip (draft kept), the Data menu's Back up, the company list
+  // (F3), Lock now (Ctrl+F3, N stays), Ctrl+Alt+N focuses the bell list, and list keys on /transactions.
+  await step('R20-D: Go To + Back chip, Alt+Y backup, F3, Ctrl+F3, Ctrl+Alt+N and list keys', async () => {
+    await page.evaluate(() => {
+      localStorage.setItem('mrchartist_tally_keys', 'on');
+      localStorage.setItem('mrchartist_tally_layout', 'prime');
+    });
+    await page.goto(srv.origin + '/invoice');
+    await page.getByLabel('Client name').fill('Go To Draft Co');
+    await page.locator('main h1').first().click();
+    await page.waitForTimeout(400); // the bell hosts the menu sheets once it has loaded
+    await page.keyboard.press('Alt+g');
+    const go = page.getByRole('dialog', { name: 'Go To' });
+    await go.waitFor();
+    await go.getByRole('combobox').fill('trial');
+    await go.getByRole('option', { name: /Trial balance/i }).first().waitFor({ timeout: 15000 });
+    await page.keyboard.press('Enter');
+    await page.waitForURL(/r=tb|tab=tb/);
+    await page.getByTestId('goto-back').click();
+    await page.waitForURL(/\/invoice$/);
+    check((await page.getByLabel('Client name').inputValue()) === 'Go To Draft Co', 'Alt+G "trial" opens the trial balance; "Back to …" returns to the editor with the draft');
+    await page.goto(srv.origin + '/');
+    await page.getByText('Stored on this device').waitFor();
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Alt+y');
+    await page.getByTestId('menu-data').waitFor();
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.keyboard.press('b')]);
+    check(/\.json$/.test(dl.suggestedFilename()), `Alt+Y then B downloads a backup (${dl.suggestedFilename()})`);
+    await page.keyboard.press('F3');
+    await page.getByTestId('company-list').waitFor();
+    check(true, 'F3 opens the company list');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+F3');
+    await page.getByTestId('lock-yes').waitFor();
+    await page.keyboard.press('n');
+    await page.getByTestId('lock-yes').waitFor({ state: 'detached' });
+    check(page.url().startsWith(srv.origin), 'Ctrl+F3 asks before locking; N stays');
+    await page.keyboard.press('Control+Alt+n');
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Notifications');
+    check(true, 'Ctrl+Alt+N opens and focuses the notifications list');
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/transactions');
+    await page.locator('tbody tr').nth(2).waitFor();
+    await page.locator('main h1').first().click();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    const href = await page.locator('tbody tr[data-selected="true"] a').first().getAttribute('href');
+    check(await page.locator('tbody tr').nth(2).getAttribute('data-selected') === 'true', 'list keys: ↓ ↓ move the highlight bar');
+    await page.keyboard.press('Enter');
+    await page.waitForURL((u) => u.pathname === href);
+    check(true, `Enter opens the highlighted document (${href})`);
+    await page.evaluate(() => localStorage.setItem('mrchartist_tally_keys', 'off'));
+  });
+
 } catch {
   /* already reported */
 } finally {

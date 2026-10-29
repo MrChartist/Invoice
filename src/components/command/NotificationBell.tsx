@@ -32,8 +32,8 @@ import { keysOn, subscribeKeys } from '../../lib/keys/stub';
 const MenuSheets = lazy(() => import('../keys/MenuSheets'));
 let hosted = false;
 const openers: Array<() => boolean> = [];
-/** R20-D3: open the list of the bell that is on screen and focus it. */
-export const openNotifications = (): void => void openers.some((f) => f());
+/** R20-D3: open the list of the bell that is on screen and focus it (handed to MenuSheets as `openBell`). */
+const openNotifications = (): void => void openers.some((f) => f());
 
 export interface NotificationBellProps {
   /** Called with a notification's `href` when its call-to-action is used. */
