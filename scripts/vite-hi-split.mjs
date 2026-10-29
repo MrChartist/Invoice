@@ -30,8 +30,8 @@ export const HI_INLINE = [
 
 const VIRTUAL = 'virtual:hi/';
 const RESOLVED = '\0' + VIRTUAL;
-/** The Hindi shell catalogue (`hi.ts`) and the regional catalogues (`regional.ts` + its six languages). */
-const HI_CORE = /[\\/]src[\\/]i18n[\\/]hi\.ts$/;
+/** The Hindi shell catalogue (`hi.ts`), the Hindi of `src/lib` messages (`hi-lib.ts`, PENDING 51) and the regional catalogues (`regional.ts` + its six languages). */
+const HI_CORE = /[\\/]src[\\/]i18n[\\/]hi(-lib)?\.ts$/;
 const REGIONAL = /[\\/]src[\\/]i18n[\\/](regional|mr|gu|ta|bn|te|kn)\.ts$/;
 
 /**

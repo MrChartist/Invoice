@@ -21,6 +21,7 @@ import { useT } from '../../i18n';
 import { secT } from '../../i18n/areas/security';
 import controls from '../../styles/controls.module.css';
 import styles from './Security.module.css';
+import { errText } from '../../i18n/lib-msg';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
@@ -60,7 +61,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
       setAgain('');
       notify(secT('encDownloaded'));
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     } finally {
       setBusy(false);
     }
@@ -86,7 +87,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
         setPending({ text, fileName: file.name });
       }
     } catch (err) {
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     } finally {
       if (fileInput.current) fileInput.current.value = '';
     }
@@ -107,7 +108,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
     try {
       setSummary(await decryptBackup(pending.text, restorePass));
     } catch (err) {
-      setRestoreError((err as Error).message);
+      setRestoreError(errText(err));
     } finally {
       setBusy(false);
     }
@@ -122,7 +123,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
       notify(secT('restored'));
       setTimeout(reloadAfterFlush, 700);
     } catch (err) {
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     }
     closeRestore();
   };

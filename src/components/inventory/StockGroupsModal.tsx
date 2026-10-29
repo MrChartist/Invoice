@@ -11,6 +11,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './masters.module.css';
 import { depthClass } from './tree-indent';
+import { errText } from '../../i18n/lib-msg';
 
 /** Stock groups and stock categories (WP-8): two nested trees, add / rename / move / delete. */
 export function StockGroupsModal({ open, items, onClose, onChanged }: {
@@ -45,7 +46,7 @@ export function StockGroupsModal({ open, items, onClose, onChanged }: {
       setVersion((v) => v + 1);
       onChanged(imT('saved'));
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     }
   };
 
@@ -56,7 +57,7 @@ export function StockGroupsModal({ open, items, onClose, onChanged }: {
       setVersion((v) => v + 1);
       onChanged(imT('deleted', { name: n.name }));
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     }
   };
 

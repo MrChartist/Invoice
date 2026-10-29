@@ -10,6 +10,7 @@ import { setT } from '../../i18n/areas/settings';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../audit/audit.module.css';
+import { libMsg } from '../../i18n/lib-msg';
 
 interface Props {
   settings: AppSettings;
@@ -82,9 +83,9 @@ export function LockBooksCard({ settings, onChange }: Props) {
           <div className={styles.presets}>
             {presets.map((p) => (
               <button key={p.id} type="button" className={styles.presetBtn} onClick={() => apply(p.date)}>
-                <strong>{p.label}</strong>
+                <strong>{libMsg(p.label)}</strong>
                 <small>
-                  {prettyDay(p.date)} · {p.hint}
+                  {prettyDay(p.date)} · {libMsg(p.hint)}
                 </small>
               </button>
             ))}

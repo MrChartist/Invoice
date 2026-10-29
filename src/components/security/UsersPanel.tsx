@@ -10,6 +10,7 @@ import { roleLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Security.module.css';
+import { errText } from '../../i18n/lib-msg';
 
 interface Props {
   notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
@@ -55,7 +56,7 @@ export function UsersPanel({ notify }: Props) {
       setPin('');
       refresh();
     } catch (err) {
-      setFormError((err as Error).message);
+      setFormError(errText(err));
     } finally {
       setBusy(false);
     }
@@ -68,7 +69,7 @@ export function UsersPanel({ notify }: Props) {
       notify(secT('roleChanged', { name: u.name, role: roleLabel(next).toLowerCase() }));
       refresh();
     } catch (err) {
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     }
   };
 
@@ -83,7 +84,7 @@ export function UsersPanel({ notify }: Props) {
       setResetFor(null);
       setResetPin('');
     } catch (err) {
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     } finally {
       setBusy(false);
     }
@@ -218,7 +219,7 @@ export function UsersPanel({ notify }: Props) {
             if (!r.ok) notify(problem(r), 'error');
             else notify(secT('removed', { name: removing.name }));
           } catch (err) {
-            notify((err as Error).message, 'error');
+            notify(errText(err), 'error');
           }
           refresh();
         }}

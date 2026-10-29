@@ -31,6 +31,7 @@ import { branchT } from '../../i18n/areas/branch-books';
 import { s7mT } from '../../i18n/areas/inventory-7s-mini';
 import { useSearchParams } from 'react-router-dom';
 import { defineArea } from '../../i18n/area';
+import { errText, libMsg } from '../../i18n/lib-msg';
 
 // WP-9: Sec 25(4) tax invoice + bill for a transfer between two GSTINs (lazy dialog).
 const BranchTransferDialog = lazy(() => import('../branches/BranchTransferDialog'));
@@ -192,7 +193,7 @@ function TransferList({ transfers, godowns, items, inputs, onChanged, onError }:
               onChanged(invT('transferDeleted', { number: deleting.transfer_number }));
             } catch (err) {
               if (isStockDependencyError(err) && err.confirmable && window.confirm(err.message)) return del(true);
-              onError(isPeriodLockedError(err) || isStockDependencyError(err) ? (err as Error).message : invT('transferDeleteFailed'));
+              onError(isPeriodLockedError(err) || isStockDependencyError(err) ? errText(err) : invT('transferDeleteFailed'));
             }
           };
           del(false);
@@ -250,11 +251,11 @@ function TransferModal({ godowns: baseGodowns, items: baseItems, inputs, onClose
   const submit = () => {
     const draft = { id: '', date, from_godown: from, to_godown: to, lines: lines.filter((l) => l.item_id) };
     const err = validateTransferShape(draft) || transferIssues(draft, inputs)[0] || '';
-    if (err) return setError(err);
+    if (err) return setError(libMsg(err));
     try {
       onSaved(transfersDb.save({ date, from_godown: from, to_godown: to, lines: draft.lines, notes: notes.trim() || undefined }));
     } catch (e) {
-      setError((e as Error).message);
+      setError(errText(e));
     }
   };
 

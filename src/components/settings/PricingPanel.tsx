@@ -22,6 +22,7 @@ import { retailT } from '../../i18n/areas/retail';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './CatalogPanel.module.css';
+import { libMsg } from '../../i18n/lib-msg';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
@@ -58,7 +59,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
   const saveLevel = () => {
     if (!level) return;
     const msg = validateLevel(level, levels);
-    if (msg) return setError(msg);
+    if (msg) return setError(libMsg(msg));
     priceLevelsDb.save(level);
     notify(setT('levelSaved', { name: level.name.trim() }));
     setLevel(null);
@@ -67,7 +68,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
   const saveScheme = () => {
     if (!scheme) return;
     const msg = validateScheme(scheme);
-    if (msg) return setError(msg);
+    if (msg) return setError(libMsg(msg));
     schemesDb.save(scheme);
     notify(setT('schemeSaved', { name: scheme.item_name }));
     setScheme(null);

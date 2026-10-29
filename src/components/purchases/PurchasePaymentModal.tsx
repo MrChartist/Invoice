@@ -18,6 +18,7 @@ import { paymentNeedsApproval } from '../../lib/purchase-approval-gate';
 import { capT } from '../../i18n/areas/capture';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
+import { errText, libMsg } from '../../i18n/lib-msg';
 
 export interface PurchasePaymentModalProps {
   /** Id of the bill; the latest copy is read from storage on every change. */
@@ -62,7 +63,7 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
   const held = paymentNeedsApproval(amount + tds);
   const submit = () => {
     const problem = validatePayment(bill, amount, date, tds);
-    if (problem) return setError(problem);
+    if (problem) return setError(libMsg(problem));
     if (held) {
       void import('../../lib/purchase-approvals')
         .then((m) => {
@@ -70,7 +71,7 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
           onChanged(capT('payHeld'));
           onClose();
         })
-        .catch((err: Error) => setError(err.message));
+        .catch((err: Error) => setError(errText(err)));
       return;
     }
     try {
@@ -84,7 +85,7 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
       onChanged(purT('paymentRecorded', { amount: formatCurrency(amount) }));
       if (left <= 0) onClose();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     }
   };
 
@@ -92,7 +93,7 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
     try {
       paymentsDb.remove(id);
     } catch (err) {
-      return setError((err as Error).message);
+      return setError(errText(err));
     }
     const updated = purchasesDb.get(purchaseId);
     setAmount(updated ? balanceOf(updated) : 0);

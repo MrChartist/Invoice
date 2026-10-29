@@ -5,11 +5,13 @@ import surface from '../../styles/surface.module.css';
 import local from './gst-reports.module.css';
 import { table14A } from '../../lib/eco-amend';
 import { r7T } from '../../i18n/areas/gst-tds-7r';
+import { useT } from '../../i18n';
+import { gstGapT } from '../../i18n/areas/gst-gaps';
 
 const cols = (withTax: boolean): Column<EcoRow>[] => [
-  { key: 'etin', label: 'Operator GSTIN', render: (r) => <span className={surface.mono}>{r.etin}</span> },
-  { key: 'n', label: 'Documents', numeric: true, render: (r) => r.count },
-  { key: 'v', label: 'Net value of supplies', numeric: true, render: (r) => <Money value={r.value} />, total: (r) => r.value },
+  { key: 'etin', label: gstGapT('ecoOperator'), render: (r) => <span className={surface.mono}>{r.etin}</span> },
+  { key: 'n', label: gstGapT('ecoDocs'), numeric: true, render: (r) => r.count },
+  { key: 'v', label: gstGapT('ecoNet'), numeric: true, render: (r) => <Money value={r.value} />, total: (r) => r.value },
   ...(withTax
     ? ([
         { key: 'i', label: 'IGST', numeric: true, render: (r) => <Money value={r.igst} />, total: (r) => r.igst },
@@ -22,23 +24,22 @@ const cols = (withTax: boolean): Column<EcoRow>[] => [
 
 /** GSTR-1 Table 14 (supplies through e-commerce operators) and GSTR-3B 3.1.1(ii). Loaded when the tab opens. */
 export default function EcoView({ g1, g3 }: { g1: Gstr1Report; g3: Gstr3bReport }) {
-  const empty = 'None in this period.';
+  useT(); // re-render on a language switch / when the Hindi pack arrives
+  const empty = gstGapT('ecoNone');
   const t14a = table14A(g1);
   const t14ab = table14Ab(g1);
   return (
     <>
       <p className={controls.hint} style={{ margin: 0 }}>
-        Documents marked “Sold through an e-commerce operator” on the invoice. 14(a): the operator collects TCS (Sec 52) — you pay the tax; these documents are also in
-        B2B / B2CL / B2CS with the operator GSTIN (B2CS type “E”). 14(b): the operator pays the tax (Sec 9(5)) — only the value is reported here and in GSTR-3B
-        3.1.1(ii), not in 3.1. JSON layout (supeco / clttx / paytx) is not verified against the offline tool. Verify with your CA.
+        {gstGapT('ecoHint')}
       </p>
-      <h3 className={local.tbHeading}>14(a) — operator collects TCS u/s 52</h3>
+      <h3 className={local.tbHeading}>{gstGapT('eco14a')}</h3>
       <DataTable columns={cols(true)} rows={g1.eco?.tcs ?? []} rowKey={(r) => r.etin} caption="Table 14(a)" emptyText={empty} />
-      <h3 className={local.tbHeading}>14(b) — operator pays tax u/s 9(5)</h3>
+      <h3 className={local.tbHeading}>{gstGapT('eco14b')}</h3>
       <DataTable columns={cols(false)} rows={g1.eco?.pay95 ?? []} rowKey={(r) => r.etin} caption="Table 14(b)" emptyText={empty} />
       <p className={surface.sectionNote}>
-        GSTR-3B 3.1.1(ii) — taxable supplies made through an operator that pays tax u/s 9(5): <strong><Money value={g3.ecoSupplies95 ?? 0} /></strong>.
-        3.1.1(i) is filed by the operator itself.
+        {gstGapT('eco311')} <strong><Money value={g3.ecoSupplies95 ?? 0} /></strong>.{' '}
+        {gstGapT('eco311i')}
       </p>
       <h3 className={local.tbHeading}>{r7T('eco14aTitle')}</h3>
       <DataTable
@@ -47,9 +48,9 @@ export default function EcoView({ g1, g3 }: { g1: Gstr1Report; g3: Gstr3bReport 
         rows={t14a}
         rowKey={(r) => `${r.etin}${r.origPeriod}`}
         columns={[
-          { key: 'etin', label: 'Operator GSTIN', render: (r) => <span className={surface.mono}>{r.etin}</span> },
+          { key: 'etin', label: gstGapT('ecoOperator'), render: (r) => <span className={surface.mono}>{r.etin}</span> },
           { key: 'op', label: r7T('eco14aPeriod'), render: (r) => `${r.origPeriod.slice(0, 2)}/${r.origPeriod.slice(2)}` },
-          { key: 'n', label: 'Documents', numeric: true, render: (r) => r.count },
+          { key: 'n', label: gstGapT('ecoDocs'), numeric: true, render: (r) => r.count },
           { key: 'v', label: r7T('eco14aValue'), numeric: true, render: (r) => <Money value={r.value} />, total: (r) => r.value },
           { key: 'i', label: 'IGST', numeric: true, render: (r) => <Money value={r.igst} />, total: (r) => r.igst },
           { key: 'c', label: 'CGST', numeric: true, render: (r) => <Money value={r.cgst} />, total: (r) => r.cgst },
@@ -65,9 +66,9 @@ export default function EcoView({ g1, g3 }: { g1: Gstr1Report; g3: Gstr3bReport 
         rows={t14ab}
         rowKey={(r) => `${r.etin}${r.origPeriod}`}
         columns={[
-          { key: 'etin', label: 'Operator GSTIN', render: (r) => <span className={surface.mono}>{r.etin}</span> },
+          { key: 'etin', label: gstGapT('ecoOperator'), render: (r) => <span className={surface.mono}>{r.etin}</span> },
           { key: 'op', label: r7T('eco14aPeriod'), render: (r) => `${r.origPeriod.slice(0, 2)}/${r.origPeriod.slice(2)}` },
-          { key: 'n', label: 'Documents', numeric: true, render: (r) => r.count },
+          { key: 'n', label: gstGapT('ecoDocs'), numeric: true, render: (r) => r.count },
           { key: 'v', label: r7T('eco14aValue'), numeric: true, render: (r) => <Money value={r.value} />, total: (r) => r.value },
         ]}
       />

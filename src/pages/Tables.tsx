@@ -16,7 +16,7 @@ import { num } from '../lib/invoice-calc';
 import { listUsers } from '../lib/auth';
 import { counterUser } from '../lib/pos-shifts';
 import { checkEcoGstin } from '../lib/eco';
-import { isLive, localDay } from '../lib/restaurant/tables';
+import { isLive, localDay, STARTER_AREA_NAME } from '../lib/restaurant/tables';
 import { autoUnavailable, idsInGroup, isUnavailable } from '../lib/restaurant/modifiers';
 import { RT, openOrder, ordersDb, restaurantDb, set86Items } from '../lib/restaurant/orders-store';
 import { cn } from '../lib/utils';
@@ -194,7 +194,7 @@ function RestaurantFloor() {
         {hotel && <Link className={styles.tab} to="/tables?tab=frontdesk" data-front-desk>{t('nav.frontDesk')}</Link>}
         {areas.map((a) => (
           <button key={a.id} type="button" role="tab" aria-selected={view.kind === 'area' && view.areaId === a.id} className={cn(styles.tab, view.kind === 'area' && view.areaId === a.id && styles.tabOn)} onClick={() => setView({ kind: 'area', areaId: a.id })}>
-            {a.name}
+            {a.name === STARTER_AREA_NAME ? rT('chDine') : a.name}
           </button>
         ))}
         {CHANNELS.map((c) => (

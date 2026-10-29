@@ -57,6 +57,7 @@ const CeilingNotice = lazy(() => import('../retail-r9/PharmacyDesk').then((m) =>
 // R12 (AG-A3): our FPV number and the agriculturist declaration for a farmer's bill (agri pack only).
 const VoucherAgriPanel = lazy(() => import('../agri/VoucherAgriPanel'));
 import { impliedPacks } from '../../lib/shop-mode';
+import { errText } from '../../i18n/lib-msg';
 
 export interface BillModalProps {
   open: boolean;
@@ -304,7 +305,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
       onSaved(res.kind === 'held' ? capT('heldMsg') : purchase ? purT('billUpdated') : purT('billSaved', { number: billNumber.trim() }));
       onClose();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     }
   };
 

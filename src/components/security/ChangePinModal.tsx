@@ -5,6 +5,7 @@ import { useT } from '../../i18n';
 import { secT } from '../../i18n/areas/security';
 import controls from '../../styles/controls.module.css';
 import styles from './Security.module.css';
+import { errText, libMsg } from '../../i18n/lib-msg';
 
 interface Props {
   open: boolean;
@@ -56,7 +57,7 @@ export function ChangePinModal({ open, onClose, onChanged }: Props) {
         setError(secT(MESSAGES[result.reason]));
       }
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     } finally {
       setBusy(false);
     }
@@ -95,7 +96,7 @@ export function ChangePinModal({ open, onClose, onChanged }: Props) {
           <label className={controls.label} htmlFor="cp-new">{secT('newPin')}</label>
           <input id="cp-new" className={controls.input} type="password" inputMode="numeric" autoComplete="new-password"
             value={newPin} onChange={(e) => setNewPin(digits(e.target.value))} maxLength={6} />
-          {strength?.warning && <span className={controls.hint}>{strength.warning} {secT('stillUse')}</span>}
+          {strength?.warning && <span className={controls.hint}>{libMsg(strength.warning)} {secT('stillUse')}</span>}
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="cp-confirm">{secT('confirmPin')}</label>

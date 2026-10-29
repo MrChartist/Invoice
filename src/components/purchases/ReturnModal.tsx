@@ -26,6 +26,7 @@ import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import local from './returns.module.css';
 import { defineArea } from '../../i18n/area';
+import { errText } from '../../i18n/lib-msg';
 
 const freeRetT = defineArea({ msg: '{n} free unit(s) go back at zero value.' } as const, { msg: '{n} फ़्री इकाई शून्य मूल्य पर वापस जाएँगी।' }); // R9 (RT-A4)
 
@@ -143,7 +144,7 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, initialQty, onClo
       const saved = purchaseReturnsDb.create(draft);
       onSaved(prT('saved', { number: saved.note_number, amount: formatCurrency(saved.total) }));
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     }
   };
 

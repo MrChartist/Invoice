@@ -7,6 +7,7 @@ import { useT } from '../../i18n';
 import { purT } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
+import { errText, libMsg } from '../../i18n/lib-msg';
 
 export interface VendorPickerProps {
   vendors: Vendor[];
@@ -36,14 +37,14 @@ export function VendorPicker({ vendors, value, onSelect, onCreated, id }: Vendor
 
   const create = () => {
     const problem = validateVendor({ name, gstin });
-    if (problem) return setError(problem);
+    if (problem) return setError(libMsg(problem));
     try {
       const vendor = vendorsDb.save({ name, gstin, state_code: stateCode });
       onCreated(vendor);
       onSelect(vendor);
       reset();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     }
   };
 

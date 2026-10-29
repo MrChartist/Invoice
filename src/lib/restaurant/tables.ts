@@ -23,13 +23,15 @@ import { resolvePrice, type PriceLevel } from '../pricing';
 import { buildPosRecord, withTotals, type PosBuildInput } from '../pos';
 
 export const STARTER_AREA_ID = 'area_dine_in';
+/** The starter area's stored name (English data; screens show it translated, PENDING 51). */
+export const STARTER_AREA_NAME = 'Dine-in';
 export const SERVICE_CHARGE_LABEL = 'Service charge (optional)';
 export const KITCHEN = 'Kitchen';
 
 /** The starter set: one area "Dine-in" with tables 1–10. */
 export function starterMasters(): { areas: DiningArea[]; tables: DiningTable[] } {
   return {
-    areas: [{ id: STARTER_AREA_ID, name: 'Dine-in', sort: 1 }],
+    areas: [{ id: STARTER_AREA_ID, name: STARTER_AREA_NAME, sort: 1 }],
     tables: Array.from({ length: 10 }, (_, i) => ({ id: `tbl_${i + 1}`, name: String(i + 1), seats: 4, area_id: STARTER_AREA_ID, sort: i + 1 })),
   };
 }

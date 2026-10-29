@@ -8,7 +8,7 @@ import type { PrinterMode } from '../../lib/escpos';
 import { generateId } from '../../lib/storage';
 import { priceLevelsDb } from '../../lib/pricing';
 import { restaurantDb } from '../../lib/restaurant/orders-store';
-import { KITCHEN } from '../../lib/restaurant/tables';
+import { KITCHEN, STARTER_AREA_NAME } from '../../lib/restaurant/tables';
 import { cn } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { rT } from '../../i18n/areas/restaurant';
@@ -97,7 +97,7 @@ export function TablesSettings({ catalog, stockGroups, onClose, onSaved, notify 
               <label className={controls.field}>
                 <span className={controls.label}>{rT('areaName')}</span>
                 <select className={controls.select} value={t.area_id} onChange={(e) => setTables((r) => r.map((x) => (x.id === t.id ? { ...x, area_id: e.target.value } : x)))}>
-                  {areas.map((a) => <option key={a.id} value={a.id}>{a.name || '—'}</option>)}
+                  {areas.map((a) => <option key={a.id} value={a.id}>{(a.name === STARTER_AREA_NAME ? rT('chDine') : a.name) || '—'}</option>)}
                 </select>
               </label>
               <button type="button" className={controls.btnDanger} onClick={() => setTables((r) => r.filter((x) => x.id !== t.id))} aria-label={rT('remove', { name: t.name })}><Trash2 size={14} /></button>

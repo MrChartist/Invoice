@@ -37,6 +37,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import tabStyles from './VendorsTab.module.css';
+import { errText, libMsg } from '../../i18n/lib-msg';
 
 export interface PurchaseOrdersTabProps {
   orders: PurchaseOrder[];
@@ -103,7 +104,7 @@ export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, o
     try {
       onConvert(billSeedFromPo(po, purchases));
     } catch (err) {
-      onChanged((err as Error).message, 'error');
+      onChanged(errText(err), 'error');
     }
   };
   const setClosed = (po: PurchaseOrder, closed: boolean) => {
@@ -115,7 +116,7 @@ export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, o
       purchaseOrdersDb.remove(po.id, purchases);
       onChanged(purT('deleted', { name: po.po_number }));
     } catch (err) {
-      onChanged((err as Error).message, 'error');
+      onChanged(errText(err), 'error');
     }
   };
 
@@ -289,7 +290,7 @@ function PoForm({
       lines,
     };
     const problem = validatePo(draft);
-    if (problem) return setError(problem);
+    if (problem) return setError(libMsg(problem));
     try {
       const saved = purchaseOrdersDb.save({
         ...po,
@@ -309,7 +310,7 @@ function PoForm({
       });
       onSaved(po ? purT('updated', { name: saved.po_number }) : purT('poSaved', { number: saved.po_number }));
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     }
   };
 

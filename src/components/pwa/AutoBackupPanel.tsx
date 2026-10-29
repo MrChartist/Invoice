@@ -28,6 +28,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Pwa.module.css';
 import { phoneT } from '../../i18n/areas/phone';
+import { libMsg } from '../../i18n/lib-msg';
 
 // 8.20: phones have no folder backups; they share an encrypted file instead.
 const ShareBackupDialog = lazy(() => import('./ShareBackupDialog').then((m) => ({ default: m.ShareBackupDialog })));
@@ -154,7 +155,7 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
             <CheckCircle2 size={18} className={styles.statusOk} aria-hidden="true" />
           )}
           <span className={styles.statusText}>
-            {syncT('lastBackup')} <strong>{describeAge(last, now)}</strong>
+            {syncT('lastBackup')} <strong>{libMsg(describeAge(last, now))}</strong>
             {last && <small>{new Date(last).toLocaleString('en-IN')}</small>}
           </span>
         </div>
