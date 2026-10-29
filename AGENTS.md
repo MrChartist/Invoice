@@ -20,8 +20,10 @@
 - **React 19** + **TypeScript** + **Vite 8** (rolldown bundler — `vite.config.ts` uses
   `rolldownOptions`, which is correct for Vite 8; do not change it to `rollupOptions`).
   Chunking (R15-A / R16-A): `codeSplitting.groups` = vendor-react, vendor-ui, app-initial (`$initial`), nine "safe" family
-  groups `f-*` and `lazy-leaves` (`scripts/vite-safe-groups.mjs` — a module joins only if nothing it imports can be dragged
-  in). Hindi strings are split out at build time (`scripts/vite-hi-split.mjs`): every `defineArea(en, hi)` must pass a
+  groups `f-*`, `lazy-leaves` and `lazy-leaves-ui` (`scripts/vite-safe-groups.mjs` — a module joins only if nothing it imports
+  can be dragged in; PERF-5 `lazy-leaves-ui` = small script leaves outside `src/lib`, never a stylesheet). PERF-5 also: `[hash:7]`
+  file names, first-paint files trimmed from preload lists (`scripts/vite-preload-trim.mjs`), `pako` aliased to
+  `src/lib/stubs/pako-fflate.ts`, CSS-module names `_<local>_<file hash>` (`docs/qa/performance.md`). Hindi strings are split out at build time (`scripts/vite-hi-split.mjs`): every `defineArea(en, hi)` must pass a
   literal Hindi object; Hindi lives in `lang-hi-*` packs (plus `lang-regional`) listed under `langs` in
   `dist/lang-manifest.json`, precached only on devices set to that language. Budgets: first paint 185 kB, core 3,300 kB,
   Hindi pack 400 kB, Hindi left in English chunks ≤ 36 kB (`scripts/check-bundle-size.mjs`). HTML escaping: `escHtml`

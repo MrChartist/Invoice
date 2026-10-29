@@ -15,6 +15,7 @@ export declare function initialSet(g: Graph): Set<string>;
 export declare function safeSet(g: Graph, member: (id: string) => boolean): Set<string>;
 export declare function isLeaf(g: Graph, id: string): boolean;
 export declare function safeFamilyGroup(g: Graph, name: string, re: RegExp, priority: number): SafeGroup;
-export declare function leafGroup(g: Graph, name: string, priority: number, opts: { maxModuleSize: number }): SafeGroup;
+export declare const UI_LEAF: RegExp;
+export declare function leafGroup(g: Graph, name: string, priority: number, opts: { maxModuleSize: number; test?: RegExp }): SafeGroup;
 export declare function graphPlugin(g: Graph): Plugin;
 export declare function familyRe(dir: string, rules: string | null, area: string, except?: string): RegExp;

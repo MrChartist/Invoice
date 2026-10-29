@@ -462,3 +462,64 @@ evaluates `TDS_SECTIONS` / `TCS_PRESETS` at load and re-exports `GST_SLABS`, non
 few importers (like `qrcode.react`) are worth moving. Next candidates, in the same spirit: lucide icons used only on
 lazy screens (every imported `lucide-react` icon still lands in `vendor-ui`, most of its 15.8 kB) — a policy change for
 `AGENTS.md`, not done here.
+
+### PERF-5 core headroom (2026-10-29)
+
+Core precache was 3,274.6 / 3,300 kB. The bundle has no duplicated module (rolldown places each module in exactly one
+chunk; checked over `build-meta/chunks.json`), so the reclaim came from what every chunk repeats: file names in
+import statements and in Vite's `__vite__mapDeps` preload lists (≈ 76 kB gz over 259 lists before), CSS-module class
+names, a second zlib library in the PDF chunk, and per-file overhead of tiny shared chunks. No change alters what the
+app does; one adds lazy code to a shared chunk (4 below).
+
+Each step measured with `npx vite build` + `gen-precache` + `check-bundle-size` in the same checkout, cumulative, on
+base `438a13f` (tree = `f7be189`).
+
+| # | Change | Core (gz kB) | Saved | First paint |
+|---|---|---|---|---|
+| 0 | base | 3,274.6 | — | 179.2 |
+| 1 | `[hash:7]` file names (entry / chunk / asset; default 8) | 3,264.6 | −10.0 | 178.7 |
+| 2 | first-paint files left out of the preload lists (`scripts/vite-preload-trim.mjs`) | 3,258.1 | −6.5 | 178.6 |
+| 3 | `pako` aliased to `src/lib/stubs/pako-fflate.ts` | 3,245.7 | −12.4 | 178.6 |
+| 4 | CSS-module names `_<local>_<file hash>` (no line number) | 3,238.1 | −7.6 | 178.0 |
+| 5 | `lazy-leaves-ui` group | 3,229.7 | −8.4 | 177.8 |
+| | **total** | **3,229.7** | **−44.9** | **177.8 (−1.4)** |
+
+1. **7-character hashes.** A hash character does not compress, and every chunk name appears in ~10,000 import
+   statements / preload entries. 7 is rolldown's minimum while a build has fewer than 4,096 chunks (its hash
+   placeholder needs the room); it fails the build loudly, never silently, if that ever changes. 42 bits of
+   content hash, per chunk name, is ample for cache busting.
+2. **Preload trim.** Vite lists a dynamic import's whole static closure, so the runtime, the entry, `vendor-react` and
+   `vendor-ui` were named in ~260 lists. They are always loaded before any `import()` runs (the entry is the page's
+   script, the rest its `<link rel="modulepreload">`s), and `__vitePreload` skips them at run time, so dropping them
+   changes no request. The plugin records the entry's static closure in a `generateBundle` (`order: 'pre'`) hook,
+   before Vite writes the lists; `resolveDependencies` filters only `hostType: 'js'`, so the HTML's modulepreload links
+   are untouched, and CSS deps never reach it.
+3. **pako → fflate.** `fast-png` (jsPDF's PNG decoder for `addImage(…, 'PNG')`, used by letterhead bands) was the only
+   importer of `pako` (20 kB gz). jsPDF already ships `fflate`; the stub implements the `Inflate` / `inflate` surface
+   fast-png drives (collect IDAT chunks, inflate once on `result`) with pako's Adler-32 check, so corrupt data still
+   throws. `tests/pako-fflate.test.ts` compares it with pako (chunked streams, levels 0–9, corrupt / truncated input);
+   PDFs with PNG images from the jsPDF chunk of both builds were byte-identical in Chromium (4 canvases, with and
+   without alpha). The PDF chunk went 125.5 → 112.5 kB gz.
+4. **CSS-module names.** Vite's default `_<local>_<hash5>_<line>` puts a different line number in every class of the
+   class-map objects; `generateScopedName` now gives `_<local>_<6 base64url chars of the file's SHA-256>`, one suffix
+   per file (compresses). Class names are opaque: nothing in `src/`, the e2e smoke or the scripts selects by them.
+5. **`lazy-leaves-ui`.** `leafGroup` takes an optional `test`; the new group (priority 8, `maxModuleSize: 1500`,
+   `UI_LEAF` = `src/components|store|hooks|i18n/areas`, `.ts/.tsx` only) holds 64 small leaves that were 29 tiny shared
+   chunks (`store/pick.ts`, `transport/Field.tsx`, area files…). Same safety rule as `lazy-leaves` (imports only first
+   paint / vendor) and, checked by `check-bundle-size`, no stylesheet (a CSS module's styles would load with the group)
+   and the same 20 kB cap: 13.2 kB. None of its modules runs code at load (top-level statements checked). Screens that
+   used one of these leaves now load the 13.2 kB group (precached; ≤ 1.5 kB raw each). 2,500 bytes saved another 3.5 kB
+   but made a 27 kB group; 1,000 saved 2.9 kB less.
+
+Re-measured after merging PENDING 51 (base `d715f44` = `b1b33c2`, which adds the `lib-msg` chunk): core 3,279.7 →
+**3,232.9 (−46.8)**, first paint 179.3 → 177.9, entry 90.9 → 89.5, Hindi pack 369.5 → 369.4, `lazy-leaves-ui` 13.3 kB.
+
+Other numbers (on `438a13f`), before → after: entry 90.8 → 89.5, `vendor-react` / `vendor-ui` unchanged (72.13 / 15.81 → 15.80),
+initial files 4 → 4, Hindi pack 361.5 → 361.4, regional 20.7 → 20.7, Hindi in core 21.7 → 21.7, `lazy-leaves` 17.7 →
+17.6, JS files 1,059 → 1,030 (core 960 → 931).
+
+Looked at and left: CSS-module JS chunks in one group (58 chunks, 15.4 kB gz) — rejected, some of those files carry
+global print rules (`:global(#root)` in `InvoicePreview` / `pos`), which would apply on every screen that loads the group;
+dropping preload lists altogether (`modulePreload: false`) — a load-time change, and it removes the HTML preloads the
+first-paint budget measures; react-router's `development` build in `vendor-react` — same size as `production`
+(NODE_ENV-guarded); jsPDF itself (118 kB gz, a prebuilt minified bundle, not tree-shakable).
