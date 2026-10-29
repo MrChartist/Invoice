@@ -6,11 +6,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createGraph, familyRe, initialSet, isLeaf, leafGroup, safeFamilyGroup, safeSet } from '../scripts/vite-safe-groups.mjs';
+import { UI_LEAF, createGraph, familyRe, initialSet, isLeaf, leafGroup, safeFamilyGroup, safeSet } from '../scripts/vite-safe-groups.mjs';
+import { preloadTrim } from '../scripts/vite-preload-trim.mjs';
 
 const cfg = readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8');
 type Group = { name: string | ((id: string, ctx?: unknown) => string | null); test?: RegExp; tags?: string[]; priority?: number; maxModuleSize?: number };
-const config = (await import('../vite.config.ts')).default as { build: { rolldownOptions: { output: { codeSplitting: { groups: Group[] } } } } };
+const config = (await import('../vite.config.ts')).default as {
+  build: { rolldownOptions: { output: { codeSplitting: { groups: Group[] } } } };
+  css: { modules: { generateScopedName: (name: string, file: string, css: string) => string } };
+};
 const groups = config.build.rolldownOptions.output.codeSplitting.groups;
 const PDF = ['/x/node_modules/jspdf/dist/jspdf.es.min.js', '/x/node_modules/html-to-image/es/index.js'];
 
@@ -19,7 +23,7 @@ test('Vite 8 rolldown options with codeSplitting.groups, no manualChunks / rollu
   assert.match(cfg, /codeSplitting:\s*\{/);
   assert.doesNotMatch(cfg, /manualChunks\s*\(/);
   assert.doesNotMatch(cfg, /rollupOptions\s*:/);
-  assert.match(cfg, /plugins: \[react\(\), cspMeta\(\), hiSplit\(\), graphPlugin\(graph\)\]/, 'the Hindi split and the graph plugin are wired');
+  assert.match(cfg, /plugins: \[react\(\), cspMeta\(\), hiSplit\(\), graphPlugin\(graph\), preload\.plugin\]/, 'the Hindi split, the graph and the preload-trim plugins are wired');
 });
 
 test('the groups, in order, with their priorities', () => {
@@ -27,12 +31,14 @@ test('the groups, in order, with their priorities', () => {
   assert.deepEqual(families.map(([n]) => n), ['f-hotel', 'f-trade', 'f-retail', 'f-services', 'f-cn', 'f-agri', 'f-mfg', 'f-prof', 'f-travel', 'f-manpower', 'f-society', 'f-logistics']); // R17-A: f-manpower; R18-A: f-society; R19-A: f-logistics
   assert.ok(families.every(([, p]) => p === 12), 'families at priority 12');
   assert.match(cfg, /leafGroup\(graph, 'lazy-leaves', 9, \{ maxModuleSize: 3000 \}\)/);
+  assert.match(cfg, /leafGroup\(graph, 'lazy-leaves-ui', 8, \{ maxModuleSize: 1500, test: UI_LEAF \}\)/, 'PERF-5');
   const names = groups.map((g) => (typeof g.name === 'string' ? g.name : g.name.name));
   assert.deepEqual(names.slice(0, 4), ['vendor-react', 'vendor-ui', 'langChunkName', 'app-initial']);
-  assert.deepEqual(groups.map((g) => g.priority), [30, 30, 25, 20, ...families.map(() => 12), 9]);
+  assert.deepEqual(groups.map((g) => g.priority), [30, 30, 25, 20, ...families.map(() => 12), 9, 8]);
   assert.deepEqual(groups[3].tags, ['$initial']);
   assert.equal(groups[3].test, undefined, 'app-initial is selected by tag only');
-  assert.equal(groups.at(-1)?.maxModuleSize, 3000);
+  assert.equal(groups.at(-2)?.maxModuleSize, 3000);
+  assert.equal(groups.at(-1)?.maxModuleSize, 1500);
 });
 
 test('every group has a filter (test, tags or a name function); none can capture the PDF stack', () => {
@@ -58,6 +64,39 @@ test('PERF-4: qrcode.react is not a first-paint vendor (only lazy templates / PO
   const [react, ui] = groups;
   const qr = '/x/node_modules/qrcode.react/lib/esm/index.js';
   assert.ok(!ui.test?.test(qr) && !react.test?.test(qr), 'qrcode.react must stay out of vendor-ui / vendor-react (−5.6 kB gz first paint)');
+});
+
+test('PERF-5: 7-character file hashes, first-paint files trimmed from the dynamic-import preload lists', () => {
+  for (const k of ['entryFileNames', 'chunkFileNames']) assert.match(cfg, new RegExp(`${k}: 'assets/\\[name\\]-\\[hash:7\\]\\.js'`));
+  assert.match(cfg, /assetFileNames: 'assets\/\[name\]-\[hash:7\]\[extname\]'/);
+  assert.match(cfg, /modulePreload: \{ resolveDependencies: preload\.resolveDependencies \}/);
+  const { plugin, resolveDependencies, firstPaint } = preloadTrim();
+  type Chunk = { type: 'chunk'; fileName: string; isEntry: boolean; imports: string[] };
+  const chunk = (fileName: string, imports: string[] = [], isEntry = false): Chunk => ({ type: 'chunk', fileName, isEntry, imports });
+  const bundle: Record<string, Chunk | { type: 'asset'; fileName: string }> = {
+    'assets/index-a.js': chunk('assets/index-a.js', ['assets/rolldown-runtime-b.js', 'assets/vendor-react-c.js'], true),
+    'assets/rolldown-runtime-b.js': chunk('assets/rolldown-runtime-b.js'),
+    'assets/vendor-react-c.js': chunk('assets/vendor-react-c.js', ['assets/rolldown-runtime-b.js']),
+    'assets/Lazy-d.js': chunk('assets/Lazy-d.js', ['assets/index-a.js', 'assets/shared-e.js']),
+    'assets/shared-e.js': chunk('assets/shared-e.js', ['assets/vendor-react-c.js']),
+    'assets/index-a.css': { type: 'asset', fileName: 'assets/index-a.css' },
+  };
+  const gen = plugin.generateBundle as { order: string; handler: (o: unknown, b: typeof bundle) => void };
+  assert.equal(gen.order, 'pre', 'runs before Vite writes the preload lists');
+  gen.handler({}, bundle);
+  assert.deepEqual([...firstPaint].sort(), ['assets/index-a.js', 'assets/rolldown-runtime-b.js', 'assets/vendor-react-c.js']);
+  const deps = ['assets/Lazy-d.js', 'assets/index-a.js', 'assets/shared-e.js', 'assets/vendor-react-c.js', 'assets/rolldown-runtime-b.js'];
+  assert.deepEqual(resolveDependencies('assets/Lazy-d.js', deps, { hostId: 'assets/x.js', hostType: 'js' }), ['assets/Lazy-d.js', 'assets/shared-e.js']);
+  assert.deepEqual(resolveDependencies('assets/index-a.js', deps, { hostId: 'index.html', hostType: 'html' }), deps, 'the HTML modulepreload links are untouched');
+});
+
+test('PERF-5: CSS-module class names are `_<local>_<6-char file hash>` (no line number)', () => {
+  const name = config.css.modules.generateScopedName;
+  const a = '.row { color: red }\n.head { color: blue }';
+  const b = '.row { color: green }';
+  assert.match(name('row', '/x/a.module.css', a), /^_row_[A-Za-z0-9_-]{6}$/);
+  assert.equal(name('row', '/x/a.module.css', a).slice(-6), name('head', '/x/a.module.css', a).slice(-6), 'one hash per file (compresses)');
+  assert.notEqual(name('row', '/x/a.module.css', a), name('row', '/x/b.module.css', b), 'same local name in two files stays apart');
 });
 
 test('bundle-size script: entry 100 kB, initial 185 kB, ≤ 5 initial files, core 3,300, Hindi 400, regional 25, leak 36', () => {
@@ -159,4 +198,26 @@ test('group name functions: the family name for safe members, lazy-leaves for sm
   assert.ok(isLeaf(g, P + 'src/lib/books.ts'), 'no imports at all is a leaf');
   assert.equal(l.maxModuleSize, 3000);
   assert.equal(g.families.get('f-trade'), FAM, 'recorded for build-meta/chunks.json');
+});
+
+test('PERF-5: lazy-leaves-ui takes small script leaves outside src/lib, never a stylesheet', () => {
+  const g = graphOf({
+    'src/main.tsx': ['src/lib/utils.ts'],
+    'src/lib/utils.ts': [],
+    'src/lib/leaf.ts': ['src/lib/utils.ts'],
+    'src/components/X.tsx': ['src/lib/utils.ts'],
+    'src/components/Y.tsx': ['src/components/y.module.css'],
+    'src/components/y.module.css': [],
+    'src/store/pick.ts': [],
+    'src/hooks/useX.ts': [],
+    'src/i18n/areas/nodes.ts': ['src/lib/utils.ts'],
+    'src/pages/Page.tsx': [],
+  }, ['src/main.tsx']);
+  const u = leafGroup(g, 'lazy-leaves-ui', 8, { maxModuleSize: 1500, test: UI_LEAF });
+  for (const id of ['src/components/X.tsx', 'src/store/pick.ts', 'src/hooks/useX.ts', 'src/i18n/areas/nodes.ts']) assert.equal(u.name(P + id), 'lazy-leaves-ui', id);
+  assert.equal(u.name(P + 'src/components/Y.tsx'), null, 'imports a lazy CSS module');
+  assert.equal(u.name(P + 'src/components/y.module.css'), null, 'a stylesheet never joins');
+  assert.equal(u.name(P + 'src/lib/leaf.ts'), null, 'src/lib leaves stay in lazy-leaves');
+  assert.equal(u.name(P + 'src/pages/Page.tsx'), null, 'routes stay their own chunks');
+  assert.equal(u.maxModuleSize, 1500);
 });
