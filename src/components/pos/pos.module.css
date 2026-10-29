@@ -225,7 +225,7 @@
   padding-top: 0.5rem;
   margin-top: 0.15rem;
   font-size: 1.5rem;
-  font-weight: 700;
+  font-weight: 600;
   font-family: var(--font-display);
 }
 
@@ -270,7 +270,7 @@
 }
 
 .kbd {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-2xs);
   padding: 0.05rem 0.35rem;
   border: 1px solid var(--border);
@@ -346,7 +346,7 @@ table.zTable td {
 
 .strong th,
 .strong td {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .drawer {
@@ -365,12 +365,12 @@ table.zTable td {
 
 .short {
   color: var(--loss);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .over {
   color: var(--warning);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* The 80 mm bill: off-screen while working, the only thing on paper while printing. */

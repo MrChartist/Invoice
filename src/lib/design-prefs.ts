@@ -314,15 +314,18 @@ export interface FontOption {
   css: string;
 }
 
-/** Offline-safe stacks: every one degrades to a system font. */
+/**
+ * The type system (docs/theme/TYPE-SYSTEM.md) has one text font, so the only override is "everything, titles too, in
+ * Chartist Sans Flex"; leaving it unset keeps the template's own title face (Chartist Sans or the Chartist Serif accent).
+ */
 export const FONT_OPTIONS: FontOption[] = [
-  { id: 'inter', label: 'Inter', css: "'Inter', system-ui, sans-serif" },
-  { id: 'outfit', label: 'Outfit', css: "'Outfit', 'Inter', system-ui, sans-serif" },
-  { id: 'serif', label: 'Playfair', css: "'Playfair Display', Georgia, 'Times New Roman', serif" },
-  { id: 'dm-serif', label: 'DM Serif', css: "'DM Serif Display', 'Playfair Display', Georgia, serif" },
-  { id: 'mono', label: 'Mono', css: "'JetBrains Mono', 'SF Mono', Menlo, ui-monospace, monospace" },
-  { id: 'system', label: 'System', css: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" },
+  { id: 'flex', label: 'Chartist Sans Flex', css: 'var(--font-body)' },
 ];
+
+/** Font ids saved before the type system (Inter, Outfit, Playfair, DM Serif, Mono, System): all read as Sans Flex. */
+const LEGACY_FONT_IDS: Readonly<Record<string, string>> = {
+  inter: 'flex', outfit: 'flex', serif: 'flex', 'dm-serif': 'flex', mono: 'flex', system: 'flex',
+};
 
 export function fontCss(id?: string): string | undefined {
   return FONT_OPTIONS.find((f) => f.id === id)?.css;
@@ -402,7 +405,8 @@ function text(value: unknown, max: number): string {
 export function sanitizeDesign(input: unknown, base: DesignPrefs = DEFAULT_DESIGN): DesignPrefs {
   const src = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
   const cols = (src.show_columns && typeof src.show_columns === 'object' ? src.show_columns : {}) as Record<string, unknown>;
-  const font = typeof src.font === 'string' && FONT_OPTIONS.some((f) => f.id === src.font) ? src.font : undefined;
+  const fontId = typeof src.font === 'string' ? (LEGACY_FONT_IDS[src.font] ?? src.font) : undefined;
+  const font = fontId && FONT_OPTIONS.some((f) => f.id === fontId) ? fontId : undefined;
   const watermarkRaw = 'watermark' in src ? text(src.watermark, 40).trim() : base.watermark;
   return {
     profile_id: typeof src.profile_id === 'string' && src.profile_id ? src.profile_id : base.profile_id,

@@ -74,9 +74,9 @@
 .kpiValue {
   display: block;
   margin-top: 0.25rem;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-lg);
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
@@ -99,7 +99,7 @@
 .dot { fill: var(--brand); }
 .zero { stroke: var(--foreground); stroke-width: 1; opacity: 0.5; }
 .grid { stroke: var(--border); stroke-width: 1; }
-.axisText { fill: var(--muted-foreground); font-size: 10px; font-family: var(--font-body); }
+.axisText { fill: var(--muted-foreground); font-size: 12px; font-family: var(--font-body); }
 
 .legend {
   display: flex;
@@ -129,7 +129,7 @@
 
 .numeric {
   text-align: right;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

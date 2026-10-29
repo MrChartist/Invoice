@@ -39,7 +39,7 @@
 .chipOn { background: color-mix(in srgb, var(--loss) 12%, transparent); border-color: var(--loss); color: var(--loss); }
 .sort select { padding-top: 0.35rem; padding-bottom: 0.35rem; }
 
-.collect, .advance, .settled { font-weight: 700; white-space: nowrap; }
+.collect, .advance, .settled { font-weight: 600; white-space: nowrap; }
 .collect { color: var(--profit); }
 .advance { color: var(--loss); }
 .settled { color: var(--muted-foreground); font-weight: 600; }

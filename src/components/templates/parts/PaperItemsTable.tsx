@@ -109,7 +109,7 @@ export function PaperItemsTable({ invoice, totals, tableStyle, works }: ItemsTab
                 </td>
               )}
               {showGst && <td className={cn(styles.right, styles.num)}>{line.tax_rate}%</td>}
-              <td className={cn(styles.right, styles.num)} style={{ fontWeight: 700 }}>
+              <td className={cn(styles.right, styles.num)} style={{ fontWeight: 600 }}>
                 {money(taxed && !isRcmTotals(totals) ? line.total : line.taxable, invoice.currency)}
               </td>
             </tr>

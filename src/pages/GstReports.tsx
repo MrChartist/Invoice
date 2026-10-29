@@ -82,6 +82,7 @@ import { helpT } from '../i18n/areas/help-r6';
 import { Term } from '../components/help/Term';
 import { EmptyState } from '../components/ui/EmptyState';
 import type { GlossaryId } from '../lib/help/glossary';
+import { printWhenReady } from '../lib/print-fonts';
 
 const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
 // Same table as `EINVOICE_META_TABLE` in einvoice.ts — read directly so the e-invoice builder stays out of this chunk.
@@ -370,7 +371,7 @@ export function GstReports() {
     const html = buildSummaryHtml(report, label, profiles.find((p) => p?.companyGstin?.trim().toUpperCase() === gstin)?.companyName);
     const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
     const w = window.open(url, '_blank');
-    if (w) w.addEventListener('load', () => w.print());
+    if (w) w.addEventListener('load', () => printWhenReady(w));
     else notify(gstT('popupBlocked'), 'error');
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };

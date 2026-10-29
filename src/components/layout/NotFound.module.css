@@ -25,7 +25,7 @@
 .title {
   font-family: var(--font-display);
   font-size: 1.25rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
@@ -35,7 +35,7 @@
 }
 
 .text code {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-base);
   padding: 0.1rem 0.35rem;
   border-radius: var(--radius-xs);

@@ -9,6 +9,7 @@ import { num, round2 } from './invoice-calc';
 import { binForName } from './bins';
 import { lineFactor } from './units';
 import { escHtml as esc } from './html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 
 interface BinItem { name: string; aliases?: string[]; location?: string; batch_bins?: Record<string, string>; unit?: string }
 
@@ -50,7 +51,7 @@ export function pickListHtml(rows: readonly PickRow[], opts: { title?: string; b
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(opts.title || 'Pick list')}</title>
-<style>body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:black;background:white;margin:12mm}h1{font-size:14pt;margin:0 0 2mm}p{margin:0 0 4mm;font-size:9pt}table{width:100%;border-collapse:collapse;font-size:10pt}th,td{border:1px solid #999;padding:1.5mm 2mm;text-align:left}th{background:#eee}.n{text-align:right}.tick{width:12mm}</style></head><body>
+<style>${PRINT_FONT_FACE}body{font-family:${PRINT_FONT};color:black;background:white;margin:12mm}h1{font-size:14pt;margin:0 0 2mm}p{margin:0 0 4mm;font-size:9pt}table{width:100%;border-collapse:collapse;font-size:10pt}th,td{border:1px solid #999;padding:1.5mm 2mm;text-align:left}th{background:#eee}.n{text-align:right}.tick{width:12mm}</style></head><body>
 <h1>${esc(opts.title || 'Pick list')}</h1><p>${esc([opts.business, opts.date].filter(Boolean).join(' · '))}</p>
 <table><thead><tr><th>Bin / rack</th><th>Item</th><th>Batch</th><th class="n">Qty</th><th>Unit</th><th>Documents</th><th>✓</th></tr></thead><tbody>${body}</tbody></table>
 </body></html>`;

@@ -180,6 +180,7 @@ export function HelpModal({ open, onClose, topic: topicId, view: initialView }: 
                 certification from NISM in no way guarantee performance of the intermediary or provide any assurance of
                 returns to investors.
               </p>
+              <p className={styles.legal} data-type-credit>{helpT('typeCredit')}</p>
               <div className={styles.links}>
                 <a href="https://mrchartist.com" target="_blank" rel="noopener noreferrer">
                   mrchartist.com <ExternalLink size={12} />
