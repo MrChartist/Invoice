@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Compass, LayoutDashboard } from 'lucide-react';
 import { tNodes, useT } from '../../i18n';
 import styles from './NotFound.module.css';
+import controls from '../../styles/controls.module.css';
 
 /** Catch-all inside the app shell: tells the user the page is missing instead of silently redirecting. */
 export function NotFound() {
@@ -25,7 +26,7 @@ export function NotFound() {
         {t('notFound.title')}
       </h1>
       <p className={styles.text}>{tNodes('notFound.text', { path: <code>{pathname}</code> })}</p>
-      <Link to="/" className={styles.btn}>
+      <Link to="/" className={`${controls.btnPrimary} ${styles.cta}`}>
         <LayoutDashboard size={16} aria-hidden="true" /> {t('notFound.back')}
       </Link>
     </section>

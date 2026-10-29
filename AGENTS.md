@@ -15,6 +15,10 @@
   auditor pack, Income-tax Act 2025 labels, industry packs (marketplace seller, transport / works contracts, fees /
   non-profits / leases). Module contract: `docs/ARCHITECTURE.md`; per-module notes: `docs/features/`.
 - **Brand source of truth**: mrchartist.com (logo `public/branding/*`, tokens in `src/index.css`; app palette = blue/gold `--pal-*`, orange kept only for the logo and the Ember template).
+  Buttons follow the Mr Chartist button system (`docs/theme/BUTTON-SYSTEM.md`): every pressable kind (`.btn` + intent /
+  size, `.join`, `.seg`, `.chip`, `.lk`) is drawn by `src/styles/buttons.css` (first paint, after `index.css`); the
+  `controls.btn*` / `segment*` module classes only compose it, primary = ink (black / white), destructive = `danger`
+  (loss red), no gold / blue / tinted buttons; `tests/button-system.test.ts` guards it. `<Button>` in `src/components/ui/Button.tsx` for new code.
 
 ## Stack
 - **React 19** + **TypeScript** + **Vite 8** (rolldown bundler — `vite.config.ts` uses

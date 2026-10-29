@@ -202,24 +202,7 @@
   color: var(--muted-foreground);
 }
 
-.iconBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-sm);
-  border: none;
-  background: transparent;
-  color: var(--muted-foreground);
-  flex-shrink: 0;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.iconBtn:hover {
-  background-color: var(--accent);
-  color: var(--foreground);
-}
+.iconBtn { composes: btn quiet icon sm from global; flex-shrink: 0; }
 
 /* ── Main ────────────────────────────────────────────────────── */
 .main {
@@ -335,11 +318,6 @@
     left: -0.875rem;
   }
 
-  .iconBtn {
-    width: 44px;
-    height: 44px;
-  }
-
   .navItem {
     min-height: 44px;
   }
@@ -400,20 +378,21 @@
     color: var(--brand-text);
   }
 
+  /* The phone bar's "New" is the ink round button of the button system (src/styles/buttons.css). */
   .tabNew {
-    color: var(--primary-foreground);
+    color: var(--btn-paper);
   }
 
   .tabNew svg {
     box-sizing: content-box;
     padding: 0.45rem;
     border-radius: var(--radius-full);
-    background: var(--primary);
-    box-shadow: var(--shadow-md);
+    background: var(--btn-ink);
+    box-shadow: var(--btn-shadow);
   }
 
   .tabNew span {
-    color: var(--brand-text);
+    color: var(--foreground);
   }
 }
 

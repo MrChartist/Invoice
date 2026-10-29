@@ -40,25 +40,8 @@
   scrollbar-width: thin;
 }
 
-.barBtn {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-height: 2rem;
-  padding: 0.25rem 0.6rem;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: var(--secondary);
-  color: var(--secondary-foreground);
-  font: inherit;
-  font-size: var(--text-sm);
-  white-space: nowrap;
-  cursor: pointer;
-}
+.barBtn { composes: btn xs from global; flex: 0 0 auto; }
 
-.barBtn:hover,
-.barBtn:focus-visible,
 .item:hover,
 .item:focus-visible {
   border-color: var(--ring);
@@ -176,10 +159,4 @@
   color: var(--muted-foreground);
   border: 1px solid var(--border);
   border-radius: var(--radius-xs);
-}
-
-@media (pointer: coarse) {
-  .barBtn {
-    min-height: 44px;
-  }
 }

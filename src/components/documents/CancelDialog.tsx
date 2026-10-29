@@ -90,8 +90,7 @@ function CancelForm({ invoice, onClose, onDone }: CancelDialogProps) {
           </button>
           <button
             type="button"
-            className={controls.btnPrimary}
-            style={isCancelled ? undefined : { backgroundColor: 'var(--destructive)' }}
+            className={isCancelled ? controls.btnPrimary : controls.btnDestructive}
             onClick={() => submit()}
             disabled={disabled}
           >

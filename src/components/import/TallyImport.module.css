@@ -93,11 +93,7 @@
   cursor: pointer;
 }
 
-.tabActive {
-  composes: tab;
-  color: var(--foreground);
-  border-bottom-color: var(--primary);
-}
+.tabActive { composes: tab; color: var(--foreground); border-bottom-color: var(--btn-ink); }
 
 .tableWrap {
   max-height: 22rem;

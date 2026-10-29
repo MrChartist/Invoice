@@ -26,17 +26,8 @@
 .khataActions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
 .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
-.chip, .chipOn {
-  border: 1px solid var(--border);
-  background: var(--card-inner);
-  color: var(--muted-foreground);
-  border-radius: 999px;
-  padding: 0.35rem 0.8rem;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-}
-.chipOn { background: color-mix(in srgb, var(--loss) 12%, transparent); border-color: var(--loss); color: var(--loss); }
+.chip { composes: chip from global; }
+.chipOn { composes: chip on from global; }
 .sort select { padding-top: 0.35rem; padding-bottom: 0.35rem; }
 
 .collect, .advance, .settled { font-weight: 700; white-space: nowrap; }

@@ -241,16 +241,6 @@
 
 .linkBtn:hover { color: var(--primary); }
 
-.dangerBtn {
-  background-color: var(--destructive);
-  color: var(--destructive-foreground);
-  border-color: var(--destructive);
-}
-
-.dangerBtn:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--destructive) 88%, black);
-}
-
 .foot {
   text-align: center;
   color: var(--muted-foreground);

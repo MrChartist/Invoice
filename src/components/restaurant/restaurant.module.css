@@ -9,28 +9,9 @@
   .layout { grid-template-columns: minmax(0, 1fr) minmax(380px, 460px); align-items: start; }
 }
 
-.tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-.tab {
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--muted-foreground);
-  border-radius: var(--radius-full);
-  padding: 6px 14px;
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-.tab:hover { color: var(--foreground); }
-.tabOn {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-foreground);
-}
+.tabs { composes: seg from global; margin-bottom: 12px; }
+.tab { composes: seg-item from global; }
+.tabOn { composes: seg-item on from global; }
 
 .grid {
   display: grid;

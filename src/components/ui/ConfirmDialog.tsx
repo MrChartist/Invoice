@@ -54,8 +54,7 @@ export function ConfirmDialog({
           </button>
           <button
             type="button"
-            className={controls.btnPrimary}
-            style={destructive ? { backgroundColor: 'var(--destructive)' } : undefined}
+            className={destructive ? controls.btnDestructive : controls.btnPrimary}
             disabled={blocked}
             onClick={() => {
               onConfirm();

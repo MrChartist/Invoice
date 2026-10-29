@@ -38,7 +38,7 @@
   outline-offset: 2px;
   border-radius: var(--radius-xs);
 }
-.tabActive { composes: tab; color: var(--brand-text); border-bottom-color: var(--primary); }
+.tabActive { composes: tab; color: var(--foreground); border-bottom-color: var(--btn-ink); }
 
 /* ── Top debtors ──────────────────────────────────────────────── */
 .debtors { list-style: none; margin: 0; padding: 0.5rem 1.25rem 1.25rem; display: flex; flex-direction: column; gap: 1rem; }

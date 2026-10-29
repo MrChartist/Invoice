@@ -35,36 +35,9 @@
   gap: 0.375rem;
 }
 
-.chip {
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--muted-foreground);
-  font-size: var(--text-base);
-  font-weight: 600;
-  padding: 0.4375rem 0.875rem;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  min-height: 36px;
-  transition: all var(--transition-fast);
-}
+.chip { composes: chip from global; }
 
-.chip:hover {
-  color: var(--foreground);
-  border-color: var(--input-border);
-}
-
-.chipActive {
-  composes: chip;
-  background: var(--primary-glow);
-  color: var(--brand-text);
-  border-color: var(--primary);
-}
-
-.chip:focus-visible,
-.chipActive:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
+.chipActive { composes: chip on from global; }
 
 .dateRow {
   display: flex;
@@ -359,7 +332,6 @@
   .stmtRow { padding: 0.625rem 1rem; }
   .stmtSub { padding-left: 1.5rem; }
   .dateField { max-width: none; }
-  .chip { min-height: 44px; }
 }
 
 @media (pointer: coarse), (max-width: 640px) {

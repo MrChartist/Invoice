@@ -71,47 +71,11 @@
   scrollbar-width: thin;
 }
 
-.barBtn {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.6rem;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: var(--secondary);
-  color: var(--secondary-foreground);
-  font: inherit;
-  font-size: var(--text-sm);
-  white-space: nowrap;
-  cursor: pointer;
-}
+.barBtn { composes: btn xs from global; flex: 0 0 auto; }
 
-.barBtn:hover,
-.barBtn:focus-visible {
-  border-color: var(--ring);
-  outline: none;
-}
+.barKey { font-family: var(--font-mono); font-weight: 600; opacity: 0.72; }
 
-.barBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.barKey {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  color: var(--brand-text);
-}
-
-.barPrimary {
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.barPrimary .barKey {
-  color: var(--primary-foreground);
-}
+.barPrimary { composes: primary from global; }
 
 /* ── Gateway menu ── */
 .layout {
