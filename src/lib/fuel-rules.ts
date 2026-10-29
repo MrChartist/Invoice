@@ -84,3 +84,11 @@ export const WM_REVERIFY_RULES: readonly FuRule<{ months: number; alert_days: nu
 /* ── R21-C ── */
 
 /* ── R21-D ── */
+
+/**
+ * D2: the Explanation to Rule 43 (applied to Rule 42) read as leaving central excise (List I entry 84) and State tax on
+ * petroleum (List II entries 51 / 54) out of E and F: typed excise + VAT per litre of the price in force × litres sold.
+ */
+export const RULE42_DUTY_EXCLUSION_RULES: readonly FuRule<{ exclude: true }>[] = [
+  { from: '2017-07-01', value: { exclude: true }, source: 'Explanation to Rule 43 CGST Rules, applied to Rule 42 (S) (FU11, FU12)', verified: false },
+];

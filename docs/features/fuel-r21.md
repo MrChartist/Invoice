@@ -113,3 +113,62 @@ now ship in the desk chunk and the POS strip reads its two tables directly (−3
 
 `room` at A's first commit (PRD §1.4): 3,300 − 3,254.5 − 20 (R20-B / C / D caps, not merged) − 5 = **20.5 kB** (R21-P not
 merged on this base). Round 21's cap = min(29, 20.5) = 20.5 kB: ≥ 20, so package D stays in Round 21; A's own cap is 8 kB.
+
+## R21-D — Credit customers and Rule 42 for pumps (OMC account and LPG cut at the D cap)
+
+### What it does
+
+- **Credit slips (D1).** View `credit` (`components/fuel/CreditView.tsx`). Table `fuel_slips` (`doc.create`, dated by
+  `date`, audited, registered by A): slip no. typed and unique per company (case and spaces ignored), date, customer,
+  vehicle no. (stored upper case), driver, product, litres, amount (filled from the price in force for the slip day,
+  editable). `fu-slips.ts`: `slipIssue`, `saveSlip`, `removeSlip` (a slip on a live bill is changed only by cancelling
+  that bill), `vehicleWarning` — vehicle-wise monthly limits on `Client.fu.vehicles` (litres and / or ₹; a warning, never
+  a block; "Add vehicle" on the screen) — and the party-level `creditCheck` of `credit-limit.ts` (unbilled slips + the
+  new slip against the client's credit limit / days). "Bill slips up to <date>" (`fu-recv-io.ts` `billSlips`) bills every
+  unbilled slip dated on or before that day in **one** `localDb.invoices.saveMany`: per customer one **Bill of Supply**
+  (`exempt_kind: 'NON_GST'`, lines per product × price row in force on the slip day, amounts exact, `sv.exempt:
+  'NON_GST'`, `fu.lines[lineId]` with `price_id` so the Rule 42 working sees the duty) and, when a non-fuel item
+  (lubricant) is on slips, one tax invoice at the item's slab (GST-inclusive amounts). Each carries `fu.slip_ids` and the
+  **vehicle-wise annexure** in the existing `annexure` field (who = vehicle, project = "Slip n", the R7 hotel pattern).
+  Billed state is derived from `fu.slip_ids` on non-cancelled documents (`billedSlipIds`); cancelling the bill frees the
+  slips. Monthly billing = the month-end date (FU7); daily billing = today's date — same button.
+- **Rule 42 for pumps (D2).** `institutions/common-credit.ts` `turnoverOf(g3, adjust?)`: the one change — an optional
+  `adjust(E, F) → { E, F, note }` applied after E / F are read (default none: the result is unchanged, `{ E, F }`).
+  `CommonCreditView` (GST → Common credit) loads `fuel/fu-rule42.ts` only with the `fuel` pack on: `dutyOf` sums
+  (excise + VAT per litre of the price row each non-GST fuel line was sold at) × litres of the period (credit notes
+  subtract; lines without a typed build-up are counted as "without a build-up"), `dutyAdjust` takes it off both E and F
+  (never below 0; `RULE42_DUTY_EXCLUSION_RULES`, `verified: false`, FU11 / FU12 ★) with the working shown under the
+  figures, and the checkbox **"Leave duties in"** switches it off. The monthly run, the true-up and the posted figures use
+  the adjusted E / F. `check31e`: the period's fuel sales value vs GSTR-3B 3.1(e) non-GST outward — a mismatch is listed.
+- **Help.** `inventory:fuel:credit` lives in `topics-purchase.ts` (the inventory area) because a view without a
+  `PACK_TABS` row resolves there — adding pack-tab rows would put bytes in first paint; the desk's Ctrl+K row
+  `inventory.fuel` lists "credit slips".
+
+### Cuts and deviations (PRD §3, §11 stop rule)
+
+First build with all four items measured **+14.2 kB** core (cap 7): splitting `deposits`, `netting` and `credit-limit`
+out of their screens' chunks cost ~2 kB on its own. Cuts in the PRD order:
+
+- **Cut 1 — LPG (D4)**: `fu-lpg.ts`, `LpgView`, `LPG_RATE_RULES` / `LPG_FORFEIT_RULES`, the refill bill and the
+  cylinder deposit / forfeit (R5-C6) were built and tested, then removed (−5.6 kB with two import fixes that kept `fu-price` / `fu-settings` in the desk chunk → +8.6 kB). `Client.fu.lpg_use` and
+  `FuSnapshot.lpg_use` stay declared (A) and unused. Round 22 candidate.
+- **Cut 2 — OMC account (D3)**: statement CSV matching and the netting set-off (`fu-omc.ts`, `OmcView`, the
+  `no-cash-readers` entry for its money reader) removed (−2.5 kB → +6.1 kB). Interplay to settle before it returns: B3
+  posts fleet-card / loyalty money to a clearing *bank* account, which a netting receipt (Dr OMC creditor / Cr OMC
+  debtor) cannot clear; the cut build netted the OMC's open documents as a customer instead.
+- **194Q hint on OMC bills**: went with the OMC view (cut 2).
+- No bridge `fu-tax-io.ts`: `fu-rule42.ts` is pure and the common-credit screen loads it; `fu-recv-io.ts` is D's only bridge.
+- `billSlips` calls `saveMany` without `withTablesRollback`: `saveMany` validates and numbers every document before its
+  one write, and A's `fu-registry` test forbids naming the series table inside `src/lib/fuel/`.
+- `fuel-r21.ts` and `fu-shared.ts` needed no D block (A declared every D shape and the `fuel_slips` name).
+
+### Sizes (gz)
+
+| | `67ccabd` (measured) | R21-D on `67ccabd` (measured) |
+|---|---|---|
+| Initial JS | 177.8 kB | 177.8 kB |
+| Entry chunk | 89.5 kB | 89.5 kB |
+| Core precache | 3,277.2 kB | 3,283.3 kB (**+6.1**, cap 7) |
+| Hindi pack | 376.6 kB | 377.0 kB |
+| Hindi in core | 21.9 kB | 21.9 kB |
+| `f-fuel` / `FuelDesk` / `CreditView` (incl. `fu-recv-io`) / `credit-limit` split / `fu-ui` split | 1.9 / 3.7 / — / — / — | 2.8 / 3.8 / 3.6 / 1.3 (−0.9 from `credit-policy`) / 0.4 |
