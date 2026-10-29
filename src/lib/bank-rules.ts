@@ -12,7 +12,9 @@
  * ignored) gets none. Every suggestion says where it came from — 'rule' or 'memory' (the screen shows
  * the engine's matches as 'match'). Memory is derived, never stored: the counterparty token of every
  * debit line that was matched to a paid expense teaches "this token → this expense head / supplier /
- * GST rate", so a manual categorisation is remembered with no extra step.
+ * GST rate", so a manual categorisation is remembered with no extra step. 8.46: `buildActionMemory` adds the same for
+ * credits received against a customer's invoices (token → receipt from that customer) and for lines posted as a
+ * payment / receipt voucher (token → voucher to that ledger), read back from the matched receipts / voucher numbers.
  */
 
 import type { BankLine, BankStatement } from './bank-recon';
@@ -216,6 +218,60 @@ export function buildMemory(
   return out;
 }
 
+/** 8.46: a remembered receipt / voucher action, keyed `D|token` (debit) or `C|token` (credit). */
+export interface ActionMemory {
+  action: RuleAction;
+  count: number;
+  last: string;
+}
+
+type VoucherLike = { number?: string; type?: string; lines?: readonly { account_id?: string; party?: string }[] };
+
+/**
+ * Learn token → receipt / voucher from past lines: a credit matched to receipts of a customer's invoices (or an
+ * on-account receipt of the party) teaches "receipt from that customer"; a line posted as a payment / receipt voucher
+ * (its note starts with the voucher number) teaches "voucher to that ledger" when the voucher has one other ledger.
+ * The most frequent action per token and direction wins (latest on a tie). Pure.
+ */
+export function buildActionMemory(
+  statements: readonly BankStatement[],
+  receipts: readonly { id?: string; invoice_id?: string; client_id?: string }[],
+  invoices: readonly { id: string; client?: { id?: string } }[],
+  vouchers: readonly VoucherLike[],
+  isBankLedger: (id: string) => boolean,
+): Map<string, ActionMemory> {
+  const clientOfInv = new Map(invoices.map((i) => [i.id, i.client?.id ?? '']));
+  const clientOfPay = new Map(receipts.filter((p) => p?.id).map((p) => [String(p.id), p.client_id || clientOfInv.get(p.invoice_id ?? '') || '']));
+  const byNo = new Map(vouchers.filter((v) => v?.number).map((v) => [v.number!, v]));
+  const tally = new Map<string, Map<string, ActionMemory>>();
+  for (const st of statements) {
+    for (const l of st.lines) {
+      const m = l.matched_to;
+      const token = m ? counterpartyToken(l.narration) : '';
+      if (!token) continue;
+      let action: RuleAction | null = null;
+      if (m!.type === 'payment' && l.credit > 0) {
+        const client = [m!.id, ...(m!.ids ?? [])].map((id) => clientOfPay.get(id ?? '')).find(Boolean);
+        if (client) action = { kind: 'receipt', client_id: client };
+      } else if (m!.type === 'manual' && l.note) {
+        const v = byNo.get(l.note.trim().split(/\s+/)[0]);
+        const others = v && (v.type === 'PAYMENT' || v.type === 'RECEIPT') ? (v.lines ?? []).filter((x) => x.account_id && !isBankLedger(x.account_id)) : [];
+        if (others.length && new Set(others.map((x) => x.account_id)).size === 1) action = { kind: 'voucher', ledger_id: others[0].account_id, ...(others[0].party ? { vendor_name: others[0].party } : {}) };
+      }
+      if (!action) continue;
+      const key = `${l.credit > 0 ? 'C' : 'D'}|${token}`;
+      const sub = `${action.kind}|${action.client_id ?? action.ledger_id}`;
+      const per = tally.get(key) ?? new Map<string, ActionMemory>();
+      const prev = per.get(sub);
+      per.set(sub, { action, count: (prev?.count ?? 0) + 1, last: prev && prev.last > l.date ? prev.last : l.date });
+      tally.set(key, per);
+    }
+  }
+  const out = new Map<string, ActionMemory>();
+  for (const [key, per] of tally) out.set(key, [...per.values()].sort((a, b) => b.count - a.count || b.last.localeCompare(a.last))[0]);
+  return out;
+}
+
 /* ── Suggestions ────────────────────────────────────────────────── */
 
 /**
@@ -229,6 +285,7 @@ export function suggestCategorisations(
   memory: ReadonlyMap<string, MemoryEntry>,
   ctx: MatchContext,
   skip: ReadonlySet<string> = new Set(),
+  actions: ReadonlyMap<string, ActionMemory> = new Map(),
 ): RuleSuggestion[] {
   const ordered = rules.filter((r) => r.active).sort((a, b) => a.priority - b.priority || a.created_at.localeCompare(b.created_at));
   const out: RuleSuggestion[] = [];
@@ -239,9 +296,10 @@ export function suggestCategorisations(
       out.push({ lineId: line.id, source: 'rule', action: rule.action, ruleId: rule.id, label: rule.name });
       continue;
     }
-    if (!(line.debit > 0)) continue;
     const token = counterpartyToken(line.narration);
-    const m = token ? memory.get(token) : undefined;
+    const am = token ? actions.get(`${line.credit > 0 ? 'C' : 'D'}|${token}`) : undefined;
+    const m = token && line.debit > 0 ? memory.get(token) : undefined;
+    if (!m && am) out.push({ lineId: line.id, source: 'memory', label: token, count: am.count, action: am.action });
     if (m) {
       out.push({
         lineId: line.id,

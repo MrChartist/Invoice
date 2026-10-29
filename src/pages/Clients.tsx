@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BellRing, Download, FileUp, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Scale, Search, Send, Trash2, UserPlus, Users } from 'lucide-react';
+import { BellRing, Download, FileUp, Globe, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Scale, Search, Send, Trash2, UserPlus, Users } from 'lucide-react';
 import { ImportWizard } from '../components/import/ImportWizard';
 import { PageHeader } from '../components/ui/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -22,7 +22,8 @@ import { formatCurrency, todayInput } from '../lib/utils';
 import type { Client } from '../types/invoice';
 import { loadKhataReport } from '../lib/khata-actions';
 import { messageLangOf } from '../lib/message-langs';
-import { buildWhatsAppStatement, khataRows, khataTotals, sortKhataRows, type KhataRow, type KhataSort } from '../lib/khata';
+import { currenciesIn } from '../lib/receivables';
+import { buildWhatsAppStatement, foreignBalances, khataRows, khataTotals, sortKhataRows, type KhataRow, type KhataSort } from '../lib/khata';
 import { whatsappLink } from '../lib/share';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
@@ -96,7 +97,10 @@ export function Clients() {
 
   // Balance per party (8.1): the receivables ledger incl. opening bills, credit notes and advances.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const report = useMemo(() => loadKhataReport().report, [version]);
+  const khata = useMemo(() => loadKhataReport(), [version]);
+  const report = khata.report;
+  // PENDING 50: balances in other currencies (export parties) as a second line; links to Receivables in that currency.
+  const foreign = useMemo(() => foreignBalances(khata.input, currenciesIn(khata.input.invoices)), [khata]);
   const rows = useMemo(() => khataRows(clients, report), [clients, report]);
   const totals = useMemo(() => khataTotals(rows), [rows]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -322,6 +326,13 @@ export function Clients() {
                               ? khataT('advance', { amount: formatCurrency(-row.net, 'INR') })
                               : khataT('settled')}
                         </span>
+                        {(foreign.get(row.key) ?? []).map((f) => (
+                          <div key={f.currency} className={styles.sub} data-foreign-balance={f.currency}>
+                            <Link to={`/receivables?tab=statements&party=${encodeURIComponent(row.key)}&cur=${f.currency}`}>
+                              {khataT(f.net > 0 ? 'alsoCollect' : 'alsoAdvance', { amount: formatCurrency(Math.abs(f.net), f.currency) })}
+                            </Link>
+                          </div>
+                        ))}
                         {row.overdue > 0.004 && (
                           <div className={styles.overdue}>{khataT('overdueLine', { amount: formatCurrency(row.overdue, 'INR'), n: row.oldestOverdueDays })}</div>
                         )}
@@ -359,6 +370,11 @@ export function Clients() {
                           <Link to={`/receivables?tab=statements&party=${encodeURIComponent(row.key)}`} className={controls.btnIcon} aria-label={salesT('cl.statementFor', { name: c.name })} title={salesT('cl.statement')}>
                             <Scale size={16} />
                           </Link>
+                          {row.party && (
+                            <Link to={`/receivables?tab=statements&party=${encodeURIComponent(row.key)}&web=1`} className={controls.btnIcon} aria-label={khataT('webPageFor', { name: c.name })} title={khataT('webPage')} data-statement-web-row>
+                              <Globe size={16} />
+                            </Link>
+                          )}
                           {edit && (
                             <>
                               <button type="button" className={controls.btnIcon} onClick={() => openEdit(c)} aria-label={salesT('cl.editOf', { name: c.name })} title={salesT('edit')}>

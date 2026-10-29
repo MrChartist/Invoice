@@ -23,6 +23,8 @@ export interface StatementViewerProps extends StatementDocumentProps {
   open: boolean;
   onClose: () => void;
   onError?: (message: string) => void;
+  /** PENDING 50: make the statement web page as soon as the viewer opens (from a list row's button). */
+  autoWeb?: boolean;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface StatementViewerProps extends StatementDocumentProps {
  * statement text, Share PDF through the OS share sheet (download where files cannot be shared) and a
  * static statement web page with a Pay-with-UPI panel and QR.
  */
-export function StatementViewer({ open, onClose, onError, ...doc }: StatementViewerProps) {
+export function StatementViewer({ open, onClose, onError, autoWeb, ...doc }: StatementViewerProps) {
   useT(); // re-render on a language switch (5.4)
   const paperRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
@@ -64,6 +66,13 @@ export function StatementViewer({ open, onClose, onError, ...doc }: StatementVie
       document.body.style.overflow = prevOverflow;
     };
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open || !autoWeb) return;
+    // After the paper (and its QR canvas) has painted: same path as pressing "Web page".
+    const t = window.setTimeout(() => document.querySelector<HTMLButtonElement>('[data-statement-web]')?.click(), 120);
+    return () => window.clearTimeout(t);
+  }, [open, autoWeb]);
 
   if (!open) return null;
 
@@ -152,7 +161,7 @@ export function StatementViewer({ open, onClose, onError, ...doc }: StatementVie
           <button type="button" className={btn} onClick={() => (ready ? void shareReady(ready) : void handleSharePdf())} disabled={busy}>
             <Share2 size={14} /> {ready ? khataT('shareNow') : khataT('sharePdf')}
           </button>
-          <button type="button" className={btn} onClick={() => void handleWebPage()}>
+          <button type="button" className={btn} onClick={() => void handleWebPage()} data-statement-web>
             <Globe size={14} /> {khataT('webPage')}
           </button>
           <button type="button" className={btn} onClick={() => window.print()}>

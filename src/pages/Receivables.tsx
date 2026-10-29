@@ -160,7 +160,7 @@ export function Receivables() {
   };
 
   const currencies = useMemo(() => currenciesIn(data.invoices), [data.invoices]);
-  const [currencyPick, setCurrencyPick] = useState('');
+  const [currencyPick, setCurrencyPick] = useState(() => (params.get('cur') ?? '').toUpperCase()); // PENDING 50: khata link in a currency
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkAct, setBulkAct] = useState(false);
   const [queue, setQueue] = useState<'overdue' | 'balance' | null>(null);
@@ -350,7 +350,7 @@ export function Receivables() {
           onNetting={(id) => { const n = new URLSearchParams(params); n.set('netting', id); setParams(n, { replace: true }); }}
           onStatement={(p) => { const n = new URLSearchParams(params); n.set('tab', 'statements'); n.set('party', p.key); setParams(n, { replace: true }); }} />}
         {tab === 'statements' && <StatementsTab report={report} data={data} currency={currency} now={now}
-          partyKey={params.get('party') ?? ''} onPick={(k) => { const n = new URLSearchParams(params); n.set('party', k); setParams(n, { replace: true }); }}
+          partyKey={params.get('party') ?? ''} autoWeb={params.get('web') === '1'} onPick={(k) => { const n = new URLSearchParams(params); n.set('party', k); setParams(n, { replace: true }); }}
           notify={notify} onChanged={() => setData(loadData())} badge={badge} />}
         {tab === 'followups' && (
           <Suspense fallback={null}>
@@ -711,8 +711,10 @@ function BillsTable({ party: p, currency, lateFeeRules, onLateFee, onWriteOff }:
 
 /* ── Statements ───────────────────────────────────────────────── */
 
-function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, onChanged, badge }: {
+function StatementsTab({ report, data, currency, now, partyKey, autoWeb, onPick, notify, onChanged, badge }: {
   badge: (partyKey: string) => ReactNode;
+  /** PENDING 50: opened from a list row's "statement web page" button — open the viewer and make the page. */
+  autoWeb?: boolean;
   report: ReturnType<typeof buildReceivables>;
   data: ReturnType<typeof loadData>;
   currency: string;
@@ -726,7 +728,7 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, 
   const [entry, setEntry] = useState<'received' | 'given' | null>(null);
   const [from, setFrom] = useState(() => toDateInput(fyStart(now)));
   const [to, setTo] = useState(() => toDateInput(now));
-  const [viewer, setViewer] = useState(false);
+  const [viewer, setViewer] = useState(!!autoWeb);
   const sender = useMemo(() => localDb.settings.activeProfile(), []);
   const [followUp, setFollowUp] = useState(false);
   const [tlVersion, setTlVersion] = useState(0);
@@ -921,7 +923,7 @@ function StatementsTab({ report, data, currency, now, partyKey, onPick, notify, 
           <PartyTimeline partyKey={party.key} invoices={data.invoices} payments={data.payments as Payment[]} clients={data.clients} version={tlVersion} />
         </Suspense>
       )}
-      <StatementViewer open={viewer} onClose={closeViewer} sender={sender} party={party} client={client}
+      <StatementViewer open={viewer} autoWeb={autoWeb} onClose={closeViewer} sender={sender} party={party} client={client}
         ledger={ledger} currency={currency} onError={(msg) => notify(msg, 'error')}
         styleKind={prefs.style} ageing={prefs.ageing ? { asOf: to || toDateInput(now) } : undefined} />
       {followUp && (

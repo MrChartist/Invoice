@@ -91,6 +91,12 @@ export function decodeEinvoiceQr(text: unknown): QrDecodeResult {
     return { ok: false, error: 'unreadable' };
   }
 
+  const fields = readQrFields(data);
+  return fields ? { ok: true, ...fields } : { ok: false, error: 'missing' };
+}
+
+/** Clean the QR fields of a decoded payload (also the e-invoice JSON, mapped to the QR names). Null = nothing usable. */
+function readQrFields(data: Record<string, unknown>): { data: EinvoiceQrData; warnings: QrWarning[] } | null {
   const warnings: QrWarning[] = [];
   const gstin = (v: unknown, w: QrWarning): string => {
     const g = cleanText(v, 20).toUpperCase().replace(/\s+/g, '');
@@ -118,8 +124,105 @@ export function decodeEinvoiceQr(text: unknown): QrDecodeResult {
   if (!irn) warnings.push('irn');
   const irnDate = qrDay(data.IrnDt);
 
-  if (!sellerGstin && !docNo && !irn) return { ok: false, error: 'missing' };
-  return { ok: true, data: { sellerGstin, buyerGstin, docNo, docType, docDate, total, itemCount, mainHsn, irn, irnDate }, warnings };
+  if (!sellerGstin && !docNo && !irn) return null;
+  return { data: { sellerGstin, buyerGstin, docNo, docType, docDate, total, itemCount, mainHsn, irn, irnDate }, warnings };
+}
+
+/* ── 8.46: the full e-invoice JSON (INV-01 schema, or the IRP's signed invoice) — lines and GST split ── */
+
+/** Largest e-invoice JSON accepted (the IRP allows 1,000 lines). */
+export const MAX_JSON_TEXT = 512 * 1024;
+
+export interface EinvoiceJsonLine {
+  name: string;
+  hsn: string;
+  qty: number;
+  unit: string;
+  /** Taxable value of the line (AssAmt). */
+  taxable: number;
+  /** GST rate %. */
+  rate: number;
+  cess: number;
+}
+
+export interface EinvoiceJsonData {
+  qr: EinvoiceQrData;
+  sellerName: string;
+  /** Place of supply state code (BuyerDtls.Pos), '' when absent. */
+  pos: string;
+  lines: EinvoiceJsonLine[];
+  cess: number;
+}
+
+export type JsonDecodeResult =
+  | { ok: true; data: EinvoiceJsonData; warnings: QrWarning[] }
+  | { ok: false; error: 'empty' | 'tooLong' | 'unreadable' | 'missing' | 'noItems' };
+
+const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+const amt = (v: unknown): number => {
+  const n = Number(scalar(v));
+  return Number.isFinite(n) && n >= 0 && n < MAX_VALUE ? Math.round(n * 100) / 100 : 0;
+};
+
+/** The invoice object inside pasted text: a JSON object / array, `{ data }`, the IRP's `SignedInvoice` or a signed JWT. */
+function invoiceObject(text: string, depth = 0): Record<string, unknown> | null {
+  let v: unknown;
+  try {
+    if (/^[[{]/.test(text)) v = JSON.parse(text);
+    else {
+      const parts = text.split('.');
+      if (parts.length !== 3) return null;
+      v = obj(JSON.parse(base64UrlToText(parts[1]))).data;
+    }
+    if (typeof v === 'string') v = JSON.parse(v);
+  } catch {
+    return null;
+  }
+  if (Array.isArray(v)) v = v[0];
+  const o = obj(v);
+  if (Array.isArray(o.ItemList)) return o;
+  if (depth < 2 && typeof o.SignedInvoice === 'string') {
+    const inner = invoiceObject(o.SignedInvoice.trim(), depth + 1);
+    return inner && { ...inner, Irn: inner.Irn ?? o.Irn, AckDt: inner.AckDt ?? o.AckDt };
+  }
+  if (depth < 2 && o.data !== undefined) return invoiceObject(typeof o.data === 'string' ? o.data.trim() : JSON.stringify(o.data), depth + 1);
+  return null;
+}
+
+/** Decode a supplier's full e-invoice JSON: the QR fields plus every line with its taxable value, GST rate and cess. Never throws. */
+export function decodeEinvoiceJson(text: unknown): JsonDecodeResult {
+  const raw = typeof text === 'string' ? text.trim() : '';
+  if (!raw) return { ok: false, error: 'empty' };
+  if (raw.length > MAX_JSON_TEXT) return { ok: false, error: 'tooLong' };
+  const inv = invoiceObject(raw);
+  if (!inv) return { ok: false, error: 'unreadable' };
+  const doc = obj(inv.DocDtls), seller = obj(inv.SellerDtls), buyer = obj(inv.BuyerDtls), val = obj(inv.ValDtls);
+  const items = (inv.ItemList as unknown[]).slice(0, 1000).map(obj);
+  if (!items.length) return { ok: false, error: 'noItems' };
+  const fields = readQrFields({
+    SellerGstin: seller.Gstin, BuyerGstin: buyer.Gstin, DocNo: doc.No, DocTyp: doc.Typ, DocDt: doc.Dt,
+    TotInvVal: val.TotInvVal, ItemCnt: items.length, MainHsnCode: items[0].HsnCd, Irn: inv.Irn, IrnDt: inv.AckDt,
+  });
+  if (!fields) return { ok: false, error: 'missing' };
+  const lines = items.map((it, i): EinvoiceJsonLine => {
+    const qty = amt(it.Qty);
+    const rate = Number(scalar(it.GstRt));
+    return {
+      name: cleanText(it.PrdDesc, 120) || `Item ${i + 1}`,
+      hsn: cleanText(it.HsnCd, 8).replace(/\D/g, ''),
+      qty: qty > 0 ? qty : 1,
+      unit: cleanText(it.Unit, 8).toUpperCase() || 'NOS',
+      taxable: it.AssAmt !== undefined ? amt(it.AssAmt) : Math.max(amt(it.TotAmt) - amt(it.Discount), 0),
+      rate: Number.isFinite(rate) && rate >= 0 && rate <= 40 ? rate : 0,
+      cess: Math.round((amt(it.CesAmt) + amt(it.CesNonAdvlAmt) + amt(it.StateCesAmt)) * 100) / 100,
+    };
+  });
+  const pos = cleanText(buyer.Pos, 2);
+  return {
+    ok: true,
+    data: { qr: fields.data, sellerName: cleanText(seller.LglNm ?? seller.TrdNm, 100), pos: /^\d{2}$/.test(pos) ? pos : '', lines, cess: Math.round(lines.reduce((t, l) => t + l.cess, 0) * 100) / 100 },
+    warnings: fields.warnings,
+  };
 }
 
 /** Test / fixture helper: build an (unsigned) token the way the IRP lays it out. */
