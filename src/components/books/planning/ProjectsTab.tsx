@@ -47,6 +47,8 @@ import { peekTable } from '../../../lib/storage';
 const ProjectMaterialsRow = lazy(() => import('../../production/ProjectMaterialsRow'));
 // R5-B6: memo row "material consumed at works sites" from stock journals tagged with a cost centre (lazy).
 const SiteMaterialsRow = lazy(() => import('../../works/SiteMaterialsRow'));
+// 7.167: memo rows "stock at the centre's godowns" (start / end) once a godown carries a cost centre (lazy).
+const CostCentreStockRow = lazy(() => import('./CostCentreStockRow'));
 
 const SECTION_KEY = { income: 'secIncome', direct: 'secDirect', indirect: 'secIndirect' } as const;
 const KIND_KEY = { project: 'kindProject', department: 'kindDepartment', branch: 'kindBranch', fund: 'kindFund' } as const;
@@ -224,6 +226,9 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
                     )}
                     {peekTable<{ cost_centre_id?: string }>('stock_journals').some((j) => j?.cost_centre_id) && (
                       <Suspense fallback={null}><SiteMaterialsRow columns={pnl.columns} period={period} cellClass={styles.sticky} /></Suspense>
+                    )}
+                    {peekTable<{ cost_centre_id?: string }>('godowns').some((g) => g?.cost_centre_id) && (
+                      <Suspense fallback={null}><CostCentreStockRow columns={pnl.columns} centres={centres} period={period} cellClass={styles.sticky} /></Suspense>
                     )}
                   </tbody>
                 </table>

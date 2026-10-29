@@ -185,6 +185,16 @@ export interface PhysicalStockLine {
   unit?: string;
   unit_factor?: number;
   counted_typed?: number;
+  /**
+   * Additive (7.167): serial count of a serial-tracked item. `serials` = the serials found (`counted` = their number);
+   * `serials_short` = book serials not found (posted as a shortage), `serials_excess` = serials found that the books do
+   * not hold there (posted as an excess under those serials). A line without a godown counts every godown:
+   * `serials_short_godowns` (index-aligned) names the godown each missing serial was in, so it leaves from there.
+   */
+  serials?: string[];
+  serials_short?: string[];
+  serials_short_godowns?: string[];
+  serials_excess?: string[];
 }
 
 /** Physical Stock voucher (Tally Ctrl+F7). Table `physical_stock`. */

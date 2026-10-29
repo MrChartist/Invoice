@@ -9,7 +9,10 @@ import type { MfgContext } from '../manufacturing/context';
 import type { ProductionPlanLine } from '../../types/manufacturing';
 import { computeStock } from '../../lib/inventory';
 import { bomsDb } from '../../lib/manufacturing';
-import { datedSources, runDatedMrp } from '../../lib/mfg/mf-mrp-dated';
+import { datedSources, openPlanDemand, runDatedMrp } from '../../lib/mfg/mf-mrp-dated';
+import { productionPlansDb } from '../../lib/mrp';
+import { peekTable } from '../../lib/storage';
+import type { ProductionOrder } from '../../types/production-r4';
 import { makeDaysOf } from '../../lib/mfg/mf-routings';
 import { num } from '../../lib/invoice-calc';
 import { todayInput } from '../../lib/utils';
@@ -18,15 +21,17 @@ import controls from '../../styles/controls.module.css';
 import { F, Grid, Sel } from './floor-ui';
 import { fmt, row } from './floor-util';
 
-export default function DatedPlanView({ ctx, lines, due }: { ctx: MfgContext; lines: readonly ProductionPlanLine[]; due?: string }) {
+export default function DatedPlanView({ ctx, lines, due, planId }: { ctx: MfgContext; lines: readonly ProductionPlanLine[]; due?: string; planId?: string }) {
   const [by, setBy] = useState<'day' | 'week'>('week');
   const today = todayInput();
   const rows = useMemo(() => {
     const src = datedSources(ctx.items, today);
     const plan = lines.filter((l) => l.item_id && num(l.qty) > 0).map((l) => ({ item_id: l.item_id, date: due || today, qty: num(l.qty), source: 'Plan' }));
     const stock = new Map(computeStock(ctx.inputs).map((p) => [p.item.id, p.qty]));
-    return runDatedMrp({ items: ctx.items, boms: bomsDb.all(), stock, demand: [...src.demand, ...plan], supply: src.supply, start: today, by, count: by === 'week' ? 7 : 14, makeDays: (id) => makeDaysOf(id) });
-  }, [ctx.items, ctx.inputs, lines, due, today, by]);
+    // 7.167: the other open plans are netted first (less what they already put on released orders).
+    const others = openPlanDemand(productionPlansDb.all(), peekTable<ProductionOrder>('production_orders'), planId);
+    return runDatedMrp({ items: ctx.items, boms: bomsDb.all(), stock, demand: [...src.demand, ...others, ...plan], supply: src.supply, start: today, by, count: by === 'week' ? 7 : 14, makeDays: (id) => makeDaysOf(id) });
+  }, [ctx.items, ctx.inputs, lines, due, today, by, planId]);
   const keys = rows[0]?.buckets.map((b) => b.key) ?? [];
   return (
     <section data-mf-dated>

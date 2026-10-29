@@ -98,6 +98,9 @@ export const s7T = defineArea({
   // physical stock / alternate units
   unit: 'Unit',
   inBase: '= {qty} {unit}',
+  serialsFound: 'Serials found',
+  missingSerials: 'Missing: {list}',
+  extraSerials: 'Found, not in the books: {list}',
   // group / category filters
   groupFilter: 'Stock group',
   allGroups: 'All groups',
@@ -192,6 +195,9 @@ export const s7T = defineArea({
   itc04JsonNote: 'ITC-04 JSON — प्रारूप असत्यापित (GST पोर्टल / ऑफ़लाइन टूल से जाँचा नहीं गया); अपलोड से पहले अपने CA से पुष्टि करें। संदर्भ के लिए CSV ही मान्य है।',
   unit: 'इकाई',
   inBase: '= {qty} {unit}',
+  serialsFound: 'मिले सीरियल',
+  missingSerials: 'गायब: {list}',
+  extraSerials: 'मिले, पर खातों में नहीं: {list}',
   groupFilter: 'स्टॉक समूह',
   allGroups: 'सभी समूह',
   primary: 'प्राथमिक (कोई समूह नहीं)',

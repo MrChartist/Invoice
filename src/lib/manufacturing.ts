@@ -26,7 +26,7 @@ import {
   VOUCHER_TABLES, computeStock, computeStockDetailed, stockVoucherInputs,
   type StockInputs, type StockItem, type StockVoucherInput, type VoucherCosting,
 } from './inventory';
-import { computeTracking, fefoAllocate, type TrackingMap } from './stock-tracking';
+import { computeTracking, fefoAllocate, type ItemTracking, type TrackingMap } from './stock-tracking';
 import { generateId, getTable, setTable } from './storage';
 import { requireAccess } from './access';
 import { assertUnlocked } from './period-lock';
@@ -299,6 +299,15 @@ export interface PhysicalDraftLine {
   counted: number;
   unit?: string;
   unit_factor?: number;
+  /** 7.167: serials found, for a serial-tracked item (the count is their number). */
+  serials?: string[];
+}
+
+const skey = (s: string) => s.trim().toUpperCase();
+/** Trimmed serials of a draft line, first spelling of each kept. */
+export function countedSerials(l: Pick<PhysicalDraftLine, 'serials'>): string[] {
+  const seen = new Set<string>();
+  return (l.serials ?? []).map((x) => String(x ?? '').trim()).filter((x) => x && !seen.has(skey(x)) && !!seen.add(skey(x)));
 }
 
 /**
@@ -310,8 +319,10 @@ export function physicalLines(drafts: readonly PhysicalDraftLine[], date: string
   const base = { ...inputs, asOf: date || undefined, vouchers: (inputs.vouchers ?? []).filter((v) => v.id !== excludeId) };
   const tracking = computeTracking(base);
   const positions = new Map(computeStock(base).map((p) => [p.item.id, p]));
+  const serialItems = new Set(inputs.items.filter((i) => i.track_stock && i.track_serials).map((i) => i.id));
   return drafts.filter((d) => d.item_id).map((d) => {
     const t = tracking.get(d.item_id);
+    if (serialItems.has(d.item_id)) return serialCountLine(d, t, positions.get(d.item_id)?.avgCost ?? 0);
     const batch = d.batch_no?.trim() ?? '';
     let book = 0;
     if (t) {
@@ -333,6 +344,32 @@ export function physicalLines(drafts: readonly PhysicalDraftLine[], date: string
   });
 }
 
+/**
+ * 7.167: a serial count. Book = serials in stock at the end of the day in the line's godown (every godown when none);
+ * shortages are the book serials not found (with the godown each was in), excesses the serials found that the books do
+ * not hold there. Base unit only (one serial per unit).
+ */
+function serialCountLine(d: PhysicalDraftLine, t: ItemTracking | undefined, rate: number): PhysicalStockLine {
+  const found = countedSerials(d);
+  const inStock = (t?.serials ?? []).filter((s) => s.inStock && (!d.godown_id || (s.godown || MAIN_GODOWN_ID) === d.godown_id));
+  const have = new Set(found.map(skey));
+  const book = new Set(inStock.map((s) => skey(s.serial)));
+  const short = inStock.filter((s) => !have.has(skey(s.serial))).sort((a, b) => a.serial.localeCompare(b.serial, undefined, { numeric: true }));
+  const excess = found.filter((s) => !book.has(skey(s)));
+  return {
+    id: d.id, item_id: d.item_id, ...(d.godown_id ? { godown_id: d.godown_id } : {}),
+    counted: found.length, book_qty: inStock.length, diff: found.length - inStock.length, rate: round2(rate),
+    serials: found, serials_short: short.map((s) => s.serial), serials_excess: excess,
+    ...(!d.godown_id && short.length ? { serials_short_godowns: short.map((s) => s.godown || MAIN_GODOWN_ID) } : {}),
+  };
+}
+
+/** Units short / in excess on a line: a serial count moves its missing and extra serials even when they net to nil. */
+export function physicalMoves(l: PhysicalStockLine): { short: number; excess: number } {
+  if (l.serials_short || l.serials_excess) return { short: l.serials_short?.length ?? 0, excess: l.serials_excess?.length ?? 0 };
+  return { short: l.diff < -EPS ? -l.diff : 0, excess: l.diff > EPS ? l.diff : 0 };
+}
+
 export interface PhysicalSummary {
   shortageQty: number;
   shortageValue: number;
@@ -343,14 +380,11 @@ export interface PhysicalSummary {
 export function physicalSummary(lines: readonly PhysicalStockLine[]): PhysicalSummary {
   const s = { shortageQty: 0, shortageValue: 0, excessQty: 0, excessValue: 0 };
   for (const l of lines) {
-    const v = Math.abs(num(l.diff)) * num(l.rate);
-    if (l.diff < -EPS) {
-      s.shortageQty += -l.diff;
-      s.shortageValue += v;
-    } else if (l.diff > EPS) {
-      s.excessQty += l.diff;
-      s.excessValue += v;
-    }
+    const m = physicalMoves(l);
+    s.shortageQty += m.short;
+    s.shortageValue += m.short * num(l.rate);
+    s.excessQty += m.excess;
+    s.excessValue += m.excess * num(l.rate);
   }
   return { shortageQty: roundQty(s.shortageQty), shortageValue: round2(s.shortageValue), excessQty: roundQty(s.excessQty), excessValue: round2(s.excessValue) };
 }
@@ -360,7 +394,12 @@ export function physicalDrift(v: PhysicalStockVoucher, inputs: StockInputs): { l
   const now = physicalLines(v.lines.map((l) => ({ ...l, counted: l.counted_typed ?? l.counted })), v.date, inputs, v.id);
   return v.lines
     .map((line, i) => ({ line, bookNow: now[i]?.book_qty ?? 0 }))
-    .filter((r) => Math.abs(r.bookNow - r.line.book_qty) > EPS);
+    .filter((r, i) => Math.abs(r.bookNow - r.line.book_qty) > EPS || serialDrift(r.line, now[i]));
+}
+
+function serialDrift(a: PhysicalStockLine, b: PhysicalStockLine | undefined): boolean {
+  const k = (l?: string[]) => (l ?? []).map(skey).sort().join('|');
+  return !!(a.serials_short || a.serials_excess) && (k(a.serials_short) !== k(b?.serials_short) || k(a.serials_excess) !== k(b?.serials_excess));
 }
 
 export function validatePhysical(v: { date: string; lines: readonly PhysicalDraftLine[] }, items: readonly StockItem[]): string {
@@ -372,7 +411,23 @@ export function validatePhysical(v: { date: string; lines: readonly PhysicalDraf
   for (const l of lines) {
     const item = trackedItem(byId, l.item_id);
     if (!item) return 'Choose a stock item that tracks stock.';
-    if (item.track_serials) return `${item.name} tracks serial numbers — count serials with a stock adjustment.`;
+    if (item.track_serials) {
+      // 7.167: serial items are counted by serial, in the base unit, one line per godown.
+      if (item.track_batches) return `${item.name} tracks batches and serials — count it with a stock adjustment.`;
+      if (lineFactor(l) !== 1) return `${item.name}: count serials in ${item.unit || 'the base unit'}.`;
+      const list = (l.serials ?? []).map((x) => String(x ?? '').trim()).filter(Boolean);
+      const dup = list.find((x, i) => list.findIndex((y) => skey(y) === skey(x)) !== i);
+      if (dup) return `Serial ${dup} is listed twice.`;
+      const k = `${l.item_id}|${l.godown_id ?? ''}`;
+      if (seen.has(k)) return `${item.name} is counted twice for the same godown.`;
+      seen.add(k);
+      for (const x of list) {
+        const sk = `${l.item_id}|#${skey(x)}`;
+        if (seen.has(sk)) return `Serial ${x} is counted on two lines.`;
+        seen.add(sk);
+      }
+      continue;
+    }
     if (num(l.counted) < 0) return `${item.name}: the count cannot be negative.`;
     const k = `${l.item_id}|${l.godown_id ?? ''}|${(l.batch_no ?? '').toUpperCase()}`;
     if (seen.has(k)) return `${item.name} is counted twice for the same godown / batch.`;
@@ -389,11 +444,24 @@ const now = () => new Date().toISOString();
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
 /** 7S: serial lines checked against live stock on the voucher date (its saved copy left out); throws the first issue. */
-function assertSerials(inputs: StockInputs, ownId: string | undefined, date: string, consume: readonly SerialLine[], produce: readonly SerialLine[]): void {
+function assertSerials(inputs: StockInputs, ownId: string | undefined, date: string, consume: readonly SerialLine[], produce: readonly SerialLine[], multiGodown = true): void {
   if (!touchesSerials([...consume, ...produce], inputs.items)) return;
   const others = { ...inputs, vouchers: (inputs.vouchers ?? []).filter((v) => v.id !== ownId) };
-  const issues = voucherSerialIssues({ consume, produce, day: date, input: others, multiGodown: true });
+  const issues = voucherSerialIssues({ consume, produce, day: date, input: others, multiGodown });
   if (issues.length) throw new Error(issues[0]);
+}
+/**
+ * 7.167: a serial count's moves checked like any voucher — a missing serial must not be needed by a later entry (sold
+ * or moved after the count), a serial found beyond the books must not be in stock elsewhere (move it by transfer).
+ */
+function assertSerialCount(inputs: StockInputs, ownId: string | undefined, date: string, lines: readonly PhysicalStockLine[]): void {
+  const counts = lines.filter((l) => l.serials_short || l.serials_excess);
+  if (!counts.length) return;
+  const out = (g: boolean) => counts.filter((l) => !!l.godown_id === g && l.serials_short?.length)
+    .map((l) => ({ item_id: l.item_id, qty: l.serials_short!.length, serials: l.serials_short, godown_id: l.godown_id }));
+  const excess = counts.filter((l) => l.serials_excess?.length).map((l) => ({ item_id: l.item_id, qty: l.serials_excess!.length, serials: l.serials_excess }));
+  assertSerials(inputs, ownId, date, out(true), excess);
+  assertSerials(inputs, ownId, date, out(false), [], false);
 }
 const lockOf = (r: { id: string; date: string; number: string }) => ({ id: r.id, issue_date: r.date, invoice_number: r.number });
 const tag = (state: string) => (state === 'overridden' ? ' (period lock overridden)' : '');
@@ -582,6 +650,7 @@ export const physicalStockDb = {
     const err = validatePhysical(input, items);
     if (err) throw new Error(err);
     const lines = physicalLines(input.lines, input.date, inputs, input.id);
+    assertSerialCount(inputs, input.id, input.date, lines);
     const s = physicalSummary(lines);
     return saveVoucher<PhysicalStockVoucher>(PHYSICAL_TABLE, PHYSICAL_PREFIX, 'physical_stock', 'Physical stock', { ...input, lines },
       () => `${plural(lines.length, 'item')} counted, shortage ${s.shortageQty} (₹${s.shortageValue}), excess ${s.excessQty} (₹${s.excessValue})`);

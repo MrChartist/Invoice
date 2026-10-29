@@ -268,7 +268,7 @@ export interface StockVoucherInput {
   type: 'manufacturing' | 'stock_journal' | 'physical';
   consume: VoucherStockLine[];
   produce: VoucherOutputLine[];
-  adjust?: { item_id: string; qty: number; godown_id?: string; batch_no?: string; rate?: number }[];
+  adjust?: { item_id: string; qty: number; godown_id?: string; batch_no?: string; rate?: number; serials?: string[] }[];
   extraAmount?: number;
   extraPct?: number;
 }
@@ -664,6 +664,7 @@ function pushVoucherEvents(vouchers: readonly StockVoucherInput[], byId: Map<str
       push(a.item_id, {
         ...base, kind: 'adjustment', qty: q, rank: 4, particulars: `${label} (${q > 0 ? 'excess' : 'shortage'})`,
         rate: q > 0 && num(a.rate) > 0 ? num(a.rate) : undefined, godown: a.godown_id, batch: a.batch_no || undefined,
+        serials: cleanSerials(a.serials), // 7.167: serial counts
       });
     }
   }
@@ -1222,6 +1223,23 @@ function baseLine<T extends { qty: number; rate?: number; unit_factor?: number }
   return { ...l, qty: num(l.qty) * f, ...(l.rate !== undefined ? { rate: num(l.rate) / f } : {}) };
 }
 
+/**
+ * 7.167: a serial count posts its missing serials as shortages (from the godown each one was in) and the serials found
+ * beyond the books as one excess — so a swapped serial moves even when the count equals the book quantity.
+ */
+function serialAdjust(l: PhysicalStockVoucher['lines'][number]): NonNullable<StockVoucherInput['adjust']> {
+  const out: NonNullable<StockVoucherInput['adjust']> = [];
+  const short = new Map<string, string[]>();
+  (l.serials_short ?? []).forEach((s, i) => {
+    const g = l.godown_id || l.serials_short_godowns?.[i] || '';
+    short.set(g, [...(short.get(g) ?? []), s]);
+  });
+  for (const [g, list] of short) out.push({ item_id: l.item_id, qty: -list.length, ...(g ? { godown_id: g } : {}), rate: l.rate, serials: list });
+  const ex = l.serials_excess ?? [];
+  if (ex.length) out.push({ item_id: l.item_id, qty: ex.length, godown_id: l.godown_id, rate: l.rate, serials: ex });
+  return out;
+}
+
 /** Engine inputs for the stored vouchers (pure). The main finished line of a Manufacturing Journal comes first. */
 export function stockVoucherInputs(
   mfg: readonly ManufacturingVoucher[], journals: readonly StockJournal[] = [], physical: readonly PhysicalStockVoucher[] = [],
@@ -1247,7 +1265,7 @@ export function stockVoucherInputs(
     if (!p?.id) continue;
     out.push({
       id: p.id, number: p.number ?? '', date: p.date, type: 'physical', consume: [], produce: [],
-      adjust: (p.lines ?? []).map((l) => ({ item_id: l.item_id, qty: num(l.diff), godown_id: l.godown_id, batch_no: l.batch_no, rate: l.rate })),
+      adjust: (p.lines ?? []).flatMap((l) => (l.serials_short || l.serials_excess ? serialAdjust(l) : [{ item_id: l.item_id, qty: num(l.diff), godown_id: l.godown_id, batch_no: l.batch_no, rate: l.rate }])),
     });
   }
   return out;
