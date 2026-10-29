@@ -10,6 +10,7 @@ import type { ReportPrefs } from '../../../lib/report-prefs';
 import type { ColumnMode } from '../../../lib/ledger';
 import { reportsT } from '../../../i18n/areas/reports-engine';
 import { useT } from '../../../i18n';
+import { useReportKeys } from '../../../lib/keys/report-keys';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './ledger.module.css';
@@ -52,13 +53,22 @@ export function ReportOptions({
     return () => window.removeEventListener('keydown', onKey, true);
   }, [prefs.detailed, onChange, detailedToggle, options.length]);
 
+  // R20-C (Tally keys): Alt+F5 = Alt+F1; Alt+N picks the columns, Alt+C adds the next column set, Alt+D removes them.
+  const modes: ColumnMode[] = ['none', 'previous', 'monthly', 'quarterly'];
+  const step = modes[Math.min(modes.indexOf(prefs.columns) + 1, modes.length - 1)];
+  useReportKeys('report', () => bar.current, {
+    'detail.alt': detailedToggle && (() => onChange({ detailed: !prefs.detailed })),
+    autoCols: columns && (() => document.getElementById(`${uid}-cols`)?.focus()),
+    addCol: columns && (() => onChange({ columns: step })),
+    delCol: columns && (() => (prefs.columns === 'none' ? false : onChange({ columns: 'none' }))),
+  });
+
   const labels: Record<OptionKey, string> = {
     showZero: reportsT('optZero'),
     showOpening: reportsT('optOpening'),
     showTransactions: reportsT('optTransactions'),
     showNarration: reportsT('optNarration'),
   };
-  const modes: ColumnMode[] = ['none', 'previous', 'monthly', 'quarterly'];
   const modeLabel: Record<ColumnMode, string> = {
     none: reportsT('colNone'),
     previous: reportsT('colPrevious'),
@@ -69,7 +79,7 @@ export function ReportOptions({
   return (
     <div ref={bar} className={`${books.toolbarGroup} no-print`}>
       {detailedToggle && (
-        <button type="button" className={controls.btnOutline} aria-pressed={prefs.detailed} onClick={() => onChange({ detailed: !prefs.detailed })} title="Alt+F1">
+        <button type="button" className={controls.btnOutline} aria-pressed={prefs.detailed} onClick={() => onChange({ detailed: !prefs.detailed })} title="Alt+F1" data-key-row="detail">
           <ListTree size={16} /> {prefs.detailed ? reportsT('condensed') : reportsT('detailed')}
         </button>
       )}

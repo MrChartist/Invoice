@@ -31,6 +31,8 @@ export interface SavedView {
   /** F12 options (incl. columns) of every report, by report id, as they were when saved. */
   prefs?: Record<string, ReportPrefs>;
   created_at: string;
+  /** R20-C (Ctrl+H "Open by default"): opened when the screen + tab is visited without a view. One per screen + tab. */
+  default?: boolean;
 }
 
 const PRESETS: readonly PeriodPreset[] = ['this_month', 'last_month', 'this_quarter', 'this_fy', 'last_fy', 'mtd', 'qtd', 'ytd', 'custom'];
@@ -69,6 +71,7 @@ export function normalizeView(raw: unknown): SavedView | null {
   if (!name || !route) return null;
   const preset = PRESETS.includes(o.preset as PeriodPreset) ? (o.preset as PeriodPreset) : 'this_fy';
   const v: SavedView = { id: typeof o.id === 'string' && o.id ? o.id : `v${Date.now()}`, name, route, tab: typeof o.tab === 'string' ? o.tab.slice(0, 40) : '', preset, created_at: typeof o.created_at === 'string' ? o.created_at : '' };
+  if (o.default === true) v.default = true;
   const p = o.period as Record<string, unknown> | undefined;
   if (preset === 'custom') {
     if (!p || typeof p.start !== 'string' || typeof p.end !== 'string' || !DAY.test(p.start) || !DAY.test(p.end) || p.start > p.end) v.preset = 'this_fy';
@@ -101,6 +104,19 @@ export function deleteView(id: string): SavedView[] {
   writeJson(REPORT_VIEWS_KEY, next);
   return next;
 }
+
+/** R20-C: make a view the default of its screen + tab (the others of that screen + tab lose the flag); again = off. */
+export function setDefaultView(id: string): SavedView[] {
+  const all = loadViews();
+  const v = all.find((x) => x.id === id);
+  const on = !!v && !v.default;
+  const next = all.map((x) => (x.id === id ? { ...x, default: on || undefined } : v && on && x.route === v.route && x.tab === v.tab ? { ...x, default: undefined } : x));
+  writeJson(REPORT_VIEWS_KEY, next);
+  return next;
+}
+
+/** The view opened by default on this screen + tab, if any. */
+export const defaultView = (route: string, tab: string): SavedView | undefined => loadViews().find((v) => v.default && v.route === route && v.tab === tab);
 
 /** Link that opens a view (`?view=<id>` is read by the screen's views bar). */
 export function viewHref(v: SavedView): string {

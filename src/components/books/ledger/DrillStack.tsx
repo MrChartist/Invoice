@@ -9,13 +9,38 @@
  *   const drill = useDrill();  drill.push({ key: 'ledger:bank', title: 'Ledger: Bank', render: () => <View /> });
  *   const nav = useDrillRows(rows.length, (i) => open(rows[i]));  <tbody id={nav.bodyId}>{rows.map((r, i) => <tr {...nav.row(i)} />)}
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { reportsT } from '../../../i18n/areas/reports-engine';
 import { useT } from '../../../i18n';
 import styles from './ledger.module.css';
 
+import { liveReport, subscribeLive } from '../../../lib/keys/report-keys';
 import { DrillContext, dialogOpen, typing, type DrillApi, type DrillEntry as Entry, type DrillFrame } from './drill-hooks';
+
+// R20-C: the "what you see" strip and the report sheets (lazy; only after a report key was used).
+const ReportPanel = lazy(() => import('../../keys/ReportSheets'));
+
+/**
+ * R20-C: where a report's filter / ticks / hidden-rows strip shows — under the report it belongs to (the live report's
+ * table sits inside this strip's parent). DrillStack mounts one; the Day Book and the Gateway viewer mount their own.
+ */
+export function ReportStrip() {
+  const live = useSyncExternalStore(subscribeLive, liveReport);
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  const mark = useCallback((el: HTMLSpanElement | null) => setHost(el?.parentElement ?? null), []);
+  const t = live?.table();
+  return (
+    <>
+      <span hidden ref={mark} />
+      {live && t && host?.contains(t) && (
+        <Suspense fallback={null}>
+          <ReportPanel live={live} />
+        </Suspense>
+      )}
+    </>
+  );
+}
 
 export type { DrillApi, DrillFrame };
 
@@ -125,6 +150,7 @@ export function DrillStack({ rootTitle, resetKey, children }: { rootTitle: strin
       {/* The root stays mounted (hidden) so its own state survives a drill and an Esc. */}
       <div hidden={depth > 0}>{children}</div>
       {top && <div key={`${top.frame.key}-${depth}`}>{top.frame.render()}</div>}
+      <ReportStrip />
     </DrillContext.Provider>
   );
 }

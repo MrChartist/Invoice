@@ -15,7 +15,10 @@ export { NEVER_CLAIM, type NeverClaim } from './never-claim';
 /** The package whose merge makes a row live; `have` = existed before Round 20 (always live). */
 export type KeyPkg = 'have' | 'A' | 'B' | 'C' | 'D';
 /** Packages merged so far. B / C / D: add your letter here (one line) in your merge. */
-export const BUILT: ReadonlySet<KeyPkg> = new Set<KeyPkg>(['have', 'A']);
+export const BUILT: ReadonlySet<KeyPkg> = new Set<KeyPkg>(['have', 'A', 'C']);
+/** Rows of a built package held back until what they call lands (R20-C: report-row delete / cancel / duplicate wait
+ * for B's entry-actions.ts; Ctrl+B basis and Ctrl+M share were cut). Remove an id when its handler ships. */
+export const HELD: ReadonlySet<string> = new Set(['dup.row', 'delete.row', 'cancel.row', 'basis', 'share', 'share.alias']);
 
 /**
  * Where a key works, most specific first: a field (`field:*`, the focused element sits inside
@@ -300,7 +303,7 @@ export function normCombo(combo: string): string {
 /** The row's combo in a layout ('' = no key there). */
 export const comboFor = (row: KeyRow, layout: KeysLayout): string => normCombo(layout === 'erp9' && row.combo.erp9 !== undefined ? row.combo.erp9 : row.combo.prime);
 
-export const isBuilt = (row: KeyRow): boolean => BUILT.has(row.pkg);
+export const isBuilt = (row: KeyRow): boolean => BUILT.has(row.pkg) && !HELD.has(row.id);
 export const rowById = (id: string): KeyRow | undefined => KEY_ROWS.find((r) => r.id === id);
 
 /** Combos the stub claims in a layout: built global Tally rows the engine runs, never `ext` or browser-unsafe ones. */
