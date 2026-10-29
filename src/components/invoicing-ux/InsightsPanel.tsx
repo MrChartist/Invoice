@@ -1,11 +1,13 @@
-import { lazy, Suspense, useMemo } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TrendingUp } from 'lucide-react';
 import type { BooksData } from '../../lib/books';
 import { peekTable } from '../../lib/storage';
 import { localDb } from '../../lib/localDb';
 import { localDayOf } from '../../lib/dates';
-import { buildInsights, type Insight, type StockRow } from '../../lib/insights';
+import { branchInsightInput, buildInsights, type Insight, type StockRow } from '../../lib/insights';
+import { loadBranches, UNASSIGNED } from '../../lib/branch';
+import controls from '../../styles/controls.module.css';
 import { liveCostPurchases, liveUnitCosts } from '../../lib/margin';
 import { formatCurrency } from '../../lib/utils';
 import { useT } from '../../i18n';
@@ -49,6 +51,9 @@ function detail(i: Insight): string {
 /** 8.108 offline insights tile: deterministic cards from `insights.ts`, each drilling into its report. */
 export function InsightsPanel({ books, stock }: { books: BooksData; stock: StockRow[] }) {
   useT();
+  // PENDING 49 (8.111): insights per branch ('' = whole business; shown only when branches exist).
+  const branches = useMemo(() => loadBranches(), []);
+  const [branch, setBranch] = useState('');
   const cards = useMemo(() => {
     // PERF-2: shared, parsed-once rows; the insight builders only read them.
     // R6-C1: the engine's copies (landed-cost vouchers applied; totals / tax unchanged).
@@ -60,11 +65,20 @@ export function InsightsPanel({ books, stock }: { books: BooksData; stock: Stock
       costs = undefined;
     }
     const quiet = { clients: peekTable<Client>('clients') as Client[], settings: loadQuietSettings() }; // R3-B7
-    return buildInsights({ invoices: books.invoices, payments: books.transactions, purchases, vendors: books.vendors, costs, stock, quiet }, localDayOf(new Date()));
-  }, [books, stock]);
+    return buildInsights(branchInsightInput({ invoices: books.invoices, payments: books.transactions, purchases, vendors: books.vendors, costs, stock, quiet }, branch, branches), localDayOf(new Date()));
+  }, [books, stock, branch, branches]);
   return (
     <div className={surface.card} data-tile="insights">
-      <div className={surface.cardHead}><span className={surface.cardHeadIcon}><TrendingUp size={16} /> {uxT('inTitle')}</span></div>
+      <div className={surface.cardHead}>
+        <span className={surface.cardHeadIcon}><TrendingUp size={16} /> {uxT('inTitle')}</span>
+        {branches.length > 0 && (
+          <select className={controls.select} value={branch} onChange={(e) => setBranch(e.target.value)} aria-label={uxT('inBranch')} data-insight-branch>
+            <option value="">{uxT('inAllBranches')}</option>
+            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            <option value={UNASSIGNED}>{uxT('inNoBranch')}</option>
+          </select>
+        )}
+      </div>
       <div className={surface.cardBody}>
         <div className={ux.cards}>
           {cards.map((c) => (

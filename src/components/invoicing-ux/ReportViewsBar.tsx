@@ -55,12 +55,14 @@ export function ReportViewsBar({ current, onApply, initialViewId, openPacks, ini
       setMsg((err as Error).message);
     }
   };
-  const download = async () => {
+  const download = async (kind: 'zip' | 'pdf' = 'zip') => {
     setBusy(true);
     setMsg('');
     try {
-      const { buildPackZip } = await import('../../lib/report-pack');
-      const { name: file, blob } = await buildPackZip(month);
+      // PENDING 49: the same pack as one PDF (html-to-image + jspdf, lazy).
+      const { name: file, blob } = kind === 'pdf'
+        ? await (await import('../../lib/report-pack-pdf')).buildPackPdf(month)
+        : await (await import('../../lib/report-pack')).buildPackZip(month);
       downloadBlob(file, blob);
       if (month === previousMonth(localDayOf(new Date())) && sched.day) {
         const next = { ...sched, lastMonth: month };
@@ -102,8 +104,11 @@ export function ReportViewsBar({ current, onApply, initialViewId, openPacks, ini
               <span className={controls.label}>{uxT('rvMonth')}</span>
               <input type="month" className={controls.input} value={month} max={localDayOf(new Date()).slice(0, 7)} onChange={(e) => e.target.value && setMonth(e.target.value)} />
             </label>
-            <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} disabled={busy} onClick={download} data-pack-download>
+            <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} disabled={busy} onClick={() => void download()} data-pack-download>
               <Download size={14} /> {busy ? uxT('rvBuilding') : uxT('rvDownload')}
+            </button>
+            <button type="button" className={cn(controls.btnOutline, controls.btnSm)} disabled={busy} onClick={() => void download('pdf')} data-pack-pdf>
+              <Download size={14} /> {uxT('rvDownloadPdf')}
             </button>
             <label className={controls.field}>
               <span className={controls.label}>{uxT('rvSchedule')}</span>
