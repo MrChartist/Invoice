@@ -320,4 +320,11 @@ Enforcement (`src/lib/rights.ts`, tiny and in the shell; rules in the lazy `src/
 - Data layer: `localDb.invoices.save` (create / alter with the back-dated window and discount cap), `invoices.remove`
   (delete) and `payments.record` (create) call `checkDocRight`. The rules load as soon as a user with rights signs in;
   until they are in, a document write by that user is refused ("User rights are loading. Try again.") — fail closed.
-- Print / PDF buttons in the preview follow the print toggle.
+- Per-type rights for purchase bills and vouchers (PENDING 52, roadmap 8.130): `purchasesDb.save` / `remove`
+  (`bookRight('purchase', …)`) and `saveVoucher` / `deleteVoucher` (`voucherRight`) check the purchase / voucher
+  create / alter / delete toggles in the data layer, so every screen that writes them follows (bill form, Gateway,
+  bank rules, imports …), with a message naming the type ("Your user may not delete vouchers"). Vouchers are also held
+  to the back-dated window by their date; a supplier bill's date is not (it is the supplier's). A POS-only cashier is
+  exempt (refund vouchers and stock side effects at the counter), as in `rightsFilter`. Tests: `tests/pending-52.test.ts`.
+- Print / PDF buttons
+ in the preview follow the print toggle.

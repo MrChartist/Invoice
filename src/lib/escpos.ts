@@ -19,6 +19,11 @@
  *    printer is remembered for the tab; after a reload the browser asks once more. Classic (SPP-only)
  *    Bluetooth printers are not reachable from a browser: pair them with the OS and use `browser`.
  *
+ * PENDING 46 (7.158): optional UPI QR for the amount due (`GS ( k`, QR model 2) and a logo raster (`GS v 0`, the
+ * sender logo turned to black / white dots by the canvas in `pos-raw-print.ts`) in the serial / Bluetooth modes —
+ * both standard Epson ESC/POS commands, off by default per device. ₹ stays "Rs.": ESC/POS code pages differ by
+ * printer model and the common ones (PC437 / PC850 / PC858 …) have no rupee sign.
+ *
  * Pure above "Device".
  */
 
@@ -34,6 +39,9 @@ export interface PrinterPrefs {
   /** Send the drawer kick on cash bills (serial / Bluetooth modes). */
   drawer: boolean;
   baud: number;
+  /** PENDING 46: UPI QR for the amount due / the sender logo as a raster (serial / Bluetooth modes). */
+  qr?: boolean;
+  logo?: boolean;
 }
 
 export const POS_PRINTER_KEY = 'mrchartist_pos_printer';
@@ -132,13 +140,67 @@ const GS = 0x1d;
 /** ESC p m t1 t2 — pulse drawer pin 2 for 25×2 ms on, 250×2 ms off. */
 export const DRAWER_KICK = [ESC, 0x70, 0x00, 0x19, 0xfa] as const;
 
-/** ESC/POS bytes: initialise, the lines, feed, partial cut, optional drawer kick. */
-export function escposBytes(lines: readonly string[], opts: { drawer?: boolean; cut?: boolean } = {}): Uint8Array {
+/** Black / white dots of an image, row-major, 1 = black. */
+export interface MonoImage {
+  width: number;
+  height: number;
+  dots: Uint8Array;
+}
+
+/** RGBA pixels → dots: luminance below `threshold` is black; transparent pixels are paper. */
+export function toMono(rgba: ArrayLike<number>, width: number, height: number, threshold = 128): MonoImage {
+  const dots = new Uint8Array(width * height);
+  for (let i = 0; i < width * height; i++) {
+    const a = rgba[i * 4 + 3] / 255;
+    const lum = (0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2]) * a + 255 * (1 - a);
+    dots[i] = lum < threshold ? 1 : 0;
+  }
+  return { width, height, dots };
+}
+
+/** `GS v 0` raster bit image, centred (8 dots per byte, leftmost dot in the high bit). */
+export function rasterBytes(img: MonoImage): number[] {
+  const bpr = Math.ceil(img.width / 8);
+  const out = [ESC, 0x61, 0x01, GS, 0x76, 0x30, 0x00, bpr & 0xff, bpr >> 8, img.height & 0xff, img.height >> 8];
+  for (let y = 0; y < img.height; y++) {
+    for (let b = 0; b < bpr; b++) {
+      let byte = 0;
+      for (let bit = 0; bit < 8; bit++) {
+        const x = b * 8 + bit;
+        if (x < img.width && img.dots[y * img.width + x]) byte |= 0x80 >> bit;
+      }
+      out.push(byte);
+    }
+  }
+  out.push(0x0a, ESC, 0x61, 0x00);
+  return out;
+}
+
+/** `GS ( k` QR code, model 2, error correction M, centred. ASCII data up to 700 bytes; [] otherwise. */
+export function qrBytes(data: string, moduleSize = 6): number[] {
+  const bytes = Array.from(String(data ?? '')).map((c) => c.charCodeAt(0));
+  if (!bytes.length || bytes.length > 700 || bytes.some((b) => b < 0x20 || b > 0x7e)) return [];
+  const len = bytes.length + 3;
+  return [
+    ESC, 0x61, 0x01,
+    GS, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00, // fn 165: model 2
+    GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, Math.min(Math.max(Math.round(moduleSize), 1), 16), // fn 167: module size
+    GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x31, // fn 169: error correction M
+    GS, 0x28, 0x6b, len & 0xff, len >> 8, 0x31, 0x50, 0x30, ...bytes, // fn 180: store the data
+    GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30, // fn 181: print
+    0x0a, ESC, 0x61, 0x00,
+  ];
+}
+
+/** ESC/POS bytes: initialise, optional logo, the lines, optional QR, feed, partial cut, optional drawer kick. */
+export function escposBytes(lines: readonly string[], opts: { drawer?: boolean; cut?: boolean; logo?: MonoImage | null; qr?: string | null } = {}): Uint8Array {
   const out: number[] = [ESC, 0x40];
+  if (opts.logo && opts.logo.width > 0 && opts.logo.height > 0) out.push(...rasterBytes(opts.logo));
   for (const line of lines) {
     for (const ch of asciiOnly(line)) out.push(ch.charCodeAt(0));
     out.push(0x0a);
   }
+  if (opts.qr) out.push(...qrBytes(opts.qr));
   out.push(ESC, 0x64, 0x04); // feed 4 lines
   if (opts.cut !== false) out.push(GS, 0x56, 0x42, 0x00); // partial cut with feed
   if (opts.drawer) out.push(...DRAWER_KICK);
@@ -167,7 +229,10 @@ export function loadPrinterPrefs(): PrinterPrefs {
       width: raw.width === 58 ? 58 : 80,
       drawer: raw.drawer === true,
       baud: [9600, 19200, 38400, 57600, 115200].includes(Number(raw.baud)) ? Number(raw.baud) : 9600,
+      ...(raw.qr === true ? { qr: true } : {}),
+      ...(raw.logo === true ? { logo: true } : {}),
     };
+
   } catch {
     return { ...DEFAULT_PRINTER };
   }

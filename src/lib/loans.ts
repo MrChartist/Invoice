@@ -12,8 +12,11 @@
  *    through `saveVoucher`, so the period lock, roles and audit log apply like any voucher.
  *  - `loanStatement`: schedule vs paid, outstanding principal, interest paid to date.
  *
- * Interest certificates, moratoriums, prepayment re-schedules and floating-rate resets are not
- * modelled: record a prepayment as an extra principal payment and verify with your lender / CA.
+ * PENDING 52 (8.130): a prepayment (n = 0) may re-schedule the loan — `reschedule: 'emi'` keeps the tenure and
+ * lowers the EMI from the next instalment, `'tenure'` keeps the EMI and ends the loan sooner; without it the schedule
+ * is unchanged (as before). `interestCertificate`: interest and principal paid in an Indian FY from the recorded
+ * payments, opening / closing principal — the books' figures, to check against the lender's certificate.
+ * Moratoriums and floating-rate resets are not modelled; verify with your lender / CA.
  * Pure above "Storage".
  */
 import { round2 } from './invoice-calc';
@@ -37,6 +40,8 @@ export interface LoanPayment {
   interest: number;
   voucher_id: string;
   voucher_number: string;
+  /** Prepayment only (PENDING 52): re-schedule the later EMIs — lower EMI, or shorter tenure. */
+  reschedule?: 'emi' | 'tenure';
 }
 
 export interface BusinessLoan {
@@ -100,20 +105,34 @@ export function addMonths(date: string, k: number): string {
   return `${yy}-${String(mm + 1).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
 }
 
-/** The full reducing-balance schedule. The last EMI is adjusted so the closing balance is exactly 0. */
-export function emiSchedule(loan: Pick<BusinessLoan, 'principal' | 'rate' | 'tenure_months' | 'first_emi'>): ScheduleRow[] {
+/**
+ * The full reducing-balance schedule. The last EMI is adjusted so the closing balance is exactly 0. PENDING 52:
+ * re-scheduling prepayments (`payments` with n = 0 and `reschedule`) cut the opening of the first EMI dated after them.
+ */
+export function emiSchedule(loan: Pick<BusinessLoan, 'principal' | 'rate' | 'tenure_months' | 'first_emi'> & { payments?: readonly LoanPayment[] }): ScheduleRow[] {
   const n = Math.floor(Number(loan.tenure_months));
-  const emi = emiAmount(loan.principal, loan.rate, n);
+  let emi = emiAmount(loan.principal, loan.rate, n);
   if (!emi || !isoDay(loan.first_emi)) return [];
   const r = Number(loan.rate) / 12 / 100;
   const rows: ScheduleRow[] = [];
   let open = round2(Number(loan.principal));
+  const prepay = (loan.payments ?? []).filter((p) => p.n === 0 && p.reschedule && p.principal > 0).slice().sort((a, b) => a.date.localeCompare(b.date));
+  let next = 0;
   for (let k = 1; k <= n; k++) {
+    const date = addMonths(loan.first_emi, k - 1);
+    let mode: LoanPayment['reschedule'];
+    while (next < prepay.length && prepay[next].date < date) {
+      open = round2(Math.max(0, open - prepay[next].principal));
+      mode = mode === 'emi' ? 'emi' : prepay[next].reschedule;
+      next++;
+    }
+    if (open <= 0) break;
+    if (mode === 'emi') emi = emiAmount(open, loan.rate, n - k + 1);
     const interest = round2(open * (r > 0 ? r : 0));
     let principal = round2(emi - interest);
     if (k === n || principal > open) principal = open;
     const close = round2(open - principal);
-    rows.push({ n: k, date: addMonths(loan.first_emi, k - 1), opening: open, emi: round2(principal + interest), interest, principal, closing: close });
+    rows.push({ n: k, date, opening: open, emi: round2(principal + interest), interest, principal, closing: close });
     open = close;
     if (open <= 0) break;
   }
@@ -141,7 +160,8 @@ export function loanStatement(loan: BusinessLoan, today: string): LoanStatement 
   const unpaid = schedule.filter((r) => !paidNs.has(r.n));
   return {
     schedule,
-    emi: emiAmount(loan.principal, loan.rate, loan.tenure_months),
+    // PENDING 52: after a re-schedule the EMI is the next one's.
+    emi: unpaid[0]?.emi ?? emiAmount(loan.principal, loan.rate, loan.tenure_months),
     totalInterest: round2(schedule.reduce((s, r) => s + r.interest, 0)),
     paidPrincipal,
     paidInterest,
@@ -149,6 +169,32 @@ export function loanStatement(loan: BusinessLoan, today: string): LoanStatement 
     next: unpaid[0] ?? null,
     overdue: unpaid.filter((r) => r.date <= today),
   };
+}
+
+export interface InterestCertificate {
+  from: string;
+  to: string;
+  /** Principal outstanding on `from` (before the year's payments; 0 when disbursed in the year). */
+  opening: number;
+  disbursed: number;
+  principal: number;
+  interest: number;
+  closing: number;
+  payments: LoanPayment[];
+}
+
+/** PENDING 52: interest / principal paid in the Indian FY starting 1 April `fyStartYear`, from the recorded payments. */
+export function interestCertificate(loan: Pick<BusinessLoan, 'principal' | 'date' | 'payments'>, fyStartYear: number): InterestCertificate {
+  const from = `${fyStartYear}-04-01`;
+  const to = `${fyStartYear + 1}-03-31`;
+  const before = loan.payments.filter((p) => p.date < from);
+  const inYear = loan.payments.filter((p) => p.date >= from && p.date <= to).slice().sort((a, b) => a.date.localeCompare(b.date) || a.n - b.n);
+  const disbursedBefore = loan.date < from;
+  const disbursed = !disbursedBefore && loan.date <= to ? round2(loan.principal) : 0;
+  const opening = disbursedBefore ? round2(Math.max(0, loan.principal - before.reduce((s, p) => s + p.principal, 0))) : 0;
+  const principal = round2(inYear.reduce((s, p) => s + p.principal, 0));
+  const interest = round2(inYear.reduce((s, p) => s + p.interest, 0));
+  return { from, to, opening, disbursed, principal, interest, closing: round2(Math.max(0, opening + disbursed - principal)), payments: inYear };
 }
 
 /** Problems with a loan draft ([] = it may be saved). */
@@ -255,7 +301,7 @@ export function postDisbursement(loanId: string): BusinessLoan {
  * Pay EMI `n` (or a prepayment with n = 0 and `principal`): Payment voucher Dr Loan (principal) +
  * Dr Interest on loans (interest) | Cr Bank / Cash. Amounts default to the schedule row.
  */
-export function payEmi(loanId: string, n: number, opts: { date?: string; principal?: number; interest?: number } = {}): LoanPayment {
+export function payEmi(loanId: string, n: number, opts: { date?: string; principal?: number; interest?: number; reschedule?: LoanPayment['reschedule'] } = {}): LoanPayment {
   requireAccess('books.edit');
   const loan = loadLoans().find((l) => l.id === loanId);
   if (!loan) throw new LoanError('Loan not found.');
@@ -279,11 +325,12 @@ export function payEmi(loanId: string, n: number, opts: { date?: string; princip
     const v = saveVoucher({
       type: 'PAYMENT',
       date,
-      narration: `${n > 0 ? `EMI ${n}` : 'Prepayment'} on loan ${loan.number} (${loan.lender}): principal ${principal.toFixed(2)}, interest ${interest.toFixed(2)}`,
+      narration: `${n > 0 ? `EMI ${n}` : `Prepayment${opts.reschedule === 'emi' ? ' (EMI re-scheduled)' : opts.reschedule === 'tenure' ? ' (tenure re-scheduled)' : ''}`} on loan
+ ${loan.number} (${loan.lender}): principal ${principal.toFixed(2)}, interest ${interest.toFixed(2)}`,
       lines,
       voucher_class: 'Loan EMI',
     });
-    const pay: LoanPayment = { id: generateId(), n, date, principal, interest, voucher_id: v.id, voucher_number: v.number };
+    const pay: LoanPayment = { id: generateId(), n, date, principal, interest, voucher_id: v.id, voucher_number: v.number, ...(n === 0 && principal > 0 && (opts.reschedule === 'emi' || opts.reschedule === 'tenure') ? { reschedule: opts.reschedule } : {}) };
     const payments = [...loan.payments, pay];
     const closed = round2(loan.principal - payments.reduce((s, p) => s + p.principal, 0)) <= 0;
     update({ ...loan, account_id: account, payments, closed });

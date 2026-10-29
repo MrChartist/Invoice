@@ -155,7 +155,10 @@ export function cleanRights(raw: unknown): UserRights | undefined {
 
 /** The pure check behind `checkDocRight` (throws). `today` is injectable for tests. */
 export function enforceRights(rights: UserRights, kind: string, op: RightOp, date?: string, doc?: RightsDoc, today: string = localDayOf(new Date())): void {
-  if (!rightAllows(rights, docKindOf(kind), op)) {
+  const family = docKindOf(kind);
+  if (!rightAllows(rights, family, op)) {
+    // PENDING 52: purchase bills and vouchers name their own type.
+    if (family === 'purchase' || family === 'voucher') throw new RightsError(`Your user may not ${op === 'alter' ? 'change' : op} ${family === 'purchase' ? 'purchase bills' : 'vouchers'}. Ask the owner.`);
     throw new AccessDeniedError(op === 'delete' ? 'doc.deleteDraft' : op === 'alter' ? 'doc.edit' : 'doc.create', currentRole());
   }
   if (op !== 'create' && op !== 'alter') return;

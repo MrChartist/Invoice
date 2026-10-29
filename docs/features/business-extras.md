@@ -158,7 +158,13 @@ downloaded for sharing / hosting.
   `unsafe-inline`, no network, and the only script allowed is the exact constant whose hash is computed at export
   (`cataloguePolicy`, tested against node's SHA-256); item data travels in a non-executed JSON block with `<`, `>`, `&`
   escaped, and the script writes only `textContent` / `href`. Every value in the HTML is escaped.
-- **Script-free fallback**: "Catalogue without cart" exports under `script-src 'none'`; either file keeps an Order link
+- **Currency (PENDING 52, roadmap 8.130)**: the tile's catalogue tools take an optional currency code and a typed rate
+  (₹ per unit, no live rates). Every price and MRP is the rupee price ÷ the rate, shown as "USD 10.00"; the cart data
+  carries `cur`, so the inline script (constant, still hash-pinned) and `cartMessage(…, { currency })` total in that
+  currency; the footer states the rate. A blank / INR code or no rate keeps rupees (`catalogueCurrency`). Tests:
+  `tests/pending-52.test.ts`.
+- **Script-free fallback**:
+ "Catalogue without cart" exports under `script-src 'none'`; either file keeps an Order link
   per item and an "Order from this category" link (the category's items listed for the buyer to fill in quantities), so
   it works with JavaScript off.
 
@@ -207,11 +213,25 @@ receipt prints it. A % invoice discount blocks the offer. GST is on the value af
 goods follow Circular 92/11/2019-GST — **verify the treatment with your CA** (especially buy A get B where B has a
 higher GST rate than A).
 
+**Per-customer and combo offers (PENDING 46).** A bill-value scheme may carry `client_ids` (Offers tile → *Only for these
+customers*): it then applies only when the bill's client id is listed (a walk-in bill gets none). *Combo price* is a
+bill-value scheme with `combo {items[{item_id, item_name, qty}], price}` instead of slabs: every full set of its items on
+the bill (lines matched by name like schemes, after line discounts, free lines left out, the per-unit value averaged over
+the item's lines) costs the combo price, and the saving is the offer (`comboSaving`). The single best offer — slab or
+combo — applies; offers never stack, so the stored `offer` and the printed line stay one. Being `bill_value`, a combo never
+makes a free line and stays out of the scheme claims. Tests: `tests/pending-46.test.ts`.
+
 **ESC/POS.** POS header → *Printer* (per device, default **browser** print unchanged): *raw text receipt* (32 columns
 for 58 mm, 48 for 80 mm, monospaced, script-free print window) or *ESC/POS over Web Serial* (feature-detected; the
 user picks the port in the browser's chooser; `ESC @`, text, feed, partial cut; with "open the cash drawer" a cash bill
 adds `ESC p 0 25 250`). No network. In browser mode a drawer opens only through the printer driver's "open drawer on
-print" setting. A failed raw / serial print falls back to the browser print.
+print" setting. A failed raw / serial print falls back to the browser print. PENDING 46: in the serial / Bluetooth modes
+two device-local switches (`qr`, `logo` in `mrchartist_pos_printer`, off by default) add a **UPI QR for the amount still
+due** (`GS ( k` model 2, error correction M, `invoiceUpiLink` from the bill's sender snapshot; nothing when the bill is
+paid or the sender has no UPI id) after the lines, and the **sender logo** as a `GS v 0` raster before them (the canvas
+scales it to ≤ 256 dots on 58 mm / 384 on 80 mm, ≤ 160 high, threshold 128, transparent = paper; `toMono` /
+`rasterBytes`). ₹ still prints as "Rs.": ESC/POS code pages differ by printer model and the common ones have no rupee
+sign, so a code-page switch cannot be verified.
 
 **Pharma pack.** Pharma tile → switch on. Drug licence number(s) on the business profile (Settings), printed under the
 GSTIN (standard / GST / receipt layouts and the raw receipt). Schedule **H / H1 / X** per stock item (tile list).
@@ -230,12 +250,16 @@ the editor item picker and the POS; optional *block sale above batch MRP* (`bloc
 
 ## Not built / gaps
 
-- Commission: TDS 194H deduction, agent ledger with its own balance screen, commission on credit notes in receipt
-  basis (agent on POS bills: 8F).
-- Offers: per-customer / per-category offers, combo prices, offers in recurring runs, conversions and importers.
-- ESC/POS: no QR / logo raster, no character code pages beyond ASCII (₹ prints as "Rs."), no network printers.
-- Pharma: Schedule X separate register book format, narcotics (NDPS) records, prescription scan attachment link
+- Commission: agent ledger with its own balance screen, commission on credit notes in receipt basis (agent on POS
+  bills: 8F; TDS 194H on the posting: R8-B, opt-in on *Post payable journal*).
+- Offers: per-category offers, stacking of several offers, offers in recurring runs, conversions and importers
+  (per-customer offers and combo prices: PENDING 46).
+- ESC/POS: no character code pages beyond ASCII (₹ prints as "Rs."; code pages are printer-specific), no network
+  printers (UPI QR and logo raster: PENDING 46).
+- Pharma: Schedule X separate register book format (the H1 register can include X rows; a separate book layout needs
+  the format verified with the drug controller), narcotics (NDPS) records, prescription scan attachment link
   (batch-wise MRP check: 8F).
+
 - Receivables statements read invoices / payments only, so a refund voucher does not appear there: a refunded walk-in
   return shows as a credit on the Walk-in customer statement (the ledger / TB / Books are right).
 - ~~The refund voucher has no bank-account tag (multi-account BRS sees it under the main bank).~~ Done in R6-C2: each

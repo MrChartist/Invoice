@@ -8,7 +8,9 @@ import { Save, Trash2 } from 'lucide-react';
 import { bankAccountsDb, DEFAULT_BANK_ID } from '../../../lib/bank-accounts';
 import { bankLedgerId } from '../../../lib/bank-ledgers';
 import { chartOf, loadUserAccounts, A } from '../../../lib/ledger/accounts';
-import { deleteFxMove, forexSummary, loadFxMoves, recordFxMove, setAccountCurrency, type FxMoveKind } from '../../../lib/forex-bank';
+import { deleteFxMove, forexSummary, payVendorFromForex, recordFxMove, setAccountCurrency, type FxMoveKind } from '../../../lib/forex-bank';
+import { vendorsDb } from '../../../lib/vendors';
+import { shiftDay } from '../../../lib/dates';
 import { getIndianFY } from '../../../lib/invoice-number';
 import { formatDate, formatMoney, todayInput } from '../../../lib/utils';
 import { fxbT } from '../../../i18n/areas/extras-7u';
@@ -17,7 +19,7 @@ import surface from '../../../styles/surface.module.css';
 import styles from './bankdocs.module.css';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
-const KIND_LABEL = { opening: 'kOpening', receipt: 'kReceipt', in: 'kIn', out: 'kOut', revalue: 'kRevalue' } as const;
+const KIND_LABEL = { opening: 'kOpening', receipt: 'kReceipt', in: 'kIn', out: 'kOut', revalue: 'kRevalue', reversal: 'kReversal' } as const;
 
 export default function ForexBankPanel({ notify }: { notify: Notify }) {
   const [tick, setTick] = useState(0);
@@ -29,7 +31,10 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
   const [to, setTo] = useState(today);
   const [currency, setCurrency] = useState(account?.currency ?? 'USD');
   const [fcyOpening, setFcyOpening] = useState(account?.fcy_opening !== undefined ? String(account.fcy_opening) : '');
-  const [kind, setKind] = useState<FxMoveKind>('revalue');
+  const [kind, setKind] = useState<FxMoveKind | 'vendor'>('revalue');
+  const [reverse, setReverse] = useState(''); // PENDING 46: reverse the revaluation on this day
+  const [vendorId, setVendorId] = useState('');
+  const vendors = useMemo(() => vendorsDb.all(), []);
   const [date, setDate] = useState(today);
   const [fcy, setFcy] = useState('');
   const [rate, setRate] = useState('');
@@ -64,12 +69,21 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
   };
   const saveCurrency = (cur: string) => run(() => setAccountCurrency(accountId, cur, fcyOpening === '' ? undefined : Number(fcyOpening)), fxbT('saved'));
   const record = () => run(() => {
+    if (kind === 'vendor') {
+      const v = vendors.find((x) => x.id === vendorId);
+      payVendorFromForex({ bank_account_id: accountId, date, vendor_id: v?.id, vendor_name: v?.name ?? '', fcy: Number(fcy) || 0, rate: Number(rate) || 0, ...(inr ? { settle: Number(inr) } : {}), ...(narration.trim() ? { narration: narration.trim() } : {}) });
+      setFcy('');
+      setInr('');
+      setNarration('');
+      return;
+    }
     recordFxMove({
       bank_account_id: accountId, date, kind, rate: Number(rate) || 0,
       ...(kind !== 'revalue' ? { fcy: Number(fcy) || 0, counter_account: counter } : {}),
       ...(kind === 'out' && inr ? { inr: Number(inr) } : {}),
       ...(party.trim() ? { counter_party: party.trim() } : {}),
       ...(narration.trim() ? { narration: narration.trim() } : {}),
+      ...(kind === 'revalue' && reverse ? { reverse_on: reverse } : {}),
     });
     setFcy('');
     setInr('');
@@ -123,9 +137,10 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
             <div className={surface.cardBody}>
               <div className={styles.grid}>
                 <label className={controls.field}><span className={controls.label}>{fxbT('kind')}</span>
-                  <select className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as FxMoveKind)}>
+                  <select className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as FxMoveKind | 'vendor')}>
                     <option value="revalue">{fxbT('kRevalue')}</option>
                     <option value="out">{fxbT('kOut')}</option>
+                    <option value="vendor">{fxbT('kVendor')}</option>
                     <option value="in">{fxbT('kIn')}</option>
                   </select></label>
                 <label className={controls.field}><span className={controls.label}>{fxbT('date')}</span>
@@ -136,24 +151,35 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
                 )}
                 <label className={controls.field}><span className={controls.label}>{kind === 'revalue' ? fxbT('closingRate', { cur }) : fxbT('rate', { cur })}</span>
                   <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value.replace(/[^0-9.]/g, ''))} /></label>
-                {kind === 'out' && (
-                  <label className={controls.field}><span className={controls.label}>{fxbT('inrReceived')}</span>
+                {kind === 'revalue' && (
+                  <label className={controls.field}><span className={controls.label}>{fxbT('reverseOn')}</span>
+                    <input className={controls.input} type="date" value={reverse} min={shiftDay(date, 1)} onChange={(e) => setReverse(e.target.value)} data-fx-reverse /></label>
+                )}
+                {kind === 'vendor' && (
+                  <label className={controls.field}><span className={controls.label}>{fxbT('vendor')}</span>
+                    <select className={controls.select} value={vendorId} onChange={(e) => setVendorId(e.target.value)} data-fx-vendor>
+                      <option value="">—</option>
+                      {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                    </select></label>
+                )}
+                {(kind === 'out' || kind === 'vendor') && (
+                  <label className={controls.field}><span className={controls.label}>{kind === 'vendor' ? fxbT('inrSettled') : fxbT('inrReceived')}</span>
                     <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={inr} onChange={(e) => setInr(e.target.value.replace(/[^0-9.]/g, ''))} placeholder={fcy && rate ? (Number(fcy) * Number(rate)).toFixed(2) : ''} /></label>
                 )}
-                {kind !== 'revalue' && (
+                {(kind === 'in' || kind === 'out') && (
                   <label className={controls.field}><span className={controls.label}>{kind === 'in' ? fxbT('fromLedger') : fxbT('toLedger')}</span>
                     <select className={controls.select} value={counter} onChange={(e) => setCounter(e.target.value)}>
                       {counters.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
                     </select></label>
                 )}
-                {kind !== 'revalue' && partyLedger && (
+                {(kind === 'in' || kind === 'out') && partyLedger && (
                   <label className={controls.field}><span className={controls.label}>{fxbT('party')}</span>
                     <input className={controls.input} value={party} onChange={(e) => setParty(e.target.value)} /></label>
                 )}
                 <label className={controls.field}><span className={controls.label}>{fxbT('narration')}</span>
                   <input className={controls.input} value={narration} onChange={(e) => setNarration(e.target.value)} /></label>
               </div>
-              <p className={styles.muted}>{kind === 'revalue' ? fxbT('revalueHelp') : kind === 'out' ? fxbT('outHelp') : fxbT('inHelp')}</p>
+              <p className={styles.muted}>{kind === 'revalue' ? `${fxbT('revalueHelp')} ${fxbT('reverseHelp')}` : kind === 'out' ? fxbT('outHelp') : kind === 'vendor' ? fxbT('vendorHelp') : fxbT('inHelp')}</p>
               <div className={styles.toolbar}><button type="button" className={controls.btnPrimary} onClick={record} disabled={!rate}>{fxbT('record')}</button></div>
             </div>
           </section>
@@ -165,7 +191,7 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
                 <thead><tr><th>{fxbT('date')}</th><th>{fxbT('kind')}</th><th>{fxbT('ref')}</th><th className={surface.numeric}>{cur}</th><th className={surface.numeric}>₹</th><th /></tr></thead>
                 <tbody>
                   {summary.rows.map((r, i) => {
-                    const move = r.kind === 'in' || r.kind === 'out' || r.kind === 'revalue';
+                    const move = !!r.move_id && r.kind !== 'reversal';
                     return (
                       <tr key={`${r.kind}-${r.ref}-${i}`}>
                         <td>{r.date ? formatDate(r.date) : '—'}</td>
@@ -174,10 +200,7 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
                         <td className={surface.numeric}>{n(r.fcy)}</td>
                         <td className={surface.numeric}>{n(r.inr)}</td>
                         <td>{move && (
-                          <button type="button" className={controls.btnGhost} aria-label={fxbT('delete')} onClick={() => {
-                            const m = loadMoveId(r.ref, accountId);
-                            if (m) run(() => deleteFxMove(m), fxbT('deleted'));
-                          }}><Trash2 size={14} /></button>
+                          <button type="button" className={controls.btnGhost} aria-label={fxbT('delete')} onClick={() => run(() => deleteFxMove(r.move_id!), fxbT('deleted'))}><Trash2 size={14} /></button>
                         )}</td>
                       </tr>
                     );
@@ -192,7 +215,5 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
   );
 }
 
-/** Move id behind a voucher number (the statement rows carry the voucher number). */
-function loadMoveId(voucherNumber: string, accountId: string): string | undefined {
-  return loadFxMoves().find((m) => m.voucher_number === voucherNumber && m.bank_account_id === accountId)?.id;
-}
+
+

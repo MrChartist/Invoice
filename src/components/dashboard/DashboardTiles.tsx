@@ -65,6 +65,7 @@ export function DashboardTiles() {
   const userId = actor?.id ?? 'default';
   const [tiles, setTiles] = useState<TileId[]>(() => loadTilePrefs(userId));
   const [branch, setBranch] = useState('');
+  const [catCur, setCatCur] = useState({ code: '', rate: '' }); // PENDING 52: catalogue in a foreign currency
   const [tick, setTick] = useState(0);
   const branches = useMemo(() => branchesDb.all(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const data = useMemo(() => {
@@ -104,7 +105,8 @@ export function DashboardTiles() {
     }
     try {
       const { exportCatalogueHtml } = await import('../../lib/catalogue-export');
-      downloadText('catalogue.html', await exportCatalogueHtml({ cart, stock }), 'text/html');
+      const currency = catCur.code.trim() ? { code: catCur.code.trim().toUpperCase(), rate: Number(catCur.rate) || 0 } : undefined;
+      downloadText('catalogue.html', await exportCatalogueHtml({ cart, stock, ...(currency ? { currency } : {}) }), 'text/html');
       notify(tilesT('catalogueDone'));
     } catch (err) {
       notify((err as Error).message, 'error');
@@ -144,7 +146,14 @@ export function DashboardTiles() {
                 </label>
               ))}
               {can('view') && (
+                <>
+                  <input className={controls.input} maxLength={3} value={catCur.code} onChange={(e) => setCatCur({ ...catCur, code: e.target.value.toUpperCase() })} placeholder="USD" aria-label={tilesT('catCurrency')} title={tilesT('catCurrency')} data-cat-currency />
+                  {catCur.code.trim() && <input className={controls.input} inputMode="decimal" value={catCur.rate} onChange={(e) => setCatCur({ ...catCur, rate: e.target.value.replace(/[^0-9.]/g, '') })} aria-label={tilesT('catRate')} placeholder={tilesT('catRate')} />}
+                </>
+              )}
+              {can('view') && (
                 <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => void exportCatalogue(true)}>
+
                   <Download size={14} /> {tilesT('catalogue')}
                 </button>
               )}

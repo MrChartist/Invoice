@@ -161,6 +161,8 @@ export const tilesT = defineArea(
     customise: 'Customise tiles',
     catalogue: 'Export catalogue (HTML)',
     catalogueDone: 'Catalogue saved — share the HTML file or host it anywhere',
+    catCurrency: 'Catalogue currency (blank = ₹)',
+    catRate: '₹ per unit (typed, no live rates)',
     receivables: 'Receivables',
     payables: 'Payables',
     cashBank: 'Cash & bank',
@@ -191,6 +193,9 @@ export const tilesT = defineArea(
     customise: 'टाइल चुनें',
     catalogue: 'कैटलॉग निर्यात करें (HTML)',
     catalogueDone: 'कैटलॉग सहेजा गया — HTML फ़ाइल साझा करें या कहीं भी होस्ट करें',
+    catCurrency: 'कैटलॉग मुद्रा (ख़ाली = ₹)',
+    catRate: '₹ प्रति इकाई (आप भरें, लाइव दर नहीं)',
+
     receivables: 'प्राप्य राशि',
     payables: 'देय राशि',
     cashBank: 'नकद और बैंक',

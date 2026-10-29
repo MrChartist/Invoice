@@ -90,6 +90,16 @@ day-end cash tally. Everything is local: files are generated in the browser, not
   Dr / Cr bank vs 4930 = **unrealised** difference, AS 11 / Ind AS 21, not reversed). All or nothing with
   `withTablesRollback`. No live rates. Postings on the account without a currency amount (supplier payments,
   INR receipts) are counted in a warning. **Verify the rates and treatment with your CA.**
+- **Pay a supplier in the currency (PENDING 46)** — entry *Pay a supplier in the currency* (`payVendorFromForex`): the
+  FCY amount, the day's rate and the rupees it settles on the supplier's bills (default amount × rate; usually the
+  bill's booked rupee value). The rupees go through `recordSupplierPayment` from the EEFC account (bills oldest first,
+  the rest on account — so bill-wise payables, ageing and Tally see an ordinary supplier payment), and the bank is
+  relieved at its **carrying value**: a Journal (class "Forex bank") posts only the difference, Dr / Cr 4930 realised.
+  Stored as an `out` move with `payment_group_id` / `vendor_id`; the warning above no longer counts those payment rows;
+  deleting the entry removes its payment rows (bills reopened) and its Journal, all or nothing. Bills stay in rupees.
+- **Revaluation reversal (PENDING 46)** — optional *Reverse on* date on a revaluation: the Journal is saved as a
+  reversing journal (`reverse_on`, mirrored by the ledger on that day), the statement shows a *Revaluation reversed*
+  row and the period's unrealised figure nets it. Without a date nothing changes (not reversed, as before).
 - **Payments from an e-payment file after confirmation** (`src/lib/epay-confirm.ts`, lazy
   `EpayConfirmPanel.tsx` under e-Payments): downloading a file keeps the batch in `epay_batches`
   (`EPB/FY…`, series counter; rows: supplier, amount, mode, reference, last four digits of the account, status
@@ -136,5 +146,7 @@ Tests: `tests/capture-bank-rules.test.ts`.
 
 ## Known gaps
 Gateway / VoucherEditor show bank ledgers through the chart but have no account picker of their own; dashboard
-per-bank tiles (P1-17); supplier payments in a foreign currency from an EEFC account (bills are rupee-only); bank
-response presets per bank (the reader is header-driven); no automatic reversal of a revaluation.
+per-bank tiles (P1-17); bills in a foreign currency (EEFC supplier payments settle rupee bills: PENDING 46); bank
+response presets per bank (the reader stays header-driven: banks do not publish their response layouts, so a preset
+could not be verified — PENDING 46 skipped it). Revaluation reversal: PENDING 46 (*Reverse on*).
+
