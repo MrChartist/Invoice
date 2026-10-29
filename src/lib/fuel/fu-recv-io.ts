@@ -6,7 +6,7 @@
  */
 import './fu-registry';
 import type { Client, InvoiceRecord } from '../../types/invoice';
-import type { FuelPrice } from '../../types/fuel-r21';
+import type { FuelNozzle, FuelPrice } from '../../types/fuel-r21';
 import { generateId, getTable } from '../storage';
 import { requireAccess } from '../access';
 import { localDb } from '../localDb';
@@ -16,6 +16,7 @@ import { blankClient, makeDraft, senderStateCode } from '../../store/invoice-def
 import { stockDb } from '../inventory';
 import { FU_TABLES } from './fu-shared';
 import { planSlipBills, readSlips, unbilledSlips, type SlipDoc } from './fu-slips';
+import { tankOf } from './fu-line';
 
 /** A document from lines, for `client`, dated `day` (amounts worked out by the shared engine). */
 function record(client: Client, day: string, docType: 'BILL_OF_SUPPLY' | 'TAX_INVOICE', items: InvoiceRecord['items'], extra: Partial<InvoiceRecord>, incl = false): InvoiceRecord {
@@ -41,6 +42,8 @@ export function billSlips(day: string): InvoiceRecord[] {
   requireAccess('doc.create');
   const docs = localDb.invoices.getAll();
   const clients = new Map(localDb.clients.getAll().map((c) => [c.id ?? '', c]));
-  const recs = planSlipBills(unbilledSlips(readSlips(), docs, day), stockDb.items(), getTable<FuelPrice>(FU_TABLES.prices), day).flatMap((d) => (clients.has(d.client_id) ? [slipDoc(d, clients.get(d.client_id)!, day)] : []));
+  const nozzles = getTable<FuelNozzle>(FU_TABLES.nozzles);
+  const tanks = getTable<{ id: string; fu?: { product_item_id: string } }>('godowns').filter((g) => g.fu);
+  const recs = planSlipBills(unbilledSlips(readSlips(), docs, day), stockDb.items(), getTable<FuelPrice>(FU_TABLES.prices), day, (s) => tankOf(s.item_id, s.nozzle_id, nozzles, tanks)).flatMap((d) => (clients.has(d.client_id) ? [slipDoc(d, clients.get(d.client_id)!, day)] : []));
   return recs.length ? localDb.invoices.saveMany(recs) : []; // validates and numbers every document before its one write
 }

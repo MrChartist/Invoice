@@ -6384,7 +6384,7 @@ try {
     await page.goto(srv.origin + '/invoice');
     await page.getByLabel('Client name').fill('Go To Draft Co');
     await page.locator('main h1').first().click();
-    await page.waitForTimeout(400); // the bell hosts the menu sheets once it has loaded
+    await page.locator('body[data-key-sheets]').waitFor({ state: 'attached', timeout: 15000 }); // QA25: the bell has mounted the menu sheets and their keys
     await page.keyboard.press('Alt+g');
     const go = page.getByRole('dialog', { name: 'Go To' });
     await go.waitFor();
@@ -6397,7 +6397,7 @@ try {
     check((await page.getByLabel('Client name').inputValue()) === 'Go To Draft Co', 'Alt+G "trial" opens the trial balance; "Back to …" returns to the editor with the draft');
     await page.goto(srv.origin + '/');
     await page.getByText('Stored on this device').waitFor();
-    await page.waitForTimeout(400);
+    await page.locator('body[data-key-sheets]').waitFor({ state: 'attached', timeout: 15000 }); // QA25: Alt+Y is handled once the sheets are mounted
     await page.keyboard.press('Alt+y');
     await page.getByTestId('menu-data').waitFor();
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.keyboard.press('b')]);
@@ -6529,9 +6529,14 @@ try {
     await page.waitForURL(/\/invoice\/[^/?]+$/);
     const id = decodeURIComponent(page.url().split('/invoice/')[1]);
     check(!!(await readJson(page, 'invoices', [], (v) => v.some((x) => x.id === id))).find((x) => x.id === id), 'Ctrl+A saved the invoice');
-    await page.keyboard.press('Escape'); // the send sheet
+    // QA25: the send sheet is lazy — wait for it to open, close it, and wait until it is gone (an aria-modal dialog
+    // swallows Alt+D), then for the editor to show the saved document before pressing Alt+D.
+    const sheet = page.locator('[data-send-sheet]');
+    await sheet.waitFor({ timeout: 15000 });
+    await page.keyboard.press('Escape');
+    await sheet.waitFor({ state: 'detached', timeout: 15000 });
+    await page.waitForFunction(() => !document.querySelector('[aria-modal="true"]'), null, { timeout: 15000 });
     await page.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
-    await page.waitForTimeout(200);
     await page.keyboard.press('Alt+d');
     const ask = page.getByRole('dialog', { name: /^Delete / });
     await ask.waitFor();

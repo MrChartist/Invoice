@@ -9,12 +9,12 @@ import { fuT } from '../../i18n/areas/fuel-r21a';
 import { dT } from '../../i18n/areas/fuel-r21d';
 import { localDb } from '../../lib/localDb';
 import { getTable } from '../../lib/storage';
-import type { FuelPrice } from '../../types/fuel-r21';
+import type { FuelNozzle, FuelPrice, FuelShift } from '../../types/fuel-r21';
 import { stockDb } from '../../lib/inventory';
 import { localDayOf } from '../../lib/dates';
 import { creditCheck } from '../../lib/credit-limit';
 import { readSlips, removeSlip, saveSlip, unbilledSlips, vehicleWarning } from '../../lib/fuel/fu-slips';
-import { priceAt } from '../../lib/fuel/fu-line';
+import { nozzleLabel, priceAt } from '../../lib/fuel/fu-line';
 import { billSlips } from '../../lib/fuel/fu-recv-io';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -35,8 +35,11 @@ export default function CreditView({ onDone }: { onDone: Done }) {
   const act = (fn: () => string | void) => { try { const m = fn(); setN(n + 1); onDone(m || fuT('saved')); } catch (e) { onDone((e as Error).message, true); } };
   const p = d.item ? priceAt(getTable<FuelPrice>('fuel_prices'), d.item, d.date ?? day, '23:59') : null;
   const amount = d.amount || (p && d.litres ? (Number(d.litres) * p.rsp).toFixed(2) : '');
+  // QA25 W1: the shift and nozzle of the fill (one of each is picked for you), so the day close leaves these litres to the slip bill.
+  const shifts = getTable<FuelShift>('fuel_shifts').filter((x) => x.date === d.date && x.status !== 'posted').sort((a, b) => a.shift_no - b.shift_no);
+  const noz = getTable<FuelNozzle>('fuel_nozzles').filter((z) => z.item_id === d.item);
   const add = () => act(() => {
-    const s = saveSlip({ slip_no: d.slip ?? '', date: d.date ?? '', client_id: d.client ?? '', vehicle_no: d.vehicle ?? '', driver: d.driver || undefined, item_id: d.item ?? '', litres: Number(d.litres), amount: Number(amount) });
+    const s = saveSlip({ slip_no: d.slip ?? '', date: d.date ?? '', client_id: d.client ?? '', vehicle_no: d.vehicle ?? '', driver: d.driver || undefined, item_id: d.item ?? '', litres: Number(d.litres), amount: Number(amount), ...(d.shift ? { shift_id: d.shift } : {}), ...(d.noz ? { nozzle_id: d.noz } : {}) });
     const owed = open.filter((x) => x.client_id === s.client_id).reduce((t, x) => t + x.amount, s.amount);
     setD({ ...d, slip: '', litres: '', amount: '' });
     return [vehicleWarning(s, c, readSlips()), ...creditCheck({ client: c, draft: { total: owed }, invoices: docs, today: day }).warnings].filter(Boolean).join(' ');
@@ -54,6 +57,8 @@ export default function CreditView({ onDone }: { onDone: Done }) {
         <In d={d} set={setD} k="vehicle" label={dT('vehicle')} w="7rem" />
         <In d={d} set={setD} k="driver" label={dT('driver')} w="7rem" />
         <Sel d={d} set={setD} k="item" label={fuT('product')} opts={items.map((i) => [i.id, i.name])} />
+        {shifts.length > 1 && <Sel d={d} set={setD} k="shift" label={fuT('shift')} opts={shifts.map((x) => [x.id, String(x.shift_no)])} />}
+        {noz.length > 1 && <Sel d={d} set={setD} k="noz" label={fuT('nozzle')} opts={noz.map((z) => [z.id, nozzleLabel(z)])} />}
         <In d={d} set={setD} k="litres" label={fuT('litres')} type="number" w="6rem" />
         <label className={controls.field}><span className={controls.label}>{dT('amount')}</span><input className={controls.input} style={{ width: '7rem' }} type="number" step="any" value={amount} onChange={(e) => setD({ ...d, amount: e.target.value })} data-fu-field="amount" /></label>
         <button type="button" className={controls.btnPrimary} onClick={add} data-fu-add-slip>{dT('addSlip')}</button>
