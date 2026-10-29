@@ -37,7 +37,7 @@ export const TOPICS: readonly HelpTopic[] = [
   t('manufacturing:mfg', 'Manufacturing journal', 'मैन्युफ़ैक्चरिंग जर्नल', 'Consume materials and add finished goods in one voucher.', 'Each time you produce.'),
   t('manufacturing:orders', 'Production orders', 'उत्पादन ऑर्डर', 'Planned production with materials issued and output received.', 'For production that runs over days.'),
   t('manufacturing:journal', 'Stock journal', 'स्टॉक जर्नल', 'Move or convert stock without a sale or purchase.', 'For repacking, conversion or corrections.'),
-  t('manufacturing:physical', 'Physical stock', 'फ़िज़िकल स्टॉक', 'Enter counted quantities; the difference is adjusted.', 'After a stock count.'),
+  t('manufacturing:physical', 'Physical stock', 'फ़िज़िकल स्टॉक', 'Enter counted quantities (serial items by serial); the difference is adjusted.', 'After a stock count.'),
   t('manufacturing:jobwork', 'Job work', 'जॉब वर्क', 'Material sent to or received from job workers, with challans.', 'When someone else processes your goods (or you theirs).', { statutory: ca(['G43', 'G44'], 'ITC-04') }),
   t('manufacturing:rejections', 'Rejections in', 'रिजेक्शन इन', 'Goods returned by customers as rejected.', 'When a customer rejects goods.'),
   t('manufacturing:plan', 'MRP plan', 'MRP योजना', 'Materials needed for planned production against stock and orders.', 'Before buying materials.'),

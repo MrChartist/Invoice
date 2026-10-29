@@ -10,7 +10,7 @@ import { s7T } from '../../i18n/areas/inventory-7s';
 import {
   physicalDrift, physicalLines, physicalStockDb, physicalSummary, validatePhysical, type PhysicalDraftLine,
 } from '../../lib/manufacturing';
-import { computeTracking } from '../../lib/stock-tracking';
+import { computeTracking, parseSerials, serialsInStock } from '../../lib/stock-tracking';
 import { godownName } from '../../lib/godowns';
 import type { PhysicalStockVoucher } from '../../types/manufacturing';
 import { mfgT } from '../../i18n/areas/manufacturing';
@@ -76,13 +76,13 @@ export function PhysicalStockTab({ ctx }: { ctx: MfgContext }) {
 }
 
 function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: PhysicalStockVoucher | null; onClose: () => void }) {
-  const tracked = useMemo(() => ctx.items.filter((i) => i.track_stock && !i.track_serials).sort((a, b) => a.name.localeCompare(b.name)), [ctx.items]);
+  const tracked = useMemo(() => ctx.items.filter((i) => i.track_stock && !(i.track_serials && i.track_batches)).sort((a, b) => a.name.localeCompare(b.name)), [ctx.items]);
   const multi = ctx.godowns.length > 1;
   const anyBatch = tracked.some((i) => i.track_batches);
   const [date, setDate] = useState(voucher?.date ?? todayInput());
   // 7S: a count may be typed in an alternate unit (stored in base units, typed figure kept).
   const [lines, setLines] = useState<PhysicalDraftLine[]>(() => voucher?.lines.map((l) => ({
-    id: l.id, item_id: l.item_id, godown_id: l.godown_id, batch_no: l.batch_no, counted: l.counted_typed ?? l.counted,
+    id: l.id, item_id: l.item_id, godown_id: l.godown_id, batch_no: l.batch_no, counted: l.counted_typed ?? l.counted, ...(l.serials ? { serials: l.serials } : {}),
     ...(l.unit_factor && l.unit_factor !== 1 ? { unit: l.unit, unit_factor: l.unit_factor } : {}),
   })) ?? []);
   const units = useMemo(() => unitsDb.stored(), []);
@@ -108,7 +108,14 @@ function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Ph
     const next: PhysicalDraftLine[] = [];
     for (const it of tracked) {
       const t = tracking.get(it.id);
-      if (it.track_batches && t?.batches.some((b) => b.batch && b.qty > 0)) {
+      if (it.track_serials) {
+        // 7.167: serial items are counted by serial, prefilled with the book serials (per godown when there are several).
+        const gs = multi ? [...new Set((t?.serials ?? []).filter((x) => x.inStock).map((x) => x.godown || ''))] : [''];
+        for (const g of gs.length ? gs : ['']) {
+          const list = serialsInStock(t, g || undefined);
+          next.push({ id: generateId(), item_id: it.id, godown_id: g || undefined, counted: list.length, serials: list });
+        }
+      } else if (it.track_batches && t?.batches.some((b) => b.batch && b.qty > 0)) {
         for (const b of t.batches) {
           if (!b.batch) continue;
           for (const [g, q] of Object.entries(multi ? b.byGodown : { '': b.qty })) {
@@ -172,7 +179,7 @@ function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Ph
                 return (
                   <tr key={l.id}>
                     <td>
-                      <select className={controls.select} aria-label={mfgT('lineItem', { n })} value={l.item_id} onChange={(e) => patch(l.id, { item_id: e.target.value, unit: undefined, unit_factor: undefined })}>
+                      <select className={controls.select} aria-label={mfgT('lineItem', { n })} value={l.item_id} onChange={(e) => patch(l.id, { item_id: e.target.value, unit: undefined, unit_factor: undefined, serials: undefined })}>
                         <option value="">{mfgT('choose')}</option>
                         {tracked.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
                       </select>
@@ -190,9 +197,19 @@ function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Ph
                     )}
                     <td className={styles.num}>{c ? qtyText(c.book_qty) : '—'}</td>
                     <td>
+                      {item?.track_serials ? (
+                        <>
+                          <textarea key={l.item_id} className={controls.textarea} rows={2} aria-label={`${s7T('serialsFound')} ${n} ${item.name}`} placeholder={s7T('serialsPh')}
+                            defaultValue={(l.serials ?? []).join('\n')} onChange={(e) => patch(l.id, { serials: parseSerials(e.target.value) })} />
+                          <span className={styles.muted}>{qtyText(c?.counted ?? 0)}</span>
+                          {!!c?.serials_short?.length && <div className={styles.loss}>{s7T('missingSerials', { list: c.serials_short.join(', ') })}</div>}
+                          {!!c?.serials_excess?.length && <div className={styles.profit}>{s7T('extraSerials', { list: c.serials_excess.join(', ') })}</div>}
+                        </>
+                      ) : (
                       <input className={cn(controls.input, controls.inputNumeric)} inputMode="decimal" aria-label={`${mfgT('counted')} ${n}${item ? ` ${item.name}${l.godown_id ? ` ${godownName(ctx.godowns, l.godown_id)}` : ''}` : ''}`}
                         value={String(l.counted)} onChange={(e) => patch(l.id, { counted: num(e.target.value) })}
                         onBlur={() => patch(l.id, { counted: roundTypedQty(l.counted, l.unit || item?.unit, units) })} />
+                      )}
                     </td>
                     {anyAlt && (
                       <td>
@@ -211,7 +228,7 @@ function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Ph
                       </td>
                     )}
                     <td className={cn(styles.num, c && c.diff < 0 ? styles.loss : c && c.diff > 0 ? styles.profit : undefined)}>{c ? qtyText(c.diff) : '—'}</td>
-                    <td className={styles.num}>{c ? money(Math.abs(c.diff) * num(c.rate)) : '—'}</td>
+                    <td className={styles.num}>{c ? money((c.serials_short || c.serials_excess ? (c.serials_short?.length ?? 0) + (c.serials_excess?.length ?? 0) : Math.abs(c.diff)) * num(c.rate)) : '—'}</td>
                     <td><button type="button" className={controls.btnIcon} aria-label={mfgT('removeLine', { n })} onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}><Trash2 size={15} /></button></td>
                   </tr>
                 );
