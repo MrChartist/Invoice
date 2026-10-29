@@ -26,7 +26,7 @@ import { requireAccess } from './access';
 import { audit } from './audit';
 import { isoDay } from './dates';
 import { refundTimeRules } from './gst-penalties';
-import { GST_HEADS, GST_HEAD_LABELS, INPUT_ACCOUNT, MINOR_HEADS, isPaid, zeroHeads, type GstChallan, type GstHead, type GstSetOffRecord, type Heads, type MinorHead } from './gst-setoff';
+import { GST_HEADS, GST_HEAD_LABELS, INPUT_ACCOUNT, MINOR_HEADS, isPaid, zeroHeads, type CreditMove, type GstChallan, type GstHead, type GstSetOffRecord, type Heads, type MinorHead } from './gst-setoff';
 import type { Gstr1Report, Gstr3bReport } from './gst-reports';
 import { num, round2 } from './invoice-calc';
 import { A, chartOf, loadUserAccounts } from './ledger/accounts';
@@ -178,6 +178,27 @@ export function cashLedgerDetail(
 export function detailByHead(d: LedgerDetail): Heads {
   const out = zeroHeads();
   for (const h of GST_HEADS) out[h] = round2(MINOR_HEADS.reduce((t, m) => t + d[h][m], 0));
+  return out;
+}
+
+/**
+ * PENDING 40 (7.131): electronic CREDIT ledger moves of ITC refund claims (`ITC_REFUND_CATEGORIES`) — the claim is
+ * debited on its filing day (Rule 89(3)); the rejected part is re-credited (PMT-03) on the day of the RFD-06 step
+ * that set it; a withdrawn claim comes back in full on the withdrawal day. A deficiency memo's re-credit (Rule 90(3))
+ * and re-filing are not modelled. Feed `carryForwardFor` / `creditLedgerBalance`.
+ */
+export function creditLedgerRefundMoves(refunds: readonly GstRefundClaim[]): CreditMove[] {
+  const out: CreditMove[] = [];
+  const neg = (h: Heads): Heads => ({ igst: -h.igst, cgst: -h.cgst, sgst: -h.sgst, cess: -h.cess });
+  for (const r of refunds) {
+    if (!ITC_REFUND_CATEGORIES.has(r.category) || !r.filed_on || r.status === 'DRAFT') continue;
+    const g = r.gstin ? { gstin: r.gstin } : {};
+    out.push({ date: r.filed_on, ...g, heads: neg(r.claimed) });
+    const at = (st: RefundStatus[]) => [...r.history].reverse().find((e) => st.includes(e.status))?.date;
+    const wd = r.status === 'WITHDRAWN' ? at(['WITHDRAWN']) : undefined;
+    if (wd) out.push({ date: wd, ...g, heads: { ...r.claimed } });
+    else if (r.rejected && headsTotal(r.rejected) > 0) out.push({ date: at(['REJECTED', 'SANCTIONED']) ?? r.filed_on, ...g, heads: { ...r.rejected } });
+  }
   return out;
 }
 

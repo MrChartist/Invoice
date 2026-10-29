@@ -59,6 +59,8 @@ export interface Vendor {
   nr_no_pe?: boolean;
   nr_dtaa_rate?: number;
   nr_dtaa_article?: string;
+  /** Additive (PENDING 40): the payer bears the tax — Sec 195A grossing-up on the Form 27Q paper. */
+  nr_tax_borne?: boolean;
   /**
    * Additive (WP-1 masters): id of a user sub-group under Sundry Creditors (`groups` table).
    * Absent = directly under Sundry Creditors. Opening balance: `ledger_openings`; bills: `opening_bills`.
