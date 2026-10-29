@@ -19,7 +19,7 @@ import { useT } from '../../../i18n';
 import { EmptyState } from '../../ui/EmptyState';
 import { useDrillRows, useReportPrefs } from './drill-hooks';
 import { ReportOptions } from './ReportToolbar';
-import { ReportStrip } from '../../keys/ReportStrip';
+import { ReportStrip } from '../../../lib/keys/report-keys';
 import { useOpenVoucher } from './report-env';
 import { money } from './format';
 import { PrintTitle, StatementToolbar } from './shared';

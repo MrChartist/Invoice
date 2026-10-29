@@ -6,7 +6,8 @@
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getReportPrefs, setReportPrefs, type ReportPrefs } from '../../../lib/report-prefs';
-import type { LedgerVoucher } from '../../../lib/ledger';
+import { negativeLedgers, type LedgerVoucher } from '../../../lib/ledger';
+import { getPeriodContext } from '../../../lib/books';
 import { can } from '../../../lib/access';
 import { setVoucherDate } from '../../../lib/gateway/period';
 import { keysOn } from '../../../lib/keys/stub';
@@ -117,8 +118,9 @@ export function useDrillRows(count: number, onActivate: (index: number) => void,
     return Array.from({ length: count }, (_, i) => opts.fact?.(i) ?? (rows.get(i) ? domFact(rows.get(i)!) : { text: '', amt: 0 }));
   };
   const self = useRef<LiveReport | null>(null);
+  const snap: LiveReport = { tools, count, sheet, dated: !!opts.fact, facts, set: setTools, setSheet, table, except: env ? () => negativeLedgers(env.ledger, getPeriodContext().period) : undefined };
   useEffect(() => {
-    self.current = { tools, count, sheet, dated: !!opts.fact, facts, set: setTools, setSheet, table, ledger: env?.ledger };
+    self.current = snap;
   });
 
   useEffect(() => {

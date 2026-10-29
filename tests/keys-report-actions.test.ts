@@ -77,8 +77,8 @@ test('stepPeriod: month, quarter and FY by the preset; whole-month and day range
 
 test('saved views: one default per screen + tab, toggled off again; the flag survives a reload', () => {
   localStorage.clear();
-  saveView({ name: 'TB big', route: '/books', tab: 'tb', preset: 'this_fy' });
-  saveView({ name: 'TB small', route: '/books', tab: 'tb', preset: 'this_month' });
+  saveView({ name: 'TB big', route: '/books', tab: 'tb', preset: 'this_fy' }, new Date(2026, 9, 1));
+  saveView({ name: 'TB small', route: '/books', tab: 'tb', preset: 'this_month' }, new Date(2026, 9, 2));
   const [a, b] = loadViews();
   setDefaultView(a.id);
   assert.equal(defaultView('/books', 'tb')?.id, a.id);

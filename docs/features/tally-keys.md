@@ -150,7 +150,7 @@ Day Book, group / ledger vouchers, the Reports hub) and on the Gateway Display v
 `nav.row(i)` now also returns `data-ri`, `aria-selected` (while ticking) and `hidden`; `nav.shown(i)` says whether a row
 is on screen. Report parts join the keys with `useReportKeys(scope, el, handlers)` (`src/lib/keys/report-keys.ts`):
 one registration per scope, and a key goes to the visible part holding the focus, else the newest visible one, so a
-report hidden under a drill level never answers. The strip mounts through `ReportStrip` (`components/keys/ReportStrip.tsx`;
+report hidden under a drill level never answers. The strip mounts through `ReportStrip` (`report-keys.ts`;
 DrillStack, Day Book and the Gateway viewer render one).
 
 **Held / cut.** `HELD` in `registry.ts` keeps built-package rows hidden: `dup.row`, `delete.row`, `cancel.row` (Alt+2 /
@@ -162,3 +162,7 @@ long-press ticking on touch (the Key bar's "Tick a row" and Ctrl / ⌘ + click a
 
 Tests: `tests/keys-report-actions.test.ts` (filter, totals, ticks / hide, period stepping, default view, held rows), e2e
 step "R20-C" in `tests/e2e/smoke.mjs` (TB: Ctrl+F chip and Esc, Space ×2 strip, Ctrl+R / Ctrl+U, Ctrl+L view, Ctrl+E CSV, +).
+
+R20-C sizes (gzip, on `91c4ebc`): first paint 177.9 → 177.9 kB (0); core 3,254.1 → 3,260.7 kB (**+6.6 kB**, cap 7: `f-keys`
++≈1.8 for `report-actions` / `report-keys` / the strip / `keys-r20c`, `ReportSheets` chunk 2.1, the rest in LedgerPanel,
+PeriodBar, DisplayReport, `report-views` and the CSS module); Hindi pack 373.2 → 373.8 kB; Hindi in core 21.8 kB (0).

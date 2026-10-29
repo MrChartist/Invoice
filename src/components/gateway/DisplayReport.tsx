@@ -13,8 +13,7 @@ import { cn, formatDate, formatMoney } from '../../lib/utils';
 import { isTypingTarget } from '../../hooks/useHotkeys';
 import { useGateway, useGatewaySession, useScreenKeys } from './context';
 import { NO_TOOLS, hideRows, invertSel, shownRows, toggleSel, toolsActive, unhideAll, unhideLast, type RowFact, type RowTools } from '../../lib/keys/report-actions';
-import { liveReport, putLive, useReportKeys, type LiveReport } from '../../lib/keys/report-keys';
-import { ReportStrip } from '../keys/ReportStrip';
+import { ReportStrip, liveReport, putLive, useReportKeys, type LiveReport } from '../../lib/keys/report-keys';
 import rk from '../keys/report-keys.module.css';
 import { ButtonBar } from './ButtonBar';
 import styles from './Gateway.module.css';
@@ -207,8 +206,9 @@ export function DisplayReport() {
 
   const grid = useRef<HTMLTableElement | null>(null);
   const self = useRef<LiveReport | null>(null);
+  const snap: LiveReport = { tools, count: rows.length, sheet, dated: true, facts: () => rows.map((r) => (frame ? factOf(frame, r) : { text: '', amt: 0 })), set: setTools, setSheet, table: () => grid.current };
   useEffect(() => {
-    self.current = { tools, count: rows.length, sheet, dated: true, facts: () => rows.map((r) => (frame ? factOf(frame, r) : { text: '', amt: 0 })), set: setTools, setSheet, table: () => grid.current };
+    self.current = snap;
   });
   useEffect(() => {
     if (toolsActive(tools) || sheet) putLive(self.current);

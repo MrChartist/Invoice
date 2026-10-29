@@ -16,7 +16,7 @@ import { useT } from '../../../i18n';
 import styles from './ledger.module.css';
 
 import { DrillContext, dialogOpen, typing, type DrillApi, type DrillEntry as Entry, type DrillFrame } from './drill-hooks';
-import { ReportStrip } from '../../keys/ReportStrip';
+import { ReportStrip } from '../../../lib/keys/report-keys';
 
 export type { DrillApi, DrillFrame };
 

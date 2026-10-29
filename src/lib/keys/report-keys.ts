@@ -1,10 +1,10 @@
 /**
  * R20-C: report key plumbing shared by the report screens (drill-hooks, ReportToolbar, PeriodBar, the Gateway viewer):
  * `useReportKeys` joins a report part to one key registration per scope, and the "live report" store feeds the
- * "what you see" strip (`ReportStrip` in DrillStack.tsx, sheets in components/keys/ReportSheets.tsx).
+ * "what you see" strip (`ReportStrip` below, sheets in components/keys/ReportSheets.tsx).
  */
-import { useEffect, useRef } from 'react';
-import type { Ledger } from '../ledger';
+import { Fragment, Suspense, createElement, lazy, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import type { NegativeLedger } from '../ledger';
 import { registerKeyActions, type KeyHandler } from './engine';
 import type { KeyScope } from './registry';
 import type { RowFact, RowTools } from './report-actions';
@@ -68,7 +68,8 @@ export interface LiveReport {
   set(f: (t: RowTools) => RowTools): void;
   setSheet(s: LiveReport['sheet']): void;
   table(): HTMLElement | null;
-  ledger?: Ledger;
+  /** Ctrl+J: the period's exceptions (wrong-side ledgers), when the report has a ledger. */
+  except?: () => NegativeLedger[];
 }
 let live: LiveReport | null = null;
 const liveSubs = new Set<() => void>();
@@ -78,3 +79,23 @@ export const putLive = (l: LiveReport | null) => {
 };
 export const liveReport = (): LiveReport | null => live;
 export const subscribeLive = (f: () => void): (() => void) => (liveSubs.add(f), () => void liveSubs.delete(f));
+
+// The strip and the report sheets load only after a report key was used.
+const ReportPanel = lazy(() => import('../../components/keys/ReportSheets'));
+
+/**
+ * Where a report's filter / ticks / hidden-rows strip shows: under the report it belongs to (the live report's table
+ * sits inside this strip's parent). DrillStack mounts one; the Day Book and the Gateway viewer mount their own.
+ */
+export function ReportStrip() {
+  const live = useSyncExternalStore(subscribeLive, liveReport);
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  const mark = useCallback((el: HTMLSpanElement | null) => setHost(el?.parentElement ?? null), []);
+  const t = live?.table();
+  return createElement(
+    Fragment,
+    null,
+    createElement('span', { hidden: true, ref: mark }),
+    live && t && host?.contains(t) ? createElement(Suspense, { fallback: null }, createElement(ReportPanel, { live })) : null,
+  );
+}

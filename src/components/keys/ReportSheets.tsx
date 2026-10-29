@@ -1,7 +1,7 @@
 /**
  * R20-C: the report keys' UI, one lazy chunk — the "what you see" strip (filter chip, ticks, hidden rows, totals of the
  * rows shown, one polite live region), the Ctrl+F filter sheet, the Ctrl+J exceptions sheet (default export, mounted
- * by `ReportStrip` in DrillStack.tsx) and the Ctrl+H / Ctrl+L saved-views sheet (`ViewsSheet`, mounted by PeriodBar).
+ * by `ReportStrip`, lib/keys/report-keys.ts) and the Ctrl+H / Ctrl+L saved-views sheet (`ViewsSheet`, mounted by PeriodBar).
  */
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,8 +11,6 @@ import { formatDate, formatMoney } from '../../lib/utils';
 import { emptyFilter, filterRows, shownRows, totalsOf, type ReportFilter } from '../../lib/keys/report-actions';
 import { deleteView, loadViews, saveView, setDefaultView, viewHref, type SavedView } from '../../lib/report-views';
 import { getAllReportPrefs } from '../../lib/report-prefs';
-import { getPeriodContext } from '../../lib/books';
-import { negativeLedgers } from '../../lib/ledger';
 import type { LiveReport } from '../../lib/keys/report-keys';
 import { Modal } from '../ui/Modal';
 import controls from '../../styles/controls.module.css';
@@ -130,7 +128,7 @@ function FilterSheet({ live }: { live: LiveReport }) {
 function ExceptSheet({ live }: { live: LiveReport }) {
   useT();
   const navigate = useNavigate();
-  const rows = useMemo(() => (live.ledger ? negativeLedgers(live.ledger, getPeriodContext().period) : []), [live.ledger]);
+  const rows = useMemo(() => live.except?.() ?? [], [live]);
   return (
     <Modal open onClose={() => live.setSheet('')} title={T('exceptTitle')}>
       {rows.length === 0 ? (
