@@ -8,7 +8,7 @@
  * flagged; a release before today is "late". Over a single bucket the totals equal `runMrp` (tests/mf-mrp-dated.test.ts).
  * Suggestions only: rows feed the existing "Create purchase order" / "Create production orders" actions.
  */
-import type { Bom } from '../../types/manufacturing';
+import type { Bom, ProductionPlan } from '../../types/manufacturing';
 import type { PurchaseOrder, PurchaseRecord, ReceiptNote } from '../../types/purchases';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { ProductionOrder } from '../../types/production-r4';
@@ -164,4 +164,33 @@ export function datedSources(items: readonly StockItem[], today: string): { dema
     if (it && r.pending > EPS) supply.push({ item_id: it.id, date: r.expected || r.date, qty: rq(r.pending * lineFactor(l)), source: r.number });
   }
   return { demand, supply };
+}
+
+/**
+ * 7.167: the other open production plans (not closed, this one left out) as dated demand for their finished items, at
+ * their due date (else the plan date): a plan is a firm intent to produce, so its output and the materials it needs are
+ * netted before this plan's. A line already put on production orders made from that plan (`plan_id`, released or later —
+ * those count through `datedSources`) is reduced by the ordered quantity; draft ("planned") and cancelled orders do not
+ * reduce it. Base units (plan lines are in the item's base unit).
+ */
+export function openPlanDemand(
+  plans: readonly ProductionPlan[], orders: readonly Pick<ProductionOrder, 'plan_id' | 'item_id' | 'planned_qty' | 'status'>[], excludeId?: string,
+): DatedQty[] {
+  const ordered = new Map<string, number>();
+  for (const o of orders) {
+    if (!o?.plan_id || o.status === 'planned' || o.status === 'cancelled') continue;
+    const k = `${o.plan_id}|${o.item_id}`;
+    ordered.set(k, (ordered.get(k) ?? 0) + Math.max(num(o.planned_qty), 0));
+  }
+  const out: DatedQty[] = [];
+  for (const p of plans) {
+    if (!p?.id || p.closed || p.id === excludeId) continue;
+    const left = new Map<string, number>();
+    for (const l of p.lines ?? []) if (l.item_id && num(l.qty) > 0) left.set(l.item_id, (left.get(l.item_id) ?? 0) + num(l.qty));
+    for (const [item, qty] of left) {
+      const q = rq(qty - (ordered.get(`${p.id}|${item}`) ?? 0));
+      if (q > EPS) out.push({ item_id: item, date: p.due_date || p.date, qty: q, source: p.number });
+    }
+  }
+  return out;
 }

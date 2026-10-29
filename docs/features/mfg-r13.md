@@ -56,6 +56,13 @@ only its own section and records its own bundle numbers.
 - **Scrap (B3)**: job-card scrap enters stock through the output journal (`mf_jc` lines); a scrap sale reads stock as usual.
 - **Cash**: no new no-cash marker (PRD §4).
 
+**Open plans in the dated MRP (7.167).** `openPlanDemand` adds the other open production plans (not closed, the one on
+screen left out) as dated demand for their finished items at their due date (else the plan date), so their output and
+materials are netted first; a plan's line is reduced by what production orders made from it (`plan_id`) already carry
+once released or later (those count through `datedSources`); draft ("planned") and cancelled orders do not reduce it.
+ROADMAP 7.167 called these "scheduled receipts": a plan is read as firm demand (an MPS line), not as supply — counting
+it as supply would let a second plan use output the first one is made for. Test: `tests/mrp-open-plans.test.ts`.
+
 ### Deviations from the PRD (MF-A)
 
 - **Doc name**: this file is `docs/features/mfg-r13.md` (as asked by the lead), not `manufacturing-r13.md`.
