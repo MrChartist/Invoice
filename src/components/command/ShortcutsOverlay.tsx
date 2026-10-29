@@ -35,7 +35,7 @@ export function ShortcutsOverlay({ open, onClose }: ShortcutsOverlayProps) {
   const [q, setQ] = useState('');
   const here = useMemo(() => sheetRows(pathname, activeScopes()), [pathname]);
   const [tab, setTab] = useState<'screen' | 'all'>(() => (here.some((r) => r.scope !== 'global') ? 'screen' : 'all'));
-  const [, setHi] = useState(0);
+  const [hiTick, setHi] = useState(0);
   const gw = /^\/gateway(\/|$)/.test(pathname);
   const other = layout === 'prime' ? 'erp9' : 'prime';
 
@@ -54,7 +54,7 @@ export function ShortcutsOverlay({ open, onClose }: ShortcutsOverlayProps) {
       seen.add(k);
       return true;
     });
-  }, [tab, here, layout, other, q, lang]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab, here, layout, other, q, lang, hiTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const never = NEVER_CLAIM.filter((n) => n.say && (!q || keysT(n.say).toLowerCase().includes(q.trim().toLowerCase())));
   const line = (r: KeyRow) => {
