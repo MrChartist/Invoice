@@ -529,6 +529,8 @@ export interface VendorTdsFields {
   nr_no_pe?: boolean;
   nr_dtaa_rate?: number;
   nr_dtaa_article?: string;
+  /** Additive (PENDING 40): the payer bears the tax — Sec 195A grossing-up on the Form 27Q paper. */
+  nr_tax_borne?: boolean;
 }
 
 /** Problems with the vendor form's TDS block: '' when fine. Messages are English (the form shows them as is). */
@@ -578,6 +580,7 @@ export function cleanVendorTds(v: VendorTdsFields): VendorTdsFields {
     nr_trc_to: v.non_resident ? isoDay(v.nr_trc_to) || undefined : undefined,
     nr_form10f: v.non_resident && v.nr_form10f ? true : undefined,
     nr_no_pe: v.non_resident && v.nr_no_pe ? true : undefined,
+    nr_tax_borne: v.non_resident && v.nr_tax_borne ? true : undefined,
     nr_dtaa_rate: v.non_resident ? n(v.nr_dtaa_rate) : undefined,
     nr_dtaa_article: v.non_resident ? String(v.nr_dtaa_article ?? '').trim().slice(0, 40) || undefined : undefined,
   };

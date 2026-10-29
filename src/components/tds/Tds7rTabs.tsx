@@ -6,7 +6,8 @@ import { useMemo, useRef, useState } from 'react';
 import { Download, RefreshCw, Trash2, Upload } from 'lucide-react';
 import type { TdsQuarter } from '../../lib/tds-payables';
 import { setReturnFiled } from '../../lib/tds-payables';
-import { form27Q, form27QCsv, form27QSheets, nr27qRows, FORM27Q_NOTE } from '../../lib/tds-27q';
+import { form15caPlan, form27Q, form27QCsv, form27QSheets, nr27qRows, FORM27Q_NOTE } from '../../lib/tds-27q';
+import { p40T } from '../../i18n/areas/statutory-p40';
 import {
   deleteJustification,
   flagsByKey,
@@ -54,7 +55,11 @@ export function Form27qTab({ data, fy, quarter, canEdit, onChanged, notify }: { 
   useT();
   const vendors = useMemo(() => vendorsDb.all(), []);
   const paper = useMemo(() => form27Q(data.rows, vendors, data.challans, fy, quarter), [data, vendors, fy, quarter]);
-  const checks = useMemo(() => nr27qRows(data.rows.filter((r) => r.fy === fy && r.quarter === quarter), vendors), [data, vendors, fy, quarter]);
+  // PENDING 40: FY rows give each payee's aggregate (surcharge slab, Form 15CA Part A limit).
+  const fyChecks = useMemo(() => nr27qRows(data.rows.filter((r) => r.fy === fy), vendors), [data, vendors, fy]);
+  const checks = fyChecks.filter((x) => x.row.quarter === quarter);
+  const parts = form15caPlan(fyChecks).filter((p) => p.row.quarter === quarter);
+  const qDay = quarterStart(fy, quarter);
   const mark = data.marks.find((m) => m.id === `27Q:${fy}-Q${quarter}`);
   const [filedOn, setFiledOn] = useState(todayInput());
   const [token, setToken] = useState('');
@@ -111,9 +116,9 @@ export function Form27qTab({ data, fy, quarter, canEdit, onChanged, notify }: { 
                   <td>{x.row.payee}<br /><span className={books.muted}>{x.row.pan || 'PANNOTAVBL'} · {formatDate(x.row.creditedOn)}</span></td>
                   <td>{x.payee.country || '—'}</td>
                   <td>{x.row.code}</td>
-                  <td className={surface.numeric}>{formatMoney(x.row.base)}</td>
+                  <td className={surface.numeric}>{formatMoney(x.row.base)}{x.grossedUp !== undefined && <><br /><span className={books.muted}>{p40T('q27Gross')} {formatMoney(x.grossedUp)}</span></>}</td>
                   <td className={surface.numeric}>{x.row.rate}% · {formatMoney(x.row.amount)}</td>
-                  <td className={surface.numeric}>{x.check.actRate}%</td>
+                  <td className={surface.numeric}>{x.check.actRate}%{x.check.surchargePct ? <><br /><span className={books.muted}>{p40T('q27Sc')} {x.check.surchargePct}%</span></> : null}</td>
                   <td className={surface.numeric}>{x.check.dtaaRate === null ? '—' : `${x.check.dtaaRate}%${x.check.dtaaBlocked ? ' ✕' : ''}`}</td>
                   <td className={surface.numeric}>{x.check.required}% ({x.check.basis === 'DTAA' ? 'DTAA' : x.check.basis === 'NO_PAN' ? '206AA' : r7T('q27BasisAct')})</td>
                   <td className={surface.numeric}>{x.shortBy > 0 ? <strong>{formatMoney(x.shortBy)}</strong> : '—'}</td>
@@ -131,6 +136,34 @@ export function Form27qTab({ data, fy, quarter, canEdit, onChanged, notify }: { 
         </div>
       )}
       <p className={books.muted}>{r7T('q27Rules')}</p>
+      {parts.length > 0 && (
+        <div className={surface.card} data-15ca>
+          <h3>{p40T('f15Title', { ca: formText('15CA', qDay, ita25Words()), cb: formText('15CB', qDay, ita25Words()) })}</h3>
+          <p className={books.muted}>{p40T('f15Hint')}</p>
+          <div className={surface.tableWrap}>
+            <table className={surface.table}>
+              <thead>
+                <tr>
+                  <th scope="col">{r7T('q27Payee')}</th>
+                  <th scope="col" className={surface.numeric}>{p40T('f15Fy')}</th>
+                  <th scope="col">{p40T('f15Part')}</th>
+                  <th scope="col">{p40T('f15Why')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {parts.map((p) => (
+                  <tr key={p.row.key}>
+                    <td>{p.row.payee}<br /><span className={books.muted}>{formatDate(p.row.creditedOn)} · {formatMoney(p.row.base)}</span></td>
+                    <td className={surface.numeric}>{formatMoney(p.aggregate)}</td>
+                    <td><strong>{p.part}</strong>{p.needs15cb ? ' + 15CB' : ''}</td>
+                    <td>{p.why}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       {canEdit && (
         <div className={books.toolbar}>
           {mark ? (

@@ -154,7 +154,7 @@ and a phone-sized screen.
      receipts / payments, voucher classes, Tally inventory quantities and TDS challans in the Tally export came in 7Q.)
   3. Audit-trail archive segments are not compressed and old FYs cannot be archived to a "history" company (7.49);
      a society's units are typed one by one (no CSV import yet, PENDING #2).
-  4. Form 15CA / 15CB, 27Q extras, ISD postings, GSTR-6 amendments and some GSTR-9 tables are not built (7.131).
+  4. 27Q FVU text, ISD postings, GSTR-6 amendments, GSTR-9 Table 13 and operator Table 15 are not built (7.131).
   5. The TDS receivable register: credit notes do not reduce the TDS expected (`receivables.md`, CA item T12).
   6. The cash-flow forecast ignores GST, TDS, loans and salaries (`cash-planning.md`).
   7. A refund paid in a later marketplace settlement shows the customer in credit on *Receivables* (R5-A7).
