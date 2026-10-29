@@ -94,8 +94,8 @@ Before = `91c4ebc`, after = this branch; `vite build` + `check-bundle-size`.
 
 | Budget | Before | After | Delta |
 |---|---|---|---|
-| First paint | 177.9 kB | SIZE_FP | SIZE_FP_D |
-| Core precache | 3,254.1 kB | SIZE_CORE | SIZE_CORE_D |
+| First paint | 177.9 kB | 177.9 kB | 0 |
+| Core precache | 3,254.1 kB | 3,254.5 kB | +0.4 kB (offers, cash forecast, donations, recycle-bin hook) |
 
 ## 5. Deferred
 
