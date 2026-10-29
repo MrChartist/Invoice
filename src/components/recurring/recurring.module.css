@@ -32,7 +32,7 @@
 .cardTitle {
   font-family: var(--font-display);
   font-size: var(--text-xl);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.01em;
   margin: 0;
   overflow-wrap: anywhere;
@@ -48,7 +48,7 @@
 .amount {
   font-family: var(--font-display);
   font-size: 1.25rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
@@ -66,7 +66,7 @@
 .factLabel {
   display: block;
   font-size: var(--text-2xs);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted-foreground);
@@ -128,7 +128,7 @@
 }
 
 .mono {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-sm);
   color: var(--foreground);
 }
@@ -149,7 +149,7 @@
 .sectionTitle {
   font-family: var(--font-display);
   font-size: var(--text-base);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.02em;
   margin: 0;
   color: var(--foreground);
@@ -168,7 +168,7 @@
 
 .itemHead span {
   font-size: var(--text-2xs);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted-foreground);
@@ -222,7 +222,7 @@
   justify-content: space-between;
   gap: 1rem;
   font-size: var(--text-md);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 @media (max-width: 640px) {

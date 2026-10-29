@@ -71,7 +71,7 @@
   height: 1.4rem;
   padding: 0 0.35rem;
   margin-right: 0.2rem;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
   font-weight: 500;
   color: var(--muted-foreground);
@@ -98,7 +98,7 @@
   justify-content: space-between;
   padding: 0.5rem 0.625rem 0.25rem;
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted-foreground);
@@ -183,7 +183,7 @@
 .mark {
   background: transparent;
   color: var(--primary);
-  font-weight: 800;
+  font-weight: 600;
   text-decoration: underline;
   text-decoration-thickness: 2px;
   text-underline-offset: 2px;
@@ -216,7 +216,7 @@
 }
 
 .emptyHint code {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   background: var(--muted);
   padding: 0.05rem 0.3rem;
   border-radius: var(--radius-xs);

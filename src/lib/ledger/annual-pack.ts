@@ -35,6 +35,7 @@ import {
 } from './reports';
 import { buildNotes, capitalTitle, reservesTitle, TEXT_NOTES, type NoteCell, type PackNote, type PartnerNoteRow } from './notes-auto';
 import { receiptsPayments, type ReceiptsPayments } from '../society/hs-rp';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 export const NOTES_TABLE = 'notes_to_accounts';
 export const ENTITY_TYPES: readonly EntityType[] = ['proprietorship', 'partnership', 'llp', 'company', 'cooperative', 'association'];
@@ -243,31 +244,31 @@ const amt = (p: number | undefined) => {
 const cell = (c: NoteCell) => (typeof c === 'number' ? `<td class="n">${esc(amt(c))}</td>` : `<td>${esc(c)}</td>`);
 
 const PACK_CSS = `
-.ap-root { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; font-size: 12px; line-height: 1.45; background: #fff; }
+.ap-root { font-family: ${PRINT_FONT}; color: #111; font-size: 12px; line-height: 1.45; background: #fff; }
 .ap-root .ap-page { width: 794px; min-height: 1123px; box-sizing: border-box; padding: 48px 56px; background: #fff; break-after: page; page-break-after: always; }
 .ap-root .ap-page:last-child { break-after: auto; page-break-after: auto; }
 .ap-root h1 { font-size: 22px; margin: 0 0 4px; }
 .ap-root h2 { font-size: 15px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.05em; }
 .ap-root h3 { font-size: 13px; margin: 18px 0 6px; }
 .ap-root .sub { color: #444; white-space: pre-line; }
-.ap-root .draft { display: inline-block; margin-top: 14px; padding: 4px 10px; border: 1.5px solid #8a5a14; color: #8a5a14; font-weight: 700; }
+.ap-root .draft { display: inline-block; margin-top: 14px; padding: 4px 10px; border: 1.5px solid #8a5a14; color: #8a5a14; font-weight: 600; }
 .ap-root .cover { display: flex; flex-direction: column; justify-content: center; min-height: 900px; }
 .ap-root .cover h1 { font-size: 30px; }
 .ap-root table { width: 100%; border-collapse: collapse; margin-top: 8px; }
 .ap-root th, .ap-root td { padding: 4px 6px; border-bottom: 1px solid #ddd; text-align: left; vertical-align: top; }
-.ap-root th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1.5px solid #222; }
+.ap-root th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1.5px solid #222; }
 .ap-root td.n, .ap-root th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ap-root td.c, .ap-root th.c { text-align: center; width: 48px; }
-.ap-root tr.l0 td { font-weight: 700; padding-top: 10px; }
+.ap-root tr.l0 td { font-weight: 600; padding-top: 10px; }
 .ap-root tr.l1 td:first-child { padding-left: 18px; }
 .ap-root tr.l2 td { font-weight: 600; border-top: 1px solid #999; }
-.ap-root tr.l3 td { font-weight: 800; border-top: 1.5px solid #222; border-bottom: 3px double #222; }
-.ap-root .meta { color: #555; font-size: 11px; margin-bottom: 10px; }
+.ap-root tr.l3 td { font-weight: 600; border-top: 1.5px solid #222; border-bottom: 3px double #222; }
+.ap-root .meta { color: #555; font-size: 12px; margin-bottom: 10px; }
 .ap-root .warn { color: #b74443; font-weight: 600; }
 .ap-root ol.index li { padding: 3px 0; }
 .ap-root .note { margin-bottom: 16px; break-inside: avoid; }
 .ap-root .note p { margin: 4px 0; }
-.ap-root .foot { margin-top: 18px; color: #777; font-size: 10px; }
+.ap-root .foot { margin-top: 18px; color: #777; font-size: 12px; }
 .ap-root .sign { display: flex; justify-content: space-between; margin-top: 48px; }
 .ap-root .sign div { border-top: 1px solid #222; padding-top: 4px; min-width: 200px; text-align: center; }
 @media print { .ap-root .ap-page { width: auto; min-height: 0; padding: 0; } }
@@ -349,7 +350,7 @@ export function annualPackHtml(pack: AnnualPack): string {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(`${pack.company.name || 'Annual accounts'} — ${pack.fy.label}`)}</title>
-<style>@page { size: 210mm 297mm; margin: 14mm; } body { margin: 0; background: #fff; }</style></head>
+<style>${PRINT_FONT_FACE}@page { size: 210mm 297mm; margin: 14mm; } body { margin: 0; background: #fff; }</style></head>
 <body>${annualPackBody(pack)}</body></html>`;
 }
 

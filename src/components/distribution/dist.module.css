@@ -99,7 +99,7 @@
 .textarea {
   width: 100%;
   min-height: 6rem;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
 }
 

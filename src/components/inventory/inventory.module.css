@@ -5,7 +5,7 @@
   align-items: center;
   gap: 0.3rem;
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   padding: 0.25rem 0.625rem;
   border-radius: var(--radius-full);
   text-transform: uppercase;
@@ -29,7 +29,7 @@
 .sectionLabel {
   font-family: var(--font-display);
   font-size: var(--text-base);
-  font-weight: 700;
+  font-weight: 600;
   margin: 0.25rem 0 -0.25rem;
 }
 
@@ -65,22 +65,22 @@
 }
 .summaryLabel {
   font-size: var(--text-2xs);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted-foreground);
 }
 .summaryValue {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--text-lg);
   overflow-wrap: anywhere;
 }
 
 .in { color: var(--profit); }
 .out { color: var(--loss); }
-.negative { color: var(--loss); font-weight: 700; }
+.negative { color: var(--loss); font-weight: 600; }
 .muted { color: var(--muted-foreground); }
 
 .ledgerWrap {
@@ -100,7 +100,7 @@
 }
 
 /* ── Batch / serial / godown tracking (6.6 / 6.10 / 6.11) ── */
-.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-variant-numeric: tabular-nums; }
 .serialBox {
   display: flex;
   flex-direction: column;
@@ -123,7 +123,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
   padding: 0.125rem 0.25rem 0.125rem 0.5rem;
   border-radius: var(--radius-full);
@@ -150,8 +150,8 @@
   border-radius: var(--radius-md);
   background: var(--card-inner);
 }
-.expired { color: var(--loss); font-weight: 700; }
-.soon { color: var(--warning); font-weight: 700; }
+.expired { color: var(--loss); font-weight: 600; }
+.soon { color: var(--warning); font-weight: 600; }
 .lookupCard {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -167,7 +167,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 .lookupList {
   display: flex;

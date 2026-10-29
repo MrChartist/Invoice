@@ -18,6 +18,7 @@ import { amountInWords } from './amount-in-words';
 import { round2 } from './invoice-calc';
 import { DB_PREFIX, getJson, setJson } from './storage';
 import { escHtml as esc } from './html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 
 export const CHEQUE_PREFS_KEY = `${DB_PREFIX}cheque_print`;
 
@@ -207,11 +208,11 @@ export function chequeHtml(print: ChequePrint, opts: { guide?: boolean; title?: 
   });
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>${esc(opts.title ?? 'Cheque')}</title>
-<style>
+<style>${PRINT_FONT_FACE}
   @page { size: ${mm(layout.width)} ${mm(layout.height)}; margin: 0; }
   html, body { margin: 0; padding: 0; background: white; color: black; }
   .leaf { position: relative; width: ${mm(layout.width)}; height: ${mm(layout.height)}; overflow: hidden;
-    font-family: 'Courier New', Courier, monospace; font-size: 11pt; font-weight: 700; }
+    font-family: ${PRINT_FONT}; font-size: 11pt; font-weight: 600; }
   .guide { outline: 0.3mm dashed gray; }
   .guide .f { outline: 0.2mm dotted gray; }
   .f { position: absolute; white-space: nowrap; overflow: hidden; line-height: 1.2; }
@@ -220,7 +221,7 @@ export function chequeHtml(print: ChequePrint, opts: { guide?: boolean; title?: 
   .figures { text-align: right; }
   .crossing { height: 12mm; transform: rotate(-30deg); transform-origin: left top; border-top: 0.4mm solid black;
     border-bottom: 0.4mm solid black; text-align: center; font-size: 9pt; display: flex; align-items: center; justify-content: center; }
-  .note { font: 10pt system-ui, sans-serif; padding: 4mm; }
+  .note { font: 10pt ${PRINT_FONT}; padding: 4mm; }
   @media print { .note { display: none; } }
 </style></head>
 <body>

@@ -18,6 +18,7 @@ import { setT } from '../../i18n/areas/settings';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './CatalogPanel.module.css';
+import { printWhenReady } from '../../lib/print-fonts';
 
 interface Row {
   key: string;
@@ -122,7 +123,7 @@ export function LabelSheetModal({ open, onClose, onChanged, preselected }: {
       w.document.write(html);
       w.document.close();
       w.focus();
-      w.print();
+      printWhenReady(w);
     } else {
       downloadText('barcode-labels.html', html, 'text/html');
     }

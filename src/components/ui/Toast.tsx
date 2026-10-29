@@ -92,7 +92,7 @@ export function Toast({ message, tone = 'success', duration = 3200, action, onCl
             background: 'none',
             border: 'none',
             color: 'var(--brand-text)',
-            fontWeight: 700,
+            fontWeight: 600,
             fontSize: '0.875rem',
             cursor: 'pointer',
             padding: 0,

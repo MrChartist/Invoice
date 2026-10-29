@@ -12,6 +12,7 @@ import { num, round2 } from '../invoice-calc';
 import { lineFactor } from '../units';
 import { esc } from '../voucher-print';
 import { formatDate, formatMoney } from '../utils';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 export interface TransferChallanParty {
   name: string;
@@ -33,21 +34,21 @@ export interface TransferChallanOptions {
 const COPIES = ['Original for consignee', 'Duplicate for transporter', 'Triplicate for consignor'];
 
 const CSS = `
-  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 24px; }
+  body { font-family: ${PRINT_FONT}; color: #111; margin: 0; padding: 24px; }
   .c { max-width: 760px; margin: 0 auto 28px; border: 1px solid #222; break-after: page; page-break-after: always; }
   .c:last-child { break-after: auto; page-break-after: auto; }
   .head { display: flex; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid #222; font-size: 12px; }
   .head h1 { margin: 0 0 4px; font-size: 17px; }
-  .title { text-align: center; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px; border-bottom: 1px solid #222; }
+  .title { text-align: center; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px; border-bottom: 1px solid #222; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #222; font-size: 12px; }
   .grid div { padding: 8px 14px; }
   .grid div:first-child { border-right: 1px solid #222; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   th, td { padding: 5px 8px; text-align: left; border-bottom: 1px solid #ccc; }
-  th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #222; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #222; }
   td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
-  tr.total td { font-weight: 700; border-top: 1px solid #222; }
-  .note { padding: 8px 14px; font-size: 11px; border-top: 1px solid #222; }
+  tr.total td { font-weight: 600; border-top: 1px solid #222; }
+  .note { padding: 8px 14px; font-size: 12px; border-top: 1px solid #222; }
   .sign { display: flex; justify-content: space-between; padding: 36px 14px 10px; font-size: 12px; }
   @media print { body { padding: 0; } }
 `;
@@ -76,7 +77,7 @@ export function challanRows(t: Pick<StockTransfer, 'lines'>, items: readonly Sto
 export function transferChallanHtml(t: Pick<StockTransfer, 'transfer_number' | 'date' | 'lines' | 'notes'>, o: TransferChallanOptions): string {
   const rows = challanRows(t, o.items, o.costOf);
   const total = round2(rows.reduce((s, r) => s + r.value, 0));
-  const body = rows.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.name)}${r.batch ? ` · batch ${esc(r.batch)}` : ''}${r.serials ? `<div style="font-size:10px;color:#555">S/N ${esc(r.serials.join(', '))}</div>` : ''}</td><td>${esc(r.hsn)}</td><td class="n">${esc(r.qty)} ${esc(r.unit)}</td><td class="n">${esc(formatMoney(r.value))}</td><td class="n">${esc(r.rate)}%</td></tr>`).join('');
+  const body = rows.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.name)}${r.batch ? ` · batch ${esc(r.batch)}` : ''}${r.serials ? `<div style="font-size:12px;color:#555">S/N ${esc(r.serials.join(', '))}</div>` : ''}</td><td>${esc(r.hsn)}</td><td class="n">${esc(r.qty)} ${esc(r.unit)}</td><td class="n">${esc(formatMoney(r.value))}</td><td class="n">${esc(r.rate)}%</td></tr>`).join('');
   const tr = o.transport ?? {};
   const transport = [tr.mode && `Mode: ${tr.mode}`, tr.vehicle && `Vehicle: ${tr.vehicle}`, tr.transporter && `Transporter: ${tr.transporter}`, tr.lr && `LR no.: ${tr.lr}`, tr.eway && `e-Way bill: ${tr.eway}`].filter(Boolean).join(' · ');
   const party = (who: string, p: { name: string; address?: string }) => `<strong>${who}</strong><br>${esc(o.company.name)} — ${esc(p.name)}${p.address ? `<br>${esc(p.address)}` : ''}${o.company.gstin ? `<br>GSTIN: ${esc(o.company.gstin)}` : ''}${o.company.stateCode ? `<br>State code: ${esc(o.company.stateCode)}` : ''}`;
@@ -93,6 +94,6 @@ export function transferChallanHtml(t: Pick<StockTransfer, 'transfer_number' | '
 </section>`;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(t.transfer_number)}</title><style>${CSS}</style></head>
+<title>${esc(t.transfer_number)}</title><style>${PRINT_FONT_FACE}${CSS}</style></head>
 <body>${COPIES.map(section).join('\n')}</body></html>`;
 }

@@ -148,6 +148,71 @@ export function splitHindi(code, rel) {
   return { code: out, modules };
 }
 
+/**
+ * PERF-6: help data whose Hindi is passed positionally to a row builder (not `defineArea`): the help topics
+ * (`t(id, title, hiTitle, …)`, keyed by the id argument) and the glossary (`key: g(term, def, app, hiDef, hiApp, …)`,
+ * keyed by the property name), and the screen tips (`{ id, …, hi }` objects, keyed by `id`). `hi` = the Hindi argument
+ * positions (or property names).
+ */
+export const HELP_SPLIT = [
+  { re: /^src\/lib\/help\/topics-[a-z]+\.ts$/, fn: 't', hi: [2], key: 0 },
+  { re: /^src\/lib\/help\/glossary\.ts$/, fn: 'g', hi: [3, 4], key: 'prop' },
+  { re: /^src\/lib\/help\/tips\.ts$/, obj: 'id', hi: ['hi'] },
+];
+
+/**
+ * PERF-6: move the Hindi arguments of a help data file into a `lang-hi-help` virtual module. Each Hindi argument
+ * becomes `""` and the file gains `export const loadHi = () => import('virtual:hi/help/<file>~<hash>')`, whose default
+ * export is `{ <key>: hi }` (one argument) or `{ <key>: [hi, …] }`; `src/lib/help/hi-tables.ts` puts it back when
+ * Hindi is on (or a search asks for it). Fail-loud: a builder call whose key or Hindi is not a static string, a
+ * duplicate key, or a listed file with no builder call fails the build. Returns null for other files.
+ */
+export function splitHelp(code, rel) {
+  const spec = HELP_SPLIT.find((s) => s.re.test(rel));
+  if (!spec) return null;
+  const ast = parseAst(code, { lang: 'ts' }, rel);
+  const found = [];
+  walk(ast, (n) => {
+    if (spec.obj) {
+      const props = n.type === 'ObjectExpression' ? n.properties.filter((p) => p.type === 'Property' && !p.computed && p.key.type === 'Identifier') : [];
+      const key = props.find((p) => p.key.name === spec.obj);
+      const his = spec.hi.map((h) => props.find((p) => p.key.name === h));
+      if (key && his.every(Boolean)) found.push({ call: { start: n.start, arguments: his.map((p) => p.value) }, key: staticString(key.value) });
+    } else if (spec.key === 'prop') {
+      if (n.type === 'Property' && n.value?.type === 'CallExpression' && n.value.callee.type === 'Identifier' && n.value.callee.name === spec.fn) {
+        found.push({ call: n.value, key: !n.computed && n.key.type === 'Identifier' ? n.key.name : staticString(n.key) });
+      }
+    } else if (n.type === 'CallExpression' && n.callee.type === 'Identifier' && n.callee.name === spec.fn) {
+      found.push({ call: n, key: staticString(n.arguments[spec.key]) });
+    }
+  });
+  const what = spec.fn ? `${spec.fn}(…)` : `{ ${spec.obj}, ${spec.hi.join(', ')} }`;
+  if (!found.length) throw new Error(`hi-split: ${rel}: no ${what} row found; update HELP_SPLIT in scripts/vite-hi-split.mjs`);
+  const data = {};
+  const edits = [];
+  for (const { call, key } of found) {
+    const where = `${rel}:${lineOf(code, call.start)}`;
+    if (key === undefined) throw new Error(`hi-split: ${where}: the key of a ${what} row must be a static string`);
+    if (key in data) throw new Error(`hi-split: ${where}: duplicate key "${key}"`);
+    const values = spec.hi.map((i, j) => {
+      const arg = spec.obj ? call.arguments[j] : call.arguments[i];
+      const v = staticString(arg);
+      if (v === undefined) throw new Error(`hi-split: ${where}: the Hindi (${typeof i === 'number' ? `argument ${i + 1}` : i}) of a ${what} row must be a string literal`);
+      edits.push({ start: arg.start, end: arg.end });
+      return v;
+    });
+    data[key] = values.length === 1 ? values[0] : values;
+  }
+  const json = JSON.stringify(data);
+  const base = rel.split('/').pop().replace(/\.ts$/, '');
+  const hash = createHash('sha256').update(`${rel}\n${json}`).digest('hex').slice(0, 8);
+  const id = `${VIRTUAL}help/${base}~${hash}`;
+  let out = code;
+  for (const e of edits.sort((a, b) => b.start - a.start)) out = out.slice(0, e.start) + '""' + out.slice(e.end);
+  out += `\nexport const loadHi = () => import(${JSON.stringify(id)});\n`;
+  return { code: out, modules: [{ id, family: 'help', data, json }] };
+}
+
 /** The language packs of a bundle: chunk file names per pack, from the chunks' module ids. Throws on a mixed chunk. */
 export function langManifest(bundle) {
   const packs = { hi: [], regional: [] };
@@ -192,7 +257,7 @@ export function hiSplit({ root = process.cwd() } = {}) {
       if (id.includes('\0') || id.includes('node_modules') || !/\.tsx?$/.test(id)) return null;
       const rel = relative(root, id.split('?')[0]).split(sep).join('/');
       if (!rel.startsWith('src/') || rel === 'src/i18n/area.ts') return null;
-      const r = splitHindi(code, rel);
+      const r = splitHelp(code, rel) ?? splitHindi(code, rel);
       if (!r) return null;
       for (const m of r.modules) virtual.set(m.id, m);
       calls += r.modules.length;

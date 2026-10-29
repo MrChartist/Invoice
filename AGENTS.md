@@ -15,6 +15,12 @@
   auditor pack, Income-tax Act 2025 labels, industry packs (marketplace seller, transport / works contracts, fees /
   non-profits / leases). Module contract: `docs/ARCHITECTURE.md`; per-module notes: `docs/features/`.
 - **Brand source of truth**: mrchartist.com (logo `public/branding/*`, tokens in `src/index.css`; app palette = blue/gold `--pal-*`, orange kept only for the logo and the Ember template).
+  **Type system** (`docs/theme/TYPE-SYSTEM.md`, licences `docs/theme/type/LICENSE.md`): three self-hosted OFL fonts only —
+  Chartist Sans Flex (text / UI / numbers, `--font-body`, `--font-num`), Chartist Sans (headings 600, `--font-heading` =
+  `--font-display`), Chartist Serif (italic accent, `--font-accent`); files + `OFL.txt` in `public/fonts/chartist-*`,
+  `@font-face` in `src/fonts.css`, standalone print documents use `src/lib/print-fonts.ts`. Noto Sans Devanagari stays as
+  the Devanagari-only script fallback. No text below 12px, no weight above 600 (`tests/type-system.test.ts`; printed-paper
+  exceptions allow-listed there). Owner deviations: Indian comma grouping stays (invoice app); em-dash removal pending.
 
 ## Stack
 - **React 19** + **TypeScript** + **Vite 8** (rolldown bundler — `vite.config.ts` uses
@@ -25,8 +31,12 @@
   file names, first-paint files trimmed from preload lists (`scripts/vite-preload-trim.mjs`), `pako` aliased to
   `src/lib/stubs/pako-fflate.ts`, CSS-module names `_<local>_<file hash>` (`docs/qa/performance.md`). Hindi strings are split out at build time (`scripts/vite-hi-split.mjs`): every `defineArea(en, hi)` must pass a
   literal Hindi object; Hindi lives in `lang-hi-*` packs (plus `lang-regional`) listed under `langs` in
-  `dist/lang-manifest.json`, precached only on devices set to that language. Budgets: first paint 185 kB, core 3,300 kB,
-  Hindi pack 400 kB, Hindi left in English chunks ≤ 36 kB (`scripts/check-bundle-size.mjs`). HTML escaping: `escHtml`
+  `dist/lang-manifest.json`, precached only on devices set to that language. PERF-6 (R21-P): the help topics' / glossary's /
+  tips' positional Hindi moves too (`splitHelp`, `HELP_SPLIT`; read back through `src/lib/help/hi-tables.ts` — keep
+  their Hindi literal); `css-maps` groups class maps of small shared CSS modules whose every rule is local (`cssIsLocal`:
+  never a `:global`, element or `@page` rule); `lazy-leaves-ui` takes leaves ≤ 2,500 B with no load effect
+  (`loadEffects`), cap 28 kB. Budgets: first paint 185 kB, core 3,300 kB,
+  Hindi pack 400 kB, Hindi left in English chunks ≤ 36 kB, leaves 20 / 28 kB (`scripts/check-bundle-size.mjs`). HTML escaping: `escHtml`
   (`src/lib/html-esc.ts`, escapes `'` too).
 - **State**: Zustand — `src/store/useInvoiceStore.ts` is the single live global store.
 - **Styling**: Vanilla CSS + CSS Modules (`*.module.css`); tokens in `src/index.css`.

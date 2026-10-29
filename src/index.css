@@ -10,19 +10,29 @@
 :root {
   color-scheme: light;
 
-  /* Fonts — same stacks as mrchartist.com. Noto Sans Devanagari leads but only covers Devanagari
-     (unicode-range in fonts.css), so Hindi text looks the same on every device and Latin is untouched. */
+  /* Fonts — the Mr. Chartist type system (docs/theme/TYPE-SYSTEM.md): three fonts, one job each, never a fourth.
+     Chartist Sans Flex = all text, interface and numbers; Chartist Sans = headings (600); Chartist Serif = the italic
+     accent word and serif document titles. Noto Sans Devanagari follows them but only covers Devanagari
+     (unicode-range in fonts.css), so Hindi text looks the same on every device; system fonts render any other script. */
   --font-devanagari: 'Noto Sans Devanagari';
-  --font-display: var(--font-devanagari), 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
-  --font-body: var(--font-devanagari), 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-accent: var(--font-devanagari), 'DM Serif Display', Georgia, serif;
-  --font-mono: var(--font-devanagari), 'JetBrains Mono', 'SF Mono', 'Menlo', ui-monospace, monospace;
-  /* Used by the invoice templates (not the app chrome) */
-  --font-serif: var(--font-devanagari), 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+  --font-heading: 'Chartist Sans', 'Chartist Sans Fallback', var(--font-devanagari), system-ui, sans-serif;
+  --font-body: 'Chartist Sans Flex', 'Chartist Sans Flex Fallback', var(--font-devanagari), system-ui, sans-serif;
+  --font-accent: 'Chartist Serif', var(--font-devanagari), Georgia, serif;
+  /* Aliases kept for the many modules that name them: headings, and figures (tabular Chartist Sans Flex). */
+  --font-display: var(--font-heading);
+  --font-num: var(--font-body);
+
+  /* Weight map (light): text 400, interface 400, labels 500, figures 350, headings 600. Nothing above 600. */
+  --fw-body: 400;
+  --fw-ui: 400;
+  --fw-label: 500;
+  --fw-num: 350;
+  --fw-heading: 600;
 
   /* Type scale — use these instead of raw sizes */
-  --text-2xs: 0.625rem;
-  --text-xs: 0.6875rem;
+  /* Readability floor (type system step 5): nothing below 12px, so the two smallest steps equal --text-sm. */
+  --text-2xs: 0.75rem;
+  --text-xs: 0.75rem;
   --text-sm: 0.75rem;
   --text-base: 0.8125rem;
   --text-md: 0.875rem;
@@ -115,6 +125,9 @@
 .dark {
   color-scheme: dark;
 
+  /* Light text on black looks bolder, so reading text steps down 20 in dark mode. */
+  --fw-body: 380;
+
   --brand: #d5a25e;
   --brand-strong: #e3b97e;
   --brand-soft: rgba(213, 162, 94, 0.16);
@@ -186,6 +199,7 @@ html {
 
 body {
   font-family: var(--font-body);
+  font-weight: var(--fw-body);
   font-size: 0.875rem;
   line-height: 1.6;
   letter-spacing: -0.006em;
@@ -213,6 +227,12 @@ img, svg {
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; font: inherit; }
 input, textarea, select { font: inherit; }
+
+/* Headings: Chartist Sans at 600 (modules may set their own family / size; nothing draws above 600). */
+h1, h2, h3, h4 { font-family: var(--font-heading); font-weight: var(--fw-heading); }
+h5, h6, b, strong, th { font-weight: 600; }
+/* The italic accent word (Chartist Serif, once per page). */
+.accent-word { font-family: var(--font-accent); font-style: italic; font-weight: 400; }
 
 /* ── Scrollbar ───────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
