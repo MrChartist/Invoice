@@ -17,6 +17,7 @@ import { secT } from '../../i18n/areas/security';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Security.module.css';
+import { errText } from '../../i18n/lib-msg';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 type Mode = 'idle' | 'enable' | 'change' | 'disable';
@@ -80,7 +81,7 @@ export function VaultPanel({ notify }: { notify: Notify }) {
       }
       reset();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     } finally {
       setBusy(false);
     }

@@ -84,6 +84,7 @@ const shortBookShown = (): boolean => {
   return localDb.settings.get().business_type === 'kirana' || !!rs?.short_book?.enabled || peekTable('short_book').length > 0;
 };
 import { trT } from '../i18n/areas/trade-r8c';
+import { errText } from '../i18n/lib-msg';
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
@@ -185,7 +186,7 @@ export function Inventory() {
       notify(okMsg);
     } catch (err) {
       // Storage, period-lock and role refusals carry a readable message.
-      notify(err instanceof Error && err.message ? err.message : invT('saveFailed'), 'error');
+      notify(err instanceof Error && err.message ? errText(err) : invT('saveFailed'), 'error');
     }
   };
 
@@ -196,7 +197,7 @@ export function Inventory() {
       saveSettings(next);
       setSettings(next);
     } catch (err) {
-      notify(err instanceof Error && err.message ? err.message : invT('settingsFailed'), 'error');
+      notify(err instanceof Error && err.message ? errText(err) : invT('settingsFailed'), 'error');
     }
   };
 

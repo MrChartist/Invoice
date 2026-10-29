@@ -44,6 +44,7 @@ import { ImageSlot } from './ProfileEditor';
 import { reachT } from '../../i18n/areas/reach';
 import { itemImageData, storeItemImage } from '../../lib/item-images';
 import { stockGroupsDb } from '../../lib/stock-groups';
+import { errText, libMsg } from '../../i18n/lib-msg';
 
 const LabelSheetModal = lazy(() => import('./LabelSheetModal').then((m) => ({ default: m.LabelSheetModal })));
 
@@ -149,7 +150,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
     reload();
   };
 
-  const fieldError = (field: CatalogError['field']) => (error?.field === field ? error.message : null);
+  const fieldError = (field: CatalogError['field']) => (error?.field === field ? libMsg(error.message) : null);
 
   return (
     <section className={surface.card}>
@@ -450,7 +451,7 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                   try {
                     setDraft({ ...draft, image: storeItemImage(data) });
                   } catch (err) {
-                    notify((err as Error).message, 'error');
+                    notify(errText(err), 'error');
                   }
                 }}
                 onClear={() => setDraft({ ...draft, image: '' })}

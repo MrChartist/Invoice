@@ -22,6 +22,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import local from './returns.module.css';
+import { errText } from '../../i18n/lib-msg';
 
 export interface ReturnsTabProps {
   purchases: PurchaseRecord[];
@@ -71,7 +72,7 @@ export function ReturnsTab({ purchases, vendors, orders, onConvert, onVendorCrea
       fn();
       changed(message);
     } catch (err) {
-      onChanged((err as Error).message, 'error');
+      onChanged(errText(err), 'error');
     }
   };
   const remove = () => {
@@ -83,7 +84,7 @@ export function ReturnsTab({ purchases, vendors, orders, onConvert, onVendorCrea
     try {
       onConvert(billSeedFromGrn(g, purchases, receipts));
     } catch (err) {
-      onChanged((err as Error).message, 'error');
+      onChanged(errText(err), 'error');
     }
   };
   const exportNotes = () => {
@@ -362,7 +363,7 @@ function SupplierNoteForm({ note, onClose, onSaved, onError }: { note: PurchaseR
           purchaseReturnsDb.setSupplierNote(note.id, number, date);
           onSaved(prT('supSaved', { number: note.note_number }));
         } catch (err) {
-          onError((err as Error).message);
+          onError(errText(err));
         }
       }}
     >

@@ -27,6 +27,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import tabStyles from './VendorsTab.module.css';
+import { errText, libMsg } from '../../i18n/lib-msg';
 
 // R14 (PS-B2): "advocate / firm of advocates" tick (inward reverse charge on legal services) — one lazy row.
 const NettingLinkRow = lazy(() => import('../receivables/NettingDialog').then((m) => ({ default: m.NettingLinkRow }))); // R15-A3
@@ -167,7 +168,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
 
   const submit = () => {
     const problem = validateVendor(draft);
-    if (problem) return setError(problem);
+    if (problem) return setError(libMsg(problem));
     if (farmerProblem) return setError(farmerProblem);
     if (draft.bank_ifsc?.trim() && !isValidIfsc(draft.bank_ifsc.trim().toUpperCase())) return setError(wireT('ifscInvalid'));
     const tdsProblem = vendorTdsProblem(draft);
@@ -183,7 +184,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
       onSaved(vendor ? purT('updated', { name: saved.name }) : purT('added', { name: saved.name }));
       onClose();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     }
   };
 

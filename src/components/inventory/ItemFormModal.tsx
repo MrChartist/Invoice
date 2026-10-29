@@ -19,6 +19,7 @@ import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
 import { retailT } from '../../i18n/areas/retail';
 import { impliedPacks } from '../../lib/shop-mode';
 import { localDb } from '../../lib/localDb';
+import { errText, libMsg } from '../../i18n/lib-msg';
 
 const LeadTimeRow = lazy(() => import('../mfg/LeadTimeRow')); // R13 MF-A4: lead / make days (shopfloor pack)
 const PackSizeRow = lazy(() => import('../agri/PackSizeRow')); // R12 AG-C4: agri class, pack size, labelled (mill / agri pack)
@@ -116,11 +117,11 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
     setTouched(true);
     if (!valid) return;
     const sc = setStockShortCode({ name, hsn: d.hsn, unit: d.unit, sale_rate: d.sale_rate === '' ? undefined : num(d.sale_rate), tax_rate: d.tax_rate === '' ? undefined : num(d.tax_rate) }, shortCode);
-    if (!sc.ok) return setShortError(sc.error.message);
+    if (!sc.ok) return setShortError(libMsg(sc.error.message));
     try {
       setStockItemFields({ name, hsn: d.hsn, unit: d.unit, sale_rate: d.sale_rate === '' ? undefined : num(d.sale_rate), tax_rate: d.tax_rate === '' ? undefined : num(d.tax_rate) }, cleanValueMap(itemFields, customFieldsDb.all()));
     } catch (err) {
-      return setShortError((err as Error).message);
+      return setShortError(errText(err));
     }
     onSave({
       ...item,
@@ -158,7 +159,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
       try {
         recipe.commit(item.id);
       } catch (err) {
-        window.alert((err as Error).message);
+        window.alert(errText(err));
       }
     }
   };
@@ -320,7 +321,7 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
           groups={masters.groups}
           categories={masters.categories}
         />
-        {touched && mastersError && <span className={controls.error} role="alert">{mastersError}</span>}
+        {touched && mastersError && <span className={controls.error} role="alert">{libMsg(mastersError)}</span>}
         {touched && negative && <span className={controls.error} role="alert">{invT('errNegative')}</span>}
         <button type="submit" hidden />
       </form>
