@@ -107,13 +107,13 @@ browser keeps by design are not claimed (`NEVER_CLAIM`) and every key has a twin
 browser run that finds a key not cancellable marks the row `browser: 'unsafe:<browser>'` (one token `u:` in the row
 line); the engine and the stub then skip it there.
 
-## Sizes (gzip, `node scripts/check-bundle-size.mjs`, base `cb6607f`)
+## Sizes (gzip, `node scripts/check-bundle-size.mjs`, base `d091326`)
 
 | | Base | After R20-A | Change |
 |---|---|---|---|
 | First paint | 177.9 kB (182,219 B) | 177.9 kB (182,173 B) | −46 B (stub in; Phase 7 route table, `useTallyKeys`, the overlay's English labels and the palette strings out) |
-| Core precache | 3,239.9 kB | 3,251.1 kB | **+11.2 kB** — over the A cap of 9 kB. Chunks: `f-keys` 7.4 (labels of every row of the round ≈ 2.2, rows ≈ 1.8, never-claim 0.3, engine / cheat / palette / hook ≈ 3.0), `KeysHost` 2.2, cheat sheet +1.0, help topic +0.2, POS +0.1; ≈ +0.7 is hash churn across ≈ 700 chunks (the first-paint chunk's export names moved). Cuts taken: 1 (Ctrl+F5 / F6 → B), 3 (no amount hint chip); cut 2 (print) kept, it costs < 0.1 kB with CSS `:has` |
-| Hindi pack | 370.0 kB | 372.8 kB | +2.8 kB (`lang-hi-keys`) |
+| Core precache | 3,242.9 kB | 3,254.1 kB | **+11.2 kB** — over the A cap of 9 kB. Chunks: `f-keys` 7.4 (labels of every row of the round ≈ 2.2, rows ≈ 1.8, never-claim 0.3, engine / cheat / palette / hook ≈ 3.0), `KeysHost` 2.2, cheat sheet +1.0, help topic +0.2, POS +0.1; ≈ +0.7 is hash churn across ≈ 700 chunks (the first-paint chunk's export names moved). Cuts taken: 1 (Ctrl+F5 / F6 → B), 3 (no amount hint chip); cut 2 (print) kept, it costs < 0.1 kB with CSS `:has` |
+| Hindi pack | ≈ 370.4 kB | 373.2 kB | +2.8 kB (`lang-hi-keys`) |
 | Hindi in English chunks | 21.7 kB | 21.8 kB | +0.1 |
 
 ## Tests
