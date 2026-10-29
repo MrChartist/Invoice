@@ -4,7 +4,7 @@
  * from the period's amendment rows (B2BA / B2CLA / CDNRA / CDNURA / EXPA) that carry the operator GSTIN (`etin`),
  * grouped by operator × original period; credit notes count negative.
  *
- * Table 14A(b) (PENDING 44, `table14Ab`): the revised value of amended supplies on which the operator pays tax u/s
+ * Table 14A(b) (PENDING 44, `table14Ab` in gst-reports.ts — kept out of this small shared module): the revised value of amended supplies on which the operator pays tax u/s
  * 9(5), from `amendments.eco95a` (value only, as Table 14(b); a supply that left 9(5) revises its row to 0).
  * Not generated (and why): Table 15 / 15A and GSTR-3B 3.1.1(i) are the OPERATOR's own rows (supplies on which the operator pays
  * tax u/s 9(5)) — this app prepares the supplier's return, so they stay nil (the 3B JSON writes `eco_sup` as zero).
@@ -51,16 +51,3 @@ export function table14A(g1: Gstr1Report): Eco14aRow[] {
   return [...out.values()].sort((a, b) => a.etin.localeCompare(b.etin) || a.origPeriod.localeCompare(b.origPeriod));
 }
 
-/** Table 14A(b): revised net value per operator × original period of this period's 9(5) amendments (PENDING 44). */
-export function table14Ab(g1: Gstr1Report): Eco14aRow[] {
-  const out = new Map<string, Eco14aRow>();
-  for (const r of g1.amendments?.eco95a ?? []) {
-    const f = r.noteType === 'C' ? -1 : 1;
-    const key = `${r.etin}|${r.origPeriod}`;
-    const t = out.get(key) ?? { etin: r.etin, origPeriod: r.origPeriod, value: 0, igst: 0, cgst: 0, sgst: 0, cess: 0, count: 0 };
-    t.value = round2(t.value + f * r.taxable);
-    t.count++;
-    out.set(key, t);
-  }
-  return [...out.values()].sort((a, b) => a.etin.localeCompare(b.etin) || a.origPeriod.localeCompare(b.origPeriod));
-}

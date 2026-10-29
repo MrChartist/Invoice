@@ -8,13 +8,13 @@ import assert from 'node:assert/strict';
 import { resetStorage } from './helpers/shim.ts';
 import { BUYER_KA, SELLER, SELLER_GSTIN, clientKA } from './helpers/world.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
-import { buildGstReport, periodForDate } from '../src/lib/gst-reports.ts';
+import { buildGstReport, isUinShaped, periodForDate } from '../src/lib/gst-reports.ts';
 import { buildGstr3bJson, gstr3bRows } from '../src/lib/gstr-json.ts';
 import { gstr1aDiff, snapshotFromReport, specialReturnDues, specialReturnForms, timeBarList, RETURN_TIME_BAR_RULES } from '../src/lib/gst-guards.ts';
+import { gstr6DueDate } from '../src/lib/gst-penalties.ts';
 import { buildGstr1aJson, GSTR1A_JSON_LAYOUT } from '../src/lib/gstr1a-json.ts';
 import { applyIrpResponse, parseIrpResponse } from '../src/lib/einvoice-bulk.ts';
 import { DUE_DATE_EXTENSIONS, complianceCalendar, withExtension } from '../src/lib/compliance.ts';
-import { isUinShaped } from '../src/lib/uin.ts';
 
 beforeEach(() => resetStorage());
 
@@ -85,6 +85,7 @@ test('time bar: GSTR-6 / 7 / 8 monthly rows (13th / 10th) are listed once they n
   const g7 = specialReturnDues('GSTR7', '2022-08-01', '2025-09-15');
   assert.equal(g7[0].due, '2022-09-10');
   assert.equal(specialReturnDues('GSTR6', '2022-08-01', '2025-09-15')[0].due, '2022-09-13');
+  for (const m of ['2017-07-01', '2022-08-01', '2025-12-01']) assert.equal(specialReturnDues('GSTR6', m, m)[0].due, gstr6DueDate(m), 'same day as GSTR6_DUE_RULES');
   assert.equal(specialReturnDues('GSTR8', '2018-08-01', '2018-11-01')[0].periodKey, '2018-10', 'no GSTR-8 before 1 Oct 2018');
   const special = specialReturnForms({ gst_special_returns: ['GSTR7'] }, [{ kind: 'INWARD', date: '2022-08-03' }], '2022-08-01');
   assert.deepEqual(special.map((s) => s.form), ['GSTR6', 'GSTR7']);

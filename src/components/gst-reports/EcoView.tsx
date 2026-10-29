@@ -1,9 +1,9 @@
-import type { EcoRow, Gstr1Report, Gstr3bReport } from '../../lib/gst-reports';
+import { table14Ab, type EcoRow, type Gstr1Report, type Gstr3bReport } from '../../lib/gst-reports';
 import { DataTable, Money, type Column } from './DataTable';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import local from './gst-reports.module.css';
-import { table14A, table14Ab } from '../../lib/eco-amend';
+import { table14A } from '../../lib/eco-amend';
 import { r7T } from '../../i18n/areas/gst-tds-7r';
 
 const cols = (withTax: boolean): Column<EcoRow>[] => [

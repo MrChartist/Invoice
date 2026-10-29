@@ -128,7 +128,7 @@ date (amending the number/date itself is possible by editing them). CSV: GST pag
 ## Table 14A(b) and the Table 8 / HSN / documents-issued effect (PENDING 44)
 - **Table 14A(b)**: an amendment whose original or revised version is a supply through an operator paying tax u/s 9(5)
   goes to `amendments.eco95a` (revised row with `etin`; value 0 when it left 9(5), then also in B2BA / B2CLA as usual).
-  `table14Ab` (`eco-amend.ts`) groups it per operator × original period — value only, all lines, as Table 14(b); E-commerce
+  `table14Ab` (`gst-reports.ts`) groups it per operator × original period — value only, all lines, as Table 14(b); E-commerce
   tab and the Amendments CSV (`14A(b)` rows). `AMEND_ECO_95` is now an info. No JSON (layout unverified) — enter it on the portal.
 - **Table 8 / HSN / documents issued** have no amendment section in GSTR-1. For each amendment of the period with its
   frozen original, the revised − original difference goes to `amendments.nilA` (Table 8 per supply type and column),

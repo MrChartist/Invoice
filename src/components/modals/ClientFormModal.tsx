@@ -6,7 +6,6 @@ import { GstinInput } from '../ui/GstinInput';
 import { ContactPickButton } from './ContactPickButton';
 import { INDIAN_STATES, resolveStateCode, stateByCode } from '../../lib/india-states';
 import { checkGstin } from '../../lib/gstin';
-import { isUinShaped } from '../../lib/uin';
 import { localDb } from '../../lib/localDb';
 import { isValidPan, isValidTan } from '../../lib/validators';
 import { MAX_FLAT_FEE, sanitizeClientLateFee, type ClientLateFeeMode } from '../../lib/late-fee-rule';
@@ -91,7 +90,8 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
     e.preventDefault();
     if (!form.name.trim()) return setError(salesT('cf.errName'));
     if (farmerProblem) return setError(farmerProblem);
-    if (form.gstin && !checkGstin(form.gstin).valid && !(form.gst_reg_type === 'uin' && isUinShaped(form.gstin))) return setError(salesT('cf.errGstin'));
+    // 8.66: a UIN holder's UIN (shape only, same check as `isUinShaped` in gst-reports.ts) is accepted in the GSTIN field.
+    if (form.gstin && !checkGstin(form.gstin).valid && !(form.gst_reg_type === 'uin' && /^[0-9]{4}[A-Z]{3}[0-9]{5}[A-Z0-9]{3}$/.test(form.gstin.trim().toUpperCase()))) return setError(salesT('cf.errGstin'));
     if (form.email && !/^\S+@\S+\.\S+$/.test(form.email.trim())) return setError(salesT('cf.errEmail'));
     const pan = (form.pan ?? '').trim().toUpperCase();
     const tan = (form.tan ?? '').trim().toUpperCase();

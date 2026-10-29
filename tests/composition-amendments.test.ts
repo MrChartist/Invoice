@@ -491,7 +491,7 @@ test('startAmendment: freezes the stored document and keeps its id, number and p
 /* ───────────── PENDING 44: Table 14A(b) and Table 8 / HSN / documents-issued amendments ───────────── */
 
 test('Table 14A(b): an amended 9(5) supply is listed with the revised value per operator × original period', async () => {
-  const { table14Ab } = await import('../src/lib/eco-amend.ts');
+  const { table14Ab } = await import('../src/lib/gst-reports.ts');
   const ECO = '27AACCF0683K1ZM';
   const original = computed(inv({ id: 'e95', invoice_number: 'INV/FY25-26/0005', issue_date: '2025-04-08', eco_gstin: ECO, eco_section: 'PAY_9_5', gst_mode: 'NONE', items: [item('Ride', 1, 1000, 0, '9964')] }));
   const rev = amended(original, '2025-06-10', { items: [{ ...original.items[0], rate: 1500, amount: 1500 }] });

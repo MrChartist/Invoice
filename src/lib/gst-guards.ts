@@ -16,7 +16,6 @@ import { isNonGstFinancialNote } from './financial-note';
 import { ruleAt, type Versioned, b2clThreshold, rateInSlabs } from './tax-rules';
 import { complianceCalendar, daysBetween, filedFor, type CalendarOptions, type FiledReturn, type ReturnDue, type ReturnForm } from './compliance';
 import { shiftDay } from './dates';
-import { gstr6DueDate } from './gst-penalties';
 import { SINGLETON_KEYS, getJson, getTable, setTable } from './storage';
 import { isOwnGstin } from './gstin';
 import type { InvoiceRecord, SenderProfile } from '../types/invoice';
@@ -184,13 +183,15 @@ export const RETURN_TIME_BAR_RULES: readonly Versioned<TimeBarRule | null>[] = [
 export type SpecialReturnForm = 'GSTR6' | 'GSTR7' | 'GSTR8';
 
 /**
- * Due day of the month after the tax period, keyed by the period's first day. GSTR-6 reads `GSTR6_DUE_RULES`
- * (gst-penalties.ts, 13th). GSTR-7 (Rule 66) and GSTR-8 (Rule 67) by the 10th — TDS / TCS in force from 1 Oct 2018
- * (Notifications 50/2018-CT and 51/2018-CT). Written from knowledge of the rules, not re-read: verify with your CA.
+ * Due day of the month after the tax period, keyed by the period's first day. GSTR-6 by the 13th (Sec 39(4) / Rule 65 —
+ * the same value as `GSTR6_DUE_RULES` in gst-penalties.ts, which is not imported here so the bell's chunk stays as it
+ * is; `tests/gst-8d-followups.test.ts` keeps the two equal). GSTR-7 (Rule 66) and GSTR-8 (Rule 67) by the 10th — TDS /
+ * TCS in force from 1 Oct 2018 (Notifications 50/2018-CT and 51/2018-CT). Written from knowledge of the rules, not
+ * re-read: verify with your CA.
  */
-export const SPECIAL_RETURN_DUE_RULES: readonly Versioned<{ GSTR7: number; GSTR8: number } | null>[] = [
-  { from: '2017-07-01', value: null, source: 'TDS / TCS provisions not in force' },
-  { from: '2018-10-01', value: { GSTR7: 10, GSTR8: 10 }, source: 'Rule 66 / Rule 67 CGST Rules; Notifications 50/2018-CT, 51/2018-CT — verify' },
+export const SPECIAL_RETURN_DUE_RULES: readonly Versioned<{ GSTR6: number; GSTR7: number | null; GSTR8: number | null }>[] = [
+  { from: '2017-07-01', value: { GSTR6: 13, GSTR7: null, GSTR8: null }, source: 'Sec 39(4), Rule 65 (GSTR-6); TDS / TCS provisions not in force — verify' },
+  { from: '2018-10-01', value: { GSTR6: 13, GSTR7: 10, GSTR8: 10 }, source: 'Rule 65 / 66 / 67 CGST Rules; Notifications 50/2018-CT, 51/2018-CT — verify' },
 ];
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -205,15 +206,11 @@ export function specialReturnDues(form: SpecialReturnForm, since: string, today:
     const m = (i % 12) + 1;
     const key = `${y}-${String(m).padStart(2, '0')}`;
     const from = `${key}-01`;
-    let due: string;
-    if (form === 'GSTR6') due = gstr6DueDate(from);
-    else {
-      const rule = ruleAt(SPECIAL_RETURN_DUE_RULES, from);
-      if (!rule) continue;
-      const ny = m === 12 ? y + 1 : y;
-      const nm = m === 12 ? 1 : m + 1;
-      due = `${ny}-${String(nm).padStart(2, '0')}-${String(rule[form]).padStart(2, '0')}`;
-    }
+    const dueDay = ruleAt(SPECIAL_RETURN_DUE_RULES, from)[form];
+    if (!dueDay) continue;
+    const ny = m === 12 ? y + 1 : y;
+    const nm = m === 12 ? 1 : m + 1;
+    const due = `${ny}-${String(nm).padStart(2, '0')}-${String(dueDay).padStart(2, '0')}`;
     out.push({ id: `${form}:${key}`, form, periodKey: key, label: `${MONTH_NAMES[m - 1]} ${y}`, from, to: shiftDay(due.slice(0, 8) + '01', -1), due, optional: false });
   }
   return out;

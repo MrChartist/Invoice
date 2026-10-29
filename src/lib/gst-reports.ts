@@ -42,7 +42,6 @@ import { isNonGstFinancialNote } from './financial-note';
 import { isPureAgentLine } from './trade/pure-agent';
 import { docCurrency, inrTotals, inrValue, missingFxRate } from './fx';
 import { checkGstin } from './gstin';
-import { isUinShaped } from './uin';
 import { stateByCode, stateByName } from './india-states';
 import { isNonSupplyCategory, isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
 import { b2clThreshold, b2clThresholdLabel, ecoReporting, gstSetOffOrder, hsnMinDigits, hsnTableSplit, type GstSetOffOrder } from './tax-rules';
@@ -1340,6 +1339,13 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
 
 /* ───────────────────────── Amendments (5.9) ───────────────────────── */
 
+/**
+ * 8.66: shape of a UIN (Unique Identity Number of a UN body / embassy, Rule 17) as seen on certificates, e.g.
+ * 0717UNO00157UNO. A shape check only — not verified; a valid GSTIN never matches it. (Kept here and in the client
+ * form rather than in a shared leaf module, so no first-paint / shared chunk changes.)
+ */
+export const isUinShaped = (raw?: string): boolean => /^[0-9]{4}[A-Z]{3}[0-9]{5}[A-Z0-9]{3}$/.test((raw ?? '').trim().toUpperCase());
+
 /** Operator GSTIN a B2CS / B2CSA row is split by (Sec 52 only), else ''. */
 const tcsEtin = (d: PDoc) => (d.etin && d.ecoSection === 'TCS_52' ? d.etin : '');
 
@@ -1512,6 +1518,24 @@ function buildAmendments(
   if (hsnRows.length) tables.hsnA = hsnRows;
   if (docA.length) tables.docA = docA;
   return { count, tables, deltas };
+}
+
+/**
+ * PENDING 44 — GSTR-1 Table 14A(b): revised net value (value only, as Table 14(b)) per operator × original period of
+ * this period's amendments of supplies on which the operator pays tax u/s 9(5) (`amendments.eco95a`). Same row shape
+ * as `table14A` (eco-amend.ts). Working paper; JSON layout not verified — verify with your CA.
+ */
+export function table14Ab(g1: Pick<Gstr1Report, 'amendments'>): { etin: string; origPeriod: string; value: number; igst: number; cgst: number; sgst: number; cess: number; count: number }[] {
+  const out = new Map<string, { etin: string; origPeriod: string; value: number; igst: number; cgst: number; sgst: number; cess: number; count: number }>();
+  for (const r of g1.amendments?.eco95a ?? []) {
+    const f = r.noteType === 'C' ? -1 : 1;
+    const key = `${r.etin}|${r.origPeriod}`;
+    const t = out.get(key) ?? { etin: r.etin, origPeriod: r.origPeriod, value: 0, igst: 0, cgst: 0, sgst: 0, cess: 0, count: 0 };
+    t.value = round2(t.value + f * r.taxable);
+    t.count++;
+    out.set(key, t);
+  }
+  return [...out.values()].sort((a, b) => a.etin.localeCompare(b.etin) || a.origPeriod.localeCompare(b.origPeriod));
 }
 
 /* ───────────────────────── Purchases (defensive) ───────────────────────── */
