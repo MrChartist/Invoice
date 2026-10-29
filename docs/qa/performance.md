@@ -540,7 +540,13 @@ Round 21 needs ≈ 30 kB of core and R20 B–D hold 20 kB more, against 45.5 kB 
 | P4 | dead lazy code | — | dropped (< 0.5 kB) | | | | |
 | | **total** | **3,235.4** | **−19.1** | **177.5 (−0.4)** | **89.1 (−0.4)** | 385.4 (+12.2) | **9.7 (−12.1)** |
 
-Other numbers, before → after: initial files 4 → 4, `lazy-leaves` 17.6 → 18.5 kB (P1: `tips.ts`, now under 3,000 B,
+Re-measured after merging `origin/master` `67ccabd` (R21-A fuel core, R20-D, PENDING 40 / 48 / 50), both builds in this
+checkout: core **3,277.0 → 3,258.6 (−18.4)**, first paint 177.8 → 177.4, entry 89.5 → 89.0, Hindi pack 376.6 → 388.9,
+Hindi in core 21.9 → 9.8, `lazy-leaves` 17.7 → 18.6, `lazy-leaves-ui` 14.0 → **27.7 / 28**, `css-maps` 3.7 kB JS + 10.0 kB
+gz CSS, JS files 1,049 → 1,004. **`lazy-leaves-ui` then has 0.3 kB headroom:** the next small UI leaf of R20 / R21 can
+fail `check-bundle-size`; the lead decides between a 2,000 B threshold (less saving) and a higher cap.
+
+Other numbers (on `182d364`), before → after: initial files 4 → 4, `lazy-leaves` 17.6 → 18.5 kB (P1: `tips.ts`, now under 3,000 B,
 and `hi-tables.ts` joined), `lazy-leaves-ui` 13.4 → **27.0 / 28 kB** (64 → 90 modules), regional 20.7 → 20.7, JS files
 1,038 → 994 (core 937 → 893).
 
@@ -571,9 +577,9 @@ and `hi-tables.ts` joined), `lazy-leaves-ui` 13.4 → **27.0 / 28 kB** (64 → 9
    are kept and the "no side effect" rule is now automatic: `loadEffects` (a conservative top-level statement check —
    declarations, imports / exports and values built from literals, functions, `defineArea`, `lazy`, `createContext`,
    `new Set / Map` pass; any other call, assignment or update is reported) keeps a module with a load effect out of the
-   group (`leafGroup(…, { pure: true })`) and `check-bundle-size` fails if one gets in. **Headroom is 1.0 kB:** a new
-   small UI leaf joins automatically, so a package that adds several may need the threshold lowered (2,000) or the cap
-   raised by the lead.
+   group (`leafGroup(…, { pure: true })`) and `check-bundle-size` fails if one gets in. **Headroom is small (1.0 kB here,
+   0.3 kB on `67ccabd`):** a new small UI leaf joins automatically, so the next package may need the threshold lowered
+   (2,000) or the cap raised by the lead.
 4. **Dead lazy code (P4), dropped.** Nothing in `build-meta/chunks.json` is unreachable: rolldown includes only
    imported modules, and the PRD's example `day-math.ts` is test-only already (no `src/` importer, not in `dist/`).
    Unused exports do ship from modules loaded with a dynamic `import()` whose namespace is passed on (e.g.
