@@ -3,7 +3,9 @@ import { useMemo, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { buildGstr9 } from '../../lib/gstr9';
 import { buildGstr9c, type Gstr9cAdjustments, type Gstr9cLine } from '../../lib/gstr9c';
-import { gstr9cRateWise, gstr9cTable14, notesItcForFy } from '../../lib/gstr9c-extra';
+import { gstr9cBooksColumn, gstr9cRateWise, gstr9cTable14, notesItcForFy } from '../../lib/gstr9c-extra';
+import { salesDocs, taxByRate } from '../../lib/sales-reports';
+import { p40T } from '../../i18n/areas/statutory-p40';
 import { loadIsdInward } from '../../lib/isd';
 import { journalItcReversals } from '../../lib/gst-reports'; // R6-C4
 import { r7T } from '../../i18n/areas/gst-tds-7r';
@@ -60,6 +62,7 @@ export function Gstr9cView({ fyStart, gstin, filerStateCode, turnover }: Gstr9cV
     });
     const g = gstSummary(books, period);
     const purchases = getTable<unknown>('purchases');
+    const rate9 = gstr9cRateWise(g9, purchases, filerStateCode);
     return {
       g9,
       books: {
@@ -70,7 +73,9 @@ export function Gstr9cView({ fyStart, gstin, filerStateCode, turnover }: Gstr9cV
         notesItc: notesItcForFy(books.purchaseReturns, fyStart),
       },
       // 7R (7.127): rate-wise Table 9 and expense-wise Table 14.
-      rate9: gstr9cRateWise(g9, purchases, filerStateCode),
+      rate9,
+      // PENDING 40: books column — the sales register by line rate against the documents (GSTR-1 HSN).
+      books9: gstr9cBooksColumn(rate9.rows, taxByRate(salesDocs(books.invoices).docs, period).rows, { igst: g.outputIgst, cgst: g.outputCgst, sgst: g.outputSgst, cess: g.outputCess ?? 0 }),
       t14: gstr9cTable14(g9, purchases, filerStateCode, books.purchaseReturns ?? []),
     };
   }, [fyStart, gstin, filerStateCode, turnover]);
@@ -150,7 +155,7 @@ export function Gstr9cView({ fyStart, gstin, filerStateCode, turnover }: Gstr9cV
       </div>
 
       <h3 className={local.tbHeading}>{r7T('c9RateTitle')}</h3>
-      <p className={styles.muted}>{r7T('c9RateHint')}</p>
+      <p className={styles.muted}>{r7T('c9RateHint')} {p40T('c9BooksHint')}</p>
       <div className={styles.scroll}>
         <table className={styles.grid} aria-label={r7T('c9RateTitle')} data-9c-rate>
           <thead>
@@ -162,17 +167,32 @@ export function Gstr9cView({ fyStart, gstin, filerStateCode, turnover }: Gstr9cV
               <th scope="col">SGST</th>
               <th scope="col">IGST</th>
               <th scope="col">Cess</th>
+              <th scope="col">{p40T('c9BooksCol')}</th>
+              <th scope="col">{p40T('c9Diff')}</th>
             </tr>
           </thead>
           <tbody>
-            {base.rate9.rows.map((r) => (
-              <tr key={r.id}>
-                <td>{r.id}</td>
-                <td style={{ textAlign: 'left' }}>{r.total ? <strong>{r.label}</strong> : r.label}</td>
-                <td>{r.total ? '' : formatMoney(r.taxable)}</td>
-                {(['cgst', 'sgst', 'igst', 'cess'] as const).map((k) => <td key={k} className={r.id === '9Q' && Math.abs(r[k]) > 1 ? styles.bad : undefined}>{formatMoney(r[k])}</td>)}
-              </tr>
-            ))}
+            {base.rate9.rows.map((r) => {
+              const bk = base.books9.books.get(r.id);
+              const d = base.books9.diff.get(r.id);
+              return (
+                <tr key={r.id}>
+                  <td>{r.id}</td>
+                  <td style={{ textAlign: 'left' }}>{r.total ? <strong>{r.label}</strong> : r.label}</td>
+                  <td>{r.total ? '' : formatMoney(r.taxable)}</td>
+                  {(['cgst', 'sgst', 'igst', 'cess'] as const).map((k) => <td key={k} className={r.id === '9Q' && Math.abs(r[k]) > 1 ? styles.bad : undefined}>{formatMoney(r[k])}</td>)}
+                  <td>{d === undefined ? '' : formatMoney(bk ? bk.cgst + bk.sgst + bk.igst + bk.cess : 0)}</td>
+                  <td className={d !== undefined && Math.abs(d) > 1 ? styles.bad : undefined}>{d === undefined ? '' : formatMoney(d)}</td>
+                </tr>
+              );
+            })}
+            <tr data-9c-not-by-rate>
+              <td>—</td>
+              <td style={{ textAlign: 'left' }}>{p40T('c9NotByRate')}</td>
+              <td colSpan={5} />
+              <td>{formatMoney(base.books9.notByRate.cgst + base.books9.notByRate.sgst + base.books9.notByRate.igst + base.books9.notByRate.cess)}</td>
+              <td />
+            </tr>
           </tbody>
         </table>
       </div>

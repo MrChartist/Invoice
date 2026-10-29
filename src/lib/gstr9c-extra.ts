@@ -109,6 +109,42 @@ export function gstr9cRateWise(g9: Gstr9Report, rawPurchases: readonly unknown[]
   return { rows, unreconciled };
 }
 
+/**
+ * PENDING 40 (7.131): the books column of rate-wise Table 9. `byRate` = the books' sales register by line rate for
+ * the FY (sales less credit notes, e.g. `taxByRate(salesDocs(...))`), `booksTotal` = output tax booked by head
+ * (`gstSummary`). Each outward rate row (9A, 9C, 9E, 9G, 9I–9K, other) gets the books figure; reverse-charge rows
+ * take the documents' own figure (the bills are the books there); tax booked but not on any document line by rate
+ * (legacy single-tax rows, foreign-currency documents) is `notByRate`. `diff` = books − documents, by row id.
+ */
+export function gstr9cBooksColumn(
+  rows: readonly Gstr9cRateRow[],
+  byRate: readonly ({ rate: number } & RateHeads)[],
+  booksTotal: Omit<RateHeads, 'taxable'>,
+): { books: Map<string, RateHeads>; diff: Map<string, number>; notByRate: RateHeads } {
+  const books = new Map<string, RateHeads>();
+  const rowFor = (rate: number) => RATE_ROWS.find((x) => Math.abs(x.rate - rate) < 0.001)?.id ?? '9-OTH';
+  const rc = new Set(['9-ORC', ...RATE_ROWS.flatMap((x) => (x.rcId ? [x.rcId] : []))]);
+  for (const r of rows) if (rc.has(r.id)) books.set(r.id, { taxable: r.taxable, cgst: r.cgst, sgst: r.sgst, igst: r.igst, cess: r.cess });
+  const byRow = zero();
+  for (const b of byRate) {
+    if (!(b.rate > 0)) continue;
+    const id = rowFor(b.rate);
+    if (!rows.some((r) => r.id === id)) continue; // a rate with no row of its own stays in `notByRate`
+    const t = books.get(id) ?? zero();
+    add(t, b);
+    add(byRow, b);
+    books.set(id, t);
+  }
+  const notByRate = zero();
+  add(notByRate, booksTotal);
+  add(notByRate, byRow, -1);
+  notByRate.taxable = 0;
+  const tax = (h?: Partial<RateHeads>) => round2(num(h?.cgst) + num(h?.sgst) + num(h?.igst) + num(h?.cess));
+  const diff = new Map<string, number>();
+  for (const r of rows) if (/^9[A-K]$|^9-O(TH|RC)$/.test(r.id)) diff.set(r.id, round2(tax(books.get(r.id)) - tax(r)));
+  return { books, diff, notByRate };
+}
+
 export interface Gstr9cExpenseRow {
   id: string;
   label: string;
