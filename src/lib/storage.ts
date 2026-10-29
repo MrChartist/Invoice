@@ -123,11 +123,11 @@ let backend: StorageBackend = 'local';
  * IndexedDB as chunks of CHUNK rows: `rows:<key>` = head `{"v":1,"n":<chunks>,"g":<random>}` and
  * `rows:<key>:<i>` = rows iC … iC+C-1 as JSON joined by ','; the logical value is `[` + chunks.join(',') + `]`,
  * byte for byte the JSON of the whole table. In memory such a value is a `Rows` object (`t` = its text once
- * read). A plain string at `<key>` (the old layout, or what writeRaw / restore / sync write) always wins over
- * chunks; every chunked write deletes it, every plain write deletes the chunks. A save re-serialises and
- * writes only the chunks whose rows changed (plus the head when rows were added, removed or moved). The head
- * is the cross-tab etag: an incremental write commits only if the stored head is the one this tab last
- * saw, else the whole table is written (last writer wins, as before).
+ * read). A plain string at `<key>` (the old layout, or what writeRaw / restore / sync write) and chunks are
+ * exclusive: every chunked write deletes it, every plain write deletes the chunks (both: see `openRows`). A save
+ * re-serialises and writes only the chunks whose rows changed (plus the head when rows were added, removed or
+ * moved). The head is the cross-tab etag for those: an incremental write commits only if the stored head is the
+ * one this tab last saw, else the whole table is written; in-place edits merge per chunk (last writer wins).
  */
 const CHUNKED = new Set([DB_PREFIX + 'invoices']);
 const CHUNK = 16;
@@ -180,32 +180,36 @@ const chunksOf = (k: string, keys: IDBValidKey[], vals: unknown[]): [number, unk
     return [/^\d+$/.test(i) ? +i : -1, vals[j]];
   });
 /**
- * The logical value of chunked key `k` from its records: the plain string if there is one, else the chunks
- * (a complete set as `Rows` plus the head it came with; an incomplete one as the text of what is there, so
- * nothing that exists is dropped). Undefined when a record cannot be opened.
+ * The logical value of chunked key `k` from its records: the plain string, or a complete set of chunks as `Rows`
+ * plus the head it came with. Both: a build that could not see the chunks wrote the plain value, so every chunk row
+ * is kept and its rows not among them (by id) are added. Undefined when a record cannot be opened or the chunk set
+ * is incomplete: the key is then left untouched and refused (`refuse`), never adopted in part.
  */
 async function openRows(k: string, base: unknown, head: unknown, chunks: [number, unknown][], open: Opener): Promise<[Val | null, string?] | undefined> {
-  if (typeof base === 'string') {
-    const s = await open(k, base);
-    return s === undefined ? undefined : [s];
-  }
-  if (typeof head !== 'string') return [null];
+  const plain = typeof base === 'string' ? await open(k, base) : null;
+  if (plain === undefined) return undefined;
+  if (typeof head !== 'string') return [plain];
   const h = await open(headKey(k), head);
-  if (h === undefined) return undefined;
-  let n = -1;
+  let n = 0;
   try {
-    const o = JSON.parse(h) as { v?: unknown; n?: unknown };
+    const o = JSON.parse(h!) as { v?: unknown; n?: unknown };
     if (o?.v === 1 && Number.isInteger(o.n)) n = o.n as number;
   } catch {
-    /* unreadable head: keep every chunk found */
+    /* unreadable head: refused below */
   }
   const c: string[] = [];
   const opened = await Promise.all(
-    chunks.map(async ([i, v]) => typeof v !== 'string' || !(i >= 0) || (n >= 0 && i >= n) || (c[i] = (await open(chunkKey(k, i), v))!) !== undefined),
+    chunks.map(async ([i, v]) => typeof v !== 'string' || !(i >= 0 && i < n) || (c[i] = (await open(chunkKey(k, i), v))!) !== undefined),
   );
-  if (opened.includes(false)) return undefined;
-  const whole = n > 0 && Object.keys(c).length === n;
-  return whole ? [{ c }, head] : [`[${c.filter((x) => x !== undefined).join(',')}]`];
+  if (opened.includes(false) || !(n > 0) || Object.keys(c).length !== n) return undefined;
+  if (plain === null) return [{ c }, head];
+  try {
+    const rows = JSON.parse(`[${c.join(',')}]`) as unknown[];
+    const ids = new Set(rows.map(idOf));
+    return [JSON.stringify([...rows, ...(JSON.parse(plain) as unknown[]).filter((r) => idOf(r) === undefined || !ids.has(idOf(r)))])];
+  } catch {
+    return undefined;
+  }
 }
 
 const cache = new Map<string, Val>();
@@ -245,6 +249,18 @@ let vaultId: string | null = null;
 let locked: { lsKeys: string[] } | null = null;
 /** Keys left untouched by the last unlock (could not be decrypted, or were not encrypted). */
 let skippedKeys: string[] = [];
+/** Chunked keys whose records could not be read in full: left untouched, every write to them refused. */
+const refused = new Set<string>();
+let refusal: StorageWriteError | null = null;
+function refuse(keys: string[]): void {
+  for (const k of keys)
+    if (CHUNKED.has(k) && !refused.has(k)) {
+      refused.add(k);
+      if (!skippedKeys.includes(k)) skippedKeys.push(k); // erase still removes its records (forgetVault)
+      refusal = new StorageWriteError('Some invoices on this device could not be read, so they were left untouched and cannot be changed. Export a backup and get help before you go on.', false);
+    }
+  if (refusal) setFlushError(refusal);
+}
 /** Set once a write was refused because another tab changed vault mode: no further writes until reload. */
 let vaultConflict: StorageWriteError | null = null;
 
@@ -394,7 +410,7 @@ export async function flushStorage(): Promise<void> {
   })().then(
     () => {
       for (const [k, v] of batch) if (pending.has(k) && pending.get(k) === v) pending.delete(k);
-      setFlushError(null);
+      setFlushError(refusal);
       try {
         channel?.postMessage({ keys: batch.map(([k]) => k) });
       } catch {
@@ -612,6 +628,7 @@ export async function initStorage(opts: { timeoutMs?: number } = {}): Promise<St
     const lsIsTruth = marked ? !stored.meta : lsData.size > 0 || !stored.meta;
     const target = new Map<string, Val>(lsIsTruth ? lsData : opened.vals);
     if (!lsIsTruth) for (const [k, v] of lsData) if (!target.has(k)) target.set(k, v);
+    for (const k of opened.bad) target.delete(k); // never written over: refused below
 
     const puts = [...target].filter(([k, v]) => opened.vals.get(k) !== v);
     const dels = [...opened.vals.keys()].filter((k) => !target.has(k));
@@ -634,6 +651,7 @@ export async function initStorage(opts: { timeoutMs?: number } = {}): Promise<St
 
     for (const [k, v] of target) cache.set(k, v);
     for (const [k, h] of opened.hs) heads.set(k, h);
+    refuse(opened.bad);
     dataVersion++;
     backend = 'idb';
     installIdbListeners();
@@ -690,6 +708,7 @@ export async function unlockStorage(passphrase: string): Promise<{ unreadable: s
   vaultKey = key;
   vaultId = id;
   skippedKeys = unreadable.sort();
+  refuse(unreadable);
   backend = 'idb';
   installIdbListeners();
   return { unreadable: [...skippedKeys] };
@@ -853,6 +872,8 @@ export async function vaultUnseal(name: string, value: string): Promise<string |
 export async function forgetVault(): Promise<void> {
   if (!vaultKey && !locked && skippedKeys.length === 0) return;
   const orphans = skippedKeys;
+  refused.clear();
+  refusal = null;
   vaultKey = null;
   vaultId = null;
   skippedKeys = [];
@@ -892,6 +913,8 @@ export function resetStorageBackend(): void {
   vaultId = null;
   locked = null;
   skippedKeys = [];
+  refused.clear();
+  refusal = null;
   vaultConflict = null;
   backend = 'local';
   cache.clear();
@@ -958,6 +981,7 @@ export function rawStamp(fullKey: string): string | object | null {
 /** Cache write (IndexedDB backend), queued for the next flush. */
 function putVal(fullKey: string, value: Val): void {
   if (vaultConflict) throw vaultConflict;
+  if (refused.has(fullKey)) throw refusal!;
   // While IndexedDB refuses writes for lack of space, refuse anything that grows the data so
   // the UI shows its usual "storage is full" error; shrinking writes go through and retry.
   if (flushError?.quotaExceeded && lenOf(value) > lenOf(cache.get(fullKey))) throw flushError;
@@ -1061,6 +1085,7 @@ const parsedCache = new Map<string, ParsedEntry>();
 const rowEntry = new WeakMap<object, ParsedEntry>();
 /** `getTable` copy → the cached row it was copied from. */
 const copyOf = new WeakMap<object, object>();
+const nestFrozen = new WeakSet<object>();
 const EMPTY_ROWS: readonly unknown[] = Object.freeze([]);
 /** Parses per table since the last `resetParseCounts()` (test seam for the parse-count guard rails). */
 const parseCounts = new Map<string, number>();
@@ -1097,6 +1122,14 @@ function registerEntry(table: string, raw: unknown, assets: unknown, rows: unkno
   const entry: ParsedEntry = { table, raw, assets, rows };
   for (const r of rows) if (r && typeof r === 'object') rowEntry.set(r, entry);
   if (FREEZE_SHARED) deepFreeze(rows);
+  // A chunked table reuses unchanged rows by identity, so a nested value changed in place would never be saved:
+  // its rows' nested values are frozen in production too (once per row), so such a write throws instead.
+  else if (typeof raw === 'object')
+    for (const r of rows)
+      if (r && typeof r === 'object' && !nestFrozen.has(r)) {
+        nestFrozen.add(r);
+        Object.values(r).forEach(deepFreeze);
+      }
   parsedCache.set(table, entry);
   return entry;
 }

@@ -19,6 +19,7 @@ import { activeCompanyId, companyDbName, pinCompany } from './company-registry';
 // connection (versionchange) and fail to reopen (VersionError), so they cannot write into a vault store.
 // v4 (PERF-3 row-level storage): no schema change either. Big tables may now be stored as chunk records
 // (`rows:<key>…`, storage.ts) that an older build cannot read; the bump keeps such builds out of the store.
+// Never lower it, and never ship a build at v4+ without the chunk reader.
 const DB_VERSION = 4;
 export const KV_STORE = 'kv';
 export const DATA_STORE = 'data';
