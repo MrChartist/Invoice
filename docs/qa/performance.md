@@ -439,21 +439,26 @@ template / QR screen (it is precached like every core chunk, so offline use is u
 "qrcode.react loads only once a UPI amount is typed" is now true. `tests/bundle-config.test.ts` asserts that neither
 vendor group captures `qrcode.react` (and that `vendor-ui` still matches `zustand` / `clsx`).
 
-| Chunk (gz -9, KiB) | Before `f395942` | After |
+Both columns built with `npx vite build` in the same checkout (the preload-map order, and so a few bytes of the
+entry, depend on the directory the build runs in). Before = base `b8a1a33` (same tree as `312b827`, PENDING 41 / 44 /
+47); after = that base + PERF-4. On the earlier base `f395942` the change measured the same: 184.8 → 179.2 initial,
+core 3,265.4 → 3,265.0.
+
+| Chunk (gz -9, KiB) | Before `b8a1a33` | After |
 |---|---|---|
-| `index` (entry = app-initial) | 90.84 | 90.84 |
+| `index` (entry = app-initial) | 90.83 | 90.84 |
 | `vendor-react` | 72.13 | 72.13 |
-| `vendor-ui` | 21.47 (69.2 raw) | **15.81** (53.4 raw) |
+| `vendor-ui` | 21.46 (69.2 raw) | **15.81** (53.4 raw) |
 | `rolldown-runtime` | 0.41 | 0.41 |
 | **First paint (initial JS)** | **184.8** | **179.2 (−5.7)** |
 | `esm` (`qrcode.react`, lazy) | — | 5.85 |
-| Core precache | 3,265.4 | 3,265.0 (−0.4) |
+| Core precache | 3,270.2 | 3,269.2 (−1.0) |
 | JS files | 1,059 | 1,060 |
 
 Measured and rejected: moving `tax-rules.ts` out of first paint (it is there only because `src/types/invoice.ts`
 evaluates `TDS_SECTIONS` / `TCS_PRESETS` at load and re-exports `GST_SLABS`, none used by `src/`). First paint
-−3.2 kB, but `tax-rules` became a shared chunk imported by 202 lazy chunks: core **+15.8 kB** (3,280.3). A widely
-shared first-paint module costs one `import{…}from` per importing chunk once it leaves the entry; only modules with
+−3.2 kB, but `tax-rules` became a shared chunk imported by 202 lazy chunks: core **+15.8 kB** (3,265.4 → 3,280.3, on
+`f395942`). A widely shared first-paint module costs one `import{…}from` per importing chunk once it leaves the entry; only modules with
 few importers (like `qrcode.react`) are worth moving. Next candidates, in the same spirit: lucide icons used only on
 lazy screens (every imported `lucide-react` icon still lands in `vendor-ui`, most of its 15.8 kB) — a policy change for
 `AGENTS.md`, not done here.
