@@ -39,6 +39,9 @@ import styles from './purchases.module.css';
 import tabStyles from './VendorsTab.module.css';
 import { errText, libMsg } from '../../i18n/lib-msg';
 import { printWhenReady } from '../../lib/print-fonts';
+import { acceptForm, entryKeyDown, focusFormDate } from '../../lib/keys/entry-actions';
+
+const PO_KEYS = entryKeyDown({ 'accept.bill': acceptForm, 'date.bill': focusFormDate });
 
 export interface PurchaseOrdersTabProps {
   orders: PurchaseOrder[];
@@ -319,6 +322,7 @@ function PoForm({
   return (
     <form
       className={styles.form}
+      onKeyDown={PO_KEYS} // R20-B: Ctrl+A accepts, F2 goes to the date (Tally keys on)
       onSubmit={(e) => {
         e.preventDefault();
         submit();

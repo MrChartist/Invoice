@@ -34,6 +34,11 @@ export const TOPICS: readonly HelpTopic[] = [
     steps: ['Press ? for every key (plain and Tally names, Hindi, search, print).', 'Switch on there, in Settings → Defaults or on the Gateway; pick TallyPrime or ERP 9 keys.', 'F10 lists every voucher with its key.'],
     related: rel(['Gateway', '/gateway'], ['Settings', '/settings']),
   }),
+  // R20-B: entry keys in the invoice editor, bill / PO / GRN forms and Gateway vouchers (Tally keys on).
+  t('tally-keys:entry', 'Entry keys', 'एंट्री कुंजियाँ', 'Ctrl+A saves, Alt+D deletes, Alt+X cancels, Alt+2 copies, Ctrl+D removes a line — each with Undo (Alt+Z).', 'While entering a document or voucher.', {
+    steps: ['Alt+C on a party or item creates it; Ctrl+Enter edits it.', 'On a voucher: Alt+T post-dated, Ctrl+L optional, Ctrl+H single / double entry, Alt+2 a copy.', 'Ctrl+R in the narration repeats the last one; Alt+S stock, Alt+A tax break-up, Alt+Q edit log.'],
+    related: rel(['Gateway', '/gateway'], ['Books', '/books']),
+  }),
   // R20-D: Go To over any screen, the Company / Data / Import menus and the list keys (Tally keys on).
   t('tally-keys:goto', 'Go To and menus', 'गो टू और मेनू', 'Alt+G opens any screen over this one; a "Back to" chip returns. Alt+K company, Alt+Y data, Alt+O import menus.', 'With Tally keys on.', {
     steps: ['Alt+G, type "trial" or "day book", Enter. Ctrl+G goes there with no chip.', 'F3 switches company; Ctrl+F3 locks; Ctrl+Alt+N opens notifications.', 'On invoices, clients, bills and suppliers: ↑ ↓ and Enter open a row.'],

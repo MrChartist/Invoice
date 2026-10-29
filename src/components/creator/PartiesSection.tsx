@@ -130,6 +130,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
         </div>
 
         <div className={styles.form}>
+          <div data-key-field="picker" data-picker="party">{/* R20-B: Alt+C new party, Ctrl+Enter alter (Tally keys) */}
           <Typeahead
             className={controls.input}
             value={client.name}
@@ -144,6 +145,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
             placeholder={t('parties.clientNamePh')}
             aria-label={t('parties.clientName')}
           />
+          </div>
           {/* A6: walk-in counter sale — no address, paid in cash in full. */}
           <div className={controls.row}>
             <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} aria-pressed={client.name === WALK_IN_NAME} onClick={cashSale} data-cash-sale>

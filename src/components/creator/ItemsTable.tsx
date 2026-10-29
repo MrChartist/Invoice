@@ -185,7 +185,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
           return (
             <div key={item.id} data-line={item.id} className={cn(styles.row, styles.body)} onKeyDown={(e) => onRowKeyDown(e, item.id, index)}>
               <div className={cn(styles.cell, styles.cName)} data-label={t('items.colItem')}>
-                <div className={styles.nameWrap}>
+                <div className={styles.nameWrap} data-key-field="picker" data-picker="item">
                   <Typeahead
                     className={controls.ghost}
                     data-field="name"
