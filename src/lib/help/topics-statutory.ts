@@ -99,7 +99,7 @@ export const TOPICS: readonly HelpTopic[] = [
   t('payroll:loans', 'Employee loans', 'कर्मचारी लोन', 'Loans and advances to employees and their recovery.', 'When you lend to an employee.', { statutory: ca(['P12']) }),
   t('payroll:payments', 'Payments', 'भुगतान', 'Salary paid, bank files and statutory deposits.', 'After the run.', { statutory: ca(['P21']) }),
   t('payroll:fnf', 'Full & final', 'फ़ुल एंड फ़ाइनल', 'Settlement when someone leaves: gratuity, leave encashment, notice pay.', 'When an employee leaves.', { statutory: ca(['P9', 'P10', 'P20']) }),
-  t('payroll:reports', 'Reports', 'रिपोर्ट', 'Payslips, registers, PF ECR, ESI and Form 24Q / 16 papers.', 'Monthly and quarterly.', { statutory: ca(['P21'], 'ECR, ESI return, 24Q, Form 16') }),
-  t('payroll:more', 'More', 'और', 'Relief u/s 89, perquisite valuation, actuarial valuations, PT option and payroll access.', 'Occasionally.', { statutory: ca(['P14', 'P22']) }),
+  t('payroll:reports', 'Reports', 'रिपोर्ट', 'Payslips, registers, PF ECR, ESI and Form 24Q / 16 papers.', 'Monthly and quarterly.', { statutory: ca(['P19', 'P21', 'P25'], 'ECR, ESI return, 24Q, Form 16') }),
+  t('payroll:more', 'More', 'और', 'Relief u/s 89, perquisite valuation, actuarial valuations, PT option and payroll access.', 'Occasionally.', { statutory: ca(['P14', 'P22', 'P23', 'P24', 'P26', 'P27']) }),
   t('practice', 'Practice desk', 'प्रैक्टिस डेस्क', "For a CA's office: every company's returns, DSC expiry and the monthly client checklist on one board.", 'Daily, if you look after several companies.', { statutory: ca(['G24']) }),
 ];

@@ -15,7 +15,7 @@ import { Out } from './Out';
 import { inr, parseAmount, runAction, type TabProps } from './shared';
 
 const TAG_KEY = { reimb: 'ext.tag.reimb', bonus: 'ext.tag.bonus', adjust: 'ext.tag.adjust' } as const;
-const PERQ_KEY = { accommodation: 'ext.perq.accommodation', car: 'ext.perq.car', meals: 'ext.perq.meals', gift: 'ext.perq.gift', other: 'ext.perq.other' } as const;
+const PERQ_KEY = { accommodation: 'ext.perq.accommodation', car: 'ext.perq.car', meals: 'ext.perq.meals', gift: 'ext.perq.gift', accretion: 'ext.perq.accretion', other: 'ext.perq.other' } as const;
 
 /** Reimbursements & one-off items, perquisites (s. 17(2)) and the statutory bonus working (7P). */
 export function ExtrasTab({ month, version, refresh, notify }: TabProps) {
