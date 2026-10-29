@@ -20,6 +20,7 @@ export const readLogs = (): FuelTankLog[] => getTable<FuelTankLog>(FU_TABLES.log
 
 /** Product litres at a dip (and the water litres under it): chart(mm) − chart(water mm) unless the chart is product-only. */
 export function dipLitres(chart: FuTank['chart'], mm: number, waterMm = 0, subtract = true): { litres: number; water_l: number } {
+  if (waterMm > mm) throw new Error(`The water dip (${waterMm} mm) cannot be above the product dip (${mm} mm).`); // QA25 W4
   const water = waterMm > 0 ? dipToLitres(chart, waterMm) : 0;
   return { litres: r3(dipToLitres(chart, mm) - (subtract ? water : 0)), water_l: water };
 }

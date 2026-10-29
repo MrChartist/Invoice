@@ -6,7 +6,7 @@
  */
 import './fu-registry';
 import { generateId, getTable, setTable } from '../storage';
-import type { FuelNozzle, FuTank } from '../../types/fuel-r21';
+import type { FuelNozzle, FuelShift, FuTank } from '../../types/fuel-r21';
 import { FU_TABLES } from './fu-shared';
 import { nozzleLabel } from './fu-line';
 
@@ -65,5 +65,11 @@ export function saveNozzle(input: Omit<FuelNozzle, 'id' | 'item_id' | 'active'> 
   return row;
 }
 
-/** Delete a nozzle (to the recycle bin). B: a nozzle with shifts is deactivated instead. */
-export const removeNozzle = (id: string): void => setTable(FU_TABLES.nozzles, readNozzles().filter((x) => x.id !== id));
+/**
+ * Delete a nozzle (to the recycle bin). A nozzle on a shift is deactivated instead (QA25 W5): its shifts, the DSR and the
+ * day close still price its readings by its product, and its last closing stays the carried opening.
+ */
+export function removeNozzle(id: string): void {
+  const used = getTable<FuelShift>(FU_TABLES.shifts).some((s) => s.readings.some((r) => r.nozzle_id === id));
+  setTable(FU_TABLES.nozzles, used ? readNozzles().map((x) => (x.id === id ? { ...x, active: false, updated_at: new Date().toISOString() } : x)) : readNozzles().filter((x) => x.id !== id));
+}

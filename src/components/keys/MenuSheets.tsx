@@ -4,7 +4,7 @@
  * (check data) and Ctrl+Alt+B (Help → About). Mounted lazily by the notification bell while Tally keys are on (the bell
  * is always mounted after first paint, so this costs first paint nothing). Rows are the registry's; data in nav-actions.ts.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
@@ -71,6 +71,11 @@ export default function MenuSheets({ openBell }: { openBell: () => void }) {
     repair: () => void navigate('/settings?tab=activity'),
     about: () => openHelp(),
   });
+  // QA25: a readiness mark once the sheets' keys are registered (the effect above runs first) — the e2e waits on it.
+  useEffect(() => {
+    document.body.setAttribute('data-key-sheets', '');
+    return () => document.body.removeAttribute('data-key-sheets');
+  }, []);
 
   // "Back to …": the chip returns to the screen Go To was opened over, then puts focus back (or on the page).
   const goBack = () => {
