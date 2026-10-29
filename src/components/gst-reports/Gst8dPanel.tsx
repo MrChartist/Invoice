@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, CalendarX, Clock, FileDiff, Lock, Snowflake } from 'lucide-react';
+import { AlertTriangle, CalendarX, Clock, Download, FileDiff, Lock, Snowflake } from 'lucide-react';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { Gstr1Report, Gstr3bReport, ReportPeriod } from '../../lib/gst-reports';
 import { periodFp, periodRange } from '../../lib/gst-reports';
@@ -14,6 +14,7 @@ import {
   saveSnapshot,
   snapshotFor,
   snapshotFromReport,
+  specialReturnForms,
   table32Diff,
   table32Locked,
   timeBarList,
@@ -26,8 +27,11 @@ import { pushedItc } from '../../lib/gst-followup';
 import { FORM_LABELS, filedFor, loadFiled, type FiledReturn, type FilerFrequency, type ReturnDue } from '../../lib/compliance';
 import { getAllEInvoiceMeta } from '../../lib/einvoice';
 import { localDb } from '../../lib/localDb';
+import { getTable } from '../../lib/storage';
 import { todayIso } from '../../lib/tax-rules';
 import { formatDate } from '../../lib/utils';
+import { downloadText } from '../../lib/download';
+import { buildGstr1aJson } from '../../lib/gstr1a-json';
 import { AatoField } from '../einvoice/IrpWindowNote';
 import { DataTable, Money } from './DataTable';
 import { useT } from '../../i18n';
@@ -224,6 +228,16 @@ function Gstr1aSection({ period, gstin, g1, g3, notify }: { period: ReportPeriod
               />
             )}
             {paper.docs.some((r) => r.kind === 'removed') && <p className={styles.note}>{ggT('g1aRemovedNote')}</p>}
+            <div className={styles.row}>
+              <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} data-g1a-json onClick={() => {
+                const out = buildGstr1aJson(paper, g1);
+                downloadText(`GSTR1A_${gstin || 'ALL'}_${fp}.json`, JSON.stringify(out.json, null, 2), 'application/json');
+                notify(ggT('g1aJsonDone', { docs: out.docs, b2cs: out.b2cs }));
+              }}>
+                <Download size={14} aria-hidden /> {ggT('g1aJson')}
+              </button>
+            </div>
+            <p className={controls.hint} style={{ margin: 0 }}>{ggT('g1aJsonNote')}</p>
           </>
         )
       )}
@@ -298,12 +312,32 @@ function ThreeBExtras({ period, gstin, g3 }: Extract<Gst8dProps, { view: '3b' }>
 
 function TimeBarTable({ frequency, stateCode, since, gstin, filed, onMark }: Extract<Gst8dProps, { view: 'timebar' }>) {
   const today = todayIso();
-  const rows = useMemo(() => (since ? timeBarList({ frequency, stateCode, today, since }, filed, gstin) : []), [frequency, stateCode, today, since, filed, gstin]);
-  if (!rows.length) return null;
+  const [extra, setExtra] = useState(() => localDb.settings.get().gst_special_returns ?? []);
+  // 8.66: GSTR-6 once the company has ISD documents, GSTR-7 / GSTR-8 when ticked below.
+  const special = useMemo(() => specialReturnForms({ gst_special_returns: extra }, getTable<{ kind?: string; date?: string }>('isd_documents'), since), [extra, since]);
+  const rows = useMemo(() => (since || special.length ? timeBarList({ frequency, stateCode, today, since: since || today }, filed, gstin, 365, special) : []), [frequency, stateCode, today, since, filed, gstin, special]);
+  const toggle = (f: 'GSTR7' | 'GSTR8', on: boolean) => {
+    const next = on ? [...new Set([...extra, f])] : extra.filter((x) => x !== f);
+    try {
+      localDb.settings.save({ ...localDb.settings.get(), gst_special_returns: next.length ? next : undefined });
+      setExtra(next);
+    } catch {
+      /* a locked settings write leaves the choice as it was */
+    }
+  };
   return (
     <section className={styles.section} aria-label={ggT('tbTitle')} style={{ marginTop: '1rem' }}>
       <h3 className={styles.head}><CalendarX size={15} aria-hidden /> {ggT('tbTitle')}</h3>
       <p className={controls.hint} style={{ margin: 0 }}>{ggT('tbHint')}</p>
+      <div className={styles.row} data-tb-special>
+        <span className={styles.muted}>{ggT('tbAlsoFile')}</span>
+        {(['GSTR7', 'GSTR8'] as const).map((f) => (
+          <label key={f} className={controls.check}>
+            <input type="checkbox" checked={extra.includes(f)} onChange={(e) => toggle(f, e.target.checked)} /> {f === 'GSTR7' ? ggT('tbGstr7') : ggT('tbGstr8')}
+          </label>
+        ))}
+      </div>
+      {!rows.length ? <p className={styles.muted}>{ggT('tbNone')}</p> : (
       <DataTable<TimeBarRow>
         caption={ggT('tbTitle')}
         emptyText=""
@@ -329,6 +363,7 @@ function TimeBarTable({ frequency, stateCode, since, gstin, filed, onMark }: Ext
           },
         ]}
       />
+      )}
     </section>
   );
 }

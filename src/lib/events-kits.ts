@@ -93,3 +93,37 @@ export function kitStockEvents(
     }
   }
 }
+
+/**
+ * 8.88 (PENDING 47): the tracked components (base units) a document's kit lines take, for the editor's shortfall
+ * warning — the same kit table, name / alias match and `unit_factor` as `kitStockEvents`. Item id → { qty, kits }. Pure.
+ */
+export function kitComponentDemand(
+  lines: readonly { name?: string; quantity?: number; unit_factor?: number }[],
+  items: readonly StockItem[],
+  boms: readonly Bom[] | undefined,
+): Map<string, { qty: number; kits: string[] }> {
+  const out = new Map<string, { qty: number; kits: string[] }>();
+  if (!boms?.length || !items.some((i) => i?.kit)) return out;
+  const table = kitTable(items, boms);
+  if (!table.size) return out;
+  const byName = new Map<string, StockItem>();
+  for (const it of items) {
+    if (!table.has(it.id)) continue;
+    for (const n of [it.name, ...(it.aliases ?? [])]) if (norm(n) && !byName.has(norm(n))) byName.set(norm(n), it);
+  }
+  const tracked = new Set(items.filter((i) => i.track_stock).map((i) => i.id));
+  for (const line of lines) {
+    const kit = byName.get(norm(line.name));
+    const kits = num(line.quantity) * lineFactor(line as never);
+    if (!kit || kits <= 0) continue;
+    for (const c of table.get(kit.id) ?? []) {
+      if (!tracked.has(c.item_id)) continue;
+      const d = out.get(c.item_id) ?? { qty: 0, kits: [] };
+      d.qty += kits * c.per;
+      if (!d.kits.includes(kit.name)) d.kits.push(kit.name);
+      out.set(c.item_id, d);
+    }
+  }
+  return out;
+}

@@ -25,7 +25,7 @@ import { assertUnlocked } from './period-lock';
 import { audit } from './audit';
 import { grnCoverage, loadReturnStockDocs, returnStockEvents, type ReturnStockDocs } from './events-returns';
 import { jobWorkStockEvents, loadJobWorkStockDocs, type JobWorkStockDocs } from './events-job-work';
-import { kitStockEvents } from './events-kits';
+import { kitComponentDemand, kitStockEvents } from './events-kits';
 import { lineFactor } from './units';
 import { itemVoucherReferences } from './item-references';
 import { applyLandedVouchers, loadLandedVouchers } from './landed-voucher'; // R4-A5
@@ -1127,6 +1127,8 @@ export interface StockShortfall {
   requested: number;
   available: number;
   shortBy: number;
+  /** Additive (8.88): kits on the document whose components need this item. */
+  kits?: string[];
 }
 
 /**
@@ -1142,8 +1144,11 @@ export function shortfallsFor(
   return shortfallsFromPositions(doc, computeStock({ ...inputs, excludeInvoiceId: doc.id }));
 }
 
-/** `shortfallsFor` over positions already computed without the document. */
-export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, positions: StockPosition[], held?: HeldStock): StockShortfall[] {
+/**
+ * `shortfallsFor` over positions already computed without the document. 8.88: `kits` (the kit items and BOMs) adds
+ * what the document's kit lines take from their tracked components (`kitComponentDemand`).
+ */
+export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, positions: StockPosition[], held?: HeldStock, kits?: { items: readonly StockItem[]; boms: readonly Bom[] }): StockShortfall[] {
   const index = buildItemIndex(positions.map((p) => p.item).filter((i) => i.track_stock));
   const byId = new Map(positions.map((p) => [p.item.id, p]));
   const wanted = new Map<string, number>();
@@ -1152,6 +1157,8 @@ export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, posit
     const q = num(line.quantity) * lineFactor(line);
     if (it && q > 0) wanted.set(it.id, (wanted.get(it.id) ?? 0) + q);
   }
+  const kitDemand = kits ? kitComponentDemand(doc.items ?? [], kits.items, kits.boms) : new Map<string, { qty: number; kits: string[] }>();
+  for (const [id, d] of kitDemand) wanted.set(id, (wanted.get(id) ?? 0) + d.qty);
   const out: StockShortfall[] = [];
   for (const [id, requested] of wanted) {
     const p = byId.get(id);
@@ -1161,6 +1168,7 @@ export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, posit
       out.push({
         itemId: id, name: p.item.name, unit: p.item.unit, requested: roundQty(requested),
         available: roundQty(available), shortBy: roundQty(requested - available),
+        ...(kitDemand.has(id) ? { kits: kitDemand.get(id)!.kits } : {}),
       });
     }
   }
@@ -1168,9 +1176,10 @@ export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, posit
 }
 
 export function describeShortfall(s: StockShortfall): string {
+  const kit = s.kits?.length ? ` — component of kit ${s.kits.join(', ')}` : '';
   return s.available <= 0
-    ? `${s.name}: out of stock (need ${s.requested} ${s.unit})`
-    : `${s.name}: only ${s.available} ${s.unit} in stock (need ${s.requested})`;
+    ? `${s.name}: out of stock (need ${s.requested} ${s.unit})${kit}`
+    : `${s.name}: only ${s.available} ${s.unit} in stock (need ${s.requested})${kit}`;
 }
 
 /* ── CSV ─────────────────────────────────────────────────────── */
@@ -1448,12 +1457,16 @@ export function stockWarningForInvoice(
   try {
     if (invoiceEffect(invoice.doc_type, 'Sent', true) !== 'out') return [];
     // Read-only view: the stock master is parsed once per stored version, not on every keystroke.
-    const tracked = peekTable<StockItem>(TABLES.items).filter((i) => i.track_stock);
+    const all = peekTable<StockItem>(TABLES.items);
+    const tracked = all.filter((i) => i.track_stock);
     if (!tracked.length) return [];
     const index = buildItemIndex(tracked);
-    if (!(invoice.items ?? []).some((l) => num(l.quantity) > 0 && index.find(l.name, l.hsn))) return [];
+    // 8.88: a line naming a kit item (not stocked itself) checks the kit's tracked components.
+    const kitNames = new Set(all.filter((i) => i?.kit).flatMap((i) => [i.name, ...(i.aliases ?? [])].map((n) => String(n ?? '').trim().toLowerCase())));
+    const kitLine = kitNames.size > 0 && (invoice.items ?? []).some((l) => num(l.quantity) > 0 && kitNames.has(String(l.name ?? '').trim().toLowerCase()));
+    if (!kitLine && !(invoice.items ?? []).some((l) => num(l.quantity) > 0 && index.find(l.name, l.hsn))) return [];
     if (invoice.doc_type === 'DELIVERY_CHALLAN' && !loadSettings().includeChallans) return [];
-    return shortfallsFromPositions(invoice, cachedPositionsWithout(invoice.id), held);
+    return shortfallsFromPositions(invoice, cachedPositionsWithout(invoice.id), held, kitLine ? { items: all, boms: peekTable<Bom>(VOUCHER_TABLES.boms) } : undefined);
   } catch {
     return [];
   }

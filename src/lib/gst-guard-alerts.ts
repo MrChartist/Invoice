@@ -8,7 +8,7 @@
 
 import type { InvoiceRecord } from '../types/invoice';
 import { COMPLIANCE_TABLE, FORM_LABELS, type FiledReturn, type FilerFrequency } from './compliance';
-import { aatoFor, irnWindowList, timeBarList, type IrnPending, type TimeBarRow } from './gst-guards';
+import { aatoFor, irnWindowList, specialReturnForms, timeBarList, type IrnPending, type TimeBarRow } from './gst-guards';
 import { localDb } from './localDb';
 import { registerNotificationProvider, type AppNotification } from './notifications';
 import { getTable, KEYS } from './storage';
@@ -84,7 +84,8 @@ export function registerGstGuardAlerts(): void {
         if (inv && inv.status !== 'Draft' && inv.status !== 'Cancelled' && d && (!since || d < since)) since = d;
       }
       const frequency: FilerFrequency = ctx.gstFrequency ?? (profile?.gst_scheme === 'composition' ? 'composition' : 'monthly');
-      if (since) timeBars = timeBarList({ frequency, stateCode: profile?.stateCode || gstin.slice(0, 2), today, since }, ctx.gstFiled ?? getTable<FiledReturn>(COMPLIANCE_TABLE), gstin, TIME_BAR_LEAD_DAYS);
+      const special = specialReturnForms(settings, getTable<{ kind?: string; date?: string }>('isd_documents'), since); // 8.66: GSTR-6 / 7 / 8
+      if (since || special.length) timeBars = timeBarList({ frequency, stateCode: profile?.stateCode || gstin.slice(0, 2), today, since: since || today }, ctx.gstFiled ?? getTable<FiledReturn>(COMPLIANCE_TABLE), gstin, TIME_BAR_LEAD_DAYS, special);
     }
     return gstGuardNotices({ at: ctx.now.toISOString(), pending, timeBars });
   });

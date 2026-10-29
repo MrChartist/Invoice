@@ -507,6 +507,15 @@ export function sectionCsv(r: Gstr1Report, id: SectionId): string {
         push('CDNRA', am.cdnra);
         push('CDNURA', am.cdnura);
         for (const x of am.b2csa) out.push(['B2CSA', '', `${x.supply === 'INTRA' ? 'Intra' : 'Inter'}-state, original month ${x.omon}`, '', '', x.omon, '', '', '', x.pos, '', x.rate, x.txval, x.igst, x.cgst, x.sgst, x.cess]);
+        // PENDING 44: Table 14A(b) and the Table 8 / 12 / 13 effects (no portal amendment section; working paper).
+        for (const d of am.eco95a ?? []) out.push(['14A(b)', d.etin, d.partyName, d.origNumber, d.origDate, d.origPeriod, d.number, d.date, d.value, d.pos, d.noteType ?? '', '', d.taxable, '', '', '', '']);
+        for (const n of am.nilA ?? []) {
+          for (const [col, v] of [['nil rated', n.nil], ['exempted', n.exempt], ['non-GST', n.nonGst]] as const) {
+            if (v) out.push(['TABLE 8 (revised - original)', '', `${nilLabel(n.type)} — ${col}`, '', '', '', '', '', '', '', '', 0, v, '', '', '', '']);
+          }
+        }
+        for (const h of am.hsnA ?? []) out.push(['HSN (revised - original)', '', `${h.hsn} · ${h.uqc} · qty ${h.qty}`, '', '', '', '', '', h.value, '', '', h.rate, h.taxable, h.igst, h.cgst, h.sgst, h.cess]);
+        for (const d of am.docA ?? []) out.push(['TABLE 13 (renumbered)', '', '', d.origNumber, d.origDate, d.origPeriod, d.number, d.date, '', '', '', '', '', '', '', '', '']);
       }
       return toCsv(out);
     }
@@ -556,6 +565,8 @@ export function gstr3bRows(b: Gstr3bReport): CsvCell[][] {
       ? [['3.1.1(ii)', 'Taxable supplies made through an e-commerce operator that pays tax u/s 9(5) (value only)', b.ecoSupplies95, '', '', ''] as CsvCell[]]
       : []),
     ...b.interStateUnreg.map((u): CsvCell[] => ['3.2', `Inter-state supplies to unregistered persons, POS ${u.pos}`, u.taxable, u.igst, '', '']),
+    ...(b.interStateComp ?? []).map((u): CsvCell[] => ['3.2', `Inter-state supplies to composition taxable persons, POS ${u.pos}`, u.taxable, u.igst, '', '']),
+    ...(b.interStateUin ?? []).map((u): CsvCell[] => ['3.2', `Inter-state supplies to UIN holders, POS ${u.pos}`, u.taxable, u.igst, '', '']),
     itc('4A(1)', 'ITC available: import of goods', b.itc.importGoods),
     itc('4A(2)', 'ITC available: import of services', b.itc.importServices),
     itc('4A(3)', 'ITC available: inward supplies liable to reverse charge', b.itc.availableRcm),
@@ -611,8 +622,9 @@ export function buildGstr3bJson(b: Gstr3bReport, gstin: string, retPeriod: strin
     },
     inter_sup: {
       unreg_details: b.interStateUnreg.map((u) => ({ pos: u.pos, txval: r(u.taxable), iamt: r(u.igst) })),
-      comp_details: [],
-      uin_details: [],
+      // 8.66: from `Client.gst_reg_type` (composition dealer / UIN holder); same row shape as unreg_details.
+      comp_details: (b.interStateComp ?? []).map((u) => ({ pos: u.pos, txval: r(u.taxable), iamt: r(u.igst) })),
+      uin_details: (b.interStateUin ?? []).map((u) => ({ pos: u.pos, txval: r(u.taxable), iamt: r(u.igst) })),
     },
     itc_elg: {
       itc_avl: [

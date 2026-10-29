@@ -4,10 +4,11 @@
  * from the period's amendment rows (B2BA / B2CLA / CDNRA / CDNURA / EXPA) that carry the operator GSTIN (`etin`),
  * grouped by operator × original period; credit notes count negative.
  *
- * Not generated (and why): Table 14A(b) — amendments of 9(5) supplies are flagged `AMEND_ECO_95` and corrected on
- * the portal; Table 15 / 15A and GSTR-3B 3.1.1(i) are the OPERATOR's own rows (supplies on which the operator pays
+ * Table 14A(b) (PENDING 44, `table14Ab` in gst-reports.ts — kept out of this small shared module): the revised value of amended supplies on which the operator pays tax u/s
+ * 9(5), from `amendments.eco95a` (value only, as Table 14(b); a supply that left 9(5) revises its row to 0).
+ * Not generated (and why): Table 15 / 15A and GSTR-3B 3.1.1(i) are the OPERATOR's own rows (supplies on which the operator pays
  * tax u/s 9(5)) — this app prepares the supplier's return, so they stay nil (the 3B JSON writes `eco_sup` as zero).
- * JSON layout of 14A is not verified, so it is a working-paper table only. Verify with your CA. Pure.
+ * JSON layout of 14A / 14A(b) is not verified, so they are working-paper tables only. Verify with your CA. Pure.
  */
 
 import type { Gstr1Report } from './gst-reports';
@@ -49,3 +50,4 @@ export function table14A(g1: Gstr1Report): Eco14aRow[] {
   }
   return [...out.values()].sort((a, b) => a.etin.localeCompare(b.etin) || a.origPeriod.localeCompare(b.origPeriod));
 }
+

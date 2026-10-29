@@ -586,6 +586,41 @@ export function GstReports() {
                 { key: 's', label: 'SGST', numeric: true, render: (r) => <Money value={r.sgst} /> },
               ]}
             />
+            {/* PENDING 44: Table 8 / 12 / 13 have no amendment section — what this period's amendments change in them. */}
+            {(am?.nilA || am?.hsnA || am?.docA) && (
+              <>
+                <h3 className={local.tbHeading}>{gstT('amendEffectsHead')}</h3>
+                <p className={controls.hint} style={{ margin: 0 }}>{gstT('amendEffectsHint')}</p>
+                {am.nilA && (
+                  <DataTable
+                    caption={gstT('capNil')}
+                    emptyText=""
+                    rows={am.nilA}
+                    rowKey={(r) => `a${r.type}`}
+                    columns={[
+                      { key: 'd', label: gstT('colDescription'), render: (r) => nilLabel(r.type) },
+                      { key: 'n', label: gstT('colNil'), numeric: true, render: (r) => <Money value={r.nil} /> },
+                      { key: 'e', label: gstT('colExempt'), numeric: true, render: (r) => <Money value={r.exempt} /> },
+                      { key: 'g', label: gstT('colNonGst'), numeric: true, render: (r) => <Money value={r.nonGst} /> },
+                    ]}
+                  />
+                )}
+                {am.hsnA && hsnTable(am.hsnA, gstT('capHsn'))}
+                {am.docA && (
+                  <DataTable
+                    caption={gstT('capDocs')}
+                    emptyText=""
+                    rows={am.docA}
+                    rowKey={(r) => `d${r.invoiceId}`}
+                    columns={[
+                      { key: 'o', label: gstT('colOrigInvoice'), render: (r) => <span className={surface.mono}>{r.origNumber} · {formatDate(r.origDate)}</span> },
+                      { key: 'p', label: gstT('colFiledIn'), render: (r) => `${r.origPeriod.slice(0, 2)}/${r.origPeriod.slice(2)}` },
+                      { key: 'n', label: gstT('colRevisedDoc'), render: (r) => <span className={surface.mono}>{r.number} · {formatDate(r.date)}</span> },
+                    ]}
+                  />
+                )}
+              </>
+            )}
           </>
         );
       }

@@ -131,4 +131,6 @@ The AATO is the additive profile field `SenderProfile.einvoice_aato` (₹), ente
 - status on the meta row (additive): `irn_cancel` / `ewb_cancel` = `{ status: prepared | done, reason, remark, prepared_at, done_on? }`; the e-Invoice dialog header shows "portal cancellation pending / cancelled on the portals" (`cancelState`).
 - Reason codes: IRN 1 duplicate, 2 data entry mistake, 3 order cancelled, 4 others; EWB 1 duplicate, 2 order cancelled, 3 data entry mistake, 4 others. Field names / codes as best known — verify.
 
-Tests: `tests/gst-guards-8d.test.ts`.
+**IRN cancel from the bulk response (8.66)**: a row of the imported IRP response / IRN-details file with status `CNL` / `Cancelled` or a cancel-date column (`CancelDate`, `CnlDt` … — names not verified) is matched by the IRN already recorded on a document and sets `irn_cancel = { status: done, done_on: <cancel day> }` (`applyIrpResponse` → `cancelled`); it is no longer counted as a rejection. A cancelled IRN that no document holds is reported as not matched. The document itself is not cancelled in the books — the result line says so.
+
+Tests: `tests/gst-guards-8d.test.ts`, `tests/gst-8d-followups.test.ts`.

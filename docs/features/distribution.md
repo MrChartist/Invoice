@@ -114,10 +114,28 @@ Inventory tabs — *Fast / slow · ABC*, *Variants, kits & bins*, *Breakage / ex
 (books.edit, dated + numbered BER) · key `credit_policy`. All in both backup lists, `TABLE_ACTIONS`, sync `DATED` /
 `NUMBERED` as noted.
 
+## 8F follow-ups (8.88, PENDING 47)
+
+- **One debit note spanning several bills** (`purchaseReturnsDb.createMulti`): one `DN/FY…` number for lines of two or
+  more bills of the same supplier; each line names its bill (`PurchaseReturnLine.purchase_id`), the note lists them in
+  `bill_refs` (additive) with `bill_number` = the numbers joined and `bill_date` = the earliest. Every bill's part is
+  validated like a single note (returnable quantity, the bill's remaining value, dates). The bills must share the GST
+  type and the ITC claim and carry no reverse charge, import, TDS or cess — otherwise one note per bill (those
+  reversals are worked out per bill). The note has no `purchase_id`: it is **on account** (not adjusted against the
+  bills), so bill balances and the bill-wise ledger are unchanged; returnable quantities, `notedValue`, the bill-edit
+  guard (`returnedQtyIssue`) and the bill delete guard read `bill_refs`. Breakage / Expiry Issue offers "One debit note
+  per supplier" (`createBrkExpIssue(…, { onePerSupplier })`, one claim, all-or-nothing). The ordinary debit-note form
+  still raises one note per bill.
+- **Kit shortfall warning**: the editor's stock warning (`stockWarningForInvoice`) expands a kit line into its default
+  BOM's tracked components (`kitComponentDemand`, same match and factors as the kit stock events) and warns
+  "Chocolate: only 5 in stock (need 6) — component of kit Gift hamper" (`StockShortfall.kits`, additive). Warn only.
+- **Order pad partial import**: the verified file lists its new orders with a tick each; unticked orders are not
+  imported and not marked imported (`importOrders(…, { only })`), so the same file brings them in later. **Camera QR**:
+  "Scan the order QR with the camera" opens the existing `CameraScanner` (browser BarcodeDetector, no library) and
+  puts the text in the box; where the browser has no BarcodeDetector, paste from an external scanner as before.
+
 ## Open items
 
-- A debit note per supplier *bill* (not one note spanning several bills of the supplier); the claim groups them.
-- Weighed-goods codes are not yet decoded by the POS scan (price → quantity); the parser is ready.
-- Kits: no shortfall warning in the editor for kit components; kit lines on purchase side are not exploded.
-- Order pad: no partial import, no edit of an imported order's lines before import; QR scanning uses any external
-  scanner (paste the text).
+- Weighed-goods codes are decoded by the POS since 8.140 (`parseScaleBarcode`).
+- Kit lines on the purchase side are not exploded.
+- Order pad: no edit of an imported order's lines before import.
