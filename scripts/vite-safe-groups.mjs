@@ -10,16 +10,20 @@
  *    components, so a cycle passes only if the whole component passes.
  *  - `leafGroup(name, priority, { maxModuleSize, test })`: a lazy `src/lib/**` module (or one matching `test`, e.g.
  *    `UI_LEAF`, PERF-5) whose static imports are all first-paint / vendor (a "leaf"), up to `maxModuleSize` bytes.
+ *  - `cssMapGroup(name, priority, { maxCssSize })` (PERF-6): the JS class maps of lazy `src/**.module.css` files whose
+ *    every rule is local (`cssIsLocal`) and whose source is at most `maxCssSize` bytes. Their styles load together,
+ *    which is harmless only because no rule can match outside its own hashed class names.
  *
  * `graphPlugin()` records the module graph once the build has loaded every module (`buildEnd`), and writes
  * `build-meta/chunks.json` (outside dist/, never precached) for the post-build checks in check-bundle-size.mjs.
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { parseAst } from 'rolldown/parseAst';
 import { join, relative, sep } from 'node:path';
 
 /** Shared graph state between the plugin (writer) and the group functions (readers). */
 export function createGraph({ vendor = [], root = process.cwd() } = {}) {
-  return { vendor, root, imports: new Map(), entries: new Set(), initial: null, safe: new Map(), families: new Map() };
+  return { vendor, root, imports: new Map(), entries: new Set(), initial: null, importers: null, safe: new Map(), families: new Map() };
 }
 
 export const isVendor = (g, id) => g.vendor.some((re) => re.test(id));
@@ -134,9 +138,148 @@ const LIB = /[\\/]src[\\/]lib[\\/][^\0]*\.tsx?$/;
 /** PERF-5: the other script folders (no `.css`: a CSS module's styles would load with the group). */
 export const UI_LEAF = /[\\/]src[\\/](?:components|store|hooks|i18n[\\/]areas)[\\/][^\0]*\.tsx?$/;
 
-/** A leaves group: small lazy leaves (≤ maxModuleSize bytes) under `test` (default: `src/lib`). */
-export function leafGroup(g, name, priority, { maxModuleSize, test = LIB }) {
-  return { name: (id) => (test.test(id) && isLeaf(g, id) ? name : null), priority, maxModuleSize };
+/** Calls that only build a value at load (no effect outside the module). */
+const PURE_CALLS = new Set(['defineArea', 'lazy', 'memo', 'forwardRef', 'createContext', 'Symbol', 'Object.freeze', 'Object.fromEntries', 'Object.keys', 'Object.entries', 'Object.values', 'Object.assign', 'Array.from', 'String.raw', 'Number', 'String', 'Boolean']);
+const PURE_CTORS = new Set(['Set', 'Map', 'WeakMap', 'WeakSet', 'RegExp', 'Intl.NumberFormat', 'Intl.DateTimeFormat', 'Intl.Collator']);
+
+const calleeName = (n) => (n.type === 'Identifier' ? n.name : n.type === 'MemberExpression' && !n.computed && n.object.type === 'Identifier' ? `${n.object.name}.${n.property.name}` : null);
+
+function pureExpr(n) {
+  if (!n) return true;
+  switch (n.type) {
+    case 'Literal': case 'Identifier': case 'ArrowFunctionExpression': case 'FunctionExpression': case 'ClassExpression': case 'ThisExpression':
+      return true;
+    case 'TemplateLiteral': return n.expressions.every(pureExpr);
+    case 'TaggedTemplateExpression': return calleeName(n.tag) === 'String.raw';
+    case 'TSAsExpression': case 'TSSatisfiesExpression': case 'TSNonNullExpression': case 'ParenthesizedExpression': case 'TSTypeAssertion':
+      return pureExpr(n.expression);
+    case 'ArrayExpression': return n.elements.every((e) => !e || (e.type === 'SpreadElement' ? pureExpr(e.argument) : pureExpr(e)));
+    case 'ObjectExpression': return n.properties.every((p) => (p.type === 'SpreadElement' ? pureExpr(p.argument) : (!p.computed || pureExpr(p.key)) && pureExpr(p.value)));
+    case 'MemberExpression': return pureExpr(n.object) && (!n.computed || pureExpr(n.property));
+    case 'UnaryExpression': return n.operator !== 'delete' && pureExpr(n.argument);
+    case 'BinaryExpression': case 'LogicalExpression': return pureExpr(n.left) && pureExpr(n.right);
+    case 'ConditionalExpression': return pureExpr(n.test) && pureExpr(n.consequent) && pureExpr(n.alternate);
+    case 'ChainExpression': return pureExpr(n.expression);
+    case 'CallExpression': {
+      const c = calleeName(n.callee);
+      // `x.map(…)` / `.filter` / `.join` on a pure value build data; anything else is an effect.
+      const method = n.callee.type === 'MemberExpression' && !n.callee.computed && ['map', 'filter', 'join', 'concat', 'slice', 'flatMap', 'reduce', 'split', 'replace', 'trim'].includes(n.callee.property.name) && pureExpr(n.callee.object);
+      return (PURE_CALLS.has(c) || method) && n.arguments.every((a) => (a.type === 'SpreadElement' ? pureExpr(a.argument) : pureExpr(a)));
+    }
+    case 'NewExpression': return PURE_CTORS.has(calleeName(n.callee)) && n.arguments.every(pureExpr);
+    default: return false;
+  }
+}
+
+/**
+ * PERF-6: the top-level statements of a module that may do something at load beyond building values (empty = none).
+ * Conservative: declarations, imports / exports and values built from literals, functions, `defineArea`, `lazy`,
+ * `createContext`, `new Set / Map` … pass; any other call, assignment or statement is reported.
+ */
+export function loadEffects(code, file) {
+  const ast = parseAst(code, { lang: file.endsWith('x') ? 'tsx' : 'ts' }, file);
+  const bad = [];
+  for (let s of ast.body) {
+    if (s.type === 'ExportNamedDeclaration' || s.type === 'ExportDefaultDeclaration') {
+      if (!s.declaration) continue;
+      s = s.declaration;
+    }
+    if (/^(Import|ExportAll)Declaration$|^TS(Interface|TypeAlias|Enum|Module|Declare)|^FunctionDeclaration$|^ClassDeclaration$|^EmptyStatement$/.test(s.type)) continue;
+    if (s.type === 'VariableDeclaration' && s.declarations.every((d) => pureExpr(d.init))) continue;
+    if (s.type === 'ExpressionStatement' ? pureExpr(s.expression) : pureExpr(s)) continue;
+    bad.push(code.slice(s.start, Math.min(s.end, s.start + 80)).replace(/\s+/g, ' '));
+  }
+  return bad;
+}
+
+/**
+ * A leaves group: small lazy leaves (≤ maxModuleSize bytes) under `test` (default: `src/lib`). PERF-6: `pure` also
+ * leaves out a module with a load effect (`loadEffects` on its source), so joining the group never runs code earlier.
+ */
+export function leafGroup(g, name, priority, { maxModuleSize, test = LIB, pure = false, read = (id) => readFileSync(id, 'utf8') }) {
+  const effects = new Map();
+  const quiet = (id) => {
+    if (!effects.has(id)) effects.set(id, loadEffects(read(id), id).length === 0);
+    return effects.get(id);
+  };
+  return { name: (id) => (test.test(id) && isLeaf(g, id) && (!pure || quiet(id)) ? name : null), priority, maxModuleSize };
+}
+
+/**
+ * PERF-6: is every rule of a CSS module local? Each selector of every style rule (also inside @media / @supports /
+ * @container / @layer) must name a class and use no `:global`; @keyframes bodies are skipped (CSS modules scope
+ * their names); any other at-rule with a body (@page, @font-face, @property …) or a bodiless one (@import) is global.
+ */
+export function cssIsLocal(css) {
+  const src = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  if (/:global\b/.test(src)) return false;
+  const stack = []; // 'nest' | 'rule' | 'skip'
+  let prelude = '';
+  let quote = null;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (quote) {
+      if (c === '\\') { i++; continue; }
+      if (c === quote) quote = null;
+      if (stack.at(-1) !== 'rule' && stack.at(-1) !== 'skip') prelude += c;
+      continue;
+    }
+    if (c === '"' || c === "'") { quote = c; if (stack.at(-1) !== 'rule' && stack.at(-1) !== 'skip') prelude += c; continue; }
+    const top = stack.at(-1);
+    if (c === '{') {
+      const p = prelude.trim();
+      prelude = '';
+      if (top === 'rule' || top === 'skip') { stack.push('skip'); continue; } // nested braces inside a declaration block / keyframes
+      if (p.startsWith('@')) {
+        const name = p.slice(1).split(/[\s(]/)[0].toLowerCase();
+        if (/^(-[a-z]+-)?keyframes$/.test(name)) stack.push('skip');
+        else if (['media', 'supports', 'container', 'layer'].includes(name)) stack.push('nest');
+        else return false;
+        continue;
+      }
+      for (const sel of p.split(',')) if (!/\.[A-Za-z_-][\w-]*/.test(sel)) return false;
+      stack.push('rule');
+      continue;
+    }
+    if (c === '}') { stack.pop(); prelude = ''; continue; }
+    if (c === ';' && top !== 'rule' && top !== 'skip') {
+      if (prelude.trim().startsWith('@')) return false; // @import / @layer x; at top level
+      prelude = '';
+      continue;
+    }
+    if (top !== 'rule' && top !== 'skip') prelude += c;
+  }
+  return true;
+}
+
+const CSS_MODULE = /[\\/]src[\\/][^\0]*\.module\.css$/;
+
+/** How many modules import each module (static imports). */
+function importerCount(g) {
+  if (g.importers) return g.importers;
+  const n = new Map();
+  for (const deps of g.imports.values()) for (const d of new Set(deps)) n.set(d, (n.get(d) ?? 0) + 1);
+  return (g.importers = n);
+}
+
+/**
+ * PERF-6: small local CSS modules' class maps in one chunk (see the header). Only modules imported by `minImporters`+
+ * modules: a module with one importer sits in that importer's chunk anyway (nothing to save), and keeping it there
+ * keeps its styles off the screens that never use it. `read` is for tests.
+ */
+export function cssMapGroup(g, name, priority, { maxCssSize, minImporters = 2, read = (id) => readFileSync(id, 'utf8') }) {
+  const ok = new Map();
+  return {
+    name: (id) => {
+      if (!CSS_MODULE.test(id) || !isLeaf(g, id) || (importerCount(g).get(id) ?? 0) < minImporters) return null;
+      if (!ok.has(id)) {
+        const css = read(id);
+        ok.set(id, css.length <= maxCssSize && cssIsLocal(css));
+      }
+      return ok.get(id) ? name : null;
+    },
+    priority,
+  };
 }
 
 /** Records the graph and writes build-meta/chunks.json. */
@@ -148,6 +291,7 @@ export function graphPlugin(g) {
       g.imports.clear();
       g.entries.clear();
       g.initial = null;
+      g.importers = null;
       g.safe.clear();
     },
     buildEnd() {
@@ -158,6 +302,7 @@ export function graphPlugin(g) {
         if (info.isEntry) g.entries.add(id);
       }
       g.initial = null;
+      g.importers = null;
     },
     generateBundle(_opts, bundle) {
       const initial = initialSet(g);
@@ -167,7 +312,7 @@ export function graphPlugin(g) {
         if (c.type !== 'chunk') continue;
         const ids = Object.keys(c.modules ?? {});
         chunks[c.fileName] = { name: c.name, entry: c.isEntry, modules: ids.map((id) => rel(g, id)) };
-        if (/^(f-|lazy-leaves)/.test(c.name)) {
+        if (/^(f-|lazy-leaves|css-maps)/.test(c.name)) {
           for (const id of ids) modules[rel(g, id)] = (g.imports.get(id) ?? []).map((d) => ({ id: rel(g, d), fixed: fixed(g, d) }));
         }
       }
