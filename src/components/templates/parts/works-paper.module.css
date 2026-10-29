@@ -12,8 +12,8 @@
 
 .boxTitle {
   padding: 4px 10px;
-  font-size: 9px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--tpl-accent);
@@ -31,7 +31,7 @@
   display: flex;
   gap: 6px;
   padding: 4px 10px;
-  font-size: 10px;
+  font-size: 12px;
   border-bottom: 1px solid var(--tpl-line);
   min-width: 0;
 }
@@ -60,7 +60,7 @@
 
 .hi {
   display: block;
-  font-size: 8px;
+  font-size: 8px; /* type-floor-exempt: multi-column printed table, 12px would push columns / the one-page A4 layout */
   font-weight: 400;
 }
 
@@ -68,7 +68,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 9.5px;
+  font-size: 9.5px; /* type-floor-exempt: multi-column printed table, 12px would push columns / the one-page A4 layout */
   margin: 0 0 10px;
 }
 
@@ -81,7 +81,7 @@
 }
 
 .table th {
-  font-size: 8px;
+  font-size: 8px; /* type-floor-exempt: multi-column printed table, 12px would push columns / the one-page A4 layout */
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--tpl-muted);
@@ -100,13 +100,13 @@
 }
 
 .sub {
-  font-size: 8.5px;
+  font-size: 8.5px; /* type-floor-exempt: multi-column printed table, 12px would push columns / the one-page A4 layout */
   color: var(--tpl-muted);
 }
 
 .section td {
-  font-size: 8.5px;
-  font-weight: 800;
+  font-size: 8.5px; /* type-floor-exempt: multi-column printed table, 12px would push columns / the one-page A4 layout */
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--tpl-accent);
@@ -114,7 +114,7 @@
 }
 
 .total td {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--tpl-ink);
   border-top: 2px solid var(--tpl-accent);
 }
@@ -130,7 +130,7 @@
 }
 
 .notes {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--tpl-muted);
   display: flex;
   flex-direction: column;
@@ -140,7 +140,7 @@
 .dedTable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 10px;
+  font-size: 10px; /* type-floor-exempt: multi-column printed table, 12px would push columns / the one-page A4 layout */
 }
 
 .dedTable td {
@@ -150,8 +150,8 @@
 
 .group td {
   padding-top: 6px;
-  font-size: 8.5px;
-  font-weight: 800;
+  font-size: 8.5px; /* type-floor-exempt: multi-column printed table, 12px would push columns / the one-page A4 layout */
+  font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--tpl-accent);
@@ -159,14 +159,14 @@
 
 .net td {
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--tpl-on-accent, var(--tpl-ink));
   background: var(--tpl-accent);
 }
 
 .words {
   margin-top: 4px;
-  font-size: 9px;
+  font-size: 12px;
   font-style: italic;
   color: var(--tpl-ink);
 }
@@ -174,7 +174,7 @@
 .declare {
   margin: 8px 0 0;
   padding: 5px 10px;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--tpl-body);
   border: 1px dashed var(--tpl-line);
   border-radius: 4px;
@@ -189,7 +189,7 @@
   margin: 12px 0 0;
   break-inside: avoid;
   page-break-inside: avoid;
-  font-size: 9.5px;
+  font-size: 12px;
   color: var(--tpl-body);
 }
 
@@ -217,15 +217,15 @@
 }
 
 .signHead {
-  font-size: 8.5px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--tpl-accent);
 }
 
 .signLine {
-  font-size: 8px;
+  font-size: 12px;
   color: var(--tpl-muted);
   border-top: 1px solid var(--tpl-line);
   padding-top: 2px;
@@ -258,14 +258,14 @@
 
 .pageTitle {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--tpl-accent);
 }
 
 .meta {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--tpl-muted);
 }
 

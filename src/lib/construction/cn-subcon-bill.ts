@@ -26,6 +26,7 @@ import { A, chartOf, loadUserAccounts, saveUserAccount, type PrimaryGroupId } fr
 import { deleteVoucher, loadVouchers, saveVoucher, VOUCHERS_TABLE } from '../ledger/vouchers';
 import { DAY, SD, noItcCentre, put, rowsOf, loadWorkOrders } from './cn-subcon';
 import { hireRecoveryFor, loadLogs, machines } from './cn-plant';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 export const SCB = 'SCB';
 export const loadSubBills = () => rowsOf<SubMeasurement>(SD.bills);
@@ -241,7 +242,7 @@ export function subBillHtml(b: PurchaseRecord, company: string): string {
   const cn = b.cn_sub;
   const rows = (cn?.abstract ?? []).map((r) => `<tr><td>${e(r.ref)}</td><td>${e(r.description)}${r.mb ? ` <small>(MB ${e(r.mb)})</small>` : ''}</td><td>${e(r.unit)}</td><td>${r.rate}</td><td>${r.prev_qty}</td><td>${r.this_qty}</td><td>${r.cum_qty}</td><td>${r.amount.toFixed(2)}</td></tr>`).join('');
   const deds = (cn?.deductions ?? []).map((d) => `<tr><td colspan="7">Less: ${e(d.label)}</td><td>${d.amount.toFixed(2)}</td></tr>`).join('');
-  return `<!doctype html><meta charset="utf-8"><title>${e(cn?.number)}</title><style>body{font:12px sans-serif;margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:4px;text-align:left}</style>
+  return `<!doctype html><meta charset="utf-8"><title>${e(cn?.number)}</title><style>${PRINT_FONT_FACE}body{font:12px ${PRINT_FONT};margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:4px;text-align:left}</style>
 <h2>Sub-contractor bill ${e(cn?.number)} — abstract</h2><p>${e(company)} · Work order ${e(cn?.wo_number)} · ${e(b.vendor_name)} · ${e(b.date)}</p>
 <table><tr><th>Item</th><th>Description</th><th>Unit</th><th>Rate</th><th>Previous</th><th>This bill</th><th>Up to date</th><th>Amount</th></tr>${rows}
 <tr><td colspan="7">Value before GST</td><td>${b.taxable.toFixed(2)}</td></tr><tr><td colspan="7">GST</td><td>${(b.total - b.taxable).toFixed(2)}</td></tr>

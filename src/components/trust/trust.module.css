@@ -74,7 +74,7 @@
 }
 
 .hash {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
   word-break: break-all;
   padding: 0.5rem;

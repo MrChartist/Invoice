@@ -99,7 +99,7 @@ export function BrsView({ brs, bankLabel, openingMissing }: BrsViewProps) {
               {bankT('brsPrintTitle', { bank: bankLabel, date: formatDate(brs.asOf) })}
             </h2>
             <Paper brs={brs} />
-            <p style={{ fontSize: '8pt', marginTop: '14pt' }}>{bankT('brsPrintNote')}</p>
+            <p style={{ fontSize: '9pt', marginTop: '14pt' }}>{bankT('brsPrintNote')}</p>
           </div>,
           document.body,
         )}

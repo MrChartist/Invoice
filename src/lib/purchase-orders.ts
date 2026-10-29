@@ -20,6 +20,7 @@ import { nextSeriesNumberFor, numberFitsFy, recordSeries } from './series-counte
 import { audit } from './audit';
 import { requireAccess } from './access';
 import { escHtml as esc } from './html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 
 export const PURCHASE_ORDERS_TABLE = 'purchase_orders';
 export const PO_PREFIX = 'PO';
@@ -157,8 +158,8 @@ export function poHtml(po: PurchaseOrder, buyer: PoBuyer, vendor?: { address?: s
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Purchase order ${esc(po.po_number)}</title>
-<style>
-  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 32px; }
+<style>${PRINT_FONT_FACE}
+  body { font-family: ${PRINT_FONT}; color: #111; margin: 0; padding: 32px; }
   .sheet { max-width: 760px; margin: 0 auto; border: 1px solid #ccc; padding: 28px 32px; }
   h1 { font-size: 20px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 4px; }
   .muted { color: #555; font-size: 13px; }
@@ -170,7 +171,7 @@ export function poHtml(po: PurchaseOrder, buyer: PoBuyer, vendor?: { address?: s
   .n { text-align: right; font-variant-numeric: tabular-nums; }
   .totals { margin-left: auto; width: 280px; margin-top: 12px; font-size: 14px; }
   .totals div { display: flex; justify-content: space-between; padding: 3px 0; }
-  .grand { font-weight: 700; border-top: 2px solid #111; margin-top: 4px; padding-top: 6px !important; }
+  .grand { font-weight: 600; border-top: 2px solid #111; margin-top: 4px; padding-top: 6px !important; }
   .sign { margin-top: 48px; text-align: right; font-size: 13px; }
   @media print { body { padding: 0; } .sheet { border: 0; } }
 </style></head>

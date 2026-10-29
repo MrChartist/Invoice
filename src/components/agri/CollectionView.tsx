@@ -18,10 +18,11 @@ import CollectionEntry from './CollectionEntry';
 import AnalyserSetup from './AnalyserSetup';
 import { farmers, milkCentres, sm, useRun, wrap, type Done } from './dairy-kit';
 import { CentrePick, F, Sel } from './dairy-ui';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../../lib/print-fonts';
 
 const SHIFT_OPTS = [['M', 'M'], ['E', 'E']] as const;
 
-const slipHtml = (e: MilkEntry, s: Pick<MilkShift, 'date' | 'shift'>, mm: number) => `<!doctype html><html><head><meta charset="utf-8"><style>@page{size:${mm}mm auto;margin:2mm}body{font:12px monospace;width:${mm - 4}mm}</style></head><body>
+const slipHtml = (e: MilkEntry, s: Pick<MilkShift, 'date' | 'shift'>, mm: number) => `<!doctype html><html><head><meta charset="utf-8"><style>${PRINT_FONT_FACE}@page{size:${mm}mm auto;margin:2mm}body{font:12px ${PRINT_FONT};width:${mm - 4}mm}</style></head><body>
 <b>${esc(localDb.settings.activeProfile()?.companyName ?? '')}</b><br>${esc(s.date)} ${s.shift}<br>${esc(e.code ?? '')} ${esc(e.name ?? '')}<br>${e.qty} ${e.unit} · Fat ${e.fat} · SNF ${e.snf}<br>${e.rejected ? `Rejected: ${esc(e.reason ?? '')}` : `Rate ${e.rate} · ₹${e.amount.toFixed(2)}`}</body></html>`;
 const waText = (e: MilkEntry, s: Pick<MilkShift, 'date' | 'shift'>, hi: boolean) => hi
   ? `${e.code ?? ''} ${e.name ?? ''}: ${s.date} ${s.shift === 'M' ? 'सुबह' : 'शाम'} · दूध ${e.qty} ${e.unit} · फैट ${e.fat} · एसएनएफ ${e.snf} · ₹${e.amount.toFixed(2)}`

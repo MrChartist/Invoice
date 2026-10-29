@@ -19,6 +19,10 @@ import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import local from './returns.module.css';
 import { errText } from '../../i18n/lib-msg';
+import { acceptForm, entryKeyDown, focusFormDate } from '../../lib/keys/entry-actions';
+
+/** R20-B: Ctrl+A accepts, F2 goes to the date (Tally keys on; the dialog reads its own keys). */
+const GRN_KEYS = entryKeyDown({ 'accept.bill': acceptForm, 'date.bill': focusFormDate });
 
 export interface GrnModalProps {
   /** GRN to record, rejection out against a GRN, or closed. */
@@ -112,7 +116,7 @@ function GrnForm({ vendors, orders, purchases, notes, onVendorCreated, onClose, 
   };
 
   return (
-    <form className={styles.form} onSubmit={(e) => { e.preventDefault(); submit(); }}>
+    <form className={styles.form} onKeyDown={GRN_KEYS} onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <VendorPicker id="grn-vendor" vendors={vendors} value={vendorId} onCreated={onVendorCreated} onSelect={(v) => setVendorId(v?.id ?? '')} />
       <div className={controls.row3}>
         <div className={controls.field}>

@@ -34,7 +34,7 @@
 .title {
   margin: 0;
   font-size: calc(var(--text-xl) * 1.25);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .text {

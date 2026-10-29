@@ -27,6 +27,7 @@ import type { WageRevision } from '../../types/manpower-r17';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field, type MpViewProps } from './mp-ui';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../../lib/print-fonts';
 
 const bar = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.5rem 0' } as const;
 const STS = ['pending', 'proved', 'waived'] as const;
@@ -65,7 +66,7 @@ function annexHtml(title: string, shares: ReturnType<typeof siteShares>, t: Amou
   const cell = (v: string | number) => `<td>${esc(String(v))}</td>`;
   const head = mcT('cols').split(',').map((h) => `<th>${esc(h)}</th>`).join('');
   const row = (a: string[], x: Amounts) => `<tr>${a.map(cell).join('')}${SHARE_KEYS.map((k) => cell(x[k].toFixed(2))).join('')}</tr>`;
-  return `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title><style>body{font:12px sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:3px;text-align:right}td:nth-child(-n+3),th:nth-child(-n+3){text-align:left}</style><h3>${esc(title)}</h3><p>${esc(refs)}</p><table><tr>${head}</tr>${shares.map((s) => row([s.name, s.code, s.uan, String(s.duties)], s)).join('')}${row([mcT('total'), '', '', String(shares.reduce((a, s) => a + s.duties, 0))], t)}</table><p>${esc(mcT('annex'))}</p>`;
+  return `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title><style>${PRINT_FONT_FACE}body{font:12px ${PRINT_FONT}}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:3px;text-align:right}td:nth-child(-n+3),th:nth-child(-n+3){text-align:left}</style><h3>${esc(title)}</h3><p>${esc(refs)}</p><table><tr>${head}</tr>${shares.map((s) => row([s.name, s.code, s.uan, String(s.duties)], s)).join('')}${row([mcT('total'), '', '', String(shares.reduce((a, s) => a + s.duties, 0))], t)}</table><p>${esc(mcT('annex'))}</p>`;
 }
 
 export default function ComplianceView({ notify }: MpViewProps) {

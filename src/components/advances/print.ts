@@ -1,4 +1,5 @@
 import { downloadText } from '../../lib/download';
+import { printWhenReady } from '../../lib/print-fonts';
 
 /**
  * Open a script-free voucher page in its own window and print it (the CSP allows it).
@@ -11,7 +12,7 @@ export function openPrintable(html: string, fileBase: string): void {
     w.document.write(html);
     w.document.close();
     w.focus();
-    w.print();
+    printWhenReady(w);
   } else {
     downloadText(`${fileBase.replace(/[\\/]/g, '-')}.html`, html, 'text/html');
   }

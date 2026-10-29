@@ -48,7 +48,7 @@ export const subscribeKeys = (f: () => void): (() => void) => (subs.add(f), () =
  * Global combos the stub claims before the engine loads (`claimList()` in registry.ts generates it, tested): `~` = only
  * with the mode on (not a Gateway key), `^` = TallyPrime layout only, `%` = Tally.ERP 9 only.
  */
-export const KEY_CLAIMS = 'alt+g mod+g mod+f1~ f2 alt+f2 f10 f4 f5 f6 f7 f8 f9 alt+f6^ alt+f5^ mod+f8 mod+f9 alt+f8 alt+f9 alt+f7 mod+f7 mod+shift+f4 f3~ alt+f3~ mod+f3~ alt+k~ alt+y~ alt+o~ mod+alt+n~ mod+alt+r~ mod+alt+b~ f11 f12';
+export const KEY_CLAIMS = 'alt+g mod+g mod+f1~ f2 alt+f2 f10 f4 f5 f6 f7 f8 f9 alt+f6^ alt+f5^ mod+f8 mod+f9 alt+f8 alt+f9 alt+f7 mod+f7 mod+shift+f4 mod+f5 mod+f6 f3~ alt+f3~ mod+f3~ alt+k~ alt+y~ alt+o~ mod+alt+n~ mod+alt+r~ mod+alt+b~ f11 f12';
 
 export const onPath = (re: RegExp): boolean => re.test(location.pathname);
 let engine: ((e: KeyLike) => boolean) | null = null;

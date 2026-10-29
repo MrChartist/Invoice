@@ -86,7 +86,7 @@
   padding: 0.5rem 0.75rem;
   text-align: left;
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted-foreground);
@@ -154,7 +154,7 @@
   margin-top: 0.25rem;
   border-top: 1px solid var(--border);
   color: var(--foreground);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--text-xl);
 }
 
@@ -275,7 +275,7 @@
 }
 
 .nodeLink {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--foreground);
   text-decoration: none;
   overflow-wrap: anywhere;
@@ -294,7 +294,7 @@
 
 .relTag {
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted-foreground);
@@ -349,7 +349,7 @@
   .table td[data-label]::before {
     content: attr(data-label);
     font-size: var(--text-xs);
-    font-weight: 700;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--muted-foreground);

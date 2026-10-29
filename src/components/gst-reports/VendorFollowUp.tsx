@@ -24,6 +24,7 @@ import { useT } from '../../i18n';
 import { ggT } from '../../i18n/areas/gst-guards';
 import controls from '../../styles/controls.module.css';
 import styles from './gst-guards.module.css';
+import { printWhenReady } from '../../lib/print-fonts';
 
 export interface VendorFollowUpProps {
   match: MatchResult;
@@ -76,7 +77,7 @@ export function VendorFollowUp({ match, effect, period, periodLabel, gstin, noti
     else {
       const url = URL.createObjectURL(new Blob([followUpHtml(ggT('fuSubject', { period: periodLabel }), text)], { type: 'text/html' }));
       const w = window.open(url, '_blank');
-      if (w) w.addEventListener('load', () => w.print());
+      if (w) w.addEventListener('load', () => printWhenReady(w));
       else notify(ggT('popupBlocked'), 'error');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     }

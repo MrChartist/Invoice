@@ -49,7 +49,7 @@
 .headline {
   font-family: var(--font-display);
   font-size: clamp(1.75rem, 3vw, 2.5rem);
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.1;
   margin: 0;
@@ -110,7 +110,7 @@
 .title {
   font-family: var(--font-display);
   font-size: 1.5rem;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.025em;
   margin: 0;
 }
@@ -146,7 +146,7 @@
 }
 
 .pinInput {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: 1.25rem;
   letter-spacing: 0.4em;
 }
@@ -218,7 +218,7 @@
 }
 
 .countdown {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
 }
 
@@ -259,8 +259,8 @@
 }
 
 .phrase {
-  font-family: var(--font-mono);
-  font-weight: 700;
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-weight: 600;
   color: var(--foreground);
   user-select: all;
 }

@@ -43,7 +43,7 @@
 .checklistHead h2 {
   font-family: var(--font-display);
   font-size: var(--text-lg);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .checklistHead span {
@@ -113,7 +113,7 @@
   height: 1rem;
   font-size: var(--text-xs);
   font-weight: 600;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   color: var(--muted-foreground);
 }
 
@@ -199,14 +199,14 @@
 }
 
 .amount {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-weight: 600;
   font-size: var(--text-base);
   white-space: nowrap;
 }
 
 .docLink {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-base);
   font-weight: 600;
 }
@@ -265,7 +265,7 @@
 
 @media (max-width: 1000px) {
   .grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -295,5 +295,5 @@
   table.recent td.rClient { grid-area: client; }
   table.recent td.rDate { grid-area: date; font-size: var(--text-sm); color: var(--muted-foreground); }
   table.recent td.rStatus { grid-area: status; justify-self: end; }
-  table.recent td.rAmt { grid-area: amt; align-self: end; justify-self: end; font-weight: 700; }
+  table.recent td.rAmt { grid-area: amt; align-self: end; justify-self: end; font-weight: 600; }
 }

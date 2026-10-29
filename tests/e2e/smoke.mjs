@@ -6500,6 +6500,61 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  // R20-B: entry keys — F8, Alt+C on the party picker creates the party (Ledger Creation), Ctrl+A saves; Alt+D (Y) deletes the saved
+  // invoice and the toast's Undo brings it back from the recycle bin; a Gateway payment with Alt+T is post-dated.
+  await step('R20-B: Alt+C new party, Ctrl+A save, Alt+D then Undo, Alt+T post-dated voucher', async () => {
+    await page.goto(srv.origin + '/');
+    await page.evaluate(() => {
+      localStorage.setItem('mrchartist_tally_keys', 'on');
+      localStorage.setItem('mrchartist_tally_layout', 'prime');
+    });
+    await page.goto(srv.origin + '/');
+    await page.getByText('Stored on this device').waitFor();
+    await page.keyboard.press('F8');
+    await page.waitForURL(/\/invoice$/);
+    const party = page.getByLabel('Client name');
+    await party.fill('R20B Keys Traders');
+    await party.press('Alt+c');
+    const add = page.getByRole('dialog', { name: 'Ledger Creation' });
+    await add.waitFor();
+    check((await add.getByLabel('Name', { exact: true }).inputValue()) === 'R20B Keys Traders', 'Alt+C opens Ledger Creation (Sundry debtors) with the typed name');
+    await add.getByLabel('Name', { exact: true }).press('Control+a');
+    await add.waitFor({ state: 'detached' });
+    check((await party.inputValue()) === 'R20B Keys Traders', 'the new party is on the invoice');
+    const clients = await readJson(page, 'clients', [], (c) => c.some((x) => x.name === 'R20B Keys Traders'));
+    check(clients.some((x) => x.name === 'R20B Keys Traders'), 'the party is created');
+    await page.getByLabel('Item 1 name').fill('Key widget');
+    await page.getByLabel('Item 1 rate').fill('250');
+    await page.keyboard.press('Control+a');
+    await page.waitForURL(/\/invoice\/[^/?]+$/);
+    const id = decodeURIComponent(page.url().split('/invoice/')[1]);
+    check(!!(await readJson(page, 'invoices', [], (v) => v.some((x) => x.id === id))).find((x) => x.id === id), 'Ctrl+A saved the invoice');
+    await page.keyboard.press('Escape'); // the send sheet
+    await page.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+    await page.waitForTimeout(200);
+    await page.keyboard.press('Alt+d');
+    const ask = page.getByRole('dialog', { name: /^Delete / });
+    await ask.waitFor();
+    await page.keyboard.press('y');
+    const gone = await readJson(page, 'invoices', [], (v) => !v.some((x) => x.id === id));
+    check(!gone.some((x) => x.id === id), 'Alt+D, Y deleted the invoice (to the recycle bin)');
+    await page.getByRole('button', { name: 'Undo', exact: true }).last().click();
+    const back = await readJson(page, 'invoices', [], (v) => v.some((x) => x.id === id));
+    check(back.some((x) => x.id === id), 'Undo restored it from the recycle bin');
+    // Alt+T on the payment voucher an earlier step saved ("Office rent"), altered and accepted with Ctrl+A.
+    const pv = (await readJson(page, 'vouchers', [])).find((x) => x.type === 'PAYMENT' && x.narration === 'Office rent');
+    await page.goto(srv.origin + `/gateway/voucher/payment?id=${encodeURIComponent(pv.id)}`);
+    await page.getByRole('heading', { name: `Alter Payment voucher ${pv.number}` }).waitFor();
+    await page.locator('textarea[data-field="narration"]').click();
+    await page.keyboard.press('Alt+t');
+    check((await page.getByTestId('gw-v-variant').inputValue()) === 'PD', 'Alt+T marks the voucher post-dated');
+    await page.keyboard.press('Control+a');
+    const vs = await readJson(page, 'vouchers', [], (v) => v.some((x) => x.id === pv.id && x.post_dated));
+    const why = await page.locator('[role=alert]').allInnerTexts();
+    check(vs.find((x) => x.id === pv.id)?.post_dated === true, `saved post-dated through saveVoucher (Post-dated register)${why.length ? ` — ${why.join(' / ')}` : ''}`);
+    await page.evaluate(() => localStorage.setItem('mrchartist_tally_keys', 'off'));
+  });
+
   // R21-B: a shift (opening 1000, closing 1250, test 5 → 245 L), cash = value, close, day close → one Bill of Supply; DSR prints.
   await step('R21-B shifts: Inventory → Fuel → Shift: open shift 1 (Ravi, nozzle 1-A opening 1000), closing 1250, test 5 → 245 L × ₹94.72, cash ₹23,206.40, close; Day close → one non-GST Bill of Supply with a cash receipt; Daily sales prints', async () => {
     const keys = ['settings', 'stock_items', 'godowns', 'fuel_nozzles', 'fuel_prices', 'fuel_shifts', 'invoices', 'transactions', 'bank_accounts', 'vouchers', 'accounts'];

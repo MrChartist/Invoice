@@ -7,6 +7,7 @@ import { chargeLine, headsFor, loadHeads, withCharges, type GoodsLine } from '..
 import { weighNet } from '../../lib/trade/tr-weight';
 import type { LineWeight } from '../../types/trade-r8';
 import { escHtml as esc } from '../../lib/html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE, printWhenReady } from '../../lib/print-fonts';
 
 /** Is `name` a stock item sold by weight / bags? */
 export const weighItem = (name: string | undefined) => {
@@ -45,11 +46,11 @@ export function printWeightSlip(title: string, party: string, lines: readonly { 
     const w = weighNet(l.wt!);
     return `<tr><td>${esc(l.name)}</td><td>${esc(l.wt!.packages)} ${esc(l.wt!.kind)}</td><td>${w.gross}</td><td>${w.tare}</td><td>${w.ded}</td><td><b>${w.net}</b></td></tr>`;
   });
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(tbT('slip'))}</title><style>body{font:13px sans-serif;margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid gray;padding:4px 6px;text-align:left}</style></head><body><h2>${esc(tbT('slip'))} — ${esc(title)}</h2><p>${esc(party)}</p><table><tr><th>Item</th><th>Packages</th><th>Gross kg</th><th>Tare kg</th><th>Dhalta kg</th><th>Net kg</th></tr>${rows.join('')}</table></body></html>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(tbT('slip'))}</title><style>${PRINT_FONT_FACE}body{font:13px ${PRINT_FONT};margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid gray;padding:4px 6px;text-align:left}</style></head><body><h2>${esc(tbT('slip'))} — ${esc(title)}</h2><p>${esc(party)}</p><table><tr><th>Item</th><th>Packages</th><th>Gross kg</th><th>Tare kg</th><th>Dhalta kg</th><th>Net kg</th></tr>${rows.join('')}</table></body></html>`;
   const w = window.open('', '_blank'); // script-free HTML; blocked pop-ups get the file instead
   if (!w) return downloadText('weight-slip.html', html, 'text/html');
   w.document.write(html);
   w.document.close();
-  w.print();
+  printWhenReady(w);
 }
 

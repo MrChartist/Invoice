@@ -73,7 +73,7 @@
 
 .negative {
   color: var(--loss);
-  font-weight: 700;
+  font-weight: 600;
 }
 .positive {
   color: var(--profit);

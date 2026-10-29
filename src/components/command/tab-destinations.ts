@@ -45,7 +45,7 @@ export interface HelpIndexRow {
 }
 
 /** R6-A2: every help topic (lazy registry + topic chunks), loaded once; `helpRows` maps it per open. */
-export const loadHelpIndex = async (): Promise<HelpIndexRow[]> => (await import('../../lib/help/registry')).helpIndex();
+export const loadHelpIndex = async (hi = false): Promise<HelpIndexRow[]> => (await import('../../lib/help/registry')).helpIndex({ hi });
 
 /** QA7 G9: help rows in the language of THIS open (the titles used to keep the language of the first open). */
 export function helpRows(rows: readonly HelpIndexRow[], lang: string): StaticEntry[] {
