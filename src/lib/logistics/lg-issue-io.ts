@@ -52,6 +52,7 @@ function toRecord(d: JobDraft, j: LgJob, date: string, e: Env): InvoiceRecord {
     id: generateId(), issue_date: date, due_date: addDaysInput(Number(e.settings.defaultDueDays) || 30, date), status: 'Sent', currency: d.currency, client, items: d.items,
     place_of_supply: d.pos, gst_mode: d.mode, supply_type: d.supply ?? (client.gstin?.trim() ? 'B2B' : 'B2C'), notes: `Job ${j.number}`, lg: d.lg,
     ...(d.exchange_rate ? { exchange_rate: d.exchange_rate } : {}), ...(d.supply === 'EXPORT_LUT' ? lutOn(date, e.snd?.companyGstin) : {}), ...(d.doc_type === 'BILL_OF_SUPPLY' ? { exempt_kind: 'EXEMPT' as const } : {}),
+    ...(d.rcm ? { reverse_charge: true, rcm_tax_excluded: true } : {}), // QA22 W3 (as R5-B freight bills)
   };
   const t = calculateInvoice(calcInputFromRecord(rec));
   return { ...rec, subtotal: t.subtotal, discount_amount: t.discount_amount, taxable_value: t.taxable_value, cgst_amount: t.cgst_amount, sgst_amount: t.sgst_amount, igst_amount: t.igst_amount, tax_amount: t.tax_amount, cess_amount: t.cess_amount, round_off: t.round_off, total: t.total, balance_due: t.balance_due, tcs_amount: t.tcs_amount, tds_amount: t.tds_amount };

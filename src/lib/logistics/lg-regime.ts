@@ -29,13 +29,15 @@ export interface RegimeCtx {
   inter: 'supplier' | 'recipient';
   /** The GTA leg's rate (R5-B option on the date, `lg-tax-io.ts`). */
   gta: number;
+  /** QA22 W3: the R5-B option is reverse charge and this recipient is liable (N 13/2017-CT(R) entry 1). */
+  gtaRcm?: boolean;
   /** Sec 2(6) not failed for this recipient (R14 export check). */
   exportOk?: boolean;
   /** An LUT in force on the date. */
   lut?: boolean;
 }
 
-export interface LgRegime { key: LgRegimeKey; pos: string; mode: LgGstMode; rate: number; supply?: 'EXPORT_LUT' | 'EXPORT_WITH_PAYMENT'; itc_note?: string; reason: string; ca: string }
+export interface LgRegime { key: LgRegimeKey; pos: string; mode: LgGstMode; rate: number; supply?: 'EXPORT_LUT' | 'EXPORT_WITH_PAYMENT'; itc_note?: string; reason: string; ca: string; /** GST payable by the recipient (GTA under RCM). */ rcm?: boolean }
 
 const R184 = 'Place of supply outside India — Sec 12(8) proviso; IGST (Circular 184/16/2022-GST)';
 const R203 = 'Sec 13(2) IGST Act (13(9) omitted from 1 Oct 2023, Circular 203/15/2023-GST)';
@@ -76,8 +78,12 @@ export function lgRegime(h: LgHead, j: LgJob, c: RegimeCtx): LgRegime {
     return make('cross_border', '96', `${reason}; ${lut ? 'export of services under LUT' : 'IGST paid'}`, 'LG3', { mode: s.registered ? 'IGST' : 'NONE', supply: lut ? 'EXPORT_LUT' : 'EXPORT_WITH_PAYMENT' });
   }
   if (rule === 'transport') {
-    if (abroad(j) && keyedAt(LG_POS_RULES, 'export', date)) return make('export_freight', '96', R184, 'LG2', { mode: s.registered ? 'IGST' : 'NONE' });
-    return make('domestic', r.registered && r.state ? r.state : s.state, 'Sec 12(8) IGST Act', 'LG1');
+    // QA22 W3: a GTA head under the reverse-charge option, billed to a liable recipient, is billed as R5-B's freight bills are.
+    const rcm = h.kind === 'gta' && !!c.gtaRcm;
+    const why = (t: string) => (rcm ? `${t}; GST payable by the recipient (reverse charge)` : t);
+    const x = rcm ? { rcm } : {};
+    if (abroad(j) && keyedAt(LG_POS_RULES, 'export', date)) return make('export_freight', '96', why(R184), 'LG2', { mode: s.registered ? 'IGST' : 'NONE', ...x });
+    return make('domestic', r.registered && r.state ? r.state : s.state, why('Sec 12(8) IGST Act'), 'LG1', x);
   }
   return make('general', home, 'Sec 12(2) IGST Act', 'LG9');
 }
