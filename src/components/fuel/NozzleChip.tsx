@@ -11,20 +11,17 @@ import { useT } from '../../i18n';
 import { fuT } from '../../i18n/areas/fuel-r21a';
 import { getTable } from '../../lib/storage';
 import type { StockItem } from '../../lib/inventory';
-import { readNozzles } from '../../lib/fuel/fu-tank';
-import { readPrices } from '../../lib/fuel/fu-price';
 import { fuDocPatch, fuelLine, nozzleLabel, priceAt } from '../../lib/fuel/fu-line';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
-import type { FuLine } from '../../types/fuel-r21';
+import type { FuelNozzle, FuelPrice, FuLine } from '../../types/fuel-r21';
 import controls from '../../styles/controls.module.css';
-import { Row } from './fu-ui';
 
 export interface PosFuel { patch: Partial<InvoiceRecord>; errors: string[] }
 const sig = (l: InvoiceItem) => `${l.quantity}|${l.rate}|${l.tax_rate}|${l.sv?.exempt ?? ''}`;
 
 export default function NozzleChip({ record, setItems, onChange }: { record: InvoiceRecord; setItems: Dispatch<SetStateAction<InvoiceItem[]>>; onChange: (v: PosFuel | null) => void }) {
   useT();
-  const [items, nozzles, prices] = useMemo(() => [getTable<StockItem>('stock_items').filter((i) => i.fu), readNozzles().filter((n) => n.active), readPrices()] as const, []);
+  const [items, nozzles, prices] = useMemo(() => [getTable<StockItem>('stock_items').filter((i) => i.fu), getTable<FuelNozzle>('fuel_nozzles').filter((n) => n.active), getTable<FuelPrice>('fuel_prices')] as const, []);
   const [pick, setPick] = useState<Record<string, { nz?: string; amt?: string }>>({});
   const day = record.issue_date;
   const now = new Date().toTimeString().slice(0, 5);
@@ -61,7 +58,7 @@ export default function NozzleChip({ record, setItems, onChange }: { record: Inv
   return (
     <div data-fu-pos>
       {rows.map(({ l, it, noz, p }) => (
-        <Row key={l.id}>
+        <div key={l.id} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
           <strong>{it.name}</strong>
           <select className={controls.select} aria-label={fuT('nozzle')} value={lines[l.id]?.nozzle_id ?? ''} onChange={(e) => set(l.id, { nz: e.target.value })} data-fu-nozzle>
             <option value="">{fuT('nozzle')}</option>
@@ -69,7 +66,7 @@ export default function NozzleChip({ record, setItems, onChange }: { record: Inv
           </select>
           <input className={controls.input} style={{ width: '6rem' }} type="number" min={0} step="any" placeholder={fuT('amount')} aria-label={fuT('amount')} value={p.amt ?? ''} onChange={(e) => set(l.id, { amt: e.target.value })} data-fu-amount />
           {lines[l.id] && <span className={controls.hint} data-fu-litres>{fuT('line', { l: lines[l.id].litres.toFixed(3), u: lines[l.id].unit === 'KG' ? 'kg' : 'L', rsp: lines[l.id].rsp ?? '', at: lines[l.id].at ?? '' })}</span>}
-        </Row>
+        </div>
       ))}
       {errors.map((m) => <p key={m} className={controls.hint} role="alert">{m}</p>)}
     </div>

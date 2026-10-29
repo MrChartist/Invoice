@@ -14,15 +14,18 @@ import { fuT } from '../../i18n/areas/fuel-r21a';
 import { activePacks } from '../../lib/industry-packs';
 import { localDb } from '../../lib/localDb';
 import controls from '../../styles/controls.module.css';
+import TanksView from './TanksView';
+import PricesView from './PricesView';
 
 export type Done = (message: string, bad?: boolean) => void;
-const FILES = import.meta.glob<{ default: ComponentType<{ onDone: Done }> }>('./*View.tsx');
+// A's two views ship in the desk chunk (with the tank / price writers); B–D's views are lazy by file name.
+const FILES = import.meta.glob<{ default: ComponentType<{ onDone: Done }> }>(['./*View.tsx', '!./TanksView.tsx', '!./PricesView.tsx']);
 const AboutStrip = lazy(() => import('../help/AboutStrip'));
 /** Every Round 21 view in desk order, with its icon (PRD §1.5) and pack (`lpg` for the LPG view, else `fuel`). */
 const ORDER = [['shift', Clock], ['dsr', ClipboardList], ['dips', Ruler], ['stock', Scale], ['tanks', Boxes], ['prices', Receipt], ['credit', Car], ['omc', Wallet], ['lpg', Truck]] as const;
 type View = (typeof ORDER)[number][0];
 const load = (v: string) => FILES[`./${v[0].toUpperCase()}${v.slice(1)}View.tsx`];
-const VIEWS = Object.fromEntries(ORDER.filter(([v]) => load(v)).map(([v]) => [v, lazy(load(v))]));
+const VIEWS: Record<string, ComponentType<{ onDone: Done }>> = { ...Object.fromEntries(ORDER.filter(([v]) => load(v)).map(([v]) => [v, lazy(load(v))])), tanks: TanksView, prices: PricesView };
 
 export default function FuelDesk({ view, onDone }: { view?: string; onDone: Done }) {
   useT();
