@@ -30,7 +30,10 @@ same number Receivables, statements and reminders show. The billed total / invoi
 stay as a second line. Default sort is by balance (biggest to collect first, advances last); also *Most overdue* and
 *Name*. An **Overdue only** chip filters. A header card totals **You'll get** (Σ positive balances) and **You'll give**
 (Σ advances held). On a phone the row becomes a card (name + balance on top, contact, then the action buttons).
-INR only (foreign-currency documents stay in Receivables' currency picker).
+**Non-INR khata (PENDING 50)**: a party billed in another currency (export clients) gets a second line per currency under
+the balance — "USD 1,500.00 to collect" / "… advance" (`foreignBalances`: the same receivables ledger run per currency) —
+linking to its statement in that currency (`/receivables?…&cur=USD`). Totals, sorting, reminders, ₹ Received / ₹ Given and
+the WhatsApp statement stay INR (a foreign receipt needs the realised rate: record it in Receivables).
 
 ## 8.2 ₹ Received and ₹ Given
 
@@ -67,6 +70,10 @@ Row buttons on Clients, and on the party detail (Receivables → Statements, bes
 - **Web page** (statement viewer): `buildClientCopyHtml` (now generic: pay-panel label / aria label and a footer note)
   wraps the frozen statement paper (QR canvas → PNG, `client-copy-dom.ts`) in a static, script-free page with its own
   `default-src 'none'` CSP and a **Pay with UPI** panel + QR for the balance. Shared as a file, else downloaded.
+- **From list rows (PENDING 50)**: a globe button on each Clients row (parties with a ledger) opens
+  `/receivables?tab=statements&party=<key>&web=1`; the statement viewer opens and makes the web page at once (same code
+  path as its *Web page* button). The browser needs a fresh tap to share after a navigation, so the page is usually
+  downloaded from there.
 
 ## 8.4 Party reminders and "Remind all overdue"
 

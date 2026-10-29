@@ -6,10 +6,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Wand2 } from 'lucide-react';
 import type { BankLine, BankStatement } from '../../../lib/bank-recon';
-import { buildMemory, ruleDraftFromLine, rulesDb, suggestCategorisations, type RuleAction, type RuleSuggestion } from '../../../lib/bank-rules';
+import { buildActionMemory, buildMemory, ruleDraftFromLine, rulesDb, suggestCategorisations, type RuleAction, type RuleSuggestion } from '../../../lib/bank-rules';
 import { applyBankBatch } from '../../../lib/bank-rules-apply';
 import { can } from '../../../lib/access';
 import { localDb } from '../../../lib/localDb';
+import { loadVouchers } from '../../../lib/ledger/vouchers';
+import { chartOf, loadUserAccounts } from '../../../lib/ledger/accounts';
+import { isCashOrBankLedger } from '../../../lib/bank-ledgers';
 import { cn, formatDate, formatMoney } from '../../../lib/utils';
 import { RuleEditorModal, type RuleDraft } from './BankRulesPanel';
 import { useT } from '../../../i18n';
@@ -53,15 +56,20 @@ export default function RuleSuggestions({ statements, lines, matched, purchases,
     return (id: string) => m.get(id);
   }, [statements]);
   const memory = useMemo(() => buildMemory(statements, purchases as never, purchasePayments), [statements, purchases, purchasePayments]);
+  // 8.46: memory for receipts (customer) and payment / receipt vouchers (ledger), read from past matched lines.
+  const actions = useMemo(() => {
+    const chart = new Map(chartOf(loadUserAccounts()).map((a) => [a.id, a]));
+    return buildActionMemory(statements, localDb.payments.getAll(), localDb.invoices.getAll(), loadVouchers(), (id) => isCashOrBankLedger(chart.get(id)));
+  }, [statements]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const rules = useMemo(() => rulesDb.all(), [tick]);
   // R18-C4: a society's credits naming a unit (A-101, FLAT 101 A) become receipts from its member (lazy, society only).
   const [hs, setHs] = useState<{ f: (l: readonly BankLine[]) => RuleSuggestion[] } | null>(null);
   useEffect(() => { if (localDb.settings.get().society_kind) void import('../../../lib/society/hs-bank-io').then((m) => setHs({ f: m.societySuggestions })); }, []);
   const list = useMemo(() => {
-    const base = suggestCategorisations(lines, rules, memory, { accountOf }, matched), seen = new Set(base.map((s) => s.lineId));
+    const base = suggestCategorisations(lines, rules, memory, { accountOf }, matched, actions), seen = new Set(base.map((s) => s.lineId));
     return hs ? [...base, ...hs.f(lines.filter((l) => !seen.has(l.id) && !matched.has(l.id) && !l.ignored && !l.matched_to))] : base;
-  }, [lines, rules, memory, accountOf, matched, hs]);
+  }, [lines, rules, memory, accountOf, matched, hs, actions]);
   const byId = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines]);
   const writable = can('books.edit');
   const picked = list.filter((s) => !off.has(s.lineId));

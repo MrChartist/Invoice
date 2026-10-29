@@ -1,28 +1,12 @@
-import { useState } from 'react';
-import { activeCompanyId, labelMainCompany, readRegistry, switchCompany } from '../../lib/companies';
-import { localDb } from '../../lib/localDb';
-import { useT } from '../../i18n';
-import { pwaT } from '../../i18n/areas/pwa';
-import controls from '../../styles/controls.module.css';
-import styles from './companies.module.css';
+import { Suspense, lazy, useState } from 'react';
+import { readRegistry } from '../../lib/companies';
+
+// R20-D: the select loads only on a device with a second company, so it is off first paint (that pays for the
+// Tally keys' F3 / Alt+K … claims the shell stub gained). F3 opens the same list as a sheet (keys/MenuSheets.tsx).
+const List = lazy(() => import('./CompanySwitcherList'));
 
 /** Sidebar switcher (6.20); renders nothing until a second company exists. */
 export function CompanySwitcher() {
-  useT(); // re-render on a language switch (5.4)
-  // F27: the main company shows its profile name, not the "Main business" placeholder.
-  const [reg] = useState(() => {
-    labelMainCompany(localDb.settings.activeProfile()?.companyName);
-    return readRegistry();
-  });
-  if (reg.list.length < 2) return null;
-  return (
-    <div className={styles.switcher}>
-      <label className={styles.switcherLabel} htmlFor="company-switch">{pwaT('company')}</label>
-      <select id="company-switch" className={controls.select} value={activeCompanyId()} onChange={(e) => switchCompany(e.target.value)}>
-        {reg.list.map((c) => (
-          <option key={c.id} value={c.id}>{c.name}</option>
-        ))}
-      </select>
-    </div>
-  );
+  const [many] = useState(() => readRegistry().list.length > 1);
+  return many ? <Suspense fallback={null}><List /></Suspense> : null;
 }

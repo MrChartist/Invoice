@@ -469,7 +469,7 @@ What Khatabook / OkCredit / Vyapar / myBillBook users do every day, offline: `wa
 | 8.4 | ✅ **Party reminders + "Remind all overdue"**: `buildPartyReminder` (total overdue, oldest bill, UPI link; English / Hinglish / Hindi), full-screen stepper one tap per party with skip / snooze / copy, logged in `reminders` with additive `party_key`; **Send everyone their balance** monthly preset | `khata.ts`, `RemindQueue.tsx` | done |
 | 8.5 | ✅ **Party balance on the bill**: Design Studio toggle (`show_party_balance`, per profile) prints *Previous balance + This bill = Total due* on every template and the thermal / POS receipt from `party_balance_snapshot` frozen at first issue (reprints never change; legacy prints nothing); accent variable only | `party-balance.ts`, `PartyBalanceBlock.tsx`, store / POS save | done |
 | 8.6 | ✅ **Due dates in shop use**: the party's credit days set the due date of a new document; the editor nudges for a due date on an unpaid bill | `useInvoiceStore.ts`, `DocumentMetaCard.tsx` | done |
-| 8.7 | ⏳ 8A follow-ups: ~~balance snapshot on recurring / converted / late-fee documents issued outside the editor~~ (✅ R6-C5), ~~per-party reminder language~~ (done in 8.121, `message-langs.ts`), statement web page from list rows, non-INR khata | — | open |
+| 8.7 | ✅ 8A follow-ups: ~~balance snapshot on recurring / converted / late-fee documents issued outside the editor~~ (✅ R6-C5), ~~per-party reminder language~~ (done in 8.121, `message-langs.ts`), ✅ statement web page from list rows, ✅ non-INR khata (foreign balances per currency on the Clients list; receipts stay in Receivables) (PENDING 50) | `Clients.tsx`, `StatementViewer.tsx`, `khata.ts` `foreignBalances` | done |
 
 ### 8D · GST guards 2025–26 (`docs/features/einvoice.md`, `docs/features/gst-reports.md`, `docs/features/gstr2b.md`, `docs/features/compliance.md`)
 
@@ -498,7 +498,7 @@ From the Vyapar / myBillBook / OkCredit comparison: the phone and the shop count
 | 8.24 | ✅ **Add party from contacts** (Contact Picker API, Android Chrome, feature-detected) | `contact-pick.ts`, `ContactPickButton.tsx` | done |
 | 8.25 | ✅ **Calculator in number fields** ("120*3+40", "1000+18%"), tiny parser, no eval | `calc-expr.ts`, `NumberInput.tsx` | done |
 | 8.26 | ✅ **Web Bluetooth thermal printing** (BLE 58 / 80 mm ESC/POS, off by default, `bluetooth=(self)`), browser-print fallback | `escpos.ts`, `PosPrinter.tsx` | done |
-| 8.27 | ⏳ 8B follow-ups: share-target on iOS (no Web Share Target there), remembered BLE printer across reloads (`getDevices` still behind a flag), Payment-in quick-pay screen (khata work), tiles for price-list items, held carts across devices (deliberately not synced) | — | open |
+| 8.27 | ◐ 8B follow-ups: share-target on iOS (no Web Share Target there), remembered BLE printer across reloads (`getDevices` still behind a flag), ~~Payment-in quick-pay screen~~ (the 8.150 PWA path), ✅ tiles for price-list items (PENDING 50), held carts across devices (deliberately not synced) | `pos-tiles.ts`, `PosTiles.tsx` | partly done |
 
 ### 8C · Capture, bank rules, approvals (`docs/features/bill-capture.md`, `docs/features/banking.md` § Bank rules)
 
@@ -512,7 +512,7 @@ Competitor parity with Zoho Books / Xero / QuickBooks / Refrens / TallyPrime 7.0
 | 8.43 | ✅ **Recurring bills / expenses** (`recurring_bills`, recurring.ts date rules): each occurrence writes a **draft** (never posted), idempotent; bell: supplier bills due this week, recurring bills due, drafts / inbox waiting (lazy provider) | `recurring-bills.ts`, `RecurringBillsPanel.tsx`, `capture-alerts.ts` | done |
 | 8.44 | ✅ **Approvals for bills, expenses and supplier payments**: thresholds (0 = all), clerk's bill held in `purchase_drafts` and payment in `payment_requests` (out of the books); owner approves (posts / pays) or rejects with a reason; shared `approvals` history; data-layer gate in `purchasesDb.save`; payments from bank statements / cheques / confirmed e-payment files exempt | `purchase-approval-gate.ts`, `purchase-approvals.ts`, `PurchaseApprovals.tsx` | done |
 | 8.45 | ✅ **Bank rules + memory** (`bank_rules`): ALL / ANY of narration contains / starts with / safe regex, counterparty token, amount range, debit / credit, bank account → expense (head, supplier, GST + ITC, cost centre, branch, mode), voucher to a ledger, receipt against a customer's invoices, contra (twin reused), ignore; run after invoice matching; every suggestion labelled Rule / Match / Memory; memory learned from past expense categorisations; "Create rule for similar lines?" after a manual expense; all-or-nothing batches through the existing writers (roles, period lock, approval gate, audit) | `bank-rules.ts`, `bank-rules-apply.ts`, `BankRulesPanel.tsx`, `RuleSuggestions.tsx` | done |
-| 8.46 | ⏳ 8C follow-ups: PDF page rendering for QR reading, a multi-line GST split from the QR (needs the full e-invoice JSON), rule actions with GST on vouchers, memory for receipts / vouchers, payment approval inside the e-payment batch screen, total-JS budget headroom | — | open |
+| 8.46 | ◐ 8C follow-ups (PENDING 48): ✅ QR from images embedded in a PDF (no page rendering — no PDF engine), ✅ multi-line GST split from the full e-invoice JSON, ✅ memory for receipts / vouchers, ✅ payment approval inside the e-payment batch; ✗ GST on voucher rule actions (vouchers never reach GSTR-3B / ITC — use the expense action); total-JS budget headroom | `pdf-images.ts`, `einvoice-qr.ts`, `bill-capture.ts`, `bank-rules.ts`, `epay-confirm.ts` | partly done |
 
 ### 8I · Filing & capture UX (`docs/features/gst-reports.md`, `docs/features/bill-capture.md`)
 
@@ -554,7 +554,7 @@ From competitor tutorials (myBillBook "Scan invoice" in Purchases, Refrens "Vali
 | 8.148 | ✅ **WhatsApp this bill** (beside Reprint, save toast; prompt when no phone; UPI link for a balance) | `pos-share.ts` | done |
 | 8.149 | ✅ **Create item from an unknown code** (POS + editor scan bar) | `QuickItemSheet.tsx`, `catalog.ts` | done |
 | 8.150 | ✅ Wiring: PWA "Payment in" (`/clients?pay=1`) → party picker → ₹ Received sheet; shared image / PDF → "Capture as supplier bill (read e-invoice QR)" or "New expense" | `PartyPicker.tsx`, `Clients.tsx`, `ShareTarget.tsx` | done |
-| 8.151 | ⏳ 8E follow-ups: scale labels with an embedded price check digit, USB-HID / Bluetooth scales, pole displays over serial (VFD), drawer hand-over between shifts, short codes on stock-only items, Option+P on macOS for the global key | — | open |
+| 8.151 | ◐ 8E follow-ups (PENDING 50): ✅ GS1 price check digit on scale labels, ✅ USB-HID / Bluetooth (Weight Scale Service) scales, ✅ drawer hand-over between shifts, ~~short codes on stock-only items~~ (QA-3 F24); ~~Option+P on macOS~~ (R20-A physical-key match); ✗ VFD pole displays (no verifiable command set) | `scale-barcode.ts`, `scale-serial.ts`, `pos-shifts.ts` | partly done |
 ### 8G · Invoicing UX & insights (`docs/features/invoicing-ux.md`)
 
 Zoho Books / FreshBooks / Xero / TallyPrime 7 habits, offline: deposits and acceptance without a portal, SmartFind, insights computed on the device.

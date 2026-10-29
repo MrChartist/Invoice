@@ -30,8 +30,15 @@ export interface ScaleProfile {
   decimals: number;
   /** Refuse a label whose EAN-13 check digit is wrong. */
   checkDigit: boolean;
+  /**
+   * PENDING 50: the digit after the PLU is a GS1 price / weight check digit over the 4- or 5-digit value
+   * (`P P I I I I V W W W W W C`); a wrong one refuses the label.
+   */
+  priceCheck?: boolean;
   /** Live weight (Web Serial): the scale's baud rate. */
   baud: number;
+  /** PENDING 50: how the live weight is read — Web Serial (default), WebHID (USB HID POS scale) or Web Bluetooth. */
+  link?: 'serial' | 'hid' | 'ble';
 }
 
 export const SCALE_PROFILE_KEY = 'mrchartist_pos_scale';
@@ -65,6 +72,8 @@ export function cleanScaleProfile(raw: unknown): ScaleProfile {
     value,
     decimals: clampInt(r.decimals, 0, 3, value === 'price' ? 2 : 3),
     checkDigit: r.checkDigit !== false,
+    ...(r.priceCheck === true ? { priceCheck: true } : {}),
+    ...(r.link === 'hid' || r.link === 'ble' ? { link: r.link } : {}),
     baud: [1200, 2400, 4800, 9600, 19200, 38400].includes(Number(r.baud)) ? Number(r.baud) : 9600,
   };
 }
@@ -86,18 +95,36 @@ export function parseScaleBarcode(raw: string, profile: ScaleProfile): ScaleRead
   if (!profile.prefixes.includes(prefix)) return null;
   if (profile.checkDigit && ean13CheckDigit(code.slice(0, 12)) !== Number(code[12])) return null;
   const plu = code.slice(2, 2 + profile.pluLength);
-  const digits = code.slice(2 + profile.pluLength, 12);
+  const at = 2 + profile.pluLength + (profile.priceCheck ? 1 : 0);
+  const digits = code.slice(at, 12);
   if (!digits) return null;
+  if (profile.priceCheck && String(priceCheckDigit(digits)) !== code[at - 1]) return null;
   const value = Number(digits) / 10 ** profile.decimals;
   if (!(value > 0)) return null;
   return { prefix, plu, value: profile.value === 'price' ? round2(value) : Math.round(value * 1000) / 1000, kind: profile.value };
 }
 
 /** Build a scale label for tests and for the settings preview ("what does my scale print?"). */
-export function makeScaleBarcode(profile: Pick<ScaleProfile, 'pluLength' | 'decimals'>, prefix: string, plu: string | number, value: number): string {
-  const valueLen = 10 - profile.pluLength;
-  const body = prefix + String(plu).padStart(profile.pluLength, '0').slice(-profile.pluLength) + String(Math.round(value * 10 ** profile.decimals)).padStart(valueLen, '0').slice(-valueLen);
+export function makeScaleBarcode(profile: Pick<ScaleProfile, 'pluLength' | 'decimals' | 'priceCheck'>, prefix: string, plu: string | number, value: number): string {
+  const valueLen = 10 - profile.pluLength - (profile.priceCheck ? 1 : 0);
+  const v = String(Math.round(value * 10 ** profile.decimals)).padStart(valueLen, '0').slice(-valueLen);
+  const body = prefix + String(plu).padStart(profile.pluLength, '0').slice(-profile.pluLength) + (profile.priceCheck ? String(priceCheckDigit(v)) : '') + v;
   return body + ean13CheckDigit(body);
+}
+
+// GS1 General Specifications, "check digit calculation for price / weight fields": weighting factors 2-, 3, 5+, 5-.
+const W2M = [0, 2, 4, 6, 8, 9, 1, 3, 5, 7];
+const W3 = [0, 3, 6, 9, 2, 5, 8, 1, 4, 7];
+const W5P = [0, 5, 1, 6, 2, 7, 3, 8, 4, 9];
+const W5M = [0, 5, 9, 4, 8, 3, 7, 2, 6, 1];
+
+/** GS1 check digit of a 4- or 5-digit price / weight field (-1 for any other length). */
+export function priceCheckDigit(value: string): number {
+  const d = [...value].map(Number);
+  if (d.length === 4) return ((W2M[d[0]] + W2M[d[1]] + W3[d[2]] + W5M[d[3]]) * 3) % 10;
+  if (d.length !== 5) return -1;
+  const sum = (W5P[d[0]] + W2M[d[1]] + W5M[d[2]] + W5P[d[3]] + W2M[d[4]]) % 10;
+  return W5M.indexOf((10 - sum) % 10);
 }
 
 const pluKey = (p: unknown) => String(p ?? '').trim().replace(/^0+(?=\d)/, '');

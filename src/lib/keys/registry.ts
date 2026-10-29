@@ -15,7 +15,7 @@ export { NEVER_CLAIM, type NeverClaim } from './never-claim';
 /** The package whose merge makes a row live; `have` = existed before Round 20 (always live). */
 export type KeyPkg = 'have' | 'A' | 'B' | 'C' | 'D';
 /** Packages merged so far. B / C / D: add your letter here (one line) in your merge. */
-export const BUILT: ReadonlySet<KeyPkg> = new Set<KeyPkg>(['have', 'A', 'C']);
+export const BUILT: ReadonlySet<KeyPkg> = new Set<KeyPkg>(['have', 'A', 'C', 'D']);
 /** Rows of a built package held back until what they call lands (R20-C: report-row delete / cancel / duplicate wait
  * for B's entry-actions.ts; Ctrl+B basis and Ctrl+M share were cut). Remove an id when its handler ships. */
 export const HELD: ReadonlySet<string> = new Set(['dup.row', 'delete.row', 'cancel.row', 'basis', 'share', 'share.alias']);

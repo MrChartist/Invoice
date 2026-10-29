@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BellRing, Download, FileUp, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Scale, Search, Send, Trash2, UserPlus, Users } from 'lucide-react';
+import { BellRing, Download, FileUp, Globe, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Scale, Search, Send, Trash2, UserPlus, Users } from 'lucide-react';
 import { ImportWizard } from '../components/import/ImportWizard';
 import { PageHeader } from '../components/ui/PageHeader';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -22,7 +22,8 @@ import { formatCurrency, todayInput } from '../lib/utils';
 import type { Client } from '../types/invoice';
 import { loadKhataReport } from '../lib/khata-actions';
 import { messageLangOf } from '../lib/message-langs';
-import { buildWhatsAppStatement, khataRows, khataTotals, sortKhataRows, type KhataRow, type KhataSort } from '../lib/khata';
+import { currenciesIn } from '../lib/receivables';
+import { buildWhatsAppStatement, foreignBalances, khataRows, khataTotals, sortKhataRows, type KhataRow, type KhataSort } from '../lib/khata';
 import { whatsappLink } from '../lib/share';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
@@ -34,6 +35,7 @@ import { s2T } from '../i18n/areas/sales-r2';
 import { svcT } from '../i18n/areas/service-r3';
 import { loadQuietSettings, quietCustomers } from '../lib/quiet-customers';
 import { DOC_DEFAULT_COLUMNS, docDefaultsToCells } from '../lib/party-defaults'; // R3-B5 CSV columns
+import { useListKeys } from '../lib/keys/use-list-keys'; // R20-D5
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
@@ -96,7 +98,10 @@ export function Clients() {
 
   // Balance per party (8.1): the receivables ledger incl. opening bills, credit notes and advances.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const report = useMemo(() => loadKhataReport().report, [version]);
+  const khata = useMemo(() => loadKhataReport(), [version]);
+  const report = khata.report;
+  // PENDING 50: balances in other currencies (export parties) as a second line; links to Receivables in that currency.
+  const foreign = useMemo(() => foreignBalances(khata.input, currenciesIn(khata.input.invoices)), [khata]);
   const rows = useMemo(() => khataRows(clients, report), [clients, report]);
   const totals = useMemo(() => khataTotals(rows), [rows]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -151,6 +156,8 @@ export function Clients() {
     setEditing(c);
     setFormOpen(true);
   };
+  // R20-D5 (Tally keys): ↑ ↓ move, Enter edits the party, Alt+D = the row's Delete button.
+  const list = useListKeys(filtered.length, (i) => edit && openEdit(filtered[i].client!), { del: (i) => edit && setDeleting(filtered[i].client!) });
 
   return (
     <div className={surface.page}>
@@ -264,14 +271,14 @@ export function Clients() {
                   <th aria-label={salesT('actions')} />
                 </tr>
               </thead>
-              <tbody>
-                {filtered.map((row) => {
+              <tbody id={list.bodyId}>
+                {filtered.map((row, i) => {
                   const c = row.client!;
                   const b = billed.get(c.name?.trim().toLowerCase() ?? '');
                   const adv = (c.id ? advanceOpen.get(c.id) : 0) || advanceOpen.get(`name:${c.name.trim().toLowerCase()}`) || 0;
                   const waHref = row.party ? whatsappLink(c.phone, buildWhatsAppStatement({ sender, party: row.party, lang: messageLangOf(c) })) : null;
                   return (
-                    <tr key={c.id ?? c.name} data-client-row={c.name}>
+                    <tr key={c.id ?? c.name} data-client-row={c.name} {...list.row(i)}>
                       <td className={styles.cWho}>
                         <div className={styles.who}>
                           <Avatar name={c.name} size={34} square />
@@ -322,6 +329,13 @@ export function Clients() {
                               ? khataT('advance', { amount: formatCurrency(-row.net, 'INR') })
                               : khataT('settled')}
                         </span>
+                        {(foreign.get(row.key) ?? []).map((f) => (
+                          <div key={f.currency} className={styles.sub} data-foreign-balance={f.currency}>
+                            <Link to={`/receivables?tab=statements&party=${encodeURIComponent(row.key)}&cur=${f.currency}`}>
+                              {khataT(f.net > 0 ? 'alsoCollect' : 'alsoAdvance', { amount: formatCurrency(Math.abs(f.net), f.currency) })}
+                            </Link>
+                          </div>
+                        ))}
                         {row.overdue > 0.004 && (
                           <div className={styles.overdue}>{khataT('overdueLine', { amount: formatCurrency(row.overdue, 'INR'), n: row.oldestOverdueDays })}</div>
                         )}
@@ -359,6 +373,11 @@ export function Clients() {
                           <Link to={`/receivables?tab=statements&party=${encodeURIComponent(row.key)}`} className={controls.btnIcon} aria-label={salesT('cl.statementFor', { name: c.name })} title={salesT('cl.statement')}>
                             <Scale size={16} />
                           </Link>
+                          {row.party && (
+                            <Link to={`/receivables?tab=statements&party=${encodeURIComponent(row.key)}&web=1`} className={controls.btnIcon} aria-label={khataT('webPageFor', { name: c.name })} title={khataT('webPage')} data-statement-web-row>
+                              <Globe size={16} />
+                            </Link>
+                          )}
                           {edit && (
                             <>
                               <button type="button" className={controls.btnIcon} onClick={() => openEdit(c)} aria-label={salesT('cl.editOf', { name: c.name })} title={salesT('edit')}>

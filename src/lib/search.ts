@@ -864,3 +864,20 @@ export function clearRecentSearches(): void {
     /* ignore */
   }
 }
+
+/* ── R20-D: Go To (Alt+G) ───────────────────────────────────── */
+
+/** Tally names for Go To, keyed by the Gateway entry id (src/lib/gateway/menu.ts); the Gateway labels in both languages
+ * and the entry's own keywords are searched too (rows built by `lib/keys/nav-goto.ts`). */
+export const GOTO_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
+  daybook: ['daily entries', 'day register', 'रोज़नामचा'],
+  'm-daybook': ['daily entries', 'day register', 'रोज़नामचा'],
+  'm-tb': ['trial', 'tb', 'तलपट'],
+  'ib-godowns': ['warehouse summary', 'location summary', 'गोदाम'],
+  'ib-summary': ['stock summary', 'inventory', 'स्टॉक'],
+  'st-rec': ['outstanding', 'receivables', 'debtors', 'बकाया'],
+  'st-pay': ['outstanding', 'payables', 'creditors', 'देनदारी'],
+  'ab-cash': ['cash book', 'bank book', 'रोकड़'],
+  'ab-groups': ['group summary', 'groups'],
+  'ab-ledger': ['ledger', 'account books', 'खाता'],
+};

@@ -34,12 +34,17 @@ export const TOPICS: readonly HelpTopic[] = [
     steps: ['Press ? for every key (plain and Tally names, Hindi, search, print).', 'Switch on there, in Settings → Defaults or on the Gateway; pick TallyPrime or ERP 9 keys.', 'F10 lists every voucher with its key.'],
     related: rel(['Gateway', '/gateway'], ['Settings', '/settings']),
   }),
+  // R20-D: Go To over any screen, the Company / Data / Import menus and the list keys (Tally keys on).
+  t('tally-keys:goto', 'Go To and menus', 'गो टू और मेनू', 'Alt+G opens any screen over this one; a "Back to" chip returns. Alt+K company, Alt+Y data, Alt+O import menus.', 'With Tally keys on.', {
+    steps: ['Alt+G, type "trial" or "day book", Enter. Ctrl+G goes there with no chip.', 'F3 switches company; Ctrl+F3 locks; Ctrl+Alt+N opens notifications.', 'On invoices, clients, bills and suppliers: ↑ ↓ and Enter open a row.'],
+    related: rel(['Gateway', '/gateway']),
+  }),
   // R20-C: report keys (Tally keys on; the Key bar lists them on every report).
   t('tally-keys:reports', 'Report keys', 'रिपोर्ट कुंजियाँ', 'On a report: Ctrl+F filter, Space tick rows, Ctrl+R hide a row (Ctrl+U / Alt+U bring back), + / − next or previous period, Ctrl+H / Ctrl+L saved views, Ctrl+J exceptions, Ctrl+P print, Ctrl+E export.', 'To look at part of a report without changing it. Nothing is saved except views.', {
     steps: ['A strip under the report shows the filter, ticked and hidden rows, and the totals of what you see.', 'Esc clears the filter; print and the Day Book export leave hidden rows out.', 'Alt+I on a Day Book or ledger row opens a new entry of that type on that day.'],
     related: rel(['Books', '/books?tab=tb'], ['Gateway', '/gateway']),
   }),
-  t('reconcile', 'Bank reconciliation', 'बैंक मिलान', 'Match bank statement lines with your books, and bank documents.', 'Monthly, when the statement arrives.'),
+  t('reconcile','Bank reconciliation', 'बैंक मिलान', 'Match bank statement lines with your books, and bank documents.', 'Monthly, when the statement arrives.'),
   t('reconcile:reconcile', 'Reconcile', 'मिलान', 'Statement lines matched, to review or ignored.', 'After importing a statement.'),
   t('reconcile:brs', 'BRS', 'BRS', 'Bank reconciliation statement: book balance against bank balance.', 'Month end.'),
   t('reconcile:statements', 'Statements', 'स्टेटमेंट', 'Bank statements imported so far.', 'To check what is loaded.'),

@@ -13,8 +13,19 @@ network call. Bank rules (8.45) are in `banking.md` § Bank rules. Outputs are w
 ## 8.40 Capture from the e-invoice signed QR
 - Sources: camera (`CameraScanner`, BarcodeDetector), photo / screenshot upload (`readQrFromImage`: BarcodeDetector on an
   `ImageBitmap`, full size then a 1600 px copy; decoded **before** the photo is downscaled for storage), or pasted text
-  (QR scanner app / USB scanner). **PDFs**: rendering a page needs a PDF engine (pdf.js) the app does not ship, so a PDF is
-  kept in the inbox and its QR is not read — the screen says so.
+  (QR scanner app / USB scanner). **PDFs (PENDING 48)**: no page is rendered (that needs a PDF engine such as pdf.js,
+  which the app does not ship, and `html-to-image` / `jspdf` only write PDFs); instead `pdf-images.ts` (lazy) reads the
+  image XObjects embedded in the file — JPEG as is, Flate gray / RGB / 1-bit pixels through the browser's
+  `DecompressionStream`, PNG predictors reversed — and `readQrFromPdf` runs the BarcodeDetector on each. A QR drawn as
+  vector paths, an encrypted PDF or another image filter (CCITT, JBIG2, JPX) is not found: the PDF is kept and the screen
+  says so.
+- **Full e-invoice JSON (PENDING 48)**: paste the supplier's e-invoice JSON (INV-01 schema, `{data}` wrappers, or the
+  IRP's response with `SignedInvoice`) in the paste box, or pick / share a `.json` file. `decodeEinvoiceJson` (≤ 512 KB,
+  ≤ 1,000 lines, same field cleaning as the QR) and `draftFromEinvoiceJson` draft **one bill line per invoice line** —
+  HSN, quantity, unit, taxable value (AssAmt; quantity 1 at the taxable value when the rate would not be exact), GST rate,
+  cess (`cess_amount`), place of supply from `BuyerDtls.Pos` and the supplier's legal name. The "check the GST split" flag
+  is set only when the lines do not add up to TotInvVal (other charges / round-off). The JSON's signature is not verified
+  and the JSON itself is not kept as an attachment.
 - `decodeEinvoiceQr(text)` (pure): `header.payload.signature`, payload `data` (JSON string or object) → SellerGstin,
   BuyerGstin, DocNo, DocTyp, DocDt (dd/mm/yyyy), TotInvVal, ItemCnt, MainHsnCode, Irn, IrnDt. **The signature is not
   verified** (needs NIC's key; offline). Untrusted input: text ≤ 4,096 chars, printable text only, doc no. ≤ 16, GSTIN
