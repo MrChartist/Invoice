@@ -120,8 +120,8 @@ period's first day, which gives this result automatically: Q4 FY 2025-26 shows F
    - liquor, scrap and minerals: 2%;
    - tendu leaves: 2%.
 
-   **Done (23d):** a `TCS_PRESET_RULES` row from 2026-04-01 (`verified: false`) adds "206C(1G) LRS education / medical above
-   ₹10 lakh 2%" and "206C(1G) overseas tour package 2%" next to LRS 20 % (unchanged). In force from 1 Apr 2026 as stated by
+   **Done (23d):** a `TCS_PRESET_RULES` row from 2026-04-01 (`verified: false`) adds "206C(1G) LRS education / medical 2%"
+   (above ₹10 lakh a year) and "206C(1G) overseas tour package 2%" next to LRS 20 % (unchanged). In force from 1 Apr 2026 as stated by
    an AD bank's LRS notice ("vide Finance Act, 2026 … w.e.f. 1st April 2026") and matched by the Protean Form 143 codes
    1086 / 1088–1089; the enacted Finance Act 2026 text itself was not read — verify with your CA. Liquor / scrap / minerals /
    tendu at 2 % are trading presets (`trading-rules.ts`), not touched here.

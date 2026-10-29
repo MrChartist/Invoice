@@ -33,7 +33,7 @@ test('23b: 2025-Act codes by date (Protean file format v1.2), none before 1 Apr 
   assert.equal(rpuCode2025('194Q', '2026-04-01'), '1031');
   assert.equal(rpuCode2025('195-R', '2026-04-01'), '1057');
   assert.equal(tcsCode2025('206C(1G) overseas remittance 20%', '2026-04-01'), '1087');
-  assert.equal(tcsCode2025('206C(1G) LRS education / medical above ₹10 lakh 2%', '2026-04-01'), '1086');
+  assert.equal(tcsCode2025('206C(1G) LRS education / medical 2%', '2026-04-01'), '1086');
   assert.equal(tcsCode2025('Sec 394(1) Sl. 8 — overseas tour package 2 %', '2026-04-01'), '', 'tour: 1088 / 1089, pick in the RPU');
   assert.equal(tcsCode2025('206C(1) scrap 1%', '2026-04-01'), '1073');
   assert.equal(tcsCode2025('206C(1G) overseas remittance 20%', '2026-03-31'), undefined);
@@ -63,7 +63,7 @@ test('23b: Form 140 / 144 / 143 papers carry the 2025-Act codes; Q4 FY 2025-26 k
     id, doc_type: 'INVOICE', status: 'Sent', invoice_number: `INV/${id}`, issue_date: '2026-05-05',
     client: { name: 'Asha', pan: 'ABCPA1234K' }, total: 102000, tcs_amount: 2000, tcs_rate: rate, tcs_label: label,
   }) as unknown as InvoiceRecord;
-  const rows = tcsCollections([inv('a', '206C(1G) LRS education / medical above ₹10 lakh 2%', 2), inv('b', '206C(1G) overseas remittance 20%', 20)]);
+  const rows = tcsCollections([inv('a', '206C(1G) LRS education / medical 2%', 2), inv('b', '206C(1G) overseas remittance 20%', 20)]);
   const e = form27EQ(rows, [], 2026, 1);
   assert.deepEqual(e.deducteeRows.slice(1).map((r) => r[2]), ['1086', '1087']);
 });
