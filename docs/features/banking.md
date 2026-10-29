@@ -108,6 +108,13 @@ day-end cash tally. Everything is local: files are generated in the browser, not
   then a unique amount. **Record confirmed payments** is all or nothing (purchase payments, bills, vendor
   payments and the batch restored on any refusal): each paid row = `recordSupplierPayment` (oldest bills first,
   rest on account) from the batch's bank on the bank's date, reference = UTR; failed rows are marked failed.
+- **Payment approval inside the batch (PENDING 48, 8.46)**: with the purchase approval policy holding supplier payments
+  above ₹Y, a user who may not approve gets **Send for approval** instead of Download when a row is above the limit
+  (`epayAmountsOverLimit`). `saveEpayBatch` refuses such a batch unless `forApproval` (the data-layer gate) and keeps it
+  with `approval.state = 'pending'` — **no file is made**. In the batch panel the owner (`doc.approve`) **Approves and
+  downloads** (the file is rebuilt from the batch rows and the supplier master's bank details) or **Rejects** with a reason;
+  each decision is audited and lands in the shared `approvals` history (doc type PAYMENT). A batch waiting or rejected
+  records nothing (`recordConfirmed` refuses it). Not on the Dashboard approvals tile yet (the batch panel is the queue).
 - **Contra for a deposit slip's cash**: saving a slip with cash posts a **Contra** Dr the slip's bank ledger |
   Cr Cash on the slip date (`DepositSlip.cash_voucher_id` / `cash_voucher_number`), before the cheques move (a
   locked period refuses the slip); "Post the cash as a Contra" can be unticked. The simple Books cash book
@@ -138,6 +145,14 @@ Tests: `tests/capture-bank-rules.test.ts`.
 - **Memory** is derived, never stored: debit lines matched to a payment of an expense teach counterparty token → expense
   head / supplier / GST rate (most frequent wins). Categorising a line by hand ("Create expense") therefore teaches it,
   and the screen offers **"Create a rule for similar lines?"** pre-filled from that line (`ruleDraftFromLine`).
+- **Memory for receipts / vouchers (PENDING 48, 8.46)**: `buildActionMemory` also learns from credits matched to receipts
+  (customer of the receipt's invoice, or the party of an on-account receipt) → *receipt from that customer*, and from lines
+  posted as a payment / receipt voucher (the line note starts with the voucher number; the voucher has exactly one
+  non-cash / bank ledger) → *voucher to that ledger* (party kept). Keyed by direction + counterparty token; an expense
+  memory still wins for a debit. A remembered receipt larger than the customer's open invoices is refused at Apply.
+- **GST on voucher actions — not done (PENDING 48)**: GSTR-3B / the ITC registers read GST from purchases, not from
+  vouchers, so input GST posted by a voucher would sit in the books where the returns never see it. A rule with GST uses
+  the **expense** action (it goes through purchases and reaches the returns).
 - **Apply** (`applyBankBatch`): every item is checked first (direction, GST rate gives the amount, ledger exists,
   approval threshold, receipt within the open balance), then written through `purchasesDb.save` + `paymentsDb.record`,
   `saveVoucher` or `localDb.payments.record` inside `withTablesRollback` — roles, period lock, approval gate and audit

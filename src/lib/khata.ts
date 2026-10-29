@@ -77,6 +77,22 @@ export function khataRows(clients: readonly Client[], report: ReceivablesReport)
   });
 }
 
+/**
+ * PENDING 50 (non-INR khata): a party's balance in each foreign currency it is billed in (export clients), from the
+ * same receivables ledger run per currency. Keyed by the receivables party key; INR stays in the main balance column.
+ */
+export function foreignBalances(input: BuildInput, currencies: readonly string[], now: Date = new Date()): Map<string, { currency: string; net: number }[]> {
+  const out = new Map<string, { currency: string; net: number }[]>();
+  for (const cur of currencies) {
+    if (cur.toUpperCase() === 'INR') continue;
+    for (const p of buildReceivables(input, { currency: cur, now }).parties) {
+      if (Math.abs(p.net) < EPS) continue;
+      out.set(p.key, [...(out.get(p.key) ?? []), { currency: cur.toUpperCase(), net: round2(p.net) }]);
+    }
+  }
+  return out;
+}
+
 export interface KhataTotals {
   /** Σ of positive balances ("You'll get"). */
   youGet: number;

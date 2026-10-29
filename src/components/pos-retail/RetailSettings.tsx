@@ -75,9 +75,9 @@ export function RetailSettings({ open, onClose, keymap, scale, onSaved, initialT
   const pickPort = async () => {
     try {
       const m = await import('../../lib/scale-serial');
-      if (!m.scaleSerialSupported()) return setPortMsg(retailT('noSerial'));
-      await m.chooseScalePort();
-      const w = await m.readScaleWeight(profile.baud);
+      if (!m.scaleLinkSupported(profile.link)) return setPortMsg(retailT('noSerial'));
+      await m.chooseScalePort(profile.link);
+      const w = await m.readScaleWeight(profile.baud, 3000, profile.link);
       setPortMsg(w ? retailT('scaleRead', { kg: w.weight.toFixed(3), state: w.stable ? retailT('stable') : retailT('unstable') }) : retailT('scaleNothing'));
     } catch (err) {
       setPortMsg((err as Error).message);
@@ -172,6 +172,9 @@ export function RetailSettings({ open, onClose, keymap, scale, onSaved, initialT
             <label className={controls.check}>
               <input type="checkbox" checked={profile.checkDigit} onChange={(e) => setProfile({ ...profile, checkDigit: e.target.checked })} /> {retailT('scaleCheck')}
             </label>
+            <label className={controls.check}>
+              <input type="checkbox" checked={!!profile.priceCheck} onChange={(e) => setProfile({ ...profile, priceCheck: e.target.checked })} data-scale-price-check /> {retailT('scalePriceCheck')}
+            </label>
             <p className={styles.muted}>{retailT('scaleSample', { code: sample, plu: '00123', value: profile.value === 'price' ? '₹125.50' : '1.250 kg' })}</p>
             <label className={controls.field}>
               <span className={controls.label}>{retailT('scaleTest')}</span>
@@ -184,8 +187,14 @@ export function RetailSettings({ open, onClose, keymap, scale, onSaved, initialT
             <p className={styles.muted}>{retailT('liveHint')}</p>
             <div className={controls.row}>
               <label className={controls.field}>
+                <span className={controls.label}>{retailT('scaleLink')}</span>
+                <select className={controls.select} value={profile.link ?? 'serial'} onChange={(e) => setProfile({ ...profile, link: e.target.value as ScaleProfile['link'] })} data-scale-link>
+                  {(['serial', 'hid', 'ble'] as const).map((k) => <option key={k} value={k}>{retailT(`link.${k}`)}</option>)}
+                </select>
+              </label>
+              <label className={controls.field}>
                 <span className={controls.label}>{retailT('baud')}</span>
-                <select className={controls.select} value={profile.baud} onChange={(e) => setProfile({ ...profile, baud: Number(e.target.value) })}>
+                <select className={controls.select} value={profile.baud} disabled={!!profile.link && profile.link !== 'serial'} onChange={(e) => setProfile({ ...profile, baud: Number(e.target.value) })}>
                   {[1200, 2400, 4800, 9600, 19200, 38400].map((b) => <option key={b} value={b}>{b}</option>)}
                 </select>
               </label>
