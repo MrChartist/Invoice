@@ -445,7 +445,8 @@ export interface PayrollAdjustment {
   created_at: string;
 }
 
-export type PerquisiteKind = 'accommodation' | 'car' | 'other' | 'meals' | 'gift';
+/** `accretion` (7.149): s. 17(2)(viia) annual accretion (Rule 3B), one-off in its month. */
+export type PerquisiteKind = 'accommodation' | 'car' | 'other' | 'meals' | 'gift' | 'accretion';
 
 /** A perquisite's taxable value per month (s. 17(2)), from `from_month` to `to_month` (open-ended if absent). */
 export interface Perquisite {
