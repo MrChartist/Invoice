@@ -15,7 +15,7 @@ export { NEVER_CLAIM, type NeverClaim } from './never-claim';
 /** The package whose merge makes a row live; `have` = existed before Round 20 (always live). */
 export type KeyPkg = 'have' | 'A' | 'B' | 'C' | 'D';
 /** Packages merged so far. B / C / D: add your letter here (one line) in your merge. */
-export const BUILT: ReadonlySet<KeyPkg> = new Set<KeyPkg>(['have', 'A', 'B']);
+export const BUILT: ReadonlySet<KeyPkg> = new Set<KeyPkg>(['have', 'A', 'B', 'D']);
 
 /**
  * Where a key works, most specific first: a field (`field:*`, the focused element sits inside

@@ -123,6 +123,48 @@ simple-mode set, layouts, search, "This screen"), `tests/keys-stub.test.ts` (cla
 `tests/keys-mode.test.ts` (fresh / existing device, subscribers, engine mode and scope rules), `tests/gateway.test.ts`
 (Phase 7 keys, ERP 9), e2e step "R20-A" in `tests/e2e/smoke.mjs`.
 
+## R20-D — Go To, company / data / import menus, list keys, onboarding
+
+- **Go To (Alt+G)** opens the Ctrl+K palette in Go To mode over the current screen (`CommandPalette` `mode` +
+  `gotoRows`): screens and reports only (no documents or actions), recent searches first, the Gateway's leaves with
+  their labels in both languages and Tally names (`lib/keys/nav-goto.ts` over `flattenMenu`), plus the R20-D synonyms
+  `GOTO_SYNONYMS` in `search.ts` ("daily entries", "warehouse summary", "outstanding", "trial", तलपट …). Picking a
+  screen shows a **"Back to …"** chip (fixed above the Key bar / Keys pill) that returns to the previous URL and puts
+  focus back (`data-focus-key` or the element id, else `#main`); a `/invoice?type=` link returns to `/invoice` so the
+  draft in the store is kept. **Ctrl+G** = Switch To (same list, no chip). On `/gateway` both fall through to the
+  Gateway's own Go To box.
+- **Menus**: Alt+K Company (S switch company, C companies, F features, G configure, U users, L lock), Alt+Y Data
+  (B back up now — the palette's `downloadBackupNow`, R restore, C check data, N new year, E recycle bin, S folder
+  sync), Alt+O Import (T Tally XML, X Excel / CSV, B bank statement). Letters as on the Gateway, `role="menu"`, ↑ ↓
+  Home End, rows filtered by rights (`MENUS` / `menuItems` in `lib/keys/nav-actions.ts`).
+- **Small keys**: F3 company list (↑ ↓ Enter), Ctrl+F3 lock (always asks Y / N — the app cannot tell whether a form
+  is dirty), Alt+F3 Settings → Data (the row's route), Ctrl+Alt+N opens and focuses the bell list, Ctrl+Alt+R check
+  data (Settings → Activity, the edit-log integrity check), Ctrl+Alt+B Help (version at the foot). Ctrl+Alt never fires
+  in a field (engine rule).
+- **Host**: `components/keys/MenuSheets.tsx` is mounted lazily by the first notification bell while Tally keys are on
+  (the bell is always mounted after first paint) and registers the global handlers with `useKeyActions('global')`.
+- **List keys** (`lib/keys/use-list-keys.ts`, Tally keys on): Transactions, Clients, Expenses bills, Vendors — ↑ ↓ Home
+  End PgUp PgDn move a highlight bar, Enter opens / edits the row (not when a button or link has focus), Space ticks the
+  row on Transactions (the only one of the four with a bulk bar), Alt+D presses the row's own Delete (its confirm and
+  "Deleted · Undo" as before), Alt+2 the row's Duplicate (Transactions). Alt+X (cancel) has no handler until B's
+  `entry-actions.ts` lands. **Not `useDrillRows`**: importing drill-hooks from the list pages split it and the ledger
+  stylesheet out of the Books chunk into three new chunks whose names reach the first-paint preload map (+112 B gz);
+  the hook is a 30-line local equivalent (same keys and steps, `moveTo` tested) that joins `f-keys`. Virtualised lists
+  (> 100 rows) do not scroll an unmounted row into view.
+- **Setup wizard**: last step asks "Have you used Tally before?" — Yes: Tally keys on, TallyPrime layout; No: off;
+  unanswered: unchanged (`applyTallyAnswer`).
+- **First paint**: the stub's `KEY_CLAIMS` gained the nine D globals; paid for by loading the sidebar company select
+  lazily (`CompanySwitcher` → `CompanySwitcherList`, only with a second company).
+
+| | Base (`91c4ebc`) | After R20-D | Change |
+|---|---|---|---|
+| First paint | 177.9 kB (182,165 B) | 177.8 kB (182,101 B) | −64 B |
+| Core precache | 3,254.1 kB (3,332,204 B) | 3,258.6 kB (3,336,794 B) | +4.5 kB (cap 6): `f-keys` +1.4 (nav-actions, list hook, keys-r20d), MenuSheets 2.3, palette +0.2, bell +0.4, wizard +0.1, list pages +0.3, the Gateway label area split into its own chunk |
+| Hindi pack | 373.2 kB | 373.7 kB | +0.5 kB (`keys-r20d`) |
+
+Tests: `tests/keys-nav.test.ts` (menus → routes / rights / letters / labels, D rows built and claimed, wizard answer,
+Go To search incl. Hindi, de-duplication, list movement), `tests/search.test.ts` (Go To rows), e2e step "R20-D".
+
 ## R20-B — voucher and document entry
 
 Built rows (`BUILT` has `B`): every `pkg: 'B'` row except those listed under "Cut". Everything works with Tally keys on
@@ -145,6 +187,8 @@ query via `loadStockQuery`, tax break-up from the editor totals, `EditLog`, the 
 and reason asks), all `Modal`s in the modal stack. Strings: `keys-r20b`.
 
 Cut — the PRD's ranked cuts 1–3, taken at the 7 kB cap: Alt+R party narration, PgUp / PgDn previous / next entry,
-Ctrl+O party facts; then Ctrl+I more details (rows stay built but unhandled, so they never fire or show on the Key bar). Also cut (cap / data model): Ctrl+H "item lines / amount only" in the editor (no such mode exists), Ctrl+Enter alter of an item
-(saves instead), Ctrl+D / Ctrl+O / Alt+A / Ctrl+I on bill forms (the line's remove button stays), Alt+X / Alt+2 on bills, voucher cancel (no cancelled state for
-a voucher without a data change). Tests: `tests/keys-entry.test.ts`; e2e step "R20-B".
+Ctrl+O party facts; then Ctrl+I more details. Their rows stay built but have no handler, so they never fire and never
+show on the Key bar (the cheat sheet's "All" tab still lists them — a lead call whether to drop the rows). Also cut (cap /
+data model): Ctrl+H "item lines / amount only" in the editor (no such mode exists), Ctrl+Enter alter of an item (saves
+instead), Ctrl+D / Ctrl+O / Alt+A / Ctrl+I on bill forms (the line's remove button stays), Alt+X / Alt+2 on bills, voucher
+cancel (no cancelled state for a voucher without a data change). Tests: `tests/keys-entry.test.ts`; e2e step "R20-B".

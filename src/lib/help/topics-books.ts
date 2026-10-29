@@ -39,7 +39,12 @@ export const TOPICS: readonly HelpTopic[] = [
     steps: ['Alt+C on a party or item creates it; Ctrl+Enter edits it.', 'On a voucher: Alt+T post-dated, Ctrl+L optional, Ctrl+H single / double entry, Alt+2 a copy.', 'Ctrl+R in the narration repeats the last one; Alt+S stock, Alt+A tax break-up, Alt+Q edit log.'],
     related: rel(['Gateway', '/gateway'], ['Books', '/books']),
   }),
-  t('reconcile', 'Bank reconciliation', 'बैंक मिलान', 'Match bank statement lines with your books, and bank documents.', 'Monthly, when the statement arrives.'),
+  // R20-D: Go To over any screen, the Company / Data / Import menus and the list keys (Tally keys on).
+  t('tally-keys:goto', 'Go To and menus', 'गो टू और मेनू', 'Alt+G opens any screen over this one; a "Back to" chip returns. Alt+K company, Alt+Y data, Alt+O import menus.', 'With Tally keys on.', {
+    steps: ['Alt+G, type "trial" or "day book", Enter. Ctrl+G goes there with no chip.', 'F3 switches company; Ctrl+F3 locks; Ctrl+Alt+N opens notifications.', 'On invoices, clients, bills and suppliers: ↑ ↓ and Enter open a row.'],
+    related: rel(['Gateway', '/gateway']),
+  }),
+  t('reconcile','Bank reconciliation', 'बैंक मिलान', 'Match bank statement lines with your books, and bank documents.', 'Monthly, when the statement arrives.'),
   t('reconcile:reconcile', 'Reconcile', 'मिलान', 'Statement lines matched, to review or ignored.', 'After importing a statement.'),
   t('reconcile:brs', 'BRS', 'BRS', 'Bank reconciliation statement: book balance against bank balance.', 'Month end.'),
   t('reconcile:statements', 'Statements', 'स्टेटमेंट', 'Bank statements imported so far.', 'To check what is loaded.'),
