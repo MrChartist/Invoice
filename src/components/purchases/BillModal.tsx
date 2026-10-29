@@ -58,6 +58,10 @@ const CeilingNotice = lazy(() => import('../retail-r9/PharmacyDesk').then((m) =>
 const VoucherAgriPanel = lazy(() => import('../agri/VoucherAgriPanel'));
 import { impliedPacks } from '../../lib/shop-mode';
 import { errText } from '../../i18n/lib-msg';
+import { acceptForm, deleteEntry, entryKeyDown, focusFormDate, withoutLine } from '../../lib/keys/entry-actions'; // R20-B
+import type { EntrySheet } from '../keys/EntrySheets';
+import { kbT } from '../../i18n/areas/keys-r20b';
+const EntrySheets = lazy(() => import('../keys/EntrySheets'));
 
 export interface BillModalProps {
   open: boolean;
@@ -309,14 +313,45 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
     }
   };
 
+  // R20-B: Tally entry keys of the bill form (the dialog reads its own keys): Ctrl+A, F2, Alt+D, Alt+Q, Ctrl+D, Alt+S.
+  const [sheet, setSheet] = useState<EntrySheet | null>(null);
+  const [cut, setCut] = useState<ReturnType<typeof withoutLine<(typeof lines)[number]>>>(null);
+  const lineAt = (t: EventTarget | null | undefined) => lines.find((l) => l.id === (t as Element | null)?.closest?.<HTMLElement>('[data-line]')?.dataset.line);
+  const undoLine = () => {
+    if (cut) changeLines(cut.undo(lines));
+    setCut(null);
+  };
+  const onKeys = entryKeyDown({
+    'accept.bill': acceptForm,
+    'date.bill': focusFormDate,
+    'delete.bill': !!purchase && (() => setSheet({ kind: 'ask', text: kbT('delAsk', { label: purchase.bill_number }), onYes: () => void deleteEntry('purchase', purchase.id).then(() => { onSaved(kbT('deleted', { label: purchase.bill_number })); onClose(); }, (err) => setError(errText(err))) })),
+    'editLog.bill': !!purchase && (() => setSheet({ kind: 'log', id: purchase.id, name: purchase.bill_number })),
+    rmLine: (e) => {
+      const l = lineAt(e.target);
+      const c = l && withoutLine(lines, l.id);
+      if (!c) return false;
+      changeLines(c.lines.length ? c.lines : [blankPurchaseLine()]);
+      setCut(c);
+    },
+    stockQuery: (e) => {
+      const l = lineAt(e.target);
+      if (!l?.name.trim()) return false;
+      setSheet({ kind: 'stock', name: l.name, hsn: l.hsn, itemId: l.item_id });
+    },
+    undo: !!cut && undoLine,
+  });
+
   return (
     <form
       className={styles.form}
+      onKeyDown={onKeys}
       onSubmit={(e) => {
         e.preventDefault();
         submit();
       }}
     >
+      {sheet && <Suspense fallback={null}><EntrySheets sheet={sheet} onClose={() => setSheet(null)} /></Suspense>}
+      {cut && <p className={controls.hint} role="status">{kbT('lineGone')} <button type="button" className={controls.btnGhost} onClick={undoLine}>{kbT('undo')} (Alt+Z)</button></p>}
       <VendorPicker
         id="bill-vendor"
         vendors={vendors}

@@ -108,7 +108,7 @@ export function LineItemsEditor({ lines, onChange, stock, date, freeCells }: Lin
           <tbody>
             {lines.map((l, i) => (
               <Fragment key={l.id}>
-              <tr>
+              <tr data-line={l.id}>
                 <td data-label={purT('thItem')}>
                   <Typeahead
                     className={controls.ghost}
