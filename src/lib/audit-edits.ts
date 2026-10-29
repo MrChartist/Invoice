@@ -327,12 +327,13 @@ const parse = (s: string): Row | null => {
 };
 
 /** The `onTableWrite` observer. */
-export function observeTableWrite(name: string, prevRaw: string | null, rows: readonly unknown[]): void {
+export function observeTableWrite(name: string, prevText: () => string | null, written: () => readonly unknown[]): void {
   if (!WATCHED_TABLES[name]) return;
+  const prevRaw = prevText();
   const cached = seen.get(name);
   const before = cached && cached.raw === prevRaw ? cached.byId : indexRaw(prevRaw);
   const next = new Map<string, string>();
-  for (const r of rows) {
+  for (const r of written()) {
     const id = rowId(r);
     if (!id || next.has(id)) continue;
     const s = JSON.stringify(r);

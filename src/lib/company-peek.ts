@@ -38,6 +38,40 @@ function openExisting(name: string): Promise<IDBDatabase | null> {
   });
 }
 
+/**
+ * PERF-3: a big `invoices` table may be stored as chunk records (`rows:<key>` head + `rows:<key>:<i>`,
+ * storage.ts). Queue the reads of `key` in `store`; the returned getter gives its stored value: the plain
+ * string (old layout, which wins), the text rebuilt from a complete set of chunks, the sealed head (so the
+ * caller sees a vault), or undefined (missing, incomplete, or a head of a layout this build does not know).
+ */
+function readKey(store: IDBObjectStore, key: string): () => unknown {
+  const base = store.get(key);
+  if (key !== PREFIX + TABLES.invoices) return () => base.result;
+  const range = IDBKeyRange.bound(`rows:${key}:`, `rows:${key}:￿`);
+  const head = store.get(`rows:${key}`);
+  const keys = store.getAllKeys(range);
+  const vals = store.getAll(range);
+  return () => {
+    if (base.result !== undefined || typeof head.result !== 'string') return base.result;
+    if (head.result.startsWith('mcv1:')) return head.result;
+    let n = -1;
+    try {
+      const h = JSON.parse(head.result) as { v?: unknown; n?: unknown };
+      if (h?.v === 1 && Number.isInteger(h.n)) n = h.n as number;
+    } catch {
+      /* unreadable head */
+    }
+    const c: unknown[] = [];
+    (keys.result ?? []).forEach((k, j) => {
+      const i = String(k).slice(`rows:${key}:`.length);
+      if (/^\d+$/.test(i)) c[+i] = vals.result?.[j];
+    });
+    if (n < 1 || c.length !== n) return undefined;
+    for (let i = 0; i < n; i++) if (typeof c[i] !== 'string' || (c[i] as string).startsWith('mcv1:')) return typeof c[i] === 'string' ? c[i] : undefined;
+    return `[${c.join(',')}]`;
+  };
+}
+
 const parse = (v: unknown): unknown[] => {
   if (typeof v !== 'string' || v.startsWith('mcv1:')) return [];
   try {
@@ -61,13 +95,8 @@ export async function peekCompany(dbName: string): Promise<PeekData | null> {
       try {
         const tx = db.transaction(DATA_STORE, 'readonly');
         const store = tx.objectStore(DATA_STORE);
-        entries.forEach(([, t], i) => {
-          const r = store.get(PREFIX + t);
-          r.onsuccess = () => {
-            out[i] = r.result;
-          };
-        });
-        tx.oncomplete = () => resolve(out);
+        const got = entries.map(([, t]) => readKey(store, PREFIX + t));
+        tx.oncomplete = () => resolve(got.map((g) => g()));
         tx.onerror = () => resolve(out);
         tx.onabort = () => resolve(out);
       } catch {
@@ -115,17 +144,11 @@ export async function peekCompliance(dbName: string): Promise<PeekedCompliance |
     if (!db.objectStoreNames.contains(DATA_STORE)) return { locked: true, tables: {} };
     const keys = [...COMPLIANCE_KEYS.map((k) => PREFIX + k), '__vault__'];
     const values = await new Promise<unknown[] | null>((resolve) => {
-      const out: unknown[] = new Array(keys.length).fill(undefined);
       try {
         const tx = db.transaction(DATA_STORE, 'readonly');
         const store = tx.objectStore(DATA_STORE);
-        keys.forEach((k, i) => {
-          const r = store.get(k);
-          r.onsuccess = () => {
-            out[i] = r.result;
-          };
-        });
-        tx.oncomplete = () => resolve(out);
+        const got = keys.map((k) => readKey(store, k));
+        tx.oncomplete = () => resolve(got.map((g) => g()));
         tx.onerror = () => resolve(null);
         tx.onabort = () => resolve(null);
       } catch {

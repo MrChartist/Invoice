@@ -18,7 +18,7 @@ import { useCostCentres } from '../cost-centres/useCostCentres';
 import { LineTracking } from './LineTracking';
 import { editorStockContext } from '../../lib/stock-tracking';
 import { saltIndex, saltOf } from '../../lib/salt-search'; // 8.84 substitutes
-import { DB_PREFIX, KEYS, SINGLETON_KEYS, getTable, listKeys, readRaw } from '../../lib/storage';
+import { DB_PREFIX, KEYS, SINGLETON_KEYS, getTable, listKeys, rawStamp, readRaw } from '../../lib/storage';
 import { afterLineChange, pickCatalogItem, setLineQuantity, setLineRate } from './pricing-actions';
 import { tNodes, useT } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
@@ -109,7 +109,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
   // PERF-2: name focus re-reads the catalogue and live stock only when stored data (or the day) changed since
   // the last read: another tab's sale still shows, but tabbing through ten lines no longer recomputes stock ten times.
   const catalogRaw = useRef<string | null | undefined>(undefined);
-  const stockStamp = useRef<(string | null)[] | null>(null);
+  const stockStamp = useRef<unknown[] | null>(null);
   const refreshOnNameFocus = () => {
     const raw = readRaw(DB_PREFIX + KEYS.items);
     if (raw !== catalogRaw.current) {
@@ -118,7 +118,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
     }
     // The working draft (autosaved while typing) is not a stock input.
     const keys = listKeys(DB_PREFIX).filter((k) => k !== SINGLETON_KEYS.draft).sort();
-    const stamp: (string | null)[] = [new Date().toDateString(), ...keys, ...keys.map((k) => readRaw(k))];
+    const stamp: unknown[] = [new Date().toDateString(), ...keys, ...keys.map((k) => rawStamp(k))]; // PERF-3: tokens
     const prev = stockStamp.current;
     if (prev && prev.length === stamp.length && prev.every((v, i) => v === stamp[i])) return;
     stockStamp.current = stamp;

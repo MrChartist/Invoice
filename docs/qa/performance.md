@@ -407,3 +407,21 @@ re-caching a dropped pack file.
   audit work itself (1 s) and still asserts one write per task; the saves keep their own cap in the test above (U6).
 - Size: first paint 182.1 → 182.2 kB (the `controllerchange` listener and the ack wait in `src/i18n/index.ts`), entry
   88.1 → 88.2 kB, core 3,103.0 → 3,104.1 kB, Hindi pack 340.6 kB unchanged.
+
+### PERF-3 row-level storage of `invoices` (PENDING 3, 2026-10-29)
+
+- **Decision.** A physical chunked layout in IndexedDB (chunks of 16 rows + a head, from 128 rows on) rather than
+  write coalescing: coalescing still re-serialises and re-writes the whole table on every flush (and seals all of it in
+  vault mode), so it only spreads the cost. Chunks make a save O(16 rows) in both serialisation and IndexedDB write
+  while the logical value (key + JSON text) stays exactly as before, so no reader, backup or sync format changes. Design
+  and guarantees: [`ARCHITECTURE.md`](../ARCHITECTURE.md) → Storage layer → Row-level storage.
+- **Why chunks, not one record per row.** Position chunks need no per-row manifest (a row list of 20,000 ids would be
+  re-written on every append) and the chunk text is a slice of the table's JSON, so the logical text is a join, byte
+  for byte. Deleting or re-ordering rows rewrites the chunks after that point (rare, and no worse than before).
+- **Timings** (Node, fake IndexedDB, rows ≈ 7 KB each like the perf-round-4 dataset, median of 5; `setTable` + flush /
+  `payments.record`): 5,000 invoices: save 93 + 45 ms → 1.0 + 2.6 ms, payment 103 → 1.9 ms; 20,000 invoices: save
+  1,061 + 616 ms → 2.0 + 2.7 ms, payment 466 → 2.8 ms. `tests/storage-rows.test.ts` asserts one changed record per
+  in-place save / payment at 2,000 and 16,000 rows and a size-independent time (generous bound).
+- **One-time cost.** The first save of a big table after an update, a restore or a sync merge writes every chunk once
+  (the old cost, once). In memory a chunked table holds its chunk texts instead of one string; its full text is built
+  only for whole-table readers (backup, sync, open export, storage health) and kept until the next write.
