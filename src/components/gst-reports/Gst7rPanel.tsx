@@ -22,6 +22,7 @@ import {
   detailByHead,
   headsTotal,
   loadPmt09,
+  creditLedgerRefundMoves,
   loadRefunds,
   refundDeadline,
   refundDelayInterest,
@@ -168,7 +169,7 @@ function CashRefundsView({ period, gstin, g1, g3, notify }: Gst7rPanelProps) {
   const basis = useMemo(() => rule894Basis(g1, g3), [g1, g3]);
   const [zr, setZr] = useState('');
   const [att, setAtt] = useState('');
-  const credit = creditLedgerBalance(setoffs, gstin);
+  const credit = creditLedgerBalance(setoffs, gstin, undefined, creditLedgerRefundMoves(refunds));
   const lut = rule894Refund({ zeroRatedTurnover: zr === '' ? basis.zeroRatedTurnover : num(zr), adjustedTotalTurnover: att === '' ? basis.adjustedTotalTurnover : num(att), netItc: basis.netItc, ...(headsTotal(credit) > 0 ? { creditBalance: credit } : {}) });
 
   return (

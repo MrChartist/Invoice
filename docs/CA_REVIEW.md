@@ -33,8 +33,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 
 | Area | Ids | Items | ★ priority |
 |---|---|---|---|
-| 1. GST | G1–G48 | 48 | 12 |
-| 2. TDS / TCS and the Income-tax Act 2025 | T1–T26 | 26 | 7 |
+| 1. GST | G1–G51 | 51 | 12 |
+| 2. TDS / TCS and the Income-tax Act 2025 | T1–T29 | 29 | 7 |
 | 3. Payroll | P1–P27 | 27 | 4 |
 | 4. Accounting and Schedule III | AC1–AC18 | 18 | 2 |
 | 5. Industry packs | I1–I36 | 36 | 6 |
@@ -52,7 +52,7 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP48 | 48 | 13 |
 | 18. Co-operative housing societies, apartment associations and RWAs (Round 18, planned) | HS1–HS70 | 70 | 19 |
 | 19. Freight forwarders, customs brokers, courier and warehouses (Round 19, planned) | LG1–LG44 | 44 | 13 |
-| **Total** | | **734** | **184** |
+| **Total** | | **740** | **184** |
 
 ---
 
@@ -110,6 +110,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | G36 | Customs cess on imports: credited to the "IGST payable on imports" ledger together with the customs IGST? | Yes (ledger 2311). | `ledger/postings*.ts`; `purchases.ts` (`selfAssessedCessOf`) | — | Developers' reading |
 | G37 | Supplier credit notes / our debit notes: in which month is ITC reduced (our note date, the supplier's note date, or the 2B period)? May the buyer reverse ITC on its own debit note before the supplier's credit note? Which reason codes (01–07) are current? How are RCM / import returns reversed? | ITC is reduced on our note date. The self-assessed liability is reversed with the ITC. Codes 01–07. | `purchase-returns.ts`, `purchase-returns-gst.ts` | — | Sec 34; GSTR-1 / Tally reason list |
 | G38 | Destroyed, expired, lost-in-transit or QC-scrapped goods: the app only **reminds** of the ITC reversal (Sec 17(5)(h)) and estimates it as cost × item rate. Is that reversal estimate right? | A reminder plus the estimate for 3B 4(B)(1). | `expiry-ops.ts`; `retail/transfer-requests.ts`; `production/qc.ts` | — | Sec 17(5)(h) |
+| G49 | ITC refund claims (export / SEZ under LUT, inverted duty): the electronic credit ledger is debited on filing RFD-01 (Rule 89(3)), the rejected part re-credited (PMT-03) and a withdrawn claim re-credited. Is the re-credit on a deficiency memo (Rule 90(3)) to be shown too? | Netted in the carried credit from the filing day; deficiency re-credit not modelled. | `gst-cash-refunds.ts` `creditLedgerRefundMoves`; `gst-setoff.ts` `carryForwardFor` | — | Rule 89(3), Rule 90(3) as understood |
+| G51 | ISD credit: when a unit receives ISD credit (and when the ISD distributes it), which ledgers should the books use — Input tax Dr / head-office (inter-branch) account Cr, or a separate "ISD credit received" account? | Nothing is posted; 3B / GSTR-9 take the ISD documents directly. | `isd.ts` | — | — |
 
 ### 1.4 Annual returns, composition, job work
 
@@ -121,6 +123,7 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | G42 | Composition service providers (6%): are exempt services left out of the base? Does a composition restaurant's turnover through a 9(5) operator count in CMP-08? Does the Sec 10(2)(d) bar on supplies through a TCS operator still apply (goods allowed from 1 Oct 2023)? | Exempt services are left out. 9(5) turnover is counted. The operator bar is a warning only. | `composition-returns.ts` (`buildCmp08`) | — | Notification 2/2019-CT(R) |
 | G43 | ITC-04: half-yearly above ₹5 crore and annual otherwise from FY 2021-22, due on the 25th? Does the 1-year (inputs) / 3-year (capital goods) Sec 143 clock end on the anniversary or the day before? How should Table 5 report inputs consumed? Is the ITC-04 JSON layout right? | Applied from the H1 2021-22 period. The clock ends the day before the anniversary (conservative). Table 5 reports the original goods in the base unit. The JSON is unverified, and the CSV is the reference (7.167: still no primary source — `ITC04_JSON_LAYOUT.verified: false`). | `tax-rules.ts` `ITC04_RULES`; `job-work.ts`; `itc04-json.ts` | 2021-04-01 | Rule 45(3), Notification 35/2021-CT (unverified) |
 | G44 | GST rate on job charges (5 / 12 / 18% by goods and the principal's registration), and deemed-supply valuation and interest when a Sec 143 clock expires. | The rate is typed by the user. On expiry the app only flags. | `job-work.ts` (`jobChargesLine`); `job-work-alerts.ts` | — | — |
+| G50 | GSTR-9C rate-wise Table 9 "books" column: is the sales register by line rate (sales less credit notes, financial notes and foreign-currency documents left out) an acceptable books figure, with the rest of the booked output tax shown as "not by rate"? | Yes; reverse-charge rows equal the bills. | `gstr9c-extra.ts` `gstr9cBooksColumn` | — | — |
 
 ### 1.5 e-Invoice and e-Way bill
 
@@ -151,7 +154,7 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | T6 | TCS presets: 206C(1H) withdrawn from 1 Apr 2025; 206C(1G) LRS 20%. The Finance Act 2026 proposals (2% on overseas tour packages, LRS for education / medical, liquor, scrap, minerals, tendu leaves): should presets be added, and from which date? | Only the LRS 20% preset. | `tax-rules.ts` `TCS_PRESET_RULES` | 2025-04-01 | Finance Acts 2020, 2023, 2025 |
 | T7 | 194-O / 194R / 194S presets: 194-O 1% (0.75% in the COVID window), 0.1% from 1 Oct 2024; 194R 10% above ₹20,000; 194S 1% above ₹10,000 (₹50,000 for a specified person is not modelled). Also the 194-O ₹5 lakh exemption for individual / HUF participants and the 5% no-PAN rate. | As stated. | `tax-rules.ts` `TDS_EXTRA_SECTION_RULES`; `tds-rules.ts` `TDS_EXTRA_THRESHOLD_RULES`, `TDS_194O_RULES` | 2024-10-01 | Finance Acts 2020, 2022, (No. 2) 2024 (all unverified) |
 | T8 | Form 26Q / 27EQ / 27Q working papers: RPU section codes (94C, 4JA, 4JB, 4IA, 4IB, 94H, 94Q, 94A, 94O, 94R, 94S; TCS 6CR / 6CQ; 27Q code 195), column order, deductee codes and the A / B rate flag. | Codes as listed. Files are for import through the RPU and must be validated with the FVU. | `tds-rules.ts` `TDS_PAYABLE_SECTIONS`, `TCS_27EQ_CODES`; `tds-returns.ts`; `tds-27q.ts` | — | NSDL RPU as understood (unverified) |
-| T9 | Non-residents (27Q): Act rates with cess (royalty / FTS 20% from 1 Apr 2023; foreign company 35% from 1 Apr 2024); the DTAA rate only with a TRC **and** Form 10F; the 206AA floor and Rule 37BC relief. Form 15CA / 15CB, surcharge and Sec 195A grossing-up are **not** built. | As stated. | `tds-rules.ts` `NR_ACT_RATE_RULES`; `tds-27q.ts` | 2024-04-01 | Sec 115A; First Schedule; Finance Acts 2018, 2023, (No. 2) 2024 (unverified) |
+| T9 | Non-residents (27Q): Act rates with cess (royalty / FTS 20% from 1 Apr 2023; foreign company 35% from 1 Apr 2024); the DTAA rate only with a TRC **and** Form 10F; the 206AA floor and Rule 37BC relief. Form 15CA / 15CB, surcharge and Sec 195A grossing-up: see T27–T29 (PENDING 40). | As stated. | `tds-rules.ts` `NR_ACT_RATE_RULES`; `tds-27q.ts` | 2024-04-01 | Sec 115A; First Schedule; Finance Acts 2018, 2023, (No. 2) 2024 (unverified) |
 | T10 | Sec 197 lower-deduction certificate: is the limit read as "credits covered in the FY", with the excess at the normal rate and the certificate used only inside its validity? | Yes. | `tds-payables.ts` | — | Developers' reading |
 | T11 | TDS on a supplier bill later reduced by a debit note: pro-rata reversal (Dr TDS payable). What if the TDS was already deposited? | Reversed pro rata, rupee-rounded, with a warning when the return comes after the deposit. | `purchase-returns.ts` (`tdsReversalForReturn`) | — | Left to the CA |
 | T12 | TDS receivable register (customers deducting from us): bucketed by invoice date; part-paid invoices pending in full; credit notes do not reduce the TDS expected. Acceptable for a 26AS / AIS match? | As stated. A flat 26AS / AIS CSV is matched. | `tds-register.ts` | — | Working paper |
@@ -169,6 +172,9 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | T24 | Depreciation: the app uses **IT Act WDV block rates** for book depreciation (40% cap from AY 2018-19), per asset. Is that acceptable for non-company entities? Companies need Schedule II useful lives. | IT Act WDV rates only. Disposals need a manual journal. | `tax-rules.ts` `DEPRECIATION_RATE_RULES`; `ledger/assets.ts` | 2017-04-01 | IT Rules, New Appendix I |
 | T25 | Pure-agent reimbursements appear as an expense and as income in the P&L. Is gross presentation acceptable? | Gross. | `ledger/postings.ts` | — | — |
 | T26 | Retainer fees, forfeited hours and overage (service billing): time of supply for continuous services (Sec 13, 31(5)). Is a forfeited block plain income with no GST change, and is overage a separate supply? | Fee invoice on its own date. Forfeiture: no credit note. Overage billed later as its own invoice. | `retainers.ts` | — | Sec 13, 31(5) CGST Act |
+| T27 | 27Q surcharge on the Act rate by the payee's FY income subject to deduction: individual / HUF / AOP 10% > ₹50 lakh, 15% > ₹1 crore, 25% > ₹2 crore, 37% > ₹5 crore (from FY 2019-20); firm 12% > ₹1 crore; foreign company 2% > ₹1 crore, 5% > ₹10 crore. Is the slab chosen on the FY total in the register right, and is the 37% still in Part II after the 115BAC cap? Surcharge on a Sec 206AA rate? | Slabs as stated, on the Act rate only (not DTAA / 206AA); 15% cap on dividends / capital gains not modelled. | `tds-rules.ts` `NR_SURCHARGE_RULES`; `tds-27q.ts` | 2017-07-01, 2019-04-01 | Finance Act Part II as summarised (unverified) |
+| T28 | Sec 195A grossing-up: net × 100 ÷ (100 − rate), at the rate that applies (DTAA rate when it applies, surcharge re-checked on the grossed income). What is the 2025-Act provision for grossing-up? | As stated; label "Sec 393 [grossing-up: provision to confirm]" from 1 Apr 2026. | `tds-27q.ts` `grossUp195A`; `ita2025.ts` `195A` | — | Sec 195A (formula as understood) |
+| T29 | Form 15CA parts (Rule 37BB): A — chargeable, FY remittances to the payee up to ₹5 lakh; B — Sec 197 / 195(2) / 195(3) certificate or order; C — above ₹5 lakh, after Form 15CB; D — not chargeable. Is the ₹5 lakh counted per payee per FY including this remittance? Are the Rules-2026 numbers Form 145 (15CA) and 146 (15CB)? | As stated; the Rule 37BB(3) specified list is not modelled. | `tds-rules.ts` `FORM15CA_RULES`; `tds-27q.ts` `form15caPlan`; `ita2025.ts` | 2016-04-01 | Notification 93/2015 as summarised; Rules-2026 form list (secondary) — unverified |
 
 > T24–T26 are counted here because they are income-tax / time-of-supply points raised by the TDS and service screens.
 

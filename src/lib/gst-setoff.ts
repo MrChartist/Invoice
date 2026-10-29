@@ -718,9 +718,34 @@ export interface CarryForward {
   /**
    * Notes: CARRY_GAP (the last posted set-off does not end the day before this period — a period in between
    * was not posted, so its own ITC is not in the figure), CARRY_UNKNOWN (that set-off was posted before 7O and
-   * stored no carry: re-post it to carry its credit forward).
+   * stored no carry: re-post it to carry its credit forward), REFUND_NETTED (PENDING 40: ITC refund claims filed
+   * since then are netted in — `refundNet`).
    */
   notes: string[];
+  /** PENDING 40: credit-ledger moves netted in, by head (debits negative). */
+  refundNet?: Heads;
+}
+
+/**
+ * PENDING 40 (7.131): a dated move on the electronic CREDIT ledger made outside a set-off — an ITC refund claim
+ * debits it on filing (Rule 89(3)), a rejected part comes back (PMT-03) and so does a withdrawn claim
+ * (`creditLedgerRefundMoves`, gst-cash-refunds.ts). Signed by head (debit negative).
+ */
+export interface CreditMove {
+  date: string;
+  gstin?: string;
+  heads: Partial<Heads>;
+}
+
+/** Sum of the moves of `gstin` dated after `after` and on or before `upTo` (no upper bound when empty). */
+export function creditMovesBetween(moves: readonly CreditMove[], gstin: string, after: string, upTo = ''): Heads {
+  const g = gstin.trim().toUpperCase();
+  const out = zeroHeads();
+  for (const m of moves) {
+    if ((m.gstin && g && m.gstin.toUpperCase() !== g) || m.date <= after || (upTo && m.date > upTo)) continue;
+    for (const h of GST_HEADS) out[h] = round2(out[h] + (Number(m.heads[h]) || 0));
+  }
+  return out;
 }
 
 const dayBefore = (day: string): string => {
@@ -731,9 +756,11 @@ const dayBefore = (day: string): string => {
 
 /**
  * Unutilised ITC by head from the latest set-off posted for an earlier period of the same GSTIN — the opening
- * credit of the period starting `from`. Working paper: the portal's electronic credit ledger is what counts.
+ * credit of the period starting `from`. PENDING 40: credit-ledger `moves` (ITC refund claims filed, re-credits)
+ * dated after that set-off's posting day and up to `upTo` (this period's own posting day, once posted) are netted
+ * in, floored at zero. Working paper: the portal's electronic credit ledger is what counts.
  */
-export function carryForwardFor(setoffs: readonly GstSetOffRecord[], from: string, gstin = ''): CarryForward {
+export function carryForwardFor(setoffs: readonly GstSetOffRecord[], from: string, gstin = '', moves: readonly CreditMove[] = [], upTo = ''): CarryForward {
   const g = gstin.trim().toUpperCase();
   const prev = setoffs
     .filter((r) => r.gstin === g && r.to && r.to < from)
@@ -742,21 +769,29 @@ export function carryForwardFor(setoffs: readonly GstSetOffRecord[], from: strin
   const notes: string[] = [];
   if (prev.to !== dayBefore(from)) notes.push('CARRY_GAP');
   if (!prev.itc_carry) notes.push('CARRY_UNKNOWN');
+  const net = creditMovesBetween(moves, g, prev.date, upTo);
+  const netted = GST_HEADS.some((h) => net[h]);
+  if (netted) notes.push('REFUND_NETTED');
   const heads = zeroHeads();
-  for (const h of GST_HEADS) heads[h] = round2(Math.max(prev.itc_carry?.[h] ?? 0, 0));
-  return { heads, fromKey: prev.period_key, fromTo: prev.to, notes };
+  for (const h of GST_HEADS) heads[h] = round2(Math.max(Math.max(prev.itc_carry?.[h] ?? 0, 0) + net[h], 0));
+  return { heads, fromKey: prev.period_key, fromTo: prev.to, notes, ...(netted ? { refundNet: net } : {}) };
 }
 
 /**
  * Electronic credit ledger balance by head as of `asOf` (default: everything): the carry of the latest
- * set-off posted on or before that day for the GSTIN. A working view, not the portal ledger.
+ * set-off posted on or before that day for the GSTIN, plus the credit-ledger `moves` after its posting day
+ * (PENDING 40). A working view, not the portal ledger.
  */
-export function creditLedgerBalance(setoffs: readonly GstSetOffRecord[], gstin = '', asOf?: string): Heads {
+export function creditLedgerBalance(setoffs: readonly GstSetOffRecord[], gstin = '', asOf?: string, moves: readonly CreditMove[] = []): Heads {
   const g = gstin.trim().toUpperCase();
   const last = setoffs
     .filter((r) => r.gstin === g && (!asOf || r.date <= asOf))
     .sort((a, b) => b.to.localeCompare(a.to) || b.date.localeCompare(a.date))[0];
-  return last?.itc_carry ? { ...last.itc_carry } : zeroHeads();
+  const out = last?.itc_carry ? { ...last.itc_carry } : zeroHeads();
+  if (!moves.length) return out;
+  const net = creditMovesBetween(moves, g, last?.date ?? '', asOf ?? '');
+  for (const h of GST_HEADS) out[h] = round2(Math.max(out[h] + net[h], 0));
+  return out;
 }
 
 /* ── Electronic cash ledger & status ───────────────────────────── */
