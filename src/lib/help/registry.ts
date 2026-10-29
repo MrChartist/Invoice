@@ -18,7 +18,7 @@ const ROUTE_AREA: Readonly<Record<string, HelpArea>> = {
   dashboard: 'sales', invoice: 'sales', clients: 'sales', receivables: 'sales', recurring: 'sales', time: 'sales',
   pos: 'sales', tables: 'sales', transactions: 'sales', 'order-pad': 'sales', 'pos-display': 'sales', 'share-target': 'sales', design: 'sales',
   expenses: 'purchase', inventory: 'purchase', manufacturing: 'purchase', distribution: 'purchase',
-  books: 'books', gateway: 'books', reconcile: 'books', cheques: 'books', loans: 'books', reports: 'books', exports: 'books',
+  books: 'books', gateway: 'books', 'tally-keys': 'books', reconcile: 'books', cheques: 'books', loans: 'books', reports: 'books', exports: 'books',
   'gst-reports': 'statutory', tds: 'statutory', payroll: 'statutory', practice: 'statutory',
   settings: 'settings',
 };

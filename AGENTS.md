@@ -92,6 +92,11 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   per kitchen station, R3-A), `mrchartist_editor_layout` (live-preview toggle, R3-C) and `mrchartist_checklist_default`
   (practice-desk default checklist, R3-C); `mrchartist_pos_branch` (POS "This counter is branch", R4-B).
   `mrchartist_ageing_prefs` (Receivables Aging tab: age by due / bill date, user slabs, interest column; PENDING 34).
+  Round 20 (R20-A): `mrchartist_tally_keys` (`off` / `on` / `on:collapsed` — the "Tally keys" switch; absent → decided once:
+  off on a fresh device, on for a device used before) and `mrchartist_tally_layout` (`prime` / `erp9` key layout). Key
+  rows live in ONE registry `src/lib/keys/registry.ts` (labels in `keys-r20a`); screens handle rows with
+  `useKeyActions(scope, { [rowId]: fn })`, never a new keydown listener; first paint holds only `src/lib/keys/stub.ts`
+  (its `KEY_CLAIMS` is generated: `tests/keys-stub.test.ts`). Notes and the B–D API: `docs/features/tally-keys.md`.
   Round 6 (R6-A): `mrchartist_help_strips` ("About this tab" strips on / off), `mrchartist_whats_new_seen` (last What's-new
   version shown), `mrchartist_feedback_draft` (unsent "Report a problem" draft), `mrchartist_tips_seen` /
   `mrchartist_tips_off` (one-time screen tips). R6-B: `mrchartist_demo_pending` may carry `id|business_type|pack,pack`
@@ -337,7 +342,7 @@ build-time config must use Vite's `VITE_` prefix.
 - Help (Round 6): **a new route or tab needs a help topic** in `src/lib/help/topics-*.ts` — `tests/help-registry.test.ts`
   walks every route, sidebar entry, GST / pack tab and every list in `src/pages/page-tabs.ts` (page tab lists live
   there; a new tab also needs its Ctrl+K title in `discover-r6-tabs.ts`). Open Help from anywhere with
-  `openHelp(topic)` (`src/lib/help-event.ts`); F1 opens it except on `/pos`, `/gateway` and in fields.
+  `openHelp(topic)` (`src/lib/help-event.ts`); F1 opens it except on `/pos` and in fields (R20-A: also on `/gateway`).
 - Version (Round 6): `__APP_VERSION__` comes from `package.json`; **the newest `WHATS_NEW` entry
   (`src/lib/whats-new.ts`) must match the package.json version** (`scripts/check-whats-new.mjs` fails `postbuild`).
 - Sample data goes only into the separate Demo company (`startDemoCompany` / `SampleDataChooser`), never a real one.

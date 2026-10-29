@@ -28,7 +28,7 @@ test('Vite 8 rolldown options with codeSplitting.groups, no manualChunks / rollu
 
 test('the groups, in order, with their priorities', () => {
   const families = [...cfg.matchAll(/safeFamilyGroup\(graph, '(f-[a-z]+)', familyRe\([^)]*\), (\d+)\)/g)].map((m) => [m[1], Number(m[2])]);
-  assert.deepEqual(families.map(([n]) => n), ['f-hotel', 'f-trade', 'f-retail', 'f-services', 'f-cn', 'f-agri', 'f-mfg', 'f-prof', 'f-travel', 'f-manpower', 'f-society', 'f-logistics']); // R17-A: f-manpower; R18-A: f-society; R19-A: f-logistics
+  assert.deepEqual(families.map(([n]) => n), ['f-hotel', 'f-trade', 'f-retail', 'f-services', 'f-cn', 'f-agri', 'f-mfg', 'f-prof', 'f-travel', 'f-manpower', 'f-society', 'f-logistics', 'f-keys']); // R17-A: f-manpower; R18-A: f-society; R19-A: f-logistics; R20-A: f-keys
   assert.ok(families.every(([, p]) => p === 12), 'families at priority 12');
   assert.match(cfg, /leafGroup\(graph, 'lazy-leaves', 9, \{ maxModuleSize: 3000 \}\)/);
   assert.match(cfg, /leafGroup\(graph, 'lazy-leaves-ui', 8, \{ maxModuleSize: 1500, test: UI_LEAF \}\)/, 'PERF-5');
@@ -138,6 +138,12 @@ test('R19-A: the f-logistics family captures the engines, rules and areas; not t
   const re = familyRe('logistics', 'logistics-rules', 'logistics-r19', 'lg-registry');
   assert.ok(re.test('/x/src/lib/logistics/lg-job.ts') && re.test('/x/src/lib/logistics-rules.ts') && re.test('/x/src/i18n/areas/logistics-r19a.ts'));
   assert.ok(!re.test('/x/src/lib/logistics/lg-registry.ts') && !re.test('/x/src/i18n/areas/logistics-r19a-pick.ts'));
+});
+test('R20-A: the f-keys family captures the key engine, registry and labels (the first-paint stub stays in app-initial); not components', () => {
+  const re = familyRe('keys', null, 'keys-r20');
+  assert.ok(re.test('/x/src/lib/keys/engine.ts') && re.test('/x/src/lib/keys/registry.ts') && re.test('/x/src/i18n/areas/keys-r20a.ts'));
+  assert.ok(!re.test('/x/src/components/keys/KeysHost.tsx'), 'components import CSS modules: their own chunks');
+  assert.ok(!re.test('/x/src/lib/pos-keys.ts') && !re.test('/x/src/components/creator/line-keys.ts'));
 });
 const fam = (id: string) => FAM.test(id);
 

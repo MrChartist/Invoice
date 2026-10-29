@@ -22,6 +22,7 @@ import {
 } from '../../lib/gateway/menu';
 import { useGateway, useGatewaySession, useScreenKeys, useTallyTerms } from './context';
 import { ButtonBar } from './ButtonBar';
+import { KeysSwitch } from '../keys/KeysHost';
 import { CreateLedgerDialog } from './CreateLedgerDialog';
 import { ariaKeys } from './keymap';
 import controls from '../../styles/controls.module.css';
@@ -179,6 +180,7 @@ export function GatewayMenu() {
           <input type="checkbox" role="switch" checked={terms} onChange={(e) => setTallyTerms(e.target.checked)} />
           {gwT('termsLabel')}
         </label>
+        <KeysSwitch />
       </div>
       <ButtonBar />
       <div className={styles.layout}>

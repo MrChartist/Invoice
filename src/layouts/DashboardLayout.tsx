@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Banknote,
@@ -54,7 +54,7 @@ import { SyncRunner } from '../components/sync/SyncRunner';
 import { TimerPill } from '../components/time/TimerPill';
 import { useRecurringRunner } from '../hooks/useRecurringRunner';
 import { formatCombo, useHotkeys } from '../hooks/useHotkeys';
-import { useTallyKeys } from '../hooks/useTallyKeys';
+import { installKeysStub, keysOn, loadKeyEngine, subscribeKeys } from '../lib/keys/stub';
 import { cn } from '../lib/utils';
 import { getCurrentUser, getUser, logout } from '../lib/auth';
 import type { AccessAction } from '../lib/access';
@@ -75,6 +75,8 @@ const HelpModal = lazy(() => import('../components/layout/HelpModal').then((m) =
 const ShortcutsOverlay = lazy(() => import('../components/command/ShortcutsOverlay').then((m) => ({ default: m.ShortcutsOverlay })));
 const QuickCreateSheet = lazy(() => import('../components/layout/QuickCreateSheet').then((m) => ({ default: m.QuickCreateSheet })));
 const CommandPalette = lazy(() => import('../components/command/CommandPalette').then((m) => ({ default: m.CommandPalette })));
+// R20-A5: Key bar, F10 vouchers sheet and key chips — only while Tally keys are on, or on the Gateway.
+const KeysHost = lazy(() => loadKeyEngine().then((m) => m.loadKeysHost()));
 
 interface NavEntry {
   /** Catalogue key of the label (5.4). */
@@ -200,7 +202,13 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [loaded, setLoaded] = useState({ help: false, palette: false, shortcuts: false });
   const openHelp = () => { setLoaded((l) => ({ ...l, help: true })); setHelpOpen(true); };
-  const openPalette = () => { setLoaded((l) => ({ ...l, palette: true })); setPaletteOpen(true); };
+  // R20-A6: the Ctrl+K actions of Tally keys (switch, layout, cheat sheet) load with the palette.
+  const [keysActs, setKeysActs] = useState<Awaited<ReturnType<typeof loadKeyEngine>> | null>(null);
+  const openPalette = () => {
+    setLoaded((l) => ({ ...l, palette: true }));
+    setPaletteOpen(true);
+    if (!keysActs) void loadKeyEngine().then(setKeysActs, () => undefined);
+  };
   const openShortcuts = () => { setLoaded((l) => ({ ...l, shortcuts: true })); setShortcutsOpen(true); };
 
   const asideRef = useRef<HTMLElement>(null);
@@ -317,6 +325,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     'mod+k': () => openPalette(),
     '/': () => openPalette(),
     '?': () => openShortcuts(),
+    'mod+/': () => openShortcuts(),
     'g d': () => navigate('/'),
     'g i': () => navigate('/invoice'),
     'g t': () => navigate('/transactions'),
@@ -324,13 +333,15 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     'g s': () => navigate('/settings'),
     // 8E (8.146): Alt+P opens the POS counter from anywhere (even while typing in a field).
     'alt+p': { handler: () => navigate('/pos'), allowInInput: true }, // the route itself needs doc.create
-    // R6-B2: F1 opens Help (R6-A2's "On this screen"), except on the POS counter (F1 = recall held bills there) and
-    // the Gateway (Tally keys); never while typing in a field (useHotkeys skips plain keys in inputs).
+    // R6-B2: F1 opens Help (R6-A2's "On this screen"), except on the POS counter (F1 = recall held bills there); R20-A:
+    // also on the Gateway. Never while typing in a field (useHotkeys skips plain keys in inputs).
     // QA7 G3: F1 does nothing while a dialog is open (Help stacked over a form lost it on Escape).
-    ...(/^\/(pos|gateway)(\/|$)/.test(location.pathname) ? {} : { f1: () => { if (!document.querySelector('[aria-modal]')) openHelp(); } }),
+    ...(/^\/pos(\/|$)/.test(location.pathname) ? {} : { f1: () => { if (!document.querySelector('[aria-modal]')) openHelp(); } }),
   });
-  // Tally keys (Phase 7): F2, F4–F9, Ctrl+F8/F9, F11, F12, Alt+G / Ctrl+G, Ctrl+/ — off on /pos and in fields.
-  useTallyKeys(navigate, openShortcuts);
+  // R20-A1: Tally keys — the claim stub (mode flag + claimed combos); the lazy engine runs them. Off by default on a
+  // fresh device (F5 reloads); always on /gateway.
+  const tallyOn = useSyncExternalStore(subscribeKeys, keysOn);
+  useEffect(() => installKeysStub((to, state) => navigate(to, state ? { state } : undefined)), [navigate]);
 
   const actions = useMemo<PaletteAction[]>(
     () => ([
@@ -361,12 +372,13 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         },
       },
       { id: 'lock', title: t('shell.lock'), run: handleLock },
+      ...(keysActs?.paletteActions(openShortcuts, notify) ?? []),
     ] as Array<PaletteAction & { need?: AccessAction }>)
       // Local roles (6.21): the palette offers only what this role may do.
       .filter((a) => !a.need || can(a.need))
       .map(({ need: _need, ...a }) => a),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [navigate, theme, role, lang],
+    [navigate, theme, role, lang, keysActs],
   );
 
   const themeLabel = theme === 'dark' ? t('shell.switchLight') : t('shell.switchDark');
@@ -515,6 +527,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
           {can('data.backup') && <BackupNudge onResult={(r) => notify(r.ok ? t('shell.backupSaved', { file: r.filename }) : r.message, r.ok ? 'success' : 'error')} />}
           <Outlet />
         </div>
+        {(tallyOn || location.pathname.startsWith('/gateway')) && <Suspense fallback={null}><KeysHost /></Suspense>}
       </main>
 
       {showTabs && (
