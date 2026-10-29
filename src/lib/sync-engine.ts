@@ -71,6 +71,7 @@ import './travel/tv-registry'; // R15: travel tables' rights and audit labels (l
 import './manpower/mp-registry'; // R17: manpower tables' rights and audit labels (lazy registration)
 import './society/hs-registry'; // R18: society tables' rights and audit labels (lazy registration)
 import './logistics/lg-registry'; // R19: logistics tables' rights and audit labels (lazy registration)
+import './fuel/fu-registry'; // R21: fuel tables' rights and audit labels (lazy registration)
 
 export const [SYNC_STATE_KEY, SYNC_CONFLICTS_KEY, SYNC_AUDIT_KEY] = SYNC_META_KEYS;
 
@@ -483,6 +484,11 @@ const DATED: Record<string, string | ((row: Record<string, unknown>) => string |
   [`${DB_PREFIX}lg_jobs`]: 'date',
   // R19-D: courier manifests (the month's last day)
   [`${DB_PREFIX}lg_manifests`]: 'date',
+  // R21: fuel prices, shifts, tank logs, credit slips (their date)
+  [`${DB_PREFIX}fuel_prices`]: 'date',
+  [`${DB_PREFIX}fuel_shifts`]: 'date',
+  [`${DB_PREFIX}fuel_tank_logs`]: 'date',
+  [`${DB_PREFIX}fuel_slips`]: 'date',
 };
 
 const INVOICES_KEY = `${DB_PREFIX}invoices`;

@@ -299,6 +299,13 @@ export const TABLE_MEANING: Readonly<Record<string, string>> = {
   lg_jobs: 'Logistics job files: mode, ports, parties, refs, containers, weights (R19).',
   // R19-D
   lg_manifests: 'Courier manifests: customer, month, dockets (R19).',
+  // R21
+  fuel_settings: 'Fuel settings: shifts, price time, test litres, credit billing (R21).',
+  fuel_nozzles: 'Fuel nozzles: DU and nozzle no., tank, product, totaliser, W&M stamping (R21).',
+  fuel_prices: 'Fuel prices: product, date and time, price per litre / kg, excise and VAT build-up (R21).',
+  fuel_shifts: 'Pump shifts: date, shift, attendants, meter readings, testing, collections (R21).',
+  fuel_tank_logs: 'Tank logs: dips, water dips, density, tank-lorry receipts (R21).',
+  fuel_slips: 'Credit slips: slip no., customer, vehicle, product, litres, amount (R21).',
   society_runs: 'Society billing runs: period, bill / due date, batch, units, counts by document type, totals by charge head, special levy, undone (R18).',
   travel_bookings: 'Travel bookings: trip / event file (cost centre), component, supplier, PNR / ref., dates, cost (currency, rate), sell, pure agent, status, supplier bill, invoice line once billed (R15).',
   // R15-C
