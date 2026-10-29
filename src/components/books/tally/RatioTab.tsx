@@ -7,12 +7,19 @@ import { formatDate, formatMoney } from '../../../lib/utils';
 import { downloadCsv } from '../download';
 import { useT } from '../../../i18n';
 import { tallyT } from '../../../i18n/areas/tally';
+import { ratioFormula, ratioLabel, ratioT } from '../../../i18n/areas/tally-ratios';
 import surface from '../../../styles/surface.module.css';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './tally.module.css';
 
-const show = (r: RatioItem) => (r.unit === 'money' ? (r.value === null ? '—' : `₹${formatMoney(r.value / 100)}`) : ratioText(r));
+const show = (r: RatioItem) => {
+  if (r.value === null) return '—';
+  if (r.unit === 'money') return `₹${formatMoney(r.value / 100)}`;
+  if (r.unit === 'days') return ratioT('days', { n: Math.round(r.value) });
+  if (r.unit === 'times') return ratioT('times', { n: r.value.toFixed(2) });
+  return ratioText(r);
+};
 
 /** Tally's Ratio Analysis from the ledger, with drill-down to the accounts behind each figure. */
 export function RatioTab({ ledger, period, asOf, onOpenAccount }: { ledger: Ledger; period: Period; asOf: string; onOpenAccount: (id: string) => void }) {
@@ -37,13 +44,13 @@ export function RatioTab({ ledger, period, asOf, onOpenAccount }: { ledger: Ledg
               <tr key={x.id}>
                 <td>
                   {x.accounts.length ? (
-                    <button type="button" className={controls.btnGhost} title={tallyT('drill')} onClick={() => onOpenAccount(x.accounts[0])}>{x.label}</button>
+                    <button type="button" className={controls.btnGhost} title={tallyT('drill')} onClick={() => onOpenAccount(x.accounts[0])}>{ratioLabel(x)}</button>
                   ) : (
-                    x.label
+                    ratioLabel(x)
                   )}
                 </td>
                 <td className={surface.numeric} data-ratio={x.id}>{show(x)}</td>
-                <td className={styles.formula}>{x.formula}</td>
+                <td className={styles.formula}>{ratioFormula(x)}</td>
               </tr>
             ))}
           </tbody>
