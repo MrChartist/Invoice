@@ -319,3 +319,6 @@ out of their screens' chunks cost ~2 kB on its own. Cuts in the PRD order:
 | Hindi pack | 376.6 kB | 377.0 kB |
 | Hindi in core | 21.9 kB | 21.9 kB |
 | `f-fuel` / `FuelDesk` / `CreditView` (incl. `fu-recv-io`) / `credit-limit` split / `fu-ui` split | 1.9 / 3.7 / — / — / — | 2.8 / 3.8 / 3.6 / 1.3 (−0.9 from `credit-policy`) / 0.4 |
+
+Merged with B, C, R21-P and the type / button systems: core 3,288.1 kB on `8d70791` (recorded base ~3,284.4) and
+3,288.5 kB on `7e1334c`; initial JS 177.5 kB, Hindi pack 391.7 kB, Hindi in core 9.8 kB, lazy-leaves-ui 27.7 / 28 kB.
