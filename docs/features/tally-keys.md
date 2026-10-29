@@ -192,3 +192,10 @@ show on the Key bar (the cheat sheet's "All" tab still lists them — a lead cal
 data model): Ctrl+H "item lines / amount only" in the editor (no such mode exists), Ctrl+Enter alter of an item (saves
 instead), Ctrl+D / Ctrl+O / Alt+A / Ctrl+I on bill forms (the line's remove button stays), Alt+X / Alt+2 on bills, voucher
 cancel (no cancelled state for a voucher without a data change). Tests: `tests/keys-entry.test.ts`; e2e step "R20-B".
+
+| | Base (`67ccabd`) | After R20-B | Change |
+|---|---|---|---|
+| First paint | 177.8 kB | 177.8 kB | 0 (`KEY_CLAIMS` + `mod+f5 mod+f6`, a few bytes) |
+| Core precache | 3,277.2 kB | 3,285.5 kB | +8.3 kB: own code +7.1 (`f-keys` +2.1 entry-actions + `keys-r20b` English, `EntrySheets` 1.5, editor hook 1.5, `VoucherEntry` 1.1, bill / PO / GRN forms 0.6, help + palette 0.3); ≈ +1.3 hash churn across ≈ 700 chunks (the first-paint chunk's hash moves with `KEY_CLAIMS`). Cap 7 kB: own code at the cap after the ranked cuts |
+| Hindi pack | 376.6 kB | 377.1 kB | +0.5 kB (`keys-r20b`) |
+| Hindi in core | 21.8 kB | 21.9 kB | +0.1 |
