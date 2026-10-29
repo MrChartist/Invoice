@@ -322,3 +322,11 @@ out of their screens' chunks cost ~2 kB on its own. Cuts in the PRD order:
 
 Merged with B, C, R21-P and the type / button systems: core 3,288.1 kB on `8d70791` (recorded base ~3,284.4) and
 3,288.5 kB on `7e1334c`; initial JS 177.5 kB, Hindi pack 391.7 kB, Hindi in core 9.8 kB, lazy-leaves-ui 27.7 / 28 kB.
+
+### QA round 25
+
+Fixes W1–W6 (`docs/prd/qa-round-25.md`): a slip is linked to its shift and nozzle (`linkSlip`; refused on a
+day-closed shift), POS and slip-bill fuel lines leave the tank (`tankOf`), the day-close bill carries `fu.lines` per price
+row (`counterLines` splits by price segment), a water dip above the product dip is refused, a nozzle with shifts is
+deactivated instead of deleted, and the monthly loss voucher counts dip + unbilled slip litres (refused while a shift of
+the month is not day-closed; `booksLag`).

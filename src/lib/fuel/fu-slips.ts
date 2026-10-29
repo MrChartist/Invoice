@@ -14,7 +14,7 @@ import { assertUnlocked } from '../period-lock';
 import { round2 } from '../invoice-calc';
 import type { Client, InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { AnnexureRow } from '../../types/service-r3';
-import type { FuelPrice, FuelSlip, FuLine, FuProduct } from '../../types/fuel-r21';
+import type { FuelNozzle, FuelPrice, FuelShift, FuelSlip, FuLine, FuProduct } from '../../types/fuel-r21';
 import { FU_TABLES } from './fu-shared';
 import { isNonGst, priceAt } from './fu-line';
 
@@ -59,6 +59,34 @@ export function vehicleWarning(s: Pick<FuelSlip, 'client_id' | 'vehicle_no' | 'd
   return '';
 }
 
+const POSTED = (d: string) => `The pump shift of ${d} is day-closed and its counter bill already holds these litres: undo its day close first.`;
+
+/**
+ * QA25 W1: the shift and nozzle a slip's litres came out of, so the day close takes them off the counter bill (else the
+ * litres are billed twice: on the counter bill and on the slip bill). A typed shift / nozzle is checked; otherwise the
+ * one not-posted shift of the slip day holding a nozzle of the product, and its one such nozzle. No shift that day holds
+ * the product: no link. Returns the link, or the reason it cannot be made.
+ */
+export function linkSlip(s: Pick<FuelSlip, 'date' | 'item_id'> & Partial<Pick<FuelSlip, 'shift_id' | 'nozzle_id'>>, nozzles: readonly Pick<FuelNozzle, 'id' | 'item_id'>[], shifts: readonly FuelShift[]): Pick<FuelSlip, 'shift_id' | 'nozzle_id'> | string {
+  const mine = new Set(nozzles.filter((n) => n.item_id === s.item_id).map((n) => n.id));
+  const held = (x: FuelShift) => x.readings.map((r) => r.nozzle_id).filter((id) => mine.has(id) && (!s.nozzle_id || id === s.nozzle_id));
+  const cands = s.shift_id ? shifts.filter((x) => x.id === s.shift_id) : shifts.filter((x) => x.date === s.date && held(x).length);
+  if (!cands.length) return s.shift_id ? 'That shift does not hold a nozzle of this product.' : { ...(s.nozzle_id ? { nozzle_id: s.nozzle_id } : {}) };
+  const live = cands.filter((x) => x.status !== 'posted');
+  if (!live.length) return POSTED(cands[0].date);
+  if (live.length > 1) return 'Pick the shift this slip was filled in.';
+  const ids = held(live[0]);
+  if (!ids.length) return 'That shift does not hold a nozzle of this product.';
+  if (ids.length > 1) return 'Pick the nozzle this slip was filled at.';
+  return { shift_id: live[0].id, nozzle_id: ids[0] };
+}
+
+/** A slip whose shift is day-closed is changed only after undoing that day close (its litres are off the counter bill). */
+function assertShiftOpen(s: Pick<FuelSlip, 'shift_id'> | undefined, shifts: readonly FuelShift[]): void {
+  const sh = s?.shift_id ? shifts.find((x) => x.id === s.shift_id) : undefined;
+  if (sh?.status === 'posted') throw new Error(POSTED(sh.date));
+}
+
 /** Add or edit a slip (refused with the reason; a billed slip is changed only by cancelling its bill). */
 export function saveSlip(input: Omit<FuelSlip, 'id'> & { id?: string }, docs: readonly InvoiceRecord[] = getTable<InvoiceRecord>('invoices')): FuelSlip {
   requireAccess('doc.create');
@@ -66,7 +94,14 @@ export function saveSlip(input: Omit<FuelSlip, 'id'> & { id?: string }, docs: re
   const why = slipIssue(input, all);
   if (why) throw new Error(why);
   if (input.id && billedSlipIds(docs).has(input.id)) throw new Error('This slip is on a bill: cancel the bill first.');
-  const row: FuelSlip = { ...input, id: input.id || generateId(), slip_no: input.slip_no.trim(), vehicle_no: k(input.vehicle_no), litres: r3(Number(input.litres)), amount: round2(Number(input.amount)) };
+  const shifts = getTable<FuelShift>(FU_TABLES.shifts);
+  assertShiftOpen(all.find((x) => x.id === input.id), shifts);
+  const link = linkSlip(input, getTable<FuelNozzle>(FU_TABLES.nozzles), shifts);
+  if (typeof link === 'string') throw new Error(link);
+  const { shift_id: _s, nozzle_id: _n, ...rest } = input;
+  void _s;
+  void _n;
+  const row: FuelSlip = { ...rest, ...link, id: input.id || generateId(), slip_no: input.slip_no.trim(), vehicle_no: k(input.vehicle_no), litres: r3(Number(input.litres)), amount: round2(Number(input.amount)) };
   assertUnlocked({ id: row.id, issue_date: row.date }, input.id ? 'edit' : 'create');
   setTable(FU_TABLES.slips, all.some((x) => x.id === row.id) ? all.map((x) => (x.id === row.id ? row : x)) : [...all, row]);
   return row;
@@ -78,6 +113,7 @@ export function removeSlip(id: string, docs: readonly InvoiceRecord[] = getTable
   const s = readSlips().find((x) => x.id === id);
   if (!s) return;
   if (billedSlipIds(docs).has(id)) throw new Error('This slip is on a bill: cancel the bill first.');
+  assertShiftOpen(s, getTable<FuelShift>(FU_TABLES.shifts));
   assertUnlocked({ id, issue_date: s.date }, 'delete');
   setTable(FU_TABLES.slips, readSlips().filter((x) => x.id !== id));
 }
@@ -87,11 +123,12 @@ export interface SlipItem { id: string; name: string; unit?: string; hsn?: strin
 export interface SlipDoc { client_id: string; fuel: boolean; items: InvoiceItem[]; lines: Record<string, FuLine>; slip_ids: string[]; annexure: AnnexureRow[] }
 
 /**
- * The month-end bills (pure): per customer, the fuel slips → one Bill of Supply (one line per product × price in
- * force; amounts kept exact), other items → one tax invoice at the item's slab. `day` decides the non-GST status.
+ * The month-end bills (pure): per customer, the fuel slips → one Bill of Supply (one line per product × tank × price in
+ * force; amounts kept exact), other items → one tax invoice at the item's slab. `day` decides the non-GST status;
+ * `tankOf` names the tank (godown) a slip's litres left, so the bill's stock leaves it (QA25 W2).
  */
-export function planSlipBills(slips: readonly FuelSlip[], items: readonly SlipItem[], prices: readonly FuelPrice[], day: string): SlipDoc[] {
-  type Acc = SlipDoc & { acc: Map<string, { it: SlipItem; p: FuelPrice | null; l: number; a: number }> };
+export function planSlipBills(slips: readonly FuelSlip[], items: readonly SlipItem[], prices: readonly FuelPrice[], day: string, tankOf: (s: FuelSlip) => string | undefined = () => undefined): SlipDoc[] {
+  type Acc = SlipDoc & { acc: Map<string, { it: SlipItem; p: FuelPrice | null; l: number; a: number; tank?: string }> };
   const docs = new Map<string, Acc>();
   for (const s of [...slips].sort((a, b) => (a.date + a.slip_no).localeCompare(b.date + b.slip_no))) {
     const it = items.find((i) => i.id === s.item_id);
@@ -101,17 +138,18 @@ export function planSlipBills(slips: readonly FuelSlip[], items: readonly SlipIt
     const d: Acc = docs.get(key) ?? { client_id: s.client_id, fuel, items: [], lines: {}, slip_ids: [], annexure: [], acc: new Map() };
     docs.set(key, d);
     const p = it.fu ? priceAt(prices, it.id, s.date, '23:59') : null;
-    const g = `${it.id}|${p?.id ?? round2(s.amount / s.litres)}`;
-    const a = d.acc.get(g) ?? { it, p, l: 0, a: 0 };
+    const tank = it.fu ? tankOf(s) : undefined;
+    const g = `${it.id}|${tank ?? ''}|${p?.id ?? round2(s.amount / s.litres)}`;
+    const a = d.acc.get(g) ?? { it, p, l: 0, a: 0, tank };
     d.acc.set(g, { ...a, l: a.l + s.litres, a: a.a + s.amount });
     d.slip_ids.push(s.id);
     d.annexure.push({ date: s.date, who: s.vehicle_no, project: `Slip ${s.slip_no}`, description: `${it.name} · ${s.litres.toFixed(3)} ${it.fu?.unit === 'KG' ? 'kg' : 'L'}${s.driver ? ` · ${s.driver}` : ''}`, minutes: 0, billed_minutes: 0, rate: round2(s.amount / s.litres), amount: s.amount, ref: s.id });
   }
   return [...docs.values()].map(({ acc, ...d }) => {
-    for (const { it, p, l, a } of acc.values()) {
+    for (const { it, p, l, a, tank } of acc.values()) {
       const id = generateId();
       const q = r3(l);
-      d.items.push({ id, name: it.name, type: 'Goods', hsn: it.hsn, unit: it.unit, quantity: q, rate: Math.round((a / q) * 1e6) / 1e6, amount: round2(a), tax_rate: d.fuel ? 0 : it.tax_rate ?? 0, ...(d.fuel ? { sv: { exempt: 'NON_GST' as const } } : {}) });
+      d.items.push({ id, name: it.name, type: 'Goods', hsn: it.hsn, unit: it.unit, quantity: q, rate: Math.round((a / q) * 1e6) / 1e6, amount: round2(a), tax_rate: d.fuel ? 0 : it.tax_rate ?? 0, ...(d.fuel ? { sv: { exempt: 'NON_GST' as const } } : {}), ...(tank ? { godown_id: tank } : {}) });
       if (it.fu) d.lines[id] = { litres: q, ...(p ? { price_id: p.id, rsp: p.rsp, at: `${p.date} ${p.time}` } : {}), ...(it.fu.unit === 'KG' ? { unit: 'KG' as const } : {}) };
     }
     return d;

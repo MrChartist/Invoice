@@ -67,6 +67,9 @@ export function saveShift(id: string, patch: Pick<FuelShift, 'readings'> & Parti
 export function removeShift(id: string): void {
   requireAccess('doc.create');
   if (readShifts().find((x) => x.id === id)?.status !== 'open') throw new Error(fbT('eNotOpen'));
+  // QA25 W1: a slip filled in this shift would lose its link (and be billed twice): delete or move the slip first.
+  const sl = getTable<FuelSlip>(FU_TABLES.slips).filter((x) => x.shift_id === id);
+  if (sl.length) throw new Error(`Credit slips ${sl.map((x) => x.slip_no).join(', ')} were filled in this shift: delete them first.`);
   setTable(FU_TABLES.shifts, readShifts().filter((x) => x.id !== id));
 }
 

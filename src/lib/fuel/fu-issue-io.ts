@@ -11,7 +11,7 @@
  */
 import './fu-registry';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
-import type { FuelNozzle, FuelPrice, FuelSettings, FuelShift } from '../../types/fuel-r21';
+import type { FuelNozzle, FuelPrice, FuelSettings, FuelShift, FuLine } from '../../types/fuel-r21';
 import { DB_PREFIX, generateId, getJson, getTable } from '../storage';
 import { requireAccess } from '../access';
 import { localDb } from '../localDb';
@@ -46,20 +46,25 @@ function clearing(name: string): string {
 }
 const bankOf = (m: FuMode, upi: string): string | undefined => (m === 'cash' ? undefined : m === 'upi' ? upi : clearing(m === 'card' ? FU_NAMES.card : FU_NAMES.fleet));
 
-function billOf(s: FuelShift, p: ShiftPlan): InvoiceRecord | null {
+function billOf(s: FuelShift, p: ShiftPlan, prices: readonly FuelPrice[]): InvoiceRecord | null {
   if (!p.lines.length) return null;
   const settings = localDb.settings.get();
   const items = stockDb.items();
   const cs = fuCfg().counter_client_id;
+  const fu: Record<string, FuLine> = {};
   const lines: InvoiceItem[] = p.lines.map((l) => {
     const it = items.find((x) => x.id === l.item_id);
-    return { id: generateId(), name: it?.name ?? l.item_id, type: 'Goods', hsn: it?.hsn ?? '', unit: it?.unit ?? 'LTR', quantity: l.litres, rate: Math.round((l.amount / l.litres) * 1e6) / 1e6, amount: l.amount, tax_rate: 0, sv: { exempt: 'NON_GST' }, ...(l.tank_id ? { godown_id: l.tank_id } : {}) };
+    const id = generateId();
+    const pr = prices.find((x) => x.id === l.price_id);
+    // QA25 W3: each line names the price row it was sold at (Rule 42 duty working, 3.1(e) check).
+    fu[id] = { litres: l.litres, price_id: l.price_id, rsp: l.rsp, ...(pr ? { at: `${pr.date} ${pr.time}` } : {}), ...(it?.fu?.unit === 'KG' ? { unit: 'KG' as const } : {}) };
+    return { id, name: it?.name ?? l.item_id, type: 'Goods', hsn: it?.hsn ?? '', unit: it?.unit ?? 'LTR', quantity: l.litres, rate: Math.round((l.amount / l.litres) * 1e6) / 1e6, amount: l.amount, tax_rate: 0, sv: { exempt: 'NON_GST' }, ...(l.tank_id ? { godown_id: l.tank_id } : {}) };
   });
   const rec: InvoiceRecord = {
     ...makeDraft({ settings, sender: localDb.settings.activeProfile() ?? null, docType: 'BILL_OF_SUPPLY', templateId: localDb.template.get() }),
     id: generateId(), issue_date: s.date, due_date: s.date, status: 'Sent', exempt_kind: 'NON_GST', gst_mode: 'NONE', supply_type: 'B2C', round_off_enabled: false, // the meter value is exact; collections settle it to the paisa
     client: { ...blankClient(), ...((cs && localDb.clients.getById(cs)) || { name: FU_NAMES.counter }) }, items: lines,
-    notes: noteOf(s), fu: { shift_id: s.id },
+    notes: noteOf(s), fu: { shift_id: s.id, lines: fu },
   };
   const t = calculateInvoice(calcInputFromRecord(rec));
   return { ...rec, subtotal: t.subtotal, discount_amount: t.discount_amount, taxable_value: t.taxable_value, cgst_amount: 0, sgst_amount: 0, igst_amount: 0, tax_amount: 0, cess_amount: 0, round_off: t.round_off, total: t.total, balance_due: t.balance_due };
@@ -74,7 +79,7 @@ export function dayClose(date: string, o: { upiBank?: string } = {}): InvoiceRec
   const data = fuData();
   const plans = shifts.map((s) => ({ s, p: planShift(s, data) }));
   return withTablesRollback(['invoices', 'clients', 'items_catalog', 'transactions', 'bank_accounts', FU_TABLES.shifts], () => {
-    const drafts = plans.map(({ s, p }) => ({ s, p, rec: billOf(s, p) }));
+    const drafts = plans.map(({ s, p }) => ({ s, p, rec: billOf(s, p, data.prices) }));
     const saved = localDb.invoices.saveMany(drafts.flatMap((d) => (d.rec ? [d.rec] : [])));
     for (const { s, p, rec } of drafts) {
       const bill = rec && saved.find((x) => x.fu?.shift_id === s.id);

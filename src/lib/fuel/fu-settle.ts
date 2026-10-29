@@ -56,17 +56,34 @@ export function settleShift(s: FuelShift, sales: readonly FuNozzleSale[], billed
   });
 }
 
-/** Counter litres / ₹ per tank × product: meter sales less POS bills and slips (refused when bills exceed the meter). */
-export function counterLines(sales: readonly FuNozzleSale[], billed: ReturnType<typeof billedInShift>): { item_id: string; tank_id: string; litres: number; amount: number; nozzles: string[] }[] {
-  const out = new Map<string, { item_id: string; tank_id: string; litres: number; amount: number; nozzles: string[] }>();
+export interface FuCounterLine { item_id: string; tank_id: string; price_id: string; rsp: number; litres: number; amount: number; nozzles: string[] }
+
+/**
+ * Counter litres / ₹ per tank × product × price row: meter sales less POS bills and slips (refused when bills exceed
+ * the meter). A nozzle's billed litres / ₹ come off its price segments in proportion to their litres, so each line keeps
+ * the price row it was sold at — the day-close bill's `fu.lines` (Rule 42 duty working, 3.1(e) check; QA25 W3).
+ */
+export function counterLines(sales: readonly FuNozzleSale[], billed: ReturnType<typeof billedInShift>): FuCounterLine[] {
+  const out = new Map<string, FuCounterLine>();
   for (const x of sales) {
     const p = billed.pos.get(x.nozzle_id);
     const q = billed.slips.get(x.nozzle_id);
-    const litres = r3(x.litres - (p?.litres ?? 0) - (q?.litres ?? 0));
-    if (litres < -0.0005) throw new Error(fbT('eOver', { n: x.nozzle_id }));
-    const k = `${x.tank_id}|${x.item_id}`;
-    const o = out.get(k) ?? { item_id: x.item_id, tank_id: x.tank_id, litres: 0, amount: 0, nozzles: [] };
-    out.set(k, { ...o, litres: r3(o.litres + litres), amount: round2(o.amount + x.value - (p?.amount ?? 0) - (q?.amount ?? 0)), nozzles: [...o.nozzles, x.nozzle_id] });
+    const bl = (p?.litres ?? 0) + (q?.litres ?? 0);
+    const ba = (p?.amount ?? 0) + (q?.amount ?? 0);
+    let restL = r3(x.litres - bl);
+    if (restL < -0.0005) throw new Error(fbT('eOver', { n: x.nozzle_id }));
+    let restA = round2(x.value - ba);
+    x.segs.forEach((g, i) => {
+      const last = i === x.segs.length - 1;
+      const share = x.litres ? g.litres / x.litres : 0;
+      const l = last ? restL : r3(g.litres - bl * share);
+      const a = last ? restA : round2(g.litres * g.rsp - ba * share);
+      restL = r3(restL - l);
+      restA = round2(restA - a);
+      const k = `${x.tank_id}|${x.item_id}|${g.price_id}`;
+      const o = out.get(k) ?? { item_id: x.item_id, tank_id: x.tank_id, price_id: g.price_id, rsp: g.rsp, litres: 0, amount: 0, nozzles: [] };
+      out.set(k, { ...o, litres: r3(o.litres + l), amount: round2(o.amount + a), nozzles: o.nozzles.includes(x.nozzle_id) ? o.nozzles : [...o.nozzles, x.nozzle_id] });
+    });
   }
   return [...out.values()].filter((l) => l.litres > 0.0005 && l.amount > 0.004);
 }

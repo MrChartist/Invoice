@@ -34,7 +34,7 @@ test('POS bills of the shift and its slips are billed; others are not', () => {
   const sales = shiftSales(S, NZ, P);
   const people = settleShift(S, sales, b);
   assert.deepEqual(people.map((p) => [p.value, p.expected, p.collected, p.diff]), [[10000, 9500, 9000, -500], [5000, 5000, 5100, 100]]);
-  assert.deepEqual(counterLines(sales, b), [{ item_id: 'ms', tank_id: 't1', litres: 135, amount: 13500, nozzles: ['n1', 'n2'] }], 'meter − POS − slips, one line per tank × product');
+  assert.deepEqual(counterLines(sales, b), [{ item_id: 'ms', tank_id: 't1', price_id: 'p1', rsp: 100, litres: 135, amount: 13500, nozzles: ['n1', 'n2'] }], 'meter − POS − slips, one line per tank × product × price row');
   const plan = postPlan(people);
   assert.deepEqual(plan.pay, { cash: 11000, upi: 2000 }, 'credit slips are not receipts; the excess comes off cash');
   assert.deepEqual(plan.excess, { cash: 100 });

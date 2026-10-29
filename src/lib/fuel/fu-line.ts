@@ -32,10 +32,22 @@ export function litresFor(amount: number, rsp: number): { litres: number; rate: 
   return { litres, rate: litres ? Math.round((amount / litres) * 1e6) / 1e6 : rsp };
 }
 
-/** The line at the price in force, from ₹ (`amount`) or litres (the line's quantity), with its `fu` data. */
-export function fuelLine(line: InvoiceItem, o: { product: FuProduct; unit?: 'L' | 'KG'; price: FuelPrice; nozzle?: FuelNozzle; amount?: number; day: string }): { line: InvoiceItem; fu: FuLine } {
+/**
+ * QA25 W2: the tank (godown) a sale of `itemId` leaves — the nozzle's tank, else the one tank every nozzle / tank of the
+ * product shares (several tanks and no nozzle: undefined, the line keeps its godown).
+ */
+export function tankOf(itemId: string, nozzleId: string | undefined, nozzles: readonly Pick<FuelNozzle, 'id' | 'item_id' | 'tank_id'>[], tanks: readonly { id: string; fu?: { product_item_id: string } }[] = []): string | undefined {
+  const n = nozzleId ? nozzles.find((x) => x.id === nozzleId) : undefined;
+  if (n) return n.tank_id;
+  const ids = new Set([...nozzles.filter((x) => x.item_id === itemId).map((x) => x.tank_id), ...tanks.filter((t) => t.fu?.product_item_id === itemId).map((t) => t.id)]);
+  return ids.size === 1 ? [...ids][0] : undefined;
+}
+
+/** The line at the price in force, from ₹ (`amount`) or litres (the line's quantity), with its `fu` data; `tank` = the godown it leaves (QA25 W2). */
+export function fuelLine(line: InvoiceItem, o: { product: FuProduct; unit?: 'L' | 'KG'; price: FuelPrice; nozzle?: FuelNozzle; amount?: number; day: string; tank?: string }): { line: InvoiceItem; fu: FuLine } {
   const q = o.amount && o.amount > 0 ? litresFor(o.amount, o.price.rsp) : { litres: r3(num(line.quantity)), rate: o.price.rsp };
-  const out: InvoiceItem = { ...line, quantity: q.litres, rate: q.rate, amount: round2(q.litres * q.rate) };
+  const tank = o.nozzle?.tank_id ?? o.tank;
+  const out: InvoiceItem = { ...line, quantity: q.litres, rate: q.rate, amount: round2(q.litres * q.rate), ...(tank ? { godown_id: tank } : {}) };
   if (isNonGst(o.product, o.day)) Object.assign(out, { tax_rate: 0, sv: { ...line.sv, exempt: 'NON_GST' } });
   const fu: FuLine = { litres: q.litres, price_id: o.price.id, rsp: o.price.rsp, at: `${o.price.date} ${o.price.time}`, ...(o.unit === 'KG' ? { unit: 'KG' as const } : {}), ...(o.nozzle ? { nozzle_id: o.nozzle.id, nozzle: nozzleLabel(o.nozzle) } : {}) };
   return { line: out, fu };

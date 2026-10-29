@@ -11,13 +11,13 @@ import { useT } from '../../i18n';
 import { fuT } from '../../i18n/areas/fuel-r21a';
 import { getTable } from '../../lib/storage';
 import type { StockItem } from '../../lib/inventory';
-import { fuDocPatch, fuelLine, nozzleLabel, priceAt } from '../../lib/fuel/fu-line';
+import { fuDocPatch, fuelLine, nozzleLabel, priceAt, tankOf } from '../../lib/fuel/fu-line';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { FuelNozzle, FuelPrice, FuLine } from '../../types/fuel-r21';
 import controls from '../../styles/controls.module.css';
 
 export interface PosFuel { patch: Partial<InvoiceRecord>; errors: string[] }
-const sig = (l: InvoiceItem) => `${l.quantity}|${l.rate}|${l.tax_rate}|${l.sv?.exempt ?? ''}`;
+const sig = (l: InvoiceItem) => `${l.quantity}|${l.rate}|${l.tax_rate}|${l.sv?.exempt ?? ''}|${l.godown_id ?? ''}`;
 
 export default function NozzleChip({ record, setItems, onChange }: { record: InvoiceRecord; setItems: Dispatch<SetStateAction<InvoiceItem[]>>; onChange: (v: PosFuel | null) => void }) {
   useT();
@@ -36,7 +36,7 @@ export default function NozzleChip({ record, setItems, onChange }: { record: Inv
     const p = pick[l.id] ?? {};
     if (!price) errors.push(fuT('noPrice', { name: it.name, at: `${day} ${now}` }));
     else {
-      const out = fuelLine(l, { product: it.fu.product, unit: it.fu.unit, price, nozzle: noz.find((n) => n.id === (p.nz ?? (noz.length === 1 ? noz[0].id : ''))), amount: Number(p.amt) || undefined, day });
+      const out = fuelLine(l, { product: it.fu.product, unit: it.fu.unit, price, nozzle: noz.find((n) => n.id === (p.nz ?? (noz.length === 1 ? noz[0].id : ''))), amount: Number(p.amt) || undefined, day, tank: tankOf(it.id, undefined, noz) });
       lines[l.id] = out.fu;
       want.set(l.id, out.line);
     }
