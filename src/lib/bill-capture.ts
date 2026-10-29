@@ -14,7 +14,7 @@
  */
 
 import type { PurchaseLine, PurchaseRecord, Vendor } from '../types/purchases';
-import type { EinvoiceQrData } from './einvoice-qr';
+import type { EinvoiceJsonData, EinvoiceQrData } from './einvoice-qr';
 import type { DraftMeta } from './purchase-drafts';
 import { computePurchaseTotals } from './purchases';
 import { round2 } from './invoice-calc';
@@ -110,4 +110,44 @@ export function draftFromQr(qr: EinvoiceQrData, ctx: CaptureContext, extra: { in
     draft,
   };
   return { bill, vendor, buyerMismatch, creditNote: false };
+}
+
+/**
+ * 8.46: draft from the supplier's FULL e-invoice JSON (pasted, or a .json file): one bill line per invoice line with
+ * its HSN, quantity, taxable value and GST rate, cess on the bill, place of supply from the JSON. The QR-only draft's
+ * "check the GST split" flag is dropped; it comes back only when the lines do not add up to the invoice value.
+ */
+export function draftFromEinvoiceJson(j: EinvoiceJsonData, ctx: CaptureContext, extra: { inboxId?: string; attachments?: PurchaseRecord['attachments'] } = {}): CaptureResult {
+  const base = draftFromQr(j.qr, ctx, extra);
+  if (!base.bill) return base;
+  const ourState = ctx.businessState || stateOf(j.qr.buyerGstin);
+  const pos = j.pos && j.pos !== '96' && j.pos !== '97' ? j.pos : base.bill.place_of_supply ?? '';
+  const lines: PurchaseLine[] = j.lines.map((l) => {
+    const rate = round2(l.taxable / l.qty);
+    const exact = Math.abs(round2(rate * l.qty) - l.taxable) < 0.005;
+    return { id: generateId(), name: l.name, ...(l.hsn ? { hsn: l.hsn } : {}), unit: l.unit, quantity: exact ? l.qty : 1, rate: exact ? rate : l.taxable, tax_rate: l.rate };
+  });
+  const t = computePurchaseTotals(lines, { placeOfSupply: pos, businessState: ourState, gstApplies: lines.some((l) => l.tax_rate > 0) });
+  const total = round2(t.total + j.cess);
+  const review = (base.bill.draft.review ?? []).filter((r) => r !== 'gst');
+  if (j.qr.total > 0 && Math.abs(total - j.qr.total) > 1) review.push('gst');
+  const { review: _r, ...meta } = base.bill.draft;
+  return {
+    ...base,
+    bill: {
+      ...base.bill,
+      vendor_name: base.bill.vendor_name || j.sellerName,
+      place_of_supply: pos || undefined,
+      lines,
+      taxable: t.taxable,
+      cgst: t.cgst,
+      sgst: t.sgst,
+      igst: t.igst,
+      ...(j.cess > 0 ? { cess_amount: j.cess } : {}),
+      total,
+      itc_eligible: !!j.qr.sellerGstin && t.tax > 0 && !base.buyerMismatch,
+      notes: `${base.bill.notes?.replace('(read from the signed QR; signature not verified)', '(read from the e-invoice JSON; signature not verified)')}`,
+      draft: { ...meta, ...(review.length ? { review } : {}) },
+    },
+  };
 }
