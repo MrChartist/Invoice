@@ -405,13 +405,13 @@ export function parseDebitNotePrefill(params: { get(name: string): string | null
  * PENDING 38: an edited bill may not fall below what goods notes already returned against it — every returned bill
  * line must still exist with at least the returned units (paid + free). Returns an error message or ''.
  */
-export function returnedQtyIssue(bill: { id?: string; lines?: readonly PurchaseLine[] }, notes: readonly { purchase_id?: string; bill_refs?: readonly { purchase_id: string }[]; goods_returned?: boolean; lines?: readonly { bill_line_id?: string; quantity?: number }[] }[]): string {
+export function returnedQtyIssue(bill: { id?: string; lines?: readonly PurchaseLine[] }, notes: readonly { purchase_id?: string; bill_refs?: readonly { purchase_id: string }[]; goods_returned?: boolean; lines?: readonly { bill_line_id?: string; quantity?: number; purchase_id?: string }[] }[]): string {
   if (!bill.id) return '';
   const back = new Map<string, number>();
   for (const n of notes) {
-    // 8.88: a note spanning several bills names each bill on its lines (bill line ids are unique).
+    // 8.88: a note spanning several bills names each bill on its lines — only this bill's lines count (QA23 W5).
     if (!n || (n.purchase_id !== bill.id && !n.bill_refs?.some((b) => b.purchase_id === bill.id)) || !n.goods_returned) continue;
-    for (const l of n.lines ?? []) if (l?.bill_line_id) back.set(l.bill_line_id, round2((back.get(l.bill_line_id) ?? 0) + Math.max(num(l.quantity), 0)));
+    for (const l of n.lines ?? []) if (l?.bill_line_id && (!n.bill_refs || l.purchase_id === bill.id)) back.set(l.bill_line_id, round2((back.get(l.bill_line_id) ?? 0) + Math.max(num(l.quantity), 0)));
   }
   for (const [lineId, qty] of back) {
     if (qty <= 0) continue;

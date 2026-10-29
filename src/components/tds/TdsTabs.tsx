@@ -37,6 +37,9 @@ import { Term } from '../help/Term';
 import { useT } from '../../i18n';
 import { tdsT } from '../../i18n/areas/tds';
 import { o7T } from '../../i18n/areas/gst-tds-7o';
+import { r7T } from '../../i18n/areas/gst-tds-7r';
+import { p40T } from '../../i18n/areas/statutory-p40';
+import { flagsByKey, loadJustifications, type JustificationKind } from '../../lib/traces-justification';
 import { ita25T, ita25Words } from '../../i18n/areas/ita2025';
 import { formText, periodStart, quarterStart, sectionText, withActRef } from '../../lib/ita2025';
 import surface from '../../styles/surface.module.css';
@@ -151,9 +154,16 @@ export function OverviewTab({ data, fy, today }: { data: TdsData; fy: number; to
 
 /* ── Deductions ───────────────────────────────────────────────── */
 
+/** PENDING 40: TRACES justification findings (open ones) beside the deductions they were matched to. */
+const TRACES_KIND: Record<JustificationKind, Parameters<typeof r7T>[0]> = {
+  SHORT_DEDUCTION: 'jkShortDeduction', SHORT_PAYMENT: 'jkShortPayment', LATE_DEDUCTION: 'jkLateDeduction', LATE_PAYMENT: 'jkLatePayment', LATE_FILING: 'jkLateFiling', PAN_ERROR: 'jkPanError', OTHER: 'jkOther',
+};
+
 export function DeductionsTab({ data, fy, today, canEdit, onChanged, notify }: { data: TdsData; fy: number; today: string; canEdit: boolean; onChanged: () => void; notify: Notify }) {
   useT();
   const [editing, setEditing] = useState<ManualTdsDeduction | 'new' | null>(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- re-read when the register changes (a re-match may follow)
+  const traces = useMemo(() => flagsByKey(loadJustifications()), [data]);
   const byKey = challanByKey(data.challans);
   const rows = data.rows.filter((r) => r.fy === fy);
   return (
@@ -191,9 +201,13 @@ export function DeductionsTab({ data, fy, today, canEdit, onChanged, notify }: {
                   const ch = byKey.get(r.key);
                   const est = interestFor(r, ch?.date, today);
                   const manual = r.manualId ? data.manual.find((m) => m.id === r.manualId) : undefined;
+                  const flags = traces.get(r.key);
                   return (
                     <tr key={r.key}>
-                      <td>{r.payee}<div className={styles.alloc}>{r.pan || 'PANNOTAVBL'}</div></td>
+                      <td>
+                        {r.payee}<div className={styles.alloc}>{r.pan || 'PANNOTAVBL'}</div>
+                        {flags && <div className={styles.alloc} data-traces-flag><strong>{p40T('tracesFlag', { kinds: flags.map((k) => r7T(TRACES_KIND[k])).join(', ') })}</strong></div>}
+                      </td>
                       <td>{sectionText(r.section, r.creditedOn, ita25Words())}</td>
                       <td className={surface.mono}>{r.billNumber}</td>
                       <td>{formatDate(r.creditedOn)}</td>

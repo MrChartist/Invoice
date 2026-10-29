@@ -4,7 +4,7 @@ import type { DonorIdCode } from '../../types/institutions-r5';
 import { localDb } from '../../lib/localDb';
 import { bankAccountsDb } from '../../lib/bank-accounts';
 import { chartOf, loadUserAccounts } from '../../lib/ledger/accounts';
-import { ID_CODES, MODES, SECTIONS, TYPES, donationWarnings, donorIdValid, fyOf, loadDonations, saveDonation, type DonationInput } from '../../lib/nonprofit/donations';
+import { ID_CODES, KIND_EXCLUDED_GROUPS, MODES, SECTIONS, TYPES, donationWarnings, donorIdValid, fyOf, loadDonations, saveDonation, type DonationInput } from '../../lib/nonprofit/donations';
 import { loadFunds } from '../../lib/nonprofit/funds';
 import { donationSectionText } from '../../lib/nonprofit/donation-receipt';
 import { ita25Words } from '../../i18n/areas/ita2025';
@@ -18,7 +18,7 @@ export function DonationForm({ notify, onSaved }: { notify: Notify; onSaved: () 
   const funds = useMemo(() => loadFunds(), []);
   const banks = useMemo(() => bankAccountsDb.active(), []);
   // PENDING 29: a gift in kind can be journalised to a goods / asset / expense ledger.
-  const kindAccounts = useMemo(() => chartOf(loadUserAccounts()).filter((a) => !['CAPITAL', 'RESERVES', 'LOANS_LT', 'LOANS_ST', 'TRADE_PAYABLES', 'DUTIES_TAXES', 'OTHER_CL', 'PROVISIONS', 'SALES', 'OTHER_INCOME'].includes(a.group)), []);
+  const kindAccounts = useMemo(() => chartOf(loadUserAccounts()).filter((a) => !KIND_EXCLUDED_GROUPS.includes(a.group)), []);
   const [d, setD] = useState<DonationInput>({ date: today(), donor_id: '', amount: 0, mode: 'electronic', type: 'others', section: '80G', fund_id: funds[0]?.id });
   const [n, setN] = useState({ name: '', code: 'pan' as DonorIdCode, no: '', address: '' });
   const set = (x: Partial<DonationInput>) => setD({ ...d, ...x });
