@@ -487,3 +487,33 @@ test('startAmendment: freezes the stored document and keeps its id, number and p
   assert.equal(localDb.invoices.getAll().length, 1);
   assert.throws(() => startAmendment({ ...saved, id: 'nope', doc_type: 'QUOTATION' }), /can be amended/);
 });
+
+/* ───────────── PENDING 44: Table 14A(b) and Table 8 / HSN / documents-issued amendments ───────────── */
+
+test('Table 14A(b): an amended 9(5) supply is listed with the revised value per operator × original period', async () => {
+  const { table14Ab } = await import('../src/lib/eco-amend.ts');
+  const ECO = '27AACCF0683K1ZM';
+  const original = computed(inv({ id: 'e95', invoice_number: 'INV/FY25-26/0005', issue_date: '2025-04-08', eco_gstin: ECO, eco_section: 'PAY_9_5', gst_mode: 'NONE', items: [item('Ride', 1, 1000, 0, '9964')] }));
+  const rev = amended(original, '2025-06-10', { items: [{ ...original.items[0], rate: 1500, amount: 1500 }] });
+  const rep = buildGstReport([rev], [], { period: JUN, gstin: FILER });
+  assert.equal(rep.gstr1.amendments?.eco95a?.length, 1);
+  assert.deepEqual(table14Ab(rep.gstr1).map((r) => [r.etin, r.origPeriod, r.value]), [[ECO, '042025', 1500]]);
+  const flag = rep.issues.find((i) => i.code === 'AMEND_ECO_95');
+  assert.equal(flag?.severity, 'info', 'no longer an "amend it on the portal only" warning');
+  assert.ok(sectionCsv(rep.gstr1, 'amend').includes('14A(b)'));
+});
+
+test('Table 8 / HSN / documents issued: the amendment period lists revised − original and renumbered documents', () => {
+  const buyer = { name: 'MH Co', gstin: BUYER_MH, email: '', address: '', city: '', zip: '' };
+  const original = computed(inv({ id: 'h1', invoice_number: 'INV/FY25-26/0001', issue_date: '2025-04-05', client: buyer, items: [item('Laptops', 10, 1000, 18, '8471'), item('Milk', 1, 500, 0, '0401')] }));
+  const rev = amended(original, '2025-06-20', { invoice_number: 'INV/FY25-26/0001R', items: [{ ...original.items[0], quantity: 12, amount: 12000 }, { ...original.items[1], rate: 700, amount: 700 }] });
+  const am = buildGstReport([rev], [], { period: JUN, gstin: FILER }).gstr1.amendments!;
+  const laptops = am.hsnA!.find((h) => h.hsn === '8471')!;
+  assert.equal(laptops.taxable, 2000);
+  assert.equal(laptops.qty, 2);
+  assert.deepEqual(am.nilA, [{ type: 'INTRAB2B', nil: 200, exempt: 0, nonGst: 0 }]);
+  assert.deepEqual(am.docA!.map((d) => [d.origNumber, d.number]), [['INV/FY25-26/0001', 'INV/FY25-26/0001R']]);
+  // April (as filed) is untouched.
+  const apr = buildGstReport([rev], [], { period: APR, gstin: FILER }).gstr1;
+  assert.equal(apr.hsn.find((h) => h.hsn === '8471')!.taxable, 10000);
+});

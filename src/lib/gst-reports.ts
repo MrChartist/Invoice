@@ -386,6 +386,19 @@ export interface Gstr1Amendments {
    * `noTax` = taxable value of zero-rated-without-payment, reverse-charge and nil / exempt lines (5J / 5K).
    */
   effects?: AmendEffect[];
+  /**
+   * Additive (PENDING 44): Table 14A(b) — amendments of supplies through an operator paying tax u/s 9(5), the revised
+   * row with the operator GSTIN in `etin` (value 0 when the revised supply no longer goes through 9(5)). Absent when none.
+   */
+  eco95a?: (AmendDocRow & { etin: string; noteType?: 'C' | 'D' })[];
+  /**
+   * Additive (PENDING 44): what the period's amendments change in tables that have no amendment section — Table 8 per
+   * supply type, Table 12 per HSN × UQC × rate (both revised − original, sign-aware) and Table 13 (documents whose
+   * number or date was amended). A working paper: verify with your CA how to carry them. Absent when nothing moved.
+   */
+  nilA?: NilRow[];
+  hsnA?: HsnRow[];
+  docA?: { invoiceId: string; origNumber: string; origDate: string; origPeriod: string; number: string; date: string }[];
 }
 
 export interface AmendEffect {
@@ -1101,6 +1114,25 @@ function addHsn(map: Map<string, HsnRow>, l: PLine, sign: number) {
   map.set(key, h);
 }
 
+const nilKey = (d: PDoc): NilSupplyType =>
+  d.supply === 'INTER' ? (d.registered ? 'INTRB2B' : 'INTRB2C') : d.registered ? 'INTRAB2B' : 'INTRAB2C';
+
+/** Table 8: a nil / exempt / non-GST line of a document that is not zero-rated, in its column (sign-aware). */
+function addNil(nilMap: Map<NilSupplyType, NilRow>, d: PDoc, l: PLine, sign: number) {
+  if (!(isNilLine(l) && l.taxable !== 0) || d.zeroRated) return;
+  const k = nilKey(d);
+  const n = nilMap.get(k) ?? { type: k, nil: 0, exempt: 0, nonGst: 0 };
+  // No GSTIN on the sender means the supply is outside GST altogether; a Bill of Supply names its column.
+  const kind = l.exempt ?? d.exemptKind; // R10 (SV-A4): a line's own column wins (Rule 46A mixed bills)
+  if (!d.senderGstin || kind === 'NON_GST') n.nonGst = round2(n.nonGst + sign * l.taxable);
+  else if (kind === 'EXEMPT') n.exempt = round2(n.exempt + sign * l.taxable);
+  else n.nil = round2(n.nil + sign * l.taxable);
+  nilMap.set(k, n);
+}
+
+/** A line of a document without a sender GSTIN and without tax is outside GST — not in the HSN summary. */
+const inHsn = (d: PDoc, l: PLine) => !(!d.senderGstin && taxOf(l) === 0 && l.cess === 0);
+
 const sortHsn = (map: Map<string, HsnRow>) => [...map.values()].sort((a, b) => a.hsn.localeCompare(b.hsn) || a.rate - b.rate);
 
 export interface PreparedGstr1 {
@@ -1157,9 +1189,6 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
   const hsnB2bMap = new Map<string, HsnRow>();
   const hsnB2cMap = new Map<string, HsnRow>();
   const totals = { taxable: 0, igst: 0, cgst: 0, sgst: 0, value: 0, cess: 0 };
-
-  const nilKey = (d: PDoc): NilSupplyType =>
-    d.supply === 'INTER' ? (d.registered ? 'INTRB2B' : 'INTRB2C') : d.registered ? 'INTRAB2B' : 'INTRAB2C';
 
   // A note follows the invoice it amends: B2CL only if that invoice was B2CL (its value and date
   // decide), so a small credit against a large invoice is reported in CDNUR, not netted into B2CS.
@@ -1254,19 +1283,8 @@ export function buildGstr1(invoices: InvoiceRecord[], opts: BuildOptions, issues
       totals.sgst = round2(totals.sgst + d.sign * l.sgst);
       totals.cess = round2(totals.cess + d.sign * l.cess);
 
-      const isNil = isNilLine(l) && l.taxable !== 0;
-      if (isNil && !d.zeroRated) {
-        const k = nilKey(d);
-        const n = nilMap.get(k) ?? { type: k, nil: 0, exempt: 0, nonGst: 0 };
-        // No GSTIN on the sender means the supply is outside GST altogether; a Bill of Supply names its column.
-        const kind = l.exempt ?? d.exemptKind; // R10 (SV-A4): a line's own column wins (Rule 46A mixed bills)
-        if (!d.senderGstin || kind === 'NON_GST') n.nonGst = round2(n.nonGst + d.sign * l.taxable);
-        else if (kind === 'EXEMPT') n.exempt = round2(n.exempt + d.sign * l.taxable);
-        else n.nil = round2(n.nil + d.sign * l.taxable);
-        nilMap.set(k, n);
-      }
-
-      if (!d.senderGstin && taxOf(l) === 0 && l.cess === 0) continue; // outside GST — not in the HSN summary
+      addNil(nilMap, d, l, d.sign);
+      if (!inHsn(d, l)) continue; // outside GST — not in the HSN summary
       addHsn(hsnMap, l, d.sign);
       // Table 12 split: by whether the recipient is registered (a note follows its recipient too).
       addHsn(d.registered ? hsnB2bMap : hsnB2cMap, l, d.sign);
@@ -1376,6 +1394,10 @@ function buildAmendments(
   const section = (d: PDoc) => (isEco95(d) ? 'ECO 9(5)' : d.isExport ? 'EXP' : d.registered ? 'B2B' : isB2cs(d) ? 'B2CS' : 'B2CL');
   const omons = new Set<string>();
   let count = 0;
+  // PENDING 44: Table 8 / 12 / 13 effects of the amendments (revised − original).
+  const nilA = new Map<NilSupplyType, NilRow>();
+  const hsnA = new Map<string, HsnRow>();
+  const docA: NonNullable<Gstr1Amendments['docA']> = [];
 
   for (const rec of amended) {
     const a = rec.amends!;
@@ -1404,8 +1426,23 @@ function buildAmendments(
     if (orig && section(orig) !== section(cur)) {
       flag('info', 'AMEND_SECTION_CHANGED', `originally reported in ${section(orig)}, now ${section(cur)}. Check with your CA how the portal expects this move to be reported.`);
     }
+    if (isEco95(cur) || (orig && isEco95(orig))) {
+      // PENDING 44: Table 14A(b) — the revised 14(b) value (all lines, as 14(b)) per operator × original period (0 once it left 9(5)).
+      (tables.eco95a ??= []).push({ ...row, etin: (isEco95(cur) ? cur.etin : orig!.etin) ?? '', ...(cur.isNote ? { noteType: cur.noteType } : {}), ...(isEco95(cur) ? { taxable: round2(cur.lines.reduce((t, l) => t + l.taxable, 0)) } : { taxable: 0, value: 0, items: [], igst: 0, cgst: 0, sgst: 0, cess: 0 }) });
+      flag('info', 'AMEND_ECO_95', 'supply through an e-commerce operator paying tax u/s 9(5): the amendment is in the Table 14A(b) working paper (E-commerce tab); its JSON is not generated — enter it on the portal. GSTR-3B 3.1.1(ii) of this period takes the difference.');
+    }
+    if (orig) {
+      for (const [d, f] of [[cur, 1], [orig, -1]] as const) {
+        if (isEco95(d)) continue; // 9(5) supplies are in Table 14(b) only
+        for (const l of d.lines) {
+          addNil(nilA, d, l, f * d.sign);
+          if (inHsn(d, l)) addHsn(hsnA, l, f * d.sign);
+        }
+      }
+      if (orig.number !== cur.number || orig.date !== cur.date) docA.push({ invoiceId: rec.id, origNumber: a.original_number, origDate: a.original_date, origPeriod: row.origPeriod, number: cur.number, date: cur.date });
+    }
     if (isEco95(cur)) {
-      flag('warning', 'AMEND_ECO_95', 'supplies on which the e-commerce operator pays tax u/s 9(5) are amended in GSTR-1 Table 14A(b), which is not generated — amend it on the portal. GSTR-3B 3.1.1(ii) of this period takes the difference.');
+      /* reported above */
     } else if (cur.isExport) {
       // Table 9A: EXPA for an export invoice, CDNURA (EXPWP / EXPWOP) for a note on one.
       if (cur.isNote) tables.cdnura.push({ ...row, noteType: cur.noteType, unregType: row.igst > 0 ? 'EXPWP' : 'EXPWOP' });
@@ -1468,6 +1505,12 @@ function buildAmendments(
   tables.cdnura.sort(byDate);
   tables.b2csa.sort((x, y) => x.omon.localeCompare(y.omon) || x.pos.localeCompare(y.pos) || x.rate - y.rate);
   if (effects.length) tables.effects = effects;
+  const moved = (n: number) => Math.abs(n) > 0.004;
+  const nilRows = [...nilA.values()].filter((n) => moved(n.nil) || moved(n.exempt) || moved(n.nonGst)).sort((x, y) => x.type.localeCompare(y.type));
+  const hsnRows = sortHsn(hsnA).filter((h) => moved(h.taxable) || moved(h.qty) || moved(h.igst + h.cgst + h.sgst + h.cess) || moved(h.value));
+  if (nilRows.length) tables.nilA = nilRows;
+  if (hsnRows.length) tables.hsnA = hsnRows;
+  if (docA.length) tables.docA = docA;
   return { count, tables, deltas };
 }
 

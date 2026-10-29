@@ -209,7 +209,9 @@ export const r7T = defineArea(
     eco14aTitle: 'Table 14A — amendments of 14(a)',
     eco14aPeriod: 'Original period',
     eco14aValue: 'Revised net value',
-    eco14aNote: 'From this period’s amendments of documents sold through a Sec 52 operator. Table 14A(b) (9(5) supplies) is corrected on the portal; Table 15 / 15A and GSTR-3B 3.1.1(i) are the operator’s own rows and stay nil in a supplier’s return. JSON layout not verified — verify with your CA.',
+    eco14aNote: 'From this period’s amendments of documents sold through a Sec 52 operator. Table 14A(b) (9(5) supplies) is listed below; Table 15 / 15A and GSTR-3B 3.1.1(i) are the operator’s own rows and stay nil in a supplier’s return. JSON layout not verified — verify with your CA.',
+    eco14abTitle: 'Table 14A(b) — amendments of 14(b) (operator pays tax u/s 9(5))',
+    eco14abNote: 'Revised value (no tax columns) of this period’s amendments of supplies on which the operator pays tax u/s 9(5); a supply that no longer goes through 9(5) revises its row to 0. Not in the JSON — enter it on the portal. Verify with your CA.',
   } as const,
   {
     loading: 'लोड हो रहा है…',
@@ -407,6 +409,8 @@ export const r7T = defineArea(
     eco14aTitle: 'तालिका 14A — 14(a) के संशोधन',
     eco14aPeriod: 'मूल अवधि',
     eco14aValue: 'संशोधित शुद्ध मूल्य',
-    eco14aNote: 'धारा 52 ऑपरेटर के ज़रिए बेचे गए दस्तावेज़ों के इस अवधि के संशोधनों से। तालिका 14A(b) (9(5) आपूर्ति) पोर्टल पर सुधारी जाती है; तालिका 15 / 15A और GSTR-3B 3.1.1(i) ऑपरेटर की अपनी पंक्तियाँ हैं और सप्लायर के रिटर्न में शून्य रहती हैं। JSON ढाँचा असत्यापित — अपने CA से जाँचें।',
+    eco14aNote: 'धारा 52 ऑपरेटर के ज़रिए बेचे गए दस्तावेज़ों के इस अवधि के संशोधनों से। तालिका 14A(b) (9(5) आपूर्ति) नीचे दी है; तालिका 15 / 15A और GSTR-3B 3.1.1(i) ऑपरेटर की अपनी पंक्तियाँ हैं और सप्लायर के रिटर्न में शून्य रहती हैं। JSON ढाँचा असत्यापित — अपने CA से जाँचें।',
+    eco14abTitle: 'तालिका 14A(b) — 14(b) के संशोधन (ऑपरेटर धारा 9(5) में कर देता है)',
+    eco14abNote: 'इस अवधि के उन आपूर्तियों के संशोधनों का संशोधित मूल्य (कर कॉलम नहीं) जिन पर ऑपरेटर धारा 9(5) में कर देता है; जो आपूर्ति अब 9(5) में नहीं है उसकी पंक्ति 0 हो जाती है। JSON में नहीं — पोर्टल पर भरें। अपने CA से जाँचें।',
   },
 );

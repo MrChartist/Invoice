@@ -124,6 +124,9 @@ export const gstT = defineArea(
     cdnraHead: 'CDNRA — amended credit / debit notes (registered)',
     cdnuraHead: 'CDNURA — amended credit / debit notes (unregistered)',
     b2csaHead: 'B2CSA — revised B2C (others) rows',
+    amendEffectsHead: 'Table 8 / HSN / documents issued — effect of these amendments',
+    amendEffectsHint: 'These tables have no amendment section in GSTR-1: the rows show revised minus original (Table 8 per supply type, HSN per code and rate) and the documents whose number or date was amended (Table 13 of the original period counted the old number). How to carry them — in this period\'s tables or in GSTR-9 — is a CA decision. Verify with your CA.',
+    colRevisedDoc: 'Revised number · date',
     colOrigMonth: 'Original month',
     colTaxableRevised: 'Taxable (revised)',
 
@@ -287,6 +290,9 @@ export const gstT = defineArea(
     cdnraHead: 'CDNRA — संशोधित क्रेडिट / डेबिट नोट (पंजीकृत)',
     cdnuraHead: 'CDNURA — संशोधित क्रेडिट / डेबिट नोट (अपंजीकृत)',
     b2csaHead: 'B2CSA — संशोधित B2C (अन्य) पंक्तियाँ',
+    amendEffectsHead: 'Table 8 / HSN / जारी दस्तावेज़ — इन संशोधनों का असर',
+    amendEffectsHint: 'GSTR-1 में इन तालिकाओं का कोई संशोधन खंड नहीं है: पंक्तियाँ संशोधित घटा मूल दिखाती हैं (Table 8 आपूर्ति प्रकार अनुसार, HSN कोड और दर अनुसार) और वे दस्तावेज़ जिनका नंबर या तारीख संशोधित हुई (मूल अवधि की Table 13 ने पुराना नंबर गिना)। इन्हें इस अवधि की तालिकाओं में या GSTR-9 में कैसे ले जाएँ — यह CA तय करें। अपने CA से जाँचें।',
+    colRevisedDoc: 'संशोधित नंबर · तारीख',
     colOrigMonth: 'मूल महीना',
     colTaxableRevised: 'कर योग्य (संशोधित)',
 

@@ -120,11 +120,23 @@ date (amending the number/date itself is possible by editing them). CSV: GST pag
 
 ## Not covered (gaps)
 - E-commerce is in `gst-reports.md` (Table 14 / 3.1.1); 7R adds Table 14A(a) from the amendment rows that carry the
-  operator GSTIN; Table 14A(b) and Table 15 (operator's own return) are not generated; an amended 9(5) supply is
-  flagged `AMEND_ECO_95`. The composition bar on supplies
+  operator GSTIN. Table 15 / 15A (the operator's own return) is **not generated** — the app prepares the supplier's
+  return and has no record of other suppliers' sales through an own platform. The composition bar on supplies
   through a TCS operator (Sec 10(2)(d), goods allowed from 1 Oct 2023) is a warning in the editor only.
-- Amendments of Table 8 / HSN / documents issued are not generated. GSTR-9 Part V reads the next FY's amendments of
-  this FY's documents (7R, `gstr9.md`).
+- GSTR-9 Part V reads the next FY's amendments of this FY's documents (7R, `gstr9.md`).
+
+## Table 14A(b) and the Table 8 / HSN / documents-issued effect (PENDING 44)
+- **Table 14A(b)**: an amendment whose original or revised version is a supply through an operator paying tax u/s 9(5)
+  goes to `amendments.eco95a` (revised row with `etin`; value 0 when it left 9(5), then also in B2BA / B2CLA as usual).
+  `table14Ab` (`eco-amend.ts`) groups it per operator × original period — value only, all lines, as Table 14(b); E-commerce
+  tab and the Amendments CSV (`14A(b)` rows). `AMEND_ECO_95` is now an info. No JSON (layout unverified) — enter it on the portal.
+- **Table 8 / HSN / documents issued** have no amendment section in GSTR-1. For each amendment of the period with its
+  frozen original, the revised − original difference goes to `amendments.nilA` (Table 8 per supply type and column),
+  `amendments.hsnA` (Table 12 per HSN × UQC × rate: qty, value, taxable, tax) and `amendments.docA` (documents whose
+  number or date was amended — Table 13 of the original period counted the old number). Shown under the Amendments tab
+  ("effect of these amendments") and in its CSV; nothing is added to this period's Table 8 / 12 / 13 or the JSON —
+  whether to carry the differences there or in GSTR-9 is a CA decision. 9(5) supplies stay out (Table 14(b) only).
+  Verify with your CA. Tests: `tests/composition-amendments.test.ts`.
 - Re-amending keeps the very first original and moves `amended_on`; the earlier amendment period then shows the
   latest revision (one level of history). There is no "undo amendment" button (edit the values back).
 - Composition eligibility (turnover limits, notified goods, inter-state bar) is warned about, not enforced; mixed

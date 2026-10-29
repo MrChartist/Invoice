@@ -507,6 +507,15 @@ export function sectionCsv(r: Gstr1Report, id: SectionId): string {
         push('CDNRA', am.cdnra);
         push('CDNURA', am.cdnura);
         for (const x of am.b2csa) out.push(['B2CSA', '', `${x.supply === 'INTRA' ? 'Intra' : 'Inter'}-state, original month ${x.omon}`, '', '', x.omon, '', '', '', x.pos, '', x.rate, x.txval, x.igst, x.cgst, x.sgst, x.cess]);
+        // PENDING 44: Table 14A(b) and the Table 8 / 12 / 13 effects (no portal amendment section; working paper).
+        for (const d of am.eco95a ?? []) out.push(['14A(b)', d.etin, d.partyName, d.origNumber, d.origDate, d.origPeriod, d.number, d.date, d.value, d.pos, d.noteType ?? '', '', d.taxable, '', '', '', '']);
+        for (const n of am.nilA ?? []) {
+          for (const [col, v] of [['nil rated', n.nil], ['exempted', n.exempt], ['non-GST', n.nonGst]] as const) {
+            if (v) out.push(['TABLE 8 (revised - original)', '', `${nilLabel(n.type)} — ${col}`, '', '', '', '', '', '', '', '', 0, v, '', '', '', '']);
+          }
+        }
+        for (const h of am.hsnA ?? []) out.push(['HSN (revised - original)', '', `${h.hsn} · ${h.uqc} · qty ${h.qty}`, '', '', '', '', '', h.value, '', '', h.rate, h.taxable, h.igst, h.cgst, h.sgst, h.cess]);
+        for (const d of am.docA ?? []) out.push(['TABLE 13 (renumbered)', '', '', d.origNumber, d.origDate, d.origPeriod, d.number, d.date, '', '', '', '', '', '', '', '', '']);
       }
       return toCsv(out);
     }
