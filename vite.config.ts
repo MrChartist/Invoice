@@ -41,9 +41,13 @@ export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   resolve: {
     // jsPDF's optional imports (doc.html / addSvgAsImage only) are never used: see the stub.
-    alias: Object.fromEntries(
-      ['html2canvas', 'canvg', 'dompurify'].map((m) => [m, fileURLToPath(new URL('./src/lib/stubs/jspdf-optional.ts', import.meta.url))]),
-    ),
+    alias: {
+      ...Object.fromEntries(
+        ['html2canvas', 'canvg', 'dompurify'].map((m) => [m, fileURLToPath(new URL('./src/lib/stubs/jspdf-optional.ts', import.meta.url))]),
+      ),
+      // PERF-5: fast-png (jsPDF's PNG decoder) inflates with jsPDF's own fflate, not a second zlib library (−20 kB gz).
+      pako: fileURLToPath(new URL('./src/lib/stubs/pako-fflate.ts', import.meta.url)),
+    },
   },
   build: {
     target: 'es2022',
