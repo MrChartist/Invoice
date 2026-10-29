@@ -405,7 +405,9 @@ export function VoucherEntry() {
   });
   useEffect(() => () => {
     try {
-      if (draftRef.current && !quitting.current) sessionStorage.setItem(DRAFT + draftRef.current[0], draftRef.current[1]);
+      // Only when leaving by Go To (Alt+G → the Gateway's Go To box); any other exit drops the typed lines as before.
+      const goTo = window.location.pathname === '/gateway' && (window.history.state as { usr?: { tally?: string } } | null)?.usr?.tally === 'goto';
+      if (draftRef.current && !quitting.current && goTo) sessionStorage.setItem(DRAFT + draftRef.current[0], draftRef.current[1]);
     } catch {
       /* per tab only */
     }

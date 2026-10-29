@@ -6429,7 +6429,8 @@ try {
     check((await page.getByTestId('gw-v-variant').inputValue()) === 'PD', 'Alt+T marks the voucher post-dated');
     await page.keyboard.press('Control+a');
     const vs = await readJson(page, 'vouchers', [], (v) => v.some((x) => x.narration === 'R20B cheque'));
-    check(vs.find((x) => x.narration === 'R20B cheque')?.post_dated === true, 'saved post-dated (Post-dated register)');
+    const why = await page.locator('[role=alert]').allInnerTexts();
+    check(vs.find((x) => x.narration === 'R20B cheque')?.post_dated === true, `saved post-dated (Post-dated register)${why.length ? ` — ${why.join(' / ')}` : ''}`);
     await page.evaluate(() => localStorage.setItem('mrchartist_tally_keys', 'off'));
   });
 
