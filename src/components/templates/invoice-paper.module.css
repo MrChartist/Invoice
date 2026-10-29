@@ -89,6 +89,8 @@
 /* ── Type helpers ─────────────────────────────────────────────── */
 .eyebrow {
   font-size: 12px;
+  /* Type system floor: 12px (was 9px) in a tight box, so labels keep the old line height and the page keeps its fit. */
+  line-height: 1.15;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1190,6 +1192,7 @@
 }
 
 .copyBanner span {
+  line-height: 1.15;
   border: 1px solid var(--tpl-accent);
   border-radius: 3px;
   padding: 2px 8px;
