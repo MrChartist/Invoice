@@ -6500,6 +6500,52 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  // R21-B: a shift (opening 1000, closing 1250, test 5 → 245 L), cash = value, close, day close → one Bill of Supply; DSR prints.
+  await step('R21-B shifts: Inventory → Fuel → Shift: open shift 1 (Ravi, nozzle 1-A opening 1000), closing 1250, test 5 → 245 L × ₹94.72, cash ₹23,206.40, close; Day close → one non-GST Bill of Supply with a cash receipt; Daily sales prints', async () => {
+    const keys = ['settings', 'stock_items', 'godowns', 'fuel_nozzles', 'fuel_prices', 'fuel_shifts', 'invoices', 'transactions', 'bank_accounts', 'vouchers', 'accounts'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const today = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'kirana', fuel_kind: 'pump', industry_packs: ['fuel'], modules: undefined, lock_until: undefined });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []).filter((s) => s.id !== 'e2e-fb-ms'), { id: 'e2e-fb-ms', name: 'E2E B Petrol', unit: 'LTR', hsn: '27101241', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, fu: { product: 'ms', unit: 'L' } }]);
+    await writeJson(page, 'godowns', [...(prev.godowns ?? []), { id: 'e2e-fb-t1', name: 'E2E B Tank', fu: { product_item_id: 'e2e-fb-ms', capacity_l: 9000, chart: [] } }]);
+    await writeJson(page, 'fuel_nozzles', [{ id: 'e2e-fb-n1', du_no: '1', nozzle_no: 'A', tank_id: 'e2e-fb-t1', item_id: 'e2e-fb-ms', totaliser_start: 1000, active: true }]);
+    await writeJson(page, 'fuel_prices', [{ id: 'e2e-fb-p', item_id: 'e2e-fb-ms', date: today, time: '00:00', rsp: 94.72 }]);
+    await writeJson(page, 'fuel_shifts', []);
+    await readJson(page, 'fuel_shifts', null, (v) => Array.isArray(v) && v.length === 0, 15000);
+    await readJson(page, 'settings', {}, (v) => v.fuel_kind === 'pump', 15000);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/inventory?tab=fuel&view=shift');
+    await page.locator('[data-fuel-shift]').waitFor({ timeout: 15000 });
+    await page.locator('[data-fuel-shift] [data-fu-field="start"]').fill('00:00');
+    await page.locator('[data-fu-field="atts"]').fill('Ravi');
+    await page.locator('[data-fu-shift-open]').click();
+    const sh = await readJson(page, 'fuel_shifts', [], (v) => v.length === 1, 15000);
+    check(sh[0]?.readings?.[0]?.opening === 1000 && sh[0].readings[0].test_l === 5, `shift opened, opening carried 1000, test 5 L (${JSON.stringify(sh[0]?.readings)})`);
+    await page.locator('[data-fu-cell="c:e2e-fb-n1"]').fill('1250');
+    await page.locator('[data-fu-cell="m:0:cash"]').fill('23206.40');
+    await page.locator('[data-fuel-shift] [data-fu-field="at"]').fill('23:59');
+    await page.locator('[data-fu-shift-close]').click();
+    await readJson(page, 'fuel_shifts', [], (v) => v[0]?.status === 'closed', 15000);
+    await page.locator('[data-fu-diff="0"]').waitFor({ timeout: 15000 });
+    check((await page.locator('[data-fu-diff="0"]').innerText()).trim() === '0', 'Ravi: no shortage or excess');
+    await page.locator('[data-fu-day-close]').click();
+    const bills = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.fu?.shift_id), 15000)).filter((i) => !beforeIds.has(i.id) && i.fu?.shift_id);
+    const b = bills[0];
+    check(bills.length === 1 && b.doc_type === 'BILL_OF_SUPPLY' && b.exempt_kind === 'NON_GST' && b.items[0].quantity === 245 && b.total === 23206.4 && b.items[0].godown_id === 'e2e-fb-t1', `one non-GST Bill of Supply: 245 L, ₹23,206.40 from the tank (${b?.doc_type}, ${b?.items?.[0]?.quantity}, ${b?.total})`);
+    const tx = await readJson(page, 'transactions', [], (v) => v.some((t) => t.invoice_id === b?.id), 15000);
+    check(tx.some((t) => t.invoice_id === b?.id && t.method === 'Cash' && t.amount === 23206.4), 'cash receipt on the bill');
+    check((await readJson(page, 'fuel_shifts', []))[0]?.status === 'posted', 'the shift is posted');
+    await page.locator('[data-fuel-view="dsr"]').click();
+    await page.locator('[data-fuel-dsr]').waitFor({ timeout: 15000 });
+    check(/245/.test(await page.locator('[data-fu-dsr-table]').first().innerText()), 'the register shows 245 L on nozzle 1-A');
+    await page.evaluate(() => { window.__dsrHtml = ''; window.open = () => ({ document: { write: (h) => { window.__dsrHtml += h; }, close() {} }, print() {} }); });
+    await page.locator('[data-fu-dsr-print]').click();
+    const html = await page.evaluate(() => window.__dsrHtml);
+    check(/A4 landscape/.test(html) && /Daily sales register/.test(html) && /23206\.4/.test(html), 'DSR prints A4 landscape with the value');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
 } catch {
   /* already reported */
 } finally {
