@@ -6423,8 +6423,10 @@ try {
     await page.keyboard.press('Enter');
     await page.getByTestId('vline-2-ledger').fill('Bank account');
     await page.keyboard.press('Enter');
-    await page.keyboard.press('Enter');
-    await page.keyboard.type('R20B cheque');
+    // Explicit amount and narration (earlier steps add cost centres, which put a field between ledger and amount).
+    await page.getByTestId('vline-2-amount').fill('900');
+    await page.getByText('Balanced', { exact: true }).waitFor();
+    await page.locator('textarea[data-field="narration"]').fill('R20B cheque');
     await page.keyboard.press('Alt+t');
     check((await page.getByTestId('gw-v-variant').inputValue()) === 'PD', 'Alt+T marks the voucher post-dated');
     await page.keyboard.press('Control+a');
