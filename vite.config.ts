@@ -6,6 +6,7 @@ import { CSP_META } from './scripts/security-headers.mjs'
 import { readFileSync } from 'node:fs'
 import { hiSplit, langChunkName } from './scripts/vite-hi-split.mjs'
 import { createGraph, familyRe, graphPlugin, leafGroup, safeFamilyGroup } from './scripts/vite-safe-groups.mjs'
+import { preloadTrim } from './scripts/vite-preload-trim.mjs'
 
 // R6-A4: the version shown in Help, What's new and the diagnostic report comes from package.json.
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
@@ -30,11 +31,13 @@ const VENDOR_REACT = /node_modules[\\/](react|react-dom|react-router|react-route
 const VENDOR_UI = /node_modules[\\/](lucide-react|zustand|clsx)[\\/]/
 // R16-A2: the module graph the safe groups read (filled at buildEnd; build-meta/chunks.json for check-bundle-size).
 const graph = createGraph({ vendor: [VENDOR_REACT, VENDOR_UI], root: fileURLToPath(new URL('.', import.meta.url)) })
+// PERF-5: first-paint files (always loaded before any import()) left out of the dynamic-import preload lists.
+const preload = preloadTrim()
 
 // https://vite.dev/config/
 export default defineConfig({
   // R16-A1: hi-split moves defineArea Hindi into lang-hi-* chunks (build only; dev keeps it inline).
-  plugins: [react(), cspMeta(), hiSplit(), graphPlugin(graph)],
+  plugins: [react(), cspMeta(), hiSplit(), graphPlugin(graph), preload.plugin],
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   resolve: {
     // jsPDF's optional imports (doc.html / addSvgAsImage only) are never used: see the stub.
@@ -44,8 +47,15 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
+    modulePreload: { resolveDependencies: preload.resolveDependencies },
     rolldownOptions: {
       output: {
+        // PERF-5: 7-character hashes (default 8): every file name is repeated in ~10,000 import statements and
+        // preload lists, and a hash character does not compress (−10 kB core). 7 is rolldown's minimum while a build
+        // has fewer than 4,096 chunks (it fails the build, never silently, if that is ever not enough).
+        entryFileNames: 'assets/[name]-[hash:7].js',
+        chunkFileNames: 'assets/[name]-[hash:7].js',
+        assetFileNames: 'assets/[name]-[hash:7][extname]',
         // Long-term-cacheable vendor chunks. Do NOT add a manual chunk for the PDF
         // stack (jspdf/html2canvas/html-to-image/dompurify): rolldown hoists shared
         // CJS interop helpers into it, which makes vendor-react import it and defeats

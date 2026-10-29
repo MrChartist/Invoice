@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createGraph, familyRe, initialSet, isLeaf, leafGroup, safeFamilyGroup, safeSet } from '../scripts/vite-safe-groups.mjs';
+import { preloadTrim } from '../scripts/vite-preload-trim.mjs';
 
 const cfg = readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8');
 type Group = { name: string | ((id: string, ctx?: unknown) => string | null); test?: RegExp; tags?: string[]; priority?: number; maxModuleSize?: number };
@@ -19,7 +20,7 @@ test('Vite 8 rolldown options with codeSplitting.groups, no manualChunks / rollu
   assert.match(cfg, /codeSplitting:\s*\{/);
   assert.doesNotMatch(cfg, /manualChunks\s*\(/);
   assert.doesNotMatch(cfg, /rollupOptions\s*:/);
-  assert.match(cfg, /plugins: \[react\(\), cspMeta\(\), hiSplit\(\), graphPlugin\(graph\)\]/, 'the Hindi split and the graph plugin are wired');
+  assert.match(cfg, /plugins: \[react\(\), cspMeta\(\), hiSplit\(\), graphPlugin\(graph\), preload\.plugin\]/, 'the Hindi split, the graph and the preload-trim plugins are wired');
 });
 
 test('the groups, in order, with their priorities', () => {
@@ -58,6 +59,30 @@ test('PERF-4: qrcode.react is not a first-paint vendor (only lazy templates / PO
   const [react, ui] = groups;
   const qr = '/x/node_modules/qrcode.react/lib/esm/index.js';
   assert.ok(!ui.test?.test(qr) && !react.test?.test(qr), 'qrcode.react must stay out of vendor-ui / vendor-react (−5.6 kB gz first paint)');
+});
+
+test('PERF-5: 7-character file hashes, first-paint files trimmed from the dynamic-import preload lists', () => {
+  for (const k of ['entryFileNames', 'chunkFileNames']) assert.match(cfg, new RegExp(`${k}: 'assets/\\[name\\]-\\[hash:7\\]\\.js'`));
+  assert.match(cfg, /assetFileNames: 'assets\/\[name\]-\[hash:7\]\[extname\]'/);
+  assert.match(cfg, /modulePreload: \{ resolveDependencies: preload\.resolveDependencies \}/);
+  const { plugin, resolveDependencies, firstPaint } = preloadTrim();
+  type Chunk = { type: 'chunk'; fileName: string; isEntry: boolean; imports: string[] };
+  const chunk = (fileName: string, imports: string[] = [], isEntry = false): Chunk => ({ type: 'chunk', fileName, isEntry, imports });
+  const bundle: Record<string, Chunk | { type: 'asset'; fileName: string }> = {
+    'assets/index-a.js': chunk('assets/index-a.js', ['assets/rolldown-runtime-b.js', 'assets/vendor-react-c.js'], true),
+    'assets/rolldown-runtime-b.js': chunk('assets/rolldown-runtime-b.js'),
+    'assets/vendor-react-c.js': chunk('assets/vendor-react-c.js', ['assets/rolldown-runtime-b.js']),
+    'assets/Lazy-d.js': chunk('assets/Lazy-d.js', ['assets/index-a.js', 'assets/shared-e.js']),
+    'assets/shared-e.js': chunk('assets/shared-e.js', ['assets/vendor-react-c.js']),
+    'assets/index-a.css': { type: 'asset', fileName: 'assets/index-a.css' },
+  };
+  const gen = plugin.generateBundle as { order: string; handler: (o: unknown, b: typeof bundle) => void };
+  assert.equal(gen.order, 'pre', 'runs before Vite writes the preload lists');
+  gen.handler({}, bundle);
+  assert.deepEqual([...firstPaint].sort(), ['assets/index-a.js', 'assets/rolldown-runtime-b.js', 'assets/vendor-react-c.js']);
+  const deps = ['assets/Lazy-d.js', 'assets/index-a.js', 'assets/shared-e.js', 'assets/vendor-react-c.js', 'assets/rolldown-runtime-b.js'];
+  assert.deepEqual(resolveDependencies('assets/Lazy-d.js', deps, { hostId: 'assets/x.js', hostType: 'js' }), ['assets/Lazy-d.js', 'assets/shared-e.js']);
+  assert.deepEqual(resolveDependencies('assets/index-a.js', deps, { hostId: 'index.html', hostType: 'html' }), deps, 'the HTML modulepreload links are untouched');
 });
 
 test('bundle-size script: entry 100 kB, initial 185 kB, ≤ 5 initial files, core 3,300, Hindi 400, regional 25, leak 36', () => {
