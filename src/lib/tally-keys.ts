@@ -1,80 +1,57 @@
 /**
- * Tally-style global function keys (Phase 7, Tally parity). Part of the app shell, so it stays tiny:
- * a table of combo → route plus a pure resolver. Labels live in the lazy Gateway area catalogue.
- *
- * Rules (tested in tests/gateway-keys.test.ts):
- *  - never fires while typing in an input / textarea / select / contenteditable — not even the
- *    Ctrl/Alt combos (forms such as the voucher screen handle their own keys and preventDefault);
+ * Tally-style global keys (Phase 7) — since R20-A a view over the key registry (`src/lib/keys/registry.ts`), no
+ * longer part of the app shell: the shell keeps only the claim stub (`keys/stub.ts`) and the lazy engine runs the
+ * rows. `resolveTallyKey` keeps Phase 7's rules for a layout (default `erp9`, the mapping before Round 20):
+ *  - never fires while typing in an input / textarea / select / contenteditable — not even the Ctrl/Alt combos;
  *  - never fires on /pos (POS owns F2–F10) or while a modal dialog is open;
  *  - entries the signed-in role cannot use are skipped;
- *  - an entry without a route is a ready hook that does nothing until its screen exists.
+ *  - Ctrl+/ is the cheat sheet (`help`, handled by the shell's useHotkeys).
+ * Tested in tests/gateway.test.ts and tests/wiring.test.ts.
  */
 import type { AccessAction } from './access';
-import { matchesEvent, parseCombo } from '../hooks/useHotkeys';
+import { KEY_ROWS, comboFor, comboOf, isBuilt, type KeyRow } from './keys/registry';
+import type { KeysLayout } from './keys/stub';
 
 export type TallyKeyId =
-  | 'date'
-  | 'period'
-  | 'contra'
-  | 'payment'
-  | 'receipt'
-  | 'journal'
-  | 'sales'
-  | 'purchase'
-  | 'creditNote'
-  | 'debitNote'
-  | 'stockJournal'
-  | 'physicalStock'
-  | 'features'
-  | 'configure'
-  | 'goto'
-  | 'gotoCtrl'
-  | 'help';
+  | 'date' | 'period' | 'contra' | 'payment' | 'receipt' | 'journal' | 'sales' | 'purchase' | 'creditNote' | 'debitNote'
+  | 'salesOrder' | 'purchaseOrder' | 'deliveryNote' | 'receiptNote' | 'stockJournal' | 'physicalStock' | 'payroll' | 'rejOut'
+  | 'vouchers' | 'features' | 'configure' | 'goto' | 'switch' | 'help.ctx' | 'help';
 
 export interface TallyKey {
   id: TallyKeyId;
   combo: string;
-  /** Route to open; null = hook ready, screen not built yet. */
+  /** Route to open; null = handled by the shell (help, vouchers sheet). */
   to: string | null;
   /** Router state for the Gateway (opens the date / period dialog or focuses Go To). */
   state?: { tally: 'date' | 'period' | 'goto' };
   need?: AccessAction;
 }
 
-export const TALLY_KEYS: readonly TallyKey[] = [
-  { id: 'date', combo: 'f2', to: '/gateway', state: { tally: 'date' } },
-  { id: 'period', combo: 'alt+f2', to: '/gateway', state: { tally: 'period' } },
-  { id: 'contra', combo: 'f4', to: '/gateway/voucher/contra', need: 'books.edit' },
-  { id: 'payment', combo: 'f5', to: '/gateway/voucher/payment', need: 'books.edit' },
-  { id: 'receipt', combo: 'f6', to: '/gateway/voucher/receipt', need: 'books.edit' },
-  { id: 'journal', combo: 'f7', to: '/gateway/voucher/journal', need: 'books.edit' },
-  { id: 'sales', combo: 'f8', to: '/invoice', need: 'doc.create' },
-  { id: 'purchase', combo: 'f9', to: '/expenses?new=bill', need: 'books.edit' },
-  { id: 'creditNote', combo: 'mod+f8', to: '/invoice?type=CREDIT_NOTE', need: 'doc.create' },
-  { id: 'debitNote', combo: 'mod+f9', to: '/invoice?type=DEBIT_NOTE', need: 'doc.create' },
-  // Alt+F7 opens the stock vouchers (Stock / Manufacturing Journal), Ctrl+F7 Physical Stock (Phase 7, /manufacturing).
-  { id: 'stockJournal', combo: 'alt+f7', to: '/manufacturing?tab=journal', need: 'books.edit' },
-  { id: 'physicalStock', combo: 'mod+f7', to: '/manufacturing?tab=physical', need: 'books.edit' },
-  { id: 'features', combo: 'f11', to: '/settings?tab=defaults' },
-  { id: 'configure', combo: 'f12', to: '/settings' },
-  { id: 'goto', combo: 'alt+g', to: '/gateway', state: { tally: 'goto' } },
-  { id: 'gotoCtrl', combo: 'mod+g', to: '/gateway', state: { tally: 'goto' } },
-  { id: 'help', combo: 'mod+/', to: null },
-];
+const toKey = (r: KeyRow, layout: KeysLayout): TallyKey => ({
+  id: r.id as TallyKeyId,
+  combo: comboFor(r, layout),
+  to: r.go ? '/gateway' : r.route ?? null,
+  ...(r.go ? { state: { tally: r.go } } : {}),
+  ...(r.need ? { need: r.need } : {}),
+});
 
-export interface KeyLike {
-  key: string;
-  ctrlKey: boolean;
-  metaKey: boolean;
-  altKey: boolean;
-  shiftKey: boolean;
+/** The global Tally keys of a layout (built rows only), plus Ctrl+/ for the cheat sheet. */
+export function tallyKeys(layout: KeysLayout = 'erp9'): TallyKey[] {
+  return [
+    ...KEY_ROWS.filter((r) => r.scope === 'global' && r.mode === 'tally' && isBuilt(r) && comboFor(r, layout)).map((r) => toKey(r, layout)),
+    { id: 'help', combo: 'mod+/', to: null },
+  ];
 }
+export const TALLY_KEYS: readonly TallyKey[] = tallyKeys('erp9');
+
+export type KeyLike = Parameters<typeof comboOf>[0];
 
 export interface TallyKeyContext {
   pathname: string;
   typing: boolean;
   modalOpen?: boolean;
   can?: (action: AccessAction) => boolean;
+  layout?: KeysLayout;
 }
 
 export const isPosPath = (pathname: string) => pathname === '/pos' || pathname.startsWith('/pos/');
@@ -82,13 +59,14 @@ export const isPosPath = (pathname: string) => pathname === '/pos' || pathname.s
 /** The Tally key an event stands for in this context, or null. `help` is returned for Ctrl+/. */
 export function resolveTallyKey(e: KeyLike, ctx: TallyKeyContext): TallyKey | null {
   if (ctx.typing || ctx.modalOpen || isPosPath(ctx.pathname)) return null;
-  const hit = TALLY_KEYS.find((k) => matchesEvent(parseCombo(k.combo), e as KeyboardEvent));
+  const combo = comboOf(e);
+  const hit = tallyKeys(ctx.layout).find((k) => k.combo === combo);
   if (!hit) return null;
   if (hit.need && ctx.can && !ctx.can(hit.need)) return null;
-  if (hit.id !== 'help' && !hit.to) return null;
-  // On the purchase side Ctrl+F9 is Tally's purchase-return Debit Note (WP-3), not the sales debit note.
-  if (hit.id === 'debitNote' && ctx.pathname.startsWith('/expenses')) {
-    return ctx.can && !ctx.can('books.edit') ? null : { ...hit, to: '/expenses?tab=returns&new=dn', need: 'books.edit' };
+  // On the purchase side the Debit Note key is Tally's purchase-return Debit Note (WP-3), not the sales debit note.
+  const row = KEY_ROWS.find((r) => r.id === hit.id);
+  if (row?.on && ctx.pathname.startsWith(row.on.path)) {
+    return row.on.need && ctx.can && !ctx.can(row.on.need) ? null : { ...hit, to: row.on.route, need: row.on.need };
   }
   return hit;
 }

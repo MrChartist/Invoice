@@ -124,7 +124,10 @@ test('readers of `someT.hi` name an area in HI_INLINE (a bilingual print must ke
       const imp = new RegExp(String.raw`import\s*\{[^}]*\b${name}\b[^}]*\}\s*from\s*'([^']+)'`).exec(code);
       const area = imp ? rel(resolve(dirname(file), imp[1]) + '.ts') : rel(file);
       readers.push(`${rel(file)} → ${area}`);
-      assert.ok(HI_INLINE.includes(area), `${rel(file)} reads ${name}.hi directly: add ${area} to HI_INLINE in scripts/vite-hi-split.mjs`);
+      // R20-A: the cheat sheet searches Hindi on an English screen after `keysT.load()` (it reads `.hi` once loaded, and
+      // falls back to English until then): a reader that loads the pack itself needs no inline Hindi.
+      const loads = SRC.some((f) => new RegExp(String.raw`\b${name}\.load\(`).test(readFileSync(f, 'utf8')));
+      assert.ok(HI_INLINE.includes(area) || loads, `${rel(file)} reads ${name}.hi directly: add ${area} to HI_INLINE in scripts/vite-hi-split.mjs`);
     }
   }
   assert.ok(readers.length >= 2, `the Gateway menu and the works paper read .hi (${readers.join('; ')})`);
