@@ -6415,24 +6415,17 @@ try {
     await page.getByRole('button', { name: 'Undo', exact: true }).last().click();
     const back = await readJson(page, 'invoices', [], (v) => v.some((x) => x.id === id));
     check(back.some((x) => x.id === id), 'Undo restored it from the recycle bin');
-    await page.goto(srv.origin + '/gateway/voucher/payment');
-    await page.getByRole('heading', { name: 'Payment voucher' }).waitFor();
-    await page.getByTestId('vline-1-ledger').fill('Rent');
-    await page.keyboard.press('Enter');
-    await page.getByTestId('vline-1-amount').fill('900');
-    await page.keyboard.press('Enter');
-    await page.getByTestId('vline-2-ledger').fill('Bank account');
-    await page.keyboard.press('Enter');
-    // Explicit amount and narration (earlier steps add cost centres, which put a field between ledger and amount).
-    await page.getByTestId('vline-2-amount').fill('900');
-    await page.getByText('Balanced', { exact: true }).waitFor();
-    await page.locator('textarea[data-field="narration"]').fill('R20B cheque');
+    // Alt+T on the payment voucher an earlier step saved ("Office rent"), altered and accepted with Ctrl+A.
+    const pv = (await readJson(page, 'vouchers', [])).find((x) => x.type === 'PAYMENT' && x.narration === 'Office rent');
+    await page.goto(srv.origin + `/gateway/voucher/payment?id=${encodeURIComponent(pv.id)}`);
+    await page.getByRole('heading', { name: `Alter Payment voucher ${pv.number}` }).waitFor();
+    await page.locator('textarea[data-field="narration"]').click();
     await page.keyboard.press('Alt+t');
     check((await page.getByTestId('gw-v-variant').inputValue()) === 'PD', 'Alt+T marks the voucher post-dated');
     await page.keyboard.press('Control+a');
-    const vs = await readJson(page, 'vouchers', [], (v) => v.some((x) => x.narration === 'R20B cheque'));
+    const vs = await readJson(page, 'vouchers', [], (v) => v.some((x) => x.id === pv.id && x.post_dated));
     const why = await page.locator('[role=alert]').allInnerTexts();
-    check(vs.find((x) => x.narration === 'R20B cheque')?.post_dated === true, `saved post-dated (Post-dated register)${why.length ? ` — ${why.join(' / ')}` : ''}`);
+    check(vs.find((x) => x.id === pv.id)?.post_dated === true, `saved post-dated through saveVoucher (Post-dated register)${why.length ? ` — ${why.join(' / ')}` : ''}`);
     await page.evaluate(() => localStorage.setItem('mrchartist_tally_keys', 'off'));
   });
 
