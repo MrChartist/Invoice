@@ -32,7 +32,7 @@ export default function EditorExtras() {
   useT();
   const s = useInvoiceStore(useShallow((st) => ({
     doc_type: st.doc_type, agent_id: st.agent_id, offer: st.offer, rx: st.rx, items: st.items, issue_date: st.issue_date,
-    discount_type: st.discount_type, discount_rate: st.discount_rate, patch: st.patch,
+    discount_type: st.discount_type, discount_rate: st.discount_rate, client: st.client, patch: st.patch,
   })));
   const agents = useMemo(() => agentsDb.all().filter((a) => a.kind !== 'broker'), []); // R8-B: brokers have their own picker
   const offers = useMemo(() => schemesDb.all().filter((x) => x.kind === 'bill_value'), []);
@@ -51,10 +51,11 @@ export default function EditorExtras() {
   useEffect(() => {
     if (!offers.length || !OFFER_DOCS.has(s.doc_type)) return;
     const rec = recordOf();
-    const next = skipOffer ? removeBillOffer(rec) : applyBillOffer(rec, offers);
+    // QA23 W3: a customer-only offer finds the picked client by name (the editor's copy carries no id).
+    const next = skipOffer ? removeBillOffer(rec) : applyBillOffer(rec, offers, { clients: offers.some((o) => o.client_ids?.length) ? localDb.clients.getAll() : [] });
     if (next === rec) return;
     s.patch({ discount_type: next.discount_type, discount_rate: next.discount_rate, offer: next.offer });
-  }, [offers, skipOffer, s.items, s.issue_date, s.doc_type, s.discount_type, s.discount_rate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [offers, skipOffer, s.items, s.issue_date, s.doc_type, s.discount_type, s.discount_rate, s.client]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!SALES.has(s.doc_type)) return null;
   const missing = pharma.enabled ? rxMissing({ items: s.items, rx: s.rx }, index) : [];
