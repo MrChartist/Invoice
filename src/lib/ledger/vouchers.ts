@@ -8,7 +8,9 @@
  * and are written to the audit log.
  */
 
-import { requireAccess } from '../access';
+import { currentActor, requireAccess } from '../access';
+import { checkDocRight } from '../rights';
+
 import { audit } from '../audit';
 import { isoDay } from '../dates';
 import { round2 } from '../invoice-calc';
@@ -228,6 +230,15 @@ function cleanLines(lines: readonly ManualVoucherLine[]): ManualVoucherLine[] {
 }
 
 /**
+ * PENDING 52 (8.130): a clerk's per-type rights for vouchers (`docs.voucher`) — create / alter / delete, and the
+ * back-dated window on the voucher date. A POS-only cashier is exempt (refund vouchers at the counter).
+ */
+function voucherRight(op: 'create' | 'alter' | 'delete', date?: string): void {
+  const actor = currentActor();
+  if (!actor?.rights?.pos_only) checkDocRight(actor, 'voucher', op, date);
+}
+
+/**
  * Create or update a manual voucher. Throws VoucherError on invalid input or a duplicate
  * number, and PeriodLockedError when the (old or new) date is inside the period lock.
  */
@@ -245,6 +256,7 @@ export function saveVoucher(input: ManualVoucherInput, chart: readonly Account[]
   if (others.some((v) => v.number.toLowerCase() === number.toLowerCase())) throw new VoucherError(`Voucher number ${number} is already used.`);
 
   requireAccess('books.edit');
+  voucherRight(prev ? 'alter' : 'create', input.date);
   const id = prev?.id ?? generateId();
   if (prev) assertUnlocked({ id, issue_date: prev.date, invoice_number: prev.number }, 'edit');
   const lock = assertUnlocked({ id, issue_date: input.date, invoice_number: number }, prev ? 'edit' : 'create');
@@ -310,6 +322,7 @@ export function deleteVoucher(id: string): void {
   const row = all.find((v) => v.id === id);
   if (!row) return;
   requireAccess('books.edit');
+  voucherRight('delete');
   // QA10 R17: a rider settlement's journal goes only with its settlement (Inventory → Deliveries → Undo settlement).
   if (row.voucher_class === 'Rider settlement' && getTable<{ voucher_id?: string }>('rider_settlements').some((s) => s?.voucher_id === id)) {
     throw new Error(`${row.number} settles a delivery rider's cash. Undo the settlement in Inventory → Deliveries instead (it removes this journal with it).`);

@@ -38,6 +38,11 @@ export interface CatalogueOptions {
   categories?: Map<string, string>;
   /** v2: item id → offer badge text (e.g. "Buy 2 get 1"). */
   offers?: Map<string, string>;
+  /**
+   * PENDING 52 (8.130): prices in a foreign currency — ISO code and the typed rate (₹ per unit, no live rates). Every
+   * price, MRP and the cart (message and total) show in that currency; absent / INR = rupees as before.
+   */
+  currency?: { code: string; rate: number };
 }
 
 export interface CataloguePolicy {
@@ -48,6 +53,14 @@ export interface CataloguePolicy {
 }
 
 const inr = (n: number) => `₹${round2(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** Money in the catalogue's currency ('' / INR = rupees; else "USD 12.50"). The inline script formats the same way. */
+export const catalogueMoney = (n: number, code = ''): string => (code && code !== 'INR' ? `${code} ${round2(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : inr(n));
+
+/** The foreign currency in force ('' = rupees): a valid three-letter code other than INR and a rate above zero. */
+export function catalogueCurrency(c: CatalogueOptions['currency']): { code: string; rate: number } {
+  const code = String(c?.code ?? '').trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(code) && code !== 'INR' && Number(c?.rate) > 0 ? { code, rate: Number(c!.rate) } : { code: '', rate: 1 };
+}
 const SAFE_IMAGE = /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+=*$/;
 const OTHER = 'Other items';
 
@@ -80,16 +93,17 @@ export interface CartLine {
  * The single WhatsApp order message the cart sends (the inline script builds exactly this text;
  * kept here so it is unit-tested). Quantities below 1 and non-numbers are dropped.
  */
-export function cartMessage(business: string, lines: readonly CartLine[], opts: { withTax?: boolean; name?: string } = {}): string {
+export function cartMessage(business: string, lines: readonly CartLine[], opts: { withTax?: boolean; name?: string; currency?: string } = {}): string {
+  const cur = opts.currency ?? '';
   const rows = lines.filter((l) => Number.isFinite(l.qty) && l.qty >= 1);
   const out = [`Order for ${business || 'your shop'}`, ''];
   let total = 0;
   rows.forEach((l, i) => {
     const amount = round2(l.qty * l.price);
     total += amount;
-    out.push(`${i + 1}. ${l.name} × ${l.qty}${l.unit ? ` ${l.unit}` : ''} @ ${inr(l.price)} = ${inr(amount)}`);
+    out.push(`${i + 1}. ${l.name} × ${l.qty}${l.unit ? ` ${l.unit}` : ''} @ ${catalogueMoney(l.price, cur)} = ${catalogueMoney(amount, cur)}`);
   });
-  out.push('', `Total: ${inr(total)}${opts.withTax === false ? ' + GST' : ''}`);
+  out.push('', `Total: ${catalogueMoney(total, cur)}${opts.withTax === false ? ' + GST' : ''}`);
   if (opts.name?.trim()) out.push(`Name: ${opts.name.trim()}`);
   return out.join('\n');
 }
@@ -152,7 +166,8 @@ ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; grid-tem
 const SCRIPT = `(function () {
   var data = JSON.parse(document.getElementById('cat-data').textContent);
   var cart = {};
-  var inr = function (n) { return '\\u20b9' + (Math.round(n * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var cur = data.cur || '';
+  var inr = function (n) { var s = (Math.round(n * 100) / 100).toLocaleString(cur ? 'en-US' : 'en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); return cur ? cur + ' ' + s : '\\u20b9' + s; };
   var box = document.getElementById('cart');
   var list = document.getElementById('cart-lines');
   var total = document.getElementById('cart-total');
@@ -225,6 +240,9 @@ function render(items: readonly InvoiceItem[], opts: CatalogueOptions, flags: Bu
   const withTax = opts.priceWithTax !== false;
   const showPrices = opts.showPrices !== false;
   const cart = !!flags.cart && !!flags.policy && showPrices;
+  const fx = catalogueCurrency(opts.currency);
+  const priceOf = (i: InvoiceItem) => round2(cataloguePrice(i, withTax) / fx.rate);
+  const money = (n: number) => catalogueMoney(n, fx.code);
   const wa = waNumber(opts.phone);
   const list = items
     .filter((i) => (i.name || '').trim())
@@ -239,8 +257,8 @@ function render(items: readonly InvoiceItem[], opts: CatalogueOptions, flags: Bu
   const catNames = [...cats.keys()].sort((a, b) => (a === OTHER ? 1 : b === OTHER ? -1 : a.localeCompare(b)));
 
   const card = (i: InvoiceItem) => {
-    const price = cataloguePrice(i, withTax);
-    const mrp = num(i.mrp);
+    const price = priceOf(i);
+    const mrp = round2(num(i.mrp) / fx.rate);
     const off = showPrices ? mrpSaving(price, mrp) : 0;
     const stock = opts.stock?.get(i.name.trim().toLowerCase());
     const img = opts.images?.get(i.id);
@@ -253,7 +271,7 @@ ${img && SAFE_IMAGE.test(img) ? `<img src="${esc(img)}" alt="${esc(i.name)}" loa
 ${badges ? `<p class="badges">${badges}</p>` : ''}
 ${i.description ? `<p class="desc">${esc(i.description)}</p>` : ''}
 <p class="meta">${[i.hsn && `HSN ${esc(i.hsn)}`, i.unit && esc(i.unit), i.sku && `SKU ${esc(i.sku)}`].filter(Boolean).join(' · ')}</p>
-${showPrices ? `<p class="price">${esc(inr(price))}${mrp > price ? ` <s>MRP ${esc(inr(mrp))}</s>` : ''} <span>${withTax && num(i.tax_rate) ? `incl. ${esc(num(i.tax_rate))}% GST` : withTax ? '' : '+ GST'}</span></p>` : ''}
+${showPrices ? `<p class="price">${esc(money(price))}${mrp > price ? ` <s>MRP ${esc(money(mrp))}</s>` : ''} <span>${withTax && num(i.tax_rate) ? `incl. ${esc(num(i.tax_rate))}% GST` : withTax ? '' : '+ GST'}</span></p>` : ''}
 ${stock === undefined ? '' : `<p class="${stock > 0 ? 'in' : 'out'}">${stock > 0 ? 'In stock' : 'Out of stock'}</p>`}
 <div class="actions">${cart && stock !== 0 ? `<input class="qty" type="number" min="1" value="1" aria-label="Quantity of ${esc(i.name)}" data-qty="${esc(i.id)}" hidden><button type="button" class="add" data-add="${esc(i.id)}" hidden>Add to cart</button>` : ''}${link ? `<a class="order" href="${esc(link)}" rel="noopener">Order</a>` : ''}</div>
 </li>`;
@@ -281,7 +299,8 @@ ${stock === undefined ? '' : `<p class="${stock > 0 ? 'in' : 'out'}">${stock > 0
         wa,
         email: wa ? '' : opts.email || '',
         withTax,
-        items: Object.fromEntries(list.map((i) => [i.id, { n: i.name, p: cataloguePrice(i, withTax), u: i.unit || '' }])),
+        ...(fx.code ? { cur: fx.code } : {}),
+        items: Object.fromEntries(list.map((i) => [i.id, { n: i.name, p: priceOf(i), u: i.unit || '' }])),
       }
     : null;
 
@@ -301,7 +320,8 @@ ${
 <script>${SCRIPT}</script>`
     : ''
 }
-<footer><p>${list.length} items · prices ${withTax ? 'include GST' : 'exclude GST'} and may change · generated ${esc(opts.generatedAt ?? new Date().toLocaleDateString('en-IN'))}</p></footer>
+<footer><p>${list.length} items · prices ${fx.code ? `in ${esc(fx.code)} at ₹${esc(fx.rate)} per ${esc(fx.code)}, ` : ''}${withTax ? 'include GST' : 'exclude GST'} and may change · generated
+ ${esc(opts.generatedAt ?? new Date().toLocaleDateString('en-IN'))}</p></footer>
 </body></html>`;
 }
 

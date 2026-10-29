@@ -6,7 +6,8 @@
  * through `round2` so totals always re-sum to the paisa.
  */
 
-import { requireAccess } from './access';
+import { currentActor, requireAccess } from './access';
+import { checkDocRight } from './rights';
 import type { PurchaseLine, PurchaseRecord } from '../types/purchases';
 import type { GstMode, InvoiceItem } from '../types/invoice';
 import { calculateInvoice, num, round2 } from './invoice-calc';
@@ -421,7 +422,18 @@ export function returnedQtyIssue(bill: { id?: string; lines?: readonly PurchaseL
   return '';
 }
 
+/**
+ * PENDING 52 (8.130): a clerk's per-type rights for purchase bills (`docs.purchase`) — create / alter / delete. A POS-only
+ * cashier is exempt (their stock and refund side effects), as in `rightsFilter`. Supplier bill dates are not held to
+ * the back-dated window (the supplier's date is not the user's choice).
+ */
+export function bookRight(kind: 'purchase' | 'voucher', op: 'create' | 'alter' | 'delete', date?: string): void {
+  const actor = currentActor();
+  if (!actor?.rights?.pos_only) checkDocRight(actor, kind, op, date);
+}
+
 export const purchasesDb = {
+
   all: (): PurchaseRecord[] => getTable<PurchaseRecord>(PURCHASES_TABLE),
   get: (id: string): PurchaseRecord | undefined => purchasesDb.all().find((p) => p.id === id),
 
@@ -429,6 +441,7 @@ export const purchasesDb = {
   save(input: Omit<PurchaseRecord, 'id'> & { id?: string }): PurchaseRecord {
     requireAccess('books.edit');
     const existing = input.id ? purchasesDb.get(input.id) : undefined;
+    bookRight('purchase', existing ? 'alter' : 'create');
     if (existing) assertBillUnlocked(existing, 'edit');
     assertBillUnlocked({ id: input.id ?? '', date: input.date, bill_number: input.bill_number }, existing ? 'edit' : 'create');
     if (existing) {
@@ -465,6 +478,7 @@ export const purchasesDb = {
   remove(id: string, opts: { confirmStock?: boolean } = {}): void {
     requireAccess('books.edit');
     const bill = purchasesDb.get(id);
+    if (bill) bookRight('purchase', 'delete');
     if (bill) assertBillUnlocked(bill, 'delete');
     // WP-3: a debit note / supplier credit note is adjusted against this bill — delete the note first.
     if (getTable<{ purchase_id?: string; bill_refs?: { purchase_id: string }[] }>('purchase_returns').some((n) => n?.purchase_id === id || !!n?.bill_refs?.some((b) => b.purchase_id === id))) throw new Error('A debit note or supplier credit note is recorded against this bill. Delete the note first.');

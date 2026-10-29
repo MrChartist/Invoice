@@ -37,5 +37,20 @@ at exactly 0 (only paise move). EMI dates keep the first EMI's day and clamp to 
 ## Statement
 
 Outstanding principal, interest paid, total interest over the term, next EMI, EMIs due and not recorded, and a CSV of
-the schedule with the voucher number of each paid EMI. Not modelled: moratoriums, floating-rate resets, re-scheduling
-after a prepayment, interest certificates — verify with your lender / CA.
+the schedule with the voucher number of each paid EMI. Not modelled: moratoriums, floating-rate resets — verify with
+your lender / CA.
+
+## Prepayment re-schedule and interest certificate (PENDING 52, roadmap 8.130)
+
+- **Record prepayment** (open loan card): principal, date and *After it*: keep the EMI and shorten the tenure
+  (default), keep the tenure and lower the EMI, or do not re-schedule. Posted like any prepayment (n = 0, Payment voucher,
+  narration "Prepayment (EMI / tenure re-scheduled)"); the choice is stored on the payment (`LoanPayment.reschedule`).
+  `emiSchedule` applies re-scheduling prepayments before the first EMI dated after them: the opening drops by the
+  prepaid principal; `'emi'` recomputes the EMI over the months left, `'tenure'` keeps it and the schedule ends when the
+  principal reaches 0. Prepayments without the field (older ones) leave the schedule as before. The card's EMI is the
+  next unpaid one.
+- **Interest certificate (CSV)** for an Indian FY (`interestCertificate`): principal outstanding at 1 April (0 when
+  disbursed in the year, the disbursement shown), each payment of the year (EMI no. / prepayment, principal, interest,
+  voucher), principal repaid, interest paid and the closing principal — from the recorded payments, to compare with the
+  lender's certificate. Tests: `tests/pending-52.test.ts`.
+

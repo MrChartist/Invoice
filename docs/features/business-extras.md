@@ -158,7 +158,13 @@ downloaded for sharing / hosting.
   `unsafe-inline`, no network, and the only script allowed is the exact constant whose hash is computed at export
   (`cataloguePolicy`, tested against node's SHA-256); item data travels in a non-executed JSON block with `<`, `>`, `&`
   escaped, and the script writes only `textContent` / `href`. Every value in the HTML is escaped.
-- **Script-free fallback**: "Catalogue without cart" exports under `script-src 'none'`; either file keeps an Order link
+- **Currency (PENDING 52, roadmap 8.130)**: the tile's catalogue tools take an optional currency code and a typed rate
+  (₹ per unit, no live rates). Every price and MRP is the rupee price ÷ the rate, shown as "USD 10.00"; the cart data
+  carries `cur`, so the inline script (constant, still hash-pinned) and `cartMessage(…, { currency })` total in that
+  currency; the footer states the rate. A blank / INR code or no rate keeps rupees (`catalogueCurrency`). Tests:
+  `tests/pending-52.test.ts`.
+- **Script-free fallback**:
+ "Catalogue without cart" exports under `script-src 'none'`; either file keeps an Order link
   per item and an "Order from this category" link (the category's items listed for the buyer to fill in quantities), so
   it works with JavaScript off.
 
