@@ -21,7 +21,7 @@ import { gzipSync } from 'node:zlib';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cssIsLocal } from './vite-safe-groups.mjs';
+import { cssIsLocal, loadEffects } from './vite-safe-groups.mjs';
 
 const dist = fileURLToPath(new URL('../dist/', import.meta.url));
 const kb = (n) => n / 1024;
@@ -70,6 +70,8 @@ const BUDGET_LANG_REGIONAL = env('BUDGET_LANG_REGIONAL_GZ_KB', 25);
 const BUDGET_HI_LEAK = env('BUDGET_HI_LEAK_GZ_KB', 36);
 const HI_LEAK_PER_CHUNK_KB = 1;
 const LEAVES_MAX_KB = 20;
+// PERF-6 (R21-P3, lead-approved): `lazy-leaves-ui` takes leaves up to 2,500 B (was 1,500), so its cap is 28 kB (was 20).
+const LEAVES_UI_MAX_KB = 28;
 /**
  * Modules allowed to keep Hindi in an English chunk above the per-chunk cap, with the reason: text needed in every
  * UI language (WhatsApp messages, bilingual prints). PERF-6: help topics, glossary and tips left the list (their Hindi
@@ -177,10 +179,17 @@ if (!meta) {
         const bad = (meta.imports[m] ?? []).filter((d) => !d.fixed);
         if (bad.length) fail(`${file} (${c.name}): ${m} imports lazy code ${bad.map((d) => d.id).slice(0, 3).join(', ')}`);
         if (/\.css$/.test(m)) fail(`${file} (${c.name}): ${m} is a stylesheet (its styles would load with the group)`);
+        // PERF-6: a UI leaf with a load effect would run it whenever any screen loads the group.
+        const src = fileURLToPath(new URL(`../${m}`, import.meta.url));
+        if (c.name === 'lazy-leaves-ui' && /\.tsx?$/.test(m) && existsSync(src)) {
+          const fx = loadEffects(readFileSync(src, 'utf8'), m);
+          if (fx.length) fail(`${file} (lazy-leaves-ui): ${m} does something at load (${fx[0]})`);
+        }
       }
       const n = kb(sizes.get(file) ?? 0);
-      console.log(`${n <= LEAVES_MAX_KB ? 'ok  ' : 'FAIL'} ${`${c.name} (gz)`.padEnd(18)} ${n.toFixed(1).padStart(7)} kB / budget ${LEAVES_MAX_KB} kB`);
-      if (n > LEAVES_MAX_KB) bad = true;
+      const cap = c.name === 'lazy-leaves-ui' ? LEAVES_UI_MAX_KB : LEAVES_MAX_KB;
+      console.log(`${n <= cap ? 'ok  ' : 'FAIL'} ${`${c.name} (gz)`.padEnd(18)} ${n.toFixed(1).padStart(7)} kB / budget ${cap} kB`);
+      if (n > cap) bad = true;
     }
     // PERF-6: `css-maps` holds only class maps of CSS modules whose every rule is local (its styles load together).
     if (c.name === 'css-maps') {
