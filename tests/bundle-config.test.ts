@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { UI_LEAF, createGraph, familyRe, initialSet, isLeaf, leafGroup, safeFamilyGroup, safeSet } from '../scripts/vite-safe-groups.mjs';
+import { UI_LEAF, createGraph, cssIsLocal, cssMapGroup, familyRe, initialSet, isLeaf, leafGroup, safeFamilyGroup, safeSet } from '../scripts/vite-safe-groups.mjs';
 import { preloadTrim } from '../scripts/vite-preload-trim.mjs';
 
 const cfg = readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8');
@@ -32,13 +32,15 @@ test('the groups, in order, with their priorities', () => {
   assert.ok(families.every(([, p]) => p === 12), 'families at priority 12');
   assert.match(cfg, /leafGroup\(graph, 'lazy-leaves', 9, \{ maxModuleSize: 3000 \}\)/);
   assert.match(cfg, /leafGroup\(graph, 'lazy-leaves-ui', 8, \{ maxModuleSize: 1500, test: UI_LEAF \}\)/, 'PERF-5');
+  assert.match(cfg, /cssMapGroup\(graph, 'css-maps', 7, \{ maxCssSize: 2500, minImporters: 2 \}\)/, 'PERF-6');
   const names = groups.map((g) => (typeof g.name === 'string' ? g.name : g.name.name));
   assert.deepEqual(names.slice(0, 4), ['vendor-react', 'vendor-ui', 'langChunkName', 'app-initial']);
-  assert.deepEqual(groups.map((g) => g.priority), [30, 30, 25, 20, ...families.map(() => 12), 9, 8]);
+  assert.deepEqual(groups.map((g) => g.priority), [30, 30, 25, 20, ...families.map(() => 12), 9, 8, 7]);
   assert.deepEqual(groups[3].tags, ['$initial']);
   assert.equal(groups[3].test, undefined, 'app-initial is selected by tag only');
-  assert.equal(groups.at(-2)?.maxModuleSize, 3000);
-  assert.equal(groups.at(-1)?.maxModuleSize, 1500);
+  assert.equal(groups.at(-3)?.maxModuleSize, 3000);
+  assert.equal(groups.at(-2)?.maxModuleSize, 1500);
+  assert.equal(groups.at(-1)?.maxModuleSize, undefined, 'css-maps is limited by CSS source size, not module size');
 });
 
 test('every group has a filter (test, tags or a name function); none can capture the PDF stack', () => {
@@ -226,4 +228,48 @@ test('PERF-5: lazy-leaves-ui takes small script leaves outside src/lib, never a 
   assert.equal(u.name(P + 'src/lib/leaf.ts'), null, 'src/lib leaves stay in lazy-leaves');
   assert.equal(u.name(P + 'src/pages/Page.tsx'), null, 'routes stay their own chunks');
   assert.equal(u.maxModuleSize, 1500);
+});
+
+test('PERF-6: cssIsLocal accepts only rules scoped by a class (no :global, element selectors, @page / @font-face)', () => {
+  assert.ok(cssIsLocal('.a { color: red }\n.a:hover, .b > td { x: y }\n@media print { .b .c { x: y } }\n@keyframes spin { from { a: b } to { a: c } }'));
+  assert.ok(cssIsLocal('/* kbd { } */ .a { background: url("x{}.png") }\n@supports (display: grid) { .g { display: grid } }'), 'comments and strings ignored');
+  for (const css of [':global(.dark) .a { x: y }', '.a { } kbd { x: y }', '@media print { :root { x: y } }', '@page { size: A4 }', '@font-face { font-family: X }', '@import "x.css";', '.a, td { x: y }']) {
+    assert.equal(cssIsLocal(css), false, css);
+  }
+});
+
+test('PERF-6: css-maps takes the class maps of small, local, lazy, shared CSS modules only', () => {
+  const g = graphOf({
+    'src/main.tsx': ['src/styles/first.module.css'],
+    'src/styles/first.module.css': [],
+    'src/components/a.module.css': [],
+    'src/components/big.module.css': [],
+    'src/components/glob.module.css': [],
+    'src/components/A.tsx': ['src/components/a.module.css', 'src/components/big.module.css', 'src/components/glob.module.css', 'src/components/one.module.css'],
+    'src/components/B.tsx': ['src/components/a.module.css', 'src/components/big.module.css', 'src/components/glob.module.css'],
+    'src/components/one.module.css': [],
+    'src/components/plain.css': [],
+  }, ['src/main.tsx']);
+  const css: Record<string, string> = {
+    [P + 'src/styles/first.module.css']: '.f { x: y }',
+    [P + 'src/components/a.module.css']: '.a { x: y }',
+    [P + 'src/components/one.module.css']: '.o { x: y }',
+    [P + 'src/components/big.module.css']: `.b { x: ${'y'.repeat(3000)} }`,
+    [P + 'src/components/glob.module.css']: ':global(#root) { display: none }',
+  };
+  const c = cssMapGroup(g, 'css-maps', 7, { maxCssSize: 2500, minImporters: 2, read: (id: string) => css[id] });
+  assert.equal(c.name(P + 'src/components/a.module.css'), 'css-maps');
+  assert.equal(c.name(P + 'src/components/one.module.css'), null, 'one importer: stays in its screen chunk');
+  assert.equal(c.name(P + 'src/components/big.module.css'), null, 'over the size cap');
+  assert.equal(c.name(P + 'src/components/glob.module.css'), null, 'a global rule never joins');
+  assert.equal(c.name(P + 'src/styles/first.module.css'), null, 'first paint stays in app-initial');
+  assert.equal(c.name(P + 'src/components/A.tsx'), null, 'scripts never join');
+  assert.equal(c.name(P + 'src/components/plain.css'), null, 'plain stylesheets never join');
+  for (const id of PDF) assert.equal(c.name(id), null);
+});
+
+test('PERF-6: check-bundle-size re-checks every css-maps module with cssIsLocal', () => {
+  const s = readFileSync(new URL('../scripts/check-bundle-size.mjs', import.meta.url), 'utf8');
+  assert.match(s, /import \{ cssIsLocal \} from '\.\/vite-safe-groups\.mjs';/);
+  assert.match(s, /if \(c\.name === 'css-maps'\)/);
 });

@@ -10,16 +10,19 @@
  *    components, so a cycle passes only if the whole component passes.
  *  - `leafGroup(name, priority, { maxModuleSize, test })`: a lazy `src/lib/**` module (or one matching `test`, e.g.
  *    `UI_LEAF`, PERF-5) whose static imports are all first-paint / vendor (a "leaf"), up to `maxModuleSize` bytes.
+ *  - `cssMapGroup(name, priority, { maxCssSize })` (PERF-6): the JS class maps of lazy `src/**.module.css` files whose
+ *    every rule is local (`cssIsLocal`) and whose source is at most `maxCssSize` bytes. Their styles load together,
+ *    which is harmless only because no rule can match outside its own hashed class names.
  *
  * `graphPlugin()` records the module graph once the build has loaded every module (`buildEnd`), and writes
  * `build-meta/chunks.json` (outside dist/, never precached) for the post-build checks in check-bundle-size.mjs.
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 /** Shared graph state between the plugin (writer) and the group functions (readers). */
 export function createGraph({ vendor = [], root = process.cwd() } = {}) {
-  return { vendor, root, imports: new Map(), entries: new Set(), initial: null, safe: new Map(), families: new Map() };
+  return { vendor, root, imports: new Map(), entries: new Set(), initial: null, importers: null, safe: new Map(), families: new Map() };
 }
 
 export const isVendor = (g, id) => g.vendor.some((re) => re.test(id));
@@ -139,6 +142,83 @@ export function leafGroup(g, name, priority, { maxModuleSize, test = LIB }) {
   return { name: (id) => (test.test(id) && isLeaf(g, id) ? name : null), priority, maxModuleSize };
 }
 
+/**
+ * PERF-6: is every rule of a CSS module local? Each selector of every style rule (also inside @media / @supports /
+ * @container / @layer) must name a class and use no `:global`; @keyframes bodies are skipped (CSS modules scope
+ * their names); any other at-rule with a body (@page, @font-face, @property …) or a bodiless one (@import) is global.
+ */
+export function cssIsLocal(css) {
+  const src = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  if (/:global\b/.test(src)) return false;
+  const stack = []; // 'nest' | 'rule' | 'skip'
+  let prelude = '';
+  let quote = null;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (quote) {
+      if (c === '\\') { i++; continue; }
+      if (c === quote) quote = null;
+      if (stack.at(-1) !== 'rule' && stack.at(-1) !== 'skip') prelude += c;
+      continue;
+    }
+    if (c === '"' || c === "'") { quote = c; if (stack.at(-1) !== 'rule' && stack.at(-1) !== 'skip') prelude += c; continue; }
+    const top = stack.at(-1);
+    if (c === '{') {
+      const p = prelude.trim();
+      prelude = '';
+      if (top === 'rule' || top === 'skip') { stack.push('skip'); continue; } // nested braces inside a declaration block / keyframes
+      if (p.startsWith('@')) {
+        const name = p.slice(1).split(/[\s(]/)[0].toLowerCase();
+        if (/^(-[a-z]+-)?keyframes$/.test(name)) stack.push('skip');
+        else if (['media', 'supports', 'container', 'layer'].includes(name)) stack.push('nest');
+        else return false;
+        continue;
+      }
+      for (const sel of p.split(',')) if (!/\.[A-Za-z_-][\w-]*/.test(sel)) return false;
+      stack.push('rule');
+      continue;
+    }
+    if (c === '}') { stack.pop(); prelude = ''; continue; }
+    if (c === ';' && top !== 'rule' && top !== 'skip') {
+      if (prelude.trim().startsWith('@')) return false; // @import / @layer x; at top level
+      prelude = '';
+      continue;
+    }
+    if (top !== 'rule' && top !== 'skip') prelude += c;
+  }
+  return true;
+}
+
+const CSS_MODULE = /[\\/]src[\\/][^\0]*\.module\.css$/;
+
+/** How many modules import each module (static imports). */
+function importerCount(g) {
+  if (g.importers) return g.importers;
+  const n = new Map();
+  for (const deps of g.imports.values()) for (const d of new Set(deps)) n.set(d, (n.get(d) ?? 0) + 1);
+  return (g.importers = n);
+}
+
+/**
+ * PERF-6: small local CSS modules' class maps in one chunk (see the header). Only modules imported by `minImporters`+
+ * modules: a module with one importer sits in that importer's chunk anyway (nothing to save), and keeping it there
+ * keeps its styles off the screens that never use it. `read` is for tests.
+ */
+export function cssMapGroup(g, name, priority, { maxCssSize, minImporters = 2, read = (id) => readFileSync(id, 'utf8') }) {
+  const ok = new Map();
+  return {
+    name: (id) => {
+      if (!CSS_MODULE.test(id) || !isLeaf(g, id) || (importerCount(g).get(id) ?? 0) < minImporters) return null;
+      if (!ok.has(id)) {
+        const css = read(id);
+        ok.set(id, css.length <= maxCssSize && cssIsLocal(css));
+      }
+      return ok.get(id) ? name : null;
+    },
+    priority,
+  };
+}
+
 /** Records the graph and writes build-meta/chunks.json. */
 export function graphPlugin(g) {
   return {
@@ -148,6 +228,7 @@ export function graphPlugin(g) {
       g.imports.clear();
       g.entries.clear();
       g.initial = null;
+      g.importers = null;
       g.safe.clear();
     },
     buildEnd() {
@@ -158,6 +239,7 @@ export function graphPlugin(g) {
         if (info.isEntry) g.entries.add(id);
       }
       g.initial = null;
+      g.importers = null;
     },
     generateBundle(_opts, bundle) {
       const initial = initialSet(g);
@@ -167,7 +249,7 @@ export function graphPlugin(g) {
         if (c.type !== 'chunk') continue;
         const ids = Object.keys(c.modules ?? {});
         chunks[c.fileName] = { name: c.name, entry: c.isEntry, modules: ids.map((id) => rel(g, id)) };
-        if (/^(f-|lazy-leaves)/.test(c.name)) {
+        if (/^(f-|lazy-leaves|css-maps)/.test(c.name)) {
           for (const id of ids) modules[rel(g, id)] = (g.imports.get(id) ?? []).map((d) => ({ id: rel(g, d), fixed: fixed(g, d) }));
         }
       }

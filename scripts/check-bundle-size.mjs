@@ -12,7 +12,8 @@
  *  - Hindi leak: Devanagari string bytes left in English chunks (gz estimate: blank them and re-gzip) stay under
  *    the total cap, and under 1 kB per chunk unless the chunk holds an allow-listed bilingual module;
  *  - every module of an `f-*` chunk matches its family; every `lazy-leaves` / `lazy-leaves-ui` module imports only
- *    first-paint / vendor modules (and is no stylesheet), and each leaves chunk stays under its cap; `html-esc` / `day-math` never reach first paint.
+ *    first-paint / vendor modules (and is no stylesheet), and each leaves chunk stays under its cap; `html-esc` / `day-math` never reach first paint;
+ *  - PERF-6: every module of the `css-maps` chunk is a CSS module whose rules are all local (`cssIsLocal`).
  * Override with env BUDGET_INITIAL_GZ_KB, BUDGET_ENTRY_GZ_KB, BUDGET_TOTAL_GZ_KB, BUDGET_INITIAL_FILES,
  * BUDGET_LANG_HI_GZ_KB, BUDGET_LANG_REGIONAL_GZ_KB, BUDGET_HI_LEAK_GZ_KB.
  */
@@ -20,6 +21,7 @@ import { gzipSync } from 'node:zlib';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cssIsLocal } from './vite-safe-groups.mjs';
 
 const dist = fileURLToPath(new URL('../dist/', import.meta.url));
 const kb = (n) => n / 1024;
@@ -179,6 +181,14 @@ if (!meta) {
       const n = kb(sizes.get(file) ?? 0);
       console.log(`${n <= LEAVES_MAX_KB ? 'ok  ' : 'FAIL'} ${`${c.name} (gz)`.padEnd(18)} ${n.toFixed(1).padStart(7)} kB / budget ${LEAVES_MAX_KB} kB`);
       if (n > LEAVES_MAX_KB) bad = true;
+    }
+    // PERF-6: `css-maps` holds only class maps of CSS modules whose every rule is local (its styles load together).
+    if (c.name === 'css-maps') {
+      for (const m of c.modules) {
+        const src = fileURLToPath(new URL(`../${m}`, import.meta.url));
+        if (!/\.module\.css$/.test(m) || !existsSync(src)) fail(`${file} (css-maps): ${m} is not a CSS module`);
+        else if (!cssIsLocal(readFileSync(src, 'utf8'))) fail(`${file} (css-maps): ${m} has a global rule (:global, an element selector or @page); its styles would apply on every screen that loads the group`);
+      }
     }
   }
   if (!Object.keys(families).length) fail('no f-* family group recorded in build-meta/chunks.json');
