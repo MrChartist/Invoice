@@ -122,3 +122,43 @@ line); the engine and the stub then skip it there.
 simple-mode set, layouts, search, "This screen"), `tests/keys-stub.test.ts` (claims = registry, Mac Option / `e.code`),
 `tests/keys-mode.test.ts` (fresh / existing device, subscribers, engine mode and scope rules), `tests/gateway.test.ts`
 (Phase 7 keys, ERP 9), e2e step "R20-A" in `tests/e2e/smoke.mjs`.
+
+## R20-C — report keys
+
+Built on every Books report that uses `useDrillRows` (trial balance, P&L, balance sheet, group summary, registers,
+Day Book, group / ledger vouchers, the Reports hub) and on the Gateway Display viewer. All work only with Tally keys on
+(rows `pkg: 'C'`, none global, so `KEY_CLAIMS` is unchanged) and are **never saved** except views (PRD Q7).
+
+| Key | What | Where it lives |
+|---|---|---|
+| Ctrl+F / Alt+F12 | Filter sheet: amount from / up to, party / ledger text, Dr / Cr side, and on voucher reports date from / to and narration. A strip under the report: "Filtered: n of m rows · Clear"; Esc on the report clears it | `filterRows` (`src/lib/keys/report-actions.ts`), `ReportSheets.tsx` |
+| (Ctrl+F12) | "Totals of what you see" (Dr, Cr, net) whenever rows are filtered, ticked or hidden; ticked rows total on their own. A parent row followed by its own shown child is not counted twice | `totalsOf` |
+| Space, Shift+↑ / ↓, Ctrl+Alt+I | Tick rows (a ☐ / ☑ column shows while any row is ticked; Ctrl / ⌘ + click is the mouse twin), extend, invert | `useDrillRows` |
+| Ctrl+R, Ctrl+U, Alt+U | Hide the ticked (else the focused) rows; restore the last batch / all. ↑ ↓ skip hidden rows; print leaves them out with a note; the Day Book CSV exports only the shown rows | `hideRows`, `unhideLast`, `unhideAll` |
+| Ctrl+H / Ctrl+L | Saved-views sheet (8G storage, `mrchartist_report_views`): open, delete, "Open by default" (additive `default` flag, one per screen + tab, applied by PeriodBar on arrival), save this view with the name box focused | `ViewsSheet`, `setDefaultView` / `defaultView` (`report-views.ts`) |
+| + / − (] / [) | Step the report period: a month / quarter / FY by the preset; a custom range of whole months by its months, else by its days | `stepPeriod`, `PeriodBar.tsx` |
+| Ctrl+J | Exceptions of the period (`negativeLedgers`: cash below zero, customers in credit …); a row opens the ledger | `ReportSheets.tsx` |
+| Alt+F5 | = Alt+F1 detailed / short | `ReportToolbar.tsx` |
+| Alt+N / Alt+C / Alt+D | Period columns (focus the picker) / next column set / back to none, on reports with the columns picker | `ReportToolbar.tsx` |
+| Shift+Enter | Day Book: one voucher's ledger lines | `DayBookTab.tsx` (`opts.expand`) |
+| Ctrl+Enter | Group summary ledger row: alter the ledger master; elsewhere = Enter | `opts.master` |
+| Alt+I / Alt+A | Day Book, group / ledger vouchers: a new entry of the row's type on its day (Gateway vouchers take the day through `setVoucherDate`; documents open their usual new form) | `opts.voucher` |
+| Ctrl+P / Ctrl+E | Print; press the report's own Export (CSV / Excel) button — no new output code | `useDrillRows` |
+
+**API (D and later reports).** `useDrillRows(count, onActivate, opts?)` keeps its signature and behaviour; the optional
+`opts` adds `fact(i)` (filter / totals facts, else read from the row's cells), `voucher(i)`, `master(i)`, `expand(i)`.
+`nav.row(i)` now also returns `data-ri`, `aria-selected` (while ticking) and `hidden`; `nav.shown(i)` says whether a row
+is on screen. Report parts join the keys with `useReportKeys(scope, el, handlers)` (`src/lib/keys/report-keys.ts`):
+one registration per scope, and a key goes to the visible part holding the focus, else the newest visible one, so a
+report hidden under a drill level never answers. The strip mounts through `ReportStrip` (`components/keys/ReportStrip.tsx`;
+DrillStack, Day Book and the Gateway viewer render one).
+
+**Held / cut.** `HELD` in `registry.ts` keeps built-package rows hidden: `dup.row`, `delete.row`, `cancel.row` (Alt+2 /
+Alt+D / Alt+X from a report row) wait for B's `entry-actions.ts` — remove the ids and add three handlers in
+`useDrillRows` when B lands; `basis` (Ctrl+B, cut 3: including optional / post-dated vouchers needs a ledger-build
+change outside C's files) and `share` / `share.alias` (Ctrl+M / Ctrl+Alt+W: no report has a share sheet to press).
+Also left out: C8 bank / GST report F-keys (cut 1), the red exception count chip, "Show original" in the views sheet,
+long-press ticking on touch (the Key bar's "Tick a row" and Ctrl / ⌘ + click are the twins).
+
+Tests: `tests/keys-report-actions.test.ts` (filter, totals, ticks / hide, period stepping, default view, held rows), e2e
+step "R20-C" in `tests/e2e/smoke.mjs` (TB: Ctrl+F chip and Esc, Space ×2 strip, Ctrl+R / Ctrl+U, Ctrl+L view, Ctrl+E CSV, +).

@@ -117,7 +117,9 @@ export function useDrillRows(count: number, onActivate: (index: number) => void,
     return Array.from({ length: count }, (_, i) => opts.fact?.(i) ?? (rows.get(i) ? domFact(rows.get(i)!) : { text: '', amt: 0 }));
   };
   const self = useRef<LiveReport | null>(null);
-  self.current = { tools, count, sheet, dated: !!opts.fact, facts, set: setTools, setSheet, table, ledger: env?.ledger };
+  useEffect(() => {
+    self.current = { tools, count, sheet, dated: !!opts.fact, facts, set: setTools, setSheet, table, ledger: env?.ledger };
+  });
 
   useEffect(() => {
     const el = document.getElementById(bodyId)?.querySelector<HTMLElement>('[data-selected="true"]');
