@@ -231,8 +231,8 @@ preferences outside the `mrchartist_inv_` prefix (never backed up or synced, no 
   over once (`pendingHandover`).
 - **Not done**: VFD pole displays over serial — makes use different command sets (Epson DM-D / ESC-POS, CD5220, Logic
   Controls) and none could be verified, so the customer-facing display stays the `/pos-display` window (8.143). Short codes
-  on stock-only items were already done (QA-3 F24: Inventory → item form, `setStockShortCode`). Option+P on macOS needs the
-  shared hotkey matcher (`useHotkeys` compares `e.key`, which is "π" there) — left to the Round 20 keyboard work (R20-A).
+  on stock-only items were already done (QA-3 F24: Inventory → item form, `setStockShortCode`). Option+P on macOS works since
+  R20-A (with Alt down `matchesEvent` reads the physical key, not "π").
   Payment-in quick-pay screen: already the 8.150 PWA path (`/clients?pay=1` → party picker → ₹ Received sheet). iOS share
   target and a remembered BLE printer wait on the browsers.
 

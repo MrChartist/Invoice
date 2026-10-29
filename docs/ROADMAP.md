@@ -554,7 +554,7 @@ From competitor tutorials (myBillBook "Scan invoice" in Purchases, Refrens "Vali
 | 8.148 | ✅ **WhatsApp this bill** (beside Reprint, save toast; prompt when no phone; UPI link for a balance) | `pos-share.ts` | done |
 | 8.149 | ✅ **Create item from an unknown code** (POS + editor scan bar) | `QuickItemSheet.tsx`, `catalog.ts` | done |
 | 8.150 | ✅ Wiring: PWA "Payment in" (`/clients?pay=1`) → party picker → ₹ Received sheet; shared image / PDF → "Capture as supplier bill (read e-invoice QR)" or "New expense" | `PartyPicker.tsx`, `Clients.tsx`, `ShareTarget.tsx` | done |
-| 8.151 | ◐ 8E follow-ups (PENDING 50): ✅ GS1 price check digit on scale labels, ✅ USB-HID / Bluetooth (Weight Scale Service) scales, ✅ drawer hand-over between shifts, ~~short codes on stock-only items~~ (QA-3 F24); ✗ VFD pole displays (no verifiable command set), Option+P on macOS (R20-A keyboard work) | `scale-barcode.ts`, `scale-serial.ts`, `pos-shifts.ts` | partly done |
+| 8.151 | ◐ 8E follow-ups (PENDING 50): ✅ GS1 price check digit on scale labels, ✅ USB-HID / Bluetooth (Weight Scale Service) scales, ✅ drawer hand-over between shifts, ~~short codes on stock-only items~~ (QA-3 F24); ~~Option+P on macOS~~ (R20-A physical-key match); ✗ VFD pole displays (no verifiable command set) | `scale-barcode.ts`, `scale-serial.ts`, `pos-shifts.ts` | partly done |
 ### 8G · Invoicing UX & insights (`docs/features/invoicing-ux.md`)
 
 Zoho Books / FreshBooks / Xero / TallyPrime 7 habits, offline: deposits and acceptance without a portal, SmartFind, insights computed on the device.

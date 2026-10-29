@@ -28,7 +28,7 @@ export function PosTiles({ sources, stock, groups, invoices, qtyOf, onPick, unav
   const [tab, setTab] = useState('fav');
   const tabs = useMemo(() => {
     const list = listRate ? priceListItems(sources, listRate) : [];
-    return [...(list.length ? [{ id: 'list', name: posT('tilesList'), items: list }] : []), ...groupTabs(sources, stock, groups)];
+    return [...(list.length ? [{ id: 'list', name: '', items: list }] : []), ...groupTabs(sources, stock, groups)];
   }, [sources, stock, groups, listRate]);
   const favItems = useMemo(() => favouriteItems(sources, favs, invoices), [sources, favs, invoices]);
   if (!favItems.length && !tabs.length) return null;
@@ -44,7 +44,7 @@ export function PosTiles({ sources, stock, groups, invoices, qtyOf, onPick, unav
       <div className={styles.tabs} role="tablist">
         {[{ id: 'fav', name: posT('tilesFav') }, ...tabs].map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={cn(styles.tab, tab === t.id && styles.tabOn)} onClick={() => setTab(t.id)}>
-            {t.name}
+            {t.id === 'list' ? posT('tilesList') : t.name}
           </button>
         ))}
       </div>
