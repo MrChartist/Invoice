@@ -10,7 +10,7 @@
  */
 import './lg-registry';
 import { generateId, getTable, setTable } from '../storage';
-import { requireAccess } from '../access';
+import { can, requireAccess } from '../access';
 import { audit } from '../audit';
 import { assertUnlocked } from '../period-lock';
 import { localDb } from '../localDb';
@@ -71,7 +71,9 @@ export function billCourierMonth(period: string, date: string, base: InvoiceReco
 export function undoCourierMonth(period: string): number {
   requireAccess('doc.create');
   const bills = liveBills(localDb.invoices.getAll()).filter((i) => i.lg?.period === period && i.lg.manifest_id);
-  const paid = new Set(getTable<Payment>('transactions').map((p) => p.invoice_id));
+  // QA22 W5: a bill with a receipt or a live credit note stops it (the note would stay a credit on a cancelled bill).
+  const live = new Set(localDb.invoices.getAll().filter((x) => x.status !== 'Cancelled').map((x) => x.id));
+  const paid = new Set([...getTable<Payment>('transactions').map((p) => p.invoice_id), ...getTable<{ from_id: string; to_id: string; relation: string }>('doc_links').filter((l) => l.relation === 'credit_note' && live.has(l.to_id)).map((l) => l.from_id)]);
   const held = bills.filter((b) => paid.has(b.id));
   if (held.length) throw new Error(lgdT('eUndoPaid', { n: held.map((b) => b.invoice_number).join(', ') }));
   return withTablesRollback(['invoices'], () => { for (const b of bills) localDb.invoices.setStatus(b.id, 'Cancelled'); return bills.length; });
@@ -105,6 +107,8 @@ export function saveAgentBill(i: Omit<BillInput, 'home'>): PurchaseRecord {
   requireAccess('books.edit');
   if (!pos(i.amount) || !pos(i.rate)) throw new Error(lgdT('eAmount'));
   if (!i.bill_no.trim()) throw new Error(lgdT('eBillNo'));
+  // QA22 W4: reverse charge on an import of services needs a supplier outside India; an Indian agent bills its own GST.
+  if (!i.agent.vendor.lg?.foreign) throw new Error(lgdT('eDomBill'));
   const all = getTable<PurchaseRecord>('purchases');
   if (all.some((b) => b.vendor_id === i.agent.vendor.id && b.bill_number.trim().toLowerCase() === i.bill_no.trim().toLowerCase())) throw new Error(lgdT('eBillDup'));
   const b = agentBill({ ...i, home: homeOf(localDb.settings.activeProfile()) }, generateId());
@@ -121,6 +125,7 @@ export function settleAgent(a: Agent, i: { amount: number; date: string; rcmPaid
   const amount = round2(i.amount), cap = Math.min(st.ours, st.theirs);
   if (!pos(amount) || amount > cap + 0.004) throw new Error(lgdT('eSettle', { a: cap.toFixed(2) }));
   if (!i.rcmPaid) throw new Error(lgdT('eRcm'));
+  if (!can('doc.approve')) throw new Error(lgdT('eOwner')); // QA22 W6: as R15-A `postNetting` (a clerk's netting needs the owner)
   const pairs = pairAgent(st.notes, st.bills, amount);
   if (pairs.some((p) => p.note.cur !== p.bill.cur)) throw new Error(lgdT('eCur'));
   assertUnlocked({ id: 'netting', issue_date: i.date }, 'create');

@@ -11,7 +11,8 @@ import { getIndianFY } from '../invoice-number';
 import { resolveStateCode } from '../india-states';
 import { intermediaryPos } from '../prof/ps-pos';
 import { exportCheck } from '../prof/ps-export-check';
-import { gtaRate } from '../transport-works-rules';
+import { ruleAt } from '../tax-rules';
+import { GTA_RCM_RECIPIENT_KINDS, gtaRate } from '../transport-works-rules';
 import { lutDb, pickLut } from '../trade/lut-register';
 import type { RegimeCtx } from './lg-regime';
 
@@ -23,14 +24,18 @@ export function regimeCtx(date: string, client: Partial<Client>, sender: SenderP
   const gstin = sender?.companyGstin?.trim() ?? '';
   const foreign = isForeignClient(client);
   const lut = pickLut(lutDb.peek(), date, gstin);
+  // The R5-B option of the FY (`gta_options`; no row = reverse charge), read here so the transport chunk is not split.
+  const gta = gtaRate(peekTable<GtaOptionRow>('gta_options').find((r) => r?.fy === getIndianFY(date).label)?.option ?? 'rcm', date);
+  const registered = /^\d{2}[A-Z0-9]{13}$/i.test(client.gstin?.trim() ?? '');
   const ok = foreign && !exportCheck({ invoice: { place_of_supply: '96', issue_date: date, sender }, client: client as Client, date }).items.some((i) => i.state === 'fail');
   return {
     date,
     sender: { state: resolveStateCode({ code: sender?.stateCode, gstin }), registered: !!gstin },
-    recipient: { state: foreign ? '96' : resolveStateCode({ code: client.state_code, gstin: client.gstin, name: client.state }), registered: /^\d{2}[A-Z0-9]{13}$/i.test(client.gstin?.trim() ?? ''), foreign },
+    recipient: { state: foreign ? '96' : resolveStateCode({ code: client.state_code, gstin: client.gstin, name: client.state }), registered, foreign },
     inter: intermediaryPos(date),
-    // The R5-B option of the FY (`gta_options`; no row = reverse charge), read here so the transport chunk is not split.
-    gta: gtaRate(peekTable<GtaOptionRow>('gta_options').find((r) => r?.fy === getIndianFY(date).label)?.option ?? 'rcm', date).rate,
+    gta: gta.rate,
+    // QA22 W3: under the RCM option a registered recipient pays (R5-B `liablePerson`; an unregistered one: the GTA, 5 %).
+    gtaRcm: gta.rcm && registered && ruleAt(GTA_RCM_RECIPIENT_KINDS, date).includes('registered'),
     exportOk: ok,
     lut: !!lut,
   };

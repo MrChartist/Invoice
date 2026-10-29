@@ -532,3 +532,14 @@ Chunks (normalized gz): `f-logistics` +5.18 kB (now 13.52 kB: `lg-doc`, `lg-cour
 `lg-d-save`, `lg-d-seam` — static in the desk chunk, which saved ≈ 2 kB of per-chunk overhead over lazy views);
 wiring ≈ 0.65 kB (help 0.17, recycle bin 0.09, palette 0.08, Ctrl+K rows 0.07, checklist 0.04, packs 0.04, bell 0.03,
 open export 0.03 …).
+
+## QA round 22 (`docs/prd/qa-round-22.md`)
+
+- **LG15 reader:** export freight (`lg.regime: 'export_freight'`, POS 96) to a recipient in India without a GSTIN is
+  B2CL / B2CS with POS 96 (was Table 6A); international courier bills carry the regime (W1, W2).
+- **GTA under RCM:** the R5-B option of the FY is reverse charge and the client is registered → the GTA head goes on its
+  own document with `reverse_charge` + `rcm_tax_excluded` (`RegimeCtx.gtaRcm`, `LgRegime.rcm`, `JobDraft.rcm`; W3).
+- **Agents in India** (`Vendor.lg.foreign` false): "Debit agent" is a domestic note (Sec 12(2), `regime: 'general'`);
+  "Agent's bill" is refused — the bill goes through Purchases (W4).
+- **Courier "Undo month"** is refused while a bill has a receipt or a live credit note (W5); **agent netting** needs the
+  owner, as R15-A (W6); agent netting rows are read-only in Books → FX (`ForeignReceiptRow.netted`, W7).

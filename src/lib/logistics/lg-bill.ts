@@ -35,6 +35,8 @@ export interface JobDraft {
   pos: string;
   mode: LgGstMode;
   supply?: LgRegime['supply'];
+  /** QA22 W3: a GTA leg under reverse charge (its own document, tax payable by the recipient). */
+  rcm?: boolean;
   currency: string;
   exchange_rate?: number;
   items: InvoiceItem[];
@@ -104,9 +106,9 @@ export function planJobBills(j: LgJob, sheet: readonly LgCharge[], c: BillCtx): 
     const rate = docCur === cur ? l.rate : round2(l.rate * fx!.rate);
     const pure = g.key === 'pure_agent';
     const kind = !c.sender.registered ? 'INVOICE' : 'TAX_INVOICE';
-    const key = single ? docCur : `${g.pos}|${docCur}|${kind}|${g.supply ?? ''}`;
+    const key = single ? docCur : `${g.pos}|${docCur}|${kind}|${g.supply ?? ''}|${g.rcm ? 'rcm' : ''}`;
     if (single && groups.get(key) && groups.get(key)!.pos !== g.pos) mixed = true;
-    const d = groups.get(key) ?? { doc_type: kind, pos: g.pos, mode: g.mode, ...(g.supply ? { supply: g.supply } : {}), currency: docCur, ...(docCur !== 'INR' ? { exchange_rate: fx!.rate } : {}), items: [], lg: { ...jobSnapshot(j), heads: {}, ...(fx ? { fx: { currency: cur, rate: fx.rate, source: fx.source } } : {}) }, regimes: [] };
+    const d = groups.get(key) ?? { doc_type: kind, pos: g.pos, mode: g.mode, ...(g.supply ? { supply: g.supply } : {}), ...(g.rcm ? { rcm: true } : {}), currency: docCur, ...(docCur !== 'INR' ? { exchange_rate: fx!.rate } : {}), items: [], lg: { ...jobSnapshot(j), heads: {}, ...(fx ? { fx: { currency: cur, rate: fx.rate, source: fx.source } } : {}) }, regimes: [] };
     const id = c.newId();
     const name = `${h.name}${docCur !== cur ? ` (${cur} ${money(l.rate)} × ${l.qty} = ${cur} ${money(l.qty * l.rate)} @ ₹${money(fx!.rate)})` : ''}${l.note ? ` — ${l.note}` : ''}`;
     d.items.push({ id, name, type: 'Service', ...(h.sac && !pure ? { hsn: h.sac } : {}), quantity: l.qty, rate, amount: round2(l.qty * rate), tax_rate: g.rate, discount_percent: 0, ...(pure ? { charge_head_id: 'rule33', description: c.passText } : {}), ...(g.key === 'exempt' ? { sv: { exempt: 'EXEMPT' } } : {}), ...(l.disb_id ? { bill_refs: [l.disb_id] } : {}) } as InvoiceItem);
