@@ -1,7 +1,7 @@
 /**
  * Minimal in-memory IndexedDB for the storage tests (no dependency). Implements only what
  * src/lib/idb-kv.ts uses: open/upgrade, object stores with out-of-line keys, transactions
- * with get/put/delete/clear/getAll/getAllKeys, commit(), oncomplete/onerror/onabort, and
+ * with get/put/delete/clear/getAll/getAllKeys (delete / getAll / getAllKeys also by `IDBKeyRange.bound`), commit(), oncomplete/onerror/onabort, and
  * connection close / versionchange. Transactions are atomic: a failed one changes nothing.
  *
  * Fault injection: `failNextWrite(name)` makes the next readwrite transaction fail with a
@@ -17,6 +17,12 @@ class FakeRequest {
   onsuccess: ((e: unknown) => void) | null = null;
   onerror: ((e: unknown) => void) | null = null;
 }
+
+/** Minimal `IDBKeyRange` (bound only), installed with the fake. */
+type Range = { lower: string; upper: string; fake: true };
+const isRange = (k: unknown): k is Range => !!k && typeof k === 'object' && (k as Range).fake === true;
+const inRange = (r: Range, k: string) => k >= r.lower && k <= r.upper;
+const FakeKeyRange = { bound: (lower: string, upper: string): Range => ({ lower, upper, fake: true }) };
 
 const err = (name: string) => Object.assign(new Error(name), { name });
 
@@ -123,7 +129,7 @@ export class FakeIDB {
         done = tx.ops.length;
         for (const op of round) {
           const s = copies.get(op.store)!;
-          const sortedKeys = () => [...s.keys()].sort();
+          const sortedKeys = () => [...s.keys()].sort().filter((k) => !isRange(op.key) || inRange(op.key, k));
           switch (op.kind) {
             case 'get':
               op.req.result = structuredClone(s.get(String(op.key)));
@@ -133,7 +139,8 @@ export class FakeIDB {
               op.req.result = op.key;
               break;
             case 'delete':
-              s.delete(String(op.key));
+              if (isRange(op.key)) { for (const k of [...s.keys()]) if (inRange(op.key, k)) s.delete(k); }
+              else s.delete(String(op.key));
               break;
             case 'clear':
               s.clear();
@@ -224,8 +231,8 @@ class FakeTx {
       put: (v: unknown, k: unknown) => add('put', k, v),
       delete: (k: unknown) => add('delete', k),
       clear: () => add('clear'),
-      getAll: () => add('getAll'),
-      getAllKeys: () => add('getAllKeys'),
+      getAll: (range?: unknown) => add('getAll', range),
+      getAllKeys: (range?: unknown) => add('getAllKeys', range),
     };
   }
   commit() {
@@ -244,6 +251,7 @@ export const fakeIdb = new FakeIDB();
 /** Install as `globalThis.indexedDB`. */
 export function installFakeIdb(): FakeIDB {
   (globalThis as unknown as { indexedDB: unknown }).indexedDB = fakeIdb;
+  (globalThis as unknown as { IDBKeyRange: unknown }).IDBKeyRange = FakeKeyRange;
   return fakeIdb;
 }
 

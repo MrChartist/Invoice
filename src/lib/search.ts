@@ -7,7 +7,7 @@
 
 import type { Client, InvoiceItem, InvoiceRecord, Payment } from '../types/invoice';
 import { effectiveStatus } from './invoice-status';
-import { DB_PREFIX, KEYS, peekTable, readRaw, writeRaw } from './storage';
+import { DB_PREFIX, KEYS, peekTable, rawStamp, readRaw, writeRaw } from './storage';
 import { amountMatches, parseQuery, typoScore, type ParsedQuery } from './smart-find';
 import { isVoidStatus, readPurchase } from './purchase-normalize';
 
@@ -646,7 +646,7 @@ export function buildIndex(d: Omit<SearchData, 'pages' | 'actions'>, now: Date =
 
 /* Index cache: rebuilt only when one of the tables' stored text changes (cheap string identity checks). */
 const INDEX_TABLES = ['invoices', 'clients', 'items_catalog', 'vendors', 'purchases', 'transactions', 'vouchers', 'cheques', 'advances', 'einvoice_meta'] as const;
-let indexCache: { raws: (string | null)[]; day: string; index: IndexEntry[] } | null = null;
+let indexCache: { raws: unknown[]; day: string; index: IndexEntry[] } | null = null;
 
 /** Rows of every searchable table, read once per storage version (shared peeked rows: read-only). */
 export function loadSearchData(): Omit<SearchData, 'pages' | 'actions'> {
@@ -666,7 +666,7 @@ export function loadSearchData(): Omit<SearchData, 'pages' | 'actions'> {
 
 /** The cached index of the open company (8.103: built once per storage version and day). */
 export function searchIndex(now: Date = new Date()): IndexEntry[] {
-  const raws = INDEX_TABLES.map((t) => readRaw(DB_PREFIX + t));
+  const raws = INDEX_TABLES.map((t) => rawStamp(DB_PREFIX + t)); // PERF-3: tokens, never a chunked table's text
   const day = now.toDateString();
   if (indexCache && indexCache.day === day && indexCache.raws.every((r, i) => r === raws[i])) return indexCache.index;
   const index = buildIndex(loadSearchData(), now);

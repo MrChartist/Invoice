@@ -117,9 +117,100 @@ function store(): Storage | null {
 
 export type StorageBackend = 'local' | 'idb';
 let backend: StorageBackend = 'local';
-const cache = new Map<string, string>();
+
+/*
+ * PERF-3 row-level storage. A table in CHUNKED (a snapshot table) that has MIN_ROWS rows or more is kept in
+ * IndexedDB as chunks of CHUNK rows: `rows:<key>` = head `{"v":1,"n":<chunks>,"g":<random>}` and
+ * `rows:<key>:<i>` = rows iC … iC+C-1 as JSON joined by ','; the logical value is `[` + chunks.join(',') + `]`,
+ * byte for byte the JSON of the whole table. In memory such a value is a `Rows` object (`t` = its text once
+ * read). A plain string at `<key>` (the old layout, or what writeRaw / restore / sync write) always wins over
+ * chunks; every chunked write deletes it, every plain write deletes the chunks. A save re-serialises and
+ * writes only the chunks whose rows changed (plus the head when rows were added, removed or moved). The head
+ * is the cross-tab etag: an incremental write commits only if the stored head is the one this tab last
+ * saw, else the whole table is written (last writer wins, as before).
+ */
+const CHUNKED = new Set([DB_PREFIX + 'invoices']);
+const CHUNK = 16;
+const MIN_ROWS = 128;
+interface Rows {
+  c: string[];
+  t?: string;
+}
+type Val = string | Rows;
+const textOf = (v: Val): string => (typeof v === 'string' ? v : (v.t ??= `[${v.c.join(',')}]`));
+const lenOf = (v: Val | undefined): number => (v === undefined ? 0 : typeof v === 'string' ? v.length : v.c.reduce((n, x) => n + x.length + 1, 1));
+const headKey = (k: string) => `rows:${k}`;
+const chunkKey = (k: string, i: number | string) => `rows:${k}:${i}`;
+const chunkRange = (k: string) => IDBKeyRange.bound(chunkKey(k, ''), chunkKey(k, '\uffff'));
+/** Delete the chunked copy of `k` (head and every chunk). */
+function clearRows(s: IDBObjectStore, k: string): void {
+  s.delete(headKey(k));
+  s.delete(chunkRange(k));
+}
+/** Delete every record of these keys. */
+function dropKeys(s: IDBObjectStore, keys: Iterable<string>): void {
+  for (const k of keys) {
+    s.delete(k);
+    if (CHUNKED.has(k)) clearRows(s, k);
+  }
+}
+/** Re-write the store copy of `snapshot` as `recs` (its `physical` records, plain or sealed). */
+function putAll(s: IDBObjectStore, snapshot: [string, Val][], recs: [string, string][]): void {
+  dropKeys(s, snapshot.map(([k]) => k).filter((k) => CHUNKED.has(k)));
+  for (const [k, v] of recs) s.put(v, k);
+}
+/** Chunks of each chunked key to write at the next flush (-1 = the head); true = all of them. */
+const dirt = new Map<string, Set<number> | true>();
+/** The stored head of each chunked key as this tab last read or wrote it (sealed in vault mode). */
+const heads = new Map<string, string>();
+/** Physical records of a value: the plain key, or a fresh head and every chunk. */
+const headRec = (k: string, v: Rows): [string, string] => [headKey(k), JSON.stringify({ v: 1, n: v.c.length, g: generateId() })];
+const physical = (k: string, v: Val): [string, string][] =>
+  typeof v === 'string' ? [[k, v]] : [headRec(k, v), ...v.c.map((x, i): [string, string] => [chunkKey(k, i), x])];
+/** Same logical value (rare paths: verification after a whole-store write). */
+const sameVal = (a: Val | undefined, b: Val): boolean => a !== undefined && textOf(a) === textOf(b);
+
+type Opener = (name: string, v: string) => string | undefined | Promise<string | undefined>;
+/** Opens a stored value with this tab's vault key; a vault store holds only sealed values, a plain one none. */
+const tabOpener: Opener = (name, v) => (!isSealed(v) ? (vaultKey ? undefined : v) : vaultKey ? unseal(vaultKey, name, v).catch(() => undefined) : undefined);
+/** [chunk index, stored value] of `k`'s chunk records. */
+const chunksOf = (k: string, keys: IDBValidKey[], vals: unknown[]): [number, unknown][] =>
+  keys.map((p, j) => {
+    const i = String(p).slice(chunkKey(k, '').length);
+    return [/^\d+$/.test(i) ? +i : -1, vals[j]];
+  });
+/**
+ * The logical value of chunked key `k` from its records: the plain string if there is one, else the chunks
+ * (a complete set as `Rows` plus the head it came with; an incomplete one as the text of what is there, so
+ * nothing that exists is dropped). Undefined when a record cannot be opened.
+ */
+async function openRows(k: string, base: unknown, head: unknown, chunks: [number, unknown][], open: Opener): Promise<[Val | null, string?] | undefined> {
+  if (typeof base === 'string') {
+    const s = await open(k, base);
+    return s === undefined ? undefined : [s];
+  }
+  if (typeof head !== 'string') return [null];
+  const h = await open(headKey(k), head);
+  if (h === undefined) return undefined;
+  let n = -1;
+  try {
+    const o = JSON.parse(h) as { v?: unknown; n?: unknown };
+    if (o?.v === 1 && Number.isInteger(o.n)) n = o.n as number;
+  } catch {
+    /* unreadable head: keep every chunk found */
+  }
+  const c: string[] = [];
+  const opened = await Promise.all(
+    chunks.map(async ([i, v]) => typeof v !== 'string' || !(i >= 0) || (n >= 0 && i >= n) || (c[i] = (await open(chunkKey(k, i), v))!) !== undefined),
+  );
+  if (opened.includes(false)) return undefined;
+  const whole = n > 0 && Object.keys(c).length === n;
+  return whole ? [{ c }, head] : [`[${c.filter((x) => x !== undefined).join(',')}]`];
+}
+
+const cache = new Map<string, Val>();
 /** Writes not yet committed to IndexedDB (null = delete). */
-const pending = new Map<string, string | null>();
+const pending = new Map<string, Val | null>();
 /**
  * `dataVersion` at this tab's last write of each key, and the version up to which writes are in a
  * flush transaction (`sent`): a remote read that started before a key's write was sent is older than
@@ -158,25 +249,30 @@ let skippedKeys: string[] = [];
 let vaultConflict: StorageWriteError | null = null;
 
 class VaultConflictError extends Error {}
+/** An incremental chunk write found another head than this tab last saw (another tab rewrote the table). */
+class RowsConflictError extends Error {}
 
 /**
  * One readwrite transaction on the data store that first reads the vault record and aborts unless
  * its id is `expect` (null = "no vault"). The check and the writes are atomic, so a write can never
- * land in a store whose vault mode another tab has just changed.
+ * land in a store whose vault mode another tab has just changed. `heads`: chunk heads that must still
+ * be stored as given (else RowsConflictError, nothing written).
  */
-async function guardedWrite(expect: string | null, write: (s: IDBObjectStore) => void): Promise<void> {
-  let conflict = false;
+async function guardedWrite(expect: string | null, write: (s: IDBObjectStore) => void, heads: [string, string | undefined][] = []): Promise<void> {
+  let conflict: Error | null = null;
   try {
     await idbTx(
       DATA_STORE,
       'readwrite',
       (s, tx) => {
         const r = s.get(VAULT_KEY);
-        r.onsuccess = () => {
+        const hs = heads.map(([k]) => s.get(k));
+        (hs[hs.length - 1] ?? r).onsuccess = () => {
           const rec: unknown = r.result;
           const id = rec === undefined ? null : isVaultRecord(rec) ? rec.id : '';
-          if (id !== expect) {
-            conflict = true;
+          if (id !== expect) conflict = new VaultConflictError('Vault mode was changed in another tab.');
+          else if (hs.some((h, i) => h.result !== heads[i][1])) conflict = new RowsConflictError();
+          if (conflict) {
             tx.abort();
             return;
           }
@@ -186,8 +282,7 @@ async function guardedWrite(expect: string | null, write: (s: IDBObjectStore) =>
       { commit: false },
     );
   } catch (err) {
-    if (conflict) throw new VaultConflictError('Vault mode was changed in another tab.');
-    throw err;
+    throw conflict ?? err;
   }
 }
 
@@ -246,21 +341,55 @@ export async function flushStorage(): Promise<void> {
   while (flushing) await flushing;
   if (backend !== 'idb' || pending.size === 0) return;
   const batch = [...pending];
+  const dirty = new Map(dirt);
+  dirt.clear();
   const ver = dataVersion;
   const key = vaultKey;
   const expect = vaultId;
+  // Physical writes ([record, value | null = delete]), chunked keys cleared first, heads that must be unchanged.
+  const ops: [string, string | null][] = [];
+  const wipe: string[] = [];
+  const checks: [string, string | undefined][] = [];
+  for (const [k, v] of batch) {
+    if (!CHUNKED.has(k)) ops.push([k, v as string | null]);
+    else if (v === null || typeof v === 'string') {
+      wipe.push(k);
+      ops.push([k, v as string | null]);
+    } else {
+      const d = dirty.get(k) ?? true;
+      ops.push([k, null]);
+      if (d === true || !heads.has(k)) {
+        wipe.push(k);
+        ops.push(...physical(k, v));
+      } else {
+        checks.push([headKey(k), heads.get(k)]);
+        if (d.has(-1)) ops.push(headRec(k, v));
+        for (const i of d) if (i >= 0) ops.push([chunkKey(k, i), i < v.c.length ? v.c[i] : null]);
+      }
+    }
+  }
   const run = (async () => {
     const values: (string | null)[] = key
-      ? await Promise.all(batch.map(([k, v]) => (v === null ? null : seal(key, k, v))))
-      : batch.map(([, v]) => v);
+      ? await Promise.all(ops.map(([k, v]) => (v === null ? null : seal(key, k, v))))
+      : ops.map(([, v]) => v);
     // Sealed values only into this tab's vault; readable ones only into a store with no vault.
-    await guardedWrite(expect, (s) => {
-      sent = ver;
-      batch.forEach(([k], i) => {
-        const v = values[i];
-        if (v === null) s.delete(k);
-        else s.put(v, k);
-      });
+    await guardedWrite(
+      expect,
+      (s) => {
+        sent = ver;
+        for (const k of wipe) clearRows(s, k);
+        ops.forEach(([k], i) => {
+          const v = values[i];
+          if (v === null) s.delete(k);
+          else s.put(v, k);
+        });
+      },
+      checks,
+    );
+    for (const k of wipe) heads.delete(k);
+    ops.forEach(([k], i) => {
+      const at = k.indexOf(':', 5); // `rows:<key>` (a head), not `rows:<key>:<i>`
+      if (k.startsWith('rows:') && at < 0) heads.set(k.slice(5), values[i]!);
     });
   })().then(
     () => {
@@ -273,7 +402,14 @@ export async function flushStorage(): Promise<void> {
       }
     },
     (err: unknown) => {
-      if (err instanceof VaultConflictError) {
+      // Not written: those chunks are still to write; all of them where another tab rewrote the table.
+      const redo = err instanceof RowsConflictError;
+      for (const [k, d] of dirty) {
+        const now = dirt.get(k);
+        dirt.set(k, redo || d === true || now === true ? true : new Set([...d, ...(now ?? [])]));
+      }
+      if (redo) scheduleFlush();
+      else if (err instanceof VaultConflictError) {
         vaultConflict = new StorageWriteError(
           'Vault mode was changed in another tab, so changes in this tab can no longer be saved. Reload this tab.',
           false,
@@ -306,31 +442,25 @@ async function onRemoteChange(keys: unknown[]): Promise<void> {
   const wanted = keys.filter((k): k is string => typeof k === 'string' && !isLocalOnlyKey(k));
   if (backend !== 'idb' || wanted.length === 0) return;
   const at = sent;
-  let reqs: IDBRequest[];
+  let reqs: IDBRequest[][];
   try {
-    reqs = await idbTx(DATA_STORE, 'readonly', (s) => wanted.map((k) => s.get(k)));
+    reqs = await idbTx(DATA_STORE, 'readonly', (s) =>
+      wanted.map((k) => (CHUNKED.has(k) ? [s.get(k), s.get(headKey(k)), s.getAllKeys(chunkRange(k)), s.getAll(chunkRange(k))] : [s.get(k)])),
+    );
   } catch {
     return;
   }
   const values = await Promise.all(
-    reqs.map(async (r, i): Promise<string | null | undefined> => {
-      const v: unknown = r.result;
-      if (typeof v !== 'string') return null;
-      if (!isSealed(v)) return vaultKey ? undefined : v; // a vault store holds only sealed values
-      if (!vaultKey) return undefined; // sealed by a vault this tab has not unlocked: its broadcast reloads us
-      try {
-        return await unseal(vaultKey, wanted[i], v);
-      } catch {
-        return undefined;
-      }
-    }),
+    reqs.map(([b, h, ks, vs], i) => openRows(wanted[i], b.result, h?.result, ks ? chunksOf(wanted[i], ks.result as IDBValidKey[], vs.result as unknown[]) : [], tabOpener)),
   );
   wanted.forEach((k, i) => {
     if (pending.has(k) || wrote.get(k)! > at) return; // this tab's newer write wins (as it did with localStorage)
-    const v = values[i];
-    if (v === undefined) return;
-    if (v === null) cache.delete(k);
-    else cache.set(k, v);
+    const r = values[i];
+    if (!r) return;
+    if (r[0] === null) cache.delete(k);
+    else cache.set(k, r[0]);
+    if (r[1]) heads.set(k, r[1]);
+    else heads.delete(k);
   });
   dataVersion++;
   for (const k of wanted) for (const fn of changeListeners) fn(k);
@@ -375,6 +505,7 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([p, timer]).finally(() => clearTimeout(t));
 }
 
+/** Every data record of the store (`data`: values as stored, chunk records included), the marker and the vault record. */
 async function readAllData(): Promise<{ data: Map<string, string>; meta: boolean; vault: unknown }> {
   const [keysReq, valuesReq] = await idbTx(DATA_STORE, 'readonly', (s) => [s.getAllKeys(), s.getAll()] as const);
   const keys = keysReq.result;
@@ -386,9 +517,30 @@ async function readAllData(): Promise<{ data: Map<string, string>; meta: boolean
     const v = values[i];
     if (k === META_KEY) meta = true;
     else if (k === VAULT_KEY) vault = v;
-    else if (typeof k === 'string' && !isLocalOnlyKey(k) && typeof v === 'string') data.set(k, v);
+    else if (typeof k === 'string' && (!isLocalOnlyKey(k) || k.startsWith('rows:')) && typeof v === 'string') data.set(k, v);
   });
   return { data, meta, vault };
+}
+
+/** The logical values of stored records (`bad`: keys whose records could not be opened). */
+async function openAll(data: Map<string, string>, open: Opener): Promise<{ vals: Map<string, Val>; hs: Map<string, string>; bad: string[] }> {
+  const vals = new Map<string, Val>();
+  const hs = new Map<string, string>();
+  const bad: string[] = [];
+  const names = [...data.keys()].filter((k) => !k.startsWith('rows:'));
+  for (const k of CHUNKED) if (!data.has(k) && data.has(headKey(k))) names.push(k);
+  await Promise.all(
+    names.map(async (k) => {
+      const all = CHUNKED.has(k) ? [...data].filter(([p]) => p.startsWith(chunkKey(k, ''))) : [];
+      const r = await openRows(k, data.get(k), CHUNKED.has(k) ? data.get(headKey(k)) : undefined, chunksOf(k, all.map(([p]) => p), all.map(([, v]) => v)), open);
+      if (!r) bad.push(k);
+      else if (r[0] !== null) {
+        vals.set(k, r[0]);
+        if (r[1]) hs.set(k, r[1]);
+      }
+    }),
+  );
+  return { vals, hs, bad };
 }
 
 export type StorageInit =
@@ -455,28 +607,33 @@ export async function initStorage(opts: { timeoutMs?: number } = {}): Promise<St
         return { backend: 'unavailable', reason: 'The data on this device is encrypted but its vault record is missing (vault damaged).', vaultDamaged: true };
       }
     }
+    const plain: Opener = (_, v) => v;
+    let opened = await openAll(stored.data, plain);
     const lsIsTruth = marked ? !stored.meta : lsData.size > 0 || !stored.meta;
-    const target = new Map(lsIsTruth ? lsData : stored.data);
+    const target = new Map<string, Val>(lsIsTruth ? lsData : opened.vals);
     if (!lsIsTruth) for (const [k, v] of lsData) if (!target.has(k)) target.set(k, v);
 
-    const puts = [...target].filter(([k, v]) => stored.data.get(k) !== v);
-    const dels = [...stored.data.keys()].filter((k) => !target.has(k));
+    const puts = [...target].filter(([k, v]) => opened.vals.get(k) !== v);
+    const dels = [...opened.vals.keys()].filter((k) => !target.has(k));
     if (!stored.meta || puts.length > 0 || dels.length > 0) {
       await withTimeout(
         // Guarded: if another tab turned vault mode on meanwhile, nothing readable is written.
         guardedWrite(null, (s) => {
+          for (const k of [...dels, ...puts.map(([k]) => k)]) if (CHUNKED.has(k)) clearRows(s, k);
           for (const k of dels) s.delete(k);
-          for (const [k, v] of puts) s.put(v, k);
+          for (const [k, v] of puts) s.put(v as string, k); // (only strings: chunks are never moved in)
           s.put(Date.now(), META_KEY); // marker: a verified copy was made (value = when)
         }),
         timeout,
       );
       const check = await withTimeout(readAllData(), timeout);
-      const ok = check.meta && check.data.size === target.size && [...target].every(([k, v]) => check.data.get(k) === v);
+      opened = await openAll(check.data, plain);
+      const ok = check.meta && opened.vals.size === target.size && [...target].every(([k, v]) => sameVal(opened.vals.get(k), v));
       if (!ok) throw new Error('The IndexedDB copy did not match localStorage.');
     }
 
     for (const [k, v] of target) cache.set(k, v);
+    for (const [k, h] of opened.hs) heads.set(k, h);
     dataVersion++;
     backend = 'idb';
     installIdbListeners();
@@ -503,35 +660,18 @@ export async function initStorage(opts: { timeoutMs?: number } = {}): Promise<St
 export async function unlockStorage(passphrase: string): Promise<{ unreadable: string[] }> {
   if (!locked) throw new VaultError('Nothing is locked.', 'bad-record');
   const fresh = await readAllData();
-  const unreadable: string[] = [];
-  const plain = new Map<string, string>();
   let key: CryptoKey | null = null;
   let id: string | null = null;
   if (fresh.vault !== undefined) {
     if (!isVaultRecord(fresh.vault)) throw new VaultError('The vault record on this device is damaged.', 'bad-record');
     key = await unwrapDek(fresh.vault, passphrase);
     id = fresh.vault.id;
-    const k = key;
-    await Promise.all(
-      [...fresh.data].map(async ([name, v]) => {
-        if (!isSealed(v)) {
-          unreadable.push(name);
-          return;
-        }
-        try {
-          plain.set(name, await unseal(k, name, v));
-        } catch {
-          unreadable.push(name);
-        }
-      }),
-    );
-  } else {
-    // Vault mode was turned off in another tab meanwhile: the store is readable as it is.
-    for (const [name, v] of fresh.data) {
-      if (isSealed(v)) unreadable.push(name);
-      else plain.set(name, v);
-    }
   }
+  // Without a record, vault mode was turned off in another tab meanwhile: the store is readable as it is.
+  const k = key;
+  const { vals: plain, hs, bad: unreadable } = await openAll(fresh.data, (name, v) =>
+    isSealed(v) !== !!k ? undefined : k ? unseal(k, name, v).catch(() => undefined) : v,
+  );
   // A stale tab's localStorage copy is dropped, not imported: it could be planted plaintext.
   const ls = store();
   for (const k of locked.lsKeys) {
@@ -545,6 +685,7 @@ export async function unlockStorage(passphrase: string): Promise<{ unreadable: s
   cache.clear();
   pending.clear();
   for (const [k, v] of plain) cache.set(k, v);
+  for (const [k, h] of hs) heads.set(k, h);
   dataVersion++;
   vaultKey = key;
   vaultId = id;
@@ -617,26 +758,27 @@ export async function enableVault(passphrase: string): Promise<void> {
   const { record, key } = await createVault(passphrase);
   await aroundVaultSwitch(() => exclusive(async () => {
     const snapshot = [...cache];
-    const sealed = await Promise.all(snapshot.map(async ([k, v]) => [k, await seal(key, k, v)] as const));
+    const recs = snapshot.flatMap(([k, v]) => physical(k, v));
+    const sealed = await Promise.all(recs.map(async ([k, v]): Promise<[string, string]> => [k, await seal(key, k, v)]));
     await guardedWrite(null, (s) => {
-      for (const [k, v] of sealed) s.put(v, k);
+      putAll(s, snapshot, sealed);
       s.put(record, VAULT_KEY);
     });
     const check = await readAllData();
     let ok = isVaultRecord(check.vault) && check.vault.id === record.id;
-    for (const [k, v] of snapshot) {
-      if (!ok) break;
-      const got = check.data.get(k);
-      ok = got !== undefined && (await unseal(key, k, got).catch(() => null)) === v;
+    if (ok) {
+      const got = (await openAll(check.data, (n, v) => unseal(key, n, v).catch(() => undefined))).vals;
+      ok = snapshot.every(([k, v]) => sameVal(got.get(k), v));
     }
     if (!ok) {
       // Put the readable copy back before reporting.
       await guardedWrite(record.id, (s) => {
-        for (const [k, v] of snapshot) s.put(v, k);
+        putAll(s, snapshot, recs);
         s.delete(VAULT_KEY);
       });
       throw new VaultError('The encrypted copy could not be verified; vault mode was not turned on.', 'decrypt-failed');
     }
+    heads.clear(); // every head was re-written: the next save of a chunked table writes it whole
     vaultKey = key;
     vaultId = record.id;
   }));
@@ -656,19 +798,18 @@ export async function disableVault(passphrase: string): Promise<void> {
     // Sealed values that never decrypted are unreadable for good once the record goes; left behind, the
     // next boot would (rightly) report a damaged vault. Plain values found in the store stay.
     const skipped = skippedKeys.filter((k) => !cache.has(k));
-    const reqs = skipped.length ? await idbTx(DATA_STORE, 'readonly', (s) => skipped.map((k) => s.get(k))) : [];
-    const orphans = skipped.filter((_, i) => {
-      const v: unknown = reqs[i].result;
-      return typeof v === 'string' && isSealed(v);
-    });
+    const reqs = skipped.length ? await idbTx(DATA_STORE, 'readonly', (s) => skipped.map((k) => [s.get(k), s.get(headKey(k))])) : [];
+    const orphans = skipped.filter((_, i) => reqs[i].some((r) => typeof r.result === 'string' && isSealed(r.result)));
     await guardedWrite(record.id, (s) => {
-      for (const [k, v] of snapshot) s.put(v, k);
-      for (const k of orphans) s.delete(k);
+      putAll(s, snapshot, snapshot.flatMap(([k, v]) => physical(k, v)));
+      dropKeys(s, orphans);
       s.delete(VAULT_KEY);
     });
     const check = await readAllData();
-    const ok = check.vault === undefined && snapshot.every(([k, v]) => check.data.get(k) === v);
+    const got = (await openAll(check.data, (_, v) => v)).vals;
+    const ok = check.vault === undefined && snapshot.every(([k, v]) => sameVal(got.get(k), v));
     if (!ok) throw new VaultError('The readable copy could not be verified. Reload and try again.', 'decrypt-failed');
+    heads.clear();
     vaultKey = null;
     vaultId = null;
     skippedKeys = [];
@@ -718,7 +859,7 @@ export async function forgetVault(): Promise<void> {
   try {
     await idbTx(DATA_STORE, 'readwrite', (s) => {
       s.delete(VAULT_KEY);
-      for (const k of orphans) s.delete(k); // values the wipe cannot see (never decrypted)
+      dropKeys(s, orphans); // values the wipe cannot see (never decrypted)
     });
   } catch {
     /* the wipe still removes the data */
@@ -755,6 +896,8 @@ export function resetStorageBackend(): void {
   backend = 'local';
   cache.clear();
   pending.clear();
+  dirt.clear();
+  heads.clear();
   if (flushTimer !== null) clearTimeout(flushTimer);
   flushTimer = null;
   flushing = null;
@@ -792,6 +935,16 @@ export function isStorageAvailable(): boolean {
 }
 
 export function readRaw(fullKey: string): string | null {
+  const v = rawStamp(fullKey);
+  return v === null ? null : textOf(v as Val);
+}
+
+/**
+ * A version token of `fullKey` (a read, like `readRaw`): equal tokens mean the stored value is unchanged.
+ * It is the stored string itself, or for a chunked table an object, so comparing it never builds the
+ * table's text: hot "did it change?" checks (memos, search index, editor) use this instead of `readRaw`.
+ */
+export function rawStamp(fullKey: string): string | object | null {
   if (fullKey === pendingKey) pendingFlush();
   if (readTrace) readTrace.add(fullKey);
   if (inCache(fullKey)) return cache.get(fullKey) ?? null;
@@ -802,18 +955,24 @@ export function readRaw(fullKey: string): string | null {
   }
 }
 
+/** Cache write (IndexedDB backend), queued for the next flush. */
+function putVal(fullKey: string, value: Val): void {
+  if (vaultConflict) throw vaultConflict;
+  // While IndexedDB refuses writes for lack of space, refuse anything that grows the data so
+  // the UI shows its usual "storage is full" error; shrinking writes go through and retry.
+  if (flushError?.quotaExceeded && lenOf(value) > lenOf(cache.get(fullKey))) throw flushError;
+  cache.set(fullKey, value);
+  pending.set(fullKey, value);
+  wrote.set(fullKey, dataVersion);
+  scheduleFlush();
+}
+
 export function writeRaw(fullKey: string, value: string): void {
   if (fullKey === pendingKey) pendingDrop();
   dataVersion++;
   if (inCache(fullKey)) {
-    if (vaultConflict) throw vaultConflict;
-    // While IndexedDB refuses writes for lack of space, refuse anything that grows the data so
-    // the UI shows its usual "storage is full" error; shrinking writes go through and retry.
-    if (flushError?.quotaExceeded && value.length > (cache.get(fullKey)?.length ?? 0)) throw flushError;
-    cache.set(fullKey, value);
-    pending.set(fullKey, value);
-    wrote.set(fullKey, dataVersion);
-    scheduleFlush();
+    putVal(fullKey, value);
+    dirt.delete(fullKey);
     return;
   }
   const s = store();
@@ -832,6 +991,7 @@ export function removeRaw(fullKey: string): void {
     if (!cache.has(fullKey) && !pending.has(fullKey)) return;
     cache.delete(fullKey);
     pending.set(fullKey, null);
+    dirt.delete(fullKey);
     wrote.set(fullKey, dataVersion);
     scheduleFlush();
     return;
@@ -891,8 +1051,9 @@ function assetIndex(): AssetIndex {
  */
 interface ParsedEntry {
   table: string;
-  raw: string;
-  assets: string | null;
+  /** `rawStamp` of the table this entry was parsed from (for a chunked table: rows[i] is in chunk i / CHUNK). */
+  raw: unknown;
+  assets: unknown;
   rows: readonly unknown[];
 }
 const parsedCache = new Map<string, ParsedEntry>();
@@ -932,7 +1093,7 @@ export function freezeShared<T>(v: T): T {
   return v;
 }
 
-function registerEntry(table: string, raw: string, assets: string | null, rows: unknown[]): ParsedEntry {
+function registerEntry(table: string, raw: unknown, assets: unknown, rows: unknown[]): ParsedEntry {
   const entry: ParsedEntry = { table, raw, assets, rows };
   for (const r of rows) if (r && typeof r === 'object') rowEntry.set(r, entry);
   if (FREEZE_SHARED) deepFreeze(rows);
@@ -940,15 +1101,30 @@ function registerEntry(table: string, raw: string, assets: string | null, rows: 
   return entry;
 }
 
-function parseEntry(table: string, raw: string, assets: string | null): ParsedEntry {
+function parseEntry(table: string, raw: Val, assets: unknown): ParsedEntry {
   parseCounts.set(table, (parseCounts.get(table) ?? 0) + 1);
   let rows: unknown[] = [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed)) rows = parsed;
-  } catch {
-    /* corrupt: an empty table (fail-soft), cached until the text changes */
+  if (typeof raw !== 'string') {
+    const c = raw.c;
+    // Chunk by chunk, so rows line up with their chunks; chunks that do not (damaged) make it a plain value.
+    try {
+      rows = c.flatMap((x, j) => {
+        const r = JSON.parse(`[${x}]`) as unknown[];
+        if (!r.length || r.length > CHUNK || (r.length < CHUNK && j < c.length - 1)) throw new Error('unaligned');
+        return r;
+      });
+    } catch {
+      raw = textOf(raw);
+      cache.set(DB_PREFIX + table, raw);
+    }
   }
+  if (typeof raw === 'string')
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) rows = parsed;
+    } catch {
+      /* corrupt: an empty table (fail-soft), cached until the text changes */
+    }
   // Snapshot images are stored by reference (assets.ts); readers always get the data URL back.
   if (rows.length && SNAPSHOT_TABLES.has(table)) rows = decodeRows(rows, assetIndex());
   return registerEntry(table, raw, assets, rows);
@@ -958,19 +1134,19 @@ function parseEntry(table: string, raw: string, assets: string | null): ParsedEn
 function liveEntry(table: string): ParsedEntry | null {
   const hit = parsedCache.get(table);
   if (!hit) return null;
-  const raw = readRaw(DB_PREFIX + table);
+  const raw = rawStamp(DB_PREFIX + table);
   if (hit.raw !== raw) return null;
-  if (SNAPSHOT_TABLES.has(table) && hit.assets !== readRaw(DB_PREFIX + ASSET_TABLE)) return null;
+  if (SNAPSHOT_TABLES.has(table) && hit.assets !== rawStamp(DB_PREFIX + ASSET_TABLE)) return null;
   return hit;
 }
 
 function sharedRows(table: string): readonly unknown[] {
-  const raw = readRaw(DB_PREFIX + table);
+  const raw = rawStamp(DB_PREFIX + table) as Val | null;
   if (!raw) {
     parsedCache.delete(table);
     return EMPTY_ROWS;
   }
-  const assets = SNAPSHOT_TABLES.has(table) ? readRaw(DB_PREFIX + ASSET_TABLE) : null;
+  const assets = SNAPSHOT_TABLES.has(table) ? rawStamp(DB_PREFIX + ASSET_TABLE) : null;
   const hit = parsedCache.get(table);
   if (hit && hit.raw === raw && hit.assets === assets) return hit.rows;
   return parseEntry(table, raw, assets).rows;
@@ -1092,12 +1268,13 @@ function verifySeed(table: string, raw: string, rows: readonly unknown[]): void 
 
 /**
  * WP-7 (P0-10, MCA edit log): ONE observer of `setTable` writes. Called after a write succeeded with
- * the table name, the table's raw JSON before the write (null when it had none) and the rows written
- * (asset-encoded rows for snapshot tables). Only `setTable` reports: `writeRaw` (restore, sync merges,
+ * the table name, a getter of the table's raw JSON before the write (null when it had none) and a getter
+ * of the rows written (asset-encoded rows for snapshot tables): getters, so a table the observer does not
+ * watch never has its text built (PERF-3). Only `setTable` reports: `writeRaw` (restore, sync merges,
  * migrations) does not. The observer must be cheap and must not write the table it is told about;
  * anything it throws is swallowed, so it can never break a save. `audit-edits.ts` is the only user.
  */
-export type TableWriteHook = (name: string, prevRaw: string | null, rows: readonly unknown[]) => void;
+export type TableWriteHook = (name: string, prevRaw: () => string | null, rows: () => readonly unknown[]) => void;
 let tableWriteHook: TableWriteHook | null = null;
 
 /** Install (or with `null` remove) the single table-write observer. Returns the previous one. */
@@ -1107,7 +1284,7 @@ export function onTableWrite(hook: TableWriteHook | null): TableWriteHook | null
   return prev;
 }
 
-function notifyTableWrite(name: string, prevRaw: string | null, rows: readonly unknown[]): void {
+function notifyTableWrite(name: string, prevRaw: () => string | null, rows: () => readonly unknown[]): void {
   if (!tableWriteHook) return;
   try {
     tableWriteHook(name, prevRaw, rows);
@@ -1116,36 +1293,108 @@ function notifyTableWrite(name: string, prevRaw: string | null, rows: readonly u
   }
 }
 
+/** Store the new asset table first, so a stored reference can never dangle. */
+function storeAssets(idx: AssetIndex): void {
+  const raw = serializeAssets(idx);
+  try {
+    writeRaw(DB_PREFIX + ASSET_TABLE, raw);
+    assetCache = { raw, idx };
+  } catch (err) {
+    assetCache = null; // idx holds an asset that was not stored
+    throw err;
+  }
+}
+
 export function setTable<T>(name: string, rows: T[]): void {
   requireTableWrite(name); // roles (6.21): clerk / viewer limits, defence in depth
   const key = DB_PREFIX + name;
-  const prevRaw = tableWriteHook ? readRaw(key) : null;
+  const before = tableWriteHook ? (inCache(key) ? cache.get(key) ?? null : readRaw(key)) : null;
+  const prevRaw = () => (before === null ? null : textOf(before));
   const prev = liveEntry(name);
   if (!SNAPSHOT_TABLES.has(name)) {
     const raw = JSON.stringify(rows);
     writeRaw(key, raw);
     seedAfterWrite(name, raw, null, prev, rows, rows);
-    notifyTableWrite(name, prevRaw, rows);
+    notifyTableWrite(name, prevRaw, () => rows);
     return;
   }
   const idx = assetIndex();
-  const encoded = encodeRows(rows, idx);
-  if (encoded.added) {
-    const raw = serializeAssets(idx);
-    try {
-      // The asset goes in first so a stored reference can never dangle.
-      writeRaw(DB_PREFIX + ASSET_TABLE, raw);
-      assetCache = { raw, idx };
-    } catch (err) {
-      assetCache = null; // idx holds an asset that was not stored
-      throw err;
-    }
+  if (CHUNKED.has(key) && inCache(key) && rows.length >= MIN_ROWS) {
+    setRows(name, key, rows, prev, idx);
+    notifyTableWrite(name, prevRaw, () => encodeRows(rows, idx).rows);
+    return;
   }
+  const encoded = encodeRows(rows, idx);
+  if (encoded.added) storeAssets(idx);
   const raw = JSON.stringify(encoded.rows);
   writeRaw(key, raw);
   // A new asset could resolve a reference an older cached row left unresolved: parse lazily then.
   seedAfterWrite(name, raw, readRaw(DB_PREFIX + ASSET_TABLE), encoded.added ? null : prev, rows, encoded.rows);
-  notifyTableWrite(name, prevRaw, encoded.rows);
+  notifyTableWrite(name, prevRaw, () => encoded.rows);
+}
+
+const idOf = (r: unknown): unknown => (r && typeof r === 'object' ? (r as { id?: unknown }).id : r);
+
+/**
+ * PERF-3 `setTable` of a chunked table: only the chunks whose rows changed are serialised (and written
+ * at the next flush). Rows are compared with the cached version by position: the cached row itself or an
+ * unchanged `getTable` copy of it at the same place leaves its chunk alone. Without an aligned cached
+ * version (first save after a plain write, a restore, a new logo …) every chunk is written once.
+ */
+function setRows(name: string, key: string, rows: readonly unknown[], prev: ParsedEntry | null, idx: AssetIndex): void {
+  const pv = cache.get(key);
+  const old = prev && typeof pv === 'object' && prev.raw === pv ? pv : null;
+  const p = old ? prev!.rows : EMPTY_ROWS;
+  const n = Math.ceil(rows.length / CHUNK);
+  const c = old ? old.c.slice(0, n) : [];
+  const out = new Array<unknown>(rows.length);
+  const changed: number[] = [];
+  let moved = rows.length !== p.length;
+  let added = false;
+  for (let j = 0; j < n; j++) {
+    const a = j * CHUNK;
+    const b = Math.min(rows.length, a + CHUNK);
+    let same = j < c.length && b === Math.min(p.length, a + CHUNK);
+    for (let i = a; i < b; i++) {
+      const o = prev ? reusableRow(rows[i], prev) : undefined;
+      out[i] = o;
+      if (o === undefined || o !== p[i]) {
+        same = false;
+        if (idOf(rows[i]) !== idOf(p[i])) moved = true;
+      }
+    }
+    if (same) continue;
+    changed.push(j);
+    const enc = encodeRows(rows.slice(a, b) as unknown[], idx);
+    added ||= enc.added;
+    const text = JSON.stringify(enc.rows);
+    c[j] = text.slice(1, -1);
+    const parsed = decodeRows(JSON.parse(text) as unknown[], idx);
+    for (let i = a; i < b; i++) if (out[i] === undefined) out[i] = parsed[i - a];
+  }
+  if (added) storeAssets(idx);
+  const v: Rows = { c };
+  dataVersion++;
+  putVal(key, v);
+  const d = old ? dirt.get(key) ?? new Set<number>() : true;
+  if (d !== true) {
+    for (const j of changed) d.add(j);
+    for (let j = n; j < old!.c.length; j++) d.add(j);
+    if (moved) d.add(-1);
+  }
+  dirt.set(key, d);
+  if (added) {
+    parsedCache.delete(name); // a new asset could resolve a reference an older cached row left unresolved
+    return;
+  }
+  registerEntry(name, v, rawStamp(DB_PREFIX + ASSET_TABLE), out);
+  // Dev / test self-check: the rows of every re-written chunk serialise to exactly its text.
+  if (FREEZE_SHARED)
+    for (const j of changed)
+      if (JSON.stringify(encodeRows(out.slice(j * CHUNK, (j + 1) * CHUNK), idx).rows).slice(1, -1) !== c[j]) {
+        parsedCache.delete(name);
+        throw new Error(`storage: bad seed for ${name}`);
+      }
 }
 
 function seedAfterWrite(table: string, raw: string, assets: string | null, prev: ParsedEntry | null, rows: readonly unknown[], stored: readonly unknown[]): void {
@@ -1194,8 +1443,12 @@ export function generateId(): string {
 
 /** Every app-owned key/value pair — the payload for export/import backups. */
 export function collectAppData(): Record<string, string> {
+  return Object.fromEntries(appEntries().map(([k, v]) => [k, textOf(v)]));
+}
+
+function appEntries(): [string, Val][] {
   const s = store();
-  const out: Record<string, string> = {};
+  const out: Record<string, Val> = {};
   if (s) {
     try {
       for (let i = 0; i < s.length; i++) {
@@ -1211,10 +1464,10 @@ export function collectAppData(): Record<string, string> {
     }
   }
   if (backend === 'idb') for (const [key, value] of cache) out[key] = value;
-  return out;
+  return Object.entries(out);
 }
 
 /** Approximate bytes used by app data — surfaced in Settings as a usage meter. */
 export function appDataSize(): number {
-  return Object.entries(collectAppData()).reduce((sum, [k, v]) => sum + k.length + v.length, 0);
+  return appEntries().reduce((sum, [k, v]) => sum + k.length + lenOf(v), 0);
 }
