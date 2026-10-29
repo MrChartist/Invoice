@@ -33,8 +33,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 
 | Area | Ids | Items | ★ priority |
 |---|---|---|---|
-| 1. GST | G1–G48 | 48 | 12 |
-| 2. TDS / TCS and the Income-tax Act 2025 | T1–T26 | 26 | 7 |
+| 1. GST | G1–G51 | 51 | 12 |
+| 2. TDS / TCS and the Income-tax Act 2025 | T1–T29 | 29 | 7 |
 | 3. Payroll | P1–P27 | 27 | 4 |
 | 4. Accounting and Schedule III | AC1–AC18 | 18 | 2 |
 | 5. Industry packs | I1–I36 | 36 | 6 |
@@ -52,7 +52,7 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP48 | 48 | 13 |
 | 18. Co-operative housing societies, apartment associations and RWAs (Round 18, planned) | HS1–HS70 | 70 | 19 |
 | 19. Freight forwarders, customs brokers, courier and warehouses (Round 19, planned) | LG1–LG44 | 44 | 13 |
-| **Total** | | **734** | **184** |
+| **Total** | | **740** | **184** |
 
 ---
 
