@@ -38,7 +38,9 @@ export type PackId = 'marketplace' | 'transport' | 'works' | 'fees' | 'nonprofit
   // R18 (R18-A1): the housing-society pack (one desk tab `society` on /recurring; switched on by the society profile, never by a type)
   | 'society'
   // R19 (R19-A1): logistics packs (one desk tab `shipments` on /time; switched on by the logistics profile, never by a type)
-  | 'logistics' | 'customs' | 'courier' | 'warehouse';
+  | 'logistics' | 'customs' | 'courier' | 'warehouse'
+  // R21 (R21-A1): fuel packs (one desk tab `fuel` on /inventory; switched on by the fuel profile, never by a type)
+  | 'fuel' | 'lpg';
 
 export const PACK_IDS: readonly PackId[] = [
   'marketplace', 'transport', 'works', 'fees', 'nonprofit', 'leases',
@@ -54,6 +56,7 @@ export const PACK_IDS: readonly PackId[] = [
   'manpower', 'security', // R17 (R17-A1)
   'society', // R18 (R18-A1)
   'logistics', 'customs', 'courier', 'warehouse', // R19 (R19-A1)
+  'fuel', 'lpg', // R21 (R21-A1)
 ];
 
 /** The packs a business type implies when `industry_packs` is absent. */
@@ -118,7 +121,7 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'leases', path: '/recurring?tab=leases', labelKey: 'tab.leases' },
   { pack: 'nonprofit', path: '/receivables?tab=donations', labelKey: 'tab.donations' },
   { pack: 'nonprofit', alsoPacks: ['society'], path: '/books?tab=funds', labelKey: 'tab.funds' }, // R18-A: + society
-  { pack: 'fees', alsoPacks: ['nonprofit', 'leases', 'hotel', 'clinic', 'salon', 'fitness', 'society'], path: '/gst-reports?tab=common-credit', labelKey: 'tab.commonCredit' }, // R10 (SV-A4): + clinic / salon / fitness; R18-A: + society
+  { pack: 'fees', alsoPacks: ['nonprofit', 'leases', 'hotel', 'clinic', 'salon', 'fitness', 'society', 'fuel'], path: '/gst-reports?tab=common-credit', labelKey: 'tab.commonCredit' }, // R10 (SV-A4): + clinic / salon / fitness; R18-A: + society; R21-A: + fuel
   // R5-B: transport (Distribution → Transport) and works contracts (Time → Works); labels in `packs-transport-works-r5.ts`
   { pack: 'transport', path: '/distribution?tab=transport', labelKey: 'tab.transport' },
   { pack: 'transport', path: '/distribution?tab=transport&view=trips', labelKey: 'view.trips' },
@@ -386,6 +389,10 @@ export const PACK_TABS: readonly PackTab[] = [
   { pack: 'logistics', alsoPacks: ['customs', 'courier', 'warehouse'], path: '/time?tab=shipments&view=agents', labelKey: 'r19.shipments.agents' },
   { pack: 'courier', path: '/time?tab=shipments&view=courier', labelKey: 'r19.shipments.courier' },
   { pack: 'logistics', alsoPacks: ['customs', 'courier', 'warehouse'], path: '/time?tab=shipments&view=reports', labelKey: 'r19.shipments.reports' },
+  // R21: the fuel desk on /inventory (A: tanks / prices; B–D add their views — labels `r21.*`)
+  { pack: 'fuel', alsoPacks: ['lpg'], path: '/inventory?tab=fuel', labelKey: 'r21.fuel' },
+  { pack: 'fuel', alsoPacks: ['lpg'], path: '/inventory?tab=fuel&view=tanks', labelKey: 'r21.fuel.tanks' },
+  { pack: 'fuel', alsoPacks: ['lpg'], path: '/inventory?tab=fuel&view=prices', labelKey: 'r21.fuel.prices' },
 ];
 
 /**

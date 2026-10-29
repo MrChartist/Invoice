@@ -28,7 +28,7 @@ test('Vite 8 rolldown options with codeSplitting.groups, no manualChunks / rollu
 
 test('the groups, in order, with their priorities', () => {
   const families = [...cfg.matchAll(/safeFamilyGroup\(graph, '(f-[a-z]+)', familyRe\([^)]*\), (\d+)\)/g)].map((m) => [m[1], Number(m[2])]);
-  assert.deepEqual(families.map(([n]) => n), ['f-hotel', 'f-trade', 'f-retail', 'f-services', 'f-cn', 'f-agri', 'f-mfg', 'f-prof', 'f-travel', 'f-manpower', 'f-society', 'f-logistics', 'f-keys']); // R17-A: f-manpower; R18-A: f-society; R19-A: f-logistics; R20-A: f-keys
+  assert.deepEqual(families.map(([n]) => n), ['f-hotel', 'f-trade', 'f-retail', 'f-services', 'f-cn', 'f-agri', 'f-mfg', 'f-prof', 'f-travel', 'f-manpower', 'f-society', 'f-logistics', 'f-keys', 'f-fuel']); // R17-A: f-manpower; R18-A: f-society; R19-A: f-logistics; R20-A: f-keys; R21-A: f-fuel
   assert.ok(families.every(([, p]) => p === 12), 'families at priority 12');
   assert.match(cfg, /leafGroup\(graph, 'lazy-leaves', 9, \{ maxModuleSize: 3000 \}\)/);
   assert.match(cfg, /leafGroup\(graph, 'lazy-leaves-ui', 8, \{ maxModuleSize: 1500, test: UI_LEAF \}\)/, 'PERF-5');
@@ -226,4 +226,10 @@ test('PERF-5: lazy-leaves-ui takes small script leaves outside src/lib, never a 
   assert.equal(u.name(P + 'src/lib/leaf.ts'), null, 'src/lib leaves stay in lazy-leaves');
   assert.equal(u.name(P + 'src/pages/Page.tsx'), null, 'routes stay their own chunks');
   assert.equal(u.maxModuleSize, 1500);
+});
+
+test('R21-A: the f-fuel family captures the engines, rules and areas; not the registry or the -pick areas', () => {
+  const re = familyRe('fuel', 'fuel-rules', 'fuel-r21', 'fu-registry');
+  assert.ok(re.test('/x/src/lib/fuel/fu-tank.ts') && re.test('/x/src/lib/fuel-rules.ts') && re.test('/x/src/i18n/areas/fuel-r21a.ts'));
+  assert.ok(!re.test('/x/src/lib/fuel/fu-registry.ts') && !re.test('/x/src/i18n/areas/fuel-r21a-pick.ts'));
 });

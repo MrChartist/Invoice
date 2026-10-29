@@ -51,7 +51,7 @@ import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Inventory.module.css';
 import { INVENTORY_PACK_TABS, INVENTORY_TABS, type InventoryPackTab, type InventoryTab } from './page-tabs'; // R6-B1; R9 pack desks
-import { visibleTabs } from '../lib/industry-packs';
+import { visiblePackTabs } from '../lib/industry-packs';
 import { defineArea } from '../i18n/area';
 import { getJson, peekTable, DB_PREFIX } from '../lib/storage';
 import { discoverT } from '../i18n/areas/discover-r6';
@@ -74,9 +74,10 @@ const MillDesk = lazy(() => import('../components/agri/MillDesk'));
 const ColdDesk = lazy(() => import('../components/agri/ColdDesk'));
 const InputsDesk = lazy(() => import('../components/agri/InputsDesk'));
 const MembersDesk = lazy(() => import('../components/agri/MembersDesk'));
+const FuelDesk = lazy(() => import('../components/fuel/FuelDesk')); // R21: the fuel desk (views mounted by file name)
 const r9TabT = defineArea(
-  { pharmacy: 'Pharmacy', apparel: 'Apparel', devices: 'Devices', jewellery: 'Jewellery', shortbook: 'Short book', farm: 'Farm', dairy: 'Dairy', mill: 'Mill', cold: 'Cold storage', inputs: 'Inputs', members: 'Members' } as const,
-  { pharmacy: 'फ़ार्मेसी', apparel: 'कपड़े', devices: 'डिवाइस', jewellery: 'ज्वेलरी', shortbook: 'शॉर्ट बुक', farm: 'खेती', dairy: 'डेयरी', mill: 'मिल', cold: 'शीतगृह', inputs: 'खाद-बीज', members: 'सदस्य' },
+  { pharmacy: 'Pharmacy', apparel: 'Apparel', devices: 'Devices', jewellery: 'Jewellery', shortbook: 'Short book', farm: 'Farm', dairy: 'Dairy', mill: 'Mill', cold: 'Cold storage', inputs: 'Inputs', members: 'Members', fuel: 'Fuel' } as const,
+  { pharmacy: 'फ़ार्मेसी', apparel: 'कपड़े', devices: 'डिवाइस', jewellery: 'ज्वेलरी', shortbook: 'शॉर्ट बुक', farm: 'खेती', dairy: 'डेयरी', mill: 'मिल', cold: 'शीतगृह', inputs: 'खाद-बीज', members: 'सदस्य', fuel: 'ईंधन' },
 );
 /** R9: the short book tab shows for a retail counter, once it is switched on, or once it has rows. */
 const shortBookShown = (): boolean => {
@@ -170,7 +171,7 @@ export function Inventory() {
     ['analysis', skT('tabAnalysis')], ['depth', skT('tabDepth')], ...(showBatches ? [['expiry', skT('tabExpiry')]] : []),
     ['hsn', trT('hsnTitle')], // R8-C (TR-C4)
     ...(shortBookShown() || tab === 'shortbook' ? [['shortbook', r9TabT('shortbook')]] : []), // R9 (RT-A4)
-    ...visibleTabs(INVENTORY_PACK_TABS, localDb.settings.get(), tab).map((t) => [t.id, r9TabT(t.id)]), // R9 pack desks
+    ...visiblePackTabs(INVENTORY_PACK_TABS, localDb.settings.get(), tab).map((t) => [t.id, r9TabT(t.id)]), // R9 pack desks
   ] as [Tab, string][]);
   // Stock groups / categories (WP-8): filters appear once any exist.
   /* eslint-disable react-hooks/exhaustive-deps */
@@ -430,6 +431,7 @@ export function Inventory() {
             {activeTab === 'cold' && <ColdDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
             {activeTab === 'inputs' && <InputsDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
             {activeTab === 'members' && <MembersDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
+            {activeTab === 'fuel' && <FuelDesk view={searchParams.get('view') ?? undefined} onDone={(m, bad) => { refresh(); notify(m, bad ? 'error' : undefined); }} />}
           </Suspense>
         ) : !hasItems ? (
           <EmptyState

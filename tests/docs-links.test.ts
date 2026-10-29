@@ -13,8 +13,9 @@ const read = (p: string) => readFileSync(p, 'utf8');
 // R17: MP ids (manpower); MP sits before P so "MP1" is never read as "P1".
 // R18: HS ids (housing societies); no id is a bare S, so "HS1" is never read as "S1".
 // R19: LG ids (logistics). LG ends in G and CA_LIST_RE has no leading \b, so LG sits before G: "LG1" is never read as "G1".
-const CITED_RE = /CA_REVIEW[^\n]*?\b((?:MF|MP|HS|LG|AG|G|TV|T|PS|PF|P|AC|I|X|CN|SV)\d{1,2})\b/g;
-const CA_LIST_RE = /(?:MF|MP|HS|CN|SV|AG|LG|G|TV|T|PS|PF|P|AC|I|X)\d{1,2}/g;
+// R21: FU ids (fuel). FU ends in U and no prefix is U or F, so "FU1" is never read as a shorter id.
+const CITED_RE = /CA_REVIEW[^\n]*?\b((?:MF|MP|HS|LG|FU|AG|G|TV|T|PS|PF|P|AC|I|X|CN|SV)\d{1,2})\b/g;
+const CA_LIST_RE = /(?:MF|MP|HS|CN|SV|AG|LG|FU|G|TV|T|PS|PF|P|AC|I|X)\d{1,2}/g;
 
 test('every docs/features/*.md path named in the roadmap exists', () => {
   const roadmap = read('docs/ROADMAP.md');
@@ -93,4 +94,13 @@ test('R19: CA-id patterns read LG ids whole and never as G ids; G alone still re
   assert.deepEqual("ca: ['LG1']".match(CA_LIST_RE), ['LG1'], 'LG1 is never read as G1');
   const row = /^\| ((?:G|TR|TV|T|PS|PF|P|AC|I|X|HT|RT|CN|SV|AG|MF|MP|HS|LG)\d+)\b/gm;
   assert.deepEqual([...'| LG1 ★ | x |\n| G1 | y |\n| AG1 | z |'.matchAll(row)].map((m) => m[1]), ['LG1', 'G1', 'AG1']);
+});
+
+test('R21: CA-id patterns read FU ids whole', () => {
+  assert.deepEqual("ca: ['FU1', 'P1', 'FU30']".match(CA_LIST_RE), ['FU1', 'P1', 'FU30']);
+  assert.equal('FUZ1'.match(CA_LIST_RE), null, 'FU needs a digit');
+  assert.deepEqual('FUX1'.match(CA_LIST_RE), ['X1'], 'never an FU id without its digit');
+  assert.deepEqual([...'see CA_REVIEW FU12 and CA_REVIEW P1'.matchAll(CITED_RE)].map((m) => m[1]), ['FU12', 'P1']);
+  const row = /^\| ((?:G|TR|TV|T|PS|PF|P|AC|I|X|HT|RT|CN|SV|AG|MF|MP|HS|LG|FU)\d+)\b/gm;
+  assert.deepEqual([...'| FU1 ★ | x |\n| P1 | y |\n| FU30 | z |'.matchAll(row)].map((m) => m[1]), ['FU1', 'P1', 'FU30']);
 });

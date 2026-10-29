@@ -30,7 +30,8 @@ export type AdvancedId =
   | 'travelProfile' // R15 (R15-B1)
   | 'manpowerProfile' // R17 (R17-A1)
   | 'societyProfile' // R18 (R18-A1)
-  | 'logisticsProfile'; // R19 (R19-A1)
+  | 'logisticsProfile' // R19 (R19-A1)
+  | 'fuelProfile'; // R21 (R21-A1)
 
 export interface FeatureRow {
   /** `mod.<id>`, `pack.<id>` or `adv.<id>`. */
@@ -120,6 +121,8 @@ const ADVANCED: readonly { id: AdvancedId; href: string; isOn: FeatureRow['isOn'
   { id: 'societyProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { society_kind?: unknown }).society_kind === 'string' },
   // R19 (R19-A1): the logistics profile (Settings → Features under Transport)
   { id: 'logisticsProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { logistics_kind?: unknown }).logistics_kind === 'string' },
+  // R21 (R21-A1): the fuel profile (Settings → Features under Kirana)
+  { id: 'fuelProfile', href: '/settings?tab=features', isOn: (s) => typeof (s as { fuel_kind?: unknown }).fuel_kind === 'string' },
 ];
 
 /** Where each module's screen is (the first sidebar route that belongs to it). */
@@ -199,6 +202,9 @@ export const PACK_HREF: Readonly<Record<PackId, string>> = {
   customs: '/time?tab=shipments',
   courier: '/time?tab=shipments',
   warehouse: '/time?tab=shipments',
+  // R21 (R21-A1): the fuel desk (tab on Inventory)
+  fuel: '/inventory?tab=fuel',
+  lpg: '/inventory?tab=fuel&view=lpg',
 };
 
 export const FEATURE_ROWS: readonly FeatureRow[] = [

@@ -530,6 +530,8 @@ const RECORD_TABLES = [
   'lg_jobs',
   // R19-D: courier manifests (customer × month, dockets inside)
   'lg_manifests',
+  // R21: fuel tables (A registers every package's: nozzles, prices; B shifts; C tank logs; D credit slips)
+  'fuel_nozzles', 'fuel_prices', 'fuel_shifts', 'fuel_tank_logs', 'fuel_slips',
   // Voucher types master (P1-13, 7Q)
   'voucher_types',
 ];
@@ -658,6 +660,8 @@ const ID_TABLES = new Set([
   'lg_jobs',
   // R19-D: courier manifests (customer × month, dockets inside)
   'lg_manifests',
+  // R21: fuel tables (A registers every package's: nozzles, prices; B shifts; C tank logs; D credit slips)
+  'fuel_nozzles', 'fuel_prices', 'fuel_shifts', 'fuel_tank_logs', 'fuel_slips',
   'voucher_types',
 ]);
 
