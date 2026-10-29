@@ -30,6 +30,7 @@ import { recT } from '../../i18n/areas/recurring';
 import { SnapshotFields } from '../custom-fields/SnapshotFields';
 import { customFieldsDb, finalizeValues } from '../../lib/custom-fields';
 import { areaNodes } from '../../i18n/areas/nodes';
+import { loadPaymentTerms } from '../../lib/payment-terms';
 
 export interface RecurringEditorProps {
   open: boolean;
@@ -111,6 +112,9 @@ function EditorBody({
   const [maxRuns, setMaxRuns] = useState(schedule?.max_runs ? String(schedule.max_runs) : '');
   const [dueIn, setDueIn] = useState(String(schedule?.due_in_days ?? localDb.settings.get().defaultDueDays ?? 14));
   const [mode, setMode] = useState<RecurringMode>(schedule?.mode ?? 'draft');
+  // PENDING 49 (8.111): instalments on every run — a payment term, or the source document's schedule re-dated.
+  const [termId, setTermId] = useState(schedule?.payment_terms_id ?? '');
+  const terms = useMemo(() => loadPaymentTerms().filter((t) => !t.inactive || t.id === schedule?.payment_terms_id), [schedule?.payment_terms_id]);
   const [errors, setErrors] = useState<string[]>([]);
 
   const sourceDate = (savedInvoices.find((i) => i.id === sourceId) ?? initialSource)?.issue_date;
@@ -204,17 +208,17 @@ function EditorBody({
           next_run: nextRun,
           due_in_days: Math.max(0, Math.floor(num(dueIn, 14))),
           mode,
+          payment_terms_id: termId || undefined,
         });
       } else {
-        saved = recurringDb.save(
-          createSchedule({
-            name,
-            template: cleaned,
-            ...rule,
-            due_in_days: num(dueIn, 14),
-            mode,
-          }),
-        );
+        const created = createSchedule({
+          name,
+          template: cleaned,
+          ...rule,
+          due_in_days: num(dueIn, 14),
+          mode,
+        });
+        saved = recurringDb.save(termId ? { ...created, payment_terms_id: termId } : created);
       }
       onSaved(saved);
       onClose();
@@ -440,6 +444,15 @@ function EditorBody({
                 value={dueIn}
                 onChange={(e) => setDueIn(e.target.value)}
               />
+            </div>
+          </div>
+          <div className={controls.row}>
+            <div className={controls.field}>
+              <label className={controls.label} htmlFor="rec-term">{recT('instTerm')}</label>
+              <select id="rec-term" className={controls.select} value={termId} onChange={(e) => setTermId(e.target.value)} data-rec-term>
+                <option value="">{template.instalments?.length ? recT('instFromDoc', { n: template.instalments.length }) : recT('instNone')}</option>
+                {terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
             </div>
           </div>
           <div className={controls.row}>

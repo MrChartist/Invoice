@@ -162,6 +162,27 @@ the dashboard tile **Insights**.
   behind **More details**.
 - **A6 Cash sale (walk-in)**: fills the POS walk-in name, clears the address and sets Fully paid + Cash.
 
+## 8.111 Follow-ups (PENDING 49)
+
+- **PDF month-end pack**: "Download pack (PDF)" next to the ZIP. `report-pack-pdf.ts` (lazy, own chunk) builds the same
+  files as the ZIP (`buildPackFiles`) and lays each CSV out as an escaped HTML table on an A4 paper — P&L, balance
+  sheet, ageing, one GSTR-1 paper with only the sections that have rows, GSTR-3B — captured through `PdfBuilder`
+  (`html-to-image` + `jspdf`, Critical Rule 6) from an off-screen host. The HTML GST summary and README stay ZIP-only.
+  Long tables are sliced at A4 page height (a row may split across pages — working paper).
+- **Instalments on recurring templates**: `RecurringTemplate.instalments` (additive) keeps the source document's
+  payment schedule as day offsets from its issue date (`templateInstalments`); every run re-dates them from its own
+  issue date (`datedInstalments`, ids `<doc>-i<n>`), and the template key never reaches the invoice. The editor now
+  offers **Payment instalments on every run**: a payment term (`RecurringSchedule.payment_terms_id`, already honoured by
+  the generator since R2-A1 but with no field) or the source document's schedule. A term wins over the template.
+- **Insights per branch**: with branches set up the Insights tile shows a branch picker (All / each branch / No branch).
+  `branchInsightInput` narrows sales and bills with `branchPredicates` (the lists' and reports' rules) and payments by
+  their invoices; the stock card is left out for a branch (stock is per godown). Picker state is not stored.
+- **POS signature pad**: after a sale, "Get signature" opens the editor's R3-C2 dialog (lazy `DeliveryProofDialog`,
+  canvas `SignaturePad` — no new dependency) for the last saved, unsigned invoice / bill of supply (`doc.edit`); the
+  signature is the document's `delivery_proof` (`setDeliveryProof`, audited).
+- **GST relief on bad debts**: none in GST (documented only, as before).
+- Tests: `report-pack-pdf`, `recurring-instalments`, `insights-branch`, `pos-signature`.
+
 ## Bundle
 
 All screens are lazy chunks (sheet, schedule card, margin chip, pay-mode chips, insights, Today, views bar, bulk

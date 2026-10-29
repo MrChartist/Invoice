@@ -572,7 +572,7 @@ Zoho Books / FreshBooks / Xero / TallyPrime 7 habits, offline: deposits and acce
 | 8.108 | ✅ **Offline insights** (deterministic): revenue vs 3-month average, top customers, expense heads spiking, DSO change, customers paying slower, margin erosion, stock at risk, GST payable trend; each card drills into its report | `insights.ts`, `InsightsPanel.tsx` (dashboard tile) | done |
 | 8.109 | ✅ **Saved report views** (device-local: name + tab + period + every report's F12 options) and **month-end packs** (P&L, BS, ageing, GSTR-1 / 3B papers in one ZIP; monthly schedule offered by the bell, auto-written to a connected backup folder) | `report-views.ts`, `report-pack.ts`, `report-pack-alerts.ts`, `ReportViewsBar.tsx` | done |
 | 8.110 | ✅ **Editor flow** (competitor tutorials): Record payment in Document actions; payment mode chips + UTR and "Fully paid" on Amount received (the receipt is recorded with that mode); split Save (Save / Save & print / Save & WhatsApp, remembered per device); Alt+P print, Alt+D duplicate; customer & items first (document details as one line, party extras behind "More details"); "Cash sale (walk-in)" chip | `counter-receipt.ts`, `PayModeChips.tsx`, `save-choice.ts`, `MetaSummary.tsx`, `editor-actions.ts`, `PartiesSection.tsx` | done |
-| 8.111 | ⏳ 8G follow-ups: PDF (not just ZIP) month-end pack; GST relief on bad debts (none in GST — documented only); schedule instalments on recurring templates; insights per branch; signature pad in the POS | — | open |
+| 8.111 | ✅ 8G follow-ups: PDF (not just ZIP) month-end pack; GST relief on bad debts (none in GST — documented only); schedule instalments on recurring templates; insights per branch; signature pad in the POS | — | done (PENDING 49, `features/invoicing-ux.md` §8.111) |
 ### 8H · Shop mode, languages, reach (`docs/features/shop-mode.md`, `docs/features/i18n.md`, `docs/features/loans.md`, `docs/features/security.md` § user rights)
 
 Vyapar / myBillBook / OkCredit parity for small shops, offline. First-paint JS +0.4 kB gz (176.7 → 177.1).
@@ -740,9 +740,9 @@ document / transaction date; stored codes, return marks and keys are unchanged.
 |---|---|---|
 | 23 | ✅ Income-tax Act 2025 section / form labels across TDS, TCS, receivables, payroll, editor and exports (date-keyed, append-only `ACT_REF_RULES` / `FORM_REF_RULES` / `OLD_CODE_SHOWN_RULES` in `src/lib/ita2025.ts`) | done: labels only, stored codes unchanged |
 | 23a | ⏳ Confirm the Sec 393 / 394 table items against the enacted Act and flip `verified` with new dated entries | open (verify with your CA) |
-| 23b | ⏳ 2025-Act RPU section codes for Forms 140 / 143 / 144 (add to `tds-rules.ts` once the Protean RPU format is confirmed) | open, waiting for the RPU file format |
+| 23b | ✅ 2025-Act RPU section codes for Forms 140 / 143 / 144 (`RPU_2025_CODE_RULES` in `tds-rules.ts`, Protean file formats v1.2) | done (tour package / luxury goods codes picked in the RPU) |
 | 23c | ⏳ Form 143 due dates (15th vs 31st; `TDS_DUE_RULES` keeps the 15th) | open |
-| 23d | ⏳ Finance Act 2026 TCS rates (tour package / LRS education 2%), as new `TCS_PRESET_RULES` entries when such presets are offered | open |
+| 23d | ✅ Finance Act 2026 TCS rates (tour package / LRS education 2%), a new `TCS_PRESET_RULES` row from 2026-04-01 (`verified: false`) | done |
 
 ## Round 5: industry packs for Indian SMB verticals (v6.x) · ✅ done
 

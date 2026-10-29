@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { History, Keyboard, Minus, Pause, Plus, Printer, ReceiptText, RotateCcw, Save, Tags, Trash2, UserRound, X } from 'lucide-react';
-import { Camera, Clock, MessageCircle, Monitor, Settings2, Store } from 'lucide-react';
+import { Camera, Clock, MessageCircle, Monitor, Pencil, Settings2, Store } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useToast } from '../components/ui/useToast';
 import { NumberInput } from '../components/ui/NumberInput';
@@ -95,6 +95,11 @@ const ShiftPanel = lazy(() => import('../components/pos-retail/ShiftPanel').then
 const QuickItemSheet = lazy(() => import('../components/pos/QuickItemSheet').then((m) => ({ default: m.QuickItemSheet })));
 // R3-A: modifier picker (when a linked item is added) and the bill as an image — both load on first use.
 const ModifierPicker = lazy(() => import('../components/restaurant/ModifierPicker').then((m) => ({ default: m.ModifierPicker })));
+// PENDING 49 (8.111): POS signature pad — the editor's R3-C2 "Get signature" dialog (canvas `SignaturePad`, no new dependency).
+/** PENDING 49: a saved, unsigned POS invoice / bill of supply can take the customer's signature (proof of delivery). */
+const posSignable = (d: Pick<InvoiceRecord, 'doc_type' | 'status' | 'delivery_proof'>): boolean =>
+  ['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY'].includes(d.doc_type) && d.status !== 'Draft' && d.status !== 'Cancelled' && !d.delivery_proof && can('doc.edit');
+const DeliveryProofDialog = lazy(() => import('../components/creator/DeliveryProofDialog'));
 const BillImageShare = lazy(() => import('../components/restaurant/BillImageShare').then((m) => ({ default: m.BillImageShare })));
 type ModGroup = import('../types/restaurant').ModifierGroup;
 
@@ -228,6 +233,7 @@ export function Pos() {
   const [changeStrip, setChangeStrip] = useState<{ amount: number; key: number } | null>(null);
   const [modFor, setModFor] = useState<{ item: InvoiceItem; groups: ModGroup[]; qty?: number } | null>(null); // R3-A4
   const [imageFor, setImageFor] = useState<InvoiceRecord | null>(null); // R3-A5
+  const [signFor, setSignFor] = useState<InvoiceRecord | null>(null); // PENDING 49
   const [lastShare, setLastShare] = useState<InvoiceRecord | null>(null);
   const [delivery, setDelivery] = useState<DeliveryInfo | null>(null); // R9 (RT-A3)
   const [rxPos, setRxPos] = useState<PosRx | null>(null); // R9 (RT-B1) prescription strip
@@ -871,6 +877,11 @@ export function Pos() {
                 <MessageCircle size={16} /> {retailT('whatsapp')}
               </button>
             ))}
+            {lastBill && posSignable(lastBill) && (
+              <button type="button" className={controls.btnOutline} onClick={() => setSignFor(lastBill)} data-pos-signature>
+                <Pencil size={16} /> {posT('signature')}
+              </button>
+            )}
             {lastShare && (
               <button type="button" className={controls.btnOutline} onClick={() => setImageFor(lastShare)} data-pos-share-image>
                 <Camera size={16} /> {rPosT('shareImage')}
@@ -1351,6 +1362,7 @@ export function Pos() {
             }}
           />
         )}
+        {signFor && <DeliveryProofDialog invoice={signFor} onClose={() => setSignFor(null)} onDone={() => setLastBill(localDb.invoices.getById(signFor.id) ?? null)} />}
         {imageFor && <BillImageShare invoice={imageFor} onDone={(r) => { setImageFor(null); if (!r.ok) notify(r.message ?? posT('saveFailed'), 'error'); }} />}
       </Suspense>
       {waFor && (

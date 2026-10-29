@@ -221,6 +221,56 @@ export const TCS_27EQ_CODES: readonly { match: RegExp; code: string; label: stri
   { match: /206C\(1F\) notified luxury/i, code: '', label: '206C(1F) notified luxury goods (code to confirm — verify with your CA)' },
 ];
 
+/**
+ * 23b: Income-tax Act 2025 section / collection codes of the quarterly statements (Forms 140 / 143 / 144, TY 2026-27
+ * onwards), read in Annexure 2 of the Protean file formats v1.2 (22 Jul 2026). `tds`: internal payable code → code;
+ * `tcs`: TCS label pattern → code (first match wins; '' = several codes fit, pick in the RPU). Before 1 Apr 2026 the
+ * 1961-Act codes above apply (`null`). Append a new dated row when a later file format changes a code.
+ */
+export interface Rpu2025Codes { tds: Readonly<Record<string, string>>; tcs: readonly { match: RegExp; code: string }[] }
+
+export const RPU_2025_CODE_RULES: readonly Versioned<Rpu2025Codes | null>[] = [
+  { from: '2017-07-01', value: null, source: '1961-Act RPU codes' },
+  {
+    from: '2026-04-01',
+    value: {
+      tds: {
+        '194C-1': '1023', '194C-2': '1024', '194J': '1027', '194J-T': '1026', '194I-A': '1008', '194I-B': '1009',
+        '194H': '1006', '194Q': '1031', '194A': '1022', '194O': '1035', '194R': '1033', '194S': '1037', '194T': '1067',
+        '195-R': '1057', '195-F': '1057', '195-I': '1057', '195-O': '1057',
+      },
+      tcs: [
+        // Tour package: 1088 (up to the threshold) or 1089 (above) — the 2 % rate has no threshold; confirm in the RPU.
+        { match: /overseas tour/i, code: '' },
+        { match: /1G.*(educat|medical)/i, code: '1086' },
+        { match: /1G/i, code: '1087' },
+        { match: /alcoholic liquor/i, code: '1068' },
+        { match: /tendu/i, code: '1069' },
+        { match: /timber \(forest lease\)/i, code: '1070' },
+        { match: /timber \(other mode\)/i, code: '1071' },
+        { match: /other forest produce/i, code: '1072' },
+        { match: /206C\(1\) scrap/i, code: '1073' },
+        { match: /206C\(1\) coal/i, code: '1074' },
+        { match: /motor vehicle/i, code: '1075' },
+        // Notified luxury goods: 1076–1085, one code per item — pick in the RPU.
+        { match: /notified luxury/i, code: '' },
+      ],
+    },
+    source: 'Protean e-TDS/TCS file formats v1.2 (22 Jul 2026), Forms 140 / 143 / 144, Annexure 2',
+    verified: true,
+  },
+];
+
+/** 2025-Act RPU code of an internal payable code on `date`, or undefined (1961 period / not mapped). */
+export function rpuCode2025(code: string, date: string): string | undefined {
+  return ruleAt(RPU_2025_CODE_RULES, date)?.tds[code];
+}
+
+/** 2025-Act collection code of a TCS label on `date` ('' = several codes fit), or undefined (1961 period / unknown). */
+export function tcsCode2025(label: string, date: string): string | undefined {
+  return ruleAt(RPU_2025_CODE_RULES, date)?.tcs.find((c) => c.match.test(label))?.code;
+}
+
 /* ── 7R (7.120): Form 27Q — payments to non-residents (Sec 195) ───────────── */
 
 /** Nature of a payment to a non-resident (drives the Act rate). */

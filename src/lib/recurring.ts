@@ -12,7 +12,7 @@
  * the same occurrence twice.
  */
 
-import type { Client, DocumentType, InvoiceItem, InvoiceRecord, SenderProfile } from '../types/invoice';
+import type { Client, DocumentType, InvoiceItem, InvoiceRecord, PaymentInstalment, SenderProfile } from '../types/invoice';
 import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-calc';
 import { localDb } from './localDb';
 import { generateId, getTable, setTable } from './storage';
@@ -82,6 +82,17 @@ export interface RecurringTemplate {
   cost_centre_id?: string;
   /** Additive (6.23, PENDING #25): document / party custom fields copied onto every generated invoice. */
   custom_values?: InvoiceRecord['custom_values'];
+  /** Additive (PENDING 49, 8.111): the source document's payment schedule as day offsets from its issue date; every
+      run re-dates them from its own issue date. A schedule's payment term (`payment_terms_id`) wins over them. */
+  instalments?: TemplateInstalment[];
+}
+
+export interface TemplateInstalment {
+  label?: string;
+  /** Days after the run's issue date (≥ 0). */
+  offset_days: number;
+  percent?: number;
+  amount?: number;
 }
 
 export interface RecurringHistoryEntry {
@@ -397,7 +408,28 @@ export function templateFromInvoice(inv: InvoiceRecord): RecurringTemplate {
     ...(inv.charges_taxable ? { charges_taxable: true } : {}),
     ...(inv.cost_centre_id ? { cost_centre_id: inv.cost_centre_id } : {}),
     ...(inv.custom_values?.length ? { custom_values: inv.custom_values.map((v) => ({ ...v })) } : {}),
+    ...(inv.payment_schedule?.length && parseYmd(inv.issue_date) ? { instalments: templateInstalments(inv.payment_schedule, inv.issue_date) } : {}),
   };
+}
+
+/** PENDING 49: a document's instalments as offsets from its issue date (an instalment due before the issue date → 0). */
+export function templateInstalments(rows: readonly PaymentInstalment[], issueDate: string): TemplateInstalment[] {
+  return rows.filter((r) => parseYmd(r.due_date)).map((r) => ({
+    ...(r.label ? { label: r.label } : {}),
+    offset_days: Math.max(0, daysBetween(issueDate, r.due_date)),
+    ...(r.percent != null ? { percent: r.percent } : r.amount != null ? { amount: r.amount } : {}),
+  }));
+}
+
+/** PENDING 49: the template's instalments dated for one run (ids stable per document). */
+export function datedInstalments(list: readonly TemplateInstalment[] | undefined, issue: string, docId: string): PaymentInstalment[] | undefined {
+  if (!list?.length) return undefined;
+  return list.map((x, n) => ({
+    id: `${docId}-i${n + 1}`,
+    ...(x.label ? { label: x.label } : {}),
+    due_date: addDays(issue, x.offset_days),
+    ...(x.percent != null ? { percent: x.percent } : x.amount != null ? { amount: x.amount } : {}),
+  }));
 }
 
 /** Totals for one run of a template, via the same engine the creator uses. */
@@ -468,12 +500,15 @@ export function buildInvoiceFromSchedule(
   // Deterministic ids per (schedule, occurrence): with folder sync (5.7) two devices generating the same
   // occurrence produce ONE document (merged by id), never two invoices with two numbers.
   const docId = recurringDocId(s.id, occurrence);
+  const { instalments, ...tpl } = t;
+  const schedule = datedInstalments(instalments, issue, docId);
   const raw = {
-    ...t,
+    ...tpl,
     id: docId,
     invoice_number: opts.invoiceNumber,
     issue_date: issue,
     due_date: addDays(issue, s.due_in_days),
+    ...(schedule ? { payment_schedule: schedule } : {}),
     status: s.mode === 'issue' ? 'Sent' : 'Draft',
     amount_paid: 0,
     items: amountHook(s, occurrence).map((i, n) => ({
