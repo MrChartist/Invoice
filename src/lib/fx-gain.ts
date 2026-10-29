@@ -120,7 +120,7 @@ export function foreignReceipts(invoices: readonly InvoiceRecord[], payments: re
       bookRate: fxRate(inv),
       realisedRate: cleanRate(p.realised_rate),
       fx: realisedFx(p, inv),
-      ...(p.exchange_purchase_id ? { netted: true } : {}),
+      ...((p as { netting_id?: string }).netting_id ? { netted: true } : {}),
     });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date) || a.invoiceNumber.localeCompare(b.invoiceNumber));
