@@ -103,9 +103,14 @@ period's first day, which gives this result automatically: Q4 FY 2025-26 shows F
 1. **Table items other than 194C and 192** come from the Bill's Tables and from secondary sources that agree with them. Check them against the
    enacted Act as amended by the Finance Act 2026 before relying on them, then set `verified: true` in a **new dated
    entry** (do not edit the existing one).
-2. **RPU / payment section codes for Forms 140 / 143 / 144.** Blogs disagree (for example 1023/1024 or 1018/1019 for 6(i)). The
-   working papers keep the 1961 RPU codes (`94C`, `4JB`, `6CQ` …) and add a "Section references" block and a warning.
-   Map the codes in the RPU, and add the new codes to `tds-rules.ts` once the Protean RPU file format is confirmed.
+2. **RPU / payment section codes for Forms 140 / 143 / 144 — done (23b).** Read in Annexure 2 of the Protean e-TDS / TCS file
+   formats v1.2 (22 Jul 2026, TY 2026-27 onwards: `Form Number 140 - 26Q`, `143-27EQ`, `144-27Q` on tinpan.proteantech.in):
+   `RPU_2025_CODE_RULES` in `tds-rules.ts` (dated 2026-04-01, `verified: true`; `rpuCode2025` / `tcsCode2025`). Form 140 /
+   144 / 143 papers from Q1 FY 2026-27 carry them (194C 1023 / 1024, 194J 1027 / 1026 technical, 194I 1008 / 1009,
+   194H 1006, 194Q 1031, 194A 1022, 194-O 1035, 194R 1033, 194S 1037, 194T 1067, Sec 195 → 1057; TCS LRS 1087,
+   LRS education / medical 1086, 206C(1) goods 1068–1074, motor vehicle 1075). Left blank, picked in the RPU: overseas tour
+   package (1088 up to / 1089 above the threshold — the 2 % rate has none) and notified luxury goods (1076–1085, one per item).
+   Earlier quarters keep the 1961 codes. The Form 144 nature-of-remittance master (updated in v1.2) is not mapped.
 3. **Form 143 (TCS) due dates.** The Form 143 guide reads 31 Jul / Oct / Jan / May, but the Jan 2026 TCS guide reads the 15th. `TDS_DUE_RULES`
    keeps the 15th (the earlier, conservative date) until this is confirmed.
 4. **Forms 130 / 131 / 133 / 143** numbering was seen only in official page titles via a search index.
@@ -115,7 +120,11 @@ period's first day, which gives this result automatically: Q4 FY 2025-26 shows F
    - liquor, scrap and minerals: 2%;
    - tendu leaves: 2%.
 
-   The app's only current TCS preset is LRS at 20%, which is unchanged. If a tour-package or education preset is added, add it as a new entry in `TCS_PRESET_RULES`.
+   **Done (23d):** a `TCS_PRESET_RULES` row from 2026-04-01 (`verified: false`) adds "206C(1G) LRS education / medical 2%"
+   (above ₹10 lakh a year) and "206C(1G) overseas tour package 2%" next to LRS 20 % (unchanged). In force from 1 Apr 2026 as stated by
+   an AD bank's LRS notice ("vide Finance Act, 2026 … w.e.f. 1st April 2026") and matched by the Protean Form 143 codes
+   1086 / 1088–1089; the enacted Finance Act 2026 text itself was not read — verify with your CA. Liquor / scrap / minerals /
+   tendu at 2 % are trading presets (`trading-rules.ts`), not touched here.
 6. **Other 1961 references not mapped:**
    - salary computation sections in payroll (17, 10, 16, 80C…, 87A, 89, 115BAC), where the Form 16 Part B paper adds a
      note;
@@ -131,9 +140,9 @@ period's first day, which gives this result automatically: Q4 FY 2025-26 shows F
 |---|---|---|
 | 23 | Income-tax Act 2025 section / form labels across TDS, TCS, receivables, payroll, editor and exports (date-keyed, append-only, `src/lib/ita2025.ts`) | ✅ done: labels only, stored codes unchanged |
 | 23a | Confirm the Sec 393 / 394 table items against the enacted Act and flip `verified` with new dated entries | ⏳ verify with your CA |
-| 23b | 2025-Act RPU section codes for Forms 140 / 143 / 144 | ⏳ open, waiting for the RPU file format |
+| 23b | 2025-Act RPU section codes for Forms 140 / 143 / 144 | ✅ done: `RPU_2025_CODE_RULES` from the Protean file formats v1.2 (tour package / luxury goods left to pick) |
 | 23c | Form 143 due dates (15th vs 31st) | ⏳ open |
-| 23d | Finance Act 2026 TCS rates (tour package / LRS education 2%), for when such presets are offered | ⏳ open |
+| 23d | Finance Act 2026 TCS rates (tour package / LRS education 2%) | ✅ done: `TCS_PRESET_RULES` row from 2026-04-01, `verified: false` |
 
 ## Tests
 

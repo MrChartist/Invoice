@@ -607,6 +607,21 @@ export function s17viiLimit(fyStart: string): number | null {
   return fyStart < S17_2_VII_RULES[0].from ? null : ruleAt(S17_2_VII_RULES, fyStart).limit;
 }
 
+/**
+ * s. 17(2)(viia) annual accretion (7.149): TP = (PC / 2) × R + (PC1 + TP1) × R, R = I ÷ Favg, Favg = (opening +
+ * closing balance) ÷ 2; PC1 / TP1 count years from `first_fy`; PC1 + TP1 above the opening balance is ignored.
+ * Read from a secondary reproduction of the notification, not the Gazette text — UNVERIFIED.
+ */
+export const S17_2_VIIA_RULES: readonly Versioned<{ first_fy: string }>[] = [
+  { from: '2020-04-01', value: { first_fy: '2020-04-01' }, verified: false, source: 'Income-tax Rules 1962, Rule 3B (Notification 11/2021, 5 Mar 2021; from secondary text) — UNVERIFIED' },
+  { from: '2026-04-01', value: { first_fy: '2020-04-01' }, verified: false, source: 'Income-tax Rules 2026, Rule 16 (accretion rule under the 2025 Act; same formula per secondary sources) — UNVERIFIED' },
+];
+
+/** Rule 3(1) Table I: hotel accommodation — the lower of `pct`% of salary and the charges; nil on transfer within `free_days`. */
+export const HOTEL_PERQ_RULES: readonly Versioned<{ pct: number; free_days: number }>[] = [
+  { from: '2001-04-01', value: { pct: 24, free_days: 15 }, verified: false, source: 'Income-tax Rules 1962, Rule 3(1) Table I (hotel: 24% of salary or charges, lower; nil on transfer for 15 days or less) — UNVERIFIED; 2026 Rules not checked' },
+];
+
 /* ── ESI: employee share not deducted on low daily wages ─────────────── */
 
 /**

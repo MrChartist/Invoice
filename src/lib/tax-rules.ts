@@ -15,6 +15,8 @@ export interface Versioned<T> {
   value: T;
   /** Short citation shown in tooltips/docs. */
   source?: string;
+  /** `false` when the row was not read in a primary text (verify with your CA). */
+  verified?: boolean;
 }
 
 /** Today as a local `YYYY-MM-DD` day. */
@@ -128,6 +130,9 @@ const TCS_1H_COVID: TcsPreset[] = [
 ];
 const TCS_1G: TcsPreset = { label: '206C(1G) overseas remittance 20%', rate: 20 };
 const TCS_1G_2020: TcsPreset = { label: '206C(1G) overseas remittance 5%', rate: 5 };
+// 23d: Finance Act 2026 (Sec 394(1) Table Sl. No. 7.D(a) / Sl. No. 8). LRS other purposes stays 20 %.
+const TCS_1G_EDU: TcsPreset = { label: '206C(1G) LRS education / medical 2%', rate: 2 }; // above ₹10 lakh a year
+const TCS_TOUR_2026: TcsPreset = { label: '206C(1G) overseas tour package 2%', rate: 2 };
 
 /**
  * 206C(1H) and 206C(1G) both start on 1 Oct 2020 (Finance Act 2020) — before that neither applies (no
@@ -142,6 +147,10 @@ export const TCS_PRESET_RULES: readonly Versioned<TcsPreset[]>[] = [
   { from: '2023-10-01', value: [...TCS_1H, TCS_1G], source: 'Finance Act 2023 (206C(1G) 20%)' },
   // 206C(1H) withdrawn for sales from 1 Apr 2025 (Finance Act 2025).
   { from: '2025-04-01', value: [TCS_1G], source: 'Finance Act 2025' },
+  // 23d: Finance Act 2026 — LRS education / medical 2 % above ₹10 lakh, overseas tour package 2 % flat. In force from
+  // 1 Apr 2026 as reported by an AD bank's LRS notice and the Protean Form 143 file format v1.2 (collection codes 1086 /
+  // 1088–1089); the enacted Finance Act 2026 text was not read — verify with your CA. (No `source` string: first paint.)
+  { from: '2026-04-01', value: [TCS_1G, TCS_1G_EDU, TCS_TOUR_2026], verified: false },
 ];
 
 export function tcsPresets(date?: string): TcsPreset[] {

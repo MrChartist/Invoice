@@ -9,7 +9,7 @@
 
 import { amountInWords } from '../amount-in-words';
 import { round2 } from '../invoice-calc';
-import { PT_STATES, ccd2Pct, tdsSalaryRuleFor } from '../payroll-rules';
+import { PT_STATES, ccd2Pct, s17viiLimit, tdsSalaryRuleFor } from '../payroll-rules';
 import { formatCurrency, formatDate } from '../utils';
 import type { AttendanceRow, AttendanceType, Employee, PayrollRun, PayslipLine } from '../../types/payroll';
 import { OT_HOURS_TYPE } from '../../types/payroll';
@@ -293,7 +293,12 @@ export function form24QAnnexure1Rows(runs: readonly PayrollRun[], fyStartYear: n
 export interface AnnualSalary {
   employee: Employee;
   months: number;
+  /** Payslips' taxable gross (salary u/s 17(1) + the perquisites in them). */
   gross: number;
+  /** 7.149: value of perquisites u/s 17(2) — the payslips' perquisites + the year's 17(2)(vii) excess (Form 16 1(b)). */
+  perquisites: number;
+  /** 7.149: employer PF + NPS + superannuation of the year above the s. 17(2)(vii) limit (actual, from final runs). */
+  s17_vii: number;
   prev_salary: number;
   pt: number;
   pf_ee: number;
@@ -319,15 +324,21 @@ export function annualSalary(runs: readonly PayrollRun[], employee: Employee, fy
   const rule = tdsSalaryRuleFor(regime, `${fyStartYear}-04-01`, employee.dob);
   const prev_salary = employee.prev_salary ?? 0;
   const gross = sum('taxable_gross');
+  const limit = s17viiLimit(`${fyStartYear}-04-01`);
+  const contrib = lines.reduce((s, x) => s + x.l.eps + x.l.epf_er + (x.l.nps_er ?? 0) + (x.l.super_er ?? 0), 0);
+  const s17_vii = limit === null ? 0 : Math.max(0, round2(contrib - limit));
+  const perquisites = round2(lines.reduce((s, x) => s + (x.l.perquisites ?? 0), 0) + s17_vii);
   const nps = round2(lines.reduce((s, x) => s + (x.l.nps_er ?? 0), 0));
   const npsCap = round2((lines.reduce((s, x) => s + x.l.pf_wages, 0) * ccd2Pct(regime, `${fyStartYear}-04-01`)) / 100);
-  const income = salaryIncome({ gross: gross + prev_salary, pt: sum('pt'), hra_exemption: employee.hra_exemption, deductions: employee.tax_deductions, other_income: employee.other_income, nps_er: nps, nps_cap: npsCap }, rule);
+  const income = salaryIncome({ gross: gross + s17_vii + prev_salary, pt: sum('pt'), hra_exemption: employee.hra_exemption, deductions: employee.tax_deductions, other_income: employee.other_income, nps_er: nps, nps_cap: npsCap }, rule);
   const fyFrom = `${fyStartYear}-04-01`;
   const fyTo = `${fyStartYear + 1}-03-31`;
   return {
     employee,
     months: lines.length,
     gross,
+    perquisites,
+    s17_vii,
     prev_salary,
     pt: sum('pt'),
     pf_ee: sum('pf_ee'),
@@ -343,7 +354,7 @@ export function annualSalary(runs: readonly PayrollRun[], employee: Employee, fy
 /** Form 24Q Annexure II (Q4): salary details of every employee for the FY. */
 export function form24QAnnexure2Rows(runs: readonly PayrollRun[], employees: readonly Employee[], fyStartYear: number): Row[] {
   const out: Row[] = [[
-    'Employee code', 'PAN', 'Employee name', 'Period from', 'Period to', 'Opted for s. 115BAC (new regime)', 'Gross salary s. 17(1) (this employer)',
+    'Employee code', 'PAN', 'Employee name', 'Period from', 'Period to', 'Opted for s. 115BAC (new regime)', 'Gross salary s. 17(1) (this employer)', 'Value of perquisites s. 17(2)',
     'Salary from previous employer', 'Exemptions s. 10 (HRA)', 'Standard deduction s. 16(ia)', 'Professional tax s. 16(iii)', 'Income chargeable under Salaries',
     'Other income reported', 'Gross total income', 'Chapter VI-A deductions', 'Total taxable income', 'Tax on total income', 'Rebate u/s 87A', 'Surcharge',
     'Health & education cess', 'Tax payable', 'TDS by this employer', 'TDS by previous employer', 'Shortfall (+) / excess (−)',
@@ -353,7 +364,7 @@ export function form24QAnnexure2Rows(runs: readonly PayrollRun[], employees: rea
     if (!a) continue;
     const deducted = round2(a.tds + a.prev_tds);
     out.push([
-      e.code, e.pan || 'PANNOTAVBL', e.name, formatDate(a.from), formatDate(a.to), e.tax_regime === 'old' ? 'No' : 'Yes', a.gross, a.prev_salary,
+      e.code, e.pan || 'PANNOTAVBL', e.name, formatDate(a.from), formatDate(a.to), e.tax_regime === 'old' ? 'No' : 'Yes', round2(a.gross + a.s17_vii - a.perquisites), a.perquisites, a.prev_salary,
       a.income.exemptions, a.income.standard_deduction, a.income.pt, a.income.income_from_salary, a.income.other_income, a.income.gross_total_income,
       a.income.deductions, a.income.total_income, a.tax.tax_on_income, a.tax.rebate, a.tax.surcharge, a.tax.cess, a.tax.total, a.tds, a.prev_tds,
       round2(a.tax.total - deducted),
@@ -374,7 +385,8 @@ export function form16PartBRows(runs: readonly PayrollRun[], employee: Employee,
     ['Particulars', 'Amount'],
     [`${formText('16', fyStart(fyStartYear))} Part B — ${employee.name} (${employee.code}), PAN ${employee.pan || 'not available'}, FY ${fy}`, ''],
     [`Period with employer: ${formatDate(a.from)} to ${formatDate(a.to)} · Regime: ${employee.tax_regime === 'old' ? 'old' : 'new (s. 115BAC)'}`, ''],
-    ['1(a) Salary as per s. 17(1)', a.gross],
+    ['1(a) Salary as per s. 17(1)', round2(a.gross + a.s17_vii - a.perquisites)],
+    [`1(b) Value of perquisites u/s 17(2) (as per ${formText('12BA', fyStart(fyStartYear))})`, a.perquisites],
     ['1(e) Salary from previous employer(s)', a.prev_salary],
     ['1(d) Total gross salary', i.gross],
     ['2 Less: allowances exempt u/s 10 (HRA)', i.exemptions],

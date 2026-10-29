@@ -107,7 +107,8 @@ All tables (the 7P and 7T ones too) are in `TABLE_ACTIONS` (`access.ts`) under `
 - **s. 17(2)(vii)**: employer PF (EPF + EPS), NPS (80CCD(2) heads) and superannuation (employer heads marked
   "superannuation") for the year — actual FINAL months + this month + the full-month rate for the rest — above ₹7.5 lakh is
   added to the year's taxable salary in the TDS projection (`tds_working.s17_vii`, payslip note; never in the month's
-  `taxable_gross`, so it is not counted twice). Reports → annual working per employee. 17(2)(viia) accretion is noted only.
+  `taxable_gross`, so it is not counted twice). Reports → annual working per employee. **7.149:** Form 16 Part B and
+  24Q Annexure II add the year's actual excess (final payslips) to income and to the perquisite line (below).
 - **ESI low daily wage**: when ESI wages ÷ paid days is within the notified limit (₹176 from 2019, date-keyed), no employee
   share is deducted; the employer share is still paid (`esi_low_wage`, payslip note).
 - **Interest u/s 201(1A) on salary TDS** (Reports → annual): per final month, TDS deducted on the payroll voucher date vs
@@ -131,6 +132,39 @@ All tables (the 7P and 7T ones too) are in `TABLE_ACTIONS` (`access.ts`) under `
   which is why only the movement is posted. A posted valuation cannot change or be deleted until its journal is deleted in
   Books. **The valuation itself (projected unit credit method, assumptions) must come from a qualified actuary — the app
   does not compute it.**
+
+### 7.149 — further 7T follow-ups
+- **Form 16 / 24Q perquisite lines** (`annualSalary`): Form 16 Part B **1(a)** salary u/s 17(1) = payslips' taxable gross −
+  their perquisites; **1(b)** value of perquisites u/s 17(2) = the payslips' perquisites + the year's 17(2)(vii) excess
+  (employer PF + NPS + superannuation of the final payslips above ₹7.5 lakh), which now also joins gross salary and the
+  tax; 24Q Annexure II has the same split ("Gross salary s. 17(1)", new column "Value of perquisites s. 17(2)").
+- **Statement of perquisites — Form 12BA working** (Reports → annual, for the employee picked under Form 16;
+  `perqStatementRows`): by nature — accommodation, car, interest-free / concessional loans (the rest of each payslip's
+  perquisites after the typed ones), free meals, gifts, 17(2)(vii) contribution, 17(2)(viia) accretion, other; the total
+  equals Form 16 1(b). Perquisites typed after a month was finalized appear as a correction under "Other". The form's
+  row numbers and layout are **not** reproduced (not verified). Labelled Form 123 from tax year 2026-27 (`ita2025.ts`,
+  `verified: false`).
+- **17(2)(viia) accretion (Rule 3B)** (Rule 3 panel → "Fund accretion"; `rule3bAccretion`): TP = (PC ÷ 2) × R +
+  (PC1 + TP1) × R, R = I ÷ Favg, Favg = (balance on 1 April + on 31 March) ÷ 2; PC1 + TP1 above the opening balance is
+  ignored. "Fill from payroll" (`rule3bSuggest`) gives PC from the year's latest TDS working, PC1 from each earlier year's
+  from FY 2020-21, TP1 from `accretion` perquisites saved for those years; I and the balances come from the fund
+  statement. Saved as a one-off perquisite of kind `accretion` in the month chosen (taxable salary for TDS and Form 16).
+  `S17_2_VIIA_RULES` rows are `verified: false`: Income-tax Rules 1962 Rule 3B (Notification 11/2021) read from a
+  secondary reproduction; from 1 Apr 2026 the Income-tax Rules 2026 (Rule 16) assumed to keep the formula.
+- **Late deduction u/s 201(1A)** (Reports → annual, the 201(1A) sheet's second table; `tdsLateDeductions`): each final
+  payslip's even share is what its own projection asked for — (annual tax − deducted before) ÷ months left (the last month
+  the balance) — less the part of earlier shortfalls that projection re-spread. TDS typed below it is short from that
+  payroll date; TDS above it makes good earlier shortfalls first in first out; each part bears 1% a month or part on the
+  part rounded down to ₹100; a shortfall never made good runs to today. An estimate — whether it is a default is P19.
+- **Hotel accommodation** (Rule 3 panel; `hotelPerquisite`, `HOTEL_PERQ_RULES`, `verified: false`): the lower of 24% of
+  salary and the hotel charges, less recovery; nil on transfer for 15 days or less. Saved as kind `accommodation`.
+  Furnished accommodation was already valued (furniture 10% a year of cost, or hire).
+- **Arrear ECR checks** (`arrearEcrChecks`, listed in the arrear working sheet and counted beside the download): UAN of 12
+  digits and once only, a name, no negative amounts, EPS / EDLI wages within EPF wages, EE share = 12% of EPF wages, EPS
+  = 8.33% of EPS wages, EPS + ER = 12% of EPF wages (₹1 a month for rounding). These are the app's own checks, not the
+  EPFO file validator.
+- **Not built:** EV car rates (no rate tied to Rule 3(2) or the 2026 Rules — CA P26), funded-gratuity plan-asset movements
+  (journal treatment — CA P27), PT challans and slabs for other States (formats not verifiable).
 
 ## Arrears (back-dated revisions)
 Save the revised structure with its effective date, then Arrears → employee, "effective from" and the pay month →
@@ -269,13 +303,17 @@ accommodation 15 / 10 / 7.5% (2001 census) and 10 / 7.5 / 5% (2011 census) from 
 (UNVERIFIED counting) · arrear ECR layout · PT-on-arrears state rules (you choose the states) · actuarial journal treatment
 (benefits paid expensed through payroll; Ind AS 19 OCI to Reserves 1100).
 
+**7.149** (`verified: false`): Rule 3B accretion formula and the PC1 + TP1 cap (secondary text; 2026 Rules assumed the
+same) · hotel 24% / 15 days · Form 12BA → Form 123 · the late-deduction model (CA P19, P23–P27).
+
 ## Known gaps
-- 7T: 17(2)(viia) accretion (Rule 3B) not computed; the 17(2)(vii) excess is in the TDS projection only (not yet in Form 16 /
-  24Q Annexure II perquisite lines or a Form 12BA); 201(1A) late deduction is not detected; arrear ECR not validated against
-  the portal; funded gratuity plan-asset movements (contributions, return on assets) are not split; hotel accommodation,
-  EV cars and other Rule 3 variants are typed as "other".
+- 7T / 7.149: Form 12BA row numbers and layout not reproduced (statement of perquisites only); arrear ECR checked by the
+  app's own rules, not against the portal; funded gratuity plan-asset movements (contributions, return on assets) are not
+  split; EV cars and other Rule 3 variants (sweeper / gardener, gas / electricity, club, credit card, movable assets…) are
+  typed as "other"; 17(3) profits in lieu of salary are not split out in Form 16.
 - The gratuity provision working on the F&F tab is a simple accrual (use the actuarial valuation entry for AS-15 / Ind AS 19).
   Leave encashment exemption limbs simplified; no leave calendar, half-day / maternity rules.
 - PF: no international workers, no voluntary PF, no EPS proration in the 58th-birthday month.
-- PT for other states must be typed in the grid; PT registration / challans are not produced.
+- PT for other states must be typed in the grid; PT registration / challans are not produced (7.149: skipped — the
+  States' challan formats and slabs could not be verified).
 - The Books cash-basis P&L approximates payroll cost by payments.

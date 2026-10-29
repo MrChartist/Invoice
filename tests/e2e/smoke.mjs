@@ -691,7 +691,7 @@ try {
     await page.goto(srv.origin + '/tds?tab=returns');
     const row = page.locator('[data-form-row="26Q"]').filter({ hasText: 'ABCPK1234F' });
     await row.first().waitFor();
-    check((await row.first().innerText()).includes('4JB') && (await row.first().innerText()).includes('10000.00'), 'Form 26Q working paper lists the 194J deduction');
+    check(/4JB|1027/.test(await row.first().innerText()) && (await row.first().innerText()).includes('10000.00'), 'Form 26Q working paper lists the 194J deduction (1027 from 1 Apr 2026, 23b)');
   });
 
   await step('double-entry books: journal voucher, trial balance, balance sheet, cash flow', async () => {

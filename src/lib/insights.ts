@@ -14,6 +14,8 @@ import { isVoidStatus, readPurchase } from './purchase-normalize';
 import { documentMargin, type UnitCost } from './margin';
 import type { Client } from '../types/invoice';
 import { quietCustomers, type QuietSettings } from './quiet-customers'; // R3-B7
+import { branchPredicates, type Branch } from './branch';
+import type { PurchaseRecord } from '../types/purchases';
 
 export type InsightId = 'revenue' | 'topCustomers' | 'expenseSpike' | 'dso' | 'slowPayers' | 'margin' | 'stockRisk' | 'gstTrend' | 'quietCustomers';
 export type InsightTone = 'good' | 'warn' | 'info';
@@ -240,4 +242,24 @@ export function buildInsights(input: InsightInput, today: string): Insight[] {
   out.push({ id: 'gstTrend', tone: gstChange !== null && gstChange >= 25 ? 'warn' : 'info', value: gstNow, unit: 'inr', baseline: gstBase, changePct: gstChange, rows: [], href: '/gst-reports' });
 
   return out;
+}
+
+/**
+ * PENDING 49 (8.111): insights for one branch. Sales and bills are narrowed with the same rules as the lists and
+ * reports (`branchPredicates`: tagged `branch_id`, else the branch's profile / GSTIN, a bill by its single in-State
+ * branch; `UNASSIGNED` = rows with none); payments follow their invoices. Stock is per godown, not per branch, so the
+ * stock card is left out for a branch. '' = the whole business (input unchanged).
+ */
+export function branchInsightInput(input: InsightInput, filter: string, branches: readonly Branch[]): InsightInput {
+  if (!filter) return input;
+  const by = branchPredicates(filter, branches);
+  const invoices = input.invoices.filter((i) => i && by.invoice(i));
+  const ids = new Set(invoices.map((i) => i.id));
+  return {
+    ...input,
+    invoices,
+    payments: input.payments.filter((p) => p && ids.has(p.invoice_id)),
+    purchases: input.purchases.filter((p) => !!p && by.purchase(p as PurchaseRecord)),
+    stock: undefined,
+  };
 }
