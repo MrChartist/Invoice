@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   periodForPreset,
   type Period,
@@ -58,7 +58,6 @@ export function PeriodBar({ preset, period, onChange }: PeriodBarProps) {
   const [views, setViews] = useState(false);
   const { pathname } = useLocation();
   const [params] = useSearchParams();
-  const navigate = useNavigate();
   const tab = params.get('tab') ?? '';
   const step = (dir: 1 | -1) => () => onChange('custom', stepPeriod(preset, period, dir));
   useReportKeys('report', () => card.current, {
@@ -69,15 +68,6 @@ export function PeriodBar({ preset, period, onChange }: PeriodBarProps) {
     views: () => setViews(true),
     saveView: () => setViews(true),
   });
-  // A view marked "Open by default" opens when this screen + tab is visited without a view of that tab.
-  // (report-views is loaded here, not imported: a static import adds its chunk to the first-paint preload list.)
-  useEffect(() => {
-    void import('../../lib/report-views').then(({ defaultView, loadViews, viewHref }) => {
-      const v = defaultView(pathname, tab);
-      const cur = loadViews().find((x) => x.id === params.get('view'));
-      if (v && (!cur || cur.tab !== tab)) navigate(viewHref(v), { replace: true });
-    });
-  }, [pathname, tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (p: PeriodPreset) => {
     onChange(p, p === 'custom' ? period : periodForPreset(p));

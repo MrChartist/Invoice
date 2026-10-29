@@ -1,7 +1,6 @@
 /**
  * R20-C: the report keys' pure helpers — filter (Ctrl+F), totals of shown rows (Ctrl+F12), ticks / hidden rows
- * (Space, Ctrl+Alt+I, Ctrl+R, Ctrl+U, Alt+U), period stepping (+ / −), the default saved view, and the rows held
- * back until package B lands.
+ * (Space, Ctrl+R, Ctrl+U, Alt+U), period stepping (+ / −) and the rows held back.
  */
 import './helpers/shim.ts';
 import test from 'node:test';
@@ -10,7 +9,6 @@ import {
   NO_TOOLS, addSel, emptyFilter, filterRows, hideRows, invertSel, shownRows, stepPeriod, stepShown, toggleSel, toolsActive,
   totalsOf, unhideAll, unhideLast, type RowFact,
 } from '../src/lib/keys/report-actions.ts';
-import { defaultView, loadViews, saveView, setDefaultView } from '../src/lib/report-views.ts';
 import { BUILT, HELD, KEY_ROWS, isBuilt } from '../src/lib/keys/registry.ts';
 import { sheetRows } from '../src/lib/keys/cheat.ts';
 
@@ -75,24 +73,10 @@ test('stepPeriod: month, quarter and FY by the preset; whole-month and day range
   assert.deepEqual(stepPeriod('custom', { start: '2026-03-30', end: '2026-04-05' }, 1), { start: '2026-04-06', end: '2026-04-12' }, 'seven days');
 });
 
-test('saved views: one default per screen + tab, toggled off again; the flag survives a reload', () => {
-  localStorage.clear();
-  saveView({ name: 'TB big', route: '/books', tab: 'tb', preset: 'this_fy' }, new Date(2026, 9, 1));
-  saveView({ name: 'TB small', route: '/books', tab: 'tb', preset: 'this_month' }, new Date(2026, 9, 2));
-  const [a, b] = loadViews();
-  setDefaultView(a.id);
-  assert.equal(defaultView('/books', 'tb')?.id, a.id);
-  setDefaultView(b.id);
-  assert.equal(defaultView('/books', 'tb')?.id, b.id, 'the other loses the flag');
-  assert.equal(loadViews().filter((v) => v.default).length, 1);
-  setDefaultView(b.id);
-  assert.equal(defaultView('/books', 'tb'), undefined, 'again = off');
-  assert.equal(defaultView('/books', 'pnl'), undefined);
-});
 
 test('C is built; report-row delete / cancel and the cut rows stay hidden; Alt+2 duplicate is live', () => {
   assert.ok(BUILT.has('C'));
-  for (const id of ['delete.row', 'cancel.row', 'basis']) {
+  for (const id of ['delete.row', 'cancel.row', 'basis', 'except', 'invert']) {
     assert.ok(HELD.has(id), id);
     assert.ok(!sheetRows(null).some((r) => r.id === id), `${id} not in the cheat sheet`);
   }

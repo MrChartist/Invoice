@@ -17,8 +17,9 @@ export type KeyPkg = 'have' | 'A' | 'B' | 'C' | 'D';
 /** Packages merged so far. B / C / D: add your letter here (one line) in your merge. */
 export const BUILT: ReadonlySet<KeyPkg> = new Set<KeyPkg>(['have', 'A', 'B', 'C', 'D']);
 /** Rows of a built package held back until their handler ships (R20-C: report-row delete / cancel need a confirm,
- * Undo and a report refresh not built yet; Ctrl+B basis and Ctrl+M share were cut). Remove an id when it ships. */
-export const HELD: ReadonlySet<string> = new Set(['delete.row', 'cancel.row', 'basis', 'share', 'share.alias']);
+ * Undo and a report refresh; Ctrl+B basis, Ctrl+J exceptions, Ctrl+Alt+I invert and Ctrl+M share were cut at the
+ * 7 kB cap). Remove an id when it ships. */
+export const HELD: ReadonlySet<string> = new Set(['delete.row', 'cancel.row', 'basis', 'except', 'invert', 'share', 'share.alias']);
 
 /**
  * Where a key works, most specific first: a field (`field:*`, the focused element sits inside

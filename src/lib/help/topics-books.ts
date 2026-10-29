@@ -45,9 +45,8 @@ export const TOPICS: readonly HelpTopic[] = [
     related: rel(['Gateway', '/gateway']),
   }),
   // R20-C: report keys (Tally keys on; the Key bar lists them on every report).
-  t('tally-keys:reports', 'Report keys', 'रिपोर्ट कुंजियाँ', 'On a report: Ctrl+F filter, Space tick rows, Ctrl+R hide a row (Ctrl+U / Alt+U bring back), + / − next or previous period, Ctrl+H / Ctrl+L saved views, Ctrl+J exceptions, Ctrl+P print, Ctrl+E export.', 'To look at part of a report without changing it. Nothing is saved except views.', {
-    steps: ['A strip under the report shows the filter, ticked and hidden rows, and the totals of what you see.', 'Esc clears the filter; print and the Day Book export leave hidden rows out.', 'Alt+I on a Day Book or ledger row opens a new entry of that type on that day.'],
-    related: rel(['Books', '/books?tab=tb'], ['Gateway', '/gateway']),
+  t('tally-keys:reports', 'Report keys', 'रिपोर्ट कुंजियाँ', 'On a report: Ctrl+F filter, Space tick, Ctrl+R hide (Ctrl+U / Alt+U bring back), + / − period, Ctrl+H / Ctrl+L views, Ctrl+P print, Ctrl+E export.', 'To look at part of a report. Only views are saved.', {
+    steps: ['A strip under the report shows the filter, ticks, hidden rows and their totals; Esc clears the filter.'],
   }),
   t('reconcile','Bank reconciliation', 'बैंक मिलान', 'Match bank statement lines with your books, and bank documents.', 'Monthly, when the statement arrives.'),
   t('reconcile:reconcile', 'Reconcile', 'मिलान', 'Statement lines matched, to review or ignored.', 'After importing a statement.'),

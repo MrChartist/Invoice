@@ -1,15 +1,15 @@
 /**
  * R20-C: the report keys' UI, one lazy chunk — the "what you see" strip (filter chip, ticks, hidden rows, totals of the
- * rows shown, one polite live region), the Ctrl+F filter sheet, the Ctrl+J exceptions sheet (default export, mounted
+ * rows shown, one polite live region), the Ctrl+F filter sheet (default export, mounted
  * by `ReportStrip`, lib/keys/report-keys.ts) and the Ctrl+H / Ctrl+L saved-views sheet (`ViewsSheet`, mounted by PeriodBar).
  */
 import { useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { repKeysT } from '../../i18n/areas/keys-r20c';
-import { formatDate, formatMoney } from '../../lib/utils';
+import { formatMoney } from '../../lib/utils';
 import { emptyFilter, filterRows, shownRows, totalsOf, type ReportFilter } from '../../lib/keys/report-actions';
-import { deleteView, loadViews, saveView, setDefaultView, viewHref, type SavedView } from '../../lib/report-views';
+import { deleteView, loadViews, saveView, viewHref, type SavedView } from '../../lib/report-views';
 import { getAllReportPrefs } from '../../lib/report-prefs';
 import type { LiveReport } from '../../lib/keys/report-keys';
 import { Modal } from '../ui/Modal';
@@ -70,7 +70,6 @@ export default function ReportPanel({ live }: { live: LiveReport }) {
         </div>
       )}
       {live.sheet === 'filter' && <FilterSheet live={live} />}
-      {live.sheet === 'except' && <ExceptSheet live={live} />}
     </>
   );
 }
@@ -135,32 +134,9 @@ function FilterSheet({ live }: { live: LiveReport }) {
   );
 }
 
-function ExceptSheet({ live }: { live: LiveReport }) {
-  useT();
-  const navigate = useNavigate();
-  const rows = useMemo(() => live.except?.() ?? [], [live]);
-  return (
-    <Modal open onClose={() => live.setSheet('')} title={T('exceptTitle')}>
-      {rows.length === 0 ? (
-        <p>{T('exceptNone')}</p>
-      ) : (
-        <ul style={s.list} data-except-list>
-          {rows.map((r, i) => (
-            <li key={i} style={s.item}>
-              <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => navigate(`/books?tab=ledger&acct=${encodeURIComponent(r.accountId)}${r.party ? `&party=${encodeURIComponent(r.party)}` : ''}`)}>
-                {r.party ? `${r.label} — ${r.party}` : r.label}
-              </button>
-              <span>{T(`r_${r.reason}`)} · {money(Math.abs(r.balance))} {r.balance < 0 ? 'Cr' : 'Dr'}{r.firstDate ? ` · ${formatDate(r.firstDate)}` : ''}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Modal>
-  );
-}
 
 /**
- * Ctrl+H saved views of this screen (open, delete, open by default) and Ctrl+L "Save this view" (same sheet, the name
+ * Ctrl+H saved views of this screen (open, delete) and Ctrl+L "Save this view" (same sheet, the name
  * box focused). 8G storage (`mrchartist_report_views`, device-local); opening a view goes through `?view=` as the
  * views bar does.
  */
@@ -207,11 +183,6 @@ export function ViewsSheet({ route, tab, preset, period, onClose }: {
           {mine.map((v) => (
             <li key={v.id} style={s.item}>
               <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => open(v)}>{v.name}</button>
-              {v.default ? (
-                <span>{T('isDefault')}</span>
-              ) : (
-                <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setViews(setDefaultView(v.id))}>{T('makeDefault')}</button>
-              )}
               <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setViews(deleteView(v.id))}>{T('remove')}</button>
             </li>
           ))}

@@ -6,8 +6,7 @@
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getReportPrefs, setReportPrefs, type ReportPrefs } from '../../../lib/report-prefs';
-import { negativeLedgers, type LedgerVoucher } from '../../../lib/ledger';
-import { getPeriodContext } from '../../../lib/books';
+import type { LedgerVoucher } from '../../../lib/ledger';
 import { can } from '../../../lib/access';
 import { keysOn } from '../../../lib/keys/stub';
 import { rowById } from '../../../lib/keys/registry';
@@ -15,10 +14,9 @@ import { rowRoute } from '../../../lib/keys/engine';
 import { duplicateRoute } from '../../../lib/keys/entry-actions';
 import { liveReport, putLive, useReportKeys, type LiveReport } from '../../../lib/keys/report-keys';
 import {
-  NO_TOOLS, addSel, hideRows, invertSel, shownRows, stepShown, toggleSel, toolsActive, unhideAll, unhideLast,
+  NO_TOOLS, addSel, hideRows, shownRows, stepShown, toggleSel, toolsActive, unhideAll, unhideLast,
   type RowFact, type RowTools,
 } from '../../../lib/keys/report-actions';
-import { EnvContext } from './report-env';
 import surface from '../../../styles/surface.module.css';
 import styles from './ledger.module.css';
 
@@ -91,15 +89,14 @@ const field = (t: EventTarget | null | undefined) => !!(t as Element | null)?.cl
 /**
  * Keyboard row navigation for a report table (↑ ↓ Home End PgUp PgDn, Enter drills). The selection
  * lives in the DrillStack, so Esc back lands on the same row. R20-C (Tally keys on): Space ticks, Shift+↑ / ↓ extend,
- * Ctrl+R hides, Ctrl+U / Alt+U restore, Ctrl+F filters (Esc clears), Ctrl+P / Ctrl+E press Print / Export, Ctrl+J
- * exceptions, Shift+Enter / Ctrl+Enter / Alt+I from `opts`; never saved (per visit).
+ * Ctrl+R hides, Ctrl+U / Alt+U restore, Ctrl+F filters (Esc clears),  Ctrl+P / Ctrl+E press Print / Export,
+ * Shift+Enter / Ctrl+Enter / Alt+I from `opts`; never saved (per visit).
  */
 export function useDrillRows(count: number, onActivate: (index: number) => void, opts: DrillRowOpts = {}) {
   const { selected, setSelected } = useDrill();
   // The row container is found by id (no ref object, so callers may pass `nav` around during render).
   const bodyId = useId();
   const navigate = useNavigate();
-  const env = useContext(EnvContext);
   const [tools, setTools] = useState<RowTools>(NO_TOOLS);
   const [sheet, setSheet] = useState<LiveReport['sheet']>('');
   const [seen, setSeen] = useState(count);
@@ -117,7 +114,7 @@ export function useDrillRows(count: number, onActivate: (index: number) => void,
     return Array.from({ length: count }, (_, i) => opts.fact?.(i) ?? (rows.get(i) ? domFact(rows.get(i)!) : { text: '', amt: 0 }));
   };
   const self = useRef<LiveReport | null>(null);
-  const snap: LiveReport = { tools, count, sheet, dated: !!opts.fact, facts, set: setTools, setSheet, table, except: env ? () => negativeLedgers(env.ledger, getPeriodContext().period) : undefined };
+  const snap: LiveReport = { tools, count, sheet, dated: !!opts.fact, facts, set: setTools, setSheet, table };
   useEffect(() => {
     self.current = snap;
   });
@@ -152,11 +149,7 @@ export function useDrillRows(count: number, onActivate: (index: number) => void,
     const v = opts.voucher?.(sel);
     const gw = v && GW_KIND[v.kind];
     if (gw && can('books.edit')) {
-      // Loaded on use: a static import would add the Gateway period chunk to the Books preload list on first paint.
-      void import('../../../lib/gateway/period').then((m) => {
-        m.setVoucherDate(v.date);
-        navigate(`/gateway/voucher/${gw}`);
-      });
+      navigate(`/gateway/voucher/${gw}`);
       return true;
     }
     const row = v && rowById(ROW_KIND[v.kind] ?? '');
@@ -199,10 +192,8 @@ export function useDrillRows(count: number, onActivate: (index: number) => void,
   useReportKeys('report', table, {
     filter: () => setSheet('filter'),
     'filter.alias': () => setSheet('filter'),
-    invert: () => setTools((t) => invertSel(t, shown)),
     unhide: () => (tools.hid.length ? setTools(unhideLast) : false),
     unhideAll: () => (tools.hid.length ? setTools(unhideAll) : false),
-    except: env ? () => setSheet('except') : undefined,
     printReport: () => window.print(),
     export: () => press('button:has(> svg.lucide-download), button:has(> svg.lucide-file-spreadsheet)'),
   });

@@ -4,7 +4,6 @@
  * "what you see" strip (`ReportStrip` below, sheets in components/keys/ReportSheets.tsx).
  */
 import { Fragment, Suspense, createElement, lazy, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { NegativeLedger } from '../ledger';
 import { registerKeyActions, type KeyHandler } from './engine';
 import type { KeyScope } from './registry';
 import type { RowFact, RowTools } from './report-actions';
@@ -57,19 +56,17 @@ export function useReportKeys(scope: KeyScope, el: () => Element | null, handler
   }, [scope, ids]);
 }
 
-/** What the "what you see" strip and the filter / exceptions sheets read from the report on screen. */
+/** What the "what you see" strip and the filter sheet read from the report on screen. */
 export interface LiveReport {
   tools: RowTools;
   count: number;
-  sheet: '' | 'filter' | 'except';
+  sheet: '' | 'filter';
   /** Rows carry dates / narrations (the filter offers those boxes). */
   dated: boolean;
   facts(): RowFact[];
   set(f: (t: RowTools) => RowTools): void;
   setSheet(s: LiveReport['sheet']): void;
   table(): HTMLElement | null;
-  /** Ctrl+J: the period's exceptions (wrong-side ledgers), when the report has a ledger. */
-  except?: () => NegativeLedger[];
 }
 let live: LiveReport | null = null;
 const liveSubs = new Set<() => void>();
