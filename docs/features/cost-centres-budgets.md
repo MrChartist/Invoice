@@ -53,6 +53,16 @@ income, direct-cost (Purchases, Direct expenses) and indirect-expense account, t
 into their parent's column. Every income / expense line lands in exactly one column, so the columns add up to the
 Profit & loss for the period (tested; the toolbar shows "Ties to the P&L"). CSV and Excel export, Print.
 
+## Cost-centre closing stock (7.167)
+A godown may belong to a cost centre (`Godown.cost_centre_id`, additive since R5-B6: set by a works site or on the
+godown form, which shows the picker once a cost centre exists); a godown inside it takes its parent's centre.
+`src/lib/ledger/cost-centre-stock.ts` values the stock lying in each centre's godowns like a branch's
+(`godownSetValuer`: quantity there × the item's company-wide unit cost that day): **opening** at the end of the day before
+the period, **closing** at its end. Books → Projects shows both as memo rows (lazy `CostCentreStockRow`, loaded only when a
+godown carries a centre; a rolled-up parent takes its children's). Memo only: the Project P&L stays ledger-based and still
+ties to the P&L; closing-stock journals tagged to a centre are not netted (none carry a centre). Test:
+`tests/cost-centre-stock.test.ts`.
+
 ## Budgets vs actual
 - Indian FY (April–March). Enter an annual amount spread evenly (exact to the paisa; the odd paise go one each to the
   first months) or month by month.
