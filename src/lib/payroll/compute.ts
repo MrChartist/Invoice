@@ -488,7 +488,7 @@ export function computePayslip(input: ComputeInput): PayslipLine | null {
     const pfAtRate = pfErOn && later.length ? pfContribution(ratePfWages, date, { onActual: e.pf_on_actual, epsExcluded: e.eps_excluded || epsOver }) : null;
     const erContribYear = round2(ytdContrib + pfEr + nps_er + super_er + ((pfAtRate ? pfAtRate.eps + pfAtRate.epf_er : 0) + npsRate + superRate) * later.length);
     const s17vii = contribLimit === null ? 0 : Math.max(0, round2(erContribYear - contribLimit));
-    if (s17vii > 0) notes.push(`Employer PF + NPS + superannuation for the year ₹${erContribYear} exceeds ₹${contribLimit}: ₹${s17vii} taxed as a perquisite u/s 17(2)(vii) (accretion u/s 17(2)(viia) not computed).`);
+    if (s17vii > 0) notes.push(`Employer PF + NPS + superannuation for the year ₹${erContribYear} exceeds ₹${contribLimit}: ₹${s17vii} taxed as a perquisite u/s 17(2)(vii) (the 17(2)(viia) accretion is worked on the Rule 3 panel).`);
     const annualGross = round2((e.prev_salary ?? 0) + ytdTaxable + taxable_gross + (rateTaxable + npsRate + laterPerq) * later.length + s17vii);
     const annualNps = round2(ytdNps + nps_er + npsRate * later.length);
     // 80CCD(2) cap on salary = Basic + DA (approximated by the PF-wage heads).

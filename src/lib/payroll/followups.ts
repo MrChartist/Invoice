@@ -1,7 +1,8 @@
 /**
  * Payroll follow-ups (7T) — pure engines: the EPFO arrear ECR, relief u/s 89(1) with the Form 10E
  * working, Rule 3 perquisite valuation (motor car, accommodation, free meals, gifts), the
- * s. 17(2)(vii) working, interest u/s 201(1A) on TDS from salary, and the journal behind an
+ * s. 17(2)(vii) working, the 17(2)(viia) accretion (Rule 3B), the statement of perquisites (Form 12BA
+ * working), interest u/s 201(1A) on TDS from salary (late deposit and late deduction), arrear ECR checks, and the journal behind an
  * actuary's gratuity / leave valuation (AS-15 / Ind AS 19).
  *
  * Pure: callers pass the data (`followups-store.ts` reads / writes storage). Statutory values come
@@ -10,11 +11,14 @@
 
 import { round2 } from '../invoice-calc';
 import { A } from '../ledger/accounts';
+import { ruleAt } from '../tax-rules';
 import { formatDate } from '../utils';
 import {
   ACCOMMODATION_PERQ_RULES,
   CAR_PERQ_RULES,
+  HOTEL_PERQ_RULES,
   MEAL_GIFT_PERQ_RULES,
+  S17_2_VIIA_RULES,
   accommodationPerqRule,
   carPerqRule,
   mealGiftRule,
@@ -32,6 +36,8 @@ import type {
   PayrollPayment,
   PayrollRun,
   PayslipLine,
+  Perquisite,
+  PerquisiteKind,
   Relief89Year,
   TaxRegime,
 } from '../../types/payroll';
@@ -103,7 +109,33 @@ export function arrearEcrText(lines: readonly ArrearEcrLine[]): string {
 export function arrearEcrRows(lines: readonly ArrearEcrLine[], payMonth: string): Row[] {
   const out: Row[] = [['UAN', 'Member name', 'Arrear months', 'Arrear EPF wages', 'Arrear EPS wages', 'Arrear EDLI wages', 'Arrear EE share', 'Arrear EPS share', 'Arrear ER share (EPF − EPS)']];
   for (const l of lines) out.push([l.uan, l.name, l.months.join(' '), l.epf_wages, l.eps_wages, l.edli_wages, l.ee, l.eps, l.er]);
+  for (const c of arrearEcrChecks(lines, payMonth)) out.push([`Check: ${c}`]);
   out.push([`Arrears paid with ${payMonth}. Layout not validated against the EPFO portal — verify with your CA.`]);
+  return out;
+}
+
+/**
+ * Checks on the arrear ECR before upload (7.149): our own arithmetic and identifiers, NOT the EPFO
+ * validator — UAN of 12 digits and once only, a name, no negative amounts, EPS / EDLI wages within EPF
+ * wages, and the shares against the PF rates of the pay month (₹1 a month for rounding).
+ */
+export function arrearEcrChecks(lines: readonly ArrearEcrLine[], payMonth: string): string[] {
+  const r = pfRule(lastDayOfMonth(payMonth));
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const l of lines) {
+    const who = `${l.uan || '—'} ${l.name}`;
+    const off = (got: number, want: number) => Math.abs(got - want) > Math.max(1, l.months.length);
+    if (!/^\d{12}$/.test(l.uan)) out.push(`${who}: UAN must be 12 digits.`);
+    else if (seen.has(l.uan)) out.push(`${who}: UAN appears twice.`);
+    seen.add(l.uan);
+    if (!l.name.trim()) out.push(`${who}: no member name.`);
+    if ([l.epf_wages, l.eps_wages, l.edli_wages, l.ee, l.eps, l.er].some((v) => v < 0)) out.push(`${who}: a negative arrear (downward revision) — check how EPFO takes it before uploading.`);
+    if (l.eps_wages > l.epf_wages || l.edli_wages > l.epf_wages) out.push(`${who}: EPS / EDLI wages exceed EPF wages.`);
+    if (off(l.ee, (l.epf_wages * r.employee_pct) / 100)) out.push(`${who}: EE share ${l.ee} is not ${r.employee_pct}% of EPF wages.`);
+    if (off(l.eps, (l.eps_wages * r.eps_pct) / 100)) out.push(`${who}: EPS share ${l.eps} is not ${r.eps_pct}% of EPS wages.`);
+    if (off(l.eps + l.er, (l.epf_wages * r.employer_pct) / 100)) out.push(`${who}: EPS + ER ${round2(l.eps + l.er)} is not ${r.employer_pct}% of EPF wages.`);
+  }
   return out;
 }
 
@@ -187,12 +219,16 @@ export function relief89Rows(r: Relief89Result, employee: Pick<Employee, 'code' 
   return out;
 }
 
-/** Latest projection (`tds_working.annual_income`) of an employee in an FY, from final runs (else drafts). */
-function projectedIncome(employeeId: string, fy: number, runs: readonly PayrollRun[]): number {
+/** Latest TDS working of an employee in an FY, from final runs (else drafts). */
+function lastWorking(employeeId: string, fy: number, runs: readonly PayrollRun[]): PayslipLine['tds_working'] {
   const inFy = (r: PayrollRun) => fyStartOfMonth(r.month) === `${fy}-04-01`;
   const pick = (list: PayrollRun[]) => list.sort((a, b) => b.month.localeCompare(a.month)).map((r) => r.lines.find((l) => l.employee_id === employeeId)).find((l): l is PayslipLine => !!l?.tds_working);
-  const line = pick(finals(runs).filter(inFy)) ?? pick(runs.filter(inFy));
-  return round2(line?.tds_working?.annual_income ?? 0);
+  return (pick(finals(runs).filter(inFy)) ?? pick(runs.filter(inFy)))?.tds_working;
+}
+
+/** Latest projection (`tds_working.annual_income`) of an employee in an FY. */
+function projectedIncome(employeeId: string, fy: number, runs: readonly PayrollRun[]): number {
+  return round2(lastWorking(employeeId, fy, runs)?.annual_income ?? 0);
 }
 
 /**
@@ -295,6 +331,16 @@ export function accommodationPerquisite(i: AccommodationPerqInput): PerqValuatio
   return { monthly: v, basis: `Accommodation ${how}${furniture ? ` + furniture ${money(furniture)}` : ''}${i.recovered ? ` − recovered ${money(i.recovered)}` : ''} a month.`, source };
 }
 
+/** Rule 3(1) Table I: hotel accommodation — the lower of the rule's % of salary and the charges, nil on transfer within the free days. */
+export function hotelPerquisite(i: { date: string; salary: number; charges: number; days: number; on_transfer: boolean; recovered?: number }): PerqValuation {
+  const r = ruleAt(HOTEL_PERQ_RULES, i.date);
+  const source = ruleSource(HOTEL_PERQ_RULES, i.date);
+  if (i.on_transfer && i.days <= r.free_days) return { monthly: 0, basis: `Hotel on transfer for ${i.days} days (${r.free_days} or less in all) — not a perquisite.`, source };
+  const cap = round2((Math.max(0, i.salary) * r.pct) / 100);
+  const v = Math.max(0, round2(Math.min(Math.max(0, i.charges), cap) - (i.recovered ?? 0)));
+  return { monthly: v, basis: `Hotel: lower of charges ${money(i.charges)} and ${r.pct}% of salary ${money(cap)}${i.recovered ? ` − recovered ${money(i.recovered)}` : ''} a month.`, source };
+}
+
 /** Rule 3(7)(iii): free meals in working hours — the cost above the exempt amount a meal. */
 export function mealsPerquisite(i: { date: string; meals: number; cost_per_meal: number; recovered_per_meal?: number }): PerqValuation {
   const r = mealGiftRule(i.date);
@@ -347,7 +393,109 @@ export function s17viiRows(runs: readonly PayrollRun[], employees: readonly Empl
     if (!any) continue;
     out.push([e.code, e.name, round2(t.pf), round2(t.nps), round2(t.superannuation), round2(t.total), limit ?? 'n/a', limit === null ? 0 : Math.max(0, round2(t.total - limit))]);
   }
-  out.push(['EPS share included in employer PF (UNVERIFIED — some exclude the pension share). s. 17(2)(viia): the annual accretion (interest, dividend) on the excess is also a perquisite (Rule 3B) — it needs the fund statements and is not computed here. Verify with your CA.']);
+  out.push(['EPS share included in employer PF (UNVERIFIED — some exclude the pension share). s. 17(2)(viia): the annual accretion on the excess (Rule 3B) is worked on the "Form 10E · Rule 3" tab from the fund statements and saved as a perquisite. Verify with your CA.']);
+  return out;
+}
+
+export interface Rule3bInput {
+  date: string;
+  /** PC: this year's employer contribution above the limit. */
+  pc: number;
+  /** PC1: the same for earlier years from FY 2020-21. */
+  pc1: number;
+  /** TP1: accretion already taxed in those earlier years. */
+  tp1: number;
+  /** I: income accrued in the fund account this year. */
+  income: number;
+  /** Fund balance on the first and the last day of the year. */
+  opening: number;
+  closing: number;
+}
+
+/** s. 17(2)(viia), Rule 3B: TP = (PC / 2) × R + (PC1 + TP1) × R, R = I ÷ Favg; PC1 + TP1 above the opening balance ignored. */
+export function rule3bAccretion(i: Rule3bInput): PerqValuation & { r: number; favg: number } {
+  const favg = round2((Math.max(0, i.opening) + Math.max(0, i.closing)) / 2);
+  const r = favg > 0 ? Math.max(0, i.income) / favg : 0;
+  const earlier = Math.min(Math.max(0, i.pc1) + Math.max(0, i.tp1), Math.max(0, i.opening));
+  const pc = Math.max(0, i.pc);
+  const monthly = round2((pc / 2) * r + earlier * r);
+  return {
+    monthly,
+    r,
+    favg,
+    basis: `Accretion u/s 17(2)(viia): (PC ${money(pc)} ÷ 2 + PC1 + TP1 ${money(earlier)}) × R ${(r * 100).toFixed(4)}% (I ${money(i.income)} ÷ Favg ${money(favg)}).`,
+    source: ruleSource(S17_2_VIIA_RULES, i.date),
+  };
+}
+
+/**
+ * Starting figures for Rule 3B from payroll: PC from the year's latest TDS working, PC1 from each
+ * earlier year's (from FY 2020-21), TP1 from accretion perquisites saved for those years. Fund income
+ * and balances come from the fund statement.
+ */
+export function rule3bSuggest(employeeId: string, fy: number, runs: readonly PayrollRun[], perqs: readonly Perquisite[]): { pc: number; pc1: number; tp1: number } {
+  const first = Number(ruleAt(S17_2_VIIA_RULES, `${fy}-04-01`).first_fy.slice(0, 4));
+  let pc1 = 0;
+  for (let y = first; y < fy; y++) pc1 += lastWorking(employeeId, y, runs)?.s17_vii ?? 0;
+  const tp1 = perqs
+    .filter((p) => p.employee_id === employeeId && p.kind === 'accretion')
+    .filter((p) => {
+      const y = Number(fyStartOfMonth(p.from_month).slice(0, 4));
+      return y >= first && y < fy;
+    })
+    .reduce((s, p) => s + p.monthly_value, 0);
+  return { pc: round2(lastWorking(employeeId, fy, runs)?.s17_vii ?? 0), pc1: round2(pc1), tp1: round2(tp1) };
+}
+
+/* ── Statement of perquisites (Form 12BA working) ─────────────── */
+
+const PERQ_NATURE: [PerquisiteKind | 'loan' | 's17vii', string][] = [
+  ['accommodation', 'Accommodation'],
+  ['car', 'Cars / other automotive'],
+  ['loan', 'Interest-free or concessional loans'],
+  ['meals', 'Free meals'],
+  ['gift', 'Gifts, vouchers, etc.'],
+  ['s17vii', 'Contribution by employer to fund and scheme taxable u/s 17(2)(vii)'],
+  ['accretion', 'Annual accretion on that fund and scheme taxable u/s 17(2)(viia)'],
+  ['other', 'Other benefits or amenities'],
+];
+
+/**
+ * Perquisites of an employee for FY `fy` by nature, from FINAL payslips: each month's typed perquisites by
+ * kind, the loan perquisite (the rest of the payslip's perquisites) and the year's 17(2)(vii) excess.
+ * Grouped as Form 12BA groups them; its row numbers and layout are not reproduced (not verified).
+ */
+export function perqStatementRows(runs: readonly PayrollRun[], perqs: readonly Perquisite[], employee: Pick<Employee, 'id' | 'code' | 'name' | 'pan'>, fy: number, formLabel = 'Form 12BA'): Row[] {
+  const by = new Map<string, number>();
+  const add = (k: string, v: number) => by.set(k, round2((by.get(k) ?? 0) + v));
+  let contrib = 0;
+  for (const r of finals(runs).filter((x) => fyStartOfMonth(x.month) === `${fy}-04-01`)) {
+    const l = r.lines.find((x) => x.employee_id === employee.id);
+    if (!l) continue;
+    contrib += employerRetirementContrib(l).total;
+    let typed = 0;
+    for (const p of perqs) {
+      if (p.employee_id !== employee.id || p.from_month > r.month || (p.to_month && p.to_month < r.month)) continue;
+      add(p.kind, p.monthly_value);
+      typed += p.monthly_value;
+    }
+    add('loan', round2((l.perquisites ?? 0) - typed));
+  }
+  const limit = s17viiLimit(`${fy}-04-01`);
+  add('s17vii', limit === null ? 0 : Math.max(0, round2(contrib - limit)));
+  if ((by.get('loan') ?? 0) < 0) {
+    add('other', by.get('loan') ?? 0);
+    by.set('loan', 0);
+  }
+  const out: Row[] = [[`Statement of perquisites (${formLabel} working): ${employee.code} ${employee.name}${employee.pan ? `, PAN ${employee.pan}` : ''}, FY ${fyLabel(fy)}`], ['Nature of perquisite', 'Amount chargeable to tax (net of recoveries)']];
+  let total = 0;
+  for (const [k, label] of PERQ_NATURE) {
+    const v = by.get(k) ?? 0;
+    total += v;
+    if (v) out.push([label, v]);
+  }
+  out.push(['Total value of perquisites (Form 16 Part B 1(b))', round2(total)]);
+  out.push([`Grouped as ${formLabel} groups perquisites; its row numbers and layout are not reproduced — copy the amounts into the notified form. Perquisites typed after a month was finalized show in "Other" as a correction. Verify with your CA.`]);
   return out;
 }
 
@@ -430,8 +578,73 @@ export function tds201Rows(runs: readonly PayrollRun[], payments: readonly Payro
     out.push([r.month, due, formatDate(r.date), formatDate(tdsDepositDue(r.date)), paid, left > 0.5 ? `not fully paid (to ${formatDate(today)})` : pays.length ? formatDate(pays[pays.length - 1].date) : '', months, interest]);
   }
   out.push(['Total', '', '', '', '', '', '', total]);
-  out.push(['Estimate only: payments are matched by their challan period; tax not deducted in time (1% a month) is not detected — type it from the TRACES demand. Verify with your CA.']);
+  out.push(['Estimate only: payments are matched by their challan period. Verify with your CA.']);
+  out.push([]);
+  out.push(['Late deduction (1% a month or part)', 'Employee', 'Short in month', 'Amount short', 'Made good on', 'Months or part', 'Interest 201(1A) (est.)']);
+  let lateTotal = 0;
+  for (const x of tdsLateDeductions(runs, fy, today)) {
+    lateTotal += x.interest;
+    out.push(['', `${x.code} ${x.name}`, x.month, x.amount, x.made_good_on ? formatDate(x.made_good_on) : `not deducted (to ${formatDate(today)})`, x.months, x.interest]);
+  }
+  out.push(['Total', '', '', '', '', '', lateTotal]);
+  out.push(['A month is short when its TDS is below the even share of that month\'s own projection (a typed-over figure); later TDS above its own share makes it good, first in first out. Whether a lower deduction is a default u/s 201 is for your CA.']);
   return out;
+}
+
+export interface TdsLateDeduction {
+  employee_id: string;
+  code: string;
+  name: string;
+  month: string;
+  amount: number;
+  /** '' while not made good (interest runs to `today`). */
+  made_good_on: string;
+  months: number;
+  interest: number;
+}
+
+/**
+ * 201(1A)(i) late deduction from FINAL payslips of FY `fy` (7.149). Each payslip's even share is what
+ * its own projection asked for: (annual tax − deducted before) ÷ months left (the last month the
+ * balance), less the part of earlier shortfalls that projection re-spread. TDS below it is short from
+ * that run's date; TDS above it makes good earlier shortfalls first in first out, each part bearing
+ * 1% a month or part on the part rounded down to ₹100 (Rule 119A). Unmade shortfalls run to `today`.
+ */
+export function tdsLateDeductions(runs: readonly PayrollRun[], fy: number, today: string): TdsLateDeduction[] {
+  const rule = tds201Rule(`${fy}-04-01`);
+  const list = finals(runs).filter((x) => fyStartOfMonth(x.month) === `${fy}-04-01`).sort((a, b) => a.month.localeCompare(b.month));
+  const pending = new Map<string, { month: string; date: string; amount: number }[]>();
+  const last = new Map<string, PayslipLine>();
+  const out: TdsLateDeduction[] = [];
+  const settle = (l: PayslipLine, p: { month: string; date: string }, amount: number, on: string, made = true) => {
+    const months = monthsOrPart(p.date, on);
+    out.push({ employee_id: l.employee_id, code: l.code, name: l.name, month: p.month, amount: round2(amount), made_good_on: made ? on : '', months, interest: Math.round((Math.floor(amount / 100) * 100 * rule.late_deduction_pct * months) / 100) });
+  };
+  for (const r of list) {
+    for (const l of r.lines) {
+      const w = l.tds_working;
+      if (!w) continue;
+      last.set(l.employee_id, l);
+      const queue = pending.get(l.employee_id) ?? [];
+      const owed = queue.reduce((s, p) => s + p.amount, 0);
+      const due = Math.max(0, round2(w.annual_tax - w.deducted_before));
+      const left = Math.max(1, w.months_left);
+      const share = round2((left === 1 ? Math.round(due) : Math.round(due / left)) - owed / left);
+      let extra = round2(l.tds - share);
+      if (extra < -1) queue.push({ month: r.month, date: r.date, amount: -extra });
+      while (extra > 1 && queue.length) {
+        const p = queue[0];
+        const part = Math.min(p.amount, extra);
+        settle(l, p, part, r.date);
+        extra = round2(extra - part);
+        p.amount = round2(p.amount - part);
+        if (p.amount <= 1) queue.shift();
+      }
+      pending.set(l.employee_id, queue);
+    }
+  }
+  for (const [id, queue] of pending) for (const p of queue) settle(last.get(id)!, p, p.amount, today, false);
+  return out.sort((a, b) => a.code.localeCompare(b.code) || a.month.localeCompare(b.month));
 }
 
 /* ── Actuarial valuation (AS-15 / Ind AS 19) ──────────────────── */

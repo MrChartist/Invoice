@@ -176,7 +176,7 @@ export function withActRef(label: string, code: string | undefined, date?: strin
 /* ── Forms ─────────────────────────────────────────────────────── */
 
 /** Form keys the app names (stored return-mark ids keep '26Q' / '27EQ' / '27Q'). */
-export type ActForm = '24Q' | '26Q' | '27Q' | '27EQ' | '16' | '16A' | '27D' | '26AS' | '10BD' | '10BE' | '15G/15H' | '26QB-QE';
+export type ActForm = '24Q' | '26Q' | '27Q' | '27EQ' | '16' | '12BA' | '16A' | '27D' | '26AS' | '10BD' | '10BE' | '15G/15H' | '26QB-QE';
 
 export interface FormRef {
   act: 1961 | 2025;
@@ -206,6 +206,7 @@ export const FORM_REF_RULES: Readonly<Record<ActForm, readonly Versioned<FormRef
   '27Q': formRules('27Q', '144', true, `${UM}: Form 144 (TDS on non-residents)`),
   '27EQ': formRules('27EQ', '143', false, `${INDEX}: Form 143 (earlier Form 27EQ)`),
   '16': formRules('16', '130', false, `${INDEX}: Form 130_131_132_133 (earlier 16 / 16A / 16B–16E / 27D)`),
+  '12BA': formRules('12BA', '123', false, 'Secondary sources (2026): Form 123 (earlier 12BA), Rule 204(2) — verify'),
   '16A': formRules('16A', '131', false, `${INDEX}: Form 131 (earlier 16A)`),
   '27D': formRules('27D', '133', false, `${INDEX}: Form 133 (earlier 27D)`),
   '26AS': formRules('26AS', '168', true, `${OFFICIAL_FAQ}, Q24–25: AIS for TY 2026-27 in Form No. 168`),

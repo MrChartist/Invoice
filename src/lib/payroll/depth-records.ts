@@ -150,7 +150,7 @@ export function normalizeAdjustments(rows: unknown[]): PayrollAdjustment[] {
   return out;
 }
 
-const PERQ_KINDS: PerquisiteKind[] = ['accommodation', 'car', 'other', 'meals', 'gift'];
+const PERQ_KINDS: PerquisiteKind[] = ['accommodation', 'car', 'other', 'meals', 'gift', 'accretion'];
 
 export function normalizePerquisites(rows: unknown[]): Perquisite[] {
   const out: Perquisite[] = [];
