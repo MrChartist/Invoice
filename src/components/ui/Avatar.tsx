@@ -49,7 +49,7 @@ export function Avatar({ name, size = 36, square, src }: AvatarProps) {
         alignItems: 'center',
         justifyContent: 'center',
         fontFamily: 'var(--font-display)',
-        fontWeight: 800,
+        fontWeight: 600,
         fontSize: Math.max(10, size * 0.38),
         letterSpacing: '-0.02em',
         overflow: 'hidden',

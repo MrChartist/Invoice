@@ -24,6 +24,7 @@ import { principalDb } from '../job-work';
 import { esc } from '../voucher-print';
 import { AG_SERIES, AG_TABLES } from './ag-shared';
 import { saveVoucher } from './ag-vouchers';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 export const WBS = AG_SERIES.wbs;
 export const WBS_TABLE = AG_TABLES.weighbridge;
@@ -165,7 +166,7 @@ const at = (s?: string) => (s ? s.replace('T', ' ') : '—');
 export function slipHtml(s: WeighbridgeSlip, business: { name?: string; address?: string }): string {
   const readings = READING_KEYS.filter((k) => s.readings?.[k] !== undefined).map((k) => `<tr><td>${esc(k[0].toUpperCase() + k.slice(1))}</td><td class="n">${esc(s.readings[k])} %</td></tr>`).join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(s.number)}</title>
-<style>@page{size:A5}body{font-family:system-ui,sans-serif;margin:0;padding:16px;font-size:13px}h1{font-size:16px;margin:0}.t{font-weight:700;text-align:center;letter-spacing:.1em;border:1px solid;padding:4px;margin:8px 0}table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px solid}td.n{text-align:right}.f{margin-top:10px;font-size:11px}</style></head><body>
+<style>${PRINT_FONT_FACE}@page{size:A5}body{font-family:${PRINT_FONT};margin:0;padding:16px;font-size:13px}h1{font-size:16px;margin:0}.t{font-weight: 600;text-align:center;letter-spacing:.1em;border:1px solid;padding:4px;margin:8px 0}table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px solid}td.n{text-align:right}.f{margin-top:10px;font-size:12px}</style></head><body>
 <h1>${esc(business.name || 'Your business')}</h1>${business.address ? `<div>${esc(business.address)}</div>` : ''}
 <div class="t">WEIGHBRIDGE SLIP${s.status === 'cancelled' ? ' — CANCELLED' : ''}</div>
 <table><tbody>

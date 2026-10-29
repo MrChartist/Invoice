@@ -76,7 +76,7 @@
 }
 
 .price {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-weight: 600;
   font-size: var(--text-base);
   white-space: nowrap;

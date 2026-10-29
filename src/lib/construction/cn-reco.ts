@@ -21,6 +21,7 @@ import { ruleAt } from '../tax-rules';
 import { siteOpening, siteStatement } from '../works/sites';
 import { COEFFICIENT_STARTERS, WASTAGE_BAND_DEFAULTS } from '../construction-rules';
 import { DAY } from './cn-subcon';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 export const starters = (date: string) => ruleAt(COEFFICIENT_STARTERS, date);
 
@@ -107,7 +108,7 @@ export const recoCsvRows = (rows: readonly RecoRow[], name: (id: string) => stri
 export function recoHtml(rows: readonly RecoRow[], name: (id: string) => string, head: { site: string; from: string; to: string; company: string }): string {
   const e = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   const [h, ...body] = recoCsvRows(rows, name);
-  return `<!doctype html><meta charset="utf-8"><title>Material reconciliation</title><style>body{font:11px sans-serif;margin:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:3px;text-align:right}td:first-child,th:first-child{text-align:left}</style>
+  return `<!doctype html><meta charset="utf-8"><title>Material reconciliation</title><style>${PRINT_FONT_FACE}body{font:12px ${PRINT_FONT};margin:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:3px;text-align:right}td:first-child,th:first-child{text-align:left}</style>
 <h2>Material reconciliation statement</h2><p>${e(head.company)} · Site ${e(head.site)} · ${e(head.from)} to ${e(head.to)}</p>
 <table><tr>${h.map((c) => `<th>${e(c)}</th>`).join('')}</tr>${body.map((r) => `<tr>${r.map((c) => `<td>${e(c)}</td>`).join('')}</tr>`).join('')}</table>
 <p><small>Free-issue materials are shown by quantity only (value 0). Band, issue rate and penal factor are contract terms. Working paper — verify with your CA (CN9).</small></p>`;

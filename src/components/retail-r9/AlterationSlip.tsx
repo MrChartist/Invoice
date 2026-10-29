@@ -9,6 +9,7 @@ import { formatCurrency, formatDate } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { escHtml as esc } from '../../lib/html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE, printWhenReady } from '../../lib/print-fonts';
 
 
 /** The lines of one copy (shared by the print and the preview). */
@@ -28,7 +29,7 @@ const token = (job: AlterationJob) => job.number.split('/').pop() ?? job.number;
 function slipHtml(job: AlterationJob, shop: string): string {
   const copy = (title: string, extra: [string, string][]) =>
     `<section><h1>${esc(shop)}</h1><h2>${esc(title)} · ${esc(rtcT('token'))} ${esc(token(job))}</h2><p class="n">${esc(job.number)} · ${esc(formatDate(job.date))}</p><table>${[...slipLines(job), ...extra].map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table></section>`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(job.number)}</title><style>@page{size:80mm auto;margin:3mm}body{font:12px system-ui,sans-serif;color:black;margin:0;width:74mm}h1{font-size:14px;margin:0}h2{font-size:16px;margin:4px 0}p{margin:2px 0}.n{font-family:monospace}table{width:100%;border-collapse:collapse}th{text-align:left;font-weight:600;padding:1px 4px 1px 0;vertical-align:top;width:35%}td{padding:1px 0}.cut{border-top:1px dashed black;margin:8px 0}</style></head><body>${copy(rtcT('customerCopy'), [])}<p>${esc(rtcT('slipNote'))}</p><div class="cut"></div>${copy(rtcT('shopCopy'), job.tailor_name ? [[rtcT('tailor'), job.tailor_name]] : [])}</body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(job.number)}</title><style>${PRINT_FONT_FACE}@page{size:80mm auto;margin:3mm}body{font:12px ${PRINT_FONT};color:black;margin:0;width:74mm}h1{font-size:14px;margin:0}h2{font-size:16px;margin:4px 0}p{margin:2px 0}.n{font-variant-numeric:tabular-nums}table{width:100%;border-collapse:collapse}th{text-align:left;font-weight:600;padding:1px 4px 1px 0;vertical-align:top;width:35%}td{padding:1px 0}.cut{border-top:1px dashed black;margin:8px 0}</style></head><body>${copy(rtcT('customerCopy'), [])}<p>${esc(rtcT('slipNote'))}</p><div class="cut"></div>${copy(rtcT('shopCopy'), job.tailor_name ? [[rtcT('tailor'), job.tailor_name]] : [])}</body></html>`;
 }
 
 function printSlip(job: AlterationJob, shop: string): void {
@@ -36,7 +37,7 @@ function printSlip(job: AlterationJob, shop: string): void {
   if (!w) return;
   w.document.write(slipHtml(job, shop));
   w.document.close();
-  w.print();
+  printWhenReady(w);
 }
 
 /** On-screen slip with a Print button. */

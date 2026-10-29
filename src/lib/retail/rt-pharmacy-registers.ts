@@ -24,6 +24,7 @@ import { plusDays } from '../pharma-gate';
 import type { H1Row } from '../pharma';
 import { isVoidStatus, readPurchase, readPurchaseLines } from '../purchase-normalize';
 import { lineFactor } from '../units';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 type Schedule = 'H' | 'H1' | 'X';
 const norm = (s: unknown) => String(s ?? '').trim().toLowerCase();
@@ -162,7 +163,7 @@ export function registerBook(opts: { title: string; shop: string; licence?: stri
   const body = pages.map((p, i) => `<section class="pg"><header><b>${esc(opts.shop)}</b>${opts.licence ? ` · DL: ${esc(opts.licence)}` : ''}<br>${esc(opts.title)} · ${esc(opts.period.from)} to ${esc(opts.period.to)} · Page ${i + 1} of ${pages.length}</header>
 <table><thead><tr>${opts.head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${p.map((x) => `<tr${x.bad ? ' class="bad"' : ''}>${x.r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>
 <footer>Working paper — verify the register format with your drug inspector / CA. Rows shaded: prescription details missing.</footer></section>`).join('\n');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(opts.title)}</title><style>@page{size:A4;margin:12mm}body{font:10px system-ui,sans-serif;color:#000}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}header{margin-bottom:6px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #444;padding:2px 4px;text-align:left}tr.bad td{background:#eee}footer{margin-top:6px;font-size:9px}</style></head><body>${body}</body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(opts.title)}</title><style>${PRINT_FONT_FACE}@page{size:A4;margin:12mm}body{font:12px ${PRINT_FONT};color:#000}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}header{margin-bottom:6px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #444;padding:2px 4px;text-align:left}tr.bad td{background:#eee}footer{margin-top:6px;font-size:12px}</style></head><body>${body}</body></html>`;
 }
 
 /* ── Licences ── */

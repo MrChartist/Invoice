@@ -12,6 +12,7 @@ import { dateLocale, useT } from '../../i18n';
 import { retailT } from '../../i18n/areas/retail';
 import controls from '../../styles/controls.module.css';
 import styles from './retail.module.css';
+import { printWhenReady } from '../../lib/print-fonts';
 
 function printHtml(html: string, name: string) {
   const w = window.open('', '_blank');
@@ -20,7 +21,7 @@ function printHtml(html: string, name: string) {
     w.document.write(html);
     w.document.close();
     w.focus();
-    w.print();
+    printWhenReady(w);
   } else {
     downloadText(`${name}.html`, html, 'text/html');
   }

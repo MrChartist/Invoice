@@ -199,7 +199,7 @@ export function GstBody({ invoice, sender, totals, skipEway, works }: Props) {
                 {showDisc && (
                   <td className={cn(styles.right, styles.num)}>{src?.discount_percent ? `${src.discount_percent}` : ''}</td>
                 )}
-                <td className={cn(styles.right, styles.num)} style={{ fontWeight: 700 }}>{money(line.taxable, cur)}</td>
+                <td className={cn(styles.right, styles.num)} style={{ fontWeight: 600 }}>{money(line.taxable, cur)}</td>
               </tr>
             );
           })}

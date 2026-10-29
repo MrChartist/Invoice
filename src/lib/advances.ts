@@ -35,6 +35,7 @@ import { ADVANCES_TABLE, advanceBalance, computeAdvanceTax, liveAdjustments, tax
 import { receivableTotal } from './rcm';
 import { recordSeries, seriesHigh } from './series-counters';
 import { escHtml as esc } from './html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 
 export { ADVANCES_TABLE, advanceBalance, computeAdvanceTax, isAdvanceAdjustment, liveAdjustments } from './advance-tax';
 export type { AdvanceBalance } from './advance-tax';
@@ -439,17 +440,17 @@ export function advancesCsv(rows: readonly AdvanceRow[]): string {
 
 
 const VOUCHER_STYLE = `
-  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 32px; }
+  body { font-family: ${PRINT_FONT}; color: #111; margin: 0; padding: 32px; }
   .sheet { max-width: 680px; margin: 0 auto; border: 1px solid #ccc; padding: 28px 32px; }
   h1 { font-size: 20px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 4px; }
   .muted { color: #555; font-size: 13px; }
   .head { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 16px; }
-  .amount { font-size: 28px; font-weight: 700; margin: 12px 0 2px; font-variant-numeric: tabular-nums; }
+  .amount { font-size: 28px; font-weight: 600; margin: 12px 0 2px; font-variant-numeric: tabular-nums; }
   table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
   th { text-align: left; color: #555; font-weight: 500; width: 42%; padding: 6px 0; vertical-align: top; }
   td { padding: 6px 0; font-variant-numeric: tabular-nums; }
   .sign { margin-top: 48px; text-align: right; font-size: 13px; }
-  .note { margin-top: 24px; font-size: 11px; color: #777; }
+  .note { margin-top: 24px; font-size: 12px; color: #777; }
   @media print { body { padding: 0; } .sheet { border: 0; } }`;
 
 function voucherShell(title: string, number: string, date: string, adv: AdvanceRecord, body: string, note: string): string {
@@ -457,7 +458,7 @@ function voucherShell(title: string, number: string, date: string, adv: AdvanceR
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)} ${esc(number)}</title>
-<style>${VOUCHER_STYLE}</style></head>
+<style>${PRINT_FONT_FACE}${VOUCHER_STYLE}</style></head>
 <body><div class="sheet">
   <div class="head">
     <div><h1>${esc(title)}</h1><div class="muted">${esc(number)} · ${esc(formatDate(date))}</div></div>

@@ -214,7 +214,7 @@ export function rawReceiptHtml(lines: readonly string[], width: ReceiptWidth, ti
   const fontPx = width === 58 ? 11 : 12;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>
-<style>@page{size:${width}mm auto;margin:2mm}html,body{margin:0;background:#fff;color:#000}pre{font:${fontPx}px/1.25 ui-monospace,"Courier New",monospace;margin:0;white-space:pre}</style></head>
+<style>@page{size:${width}mm auto;margin:2mm}html,body{margin:0;background:#fff;color:#000}pre{font:${fontPx}px/1.25 monospace;margin:0;white-space:pre}</style></head>
 <body><pre>${esc(lines.join('\n'))}</pre></body></html>`;
 }
 

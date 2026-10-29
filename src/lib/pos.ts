@@ -36,6 +36,7 @@ import { nextPartyBalanceSnapshot } from './party-balance';
 import { partyBalanceSnapshotFor } from './khata-actions';
 import { EXCHANGE_NOTE, applyExchange, openExchange, zReturns, type PosReturn, type ZReturns } from './pos-returns';
 import { escHtml as esc } from './html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 import { liveRedeemIssue, recordPromoUse, stampVoucherPayment } from './retail/gift-voucher-core'; // R4-B1
 import { movedNoCash } from './advance-tax'; // no-cash.ts (QA6-1 F4)
 
@@ -622,18 +623,18 @@ export function zReportHtml(z: ZReport, opts: { business?: string; close?: PosDa
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(opts.title ?? 'Z report')} ${esc(z.day)}</title>
-<style>
+<style>${PRINT_FONT_FACE}
 @page { size: 80mm auto; margin: 0; }
-body { width: 72mm; margin: 4mm; font: 12px/1.35 ui-monospace, Menlo, Consolas, monospace; color: black; background: white; }
+body { width: 72mm; margin: 4mm; font: 12px/1.35 ${PRINT_FONT}; color: black; background: white; }
 h1 { font-size: 15px; text-align: center; margin: 0 0 2px; }
 p { margin: 0; text-align: center; }
 table { width: 100%; border-collapse: collapse; margin-top: 6px; }
 td { padding: 1px 0; vertical-align: top; }
 .r { text-align: right; white-space: nowrap; }
-.b td { font-weight: 700; }
+.b td { font-weight: 600; }
 .sep td { border-top: 1px dashed black; padding-top: 3px; }
 h2 { font-size: 12px; margin: 8px 0 0; border-bottom: 1px dashed black; }
-.foot { margin-top: 8px; font-size: 10px; }
+.foot { margin-top: 8px; font-size: 12px; }
 </style></head><body>
 <h1>${esc((opts.title ?? 'Z report').toUpperCase())}</h1>
 ${opts.business ? `<p>${esc(opts.business)}</p>` : ''}

@@ -182,7 +182,7 @@ export function barcodeSvg(code: string, opts: { height?: number; text?: boolean
   const height = barH + (showText ? 10 : 0);
   const rects = barRuns(modules).map(([x, w]) => `<rect x="${x + quiet}" y="0" width="${w}" height="${barH}"/>`).join('');
   const label = showText
-    ? `<text x="${width / 2}" y="${barH + 8.5}" text-anchor="middle" font-size="8" font-family="monospace">${escapeXml(code.trim())}</text>`
+    ? `<text x="${width / 2}" y="${barH + 8.5}" text-anchor="middle" font-size="8" font-family="'Chartist Sans Flex', sans-serif" font-variant-numeric="tabular-nums">${escapeXml(code.trim())}</text>`
     : '';
   const cls = opts.className ? ` class="${escapeXml(opts.className)}"` : '';
   return `<svg xmlns="http://www.w3.org/2000/svg"${cls} viewBox="0 0 ${width} ${height}" role="img" aria-label="Barcode ${escapeXml(code.trim())}" shape-rendering="crispEdges"><rect width="${width}" height="${height}" fill="white"/><g fill="black">${rects}</g>${label}</svg>`;

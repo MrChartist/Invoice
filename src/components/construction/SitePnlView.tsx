@@ -9,6 +9,7 @@ import { Num, Table, Txt } from './site-ui';
 import { T, n, row, useRun } from './site-kit';
 import controls from '../../styles/controls.module.css';
 import type { SdKey } from '../../i18n/areas/construction-r11d';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../../lib/print-fonts';
 
 export default function SitePnlView({ boq, notify }: { boq: InvoiceRecord; notify: Notify }) {
   const [tick, run] = useRun(notify);
@@ -25,7 +26,7 @@ export default function SitePnlView({ boq, notify }: { boq: InvoiceRecord; notif
     const ctc = w.ctc.split(',').map((s) => s.split(':')).filter((x) => x.length === 2).map(([group, amount]) => ({ group: group.trim(), amount: n(amount) }));
     saveSitePnlInputs(boq, { unmeasured: n(w.unmeasured), ctc });
   });
-  const html = () => `<!doctype html><meta charset="utf-8"><title>Site P&amp;L</title><style>body{font:12px sans-serif;margin:24px}td{border-bottom:1px solid #ccc;padding:3px 8px}</style><h2>${L('title')} — ${boq.invoice_number} · ${boq.client?.name ?? ''}</h2><p>${p.from} – ${p.to}</p><table>${rows.slice(1).map(([a, b]) => `<tr><td>${a}</td><td>${typeof b === 'number' ? b.toFixed(2) : b}</td></tr>`).join('')}</table><p><small>${L('memoNote')}</small></p>`;
+  const html = () => `<!doctype html><meta charset="utf-8"><title>Site P&amp;L</title><style>${PRINT_FONT_FACE}body{font:12px ${PRINT_FONT};margin:24px}td{border-bottom:1px solid #ccc;padding:3px 8px}</style><h2>${L('title')} — ${boq.invoice_number} · ${boq.client?.name ?? ''}</h2><p>${p.from} – ${p.to}</p><table>${rows.slice(1).map(([a, b]) => `<tr><td>${a}</td><td>${typeof b === 'number' ? b.toFixed(2) : b}</td></tr>`).join('')}</table><p><small>${L('memoNote')}</small></p>`;
   return (
     <div data-sd-view="pnl">
       <div style={row}>

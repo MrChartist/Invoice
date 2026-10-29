@@ -18,6 +18,7 @@ import { dayOpeningFloat, shiftsDb } from '../../lib/pos-shifts';
 import { cashWithRiders } from '../../lib/pos'; // R9 (RT-A3)
 import { peekTable } from '../../lib/storage';
 import { defineArea } from '../../i18n/area';
+import { printWhenReady } from '../../lib/print-fonts';
 
 const zrT = defineArea({ riders: 'Cash with riders' } as const, { riders: 'राइडरों के पास कैश' });
 
@@ -28,7 +29,7 @@ function printHtml(html: string, name: string) {
     w.document.write(html);
     w.document.close();
     w.focus();
-    w.print();
+    printWhenReady(w);
   } else {
     downloadText(`${name}.html`, html, 'text/html');
   }

@@ -8,10 +8,11 @@ import type { BankAccount } from '../bank-accounts';
 import { esc } from '../voucher-print';
 import { formatCurrency, formatDate } from '../utils';
 import { agreementValue, passThroughTotal } from './cn-bookings';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 const m = (n: number) => esc(formatCurrency(n));
-const CSS = 'body{font:13px/1.45 system-ui,sans-serif;color:#111;margin:24px}h1{font-size:18px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin:10px 0}td,th{border:1px solid #999;padding:4px 6px;text-align:left}td.n,th.n{text-align:right}.note{font-size:11px;color:#555}';
-const page = (title: string, body: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title><style>${CSS}</style></head><body>${body}<p class="note">Working paper — verify with your CA.</p></body></html>`;
+const CSS = `body{font:13px/1.45 ${PRINT_FONT};color:#111;margin:24px}h1{font-size:18px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin:10px 0}td,th{border:1px solid #999;padding:4px 6px;text-align:left}td.n,th.n{text-align:right}.note{font-size:12px;color:#555}`;
+const page = (title: string, body: string) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title><style>${PRINT_FONT_FACE}${CSS}</style></head><body>${body}<p class="note">Working paper — verify with your CA.</p></body></html>`;
 
 export function allotmentHtml(b: RealtyBooking, u: RealtyUnit | undefined, p: RealtyProject | undefined, plan: PaymentPlan | undefined, acc: BankAccount | undefined, company: string, terms = ''): string {
   const heads = (pass: boolean) => b.cost_sheet.filter((h) => h.pass_through === pass && h.amount).map((h) => `<tr><td>${esc(h.head)}</td><td class="n">${m(h.amount)}</td></tr>`).join('');

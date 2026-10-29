@@ -8,6 +8,7 @@ import { barcodeSvg, pickSymbology } from './barcode';
 import { formatCurrency } from './utils';
 import { num } from './invoice-calc';
 import { escHtml as esc } from './html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 
 export interface LabelLayout {
   id: string;
@@ -131,12 +132,12 @@ export function labelSheetHtml(items: readonly LabelItem[], opts: LabelSheetOpti
   const page = pageSize(L);
   const css = `@page { size: ${L.roll ? `${page.width}mm ${page.height}mm` : 'A4'}; margin: 0; }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: black; background: white; }
+body { margin: 0; font-family: ${PRINT_FONT}; color: black; background: white; }
 .sheet { width: ${page.width}mm; height: ${page.height}mm; padding: ${L.top}mm 0 0 ${L.left}mm; display: grid; grid-template-columns: repeat(${L.cols}, ${L.width}mm); grid-auto-rows: ${L.height}mm; column-gap: ${L.gapX}mm; row-gap: ${L.gapY}mm; page-break-after: always; break-after: page; overflow: hidden; }
 .sheet:last-child { page-break-after: auto; break-after: auto; }
 .cell { overflow: hidden; padding: ${small ? '0.8mm 1.2mm' : '1.5mm 2.5mm'}; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: ${small ? '0.2mm' : '0.6mm'}; }
 .name { font-size: ${small ? 6.5 : 8.5}pt; font-weight: 600; line-height: 1.15; max-height: 2.3em; overflow: hidden; width: 100%; }
-.price { font-size: ${small ? 6.5 : 8}pt; font-weight: 700; }
+.price { font-size: ${small ? 6.5 : 8}pt; font-weight: 600; }
 .bars { width: 100%; flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; }
 .bars svg { height: 100%; max-width: 100%; }
 @media screen { body { background: gainsboro; } .sheet { background: white; margin: 8mm auto; box-shadow: 0 1px 4px rgba(0,0,0,.25); } .cell { outline: 1px dashed silver; } }`;
@@ -144,7 +145,7 @@ body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, san
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Barcode labels${opts.business ? ` · ${esc(opts.business)}` : ''}</title>
-<style>${css}</style></head><body>
+<style>${PRINT_FONT_FACE}${css}</style></head><body>
 ${pages.map((p) => `<section class="sheet">${p.map(label).join('')}</section>`).join('\n')}
 </body></html>`;
 }

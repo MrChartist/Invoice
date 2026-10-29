@@ -20,6 +20,7 @@ import { closeCycle, loadCycles, saveCycleDraft } from './ag-cycle-post';
 import { readAgriSettings } from './ag-settings';
 import { loadShifts } from './ag-shifts';
 import { clrOf, q3, solids, toL } from './ag-rate-chart';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 export interface MilkCycleDraft { lines: FarmerCycleLine[]; unclosed: MilkShift[]; shiftIds: string[] }
 
@@ -117,5 +118,5 @@ export function milkBillHtml(c: FarmerCycle, firm: string, only?: readonly strin
 <tr><th colspan="2">Total</th><th>${l.qty.toFixed(3)}</th><th colspan="2">kg fat ${num(l.kg_fat).toFixed(3)} · kg SNF ${num(l.kg_snf).toFixed(3)}</th><th></th><th>${f2(l.amount)}</th></tr>
 ${num(l.carried) ? `<tr><td colspan="6">Carried from the last cycle</td><td>${f2(num(l.carried))}</td></tr>` : ''}${l.deductions.map((x) => `<tr><td colspan="6">Less: ${esc(x.kind)}${x.note ? ` (${esc(x.note)})` : ''}</td><td>−${f2(x.amount)}</td></tr>`).join('')}
 <tr><th colspan="6">Net payable (${l.mode === 'bank' ? 'bank' : 'cash'})</th><th>${f2(l.net)}</th></tr></table></section>`).join('');
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(c.number)}</title><style>@page{size:A5;margin:10mm}body{font:12px sans-serif}section{page-break-after:always}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:2px 4px;text-align:right}td:first-child,th:first-child{text-align:left}h2{margin:0}</style></head><body>${pages}<p>Cycle total ₹${f2(t.gross)} · deductions ₹${f2(t.deductions)} · net ₹${f2(t.net)}</p></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(c.number)}</title><style>${PRINT_FONT_FACE}@page{size:A5;margin:10mm}body{font:12px ${PRINT_FONT}}section{page-break-after:always}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:2px 4px;text-align:right}td:first-child,th:first-child{text-align:left}h2{margin:0}</style></head><body>${pages}<p>Cycle total ₹${f2(t.gross)} · deductions ₹${f2(t.deductions)} · net ₹${f2(t.net)}</p></body></html>`;
 }

@@ -10,13 +10,14 @@ import { escHtml } from './html-esc';
 import { paperSize } from './design-prefs';
 import { localDb } from './localDb';
 import type { PackFile } from './report-pack';
+import { PRINT_FONT } from './print-fonts';
 
 export interface PackPdfPaper {
   title: string;
   html: string;
 }
 
-const TABLE = 'width:100%;border-collapse:collapse;font-size:10px;margin:0 0 14px';
+const TABLE = 'width:100%;border-collapse:collapse;font-size:12px;margin:0 0 14px';
 const CELL = 'border:1px solid #c8c8c8;padding:3px 5px;text-align:left;vertical-align:top';
 
 /** One CSV as an HTML table (first row = header); every value escaped. Empty when the CSV has no data row. */
@@ -34,7 +35,7 @@ export function csvTableHtml(csv: string): string {
 }
 
 const page = (title: string, sub: string, body: string): string =>
-  `<div style="padding:28px 32px;font-family:system-ui,sans-serif;color:#111;background:#fff"><h2 style="margin:0 0 4px;font-size:16px">${escHtml(title)}</h2><p style="margin:0 0 12px;font-size:10px;color:#555">${escHtml(sub)}</p>${body}</div>`;
+  `<div style="padding:28px 32px;font-family:${PRINT_FONT};color:#111;background:#fff"><h2 style="margin:0 0 4px;font-size:16px">${escHtml(title)}</h2><p style="margin:0 0 12px;font-size:12px;color:#555">${escHtml(sub)}</p>${body}</div>`;
 
 /**
  * The papers of the PDF, in pack order: P&L, balance sheet, ageing, one GSTR-1 paper (only sections with rows), GSTR-3B.
@@ -46,7 +47,7 @@ export function packPdfPapers(month: string, files: readonly PackFile[], company
   const one = (title: string, f: PackFile | undefined) => {
     if (!f) return;
     const t = csvTableHtml(f.text);
-    out.push({ title, html: page(title, sub, t || '<p style="font-size:11px">No rows.</p>') });
+    out.push({ title, html: page(title, sub, t || '<p style="font-size:12px">No rows.</p>') });
   };
   one('Profit & loss', files.find((f) => f.name.startsWith('PnL_')));
   one('Balance sheet', files.find((f) => f.name.startsWith('BalanceSheet_')));
@@ -54,7 +55,7 @@ export function packPdfPapers(month: string, files: readonly PackFile[], company
   const gstr1 = files.filter((f) => f.name.startsWith('GSTR1_'))
     .map((f) => ({ id: f.name.replace(/^GSTR1_[^_]+_|\.csv$/g, ''), t: csvTableHtml(f.text) }))
     .filter((x) => x.t);
-  out.push({ title: 'GSTR-1', html: page('GSTR-1', sub, gstr1.length ? gstr1.map((x) => `<h3 style="font-size:12px;margin:8px 0 4px">${escHtml(x.id.toUpperCase())}</h3>${x.t}`).join('') : '<p style="font-size:11px">No rows.</p>') });
+  out.push({ title: 'GSTR-1', html: page('GSTR-1', sub, gstr1.length ? gstr1.map((x) => `<h3 style="font-size:12px;margin:8px 0 4px">${escHtml(x.id.toUpperCase())}</h3>${x.t}`).join('') : '<p style="font-size:12px">No rows.</p>') });
   one('GSTR-3B', files.find((f) => f.name.startsWith('GSTR3B_')));
   return out;
 }
