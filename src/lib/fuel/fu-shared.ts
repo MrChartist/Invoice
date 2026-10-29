@@ -34,3 +34,7 @@ export const FU_NAMES = {
   excess: 'Excess at pump',
   short: 'Shortage at pump',
 } as const;
+
+// R21-C
+/** C3: the class (narration head) of the monthly stock-register loss / gain voucher (one per tank per month, FU18). */
+export const FU_LOSS_CLASS = 'Normal loss — evaporation / handling';
