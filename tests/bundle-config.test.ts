@@ -50,6 +50,14 @@ test('vendor tests still match their packages', () => {
   assert.ok(react.test?.test('/x/node_modules/react-dom/index.js'));
   assert.ok(react.test?.test('C:\\x\\node_modules\\scheduler\\index.js'));
   assert.ok(ui.test?.test('/x/node_modules/lucide-react/dist/x.js'));
+  assert.ok(ui.test?.test('/x/node_modules/zustand/esm/react.mjs'));
+  assert.ok(ui.test?.test('/x/node_modules/clsx/dist/clsx.mjs'));
+});
+
+test('PERF-4: qrcode.react is not a first-paint vendor (only lazy templates / POS / statements import it)', () => {
+  const [react, ui] = groups;
+  const qr = '/x/node_modules/qrcode.react/lib/esm/index.js';
+  assert.ok(!ui.test?.test(qr) && !react.test?.test(qr), 'qrcode.react must stay out of vendor-ui / vendor-react (−5.6 kB gz first paint)');
 });
 
 test('bundle-size script: entry 100 kB, initial 185 kB, ≤ 5 initial files, core 3,300, Hindi 400, regional 25, leak 36', () => {
