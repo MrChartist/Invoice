@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createGraph, familyRe, initialSet, isLeaf, leafGroup, safeFamilyGroup, safeSet } from '../scripts/vite-safe-groups.mjs';
+import { UI_LEAF, createGraph, familyRe, initialSet, isLeaf, leafGroup, safeFamilyGroup, safeSet } from '../scripts/vite-safe-groups.mjs';
 import { preloadTrim } from '../scripts/vite-preload-trim.mjs';
 
 const cfg = readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8');
@@ -31,12 +31,14 @@ test('the groups, in order, with their priorities', () => {
   assert.deepEqual(families.map(([n]) => n), ['f-hotel', 'f-trade', 'f-retail', 'f-services', 'f-cn', 'f-agri', 'f-mfg', 'f-prof', 'f-travel', 'f-manpower', 'f-society', 'f-logistics']); // R17-A: f-manpower; R18-A: f-society; R19-A: f-logistics
   assert.ok(families.every(([, p]) => p === 12), 'families at priority 12');
   assert.match(cfg, /leafGroup\(graph, 'lazy-leaves', 9, \{ maxModuleSize: 3000 \}\)/);
+  assert.match(cfg, /leafGroup\(graph, 'lazy-leaves-ui', 8, \{ maxModuleSize: 1500, test: UI_LEAF \}\)/, 'PERF-5');
   const names = groups.map((g) => (typeof g.name === 'string' ? g.name : g.name.name));
   assert.deepEqual(names.slice(0, 4), ['vendor-react', 'vendor-ui', 'langChunkName', 'app-initial']);
-  assert.deepEqual(groups.map((g) => g.priority), [30, 30, 25, 20, ...families.map(() => 12), 9]);
+  assert.deepEqual(groups.map((g) => g.priority), [30, 30, 25, 20, ...families.map(() => 12), 9, 8]);
   assert.deepEqual(groups[3].tags, ['$initial']);
   assert.equal(groups[3].test, undefined, 'app-initial is selected by tag only');
-  assert.equal(groups.at(-1)?.maxModuleSize, 3000);
+  assert.equal(groups.at(-2)?.maxModuleSize, 3000);
+  assert.equal(groups.at(-1)?.maxModuleSize, 1500);
 });
 
 test('every group has a filter (test, tags or a name function); none can capture the PDF stack', () => {
@@ -196,4 +198,26 @@ test('group name functions: the family name for safe members, lazy-leaves for sm
   assert.ok(isLeaf(g, P + 'src/lib/books.ts'), 'no imports at all is a leaf');
   assert.equal(l.maxModuleSize, 3000);
   assert.equal(g.families.get('f-trade'), FAM, 'recorded for build-meta/chunks.json');
+});
+
+test('PERF-5: lazy-leaves-ui takes small script leaves outside src/lib, never a stylesheet', () => {
+  const g = graphOf({
+    'src/main.tsx': ['src/lib/utils.ts'],
+    'src/lib/utils.ts': [],
+    'src/lib/leaf.ts': ['src/lib/utils.ts'],
+    'src/components/X.tsx': ['src/lib/utils.ts'],
+    'src/components/Y.tsx': ['src/components/y.module.css'],
+    'src/components/y.module.css': [],
+    'src/store/pick.ts': [],
+    'src/hooks/useX.ts': [],
+    'src/i18n/areas/nodes.ts': ['src/lib/utils.ts'],
+    'src/pages/Page.tsx': [],
+  }, ['src/main.tsx']);
+  const u = leafGroup(g, 'lazy-leaves-ui', 8, { maxModuleSize: 1500, test: UI_LEAF });
+  for (const id of ['src/components/X.tsx', 'src/store/pick.ts', 'src/hooks/useX.ts', 'src/i18n/areas/nodes.ts']) assert.equal(u.name(P + id), 'lazy-leaves-ui', id);
+  assert.equal(u.name(P + 'src/components/Y.tsx'), null, 'imports a lazy CSS module');
+  assert.equal(u.name(P + 'src/components/y.module.css'), null, 'a stylesheet never joins');
+  assert.equal(u.name(P + 'src/lib/leaf.ts'), null, 'src/lib leaves stay in lazy-leaves');
+  assert.equal(u.name(P + 'src/pages/Page.tsx'), null, 'routes stay their own chunks');
+  assert.equal(u.maxModuleSize, 1500);
 });

@@ -6,7 +6,7 @@ import { CSP_META } from './scripts/security-headers.mjs'
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { hiSplit, langChunkName } from './scripts/vite-hi-split.mjs'
-import { createGraph, familyRe, graphPlugin, leafGroup, safeFamilyGroup } from './scripts/vite-safe-groups.mjs'
+import { UI_LEAF, createGraph, familyRe, graphPlugin, leafGroup, safeFamilyGroup } from './scripts/vite-safe-groups.mjs'
 import { preloadTrim } from './scripts/vite-preload-trim.mjs'
 
 // R6-A4: the version shown in Help, What's new and the diagnostic report comes from package.json.
@@ -100,6 +100,8 @@ export default defineConfig({
             safeFamilyGroup(graph, 'f-logistics', familyRe('logistics', 'logistics-rules', 'logistics-r19', 'lg-registry'), 12), // R19-A: the registry stays a lazy leaf (sync / recycle bin)
             // R16-A2: small lazy src/lib leaves (imports all first-paint / vendor) in one chunk.
             leafGroup(graph, 'lazy-leaves', 9, { maxModuleSize: 3000 }),
+            // PERF-5: the same for small leaves of src/components, store, hooks and i18n areas (one chunk, no CSS).
+            leafGroup(graph, 'lazy-leaves-ui', 8, { maxModuleSize: 1500, test: UI_LEAF }),
           ],
         },
       },

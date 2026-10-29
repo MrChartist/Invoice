@@ -11,8 +11,8 @@
  * Post-build invariants (R16-A1 / A2, read from build-meta/chunks.json written by scripts/vite-safe-groups.mjs):
  *  - Hindi leak: Devanagari string bytes left in English chunks (gz estimate: blank them and re-gzip) stay under
  *    the total cap, and under 1 kB per chunk unless the chunk holds an allow-listed bilingual module;
- *  - every module of an `f-*` chunk matches its family; every `lazy-leaves` module imports only first-paint /
- *    vendor modules, and the leaves chunk stays under its cap; `html-esc` / `day-math` never reach first paint.
+ *  - every module of an `f-*` chunk matches its family; every `lazy-leaves` / `lazy-leaves-ui` module imports only
+ *    first-paint / vendor modules (and is no stylesheet), and each leaves chunk stays under its cap; `html-esc` / `day-math` never reach first paint.
  * Override with env BUDGET_INITIAL_GZ_KB, BUDGET_ENTRY_GZ_KB, BUDGET_TOTAL_GZ_KB, BUDGET_INITIAL_FILES,
  * BUDGET_LANG_HI_GZ_KB, BUDGET_LANG_REGIONAL_GZ_KB, BUDGET_HI_LEAK_GZ_KB.
  */
@@ -170,13 +170,15 @@ if (!meta) {
       const stray = c.modules.filter((m) => !families[fam].test('/' + m));
       if (stray.length) fail(`${file} (${fam}) holds modules outside its family: ${stray.slice(0, 5).join(', ')}`);
     }
-    if (c.name === 'lazy-leaves') {
+    // PERF-5: `lazy-leaves-ui` (small leaves of src/components, store, hooks, i18n areas) has the same rules and cap.
+    if (c.name === 'lazy-leaves' || c.name === 'lazy-leaves-ui') {
       for (const m of c.modules) {
         const bad = (meta.imports[m] ?? []).filter((d) => !d.fixed);
-        if (bad.length) fail(`${file} (lazy-leaves): ${m} imports lazy code ${bad.map((d) => d.id).slice(0, 3).join(', ')}`);
+        if (bad.length) fail(`${file} (${c.name}): ${m} imports lazy code ${bad.map((d) => d.id).slice(0, 3).join(', ')}`);
+        if (/\.css$/.test(m)) fail(`${file} (${c.name}): ${m} is a stylesheet (its styles would load with the group)`);
       }
       const n = kb(sizes.get(file) ?? 0);
-      console.log(`${n <= LEAVES_MAX_KB ? 'ok  ' : 'FAIL'} ${'lazy-leaves (gz)'.padEnd(18)} ${n.toFixed(1).padStart(7)} kB / budget ${LEAVES_MAX_KB} kB`);
+      console.log(`${n <= LEAVES_MAX_KB ? 'ok  ' : 'FAIL'} ${`${c.name} (gz)`.padEnd(18)} ${n.toFixed(1).padStart(7)} kB / budget ${LEAVES_MAX_KB} kB`);
       if (n > LEAVES_MAX_KB) bad = true;
     }
   }

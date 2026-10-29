@@ -8,8 +8,8 @@
  *  - `safeFamilyGroup(name, re, priority)`: a module matching `re` whose static imports are all first-paint
  *    (`$initial`), a vendor-group module, or family modules that pass the same test. Computed over strongly connected
  *    components, so a cycle passes only if the whole component passes.
- *  - `leafGroup(name, priority, { maxModuleSize })`: a lazy `src/lib/**` module whose static imports are all
- *    first-paint / vendor (a "leaf"), up to `maxModuleSize` bytes.
+ *  - `leafGroup(name, priority, { maxModuleSize, test })`: a lazy `src/lib/**` module (or one matching `test`, e.g.
+ *    `UI_LEAF`, PERF-5) whose static imports are all first-paint / vendor (a "leaf"), up to `maxModuleSize` bytes.
  *
  * `graphPlugin()` records the module graph once the build has loaded every module (`buildEnd`), and writes
  * `build-meta/chunks.json` (outside dist/, never precached) for the post-build checks in check-bundle-size.mjs.
@@ -131,10 +131,12 @@ export function safeFamilyGroup(g, name, re, priority) {
 }
 
 const LIB = /[\\/]src[\\/]lib[\\/][^\0]*\.tsx?$/;
+/** PERF-5: the other script folders (no `.css`: a CSS module's styles would load with the group). */
+export const UI_LEAF = /[\\/]src[\\/](?:components|store|hooks|i18n[\\/]areas)[\\/][^\0]*\.tsx?$/;
 
-/** The lazy-leaves group: small `src/lib` leaves (≤ maxModuleSize bytes). */
-export function leafGroup(g, name, priority, { maxModuleSize }) {
-  return { name: (id) => (LIB.test(id) && isLeaf(g, id) ? name : null), priority, maxModuleSize };
+/** A leaves group: small lazy leaves (≤ maxModuleSize bytes) under `test` (default: `src/lib`). */
+export function leafGroup(g, name, priority, { maxModuleSize, test = LIB }) {
+  return { name: (id) => (test.test(id) && isLeaf(g, id) ? name : null), priority, maxModuleSize };
 }
 
 /** Records the graph and writes build-meta/chunks.json. */
