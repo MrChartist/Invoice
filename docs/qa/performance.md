@@ -40,7 +40,8 @@ After config+src: `index` 17.0 / 5.0, `vendor-react` 230.9 / 73.8, `vendor-ui` 2
 (the last four are loaded only on first "Download PDF").
 
 ### What changed in `vite.config.ts`
-- Vendor chunks only for `react*` and `lucide-react`/`qrcode.react`/`zustand`/`clsx` (long-term cacheable).
+- Vendor chunks only for `react*` and `lucide-react`/`zustand`/`clsx` (long-term cacheable). `qrcode.react` was in
+  `vendor-ui` until PERF-4 (2026-10-29), see the end of this file.
 - **No manual chunk for the PDF stack.** Tried it: rolldown hoists a shared CJS-interop helper into
   `vendor-pdf`, so `vendor-react` imports from it and the PDF chunk is preloaded anyway (+180 kB gz).
   Letting `import()` split it naturally gives clean lazy chunks.
@@ -425,3 +426,34 @@ re-caching a dropped pack file.
 - **One-time cost.** The first save of a big table after an update, a restore or a sync merge writes every chunk once
   (the old cost, once). In memory a chunked table holds its chunk texts instead of one string; its full text is built
   only for whole-table readers (backup, sync, open export, storage health) and kept until the next write.
+
+### PERF-4 first-paint headroom (2026-10-29)
+
+First paint was 184.8 / 185 kB, so no change to `storage.ts`, `localDb.ts` or the shell could land. Attribution
+(sourcemap build, bytes per source module in each initial chunk) showed the largest single item that first paint does
+not use was **`qrcode.react` inside `vendor-ui`** (15.8 kB raw): `VENDOR_UI` named it, so the QR library shipped with
+every first paint although only lazy modules import it (invoice templates, IRN block, statements, POS UPI QR, order
+pad, bundle tickets, farmer cards, customer display). The fix is one token in `vite.config.ts`: `qrcode.react` left
+the `VENDOR_UI` regex; rolldown now emits it as its own lazy chunk (`esm-*.js`, one module), loaded with the first
+template / QR screen (it is precached like every core chunk, so offline use is unchanged). The `Pos.tsx` comment
+"qrcode.react loads only once a UPI amount is typed" is now true. `tests/bundle-config.test.ts` asserts that neither
+vendor group captures `qrcode.react` (and that `vendor-ui` still matches `zustand` / `clsx`).
+
+| Chunk (gz -9, KiB) | Before `f395942` | After |
+|---|---|---|
+| `index` (entry = app-initial) | 90.84 | 90.84 |
+| `vendor-react` | 72.13 | 72.13 |
+| `vendor-ui` | 21.47 (69.2 raw) | **15.81** (53.4 raw) |
+| `rolldown-runtime` | 0.41 | 0.41 |
+| **First paint (initial JS)** | **184.8** | **179.2 (−5.7)** |
+| `esm` (`qrcode.react`, lazy) | — | 5.85 |
+| Core precache | 3,265.4 | 3,265.0 (−0.4) |
+| JS files | 1,059 | 1,060 |
+
+Measured and rejected: moving `tax-rules.ts` out of first paint (it is there only because `src/types/invoice.ts`
+evaluates `TDS_SECTIONS` / `TCS_PRESETS` at load and re-exports `GST_SLABS`, none used by `src/`). First paint
+−3.2 kB, but `tax-rules` became a shared chunk imported by 202 lazy chunks: core **+15.8 kB** (3,280.3). A widely
+shared first-paint module costs one `import{…}from` per importing chunk once it leaves the entry; only modules with
+few importers (like `qrcode.react`) are worth moving. Next candidates, in the same spirit: lucide icons used only on
+lazy screens (every imported `lucide-react` icon still lands in `vendor-ui`, most of its 15.8 kB) — a policy change for
+`AGENTS.md`, not done here.

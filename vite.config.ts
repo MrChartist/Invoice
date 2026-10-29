@@ -26,7 +26,8 @@ function cspMeta(): Plugin {
 }
 
 const VENDOR_REACT = /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/
-const VENDOR_UI = /node_modules[\\/](lucide-react|qrcode\.react|zustand|clsx)[\\/]/
+// PERF-4: no `qrcode.react` here — only lazy screens import it, and in vendor-ui it cost first paint 5.7 kB gz.
+const VENDOR_UI = /node_modules[\\/](lucide-react|zustand|clsx)[\\/]/
 // R16-A2: the module graph the safe groups read (filled at buildEnd; build-meta/chunks.json for check-bundle-size).
 const graph = createGraph({ vendor: [VENDOR_REACT, VENDOR_UI], root: fileURLToPath(new URL('.', import.meta.url)) })
 
