@@ -95,6 +95,7 @@ export const INVENTORY_PACK_TABS = [
   { id: 'cold', pack: 'coldstore' }, // AG-D: views lots / gatepasses / rent / loans / chambers
   { id: 'inputs', pack: 'agri_inputs' }, // AG-D: views licences / subsidy / credit
   { id: 'members', pack: 'fpo' }, // AG-D: views register / shares / patronage / papers
+  { id: 'fuel', pack: 'fuel', alsoPacks: ['lpg'] }, // R21: views tanks / prices (A), shift / dsr (B), dips / stock (C), credit / omc / lpg (D)
 ] as const;
 export type InventoryPackTab = (typeof INVENTORY_PACK_TABS)[number]['id'];
 /* ── Distribution ── */

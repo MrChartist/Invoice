@@ -523,3 +523,23 @@ export function applyLogisticsKind(kind: LogisticsKindId, opts: { registered?: b
   const packs = [...(opts.currentPacks ?? []), ...LG_KIND_PACKS[kind], ...(kind === 'multi' ? opts.extra ?? [] : []), ...(opts.ownLorries ? ['transport' as const] : [])];
   return { business_type: 'transport', modules, logistics_kind: kind, industry_packs: [...new Set<PackId>(packs)], defaultDueDays: 30, templateId: 'gst_tax_invoice' };
 }
+
+/* ── R21 (R21-A1): fuel profile — a wizard card, not a business type (the R12 / R13 / R18 / R19 pattern) ── */
+
+/** The fuel picker's choices (stored as `settings.fuel_kind`). */
+export const FUEL_KINDS = ['pump', 'cng', 'pump_cng', 'lpg', 'pump_lpg'] as const;
+export type FuelKindId = (typeof FUEL_KINDS)[number];
+export const isFuelKind = (v: unknown): v is FuelKindId => typeof v === 'string' && (FUEL_KINDS as readonly string[]).includes(v);
+/** Where a kind lands after setup: the fuel desk on Inventory (shift view; an LPG distributor the LPG view). */
+export const fuelLanding = (kind: FuelKindId): string => `/inventory?tab=fuel&view=${kind === 'lpg' ? 'lpg' : 'shift'}`;
+
+/**
+ * Settings patch for a fuel profile: business type `kirana` (POS, purchases, inventory, reports) with EXPLICIT modules =
+ * the kirana preset ∪ accounts, banking, gst, tds, payroll, and EXPLICIT packs = the company's ∪ `fuel` / `lpg` by kind.
+ * It writes no `retail_kind` (no retail desk). Changing the profile deletes nothing.
+ */
+export function applyFuelKind(kind: FuelKindId, opts: { currentPacks?: readonly PackId[] } = {}): ShopModeSettings & { fuel_kind: FuelKindId; industry_packs: PackId[] } {
+  const modules = [...new Set<ModuleId>([...PRESETS.kirana, 'accounts', 'banking', 'gst', 'tds', 'payroll'])];
+  const packs: PackId[] = kind === 'lpg' ? ['lpg'] : kind === 'pump_lpg' ? ['fuel', 'lpg'] : ['fuel'];
+  return { business_type: 'kirana', modules, fuel_kind: kind, industry_packs: [...new Set<PackId>([...(opts.currentPacks ?? []), ...packs])] };
+}

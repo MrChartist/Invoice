@@ -6374,6 +6374,78 @@ try {
     await page.evaluate(() => localStorage.setItem('mrchartist_tally_keys', 'off'));
   });
 
+  // R21-A: fuel core — the profile, a tank with its chart, a nozzle, a price, the POS fuel line and its paper.
+  await step('R21-A fuel core: Settings → Fuel profile → Petrol / diesel pump (kirana, explicit ["fuel"], gst + accounts); Inventory → Fuel → Tanks: tank (9,000 L, 3-row chart) + nozzle 1-A; Prices: ₹94.72 from today 00:00; POS: scan petrol, ₹500 → 5.279 L, cash ₹500 → a non-GST Bill of Supply ₹500.00 with the nozzle line on the paper', async () => {
+    const keys = ['settings', 'stock_items', 'godowns', 'fuel_nozzles', 'fuel_prices', 'invoices', 'transactions'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'kirana', modules: undefined, industry_packs: undefined, fuel_kind: undefined, retail_kind: undefined, logistics_kind: undefined, society_kind: undefined, service_kind: undefined, manpower_kind: undefined, travel_kind: undefined, prof_kind: undefined, mfg_kind: undefined, agri_kind: undefined, lock_until: undefined });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), { id: 'e2e-fu-ms', name: 'E2E Petrol', unit: 'LTR', hsn: '27101241', barcode: '8909999000017', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0 }]);
+    await writeJson(page, 'fuel_nozzles', []);
+    await writeJson(page, 'fuel_prices', []);
+    await readJson(page, 'stock_items', [], (v) => v.some((s) => s.id === 'e2e-fu-ms'), 15000);
+    await readJson(page, 'fuel_prices', null, (v) => Array.isArray(v) && v.length === 0, 15000);
+    await readJson(page, 'settings', {}, (v) => v.business_type === 'kirana' && !v.fuel_kind, 15000);
+    await page.goto(srv.origin + '/settings?tab=features');
+    await page.locator('[data-fu-kind-card="pump"]').click({ timeout: 15000 });
+    await page.getByRole('button', { name: 'Save settings' }).first().click();
+    const st = await readJson(page, 'settings', {}, (v) => v.fuel_kind === 'pump', 15000);
+    check(st.business_type === 'kirana' && JSON.stringify(st.industry_packs) === '["fuel"]' && ['gst', 'accounts', 'pos', 'inventory'].every((m) => st.modules?.includes(m)) && !st.retail_kind, `Petrol / diesel pump: kirana + explicit ["fuel"] + gst / accounts (${st.industry_packs}; ${st.modules})`);
+    await page.goto(srv.origin + '/inventory?tab=fuel&view=tanks');
+    await page.locator('[data-fuel-desk]').waitFor({ timeout: 15000 });
+    check((await page.getByRole('tab').allInnerTexts()).some((t) => /^Fuel$/.test(t.trim())), 'Inventory lists the Fuel tab');
+    await page.locator('[data-fu-field="name"]').fill('E2E Tank MS');
+    await page.locator('[data-fuel-tanks] [data-fu-field="item"]').selectOption('e2e-fu-ms');
+    await page.locator('[data-fu-field="cap"]').fill('9000');
+    await page.locator('[data-fu-field="chart"]').fill('Dip mm,Litres\n0,0\n500,2000\n1000,5200');
+    await page.locator('[data-fu-add-tank]').click();
+    const gds = await readJson(page, 'godowns', [], (v) => v.some((g) => g.name === 'E2E Tank MS' && g.fu), 15000);
+    const tank = gds.find((g) => g.name === 'E2E Tank MS');
+    check(tank?.fu?.capacity_l === 9000 && tank.fu.chart.length === 3 && tank.fu.product_item_id === 'e2e-fu-ms' && !tank.kind, `tank = an ordinary godown with fu (${JSON.stringify(tank?.fu)})`);
+    const items = await readJson(page, 'stock_items', [], (v) => v.some((s) => s.id === 'e2e-fu-ms' && s.fu), 15000);
+    check(items.find((s) => s.id === 'e2e-fu-ms')?.fu?.product === 'ms', 'the product is marked as petrol (ms)');
+    await page.locator('[data-fu-field="du"]').fill('1');
+    await page.locator('[data-fu-field="no"]').fill('a');
+    await page.locator('[data-fu-field="tank"]').selectOption(tank.id);
+    await page.locator('[data-fu-field="tot"]').fill('1000');
+    await page.locator('[data-fu-add-nozzle]').click();
+    const nz = await readJson(page, 'fuel_nozzles', [], (v) => v.length === 1, 15000);
+    check(nz[0]?.nozzle_no === 'A' && nz[0]?.item_id === 'e2e-fu-ms' && nz[0]?.tank_id === tank.id, 'nozzle 1-A draws petrol from the tank');
+    await page.locator('[data-fuel-view="prices"]').click();
+    await page.locator('[data-fuel-prices]').waitFor({ timeout: 15000 });
+    await page.locator('[data-fuel-prices] [data-fu-field="item"]').selectOption('e2e-fu-ms');
+    await page.locator('[data-fu-field="time"]').fill('00:00');
+    await page.locator('[data-fu-field="rsp"]').fill('94.72');
+    await page.locator('[data-fu-add-price]').click();
+    const pr = await readJson(page, 'fuel_prices', [], (v) => v.length === 1, 15000);
+    check(pr[0]?.rsp === 94.72 && pr[0]?.time === '00:00', 'price ₹94.72 from today 00:00');
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/pos');
+    const scan = page.locator('#pos-scan');
+    await scan.waitFor();
+    await scan.fill('8909999000017');
+    await scan.press('Enter');
+    await page.locator('[data-fu-pos]').waitFor({ timeout: 15000 });
+    await page.locator('[data-fu-amount]').fill('500');
+    await page.waitForFunction(() => /^5\.279 L/.test(document.querySelector('[data-fu-litres]')?.textContent ?? ''), null, { timeout: 15000 });
+    check(true, '₹500 at ₹94.72 → 5.279 L on nozzle 1-A');
+    await page.waitForFunction(() => /500\.00/.test(document.querySelector('[data-pos-total]')?.textContent ?? ''), null, { timeout: 15000 });
+    await page.locator('#pos-Cash').fill('500');
+    await page.getByRole('button', { name: /Save bill/ }).click();
+    const bill = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.fu), 15000)).find((i) => !beforeIds.has(i.id) && i.fu);
+    const fl = bill?.fu?.lines?.[bill?.items?.[0]?.id];
+    check(bill?.doc_type === 'BILL_OF_SUPPLY' && bill.exempt_kind === 'NON_GST' && bill.total === 500 && bill.items[0].quantity === 5.279 && bill.items[0].sv?.exempt === 'NON_GST' && bill.items[0].tax_rate === 0, `a non-GST Bill of Supply ₹500.00, 5.279 L (${bill?.doc_type}, ${bill?.total}, ${bill?.items?.[0]?.quantity})`);
+    check(fl?.nozzle === '1-A' && fl.rsp === 94.72 && fl.litres === 5.279, `fu snapshot: nozzle 1-A, ₹94.72, 5.279 L (${JSON.stringify(fl)})`);
+    await page.goto(srv.origin + `/invoice/${bill.id}`);
+    await page.getByRole('button', { name: /Preview & download PDF/ }).click({ timeout: 15000 });
+    const dlg = page.getByRole('dialog', { name: 'Document preview' });
+    await dlg.locator('[data-fuel-lines]').waitFor({ timeout: 15000 });
+    const paper = await dlg.locator('[data-fuel-lines]').innerText();
+    check(/Nozzle 1-A · 5\.279 L @ ₹94\.72 \(price of \d\d-\d\d-\d{4} 00:00\)/.test(paper), `the paper prints the nozzle line (${paper})`);
+    await page.keyboard.press('Escape');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   // R20-C: report keys on the trial balance — Ctrl+F filter chip (Esc clears), Space ticks with a totals strip, Ctrl+R
   // hides and Ctrl+U restores, Ctrl+L saves a view, Ctrl+E presses the CSV button, + steps the period.
   await step('R20-C: report filter, ticks, hide / restore, saved view, export and period keys', async () => {

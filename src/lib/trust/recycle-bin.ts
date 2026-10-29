@@ -45,6 +45,7 @@ import '../travel/tv-registry'; // R15: travel tables' rights and audit labels (
 import '../manpower/mp-registry'; // R17: manpower tables' rights and audit labels (lazy registration)
 import '../society/hs-registry'; // R18: society tables' rights and audit labels (lazy registration)
 import '../logistics/lg-registry'; // R19: logistics tables' rights and audit labels (lazy registration)
+import '../fuel/fu-registry'; // R21: fuel tables' rights and audit labels (lazy registration)
 import { syncUrdPaid, urdLeft } from '../retail/rt-doc-hooks'; // QA10 R7: URD vouchers settled by exchange
 
 export { BIN_TABLE };
