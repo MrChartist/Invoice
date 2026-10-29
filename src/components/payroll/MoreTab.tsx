@@ -1,16 +1,19 @@
 import { useMemo, useState } from 'react';
 import { Plus, Save, Trash2, Wand2 } from 'lucide-react';
 import { loadEmployees, loadPayrollSettings, loadRuns } from '../../lib/payroll/store';
-import { loadArrears, savePerquisite } from '../../lib/payroll/depth-store';
+import { loadArrears, loadPerquisites, savePerquisite } from '../../lib/payroll/depth-store';
 import { deleteRelief89, loadRelief89, saveRelief89, savePtExtraStates } from '../../lib/payroll/followups-store';
 import {
   accommodationPerquisite,
   carPerquisite,
   giftPerquisite,
+  hotelPerquisite,
   mealsPerquisite,
   relief89,
   relief89Rows,
   relief89Suggest,
+  rule3bAccretion,
+  rule3bSuggest,
   type PerqValuation,
 } from '../../lib/payroll/followups';
 import { payrollGrantees, setPayrollGrant } from '../../lib/payroll/grants';
@@ -194,9 +197,11 @@ function ReliefPanel({ month, version, refresh, notify }: TabProps) {
 
 /* ── Rule 3 perquisite valuation ──────────────────────────────── */
 
-const PERQ_KINDS = ['car', 'accommodation', 'meals', 'gift'] as const;
+const PERQ_KINDS = ['car', 'accommodation', 'hotel', 'meals', 'gift', 'accretion'] as const;
 type CalcKind = (typeof PERQ_KINDS)[number];
-const KIND_KEY = { car: 'ext.perq.car', accommodation: 'ext.perq.accommodation', meals: 'ext.perq.meals', gift: 'ext.perq.gift' } as const;
+const KIND_KEY = { car: 'ext.perq.car', accommodation: 'ext.perq.accommodation', hotel: 'ext.perq.hotel', meals: 'ext.perq.meals', gift: 'ext.perq.gift', accretion: 'ext.perq.accretion' } as const;
+/** Calculator kind → stored perquisite kind (hotel is accommodation; accretion and gifts are one-off). */
+const STORED: Record<CalcKind, PerquisiteKind> = { car: 'car', accommodation: 'accommodation', hotel: 'accommodation', meals: 'meals', gift: 'gift', accretion: 'accretion' };
 
 function PerqPanel({ month, version, refresh, notify }: TabProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -215,7 +220,12 @@ function PerqPanel({ month, version, refresh, notify }: TabProps) {
         ? accommodationPerquisite({ date, salary: n(f.salary ?? ''), ownership: f.ownership === 'leased' ? 'leased' : 'owned', population: n(f.population ?? ''), rent: n(f.rent ?? ''), furniture_cost: n(f.furniture_cost ?? ''), furniture_hire: n(f.furniture_hire ?? ''), recovered: n(f.recovered ?? '') })
         : kind === 'meals'
           ? mealsPerquisite({ date, meals: n(f.meals ?? ''), cost_per_meal: n(f.cost_per_meal ?? ''), recovered_per_meal: n(f.recovered_per_meal ?? '') })
-          : giftPerquisite({ date, value: n(f.gift ?? ''), earlier_this_year: n(f.gift_earlier ?? '') });
+          : kind === 'hotel'
+            ? hotelPerquisite({ date, salary: n(f.salary ?? ''), charges: n(f.charges ?? ''), days: n(f.days ?? ''), on_transfer: f.on_transfer === '1', recovered: n(f.recovered ?? '') })
+            : kind === 'accretion'
+              ? rule3bAccretion({ date, pc: n(f.pc ?? ''), pc1: n(f.pc1 ?? ''), tp1: n(f.tp1 ?? ''), income: n(f.fund_income ?? ''), opening: n(f.opening ?? ''), closing: n(f.closing ?? '') })
+              : giftPerquisite({ date, value: n(f.gift ?? ''), earlier_this_year: n(f.gift_earlier ?? '') });
+  const oneOff = kind === 'gift' || kind === 'accretion';
   const num = (k: string, label: string) => (
     <label className={controls.field} key={k}>
       <span className={controls.label}>{label}</span>
@@ -232,9 +242,7 @@ function PerqPanel({ month, version, refresh, notify }: TabProps) {
   );
   const employee = empId || employees[0]?.id || '';
   const save = () => {
-    const perqKind: PerquisiteKind = kind;
-    const oneOff = kind === 'gift';
-    savePerquisite({ employee_id: employee, kind: perqKind, description: mT('perq.desc', { kind: pT(KIND_KEY[kind]) }), from_month: from, ...(oneOff ? { to_month: from } : to ? { to_month: to } : {}), monthly_value: v.monthly, basis: v.basis });
+    savePerquisite({ employee_id: employee, kind: STORED[kind], description: mT('perq.desc', { kind: pT(KIND_KEY[kind]) }), from_month: from, ...(oneOff ? { to_month: from } : to ? { to_month: to } : {}), monthly_value: v.monthly, basis: v.basis });
   };
 
   return (
@@ -256,7 +264,7 @@ function PerqPanel({ month, version, refresh, notify }: TabProps) {
             </select>
           </label>
           <label className={controls.field}><span className={controls.label}>{pT('ext.perqFrom')}</span><input className={controls.input} type="month" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-          {kind !== 'gift' && <label className={controls.field}><span className={controls.label}>{pT('ext.perqTo')}</span><input className={controls.input} type="month" value={to} onChange={(e) => setTo(e.target.value)} /></label>}
+          {!oneOff && <label className={controls.field}><span className={controls.label}>{pT('ext.perqTo')}</span><input className={controls.input} type="month" value={to} onChange={(e) => setTo(e.target.value)} /></label>}
         </div>
         <div className={styles.formGrid}>
           {kind === 'car' && [
@@ -278,8 +286,36 @@ function PerqPanel({ month, version, refresh, notify }: TabProps) {
           ]}
           {kind === 'meals' && [num('meals', mT('perq.meals')), num('cost_per_meal', mT('perq.costPerMeal')), num('recovered_per_meal', mT('perq.recoveredPerMeal'))]}
           {kind === 'gift' && [num('gift', mT('perq.gift')), num('gift_earlier', mT('perq.giftEarlier'))]}
+          {kind === 'hotel' && [
+            num('salary', mT('perq.salary')),
+            num('charges', mT('perq.hotelCharges')),
+            num('days', mT('perq.hotelDays')),
+            pick('on_transfer', mT('perq.onTransfer'), [['', mT('no')], ['1', mT('yes')]]),
+            num('recovered', mT('perq.recovered')),
+          ]}
+          {kind === 'accretion' && [
+            num('pc', mT('perq.pc')),
+            num('pc1', mT('perq.pc1')),
+            num('tp1', mT('perq.tp1')),
+            num('fund_income', mT('perq.fundIncome')),
+            num('opening', mT('perq.opening')),
+            num('closing', mT('perq.closing')),
+          ]}
         </div>
-        <p className={styles.strong}>{kind === 'gift' ? mT('perq.valueOnce', { amount: inr(v.monthly) }) : mT('perq.value', { amount: inr(v.monthly) })}</p>
+        {kind === 'accretion' && (
+          <button
+            type="button"
+            className={controls.btnOutline}
+            disabled={!employee}
+            onClick={() => {
+              const x = rule3bSuggest(employee, Number(fyStartOfMonth(from || month).slice(0, 4)), loadRuns(), loadPerquisites());
+              setF({ ...f, pc: String(x.pc), pc1: String(x.pc1), tp1: String(x.tp1) });
+            }}
+          >
+            <Wand2 size={15} /> {mT('r89.suggest')}
+          </button>
+        )}
+        <p className={styles.strong}>{oneOff ? mT('perq.valueOnce', { amount: inr(v.monthly) }) : mT('perq.value', { amount: inr(v.monthly) })}</p>
         <p className={styles.sub}>{v.basis}</p>
         <p className={styles.note}>{mT('perq.source', { source: v.source })}</p>
         <button type="button" className={controls.btnOutline} disabled={!employee || !(v.monthly > 0)} onClick={() => runAction(save, refresh, notify, pT('ext.perqSaved'))}>

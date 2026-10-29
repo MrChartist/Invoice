@@ -16,9 +16,9 @@ import {
 } from '../../lib/payroll/reports';
 import { daysInMonth, fyStartOfMonth } from '../../lib/payroll/statutory';
 import { arrearsRegisterRows, pfLateRows } from '../../lib/payroll/depth-reports';
-import { loadArrears } from '../../lib/payroll/depth-records';
+import { loadArrears, loadPerquisites } from '../../lib/payroll/depth-records';
 import { loadPayrollPayments } from '../../lib/payroll/records';
-import { arrearEcrLines, arrearEcrRows, arrearEcrText, s17viiRows, tds201Rows } from '../../lib/payroll/followups';
+import { arrearEcrChecks, arrearEcrLines, arrearEcrRows, arrearEcrText, perqStatementRows, s17viiRows, tds201Rows } from '../../lib/payroll/followups';
 import { todayInput } from '../../lib/utils';
 import { downloadText } from '../../lib/download';
 import { payrollT as pT } from '../../i18n/areas/payroll';
@@ -97,6 +97,10 @@ export function ReportsTab({ month, version, refresh, notify }: Props) {
                   <span className={styles.inline}>
                     <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => downloadText(`ECR-arrear-${month}.txt`, arrearEcrText(lines), 'text/plain')}><Download size={14} /> ECR .txt</button>
                     {out(`pf-arrear-working-${month}`, arrearEcrRows(lines, month), 'PF arrears')}
+                    {(() => {
+                      const n = arrearEcrChecks(lines, month).length;
+                      return n ? <span className={styles.sub}>{pT('rep.arrearEcrChecks', { n })}</span> : null;
+                    })()}
                   </span>
                 ) : <span className={styles.sub}>{pT('rep.noArrears')}</span>,
               );
@@ -138,6 +142,11 @@ export function ReportsTab({ month, version, refresh, notify }: Props) {
                   {out(`form16-partB-${emp.code}-FY${fyLabel}`, form16PartBRows(fyRuns, emp, fyStart), 'Form 16 Part B')}
                 </span>
               ) : noRun,
+            )}
+            {emp && item(
+              pT('rep.f12ba', { form: formText('12BA', fyFirstDay(fyStart), ita25Words()) }),
+              pT('rep.f12baHint'),
+              out(`perquisites-${emp.code}-FY${fyLabel}`, perqStatementRows(fyRuns, loadPerquisites(), emp, fyStart, formText('12BA', fyFirstDay(fyStart))), 'Perquisites'),
             )}
           </ul>
           <p className={styles.note}>{WORKING_PAPER}</p>
