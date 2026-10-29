@@ -26,8 +26,13 @@ export const TOPICS: readonly HelpTopic[] = [
   t('books:ratio', 'Ratio analysis', 'अनुपात विश्लेषण', 'Key ratios from the balance sheet and P&L.', 'For a lender or a review.'),
   t('books:defer', 'Deferrals', 'डेफ़रल', 'Income or expense spread over months (prepaid, advance billing).', 'For annual fees or prepaid costs.', { statutory: ca(['AC5']) }),
   t('gateway', 'Gateway', 'गेटवे', 'A Tally-style keyboard screen: vouchers with F4–F9, reports and masters without the mouse.', 'If you work like Tally.', {
-    steps: ['F4 contra, F5 payment, F6 receipt, F7 journal, F8 sales, F9 purchase.', 'Ctrl+/ lists the keys.'],
+    steps: ['F4 contra, F5 payment, F6 receipt, F7 journal, F8 sales, F9 purchase.', 'Press ? (or Ctrl+/) for every key; Help topic "Tally keys" explains the switch.'],
     related: rel(['Books', '/books']),
+  }),
+  // R20-A: the Tally keys switch, cheat sheet, Key bar and F10 vouchers sheet (no route of its own; opened from the sheet).
+  t('tally-keys', 'Tally keys', 'टैली कुंजियाँ', "Tally's keys on or off. Off: the app's own keys only (F5 reloads). On: F4–F10, Alt+F5 … and a Key bar.", 'If your hands know Tally.', {
+    steps: ['Press ? for every key (plain and Tally names, Hindi, search, print).', 'Switch on there, in Settings → Defaults or on the Gateway; pick TallyPrime or ERP 9 keys.', 'F10 lists every voucher with its key.'],
+    related: rel(['Gateway', '/gateway'], ['Settings', '/settings']),
   }),
   t('reconcile', 'Bank reconciliation', 'बैंक मिलान', 'Match bank statement lines with your books, and bank documents.', 'Monthly, when the statement arrives.'),
   t('reconcile:reconcile', 'Reconcile', 'मिलान', 'Statement lines matched, to review or ignored.', 'After importing a statement.'),

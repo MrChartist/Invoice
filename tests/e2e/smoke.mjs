@@ -6291,6 +6291,89 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  // R20-A: Tally keys — off on a fresh device (F5 / F8 left alone), the bilingual cheat sheet, the switch, F8 / Alt+F6
+  // in the TallyPrime layout, the Key bar on a report, F10 vouchers sheet + letter, the phone pill, and an existing
+  // device keeping today's keys (F5 payment, Ctrl+F8 credit note in the ERP 9 layout).
+  await step('R20-A: Tally keys switch, cheat sheet, Key bar, F10 vouchers sheet and voucher keys', async () => {
+    await page.goto(srv.origin + '/');
+    await page.getByText('Stored on this device').waitFor();
+    check(await page.evaluate(() => localStorage.getItem('mrchartist_tally_keys')) === 'off', 'fresh device: Tally keys start off');
+    const preventedBy = async (key) => {
+      await page.evaluate(() => {
+        window.__r20 = 'none';
+        window.addEventListener('keydown', (e) => { window.__r20 = e.defaultPrevented ? 'prevented' : 'free'; }, { once: true });
+      });
+      await page.keyboard.press(key);
+      await page.waitForTimeout(300);
+      return page.evaluate(() => window.__r20 ?? 'reloaded').catch(() => 'reloaded');
+    };
+    check((await preventedBy('F5')) !== 'prevented', 'keys off: F5 is left to the browser (reload)');
+    await page.getByText('Stored on this device').waitFor();
+    await preventedBy('F8');
+    check(!/\/invoice/.test(page.url()), 'keys off: F8 does nothing');
+    await page.keyboard.press('?');
+    const sheet = page.getByRole('dialog', { name: 'Keyboard cheat sheet' });
+    await sheet.waitFor();
+    await sheet.getByTestId('cheat-search').fill('भुगतान');
+    await sheet.getByText('Money paid out').first().waitFor();
+    check(await sheet.getByText('Switch on Tally keys to use').count() > 0, 'cheat sheet: "भुगतान" finds Payment, dimmed with "Switch on Tally keys to use"');
+    await sheet.getByTestId('cheat-search').fill('f5');
+    await sheet.getByText('Money paid out').first().waitFor();
+    await sheet.getByTestId('tally-keys-switch').check();
+    check(await page.evaluate(() => localStorage.getItem('mrchartist_tally_keys')) === 'on' && (await sheet.getByTestId('tally-keys-layout').inputValue()) === 'prime', 'the switch turns Tally keys on, layout TallyPrime');
+    await page.keyboard.press('Escape');
+    await sheet.waitFor({ state: 'detached' });
+    await page.keyboard.press('F8');
+    await page.waitForURL(/\/invoice$/);
+    check(true, 'keys on: F8 opens a new invoice');
+    await page.goto(srv.origin + '/books?tab=tb');
+    const bar = page.getByTestId('key-bar');
+    await bar.waitFor();
+    const n = await bar.getByRole('button').count();
+    check(n >= 6, `Key bar on the trial balance lists its keys (${n})`);
+    const toggle = page.locator('button[title="Alt+F1"]').first();
+    const before = await toggle.getAttribute('aria-pressed');
+    await page.getByTestId('kb-detail').click();
+    await page.waitForFunction((b) => document.querySelector('button[title="Alt+F1"]')?.getAttribute('aria-pressed') !== b, before);
+    check(true, 'Key bar "Detailed / short" toggles the report like Alt+F1');
+    await page.locator('body').click({ position: { x: 5, y: 5 } }).catch(() => {});
+    await page.keyboard.press('F10');
+    const vs = page.getByRole('dialog', { name: 'Vouchers (F10)' });
+    await vs.waitFor();
+    await page.keyboard.press('r');
+    await page.waitForURL(/\/gateway\/voucher\/receipt/);
+    check(true, 'F10 opens the vouchers sheet; R opens Receipt');
+    await page.goto(srv.origin + '/');
+    await page.getByText('Stored on this device').waitFor();
+    await page.keyboard.press('Alt+F6');
+    await page.waitForURL(/type=CREDIT_NOTE/);
+    check(true, 'TallyPrime layout: Alt+F6 opens a credit note');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(srv.origin + '/books?tab=tb');
+    await page.getByTestId('keys-pill').click();
+    await page.getByRole('dialog', { name: 'Keys of this screen' }).waitFor();
+    check(true, 'phones: a "Keys" pill opens the same list as a sheet');
+    await page.keyboard.press('Escape');
+    await page.setViewportSize({ width: 1280, height: 900 });
+    // An existing device (What's new seen at an older version, no stored choice) keeps today's keys.
+    await page.evaluate(() => {
+      localStorage.removeItem('mrchartist_tally_keys');
+      localStorage.removeItem('mrchartist_tally_layout');
+      localStorage.setItem('mrchartist_whats_new_seen', '1.0.0');
+    });
+    await page.goto(srv.origin + '/');
+    await page.getByText('Stored on this device').waitFor();
+    await page.keyboard.press('F5');
+    await page.waitForURL(/\/gateway\/voucher\/payment/);
+    check(await page.evaluate(() => localStorage.getItem('mrchartist_tally_layout')) === 'erp9', 'existing device: on with the ERP 9 layout; F5 opens Payment as before');
+    await page.goto(srv.origin + '/');
+    await page.getByText('Stored on this device').waitFor();
+    await page.keyboard.press('Control+F8');
+    await page.waitForURL(/type=CREDIT_NOTE/);
+    check(true, 'ERP 9 layout: Ctrl+F8 opens a credit note');
+    await page.evaluate(() => localStorage.setItem('mrchartist_tally_keys', 'off'));
+  });
+
 } catch {
   /* already reported */
 } finally {

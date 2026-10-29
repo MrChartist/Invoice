@@ -24,7 +24,7 @@ export const TIPS: readonly Tip[] = [
   { id: 'books', route: '/books', en: 'Tip: Alt+F2 changes the period of every report; F12 opens its options.', hi: 'टिप: Alt+F2 हर रिपोर्ट की अवधि बदलता है; F12 विकल्प खोलता है।' },
   { id: 'reports', route: '/reports', en: 'Tip: Saved views remember a tab and period; the cross-checks at the bottom compare the Dashboard with Books.', hi: 'टिप: सेव्ड व्यू टैब और अवधि याद रखते हैं; नीचे के क्रॉस-चेक डैशबोर्ड का मिलान बही से करते हैं।' },
   { id: 'gst', route: '/gst-reports', en: 'Tip: follow the filing strip — period, check, download, mark filed.', hi: 'टिप: फ़ाइलिंग पट्टी के क्रम में चलें — अवधि, जाँच, डाउनलोड, फ़ाइल चिह्नित।' },
-  { id: 'gateway', route: '/gateway', en: 'Tip: Ctrl+/ lists every Gateway key.', hi: 'टिप: Ctrl+/ गेटवे की सभी कुंजियाँ दिखाता है।' },
+  { id: 'gateway', route: '/gateway', en: 'Tip: press ? for every key — plain names and Tally names.', hi: 'टिप: हर कुंजी के लिए ? दबाएँ — आसान नाम और Tally नाम।' },
   { id: 'inventory', route: '/inventory', en: 'Tip: stock groups and units keep a long item list tidy.', hi: 'टिप: स्टॉक ग्रुप और इकाइयाँ लंबी आइटम सूची को व्यवस्थित रखते हैं।' },
   { id: 'tds', route: '/tds', en: 'Tip: mark TDS on the supplier bill; it appears here with its due dates.', hi: 'टिप: सप्लायर बिल पर TDS चिह्नित करें; यह यहाँ देय तारीख़ों के साथ दिखेगा।' },
   { id: 'payroll', route: '/payroll', en: 'Tip: set pay heads and structures once; each month is attendance → run → pay.', hi: 'टिप: पे हेड और संरचना एक बार बनाएँ; हर महीने उपस्थिति → रन → भुगतान।' },
