@@ -41,7 +41,8 @@ import { calcInputFromRecord, calculateInvoice, isIgstZeroRated, isZeroRated, nu
 import { isNonGstFinancialNote } from './financial-note';
 import { isPureAgentLine } from './trade/pure-agent';
 import { docCurrency, inrTotals, inrValue, missingFxRate } from './fx';
-import { checkGstin, isUinShaped } from './gstin';
+import { checkGstin } from './gstin';
+import { isUinShaped } from './uin';
 import { stateByCode, stateByName } from './india-states';
 import { isNonSupplyCategory, isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
 import { b2clThreshold, b2clThresholdLabel, ecoReporting, gstSetOffOrder, hsnMinDigits, hsnTableSplit, type GstSetOffOrder } from './tax-rules';

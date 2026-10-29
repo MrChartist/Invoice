@@ -14,7 +14,7 @@ import { gstr1aDiff, snapshotFromReport, specialReturnDues, specialReturnForms, 
 import { buildGstr1aJson, GSTR1A_JSON_LAYOUT } from '../src/lib/gstr1a-json.ts';
 import { applyIrpResponse, parseIrpResponse } from '../src/lib/einvoice-bulk.ts';
 import { DUE_DATE_EXTENSIONS, complianceCalendar, withExtension } from '../src/lib/compliance.ts';
-import { isUinShaped } from '../src/lib/gstin.ts';
+import { isUinShaped } from '../src/lib/uin.ts';
 
 beforeEach(() => resetStorage());
 
