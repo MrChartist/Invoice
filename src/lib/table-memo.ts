@@ -7,14 +7,14 @@
  * any invalidation call.
  */
 import { ASSET_TABLE, SNAPSHOT_TABLES } from './assets';
-import { DB_PREFIX, freezeShared, readRaw, setReadTrace } from './storage';
+import { DB_PREFIX, freezeShared, rawStamp, setReadTrace } from './storage';
 
 /* Version tokens: a per-key counter that moves whenever the stored text of the key changes. */
-const stampSeen = new Map<string, { raw: string | null; v: number }>();
+const stampSeen = new Map<string, { raw: unknown; v: number }>();
 let stampSeq = 0;
 
 function keyStamp(fullKey: string): number {
-  const raw = readRaw(fullKey);
+  const raw = rawStamp(fullKey); // PERF-3: never builds a chunked table's text
   const seen = stampSeen.get(fullKey);
   if (seen && seen.raw === raw) return seen.v;
   const v = ++stampSeq;

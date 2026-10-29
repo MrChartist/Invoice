@@ -720,7 +720,7 @@ Scale audit on a 15k-invoice company; two fix packages with mostly disjoint file
 |---|---|---|---|
 | PERF-1 | ✅ **Data layer, background work, save path** (H1, H2, H3, H6, H10, H11): parsed-rows cache (one parse per stored version, `peekTable`, copy-on-write `getTable`), `table-memo.ts` memoised derived results, quiet stamp-gated bell, memoised stock engine, save without re-parse, ledger running-balance index, single-parse backup. Cold start 14.6 s → 6.6 s, bell 5 s → 57 ms, parses of `invoices` per save 24 → 0 | `storage.ts`, `table-memo.ts`, `localDb.ts`, `notifications.ts`, `inventory.ts`, `books.ts`, `backup.ts` | done |
 | PERF-2 | ✅ **UI layer** (H4, H5, H7, H8, H9, H12): pre-folded SmartFind index, cheap editor typeahead, one peek per Dashboard, grouped receivables scores, collator-based invoice list, peeked reads in POS / GST | `search.ts`, `smart-find.ts`, `suggest.ts`, `Dashboard.tsx`, `Receivables.tsx`, `Transactions.tsx` | done |
-| PERF-3 | ⏳ Still open after PERF-1: the one full stringify of the `invoices` table per save (~0.5 s on 36 MB) and ~13 audit-log rewrites per save; the rest of save time is the editor's own re-render | `storage.ts`, `audit.ts` | open |
+| PERF-3 | ✅ The full stringify + IndexedDB rewrite of the `invoices` table per save is gone: a big table is stored in chunks of 16 rows and a save / payment re-serialises and writes one chunk (5,000 invoices ≈ 7 KB each: save 139 → 4 ms, payment 103 → 2 ms; 20,000: save 1.7 s → 5 ms, payment 466 → 3 ms, Node + fake IndexedDB). Audit appends were coalesced in R15-A2. The rest of save time is the editor's own re-render | `storage.ts`, `audit.ts` | done |
 
 ### QA round 5 fixes (`docs/prd/qa-round-5.md`) · ✅ done
 

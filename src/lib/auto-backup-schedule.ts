@@ -5,7 +5,7 @@
  * Re-exported from auto-backup.ts, so existing imports keep working.
  */
 
-import { DB_PREFIX, readRaw, removeRaw, writeRaw } from './storage';
+import { DB_PREFIX, rawStamp, readRaw, removeRaw, writeRaw } from './storage';
 import { requireAccess } from './access';
 
 export type BackupFrequency = 'daily' | 'weekly' | 'on-close';
@@ -179,8 +179,9 @@ export function getSnooze(): string | null {
 /** True when the user has created anything worth protecting. */
 export function hasBackupWorthyData(): boolean {
   for (const t of ['invoices', 'clients', 'transactions', 'items_catalog', 'vendors', 'purchases']) {
-    const raw = readRaw(DB_PREFIX + t);
-    if (raw && raw.length > 2 && raw.trim() !== '[]') return true;
+    // PERF-3: a chunked table (stamp is not a string) always holds rows; never build its text here.
+    const raw = rawStamp(DB_PREFIX + t);
+    if (raw && (typeof raw !== 'string' || (raw.length > 2 && raw.trim() !== '[]'))) return true;
   }
   return false;
 }
