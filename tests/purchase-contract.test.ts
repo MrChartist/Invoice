@@ -1202,3 +1202,12 @@ test('R19-D readers (lg-agents; lg-alerts / lg-reports through C\'s lg-recv-io) 
   assert.deepEqual(lgAlerts('2026-04-12', { jobs: [job], invoices: [], disb: rows, deposits: [], manifests: [] }).map((n) => n.id), ['lg:disb:j']);
   assert.deepEqual(disbAgeing([job], rows)[0].b, [0, 0, 0, 1180], 'ageing reads the total and date through readPurchase (101 days)');
 });
+
+// R21-C2: the tank-lorry receipt reads the OMC bill through `readPurchase` / `readPurchaseLines` (`fu-stock-io.ts`
+// `omcBills` → `fu-receipt.ts` `billLitres`): litres by item (alternate units converted), void bills and expenses left out.
+test('R21-C tank-lorry receipt (fu-receipt via fu-stock-io) reads the real bill shape', async () => {
+  const { omcBills } = await import('../src/lib/fuel/fu-stock-io.ts');
+  const omc = { ...bill, id: 'o1', vendor_name: 'Oil Co', bill_number: 'OMC/1', lines: [{ id: 'l1', name: 'Petrol', item_id: 'ms', hsn: '27101241', unit: 'KL', unit_factor: 1000, quantity: 12, rate: 91250, tax_rate: 0 }] } as PurchaseRecord;
+  const rows = omcBills({ id: 'ms', name: 'Petrol' }, [omc, { ...omc, id: 'o2', status: 'void' }, { ...omc, id: 'o3', kind: 'EXPENSE' }, bill]);
+  assert.deepEqual(rows.map((r) => [r.id, r.number, r.date, r.party, r.litres, r.rate]), [['o1', 'OMC/1', '2026-04-12', 'Oil Co', 12000, 91.25]]);
+});
