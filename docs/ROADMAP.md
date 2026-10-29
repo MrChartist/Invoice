@@ -538,7 +538,7 @@ From competitor tutorials (myBillBook "Scan invoice" in Purchases, Refrens "Vali
 | 8.85 | ✅ **Item variants** (attribute grid → child items with SKUs / barcodes) and **kits** consuming BOM components on sale (`variants.ts`, `events-kits.ts`) | — | done |
 | 8.86 | ✅ **Bin / rack** on items and batches, snapshotted on delivery challan lines and printed on pick lists (`bins.ts`) | — | done |
 | 8.87 | ✅ **Thermal roll labels**: 50×25, 38×25 2-up, 100×50 presets; raw TSPL / EPL / ZPL over Web Serial or file; weighed-goods EAN-13 with embedded price (`label-sheet.ts`, `label-raw.ts`) | — | done |
-| 8.88 | ⏳ 8F follow-ups: one debit note spanning several bills of a supplier, ~~POS decoding of weighed-goods codes~~ (done in 8.140, `parseScaleBarcode`), kit shortfall warnings, order-pad partial import / camera QR scan | — | open |
+| 8.88 | ✅ 8F follow-ups: one debit note spanning several bills of a supplier (`createMulti`, on account), ~~POS decoding of weighed-goods codes~~ (done in 8.140, `parseScaleBarcode`), kit shortfall warnings (`kitComponentDemand`), order-pad partial import / camera QR scan (existing `CameraScanner`) | `purchase-returns.ts`, `events-kits.ts`, `order-pad.ts` | done |
 ### 8E · Retail speed (`docs/features/pos-barcode-pricing.md` § 8E)
 
 | # | Item | Where | Status |

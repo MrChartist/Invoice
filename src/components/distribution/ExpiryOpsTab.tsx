@@ -33,6 +33,7 @@ export default function ExpiryOpsTab({ items, positions, tracking, today, onChan
   const [date, setDate] = useState(today);
   const [skip, setSkip] = useState<Set<string>>(new Set());
   const [qty, setQty] = useState<Record<string, number>>({});
+  const [onePerSupplier, setOnePerSupplier] = useState(false); // 8.88: one debit note spanning the supplier's bills
   const [tick, setTick] = useState(0);
   const godowns = useMemo(() => godownsDb.list(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const expiryGodowns = godowns.filter((g) => g.kind === 'expiry');
@@ -148,8 +149,13 @@ export default function ExpiryOpsTab({ items, positions, tracking, today, onChan
           ))}
           {cand.untraced.length > 0 && <p className={`${own.notice}`}>{phT('untraced', { list: cand.untraced.map((u) => `${u.item} ${u.batch} (${u.qty})`).join(', ') })}</p>}
           {groups.length > 0 && (
+            <label className={controls.check}>
+              <input type="checkbox" checked={onePerSupplier} onChange={(e) => setOnePerSupplier(e.target.checked)} data-brk-one-note /> {phT('onePerSupplier')}
+            </label>
+          )}
+          {groups.length > 0 && (
             <button type="button" className={controls.btnPrimary} data-brk-issue onClick={() => run(() => {
-              const made = createBrkExpIssue(chosen(), date, { createNote: (d) => purchaseReturnsDb.create(d) });
+              const made = createBrkExpIssue(chosen(), date, { createNote: (d) => purchaseReturnsDb.create(d), createMultiNote: (d) => purchaseReturnsDb.createMulti(d) }, undefined, { onePerSupplier });
               setSkip(new Set());
               setQty({});
               return phT('issued', { claims: made.length, notes: made.reduce((s, c) => s + c.note_numbers.length, 0) });

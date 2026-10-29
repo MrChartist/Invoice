@@ -325,6 +325,8 @@ export interface PurchaseReturnLine {
   id: string;
   /** The bill line returned / re-valued (`PurchaseLine.id`). */
   bill_line_id?: string;
+  /** Additive (8.88): the bill of this line on a note spanning several bills (`PurchaseReturn.bill_refs`). */
+  purchase_id?: string;
   name: string;
   hsn?: string;
   unit?: string;
@@ -394,6 +396,12 @@ export interface PurchaseReturn {
   notes?: string;
   created_at?: string;
   updated_at?: string;
+  /**
+   * Additive (8.88, PENDING 47): ONE debit note spanning several bills of the supplier (`purchaseReturnsDb.createMulti`).
+   * Such a note has no `purchase_id` (it sits on account, like a note without a bill); each line names its bill in
+   * `PurchaseReturnLine.purchase_id`, and `bill_number` / `bill_date` hold the bills' numbers joined / the earliest date.
+   */
+  bill_refs?: { purchase_id: string; bill_number: string; bill_date: string }[];
 }
 
 /* ── Receipt notes (GRN) and Rejection Out (WP-3, P1-8) — table `receipt_notes` ── */

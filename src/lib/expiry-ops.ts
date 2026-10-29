@@ -5,7 +5,8 @@
  *    the supplier bill(s) that brought that batch in (the line's `item_id`, else item name; most recent
  *    bill first, never more than the bill line can still return) and grouped by supplier. One pass creates
  *    the debit notes (`purchase_returns`, `DN/FY…`, goods returned from the batch's godown — the stock
- *    engine takes the goods out) — one per supplier bill, since a debit note is against one bill — and ONE
+ *    engine takes the goods out) — one per supplier bill, or (8.88, "one note per supplier") ONE note spanning the
+ *    supplier's bills (`purchaseReturnsDb.createMulti`, on account) — and ONE
  *    claim per supplier (`expiry_claims`) holding them. All-or-nothing: if any note is refused (period lock,
  *    returnable quantity, role) nothing is written.
  *  - Claim tracking: pending → credit received (the supplier's credit note number / date is written on each
@@ -245,13 +246,18 @@ export interface IssueDeps {
     kind: 'DEBIT_NOTE'; date: string; purchaseId: string; reason: '01'; goodsReturned: true; notes?: string;
     lines: { id: string; bill_line_id: string; name: string; hsn?: string; unit?: string; quantity: number; rate: number; tax_rate: number; godown_id?: string; batch_no?: string }[];
   }) => PurchaseReturn;
+  /** 8.88: `purchaseReturnsDb.createMulti` — one debit note spanning several bills of the supplier. */
+  createMultiNote?: (draft: {
+    date: string; reason: '01'; goodsReturned: true; notes?: string;
+    lines: { id: string; purchase_id: string; bill_line_id: string; name: string; hsn?: string; unit?: string; quantity: number; rate: number; tax_rate: number; godown_id?: string; batch_no?: string }[];
+  }) => PurchaseReturn;
 }
 
 /**
  * Create the debit notes and one claim per supplier for the chosen rows, all-or-nothing.
  * Rows of a bill line are merged per godown + batch; quantities go back in the bill line's unit.
  */
-export function createBrkExpIssue(rows: readonly IssueRow[], date: string, deps: IssueDeps, note = 'Breakage / expiry return'): ExpiryClaim[] {
+export function createBrkExpIssue(rows: readonly IssueRow[], date: string, deps: IssueDeps, note = 'Breakage / expiry return', opts: { onePerSupplier?: boolean } = {}): ExpiryClaim[] {
   requireAccess('books.edit');
   const chosen = rows.filter((r) => r.qty > EPS);
   if (!chosen.length) throw new Error('Choose at least one batch to send back.');
@@ -260,17 +266,22 @@ export function createBrkExpIssue(rows: readonly IssueRow[], date: string, deps:
     const claims: ExpiryClaim[] = [];
     for (const g of groupBySupplier(chosen)) {
       const notes: PurchaseReturn[] = [];
-      for (const billId of g.bills) {
+      const linesOf = (billId: string) => {
         const bill = purchases.find((p) => p.id === billId);
         if (!bill) throw new Error(`Bill ${billId} no longer exists.`);
-        const lines = g.rows.filter((r) => r.billId === billId).map((r) => {
+        return g.rows.filter((r) => r.billId === billId).map((r) => {
           const bl = bill.lines.find((l) => l.id === r.billLineId);
           return {
             id: generateId(), bill_line_id: r.billLineId, name: bl?.name ?? r.item, ...(bl?.hsn ? { hsn: bl.hsn } : {}), ...(bl?.unit ? { unit: bl.unit } : {}),
             quantity: round2(r.qty / r.factor), rate: r.unitCost, tax_rate: r.taxRate, godown_id: r.godown, batch_no: r.batch,
           };
         });
-        notes.push(deps.createNote({ kind: 'DEBIT_NOTE', date, purchaseId: billId, reason: '01', goodsReturned: true, notes: note, lines }));
+      };
+      if (opts.onePerSupplier && deps.createMultiNote && g.bills.length > 1) {
+        // 8.88: one debit note for the supplier, each line naming its bill.
+        notes.push(deps.createMultiNote({ date, reason: '01', goodsReturned: true, notes: note, lines: g.bills.flatMap((billId) => linesOf(billId).map((l) => ({ ...l, purchase_id: billId }))) }));
+      } else {
+        for (const billId of g.bills) notes.push(deps.createNote({ kind: 'DEBIT_NOTE', date, purchaseId: billId, reason: '01', goodsReturned: true, notes: note, lines: linesOf(billId) }));
       }
       const claim: ExpiryClaim = {
         id: generateId(), date, ...(g.vendorId ? { vendor_id: g.vendorId } : {}), vendor_name: g.vendorName,

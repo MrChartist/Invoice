@@ -77,9 +77,16 @@ export interface ReturnableLine {
   unitCost: number;
 }
 
-/** Notes against `billId`, optionally leaving one out (the note being edited). */
+/** Notes against `billId` (8.88: also a note spanning several bills that names it), optionally leaving one out. */
 export function notesForBill(notes: readonly PurchaseReturn[], billId: string, excludeId?: string): PurchaseReturn[] {
-  return notes.filter((n) => n && n.purchase_id === billId && n.id !== excludeId);
+  return notes.filter((n) => n && (n.purchase_id === billId || !!n.bill_refs?.some((b) => b.purchase_id === billId)) && n.id !== excludeId);
+}
+
+/** 8.88: the part of a note that falls on `billId` — the whole note, or the lines of that bill on a multi-bill note. */
+export function noteValueOn(n: PurchaseReturn, billId: string): number {
+  if (n.purchase_id === billId || !n.bill_refs) return num(n.total);
+  const mode = num(n.igst) > 0 ? 'IGST' : num(n.cgst) + num(n.sgst) > 0 ? 'CGST_SGST' : 'NONE';
+  return noteTotals((n.lines ?? []).filter((l) => l.purchase_id === billId), mode).total;
 }
 
 /** Per bill line: billed quantity less what earlier goods notes returned. */
@@ -113,7 +120,7 @@ export function freeUnitsReturned(r: Pick<ReturnableLine, 'paid' | 'returned'>, 
 
 /** Value already taken off the bill by earlier notes (their totals). */
 export function notedValue(bill: PurchaseRecord, notes: readonly PurchaseReturn[], excludeId?: string): number {
-  return round2(notesForBill(notes, bill.id, excludeId).reduce((s, n) => s + num(n.total), 0));
+  return round2(notesForBill(notes, bill.id, excludeId).reduce((s, n) => s + noteValueOn(n, bill.id), 0));
 }
 
 export interface NoteTotals {
@@ -334,6 +341,54 @@ export const purchaseReturnsDb = {
       doc_number: record.note_number,
       parent_id: bill?.id,
       summary: `${record.kind === 'DEBIT_NOTE' ? 'Debit note' : `Supplier credit note ${record.supplier_note_number ?? ''}`.trim()} ${record.note_number} of ₹${record.total.toFixed(2)} to ${record.vendor_name}${bill ? ` against bill ${bill.bill_number || bill.id}` : ' (on account)'} dated ${record.date}`,
+    });
+    return record;
+  },
+
+  /**
+   * 8.88 (PENDING 47): ONE debit note against several bills of the same supplier. Every bill's part is checked like a
+   * single note (returnable quantities, the bill's remaining value, dates); the bills must share the GST type and the
+   * ITC claim and carry no TDS, cess, reverse charge or import (otherwise raise one note per bill — those reversals are
+   * worked out per bill). The note is not adjusted against the bills: it stays on account until the supplier's credit
+   * is settled, so bill balances and the bill-wise ledger stay exactly as they are. One number, one audit row.
+   */
+  createMulti(draft: { date: string; reason: NoteReasonCode; goodsReturned: boolean; lines: PurchaseReturnLine[]; notes?: string }): PurchaseReturn {
+    requireAccess('books.edit');
+    const all = purchaseReturnsDb.all();
+    const billIds = [...new Set(draft.lines.filter((l) => num(l.quantity) > EPS && num(l.rate) > EPS).map((l) => l.purchase_id ?? ''))];
+    if (billIds.some((b) => !b)) throw new PurchaseReturnError('Every line of a note against several bills must name its bill.');
+    if (billIds.length < 2) throw new PurchaseReturnError('Choose lines from at least two bills (or raise a note against the one bill).');
+    const bills = billIds.map((id) => purchasesDb.get(id));
+    if (bills.some((b) => !b)) throw new PurchaseReturnError('A bill no longer exists.');
+    const list = bills as PurchaseRecord[];
+    const party = (b: PurchaseRecord) => (b.vendor_id ? `id:${b.vendor_id}` : `name:${(b.vendor_name ?? '').trim().toLowerCase()}`);
+    if (new Set(list.map(party)).size > 1) throw new PurchaseReturnError('All the bills must be of the same supplier.');
+    const mode = noteGstMode(list[0]);
+    if (list.some((b) => noteGstMode(b) !== mode || !!b.itc_eligible !== !!list[0].itc_eligible)) throw new PurchaseReturnError('The bills differ in GST type or ITC claim: raise one debit note per bill.');
+    if (list.some((b) => b.reverse_charge || b.import_type || num(b.tds_amount) > 0 || num((b as { cess_amount?: number }).cess_amount) > 0)) throw new PurchaseReturnError('A bill has reverse charge, import, TDS or cess: raise one debit note per bill.');
+    for (const b of list) {
+      const problem = validateNote({ kind: 'DEBIT_NOTE', date: draft.date, purchaseId: b.id, reason: draft.reason, goodsReturned: draft.goodsReturned, lines: draft.lines.filter((l) => l.purchase_id === b.id) }, b, all);
+      if (problem) throw new PurchaseReturnError(`Bill ${b.bill_number || b.id}: ${problem}`);
+    }
+    const number = purchaseReturnsDb.nextNumber(draft.date);
+    assertUnlocked({ issue_date: isoDay(draft.date), invoice_number: number }, 'create');
+    const first = list[0];
+    const sorted = [...list].sort((a, b) => a.date.localeCompare(b.date) || (a.bill_number ?? '').localeCompare(b.bill_number ?? ''));
+    const base = noteRecordFrom({ kind: 'DEBIT_NOTE', date: draft.date, vendorId: first.vendor_id, vendorName: first.vendor_name, vendorGstin: first.vendor_gstin, reason: draft.reason, goodsReturned: draft.goodsReturned, lines: draft.lines, notes: draft.notes, mode, itcEligible: !!first.itc_eligible }, undefined, number, 0);
+    const record: PurchaseReturn = {
+      ...base,
+      bill_number: sorted.map((b) => b.bill_number || b.id).join(', '),
+      bill_date: sorted[0].date,
+      bill_refs: sorted.map((b) => ({ purchase_id: b.id, bill_number: b.bill_number ?? '', bill_date: b.date })),
+      ...(first.place_of_supply ? { place_of_supply: first.place_of_supply } : {}),
+      bill_kind: first.kind ?? 'PURCHASE',
+      category: first.category ?? 'Purchases',
+    };
+    setTable(PURCHASE_RETURNS_TABLE, [...all, record]);
+    recordSeries(record.note_number);
+    audit.record({
+      entity: 'purchase', entity_id: record.id, action: 'create', doc_number: record.note_number,
+      summary: `Debit note ${record.note_number} of ₹${record.total.toFixed(2)} to ${record.vendor_name} against bills ${record.bill_number} (on account) dated ${record.date}`,
     });
     return record;
   },

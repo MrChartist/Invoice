@@ -230,10 +230,15 @@ export interface ImportDeps {
 /**
  * Import a verified payload as sales orders (all-or-nothing). Unknown parties are matched by name or added
  * to the client master through the normal save. Returns the created orders and the skipped duplicates.
+ * 8.88 partial import: `only` (order ids) imports just those orders of the file; the others are not marked imported,
+ * so the same file can bring them in later.
  */
-export function importOrders(payload: PadPayload, deps: ImportDeps): { created: InvoiceRecord[]; duplicates: PadOrder[] } {
+export function importOrders(payload: PadPayload, deps: ImportDeps, opts: { only?: readonly string[] } = {}): { created: InvoiceRecord[]; duplicates: PadOrder[] } {
   requireAccess('doc.create');
-  const { fresh, duplicates } = newOrders(payload.orders, importsDb.all());
+  const split = newOrders(payload.orders, importsDb.all());
+  const duplicates = split.duplicates;
+  const only = opts.only ? new Set(opts.only) : null;
+  const fresh = only ? split.fresh.filter((o) => only.has(o.id)) : split.fresh;
   if (!fresh.length) return { created: [], duplicates };
   const n = (s: unknown) => String(s ?? '').trim().toLowerCase();
   const clients = getTable<Client>('clients');
@@ -258,7 +263,8 @@ export function importOrders(payload: PadPayload, deps: ImportDeps): { created: 
     return out;
   });
   try {
-    audit.record({ entity: 'invoice', entity_id: created[0]?.id ?? 'order-pad', action: 'create', summary: `Order pad: ${created.length} sales order(s) imported from ${payload.salesman.name || 'a salesman'}${duplicates.length ? `, ${duplicates.length} already imported skipped` : ''}` });
+    const left = split.fresh.length - fresh.length;
+    audit.record({ entity: 'invoice', entity_id: created[0]?.id ?? 'order-pad', action: 'create', summary: `Order pad: ${created.length} sales order(s) imported from ${payload.salesman.name || 'a salesman'}${duplicates.length ? `, ${duplicates.length} already imported skipped` : ''}${left ? `, ${left} left for later` : ''}` });
   } catch {
     /* logging never blocks */
   }
