@@ -6374,6 +6374,64 @@ try {
     await page.evaluate(() => localStorage.setItem('mrchartist_tally_keys', 'off'));
   });
 
+  // R20-B: entry keys — F8, Alt+C on the party picker creates the party, Ctrl+A saves; Alt+D (Y) deletes the saved
+  // invoice and the toast's Undo brings it back from the recycle bin; a Gateway payment with Alt+T is post-dated.
+  await step('R20-B: Alt+C new party, Ctrl+A save, Alt+D then Undo, Alt+T post-dated voucher', async () => {
+    await page.goto(srv.origin + '/');
+    await page.evaluate(() => {
+      localStorage.setItem('mrchartist_tally_keys', 'on');
+      localStorage.setItem('mrchartist_tally_layout', 'prime');
+    });
+    await page.goto(srv.origin + '/');
+    await page.getByText('Stored on this device').waitFor();
+    await page.keyboard.press('F8');
+    await page.waitForURL(/\/invoice$/);
+    const party = page.getByLabel('Client name');
+    await party.fill('R20B Keys Traders');
+    await party.press('Alt+c');
+    const add = page.getByRole('dialog', { name: 'Add client' });
+    await add.waitFor();
+    check((await add.getByLabel(/name/i).first().inputValue()) === 'R20B Keys Traders', 'Alt+C opens Add client with the typed name');
+    await add.getByRole('button', { name: 'Add client' }).click();
+    await add.waitFor({ state: 'detached' });
+    const clients = await readJson(page, 'clients', [], (c) => c.some((x) => x.name === 'R20B Keys Traders'));
+    check(clients.some((x) => x.name === 'R20B Keys Traders'), 'the party is created');
+    await page.getByLabel('Item 1 name').fill('Key widget');
+    await page.getByLabel('Item 1 rate').fill('250');
+    await page.keyboard.press('Control+a');
+    await page.waitForURL(/\/invoice\/[^/?]+$/);
+    const id = decodeURIComponent(page.url().split('/invoice/')[1]);
+    check(!!(await readJson(page, 'invoices', [], (v) => v.some((x) => x.id === id))).find((x) => x.id === id), 'Ctrl+A saved the invoice');
+    await page.keyboard.press('Escape'); // the send sheet
+    await page.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+    await page.waitForTimeout(200);
+    await page.keyboard.press('Alt+d');
+    const ask = page.getByRole('dialog', { name: /^Delete / });
+    await ask.waitFor();
+    await page.keyboard.press('y');
+    const gone = await readJson(page, 'invoices', [], (v) => !v.some((x) => x.id === id));
+    check(!gone.some((x) => x.id === id), 'Alt+D, Y deleted the invoice (to the recycle bin)');
+    await page.getByRole('button', { name: 'Undo', exact: true }).last().click();
+    const back = await readJson(page, 'invoices', [], (v) => v.some((x) => x.id === id));
+    check(back.some((x) => x.id === id), 'Undo restored it from the recycle bin');
+    await page.goto(srv.origin + '/gateway/voucher/payment');
+    await page.getByRole('heading', { name: 'Payment voucher' }).waitFor();
+    await page.getByTestId('vline-1-ledger').fill('Rent');
+    await page.keyboard.press('Enter');
+    await page.getByTestId('vline-1-amount').fill('900');
+    await page.keyboard.press('Enter');
+    await page.getByTestId('vline-2-ledger').fill('Bank account');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('R20B cheque');
+    await page.keyboard.press('Alt+t');
+    check((await page.getByTestId('gw-v-variant').inputValue()) === 'PD', 'Alt+T marks the voucher post-dated');
+    await page.keyboard.press('Control+a');
+    const vs = await readJson(page, 'vouchers', [], (v) => v.some((x) => x.narration === 'R20B cheque'));
+    check(vs.find((x) => x.narration === 'R20B cheque')?.post_dated === true, 'saved post-dated (Post-dated register)');
+    await page.evaluate(() => localStorage.setItem('mrchartist_tally_keys', 'off'));
+  });
+
 } catch {
   /* already reported */
 } finally {

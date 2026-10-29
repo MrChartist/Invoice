@@ -143,7 +143,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
       open={open}
       onClose={onClose}
       size="lg"
-      title={client ? salesT('cf.editTitle') : salesT('cf.addTitle')}
+      title={client?.id ? salesT('cf.editTitle') : salesT('cf.addTitle')}
       subtitle={salesT('cf.subtitle')}
       footer={
         <>
@@ -151,7 +151,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
             {salesT('cancel')}
           </button>
           <button type="submit" form="client-form" className={controls.btnPrimary}>
-            {client ? salesT('cf.saveChanges') : salesT('cf.addTitle')}
+            {client?.id ? salesT('cf.saveChanges') : salesT('cf.addTitle')}
           </button>
         </>
       }
