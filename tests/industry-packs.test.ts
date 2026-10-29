@@ -99,7 +99,9 @@ const R10_PACKS: readonly string[] = ['clinic', 'salon', 'fitness', 'workshop',
   // R18: the society pack too — every society kind keeps `recurring` and `accounts`; common credit needs `gst` anyway.
   'society',
   // R19: the logistics packs too — every logistics kind keeps `time` (the Shipments desk and the exportsvc tab live there).
-  'logistics', 'customs', 'courier', 'warehouse'];
+  'logistics', 'customs', 'courier', 'warehouse',
+  // R21: the fuel packs only add the common-credit GST tab here — the fuel profile keeps `gst` (its desk lives on /inventory).
+  'fuel', 'lpg'];
 
 test('R6-B2 pin: the shell copies PACK_ROUTES / PACK_OF_TYPE_INLINE equal PACK_TABS / PACK_OF_TYPE', async () => {
   const { PACK_ROUTES, PACK_OF_TYPE_INLINE, moduleOfPath } = await import('../src/lib/shop-mode.ts');

@@ -112,7 +112,7 @@ test('every topic has English and Hindi titles, what / when, ≤ 5 steps; statut
 });
 
 test('every caItems id exists in docs/CA_REVIEW.md', () => {
-  const ids = new Set([...src('docs/CA_REVIEW.md').matchAll(/^\| ((?:G|TR|TV|T|PS|PF|P|AC|I|X|HT|RT|CN|SV|AG|MF|MP|HS|LG)\d+)\b/gm)].map((m) => m[1])); // R19: LG ids; R18: HS ids; R17: MP ids; R16: PF ids; R15: TV ids; R8: TR ids; R7: HT ids; R9: RT ids; R11: CN ids; R10: SV ids; R12: AG ids; R13: MF ids
+  const ids = new Set([...src('docs/CA_REVIEW.md').matchAll(/^\| ((?:G|TR|TV|T|PS|PF|P|AC|I|X|HT|RT|CN|SV|AG|MF|MP|HS|LG|FU)\d+)\b/gm)].map((m) => m[1])); // R21: FU ids; R19: LG ids; R18: HS ids; R17: MP ids; R16: PF ids; R15: TV ids; R8: TR ids; R7: HT ids; R9: RT ids; R11: CN ids; R10: SV ids; R12: AG ids; R13: MF ids
   assert.ok(ids.size >= 150, `read ${ids.size} CA ids`);
   for (const x of ALL) for (const id of x.statutory?.caItems ?? []) assert.ok(ids.has(id), `${x.id}: CA item ${id} not in CA_REVIEW.md`);
 });
@@ -125,7 +125,7 @@ test('no topic promises a statutory value (₹ / % only "as the app applies it")
 });
 
 test('R19: the CA-id row pattern reads LG ids whole and never as G ids', () => {
-  const row = /^\| ((?:G|TR|TV|T|PS|PF|P|AC|I|X|HT|RT|CN|SV|AG|MF|MP|HS|LG)\d+)\b/gm;
+  const row = /^\| ((?:G|TR|TV|T|PS|PF|P|AC|I|X|HT|RT|CN|SV|AG|MF|MP|HS|LG|FU)\d+)\b/gm;
   assert.deepEqual([...'| LG1 ★ | x |\n| G1 | y |\n| LG44 | z |'.matchAll(row)].map((m) => m[1]), ['LG1', 'G1', 'LG44']);
   assert.ok(ALL.some((x) => x.statutory?.caItems?.includes('LG1')), 'a Round 19 topic cites LG1');
 });

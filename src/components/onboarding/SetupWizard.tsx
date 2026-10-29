@@ -31,6 +31,7 @@ import { hsPickT } from '../../i18n/areas/society-r18a-pick';
 import { logisticsLanding, applyLogisticsKind, isLogisticsKind } from '../../lib/shop-presets'; // R19-A1
 import { LogisticsKindPicker, type LgPick } from '../logistics/LogisticsKindPicker';
 import { lgPickT } from '../../i18n/areas/logistics-r19a-pick';
+import { applyFuelKind, fuelLanding, isFuelKind, type FuelKindId } from '../../lib/shop-presets'; import { FuelKindPicker } from '../fuel/FuelKindPicker'; // R21-A1
 import type { ProfIds } from '../../lib/prof/ps-profile';
 import { normalizeUdyam, validateUdyam } from '../../lib/msme';
 import { activePacks } from '../../lib/industry-packs';
@@ -132,12 +133,14 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
   // R19-A1: the "Freight forwarding, customs clearance, courier or warehouse" card is not a business type: its kind writes `transport`.
   const [lgOn, setLgOn] = useState(() => isLogisticsKind(localDb.settings.get().logistics_kind));
   const [lgPick, setLgPick] = useState<LgPick>(() => ({ kind: isLogisticsKind(localDb.settings.get().logistics_kind) ? localDb.settings.get().logistics_kind! : '', extra: [], lorries: false }));
+  const [fu, setFu] = useState(() => { const k = localDb.settings.get().fuel_kind; return { on: isFuelKind(k), kind: (isFuelKind(k) ? k : '') as FuelKindId | '' }; }); // R21-A1: the fuel card (`kirana` + `fuel_kind`)
   const { lang } = useT();
   const pickBusiness = (b: BusinessType) => {
     setAgOn(false); // R12
     setMfOn(false); // R13
     setHsOn(false); // R18
     setLgOn(false); // R19
+    setFu({ on: false, kind: '' }); // R21
     setBusiness(b);
     // The design follows the business type until the user picks one on the last step.
     set({ templateId: BUSINESS_DEFAULTS[b].templateId });
@@ -183,6 +186,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
       const prof = svc === 'professional' && pfKind ? pfKind : null; // R14 (PS-A1)
       const travel = svc === 'travel' && tvKind ? tvKind : null; // R15-B1
       const manpower = svc === 'manpower' && mpKind ? mpKind : null; // R17-A1
+      const fuk = fu.on && fu.kind && business === 'kirana' && !agOn && !mfOn && !hsOn && !lgOn ? fu.kind : null; // R21-A1: the fuel profile wins over the retail picker
       const saved = {
         ...applyBusinessDefaults(applyAnswers(localDb.settings.get(), a), business),
         ...(trade ? { ...applyTradeKind(trade), defaultDueDays: TRADE_PROFILES[trade].defaultDueDays } : {}),
@@ -196,6 +200,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
         ...(lgk ? applyLogisticsKind(lgk, { registered: a.gstRegistered, ownLorries: lgPick.lorries, extra: lgPick.extra, currentPacks: Array.isArray(localDb.settings.get().industry_packs) ? activePacks(localDb.settings.get()) : [] }) : {}),
         ...(soc ? applySocietyKind(soc, { registered: a.gstRegistered, currentPacks: Array.isArray(localDb.settings.get().industry_packs) ? activePacks(localDb.settings.get()) : [] }) : {}),
         ...(mfg ? { ...applyMfgKind(mfg, { registered: a.gstRegistered, sub: mfSub, currentPacks: activePacks(localDb.settings.get()) }), ...(MFG_PROFILES[mfg].defaultDueDays !== undefined ? { defaultDueDays: MFG_PROFILES[mfg].defaultDueDays } : {}) } : {}),
+        ...(fuk ? applyFuelKind(fuk, { currentPacks: Array.isArray(localDb.settings.get().industry_packs) ? activePacks(localDb.settings.get()) : [] }) : {}), // R21-A1
       };
       // R13 (MF-A1): the Udyam number and category go on the active sender profile (snapshotted on every document).
       const udyam = mfg && normalizeUdyam(mfUdyam.no);
@@ -211,6 +216,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
       window.dispatchEvent(new Event(SHOP_MODE_EVENT));
       localDb.template.set(a.templateId);
       applyTallyAnswer(tally);
+      if (fuk) return onClose(fuelLanding(fuk)); // R21-A1
       onClose(lgk ? logisticsLanding(lgk) : soc ? societyLanding(soc) : mfg ? MFG_PROFILES[mfg].landing : agri ? AGRI_PROFILES[agri].landing : trade ? TRADE_PROFILES[trade].landing : retail ? RETAIL_PROFILES[retail].landing : cons ? CONSTRUCTION_PROFILES[cons].landing : prof ? PROF_PROFILES[prof].landing : travel ? TRAVEL_LANDING[travel] : manpower ? MANPOWER_LANDING[manpower] : svc ? SERVICE_PROFILES[svc].landing : BUSINESS_DEFAULTS[business].landing);
     } catch (err) {
       setError((err as Error).message);
@@ -332,6 +338,7 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
                 <strong>{lgPickT('card')}</strong>
                 <span>{lgPickT('cardHint')}</span>
               </button>
+              <FuelKindPicker card={{ on: fu.on && business === 'kirana' && !agOn && !mfOn && !hsOn && !lgOn, pick: () => { pickBusiness('kirana'); setRetailKind(''); setFu({ on: true, kind: '' }); } }} value={fu.kind} onPick={(k) => setFu({ on: true, kind: k })} cardClass={styles.shopCard} />{/* R21-A1: not a business type — its kind writes `kirana` */}
             </div>
             {lgOn && (
               <div className={controls.field} data-wizard-logistics>

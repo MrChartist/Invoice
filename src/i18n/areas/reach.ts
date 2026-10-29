@@ -270,6 +270,7 @@ export const reachT = defineArea(
     'pack.security': 'Security agency', 'packDesc.security': 'PSARA licences and guard licences on the Deploy desk.',
     'pack.society': 'Housing society', 'packDesc.society': 'The Society desk on Recurring.', // R18-A1
     'pack.logistics': 'Freight forwarding', 'packDesc.logistics': 'Shipments desk.', 'pack.customs': 'Customs broker (CHA)', 'packDesc.customs': 'Duty deposits per job.', 'pack.courier': 'Courier franchise', 'packDesc.courier': 'Courier manifests.', 'pack.warehouse': 'Warehouse / 3PL', 'packDesc.warehouse': 'Storage billing.', // R19-A1
+    'pack.fuel': 'Petrol pump / CNG', 'packDesc.fuel': 'Fuel desk on Inventory.', 'pack.lpg': 'LPG distributor', 'packDesc.lpg': 'LPG view of the fuel desk.', // R21-A1
     'ck.workCentres': 'Add your work centres (machines and their hour rates)',
     'ck.udyam': 'Add your Udyam number (printed on invoices)',
     'ck.firstDrawing': 'Add your first drawing',
@@ -547,6 +548,7 @@ export const reachT = defineArea(
     'pack.security': 'सुरक्षा एजेंसी', 'packDesc.security': 'तैनाती डेस्क पर PSARA लाइसेंस और गार्ड लाइसेंस।',
     'pack.society': 'आवास सोसाइटी', 'packDesc.society': 'आवर्ती पर सोसाइटी डेस्क।',
     'pack.logistics': 'फ्रेट फ़ॉरवर्डिंग', 'packDesc.logistics': 'शिपमेंट डेस्क।', 'pack.customs': 'कस्टम ब्रोकर (CHA)', 'packDesc.customs': 'हर जॉब पर ड्यूटी जमा।', 'pack.courier': 'कूरियर फ़्रैंचाइज़ी', 'packDesc.courier': 'कूरियर मैनिफ़ेस्ट।', 'pack.warehouse': 'वेयरहाउस / 3PL', 'packDesc.warehouse': 'भंडारण बिलिंग।',
+    'pack.fuel': 'पेट्रोल पंप / CNG', 'packDesc.fuel': 'इन्वेंटरी पर ईंधन डेस्क।', 'pack.lpg': 'LPG वितरक', 'packDesc.lpg': 'ईंधन डेस्क का LPG दृश्य।',
     'ck.workCentres': 'अपने कार्य केंद्र जोड़ें (मशीनें और उनकी घंटे की दर)',
     'ck.udyam': 'अपना उद्यम पंजीकरण नंबर जोड़ें (इनवॉइस पर छपता है)',
     'ck.firstDrawing': 'पहली ड्रॉइंग जोड़ें',
