@@ -8,9 +8,8 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Camera, ClipboardPaste, FileUp, Inbox, Trash2 } from 'lucide-react';
 import type { PurchaseRecord } from '../../types/purchases';
 import { cameraScanSupported } from '../scan/camera';
-import { decodeEinvoiceQr, type QrWarning } from '../../lib/einvoice-qr';
-import { captureContext, draftFromQrNow, INBOX_CHANGED_EVENT, openCaptureFromFile } from '../../lib/capture-browser';
-import { draftFromQr } from '../../lib/bill-capture';
+import { MAX_JSON_TEXT } from '../../lib/einvoice-qr';
+import { captureFromQrText, INBOX_CHANGED_EVENT, openCaptureFromFile } from '../../lib/capture-browser';
 import { inboxDb, type InboxDoc } from '../../lib/doc-inbox';
 import { billOfDraft, draftsDb, type PurchaseDraft } from '../../lib/purchase-drafts';
 import { runDueBillSchedules } from '../../lib/recurring-bills';
@@ -40,10 +39,6 @@ export interface InboxTabProps {
   /** Inbox row to highlight (`?doc=`). */
   focusId?: string | null;
 }
-
-const warnText: Record<QrWarning, 'wSeller' | 'wBuyer' | 'wDate' | 'wIrn' | 'wTotal' | 'wType'> = {
-  sellerGstin: 'wSeller', buyerGstin: 'wBuyer', docDate: 'wDate', irn: 'wIrn', total: 'wTotal', docType: 'wType',
-};
 
 export default function InboxTab({ onPost, onChanged, businessState, focusId }: InboxTabProps) {
   useT();
@@ -83,23 +78,15 @@ export default function InboxTab({ onPost, onChanged, businessState, focusId }: 
   const docs = inboxDb.open();
   const drafts = draftsDb.all().sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
 
+  // One path with the "Scan bill" dialog (capture-browser.ts): signed QR text, or (8.46) the full e-invoice JSON.
   const fromQrText = (text: string, source: 'camera' | 'paste') => {
-    const res = decodeEinvoiceQr(text);
-    if (!res.ok) return onChanged(capT(`e_${res.error}`), 'error');
     try {
-      const preview = draftFromQr(res.data, captureContext());
-      if (preview.creditNote) {
-        inboxDb.add({ source, qr: res.data, note: capT('creditNote') });
-        refresh();
-        return onChanged(capT('creditNote'), 'info');
+      const r = captureFromQrText(text, source);
+      onChanged(r.message, r.tone);
+      if (r.route) {
+        setQrText('');
+        setPaste(false);
       }
-      const row = inboxDb.add({ source, qr: res.data });
-      const d = draftFromQrNow(res.data, { inboxId: row.id });
-      if (d) inboxDb.update(row.id, { draft_id: d.id });
-      const extra = [...res.warnings.map((w) => capT(warnText[w])), ...(preview.buyerMismatch ? [capT('warnBuyer', { gstin: res.data.buyerGstin })] : [])];
-      onChanged(`${capT('drafted', { no: res.data.docNo || '—' })} ${capT('sigNote')}${extra.length ? ` ${extra.join(' ')}` : ''}`, extra.length ? 'info' : 'success');
-      setQrText('');
-      setPaste(false);
     } catch (err) {
       onChanged((err as Error).message, 'error');
     }
@@ -203,13 +190,13 @@ export default function InboxTab({ onPost, onChanged, businessState, focusId }: 
               <button type="button" className={controls.btnOutline} aria-expanded={paste} onClick={() => setPaste((p) => !p)}>
                 <ClipboardPaste size={16} /> {capT('pasteQr')}
               </button>
-              <input ref={fileRef} type="file" hidden multiple accept={ATTACHMENT_ACCEPT} onChange={(e) => void onFiles(e.target.files)} data-testid="capture-file" />
+              <input ref={fileRef} type="file" hidden multiple accept={`${ATTACHMENT_ACCEPT},.json,application/json`} onChange={(e) => void onFiles(e.target.files)} data-testid="capture-file" />
             </div>
           )}
           {paste && (
             <div className={css.stack}>
               <label className={controls.label} htmlFor="cap-qr">{capT('pasteLabel')}</label>
-              <textarea id="cap-qr" className={cn(controls.textarea, css.textarea)} maxLength={4096} value={qrText} onChange={(e) => setQrText(e.target.value)} />
+              <textarea id="cap-qr" className={cn(controls.textarea, css.textarea)} maxLength={MAX_JSON_TEXT} value={qrText} onChange={(e) => setQrText(e.target.value)} />
               <div className={css.bar}>
                 <button type="button" className={controls.btnPrimary} disabled={!qrText.trim()} onClick={() => fromQrText(qrText, 'paste')}>{capT('readQr')}</button>
               </div>
