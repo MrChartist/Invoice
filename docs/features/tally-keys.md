@@ -45,7 +45,7 @@ packages B, C and D build on. R20-A built the engine; B / C / D only add **handl
 | `src/lib/keys/engine.ts` | `registerKeyActions`, `dispatchKey`, `candidates`, `runKeyRow`, `screenRows`, `rowRoute`, `rowLive` |
 | `src/lib/keys/use-key-actions.ts` | `useKeyActions(scope, handlers, enabled?)`, `useKeysState()` |
 | `src/lib/keys/cheat.ts`, `palette.ts` | Cheat-sheet search / "This screen"; the Ctrl+K actions |
-| `src/components/keys/{KeysHost,VouchersSheet,KeysSwitch}.tsx`, `keys.module.css` | Key bar, phone sheet, chips, F10 sheet, switch, key caps |
+| `src/components/keys/KeysHost.tsx`, `keys.module.css` | One lazy chunk: Key bar, phone sheet, chips, F10 `VouchersSheet`, `KeysSwitch`, `KeyCaps` |
 | `src/components/command/ShortcutsOverlay.tsx` | The cheat sheet (same lazy mount as before) |
 | `src/i18n/areas/keys-r20a.ts` | Every row label of the round (A–D), both languages; sheet / bar strings |
 | `src/lib/tally-keys.ts` | Phase 7 view over the registry (`resolveTallyKey`, `TALLY_KEYS`, layout `erp9` by default); not on first paint |

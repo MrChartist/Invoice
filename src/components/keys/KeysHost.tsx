@@ -1,5 +1,7 @@
 /**
- * R20-A5: mounted lazily by DashboardLayout while Tally keys are on (or on /gateway). It loads the engine, handles the
+ * R20-A5: the keys UI in one chunk (KeysHost, the switch, key caps, the F10 sheet).
+ *
+ * KeysHost: mounted lazily by DashboardLayout while Tally keys are on (or on /gateway). It loads the engine, handles the
  * global rows that need the shell (F10 vouchers sheet, Ctrl+F1 help), draws the per-screen Key bar (role="toolbar",
  * one tab stop, roving arrows, collapsible; phones get a "Keys" pill and a sheet) and the key chips of
  * `[data-key-row]` buttons (`data-key-chip`, drawn by CSS; the button gets `aria-keyshortcuts`).
@@ -10,16 +12,15 @@ import { ChevronDown, Keyboard } from 'lucide-react';
 import { useT } from '../../i18n';
 import { cn } from '../../lib/utils';
 import { keysT } from '../../i18n/areas/keys-r20a';
+import { can } from '../../lib/access';
 import { openHelp } from '../../lib/help-event';
 import { readRaw } from '../../lib/storage';
-import { formatCombo } from '../../hooks/useHotkeys';
-import { ariaCombo, comboFor, rowById, type KeyRow } from '../../lib/keys/registry';
+import { formatCombo, isApplePlatform } from '../../hooks/useHotkeys';
+import { KEY_ROWS, ariaCombo, comboFor, isBuilt, rowById, type KeyRow } from '../../lib/keys/registry';
 import { runKeyRow, screenRows } from '../../lib/keys/engine';
-import { keysLayout, keysMode, setKeysMode } from '../../lib/keys/stub';
+import { keysLayout, keysMode, setKeysLayout, setKeysMode, type KeysLayout } from '../../lib/keys/stub';
 import { useKeyActions, useKeysState } from '../../lib/keys/use-key-actions';
 import { Modal } from '../ui/Modal';
-import { KeyCaps } from './KeysSwitch';
-import { VouchersSheet } from './VouchersSheet';
 import s from './keys.module.css';
 
 const label = (r: KeyRow) => keysT(readRaw('mrchartist_tally_terms') === '1' && r.tally ? r.tally : r.plain);
@@ -132,5 +133,100 @@ function KeyBar({ rows, layout, onRun }: { rows: KeyRow[]; layout: ReturnType<ty
         <ChevronDown size={16} aria-hidden="true" />
       </button>
     </div>
+  );
+}
+
+/**
+ * R20-A1 / A3: the "Tally keys" switch and the key layout picker (TallyPrime / Tally.ERP 9, only while on). One
+ * component for every twin: the cheat sheet header, the Gateway menu, Settings → Defaults. Announces the change in a
+ * polite live region.
+ */
+export function KeysSwitch({ hint }: { hint?: boolean }) {
+  useT();
+  const [on, layout] = useKeysState();
+  const [said, setSaid] = useState('');
+  return (
+    <span className={s.switch}>
+      <label className={s.toggle} title={keysT('switchHint')}>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={on}
+          data-testid="tally-keys-switch"
+          onChange={(e) => {
+            setKeysMode(e.target.checked ? 'on' : 'off');
+            setSaid(keysT(e.target.checked ? 'on' : 'off'));
+          }}
+        />
+        {keysT('switch_')}
+      </label>
+      {on && (
+        <select className={s.select} aria-label={keysT('layout')} value={layout} onChange={(e) => setKeysLayout(e.target.value as KeysLayout)} data-testid="tally-keys-layout">
+          <option value="prime">{keysT('prime')}</option>
+          <option value="erp9">{keysT('erp9')}</option>
+        </select>
+      )}
+      {hint && <span className={s.hint}>{keysT('switchHint')}</span>}
+      <span className={s.sr} aria-live="polite">{said}</span>
+    </span>
+  );
+}
+
+/** Key caps of a combo (Latin, `lang="en"`); on a Mac an F-key shows "fn" first. Hidden from screen readers. */
+export function KeyCaps({ combo }: { combo: string }) {
+  const apple = isApplePlatform();
+  const parts = formatCombo(combo, apple);
+  if (apple && /(^|\+)f\d+$/.test(combo)) parts.unshift('fn');
+  return (
+    <span className={s.caps} aria-hidden="true" lang="en">
+      {parts.map((k, i) => (k === 'then' ? <span key={i}>{keysT('then')}</span> : <kbd key={i} className={s.kbd}>{k}</kbd>))}
+    </span>
+  );
+}
+
+
+/**
+ * R20-A (VK18): F10 "List of vouchers" over the current screen — every voucher with its key in the current layout,
+ * plain name first, Tally name second, and a letter to pick it (role="menu", so screen readers switch to focus mode).
+ * The answer for every key a browser or a Mac will not give us (Ctrl+F4 payroll, F-keys without fn …).
+ */
+export function VouchersSheet({ onClose }: { onClose: () => void }) {
+  useT();
+  const layout = keysLayout();
+  const rows = KEY_ROWS.filter((r) => r.letter && isBuilt(r) && (!r.need || can(r.need)));
+  const pick = (id: string) => {
+    onClose();
+    // After the dialog left the modal stack (keys and routes act on the page underneath).
+    setTimeout(() => runKeyRow(id));
+  };
+  return (
+    <Modal open onClose={onClose} size="sm" title={keysT('vTitle')} subtitle={keysT('vSub')}>
+      <div
+        role="menu"
+        aria-label={keysT('vTitle')}
+        className={s.menu}
+        onKeyDown={(e) => {
+          const hit = !e.ctrlKey && !e.metaKey && !e.altKey && rows.find((r) => r.letter === e.key.toUpperCase());
+          if (hit) {
+            e.preventDefault();
+            pick(hit.id);
+          }
+        }}
+      >
+        {rows.map((r) => {
+          const combo = comboFor(r, layout);
+          return (
+            <button key={r.id} type="button" role="menuitem" className={s.item} onClick={() => pick(r.id)} data-testid={`vs-${r.id}`} aria-keyshortcuts={r.letter}>
+              <span className={s.letter}>{r.letter}</span>
+              <span className={s.itemText}>
+                {keysT(r.plain)}
+                {r.tally && <small>{keysT(r.tally)}</small>}
+              </span>
+              {combo && <KeyCaps combo={combo} />}
+            </button>
+          );
+        })}
+      </div>
+    </Modal>
   );
 }

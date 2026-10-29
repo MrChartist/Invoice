@@ -16,7 +16,7 @@ import { NEVER_CLAIM, comboFor, type KeyGroup, type KeyRow } from '../../lib/key
 import { rowMatches, sheetRows } from '../../lib/keys/cheat';
 import { activeScopes } from '../../lib/keys/engine';
 import { useKeysState } from '../../lib/keys/use-key-actions';
-import { KeyCaps, KeysSwitch } from '../keys/KeysSwitch';
+import { KeyCaps, KeysSwitch } from '../keys/KeysHost';
 import { cn } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import styles from './ShortcutsOverlay.module.css';
