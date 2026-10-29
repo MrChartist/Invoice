@@ -22,11 +22,12 @@ const TABLE: Record<EntryKind, string> = { invoice: 'invoices', voucher: 'vouche
  * The row among `ids` this key presses here, for a screen that reads its own keys (the Gateway voucher, a form in a
  * dialog, where the engine stays out). Same rules as the engine (built, mode, rights, layout, field scopes), except that
  * in a text field an F-key or a modified key fires too (Tally forms are all fields) — never Ctrl+Alt (AltGr).
+ * `anyField`: every key fires in a field (the Gateway voucher, where every place is a field).
  */
-export function rowFor(e: KeyLike, ids: readonly string[]): KeyRow | undefined {
+export function rowFor(e: KeyLike, ids: readonly string[], anyField = false): KeyRow | undefined {
   const combo = comboOf(e);
   const el = (e.target ?? null) as Element | null;
-  const typing = isTypingTarget(el) && !(/^(f\d+|mod\+|alt\+)/.test(combo) && !combo.startsWith('mod+alt+'));
+  const typing = isTypingTarget(el) && (combo.startsWith('mod+alt+') || !(anyField || /^(f\d+|mod\+|alt\+)/.test(combo)));
   for (const id of ids) {
     const r = rowById(id);
     if (!r || comboFor(r, keysLayout()) !== combo || !rowLive(r, combo)) continue;

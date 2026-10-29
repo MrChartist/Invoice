@@ -52,6 +52,10 @@ import {
 } from '../../lib/gateway/voucher-entry';
 import type { TallyKeyId } from '../../lib/tally-keys';
 import { cn, formatMoney } from '../../lib/utils';
+import { lastText, rowFor, stepId, undoDelete } from '../../lib/keys/entry-actions'; // R20-B
+import { keysT } from '../../i18n/areas/keys-r20a';
+import { kbT } from '../../i18n/areas/keys-r20b';
+import { useToast } from '../ui/useToast';
 import { useGateway, useScreenKeys, useTallyTerms } from './context';
 import { ButtonBar } from './ButtonBar';
 import { CreateLedgerDialog } from './CreateLedgerDialog';
@@ -77,6 +81,22 @@ const readMode = (): 'single' | 'double' => {
     return 'double';
   }
 };
+// R20-B: the entry rows this screen reads itself (the Gateway's capture listener), and the session draft (GK12).
+const ENTRY_ROWS = ['postDated', 'optional', 'mode.voucher', 'cancel.voucher', 'dup.voucher', 'editLog.voucher', 'prevV.voucher', 'nextV.voucher', 'narrType', 'narrParty'];
+const EditLog = lazy(() => import('../audit/EditLog').then((m) => ({ default: m.EditLog })));
+type Variant = '' | 'OPTIONAL' | 'MEMO' | 'PD';
+const variantOf = (v?: { variant?: string; post_dated?: boolean } | null): Variant => (v?.variant === 'OPTIONAL' || v?.variant === 'MEMO' ? v.variant : v?.post_dated ? 'PD' : '');
+const DRAFT = 'mrchartist_gw_draft:';
+const takeDraft = (type: string): { date: string; narration: string; lines: EntryLine[] } | null => {
+  try {
+    const raw = sessionStorage.getItem(DRAFT + type);
+    sessionStorage.removeItem(DRAFT + type);
+    const d = raw ? JSON.parse(raw) : null;
+    return d && Array.isArray(d.lines) ? { ...d, lines: d.lines.map((l: EntryLine) => ({ ...l, key: nextKey() })) } : null;
+  } catch {
+    return null;
+  }
+};
 const REF_KINDS: RefKind[] = ['agst', 'new', 'advance', 'onacc'];
 const REF_LABEL: Record<RefKind, 'agstRef' | 'newRef' | 'advance' | 'onAccount'> = { agst: 'agstRef', new: 'newRef', advance: 'advance', onacc: 'onAccount' };
 
@@ -92,7 +112,7 @@ function refsOfVoucher(id: string): BillRefRow[] {
   return out;
 }
 
-type Confirm = null | 'quit' | 'delete';
+type Confirm = null | 'quit' | 'delete' | 'go';
 
 /**
  * Tally-style single-screen voucher entry (F4 Contra, F5 Payment, F6 Receipt, F7 Journal).
@@ -114,6 +134,16 @@ export function VoucherEntry() {
 
   const [version, setVersion] = useState(0);
   const existing = useMemo(() => (id ? loadVouchers().find((v) => v.id === id) ?? null : null), [id, version]); // eslint-disable-line react-hooks/exhaustive-deps
+  // R20-B Alt+2: `?dup=<id>` opens an unsaved copy (new number on save; quitting drops it).
+  const dupId = id ? null : params.get('dup');
+  const dupSrc = useMemo(() => (dupId ? loadVouchers().find((v) => v.id === dupId) ?? null : null), [dupId]);
+  const [draft] = useState(() => (id || dupId ? null : takeDraft(type)));
+  const src = existing ?? dupSrc;
+  const { notify: note, toastNode } = useToast();
+  const [variant, setVariant] = useState<Variant>(() => variantOf(src));
+  const [logOpen, setLogOpen] = useState(false);
+  const [goId, setGoId] = useState('');
+  const quitting = useRef(false);
   const [chart, setChart] = useState<Account[]>(() => chartOf(loadUserAccounts()));
   const [clients, setClients] = useState(() => localDb.clients.getAll());
   const [vendors, setVendors] = useState(() => vendorsDb.all());
@@ -122,15 +152,15 @@ export function VoucherEntry() {
   const byId = useMemo(() => new Map(chart.map((a) => [a.id, a])), [chart]);
   const options = useMemo(() => ledgerOptions(chart, clients, vendors, type), [chart, clients, vendors, type]);
 
-  const initialLines = () => (existing ? linesFromVoucher(existing, nextKey) : [blankLine(firstSide(type))]);
-  const [date, setDate] = useState(() => existing?.date ?? getVoucherDate());
+  const initialLines = () => (src ? linesFromVoucher(src, nextKey) : draft?.lines.length ? draft.lines : [blankLine(firstSide(type))]);
+  const [date, setDate] = useState(() => src?.date ?? draft?.date ?? getVoucherDate());
   const [number, setNumber] = useState(existing?.number ?? '');
-  const [narration, setNarration] = useState(existing?.narration ?? '');
-  const [branchId, setBranchId] = useState(existing?.branch_id ?? '');
+  const [narration, setNarration] = useState(src?.narration ?? draft?.narration ?? '');
+  const [branchId, setBranchId] = useState(src?.branch_id ?? '');
   const [lines, setLines] = useState<EntryLine[]>(initialLines);
   // 7Q (P1-13 / 7.19): voucher type, voucher class, single-entry mode, bill-wise references.
   const [voucherTypeId, setVoucherTypeId] = useState<string | undefined>(existing?.voucher_type_id);
-  const [voucherClass, setVoucherClass] = useState(existing?.voucher_class ?? '');
+  const [voucherClass, setVoucherClass] = useState(src?.voucher_class ?? '');
   const [mode, setMode] = useState<'single' | 'double'>(() => (SINGLE_ENTRY_TYPES.includes(type) && readMode() === 'single' && !existing ? 'single' : 'double'));
   const [accountId, setAccountId] = useState('');
   const [accountKey] = useState(() => nextKey());
@@ -147,17 +177,19 @@ export function VoucherEntry() {
   const pendingFocus = useRef<string | null>(null);
 
   // Load another stored voucher when the id changes (drill-down into a different voucher).
-  const [shownId, setShownId] = useState(id);
-  if (shownId !== id) {
-    setShownId(id);
-    setDate(existing?.date ?? getVoucherDate());
+  const shown = id ?? `dup:${dupId}`;
+  const [shownId, setShownId] = useState(shown);
+  if (shownId !== shown) {
+    setShownId(shown);
+    setDate(src?.date ?? getVoucherDate());
     setNumber(existing?.number ?? '');
-    setNarration(existing?.narration ?? '');
-    setBranchId(existing?.branch_id ?? '');
-    setLines(existing ? linesFromVoucher(existing, nextKey) : [blankLine(firstSide(type))]);
+    setNarration(src?.narration ?? '');
+    setBranchId(src?.branch_id ?? '');
+    setLines(src ? linesFromVoucher(src, nextKey) : [blankLine(firstSide(type))]);
     setQueries({});
     setVoucherTypeId(existing?.voucher_type_id);
-    setVoucherClass(existing?.voucher_class ?? '');
+    setVoucherClass(src?.voucher_class ?? '');
+    setVariant(variantOf(src));
     setRefs(existing ? refsOfVoucher(existing.id) : []);
     setMode('double');
   }
@@ -220,6 +252,7 @@ export function VoucherEntry() {
     ...(branchId ? { branch_id: branchId } : {}),
     ...(vtId ? { voucher_type_id: vtId } : {}),
     ...(voucherClass.trim() ? { voucher_class: voucherClass.trim() } : {}),
+    ...(variant === 'PD' ? { post_dated: true } : variant ? { variant } : {}),
   });
   const dirty = existing
     ? JSON.stringify({ date, narration, lines: draftInput().lines }) !== baseline
@@ -245,6 +278,7 @@ export function VoucherEntry() {
   const suggestionsFor = (key: number) => searchLedgers(options, queries[key] ?? '');
 
   const leave = () => {
+    quitting.current = true;
     if (location.key !== 'default' && window.history.length > 1) navigate(-1);
     else navigate('/gateway?m=vouchers');
   };
@@ -348,15 +382,68 @@ export function VoucherEntry() {
     setLines((ls) => [...ls, { key: nextKey(), side, account_id: bank, amount: '' }]);
   };
 
+  // R20-B: a delete stays on a fresh voucher of the type, with Undo (the recycle bin's restore).
   const remove = () => {
     if (!existing) return;
+    const gone = existing;
     try {
-      deleteVoucher(existing.id);
-      notify(gwT('vDeleted', { number: existing.number }));
-      leave();
+      deleteVoucher(gone.id);
+      navigate(`/gateway/voucher/${typeRoute(type)}`, { replace: true });
+      note(gwT('vDeleted', { number: gone.number }), 'success', {
+        action: {
+          label: kbT('undo'),
+          onClick: () => void undoDelete('voucher', gone.id).then(() => navigate(`/gateway/voucher/${typeRoute(gone.type)}?id=${encodeURIComponent(gone.id)}`), (err) => note((err as Error).message, 'error')),
+        },
+      });
     } catch (err) {
       setError((err as Error).message);
     }
+  };
+  const openOther = (to = goId) => {
+    setGoId('');
+    navigate(`/gateway/voucher/${typeRoute(type)}?id=${encodeURIComponent(to)}`, { replace: true });
+  };
+  // Typed lines of a new voucher survive leaving by Go To (sessionStorage, this tab; cleared by save / quit).
+  const draftRef = useRef<[string, string] | null>(null);
+  useEffect(() => {
+    draftRef.current = !src && filledLines(lines).length ? [type, JSON.stringify({ date, narration, lines: filledLines(lines) })] : null;
+  });
+  useEffect(() => () => {
+    try {
+      if (draftRef.current && !quitting.current) sessionStorage.setItem(DRAFT + draftRef.current[0], draftRef.current[1]);
+    } catch {
+      /* per tab only */
+    }
+  }, []);
+  useEffect(() => {
+    if (draft) notify(kbT('draftBack'), 'info');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  /** R20-B entry keys (Alt+T, Ctrl+L, Ctrl+H, Alt+X, Alt+2, Alt+Q, PgUp / PgDn, Ctrl+R / Alt+R in the narration). */
+  const entryKey = (rowId: string, e: KeyboardEvent): boolean => {
+    const step = (dir: -1 | 1) => {
+      if (!existing || (e.target as Element | null)?.tagName === 'TEXTAREA') return false;
+      const to = stepId(loadVouchers().filter((v) => v.type === type), existing.id, dir);
+      if (to && dirty) {
+        setGoId(to);
+        setConfirm('go');
+      } else if (to) openOther(to);
+      return true;
+    };
+    const narr = (party?: string) => {
+      const text = lastText(loadVouchers(), (v) => v.type === type && (party === undefined || v.lines.some((l) => !!party && l.party === party)), (v) => v.narration, (v) => v.date, existing?.id);
+      if (text) setNarration(text);
+      else notify(kbT('noNarr'), 'info');
+      return true;
+    };
+    if (rowId === 'postDated') return setVariant((v) => (v === 'PD' ? '' : 'PD')), true;
+    if (rowId === 'optional') return setVariant((v) => (v === 'OPTIONAL' ? '' : 'OPTIONAL')), true;
+    if (rowId === 'mode.voucher') return SINGLE_ENTRY_TYPES.includes(type) && (toggleMode(), true);
+    if (rowId === 'cancel.voucher') return notify(kbT('vCancel'), 'info'), true;
+    if (rowId === 'dup.voucher') return !!existing && (navigate(`/gateway/voucher/${typeRoute(type)}?dup=${encodeURIComponent(existing.id)}`), note(kbT('dupDone', { label: existing.number }), 'info'), true);
+    if (rowId === 'editLog.voucher') return !!existing && (setLogOpen(true), true);
+    if (rowId === 'prevV.voucher' || rowId === 'nextV.voucher') return step(rowId === 'prevV.voucher' ? -1 : 1);
+    if (rowId === 'narrType') return narr();
+    return narr(lines.find((l) => l.party)?.party ?? '');
   };
 
   const switchType = (t: ManualVoucherType) => {
@@ -432,6 +519,7 @@ export function VoucherEntry() {
     if (confirm) {
       if (k === 'y' || (k === 'enter' && !mod)) {
         if (confirm === 'quit') leave();
+        else if (confirm === 'go') openOther();
         else remove();
         setConfirm(null);
         return true;
@@ -443,6 +531,8 @@ export function VoucherEntry() {
       return false;
     }
     if (mod && !e.altKey && !e.shiftKey && k === 'a') return accept(), true;
+    const row = rowFor(e, ENTRY_ROWS, true);
+    if (row) return entryKey(row.id, e);
     if (e.altKey && !mod && k === 'c') {
       const key = at.includes(':') ? Number(at.split(':')[0]) : (lines.find((l) => !l.account_id)?.key ?? lines[lines.length - 1].key);
       setCreating({ key, name: queries[key] ?? '' });
@@ -507,7 +597,11 @@ export function VoucherEntry() {
           { id: 'accept', combo: 'mod+a', label: gwT('bbAccept'), onClick: accept, primary: true },
           { id: 'create', combo: 'alt+c', label: gwT('bbCreate'), onClick: () => setCreating({ key: lines.find((l) => !l.account_id)?.key ?? lines[lines.length - 1].key, name: '' }) },
           { id: 'quit', combo: 'escape', label: gwT('bbQuit'), onClick: () => (dirty ? setConfirm('quit') : leave()) },
-          ...(existing ? [{ id: 'delete', combo: 'alt+d', label: gwT('bbDelete'), onClick: () => setConfirm('delete') }] : []),
+          ...(existing ? [
+            { id: 'delete', combo: 'alt+d', label: gwT('bbDelete'), onClick: () => setConfirm('delete') },
+            { id: 'dup', combo: 'alt+2', label: keysT('dup'), onClick: () => navigate(`/gateway/voucher/${typeRoute(type)}?dup=${encodeURIComponent(existing.id)}`) },
+            { id: 'editLog', combo: 'alt+q', label: keysT('editLog'), onClick: () => setLogOpen(true) },
+          ] : []),
         ]}
         onVoucherType={(tid) => {
           const t = BAR_TYPE[tid];
@@ -547,6 +641,15 @@ export function VoucherEntry() {
             <label className={styles.vField}>
               {gwT('vDate')}
               <input data-field="date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} aria-keyshortcuts="F2" />
+            </label>
+            <label className={styles.vField}>
+              {kbT('kind')}
+              <select data-field="variant" className={controls.select} value={variant} onChange={(e) => setVariant(e.target.value as Variant)} data-testid="gw-v-variant">
+                <option value="">{kbT('regular')}</option>
+                <option value="OPTIONAL">{keysT('optional')} (Ctrl+L)</option>
+                <option value="PD">{keysT('postDated')} (Alt+T)</option>
+                <option value="MEMO">{kbT('memo')}</option>
+              </select>
             </label>
             {hasTypes && (
               <label className={styles.vField}>
@@ -765,6 +868,7 @@ export function VoucherEntry() {
         <label className={styles.narration}>
           <span className={styles.hint}>{gwT('vNarration')}</span>
           <textarea
+            data-key-field="narration"
             data-field="narration"
             className={controls.textarea}
             rows={2}
@@ -778,11 +882,11 @@ export function VoucherEntry() {
         {confirm && (
           <div className={styles.confirm} role="alertdialog" aria-labelledby="gw-confirm-title">
             <strong id="gw-confirm-title">
-              {confirm === 'quit' ? gwT('vQuitTitle') : gwT('vDeleteTitle', { number: existing?.number ?? '' })}
+              {confirm === 'quit' ? gwT('vQuitTitle') : confirm === 'go' ? kbT('unsaved') : gwT('vDeleteTitle', { number: existing?.number ?? '' })}
             </strong>
             {confirm === 'quit' && <span className={styles.hint}>{gwT('vQuitBody')}</span>}
             <span>
-              <button type="button" className={controls.btnDanger} autoFocus onClick={() => (confirm === 'quit' ? leave() : remove())} aria-keyshortcuts="Y">
+              <button type="button" className={controls.btnDanger} autoFocus onClick={() => (confirm === 'quit' ? leave() : confirm === 'go' ? openOther() : remove())} aria-keyshortcuts="Y">
                 {gwT('yes')} (Y)
               </button>{' '}
               <button type="button" className={controls.btnOutline} onClick={() => setConfirm(null)} aria-keyshortcuts="N">
@@ -809,6 +913,8 @@ export function VoucherEntry() {
         </div>
       </section>
 
+      {toastNode}
+      {logOpen && existing && <Suspense fallback={null}><EditLog open recordId={existing.id} name={existing.number} onClose={() => setLogOpen(false)} /></Suspense>}
       {creating && (
         <CreateLedgerDialog
           kind="account"
