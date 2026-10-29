@@ -2,7 +2,12 @@ import { useNavigate } from 'react-router-dom';
 import { formatCombo } from '../../hooks/useHotkeys';
 import { useCan } from '../../hooks/useCan';
 import { gwT, type GwKey } from '../../i18n/areas/gateway';
-import { TALLY_KEYS, type TallyKeyId } from '../../lib/tally-keys';
+import type { TallyKeyId } from '../../lib/tally-keys';
+import { comboFor, rowById } from '../../lib/keys/registry';
+import { rowRoute, runKeyRow } from '../../lib/keys/engine';
+import { keysT } from '../../i18n/areas/keys-r20a';
+import { keysLayout } from '../../lib/keys/stub';
+import { useKeysState } from '../../lib/keys/use-key-actions';
 import { useGateway, useTallyTerms } from './context';
 import { ariaKeys } from './keymap';
 import { cn } from '../../lib/utils';
@@ -41,11 +46,15 @@ export function ButtonBar({ extra = [], onVoucherType }: { extra?: BarButton[]; 
   const { openDate, openPeriod } = useGateway();
   const terms = useTallyTerms();
 
+  useKeysState(); // R20-A3: re-render on a layout switch
+  // R20-A: built from the key registry in the current layout (TallyPrime: Alt+F6 / Alt+F5 credit / debit note).
   const keyButton = (id: TallyKeyId): BarButton | null => {
-    const k = TALLY_KEYS.find((x) => x.id === id);
-    if (!k || !k.to || (k.need && !can(k.need))) return null;
+    const row = rowById(id);
+    const combo = row ? comboFor(row, keysLayout()) : '';
+    const to = row && rowRoute(row);
+    if (!row || !to || !combo || (row.need && !can(row.need))) return null;
     const label = gwT((terms && TALLY_LABEL[id]) || LABEL[id] || 'bbHelp');
-    return { id, combo: k.combo, label, onClick: () => (onVoucherType?.(id) ? undefined : navigate(k.to!, k.state ? { state: k.state } : undefined)) };
+    return { id, combo, label, onClick: () => (onVoucherType?.(id) ? undefined : navigate(to)) };
   };
 
   const buttons: BarButton[] = [
@@ -53,6 +62,7 @@ export function ButtonBar({ extra = [], onVoucherType }: { extra?: BarButton[]; 
     { id: 'date', combo: 'f2', label: gwT('bbDate'), onClick: openDate },
     { id: 'period', combo: 'alt+f2', label: gwT('bbPeriod'), onClick: openPeriod },
     ...VOUCHER_IDS.map(keyButton).filter((b): b is BarButton => !!b),
+    { id: 'vouchers', combo: 'f10', label: keysT('vouchers'), onClick: () => runKeyRow('vouchers') }, // R20-A: F10 sheet
     { id: 'goto', combo: 'alt+g', label: gwT('bbGoto'), onClick: () => navigate('/gateway', { state: { tally: 'goto' } }) },
     { id: 'features', combo: 'f11', label: gwT('bbFeatures'), onClick: () => navigate('/settings?tab=defaults') },
     { id: 'configure', combo: 'f12', label: gwT('bbConfigure'), onClick: () => navigate('/settings') },

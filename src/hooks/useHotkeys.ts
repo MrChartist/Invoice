@@ -84,7 +84,9 @@ export function matchesEvent(parsed: ParsedCombo, e: KeyboardEvent): boolean {
   const modDown = e.ctrlKey || e.metaKey;
   if (parsed.mod !== modDown) return false;
   if (parsed.alt !== e.altKey) return false;
-  const key = e.key.toLowerCase();
+  // R20-A (bug 1): with Alt down, letters / digits match the physical key — Mac Option+G types "©", AltGr types characters.
+  const code = e.code || '';
+  const key = e.altKey && /^(Key[A-Z]|Digit\d)$/.test(code) ? code.slice(code[0] === 'K' ? 3 : 5).toLowerCase() : e.key.toLowerCase();
   // Printable symbols such as "?" already encode Shift; only enforce Shift for letters/named keys.
   const symbol = key.length === 1 && !/[a-z0-9]/.test(key);
   if (!symbol && parsed.shift !== e.shiftKey) return false;
@@ -122,32 +124,6 @@ export function formatCombo(combo: string, apple: boolean = isApplePlatform()): 
   });
   return out;
 }
-
-export interface ShortcutInfo {
-  combo: string;
-  label: string;
-  /** Built-in groups, or another screen's own (e.g. the Gateway's "Tally keys"). */
-  group: 'General' | 'Go to' | 'Invoice editor' | (string & {});
-  /** Owned and handled elsewhere (listed for reference only). */
-  external?: boolean;
-}
-
-/** Single source of truth for the shortcuts overlay. */
-export const GLOBAL_SHORTCUTS: ShortcutInfo[] = [
-  { combo: 'mod+k', label: 'Open command palette', group: 'General' },
-  { combo: '/', label: 'Search (when not typing)', group: 'General' },
-  { combo: '?', label: 'Show keyboard shortcuts', group: 'General' },
-  { combo: 'escape', label: 'Close dialog or palette', group: 'General' },
-  { combo: 'g d', label: 'Go to Dashboard', group: 'Go to' },
-  { combo: 'g i', label: 'Go to New invoice', group: 'Go to' },
-  { combo: 'g t', label: 'Go to Invoices', group: 'Go to' },
-  { combo: 'g c', label: 'Go to Clients', group: 'Go to' },
-  { combo: 'g s', label: 'Go to Settings', group: 'Go to' },
-  { combo: 'alt+p', label: 'Go to POS counter', group: 'Go to' },
-  { combo: 'mod+s', label: 'Save invoice', group: 'Invoice editor', external: true },
-  { combo: 'mod+p', label: 'Open preview (print or PDF)', group: 'Invoice editor', external: true },
-  { combo: 'alt+r', label: 'Repeat the party\'s last bill', group: 'Invoice editor', external: true }, // R3-B6
-];
 
 interface Entry {
   steps: ParsedCombo[];

@@ -1,0 +1,185 @@
+/* R20-A: key caps, the Key bar, the phone "Keys" pill, the Vouchers sheet and the Tally keys switch (tokens only). */
+.caps {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.3rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* The Key bar: after the main content, stuck to the bottom of the scrolling area. */
+.bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  gap: 0.375rem;
+  overflow-x: auto;
+  margin-top: auto;
+  padding: 0.375rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  scrollbar-width: thin;
+}
+
+.barBtn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.barBtn:hover,
+.barBtn:focus-visible,
+.item:hover,
+.item:focus-visible {
+  border-color: var(--ring);
+  outline: none;
+}
+
+.pill {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(var(--tab-bar-h, 0px) + 1rem);
+  z-index: 24;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0 1rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.pillDesk {
+  min-height: 2rem;
+}
+
+.menu {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.itemText {
+  flex: 1;
+  display: grid;
+}
+
+.itemText small {
+  color: var(--muted-foreground);
+}
+
+.letter {
+  width: 1.5rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--brand-text);
+  text-decoration: underline;
+}
+
+.switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.select {
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--foreground);
+}
+
+.hint {
+  flex-basis: 100%;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Chips on screens' own buttons (`data-key-row`), drawn while Tally keys are on. */
+:global(html[data-tally-keys]) [data-key-chip]::after {
+  content: attr(data-key-chip);
+  margin-left: 0.35rem;
+  padding: 0 0.3rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+}
+
+@media (pointer: coarse) {
+  .barBtn {
+    min-height: 44px;
+  }
+}

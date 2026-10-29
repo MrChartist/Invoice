@@ -19,6 +19,8 @@ export type AreaTranslator<K extends string> = ((key: K, vars?: MessageVars) => 
   readonly en: Readonly<Record<K, string>>;
   /** The Hindi table once loaded (R16-A1: a build chunk), else English — never undefined. */
   readonly hi: Readonly<Record<K, string>>;
+  /** R20-A: fetch the Hindi table without switching language (a cheat-sheet search typed in Hindi). */
+  readonly load: () => Promise<void>;
 };
 
 type HiTable = Readonly<Record<string, string>>;
@@ -32,13 +34,12 @@ type HiTable = Readonly<Record<string, string>>;
 export function defineArea<const E extends Record<string, string>>(en: E, hi: { readonly [K in keyof E]: string }): AreaTranslator<Extract<keyof E, string>> {
   const lazy = typeof (hi as unknown) === 'function' ? (hi as unknown as () => Promise<{ default: HiTable }>) : null;
   let table: HiTable | undefined = lazy ? undefined : hi;
-  if (lazy) {
-    let pending: Promise<void> | undefined;
-    registerHindi(() => (pending ??= lazy().then(
-      (m) => { table = m.default; },
-      (e) => { pending = undefined; throw e; },
-    )));
-  }
+  let pending: Promise<void> | undefined;
+  const load = () => (lazy ? (pending ??= lazy().then(
+    (m) => { table = m.default; },
+    (e) => { pending = undefined; throw e; },
+  )) : Promise.resolve());
+  if (lazy) registerHindi(load);
   const fn = (key: Extract<keyof E, string>, vars?: MessageVars): string => {
     // Hindi from the area file; other languages (8H) from their phrase glossary; English otherwise.
     const text = (getLanguage() === 'hi' ? table?.[key] : undefined) || (en[key] && phrase(en[key])) || en[key] || key;
@@ -47,5 +48,6 @@ export function defineArea<const E extends Record<string, string>>(en: E, hi: { 
   return Object.defineProperties(fn, {
     en: { value: en, enumerable: true },
     hi: { get: () => table ?? en, enumerable: true },
+    load: { value: load },
   }) as unknown as AreaTranslator<Extract<keyof E, string>>;
 }

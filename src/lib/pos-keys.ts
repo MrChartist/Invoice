@@ -11,6 +11,7 @@
  *
  * Pure above "Storage".
  */
+import { NEVER_CLAIM } from './keys/never-claim';
 import { num, round2 } from './invoice-calc';
 import { POS_SHORTCUTS, type PosAction } from './pos';
 
@@ -97,6 +98,9 @@ export function isAssignableCombo(combo: string): boolean {
   const key = parts.pop() ?? '';
   const mods = new Set(parts);
   if ([...mods].some((m) => !['Ctrl', 'Alt', 'Shift'].includes(m))) return false;
+  // R20-A: the browser / OS keys the app never claims (one shared list, `src/lib/keys/never-claim.ts`).
+  const ours = [mods.has('Ctrl') && 'mod', mods.has('Alt') && 'alt', mods.has('Shift') && 'shift', key.toLowerCase()].filter(Boolean).join('+');
+  if (NEVER_CLAIM.some((n) => !n.apple && n.combo === ours)) return false;
   // Ctrl+F4 / Alt+F4 close the tab / window; bare F11 / F12 are full screen / developer tools.
   if (/^F([1-9]|1[0-2])$/.test(key)) return !(key === 'F4' && (mods.has('Ctrl') || mods.has('Alt'))) && !(['F11', 'F12'].includes(key) && !mods.size);
   if (['PageUp', 'PageDown', 'Home', 'End'].includes(key)) return !mods.has('Ctrl');

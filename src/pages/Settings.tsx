@@ -46,6 +46,7 @@ const ReminderSchedulePanel = lazy(() => import('../components/settings/Reminder
 
 // R6-B5: Settings → Features (every module, pack and advanced option in one list) — its own chunk.
 const FeaturesPanel = lazy(() => import('../components/settings/FeaturesPanel'));
+const KeysSwitch = lazy(() => import('../components/keys/KeysSwitch')); // R20-A1: the Tally keys switch (one row)
 const RetailChecks = lazy(() => import('../components/retail-r9/rt-a-hub').then((m) => ({ default: m.RetailChecks }))); // R9 (RT-A2)
 
 type Tab = SettingsTab;
@@ -296,6 +297,13 @@ export function Settings() {
             <ShopModePanel settings={settings} onChange={patchSettings} />
           </Suspense>
           <DefaultsPanel settings={settings} onChange={patchSettings} />
+          <Suspense fallback={null}>
+            <section className={surface.card}>
+              <div className={surface.cardBody}>
+                <KeysSwitch hint />
+              </div>
+            </section>
+          </Suspense>
           <Suspense fallback={null}>
             <CurrencyRatesPanel notify={notify} />
           </Suspense>
