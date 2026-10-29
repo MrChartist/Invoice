@@ -523,3 +523,61 @@ global print rules (`:global(#root)` in `InvoicePreview` / `pos`), which would a
 dropping preload lists altogether (`modulePreload: false`) — a load-time change, and it removes the HTML preloads the
 first-paint budget measures; react-router's `development` build in `vendor-react` — same size as `production`
 (NODE_ENV-guarded); jsPDF itself (118 kB gz, a prebuilt minified bundle, not tree-shakable).
+
+### PERF-6 core-precache reclaim (2026-10-29, R21-P)
+
+Round 21 needs ≈ 30 kB of core and R20 B–D hold 20 kB more, against 45.5 kB of headroom (`docs/prd/round-21.md`
+§1.4), so this package reclaims core with no change to what the app does. Every column below was built with
+`npx vite build` + `gen-precache` + `check-bundle-size` in the same checkout, cumulative, on base `182d364`
+(`origin/master` `4695f54` + the Round 21 PRD, docs only).
+
+| # | Change | Core (gz kB) | Saved | First paint | Entry | Hindi pack | Hindi in core |
+|---|---|---|---|---|---|---|---|
+| 0 | base (measured) | 3,254.5 | — | 177.9 | 89.5 | 373.2 | 21.8 |
+| P1 | help topics / glossary / tips Hindi → `lang-hi-help` | 3,244.4 | −10.1 | 177.9 | 89.6 | 385.4 | **9.7** |
+| P2 | `css-maps`: class maps of small, shared, local CSS modules | 3,240.7 | −3.7 | 177.5 | 89.2 | 385.4 | 9.7 |
+| P3 | `lazy-leaves-ui` 1,500 → 2,500 B (cap 20 → 28 kB, lead-approved) | 3,235.4 | −5.3 | 177.5 | 89.1 | 385.4 | 9.7 |
+| P4 | dead lazy code | — | dropped (< 0.5 kB) | | | | |
+| | **total** | **3,235.4** | **−19.1** | **177.5 (−0.4)** | **89.1 (−0.4)** | 385.4 (+12.2) | **9.7 (−12.1)** |
+
+Other numbers, before → after: initial files 4 → 4, `lazy-leaves` 17.6 → 18.5 kB (P1: `tips.ts`, now under 3,000 B,
+and `hi-tables.ts` joined), `lazy-leaves-ui` 13.4 → **27.0 / 28 kB** (64 → 90 modules), regional 20.7 → 20.7, JS files
+1,038 → 994 (core 937 → 893).
+
+1. **Help Hindi out of the English chunks (P1).** The help topics pass their Hindi title positionally
+   (`t(id, title, hiTitle, …)`), the glossary its Hindi definition (`g(term, def, app, hiDef, hiApp)`), the tips a `hi`
+   field: 11.8 kB gz of Devanagari in English chunks, allow-listed in `HI_LEAK_ALLOW`. `splitHelp`
+   (`scripts/vite-hi-split.mjs`, `HELP_SPLIT`) now blanks those arguments at build time and emits one
+   `virtual:hi/help/<file>~<hash>` module per file (`{ id: hindi }`) into `lang-hi-help`; the data module gains
+   `export const loadHi`. `src/lib/help/hi-tables.ts` (`withHindi`) puts the Hindi back: registered with the language
+   switch (Hindi on → loaded at once; `setLanguage('hi')` awaits it) and awaited before a topic / term / tip renders in
+   Hindi. The Help search and the Ctrl+K "Help topics" group fetch the titles on an English device only when the query
+   is typed in Devanagari (search then awaits the pack; offline without it, English results only). The source files
+   are unchanged (dev and tests keep the Hindi inline, `tests/help-registry.test.ts` unchanged); the build fails loud on
+   a non-literal Hindi, a dynamic or duplicate key, or a listed file with no rows (`tests/help-hi-split.test.ts`). The
+   help entries left `HI_LEAK_ALLOW`; the Hindi pack grew by what left the core (+12.2 kB, 385.4 / 400).
+2. **`css-maps` (P2).** PERF-5 rejected one group of all CSS-module class maps because some files carry global rules.
+   `cssMapGroup` takes only a lazy CSS module of ≤ 2,500 bytes with two or more importers (one importer: it sits in that
+   screen's chunk anyway) whose every rule is local: `cssIsLocal` (`scripts/vite-safe-groups.mjs`) requires a class in
+   every selector of every style rule (also inside `@media` / `@supports` / `@container` / `@layer`), no `:global`, no
+   `@page` / `@font-face` / `@import`; `@keyframes` names are scoped. It rejects 11 of 150 files today (e.g.
+   `HelpModal`'s bare `kbd`, `StatementViewer`'s `@page`, `bankdocs`' `:global(#root)` print rule). 53 class maps
+   (3.7 kB gz JS) now share one chunk and one stylesheet (61.7 kB raw / 9.9 kB gz), so a screen that uses one loads the
+   others' styles too: they can only match their own hashed classes. `check-bundle-size` re-checks every `css-maps`
+   module with `cssIsLocal`. Measured and left: all 82 small local modules (no importer rule) saved 5.5 kB but loaded
+   91 kB of CSS with the group.
+3. **`lazy-leaves-ui` at 2,500 bytes (P3).** As measured in PERF-5 (−3.5 kB then; −5.3 kB now, the group having more
+   candidates). The cap is 28 kB for this group only (`LEAVES_UI_MAX_KB`; `lazy-leaves` keeps 20). The safety rules
+   are kept and the "no side effect" rule is now automatic: `loadEffects` (a conservative top-level statement check —
+   declarations, imports / exports and values built from literals, functions, `defineArea`, `lazy`, `createContext`,
+   `new Set / Map` pass; any other call, assignment or update is reported) keeps a module with a load effect out of the
+   group (`leafGroup(…, { pure: true })`) and `check-bundle-size` fails if one gets in. **Headroom is 1.0 kB:** a new
+   small UI leaf joins automatically, so a package that adds several may need the threshold lowered (2,000) or the cap
+   raised by the lead.
+4. **Dead lazy code (P4), dropped.** Nothing in `build-meta/chunks.json` is unreachable: rolldown includes only
+   imported modules, and the PRD's example `day-math.ts` is test-only already (no `src/` importer, not in `dist/`).
+   Unused exports do ship from modules loaded with a dynamic `import()` whose namespace is passed on (e.g.
+   `balanceSheetCsv` in the `books` chunk, via `Dashboard.tsx` `Promise.all([import('../lib/books'), …])`); the ones with
+   no importer in `src/`, `tests/` or `scripts/` total ≈ 4.7 kB of source (≈ 1 kB gz at most) across 13 feature files
+   that R20 B–D / Round 21 may start calling (`PERIOD_PRESET_LABELS`, `paiseToRupees` …), so the stop rule (< 0.5 kB
+   per safe step) applies. Unbundled orphans (`R8Stub` … `R13Stub`, `payroll/index.ts`) cost 0 bytes.
