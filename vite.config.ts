@@ -4,6 +4,7 @@ import type { Plugin } from 'vite'
 import { fileURLToPath } from 'node:url'
 import { CSP_META } from './scripts/security-headers.mjs'
 import { readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { hiSplit, langChunkName } from './scripts/vite-hi-split.mjs'
 import { createGraph, familyRe, graphPlugin, leafGroup, safeFamilyGroup } from './scripts/vite-safe-groups.mjs'
 import { preloadTrim } from './scripts/vite-preload-trim.mjs'
@@ -39,6 +40,12 @@ export default defineConfig({
   // R16-A1: hi-split moves defineArea Hindi into lang-hi-* chunks (build only; dev keeps it inline).
   plugins: [react(), cspMeta(), hiSplit(), graphPlugin(graph), preload.plugin],
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  css: {
+    // PERF-5: CSS-module class names `_<local>_<file hash>` (Vite's default adds `_<line>`). The file hash is the
+    // same for every class of a file, so it compresses; the line number did not (−7.6 kB gz core). 6 base64url
+    // characters of the file's SHA-256 (36 bits) keep two files' same-named classes apart.
+    modules: { generateScopedName: (name: string, _file: string, css: string) => `_${name}_${createHash('sha256').update(css).digest('base64url').slice(0, 6)}` },
+  },
   resolve: {
     // jsPDF's optional imports (doc.html / addSvgAsImage only) are never used: see the stub.
     alias: {

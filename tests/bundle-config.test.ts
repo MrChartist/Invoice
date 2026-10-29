@@ -11,7 +11,10 @@ import { preloadTrim } from '../scripts/vite-preload-trim.mjs';
 
 const cfg = readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8');
 type Group = { name: string | ((id: string, ctx?: unknown) => string | null); test?: RegExp; tags?: string[]; priority?: number; maxModuleSize?: number };
-const config = (await import('../vite.config.ts')).default as { build: { rolldownOptions: { output: { codeSplitting: { groups: Group[] } } } } };
+const config = (await import('../vite.config.ts')).default as {
+  build: { rolldownOptions: { output: { codeSplitting: { groups: Group[] } } } };
+  css: { modules: { generateScopedName: (name: string, file: string, css: string) => string } };
+};
 const groups = config.build.rolldownOptions.output.codeSplitting.groups;
 const PDF = ['/x/node_modules/jspdf/dist/jspdf.es.min.js', '/x/node_modules/html-to-image/es/index.js'];
 
@@ -83,6 +86,15 @@ test('PERF-5: 7-character file hashes, first-paint files trimmed from the dynami
   const deps = ['assets/Lazy-d.js', 'assets/index-a.js', 'assets/shared-e.js', 'assets/vendor-react-c.js', 'assets/rolldown-runtime-b.js'];
   assert.deepEqual(resolveDependencies('assets/Lazy-d.js', deps, { hostId: 'assets/x.js', hostType: 'js' }), ['assets/Lazy-d.js', 'assets/shared-e.js']);
   assert.deepEqual(resolveDependencies('assets/index-a.js', deps, { hostId: 'index.html', hostType: 'html' }), deps, 'the HTML modulepreload links are untouched');
+});
+
+test('PERF-5: CSS-module class names are `_<local>_<6-char file hash>` (no line number)', () => {
+  const name = config.css.modules.generateScopedName;
+  const a = '.row { color: red }\n.head { color: blue }';
+  const b = '.row { color: green }';
+  assert.match(name('row', '/x/a.module.css', a), /^_row_[A-Za-z0-9_-]{6}$/);
+  assert.equal(name('row', '/x/a.module.css', a).slice(-6), name('head', '/x/a.module.css', a).slice(-6), 'one hash per file (compresses)');
+  assert.notEqual(name('row', '/x/a.module.css', a), name('row', '/x/b.module.css', b), 'same local name in two files stays apart');
 });
 
 test('bundle-size script: entry 100 kB, initial 185 kB, ≤ 5 initial files, core 3,300, Hindi 400, regional 25, leak 36', () => {
