@@ -30,11 +30,7 @@
   color: var(--foreground);
 }
 
-.tabActive {
-  composes: tab;
-  color: var(--brand-text);
-  border-bottom-color: var(--primary);
-}
+.tabActive { composes: tab; color: var(--foreground); border-bottom-color: var(--btn-ink); }
 
 .tab:focus-visible,
 .tabActive:focus-visible {

@@ -222,7 +222,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
               {error && <div className={styles.noticeError} role="alert">{error}</div>}
               <button
                 type="submit"
-                className={`${controls.btnPrimary} ${controls.btnLg} ${controls.btnBlock} ${styles.dangerBtn}`}
+                className={`${controls.btnDestructive} ${controls.btnLg} ${controls.btnBlock}`}
                 disabled={!isResetPhrase(phrase) || (needOwnerName && !ownerName.trim())}
               >
                 {t('login.eraseButton')}

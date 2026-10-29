@@ -23,33 +23,9 @@
   scrollbar-width: thin;
 }
 
-.tab {
-  border: none;
-  background: transparent;
-  color: var(--muted-foreground);
-  font-family: var(--font-body);
-  font-size: var(--text-base);
-  font-weight: 600;
-  padding: 0.625rem 0.875rem;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  white-space: nowrap;
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  transition: color var(--transition-fast), background-color var(--transition-fast);
-}
+.tab { composes: seg-item from global; flex: none; }
 
-.tab:hover { color: var(--foreground); background: var(--accent); }
-
-.tab:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
-
-.tabActive {
-  composes: tab;
-  color: var(--brand-text);
-  background: var(--primary-glow);
-}
+.tabActive { composes: seg-item on from global; flex: none; }
 
 .tabCount {
   font-size: var(--text-xs);
@@ -199,7 +175,6 @@
 
 /* ── Touch targets (coarse pointers) ───────────────────────── */
 @media (pointer: coarse), (max-width: 640px) {
-  .tab { min-height: 40px; }
   .issueLink { display: inline-flex; align-items: center; min-height: 40px; }
 }
 
