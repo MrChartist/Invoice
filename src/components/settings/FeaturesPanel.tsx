@@ -30,6 +30,9 @@ import { hsPickT } from '../../i18n/areas/society-r18a-pick';
 import { applyLogisticsKind } from '../../lib/shop-presets'; // R19-A1
 import { LogisticsKindPicker } from '../logistics/LogisticsKindPicker';
 import { lgPickT } from '../../i18n/areas/logistics-r19a-pick';
+import { applyFuelKind } from '../../lib/shop-presets'; // R21-A1
+import { FuelKindPicker } from '../fuel/FuelKindPicker';
+import { fuPickT } from '../../i18n/areas/fuel-r21a-pick';
 import { ConstructionKindPicker } from '../construction/ConstructionKindPicker'; // R11 (CN-A1)
 const ConstructionSettingsForm = lazy(() => import('../construction/ConstructionSettingsForm')); // R11 (CN-A1, PENDING #22)
 import { DB_PREFIX, getJson } from '../../lib/storage';
@@ -278,6 +281,13 @@ export default function FeaturesPanel({ settings, onChange }: Props) {
                 onChange(applyLogisticsKind(v.kind, { registered, ownLorries: v.lorries, extra: v.extra, currentPacks: keep }) as Partial<typeof settings>);
               }}
             />
+          </div>
+        )}
+        {/* R21-A1: "Fuel profile" for every kirana company (+ Custom); the packs follow the kind; changing it deletes nothing */}
+        {(settings.business_type === 'kirana' || !!settings.fuel_kind) && (
+          <div className={controls.field} data-features-fuel>
+            <span className={controls.label}>{fuPickT('title')}</span>
+            <FuelKindPicker value={settings.fuel_kind ?? ''} custom disabled={!owner} onPick={(k) => onChange(k ? (applyFuelKind(k, { currentPacks: (Array.isArray(settings.industry_packs) ? packsOn : []).filter((p) => p !== 'fuel' && p !== 'lpg') }) as Partial<typeof settings>) : { fuel_kind: undefined })} />
           </div>
         )}
         {/* R12 (AG-A1): "Agriculture profile" for every company (a trader may add cold storage, a kirana inputs) */}
