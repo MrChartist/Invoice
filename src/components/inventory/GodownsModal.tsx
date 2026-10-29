@@ -22,6 +22,13 @@ const replT = defineArea(
 import surface from '../../styles/surface.module.css';
 import styles from './inventory.module.css';
 import { errText } from '../../i18n/lib-msg';
+import { costCentreLabel, loadCostCentres, pickableCentres } from '../../lib/cost-centres';
+
+// 7.167: a godown may belong to a cost centre (its stock shows on that centre's column of the Project P&L).
+const ccT = defineArea(
+  { label: 'Cost centre (stock held for)', none: 'None', hint: 'Books → Projects shows the stock in this godown under that cost centre (memo).' } as const,
+  { label: 'कॉस्ट सेंटर (किसके लिए रखा स्टॉक)', none: 'कोई नहीं', hint: 'बहीखाता → प्रोजेक्ट इस गोदाम का स्टॉक उस कॉस्ट सेंटर में दिखाता है (मेमो)।' },
+);
 
 /**
  * Add, rename or delete godowns (6.10). Main always exists; creating a second godown turns on
@@ -37,7 +44,8 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
   onChanged: (message: string) => void;
 }) {
   useT(); // re-render on a language switch (5.4)
-  const [editing, setEditing] = useState<{ id?: string; name: string; address: string; parent_id: string; kind?: Godown['kind'] | ''; replenish_from?: string } | null>(null);
+  const [editing, setEditing] = useState<{ id?: string; name: string; address: string; parent_id: string; kind?: Godown['kind'] | ''; replenish_from?: string; cost_centre_id?: string } | null>(null);
+  const [centres] = useState(() => loadCostCentres());
   // WP-8: godowns may sit inside another godown (warehouse → store room); shown as a tree.
   const tree = godownTree(godowns);
   const blocked = editing?.id ? descendantIds(editing.id, godowns) : new Set<string>();
@@ -48,10 +56,11 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
     try {
       const saved = godownsDb.save({ id: editing.id, name: editing.name, address: editing.address, parent_id: editing.parent_id || undefined, kind: editing.kind ?? '' });
       // R4-B5: the godown this store is refilled from first (Main is implicit: stored only when it carries a field).
-      if ((saved.replenish_from ?? '') !== (editing.replenish_from ?? '')) {
+      if ((saved.replenish_from ?? '') !== (editing.replenish_from ?? '') || (saved.cost_centre_id ?? '') !== (editing.cost_centre_id ?? '')) {
         const rows = getTable<Godown>('godowns');
-        const next = { ...saved, ...(editing.replenish_from ? { replenish_from: editing.replenish_from } : {}) };
+        const next = { ...saved, ...(editing.replenish_from ? { replenish_from: editing.replenish_from } : {}), ...(editing.cost_centre_id ? { cost_centre_id: editing.cost_centre_id } : {}) };
         if (!editing.replenish_from) delete next.replenish_from;
+        if (!editing.cost_centre_id) delete next.cost_centre_id;
         setTable('godowns', rows.some((g) => g.id === saved.id) ? rows.map((g) => (g.id === saved.id ? next : g)) : [...rows, next]);
       }
       onChanged(editing.id ? invT('godownRenamed') : invT('godownAdded', { name: editing.name.trim() }));
@@ -95,7 +104,7 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
                 <td className={styles.muted}>{g.address || '—'}</td>
                 <td>
                   <span className={surface.rowActions}>
-                    <button type="button" className={controls.btnIcon} aria-label={invT('rename', { name: g.name })} onClick={() => setEditing({ id: g.id, name: g.name, address: g.address ?? '', parent_id: g.parent_id ?? '', kind: g.kind ?? '', replenish_from: g.replenish_from ?? getTable<Godown>('godowns').find((x) => x.id === g.id)?.replenish_from ?? '' })}>
+                    <button type="button" className={controls.btnIcon} aria-label={invT('rename', { name: g.name })} onClick={() => setEditing({ id: g.id, name: g.name, address: g.address ?? '', parent_id: g.parent_id ?? '', kind: g.kind ?? '', replenish_from: g.replenish_from ?? getTable<Godown>('godowns').find((x) => x.id === g.id)?.replenish_from ?? '', cost_centre_id: g.cost_centre_id ?? getTable<Godown>('godowns').find((x) => x.id === g.id)?.cost_centre_id })}>
                       <Edit3 size={16} />
                     </button>
                     {g.id !== MAIN_GODOWN_ID && (
@@ -145,6 +154,16 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
                   {godowns.filter((x) => x.id !== editing.id && !x.kind).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                 </select>
                 <span className={controls.hint}>{replT('hint')}</span>
+              </div>
+            )}
+            {centres.length > 0 && (
+              <div className={controls.field}>
+                <label className={controls.label} htmlFor="gd-cc">{ccT('label')}</label>
+                <select id="gd-cc" className={controls.select} value={editing.cost_centre_id ?? ''} onChange={(e) => setEditing({ ...editing, cost_centre_id: e.target.value || undefined })}>
+                  <option value="">{ccT('none')}</option>
+                  {pickableCentres(centres, editing.cost_centre_id).map((c) => <option key={c.id} value={c.id}>{costCentreLabel(c, centres)}</option>)}
+                </select>
+                <span className={controls.hint}>{ccT('hint')}</span>
               </div>
             )}
             <div className={surface.pageActions}>

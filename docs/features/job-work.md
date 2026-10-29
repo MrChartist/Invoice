@@ -142,6 +142,10 @@ every POS quantity change.
 - **ITC-04 JSON** (`src/lib/itc04-json.ts`): "Download JSON (layout unverified)" beside the CSV — `m2jw` (Table 4),
   `jw2m` (5A), `jw2jw` (5B), `jwsupply` (5C) grouped by job worker GSTIN, `fp` = MMYYYY of the period's last month,
   dd-mm-yyyy dates. **The layout is not verified against the portal / offline tool**; the CSV stays the reference.
+  7.167 check (Oct 2026): no primary source could be read — GSTN ships the offline tool as an Excel workbook and
+  publishes no JSON schema, and gst.gov.in was unreachable from the build environment (only the GSTN FAQ's "hidden module
+  m2jw" error text corroborates a section name). `ITC04_JSON_LAYOUT = { verified: false, ca: 'G43' }` records that; no
+  marker key is added to the upload file. Test: `tests/itc04-json-layout.test.ts`.
 
 CA points added by 7S: e-Way bill for job-work challans (Rule 138 — inter-State always, intra-State above ₹50,000; tax
 values nil), ITC-04 JSON keys / codes, and whether the principal's goods register needs the principal's batch.

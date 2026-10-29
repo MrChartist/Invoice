@@ -181,7 +181,7 @@ export function MrpTab({ ctx }: { ctx: MfgContext }) {
       </div>
 
       <p className={styles.section} style={{ margin: '1rem 0 0.5rem' }}>{s7T('requirement')}</p>
-      {dated && <Suspense fallback={null}><DatedPlanView ctx={ctx} lines={lines} due={due || undefined} /></Suspense>}
+      {dated && <Suspense fallback={null}><DatedPlanView ctx={ctx} lines={lines} due={due || undefined} planId={planId} /></Suspense>}
       {rows.length === 0 ? <p className={styles.muted}>{s7T('mrpEmpty')}</p> : (
         <div className={surface.tableWrap}>
           <table className={surface.table} data-testid="mrp-table">

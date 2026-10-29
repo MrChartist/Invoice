@@ -78,6 +78,17 @@ the end of that day, so positions after the date start from the counted figure. 
 figure later: the list flags "Book stock has changed since this count" (`physicalDrift`); open and save to re-post.
 A line without a godown counts the item company-wide (the difference lands in Main).
 
+**Serial counts (7.167).** A serial-tracked item is counted by serial: the counted cell takes the serials found (one per
+line or comma-separated; "Load all" fills each godown's book serials). `physicalLines` sets `book_qty` = serials in stock
+at the end of the day in the line's godown (every godown when none), `serials_short` = book serials not found and
+`serials_excess` = serials found that the books do not hold there (additive `PhysicalStockLine` fields; `counted` / `diff`
+stay counts). The engine posts each missing serial as a shortage **from the godown it was in**
+(`serials_short_godowns` on a company-wide line) and the extra serials as one excess at the line's godown, so a swapped
+serial moves even when the count equals the book (`physicalMoves` / `physicalSummary` count both sides). On save the moves
+are checked like any voucher (`assertSerialCount` → `voucherSerialIssues`): a missing serial sold or moved later, or a
+"found" serial already in stock elsewhere (move it by stock transfer instead), is refused. Base unit only; an item that
+tracks both batches and serials is still counted with a stock adjustment. Tests: `tests/physical-serial-count.test.ts`.
+
 ## Reorder
 
 `shortfall = max(0, level − closing)`, `pending` = quantity still to receive on open / partly received POs (matched by

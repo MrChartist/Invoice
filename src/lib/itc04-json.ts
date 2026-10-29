@@ -14,6 +14,14 @@
 import type { Itc04Report, Itc04Table5Row } from './itc04';
 import { round2 } from './invoice-calc';
 
+/**
+ * 7.167 check (Oct 2026): the layout could not be verified from a primary source. GSTN publishes the ITC-04 offline tool
+ * (an Excel workbook that writes the JSON) but no JSON schema; gst.gov.in / tutorial.gst.gov.in were unreachable from
+ * the build environment, and only the GSTN FAQ's "hidden module m2jw" error text corroborates one section name. So the
+ * file stays a working paper: `verified: false` until a CA (or the offline tool's import) confirms it — CA item G43.
+ */
+export const ITC04_JSON_LAYOUT = { verified: false, checked: '2026-10-29', ca: 'G43' } as const;
+
 export const ITC04_JSON_NOTE = 'ITC-04 JSON — layout unverified (not validated against the GST portal / offline tool); verify with your CA before uploading.';
 
 const ddmmyyyy = (iso: string) => {
