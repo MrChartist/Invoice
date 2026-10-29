@@ -98,12 +98,18 @@ PRD: `docs/prd/round-21.md`. CA items: `docs/CA_REVIEW.md` §21 (FU1–FU30). Wo
 
 ### Sizes (gz)
 
-| | Before (`4695f54`) | After R21-A |
-|---|---|---|
-| Initial JS | 177.9 kB | see PROGRESS row |
-| Core precache | 3,254.5 kB | see PROGRESS row |
-| Hindi pack | 373.2 kB | see PROGRESS row |
-| Hindi in core | 21.8 kB | see PROGRESS row |
+| | `4695f54` (measured) | R21-A on `4695f54` (measured) | R21-A merged with `685ce27` (measured) |
+|---|---|---|---|
+| Initial JS | 177.9 kB | 177.9 kB | 177.9 kB |
+| Entry chunk | 89.5 kB | 89.6 kB | 89.6 kB |
+| Core precache | 3,254.5 kB | 3,262.2 kB (**+7.7**, cap 8) | 3,266.8 kB (#115 recorded 3,256.5) |
+| Hindi pack | 373.2 kB | 374.6 kB | 375.6 kB |
+| Hindi in core | 21.8 kB | 21.8 kB | 21.8 kB |
+| `f-fuel` / `FuelDesk` (incl. tanks + prices views) / `NozzleChip` / `FuelLines` | — | 1.9 / 3.7 / 1.2 / 0.5 kB | same |
+
+First build (each view, writer and form helper its own chunk) measured +10.9 kB; A's two views and the tank / price writers
+now ship in the desk chunk and the POS strip reads its two tables directly (−3.2 kB). The +10.3 kB against #115's recorded
+3,256.5 kB includes #115's own growth as measured in this checkout (its row was recorded before its final merge).
 
 `room` at A's first commit (PRD §1.4): 3,300 − 3,254.5 − 20 (R20-B / C / D caps, not merged) − 5 = **20.5 kB** (R21-P not
 merged on this base). Round 21's cap = min(29, 20.5) = 20.5 kB: ≥ 20, so package D stays in Round 21; A's own cap is 8 kB.
