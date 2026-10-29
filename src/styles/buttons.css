@@ -88,7 +88,7 @@ html.dark.a11y-contrast { --btn-edge: rgb(255 255 255 / 0.65); --btn-edge-strong
   letter-spacing: -0.005em;
   white-space: nowrap;
   text-decoration: none;
-  text-wrap: balance;
+  text-wrap-style: balance; /* `text-wrap` would reset white-space */
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -341,7 +341,7 @@ html.a11y-focus .btn:focus {
   align-items: stretch;
   max-width: 100%;
   gap: 2px;
-  padding: 3px;
+  padding: 2px;
   border: 1px solid var(--btn-edge);
   border-radius: 1.375rem;
   background: var(--btn-paper);
@@ -355,7 +355,7 @@ html.a11y-focus .btn:focus {
   justify-content: center;
   gap: 0.4rem;
   min-height: 2rem;
-  padding: 0 0.875rem;
+  padding: 0 0.75rem;
   border: 0;
   border-radius: 999px;
   background: transparent;
