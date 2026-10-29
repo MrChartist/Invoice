@@ -167,7 +167,7 @@ export function saveLr(input: LrInput, parties: readonly { id?: string; gstin?: 
   setTable(LR_TABLE, prev ? all.map((r) => (r.id === id ? row : r)) : [...all, row]);
   recordSeries(number);
   if (overridden && (!prev || prev.liable !== liable)) {
-    audit.record({ entity: 'invoice', entity_id: id, action: 'override', doc_number: number, summary: `LR ${number}: person liable for GST set to ${liable === 'gta' ? 'the GTA' : 'the recipient (reverse charge)'} instead of ${derived === 'gta' ? 'the GTA' : 'the recipient'} — ${row.liable_override_reason}` });
+    audit.record({ entity: 'invoice', entity_id: id, action: 'override', doc_number: number, summary: `LR ${number}: person liable for GST set to ${liable === 'gta' ? 'the GTA' : 'the recipient (reverse charge)'} instead of ${derived === 'gta' ? 'the GTA' : 'the recipient'}, ${row.liable_override_reason}` });
   }
   return row;
 }
@@ -198,7 +198,7 @@ export function cancelLr(id: string, reason: string, invoices: readonly Pick<Inv
   if (!reason.trim()) throw new LrError('Give the reason for cancelling.');
   return patch(id, 'cancel', (r) => {
     const st = effectiveStatus(r, invoices);
-    if (!canMove(st, 'cancelled')) throw new LrError(`LR ${r.number} is ${st} and cannot be cancelled${st === 'billed' ? ' — cancel its freight bill first' : ''}.`);
+    if (!canMove(st, 'cancelled')) throw new LrError(`LR ${r.number} is ${st} and cannot be cancelled${st === 'billed' ? ': cancel its freight bill first' : ''}.`);
     return { ...r, status: 'cancelled', cancelled_reason: reason.trim() };
   });
 }

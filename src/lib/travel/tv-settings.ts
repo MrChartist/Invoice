@@ -31,7 +31,7 @@ export function saveTravelSettings(patch: Partial<TravelSettings>): TravelSettin
   if (next.regime_default && !TV_REGIMES.includes(next.regime_default)) delete next.regime_default;
   setJson(TRAVEL_SETTINGS_KEY, next);
   try {
-    audit.record({ entity: 'settings', entity_id: TV_OBJECTS.settings, action: 'update', summary: `Travel settings: regime ${before.regime_default ?? '—'} → ${next.regime_default ?? '—'}` });
+    audit.record({ entity: 'settings', entity_id: TV_OBJECTS.settings, action: 'update', summary: `Travel settings: regime ${before.regime_default ?? '-'} → ${next.regime_default ?? '-'}` });
   } catch {
     /* logging never blocks */
   }

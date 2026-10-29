@@ -33,7 +33,7 @@ import {
 import { TCS_27EQ_CODES, rpuCode2025, tcsCode2025, type DeducteeType } from './tds-rules';
 import { actRef, formText, quarterStart, sectionText } from './ita2025';
 
-export const UNVERIFIED_NOTE = 'UNVERIFIED working paper in NSDL RPU column order — import through the RPU, validate with the FVU and verify with your CA.';
+export const UNVERIFIED_NOTE = 'UNVERIFIED working paper in NSDL RPU column order: import through the RPU, validate with the FVU and verify with your CA.';
 
 /** dd/mm/yyyy, the RPU date format. */
 export function rpuDate(day: string): string {
@@ -150,9 +150,9 @@ function buildPaper(form: '26Q' | '27EQ', rows: readonly AnyRow[], challans: rea
     const ch = byKey.get(r.key);
     if (ch) deposited += r.amount;
     // R5-B3: a Sec 194C(6) nil row (reason T) has nothing to deposit; it is reported with its no-deduction reason.
-    else if (r.reason === 'T' && !(r.amount > 0)) warnings.push(`${r.name}: no TDS under a Sec 194C(6) declaration (reason T) — keep the declaration and PAN on file; verify with your CA.`);
+    else if (r.reason === 'T' && !(r.amount > 0)) warnings.push(`${r.name}: no TDS under a Sec 194C(6) declaration (reason T), keep the declaration and PAN on file; verify with your CA.`);
     else warnings.push(`${r.name}: ₹${amt(r.amount)} deducted on ${r.deductedOn} is not linked to a challan.`);
-    if (!r.pan) warnings.push(`${r.name}: PAN missing — the RPU needs "PANNOTAVBL" and the 20% rate (206AA).`);
+    if (!r.pan) warnings.push(`${r.name}: PAN missing, the RPU needs "PANNOTAVBL" and the 20% rate (206AA).`);
     const sr = ch ? srOf.get(ch.id) ?? '' : '';
     const pan = r.pan || 'PANNOTAVBL';
     const dep = ch ? amt(r.amount) : '0.00';
@@ -172,8 +172,8 @@ function buildPaper(form: '26Q' | '27EQ', rows: readonly AnyRow[], challans: rea
   }
   // 23b: rows carry the 2025-Act codes of the Protean file format where the app knows them (4 digits).
   const unmapped = list.filter((r) => actRef(r.refCode, r.creditedOn).act === 2025 && !/^\d{4}$/.test(r.code));
-  if (unmapped.length) warnings.push(`Income-tax Act 2025 period: ${[...new Set(unmapped.map((r) => r.code || r.refCode))].join(', ')} — no single 2025-Act code known; ${formText(form, start)} uses the 2025-Act section codes of the current RPU — pick each code in the RPU (see "Section references") and verify with your CA.`);
-  else if (refs.size) warnings.push(`Income-tax Act 2025 period: section codes are the 2025-Act codes of the Protean ${formText(form, start)} file format v1.2 (Annexure 2) — validate with the FVU and verify with your CA.`);
+  if (unmapped.length) warnings.push(`Income-tax Act 2025 period: ${[...new Set(unmapped.map((r) => r.code || r.refCode))].join(', ')}, no single 2025-Act code known; ${formText(form, start)} uses the 2025-Act section codes of the current RPU, pick each code in the RPU (see "Section references") and verify with your CA.`);
+  else if (refs.size) warnings.push(`Income-tax Act 2025 period: section codes are the 2025-Act codes of the Protean ${formText(form, start)} file format v1.2 (Annexure 2), validate with the FVU and verify with your CA.`);
   for (const c of used) {
     const linked = round2(list.filter((r) => byKey.get(r.key)?.id === c.id).reduce((t, r) => t + r.amount, 0));
     if (Math.abs(linked - c.amount) > 0.5) warnings.push(`Challan ${c.bsr_code}/${c.challan_no}: tax ₹${amt(c.amount)} vs ₹${amt(linked)} linked to this quarter (the rest may belong to another quarter).`);

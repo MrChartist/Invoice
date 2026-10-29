@@ -48,6 +48,6 @@ export function transferBetweenFunds(fromId: string, toId: string, amount: numbe
   if (!(p > 0)) throw new R5cError('amount');
   return withTablesRollback(['vouchers', 'accounts'], () => {
     const acc = ensureInterFundAccount();
-    return saveVoucher({ type: 'JOURNAL', date, narration: `Inter-fund transfer${note ? ` — ${note}` : ''}`, voucher_class: 'Inter-fund transfer', lines: [{ account_id: acc, dr: p, cr: 0, cost_centre_id: fromId }, { account_id: acc, dr: 0, cr: p, cost_centre_id: toId }] });
+    return saveVoucher({ type: 'JOURNAL', date, narration: `Inter-fund transfer${note ? `: ${note}` : ''}`, voucher_class: 'Inter-fund transfer', lines: [{ account_id: acc, dr: p, cr: 0, cost_centre_id: fromId }, { account_id: acc, dr: 0, cr: p, cost_centre_id: toId }] });
   });
 }

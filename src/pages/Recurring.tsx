@@ -220,7 +220,7 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
       <>
       <section className={surface.statGrid} aria-label={recT('summary')}>
         <StatCard label={recT('active')} value={stats.active} hint={recT('nPaused', { n: stats.paused })} icon={Repeat} tone="profit" />
-        <StatCard label={recT('nextRun')} value={stats.next ? formatDate(stats.next) : '—'} hint={recT('nextRunHint')} icon={CalendarClock} />
+        <StatCard label={recT('nextRun')} value={stats.next ? formatDate(stats.next) : '-'} hint={recT('nextRunHint')} icon={CalendarClock} />
         <StatCard label={recT('mrr')} value={formatCurrency(stats.mrr)} hint={recT('mrrHint')} icon={TrendingUp} tone="brand" />
         <StatCard label={recT('paused')} value={stats.paused} hint={recT('pausedHint')} icon={Pause} tone={stats.paused ? 'warning' : 'default'} />
       </section>

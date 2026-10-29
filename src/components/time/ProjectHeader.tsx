@@ -95,12 +95,12 @@ export function ProjectHeader({ project, entries, tasks, prefs, live }: {
         </div>
         <div className={styles.stat}>
           <span className={styles.statLabel}>{svcT('feeUsed')}</span>
-          <span className={styles.statValue}>{b.fee_pct === null ? '–' : `${feePct}%`}</span>
+          <span className={styles.statValue}>{b.fee_pct === null ? '-' : `${feePct}%`}</span>
           <Bar pct={b.fee_pct} />
         </div>
         <div className={styles.stat}>
           <span className={styles.statLabel}>{svcT('forecast')}</span>
-          <span className={styles.statValue}>{b.forecast_minutes === null ? '–' : formatMinutes(b.forecast_minutes)}</span>
+          <span className={styles.statValue}>{b.forecast_minutes === null ? '-' : formatMinutes(b.forecast_minutes)}</span>
           {b.forecast_minutes === null && <span className={styles.muted}>{svcT('forecastNone')}</span>}
         </div>
         <div className={styles.stat}>

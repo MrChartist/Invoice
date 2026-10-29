@@ -24,11 +24,11 @@ export function psBoxes(ps: PsSnapshot): PsBox[] {
   const out: PsBox[] = [{
     title: 'Professional particulars',
     rows: rows([
-      ['Matter', m ? `${m.code} — ${m.name}` : undefined], ['Court / forum', m?.court], ['Case no.', m?.case_no],
+      ['Matter', m ? `${m.code}: ${m.name}` : undefined], ['Court / forum', m?.court], ['Case no.', m?.case_no],
       ['Engagement', e ? `${e.number} · ${MODEL_LABEL[e.model] ?? e.model}` : undefined], ['Billing basis', ps.basis],
       // PS-B: the advocate's enrolment, the design stage and the media commission
       ['Enrolment no.', ps.legal?.enrolment ? `${ps.legal.enrolment}${ps.legal.bar_council ? ` · ${ps.legal.bar_council}` : ''}` : undefined],
-      ['Stage', ps.stage?.no ? `${ps.stage.no} of ${ps.stage.of}${ps.stage.label ? ` — ${ps.stage.label}` : ''}` : undefined],
+      ['Stage', ps.stage?.no ? `${ps.stage.no} of ${ps.stage.of}${ps.stage.label ? `: ${ps.stage.label}` : ''}` : undefined],
       ['Media commission', ps.media?.commission_pct ? `${ps.media.commission_pct}%` : undefined],
       // PS-C: purpose code and the export check
       ['Purpose code', ps.purpose_code], ['Export check', ps.export?.checks?.length ? `${ps.export.checks.filter((c) => c.ok).length} / ${ps.export.checks.length} conditions` : undefined],
@@ -47,7 +47,7 @@ export function psAnnexure(inv: Pick<InvoiceRecord, 'ps' | 'annexure'>): PsSecti
   if (inv.ps && rs.some((r) => r.who)) {
     const by = new Map<string, { min: number; amt: number; rates: Set<number> }>();
     for (const r of rs) {
-      const k = r.who || '—';
+      const k = r.who || '-';
       const x = by.get(k) ?? { min: 0, amt: 0, rates: new Set<number>() };
       x.min += num(r.billed_minutes);
       x.amt += num(r.amount);

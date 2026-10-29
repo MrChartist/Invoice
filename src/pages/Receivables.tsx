@@ -314,9 +314,9 @@ export function Receivables() {
           } />
         <Stat label={rcvT('overdue')} value={fmt(report.totals.overdue)} icon={AlertTriangle} tone="loss"
           hint={report.totals.gross > 0 ? rcvT('pctOfOpen', { pct: Math.round((report.totals.overdue / report.totals.gross) * 100) }) : rcvT('allClear')} />
-        <Stat label={rcvT('dso')} value={dso === null ? '—' : rcvT('days', { n: dso })} icon={Clock}
+        <Stat label={rcvT('dso')} value={dso === null ? '-' : rcvT('days', { n: dso })} icon={Clock}
           hint={rcvT('dsoHint')} />
-        <Stat label={rcvT('efficiency')} value={efficiency === null ? '—' : `${efficiency}%`} icon={Percent}
+        <Stat label={rcvT('efficiency')} value={efficiency === null ? '-' : `${efficiency}%`} icon={Percent}
           hint={rcvT('efficiencyHint')} />
       </div>
 
@@ -379,9 +379,9 @@ export function Receivables() {
                     <tr key={r.month}>
                       <td>{formatDate(`${r.month}-01`).replace(/^1 /, '')}</td>
                       <td className={surface.numeric}>{formatMoney(r.billed, currency)}</td>
-                      <td className={surface.numeric}>{r.credited ? formatMoney(r.credited, currency) : '—'}</td>
+                      <td className={surface.numeric}>{r.credited ? formatMoney(r.credited, currency) : '-'}</td>
                       <td className={surface.numeric}>{formatMoney(r.received, currency)}</td>
-                      <td className={surface.numeric}>{r.efficiency === null ? '—' : `${r.efficiency}%`}</td>
+                      <td className={surface.numeric}>{r.efficiency === null ? '-' : `${r.efficiency}%`}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -483,7 +483,7 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
   const cols = 8 + (interest ? 1 : 0);
   const toggle = (k: string) => setOpen((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const top = topDebtors(report, 5);
-  const m = (n: number) => (n ? formatMoney(n, currency) : '—');
+  const m = (n: number) => (n ? formatMoney(n, currency) : '-');
 
   // Long party lists mount only the rows in view; an expanded party's bill row is measured with it.
   const partyKeys = useMemo(() => report.parties.map((p) => p.key), [report.parties]);
@@ -649,7 +649,7 @@ function BillsTable({ party: p, currency, lateFeeRules, onLateFee, onWriteOff }:
   /** R2-A3: owner-only single write-off of an invoice's open balance. */
   onWriteOff?: (bill: PartyReceivable['bills'][number]) => void;
 }) {
-  const m = (n: number) => (n ? formatMoney(n, currency) : '—');
+  const m = (n: number) => (n ? formatMoney(n, currency) : '-');
   const billKeys = useMemo(() => p.bills.map((b) => b.invoiceId), [p.bills]);
   const virtual = useVirtualRows(billKeys, { estimate: 45 });
   const hasCredits = p.creditNotes > 0 || p.advances > 0;
@@ -882,7 +882,7 @@ function StatementsTab({ report, data, currency, now, partyKey, autoWeb, onPick,
             </thead>
             <tbody {...virtual.bodyProps}>
               <tr className={styles.openingRow} aria-rowindex={virtual.enabled ? 2 : undefined}>
-                <td>{from ? formatDate(from) : '—'}</td><td /><td><em>{rcvT('openingBalance')}</em></td><td /><td />
+                <td>{from ? formatDate(from) : '-'}</td><td /><td><em>{rcvT('openingBalance')}</em></td><td /><td />
                 <td className={surface.numeric}>{drcr(ledger.opening, currency)}</td>
               </tr>
               {virtual.slots.map((slot) => {

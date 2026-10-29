@@ -68,7 +68,7 @@ export function worksExtras({ today, base }: ProfileContext): DemoExtras {
     due_date: shiftDay(raDay, 30),
     status: 'Sent',
     items: stageItems,
-    notes: `RA bill no. 1 — ${boq.invoice_number} · work order WO-DEMO-17\nSample RA bill (demo).`,
+    notes: `RA bill no. 1: ${boq.invoice_number} · work order WO-DEMO-17\nSample RA bill (demo).`,
     created_at: `${raDay}T09:00:00.000Z`,
   } as Demo<InvoiceRecord>);
   // Retention 5% of the taxable value; net payable = total − retention (no RCM on a works contract bill).

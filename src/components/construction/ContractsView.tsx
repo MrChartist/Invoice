@@ -52,8 +52,8 @@ export default function ContractsView({ notify, refresh, tick }: PanelProps) {
   const run = runner(notify, refresh);
   const day = today();
   const spec: Spec[] = [
-    ['client_id', twT('client'), [['', '—'], ...clients.map((c) => [c.id ?? '', c.name] as const)]], ['boq_id', twT('boq'), [['', '—'], ...invoices.filter((b) => (b.doc_type === 'SALES_ORDER' || b.doc_type === 'QUOTATION') && b.status !== 'Cancelled').map((b) => [b.id, `${b.invoice_number} · ${b.client?.name}`] as const)]],
-    ['name_of_work', cbT('nameOfWork')], ['agreement_no', cbT('agreementNo')], ['agreement_date', cbT('agreementDate'), 'date'], ['work_order_no', twT('workOrder')], ['work_order_date', `${twT('workOrder')} — ${twT('date')}`, 'date'],
+    ['client_id', twT('client'), [['', '-'], ...clients.map((c) => [c.id ?? '', c.name] as const)]], ['boq_id', twT('boq'), [['', '-'], ...invoices.filter((b) => (b.doc_type === 'SALES_ORDER' || b.doc_type === 'QUOTATION') && b.status !== 'Cancelled').map((b) => [b.id, `${b.invoice_number} · ${b.client?.name}`] as const)]],
+    ['name_of_work', cbT('nameOfWork')], ['agreement_no', cbT('agreementNo')], ['agreement_date', cbT('agreementDate'), 'date'], ['work_order_no', twT('workOrder')], ['work_order_date', `${twT('workOrder')}: ${twT('date')}`, 'date'],
     ['tender_ref', cbT('tenderRef')], ['client_office', cbT('clientOffice')], ['engineer', cbT('engineer')], ['site_address', cbT('siteAddress')], ['site_state', cbT('siteState')],
     ['contract_value', twT('contractValue'), 'number'], ['stipulated_start', cbT('start'), 'date'], ['stipulated_completion', cbT('completion'), 'date'], ['completed_on', twT('completedOn'), 'date'],
     ['deviation_pct', cbT('deviationPct'), 'number'], ['dlp_months', twT('dlpMonths'), 'number'], ['retention_pct', cbT('retentionPct'), 'number'], ['sd_pct', cbT('sdPct'), 'number'],
@@ -89,7 +89,7 @@ export default function ContractsView({ notify, refresh, tick }: PanelProps) {
                   <td className={surface.numeric}>{fmtMoney(s.received)}</td>
                   <td className={surface.numeric}>{fmtMoney(s.retention)}</td>
                   <td className={s.delay ? styles.bad : ''}>{s.delay ? cbT('delayDays', { n: s.delay }) : cbT('daysLeft', { n: s.daysLeft })}</td>
-                  <td className={surface.numeric}>{s.ld ? fmtMoney(s.ld) : '—'}</td>
+                  <td className={surface.numeric}>{s.ld ? fmtMoney(s.ld) : '-'}</td>
                   <td><button type="button" className={B.gs} onClick={() => setV(toVals(k))}>{twT('edit')}</button><button type="button" className={B.gs} onClick={() => setSel(k.id)} data-cn-closure-open>{cbT('closure')}</button></td>
                 </tr>
               );
@@ -115,7 +115,7 @@ export default function ContractsView({ notify, refresh, tick }: PanelProps) {
           <h4>{cbT('closure')}: {c.name_of_work}</h4>
           {closureChecklist(c, data).map((it) => (
             <div key={it.key} className={styles.toolbar} data-cn-check={it.key} data-state={it.state}>
-              {it.state === 'open' ? '○' : '✓'} {cbT(`cl.${it.key}` as `cl.${CnClosureKey}`)}{it.due ? ` (${it.due})` : ''}{it.state === 'waived' ? ` — ${c.closure?.waived?.[it.key]}` : ''}
+              {it.state === 'open' ? '○' : '✓'} {cbT(`cl.${it.key}` as `cl.${CnClosureKey}`)}{it.due ? ` (${it.due})` : ''}{it.state === 'waived' ? `: ${c.closure?.waived?.[it.key]}` : ''}
               {it.state === 'open' && HAND_TICKS.includes(it.key) && <button type="button" className={B.gs} onClick={() => run(() => setClosure(c.id, { ticks: { [it.key]: true } }))}>{cbT('tick')}</button>}
               {it.state === 'open' && <button type="button" className={B.gs} onClick={() => run(() => setClosure(c.id, { waived: { [it.key]: String(why.why) } }))}>{cbT('waive')}</button>}
             </div>

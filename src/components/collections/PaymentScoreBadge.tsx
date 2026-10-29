@@ -8,7 +8,7 @@ export function PaymentScoreBadge({ score }: { score: PaymentScore | null | unde
   if (!score) return null;
   const reasons = [...score.reasons, score.trend ? colT(`scTrend.${score.trend}`) : ''].filter(Boolean).join(' · ');
   if (!score.grade) {
-    return <span className={cn(styles.grade, styles.gradeNone, 'no-print')} title={colT('scNone')} aria-label={colT('scNone')}>–</span>;
+    return <span className={cn(styles.grade, styles.gradeNone, 'no-print')} title={colT('scNone')} aria-label={colT('scNone')}>-</span>;
   }
   const tone = { A: styles.gradeA, B: styles.gradeB, C: styles.gradeC, D: styles.gradeD }[score.grade];
   return (

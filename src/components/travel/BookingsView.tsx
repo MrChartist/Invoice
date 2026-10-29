@@ -82,8 +82,8 @@ export function BookingTable({ tripId, filter = 'all', notify, onChanged }: { tr
           <tbody>
             {rows.map((b) => (
               <tr key={b.id} data-tv-booking={b.component}>
-                <td>{b.start}</td>{!tripId && <td>{d.codes.get(b.trip_id) ?? '—'}</td>}<td>{tvList('comps', TV_COMPONENTS, b.component)}</td>
-                <td>{d.vendors.find((v) => v.id === b.vendor_id)?.name ?? '—'}</td><td>{b.ref ?? ''}</td>
+                <td>{b.start}</td>{!tripId && <td>{d.codes.get(b.trip_id) ?? '-'}</td>}<td>{tvList('comps', TV_COMPONENTS, b.component)}</td>
+                <td>{d.vendors.find((v) => v.id === b.vendor_id)?.name ?? '-'}</td><td>{b.ref ?? ''}</td>
                 <td className={surface.numeric}>{formatCurrency(costInr(b))}</td><td className={surface.numeric}>{b.pure_agent ? '≈ ' : ''}{formatCurrency(b.sell)}</td>
                 <td>{tvList('bsts', BSTS, b.status)}{isBilled(b, d.live) ? ` · ${tvT('billed')}` : ''}</td>
                 <td className={surface.rowActions}>
@@ -117,7 +117,7 @@ function BookingForm({ tripId, vendors, onAdd }: { tripId: string; vendors: { id
       <Field label={tvT('component')}><ListSelect list="comps" ids={TV_COMPONENTS} value={f.component} onChange={(component) => set({ component })} attr="data-tv-b-comp" /></Field>
       <Field label={tvT('supplier')}>
         <select className={controls.select} value={f.vendor_id} onChange={(e) => set({ vendor_id: e.target.value })}>
-          <option value="">—</option>
+          <option value="">-</option>
           {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
         </select>
       </Field>

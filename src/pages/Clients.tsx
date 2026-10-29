@@ -300,7 +300,7 @@ export function Clients() {
                               <Phone size={12} /> {c.phone}
                             </span>
                           ) : null}
-                          {!c.email && !c.phone && !c.contacts?.length && <span className={styles.sub}>—</span>}
+                          {!c.email && !c.phone && !c.contacts?.length && <span className={styles.sub}>-</span>}
                           {c.contacts?.length ? <span className={styles.sub}>{s2T('c.nContacts', { n: c.contacts.length })}</span> : null}
                         </div>
                       </td>
@@ -312,11 +312,11 @@ export function Clients() {
                             </span>
                           </span>
                         ) : (
-                          <span className={styles.sub}>—</span>
+                          <span className={styles.sub}>-</span>
                         )}
                       </td>
                       <td className={`${surface.mono} ${styles.cGst}`} data-empty={!c.gstin && !c.pan && !c.tan ? 'true' : undefined}>
-                        {c.gstin || (!c.pan && !c.tan && <span className={styles.sub}>—</span>)}
+                        {c.gstin || (!c.pan && !c.tan && <span className={styles.sub}>-</span>)}
                         {(c.pan || c.tan) && (
                           <div className={styles.sub}>{[c.pan && `PAN ${c.pan}`, c.tan && `TAN ${c.tan}`].filter(Boolean).join(' · ')}</div>
                         )}

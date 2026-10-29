@@ -201,7 +201,7 @@ export function LabelSheetModal({ open, onClose, onChanged, preselected }: {
                         <span className={surface.mono}>{r.code}</span>
                       </div>
                     ) : (
-                      <span className={styles.sub}>—</span>
+                      <span className={styles.sub}>-</span>
                     )}
                   </td>
                   <td className={surface.numeric}>{formatCurrency(r.rate)}{r.mrp ? <div className={styles.sub}>{setT('mrpN', { amount: formatCurrency(r.mrp) })}</div> : null}</td>

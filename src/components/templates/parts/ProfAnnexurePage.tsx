@@ -12,7 +12,7 @@ export default function ProfAnnexurePage({ invoice }: { invoice: InvoiceRecord }
   if (!sections.length) return null;
   return (
     <section className={styles.page} data-prof-annexure>
-      <div className={styles.title}>Annexure — {invoice.invoice_number || 'draft'}</div>
+      <div className={styles.title}>Annexure: {invoice.invoice_number || 'draft'}</div>
       {sections.map((s) => (
         <table key={s.title} className={styles.table} aria-label={s.title}>
           <caption className={styles.title}>{s.title}</caption>

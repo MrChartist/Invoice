@@ -117,7 +117,7 @@ export function buildPaymentAdvice(key: string, input: AdviceInput): PaymentAdvi
     const settled = allPays.filter((x) => x.purchase_id === raw.id).reduce((s, x) => s + num(x.amount) + Math.max(num(x.tds_amount), 0), 0);
     const legacy = Math.max(num(raw.amount_paid) - settled, 0);
     lines.push({
-      billNo: c.number || '—',
+      billNo: c.number || '-',
       billDate: c.date,
       billAmount: round2(c.total),
       tdsOnBill: round2(c.tdsOnBill),

@@ -43,7 +43,7 @@ export function cnFinanceNotices(d: CnAlertData, today: string, at: string): App
     if (c.status === 'closed') continue;
     const bills = contractBills(c, d.invoices);
     for (const x of advanceStatus(c, bills, d.advances, today)) {
-      if (x.balance > 0.5 && x.workPct >= num(x.term.recover_by_pct ?? 80)) note(`mob:${c.id}:${x.term.advance_id}`, true, `${c.name_of_work}: advance balance ${rs(x.balance)} at ${x.workPct}% of work`, 'The contract recovers it fully by this stage — recover it on the next RA bill.', 'advances');
+      if (x.balance > 0.5 && x.workPct >= num(x.term.recover_by_pct ?? 80)) note(`mob:${c.id}:${x.term.advance_id}`, true, `${c.name_of_work}: advance balance ${rs(x.balance)} at ${x.workPct}% of work`, 'The contract recovers it fully by this stage: recover it on the next RA bill.', 'advances');
     }
     for (const b of bills) {
       if (b.issue_date > shiftDay(today, -r.withheld_alert_days)) continue;

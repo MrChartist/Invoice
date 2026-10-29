@@ -70,7 +70,7 @@ test('subsidised sale needs the PoS txn no. and a farmer ID (4 digits or KCC, ne
   assert.ok(validFarmerId('4321') && validFarmerId('KCC/UP/1234'));
   const ag = { kind: 'inputs' as const, inputs: { pos_txn: 'P', farmer_id: '4321' } };
   const earlier = [sale({ id: 'a', ag, items: [{ id: 'x', name: 'Urea 45 kg', quantity: 45, rate: 266.5 }] as never }), sale({ id: 'b', ag: { kind: 'inputs', inputs: { pos_txn: 'P', farmer_id: '9999' } }, items: [{ id: 'x', name: 'Urea 45 kg', quantity: 45, rate: 1 }] as never })];
-  assert.match(capWarning(sale({ id: 'n', ag }), earlier, isUrea)!, /55 subsidised bags this month — above 50/);
+  assert.match(capWarning(sale({ id: 'n', ag }), earlier, isUrea)!, /55 subsidised bags this month: above 50/);
   assert.equal(capWarning(sale({ id: 'n', ag, items: [{ id: 'x', name: 'Urea 45 kg', quantity: 5, rate: 1 }] as never }), earlier, isUrea), undefined, 'exactly 50 is fine');
 });
 

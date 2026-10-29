@@ -294,7 +294,7 @@ export function deleteCostCentre(id: string): void {
   const row = all.find((c) => c.id === id);
   if (!row) return;
   if (usageTotal(readCostCentreUsage(id)) > 0) {
-    throw new CostCentreError(`"${row.name}" is used by documents, recurring templates, budgets, project tasks, site musters, deployed staff or other cost centres — mark it inactive instead.`);
+    throw new CostCentreError(`"${row.name}" is used by documents, recurring templates, budgets, project tasks, site musters, deployed staff or other cost centres: mark it inactive instead.`);
   }
   setTable(COST_CENTRES_TABLE, all.filter((c) => c.id !== id));
   audit.record({ entity: 'cost_centre', entity_id: id, action: 'delete', summary: `Deleted ${COST_CENTRE_KIND_LABELS[row.kind].toLowerCase()} "${row.name}"` });

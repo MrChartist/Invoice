@@ -160,8 +160,8 @@ export default function AdvancesTab({ partyKey = '', notify, onChanged }: Advanc
                         <span className={styles.sub}>{a.supply === 'goods' ? rcvT('goods') : rcvT('services')} · {a.tax_rate}% · {rcvT('pos', { code: a.place_of_supply })}</span>
                       </td>
                       <td className={styles.numeric}>{money(a.amount)}</td>
-                      <td className={styles.numeric}>{a.tax.applies ? money(tax) : '—'}</td>
-                      <td className={styles.numeric}>{b.adjusted + b.refunded > 0 ? money(b.adjusted + b.refunded) : '—'}</td>
+                      <td className={styles.numeric}>{a.tax.applies ? money(tax) : '-'}</td>
+                      <td className={styles.numeric}>{b.adjusted + b.refunded > 0 ? money(b.adjusted + b.refunded) : '-'}</td>
                       <td className={`${styles.numeric} ${b.open > 0.004 ? styles.open : ''}`}>{money(b.open)}</td>
                       <td>
                         <div className={styles.actions}>

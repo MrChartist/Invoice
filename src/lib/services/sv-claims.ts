@@ -110,7 +110,7 @@ function draftFor(claim: PayerClaim, role: 'payer' | 'beneficiary', items: Invoi
   const client = role === 'payer' ? clientOf(claim.payer_id, claim.payer_name) : clientOf(claim.beneficiary_id, claim.beneficiary_name);
   const draft = buildBillDraft({ ...base, issue_date: date }, client, items, sender);
   const sv = { claim: { id: claim.id, number: claim.number, role, ...(claim.policy_no ? { policy_no: claim.policy_no } : {}), ...(claim.claim_no ? { claim_no: claim.claim_no } : {}), beneficiary: claim.beneficiary_name, payer: claim.payer_name } };
-  const note = `Part of claim ${claim.number}${claim.claim_no ? ` (claim no. ${claim.claim_no})` : ''}${role === 'payer' ? ` — insured / patient: ${claim.beneficiary_name}${claim.policy_no ? `, policy ${claim.policy_no}` : ''}` : ` — balance after ${claim.payer_name}'s approval`}.`;
+  const note = `Part of claim ${claim.number}${claim.claim_no ? ` (claim no. ${claim.claim_no})` : ''}${role === 'payer' ? `, insured / patient: ${claim.beneficiary_name}${claim.policy_no ? `, policy ${claim.policy_no}` : ''}` : `: balance after ${claim.payer_name}'s approval`}.`;
   return { ...draft, sv: { ...draft.sv, ...sv }, notes: [note, draft.notes].filter(Boolean).join('\n'), invoice_number: reuse?.invoice_number || localDb.invoices.nextNumber(date, draft.doc_type, sender?.invoicePrefix || undefined) };
 }
 

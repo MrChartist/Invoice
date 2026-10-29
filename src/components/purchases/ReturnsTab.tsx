@@ -208,12 +208,12 @@ export function ReturnsTab({ purchases, vendors, orders, onConvert, onVendorCrea
                     <tr key={g.id}>
                       <td>
                         <div className={local.name}>{g.number}</div>
-                        <div className={local.sub}>{isGrn ? prT('kindGrn') : prT('kindRj', { grn: from ?? '—' })}{g.challan_no ? ` · ${prT('challanRef', { number: g.challan_no })}` : ''}</div>
+                        <div className={local.sub}>{isGrn ? prT('kindGrn') : prT('kindRj', { grn: from ?? '-' })}{g.challan_no ? ` · ${prT('challanRef', { number: g.challan_no })}` : ''}</div>
                       </td>
                       <td>{g.vendor_name}</td>
                       <td className={local.nowrap}>{formatDate(g.date)}</td>
                       <td>{st ? <StatusBadge status={grnStateLabel(st.state)} tone={GRN_TONE[st.state]} /> : <span className={local.sub}>{prT('lines', { n: g.lines.length })}</span>}</td>
-                      <td className={surface.numeric}>{st ? formatCurrency(st.pendingValue) : '—'}</td>
+                      <td className={surface.numeric}>{st ? formatCurrency(st.pendingValue) : '-'}</td>
                       <td>
                         {editable && (
                           <div className={surface.rowActions}>
@@ -295,7 +295,7 @@ export function ReturnsTab({ purchases, vendors, orders, onConvert, onVendorCrea
                       <td className={surface.numeric}>{r.pending} {r.unit}</td>
                       <td className={surface.numeric}>{formatCurrency(r.value)}</td>
                       <td className={local.nowrap}>
-                        {r.expected ? formatDate(r.expected) : '—'}
+                        {r.expected ? formatDate(r.expected) : '-'}
                         {r.overdueDays > 0 && <div className={local.sub}>{prT('overdue', { n: r.overdueDays })}</div>}
                       </td>
                     </tr>

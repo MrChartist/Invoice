@@ -49,7 +49,7 @@ test('lines: one pure-agent fare line per ticket, one service line; adding again
   assert.equal(b.items.length, 4, 'the old service line is replaced');
   assert.equal(b.items[3].rate, 1420);
   const c = mergeTickets([], undefined, [dom()], { method: 'actual', fee: 300, date: '2026-10-05' });
-  assert.deepEqual([c.items[1].rate, c.items[1].name, c.warn], [300, 'Service fee — air tickets', false]);
+  assert.deepEqual([c.items[1].rate, c.items[1].name, c.warn], [300, 'Service fee: air tickets', false]);
   assert.match(tvLineText({ id: c.items[0].id }, c.tv), /Tkt 0581234567890 · PNR ABC123 · DEL-BOM · Basic 4200.00 \+ taxes 940.00 \+ airline GST 210.00/);
   assert.match(tvPaper(a.tv).decl, /₹420\.00/);
 });

@@ -42,7 +42,7 @@ export function AgingStack({
           <li key={b} className={`${styles.legendItem} ${TONE[i]}`}>
             <span className={styles.legendLabel}><span className={styles.dot} />{bucketLabel(b, ageing)}</span>
             <span className={styles.legendValue}>{formatMoney(buckets[b], currency)}</span>
-            <span className={styles.legendPct}>{total > 0 ? rcvT('chPctBills', { pct: Math.round((buckets[b] / total) * 100) }) : '—'}</span>
+            <span className={styles.legendPct}>{total > 0 ? rcvT('chPctBills', { pct: Math.round((buckets[b] / total) * 100) }) : '-'}</span>
           </li>
         ))}
       </ul>

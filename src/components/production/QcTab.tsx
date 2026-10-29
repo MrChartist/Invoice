@@ -66,7 +66,7 @@ export function QcTab({ ctx }: { ctx: MfgContext }) {
               {rows.map((r) => (
                 <tr key={r.key}>
                   <td>{name(r.itemId)}</td>
-                  <td>{r.batch || '—'}</td>
+                  <td>{r.batch || '-'}</td>
                   <td>{ctx.godowns.find((g) => g.id === r.godownId)?.name ?? ''}</td>
                   <td>{pT(`srcKind_${r.source.kind}` as 'srcKind_grn')} {r.source.number ?? ''}{r.source.party ? ` · ${r.source.party}` : ''}</td>
                   <td>{formatDate(r.since)}</td>
@@ -93,7 +93,7 @@ export function QcTab({ ctx }: { ctx: MfgContext }) {
           <div className={surface.tableWrap}>
             <table className={surface.table}>
               <thead><tr><th>{pT('date')}</th><th>{pT('item')}</th><th>{pT('batch')}</th><th className={mfg.num}>{pT('qty')}</th><th>{pT('result')}</th><th>{pT('inspector')}</th><th>{pT('note')}</th></tr></thead>
-              <tbody>{results.map((r) => <tr key={r.id}><td>{formatDate(r.date)}</td><td>{name(r.item_id)}</td><td>{r.batch_no ?? '—'}</td><td className={mfg.num}>{qtyText(r.qty)}</td><td className={r.result === 'pass' ? styles.favourable : styles.adverse}>{pT(r.result === 'pass' ? 'pass' : 'fail')}</td><td>{r.inspector ?? '—'}</td><td>{r.note ?? ''}</td></tr>)}</tbody>
+              <tbody>{results.map((r) => <tr key={r.id}><td>{formatDate(r.date)}</td><td>{name(r.item_id)}</td><td>{r.batch_no ?? '-'}</td><td className={mfg.num}>{qtyText(r.qty)}</td><td className={r.result === 'pass' ? styles.favourable : styles.adverse}>{pT(r.result === 'pass' ? 'pass' : 'fail')}</td><td>{r.inspector ?? '-'}</td><td>{r.note ?? ''}</td></tr>)}</tbody>
             </table>
           </div>
         </>
@@ -148,7 +148,7 @@ function QcDecision({ ctx, row, mode, onClose }: { ctx: MfgContext; row: QcRow; 
       }
       if (row.source.kind === 'manufacturing' || row.source.kind === 'transfer' || row.source.kind === 'other') {
         const j = withTablesRollback(['stock_journals', 'series_counters', 'qc_results'], () => {
-          const sj = saveConsumeOnlyJournal({ date, consume: releaseLines(row, num(qty)).map((l) => ({ ...l, godown_id: row.godownId })), narration: `${pT('scrapNote')}${note.trim() ? ` — ${note.trim()}` : ''}` }, ctx.items, ctx.inputs);
+          const sj = saveConsumeOnlyJournal({ date, consume: releaseLines(row, num(qty)).map((l) => ({ ...l, godown_id: row.godownId })), narration: `${pT('scrapNote')}${note.trim() ? `: ${note.trim()}` : ''}` }, ctx.items, ctx.inputs);
           qcResultsDb.save({ ...base, result: 'fail', return_id: sj.id });
           return sj;
         });

@@ -73,12 +73,12 @@ export const GSTR4_LATE_FEE_RULES: readonly Versioned<CompositionLateFee>[] = [
   {
     from: '2019-04-01',
     value: { perDay: 50, perDayNil: 20, cap: 10000, capNil: 10000 },
-    source: 'Sec 47(1) (max ₹5,000 per Act); Notification 73/2017-CT (₹25 / ₹10 per Act per day) — verify',
+    source: 'Sec 47(1) (max ₹5,000 per Act); Notification 73/2017-CT (₹25 / ₹10 per Act per day): verify',
   },
   {
     from: '2021-04-01',
     value: { perDay: 50, perDayNil: 20, cap: 2000, capNil: 500 },
-    source: 'Notification 21/2021-CT (FY 2021-22 on: max ₹1,000 + ₹1,000, nil ₹250 + ₹250) — verify',
+    source: 'Notification 21/2021-CT (FY 2021-22 on: max ₹1,000 + ₹1,000, nil ₹250 + ₹250), verify',
   },
 ];
 
@@ -177,7 +177,7 @@ export function estimateFor(
  */
 export const RCM_SELF_INVOICE_DAYS_RULES: readonly Versioned<number | null>[] = [
   { from: '2017-07-01', value: null, source: 'Sec 31(3)(f): no separate time limit in the rules' },
-  { from: '2024-11-01', value: 30, source: 'Rule 47A (Notification 20/2024-CT) — verify' },
+  { from: '2024-11-01', value: 30, source: 'Rule 47A (Notification 20/2024-CT): verify' },
 ];
 
 export function rcmSelfInvoiceDays(receivedOn?: string): number | null {
@@ -196,7 +196,7 @@ export function rcmSelfInvoiceDays(receivedOn?: string): number | null {
  * Append new versions; never edit an old one.
  */
 export const REFUND_TIME_RULES: readonly Versioned<{ limitYears: number; provisionalPct: number; sanctionDays: number; delayInterestPct: number }>[] = [
-  { from: '2017-07-01', value: { limitYears: 2, provisionalPct: 90, sanctionDays: 60, delayInterestPct: 6 }, source: 'Sec 54(1), 54(6), 54(7), Sec 56; Rule 91; Notification 13/2017-CT — verify' },
+  { from: '2017-07-01', value: { limitYears: 2, provisionalPct: 90, sanctionDays: 60, delayInterestPct: 6 }, source: 'Sec 54(1), 54(6), 54(7), Sec 56; Rule 91; Notification 13/2017-CT: verify' },
 ];
 
 export function refundTimeRules(relevantDate?: string) {
@@ -208,7 +208,7 @@ export function refundTimeRules(relevantDate?: string) {
  * UNVERIFIED: 13th (Sec 39(4) / Rule 65). Append-only.
  */
 export const GSTR6_DUE_RULES: readonly Versioned<{ dueDay: number }>[] = [
-  { from: '2017-07-01', value: { dueDay: 13 }, source: 'Sec 39(4), Rule 65 — verify' },
+  { from: '2017-07-01', value: { dueDay: 13 }, source: 'Sec 39(4), Rule 65: verify' },
 ];
 
 /** GSTR-6 due date for the month starting `periodStart` (`YYYY-MM-01`). */
@@ -227,8 +227,8 @@ export function gstr6DueDate(periodStart: string): string {
  * Append-only.
  */
 export const NEXT_FY_CUTOFF_RULES: readonly Versioned<string>[] = [
-  { from: '2017-07-01', value: '10-20', source: 'Sec 16(4) / 34(2): due date of the September return — verify' },
-  { from: '2021-04-01', value: '11-30', source: 'Finance Act 2022 (30 November) — verify' },
+  { from: '2017-07-01', value: '10-20', source: 'Sec 16(4) / 34(2): due date of the September return, verify' },
+  { from: '2021-04-01', value: '11-30', source: 'Finance Act 2022 (30 November): verify' },
 ];
 
 /** Last day (local `YYYY-MM-DD`) of the next-FY window for the FY that starts in April of `fyStart`. */
@@ -242,5 +242,5 @@ export function nextFyCutoff(fyStart: number): string {
  */
 export const ISD_MANDATORY_RULES: readonly Versioned<boolean>[] = [
   { from: '2017-07-01', value: false, source: 'Sec 20 as enacted: ISD optional' },
-  { from: '2025-04-01', value: true, source: 'Finance Act 2024, Sec 20 substituted (Notification 16/2024-CT) — verify' },
+  { from: '2025-04-01', value: true, source: 'Finance Act 2024, Sec 20 substituted (Notification 16/2024-CT): verify' },
 ];

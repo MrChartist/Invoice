@@ -30,7 +30,7 @@ export default function Buyer194qCard({ today }: { today: string }) {
   return (
     <div className={own.stack} data-194q-card>
       <label className={controls.field}>
-        <span className={controls.label}>{trT('q194Title')} — {trT('q194Text', { fy })}</span>
+        <span className={controls.label}>{trT('q194Title')} : {trT('q194Text', { fy })}</span>
         <input type="number" min={0} className={controls.input} style={{ maxWidth: 240 }} value={value ?? ''} onChange={(e) => save(e.target.value === '' ? undefined : Math.max(Number(e.target.value) || 0, 0))} />
       </label>
       <p className={own.muted}>{trT(status === 'applies' ? 'q194Applies' : status === 'below' ? 'q194Below' : 'q194Unknown')} {trT('workingPaper')}</p>

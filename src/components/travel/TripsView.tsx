@@ -70,7 +70,7 @@ export default function TripsView({ notify }: TvViewProps) {
       <div style={row}>
         <Field label={tvT('status')}>
           <select className={controls.select} value={status} onChange={(e) => setStatus(e.target.value as TripStatus | '')}>
-            <option value="">—</option>
+            <option value="">-</option>
             {TRIP_STATUSES.map((s) => <option key={s} value={s}>{tvList('sts', TRIP_STATUSES, s)}</option>)}
           </select>
         </Field>
@@ -84,7 +84,7 @@ export default function TripsView({ notify }: TvViewProps) {
                 const c = costing(t);
                 return (
                   <tr key={t.id} data-tv-trip={t.tv.code}>
-                    <td>{tripLabel(t)}</td><td>{t.tv.start ?? '—'}</td><td>{tvList('sts', TRIP_STATUSES, t.tv.status)}</td>
+                    <td>{tripLabel(t)}</td><td>{t.tv.start ?? '-'}</td><td>{tvList('sts', TRIP_STATUSES, t.tv.status)}</td>
                     <td className={surface.numeric}>{money(c.sell)}</td><td className={surface.numeric}>{money(c.cost)}</td><td className={surface.numeric} data-tv-margin>{pct(c.pct)}</td>
                     <td className={surface.numeric}>{c.unbilled}</td><td className={surface.numeric}>{money(c.unpaid)}</td>
                     <td className={surface.rowActions}>
@@ -113,7 +113,7 @@ export default function TripsView({ notify }: TvViewProps) {
       {overrides.length > 0 && (
         <>
           <h3>{tvT('itcList')}</h3>
-          <ul data-tv-itc-overrides>{overrides.map((o) => <li key={o.id}>{o.date} · {o.number} · {data.trips.find((t) => t.id === o.trip_id)?.tv.code ?? '—'} · {money(o.tax)} · {tvT('reason')}: {o.reason || '—'}</li>)}</ul>
+          <ul data-tv-itc-overrides>{overrides.map((o) => <li key={o.id}>{o.date} · {o.number} · {data.trips.find((t) => t.id === o.trip_id)?.tv.code ?? '-'} · {money(o.tax)} · {tvT('reason')}: {o.reason || '-'}</li>)}</ul>
         </>
       )}
     </>
@@ -141,7 +141,7 @@ function TripForm({ regime, clients, notify, onSaved }: { regime: TvRegime; clie
         <Field label={tvT('name')}><input className={controls.input} value={f.name} onChange={(e) => set({ name: e.target.value })} data-tv-trip-name /></Field>
         <Field label={tvT('client')}>
           <select className={controls.select} value={f.client_id} onChange={(e) => set({ client_id: e.target.value })} data-tv-trip-client>
-            <option value="">—</option>
+            <option value="">-</option>
             {clients.map((c) => <option key={c.id} value={c.id ?? ''}>{c.name}</option>)}
           </select>
         </Field>

@@ -63,7 +63,7 @@ export default function StagesView({ notify }: Pick<PsDeskProps, 'notify'>) {
         <button type="button" className={sm} disabled={!(rev.cost > 0)} onClick={() => { setP({ ...p, revisions: [...p.revisions, rev] }); setRev({ ...rev, cost: 0 }); }} data-ps-st-b="revise">{psbT('st.revise')}</button>
         <button type="button" className={controls.btnPrimary} onClick={save} data-ps-st-b="save">{psbT('st.save')}</button>
       </div>
-      <p className={controls.hint} data-ps-st-pos={pos.pos}>{psbT('st.pos', { pos: pos.pos || '—', basis: psbT(pos.basis === 'property' ? 'st.property' : 'st.recipient') })} {psbT('st.billed', { amount: rs(billed) })}</p>
+      <p className={controls.hint} data-ps-st-pos={pos.pos}>{psbT('st.pos', { pos: pos.pos || '-', basis: psbT(pos.basis === 'property' ? 'st.property' : 'st.recipient') })} {psbT('st.billed', { amount: rs(billed) })}</p>
       <Tbl empty="" head={[psbT('st.stage'), psbT('st.cum'), psbT('st.due'), '']} rows={stageSchedule(p, today).map((s, k) => {
         const b = p.fee_pct > 0 ? stageBill(p, s.id, today, billed) : null;
         return [

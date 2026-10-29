@@ -54,7 +54,7 @@ export function inspectionSnap(r: InspectionReport, d: Pick<Drawing, 'number' | 
   return {
     report_no: `${r.number} · ${d.number} rev ${r.rev} · sample ${r.sample}`,
     result: r.result,
-    rows: ev.rows.map((x) => ({ label: `${x.char.name} (${tolText(x.char)})`, value: x.values.length ? `${Math.min(...x.values)} – ${Math.max(...x.values)}${x.ok ? '' : ` · ${x.out.length} out`}` : '—' })),
+    rows: ev.rows.map((x) => ({ label: `${x.char.name} (${tolText(x.char)})`, value: x.values.length ? `${Math.min(...x.values)} – ${Math.max(...x.values)}${x.ok ? '' : ` · ${x.out.length} out`}` : '-' })),
   };
 }
 
@@ -64,10 +64,10 @@ export function reportHtml(r: InspectionReport, d: Drawing, business: { name?: s
   const rows = ev.rows.map((x) => `<tr><td>${esc(x.char.name)}${x.char.critical ? ' ★' : ''}</td><td>${esc(tolText(x.char))}</td><td>${x.values.map((v) => (inTol(x.char, v) ? esc(v) : `<b>${esc(v)}✗</b>`)).join(', ')}</td><td>${x.ok ? 'OK' : 'NOT OK'}</td></tr>`).join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(r.number)}</title>
 <style>${PRINT_FONT_FACE}@page{size:A4}body{font-family:${PRINT_FONT};margin:0;padding:20px;font-size:12px}h1{font-size:16px;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:10px}td,th{border:1px solid;padding:4px 6px;text-align:left}.f{margin-top:24px}</style></head><body>
-<h1>${esc(business.name || 'Your business')} — ${r.kind === 'first_article' ? 'FIRST ARTICLE' : r.kind === 'lot' ? 'LOT' : 'FINAL'} INSPECTION REPORT</h1>
-<div>${esc(r.number)} · ${esc(r.date)} · Drawing ${esc(d.number)} rev ${esc(r.rev)} — ${esc(d.title)}${d.material_grade ? ` · ${esc(d.material_grade)}` : ''} · Sample ${esc(r.sample)}</div>
+<h1>${esc(business.name || 'Your business')}: ${r.kind === 'first_article' ? 'FIRST ARTICLE' : r.kind === 'lot' ? 'LOT' : 'FINAL'} INSPECTION REPORT</h1>
+<div>${esc(r.number)} · ${esc(r.date)} · Drawing ${esc(d.number)} rev ${esc(r.rev)}: ${esc(d.title)}${d.material_grade ? ` · ${esc(d.material_grade)}` : ''} · Sample ${esc(r.sample)}</div>
 <table><thead><tr><th>Characteristic</th><th>Specification</th><th>Readings</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>
-<p><b>Result: ${esc(r.result.toUpperCase())}</b>${r.note ? ` — ${esc(r.note)}` : ''}</p>
+<p><b>Result: ${esc(r.result.toUpperCase())}</b>${r.note ? `: ${esc(r.note)}` : ''}</p>
 <p class="f">Inspector: ${esc(r.inspector)} ______________ &nbsp; Approved ______________</p></body></html>`;
 }
 

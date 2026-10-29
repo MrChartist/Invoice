@@ -34,7 +34,7 @@ export default function CmReconcileView({ ctx }: { ctx: CmCtx }) {
         <Fld l={cmT('asOn')}><input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></Fld>
         <Fld l={cmT('stmt')}><input className={controls.input} inputMode="decimal" value={stmt} onChange={(e) => setStmt(e.target.value.replace(/[^0-9.-]/g, ''))} data-cm="stmt" /></Fld>
       </div>
-      <Tbl empty="" head={['', '₹']} rows={[[cmT('stmt'), r.reco.statement === null ? '—' : rs(r.reco.statement)], [cmT('ledgerBal'), rs(r.reco.ledger)], [cmT('clientsBal'), rs(r.reco.clients)]]} />
+      <Tbl empty="" head={['', '₹']} rows={[[cmT('stmt'), r.reco.statement === null ? '-' : rs(r.reco.statement)], [cmT('ledgerBal'), rs(r.reco.ledger)], [cmT('clientsBal'), rs(r.reco.clients)]]} />
       <p className={controls.hint} role="status" data-cm-agreed={r.reco.agreed ? 'yes' : 'no'}>{r.reco.agreed ? cmT('agreed') : cmT('diffs')}</p>
       {r.reco.diffs.length > 0 && <Tbl empty="" head={[cmT('diffs'), cmT('ref'), '₹']} rows={r.reco.diffs.map((d) => [cmT(`d.${d.kind}`), d.ref, rs(d.amount)])} />}
       <Tbl empty={cmT('none')} head={[cmT('client'), cmT('matter'), cmT('held')]} rows={r.bal.map((b) => [name(b.client), ctx.matters.find((m) => m.id === b.matter)?.name ?? '', rs(b.balance)])} />

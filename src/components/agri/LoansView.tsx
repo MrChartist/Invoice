@@ -48,7 +48,7 @@ export default function LoansView({ onDone }: { onDone: Done }) {
         <B k="repay" on={() => run(() => { const l = repayLoan(r.loan, r as never); return agdT(l.status === 'closed' ? 'loanClosed' : 'repaid', { n: l.number }); })} data-agd-b="repay" />
       </Form>
       {shown && <section data-agd-interest>
-        <h3>{agdT('interestSt')} — {shown.number} <B k="print" on={() => printPaper(loanStatementHtml(shown, day, company()), shown.number)} /></h3>
+        <h3>{agdT('interestSt')} : {shown.number} <B k="print" on={() => printPaper(loanStatementHtml(shown, day, company()), shown.number)} /></h3>
         <Tbl head={['date', '', 'days', 'interest', 'paid', 'outstanding']} rows={interestStatement(shown, day).map((x) => [x.date, x.what, x.days, fmt(x.interest), fmt(x.paid), fmt(x.principal)])} />
       </section>}
       <Form v={c} set={setC} f={[['release_ltv_pct', 'releaseLtv', 'n', 160]]}>

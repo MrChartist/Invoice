@@ -126,7 +126,7 @@ export async function makePurchaseOrders(day: string, ids?: readonly string[]): 
     const t = computePurchaseTotals(lines.map((l) => ({ ...l, tax_rate: num(l.tax_rate) })));
     const po = purchaseOrdersDb.save({
       date: day, vendor_name: g.supplier?.vendorName || 'Supplier to be chosen', ...(g.supplier?.vendorId ? { vendor_id: g.supplier.vendorId } : {}),
-      lines, taxable: t.taxable, cgst: t.cgst, sgst: t.sgst, igst: t.igst, total: t.total, notes: 'From the short book (draft — check quantities and rates).',
+      lines, taxable: t.taxable, cgst: t.cgst, sgst: t.sgst, igst: t.igst, total: t.total, notes: 'From the short book (draft: check quantities and rates).',
     });
     for (const r of g.rows) poOf.set(r.id, po.id);
   }

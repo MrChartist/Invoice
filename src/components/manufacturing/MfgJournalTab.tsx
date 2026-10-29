@@ -207,7 +207,7 @@ function MfgModal({ ctx, voucher, prefill, onClose }: { ctx: MfgContext; voucher
             <div className={controls.field}>
               <label className={controls.label} htmlFor="mfg-gd">{mfgT('godown')}</label>
               <select id="mfg-gd" className={controls.select} value={godown} onChange={(e) => setGodown(e.target.value)}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {ctx.godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
             </div>

@@ -138,7 +138,7 @@ export function reRate(unbilled: readonly TimeEntry[], data: RateData): ReRateCh
   for (const e of unbilled) {
     const r = resolveEntryRate(e, data);
     if (round2(num(e.hourly_rate)) !== r.rate) {
-      out.push({ id: e.id, date: e.date, description: [e.project, e.description].filter(Boolean).join(' — '), from: round2(num(e.hourly_rate)), to: r.rate, source: r.source });
+      out.push({ id: e.id, date: e.date, description: [e.project, e.description].filter(Boolean).join(': '), from: round2(num(e.hourly_rate)), to: r.rate, source: r.source });
     }
   }
   return out.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));

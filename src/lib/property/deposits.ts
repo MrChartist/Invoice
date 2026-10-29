@@ -100,7 +100,7 @@ function settleFromDeposit(d: SecurityDeposit, inv: InvoiceRecord, amount: numbe
   const p = paise(amount);
   const party = partyOf(inv);
   const v = saveReceiptVoucher(
-    { type: 'JOURNAL', date, narration: `${note} — ${d.party_name}, against ${inv.invoice_number}`, lines: [{ account_id: ensureDepositsReceivedAccount(), dr: p, cr: 0 }, { account_id: A.debtors, dr: 0, cr: p, party }], voucher_class: 'Security deposit' },
+    { type: 'JOURNAL', date, narration: `${note}: ${d.party_name}, against ${inv.invoice_number}`, lines: [{ account_id: ensureDepositsReceivedAccount(), dr: p, cr: 0 }, { account_id: A.debtors, dr: 0, cr: p, party }], voucher_class: 'Security deposit' },
     undefined,
     { party, total: amount, allocations: [{ bill_id: inv.id, ref: inv.invoice_number, amount }], method: ADJUST_METHOD },
   );
@@ -174,7 +174,7 @@ export function applyToCharge(id: string, kind: 'adjust' | 'forfeit', amount: nu
     doc_type: 'TAX_INVOICE', currency: 'INR', template_id: ctx.templateId, client, sender: ctx.sender,
     items: [{ id: 'l1', name: str(what) || (kind === 'forfeit' ? 'Security deposit forfeited' : 'Damages recovered from deposit'), type: 'Service', ...(ctx.sac ? { hsn: ctx.sac } : {}), quantity: 1, rate: gross, tax_rate: rate, amount: gross }],
     gst_mode: 'CGST_SGST', place_of_supply: '', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0,
-    round_off_enabled: false, price_includes_tax: true, notes: 'Applied from the security deposit as consideration — GST payable on the applied part.', terms: '',
+    round_off_enabled: false, price_includes_tax: true, notes: 'Applied from the security deposit as consideration: GST payable on the applied part.', terms: '',
   } as RecurringTemplate;
   return withTablesRollback([DEPOSITS_TABLE, 'vouchers', 'accounts', 'transactions', 'invoices', 'batch_runs', 'clients', 'items_catalog'], () => {
     const drafts = buildBatchDrafts(tpl, [{ key: `dep:${d.id}`, client }], { date: day(date), dueDays: 0, sender: ctx.sender });
@@ -193,7 +193,7 @@ export function refundDeposit(id: string, amount: number, date: string, mode = '
     const cash = moneyLedger(mode, bankAccountId ?? d.bank_account_id);
     const held = d.direction === 'received' ? ensureDepositsReceivedAccount() : A.deposits;
     const lines: ManualVoucherLine[] = d.direction === 'received' ? [{ account_id: held, dr: p, cr: 0 }, { account_id: cash, dr: 0, cr: p }] : [{ account_id: cash, dr: p, cr: 0 }, { account_id: held, dr: 0, cr: p }];
-    const v = saveVoucher({ type: d.direction === 'received' ? 'PAYMENT' : 'RECEIPT', date: day(date), narration: `Security deposit refund — ${d.party_name}`, lines, voucher_class: 'Security deposit' });
+    const v = saveVoucher({ type: d.direction === 'received' ? 'PAYMENT' : 'RECEIPT', date: day(date), narration: `Security deposit refund: ${d.party_name}`, lines, voucher_class: 'Security deposit' });
     return write(d, { id: generateId(), kind: 'refund', date: day(date), amount: money(amount), voucher_id: v.id });
   });
 }

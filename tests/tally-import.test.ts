@@ -160,7 +160,7 @@ test('apply: masters via WP-1 APIs, openings match Tally to the paisa, vouchers 
   const sale = vs.find((v) => v.narration.includes('#101'))!;
   assert.equal(sale.type, 'JOURNAL');
   assert.equal(sale.voucher_class, 'Tally import');
-  assert.match(sale.narration, /Tally Sales GST #101 — 10 widgets \[tally:[0-9a-f]{12}\]/);
+  assert.match(sale.narration, /Tally Sales GST #101, 10 widgets \[tally:[0-9a-f]{12}\]/);
   const debtorLine = sale.lines.find((l) => l.account_id === A.debtors)!;
   assert.deepEqual([debtorLine.dr, debtorLine.party], [1180000, 'Acme Retail']);
   const centres = loadCostCentres();

@@ -103,7 +103,7 @@ export function PrincipalPanel({ data }: { data: JwData }) {
                   <tr key={`${b.party}|${b.name}|${b.godown}|${b.batch}`}>
                     <td>{b.party}</td><td>{b.name}</td>
                     <td>{b.godown ? godownName(ctx.godowns, b.godown) : <span className={styles.muted}>{s7T('notRecorded')}</span>}</td>
-                    <td>{b.batch || '—'}</td>
+                    <td>{b.batch || '-'}</td>
                     <td className={styles.num}>{qtyText(b.received)} {b.unit ?? ''}</td>
                     <td className={styles.num}>{qtyText(b.returned)}</td>
                     <td className={styles.num}><strong>{qtyText(b.pending)}</strong></td>
@@ -222,7 +222,7 @@ function PrincipalModal({ data, doc, kind, onClose }: { data: JwData; doc: Princ
                   <td><input className={cn(controls.input, controls.inputNumeric)} inputMode="decimal" aria-label={jwT('lineValue', { label, n: i + 1 })} value={l.value ? String(l.value) : ''} onChange={(e) => patch(l.id, { value: num(e.target.value) || undefined })} /></td>
                   <td>
                     <select className={controls.select} aria-label={`${label} ${i + 1} ${s7T('godown')}`} value={l.godown_id ?? ''} onChange={(e) => patch(l.id, { godown_id: e.target.value || undefined })}>
-                      <option value="">—</option>
+                      <option value="">-</option>
                       {data.ownGodowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                     </select>
                   </td>

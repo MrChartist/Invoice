@@ -77,27 +77,27 @@ export function planBill(entries: readonly TimeEntry[], edits: Readonly<Record<s
   if (model === 'fixed') {
     coverAll();
     const left = round2(num(eng!.fee) - num(o.feesBefore));
-    if (left > 0) fees.push({ name: `Professional fees — ${eng!.title} (fixed fee)`, amount: left });
+    if (left > 0) fees.push({ name: `Professional fees: ${eng!.title} (fixed fee)`, amount: left });
     basis = `Fixed fee ${o.money(num(eng!.fee))}${h ? ` · time recorded ${h} h` : ''}`;
     reason = 'Fixed fee';
   } else if (model === 'milestone') {
     coverAll();
     const ms = eng!.milestones ?? [];
     const pick = ms.filter((m) => (o.milestoneIds ?? []).includes(m.id) && !(o.milestonesBilled ?? []).includes(m.id));
-    for (const m of pick) fees.push({ name: `Professional fees — ${m.label} (stage ${ms.indexOf(m) + 1} of ${ms.length})`, amount: milestoneAmount(eng!, m), milestone: m.id });
-    basis = pick.length ? `Fixed fee — ${pick.map((m) => `stage ${ms.indexOf(m) + 1} of ${ms.length}`).join(', ')}` : 'Milestone billing';
+    for (const m of pick) fees.push({ name: `Professional fees: ${m.label} (stage ${ms.indexOf(m) + 1} of ${ms.length})`, amount: milestoneAmount(eng!, m), milestone: m.id });
+    basis = pick.length ? `Fixed fee: ${pick.map((m) => `stage ${ms.indexOf(m) + 1} of ${ms.length}`).join(', ')}` : 'Milestone billing';
     reason = 'Fixed fee';
   } else if (model === 'success') {
     if (!eng!.success?.done_on) throw new Error('Mark the success event as done (date and reference) before billing the success fee.');
     coverAll();
     const s = eng!.success;
     const amount = round2(num(s.amount) > 0 ? num(s.amount) : (num(s.base_amount) * num(s.pct)) / 100);
-    if (num(o.feesBefore) <= 0 && amount > 0) fees.push({ name: `Success fee — ${s.event}`, amount });
+    if (num(o.feesBefore) <= 0 && amount > 0) fees.push({ name: `Success fee: ${s.event}`, amount });
     basis = `Success fee on ${s.basis || s.event}${s.ref ? ` (${s.ref})` : ''}`;
     reason = 'Fixed fee';
   } else if (model === 'retainer' && !eng!.retainer_id) {
     coverAll();
-    if (num(eng!.fee) > 0) fees.push({ name: `Professional fees — ${eng!.title} (monthly retainer)`, amount: round2(num(eng!.fee)) });
+    if (num(eng!.fee) > 0) fees.push({ name: `Professional fees: ${eng!.title} (monthly retainer)`, amount: round2(num(eng!.fee)) });
     basis = `Retainer ${o.money(num(eng!.fee))} a month${h ? ` · time recorded ${h} h` : ''}`;
     reason = 'Fixed fee';
   } else if (model === 'capped') {

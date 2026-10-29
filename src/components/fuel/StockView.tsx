@@ -23,7 +23,7 @@ import { In, Row, Sel } from './fu-ui';
 import type { Done } from './FuelDesk';
 
 const KINDS = ['peso', 'wm_du', 'fire', 'calibration', 'dealership', 'other'] as const;
-const f = (v: number | null) => (v == null ? '—' : v.toFixed(3).replace(/\.?0+$/, ''));
+const f = (v: number | null) => (v == null ? '-' : v.toFixed(3).replace(/\.?0+$/, ''));
 
 export default function StockView({ onDone }: { onDone: Done }) {
   useT();
@@ -69,7 +69,7 @@ export default function StockView({ onDone }: { onDone: Done }) {
         <In d={d} set={setD} k="to" label={fcT('validTo')} type="date" />
         <button type="button" className={controls.btnPrimary} onClick={() => act(() => { if (!d.to) throw new Error(fcT('validTo')); saveFuelSettings({ licences: [...(s.licences ?? []), { kind: d.kind as FuLicence['kind'], ref: d.ref ?? '', valid_to: d.to }] }); return fuT('saved'); })} data-fu-add-licence>{fcT('addLic')}</button>
       </Row>
-      <ul data-fu-dues>{dueList(today, { licences: s.licences ?? [], nozzles, tanks }).map((x) => <li key={x.k + x.name + x.till} className={x.soon ? controls.hint : undefined}>{x.soon ? '⚠ ' : ''}{x.k === 'lic' ? `${fcT(`lk.${x.kind ?? 'other'}`)} ${x.name}` : fcT(x.k, { n: x.name })} — {x.till} ({fcT('left', { n: x.left })}){x.i != null && <button type="button" className={controls.btnGhost} onClick={() => act(() => { saveFuelSettings({ licences: (s.licences ?? []).filter((_, j) => j !== x.i) }); return fuT('saved'); })}>{fuT('del')}</button>}</li>)}</ul>
+      <ul data-fu-dues>{dueList(today, { licences: s.licences ?? [], nozzles, tanks }).map((x) => <li key={x.k + x.name + x.till} className={x.soon ? controls.hint : undefined}>{x.soon ? '⚠ ' : ''}{x.k === 'lic' ? `${fcT(`lk.${x.kind ?? 'other'}`)} ${x.name}` : fcT(x.k, { n: x.name })} : {x.till} ({fcT('left', { n: x.left })}){x.i != null && <button type="button" className={controls.btnGhost} onClick={() => act(() => { saveFuelSettings({ licences: (s.licences ?? []).filter((_, j) => j !== x.i) }); return fuT('saved'); })}>{fuT('del')}</button>}</li>)}</ul>
     </div>
   );
 }

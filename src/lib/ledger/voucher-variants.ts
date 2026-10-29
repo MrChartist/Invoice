@@ -48,7 +48,7 @@ export function reversalOf(v: ManualVoucher, today: string): ManualVoucher | nul
     type: 'JOURNAL',
     number: `${v.number}-R`,
     date: v.reverse_on,
-    narration: `Reversal of ${v.number}${v.narration ? ` — ${v.narration}` : ''}`,
+    narration: `Reversal of ${v.number}${v.narration ? `: ${v.narration}` : ''}`,
     lines: v.lines.map((l) => ({ ...l, dr: l.cr, cr: l.dr })),
     created_at: v.created_at,
   };

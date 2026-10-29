@@ -37,7 +37,7 @@ export function ImportStep({ kind, table, preview, dry, report, running, progres
           </div>
           {note && <p className={ctl.hint} role="note" data-testid="import-openings-note"><AlertTriangle size={14} /> {note}</p>}
           <p className={ctl.hint}>
-            Data is written to this browser only. Existing invoices are never overwritten — a number that already exists is skipped.
+            Data is written to this browser only. Existing invoices are never overwritten: a number that already exists is skipped.
             Take a backup from Settings first if you are unsure.
           </p>
           {running && (
@@ -87,7 +87,7 @@ export function ImportStep({ kind, table, preview, dry, report, running, progres
               <ul className={styles.errList}>
                 {report.errors.slice(0, 8).map((e, i) => (
                   <li key={i}>
-                    <strong>Row {e.line}</strong> {e.label && `· ${e.label}`} — {e.message}
+                    <strong>Row {e.line}</strong> {e.label && `· ${e.label}`} : {e.message}
                   </li>
                 ))}
                 {report.errors.length > 8 && <li>…and {report.errors.length - 8} more in the download.</li>}

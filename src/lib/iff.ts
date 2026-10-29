@@ -19,14 +19,14 @@ import { ruleAt, type Versioned } from './tax-rules';
 
 export const IFF_LIMIT_RULES: readonly Versioned<number | null>[] = [
   { from: '2017-07-01', value: null, source: 'No IFF before the QRMP scheme' },
-  { from: '2021-01-01', value: 5_000_000, source: 'Rule 59(2) / Notification 82/2020-CT (₹50 lakh a month) — verify' },
+  { from: '2021-01-01', value: 5_000_000, source: 'Rule 59(2) / Notification 82/2020-CT (₹50 lakh a month): verify' },
 ];
 
 export function iffMonthlyLimit(periodStart?: string): number | null {
   return ruleAt(IFF_LIMIT_RULES, periodStart);
 }
 
-export const IFF_DISCLAIMER = 'IFF working paper (QRMP months 1–2): B2B invoices and notes to registered buyers only. JSON layout not validated against the GST offline tool — import it there and verify with your CA.';
+export const IFF_DISCLAIMER = 'IFF working paper (QRMP months 1–2): B2B invoices and notes to registered buyers only. JSON layout not validated against the GST offline tool: import it there and verify with your CA.';
 
 export interface IffCheck {
   /** B2B + CDNR taxable value of the month (notes: credit −, debit +). */

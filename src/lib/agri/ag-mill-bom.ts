@@ -42,7 +42,7 @@ export interface MillStarter {
 
 export const MILL_STARTERS: Readonly<Record<MillKind, MillStarter>> = {
   rice: {
-    kind: 'rice', name: 'Rice mill starter (practice — adjust)',
+    kind: 'rice', name: 'Rice mill starter (practice: adjust)',
     lines: [
       { key: 'paddy', name: 'Paddy', role: 'input', qty: 100, ag_class: 'paddy' },
       { key: 'rice', name: 'Rice', role: 'main', qty: 64, ag_class: 'cereal_loose' },
@@ -52,7 +52,7 @@ export const MILL_STARTERS: Readonly<Record<MillKind, MillStarter>> = {
     ],
   },
   flour: {
-    kind: 'flour', name: 'Flour mill starter (practice — adjust)',
+    kind: 'flour', name: 'Flour mill starter (practice: adjust)',
     lines: [
       { key: 'wheat', name: 'Wheat', role: 'input', qty: 100, ag_class: 'cereal_loose' },
       { key: 'atta', name: 'Atta', role: 'main', qty: 44, ag_class: 'flour_loose' },
@@ -62,7 +62,7 @@ export const MILL_STARTERS: Readonly<Record<MillKind, MillStarter>> = {
     ],
   },
   dal: {
-    kind: 'dal', name: 'Dal mill starter (practice — adjust)',
+    kind: 'dal', name: 'Dal mill starter (practice: adjust)',
     lines: [
       { key: 'pulses', name: 'Pulses (whole)', role: 'input', qty: 100, ag_class: 'pulses_loose' },
       { key: 'dal', name: 'Dal', role: 'main', qty: 72, ag_class: 'pulses_loose' },
@@ -72,7 +72,7 @@ export const MILL_STARTERS: Readonly<Record<MillKind, MillStarter>> = {
     ],
   },
   oil: {
-    kind: 'oil', name: 'Oil mill starter (practice — adjust)',
+    kind: 'oil', name: 'Oil mill starter (practice: adjust)',
     lines: [
       { key: 'seed', name: 'Oilseed', role: 'input', qty: 100 },
       { key: 'oil', name: 'Edible oil', role: 'main', qty: 33, ag_class: 'edible_oil' },
@@ -98,7 +98,7 @@ export function starterBom(s: MillStarter, itemIds: Readonly<Record<string, stri
       id: newId(), item_id: itemIds[l.key], qty: l.qty, kind: kindOf(l.role),
       ...(l.role === 'co' ? { cost_pct: num(l.cost_pct) } : { rate: Math.max(num(rates[l.key]), 0) }),
     })),
-    notes: 'Mill starter (Round 12): practice figures — adjust quantities, co-product shares and by-product rates to your mill.',
+    notes: 'Mill starter (Round 12): practice figures, adjust quantities, co-product shares and by-product rates to your mill.',
   };
 }
 

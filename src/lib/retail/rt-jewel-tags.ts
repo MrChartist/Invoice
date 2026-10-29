@@ -113,7 +113,7 @@ export function deleteTag(id: string, tracking: TrackingMap): void {
   const t = all.find((x) => x.id === id);
   if (!t) return;
   const s = tracking.get(t.item_id)?.serials.find((x) => serialKey(x.serial) === serialKey(t.tag));
-  if (s && !s.inStock) throw new Error(`Tag ${t.tag} is sold — it stays with its bill.`);
+  if (s && !s.inStock) throw new Error(`Tag ${t.tag} is sold: it stays with its bill.`);
   if (t.move_id) stockDb.deleteMove(t.move_id);
   setTable(TAGS_TABLE, all.filter((x) => x.id !== id));
 }

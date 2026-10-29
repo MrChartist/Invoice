@@ -22,7 +22,7 @@ import {
 } from './gstr2b';
 
 export const IMS_FILE_FORMAT = 'mrchartist-ims-working-v1';
-export const IMS_LAYOUT_NOTE = 'Layout unverified — working paper, not a portal upload file — verify with your CA.';
+export const IMS_LAYOUT_NOTE = 'Layout unverified: working paper, not a portal upload file. Verify with your CA.';
 
 const ACTION_CODE = { ACCEPT: 'A', REJECT: 'R', PENDING: 'P' } as const;
 
@@ -129,7 +129,7 @@ export function imsFileSheets(file: ImsFile): { name: string; rows: (string | nu
   const s = file.summary;
   const summary: (string | number)[][] = [
     ['IMS working file', file.note],
-    ['GSTIN', file.gstin || '—'],
+    ['GSTIN', file.gstin || '-'],
     ['Return period', file.rtnprd],
     ['Generated on', file.generated_on],
     ['Accepted', s.accepted],

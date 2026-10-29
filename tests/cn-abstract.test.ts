@@ -26,7 +26,7 @@ test('deviation split at the limit (cumulative, never counted twice)', () => {
 test('sections and sub-totals equal the bill; quantity beyond 25% becomes its own deviation line', () => {
   const r = saveRaBill(boq.id, { date: '2026-06-30', lines: [{ line_id: 'l1', cumulative_qty: 1300, extra_reason: 'VO-3', mb_ref: '112/45-47' }, { line_id: 'l2', cumulative_qty: 50 }] });
   const items = r.invoice.items.map((i) => [i.name, i.quantity, itemKind(i, r.invoice.boq_terms!.cn!.lines)]);
-  assert.deepEqual(items, [['Earthwork excavation', 1000, 'boq'], ['Extra item — Earthwork excavation', 250, 'extra'], ['Deviation — Earthwork excavation', 50, 'deviation'], ['PCC 1:4:8', 50, 'boq']]);
+  assert.deepEqual(items, [['Earthwork excavation', 1000, 'boq'], ['Extra item: Earthwork excavation', 250, 'extra'], ['Deviation: Earthwork excavation', 50, 'deviation'], ['PCC 1:4:8', 50, 'boq']]);
   const cn = cnOf(r.invoice.id);
   const secs = abstractSections(cn.abstract!);
   assert.deepEqual(secs.map((s) => s.kind), ['boq', 'extra', 'deviation']);

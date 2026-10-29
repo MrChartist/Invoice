@@ -46,7 +46,7 @@ const NPO = (e: EntityType) => e === 'cooperative' || e === 'association';
 const L = (e: EntityType) => NPO(e)
   ? { pl: 'Income and Expenditure Account', net: 'Excess of income over expenditure / (expenditure over income)', el: 'I. FUNDS AND LIABILITIES', as: 'II. PROPERTY AND ASSETS', funds: "Members' funds" }
   : { pl: 'Statement of profit and loss', net: 'Profit / (loss) for the year', el: 'I. EQUITY AND LIABILITIES', as: 'II. ASSETS', funds: '' };
-export const DRAFT_LINE = 'Draft — prepared from books, verify with your CA';
+export const DRAFT_LINE = 'Draft: prepared from books, verify with your CA';
 
 export const fyId = (startYear: number) => `FY${String(startYear).slice(2)}-${String(startYear + 1).slice(2)}`;
 const fyText = (startYear: number) => `FY ${startYear}-${String(startYear + 1).slice(2)}`;
@@ -237,7 +237,7 @@ export function profitLossLines(pack: AnnualPack): StatementLine[] {
 
 const amt = (p: number | undefined) => {
   if (p === undefined) return '';
-  if (!p) return '–';
+  if (!p) return '-';
   const s = formatMoney(Math.abs(p) / 100);
   return p < 0 ? `(${s})` : s;
 };
@@ -294,7 +294,7 @@ function cashFlowHtml(c: CashFlowStatement): string {
   <tr class="l0"><td colspan="2">B. Cash flow from investing activities</td></tr>${c.investing.lines.map((l) => line(l.label, l.amount)).join('')}${line('Net cash from investing activities', c.investing.total, 'l2')}
   <tr class="l0"><td colspan="2">C. Cash flow from financing activities</td></tr>${c.financing.lines.map((l) => line(l.label, l.amount)).join('')}${line('Net cash from financing activities', c.financing.total, 'l2')}
   ${line('Net increase / (decrease) in cash & cash equivalents', c.netChange, 'l2')}${line('Cash & cash equivalents at the beginning', c.openingCash)}${line('Cash & cash equivalents at the end', c.closingCash, 'l3')}
-  </tbody></table>${c.difference ? `<p class="warn">Cash-flow difference ₹${esc(amt(c.difference))} — check the books.</p>` : ''}`;
+  </tbody></table>${c.difference ? `<p class="warn">Cash-flow difference ₹${esc(amt(c.difference))}: check the books.</p>` : ''}`;
 }
 
 function trialBalanceHtml(tb: TrialBalance): string {
@@ -325,7 +325,7 @@ export function annualPackBody(pack: AnnualPack): string {
   const c = pack.company;
   const sub = [c.address, c.gstin ? `GSTIN: ${c.gstin}` : '', c.pan ? `PAN: ${c.pan}` : ''].filter(Boolean).join('\n');
   const ent = { proprietorship: 'Proprietorship', partnership: 'Partnership firm', llp: 'Limited liability partnership', company: 'Company', cooperative: 'Co-operative society', association: 'Association' }[pack.entity];
-  const asAt = pack.interim ? `As at ${formatDate(pack.asAt)} (interim — the year ends ${formatDate(pack.fy.end)})` : `As at ${formatDate(pack.fy.end)}`;
+  const asAt = pack.interim ? `As at ${formatDate(pack.asAt)} (interim: the year ends ${formatDate(pack.fy.end)})` : `As at ${formatDate(pack.fy.end)}`;
   const period = pack.interim ? `For the period ${formatDate(pack.fy.start)} to ${formatDate(pack.asAt)} (interim)` : `For the year ended ${formatDate(pack.fy.end)}`;
   const tie = pack.difference ? `<p class="warn">The balance sheet does not tie: difference ₹${esc(amt(pack.difference))}. Check the Vouchers warnings in Books before sharing.</p>` : '';
   const pages = [
@@ -339,7 +339,7 @@ export function annualPackBody(pack: AnnualPack): string {
     `<section class="ap-page">${header(pack, L(pack.entity).pl, period)}${statementTable(profitLossLines(pack), pack.fy.label, pack.prev.label)}${pack.pl.stockLabel ? `<p class="foot">Closing stock: ${esc(pack.pl.stockLabel)}.</p>` : ''}</section>`,
     `<section class="ap-page">${header(pack, 'Cash-flow statement (AS 3, indirect method)', period)}${cashFlowHtml(pack.cf)}</section>`,
     `<section class="ap-page">${header(pack, 'Trial balance', asAt)}${trialBalanceHtml(pack.tb)}</section>`,
-    `<section class="ap-page">${header(pack, 'Notes to accounts', period)}${pack.notes.map(noteHtml).join('')}<p class="foot">${esc(DRAFT_LINE)}. Schedule III wording for ${esc(ent.toLowerCase())} and the notes required for your entity — verify with your CA.</p></section>`,
+    `<section class="ap-page">${header(pack, 'Notes to accounts', period)}${pack.notes.map(noteHtml).join('')}<p class="foot">${esc(DRAFT_LINE)}. Schedule III wording for ${esc(ent.toLowerCase())} and the notes required for your entity: verify with your CA.</p></section>`,
     ...(pack.rp ? [`<section class="ap-page" data-ap-rp>${header(pack, 'Receipts and Payments account', period)}<table><tbody>${rpRows(pack.rp).slice(1).map(([a, b]) => `<tr class="${b === '' ? 'l0' : 'l1'}"><td>${esc(String(a))}</td><td class="n">${b === '' ? '' : esc(formatMoney(Number(b)))}</td></tr>`).join('')}</tbody></table></section>`] : []),
   ];
   return `<div class="ap-root"><style>${PACK_CSS}</style>${pages.join('\n')}</div>`;
@@ -349,7 +349,7 @@ export function annualPackBody(pack: AnnualPack): string {
 export function annualPackHtml(pack: AnnualPack): string {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(`${pack.company.name || 'Annual accounts'} — ${pack.fy.label}`)}</title>
+<title>${esc(`${pack.company.name || 'Annual accounts'}: ${pack.fy.label}`)}</title>
 <style>${PRINT_FONT_FACE}@page { size: 210mm 297mm; margin: 14mm; } body { margin: 0; background: #fff; }</style></head>
 <body>${annualPackBody(pack)}</body></html>`;
 }
@@ -376,7 +376,7 @@ export function annualPackSheets(pack: AnnualPack): { name: string; rows: (strin
     ['Closing cash', rupees(cf.closingCash)],
   ];
   const tb: (string | number)[][] = [['Code', 'Account', 'Group', 'Opening', 'Debit', 'Credit', 'Closing (Dr +)'], ...pack.tb.rows.map((r) => [r.account.code, r.account.name, groupOf(r.account.group).label, rupees(r.opening), rupees(r.debit), rupees(r.credit), rupees(r.closing)])];
-  const notes: (string | number)[][] = [[`Notes to accounts — ${pack.fy.label}`, DRAFT_LINE]];
+  const notes: (string | number)[][] = [[`Notes to accounts: ${pack.fy.label}`, DRAFT_LINE]];
   for (const n of pack.notes) {
     if (!n.tables.length) continue;
     notes.push([], [`${n.no}. ${n.title}`]);

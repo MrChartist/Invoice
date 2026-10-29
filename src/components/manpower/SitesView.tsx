@@ -40,11 +40,11 @@ export default function SitesView({ notify }: MpViewProps) {
               {data.sites.map((s) => (
                 <tr key={s.id} data-mp-site={s.mp.code}>
                   <td>{siteLabel(s)}</td>
-                  <td>{clientOf(s.client_id)?.name ?? '—'}</td>
+                  <td>{clientOf(s.client_id)?.name ?? '-'}</td>
                   <td>{s.mp.posts.map((p) => p.name).join(', ')}</td>
                   <td className={surface.numeric}>{s.mp.posts.reduce((t, p) => t + p.heads, 0)}</td>
                   <td className={surface.numeric}>{formatCurrency(monthValue(s.mp, 30))}</td>
-                  <td style={endsSoon(s.mp, today) ? { color: 'var(--destructive)' } : undefined}>{s.mp.contract.to ?? '—'}</td>
+                  <td style={endsSoon(s.mp, today) ? { color: 'var(--destructive)' } : undefined}>{s.mp.contract.to ?? '-'}</td>
                   <td><RegimeChip client={clientOf(s.client_id)} sacs={s.mp.posts.map((p) => p.sac)} date={today} entity={data.entity} /></td>
                   <td className={surface.rowActions}><button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setOpen(s.id)} data-mp-open-site={s.mp.code}>{mpT('open')}</button></td>
                 </tr>

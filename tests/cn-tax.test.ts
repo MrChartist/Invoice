@@ -48,7 +48,7 @@ test('declarations by line mix; supply + installation caution; one-click re-clas
   assert.equal(declarationKind(['wc_general'], false), 'works');
   assert.equal(declarationKind(['supply_goods', 'install_service'], true), 'supply_install');
   assert.equal(declarationKind([undefined], false), 'none');
-  assert.deepEqual(worksDeclarations({ a: { cls: 'wc_govt' }, b: { cls: 'pure_labour_exempt' } }, true), ['Composite supply of works contract as defined in Sec 2(119) of the CGST Act, 2017.', 'Exempt — pure labour (verify with your CA, CN2).']);
+  assert.deepEqual(worksDeclarations({ a: { cls: 'wc_govt' }, b: { cls: 'pure_labour_exempt' } }, true), ['Composite supply of works contract as defined in Sec 2(119) of the CGST Act, 2017.', 'Exempt: pure labour (verify with your CA, CN2).']);
   assert.ok(mixedSupplyInstall(['supply_goods', 'install_service']));
   assert.ok(!mixedSupplyInstall(['supply_goods']));
   assert.deepEqual(reclassAsWorks({ a: { cls: 'supply_goods' }, b: { cls: 'install_service' }, c: { cls: 'manpower' } }), { a: { cls: 'wc_general' }, b: { cls: 'wc_general' }, c: { cls: 'manpower' } });

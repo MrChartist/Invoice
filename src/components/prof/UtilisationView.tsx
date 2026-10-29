@@ -40,7 +40,7 @@ export default function UtilisationView({ notify }: Pick<PsDeskProps, 'notify'>)
     if (r) { setD(null); setTick((x) => x + 1); }
   };
   const head = [psT('staff'), pwT('available'), pwT('billable'), pwT('nonBill'), pwT('util'), pwT('targetPct')];
-  const csv = rows.map((r) => [r.name, r.available, r.billable, Object.entries(r.nonBillable).map(([k, h]) => `${wt.get(k) ?? '—'} ${h}`).join('; '), pct(r.pct), r.target ?? '']);
+  const csv = rows.map((r) => [r.name, r.available, r.billable, Object.entries(r.nonBillable).map(([k, h]) => `${wt.get(k) ?? '-'} ${h}`).join('; '), pct(r.pct), r.target ?? '']);
   const num = (k: keyof Draft, label: string) => <Field label={label}><input type={k === 'from' ? 'date' : 'number'} min={0} className={controls.input} value={d?.[k] ?? ''} onChange={(e) => d && setD({ ...d, [k]: e.target.value })} data-staff-ps={k} /></Field>;
   return (
     <div className={surface.card}>

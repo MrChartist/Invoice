@@ -111,7 +111,7 @@ export function hireOutInvoice(vendorId: string, clientId: string, date: string)
     return { name: `Hire of ${m?.name ?? 'equipment'} with operator`, hsn: r.withOperator.sac, unit: 'HRS', quantity: round2(h), rate: m?.hireOut ?? 0, tax_rate: r.rate };
   });
   return withTablesRollback(['invoices', SD.logs, 'series_counters'], () => {
-    const inv = draftInvoice(clientId, items, 'Hire of plant with operator (SAC per PLANT_HIRE_SAC_RULES — verify with your CA, CN17).', date);
+    const inv = draftInvoice(clientId, items, 'Hire of plant with operator (SAC per PLANT_HIRE_SAC_RULES: verify with your CA, CN17).', date);
     setTable(SD.logs, loadLogs().map((l) => (open.some((o) => o.id === l.id) ? { ...l, recovered_in: inv.invoice_number || 'invoice', recovered_invoice_id: inv.id } : l)));
     return inv;
   });

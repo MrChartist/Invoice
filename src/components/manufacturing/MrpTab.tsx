@@ -206,7 +206,7 @@ export function MrpTab({ ctx }: { ctx: MfgContext }) {
                       ? <Link to={`/manufacturing?tab=mfg&make=${encodeURIComponent(r.item.id)}&qty=${r.suggested}`} className={cn(controls.btnOutline, controls.btnSm)}><Factory size={13} aria-hidden="true" /> {s7T('manufacture')}</Link>
                       : <span className={r.action === 'buy' ? styles.loss : styles.muted}>{actionText(r.action)}</span>}
                   </td>
-                  <td className={styles.num}><strong>{r.suggested ? qtyText(r.suggested) : '—'}</strong></td>
+                  <td className={styles.num}><strong>{r.suggested ? qtyText(r.suggested) : '-'}</strong></td>
                   <td className={styles.num}>{r.action === 'buy' ? money(r.rate) : ''}</td>
                   <td className={styles.muted}>{r.for.map((x) => (x === 'Plan' ? s7T('planWord') : x)).join(', ')}</td>
                 </tr>
@@ -243,7 +243,7 @@ export function MrpTab({ ctx }: { ctx: MfgContext }) {
               <tr key={p.id}>
                 <td className={surface.mono}>{p.number}</td>
                 <td>{formatDate(p.date)}</td>
-                <td>{p.due_date ? formatDate(p.due_date) : '—'}</td>
+                <td>{p.due_date ? formatDate(p.due_date) : '-'}</td>
                 <td>{p.lines.map((l) => `${ctx.items.find((i) => i.id === l.item_id)?.name ?? '?'} × ${qtyText(num(l.qty))}`).join(', ')}</td>
                 <td className={surface.rowActions}>
                   <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => load(p)}>{s7T('open')}</button>

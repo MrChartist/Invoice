@@ -44,7 +44,7 @@ export default function ExportCheckView({ notify }: { notify: Notify }) {
       <button key="o" type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setOpen(open === inv.id ? '' : inv.id)}>{pcT('open')}</button>];
     if (open !== inv.id) return [row];
     return [row, [<div key="m" data-ps-check={inv.id}>
-      <ul>{c.items.map((i) => <li key={i.id} className={i.state === 'ok' ? css.ok : i.state === 'fail' ? css.bad : undefined}>{pcT(`c.${i.id}`)} — {pcT(`s.${i.state}`)}: {pcT(`r.${i.reason}` as PcKey)}</li>)}</ul>
+      <ul>{c.items.map((i) => <li key={i.id} className={i.state === 'ok' ? css.ok : i.state === 'fail' ? css.bad : undefined}>{pcT(`c.${i.id}`)} : {pcT(`s.${i.state}`)}: {pcT(`r.${i.reason}` as PcKey)}</li>)}</ul>
       <p className={controls.hint}>{pcT('soft')}</p>
       {client && <PartyFacts key={`p${tick}`} client={client} run={run} />}
       <DocFacts key={`d${tick}`} inv={inv} run={run} />

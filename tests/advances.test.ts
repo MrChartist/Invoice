@@ -360,7 +360,7 @@ test('receipt voucher (Rule 50) escapes every value and has no script', () => {
   assert.ok(!/<script/i.test(html));
   assert.match(html, /Evil &lt;script&gt;alert\(1\)&lt;\/script&gt; &amp; Co/);
   assert.match(html, /Mumbai &lt;HQ&gt;/);
-  assert.match(html, /27 — Maharashtra/);
+  assert.match(html, /27 \(Maharashtra\)/);
   assert.match(html, /CGST @ 9%/);
   assert.match(html, /Rule 50/);
   const csv = advancesCsv(advanceRows(loadAdvances(), [], []));

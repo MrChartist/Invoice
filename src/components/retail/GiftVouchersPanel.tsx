@@ -49,7 +49,7 @@ export default function GiftVouchersPanel() {
   const reg = useMemo(() => gvRegister(vouchers, payments, invoices, { ...period, day: today }), [vouchers, payments, invoices, period, today]);
   const breakage = useMemo(() => giftVouchersDb.breakageDue(today), [tick, today]); // eslint-disable-line react-hooks/exhaustive-deps
   const journals = useMemo(() => [...new Set(vouchers.map((v) => v.breakage_voucher_id).filter((x): x is string => !!x))], [vouchers]);
-  const branchName = (id: string) => branches.find((b) => b.id === id)?.name ?? '—';
+  const branchName = (id: string) => branches.find((b) => b.id === id)?.name ?? '-';
 
   const run = (fn: () => string) => {
     try {
@@ -89,7 +89,7 @@ export default function GiftVouchersPanel() {
               {branches.length > 0 && (
                 <label className={controls.field}><span className={controls.label}>{sT('branch')}</span>
                   <select className={controls.select} value={sell.branch} onChange={(e) => setSell({ ...sell, branch: e.target.value })}>
-                    <option value="">—</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    <option value="">-</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </label>
               )}

@@ -101,7 +101,7 @@ export function h1Register(invoices: readonly InvoiceRecord[], index: ReadonlyMa
 
 export function h1RegisterCsv(rows: readonly H1Row[], period: { from: string; to: string }): string {
   return toCsv([
-    [`Schedule H1 register ${period.from} to ${period.to} — verify the format with the drug inspector / your CA`],
+    [`Schedule H1 register ${period.from} to ${period.to}: verify the format with the drug inspector / your CA`],
     ['Date', 'Bill no.', 'Patient', 'Patient address', 'Prescriber', 'Prescriber reg. no.', 'Drug', 'Schedule', 'Batch', 'Expiry', 'Quantity', 'Unit', 'Prescription details missing'],
     ...rows.map((r) => [r.date, r.number, r.patient, r.patient_address, r.prescriber, r.prescriber_reg, r.drug, r.schedule, r.batch, r.expiry, r.qty, r.unit, r.missingRx ? 'Yes' : '']),
   ]);

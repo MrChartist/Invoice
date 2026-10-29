@@ -40,15 +40,15 @@ test('school exemption, manual exemption, mixed posts split, forced choices', ()
   assert.deepEqual([postRegime('998533', { date: D, client: school }).regime, postRegime('998525', { date: D, client: school }).regime], ['exempt66', 'exempt66']);
   assert.equal(postRegime('998513', { date: D, client: school }).regime, 'fwd', 'staffing is not Sl. 66');
   assert.match(postRegime('998525', { date: D, client: school }).decl, /Sl\. 66\(b\)\(iii\)/);
-  const m = postRegime('998525', { date: D, client: reg, manual: 'Sl. 3 — municipal office' });
-  assert.deepEqual([m.regime, m.rate, m.decl], ['manual_exempt', 0, 'Exempt — Sl. 3 — municipal office. Verify with your CA.']);
+  const m = postRegime('998525', { date: D, client: reg, manual: 'Sl. 3: municipal office' });
+  assert.deepEqual([m.regime, m.rate, m.decl], ['manual_exempt', 0, 'Exempt: Sl. 3: municipal office. Verify with your CA.']);
   const mixed = mpRegime({ date: D, client: reg }, ['998525', '998533']);
   assert.equal(mixed.split, true);
   const g = splitPosts([{ sac: '998525', n: 1 }, { sac: '998533', n: 2 }, { sac: '998525', n: 3 }], { date: D, client: reg });
   assert.deepEqual([g.rcm?.map((p) => p.n), g.fwd?.map((p) => p.n)], [[1, 3], [2]]);
   assert.equal(mpRegime({ date: D, client: reg }, ['998525', '998525']).split, undefined);
   assert.equal(forcedRegime('rcm', D).regime, 'rcm');
-  assert.equal(forcedRegime('manual_exempt', D, 'x').decl, 'Exempt — x. Verify with your CA.');
+  assert.equal(forcedRegime('manual_exempt', D, 'x').decl, 'Exempt: x. Verify with your CA.');
 });
 
 test('patch: rcm flags, exempt marks, a typed rate wins, an earlier exempt mark is undone; other mp keys kept', () => {

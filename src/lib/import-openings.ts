@@ -311,7 +311,7 @@ export function buildOpeningsPreview(p: OpeningsPreviewParams): OpeningsPreview 
   const records = new Map<number, OpeningsImportRecord>();
   const entries = new Map<string, number>(ctx.openings.map((o) => [o.ledger_id, signedOpening(o)]));
   const seen = new Map<string, number>();
-  const lockIssue = (): RowIssue => ({ level: 'error', message: `The opening day (${prettyDay(openingDay)}) is in a locked period — unlock it (Settings → Security) to import opening balances.` });
+  const lockIssue = (): RowIssue => ({ level: 'error', message: `The opening day (${prettyDay(openingDay)}) is in a locked period: unlock it (Settings → Security) to import opening balances.` });
 
   table.rows.forEach((r, i) => {
     if (r.every((c) => String(c ?? '').trim() === '')) return;
@@ -356,14 +356,14 @@ export function buildOpeningsPreview(p: OpeningsPreviewParams): OpeningsPreview 
         ...(state_code ? { state_code } : {}),
         ...(opening !== undefined && opening !== 0 ? { opening } : {}),
       };
-      if (target === 'client') issues.push({ level: 'warning', field: 'party_type', message: 'A customer — imported into Clients, not Suppliers' });
+      if (target === 'client') issues.push({ level: 'warning', field: 'party_type', message: 'A customer: imported into Clients, not Suppliers' });
       if (name && !dup(`${target}:${gstin || norm(name)}`)) {
         const match = findParty(target === 'vendor' ? vendorIx : clientIx, name, gstin);
         if (match) {
           row.matchId = match.id;
           if (dupMode === 'update') {
             row.action = 'update';
-            if (norm(match.name) !== norm(name)) issues.push({ level: 'warning', field: 'name', message: `Matched existing ${target === 'vendor' ? 'supplier' : 'client'} "${match.name}" by GSTIN — its name is kept` });
+            if (norm(match.name) !== norm(name)) issues.push({ level: 'warning', field: 'name', message: `Matched existing ${target === 'vendor' ? 'supplier' : 'client'} "${match.name}" by GSTIN: its name is kept` });
           } else {
             row.action = 'skip';
             row.skipReason = `Already exists as "${match.name}"`;
@@ -420,9 +420,9 @@ export function buildOpeningsPreview(p: OpeningsPreviewParams): OpeningsPreview 
           if (existing) {
             row.matchId = existing.id;
             row.action = 'update';
-            if (groupText && primaryOf(gm.group, ctx.userGroups) !== existing.group) issues.push({ level: 'warning', field: 'group', message: `"${existing.name}" already exists under ${groupLabel(existing.group)} — kept there` });
-          } else if (!groupText) issues.push({ level: 'warning', field: 'group', message: `No group given — placed under ${groupLabel(gm.primary)}` });
-          else if (!gm.exact) issues.push({ level: 'warning', field: 'group', message: `Group "${groupText}" is not a known group — mapped to ${groupLabel(gm.primary)}` });
+            if (groupText && primaryOf(gm.group, ctx.userGroups) !== existing.group) issues.push({ level: 'warning', field: 'group', message: `"${existing.name}" already exists under ${groupLabel(existing.group)}: kept there` });
+          } else if (!groupText) issues.push({ level: 'warning', field: 'group', message: `No group given: placed under ${groupLabel(gm.primary)}` });
+          else if (!gm.exact) issues.push({ level: 'warning', field: 'group', message: `Group "${groupText}" is not a known group: mapped to ${groupLabel(gm.primary)}` });
           if (!dup(`acc:${existing?.id ?? norm(name)}`)) entries.set(existing?.id ?? `new:${i}`, amount);
         }
         if (amount !== 0 && locked) issues.push(lockIssue());
@@ -437,10 +437,10 @@ export function buildOpeningsPreview(p: OpeningsPreviewParams): OpeningsPreview 
       const dateRaw = cell(mapping, r, 'date');
       const date = parseDate(dateRaw);
       if (!date) issues.push({ level: 'error', field: 'date', message: dateRaw ? `Bill date "${dateRaw}" is not a date` : 'Bill date is required' });
-      else if (date >= ctx.booksBegin) issues.push({ level: 'warning', field: 'date', message: `Dated on or after the books begin (${prettyDay(ctx.booksBegin)}) — usually entered as an invoice / bill instead` });
+      else if (date >= ctx.booksBegin) issues.push({ level: 'warning', field: 'date', message: `Dated on or after the books begin (${prettyDay(ctx.booksBegin)}): usually entered as an invoice / bill instead` });
       const dueRaw = cell(mapping, r, 'due_date');
       const due = dueRaw ? parseDate(dueRaw) : null;
-      if (dueRaw && !due) issues.push({ level: 'warning', field: 'due_date', message: `Due date "${dueRaw}" is not a date — ignored` });
+      if (dueRaw && !due) issues.push({ level: 'warning', field: 'due_date', message: `Due date "${dueRaw}" is not a date: ignored` });
       else if (due && date && due < date) issues.push({ level: 'error', field: 'due_date', message: 'The due date is before the bill date' });
       const days = parseNumber(cell(mapping, r, 'credit_days'));
       const amountRaw = cell(mapping, r, 'amount');
@@ -498,7 +498,7 @@ export function buildOpeningsPreview(p: OpeningsPreviewParams): OpeningsPreview 
 /** Banner text for the dry run: the difference that will post to 1090 ('' when they agree). */
 export function differenceNote(preview: Pick<OpeningsPreview, 'difference'>): string {
   const t = openingDifferenceText(preview.difference);
-  return t ? `${t} — posts to "Opening balance difference" (1090) until it is corrected.` : '';
+  return t ? `${t}. It posts to "Opening balance difference" (1090) until it is corrected.` : '';
 }
 
 /* ── Apply ───────────────────────────────────────────────────────── */
@@ -561,7 +561,7 @@ function nextCode(chart: readonly Account[]): () => string {
 export function applyOpeningsImport(preview: OpeningsPreview, opts: { fileName?: string } = {}): ImportReport {
   requireAccess('books.edit');
   const bad = preview.rows.filter((r) => r.action === 'error');
-  if (bad.length) throw new ImportOpeningsError(`Fix or skip the ${bad.length} row${bad.length === 1 ? '' : 's'} with errors first — nothing was imported.`);
+  if (bad.length) throw new ImportOpeningsError(`Fix or skip the ${bad.length} row${bad.length === 1 ? '' : 's'} with errors first: nothing was imported.`);
   const live = preview.rows.filter((r) => (r.action === 'create' || r.action === 'update') && preview.records.has(r.index));
   const report: ImportReport = { created: 0, updated: 0, skipped: preview.rows.length - live.length, errors: [] };
   return withTablesRollback(TOUCHED, () => {

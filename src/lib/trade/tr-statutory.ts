@@ -55,7 +55,7 @@ export const presetOfLabel = (label: string | undefined, date: string): TradeTcs
 /** 206C(1F): '' when some line's value exceeds the limit, else the warning text. Other presets: ''. */
 export function tcs1fWarning(preset: Pick<TradeTcsPreset, 'section' | 'above'> | undefined, lineValues: readonly number[]): string {
   if (!preset || preset.section !== '206C1F' || !preset.above) return '';
-  return lineValues.some((v) => v > preset.above!) ? '' : 'TCS u/s 206C(1F) applies only when one item is valued above ₹10 lakh — no line on this bill is.';
+  return lineValues.some((v) => v > preset.above!) ? '' : 'TCS u/s 206C(1F) applies only when one item is valued above ₹10 lakh: no line on this bill is.';
 }
 
 /** 206CC (no PAN of the buyer): twice the rate or the floor, whichever is higher. */
@@ -81,9 +81,9 @@ export function buyer194q(date: string, turnoverByFy?: Readonly<Record<string, n
   if (limit == null) return { status: 'not_in_force', limit, fy, message: '194Q was not in force on this date.' };
   const raw = turnoverByFy?.[fy];
   const t = typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : undefined;
-  if (t === undefined) return { status: 'unknown', limit, fy, message: `Our turnover for FY ${fy} is not entered (TDS → Overview): 194Q is allowed, but it binds only a buyer above ₹10 crore — verify with your CA.` };
+  if (t === undefined) return { status: 'unknown', limit, fy, message: `Our turnover for FY ${fy} is not entered (TDS → Overview): 194Q is allowed, but it binds only a buyer above ₹10 crore, verify with your CA.` };
   if (t > limit) return { status: 'applies', limit, fy, turnover: t, message: '' };
-  return { status: 'below', limit, fy, turnover: t, message: `194Q does not apply: our turnover for FY ${fy} is not above ₹10 crore (the buyer's test) — verify with your CA.` };
+  return { status: 'below', limit, fy, turnover: t, message: `194Q does not apply: our turnover for FY ${fy} is not above ₹10 crore (the buyer's test), verify with your CA.` };
 }
 
 /** Sales side: a customer that deducts 194Q does so on our FY sales to it above the 194Q threshold. */

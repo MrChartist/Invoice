@@ -117,7 +117,7 @@ export function shiftExpected(z: ZReport, openingFloat: number): number {
 
 /** Why a shift cannot be closed now ('' = it can). R3-A: live restaurant orders block it too. */
 export function closeBlocker(heldBills: number, openOrders = ''): string {
-  return heldBills > 0 ? `${heldBills} bill${heldBills === 1 ? ' is' : 's are'} on hold — recall and save or drop ${heldBills === 1 ? 'it' : 'them'} before closing the shift.` : openOrders;
+  return heldBills > 0 ? `${heldBills} bill${heldBills === 1 ? ' is' : 's are'} on hold: recall and save or drop ${heldBills === 1 ? 'it' : 'them'} before closing the shift.` : openOrders;
 }
 
 /**
@@ -159,7 +159,7 @@ export const shiftsDb = {
     requireAccess('doc.create');
     const all = shiftsDb.all();
     const user = counterUser();
-    if (openShiftOf(all, user.id)) throw new Error('You already have a shift open — close it first.');
+    if (openShiftOf(all, user.id)) throw new Error('You already have a shift open: close it first.');
     const from = pendingHandover(all);
     const float = round2(Math.max(num(openingFloat), 0));
     const row: PosShift = {

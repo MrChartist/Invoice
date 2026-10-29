@@ -28,7 +28,7 @@ export function RetainerReport({ retainer, rows, company }: { retainer: Retainer
           <tbody>
             {rows.map((x) => (
               <tr key={x.period}>
-                <td>{x.label}</td><td>{x.fee_invoice || '—'}</td><td className={surface.numeric}>{x.allowance_h}</td><td className={surface.numeric}>{x.used_h}</td>
+                <td>{x.label}</td><td>{x.fee_invoice || '-'}</td><td className={surface.numeric}>{x.allowance_h}</td><td className={surface.numeric}>{x.used_h}</td>
                 <td className={surface.numeric}>{x.remaining_h}</td><td className={surface.numeric}>{x.rolled_h}</td><td className={surface.numeric}>{x.forfeited_h}</td>
                 <td className={surface.numeric}>{x.overage_h} · {formatCurrency(x.overage_invoiced)}</td><td>{x.state}</td>
               </tr>

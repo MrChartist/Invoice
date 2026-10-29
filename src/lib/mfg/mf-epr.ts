@@ -32,7 +32,7 @@ export function eprSupplied(invoices: readonly Pick<InvoiceRecord, 'doc_type' | 
       if (!it) continue;
       const kg = (eff === 'out' ? 1 : -1) * num(l.quantity) * lineFactor(l) * kgPer(it);
       const k = `${month}|${it.mf_epr}|${c?.name ?? ''}`;
-      const row = m.get(k) ?? { month, category: String(it.mf_epr), client: c?.name || '—', epr_no: c?.mf?.epr_no ?? '', kg: 0 };
+      const row = m.get(k) ?? { month, category: String(it.mf_epr), client: c?.name || '-', epr_no: c?.mf?.epr_no ?? '', kg: 0 };
       row.kg += kg;
       m.set(k, row);
     }
@@ -59,4 +59,4 @@ const q = (s: string | number) => `"${String(s).replace(/"/g, '""')}"`;
 
 /** CSV for the brand owner (one row per month × category × customer). */
 export const eprCsv = (rows: readonly EprRow[]): string =>
-  ['Month,EPR category,Customer,Customer EPR registration,Kg supplied', ...rows.map((r) => [r.month, r.category, r.client, r.epr_no, r.kg].map(q).join(','))].join('\n') + '\nWorking paper — your EPR filing is on the CPCB portal.\n';
+  ['Month,EPR category,Customer,Customer EPR registration,Kg supplied', ...rows.map((r) => [r.month, r.category, r.client, r.epr_no, r.kg].map(q).join(','))].join('\n') + '\nWorking paper: your EPR filing is on the CPCB portal.\n';

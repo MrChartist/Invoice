@@ -109,12 +109,12 @@ test('redeem: ₹0 line with the session text and the commission value; over-use
   const line = { name: 'Facial', sv: { staff_id: 's1' } };
   const p = redeemPatch(m, line, '2026-05-05', 2);
   assert.equal(p.rate, 0);
-  assert.equal(p.description, `Session 3 of 6 — ${m.number}`);
+  assert.equal(p.description, `Session 3 of 6: ${m.number}`);
   assert.deepEqual(p.sv?.redeem, { membership_id: m.id, session: 3, of: 6, value: 1500 });
   assert.equal(p.sv?.staff_id, 's1');
   assert.throws(() => redeemPatch(m, line, '2026-05-05', 6), /expired/);
   assert.throws(() => redeemPatch(m, { name: 'Haircut' }, '2026-05-05', 0), /does not cover/);
-  assert.throws(() => redeemPatch(m, line, '2026-12-01', 0), /expired — renew/);
+  assert.throws(() => redeemPatch(m, line, '2026-12-01', 0), /expired: renew/);
   const bill = { ...inv(m.invoice_ids[0]), id: 'r1', invoice_number: 'INV/X/1', items: [{ ...inv(m.invoice_ids[0]).items[0], name: 'Facial', ...p }] } as InvoiceRecord;
   assert.equal(sessionsUsed(m, [bill]), 1);
   assert.equal(lineKind(bill.items[0], { sv: undefined }), 'package_redemption');

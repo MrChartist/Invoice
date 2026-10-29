@@ -6,7 +6,7 @@ export const money = (paise: number) => formatMoney(paise / 100);
 
 /** Signed paise → "1,234.00 Dr" / "Cr" ('' for zero). */
 export function drCr(paise: number): string {
-  if (!paise) return '—';
+  if (!paise) return '-';
   return `${formatMoney(Math.abs(paise) / 100)} ${paise > 0 ? 'Dr' : 'Cr'}`;
 }
 

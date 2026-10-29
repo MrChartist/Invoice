@@ -74,7 +74,7 @@ export function ProgressInvoiceDialog({ source, onClose, onCreated }: { source: 
               if (m?.expected_date) setDate(m.expected_date);
             }}>
               <option value="">{s2T('p.noMilestone')}</option>
-              {open.map((m) => <option key={m.id} value={m.id}>{m.name} — {m.percent}%</option>)}
+              {open.map((m) => <option key={m.id} value={m.id}>{m.name} : {m.percent}%</option>)}
             </select>
           </label>
         )}

@@ -240,7 +240,7 @@ export function buildGstr4Annual(
   const notes = [
     'Table 7: the TCS estimate is worked out from documents marked "operator collects TCS (Sec 52)"; the credit you may claim is what the operator / deductor filed in GSTR-8 / GSTR-7 (auto-filled on the portal).',
     'Table 8: interest is Sec 50 interest (18% p.a.) on each CMP-08 paid after its due date (dates from the Compliance tab); late fee is the GSTR-4 late fee for the filing date. Waivers and extensions are not modelled.',
-    'Working paper — verify with your CA before filing.',
+    'Working paper: verify with your CA before filing.',
   ];
   return {
     fyStart,

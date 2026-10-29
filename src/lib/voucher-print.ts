@@ -100,7 +100,7 @@ export function voucherSection(m: VoucherPrintModel): string {
   return `<section class="v">
   <div class="head"><h1>${esc(m.company.name || 'Your business')}</h1>${sub ? `<div class="sub">${esc(sub)}</div>` : ''}</div>
   <div class="title">${esc(m.typeLabel)} Voucher</div>
-  <div class="meta"><span>No.: <strong>${esc(m.number || '—')}</strong></span><span>Dated: <strong>${esc(formatDate(m.date))}</strong></span></div>
+  <div class="meta"><span>No.: <strong>${esc(m.number || '-')}</strong></span><span>Dated: <strong>${esc(formatDate(m.date))}</strong></span></div>
   ${m.party ? `<div class="meta"><span>Party: <strong>${esc(m.party)}</strong></span></div>` : ''}
   <table><thead><tr><th>Particulars</th><th class="n">Debit (₹)</th><th class="n">Credit (₹)</th></tr></thead>
   <tbody>${rows}<tr class="total"><td>Total</td><td class="n">${money(total.dr)}</td><td class="n">${money(total.cr)}</td></tr></tbody></table>
@@ -118,7 +118,7 @@ export function voucherHtml(models: readonly VoucherPrintModel[], title = 'Vouch
 <style>${PRINT_FONT_FACE}${VOUCHER_CSS}</style></head>
 <body>
 ${models.map(voucherSection).join('\n')}
-<p class="note">Printed on the issuer's device. Working paper — verify with your CA.</p>
+<p class="note">Printed on the issuer's device. Working paper: verify with your CA.</p>
 </body></html>`;
 }
 

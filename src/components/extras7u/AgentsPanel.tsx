@@ -85,7 +85,7 @@ export function AgentsPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
               <div key={i} className={own.row}>
                 <label className={controls.field}><span className={controls.label}>{x7T('stockGroup')}</span>
                   <select className={controls.select} value={g.group_id} onChange={(e) => setRate(i, { group_id: e.target.value })}>
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {groups.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                   </select></label>
                 <label className={controls.field}><span className={controls.label}>%</span>

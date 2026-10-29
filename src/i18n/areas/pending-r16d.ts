@@ -6,7 +6,7 @@ import { defineArea } from '../area';
 
 export const pendT = defineArea(
   {
-    lead: 'Recommended by the GST Council on 8 Oct 2026, not yet notified — verify with your CA:',
+    lead: 'Recommended by the GST Council on 8 Oct 2026, not yet notified: verify with your CA:',
     head: 'Announced, not yet in force',
     pf1_services: 'Net ITC of an inverted-duty refund to include input services availed from 1 Nov 2026; this paper still counts inputs only.',
     pf1_capital: 'Capital goods ITC from 1 Apr 2027 to count over 60 months in the refund; not included here.',
@@ -20,7 +20,7 @@ export const pendT = defineArea(
     lg19_delivery: 'Delivery services through e-commerce operators to be taxed at 5 % without ITC, paid by the operator (Sec 9(5)); courier and postal excluded. Not applied.',
   } as const,
   {
-    lead: 'GST परिषद की 8 अक्टूबर 2026 की सिफ़ारिश, अभी अधिसूचित नहीं — अपने CA से जाँचें:',
+    lead: 'GST परिषद की 8 अक्टूबर 2026 की सिफ़ारिश, अभी अधिसूचित नहीं: अपने CA से जाँचें:',
     head: 'घोषित, अभी लागू नहीं',
     pf1_services: 'उल्टे शुल्क (इनवर्टेड ड्यूटी) रिफ़ंड के शुद्ध ITC में 1 नवंबर 2026 से ली गई इनपुट सेवाएँ भी; यह पत्र अभी केवल इनपुट गिनता है।',
     pf1_capital: '1 अप्रैल 2027 से पूँजीगत माल का ITC 60 महीनों में रिफ़ंड में; यहाँ शामिल नहीं।',

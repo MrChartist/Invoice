@@ -102,7 +102,7 @@ export function lotStatus(p: Pick<CutPlan, 'cut' | 'bundles'>): LotStatus {
     if (b.at.where === 'finished') add(s.finishedBySize, b.size, live);
     else if (live) {
       add(s.wipBySize, b.size, live);
-      add(s.byOp, b.at.op ?? '—', live);
+      add(s.byOp, b.at.op ?? '-', live);
     }
   }
   s.open = s.cut - Object.values(s.finishedBySize).reduce((a, q) => a + q, 0) - s.rejected;
@@ -165,7 +165,7 @@ export function reportFinished(id: string, date: string, items: readonly StockIt
     let plan = p;
     for (const r of rows) {
       const draft = buildOutputVoucher(order, orderProgress(order, loadOrderDocs()), bom, { qty: r.qty, date }, generateId);
-      const v = manufacturingDb.save({ ...draft, item_id: r.item_id, narration: `${draft.narration} — ${p.number} ${r.size}` }, items, inputs);
+      const v = manufacturingDb.save({ ...draft, item_id: r.item_id, narration: `${draft.narration}: ${p.number} ${r.size}` }, items, inputs);
       ids.push(v.id);
       const nos = new Set(r.nos);
       plan = { ...plan, bundles: (plan.bundles ?? []).map((b) => (nos.has(b.no) ? { ...b, reported: v.id } : b)) };

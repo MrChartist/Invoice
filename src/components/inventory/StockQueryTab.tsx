@@ -26,7 +26,7 @@ export function StockQueryTab({ items, version, today, initialId }: { items: Sto
           <thead><tr><th>{imT('date')}</th><th>{imT('party')}</th><th className={styles.num}>{imT('qty')}</th><th className={styles.num}>{imT('ratePer', { unit })}</th></tr></thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i}><td>{formatDate(r.date)}<div className={styles.muted}>{r.ref}</div></td><td>{r.party || '—'}</td><td className={styles.num}>{r.qty}</td><td className={styles.num}>{formatMoney(r.rate)}</td></tr>
+              <tr key={i}><td>{formatDate(r.date)}<div className={styles.muted}>{r.ref}</div></td><td>{r.party || '-'}</td><td className={styles.num}>{r.qty}</td><td className={styles.num}>{formatMoney(r.rate)}</td></tr>
             ))}
           </tbody>
         </table>
@@ -69,7 +69,7 @@ export function StockQueryTab({ items, version, today, initialId }: { items: Sto
                 <p className={styles.cardTitle}>{imT('batches')}</p>
                 <table className={styles.mini}>
                   <thead><tr><th>{imT('batches')}</th><th>{imT('expiry')}</th><th className={styles.num}>{imT('qty')}</th></tr></thead>
-                  <tbody>{q.batches.map((b) => <tr key={b.batch}><td>{b.batch}</td><td>{b.expiry ? formatDate(b.expiry) : '—'}</td><td className={styles.num}>{b.qty}</td></tr>)}</tbody>
+                  <tbody>{q.batches.map((b) => <tr key={b.batch}><td>{b.batch}</td><td>{b.expiry ? formatDate(b.expiry) : '-'}</td><td className={styles.num}>{b.qty}</td></tr>)}</tbody>
                 </table>
               </div>
             )}

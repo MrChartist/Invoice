@@ -25,7 +25,7 @@ export const BETA_GUIDE: readonly GuideSection[] = [
     heading: '1. What the app is', hiHeading: '1. यह ऐप क्या है',
     lines: [
       'Invoicing and light accounting for Indian businesses: sales documents, payments, purchases with ITC and TDS, inventory, books, GST working papers, e-Invoice / e-Way JSON, Tally XML and payroll.',
-      'Local-first and private: no server and no account. Your data stays in this browser on this device, so we cannot see it or recover it — your backups are the only copy.',
+      'Local-first and private: no server and no account. Your data stays in this browser on this device, so we cannot see it or recover it: your backups are the only copy.',
     ],
   },
   {

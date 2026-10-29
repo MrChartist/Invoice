@@ -76,7 +76,7 @@ export function creditPartner(input: { partnerId: string; kind: PartnerCreditKin
     const v = saveVoucher({
       type: 'JOURNAL',
       date: input.date,
-      narration: `${input.kind[0].toUpperCase()}${input.kind.slice(1)} credited to ${p.name}${tds ? ` — TDS u/s 194T ₹${tds}` : ''}: verify with your CA`,
+      narration: `${input.kind[0].toUpperCase()}${input.kind.slice(1)} credited to ${p.name}${tds ? `: TDS u/s 194T ₹${tds}` : ''}: verify with your CA`,
       lines: [
         { account_id: expenseFor(input.kind), dr: paise, cr: 0 },
         { account_id: p.current_account_id, dr: 0, cr: paise - tdsPaise },

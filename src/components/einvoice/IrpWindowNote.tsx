@@ -47,7 +47,7 @@ export function AatoField({ profileGstin, onSaved }: { profileGstin?: string; on
     const n = Number(value.replace(/[^0-9.]/g, ''));
     try {
       localDb.settings.save({ ...s, profiles: s.profiles.map((p) => (p.id === prof.id ? { ...p, einvoice_aato: n > 0 ? n : undefined } : p)) });
-      setMsg(ggT('aatoSaved', { name: prof.companyName || prof.companyGstin || '—' }));
+      setMsg(ggT('aatoSaved', { name: prof.companyName || prof.companyGstin || '-' }));
       onSaved?.();
     } catch (e) {
       setMsg((e as Error).message);

@@ -12,7 +12,7 @@ import { ACT_WORDS_PRINT, formText, sectionText, type ActWords } from '../ita202
 import { fyOf } from './donations';
 
 /** Section label on a date ("80G" before 1 Apr 2026, "Sec 133(1)(b)(ii) [old 80G]" from then). */
-export const donationSectionText = (section: string, date: string, w: ActWords = ACT_WORDS_PRINT) => (section === 'none' ? '—' : section === '80G' ? sectionText('80G', date, w) : `Sec ${section}`);
+export const donationSectionText = (section: string, date: string, w: ActWords = ACT_WORDS_PRINT) => (section === 'none' ? '-' : section === '80G' ? sectionText('80G', date, w) : `Sec ${section}`);
 
 /** "Form 10BD" for FY 2025-26, "Form 113 [old 10BD]" for FY 2026-27 on (chosen by the FY of the donation). */
 export const tenBdText = (date: string, w: ActWords = ACT_WORDS_PRINT) => formText('10BD', `${fyOf(date)}-04-01`, w);
@@ -26,7 +26,7 @@ export function donationReceiptHtml(d: Donation, donor: Client | undefined, p: S
     ...(d.section !== 'none' ? [`${tenBeText(d.date)} will be issued after ${tenBdText(d.date)} is filed.`] : []),
   ];
   return receiptHtml({
-    title: `Donation receipt${d.cancelled ? ' — CANCELLED' : ''}`, number: d.number, date: d.date, from: d.anonymous ? 'Anonymous' : donor?.company || donor?.name || '', fromGstin: '',
+    title: `Donation receipt${d.cancelled ? ': CANCELLED' : ''}`, number: d.number, date: d.date, from: d.anonymous ? 'Anonymous' : donor?.company || donor?.name || '', fromGstin: '',
     business: p?.companyName ?? '', businessGstin: p?.companyGstin ?? '', businessAddress: p?.companyAddress ?? '', amount: d.amount, currency: 'INR', amountWords: amountInWords(d.amount, 'INR'),
     method: opts.labels.mode, reference: d.reference ?? '', against: '', invoiceTotal: d.amount, balanceAfter: 0,
     rows: [

@@ -84,7 +84,7 @@ export default function ReplenishTab({ ctx }: { ctx: MfgContext }) {
           <span className={css.actions}>
             <button type="button" className={cn(controls.btnOutline, controls.btnSm)} disabled={!toTransfer.length} onClick={raiseRequests}><ArrowLeftRight size={14} aria-hidden="true" /> {sT('rpRaise', { n: toTransfer.length })}</button>
             <select className={controls.select} aria-label={sT('vendor')} value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
-              <option value="">{sT('vendor')}: {toBuy[0]?.vendor ?? '—'}</option>
+              <option value="">{sT('vendor')}: {toBuy[0]?.vendor ?? '-'}</option>
               {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
             <button type="button" className={cn(controls.btnOutline, controls.btnSm)} disabled={!toBuy.length} onClick={raisePo}><ShoppingCart size={14} aria-hidden="true" /> {sT('rpPoBtn', { n: toBuy.length })}</button>

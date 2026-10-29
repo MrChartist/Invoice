@@ -36,7 +36,7 @@ export function PvWorkingPage({ invoice }: { invoice: InvoiceRecord }) {
           <span className={styles.pageTitle}>{pe('p.pvTitle', { number: pv.number ?? '', clause: pv.clause ?? '', from: cfg.date(pv.period_from ?? ''), to: cfg.date(pv.period_to ?? '') })}</span>
           <span className={styles.meta}>{invoice.client?.name} · {invoice.invoice_number || 'DRAFT'}</span>
         </div>
-        <div className={styles.meta}>{pe('p.pvFormula', { m: num(pv.m_factor), base: pv.base_month ?? '—' })}</div>
+        <div className={styles.meta}>{pe('p.pvFormula', { m: num(pv.m_factor), base: pv.base_month ?? '-' })}</div>
         <table className={styles.table}>
           <thead>
             <tr>

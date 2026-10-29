@@ -182,7 +182,7 @@ export function AdvanceFormModal({ open, advance, partyName, onClose, onSaved }:
           <span className={controls.label}>{rcvT('afPos')}</span>
           <select className={controls.select} value={form.pos} onChange={(e) => set('pos', e.target.value)}>
             <option value="">{rcvT('afChoose')}</option>
-            {INDIAN_STATES.map((s) => <option key={s.code} value={s.code}>{s.code} — {s.name}</option>)}
+            {INDIAN_STATES.map((s) => <option key={s.code} value={s.code}>{s.code} : {s.name}</option>)}
           </select>
         </label>
         <div className={styles.taxBox} role="status" aria-live="polite">

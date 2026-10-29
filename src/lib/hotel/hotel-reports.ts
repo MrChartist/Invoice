@@ -78,7 +78,7 @@ export function byRoomType(from: string, to: string, d: { rooms: readonly Room[]
 }
 
 /** Source of a booking: walk-in / phone / direct / company / agent, or the OTA's name. */
-export const sourceOf = (r: Pick<Reservation, 'source' | 'ota'>): string => (r.source === 'ota' ? `OTA · ${r.ota?.name || '—'}` : r.source);
+export const sourceOf = (r: Pick<Reservation, 'source' | 'ota'>): string => (r.source === 'ota' ? `OTA · ${r.ota?.name || '-'}` : r.source);
 
 /** Room-nights (paid) and room revenue by source; totals equal the period's room revenue from stays. */
 export function sourceMix(from: string, to: string, reservations: readonly Reservation[], folios: readonly Folio[]): { source: string; nights: number; revenue: number }[] {

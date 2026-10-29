@@ -84,7 +84,7 @@ export default function MusterView({ notify }: MpViewProps) {
               <tr key={i} data-mp-muster-row={name(r.employee_id)?.code ?? i}>
                 <td>
                   <select className={controls.select} aria-label={mbT('person')} disabled={ro} value={r.employee_id} onChange={(e) => set(i, { employee_id: e.target.value })} data-mp-row-person>
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {staff.map((e) => <option key={e.id} value={e.id}>{e.code} {e.name}</option>)}
                   </select>
                 </td>
@@ -121,7 +121,7 @@ export default function MusterView({ notify }: MpViewProps) {
           {push.missing && <p className={controls.hint}>{mbT('missing', { s: push.missing })}</p>}
           <table className={surface.table}>
             <thead><tr><th>{mbT('person')}</th><th className={surface.numeric}>{mpT('duties')}</th><th className={surface.numeric}>{mbT('lopNow')}</th><th className={surface.numeric}>{mbT('lop')}</th><th className={surface.numeric}>{mbT('ot')}</th></tr></thead>
-            <tbody>{push.rows.map((r) => <tr key={r.employee_id} data-mp-push-row={name(r.employee_id)?.code}><td>{name(r.employee_id)?.name ?? r.employee_id}</td><td className={surface.numeric}>{r.duties}</td><td className={surface.numeric}>{r.cur?.lop ?? '—'}</td><td className={surface.numeric}>{r.lop}</td><td className={surface.numeric}>{r.units.ot_hours ?? ''}</td></tr>)}</tbody>
+            <tbody>{push.rows.map((r) => <tr key={r.employee_id} data-mp-push-row={name(r.employee_id)?.code}><td>{name(r.employee_id)?.name ?? r.employee_id}</td><td className={surface.numeric}>{r.duties}</td><td className={surface.numeric}>{r.cur?.lop ?? '-'}</td><td className={surface.numeric}>{r.lop}</td><td className={surface.numeric}>{r.units.ot_hours ?? ''}</td></tr>)}</tbody>
           </table>
           <button type="button" className={controls.btnPrimary} disabled={!push.rows.length} onClick={() => void send()} data-mp-push-confirm>{mbT('confirm')}</button>
         </div>

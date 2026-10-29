@@ -95,7 +95,7 @@ export const fieldLabel = (key: string) => FIELD_LABELS[key] ?? humanize(key);
 /** Display value: money / dates formatted, objects summarised, private fields hidden unless allowed. */
 export function showValue(key: string, v: unknown, opts: { seePrivate: boolean; currency?: string } = { seePrivate: true }): string {
   if (!opts.seePrivate && PRIVATE_FIELD.test(key)) return '(changed)';
-  if (v === undefined || v === null || v === '') return '—';
+  if (v === undefined || v === null || v === '') return '-';
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
   if (typeof v === 'number') return MONEY.has(key) ? formatCurrency(v, opts.currency || 'INR') : String(v);
   if (typeof v === 'string') {

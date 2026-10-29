@@ -14,7 +14,7 @@ export const scanT = defineArea(
     failed: 'The camera could not be started. Use a USB scanner or type the code instead.',
     preview: 'Camera preview',
     read: 'Read {code}',
-    local: 'Nothing is uploaded — the image is read on this device.',
+    local: 'Nothing is uploaded: the image is read on this device.',
   } as const,
   {
     placeholder: 'बारकोड / SKU स्कैन करें या टाइप करें, फिर Enter',
@@ -28,6 +28,6 @@ export const scanT = defineArea(
     failed: 'कैमरा शुरू नहीं हो सका। USB स्कैनर इस्तेमाल करें या कोड टाइप करें।',
     preview: 'कैमरा प्रीव्यू',
     read: '{code} पढ़ा गया',
-    local: 'कुछ भी अपलोड नहीं होता — तस्वीर इसी डिवाइस पर पढ़ी जाती है।',
+    local: 'कुछ भी अपलोड नहीं होता: तस्वीर इसी डिवाइस पर पढ़ी जाती है।',
   },
 );

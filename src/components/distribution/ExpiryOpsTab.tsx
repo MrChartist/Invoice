@@ -248,7 +248,7 @@ export default function ExpiryOpsTab({ items, positions, tracking, today, onChan
                 {expiryStock.map((r) => (
                   <tr key={r.key}>
                     <td><input type="checkbox" aria-label={phT('include', { item: r.item.name })} checked={destroyPick.has(r.key)} onChange={(e) => { const n = new Set(destroyPick); if (e.target.checked) n.add(r.key); else n.delete(r.key); setDestroyPick(n); }} /></td>
-                    <td>{r.item.name}</td><td>{r.batch || '—'}</td><td>{gname(r.godown)}</td><td className={own.num}>{r.qty}</td><td className={own.num}>{formatCurrency(posById.get(r.item.id)?.avgCost ?? 0)}</td>
+                    <td>{r.item.name}</td><td>{r.batch || '-'}</td><td>{gname(r.godown)}</td><td className={own.num}>{r.qty}</td><td className={own.num}>{formatCurrency(posById.get(r.item.id)?.avgCost ?? 0)}</td>
                   </tr>
                 ))}
               </tbody>

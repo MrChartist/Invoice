@@ -56,7 +56,7 @@ test('close → one purchase, feed set-off receipt (no cash), balanced journal; 
   assert.equal(bills.length, 1, 'one purchases row per cycle');
   assert.equal(bills[0].total, 7000, 'Σ lines = purchase total');
   assert.equal(bills[0].amount_paid, 1050, 'deductions rolled into amount_paid');
-  assert.equal(bills[0].vendor_name, 'Farmers — Rampur');
+  assert.equal(bills[0].vendor_name, 'Farmers: Rampur');
   const r = getTable<Payment>('transactions').find((p) => p.invoice_id === feed.id)!;
   assert.equal(r.exchange_purchase_id, closed.purchase_id);
   assert.ok(movedNoCash(r), 'cash readers skip the set-off');

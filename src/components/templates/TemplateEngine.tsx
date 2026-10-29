@@ -169,7 +169,7 @@ export function TemplateEngine({ invoice, sender, totals, templateId, design, pa
   const challan = invoice.doc_type === 'DELIVERY_CHALLAN';
   const hideAmounts = challan && !!invoice.challan_hide_amounts;
   const returnNote = challan && invoice.challan_returnable
-    ? `Returnable delivery challan — not a sale. Goods to be returned${invoice.challan_return_by ? ` by ${formatDate(invoice.challan_return_by)}` : ''}.`
+    ? `Returnable delivery challan: not a sale. Goods to be returned${invoice.challan_return_by ? ` by ${formatDate(invoice.challan_return_by)}` : ''}.`
     : '';
 
   const exportBlock = (/^EXPORT/.test(invoice.supply_type ?? '') || /^9[67]$/.test(invoice.place_of_supply ?? '') || EXPORT_KEYS.some((k) => invoice[k])) && (

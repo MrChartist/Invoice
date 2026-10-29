@@ -24,7 +24,7 @@ test('FEFO with a floor: skips batches below the client\'s minimum; shortfall me
   const r = floorBatches([old, fresh], '2026-10-27', { pct: 70 }, 20);
   assert.deepEqual(r.ok.map((b) => b.batch), ['B2']);
   assert.equal(r.qualifying, 12);
-  assert.equal(r.message, 'no batch with ≥ 70% life — 12 units qualify');
+  assert.equal(r.message, 'no batch with ≥ 70% life: 12 units qualify');
   assert.equal(floorBatches([old, fresh], '2026-10-27', { pct: 70 }, 10).message, '');
   assert.equal(floorBatches([old, fresh], '2026-10-27', undefined, 40).ok.length, 2);
   assert.equal(meetsFloor({ expiry: '2027-01-01' }, '2026-10-27', { pct: 50 }), false, 'no MFG date: % cannot be checked');

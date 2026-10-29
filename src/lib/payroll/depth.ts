@@ -582,7 +582,7 @@ export function fnfWorking(fnf: FnfSettlement, employee: Employee, ctx: FnfConte
       if (out <= 0) continue;
       const interest = monthlyInterest(out, loan.interest_rate);
       loans.push({ loan_id: loan.id, number: loan.number, outstanding: out, interest });
-      items.push({ key: `loan:${loan.id}`, name: `${loan.kind === 'advance' ? 'Advance' : 'Loan'} ${loan.number} — balance recovered`, kind: 'deduction', amount: round2(out + interest), account_id: A.staffAdvances, tag: 'loan', ref_id: loan.id, ...(interest ? { interest } : {}) });
+      items.push({ key: `loan:${loan.id}`, name: `${loan.kind === 'advance' ? 'Advance' : 'Loan'} ${loan.number}: balance recovered`, kind: 'deduction', amount: round2(out + interest), account_id: A.staffAdvances, tag: 'loan', ref_id: loan.id, ...(interest ? { interest } : {}) });
     }
   }
 

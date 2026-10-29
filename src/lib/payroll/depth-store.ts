@@ -99,7 +99,7 @@ export function saveArrears(input: ArrearsInput): ArrearsRecord {
   const gross = round2(months.reduce((s, m) => s + m.gross, 0));
   const [row] = normalizeArrears([{ id: prev?.id ?? generateId(), employee_id: input.employee_id, from_month: input.from_month, pay_month: input.pay_month, months, gross, note: str(input.note), created_at: prev?.created_at ?? now() }]);
   setTable(PAYROLL_TABLES.arrears, prev ? all.map((r) => (r.id === row.id ? row : r)) : [...all, row]);
-  audit.record({ entity: 'payroll', entity_id: row.id, action: prev ? 'update' : 'create', summary: `Arrears for ${employeeName(row.employee_id)}: ${months.length} month${months.length === 1 ? '' : 's'} from ${row.from_month}, paid with ${row.pay_month}${arrearsEarlierFy(row) ? ' (earlier FY — relief u/s 89)' : ''}` });
+  audit.record({ entity: 'payroll', entity_id: row.id, action: prev ? 'update' : 'create', summary: `Arrears for ${employeeName(row.employee_id)}: ${months.length} month${months.length === 1 ? '' : 's'} from ${row.from_month}, paid with ${row.pay_month}${arrearsEarlierFy(row) ? ' (earlier FY: relief u/s 89)' : ''}` });
   return row;
 }
 
@@ -381,7 +381,7 @@ export function postProvisionJournal(kind: ProvisionKind, date: string, amount: 
   return saveVoucher({
     type: 'JOURNAL',
     date,
-    narration: `${up ? 'Provision for' : 'Release of provision for'} ${PROVISION_WORD[kind]} as at ${date} (payroll working — verify with your CA)${note ? ` · ${note}` : ''}`,
+    narration: `${up ? 'Provision for' : 'Release of provision for'} ${PROVISION_WORD[kind]} as at ${date} (payroll working: verify with your CA)${note ? ` · ${note}` : ''}`,
     lines: up
       ? [{ account_id: expense, dr: p, cr: 0 }, { account_id: A.provisions, dr: 0, cr: p }]
       : [{ account_id: A.provisions, dr: p, cr: 0 }, { account_id: expense, dr: 0, cr: p }],

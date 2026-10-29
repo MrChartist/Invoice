@@ -46,7 +46,7 @@ export function setPayrollGrant(userId: string, granted: boolean): PayrollGrante
       entity_id: 'users',
       action: 'update',
       summary: granted
-        ? `Payroll access granted to ${u.name} (${u.role}) — salaries, payslips and statutory returns become visible to this user`
+        ? `Payroll access granted to ${u.name} (${u.role}): salaries, payslips and statutory returns become visible to this user`
         : `Payroll access withdrawn from ${u.name} (${u.role})`,
     });
     // Every open tab re-checks who is signed in, so the change applies at once.

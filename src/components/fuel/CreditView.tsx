@@ -31,7 +31,7 @@ export default function CreditView({ onDone }: { onDone: Done }) {
   const docs = localDb.invoices.getAll();
   const open = unbilledSlips(readSlips(), docs);
   const c = clients.find((x) => x.id === d.client);
-  const name = (id: string, l: { id?: string; name: string }[]) => l.find((x) => x.id === id)?.name ?? '—';
+  const name = (id: string, l: { id?: string; name: string }[]) => l.find((x) => x.id === id)?.name ?? '-';
   const act = (fn: () => string | void) => { try { const m = fn(); setN(n + 1); onDone(m || fuT('saved')); } catch (e) { onDone((e as Error).message, true); } };
   const p = d.item ? priceAt(getTable<FuelPrice>('fuel_prices'), d.item, d.date ?? day, '23:59') : null;
   const amount = d.amount || (p && d.litres ? (Number(d.litres) * p.rsp).toFixed(2) : '');

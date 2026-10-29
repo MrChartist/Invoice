@@ -29,7 +29,7 @@ import { cellOf, guessColumns, numOf, type SynonymTable } from './file-map';
 import { ECO_CREDITS_TABLE, operatorGstinFor } from './channels';
 import { ensureGstTdsReceivableAccount, ensureTcsReceivableAccount } from './settlement-post';
 
-export const WORKING_PAPER = 'Working paper — the portal statement is the authority; verify with your CA.';
+export const WORKING_PAPER = 'Working paper: the portal statement is the authority; verify with your CA.';
 
 export type CreditKind = 'tcs' | 'tds';
 
@@ -283,7 +283,7 @@ export function acceptCredit(id: string, date?: string): EcoCredit {
     const p = rupeesToPaise(amount);
     const v = saveVoucher({
       type: 'JOURNAL', date: day, voucher_class: row.kind === 'tcs' ? 'GST TCS credit' : 'GST TDS credit',
-      narration: `GST ${row.kind.toUpperCase()} credit accepted on the portal — ${row.operator_gstin}, ${row.month} (IGST ${row.igst}, CGST ${row.cgst}, SGST ${row.sgst}). ${WORKING_PAPER}`,
+      narration: `GST ${row.kind.toUpperCase()} credit accepted on the portal: ${row.operator_gstin}, ${row.month} (IGST ${row.igst}, CGST ${row.cgst}, SGST ${row.sgst}). ${WORKING_PAPER}`,
       lines: [{ account_id: A.gstCash, dr: p, cr: 0 }, { account_id: credit, dr: 0, cr: p }],
     });
     const next: EcoCredit = { ...row, decision: 'accepted', decided_on: day, journal_id: v.id };

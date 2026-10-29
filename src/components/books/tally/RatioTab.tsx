@@ -14,7 +14,7 @@ import books from '../books.module.css';
 import styles from './tally.module.css';
 
 const show = (r: RatioItem) => {
-  if (r.value === null) return '—';
+  if (r.value === null) return '-';
   if (r.unit === 'money') return `₹${formatMoney(r.value / 100)}`;
   if (r.unit === 'days') return ratioT('days', { n: Math.round(r.value) });
   if (r.unit === 'times') return ratioT('times', { n: r.value.toFixed(2) });

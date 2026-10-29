@@ -38,8 +38,8 @@ export default function ExportDetailsFields() {
     <label className={`${controls.field} ${styles.grow}`}>
       <span className={controls.label}>{label}</span>
       <select className={controls.select} value={countryCode(s[k])} onChange={(e) => set(k, e.target.value)}>
-        <option value="">{k === 'country_of_origin' ? 'IN — India' : trT('countryPick')}</option>
-        {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.code} — {c.name}</option>)}
+        <option value="">{k === 'country_of_origin' ? 'IN: India' : trT('countryPick')}</option>
+        {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.code} : {c.name}</option>)}
       </select>
     </label>
   );

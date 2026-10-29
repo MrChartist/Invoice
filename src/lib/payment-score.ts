@@ -209,7 +209,7 @@ export function paymentScore(partyKey: string, input: ScoreInput, today: string)
 
 /** "B · pays 6 days late on average · 80% of 5 bills on time" — tooltip text. */
 export function scoreSummary(s: PaymentScore): string {
-  return [s.grade ?? '—', ...s.reasons, s.trend ? `trend ${s.trend}` : ''].filter(Boolean).join(' · ');
+  return [s.grade ?? '-', ...s.reasons, s.trend ? `trend ${s.trend}` : ''].filter(Boolean).join(' · ');
 }
 
 /**

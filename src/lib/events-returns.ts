@@ -105,10 +105,10 @@ export function returnStockEvents(
       const base = { date: day(g.date), refType: isGrn ? 'grn' : 'rejection_out', refId: g.id, refNumber: g.number, party: g.vendor_name, godown: l.godown_id, batch: l.batch_no || undefined };
       if (isGrn) {
         const billed = rates.get(l.id);
-        push(it.id, { ...base, kind: 'purchase', qty: q, rate: billed && billed > 0 ? billed : num(l.rate) / factor, particulars: `Receipt note — ${g.number}${party}`, mfg: l.mfg_date || undefined, expiry: l.expiry_date || undefined });
+        push(it.id, { ...base, kind: 'purchase', qty: q, rate: billed && billed > 0 ? billed : num(l.rate) / factor, particulars: `Receipt note: ${g.number}${party}`, mfg: l.mfg_date || undefined, expiry: l.expiry_date || undefined });
       } else {
         const from = g.grn_id ? grnNumber.get(g.grn_id) : undefined;
-        push(it.id, { ...base, kind: 'adjustment', qty: -q, particulars: `Rejection out — ${g.number}${from ? ` (${from})` : ''}${party}` });
+        push(it.id, { ...base, kind: 'adjustment', qty: -q, particulars: `Rejection out: ${g.number}${from ? ` (${from})` : ''}${party}` });
       }
     }
   }
@@ -131,7 +131,7 @@ export function returnStockEvents(
         kind: 'adjustment',
         qty: -q,
         saleRate: num(l.rate) / factor,
-        particulars: `Purchase return — ${n.note_number}${n.bill_number ? ` (bill ${n.bill_number})` : ''}${party}`,
+        particulars: `Purchase return: ${n.note_number}${n.bill_number ? ` (bill ${n.bill_number})` : ''}${party}`,
         refType: 'purchase_return',
         refId: n.id,
         refNumber: n.note_number,

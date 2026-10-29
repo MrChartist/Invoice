@@ -101,7 +101,7 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
             {tree.map(({ node, depth }) => ({ g: godowns.find((x) => x.id === node.id) ?? { id: node.id, name: node.name }, depth })).map(({ g, depth }) => (
               <tr key={g.id}>
                 <td><span className={depthClass(depth)}>{g.name}</span>{g.id === MAIN_GODOWN_ID && <span className={styles.muted}>{invT('defaultTag')}</span>}{g.kind && <span className={styles.muted}> · {g.kind === 'transit' ? replT('transit') : skT(g.kind === 'van' ? 'kindVan' : 'kindExpiry')}</span>}</td>
-                <td className={styles.muted}>{g.address || '—'}</td>
+                <td className={styles.muted}>{g.address || '-'}</td>
                 <td>
                   <span className={surface.rowActions}>
                     <button type="button" className={controls.btnIcon} aria-label={invT('rename', { name: g.name })} onClick={() => setEditing({ id: g.id, name: g.name, address: g.address ?? '', parent_id: g.parent_id ?? '', kind: g.kind ?? '', replenish_from: g.replenish_from ?? getTable<Godown>('godowns').find((x) => x.id === g.id)?.replenish_from ?? '', cost_centre_id: g.cost_centre_id ?? getTable<Godown>('godowns').find((x) => x.id === g.id)?.cost_centre_id })}>

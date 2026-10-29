@@ -74,10 +74,10 @@ export function abstractHtml(boq: InvoiceRecord, bill: InvoiceRecord, rows: read
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(`RA ${bill.ra_no ?? ''} abstract`)}</title><style>${PRINT_FONT_FACE}
 body{font-family:${PRINT_FONT};color:#111;margin:0;padding:20px;font-size:12px}h1{font-size:16px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:10px}
 th,td{border:1px solid #999;padding:4px 6px;text-align:left}td.n,th.n{text-align:right}.sum{max-width:420px;margin-left:auto}.note{color:#777;font-size:12px}@media print{body{padding:0}}</style></head><body>
-<h1>${esc(company)} — RA bill no. ${esc(bill.ra_no ?? '')}${bill.ra_final ? ' (final)' : ''}: abstract</h1>
+<h1>${esc(company)}: RA bill no. ${esc(bill.ra_no ?? '')}${bill.ra_final ? ' (final)' : ''}: abstract</h1>
 <div>Invoice ${esc(bill.invoice_number)} dated ${esc(bill.issue_date)} · BOQ ${esc(boq.invoice_number)} · ${esc(bill.client?.name ?? '')}</div>
 <table><thead><tr><th>Item no.</th><th>Description</th><th>Unit</th><th class="n">BOQ qty</th><th class="n">Rate</th><th class="n">Prev qty</th><th class="n">Prev ₹</th><th class="n">This qty</th><th class="n">This ₹</th><th class="n">Cum qty</th><th class="n">Cum ₹</th><th class="n">% BOQ</th><th>MB</th></tr></thead>
 <tbody>${body}<tr><th colspan="6">Total</th><th class="n">${m(t.prev)}</th><th></th><th class="n">${m(t.this)}</th><th></th><th class="n">${m(t.cum)}</th><th></th><th></th></tr></tbody></table>
 <table class="sum"><tbody><tr><td>Gross this bill (incl. GST)</td><td class="n">${m(num(bill.total))}</td></tr>${deds}<tr><th>Net payable</th><th class="n">${m(num(bill.ra_net_payable ?? bill.total))}</th></tr></tbody></table>
-<p class="note">GST is charged on the full bill value; deductions do not change it. Working paper — verify with your CA.</p></body></html>`;
+<p class="note">GST is charged on the full bill value; deductions do not change it. Working paper: verify with your CA.</p></body></html>`;
 }

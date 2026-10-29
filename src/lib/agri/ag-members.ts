@@ -108,7 +108,7 @@ export function certificateHtml(r: MemberShareRow, ctx: { company: string; folio
   return smallPaper(`Share certificate ${r.certificate_no ?? ''}`.trim(), ctx.company, [
     ['Member', r.member_name], ['Folio / member no.', ctx.folio ?? ''], ['Shares', r.shares], ['Face value (₹)', r.face_value], ['Amount paid (₹)', round2(num(r.shares) * num(r.face_value))],
     ['Distinctive nos.', ctx.from && ctx.to ? `${ctx.from} to ${ctx.to}` : ''], ['Date of allotment', r.date], ['Approved on', r.approved_on ?? ''],
-  ], 'Issued under the articles / bye-laws. Working paper — verify the form with your CS / Registrar (AG18, AG19).', 'Director / Secretary');
+  ], 'Issued under the articles / bye-laws. Working paper: verify the form with your CS / Registrar (AG18, AG19).', 'Director / Secretary');
 }
 
 /** Distinctive numbers of a certificate: shares issued before it + 1 … + its shares (allotments and transfers in, by date then entry). */

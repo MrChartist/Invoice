@@ -45,7 +45,7 @@ export default function MfProfileRow({ notify }: { notify: (m: string, tone?: 's
       <label className={controls.field}>
         <span className={controls.label}>{mfPickT('category')}</span>
         <select className={controls.select} value={cat} onChange={(e) => setCat(e.target.value)} data-mf-category>
-          <option value="">—</option>
+          <option value="">-</option>
           {(['MICRO', 'SMALL', 'MEDIUM'] as const).map((c) => <option key={c} value={c}>{mfPickT(`cat.${c}`)}</option>)}
         </select>
       </label>

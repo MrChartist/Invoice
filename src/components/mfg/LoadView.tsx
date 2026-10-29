@@ -85,19 +85,19 @@ export default function LoadView({ ctx }: { ctx: MfgContext }) {
       {!centres.length && <p className={controls.hint}>{fT('needCentres')}</p>}
       {ctx.canBooks && open.length > 0 && (
         <div style={row}>
-          <F label={fT('order')}><Sel v={move.id} set={(x) => setMove({ id: x, due: orders.find((o) => o.id === x)?.due_date ?? '' })} o={[['', '—'], ...open.map((o) => [o.id, `${o.number}${o.due_date ? ` · ${o.due_date}` : ''}`] as const)]} /></F>
+          <F label={fT('order')}><Sel v={move.id} set={(x) => setMove({ id: x, due: orders.find((o) => o.id === x)?.due_date ?? '' })} o={[['', '-'], ...open.map((o) => [o.id, `${o.number}${o.due_date ? ` · ${o.due_date}` : ''}`] as const)]} /></F>
           <F label={fT('due')} w={160}><In type="date" v={move.due} set={(x) => setMove({ ...move, due: x })} /></F>
           <button type="button" className={controls.btnOutline} onClick={moveOrder} disabled={!move.id}>{fT('moveDue')}</button>
         </div>
       )}
       <h4>{fT('promiseTitle')}</h4>
       <div style={row}>
-        <F label={fT('item')}><Sel v={item} set={setItem} o={[['', '—'], ...ctx.items.filter((i) => i.track_stock).map((i) => [i.id, i.name] as const)]} /></F>
+        <F label={fT('item')}><Sel v={item} set={setItem} o={[['', '-'], ...ctx.items.filter((i) => i.track_stock).map((i) => [i.id, i.name] as const)]} /></F>
         <F label={fT('qty')} w={110}><In v={qty} set={setQty} inputMode="decimal" /></F>
         <button type="button" className={controls.btnOutline} onClick={ask} disabled={!item || !(num(qty) > 0)} data-mf="promise">{fT('promiseAsk')}</button>
       </div>
       {promise && <p data-mf-promise>{promise}</p>}
-      <Grid attr="open" head={[fT('order'), fT('item'), fT('qty'), fT('due')]} rows={open.map((o) => [o.number, ctx.items.find((i) => i.id === o.item_id)?.name ?? '?', fmt(num(o.planned_qty)), o.due_date ?? '—'])} />
+      <Grid attr="open" head={[fT('order'), fT('item'), fT('qty'), fT('due')]} rows={open.map((o) => [o.number, ctx.items.find((i) => i.id === o.item_id)?.name ?? '?', fmt(num(o.planned_qty)), o.due_date ?? '-'])} />
     </section>
   );
 }

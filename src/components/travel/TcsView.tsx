@@ -50,7 +50,7 @@ export default function TcsView({ notify }: TvViewProps) {
           <table className={surface.table} data-tv-tcs-register>
             <thead><tr><th>{tvdT('buyer')}</th><th>{tvdT('pan')}</th><th className={surface.numeric}>{tvdT('docs')}</th><th className={surface.numeric}>{tvdT('base')}</th><th className={surface.numeric}>{tvdT('collected')}</th></tr></thead>
             <tbody>
-              {reg.buyers.map((b) => <tr key={b.key}><td>{b.name}</td><td>{b.pan || '—'}</td><td className={surface.numeric}>{b.count}</td><td className={surface.numeric}>{money(b.base)}</td><td className={surface.numeric}>{money(b.tcs)}</td></tr>)}
+              {reg.buyers.map((b) => <tr key={b.key}><td>{b.name}</td><td>{b.pan || '-'}</td><td className={surface.numeric}>{b.count}</td><td className={surface.numeric}>{money(b.base)}</td><td className={surface.numeric}>{money(b.tcs)}</td></tr>)}
               <tr>{reg.quarters.map((q, i) => <th key={i} className={surface.numeric}>{tvdT('quarter')} {i + 1}: {money(q)}</th>)}<th className={surface.numeric}>{tvT('total')}: {money(reg.total)}</th></tr>
             </tbody>
           </table>

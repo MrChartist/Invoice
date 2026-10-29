@@ -57,7 +57,7 @@ const inr = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigi
 
 export function tourTcsLabel(date: string, rates: readonly number[], noPan = false): string {
   const r = [...new Set(rates)].map((x) => `${x} %`).join(' / ');
-  return `${date >= ACT_2025 ? 'Sec 394(1) Sl. 8 —' : '206C(1G)'} overseas tour package ${r}${noPan ? ' (no PAN)' : ''}`;
+  return `${date >= ACT_2025 ? 'Sec 394(1) Sl. 8:' : '206C(1G)'} overseas tour package ${r}${noPan ? ' (no PAN)' : ''}`;
 }
 
 /** TCS of one invoice by date, base and the buyer's FY aggregate. */

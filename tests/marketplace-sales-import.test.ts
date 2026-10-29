@@ -4,7 +4,7 @@ import { beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { AMZ_MH, fixture, importMtr, setupWorld } from './helpers/marketplace.ts';
 import { guessColumns } from '../src/lib/marketplace/file-map.ts';
-import { SALES_FIELDS, liveSalesContext, planSalesImport, rowKind, undoSalesImport, loadImports } from '../src/lib/marketplace/sales-import.ts';
+import { SALES_FIELDS, liveSalesContext, planSalesImport, rowKind, undoSalesImport, loadImports, summaryOrderIds } from '../src/lib/marketplace/sales-import.ts';
 import { localDb } from '../src/lib/localDb.ts';
 import { getTable } from '../src/lib/storage.ts';
 import { buildGstr1 } from '../src/lib/gst-reports.ts';
@@ -45,7 +45,7 @@ test('B2C row → INVOICE with ECO tag and ship-to state; B2B → TAX_INVOICE; r
   assert.equal(b2c.igst_amount, 90);
   assert.equal(b2c.total, 590);
   assert.equal(b2c.channel_order_id, '402-111');
-  assert.match(b2c.client.name, /Amazon customer — Karnataka/);
+  assert.match(b2c.client.name, /Amazon customer: Karnataka/);
   assert.equal(b2c.status !== 'Draft', true, 'issued, not a draft');
   const b2b = byNo('IN-1003');
   assert.equal(b2b.doc_type, 'TAX_INVOICE');
@@ -192,4 +192,9 @@ test('QA6 F2: a summary saved without order ids is matched from its notes; else 
   const plan = planFile(false);
   assert.equal(plan.docs.filter((d) => d.record.doc_type === 'INVOICE').length, 0, 'no B2C invoice planned');
   assert.ok(plan.errors.some((e) => /already covers/i.test(e.message)), plan.errors.map((e) => e.message).join(' | '));
+});
+
+test('summary notes: the order list reads from the new text and from notes saved before the writing rule (em dash)', () => {
+  assert.deepEqual(summaryOrderIds({ notes: 'Marketplace summary (Amazon): 2 orders: A1, A2' }), ['A1', 'A2']);
+  assert.deepEqual(summaryOrderIds({ notes: 'Marketplace summary (Amazon): 2 orders — A1, A2' }), ['A1', 'A2']);
 });

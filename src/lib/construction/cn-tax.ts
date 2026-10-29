@@ -59,7 +59,7 @@ export function otherStateNotice(site: CnSite | undefined, senderStates: readonl
   const s = siteState(site);
   if (!s || senderStates.filter(Boolean).includes(s)) return '';
   const name = stateByCode(s)?.name ?? s;
-  return `Services for immovable property are supplied where the property is (Sec 12(3)); you may need registration in ${name} — verify with your CA (CN4).`;
+  return `Services for immovable property are supplied where the property is (Sec 12(3)); you may need registration in ${name}: verify with your CA (CN4).`;
 }
 
 /* ── Declarations (CN-A2 AC4): in `cn-print.ts` (the paper chunk prints them) ── */
@@ -70,7 +70,7 @@ export { DECLARATION_TEXT, PURE_LABOUR_TEXT, declarationKind, worksDeclarations,
 /** The editor caution: one document mixes supply-of-goods and installation lines. */
 export const mixedSupplyInstall = (classes: readonly (CnClass | undefined)[]): boolean => classes.includes('supply_goods') && classes.includes('install_service');
 
-export const SPLIT_CAUTION = 'If the installation makes the goods part of the building, the whole contract is a works contract at the works rate — check with your CA (CN3).';
+export const SPLIT_CAUTION = 'If the installation makes the goods part of the building, the whole contract is a works contract at the works rate: check with your CA (CN3).';
 
 /** "Treat as works contract": supply / installation lines become `wc_general` (other classes unchanged). */
 export function reclassAsWorks(lines: Readonly<Record<string, CnLine>>): Record<string, CnLine> {

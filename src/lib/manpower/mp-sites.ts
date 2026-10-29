@@ -19,7 +19,7 @@ export interface Site { id: string; name: string; client_id?: string; mp: SiteIn
 
 /** The sites among the cost-centre rows (default: the stored table). */
 export const loadSites = (rows: readonly { id: string; name: string; client_id?: string; mp?: SiteInfo }[] = getTable('cost_centres')): Site[] => rows.filter((c): c is Site => !!c?.mp?.code);
-export const siteLabel = (s: Pick<Site, 'name' | 'mp'>): string => `${s.mp.code} — ${s.name}`;
+export const siteLabel = (s: Pick<Site, 'name' | 'mp'>): string => `${s.mp.code}: ${s.name}`;
 
 /** SAC for a post: guards / supervisors / gunmen 998525, housekeeping / cleaning 998533, else by the agency's kind. */
 export function suggestSac(postName: string, kind?: string, date?: string): string {

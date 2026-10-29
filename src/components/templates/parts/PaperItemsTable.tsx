@@ -86,13 +86,13 @@ export function PaperItemsTable({ invoice, totals, tableStyle, works }: ItemsTab
               <td className={cn(styles.center, styles.num)}>{index + 1}</td>
               <td>
                 {photos.has(line.id) && <img className={art.itemThumb} src={photos.get(line.id)} alt="" data-item-photo />}
-                <div className={styles.itemName}>{line.name || '—'}</div>
+                <div className={styles.itemName}>{line.name || '-'}</div>
                 {source?.description && <div className={styles.itemDesc}>{source.description}</div>}
                 <ItemCustomLine values={source?.custom_values} />
                 {show.tracking && trackingText(source, invoice.ag, invoice.mf, invoice.ps, invoice.tv, invoice.mp, invoice.hs, invoice.lg) && <div className={styles.itemDesc}>{trackingText(source, invoice.ag, invoice.mf, invoice.ps, invoice.tv, invoice.mp, invoice.hs, invoice.lg)}</div>}
                 {worksLineText(source, invoice.boq_terms?.cn) && <div className={styles.itemDesc} data-works-line>{worksLineText(source, invoice.boq_terms?.cn)}</div>}
               </td>
-              {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '—'}</td>}
+              {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '-'}</td>}
               <td className={cn(styles.right, styles.num)}>
                 {formatQuantity(line.quantity)}
                 {col.unit && line.unit ? ` ${line.unit}` : ''}
@@ -100,7 +100,7 @@ export function PaperItemsTable({ invoice, totals, tableStyle, works }: ItemsTab
               <td className={cn(styles.right, styles.num)}>{money(line.rate, invoice.currency)}</td>
               {showDiscount && (
                 <td className={cn(styles.right, styles.num)}>
-                  {source?.discount_percent ? `${source.discount_percent}%` : '—'}
+                  {source?.discount_percent ? `${source.discount_percent}%` : '-'}
                 </td>
               )}
               {showTaxable && (

@@ -11,7 +11,7 @@ export default function TcsLine({ tv }: { tv: TvSnapshot }) {
   if (!t && !tv.pos_note) return null;
   return (
     <>
-      {t && <p className={styles.decl} data-travel-tcs>TCS: {t.label}{t.slab ? ` — ${t.slab}` : ''}. Verify with your CA.</p>}
+      {t && <p className={styles.decl} data-travel-tcs>TCS: {t.label}{t.slab ? `: ${t.slab}` : ''}. Verify with your CA.</p>}
       {tv.pos_note && <p className={styles.decl} data-travel-pos>{tv.pos_note}</p>}
     </>
   );

@@ -53,7 +53,7 @@ export function clockOut(job: ServiceJob, staff: { id: string; name: string }, a
 export function logTime(job: Pick<ServiceJob, 'id' | 'number' | 'customer' | 'client_id'>, staff: { id: string; name: string }, minutes: number, date: string): TimeEntry {
   requireAccess('doc.create');
   if (!(num(minutes) > 0)) throw new Error('Type the minutes.');
-  return timeDb.save({ client_name: job.customer, ...(job.client_id ? { client_id: job.client_id } : {}), description: `${job.number} — ${staff.name}`, date, minutes: Math.round(num(minutes)), hourly_rate: 0, billable: false, job_id: job.id, staff_id: staff.id });
+  return timeDb.save({ client_name: job.customer, ...(job.client_id ? { client_id: job.client_id } : {}), description: `${job.number}: ${staff.name}`, date, minutes: Math.round(num(minutes)), hourly_rate: 0, billable: false, job_id: job.id, staff_id: staff.id });
 }
 
 export interface EfficiencyRow { staff_id: string; billed: number; clocked: number; pct: number }

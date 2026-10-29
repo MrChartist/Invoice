@@ -7,7 +7,7 @@ import { defineArea } from '../area';
 export const repT = defineArea(
   {
     title: 'Sales & purchase reports',
-    subtitle: 'Who buys what, when, and how they pay — reconciled to your Dashboard and Books.',
+    subtitle: 'Who buys what, when, and how they pay: reconciled to your Dashboard and Books.',
     tablist: 'Reports',
     tabCustomers: 'By customer',
     tabItems: 'By item',
@@ -34,8 +34,8 @@ export const repT = defineArea(
     customersOne: '{n} customer',
     customersMany: '{n} customers',
     noSalesYet: 'no sales yet',
-    foreignOne: '{n} document is in a foreign currency and left out — amounts in different currencies are never added together. See the invoice list for those.',
-    foreignMany: '{n} documents are in a foreign currency and left out — amounts in different currencies are never added together. See the invoice list for those.',
+    foreignOne: '{n} document is in a foreign currency and left out: amounts in different currencies are never added together. See the invoice list for those.',
+    foreignMany: '{n} documents are in a foreign currency and left out: amounts in different currencies are never added together. See the invoice list for those.',
 
     ccBilled: 'Billed (incl. GST, net of credit notes)',
     ccIncome: 'Income (excl. GST)',
@@ -121,7 +121,7 @@ export const repT = defineArea(
     colCess: 'Cess',
     colGstCollected: 'GST collected',
     colDocuments: 'Documents',
-    taxNote: 'By the GST slab actually charged on each line, net of credit notes. A working paper — your GSTR-1 / 3B figures live under GST reports; verify with your CA.',
+    taxNote: 'By the GST slab actually charged on each line, net of credit notes. A working paper: your GSTR-1 / 3B figures live under GST reports; verify with your CA.',
     capTax: 'Tax collected by rate',
 
     colMode: 'Mode',
@@ -147,7 +147,7 @@ export const repT = defineArea(
     openExpenses: 'Open Expenses',
     byCategory: 'By category',
     byVendor: 'By vendor',
-    costNote: 'Cost = taxable value plus any GST that cannot be claimed as input credit — the same figure Books deducts in the P&L.',
+    costNote: 'Cost = taxable value plus any GST that cannot be claimed as input credit: the same figure Books deducts in the P&L.',
     capExpCategory: 'Expenses by category',
     capExpVendor: 'Expenses by vendor',
 
@@ -177,7 +177,7 @@ export const repT = defineArea(
   } as const,
   {
     title: 'बिक्री और खरीद रिपोर्ट',
-    subtitle: 'कौन क्या खरीदता है, कब और कैसे भुगतान करता है — आपके डैशबोर्ड और बही-खाते से मिलान किया हुआ।',
+    subtitle: 'कौन क्या खरीदता है, कब और कैसे भुगतान करता है: आपके डैशबोर्ड और बही-खाते से मिलान किया हुआ।',
     tablist: 'रिपोर्ट',
     tabCustomers: 'ग्राहक अनुसार',
     tabItems: 'आइटम अनुसार',
@@ -204,8 +204,8 @@ export const repT = defineArea(
     customersOne: '{n} ग्राहक',
     customersMany: '{n} ग्राहक',
     noSalesYet: 'अभी कोई बिक्री नहीं',
-    foreignOne: '{n} दस्तावेज़ विदेशी मुद्रा में है, इसलिए छोड़ा गया — अलग-अलग मुद्राओं की राशियाँ कभी नहीं जोड़ी जातीं। उसके लिए इनवॉइस सूची देखें।',
-    foreignMany: '{n} दस्तावेज़ विदेशी मुद्रा में हैं, इसलिए छोड़े गए — अलग-अलग मुद्राओं की राशियाँ कभी नहीं जोड़ी जातीं। उनके लिए इनवॉइस सूची देखें।',
+    foreignOne: '{n} दस्तावेज़ विदेशी मुद्रा में है, इसलिए छोड़ा गया: अलग-अलग मुद्राओं की राशियाँ कभी नहीं जोड़ी जातीं। उसके लिए इनवॉइस सूची देखें।',
+    foreignMany: '{n} दस्तावेज़ विदेशी मुद्रा में हैं, इसलिए छोड़े गए: अलग-अलग मुद्राओं की राशियाँ कभी नहीं जोड़ी जातीं। उनके लिए इनवॉइस सूची देखें।',
 
     ccBilled: 'बिल की गई राशि (GST सहित, क्रेडिट नोट घटाकर)',
     ccIncome: 'आय (GST के बिना)',
@@ -291,7 +291,7 @@ export const repT = defineArea(
     colCess: 'सेस',
     colGstCollected: 'वसूला गया GST',
     colDocuments: 'दस्तावेज़',
-    taxNote: 'हर लाइन पर वास्तव में लगे GST स्लैब के अनुसार, क्रेडिट नोट घटाकर। यह कार्य-पत्र है — आपके GSTR-1 / 3B आँकड़े GST रिपोर्ट में हैं; अपने CA से जाँच करवाएँ।',
+    taxNote: 'हर लाइन पर वास्तव में लगे GST स्लैब के अनुसार, क्रेडिट नोट घटाकर। यह कार्य-पत्र है: आपके GSTR-1 / 3B आँकड़े GST रिपोर्ट में हैं; अपने CA से जाँच करवाएँ।',
     capTax: 'दर अनुसार वसूला गया टैक्स',
 
     colMode: 'तरीका',
@@ -317,7 +317,7 @@ export const repT = defineArea(
     openExpenses: 'खर्च खोलें',
     byCategory: 'श्रेणी अनुसार',
     byVendor: 'विक्रेता अनुसार',
-    costNote: 'लागत = कर योग्य मूल्य + वह GST जिसका इनपुट क्रेडिट नहीं मिल सकता — वही आँकड़ा जो बही-खाता लाभ-हानि में घटाता है।',
+    costNote: 'लागत = कर योग्य मूल्य + वह GST जिसका इनपुट क्रेडिट नहीं मिल सकता: वही आँकड़ा जो बही-खाता लाभ-हानि में घटाता है।',
     capExpCategory: 'श्रेणी अनुसार खर्च',
     capExpVendor: 'विक्रेता अनुसार खर्च',
 

@@ -256,7 +256,7 @@ function Bookings({ ctx }: { ctx: Ctx }) {
   const d = useMemo(() => ({ all: hotelDb.reservations(), rooms: hotelDb.rooms() }), [ctx.tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const date = String(f.date || ctx.day);
   const base = f.list === 'arrivals' ? arrivalsOn(d.all, date) : f.list === 'dueOuts' ? departuresOn(d.all, date) : f.list === 'inHouse' ? inHouseOn(d.all, date) : [...d.all].reverse();
-  const no = (l: RoomLine) => d.rooms.find((x) => x.id === l.room_id)?.number ?? '—';
+  const no = (l: RoomLine) => d.rooms.find((x) => x.id === l.room_id)?.number ?? '-';
   return (
     <div className={styles.stack} data-hotel-reservations>
       <Row>
@@ -333,7 +333,7 @@ function Booking({ ctx, d, close }: { ctx: Ctx; d: { res?: string; preset?: Part
           <Fields v={f} set={(p) => setF({ ...f, ...p })} off={!live} spec={[
             ['name', 'guest'], ['phone', 'phone'], ['email', 'email'], ['nationality', 'nationality'], ['source', 'source', SOURCES],
             ...(f.source === 'ota' ? [['otaName', 'otaName'], ['ref', 'otaRef'], ['gstin', 'otaGstin'], ['collect', 'collect', ['ota_collect', 'hotel_collect']]] as Spec[] : []),
-            ['bill', 'billTo', [['', '—'], ...m.clients.filter((c) => c.id).map((c) => [c.id!, c.company || c.name] as const)]],
+            ['bill', 'billTo', [['', '-'], ...m.clients.filter((c) => c.id).map((c) => [c.id!, c.company || c.name] as const)]],
             ['arrival', 'arrival', 'd'], ['departure', 'departure', 'd'], ['guarantee', 'guarantee', ['none', 'advance', 'company', 'card_noted']],
             ...(f.status === 'tentative' || f.status === 'confirmed' ? [['status', 'status', [['tentative', hT('st.tentative')], ['confirmed', hT('st.confirmed')]]]] as Spec[] : []),
             ['notes', 'notes'],
@@ -572,7 +572,7 @@ function Setup({ ctx }: { ctx: Ctx }) {
         <div className={styles.box} data-rate-plan-form>
           <Grid><Fields v={plan} set={(p) => setPlan({ ...plan, ...p })} spec={[
             ['name', 'name'], ['code', 'code'], ['meal_plan', 'mealPlan', ['EP', 'CP', 'MAP', 'AP']], ['audience', 'audience', ['public', 'corporate', 'agent', 'ota']],
-            ['client_id', 'billTo', [['', '—'], ...init.clients.filter((c) => c.id).map((c) => [c.id!, c.company || c.name] as const)]],
+            ['client_id', 'billTo', [['', '-'], ...init.clients.filter((c) => c.id).map((c) => [c.id!, c.company || c.name] as const)]],
             ['min_stay', 'minStay', 'n'], ['meal_per_adult', 'mealPerAdult', 'n'], ['weekend', 'weekend'], ['weekend_pct', 'weekendPct', 'n'],
             ['free_until_hours', 'freeHours', 'n'], ['charge', 'charge', ['none', 'first_night', 'pct', 'full']], ['pct', 'pct', 'n'], ['no_show', 'noShowCharge', ['first_night', 'full', 'none']],
             ['tax_inclusive', 'taxInclusive', 'c'], ['meals_separate', 'mealsSeparate', 'c'], ['active', 'active', 'c'],

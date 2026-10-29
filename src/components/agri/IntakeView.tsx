@@ -44,7 +44,7 @@ export default function IntakeView({ onDone }: { onDone: Done }) {
   const now = localStamp();
   const report = dailyIntake(d.slips, day, now);
   const done = d.slips.filter((s) => s.date === day && s.status !== 'open');
-  const name = (s: { party_name?: string }) => s.party_name || '—';
+  const name = (s: { party_name?: string }) => s.party_name || '-';
   const business = () => { const p = localDb.settings.activeProfile(); return { name: p?.companyName, address: p?.companyAddress }; };
   return (
     <div data-ml-view="intake">
@@ -83,8 +83,8 @@ export default function IntakeView({ onDone }: { onDone: Done }) {
 
       <div style={row}><h4>{T('doneSlips')}</h4><Txt l={W('date')} v={day} set={setDay} type="date" x={170} /></div>
       <Table d="done" head={[T('slip'), W('vehicle'), T('party'), T('commodity'), T('net'), T('moisture'), T('used'), '']} rows={done.map((s) => [
-        s.number, s.vehicle, name(s), s.commodity, kg(s.net_kg), s.readings?.moisture ?? '—',
-        s.status === 'cancelled' ? `${W('cancelled')}${s.cancel_reason ? ` (${s.cancel_reason})` : ''}` : s.ref_id ? T(`u.${s.use}`) : '—',
+        s.number, s.vehicle, name(s), s.commodity, kg(s.net_kg), s.readings?.moisture ?? '-',
+        s.status === 'cancelled' ? `${W('cancelled')}${s.cancel_reason ? ` (${s.cancel_reason})` : ''}` : s.ref_id ? T(`u.${s.use}`) : '-',
         <span key="a" style={row}>
           <button type="button" className={B.gs} onClick={() => printHtml(slipHtml(s, business()), s.number)}>{W('print')}</button>
           {s.status === 'done' && !s.ref_id && <>
@@ -107,7 +107,7 @@ export default function IntakeView({ onDone }: { onDone: Done }) {
         {T('net')}: {kg(report.net_kg)}{report.avg_moisture !== null ? ` · ${T('avgMoisture', { pct: report.avg_moisture })}` : ''}{report.stale ? ` · ${T('staleCount', { n: report.stale })}` : ''}
       </p>
       {([['byCommodity', report.byCommodity, (k: string) => k], ['byParty', report.byParty, (k: string) => T(`pk.${k as WbsPartyKind}`)], ['byUse', report.byUse, (k: string) => T(`u.${k as WbsUse}`)]] as const).map(([h, rows, label]) => (
-        <Table key={h} d={h} head={[T(h), T('slips'), T('net'), T('moisture')]} rows={rows.map((g) => [label(g.key), g.slips, kg(g.net_kg), g.avg_moisture ?? '—'])} />
+        <Table key={h} d={h} head={[T(h), T('slips'), T('net'), T('moisture')]} rows={rows.map((g) => [label(g.key), g.slips, kg(g.net_kg), g.avg_moisture ?? '-'])} />
       ))}
     </div>
   );

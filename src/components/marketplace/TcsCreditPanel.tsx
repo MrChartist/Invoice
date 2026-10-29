@@ -71,7 +71,7 @@ export default function TcsCreditPanel({ kind = 'tcs', notify }: { kind?: Credit
                   <td>{r.month}</td>
                   <td className={surface.numeric}>{heads(r.books)}</td>
                   {kind === 'tcs' && <td className={surface.numeric}>{fmtMoney(r.withheld)}</td>}
-                  <td className={surface.numeric}>{r.portal ? heads(r.portal) : '—'}</td>
+                  <td className={surface.numeric}>{r.portal ? heads(r.portal) : '-'}</td>
                   <td className={r.reason === 'ok' ? styles.good : styles.bad}>{mT(`reason.${r.reason}`)}</td>
                   <td className={surface.rowActions}>
                     {r.portal && !r.portal.decision && (

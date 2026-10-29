@@ -103,12 +103,12 @@ export function ReorderTab({ ctx }: { ctx: MfgContext }) {
                 <tr key={k}>
                   <td><input type="checkbox" disabled={!(r.suggested > 0)} checked={picked.has(k)} onChange={() => toggle(k)} aria-label={mfgT('selectRow', { name: r.item.name })} /></td>
                   <td className={r.below ? styles.loss : undefined}>{r.item.name}</td>
-                  {multi && <td>{r.godown ? godownName(ctx.godowns, r.godown) : '—'}</td>}
+                  {multi && <td>{r.godown ? godownName(ctx.godowns, r.godown) : '-'}</td>}
                   <td className={styles.num}>{qtyText(r.closing)} {r.item.unit}</td>
                   <td className={styles.num}>{qtyText(r.reorderLevel)}</td>
                   <td className={styles.num}>{qtyText(r.shortfall)}</td>
                   <td className={styles.num}>{qtyText(r.pendingPo)}</td>
-                  <td className={styles.num}>{r.minOrderQty ? qtyText(r.minOrderQty) : '—'}</td>
+                  <td className={styles.num}>{r.minOrderQty ? qtyText(r.minOrderQty) : '-'}</td>
                   <td className={styles.num}><strong>{qtyText(r.suggested)}</strong></td>
                   <td className={styles.num}>{money(r.rate)}</td>
                 </tr>

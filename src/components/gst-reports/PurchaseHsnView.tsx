@@ -33,7 +33,7 @@ export function PurchaseHsnView({ period, filerStateCode }: PurchaseHsnViewProps
         columns={[
           { key: 'h', label: soT('hsnCode'), render: (r) => <span className={surface.mono}>{r.hsn}</span> },
           { key: 'd', label: soT('hsnDesc'), render: (r) => r.description },
-          { key: 'u', label: soT('hsnUqc'), render: (r) => r.uqc || '—' },
+          { key: 'u', label: soT('hsnUqc'), render: (r) => r.uqc || '-' },
           { key: 'q', label: soT('colQty'), numeric: true, render: (r) => r.qty || '' },
           { key: 'r', label: soT('hsnRate'), numeric: true, render: (r) => r.rate },
           { key: 't', label: soT('colTaxable'), numeric: true, render: (r) => <Money value={r.taxable} />, total: (r) => r.taxable },

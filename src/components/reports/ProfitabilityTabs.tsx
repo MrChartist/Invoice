@@ -20,7 +20,7 @@ import { repT } from '../../i18n/areas/reports';
 import { plural } from '../../i18n/areas/plural';
 
 const slug = (p: Period) => `${p.start}_to_${p.end}`;
-const pct = (m: number | null) => (m === null ? '—' : `${m.toFixed(1)}%`);
+const pct = (m: number | null) => (m === null ? '-' : `${m.toFixed(1)}%`);
 const SOURCE_KEY = { stock: 'srcStock', purchases: 'srcPurchases', none: 'srcNone', mixed: 'srcMixed' } as const;
 const costSourceLabel = (s: ItemProfitRow['source']) => repT(SOURCE_KEY[s]);
 const signed = (n: number) => <span className={n < 0 ? styles.neg : styles.pos}>{money(n)}</span>;
@@ -40,7 +40,7 @@ export function ItemProfitTab({ rep, period }: { rep: ReturnType<typeof itemProf
   const t = rep.totals;
   const cols: Column<ItemProfitRow>[] = [
     { id: 'name', label: repT('colItemOnly'), sort: (r) => r.name, cell: (r) => r.name, total: repT('total') },
-    { id: 'hsn', label: 'HSN/SAC', sort: (r) => r.hsn, cell: (r) => <span className={surface.mono}>{r.hsn || '—'}</span> },
+    { id: 'hsn', label: 'HSN/SAC', sort: (r) => r.hsn, cell: (r) => <span className={surface.mono}>{r.hsn || '-'}</span> },
     { id: 'qty', label: repT('colQty'), numeric: true, sort: (r) => r.quantity, cell: (r) => `${r.quantity}${r.unit ? ` ${r.unit}` : ''}` },
     { id: 'rev', label: repT('colSalesExcl'), numeric: true, sort: (r) => r.revenue, cell: (r) => money(r.revenue), total: money(t.revenue) },
     { id: 'cost', label: repT('colCost'), numeric: true, sort: (r) => r.cost, cell: (r) => money(r.cost), total: money(t.cost) },
@@ -92,7 +92,7 @@ export function PartyProfitTab({ rep, period }: { rep: ReturnType<typeof partyPr
     { id: 'exp', label: repT('colBillable'), numeric: true, sort: (r) => r.expenses, cell: (r) => money(r.expenses), total: money(t.expenses) },
     { id: 'profit', label: repT('colProfit'), numeric: true, sort: (r) => r.profit, cell: (r) => signed(r.profit), total: money(t.profit) },
     { id: 'margin', label: repT('colMargin'), numeric: true, sort: (r) => r.margin, cell: (r) => pct(r.margin), total: pct(t.margin) },
-    { id: 'unc', label: repT('colNotCosted'), numeric: true, sort: (r) => r.uncosted, cell: (r) => (r.uncosted ? money(r.uncosted) : '—'), total: money(t.uncosted) },
+    { id: 'unc', label: repT('colNotCosted'), numeric: true, sort: (r) => r.uncosted, cell: (r) => (r.uncosted ? money(r.uncosted) : '-'), total: money(t.uncosted) },
   ];
   return (
     <div className={styles.stack}>

@@ -162,7 +162,7 @@ export function PosApparel({ record, setItems }: { record: InvoiceRecord; setIte
   return (
     <div className={controls.hint} data-pos-bands>
       {banded.length > 0 && <strong>{rtcT('posBands')}: </strong>}
-      {banded.map((l) => <span key={l.id} data-band-line={l.name}>{l.name} — <BandChipText item={l} date={record.issue_date} />; </span>)}
+      {banded.map((l) => <span key={l.id} data-band-line={l.name}>{l.name} : <BandChipText item={l} date={record.issue_date} />; </span>)}
       {due > 0 && <Link to="/inventory?tab=apparel&view=alterations" data-pos-alt-due>{rtcT('dueCount', { n: due })}</Link>}
     </div>
   );
@@ -289,7 +289,7 @@ function AlterationsView({ onDone }: { onDone: Done }) {
                     <td><button type="button" className={controls.btnGhost} onClick={() => setShown(j.id)}>{j.number}</button><br /><small>{rtcT(`st.${j.status}`)}</small></td>
                     <td>{[j.customer, j.phone].filter(Boolean).join(' · ')}</td>
                     <td>{j.garment}{j.notes ? <><br /><small>{j.notes}</small></> : null}</td>
-                    <td>{j.tailor_name ?? '—'}</td>
+                    <td>{j.tailor_name ?? '-'}</td>
                     <td>{j.due}{j.due < day && (j.status === 'received' || j.status === 'with_tailor') ? <small style={{ color: 'var(--loss)' }}> {rtcT('overdue')}</small> : null}</td>
                     <td className={surface.numeric}>{j.charge > 0 ? formatCurrency(j.charge) : rtcT('free')}</td>
                     <td style={{ textAlign: 'right' }}>
@@ -309,7 +309,7 @@ function AlterationsView({ onDone }: { onDone: Done }) {
       {tailors.length > 0 && (
         <div className={controls.row} style={{ flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginTop: '0.75rem' }}>
           <label className={controls.field}><span className={controls.label}>{rtcT('tailor')}</span>
-            <select className={controls.select} value={tb.tailor} onChange={(e) => setTb({ ...tb, tailor: e.target.value })}><option value="">—</option>{tailors.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+            <select className={controls.select} value={tb.tailor} onChange={(e) => setTb({ ...tb, tailor: e.target.value })}><option value="">-</option>{tailors.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
           </label>
           <label className={controls.field}><span className={controls.label}>{rtcT('from')}</span><input type="date" className={controls.input} value={tb.from} onChange={(e) => setTb({ ...tb, from: e.target.value })} /></label>
           <label className={controls.field}><span className={controls.label}>{rtcT('to')}</span><input type="date" className={controls.input} value={tb.to} onChange={(e) => setTb({ ...tb, to: e.target.value })} /></label>

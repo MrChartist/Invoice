@@ -338,7 +338,7 @@ export const receiptNotesDb = {
     const record: ReceiptNote = { ...existing, ...draft, id: existing?.id ?? generateId(), number, date: isoDay(input.date), created_at: existing?.created_at ?? now(), updated_at: now() };
     setTable(RECEIPT_NOTES_TABLE, existing ? all.map((n) => (n.id === record.id ? record : n)) : [...all, record]);
     recordSeries(record.number);
-    audit.record({ entity: 'purchase', entity_id: record.id, action: existing ? 'update' : 'create', doc_number: record.number, summary: `${record.kind === 'GRN' ? 'Receipt note' : 'Rejection out'} ${record.number} — ${record.vendor_name}, ${record.lines.length} line(s), ${record.date}` });
+    audit.record({ entity: 'purchase', entity_id: record.id, action: existing ? 'update' : 'create', doc_number: record.number, summary: `${record.kind === 'GRN' ? 'Receipt note' : 'Rejection out'} ${record.number}: ${record.vendor_name}, ${record.lines.length} line(s), ${record.date}` });
     return record;
   },
 

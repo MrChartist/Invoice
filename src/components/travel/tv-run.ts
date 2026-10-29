@@ -14,4 +14,4 @@ export const runWith = (notify: Notify) => <T>(fn: () => T, ok?: string): T | un
   }
 };
 
-export const pct = (n: number | null): string => (n === null ? '—' : `${n.toFixed(1)}%`);
+export const pct = (n: number | null): string => (n === null ? '-' : `${n.toFixed(1)}%`);

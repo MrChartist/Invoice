@@ -130,7 +130,7 @@ export const syncT = defineArea(
       'Scheduled backups run while the app is open. After a browser restart the browser may ask you to re-allow folder access; click Back up now once to do that. Older files beyond the limit are removed, but only files this app created.',
     encryption: 'Encryption',
     encOnText:
-      'Backups are encrypted (AES-256). Restore them from Settings → Data with your passphrase — it is not stored anywhere, so a lost passphrase means the files cannot be opened.',
+      'Backups are encrypted (AES-256). Restore them from Settings → Data with your passphrase: it is not stored anywhere, so a lost passphrase means the files cannot be opened.',
     stopEnc: 'Stop encrypting',
     encOffText:
       'Backups are plain JSON with your bank, GSTIN and client details. If the folder syncs to the cloud (Google Drive, Dropbox, iCloud), set a passphrase so those copies are encrypted.',
@@ -292,7 +292,7 @@ export const syncT = defineArea(
       'तय बैकअप ऐप खुला रहने पर चलते हैं। ब्राउज़र दोबारा शुरू होने के बाद वह फ़ोल्डर की अनुमति फिर माँग सकता है; इसके लिए एक बार "अभी बैकअप लें" दबाएँ। सीमा से पुरानी फ़ाइलें हटाई जाती हैं, पर सिर्फ़ वही जो इस ऐप ने बनाई हैं।',
     encryption: 'एन्क्रिप्शन',
     encOnText:
-      'बैकअप एन्क्रिप्टेड हैं (AES-256)। उन्हें सेटिंग्स → डेटा से अपने पासफ़्रेज़ के साथ रिस्टोर करें — यह कहीं नहीं रखा जाता, इसलिए पासफ़्रेज़ खोने पर फ़ाइलें नहीं खुल सकेंगी।',
+      'बैकअप एन्क्रिप्टेड हैं (AES-256)। उन्हें सेटिंग्स → डेटा से अपने पासफ़्रेज़ के साथ रिस्टोर करें: यह कहीं नहीं रखा जाता, इसलिए पासफ़्रेज़ खोने पर फ़ाइलें नहीं खुल सकेंगी।',
     stopEnc: 'एन्क्रिप्ट करना बंद करें',
     encOffText:
       'बैकअप सादी JSON फ़ाइलें हैं, जिनमें आपके बैंक, GSTIN और ग्राहकों की जानकारी है। फ़ोल्डर क्लाउड (Google Drive, Dropbox, iCloud) से सिंक होता हो तो पासफ़्रेज़ सेट करें, ताकि वे कॉपियाँ एन्क्रिप्टेड रहें।',

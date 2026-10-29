@@ -12,7 +12,7 @@ export const hsdT = defineArea(
     no: 'Member no.', admitted: 'Admitted on', cert: 'Share certificate', nominees: 'Nominees (name:share %:relation; …)', transfers: 'Transfers', save: 'Save', saved: 'Saved.',
     audit: 'Audit', auditor: 'Auditor', appointed: 'Appointed on', dueOn: 'Due date', report: 'Report on', rectified: 'Rectification report on',
     sDue: 'Due in {n} days', sOver: 'Overdue', sDone: 'Reported', sFixed: 'Rectified', aTitle: 'Society audit {fy} due on {d}', aOpen: 'Open registers',
-    itax: 'Income tax (working paper)', mutual: 'Mutual receipts (members)', nonMutual: 'Non-member income, bank interest, dividends', ded: 'Deduction lines', tdsNote: 'TDS on contractors, professionals and rent: see the TDS rows of your payables; no new rows here (HS23).', bank: 'Interest from a co-operative bank under (2)(d): flagged (HS21).', wp: 'Working paper — verify with your CA. Nothing posts.',
+    itax: 'Income tax (working paper)', mutual: 'Mutual receipts (members)', nonMutual: 'Non-member income, bank interest, dividends', ded: 'Deduction lines', tdsNote: 'TDS on contractors, professionals and rent: see the TDS rows of your payables; no new rows here (HS23).', bank: 'Interest from a co-operative bank under (2)(d): flagged (HS21).', wp: 'Working paper: verify with your CA. Nothing posts.',
     noFunds: 'Map the funds first, and pick a period.', covered: 'The fund transfer for {p} already covers part of this period: post transfers by the same kind of period (or reverse that journal first).',
   } as const,
   {
@@ -22,7 +22,7 @@ export const hsdT = defineArea(
     no: 'सदस्य क्र.', admitted: 'प्रवेश तिथि', cert: 'शेयर प्रमाणपत्र', nominees: 'नामांकित (नाम:हिस्सा %:संबंध; …)', transfers: 'हस्तांतरण', save: 'सहेजें', saved: 'सहेजा गया।',
     audit: 'लेखा परीक्षा', auditor: 'लेखा परीक्षक', appointed: 'नियुक्ति तिथि', dueOn: 'देय तिथि', report: 'रिपोर्ट तिथि', rectified: 'सुधार रिपोर्ट तिथि',
     sDue: '{n} दिन में देय', sOver: 'अतिदेय', sDone: 'रिपोर्ट मिली', sFixed: 'सुधार हुआ', aTitle: 'सोसाइटी लेखा परीक्षा {fy} {d} को देय', aOpen: 'रजिस्टर खोलें',
-    itax: 'आयकर (कार्य-पत्र)', mutual: 'पारस्परिक प्राप्तियाँ (सदस्य)', nonMutual: 'गैर-सदस्य आय, बैंक ब्याज, लाभांश', ded: 'कटौती की पंक्तियाँ', tdsNote: 'ठेकेदार, पेशेवर और किराये पर TDS: अपने देय की TDS पंक्तियाँ देखें; यहाँ नई पंक्ति नहीं (HS23)।', bank: 'सहकारी बैंक से ब्याज (2)(d) में: चिह्नित (HS21)।', wp: 'कार्य-पत्र — अपने CA से जाँचें। कुछ दर्ज नहीं होता।',
+    itax: 'आयकर (कार्य-पत्र)', mutual: 'पारस्परिक प्राप्तियाँ (सदस्य)', nonMutual: 'गैर-सदस्य आय, बैंक ब्याज, लाभांश', ded: 'कटौती की पंक्तियाँ', tdsNote: 'ठेकेदार, पेशेवर और किराये पर TDS: अपने देय की TDS पंक्तियाँ देखें; यहाँ नई पंक्ति नहीं (HS23)।', bank: 'सहकारी बैंक से ब्याज (2)(d) में: चिह्नित (HS21)।', wp: 'कार्य-पत्र: अपने CA से जाँचें। कुछ दर्ज नहीं होता।',
     noFunds: 'पहले फंड जोड़ें और अवधि चुनें।', covered: '{p} का फंड हस्तांतरण इस अवधि का हिस्सा पहले से शामिल करता है: उसी प्रकार की अवधि से हस्तांतरण करें (या पहले वह जर्नल उलटें)।',
   },
 );

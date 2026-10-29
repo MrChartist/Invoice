@@ -104,12 +104,12 @@ export function BatchesTab({ tracking, today, days, godowns, onDownload }: {
             <tr key={r.key}>
               <td>{r.item}</td>
               <td className={styles.mono}>{r.batch}{r.mrp ? <span className={styles.muted}>{invT('mrpN', { mrp: r.mrp })}</span> : null}</td>
-              <td>{r.mfg ? formatDate(r.mfg) : '—'}</td>
-              <td>{r.expiry ? formatDate(r.expiry) : '—'}</td>
+              <td>{r.mfg ? formatDate(r.mfg) : '-'}</td>
+              <td>{r.expiry ? formatDate(r.expiry) : '-'}</td>
               <td className={cn(surface.numeric, r.qty < 0 && styles.negative)}>{r.qty} {r.unit}</td>
               {multi && (
                 <td className={styles.muted}>
-                  {godowns.filter((g) => r.byGodown[g.id]).map((g) => `${godownName(godowns, g.id)} ${r.byGodown[g.id]}`).join(' · ') || '—'}
+                  {godowns.filter((g) => r.byGodown[g.id]).map((g) => `${godownName(godowns, g.id)} ${r.byGodown[g.id]}`).join(' · ') || '-'}
                 </td>
               )}
               <td>{status(r)}</td>

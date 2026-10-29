@@ -31,14 +31,14 @@ import { SINGLETON_KEYS, getJson, peekTable } from './storage';
 // R5-B2: informational ITC caution for a GTA that opted for 5% forward charge without ITC this FY (transport pack only).
 const gtaT = defineArea(
   {
-    warnGta: 'GTA option FY {fy}: 5% without ITC — check the ITC on this bill (verify with your CA).',
-    warnRealty: 'Project {name} pays GST at 1% / 5% without ITC — this bill claims ITC (verify with your CA, CN34).',
-    warnRealtyCo: 'Your projects pay GST at 1% / 5% without ITC — this bill claims ITC. Untick it, or save again to claim it (the note is kept as the reason, audited; verify with your CA, PF18).',
+    warnGta: 'GTA option FY {fy}: 5% without ITC, check the ITC on this bill (verify with your CA).',
+    warnRealty: 'Project {name} pays GST at 1% / 5% without ITC: this bill claims ITC (verify with your CA, CN34).',
+    warnRealtyCo: 'Your projects pay GST at 1% / 5% without ITC: this bill claims ITC. Untick it, or save again to claim it (the note is kept as the reason, audited; verify with your CA, PF18).',
   } as const,
   {
-    warnGta: 'GTA विकल्प वित्त वर्ष {fy}: 5% बिना ITC — इस बिल का ITC जाँचें (CA से पुष्टि करें)।',
-    warnRealty: 'प्रोजेक्ट {name} पर GST 1% / 5% बिना ITC है — यह बिल ITC ले रहा है (CA से पुष्टि करें, CN34)।',
-    warnRealtyCo: 'आपके प्रोजेक्ट पर GST 1% / 5% बिना ITC है — यह बिल ITC ले रहा है। टिक हटाएँ, या ITC लेने के लिए फिर सहेजें (टिप्पणी कारण के रूप में रहेगी, ऑडिट होगा; CA से पुष्टि करें, PF18)।',
+    warnGta: 'GTA विकल्प वित्त वर्ष {fy}: 5% बिना ITC, इस बिल का ITC जाँचें (CA से पुष्टि करें)।',
+    warnRealty: 'प्रोजेक्ट {name} पर GST 1% / 5% बिना ITC है: यह बिल ITC ले रहा है (CA से पुष्टि करें, CN34)।',
+    warnRealtyCo: 'आपके प्रोजेक्ट पर GST 1% / 5% बिना ITC है: यह बिल ITC ले रहा है। टिक हटाएँ, या ITC लेने के लिए फिर सहेजें (टिप्पणी कारण के रूप में रहेगी, ऑडिट होगा; CA से पुष्टि करें, PF18)।',
   },
 );
 
@@ -82,7 +82,7 @@ type BillInput = Omit<PurchaseRecord, 'id'> & { id?: string };
 export function billWarnings(input: BillInput, purchases: readonly PurchaseRecord[], draft?: DraftMeta): string[] {
   const out: string[] = [];
   const dup = findBillDuplicates(input, purchases);
-  const ref = (p: PurchaseRecord) => `${p.bill_number || '—'} · ${formatDate(p.date)} · ${formatCurrency(p.total)}`;
+  const ref = (p: PurchaseRecord) => `${p.bill_number || '-'} · ${formatDate(p.date)} · ${formatCurrency(p.total)}`;
   if (dup.exact.length) out.push(capT('warnDup', { list: dup.exact.slice(0, 3).map(ref).join('; ') }));
   if (dup.near.length) out.push(capT('warnNear', { list: dup.near.slice(0, 3).map(ref).join('; ') }));
   if (draft?.expected_total && Math.abs(draft.expected_total - (Number(input.total) || 0)) > 1) {
@@ -109,7 +109,7 @@ export function saveBillGuarded(input: BillInput, opts: { confirmed?: boolean; p
     return { kind: 'held', draft: submitBillForApproval(input, { payNow: opts.payNow }) };
   }
   // R16-D3 (PF18): ITC claimed past the realty caution is an override — audited, the bill's note is the reason.
-  const why = opts.confirmed && realtyItcCaution(input) ? (input.notes ?? '').trim() || '—' : '';
+  const why = opts.confirmed && realtyItcCaution(input) ? (input.notes ?? '').trim() || '-' : '';
   const audited = (b: PurchaseRecord): PurchaseRecord => {
     if (why) audit.record({ entity: 'purchase', entity_id: b.id, action: 'override', doc_number: b.bill_number, summary: `ITC claimed on ${b.bill_number} despite the 1% / 5% no-ITC scheme (PF18): ${why}` });
     return b;

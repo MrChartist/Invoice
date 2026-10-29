@@ -74,7 +74,7 @@ export async function postPayout(p: PayoutInput): Promise<Payment[]> {
   const invs = new Map(localDb.invoices.getAll().map((i) => [i.id, i]));
   if (!p.rows.length || p.rows.some((r) => !invs.has(r.invoiceId))) throw new HotelError('Pick the bookings this payout covers.');
   const { nets, gap } = payoutPlan(p.rows, (id) => invoiceOpen(invs.get(id)!), p.amount);
-  if (Math.abs(gap) > 0.004) throw new HotelError(`The payout differs from the bookings by ₹${gap.toFixed(2)} — check commission, TCS and 194-O.`);
+  if (Math.abs(gap) > 0.004) throw new HotelError(`The payout differs from the bookings by ₹${gap.toFixed(2)}: check commission, TCS and 194-O.`);
   if (nets.some((n) => n < 0)) throw new HotelError('A booking\'s deductions are more than what it owes.');
   const ref = `OTA payout ${p.ref || p.date}`;
   const sum = (k: keyof Omit<PayoutRow, 'invoiceId'>) => round2(p.rows.reduce((s, r) => s + r[k], 0));

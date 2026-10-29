@@ -273,7 +273,7 @@ export function designForDoc<T extends Pick<DesignPrefs, 'labels' | 'labels_by_t
 /** "TAX INVOICE — PROFESSIONAL SERVICES": the statutory title always leads; the suffix is appended. */
 export function docTitleText(baseTitle: string, design: Pick<DesignPrefs, 'title_suffix'> | null | undefined, docType: DocumentType | undefined): string {
   const suffix = docType ? design?.title_suffix?.[docType]?.trim() : '';
-  return suffix ? `${baseTitle} — ${suffix}` : baseTitle;
+  return suffix ? `${baseTitle}: ${suffix}` : baseTitle;
 }
 
 export interface PreprintedPrefs {

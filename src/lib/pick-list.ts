@@ -47,7 +47,7 @@ export function pickRows(docs: readonly Pick<InvoiceRecord, 'invoice_number' | '
 
 
 export function pickListHtml(rows: readonly PickRow[], opts: { title?: string; business?: string; date?: string } = {}): string {
-  const body = rows.map((r) => `<tr><td>${esc(r.bin || '—')}</td><td>${esc(r.item)}</td><td>${esc(r.batch)}</td><td class="n">${r.qty}</td><td>${esc(r.unit)}</td><td>${esc(r.docs.join(', '))}</td><td class="tick"></td></tr>`).join('');
+  const body = rows.map((r) => `<tr><td>${esc(r.bin || '-')}</td><td>${esc(r.item)}</td><td>${esc(r.batch)}</td><td class="n">${r.qty}</td><td>${esc(r.unit)}</td><td>${esc(r.docs.join(', '))}</td><td class="tick"></td></tr>`).join('');
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(opts.title || 'Pick list')}</title>

@@ -74,7 +74,7 @@ function ConflictItem({ c, onResolve }: { c: SyncConflict; onResolve: (id: strin
         <ul className={styles.diff}>
           {c.docs.map((d) => (
             <li key={d.id}>
-              {c.key.endsWith('_invoices') ? <Link to={`/invoice/${d.id}`}>{d.number || d.id}</Link> : d.number || d.id} · {d.client || '—'} · {d.date} · {d.total.toLocaleString('en-IN')}
+              {c.key.endsWith('_invoices') ? <Link to={`/invoice/${d.id}`}>{d.number || d.id}</Link> : d.number || d.id} · {d.client || '-'} · {d.date} · {d.total.toLocaleString('en-IN')}
               {d.device ? syncT('fromDevice', { device: d.device }) : ''}
             </li>
           ))}

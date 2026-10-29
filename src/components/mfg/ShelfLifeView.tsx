@@ -33,12 +33,12 @@ export default function ShelfLifeView({ ctx }: { ctx: MfgContext }) {
     <>
       <p data-mfd-buckets>{LIFE_BUCKETS.filter((b) => totals[b]).map((b) => `${fdT(`b.${b}` as FdKey)}: ${rs(totals[b])}`).join(' · ') || fdT('none')}</p>
       <Tbl empty={fdT('none')} head={[fdT('item'), fdT('batch'), fdT('godown'), fdT('qty'), fdT('expiry'), fdT('life'), fdT('action')]}
-        rows={rows.filter((r) => r.bucket !== 'ok').map((r) => [r.item, r.batch, godownName(ctx.godowns, r.godown), rs(r.qty), r.expiry ?? '', r.pct === null ? `${r.days ?? '—'} ${fdT('days')}` : `${r.pct}% · ${r.days} ${fdT('days')}`, BUCKET_ACTION[r.bucket]])} />
+        rows={rows.filter((r) => r.bucket !== 'ok').map((r) => [r.item, r.batch, godownName(ctx.godowns, r.godown), rs(r.qty), r.expiry ?? '', r.pct === null ? `${r.days ?? '-'} ${fdT('days')}` : `${r.pct}% · ${r.days} ${fdT('days')}`, BUCKET_ACTION[r.bucket]])} />
       <h3>{fdT('clientFloor')}</h3>
       <div style={row}>
         <Fld l={fdT('client')}>
           <select className={controls.select} value={f.client} onChange={(e) => pickClient(e.target.value)} data-mfd="floor-client">
-            <option value="">—</option>
+            <option value="">-</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </Fld>

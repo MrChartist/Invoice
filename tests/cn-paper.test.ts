@@ -47,8 +47,8 @@ test('line sub-line: BOQ item no., M-book, class with approval; nothing on old d
   assert.equal(worksLineText({ id: 'z' }, cn), '');
   assert.equal(worksLineText({ id: 'a' }, undefined), '');
   assert.equal(trackingText({ boq_ref: '2.1' } as never), '', 'trackingText unchanged for an ordinary line');
-  assert.equal(raDocTitle({ ra_no: 4 }, 'Tax Invoice'), 'Tax Invoice — Running Account Bill No. 4');
-  assert.equal(raDocTitle({ ra_no: 4, ra_final: true }, 'Tax Invoice'), 'Tax Invoice — Final Bill');
+  assert.equal(raDocTitle({ ra_no: 4 }, 'Tax Invoice'), 'Tax Invoice: Running Account Bill No. 4');
+  assert.equal(raDocTitle({ ra_no: 4, ra_final: true }, 'Tax Invoice'), 'Tax Invoice: Final Bill');
 });
 
 test('TemplateEngine mounts the works parts lazily, gated by the snapshot, never on receipt paper', () => {

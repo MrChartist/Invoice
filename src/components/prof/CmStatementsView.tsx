@@ -24,7 +24,7 @@ export default function CmStatementsView({ ctx }: { ctx: CmCtx }) {
   const body = st.rows.map((x) => [x.v.date, x.v.number, cmT(`k.${x.v.kind}` as 'k.receipt'), x.v.narration || x.v.ref, rs(x.amount), rs(x.balance)]);
   const print = () => {
     const firm = localDb.settings.activeProfile()?.companyName ?? '';
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(cmT('stmtTitle'))}</title><style>${PRINT_FONT_FACE}body{font:13px ${PRINT_FONT};margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid gray;padding:4px 6px;text-align:left}</style></head><body><h2>${esc(cmT('stmtTitle'))} — ${esc(who)}</h2><p>${esc(firm)} · ${esc(from)} – ${esc(to)}</p><p>${esc(cmT('opening'))}: ₹${rs(st.opening)}</p><table><tr>${[cmT('date'), cmT('number'), cmT('kind'), cmT('narration'), cmT('amount'), cmT('held')].map((h) => `<th>${esc(h)}</th>`).join('')}</tr>${body.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table><p><b>${esc(cmT('closing'))}: ₹${rs(st.closing)}</b></p><p>${esc(cmT('copyNote'))}</p></body></html>`;
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(cmT('stmtTitle'))}</title><style>${PRINT_FONT_FACE}body{font:13px ${PRINT_FONT};margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid gray;padding:4px 6px;text-align:left}</style></head><body><h2>${esc(cmT('stmtTitle'))}: ${esc(who)}</h2><p>${esc(firm)} · ${esc(from)} – ${esc(to)}</p><p>${esc(cmT('opening'))}: ₹${rs(st.opening)}</p><table><tr>${[cmT('date'), cmT('number'), cmT('kind'), cmT('narration'), cmT('amount'), cmT('held')].map((h) => `<th>${esc(h)}</th>`).join('')}</tr>${body.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table><p><b>${esc(cmT('closing'))}: ₹${rs(st.closing)}</b></p><p>${esc(cmT('copyNote'))}</p></body></html>`;
     const w = window.open('', '_blank'); // script-free HTML; a blocked pop-up saves the file instead
     if (!w) return downloadText('client-money-statement.html', html, 'text/html');
     w.document.write(html);
@@ -40,7 +40,7 @@ export default function CmStatementsView({ ctx }: { ctx: CmCtx }) {
           <select className={controls.select} value={client} onChange={(e) => setClient(e.target.value)} data-cm="st-client">{ctx.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         </Fld>
         <Fld l={cmT('matter')}>
-          <select className={controls.select} value={matter} onChange={(e) => setMatter(e.target.value)}><option value="">—</option>{ctx.matters.filter((m) => !m.client_id || m.client_id === client).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+          <select className={controls.select} value={matter} onChange={(e) => setMatter(e.target.value)}><option value="">-</option>{ctx.matters.filter((m) => !m.client_id || m.client_id === client).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
         </Fld>
         <Fld l={cmT('from')}><input type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} data-cm="st-from" /></Fld>
         <Fld l={cmT('to')}><input type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></Fld>

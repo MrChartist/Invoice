@@ -209,7 +209,7 @@ export function Reports() {
           label={repT('statTop3')}
           icon={Percent}
           tone={conc.level === 'high' ? 'loss' : conc.level === 'moderate' ? 'warning' : 'default'}
-          value={conc.customers ? `${conc.top3Share.toFixed(1)}%` : '—'}
+          value={conc.customers ? `${conc.top3Share.toFixed(1)}%` : '-'}
           hint={conc.customers ? plural(repT, 'customersOne', 'customersMany', conc.customers) : repT('noSalesYet')}
         />
       </div>

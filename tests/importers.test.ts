@@ -86,6 +86,8 @@ test('resolveStateText: names, codes, abbreviations and legacy names', () => {
   assert.equal(resolveStateText('MAHARASHTRA ')?.code, '27');
   assert.equal(resolveStateText('27-Maharashtra')?.code, '27');
   assert.equal(resolveStateText('Karnataka (29)')?.code, '29');
+  assert.equal(resolveStateText('29 (Karnataka)')?.code, '29', 'the app place-of-supply text');
+  assert.equal(resolveStateText('29 — Karnataka')?.code, '29', 'text written before the no-em-dash rule');
   assert.equal(resolveStateText('7')?.code, '07');
   assert.equal(resolveStateText('MH')?.code, '27');
   assert.equal(resolveStateText('Orissa')?.code, '21');

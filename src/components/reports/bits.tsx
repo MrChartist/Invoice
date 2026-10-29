@@ -21,7 +21,7 @@ export function Share({ value }: { value: number }) {
 
 /** Year-on-year change with an arrow (colour is never the only signal). */
 export function Delta({ value }: { value: number | null }) {
-  if (value === null) return <span className={styles.muted}>—</span>;
+  if (value === null) return <span className={styles.muted}>-</span>;
   const cls = value > 0 ? styles.pos : value < 0 ? styles.neg : '';
   const Icon = value > 0 ? ArrowUpRight : value < 0 ? ArrowDownRight : Minus;
   return (

@@ -50,7 +50,7 @@ const r3 = (x: number) => Math.round((x + Number.EPSILON) * 1000) / 1000 || 0;
 export const defaultOutturn = (kind: CmrAgreement['kind'], date?: string): number => ruleAt(OUTTURN_STANDARDS, date)[kind];
 
 /** The paddy line name of an agreement in the JWP register (receipts and returns match on it). */
-export const paddyName = (a: Pick<CmrAgreement, 'season' | 'kind'>) => `Paddy — CMR ${a.season.trim()}${a.kind === 'parboiled' ? ' (parboiled)' : ''}`;
+export const paddyName = (a: Pick<CmrAgreement, 'season' | 'kind'>) => `Paddy: CMR ${a.season.trim()}${a.kind === 'parboiled' ? ' (parboiled)' : ''}`;
 
 export interface CmrAccount {
   paddy: number;
@@ -147,7 +147,7 @@ export function cmrBilling(a: Pick<CmrAgreement, 'id' | 'deliveries'>, invoices:
     const c = inv.ag?.cmr;
     if (c?.agreement_id !== a.id || inv.status === 'Cancelled') continue;
     billed += num(c.billed_qtl);
-    for (const id of c.delivery_ids ?? []) billedBy.set(id, inv.invoice_number || '—');
+    for (const id of c.delivery_ids ?? []) billedBy.set(id, inv.invoice_number || '-');
   }
   const delivered = (a.deliveries ?? []).reduce((s, d) => s + num(d.qty), 0);
   return { billed: r3(billed), unbilled: r3(Math.max(delivered - billed, 0)), billedBy };
@@ -217,7 +217,7 @@ export function addPaddyLot(agreementId: string, x: { date: string; qty?: number
   return withTablesRollback([CMR_TABLE, WBS_TABLE, 'job_work_principal', 'series_counters'], () => {
     const r = principalDb.save({
       date: x.date, kind: 'receipt', party_name: a.agency_name, client_id: a.agency_id, challan_no: x.challan_no || slip?.number || '', challan_date: x.date,
-      lines: [{ id: generateId(), name: paddyName(a), qty, unit: 'QTL' }], narration: `Custom milling ${a.season} — paddy received${slip ? ` (weighbridge slip ${slip.number})` : ''}`,
+      lines: [{ id: generateId(), name: paddyName(a), qty, unit: 'QTL' }], narration: `Custom milling ${a.season}: paddy received${slip ? ` (weighbridge slip ${slip.number})` : ''}`,
     });
     const lot: CmrPaddyLot = { id: generateId(), ...(slip ? { wbs_id: slip.id } : {}), jwp_id: r.id, date: x.date, qty };
     put(CMR_TABLE, { ...mustGet(agreementId), paddy_lots: [...a.paddy_lots, lot], updated_at: stamp() });
@@ -320,12 +320,12 @@ export function millingChargesInvoice(agreementId: string, x: { date: string; qt
   const goods = round2(Math.max(num(x.goods_value), 0));
   const test = pdsTest(goods, service + goods, x.date);
   const items = [
-    { name: `Milling charges — CMR ${a.season} (${qty} qtl rice; ${picked.map((d) => d.number).join(', ')})`, hsn: test.sac, unit: 'QTL', quantity: qty, rate, tax_rate: test.rate, ag_class: 'milling_pds' as const },
+    { name: `Milling charges: CMR ${a.season} (${qty} qtl rice; ${picked.map((d) => d.number).join(', ')})`, hsn: test.sac, unit: 'QTL', quantity: qty, rate, tax_rate: test.rate, ag_class: 'milling_pds' as const },
     ...(goods > 0 ? [{ name: 'Goods used in milling (fortificant, gunny, packing)', hsn: test.sac, unit: 'NOS', quantity: 1, rate: goods, tax_rate: test.rate, ag_class: 'milling_pds' as const }] : []),
   ];
   const note = test.exempt
-    ? `Milling of paddy for PDS — goods ${test.goodsPct}% of value (≤ ${test.limit}%): exempt, N 12/2017 entry 3A (Circular 153/09/2021-GST). Working paper — verify with your CA (AG9).`
-    : `Milling of paddy for PDS — goods ${test.goodsPct}% of value (> ${test.limit}%): 5% job work, N 11/2017 entry 26 (Circular 153/09/2021-GST). Working paper — verify with your CA (AG9).`;
+    ? `Milling of paddy for PDS, goods ${test.goodsPct}% of value (≤ ${test.limit}%): exempt, N 12/2017 entry 3A (Circular 153/09/2021-GST). Working paper: verify with your CA (AG9).`
+    : `Milling of paddy for PDS, goods ${test.goodsPct}% of value (> ${test.limit}%): 5% job work, N 11/2017 entry 26 (Circular 153/09/2021-GST). Working paper: verify with your CA (AG9).`;
   const cmr = { ...cmrSnapshot(a, x.date, test.goodsPct), agreement_id: a.id, delivery_ids: picked.map((d) => d.id), billed_qtl: qty };
   const invoice = draftDoc(a.agency_id, x.date, items, test.exempt, note, agSnapshot('cmr', { cmr }));
   return { invoice, test };
@@ -335,9 +335,9 @@ export function millingChargesInvoice(agreementId: string, x: { date: string; qt
 export function jobMillingInvoice(x: { client_id: string; date: string; qty: number; rate: number; process?: string; registered: boolean; tax_rate?: number; jwp_number?: string }): InvoiceRecord {
   const s = jobMillingRate(x.registered, x.date);
   const taxRate = x.tax_rate !== undefined && String(x.tax_rate) !== '' ? num(x.tax_rate) : s.rate;
-  if (taxRate === null) throw new Error('Unregistered principal: type the GST rate (verify with your CA — AG10).');
+  if (taxRate === null) throw new Error('Unregistered principal: type the GST rate (verify with your CA, AG10).');
   const line = jobChargesLine({ process: x.process || 'milling', rate: x.rate, number: x.jwp_number ?? '' }, x.qty, taxRate);
-  const note = `Job milling (class job_milling, SAC ${s.sac}) — ${x.registered ? '5% suggested for a registered principal, N 11/2017 entry 26' : 'unregistered principal: rate typed'}. Working paper — verify with your CA (AG10).`;
+  const note = `Job milling (class job_milling, SAC ${s.sac}): ${x.registered ? '5% suggested for a registered principal, N 11/2017 entry 26' : 'unregistered principal: rate typed'}. Working paper: verify with your CA (AG10).`;
   const { id: _i, type: _t, amount: _a, ...rest } = line;
   void _i; void _t; void _a;
   return draftDoc(x.client_id, x.date, [{ ...rest, hsn: s.sac, ag_class: 'job_milling' }], taxRate === 0, note, agSnapshot('job_milling', { header: x.jwp_number ? { jwp: x.jwp_number } : undefined }));

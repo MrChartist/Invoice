@@ -98,18 +98,18 @@ function buildAllGroups({ exceptions, issues, gaps, lut = [] }: PreflightInput):
     if (i.severity === 'error') g.severity = 'error';
     g.count++;
     g.vars.n = g.count;
-    g.items.push({ key: i.id, label: i.invoiceNumber || (i.invoiceId ? '—' : issueText(i)), detail: issueText(i), link: i.link ?? (i.invoiceId ? docLink(i.invoiceId) : undefined) });
+    g.items.push({ key: i.id, label: i.invoiceNumber || (i.invoiceId ? '-' : issueText(i)), detail: issueText(i), link: i.link ?? (i.invoiceId ? docLink(i.invoiceId) : undefined) });
   }
 
   // R4-C1: zero-rated exports without a live LUT (Rule 96A) — verify with your CA.
   for (const l of lut) {
     const message = l.code === 'LUT_MISSING'
-      ? 'Zero-rated export without an LUT (Rule 96A) — verify with your CA'
-      : `LUT of ${l.lutFy} on a document of ${l.fy} — verify with your CA`;
+      ? 'Zero-rated export without an LUT (Rule 96A): verify with your CA'
+      : `LUT of ${l.lutFy} on a document of ${l.fy}: verify with your CA`;
     const g = group(`issue:${l.code}`, { source: 'issue', code: l.code, severity: l.code === 'LUT_MISSING' ? 'error' : 'warning', vars: { n: 0, message } });
     g.count++;
     g.vars.n = g.count;
-    g.items.push({ key: `${l.code}:${l.invoiceId}`, label: l.number || '—', detail: message, link: docLink(l.invoiceId) });
+    g.items.push({ key: `${l.code}:${l.invoiceId}`, label: l.number || '-', detail: message, link: docLink(l.invoiceId) });
   }
 
   // Rule 46: gaps in a series are reported as cancelled in Table 13 — worth explaining before filing.

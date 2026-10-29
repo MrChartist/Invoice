@@ -20,7 +20,7 @@ import { EWAY_THRESHOLD, EWAY_VERSION, ewayTransModeCode, normaliseVehicle, type
 
 /** Portal sub-supply type 5 = "For Own Use". */
 export const EWAY_SUB_OWN_USE = 5;
-export const TRANSFER_EWAY_CA_NOTE = 'e-Way bill JSON for a branch transfer under the same GSTIN (sub-type For own use, document CHL, value at cost) — not validated against the portal; verify with your CA.';
+export const TRANSFER_EWAY_CA_NOTE = 'e-Way bill JSON for a branch transfer under the same GSTIN (sub-type For own use, document CHL, value at cost): not validated against the portal; verify with your CA.';
 
 export interface TransferEwayOptions {
   sender: { name: string; gstin?: string; stateCode?: string };
@@ -65,7 +65,7 @@ export function buildEwayTransfer(t: Pick<StockTransfer, 'transfer_number' | 'da
   const fromState = stateByCode(opts.sender.stateCode)?.code ?? gstin.slice(0, 2);
   const toState = opts.toStateCode || fromState;
   if (!gstin) notes.push('Your GSTIN is missing in the business profile.');
-  if (toState !== fromState) notes.push('The two premises are in different States: a branch in another State has its own GSTIN — raise a tax invoice (Sec 25(4)) instead.');
+  if (toState !== fromState) notes.push('The two premises are in different States: a branch in another State has its own GSTIN, raise a tax invoice (Sec 25(4)) instead.');
   const fromAddr = splitAddress(opts.fromAddress ?? '');
   const toAddr = splitAddress(opts.toAddress ?? '');
   if (!opts.toAddress) notes.push('Add the receiving godown / branch address before uploading.');
@@ -77,7 +77,7 @@ export function buildEwayTransfer(t: Pick<StockTransfer, 'transfer_number' | 'da
     const hsn = (it.hsn ?? '').replace(/\D/g, '');
     if (!hsn) notes.push(`${it.name}: no HSN code.`);
     const value = round2(qty * Math.max(num(opts.costOf(it.id)), 0));
-    if (!(value > 0)) notes.push(`${it.name}: no cost value in stock — the line goes at ₹0.`);
+    if (!(value > 0)) notes.push(`${it.name}: no cost value in stock, the line goes at ₹0.`);
     const rate = Math.max(num(it.tax_rate), 0);
     itemList.push({
       productName: it.name.slice(0, 100),

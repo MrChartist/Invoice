@@ -103,7 +103,7 @@ export function followUpText(f: FollowUp, period: string, ourGstin: string, w: F
       if (i.booksTax !== undefined) parts.push(`${w.books}: ${w.taxable} ${money(i.booksTaxable)}, ${w.tax} ${money(i.booksTax)}`);
       if (i.g2bTax !== undefined) parts.push(`${w.in2b}: ${w.taxable} ${money(i.g2bTaxable)}, ${w.tax} ${money(i.g2bTax)}`);
       if (i.diffs.length) parts.push(i.diffs.map((d) => w.diffs[d]).join(', '));
-      lines.push(parts.join(' — '));
+      lines.push(parts.length > 1 ? `${parts[0]}: ${parts.slice(1).join('; ')}` : parts[0]);
     });
   };
   section('not_in_2b', w.notIn2b);

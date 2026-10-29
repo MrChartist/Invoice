@@ -32,13 +32,13 @@ export default function EprView({ ctx, done }: { ctx: MfgContext; done: Done }) 
         <Txt l={M('to')} type="month" v={to} set={setTo} x={150} />
         <button type="button" className={B.os} data-mfb-epr-csv onClick={() => downloadText(`epr-${from}-${to}.csv`, eprCsv(rows), 'text/csv')}>{M('csv')}</button>
       </div>
-      <Table d="epr" empty={M('noEpr')} head={[M('month'), M('category'), M('customer'), M('eprNo'), M('kgSupplied')]} rows={rows.map((r) => [r.month, r.category, r.client, r.epr_no || '—', fmt(r.kg)])} />
+      <Table d="epr" empty={M('noEpr')} head={[M('month'), M('category'), M('customer'), M('eprNo'), M('kgSupplied')]} rows={rows.map((r) => [r.month, r.category, r.client, r.epr_no || '-', fmt(r.kg)])} />
       <p className={controls.hint} data-mfb-recycled>{M('recycled', { month: to, pcr: fmt(rec.pcr_kg), input: fmt(rec.input_kg), pct: rec.pct })}</p>
 
       <h4>{M('itemEpr')}</h4>
       <div style={row}>
         <Sel l={M('item')} v={it.id} set={(x) => { const s = ctx.items.find((i) => i.id === x); setIt({ id: x, cat: s?.mf_epr ?? '', kg: String(s?.mf_unit_kg ?? ''), max: String(s?.mf_max_regrind_pct ?? ''), pcr: !!s?.mf_pcr }); }} o={opt(ctx.items, (i) => i.id, (i) => i.name)} x={200} d="epr-item" />
-        <Sel l={M('category')} v={it.cat} set={(x) => setIt({ ...it, cat: x })} o={[['', '—'], ...CATS.map((c) => [c, M(`cat.${c}`)] as const)]} x={170} d="epr-cat" />
+        <Sel l={M('category')} v={it.cat} set={(x) => setIt({ ...it, cat: x })} o={[['', '-'], ...CATS.map((c) => [c, M(`cat.${c}`)] as const)]} x={170} d="epr-cat" />
         <Num l={M('unitKg')} v={it.kg} set={(x) => setIt({ ...it, kg: x })} x={100} />
         <Num l={M('maxRegrind')} v={it.max} set={(x) => setIt({ ...it, max: x })} x={110} />
         <label className={controls.label}><input type="checkbox" checked={it.pcr} onChange={(e) => setIt({ ...it, pcr: e.target.checked })} /> {M('pcr')}</label>

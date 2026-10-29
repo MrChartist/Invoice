@@ -40,14 +40,14 @@ export default function TripPick({ value, onChange, itc, setItc }: { value: Tag;
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }} data-tv-trip-pick>
       <Field label={tvT('trip')}>
         <select className={controls.select} value={value?.trip_id ?? ''} onChange={(e) => pick(e.target.value)} data-tv-bill-trip>
-          <option value="">—</option>
+          <option value="">-</option>
           {trips.map((t) => <option key={t.id} value={t.id}>{tripLabel(t)}</option>)}
         </select>
       </Field>
       {value?.trip_id && bookings.length > 0 && (
         <Field label={tvT('booking')}>
           <select className={controls.select} value={value.booking_id ?? ''} onChange={(e) => pick(value.trip_id, e.target.value || undefined)} data-tv-bill-booking>
-            <option value="">—</option>
+            <option value="">-</option>
             {bookings.map((b) => <option key={b.id} value={b.id}>{b.start} · {tvList('comps', TV_COMPONENTS, b.component)}{b.ref ? ` · ${b.ref}` : ''}</option>)}
           </select>
         </Field>

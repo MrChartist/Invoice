@@ -306,7 +306,7 @@ ${stock === undefined ? '' : `<p class="${stock > 0 ? 'in' : 'out'}">${stock > 0
 
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-${policy}<title>${esc(opts.business || 'Catalogue')} — catalogue</title>
+${policy}<title>${esc(opts.business || 'Catalogue')}: catalogue</title>
 <style>${STYLE}</style></head><body>
 <header>
 <h1>${esc(opts.business || 'Catalogue')}</h1>

@@ -128,7 +128,7 @@ export function StructuresTab({ version, refresh, notify }: Props) {
                           data-row={i}
                           data-col="amt"
                           aria-label={pT('structures.amountFor', { name: h.name })}
-                          placeholder={h.calc === 'percent' || h.calc === 'computed' ? pT('structures.include') : '—'}
+                          placeholder={h.calc === 'percent' || h.calc === 'computed' ? pT('structures.include') : '-'}
                           value={current.amounts[h.id] ?? ''}
                           onKeyDown={gridKeyDown}
                           onChange={(e) => setDraft({ ...current, amounts: { ...current.amounts, [h.id]: e.target.value } })}

@@ -59,6 +59,6 @@ export function floorBatches<T extends { batch: string; mfg?: string; expiry?: s
 /** "no batch with ≥ 70% life — 12 units qualify". */
 export function shortfallText(floor: ShelfFloor, qualifying: number): string {
   const need = [floor.pct ? `${floor.pct}% life` : '', floor.days ? `${floor.days} days` : ''].filter(Boolean).join(' and ');
-  return `no batch with ≥ ${need} — ${qualifying} units qualify`;
+  return `no batch with ≥ ${need}: ${qualifying} units qualify`;
 }
 

@@ -15,7 +15,7 @@ export default function BalanceView({ ctx }: { ctx: MfgContext }) {
         const b = runBalance(r, d.moulds.find((m) => m.id === r.mould_id));
         const it = ctx.items.find((i) => i.id === r.item_id);
         const w = regrindWarning(b, it);
-        return [r.date, it?.name ?? '—', fmt(b.input_kg), fmt(b.good_kg), fmt(b.reject_kg), fmt(b.runner_kg), fmt(b.purge_kg), <span key="l" data-mfb-loss>{fmt(b.loss_kg)}</span>, `${b.yield_pct}%`, <span key="g" title={w} data-mfb-regrind-warn={w ? '1' : undefined}>{b.regrind_pct}%{w ? ' ⚠' : ''}</span>, `${b.efficiency_pct}%`];
+        return [r.date, it?.name ?? '-', fmt(b.input_kg), fmt(b.good_kg), fmt(b.reject_kg), fmt(b.runner_kg), fmt(b.purge_kg), <span key="l" data-mfb-loss>{fmt(b.loss_kg)}</span>, `${b.yield_pct}%`, <span key="g" title={w} data-mfb-regrind-warn={w ? '1' : undefined}>{b.regrind_pct}%{w ? ' ⚠' : ''}</span>, `${b.efficiency_pct}%`];
       })} />
     </div>
   );

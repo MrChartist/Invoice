@@ -137,7 +137,7 @@ export function resaleCheckIssue(checks: readonly ImeiCheck[], imei: string, day
   const c = lastCheck(checks, imei, pair);
   if (c?.result === 'blocked') return `IMEI ${imei} was logged as BLOCKED on ${c.date}: do not resell it. Verify with your CA.`;
   const days = resaleCheckDays(day);
-  if (!c || c.date < shiftDay(day, -days)) return `IMEI ${imei}: no "clear" blocked-IMEI check in the last ${days} days — check it on the government portal and log it (Telecom Cyber Security Amendment Rules 2025, verify with your CA).`;
+  if (!c || c.date < shiftDay(day, -days)) return `IMEI ${imei}: no "clear" blocked-IMEI check in the last ${days} days, check it on the government portal and log it (Telecom Cyber Security Amendment Rules 2025, verify with your CA).`;
   return '';
 }
 

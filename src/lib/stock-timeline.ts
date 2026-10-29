@@ -141,7 +141,7 @@ export function removalIssues(
       const minBefore = lowestRunning(list, c.delta).min;
       const after = lowestRunning(rest, c.delta, Math.min(minBefore, 0));
       if (!(after.min < -EPS && after.min < minBefore - EPS)) continue;
-      const msg = `${item.name}: ${eventLabel(after.first)} uses ${c.what} that this entry provides — ${c.serial ? 'remove or change that entry first' : `it would go ${roundQty(after.min)} below zero`}.`;
+      const msg = `${item.name}: ${eventLabel(after.first)} uses ${c.what} that this entry provides, ${c.serial ? 'remove or change that entry first' : `it would go ${roundQty(after.min)} below zero`}.`;
       (c.serial ? out.errors : out.warnings).push(msg);
     }
   }

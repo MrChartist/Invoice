@@ -35,7 +35,7 @@ export function postLines(site: Site, post: MpPost, m: Pick<SiteMuster, 'month' 
   const ot = rows.reduce((t, r) => t + (Number(r.ot_hours) || 0), 0);
   if (!duties && !ot) return [];
   const days = s.billing_days === 26 || s.billing_days === 30 ? s.billing_days : daysIn(m.month);
-  const nm = `${grouped ? `${site.mp.code} ${site.name} — ` : ''}${post.name}`;
+  const nm = `${grouped ? `${site.mp.code} ${site.name}: ` : ''}${post.name}`;
   const line = (name: string, unit: string, quantity: number, rate: number, amount = round2(quantity * rate)): BillLine => ({ id: newId(), name, hsn: post.sac, sac: post.sac, unit, quantity, rate, amount, site, post, duties });
   if (post.basis === 'duty') return [line(nm, 'DUTY', duties, post.rate)];
   if (post.basis === 'hour') {
@@ -48,13 +48,13 @@ export function postLines(site: Site, post: MpPost, m: Pick<SiteMuster, 'month' 
     return [line(`${nm} (${post.heads} × ₹${post.rate} a month; ${duties} of ${post.heads * days} duties)`, 'MONTH', 1, amt, amt)];
   }
   const wages = round2(duties * post.rate);
-  const out = [line(`${nm} — wages (${duties} duties × ₹${post.rate})`, 'DUTY', duties, post.rate, wages)];
+  const out = [line(`${nm}: wages (${duties} duties × ₹${post.rate})`, 'DUTY', duties, post.rate, wages)];
   for (const [k, label] of COSTPLUS) {
     const pct = Number(s.costplus?.[k]) || 0;
-    if (pct > 0) out.push(line(`${nm} — ${label} ${pct} %`, 'NOS', 1, round2((wages * pct) / 100)));
+    if (pct > 0) out.push(line(`${nm}: ${label} ${pct} %`, 'NOS', 1, round2((wages * pct) / 100)));
   }
   const uni = Number(s.costplus?.uniform_per_head) || 0;
-  if (uni > 0) out.push(line(`${nm} — uniforms (${post.heads} × ₹${uni})`, 'NOS', post.heads, uni));
+  if (uni > 0) out.push(line(`${nm}: uniforms (${post.heads} × ₹${uni})`, 'NOS', post.heads, uni));
   return out;
 }
 
@@ -116,7 +116,7 @@ export function billPlans(i: PlanInput): BillPlan[] {
         for (const { site } of multi ? ms : [{ site: part[0].site }]) {
           const mine = multi ? part.filter((l) => l.site.id === site.id) : part;
           const amt = round2((round2(mine.reduce((t, l) => t + l.amount, 0)) * pct) / 100);
-          if (amt > 0) items.push({ id: i.newId(), name: `Service charge ${pct} %${multi ? ` — ${site.mp.code}` : ''}`, hsn: mine[0].hsn, unit: 'NOS', quantity: 1, rate: amt, amount: amt, type: 'Service', discount_percent: 0, tax_rate: 0, ...cc(site.id) });
+          if (amt > 0) items.push({ id: i.newId(), name: `Service charge ${pct} %${multi ? `: ${site.mp.code}` : ''}`, hsn: mine[0].hsn, unit: 'NOS', quantity: 1, rate: amt, amount: amt, type: 'Service', discount_percent: 0, tax_rate: 0, ...cc(site.id) });
         }
       }
       const byPost = new Map<string, MpPostRow>();
@@ -128,7 +128,7 @@ export function billPlans(i: PlanInput): BillPlan[] {
       }
       const posts = [...byPost.values()];
       const name = (id: string) => i.staff.find((e) => e.id === id);
-      const annex = ms.flatMap(({ site, m }) => m.rows.filter((r) => part.some((l) => l.site === site && l.post.id === r.post_id)).map((r) => ({ name: name(r.employee_id)?.name ?? '—', code: name(r.employee_id)?.code ?? '', duties: r.duties, ...(r.ot_hours ? { ot: r.ot_hours } : {}), post: `${grouped ? `${site.mp.code} ` : ''}${site.mp.posts.find((p) => p.id === r.post_id)?.name ?? ''}${r.relief ? ' (reliever)' : ''}` })));
+      const annex = ms.flatMap(({ site, m }) => m.rows.filter((r) => part.some((l) => l.site === site && l.post.id === r.post_id)).map((r) => ({ name: name(r.employee_id)?.name ?? '-', code: name(r.employee_id)?.code ?? '', duties: r.duties, ...(r.ot_hours ? { ot: r.ot_hours } : {}), post: `${grouped ? `${site.mp.code} ` : ''}${site.mp.posts.find((p) => p.id === r.post_id)?.name ?? ''}${r.relief ? ' (reliever)' : ''}` })));
       const bases = [...new Set(part.map((l) => l.post.basis))];
       const one = ms.length === 1 ? ms[0].site : undefined;
       out.push({

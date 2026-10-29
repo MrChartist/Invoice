@@ -112,7 +112,7 @@ export function saveDonation(input: DonationInput, donorName: string): Donation 
       voucherId = saveVoucher({
         ...(reuse ? { id: reuse } : {}),
         type: kindAccount ? 'JOURNAL' : 'RECEIPT', date,
-        narration: `Donation ${number} from ${input.anonymous ? 'anonymous donor' : donorName} — ${input.section === 'none' ? 'no deduction' : input.section}, ${input.type}${input.reference ? `, ref ${input.reference}` : ''}${kindAccount ? ' — gift in kind' : ''}`,
+        narration: `Donation ${number} from ${input.anonymous ? 'anonymous donor' : donorName}: ${input.section === 'none' ? 'no deduction' : input.section}, ${input.type}${input.reference ? `, ref ${input.reference}` : ''}${kindAccount ? ': gift in kind' : ''}`,
         lines: [{ account_id: money_, dr: p, cr: 0 }, { account_id: credit, dr: 0, cr: p, ...(input.fund_id ? { cost_centre_id: input.fund_id } : {}) }],
         voucher_class: 'Donation',
       }).id;

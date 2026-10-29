@@ -41,7 +41,7 @@ function parseWithDom(text: string): XmlNode {
 }
 
 const rs = (p: number) => `₹${(Math.abs(p) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const drcr = (p: number) => (p ? `${rs(p)} ${p > 0 ? 'Dr' : 'Cr'}` : '—');
+const drcr = (p: number) => (p ? `${rs(p)} ${p > 0 ? 'Dr' : 'Cr'}` : '-');
 
 const STATUS_KEY: Record<PlannedVoucherStatus, 'stOk' | 'stDuplicate' | 'stLocked' | 'stCancelled' | 'stBefore' | 'stError' | 'stStockOnly'> = {
   ok: 'stOk', duplicate: 'stDuplicate', locked: 'stLocked', cancelled: 'stCancelled', before_books: 'stBefore', error: 'stError', stock_only: 'stStockOnly',
@@ -220,7 +220,7 @@ export function TallyImport({ open, onClose, notify }: TallyImportProps) {
         </div>
         {opts.includeOpenings && (
           <p className={plan.openingTotals.diff ? styles.warnBox : styles.note}>
-            {migT('openingTb')}: {rs(plan.openingTotals.dr)} Dr · {rs(plan.openingTotals.cr)} Cr — {plan.openingTotals.diff ? migT('openingDiff', { amount: drcr(plan.openingTotals.diff) }) : migT('openingOk')}
+            {migT('openingTb')}: {rs(plan.openingTotals.dr)} Dr · {rs(plan.openingTotals.cr)} Cr: {plan.openingTotals.diff ? migT('openingDiff', { amount: drcr(plan.openingTotals.diff) }) : migT('openingOk')}
           </p>
         )}
         <div className={styles.tabs} role="tablist">
@@ -239,7 +239,7 @@ export function TallyImport({ open, onClose, notify }: TallyImportProps) {
                   return (
                     <tr key={l.rec.name}>
                       <td>{l.rec.name}{l.issues.length > 0 && <div className={styles.muted}>{l.issues[0]}</div>}</td>
-                      <td className={styles.muted}>{l.rec.parent || '—'}</td>
+                      <td className={styles.muted}>{l.rec.parent || '-'}</td>
                       <td>
                         {t.kind === 'client' || t.kind === 'vendor' ? (
                           <span className={styles.chip}>{migT(t.kind === 'client' ? 'tClient' : 'tVendor')}{t.existingId ? ` · ${migT('existingWord')}` : ''}</span>

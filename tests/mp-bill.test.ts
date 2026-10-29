@@ -62,7 +62,7 @@ test('plans: drafts skipped, grouping by client + bill group, the regime split, 
     ['rcm', ['a', 'b'], [24800, 24800, 2480, 2480]], // QA20 V3: one service-charge line per site on a bill of several sites
     ['fwd', ['a'], [18600, 1860]],
   ]);
-  assert.match(plans[0].items[0].name, /^S-A Tower A — Guard/);
+  assert.match(plans[0].items[0].name, /^S-A Tower A: Guard/);
   assert.deepEqual([plans[0].mp.muster_id, plans[0].mp.muster_ids, plans[0].mp.site, plans[1].mp.site?.code], ['m-a', ['m-a', 'm-b'], undefined, 'S-A']);
   assert.deepEqual(plans[0].mp.annex?.map((r) => [r.name, r.post]), [['Ram', 'S-A Guard (12 h)'], ['Ram', 'S-B Guard (12 h)']]);
 });

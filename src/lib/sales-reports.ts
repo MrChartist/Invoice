@@ -381,7 +381,7 @@ export function concentration(report: CustomerReport, topN = 10): Concentration 
   if (level === 'high' || level === 'moderate') {
     warning =
       ranked.length <= 3
-        ? `Only ${ranked.length} customer${ranked.length === 1 ? '' : 's'} bought in this period — all revenue depends on ${ranked.length === 1 ? 'one account' : 'them'}.`
+        ? `Only ${ranked.length} customer${ranked.length === 1 ? '' : 's'} bought in this period: all revenue depends on ${ranked.length === 1 ? 'one account' : 'them'}.`
         : `Your top 3 customers account for ${top3Share.toFixed(1)}% of sales (${ranked.slice(0, 3).map((r) => r.name).join(', ')}). Losing one would hurt.`;
   }
   return { top, customers: ranked.length, top1Share: share(1), top3Share, top5Share: share(5), level, warning };

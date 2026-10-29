@@ -66,11 +66,11 @@ export default function BundlesView({ ctx }: { ctx: MfgContext }) {
         <ScanField id="mfc-scan" label={gT('scan')} onCode={onCode} placeholder="CUT/FY26-27/0001/1" />
       </div>
       {p && st && <>
-        <p data-mfc-status>{gT('status', { cut: st.cut, finished: Object.values(st.finishedBySize).reduce((a, q) => a + q, 0), rejected: st.rejected, open: st.open })} · {gT('wip')}: {ratioText(st.wipBySize) || '—'} · {Object.entries(st.byPlace).map(([k, q]) => `${gT(`w.${k}` as 'w.floor')} ${q}`).join(' · ')}</p>
+        <p data-mfc-status>{gT('status', { cut: st.cut, finished: Object.values(st.finishedBySize).reduce((a, q) => a + q, 0), rejected: st.rejected, open: st.open })} · {gT('wip')}: {ratioText(st.wipBySize) || '-'} · {Object.entries(st.byPlace).map(([k, q]) => `${gT(`w.${k}` as 'w.floor')} ${q}`).join(' · ')}</p>
         {ctx.canBooks && p.order_id && Object.keys(st.finishedBySize).length > 0 && <Btn on={() => run(ctx, () => gT('reported', { n: reportFinished(p.id, today(), ctx.items, ctx.inputs).length }))} data-mfc="b-report">{gT('reportFinished')}</Btn>}
         <Grid attr="bundles" head={[gT('bundle'), gT('size'), gT('pieces'), gT('where'), gT('lastStep')]} rows={(p.bundles ?? []).map((b) => [
           bundleId(p.number, b.no), `${b.size} ${b.colour}${b.shade ? ` · ${b.shade}` : ''}`, `${livePieces(b)}${b.rejected ? ` (−${b.rejected})` : ''}`,
-          `${gT(`w.${b.at.where}` as 'w.floor')}${b.at.op ? ` · ${b.at.op}` : ''}`, b.history.at(-1) ? `${b.history.at(-1)!.date} ${b.history.at(-1)!.op ?? ''}` : '—',
+          `${gT(`w.${b.at.where}` as 'w.floor')}${b.at.op ? ` · ${b.at.op}` : ''}`, b.history.at(-1) ? `${b.history.at(-1)!.date} ${b.history.at(-1)!.op ?? ''}` : '-',
         ])} />
       </>}
       {tickets && p && <BundleTickets plan={p} styleName={ctx.items.find((i) => i.id === p.style_id)?.name ?? ''} onClose={() => setTickets(false)} />}

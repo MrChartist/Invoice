@@ -187,7 +187,7 @@ export function Gstr9cView({ fyStart, gstin, filerStateCode, turnover }: Gstr9cV
               );
             })}
             <tr data-9c-not-by-rate>
-              <td>—</td>
+              <td>-</td>
               <td style={{ textAlign: 'left' }}>{p40T('c9NotByRate')}</td>
               <td colSpan={5} />
               <td>{formatMoney(base.books9.notByRate.cgst + base.books9.notByRate.sgst + base.books9.notByRate.igst + base.books9.notByRate.cess)}</td>

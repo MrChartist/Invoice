@@ -136,7 +136,7 @@ export function buildGstr9PartV(invoices: InvoiceRecord[], o: PartVOptions): Par
       }
     }
   }
-  if (unattributed) notes.push(`${unattributed} credit / debit note(s) in the window are not linked to an invoice, so they cannot be attributed to this FY — check them by hand.`);
+  if (unattributed) notes.push(`${unattributed} credit / debit note(s) in the window are not linked to an invoice, so they cannot be attributed to this FY: check them by hand.`);
 
   // Table 12: supplier notes in the window on bills of this FY that claimed ITC.
   const billDate = new Map<string, string>();

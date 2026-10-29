@@ -291,7 +291,7 @@ export function Dashboard() {
                         {inv.invoice_number}
                       </Link>
                     </td>
-                    <td className={styles.rClient}>{inv.client?.name || '—'}</td>
+                    <td className={styles.rClient}>{inv.client?.name || '-'}</td>
                     <td className={styles.rDate}>{formatDate(inv.issue_date)}</td>
                     <td className={styles.rStatus}>
                       <StatusBadge status={effectiveStatus(inv, now)} />

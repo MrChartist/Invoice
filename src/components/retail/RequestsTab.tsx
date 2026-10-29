@@ -79,7 +79,7 @@ export default function RequestsTab({ ctx }: { ctx: TransferCtx }) {
                   <td>{formatDate(r.date)}</td>
                   <td>{nameOfGodown(ctx, r.from_godown)} → {nameOfGodown(ctx, r.to_godown)}</td>
                   <td>{r.lines.map((l) => `${itemName(l.item_id)} × ${l.qty}${l.unit ? ` ${l.unit}` : ''}`).join(', ')}</td>
-                  <td>{r.needed_by ? formatDate(r.needed_by) : '—'}</td>
+                  <td>{r.needed_by ? formatDate(r.needed_by) : '-'}</td>
                   <td><span className={cn(css.chip, css[status])} data-trq-status>{sT(`rs.${status}`)}</span></td>
                   <td className={css.actions}>
                     <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setOpen(open === r.id ? null : r.id)} aria-expanded={open === r.id}>{sT('details')}</button>
@@ -219,7 +219,7 @@ function RequestForm({ ctx, onClose }: { ctx: TransferCtx; onClose: () => void }
             <select className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)} data-trq-from>{stores.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
           </label>
           <label className={controls.field}><span className={controls.label}>{sT('toGodown')}</span>
-            <select className={controls.select} value={to} onChange={(e) => setTo(e.target.value)} data-trq-to><option value="">—</option>{stores.filter((g) => g.id !== from).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
+            <select className={controls.select} value={to} onChange={(e) => setTo(e.target.value)} data-trq-to><option value="">-</option>{stores.filter((g) => g.id !== from).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
           </label>
           <label className={controls.field}><span className={controls.label}>{sT('neededBy')}</span><input type="date" className={controls.input} value={neededBy} onChange={(e) => setNeededBy(e.target.value)} /></label>
         </div>

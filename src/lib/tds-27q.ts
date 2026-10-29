@@ -35,7 +35,7 @@ import { actRef, formText, quarterStart, sectionText } from './ita2025';
 /** Section code of a 27Q row: the 2025-Act code from 1 Apr 2026 (23b), else the 1961 RPU code. */
 const rpu27Q = (r: TdsDeductionRow): string => rpuCode2025(r.code, r.creditedOn) || payableSection(r.code)?.rpu || r.section;
 
-export const FORM27Q_NOTE = 'UNVERIFIED Form 27Q working paper (non-residents) in NSDL RPU column order as understood — import through the RPU, validate with the FVU and verify every rate, the DTAA claim and Form 15CA / 15CB with your CA.';
+export const FORM27Q_NOTE = 'UNVERIFIED Form 27Q working paper (non-residents) in NSDL RPU column order as understood: import through the RPU, validate with the FVU and verify every rate, the DTAA claim and Form 15CA / 15CB with your CA.';
 
 /** Sec 206AA floor for a payee without PAN (no Rule 37BC details). */
 export const NR_NO_PAN_RATE = 20;
@@ -103,7 +103,7 @@ export function nrRateCheck(code: string, date: string, pan: string, deducteeTyp
   const sc = nrSurchargePct(deducteeType, aggregate, date);
   const actRate = round2((act.base * (100 + sc) * (100 + act.cessPct)) / 10000);
   const notes: string[] = [];
-  if (sc) notes.push(`Surcharge ${sc}% on the Act rate: the payee's income subject to deduction this FY is ₹${amt(aggregate)} (First Schedule Part II as understood — verify).`);
+  if (sc) notes.push(`Surcharge ${sc}% on the Act rate: the payee's income subject to deduction this FY is ₹${amt(aggregate)} (First Schedule Part II as understood, verify).`);
   let required = actRate;
   let basis: NrRateCheck['basis'] = 'ACT';
   let dtaaBlocked = false;
@@ -113,23 +113,23 @@ export function nrRateCheck(code: string, date: string, pan: string, deducteeTyp
       if (payee.dtaaRate < actRate) {
         required = payee.dtaaRate;
         basis = 'DTAA';
-        notes.push(`DTAA rate ${payee.dtaaRate}%${payee.dtaaArticle ? ` (${payee.dtaaArticle})` : ''} is lower than the Act rate ${actRate}% — applied (TRC and Form 10F on file).`);
-      } else notes.push(`Act rate ${actRate}% is not higher than the DTAA rate ${payee.dtaaRate}% — Act rate applies (Sec 90(2)).`);
+        notes.push(`DTAA rate ${payee.dtaaRate}%${payee.dtaaArticle ? ` (${payee.dtaaArticle})` : ''} is lower than the Act rate ${actRate}%: applied (TRC and Form 10F on file).`);
+      } else notes.push(`Act rate ${actRate}% is not higher than the DTAA rate ${payee.dtaaRate}%: Act rate applies (Sec 90(2)).`);
     } else {
       dtaaBlocked = true;
-      notes.push(`DTAA rate ${payee.dtaaRate}% cannot be applied: ${!payee.trcNo ? 'no Tax Residency Certificate' : !trc ? `TRC expired on ${payee.trcTo}` : 'Form 10F not on file'} (Sec 90(4) / 90(5)) — Act rate ${actRate}% (incl. ${act.cessPct}% cess${sc ? `, ${sc}% surcharge` : ''}).`);
+      notes.push(`DTAA rate ${payee.dtaaRate}% cannot be applied: ${!payee.trcNo ? 'no Tax Residency Certificate' : !trc ? `TRC expired on ${payee.trcTo}` : 'Form 10F not on file'} (Sec 90(4) / 90(5)), Act rate ${actRate}% (incl. ${act.cessPct}% cess${sc ? `, ${sc}% surcharge` : ''}).`);
     }
   }
   if (!isValidPan(pan)) {
     const rule37bc = !!payee.country && !!payee.tin && !!payee.trcNo;
-    if (rule37bc) notes.push('No PAN: Rule 37BC details (country, foreign TIN, TRC) are on file, so Sec 206AA does not apply (Sec 206AA(7)) — verify.');
+    if (rule37bc) notes.push('No PAN: Rule 37BC details (country, foreign TIN, TRC) are on file, so Sec 206AA does not apply (Sec 206AA(7)), verify.');
     else if (required < NR_NO_PAN_RATE) {
       required = NR_NO_PAN_RATE;
       basis = 'NO_PAN';
       notes.push(`No PAN and no Rule 37BC details: Sec 206AA rate ${NR_NO_PAN_RATE}%.`);
     }
   }
-  if (!code.startsWith('195')) notes.push(`Booked under ${payableSection(code)?.label ?? code}: payments to a non-resident are normally deducted under Sec 195 — check the section.`);
+  if (!code.startsWith('195')) notes.push(`Booked under ${payableSection(code)?.label ?? code}: payments to a non-resident are normally deducted under Sec 195, check the section.`);
   return { nature, actRate, surchargePct: basis === 'ACT' ? sc : 0, dtaaRate: payee.dtaaRate, required: round2(required), basis, dtaaBlocked, notes };
 }
 
@@ -182,7 +182,7 @@ export function nr27qRows(rows: readonly TdsDeductionRow[], vendors: readonly un
       // The grossed-up income may cross a surcharge slab: check again on the grossed aggregate.
       check = nrRateCheck(r.code, r.creditedOn, r.pan, r.deducteeType, payee, round2((total * grossUp195A(r.base, check.required)) / r.base));
       grossedUp = grossUp195A(r.base, check.required);
-      check.notes.push(`${sec195A(r.creditedOn)}: tax borne by the payer — ₹${amt(r.base)} credited is grossed up to ₹${amt(grossedUp)} at ${check.required}%.`);
+      check.notes.push(`${sec195A(r.creditedOn)}: tax borne by the payer, ₹${amt(r.base)} credited is grossed up to ₹${amt(grossedUp)} at ${check.required}%.`);
     }
     const income = grossedUp ?? r.base;
     const requiredTds = income > 0 ? Math.round((income * check.required) / 100) : r.amount;
@@ -274,11 +274,11 @@ export function form27Q(rows: readonly TdsDeductionRow[], vendors: readonly unkn
     const ch = byKey.get(r.key);
     if (ch) deposited += r.amount;
     else warnings.push(`${r.payee}: ₹${amt(r.amount)} deducted on ${r.deductedOn} is not linked to a challan.`);
-    if (!r.pan && !(x.payee.country && x.payee.tin)) warnings.push(`${r.payee}: no PAN and no Rule 37BC details (country, foreign TIN) — the RPU needs PANNOTAVBL and the 20% rate.`);
+    if (!r.pan && !(x.payee.country && x.payee.tin)) warnings.push(`${r.payee}: no PAN and no Rule 37BC details (country, foreign TIN), the RPU needs PANNOTAVBL and the 20% rate.`);
     if (!x.payee.country) warnings.push(`${r.payee}: country of residence missing (vendor form → non-resident details).`);
     if (x.shortBy > 0) {
       shortBy += x.shortBy;
-      warnings.push(`${r.payee}: short deduction ₹${amt(x.shortBy)} — ${r.rate}% applied, ${x.check.required}% required (${x.check.basis === 'DTAA' ? 'DTAA' : x.check.basis === 'NO_PAN' ? 'Sec 206AA' : 'Act rate with cess'}).`);
+      warnings.push(`${r.payee}: short deduction ₹${amt(x.shortBy)}, ${r.rate}% applied, ${x.check.required}% required (${x.check.basis === 'DTAA' ? 'DTAA' : x.check.basis === 'NO_PAN' ? 'Sec 206AA' : 'Act rate with cess'}).`);
     }
     for (const n of x.check.notes) if (/cannot be applied|Booked under|Sec 195A|Surcharge/.test(n)) warnings.push(`${r.payee}: ${n}`);
     // Act rate includes surcharge and cess: split the TDS into tax + surcharge + cess for the RPU columns; a DTAA
@@ -300,7 +300,7 @@ export function form27Q(rows: readonly TdsDeductionRow[], vendors: readonly unkn
   const deducted = round2(list.reduce((t, x) => t + x.row.amount, 0));
   // Income-tax Act 2025: Sec 195 → Sec 393(2) Table; 23b: section codes of the Protean Form 144 file format v1.2.
   const ref = list.find((x) => actRef(x.row.code, x.row.creditedOn).act === 2025);
-  if (ref) warnings.push(`Income-tax Act 2025 period: ${sectionText(ref.row.code, ref.row.creditedOn)}. Section codes are the 2025-Act codes of the Protean Form 144 file format v1.2 (Annexure 2); the nature-of-remittance codes stay as understood — validate with the FVU and verify with your CA.`);
+  if (ref) warnings.push(`Income-tax Act 2025 period: ${sectionText(ref.row.code, ref.row.creditedOn)}. Section codes are the 2025-Act codes of the Protean Form 144 file format v1.2 (Annexure 2); the nature-of-remittance codes stay as understood: validate with the FVU and verify with your CA.`);
   return { form: '27Q', formLabel: formText('27Q', quarterStart(fy, quarter)), fy, quarter, challanRows, deducteeRows, totals: { deducted, deposited: round2(deposited), challans: used.length, shortBy: round2(shortBy) }, warnings: [...new Set(warnings)] };
 }
 

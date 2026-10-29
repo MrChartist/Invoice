@@ -62,7 +62,7 @@ export function OrdersTab({ ctx }: { ctx: MfgContext }) {
   })() : undefined);
   const open = (id: string | null) => setParams((p) => { if (id) p.set('order', id); else p.delete('order'); return p; }, { replace: true });
   const soNumbers = useMemo(() => new Map(peekTable<InvoiceRecord>('invoices').filter((d) => d.doc_type === 'SALES_ORDER').map((d) => [d.id, d.invoice_number])), [ctx.version]); // eslint-disable-line react-hooks/exhaustive-deps
-  const soNumber = (id?: string) => (id ? soNumbers.get(id) ?? '—' : '');
+  const soNumber = (id?: string) => (id ? soNumbers.get(id) ?? '-' : '');
 
   const mtoDrafts = useMemo(() => {
     const so = salesOrders.find((d) => d.id === soId);
@@ -146,8 +146,8 @@ export function OrdersTab({ ctx }: { ctx: MfgContext }) {
                 <td className={mfg.num}>{qtyText(o.planned_qty)} {unit(o.item_id)}</td>
                 <td className={mfg.num}>{qtyText(p.output)}</td>
                 <td><StatusBadge status={status} /></td>
-                <td>{o.due_date ? formatDate(o.due_date) : '—'}</td>
-                <td className={surface.mono}>{soNumber(o.so_id) || '—'}</td>
+                <td>{o.due_date ? formatDate(o.due_date) : '-'}</td>
+                <td className={surface.mono}>{soNumber(o.so_id) || '-'}</td>
                 <td className={surface.rowActions}><button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => open(o.id)}>{pT('open')} <span className={surface.srOnly}>{o.number}</span></button></td>
               </tr>
             ))}
@@ -217,7 +217,7 @@ export function OrdersTab({ ctx }: { ctx: MfgContext }) {
           {impliedPacks(localDb.settings.get()).includes('mill') && <Suspense fallback={null}><YieldPanel key={s.o.id} order={s.o} items={ctx.items} canEdit={ctx.canBooks && s.status !== 'closed' && s.status !== 'cancelled'} onSaved={(m, bad) => (bad ? ctx.error(m) : ctx.changed(m))} /></Suspense>}
           <details>
             <summary>{pT('history')}</summary>
-            <ul className={styles.log}>{[...(s.o.log ?? [])].reverse().map((l, i) => <li key={i}>{formatDate(l.at.slice(0, 10))} · {pT(`log_${l.action}` as 'log_create')}{l.note ? ` — ${l.note}` : ''}{l.by ? ` (${l.by})` : ''}</li>)}</ul>
+            <ul className={styles.log}>{[...(s.o.log ?? [])].reverse().map((l, i) => <li key={i}>{formatDate(l.at.slice(0, 10))} · {pT(`log_${l.action}` as 'log_create')}{l.note ? `: ${l.note}` : ''}{l.by ? ` (${l.by})` : ''}</li>)}</ul>
           </details>
         </section>
       )}

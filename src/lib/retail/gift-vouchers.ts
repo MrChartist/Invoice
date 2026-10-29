@@ -129,7 +129,7 @@ export const giftVouchersDb = {
         const seq = parseSeries(number)?.seq ?? numbers.length;
         let code = makeVoucherCode(date, seq, fill);
         for (let tries = 0; codes.has(codeKey(code)) && tries < 20; tries++) code = makeVoucherCode(date, seq, fill);
-        if (codes.has(codeKey(code))) throw new Error('Could not make a unique voucher code — try again.');
+        if (codes.has(codeKey(code))) throw new Error('Could not make a unique voucher code: try again.');
         codes.add(codeKey(code));
         made.push({
           id: generateId(), number, code, face_value: face, issued_on: date, expires_on: expires, status: 'active',
@@ -148,7 +148,7 @@ export const giftVouchersDb = {
         const amount = paise(face * count);
         const v = saveVoucher({
           type: 'RECEIPT', date,
-          narration: `Sale of ${count} gift voucher${count === 1 ? '' : 's'} ${made[0].number}${count > 1 ? ` – ${made[made.length - 1].number}` : ''} × ₹${face}${input.buyer?.trim() ? ` to ${input.buyer.trim()}` : ''} (${input.method || 'Cash'}) — no invoice: not a supply (Circular 243/37/2024-GST), verify with your CA`,
+          narration: `Sale of ${count} gift voucher${count === 1 ? '' : 's'} ${made[0].number}${count > 1 ? ` – ${made[made.length - 1].number}` : ''} × ₹${face}${input.buyer?.trim() ? ` to ${input.buyer.trim()}` : ''} (${input.method || 'Cash'}), no invoice: not a supply (Circular 243/37/2024-GST), verify with your CA`,
           lines: [{ account_id: cashAccountFor(input.method), dr: amount, cr: 0 }, { account_id: liability, dr: 0, cr: amount }],
           voucher_class: 'Gift voucher sale',
           ...(input.branch_id ? { branch_id: input.branch_id } : {}),
@@ -183,7 +183,7 @@ export const giftVouchersDb = {
         const amount = paise(v.face_value);
         refund = saveVoucher({
           type: 'PAYMENT', date,
-          narration: `Refund of cancelled gift voucher ${v.number}${v.buyer ? ` to ${v.buyer}` : ''}${reason?.trim() ? ` — ${reason.trim()}` : ''}`,
+          narration: `Refund of cancelled gift voucher ${v.number}${v.buyer ? ` to ${v.buyer}` : ''}${reason?.trim() ? `: ${reason.trim()}` : ''}`,
           lines: [{ account_id: ensureGiftVoucherAccount(), dr: amount, cr: 0 }, { account_id: cashAccountFor(v.tender), dr: 0, cr: amount }],
           voucher_class: 'Gift voucher refund',
           ...(v.branch_id ? { branch_id: v.branch_id } : {}),
@@ -218,16 +218,16 @@ export const giftVouchersDb = {
     if (!isoDay(asOf) || !isoDay(date)) throw new Error('Choose the dates.');
     // QA6 F10: a balance is unredeemed only once the voucher has expired: never date the income before the "as at" day
     // (every voucher it covers expired before it, so never before an expiry or a sale either).
-    if (date < asOf) throw new Error('Date the breakage journal on or after the "as at" day — a balance is unredeemed only after the voucher expires.');
+    if (date < asOf) throw new Error('Date the breakage journal on or after the "as at" day: a balance is unredeemed only after the voucher expires.');
     const due = giftVouchersDb.breakageDue(asOf);
     if (!due.length) throw new Error('No expired gift voucher has a balance left to recognise.');
     const early = due.find((r) => date <= r.voucher.expires_on || date < r.voucher.issued_on);
-    if (early) throw new Error(`Date the breakage journal on or after the "as at" day — ${early.voucher.number} expires on ${early.voucher.expires_on}.`);
+    if (early) throw new Error(`Date the breakage journal on or after the "as at" day: ${early.voucher.number} expires on ${early.voucher.expires_on}.`);
     const amount = round2(due.reduce((s, r) => s + r.balance, 0));
     const out = withTablesRollback([GV_TABLE, 'vouchers', 'accounts'], () => {
       const j = saveVoucher({
         type: 'JOURNAL', date,
-        narration: `Unredeemed balance of ${due.length} expired gift voucher${due.length === 1 ? '' : 's'} (${due.slice(0, 5).map((r) => r.voucher.number).join(', ')}${due.length > 5 ? ', …' : ''}) recognised as income — no GST: breakage is not a supply (Circular 243/37/2024-GST); verify with your CA`,
+        narration: `Unredeemed balance of ${due.length} expired gift voucher${due.length === 1 ? '' : 's'} (${due.slice(0, 5).map((r) => r.voucher.number).join(', ')}${due.length > 5 ? ', …' : ''}) recognised as income, no GST: breakage is not a supply (Circular 243/37/2024-GST); verify with your CA`,
         lines: [{ account_id: ensureGiftVoucherAccount(), dr: paise(amount), cr: 0 }, { account_id: ensureBreakageAccount(), dr: 0, cr: paise(amount) }],
         voucher_class: 'Gift voucher breakage',
       });
@@ -361,7 +361,7 @@ export function gvHistory(v: GiftVoucher, payments: readonly Payment[], invoices
 
 export function gvRegisterCsv(reg: GvRegister, branchName: (id: string) => string): string {
   return toCsv([
-    ['Gift voucher register — working paper (verify with your CA)'],
+    ['Gift voucher register: working paper (verify with your CA)'],
     ['Number', 'Code', 'Promotional', 'Face value', 'Issued on', 'Expires on', 'Buyer', 'Branch', 'Redeemed', 'Recognised as income', 'Balance', 'Status'],
     ...reg.rows.map((r) => [
       r.voucher.number, r.voucher.code, r.voucher.promo ? 'Yes' : '', r.voucher.face_value, r.voucher.issued_on, r.voucher.expires_on,

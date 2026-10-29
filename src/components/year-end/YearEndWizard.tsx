@@ -110,7 +110,7 @@ export function YearEndWizard({ open, onClose, notify }: YearEndWizardProps) {
                 <label className={controls.field}>
                   <span className={controls.label}>{migT('provAccount')}</span>
                   <select className={controls.select} value={p.account_id} onChange={(e) => setProv(prov.map((x, n) => (n === i ? { ...x, account_id: e.target.value } : x)))}>
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {expenseAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
                   </select>
                 </label>

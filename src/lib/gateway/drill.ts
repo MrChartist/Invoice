@@ -316,7 +316,7 @@ export function monthlyFrame(ledger: Ledger, accountId: string, period: Period, 
     rows.push({ id: `m-${k}`, label: monthLabel(k), cells: [m.dr || null, m.cr || null, bal], level: 1, drill: { t: 'm', v: k } });
   }
   return {
-    title: { text: party !== undefined ? party || '—' : s.account.name },
+    title: { text: party !== undefined ? party || '-' : s.account.name },
     period,
     columns: [{ key: 'particulars', kind: 'text' }, { key: 'debit', kind: 'amount' }, { key: 'credit', kind: 'amount' }, { key: 'closing', kind: 'balance' }],
     rows,

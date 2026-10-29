@@ -187,15 +187,15 @@ function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Ph
                     {multi && (
                       <td>
                         <select className={controls.select} aria-label={`${n} ${mfgT('godown')}`} value={l.godown_id ?? ''} onChange={(e) => patch(l.id, { godown_id: e.target.value || undefined })}>
-                          <option value="">—</option>
+                          <option value="">-</option>
                           {ctx.godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                         </select>
                       </td>
                     )}
                     {anyBatch && (
-                      <td>{item?.track_batches ? <input className={controls.input} aria-label={`${n} ${mfgT('batch')}`} value={l.batch_no ?? ''} onChange={(e) => patch(l.id, { batch_no: e.target.value || undefined })} /> : '—'}</td>
+                      <td>{item?.track_batches ? <input className={controls.input} aria-label={`${n} ${mfgT('batch')}`} value={l.batch_no ?? ''} onChange={(e) => patch(l.id, { batch_no: e.target.value || undefined })} /> : '-'}</td>
                     )}
-                    <td className={styles.num}>{c ? qtyText(c.book_qty) : '—'}</td>
+                    <td className={styles.num}>{c ? qtyText(c.book_qty) : '-'}</td>
                     <td>
                       {item?.track_serials ? (
                         <>
@@ -227,8 +227,8 @@ function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Ph
                         ) : <span className={styles.muted}>{item?.unit ?? ''}</span>}
                       </td>
                     )}
-                    <td className={cn(styles.num, c && c.diff < 0 ? styles.loss : c && c.diff > 0 ? styles.profit : undefined)}>{c ? qtyText(c.diff) : '—'}</td>
-                    <td className={styles.num}>{c ? money((c.serials_short || c.serials_excess ? (c.serials_short?.length ?? 0) + (c.serials_excess?.length ?? 0) : Math.abs(c.diff)) * num(c.rate)) : '—'}</td>
+                    <td className={cn(styles.num, c && c.diff < 0 ? styles.loss : c && c.diff > 0 ? styles.profit : undefined)}>{c ? qtyText(c.diff) : '-'}</td>
+                    <td className={styles.num}>{c ? money((c.serials_short || c.serials_excess ? (c.serials_short?.length ?? 0) + (c.serials_excess?.length ?? 0) : Math.abs(c.diff)) * num(c.rate)) : '-'}</td>
                     <td><button type="button" className={controls.btnIcon} aria-label={mfgT('removeLine', { n })} onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}><Trash2 size={15} /></button></td>
                   </tr>
                 );

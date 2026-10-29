@@ -86,7 +86,7 @@ export const validateFssai = (s: string | undefined): string => (!s?.trim() || F
 export function fssaiWarning(sender: { fssai_no?: string } | null | undefined, foodPackOn: boolean): string {
   if (!foodPackOn) return '';
   const no = sender?.fssai_no?.trim();
-  if (!no) return 'Food invoices must show your FSSAI licence / registration number (FSSAI order, from 1 Oct 2021) — add it to the business profile.';
+  if (!no) return 'Food invoices must show your FSSAI licence / registration number (FSSAI order, from 1 Oct 2021): add it to the business profile.';
   return validateFssai(no);
 }
 
@@ -111,5 +111,5 @@ export function foodClassRate(cls: string | undefined, date?: string): FoodClass
 export function foodRateNotice(cls: string | undefined, typedRate: number, date: string): { suggestion?: FoodClassRate; notice: string } {
   const suggestion = foodClassRate(cls, date);
   if (!suggestion || n(typedRate) === suggestion.rate) return { suggestion, notice: '' };
-  return { suggestion, notice: `Rate differs from the class (${suggestion.rate}% on ${date}, HSN ${suggestion.hsn}) — verify MF6.` };
+  return { suggestion, notice: `Rate differs from the class (${suggestion.rate}% on ${date}, HSN ${suggestion.hsn}): verify MF6.` };
 }

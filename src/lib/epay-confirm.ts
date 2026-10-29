@@ -320,7 +320,7 @@ export function decideEpayBatch(id: string, decision: 'approved' | 'rejected', n
       requested_by: b.approval!.requested_by, requested_at: b.approval!.requested_at, decided_by: by, decided_at: at, ...(note.trim() ? { note: note.trim() } : {}),
     }]);
   });
-  logSafe(`${decision === 'approved' ? 'Approved' : 'Rejected'} e-payment batch ${b.number} (₹${b.total.toFixed(2)})${note.trim() ? ` — ${note.trim()}` : ''}`, b);
+  logSafe(`${decision === 'approved' ? 'Approved' : 'Rejected'} e-payment batch ${b.number} (₹${b.total.toFixed(2)})${note.trim() ? `: ${note.trim()}` : ''}`, b);
   return next;
 }
 

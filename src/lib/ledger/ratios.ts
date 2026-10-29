@@ -146,7 +146,7 @@ export function ratioAnalysis(ledger: Ledger, period: Period, asOf: string = per
 
 /** Label of a ratio's value for CSV / screen ("12.50%", "1.80 : 1", "45 days", "₹…" handled by the caller). */
 export function ratioText(r: RatioItem): string {
-  if (r.value === null) return '—';
+  if (r.value === null) return '-';
   if (r.unit === 'money') return (r.value / 100).toFixed(2);
   if (r.unit === 'percent') return `${r.value.toFixed(2)}%`;
   if (r.unit === 'days') return `${Math.round(r.value)} days`;

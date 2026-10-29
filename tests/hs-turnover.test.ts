@@ -10,7 +10,7 @@ import { ruleAt } from '../src/lib/tax-rules.ts';
 import { SECURITY_RCM_RULES } from '../src/lib/manpower-rules.ts';
 import type { InvoiceRecord } from '../src/types/invoice.ts';
 
-const PA = 'Recovered at actual as a pure agent (Rule 33) — outside the taxable value. Verify with your CA.';
+const PA = 'Recovered at actual as a pure agent (Rule 33): outside the taxable value. Verify with your CA.';
 const doc = (o: Partial<InvoiceRecord>): InvoiceRecord => ({ id: String(Math.random()), status: 'Sent', issue_date: '2026-10-01', items: [], ...o }) as InvoiceRecord;
 const BOS = doc({ doc_type: 'BILL_OF_SUPPLY', taxable_value: 6710, items: [{ id: 'a', name: 'svc', quantity: 1, rate: 5510, amount: 5510 }, { id: 'b', name: 'ptx', quantity: 1, rate: 1200, amount: 1200, charge_head_id: 'rule33', description: PA }] as never, hs: { unit: { id: 'u1', code: 'A-101', members: [] }, period: '2026-10', test: { counted: 5510, limit: 7500, months: 1 } } });
 const TAX = doc({ doc_type: 'TAX_INVOICE', taxable_value: 12010, items: [{ id: 'a', name: 'svc', quantity: 1, rate: 9010, amount: 9010, tax_rate: 18 }, { id: 'b', name: 'ptx', quantity: 1, rate: 3000, amount: 3000, charge_head_id: 'rule33', description: PA }] as never, hs: { unit: { id: 'u3', code: 'A-901', members: [] }, period: '2026-10', test: { counted: 9010, limit: 7500, months: 1 } } });

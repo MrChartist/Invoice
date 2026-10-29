@@ -243,7 +243,7 @@ export function TotalsBlock({ invoice, sender, totals }: BlockProps) {
       {(invoice.supply_type === 'EXPORT_LUT' || invoice.supply_type === 'SEZ_WITHOUT_PAYMENT') && (
         <div className={styles.words}>
           Supply meant for export/SEZ under LUT/bond without payment of IGST
-          {invoice.lut_number ? ` — LUT No. ${invoice.lut_number}` : ''}
+          {invoice.lut_number ? `: LUT No. ${invoice.lut_number}` : ''}
           {invoice.lut_date ? ` dated ${invoice.lut_date}` : ''}.
         </div>
       )}

@@ -47,7 +47,7 @@ const CLASSES: readonly VehicleClass[] = ['hatch', 'sedan', 'suv', '2W', '3W', '
 const sm = `${controls.btnOutline} ${controls.btnSm}`;
 const gh = `${controls.btnGhost} ${controls.btnSm}`;
 const pr = `${controls.btnPrimary} ${controls.btnSm}`;
-const opts = (rows: readonly (readonly [string, string])[], blank = true) => <>{blank && <option value="">—</option>}{rows.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</>;
+const opts = (rows: readonly (readonly [string, string])[], blank = true) => <>{blank && <option value="">-</option>}{rows.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</>;
 
 /** Labelled inputs: [key, type | options, label]; `data-ws-<key>` on each control. */
 function Fields({ spec, f, set }: { spec: readonly (readonly [string, (string | readonly (readonly [string, string])[])?, string?])[]; f: Form; set: (f: Form) => void }) {
@@ -247,7 +247,7 @@ function Estimates({ c }: { c: Ctx }) {
             {quotes.map((q) => {
               const ok = job.approvals?.filter((x) => x.quote_id === q.id).map((x) => `${x.by} · ${wsT(`h.${x.how}`)}${x.note ? ` · ${x.note}` : ''}`).join('; ');
               const wa = waLink(job.phone, wsT('waEst', { number: q.invoice_number, what: asset ? assetLabel(asset) : job.asset.model, total: formatCurrency(q.total), shop: c.shop }));
-              return <tr key={q.id}><td>{q.invoice_number}</td><td>{formatCurrency(q.total)}</td><td>{ok || '—'}</td><td>{wa && <a className={gh} href={wa} target="_blank" rel="noopener noreferrer">{wsT('ask')}</a>}</td></tr>;
+              return <tr key={q.id}><td>{q.invoice_number}</td><td>{formatCurrency(q.total)}</td><td>{ok || '-'}</td><td>{wa && <a className={gh} href={wa} target="_blank" rel="noopener noreferrer">{wsT('ask')}</a>}</td></tr>;
             })}
           </Table>
           <Fields f={ap} set={setAp} spec={[['quote', quotes.map((q) => [q.id, q.invoice_number] as const), wsT('estimate')], ['by'], ['how', (['signature', 'phone', 'whatsapp', 'in person'] as const).map((h) => [h, wsT(`h.${h}`)] as const)], ['note']]} />

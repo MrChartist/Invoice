@@ -47,10 +47,10 @@ export function BomTab({ ctx }: { ctx: MfgContext }) {
               const item = byId.get(b.item_id);
               return (
                 <tr key={b.id}>
-                  <td>{item?.name ?? '—'}</td>
+                  <td>{item?.name ?? '-'}</td>
                   <td>{b.name}{b.is_default && <span className={styles.tag}>{mfgT('defaultTag')}</span>}<div className={styles.muted}>{mfgT('perUnits', { n: qtyText(b.batch_qty), unit: item?.unit ?? '' })}</div></td>
                   <td>{b.components.map((c) => `${byId.get(c.item_id)?.name ?? '?'} × ${qtyText(c.qty)}${num(c.scrap_pct) ? ` (+${c.scrap_pct}%)` : ''}`).join(', ')}</td>
-                  <td>{(b.outputs ?? []).map((o) => `${byId.get(o.item_id)?.name ?? '?'} × ${qtyText(o.qty)}`).join(', ') || '—'}</td>
+                  <td>{(b.outputs ?? []).map((o) => `${byId.get(o.item_id)?.name ?? '?'} × ${qtyText(o.qty)}`).join(', ') || '-'}</td>
                   <td className={surface.rowActions}>
                     {ctx.canMasters && (
                       <>
@@ -62,7 +62,7 @@ export function BomTab({ ctx }: { ctx: MfgContext }) {
                 </tr>
               );
             })}
-            {sorted.length === 0 && <tr><td colSpan={5} className={styles.muted}>—</td></tr>}
+            {sorted.length === 0 && <tr><td colSpan={5} className={styles.muted}>-</td></tr>}
           </tbody>
         </table>
       </div>

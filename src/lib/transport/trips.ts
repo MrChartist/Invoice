@@ -112,7 +112,7 @@ export function addTripExpense(tripId: string, e: { date: string; kind: string; 
   if (!(num(e.amount) > 0)) throw new TripError('Enter the amount.');
   const vehicle = loadVehicles().find((v) => v.id === trip.vehicle_id);
   return withTablesRollback([PURCHASES_TABLE, 'purchase_payments', TRIPS_TABLE, VEHICLES_TABLE, 'cost_centres'], () => {
-    const line = expenseLine(`${e.kind} — ${trip.number}`, num(e.amount), num(e.taxRate), true);
+    const line = expenseLine(`${e.kind}: ${trip.number}`, num(e.amount), num(e.taxRate), true);
     const totals = computePurchaseTotals([line]);
     const cc = vehicle?.own ? ensureVehicleCostCentre(vehicle) : undefined;
     const bill = purchasesDb.save({
@@ -120,7 +120,7 @@ export function addTripExpense(tripId: string, e: { date: string; kind: string; 
       vendor_name: e.kind,
       bill_number: '',
       date: e.date,
-      category: `Trip — ${e.kind}`,
+      category: `Trip: ${e.kind}`,
       lines: [line],
       taxable: totals.taxable, cgst: totals.cgst, sgst: totals.sgst, igst: totals.igst, total: totals.total,
       itc_eligible: num(e.taxRate) > 0,
@@ -145,7 +145,7 @@ export function giveDriverAdvance(tripId: string, a: { date: string; amount: num
   const paise = rupeesToPaise(a.amount);
   if (!(paise > 0)) throw new TripError('Enter the advance amount.');
   return withTablesRollback([TRIPS_TABLE, 'vouchers'], () => {
-    const v = saveVoucher({ type: 'PAYMENT', date: a.date, narration: `Driver advance — trip ${trip.number}${trip.driver ? ` (${trip.driver})` : ''}`, voucher_class: 'Trip advance', lines: [{ account_id: A.staffAdvances, dr: paise, cr: 0, party: trip.driver }, { account_id: cashSide(a.method), dr: 0, cr: paise }] });
+    const v = saveVoucher({ type: 'PAYMENT', date: a.date, narration: `Driver advance: trip ${trip.number}${trip.driver ? ` (${trip.driver})` : ''}`, voucher_class: 'Trip advance', lines: [{ account_id: A.staffAdvances, dr: paise, cr: 0, party: trip.driver }, { account_id: cashSide(a.method), dr: 0, cr: paise }] });
     const next = { ...getTrip(tripId), advance_ids: [...trip.advance_ids, v.id] };
     writeTrip(next);
     return next;
@@ -192,7 +192,7 @@ export function closeTrip(tripId: string, c: { date: string; end_km?: number; sp
     let settleId: string | undefined;
     if (settle > 0) {
       const p = rupeesToPaise(settle);
-      settleId = saveVoucher({ type: 'JOURNAL', date: c.date, narration: `Driver advance settled — trip ${trip.number}: spent ₹${round2(num(c.spent))}, returned ₹${round2(num(c.returned))}`, voucher_class: 'Trip advance', lines: [{ account_id: A.cash, dr: p, cr: 0 }, { account_id: A.staffAdvances, dr: 0, cr: p, party: trip.driver }] }).id;
+      settleId = saveVoucher({ type: 'JOURNAL', date: c.date, narration: `Driver advance settled, trip ${trip.number}: spent ₹${round2(num(c.spent))}, returned ₹${round2(num(c.returned))}`, voucher_class: 'Trip advance', lines: [{ account_id: A.cash, dr: p, cr: 0 }, { account_id: A.staffAdvances, dr: 0, cr: p, party: trip.driver }] }).id;
     }
     const next: Trip = { ...getTrip(tripId), status: 'closed', closed_on: c.date, end_date: c.date, ...(c.end_km !== undefined ? { end_km: num(c.end_km) } : {}), ...(settleId ? { settle_id: settleId } : {}) };
     writeTrip(next);
@@ -227,7 +227,7 @@ export function recordLorryHire(tripId: string, h: { date: string; vendorId: str
   const vendor = getTable<Vendor>('vendors').find((v) => v.id === h.vendorId);
   if (!vendor) throw new TripError('Choose the lorry owner (a supplier).');
   if (!(num(h.amount) > 0)) throw new TripError('Enter the hire amount.');
-  const line = { id: generateId(), name: `Lorry hire — ${trip.number}`, quantity: 1, rate: round2(num(h.amount)), tax_rate: 0 };
+  const line = { id: generateId(), name: `Lorry hire: ${trip.number}`, quantity: 1, rate: round2(num(h.amount)), tax_rate: 0 };
   const totals = computePurchaseTotals([line]);
   const decl = vendor.transporter_194c6;
   const { fields } = resolveBillTds(

@@ -32,7 +32,7 @@ export default function MillBatchesView({ onDone }: { onDone: Done }) {
       </div>
       <p className={controls.hint}>{T('starterNote')}</p>
       <Table d="batches" head={[T('order'), W('date'), W('item'), `${T('input')} (${T('qtl')})`, T('outturn'), T('standard'), T('byPct'), T('loss'), '', '']} rows={rows.map(({ o, y, name }) => [
-        o.number, o.date, name, y.input ? q(y.input) : '—', y.input ? y.outturnPct : '—', y.standard || '—', y.input ? y.byPct : '—', y.input ? y.lossPct : '—',
+        o.number, o.date, name, y.input ? q(y.input) : '-', y.input ? y.outturnPct : '-', y.standard || '-', y.input ? y.byPct : '-', y.input ? y.lossPct : '-',
         <span key="f" data-ml-flag={y.flag ?? ''}>{y.flag ? T(`f.${y.flag}`) : ''}</span>,
         <Link key="l" className={B.gs} to={`/manufacturing?tab=orders&order=${o.id}`}>{W('open')}</Link>,
       ])} />

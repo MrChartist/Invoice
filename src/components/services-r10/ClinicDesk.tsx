@@ -102,7 +102,7 @@ function PatientPick({ patients, value, onChange }: { patients: Client[]; value:
       <F k="find"><input className={controls.input} value={q} onChange={(e) => setQ(e.target.value)} data-patient-search /></F>
       <F k="patient">
         <select className={controls.select} value={value} onChange={(e) => onChange(patients.find((p) => p.id === e.target.value))} data-patient-pick>
-          <option value="">—</option>
+          <option value="">-</option>
           {list.map((p) => <option key={p.id} value={p.id}>{[uhidOf(p), p.name, p.phone].filter(Boolean).join(' · ')}</option>)}
         </select>
       </F>
@@ -110,7 +110,7 @@ function PatientPick({ patients, value, onChange }: { patients: Client[]; value:
   );
 }
 const DocPick = ({ doctors, value, onChange, k = 'doctor' }: { doctors: Doctor[]; value: string; onChange: (id: string) => void; k?: BKey }) => (
-  <F k={k}><select className={controls.select} value={value} onChange={(e) => onChange(e.target.value)} data-doctor-pick={k}><option value="">—</option>{doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></F>
+  <F k={k}><select className={controls.select} value={value} onChange={(e) => onChange(e.target.value)} data-doctor-pick={k}><option value="">-</option>{doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></F>
 );
 const refOf = (doctors: Doctor[], id: string) => (id ? { doctor_id: id, name: doctors.find((d) => d.id === id)?.name } : undefined);
 const open = (nav: (to: string) => void, inv: InvoiceRecord) => nav(`/invoice/${inv.id}`);
@@ -144,7 +144,7 @@ function Patients({ run, patients, doctors }: Ctx) {
         <F k="phone"><input className={controls.input} value={f.phone} onChange={(e) => set({ phone: e.target.value })} /></F>
         <F k="age"><input className={controls.input} type="number" min={0} value={f.age} onChange={(e) => set({ age: e.target.value })} /></F>
         <F k="dob"><input className={controls.input} type="date" value={f.dob} onChange={(e) => set({ dob: e.target.value })} /></F>
-        <F k="sex"><select className={controls.select} value={f.sex} onChange={(e) => set({ sex: e.target.value })} data-patient-sex><option value="">—</option><option value="F">F</option><option value="M">M</option><option value="O">O</option></select></F>
+        <F k="sex"><select className={controls.select} value={f.sex} onChange={(e) => set({ sex: e.target.value })} data-patient-sex><option value="">-</option><option value="F">F</option><option value="M">M</option><option value="O">O</option></select></F>
         <F k="guardian"><input className={controls.input} value={f.guardian} onChange={(e) => set({ guardian: e.target.value })} /></F>
         <F k="blood"><input className={controls.input} value={f.blood} onChange={(e) => set({ blood: e.target.value })} /></F>
         <DocPick doctors={doctors} value={f.referred_by} onChange={(id) => set({ referred_by: id })} k="referredBy" />
@@ -257,7 +257,7 @@ function Doctors({ run, doctors }: Pick<Ctx, 'run' | 'doctors'>) {
       <div className={styles.form}>
         {txt('name', 'name')}{txt('qualification', 'qual')}{txt('council', 'council')}{txt('reg_no', 'regNo')}{txt('speciality', 'speciality')}
         {numF('consult_fee', 'consultFee')}{numF('follow_up_fee', 'fuFee')}{numF('follow_up_days', 'fuDays')}
-        <F k="staffLink"><select className={controls.select} value={f.staff_id} onChange={(e) => set({ staff_id: e.target.value })}><option value="">—</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></F>
+        <F k="staffLink"><select className={controls.select} value={f.staff_id} onChange={(e) => set({ staff_id: e.target.value })}><option value="">-</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></F>
         <label className={controls.check}><input type="checkbox" checked={f.in_house} onChange={(e) => set({ in_house: e.target.checked })} /> {bT('inHouse')}</label>
         {numF('pct', 'sharePct')}{numF('per_visit', 'sharePer')}
       </div>
@@ -297,7 +297,7 @@ function Ipd({ run, patients, doctors, tick, notify }: Ctx) {
     setCh({ name: '', qty: '1', rate: '', item: '' });
   });
   const deposit = () => a && run(() => {
-    const adv = saveAdvance({ date: today, client: { id: a.patient_id, name: a.patient_name }, place_of_supply: senderStateCode(localDb.settings.activeProfile()), supply: 'services', tax_rate: 0, amount: Number(amt), method: 'Cash', description: `Deposit — admission ${a.number}` });
+    const adv = saveAdvance({ date: today, client: { id: a.patient_id, name: a.patient_name }, place_of_supply: senderStateCode(localDb.settings.activeProfile()), supply: 'services', tax_rate: 0, amount: Number(amt), method: 'Cash', description: `Deposit: admission ${a.number}` });
     attachDeposit(a.id, adv.id);
     setAmt('');
   }, bT('depositSaved'));
@@ -305,7 +305,7 @@ function Ipd({ run, patients, doctors, tick, notify }: Ctx) {
   const refund = () => a && run(() => {
     for (const id of a.deposits ?? []) {
       const left = depositsOpen({ deposits: [id] });
-      if (left > 0) refundAdvance(id, { amount: left, date: today, method: 'Cash', note: `Excess deposit — ${a.number}` });
+      if (left > 0) refundAdvance(id, { amount: left, date: today, method: 'Cash', note: `Excess deposit: ${a.number}` });
     }
   });
   const saveRooms = (text: string) => run(() => saveClinicSettings({ rooms: text.split('\n').map((l) => l.split(',').map((x) => x.trim())).filter((x) => x[0]).map(([name, kind, rate], i) => ({ id: rooms[i]?.id ?? `r${i}-${name}`, name, kind: (kind || 'general') as ClinicRoom['kind'], rate: Number(rate) || 0 })) }));
@@ -314,10 +314,10 @@ function Ipd({ run, patients, doctors, tick, notify }: Ctx) {
       <div className={styles.form}>
         <PatientPick patients={patients} value={f.pt} onChange={(c) => setF({ ...f, pt: c?.id ?? '' })} />
         <DocPick doctors={doctors} value={f.doc} onChange={(doc) => setF({ ...f, doc })} />
-        <F k="room"><select className={controls.select} value={f.room} onChange={(e) => setF({ ...f, room: e.target.value })} data-admit-room><option value="">—</option>{rooms.map((r) => <option key={r.id} value={r.id}>{`${r.name} · ${r.kind} · ${money(r.rate)}`}</option>)}</select></F>
+        <F k="room"><select className={controls.select} value={f.room} onChange={(e) => setF({ ...f, room: e.target.value })} data-admit-room><option value="">-</option>{rooms.map((r) => <option key={r.id} value={r.id}>{`${r.name} · ${r.kind} · ${money(r.rate)}`}</option>)}</select></F>
         <F k="date"><input className={controls.input} type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></F>
         <F k="time"><input className={controls.input} type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} /></F>
-        <F k="claim"><select className={controls.select} value={f.claim} onChange={(e) => setF({ ...f, claim: e.target.value })}><option value="">—</option>{claims.map((c) => <option key={c.id} value={c.id}>{`${c.number} · ${c.payer_name}`}</option>)}</select></F>
+        <F k="claim"><select className={controls.select} value={f.claim} onChange={(e) => setF({ ...f, claim: e.target.value })}><option value="">-</option>{claims.map((c) => <option key={c.id} value={c.id}>{`${c.number} · ${c.payer_name}`}</option>)}</select></F>
         <DocPick doctors={doctors} value={f.ref} onChange={(ref) => setF({ ...f, ref })} k="referredBy" />
       </div>
       <div className={styles.actions}><button type="button" className={controls.btnPrimary} onClick={admit} data-admit>{bT('admit')}</button></div>
@@ -327,7 +327,7 @@ function Ipd({ run, patients, doctors, tick, notify }: Ctx) {
           <tbody>
             {list.map((x) => (
               <tr key={x.id} onClick={() => setSel(x.id)} aria-selected={x.id === sel} data-admission={x.number}>
-                <td>{x.number}</td><td>{x.patient_name}</td><td>{x.room ? `${x.room.name} (${money(x.room.rate)})` : '—'}</td><td>{money(linesGross(admissionLines(x, today, mode)))}</td><td>{money(depositsOpen(x))}</td><td>{bT(`as.${x.status}`)}</td>
+                <td>{x.number}</td><td>{x.patient_name}</td><td>{x.room ? `${x.room.name} (${money(x.room.rate)})` : '-'}</td><td>{money(linesGross(admissionLines(x, today, mode)))}</td><td>{money(depositsOpen(x))}</td><td>{bT(`as.${x.status}`)}</td>
               </tr>
             ))}
           </tbody>
@@ -450,7 +450,7 @@ function Results({ o, run, onBill }: { o: LabOrder; run: Run; onBill: () => void
         <tbody>
           {o.tests.flatMap((t) => t.params.map((p) => {
             const fl = flagOf(p, vals[resultKey(t.id, p.code)] ?? '', o.sex, o.age);
-            return <tr key={resultKey(t.id, p.code)}><td>{t.name} — {p.name}</td><td>{input(t.id, p)}</td><td>{p.unit}</td><td><strong>{fl}</strong></td></tr>;
+            return <tr key={resultKey(t.id, p.code)}><td>{t.name} : {p.name}</td><td>{input(t.id, p)}</td><td>{p.unit}</td><td><strong>{fl}</strong></td></tr>;
           }))}
         </tbody>
       </table>

@@ -143,7 +143,7 @@ export function rejectionFromQc<L extends { item_id?: string; name: string; batc
 export function qcNotices(rows: readonly QcRow[], days: number, nameOf: (id: string) => string, at: string): { id: string; severity: 'warning'; title: string; detail: string; href: string; cta: string; at: string }[] {
   const aged = agedQc(rows, days);
   if (!aged.length) return [];
-  const sample = aged.slice(0, 3).map((r) => `${nameOf(r.itemId)}${r.batch ? ` (${r.batch})` : ''} — ${r.ageDays} days`).join('; ');
+  const sample = aged.slice(0, 3).map((r) => `${nameOf(r.itemId)}${r.batch ? ` (${r.batch})` : ''}: ${r.ageDays} days`).join('; ');
   return [{ id: `qc-aged:${aged[0].key}:${aged.length}`, severity: 'warning', title: `${aged.length} lot${aged.length === 1 ? '' : 's'} waiting in QC for more than ${days} days`, detail: sample, href: '/manufacturing?tab=qc', cta: 'Open QC desk', at }];
 }
 
@@ -192,7 +192,7 @@ export const qcResultsDb = {
     const rows = qcResultsDb.all();
     setTable(QC_RESULTS_TABLE, rows.some((r) => r.id === id) ? rows.map((r) => (r.id === id ? row : r)) : [...rows, row]);
     try {
-      audit.record({ entity: 'manufacturing', entity_id: id, action: 'create', doc_number: input.source.number, summary: `QC ${input.result === 'pass' ? 'passed' : 'failed'}: ${row.qty} unit(s)${input.batch_no ? ` of batch ${input.batch_no}` : ''}${input.note ? ` — ${input.note}` : ''}${state === 'overridden' ? ' (period lock overridden)' : ''}` });
+      audit.record({ entity: 'manufacturing', entity_id: id, action: 'create', doc_number: input.source.number, summary: `QC ${input.result === 'pass' ? 'passed' : 'failed'}: ${row.qty} unit(s)${input.batch_no ? ` of batch ${input.batch_no}` : ''}${input.note ? `: ${input.note}` : ''}${state === 'overridden' ? ' (period lock overridden)' : ''}` });
     } catch {
       /* logging never breaks a save */
     }

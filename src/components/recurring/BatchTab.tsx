@@ -69,8 +69,8 @@ export function BatchTab() {
   const [note, setNote] = useState('');
 
   const sources = kind === 'recurring'
-    ? schedules.map((s) => ({ id: s.id, label: `${s.name} — ${s.template.client.name}` }))
-    : docs.filter((d) => (kind === 'invoice' ? isBill(d.doc_type) : d.doc_type === 'QUOTATION')).slice(0, 200).map((d) => ({ id: d.id, label: `${d.invoice_number} — ${d.client?.name ?? ''} · ${formatCurrency(d.total, d.currency || 'INR')}` }));
+    ? schedules.map((s) => ({ id: s.id, label: `${s.name}: ${s.template.client.name}` }))
+    : docs.filter((d) => (kind === 'invoice' ? isBill(d.doc_type) : d.doc_type === 'QUOTATION')).slice(0, 200).map((d) => ({ id: d.id, label: `${d.invoice_number}: ${d.client?.name ?? ''} · ${formatCurrency(d.total, d.currency || 'INR')}` }));
   const template = useMemo(() => {
     if (!sourceId) return null;
     if (kind === 'recurring') return recurringDb.getById(sourceId)?.template ?? null;
@@ -129,7 +129,7 @@ export function BatchTab() {
     setError('');
     try {
       if (!template) return;
-      const n = batchToRecurring(template, parties, { name: sources.find((s) => s.id === sourceId)?.label.split(' — ')[0] ?? 'Batch', frequency: rec.freq, start_date: rec.start, mode });
+      const n = batchToRecurring(template, parties, { name: sources.find((s) => s.id === sourceId)?.label.split(': ')[0] ?? 'Batch', frequency: rec.freq, start_date: rec.start, mode });
       setNote(s2T('b.recurringDone', { n }));
       setRec({ ...rec, open: false });
     } catch (err) {
@@ -175,7 +175,7 @@ export function BatchTab() {
             <label className={controls.field}>
               <span className={controls.label}>{s2T('b.pickSource')}</span>
               <select className={controls.select} value={sourceId} onChange={(e) => setSourceId(e.target.value)} data-batch-source>
-                <option value="">—</option>
+                <option value="">-</option>
                 {sources.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
             </label>
@@ -289,11 +289,11 @@ export function BatchTab() {
                     <tr key={d.party.key}>
                       <td>{d.party.client.name}</td>
                       <td className={d.stateWarning ? styles.warn : undefined} title={d.stateWarning ? s2T('b.noState') : undefined}>
-                        {formatPlaceOfSupply(d.record.place_of_supply) || '—'}{d.stateWarning ? ' ⚠' : ''}
+                        {formatPlaceOfSupply(d.record.place_of_supply) || '-'}{d.stateWarning ? ' ⚠' : ''}
                       </td>
-                      <td>{d.record.gst_mode === 'IGST' ? 'IGST' : d.record.gst_mode === 'CGST_SGST' ? 'CGST + SGST' : '—'}</td>
+                      <td>{d.record.gst_mode === 'IGST' ? 'IGST' : d.record.gst_mode === 'CGST_SGST' ? 'CGST + SGST' : '-'}</td>
                       <td className={styles.num}>{formatCurrency(d.record.total, d.record.currency || 'INR')}</td>
-                      <td className={d.creditWarning ? styles.warn : styles.muted}>{d.creditWarning || '—'}</td>
+                      <td className={d.creditWarning ? styles.warn : styles.muted}>{d.creditWarning || '-'}</td>
                       <td>{d.einvoice === 'yes' ? s2T('b.einvYes') : d.einvoice === 'no' ? s2T('b.einvNo') : s2T('b.einvUnknown')}</td>
                     </tr>
                   ))}
@@ -340,7 +340,7 @@ export function BatchTab() {
               <>
                 <p className={styles.muted}>{s2T('b.held')}</p>
                 <ul className={styles.list}>
-                  {result.held.map((h) => <li key={h.invoice.id}><Link to={`/invoice/${h.invoice.id}`}>{h.invoice.invoice_number || s2T('b.unnumbered')}</Link> — {h.reason}</li>)}
+                  {result.held.map((h) => <li key={h.invoice.id}><Link to={`/invoice/${h.invoice.id}`}>{h.invoice.invoice_number || s2T('b.unnumbered')}</Link> : {h.reason}</li>)}
                 </ul>
               </>
             )}

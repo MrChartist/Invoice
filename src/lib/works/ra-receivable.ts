@@ -119,7 +119,7 @@ export function recordDeductionRow(invoiceId: string, kind: ClearingKind, opts: 
       narration: `${label} deducted by ${inv.client?.name ?? ''} from ${inv.invoice_number}${inv.ra_no ? ` (RA ${inv.ra_no})` : ''}`,
       lines: [{ account_id: account, dr: p, cr: 0 }, { account_id: bankLedgerId(clearing), dr: 0, cr: p }],
     });
-    const pay = localDb.payments.record({ invoiceId, amount, method: own ? `Recovery — ${label}`.slice(0, 60) : kind === 'gst_tds' ? GST_TDS_METHOD : CESS_METHOD, date: opts.date, bankAccountId: clearing, reference: inv.invoice_number, note: `${label} — journal ${v.number}` });
+    const pay = localDb.payments.record({ invoiceId, amount, method: own ? `Recovery: ${label}`.slice(0, 60) : kind === 'gst_tds' ? GST_TDS_METHOD : CESS_METHOD, date: opts.date, bankAccountId: clearing, reference: inv.invoice_number, note: `${label}: journal ${v.number}` });
     tag([pay.id], kind, v.id);
     return { ...pay, ra_kind: kind, ra_journal_id: v.id };
   });

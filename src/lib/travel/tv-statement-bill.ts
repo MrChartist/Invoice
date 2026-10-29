@@ -20,7 +20,7 @@ const line = (name: string, rate: number): PurchaseLine => ({ id: generateId(), 
 /** Pure: the bill a statement stands for (read back through `readPurchase` — tests/purchase-contract.test.ts). */
 export function statementBill(st: SupplierStatement, v?: { name: string; gstin?: string }): Omit<PurchaseRecord, 'id'> {
   const net = st.totals.net;
-  if (!(net > 0)) throw new Error('The supplier owes you on this statement — record their credit note instead.');
+  if (!(net > 0)) throw new Error('The supplier owes you on this statement: record their credit note instead.');
   const adm = round2(st.rows.filter((r) => r.flag === 'adm' && !r.disputed).reduce((s, r) => s + r.net, 0));
   const what = 'Fares and taxes at actual';
   const lines = adm > 0 && net - adm > 0 ? [line(`${what}, net of commission ₹${st.totals.commission.toFixed(2)}`, round2(net - adm)), line('ADM charges', adm)] : [line(what, net)];

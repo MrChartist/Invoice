@@ -88,7 +88,7 @@ export const loadKarigarMoves = (): KarigarMove[] => getTable<KarigarMove>(KARIG
 
 /** The karigar's wip godown (created once; non-saleable). */
 export function karigarGodown(k: Pick<Vendor, 'id' | 'name'>): string {
-  return (godownsDb.list().find((g) => g.kind === 'wip' && g.vendor_id === k.id) ?? godownsDb.save({ name: `Karigar — ${k.name}`, kind: 'wip', job_worker: true, vendor_id: k.id })).id;
+  return (godownsDb.list().find((g) => g.kind === 'wip' && g.vendor_id === k.id) ?? godownsDb.save({ name: `Karigar: ${k.name}`, kind: 'wip', job_worker: true, vendor_id: k.id })).id;
 }
 
 function move(itemId: string, date: string, qty: number, godown: string, note: string, rate = 0): string {
@@ -175,9 +175,9 @@ export function recordKarigar(input: KarigarInput): KarigarMove {
     const half = round2(gst / 2);
     draftId = draftsDb.save({
       kind: 'EXPENSE', vendor_id: input.karigar.id, vendor_name: input.karigar.name, bill_number: number, date: input.date, category: 'Karigar labour (job work)',
-      lines: [{ id: generateId(), name: `Labour — ${number}`, quantity: 1, rate: lab.amount, tax_rate: reg ? 5 : 0, unit: 'NOS', hsn: '9988' }],
+      lines: [{ id: generateId(), name: `Labour: ${number}`, quantity: 1, rate: lab.amount, tax_rate: reg ? 5 : 0, unit: 'NOS', hsn: '9988' }],
       taxable: lab.amount, cgst: half, sgst: round2(gst - half), igst: 0, total: round2(lab.amount + gst), amount_paid: 0, itc_eligible: reg,
-      notes: `Karigar labour, SAC 9988 job work — ${reg ? '5% (registered karigar)' : 'no GST, no RCM (unregistered karigar)'}. Verify with your CA (RT20).`,
+      notes: `Karigar labour, SAC 9988 job work: ${reg ? '5% (registered karigar)' : 'no GST, no RCM (unregistered karigar)'}. Verify with your CA (RT20).`,
       draft: { source: 'manual', created_at: new Date().toISOString() },
     }).id;
   }

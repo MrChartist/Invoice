@@ -321,7 +321,7 @@ export function buildForecast(input: ForecastInput): Forecast {
     const dueRaw = isoDay(pickStr(r, ['due_date']));
     const vendor = vendorById.get(pickStr(r, ['vendor_id']));
     let due = dueRaw || bill.date;
-    let basis = dueRaw ? `due ${fmtDay(dueRaw)}` : `no due date — bill date ${fmtDay(bill.date)}`;
+    let basis = dueRaw ? `due ${fmtDay(dueRaw)}` : `no due date: bill date ${fmtDay(bill.date)}`;
     if (vendor && isMse(vendor)) {
       const limit = paymentLimit(bill.date, dueRaw || undefined);
       if (limit < due || !dueRaw) {
@@ -559,13 +559,13 @@ export function payrollCommitments(runs: readonly RunLike[], payments: readonly 
 
 export function forecastCsv(f: Forecast): string {
   return toCsv([
-    [`Cash-flow forecast ${f.today} to ${f.end}`, 'ESTIMATE — based on due dates, payment history and schedules; not a statement'],
+    [`Cash-flow forecast ${f.today} to ${f.end}`, 'ESTIMATE: based on due dates, payment history and schedules; not a statement'],
     ['Opening cash + bank', f.opening],
     [],
     ['Week from', 'Week to', 'Opening', 'Money in', 'Money out', 'Net', 'Closing'],
     ...f.buckets.map((b) => [b.start, b.end, b.opening, b.inflow, b.outflow, b.net, b.closing]),
     [],
     ['Expected date', 'Type', 'In / out', 'Party', 'Reference', 'Amount', 'Basis'],
-    ...f.items.map((i) => [i.date, KIND_LABELS[i.kind], i.direction === 'in' ? 'In' : 'Out', i.party, i.ref, i.amount, i.basis + (i.overdue ? ' (overdue — assumed today)' : '')]),
+    ...f.items.map((i) => [i.date, KIND_LABELS[i.kind], i.direction === 'in' ? 'In' : 'Out', i.party, i.ref, i.amount, i.basis + (i.overdue ? ' (overdue: assumed today)' : '')]),
   ]);
 }

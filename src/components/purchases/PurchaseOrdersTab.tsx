@@ -171,19 +171,19 @@ export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, o
                       <div className={tabStyles.name}>{po.po_number}</div>
                       {po.so_id && (
                         <div className={tabStyles.sub} data-po-so>
-                          <Link to={`/invoice/${po.so_id}`}>{s2T('po.soRef', { number: soNumbers.get(po.so_id) ?? '—' })}</Link>
+                          <Link to={`/invoice/${po.so_id}`}>{s2T('po.soRef', { number: soNumbers.get(po.so_id) ?? '-' })}</Link>
                           {po.drop_ship ? ` · ${s2T('po.dropShipTag')}` : ''}
                         </div>
                       )}
                       {f.bills.length > 0 && <div className={tabStyles.sub}>{purT(f.bills.length === 1 ? 'poBillsOne' : 'poBillsMany', { n: f.bills.length, list: f.bills.map((b) => b.bill_number).join(', ') })}</div>}
                     </td>
-                    <td>{po.vendor_name || '—'}</td>
+                    <td>{po.vendor_name || '-'}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {formatDate(po.date)}
                       {po.expected_date && <div className={tabStyles.sub}>{purT('expected', { date: formatDate(po.expected_date) })}</div>}
                     </td>
                     <td><StatusBadge status={poStateLabel(f.state)} tone={poTone(f.state)} /></td>
-                    <td className={surface.numeric}>{ordered > 0 ? `${Math.round((received / ordered) * 100)}%` : '—'}</td>
+                    <td className={surface.numeric}>{ordered > 0 ? `${Math.round((received / ordered) * 100)}%` : '-'}</td>
                     <td className={surface.numeric}>{formatCurrency(po.total)}</td>
                     <td>
                       <div className={surface.rowActions}>
@@ -354,7 +354,7 @@ function PoForm({
           <select id="po-pos" className={controls.select} value={pos} onChange={(e) => setPos(e.target.value)}>
             <option value="">{purT('notSpecified')}</option>
             {INDIAN_STATES.map((s) => (
-              <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+              <option key={s.code} value={s.code}>{s.code} : {s.name}</option>
             ))}
           </select>
         </div>

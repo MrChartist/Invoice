@@ -175,7 +175,7 @@ export function registerSummary(rows: readonly RegisterRow[], heads: readonly Ch
 /** Market fee register (CSV working paper; State formats differ — verify with your CA). */
 export function registerCsv(rows: readonly RegisterRow[], period: { from: string; to: string }): string {
   return toCsv([
-    [`Market fee register ${period.from} to ${period.to} — working paper, verify with your CA`],
+    [`Market fee register ${period.from} to ${period.to}: working paper, verify with your CA`],
     ['Side', 'Date', 'Document', 'Party', 'Head', 'Base', 'Rate', 'Amount'],
     ...rows.map((r) => [r.side, r.date, r.number, r.party, r.head, r.base, r.rate, r.amount.toFixed(2)]),
     ['', '', '', '', 'Total', '', '', r2(rows.reduce((t, r) => t + r.amount, 0)).toFixed(2)],

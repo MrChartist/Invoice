@@ -77,5 +77,5 @@ export function jwHolds(line: Pick<InvoiceItem, 'jw' | 'quantity' | 'rate'>, rup
 export function huidWarning(line: Pick<InvoiceItem, 'name' | 'jw'>, date: string): string {
   const jw = line.jw;
   if (!jw || jw.metal !== 'gold' || jw.job_work || validHuid(jw.huid) || !ruleAt(HALLMARK_RULES, date).huidMandatory) return '';
-  return `${line.name}: no valid 6-character HUID — gold jewellery in a notified district must be hallmarked (verify with your CA).`;
+  return `${line.name}: no valid 6-character HUID, gold jewellery in a notified district must be hallmarked (verify with your CA).`;
 }

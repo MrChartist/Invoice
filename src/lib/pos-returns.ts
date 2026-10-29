@@ -251,7 +251,7 @@ export function refundIssues(amount: number, refundable: number, refunds: readon
   const errors: string[] = [];
   const sum = round2(refunds.reduce((s, r) => s + Math.max(num(r.amount), 0), 0));
   if (Math.abs(sum - round2(amount)) > 0.009) errors.push(`The refund (₹${sum.toFixed(2)}) must equal the credit note (₹${round2(amount).toFixed(2)}).`);
-  if (sum > refundable + 0.009) errors.push(`Only ₹${refundable.toFixed(2)} was received on this bill — refund at most that, or keep the rest on account.`);
+  if (sum > refundable + 0.009) errors.push(`Only ₹${refundable.toFixed(2)} was received on this bill: refund at most that, or keep the rest on account.`);
   return errors;
 }
 

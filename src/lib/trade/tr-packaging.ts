@@ -136,7 +136,7 @@ export function buildChargeInvoice(t: PackagingType, qty: number, client: Client
   const rec: InvoiceRecord = {
     ...draft, issue_date: date, due_date: date > draft.due_date ? date : draft.due_date, status: 'Draft', client: { ...client }, place_of_supply: pos,
     gst_mode: deriveGstMode({ senderStateCode: home, placeOfSupply: pos, senderHasGstin: !!ctx.sender?.companyGstin?.trim(), taxEnabled: true }),
-    items: [{ id: generateId(), name: `${t.name} not returned`, description: 'Returnable packaging not returned — charged as a sale of the packaging (verify with your CA).', type: 'Goods', ...(t.hsn ? { hsn: t.hsn } : {}), unit: t.unit || 'NOS', quantity: qty, rate, tax_rate: num(t.tax_rate), discount_percent: 0, amount: round2(qty * rate) }],
+    items: [{ id: generateId(), name: `${t.name} not returned`, description: 'Returnable packaging not returned: charged as a sale of the packaging (verify with your CA).', type: 'Goods', ...(t.hsn ? { hsn: t.hsn } : {}), unit: t.unit || 'NOS', quantity: qty, rate, tax_rate: num(t.tax_rate), discount_percent: 0, amount: round2(qty * rate) }],
   };
   // QA8 T6: an SEZ customer's crates follow the supply type of their latest sale (zero-rated under LUT / IGST).
   const sez = ctx.lastSale?.supply_type?.startsWith('SEZ') ? ctx.lastSale : undefined;

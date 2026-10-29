@@ -6,7 +6,7 @@ import { logisticsPaper } from '../src/lib/logistics/lg-print.ts';
 import { trackingText } from '../src/components/templates/paper-helpers.ts';
 import type { LgSnapshot } from '../src/types/logistics-r19.ts';
 
-const air: LgSnapshot = { job_id: 'j1', job_no: 'JOB/FY26-27/0001', mode: 'air', dir: 'export', refs: { hawb: 'SBL-0001', mawb: '176-12345675', flight: 'SQ 423', sb_no: '1234567', sb_date: '2026-11-04' }, ports: { origin: 'BOM', destination: 'SIN', dest_country: 'SG' }, weights: { pkgs: 5, gross_kg: 480, chargeable_kg: 500 }, pos_reason: 'Place of supply outside India — Sec 12(8) proviso; IGST (Circular 184/16/2022-GST)' };
+const air: LgSnapshot = { job_id: 'j1', job_no: 'JOB/FY26-27/0001', mode: 'air', dir: 'export', refs: { hawb: 'SBL-0001', mawb: '176-12345675', flight: 'SQ 423', sb_no: '1234567', sb_date: '2026-11-04' }, ports: { origin: 'BOM', destination: 'SIN', dest_country: 'SG' }, weights: { pkgs: 5, gross_kg: 480, chargeable_kg: 500 }, pos_reason: 'Place of supply outside India: Sec 12(8) proviso; IGST (Circular 184/16/2022-GST)' };
 
 test('rows and the reason come from the snapshot only', () => {
   const p = logisticsPaper(air);
@@ -25,6 +25,6 @@ test('old invoices print exactly as before; an empty snapshot prints no block', 
 
 test('R19-B4: the exchange rate of a foreign-currency charge prints with Rule 34(2) (LG13)', () => {
   const p = logisticsPaper({ ...air, fx: { currency: 'USD', rate: 84, source: 'RBI' } });
-  assert.deepEqual(p.rows.at(-1), ['Exchange rate', '₹84.00 / USD (Rule 34(2) CGST Rules — as per accounting standards)']);
+  assert.deepEqual(p.rows.at(-1), ['Exchange rate', '₹84.00 / USD (Rule 34(2) CGST Rules: as per accounting standards)']);
   assert.ok(!logisticsPaper(air).rows.some(([k]) => k === 'Exchange rate'));
 });

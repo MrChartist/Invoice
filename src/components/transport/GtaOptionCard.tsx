@@ -43,7 +43,7 @@ export function GtaOptionCard({ notify, refresh, tick }: PanelProps) {
         <div className={surface.tableWrap}>
           <table className={surface.table}>
             <thead><tr><th>{twT('fy')}</th><th>{twT('option')}</th><th>{twT('filedOn')}</th><th>ARN</th></tr></thead>
-            <tbody>{rows.map((r) => <tr key={r.id}><td>{r.fy}</td><td>{optionLine(r.option, `20${r.fy.slice(0, 2)}-04-01`)}</td><td>{r.filed_on ?? '—'}</td><td>{r.arn ?? '—'}</td></tr>)}</tbody>
+            <tbody>{rows.map((r) => <tr key={r.id}><td>{r.fy}</td><td>{optionLine(r.option, `20${r.fy.slice(0, 2)}-04-01`)}</td><td>{r.filed_on ?? '-'}</td><td>{r.arn ?? '-'}</td></tr>)}</tbody>
           </table>
         </div>
       )}

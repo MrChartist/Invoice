@@ -44,11 +44,11 @@ export function DonationForm({ notify, onSaved }: { notify: Notify; onSaved: () 
         <T l={iT('amount')} v={d.amount || ''} on={(v) => set({ amount: num(v) })} d="donation-amount" />
         <S l={iT('mode')} v={d.mode} o={opts(MODES, 'mode.')} on={(v) => set({ mode: v as DonationInput['mode'] })} />
         {d.mode !== 'cash' && d.mode !== 'kind' && banks.length > 1 && <S l={iT('bank')} v={d.bank_account_id} o={banks.map((b) => [b.id, `${b.name}${b.fcra ? ' (FCRA)' : ''}`] as const)} on={(v) => set({ bank_account_id: v })} />}
-        {d.mode === 'kind' && <S l={iT('kindAccount')} v={d.kind_account_id ?? ''} o={[['', '—'], ...kindAccounts.map((a) => [a.id, `${a.code} ${a.name}`] as const)]} on={(v) => set({ kind_account_id: v || undefined })} />}
+        {d.mode === 'kind' && <S l={iT('kindAccount')} v={d.kind_account_id ?? ''} o={[['', '-'], ...kindAccounts.map((a) => [a.id, `${a.code} ${a.name}`] as const)]} on={(v) => set({ kind_account_id: v || undefined })} />}
         <T l={iT('ref')} v={d.reference} on={(reference) => set({ reference })} />
         <S l={iT('type')} v={d.type} o={opts(TYPES, 'type.')} on={(v) => set({ type: v as DonationInput['type'] })} />
-        <S l={iT('fund')} v={d.fund_id} o={[['', '—'], ...funds.map((f) => [f.id, f.name] as const)]} on={(v) => set({ fund_id: v || undefined })} />
-        <S l={iT('section')} v={d.section} o={SECTIONS.map((x) => [x, x === 'none' ? '—' : donationSectionText(x, d.date, ita25Words())] as const)} on={(v) => set({ section: v as DonationInput['section'] })} />
+        <S l={iT('fund')} v={d.fund_id} o={[['', '-'], ...funds.map((f) => [f.id, f.name] as const)]} on={(v) => set({ fund_id: v || undefined })} />
+        <S l={iT('section')} v={d.section} o={SECTIONS.map((x) => [x, x === 'none' ? '-' : donationSectionText(x, d.date, ita25Words())] as const)} on={(v) => set({ section: v as DonationInput['section'] })} />
         <T l={iT('purpose')} v={d.purpose} on={(purpose) => set({ purpose })} />
         <C l={iT('anonymous')} v={d.anonymous} on={(anonymous) => set({ anonymous })} />
       </div>

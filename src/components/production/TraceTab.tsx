@@ -107,7 +107,7 @@ export function TraceTab({ ctx }: { ctx: MfgContext }) {
               <tbody>
                 {[...result.fwd.outward, ...result.fwd.returned].map((o, i) => (
                   <tr key={i}>
-                    <td className={surface.mono}>{o.refNumber}</td><td>{formatDate(o.date)}</td><td>{o.party || '—'}</td><td>{name(o.itemId)}</td><td>{o.batch}</td>
+                    <td className={surface.mono}>{o.refNumber}</td><td>{formatDate(o.date)}</td><td>{o.party || '-'}</td><td>{name(o.itemId)}</td><td>{o.batch}</td>
                     <td className={mfg.num}>{qtyText(o.qty)}</td><td>{pT(`out_${o.kind}` as 'out_sale')}</td>
                   </tr>
                 ))}
@@ -130,7 +130,7 @@ function Node({ n, name }: { n: TraceNode & { qty?: number }; name: (id: string)
       {n.untracked && <span className={mfg.muted}> ({pT('untracked')})</span>}
       {n.repeat && <span className={mfg.muted}> ({pT('repeat')})</span>}
       {n.sources.length > 0 && (
-        <span className={mfg.muted}> ← {n.sources.map((s) => `${pT(`src_${s.kind}` as 'src_purchase')} ${s.refNumber || ''}${s.party ? ` · ${s.party}` : ''} · ${(s.kind === 'opening' ? '—' : formatDate(s.date))} (${qtyText(s.qty)})`).join('; ')}</span>
+        <span className={mfg.muted}> ← {n.sources.map((s) => `${pT(`src_${s.kind}` as 'src_purchase')} ${s.refNumber || ''}${s.party ? ` · ${s.party}` : ''} · ${(s.kind === 'opening' ? '-' : formatDate(s.date))} (${qtyText(s.qty)})`).join('; ')}</span>
       )}
       {n.madeBy.map((m, i) => (
         <ul key={i} className={styles.tree}>

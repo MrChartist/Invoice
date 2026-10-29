@@ -129,7 +129,7 @@ export function ticketHtml(e: PrintEstimate, b: EstimateBreak, order?: Pick<Prod
 <h1>JOB TICKET ${esc(order?.number ?? '')} · ${esc(e.number)}</h1><table><tbody>
 ${row('Job', e.job)}${row('Quantity', b.qty)}${row('Finished size', `${e.size.w} × ${e.size.h} mm`)}${row('Colours', `${e.colours_front} front + ${e.colours_back} back${e.varnish_plate ? ' + varnish' : ''}`)}
 ${row('Sheet', `${e.sheet.w} × ${e.sheet.h} mm · ${e.gsm} GSM · ${b.ups} ups`)}${row('Sheets', `${b.net_sheets} + ${b.waste_sheets} wastage = ${b.sheets} (${b.kg} kg, ${b.reams} reams)`)}
-${row('Plates', b.plates)}${row('Impressions', `${b.impressions} (${b.passes} pass${b.passes === 1 ? '' : 'es'})`)}${row('Finishing', e.finishing.map((f) => f.name).join(', ') || '—')}
+${row('Plates', b.plates)}${row('Impressions', `${b.impressions} (${b.passes} pass${b.passes === 1 ? '' : 'es'})`)}${row('Finishing', e.finishing.map((f) => f.name).join(', ') || '-')}
 ${actualSheets !== undefined ? row('Actual sheets issued', `${actualSheets} (estimate ${b.sheets})`) : ''}</tbody></table>
 <p>Press ______________ &nbsp; Operator ______________ &nbsp; Checked ______________</p></body></html>`;
 }

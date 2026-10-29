@@ -38,7 +38,7 @@ import { shiftDay } from '../dates';
 export const REQUESTS_TABLE = 'transfer_requests';
 export const REQUEST_PREFIX = 'TRQ';
 export const TRANSIT_PREFIX = 'In transit → ';
-export const TRANSFER_CA_NOTE = 'Same-GSTIN branch transfer: not a supply; goods move on a delivery challan (Rule 55) with an e-Way bill where required (sub-type "For own use", value at cost). Working paper — verify with your CA.';
+export const TRANSFER_CA_NOTE = 'Same-GSTIN branch transfer: not a supply; goods move on a delivery challan (Rule 55) with an e-Way bill where required (sub-type "For own use", value at cost). Working paper: verify with your CA.';
 
 const EPS = 1e-6;
 const rq = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000 || 0;
@@ -544,7 +544,7 @@ export const transferRequestsDb = {
       : transitLines(p, new Map([[e.item_id, e.qty]]));
     const consume: VoucherStockLine[] = picked.map((l) => ({ ...l, godown_id: transit.id }));
     return withTablesRollback([REQUESTS_TABLE, SJ_TABLE, 'series_counters'], () => {
-      const j = saveConsumeOnlyJournal({ date, consume, request_id: r.id, narration: `Goods ${e.kind} in transit written off — ${r.number}${e.note ? ` (${e.note})` : ''}. Check ITC reversal (Sec 17(5)(h)) with your CA.` }, items, inputs);
+      const j = saveConsumeOnlyJournal({ date, consume, request_id: r.id, narration: `Goods ${e.kind} in transit written off: ${r.number}${e.note ? ` (${e.note})` : ''}. Check ITC reversal (Sec 17(5)(h)) with your CA.` }, items, inputs);
       const exceptions = (r.exceptions ?? []).map((x) => (x.id === e.id ? { ...x, status: 'written_off' as const, ref: j.number } : x));
       const saved = persist({ ...mustGet(id), exceptions, writeoff_ids: [...(r.writeoff_ids ?? []), j.id] }, logRow('write_off', j.number));
       logAudit(saved, 'update', `Wrote off ${e.qty} ${e.kind} in transit on ${r.number} (${j.number})`);
@@ -575,7 +575,7 @@ export const transferRequestsDb = {
     return withTablesRollback([REQUESTS_TABLE, 'stock_transfers', 'series_counters'], () => {
       const problems = transferIssues({ id: '', date, from_godown: transit.id, to_godown: r.to_godown, lines }, inputs);
       if (problems.length) throw new Error(problems[0]);
-      const t = transfersDb.save({ date, from_godown: transit.id, to_godown: r.to_godown, lines, request_id: r.id, leg: 'in', notes: `Found: ${e.kind} goods received late — ${r.number}` });
+      const t = transfersDb.save({ date, from_godown: transit.id, to_godown: r.to_godown, lines, request_id: r.id, leg: 'in', notes: `Found: ${e.kind} goods received late, ${r.number}` });
       const exceptions = (r.exceptions ?? []).map((x) => (x.id === e.id ? { ...x, status: 'found' as const, ref: t.transfer_number } : x));
       return persist({ ...mustGet(id), exceptions, receipt_ids: [...(r.receipt_ids ?? []), t.id] }, logRow('receive', `${t.transfer_number} (found)`));
     });

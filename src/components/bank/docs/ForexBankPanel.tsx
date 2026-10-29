@@ -126,7 +126,7 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
           <div className={styles.totals} data-forex-summary>
             <span>{fxbT('fcyBalance')}: <strong>{cur} {n(summary.fcy)}</strong></span>
             <span>{fxbT('inrBalance')}: <strong>₹{n(summary.inr)}</strong></span>
-            <span>{fxbT('carrying')}: <strong>{summary.rate === null ? '—' : `₹${summary.rate.toFixed(4)}`}</strong></span>
+            <span>{fxbT('carrying')}: <strong>{summary.rate === null ? '-' : `₹${summary.rate.toFixed(4)}`}</strong></span>
             <span>{fxbT('realised')}: <strong>₹{n(summary.realised)}</strong></span>
             <span>{fxbT('unrealised')}: <strong>₹{n(summary.unrealised)}</strong></span>
           </div>
@@ -158,7 +158,7 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
                 {kind === 'vendor' && (
                   <label className={controls.field}><span className={controls.label}>{fxbT('vendor')}</span>
                     <select className={controls.select} value={vendorId} onChange={(e) => setVendorId(e.target.value)} data-fx-vendor>
-                      <option value="">—</option>
+                      <option value="">-</option>
                       {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
                     </select></label>
                 )}
@@ -194,7 +194,7 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
                     const move = !!r.move_id && r.kind !== 'reversal';
                     return (
                       <tr key={`${r.kind}-${r.ref}-${i}`}>
-                        <td>{r.date ? formatDate(r.date) : '—'}</td>
+                        <td>{r.date ? formatDate(r.date) : '-'}</td>
                         <td>{fxbT(KIND_LABEL[r.kind])}</td>
                         <td>{r.ref}</td>
                         <td className={surface.numeric}>{n(r.fcy)}</td>

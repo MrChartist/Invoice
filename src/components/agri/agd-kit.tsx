@@ -37,7 +37,7 @@ export function Form({ v, set, f, children }: { v: Obj; set: (v: Obj) => void; f
         const on = (val: unknown) => set({ ...v, [k]: val });
         const input = kind === 'n' ? <NumberInput className={controls.input} value={Number(v[k]) || 0} onChange={on} data-agd={k} />
           : kind === 'c' ? <input type="checkbox" checked={!!v[k]} onChange={(e) => on(e.target.checked)} data-agd={k} />
-          : Array.isArray(kind) ? <Sel value={String(v[k] ?? '')} onChange={on} opts={kind} blank="—" data-agd={k} />
+          : Array.isArray(kind) ? <Sel value={String(v[k] ?? '')} onChange={on} opts={kind} blank="-" data-agd={k} />
           : <input type={kind === 'd' ? 'date' : kind === 'm' ? 'month' : 'text'} className={controls.input} value={String(v[k] ?? '')} onChange={(e) => on(e.target.value)} data-agd={k} />;
         return <F key={k} label={agdT(label)} w={w}>{input}</F>;
       })}

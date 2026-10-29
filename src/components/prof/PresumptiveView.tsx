@@ -33,12 +33,12 @@ export default function PresumptiveView() {
   const label = sectionText('44ADA', `${fy}-04-01`);
   const rows: [string, string][] = [
     [fdT('gross'), inr(p.accrual)], [fdT('recoveries'), inr(p.recoveriesOut)], [fdT('cashBasis'), inr(p.cashBasis)], [fdT('cashPct'), `${p.cashPct} %`],
-    [fdT('limit'), `${inr(p.limit)} — ${p.withinLimit ? fdT('within') : fdT('over')}`], [`${fdT('deemed')} (${p.deemedPct} %)`, inr(p.deemed)],
+    [fdT('limit'), `${inr(p.limit)}: ${p.withinLimit ? fdT('within') : fdT('over')}`], [`${fdT('deemed')} (${p.deemedPct} %)`, inr(p.deemed)],
     ...(p.bookProfit !== undefined ? [[fdT('netProfit'), inr(p.bookProfit)], [fdT('difference'), inr(p.difference ?? 0)]] as [string, string][] : []),
     [fdT('advanceDue'), p.advanceTaxDue],
   ];
   const print = () => {
-    const html = `<h2>${esc(label)} — FY ${fy}-${String(fy + 1).slice(2)}</h2><table border="1" cellpadding="4">${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table><p>${p.notes.map(esc).join('<br>')}</p><p>${esc(fdT('wp'))}</p>`;
+    const html = `<h2>${esc(label)}: FY ${fy}-${String(fy + 1).slice(2)}</h2><table border="1" cellpadding="4">${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table><p>${p.notes.map(esc).join('<br>')}</p><p>${esc(fdT('wp'))}</p>`;
     printHtmlDocument(`<!doctype html><meta charset="utf-8"><title>${esc(label)}</title><body>${html}</body>`, (h) => downloadText('presumptive.html', h, 'text/html'));
   };
   return (

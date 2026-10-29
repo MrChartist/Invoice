@@ -44,7 +44,7 @@ export function cashReceiptIssue(mode: GuardMode | undefined, cash: number, earl
   const limit = cashReceiptLimit(date);
   const total = round2(num(cash) + num(earlierToday));
   if (total < limit) return null;
-  return { block: mode === 'block', message: `Cash of ₹${limit.toLocaleString('en-IN')} or more cannot be accepted from one person in a day (Sec 269ST): ₹${total.toLocaleString('en-IN')} in cash. Take the rest by UPI / card / bank — verify with your CA.` };
+  return { block: mode === 'block', message: `Cash of ₹${limit.toLocaleString('en-IN')} or more cannot be accepted from one person in a day (Sec 269ST): ₹${total.toLocaleString('en-IN')} in cash. Take the rest by UPI / card / bank: verify with your CA.` };
 }
 
 /**
@@ -53,7 +53,7 @@ export function cashReceiptIssue(mode: GuardMode | undefined, cash: number, earl
  */
 export function cashPaymentIssue(paidToday: number, date?: string, payee?: Parameters<typeof cashPayeeNote>[0]): string {
   const limit = cashPaymentLimit(date);
-  const warn = num(paidToday) > limit ? `Sec 40A(3): cash above ₹${limit.toLocaleString('en-IN')} paid to one person in a day may be disallowed — pay by bank. Verify with your CA.` : '';
+  const warn = num(paidToday) > limit ? `Sec 40A(3): cash above ₹${limit.toLocaleString('en-IN')} paid to one person in a day may be disallowed, pay by bank. Verify with your CA.` : '';
   return payee ? cashPayeeNote(payee, paidToday, limit, warn) : warn; // R12 (AG-A4): Rule 6DD(e)
 }
 
@@ -86,7 +86,7 @@ export function cashGuards(mode: GuardMode | undefined, date: string, cashNow: n
   if (!(num(cashNow) > 0)) return [];
   const r = cashReceiptIssue(mode, cashNow, earlier, date);
   const out: Guard[] = r ? [{ level: r.block ? 'error' : 'warn', message: r.message }] : [];
-  if (round2(num(cashNow) + num(earlier)) >= ruleAt(PMLA_CASH_RULES, date)) out.push({ level: 'warn', message: 'KYC and record-keeping under PMLA may apply to this cash — verify with your CA.' });
+  if (round2(num(cashNow) + num(earlier)) >= ruleAt(PMLA_CASH_RULES, date)) out.push({ level: 'warn', message: 'KYC and record-keeping under PMLA may apply to this cash: verify with your CA.' });
   return out;
 }
 
@@ -97,14 +97,14 @@ export const panNeeded = (amount: number, date?: string): boolean => num(amount)
 export function panGuard(total: number, date: string, kyc: SaleKyc | undefined, require: boolean): Guard | null {
   const limit = ruleAt(PAN_SALE_LIMIT_RULES, date);
   if (!panNeeded(total, date) || validPan(kyc?.pan) || kyc?.form === '60' || kyc?.form === '97') return null;
-  return { level: require ? 'error' : 'warn', message: `A sale above ₹${limit.toLocaleString('en-IN')} needs the customer's PAN or a Form 60 / 97 declaration (Rule 114B) — verify with your CA.` };
+  return { level: require ? 'error' : 'warn', message: `A sale above ₹${limit.toLocaleString('en-IN')} needs the customer's PAN or a Form 60 / 97 declaration (Rule 114B): verify with your CA.` };
 }
 
 /** RT-E2 / RT22: e-Way note when every goods line is chapter 71, else '' (the usual threshold applies). */
 export function ewayChapterNote(hsns: readonly string[], date?: string): string {
   const ch = ruleAt(EWAY_EXEMPT_CHAPTER_RULES, date);
   const goods = hsns.map((h) => String(h ?? '').replace(/\D/g, '')).filter((h) => h && !h.startsWith('99'));
-  return goods.length && goods.every((h) => ch.some((c) => h.startsWith(c))) ? 'e-Way bill not required for Chapter 71 goods (Rule 138(14) annexure) — verify with your CA.' : '';
+  return goods.length && goods.every((h) => ch.some((c) => h.startsWith(c))) ? 'e-Way bill not required for Chapter 71 goods (Rule 138(14) annexure): verify with your CA.' : '';
 }
 
 const SALE_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY']);

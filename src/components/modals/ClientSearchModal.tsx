@@ -73,7 +73,7 @@ export function ClientSearchModal({ isOpen, onClose }: Props) {
                 <Avatar name={c.name} size={34} square />
                 <span className={styles.main}>
                   <span className={styles.title}>{c.name}</span>
-                  <span className={styles.sub}>{[clinic && uhidOf(c), c.company, c.city, c.gstin].filter(Boolean).join(' · ') || c.email || '—'}</span>
+                  <span className={styles.sub}>{[clinic && uhidOf(c), c.company, c.city, c.gstin].filter(Boolean).join(' · ') || c.email || '-'}</span>
                 </span>
               </button>
             </li>

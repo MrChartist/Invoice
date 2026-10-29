@@ -221,7 +221,7 @@ function reservesNote(c: NotesContext): PackNote {
     id: 'reserves',
     title: reservesTitle(c.entity),
     kind: 'auto',
-    paragraphs: c.entity === 'company' ? [] : ['For a proprietorship / firm the profit is normally carried to the capital account(s); here it is shown as surplus — verify the presentation with your CA.'],
+    paragraphs: c.entity === 'company' ? [] : ['For a proprietorship / firm the profit is normally carried to the capital account(s); here it is shown as surplus: verify the presentation with your CA.'],
     tables: [{ columns: ['Particulars', c.fy.label], rows }],
   };
 }
@@ -267,15 +267,15 @@ function payablesNote(c: NotesContext): PackNote {
     title: 'Trade payables',
     kind: 'auto',
     paragraphs: [
-      `Micro and small enterprises are identified from the Udyam category on the supplier master${msmeParties.length ? ` (${msmeParties.length} supplier(s))` : ''}. MSMED Act Sec 22 disclosure — principal and interest remaining unpaid, interest paid and payable: (add figures). Ageing is from the bill date, not the due date — verify with your CA.`,
+      `Micro and small enterprises are identified from the Udyam category on the supplier master${msmeParties.length ? ` (${msmeParties.length} supplier(s))` : ''}. MSMED Act Sec 22 disclosure, principal and interest remaining unpaid, interest paid and payable: (add figures). Ageing is from the bill date, not the due date: verify with your CA.`,
     ],
     tables: [{
       columns: ['Particulars', ...PAYABLE_BUCKETS.labels, 'Total'],
       rows: [
         ['MSME', ...msme, tot(msme)],
         ['Others', ...others, tot(others)],
-        ['Disputed dues — MSME', 0, 0, 0, 0, 0],
-        ['Disputed dues — Others', 0, 0, 0, 0, 0],
+        ['Disputed dues: MSME', 0, 0, 0, 0, 0],
+        ['Disputed dues: Others', 0, 0, 0, 0, 0],
         ['Total', ...ag.totals, tot(ag.totals)],
       ],
     }],
@@ -289,12 +289,12 @@ function receivablesNote(c: NotesContext): PackNote {
     id: 'receivables',
     title: 'Trade receivables',
     kind: 'auto',
-    paragraphs: ['Secured / unsecured, considered good / doubtful: shown as unsecured, considered good — adjust as needed. Ageing is from the invoice date — verify with your CA.'],
+    paragraphs: ['Secured / unsecured, considered good / doubtful: shown as unsecured, considered good, adjust as needed. Ageing is from the invoice date: verify with your CA.'],
     tables: [{
       columns: ['Particulars', ...RECEIVABLE_BUCKETS.labels, 'Total'],
       rows: [
-        ['Undisputed — considered good (unsecured)', ...ag.totals, tot],
-        ['Undisputed — considered doubtful', 0, 0, 0, 0, 0, 0],
+        ['Undisputed: considered good (unsecured)', ...ag.totals, tot],
+        ['Undisputed: considered doubtful', 0, 0, 0, 0, 0, 0],
         ['Disputed', 0, 0, 0, 0, 0, 0],
       ],
     }],
@@ -353,9 +353,9 @@ function fixedAssetsNote(c: NotesContext): PackNote {
       c.assets.length
         ? tie
           ? 'The net block agrees with the written-down value in the fixed-asset register.'
-          : `Fixed-asset register written-down value at year end: ₹${(s.registerWdv / 100).toFixed(2)}; net block per books: ₹${(s.net.closing / 100).toFixed(2)}. Assets bought through purchase bills are in the books but may be missing from the register (or the reverse) — reconcile before finalising.`
+          : `Fixed-asset register written-down value at year end: ₹${(s.registerWdv / 100).toFixed(2)}; net block per books: ₹${(s.net.closing / 100).toFixed(2)}. Assets bought through purchase bills are in the books but may be missing from the register (or the reverse): reconcile before finalising.`
         : 'No assets are recorded in the fixed-asset register; figures are from the ledger.',
-      'Depreciation is on the written-down value at Income-tax Act rates as computed by the register — the Companies Act useful-life method may differ (verify with your CA).',
+      'Depreciation is on the written-down value at Income-tax Act rates as computed by the register: the Companies Act useful-life method may differ (verify with your CA).',
     ],
     tables: [
       { title: 'Gross block', columns: ['Asset class', `As at ${c.fy.start}`, 'Additions', 'Deletions', `As at ${c.fy.end}`], rows },
@@ -457,7 +457,7 @@ function taxesNote(c: NotesContext): PackNote {
     id: 'taxes',
     title: 'GST and TDS balances',
     kind: 'auto',
-    paragraphs: ['Debit balances (input credit, TDS receivable) are shown under short-term loans & advances; credit balances (output tax, TDS payable) under other current liabilities. Positive = debit. Reconcile with the GST portal ledgers and Form 26AS — verify with your CA.'],
+    paragraphs: ['Debit balances (input credit, TDS receivable) are shown under short-term loans & advances; credit balances (output tax, TDS payable) under other current liabilities. Positive = debit. Reconcile with the GST portal ledgers and Form 26AS: verify with your CA.'],
     tables: [{ columns: ['Ledger', c.fy.label, c.prev.label], rows }],
   };
 }

@@ -111,7 +111,7 @@ export function settleShort(shiftId: string, idx: number, how: 'cash' | 'write_o
   const amount = round2(Math.min(-(a?.diff ?? 0), Number(bill.balance_due) || 0));
   if (!(amount > 0.004)) throw new Error(fbT('eNoShort'));
   withTablesRollback(['transactions', 'invoices', FU_TABLES.shifts], () => {
-    const p = localDb.payments.record({ invoiceId: bill.id, amount, date: s.date, method: how === 'cash' ? 'Cash' : WRITE_OFF_METHOD, writeOff: how === 'write_off', note: `${FU_NAMES.short} — ${a.name}` });
+    const p = localDb.payments.record({ invoiceId: bill.id, amount, date: s.date, method: how === 'cash' ? 'Cash' : WRITE_OFF_METHOD, writeOff: how === 'write_off', note: `${FU_NAMES.short}: ${a.name}` });
     markShift(s.id, { settled: [...(s.settled ?? []), { attendant: idx, how, payment_id: p.id, amount }] });
   });
 }

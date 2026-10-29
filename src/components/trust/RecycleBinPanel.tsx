@@ -156,9 +156,9 @@ export default function RecycleBinPanel({ onClose, notify }: { onClose: () => vo
                         {/* QA6-1 F1: the module that owns the row refuses — say why and where to redo it. */}
                         {plan.refusal === 'module' && <div className={styles.note} data-bin-refusal>{plan.message}</div>}
                       </td>
-                      <td>{d.number || '—'}{d.day ? <div className={styles.muted}>{d.day}</div> : null}</td>
+                      <td>{d.number || '-'}{d.day ? <div className={styles.muted}>{d.day}</div> : null}</td>
                       <td>{when(e.deleted_at)}</td>
-                      <td>{e.deleted_by ?? '—'}</td>
+                      <td>{e.deleted_by ?? '-'}</td>
                       <td>
                         <div className={styles.actions}>
                           {plan.refusal === 'parentMissing' && plan.parentEntry ? (

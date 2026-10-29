@@ -88,7 +88,7 @@ export function settleWeek(site: Pick<Godown, 'id' | 'name' | 'cost_centre_id'>,
   const gross = round2(rows.reduce((s, r) => s + r.gross, 0)), adv = round2(rows.reduce((s, r) => s + r.advance, 0));
   return withTablesRollback([SD.muster, VOUCHERS_TABLE, 'series_counters', 'accounts'], () => {
     const v = saveVoucher({
-      type: 'PAYMENT', date: opts.date, voucher_class: 'Site wages', narration: `Site wages ${number} — ${site.name}, ${from} to ${to} (${rows.length} workers)`,
+      type: 'PAYMENT', date: opts.date, voucher_class: 'Site wages', narration: `Site wages ${number}: ${site.name}, ${from} to ${to} (${rows.length} workers)`,
       lines: [
         { account_id: ledgerId('Site labour wages', 'DIRECT_EXPENSES', 5840), dr: p(gross), cr: 0, ...(site.cost_centre_id ? { cost_centre_id: site.cost_centre_id } : {}) },
         ...(adv > 0 ? [{ account_id: ledgerId('Advances to site labour', 'LOANS_ADV_ST', 3640), dr: 0, cr: p(adv) }] : []),

@@ -63,7 +63,7 @@ export function validateUploadRow(r: UploadRow): string[] {
   else if (!IFSC_RE.test(ifsc)) errors.push('IFSC should be 11 characters like HDFC0001234');
   const amt = round2(num(r.amount));
   if (!(amt > 0)) errors.push('amount must be above zero');
-  if (r.mode === 'RTGS' && amt < RTGS_MIN) errors.push('RTGS needs ₹2,00,000 or more — use NEFT');
+  if (r.mode === 'RTGS' && amt < RTGS_MIN) errors.push('RTGS needs ₹2,00,000 or more: use NEFT');
   return errors;
 }
 
@@ -74,7 +74,7 @@ export function validateUpload(input: UploadInput): string[] {
   if (input.preset !== 'generic' && !cleanAccountNo(input.debitAccountNo)) errors.push('Enter the full account number of the account to debit (bank accounts master).');
   if (!input.rows.length) errors.push('Add at least one payment.');
   input.rows.forEach((r, i) => {
-    for (const e of validateUploadRow(r)) errors.push(`Row ${i + 1} (${r.beneficiary || '—'}): ${e}.`);
+    for (const e of validateUploadRow(r)) errors.push(`Row ${i + 1} (${r.beneficiary || '-'}): ${e}.`);
   });
   return errors;
 }

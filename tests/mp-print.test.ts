@@ -10,7 +10,7 @@ const mp: MpSnapshot = { site: { id: 's', code: 'S-001', name: 'Sunrise Towers' 
 
 test('rows, posts and sentence come from the snapshot only', () => {
   const p = mpPaper(mp);
-  assert.deepEqual(p.rows, [['Site', 'S-001 — Sunrise Towers'], ['Service month', 'Oct 2026']]);
+  assert.deepEqual(p.rows, [['Site', 'S-001: Sunrise Towers'], ['Service month', 'Oct 2026']]);
   assert.equal(p.posts.length, 1);
   assert.equal(p.decl, mp.decl);
   assert.equal(monthText('2026-13x'), '');

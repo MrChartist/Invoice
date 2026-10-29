@@ -215,7 +215,7 @@ test('job-work e-Way JSON: sub-type Job Work, CHL, inter-State IGST rate, nil ta
   assert.deepEqual([b.bill.supplyType, b.bill.docType, b.bill.docNo, b.bill.docDate], ['O', 'CHL', 'JWC/FY26-27/0003', '05/07/2026']);
   assert.deepEqual([b.bill.fromStateCode, b.bill.toStateCode, b.bill.toPincode, b.bill.fromPincode], [27, 29, 560058, 400001]);
   assert.deepEqual(b.bill.itemList[0], {
-    productName: 'Steel rod', productDesc: 'Steel rod — for Machining', hsnCode: 7214, quantity: 40, qtyUnit: 'KGS',
+    productName: 'Steel rod', productDesc: 'Steel rod: for Machining', hsnCode: 7214, quantity: 40, qtyUnit: 'KGS',
     taxableAmount: 2000, sgstRate: 0, cgstRate: 0, igstRate: 18, cessRate: 0,
   });
   assert.deepEqual([b.bill.totalValue, b.bill.igstValue, b.bill.totInvValue, b.bill.vehicleNo, b.bill.transDistance], [2000, 0, 2000, 'MH12AB1234', '812']);

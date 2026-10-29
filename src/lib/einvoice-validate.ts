@@ -81,7 +81,7 @@ function checkParty(
         p.Gstin
           ? `${label} GSTIN "${p.Gstin}" is invalid: ${g.message}.`
           : label === 'Seller'
-            ? 'Seller GSTIN is missing — add it to the sender profile in Settings.'
+            ? 'Seller GSTIN is missing: add it to the sender profile in Settings.'
             : 'Buyer GSTIN is missing. e-Invoicing applies to B2B supplies only; for unregistered buyers an IRN is not required.',
       ),
     );
@@ -133,7 +133,7 @@ export function validateEInvoice(
     if (record.status === 'Cancelled') {
       out.push(issue('error', 'CANCELLED', 'Document', 'This invoice is cancelled.'));
     } else if (record.status === 'Draft') {
-      out.push(issue('warning', 'DRAFT', 'Document', 'Invoice is still a Draft — finalise it before reporting to the IRP.'));
+      out.push(issue('warning', 'DRAFT', 'Document', 'Invoice is still a Draft: finalise it before reporting to the IRP.'));
     }
     if (record.gst_mode === 'NONE') {
       out.push(issue('warning', 'NO_GST', 'Tax', 'Invoice has no GST charged (mode: none). Confirm it is a nil-rated/exempt supply; the JSON reports 0% on every line.'));
@@ -218,7 +218,7 @@ export function validateEInvoice(
     }
   }
   if (foreign && !payload.ExpDtls?.CntCode) {
-    out.push(issue('warning', 'EXPORT_COUNTRY', 'Export', 'Export country code (e.g. US) is not set — add it in the Export details.'));
+    out.push(issue('warning', 'EXPORT_COUNTRY', 'Export', 'Export country code (e.g. US) is not set: add it in the Export details.'));
   }
 
   // ── Items ──
@@ -359,7 +359,7 @@ export function validateEway(bill: EwayBill, record?: InvoiceRecord, opts: { now
 
   // Value / threshold
   if (bill.itemList.length === 0) {
-    out.push(issue('error', 'EWB_NO_GOODS', 'Items', 'No goods on this invoice — e-Way Bills apply to movement of goods, not services (SAC 99xxxx).'));
+    out.push(issue('error', 'EWB_NO_GOODS', 'Items', 'No goods on this invoice: e-Way Bills apply to movement of goods, not services (SAC 99xxxx).'));
   } else if (opts.skippedServiceLines) {
     out.push(issue('warning', 'EWB_SERVICES_SKIPPED', 'Items', `${opts.skippedServiceLines} service line(s) were left out of the e-Way file; it covers goods only.`));
   }
@@ -367,7 +367,7 @@ export function validateEway(bill: EwayBill, record?: InvoiceRecord, opts: { now
   const ch71 = ewayChapterNote(bill.itemList.map((i) => String(i.hsnCode)), record?.issue_date); // R9 (RT-E2): chapter 71 needs no e-Way bill
   if (ch71) out.push(issue('warning', 'EWB_CH71', 'Items', ch71));
   // QA13 G5 (AG-C4, AG12): only nil / exempt goods — the same note as `ag-packing.ts` EXEMPT_EWAY_NOTE.
-  else if (bill.itemList.length > 0 && bill.itemList.every((i) => !(Number(i.igstRate) || Number(i.cgstRate) || Number(i.cessRate)))) out.push(issue('warning', 'EWB_EXEMPT', 'Items', 'e-Way bill may not be needed for exempt goods — verify with your CA (AG12).'));
+  else if (bill.itemList.length > 0 && bill.itemList.every((i) => !(Number(i.igstRate) || Number(i.cgstRate) || Number(i.cessRate)))) out.push(issue('warning', 'EWB_EXEMPT', 'Items', 'e-Way bill may not be needed for exempt goods: verify with your CA (AG12).'));
   else if (bill.totInvValue <= EWAY_THRESHOLD && bill.itemList.length > 0) {
     out.push(issue('warning', 'EWB_BELOW_THRESHOLD', 'Value', `Consignment value is ₹${bill.totInvValue.toLocaleString('en-IN')}, at or below the ₹50,000 threshold. An e-Way Bill is not mandatory for it (some states and goods differ).`));
   }
@@ -387,7 +387,7 @@ export function validateEway(bill: EwayBill, record?: InvoiceRecord, opts: { now
   if (!Number.isInteger(dist) || dist < 0 || dist > 4000) {
     out.push(issue('error', 'EWB_DISTANCE', 'Transport', 'Distance must be a whole number of km between 0 and 4000 (0 lets the portal compute it).'));
   } else if (dist === 0) {
-    out.push(issue('warning', 'EWB_DISTANCE_ZERO', 'Transport', 'Distance is 0 — the portal will calculate it from the PIN codes.'));
+    out.push(issue('warning', 'EWB_DISTANCE_ZERO', 'Transport', 'Distance is 0: the portal will calculate it from the PIN codes.'));
   }
 
   const road = bill.transMode === 1;

@@ -55,7 +55,7 @@ function customerVendor(c: OldGoldInput['customer']): Vendor {
   const all = vendorsDb.all();
   const ph = phoneKey(c.phone);
   return all.find((v) => (ph.length === 10 && phoneKey(v.phone) === ph) || v.name.trim().toLowerCase() === c.name.trim().toLowerCase())
-    ?? vendorsDb.save({ name: c.name.trim(), ...(ph ? { phone: c.phone } : {}), ...(c.pan ? { pan: c.pan.toUpperCase() } : {}), notes: 'Customer — old gold / URD purchases' });
+    ?? vendorsDb.save({ name: c.name.trim(), ...(ph ? { phone: c.phone } : {}), ...(c.pan ? { pan: c.pan.toUpperCase() } : {}), notes: 'Customer: old gold / URD purchases' });
 }
 
 /** Record an old-gold voucher (URD number, no GST, into the 'used' godown). Throws when PAN / Form 60 is needed. */
@@ -65,7 +65,7 @@ export function recordOldGold(input: OldGoldInput): PurchaseRecord {
   if (!(v.fine > 0) || !(v.value > 0)) throw new Error('Enter the weight, touch % and the buy rate.');
   const panNeeded = overPanLimit(v.value, input.date); // QA10 R14: "exceeding" the limit, as on a sale (one rule)
   const c = input.customer;
-  if (panNeeded && !/^[A-Z]{5}\d{4}[A-Z]$/.test(String(c.pan ?? '').toUpperCase()) && !c.form) throw new Error('This voucher reaches the PAN limit: take the customer\'s PAN or a Form 60 declaration (Rule 114B) — verify with your CA.');
+  if (panNeeded && !/^[A-Z]{5}\d{4}[A-Z]$/.test(String(c.pan ?? '').toUpperCase()) && !c.form) throw new Error('This voucher reaches the PAN limit: take the customer\'s PAN or a Form 60 declaration (Rule 114B), verify with your CA.');
   const vendor = customerVendor(c);
   const name = input.metal === 'silver' ? 'Old silver (fine)' : 'Old gold (fine 24K)';
   let item = stockDb.items().find((i) => i.name === name);
@@ -81,7 +81,7 @@ export function recordOldGold(input: OldGoldInput): PurchaseRecord {
     kind: 'PURCHASE', vendor_id: vendor.id, vendor_name: vendor.name, bill_number: number, date: input.date, category: 'Old gold purchase (URD)',
     lines: [{ id: generateId(), name, hsn: item.hsn, unit: 'GMS', item_id: item.id, godown_id: used, quantity: v.fine, rate: Number((v.value / v.fine).toFixed(6)), tax_rate: 0 }],
     taxable: v.value, cgst: 0, sgst: 0, igst: 0, total: v.value, amount_paid: 0, exchange_paid: 0, itc_eligible: false, old_metal: old,
-    notes: `Purchase voucher for old ${input.metal} from an unregistered person — no GST / ITC / RCM (RT17). Verify with your CA.`,
+    notes: `Purchase voucher for old ${input.metal} from an unregistered person: no GST / ITC / RCM (RT17). Verify with your CA.`,
   });
   recordUrd(number);
   return bill;

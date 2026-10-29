@@ -109,7 +109,7 @@ export function preflightIssues(docs: readonly Doc[], input: Omit<ExportCheckInp
     const c = exportCheck({ ...input, invoice: d, client: input.clients.find((x) => !!x.id && x.id === d.client?.id) ?? d.client });
     const v = verdict(c);
     const failed = c.items.filter((i) => i.state === 'fail').map((i) => i.id).join(', ');
-    if (v === 'not') out.push({ id: `PS_EXPORT:${d.id}`, severity: 'warning', code: 'PS_EXPORT_FAIL', message: `${d.invoice_number}: Sec 2(6) condition not met (${failed}) — zero-rating under LUT may not apply; verify with your CA (PS5)`, invoiceId: d.id, invoiceNumber: String(d.invoice_number ?? '') });
+    if (v === 'not') out.push({ id: `PS_EXPORT:${d.id}`, severity: 'warning', code: 'PS_EXPORT_FAIL', message: `${d.invoice_number}: Sec 2(6) condition not met (${failed}), zero-rating under LUT may not apply; verify with your CA (PS5)`, invoiceId: d.id, invoiceNumber: String(d.invoice_number ?? '') });
     else if (v === 'pending') out.push({ id: `PS_PAY:${d.id}`, severity: 'info', code: 'PS_EXPORT_PENDING', message: `${d.invoice_number}: payment in foreign exchange not received yet (Sec 2(6)(iv))`, invoiceId: d.id, invoiceNumber: String(d.invoice_number ?? '') });
   }
   return out;

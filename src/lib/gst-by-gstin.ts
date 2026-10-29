@@ -112,7 +112,7 @@ export function buildByGstin(invoices: InvoiceRecord[], rawPurchases: readonly u
     warnings.push(`${unassignedBills.length} purchase bill(s) of the period have no branch GSTIN and no single registration in their place-of-supply State: ${unassignedBills.slice(0, 8).join(', ')}${unassignedBills.length > 8 ? ' …' : ''}. Set the receiving branch on the bill.`);
   }
   const noSender = invoices.filter((i) => i && inPeriod(String(i.issue_date ?? ''), o.period) && !up(i.sender?.companyGstin) && i.status !== 'Draft' && i.status !== 'Cancelled').length;
-  if (noSender && cols.length > 1) warnings.push(`${noSender} document(s) of the period carry no sender GSTIN: the builder counts them under every GSTIN — open them and save with the right profile.`);
+  if (noSender && cols.length > 1) warnings.push(`${noSender} document(s) of the period carry no sender GSTIN: the builder counts them under every GSTIN, open them and save with the right profile.`);
 
   const sum = (xs: number[]) => round2(xs.reduce((a, b) => a + b, 0));
   const t = (h: { igst: number; cgst: number; sgst: number; cess?: number }) => round2(h.igst + h.cgst + h.sgst + (h.cess ?? 0));

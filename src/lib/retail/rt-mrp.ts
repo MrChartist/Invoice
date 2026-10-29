@@ -114,7 +114,7 @@ export function mrpIssues(doc: MrpDoc, opts: { mode: GuardMode | undefined; mrpO
     const msg = `${name}: ₹${prices[i].toFixed(2)} a unit (incl. GST) is above the MRP ₹${mrp.toFixed(2)} ${MRP_TAG}`;
     if (opts.mode === 'warn') out.warnings.push(msg);
     else if (opts.owner) out.confirm.push(msg);
-    else out.errors.push(`${msg.slice(0, -MRP_TAG.length).trim()} — only the owner can sell above MRP ${MRP_TAG}`);
+    else out.errors.push(`${msg.slice(0, -MRP_TAG.length).trim()}: only the owner can sell above MRP ${MRP_TAG}`);
   });
   return out;
 }

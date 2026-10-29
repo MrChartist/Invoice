@@ -127,7 +127,7 @@ export function StatementStrip({ invoice, due }: { invoice: InvoiceRecord; due: 
       </div>
       <div>
         <div className={styles.eyebrowMuted}>{isQuote ? t('validUntil') : invoice.doc_type === 'SALES_ORDER' ? t('deliveryBy') : t('dueDate')}</div>
-        <div className={styles.statementVal}>{date(invoice.due_date) || '—'}</div>
+        <div className={styles.statementVal}>{date(invoice.due_date) || '-'}</div>
       </div>
       <div>
         <div className={styles.eyebrowMuted}>{t('balanceDue')}</div>

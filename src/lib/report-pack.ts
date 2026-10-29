@@ -21,7 +21,7 @@ import type { AdvanceRecord } from '../types/advances';
 const r = (p: number) => Math.round(p) / 100;
 
 export function pnlCsv(p: LedgerProfitLoss): string {
-  const rows: (string | number)[][] = [[`Profit & loss ${p.period.start} to ${p.period.end}`, 'Working paper — verify with your CA'], ['Particulars', 'Amount']];
+  const rows: (string | number)[][] = [[`Profit & loss ${p.period.start} to ${p.period.end}`, 'Working paper: verify with your CA'], ['Particulars', 'Amount']];
   for (const [title, list, total] of [['INCOME', p.income, p.totalIncome], ['EXPENSES', p.expenses, p.totalExpenses]] as const) {
     rows.push([title, '']);
     for (const s of list) {
@@ -69,7 +69,7 @@ export function buildPackFiles(month: string, now: Date = new Date()): PackFile[
   for (const id of GST_SECTIONS) files.push({ name: `GSTR1_${month}_${id}.csv`, text: sectionCsv(rep.gstr1, id) });
   files.push({ name: `GSTR3B_${month}.csv`, text: gstr3bCsv(rep.gstr3b) });
   files.push({ name: `GST_summary_${month}.html`, text: buildSummaryHtml(rep, periodLabel(gstPeriod), profile?.companyName ?? '') });
-  files.push({ name: 'README.txt', text: `Month-end pack for ${month}, generated ${now.toISOString()} on this device by Mr. Chartist Invoice.\nAll files are working papers, not portal-validated returns — verify with your CA before filing.\n` });
+  files.push({ name: 'README.txt', text: `Month-end pack for ${month}, generated ${now.toISOString()} on this device by Mr. Chartist Invoice.\nAll files are working papers, not portal-validated returns: verify with your CA before filing.\n` });
   return files;
 }
 

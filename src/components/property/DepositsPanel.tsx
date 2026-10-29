@@ -33,11 +33,11 @@ export function DepositsPanel({ deposits, leases, notify, refresh }: { deposits:
     <div className={styles.stack} data-deposits>
       <div className={styles.toolbar}>
         <S l={iT('direction')} v={f.direction} o={[['received', iT('dir.received')], ['paid', iT('dir.paid')]]} on={(v) => set({ direction: v as 'paid' })} />
-        <S l={iT('party')} v={f.party_id} o={[['', '—'], ...clients.map((c) => [c.id!, c.name] as const)]} on={(party_id) => set({ party_id, party_name: name(party_id) })} />
+        <S l={iT('party')} v={f.party_id} o={[['', '-'], ...clients.map((c) => [c.id!, c.name] as const)]} on={(party_id) => set({ party_id, party_name: name(party_id) })} />
         <T l={iT('amount')} v={f.amount || ''} on={(v) => set({ amount: num(v) })} />
         <T l={iT('date')} t="date" v={f.date} on={(date) => set({ date })} />
         <S l={iT('mode')} v={f.mode} o={[['bank', iT('mode.electronic')], ['cash', iT('mode.cash')]]} on={(mode) => set({ mode })} />
-        <S l={iT('lease')} v={f.lease_id} o={[['', '—'], ...leases.map((l) => [l.id, `${name(l.tenant_id)} · ${l.start}`] as const)]} on={(v) => set({ lease_id: v || undefined })} />
+        <S l={iT('lease')} v={f.lease_id} o={[['', '-'], ...leases.map((l) => [l.id, `${name(l.tenant_id)} · ${l.start}`] as const)]} on={(v) => set({ lease_id: v || undefined })} />
         <T l={iT('interestPa')} v={f.interest_pct} on={(v) => set({ interest_pct: num(v) || undefined })} />
         <B p l={iT('save')} on={() => run(() => recordDeposit(f))} />
       </div>
@@ -48,7 +48,7 @@ export function DepositsPanel({ deposits, leases, notify, refresh }: { deposits:
       {sel && (
         <div className={styles.toolbar}>
           <strong>{iT(`act.${sel.act}`)} · {sel.d.party_name}</strong>
-          {sel.act === 'adjust' && <S l={iT('invoice')} v={sel.inv} o={[['', '—'], ...open.map(({ inv: i, due }) => [i.id, `${i.invoice_number} · ${rs(due)}`] as const)]} on={(inv) => setSel({ ...sel, inv })} />}
+          {sel.act === 'adjust' && <S l={iT('invoice')} v={sel.inv} o={[['', '-'], ...open.map(({ inv: i, due }) => [i.id, `${i.invoice_number} · ${rs(due)}`] as const)]} on={(inv) => setSel({ ...sel, inv })} />}
           {(sel.act === 'damages' || sel.act === 'forfeit') && <T l={iT('description')} v={sel.what} on={(what) => setSel({ ...sel, what })} />}
           <T l={iT('amount')} v={sel.amount || ''} on={(v) => setSel({ ...sel, amount: num(v) })} />
           <B p l={iT('confirm')} on={go} />

@@ -6,8 +6,8 @@ import { money } from '../ledger/format';
 import surface from '../../../styles/surface.module.css';
 
 const ccsT = defineArea(
-  { opening: 'Stock at the centre’s godowns — start (memo)', closing: 'Stock at the centre’s godowns — end (memo)' } as const,
-  { opening: 'केंद्र के गोदामों में स्टॉक — आरंभ (मेमो)', closing: 'केंद्र के गोदामों में स्टॉक — अंत (मेमो)' },
+  { opening: 'Stock at the centre’s godowns: start (memo)', closing: 'Stock at the centre’s godowns: end (memo)' } as const,
+  { opening: 'केंद्र के गोदामों में स्टॉक: आरंभ (मेमो)', closing: 'केंद्र के गोदामों में स्टॉक: अंत (मेमो)' },
 );
 
 /**
@@ -34,7 +34,7 @@ export default function CostCentreStockRow({ columns, centres, period, cellClass
     return (
       <tr data-cc-stock={pick}>
         <td className={cellClass}>{ccsT(pick)}</td>
-        {columns.map((c) => <td key={c.key} className={surface.numeric}>{byCol.get(c.key) ? money(byCol.get(c.key)![pick]) : '—'}</td>)}
+        {columns.map((c) => <td key={c.key} className={surface.numeric}>{byCol.get(c.key) ? money(byCol.get(c.key)![pick]) : '-'}</td>)}
         <td className={surface.numeric}>{money(total)}</td>
       </tr>
     );

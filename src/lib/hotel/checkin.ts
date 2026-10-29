@@ -52,14 +52,14 @@ export function checkIn(input: CheckInInput): CheckInResult {
   const rooms = hotelDb.rooms();
   const room = rooms.find((r) => r.id === input.roomId);
   if (!room) throw new HotelError('Choose a room.');
-  if (room.room_type_id !== line.room_type_id) throw new HotelError(`Room ${room.number} is another room type — change the booking first.`);
+  if (room.room_type_id !== line.room_type_id) throw new HotelError(`Room ${room.number} is another room type: change the booking first.`);
   if (oooOn(room, line.arrival || res.arrival)) throw new HotelError(`Room ${room.number} is out of order.`);
   const others = hotelDb.reservations();
   if (others.some((r) => r.lines.some((l) => l.status === 'checked_in' && l.room_id === room.id))) throw new HotelError(`Room ${room.number} is occupied.`);
   const moved = { ...line, room_id: room.id };
   const check = checkLines({ ...res, lines: res.lines.map((l) => (l.id === line.id ? moved : l)) }, { rooms, reservations: others, exceptResId: res.id });
   if (check.error) throw new HotelError(check.error);
-  if (!input.force && !readyForCheckIn(room)) throw new NeedsConfirm(`Room ${room.number} is ${room.hk_status ?? 'not ready'} — check in anyway?`);
+  if (!input.force && !readyForCheckIn(room)) throw new NeedsConfirm(`Room ${room.number} is ${room.hk_status ?? 'not ready'}: check in anyway?`);
   if (!input.guests.length) throw new HotelError('Add the primary guest.');
   const guests = input.guests.map((g) => cleanGuest(g, at));
   const foreign = guests.filter((g) => !isIndian(g.nationality));

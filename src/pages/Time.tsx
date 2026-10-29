@@ -119,7 +119,7 @@ const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 /** Weekday column head: English as before, Hindi weekday names for a Hindi interface. */
 const dayName = (ymd: string, i: number, lang: string) =>
   lang === 'hi' ? new Intl.DateTimeFormat(dateLocale(), { weekday: 'short' }).format(new Date(`${ymd}T12:00:00`)) : DAY_NAMES[i];
-const hrs = (m: number) => (m ? (m / 60).toFixed(2) : '–');
+const hrs = (m: number) => (m ? (m / 60).toFixed(2) : '-');
 
 interface Unbilled {
   key: string;
@@ -350,7 +350,7 @@ export function Time() {
                     <tr key={e.id}>
                       <td>{formatDate(e.date)}</td>
                       <td>{e.client_name}</td>
-                      <td>{[e.project, e.description].filter(Boolean).join(' — ') || '–'}</td>
+                      <td>{[e.project, e.description].filter(Boolean).join(': ') || '-'}</td>
                       <td className={surface.numeric}>{formatMinutes(e.minutes)}</td>
                       <td className={surface.numeric}>{formatCurrency(entryAmount(e, prefs))}</td>
                       <td>{status(e, e.billable)}</td>
@@ -384,8 +384,8 @@ export function Time() {
                     <tr key={t.id}>
                       <td>{formatDate(t.date)}</td>
                       <td>{t.client_name}</td>
-                      <td>{[t.from, t.to].filter(Boolean).join(' → ') || '–'}</td>
-                      <td>{t.purpose || '–'}</td>
+                      <td>{[t.from, t.to].filter(Boolean).join(' → ') || '-'}</td>
+                      <td>{t.purpose || '-'}</td>
                       <td className={surface.numeric}>{t.km}</td>
                       <td className={surface.numeric}>{formatCurrency(mileageAmount(t))}</td>
                       <td>{status(t)}</td>
@@ -416,9 +416,9 @@ export function Time() {
                   {unbilled.map((u) => (
                     <tr key={u.key}>
                       <td>{u.name}</td>
-                      <td className={surface.numeric}>{u.minutes ? `${formatMinutes(u.minutes)} · ${formatCurrency(u.time)}` : '–'}</td>
-                      <td className={surface.numeric}>{u.expenseCount ? `${u.expenseCount} · ${formatCurrency(u.expenses)}` : '–'}</td>
-                      <td className={surface.numeric}>{u.km ? `${u.km} km · ${formatCurrency(u.mileage)}` : '–'}</td>
+                      <td className={surface.numeric}>{u.minutes ? `${formatMinutes(u.minutes)} · ${formatCurrency(u.time)}` : '-'}</td>
+                      <td className={surface.numeric}>{u.expenseCount ? `${u.expenseCount} · ${formatCurrency(u.expenses)}` : '-'}</td>
+                      <td className={surface.numeric}>{u.km ? `${u.km} km · ${formatCurrency(u.mileage)}` : '-'}</td>
                       <td className={surface.numeric}><strong>{formatCurrency(round2(u.time + u.expenses + u.mileage))}</strong></td>
                       <td className={surface.rowActions}>
                         <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} onClick={() => setBillTarget({ key: u.key, name: u.name })}>

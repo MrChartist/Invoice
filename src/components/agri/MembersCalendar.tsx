@@ -13,7 +13,7 @@ export default function MembersCalendar({ today }: { today: string }) {
   const rows = membersCalendar(kind, +today.slice(0, 4) - (+today.slice(5, 7) >= 4 ? 1 : 2), readAgriSettings().calendar);
   return (
     <section className={surface.card} data-agd-calendar>
-      <div className={surface.cardHead}><span className={surface.cardHeadIcon}>{agdT('calendar')} — {agdT(kind)}</span></div>
+      <div className={surface.cardHead}><span className={surface.cardHeadIcon}>{agdT('calendar')} : {agdT(kind)}</span></div>
       <div className={surface.cardBody}>
         <Tbl head={['what', 'dueOn', '']} flag={rows.map((r) => r.due < today)} rows={rows.map((r) => [r.label, r.due, r.due < today ? agdT('pastDue') : ''])} />
       </div>

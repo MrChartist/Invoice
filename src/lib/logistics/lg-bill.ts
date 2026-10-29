@@ -110,7 +110,7 @@ export function planJobBills(j: LgJob, sheet: readonly LgCharge[], c: BillCtx): 
     if (single && groups.get(key) && groups.get(key)!.pos !== g.pos) mixed = true;
     const d = groups.get(key) ?? { doc_type: kind, pos: g.pos, mode: g.mode, ...(g.supply ? { supply: g.supply } : {}), ...(g.rcm ? { rcm: true } : {}), currency: docCur, ...(docCur !== 'INR' ? { exchange_rate: fx!.rate } : {}), items: [], lg: { ...jobSnapshot(j), heads: {}, ...(fx ? { fx: { currency: cur, rate: fx.rate, source: fx.source } } : {}) }, regimes: [] };
     const id = c.newId();
-    const name = `${h.name}${docCur !== cur ? ` (${cur} ${money(l.rate)} × ${l.qty} = ${cur} ${money(l.qty * l.rate)} @ ₹${money(fx!.rate)})` : ''}${l.note ? ` — ${l.note}` : ''}`;
+    const name = `${h.name}${docCur !== cur ? ` (${cur} ${money(l.rate)} × ${l.qty} = ${cur} ${money(l.qty * l.rate)} @ ₹${money(fx!.rate)})` : ''}${l.note ? `: ${l.note}` : ''}`;
     d.items.push({ id, name, type: 'Service', ...(h.sac && !pure ? { hsn: h.sac } : {}), quantity: l.qty, rate, amount: round2(l.qty * rate), tax_rate: g.rate, discount_percent: 0, ...(pure ? { charge_head_id: 'rule33', description: c.passText } : {}), ...(g.key === 'exempt' ? { sv: { exempt: 'EXEMPT' } } : {}), ...(l.disb_id ? { bill_refs: [l.disb_id] } : {}) } as InvoiceItem);
     if (l.disb) (d.lg.disb ??= []).push(l.disb); // R19-C
     d.lg.heads![id] = h.id;

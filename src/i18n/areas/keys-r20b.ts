@@ -5,8 +5,8 @@ import { defineArea } from '../area';
 export const kbT = defineArea(
   {
     delAsk: 'Delete {label}?', deleted: 'Deleted {label}.', undo: 'Undo', undone: '{label} is back.', yes: 'Yes (Y)', no: 'No (N)',
-    cancelTitle: 'Cancel {label}', reason: 'Reason for cancelling', paidAck: 'Payments are recorded against it — cancel anyway',
-    cancelled: 'Cancelled {label}.', vCancel: 'A voucher is not cancelled here: delete it (Alt+D) — Undo brings it back.',
+    cancelTitle: 'Cancel {label}', reason: 'Reason for cancelling', paidAck: 'Payments are recorded against it: cancel anyway',
+    cancelled: 'Cancelled {label}.', vCancel: 'A voucher is not cancelled here: delete it (Alt+D), Undo brings it back.',
     dupDone: 'Copy of {label}: it saves with a new number.', lineGone: 'Line removed.',
     noNarr: 'No earlier narration found.', draftBack: 'Lines you typed before leaving are back.',
     kind: 'Kind', regular: 'Regular', memo: 'Memorandum',
@@ -16,8 +16,8 @@ export const kbT = defineArea(
   },
   {
     delAsk: '{label} हटाएँ?', deleted: '{label} हटाया।', undo: 'वापस लाएँ', undone: '{label} वापस आ गया।', yes: 'हाँ (Y)', no: 'नहीं (N)',
-    cancelTitle: '{label} रद्द करें', reason: 'रद्द करने का कारण', paidAck: 'इस पर भुगतान दर्ज हैं — फिर भी रद्द करें',
-    cancelled: '{label} रद्द किया।', vCancel: 'वाउचर यहाँ रद्द नहीं होता: इसे हटाएँ (Alt+D) — "वापस लाएँ" से लौट आता है।',
+    cancelTitle: '{label} रद्द करें', reason: 'रद्द करने का कारण', paidAck: 'इस पर भुगतान दर्ज हैं: फिर भी रद्द करें',
+    cancelled: '{label} रद्द किया।', vCancel: 'वाउचर यहाँ रद्द नहीं होता: इसे हटाएँ (Alt+D), "वापस लाएँ" से लौट आता है।',
     dupDone: '{label} की प्रतिलिपि: सेव करने पर नया नंबर मिलेगा।', lineGone: 'पंक्ति हटाई।',
     noNarr: 'पहले का कोई विवरण नहीं मिला।', draftBack: 'जाने से पहले लिखी पंक्तियाँ वापस आ गईं।',
     kind: 'प्रकार', regular: 'सामान्य', memo: 'मेमोरेंडम',

@@ -51,7 +51,7 @@ export default function GstView(_: HsViewProps) {
         <tbody>
           {[[false, false], [false, true], [true, false], [true, true]].map(([big, ab]) => (
             <tr key={`${big}${ab}`} style={big === d.pos.big && ab === d.pos.above ? { fontWeight: 600, outline: '2px solid var(--accent)' } : undefined}>
-              <td>{yn(big)}</td><td>{yn(ab)}</td><td>{yn(big && ab)}{big === d.pos.big && ab === d.pos.above ? ` — ${hsbT('you')}` : ''}</td>
+              <td>{yn(big)}</td><td>{yn(ab)}</td><td>{yn(big && ab)}{big === d.pos.big && ab === d.pos.above ? `: ${hsbT('you')}` : ''}</td>
             </tr>
           ))}
         </tbody>

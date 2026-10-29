@@ -246,9 +246,9 @@ export function parseSettlement(sheets: readonly SettlementSheet[], presetId: Se
   const payout = round2(opts.payout ?? header.payout ?? netTotal ?? NaN);
   const settlement_id = (opts.settlement_id || header.settlement_id || '').trim();
   const deposit_date = opts.deposit_date || header.deposit_date || '';
-  if (!settlement_id) problems.push('No settlement id in the file — type the settlement reference.');
-  if (!deposit_date) problems.push('No deposit date in the file — type the date the money reached the bank.');
-  if (!Number.isFinite(payout)) problems.push('No payout amount in the file — type the amount deposited.');
+  if (!settlement_id) problems.push('No settlement id in the file: type the settlement reference.');
+  if (!deposit_date) problems.push('No deposit date in the file: type the date the money reached the bank.');
+  if (!Number.isFinite(payout)) problems.push('No payout amount in the file: type the amount deposited.');
   if (!lines.length) problems.push('No amounts found in the file.');
   const sum = round2(lines.reduce((s, l) => s + l.amount, 0));
   const difference = Number.isFinite(payout) ? round2(sum - payout) : NaN;

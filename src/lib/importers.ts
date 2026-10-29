@@ -201,6 +201,9 @@ export function resolveStateText(raw: string): ResolvedState | undefined {
   if (/^\d{1,2}$/.test(s)) return found(s);
   const lead = /^(\d{2})\s*[-–—:]\s*(.+)$/.exec(s);
   if (lead) return found(lead[1]) ?? resolveStateText(lead[2]);
+  // "27 (Maharashtra)": the app's own place-of-supply text.
+  const paren = /^(\d{2})\s*\(\s*(.+?)\s*\)$/.exec(s);
+  if (paren) return found(paren[1]) ?? resolveStateText(paren[2]);
   const trail = /^(.+?)\s*\(\s*(\d{2})\s*\)$/.exec(s);
   if (trail) return found(trail[2]) ?? resolveStateText(trail[1]);
   const key = squash(s);
@@ -605,7 +608,7 @@ function buildInvoiceRecord(
 
   const number = h('invoice_number');
   if (!number) {
-    err(ctx, 'invoice_number', 'Invoice number is required — opening invoices keep the number you give them');
+    err(ctx, 'invoice_number', 'Invoice number is required: opening invoices keep the number you give them');
     return null;
   }
   const issueRaw = h('issue_date');
@@ -617,7 +620,7 @@ function buildInvoiceRecord(
   const dueRaw = h('due_date');
   if (dueRaw) {
     due = parseDate(dueRaw);
-    if (!due) warn(ctx, 'due_date', `Due date "${dueRaw}" is not a recognised date — using the default`);
+    if (!due) warn(ctx, 'due_date', `Due date "${dueRaw}" is not a recognised date: using the default`);
   }
   if (issue && due && due < issue) warn(ctx, 'due_date', 'Due date is before the invoice date');
 
@@ -683,7 +686,7 @@ function buildInvoiceRecord(
             taxable = total;
             tax = 0;
             if ((mapping.tax_amount ?? -1) < 0 && splitTax === undefined) {
-              warn(ctx, 'tax_amount', 'No tax columns mapped — treated as a tax-free invoice');
+              warn(ctx, 'tax_amount', 'No tax columns mapped: treated as a tax-free invoice');
             }
           }
         } else if (tax === undefined) {
@@ -693,11 +696,11 @@ function buildInvoiceRecord(
         tax = headerRate !== undefined ? round2((taxable * headerRate) / 100) : 0;
       }
       const t = taxable ?? 0;
-      if (t < 0) err(ctx, 'taxable_value', 'Taxable value works out negative — check the tax/total columns');
+      if (t < 0) err(ctx, 'taxable_value', 'Taxable value works out negative: check the tax/total columns');
       if (headerRate === undefined) headerRate = t > 0 ? snapSlab(((tax ?? 0) / t) * 100) : 0;
       items.push({
         id: generateId(),
-        name: `Opening balance — ${number}`,
+        name: `Opening balance: ${number}`,
         description: '',
         type: 'Service',
         hsn: '',
@@ -772,7 +775,7 @@ function buildInvoiceRecord(
           warn(
             ctx,
             'total',
-            `Line items add up to ${plain.total.toFixed(2)} but the file says ${given.toFixed(2)} — the ${diff > 0 ? '+' : '−'}${Math.abs(diff).toFixed(2)} difference is kept as an adjustment so the total matches`,
+            `Line items add up to ${plain.total.toFixed(2)} but the file says ${given.toFixed(2)}: the ${diff > 0 ? '+' : '−'}${Math.abs(diff).toFixed(2)} difference is kept as an adjustment so the total matches`,
           );
         }
       }
@@ -783,14 +786,14 @@ function buildInvoiceRecord(
   const finalTotal = totals.total;
   const statusText = h('status');
   let status = statusFromText(statusText);
-  if (statusText && !status) warn(ctx, 'status', `Status "${statusText}" was not recognised — derived from the amounts`);
+  if (statusText && !status) warn(ctx, 'status', `Status "${statusText}" was not recognised: derived from the amounts`);
   if (paid === undefined) {
     if (balance !== undefined) paid = Math.max(round2(finalTotal - balance), 0);
     else if (status === 'Paid') paid = finalTotal;
     else paid = 0;
   }
   if (paid > finalTotal) {
-    warn(ctx, 'amount_paid', 'Amount received is more than the invoice total — capped at the total');
+    warn(ctx, 'amount_paid', 'Amount received is more than the invoice total: capped at the total');
     paid = finalTotal;
   }
   if (status !== 'Cancelled' && status !== 'Draft') {
@@ -931,7 +934,7 @@ export function buildPreview(params: PreviewParams): ImportPreview {
           if (options.duplicateMode === 'update') {
             row.action = 'update';
             if (normName(match.name) !== normName(rec.name)) {
-              warn(ctx, 'name', `Matched existing client "${match.name}" by GSTIN — its name is kept`);
+              warn(ctx, 'name', `Matched existing client "${match.name}" by GSTIN: its name is kept`);
             }
           } else {
             row.action = 'skip';
@@ -1011,7 +1014,7 @@ export function buildPreview(params: PreviewParams): ImportPreview {
     });
     for (const i of noNumber) {
       const issues: RowIssue[] = [
-        { level: 'error', field: 'invoice_number', message: 'Invoice number is required — opening invoices keep the number you give them' },
+        { level: 'error', field: 'invoice_number', message: 'Invoice number is required: opening invoices keep the number you give them' },
       ];
       const row = base(i, issues, '(no number)');
       row.action = 'error';
@@ -1028,7 +1031,7 @@ export function buildPreview(params: PreviewParams): ImportPreview {
         row.label = `${rec.invoice_number} · ${rec.client.name}`;
         if (taken.has(rec.invoice_number.trim().toLowerCase())) {
           row.action = 'skip';
-          row.skipReason = 'Invoice number already exists — never overwritten';
+          row.skipReason = 'Invoice number already exists: never overwritten';
           row.issues.push({ level: 'error', field: 'invoice_number', message: row.skipReason });
         }
       }
@@ -1225,8 +1228,8 @@ export async function applyImport(
               line: r.line,
               label: r.label,
               message: locked
-                ? `Dated inside the locked period (books locked up to ${prettyDay(lockUntil)}) — not imported`
-                : 'Invoice number already exists — not overwritten',
+                ? `Dated inside the locked period (books locked up to ${prettyDay(lockUntil)}): not imported`
+                : 'Invoice number already exists: not overwritten',
             });
           }
         }

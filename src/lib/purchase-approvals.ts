@@ -62,7 +62,7 @@ export class PurchaseApprovalError extends Error {
 const who = () => currentActor()?.name ?? '';
 const nowIso = () => new Date().toISOString();
 const label = (b: Pick<PurchaseRecord, 'kind' | 'bill_number' | 'vendor_name'>) =>
-  `${b.kind === 'EXPENSE' ? 'expense' : 'bill'}${b.bill_number ? ` ${b.bill_number}` : ''} of ${b.vendor_name || '—'}`;
+  `${b.kind === 'EXPENSE' ? 'expense' : 'bill'}${b.bill_number ? ` ${b.bill_number}` : ''} of ${b.vendor_name || '-'}`;
 
 function logSafe(fn: () => void) {
   try {
@@ -161,7 +161,7 @@ export function approveBill(draftId: string, note?: string): PurchaseRecord {
     return bill;
   });
   logSafe(() =>
-    audit.record({ entity: 'purchase', entity_id: saved.id, action: 'create', doc_number: saved.bill_number || undefined, summary: `Approved ${label(saved)} (${formatCurrency(saved.total)}) requested by ${ap.requested_by || 'a clerk'}${note?.trim() ? ` — ${note.trim()}` : ''}` }),
+    audit.record({ entity: 'purchase', entity_id: saved.id, action: 'create', doc_number: saved.bill_number || undefined, summary: `Approved ${label(saved)} (${formatCurrency(saved.total)}) requested by ${ap.requested_by || 'a clerk'}${note?.trim() ? `: ${note.trim()}` : ''}` }),
   );
   return purchasesDb.get(saved.id) ?? saved;
 }
@@ -183,7 +183,7 @@ export function rejectBill(draftId: string, note: string): PurchaseDraft {
     });
     return next;
   });
-  logSafe(() => audit.record({ entity: 'purchase', entity_id: d.id, action: 'update', doc_number: d.bill_number || undefined, summary: `Rejected ${label(d)} (${formatCurrency(d.total)}) — ${note.trim()}` }));
+  logSafe(() => audit.record({ entity: 'purchase', entity_id: d.id, action: 'update', doc_number: d.bill_number || undefined, summary: `Rejected ${label(d)} (${formatCurrency(d.total)}): ${note.trim()}` }));
   return row;
 }
 
@@ -249,7 +249,7 @@ function decidePayment(id: string, decision: 'approved' | 'rejected', note?: str
     return row;
   });
   logSafe(() =>
-    audit.record({ entity: 'purchase', entity_id: req.purchase_id, action: 'update', doc_number: req.bill_number || undefined, summary: `${decision === 'approved' ? 'Approved' : 'Rejected'} payment of ${formatCurrency(req.amount)} to ${req.vendor_name || '—'} requested by ${req.requested_by || 'a clerk'}${note?.trim() ? ` — ${note.trim()}` : ''}` }),
+    audit.record({ entity: 'purchase', entity_id: req.purchase_id, action: 'update', doc_number: req.bill_number || undefined, summary: `${decision === 'approved' ? 'Approved' : 'Rejected'} payment of ${formatCurrency(req.amount)} to ${req.vendor_name || '-'} requested by ${req.requested_by || 'a clerk'}${note?.trim() ? `: ${note.trim()}` : ''}` }),
   );
   return next;
 }

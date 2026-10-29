@@ -213,7 +213,7 @@ export const shortfallNote = (a: Pick<ExportAuthorisation, 'date'>) => ruleAt(AA
 /** ANF 4F working rows (CSV): exports then imports. Nothing is filed. */
 export function anf4fSheet(a: ExportAuthorisation, exports: readonly EoMovement[], imports: readonly EoMovement[]): (string | number)[][] {
   return [
-    [`ANF 4F working paper — ${a.kind === 'aa' ? 'Advance Authorisation' : 'EPCG'} ${a.number} dated ${a.date} — verify with a DGFT consultant (MF16 / MF17)`],
+    [`ANF 4F working paper: ${a.kind === 'aa' ? 'Advance Authorisation' : 'EPCG'} ${a.number} dated ${a.date}, verify with a DGFT consultant (MF16 / MF17)`],
     ['Side', 'Document', 'Date', 'Item', 'Quantity', 'Value ₹ (FOB / CIF)'],
     ...exports.map((e) => ['Export', e.number, e.date, e.item, e.qty, e.value]),
     ...imports.map((e) => ['Import', e.number, e.date, e.item, e.qty, e.value]),
@@ -257,7 +257,7 @@ export const authorisationsDb = {
     const rows = authorisationsDb.all();
     const row = rows.find((r) => r.id === id);
     if (!row) return;
-    if (tagged > 0) throw new Error('Invoices or bills are tagged to this authorisation — untag them first.');
+    if (tagged > 0) throw new Error('Invoices or bills are tagged to this authorisation: untag them first.');
     assertUnlocked({ issue_date: row.date }, 'delete');
     setTable(AUTHORISATIONS_TABLE, rows.filter((r) => r.id !== id));
   },

@@ -512,7 +512,7 @@ export function sectionCsv(r: Gstr1Report, id: SectionId): string {
         for (const d of am.eco95a ?? []) out.push(['14A(b)', d.etin, d.partyName, d.origNumber, d.origDate, d.origPeriod, d.number, d.date, d.value, d.pos, d.noteType ?? '', '', d.taxable, '', '', '', '']);
         for (const n of am.nilA ?? []) {
           for (const [col, v] of [['nil rated', n.nil], ['exempted', n.exempt], ['non-GST', n.nonGst]] as const) {
-            if (v) out.push(['TABLE 8 (revised - original)', '', `${nilLabel(n.type)} — ${col}`, '', '', '', '', '', '', '', '', 0, v, '', '', '', '']);
+            if (v) out.push(['TABLE 8 (revised - original)', '', `${nilLabel(n.type)}: ${col}`, '', '', '', '', '', '', '', '', 0, v, '', '', '', '']);
           }
         }
         for (const h of am.hsnA ?? []) out.push(['HSN (revised - original)', '', `${h.hsn} · ${h.uqc} · qty ${h.qty}`, '', '', '', '', '', h.value, '', '', h.rate, h.taxable, h.igst, h.cgst, h.sgst, h.cess]);

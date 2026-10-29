@@ -46,7 +46,7 @@ export function yearEndPaper(i: {
     const key = c?.id ?? `client:${client}`;
     const eng = engagementOf(c?.id, i.engagements ?? []);
     const short = !!eng?.end && daysIn(eng.start, eng.end) <= 90;
-    const r = map.get(key) ?? { key, label: c ? (c.ps?.code ? `${c.ps.code} — ${c.name}` : c.name) : client, client, standard: 0, realisation: 1, net: 0, method: short ? 'completed' as const : 'poc' as const };
+    const r = map.get(key) ?? { key, label: c ? (c.ps?.code ? `${c.ps.code}: ${c.name}` : c.name) : client, client, standard: 0, realisation: 1, net: 0, method: short ? 'completed' as const : 'poc' as const };
     r.standard = round2(r.standard + amt);
     map.set(key, r);
   };
@@ -81,5 +81,5 @@ export async function postAccrual(net: number, closing: string): Promise<string>
   const dr = ensure('Unbilled revenue (WIP)', 'OTHER_CA', 1480);
   const cr = ensure('Professional fees — unbilled', 'SALES', 4090);
   const paise = Math.round(net * 100);
-  return saveVoucher({ type: 'JOURNAL', date: closing, narration: 'Unbilled professional work at the year end (AS 9 / ICDS IV), reversed the next day — working paper, verify with your CA (PS23)', lines: [{ account_id: dr, dr: paise, cr: 0 }, { account_id: cr, dr: 0, cr: paise }], reverse_on: shiftDay(closing, 1), voucher_class: ACCRUAL_CLASS }).number;
+  return saveVoucher({ type: 'JOURNAL', date: closing, narration: 'Unbilled professional work at the year end (AS 9 / ICDS IV), reversed the next day: working paper, verify with your CA (PS23)', lines: [{ account_id: dr, dr: paise, cr: 0 }, { account_id: cr, dr: 0, cr: paise }], reverse_on: shiftDay(closing, 1), voucher_class: ACCRUAL_CLASS }).number;
 }

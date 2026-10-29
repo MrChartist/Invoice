@@ -185,7 +185,7 @@ function WizardBody({ onClose, kind: initialKind, onDone }: ImportWizardProps) {
         }
         result = applyOpeningsImport(openingsPreview, { fileName: state.fileName });
       } else if (isBooksKind(preview.kind as ImportKind)) {
-        if (!booksLib) throw new Error('The importer is still loading — try again.');
+        if (!booksLib) throw new Error('The importer is still loading: try again.');
         // P1-21 (7Q): one undo copy for the whole import (owner only), like the Tally import.
         if (!(await saveSafetySnapshot('import')) && !window.confirm('An undo copy could not be saved. Import anyway?')) {
           dispatch({ type: 'runEnded' });

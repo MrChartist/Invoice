@@ -250,7 +250,7 @@ export function VoucherEditor({ accounts: initialAccounts, voucher, defaultDate,
                 {!needsParty && centres.length > 0 && isPnl(r.account_id) ? (
                   <CostCentreSelect id={`${uid}-cc-${r.key}`} ariaLabel={ledgerT('lineCc', { n: i + 1 })} centres={centres} value={r.cc} onChange={(v) => patch(r.key, { cc: v })} />
                 ) : (
-                  <input aria-label={ledgerT('lineParty', { n: i + 1 })} className={controls.input} value={r.party} disabled={!needsParty} placeholder={needsParty ? ledgerT('partyName') : '—'} onChange={(e) => patch(r.key, { party: e.target.value })} />
+                  <input aria-label={ledgerT('lineParty', { n: i + 1 })} className={controls.input} value={r.party} disabled={!needsParty} placeholder={needsParty ? ledgerT('partyName') : '-'} onChange={(e) => patch(r.key, { party: e.target.value })} />
                 )}
                 <input aria-label={ledgerT('lineDebit', { n: i + 1 })} className={`${controls.input} ${books.numInput}`} inputMode="decimal" value={r.dr} placeholder="0.00" onChange={(e) => patch(r.key, { dr: e.target.value, ...(e.target.value ? { cr: '' } : {}) })} />
                 <input aria-label={ledgerT('lineCredit', { n: i + 1 })} className={`${controls.input} ${books.numInput}`} inputMode="decimal" value={r.cr} placeholder="0.00" onChange={(e) => patch(r.key, { cr: e.target.value, ...(e.target.value ? { dr: '' } : {}) })} />

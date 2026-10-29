@@ -55,7 +55,7 @@ test('bills older than the credit period warn even within the limit', () => {
   // 'a' (1 Aug, 84 days) and 'u' (1 Oct, 23 days → within). Only 'a' is past 30 days.
   assert.deepEqual(r.overdue, { count: 1, amount: 30000, oldestDays: 84 });
   assert.equal(r.overBy, 0);
-  assert.match(r.warnings[0], /1 bill \(₹30,000\.00\) older than the 30-day credit period — oldest 84 days/);
+  assert.match(r.warnings[0], /1 bill \(₹30,000\.00\) older than the 30-day credit period: oldest 84 days/);
 });
 
 test('client master is found by id, else by name; invoices match by id, else by name', () => {

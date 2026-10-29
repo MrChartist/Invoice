@@ -42,11 +42,11 @@ test('running charges, composite medicines exempt (stock line kept), interim pri
   attachDeposit(a.id, adv.id);
   assert.equal(depositsOpen(loadAdmissions()[0]), 20000);
   const lines = admissionLines(loadAdmissions()[0], '2026-10-06');
-  assert.deepEqual(lines.map((l) => [l.name.split(' (')[0], l.quantity, l.tax_rate, l.sv?.exempt ?? '']), [['Room — private room', 1, 5, ''], ['Procedure', 1, 0, 'EXEMPT'], ['Paracetamol 500', 10, 0, 'EXEMPT']]);
+  assert.deepEqual(lines.map((l) => [l.name.split(' (')[0], l.quantity, l.tax_rate, l.sv?.exempt ?? '']), [['Room: private room', 1, 5, ''], ['Procedure', 1, 0, 'EXEMPT'], ['Paracetamol 500', 10, 0, 'EXEMPT']]);
   assert.equal(lines[2].hsn, '3004');
   assert.equal(lines[2].type, 'Goods', 'the stock reader moves the medicine out with the bill line');
   assert.equal(linesGross(lines), 6300 + 3000 + 20);
-  assert.match(interimHtml(loadAdmissions()[0], { asOn: '2026-10-06', business: 'Clinic', deposits: 20000, money: (n) => String(n) }), /Interim bill — not a tax invoice/);
+  assert.match(interimHtml(loadAdmissions()[0], { asOn: '2026-10-06', business: 'Clinic', deposits: 20000, money: (n) => String(n) }), /Interim bill: not a tax invoice/);
   assert.throws(() => finalBill(a.id, '2026-10-07'), /Discharge the patient first/);
   discharge(a.id, '2026-10-07', '11:00');
   const { bill } = finalBill(a.id, '2026-10-07');

@@ -20,6 +20,6 @@ export function useRun(notify: Notify) {
   }] as const;
 }
 
-export const opt = <X,>(xs: readonly X[], id: (x: X) => string, name: (x: X) => string, blank = true) => [...(blank ? [['', '—'] as const] : []), ...xs.map((x) => [id(x), name(x)] as const)];
+export const opt = <X,>(xs: readonly X[], id: (x: X) => string, name: (x: X) => string, blank = true) => [...(blank ? [['', '-'] as const] : []), ...xs.map((x) => [id(x), name(x)] as const)];
 export const n = (s: string) => Number(s) || 0;
 export const monthOf = (d: string) => d.slice(0, 7);

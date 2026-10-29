@@ -51,8 +51,8 @@ export default function PurchaseApprovals({ notify }: { notify?: (m: string, ton
           {bills.map((d) => (
             <li key={d.id} className={own.item}>
               <div>
-                <strong>{d.kind === 'EXPENSE' ? capT('kindExpense') : capT('kindBill')} {d.bill_number || '—'} · {d.vendor_name || '—'}</strong>
-                <span className={controls.hint}>{capT('apLine', { amount: formatCurrency(d.total), by: d.draft.approval?.requested_by || '—', date: formatDate(d.date) })}</span>
+                <strong>{d.kind === 'EXPENSE' ? capT('kindExpense') : capT('kindBill')} {d.bill_number || '-'} · {d.vendor_name || '-'}</strong>
+                <span className={controls.hint}>{capT('apLine', { amount: formatCurrency(d.total), by: d.draft.approval?.requested_by || '-', date: formatDate(d.date) })}</span>
               </div>
               {mayApprove && (
                 <div className={own.actions}>
@@ -66,8 +66,8 @@ export default function PurchaseApprovals({ notify }: { notify?: (m: string, ton
           {pays.map((p) => (
             <li key={p.id} className={own.item}>
               <div>
-                <strong>{capT('payTo', { vendor: p.vendor_name || '—', no: p.bill_number || '—' })}</strong>
-                <span className={controls.hint}>{capT('apLine', { amount: formatCurrency(p.amount), by: p.requested_by || '—', date: formatDate(p.date) })} · {p.method}</span>
+                <strong>{capT('payTo', { vendor: p.vendor_name || '-', no: p.bill_number || '-' })}</strong>
+                <span className={controls.hint}>{capT('apLine', { amount: formatCurrency(p.amount), by: p.requested_by || '-', date: formatDate(p.date) })} · {p.method}</span>
               </div>
               {mayApprove && (
                 <div className={own.actions}>
@@ -86,7 +86,7 @@ export default function PurchaseApprovals({ notify }: { notify?: (m: string, ton
           <ul className={own.list}>
             {history.map((h) => (
               <li key={h.id} className={own.item}>
-                <span>{h.decision === 'approved' ? '✓' : '✗'} {capT(h.doc_type === 'PAYMENT' ? 'hPay' : 'hBill')} {h.doc_number || '—'} · {formatCurrency(h.amount)} · {h.decided_by} · {formatDate(h.decided_at.slice(0, 10))}{h.note ? ` — ${h.note}` : ''}</span>
+                <span>{h.decision === 'approved' ? '✓' : '✗'} {capT(h.doc_type === 'PAYMENT' ? 'hPay' : 'hBill')} {h.doc_number || '-'} · {formatCurrency(h.amount)} · {h.decided_by} · {formatDate(h.decided_at.slice(0, 10))}{h.note ? `: ${h.note}` : ''}</span>
               </li>
             ))}
           </ul>

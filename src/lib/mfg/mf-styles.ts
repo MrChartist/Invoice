@@ -67,7 +67,7 @@ export function gridChildren(parent: StockItem, all: readonly StockItem[], grid:
       const qty = num(r.qty[i]);
       if (!(qty > 0)) return;
       const child = childFor(parent, all, size, r.colour);
-      if (!child) throw new Error(`${parent.name}: no variant for ${size}${r.colour ? ` / ${r.colour}` : ''} — create the variants first.`);
+      if (!child) throw new Error(`${parent.name}: no variant for ${size}${r.colour ? ` / ${r.colour}` : ''}, create the variants first.`);
       out.push({ item_id: child.id, size, colour: r.colour, qty });
     });
   }

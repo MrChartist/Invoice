@@ -16,4 +16,4 @@ export function runWith(notify: Notify) {
   };
 }
 
-export const pct = (n: number | null | undefined): string => (n === null || n === undefined ? '—' : `${n}%`);
+export const pct = (n: number | null | undefined): string => (n === null || n === undefined ? '-' : `${n}%`);

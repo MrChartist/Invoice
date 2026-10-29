@@ -48,7 +48,7 @@ export default function CostCardsView({ ctx }: { ctx: MfgContext }) {
       <div style={row}>
         <Fld l={fdT('item')}>
           <select className={controls.select} value={d.item_id} onChange={(e) => pick(e.target.value)} data-mfd="card-item">
-            <option value="">—</option>
+            <option value="">-</option>
             {made.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
           </select>
         </Fld>
@@ -58,7 +58,7 @@ export default function CostCardsView({ ctx }: { ctx: MfgContext }) {
         <Fld l={fdT('convKg')}>{num(d.conversion_per_kg, (v) => set({ conversion_per_kg: v }), 'conv')}</Fld>
         <Fld l={fdT('overhead')}>{num(d.overhead_pct, (v) => set({ overhead_pct: v }), 'oh')}</Fld>
       </div>
-      <Tbl empty={fdT('none')} head={[fdT('ingredient'), fdT('qty'), fdT('rate'), fdT('latest')]} rows={d.lines.map((l, i) => [l.name, `${l.qty} ${l.unit ?? ''}`, num(l.rate, (v) => set({ lines: d.lines.map((x, n) => (n === i ? { ...x, rate: v } : x)) }), 'rate'), latest.get(l.item_id) ?? '—'])} />
+      <Tbl empty={fdT('none')} head={[fdT('ingredient'), fdT('qty'), fdT('rate'), fdT('latest')]} rows={d.lines.map((l, i) => [l.name, `${l.qty} ${l.unit ?? ''}`, num(l.rate, (v) => set({ lines: d.lines.map((x, n) => (n === i ? { ...x, rate: v } : x)) }), 'rate'), latest.get(l.item_id) ?? '-'])} />
       <Tbl empty="" head={[fdT('pack'), fdT('packKg'), fdT('packing'), fdT('distributor'), fdT('retailer'), fdT('mrp'), fdT('perPack'), fdT('margin')]} rows={d.packs.map((p, i) => {
         const c = cost.packs[i];
         return [

@@ -63,7 +63,7 @@ const MODES = [
 const signed = (paise: number) => (paise < 0 ? `−${money(-paise)}` : paise > 0 ? `+${money(paise)}` : money(0));
 const tone = (v: Variance) => (v.variance === 0 ? '' : v.favourable ? styles.fav : styles.adv);
 const toneWord = (v: Variance) => planT(v.variance === 0 ? 'onBudget' : v.favourable ? 'favourable' : 'adverse');
-const pct = (v: Variance) => (v.percent === null ? '—' : `${v.percent > 0 ? '+' : ''}${v.percent}%`);
+const pct = (v: Variance) => (v.percent === null ? '-' : `${v.percent > 0 ? '+' : ''}${v.percent}%`);
 
 export function BudgetsTab({ ledger, notify }: Props) {
   useT();

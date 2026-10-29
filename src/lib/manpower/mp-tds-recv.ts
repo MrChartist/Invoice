@@ -22,7 +22,7 @@ export function tdsReceivable(invoices: readonly InvoiceRecord[]): TdsRecvRow[] 
   for (const i of invoices) {
     if (!i.mp?.month || i.status === 'Cancelled' || i.doc_type === 'CREDIT_NOTE' || !/^\d{4}-\d{2}/.test(i.issue_date ?? '')) continue;
     const { fy, q } = fyQuarter(i.issue_date);
-    const client = i.client?.name || '—';
+    const client = i.client?.name || '-';
     const key = `${i.client?.id || client}|${fy}|${q}`;
     const r = by.get(key) ?? { key, client, fy, q, bills: 0, base: 0, expected: 0, booked: 0, diff: 0, label: '' };
     r.bills += 1;

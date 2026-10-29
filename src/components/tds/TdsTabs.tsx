@@ -619,7 +619,7 @@ export function Form16aTab({ data, fy, quarter }: { data: TdsData; fy: number; q
                       <td>{formatDate(r.date)}</td>
                       <td className={surface.numeric}>{formatMoney(r.paid)}</td>
                       <td className={surface.numeric}>{formatMoney(r.tds)}</td>
-                      <td>{r.deposited ? '✓' : '—'}</td>
+                      <td>{r.deposited ? '✓' : '-'}</td>
                     </tr>
                   ))}
                   <tr className={books.totalRow}>

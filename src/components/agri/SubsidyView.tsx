@@ -24,7 +24,7 @@ export default function SubsidyView({ onDone }: { onDone: Done }) {
       <Form v={f} set={setF} f={[['month', 'month', 'm'], ['cap', 'cap', 'n', 150]]}>
         <B k="save" on={() => run(() => { saveAgriSettings({ subsidy: { cap: f.cap } }); return agdT('saved'); })} />
       </Form>
-      <Tbl head={['item', 'book', 'posStock', 'diff']} flag={r.rows.map((x) => !!x.diff)} rows={r.rows.map((x) => [x.item, x.book, <NumberInput key="p" className={controls.input} style={{ maxWidth: 110 }} value={x.pos ?? 0} onChange={(v) => setPos(x.item_id, v)} data-agd="pos-stock" />, x.diff ?? '—'])} />
+      <Tbl head={['item', 'book', 'posStock', 'diff']} flag={r.rows.map((x) => !!x.diff)} rows={r.rows.map((x) => [x.item, x.book, <NumberInput key="p" className={controls.input} style={{ maxWidth: 110 }} value={x.pos ?? 0} onChange={(v) => setPos(x.item_id, v)} data-agd="pos-stock" />, x.diff ?? '-'])} />
       {!!r.missing.length && <><h3>{agdT('missingPos')}</h3><Tbl head={['bill', 'date', 'party']} rows={r.missing.map((i) => [i.invoice_number, i.issue_date, i.client?.name ?? ''])} /></>}
       <h3>{agdT('flagItems')}</h3>
       <div style={wrap}>{positions.filter((p) => p.item.track_stock).map((p) => <label key={p.item.id}><input type="checkbox" checked={!!p.item.ag_subsidised} onChange={(e) => run(() => flagSubsidised(p.item.id, e.target.checked))} /> {p.item.name}</label>)}</div>

@@ -67,7 +67,7 @@ export function LedgerModal({ open, position, onClose, onDeleteMove, onDownload 
             )}
             {position.ledger.map((r) => (
               <tr key={r.key}>
-                <td>{r.date ? formatDate(r.date) : '—'}</td>
+                <td>{r.date ? formatDate(r.date) : '-'}</td>
                 <td className={styles.particulars}>{r.particulars}</td>
                 <td className={cn(surface.numeric, styles.in)}>{r.qtyIn || ''}</td>
                 <td className={cn(surface.numeric, styles.out)}>{r.qtyOut || ''}</td>

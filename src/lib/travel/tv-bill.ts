@@ -30,7 +30,7 @@ export function tripLines(name: string, regime: NonNullable<InvoiceRecord['tv']>
   const items: InvoiceItem[] = [];
   const pass = regime === 'agent' ? open.filter((b) => b.pure_agent) : [];
   for (const b of pass) {
-    const l = line({ name: `${b.component.toUpperCase()} — ${b.ref || name} (at actual)`, description: PURE_AGENT_CHARGE, charge_head_id: 'rule33', quantity: 1, rate: costInr(b), tax_rate: 0 });
+    const l = line({ name: `${b.component.toUpperCase()}: ${b.ref || name} (at actual)`, description: PURE_AGENT_CHARGE, charge_head_id: 'rule33', quantity: 1, rate: costInr(b), tax_rate: 0 });
     items.push(l);
     refs.set(b.id, l.id);
   }
@@ -38,7 +38,7 @@ export function tripLines(name: string, regime: NonNullable<InvoiceRecord['tv']>
   const value = round2(open.reduce((s, b) => s + (Number(b.sell) || 0), 0) - pass.reduce((s, b) => s + costInr(b), 0));
   if (value > 0) {
     const main = line({
-      name: regime === 'agent' ? `Service charge — ${name}` : `Tour package — ${name}`,
+      name: regime === 'agent' ? `Service charge: ${name}` : `Tour package: ${name}`,
       hsn: rule.sac, quantity: 1, rate: value, tax_rate: rule.rate,
       ...(regime === 'exempt_outside' ? { sv: { exempt: 'EXEMPT' as const } } : {}),
     });

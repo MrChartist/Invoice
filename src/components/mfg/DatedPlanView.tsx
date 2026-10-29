@@ -38,9 +38,9 @@ export default function DatedPlanView({ ctx, lines, due, planId }: { ctx: MfgCon
       <div style={row}><F label={fT('by')} w={120}><Sel v={by} set={(x) => setBy(x as 'day' | 'week')} o={[['week', fT('week')], ['day', fT('day')]]} /></F></div>
       <Grid attr="dated" head={[fT('item'), fT('action'), fT('lead'), fT('orderBy'), ...keys.map((k) => k.slice(5))]} rows={rows.map((r) => [
         `${r.item.name}${r.pastDue ? ` · ${fT('pastDue')}` : ''}`,
-        r.action === 'none' ? '—' : fT(r.action),
+        r.action === 'none' ? '-' : fT(r.action),
         r.lead,
-        r.orders.map((o) => `${fmt(o.qty)} @ ${o.release}${o.late ? ` (${fT('late')})` : ''}`).join(', ') || '—',
+        r.orders.map((o) => `${fmt(o.qty)} @ ${o.release}${o.late ? ` (${fT('late')})` : ''}`).join(', ') || '-',
         ...r.buckets.map((b) => (b.gross || b.planned ? `${fmt(b.gross)}${b.planned ? ` +${fmt(b.planned)}` : ''}` : '')),
       ])} />
       <p className={controls.hint}>{fT('datedHint')}</p>

@@ -123,7 +123,7 @@ export function dailyIntake(slips: readonly WeighbridgeSlip[], date: string, now
   const open = openSlips(slips, now);
   return {
     date,
-    byCommodity: group(done, (s) => s.commodity.trim() || '—'),
+    byCommodity: group(done, (s) => s.commodity.trim() || '-'),
     byParty: group(done, (s) => s.party_kind),
     byUse: group(done, (s) => s.use),
     net_kg: all?.net_kg ?? 0,
@@ -160,7 +160,7 @@ export function voucherPrefill(s: WeighbridgeSlip): VoucherPrefill {
 }
 
 const fmtKg = (n: number) => num(n).toLocaleString('en-IN', { maximumFractionDigits: 3 });
-const at = (s?: string) => (s ? s.replace('T', ' ') : '—');
+const at = (s?: string) => (s ? s.replace('T', ' ') : '-');
 
 /** The printed slip (A5 small paper): both weighings with times, net, readings, "subject to quality cut". */
 export function slipHtml(s: WeighbridgeSlip, business: { name?: string; address?: string }): string {
@@ -168,14 +168,14 @@ export function slipHtml(s: WeighbridgeSlip, business: { name?: string; address?
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(s.number)}</title>
 <style>${PRINT_FONT_FACE}@page{size:A5}body{font-family:${PRINT_FONT};margin:0;padding:16px;font-size:13px}h1{font-size:16px;margin:0}.t{font-weight: 600;text-align:center;letter-spacing:.1em;border:1px solid;padding:4px;margin:8px 0}table{width:100%;border-collapse:collapse}td{padding:4px 6px;border-bottom:1px solid}td.n{text-align:right}.f{margin-top:10px;font-size:12px}</style></head><body>
 <h1>${esc(business.name || 'Your business')}</h1>${business.address ? `<div>${esc(business.address)}</div>` : ''}
-<div class="t">WEIGHBRIDGE SLIP${s.status === 'cancelled' ? ' — CANCELLED' : ''}</div>
+<div class="t">WEIGHBRIDGE SLIP${s.status === 'cancelled' ? ': CANCELLED' : ''}</div>
 <table><tbody>
 <tr><td>Slip no.</td><td class="n"><strong>${esc(s.number)}</strong></td></tr>
 <tr><td>Vehicle</td><td class="n">${esc(s.vehicle)}</td></tr>
-<tr><td>Party</td><td class="n">${esc(s.party_name || '—')} (${esc(s.party_kind)})</td></tr>
+<tr><td>Party</td><td class="n">${esc(s.party_name || '-')} (${esc(s.party_kind)})</td></tr>
 <tr><td>Commodity</td><td class="n">${esc(s.commodity)}${s.bags ? ` · ${esc(s.bags)} bags` : ''}</td></tr>
 <tr><td>Gross (loaded) · ${esc(at(s.gross_at))}</td><td class="n">${esc(fmtKg(s.gross_kg))} kg</td></tr>
-<tr><td>Tare (empty) · ${esc(at(s.tare_at))}</td><td class="n">${s.tare_kg !== undefined ? `${esc(fmtKg(s.tare_kg))} kg` : '—'}</td></tr>
+<tr><td>Tare (empty) · ${esc(at(s.tare_at))}</td><td class="n">${s.tare_kg !== undefined ? `${esc(fmtKg(s.tare_kg))} kg` : '-'}</td></tr>
 <tr><td><strong>Net</strong></td><td class="n"><strong>${esc(fmtKg(s.net_kg))} kg</strong></td></tr>
 ${readings}
 </tbody></table>
@@ -295,7 +295,7 @@ export function receiveForJob(id: string, principal: { name: string; client_id?:
     const r = principalDb.save({
       date: s.date, kind: 'receipt', party_name: principal.name || s.party_name || 'Principal', ...(principal.client_id ? { client_id: principal.client_id } : {}),
       ...(principal.gstin ? { party_gstin: principal.gstin } : {}), challan_no: s.number, challan_date: s.date,
-      lines: [{ id: generateId(), name: s.commodity, qty: r3(num(s.net_kg) / 100), unit: 'QTL' }], narration: `Job milling — weighbridge slip ${s.number}, vehicle ${s.vehicle}`,
+      lines: [{ id: generateId(), name: s.commodity, qty: r3(num(s.net_kg) / 100), unit: 'QTL' }], narration: `Job milling: weighbridge slip ${s.number}, vehicle ${s.vehicle}`,
     });
     return { slip: markUsed(s.id, 'job', r.id), jwpId: r.id, jwpNumber: r.number };
   });

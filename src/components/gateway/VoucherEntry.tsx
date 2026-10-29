@@ -663,7 +663,7 @@ export function VoucherEntry() {
           <label className={styles.vField}>
             {vtT('account')}
             <select data-field="account" className={controls.select} value={accountId} onChange={(e) => setAccountId(e.target.value)} data-testid="gw-v-account" aria-describedby="gw-v-account-hint">
-              <option value="">—</option>
+              <option value="">-</option>
               {cashBank.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
             <span id="gw-v-account-hint" className={styles.hint}>{vtT('accountHint')}</span>
@@ -827,7 +827,7 @@ export function VoucherEntry() {
                 </select>
                 {r.kind === 'agst' ? (
                   <select className={controls.select} value={r.bill_id ?? ''} aria-label={`${vtT('bill')} ${i + 1}`} onChange={(e) => setRefs((rs) => rs.map((x) => (x.key === r.key ? { ...x, bill_id: e.target.value || undefined } : x)))} data-testid={`gw-ref-${i + 1}-bill`}>
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {openBills.map((b) => <option key={b.id} value={b.id}>{`${b.ref} · ${vtT('due', { amount: formatMoney(b.outstanding) })}`}</option>)}
                   </select>
                 ) : r.kind === 'new' ? (

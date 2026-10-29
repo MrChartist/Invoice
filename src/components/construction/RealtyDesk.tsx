@@ -105,7 +105,7 @@ export default function RealtyDesk({ onDone }: { onDone: Done }) {
 
 type Body = { run: (fn: () => string | void) => void; tick: number; projects: RealtyProject[] };
 type PBody = Body & { p: RealtyProject };
-const banks = () => [['', '—'] as const, ...bankAccountsDb.active().map((a) => [a.id, a.name] as const)];
+const banks = () => [['', '-'] as const, ...bankAccountsDb.active().map((a) => [a.id, a.name] as const)];
 
 /* ── C1 projects ── */
 type PForm = { id?: string; name: string; rera_no: string; rera_valid_till: string; rera_account_id: string; collection_account_id: string; state_code: string; city_class: RealtyProject['city_class']; gst_scheme: RealtyProject['gst_scheme']; old_rate: number; cc_date: string; oc_date: string; towers: string };
@@ -226,13 +226,13 @@ function Bookings({ run, tick, p }: PBody) {
       <h4>{T('book')}</h4>
       <div className={controls.row} style={row} data-rc-book>
         <Sel l={T('unit')} v={unit?.id ?? ''} set={(x) => { setF({ ...f, unit_id: x }); setSheet(null); }} o={free.map((u) => [u.id, `${u.unit_no} · ${rs(unitPrice(u))}`] as const)} w={200} d="k-unit" />
-        <Sel l={T('buyer')} v={f.client_id} set={(x) => setF({ ...f, client_id: x })} o={[['', '—'] as const, ...data.clients.map((c) => [c.id ?? '', c.name] as const)]} w={200} d="k-client" />
+        <Sel l={T('buyer')} v={f.client_id} set={(x) => setF({ ...f, client_id: x })} o={[['', '-'] as const, ...data.clients.map((c) => [c.id ?? '', c.name] as const)]} w={200} d="k-client" />
         {!f.client_id && <Txt l={T('name')} v={f.name} set={(x) => setF({ ...f, name: x })} w={180} d="k-name" />}
         <Txt l={T('coApp')} v={f.co} set={(x) => setF({ ...f, co: x })} w={180} />
         <Sel l={T('plan')} v={f.plan_id || data.plans[0]?.id || ''} set={(x) => setF({ ...f, plan_id: x })} o={data.plans.map((x) => [x.id, x.name] as const)} w={180} />
         <Txt l={T('date')} v={f.date} set={(x) => setF({ ...f, date: x })} type="date" w={160} d="k-date" />
         <Num l={T('stamp')} v={f.stamp} set={(x) => setF({ ...f, stamp: x })} />
-        <Sel l={T('broker')} v={f.broker} set={(x) => setF({ ...f, broker: x })} o={[['', '—'] as const, ...vendors.map((x) => [x.id, x.name] as const)]} w={200} d="k-broker" />
+        <Sel l={T('broker')} v={f.broker} set={(x) => setF({ ...f, broker: x })} o={[['', '-'] as const, ...vendors.map((x) => [x.id, x.name] as const)]} w={200} d="k-broker" />
         {f.broker && <Num l={T('brokerPct')} v={f.bpct} set={(x) => setF({ ...f, bpct: x })} w={120} d="k-bpct" />}
       </div>
       <div className={controls.row} style={row} data-rc-sheet>

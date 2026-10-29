@@ -89,7 +89,7 @@ export function OffersPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
                   <div key={i} className={own.row}>
                     <label className={controls.field}><span className={controls.label}>{x7T('comboItem')}</span>
                       <select className={controls.select} value={x.item_id} onChange={(e) => setComboItem(i, { id: e.target.value })}>
-                        <option value="">—</option>
+                        <option value="">-</option>
                         {catalog.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select></label>
                     <label className={controls.field}><span className={controls.label}>{x7T('buyQty')}</span>
@@ -124,14 +124,14 @@ export function OffersPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
               <div className={own.row}>
                 <label className={controls.field}><span className={controls.label}>{x7T('buyItem')}</span>
                   <select className={controls.select} value={form.item_id} onChange={(e) => pickItem(e.target.value, 'paid')}>
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {catalog.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select></label>
                 <label className={controls.field}><span className={controls.label}>{x7T('buyQty')}</span>
                   <input className={cn(controls.input, controls.inputNumeric)} inputMode="numeric" value={String(form.buy_qty)} onChange={(e) => setForm({ ...form, buy_qty: n(e.target.value) })} /></label>
                 <label className={controls.field}><span className={controls.label}>{x7T('freeItem')}</span>
                   <select className={controls.select} value={form.free_item_id ?? ''} onChange={(e) => pickItem(e.target.value, 'free')}>
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {catalog.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select></label>
                 <label className={controls.field}><span className={controls.label}>{x7T('freeQty')}</span>

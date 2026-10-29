@@ -40,7 +40,7 @@ export default function BatchesView({ onDone }: { onDone: Done }) {
         <button type="button" className={controls.btnPrimary} onClick={() => run(() => { saveBatch({ kind, name, start, placed: Number(placed), unit, ...(Number(sw) > 0 ? { start_weight_kg: Number(sw) } : {}) }); setName(''); return agT('saved'); })} data-ag-b-save>{agT('addBatch')}</button>
       </div>
       <div style={wrap}>
-        <F label={agT('batch')}><select className={controls.select} value={ev.id} onChange={(e) => setEv({ ...ev, id: e.target.value })}><option value="">—</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></F>
+        <F label={agT('batch')}><select className={controls.select} value={ev.id} onChange={(e) => setEv({ ...ev, id: e.target.value })}><option value="">-</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></F>
         <F label={agT('event')}><select className={controls.select} value={ev.kind} onChange={(e) => setEv({ ...ev, kind: e.target.value as FarmBatchEvent['kind'] })}>{EVENTS.map((k) => <option key={k} value={k}>{agT(`e.${k}`)}</option>)}</select></F>
         <F label={agT('date')}><In v={ev.date} set={(v) => setEv({ ...ev, date: v })} type="date" /></F>
         <F label={agT('qtyKg')}><In v={ev.qty} set={(v) => setEv({ ...ev, qty: v })} type="number" w={90} /></F>
@@ -48,7 +48,7 @@ export default function BatchesView({ onDone }: { onDone: Done }) {
       </div>
       <Grid attr="batches" head={[agT('name'), agT('start'), agT('placed'), agT('mortality'), agT('feedKg'), 'FCR', agT('status')]} rows={batches.map((b) => {
         const m = batchMemo(b);
-        return [`${b.name} (${agT(`b.${b.kind}`)})`, b.start, `${b.placed} ${b.unit}`, `${m.dead} (${m.mortalityPct}%)`, m.feedKg, m.fcr ?? '—', b.status === 'active' ? agT('active') : agT('closed')];
+        return [`${b.name} (${agT(`b.${b.kind}`)})`, b.start, `${b.placed} ${b.unit}`, `${m.dead} (${m.mortalityPct}%)`, m.feedKg, m.fcr ?? '-', b.status === 'active' ? agT('active') : agT('closed')];
       })} />
       <button type="button" className={controls.btnGhost} onClick={() => run(() => { agriIncomeLedger(); return agT('agIncomeOk'); })}>{agT('agIncome')}</button>
     </div>

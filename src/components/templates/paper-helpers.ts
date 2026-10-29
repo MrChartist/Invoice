@@ -107,7 +107,7 @@ export function rcmTaxNote(totals: CalcTotals, money: (amount: number) => string
     totals.igst_amount > 0 && `IGST ${money(totals.igst_amount)}`,
     totals.cess_amount > 0 && `Cess ${money(totals.cess_amount)}`,
   ].filter(Boolean);
-  return `Tax payable by the recipient under reverse charge (Sec 9(3)/9(4) CGST Act, Rule 46(p)): ${heads.join(', ')} — total ${money(totals.rcm_tax)}. Not included in the amount payable.`;
+  return `Tax payable by the recipient under reverse charge (Sec 9(3)/9(4) CGST Act, Rule 46(p)): ${heads.join(', ')}, total ${money(totals.rcm_tax)}. Not included in the amount payable.`;
 }
 
 /** Legacy single "Tax" line. */
@@ -154,7 +154,7 @@ export function worksLineText(item: Pick<InvoiceItem, 'id'> | undefined, cn: { l
 
 /** R11 (CN-A3): "Tax Invoice — Running Account Bill No. 4" / "… — Final Bill" for an RA bill; '' otherwise. */
 export const raDocTitle = (inv: Pick<InvoiceRecord, 'ra_no' | 'ra_final'>, label: string): string =>
-  inv.ra_no ? `${label} — ${inv.ra_final ? 'Final Bill' : `Running Account Bill No. ${inv.ra_no}`}` : '';
+  inv.ra_no ? `${label}: ${inv.ra_final ? 'Final Bill' : `Running Account Bill No. ${inv.ra_no}`}` : '';
 
 /**
  * R10 (SV-A4): Rule 46A — "Invoice-cum-Bill of Supply" for a tax invoice to a recipient without a GSTIN that carries
@@ -193,9 +193,9 @@ const AG_LOOSE = ['cereal_loose', 'pulses_loose', 'flour_loose', 'paddy', 'veg_f
 export function agriDeclaration(inv: Pick<InvoiceRecord, 'doc_type' | 'items' | 'ag'>): string {
   const ag = inv.ag;
   if (ag?.declaration) return ag.declaration;
-  if (ag?.kind === 'rent' && ag.rent?.exempt) return 'Exempt — storage of agricultural produce (N 12/2017-CT(R) entry 54(e); verify with your CA, AG8).';
-  if (ag?.kind === 'interest') return 'Interest on loan — exempt (verify with your CA, AG24).';
-  return inv.doc_type === 'BILL_OF_SUPPLY' && (inv.items ?? []).some((i) => i?.ag_class && AG_LOOSE.includes(i.ag_class)) ? 'Agricultural produce — not pre-packaged and labelled.' : '';
+  if (ag?.kind === 'rent' && ag.rent?.exempt) return 'Exempt: storage of agricultural produce (N 12/2017-CT(R) entry 54(e); verify with your CA, AG8).';
+  if (ag?.kind === 'interest') return 'Interest on loan: exempt (verify with your CA, AG24).';
+  return inv.doc_type === 'BILL_OF_SUPPLY' && (inv.items ?? []).some((i) => i?.ag_class && AG_LOOSE.includes(i.ag_class)) ? 'Agricultural produce: not pre-packaged and labelled.' : '';
 }
 
 /** R10 (SV-B1): "UHID … · Dr name (Reg. no. …) · Token n" under the bill-to, from the record snapshot `sv.visit`; '' otherwise. */
@@ -254,13 +254,13 @@ export function mfDeclaration(inv: Pick<InvoiceRecord, 'mf' | 'sender' | 'client
   const out: string[] = [];
   if (mf?.declaration) out.push(mf.declaration);
   else {
-    if (mf?.scrap?.tcs) out.push('Waste and scrap — TCS u/s 394(1) collected (verify with your CA, MF10).');
+    if (mf?.scrap?.tcs) out.push('Waste and scrap: TCS u/s 394(1) collected (verify with your CA, MF10).');
     if (mf?.export_aa?.aa_no) out.push(`Goods supplied under Advance Authorisation no. ${mf.export_aa.aa_no}${mf.export_aa.sion ? `, SION ${mf.export_aa.sion}` : ''} (verify, MF16).`);
     if (mf?.recycled_pct !== undefined) out.push(`Recycled content ${mf.recycled_pct}% (PWM Rules; verify, MF27).`);
   }
   const s = inv.sender;
   if (s?.msme_udyam && (s.msme_category === 'MICRO' || s.msme_category === 'SMALL') && inv.client?.gstin?.trim() && inv.doc_type !== 'QUOTATION') {
-    out.push(`Payment due within ${MSME_PAYMENT_DAYS.agreed} days of acceptance — MSMED Act 2006 Sec 15; interest u/s 16 beyond (verify, MF22).`);
+    out.push(`Payment due within ${MSME_PAYMENT_DAYS.agreed} days of acceptance: MSMED Act 2006 Sec 15; interest u/s 16 beyond (verify, MF22).`);
   }
   return out.join(' ');
 }
@@ -307,9 +307,9 @@ export function psDeclaration(inv: Pick<InvoiceRecord, 'ps' | 'items'>): string 
   const ps = inv.ps;
   if (!ps) return '';
   const out: string[] = [];
-  if (ps.legal?.regime === 'rcm') out.push('GST on this supply is payable by the recipient under reverse charge — N 13/2017-CT(R) entry 2 (verify, PS1).');
-  if (ps.legal?.regime === 'exempt') out.push('Exempt legal services — N 12/2017-CT(R) entry 45 (verify, PS1).');
-  if (inv.items?.some((i) => i.charge_head_id === 'rule33')) out.push('Disbursements recovered at actual as pure agent (Rule 33) — outside the taxable value (verify, PS3).');
+  if (ps.legal?.regime === 'rcm') out.push('GST on this supply is payable by the recipient under reverse charge: N 13/2017-CT(R) entry 2 (verify, PS1).');
+  if (ps.legal?.regime === 'exempt') out.push('Exempt legal services: N 12/2017-CT(R) entry 45 (verify, PS1).');
+  if (inv.items?.some((i) => i.charge_head_id === 'rule33')) out.push('Disbursements recovered at actual as pure agent (Rule 33): outside the taxable value (verify, PS3).');
   if (ps.export?.checks?.length) out.push(`Export of services: Sec 2(6) IGST conditions checked ${ps.export.checks.filter((c) => c.ok).length} of ${ps.export.checks.length} (verify, PS5).`);
   if (ps.unregistered) out.push('Supplier not registered under GST (verify, PS13).');
   return out.join(' ');

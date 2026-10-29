@@ -40,7 +40,7 @@ export const emptyDraft = (area = ''): FeedbackDraft => ({ kind: 'problem', area
 
 /** The typed part of the report (scrubbed). An idea / question has no expected / actual block. */
 export function composeTyped(d: FeedbackDraft): string {
-  const lines = [`Mr. Chartist Invoice — beta ${KIND_TEXT[d.kind].toLowerCase()}`, `Kind: ${KIND_TEXT[d.kind]} · Area: ${scrubTyped(d.area) || '—'}`];
+  const lines = [`Mr. Chartist Invoice: beta ${KIND_TEXT[d.kind].toLowerCase()}`, `Kind: ${KIND_TEXT[d.kind]} · Area: ${scrubTyped(d.area) || '-'}`];
   if (d.kind === 'problem') lines.push(`Severity: ${SEVERITY_TEXT[d.severity]}`);
   const block = (head: string, text: string) => (text.trim() ? ['', `${head}:`, scrubTyped(text.trim())] : []);
   lines.push(...block(d.kind === 'idea' ? 'Idea' : d.kind === 'question' ? 'Question' : 'What I did', d.did));
@@ -72,7 +72,7 @@ export function capForShare(d: FeedbackDraft, diagnostics: string, cap = SHARE_C
   const typed = wellFormed(composeTyped(d));
   const full = wellFormed(`${typed}\n\n${diagnostics}`.trim()); // = composeFeedback, scrubbed once
   if (encodedLength(full) <= cap) return { text: full, shortened: false };
-  const note = '\n… (diagnostics shortened — the full report was copied; paste it below)';
+  const note = '\n… (diagnostics shortened: the full report was copied; paste it below)';
   const lines = wellFormed(diagnostics).split('\n');
   while (lines.length > 1) {
     lines.pop();
@@ -93,7 +93,7 @@ export function capForShare(d: FeedbackDraft, diagnostics: string, cap = SHARE_C
   return { text: chars.slice(0, lo).join('') + '…' + note, shortened: true };
 }
 
-export const subjectFor = (d: FeedbackDraft): string => `Mr. Chartist Invoice beta — ${KIND_TEXT[d.kind]}${d.area ? `: ${scrubTyped(d.area)}` : ''}`;
+export const subjectFor = (d: FeedbackDraft): string => `Mr. Chartist Invoice beta: ${KIND_TEXT[d.kind]}${d.area ? `: ${scrubTyped(d.area)}` : ''}`;
 
 /** `https://wa.me/?text=…` (no recipient unless `FEEDBACK_CONTACT.whatsapp` is set). */
 export function whatsappLink(text: string, number = FEEDBACK_CONTACT.whatsapp): string {

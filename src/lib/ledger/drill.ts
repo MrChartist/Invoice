@@ -50,11 +50,11 @@ export function drillTitle(level: DrillLevel, ledger: Ledger): string {
       return `Group Vouchers: ${reportGroup(level.groupId)?.label ?? level.groupId}`;
     case 'ledger': {
       const a = ledger.byId.get(level.accountId);
-      return `Ledger Monthly Summary: ${a?.name ?? level.accountId}${level.party ? ` — ${level.party}` : ''}`;
+      return `Ledger Monthly Summary: ${a?.name ?? level.accountId}${level.party ? `: ${level.party}` : ''}`;
     }
     case 'vouchers': {
       const a = ledger.byId.get(level.accountId);
-      return `Ledger Vouchers: ${a?.name ?? level.accountId}${level.party ? ` — ${level.party}` : ''}`;
+      return `Ledger Vouchers: ${a?.name ?? level.accountId}${level.party ? `: ${level.party}` : ''}`;
     }
     case 'voucher': {
       const v = findVoucher(ledger, level.voucherId);

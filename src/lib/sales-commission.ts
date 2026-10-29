@@ -180,11 +180,11 @@ export function commissionStatement(agent: SalesAgent, period: { from: string; t
 
 export function commissionCsv(agent: SalesAgent, period: { from: string; to: string }, st: { lines: CommissionLine[]; total: number }): string {
   return toCsv([
-    [`Commission statement — ${agent.name} (${agent.basis === 'receipt' ? 'on receipt' : 'on invoice'}) ${period.from} to ${period.to}`],
+    [`Commission statement: ${agent.name} (${agent.basis === 'receipt' ? 'on receipt' : 'on invoice'}) ${period.from} to ${period.to}`],
     ['Date', 'Document', 'Party', 'Taxable value', 'Commission on document', 'Earned in period'],
     ...st.lines.map((l) => [l.date, l.number, l.party, l.base.toFixed(2), l.commission.toFixed(2), l.earned.toFixed(2)]),
     ['', '', 'Total', '', '', st.total.toFixed(2)],
-    ['TDS u/s 194H is not deducted here — verify with your CA.'],
+    ['TDS u/s 194H is not deducted here: verify with your CA.'],
   ]);
 }
 
@@ -293,7 +293,7 @@ export function postCommission(agentId: string, period: { from: string; to: stri
     const v = saveVoucher({
       type: 'JOURNAL',
       date,
-      narration: `Sales commission payable to ${agent.name} for ${period.from} to ${period.to} (${agent.basis === 'receipt' ? 'on receipt' : 'on invoice'}, ${st.lines.length} document(s)) — TDS u/s 194H: verify with your CA`,
+      narration: `Sales commission payable to ${agent.name} for ${period.from} to ${period.to} (${agent.basis === 'receipt' ? 'on receipt' : 'on invoice'}, ${st.lines.length} document(s)), TDS u/s 194H: verify with your CA`,
       lines: [
         { account_id: expense, dr: paise, cr: 0 },
         { account_id: A.creditors, dr: 0, cr: paise - tdsPaise, party: agent.name },

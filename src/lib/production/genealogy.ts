@@ -246,7 +246,7 @@ export function recallList(f: ForwardResult, contact: (party: string, refId: str
   for (const o of f.outward) {
     if (o.kind !== 'sale' || o.refType !== 'invoice') continue;
     const k = o.party.trim().toLowerCase() || '(no party)';
-    const r = rows.get(k) ?? { party: o.party || '—', docs: [], qty: 0, returned: 0, ...(contact(o.party, o.refId) ?? {}) };
+    const r = rows.get(k) ?? { party: o.party || '-', docs: [], qty: 0, returned: 0, ...(contact(o.party, o.refId) ?? {}) };
     r.docs.push({ refId: o.refId, refNumber: o.refNumber, date: o.date, batch: o.batch, itemId: o.itemId, qty: o.qty });
     r.qty = rq(r.qty + o.qty);
     rows.set(k, r);

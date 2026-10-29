@@ -72,7 +72,7 @@ export function ShopModePanel({ settings, onChange }: Props) {
         </fieldset>
         <p className={controls.hint}>{all ? reachT('showingAll') : reachT('coreNote')}</p>
         <fieldset className={styles.modules} data-industry-packs>
-          <legend className={controls.label}>{reachT('packsTitle')}{Array.isArray(settings.industry_packs) ? '' : ` — ${reachT('packsFromType')}`}</legend>
+          <legend className={controls.label}>{reachT('packsTitle')}{Array.isArray(settings.industry_packs) ? '' : `: ${reachT('packsFromType')}`}</legend>
           {PACK_IDS.map((p) => (
             <label key={p} className={controls.check} title={reachT(`packDesc.${p}`)}>
               <input type="checkbox" checked={packs.includes(p)} onChange={() => togglePack(p)} /> <span><strong>{reachT(`pack.${p}`)}</strong><br /><small>{reachT(`packDesc.${p}`)}</small></span>

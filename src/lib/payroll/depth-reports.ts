@@ -85,11 +85,11 @@ export function fnfStatementHtml(fnf: FnfSettlement, employee: Employee, w: FnfW
 <body><div class="sheet">
   <div class="muted">${escapeHtml(company?.companyName ?? '')}</div>
   <h1>Full &amp; final settlement</h1>
-  <div class="muted">${escapeHtml(fnf.number)} · paid with payroll of ${escapeHtml(monthLabel(fnf.pay_month))}${run?.status === 'final' ? ` (${escapeHtml(run.number)})` : ' — draft, not finalized'}</div>
+  <div class="muted">${escapeHtml(fnf.number)} · paid with payroll of ${escapeHtml(monthLabel(fnf.pay_month))}${run?.status === 'final' ? ` (${escapeHtml(run.number)})` : ': draft, not finalized'}</div>
   <div class="grid">
     <div><span>Employee</span>${escapeHtml(`${employee.name} (${employee.code})`)}</div>
     <div><span>PAN</span>${escapeHtml(employee.pan ?? 'not available')}</div>
-    <div><span>Date of joining</span>${escapeHtml(employee.doj ? formatDate(employee.doj) : '—')}</div>
+    <div><span>Date of joining</span>${escapeHtml(employee.doj ? formatDate(employee.doj) : '-')}</div>
     <div><span>Date of leaving</span>${escapeHtml(formatDate(w.dol))}</div>
     <div><span>Reason</span>${escapeHtml(REASON[fnf.reason])}</div>
     <div><span>Service</span>${escapeHtml(`${g.service.years} years ${g.service.months} months ${g.service.days} days`)}</div>
@@ -107,7 +107,7 @@ export function fnfStatementHtml(fnf: FnfSettlement, employee: Employee, w: FnfW
   <h2>Working</h2>
   <table><tbody>
     ${row(`Gratuity: 15/26 × ${formatCurrency(w.basic_da, 'INR')} × ${g.service.gratuity_years} years (ceiling ${formatCurrency(g.ceiling, 'INR')})`, m(g.formula))}
-    ${row(`Gratuity ${g.eligible ? 'payable' : 'not payable — less than five years of service'}${g.borderline ? ' (4 years 240 days or more: ask your CA)' : ''}`, m(g.paid))}
+    ${row(`Gratuity ${g.eligible ? 'payable' : 'not payable: less than five years of service'}${g.borderline ? ' (4 years 240 days or more: ask your CA)' : ''}`, m(g.paid))}
     ${row('Gratuity exempt u/s 10(10)(ii) / taxable', `${m(g.exempt)} / ${m(round2(g.paid - g.exempt))}`)}
     ${row(`Leave encashment: ${w.leave.days} days × ${formatCurrency(w.leave.rate, 'INR')} (balance ${w.leave.balance} days)`, m(w.leave.amount))}
     ${row('Leave encashment exempt u/s 10(10AA) / taxable', `${m(w.leave.exempt)} / ${m(round2(w.leave.amount - w.leave.exempt))}`)}
@@ -116,7 +116,7 @@ export function fnfStatementHtml(fnf: FnfSettlement, employee: Employee, w: FnfW
     ${line ? row('TDS u/s 192 on the final salary (balance of the year)', m(line.tds)) : ''}
   </tbody></table>
   ${fnf.note ? `<p class="muted">${escapeHtml(fnf.note)}</p>` : ''}
-  <div class="sign"><span>Received in full and final settlement — employee</span><span>For ${escapeHtml(company?.companyName ?? '')} — authorised signatory</span></div>
+  <div class="sign"><span>Received in full and final settlement: employee</span><span>For ${escapeHtml(company?.companyName ?? '')}: authorised signatory</span></div>
   <div class="note">${escapeHtml(WORKING_PAPER)} Gratuity per the Payment of Gratuity Act 1972; exemptions u/s 10(10) and 10(10AA) as worked above; Form 16 for the year follows the final payroll.</div>
 </div></body></html>`;
 }
@@ -143,7 +143,7 @@ export function loanRegisterRows(loans: readonly EmployeeLoan[], employees: read
     const rec = loanRecoveries(l, runs);
     out.push([l.number, name.get(l.employee_id) ?? '', l.kind, formatDate(l.date), l.amount, l.interest_rate, l.emi, l.start_month, round2(rec.reduce((s, r) => s + r.principal, 0)), round2(rec.reduce((s, r) => s + r.interest, 0)), loanOutstanding(l, runs), l.purpose === 'medical' ? 'Medical treatment' : 'General']);
   }
-  out.push(['Interest-free / concessional loans above the small-loan limit are a perquisite u/s 17(2) (Rule 3(7)(i)) at the SBI rate — included in the TDS projection.']);
+  out.push(['Interest-free / concessional loans above the small-loan limit are a perquisite u/s 17(2) (Rule 3(7)(i)) at the SBI rate: included in the TDS projection.']);
   out.push([WORKING_PAPER]);
   return out;
 }
@@ -180,7 +180,7 @@ export function gratuityProvisionRows(employees: readonly Employee[], structures
     out.push([`${e.code} ${e.name}`, formatDate(e.doj), `${g.service.years}y ${g.service.months}m`, g.service.gratuity_years, ld, g.accrued, g.eligible ? 'Yes' : g.borderline ? 'Borderline' : 'No']);
   }
   out.push(['Total', '', '', '', '', round2(total), '']);
-  out.push(['15/26 × last drawn Basic + DA × completed years (part above six months counts), within the ceiling. An actuarial valuation (AS 15 / Ind AS 19) may be required — verify with your CA.']);
+  out.push(['15/26 × last drawn Basic + DA × completed years (part above six months counts), within the ceiling. An actuarial valuation (AS 15 / Ind AS 19) may be required: verify with your CA.']);
   out.push([WORKING_PAPER]);
   return { rows: out, total: round2(total) };
 }
@@ -191,7 +191,7 @@ export function bonusRows(runs: readonly PayrollRun[], employees: readonly Emplo
   for (const r of items) out.push([`${r.code} ${r.name}`, r.months, r.days_worked, r.salary, r.bonus_wages, r.bonus, r.reason ?? '']);
   const total = round2(items.reduce((s, r) => s + r.bonus, 0));
   out.push(['Total', '', '', '', '', total, '']);
-  out.push([`Payment of Bonus Act 1965 at ${ratePct}% (8.33%–20% by allocable surplus). Payable within 8 months of the year end — verify with your CA.`]);
+  out.push([`Payment of Bonus Act 1965 at ${ratePct}% (8.33%–20% by allocable surplus). Payable within 8 months of the year end: verify with your CA.`]);
   out.push([WORKING_PAPER]);
   return { rows: out, total, items };
 }

@@ -73,9 +73,9 @@ export function DeductionSetEditor({ boq, notify, refresh }: PanelProps & { boq:
         <F l={twT('completedOn')}><input className={controls.input} type="date" value={f.done} onChange={(e) => setF({ ...f, done: e.target.value })} /></F>
         <F l={twT('releaseOn')}><input className={controls.input} type="date" value={f.release} onChange={(e) => setF({ ...f, release: e.target.value })} /></F>
         <F l={twT('mobAdvance')}>
-          <select className={controls.select} value={f.adv} onChange={(e) => setF({ ...f, adv: e.target.value })}><option value="">—</option>{advances.map((a) => <option key={a.id} value={a.id}>{a.number} · {a.amount}</option>)}</select></F>
+          <select className={controls.select} value={f.adv} onChange={(e) => setF({ ...f, adv: e.target.value })}><option value="">-</option>{advances.map((a) => <option key={a.id} value={a.id}>{a.number} · {a.amount}</option>)}</select></F>
         <F l={twT('project')}>
-          <select className={controls.select} value={f.cc} onChange={(e) => setF({ ...f, cc: e.target.value })}><option value="">—</option>{projects.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></F>
+          <select className={controls.select} value={f.cc} onChange={(e) => setF({ ...f, cc: e.target.value })}><option value="">-</option>{projects.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></F>
         <F l={twT('cessMode')}>
           <select className={controls.select} value={f.cess} onChange={(e) => setF({ ...f, cess: e.target.value as 'expense' | 'recoverable' })}><option value="expense">{twT('cess.expense')}</option><option value="recoverable">{twT('cess.recoverable')}</option></select></F>
         <label className={controls.check}><input type="checkbox" checked={f.deductor} onChange={(e) => setF({ ...f, deductor: e.target.checked })} /> {twT('gstTdsDeductor')}</label>

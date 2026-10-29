@@ -104,7 +104,7 @@ export const HI_LIB: readonly (readonly [string, string])[] = [
   ['HSN / SAC is 4 to 8 digits.', 'HSN / SAC 4 से 8 अंकों का होता है।'],
   ['GST rate must be between 0 and 100.', 'GST दर 0 से 100 के बीच होनी चाहिए।'],
   ['A barcode takes letters, digits and plain punctuation only.', 'बारकोड में केवल अक्षर, अंक और सामान्य विराम चिह्न हो सकते हैं।'],
-  ['This EAN-13 has a wrong check digit — it should end in {digit}.', 'इस EAN-13 का चेक अंक गलत है — इसका अंतिम अंक {digit} होना चाहिए।'],
+  ['This EAN-13 has a wrong check digit: it should end in {digit}.', 'इस EAN-13 का चेक अंक गलत है: इसका अंतिम अंक {digit} होना चाहिए।'],
   ['“{name}” already has this barcode.', '“{name}” पर यह बारकोड पहले से है।'],
   ['“{name}” already uses this SKU.', '“{name}” पहले से यह SKU इस्तेमाल करता है।'],
   ['A short code is up to 12 letters / digits, no spaces.', 'शॉर्ट कोड 12 तक अक्षर / अंक का होता है, बिना स्पेस।'],

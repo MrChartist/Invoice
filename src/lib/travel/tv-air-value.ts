@@ -56,7 +56,7 @@ export function mergeTickets(items: readonly InvoiceItem[], tv: TvSnapshot | und
   const lines = { ...(tv?.lines ?? {}) };
   const fares = add.map((raw) => {
     const t = clean(raw);
-    const l = { ...svcLine(`Air ticket${t.sector ? ` — ${t.sector}` : ''}`, '', fareOf(t), 0), description: PURE_AGENT_CHARGE, charge_head_id: 'rule33' };
+    const l = { ...svcLine(`Air ticket${t.sector ? `: ${t.sector}` : ''}`, '', fareOf(t), 0), description: PURE_AGENT_CHARGE, charge_head_id: 'rule33' };
     delete l.hsn;
     lines[l.id] = { tkt: t };
     return l;
@@ -68,7 +68,7 @@ export function mergeTickets(items: readonly InvoiceItem[], tv: TvSnapshot | und
   const fee = round2(n(o.fee));
   const sac = ruleAt(AIR_SAC_RULES, o.date);
   const value = o.method === 'deemed' ? deemedValue(tickets, o.date) : fee;
-  const svc = value > 0 ? svcLine(o.method === 'deemed' ? 'Air travel agent service — value under Rule 32(3)' : 'Service fee — air tickets', sac.air, value, sac.rate) : null;
+  const svc = value > 0 ? svcLine(o.method === 'deemed' ? 'Air travel agent service: value under Rule 32(3)' : 'Service fee: air tickets', sac.air, value, sac.rate) : null;
   const r = ruleAt(AIR_AGENT_VALUE_RULES, o.date);
   const basic = round2(tickets.reduce((s, t) => s + n(t.basic), 0));
   const note = o.method === 'deemed' ? `Agent's service valued under Rule 32(3) at ${r.domestic} % / ${r.intl} % (domestic / international) of basic fare ₹${basic.toFixed(2)} = ₹${value.toFixed(2)}; fares at actual as pure agent. Verify with your CA.` : '';

@@ -64,17 +64,17 @@ export function leaseSchedulePart(l: Lease, ctx: LeaseContext): { template: Recu
   const g = ruleAt(LEASE_GST_RULES, l.start);
   const rate = kind.gst ? g.commercialRate : 0;
   const line = (id: string, name: string, amount: number): InvoiceItem => ({ id, name, type: 'Service', hsn: g.sac, quantity: 1, rate: round2(amount), tax_rate: rate, amount: round2(amount) });
-  const items = [line('rent', `Rent — ${ctx.property.name}${units ? ` (${units})` : ''} — {period}`, l.rent)];
+  const items = [line('rent', `Rent: ${ctx.property.name}${units ? ` (${units})` : ''}, {period}`, l.rent)];
   const cam = camAmount(l, ctx.property);
-  if (cam > 0) items.push(line('cam', 'Common area maintenance (CAM) — {period}', cam));
-  (l.heads ?? []).forEach((h, i) => money(h.amount) > 0 && items.push(line(`h${i + 1}`, `${str(h.name) || 'Charges'} — {period}`, money(h.amount))));
+  if (cam > 0) items.push(line('cam', 'Common area maintenance (CAM): {period}', cam));
+  (l.heads ?? []).forEach((h, i) => money(h.amount) > 0 && items.push(line(`h${i + 1}`, `${str(h.name) || 'Charges'}: {period}`, money(h.amount))));
   const pos = resolveStateCode({ code: ctx.property.state, name: ctx.property.state }) || senderStateCode(ctx.sender);
   const tdsRate = l.tds ? (l.tds.rate ?? sectionRate(l.tds.section, l.start) ?? 0) : 0;
   const template = {
     doc_type: kind.doc, currency: 'INR', template_id: ctx.templateId, client: partySnapshot(ctx.tenant), sender: ctx.sender, items,
     gst_mode: kind.gst ? deriveGstMode({ senderStateCode: senderStateCode(ctx.sender), placeOfSupply: pos, senderHasGstin: !!str(ctx.sender?.companyGstin), taxEnabled: true }) : 'NONE',
     place_of_supply: pos, reverse_charge: kind.reverse, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0,
-    round_off_enabled: ctx.roundOff !== false, notes: `Lease of ${ctx.property.name}${units ? ` — ${units}` : ''}`, terms: '',
+    round_off_enabled: ctx.roundOff !== false, notes: `Lease of ${ctx.property.name}${units ? `: ${units}` : ''}`, terms: '',
     ...(l.tds && tdsRate > 0 ? { tds_enabled: true, tds_section: l.tds.section, tds_rate: tdsRate } : {}),
     ...(kind.doc === 'BILL_OF_SUPPLY' ? { exempt_kind: 'EXEMPT' } : {}),
   } as RecurringTemplate;
@@ -111,7 +111,7 @@ export function saveLease(input: Omit<Lease, 'id' | 'schedule_id' | 'status'> & 
       const base: RecurringSchedule = old ?? createSchedule({ name: '', template: part.template, frequency: 'monthly', start_date: part.start, mode: 'issue' });
       const fresh = !old || old.run_count === 0;
       const s = recurringDb.save({
-        ...base, name: `Rent — ${ctx.tenant.name} — ${ctx.property.name}`, template: part.template, lease_id: lease.id, escalation: part.escalation,
+        ...base, name: `Rent: ${ctx.tenant.name}, ${ctx.property.name}`, template: part.template, lease_id: lease.id, escalation: part.escalation,
         end_date: lease.end, due_in_days: Math.max(0, Math.floor(lease.due_days) || 0), mode: 'issue',
         ...(fresh ? { start_date: part.start, next_run: part.start } : {}),
       });

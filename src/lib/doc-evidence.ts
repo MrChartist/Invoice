@@ -182,7 +182,7 @@ export function setDeliveryProof(id: string, input: ProofInput): InvoiceRecord {
       entity_id: id,
       action: 'update',
       doc_number: before.invoice_number,
-      summary: `${replaced ? 'Receiver signature replaced' : 'Receiver signature taken'} on ${before.invoice_number || 'document'} — received by ${proof.receiver}${replaced ? ` (reason: ${proof.replaced?.at(-1)?.reason})` : ''}${overridden ? ' (period-lock override)' : ''}`,
+      summary: `${replaced ? 'Receiver signature replaced' : 'Receiver signature taken'} on ${before.invoice_number || 'document'}: received by ${proof.receiver}${replaced ? ` (reason: ${proof.replaced?.at(-1)?.reason})` : ''}${overridden ? ' (period-lock override)' : ''}`,
     });
   } catch {
     /* logging never breaks the write */

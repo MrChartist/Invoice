@@ -71,7 +71,7 @@ export default function LabourView({ notify }: { notify: Notify }) {
         <Num l={T('holdPct')} v={pct} set={setPct} n={140} />
         <button type="button" className={B.os} onClick={() => run(() => { saveConstructionSettings({ labour_withhold_pct: n(pct) }); })}>{T('save')}</button>
       </div>
-      <Table d="holds" head={[T('bill'), T('contractor'), T('date'), T('balance'), T('hold'), T('payNow')]} rows={d.bills.map((b) => [b.bill.bill_number, b.bill.vendor_name, b.bill.date, fmtMoney(b.balance), b.hold > 0 ? <strong key="h" data-sd-hold>{fmtMoney(b.hold)} · {T(`lc.${b.status}`)}</strong> : '—', fmtMoney(b.payNow)])} />
+      <Table d="holds" head={[T('bill'), T('contractor'), T('date'), T('balance'), T('hold'), T('payNow')]} rows={d.bills.map((b) => [b.bill.bill_number, b.bill.vendor_name, b.bill.date, fmtMoney(b.balance), b.hold > 0 ? <strong key="h" data-sd-hold>{fmtMoney(b.hold)} · {T(`lc.${b.status}`)}</strong> : '-', fmtMoney(b.payNow)])} />
       <h4>{T('manpower')}</h4>
       <div style={row} data-sd-manpower>
         <Sel l={T('client')} v={mp.client} set={(x) => setMp({ ...mp, client: x })} o={opt(d.clients, (x) => x.id ?? '', (x) => x.name)} n={200} />

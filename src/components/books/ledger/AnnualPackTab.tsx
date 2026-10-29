@@ -153,7 +153,7 @@ export default function AnnualPackTab({ period, today, notify }: { period: Perio
         { name: `PnL_${pack.fy.id}.csv`, data: enc.encode(pnlCsv(pack.pl)) },
         { name: `CashFlow_${pack.fy.id}.csv`, data: enc.encode(cashFlowCsv(pack.cf)) },
         { name: `TrialBalance_${pack.fy.id}.csv`, data: enc.encode(trialBalanceCsv(pack.tb)) },
-        { name: 'README.txt', data: enc.encode(`Annual accounts pack ${pack.fy.label}, generated ${today} on this device by Mr. Chartist Invoice.\nDraft prepared from the books — not audited. Verify with your CA.\n`) },
+        { name: 'README.txt', data: enc.encode(`Annual accounts pack ${pack.fy.label}, generated ${today} on this device by Mr. Chartist Invoice.\nDraft prepared from the books: not audited. Verify with your CA.\n`) },
       ]);
       downloadBlob(`${stem}.zip`, blob);
     } finally {

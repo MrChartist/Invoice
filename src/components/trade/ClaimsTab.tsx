@@ -77,7 +77,7 @@ export default function ClaimsTab({ onDone }: { onDone: Done }) {
 type Vendors = { id: string; name: string }[];
 const VendorSelect = ({ value, onChange, vendors, data }: { value: string; onChange: (v: string) => void; vendors: Vendors; data?: string }) => (
   <select className={controls.select} value={value} onChange={(e) => onChange(e.target.value)} data-principal={data}>
-    <option value="">{aT('principal')}: —</option>
+    <option value="">{aT('principal')}: -</option>
     {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
   </select>
 );
@@ -109,7 +109,7 @@ function Schemes({ run, vendors }: { run: Run; vendors: Vendors }) {
         <div className={own.row}>
           <F label={aT('group')}>
             <select className={controls.select} value={f.scope?.group_ids?.[0] ?? ''} onChange={(e) => scope({ group_ids: e.target.value ? [e.target.value] : [] })} data-scheme-group>
-              <option value="">—</option>
+              <option value="">-</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </F>
@@ -212,7 +212,7 @@ function PriceDrop({ run, vendors }: { run: Run; vendors: Vendors }) {
                     <span className={own.row}>
                       <VendorSelect vendors={vendors} value={principal} onChange={setPrincipal} />
                       <button type="button" className={controls.btnGhost} disabled={!principal} onClick={() => run(() => claimPriceDrop(r.id, vendors.find((v) => v.id === principal)!, todayInput()).number)}>{aT('claim')}</button>
-                      <button type="button" className={controls.btnGhost} onClick={() => window.confirm(aT('undoAsk')) && run(() => `${undoPriceDrop(r.id).number} — ${aT('st.undone')}`)}>{aT('undo')}</button>
+                      <button type="button" className={controls.btnGhost} onClick={() => window.confirm(aT('undoAsk')) && run(() => `${undoPriceDrop(r.id).number}: ${aT('st.undone')}`)}>{aT('undo')}</button>
                     </span>
                   )}
                 </td>
@@ -259,11 +259,11 @@ function Claims({ run, vendors }: { run: Run; vendors: Vendors }) {
                 <td className={own.row}>
                   <button type="button" className={controls.btnGhost} onClick={() => setShown(shown === c.id ? '' : c.id)}>{aT('view')}</button>
                   <button type="button" className={controls.btnGhost} onClick={() => downloadCsv(`${c.number.replace(/\//g, '-')}.csv`, claimCsv(c))}>CSV</button>
-                  {c.status === 'draft' && <button type="button" className={controls.btnGhost} onClick={() => run(() => `${markClaim(c.id, 'sent').number} — ${aT('st.sent')}`)}>{aT('markSent')}</button>}
+                  {c.status === 'draft' && <button type="button" className={controls.btnGhost} onClick={() => run(() => `${markClaim(c.id, 'sent').number}: ${aT('st.sent')}`)}>{aT('markSent')}</button>}
                   {(c.status === 'draft' || c.status === 'sent') && <button type="button" className={controls.btnGhost} onClick={() => setSettle({ id: c.id, mode: 'financial', note_no: '', date: todayInput(), amount: String(c.amount), gst_rate: '18' })} data-claim-settle>{aT('settle')}</button>}
-                  {(c.status === 'draft' || c.status === 'sent') && <button type="button" className={controls.btnGhost} onClick={() => run(() => `${markClaim(c.id, 'rejected').number} — ${aT('st.rejected')}`)}>{aT('reject')}</button>}
+                  {(c.status === 'draft' || c.status === 'sent') && <button type="button" className={controls.btnGhost} onClick={() => run(() => `${markClaim(c.id, 'rejected').number}: ${aT('st.rejected')}`)}>{aT('reject')}</button>}
                   {(c.status === 'draft' || c.status === 'rejected') && <button type="button" className={controls.btnGhost} onClick={() => run(() => { deleteClaim(c.id); return aT('deleted'); })}>{aT('delete')}</button>}
-                  {c.settlement && <button type="button" className={controls.btnGhost} onClick={() => run(() => `${unsettleClaim(c.id).number} — ${aT('st.sent')}`)}>{aT('undo')}</button>}
+                  {c.settlement && <button type="button" className={controls.btnGhost} onClick={() => run(() => `${unsettleClaim(c.id).number}: ${aT('st.sent')}`)}>{aT('undo')}</button>}
                 </td>
               </tr>
             ))}
@@ -283,7 +283,7 @@ function Claims({ run, vendors }: { run: Run; vendors: Vendors }) {
           <F label={aT('date')}><input type="date" className={controls.input} value={settle.date} onChange={(e) => setSettle({ ...settle, date: e.target.value })} /></F>
           <F label={aT('amount')}><input type="number" className={controls.input} value={settle.amount} onChange={(e) => setSettle({ ...settle, amount: e.target.value })} /></F>
           {settle.mode === 'gst' && <F label="GST %"><input type="number" className={controls.input} value={settle.gst_rate} onChange={(e) => setSettle({ ...settle, gst_rate: e.target.value })} /></F>}
-          <div><button type="button" className={controls.btnPrimary} onClick={() => run(() => { const c = settleClaim(settle.id, { ...settle, amount: Number(settle.amount), gst_rate: Number(settle.gst_rate) }); setSettle(null); return `${c.number} — ${aT(`st.${c.status}`)}`; })}>{aT('save')}</button></div>
+          <div><button type="button" className={controls.btnPrimary} onClick={() => run(() => { const c = settleClaim(settle.id, { ...settle, amount: Number(settle.amount), gst_rate: Number(settle.gst_rate) }); setSettle(null); return `${c.number}: ${aT(`st.${c.status}`)}`; })}>{aT('save')}</button></div>
         </div>
       )}
       {open && <ClaimPrint c={open} />}

@@ -70,7 +70,7 @@ export function MrpBasisTool({ onDone }: { onDone: (msg: string, error?: boolean
         <label className={controls.field}>
           <span className={controls.label}>{rtaT('basisItem')}</span>
           <select className={controls.select} value={name} onChange={(e) => pick(e.target.value)} data-mrp-basis-item>
-            <option value="">—</option>
+            <option value="">-</option>
             {items.map((i) => <option key={i.id} value={i.name}>{i.name}{i.mrp_tax_basis ? ` (${i.mrp_tax_basis.rate}%)` : ''}</option>)}
           </select>
         </label>

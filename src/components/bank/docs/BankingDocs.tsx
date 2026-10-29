@@ -103,7 +103,7 @@ function SlipDocument({ v }: { v: DepositSlipView }) {
         <span>Date: {formatDate(v.date)}</span>
         <span>Account name: {v.accountName}</span>
         <span>Account no.: {v.accountNo || '________________'}</span>
-        <span>IFSC / branch: {[v.ifsc, v.branch].filter(Boolean).join(' / ') || '—'}</span>
+        <span>IFSC / branch: {[v.ifsc, v.branch].filter(Boolean).join(' / ') || '-'}</span>
         <span>Depositor: {v.depositor || '________________'}</span>
       </div>
       {v.cheques.length > 0 && (
@@ -128,7 +128,7 @@ function SlipDocument({ v }: { v: DepositSlipView }) {
           </tbody>
         </table>
       )}
-      <p><strong>Grand total: ₹{formatMoney(v.total)}</strong> — {v.words}</p>
+      <p><strong>Grand total: ₹{formatMoney(v.total)}</strong> : {v.words}</p>
       <p>Signature of depositor: ____________________</p>
     </div>
   );
@@ -250,7 +250,7 @@ function AdviceDocument({ a }: { a: PaymentAdvice }) {
         <span>To: {a.vendor}{a.vendorGstin ? ` (GSTIN ${a.vendorGstin})` : ''}</span>
         <span>Date: {formatDate(a.date)}</span>
         <span>Mode: {a.method}{a.reference ? ` · Ref ${a.reference}` : ''}</span>
-        <span>Paid to: {a.vendorBank || '—'}</span>
+        <span>Paid to: {a.vendorBank || '-'}</span>
         {a.paidFrom && <span>Paid from: {a.paidFrom}</span>}
       </div>
       <p>We have made the following payment to you:</p>
@@ -264,7 +264,7 @@ function AdviceDocument({ a }: { a: PaymentAdvice }) {
           <tr><td colSpan={3}><strong>Total</strong></td><td className={styles.num}><strong>{formatMoney(a.totalTds)}</strong></td><td className={styles.num}><strong>{formatMoney(a.totalPaid)}</strong></td><td /></tr>
         </tbody>
       </table>
-      <p>Amount paid: ₹{formatMoney(a.totalPaid)} — {a.words}</p>
+      <p>Amount paid: ₹{formatMoney(a.totalPaid)} : {a.words}</p>
       {a.totalTds > 0 && <p>TDS of ₹{formatMoney(a.totalTds)} has been deducted and will be deposited with the government; the Form 16A certificate follows after the quarter.</p>}
     </div>
   );
@@ -407,7 +407,7 @@ function EPaymentsPanel({ notify }: { notify: Notify }) {
             <div className={styles.rowEdit}>
               <label className={controls.field}><span className={controls.label}>{bnkT('vendor')}</span>
                 <select className={controls.select} value={r.vendorId} onChange={(e) => setRow(i, { vendorId: e.target.value })}>
-                  <option value="">—</option>
+                  <option value="">-</option>
                   {vendors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                 </select></label>
               <label className={controls.field}><span className={controls.label}>{bnkT('amount')}</span>

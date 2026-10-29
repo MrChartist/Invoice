@@ -64,13 +64,13 @@ export function materialOutChallanHtml(o: MaterialOut, items: readonly StockItem
   const section = (copy: string) => `<section class="c">
   <div class="head"><div><h1>${esc(company.name || 'Your business')}</h1>${company.address ? `<div>${esc(company.address)}</div>` : ''}${company.gstin ? `<div>GSTIN: ${esc(company.gstin)}</div>` : ''}</div>
   <div style="text-align:right"><div><strong>${esc(copy)}</strong></div><div>Challan no.: <strong>${esc(o.number)}</strong></div><div>Date: <strong>${esc(formatDate(o.date))}</strong></div></div></div>
-  <div class="title">Delivery challan — goods sent for job work</div>
+  <div class="title">Delivery challan: goods sent for job work</div>
   <div class="grid"><div><strong>Consignee (job worker)</strong><br>${esc(o.party_name)}${o.party_gstin ? `<br>GSTIN: ${esc(o.party_gstin)}` : ''}${theirState ? `<br>State code: ${esc(theirState)}` : ''}</div>
   <div>${o.process ? `<strong>Nature of job work:</strong> ${esc(o.process)}<br>` : ''}${inter ? `<strong>Place of supply:</strong> ${esc(theirState)} (inter-State)<br>` : ''}${o.eway_bill_no ? `<strong>e-Way bill:</strong> ${esc(o.eway_bill_no)}` : ''}</div></div>
   <table><thead><tr><th>#</th><th>Description</th><th>HSN</th><th class="n">Quantity</th><th class="n">Taxable value (₹)</th><th class="n">Rate</th><th class="n">${inter ? 'IGST' : 'CGST + SGST'} (₹)</th></tr></thead>
   <tbody>${rows}<tr class="total"><td></td><td>Total</td><td></td><td></td><td class="n">${esc(formatMoney(round2(totalValue)))}</td><td></td><td class="n">${esc(formatMoney(round2(totalTax)))}</td></tr></tbody></table>
-  <div class="note">Goods sent for job work under Section 143 of the CGST Act and Rule 55 — not a supply; no tax is charged on this challan (tax shown for information). Inputs are to be returned within one year and capital goods within three years of this date. ${o.narration ? esc(o.narration) : ''}</div>
-  <div class="sign">For ${esc(company.name || 'Your business')} — Authorised signatory</div>
+  <div class="note">Goods sent for job work under Section 143 of the CGST Act and Rule 55: not a supply; no tax is charged on this challan (tax shown for information). Inputs are to be returned within one year and capital goods within three years of this date. ${o.narration ? esc(o.narration) : ''}</div>
+  <div class="sign">For ${esc(company.name || 'Your business')}: Authorised signatory</div>
 </section>`;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">

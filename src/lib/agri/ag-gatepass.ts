@@ -44,7 +44,7 @@ export function checkGatePass(lot: ColdLot, bags: number, date: string, ctx: { l
   if (!(q3(bags) > 0)) errors.push('Enter the bags going out.');
   else if (q3(bags) > bal) errors.push(`Only ${bal} bags are in lot ${lot.number}.`);
   const liens = liensOn(lot.id, ctx.loans, date).filter((l) => !releaseCovered(l, ctx.lots, lot.id, bags, date, ctx.releaseLtv));
-  for (const l of liens) errors.push(`Loan ${l.number} has a lien on this lot: ₹${loanState(l, date).total.toFixed(2)} due — clear it first, or the owner may override with a reason.`);
+  for (const l of liens) errors.push(`Loan ${l.number} has a lien on this lot: ₹${loanState(l, date).total.toFixed(2)} due, clear it first, or the owner may override with a reason.`);
   const unpaid = ctx.invoices.filter((i) => i?.ag?.rent?.lot_id === lot.id && i.status !== 'Draft' && i.status !== 'Cancelled' && num(i.balance_due) > 0.005);
   if (unpaid.length) warnings.push(`Rent due on ${unpaid.map((i) => i.invoice_number).join(', ')}: ₹${unpaid.reduce((s, i) => s + num(i.balance_due), 0).toFixed(2)}.`);
   return { errors, warnings, liens };
@@ -54,7 +54,7 @@ export function checkGatePass(lot: ColdLot, bags: number, date: string, ctx: { l
 export function gatePassHtml(lot: ColdLot, out: ColdGateOut, company: string): string {
   const upTo = lot.outs.slice(0, lot.outs.findIndex((o) => o.id === out.id) + 1).reduce((s, o) => s + num(o.bags), 0) + (lot.transfers ?? []).filter((t) => t.date <= out.date).reduce((s, t) => s + num(t.bags), 0);
   return smallPaper(`Gate pass ${out.number}`, company, [
-    ['Lot / receipt', lot.number], ['Depositor', lot.depositor_name], ['Commodity', [lot.commodity, lot.variety].filter(Boolean).join(' — ')], ['Date', out.date],
+    ['Lot / receipt', lot.number], ['Depositor', lot.depositor_name], ['Commodity', [lot.commodity, lot.variety].filter(Boolean).join(', ')], ['Date', out.date],
     ['Bags released', out.bags], ['Weight (kg)', out.weight_kg ?? ''], ['Balance bags', q3(num(lot.bags) - upTo)], ['To / vehicle', [out.to, out.vehicle].filter(Boolean).join(' · ')],
     ['Taken by', out.by ?? ''], ['Loan check', out.loan_check === 'override' ? `Overridden: ${out.override_reason}` : 'Clear'],
   ], 'Goods released against this pass only.');
@@ -72,11 +72,11 @@ export function depositorStatement(lots: readonly ColdLot[], invoices: readonly 
 
 /** The depositor statement paper (A5): one row per lot, then rent and each open loan. */
 export function statementHtml(st: ReturnType<typeof depositorStatement>, name: string, company: string, day: string): string {
-  return smallPaper(`Depositor statement — ${name}`, `${company} · as at ${day}`, [
+  return smallPaper(`Depositor statement: ${name}`, `${company} · as at ${day}`, [
     ...st.lots.map((l): [string, unknown] => [`${l.number} · ${l.commodity}`, `in ${l.bags} · out ${bagsOut(l)} · balance ${lotBalance(l)} bags`]),
     ['Total bags', `in ${st.in} · out ${st.out} · balance ${st.balance}`], ['Rent billed / due', `₹${st.billed.toFixed(2)} / ₹${st.due.toFixed(2)}`],
     ...st.loans.map((x): [string, unknown] => [`Loan ${x.loan.number}`, `₹${x.due.toFixed(2)} due (principal + interest)`]),
-  ], 'Goods held in custody for the depositor — never our stock. Working paper; verify with your CA.');
+  ], 'Goods held in custody for the depositor: never our stock. Working paper; verify with your CA.');
 }
 
 /* ── Storage ── */

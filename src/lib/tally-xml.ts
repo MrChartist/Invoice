@@ -548,7 +548,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
     for (const p of allSorted) {
       if (p.advance_id && tdsOn.has(p)) {
         const inv = byId.get(p.invoice_id)!;
-        warnings.push(`${clean(inv.invoice_number) || inv.id}: the customer's TDS is settled by an advance adjustment, which has no voucher here — post the TDS journal in Tally.`);
+        warnings.push(`${clean(inv.invoice_number) || inv.id}: the customer's TDS is settled by an advance adjustment, which has no voucher here, post the TDS journal in Tally.`);
       }
     }
     for (const p of filterPayments(source.payments, sales, o.range)) {
@@ -667,7 +667,7 @@ export function buildTallyModel(source: ExportSource, options: TallyOptions): Ta
       const rows = paidRows.get(inv.id) ?? 0;
       if (toPaise(inv.amount_paid) > rows) {
         warnings.push(
-          `${clean(inv.invoice_number) || inv.id}: amount paid ${fixed2(inv.amount_paid)} is higher than its recorded payments (${fixed2(rows / 100)}) — the difference has no Receipt voucher.`,
+          `${clean(inv.invoice_number) || inv.id}: amount paid ${fixed2(inv.amount_paid)} is higher than its recorded payments (${fixed2(rows / 100)}), the difference has no Receipt voucher.`,
         );
       }
     }

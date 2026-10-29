@@ -463,7 +463,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
     if (!it || !it.track_stock || !num(m.qty)) continue;
     const mf = lineFactor(m); // 7M: an adjustment typed in an alternate unit
     const q = num(m.qty) * mf;
-    const note = m.note ? ` — ${m.note}` : '';
+    const note = m.note ? `: ${m.note}` : '';
     const label =
       m.kind === 'opening' ? 'Opening balance'
       : m.kind === 'adjustment' ? `Adjustment${note}`
@@ -521,7 +521,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
           kind: 'sale',
           qty: -q,
           saleRate: netRate(line) / factor,
-          particulars: `${inv.doc_type === 'DELIVERY_CHALLAN' ? 'Challan' : 'Sale'} — ${inv.invoice_number ?? ''}${clientName}`,
+          particulars: `${inv.doc_type === 'DELIVERY_CHALLAN' ? 'Challan' : 'Sale'}: ${inv.invoice_number ?? ''}${clientName}`,
           refType: 'invoice',
           refId: inv.id,
           ...dims,
@@ -532,7 +532,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
           kind: 'return',
           qty: q,
           saleRate: netRate(line) / factor,
-          particulars: `Sales return — ${inv.invoice_number ?? ''}${clientName}`,
+          particulars: `Sales return: ${inv.invoice_number ?? ''}${clientName}`,
           refType: 'invoice',
           refId: inv.id,
           ...dims,
@@ -560,7 +560,7 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
         kind: 'purchase',
         qty: q,
         rate: (line.unitCost + line.landedUnit) / line.unitFactor, // WP-8: landed cost loads the stock cost
-        particulars: `Purchase — ${bill.number}${bill.partyName ? ` · ${bill.partyName}` : ''}`,
+        particulars: `Purchase: ${bill.number}${bill.partyName ? ` · ${bill.partyName}` : ''}`,
         refType: 'purchase',
         refId: bill.id || undefined,
         godown: line.godownId,
@@ -594,8 +594,8 @@ export function collectEvents(input: StockInputs): Map<string, StockEvent[]> {
           date, kind: 'transfer' as const, refType: 'transfer', refId: t.id, refNumber: t.transfer_number,
           batch: l.batch_no || undefined, serials: cleanSerials(l.serials),
         };
-        push(it.id, { ...base, qty: -q, godown: t.from_godown, particulars: `Transfer out — ${t.transfer_number}` });
-        push(it.id, { ...base, qty: q, godown: t.to_godown, particulars: `Transfer in — ${t.transfer_number}` });
+        push(it.id, { ...base, qty: -q, godown: t.from_godown, particulars: `Transfer out: ${t.transfer_number}` });
+        push(it.id, { ...base, qty: q, godown: t.to_godown, particulars: `Transfer in: ${t.transfer_number}` });
       }
     }
   }
@@ -630,7 +630,7 @@ function pushVoucherEvents(vouchers: readonly StockVoucherInput[], byId: Map<str
   for (const v of sorted) {
     const date = dayOf(v.date);
     if (!date) continue;
-    const label = `${VOUCHER_LABEL[v.type]} — ${v.number}`;
+    const label = `${VOUCHER_LABEL[v.type]}: ${v.number}`;
     const refType = v.type === 'manufacturing' ? 'manufacturing' : v.type === 'stock_journal' ? 'stock_journal' : 'physical_stock';
     const base = { date, refType, refId: v.id, refNumber: v.number, party: VOUCHER_LABEL[v.type] };
     const tracked = (id: string) => {
@@ -1177,7 +1177,7 @@ export function shortfallsFromPositions(doc: Pick<InvoiceRecord, 'items'>, posit
 }
 
 export function describeShortfall(s: StockShortfall): string {
-  const kit = s.kits?.length ? ` — component of kit ${s.kits.join(', ')}` : '';
+  const kit = s.kits?.length ? `: component of kit ${s.kits.join(', ')}` : '';
   return s.available <= 0
     ? `${s.name}: out of stock (need ${s.requested} ${s.unit})${kit}`
     : `${s.name}: only ${s.available} ${s.unit} in stock (need ${s.requested})${kit}`;

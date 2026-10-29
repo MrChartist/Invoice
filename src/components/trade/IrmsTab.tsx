@@ -52,10 +52,10 @@ export default function IrmsTab({ rows, notify, changed }: { rows: RealisationRo
                     <td>{r.remitter ?? ''}</td>
                     <td className={styles.num}>{money(r.fcy, r.currency)}</td>
                     <td>
-                      {r.allocations.map((a) => <div key={a.invoice_id}>{rows.find((x) => x.invoiceId === a.invoice_id)?.number ?? '—'} · {money(a.fcy, r.currency)}</div>)}
+                      {r.allocations.map((a) => <div key={a.invoice_id}>{rows.find((x) => x.invoiceId === a.invoice_id)?.number ?? '-'} · {money(a.fcy, r.currency)}</div>)}
                       {used < r.fcy - 0.005 && <div className={styles.warn}>{trT('irmUnallocated', { amount: money(round2(r.fcy - used), r.currency) })}</div>}
                     </td>
-                    <td>{r.ebrc_no ? `${r.ebrc_no} · ${trT(`ebrc_${r.ebrc_status ?? 'pending'}`)}` : '—'}</td>
+                    <td>{r.ebrc_no ? `${r.ebrc_no} · ${trT(`ebrc_${r.ebrc_status ?? 'pending'}`)}` : '-'}</td>
                     <td>
                       {canBooks && <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setEditing({ ...r })}>{trT('edit')}</button>}
                       {canBooks && (

@@ -32,7 +32,7 @@ export interface ActRef {
 }
 
 const OFFICIAL_FAQ = 'CBDT FAQ, TDS compliance (incometax.gov.in)';
-const BILL_TABLE = 'Income-tax Bill 2025 Sec 393 / 394 Table (Act numbering per CBDT FAQ) — verify';
+const BILL_TABLE = 'Income-tax Bill 2025 Sec 393 / 394 Table (Act numbering per CBDT FAQ): verify';
 
 /** 1961 → 2025 for one code. `ref2025` null: the provision has no 2025-Act counterpart (keeps the old label). */
 function refRules(old: string, ref2025: string | null, verified: boolean, source: string): readonly Versioned<ActRef>[] {
@@ -65,7 +65,7 @@ export const ACT_REF_RULES: Readonly<Record<string, readonly Versioned<ActRef>[]
   '194M': refRules('194M', T393('6(ii)'), false, `${BILL_TABLE}; Form 141 list`),
   '195': refRules('195', 'Sec 393(2) [Table: Sl. No. 17]', false, BILL_TABLE),
   // PENDING 40: grossing-up when the payer bears the tax — the 2025-Act provision was not found in the sources read.
-  '195A': refRules('195A', 'Sec 393 [grossing-up: provision to confirm]', false, 'Not found in the sources read (P40) — verify'),
+  '195A': refRules('195A', 'Sec 393 [grossing-up: provision to confirm]', false, 'Not found in the sources read (P40): verify'),
   // TCS: Sec 394 is stated in the CBDT FAQ (Q18); the table item is the Bill's — verify.
   '206C1G': refRules('206C(1G)', 'Sec 394(1) [Table: Sl. No. 7]', false, `${OFFICIAL_FAQ}, Q18 (Sec 394); ${BILL_TABLE}`),
   // 206C(1H) was omitted from 1 Apr 2025 (Finance Act 2025): no 2025-Act counterpart.
@@ -75,13 +75,13 @@ export const ACT_REF_RULES: Readonly<Record<string, readonly Versioned<ActRef>[]
   '206C1': refRules('206C(1)', 'Sec 394(1) [Table: Sl. No. 1–5]', false, `${BILL_TABLE}; Finance Act 2026 as reported (TR14)`),
   '206C1F': refRules('206C(1F)', 'Sec 394(1) [Table: Sl. No. 6]', false, `${BILL_TABLE}; Sl. 6 vs 6.D disputed (TR15)`),
   // R5-C: donee approval for donations (80G → Sec 133(1)(b)(ii)); the donee statement (10BD) is Sec 354(1) / Form 113 — verify.
-  '80G': refRules('80G', 'Sec 133(1)(b)(ii)', false, 'Section mapping guide ITA 1961 → 2025 as understood — verify'),
+  '80G': refRules('80G', 'Sec 133(1)(b)(ii)', false, 'Section mapping guide ITA 1961 → 2025 as understood: verify'),
   // R14 (PS-D2): 194T (payments to partners) — the Sec 393 table entry is not confirmed (PS19): the label names the
   // section only and stays "verify with your CA" until a CA answers.
-  '194T': refRules('194T', 'Sec 393(1) [Table: entry to confirm]', false, 'Not found in the sources read (PS19) — verify'),
+  '194T': refRules('194T', 'Sec 393(1) [Table: entry to confirm]', false, 'Not found in the sources read (PS19): verify'),
   // R14 (PS-D1 / D4): partners' remuneration and interest limits, and presumptive income of professionals (as reported).
-  '40B': refRules('40(b)', 'Sec 35(e)', false, 'Income-tax Act 2025 Sec 35 as reported (PS20) — verify'),
-  '44ADA': refRules('44ADA', 'Sec 58', false, 'Income-tax Act 2025 Sec 58(2) Table Sl. 3 as reported (PS22) — verify'),
+  '40B': refRules('40(b)', 'Sec 35(e)', false, 'Income-tax Act 2025 Sec 35 as reported (PS20): verify'),
+  '44ADA': refRules('44ADA', 'Sec 58', false, 'Income-tax Act 2025 Sec 58(2) Table Sl. 3 as reported (PS22): verify'),
   // R15-A4 (TV3): TCS on an overseas tour programme package is Sl. No. 8 of the Sec 394(1) Table; LRS stays Sl. No. 7
   // (the '206C1G' row above). Read in the Bill as introduced. Stored codes are never renamed: labels / codes naming
   // a tour map here through `actKey`.
@@ -196,7 +196,7 @@ function formRules(old: string, n2025: string, verified: boolean, source: string
 }
 
 const UM = 'e-Filing user manual (incometax.gov.in)';
-const INDEX = 'incometaxindia.gov.in form page (seen in search index, not opened) — verify';
+const INDEX = 'incometaxindia.gov.in form page (seen in search index, not opened): verify';
 
 /**
  * Form numbers under the Income-tax Rules 2026, by the first day of the period the form covers. A return or
@@ -208,7 +208,7 @@ export const FORM_REF_RULES: Readonly<Record<ActForm, readonly Versioned<FormRef
   '27Q': formRules('27Q', '144', true, `${UM}: Form 144 (TDS on non-residents)`),
   '27EQ': formRules('27EQ', '143', false, `${INDEX}: Form 143 (earlier Form 27EQ)`),
   '16': formRules('16', '130', false, `${INDEX}: Form 130_131_132_133 (earlier 16 / 16A / 16B–16E / 27D)`),
-  '12BA': formRules('12BA', '123', false, 'Secondary sources (2026): Form 123 (earlier 12BA), Rule 204(2) — verify'),
+  '12BA': formRules('12BA', '123', false, 'Secondary sources (2026): Form 123 (earlier 12BA), Rule 204(2), verify'),
   '16A': formRules('16A', '131', false, `${INDEX}: Form 131 (earlier 16A)`),
   '27D': formRules('27D', '133', false, `${INDEX}: Form 133 (earlier 27D)`),
   '26AS': formRules('26AS', '168', true, `${OFFICIAL_FAQ}, Q24–25: AIS for TY 2026-27 in Form No. 168`),
@@ -217,8 +217,8 @@ export const FORM_REF_RULES: Readonly<Record<ActForm, readonly Versioned<FormRef
   '15G/15H': formRules('15G/15H', '121', true, 'Form mapping guide, ITA 1961 → 2025 (incometax.gov.in)'),
   '26QB-QE': formRules('26QB-QE', '141', true, `${OFFICIAL_FAQ}, Q9; form mapping guide`),
   // PENDING 40: remittances to non-residents (Rule 37BB) — Rules-2026 numbers as reported in secondary sources.
-  '15CA': formRules('15CA', '145', false, 'Income-tax Rules 2026 form list as reported (secondary) — verify'),
-  '15CB': formRules('15CB', '146', false, 'Income-tax Rules 2026 form list as reported (secondary) — verify'),
+  '15CA': formRules('15CA', '145', false, 'Income-tax Rules 2026 form list as reported (secondary): verify'),
+  '15CB': formRules('15CB', '146', false, 'Income-tax Rules 2026 form list as reported (secondary): verify'),
 };
 
 export function formRef(form: ActForm, date?: string): FormRef {

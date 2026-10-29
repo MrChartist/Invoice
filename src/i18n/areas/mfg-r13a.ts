@@ -4,7 +4,7 @@ import { defineArea } from '../area';
 export const fT = defineArea(
   {
     'view.centres': 'Work centres', 'view.routings': 'Routings', 'view.cards': 'Job cards', 'view.load': 'Load', 'view.wip': 'WIP',
-    wp: 'Planning figures and working papers — verify valuation and statutory points with your CA.',
+    wp: 'Planning figures and working papers: verify valuation and statutory points with your CA.',
     none: 'Nothing here yet.', save: 'Save', cancel: 'Cancel', edit: 'Edit', delete: 'Delete', deleted: 'Deleted.', back: 'Back',
     name: 'Name', kind: 'Kind', 'kind.machine': 'Machine', 'kind.line': 'Line', 'kind.manual': 'Manual', 'kind.outside': 'Outside (job work)',
     vendor: 'Job worker', rate: 'Rate ₹ / h', rateMachine: 'Machine ₹ / h', rateLabour: 'Labour ₹ / h', ratePower: 'Power ₹ / h', rateOverhead: 'Overhead ₹ / h',
@@ -28,7 +28,7 @@ export const fT = defineArea(
   } as const,
   {
     'view.centres': 'कार्य केंद्र', 'view.routings': 'रूटिंग', 'view.cards': 'जॉब कार्ड', 'view.load': 'लोड', 'view.wip': 'WIP',
-    wp: 'योजना के आँकड़े और कार्य पत्र — मूल्यांकन और वैधानिक बातें अपने CA से जाँचें।',
+    wp: 'योजना के आँकड़े और कार्य पत्र: मूल्यांकन और वैधानिक बातें अपने CA से जाँचें।',
     none: 'अभी यहाँ कुछ नहीं।', save: 'सहेजें', cancel: 'रद्द करें', edit: 'बदलें', delete: 'हटाएँ', deleted: 'हटाया गया।', back: 'वापस',
     name: 'नाम', kind: 'प्रकार', 'kind.machine': 'मशीन', 'kind.line': 'लाइन', 'kind.manual': 'हाथ का काम', 'kind.outside': 'बाहर (जॉब वर्क)',
     vendor: 'जॉब वर्कर', rate: 'दर ₹ / घंटा', rateMachine: 'मशीन ₹ / घंटा', rateLabour: 'मज़दूरी ₹ / घंटा', ratePower: 'बिजली ₹ / घंटा', rateOverhead: 'ओवरहेड ₹ / घंटा',

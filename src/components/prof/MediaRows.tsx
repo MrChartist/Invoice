@@ -26,7 +26,7 @@ export default function MediaRows({ ps, onChange }: { ps: unknown; onChange: (ps
       <label className={controls.field}>
         <span className={controls.label}>{psbT('client')}</span>
         <select className={controls.select} value={m?.client_id ?? ''} onChange={(e) => set({ client_id: e.target.value })} data-ps-media="client">
-          <option value="">—</option>
+          <option value="">-</option>
           {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </label>

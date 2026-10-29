@@ -37,7 +37,7 @@ export function subsidyErrors(doc: Pick<InvoiceRecord, 'doc_type' | 'status' | '
   const i = doc.ag?.inputs;
   const out: string[] = [];
   if (!i?.pos_txn?.trim()) out.push('Subsidised fertiliser: enter the PoS transaction no. from the fertiliser PoS device.');
-  if (!validFarmerId(i?.farmer_id)) out.push('Subsidised fertiliser: enter the farmer ID — Aadhaar last 4 digits or the KCC no. (never the full Aadhaar).');
+  if (!validFarmerId(i?.farmer_id)) out.push('Subsidised fertiliser: enter the farmer ID, Aadhaar last 4 digits or the KCC no. (never the full Aadhaar).');
   return out;
 }
 
@@ -50,7 +50,7 @@ export function capWarning(doc: Pick<InvoiceRecord, 'id' | 'issue_date' | 'clien
   const key = farmerKey(doc);
   const before = invoices.filter((i) => i.id !== doc.id && live(i) && i.issue_date.slice(0, 7) === month && farmerKey(i) === key).reduce((s, i) => s + subsidisedBags(i, isSub), 0);
   const total = q3(before + subsidisedBags(doc, isSub));
-  return total > limit ? `This farmer has ${total} subsidised bags this month — above ${limit} a month (reported cap — verify AG22).` : undefined;
+  return total > limit ? `This farmer has ${total} subsidised bags this month: above ${limit} a month (reported cap, verify AG22).` : undefined;
 }
 
 export interface PosCheckRow { item_id: string; item: string; book: number; pos: number | undefined; diff: number | undefined }

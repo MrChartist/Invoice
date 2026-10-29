@@ -497,7 +497,7 @@ export function advanceVoucherHtml(a: AdvanceRecord): string {
   <div class="muted">${esc(amountInWords(a.amount, 'INR'))}</div>
   <table>
     ${row('Description of supply', esc(a.description || (a.supply === 'goods' ? 'Advance against supply of goods' : 'Advance against supply of services')))}
-    ${row('Place of supply', esc(formatPlaceOfSupply(a.place_of_supply) || (a.place_of_supply === '96' || a.place_of_supply === '99' ? '96 — Other Countries' : a.place_of_supply)))}
+    ${row('Place of supply', esc(formatPlaceOfSupply(a.place_of_supply) || (a.place_of_supply === '96' || a.place_of_supply === '99' ? '96 (Other Countries)' : a.place_of_supply)))}
     ${a.tax.applies ? row('Taxable value', m(a.tax.taxable)) : ''}
     ${taxRows(a, a.tax, row, m)}
     ${row('Tax payable on reverse charge', 'No')}

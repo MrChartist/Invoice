@@ -165,7 +165,7 @@ export function saveSubBill(woId: string, i: SubBillInput): { measurement: SubMe
       const p = (n: number) => Math.round(n * 100);
       jvId = saveVoucher({
         type: 'JOURNAL', date: i.date, voucher_class: 'Sub-contractor deductions',
-        narration: `Deductions on sub-contractor bill ${number} (${wo.number}) — ${wo.vendor_name}`,
+        narration: `Deductions on sub-contractor bill ${number} (${wo.number}): ${wo.vendor_name}`,
         lines: [
           { account_id: A.creditors, dr: p(jvTotal), cr: 0, party: wo.vendor_name },
           ...jvDeds.map((d) => {
@@ -243,9 +243,9 @@ export function subBillHtml(b: PurchaseRecord, company: string): string {
   const rows = (cn?.abstract ?? []).map((r) => `<tr><td>${e(r.ref)}</td><td>${e(r.description)}${r.mb ? ` <small>(MB ${e(r.mb)})</small>` : ''}</td><td>${e(r.unit)}</td><td>${r.rate}</td><td>${r.prev_qty}</td><td>${r.this_qty}</td><td>${r.cum_qty}</td><td>${r.amount.toFixed(2)}</td></tr>`).join('');
   const deds = (cn?.deductions ?? []).map((d) => `<tr><td colspan="7">Less: ${e(d.label)}</td><td>${d.amount.toFixed(2)}</td></tr>`).join('');
   return `<!doctype html><meta charset="utf-8"><title>${e(cn?.number)}</title><style>${PRINT_FONT_FACE}body{font:12px ${PRINT_FONT};margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:4px;text-align:left}</style>
-<h2>Sub-contractor bill ${e(cn?.number)} — abstract</h2><p>${e(company)} · Work order ${e(cn?.wo_number)} · ${e(b.vendor_name)} · ${e(b.date)}</p>
+<h2>Sub-contractor bill ${e(cn?.number)}: abstract</h2><p>${e(company)} · Work order ${e(cn?.wo_number)} · ${e(b.vendor_name)} · ${e(b.date)}</p>
 <table><tr><th>Item</th><th>Description</th><th>Unit</th><th>Rate</th><th>Previous</th><th>This bill</th><th>Up to date</th><th>Amount</th></tr>${rows}
 <tr><td colspan="7">Value before GST</td><td>${b.taxable.toFixed(2)}</td></tr><tr><td colspan="7">GST</td><td>${(b.total - b.taxable).toFixed(2)}</td></tr>
 <tr><td colspan="7">Less: TDS ${e(b.tds_section)}</td><td>${num(cn?.tds).toFixed(2)}</td></tr>${deds}<tr><th colspan="7">Net payable</th><th>${num(cn?.net).toFixed(2)}</th></tr></table>
-<p><small>Working paper — TDS u/s 194C on the value before GST (CBDT Circular 23/2017); verify with your CA.</small></p>`;
+<p><small>Working paper: TDS u/s 194C on the value before GST (CBDT Circular 23/2017); verify with your CA.</small></p>`;
 }

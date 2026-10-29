@@ -106,9 +106,9 @@ function RxView({ onDone }: { onDone: Done }) {
         head={[rtbT('date'), rtbT('bill'), rtbT('patient'), rtbT('doctor'), rtbT('schedules'), '']}
         flagged={rows.map((i) => !i.rx?.patient?.trim() || !i.rx?.prescriber?.trim())}
         rows={rows.map((i) => [
-          i.issue_date, i.invoice_number, [i.rx?.patient, i.rx?.age ? `${i.rx.age}${i.rx.gender ?? ''}` : ''].filter(Boolean).join(' · ') || i.client?.name || '—',
-          (i.rx?.doctor_id && doctors.get(i.rx.doctor_id)) || i.rx?.prescriber || '—',
-          [...new Set(scheduledLines(i.items ?? [], index).map((l) => l.schedule))].join(' / ') || '—',
+          i.issue_date, i.invoice_number, [i.rx?.patient, i.rx?.age ? `${i.rx.age}${i.rx.gender ?? ''}` : ''].filter(Boolean).join(' · ') || i.client?.name || '-',
+          (i.rx?.doctor_id && doctors.get(i.rx.doctor_id)) || i.rx?.prescriber || '-',
+          [...new Set(scheduledLines(i.items ?? [], index).map((l) => l.schedule))].join(' / ') || '-',
           made.has(i.id) ? rtbT('refillMade') : <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => run(() => { const r = saveRefill(refillFromBill(i, every)); return rtbT('refillSaved', { name: r.name, date: r.next_due }); })} data-rtb-make-refill>{rtbT('makeRefill')}</button>,
         ])}
       />
@@ -199,7 +199,7 @@ function RegistersView({ onDone }: { onDone: Done }) {
         <div style={wrap}>
           <label className={controls.field}><span className={controls.label}>{rtbT('reg.narcotic')}</span>
             <select className={controls.select} value={pick} onChange={(e) => setPick(e.target.value)}>
-              <option value="">—</option>
+              <option value="">-</option>
               {items.filter((i) => !i.narcotic).map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
             </select></label>
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!pick} onClick={() => run(() => { patchStockItem(pick, { narcotic: true }); setPick(''); return rtbT('saved'); })}>{rtbT('markNarcotic')}</button>
@@ -310,7 +310,7 @@ function PricesView({ onDone }: { onDone: Done }) {
       <div style={wrap}>
         <label className={controls.field}><span className={controls.label}>{rtbT('item')}</span>
           <select className={controls.select} value={id} onChange={(e) => setId(e.target.value)} data-rtb-price-item>
-            <option value="">—</option>
+            <option value="">-</option>
             {items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
           </select></label>
       </div>
@@ -333,12 +333,12 @@ function PricesView({ onDone }: { onDone: Done }) {
       )}
       <label className={controls.field}><span className={controls.label}>{rtbT('ceilingCsv')}</span>
         <textarea className={controls.textarea} rows={3} value={csv} onChange={(e) => setCsv(e.target.value)} placeholder="Paracetamol 500 TAB, 1.82, TAB, 01-04-2026" /></label>
-      <p><button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!csv.trim()} onClick={() => run(() => { const r = importCeilings(parseCeilingCsv(csv)); setCsv(''); return rtbT('csvDone', { n: r.added, missing: r.missing.join(', ') || '—' }); })}><FileSpreadsheet size={14} aria-hidden="true" /> {rtbT('importCsv')}</button></p>
+      <p><button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!csv.trim()} onClick={() => run(() => { const r = importCeilings(parseCeilingCsv(csv)); setCsv(''); return rtbT('csvDone', { n: r.added, missing: r.missing.join(', ') || '-' }); })}><FileSpreadsheet size={14} aria-hidden="true" /> {rtbT('importCsv')}</button></p>
       <p className={controls.hint}>{rtbT('ceilingNote')}</p>
       <h3>{rtbT('margins')} <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!margins.length} onClick={() => downloadText(`margins-${day}.csv`, marginCsv(margins), 'text/csv')}><Download size={14} aria-hidden="true" /> CSV</button></h3>
       <Table
         head={[rtbT('item'), rtbT('batch'), 'PTR', rtbT('costAfterFree'), 'PTS', 'MRP', rtbT('sellRate'), rtbT('marginPtr'), rtbT('scheme')]}
-        rows={margins.map((m) => [m.item, m.batch || '—', m.ptr.toFixed(2), m.cost.toFixed(2), m.pts?.toFixed(2) ?? '', m.mrp.toFixed(2), m.sell.toFixed(2), m.margin === null ? '—' : `${m.margin}%`, m.scheme])}
+        rows={margins.map((m) => [m.item, m.batch || '-', m.ptr.toFixed(2), m.cost.toFixed(2), m.pts?.toFixed(2) ?? '', m.mrp.toFixed(2), m.sell.toFixed(2), m.margin === null ? '-' : `${m.margin}%`, m.scheme])}
       />
     </>
   );

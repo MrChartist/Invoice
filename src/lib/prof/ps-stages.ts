@@ -135,7 +135,7 @@ export function createStageBill(e: StageEngagement, stageId: string, date: strin
   const settings = localDb.settings.get();
   const sender = localDb.settings.activeProfile() ?? null;
   const base = makeDraft({ settings, sender, docType: 'INVOICE', templateId: localDb.template.get() });
-  const item = { id: generateId(), type: 'Service', name: `Professional fees — stage ${snap.no} of ${snap.of}: ${snap.label}`, description: `${num(plan.fee_pct)}% of project cost ₹${snap.project_cost} × ${snap.stage_pct}% cumulative, less ₹${snap.billed_before} billed`, hsn: opts.sac ?? '998321', unit: 'OTH', quantity: 1, rate: b.amount, tax_rate: opts.gstRate ?? 18, discount_percent: 0, amount: b.amount };
+  const item = { id: generateId(), type: 'Service', name: `Professional fees, stage ${snap.no} of ${snap.of}: ${snap.label}`, description: `${num(plan.fee_pct)}% of project cost ₹${snap.project_cost} × ${snap.stage_pct}% cumulative, less ₹${snap.billed_before} billed`, hsn: opts.sac ?? '998321', unit: 'OTH', quantity: 1, rate: b.amount, tax_rate: opts.gstRate ?? 18, discount_percent: 0, amount: b.amount };
   let rec = buildBillDraft({ ...base, id: generateId(), issue_date: date }, client, [item], sender);
   const pos = propertyPos(plan.property, client).pos;
   if (pos && pos !== rec.place_of_supply) {
@@ -145,7 +145,7 @@ export function createStageBill(e: StageEngagement, stageId: string, date: strin
   }
   // QA17 R6: the property's place of supply also feeds PS-C's Sec 2(6) check (13(4)): a foreign client's Indian house
   // is not an export, whatever the supply type says.
-  const ps = { kind: 'stage', engagement: { id: e.id, number: e.number, model: e.model }, basis: `Stage ${snap.no} of ${snap.of} on project cost`, stage: snap, ...(pos ? { export: { pos_class: 'property' as const, property_state: pos } } : {}), lines: { [item.id]: { stage: `Stage ${snap.no} of ${snap.of} — ${snap.label}` } } };
+  const ps = { kind: 'stage', engagement: { id: e.id, number: e.number, model: e.model }, basis: `Stage ${snap.no} of ${snap.of} on project cost`, stage: snap, ...(pos ? { export: { pos_class: 'property' as const, property_state: pos } } : {}), lines: { [item.id]: { stage: `Stage ${snap.no} of ${snap.of}: ${snap.label}` } } };
   rec = { ...rec, ps } as InvoiceRecord;
   rec.invoice_number = localDb.invoices.nextNumber(rec.issue_date, rec.doc_type, sender?.invoicePrefix || undefined);
   return localDb.invoices.save(rec);

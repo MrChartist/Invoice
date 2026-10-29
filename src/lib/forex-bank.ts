@@ -290,7 +290,7 @@ export function recordFxMove(input: FxMoveInput): FxBankMove {
   const date = isoDay(input.date);
   if (!date) throw new ForexBankError('Choose the date.');
   const rate = num(input.rate);
-  if (!(rate > 0)) throw new ForexBankError('Enter the rate (₹ per unit) — no live rates are fetched.');
+  if (!(rate > 0)) throw new ForexBankError('Enter the rate (₹ per unit): no live rates are fetched.');
   const data = liveForexData();
   const fcyBal = fcyBalanceAt(acc, data, date);
   const inrBal = ledgerInrBalance(acc.id, date);
@@ -312,14 +312,14 @@ export function recordFxMove(input: FxMoveInput): FxBankMove {
     const plan = planOutflow({ fcy, inrReceived: received, fcyBalance: fcyBal, inrBalance: inrBal });
     if (plan.errors.length) throw new ForexBankError(plan.errors[0]);
     move = { bank_account_id: acc.id, date, kind: 'out', fcy, rate, inr: received, carrying: plan.carrying, diff: plan.diff, counter_account: input.counter_account, ...(input.counter_party ? { counter_party: input.counter_party } : {}) };
-    narration = `${cur} ${money(fcy)} out of ${acc.name} @ ₹${rate}: ₹${money(received)} against carrying value ₹${money(plan.carrying)} — realised exchange ${plan.diff >= 0 ? 'gain' : 'loss'} ₹${money(Math.abs(plan.diff))} (verify with your CA)`;
+    narration = `${cur} ${money(fcy)} out of ${acc.name} @ ₹${rate}: ₹${money(received)} against carrying value ₹${money(plan.carrying)}, realised exchange ${plan.diff >= 0 ? 'gain' : 'loss'} ₹${money(Math.abs(plan.diff))} (verify with your CA)`;
   } else {
     const plan = planRevaluation({ fcyBalance: fcyBal, inrBalance: inrBal, rate });
     if (Math.abs(plan.diff) < 0.005) throw new ForexBankError('Nothing to revalue: the book balance already equals the balance at that rate.');
     const reverseOn = input.reverse_on ? isoDay(input.reverse_on) : '';
     if (input.reverse_on && !(reverseOn && reverseOn > date)) throw new ForexBankError('Choose a reversal date after the revaluation date.');
     move = { bank_account_id: acc.id, date, kind: 'revalue', fcy: 0, rate, inr: plan.diff, diff: plan.diff, ...(reverseOn ? { reverse_on: reverseOn } : {}) };
-    narration = `Revaluation of ${acc.name}: ${cur} ${money(plan.fcy)} @ ₹${rate} closing rate = ₹${money(plan.restated)} against book ₹${money(plan.book)} — unrealised exchange ${plan.diff >= 0 ? 'gain' : 'loss'}${reverseOn ? `, reversed on ${reverseOn}` : ''} (AS 11; verify with your CA)`;
+    narration = `Revaluation of ${acc.name}: ${cur} ${money(plan.fcy)} @ ₹${rate} closing rate = ₹${money(plan.restated)} against book ₹${money(plan.book)}, unrealised exchange ${plan.diff >= 0 ? 'gain' : 'loss'}${reverseOn ? `, reversed on ${reverseOn}` : ''} (AS 11; verify with your CA)`;
   }
   const lines = moveVoucherLines(move, ledger);
   return withTablesRollback([FX_BANK_MOVES_TABLE, 'vouchers'], () => {
@@ -359,7 +359,7 @@ export function payVendorFromForex(input: FxVendorPaymentInput): FxBankMove {
   const vendorName = (input.vendor_name ?? '').trim();
   if (!vendorName) throw new ForexBankError('Choose the supplier.');
   const rate = num(input.rate);
-  if (!(rate > 0)) throw new ForexBankError('Enter the rate (₹ per unit) — no live rates are fetched.');
+  if (!(rate > 0)) throw new ForexBankError('Enter the rate (₹ per unit): no live rates are fetched.');
   const fcy = round2(num(input.fcy));
   const settle = num(input.settle) > 0 ? round2(num(input.settle)) : round2(fcy * rate);
   const plan = planOutflow({ fcy, inrReceived: settle, fcyBalance: fcyBalanceAt(acc, liveForexData(), date), inrBalance: ledgerInrBalance(acc.id, date) });
@@ -373,7 +373,7 @@ export function payVendorFromForex(input: FxVendorPaymentInput): FxBankMove {
     });
     let voucher = { id: '', number: '' };
     if (Math.abs(plan.diff) >= 0.005) {
-      const text = `${cur} ${money(fcy)} paid to ${vendorName} from ${acc.name}: ₹${money(settle)} settled against carrying value ₹${money(plan.carrying)} — realised exchange ${plan.diff >= 0 ? 'gain' : 'loss'} ₹${money(Math.abs(plan.diff))} (verify with your CA)`;
+      const text = `${cur} ${money(fcy)} paid to ${vendorName} from ${acc.name}: ₹${money(settle)} settled against carrying value ₹${money(plan.carrying)}, realised exchange ${plan.diff >= 0 ? 'gain' : 'loss'} ₹${money(Math.abs(plan.diff))} (verify with your CA)`;
       // The payment already credited the bank with `settle`; this Journal brings the credit to the carrying value.
       voucher = saveVoucher({ type: 'JOURNAL', date, narration: input.narration?.trim() ? `${input.narration.trim()} | ${text}` : text, lines: moveVoucherLines({ kind: 'revalue', inr: plan.diff, diff: plan.diff }, bankLedgerId(acc.id)), voucher_class: 'Forex bank' });
     }

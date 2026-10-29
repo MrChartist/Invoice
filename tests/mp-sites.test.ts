@@ -60,7 +60,7 @@ test('client flags on Client.mp; the payroll store keeps Employee.mp; the firm f
   saveClientMp('c-mh', {});
   assert.equal(localDb.clients.getById('c-mh')!.mp, undefined);
   const s = saveSite({ name: 'Tower', mp: info() });
-  assert.equal(siteLabel(loadSites()[0]), 'S-001 — Tower');
+  assert.equal(siteLabel(loadSites()[0]), 'S-001: Tower');
   assert.deepEqual(normalizeEmployees([{ id: 'e', name: 'Ramesh', cost_centre_id: s.id, mp: { post_id: 'p1' } }])[0].mp, { post_id: 'p1' });
   assert.equal(loadEmployees().length, 0);
   assert.equal(firmForm(), 'proprietorship');

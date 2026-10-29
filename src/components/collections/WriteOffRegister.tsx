@@ -77,10 +77,10 @@ export function WriteOffRegister({ notify, onChanged }: { notify: (m: string, to
                 <tr key={r.invoiceId}>
                   <td>{r.party}</td>
                   <td className={surface.mono}>{r.number}</td>
-                  <td>{r.date ? formatDate(r.date) : '—'}</td>
-                  <td>{r.reason || '—'}</td>
+                  <td>{r.date ? formatDate(r.date) : '-'}</td>
+                  <td>{r.reason || '-'}</td>
                   <td className={surface.numeric}>{formatMoney(r.writtenOff, 'INR')}</td>
-                  <td className={surface.numeric}>{r.recovered ? formatMoney(r.recovered, 'INR') : '—'}</td>
+                  <td className={surface.numeric}>{r.recovered ? formatMoney(r.recovered, 'INR') : '-'}</td>
                   <td className={surface.numeric}><strong>{formatMoney(r.net, 'INR')}</strong></td>
                   {owner && (
                     <td>

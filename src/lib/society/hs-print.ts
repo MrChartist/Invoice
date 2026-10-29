@@ -22,7 +22,7 @@ const dmy = (d: string) => d.split('-').reverse().join('/');
 
 /** The footnote lines (from the snapshot only). */
 export function explainLines(hs: HsSnapshot): string[] {
-  const out = (hs.heads ?? []).slice(0, 16).map((h) => `${h.name}: ${h.basis || '—'} = ${rs(h.amount)}`);
+  const out = (hs.heads ?? []).slice(0, 16).map((h) => `${h.name}: ${h.basis || '-'} = ${rs(h.amount)}`);
   if (hs.test && hs.test.limit > 0 && /^(exempt77c|taxable_)/.test(hs.regime ?? '')) out.push(`GST test: member contributions ${rs(hs.test.counted / Math.max(1, hs.test.months))} a month against the ${rs(hs.test.limit)} a month limit.`);
   if (hs.heads?.some((h) => h.kind === 'statutory')) out.push('Statutory dues are collected for the authority and passed on, outside GST.');
   if (hs.interest) out.push(`Interest: ${hs.interest.pct} % a year, simple, on ${rs(hs.interest.on)} from ${dmy(hs.interest.from)} to ${dmy(hs.interest.to)}.`);

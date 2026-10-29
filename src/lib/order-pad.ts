@@ -254,7 +254,7 @@ export function importOrders(payload: PadPayload, deps: ImportDeps, opts: { only
       const master = (o.client_id ? clients.find((c) => c.id === o.client_id) : undefined) ?? clients.find((c) => n(c.name) === n(o.client_name));
       const client: Client = master ?? ({ name: o.client_name, email: '', address: '', city: '', zip: '' } as Client);
       const items = orderLines(o, stock, catalog, deps.defaultTax, generateId);
-      const rec = deps.buildOrder({ client, date: o.date, items, agentId: agentId ?? master?.agent_id, note: [o.note, `Order pad · ${payload.salesman.name || 'salesman'} · ${o.id}`].filter(Boolean).join(' — ') });
+      const rec = deps.buildOrder({ client, date: o.date, items, agentId: agentId ?? master?.agent_id, note: [o.note, `Order pad · ${payload.salesman.name || 'salesman'} · ${o.id}`].filter(Boolean).join(', ') });
       const saved = deps.save(rec);
       out.push(saved);
       rows.push({ id: o.id, invoice_id: saved.id, number: saved.invoice_number, salesman: payload.salesman.name, order_date: o.date, imported_at: new Date().toISOString() });

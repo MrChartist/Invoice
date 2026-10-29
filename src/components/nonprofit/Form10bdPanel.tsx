@@ -32,7 +32,7 @@ export function Form10bdPanel({ notify, tick, refresh }: { notify: Notify; tick:
       </div>
       <p className={styles.note}>{iT('bdNote', { form: bd, date: due.bd, fee: due.lateFeePerDay })}</p>
       <Tbl d="10bd-rows" h={['#', iT('donor'), iT('idNo'), iT('section'), iT('type'), iT('mode'), iT('amount')]} rows={rows.map((r) => [r.sr, r.name, r.id_no, r.section, r.type, r.mode, rs(r.amount)])} />
-      {!filing && res.left.map(({ d, why }) => <p key={d.id} className={styles.warn}>{d.number} · {rs(d.amount)} — {iT(`why.${why}`)}</p>)}
+      {!filing && res.left.map(({ d, why }) => <p key={d.id} className={styles.warn}>{d.number} · {rs(d.amount)} : {iT(`why.${why}`)}</p>)}
       {filing?.filed_on ? <p>{iT('filed', { form: bd, arn: filing.arn ?? '', date: filing.filed_on })}</p> : (
         <div className={styles.toolbar}>
           <T l="ARN" v={f.arn} on={(arn) => setF({ ...f, arn })} />
@@ -51,7 +51,7 @@ export function Form10bdPanel({ notify, tick, refresh }: { notify: Notify; tick:
           const r = be.find((x) => x.donor_id === id);
           return (
             <div key={id} className={styles.toolbar}>
-              <span>{donors.get(id)?.name} · {r?.sent_on ?? '—'}</span>
+              <span>{donors.get(id)?.name} · {r?.sent_on ?? '-'}</span>
               <T l={iT('certNo')} v={r?.cert_no} on={(cert_no) => attempt(notify, () => { save10be(fy, [{ donor_id: id, cert_no }]); refresh(); })} />
             </div>
           );

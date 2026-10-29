@@ -20,7 +20,11 @@
   `--font-display`), Chartist Serif (italic accent, `--font-accent`); files + `OFL.txt` in `public/fonts/chartist-*`,
   `@font-face` in `src/fonts.css`, standalone print documents use `src/lib/print-fonts.ts`. Noto Sans Devanagari stays as
   the Devanagari-only script fallback. No text below 12px, no weight above 600 (`tests/type-system.test.ts`; printed-paper
-  exceptions allow-listed there). Owner deviations: Indian comma grouping stays (invoice app); em-dash removal pending.
+  exceptions allow-listed there). Owner deviations: Indian comma grouping stays (invoice app).
+  No em dash (U+2014) in visible text: sentences use a comma, colon, full stop or brackets, an empty cell is a plain "-",
+  a place of supply prints "27 (Maharashtra)"; `tests/no-em-dash.test.ts` scans every string / template / JSX text token
+  in `src/` (allow-list = ledger names and voucher classes matched by name, each with its reason); readers of old stored
+  text keep accepting "—".
   Buttons follow the Mr Chartist button system (`docs/theme/BUTTON-SYSTEM.md`): every pressable kind (`.btn` + intent /
   size, `.join`, `.seg`, `.chip`, `.lk`) is drawn by `src/styles/buttons.css` (first paint, after `index.css`); the
   `controls.btn*` / `segment*` module classes only compose it, primary = ink (black / white), destructive = `danger`

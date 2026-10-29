@@ -150,7 +150,7 @@ test('time lines group by project + description + rate, qty in hours to 2 dp wit
   assert.equal(research.tax_rate, 18);
   assert.equal(research.amount, 1500);
   assert.match(research.description!, /2 entries/);
-  assert.equal(lines[1].name, 'Audit — Ledger review');
+  assert.equal(lines[1].name, 'Audit: Ledger review');
   assert.equal(lines[2].rate, 2000);
   // Per-entry rounding before summing.
   const up = ts.timeLines([entry({ minutes: 7 }), entry({ minutes: 7 })], { ...prefs, round_increment: 6, round_mode: 'up' });
@@ -224,7 +224,7 @@ test('bill unbilled time creates a new draft with the right lines and marks the 
   assert.match(inv.invoice_number, /^INV\/FY26-27\/\d{4}$/);
   assert.equal(inv.gst_mode, 'CGST_SGST', 'Maharashtra seller → Maharashtra client');
   const names = inv.items.map((i) => i.name);
-  assert.deepEqual(names, ['Research', 'Audit — Research', 'Re-billed expense — Travel: IndiGo (#TKT9)', 'Reimbursement — Government fees: IndiGo (#FEE1)', 'Mileage']);
+  assert.deepEqual(names, ['Research', 'Audit: Research', 'Re-billed expense: Travel, IndiGo (#TKT9)', 'Reimbursement: Government fees, IndiGo (#FEE1)', 'Mileage']);
   // 1.5 h + 0.5 h at 1000, 5500 re-billed, 1000 pure agent, 1000 mileage.
   assert.equal(inv.taxable_value, 1500 + 500 + 5500 + 1000 + 1000);
   assert.equal(inv.tax_amount, Math.round((1500 + 500 + 5500 + 1000) * 0.18 * 100) / 100, 'pure-agent line carries no GST');

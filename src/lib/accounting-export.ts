@@ -561,7 +561,7 @@ export function buildAccountantBundle(source: ExportSource, o: BundleOptions): B
   }
 
   const combinedDoc = {
-    generator: 'MrChartist Invoice Creator — Export Center',
+    generator: 'MrChartist Invoice Creator: Export Center',
     company: o.companyName,
     range: o.range ?? {},
     datasets: Object.fromEntries(

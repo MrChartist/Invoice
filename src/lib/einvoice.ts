@@ -393,7 +393,7 @@ export function buildEInvoice(record: InvoiceRecord, options: EInvoiceOptions = 
   // (NIC adds AssVal + tax heads), so the recipient-pays tax is kept in TotInvVal here.
   const calc = inrTotals(calculateInvoice(calcInputFromRecord(record, { rcm_exclude_tax: false })), record);
   if (missingFxRate(record)) {
-    assumptions.push(issue('error', 'FX_RATE_MISSING', 'Currency', `Amounts are in ${docCurrency(record)} but the invoice has no exchange rate. The IRP needs INR values — add the CBIC / shipping-bill rate on the invoice.`));
+    assumptions.push(issue('error', 'FX_RATE_MISSING', 'Currency', `Amounts are in ${docCurrency(record)} but the invoice has no exchange rate. The IRP needs INR values: add the CBIC / shipping-bill rate on the invoice.`));
   }
 
   // ── Seller ──
