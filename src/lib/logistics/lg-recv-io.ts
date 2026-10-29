@@ -21,6 +21,7 @@ import { assertUnlocked } from '../period-lock';
 import { getTable, setTable } from '../storage';
 import { localDb } from '../localDb';
 import { parseTable } from '../csv';
+import { lgcT } from '../../i18n/areas/logistics-r19c';
 import { loadJobs, saveJob } from './lg-save';
 import { readLogisticsSettings } from './lg-settings';
 import { docRefsFromTable } from './lg-register';
@@ -54,11 +55,11 @@ export function addDisbursement(input: DisbInput, pay?: { method: string; refere
 /** C3: write off an unrecoverable disbursement (memo stamp `lg.wo`, no journal; refused in a locked period). */
 export function writeOffDisb(id: string, date: string, reason: string, by?: string): void {
   requireAccess('books.edit');
-  if (!reason.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Give the date and a reason.');
+  if (!reason.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(lgcT('eWo'));
   assertUnlocked({ issue_date: date }, 'edit');
   const rows = getTable<PurchaseRecord>('purchases');
   const p = rows.find((x) => x?.id === id && x.lg?.on_behalf);
-  if (!p?.lg || p.lg.wo) throw new Error('Not an open disbursement.');
+  if (!p?.lg || p.lg.wo) throw new Error(lgcT('eNotOpen'));
   setTable('purchases', rows.map((x) => (x === p ? { ...p, lg: { ...p.lg!, wo: { date, reason: reason.trim(), ...(by ? { by } : {}) } } } : x)));
 }
 
@@ -75,7 +76,7 @@ export function loadDeposits(): DepositBal[] {
 /** C2: receive a deposit for a job (Receipt Voucher at 0 %, pass-through). POS = the client's State, else ours. */
 export function addDeposit(job: Pick<LgJob, 'id' | 'number' | 'client_id'>, x: DepositReceipt) {
   const c = localDb.clients.getById(job.client_id);
-  if (!c) throw new Error('Client not found.');
+  if (!c) throw new Error(lgcT('eClient'));
   const pos = c.state_code || senderSnapshot()?.stateCode || '';
   return saveAdvance(depositInput(job, { id: c.id, name: c.name, ...(c.gstin ? { gstin: c.gstin } : {}), ...(c.state_code ? { state_code: c.state_code } : {}) }, pos, x));
 }
@@ -89,7 +90,7 @@ export function jobOpenInvoices(jobId: string): { id: string; number: string; op
 /** C2: apply a deposit to an invoice of its job (the smaller of what is left on each). */
 export function applyDeposit(dep: DepositBal, invoiceId: string, date?: string) {
   const inv = jobOpenInvoices(dep.job_id).find((i) => i.id === invoiceId);
-  if (!inv) throw new Error('No open invoice of this job.');
+  if (!inv) throw new Error(lgcT('noInv'));
   return applyAdvance({ advanceId: dep.id, invoiceId, amount: applyAmount(dep.open, inv.open), ...(date ? { date } : {}) });
 }
 

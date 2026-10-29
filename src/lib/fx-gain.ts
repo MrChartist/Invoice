@@ -94,6 +94,8 @@ export interface ForeignReceiptRow {
   bookRate: number | null;
   realisedRate?: number;
   fx: RealisedFx | null;
+  /** QA22 W7: a netting row (R19-D agent set-off): its rate is the bill's, set by the netting — not edited here. */
+  netted?: boolean;
 }
 
 const partyOf = (inv: InvoiceRecord) => String(inv.client?.company || inv.client?.name || '').trim() || 'Customer';
@@ -118,6 +120,7 @@ export function foreignReceipts(invoices: readonly InvoiceRecord[], payments: re
       bookRate: fxRate(inv),
       realisedRate: cleanRate(p.realised_rate),
       fx: realisedFx(p, inv),
+      ...(p.exchange_purchase_id ? { netted: true } : {}),
     });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date) || a.invoiceNumber.localeCompare(b.invoiceNumber));

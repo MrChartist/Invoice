@@ -109,7 +109,7 @@ export default function FxTab({ data, period, onChanged, notify }: { data: Books
                             inputMode="decimal"
                             aria-label={planT('rateAria', { invoice: r.invoiceNumber, date: formatDate(r.date) })}
                             value={value}
-                            disabled={locked || r.bookRate === null}
+                            disabled={locked || r.bookRate === null || r.netted}
                             onChange={(e) => setDraft((d) => ({ ...d, [r.paymentId]: e.target.value }))}
                           />
                           {dirty && (
