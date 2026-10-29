@@ -203,6 +203,8 @@ declare module './purchases' {
       ref?: string;
       in_client_name?: boolean;
       wo?: { date: string; reason: string; by?: string };
+      /** D1: an overseas agent's bill typed in its currency (`amount` in that currency, `rate` ₹ per unit; the bill is booked in ₹). */
+      fx?: { currency: string; amount: number; rate: number };
     };
   }
   interface Vendor {

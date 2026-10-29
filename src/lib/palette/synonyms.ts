@@ -169,6 +169,10 @@ export const TAB_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   '/time?tab=deploy&view=statutory': ['arrears', 'vda', 'wage revision', 'debit note', 'tds receivable', 'psara', 'licence renewal', 'बकाया'],
   // R19-A: the Shipments desk (B–D add billing / costing / customs / agents / courier / storage)
   '/time?tab=shipments': ['freight forwarder', 'logistics', 'customs broker', 'शिपमेंट'],
+  // R19-D
+  '/time?tab=shipments&view=agents': ['overseas agent', 'profit share'],
+  '/time?tab=shipments&view=courier': ['docket', 'manifest', 'AWB'],
+  '/time?tab=shipments&view=reports': ['job margin', 'lane margin'],
   '/time?tab=shipments&view=jobs': ['job file', 'shipment', 'consignment', 'जॉब'],
   '/time?tab=shipments&view=rates': ['charge heads', 'freight rate', 'भाड़ा'],
   '/time?tab=shipments&view=billing': ['freight invoice', 'bill job', 'POS 96', 'बिलिंग'], // R19-B

@@ -1,0 +1,51 @@
+/**
+ * R19-D: overseas agents, courier manifests, logistics reports and notices. Shared words (job, agent,
+ * client, chargeable, kind, currency, rate, name …) come from `logistics-r19a.ts`. Lists (`agentKinds`, `noteKinds`,
+ * `byList`) and report headers (`h*`) are comma-separated, in the order of their ids.
+ */
+import { defineArea } from '../area';
+
+export const lgdT = defineArea(
+  {
+    agents: 'Agents', courier: 'Courier', reports: 'Reports',
+    agentKinds: 'Overseas agent,Shipping line,Airline,Co-loader,CFS,Transporter,Other', noteKinds: 'Profit share,Freight,Other charges',
+    country: 'Country (ISO)', foreign: 'Outside India', addAgent: 'Add agent', ours: 'Owed to us', theirs: 'We owe', net: 'Net',
+    amount: 'Amount', billNo: 'Their bill no.', debit: 'Debit agent', agentBill: "Agent's bill", period: 'Month', doc: 'Document',
+    hNote: 'Outside India: our note is an export of services (LUT); their bill an import of services (reverse charge).',
+    paste: "Agent's statement: job or HBL, amount (+ we owe)", diff: '{r}: ours {o}, theirs {t}',
+    rcmPaid: 'Reverse-charge IGST paid', settle: 'Settle by netting',
+    hFema: 'Netting export receivables against import payables: AD bank conditions (FEMA).',
+    zone: 'Zone', first_500g: 'First 500 g', addl_500g: 'Each 500 g more', min: 'Minimum', rto_pct: 'RTO %', import: 'Import dockets', dockets: 'Dockets', remove: 'Remove',
+    eCols: 'Columns needed: docket, date, zone.', eMany: 'At most 5,000 dockets per file.', eRows: 'Rows to fix: {r}.', imported: '{n} dockets imported.',
+    hEway: 'Value over ₹50,000 ({d}): the courier may file e-Way Part A for the consignor (Rule 138).',
+    billDate: 'Bill date', billMonth: 'Bill month', billed: '{n} bills issued.', undo: 'Undo month', undone: '{n} bills cancelled.',
+    r_margin: 'Margin', r_agents: 'Agent balances', r_ageing: 'Disbursements ageing', by: 'By', byList: 'Lane,Client,Salesperson,Month',
+    hMargin: 'Group,Jobs,Revenue,Cost,Margin,%', hAgents: 'Agent,Owed to us,We owe,Net', hAgeing: 'Job,0–30,31–60,61–90,90+,Total',
+    aUnbilled: '{j} delivered, not billed', aDisb: '{j} — disbursements unrecovered', aShort: '{j} — deposit short', aMan: '{n} courier manifests of {p} not billed', aAmt: '{a} over 30 days', aOpen: 'Open',
+    eClient: 'Choose the client.', eDup: 'Dockets already on a manifest: {d}.', eBilled: '{p} is billed; undo it first.', eUndoPaid: 'Bills with receipts: {n}.',
+    eName: 'Type the name.', eAgentDup: 'A supplier with this name exists.', eAmount: 'Type the amount and the rate.',
+    eBillNo: 'Type their bill number.', eBillDup: 'This bill is already booked.', eSettle: 'Set off between 0 and {a}.', eRcm: 'Pay the reverse-charge IGST first and tick the box.',
+    eCur: 'Different currencies.', eAgentClient: 'The agent has no client record.',
+  } as const,
+  {
+    agents: 'एजेंट', courier: 'कूरियर', reports: 'रिपोर्ट',
+    agentKinds: 'विदेशी एजेंट,शिपिंग लाइन,एयरलाइन,को-लोडर,CFS,ट्रांसपोर्टर,अन्य', noteKinds: 'लाभ हिस्सा,भाड़ा (फ्रेट),अन्य शुल्क',
+    country: 'देश (ISO)', foreign: 'भारत से बाहर', addAgent: 'एजेंट जोड़ें', ours: 'हमें मिलना है', theirs: 'हमें देना है', net: 'शुद्ध',
+    amount: 'राशि', billNo: 'उनका बिल नं.', debit: 'एजेंट को डेबिट', agentBill: 'एजेंट का बिल', period: 'महीना', doc: 'दस्तावेज़',
+    hNote: 'भारत से बाहर: हमारा नोट सेवाओं का निर्यात है (LUT हो तो उसके तहत); उनका बिल रिवर्स चार्ज में सेवाओं का आयात।',
+    paste: 'एजेंट का विवरण: जॉब या HBL, राशि (+ हमें देना)', diff: '{r}: हमारा {o}, उनका {t}',
+    rcmPaid: 'रिवर्स-चार्ज IGST चुका दिया', settle: 'नेटिंग से निपटाएँ',
+    hFema: 'निर्यात प्राप्य को आयात देय से समायोजित करने के लिए AD बैंक की शर्तें (FEMA) ज़रूरी हैं।',
+    zone: 'ज़ोन', first_500g: 'पहले 500 ग्रा.', addl_500g: 'हर अगले 500 ग्रा.', min: 'न्यूनतम', rto_pct: 'RTO %', import: 'डॉकेट आयात करें', dockets: 'कूरियर डॉकेट', remove: 'हटाएँ',
+    eCols: 'ज़रूरी कॉलम: डॉकेट, तिथि, ज़ोन।', eMany: 'एक फ़ाइल में अधिकतम 5,000 डॉकेट।', eRows: 'ठीक करने वाली पंक्तियाँ: {r}।', imported: '{n} डॉकेट आयात हुए।',
+    hEway: '₹50,000 से अधिक मूल्य ({d}): कूरियर प्रेषक की ओर से ई-वे भाग A भर सकता है (नियम 138)।',
+    billDate: 'बिल तिथि', billMonth: 'महीने का बिल', billed: '{n} बिल जारी हुए।', undo: 'महीना वापस लें', undone: '{n} बिल रद्द हुए।',
+    r_margin: 'मार्जिन', r_agents: 'एजेंट शेष', r_ageing: 'डिस्बर्समेंट की आयु', by: 'आधार', byList: 'मार्ग,ग्राहक,विक्रेता,महीना',
+    hMargin: 'समूह,जॉब,आय,लागत,मार्जिन,%', hAgents: 'एजेंट,हमें मिलना है,हमें देना है,शुद्ध', hAgeing: 'जॉब,0–30,31–60,61–90,90+,कुल',
+    aUnbilled: '{j} डिलीवर, बिल नहीं बना', aDisb: '{j} — डिस्बर्समेंट नहीं वसूले', aShort: '{j} — जमा कम', aMan: '{p} के {n} कूरियर मैनिफ़ेस्ट का बिल नहीं बना', aAmt: '{a}, 30 दिन से अधिक', aOpen: 'खोलें',
+    eClient: 'ग्राहक चुनें।', eDup: 'ये डॉकेट पहले से मैनिफ़ेस्ट पर हैं: {d}।', eBilled: '{p} का बिल बन चुका है; पहले वापस लें।', eUndoPaid: 'प्राप्ति वाले बिल: {n}।',
+    eName: 'नाम लिखें।', eAgentDup: 'इस नाम का आपूर्तिकर्ता पहले से है।', eAmount: 'राशि और दर लिखें।',
+    eBillNo: 'उनका बिल नंबर लिखें।', eBillDup: 'यह बिल पहले से दर्ज है।', eSettle: '0 से {a} के बीच समायोजित करें।', eRcm: 'पहले रिवर्स-चार्ज IGST चुकाएँ और बॉक्स पर टिक करें।',
+    eCur: 'अलग-अलग मुद्राएँ।', eAgentClient: 'एजेंट का ग्राहक रिकॉर्ड नहीं है।',
+  },
+);
