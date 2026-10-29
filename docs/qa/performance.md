@@ -511,7 +511,10 @@ base `438a13f` (tree = `f7be189`).
    used one of these leaves now load the 13.2 kB group (precached; ≤ 1.5 kB raw each). 2,500 bytes saved another 3.5 kB
    but made a 27 kB group; 1,000 saved 2.9 kB less.
 
-Other numbers, before → after: entry 90.8 → 89.5, `vendor-react` / `vendor-ui` unchanged (72.13 / 15.81 → 15.80),
+Re-measured after merging PENDING 51 (base `d715f44` = `b1b33c2`, which adds the `lib-msg` chunk): core 3,279.7 →
+**3,232.9 (−46.8)**, first paint 179.3 → 177.9, entry 90.9 → 89.5, Hindi pack 369.5 → 369.4, `lazy-leaves-ui` 13.3 kB.
+
+Other numbers (on `438a13f`), before → after: entry 90.8 → 89.5, `vendor-react` / `vendor-ui` unchanged (72.13 / 15.81 → 15.80),
 initial files 4 → 4, Hindi pack 361.5 → 361.4, regional 20.7 → 20.7, Hindi in core 21.7 → 21.7, `lazy-leaves` 17.7 →
 17.6, JS files 1,059 → 1,030 (core 960 → 931).
 
