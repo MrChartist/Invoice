@@ -121,6 +121,7 @@ const PosDevices = lazy(() => import('../components/retail-r9/DevicesDesk').then
 const PosJewel = lazy(() => import('../components/retail-r9/JewelleryDesk').then((m) => ({ default: m.PosJewel }))); // R9 (RT-E2/E3) tag box, cash / PAN guard
 const PosAppointment = lazy(() => import('../components/services-r10/PosAppointment')); // R10 (SV-A2) `?appt=` bill from the front desk
 const PosInputsStrip = lazy(() => import('../components/agri/PosInputsStrip')); // R12 (AG-D4) PoS txn no., farmer ID, credit till harvest
+const PosFuelStrip = lazy(() => import('../components/fuel/NozzleChip')); // R21-A3 nozzle chip, ₹ ↔ litres, non-GST fuel
 const PosPackages = lazy(() => import('../components/services-r10/SvRedeem').then((m) => ({ default: m.PosPackages }))); // R10 (SV-C1) "Use package"
 const PosStaff = lazy(() => import('../components/services-r10/PosStaff')); // R10 (SV-A) staff per line, tip
 // R4-B3: the counter's branch (store price list). Inline labels, so the POS does not load the stores catalogue.
@@ -241,6 +242,7 @@ export function Pos() {
   const [jwPos, setJwPos] = useState<{ kyc?: SaleKyc; errors: string[] } | null>(null); // R9 (RT-E3) cash / PAN guard
   const [agPos, setAgPos] = useState<{ ag: NonNullable<InvoiceRecord['ag']>; due?: string; errors: string[] } | null>(null); // R12 (AG-D4)
   const [svBlock, setSvBlock] = useState<string[]>([]); // R10 (PENDING #21): staff required on service lines
+  const [fuPos, setFuPos] = useState<{ patch: Partial<InvoiceRecord>; errors: string[] } | null>(null); // R21-A3 fuel strip
   const pharmaOn = useMemo(() => readPharmaSettings().enabled, []);
   /** The line the last scan / pick went to (Alt+Q), the quantity field last focused (Alt+W live weight). */
   const lastLine = useRef<string | null>(null);
@@ -274,7 +276,7 @@ export function Pos() {
   }, [redeemed, built, promoV, promoMany]);
   const promoted = promo.record ?? redeemed?.record ?? built;
   // 7U: a running bill-value offer applies after the price level / slab and the loyalty redemption.
-  const offered = useMemo(() => applyBillOffer(promoted, data.pricing?.schemes ?? [], { retotalRecord: true }), [promoted, data.pricing]);
+  const offered = useMemo(() => applyBillOffer(fuPos ? { ...promoted, ...fuPos.patch } : promoted, data.pricing?.schemes ?? [], { retotalRecord: true }), [promoted, data.pricing, fuPos]); // R21-A3: + the fuel patch
   const jwKyc = jwPos?.kyc; // R9 (RT-E3)
   const record = useMemo(() => (agentId || delivery || rxPos || jwKyc || agPos ? { ...offered, ...(agentId ? { agent_id: agentId } : {}), ...(delivery?.address.trim() ? { delivery } : {}), ...(rxPos?.rx ? { rx: rxPos.rx } : {}), ...(rxPos?.att?.length ? { attachments: rxPos.att } : {}), ...(jwKyc ? { kyc: jwKyc } : {}), ...(agPos ? { ag: agPos.ag, ...(agPos.due ? { due_date: agPos.due } : {}) } : {}) } : offered), [offered, agentId, delivery, rxPos, jwKyc, agPos]);
   // R9: retail checks (MRP guard, deliveries, short book) read once; the strip loads only when one is on.
@@ -554,6 +556,7 @@ export function Pos() {
     setDevPay(null); // R9 (RT-D)
     setJwPos(null); // R9 (RT-E3)
     setAgPos(null); // R12 (AG-D4)
+    setFuPos(null); // R21-A3
     setRedeemPts(0);
     setGvApplied([]);
     setParty(WALK_IN);
@@ -589,6 +592,7 @@ export function Pos() {
     if (devPay?.error) return setErrors([devPay.error]); // R9 (RT-D)
     if (jwPos?.errors.length) return setErrors(jwPos.errors); // R9 (RT-E3): cash 269ST / PAN 114B
     if (agPos?.errors.length) return setErrors(agPos.errors); // R12 (AG-D4): subsidised fertiliser needs the PoS txn no.
+    if (fuPos?.errors.length) return setErrors(fuPos.errors); // R21-A3: no price in force / mixed bill to a GSTIN buyer
     if (svBlock.length) return setErrors(svBlock); // R10 (PENDING #21): staff required on service lines
     // 8E (8.144): an "On account" amount must be what is left unpaid.
     if (onAccount > 0.004 && Math.abs(onAccount - summary.due) > 0.004) {
@@ -1128,6 +1132,7 @@ export function Pos() {
               {party.client && (isPackOn(settings, 'salon') || isPackOn(settings, 'fitness')) && <Suspense fallback={null}><PosPackages client={party.client} items={items} setItems={setItems} notify={notify} /></Suspense>}
               {isPackOn(settings, 'apparel') && <Suspense fallback={null}><PosApparel record={record} setItems={setItems} /></Suspense>}
               {isPackOn(settings, 'agri_inputs') && <Suspense fallback={null}><PosInputsStrip key={lastBill?.id} record={record} onChange={setAgPos} /></Suspense>}
+              {isPackOn(settings, 'fuel') && <Suspense fallback={null}><PosFuelStrip key={lastBill?.id} record={record} setItems={setItems} onChange={setFuPos} /></Suspense>}
               {(isPackOn(settings, 'jewellery') || !!retailRs.require_pan) && <Suspense fallback={null}><PosJewel record={record} cash={devicesOn ? 0 : Math.max(summary.cash - summary.change, 0)} setItems={setItems} onChange={setJwPos} /></Suspense>}
               {party.client ? null : (
                 <>

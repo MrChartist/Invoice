@@ -52,7 +52,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 17. Security, facility-management and manpower-supply agencies (Round 17, planned) | MP1–MP48 | 48 | 13 |
 | 18. Co-operative housing societies, apartment associations and RWAs (Round 18, planned) | HS1–HS70 | 70 | 19 |
 | 19. Freight forwarders, customs brokers, courier and warehouses (Round 19, planned) | LG1–LG44 | 44 | 13 |
-| **Total** | | **740** | **184** |
+| 21. Petrol pumps, CNG stations and LPG distributors (Round 21, planned) | FU1–FU30 | 30 | 9 |
+| **Total** | | **770** | **193** |
 
 ---
 
@@ -1441,6 +1442,54 @@ ends in `G`: the CA-id patterns read `LG1` whole, never as `G1` (`tests/docs-lin
 | LG44 | Section labels by date on TDS / TCS working papers (194C → Sec 393 Sl. 6 from 1 Apr 2026). | `ita2025.ts` | `ita2025.ts` labels (not edited) | 2026-04-01 | existing rows |
 
 `LG` ids are counted once here. The ★ items (LG1, LG2, LG3, LG4, LG5, LG6, LG9, LG10, LG14, LG15, LG21, LG23, LG30) change what a document prints or a return reports.
+
+## 21. Petrol pumps, CNG stations and LPG distributors (Round 21, ids FU1–FU30)
+
+Added with `docs/prd/round-21.md` (§9: FU1–FU30) by R21-A. It covers dealer-operated petrol / diesel retail outlets,
+CNG stations and LPG distributors. `FU` ("fuel") ends in `U`, and no prefix is `U` or `F`: the CA-id patterns read `FU1`
+whole (`tests/docs-links.test.ts`).
+
+- Files named under "Where" with a package in brackets are planned by that package (R21-B, R21-C, R21-D); the others
+  exist since R21-A. Every rule row in `src/lib/fuel-rules.ts` is `verified: false` unless its value was read in a
+  primary text in Round 21 (its source then says "Read (R21)": the HPCL Marketing Discipline Guidelines 2012, Ver. 7 of
+  30 Nov 2022). GST slabs, 194Q, Act labels and the Rule 42 dates stay in their own rule files and are not edited.
+- MDG values are oil-company contract terms, not law: hints with the reason shown, never blocks. Every output is a working paper.
+- ★ = changes what a document prints or a return reports. Sources: §2.8 of the PRD (P = primary text read, S = secondary).
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| FU1 ★ | MS, HSD (incl. branded), CNG and PNG are outside GST under Sec 9(2) until a date is notified; the pump reports their sales as non-GST (GSTR-1 Table 8 non-GST column, GSTR-3B 3.1(e)). Right, including CNG sold by a dealer (not the gas company)? | As stated | `fuel-rules.ts` `FUEL_GST_STATUS_RULES`; `fuel/fu-line.ts` `isNonGst`, `fuelLine` (R10 line key `sv.exempt: 'NON_GST'`) | 2017-07-01 | S explainer May 2026; Lok Sabha / Rajya Sabha replies 2025 (unverified) |
+| FU2 ★ | Lubricants, greases, AdBlue, coolant at 18 % by HSN; any of them at another rate after 22 Sep 2025? | Item slab | `fuel-rules.ts` `LUBE_HINT_RULES` (hint); the item's own slab | 2017-07-01 | S practitioner tables (unverified) |
+| FU3 ★ | No e-Way bill for MS / HSD / natural gas (Rule 138(14)); for a mixed consignment (diesel + lubricant) the e-Way value is the lubricant only. Which clause letter is current? | Non-GST lines left out of the e-Way JSON; fuel-only → "not needed" note | `eway.ts` `buildEway` (non-GST lines); `fuel-rules.ts` `EWAY_FUEL_EXEMPT_RULES` | 2018-04-01 | S taxguru / cleartax / taxheal (clause letter differs) |
+| FU4 ★ | A mixed bill (fuel + lubricant) to an unregistered buyer is one "Invoice-cum-Bill of Supply" (Rule 46A); to a registered buyer the fuel and the lubricant are billed separately. Is the split needed, or may one tax invoice show the non-GST fuel lines? | Rule 46A title without a GSTIN; with a GSTIN the POS asks for two bills (`fuSplit`) | `fuel/fu-line.ts` `fuDocPatch`, `fuSplit`; `components/fuel/NozzleChip.tsx` | — | existing R10 rows |
+| FU5 | VAT on MS / HSD is outside the app: per-litre VAT is typed for the Rule 42 base and margins only. Any State where the retail dealer must also show VAT on the bill? | Not printed unless typed in the item name | `fuel_prices.build.vat` (typed) | — | — |
+| FU6 | A Bill of Supply per shift for counter sales (not per customer) — acceptable as the dealer's sales record for income tax and the MDG "sales bills" requirement? | Per shift | (R21-B) day close | — | — |
+| FU7 | Credit slips billed monthly: the sale is recognised on the bill date in the books while the litres leave the tank on the slip dates (the MDG register is meter-based). Acceptable, or must unbilled slips be accrued at month end? | Monthly bill dated month end | (R21-D) credit slips | — | — |
+| FU8 | "₹500 of petrol": the bill shows ₹500.00 and litres to three decimals at the price in force; the litre rounding is not adjusted. Right? | As stated (the line rate is worked back so the amount stays exact) | `fuel/fu-line.ts` `litresFor` | — | — |
+| FU9 | Mid-shift price change: litres split by a typed reading; without it, all at the opening price. Right? | As stated | (R21-B) shift entry; `fuel/fu-line.ts` `priceAt` | — | — |
+| FU10 | Attendant shortages: settled by cash receipt or written off to "Shortage at pump" (expense). Recovery from salary is not built. Any TDS / PF / wage-law point on deducting shortages? | Receipt or write-off | (R21-B) settlement | — | — |
+| FU11 | Rule 42 / 43 for a pump: E = non-GST + exempt turnover, F = total turnover (existing R5-C working). Is non-GST fuel "exempt supply" for Rule 42 through Sec 2(47)? | As stated | `institutions/common-credit.ts` (GST → Common credit, pack `fuel`) | — | existing R5-C rows |
+| FU12 ★ | The Explanation to Rule 43 (applied to Rule 42) is read as excluding central excise (entry 84 List I) and State tax on petroleum (entries 51 / 54 List II) from both E and F. The app takes the typed excise + VAT per litre of the price in force × litres sold. (a) Is that reading right? (b) Is the price build-up typed from the OMC acceptable evidence? (c) Default on? | On, with a switch and the working | `fuel_prices.build` (A); (R21-D) `RULE42_DUTY_EXCLUSION_RULES` | 2017-07-01 | not read this round (practitioner notes, S) |
+| FU13 | ITC on purchases: none on MS / HSD (no GST charged); full on lubricants for resale; common inputs through Rule 42; capital goods (DUs, tanks) through Rule 43. Any blocked credit (Sec 17(5)) specific to pumps? | As stated | purchases (item GST kind) | — | developers' reading |
+| FU14 | 194Q on OMC purchases when the dealer's turnover exceeded ₹10 crore: 0.1 % above ₹50 lakh from one OMC in the year (Sec 393 table from 1 Apr 2026). Does the OMC instead collect / the dealer deduct under another section? | Hint only | (R21-D) via `tds-rules.ts` / `ita2025.ts` (not edited) | 2026-04-01 | existing rows |
+| FU15 | MDG receipt density tolerance ± 3.0 kg/m³ (2022 text). Has MDG 2024 changed it? | Hint at ± 3.0 | `fuel-rules.ts` `MDG_DENSITY_RULES`; (R21-C) receipt | 2022-11-30 | P HPCL MDG 2012 Ver. 7, receipt procedure (iv) |
+| FU16 | Water dip: product litres = chart(product dip) − chart(water dip)? Or the chart is already product-only? | Setting; default subtract water | `fuel/fu-tank.ts` `dipToLitres`; `fuel-rules.ts` `MDG_DAILY_RECORDS_RULES`; (R21-C) dips | 2022-11-30 | P MDG cl. 1.3 (ii), 1.4.1 (b), (c) |
+| FU17 | Daily 5-litre test per nozzle returned to the tank, recorded and excluded from sales. Any State W&M rule differing? | As stated | `fuel-rules.ts` `MDG_NOZZLE_TEST_RULES`; (R21-B) shift | 2022-11-30 | P MDG cl. 1.4.2 (b), (d) |
+| FU18 ★ | Stock variation: monthly physical stock voucher for the tank's variation within the MDG band (4 % of tank stock after evaporation MS 0.75 % / 0.60 %, HSD 0.25 % / 0.20 %; 2022 text). (a) Normal loss charged to purchases / cost of goods, abnormal loss separate? (b) Any ITC point (none on fuel)? (c) MDG 2024 values? | Monthly, normal-loss class | `fuel-rules.ts` `MDG_VARIATION_RULES`; (R21-C) stock register | 2022-11-30 | P MDG cl. 5.1.11 (2024 text not read) |
+| FU19 | Records retention per MDG: current + previous FY for sales / density registers vs 8 years under the CGST Act / Companies Act. The app keeps everything; the DSR print is the OMC copy. | Keep all | `fuel-rules.ts` `MDG_RECORDS_RULES` | 2022-11-30 | P MDG cl. 5.1.12 |
+| FU20 ★ | LPG: household 5 % (Sch I 209), NDEC by the OMC 5 % (Sch I 208), other 18 % (Sch II 30) from 22 Sep 2025; before that household 5 %, other 18 %. (a) Entry numbers (sources differ)? (b) NDEC sold by a distributor (not the OMC) — 5 % or 18 %? | As stated; NDEC 18 % when sold by the distributor | (R21-D) `LPG_RATE_RULES` | 2017-07-01 | S taxgarden.in (entry numbers disagree) |
+| FU21 ★ | Refundable cylinder / regulator deposits: no GST on receipt (Sec 2(31) proviso); on forfeiture (lost cylinder) a tax invoice at 18 %? or the refill's rate? | 18 % on forfeiture | (R21-D) `LPG_DEPOSIT_RULES` | — | S taxgarden.in |
+| FU22 | Auto-LPG sold at a pump (2711): rate? (rows only; no dispenser support beyond a nozzle) | Item slab hint | `fuel-rules.ts` `LUBE_HINT_RULES` | — | — |
+| FU23 ★ | LPG delivery charges billed with a refill are a composite supply at the refill's rate (Sec 8(a)); billed separately later — 18 %? | With the refill | (R21-D) `LPG_DELIVERY_RULES` | — | S taxgarden.in |
+| FU24 | Legal Metrology re-verification of dispensing pumps every 12 months (Rule 27, General Rules 2011) and after repair / relocation — confirm periodicity; State rules differ? | 12 months, alert 30 days before | `fuel-rules.ts` `WM_REVERIFY_RULES`; `fuel_nozzles.wm_due`; (R21-C) alerts | 2011-04-01 | S taxclue / Delhi W&M pages (unverified) |
+| FU25 | PESO licence (Petroleum Rules 2002) renewal, fire NOC, tank calibration — dates typed; any statutory consequence the app should state? | Alerts only | `Godown.fu.calibration_due`; (R21-C) licences | — | — |
+| FU26 | Fleet-card / OMC loyalty-card money adjusted by the OMC against its invoice: recorded as a netting receipt (no cash); OMC service charges on fleet cards — taxable supply to the dealer (ITC through Rule 42)? | As stated | (R21-D) OMC account (`netting.ts`) | — | — |
+| FU27 | Card-machine MDR / UPI charges: bank's tax invoice, ITC common (Rule 42). Right? | As stated | purchases | — | — |
+| FU28 | Dealer commission / "additional dealer margin" / incentives credited by the OMC by credit note: GST on a commercial credit note without GST? Income in the dealer's books only? | Income; no GST computed | — | — | — |
+| FU29 | Excess cash at the pump (collected > expected): other income; any GST / VAT on it? | Other income, no tax | (R21-B) settlement | — | — |
+| FU30 | Presumptive taxation (44AD) for a pump: turnover = gross receipts including excise / VAT built into the price? The app's turnover reports show gross; a "net of duties" figure is shown beside it. | Gross, with net shown | (R21-D) | — | — |
+
+`FU` ids are counted once here. The ★ items (FU1, FU2, FU3, FU4, FU12, FU18, FU20, FU21, FU23) change what a document prints or a return reports.
 
 ## Answers log
 

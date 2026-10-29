@@ -254,6 +254,28 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   (one `saveMany`; regimes `lg-regime.ts`; C / D add lines only through `billExtras` in `lg-bill.ts`); a POS-96 document with
   `lg.regime: 'export_freight'` and a valid client GSTIN is B2B, not EXP, in `gst-reports.ts` / `einvoice.ts` (LG15). Notes:
   `docs/features/logistics-r19.md`.
+- Round 21 (petrol pumps, CNG stations & LPG distributors) company data: names in `src/lib/fuel/fu-shared.ts` (R21-A tables
+  `fuel_nozzles` (`master.edit`, not dated), `fuel_prices` (`master.edit`, dated by `date` + `time` `HH:MM`); B `fuel_shifts`,
+  C `fuel_tank_logs`, D `fuel_slips` (`doc.create`, dated); object `fuel_settings` (`settings.manage`, audited on save, a
+  singleton; absent = nothing fuel — `fuDefaultsFor` fills what is not stored)), all backed up and synced; **no new series**.
+  Settings `fuel_kind` (`pump` / `cng` / `pump_cng` / `lpg` / `pump_lpg`): a wizard card, not a business type — business type
+  `kirana` with EXPLICIT `modules` (kirana preset ∪ accounts, banking, gst, tds, payroll) and EXPLICIT `industry_packs` ∪
+  `fuel` / `lpg`; never `retail_kind`. Desk tab `fuel` on `/inventory` (`INVENTORY_PACK_TABS`, `alsoPacks` `lpg`, filtered by
+  `visiblePackTabs`), views mounted by file name through `import.meta.glob` over `components/fuel/*View.tsx` (A `tanks` /
+  `prices`; B `shift` / `dsr`; C `dips` / `stock`; D `credit` / `omc` / `lpg` — views, never tabs; the desk already holds every
+  view's label, icon and pack); the `common-credit` GST tab takes `fuel`; `PACK_OF_TYPE` / `PACK_ROUTES` unchanged. **A tank
+  is a godown with `Godown.fu`** (chart `[mm, litres][]`; no new `Godown.kind`); a pump product is `StockItem.fu`. Rights and
+  audit labels of EVERY Round 21 table are registered at runtime by `src/lib/fuel/fu-registry.ts`: **every module that writes a
+  Round 21 table must `import './fu-registry'`**, and so do `sync-engine.ts` and `trust/recycle-bin.ts`
+  (`tests/fu-registry.test.ts`). Round 21 invoice snapshots live under ONE record key `fu` (`R21_RECORD_KEYS`, spread into
+  `R9_RECORD_KEYS`; per-line pump data in `fu.lines[lineId]`) — never add keys; a fuel line's non-GST column reuses the R10
+  line key `sv.exempt: 'NON_GST'`; a fuel-only bill is a Bill of Supply (`exempt_kind: 'NON_GST'`), a mixed bill without a
+  GSTIN takes the Rule 46A title (`sv.rule46a`). `eway.ts` leaves non-GST lines out of the e-Way JSON (Rule 138(14)). POS: one
+  lazy strip (`components/fuel/NozzleChip.tsx`, pack `fuel`). Build group `f-fuel` (`vite.config.ts`,
+  `familyRe('fuel', 'fuel-rules', 'fuel-r21', 'fu-registry')` — the registry a lazy leaf): engines in `src/lib/fuel/` import
+  only first-paint modules, `fuel-rules.ts` and each other; shared lazy code goes through bridges `fu-*-io.ts` (≤ 4). Rule
+  values in `src/lib/fuel-rules.ts` (lazy only, date-keyed, `tests/fu-rules.test.ts`; MDG rows are dealer-contract hints,
+  never blocks). CA ids `FU1`–`FU30`. Notes: `docs/features/fuel-r21.md`.
 - 8H company data: `business_type` / `modules` on the settings object (shop mode, absent = full), tables `business_loans`
   and `currency_rates`; finer user rights live on the device-local user record (`rights`, never backed up).
 - Rounds 2–5 company data (backed up and synced; each registered in `backup.ts`, `access.ts` `TABLE_ACTIONS`,
