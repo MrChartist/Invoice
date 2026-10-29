@@ -66,7 +66,7 @@ export default function MenuSheets({ openBell }: { openBell: () => void }) {
     menuData: () => setSheet('data'),
     menuImport: () => setSheet('import'),
     notify: () => openBell(),
-    repair: () => navigate('/settings?tab=activity'),
+    repair: () => void navigate('/settings?tab=activity'),
     about: () => openHelp(),
   });
 
