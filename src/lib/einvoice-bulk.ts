@@ -45,6 +45,7 @@ import {
 import { buildEwayBulk, stringifyEway, type EwayBill, type EwayPayload, type EwayTransMode, type EwayTransport } from './eway';
 import { preflightEInvoice, preflightEway } from './einvoice-validate';
 import { parseTable, stripBom } from './csv';
+import { localDayOf } from './dates';
 import { getTable, setTable } from './storage';
 import type { UnitMaster } from './units';
 
@@ -274,6 +275,8 @@ export interface IrpResponseRow {
   ewbValidTill: string;
   status: string;
   error: string;
+  /** 8.66: cancellation date/time of the IRN, when the file reports it cancelled. */
+  cancelDate: string;
 }
 
 export interface ParsedIrpResponse {
@@ -298,6 +301,8 @@ const ALIASES: Record<Exclude<keyof IrpResponseRow, 'line'>, string[]> = {
   ewbValidTill: ['ewbvalidtill', 'ewbvalidupto', 'validupto', 'validtill', 'ewayvalidupto', 'ewbvaliddate'],
   status: ['status', 'irnstatus'],
   error: ['errormessage', 'errordetails', 'errormsg', 'error', 'errors', 'remarks', 'errorcode'],
+  // 8.66: cancelled IRNs in the bulk tool's response / IRN-details download (column names not verified).
+  cancelDate: ['canceldate', 'canceldt', 'cnldt', 'cnldate', 'cancelleddate', 'cancellationdate', 'irncanceldate'],
 };
 
 const scalar = (v: unknown): string =>
@@ -372,7 +377,7 @@ export function decodeSignedQr(token: string): { docNo: string; docDate: string;
 }
 
 function toRow(fields: Map<string, string>, line: number): IrpResponseRow {
-  const r: IrpResponseRow = { line, docNo: '', docDate: '', sellerGstin: '', irn: '', ackNo: '', ackDate: '', signedQr: '', ewbNo: '', ewbDate: '', ewbValidTill: '', status: '', error: '' };
+  const r: IrpResponseRow = { line, docNo: '', docDate: '', sellerGstin: '', irn: '', ackNo: '', ackDate: '', signedQr: '', ewbNo: '', ewbDate: '', ewbValidTill: '', status: '', error: '', cancelDate: '' };
   for (const key of Object.keys(ALIASES) as (keyof typeof ALIASES)[]) r[key] = pick(fields, ALIASES[key]);
   if (r.signedQr && (!r.docNo || !r.irn || !r.sellerGstin)) {
     const q = decodeSignedQr(r.signedQr);
@@ -448,7 +453,10 @@ export function normaliseIrpDate(value: string, dateOnly = false): string {
   return `${date} ${String(h).padStart(2, '0')}:${t[2]}:${t[3] ?? '00'}`;
 }
 
-const FAILED_STATUS = new Set(['0', 'failed', 'failure', 'error', 'rejected', 'cancelled', 'cnl']);
+const FAILED_STATUS = new Set(['0', 'failed', 'failure', 'error', 'rejected']);
+/** 8.66: an IRN reported cancelled (IRP status `CNL`) — recorded as cancelled on the portal, not as a failure. */
+const CANCELLED_STATUS = new Set(['cancelled', 'canceled', 'cnl', 'cancel']);
+export const isCancelledRow = (r: Pick<IrpResponseRow, 'status' | 'cancelDate'>) => CANCELLED_STATUS.has(r.status.trim().toLowerCase()) || !!r.cancelDate.trim();
 
 export interface IrpImportWritten {
   line: number;
@@ -473,6 +481,8 @@ export interface IrpImportResult {
   unmatched: IrpImportSkipped[];
   /** Rows the IRP rejected, or that fail the IRN / Ack / EWB format checks, or would overwrite a different IRN. */
   failed: IrpImportSkipped[];
+  /** 8.66: IRNs the file reports cancelled, recorded as cancelled on the portal (`einvoice_meta.irn_cancel`). */
+  cancelled: IrpImportWritten[];
 }
 
 const docKey = (s: string) => (s ?? '').trim().toUpperCase();
@@ -499,9 +509,30 @@ export function applyIrpResponse(
   const written: IrpImportWritten[] = [];
   const unmatched: IrpImportSkipped[] = [];
   const failed: IrpImportSkipped[] = [];
+  const cancelled: IrpImportWritten[] = [];
+  const invById = new Map(invoices.filter(Boolean).map((i) => [i.id, i]));
 
   for (const r of rows) {
     const status = r.status.trim().toLowerCase();
+    if (isCancelledRow(r)) {
+      // 8.66: the IRN was cancelled on the IRP — match it by the IRN already recorded on a document.
+      const irn = r.irn.trim().toLowerCase();
+      const hit = irn ? [...meta.values()].find((m) => (m.irn ?? '').toLowerCase() === irn) : undefined;
+      if (!hit) {
+        unmatched.push({ line: r.line, docNo: r.docNo, reason: irn ? 'Cancelled IRN: no document has this IRN recorded.' : 'Cancelled row without an IRN.' });
+        continue;
+      }
+      const prev = hit.irn_cancel;
+      const today = opts.now ? stamp.slice(0, 10) : localDayOf(new Date()); // QA14: the local day, never the UTC one
+      const on = normaliseIrpDate(r.cancelDate, true) || today;
+      meta.set(hit.invoice_id, {
+        ...hit,
+        irn_cancel: { reason: prev?.reason ?? 'other', remark: prev?.remark || 'Cancelled on the IRP (from the response file)', prepared_at: prev?.prepared_at ?? stamp, status: 'done', done_on: /^\d{4}-\d{2}-\d{2}$/.test(on) ? on : today },
+        updated_at: stamp,
+      });
+      cancelled.push({ line: r.line, invoiceId: hit.invoice_id, number: invById.get(hit.invoice_id)?.invoice_number ?? r.docNo, irn, replaced: false });
+      continue;
+    }
     if (FAILED_STATUS.has(status) || (!r.irn && r.error)) {
       failed.push({ line: r.line, docNo: r.docNo, reason: `Rejected by the IRP${r.error ? `: ${r.error}` : ''}` });
       continue;
@@ -559,7 +590,7 @@ export function applyIrpResponse(
     meta.set(inv.id, next);
     written.push({ line: r.line, invoiceId: inv.id, number: inv.invoice_number, irn, replaced });
   }
-  return { meta: [...meta.values()], written, unmatched, failed };
+  return { meta: [...meta.values()], written, unmatched, failed, cancelled };
 }
 
 /**
@@ -572,6 +603,6 @@ export function importIrpResponse(
 ): { parsed: ParsedIrpResponse; result: IrpImportResult } {
   const parsed = parseIrpResponse(text);
   const result = applyIrpResponse(parsed.rows, getTable<InvoiceRecord>('invoices'), getAllEInvoiceMeta(), opts);
-  if (result.written.length) setTable(EINVOICE_META_TABLE, result.meta);
+  if (result.written.length || result.cancelled.length) setTable(EINVOICE_META_TABLE, result.meta);
   return { parsed, result };
 }

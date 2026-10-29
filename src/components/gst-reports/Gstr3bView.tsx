@@ -55,12 +55,12 @@ export function Gstr3bView({ report: b, onOpenSetOff }: { report: Gstr3bReport; 
     { table: '3.1(d)', label: 'Inward supplies liable to reverse charge', ...o.inwardRcm },
     { table: '3.1(e)', label: 'Non-GST outward supplies', taxable: o.nonGst },
   ];
-  const t32: Row[] = b.interStateUnreg.map((u) => ({
-    table: '3.2',
-    label: `Inter-state supplies to unregistered persons, place of supply ${u.pos}`,
-    taxable: u.taxable,
-    igst: u.igst,
-  }));
+  const t32: Row[] = [
+    ...b.interStateUnreg.map((u) => ({ table: '3.2', label: `Inter-state supplies to unregistered persons, place of supply ${u.pos}`, taxable: u.taxable, igst: u.igst })),
+    // 8.66: parties marked composition dealer / UIN holder on the client master.
+    ...(b.interStateComp ?? []).map((u) => ({ table: '3.2', label: `Inter-state supplies to composition taxable persons, place of supply ${u.pos}`, taxable: u.taxable, igst: u.igst })),
+    ...(b.interStateUin ?? []).map((u) => ({ table: '3.2', label: `Inter-state supplies to UIN holders, place of supply ${u.pos}`, taxable: u.taxable, igst: u.igst })),
+  ];
   const h = (table: string, label: string, x: { igst: number; cgst: number; sgst: number }): Row => ({
     table, label, igst: x.igst, cgst: x.cgst, sgst: x.sgst,
   });

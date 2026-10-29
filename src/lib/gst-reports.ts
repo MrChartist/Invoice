@@ -41,7 +41,7 @@ import { calcInputFromRecord, calculateInvoice, isIgstZeroRated, isZeroRated, nu
 import { isNonGstFinancialNote } from './financial-note';
 import { isPureAgentLine } from './trade/pure-agent';
 import { docCurrency, inrTotals, inrValue, missingFxRate } from './fx';
-import { checkGstin } from './gstin';
+import { checkGstin, isUinShaped } from './gstin';
 import { stateByCode, stateByName } from './india-states';
 import { isNonSupplyCategory, isVoidStatus, readPurchase, splitLumpTax } from './purchase-normalize';
 import { b2clThreshold, b2clThresholdLabel, ecoReporting, gstSetOffOrder, hsnMinDigits, hsnTableSplit, type GstSetOffOrder } from './tax-rules';
@@ -440,6 +440,10 @@ export interface Gstr3bReport {
   };
   /** 3.2 inter-state supplies to unregistered persons, by place of supply. */
   interStateUnreg: { pos: string; taxable: number; igst: number }[];
+  /** Additive (8.66): 3.2 inter-state supplies to composition taxable persons, by POS. Absent when none. */
+  interStateComp?: { pos: string; taxable: number; igst: number }[];
+  /** Additive (8.66): 3.2 inter-state supplies to UIN holders, by POS. Absent when none. */
+  interStateUin?: { pos: string; taxable: number; igst: number }[];
   /** 4 */
   itc: {
     importGoods: ItcHeads; // 4A(1)
@@ -615,6 +619,8 @@ export interface PDoc {
   /** Additive: e-commerce operator GSTIN and section (src/lib/eco.ts). */
   etin?: string;
   ecoSection?: EcoSection;
+  /** Additive (8.66): registered recipient that is a composition dealer or a UIN holder (`Client.gst_reg_type`). */
+  recipient?: 'composition' | 'uin';
 }
 
 /** Supply through an e-commerce operator that pays the tax u/s 9(5): value only (Table 14(b), 3B 3.1.1(ii)). */
@@ -765,10 +771,14 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
 
   const gstinRaw = (rec.client?.gstin ?? '').trim().toUpperCase();
   const chk = checkGstin(gstinRaw);
-  if (gstinRaw && !chk.valid) {
+  // 8.66: a UN body / embassy is identified by its UIN (in the GSTIN field, client marked `gst_reg_type: 'uin'`).
+  const regType = rec.client?.gst_reg_type;
+  const uin = regType === 'uin' && !chk.valid && isUinShaped(gstinRaw);
+  if (gstinRaw && !chk.valid && !uin) {
     push('error', 'GSTIN_INVALID', `client GSTIN "${gstinRaw}" is invalid (${chk.message}); treated as unregistered.`, '/clients', 'Fix client');
   }
-  const registered = chk.valid;
+  if (uin) push('info', 'UIN_RECIPIENT', `recipient UIN ${gstinRaw} (UN body / embassy): reported in B2B with the UIN and in GSTR-3B Table 3.2 (UIN holders). The UIN is checked for shape only — verify with your CA.`);
+  const registered = chk.valid || uin;
   if (registered && chk.stateCode && pos && chk.stateCode !== pos && !isExport && !freight96) {
     push('info', 'POS_VS_GSTIN', `place of supply ${pos} differs from client GSTIN state ${chk.stateCode}; correct only for ship-to / bill-to cases.`);
   }
@@ -869,6 +879,7 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     lines,
     ...(bos ? { exemptKind: rec.exempt_kind ?? 'EXEMPT' } : {}),
     ...(eco ? { etin: eco.gstin, ecoSection: eco.section } : {}),
+    ...(registered && (regType === 'composition' || regType === 'uin') ? { recipient: regType } : {}),
   };
 }
 
@@ -1627,6 +1638,8 @@ export function buildGstr3b(
   let eco95 = 0;
   let hasEco95 = false;
   const unregInter = new Map<string, { pos: string; taxable: number; igst: number }>();
+  const compInter = new Map<string, { pos: string; taxable: number; igst: number }>();
+  const uinInter = new Map<string, { pos: string; taxable: number; igst: number }>();
 
   for (const d of docs) {
     if (isEco95(d)) {
@@ -1659,11 +1672,13 @@ export function buildGstr3b(
       taxable.cgst = round2(taxable.cgst + s * l.cgst);
       taxable.sgst = round2(taxable.sgst + s * l.sgst);
       taxable.cess = round2(taxable.cess + s * l.cess);
-      if (!d.registered && d.supply === 'INTER') {
-        const u = unregInter.get(d.pos) ?? { pos: d.pos, taxable: 0, igst: 0 };
+      // 3.2 (8.66): unregistered persons, composition taxable persons and UIN holders, each by place of supply.
+      const t32 = d.supply !== 'INTER' ? null : !d.registered ? unregInter : d.recipient === 'composition' ? compInter : d.recipient === 'uin' ? uinInter : null;
+      if (t32) {
+        const u = t32.get(d.pos) ?? { pos: d.pos, taxable: 0, igst: 0 };
         u.taxable = round2(u.taxable + s * l.taxable);
         u.igst = round2(u.igst + s * l.igst);
-        unregInter.set(d.pos, u);
+        t32.set(d.pos, u);
       }
     }
   }
@@ -1780,6 +1795,8 @@ export function buildGstr3b(
   return {
     outward: { taxable, zeroRated: zero, nilExempt: nil, inwardRcm: rcm, nonGst },
     interStateUnreg: [...unregInter.values()].sort((a, b) => a.pos.localeCompare(b.pos)),
+    ...(compInter.size ? { interStateComp: [...compInter.values()].sort((a, b) => a.pos.localeCompare(b.pos)) } : {}),
+    ...(uinInter.size ? { interStateUin: [...uinInter.values()].sort((a, b) => a.pos.localeCompare(b.pos)) } : {}),
     itc: {
       importGoods: impGoods,
       importServices: impServices,

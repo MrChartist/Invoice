@@ -556,6 +556,8 @@ export function gstr3bRows(b: Gstr3bReport): CsvCell[][] {
       ? [['3.1.1(ii)', 'Taxable supplies made through an e-commerce operator that pays tax u/s 9(5) (value only)', b.ecoSupplies95, '', '', ''] as CsvCell[]]
       : []),
     ...b.interStateUnreg.map((u): CsvCell[] => ['3.2', `Inter-state supplies to unregistered persons, POS ${u.pos}`, u.taxable, u.igst, '', '']),
+    ...(b.interStateComp ?? []).map((u): CsvCell[] => ['3.2', `Inter-state supplies to composition taxable persons, POS ${u.pos}`, u.taxable, u.igst, '', '']),
+    ...(b.interStateUin ?? []).map((u): CsvCell[] => ['3.2', `Inter-state supplies to UIN holders, POS ${u.pos}`, u.taxable, u.igst, '', '']),
     itc('4A(1)', 'ITC available: import of goods', b.itc.importGoods),
     itc('4A(2)', 'ITC available: import of services', b.itc.importServices),
     itc('4A(3)', 'ITC available: inward supplies liable to reverse charge', b.itc.availableRcm),
@@ -611,8 +613,9 @@ export function buildGstr3bJson(b: Gstr3bReport, gstin: string, retPeriod: strin
     },
     inter_sup: {
       unreg_details: b.interStateUnreg.map((u) => ({ pos: u.pos, txval: r(u.taxable), iamt: r(u.igst) })),
-      comp_details: [],
-      uin_details: [],
+      // 8.66: from `Client.gst_reg_type` (composition dealer / UIN holder); same row shape as unreg_details.
+      comp_details: (b.interStateComp ?? []).map((u) => ({ pos: u.pos, txval: r(u.taxable), iamt: r(u.igst) })),
+      uin_details: (b.interStateUin ?? []).map((u) => ({ pos: u.pos, txval: r(u.taxable), iamt: r(u.igst) })),
     },
     itc_elg: {
       itc_avl: [

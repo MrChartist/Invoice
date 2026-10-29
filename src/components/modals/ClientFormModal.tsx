@@ -5,7 +5,7 @@ import { cleanValueMap, customFieldsDb } from '../../lib/custom-fields';
 import { GstinInput } from '../ui/GstinInput';
 import { ContactPickButton } from './ContactPickButton';
 import { INDIAN_STATES, resolveStateCode, stateByCode } from '../../lib/india-states';
-import { checkGstin } from '../../lib/gstin';
+import { checkGstin, isUinShaped } from '../../lib/gstin';
 import { localDb } from '../../lib/localDb';
 import { isValidPan, isValidTan } from '../../lib/validators';
 import { MAX_FLAT_FEE, sanitizeClientLateFee, type ClientLateFeeMode } from '../../lib/late-fee-rule';
@@ -90,7 +90,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
     e.preventDefault();
     if (!form.name.trim()) return setError(salesT('cf.errName'));
     if (farmerProblem) return setError(farmerProblem);
-    if (form.gstin && !checkGstin(form.gstin).valid) return setError(salesT('cf.errGstin'));
+    if (form.gstin && !checkGstin(form.gstin).valid && !(form.gst_reg_type === 'uin' && isUinShaped(form.gstin))) return setError(salesT('cf.errGstin'));
     if (form.email && !/^\S+@\S+\.\S+$/.test(form.email.trim())) return setError(salesT('cf.errEmail'));
     const pan = (form.pan ?? '').trim().toUpperCase();
     const tan = (form.tan ?? '').trim().toUpperCase();
@@ -227,6 +227,15 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
           <GstinInput id="client-gstin" value={form.gstin ?? ''} onChange={(v) => set('gstin', v)} onStateCode={setStateCode} />
           <span className={controls.hint}>{salesT('cf.gstinHint')}</span>
         </div>
+        <label className={controls.field}>
+          <span className={controls.label}>{salesT('cf.regType')}</span>
+          <select className={controls.select} value={form.gst_reg_type ?? ''} onChange={(e) => set('gst_reg_type', (e.target.value || undefined) as Client['gst_reg_type'])} data-client-reg-type>
+            <option value="">{salesT('cf.regRegular')}</option>
+            <option value="composition">{salesT('cf.regComposition')}</option>
+            <option value="uin">{salesT('cf.regUin')}</option>
+          </select>
+          <span className={controls.hint}>{salesT('cf.regHint')}</span>
+        </label>
         <div className={controls.row}>
           <label className={controls.field}>
             <span className={controls.label}>{salesT('cf.pan')}</span>

@@ -50,6 +50,12 @@ export function checkGstin(raw?: string): GstinCheck {
   return { valid: true, stateCode: gstin.slice(0, 2), pan: gstin.slice(2, 12) };
 }
 
+/**
+ * 8.66: shape of a UIN (Unique Identity Number of a UN body / embassy, Rule 17) as seen on certificates, e.g.
+ * 0717UNO00157UNO. A shape check only — not verified against the portal; a valid GSTIN never matches it.
+ */
+export const isUinShaped = (raw?: string): boolean => /^[0-9]{4}[A-Z]{3}[0-9]{5}[A-Z0-9]{3}$/.test((raw ?? '').trim().toUpperCase());
+
 export function isValidGstin(raw?: string): boolean {
   return checkGstin(raw).valid;
 }

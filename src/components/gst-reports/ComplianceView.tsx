@@ -174,7 +174,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
           columns={[
             { key: 'f', label: gvT('colReturn'), render: (x) => FORM_LABELS[x.r.form] },
             { key: 'p', label: gvT('period'), render: (x) => x.r.label },
-            { key: 'd', label: gvT('colDue'), render: (x) => formatDate(x.r.due) },
+            { key: 'd', label: gvT('colDue'), render: (x) => (x.r.extended_from ? <span title={x.r.extension_source}>{formatDate(x.r.due)} <small className={controls.hint}>{gvT('extendedFrom', { date: formatDate(x.r.extended_from) })}</small></span> : formatDate(x.r.due)) },
             { key: 's', label: gvT('colStatus'), render: (x) => <span className={`${surface.badge} ${STATUS[x.status].cls}`}>{gvT(STATUS[x.status].label)}{x.days > 0 && !x.r.optional ? gvT('daysLate', { n: x.days }) : ''}</span> },
             {
               key: 'filed',
