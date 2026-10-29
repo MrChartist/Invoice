@@ -25,6 +25,8 @@ export const TOPICS: readonly HelpTopic[] = [
   t('inventory:godowns', 'Godowns', 'गोदाम', 'Stock per location.', 'When you keep stock in more than one place.'),
   t('inventory:transfers', 'Transfers', 'ट्रांसफ़र', 'Stock moved between godowns.', 'When goods move from one place to another.', { statutory: ca(['G48']) }),
   t('inventory:serials', 'Serial lookup', 'सीरियल खोज', 'Where a serial number was bought and sold.', 'For warranty or a returned piece.'),
+  // R21-D: fuel desk views without a pack-tab row (no first-paint bytes); the desk topic `inventory:fuel` is in topics-packs.
+  t('inventory:fuel:credit', 'Credit slips', 'उधार पर्चियाँ', 'Slip book of credit customers with vehicle limits; month-end Bill of Supply per customer with a vehicle-wise annexure.', 'Each slip; month end.', { statutory: ca(['FU1', 'FU7']) }),
   t('inventory:query', 'Stock query', 'स्टॉक क्वेरी', "One item's position across godowns, batches and orders.", 'When a customer asks "do you have it?".'),
   t('inventory:orders', 'Order outstanding', 'बकाया ऑर्डर', 'Sales and purchase orders still to be delivered or received.', 'To plan dispatch and buying.'),
   t('inventory:analysis', 'Stock analysis', 'स्टॉक विश्लेषण', 'Fast and slow movers, ageing and reorder hints.', 'Monthly review.'),

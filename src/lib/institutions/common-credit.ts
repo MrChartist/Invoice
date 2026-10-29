@@ -122,11 +122,20 @@ export function rule42(i: MonthInputs, E: number, F: number, month: string): Rul
 
 const monthsBetween = (a: string, b: string) => (+b.slice(0, 4) - +a.slice(0, 4)) * 12 + (+b.slice(5, 7) - +a.slice(5, 7));
 
-/** E and F from a GSTR-3B summary of the period (exempt = nil / exempt + non-GST; zero-rated and RCM outward are taxable). */
-export function turnoverOf(g3: { outward: { taxable: { taxable: number }; zeroRated: { taxable: number }; nilExempt: { inter: number; intra: number }; nonGst: number }; outwardRcmTaxable?: number; ecoSupplies95?: number }): { E: number; F: number } {
+/** R21-D2: an optional change to E and F after they are read (a pump's excise + VAT left out, FU12), with its working. */
+export type TurnoverAdjust = (E: number, F: number) => { E: number; F: number; note: string };
+
+/**
+ * E and F from a GSTR-3B summary of the period (exempt = nil / exempt + non-GST; zero-rated and RCM outward are taxable).
+ * `adjust` (R21-D2, default none) changes both afterwards and returns its `note`.
+ */
+export function turnoverOf(g3: { outward: { taxable: { taxable: number }; zeroRated: { taxable: number }; nilExempt: { inter: number; intra: number }; nonGst: number }; outwardRcmTaxable?: number; ecoSupplies95?: number }, adjust?: TurnoverAdjust): { E: number; F: number; note?: string } {
   const o = g3.outward;
   const E = round2(o.nilExempt.inter + o.nilExempt.intra + o.nonGst);
-  return { E, F: round2(E + o.taxable.taxable + o.zeroRated.taxable + (g3.outwardRcmTaxable ?? 0) + (g3.ecoSupplies95 ?? 0)) };
+  const F = round2(E + o.taxable.taxable + o.zeroRated.taxable + (g3.outwardRcmTaxable ?? 0) + (g3.ecoSupplies95 ?? 0));
+  if (!adjust) return { E, F };
+  const a = adjust(E, F);
+  return { E: round2(a.E), F: round2(a.F), note: a.note };
 }
 
 /**

@@ -6642,6 +6642,44 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  // R21-D: credit slips → month-end Bill of Supply with the vehicle annexure; Rule 42 duty exclusion (LPG cut at the D cap).
+  await step('R21-D credit customers: two slips for one customer → one Bill of Supply with a two-row vehicle annexure; GST → Common credit shows E / F with pump duties left out', async () => {
+    const keys = ['settings', 'stock_items', 'fuel_prices', 'fuel_slips', 'clients', 'invoices'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const today = await page.evaluate(() => new Date().toLocaleDateString('en-CA'));
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'kirana', modules: undefined, industry_packs: ['fuel'], fuel_kind: 'pump', lock_until: undefined });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []), { id: 'e2e-fd-hsd', name: 'E2E Diesel', unit: 'LTR', hsn: '27101944', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, fu: { product: 'hsd', unit: 'L' } }]);
+    await writeJson(page, 'fuel_prices', [{ id: 'e2e-fd-p', item_id: 'e2e-fd-hsd', date: today, time: '00:00', rsp: 90, build: { excise: 16, vat: 14 } }]);
+    await writeJson(page, 'fuel_slips', []);
+    await writeJson(page, 'clients', [...(prev.clients ?? []), { id: 'e2e-fd-fleet', name: 'E2E Fleet Transport', email: '', address: '', city: '', zip: '' }]);
+    await readJson(page, 'clients', [], (v) => v.some((c) => c.id === 'e2e-fd-fleet'), 15000);
+    await readJson(page, 'settings', {}, (v) => v.fuel_kind === 'pump' && v.industry_packs?.length === 1, 15000);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/inventory?tab=fuel&view=credit');
+    await page.locator('[data-fuel-credit]').waitFor({ timeout: 15000 });
+    for (const [no, veh, l] of [['E2E-S1', 'MH12AB1234', '10'], ['E2E-S2', 'MH12CD5678', '20']]) {
+      await page.locator('[data-fu-field="slip"]').fill(no);
+      await page.locator('[data-fu-field="client"]').selectOption('e2e-fd-fleet');
+      await page.locator('[data-fu-field="vehicle"]').fill(veh);
+      await page.locator('[data-fu-field="item"]').selectOption('e2e-fd-hsd');
+      await page.locator('[data-fu-field="litres"]').fill(l);
+      await page.locator('[data-fu-add-slip]').click();
+      await readJson(page, 'fuel_slips', [], (v) => v.some((x) => x.slip_no === no), 15000);
+    }
+    const slips = await readJson(page, 'fuel_slips', []);
+    check(slips.length === 2 && slips.every((x) => x.amount === x.litres * 90), `two slips at the price in force (${slips.map((x) => x.amount)})`);
+    await page.locator('[data-fu-bill-slips]').click();
+    const docs = await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.fu?.slip_ids), 15000);
+    const bos = docs.find((i) => !beforeIds.has(i.id) && i.fu?.slip_ids);
+    check(bos?.doc_type === 'BILL_OF_SUPPLY' && bos.total === 2700 && bos.fu.slip_ids.length === 2 && bos.annexure?.rows?.length === 2 && bos.annexure.rows.map((r) => r.who).join() === 'MH12AB1234,MH12CD5678', `one Bill of Supply ₹2,700 with a two-row vehicle annexure (${bos?.doc_type}, ${bos?.total}, ${bos?.annexure?.rows?.map((r) => r.who)})`);
+    await page.goto(srv.origin + '/gst-reports?tab=common-credit');
+    await page.locator('[data-cc-fuel]').waitFor({ timeout: 15000 });
+    await page.waitForFunction(() => /left out of E and F: ₹900\.00/.test(document.querySelector('[data-cc-fuel]')?.textContent ?? ''), null, { timeout: 15000 });
+    check(true, 'Rule 42: ₹900 of excise + VAT (30 L × ₹30) left out of E and F');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   // R20-C: report keys on the trial balance — Ctrl+F filter chip (Esc clears), Space ticks with a totals strip, Ctrl+R
   // hides and Ctrl+U restores, Ctrl+L saves a view, Ctrl+E presses the CSV button, + steps the period.
   await step('R20-C: report filter, ticks, hide / restore, saved view, export and period keys', async () => {

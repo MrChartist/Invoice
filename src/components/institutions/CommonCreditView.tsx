@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { InvoiceRecord } from '../../types/invoice';
 import type { PurchaseRecord } from '../../types/purchases';
 import type { ItcUse } from '../../types/institutions-r5';
+import type { FuelPrice } from '../../types/fuel-r21';
 import { getTable } from '../../lib/storage';
 import { buildGstReport, type ReportPeriod } from '../../lib/gst-reports';
 import { purchasesDb } from '../../lib/purchases';
@@ -42,23 +43,33 @@ export default function CommonCreditView({ notify }: { notify: Notify }) {
     if (sv) loads.push(Promise.all([import('../../lib/services/sv-tax'), import('../../lib/services/sv-settings')]).then(([t, st]) => (inv, f, to) => t.svExemptLike(inv, f, to, st.readServiceSettings())));
     if (loads.length) void Promise.all(loads).then((fns) => setXl(() => (inv: readonly InvoiceRecord[], f: string, to: string) => fns.reduce((n, fn) => n + fn(inv, f, to), 0)));
   }, [hotel, sv]);
+  // R21-D2: a pump's excise + VAT left out of E and F (FU12), loaded only with the fuel pack; "Leave duties in" undoes it.
+  const fuel = isPackOn(localDb.settings.get(), 'fuel');
+  const [fx, setFx] = useState<null | { r: typeof import('../../lib/fuel/fu-rule42'); prices: FuelPrice[] }>(null);
+  const [leaveIn, setLeaveIn] = useState(false);
+  useEffect(() => {
+    if (fuel) void import('../../lib/fuel/fu-rule42').then((r) => setFx({ r, prices: getTable<FuelPrice>('fuel_prices') }));
+  }, [fuel]);
   const ef = (p: ReportPeriod) => {
-    const r = turnoverOf(buildGstReport(data.inv, data.pur, { period: p }).gstr3b);
     const m = p.kind === 'month' ? `${p.month! < 4 ? p.fyStart + 1 : p.fyStart}-${String(p.month).padStart(2, '0')}` : '';
-    return xl ? { E: round2(r.E + xl(data.inv, m ? `${m}-01` : `${p.fyStart}-04-01`, m ? end(m) : `${p.fyStart + 1}-03-31`)), F: r.F } : r;
+    const from = m ? `${m}-01` : `${p.fyStart}-04-01`;
+    const to = m ? end(m) : `${p.fyStart + 1}-03-31`;
+    const g3 = buildGstReport(data.inv, data.pur, { period: p }).gstr3b;
+    const w = fx?.r.dutyOf(data.inv, fx.prices, from, to);
+    const r = turnoverOf(g3, w && fx?.r.dutyAdjust(w, from, leaveIn));
+    const note = [r.note, w && fx?.r.check31e(w, g3.outward.nonGst)].filter(Boolean).join(' ');
+    return { E: xl ? round2(r.E + xl(data.inv, from, to)) : r.E, F: r.F, note };
   };
   const fy = fyOf(month);
-  const res = useMemo(() => {
-    const { E, F } = ef({ kind: 'month', fyStart: fy, month: +month.slice(5, 7) });
-    return rule42(inputsFor(data.pur, `${month}-01`, end(month)), E, F, month);
-  }, [data, month, xl]); // eslint-disable-line react-hooks/exhaustive-deps
+  const mo = useMemo(() => ef({ kind: 'month', fyStart: fy, month: +month.slice(5, 7) }), [data, month, xl, fx, leaveIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  const res = useMemo(() => rule42(inputsFor(data.pur, `${month}-01`, end(month)), mo.E, mo.F, month), [data, month, mo]);
   const year = useMemo(() => {
     const ms = Array.from({ length: 12 }, (_x, i) => `${i < 9 ? fy : fy + 1}-${String(((i + 3) % 12) + 1).padStart(2, '0')}`).filter((m) => m <= today().slice(0, 7));
     const { E, F } = ef({ kind: 'fy', fyStart: fy });
     const done: Heads = { igst: 0, cgst: 0, sgst: 0, cess: 0 };
     for (const r of data.runs) if (r.kind === 'monthly' && fyOf(r.month) === fy) HEADS.forEach((h) => (done[h] += r.figures[`D_${h}`] ?? 0));
     return trueUp(ms.map((m) => { const i = inputsFor(data.pur, `${m}-01`, end(m)); return { C2: rule42(i, 0, 1, m).C2, nonBusiness: i.nonBusiness }; }), E, F, done, fy);
-  }, [data, fy, xl]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, fy, xl, fx, leaveIn]); // eslint-disable-line react-hooks/exhaustive-deps
   const fyKey = `FY${fy}-${String(fy + 1).slice(2)}`;
   const posted = data.runs.find((r) => r.kind === 'monthly' && r.month === month);
   const postedFy = data.runs.find((r) => r.kind === 'annual' && r.month === fyKey);
@@ -84,6 +95,7 @@ export default function CommonCreditView({ notify }: { notify: Notify }) {
         )}
       </div>
       <p>E {rs(res.E)} · F {rs(res.F)} · E ÷ F {(res.ratio * 100).toFixed(2)}% · {iT('reverse')} <strong>{rs(headsTotal(res.reverse))}</strong></p>
+      {fx && <p className={styles.note} data-cc-fuel><label><input type="checkbox" checked={leaveIn} onChange={(e) => setLeaveIn(e.target.checked)} /> {fx.r.r42Label()}</label> {mo.note}</p>}
       <Tbl h={['', 'IGST', 'CGST', 'SGST', 'Cess', iT('total')]} rows={ROWS.map((k) => [`${k}: ${iT(`cc.${k}`)}`, ...HEADS.map((h) => res[k][h].toFixed(2)), headsTotal(res[k]).toFixed(2)])} />
       <p className={styles.note}>{iT('cc3b')}</p>
       {data.pur.filter((p) => (p.date ?? '').slice(0, 7) === month && Number(p.cgst) + Number(p.sgst) + Number(p.igst) > 0).map((p) => (
