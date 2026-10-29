@@ -21,6 +21,10 @@
   `@font-face` in `src/fonts.css`, standalone print documents use `src/lib/print-fonts.ts`. Noto Sans Devanagari stays as
   the Devanagari-only script fallback. No text below 12px, no weight above 600 (`tests/type-system.test.ts`; printed-paper
   exceptions allow-listed there). Owner deviations: Indian comma grouping stays (invoice app); em-dash removal pending.
+  Buttons follow the Mr Chartist button system (`docs/theme/BUTTON-SYSTEM.md`): every pressable kind (`.btn` + intent /
+  size, `.join`, `.seg`, `.chip`, `.lk`) is drawn by `src/styles/buttons.css` (first paint, after `index.css`); the
+  `controls.btn*` / `segment*` module classes only compose it, primary = ink (black / white), destructive = `danger`
+  (loss red), no gold / blue / tinted buttons; `tests/button-system.test.ts` guards it. `<Button>` in `src/components/ui/Button.tsx` for new code.
 
 ## Stack
 - **React 19** + **TypeScript** + **Vite 8** (rolldown bundler — `vite.config.ts` uses

@@ -10,6 +10,7 @@ import { installErrorRing } from './lib/error-ring';
 import { audit } from './lib/audit';
 import './fonts.css';
 import './index.css';
+import './styles/buttons.css';
 
 // Beta: keep the last console errors in memory for Help → Report a problem (never stored or sent).
 installErrorRing();

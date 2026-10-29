@@ -108,31 +108,11 @@
   padding: 0.25rem 1rem 0.75rem;
 }
 
-.tabs {
-  display: flex;
-  gap: 0.375rem;
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
-}
+.tabs { composes: seg from global; flex-wrap: nowrap; overflow-x: auto; margin-bottom: 0.5rem; }
 
-.tab {
-  flex: none;
-  padding: 0.3rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  background: var(--card);
-  color: var(--foreground);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
+.tab { composes: seg-item from global; flex: none; }
 
-.tabOn {
-  border-color: var(--brand);
-  background: var(--brand-soft);
-  color: var(--brand-text);
-  font-weight: 600;
-}
+.tabOn { composes: seg-item on from global; }
 
 .grid {
   display: grid;

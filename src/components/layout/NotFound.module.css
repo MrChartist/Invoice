@@ -42,19 +42,4 @@
   background: var(--card-inner);
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 40px;
-  margin-top: 0.5rem;
-  padding: 0 1.125rem;
-  border-radius: var(--radius-sm);
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font-weight: 600;
-}
-
-.btn:hover {
-  background: var(--primary-hover);
-}
+.cta { margin-top: 0.5rem; }

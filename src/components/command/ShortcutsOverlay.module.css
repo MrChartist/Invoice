@@ -93,27 +93,11 @@
   color: var(--muted-foreground);
 }
 
-.tabs {
-  display: inline-flex;
-  gap: 0.25rem;
-}
+.tabs { composes: seg from global; }
 
-.tab {
-  padding: 0.3rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--foreground);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
+.tab { composes: seg-item from global; }
 
-.tabOn {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-foreground);
-}
+.tabOn { composes: seg-item on from global; }
 
 .tally {
   display: block;
