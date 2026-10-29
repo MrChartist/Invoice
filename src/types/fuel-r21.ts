@@ -178,6 +178,33 @@ export interface FuelTankLog {
   /** C2: the OMC purchase bill and its compartments. */
   purchase_id?: string;
   compartments?: { invoice_l: number; invoice_density?: number; observed_density?: number }[];
+  /** C1: water litres from the water dip (shown; deducted from `litres` unless `fuel_settings.dip_water` is `show`). */
+  water_l?: number;
+  /** C2: tank dips before / after decantation (litres from the chart) and the meter litres sold while decanting. */
+  before_mm?: number;
+  after_mm?: number;
+  before_l?: number;
+  after_l?: number;
+  sold_l?: number;
+  note?: string;
+  created_at?: string;
+}
+
+/** C1 / C3 / C4 settings (merge into A's `FuelSettings`). */
+export interface FuelSettings {
+  /** FU16: `subtract` (default) = product litres = chart(dip) − chart(water dip); `show` = the chart is product-only. */
+  dip_water?: 'subtract' | 'show';
+  /** FU18: the outlet's annual sales in KL for the MDG evaporation step (absent = this FY's sales, annualised). */
+  annual_kl?: number;
+  /** C4: licence / stamping / calibration due dates. */
+  licences?: FuLicence[];
+}
+
+declare module './manufacturing' {
+  interface PhysicalStockVoucher {
+    /** C3: the tank and month a stock-register loss / gain voucher posts (one per tank per month). */
+    fu?: { tank_id: string; month: string };
+  }
 }
 
 /** C4: licence / stamping / calibration due dates (on `fuel_settings`). */
