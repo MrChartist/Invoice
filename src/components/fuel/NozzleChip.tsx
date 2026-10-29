@@ -17,7 +17,7 @@ import { fuDocPatch, fuelLine, nozzleLabel, priceAt } from '../../lib/fuel/fu-li
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { FuLine } from '../../types/fuel-r21';
 import controls from '../../styles/controls.module.css';
-import { row } from './fu-ui';
+import { Row } from './fu-ui';
 
 export interface PosFuel { patch: Partial<InvoiceRecord>; errors: string[] }
 const sig = (l: InvoiceItem) => `${l.quantity}|${l.rate}|${l.tax_rate}|${l.sv?.exempt ?? ''}`;
@@ -61,7 +61,7 @@ export default function NozzleChip({ record, setItems, onChange }: { record: Inv
   return (
     <div data-fu-pos>
       {rows.map(({ l, it, noz, p }) => (
-        <div key={l.id} style={row}>
+        <Row key={l.id}>
           <strong>{it.name}</strong>
           <select className={controls.select} aria-label={fuT('nozzle')} value={lines[l.id]?.nozzle_id ?? ''} onChange={(e) => set(l.id, { nz: e.target.value })} data-fu-nozzle>
             <option value="">{fuT('nozzle')}</option>
@@ -69,7 +69,7 @@ export default function NozzleChip({ record, setItems, onChange }: { record: Inv
           </select>
           <input className={controls.input} style={{ width: '6rem' }} type="number" min={0} step="any" placeholder={fuT('amount')} aria-label={fuT('amount')} value={p.amt ?? ''} onChange={(e) => set(l.id, { amt: e.target.value })} data-fu-amount />
           {lines[l.id] && <span className={controls.hint} data-fu-litres>{fuT('line', { l: lines[l.id].litres.toFixed(3), u: lines[l.id].unit === 'KG' ? 'kg' : 'L', rsp: lines[l.id].rsp ?? '', at: lines[l.id].at ?? '' })}</span>}
-        </div>
+        </Row>
       ))}
       {errors.map((m) => <p key={m} className={controls.hint} role="alert">{m}</p>)}
     </div>

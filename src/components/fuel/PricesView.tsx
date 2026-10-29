@@ -13,7 +13,7 @@ import { priceAt } from '../../lib/fuel/fu-line';
 import { readFuelSettings } from '../../lib/fuel/fu-settings';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
-import { In, Sel, row } from './fu-ui';
+import { In, Row, Sel } from './fu-ui';
 import type { Done } from './FuelDesk';
 
 export default function PricesView({ onDone }: { onDone: Done }) {
@@ -30,11 +30,11 @@ export default function PricesView({ onDone }: { onDone: Done }) {
   const num = (k: string) => (d[k] ? Number(d[k]) : undefined);
   return (
     <div data-fuel-prices key={n}>
-      <div style={row}>
+      <Row>
         {items.map((i) => { const p = priceAt(rows, i.id, day, now); return <span key={i.id} className={controls.hint} data-fu-board>{i.name}: {p ? `₹${p.rsp}` : '—'}</span>; })}
         <button type="button" className={controls.btnOutline} onClick={() => act(() => copyYesterday(items.map((i) => i.id), day, shiftDay(day, -1), time))}>{fuT('copy')}</button>
-      </div>
-      <div style={row}>
+      </Row>
+      <Row>
         <Sel d={d} set={setD} k="item" label={fuT('product')} opts={items.map((i) => [i.id, i.name])} />
         <In d={d} set={setD} k="date" label={fuT('date')} type="date" />
         <In d={d} set={setD} k="time" label={fuT('time')} w="5rem" />
@@ -42,7 +42,7 @@ export default function PricesView({ onDone }: { onDone: Done }) {
         <In d={d} set={setD} k="excise" label={fuT('excise')} type="number" w="6rem" />
         <In d={d} set={setD} k="vat" label={fuT('vat')} type="number" w="6rem" />
         <button type="button" className={controls.btnPrimary} onClick={() => act(() => savePrice({ item_id: d.item ?? '', date: d.date ?? '', time: d.time ?? '', rsp: Number(d.rsp), ...(d.excise || d.vat ? { build: { excise: num('excise'), vat: num('vat') } } : {}) }))} data-fu-add-price>{fuT('addPrice')}</button>
-      </div>
+      </Row>
       {rows.length > 0 && (
         <div className={surface.tableWrap}>
           <table className={surface.table}>

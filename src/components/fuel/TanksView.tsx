@@ -15,7 +15,7 @@ import { nozzleLabel } from '../../lib/fuel/fu-line';
 import type { FuProduct } from '../../types/fuel-r21';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
-import { In, Sel, row } from './fu-ui';
+import { In, Row, Sel } from './fu-ui';
 import type { Done } from './FuelDesk';
 
 const KINDS: FuProduct[] = ['ms', 'hsd', 'ms_branded', 'hsd_branded', 'cng', 'auto_lpg'];
@@ -44,15 +44,15 @@ export default function TanksView({ onDone }: { onDone: Done }) {
   });
   return (
     <div data-fuel-tanks key={n}>
-      <div style={row}>
+      <Row>
         <In d={t} set={setT} k="name" label={fuT('tank')} />
         <Sel d={t} set={setT} k="item" label={fuT('product')} opts={items.map((i) => [i.id, i.name])} />
         <Sel d={t} set={setT} k="kind" label={fuT('kind')} opts={KINDS.map((k) => [k, fuT(`p.${k}`)])} />
         <In d={t} set={setT} k="cap" label={fuT('capacity')} type="number" w="6rem" />
         <In d={t} set={setT} k="due" label={fuT('calDue')} type="date" />
-      </div>
+      </Row>
       <label className={controls.field}><span className={controls.label}>{fuT('chart')}</span><textarea className={controls.input} rows={3} value={t.chart ?? ''} onChange={(e) => setT({ ...t, chart: e.target.value })} data-fu-field="chart" /></label>
-      <div style={row}><button type="button" className={controls.btnPrimary} onClick={addTank} data-fu-add-tank>{fuT('addTank')}</button></div>
+      <Row><button type="button" className={controls.btnPrimary} onClick={addTank} data-fu-add-tank>{fuT('addTank')}</button></Row>
       {!tanks.length ? <p className={controls.hint}>{fuT('noTanks')}</p> : (
         <div className={surface.tableWrap}>
           <table className={surface.table}>
@@ -62,14 +62,14 @@ export default function TanksView({ onDone }: { onDone: Done }) {
         </div>
       )}
       <h3>{fuT('nozzle')}</h3>
-      <div style={row}>
+      <Row>
         <In d={z} set={setZ} k="du" label={fuT('du')} w="4rem" />
         <In d={z} set={setZ} k="no" label={fuT('nozzleNo')} w="4rem" />
         <Sel d={z} set={setZ} k="tank" label={fuT('tank')} opts={tanks.map((g) => [g.id, g.name])} />
         <In d={z} set={setZ} k="tot" label={fuT('totaliser')} type="number" />
         <In d={z} set={setZ} k="wm" label={fuT('wmDue')} type="date" />
         <button type="button" className={controls.btnPrimary} onClick={() => act(() => { saveNozzle({ du_no: z.du ?? '', nozzle_no: z.no ?? '', tank_id: z.tank ?? '', totaliser_start: Number(z.tot || 0), ...(z.wm ? { wm_due: z.wm } : {}) }, tanks); setZ({}); })} data-fu-add-nozzle>{fuT('addNozzle')}</button>
-      </div>
+      </Row>
       {nozzles.length > 0 && (
         <div className={surface.tableWrap}>
           <table className={surface.table}>

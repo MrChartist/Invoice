@@ -1,8 +1,9 @@
-/** R21: the small form bits the fuel views share (a labelled input / select over a draft object, a row layout). */
-import type { CSSProperties } from 'react';
+/** R21: the small form bits the fuel views share (a labelled input / select over a draft object, a row). */
+import type { ReactNode } from 'react';
 import controls from '../../styles/controls.module.css';
 
-export const row: CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.75rem' };
+/** A wrapping row of fields / buttons. */
+export const Row = ({ children }: { children: ReactNode }) => <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.75rem' }}>{children}</div>;
 type Draft = Record<string, string>;
 
 /** A labelled input bound to `d[k]` (`type` number / date / time / text). */
