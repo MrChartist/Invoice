@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { num } from '../../lib/invoice-calc';
-import { favouriteItems, groupTabs, loadFavs, saveFavs, stockClass, toggleFav } from '../../lib/pos-tiles';
+import { favouriteItems, groupTabs, loadFavs, priceListItems, saveFavs, stockClass, toggleFav } from '../../lib/pos-tiles';
 import { cn, formatCurrency } from '../../lib/utils';
 import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import { useT } from '../../i18n';
@@ -17,14 +17,19 @@ export interface PosTilesProps {
   onPick: (item: InvoiceItem) => void;
   /** R3-A4: "not available today" items are greyed (still tappable: the caller asks to confirm). */
   unavailable?: (item: InvoiceItem) => boolean;
+  /** PENDING 50: the selling price-list rate in force today (a "Price list" tab when any item has one). */
+  listRate?: (item: InvoiceItem) => number | undefined;
 }
 
 /** Favourites + stock-group tabs of tappable items (8.22) for loose goods without a barcode. */
-export function PosTiles({ sources, stock, groups, invoices, qtyOf, onPick, unavailable }: PosTilesProps) {
+export function PosTiles({ sources, stock, groups, invoices, qtyOf, onPick, unavailable, listRate }: PosTilesProps) {
   useT();
   const [favs, setFavs] = useState(loadFavs);
   const [tab, setTab] = useState('fav');
-  const tabs = useMemo(() => groupTabs(sources, stock, groups), [sources, stock, groups]);
+  const tabs = useMemo(() => {
+    const list = listRate ? priceListItems(sources, listRate) : [];
+    return [...(list.length ? [{ id: 'list', name: posT('tilesList'), items: list }] : []), ...groupTabs(sources, stock, groups)];
+  }, [sources, stock, groups, listRate]);
   const favItems = useMemo(() => favouriteItems(sources, favs, invoices), [sources, favs, invoices]);
   if (!favItems.length && !tabs.length) return null;
   const shown = tab === 'fav' ? favItems : tabs.find((t) => t.id === tab)?.items ?? favItems;

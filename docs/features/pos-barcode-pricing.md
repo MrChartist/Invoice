@@ -211,6 +211,31 @@ preferences outside the `mrchartist_inv_` prefix (never backed up or synced, no 
   word becomes the short code), name, rate, GST, HSN, unit → saved through `saveCatalogItem` validation → added to the bill / line.
   *Search instead* keeps the text in the scan box.
 
+### 8E follow-ups (PENDING 50, roadmap 8.27 / 8.151)
+
+- **Price-list tiles** (8.27): with selling price lists in force, the tile grid gets a **Price list** tab (first) listing the
+  items that have a list price today, each tile showing that rate (`priceListItems`, `PosTiles` `listRate`).
+- **Price check digit on scale labels** (8.151): counter settings → *Labels carry a price / weight check digit after the item
+  code (GS1)* (`ScaleProfile.priceCheck`, off by default). The label is then `P P I…I V W…W C`: the digit after the PLU is the
+  GS1 check digit of the 4- or 5-digit value (weighting factors 2-, 3, 5+, 5-; `priceCheckDigit`, e.g. 2875 → 9,
+  14685 → 6); a wrong one refuses the label like a wrong EAN check digit. The sample code in settings follows the profile.
+- **USB HID and Bluetooth scales** (8.151): *Scale connection* = Serial (as before), **USB (HID scale)** over WebHID — the
+  USB-IF HID Point-of-Sale Scale Data Report (usage page 0x8D: status, unit g / kg / oz / lb, signed exponent, 16-bit
+  weight; `parseHidScaleReport`) — or **Bluetooth** over Web Bluetooth with the Bluetooth SIG Weight Scale Service (0x181D,
+  Weight Measurement 0x2A9D at 0.005 kg / 0.01 lb; `parseBleWeight`). Both feature-detected (`scaleLinkSupported`) and
+  only after the browser's own device chooser; Alt+W reads whichever link is set. Scales with a proprietary Bluetooth
+  service are not read.
+- **Drawer hand-over between shifts** (8.151): closing a shift can *Leave in the drawer for the next shift* (≤ the cash
+  counted; `PosShift.handover`). The next shift opened proposes that amount as its float and records `took_over`
+  (shift, amount handed over, difference to the float entered) in the shift row and the audit log; a hand-over is taken
+  over once (`pendingHandover`).
+- **Not done**: VFD pole displays over serial — makes use different command sets (Epson DM-D / ESC-POS, CD5220, Logic
+  Controls) and none could be verified, so the customer-facing display stays the `/pos-display` window (8.143). Short codes
+  on stock-only items were already done (QA-3 F24: Inventory → item form, `setStockShortCode`). Option+P on macOS needs the
+  shared hotkey matcher (`useHotkeys` compares `e.key`, which is "π" there) — left to the Round 20 keyboard work (R20-A).
+  Payment-in quick-pay screen: already the 8.150 PWA path (`/clients?pay=1` → party picker → ₹ Received sheet). iOS share
+  target and a remembered BLE printer wait on the browsers.
+
 ## Local roles (6.21)
 
 `/pos` and its sidebar entry need `doc.create` (owner, clerk); the bill and its payments go through the same

@@ -76,6 +76,19 @@ export function favouriteItems(sources: readonly InvoiceItem[], starred: readonl
   return picked.length ? picked : frequentItems(sources, invoices);
 }
 
+/**
+ * PENDING 50: "Price list" tab — items with a selling price list in force today, each tile carrying that rate
+ * (`rateOf` = `priceListRate` for the day; undefined = no list price).
+ */
+export function priceListItems(sources: readonly InvoiceItem[], rateOf: (item: InvoiceItem) => number | undefined): InvoiceItem[] {
+  const out: InvoiceItem[] = [];
+  for (const s of sources) {
+    const rate = rateOf(s);
+    if (rate !== undefined && out.length < MAX_TILES) out.push({ ...s, rate });
+  }
+  return out;
+}
+
 /** 'neg' below zero, 'zero' at zero, 'ok' otherwise; null = not a tracked stock item. */
 export function stockClass(qty: number | null | undefined): 'neg' | 'zero' | 'ok' | null {
   if (qty === null || qty === undefined || !Number.isFinite(qty)) return null;

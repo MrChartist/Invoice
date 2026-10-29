@@ -5,7 +5,7 @@ import { NumberInput } from '../ui/NumberInput';
 import { localDb } from '../../lib/localDb';
 import { zReportHtml, type PosDayClose } from '../../lib/pos';
 import { posReturnsDb } from '../../lib/pos-returns';
-import { closeBlocker, shiftExpected, shiftReport, shiftsDb, type PosShift } from '../../lib/pos-shifts';
+import { closeBlocker, pendingHandover, shiftExpected, shiftReport, shiftsDb, type PosShift } from '../../lib/pos-shifts';
 import { downloadText } from '../../lib/download';
 import { cn, formatCurrency, todayInput } from '../../lib/utils';
 import { dateLocale, useT } from '../../i18n';
@@ -49,7 +49,11 @@ export function ShiftPanel({ open, onClose, held, notify, onChanged }: {
   const current = useMemo(() => shiftsDb.current(), [tick, open]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const today = useMemo(() => shiftsDb.all().filter((s) => s.day === todayInput()), [tick, open]);
-  const [float, setFloat] = useState(0);
+  // PENDING 50: cash the last cashier left in the drawer is proposed as this shift's float.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handed = useMemo(() => pendingHandover(shiftsDb.all()), [tick, open]);
+  const [float, setFloat] = useState(() => handed?.handover ?? 0);
+  const [handover, setHandover] = useState(0);
   const [counted, setCountedValue] = useState(0);
   // QA-3 F16: no difference (and no close) until the cash is counted: a blank count is not ₹0.
   const [countedTyped, setCountedTyped] = useState(false);
@@ -80,9 +84,11 @@ export function ShiftPanel({ open, onClose, held, notify, onChanged }: {
   const doClose = () => {
     if (!current || !z) return;
     try {
-      const s = shiftsDb.close(current.id, z, counted, held, note);
+      const s = shiftsDb.close(current.id, z, counted, held, note, handover);
       setTick((t) => t + 1);
       setCountedValue(0);
+      setFloat(s.handover ?? 0);
+      setHandover(0);
       setCountedTyped(false);
       onChanged(undefined);
       notify(retailT('shiftClosed', { n: s.number, diff: formatCurrency(s.difference ?? 0) }));
@@ -117,7 +123,7 @@ export function ShiftPanel({ open, onClose, held, notify, onChanged }: {
           <label className={controls.field}>
             <span className={controls.label}>{retailT('openingFloat')}</span>
             <NumberInput id="shift-float" className={cn(controls.input, controls.inputNumeric)} value={float} onChange={setFloat} placeholder="0" />
-            <span className={controls.hint}>{retailT('shiftOptional')}</span>
+            <span className={controls.hint}>{handed ? retailT('handedOver', { amount: formatCurrency(handed.handover ?? 0), n: handed.number, user: handed.user_name }) : retailT('shiftOptional')}</span>
           </label>
         ) : z && (
           <>
@@ -137,6 +143,10 @@ export function ShiftPanel({ open, onClose, held, notify, onChanged }: {
               <label className={controls.field}>
                 <span className={controls.label}>{retailT('counted')}</span>
                 <NumberInput id="shift-counted" className={cn(controls.input, controls.inputNumeric)} value={counted} onChange={setCounted} placeholder="0" />
+              </label>
+              <label className={controls.field}>
+                <span className={controls.label}>{retailT('handover')}</span>
+                <NumberInput id="shift-handover" className={cn(controls.input, controls.inputNumeric)} value={handover} onChange={setHandover} placeholder="0" />
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{retailT('note')}</span>

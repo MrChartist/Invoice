@@ -310,6 +310,9 @@ export function Pos() {
   const qtyByName = useMemo(() => new Map(data.positions.filter((p) => p.item.track_stock).map((p) => [p.item.name.trim().toLowerCase(), p.qty - (data.held.get(p.item.id) ?? 0)])), [data.positions, data.held]);
   const qtyOf = useCallback((i: InvoiceItem) => qtyByName.get(i.name.trim().toLowerCase()) ?? null, [qtyByName]);
 
+  // PENDING 50: price-list tiles (the rate in force today), only when selling price lists exist.
+  const tileListRate = useMemo(() => (data.lists ? (i: InvoiceItem) => priceListRate(data.stock, i.name, i.hsn, day) : undefined), [data.lists, data.stock, day]);
+
   /* ── Lines ─────────────────────────────────────────────────── */
 
   /** Price (level + slab) and scheme lines after a change; typed rates (no basis) stay. */
@@ -742,8 +745,8 @@ export function Pos() {
     if (!id) return notify(retailT('weighNoLine'), 'error');
     try {
       const m = await import('../lib/scale-serial');
-      if (!m.scaleSerialSupported()) return notify(retailT('noSerial'), 'error');
-      const w = await m.readScaleWeight(scale.baud);
+      if (!m.scaleLinkSupported(scale.link)) return notify(retailT('noSerial'), 'error');
+      const w = await m.readScaleWeight(scale.baud, 3000, scale.link);
       if (!w || !(w.weight > 0)) return notify(retailT('scaleNothing'), 'error');
       if (!w.stable) return notify(retailT('scaleUnstable', { kg: w.weight.toFixed(3) }), 'error');
       setQty(id, w.weight);
@@ -1073,6 +1076,7 @@ export function Pos() {
             invoices={data.posBills}
             qtyOf={qtyOf}
             unavailable={(i) => i.unavailable_on === day86}
+            listRate={tileListRate}
             onPick={(item) => {
               addPicked(item);
               searchRef.current?.focus();

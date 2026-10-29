@@ -69,6 +69,9 @@ export const khataT = defineArea(
     sharePdf: 'Share PDF',
     shareNow: 'Share PDF now',
     webPage: 'Web page',
+    webPageFor: 'Statement web page for {name}',
+    alsoCollect: '{amount} to collect',
+    alsoAdvance: '{amount} advance',
     payPanel: 'Pay this balance',
 
     // Reminder queue
@@ -156,6 +159,9 @@ export const khataT = defineArea(
     sharePdf: 'PDF साझा करें',
     shareNow: 'अभी PDF साझा करें',
     webPage: 'वेब पेज',
+    webPageFor: '{name} का स्टेटमेंट वेब पेज',
+    alsoCollect: '{amount} लेना है',
+    alsoAdvance: '{amount} अग्रिम',
     payPanel: 'यह बकाया चुकाएँ',
 
     queueOverdue: 'सभी बकायादारों को याद दिलाएँ',
