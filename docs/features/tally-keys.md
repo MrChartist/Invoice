@@ -164,3 +164,38 @@ simple-mode set, layouts, search, "This screen"), `tests/keys-stub.test.ts` (cla
 
 Tests: `tests/keys-nav.test.ts` (menus → routes / rights / letters / labels, D rows built and claimed, wizard answer,
 Go To search incl. Hindi, de-duplication, list movement), `tests/search.test.ts` (Go To rows), e2e step "R20-D".
+
+## R20-B — voucher and document entry
+
+Built rows (`BUILT` has `B`): every `pkg: 'B'` row except those listed under "Cut". Everything works with Tally keys on
+(Gateway rows also on `/gateway`); simple mode is unchanged.
+
+| Where | Keys | How |
+|---|---|---|
+| Invoice editor (`useEditorEntryKeys` in `src/hooks/useCreatorKeys.ts`, one call in `InvoiceCreator.tsx`) | Ctrl+A accept · Alt+D delete (Y / N) · Alt+X cancel (reason once) · Alt+2 duplicate · F2 date · Alt+A tax break-up · Alt+Q edit log · line: Ctrl+D remove (Undo re-inserts), Alt+S / Ctrl+Shift+S stock query · picker (`data-key-field="picker"` on the party name and the item name cell): Alt+C create (party: Ledger Creation under Sundry debtors with the typed name, which saves the client; item: stock item create-on-the-fly), Ctrl+Enter Ledger Alteration of the party (else save; `CreateMasterRequest.alter`) · notes (`data-key-field="narration"`): Ctrl+R last notes of this document type | `useKeyActions('editor' / 'line' / 'field:picker' / 'field:narration')`. Engine rule: rows without `inField` (Alt+D, Alt+X, Alt+2, F2 …) fire when focus is not in a text field. In Tally mode the editor's old Alt+D (duplicate) yields to the engine: Alt+D deletes, Alt+2 duplicates |
+| Gateway voucher (`VoucherEntry.tsx`, its own capture listener) | Alt+T post-dated · Ctrl+L optional · "Kind" chip next to the date (Regular / Optional / Post-dated / Memorandum, written through `saveVoucher`) · Ctrl+H single / double entry · Alt+2 duplicate (`?dup=<id>`, new number on save, quitting drops it) · Alt+Q edit log · narration: Ctrl+R last narration of the type · Alt+X explains that a voucher is deleted, not cancelled · Alt+D now stays on a fresh voucher with an Undo toast | `rowFor(e, ids, true)` (every key works in a field, as on the Gateway); twins: the Kind chip and Button-bar entries (Duplicate, Edit history). Typed lines of a new voucher left by Go To are kept in `sessionStorage` (`mrchartist_gw_draft:<TYPE>`, this tab) and come back on the next new voucher of the type; quit / save clear it |
+| Bill / PO / GRN forms (dialogs: the engine stays out, `entryKeyDown` on the `<form>`) | Ctrl+A accept, F2 date (all three) · bill: Alt+D delete (Y / N; Expenses' recycle-bin Undo toast), Alt+Q edit log, Alt+S stock query on a line | `LineItemsEditor` rows carry `data-line` |
+| Global | Ctrl+F5 rejection out (purchase-return debit note), Ctrl+F6 rejection in (`/invoice?type=CREDIT_NOTE&rej=1` → a credit note with "goods came back") | `KEY_CLAIMS` regenerated; the `rejIn` row got its route (one token, lead-reviewed) |
+
+`src/lib/keys/entry-actions.ts` (C's report rows and D's list rows call it): `deleteEntry(kind, id)` /
+`undoDelete(kind, id)` (`invoice` / `voucher` / `purchase`; data-layer delete to the recycle bin, Undo through
+`restoreEntries`, so rights, period lock and module checks run again), `cancelEntry(id, reason, ack?)` /
+`undoCancel(id)` (`cancelDocument` / `reinstateDocument`), `duplicateRoute(kind, id, type?)` (the editor / voucher
+opens an unsaved copy), `rowFor` / `entryKeyDown` (screens that read their own keys), `lastText`,
+`withoutLine`, `acceptForm`, `focusFormDate`. Side sheets: `src/components/keys/EntrySheets.tsx` (one lazy chunk; stock
+query via `loadStockQuery`, tax break-up from the editor totals, `EditLog`, the Y / N
+and reason asks), all `Modal`s in the modal stack. Strings: `keys-r20b`.
+
+Cut — the PRD's ranked cuts 1–3, taken at the 7 kB cap: Alt+R party narration, PgUp / PgDn previous / next entry,
+Ctrl+O party facts; then Ctrl+I more details. Their rows stay built but have no handler, so they never fire and never
+show on the Key bar (the cheat sheet's "All" tab still lists them — a lead call whether to drop the rows). Also cut (cap /
+data model): Ctrl+H "item lines / amount only" in the editor (no such mode exists), Ctrl+Enter alter of an item (saves
+instead), Ctrl+D / Ctrl+O / Alt+A / Ctrl+I on bill forms (the line's remove button stays), Alt+X / Alt+2 on bills, voucher
+cancel (no cancelled state for a voucher without a data change). Tests: `tests/keys-entry.test.ts`; e2e step "R20-B".
+
+| | Base (`67ccabd`) | After R20-B | Change |
+|---|---|---|---|
+| First paint | 177.8 kB | 177.8 kB | 0 (`KEY_CLAIMS` + `mod+f5 mod+f6`, a few bytes) |
+| Core precache | 3,277.2 kB | 3,285.5 kB | +8.3 kB: own code +7.1 (`f-keys` +2.1 entry-actions + `keys-r20b` English, `EntrySheets` 1.5, editor hook 1.5, `VoucherEntry` 1.1, bill / PO / GRN forms 0.6, help + palette 0.3); ≈ +1.3 hash churn across ≈ 700 chunks (the first-paint chunk's hash moves with `KEY_CLAIMS`). Cap 7 kB: own code at the cap after the ranked cuts |
+| Hindi pack | 376.6 kB | 377.1 kB | +0.5 kB (`keys-r20b`) |
+| Hindi in core | 21.8 kB | 21.9 kB | +0.1 |

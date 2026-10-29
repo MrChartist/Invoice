@@ -114,6 +114,73 @@ now ship in the desk chunk and the POS strip reads its two tables directly (−3
 `room` at A's first commit (PRD §1.4): 3,300 − 3,254.5 − 20 (R20-B / C / D caps, not merged) − 5 = **20.5 kB** (R21-P not
 merged on this base). Round 21's cap = min(29, 20.5) = 20.5 kB: ≥ 20, so package D stays in Round 21; A's own cap is 8 kB.
 
+## R21-B — Shifts, attendants and the day close
+
+### What it does
+
+- **Shift (B1).** `fuel_shifts` (`doc.create`, dated by `date`, audited; one row per day × shift number), view `shift`.
+  "Open shift" takes the shift number, start time and the attendants (comma separated; with more than one, a picker per
+  nozzle says who holds it); a reading per held nozzle is created with the **opening carried** from the latest earlier
+  closed shift (else the nozzle's totaliser start) and the daily test litres (`fuel_settings.test_litres`, 5). An opening
+  that differs from the carried one needs a reason and is audited. Litres sold = closing − opening − test (the test goes
+  back to the tank, never sold); a totaliser past its maximum wraps (`FuReading.max`, default 10⁷; a wrap is accepted
+  only within a tenth of the dial, otherwise "closing below opening" is refused); a negative sale is refused. Value = the
+  price in force at the shift's opening; with a price change inside the shift and a typed reading at the change
+  (`FuReading.splits`, one per change) the litres split at it (FU9). Moments are local "YYYY-MM-DD HH:MM"; a closing time
+  earlier than the start closes on the next day. Pure maths in `fu-shift.ts`, the store in `fu-dayclose.ts`.
+- **Settlement (B2, `fu-settle.ts`, pure).** Per attendant: expected = value of their nozzles' litres − the amount of
+  POS bills made from those nozzles during the shift (bills with `fu.lines[...].nozzle_id`, created between open and
+  close; cancelled bills, day-close bills and slip bills left out); collections typed by mode (cash, UPI, card, fleet card,
+  OMC loyalty, credit slips); short (−) / excess (+) = collected − expected. A shortage on a posted shift is settled by
+  "Recover in cash" (a cash receipt on the shift's bill) or "Write off" (the existing `write_off` row, note "Shortage at
+  pump — <name>", owner only like every write-off; `movedNoCash` skips it). Salary recovery is not built (FU10).
+- **Day close (B3, `fu-issue-io.ts`).** Every closed shift of the day → ONE non-GST Bill of Supply of its **counter
+  litres** (meter litres less POS bills and D's credit slips of the shift), lines per tank × product with
+  `godown_id` = the tank (stock leaves the right tank), `sv.exempt: 'NON_GST'`, `exempt_kind: 'NON_GST'`, client
+  `fuel_settings.counter_client_id` or "Counter sales — fuel", `fu.shift_id`, no round-off (the meter value is exact) —
+  all of the day's bills in **one `localDb.invoices.saveMany`**. Receipts by mode: cash → cash; UPI → the bank picked
+  on the bar (real banks only, `pickableBankAccounts('payout')`); card → "Card settlements clearing"; fleet card / OMC
+  loyalty → "Fleet-card receivable (OMC)" (clearing accounts created on first use, `clearing: true`, so cheque / e-payment
+  / BRS pickers never offer them). Credit-slip collections are not receipts (D bills the slips). Receipts never exceed the
+  bill. Undo = the bill's receipts removed, the bill cancelled (its number stays used), status back to `closed`.
+- **DSR (B4, `fu-dsr.ts` pure + `DsrView`).** Per shift × nozzle opening / closing / test / sold / rate(s) / value; per
+  product litres, average rate, value; collections by mode; credit-slip sales; short / excess per attendant. Print window
+  A4 landscape (script-free, `escHtml`; a blocked pop-up saves the HTML).
+- **Help, Ctrl+K.** Topics `inventory:fuel:shift` and `inventory:fuel:dsr` live in `topics-purchase.ts` (Inventory's
+  area: a pack-area topic needs a `PACK_TABS` row, which is A's file); the `inventory.fuel` Ctrl+K title lists the new
+  words. Strings in `fuel-r21b.ts` (literal Hindi). e2e: the R21-B step (1000 → 1250, test 5 → 245 L × ₹94.72, cash
+  ₹23,206.40, close, day close → one Bill of Supply with a cash receipt, DSR prints).
+
+### Cuts and deviations
+
+- **Cut 1 — DSR CSV** (PRD §11): not built; print only.
+- **Cut 2 — "Excess at pump" journal**: not built. An excess is kept out of the receipts (taken off the attendant's
+  collections, cash first) and shown on the shift as a note: "post it in Books to Excess at pump (other income)" (FU29).
+- No `fuel-rules.ts` B block: the meter maximum is a device convention, not a rule.
+- Help topics in `topics-purchase.ts`, not `topics-packs.ts` (see above); no `PACK_TABS` / palette rows for the two
+  views (`industry-packs.ts` is A's file); the Ctrl+K row is A's `inventory.fuel` with B's words appended.
+- The bridge and the shift view read `fuel_nozzles` / `fuel_prices` / `fuel_settings` directly (`fuData`, `fuCfg`), so
+  A's writers stay in the desk chunk.
+- Rollback lists leave out `series_counters` (`tests/fu-registry.test.ts`: Round 21 names no series); a failed day close
+  can therefore leave a number reserved, as a deleted document does.
+
+### Sizes (gz)
+
+| | `67ccabd` (master, measured) | R21-B on `67ccabd` (measured) |
+|---|---|---|
+| Initial JS | 177.8 kB | 177.8 kB |
+| Entry chunk | 89.5 kB | 89.5 kB |
+| Core precache | 3,277.2 kB | 3,288.7 kB (**+11.5**, cap 7) |
+| Hindi pack | 376.6 kB | 377.7 kB (`lang-hi-fuel` +1.0) |
+| Hindi in core | 21.9 kB | 21.9 kB |
+| New / grown chunks | — | `f-fuel` +2.8, `fu-issue-io` 2.7 (bridge + shift store), `ShiftView` 2.5, `DsrView` 1.3, `fu-ui` 0.4 (now shared), `topics-purchase` +0.3, `FuelDesk` +0.2 |
+
+The chunks sum to +10.2 kB; `check-bundle-size` reports +11.5 kB for the core (the precache list / manifest and per-file
+overhead of four more files). **Over the B cap of 7 kB after both stop-rule cuts.** Measured on the way: first build
++10.9 kB on `2737c99`; reading A's tables directly (A's writers back in the desk chunk) and cuts 1 /
+2 took ≈ 1 kB off; the final +11.5 is measured against `67ccabd` (the chunk sum, +10.2 kB, is the package itself).
+The core total stays under the 3,300 kB budget; no cut beyond the PRD's stop rule was made — the lead decides.
+
 ## R21-D — Credit customers and Rule 42 for pumps (OMC account and LPG cut at the D cap)
 
 ### What it does

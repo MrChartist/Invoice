@@ -25,3 +25,12 @@ export const FU_PACKS = ['fuel', 'lpg'] as const;
 
 /** The date field each dated table is synced / period-locked by (mirrors the `sync-engine.ts` DATED rows). */
 export const FU_DATED: Readonly<Record<string, string>> = { fuel_prices: 'date', fuel_shifts: 'date', fuel_tank_logs: 'date', fuel_slips: 'date' };
+
+// R21-B — names the day close writes (the client, clearing accounts and ledgers are created by name on first use).
+export const FU_NAMES = {
+  counter: 'Counter sales — fuel',
+  card: 'Card settlements clearing',
+  fleet: 'Fleet-card receivable (OMC)',
+  excess: 'Excess at pump',
+  short: 'Shortage at pump',
+} as const;

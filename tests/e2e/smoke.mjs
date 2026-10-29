@@ -6500,6 +6500,107 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  // R20-B: entry keys — F8, Alt+C on the party picker creates the party (Ledger Creation), Ctrl+A saves; Alt+D (Y) deletes the saved
+  // invoice and the toast's Undo brings it back from the recycle bin; a Gateway payment with Alt+T is post-dated.
+  await step('R20-B: Alt+C new party, Ctrl+A save, Alt+D then Undo, Alt+T post-dated voucher', async () => {
+    await page.goto(srv.origin + '/');
+    await page.evaluate(() => {
+      localStorage.setItem('mrchartist_tally_keys', 'on');
+      localStorage.setItem('mrchartist_tally_layout', 'prime');
+    });
+    await page.goto(srv.origin + '/');
+    await page.getByText('Stored on this device').waitFor();
+    await page.keyboard.press('F8');
+    await page.waitForURL(/\/invoice$/);
+    const party = page.getByLabel('Client name');
+    await party.fill('R20B Keys Traders');
+    await party.press('Alt+c');
+    const add = page.getByRole('dialog', { name: 'Ledger Creation' });
+    await add.waitFor();
+    check((await add.getByLabel('Name', { exact: true }).inputValue()) === 'R20B Keys Traders', 'Alt+C opens Ledger Creation (Sundry debtors) with the typed name');
+    await add.getByLabel('Name', { exact: true }).press('Control+a');
+    await add.waitFor({ state: 'detached' });
+    check((await party.inputValue()) === 'R20B Keys Traders', 'the new party is on the invoice');
+    const clients = await readJson(page, 'clients', [], (c) => c.some((x) => x.name === 'R20B Keys Traders'));
+    check(clients.some((x) => x.name === 'R20B Keys Traders'), 'the party is created');
+    await page.getByLabel('Item 1 name').fill('Key widget');
+    await page.getByLabel('Item 1 rate').fill('250');
+    await page.keyboard.press('Control+a');
+    await page.waitForURL(/\/invoice\/[^/?]+$/);
+    const id = decodeURIComponent(page.url().split('/invoice/')[1]);
+    check(!!(await readJson(page, 'invoices', [], (v) => v.some((x) => x.id === id))).find((x) => x.id === id), 'Ctrl+A saved the invoice');
+    await page.keyboard.press('Escape'); // the send sheet
+    await page.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+    await page.waitForTimeout(200);
+    await page.keyboard.press('Alt+d');
+    const ask = page.getByRole('dialog', { name: /^Delete / });
+    await ask.waitFor();
+    await page.keyboard.press('y');
+    const gone = await readJson(page, 'invoices', [], (v) => !v.some((x) => x.id === id));
+    check(!gone.some((x) => x.id === id), 'Alt+D, Y deleted the invoice (to the recycle bin)');
+    await page.getByRole('button', { name: 'Undo', exact: true }).last().click();
+    const back = await readJson(page, 'invoices', [], (v) => v.some((x) => x.id === id));
+    check(back.some((x) => x.id === id), 'Undo restored it from the recycle bin');
+    // Alt+T on the payment voucher an earlier step saved ("Office rent"), altered and accepted with Ctrl+A.
+    const pv = (await readJson(page, 'vouchers', [])).find((x) => x.type === 'PAYMENT' && x.narration === 'Office rent');
+    await page.goto(srv.origin + `/gateway/voucher/payment?id=${encodeURIComponent(pv.id)}`);
+    await page.getByRole('heading', { name: `Alter Payment voucher ${pv.number}` }).waitFor();
+    await page.locator('textarea[data-field="narration"]').click();
+    await page.keyboard.press('Alt+t');
+    check((await page.getByTestId('gw-v-variant').inputValue()) === 'PD', 'Alt+T marks the voucher post-dated');
+    await page.keyboard.press('Control+a');
+    const vs = await readJson(page, 'vouchers', [], (v) => v.some((x) => x.id === pv.id && x.post_dated));
+    const why = await page.locator('[role=alert]').allInnerTexts();
+    check(vs.find((x) => x.id === pv.id)?.post_dated === true, `saved post-dated through saveVoucher (Post-dated register)${why.length ? ` — ${why.join(' / ')}` : ''}`);
+    await page.evaluate(() => localStorage.setItem('mrchartist_tally_keys', 'off'));
+  });
+
+  // R21-B: a shift (opening 1000, closing 1250, test 5 → 245 L), cash = value, close, day close → one Bill of Supply; DSR prints.
+  await step('R21-B shifts: Inventory → Fuel → Shift: open shift 1 (Ravi, nozzle 1-A opening 1000), closing 1250, test 5 → 245 L × ₹94.72, cash ₹23,206.40, close; Day close → one non-GST Bill of Supply with a cash receipt; Daily sales prints', async () => {
+    const keys = ['settings', 'stock_items', 'godowns', 'fuel_nozzles', 'fuel_prices', 'fuel_shifts', 'invoices', 'transactions', 'bank_accounts', 'vouchers', 'accounts'];
+    const prev = Object.fromEntries(await Promise.all(keys.map(async (k) => [k, await readJson(page, k, null)])));
+    const today = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; });
+    await writeJson(page, 'settings', { ...(prev.settings ?? {}), business_type: 'kirana', fuel_kind: 'pump', industry_packs: ['fuel'], modules: undefined, lock_until: undefined });
+    await writeJson(page, 'stock_items', [...(prev.stock_items ?? []).filter((s) => s.id !== 'e2e-fb-ms'), { id: 'e2e-fb-ms', name: 'E2E B Petrol', unit: 'LTR', hsn: '27101241', track_stock: true, opening_qty: 0, opening_rate: 0, reorder_level: 0, fu: { product: 'ms', unit: 'L' } }]);
+    await writeJson(page, 'godowns', [...(prev.godowns ?? []), { id: 'e2e-fb-t1', name: 'E2E B Tank', fu: { product_item_id: 'e2e-fb-ms', capacity_l: 9000, chart: [] } }]);
+    await writeJson(page, 'fuel_nozzles', [{ id: 'e2e-fb-n1', du_no: '1', nozzle_no: 'A', tank_id: 'e2e-fb-t1', item_id: 'e2e-fb-ms', totaliser_start: 1000, active: true }]);
+    await writeJson(page, 'fuel_prices', [{ id: 'e2e-fb-p', item_id: 'e2e-fb-ms', date: today, time: '00:00', rsp: 94.72 }]);
+    await writeJson(page, 'fuel_shifts', []);
+    await readJson(page, 'fuel_shifts', null, (v) => Array.isArray(v) && v.length === 0, 15000);
+    await readJson(page, 'settings', {}, (v) => v.fuel_kind === 'pump', 15000);
+    const beforeIds = new Set((await readJson(page, 'invoices', [])).map((i) => i.id));
+    await page.goto(srv.origin + '/inventory?tab=fuel&view=shift');
+    await page.locator('[data-fuel-shift]').waitFor({ timeout: 15000 });
+    await page.locator('[data-fuel-shift] [data-fu-field="start"]').fill('00:00');
+    await page.locator('[data-fu-field="atts"]').fill('Ravi');
+    await page.locator('[data-fu-shift-open]').click();
+    const sh = await readJson(page, 'fuel_shifts', [], (v) => v.length === 1, 15000);
+    check(sh[0]?.readings?.[0]?.opening === 1000 && sh[0].readings[0].test_l === 5, `shift opened, opening carried 1000, test 5 L (${JSON.stringify(sh[0]?.readings)})`);
+    await page.locator('[data-fu-cell="c:e2e-fb-n1"]').fill('1250');
+    await page.locator('[data-fu-cell="m:0:cash"]').fill('23206.40');
+    await page.locator('[data-fuel-shift] [data-fu-field="at"]').fill('23:59');
+    await page.locator('[data-fu-shift-close]').click();
+    await readJson(page, 'fuel_shifts', [], (v) => v[0]?.status === 'closed', 15000);
+    await page.locator('[data-fu-diff="0"]').waitFor({ timeout: 15000 });
+    check((await page.locator('[data-fu-diff="0"]').innerText()).trim() === '0', 'Ravi: no shortage or excess');
+    await page.locator('[data-fu-day-close]').click();
+    const bills = (await readJson(page, 'invoices', [], (v) => v.some((i) => !beforeIds.has(i.id) && i.fu?.shift_id), 15000)).filter((i) => !beforeIds.has(i.id) && i.fu?.shift_id);
+    const b = bills[0];
+    check(bills.length === 1 && b.doc_type === 'BILL_OF_SUPPLY' && b.exempt_kind === 'NON_GST' && b.items[0].quantity === 245 && b.total === 23206.4 && b.items[0].godown_id === 'e2e-fb-t1', `one non-GST Bill of Supply: 245 L, ₹23,206.40 from the tank (${b?.doc_type}, ${b?.items?.[0]?.quantity}, ${b?.total})`);
+    const tx = await readJson(page, 'transactions', [], (v) => v.some((t) => t.invoice_id === b?.id), 15000);
+    check(tx.some((t) => t.invoice_id === b?.id && t.method === 'Cash' && t.amount === 23206.4), 'cash receipt on the bill');
+    check((await readJson(page, 'fuel_shifts', []))[0]?.status === 'posted', 'the shift is posted');
+    await page.locator('[data-fuel-view="dsr"]').click();
+    await page.locator('[data-fuel-dsr]').waitFor({ timeout: 15000 });
+    check(/245/.test(await page.locator('[data-fu-dsr-table]').first().innerText()), 'the register shows 245 L on nozzle 1-A');
+    await page.evaluate(() => { window.__dsrHtml = ''; window.open = () => ({ document: { write: (h) => { window.__dsrHtml += h; }, close() {} }, print() {} }); });
+    await page.locator('[data-fu-dsr-print]').click();
+    const html = await page.evaluate(() => window.__dsrHtml);
+    check(/A4 landscape/.test(html) && /Daily sales register/.test(html) && /23206\.4/.test(html), 'DSR prints A4 landscape with the value');
+    await page.goto(srv.origin + '/expenses');
+    for (const k of keys) await writeJson(page, k, prev[k]);
+  });
+
   // R21-D: credit slips → month-end Bill of Supply with the vehicle annexure; Rule 42 duty exclusion (LPG cut at the D cap).
   await step('R21-D credit customers: two slips for one customer → one Bill of Supply with a two-row vehicle annexure; GST → Common credit shows E / F with pump duties left out', async () => {
     const keys = ['settings', 'stock_items', 'fuel_prices', 'fuel_slips', 'clients', 'invoices'];

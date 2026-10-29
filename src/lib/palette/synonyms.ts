@@ -205,3 +205,9 @@ export const GST_GROUP_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   recon: ['reconciliation', 'itc'],
   tools: ['gst tools'],
 };
+
+// R20-B: Tally names of the voucher kinds and rejections the entry keys write (appended; the rows above are unchanged).
+for (const [href, words] of Object.entries({
+  '/books?tab=vreg': ['optional voucher', 'post-dated voucher', 'memorandum', 'पोस्ट-डेटेड'],
+  '/expenses?tab=returns': ['rejection out', 'रिजेक्शन आउट'],
+})) (TAB_SYNONYMS as Record<string, readonly string[]>)[href] = [...(TAB_SYNONYMS[href] ?? []), ...words];
