@@ -5,7 +5,8 @@
  */
 import { useMemo, useState } from 'react';
 import { CheckCheck, Upload } from 'lucide-react';
-import { loadEpayBatches, matchResponse, needsConfirmation, parseBankResponse, recordConfirmed, type BankResponseRow } from '../../../lib/epay-confirm';
+import { decideEpayBatch, epayBatchCleared, loadEpayBatches, matchResponse, needsConfirmation, parseBankResponse, recordConfirmed, type BankResponseRow, type EpayBatch } from '../../../lib/epay-confirm';
+import { can } from '../../../lib/access';
 import { formatDate, formatMoney } from '../../../lib/utils';
 import { fxbT } from '../../../i18n/areas/extras-7u';
 import controls from '../../../styles/controls.module.css';
@@ -14,7 +15,7 @@ import styles from './bankdocs.module.css';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
-export default function EpayConfirmPanel({ notify, version }: { notify: Notify; version: number }) {
+export default function EpayConfirmPanel({ notify, version, onFile }: { notify: Notify; version: number; onFile: (b: EpayBatch) => void }) {
   const [tick, setTick] = useState(0);
   const batches = useMemo(() => [...loadEpayBatches()].reverse().slice(0, 30), [tick, version]); // eslint-disable-line react-hooks/exhaustive-deps
   const [batchId, setBatchId] = useState('');
@@ -59,6 +60,21 @@ export default function EpayConfirmPanel({ notify, version }: { notify: Notify; 
     else next.delete(rowId);
     setConfirmed(next);
   };
+  // 8.46: a batch sent for approval — the owner approves (and downloads the file) or rejects it with a reason.
+  const decide = (approve: boolean) => {
+    if (!batch) return;
+    const note = approve ? '' : window.prompt(fxbT('rejectWhy')) ?? '';
+    if (!approve && !note.trim()) return;
+    try {
+      const b = decideEpayBatch(batch.id, approve ? 'approved' : 'rejected', note);
+      if (approve) onFile(b);
+      notify(fxbT(approve ? 'approvedDl' : 'rejectedMsg', { number: b.number }), 'success');
+      setTick((t) => t + 1);
+    } catch (err) {
+      notify((err as Error).message, 'error');
+    }
+  };
+  const ap = batch?.approval;
   const statusLabel = { sent: 'stSent', paid: 'stPaid', failed: 'stFailed', pending: 'stPending' } as const;
 
   return (
@@ -70,12 +86,24 @@ export default function EpayConfirmPanel({ notify, version }: { notify: Notify; 
           <select className={controls.select} value={batch?.id ?? ''} onChange={(e) => { setBatchId(e.target.value); setResponse(null); }}>
             {batches.map((b) => <option key={b.id} value={b.id}>{b.number} · {formatDate(b.date)} · ₹{formatMoney(b.total)} · {b.rows.filter((r) => r.status === 'sent').length} {fxbT('open')}</option>)}
           </select></label>
-        <div className={styles.toolbar}>
+        {ap && ap.state !== 'approved' && (
+          <div className={styles.toolbar} data-epay-approval={ap.state}>
+            <span className={styles.warn}>{ap.state === 'pending' ? fxbT('apPending') : fxbT('apRejected', { note: ap.note ?? '' })}</span>
+            {ap.state === 'pending' && can('doc.approve') && (
+              <>
+                <button type="button" className={controls.btnPrimary} onClick={() => decide(true)}><CheckCheck size={16} /> {fxbT('approveDl')}</button>
+                <button type="button" className={controls.btnOutline} onClick={() => decide(false)}>{fxbT('reject')}</button>
+              </>
+            )}
+          </div>
+        )}
+        {ap?.state === 'approved' && batch && <div className={styles.toolbar}><button type="button" className={controls.btnOutline} onClick={() => onFile(batch)}>{fxbT('download')}</button></div>}
+        {batch && epayBatchCleared(batch) && <div className={styles.toolbar}>
           <label className={controls.btnOutline}>
             <Upload size={16} /> {fxbT('loadFile')}
             <input type="file" accept=".csv,.txt,.tsv,text/csv" hidden onChange={async (e) => { const f = e.target.files?.[0]; if (f) read(await f.text()); e.target.value = ''; }} />
           </label>
-        </div>
+        </div>}
         <label className={controls.field}><span className={controls.label}>{fxbT('orPaste')}</span>
           <textarea className={controls.textarea} rows={4} value={text} onChange={(e) => read(e.target.value)} aria-label={fxbT('orPaste')} /></label>
         {error && <p className={styles.bad}>{error}</p>}

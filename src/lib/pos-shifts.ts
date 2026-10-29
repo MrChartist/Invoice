@@ -10,6 +10,11 @@
  * bills → `zReport` maths (tax, tenders from those bills' payments, returns made during the shift).
  * Closing is refused while bills are on hold on this counter (they would fall outside every shift).
  *
+ * Drawer hand-over (PENDING 50, 8.151): closing a shift may leave part of the counted cash in the drawer for the next
+ * cashier (`handover`, the rest is taken out / banked). The next shift opened takes it over (`took_over`): its float is
+ * proposed as that amount, and a different float is kept with the difference noted, so a short drawer between two
+ * cashiers shows up on the second one's open. A hand-over is taken over once.
+ *
  * Pure above "Storage".
  */
 import type { InvoiceRecord, Payment } from '../types/invoice';
@@ -43,6 +48,10 @@ export interface PosShift {
   /** Totals frozen at close (the shift's Z report summary). */
   totals?: ShiftTotals;
   note?: string;
+  /** PENDING 50: cash left in the drawer at close for the next shift (≤ counted). */
+  handover?: number;
+  /** PENDING 50: the closed shift whose hand-over this shift took over, and the float found vs handed over. */
+  took_over?: { shift_id: string; amount: number; difference: number };
 }
 
 export interface ShiftTotals {
@@ -120,6 +129,14 @@ export function dayOpeningFloat(shifts: readonly PosShift[], day: string): numbe
   return first ? round2(Math.max(num(first.opening_float), 0)) : 0;
 }
 
+/** PENDING 50: the latest closed shift with cash handed over that no shift has taken over yet. */
+export function pendingHandover(shifts: readonly PosShift[]): PosShift | undefined {
+  const taken = new Set(shifts.map((s) => s.took_over?.shift_id).filter(Boolean));
+  return shifts
+    .filter((s) => s.closed_at && num(s.handover) > 0 && !taken.has(s.id))
+    .sort((a, b) => (b.closed_at ?? '').localeCompare(a.closed_at ?? ''))[0];
+}
+
 /** Next shift number for `day`. */
 export const nextShiftNumber = (shifts: readonly PosShift[], day: string): number => shifts.filter((s) => s.day === day).reduce((m, s) => Math.max(m, s.number || 0), 0) + 1;
 
@@ -143,6 +160,8 @@ export const shiftsDb = {
     const all = shiftsDb.all();
     const user = counterUser();
     if (openShiftOf(all, user.id)) throw new Error('You already have a shift open — close it first.');
+    const from = pendingHandover(all);
+    const float = round2(Math.max(num(openingFloat), 0));
     const row: PosShift = {
       id: generateId(),
       day,
@@ -150,11 +169,13 @@ export const shiftsDb = {
       user_id: user.id,
       user_name: user.name,
       opened_at: new Date().toISOString(),
-      opening_float: round2(Math.max(num(openingFloat), 0)),
+      opening_float: float,
       bill_ids: [],
+      ...(from ? { took_over: { shift_id: from.id, amount: round2(num(from.handover)), difference: round2(float - num(from.handover)) } } : {}),
     };
     write([...all, row]);
-    log(row, 'create', `Opened POS shift ${row.number} (${day}) for ${row.user_name}, float ₹${row.opening_float}`);
+    const took = row.took_over ? ` (took over ₹${row.took_over.amount} from shift ${from!.number} of ${from!.user_name}${row.took_over.difference ? `, difference ₹${row.took_over.difference}` : ''})` : '';
+    log(row, 'create', `Opened POS shift ${row.number} (${day}) for ${row.user_name}, float ₹${row.opening_float}${took}`);
     return row;
   },
   /** Note a saved POS bill on the open shift (no-op without one). */
@@ -166,7 +187,7 @@ export const shiftsDb = {
     write(all);
   },
   /** Close with the counted cash; refused while bills are on hold. Returns the closed row. */
-  close: (shiftId: string, z: ZReport, counted: number, heldBills: number, note?: string): PosShift => {
+  close: (shiftId: string, z: ZReport, counted: number, heldBills: number, note?: string, handover = 0): PosShift => {
     requireAccess('doc.create');
     const blocker = closeBlocker(heldBills, openOrdersBlocker());
     if (blocker) throw new Error(blocker);
@@ -174,6 +195,8 @@ export const shiftsDb = {
     const idx = all.findIndex((s) => s.id === shiftId);
     if (idx < 0) throw new Error('This shift no longer exists.');
     if (all[idx].closed_at) throw new Error('This shift is already closed.');
+    const hand = round2(Math.max(num(handover), 0));
+    if (hand > round2(num(counted)) + 0.004) throw new Error('The cash left for the next shift cannot be more than the cash counted.');
     const expected = shiftExpected(z, all[idx].opening_float);
     const row: PosShift = {
       ...all[idx],
@@ -183,10 +206,11 @@ export const shiftsDb = {
       difference: round2(num(counted) - expected),
       totals: shiftTotals(z),
       ...(note?.trim() ? { note: note.trim() } : {}),
+      ...(hand > 0 ? { handover: hand } : {}),
     };
     all[idx] = row;
     write(all);
-    log(row, 'update', `Closed POS shift ${row.number} (${row.day}) of ${row.user_name}: counted ₹${row.counted_cash}, expected ₹${expected}, difference ₹${row.difference}`);
+    log(row, 'update', `Closed POS shift ${row.number} (${row.day}) of ${row.user_name}: counted ₹${row.counted_cash}, expected ₹${expected}, difference ₹${row.difference}${hand > 0 ? `, ₹${hand} left for the next shift` : ''}`);
     return row;
   },
 };
