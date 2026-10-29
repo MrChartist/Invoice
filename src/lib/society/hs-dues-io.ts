@@ -28,6 +28,7 @@ import { nextCertificate, transferError, transferUnit, type TransferInput } from
 import { SOCIETY_TEMPLATES } from './hs-reminders';
 import { loadUnits, saveUnit } from './hs-units-save';
 import { societySettings } from './hs-issue-io';
+import { PRINT_FONT } from '../print-fonts';
 
 const fn = computeInterest as InterestFn;
 const index = (): DuesIndex => duesIndex(localDb.invoices.getAll(), getTable<Payment>('transactions'), getTable('doc_links'));
@@ -108,5 +109,5 @@ export function reminderLink(l: DuesLine): string {
 
 /** Print: a certificate text, or the notice-board list (unit and amount only — no phone numbers). */
 export function printText(title: string, lines: readonly string[]): void {
-  printHtmlDocument(`<!doctype html><meta charset="utf-8"><title>${escHtml(title)}</title><body style="font:14px/1.6 sans-serif;margin:24px"><h2>${escHtml(title)}</h2>${lines.map((l) => `<p>${escHtml(l)}</p>`).join('')}<p style="color:#666">${escHtml('Working paper — verify with your CA.')}</p></body>`, () => undefined);
+  printHtmlDocument(`<!doctype html><meta charset="utf-8"><title>${escHtml(title)}</title><body style="font:14px/1.6 ${PRINT_FONT};margin:24px"><h2>${escHtml(title)}</h2>${lines.map((l) => `<p>${escHtml(l)}</p>`).join('')}<p style="color:#666">${escHtml('Working paper — verify with your CA.')}</p></body>`, () => undefined);
 }

@@ -29,4 +29,4 @@
 .cond { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .cond > select, .cond > input { flex: 1 1 9rem; min-width: 0; }
 .details summary { cursor: pointer; font-weight: 600; }
-.textarea { width: 100%; min-height: 5rem; font-family: var(--font-mono); font-size: var(--text-xs); }
+.textarea { width: 100%; min-height: 5rem; font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: var(--text-xs); }

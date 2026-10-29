@@ -51,7 +51,7 @@
 
 .legendValue {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: 1.0625rem;
   font-variant-numeric: tabular-nums;
 }
@@ -76,7 +76,7 @@
 .barBilled { fill: var(--muted-foreground); opacity: 0.45; }
 .barReceived { fill: var(--profit); }
 .bar:hover .barBilled { opacity: 0.7; }
-.effText { fill: var(--foreground); font-size: var(--text-2xs); font-weight: 700; font-family: var(--font-display); }
+.effText { fill: var(--foreground); font-size: var(--text-2xs); font-weight: 600; font-family: var(--font-display); }
 
 .keys { display: flex; gap: 1rem; flex-wrap: wrap; font-size: var(--text-sm); color: var(--muted-foreground); font-weight: 600; margin-bottom: 0.5rem; }
 .key { display: inline-flex; align-items: center; gap: 0.4rem; }
@@ -86,7 +86,7 @@
 .chip {
   display: inline-block;
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   padding: 0.2rem 0.55rem;
   border-radius: var(--radius-full);
   color: var(--tone);

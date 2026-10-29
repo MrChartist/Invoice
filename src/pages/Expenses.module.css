@@ -68,7 +68,7 @@
 }
 
 .count {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
   opacity: 0.6;
   margin-left: 0.15rem;

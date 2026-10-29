@@ -7,10 +7,18 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { getLanguage, useT } from '../../i18n';
 import { helpT } from '../../i18n/areas/help-r6';
 import type { GlossaryId, GlossaryTerm } from '../../lib/help/glossary';
+import { withHindi, type HiTableLoader } from '../../lib/help/hi-tables';
 import styles from './help.module.css';
 
+type GlossaryModule = { GLOSSARY: Readonly<Record<string, GlossaryTerm>>; loadHi?: HiTableLoader<readonly [string, string]> };
 let glossary: Promise<Readonly<Record<string, GlossaryTerm>>> | null = null;
-const loadGlossary = () => (glossary ??= import('../../lib/help/glossary').then((m) => m.GLOSSARY));
+// PERF-6: a build moves the Hindi into the `lang-hi-help` pack (`loadHi`); it is put back when Hindi is on.
+const loadGlossary = () => (glossary ??= import('../../lib/help/glossary').then(async (m: GlossaryModule) => {
+  await withHindi(m.loadHi, (hi) => {
+    for (const [id, [def, app]] of Object.entries(hi)) if (m.GLOSSARY[id]) m.GLOSSARY[id].hi = { def, app };
+  });
+  return m.GLOSSARY;
+}));
 
 export function Term({ id, children }: { id: GlossaryId; children: ReactNode }) {
   useT();
@@ -38,7 +46,7 @@ export function Term({ id, children }: { id: GlossaryId; children: ReactNode }) 
     };
   }, [open, id]);
 
-  const text = entry ? (getLanguage() === 'hi' ? entry.hi : entry.en) : null;
+  const text = entry ? (getLanguage() === 'hi' && entry.hi.def ? entry.hi : entry.en) : null;
   return (
     <span className={styles.termWrap} ref={wrap}>
       <button

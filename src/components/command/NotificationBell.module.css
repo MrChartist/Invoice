@@ -42,7 +42,7 @@
   align-items: center;
   justify-content: center;
   font-size: var(--text-2xs);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
   color: var(--primary-foreground);
   background: var(--primary);
@@ -83,7 +83,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--text-lg);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .list {
@@ -142,7 +142,7 @@
 .itemTitle {
   margin: 0;
   font-size: var(--text-base);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .detail {

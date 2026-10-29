@@ -43,5 +43,5 @@ Existing callers without `design` keep working. Print: `window.print()` honours 
 Cross-link: a "Customise design" link to `/design` from the preview toolbar and Settings profile card.
 
 ## Notes
-- No new dependencies, no network. Fonts degrade to system fonts when DM Serif Display / Noto Devanagari are not installed.
+- No new dependencies, no network. Fonts follow the type system (`docs/theme/TYPE-SYSTEM.md`): the paper is set in Chartist Sans Flex, titles in Chartist Sans or the Chartist Serif italic accent; the Font control offers only "Template" or "Chartist Sans Flex" (ids saved before it read as Sans Flex). All self-hosted and precached.
 - Thermal height is content-driven (`paperSize().autoHeight`); measure the element for the PDF.

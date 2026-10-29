@@ -16,6 +16,7 @@ import controls from '../../styles/controls.module.css';
 import styles from './Cheques.module.css';
 import { useT } from '../../i18n';
 import { chqT } from '../../i18n/areas/cheques';
+import { printWhenReady } from '../../lib/print-fonts';
 
 const FIELDS: ChequeField[] = ['date', 'payee', 'words1', 'words2', 'figures', 'crossing'];
 const fieldLabel = (f: ChequeField) => chqT(`f.${f}`);
@@ -28,7 +29,7 @@ function printHtml(html: string, name: string) {
     w.document.write(html);
     w.document.close();
     w.focus();
-    w.print();
+    printWhenReady(w);
   } else {
     downloadText(`${name}.html`, html, 'text/html');
   }

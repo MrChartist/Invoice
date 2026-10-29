@@ -16,6 +16,7 @@ import { formatCurrency, formatDate } from './utils';
 import { round2 } from './invoice-calc';
 import { receivableTotal } from './rcm';
 import { escHtml as esc } from './html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 
 export function receiptNumber(
   payment: Pick<Payment, 'id' | 'date'> & Partial<Pick<Payment, 'receipt_number'>>,
@@ -101,18 +102,18 @@ export function receiptHtml(r: ReceiptData): string {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Receipt ${esc(r.number)}</title>
-<style>
-  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 32px; }
+<style>${PRINT_FONT_FACE}
+  body { font-family: ${PRINT_FONT}; color: #111; margin: 0; padding: 32px; }
   .sheet { max-width: 640px; margin: 0 auto; border: 1px solid #ccc; padding: 28px 32px; }
   h1 { font-size: 20px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 4px; }
   .muted { color: #555; font-size: 13px; }
   .head { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 16px; }
-  .amount { font-size: 28px; font-weight: 700; margin: 12px 0 2px; font-variant-numeric: tabular-nums; }
+  .amount { font-size: 28px; font-weight: 600; margin: 12px 0 2px; font-variant-numeric: tabular-nums; }
   table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
   th { text-align: left; color: #555; font-weight: 500; width: 40%; padding: 6px 0; vertical-align: top; }
   td { padding: 6px 0; }
   .sign { margin-top: 48px; text-align: right; font-size: 13px; }
-  .note { margin-top: 24px; font-size: 11px; color: #777; }
+  .note { margin-top: 24px; font-size: 12px; color: #777; }
   @media print { body { padding: 0; } .sheet { border: 0; } }
 </style></head>
 <body><div class="sheet">

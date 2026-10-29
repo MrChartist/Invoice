@@ -28,6 +28,7 @@ import type {
   RateRow,
 } from './gst-reports';
 import { escHtml as esc } from './html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 
 /* ───────────────────────── JSON ───────────────────────── */
 
@@ -692,12 +693,12 @@ export function buildSummaryHtml(rep: GstReport, periodTitle: string, filerName 
   if (eco95.length) sections.push(['Table 14(b) e-commerce operator pays tax u/s 9(5) (value only)', eco95.length, sum(eco95, 'value'), 0, 0, 0]);
   const p = b.payment;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>GST summary - ${esc(periodTitle)}</title>
-<style>
-body{font:13px/1.45 system-ui,sans-serif;color:black;margin:24px;max-width:900px}
+<style>${PRINT_FONT_FACE}
+body{font:13px/1.45 ${PRINT_FONT};color:black;margin:24px;max-width:900px}
 h1{font-size:20px;margin:0 0 2px}h2{font-size:14px;margin:22px 0 6px;border-bottom:2px solid black;padding-bottom:3px}
 p.m{color:dimgray;margin:2px 0}table{width:100%;border-collapse:collapse}
-td,th{border-bottom:1px solid lightgray;padding:4px 6px;text-align:left}th{font-size:11px;text-transform:uppercase;color:dimgray}
-td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}tr.b td{font-weight:700;border-top:1px solid black}
+td,th{border-bottom:1px solid lightgray;padding:4px 6px;text-align:left}th{font-size:12px;text-transform:uppercase;color:dimgray}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}tr.b td{font-weight: 600;border-top:1px solid black}
 .w{margin-top:24px;padding:8px 10px;border:1px solid gray;font-size:12px}
 @media print{body{margin:0}}
 </style></head><body>

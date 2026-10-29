@@ -13,6 +13,7 @@ import { buildLedger, closingInWords, type PartyReceivable } from './receivables
 import { round2 } from './invoice-calc';
 import { formatDate, formatMoney } from './utils';
 import { esc } from './voucher-print';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 
 export interface LetterBill {
   number: string;
@@ -91,7 +92,7 @@ function drCr(n: number, currency: string): string {
 }
 
 const LETTER_CSS = `
-  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 32px; font-size: 13px; line-height: 1.5; }
+  body { font-family: ${PRINT_FONT}; color: #111; margin: 0; padding: 32px; font-size: 13px; line-height: 1.5; }
   .l { max-width: 720px; margin: 0 auto 40px; break-after: page; page-break-after: always; }
   .l:last-of-type { break-after: auto; page-break-after: auto; }
   .head { text-align: center; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 16px; }
@@ -102,12 +103,12 @@ const LETTER_CSS = `
   h2 { font-size: 14px; margin: 16px 0 8px; }
   table { width: 100%; border-collapse: collapse; margin: 8px 0; }
   th, td { border: 1px solid #999; padding: 5px 8px; text-align: left; }
-  th { background: #f2f2f2; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  th { background: #f2f2f2; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
   td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
-  tr.total td { font-weight: 700; }
+  tr.total td { font-weight: 600; }
   .sign { display: flex; justify-content: space-between; margin-top: 48px; gap: 24px; }
   .sign div { flex: 1; border-top: 1px solid #111; padding-top: 6px; font-size: 12px; }
-  .note { font-size: 10px; color: #777; margin-top: 20px; }
+  .note { font-size: 12px; color: #777; margin-top: 20px; }
   @media print { body { padding: 0; } }
 `;
 
@@ -153,7 +154,7 @@ export function confirmationLettersHtml(letters: readonly ConfirmationLetter[], 
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Confirmation of accounts</title>
-<style>${LETTER_CSS}</style></head>
+<style>${PRINT_FONT_FACE}${LETTER_CSS}</style></head>
 <body>
 ${letters.map((l) => letterSection(l, sender, today)).join('\n')}
 </body></html>`;

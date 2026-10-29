@@ -14,4 +14,4 @@
 .field { flex: 1 1 8rem; min-width: 0; height: 2rem; padding: 0 0.5rem; border: 1px solid var(--input-border); border-radius: var(--radius-sm); background: var(--card); color: var(--foreground); font-size: var(--text-base); }
 .hint { margin: 0; font-size: var(--text-sm); color: var(--muted-foreground); line-height: 1.35; }
 .result { display: flex; justify-content: space-between; font-size: var(--text-base); color: var(--foreground); }
-.resultStrong { font-weight: 700; }
+.resultStrong { font-weight: 600; }

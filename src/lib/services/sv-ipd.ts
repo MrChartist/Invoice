@@ -30,6 +30,7 @@ import { billClaim, loadClaims } from './sv-claims';
 import { doctorStaff } from './sv-opd';
 import { clinicDraft, clinicLine, dayDiff, liveInvoice, patientClient, uhidOf } from './sv-patients';
 import { SV_SERIES, SV_TABLES } from './sv-shared';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 export const IPD = SV_SERIES.admissions;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -193,7 +194,7 @@ export function interimHtml(a: Admission, o: { asOn: string; business: string; d
   const lines = admissionLines(a, o.asOn, o.mode);
   const gross = linesGross(lines);
   const rows = lines.map((l) => `<tr><td>${esc(l.name)}</td><td class="n">${num(l.quantity)}</td><td class="n">${esc(o.money(num(l.rate)))}</td><td class="n">${num(l.tax_rate) ? `${num(l.tax_rate)}%` : 'Exempt'}</td><td class="n">${esc(o.money(round2(num(l.quantity) * num(l.rate) * (1 + num(l.tax_rate) / 100))))}</td></tr>`).join('');
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Interim bill ${esc(a.number)}</title><style>body{font:11pt system-ui,sans-serif;margin:14mm}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #999;padding:4px;text-align:left}.n{text-align:right}</style></head><body><h2>${esc(o.business)}</h2><p><strong>Interim bill — not a tax invoice</strong> · ${esc(a.number)} · ${esc(a.patient_name)}${a.uhid ? ` · UHID ${esc(a.uhid)}` : ''} · admitted ${esc(a.admit_date)} · as on ${esc(o.asOn)}</p><table><thead><tr><th>Charge</th><th class="n">Qty</th><th class="n">Rate</th><th class="n">GST</th><th class="n">Amount</th></tr></thead><tbody>${rows}</tbody></table><p class="n">Charges ${esc(o.money(gross))} · Less deposits ${esc(o.money(o.deposits))} · <strong>Balance ${esc(o.money(round2(gross - o.deposits)))}</strong></p></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Interim bill ${esc(a.number)}</title><style>${PRINT_FONT_FACE}body{font:11pt ${PRINT_FONT};margin:14mm}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #999;padding:4px;text-align:left}.n{text-align:right}</style></head><body><h2>${esc(o.business)}</h2><p><strong>Interim bill — not a tax invoice</strong> · ${esc(a.number)} · ${esc(a.patient_name)}${a.uhid ? ` · UHID ${esc(a.uhid)}` : ''} · admitted ${esc(a.admit_date)} · as on ${esc(o.asOn)}</p><table><thead><tr><th>Charge</th><th class="n">Qty</th><th class="n">Rate</th><th class="n">GST</th><th class="n">Amount</th></tr></thead><tbody>${rows}</tbody></table><p class="n">Charges ${esc(o.money(gross))} · Less deposits ${esc(o.money(o.deposits))} · <strong>Balance ${esc(o.money(round2(gross - o.deposits)))}</strong></p></body></html>`;
 }
 
 /** Bell rows: admissions open more than 7 days; deposits short of charges by more than the alert limit. */

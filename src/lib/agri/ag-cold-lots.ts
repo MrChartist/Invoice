@@ -18,6 +18,7 @@ import { esc } from '../voucher-print';
 import { AG_SERIES, AG_TABLES } from './ag-shared';
 import { liensOn, loadLoans, releaseCovered } from './ag-loans';
 import { readAgriSettings } from './ag-settings';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 export const LOTS_TABLE = AG_TABLES.coldLots;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -46,7 +47,7 @@ export function depositorLots(lots: readonly ColdLot[], depositorId: string) {
 
 /** A small A5 paper (storage receipt, gate pass, share certificate): title, label / value rows, a foot note. */
 export function smallPaper(title: string, head: string, rows: readonly [string, unknown][], foot: string, sign = 'Authorised signatory'): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A5;margin:12mm}body{font:13px system-ui,sans-serif;color:#111}h1{font-size:17px;margin:0 0 2px}p{margin:4px 0}table{width:100%;border-collapse:collapse;margin:10px 0}td{border:1px solid #999;padding:5px 7px}td:first-child{width:38%;color:#444}.f{font-size:11px;color:#444}.s{margin-top:36px;text-align:right}</style></head><body><h1>${esc(title)}</h1><p>${esc(head)}</p><table>${rows.filter((r) => r[1] !== undefined && r[1] !== '').map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table><p class="f">${esc(foot)}</p><p class="s">${esc(sign)}</p></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${PRINT_FONT_FACE}@page{size:A5;margin:12mm}body{font:13px ${PRINT_FONT};color:#111}h1{font-size:17px;margin:0 0 2px}p{margin:4px 0}table{width:100%;border-collapse:collapse;margin:10px 0}td{border:1px solid #999;padding:5px 7px}td:first-child{width:38%;color:#444}.f{font-size:12px;color:#444}.s{margin-top:36px;text-align:right}</style></head><body><h1>${esc(title)}</h1><p>${esc(head)}</p><table>${rows.filter((r) => r[1] !== undefined && r[1] !== '').map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table><p class="f">${esc(foot)}</p><p class="s">${esc(sign)}</p></body></html>`;
 }
 
 /** Storage receipt (A5): "Non-negotiable receipt — not a WDRA e-NWR" (AG23) and the terms typed in settings. */
