@@ -15,6 +15,12 @@
  *    account on the bank's date, reference = the UTR; failed rows are marked failed. One refusal
  *    (period lock, role, a bill that changed) restores every table.
  *
+ * 8.46: payment approval inside the batch. When the purchase approval policy holds supplier payments above ₹Y and the
+ * user cannot approve, `saveEpayBatch` refuses a batch with such a row unless it is sent for approval
+ * (`forApproval`): the batch is kept with `approval.state = 'pending'` and NO file is made. The owner approves
+ * (`decideEpayBatch`, `doc.approve`, audit + the shared `approvals` history as doc type PAYMENT) and downloads the
+ * file from the batch, or rejects it with a reason. A batch still waiting (or rejected) records nothing.
+ *
  * Bill balances come from `purchasesDb` + `balanceOf` (the shared `supplierPayable` reading of the
  * PurchaseRecord shape; contract row in `tests/purchase-contract.test.ts`). Pure above "Storage".
  */
@@ -30,9 +36,11 @@ import { isVoidStatus } from './purchase-normalize';
 import { nextSeriesNumberFor, recordSeries } from './series-counters';
 import { withTablesRollback } from './table-txn';
 import { generateId, getTable, setTable } from './storage';
-import { requireAccess } from './access';
+import { can, currentActor, requireAccess } from './access';
 import { audit } from './audit';
 import type { UploadMode, UploadPreset } from './bank-upload';
+import { paymentApprovalRequired, readPurchaseApprovalPolicy } from './purchase-approval-gate';
+import { APPROVALS_TABLE, approvalLog } from './approvals';
 
 export const EPAY_BATCHES_TABLE = 'epay_batches';
 export const EPAY_PREFIX = 'EPB';
@@ -65,6 +73,17 @@ export interface EpayBatch {
   rows: EpayBatchRow[];
   total: number;
   created_at: string;
+  /** 8.46: set when the batch was sent for the owner's approval (absent = made by someone who may approve). */
+  approval?: EpayApproval;
+}
+
+export interface EpayApproval {
+  state: 'pending' | 'approved' | 'rejected';
+  requested_by: string;
+  requested_at: string;
+  decided_by?: string;
+  decided_at?: string;
+  note?: string;
 }
 
 export interface BankResponseRow {
@@ -230,12 +249,25 @@ export class EpayError extends Error {
 
 export const loadEpayBatches = (): EpayBatch[] => getTable<EpayBatch>(EPAY_BATCHES_TABLE).filter((b) => b && typeof b.id === 'string' && Array.isArray(b.rows));
 
-/** Keep a downloaded batch (rows still "sent"). */
-export function saveEpayBatch(input: { date: string; bank_account_id?: string; preset: UploadPreset; rows: readonly { vendorId?: string; vendorName: string; amount: number; mode: UploadMode; reference: string; accountNo?: string }[] }): EpayBatch {
+/** 8.46: amounts in a batch that the signed-in user may not pay without the owner's approval. */
+export function epayAmountsOverLimit(amounts: readonly number[], policy = readPurchaseApprovalPolicy(), canApprove = can('doc.approve')): number[] {
+  return amounts.filter((a) => paymentApprovalRequired(a, policy, canApprove));
+}
+
+/** 8.46: may the batch's file go to the bank / its payments be recorded? (no approval asked, or approved) */
+export const epayBatchCleared = (b: Pick<EpayBatch, 'approval'>): boolean => !b.approval || b.approval.state === 'approved';
+
+/**
+ * Keep a downloaded batch (rows still "sent"). 8.46: a batch holding a payment above the approval limit of a user
+ * who may not approve is refused unless `forApproval` — then it is kept as waiting for approval (no file).
+ */
+export function saveEpayBatch(input: { date: string; bank_account_id?: string; preset: UploadPreset; rows: readonly { vendorId?: string; vendorName: string; amount: number; mode: UploadMode; reference: string; accountNo?: string }[] }, opts: { forApproval?: boolean } = {}): EpayBatch {
   requireAccess('books.edit');
   const date = isoDay(input.date);
   if (!date) throw new EpayError('Choose the payment date.');
   if (!input.rows.length) throw new EpayError('Add at least one payment.');
+  const held = epayAmountsOverLimit(input.rows.map((r) => num(r.amount))).length > 0;
+  if (held && !opts.forApproval) throw new EpayError("This batch has a payment above your approval limit: send it for the owner's approval.");
   const all = loadEpayBatches();
   const batch: EpayBatch = {
     id: generateId(),
@@ -255,10 +287,41 @@ export function saveEpayBatch(input: { date: string; bank_account_id?: string; p
     })),
     total: round2(input.rows.reduce((s, r) => s + num(r.amount), 0)),
     created_at: new Date().toISOString(),
+    ...(held ? { approval: { state: 'pending' as const, requested_by: actorName(), requested_at: new Date().toISOString() } } : {}),
   };
   setTable(EPAY_BATCHES_TABLE, [...all, batch]);
   recordSeries(batch.number);
+  if (held) logSafe(`Sent e-payment batch ${batch.number} (₹${batch.total.toFixed(2)}) for approval`, batch);
   return batch;
+}
+
+const actorName = () => { const a = currentActor(); return a ? a.name || a.role : ''; };
+const logSafe = (summary: string, b: EpayBatch) => {
+  try {
+    audit.record({ entity: 'vendor_payment', entity_id: b.id, action: 'update', doc_number: b.number, summary });
+  } catch {
+    /* logging never breaks a save */
+  }
+};
+
+/** 8.46: the owner approves (the file may then be downloaded) or rejects (reason required) a batch sent for approval. */
+export function decideEpayBatch(id: string, decision: 'approved' | 'rejected', note = ''): EpayBatch {
+  requireAccess('doc.approve');
+  const b = loadEpayBatches().find((x) => x.id === id);
+  if (!b || b.approval?.state !== 'pending') throw new EpayError('This batch is not waiting for approval.');
+  if (decision === 'rejected' && !note.trim()) throw new EpayError('Add a reason so the clerk knows what to change.');
+  const by = actorName() || 'Owner';
+  const at = new Date().toISOString();
+  const next: EpayBatch = { ...b, approval: { ...b.approval, state: decision, decided_by: by, decided_at: at, ...(note.trim() ? { note: note.trim() } : {}) } };
+  withTablesRollback([EPAY_BATCHES_TABLE, APPROVALS_TABLE], () => {
+    setTable(EPAY_BATCHES_TABLE, loadEpayBatches().map((x) => (x.id === id ? next : x)));
+    setTable(APPROVALS_TABLE, [...approvalLog(), {
+      id: generateId(), doc_id: b.id, doc_number: b.number, doc_type: 'PAYMENT', amount: b.total, decision,
+      requested_by: b.approval!.requested_by, requested_at: b.approval!.requested_at, decided_by: by, decided_at: at, ...(note.trim() ? { note: note.trim() } : {}),
+    }]);
+  });
+  logSafe(`${decision === 'approved' ? 'Approved' : 'Rejected'} e-payment batch ${b.number} (₹${b.total.toFixed(2)})${note.trim() ? ` — ${note.trim()}` : ''}`, b);
+  return next;
 }
 
 export interface RecordResult {
@@ -279,6 +342,7 @@ export function recordConfirmed(batchId: string, matches: readonly EpayMatch[], 
   requireAccess('books.edit');
   const batch = loadEpayBatches().find((b) => b.id === batchId);
   if (!batch) throw new EpayError('e-Payment batch not found.');
+  if (!epayBatchCleared(batch)) throw new EpayError(`Batch ${batch.number} has not been approved.`);
   const ok = new Set(confirmedRows);
   // Unconfirmed amount-only matches stay open (as if the bank had not answered for them yet).
   const byRow = new Map(matches.filter((m) => !needsConfirmation(m) || ok.has(m.rowId)).map((m) => [m.rowId, m]));

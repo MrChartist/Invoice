@@ -22,7 +22,7 @@ import type { Vendor } from '../../../types/purchases';
 import { useT } from '../../../i18n';
 import { bnkT } from '../../../i18n/areas/banking';
 import { fxbT } from '../../../i18n/areas/extras-7u';
-import { saveEpayBatch } from '../../../lib/epay-confirm';
+import { epayAmountsOverLimit, saveEpayBatch, type EpayBatch } from '../../../lib/epay-confirm';
 import controls from '../../../styles/controls.module.css';
 import surface from '../../../styles/surface.module.css';
 import styles from './bankdocs.module.css';
@@ -362,17 +362,30 @@ function EPaymentsPanel({ notify }: { notify: Notify }) {
       return { vendorId: v.id, amount: String(amt), mode: suggestMode(amt), reference: 'Bills due' };
     }));
   };
+  // 8.46: payments above the approval limit of a user who may not approve → the batch goes for approval, no file.
+  const overLimit = epayAmountsOverLimit(uploadRows.map((r) => r.amount)).length;
   const download = () => {
     try {
       const f = buildUploadFile({ preset, date, debitAccountNo: debit, rows: uploadRows });
       // 7U: keep the batch so the payments can be recorded once the bank confirms.
-      const batch = saveEpayBatch({ date, bank_account_id: accountId, preset, rows: uploadRows.map((r) => ({ vendorId: r.vendorId, vendorName: byId.get(r.vendorId ?? '')?.name ?? r.beneficiary, amount: r.amount, mode: r.mode, reference: r.reference, accountNo: r.accountNo })) });
-      saveFile(f.filename, f.text);
+      const batch = saveEpayBatch({ date, bank_account_id: accountId, preset, rows: uploadRows.map((r) => ({ vendorId: r.vendorId, vendorName: byId.get(r.vendorId ?? '')?.name ?? r.beneficiary, amount: r.amount, mode: r.mode, reference: r.reference, accountNo: r.accountNo })) }, { forApproval: overLimit > 0 });
       setBatches((n) => n + 1);
+      if (batch.approval) return notify(fxbT('sentApproval', { number: batch.number }), 'info');
+      saveFile(f.filename, f.text);
       notify(`${bnkT('downloaded', { n: f.count, amount: rupees(f.total) })} ${fxbT('batchKept', { number: batch.number })}`, 'success');
     } catch (err) {
       notify((err as Error).message, 'error');
     }
+  };
+  /** 8.46: the file of a batch the owner approved (bank details read from the supplier master now). */
+  const batchFile = (b: EpayBatch) => {
+    const vs = vendorsDb.all();
+    const rowsOf: UploadRow[] = b.rows.map((r) => {
+      const v = vs.find((x) => x.id === r.vendor_id);
+      return { beneficiary: v?.beneficiary_name || v?.name || r.vendor_name, accountNo: v?.bank_account_no ?? '', ifsc: v?.bank_ifsc ?? '', amount: r.amount, mode: r.mode, reference: r.reference, email: v?.email, bankName: v?.bank_name, vendorId: r.vendor_id };
+    });
+    const f = buildUploadFile({ preset: b.preset, date: b.date, debitAccountNo: accounts.find((a) => a.id === (b.bank_account_id ?? DEFAULT_BANK_ID))?.account_no ?? '', rows: rowsOf });
+    saveFile(f.filename, f.text);
   };
   const presetLabel = { generic: 'presetGeneric', hdfc: 'presetHdfc', icici: 'presetIcici', sbi: 'presetSbi' } as const;
   return (
@@ -420,12 +433,13 @@ function EPaymentsPanel({ notify }: { notify: Notify }) {
       <div className={styles.toolbar}>
         <button type="button" className={controls.btnOutline} onClick={() => setRows([...rows, { vendorId: '', amount: '', mode: 'NEFT', reference: '' }])}>{bnkT('addRow')}</button>
         <button type="button" className={controls.btnOutline} onClick={fillDue}>{bnkT('fillDue')}</button>
-        <button type="button" className={controls.btnPrimary} onClick={download} disabled={!rows.length || problems.length > 0}><Download size={16} /> {bnkT('download')}</button>
+        <button type="button" className={controls.btnPrimary} onClick={download} disabled={!rows.length || problems.length > 0}><Download size={16} /> {overLimit ? fxbT('sendApproval') : bnkT('download')}</button>
       </div>
+      {overLimit > 0 && <p className={styles.warn} role="note">{fxbT('overLimit', { n: overLimit })}</p>}
       {problems.length > 0 && (
         <ul className={styles.list}>{problems.slice(0, 12).map((p) => <li key={p} className={styles.warn}>{p}</li>)}</ul>
       )}
-      <Suspense fallback={null}><EpayConfirmPanel notify={notify} version={batches} /></Suspense>
+      <Suspense fallback={null}><EpayConfirmPanel notify={notify} version={batches} onFile={batchFile} /></Suspense>
     </div>
   );
 }
