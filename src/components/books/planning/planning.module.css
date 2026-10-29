@@ -13,12 +13,12 @@
 
 .fav {
   color: var(--profit);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .adv {
   color: var(--loss);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .inactive {

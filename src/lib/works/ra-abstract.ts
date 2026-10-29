@@ -9,6 +9,7 @@ import { num, round2 } from '../invoice-calc';
 import { esc } from '../voucher-print';
 import { lineValue, roundQty, stageInvoices } from '../progress-billing';
 import { boqLines } from './boq';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 export interface AbstractRow {
   lineId: string;
@@ -70,9 +71,9 @@ export function abstractHtml(boq: InvoiceRecord, bill: InvoiceRecord, rows: read
   const mbOf = (lineId: string) => [...new Set(bill.items.filter((i) => i.progress_line_of === lineId).map((i) => bill.boq_terms?.cn?.lines?.[i.id]?.mb).filter(Boolean))].join(', ');
   const body = rows.map((r) => `<tr><td>${esc(r.ref)}</td><td>${esc(r.description)}</td><td>${esc(r.unit)}</td><td class="n">${r.boqQty}</td><td class="n">${m(r.rate)}</td><td class="n">${r.prevQty}</td><td class="n">${m(r.prevAmount)}</td><td class="n">${r.thisQty}</td><td class="n">${m(r.thisAmount)}</td><td class="n">${r.cumQty}</td><td class="n">${m(r.cumAmount)}</td><td class="n">${r.pct}%</td><td>${esc(mbOf(r.lineId))}</td></tr>`).join('');
   const deds = (bill.ra_deductions ?? []).map((d) => `<tr><td>Less: ${esc(d.label)}</td><td class="n">${m(d.amount)}</td></tr>`).join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(`RA ${bill.ra_no ?? ''} abstract`)}</title><style>
-body{font-family:system-ui,sans-serif;color:#111;margin:0;padding:20px;font-size:12px}h1{font-size:16px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:10px}
-th,td{border:1px solid #999;padding:4px 6px;text-align:left}td.n,th.n{text-align:right}.sum{max-width:420px;margin-left:auto}.note{color:#777;font-size:10px}@media print{body{padding:0}}</style></head><body>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(`RA ${bill.ra_no ?? ''} abstract`)}</title><style>${PRINT_FONT_FACE}
+body{font-family:${PRINT_FONT};color:#111;margin:0;padding:20px;font-size:12px}h1{font-size:16px;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin-top:10px}
+th,td{border:1px solid #999;padding:4px 6px;text-align:left}td.n,th.n{text-align:right}.sum{max-width:420px;margin-left:auto}.note{color:#777;font-size:12px}@media print{body{padding:0}}</style></head><body>
 <h1>${esc(company)} — RA bill no. ${esc(bill.ra_no ?? '')}${bill.ra_final ? ' (final)' : ''}: abstract</h1>
 <div>Invoice ${esc(bill.invoice_number)} dated ${esc(bill.issue_date)} · BOQ ${esc(boq.invoice_number)} · ${esc(bill.client?.name ?? '')}</div>
 <table><thead><tr><th>Item no.</th><th>Description</th><th>Unit</th><th class="n">BOQ qty</th><th class="n">Rate</th><th class="n">Prev qty</th><th class="n">Prev ₹</th><th class="n">This qty</th><th class="n">This ₹</th><th class="n">Cum qty</th><th class="n">Cum ₹</th><th class="n">% BOQ</th><th>MB</th></tr></thead>

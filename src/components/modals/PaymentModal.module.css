@@ -13,7 +13,7 @@
 
 .summary dt {
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted-foreground);
@@ -21,7 +21,7 @@
 
 .summary dd {
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: 600;
   font-size: 1.0625rem;
   letter-spacing: -0.02em;
   margin-top: 0.2rem;
@@ -39,7 +39,7 @@
 
 .historyLabel {
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted-foreground);

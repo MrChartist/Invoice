@@ -4,7 +4,7 @@
 
 .amountInput {
   font-size: 1.6rem;
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   padding: 0.5rem 0.75rem;
 }
@@ -36,7 +36,7 @@
   align-items: center;
   font-size: var(--text-sm);
 }
-.allocRef { font-family: var(--font-mono); overflow-wrap: anywhere; }
+.allocRef { font-family: var(--font-num); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .allocSub { display: block; color: var(--muted-foreground); font-size: var(--text-xs, 0.75rem); }
 .allocInput { text-align: right; font-variant-numeric: tabular-nums; padding: 0.35rem 0.5rem; }
 .onAccount { font-size: var(--text-sm); color: var(--muted-foreground); }
@@ -69,7 +69,7 @@
   background: var(--card);
   border-bottom: 1px solid var(--border);
 }
-.queueTitle { font-family: var(--font-display); font-weight: 700; font-size: var(--text-lg); }
+.queueTitle { font-family: var(--font-display); font-weight: 600; font-size: var(--text-lg); }
 .queueBody {
   flex: 1;
   overflow: auto;
@@ -91,8 +91,8 @@
   overflow: hidden;
 }
 .progressFill { height: 100%; background: var(--brand-text); transition: width var(--transition-fast); }
-.partyName { font-family: var(--font-display); font-weight: 700; font-size: 1.35rem; }
-.partyAmount { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--brand-text); }
+.partyName { font-family: var(--font-display); font-weight: 600; font-size: 1.35rem; }
+.partyAmount { font-size: 1.6rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--brand-text); }
 .meta { font-size: var(--text-sm); color: var(--muted-foreground); }
 .message { min-height: 11rem; font-size: var(--text-md); }
 .queueActions { display: flex; flex-wrap: wrap; gap: 0.5rem; }

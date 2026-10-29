@@ -137,13 +137,19 @@ export function StatementStrip({ invoice, due }: { invoice: InvoiceRecord; due: 
   );
 }
 
+/** Inline title face. The accent serif has a single 400 italic cut (type system), so it is never asked for bold. */
+function titleFace(fontFamily: string): CSSProperties {
+  return fontFamily === 'var(--font-accent)' ? { fontFamily, fontStyle: 'italic', fontWeight: 400 } : { fontFamily };
+}
+
 /** The header treatments the templates are built from. */
 export function PaperHeader({ invoice, sender, meta }: HeaderProps) {
-  const { logoPosition, bilingual, title: titled } = usePaper();
+  const { logoPosition, bilingual, title: titled, fontOverride } = usePaper();
   const layout = meta.layout;
   const title = titled(raDocTitle(invoice, invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice')) || svDocTitle(invoice) || invoice.print_title || (DOCUMENT_LABELS[invoice.doc_type] ?? 'Invoice'), invoice.doc_type); // R2-C5 suffix; R11 RA title
-  // The Ink skin sets its own serif title face in CSS; don't override it inline.
-  const titleStyle = layout === 'ink' ? undefined : { fontFamily: meta.fontFamily };
+  // The Ink skin sets its own title face in CSS; don't override it inline. Otherwise the template's title face
+  // (Chartist Sans, or the Chartist Serif italic accent), or the Design Studio font when one is chosen.
+  const titleStyle = layout === 'ink' ? undefined : titleFace(fontOverride ?? meta.titleFont);
   const number = invoice.invoice_number || 'DRAFT';
   // R3-C3: a letterhead header band replaces the template's logo / name block; title + number stay.
   const headerBand = useHeaderBand();

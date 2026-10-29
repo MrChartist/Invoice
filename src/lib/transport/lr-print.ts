@@ -8,6 +8,7 @@ import { esc } from '../voucher-print';
 import { freightOf } from './consignment-notes';
 import { optionFor, optionLine } from './gta-option';
 import type { GtaOptionRow } from '../../types/transport-works-r5';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../print-fonts';
 
 export const LR_COPIES = ['Consignor copy', 'Consignee copy', 'Driver / office copy'] as const;
 
@@ -58,19 +59,19 @@ function copy(lr: ConsignmentNote, ctx: LrPrintContext, label: string): string {
 
 const round = (n: number) => Math.round(n * 100) / 100;
 
-const CSS = `body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#111;margin:0;padding:20px}
+const CSS = `body{font-family:${PRINT_FONT};color:#111;margin:0;padding:20px}
 .lr{max-width:760px;margin:0 auto 24px;border:1px solid #222;break-after:page;page-break-after:always}.lr:last-of-type{break-after:auto}
 .head{text-align:center;padding:10px;border-bottom:1px solid #222}.head h1{margin:0;font-size:18px}.sub{font-size:12px;color:#444}
-.title{text-align:center;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:5px;border-bottom:1px solid #222}
+.title{text-align:center;font-weight: 600;text-transform:uppercase;letter-spacing:.08em;padding:5px;border-bottom:1px solid #222}
 .meta{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;padding:6px 12px;font-size:13px;border-bottom:1px solid #222}
 table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:5px 10px;text-align:left;vertical-align:top;border-bottom:1px solid #ddd}
 td.n,th.n{text-align:right}.parties td{width:33%;border-right:1px solid #ddd}.liable,.decl{padding:8px 12px;font-size:12px;border-top:1px solid #222}
 .sign{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #222;font-size:12px}.sign div{padding:40px 10px 8px;text-align:center}
-.note{max-width:760px;margin:0 auto;font-size:10px;color:#777}@media print{body{padding:0}.note{display:none}}`;
+.note{max-width:760px;margin:0 auto;font-size:12px;color:#777}@media print{body{padding:0}.note{display:none}}`;
 
 /** The full print page: three copies of one LR. */
 export function lrHtml(lr: ConsignmentNote, ctx: LrPrintContext): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(lr.number)}</title><style>${CSS}</style></head><body>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(lr.number)}</title><style>${PRINT_FONT_FACE}${CSS}</style></head><body>
 ${LR_COPIES.map((c) => copy(lr, ctx, c)).join('\n')}
 <p class="note">Printed on the issuer's device. Working paper — verify the consignment-note contents with your CA.</p></body></html>`;
 }

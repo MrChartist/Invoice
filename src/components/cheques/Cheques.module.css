@@ -12,7 +12,7 @@
 
 .numeric {
   text-align: right;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -60,9 +60,9 @@
   background: var(--card);
   color: var(--foreground);
   outline: 1px solid var(--border);
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: 11pt;
-  font-weight: 700;
+  font-weight: 600;
   zoom: 0.8;
 }
 

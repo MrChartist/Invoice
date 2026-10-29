@@ -4,7 +4,7 @@ export function showUnavailable(reason: string, opts: { vaultDamaged?: boolean }
   if (!root) return;
   const box = document.createElement('main');
   box.setAttribute('role', 'alert');
-  box.style.cssText = 'max-width:32rem;margin:15vh auto;padding:0 16px;font-family:system-ui,sans-serif';
+  box.style.cssText = 'max-width:32rem;margin:15vh auto;padding:0 16px;font-family:var(--font-body, "Chartist Sans Flex", system-ui, sans-serif)';
   const h = document.createElement('h1');
   h.textContent = 'Your data could not be opened';
   h.style.fontSize = '1.25rem';

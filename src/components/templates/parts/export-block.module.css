@@ -9,8 +9,8 @@
 }
 
 .title {
-  font-size: 9px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--tpl-accent);
@@ -26,7 +26,7 @@
 .item {
   display: flex;
   gap: 6px;
-  font-size: 10px;
+  font-size: 12px;
   min-width: 0;
 }
 

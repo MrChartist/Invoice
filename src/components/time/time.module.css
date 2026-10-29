@@ -45,9 +45,9 @@ p.muted { margin: 0; }
 }
 
 .timerClock {
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xl);
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 

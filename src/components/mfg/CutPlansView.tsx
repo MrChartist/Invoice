@@ -15,6 +15,7 @@ import { gT } from '../../i18n/areas/mfg-r13c';
 import { Btn, F, Grid, In, Sel } from './garments-ui';
 import { n2, opts, parseRatio, ratioText, row, run, stack, today } from './garments-util';
 import { escHtml as esc } from '../../lib/html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE } from '../../lib/print-fonts';
 
 type Lay = { plies: string; ratio: string; len: string };
 type D = { id?: string; date: string; style: string; colour: string; order: string; fabric: string; lays: Lay[]; issued: string; ends: string; kg: string; wasteItem: string; want: string; cap: string };
@@ -48,7 +49,7 @@ export default function CutPlansView({ ctx }: { ctx: MfgContext }) {
   const std = (p: CutPlan) => fabricFor(styleOf(ctx.items.find((i) => i.id === p.style_id)), p.colour)?.per_piece_m ?? 0;
   const print = (p: CutPlan) => {
     const c = consumption(p, std(p));
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(p.number)}</title><style>body{font:12px sans-serif;margin:16px}td,th{border:1px solid #999;padding:4px}table{border-collapse:collapse}</style></head><body>
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(p.number)}</title><style>${PRINT_FONT_FACE}body{font:12px ${PRINT_FONT};margin:16px}td,th{border:1px solid #999;padding:4px}table{border-collapse:collapse}</style></head><body>
 <h2>${esc(gT('cutReport'))} ${esc(p.number)}</h2><p>${esc(name(p.style_id))} · ${esc(p.colour)} · ${esc(p.date)}</p>
 <table><tr><th>${esc(gT('plies'))}</th><th>${esc(gT('ratio'))}</th><th>${esc(gT('marker'))}</th></tr>${p.lays.map((l) => `<tr><td>${l.plies}</td><td>${esc(ratioText(l.marker_ratio))}</td><td>${l.marker_length_m}</td></tr>`).join('')}</table>
 <p>${esc(gT('cutBySize'))}: ${esc(ratioText(p.cut))} = ${c.pieces}</p><p>${esc(gT('consumption'))}: ${c.per_piece_m} m (${esc(gT('standard'))} ${std(p)} m, ${c.variance_m} m / ${c.variance_pct}%) · ${esc(gT('endBits'))} ${num(p.end_bits_m)} m · ${esc(gT('wasteKg'))} ${num(p.cut_waste_kg)}</p>

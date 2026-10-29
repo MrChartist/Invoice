@@ -20,6 +20,7 @@ import { NumberInput } from '../ui/NumberInput';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { escHtml as esc } from '../../lib/html-esc';
+import { PRINT_FONT, PRINT_FONT_FACE, printWhenReady } from '../../lib/print-fonts';
 
 const STATUSES: DeliveryStatus[] = ['new', 'packed', 'out', 'delivered', 'returned', 'cancelled'];
 
@@ -48,14 +49,14 @@ export default function DeliveriesTab({ onDone }: { onDone: (msg: string, error?
   const status = (s: DeliveryStatus) => rtaT(`st.${s}`);
   const printRun = (riderId: string) => {
     const list = rows.filter((r) => r.delivery.rider_id === riderId && (r.delivery.status === 'packed' || r.delivery.status === 'out'));
-    const html = `<!doctype html><meta charset="utf-8"><title>${esc(rtaT('runSheet'))}</title><style>body{font:14px sans-serif}td,th{border:1px solid #999;padding:4px}table{border-collapse:collapse;width:100%}</style><h2>${esc(rtaT('runSheet'))} — ${esc(riderName(riderId))} · ${day}</h2><table><tr><th>#</th><th>${esc(rtaT('address'))}</th><th>${esc(rtaT('phone'))}</th><th>${esc(rtaT('slot'))}</th><th>${esc(rtaT('toCollect'))}</th></tr>${list
+    const html = `<!doctype html><meta charset="utf-8"><title>${esc(rtaT('runSheet'))}</title><style>${PRINT_FONT_FACE}body{font:14px ${PRINT_FONT}}td,th{border:1px solid #999;padding:4px}table{border-collapse:collapse;width:100%}</style><h2>${esc(rtaT('runSheet'))} — ${esc(riderName(riderId))} · ${day}</h2><table><tr><th>#</th><th>${esc(rtaT('address'))}</th><th>${esc(rtaT('phone'))}</th><th>${esc(rtaT('slot'))}</th><th>${esc(rtaT('toCollect'))}</th></tr>${list
       .map((r) => `<tr><td>${esc(r.invoice.invoice_number)}</td><td>${esc(r.delivery.address)}</td><td>${esc(r.delivery.phone ?? '')}</td><td>${esc(r.delivery.slot ?? '')}</td><td>${r.delivery.cod ? esc(formatCurrency(r.toCollect)) : '—'}</td></tr>`)
       .join('')}</table>`;
     const w = window.open('', '_blank');
     if (!w) return;
     w.document.write(html);
     w.document.close();
-    w.print();
+    printWhenReady(w);
   };
   const waLink = (r: (typeof rows)[number]) => {
     const digits = String(r.delivery.phone ?? r.invoice.client?.phone ?? '').replace(/\D/g, '');

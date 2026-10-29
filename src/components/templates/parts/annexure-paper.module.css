@@ -20,20 +20,20 @@
 
 .title {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--tpl-accent);
 }
 
 .meta {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--tpl-muted);
 }
 
 .section {
-  font-size: 9px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--tpl-accent);
@@ -43,7 +43,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 9.5px;
+  font-size: 9.5px; /* type-floor-exempt: multi-column printed table, 12px would push columns / the one-page A4 layout */
 }
 
 .table th,
@@ -55,7 +55,7 @@
 }
 
 .table th {
-  font-size: 8.5px;
+  font-size: 8.5px; /* type-floor-exempt: multi-column printed table, 12px would push columns / the one-page A4 layout */
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--tpl-muted);
@@ -73,19 +73,19 @@
 }
 
 .total td {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--tpl-ink);
   border-top: 1px solid var(--tpl-accent);
 }
 
 .flag {
-  font-size: 8px;
-  font-weight: 700;
+  font-size: 8px; /* type-floor-exempt: multi-column printed table, 12px would push columns / the one-page A4 layout */
+  font-weight: 600;
   color: var(--tpl-accent);
 }
 
 .foot {
-  font-size: 8.5px;
+  font-size: 12px;
   color: var(--tpl-muted);
 }
 

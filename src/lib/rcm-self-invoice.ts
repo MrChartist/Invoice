@@ -29,6 +29,7 @@ import { nextSeriesNumberFor, recordSeries } from './series-counters';
 import { generateId, getTable, setTable } from './storage';
 import { amountInWords } from './amount-in-words';
 import { esc } from './voucher-print';
+import { PRINT_FONT, PRINT_FONT_FACE } from './print-fonts';
 
 export const RCM_DOCS_TABLE = 'rcm_documents';
 export const SELF_INVOICE_PREFIX = 'RCM';
@@ -346,7 +347,7 @@ const money = (n: number) => esc(round2(n).toFixed(2));
 const stateLabel = (code?: string) => (code ? `${code}${stateByCode(code)?.name ? ` — ${stateByCode(code)!.name}` : ''}` : '—');
 
 const PRINT_CSS = `
-  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111; margin: 0; padding: 24px; }
+  body { font-family: ${PRINT_FONT}; color: #111; margin: 0; padding: 24px; }
   .doc { max-width: 820px; margin: 0 auto 28px; border: 1px solid #222; break-after: page; page-break-after: always; }
   .doc:last-child { break-after: auto; page-break-after: auto; }
   h1 { margin: 0; font-size: 17px; text-align: center; padding: 10px; border-bottom: 1px solid #222; letter-spacing: 0.06em; text-transform: uppercase; }
@@ -355,14 +356,14 @@ const PRINT_CSS = `
   .parties div { padding: 8px 12px; white-space: pre-line; }
   .parties div + div { border-left: 1px solid #222; }
   .meta { display: flex; flex-wrap: wrap; gap: 4px 24px; padding: 8px 12px; font-size: 12px; border-bottom: 1px solid #222; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
   th, td { padding: 5px 6px; border-bottom: 1px solid #ccc; text-align: left; vertical-align: top; }
-  th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #222; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #222; }
   td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  tr.total td { font-weight: 700; border-top: 1px solid #222; }
+  tr.total td { font-weight: 600; border-top: 1px solid #222; }
   .words, .notes { padding: 8px 12px; font-size: 12px; border-top: 1px solid #222; }
   .sign { display: flex; justify-content: flex-end; padding: 40px 12px 10px; font-size: 12px; border-top: 1px solid #222; }
-  .wp { max-width: 820px; margin: 0 auto; font-size: 10px; color: #666; }
+  .wp { max-width: 820px; margin: 0 auto; font-size: 12px; color: #666; }
 `;
 
 function docSection(d: RcmDocument): string {
@@ -388,7 +389,7 @@ function docSection(d: RcmDocument): string {
 export function rcmDocsHtml(docs: readonly RcmDocument[], title = 'Reverse-charge documents'): string {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)}</title><style>${PRINT_CSS}</style></head>
+<title>${esc(title)}</title><style>${PRINT_FONT_FACE}${PRINT_CSS}</style></head>
 <body>
 ${docs.map(docSection).join('\n')}
 <p class="wp">${esc(RCM_DISCLAIMER)}</p>

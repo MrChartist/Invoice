@@ -28,6 +28,7 @@ import local from './gst-reports.module.css';
 import styles from './gst-setoff.module.css';
 import { useT } from '../../i18n';
 import { o7T } from '../../i18n/areas/gst-tds-7o';
+import { printWhenReady } from '../../lib/print-fonts';
 
 export interface RcmDocsPanelProps {
   notify: (msg: string, tone?: 'success' | 'error' | 'info') => void;
@@ -58,7 +59,7 @@ function print(docs: RcmDocument[], name: string) {
   w.document.write(html);
   w.document.close();
   w.focus();
-  w.print();
+  printWhenReady(w);
 }
 
 export function RcmDocsPanel({ notify }: RcmDocsPanelProps) {

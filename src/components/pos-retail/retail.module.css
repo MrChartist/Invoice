@@ -29,7 +29,7 @@
   border-bottom-width: 2px;
   border-radius: var(--radius-sm);
   background: var(--card-inner);
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: 0.75rem;
   text-align: center;
   color: var(--foreground);
@@ -97,7 +97,7 @@
 
 .capture {
   min-width: 8rem;
-  font-family: var(--font-mono);
+  font-family: var(--font-num); font-variant-numeric: tabular-nums;
 }
 
 .conflict {
@@ -165,7 +165,7 @@
   grid-column: 1 / -1;
   font-family: var(--font-display);
   font-size: 1.5rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .displayLines {
@@ -224,7 +224,7 @@
   color: var(--primary-foreground);
   font-family: var(--font-display);
   font-size: 2.5rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .displayServing {
@@ -236,7 +236,7 @@
   color: var(--primary-foreground);
   font-family: var(--font-display);
   font-size: 1.75rem;
-  font-weight: 700;
+  font-weight: 600;
   text-align: center;
 }
 
@@ -270,7 +270,7 @@
   color: var(--primary-foreground);
   font-family: var(--font-display);
   font-size: clamp(1.5rem, 5vw, 2.75rem);
-  font-weight: 700;
+  font-weight: 600;
   text-align: center;
   box-shadow: var(--shadow-lg, none);
 }
