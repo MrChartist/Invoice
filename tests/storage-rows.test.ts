@@ -213,7 +213,7 @@ test('appending, deleting and re-ordering keep the chunks aligned (head moves on
   assert.equal(chunkKeys().length, 0);
 });
 
-test('writeRaw (restore / sync merge) stores the plain layout, which wins over any chunks', async () => {
+test('writeRaw (restore / sync merge) stores the plain layout and removes the chunks', async () => {
   await initStorage();
   setTable('invoices', make(140));
   await flushStorage();
@@ -221,30 +221,82 @@ test('writeRaw (restore / sync merge) stores the plain layout, which wins over a
   await flushStorage();
   assert.equal(idbData().has(HEAD), false);
   assert.equal(chunkKeys().length, 0);
-  // A plain value next to chunks (an older build's write) is the truth.
-  setTable('invoices', make(140));
-  await flushStorage();
-  idbData().set(INV, JSON.stringify(make(2, 77)));
-  await reboot();
-  assert.deepEqual(getTable<Inv>('invoices').map((r) => r.id), ['inv77', 'inv78']);
-  setTable('invoices', make(140));
-  await flushStorage();
-  assert.equal(chunkKeys().length, 9);
-  assert.equal(idbData().has(INV), false);
 });
 
-test('a damaged chunk set keeps every row that is there; a misaligned one is rewritten whole', async () => {
+test('plain value next to chunks (a chunk-unaware build wrote it): merged by id, no chunk row is lost', async () => {
+  await initStorage();
+  setTable('invoices', make(140));
+  await flushStorage();
+  // That build read the table as empty and saved one new invoice, plus a stale copy of inv5.
+  idbData().set(INV, JSON.stringify([{ ...make(1, 5)[0], notes: 'stale copy' }, ...make(1, 500)]));
+  await reboot();
+  const rows = getTable<Inv>('invoices');
+  assert.equal(rows.length, 141, 'every chunk row plus the new one');
+  assert.equal(rows[5].notes, 'note 5 – ₹', 'the chunk copy is kept');
+  assert.equal(rows[140].id, 'inv500');
+  // The next save writes the merged table as chunks and drops the plain value.
+  rows[0] = { ...rows[0], notes: 'saved' };
+  setTable('invoices', rows);
+  await flushStorage();
+  assert.equal(idbData().has(INV), false);
+  assert.equal(chunkKeys().length, 9);
+  await reboot();
+  assert.equal(getTable('invoices').length, 141);
+  // Unreadable plain value next to chunks: nothing adopted, nothing deleted.
+  idbData().set(INV, '{not json');
+  await reboot();
+  assert.deepEqual(getTable('invoices'), []);
+  assert.throws(() => setTable('invoices', make(1, 900)), /could not be read/);
+  await flushStorage();
+  assert.equal(chunkKeys().length, 9, 'chunks untouched');
+});
+
+test('the database version stays at 4 or above (older builds cannot read chunks)', async () => {
+  await initStorage();
+  assert.ok(fakeIdb.dbs.get(DB)!.version >= 4);
+});
+
+test('a nested value changed in place on a chunked table throws in production too (never silently unsaved)', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
+  delete env.MRC_FREEZE_SHARED;
+  const r = spawnSync(process.execPath, ['--experimental-strip-types', '--import', './tests/hooks/register.mjs', 'tests/helpers/nested-mutation.ts'], { env, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^frozen=false nested=(threw|saved)$/m);
+});
+
+test('an incomplete chunk set is refused, left untouched and reported, never adopted in part', async () => {
   await initStorage();
   setTable('invoices', make(160));
   await flushStorage();
   idbData().delete(`${HEAD}:3`);
+  const left = new Map(idbData());
   await reboot();
-  const ids = getTable<Inv>('invoices').map((r) => r.id);
-  assert.equal(ids.length, 144, 'the other chunks are kept');
-  assert.ok(!ids.includes('inv50'));
-  setTable('invoices', getTable('invoices'));
+  assert.deepEqual(getTable('invoices'), []);
+  assert.match(storageFailure()?.message ?? '', /could not be read/);
+  assert.throws(() => setTable('invoices', make(130)), /could not be read/);
+  setTable('clients', [{ id: 'c1' }]); // other tables still save
   await flushStorage();
-  assert.equal(chunkKeys().length, 9);
+  assert.match(storageFailure()?.message ?? '', /could not be read/, 'still reported after a good flush');
+  for (const [k, v] of left) if (k.startsWith('rows:')) assert.equal(idbData().get(k), v, `${k} untouched`);
+  // A stray chunk past the head's count is ignored.
+  resetStorageBackend();
+  resetIdbConnection();
+  fakeIdb.reset();
+  installFakeIdb();
+  await initStorage();
+  setTable('invoices', make(160));
+  await flushStorage();
+  idbData().set(`${HEAD}:10`, JSON.stringify(make(1, 999)[0]));
+  await reboot();
+  assert.equal(getTable('invoices').length, 160);
+});
+
+test('a misaligned chunk is read as plain text and rewritten whole', async () => {
+  await initStorage();
+  setTable('invoices', make(144));
+  await flushStorage();
   // A chunk holding 17 rows: read as the plain text, then rewritten aligned.
   idbData().set(`${HEAD}:0`, `${idbData().get(`${HEAD}:0`)},${JSON.stringify(make(1, 999)[0])}`);
   await reboot();
@@ -256,6 +308,7 @@ test('a damaged chunk set keeps every row that is there; a misaligned one is rew
   await reboot();
   assert.equal(getTable<Inv>('invoices')[0].notes, 'after repair');
   assert.equal(getTable('invoices').length, 145);
+  assert.equal(chunkKeys().length, 10);
 });
 
 test('backups round-trip in both directions between the layouts', async () => {
@@ -313,6 +366,7 @@ test('vault mode seals every chunk and the head; unlock and saves keep working',
   await reboot();
   assert.deepEqual((await unlockStorage(PASS)).unreadable, [INV]);
   assert.deepEqual(getTable('invoices'), []);
+  assert.throws(() => setTable('invoices', make(130)), /could not be read/, 'the sealed chunks are never written over');
 });
 
 test('turning vault mode off writes readable chunks back', async () => {
@@ -382,14 +436,16 @@ test('peekCompliance / peekCompany read the old and the new layout, and skip wha
   otherDb('new', { [HEAD]: JSON.stringify({ v: 1, n: 3, g: 'x' }), ...Object.fromEntries(chunks.map((c, i) => [`${HEAD}:${i}`, c])) });
   otherDb('newer', { [HEAD]: JSON.stringify({ v: 2, n: 3, g: 'x' }), ...Object.fromEntries(chunks.map((c, i) => [`${HEAD}:${i}`, c])) });
   otherDb('broken', { [HEAD]: JSON.stringify({ v: 1, n: 4, g: 'x' }), ...Object.fromEntries(chunks.map((c, i) => [`${HEAD}:${i}`, c])) });
+  otherDb('stray', { [HEAD]: JSON.stringify({ v: 1, n: 3, g: 'x' }), ...Object.fromEntries(chunks.map((c, i) => [`${HEAD}:${i}`, c])), [`${HEAD}:7`]: chunks[0] });
+  otherDb('both', { [INV]: JSON.stringify(rows.slice(0, 1)), [HEAD]: JSON.stringify({ v: 1, n: 3, g: 'x' }), ...Object.fromEntries(chunks.map((c, i) => [`${HEAD}:${i}`, c])) });
   otherDb('sealed', { [HEAD]: 'mcv1:abc:def', [`${HEAD}:0`]: 'mcv1:a:b' });
-  for (const name of ['old', 'new']) {
+  for (const name of ['old', 'new', 'stray']) {
     const p = await peekCompliance(name);
     assert.equal(p?.locked, false, name);
     assert.deepEqual(p?.tables.invoices, rows, name);
     assert.equal((await peekCompany(name))?.invoices.length, 40, name);
   }
-  for (const name of ['newer', 'broken']) {
+  for (const name of ['newer', 'broken', 'both']) {
     const p = await peekCompliance(name);
     assert.equal(p?.locked, false);
     assert.equal(p?.tables.invoices, undefined, `${name}: left out, never misread`);

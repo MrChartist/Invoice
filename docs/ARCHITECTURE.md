@@ -94,9 +94,12 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
   the same key and the same JSON text, byte for byte. *Physical layout:* `rows:<key>` = head
   `{"v":1,"n":<chunks>,"g":<random>}`, `rows:<key>:<i>` = rows 16i … 16i+15 as their JSON joined by `,`, so the
   logical text is `[` + chunks.join(',') + `]`. These keys are outside the `mrchartist_inv_` prefix (never listed as app
-  data). A plain string at `<key>` (the old layout, a table under 128 rows, and whatever `writeRaw` stores — restore,
-  sync merges, migrations) always wins over chunks: every chunked write deletes it, every plain write deletes the head
-  and every chunk (`IDBKeyRange`), each in the same transaction. *Migration* is lazy and atomic: the first `setTable` of
+  data). A plain string at `<key>` is the old layout, a table under 128 rows, or whatever `writeRaw` stores (restore,
+  sync merges, migrations). The two layouts are exclusive: every chunked write deletes the plain value, every plain write
+  deletes the head and every chunk (`IDBKeyRange`), each in the same transaction. Both at once can only mean a build that
+  could not see the chunks wrote the plain value (it read the table as empty), so boot **merges** them: every chunk row
+  is kept and the plain rows whose `id` is not among them are added; if either side cannot be parsed nothing is adopted
+  and the key is refused (below). *Migration* is lazy and atomic: the first `setTable` of
   a big table after boot / restore writes all chunks and deletes the plain copy in one transaction (crash-safe: a failed
   or interrupted flush leaves the old layout untouched and is retried; re-running it is a no-op). *In memory* a
   chunked value is a `Rows` object (`{ c: chunks, t?: text }`); `readRaw` builds the text on demand and keeps it until
@@ -105,16 +108,27 @@ in-memory cache (localStorage when IndexedDB is unavailable), device-local keys 
   on that token; a chunk that does not hold exactly 16 rows (damage) turns the value into a plain string, so the next
   save rewrites the table aligned. *Diffing:* rows are compared with the cached version by position (the cached row or
   an unchanged `getTable` copy at the same index); the head is re-written only when rows were added, removed or moved.
-  *Cross-tab:* the stored head is the etag. An incremental flush commits only if the head is still the one this tab
-  last read or wrote (checked inside the write transaction, like the vault id); otherwise it aborts and the next flush
-  writes the whole table (last writer wins, as before). Another tab's broadcast re-reads base + head + chunks in one
+  Because unchanged rows are reused by identity, the nested values of a chunked table's cached rows are frozen in
+  production too (once per row, `registerEntry`): a nested value changed in place on a `getTable` copy throws instead
+  of being silently left unsaved (dev builds and tests deep-freeze every table as before).
+  *Cross-tab:* the stored head is the etag, and it changes only when rows are added, removed or moved. An incremental
+  flush commits only if the head is still the one this tab last read or wrote (checked inside the write transaction,
+  like the vault id); otherwise it aborts and the next flush writes the whole table (last writer wins, as before). Two
+  tabs that only edit rows in place do not change the head: their writes merge chunk by chunk, the last writer of each
+  chunk winning (finer than before, where the last writer of the whole table won). Another tab's broadcast re-reads base + head + chunks in one
   read-only transaction. *Vault mode:* head and chunks are sealed like every value (AAD = the record's own key, so a
   chunk moved to another index does not open); enable / disable re-write them; a chunk that does not decrypt makes
-  the table unreadable (reported, left in place), never half-read. *Damaged sets:* a missing chunk keeps every row that
-  is there (as plain text). *Old builds:* the IndexedDB version is 4 (no schema change), so a tab still running a build
-  that cannot read chunks loses its connection and cannot reopen (as with v3 for vault mode). *Other companies:*
+  the table unreadable, never half-read. *Refused keys:* a chunk that does not decrypt, an incomplete chunk set (a chunk
+  of `0…n-1` missing, or an unreadable head) or an unmergeable pair of layouts is never adopted: the table reads as empty,
+  its records stay untouched, every write to it throws, and `storageFailure()` reports it until reload (erase still
+  removes the records). Chunks past the head's count are ignored. A chunk that does not hold exactly 16 rows is read as
+  the plain text and rewritten aligned on the next save. *Old builds:* the IndexedDB version is 4 (no schema change), so a tab still running a build
+  that cannot read chunks loses its connection and cannot reopen (as with v3 for vault mode). Any build with version
+  ≥ 4 must read the `rows:` layout; a revert must never lower the version or drop the reader (`tests/storage-rows.test.ts`
+  guards the version). *Other companies:*
   `company-peek.ts` (`peekCompliance` / `peekCompany`, version-less, read-only) reads the plain key or a complete
-  chunk set; a sealed head or chunk reads as locked; an incomplete set or a head with another `v` leaves the table out.
+  chunk set (chunks past the head's count ignored); a sealed head or chunk reads as locked; an incomplete set, both
+  layouts at once or a head with another `v` leaves the table out.
   The localStorage fallback never chunks. Tests: `tests/storage-rows.test.ts`.
 - **Rule for new code.** No module evaluated before `initStorage()` (i.e. statically imported by `main.tsx` /
   `App.tsx`) may read storage at module level; read inside functions, effects or lazily loaded modules.

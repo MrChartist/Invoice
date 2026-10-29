@@ -383,7 +383,8 @@ build-time config must use Vite's `VITE_` prefix.
 - A 4-6 digit PIN is a lock screen, not encryption of the stored data; optional vault mode (`src/lib/vault.ts`) encrypts the IndexedDB store at rest. Never write the `__vault__` record or sealed (`mcv1:`) values outside `storage.ts`.
 - PERF-3: a big `invoices` table (≥ 128 rows) is stored in IndexedDB as `rows:<key>` head + `rows:<key>:<i>` chunks
   (IndexedDB version 4); the logical key / JSON is unchanged. Only `storage.ts` writes them (`company-peek.ts` reads
-  them); a plain value at the key always wins. For "did it change?" checks use `rawStamp(key)`, not `readRaw`
+  them); the two layouts are exclusive, and if both exist boot merges them by `id` (chunk rows kept). **Any build with
+  DB_VERSION ≥ 4 must read the `rows:` layout: a revert must never lower `DB_VERSION` or drop the reader.** For "did it change?" checks use `rawStamp(key)`, not `readRaw`
   (which builds the whole text of a chunked table). Notes: `docs/ARCHITECTURE.md` → Row-level storage.
 - `.xlsx` is handled by our own minimal reader/writer (`src/lib/zip.ts` + `src/lib/xlsx.ts`, native
   `DecompressionStream`/`CompressionStream`): no `.xls`/`.ods`/encrypted/ZIP64 workbooks, no styles beyond a bold

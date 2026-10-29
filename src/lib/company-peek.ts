@@ -41,8 +41,9 @@ function openExisting(name: string): Promise<IDBDatabase | null> {
 /**
  * PERF-3: a big `invoices` table may be stored as chunk records (`rows:<key>` head + `rows:<key>:<i>`,
  * storage.ts). Queue the reads of `key` in `store`; the returned getter gives its stored value: the plain
- * string (old layout, which wins), the text rebuilt from a complete set of chunks, the sealed head (so the
- * caller sees a vault), or undefined (missing, incomplete, or a head of a layout this build does not know).
+ * string (old layout), the text rebuilt from a complete set of chunks, the sealed head (so the
+ * caller sees a vault), or undefined (missing, incomplete, both layouts at once, or a head of a layout this build
+ * does not know). Chunks past the head's count are ignored, as in storage.ts.
  */
 function readKey(store: IDBObjectStore, key: string): () => unknown {
   const base = store.get(key);
@@ -52,7 +53,8 @@ function readKey(store: IDBObjectStore, key: string): () => unknown {
   const keys = store.getAllKeys(range);
   const vals = store.getAll(range);
   return () => {
-    if (base.result !== undefined || typeof head.result !== 'string') return base.result;
+    if (typeof head.result !== 'string') return base.result;
+    if (base.result !== undefined) return undefined; // both layouts: the company's own boot merges them; left out here
     if (head.result.startsWith('mcv1:')) return head.result;
     let n = -1;
     try {
@@ -64,7 +66,7 @@ function readKey(store: IDBObjectStore, key: string): () => unknown {
     const c: unknown[] = [];
     (keys.result ?? []).forEach((k, j) => {
       const i = String(k).slice(`rows:${key}:`.length);
-      if (/^\d+$/.test(i)) c[+i] = vals.result?.[j];
+      if (/^\d+$/.test(i) && +i < n) c[+i] = vals.result?.[j];
     });
     if (n < 1 || c.length !== n) return undefined;
     for (let i = 0; i < n; i++) if (typeof c[i] !== 'string' || (c[i] as string).startsWith('mcv1:')) return typeof c[i] === 'string' ? c[i] : undefined;
