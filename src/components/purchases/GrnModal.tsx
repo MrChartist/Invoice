@@ -18,6 +18,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import local from './returns.module.css';
+import { errText } from '../../i18n/lib-msg';
 
 export interface GrnModalProps {
   /** GRN to record, rejection out against a GRN, or closed. */
@@ -106,7 +107,7 @@ function GrnForm({ vendors, orders, purchases, notes, onVendorCreated, onClose, 
       );
       onSaved(prT('grnSaved', { number: saved.number }));
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     }
   };
 
@@ -172,7 +173,7 @@ function RejectionForm({ grnId, purchases, notes, onClose, onSaved }: Rest & { g
       );
       onSaved(prT('rjSaved', { number: saved.number }));
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     }
   };
 

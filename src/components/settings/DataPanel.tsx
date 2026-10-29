@@ -50,6 +50,7 @@ const RetentionNote = lazy(() => import('../trust/TrustCard').then((m) => ({ def
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Settings.module.css';
+import { errText, libMsg } from '../../i18n/lib-msg';
 
 interface Props {
   notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
@@ -132,7 +133,7 @@ export function DataPanel({ notify }: Props) {
     try {
       downloadBlob(backupFilename(), exportPlainBackupBlob()); // PERF-1: parts, never one 70 MB string
     } catch (err) {
-      return notify((err as Error).message, 'error');
+      return notify(errText(err), 'error');
     }
     markBackupDone();
     setVersion((v) => v + 1); // QA-3 F13: the status line re-reads the last-backup time now, not after a reload
@@ -155,7 +156,7 @@ export function DataPanel({ notify }: Props) {
       setVersion((v) => v + 1);
       notify(setT('backupSaved'));
     } catch (err) {
-      if ((err as Error).name !== 'AbortError') notify(setT('couldNotSave', { message: (err as Error).message }), 'error');
+      if ((err as Error).name !== 'AbortError') notify(setT('couldNotSave', { message: errText(err) }), 'error');
     }
   };
 
@@ -166,7 +167,7 @@ export function DataPanel({ notify }: Props) {
       const { data, summary } = parseBackup(await file.text());
       setPending({ data, summary, fileName: file.name });
     } catch (err) {
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     } finally {
       if (fileInput.current) fileInput.current.value = '';
     }
@@ -183,7 +184,7 @@ export function DataPanel({ notify }: Props) {
       notify(setT('restored'));
       setTimeout(reloadAfterFlush, 700);
     } catch (err) {
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     }
     setPending(null);
   };
@@ -213,8 +214,8 @@ export function DataPanel({ notify }: Props) {
                     <AlertTriangle size={16} className={f.level === 'critical' ? styles.healthCritical : styles.healthWarn} aria-hidden="true" />
                   )}
                   <div>
-                    <strong>{f.title}</strong>
-                    <span>{f.detail}</span>
+                    <strong>{libMsg(f.title)}</strong>
+                    <span>{libMsg(f.detail)}</span>
                   </div>
                 </li>
               ))}
@@ -235,7 +236,7 @@ export function DataPanel({ notify }: Props) {
                       const r = cleanupUnusedAttachments();
                       notify(setT(r.removed === 1 ? 'removedOne' : 'removedMany', { n: r.removed, size: formatChars(r.chars) }));
                     } catch (err) {
-                      notify((err as Error).message, 'error');
+                      notify(errText(err), 'error');
                     }
                     setVersion((v) => v + 1);
                   }}
@@ -467,7 +468,7 @@ export function DataPanel({ notify }: Props) {
           try {
             requireAccess('data.erase'); // before anything is forgotten (undo copy, backup key, vault)
           } catch (err) {
-            return notify((err as Error).message, 'error');
+            return notify(errText(err), 'error');
           }
           await forgetDeviceData();
           wipeAppData();
@@ -490,7 +491,7 @@ export function DataPanel({ notify }: Props) {
             notify(setT('putBackDone'));
             setTimeout(reloadAfterFlush, 700);
           } catch (err) {
-            notify((err as Error).message, 'error');
+            notify(errText(err), 'error');
           }
         }}
         onClose={() => setUndoOpen(false)}

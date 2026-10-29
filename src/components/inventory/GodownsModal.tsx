@@ -21,6 +21,7 @@ const replT = defineArea(
 );
 import surface from '../../styles/surface.module.css';
 import styles from './inventory.module.css';
+import { errText } from '../../i18n/lib-msg';
 
 /**
  * Add, rename or delete godowns (6.10). Main always exists; creating a second godown turns on
@@ -57,7 +58,7 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
       setEditing(null);
       setError('');
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     }
   };
 
@@ -71,7 +72,7 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
       onChanged(invT('godownDeleted', { name: g.name }));
       setError('');
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     }
   };
 

@@ -9,6 +9,7 @@ import { imT } from '../../i18n/areas/inventory-masters';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './masters.module.css';
+import { errText } from '../../i18n/lib-msg';
 
 type SimpleDraft = { id?: string; symbol: string; name: string; uqc: string; decimals: string; locked?: boolean };
 type CompoundDraft = { id?: string; first: string; factor: string; second: string };
@@ -38,7 +39,7 @@ export function UnitsModal({ open, items, onClose, onChanged }: {
       onChanged(imT('saved'));
       return true;
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
       return false;
     }
   };

@@ -48,6 +48,7 @@ import { PURCHASE_CATEGORIES, type PurchaseRecord } from '../types/purchases';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Expenses.module.css';
+import { errText } from '../i18n/lib-msg';
 import { EXPENSES_TABS, type ExpensesTab } from './page-tabs'; // R6-B1
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
@@ -112,7 +113,7 @@ export function Expenses() {
         try {
           refs.push(await attachFile(f));
         } catch (err) {
-          notify(`${f.name}: ${(err as Error).message}`, 'error');
+          notify(`${f.name}: ${errText(err)}`, 'error');
         }
       }
       setSharedFiles(refs);
@@ -183,7 +184,7 @@ export function Expenses() {
     } catch (err) {
       // Later sales used this bill's stock: ask before letting it go negative (serial conflicts never confirm).
       if (isStockDependencyError(err) && err.confirmable && window.confirm(`${err.message}\n\nDelete the bill anyway?`)) return remove(p, true);
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     }
   };
 

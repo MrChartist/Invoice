@@ -29,6 +29,7 @@ import type { SenderProfile } from '../types/invoice';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/settings/Settings.module.css';
+import { errText } from '../i18n/lib-msg';
 
 // The activity log is only needed on its own tab, so it stays out of the Settings chunk.
 const CustomFieldsPanel = lazy(() => import('../components/custom-fields/CustomFieldsPanel').then((m) => ({ default: m.CustomFieldsPanel })));
@@ -176,7 +177,7 @@ export function Settings() {
       window.dispatchEvent(new Event(SHOP_MODE_EVENT)); // 8H: the sidebar re-reads the shop mode
       notify(t('settings.saved'));
     } catch (err) {
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     }
   };
 

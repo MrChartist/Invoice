@@ -16,6 +16,7 @@ import { remindT } from '../../i18n/areas/reminders';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../collections/collections.module.css';
+import { errText } from '../../i18n/lib-msg';
 
 const LANGS: ReminderLanguage[] = ['en', 'hinglish'];
 
@@ -68,7 +69,7 @@ export function ReminderSchedulePanel({ notify }: { notify: (m: string, tone?: '
       setS(saveReminderSchedule(s));
       notify(colT('rsSaved'));
     } catch (err) {
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     }
   };
 

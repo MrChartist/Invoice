@@ -26,6 +26,7 @@ import styles from './purchases.module.css';
 import { localDb } from '../../lib/localDb';
 import { SnapshotFields } from '../custom-fields/SnapshotFields';
 import { customFieldsDb, finalizeValues } from '../../lib/custom-fields';
+import { errText } from '../../i18n/lib-msg';
 
 // R14 PS-B1: the disbursement row (kind, on the client's behalf) — professional companies only, one lazy chunk.
 const DisbursementRow = lazy(() => import('../prof/DisbursementRow'));
@@ -155,7 +156,7 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
       onSaved(expense ? purT('expUpdated') : purT('expAdded', { amount: formatCurrency(saved.total) }));
       onClose();
     } catch (err) {
-      setError((err as Error).message);
+      setError(errText(err));
     }
   };
 

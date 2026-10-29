@@ -4,6 +4,7 @@ import { currentActor } from '../../lib/access';
 import { todayIso } from '../../lib/tax-rules';
 import { useT } from '../../i18n';
 import { dkT } from '../../i18n/areas/desks-r3';
+import { checklistLabel } from '../../i18n/areas/desks-checklist';
 import controls from '../../styles/controls.module.css';
 import styles from './practice.module.css';
 
@@ -37,7 +38,7 @@ export function ChecklistPanel({ onChanged }: { onChanged?: () => void }) {
           <li key={i.id} className={styles.item}>
             <label className={controls.check}>
               <input type="checkbox" checked={!!i.done_at} onChange={() => { checklistDb.toggle(month, i.id, currentActor()?.name ?? ''); changed(); }} data-check-item={i.id} />
-              {i.label}
+              {checklistLabel(i.label)}
             </label>
             {i.carried && <span className={styles.flag}>{dkT('ck.carried', { month: i.carried })}</span>}
           </li>

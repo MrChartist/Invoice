@@ -18,6 +18,7 @@ import { syncT } from '../../i18n/areas/sync';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './companies.module.css';
+import { errText } from '../../i18n/lib-msg';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
@@ -40,7 +41,7 @@ export function CompaniesPanel({ notify }: { notify: Notify }) {
       refresh();
       notify(syncT('companyCreated', { name: c.name }));
     } catch (err) {
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     }
   };
 
@@ -52,7 +53,7 @@ export function CompaniesPanel({ notify }: { notify: Notify }) {
       setRenaming(null);
       refresh();
     } catch (err) {
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     }
   };
 
@@ -133,7 +134,7 @@ export function CompaniesPanel({ notify }: { notify: Notify }) {
               refresh();
               notify(ok ? syncT('companyDeleted', { name: c.name }) : syncT('companyKeptOpen'), ok ? 'success' : 'error');
             },
-            (err: unknown) => notify((err as Error).message, 'error'),
+            (err: unknown) => notify(errText(err), 'error'),
           );
         }}
       />

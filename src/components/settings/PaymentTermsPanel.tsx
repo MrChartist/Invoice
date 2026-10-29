@@ -13,6 +13,7 @@ import { colT } from '../../i18n/areas/collections';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../collections/collections.module.css';
+import { errText } from '../../i18n/lib-msg';
 
 // R13 (MF-A5): Udyam category, print switch and FSSAI number (lazy row beside the Udyam number).
 const MfProfileRow = lazy(() => import('../mfg/MfProfileRow'));
@@ -51,7 +52,7 @@ export function PaymentTermsPanel({ notify }: { notify: (m: string, tone?: 'succ
       setErrors([]);
       notify(colT('ptSaved'));
     } catch (err) {
-      setErrors([(err as Error).message]);
+      setErrors([errText(err)]);
     }
   };
   const toggle = (t: PaymentTerm) => {
@@ -59,7 +60,7 @@ export function PaymentTermsPanel({ notify }: { notify: (m: string, tone?: 'succ
       setTermActive(t.id, !!t.inactive);
       setTerms(loadPaymentTerms());
     } catch (err) {
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     }
   };
   const saveUdyam = () => {
@@ -70,7 +71,7 @@ export function PaymentTermsPanel({ notify }: { notify: (m: string, tone?: 'succ
       localDb.settings.save({ ...s, profiles: s.profiles.map((p) => (p.id === s.activeProfileId ? { ...p, msme_udyam: normalizeUdyam(udyam) || undefined } : p)) });
       notify(colT('ptUdyamSaved'));
     } catch (err) {
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     }
   };
   const saveSettings = () => {
@@ -78,7 +79,7 @@ export function PaymentTermsPanel({ notify }: { notify: (m: string, tone?: 'succ
       setSettings(saveCollectionSettings(settings));
       notify(colT('ssSaved'));
     } catch (err) {
-      notify((err as Error).message, 'error');
+      notify(errText(err), 'error');
     }
   };
   const setRow = (i: number, patch: Partial<TermInstalment>) =>
