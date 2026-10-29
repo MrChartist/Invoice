@@ -75,6 +75,8 @@ export interface CommandPaletteProps {
   onNavigate: (href: string) => void;
   /** R20-D: Go To (Alt+G) / Switch To (Ctrl+G) — screens and reports only, Tally names, recents first. */
   mode?: 'goto' | 'switch';
+  /** R20-D: the Go To rows (the Gateway's screens and reports, `lib/keys/nav-goto.ts`), given with `mode`. */
+  gotoRows?: StaticEntry[];
 }
 
 interface Option {
@@ -85,6 +87,8 @@ interface Option {
   /** R6-B1: the heading of a lazy group (Tabs / Features / Help topics) instead of the result group's. */
   section?: string;
 }
+
+const NO_ROWS: StaticEntry[] = [];
 
 /** "help gstr" or "? gstr" searches help topics only. */
 const HELP_QUERY = /^(?:help\s+|\?\s*)(.+)$/i;
@@ -135,7 +139,7 @@ function iconFor(r: SearchResult, action?: PaletteAction, nav?: PaletteNavItem):
   }
 }
 
-export function CommandPalette({ open, onClose, navItems = [], actions = [], onNavigate, mode }: CommandPaletteProps) {
+export function CommandPalette({ open, onClose, navItems = [], actions = [], onNavigate, mode, gotoRows = NO_ROWS }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const [recents, setRecents] = useState<string[]>([]);
@@ -236,11 +240,6 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
   }, [open, disc, helpRaw.length]);
   // QA7 G9: titles follow the language of each open (the raw index is loaded once).
   const helpEntries = useMemo(() => (open && disc ? disc.helpRows(helpRaw, getLanguage()) : []), [open, disc, helpRaw]);
-  // R20-D: the Gateway's screens and reports with their Tally names, loaded on the first Go To.
-  const [gotoRows, setGotoRows] = useState<StaticEntry[]>([]);
-  useEffect(() => {
-    if (open && mode && !gotoRows.length) import('../../lib/keys/nav-goto').then((m) => setGotoRows(m.gatewayGoto()), () => undefined);
-  }, [open, mode, gotoRows.length]);
   const actionById = useMemo(() => new Map(actions.map((a) => [a.id, a])), [actions]);
   const navByHref = useMemo(() => new Map(navItems.map((n) => [n.to, n])), [navItems]);
 

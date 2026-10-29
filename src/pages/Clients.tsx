@@ -34,7 +34,7 @@ import { s2T } from '../i18n/areas/sales-r2';
 import { svcT } from '../i18n/areas/service-r3';
 import { loadQuietSettings, quietCustomers } from '../lib/quiet-customers';
 import { DOC_DEFAULT_COLUMNS, docDefaultsToCells } from '../lib/party-defaults'; // R3-B5 CSV columns
-import { useListKeys } from '../components/keys/use-list-keys'; // R20-D5
+import { useListKeys } from '../lib/keys/use-list-keys'; // R20-D5
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip

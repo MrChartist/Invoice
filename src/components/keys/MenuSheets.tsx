@@ -4,7 +4,7 @@
  * (check data) and Ctrl+Alt+B (Help → About). Mounted lazily by the notification bell while Tally keys are on (the bell
  * is always mounted after first paint, so this costs first paint nothing). Rows are the registry's; data in nav-actions.ts.
  */
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
@@ -18,6 +18,7 @@ import { comboFor, rowById } from '../../lib/keys/registry';
 import { keysLayout } from '../../lib/keys/stub';
 import { useKeyActions } from '../../lib/keys/use-key-actions';
 import { itemForLetter, menuItems, screenName, type MenuId, type MenuItem } from '../../lib/keys/nav-actions';
+import { gatewayGoto } from '../../lib/keys/nav-goto';
 import { CommandPalette } from '../command/CommandPalette';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/useToast';
@@ -50,6 +51,7 @@ export default function MenuSheets({ openBell }: { openBell: () => void }) {
   const [mode, setMode] = useState<'goto' | 'switch' | null>(null);
   const [back, setBack] = useState<Back | null>(null);
   const from = useRef<Back | null>(null);
+  const gotoRows = useMemo(() => (mode ? gatewayGoto() : []), [mode]);
 
   const go = (m: 'goto' | 'switch') => {
     if (onGateway()) return false; // the Gateway's own Go To box
@@ -114,6 +116,7 @@ export default function MenuSheets({ openBell }: { openBell: () => void }) {
         <CommandPalette
           open
           mode={mode}
+          gotoRows={gotoRows}
           onClose={() => setMode(null)}
           onNavigate={(href) => {
             const f = from.current;

@@ -13,7 +13,7 @@ import { KEY_ROWS, claimList, isBuilt, rowById } from '../src/lib/keys/registry.
 import { KEY_CLAIMS, keysLayout, keysOn } from '../src/lib/keys/stub.ts';
 import { keysT } from '../src/i18n/areas/keys-r20a.ts';
 import { navT } from '../src/i18n/areas/keys-r20d.ts';
-import { GOTO_SYNONYMS } from '../src/lib/palette/synonyms.ts';
+import { GOTO_SYNONYMS } from '../src/lib/search.ts';
 import { searchAll } from '../src/lib/search.ts';
 
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
@@ -83,4 +83,14 @@ test('gotoEntries: de-duplicates by destination and adds synonyms by entry id', 
 test('screenName: the page heading, else the document title', () => {
   assert.equal(screenName({ querySelector: () => ({ textContent: ' Invoices ' }), title: 'x' } as never), 'Invoices');
   assert.equal(screenName({ querySelector: () => null, title: 'Books · Mr. Chartist' } as never), 'Books');
+});
+
+test('list keys: the highlight moves within the list (↑ ↓ Home End PgUp PgDn)', async () => {
+  const { moveTo } = await import('../src/lib/keys/use-list-keys.ts');
+  assert.equal(moveTo('move.down', 0, 5), 1);
+  assert.equal(moveTo('move.up', 0, 5), 0);
+  assert.equal(moveTo('move.end', 1, 5), 4);
+  assert.equal(moveTo('move.home', 4, 5), 0);
+  assert.equal(moveTo('move.pgdn', 2, 5), 4);
+  assert.equal(moveTo('move.pgup', 12, 30), 2);
 });

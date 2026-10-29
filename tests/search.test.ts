@@ -160,7 +160,7 @@ test('addRecent: dedupes case-insensitively, newest first, caps at 8', () => {
 // R20-D: Go To rows (the Gateway's screens, Tally names, R20-D synonyms) are searched as pages, in both languages.
 test('Go To rows: Tally report names and Hindi synonyms match as pages', async () => {
   const { gotoEntries } = await import('../src/lib/keys/nav-actions.ts');
-  const { GOTO_SYNONYMS } = await import('../src/lib/palette/synonyms.ts');
+  const { GOTO_SYNONYMS } = await import('../src/lib/search.ts');
   const pages = gotoEntries(
     [
       { id: 'm-tb', label: 'Trial balance', path: ['Display more reports'], href: '/gateway/display?r=tb&from=more', haystack: 'trial balance ट्रायल बैलेंस' },

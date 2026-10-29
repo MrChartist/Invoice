@@ -4,7 +4,7 @@
  * - The Company (Alt+K), Data (Alt+Y) and Import (Alt+O) sheets: every row is an existing route or action, with a
  *   letter (as on the Gateway) and, where one exists, the registry row whose key it shows.
  * - Go To (Alt+G): the Gateway's leaf entries (`flattenMenu`) become palette rows with Tally names and the R20-D
- *   synonyms (`GOTO_SYNONYMS` in palette/synonyms.ts; built by `nav-goto.ts`).
+ *   synonyms (`GOTO_SYNONYMS` in search.ts; built by `nav-goto.ts`).
  * - The setup-wizard answer "Have you used Tally?" sets the Tally keys switch.
  * The sheets themselves are `components/keys/MenuSheets.tsx`.
  */

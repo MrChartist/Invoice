@@ -9,7 +9,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import tabStyles from './VendorsTab.module.css';
-import { useListKeys } from '../keys/use-list-keys'; // R20-D5
+import { useListKeys } from '../../lib/keys/use-list-keys'; // R20-D5
 
 export interface PurchasesTableProps {
   rows: PurchaseRecord[];
