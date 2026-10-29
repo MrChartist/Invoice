@@ -70,7 +70,8 @@ const HI_LEAK_PER_CHUNK_KB = 1;
 const LEAVES_MAX_KB = 20;
 /**
  * Modules allowed to keep Hindi in an English chunk above the per-chunk cap, with the reason: text needed in every
- * UI language (WhatsApp messages, bilingual prints), or Hindi still passed positionally (help, Round 17).
+ * UI language (WhatsApp messages, bilingual prints). PERF-6: help topics, glossary and tips left the list (their Hindi
+ * moved to `lang-hi-help`, scripts/vite-hi-split.mjs `splitHelp`).
  */
 const HI_LEAK_ALLOW = [
   /message-langs\./, // WhatsApp / SMS texts in Hindi, sent from an English interface too
@@ -80,8 +81,6 @@ const HI_LEAK_ALLOW = [
   /gateway\./, // the bilingual Gateway menu (HI_INLINE)
   /einvoice-print\./, // bilingual e-invoice print
   /whats-new\./, // What's new (title + hi per row)
-  /lib\/help\/(glossary|topics-)/, // help topics / glossary: positional Hindi (moved in a later round)
-  /ScreenTip\./, // one-time screen tips (en + hi)
 ];
 
 const meta = (() => {

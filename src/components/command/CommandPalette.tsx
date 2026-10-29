@@ -228,9 +228,16 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
   const featureEntries = useMemo(() => (open && disc ? disc.featureDestinations() : []), [open, disc]);
   const labels = useMemo(() => (disc ? disc.discoverLabels() : null), [disc, open]); // eslint-disable-line react-hooks/exhaustive-deps
   const [helpRaw, setHelpRaw] = useState<HelpIndexRow[]>([]);
+  // PERF-6: the help topics' Hindi titles are a language-pack chunk: asked for in Hindi, or for a Devanagari query.
+  const [helpHi, setHelpHi] = useState(false);
+  const wantHelpHi = getLanguage() === 'hi' || /[\u0900-\u097F]/.test(query);
   useEffect(() => {
-    if (open && disc && !helpRaw.length) disc.loadHelpIndex().then(setHelpRaw, () => undefined);
-  }, [open, disc, helpRaw.length]);
+    if (!open || !disc || (helpRaw.length && (helpHi || !wantHelpHi))) return;
+    disc.loadHelpIndex(wantHelpHi).then((rows) => {
+      setHelpRaw(rows);
+      setHelpHi(wantHelpHi);
+    }, () => undefined);
+  }, [open, disc, helpRaw.length, helpHi, wantHelpHi]);
   // QA7 G9: titles follow the language of each open (the raw index is loaded once).
   const helpEntries = useMemo(() => (open && disc ? disc.helpRows(helpRaw, getLanguage()) : []), [open, disc, helpRaw]);
   const actionById = useMemo(() => new Map(actions.map((a) => [a.id, a])), [actions]);

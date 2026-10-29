@@ -1,7 +1,7 @@
 /** R6-A2 search over every help topic (same tokeniser and scorer as Ctrl+K, `search.ts`). Topics load on first use. */
 import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
-import { useT } from '../../i18n';
+import { getLanguage, useT } from '../../i18n';
 import { helpT } from '../../i18n/areas/help-r6';
 import { helpIndex } from '../../lib/help/registry';
 import { prepareTokens, scoreTokens, type Field } from '../../lib/search';
@@ -15,29 +15,31 @@ type Indexed = HelpTopic & { href: string; fields: Field[] };
 export function HelpSearch({ onPick }: { onPick: (topic: HelpTopic) => void }) {
   useT();
   const [q, setQ] = useState('');
-  const [index, setIndex] = useState<Indexed[] | null>(null);
+  const [index, setIndex] = useState<{ rows: Indexed[]; hi: boolean } | null>(null);
+  // PERF-6: on an English interface the Hindi titles load only when the query is typed in Devanagari.
+  const wantHi = getLanguage() === 'hi' || /[\u0900-\u097F]/.test(q);
 
   useEffect(() => {
-    if (!q.trim() || index) return;
+    if (!q.trim() || (index && (index.hi || !wantHi))) return;
     let alive = true;
-    helpIndex().then(
-      (all) => alive && setIndex(all.map((x) => ({ ...x, fields: [
+    helpIndex({ hi: wantHi }).then(
+      (all) => alive && setIndex({ hi: wantHi, rows: all.map((x) => ({ ...x, fields: [
         { text: x.title, weight: 3, isTitle: true },
         { text: x.hiTitle, weight: 3 },
         { text: x.id.replace(/[:-]/g, ' '), weight: 2 },
         { text: x.what, weight: 1 },
-      ] }))),
+      ] })) }),
       () => undefined,
     );
     return () => {
       alive = false;
     };
-  }, [q, index]);
+  }, [q, index, wantHi]);
 
   const results = useMemo(() => {
     if (!index || !q.trim()) return [];
     const tokens = prepareTokens(q);
-    return index
+    return index.rows
       .map((x) => ({ x, s: scoreTokens(tokens, x.fields) }))
       .filter((r): r is { x: Indexed; s: NonNullable<typeof r.s> } => !!r.s && r.s.score > 0)
       .sort((a, b) => b.s.score - a.s.score)
