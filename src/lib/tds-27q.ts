@@ -12,8 +12,10 @@
  *  - no PAN: Sec 206AA — at least 20%, unless the Rule 37BC details (country, foreign TIN, TRC) are on file
  *    (Sec 206AA(7)).
  * and flags SHORT deduction (rate applied below the required one) and non-resident rows booked under a resident
- * section. Surcharge, Sec 194LB / 194LC / 194LD concessional rates, grossing-up (Sec 195A) and Form 15CA / 15CB
- * are NOT modelled.
+ * section. PENDING 40 (7.131) adds: surcharge on the Act rate by the payee's FY aggregate (`nrSurchargePct`,
+ * unverified rows), Sec 195A grossing-up when the payer bears the tax (`Vendor.nr_tax_borne`: the amount credited
+ * is the net, the income is net × 100 ÷ (100 − rate)), and the Form 15CA part / 15CB need per remittance (Rule
+ * 37BB, `form15caPlan`). Sec 194LB / 194LC / 194LD concessional rates and the FVU text file are NOT modelled.
  *
  * UNVERIFIED: column order, section code '195', deductee codes, the "rate as per IT Act / DTAA" flag (A / B) and
  * remittance nature codes follow the NSDL RPU as we understand it — import through the RPU, validate with the FVU
@@ -25,7 +27,8 @@ import { num, round2 } from './invoice-calc';
 import { toCsv } from './csv';
 import { challanByKey, challanTotal, deducteeCode, type TdsChallan, type TdsDeductionRow, type TdsQuarter } from './tds-payables';
 import { rpuDate } from './tds-returns';
-import { nrActRate, nrNatureOf, payableSection, rpuCode2025, type NrNature } from './tds-rules';
+import { FORM15CA_RULES, nrActRate, nrNatureOf, nrSurchargePct, payableSection, rpuCode2025, type NrNature } from './tds-rules';
+import { ruleAt } from './tax-rules';
 import { isValidPan } from './validators';
 import { actRef, formText, quarterStart, sectionText } from './ita2025';
 
@@ -49,6 +52,8 @@ export interface NrPayee {
   noPe: boolean;
   dtaaRate: number | null;
   dtaaArticle: string;
+  /** PENDING 40: the payer bears the tax (Sec 195A grossing-up). */
+  taxBorne: boolean;
 }
 
 export function nrPayeeOf(vendor: unknown): NrPayee {
@@ -63,6 +68,7 @@ export function nrPayeeOf(vendor: unknown): NrPayee {
     noPe: v.nr_no_pe === true,
     dtaaRate: rate === undefined || rate === null || rate === '' || !Number.isFinite(Number(rate)) ? null : Number(rate),
     dtaaArticle: str(v.nr_dtaa_article),
+    taxBorne: v.nr_tax_borne === true,
   };
 }
 
@@ -73,8 +79,10 @@ export function trcValidOn(p: Pick<NrPayee, 'trcNo' | 'trcTo'>, date: string): b
 
 export interface NrRateCheck {
   nature: NrNature;
-  /** Act rate with cess (%). */
+  /** Act rate with surcharge and cess (%). */
   actRate: number;
+  /** PENDING 40: surcharge % in the required rate (0 below the first slab, or when a DTAA / 206AA rate applies). */
+  surchargePct: number;
   /** DTAA rate typed on the vendor (null = none). */
   dtaaRate: number | null;
   /** Rate that should apply (%), and on what basis. */
@@ -85,25 +93,31 @@ export interface NrRateCheck {
   notes: string[];
 }
 
-/** Rate that should have applied to a non-resident credit of `date` under section `code`. */
-export function nrRateCheck(code: string, date: string, pan: string, deducteeType: TdsDeductionRow['deducteeType'], payee: NrPayee): NrRateCheck {
+/**
+ * Rate that should have applied to a non-resident credit of `date` under section `code`. `aggregate` = the payee's
+ * income paid or likely to be paid in the FY and subject to deduction (₹) — picks the surcharge slab.
+ */
+export function nrRateCheck(code: string, date: string, pan: string, deducteeType: TdsDeductionRow['deducteeType'], payee: NrPayee, aggregate = 0): NrRateCheck {
   const nature = nrNatureOf(code);
   const act = nrActRate(nature, date, deducteeType);
+  const sc = nrSurchargePct(deducteeType, aggregate, date);
+  const actRate = round2((act.base * (100 + sc) * (100 + act.cessPct)) / 10000);
   const notes: string[] = [];
-  let required = act.rate;
+  if (sc) notes.push(`Surcharge ${sc}% on the Act rate: the payee's income subject to deduction this FY is ₹${amt(aggregate)} (First Schedule Part II as understood — verify).`);
+  let required = actRate;
   let basis: NrRateCheck['basis'] = 'ACT';
   let dtaaBlocked = false;
   if (payee.dtaaRate !== null) {
     const trc = trcValidOn(payee, date);
     if (trc && payee.form10f) {
-      if (payee.dtaaRate < act.rate) {
+      if (payee.dtaaRate < actRate) {
         required = payee.dtaaRate;
         basis = 'DTAA';
-        notes.push(`DTAA rate ${payee.dtaaRate}%${payee.dtaaArticle ? ` (${payee.dtaaArticle})` : ''} is lower than the Act rate ${act.rate}% — applied (TRC and Form 10F on file).`);
-      } else notes.push(`Act rate ${act.rate}% is not higher than the DTAA rate ${payee.dtaaRate}% — Act rate applies (Sec 90(2)).`);
+        notes.push(`DTAA rate ${payee.dtaaRate}%${payee.dtaaArticle ? ` (${payee.dtaaArticle})` : ''} is lower than the Act rate ${actRate}% — applied (TRC and Form 10F on file).`);
+      } else notes.push(`Act rate ${actRate}% is not higher than the DTAA rate ${payee.dtaaRate}% — Act rate applies (Sec 90(2)).`);
     } else {
       dtaaBlocked = true;
-      notes.push(`DTAA rate ${payee.dtaaRate}% cannot be applied: ${!payee.trcNo ? 'no Tax Residency Certificate' : !trc ? `TRC expired on ${payee.trcTo}` : 'Form 10F not on file'} (Sec 90(4) / 90(5)) — Act rate ${act.rate}% (incl. ${act.cessPct}% cess).`);
+      notes.push(`DTAA rate ${payee.dtaaRate}% cannot be applied: ${!payee.trcNo ? 'no Tax Residency Certificate' : !trc ? `TRC expired on ${payee.trcTo}` : 'Form 10F not on file'} (Sec 90(4) / 90(5)) — Act rate ${actRate}% (incl. ${act.cessPct}% cess${sc ? `, ${sc}% surcharge` : ''}).`);
     }
   }
   if (!isValidPan(pan)) {
@@ -116,7 +130,15 @@ export function nrRateCheck(code: string, date: string, pan: string, deducteeTyp
     }
   }
   if (!code.startsWith('195')) notes.push(`Booked under ${payableSection(code)?.label ?? code}: payments to a non-resident are normally deducted under Sec 195 — check the section.`);
-  return { nature, actRate: act.rate, dtaaRate: payee.dtaaRate, required: round2(required), basis, dtaaBlocked, notes };
+  return { nature, actRate, surchargePct: basis === 'ACT' ? sc : 0, dtaaRate: payee.dtaaRate, required: round2(required), basis, dtaaBlocked, notes };
+}
+
+/**
+ * Sec 195A: when the payer bears the tax, the income is the net amount grossed up so that, after deducting tax
+ * at `ratePct`, the net is left: net × 100 ÷ (100 − rate), rupee-rounded.
+ */
+export function grossUp195A(net: number, ratePct: number): number {
+  return ratePct > 0 && ratePct < 100 ? Math.round((net * 100) / (100 - ratePct)) : round2(net);
 }
 
 export interface Nr27qRow {
@@ -126,19 +148,86 @@ export interface Nr27qRow {
   /** Tax that should have been deducted at `check.required` (rupee-rounded) and the shortfall (₹, ≥ 0). */
   requiredTds: number;
   shortBy: number;
+  /** PENDING 40: Sec 195A — the income after grossing up the net amount credited (only when the payer bears the tax). */
+  grossedUp?: number;
 }
 
-/** Non-resident rows of the register with the vendor's NR details and the rate check, oldest first. */
-export function nr27qRows(rows: readonly TdsDeductionRow[], vendors: readonly unknown[]): Nr27qRow[] {
+const payeeKey = (r: TdsDeductionRow) => r.vendorId || r.pan || r.payee;
+/** "Sec 195A", or its 2025-Act label from 1 Apr 2026 (ita2025.ts). */
+const sec195A = (date: string) => (actRef('195A', date).act === 2025 ? sectionText('195A', date) : 'Sec 195A');
+
+/** Income subject to deduction per payee (₹), summed over the non-resident `rows`. */
+export function nrAggregates(rows: readonly TdsDeductionRow[]): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const r of rows) if (r.nonResident) m.set(payeeKey(r), round2((m.get(payeeKey(r)) ?? 0) + Math.max(r.base, 0)));
+  return m;
+}
+
+/**
+ * Non-resident rows of the register with the vendor's NR details and the rate check, oldest first. `fyRows` (the
+ * whole FY of the register; default `rows`) gives each payee's aggregate for the surcharge slab.
+ */
+export function nr27qRows(rows: readonly TdsDeductionRow[], vendors: readonly unknown[], fyRows: readonly TdsDeductionRow[] = rows): Nr27qRow[] {
   const byId = new Map<string, unknown>();
   for (const v of vendors) if (v && typeof v === 'object') byId.set(str((v as Record<string, unknown>).id), v);
+  const agg = nrAggregates(fyRows);
   const out: Nr27qRow[] = [];
   for (const r of rows) {
     if (!r.nonResident) continue;
     const payee = nrPayeeOf(r.vendorId ? byId.get(r.vendorId) : undefined);
-    const check = nrRateCheck(r.code, r.creditedOn, r.pan, r.deducteeType, payee);
-    const requiredTds = r.base > 0 ? Math.round((r.base * check.required) / 100) : r.amount;
-    out.push({ row: r, payee, check, requiredTds, shortBy: Math.max(round2(requiredTds - r.amount), 0) });
+    const total = agg.get(payeeKey(r)) ?? r.base;
+    let check = nrRateCheck(r.code, r.creditedOn, r.pan, r.deducteeType, payee, total);
+    let grossedUp: number | undefined;
+    if (payee.taxBorne && r.base > 0) {
+      // The grossed-up income may cross a surcharge slab: check again on the grossed aggregate.
+      check = nrRateCheck(r.code, r.creditedOn, r.pan, r.deducteeType, payee, round2((total * grossUp195A(r.base, check.required)) / r.base));
+      grossedUp = grossUp195A(r.base, check.required);
+      check.notes.push(`${sec195A(r.creditedOn)}: tax borne by the payer — ₹${amt(r.base)} credited is grossed up to ₹${amt(grossedUp)} at ${check.required}%.`);
+    }
+    const income = grossedUp ?? r.base;
+    const requiredTds = income > 0 ? Math.round((income * check.required) / 100) : r.amount;
+    out.push({ row: r, payee, check, requiredTds, shortBy: Math.max(round2(requiredTds - r.amount), 0), ...(grossedUp !== undefined ? { grossedUp } : {}) });
+  }
+  return out;
+}
+
+/* ── Form 15CA / 15CB (Rule 37BB) ─────────────────────────────── */
+
+export type Form15caPart = 'A' | 'B' | 'C' | 'D';
+
+export interface Form15caRow {
+  row: TdsDeductionRow;
+  part: Form15caPart;
+  /** Accountant's certificate (Form 15CB) needed before the remittance. */
+  needs15cb: boolean;
+  /** Payee's remittances of the FY so far, this one included (₹). */
+  aggregate: number;
+  why: string;
+}
+
+/**
+ * Which part of Form 15CA each remittance to a non-resident falls in (Rule 37BB as substituted from 1 Apr 2016, as
+ * understood): D — not chargeable to tax (the rate that applies is nil); B — a Sec 197 certificate or Sec 195(2) /
+ * 195(3) order is on file; A — chargeable and the payee's remittances in the FY, this one included, do not exceed
+ * `FORM15CA_RULES` (₹5 lakh); C — above that, after a Form 15CB from a chartered accountant. Remittances in the
+ * Rule 37BB(3) specified list need no form — not modelled. `list` = one FY's rows. Working paper.
+ */
+export function form15caPlan(list: readonly Nr27qRow[]): Form15caRow[] {
+  const sorted = [...list].sort((a, b) => a.row.creditedOn.localeCompare(b.row.creditedOn));
+  const running = new Map<string, number>();
+  const out: Form15caRow[] = [];
+  for (const x of sorted) {
+    const limit = ruleAt(FORM15CA_RULES, x.row.creditedOn).partALimit;
+    const k = payeeKey(x.row);
+    const aggregate = round2((running.get(k) ?? 0) + (x.grossedUp ?? x.row.base));
+    running.set(k, aggregate);
+    let part: Form15caPart;
+    let why: string;
+    if (x.check.required <= 0) [part, why] = ['D', 'Not chargeable to tax at the rate that applies.'];
+    else if (x.row.certNo) [part, why] = ['B', `Certificate / order ${x.row.certNo} (Sec 197 / 195(2) / 195(3)) on file.`];
+    else if (aggregate <= limit) [part, why] = ['A', `FY remittances ₹${amt(aggregate)} do not exceed ₹${amt(limit)}.`];
+    else [part, why] = ['C', `FY remittances ₹${amt(aggregate)} exceed ₹${amt(limit)}: Form 15CB first.`];
+    out.push({ row: x.row, part, needs15cb: part === 'C', aggregate, why });
   }
   return out;
 }
@@ -159,11 +248,15 @@ export interface Form27QPaper {
 }
 
 const CHALLAN_HEAD = ['Sr. No.', 'Section code', 'TDS (₹)', 'Surcharge (₹)', 'Education cess (₹)', 'Interest (₹)', 'Fee (₹)', 'Others (₹)', 'Total (₹)', 'Cheque / DD no.', 'BSR code', 'Date of deposit', 'Challan serial no.', 'Minor head', 'Book entry'];
-const DEDUCTEE_HEAD = ['Sr. No.', 'Challan Sr. No.', 'Section code', 'Deductee code', 'PAN of deductee', 'Name of deductee', 'Date of payment / credit', 'Amount paid / credited (₹)', 'TDS (₹)', 'Surcharge (₹)', 'Education cess (₹)', 'Total tax deducted (₹)', 'Total tax deposited (₹)', 'Date of deduction', 'Rate (%)', 'Reason for non / lower / higher deduction', 'Certificate no. (Sec 197)', 'Rate as per IT Act (A) / DTAA (B)', 'Nature of remittance', 'Form 15CA acknowledgement', 'Country of residence', 'Tax identification no.', 'TRC on file', 'Form 10F', 'Required rate (%)', 'Short deduction (₹)'];
+const DEDUCTEE_HEAD = ['Sr. No.', 'Challan Sr. No.', 'Section code', 'Deductee code', 'PAN of deductee', 'Name of deductee', 'Date of payment / credit', 'Amount paid / credited (₹)', 'TDS (₹)', 'Surcharge (₹)', 'Education cess (₹)', 'Total tax deducted (₹)', 'Total tax deposited (₹)', 'Date of deduction', 'Rate (%)', 'Reason for non / lower / higher deduction', 'Certificate no. (Sec 197)', 'Rate as per IT Act (A) / DTAA (B)', 'Nature of remittance', 'Form 15CA acknowledgement', 'Country of residence', 'Tax identification no.', 'TRC on file', 'Form 10F', 'Required rate (%)', 'Short deduction (₹)', 'Form 15CA part (Rule 37BB)'];
 
 /** Form 27Q for a quarter (non-resident rows only; TDS challans, never TCS). */
 export function form27Q(rows: readonly TdsDeductionRow[], vendors: readonly unknown[], challans: readonly TdsChallan[], fy: number, quarter: TdsQuarter): Form27QPaper {
-  const list = nr27qRows(rows.filter((r) => r.fy === fy && r.quarter === quarter), vendors);
+  const fyRows = rows.filter((r) => r.fy === fy);
+  // PENDING 40: the FY's rows give each payee's aggregate (surcharge slab, Form 15CA Part A limit).
+  const fyList = nr27qRows(fyRows, vendors);
+  const list = fyList.filter((x) => x.row.quarter === quarter);
+  const partOf = new Map(form15caPlan(fyList).map((p) => [p.row.key, p]));
   const warnings: string[] = [];
   const byKey = challanByKey(challans.filter((c) => c.kind !== 'TCS'));
   const used = [...new Set(list.map((x) => byKey.get(x.row.key)).filter((c): c is TdsChallan => !!c))].sort((a, b) => a.date.localeCompare(b.date) || a.challan_no.localeCompare(b.challan_no));
@@ -187,16 +280,21 @@ export function form27Q(rows: readonly TdsDeductionRow[], vendors: readonly unkn
       shortBy += x.shortBy;
       warnings.push(`${r.payee}: short deduction ₹${amt(x.shortBy)} — ${r.rate}% applied, ${x.check.required}% required (${x.check.basis === 'DTAA' ? 'DTAA' : x.check.basis === 'NO_PAN' ? 'Sec 206AA' : 'Act rate with cess'}).`);
     }
-    for (const n of x.check.notes) if (/cannot be applied|Booked under/.test(n)) warnings.push(`${r.payee}: ${n}`);
-    // Act rate includes cess: split the TDS into tax + cess for the RPU columns; a DTAA rate carries no cess.
+    for (const n of x.check.notes) if (/cannot be applied|Booked under|Sec 195A|Surcharge/.test(n)) warnings.push(`${r.payee}: ${n}`);
+    // Act rate includes surcharge and cess: split the TDS into tax + surcharge + cess for the RPU columns; a DTAA
+    // rate carries neither.
     const cessPct = x.check.basis === 'DTAA' ? 0 : nrActRate(x.check.nature, r.creditedOn, r.deducteeType).cessPct;
-    const tax = cessPct ? round2((r.amount * 100) / (100 + cessPct)) : r.amount;
-    const cess = round2(r.amount - tax);
+    const sc = x.check.surchargePct;
+    const tax = cessPct || sc ? round2((r.amount * 10000) / ((100 + sc) * (100 + cessPct))) : r.amount;
+    const surcharge = round2((tax * sc) / 100);
+    const cess = round2(r.amount - tax - surcharge);
+    const plan = partOf.get(r.key);
     deducteeRows.push([
       i + 1, ch ? srOf.get(ch.id) ?? '' : '', rpu27Q(r), deducteeCode(r.deducteeType), r.pan || 'PANNOTAVBL', r.payee,
-      rpuDate(r.creditedOn), amt(r.base), amt(tax), '0.00', amt(cess), amt(r.amount), ch ? amt(r.amount) : '0.00', rpuDate(r.deductedOn), r.rate, r.reason, r.certNo,
+      rpuDate(r.creditedOn), amt(x.grossedUp ?? r.base), amt(tax), amt(surcharge), amt(cess), amt(r.amount), ch ? amt(r.amount) : '0.00', rpuDate(r.deductedOn), r.rate, r.reason, r.certNo,
       x.check.basis === 'DTAA' ? 'B' : 'A', `${NATURE_CODE[x.check.nature]} ${NATURE_LABEL[x.check.nature]}`, '', x.payee.country, x.payee.tin,
       x.payee.trcNo ? `${x.payee.trcNo}${x.payee.trcTo ? ` (to ${rpuDate(x.payee.trcTo)})` : ''}` : 'No', x.payee.form10f ? 'Yes' : 'No', x.check.required, amt(x.shortBy),
+      plan ? `${plan.part}${plan.needs15cb ? ' + 15CB' : ''}` : '',
     ]);
   });
   const deducted = round2(list.reduce((t, x) => t + x.row.amount, 0));

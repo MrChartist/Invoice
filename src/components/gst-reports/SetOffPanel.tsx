@@ -16,6 +16,7 @@ import {
   deleteSetOff,
   loadGstChallans,
   loadSetOffs,
+  periodKeyOf,
   periodPaymentStatus,
   planSetOff,
   setOffFor,
@@ -23,7 +24,7 @@ import {
   threeBDue,
   type ChallanAmounts,
 } from '../../lib/gst-setoff';
-import { cashLedgerDetail, detailByHead, loadPmt09, loadRefunds } from '../../lib/gst-cash-refunds';
+import { cashLedgerDetail, creditLedgerRefundMoves, detailByHead, loadPmt09, loadRefunds } from '../../lib/gst-cash-refunds';
 import { GST_SETOFF_RULES, todayIso } from '../../lib/tax-rules';
 import { localDb } from '../../lib/localDb';
 import type { FilerFrequency } from '../../lib/compliance';
@@ -37,6 +38,7 @@ import { useT } from '../../i18n';
 import { soT } from '../../i18n/areas/gst-setoff';
 import { ChallanList } from './ChallanList';
 import { o7T } from '../../i18n/areas/gst-tds-7o';
+import { p40T } from '../../i18n/areas/statutory-p40';
 
 const SetOffDialog = lazy(() => import('./SetOffDialog'));
 
@@ -75,17 +77,22 @@ export function SetOffPanel({ report, period, gstin, stateCode, turnover, notify
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const setoffs = useMemo(() => loadSetOffs(), [version]);
   // 7O (7.91): unutilised ITC of the last posted set-off joins this period's credit.
-  const carry = useMemo(() => carryForwardFor(setoffs, periodRange(period).from, gstin), [setoffs, period, gstin]);
+  // PENDING 40: ITC refund claims filed since that set-off debit the credit ledger (Rule 89(3)).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const refunds = useMemo(() => loadRefunds(), [version]);
+  const carry = useMemo(() => {
+    const own = setOffFor(setoffs, periodKeyOf(period), gstin);
+    return carryForwardFor(setoffs, periodRange(period).from, gstin, creditLedgerRefundMoves(refunds), own?.date ?? '');
+  }, [setoffs, period, gstin, refunds]);
   const plan = useMemo(
     () => planSetOff(report, { period, due: due.form === 'GSTR3B' ? due.due : '', paidOn: effectivePaidOn, turnover, includeInterest: withInterest, includeLateFee: withFee, ...(withCarry ? { openingItc: carry.heads } : {}) }),
     [report, period, due, effectivePaidOn, turnover, withInterest, withFee, withCarry, carry],
   );
   const record = setOffFor(setoffs, plan.periodKey, gstin);
-  const credit = creditLedgerBalance(setoffs, gstin);
+  const credit = creditLedgerBalance(setoffs, gstin, undefined, creditLedgerRefundMoves(refunds));
   const status = periodPaymentStatus(plan, challans, setoffs, gstin);
   // 7R (7.121): PMT-09 transfers move money between heads and filed cash refunds take it out.
   const transfers = loadPmt09();
-  const refunds = loadRefunds();
   const balance = transfers.length || refunds.length ? detailByHead(cashLedgerDetail(challans, setoffs, transfers, refunds)) : cashLedgerBalance(challans, setoffs);
   const balanceForPeriod = transfers.length || refunds.length ? detailByHead(cashLedgerDetail(challans, setoffs.filter((r) => r !== record), transfers, refunds)) : cashLedgerBalance(challans, setoffs.filter((r) => r !== record));
   const label = periodLabel(period);
@@ -184,6 +191,7 @@ export function SetOffPanel({ report, period, gstin, stateCode, turnover, notify
               {o7T('carryFrom', { period: carry.fromKey, amount: m(sumHeads(carry.heads)) })}
               {carry.notes.includes('CARRY_GAP') && ` ${o7T('carryGap')}`}
               {carry.notes.includes('CARRY_UNKNOWN') && ` ${o7T('carryUnknown')}`}
+              {carry.refundNet && ` ${p40T('carryRefund', { amount: m(sumHeads(carry.refundNet)) })}`}
             </p>
           )}
 
