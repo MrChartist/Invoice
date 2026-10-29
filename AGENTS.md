@@ -31,8 +31,12 @@
   file names, first-paint files trimmed from preload lists (`scripts/vite-preload-trim.mjs`), `pako` aliased to
   `src/lib/stubs/pako-fflate.ts`, CSS-module names `_<local>_<file hash>` (`docs/qa/performance.md`). Hindi strings are split out at build time (`scripts/vite-hi-split.mjs`): every `defineArea(en, hi)` must pass a
   literal Hindi object; Hindi lives in `lang-hi-*` packs (plus `lang-regional`) listed under `langs` in
-  `dist/lang-manifest.json`, precached only on devices set to that language. Budgets: first paint 185 kB, core 3,300 kB,
-  Hindi pack 400 kB, Hindi left in English chunks ≤ 36 kB (`scripts/check-bundle-size.mjs`). HTML escaping: `escHtml`
+  `dist/lang-manifest.json`, precached only on devices set to that language. PERF-6 (R21-P): the help topics' / glossary's /
+  tips' positional Hindi moves too (`splitHelp`, `HELP_SPLIT`; read back through `src/lib/help/hi-tables.ts` — keep
+  their Hindi literal); `css-maps` groups class maps of small shared CSS modules whose every rule is local (`cssIsLocal`:
+  never a `:global`, element or `@page` rule); `lazy-leaves-ui` takes leaves ≤ 2,500 B with no load effect
+  (`loadEffects`), cap 28 kB. Budgets: first paint 185 kB, core 3,300 kB,
+  Hindi pack 400 kB, Hindi left in English chunks ≤ 36 kB, leaves 20 / 28 kB (`scripts/check-bundle-size.mjs`). HTML escaping: `escHtml`
   (`src/lib/html-esc.ts`, escapes `'` too).
 - **State**: Zustand — `src/store/useInvoiceStore.ts` is the single live global store.
 - **Styling**: Vanilla CSS + CSS Modules (`*.module.css`); tokens in `src/index.css`.

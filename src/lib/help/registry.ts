@@ -11,6 +11,7 @@
  */
 import { PACK_TABS } from '../industry-packs';
 import type { HelpTopic } from './types';
+import { withHindi, type HiTableLoader } from './hi-tables';
 
 export type HelpArea = 'sales' | 'purchase' | 'books' | 'statutory' | 'packs' | 'settings';
 
@@ -59,7 +60,10 @@ export function candidates(pathname: string, search = ''): string[] {
   return parts.map((_, i) => parts.slice(0, parts.length - i).join(':'));
 }
 
-const LOADERS: Record<HelpArea, () => Promise<{ TOPICS: readonly HelpTopic[] }>> = {
+/** PERF-6: a build moves the Hindi titles out (`loadHi`, see `hi-tables.ts`); dev / tests keep them inline. */
+type TopicsModule = { TOPICS: readonly HelpTopic[]; loadHi?: HiTableLoader<string> };
+
+const LOADERS: Record<HelpArea, () => Promise<TopicsModule>> = {
   sales: () => import('./topics-sales'),
   purchase: () => import('./topics-purchase'),
   books: () => import('./topics-books'),
@@ -71,11 +75,18 @@ const LOADERS: Record<HelpArea, () => Promise<{ TOPICS: readonly HelpTopic[] }>>
 export const HELP_AREAS: readonly HelpArea[] = ['sales', 'purchase', 'books', 'statutory', 'packs', 'settings'];
 
 const cache = new Map<HelpArea, Promise<Map<string, HelpTopic>>>();
+const hiFills = new Map<HelpArea, () => Promise<void>>();
 
+/** An area's topics; with Hindi on, their Hindi titles are in place before it resolves. */
 export function loadArea(area: HelpArea): Promise<Map<string, HelpTopic>> {
   let p = cache.get(area);
   if (!p) {
-    p = LOADERS[area]().then((m) => new Map(m.TOPICS.map((x) => [x.id, x])));
+    p = LOADERS[area]().then(async (m) => {
+      hiFills.set(area, await withHindi(m.loadHi, (hi) => {
+        for (const x of m.TOPICS) x.hiTitle = hi[x.id] || x.hiTitle;
+      }));
+      return new Map(m.TOPICS.map((x) => [x.id, x]));
+    });
     p.catch(() => cache.delete(area));
     cache.set(area, p);
   }
@@ -98,8 +109,12 @@ export function helpFor(pathname: string, search = ''): Promise<HelpTopic | null
   return topicById(topicKey(pathname, search));
 }
 
-/** Every topic with its href (Help search; R6-B's palette "Help topics" group). */
-export async function helpIndex(): Promise<(HelpTopic & { href: string })[]> {
+/**
+ * Every topic with its href (Help search; R6-B's palette "Help topics" group). `hi`: also fetch the Hindi titles when
+ * the interface is in English (PERF-6: a search typed in Devanagari); offline without the pack they stay empty.
+ */
+export async function helpIndex({ hi = false }: { hi?: boolean } = {}): Promise<(HelpTopic & { href: string })[]> {
   const maps = await Promise.all(HELP_AREAS.map(loadArea));
+  if (hi) await Promise.all(HELP_AREAS.map((a) => hiFills.get(a)?.()));
   return maps.flatMap((m) => [...m.values()].map((x) => ({ ...x, href: hrefOfKey(x.id) })));
 }
