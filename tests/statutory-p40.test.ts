@@ -20,7 +20,7 @@ const H = (igst = 0, cgst = 0, sgst = 0, cess = 0): Heads => ({ igst, cgst, sgst
 const Z = H();
 
 function setoff(id: string, from: string, to: string, date: string, carry: Heads): GstSetOffRecord {
-  return { id, period_key: from.slice(0, 7), gstin: '27AAAAA0000A1Z5', from, to, date, due: '', voucher_id: '', voucher_number: '', liability: Z, rc_liability: Z, itc_used: Z, cash_tax: Z, interest: Z, late_fee: Z, itc_carry: carry };
+  return { id, period_key: from.slice(0, 7), gstin: '27AAAAA0000A1Z5', from, to, date, due: '', voucher_id: '', voucher_number: '', liability: Z, rc_liability: Z, itc_used: Z, cash_tax: Z, interest: Z, late_fee: Z, itc_carry: carry, created_at: '' };
 }
 function claim(p: Partial<GstRefundClaim>): GstRefundClaim {
   return { id: 'r', category: 'EXPORT_LUT_ITC', period_from: '2025-04-01', period_to: '2025-04-30', relevant_date: '2025-04-30', claimed: H(30000), status: 'FILED', history: [], gstin: '27AAAAA0000A1Z5', ...p };
