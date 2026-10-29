@@ -9,6 +9,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import tabStyles from './VendorsTab.module.css';
+import { useListKeys } from '../keys/use-list-keys'; // R20-D5
 
 export interface PurchasesTableProps {
   rows: PurchaseRecord[];
@@ -20,6 +21,8 @@ export interface PurchasesTableProps {
 
 export function PurchasesTable({ rows, today, onPay, onEdit, onDelete }: PurchasesTableProps) {
   useT(); // re-render on a language switch (5.4)
+  // R20-D5 (Tally keys): ↑ ↓ move, Enter opens the bill, Alt+D = the row's Delete button.
+  const list = useListKeys(rows.length, (i) => onEdit(rows[i]), { del: (i) => onDelete(rows[i]) });
   return (
     <div className={surface.tableWrap}>
       <table className={surface.table}>
@@ -35,13 +38,13 @@ export function PurchasesTable({ rows, today, onPay, onEdit, onDelete }: Purchas
             <th aria-label={purT('thActions')} />
           </tr>
         </thead>
-        <tbody>
-          {rows.map((p) => {
+        <tbody id={list.bodyId}>
+          {rows.map((p, i) => {
             const status = deriveStatus(p, today);
             const balance = balanceOf(p);
             const tax = p.cgst + p.sgst + p.igst;
             return (
-              <tr key={p.id}>
+              <tr key={p.id} {...list.row(i)}>
                 <td>
                   <div className={tabStyles.name}>
                     <span>{p.vendor_name || '—'}</span>

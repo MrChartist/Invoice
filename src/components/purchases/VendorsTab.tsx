@@ -28,6 +28,7 @@ import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import tabStyles from './VendorsTab.module.css';
 import { errText, libMsg } from '../../i18n/lib-msg';
+import { useListKeys } from '../keys/use-list-keys'; // R20-D5
 
 // R14 (PS-B2): "advocate / firm of advocates" tick (inward reverse charge on legal services) — one lazy row.
 const NettingLinkRow = lazy(() => import('../receivables/NettingDialog').then((m) => ({ default: m.NettingLinkRow }))); // R15-A3
@@ -48,6 +49,8 @@ export function VendorsTab({ vendors, purchases, onChanged }: VendorsTabProps) {
 
   const balances = useMemo(() => vendorBalances(purchases), [purchases]);
   const rows = useMemo(() => searchVendors(vendors, query), [vendors, query]);
+  // R20-D5 (Tally keys): ↑ ↓ move, Enter edits the supplier, Alt+D = the row's Delete button.
+  const list = useListKeys(rows.length, (i) => setEditing(rows[i]), { del: (i) => setDeleting(rows[i]) });
 
   return (
     <section className={surface.card}>
@@ -84,11 +87,11 @@ export function VendorsTab({ vendors, purchases, onChanged }: VendorsTabProps) {
                 <th aria-label={purT('thActions')} />
               </tr>
             </thead>
-            <tbody>
-              {rows.map((v) => {
+            <tbody id={list.bodyId}>
+              {rows.map((v, i) => {
                 const b = balances.get(v.id);
                 return (
-                  <tr key={v.id}>
+                  <tr key={v.id} {...list.row(i)}>
                     <td>
                       <div className={tabStyles.name}>
                         <Avatar name={v.name} size={28} square />

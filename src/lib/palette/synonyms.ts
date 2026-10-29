@@ -205,3 +205,18 @@ export const GST_GROUP_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
   recon: ['reconciliation', 'itc'],
   tools: ['gst tools'],
 };
+
+// R20-D: Tally names for Go To (Alt+G), keyed by the Gateway entry id (src/lib/gateway/menu.ts); the Gateway labels in
+// both languages and the entry's own keywords are searched too.
+export const GOTO_SYNONYMS: Readonly<Record<string, readonly string[]>> = {
+  daybook: ['daily entries', 'day register', 'रोज़नामचा'],
+  'm-daybook': ['daily entries', 'day register', 'रोज़नामचा'],
+  'm-tb': ['trial', 'tb', 'तलपट'],
+  'ib-godowns': ['warehouse summary', 'location summary', 'गोदाम'],
+  'ib-summary': ['stock summary', 'inventory', 'स्टॉक'],
+  'st-rec': ['outstanding', 'receivables', 'debtors', 'बकाया'],
+  'st-pay': ['outstanding', 'payables', 'creditors', 'देनदारी'],
+  'ab-cash': ['cash book', 'bank book', 'रोकड़'],
+  'ab-groups': ['group summary', 'groups'],
+  'ab-ledger': ['ledger', 'account books', 'खाता'],
+};

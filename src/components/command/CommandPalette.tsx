@@ -41,6 +41,7 @@ import { sfT } from '../../i18n/areas/smart-find';
 import { getLanguage } from '../../i18n';
 import type { HelpIndexRow } from './tab-destinations';
 import { openHelp } from '../../lib/help-event';
+import { navT } from '../../i18n/areas/keys-r20d'; // R20-D Go To mode
 import styles from './CommandPalette.module.css';
 
 export interface PaletteAction {
@@ -72,6 +73,8 @@ export interface CommandPaletteProps {
   actions?: PaletteAction[];
   /** Called with an href for page / invoice / client results. */
   onNavigate: (href: string) => void;
+  /** R20-D: Go To (Alt+G) / Switch To (Ctrl+G) — screens and reports only, Tally names, recents first. */
+  mode?: 'goto' | 'switch';
 }
 
 interface Option {
@@ -132,7 +135,7 @@ function iconFor(r: SearchResult, action?: PaletteAction, nav?: PaletteNavItem):
   }
 }
 
-export function CommandPalette({ open, onClose, navItems = [], actions = [], onNavigate }: CommandPaletteProps) {
+export function CommandPalette({ open, onClose, navItems = [], actions = [], onNavigate, mode }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const [recents, setRecents] = useState<string[]>([]);
@@ -233,6 +236,11 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
   }, [open, disc, helpRaw.length]);
   // QA7 G9: titles follow the language of each open (the raw index is loaded once).
   const helpEntries = useMemo(() => (open && disc ? disc.helpRows(helpRaw, getLanguage()) : []), [open, disc, helpRaw]);
+  // R20-D: the Gateway's screens and reports with their Tally names, loaded on the first Go To.
+  const [gotoRows, setGotoRows] = useState<StaticEntry[]>([]);
+  useEffect(() => {
+    if (open && mode && !gotoRows.length) import('../../lib/keys/nav-goto').then((m) => setGotoRows(m.gatewayGoto()), () => undefined);
+  }, [open, mode, gotoRows.length]);
   const actionById = useMemo(() => new Map(actions.map((a) => [a.id, a])), [actions]);
   const navByHref = useMemo(() => new Map(navItems.map((n) => [n.to, n])), [navItems]);
 
@@ -243,6 +251,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
     const q = text.trim();
     if (!q) {
       const base: Option[] = recents.map((text) => ({ key: `recent:${text}`, kind: 'recent', text }));
+      if (mode) return [...base, ...gotoRows.map((e): Option => ({ key: e.id, kind: 'result', result: { ...e, group: 'pages', score: 0, ranges: [] } }))];
       const staticRows: SearchResult[] = [
         ...actionEntries.map((e) => ({ ...e, group: 'actions' as SearchGroup, score: 0, ranges: [] as Range[] })),
         ...pageEntries.map((e) => ({ ...e, group: 'pages' as SearchGroup, score: 0, ranges: [] as Range[] })),
@@ -254,11 +263,12 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
       // R6-B1: "help <words>" / "? <words>" — help topics only.
       return disc.searchRows(asHelp[1], helpEntries, 8).map((r) => ({ key: r.id, kind: 'result' as const, result: r, section: labels.help }));
     }
-    const found = searchAll(q, {
-      data: { pages: [...pageEntries, ...tallyEntries, ...r2aEntries, ...r2cEntries, ...r2bEntries, ...r3aEntries, ...r3bEntries, ...r3cEntries, ...r4aEntries, ...r4bEntries, ...r4cEntries, ...packEntries], actions: actionEntries },
-      perGroup: 6,
+    let found = searchAll(q, {
+      data: { pages: [...gotoRows, ...pageEntries, ...tallyEntries, ...r2aEntries, ...r2cEntries, ...r2bEntries, ...r3aEntries, ...r3bEntries, ...r3cEntries, ...r4aEntries, ...r4bEntries, ...r4cEntries, ...packEntries], actions: mode ? [] : actionEntries },
+      perGroup: mode ? 12 : 6,
     });
-    if (allCompanies && peeked) for (const c of peeked) found.push(...searchPeek(q, c, c.data));
+    if (mode) found = found.filter((r) => r.group === 'pages');
+    else if (allCompanies && peeked) for (const c of peeked) found.push(...searchPeek(q, c, c.data));
     // Render order follows group relevance, so flatten through groupResults.
     const groups = groupResults(found).map((g) => g.items.map((r): Option => ({ key: r.id, kind: 'result', result: r })));
     if (disc && labels) {
@@ -272,7 +282,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
       if (feats.length) groups.push(feats);
     }
     return groups.flat();
-  }, [open, recents, pageEntries, tallyEntries, r2aEntries, r2cEntries, r2bEntries, r3aEntries, r3bEntries, r3cEntries, r4aEntries, r4bEntries, r4cEntries, packEntries, actionEntries, allCompanies, peeked, disc, labels, tabEntries, featureEntries, helpEntries]);
+  }, [open, recents, pageEntries, tallyEntries, r2aEntries, r2cEntries, r2bEntries, r3aEntries, r3bEntries, r3cEntries, r4aEntries, r4bEntries, r4cEntries, packEntries, actionEntries, allCompanies, peeked, disc, labels, tabEntries, featureEntries, helpEntries, mode, gotoRows]);
   const options = useMemo(() => optionsFor(searchQuery), [optionsFor, searchQuery]);
 
   // Reset on open; remember and restore focus.
@@ -407,9 +417,10 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
         className={styles.dialog}
         role="dialog"
         aria-modal="true"
-        aria-label="Command palette"
+        aria-label={mode ? navT(mode === 'goto' ? 'gotoTitle' : 'switchTitle') : 'Command palette'}
         onKeyDown={onKeyDown}
       >
+        {mode && <div className={styles.groupHead} data-testid="goto-title">{navT(mode === 'goto' ? 'gotoTitle' : 'switchTitle')}</div>}
         <div className={styles.searchRow}>
           <Search size={18} className={styles.searchIcon} aria-hidden="true" />
           <input
@@ -422,7 +433,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
             aria-autocomplete="list"
             aria-activedescendant={options.length ? optionId(clampedActive) : undefined}
             aria-label="Search invoices, bills, parties, payments, amounts, pages and actions"
-            placeholder="Find anything: invoices, bills, parties, UTR, ₹12.5k, >50k…"
+            placeholder={mode ? navT('gotoPh') : 'Find anything: invoices, bills, parties, UTR, ₹12.5k, >50k…'}
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
@@ -434,7 +445,7 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
           />
           <kbd className={styles.kbd}>Esc</kbd>
         </div>
-        {multiCompany && (
+        {multiCompany && !mode && (
           <label className={styles.emptyHint} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.25rem 1rem' }}>
             <input type="checkbox" checked={allCompanies} onChange={(e) => setAllCompanies(e.target.checked)} /> {sfT('allCompanies')}
           </label>

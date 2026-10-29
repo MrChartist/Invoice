@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { AlertOctagon, AlertTriangle, Bell, BellOff, CheckCheck, Clock, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { t } from '../../i18n';
@@ -25,6 +25,15 @@ import {
 } from '../../lib/notifications';
 import { BackupStatusLine } from '../pwa/BackupStatusLine';
 import styles from './NotificationBell.module.css';
+import { keysOn, subscribeKeys } from '../../lib/keys/stub';
+
+// R20-D: the Go To / Company / Data / Import sheets and their keys load with Tally keys on, hosted by the first bell
+// mounted (the bell is always mounted after first paint); Ctrl+Alt+N opens the visible bell through `openNotifications`.
+const MenuSheets = lazy(() => import('../keys/MenuSheets'));
+let hosted = false;
+const openers: Array<() => boolean> = [];
+/** R20-D3: open the list of the bell that is on screen and focus it. */
+export const openNotifications = (): void => void openers.some((f) => f());
 
 export interface NotificationBellProps {
   /** Called with a notification's `href` when its call-to-action is used. */
@@ -339,6 +348,16 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
+  const tallyOn = useSyncExternalStore(subscribeKeys, keysOn);
+  const [host, setHost] = useState(false);
+  useEffect(() => {
+    if (hosted) return;
+    hosted = true;
+    setHost(true); // eslint-disable-line react-hooks/set-state-in-effect
+    return () => {
+      hosted = false;
+    };
+  }, []);
 
   // PERF-1: every trigger (poll, focus, cross-tab change, a provider that finished loading) is coalesced
   // into ONE run on the next task; unchanged data reuses the providers' last result (`reusableVisibleNotifications`).
@@ -369,6 +388,18 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
       window.removeEventListener('storage', onStorage);
     };
   }, [bell, pollMs]);
+
+  useEffect(() => {
+    const f = () => {
+      if (!rootRef.current?.getClientRects().length) return false;
+      refresh();
+      setOpen(true);
+      setTimeout(() => panelRef.current?.focus());
+      return true;
+    };
+    openers.push(f);
+    return () => void openers.splice(openers.indexOf(f), 1);
+  }, [refresh]);
 
   // Close on outside click / Escape; return focus to the bell.
   useEffect(() => {
@@ -443,6 +474,7 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
           className={styles.panel}
           role="dialog"
           aria-label="Notifications"
+          tabIndex={-1}
         >
           <div className={styles.head}>
             <h2 className={styles.title}>Notifications</h2>
@@ -522,6 +554,7 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
           )}
         </div>
       )}
+      {host && tallyOn && <Suspense fallback={null}><MenuSheets openBell={openNotifications} /></Suspense>}
     </div>
   );
 }
