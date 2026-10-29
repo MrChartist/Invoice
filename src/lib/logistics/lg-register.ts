@@ -11,6 +11,7 @@ import type { LgJob } from '../../types/logistics-r19';
 import { round2 } from '../invoice-calc';
 import { keyedAt, CBLR_RULES } from '../logistics-rules';
 import { lgList } from '../../i18n/areas/logistics-r19a';
+import { lgcT } from '../../i18n/areas/logistics-r19c';
 import type { DepositBal } from './lg-deposits';
 import type { LgDisbRow } from './lg-disb';
 import { LG_STATUSES } from './lg-job';
@@ -74,7 +75,7 @@ export function docRefsFromTable(t: { headers: readonly string[]; rows: readonly
     const no = String(r[cn] ?? '').trim();
     const raw = String(r[cd] ?? '').trim();
     const d = raw ? toDay(raw) : '';
-    if (!j || !no || (raw && !d)) return void errors.push(`Row ${i + 2}: ${!j ? 'job not found' : !no ? 'no SB / BOE number' : 'date not read'}`);
+    if (!j || !no || (raw && !d)) return void errors.push(lgcT(!j ? 'rJob' : !no ? 'rNo' : 'rDate', { r: i + 2 }));
     const imp = j.dir === 'import';
     const igm = ci >= 0 ? String(r[ci] ?? '').trim() : '';
     ok.push({ id: j.id, refs: { ...j.refs, [imp ? 'boe_no' : 'sb_no']: no, ...(d ? { [imp ? 'boe_date' : 'sb_date']: d } : {}), ...(imp && igm ? { igm } : {}) } });

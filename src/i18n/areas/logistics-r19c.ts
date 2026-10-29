@@ -20,6 +20,8 @@ export const lgcT = defineArea(
     eAmount: 'Enter an amount above zero.', ePayee: 'Type who was paid.', eDate: 'Choose the date.', noInv: 'No issued rupee invoice of this job is open.', done: 'Saved.',
     importRefs: 'Import SB / BOE numbers (CSV)', imported: '{n} jobs updated.',
     seam: 'Billing → Bill job puts each unrecovered disbursement on the job\'s bill as a Rule 33 line.',
+    eWo: 'Give the date and a reason.', eNotOpen: 'Not an open disbursement.', eClient: 'Client not found.',
+    rJob: 'Row {r}: job not found', rNo: 'Row {r}: no SB / BOE number', rDate: 'Row {r}: date not read',
   } as const,
   {
     customs: 'सीमा शुल्क', job: 'जॉब', pick: 'एक जॉब चुनें।', disb: 'वितरण व्यय (डिस्बर्समेंट)', deps: 'ड्यूटी जमा', register: 'CB रजिस्टर (विनियम 10(k))',
@@ -35,6 +37,8 @@ export const lgcT = defineArea(
     eAmount: 'शून्य से अधिक राशि लिखें।', ePayee: 'किसे भुगतान किया, लिखें।', eDate: 'तिथि चुनें।', noInv: 'इस जॉब का कोई जारी रुपया बिल बकाया नहीं है।', done: 'सहेजा गया।',
     importRefs: 'SB / BOE नंबर आयात करें (CSV)', imported: '{n} जॉब अपडेट हुईं।',
     seam: 'बिलिंग → जॉब का बिल बनाएँ: हर न वसूला डिस्बर्समेंट नियम 33 पंक्ति के रूप में बिल पर जुड़ता है।',
+    eWo: 'तिथि और कारण लिखें।', eNotOpen: 'यह खुला डिस्बर्समेंट नहीं है।', eClient: 'ग्राहक नहीं मिला।',
+    rJob: 'पंक्ति {r}: जॉब नहीं मिली', rNo: 'पंक्ति {r}: SB / BOE नंबर नहीं', rDate: 'पंक्ति {r}: तिथि नहीं पढ़ी गई',
   },
 );
 

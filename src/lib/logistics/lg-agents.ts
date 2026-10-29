@@ -14,7 +14,7 @@ import type { PurchaseRecord, Vendor } from '../../types/purchases';
 import type { LgHeadKind, LgJob, LgMode } from '../../types/logistics-r19';
 import { lgRateFor, sacFor } from './lg-heads';
 import { lgdT } from '../../i18n/areas/logistics-r19d';
-import { lgDoc, periodOf, svcLine, type DocCtx } from './lg-doc';
+import { lgDoc, partyPos, periodOf, svcLine, type DocCtx } from './lg-doc';
 
 export type AgentKind = NonNullable<Vendor['lg']>['kind'];
 export const AGENT_KINDS: readonly AgentKind[] = ['agent', 'shipping_line', 'airline', 'co_loader', 'cfs', 'transporter', 'other'];
@@ -37,6 +37,12 @@ export function agentNote(i: NoteInput, ctx: DocCtx): InvoiceRecord {
   const head = headOf(i.kind, i.job);
   const name = i.kind === 'profit_share' ? 'Profit share' : i.kind === 'freight' ? 'Freight' : 'Other charges';
   const item = svcLine(name, jobText(i.job), i.amount, sacFor(head, ctx.date), lgRateFor(head, ctx.date, i.job?.legs)?.rate ?? 18);
+  // QA22 W4: an agent in India ("outside India" unticked) is billed as a domestic supply (Sec 12(2)), never as an export.
+  if (!i.agent.vendor.lg?.foreign) {
+    const c = i.agent.client, b2b = /^\d{2}[0-9A-Z]{13}$/i.test(c.gstin?.trim() ?? '');
+    return lgDoc(ctx, c, [item], partyPos(c, ctx.home), { currency: i.currency.toUpperCase(), ...(i.currency.toUpperCase() !== 'INR' ? { exchange_rate: i.rate } : {}), supply_type: b2b ? 'B2B' : 'B2C', notes: `${name} — ${jobText(i.job)}`.trim(),
+      lg: { ...(i.job ? { job_id: i.job.id, job_no: i.job.number } : {}), agent: { id: i.agent.vendor.id, name: i.agent.vendor.name, kind: i.kind }, regime: 'general', pos_reason: 'Place of supply: the recipient\'s location — Sec 12(2) IGST Act.' } });
+  }
   return lgDoc(ctx, i.agent.client, [item], '96', {
     currency: i.currency.toUpperCase(), exchange_rate: i.rate, supply_type: i.lut ? 'EXPORT_LUT' : 'EXPORT_WITH_PAYMENT', ...(i.lut ?? {}),
     notes: `${name} — ${jobText(i.job)}`.trim(),

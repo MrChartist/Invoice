@@ -106,7 +106,9 @@ export function courierBill(g: CourierGroup, ctx: DocCtx): InvoiceRecord {
   const items = g.dockets.map((d) => svcLine('Courier charges', [d.no, d.date.split('-').reverse().join('/'), d.zone, `${d.chargeable_kg} kg`, d.service !== 'standard' && d.service, d.status === 'rto' && 'RTO', d.dest_pin].filter(Boolean).join(' · '), d.charge, sac, rate));
   return lgDoc(ctx, g.client, items, g.intl ? '96' : partyPos(g.client, ctx.home), {
     notes: `Courier charges for ${g.m.period}: ${t.count} docket(s), ${t.kg} kg chargeable.`,
-    lg: { manifest_id: g.m.id, period: g.m.period, count: t.count, kg: t.kg, pos_reason: g.intl ? 'Place of supply: outside India (96), Sec 12(8) proviso IGST Act.' : 'Place of supply: Sec 12(8) IGST Act.' },
+    // QA22 W2: an international docket of a customer in India is export freight (POS 96, IGST) — the GST readers report it
+    // as a domestic supply (B2B / B2C with POS 96, LG15), never as an export in Table 6A.
+    lg: { manifest_id: g.m.id, period: g.m.period, count: t.count, kg: t.kg, ...(g.intl && !['96', '97', '99'].includes(String(g.client.state_code ?? '')) ? { regime: 'export_freight' } : {}), pos_reason: g.intl ? 'Place of supply: outside India (96), Sec 12(8) proviso IGST Act.' : 'Place of supply: Sec 12(8) IGST Act.' },
   });
 }
 

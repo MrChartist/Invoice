@@ -719,9 +719,10 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
 
   const st = rec.supply_type;
   const isSez = st === 'SEZ_WITH_PAYMENT' || st === 'SEZ_WITHOUT_PAYMENT';
-  // R19-B (LG15): export freight billed to a registered Indian recipient (POS 96 under the Sec 12(8) proviso) is B2B
-  // with POS 96 and IGST (Circular 184/16/2022-GST Sl. 4), not an export (Table 6A).
-  const freight96 = posRaw === '96' && rec.lg?.regime === 'export_freight' && checkGstin((rec.client?.gstin ?? '').trim().toUpperCase()).valid;
+  // R19-B (LG15): export freight billed to a recipient in India (POS 96 under the Sec 12(8) proviso) is a domestic
+  // supply with POS 96 and IGST (Circular 184/16/2022-GST Sl. 4), not an export (Table 6A): B2B with a GSTIN, else
+  // B2CL / B2CS (QA22 W1). A client coded "Other Country" stays an export.
+  const freight96 = posRaw === '96' && rec.lg?.regime === 'export_freight' && (checkGstin((rec.client?.gstin ?? '').trim().toUpperCase()).valid || !FOREIGN_POS.has(String(rec.client?.state_code ?? '').trim()));
   const isExport =
     (posRaw === '96' && !freight96) ||
     st === 'EXPORT_LUT' ||

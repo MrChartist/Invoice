@@ -852,7 +852,7 @@ below) whose findings were fixed with regression tests. Rows still open are in [
 | 18 | Co-operative housing societies, AOAs and RWAs | R18-A society core, R18-B billing run and GST (with `saveMany`), R18-C dues and collections, R18-D funds and statutory | `society-r18.md` | ✅ done (QA21) |
 | 19 | Freight forwarders, customs brokers (CHA), courier franchises, 3PL | LG-A … LG-D (job files, house-bill margin, CHA disbursements, courier dockets, storage billing) | `docs/prd/round-19.md` | 🟡 PRD drafted, being built |
 
-### QA rounds 7–21
+### QA rounds 7–22
 
 | QA round | Scope | Report | Fixes |
 |---|---|---|---|
@@ -871,6 +871,7 @@ below) whose findings were fixed with regression tests. Rows still open are in [
 | 19 | Round 16 platform (Hindi packs, safe groups, service worker) | `qa-round-19.md` | ✅ fixed in the loop (`tests/qa19-platform.test.ts`) |
 | 20 | Round 17 manpower | `qa-round-20.md` | ✅ fixed in the loop (`tests/qa20-manpower.test.ts`) |
 | 21 | Round 18 housing societies and the bulk save (`saveMany`) | `qa-round-21.md` | ✅ fixed in the loop (`tests/qa21-society.test.ts`) |
+| 22 | Round 19 logistics (forwarders, CHA, courier, agents) | `qa-round-22.md` | ✅ fixed in the loop (`tests/qa22-logistics.test.ts`) |
 
 Left-as-found items and cut features of these rounds are tracked in [`PENDING.md`](PENDING.md) §2 (closed ones in §6).
 
