@@ -29,7 +29,7 @@ import { parseSeries } from '../series-counters';
 import { withTablesRollback } from '../table-txn';
 import { round2 } from '../invoice-calc';
 import { isIssued, localDb } from '../localDb';
-import { purchasesDb } from '../purchases';
+import { purchasesDb, returnedQtyIssue } from '../purchases';
 import { BIN_RETENTION } from '../trade/trade-rules';
 import { PAYROLL_TABLES } from './payroll-tables';
 import { liveRedeemIssue } from '../retail/gift-voucher-core';
@@ -491,6 +491,20 @@ registerRestoreHook('invoices', (row, e, live) => {
   }
   const pv = cn && isObj(cn.pv) ? str(cn.pv.statement_id) : '';
   if (pv && !live('price_variations').some((x) => str(x?.id) === pv && str(x?.status) === 'billed' && str(x?.invoice_id) === e.row_id)) return { refuse: 'Its price variation statement was cancelled or billed again since. Bill the statement again in Time → Works → Escalation.' };
+  return null;
+});
+// QA23 W6 (PENDING 38 / 8.88): a goods debit note comes back only while each of its bills is live and still holds the
+// units it returned (a bill edited down after the note was deleted would otherwise show more returned than billed).
+registerRestoreHook('purchase_returns', (row, e, live) => {
+  if (!row.goods_returned) return null;
+  const ids = Array.isArray(row.bill_refs) ? row.bill_refs.map((b) => str(isObj(b) ? b.purchase_id : '')) : [str(row.purchase_id)];
+  const notes = [...live('purchase_returns').filter((n) => str(n?.id) !== e.row_id), row] as Parameters<typeof returnedQtyIssue>[1];
+  for (const id of ids.filter(Boolean)) {
+    const bill = live('purchases').find((b) => str(b?.id) === id);
+    if (!bill) return { refuse: `Its bill ${str(row.bill_number)} is no longer in the books. Restore the bill first.` };
+    const issue = returnedQtyIssue(bill as Parameters<typeof returnedQtyIssue>[0], notes);
+    if (issue) return { refuse: `${issue.replace(/ Delete the note first\.$/, '')} Raise a new note instead.` };
+  }
   return null;
 });
 registerRestoreHook('purchase_returns', (row, e, live) => {

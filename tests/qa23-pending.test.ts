@@ -16,6 +16,13 @@ import { localDb } from '../src/lib/localDb.ts';
 import { loadVouchers } from '../src/lib/ledger/vouchers.ts';
 import { A } from '../src/lib/ledger/accounts.ts';
 import { saveDonation } from '../src/lib/nonprofit/donations.ts';
+import { resetStorage } from './helpers/shim.ts';
+import { installSettings } from './helpers/world.ts';
+import { setActorProvider } from '../src/lib/access.ts';
+import { getTable, setTable } from '../src/lib/storage.ts';
+import { purchaseReturnsDb } from '../src/lib/purchase-returns.ts';
+import { purchasesDb, returnedQtyIssue } from '../src/lib/purchases.ts';
+import type { PurchaseRecord } from '../src/types/purchases.ts';
 
 test('W1: the cash forecast follows re-scheduled prepayments and leaves closed loans out', () => {
   const base = { principal: 500000, rate: 10.5, tenure_months: 36, first_emi: '2026-01-31' };
@@ -63,4 +70,40 @@ test('W4: a gift in kind is never journalised to cash / bank, and clearing its l
   const k2 = saveDonation({ ...k, kind_account_id: undefined }, 'Asha');
   assert.equal(k2.voucher_id, undefined);
   assert.equal(loadVouchers().some((v) => v.id === k.voucher_id), false, 'the old journal does not stay in the books');
+});
+
+const pBill = (id: string, date: string, qty: number): PurchaseRecord => ({
+  id, kind: 'PURCHASE', vendor_id: 'v-alpha', vendor_name: 'Alpha Pharma', bill_number: `A/${id}`, date, place_of_supply: '27', category: 'Purchases',
+  lines: [{ id: `l-${id}`, name: 'Paracetamol 500', quantity: qty, rate: 20, tax_rate: 12 }], taxable: qty * 20, cgst: qty * 1.2, sgst: qty * 1.2, igst: 0,
+  itc_eligible: true, total: qty * 22.4, amount_paid: 0,
+});
+
+test('W5: a bill covered by a multi-bill goods note can still be edited (only its own lines count)', () => {
+  setActorProvider(null);
+  resetStorage();
+  installSettings();
+  setTable('purchases', [pBill('b1', '2026-04-10', 10), pBill('b2', '2026-04-12', 5)]);
+  purchaseReturnsDb.createMulti({ date: '2026-05-10', reason: '01', goodsReturned: true, lines: [
+    { id: 'n1', purchase_id: 'b1', bill_line_id: 'l-b1', name: 'Paracetamol 500', quantity: 4, rate: 20, tax_rate: 12 },
+    { id: 'n2', purchase_id: 'b2', bill_line_id: 'l-b2', name: 'Paracetamol 500', quantity: 2, rate: 20, tax_rate: 12 },
+  ] });
+  const notes = purchaseReturnsDb.all();
+  assert.equal(returnedQtyIssue(purchasesDb.get('b2')!, notes), '', 'b1\'s returned line is not looked for on b2');
+  assert.match(returnedQtyIssue({ ...purchasesDb.get('b2')!, lines: [{ ...purchasesDb.get('b2')!.lines[0], quantity: 1 }] }, notes), /already returned/);
+});
+
+test('W6: a goods debit note is not restored from the bin onto a bill edited below what it returned', async () => {
+  const { restoreEntry } = await import('../src/lib/trust/recycle-bin.ts');
+  setActorProvider(null);
+  resetStorage();
+  installSettings();
+  setTable('purchases', [pBill('b1', '2026-04-10', 10)]);
+  const dn = purchaseReturnsDb.create({ kind: 'DEBIT_NOTE', date: '2026-05-10', purchaseId: 'b1', reason: '01', goodsReturned: true, lines: [{ id: 'n1', bill_line_id: 'l-b1', name: 'Paracetamol 500', quantity: 4, rate: 20, tax_rate: 12 }] });
+  purchaseReturnsDb.remove(dn.id);
+  await Promise.resolve();
+  const b = purchasesDb.get('b1')!;
+  purchasesDb.save({ ...b, lines: [{ ...b.lines[0], quantity: 2 }], taxable: 40, cgst: 2.4, sgst: 2.4, total: 44.8 });
+  const entry = getTable<{ id: string; table: string; row_id: string }>('recycle_bin').find((x) => x.table === 'purchase_returns' && x.row_id === dn.id);
+  assert.ok(entry, 'the note went to the bin');
+  assert.throws(() => restoreEntry(entry!.id), /already returned/);
 });
