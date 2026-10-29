@@ -222,6 +222,29 @@ transDocDate, tripSheetEwbBills: [{ ewbNo }] }] }` — **layout unverified** (`C
   unit. Rows: B2B / B2CL / B2CS / notes / exports / documents; 3.1(a) value and tax, 3.1(b), 3.1(d), 4A, 4B, 4C, cash.
   CSV. Documents without a sender GSTIN are counted under every GSTIN by the builder — warned.
 
+## PENDING 40 follow-ups (7.131)
+
+- **ITC refunds netted in the carried credit**: `creditLedgerRefundMoves(refunds)` (gst-cash-refunds.ts) turns ITC
+  refund claims (`ITC_REFUND_CATEGORIES`: export / SEZ under LUT, inverted duty) into dated credit-ledger moves — the
+  claim debited on its filing day (Rule 89(3)), the rejected part re-credited on the RFD-06 step (PMT-03), a
+  withdrawn claim re-credited on the withdrawal day. `carryForwardFor(setoffs, from, gstin, moves, upTo)` nets the
+  moves dated after the previous set-off's posting day and up to this period's own posting day (note `REFUND_NETTED`,
+  `refundNet`; floored at zero); `creditLedgerBalance(…, moves)` does the same for the "Credit ledger (carried)" stat
+  and the Rule 89(4) cap. Re-credit on a deficiency memo (Rule 90(3)) and re-filing are not modelled (CA G49).
+- **Books column on 9C Table 9** (`gstr9cBooksColumn`): the sales register by line rate (`taxByRate(salesDocs)`,
+  sales less credit notes, financial notes and foreign-currency documents left out) beside each outward rate row,
+  reverse-charge rows equal to the bills, "Difference" = books − documents, and a row for output tax in the books
+  (`gstSummary`) that is on no document line by rate (CA G50).
+
+Skipped, with reasons:
+- **ISD ledger postings** — whether ISD credit received is booked against a head-office / branch account or the
+  distributing registration's own ledger is an accounting judgement (CA G51); nothing is posted.
+- **GSTR-6 amendments** (Tables 6 / 7 / 9) — the amendment tables' layout could not be read from a primary source.
+- **GSTR-9 Part V Table 13** — the app claims every bill's ITC in the month of its date and keeps no "claimed in
+  period" record or stored GSTR-2B history, so it has nothing to put there beyond nil; enter it on the portal.
+- **Operator-side GSTR-1 Table 15 / GSTR-3B 3.1.1(i)** — the app has no record of other suppliers' sales through an
+  own platform (no invoice field for "supplied by X through us under 9(5)", and the editor is owned by Round 20).
+
 ## Wiring for the lead
 
 Nothing in the shell: the tabs live inside the existing lazy GST reports page (`src/pages/GstReports.tsx`, `TABS` +
@@ -264,10 +287,11 @@ default rate now fills invoice / bill lines when an HSN is typed (`src/lib/hsn-d
   credit ledger: credit used outside the app, or periods never posted, are not known to it.
 - (7R closed: PMT-09 and refund claims, ISD / GSTR-6, consolidated e-Way, cess on supplier notes, signed 4C in the 3B
   JSON, `gst_summary` cess, 9C Table 12 split / rate-wise Table 9 / Table 14. EXPA was built earlier — `gst-reports.md`.)
-- Refund of IGST on exports of goods with payment (shipping bill route) is not an RFD-01 claim and is not tracked;
-  provisional-refund 90% and Sec 56 interest are estimates; the credit ledger is debited for ITC refunds only in the
-  posting when paid (the carried credit in the set-off plan does not yet net filed ITC refund claims).
-- ISD: no ledger postings; the Rule 39 turnover basis is typed; Table 6 / 7 / 9 amendments of GSTR-6 not built.
-- 9C rate-wise Table 9 has no books column (documents vs GSTR-9 only); Table 14 heads are a keyword mapping.
+- Refund of IGST on exports of goods with payment (shipping bill route) is tracked as an export-incentive row (R4-C2);
+  provisional-refund 90% and Sec 56 interest are estimates. (PENDING 40: filed ITC refund claims are now netted in
+  the carried credit.)
+- ISD: no ledger postings (CA G51); the Rule 39 turnover basis is typed; Table 6 / 7 / 9 amendments of GSTR-6 not
+  built (layout not verified).
+- 9C Table 14 heads are a keyword mapping. (PENDING 40: rate-wise Table 9 has a books column.)
 - ~~HSN master defaults are not yet applied automatically in the invoice / bill line editors (`resolveGstRate` is ready
   for them).~~ Done: `useHsnDefaultRate` in the invoice editor and `hsn-defaults` in `BillModal.tsx` (stale note struck by R6-C6).

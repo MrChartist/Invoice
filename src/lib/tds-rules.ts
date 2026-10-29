@@ -306,6 +306,38 @@ export const NR_ACT_RATE_RULES: readonly Versioned<NrActRates>[] = [
   { from: '2024-04-01', value: { ROYALTY: 20, FTS: 20, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 35, cessPct: 4 }, source: 'Finance (No. 2) Act 2024 (foreign company 35%) — verify' },
 ];
 
+/**
+ * PENDING 40 (7.131): surcharge on tax deducted from a NON-RESIDENT (First Schedule Part II of each Finance Act,
+ * "rates for deduction of income-tax at source in certain cases"), % of the tax, chosen by the income or aggregate
+ * of income paid or likely to be paid and subject to deduction. Slabs `[above ₹, %]`, highest first; `other` =
+ * individual / HUF / AOP / BOI, `firm` = firm / co-operative society, `company` = foreign company. Not on a DTAA
+ * rate. The 15% cap on dividend / capital-gains income and any regime-based cap are not modelled. Read from
+ * secondary summaries of the Finance Acts, not the enacted Part II: UNVERIFIED — verify with your CA. Append-only.
+ */
+export interface NrSurcharge { other: readonly (readonly [number, number])[]; firm: readonly (readonly [number, number])[]; company: readonly (readonly [number, number])[] }
+
+const NR_SC_FIRM_CO = { firm: [[1e7, 12]], company: [[1e8, 5], [1e7, 2]] } as const;
+export const NR_SURCHARGE_RULES: readonly Versioned<NrSurcharge>[] = [
+  { from: '2017-07-01', value: { other: [[1e7, 15], [5e6, 10]], ...NR_SC_FIRM_CO }, source: 'Finance Act 2017 First Schedule Part II as summarised — verify', verified: false },
+  { from: '2019-04-01', value: { other: [[5e7, 37], [2e7, 25], [1e7, 15], [5e6, 10]], ...NR_SC_FIRM_CO }, source: 'Finance (No. 2) Act 2019 First Schedule Part II as summarised — verify', verified: false },
+];
+
+/**
+ * PENDING 40: Form 15CA Part A limit — a chargeable remittance needs only Part A while the payee's remittances in
+ * the FY do not exceed it; above it, Part C with a Form 15CB (Rule 37BB as substituted by Notification 93/2015,
+ * from 1 Apr 2016, as understood — not read in the gazette text: verify). Append-only.
+ */
+export const FORM15CA_RULES: readonly Versioned<{ partALimit: number }>[] = [
+  { from: '2016-04-01', value: { partALimit: 500000 }, source: 'Rule 37BB (Notification 93/2015) as summarised — verify', verified: false },
+];
+
+/** Surcharge % on a non-resident's TDS for an aggregate of `aggregate` ₹ in the FY (0 below the first slab). */
+export function nrSurchargePct(deductee: DeducteeType | undefined, aggregate: number, date?: string): number {
+  const r = ruleAt(NR_SURCHARGE_RULES, date);
+  const slabs = deductee === 'COMPANY' ? r.company : deductee === 'FIRM' ? r.firm : r.other;
+  return slabs.find(([above]) => aggregate > above)?.[1] ?? 0;
+}
+
 /** Act rate for a non-resident payment: the base rate and the effective rate with cess (2 decimals). */
 export function nrActRate(nature: NrNature, date?: string, deductee?: DeducteeType): { rate: number; base: number; cessPct: number } {
   const r = ruleAt(NR_ACT_RATE_RULES, date);

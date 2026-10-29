@@ -463,6 +463,9 @@ export function clientToParty(c: Partial<Client>): Partial<Client> {
     state_code: c.state_code ?? '',
     zip: c.zip ?? '',
     gstin: c.gstin ?? '',
+    // QA23 W2 (8.66): composition dealer / UIN holder — GSTR-1 / 3B Table 3.2 read it from the document's snapshot.
+    // Always set (undefined clears the previous client's kind when another client is picked).
+    gst_reg_type: c.gst_reg_type,
     // Party custom-field values (6.23): the store copies them into the document snapshot and
     // never keeps this map on the invoice's client copy.
     custom_fields: c.custom_fields ?? {},

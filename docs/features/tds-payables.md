@@ -119,9 +119,28 @@ TRACES file is **not verified**.
   at the exchange rate — no Books import, so the bell chunk stays small) feed `businessNotices({ tcsDue })`; the bell
   provider loads once an invoice carries TCS.
 
+## 27Q follow-ups (PENDING 40, 7.131)
+- **Surcharge** (`NR_SURCHARGE_RULES`, `nrSurchargePct` in `tds-rules.ts`; `verified: false`): % of the tax by the
+  payee's income subject to deduction in the FY (`nrAggregates` over the FY's register rows — the paper and the tab
+  pass the whole FY): individual / HUF / AOP 10% > ₹50 lakh, 15% > ₹1 crore, 25% > ₹2 crore, 37% > ₹5 crore (from
+  FY 2019-20; 10 / 15% before); firm 12% > ₹1 crore; foreign company 2% > ₹1 crore, 5% > ₹10 crore. Applied on the
+  Act rate only (`actRate` = base × (1 + SC) × (1 + cess)); never on a DTAA or Sec 206AA rate. The 27Q deductee rows
+  split the TDS into tax / surcharge / cess. The 15% cap on dividends / capital gains is not modelled (CA T27).
+- **Sec 195A grossing-up**: vendor tick "We bear the tax" (`Vendor.nr_tax_borne`, additive). The amount credited is
+  the net; `grossUp195A(net, rate)` = net × 100 ÷ (100 − rate), rupee-rounded; the required TDS and the 27Q "amount
+  paid / credited" use the grossed figure, re-checked against the surcharge slab after grossing (CA T28).
+- **Form 15CA / 15CB** (`form15caPlan`, Rule 37BB as understood; `FORM15CA_RULES` ₹5 lakh Part A limit from 1 Apr
+  2016, `verified: false`): Part D when the rate that applies is nil, Part B with a Sec 197 / 195(2) certificate
+  number, Part A while the payee's FY remittances (this one included) stay within the limit, else Part C after a
+  Form 15CB. Shown as a table on the Form 27Q tab and as the last column of the 27Q paper. The Rule 37BB(3)
+  specified list (no form) is not modelled. Rules-2026 labels Form 145 / 146 through `ita2025.ts` (`verified: false`,
+  CA T29); Sec 195A's 2025-Act provision is not confirmed (label "provision to confirm").
+- **TRACES flags in the Deductions tab**: open justification findings matched to a register row show under the
+  payee ("TRACES: Short deduction, …", `flagsByKey`).
+
 ## Open items
-Form 15CA / 15CB, surcharge and Sec 195A grossing-up on 27Q; TDS 27Q FVU text layout; justification findings shown in
-the Deductions tab itself (the TRACES tab lists them); 194-O Aadhaar in place of PAN.
+TDS 27Q FVU text file — **skipped**: the NSDL / Protean FVU file format cannot be read or validated here, so the app
+keeps the RPU-column working paper (import through the RPU, validate with the FVU). 194-O Aadhaar in place of PAN.
 
 ## Statutory values to verify (`src/lib/tds-rules.ts`)
 194C ₹30k / ₹1L; 194J ₹30k → ₹50k (1 Apr 2025); 194I ₹1.8L → ₹2.4L (1 Apr 2019) → ₹50k/month (1 Apr 2025); 194H ₹15k →
