@@ -22,6 +22,7 @@ import { cleanVendorTds, deducteeTypeFromPan, vendorTdsProblem } from '../../lib
 import { DEDUCTEE_TYPES, TDS_PAYABLE_SECTIONS, type DeducteeType } from '../../lib/tds-rules';
 import { o7T } from '../../i18n/areas/gst-tds-7o';
 import { r7T } from '../../i18n/areas/gst-tds-7r';
+import { p40T } from '../../i18n/areas/statutory-p40';
 import { tdsT } from '../../i18n/areas/tds';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
@@ -365,6 +366,9 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
             </label>
             <label className={controls.check}>
               <input type="checkbox" checked={!!draft.nr_no_pe} onChange={(e) => set({ nr_no_pe: e.target.checked })} /> {r7T('vNrNoPe')}
+            </label>
+            <label className={controls.check}>
+              <input type="checkbox" checked={!!draft.nr_tax_borne} onChange={(e) => set({ nr_tax_borne: e.target.checked })} /> {p40T('vNrTaxBorne')}
             </label>
             <span className={controls.hint}>{r7T('vNrHint')}</span>
           </div>

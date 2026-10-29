@@ -64,6 +64,8 @@ export const ACT_REF_RULES: Readonly<Record<string, readonly Versioned<ActRef>[]
   '194IB': refRules('194-IB', T393('2(i)'), false, `${BILL_TABLE}; Form 141 list`),
   '194M': refRules('194M', T393('6(ii)'), false, `${BILL_TABLE}; Form 141 list`),
   '195': refRules('195', 'Sec 393(2) [Table: Sl. No. 17]', false, BILL_TABLE),
+  // PENDING 40: grossing-up when the payer bears the tax — the 2025-Act provision was not found in the sources read.
+  '195A': refRules('195A', 'Sec 393 [grossing-up: provision to confirm]', false, 'Not found in the sources read (P40) — verify'),
   // TCS: Sec 394 is stated in the CBDT FAQ (Q18); the table item is the Bill's — verify.
   '206C1G': refRules('206C(1G)', 'Sec 394(1) [Table: Sl. No. 7]', false, `${OFFICIAL_FAQ}, Q18 (Sec 394); ${BILL_TABLE}`),
   // 206C(1H) was omitted from 1 Apr 2025 (Finance Act 2025): no 2025-Act counterpart.
@@ -176,7 +178,7 @@ export function withActRef(label: string, code: string | undefined, date?: strin
 /* ── Forms ─────────────────────────────────────────────────────── */
 
 /** Form keys the app names (stored return-mark ids keep '26Q' / '27EQ' / '27Q'). */
-export type ActForm = '24Q' | '26Q' | '27Q' | '27EQ' | '16' | '12BA' | '16A' | '27D' | '26AS' | '10BD' | '10BE' | '15G/15H' | '26QB-QE';
+export type ActForm = '24Q' | '26Q' | '27Q' | '27EQ' | '16' | '12BA' | '16A' | '27D' | '26AS' | '10BD' | '10BE' | '15G/15H' | '26QB-QE' | '15CA' | '15CB';
 
 export interface FormRef {
   act: 1961 | 2025;
@@ -214,6 +216,9 @@ export const FORM_REF_RULES: Readonly<Record<ActForm, readonly Versioned<FormRef
   '10BE': formRules('10BE', '114', true, 'Form mapping guide, ITA 1961 → 2025 (incometax.gov.in)'),
   '15G/15H': formRules('15G/15H', '121', true, 'Form mapping guide, ITA 1961 → 2025 (incometax.gov.in)'),
   '26QB-QE': formRules('26QB-QE', '141', true, `${OFFICIAL_FAQ}, Q9; form mapping guide`),
+  // PENDING 40: remittances to non-residents (Rule 37BB) — Rules-2026 numbers as reported in secondary sources.
+  '15CA': formRules('15CA', '145', false, 'Income-tax Rules 2026 form list as reported (secondary) — verify'),
+  '15CB': formRules('15CB', '146', false, 'Income-tax Rules 2026 form list as reported (secondary) — verify'),
 };
 
 export function formRef(form: ActForm, date?: string): FormRef {
