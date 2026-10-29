@@ -3,7 +3,7 @@
  * rows shown, one polite live region), the Ctrl+F filter sheet, the Ctrl+J exceptions sheet (default export, mounted
  * by `ReportStrip`, lib/keys/report-keys.ts) and the Ctrl+H / Ctrl+L saved-views sheet (`ViewsSheet`, mounted by PeriodBar).
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useT } from '../../i18n';
 import { repKeysT } from '../../i18n/areas/keys-r20c';
@@ -14,7 +14,17 @@ import { getAllReportPrefs } from '../../lib/report-prefs';
 import type { LiveReport } from '../../lib/keys/report-keys';
 import { Modal } from '../ui/Modal';
 import controls from '../../styles/controls.module.css';
-import s from './report-keys.module.css';
+import lg from '../books/ledger/ledger.module.css';
+
+// Inline styles: no stylesheet of its own (a new CSS file would join every report route's preload list).
+const s = {
+  strip: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.375rem 0.75rem', marginTop: '0.5rem', padding: '0.5rem 0.75rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--card)', fontSize: 'var(--text-sm)' },
+  chip: { display: 'inline-flex', alignItems: 'center', gap: '0.375rem' },
+  totals: { marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' },
+  form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(10rem, 1fr))', gap: '0.75rem' },
+  list: { display: 'grid', gap: '0.375rem', margin: 0, padding: 0, listStyle: 'none' },
+  item: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' },
+} as const satisfies Record<string, CSSProperties>;
 
 const money = (p: number) => formatMoney(p / 100);
 const T = repKeysT;
@@ -28,35 +38,35 @@ export default function ReportPanel({ live }: { live: LiveReport }) {
   const tot = totalsOf(facts, ticked.length ? ticked : shown);
   const hidden = tools.hid.flat().length;
   const btn = (label: string, on: () => void) => (
-    <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={on}>{label}</button>
+    <button type="button" className={`${controls.btnGhost} ${controls.btnSm} no-print`} onClick={on}>{label}</button>
   );
   return (
     <>
       {(tools.filter || ticked.length > 0 || hidden > 0) && (
-        <div className={s.strip} role="status" aria-live="polite" data-report-strip>
+        <div style={s.strip} role="status" aria-live="polite" data-report-strip>
           {tools.filter && (
-            <span className={s.chip}>
+            <span style={s.chip}>
               {T('filtered', { n: shown.length, total: count })}
               {btn(T('clear'), () => live.set((t) => ({ ...t, filter: null, match: null })))}
             </span>
           )}
           {ticked.length > 0 && (
-            <span className={s.chip}>
+            <span style={s.chip}>
               {T('selected', { n: ticked.length })}
               {btn(T('untick'), () => live.set((t) => ({ ...t, sel: [] })))}
             </span>
           )}
           {hidden > 0 && (
-            <span className={s.chip} data-hidden-count={hidden}>
+            <span style={s.chip} data-hidden-count={hidden}>
               {T('hidden', { n: hidden })}
               {btn(T('showAll'), () => live.set((t) => ({ ...t, hid: [] })))}
             </span>
           )}
-          <span className={s.totals} data-shown-totals>
+          <span style={s.totals} data-shown-totals>
             {ticked.length ? T('selected', { n: ticked.length }) : T('shownTotals')}: Dr {money(tot.dr)} · Cr {money(tot.cr)} · {T('net')}{' '}
             {money(Math.abs(tot.net))} {tot.net < 0 ? 'Cr' : 'Dr'}
           </span>
-          {hidden > 0 && <span className={s.printOnly}>{T('hideNote')}</span>}
+          {hidden > 0 && <span className={lg.printTitle}>{T('hideNote')}</span>}
         </div>
       )}
       {live.sheet === 'filter' && <FilterSheet live={live} />}
@@ -104,7 +114,7 @@ function FilterSheet({ live }: { live: LiveReport }) {
         </>
       }
     >
-      <form className={s.form} onSubmit={(e) => (e.preventDefault(), apply())}>
+      <form style={s.form} onSubmit={(e) => (e.preventDefault(), apply())}>
         {box('min', T('amtFrom'), 'number')}
         {box('max', T('amtTo'), 'number')}
         {box('text', T('text'))}
@@ -134,9 +144,9 @@ function ExceptSheet({ live }: { live: LiveReport }) {
       {rows.length === 0 ? (
         <p>{T('exceptNone')}</p>
       ) : (
-        <ul className={s.list} data-except-list>
+        <ul style={s.list} data-except-list>
           {rows.map((r, i) => (
-            <li key={i}>
+            <li key={i} style={s.item}>
               <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => navigate(`/books?tab=ledger&acct=${encodeURIComponent(r.accountId)}${r.party ? `&party=${encodeURIComponent(r.party)}` : ''}`)}>
                 {r.party ? `${r.label} — ${r.party}` : r.label}
               </button>
@@ -182,7 +192,7 @@ export function ViewsSheet({ route, tab, preset, period, onClose }: {
   };
   return (
     <Modal open onClose={onClose} title={T('viewsTitle')} subtitle={T('viewsSub')}>
-      <form className={s.form} onSubmit={(e) => (e.preventDefault(), name.trim() && save())}>
+      <form style={s.form} onSubmit={(e) => (e.preventDefault(), name.trim() && save())}>
         <label className={controls.field}>
           <span className={controls.label}>{T('viewName')}</span>
           <input className={controls.input} value={name} onChange={(e) => setName(e.target.value)} data-autofocus data-view-name />
@@ -193,9 +203,9 @@ export function ViewsSheet({ route, tab, preset, period, onClose }: {
       {mine.length === 0 ? (
         <p>{T('noViews')}</p>
       ) : (
-        <ul className={s.list} data-views-list>
+        <ul style={s.list} data-views-list>
           {mine.map((v) => (
-            <li key={v.id}>
+            <li key={v.id} style={s.item}>
               <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => open(v)}>{v.name}</button>
               {v.default ? (
                 <span>{T('isDefault')}</span>

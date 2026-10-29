@@ -21,7 +21,6 @@ import {
 } from '../../../lib/keys/report-actions';
 import { EnvContext } from './report-env';
 import surface from '../../../styles/surface.module.css';
-import rk from '../../keys/report-keys.module.css';
 import styles from './ledger.module.css';
 
 export interface DrillFrame {
@@ -135,11 +134,6 @@ export function useDrillRows(count: number, onActivate: (index: number) => void,
     if (t && !typing(document.activeElement) && !dialogOpen()) t.focus({ preventScroll: true });
   }, [bodyId]);
 
-  // The tick column shows while rows are ticked (on the body, so callers keep `id={nav.bodyId}`).
-  useEffect(() => {
-    document.getElementById(bodyId)?.classList.toggle(rk.ticking, tools.sel.length > 0);
-  }, [bodyId, tools.sel.length]);
-
   // The "what you see" strip and sheets follow the report that was last acted on.
   useEffect(() => {
     if (toolsActive(tools) || sheet) putLive(self.current);
@@ -251,7 +245,8 @@ export function useDrillRows(count: number, onActivate: (index: number) => void,
       'data-selected': i === sel ? 'true' : undefined,
       'aria-selected': tools.sel.length ? tools.sel.includes(i) : undefined,
       hidden: hid.has(i) || (tools.match ? !tools.match.includes(i) : undefined) || undefined,
-      className: [i === sel ? styles.rowSel : '', tools.sel.includes(i) ? rk.tick : ''].filter(Boolean).join(' ') || undefined,
+      // Ticked rows share the cursor's highlight (aria-selected says which); the strip counts them.
+      className: i === sel || tools.sel.includes(i) ? styles.rowSel : undefined,
       onClick: (e: React.MouseEvent) => {
         setSelected(i);
         // Ctrl / ⌘ + click ticks the row (the mouse twin of Space).

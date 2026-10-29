@@ -203,14 +203,14 @@ cancel (no cancelled state for a voucher without a data change). Tests: `tests/k
 ## R20-C — report keys
 
 Built on every Books report that uses `useDrillRows` (trial balance, P&L, balance sheet, group summary, registers,
-Day Book, group / ledger vouchers, the Reports hub) and on the Gateway Display viewer. All work only with Tally keys on
+Day Book, group / ledger vouchers, the Reports hub). All work only with Tally keys on
 (rows `pkg: 'C'`, none global, so `KEY_CLAIMS` is unchanged) and are **never saved** except views (PRD Q7).
 
 | Key | What | Where it lives |
 |---|---|---|
 | Ctrl+F / Alt+F12 | Filter sheet: amount from / up to, party / ledger text, Dr / Cr side, and on voucher reports date from / to and narration. A strip under the report: "Filtered: n of m rows · Clear"; Esc on the report clears it | `filterRows` (`src/lib/keys/report-actions.ts`), `ReportSheets.tsx` |
 | (Ctrl+F12) | "Totals of what you see" (Dr, Cr, net) whenever rows are filtered, ticked or hidden; ticked rows total on their own. A parent row followed by its own shown child is not counted twice | `totalsOf` |
-| Space, Shift+↑ / ↓, Ctrl+Alt+I | Tick rows (a ☐ / ☑ column shows while any row is ticked; Ctrl / ⌘ + click is the mouse twin), extend, invert | `useDrillRows` |
+| Space, Shift+↑ / ↓, Ctrl+Alt+I | Tick rows (ticked rows take the cursor's highlight and `aria-selected`; the strip counts them; Ctrl / ⌘ + click is the mouse twin), extend, invert | `useDrillRows` |
 | Ctrl+R, Ctrl+U, Alt+U | Hide the ticked (else the focused) rows; restore the last batch / all. ↑ ↓ skip hidden rows; print leaves them out with a note; the Day Book CSV exports only the shown rows | `hideRows`, `unhideLast`, `unhideAll` |
 | Ctrl+H / Ctrl+L | Saved-views sheet (8G storage, `mrchartist_report_views`): open, delete, "Open by default" (additive `default` flag, one per screen + tab, applied by PeriodBar on arrival), save this view with the name box focused | `ViewsSheet`, `setDefaultView` / `defaultView` (`report-views.ts`) |
 | + / − (] / [) | Step the report period: a month / quarter / FY by the preset; a custom range of whole months by its months, else by its days | `stepPeriod`, `PeriodBar.tsx` |
@@ -228,7 +228,7 @@ Day Book, group / ledger vouchers, the Reports hub) and on the Gateway Display v
 is on screen. Report parts join the keys with `useReportKeys(scope, el, handlers)` (`src/lib/keys/report-keys.ts`):
 one registration per scope, and a key goes to the visible part holding the focus, else the newest visible one, so a
 report hidden under a drill level never answers. The strip mounts through `ReportStrip` (`report-keys.ts`;
-DrillStack, Day Book and the Gateway viewer render one).
+DrillStack and the Day Book render one).
 
 **Held / cut.** `HELD` in `registry.ts` keeps built-package rows hidden: `delete.row`, `cancel.row` (Alt+D / Alt+X from
 a report row: B's `deleteEntry` / `cancelEntry` are there, but a report row needs the Y / N confirm, the reason box, the
@@ -236,12 +236,11 @@ Undo toast and a ledger refresh of the open report — a follow-up; remove the i
 live: it opens B's `duplicateRoute` for a manual voucher or a sales document. Cut: `basis` (Ctrl+B, cut 3: including
 optional / post-dated vouchers needs a ledger-build change outside C's files) and `share` / `share.alias` (Ctrl+M /
 Ctrl+Alt+W: no report has a share sheet to press).
-Also left out: C8 bank / GST report F-keys (cut 1), the red exception count chip, "Show original" in the views sheet,
+Also left out: the Gateway Display viewer (its own row model and keys; cut at the 7 kB cap — Books reports carry
+every key), C8 bank / GST report F-keys (cut 1), the red exception count chip, "Show original" in the views sheet,
 long-press ticking on touch (the Key bar's "Tick a row" and Ctrl / ⌘ + click are the twins).
 
 Tests: `tests/keys-report-actions.test.ts` (filter, totals, ticks / hide, period stepping, default view, held rows), e2e
 step "R20-C" in `tests/e2e/smoke.mjs` (TB: Ctrl+F chip and Esc, Space ×2 strip, Ctrl+R / Ctrl+U, Ctrl+L view, Ctrl+E CSV, +).
 
-R20-C sizes (gzip, on `91c4ebc`): first paint 177.9 → 177.9 kB (0); core 3,254.1 → 3,260.7 kB (**+6.6 kB**, cap 7: `f-keys`
-+≈1.8 for `report-actions` / `report-keys` / the strip / `keys-r20c`, `ReportSheets` chunk 2.1, the rest in LedgerPanel,
-PeriodBar, DisplayReport, `report-views` and the CSS module); Hindi pack 373.2 → 373.8 kB; Hindi in core 21.8 kB (0).
+R20-C sizes (gzip, against master `bef8125`, both built here): SIZES_TBD

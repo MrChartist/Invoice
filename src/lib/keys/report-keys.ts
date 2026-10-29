@@ -1,5 +1,5 @@
 /**
- * R20-C: report key plumbing shared by the report screens (drill-hooks, ReportToolbar, PeriodBar, the Gateway viewer):
+ * R20-C: report key plumbing shared by the report screens (drill-hooks, ReportToolbar, PeriodBar):
  * `useReportKeys` joins a report part to one key registration per scope, and the "live report" store feeds the
  * "what you see" strip (`ReportStrip` below, sheets in components/keys/ReportSheets.tsx).
  */
@@ -85,7 +85,7 @@ const ReportPanel = lazy(() => import('../../components/keys/ReportSheets'));
 
 /**
  * Where a report's filter / ticks / hidden-rows strip shows: under the report it belongs to (the live report's table
- * sits inside this strip's parent). DrillStack mounts one; the Day Book and the Gateway viewer mount their own.
+ * sits inside this strip's parent). DrillStack mounts one; the Day Book mounts its own.
  */
 export function ReportStrip() {
   const live = useSyncExternalStore(subscribeLive, liveReport);

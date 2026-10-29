@@ -12,9 +12,6 @@ import { isScreenId } from '../../lib/gateway/menu';
 import { cn, formatDate, formatMoney } from '../../lib/utils';
 import { isTypingTarget } from '../../hooks/useHotkeys';
 import { useGateway, useGatewaySession, useScreenKeys } from './context';
-import { NO_TOOLS, hideRows, invertSel, shownRows, toggleSel, toolsActive, unhideAll, unhideLast, type RowFact, type RowTools } from '../../lib/keys/report-actions';
-import { ReportStrip, liveReport, putLive, useReportKeys, type LiveReport } from '../../lib/keys/report-keys';
-import rk from '../keys/report-keys.module.css';
 import { ButtonBar } from './ButtonBar';
 import styles from './Gateway.module.css';
 
@@ -64,16 +61,6 @@ function frameTitle(f: DisplayFrame, report: ReportId): string {
 
 const rowLabel = (r: DisplayRow) => (typeof r.label === 'string' ? r.label : gwT(r.label.key));
 
-/** R20-C: what the filter / totals read from a Display row (last amount, credit columns negative, any date cell). */
-function factOf(f: DisplayFrame, r: DisplayRow): RowFact {
-  const out: RowFact = { text: [rowLabel(r), ...r.cells.filter((c) => typeof c === 'string')].join(' '), amt: 0, depth: r.heading ? -1 : r.level };
-  [rowLabel(r), ...r.cells].forEach((c, k) => {
-    if (typeof c === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c)) out.date = c;
-    if (k && typeof c === 'number' && c) out.amt = f.columns[k]?.key === 'credit' ? -c : c;
-  });
-  return out;
-}
-
 /**
  * Gateway "Display" reports with drill-down: Enter goes one level in (group → ledgers → parties →
  * months → vouchers → voucher / document), Esc one level out, keeping the selected line.
@@ -107,17 +94,8 @@ export function DisplayReport() {
   }, [ledger, report, path, period, today, account, stock, branchId]);
 
   const rows = frame?.rows ?? [];
+  const focusable = rows.map((r, i) => (r.heading ? -1 : i)).filter((i) => i >= 0);
   const key = location.search;
-  // R20-C (Tally keys): Ctrl+F filter, Space ticks, Ctrl+R hides, Ctrl+U / Alt+U restore, Ctrl+P prints; per visit.
-  const [tools, setTools] = useState<RowTools>(NO_TOOLS);
-  const [sheet, setSheet] = useState<LiveReport['sheet']>('');
-  const [toolsKey, setToolsKey] = useState(key);
-  if (toolsKey !== key) {
-    setToolsKey(key);
-    setTools(NO_TOOLS);
-  }
-  const shown = new Set(shownRows(rows.length, tools));
-  const focusable = rows.map((r, i) => (r.heading || !shown.has(i) ? -1 : i)).filter((i) => i >= 0);
   const [sel, setSel] = useState(() => memory.get(key) ?? focusable[0] ?? 0);
   const [shownKey, setShownKey] = useState(key);
   if (shownKey !== key) {
@@ -195,36 +173,11 @@ export function DisplayReport() {
         enter(sel);
         return true;
       case 'Escape':
-        // R20-C: Esc clears the filter (then the ticks) before it leaves the level.
-        if (tools.filter || tools.sel.length) setTools((t) => (t.filter ? { ...t, filter: null, match: null } : { ...t, sel: [] }));
-        else back();
+        back();
         return true;
       default:
         return false;
     }
-  });
-
-  const grid = useRef<HTMLTableElement | null>(null);
-  const self = useRef<LiveReport | null>(null);
-  const snap: LiveReport = { tools, count: rows.length, sheet, dated: true, facts: () => rows.map((r) => (frame ? factOf(frame, r) : { text: '', amt: 0 })), set: setTools, setSheet, table: () => grid.current };
-  useEffect(() => {
-    self.current = snap;
-  });
-  useEffect(() => {
-    if (toolsActive(tools) || sheet) putLive(self.current);
-    else if (liveReport()?.table() === grid.current) putLive(null);
-  }, [tools, sheet]);
-  useReportKeys('reportRow', () => grid.current, {
-    select: () => setTools((t) => toggleSel(t, sel)),
-    hide: () => setTools((t) => hideRows(t, sel)),
-  });
-  useReportKeys('report', () => grid.current, {
-    filter: () => setSheet('filter'),
-    'filter.alias': () => setSheet('filter'),
-    invert: () => setTools((t) => invertSel(t, focusable)),
-    unhide: () => (tools.hid.length ? setTools(unhideLast) : false),
-    unhideAll: () => (tools.hid.length ? setTools(unhideAll) : false),
-    printReport: () => window.print(),
   });
 
   const title = frame ? frameTitle(frame, report) : gwT(REPORT_TITLE[report]);
@@ -264,7 +217,7 @@ export function DisplayReport() {
         </div>
         {frame && rows.length ? (
           <div className={styles.tableWrap}>
-            <table ref={grid} className={styles.grid} role="grid" aria-labelledby="gw-report-title">
+            <table className={styles.grid} role="grid" aria-labelledby="gw-report-title">
               <thead>
                 <tr>
                   {frame.columns.map((c, ci) => (
@@ -281,11 +234,9 @@ export function DisplayReport() {
                       ref={(el) => {
                         rowRefs.current[i] = el;
                       }}
-                      className={cn(r.heading ? styles.heading : styles.row, active && styles.rowActive, tools.sel.includes(i) && rk.tick)}
+                      className={cn(r.heading ? styles.heading : styles.row, active && styles.rowActive)}
                       tabIndex={r.heading ? undefined : active ? 0 : -1}
                       aria-selected={r.heading ? undefined : active}
-                      hidden={!shown.has(i) || undefined}
-                      data-ri={i}
                       onFocus={() => !r.heading && setSel(i)}
                       onClick={() => {
                         if (r.heading) return;
@@ -322,7 +273,6 @@ export function DisplayReport() {
         ) : (
           <p className={styles.empty}>{gwT('empty')}</p>
         )}
-        <ReportStrip />
         <p className={styles.note}>
           {gwT('drillHint')} · {gwT('caNote')}
           {branchId && <> · {branchT('scopeNote')}</>}
