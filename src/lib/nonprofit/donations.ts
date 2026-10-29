@@ -11,7 +11,7 @@ import type { Client } from '../../types/invoice';
 import type { Donation, DonationMode, DonationSection, DonationType, DonorIdCode } from '../../types/institutions-r5';
 import { requireAccess } from '../access';
 import { assertUnlocked } from '../period-lock';
-import { A } from '../ledger/accounts';
+import { A, chartOf, loadUserAccounts } from '../ledger/accounts';
 import { deleteVoucher, saveVoucher } from '../ledger/vouchers';
 import { bankLedgerId } from '../bank-ledgers';
 import { getIndianFY } from '../invoice-number';
@@ -27,6 +27,12 @@ export const MODES: readonly DonationMode[] = ['cash', 'electronic', 'kind', 'ot
 export const TYPES: readonly DonationType[] = ['others', 'corpus', 'specific_grant'];
 export const SECTIONS: readonly DonationSection[] = ['80G', '35(1)(ii)', '35(1)(iia)', '35(1)(iii)', 'none'];
 export const ID_CODES: readonly DonorIdCode[] = ['pan', 'aadhaar', 'tan', 'passport', 'voter_id', 'driving_licence', 'ration_card', 'foreign_tax_id'];
+
+/**
+ * QA23 W4: groups a gift in kind may not be journalised to — money and parties (a journal Dr cash / bank would show
+ * money that never came in), and the liability / income side (the credit already goes to income or corpus).
+ */
+export const KIND_EXCLUDED_GROUPS: readonly string[] = ['CASH_BANK', 'TRADE_RECEIVABLES', 'CAPITAL', 'RESERVES', 'LOANS_LT', 'LOANS_ST', 'TRADE_PAYABLES', 'DUTIES_TAXES', 'OTHER_CL', 'PROVISIONS', 'SALES', 'OTHER_INCOME'];
 
 export const ensureDonationsAccount = () => ensureAccount(DONATIONS_ACCOUNT, 'OTHER_INCOME', 4810);
 export const ensureCorpusAccount = () => ensureAccount(CORPUS_ACCOUNT, 'RESERVES', 1310);
@@ -87,13 +93,19 @@ export function saveDonation(input: DonationInput, donorName: string): Donation 
   const id = prev?.id ?? generateId();
   const number = prev?.number ?? nextSeriesNumberFor(DON_PREFIX, date, all.map((d) => d.number));
   assertUnlocked({ id, issue_date: date, invoice_number: number }, prev ? 'edit' : 'create');
+  const kindAccount = input.mode === 'kind' ? str(input.kind_account_id) : '';
+  if (kindAccount) {
+    const acc = chartOf(loadUserAccounts()).find((a) => a.id === kindAccount);
+    if (!acc || KIND_EXCLUDED_GROUPS.includes(acc.group)) throw new R5cError('input');
+  }
   return withTablesRollback([DONATIONS_TABLE, 'vouchers', 'accounts', SERIES_TABLE], () => {
     let voucherId: string | undefined;
-    const kindAccount = input.mode === 'kind' ? str(input.kind_account_id) : '';
-    // The voucher type changes with the mode (receipt ↔ journal), so a changed mode replaces the old voucher.
-    const reuse = prev?.voucher_id && (prev.mode === 'kind') === (input.mode === 'kind') ? prev.voucher_id : undefined;
+    // The voucher type changes with the mode (receipt ↔ journal), so a changed mode replaces the old voucher; so does
+    // a gift in kind whose ledger is cleared (QA23 W4: it posts nothing now, so its old journal must go).
+    const posts = input.mode !== 'kind' || !!kindAccount;
+    const reuse = posts && prev?.voucher_id && (prev.mode === 'kind') === (input.mode === 'kind') ? prev.voucher_id : undefined;
     if (prev?.voucher_id && !reuse) deleteVoucher(prev.voucher_id);
-    if (input.mode !== 'kind' || kindAccount) {
+    if (posts) {
       const credit = input.type === 'corpus' ? ensureCorpusAccount() : ensureDonationsAccount();
       const money_ = kindAccount || (input.mode === 'cash' ? A.cash : bankLedgerId(input.bank_account_id));
       const p = paise(amount);

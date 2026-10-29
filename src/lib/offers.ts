@@ -54,10 +54,23 @@ export function comboSaving(combo: ComboOffer, items: readonly Pick<InvoiceRecor
   return { sets, value: round2(Math.max(0, sets * (setValue - num(combo.price)))) };
 }
 
-/** Best running bill-value offer for a bill value on `day` (null when none reaches). `rec` gives the customer and lines (PENDING 46). */
-export function bestBillOffer(schemes: readonly Scheme[], billValue: number, day: string, rec?: Pick<InvoiceRecord, 'items' | 'client'>): BillOffer | null {
+/**
+ * The customer's master id: the snapshot's own id, else (QA23 W3) the master of the same name — a client picked in the
+ * editor is copied without its id (`clientToParty`), so per-customer offers match by name like the credit check.
+ */
+function customerId(client: Pick<NonNullable<InvoiceRecord['client']>, 'id' | 'name'> | undefined, clients: readonly { id?: string; name?: string }[] = []): string {
+  if (client?.id) return client.id;
+  const name = norm(client?.name);
+  return (name && clients.find((c) => norm(c.name) === name)?.id) || '';
+}
+
+/**
+ * Best running bill-value offer for a bill value on `day` (null when none reaches). `rec` gives the customer and lines
+ * (PENDING 46); `clients` resolves a customer snapshot without an id by name (QA23 W3).
+ */
+export function bestBillOffer(schemes: readonly Scheme[], billValue: number, day: string, rec?: Pick<InvoiceRecord, 'items' | 'client'>, clients?: readonly { id?: string; name?: string }[]): BillOffer | null {
   let best: BillOffer | null = null;
-  const clientId = rec?.client?.id ?? '';
+  const clientId = customerId(rec?.client, clients);
   for (const s of schemes) {
     if (s.kind !== 'bill_value' || !schemeActive(s, day)) continue;
     if (s.client_ids?.length && !s.client_ids.includes(clientId)) continue;
@@ -102,10 +115,10 @@ export function removeBillOffer(rec: InvoiceRecord): InvoiceRecord {
  * Apply the best running offer (or drop a stale one). Returns the same record when nothing changes.
  * `retotalRecord` = recompute the stored totals (POS cart); the editor recomputes them itself.
  */
-export function applyBillOffer(rec: InvoiceRecord, schemes: readonly Scheme[], opts: { retotalRecord?: boolean } = {}): InvoiceRecord {
+export function applyBillOffer(rec: InvoiceRecord, schemes: readonly Scheme[], opts: { retotalRecord?: boolean; clients?: readonly { id?: string; name?: string }[] } = {}): InvoiceRecord {
   if (rec.doc_type === 'CREDIT_NOTE' || rec.doc_type === 'DEBIT_NOTE') return rec;
   const base = removeBillOffer(rec);
-  const offer = base.discount_type === 'PERCENT' && num(base.discount_rate) > 0 ? null : bestBillOffer(schemes, billValueOf(base), rec.issue_date, base);
+  const offer = base.discount_type === 'PERCENT' && num(base.discount_rate) > 0 ? null : bestBillOffer(schemes, billValueOf(base), rec.issue_date, base, opts.clients);
 
   if (!offer && !rec.offer) return rec;
   if (offer && rec.offer && rec.offer.scheme_id === offer.scheme.id && Math.abs(num(rec.offer.value) - offer.value) < 0.005 && rec.offer.label === offer.label && rec.discount_type === 'AMOUNT' && num(rec.discount_rate) + 0.004 >= offer.value) return rec;
