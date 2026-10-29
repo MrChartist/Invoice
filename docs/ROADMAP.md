@@ -740,9 +740,9 @@ document / transaction date; stored codes, return marks and keys are unchanged.
 |---|---|---|
 | 23 | ✅ Income-tax Act 2025 section / form labels across TDS, TCS, receivables, payroll, editor and exports (date-keyed, append-only `ACT_REF_RULES` / `FORM_REF_RULES` / `OLD_CODE_SHOWN_RULES` in `src/lib/ita2025.ts`) | done: labels only, stored codes unchanged |
 | 23a | ⏳ Confirm the Sec 393 / 394 table items against the enacted Act and flip `verified` with new dated entries | open (verify with your CA) |
-| 23b | ⏳ 2025-Act RPU section codes for Forms 140 / 143 / 144 (add to `tds-rules.ts` once the Protean RPU format is confirmed) | open, waiting for the RPU file format |
+| 23b | ✅ 2025-Act RPU section codes for Forms 140 / 143 / 144 (`RPU_2025_CODE_RULES` in `tds-rules.ts`, Protean file formats v1.2) | done (tour package / luxury goods codes picked in the RPU) |
 | 23c | ⏳ Form 143 due dates (15th vs 31st; `TDS_DUE_RULES` keeps the 15th) | open |
-| 23d | ⏳ Finance Act 2026 TCS rates (tour package / LRS education 2%), as new `TCS_PRESET_RULES` entries when such presets are offered | open |
+| 23d | ✅ Finance Act 2026 TCS rates (tour package / LRS education 2%), a new `TCS_PRESET_RULES` row from 2026-04-01 (`verified: false`) | done |
 
 ## Round 5: industry packs for Indian SMB verticals (v6.x) · ✅ done
 

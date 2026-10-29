@@ -25,9 +25,12 @@ import { num, round2 } from './invoice-calc';
 import { toCsv } from './csv';
 import { challanByKey, challanTotal, deducteeCode, type TdsChallan, type TdsDeductionRow, type TdsQuarter } from './tds-payables';
 import { rpuDate } from './tds-returns';
-import { nrActRate, nrNatureOf, payableSection, type NrNature } from './tds-rules';
+import { nrActRate, nrNatureOf, payableSection, rpuCode2025, type NrNature } from './tds-rules';
 import { isValidPan } from './validators';
 import { actRef, formText, quarterStart, sectionText } from './ita2025';
+
+/** Section code of a 27Q row: the 2025-Act code from 1 Apr 2026 (23b), else the 1961 RPU code. */
+const rpu27Q = (r: TdsDeductionRow): string => rpuCode2025(r.code, r.creditedOn) || payableSection(r.code)?.rpu || r.section;
 
 export const FORM27Q_NOTE = 'UNVERIFIED Form 27Q working paper (non-residents) in NSDL RPU column order as understood — import through the RPU, validate with the FVU and verify every rate, the DTAA claim and Form 15CA / 15CB with your CA.';
 
@@ -167,7 +170,7 @@ export function form27Q(rows: readonly TdsDeductionRow[], vendors: readonly unkn
   const srOf = new Map(used.map((c, i) => [c.id, i + 1]));
   const challanRows: (string | number)[][] = [CHALLAN_HEAD];
   used.forEach((c, i) => {
-    const codes = [...new Set(list.filter((x) => byKey.get(x.row.key)?.id === c.id).map((x) => payableSection(x.row.code)?.rpu || x.row.section))];
+    const codes = [...new Set(list.filter((x) => byKey.get(x.row.key)?.id === c.id).map((x) => rpu27Q(x.row)))];
     challanRows.push([i + 1, codes.length === 1 ? codes[0] : '', amt(c.amount), '0.00', '0.00', amt(num(c.interest)), amt(num(c.fee)), amt(num(c.others)), amt(challanTotal(c)), '', c.bsr_code, rpuDate(c.date), c.challan_no, c.minor_head ?? '200', 'N']);
   });
   const deducteeRows: (string | number)[][] = [DEDUCTEE_HEAD];
@@ -190,16 +193,16 @@ export function form27Q(rows: readonly TdsDeductionRow[], vendors: readonly unkn
     const tax = cessPct ? round2((r.amount * 100) / (100 + cessPct)) : r.amount;
     const cess = round2(r.amount - tax);
     deducteeRows.push([
-      i + 1, ch ? srOf.get(ch.id) ?? '' : '', payableSection(r.code)?.rpu || r.section, deducteeCode(r.deducteeType), r.pan || 'PANNOTAVBL', r.payee,
+      i + 1, ch ? srOf.get(ch.id) ?? '' : '', rpu27Q(r), deducteeCode(r.deducteeType), r.pan || 'PANNOTAVBL', r.payee,
       rpuDate(r.creditedOn), amt(r.base), amt(tax), '0.00', amt(cess), amt(r.amount), ch ? amt(r.amount) : '0.00', rpuDate(r.deductedOn), r.rate, r.reason, r.certNo,
       x.check.basis === 'DTAA' ? 'B' : 'A', `${NATURE_CODE[x.check.nature]} ${NATURE_LABEL[x.check.nature]}`, '', x.payee.country, x.payee.tin,
       x.payee.trcNo ? `${x.payee.trcNo}${x.payee.trcTo ? ` (to ${rpuDate(x.payee.trcTo)})` : ''}` : 'No', x.payee.form10f ? 'Yes' : 'No', x.check.required, amt(x.shortBy),
     ]);
   });
   const deducted = round2(list.reduce((t, x) => t + x.row.amount, 0));
-  // Income-tax Act 2025: Sec 195 → Sec 393(2) Table; the RPU section codes above stay the 1961 ones the app knows.
+  // Income-tax Act 2025: Sec 195 → Sec 393(2) Table; 23b: section codes of the Protean Form 144 file format v1.2.
   const ref = list.find((x) => actRef(x.row.code, x.row.creditedOn).act === 2025);
-  if (ref) warnings.push(`Income-tax Act 2025 period: ${sectionText(ref.row.code, ref.row.creditedOn)}. The section codes above are the 1961-Act RPU codes; map them to the current RPU's codes and verify with your CA.`);
+  if (ref) warnings.push(`Income-tax Act 2025 period: ${sectionText(ref.row.code, ref.row.creditedOn)}. Section codes are the 2025-Act codes of the Protean Form 144 file format v1.2 (Annexure 2); the nature-of-remittance codes stay as understood — validate with the FVU and verify with your CA.`);
   return { form: '27Q', formLabel: formText('27Q', quarterStart(fy, quarter)), fy, quarter, challanRows, deducteeRows, totals: { deducted, deposited: round2(deposited), challans: used.length, shortBy: round2(shortBy) }, warnings: [...new Set(warnings)] };
 }
 

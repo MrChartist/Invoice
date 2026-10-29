@@ -30,7 +30,7 @@ import {
   type TdsDeductionRow,
   type TdsQuarter,
 } from './tds-payables';
-import { TCS_27EQ_CODES, type DeducteeType } from './tds-rules';
+import { TCS_27EQ_CODES, rpuCode2025, tcsCode2025, type DeducteeType } from './tds-rules';
 import { actRef, formText, quarterStart, sectionText } from './ita2025';
 
 export const UNVERIFIED_NOTE = 'UNVERIFIED working paper in NSDL RPU column order — import through the RPU, validate with the FVU and verify with your CA.';
@@ -170,7 +170,10 @@ function buildPaper(form: '26Q' | '27EQ', rows: readonly AnyRow[], challans: rea
     const ref = actRef(r.refCode, r.creditedOn);
     if (ref.act === 2025) refs.set(r.code, sectionText(r.refCode, r.creditedOn));
   }
-  if (refs.size) warnings.push(`Income-tax Act 2025 period: the section codes above are the 1961-Act RPU codes the app knows; ${formText(form, start)} uses the 2025-Act section codes of the current RPU — map each code (see "Section references") and verify with your CA.`);
+  // 23b: rows carry the 2025-Act codes of the Protean file format where the app knows them (4 digits).
+  const unmapped = list.filter((r) => actRef(r.refCode, r.creditedOn).act === 2025 && !/^\d{4}$/.test(r.code));
+  if (unmapped.length) warnings.push(`Income-tax Act 2025 period: ${[...new Set(unmapped.map((r) => r.code || r.refCode))].join(', ')} — no single 2025-Act code known; ${formText(form, start)} uses the 2025-Act section codes of the current RPU — pick each code in the RPU (see "Section references") and verify with your CA.`);
+  else if (refs.size) warnings.push(`Income-tax Act 2025 period: section codes are the 2025-Act codes of the Protean ${formText(form, start)} file format v1.2 (Annexure 2) — validate with the FVU and verify with your CA.`);
   for (const c of used) {
     const linked = round2(list.filter((r) => byKey.get(r.key)?.id === c.id).reduce((t, r) => t + r.amount, 0));
     if (Math.abs(linked - c.amount) > 0.5) warnings.push(`Challan ${c.bsr_code}/${c.challan_no}: tax ₹${amt(c.amount)} vs ₹${amt(linked)} linked to this quarter (the rest may belong to another quarter).`);
@@ -183,7 +186,7 @@ export function form26Q(rows: readonly TdsDeductionRow[], challans: readonly Tds
   const resident = rows.filter((r) => !r.nonResident);
   const paper = buildPaper(
     '26Q',
-    resident.map((r) => ({ ...r, name: r.payee, code: r.rpu || r.section, refCode: r.code })),
+    resident.map((r) => ({ ...r, name: r.payee, code: rpuCode2025(r.code, r.creditedOn) || r.rpu || r.section, refCode: r.code })),
     challans.filter((c) => c.kind !== 'TCS'),
     fy,
     quarter,
@@ -197,7 +200,11 @@ export function form27EQ(rows: readonly TcsRow[], challans: readonly TdsChallan[
   return buildPaper(
     '27EQ',
     // A blank code (to confirm: luxury goods, R15-D tour packages) is mapped by the row's own label.
-    rows.map((r) => ({ ...r, name: r.collectee, reason: '', certNo: '', refCode: (r.code ? TCS_27EQ_CODES.find((c) => c.code === r.code)?.label : '') || r.label })),
+    rows.map((r) => {
+      const refCode = (r.code ? TCS_27EQ_CODES.find((c) => c.code === r.code)?.label : '') || r.label;
+      // 23b: 2025-Act collection code by the invoice's own label ('' = several fit); unknown labels keep the stored code.
+      return { ...r, name: r.collectee, reason: '', certNo: '', code: tcsCode2025(r.label, r.creditedOn) ?? r.code, refCode };
+    }),
     challans.filter((c) => c.kind === 'TCS'),
     fy,
     quarter,

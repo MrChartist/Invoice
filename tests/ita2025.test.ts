@@ -134,8 +134,8 @@ test('exports: 26Q / 16A of Q4 FY 2025-26 keep the 1961 names; Q1 FY 2026-27 is 
   const after = form26Q([newRow], [], 2026, 1);
   assert.equal(after.form, '26Q', 'stored key unchanged');
   assert.equal(after.formLabel, 'Form 140 [old 26Q]');
-  assert.deepEqual(after.refs, [['94C', 'Sec 393(1) [Table: Sl. No. 6(i)] [old 194C]']]);
-  assert.equal(after.deducteeRows[1][2], '94C', 'RPU column order and codes unchanged');
+  assert.deepEqual(after.refs, [['1023', 'Sec 393(1) [Table: Sl. No. 6(i)] [old 194C]']]);
+  assert.equal(after.deducteeRows[1][2], '1023', '23b: 2025-Act RPU code (Protean file format v1.2), column order unchanged');
   const csv = paperCsv(after);
   assert.ok(csv.includes('Form 140 [old 26Q]'));
   assert.ok(csv.includes('Section references (Income-tax Act 2025)'));
