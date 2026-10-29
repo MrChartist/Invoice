@@ -6374,7 +6374,7 @@ try {
     await page.evaluate(() => localStorage.setItem('mrchartist_tally_keys', 'off'));
   });
 
-  // R20-B: entry keys — F8, Alt+C on the party picker creates the party, Ctrl+A saves; Alt+D (Y) deletes the saved
+  // R20-B: entry keys — F8, Alt+C on the party picker creates the party (Ledger Creation), Ctrl+A saves; Alt+D (Y) deletes the saved
   // invoice and the toast's Undo brings it back from the recycle bin; a Gateway payment with Alt+T is post-dated.
   await step('R20-B: Alt+C new party, Ctrl+A save, Alt+D then Undo, Alt+T post-dated voucher', async () => {
     await page.goto(srv.origin + '/');
@@ -6389,11 +6389,12 @@ try {
     const party = page.getByLabel('Client name');
     await party.fill('R20B Keys Traders');
     await party.press('Alt+c');
-    const add = page.getByRole('dialog', { name: 'Add client' });
+    const add = page.getByRole('dialog', { name: 'Ledger Creation' });
     await add.waitFor();
-    check((await add.getByLabel(/name/i).first().inputValue()) === 'R20B Keys Traders', 'Alt+C opens Add client with the typed name');
-    await add.getByRole('button', { name: 'Add client' }).click();
+    check((await add.getByLabel('Name', { exact: true }).inputValue()) === 'R20B Keys Traders', 'Alt+C opens Ledger Creation (Sundry debtors) with the typed name');
+    await add.getByLabel('Name', { exact: true }).press('Control+a');
     await add.waitFor({ state: 'detached' });
+    check((await party.inputValue()) === 'R20B Keys Traders', 'the new party is on the invoice');
     const clients = await readJson(page, 'clients', [], (c) => c.some((x) => x.name === 'R20B Keys Traders'));
     check(clients.some((x) => x.name === 'R20B Keys Traders'), 'the party is created');
     await page.getByLabel('Item 1 name').fill('Key widget');

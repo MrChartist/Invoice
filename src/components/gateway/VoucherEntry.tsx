@@ -52,7 +52,7 @@ import {
 } from '../../lib/gateway/voucher-entry';
 import type { TallyKeyId } from '../../lib/tally-keys';
 import { cn, formatMoney } from '../../lib/utils';
-import { lastText, rowFor, stepId, undoDelete } from '../../lib/keys/entry-actions'; // R20-B
+import { lastText, rowFor, undoDelete } from '../../lib/keys/entry-actions'; // R20-B
 import { keysT } from '../../i18n/areas/keys-r20a';
 import { kbT } from '../../i18n/areas/keys-r20b';
 import { useToast } from '../ui/useToast';
@@ -82,7 +82,7 @@ const readMode = (): 'single' | 'double' => {
   }
 };
 // R20-B: the entry rows this screen reads itself (the Gateway's capture listener), and the session draft (GK12).
-const ENTRY_ROWS = ['postDated', 'optional', 'mode.voucher', 'cancel.voucher', 'dup.voucher', 'editLog.voucher', 'prevV.voucher', 'nextV.voucher', 'narrType', 'narrParty'];
+const ENTRY_ROWS = ['postDated', 'optional', 'mode.voucher', 'cancel.voucher', 'dup.voucher', 'editLog.voucher', 'narrType'];
 const EditLog = lazy(() => import('../audit/EditLog').then((m) => ({ default: m.EditLog })));
 type Variant = '' | 'OPTIONAL' | 'MEMO' | 'PD';
 const variantOf = (v?: { variant?: string; post_dated?: boolean } | null): Variant => (v?.variant === 'OPTIONAL' || v?.variant === 'MEMO' ? v.variant : v?.post_dated ? 'PD' : '');
@@ -112,7 +112,7 @@ function refsOfVoucher(id: string): BillRefRow[] {
   return out;
 }
 
-type Confirm = null | 'quit' | 'delete' | 'go';
+type Confirm = null | 'quit' | 'delete';
 
 /**
  * Tally-style single-screen voucher entry (F4 Contra, F5 Payment, F6 Receipt, F7 Journal).
@@ -142,7 +142,6 @@ export function VoucherEntry() {
   const { notify: note, toastNode } = useToast();
   const [variant, setVariant] = useState<Variant>(() => variantOf(src));
   const [logOpen, setLogOpen] = useState(false);
-  const [goId, setGoId] = useState('');
   const quitting = useRef(false);
   const [chart, setChart] = useState<Account[]>(() => chartOf(loadUserAccounts()));
   const [clients, setClients] = useState(() => localDb.clients.getAll());
@@ -399,10 +398,6 @@ export function VoucherEntry() {
       setError((err as Error).message);
     }
   };
-  const openOther = (to = goId) => {
-    setGoId('');
-    navigate(`/gateway/voucher/${typeRoute(type)}?id=${encodeURIComponent(to)}`, { replace: true });
-  };
   // Typed lines of a new voucher survive leaving by Go To (sessionStorage, this tab; cleared by save / quit).
   const draftRef = useRef<[string, string] | null>(null);
   useEffect(() => {
@@ -418,32 +413,18 @@ export function VoucherEntry() {
   useEffect(() => {
     if (draft) notify(kbT('draftBack'), 'info');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  /** R20-B entry keys (Alt+T, Ctrl+L, Ctrl+H, Alt+X, Alt+2, Alt+Q, PgUp / PgDn, Ctrl+R / Alt+R in the narration). */
-  const entryKey = (rowId: string, e: KeyboardEvent): boolean => {
-    const step = (dir: -1 | 1) => {
-      if (!existing || (e.target as Element | null)?.tagName === 'TEXTAREA') return false;
-      const to = stepId(loadVouchers().filter((v) => v.type === type), existing.id, dir);
-      if (to && dirty) {
-        setGoId(to);
-        setConfirm('go');
-      } else if (to) openOther(to);
-      return true;
-    };
-    const narr = (party?: string) => {
-      const text = lastText(loadVouchers(), (v) => v.type === type && (party === undefined || v.lines.some((l) => !!party && l.party === party)), (v) => v.narration, (v) => v.date, existing?.id);
-      if (text) setNarration(text);
-      else notify(kbT('noNarr'), 'info');
-      return true;
-    };
+  /** R20-B entry keys (Alt+T, Ctrl+L, Ctrl+H, Alt+X, Alt+2, Alt+Q, Ctrl+R in the narration). */
+  const entryKey = (rowId: string): boolean => {
     if (rowId === 'postDated') return setVariant((v) => (v === 'PD' ? '' : 'PD')), true;
     if (rowId === 'optional') return setVariant((v) => (v === 'OPTIONAL' ? '' : 'OPTIONAL')), true;
     if (rowId === 'mode.voucher') return SINGLE_ENTRY_TYPES.includes(type) && (toggleMode(), true);
     if (rowId === 'cancel.voucher') return notify(kbT('vCancel'), 'info'), true;
     if (rowId === 'dup.voucher') return !!existing && (navigate(`/gateway/voucher/${typeRoute(type)}?dup=${encodeURIComponent(existing.id)}`), note(kbT('dupDone', { label: existing.number }), 'info'), true);
     if (rowId === 'editLog.voucher') return !!existing && (setLogOpen(true), true);
-    if (rowId === 'prevV.voucher' || rowId === 'nextV.voucher') return step(rowId === 'prevV.voucher' ? -1 : 1);
-    if (rowId === 'narrType') return narr();
-    return narr(lines.find((l) => l.party)?.party ?? '');
+    const text = lastText(loadVouchers(), (v) => v.type === type, (v) => v.narration, (v) => v.date, existing?.id);
+    if (text) setNarration(text);
+    else notify(kbT('noNarr'), 'info');
+    return true;
   };
 
   const switchType = (t: ManualVoucherType) => {
@@ -519,7 +500,6 @@ export function VoucherEntry() {
     if (confirm) {
       if (k === 'y' || (k === 'enter' && !mod)) {
         if (confirm === 'quit') leave();
-        else if (confirm === 'go') openOther();
         else remove();
         setConfirm(null);
         return true;
@@ -532,7 +512,7 @@ export function VoucherEntry() {
     }
     if (mod && !e.altKey && !e.shiftKey && k === 'a') return accept(), true;
     const row = rowFor(e, ENTRY_ROWS, true);
-    if (row) return entryKey(row.id, e);
+    if (row) return entryKey(row.id);
     if (e.altKey && !mod && k === 'c') {
       const key = at.includes(':') ? Number(at.split(':')[0]) : (lines.find((l) => !l.account_id)?.key ?? lines[lines.length - 1].key);
       setCreating({ key, name: queries[key] ?? '' });
@@ -882,11 +862,11 @@ export function VoucherEntry() {
         {confirm && (
           <div className={styles.confirm} role="alertdialog" aria-labelledby="gw-confirm-title">
             <strong id="gw-confirm-title">
-              {confirm === 'quit' ? gwT('vQuitTitle') : confirm === 'go' ? kbT('unsaved') : gwT('vDeleteTitle', { number: existing?.number ?? '' })}
+              {confirm === 'quit' ? gwT('vQuitTitle') : gwT('vDeleteTitle', { number: existing?.number ?? '' })}
             </strong>
             {confirm === 'quit' && <span className={styles.hint}>{gwT('vQuitBody')}</span>}
             <span>
-              <button type="button" className={controls.btnDanger} autoFocus onClick={() => (confirm === 'quit' ? leave() : confirm === 'go' ? openOther() : remove())} aria-keyshortcuts="Y">
+              <button type="button" className={controls.btnDanger} autoFocus onClick={() => (confirm === 'quit' ? leave() : remove())} aria-keyshortcuts="Y">
                 {gwT('yes')} (Y)
               </button>{' '}
               <button type="button" className={controls.btnOutline} onClick={() => setConfirm(null)} aria-keyshortcuts="N">

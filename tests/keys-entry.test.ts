@@ -1,6 +1,6 @@
 /**
  * R20-B voucher and document entry: the entry actions (delete / cancel with Undo through the recycle bin and the
- * reinstate path, duplicate route), remove-line Undo, the narration lookup, PgUp / PgDn order, the row matcher of
+ * reinstate path, duplicate route), remove-line Undo, the narration lookup, the row matcher of
  * screens that read their own keys, and voucher variants written through saveVoucher.
  */
 import './helpers/shim.ts';
@@ -12,7 +12,7 @@ import { localDb } from '../src/lib/localDb.ts';
 import { A, loadVouchers, saveVoucher } from '../src/lib/ledger/index.ts';
 import { inBooks } from '../src/lib/ledger/voucher-variants.ts';
 import { setActorProvider } from '../src/lib/access.ts';
-import { cancelEntry, deleteEntry, duplicateRoute, lastText, rowFor, stepId, undoCancel, undoDelete, withoutLine } from '../src/lib/keys/entry-actions.ts';
+import { cancelEntry, deleteEntry, duplicateRoute, lastText, rowFor, undoCancel, undoDelete, withoutLine } from '../src/lib/keys/entry-actions.ts';
 import { BUILT, rowById } from '../src/lib/keys/registry.ts';
 import { setKeysLayout, setKeysMode } from '../src/lib/keys/stub.ts';
 import { createViaStore, installSettings } from './helpers/world.ts';
@@ -27,7 +27,7 @@ const key = (k: string, mods: { ctrl?: boolean; alt?: boolean; code?: string } =
 
 test('B is built and its rows exist', () => {
   assert.ok(BUILT.has('B'));
-  for (const id of ['accept.editor', 'delete.editor', 'cancel.editor', 'dup.editor', 'rmLine', 'postDated', 'optional', 'narrType', 'prevV.voucher', 'rejIn']) assert.ok(rowById(id), id);
+  for (const id of ['accept.editor', 'delete.editor', 'cancel.editor', 'dup.editor', 'rmLine', 'postDated', 'optional', 'narrType', 'rejIn']) assert.ok(rowById(id), id);
   assert.equal(rowById('rejIn')!.route, '/invoice?type=CREDIT_NOTE&rej=1', 'Ctrl+F6 opens a credit note with goods came back');
 });
 
@@ -49,7 +49,7 @@ test('rowFor: layout, mode, fields (Ctrl+Alt never), field scopes', () => {
   assert.equal(rowFor(key('a', { ctrl: true, code: 'KeyA' }, input), ['accept.bill']), undefined, 'simple mode: Ctrl+A selects all');
 });
 
-test('pure helpers: last narration, PgUp / PgDn order, remove line + Undo, duplicate route', () => {
+test('pure helpers: last narration, remove line + Undo, duplicate route', () => {
   const rows = [
     { id: 'a', type: 'P', date: '2026-05-01', n: 'old rent' },
     { id: 'b', type: 'P', date: '2026-05-03', n: 'May rent' },
@@ -59,10 +59,6 @@ test('pure helpers: last narration, PgUp / PgDn order, remove line + Undo, dupli
   assert.equal(lastText(rows, (r) => r.type === 'P', (r) => r.n, (r) => r.date), 'May rent');
   assert.equal(lastText(rows, (r) => r.type === 'P', (r) => r.n, (r) => r.date, 'b'), 'old rent', 'the open entry is left out');
   assert.equal(lastText(rows, () => false, (r) => r.n, (r) => r.date), '');
-  const vs = [{ id: 'x', date: '2026-05-02', number: 'PV/10' }, { id: 'y', date: '2026-05-02', number: 'PV/9' }, { id: 'z', date: '2026-05-01', number: 'PV/11' }];
-  assert.equal(stepId(vs, 'y', -1), 'z');
-  assert.equal(stepId(vs, 'y', 1), 'x', 'numbers in numeric order within a day');
-  assert.equal(stepId(vs, 'x', 1), undefined);
   const lines = [{ id: '1' }, { id: '2' }, { id: '3' }];
   const cut = withoutLine(lines, '2')!;
   assert.deepEqual(cut.lines.map((l) => l.id), ['1', '3']);

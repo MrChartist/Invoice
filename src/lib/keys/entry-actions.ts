@@ -59,13 +59,6 @@ export function lastText<T extends { id?: string }>(rows: readonly T[], pick: (r
   return best?.[1] ?? '';
 }
 
-/** The entry before (-1) / after (1) `id` in date, then number order (PgUp / PgDn while altering). */
-export function stepId(rows: readonly { id: string; date: string; number: string }[], id: string, dir: -1 | 1): string | undefined {
-  const s = [...rows].sort((a, b) => a.date.localeCompare(b.date) || a.number.localeCompare(b.number, 'en', { numeric: true }));
-  const i = s.findIndex((r) => r.id === id);
-  return i < 0 ? undefined : s[i + dir]?.id;
-}
-
 /** Ctrl+D: the lines without `id` (one blank kept by the caller) and the Undo that puts it back where it was. */
 export function withoutLine<T extends { id: string }>(lines: readonly T[], id: string): { lines: T[]; undo: (now: readonly T[]) => T[] } | null {
   const i = lines.findIndex((l) => l.id === id);
