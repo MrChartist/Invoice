@@ -11,7 +11,7 @@ import { localDb } from '../../lib/localDb';
 import { getTable } from '../../lib/storage';
 import { VOUCHER_TYPES_TABLE, baseOfDoc, type VoucherSeries } from '../../lib/voucher-series';
 import { STATUS_OPTIONS } from '../../lib/invoice-status';
-import { addDaysInput, CURRENCIES, cn } from '../../lib/utils';
+import { CURRENCIES, cn } from '../../lib/utils';
 import { dueAfterIssueChange } from '../../lib/dates';
 import { DOCUMENT_LABELS, type DocumentType, type InvoiceStatus } from '../../types/invoice';
 import { useT } from '../../i18n';
@@ -34,7 +34,6 @@ const TermsPicker = lazy(() => import('../collections/TermsPicker'));
 const ContractPanel = lazy(() => import('./ContractPanel'));
 
 const DOC_TYPES = Object.keys(DOCUMENT_LABELS) as DocumentType[];
-const DUE_PRESETS = [0, 7, 15, 30, 45];
 
 interface Props {
   editing: boolean;
@@ -166,20 +165,13 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
           </label>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="due-date">{s.doc_type === 'SALES_ORDER' ? t('meta.deliveryBy') : t('meta.dueDate')}</label>
-            <DateField id="due-date" className={controls.input} value={s.due_date} min={s.issue_date} chips={['+7', '+15', '+30', '+45', 'monthEnd']} chipBase={s.issue_date} onChange={(e) => setDue(e.target.value)} />
+            <DateField id="due-date" className={controls.input} value={s.due_date} min={s.issue_date} chips={['onReceipt', '+7', '+15', '+30', '+45', 'monthEnd']} chipBase={s.issue_date} onChange={(e) => setDue(e.target.value)} />
             {/* 8.6: an unpaid bill with no credit period nudges for a due date (ageing / reminders use it). */}
             {(s.doc_type === 'INVOICE' || s.doc_type === 'TAX_INVOICE' || s.doc_type === 'BILL_OF_SUPPLY') &&
               s.status !== 'Paid' && s.status !== 'Cancelled' && (Number(s.balance_due) || 0) > 0.004 &&
               (!s.due_date || s.due_date <= s.issue_date) && (
                 <span className={controls.hint} role="note" data-due-nudge>{khataT('dueNudge')}</span>
               )}
-            <div className={styles.chips}>
-              {DUE_PRESETS.map((d) => (
-                <button key={d} type="button" aria-label={d === 0 ? t('meta.dueOnReceipt') : t('meta.dueInDays', { n: d })} className={styles.chip} onClick={() => setDue(addDaysInput(d, s.issue_date))}>
-                  {d === 0 ? t('meta.now') : t('meta.daysShort', { n: d })}
-                </button>
-              ))}
-            </div>
             <Suspense fallback={null}>
               <TermsPicker />
             </Suspense>

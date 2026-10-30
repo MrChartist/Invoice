@@ -187,6 +187,7 @@ function chipValue(c: DateChip, base: string): string {
     case 'today': return today;
     case 'yesterday': return addDays(today, -1);
     case 'tomorrow': return addDays(today, 1);
+    case 'onReceipt': return base;
     case 'monthStart': return `${base.slice(0, 7)}-01`;
     case 'monthEnd': return monthEnd(base);
     case 'fyStart': return fyBounds(base).start;

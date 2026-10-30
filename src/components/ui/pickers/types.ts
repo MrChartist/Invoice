@@ -1,7 +1,7 @@
 /** Shared shapes of the picker shells and their one lazy popup chunk (docs/theme/IOS-UI.md, Pickers). Types only. */
 
 /** A quick chip under the calendar. Relative chips count from `chipBase` (the field's value, else today). */
-export type DateChip = 'today' | 'yesterday' | 'tomorrow' | '+7' | '+15' | '+30' | '+45' | '+60' | '+90' | 'monthEnd' | 'fyStart' | 'fyEnd' | 'monthStart';
+export type DateChip = 'onReceipt' | 'today' | 'yesterday' | 'tomorrow' | '+7' | '+15' | '+30' | '+45' | '+60' | '+90' | 'monthEnd' | 'fyStart' | 'fyEnd' | 'monthStart';
 
 /** Range presets (`DateRangeField`, or a `range` on two `DateField`s). */
 export type RangePreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'lastQuarter' | 'thisFy' | 'lastFy' | 'last7' | 'last30';

@@ -12,9 +12,12 @@ export const preloadPopup = () => void import('./PickerPopup').catch(() => {});
 export function nameOf(el: HTMLElement, fallback: string): string {
   const own = el.getAttribute('aria-label');
   if (own) return own;
-  const byFor = el.id ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null;
-  const text = (byFor ?? el.closest('label'))?.textContent?.trim();
-  return text || fallback;
+  const label = (el.id ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null) ?? el.closest('label');
+  if (!label) return fallback;
+  // The label's own words only: a wrapping <label> also holds the control (a select's option texts, a field's value).
+  const copy = label.cloneNode(true) as HTMLElement;
+  copy.querySelectorAll('select, input, textarea, button, [role="listbox"], [data-picker]').forEach((n) => n.remove());
+  return copy.textContent?.replace(/\s+/g, ' ').trim() || fallback;
 }
 
 export const change = (value: string, el: { name?: string; id?: string } | null): PickerChange => {
