@@ -70,7 +70,7 @@ export default function ContractPanel() {
           <input className={controls.input} value={h.site?.address ?? ''} onChange={(e) => setH({ site: { ...h.site, address: e.target.value || undefined } })} data-cn-site /></label>
         <label className={controls.field}><span className={controls.label}>{cnT('siteState')}</span>
           <select className={controls.select} value={h.site?.state_code ?? ''} onChange={(e) => setH({ site: { ...h.site, state_code: e.target.value || undefined } })}>
-            <option value="">—</option>
+            <option value="">-</option>
             {INDIAN_STATES.map((st) => <option key={st.code} value={st.code}>{st.name}</option>)}
           </select></label>
         <label className={controls.field}><span className={controls.label}>{cnT('paperStyle')}</span>

@@ -24,7 +24,7 @@ export const assetLabel = (a: Pick<ServiceAsset, 'reg_no' | 'serial' | 'make' | 
 /** Warning (never a block) when a reading is below the last one. */
 export const odometerIssue = (a: Pick<ServiceAsset, 'odometer'> | undefined, km: number | undefined): string => {
   const last = lastKm(a);
-  return km !== undefined && last !== undefined && km < last ? `Odometer ${km} km is below the last reading ${last} km — check it.` : '';
+  return km !== undefined && last !== undefined && km < last ? `Odometer ${km} km is below the last reading ${last} km: check it.` : '';
 };
 
 /** Pure: the asset with a reading added (date order; one reading per day, the newer replaces it). */

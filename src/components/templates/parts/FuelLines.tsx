@@ -12,7 +12,7 @@ const dmy = (at: string) => at.replace(/^(\d{4})-(\d{2})-(\d{2})/, '$3-$2-$1');
 export default function FuelLines({ invoice }: { invoice: InvoiceRecord }) {
   const rows = (invoice.items ?? []).flatMap((i) => {
     const f = invoice.fu?.lines?.[i.id];
-    return f ? [[i.id, `${i.name} — ${[f.nozzle && `Nozzle ${f.nozzle}`, `${f.litres.toFixed(3)} ${f.unit === 'KG' ? 'kg' : 'L'}${f.rsp ? ` @ ₹${f.rsp}` : ''}${f.at ? ` (price of ${dmy(f.at)})` : ''}`, f.vehicle && `Vehicle ${f.vehicle}`, f.slip_no && `Slip ${f.slip_no}`].filter(Boolean).join(' · ')}`]] : [];
+    return f ? [[i.id, `${i.name}: ${[f.nozzle && `Nozzle ${f.nozzle}`, `${f.litres.toFixed(3)} ${f.unit === 'KG' ? 'kg' : 'L'}${f.rsp ? ` @ ₹${f.rsp}` : ''}${f.at ? ` (price of ${dmy(f.at)})` : ''}`, f.vehicle && `Vehicle ${f.vehicle}`, f.slip_no && `Slip ${f.slip_no}`].filter(Boolean).join(' · ')}`]] : [];
   });
   if (!rows.length) return null;
   return <section className={styles.block} aria-label="Fuel" data-fuel-lines>{rows.map(([k, v]) => <div key={k}>{v}</div>)}</section>;

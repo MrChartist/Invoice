@@ -94,7 +94,7 @@ test('working file shape (snapshot of keys) and XLSX sheets', () => {
   assert.equal(f.format, IMS_FILE_FORMAT);
   assert.equal(f.note, IMS_LAYOUT_NOTE);
   assert.match(f.note, /unverified/i);
-  assert.match(f.note, /verify with your CA/);
+  assert.match(f.note, /verify with your CA/i);
   assert.equal(f.gstin, '27AABCU9603R1ZX');
   assert.deepEqual(Object.keys(f).sort(), ['docs', 'format', 'generated_on', 'gstin', 'issues', 'note', 'rtnprd', 'summary']);
   assert.deepEqual(f.docs[0], {

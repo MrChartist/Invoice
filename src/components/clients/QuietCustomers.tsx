@@ -83,7 +83,7 @@ export default function QuietCustomers({ clients, notify }: { clients: Client[];
                       <td className={surface.numeric}>{svcT('nDays', { n: Math.round(r.median_gap) })}</td>
                       <td className={surface.numeric}><strong>{svcT('nDays', { n: r.days_quiet })}</strong></td>
                       <td className={surface.numeric}>{formatCurrency(r.sales_12m, 'INR')} · {r.count_12m}</td>
-                      <td>{r.top_items.join(', ') || '–'}{nudged ? <div className={surface.statHint}>{svcT('nudged', { date: formatDate(nudged.slice(0, 10)) })}</div> : null}</td>
+                      <td>{r.top_items.join(', ') || '-'}{nudged ? <div className={surface.statHint}>{svcT('nudged', { date: formatDate(nudged.slice(0, 10)) })}</div> : null}</td>
                       <td className={surface.rowActions}>
                         {r.client?.phone ? (
                           <a href={nudgeHref(r)} target="_blank" rel="noopener noreferrer" className={controls.btnIcon} aria-label={svcT('nudgeFor', { name: r.name })} title={svcT('nudge')}
@@ -91,7 +91,7 @@ export default function QuietCustomers({ clients, notify }: { clients: Client[];
                             <MessageCircle size={16} />
                           </a>
                         ) : (
-                          <span className={surface.statHint} title={svcT('noPhone')}>—</span>
+                          <span className={surface.statHint} title={svcT('noPhone')}>-</span>
                         )}
                         {editable && (
                           <>

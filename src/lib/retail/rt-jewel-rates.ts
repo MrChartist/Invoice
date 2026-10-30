@@ -50,7 +50,7 @@ export function ratesOn(rates: readonly MetalRate[], date: string): Map<string, 
 export const rateFor = (rates: readonly MetalRate[], metal: Metal, purity: string, date: string): MetalRate | undefined => ratesOn(rates, date).get(`${metal}:${purity}`);
 
 /** Error text for a bill line with no rate on its date ('' when there is one). */
-export const noRateError = (metal: Metal, purity: string, date: string): string => `No ${metal} ${purity} rate for ${date} — set today's rate on Jewellery → Rates (the owner may type a line rate).`;
+export const noRateError = (metal: Metal, purity: string, date: string): string => `No ${metal} ${purity} rate for ${date}: set today's rate on Jewellery → Rates (the owner may type a line rate).`;
 
 /** Save the day's rates (append-only; only rows with a sale or buy rate). Returns the rows written. */
 export function saveRates(date: string, rows: readonly { metal: Metal; purity: string; sale: number; buy: number }[]): MetalRate[] {

@@ -25,7 +25,7 @@ export function LrList({ notify, refresh, tick }: PanelProps) {
   const [edit, setEdit] = useState<ConsignmentNote | 'new' | null>(null);
   const [act, setAct] = useState<Act>(null);
   const [v, setV] = useState({ day: today(), by: '', shortage: '', damage: '', detention: '', reason: '', method: 'Cash' });
-  const name = (id?: string) => clients.find((c) => c.id === id)?.name ?? '—';
+  const name = (id?: string) => clients.find((c) => c.id === id)?.name ?? '-';
   const party = (id?: string) => {
     const c = clients.find((x) => x.id === id);
     return c ? { name: c.name, gstin: c.gstin, address: c.address } : undefined;
@@ -44,9 +44,9 @@ export function LrList({ notify, refresh, tick }: PanelProps) {
     const p = localDb.settings.activeProfile();
     return { name: p?.companyName ?? '', address: p?.companyAddress, gstin: p?.companyGstin };
   };
-  const print = (lr: ConsignmentNote) => printHtml(lrHtml(lr, { company: company(), consignor: party(lr.consignor_id) ?? { name: '—' }, consignee: party(lr.consignee_id) ?? { name: '—' }, billingParty: party(lr.billing_party_id), options: loadGtaOptions() }), lr.number);
+  const print = (lr: ConsignmentNote) => printHtml(lrHtml(lr, { company: company(), consignor: party(lr.consignor_id) ?? { name: '-' }, consignee: party(lr.consignee_id) ?? { name: '-' }, billingParty: party(lr.billing_party_id), options: loadGtaOptions() }), lr.number);
   const share = (lr: ConsignmentNote) => {
-    const text = lrShareText(lr, { company: company(), consignee: party(lr.consignee_id) ?? { name: '—' } });
+    const text = lrShareText(lr, { company: company(), consignee: party(lr.consignee_id) ?? { name: '-' } });
     if (navigator.share) void navigator.share({ text }).catch(() => undefined);
     else window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
   };

@@ -52,7 +52,7 @@ export default function HeadsView({ notify }: HsViewProps) {
       <div style={row}>
         <F label={hsT('state')}>
           <select className={controls.select} value={s.state ?? ''} onChange={(e) => set({ state: e.target.value || undefined })}>
-            <option value="">—</option>
+            <option value="">-</option>
             {INDIAN_STATES.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
           </select>
         </F>

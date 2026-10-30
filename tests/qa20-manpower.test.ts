@@ -91,7 +91,7 @@ test('V3: a bill of several sites carries each line\'s site; site P&L and the bo
   const [inv] = billMonth('2026-09').invoices;
   assert.equal(inv.taxable_value, 150260);
   assert.ok(inv.items.every((l) => l.cost_centre_id === a.id || l.cost_centre_id === b.id), 'every line names its site');
-  assert.deepEqual(inv.items.filter((l) => /^Service charge/.test(l.name)).map((l) => [l.name, l.amount, l.cost_centre_id]), [['Service charge 10 % — S-001', 12860, a.id], ['Service charge 10 % — S-009', 800, b.id]]);
+  assert.deepEqual(inv.items.filter((l) => /^Service charge/.test(l.name)).map((l) => [l.name, l.amount, l.cost_centre_id]), [['Service charge 10 %: S-001', 12860, a.id], ['Service charge 10 %: S-009', 800, b.id]]);
   assert.deepEqual([billedFor(inv, a), billedFor(inv, b)], [141460, 8800], 'service charge included (it was left out: 128,600 / 8,000)');
   issue(inv);
   const pnl = costCentrePnl(loadLedger(), { start: '2026-09-01', end: '2026-09-30' }, loadCostCentres());

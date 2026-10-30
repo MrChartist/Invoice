@@ -185,7 +185,7 @@ export function saveCheckout(input: CheckoutInput): InvoiceRecord[] {
       if (!f || f.status === 'invoiced') throw new HotelError('This folio is already billed.');
       const draft = draftFor(f, day, { guest: plan.guest, interim: input.interim });
       if (!draft.lineIds.length) continue;
-      if (!(draft.record.total > 0)) throw new HotelError(`${f.name}: nothing to bill${f.lines.some((l) => l.kind === 'allowance' && !l.void) ? ' — move the allowance to the window it discounts' : ''}.`);
+      if (!(draft.record.total > 0)) throw new HotelError(`${f.name}: nothing to bill${f.lines.some((l) => l.kind === 'allowance' && !l.void) ? ': move the allowance to the window it discounts' : ''}.`);
       const saved = saveAndSettle(draft.record, plan, todayIso(input.at));
       const ids = new Set(draft.lineIds);
       hotelDb.putFolios({ ...f, lines: f.lines.map((l) => (ids.has(l.id) ? { ...l, src: { ...l.src, invoice_id: saved.id } } : l)), invoice_ids: [...(f.invoice_ids ?? []), saved.id] });

@@ -70,7 +70,7 @@ export function AuditIntegrity() {
       <p className={styles.integrityNote}>
         Each entry is sealed with a SHA-256 hash that includes the entry before it, so editing, deleting or reordering
         entries inside the app&apos;s data shows up here. Someone with full access to this device could still rewrite
-        everything, hashes included &mdash; note the head hash below (or send it to your CA) to make that detectable later.
+        everything, hashes included. Note the head hash below (or send it to your CA) to make that detectable later.
       </p>
 
       <div className={styles.headRow}>

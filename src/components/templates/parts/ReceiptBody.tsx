@@ -81,7 +81,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
           return (
             <div key={line.id} className={styles.rcItem}>
               <div className={styles.rcItemName}>
-                {i + 1}. {line.name || '—'}
+                {i + 1}. {line.name || '-'}
                 {col.hsn && line.hsn && <span className={styles.rcSmall}> [{line.hsn}]</span>}
               </div>
               <ItemCustomLine values={src?.custom_values} />
@@ -148,7 +148,7 @@ export function ReceiptBody({ invoice, sender, totals }: Props) {
         </div>
       )}
       <hr className={styles.rcRule} />
-      <div className={cn(styles.rcCenter, styles.rcSmall)}>{footerText || 'Thank you — visit again!'}</div>
+      <div className={cn(styles.rcCenter, styles.rcSmall)}>{footerText || 'Thank you, visit again!'}</div>
     </div>
   );
 }

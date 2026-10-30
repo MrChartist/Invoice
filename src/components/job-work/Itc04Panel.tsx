@@ -94,7 +94,7 @@ export function Itc04Panel({ data }: { data: JwData }) {
             {report.table4.map((r, i) => (
               <tr key={`${r.challan_no}-${i}`}>
                 <td className={styles.mono}>{r.challan_no}<div className={styles.muted}>{formatDate(r.challan_date)}</div></td>
-                <td>{r.jw_gstin || r.jw_state || '—'}</td>
+                <td>{r.jw_gstin || r.jw_state || '-'}</td>
                 <td>{r.item}</td><td>{r.hsn}</td><td>{r.uqc}</td>
                 <td className={styles.num}>{r.qty}</td><td className={styles.num}>{formatMoney(r.taxable_value)}</td><td>{r.goods_type}</td>
                 <td className={styles.num}>{formatMoney(r.igst)}</td><td className={styles.num}>{formatMoney(r.cgst)}</td><td className={styles.num}>{formatMoney(r.sgst)}</td>
@@ -117,10 +117,10 @@ export function Itc04Panel({ data }: { data: JwData }) {
             {report.table5.map((r, i) => (
               <tr key={`${r.table}-${r.jw_challan_no}-${i}`}>
                 <td><span className={styles.badge}>{r.table}</span></td>
-                <td>{r.via ?? (r.jw_gstin || r.jw_state || '—')}</td>
+                <td>{r.via ?? (r.jw_gstin || r.jw_state || '-')}</td>
                 <td className={styles.mono}>{r.jw_challan_no}<div className={styles.muted}>{formatDate(r.jw_challan_date)}</div></td>
                 <td className={styles.mono}>{r.original_challan_no}<div className={styles.muted}>{r.original_challan_date ? formatDate(r.original_challan_date) : ''}</div></td>
-                <td>{r.item}</td><td>{r.uqc}</td><td className={styles.num}>{r.qty}</td><td>{r.nature}</td><td className={styles.num}>{r.loss_qty || '—'}</td>
+                <td>{r.item}</td><td>{r.uqc}</td><td className={styles.num}>{r.qty}</td><td>{r.nature}</td><td className={styles.num}>{r.loss_qty || '-'}</td>
               </tr>
             ))}
             {report.table5.length === 0 && <tr><td colSpan={9} className={styles.muted}>{jwT('empty')}</td></tr>}

@@ -52,7 +52,7 @@ test('gate passes: balances, over-release refused, GPO numbers never reused afte
   undoGatePass(a.id);
   assert.equal(issueGatePass(a.id, { date: '2026-06-04', bags: 180, bill: false }).out.number, 'GPO/FY26-27/0003', 'GPO 0002 stays used');
   assert.equal(loadLots()[0].status, 'closed');
-  assert.match(receiptHtml(a, { company: 'Cold Co' }), /Non-negotiable receipt — not a WDRA e-NWR/);
+  assert.match(receiptHtml(a, { company: 'Cold Co' }), /Non-negotiable receipt: not a WDRA e-NWR/);
 });
 
 test('a loan\'s lien blocks the gate pass until repaid; an owner override needs a reason and is audited', () => {
@@ -118,7 +118,7 @@ test('depositor statement: lots in / out / balance, rent billed and due (issued 
   const other = depositorStatement(loadLots(), [r.bill!], loadLoans(), trader.id, '2026-07-10');
   assert.deepEqual([other.lots.length, other.balance, other.billed, other.loans.length], [1, 20, 0, 0]);
   const html = statementHtml(st, farmer.name, 'Cold Co', '2026-07-10');
-  assert.match(html, /Depositor statement — Ram Singh/);
+  assert.match(html, /Depositor statement: Ram Singh/);
   assert.match(html, new RegExp(`${a.number.replace(/\//g, '\\/')} · Potato</td><td>in 240 · out 80 · balance 160 bags`));
   assert.match(html, /Rent billed \/ due/);
   assert.match(html, /Loan LAS\/FY26-27\/0001/);

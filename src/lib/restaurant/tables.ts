@@ -426,7 +426,7 @@ export function finishOrderRecord(rec: InvoiceRecord, order: TableOrder): Invoic
         ...out,
         other_charges: charge,
         charges_taxable: true,
-        notes: [out.notes, `Other charges = ${SERVICE_CHARGE_LABEL} @ ${pct}%: ₹${charge.toFixed(2)}. It is voluntary — ask us to remove it.`].filter(Boolean).join('\n'),
+        notes: [out.notes, `Other charges = ${SERVICE_CHARGE_LABEL} @ ${pct}%: ₹${charge.toFixed(2)}. It is voluntary: ask us to remove it.`].filter(Boolean).join('\n'),
       };
     }
   }

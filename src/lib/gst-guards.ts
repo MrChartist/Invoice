@@ -68,7 +68,7 @@ export interface IrpWindowRule {
  */
 export const IRP_REPORTING_WINDOW_RULES: readonly Versioned<IrpWindowRule | null>[] = [
   { from: '2020-10-01', value: null, source: 'No reporting time limit on the IRP' },
-  { from: '2023-11-01', value: { aatoFrom: 1e9, days: 30, docTypes: ['INV'] }, source: 'GSTN advisory 13 Sep 2023 (AATO ≥ ₹100 crore, invoices) — verify' },
+  { from: '2023-11-01', value: { aatoFrom: 1e9, days: 30, docTypes: ['INV'] }, source: 'GSTN advisory 13 Sep 2023 (AATO ≥ ₹100 crore, invoices): verify' },
   { from: '2025-04-01', value: { aatoFrom: 1e8, days: 30, docTypes: ['INV', 'CRN', 'DBN'] }, source: 'GSTN advisory 5 Nov 2024 (AATO ≥ ₹10 crore, invoices / credit / debit notes)' },
 ];
 
@@ -174,7 +174,7 @@ export const RETURN_TIME_BAR_RULES: readonly Versioned<TimeBarRule | null>[] = [
     // 8.66: the advisory's list also names GSTR-6 (ISD, Sec 39(4)), GSTR-7 (TDS, Sec 39(3)) and GSTR-8 (TCS, Sec 52(4)).
     from: '2024-10-29',
     value: { years: 3, enforcedFrom: '2025-08-01', forms: ['GSTR1', 'GSTR3B', 'GSTR4', 'GSTR9', 'GSTR6', 'GSTR7', 'GSTR8'] },
-    source: 'GSTN advisory 29 Oct 2024 (GSTR-6 / 7 / 8 on the list as understood — verify with your CA)',
+    source: 'GSTN advisory 29 Oct 2024 (GSTR-6 / 7 / 8 on the list as understood: verify with your CA)',
   },
 ];
 
@@ -190,8 +190,8 @@ export type SpecialReturnForm = 'GSTR6' | 'GSTR7' | 'GSTR8';
  * re-read: verify with your CA.
  */
 export const SPECIAL_RETURN_DUE_RULES: readonly Versioned<{ GSTR6: number; GSTR7: number | null; GSTR8: number | null }>[] = [
-  { from: '2017-07-01', value: { GSTR6: 13, GSTR7: null, GSTR8: null }, source: 'Sec 39(4), Rule 65 (GSTR-6); TDS / TCS provisions not in force — verify' },
-  { from: '2018-10-01', value: { GSTR6: 13, GSTR7: 10, GSTR8: 10 }, source: 'Rule 65 / 66 / 67 CGST Rules; Notifications 50/2018-CT, 51/2018-CT — verify' },
+  { from: '2017-07-01', value: { GSTR6: 13, GSTR7: null, GSTR8: null }, source: 'Sec 39(4), Rule 65 (GSTR-6); TDS / TCS provisions not in force: verify' },
+  { from: '2018-10-01', value: { GSTR6: 13, GSTR7: 10, GSTR8: 10 }, source: 'Rule 65 / 66 / 67 CGST Rules; Notifications 50/2018-CT, 51/2018-CT: verify' },
 ];
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -373,7 +373,7 @@ export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOp
     if (date < o.from || date > o.to) continue;
     const sg = (inv.sender?.companyGstin ?? '').trim().toUpperCase();
     if (g && sg && sg !== g) continue;
-    const base = { invoiceId: inv.id, number: inv.invoice_number || '—', date };
+    const base = { invoiceId: inv.id, number: inv.invoice_number || '-', date };
     const push = (code: GstExceptionCode, severity: 'error' | 'warning', vars: Record<string, string | number> = {}) => out.push({ code, severity, ...base, vars });
     const ctin = String(inv.client?.gstin ?? '').trim().toUpperCase();
     const b2b = isGstinShaped(ctin);
@@ -427,7 +427,7 @@ export function gstExceptions(invoices: readonly InvoiceRecord[], o: ExceptionOp
  */
 export const GSTR1A_RULES: readonly Versioned<boolean>[] = [
   { from: '2017-07-01', value: false, source: 'No GSTR-1A (same-period amendment) form' },
-  { from: '2024-07-01', value: true, source: 'Rule 59(4A), Notification 12/2024-CT — verify the first period' },
+  { from: '2024-07-01', value: true, source: 'Rule 59(4A), Notification 12/2024-CT: verify the first period' },
 ];
 
 export const gstr1aAvailable = (periodStart: string) => ruleAt(GSTR1A_RULES, periodStart);

@@ -37,7 +37,7 @@ export const PAYMENT_VOUCHER_PREFIX = 'RPV';
 /** Rule 46(b): a consecutive serial number "not exceeding sixteen characters". */
 export const RCM_NUMBER_MAX = 16;
 
-export const RCM_DISCLAIMER = 'Working paper — self-invoice / payment voucher prepared offline for reverse-charge supplies. Not validated against the GST portal; verify the contents, series and time limits with your CA.';
+export const RCM_DISCLAIMER = 'Working paper: self-invoice / payment voucher prepared offline for reverse-charge supplies. Not validated against the GST portal; verify the contents, series and time limits with your CA.';
 
 export type RcmDocKind = 'SELF_INVOICE' | 'PAYMENT_VOUCHER';
 
@@ -344,7 +344,7 @@ export function nextRcmNumber(kind: RcmDocKind, date: string, docs: readonly Rcm
 /* ── Print ────────────────────────────────────────────────────── */
 
 const money = (n: number) => esc(round2(n).toFixed(2));
-const stateLabel = (code?: string) => (code ? `${code}${stateByCode(code)?.name ? ` — ${stateByCode(code)!.name}` : ''}` : '—');
+const stateLabel = (code?: string) => (code ? `${code}${stateByCode(code)?.name ? `: ${stateByCode(code)!.name}` : ''}` : '-');
 
 const PRINT_CSS = `
   body { font-family: ${PRINT_FONT}; color: #111; margin: 0; padding: 24px; }
@@ -367,7 +367,7 @@ const PRINT_CSS = `
 `;
 
 function docSection(d: RcmDocument): string {
-  const title = d.kind === 'SELF_INVOICE' ? 'Tax invoice (self-invoice) — reverse charge' : 'Payment voucher — reverse charge';
+  const title = d.kind === 'SELF_INVOICE' ? 'Tax invoice (self-invoice): reverse charge' : 'Payment voucher: reverse charge';
   const rule = d.kind === 'SELF_INVOICE' ? 'Issued by the recipient under Sec 31(3)(f) read with Rule 46 of the CGST Rules' : 'Issued by the recipient under Sec 31(3)(g) read with Rule 52 of the CGST Rules';
   const party = (label: string, p: RcmParty) => `<div><strong>${esc(label)}</strong>\n${esc(p.name)}${p.address ? `\n${esc(p.address)}` : ''}\nGSTIN: ${esc(p.gstin || 'Unregistered')}\nState: ${esc(stateLabel(p.state_code))}</div>`;
   const rows = d.lines.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.description)}${l.bill_number ? `<br><small>Bill ${esc(l.bill_number)}${l.bill_date ? ` dt ${esc(l.bill_date)}` : ''}</small>` : ''}</td><td>${esc(l.hsn ?? '')}</td><td class="n">${l.quantity !== undefined ? esc(String(l.quantity)) : ''} ${esc(l.unit ?? '')}</td><td class="n">${money(l.taxable)}</td><td class="n">${esc(String(l.rate))}%</td><td class="n">${money(l.igst)}</td><td class="n">${money(l.cgst)}</td><td class="n">${money(l.sgst)}</td><td class="n">${money(l.cess)}</td></tr>`).join('');
@@ -381,7 +381,7 @@ function docSection(d: RcmDocument): string {
   <tbody>${rows}<tr class="total"><td></td><td colspan="3">Total</td><td class="n">${money(d.taxable)}</td><td></td><td class="n">${money(d.igst)}</td><td class="n">${money(d.cgst)}</td><td class="n">${money(d.sgst)}</td><td class="n">${money(d.cess)}</td></tr></tbody></table>
   <div class="words"><strong>Tax payable by the recipient (in words):</strong> ${esc(amountInWords(tax))}</div>
   ${d.notes ? `<div class="notes">${esc(d.notes)}</div>` : ''}
-  <div class="sign">For ${esc(d.recipient.name || 'the recipient')} — Authorised signatory</div>
+  <div class="sign">For ${esc(d.recipient.name || 'the recipient')}: Authorised signatory</div>
 </section>`;
 }
 

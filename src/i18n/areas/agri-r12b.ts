@@ -7,7 +7,7 @@ import { defineArea } from '../area';
 
 export const bT = defineArea(
   {
-    workingPaper: 'Working paper — verify with your union and your CA.',
+    workingPaper: 'Working paper: verify with your union and your CA.',
     'view.charts': 'Rate charts',
     'view.collection': 'Collection',
     'view.bills': 'Milk bills',
@@ -141,7 +141,7 @@ export const bT = defineArea(
     gstToday: 'GST today',
     addStarter: 'Add starter',
     starterAdded: '{name} added.',
-    productsHint: 'Typical yields — adjust. Make products in',
+    productsHint: 'Typical yields: adjust. Make products in',
     makeProducts: 'Manufacturing',
     fatMemo: 'Fat memo',
     productQty: 'Product kg',
@@ -158,7 +158,7 @@ export const bT = defineArea(
     grid: 'Days grid',
   } as const,
   {
-    workingPaper: 'कार्य-पत्र — अपने संघ और सीए से जाँचें।',
+    workingPaper: 'कार्य-पत्र: अपने संघ और सीए से जाँचें।',
     'view.charts': 'दर तालिका',
     'view.collection': 'दूध संग्रह',
     'view.bills': 'दूध बिल',
@@ -292,7 +292,7 @@ export const bT = defineArea(
     gstToday: 'आज जीएसटी',
     addStarter: 'शुरुआती BOM जोड़ें',
     starterAdded: '{name} जुड़ा।',
-    productsHint: 'सामान्य उपज — बदलें। उत्पाद बनाएँ:',
+    productsHint: 'सामान्य उपज: बदलें। उत्पाद बनाएँ:',
     makeProducts: 'विनिर्माण',
     fatMemo: 'फैट ज्ञापन',
     productQty: 'उत्पाद किलो',

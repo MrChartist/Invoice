@@ -162,7 +162,7 @@ export function buildInterestInvoice(p: PartyInterest, ctx: { date: string; asOf
     ...draft, issue_date: ctx.date, due_date: ctx.date > draft.due_date ? ctx.date : draft.due_date, status: 'Draft', client: { ...ctx.client }, items, place_of_supply: pos,
     gst_mode: deriveGstMode({ senderStateCode: home, placeOfSupply: pos, senderHasGstin: !!ctx.sender?.companyGstin?.trim(), taxEnabled: true }),
     ...(src ? { supply_type: src.supply_type, place_of_supply: src.place_of_supply || pos, gst_mode: src.gst_mode, ...(src.lut_number ? { lut_number: src.lut_number } : {}), ...(src.lut_date ? { lut_date: src.lut_date } : {}) } : {}),
-    notes: `Interest on overdue bills as on ${ctx.asOf} (Sec 15(2)(d) CGST Act: part of the value of the supply — verify with your CA).`,
+    notes: `Interest on overdue bills as on ${ctx.asOf} (Sec 15(2)(d) CGST Act: part of the value of the supply, verify with your CA).`,
   };
   const t = calculateInvoice(calcInputFromRecord(rec, { amount_paid: 0 }));
   return { ...rec, subtotal: t.subtotal, discount_amount: t.discount_amount, taxable_value: t.taxable_value, cgst_amount: t.cgst_amount, sgst_amount: t.sgst_amount, igst_amount: t.igst_amount, tax_amount: t.tax_amount, round_off: t.round_off, total: t.total, balance_due: t.balance_due, cess_amount: t.cess_amount, tcs_amount: t.tcs_amount, tds_amount: t.tds_amount };
@@ -222,5 +222,5 @@ export function undoInterestRun(runId: string): InterestRun {
 
 /** Statement text for one party (print / WhatsApp). */
 export function interestText(p: PartyInterest, asOf: string, money: (n: number) => string): string {
-  return [`Interest statement — ${p.party} (as on ${asOf}, ${p.rate}% p.a.)`, ...p.bills.map((b) => `${b.number} (${b.date}, due ${b.due}): ${b.from} to ${b.to}, ${b.days} days on ${money(b.outstanding)} → ${money(b.amount)}`), `Total interest: ${money(p.total)}`].join('\n');
+  return [`Interest statement: ${p.party} (as on ${asOf}, ${p.rate}% p.a.)`, ...p.bills.map((b) => `${b.number} (${b.date}, due ${b.due}): ${b.from} to ${b.to}, ${b.days} days on ${money(b.outstanding)} → ${money(b.amount)}`), `Total interest: ${money(p.total)}`].join('\n');
 }

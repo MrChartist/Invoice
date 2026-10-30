@@ -6,7 +6,7 @@ export const row = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItem
 export const n = (s: string | undefined) => Number(s) || 0;
 export const fmt = (x: number) => x.toLocaleString('en-IN', { maximumFractionDigits: 3 });
 /** `[[id, name]]` with a leading blank option. */
-export const opt = <X,>(xs: readonly X[], id: (x: X) => string, name: (x: X) => string) => [['', '—'] as const, ...xs.map((x) => [id(x), name(x)] as const)];
+export const opt = <X,>(xs: readonly X[], id: (x: X) => string, name: (x: X) => string) => [['', '-'] as const, ...xs.map((x) => [id(x), name(x)] as const)];
 /** The value of `fn`, or `fallback` when it throws (live previews of half-typed forms). */
 export function attempt<T>(fn: () => T, fallback: T): T {
   try {

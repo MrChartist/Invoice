@@ -35,7 +35,7 @@ test('next service by days, and by km projection when km would come first', () =
 test('due list: service in 30 days / overdue, insurance expiry; texts en / hi', () => {
   const rows = dueList([car({ next_service_date: '2026-11-10', next_service_km: 52000, policy_expiry: '2026-10-15' }), car({ id: 'a2', next_service_date: '2027-03-01' })], DAY);
   assert.deepEqual(rows.map((r) => [r.kind, r.date, r.overdue]), [['insurance', '2026-10-15', true], ['service', '2026-11-10', false]]);
-  assert.equal(reminderText(rows[1], 'AllWheels'), 'Hello Mr Patil, your MH12AB1234 Maruti Swift is due for service on 2026-11-10 or at 52000 km. Reply to book a slot. — AllWheels');
+  assert.equal(reminderText(rows[1], 'AllWheels'), 'Hello Mr Patil, your MH12AB1234 Maruti Swift is due for service on 2026-11-10 or at 52000 km. Reply to book a slot. AllWheels');
   assert.match(reminderText(rows[0], 'AllWheels', 'hi'), /बीमा 2026-10-15/);
 });
 

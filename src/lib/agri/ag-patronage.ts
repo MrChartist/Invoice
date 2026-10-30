@@ -100,7 +100,7 @@ export function draftAppropriation(dist: Distribution, date: string): ManualVouc
   ] as const;
   return saveVoucher({
     type: 'JOURNAL', date, variant: 'OPTIONAL', voucher_class: 'Appropriation (draft)',
-    narration: `Draft appropriation of profit ₹${dist.pat.toFixed(2)}: reserve, dividend, patronage bonus — for the general meeting; verify with your CA (AG18, AG25)`,
+    narration: `Draft appropriation of profit ₹${dist.pat.toFixed(2)}: reserve, dividend, patronage bonus, for the general meeting; verify with your CA (AG18, AG25)`,
     lines: [{ account_id: A.reserves, dr: p(total), cr: 0 }, ...cr.filter(([n]) => n > 0).map(([n, id]) => ({ account_id: id, dr: 0, cr: p(n) }))],
   });
 }

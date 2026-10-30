@@ -32,7 +32,7 @@ export default function BillRecoveries({ boqId, onChange }: { boqId: string; onC
   };
   const w = v.wi && v.wt && v.wr ? wastageRecovery(Number(v.wi), Number(v.wt), Number(v.wr)) : null;
   const spec: Spec[] = [...Array(rows).keys()].flatMap((i) => [
-    [`kind${i}`, twT('kind'), KINDS.map((k) => [k, cbT(`rk.${k}`)] as const)], [`ref${i}`, cbT('rk.secured_advance'), [['', '—'], ...secured.map((s) => [s.id, `${s.date} · ${fmtMoney(s.amount)}`] as const)]],
+    [`kind${i}`, twT('kind'), KINDS.map((k) => [k, cbT(`rk.${k}`)] as const)], [`ref${i}`, cbT('rk.secured_advance'), [['', '-'], ...secured.map((s) => [s.id, `${s.date} · ${fmtMoney(s.amount)}`] as const)]],
     ...F.map((k) => [`${k}${i}`, twT(k), k === 'reason' ? undefined : 'number'] as const), [`rel${i}`, twT('releaseOn'), 'date'],
   ] as Spec[]);
   return (

@@ -60,7 +60,7 @@ test('SV-A: the POS strip is lazy and mounted only for service packs', () => {
 
 test('SV-A tips: one 0% non-GST tip line; paid to the staff member in full, outside commission, slab and TDS base', () => {
   const t = tipLine(asha, 150);
-  assert.deepEqual([t.name, t.rate, t.tax_rate, t.sv], ['Tip — Asha', 150, 0, { tip: true, staff_id: 's1', staff_name: 'Asha', exempt: 'NON_GST' }]);
+  assert.deepEqual([t.name, t.rate, t.tax_rate, t.sv], ['Tip: Asha', 150, 0, { tip: true, staff_id: 's1', staff_name: 'Asha', exempt: 'NON_GST' }]);
   const base = [{ id: 'a', name: 'Haircut' } as InvoiceItem];
   const one = setTip(base, asha, 100);
   assert.equal(one.filter(isTipLine).length, 1);

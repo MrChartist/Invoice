@@ -71,7 +71,7 @@ export function UnitsModal({ open, items, onClose, onChanged }: {
                 return (
                   <tr key={u.id}>
                     <td>{u.symbol}{u.id.startsWith('builtin:') && <span className={styles.muted}> · {imT('builtIn')}</span>}</td>
-                    <td>{u.name || '—'}</td>
+                    <td>{u.name || '-'}</td>
                     <td>{u.uqc || imT('uqcAuto', { uqc: mapUnitToUqc(u.symbol) })}</td>
                     <td className={surface.numeric}>{u.decimals ?? 0}</td>
                     <td>

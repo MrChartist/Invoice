@@ -46,7 +46,7 @@ export default function RegistersView({ notify }: HsViewProps) {
   const tx = useMemo(() => itaxFigures(Number(fy.slice(0, 4))), [fy]);
   const act = (fn: () => void) => { try { fn(); notify(hsdT('saved')); setTick((t) => t + 1); } catch (e) { notify((e as Error).message, 'error'); } };
   const title = reg === 'j' ? (formJ ? hsdT('j') : hsdT('members')) : hsdT(reg);
-  const line = (r: (typeof rows)[number]) => reg === 'share' ? `${r.no}. ${r.name} — ${r.unit} — ${r.cert ?? ''}` : reg === 'nomination' ? `${r.no}. ${r.name} — ${r.unit} — ${nomineesText(r.nominees)}` : `${r.no}. ${r.name} — ${r.unit} — ${r.admitted ?? ''} — ${r.cert ?? ''}${reg === 'iReg' ? ` — ${hsdT('transfers')}: ${r.transfers}` : ''}`;
+  const line = (r: (typeof rows)[number]) => reg === 'share' ? `${r.no}. ${r.name}: ${r.unit}, ${r.cert ?? ''}` : reg === 'nomination' ? `${r.no}. ${r.name}: ${r.unit}, ${nomineesText(r.nominees)}` : `${r.no}. ${r.name}: ${r.unit}, ${r.admitted ?? ''}, ${r.cert ?? ''}${reg === 'iReg' ? `, ${hsdT('transfers')}: ${r.transfers}` : ''}`;
   const set = (k: keyof HsAudit, x: string) => setAu({ ...cur, [k]: x || undefined });
   return (
     <section data-hs-registers>
@@ -86,7 +86,7 @@ export default function RegistersView({ notify }: HsViewProps) {
       <h3>{hsdT('itax')}</h3>
       <div data-hs-itax>
         <p>{hsdT('mutual')}: {formatCurrency(tx.mutual)} · {hsdT('nonMutual')}: {formatCurrency(round(tx.outsider + tx.other))}</p>
-        {tx.rule && <p>{hsdT('ded')} ({tx.rule.act}): {tx.rule.lines.map((l) => `Sec ${l.code} — ${l.text}${l.cap ? ` (up to ${formatCurrency(l.cap)})` : ''}`).join('; ')}. {hsdT('bank')}</p>}
+        {tx.rule && <p>{hsdT('ded')} ({tx.rule.act}): {tx.rule.lines.map((l) => `Sec ${l.code}: ${l.text}${l.cap ? ` (up to ${formatCurrency(l.cap)})` : ''}`).join('; ')}. {hsdT('bank')}</p>}
         <p className={controls.hint}>{hsdT('tdsNote')} {hsdT('wp')}</p>
       </div>
     </section>

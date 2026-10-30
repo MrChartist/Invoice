@@ -219,17 +219,17 @@ export function buildSchema(tables: readonly FlatTable[], company: string, gener
 
 export function buildReadme(tables: readonly FlatTable[], company: string, generated: string, opts: ExportOptions & { workbook: boolean; attachments: number; images: number }): string {
   return [
-    `# ${company || 'Company'} — full data export`,
+    `# ${company || 'Company'}: full data export`,
     '',
     `Made on ${generated} by Mr. Chartist Invoice. Every file opens in a spreadsheet; nothing here needs this app.`,
     '',
     '## Files',
     '',
-    ...tables.map((t) => `- \`${t.name}.csv\` — ${tableMeaning(t.name)} (${t.rows.length} row${t.rows.length === 1 ? '' : 's'})`),
-    '- `schema.json` — every table and column with its type (string / number / date / bool / json) and meaning ("unknown" when not described).',
-    ...(opts.workbook ? ['- `workbook.xlsx` — the same tables, one sheet each (header row bold).'] : []),
-    ...(opts.images ? [`- \`assets/\` — ${opts.images} logo / signature image(s) referenced from the CSVs.`] : []),
-    ...(opts.attachments ? [`- \`attachments/\` — ${opts.attachments} attached file(s), listed in \`attachments_index.csv\`.`] : []),
+    ...tables.map((t) => `- \`${t.name}.csv\`: ${tableMeaning(t.name)} (${t.rows.length} row${t.rows.length === 1 ? '' : 's'})`),
+    '- `schema.json`: every table and column with its type (string / number / date / bool / json) and meaning ("unknown" when not described).',
+    ...(opts.workbook ? ['- `workbook.xlsx`: the same tables, one sheet each (header row bold).'] : []),
+    ...(opts.images ? [`- \`assets/\`: ${opts.images} logo / signature image(s) referenced from the CSVs.`] : []),
+    ...(opts.attachments ? [`- \`attachments/\`: ${opts.attachments} attached file(s), listed in \`attachments_index.csv\`.`] : []),
     '',
     '## Conventions',
     '',

@@ -216,9 +216,9 @@ function BalanceSheetRoot({ ledger, asOf, period, stock, assets, today, onChange
                       <td>{DEPRECIATION_BLOCK_LABELS[a.block]}</td>
                       <td>{formatDate(a.put_to_use)}</td>
                       <td className={surface.numeric}>{money(Math.round(a.cost * 100))}</td>
-                      <td className={surface.numeric}>{row ? `${row.ratePct}%${row.halfRate ? ledgerT('half') : ''}` : '—'}</td>
-                      <td className={surface.numeric}>{row ? money(row.depreciation) : '—'}</td>
-                      <td className={surface.numeric}>{row ? money(row.closingWdv) : '—'}</td>
+                      <td className={surface.numeric}>{row ? `${row.ratePct}%${row.halfRate ? ledgerT('half') : ''}` : '-'}</td>
+                      <td className={surface.numeric}>{row ? money(row.depreciation) : '-'}</td>
+                      <td className={surface.numeric}>{row ? money(row.closingWdv) : '-'}</td>
                       <td className="no-print">
                         <div className={books.toolbarGroup}>
                           <button type="button" className={controls.btnIcon} aria-label={ledgerT('editName', { name: a.name })} onClick={() => setEditing(a)}><Pencil size={16} /></button>

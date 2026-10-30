@@ -206,7 +206,7 @@ export const gu: Catalogue = {
     'Scan barcode or search items': 'બારકોડ સ્કૅન કરો અથવા વસ્તુ શોધો',
     'Scan an item or search by name to start the bill.': 'બિલ શરૂ કરવા વસ્તુ સ્કૅન કરો અથવા નામથી શોધો.',
     Customer: 'ગ્રાહક',
-    'Walk-in customer — or search saved customers': 'વૉક-ઇન ગ્રાહક — અથવા સાચવેલા ગ્રાહકો શોધો',
+    'Walk-in customer: or search saved customers': 'વૉક-ઇન ગ્રાહક: અથવા સાચવેલા ગ્રાહકો શોધો',
     'Name (optional)': 'નામ (વૈકલ્પિક)',
     'Phone (optional)': 'ફોન (વૈકલ્પિક)',
     Totals: 'કુલ રકમ',

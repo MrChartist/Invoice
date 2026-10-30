@@ -97,15 +97,15 @@ export function jobWorkStockEvents(docs: JobWorkStockDocs | undefined, ctx: JobW
       const from = l.godown_id || MAIN;
       if (!ctx.byId(l.item_id) || !(q > 0) || from === o.job_worker_godown) continue;
       const base = { date, kind: 'transfer' as const, refType: 'job_work_out', refId: o.id, refNumber: o.number, party: o.party_name, batch: l.batch_no || undefined, serials: cleanSerials(l.serials) };
-      push(l.item_id, { ...base, qty: -q, godown: from, particulars: `Material out — ${o.number} · ${o.party_name}` });
-      push(l.item_id, { ...base, qty: q, godown: o.job_worker_godown, particulars: `Material out — ${o.number} · at ${o.party_name}` });
+      push(l.item_id, { ...base, qty: -q, godown: from, particulars: `Material out: ${o.number} · ${o.party_name}` });
+      push(l.item_id, { ...base, qty: q, godown: o.job_worker_godown, particulars: `Material out: ${o.number} · at ${o.party_name}` });
     }
   }
   const sorted = [...docs.ins].filter((v) => v && day(v.date)).sort((a, b) => day(a.date).localeCompare(day(b.date)) || String(a.number).localeCompare(String(b.number), undefined, { numeric: true }));
   for (const v of sorted) {
     const date = day(v.date);
     const jw = v.job_worker_godown || MAIN;
-    const label = `Material in — ${v.number}`;
+    const label = `Material in: ${v.number}`;
     const base = { date, refType: 'job_work_in', refId: v.id, refNumber: v.number, party: v.party_name };
     for (const l of v.consumed ?? []) {
       const q = num(l?.qty) * lineFactor(l);
@@ -162,7 +162,7 @@ export function jobWorkStockEvents(docs: JobWorkStockDocs | undefined, ctx: JobW
       if (!it || !(q > 0)) continue;
       push(it.id, {
         date, kind: 'return', qty: q, saleRate: src ? (num(src.rate) * (1 - Math.min(Math.max(num(src.discount_percent), 0), 100) / 100)) / f : undefined,
-        particulars: `Rejection in — ${r.number} (challan ${r.challan_number ?? challan?.invoice_number ?? ''})${r.client_name ? ` · ${r.client_name}` : ''}`,
+        particulars: `Rejection in: ${r.number} (challan ${r.challan_number ?? challan?.invoice_number ?? ''})${r.client_name ? ` · ${r.client_name}` : ''}`,
         refType: 'rejection_in', refId: r.id, refNumber: r.number, party: r.client_name,
         godown: l.godown_id ?? src?.godown_id, batch: (l.batch_no ?? src?.batch_no) || undefined,
       });

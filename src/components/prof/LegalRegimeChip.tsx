@@ -41,7 +41,7 @@ export default function LegalRegimeChip() {
   return (
     <p className={controls.hint} role="note" data-ps-legal={legal.regime}>
       {!registered && <>{psbT('memo')} · </>}
-      {psbT('legal')}: {psbT(`r.${legal.regime}`)} — {psbT(`why.${why}`)} ·{' '}
+      {psbT('legal')}: {psbT(`r.${legal.regime}`)} : {psbT(`why.${why}`)} ·{' '}
       <button type="button" className={controls.btnGhost} onClick={() => apply(NEXT[legal.regime!])} data-ps-legal-change>{psbT('change')}</button> <small>{psbT('verify')}</small>
     </p>
   );

@@ -144,16 +144,16 @@ export function Practice() {
                       <td colSpan={9} className={styles.muted}><Lock size={13} aria-hidden /> {dkT('pr.locked')}</td>
                     ) : (
                       <>
-                        <td>{r.gstins.join(', ') || '—'}<div className={styles.note}>{dkT(`pr.freq.${r.frequency}` as const)}</div></td>
-                        <td>{r.nextDue ? <>{r.nextDue.form} {r.nextDue.label}<div className={styles.note}>{formatDate(r.nextDue.due)}</div></> : '—'}</td>
+                        <td>{r.gstins.join(', ') || '-'}<div className={styles.note}>{dkT(`pr.freq.${r.frequency}` as const)}</div></td>
+                        <td>{r.nextDue ? <>{r.nextDue.form} {r.nextDue.label}<div className={styles.note}>{formatDate(r.nextDue.due)}</div></> : '-'}</td>
                         <td className={`${styles.num} ${r.overdue ? styles.bad : ''}`} title={r.overdueForms.join('\n')}>{r.overdue}</td>
-                        <td>{r.lastTds ?? '—'}<div className={styles.note}>{dkT('pr.tdsFy', { n: r.tdsFiledThisFy })}</div></td>
-                        <td>{r.lastVoucher ? formatDate(r.lastVoucher) : '—'}</td>
+                        <td>{r.lastTds ?? '-'}<div className={styles.note}>{dkT('pr.tdsFy', { n: r.tdsFiledThisFy })}</div></td>
+                        <td>{r.lastVoucher ? formatDate(r.lastVoucher) : '-'}</td>
                         <td>{r.lockUntil ? formatDate(r.lockUntil) : dkT('pr.unlocked')}</td>
                         <td className={styles.num}>{r.drafts}</td>
                         <td>{r.checklist.done}/{r.checklist.total}</td>
                         <td className={r.dsc && r.dsc.days <= 7 ? styles.bad : r.dsc && r.dsc.days <= 30 ? styles.warn : undefined}>
-                          {r.dsc ? <>{formatDate(r.dsc.validTo)}<div className={styles.note}>{r.dsc.holder}</div></> : '—'}
+                          {r.dsc ? <>{formatDate(r.dsc.validTo)}<div className={styles.note}>{r.dsc.holder}</div></> : '-'}
                         </td>
                       </>
                     )}

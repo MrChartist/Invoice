@@ -40,7 +40,7 @@ export function linesWithoutStaff(items: readonly InvoiceItem[]): InvoiceItem[] 
 /** A tip line for `staff` (0%, non-GST, never discounted). */
 export function tipLine(staff: Staff, amount: number): InvoiceItem {
   const a = round2(Math.max(Number(amount) || 0, 0));
-  return { ...blankItem(0), name: `Tip — ${staff.name}`, hsn: '', unit: 'NOS', quantity: 1, rate: a, amount: a, tax_rate: 0, sv: { tip: true, staff_id: staff.id, staff_name: staff.name, exempt: 'NON_GST' } };
+  return { ...blankItem(0), name: `Tip: ${staff.name}`, hsn: '', unit: 'NOS', quantity: 1, rate: a, amount: a, tax_rate: 0, sv: { tip: true, staff_id: staff.id, staff_name: staff.name, exempt: 'NON_GST' } };
 }
 
 /** Lines with the tip set to `amount` for `staff` (one tip line per bill; 0 removes it). */

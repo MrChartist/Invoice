@@ -27,10 +27,10 @@ export default function MfgCalendar({ today }: { today: string }) {
     const idOf = (n: string) => ids.get(n.trim().toLowerCase());
     for (const a of auths) {
       const s = eoStatus(a, exportsAgainst(inv, a.id, idOf), importsAgainst(bills, a.id, idOf), today);
-      if (s.bell) rows.push([`${a.kind === 'aa' ? 'AA' : 'EPCG'} ${a.number} — ${sdT('eoDue')}`, a.eo_extended_to || a.eo_due]);
+      if (s.bell) rows.push([`${a.kind === 'aa' ? 'AA' : 'EPCG'} ${a.number}: ${sdT('eoDue')}`, a.eo_extended_to || a.eo_due]);
     }
   }
-  for (const c of pendingClaims(incentiveClaimsDb.all(), today)) rows.push([`${c.name} — ${sdT('pending')} ${claimFigures(c, today).pending}`, c.claimed_on || c.period_to]);
+  for (const c of pendingClaims(incentiveClaimsDb.all(), today)) rows.push([`${c.name}: ${sdT('pending')} ${claimFigures(c, today).pending}`, c.claimed_on || c.period_to]);
   if (!rows.length) return null;
   return (
     <section className={surface.card} data-mfd-calendar>

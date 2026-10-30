@@ -37,7 +37,7 @@ export default function ProfitView(_: MpViewProps) {
         <table className={surface.table}>
           <thead><tr><th>{mpT('site')}</th>{K.map((k, i) => <th key={k} className={surface.numeric}>{mcList('pl', i)}</th>)}<th className={surface.numeric}>{mcList('pl', 6)}</th></tr></thead>
           <tbody>
-            {d.rows.map((r) => <tr key={r.site.id} data-mp-profit-site={r.site.mp.code}><td>{siteLabel(r.site)}</td>{K.map((k) => <td key={k} className={surface.numeric} data-k={k}>{formatCurrency(r[k])}</td>)}<td className={surface.numeric}>{r.pct === null ? '—' : `${r.pct} %`}</td></tr>)}
+            {d.rows.map((r) => <tr key={r.site.id} data-mp-profit-site={r.site.mp.code}><td>{siteLabel(r.site)}</td>{K.map((k) => <td key={k} className={surface.numeric} data-k={k}>{formatCurrency(r[k])}</td>)}<td className={surface.numeric}>{r.pct === null ? '-' : `${r.pct} %`}</td></tr>)}
           </tbody>
         </table>
       </div>

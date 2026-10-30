@@ -20,11 +20,11 @@ export default function PackSizeRow({ value, unit, onChange }: { value: PackFiel
   return (
     <div data-ml-pack>
       <div style={row}>
-        <Sel l={T('agClass')} v={value.ag_class ?? ''} set={(x) => onChange({ ...value, ag_class: (x || undefined) as AgClass | undefined })} o={[['', '—'], ...CLASSES.map((c) => [c, c] as const)]} x={200} d="ag-class" />
+        <Sel l={T('agClass')} v={value.ag_class ?? ''} set={(x) => onChange({ ...value, ag_class: (x || undefined) as AgClass | undefined })} o={[['', '-'], ...CLASSES.map((c) => [c, c] as const)]} x={200} d="ag-class" />
         <Num l={T('packSize')} v={value.ag_pack_kg === undefined ? '' : String(value.ag_pack_kg)} set={(x) => onChange({ ...value, ag_pack_kg: x === '' ? undefined : Number(x) })} x={150} d="pack-kg" />
         <label className={controls.check}><input type="checkbox" checked={!!value.ag_labelled} onChange={(e) => onChange({ ...value, ag_labelled: e.target.checked || undefined })} data-ml="labelled" /> {T('labelled')}</label>
       </div>
-      {s && <p className={controls.hint} data-ml-suggest={s.rate}>{T('suggestion', { cls: s.ag_class, rate: s.rate, hsn: s.hsn })}{s.note ? ` — ${T('packNote')}` : ''}</p>}
+      {s && <p className={controls.hint} data-ml-suggest={s.rate}>{T('suggestion', { cls: s.ag_class, rate: s.rate, hsn: s.hsn })}{s.note ? `: ${T('packNote')}` : ''}</p>}
     </div>
   );
 }

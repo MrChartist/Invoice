@@ -67,7 +67,7 @@ export function ShortcutsOverlay({ open, onClose }: ShortcutsOverlayProps) {
           {keysT(r.plain)}
           {r.tally && <span className={styles.tally}>{keysT(r.tally)}</span>}
           {dim && <span className={styles.note}>{keysT('needOn')}</span>}
-          {o !== c && <span className={styles.note}>{keysT('other', { layout: keysT(other), key: o ? formatCombo(o).join('+') : '—' })}</span>}
+          {o !== c && <span className={styles.note}>{keysT('other', { layout: keysT(other), key: o ? formatCombo(o).join('+') : '-' })}</span>}
         </span>
         {c ? <KeyCaps combo={c} /> : <span className={styles.note}>F10</span>}
       </li>

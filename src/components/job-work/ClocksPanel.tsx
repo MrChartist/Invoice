@@ -34,8 +34,8 @@ export function ClocksPanel({ data }: { data: JwData }) {
                 <td className={styles.num}>{qtyText(l.sent)} {item(l.item_id)?.unit ?? ''}</td>
                 <td className={styles.num}>{qtyText(l.consumed + l.returned + l.supplied + l.lost)}</td>
                 <td className={styles.num}><strong>{qtyText(l.pending)}</strong></td>
-                <td>{l.deadline ? formatDate(l.deadline) : '—'}</td>
-                <td className={styles.num}>{l.status === 'settled' || l.daysLeft === null ? '—' : l.daysLeft}</td>
+                <td>{l.deadline ? formatDate(l.deadline) : '-'}</td>
+                <td className={styles.num}>{l.status === 'settled' || l.daysLeft === null ? '-' : l.daysLeft}</td>
                 <td><ClockBadge status={l.status} />{l.late ? <div className={styles.muted}>{jwT('late')}</div> : null}</td>
               </tr>
             ))}

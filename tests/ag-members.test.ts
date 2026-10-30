@@ -91,7 +91,7 @@ test('80PA after AY 2024-25 computes nothing; Sec 149 labels from 1 Apr 2026; ca
   assert.equal(producerPaper(2023, 500000, 2e9).deduction, 0, 'turnover ₹200 crore');
   const late = producerPaper(2025, 500000, 5e8);
   assert.deepEqual([late.ay, late.deduction], ['2026-27', 0]);
-  assert.match(late.note, /No deduction found after AY 2024-25 — verify/);
+  assert.match(late.note, /No deduction found after AY 2024-25: verify/);
   assert.equal(producerPaper(2024, 1, 1).deduction, 0, 'AY 2025-26 too');
   assert.equal(coopSection(2025).section, '80P(2)');
   assert.equal(coopSection(2026).section, '149');
@@ -102,7 +102,7 @@ test('80PA after AY 2024-25 computes nothing; Sec 149 labels from 1 Apr 2026; ca
   assert.deepEqual(cal.map((c) => [c.key, c.due]), [['internalAudit', '2027-03-31'], ['register', '2027-04-30'], ['agm', '2027-09-15'], ['financials', '2027-10-30'], ['annualReturn', '2027-11-29']]);
 });
 
-test('QA13: allotment from application money checks the balance — ledger ceiling, other members\' cycle money held back', () => {
+test('QA13: allotment from application money checks the balance, ledger ceiling, other members\' cycle money held back', () => {
   const [asha, bholu] = loadMembers();
   // Pure: ledger 1,000; Asha's cycle money 300, all members' 800 → 300 + (1,000 − 800) = 500.
   assert.equal(applicationAvailable(1000, 300, 800), 500);
@@ -118,7 +118,7 @@ test('QA13: allotment from application money checks the balance — ledger ceili
   // Asha cannot use Bholu's money.
   assert.throws(() => allotShares(asha, { date: '2026-06-01', shares: 5, face_value: 100, paid_from: 'application' }), /Only ₹300\.00 of share application money is available for Asha Devi/);
   // A receipt of 200 into the ledger (not tied to a cycle) is open to her.
-  postPair({ type: 'RECEIPT', date: '2026-05-20', dr: A.bank, cr: app, amount: 200, narration: 'Application money — Asha', cls: 'test' });
+  postPair({ type: 'RECEIPT', date: '2026-05-20', dr: A.bank, cr: app, amount: 200, narration: 'Application money: Asha', cls: 'test' });
   const a = allotShares(asha, { date: '2026-06-01', shares: 5, face_value: 100, paid_from: 'application' });
   assert.equal(a.amount, 500);
   // The ledger is read as at the allotment date: before the cycle journal there is nothing.

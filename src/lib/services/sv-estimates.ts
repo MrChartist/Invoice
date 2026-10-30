@@ -60,7 +60,7 @@ export const partLine = (it: { name: string; hsn?: string; tax_rate?: number; sa
 
 /** Sublet / outside work re-billed at cost + markup (part of our supply at the labour SAC; SV24). */
 export const subletLine = (what: string, cost: number, markupPct: number, kind: string, date?: string): InvoiceItem =>
-  line({ name: `Outside work — ${what}`, type: 'Service', hsn: repairSac(kind, date), quantity: 1, rate: round2(num(cost) * (1 + num(markupPct) / 100)) });
+  line({ name: `Outside work: ${what}`, type: 'Service', hsn: repairSac(kind, date), quantity: 1, rate: round2(num(cost) * (1 + num(markupPct) / 100)) });
 
 const recordOf = (job: ServiceJob, asset: ServiceAsset | undefined) => ({ id: job.id, number: job.number, ...(asset?.reg_no || asset?.serial ? { asset: asset.reg_no || asset.serial } : {}), ...(job.odometer_in ? { odometer: job.odometer_in } : {}) });
 
@@ -126,7 +126,7 @@ export function billWorkshopJob(jobId: string, date: string): InvoiceRecord {
   return withTablesRollback(['invoices', 'series_counters', 'service_jobs', 'stock_transfers', 'doc_links', 'service_assets', 'transactions', 'advances'], () => {
     settleForBill(job, date);
     const d = draft(job, items, date, 'INVOICE');
-    const notes = [d.notes, job.amc_id && 'AMC visit: covered labour not charged.', !split && claim && `Claim with ${claim.payer_name}${claim.claim_no ? ` (claim no. ${claim.claim_no})` : ''} — for the owner's information.`, warranty].filter(Boolean).join('\n');
+    const notes = [d.notes, job.amc_id && 'AMC visit: covered labour not charged.', !split && claim && `Claim with ${claim.payer_name}${claim.claim_no ? ` (claim no. ${claim.claim_no})` : ''}: for the owner's information.`, warranty].filter(Boolean).join('\n');
     let saved = localDb.invoices.save({ ...d, notes, status: split ? 'Draft' : 'Sent' });
     if (!split && job.advance_id) {
       const adv = loadAdvances().find((a) => a.id === job.advance_id);

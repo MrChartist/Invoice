@@ -192,8 +192,8 @@ export default function ForecastTab({ data }: { data: BooksData }) {
                 <tr key={b.start}>
                   <td>{short(b.start)} – {short(b.end)}</td>
                   <td className={styles.numeric}>{formatMoney(b.opening)}</td>
-                  <td className={`${styles.numeric} ${styles.pos}`}>{b.inflow ? formatMoney(b.inflow) : '—'}</td>
-                  <td className={`${styles.numeric} ${styles.neg}`}>{b.outflow ? formatMoney(b.outflow) : '—'}</td>
+                  <td className={`${styles.numeric} ${styles.pos}`}>{b.inflow ? formatMoney(b.inflow) : '-'}</td>
+                  <td className={`${styles.numeric} ${styles.neg}`}>{b.outflow ? formatMoney(b.outflow) : '-'}</td>
                   <td className={styles.numeric}>{formatMoney(b.net)}</td>
                   <td className={`${styles.numeric} ${b.closing < 0 ? styles.neg : ''}`}>{formatMoney(b.closing)}</td>
                 </tr>
@@ -223,7 +223,7 @@ export default function ForecastTab({ data }: { data: BooksData }) {
                   <td>{formatDate(it.date)}{it.overdue && <span className={styles.overdue}>{planT('overdue')}</span>}</td>
                   <td>{planT(KIND_KEY[it.kind])}</td>
                   <td>{it.party}</td>
-                  <td>{it.link ? <Link to={it.link}>{it.ref || '—'}</Link> : it.ref || '—'}</td>
+                  <td>{it.link ? <Link to={it.link}>{it.ref || '-'}</Link> : it.ref || '-'}</td>
                   <td className={styles.muted}>{it.basis}</td>
                   <td className={`${styles.numeric} ${it.direction === 'in' ? styles.pos : styles.neg}`}>{it.direction === 'in' ? '+' : '−'}{formatMoney(it.amount)}</td>
                 </tr>

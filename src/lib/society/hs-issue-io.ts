@@ -56,7 +56,7 @@ function template(b: UnitBill): RecurringTemplate {
   return {
     doc_type: doc, currency: 'INR', template_id: localDb.template.get(), client: b.client, sender: sender(), items: b.items, gst_mode: doc === 'TAX_INVOICE' ? 'CGST_SGST' : 'NONE',
     place_of_supply: '', reverse_charge: false, discount_type: 'PERCENT', discount_rate: 0, tax_rate: 0, shipping: 0, other_charges: 0, round_off_enabled: false,
-    notes: `${b.hs.levy ? b.hs.levy.name : 'Maintenance bill'} — ${b.unit.code} — ${periodText(b.hs.period)}`, terms: '', ...(doc === 'BILL_OF_SUPPLY' ? { exempt_kind: 'EXEMPT' } : {}),
+    notes: `${b.hs.levy ? b.hs.levy.name : 'Maintenance bill'}: ${b.unit.code}, ${periodText(b.hs.period)}`, terms: '', ...(doc === 'BILL_OF_SUPPLY' ? { exempt_kind: 'EXEMPT' } : {}),
   } as RecurringTemplate;
 }
 

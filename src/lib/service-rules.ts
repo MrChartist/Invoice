@@ -42,7 +42,7 @@ const ROOMS_2022: ClassTable = { ...BASE_2017, hospital_room_high: { rate: 5, sa
 
 /** Class → rate / SAC by document date (SV1, SV2, SV3, SV11, SV17). */
 export const SERVICE_CLASS_RULES: readonly SvRule<ClassTable>[] = [
-  { from: '2017-07-01', value: BASE_2017, source: 'N 12/2017-CT(R) entries 74 (health care), 66 (education), 1 (12AB yoga); N 11/2017-CT(R) heading 9997 / 9992 / 9987 at 18% — as recalled', verified: false },
+  { from: '2017-07-01', value: BASE_2017, source: 'N 12/2017-CT(R) entries 74 (health care), 66 (education), 1 (12AB yoga); N 11/2017-CT(R) heading 9997 / 9992 / 9987 at 18%: as recalled', verified: false },
   { from: '2022-07-18', value: ROOMS_2022, source: 'N 03/2022 + 04/2022-CT(R): hospital room above ₹5,000 a day (non-ICU) 5% without ITC (SV3, secondary)', verified: false },
   {
     from: '2025-09-22',
@@ -59,7 +59,7 @@ export const NO_ITC_CLASSES: readonly SvClass[] = ['hospital_room_high', 'beauty
 
 /** SV13: composition 6% vs the regular 5%-no-ITC rate (null = no notice before the 5% rate began). */
 export const COMPOSITION_SERVICE_NOTE_RULES: readonly SvRule<{ composition: number; regular: number } | null>[] = [
-  { from: '2019-04-01', value: null, source: 'N 2/2019-CT(R): 6% composition for services (Sec 10(2A)); regular rate 18% — no notice', verified: false },
+  { from: '2019-04-01', value: null, source: 'N 2/2019-CT(R): 6% composition for services (Sec 10(2A)); regular rate 18%, no notice', verified: false },
   { from: '2025-09-22', value: { composition: 6, regular: 5 }, source: 'N 15/2025-CT(R): beauty / fitness 5% without ITC; composition stays 6% (SV13)', verified: false },
 ];
 
@@ -76,7 +76,7 @@ export const HOSPITAL_ROOM_RULES: readonly SvRule<HospitalRoomRule | null>[] = [
 
 /** SV1 / SV4: SAC of a consultation and the composite treatment (medicines, consumables, implants, food on admission). */
 export const HEALTH_CLASS_RULES: readonly SvRule<{ consultSac: string; compositeExempt: boolean }>[] = [
-  { from: '2017-07-01', value: { consultSac: '999312', compositeExempt: true }, source: 'SAC 999312 medical services; Circular 32/06/2018-GST para 5: in-patient medicines / food part of the composite health care supply — as recalled (SV1, SV4)', verified: false },
+  { from: '2017-07-01', value: { consultSac: '999312', compositeExempt: true }, source: 'SAC 999312 medical services; Circular 32/06/2018-GST para 5: in-patient medicines / food part of the composite health care supply, as recalled (SV1, SV4)', verified: false },
 ];
 
 /** SV8: the permanent caution on referral payments to doctors. */
@@ -99,7 +99,7 @@ export interface CoachingRefundRule { basis: 'days' | 'months'; dueDays: number 
 
 /** SV18: unused period refunded pro rata (by days; months is a setting), due within 10 days of the request. */
 export const COACHING_REFUND_RULES: readonly SvRule<CoachingRefundRule>[] = [
-  { from: '2024-01-16', value: { basis: 'days', dueDays: 10 }, source: 'MoE Guidelines for Registration and Regulation of Coaching Centres 2024 (as reported: pro rata refund of the remaining period within 10 days, hostel / mess too) — secondary, date unverified (SV18)', verified: false },
+  { from: '2024-01-16', value: { basis: 'days', dueDays: 10 }, source: 'MoE Guidelines for Registration and Regulation of Coaching Centres 2024 (as reported: pro rata refund of the remaining period within 10 days, hostel / mess too), secondary, date unverified (SV18)', verified: false },
 ];
 
 /* ── SV-D: repair and service centres (filled by SV-D) ───────────────────────────────────────────────────────── */
@@ -108,7 +108,7 @@ export interface RepairSacRule { vehicle: string; appliance: string; computer: s
 
 /** SV20: repair SAC per asset kind (group 9987; labour 18% when priced separately from parts). */
 export const REPAIR_SAC_RULES: readonly SvRule<RepairSacRule>[] = [
-  { from: '2017-07-01', value: { vehicle: '998714', appliance: '998715', computer: '998713', telecom: '998716', other: '998729' }, source: 'SAC 9987: 998714 transport machinery, 998715 household appliances, 998713 computers, 998716 telecom, 998729 other goods — as recalled; AAR WB Alok Bhanuka 2018 / UP Premier Car Sales 2019 on separate supplies (SV20, secondary)', verified: false },
+  { from: '2017-07-01', value: { vehicle: '998714', appliance: '998715', computer: '998713', telecom: '998716', other: '998729' }, source: 'SAC 9987: 998714 transport machinery, 998715 household appliances, 998713 computers, 998716 telecom, 998729 other goods, as recalled; AAR WB Alok Bhanuka 2018 / UP Premier Car Sales 2019 on separate supplies (SV20, secondary)', verified: false },
 ];
 
 /** Depreciation % the owner pays on an approved part, by category; metal by vehicle age ([months up to, %]). */
@@ -122,7 +122,7 @@ export const MOTOR_DEPRECIATION_DEFAULTS: readonly SvRule<MotorDepreciation>[] =
   {
     from: '2002-07-01',
     value: { pct: { rubber: 50, plastic: 50, fibre: 30, glass: 0, paint: 25, other: 0 }, metal: [[6, 0], [12, 5], [24, 10], [36, 15], [48, 25], [60, 35], [120, 40], [Infinity, 50]] },
-    source: 'Insurer practice, not statute: India Motor Tariff GR 9 schedule as carried in private-car policies (rubber / nylon / plastic 50%, fibre glass 30%, glass nil, metal by vehicle age) — verify with the insurer (SV22)',
+    source: 'Insurer practice, not statute: India Motor Tariff GR 9 schedule as carried in private-car policies (rubber / nylon / plastic 50%, fibre glass 30%, glass nil, metal by vehicle age), verify with the insurer (SV22)',
     verified: false,
   },
 ];

@@ -67,7 +67,7 @@ export default function AgentsView({ notify }: LgViewProps) {
         <section data-lg-agent-desk>
           <h3>{a.vendor.name}</h3>
           <div style={row}>
-            <Pick label={lgT('job')} value={f.job} ids={d.jobs.map((j) => j.id)} name={(x) => d.jobs.find((j) => j.id === x)?.number ?? x} blank="—" onChange={(v) => setF({ ...f, job: v })} attr="agent-job" />
+            <Pick label={lgT('job')} value={f.job} ids={d.jobs.map((j) => j.id)} name={(x) => d.jobs.find((j) => j.id === x)?.number ?? x} blank="-" onChange={(v) => setF({ ...f, job: v })} attr="agent-job" />
             <Pick label={lgT('kind')} value={f.kind} ids={NOTE_KINDS} name={(x) => list('noteKinds', NOTE_KINDS, x)} onChange={(v) => setF({ ...f, kind: v as NoteKind })} />
             <In label={lgdT('amount')} type="number" value={f.amount} onChange={(v) => setF({ ...f, amount: numIn(v) })} attr="agent-amount" />
             <In label={lgT('currency')} value={f.cur} onChange={(v) => setF({ ...f, cur: v.toUpperCase().slice(0, 3) })} />

@@ -33,7 +33,7 @@ test('one regime per invoice: 5 % mixed with other taxed lines warns; pure-agent
 test('lines: to5 one gross package line at 5 %; agent a fee line + pure-agent lines at cost; exempt in the exempt column', () => {
   const bk = (id: string, cost: number, sell: number, pure = false) => ({ id, trip_id: 't', component: 'hotel' as const, start: '2026-11-10', cost, sell, status: 'confirmed' as const, created_at: '', ...(pure ? { pure_agent: true } : {}) });
   const to5 = tripLines('Goa (2611-001)', 'to5', '2026-11-10', [bk('a', 42000, 50000), bk('b', 6000, 10000)]);
-  assert.deepEqual(to5.items.map((l) => [l.name, l.rate, l.tax_rate, l.hsn]), [['Tour package — Goa (2611-001)', 60000, 5, '998555']]);
+  assert.deepEqual(to5.items.map((l) => [l.name, l.rate, l.tax_rate, l.hsn]), [['Tour package: Goa (2611-001)', 60000, 5, '998555']]);
   assert.deepEqual([...to5.refs.values()], [to5.items[0].id, to5.items[0].id]);
   const ag = tripLines('Goa', 'agent', '2026-11-10', [bk('h', 9000, 9000, true), bk('f', 0, 2500)]);
   assert.deepEqual(ag.items.map((l) => [l.rate, l.tax_rate, isPureAgentLine(l)]), [[2500, 18, false], [9000, 0, true]]);

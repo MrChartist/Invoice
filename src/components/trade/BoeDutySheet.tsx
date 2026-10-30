@@ -100,7 +100,7 @@ export default function BoeDutySheet({ lines, date, bill, initial, onApply, onCl
           <label className={`${controls.field} ${styles.grow}`}>
             <span className={controls.label}>{trT('boeRateLabel', { currency })}</span>
             <NumberInput className={`${controls.input} ${controls.inputNumeric}`} value={rate} onChange={setRate} />
-            <span className={controls.hint}>{trT('boeRateHint', { rate: ref ? `${ref.rate} (${ref.date})` : '—' })}</span>
+            <span className={controls.hint}>{trT('boeRateHint', { rate: ref ? `${ref.rate} (${ref.date})` : '-' })}</span>
           </label>
           {num(trT('boeFob'), fob, setFob)}
           {num(trT('boeFreight'), freight, setFreight)}

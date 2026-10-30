@@ -178,7 +178,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
               <option value="">{t('parties.state')}</option>
               {INDIAN_STATES.map((s) => (
                 <option key={s.code} value={s.code}>
-                  {s.code} — {s.name}
+                  {s.code} : {s.name}
                 </option>
               ))}
             </select>
@@ -205,7 +205,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
                 <option value="">{t('parties.state')}</option>
                 {INDIAN_STATES.map((s) => (
                   <option key={s.code} value={s.code}>
-                    {s.code} — {s.name}
+                    {s.code} : {s.name}
                   </option>
                 ))}
               </select>
@@ -224,7 +224,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
             <option value="">{t('parties.notSet')}</option>
             {INDIAN_STATES.map((s) => (
               <option key={s.code} value={s.code}>
-                {s.code} — {s.name}
+                {s.code} : {s.name}
               </option>
             ))}
           </select>

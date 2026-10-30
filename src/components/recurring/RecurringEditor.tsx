@@ -55,12 +55,12 @@ function scratchTemplate(): RecurringTemplate {
   });
   const tpl = templateFromInvoice({ ...draft, items: [blankItem(draft.tax_rate)] });
   // templateFromInvoice drops empty rows; a scratch schedule starts with one.
-  return { ...tpl, items: [{ ...blankItem(draft.tax_rate), name: 'Monthly subscription — {month} {year}' }] };
+  return { ...tpl, items: [{ ...blankItem(draft.tax_rate), name: 'Monthly subscription: {month} {year}' }] };
 }
 
 function suggestName(t: RecurringTemplate): string {
-  const first = t.items.find((i) => i.name.trim())?.name.replace(/\s*[—-]\s*\{.*$/, '').trim();
-  return [t.client.name, first].filter(Boolean).join(' — ');
+  const first = t.items.find((i) => i.name.trim())?.name.replace(/\s*[—:-]\s*\{.*$/, '').trim();
+  return [t.client.name, first].filter(Boolean).join(': ');
 }
 
 /** 1 -> "1st", 22 -> "22nd", 31 -> "31st", 11 -> "11th". */
@@ -332,7 +332,7 @@ function EditorBody({
                   className={controls.input}
                   aria-label={recT('itemName', { n: idx + 1 })}
                   value={item.name}
-                  placeholder="Service — {month} {year}"
+                  placeholder="Service: {month} {year}"
                   onChange={(e) => patchItem(item.id, { name: e.target.value })}
                 />
                 <input

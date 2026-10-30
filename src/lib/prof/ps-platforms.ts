@@ -90,13 +90,13 @@ export function receiveViaPlatform(inv: Pick<InvoiceRecord, 'id' | 'invoice_numb
   return withTablesRollback(['transactions', 'invoices', 'purchases', 'purchase_payments'], () => {
     const pay = localDb.payments.record({ invoiceId: inv.id, amount: round2(num(r.gross)), method: 'Bank Transfer', reference: r.reference, note: `Platform: ${platform.name} (fees ${plan.feeFc} ${String(inv.currency).toUpperCase()})`, date: r.date, realisedRate: plan.rate, bankAccountId: platform.bank_account_id });
     if (!(plan.feeInr > 0)) return { ...plan, paymentId: pay.id };
-    const lines = [{ id: generateId(), name: `${platform.name} fees — ${inv.invoice_number}`, hsn: PLATFORM_FEE_SAC, unit: 'NOS', quantity: 1, rate: plan.feeInr, tax_rate: plan.rcm ? RCM_IGST_RATE : 0 }];
+    const lines = [{ id: generateId(), name: `${platform.name} fees: ${inv.invoice_number}`, hsn: PLATFORM_FEE_SAC, unit: 'NOS', quantity: 1, rate: plan.feeInr, tax_rate: plan.rcm ? RCM_IGST_RATE : 0 }];
     const t = computePurchaseTotals(lines, { placeOfSupply: '96', businessState: '00', gstApplies: plan.rcm });
     const bill: Omit<PurchaseRecord, 'id'> = {
       kind: 'EXPENSE', vendor_id: platform.vendor_id, vendor_name: platform.name, bill_number: `${platform.name.slice(0, 12)}/${r.reference || inv.invoice_number}`.slice(0, 40), date: r.date,
       category: platform.fee_ledger || 'Platform fees', lines, taxable: t.taxable, cgst: 0, sgst: 0, igst: t.igst, itc_eligible: plan.rcm, total: t.total, amount_paid: 0,
       ...(plan.rcm ? { import_type: 'SERVICES' as const } : {}),
-      notes: `Fees deducted by ${platform.name} on ${inv.invoice_number}${plan.rcm ? ' — import of services, reverse charge' : ''}`,
+      notes: `Fees deducted by ${platform.name} on ${inv.invoice_number}${plan.rcm ? ': import of services, reverse charge' : ''}`,
     };
     const saved = purchasesDb.save(bill);
     const owe = supplierPayableOf({ reverseCharge: false, importType: plan.rcm ? 'SERVICES' : '', tax: t.tax, taxable: t.taxable, total: t.total });

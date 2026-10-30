@@ -103,7 +103,7 @@ export function ReviewStep({ state, table, preview, rows, writable, dispatch }: 
           Show more ({(rows.length - visible).toLocaleString('en-IN')} remaining)
         </button>
       )}
-      {writable === 0 && <p className={ctl.error}>Nothing to import yet — fix the errors, change the mapping, or un-skip rows.</p>}
+      {writable === 0 && <p className={ctl.error}>Nothing to import yet: fix the errors, change the mapping, or un-skip rows.</p>}
     </div>
   );
 }
@@ -130,7 +130,7 @@ function ReviewRow({ row, isSkipped, open, table, mapping, kind, onToggleSkip, o
       <tr className={cn(row.action === 'error' && styles.rowError, isSkipped && styles.rowSkipped)}>
         <td className={styles.mono}>{row.line}</td>
         <td>
-          <span className={styles.recordName}>{row.label || '—'}</span>
+          <span className={styles.recordName}>{row.label || '-'}</span>
           {row.skipReason && <span className={styles.fieldHint}>{row.skipReason}</span>}
         </td>
         <td>
@@ -138,7 +138,7 @@ function ReviewRow({ row, isSkipped, open, table, mapping, kind, onToggleSkip, o
         </td>
         <td>
           {problems.length === 0 ? (
-            <span className={ctl.hint}>—</span>
+            <span className={ctl.hint}>-</span>
           ) : (
             <ul className={styles.issueList}>
               {problems.map((p, i) => (

@@ -42,7 +42,7 @@ test('paper: registered vs unregistered, Bill of Supply for all-exempt, sentence
   assert.equal(legalDocKind(true, ['exempt', 'rcm']), 'tax_invoice');
   assert.equal(docRegime(['taxable', 'exempt']), 'taxable');
   assert.match(legalSentence({ regime: 'rcm', entry: 'N 13/2017-CT(R) entry 2' }, true), /payable by the recipient under reverse charge/);
-  assert.match(legalSentence({ regime: 'exempt' }, true), /^Exempt — N 12\/2017-CT\(R\), entry 45/);
+  assert.match(legalSentence({ regime: 'exempt' }, true), /^Exempt: N 12\/2017-CT\(R\), entry 45/);
   assert.match(legalSentence({ regime: 'exempt' }, false), /^Not registered under GST/);
   const rec = { client: clientRetail, items: [{ id: 'a', name: 'Fees', hsn: '998213', quantity: 1, rate: 10000, tax_rate: 18, discount_percent: 0, amount: 10000, type: 'Service' }], issue_date: D, doc_type: 'INVOICE' } as unknown as InvoiceRecord;
   const memo = legalPatch({ record: rec, registered: false });
@@ -68,11 +68,11 @@ test('GSTR-1: an RCM fee note is reported with rchrg Y and the tax is not receiv
 });
 
 test('appearances bill per entry; WorkType.ps survives the normaliser', () => {
-  const [wt] = normalizeWorkTypes([{ id: 'w1', name: 'Appearance — Saket court', rate: 15000, ps: { unit: 'appearance' } }]);
+  const [wt] = normalizeWorkTypes([{ id: 'w1', name: 'Appearance: Saket court', rate: 15000, ps: { unit: 'appearance' } }]);
   assert.equal(workUnitOf(wt), 'appearance');
   assert.equal(workUnitOf({ ps: { unit: 'x' } }), 'hour');
   const lines = appearanceLines([{ work_type_id: 'w1', date: '2026-10-01', hourly_rate: 4000 }, { work_type_id: 'w1', date: '2026-10-09' }, { work_type_id: 'other', date: '2026-10-09' }], [wt, { id: 'other', name: 'Research', rate: 4000 }]);
-  assert.deepEqual(lines, [{ name: 'Appearance — Saket court', quantity: 2, rate: 15000, unit: 'NOS', work_type_id: 'w1' }]);
+  assert.deepEqual(lines, [{ name: 'Appearance: Saket court', quantity: 2, rate: 15000, unit: 'NOS', work_type_id: 'w1' }]);
 });
 
 test('inward: a bill from an advocate with a legal SAC prompts RCM unless we are a small business', () => {

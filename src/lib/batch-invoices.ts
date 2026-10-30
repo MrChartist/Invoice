@@ -369,7 +369,7 @@ export function batchToRecurring(template: RecurringTemplate, parties: readonly 
   return withTablesRollback([RECURRING_TABLE], () => {
     for (const d of drafts) {
       const t = templateFromInvoice(d.record);
-      recurringDb.save(createSchedule({ ...rule, name: `${clean(rule.name) || 'Batch'} — ${d.party.client.name}`, template: t }));
+      recurringDb.save(createSchedule({ ...rule, name: `${clean(rule.name) || 'Batch'}: ${d.party.client.name}`, template: t }));
     }
     return drafts.length;
   });

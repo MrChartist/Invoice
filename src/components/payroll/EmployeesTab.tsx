@@ -250,21 +250,21 @@ function EmployeeModal({
         <label className={controls.field}>
           <span className={controls.label}>{pT('f.department')}</span>
           <select className={controls.select} value={f.cost_centre_id ?? ''} onChange={(e) => set('cost_centre_id', e.target.value || undefined)}>
-            <option value="">—</option>
+            <option value="">-</option>
             {centres.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{pT('f.group')}</span>
           <select className={controls.select} value={f.group_id ?? ''} onChange={(e) => set('group_id', e.target.value || undefined)}>
-            <option value="">—</option>
+            <option value="">-</option>
             {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{pT('f.gender')}</span>
           <select className={controls.select} value={f.gender ?? ''} onChange={(e) => set('gender', (e.target.value || undefined) as EmployeeInput['gender'])}>
-            <option value="">—</option>
+            <option value="">-</option>
             <option value="M">{pT('gender.m')}</option>
             <option value="F">{pT('gender.f')}</option>
             <option value="O">{pT('gender.o')}</option>
@@ -290,7 +290,7 @@ function EmployeeModal({
         <label className={controls.field}>
           <span className={controls.label}>{pT('f.state')}</span>
           <select className={controls.select} value={f.state ?? ''} onChange={(e) => set('state', e.target.value || undefined)}>
-            <option value="">—</option>
+            <option value="">-</option>
             {INDIAN_STATES.map((s) => <option key={s.code} value={s.code}>{s.name}{PT_STATES[s.code] ? ' · PT' : ''}</option>)}
           </select>
         </label>

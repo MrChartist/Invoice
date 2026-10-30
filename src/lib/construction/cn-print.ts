@@ -50,10 +50,10 @@ export function deductionNotes(deds: readonly RaDeduction[] | undefined, money: 
   if (!list.length) return [];
   const sum = (k: RaDeductionKind) => round2(list.filter((d) => d.kind === k).reduce((s, d) => s + num(d.amount), 0));
   const out = ['GST is charged on the full bill value; deductions do not reduce it.'];
-  if (sum('gst_tds') > 0) out.push(`GST TDS u/s 51 (${money(sum('gst_tds'))}) to be deducted by the recipient — credit after GSTR-7.`);
+  if (sum('gst_tds') > 0) out.push(`GST TDS u/s 51 (${money(sum('gst_tds'))}) to be deducted by the recipient: credit after GSTR-7.`);
   if (sum('labour_cess') > 0) out.push(`Labour cess deducted at source (${money(sum('labour_cess'))}).`);
   // CN-B4: LD is not consideration for a supply (Circular 178/10/2022) — the bill's taxable value is unchanged.
-  if (sum('ld') > 0) out.push(`Liquidated damages (${money(sum('ld'))}) are not a supply (Circular 178/10/2022 — verify with your CA); GST stays on the full value.`);
+  if (sum('ld') > 0) out.push(`Liquidated damages (${money(sum('ld'))}) are not a supply (Circular 178/10/2022: verify with your CA); GST stays on the full value.`);
   return out;
 }
 
@@ -108,7 +108,7 @@ export const DECLARATION_TEXT: Readonly<Record<Exclude<WorksDeclarationKind, 'no
   supply_install: 'Supply of goods with installation (the supply part at the goods rate; installation as a service).',
 };
 
-export const PURE_LABOUR_TEXT = 'Exempt — pure labour (verify with your CA, CN2).';
+export const PURE_LABOUR_TEXT = 'Exempt: pure labour (verify with your CA, CN2).';
 
 /** The declaration lines of a works document ('' entries dropped). */
 export function worksDeclarations(lines: Readonly<Record<string, CnLine>> | undefined, works: boolean): string[] {

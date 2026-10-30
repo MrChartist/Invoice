@@ -48,7 +48,7 @@ export function brokerageBill(c: { vendor: { id?: string; name: string; gstin?: 
     taxable, igst: inter ? gst : 0, cgst: inter ? 0 : half, sgst: inter ? 0 : round2(gst - half),
     itc_eligible: gst > 0, total: round2(taxable + gst), amount_paid: 0,
     ...(rate ? { tds_section: '194H', tds_rate: rate, tds_base: taxable, tds_amount: round2((taxable * rate) / 100), tds_on: 'BILL' as const } : {}),
-    notes: 'Broker commission on a booking (194H). Working paper — verify with your CA.',
+    notes: 'Broker commission on a booking (194H). Working paper: verify with your CA.',
   };
 }
 

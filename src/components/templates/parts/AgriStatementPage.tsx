@@ -13,7 +13,7 @@ export default function AgriStatementPage({ invoice }: { invoice: InvoiceRecord 
   if (!working.length && !milk.length && !ag.cmr) return null;
   return (
     <section className={styles.page} data-agri-statement>
-      <div className={styles.title}>Statement — {invoice.invoice_number || 'draft'}</div>
+      <div className={styles.title}>Statement: {invoice.invoice_number || 'draft'}</div>
       {working.length > 0 && (
         <table className={styles.table} data-agri-working>
           <tbody>{working.map((w, i) => <tr key={i}><th>{w.label}</th><td>{w.value}</td></tr>)}</tbody>

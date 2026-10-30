@@ -122,7 +122,7 @@ export function doctorWiseSales(invoices: readonly InvoiceRecord[], doctors: rea
 
 export function doctorSalesCsv(rows: readonly DoctorSales[], period: { from: string; to: string }): string {
   return toCsv([
-    [`Doctor-wise sales ${period.from} to ${period.to} — working paper, verify with your CA`],
+    [`Doctor-wise sales ${period.from} to ${period.to}: working paper, verify with your CA`],
     ['Doctor', 'Registration', 'Bills', 'Value', 'Scheduled-drug lines'],
     ...rows.map((r) => [r.name, r.reg, r.bills, r.value, r.scheduledLines]),
   ]);
@@ -181,7 +181,7 @@ export function saveRxSettings(patch: Pick<PharmaSettings, 'licences' | 'pharmac
   requireAccess('settings.manage');
   const licences = (patch.licences ?? []).map((l) => ({ ...l, number: l.number.trim() })).filter((l) => l.number);
   for (const l of licences) {
-    if (l.valid_from && l.valid_to && l.valid_to < l.valid_from) throw new Error(`${l.form}: ${l.number} — "valid to" is before "valid from".`);
+    if (l.valid_from && l.valid_to && l.valid_to < l.valid_from) throw new Error(`${l.form}: ${l.number}, "valid to" is before "valid from".`);
   }
   const pharmacist = patch.pharmacist?.name?.trim() ? { name: patch.pharmacist.name.trim(), reg_no: patch.pharmacist.reg_no?.trim() ?? '', ...(patch.pharmacist.council?.trim() ? { council: patch.pharmacist.council.trim() } : {}) } : undefined;
   const raw = getJson<Record<string, unknown> | null>(PHARMA_SETTINGS_KEY, null) ?? { ...readPharmaSettings() };

@@ -56,7 +56,7 @@ export default function FarmersView({ onDone }: { onDone: Done }) {
             <F label={agT('name')}><In v={f.name} set={(v) => set({ name: v })} data-ag-farmer-name /></F>
             <F label={agT('code')}><In v={f.code} set={(v) => set({ code: v })} w={90} /></F>
             <F label={agT('village')}><In v={f.village} set={(v) => set({ village: v })} /></F>
-            <F label={agT('centre')}><select className={controls.select} value={f.centre_id} onChange={(e) => set({ centre_id: e.target.value })}><option value="">—</option>{centres.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></F>
+            <F label={agT('centre')}><select className={controls.select} value={f.centre_id} onChange={(e) => set({ centre_id: e.target.value })}><option value="">-</option>{centres.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></F>
             <F label={agT('memberNo')}><In v={f.member_no} set={(v) => set({ member_no: v })} w={90} /></F>
             <label className={controls.check}><input type="checkbox" checked={f.member} onChange={(e) => set({ member: e.target.checked })} /> {agT('member')}</label>
             <F label={agT('phone')}><In v={f.phone} set={(v) => set({ phone: v })} type="tel" /></F>

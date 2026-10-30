@@ -8,7 +8,7 @@ import { defineArea } from '../area';
 export const booksT = defineArea(
   {
     title: 'Books',
-    subtitle: 'Double-entry books built from your invoices, receipts and purchases, plus your own vouchers — ledgers, trial balance, P&L, balance sheet and cash flow.',
+    subtitle: 'Double-entry books built from your invoices, receipts and purchases, plus your own vouchers: ledgers, trial balance, P&L, balance sheet and cash flow.',
     tablist: 'Books reports',
     tabDay: 'Day book',
     tabCash: 'Cash & bank',
@@ -152,7 +152,7 @@ export const booksT = defineArea(
   } as const,
   {
     title: 'बही-खाता',
-    subtitle: 'आपके इनवॉइस, रसीदों और खरीद से बने डबल-एंट्री खाते, साथ में आपके अपने वाउचर — लेजर, ट्रायल बैलेंस, लाभ-हानि, बैलेंस शीट और कैश फ़्लो।',
+    subtitle: 'आपके इनवॉइस, रसीदों और खरीद से बने डबल-एंट्री खाते, साथ में आपके अपने वाउचर: लेजर, ट्रायल बैलेंस, लाभ-हानि, बैलेंस शीट और कैश फ़्लो।',
     tablist: 'बही-खाता रिपोर्ट',
     tabDay: 'डे बुक',
     tabCash: 'नकद और बैंक',

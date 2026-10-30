@@ -334,7 +334,7 @@ export function timeLines(entries: TimeEntry[], prefs: TimePrefs, centres: reado
     const hours = toHours(minutes);
     if (hours <= 0) continue;
     out.push(line({
-      name: project && desc ? `${project} — ${desc}` : project || desc || 'Professional services',
+      name: project && desc ? `${project}: ${desc}` : project || desc || 'Professional services',
       description: `${span(group.map((e) => e.date))} · ${group.length} ${group.length === 1 ? 'entry' : 'entries'}`,
       hsn: sacFor(first, workTypes, prefs.sac),
       unit: 'HRS',
@@ -349,7 +349,7 @@ export function timeLines(entries: TimeEntry[], prefs: TimePrefs, centres: reado
 }
 
 export const PURE_AGENT_NOTE =
-  'Recovered at actual cost as a pure agent (Rule 33, CGST Rules) — excluded from the taxable value. Verify with your CA.';
+  'Recovered at actual cost as a pure agent (Rule 33, CGST Rules): excluded from the taxable value. Verify with your CA.';
 
 /** Cost of a bill to us: net of GST when the credit is claimed, else the full amount paid. */
 export const rebillCost = (p: PurchaseRecord): number => round2(p.itc_eligible ? num(p.taxable) : num(p.total));
@@ -361,12 +361,12 @@ export const rebillCost = (p: PurchaseRecord): number => round2(p.itc_eligible ?
  */
 export function expenseLine(p: PurchaseRecord, prefs: TimePrefs): InvoiceItem {
   const cc = p.cost_centre_id ? { cost_centre_id: p.cost_centre_id } : {};
-  const label = [p.category || 'Expense', p.vendor_name].filter(Boolean).join(': ') + (p.bill_number ? ` (#${p.bill_number})` : '');
+  const label = [p.category || 'Expense', p.vendor_name].filter(Boolean).join(', ') + (p.bill_number ? ` (#${p.bill_number})` : '');
   if (p.pure_agent) {
     // R14 PS-B1: the R8 pure-agent line key (sentinel head `rule33` + the shared Rule 33 text), so GSTR-1 / e-Invoice /
     // e-Way leave the reimbursement out of the supply (`isPureAgentLine`); old invoices keep their nil-rated 0% line.
     return line({
-      name: `Reimbursement — ${label}`,
+      name: `Reimbursement: ${label}`,
       description: PURE_AGENT_CHARGE,
       charge_head_id: 'rule33',
       unit: 'NOS',
@@ -379,7 +379,7 @@ export function expenseLine(p: PurchaseRecord, prefs: TimePrefs): InvoiceItem {
   }
   const markup = Math.max(num(p.markup_percent), 0);
   return line({
-    name: `Re-billed expense — ${label}`,
+    name: `Re-billed expense: ${label}`,
     description: `${shortDay(p.date)}${markup ? ` · includes ${markup}% markup` : ''} · part of the taxable supply`,
     hsn: prefs.sac,
     unit: 'NOS',

@@ -142,7 +142,7 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
                   <tr key={c.id}>
                     <td className={c.parent_id ? styles.child : undefined}>{c.parent_id ? '↳ ' : ''}{c.name}</td>
                     <td>{kindLabel(c.kind)}</td>
-                    <td>{clients.find((x) => x.id === c.client_id)?.name ?? '—'}</td>
+                    <td>{clients.find((x) => x.id === c.client_id)?.name ?? '-'}</td>
                     <td className={c.active ? undefined : styles.inactive}>{c.active ? planT('active') : planT('inactive')}</td>
                     <td>
                       <div className={surface.rowActions}>
@@ -200,7 +200,7 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
                             <tr key={r.account.id}>
                               <td className={styles.sticky}>{r.account.code} · {r.account.name}</td>
                               {pnl.columns.map((c) => (
-                                <td key={c.key} className={surface.numeric}>{r.amounts[c.key] ? signed(r.amounts[c.key]) : '—'}</td>
+                                <td key={c.key} className={surface.numeric}>{r.amounts[c.key] ? signed(r.amounts[c.key]) : '-'}</td>
                               ))}
                               <td className={surface.numeric}>{signed(r.total)}</td>
                             </tr>
@@ -215,9 +215,9 @@ export function ProjectsTab({ ledger, period, notify }: Props) {
                       <td className={styles.sticky}>{planT('marginPct')}</td>
                       {pnl.columns.map((c) => {
                         const m = marginPercent(pnl.totals[c.key]);
-                        return <td key={c.key} className={surface.numeric}>{m === null ? '—' : `${m}%`}</td>;
+                        return <td key={c.key} className={surface.numeric}>{m === null ? '-' : `${m}%`}</td>;
                       })}
-                      <td className={surface.numeric}>{marginPercent(pnl.grand) === null ? '—' : `${marginPercent(pnl.grand)}%`}</td>
+                      <td className={surface.numeric}>{marginPercent(pnl.grand) === null ? '-' : `${marginPercent(pnl.grand)}%`}</td>
                     </tr>
                     {totalsRow(planT('secIndirect'), (t) => t.indirectExpenses)}
                     {totalsRow(planT('netProfitLoss'), (t) => t.netProfit, true)}

@@ -409,7 +409,7 @@ export function parseBankStatement(text: string, options: ParseOptions = {}): Pa
   }
 
   if (sawSciNotation) {
-    warnings.push('Some reference numbers look like 4.12E+11 — Excel shortened them. Re-export the statement as CSV from the bank, not via Excel, so UTR matching works.');
+    warnings.push('Some reference numbers look like 4.12E+11: Excel shortened them. Re-export the statement as CSV from the bank, not via Excel, so UTR matching works.');
   }
   if (lines.length === 0) warnings.push('No transaction rows were found under the header.');
   return {
@@ -924,7 +924,7 @@ export function suggestMatches(
         type,
         candidateIds: [s.cand.id],
         confidence,
-        reasons: ambiguous ? [...s.reasons, 'Another entry looks similar — check before confirming'] : s.reasons,
+        reasons: ambiguous ? [...s.reasons, 'Another entry looks similar: check before confirming'] : s.reasons,
         ambiguous,
         combo: false,
         // A line whose best entry went to a better-fitting line only gets alternatives (rank >= 2).

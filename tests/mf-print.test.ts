@@ -22,7 +22,7 @@ test('Udyam line only with the category on the snapshot (old snapshots print not
 
 test('MSE clause: micro / small seller to a GSTIN buyer only; snapshot declarations', () => {
   const inv = (sender: object, gstin = '27AAPFU0939F1ZV', mf?: object) => ({ sender, client: { gstin }, doc_type: 'INVOICE', mf }) as never;
-  assert.match(mfDeclaration(inv(SELLER)), /^Payment due within 45 days of acceptance — MSMED Act 2006 Sec 15/);
+  assert.match(mfDeclaration(inv(SELLER)), /^Payment due within 45 days of acceptance: MSMED Act 2006 Sec 15/);
   assert.equal(mfDeclaration(inv(SELLER, '')), '', 'no clause without the buyer\'s GSTIN');
   assert.equal(mfDeclaration(inv({ ...SELLER, msme_category: 'MEDIUM' })), '');
   assert.equal(mfDeclaration(inv({})), '');

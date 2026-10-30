@@ -22,7 +22,7 @@ export function postBoeDuty(billId: string): ManualVoucher {
     const v = saveVoucher({
       type: 'JOURNAL',
       date: bill.boe_date || bill.date,
-      narration: `Customs duty on BOE ${bill.boe_number ?? ''} (${bill.vendor_name}, bill ${bill.bill_number}): BCD + SWS + other duties — in stock cost for valuation; verify with your CA`.replace(/\s+/g, ' '),
+      narration: `Customs duty on BOE ${bill.boe_number ?? ''} (${bill.vendor_name}, bill ${bill.bill_number}): BCD + SWS + other duties, in stock cost for valuation; verify with your CA`.replace(/\s+/g, ' '),
       lines: dutyJournalLines(bill.boe_duty.totals.duty, { customsDuty: ensureTradeLedger('customsDuty'), customsPayable: ensureTradeLedger('customsPayable') }),
       voucher_class: BOE_DUTY_CLASS,
     });

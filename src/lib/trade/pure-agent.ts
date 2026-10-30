@@ -4,7 +4,7 @@
  * the document total — e-Invoice `OthChrg`, e-Way `otherValue`). Data only, no imports: GST readers stay small.
  * Working paper — verify with your CA.
  */
-export const PURE_AGENT_CHARGE = 'Recovered at actual as a pure agent (Rule 33) — outside the taxable value. Verify with your CA.';
+export const PURE_AGENT_CHARGE = 'Recovered at actual as a pure agent (Rule 33): outside the taxable value. Verify with your CA.';
 
 /** A charge line of an `outside` head (stamped with the Rule 33 note by `chargeLine`). */
 export const isPureAgentLine = (l: { charge_head_id?: string; description?: string } | null | undefined): boolean =>

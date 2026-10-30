@@ -102,12 +102,12 @@ export function CostingTab({ ctx }: { ctx: MfgContext }) {
             {margins.map((m) => (
               <tr key={m.so.id}>
                 <td className={surface.mono}>{m.so.invoice_number}</td>
-                <td>{m.so.issue_date ? formatDate(m.so.issue_date) : '—'}</td>
-                <td>{m.so.client?.name ?? '—'}</td>
+                <td>{m.so.issue_date ? formatDate(m.so.issue_date) : '-'}</td>
+                <td>{m.so.client?.name ?? '-'}</td>
                 <td className={mfg.num}>{money(m.revenue)}</td>
                 <td className={mfg.num}>{money(m.cost)}</td>
                 <td className={cn(mfg.num, m.margin < 0 ? styles.adverse : undefined)}>{money(m.margin)}</td>
-                <td className={mfg.num}>{m.margin_pct === null ? '—' : `${m.margin_pct}%`}</td>
+                <td className={mfg.num}>{m.margin_pct === null ? '-' : `${m.margin_pct}%`}</td>
               </tr>
             ))}
             {margins.length === 0 && <tr><td colSpan={7} className={mfg.muted}>{pT('noSoMargin')}</td></tr>}

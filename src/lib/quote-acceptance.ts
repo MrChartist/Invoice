@@ -114,7 +114,7 @@ export function setQuoteAcceptance(id: string, acceptance: QuoteAcceptance): Inv
     const row = invoiceUpdated(before, invoices[idx], overridden ? OVERRIDE_NOTE : '');
     const how = acceptance.method === 'counter' ? 'signed at the counter' : 'accepted remotely';
     const base = row ?? { entity: 'invoice' as const, entity_id: id, action: 'update' as const, doc_number: before.invoice_number, summary: 'Quotation accepted' };
-    audit.record({ ...base, summary: `${base.summary} — accepted by ${acceptance.signer} (${how})` });
+    audit.record({ ...base, summary: `${base.summary}: accepted by ${acceptance.signer} (${how})` });
   } catch {
     /* logging never breaks an acceptance */
   }

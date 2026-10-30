@@ -82,7 +82,7 @@ export default function PartyRatesEditor({ onDone }: { onDone: (msg: string, err
           <option value="purchase">{aT('side.purchase')}</option>
         </select>
         <select className={controls.select} value={party} onChange={(e) => setParty(e.target.value)} aria-label={aT('party')} data-party-rate-party>
-          <option value="">{aT('party')}: —</option>
+          <option value="">{aT('party')}: -</option>
           {parties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
         {client && (

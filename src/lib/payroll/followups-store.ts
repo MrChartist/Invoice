@@ -62,7 +62,7 @@ export function saveRelief89(input: Relief89Input): Relief89Record {
   const prev = input.id ? all.find((r) => r.id === input.id) : all.find((r) => r.employee_id === e.id && r.fy === fy);
   const [row] = normalizeRelief89([{ ...input, fy, years, income_with: incomeWith, relief: result.relief, id: prev?.id ?? generateId(), created_at: prev?.created_at ?? now(), ...(prev ? { updated_at: now() } : {}) }]);
   setTable(PAYROLL_TABLES.relief89, prev ? all.map((r) => (r.id === row.id ? row : r)) : [...all, row]);
-  audit.record({ entity: 'payroll', entity_id: row.id, action: prev ? 'update' : 'create', summary: `Relief u/s 89 (Form 10E) for ${employeeName(e.id)}, FY ${fy}-${String((fy + 1) % 100).padStart(2, '0')}: arrears over ${years.length} year${years.length === 1 ? '' : 's'}${row.apply_tds ? ' — allowed in TDS' : ''}` });
+  audit.record({ entity: 'payroll', entity_id: row.id, action: prev ? 'update' : 'create', summary: `Relief u/s 89 (Form 10E) for ${employeeName(e.id)}, FY ${fy}-${String((fy + 1) % 100).padStart(2, '0')}: arrears over ${years.length} year${years.length === 1 ? '' : 's'}${row.apply_tds ? ': allowed in TDS' : ''}` });
   return row;
 }
 
@@ -106,7 +106,7 @@ export function saveActuarial(input: ActuarialInput): ActuarialValuation {
   setTable(PAYROLL_TABLES.actuarial, prev ? all.map((v) => (v.id === id ? row : v)) : [...all, row]);
   if (!prev) recordSeries(number);
   const chk = actuarialCheck(row);
-  audit.record({ entity: 'payroll', entity_id: id, action: prev ? 'update' : 'create', doc_number: number, summary: `Actuarial valuation ${number} (${row.kind}, ${row.standard === 'indas19' ? 'Ind AS 19' : 'AS-15'}) as at ${row.date} by ${row.actuary}: closing obligation ${money(row.closing)}${chk.ok ? '' : ` — roll-forward differs by ${money(chk.difference)}`}${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
+  audit.record({ entity: 'payroll', entity_id: id, action: prev ? 'update' : 'create', doc_number: number, summary: `Actuarial valuation ${number} (${row.kind}, ${row.standard === 'indas19' ? 'Ind AS 19' : 'AS-15'}) as at ${row.date} by ${row.actuary}: closing obligation ${money(row.closing)}${chk.ok ? '' : `: roll-forward differs by ${money(chk.difference)}`}${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
   return row;
 }
 
@@ -135,7 +135,7 @@ export function postActuarialJournal(id: string) {
   const chk = actuarialCheck(v);
   if (!chk.ok) throw new PayrollError(`The actuary's figures do not add up: opening + costs − benefits ± actuarial loss = ${money(chk.expected_closing)}, closing ${money(v.closing)}. Check the report.`);
   const j = actuarialJournal(v);
-  if (!j.lines.length) throw new PayrollError('The provision in the books already equals the liability — nothing to post.');
+  if (!j.lines.length) throw new PayrollError('The provision in the books already equals the liability: nothing to post.');
   const lines = j.lines.map((l) => {
     const p = Math.round(Math.abs(l.amount) * 100);
     return l.amount > 0 ? { account_id: l.account_id, dr: p, cr: 0 } : { account_id: l.account_id, dr: 0, cr: p };
@@ -144,7 +144,7 @@ export function postActuarialJournal(id: string) {
   const voucher = saveVoucher({
     type: 'JOURNAL',
     date: v.date,
-    narration: `Provision for ${what} per actuarial valuation ${v.number} as at ${v.date} (${v.standard === 'indas19' ? 'Ind AS 19' : 'AS-15'}; actuary ${v.actuary}${v.report_ref ? `, report ${v.report_ref}` : ''})${j.oci ? ` — remeasurement ${money(j.oci)} to OCI` : ''} — verify with your CA`,
+    narration: `Provision for ${what} per actuarial valuation ${v.number} as at ${v.date} (${v.standard === 'indas19' ? 'Ind AS 19' : 'AS-15'}; actuary ${v.actuary}${v.report_ref ? `, report ${v.report_ref}` : ''})${j.oci ? `: remeasurement ${money(j.oci)} to OCI` : ''}: verify with your CA`,
     lines,
     voucher_class: 'Payroll provision',
   });

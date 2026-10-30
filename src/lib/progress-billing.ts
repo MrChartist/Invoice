@@ -329,7 +329,7 @@ export function buildProgressInvoice(source: InvoiceRecord, req: ProgressRequest
     ...(milestone ? { milestone_id: milestone.id } : {}),
     ...(over.length ? { over_reason: String(req.overReason).trim() } : {}),
   };
-  const title = `Stage ${stage} — ${pctLabel} of ${source.invoice_number}${milestone ? ` (${milestone.name})` : ''}`;
+  const title = `Stage ${stage}: ${pctLabel} of ${source.invoice_number}${milestone ? ` (${milestone.name})` : ''}`;
   return stageShell(source, ctx, items, progress, title, {
     shipping: round2(num(source.shipping) * weight),
     other: round2(num(source.other_charges) * weight),
@@ -361,7 +361,7 @@ export function buildBalanceInvoice(source: InvoiceRecord, ctx: StageContext): I
   if (!items.length) throw new ProgressError('Nothing is left to bill: every line is fully invoiced.');
   const billedCharges = summary.stages.reduce((s, i) => ({ shipping: s.shipping + num(i.shipping), other: s.other + num(i.other_charges) }), { shipping: 0, other: 0 });
   const progress: ProgressOf = { source_id: source.id, basis: 'percent', value: round2(Math.max(100 - summary.percent, 0)), stage, final: true };
-  return absorbRoundOff(stageShell(source, ctx, items, progress, `Stage ${stage} — remaining balance of ${source.invoice_number}`, {
+  return absorbRoundOff(stageShell(source, ctx, items, progress, `Stage ${stage}: remaining balance of ${source.invoice_number}`, {
     shipping: Math.max(round2(num(source.shipping) - billedCharges.shipping), 0),
     other: round2(num(source.other_charges) - billedCharges.other),
   }), summary);

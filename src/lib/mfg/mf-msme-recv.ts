@@ -129,9 +129,9 @@ export function interestLetterHtml(seller: { name: string; udyam: string; catego
   const rows = bills.map((b) => `<tr><td>${esc(b.number)}</td><td>${b.date}</td><td>${b.limit}</td><td style="text-align:right">${rs(b.total)}</td><td style="text-align:right">${rs(b.unpaid)}</td><td style="text-align:right">${b.daysOverdue}</td><td style="text-align:right">${rs(b.interest)}</td></tr>`).join('');
   return `<h2>Claim for interest under Sec 16 of the MSMED Act 2006</h2>
 <p>${asOf}</p><p>To: ${esc(buyer)} (GSTIN ${esc(gstin)})</p>
-<p>From: ${esc(seller.name)} — ${esc(seller.category)} enterprise, Udyam ${esc(seller.udyam)}</p>
+<p>From: ${esc(seller.name)}, ${esc(seller.category)} enterprise, Udyam ${esc(seller.udyam)}</p>
 <p>The bills below were not paid within the period allowed by Sec 15. Interest under Sec 16 (compound, monthly rests, three times the RBI bank rate) to ${asOf}:</p>
 <table border="1" cellspacing="0" cellpadding="4"><thead><tr><th>Bill</th><th>Date</th><th>Due by (Sec 15)</th><th>Amount</th><th>Unpaid</th><th>Days late</th><th>Interest</th></tr></thead><tbody>${rows}</tbody></table>
 <p><b>Interest claimed: ${rs(total)}</b>. ${esc(HBH_NOTE)}</p>
-<p style="font-size:smaller">Working paper — verify with your CA (MF20). Interest is booked only when a debit note is raised.</p>`;
+<p style="font-size:smaller">Working paper: verify with your CA (MF20). Interest is booked only when a debit note is raised.</p>`;
 }

@@ -88,7 +88,7 @@ export function form1Rows(
 /** The sheet (CSV / XLSX rows). */
 export function form1Sheet(rows: readonly Form1Row[], h: Form1Half): (string | number)[][] {
   return [
-    [`MSME Form-1 working paper — ${h.label} (file by ${h.due}) — verify with your CA (MF23)`],
+    [`MSME Form-1 working paper: ${h.label} (file by ${h.due}), verify with your CA (MF23)`],
     ['Supplier', 'PAN', 'Udyam', 'Category', 'Bill', 'Bill date', 'Date due (45 days)', 'Amount', `Unpaid at ${h.to}`, 'Days', 'Reason for delay', 'Note'],
     ...rows.map((r) => [r.supplier, r.pan, r.udyam, r.category, r.bill, r.date, r.dateDue, r.amount, r.unpaid, r.days, r.reason, r.trader ? 'Flagged trader (MF21)' : '']),
   ];

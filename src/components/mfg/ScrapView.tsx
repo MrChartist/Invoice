@@ -42,8 +42,8 @@ export default function ScrapView({ ctx, done }: { ctx: MfgContext; done: Done }
     <div data-mfb-view="scrap">
       <h4>{S('register')}</h4>
       <Table d="scrap-register" empty={S('noScrap')} head={[S('month'), S('item'), S('made'), S('onCards'), S('sold'), S('inStock'), S('valueAtRate'), S('avgRealised')]} rows={d.rows.map((r) => [
-        r.month, item(r.item_id)?.name ?? '—', fmt(r.made), fmt(r.pending), fmt(r.sold), fmt(d.stock.get(r.item_id) ?? 0),
-        money(r.made * scrapRate(item(r.item_id))), r.sold > 0 ? money(r.sold_value / r.sold) : '—',
+        r.month, item(r.item_id)?.name ?? '-', fmt(r.made), fmt(r.pending), fmt(r.sold), fmt(d.stock.get(r.item_id) ?? 0),
+        money(r.made * scrapRate(item(r.item_id))), r.sold > 0 ? money(r.sold_value / r.sold) : '-',
       ])} />
 
       <h4>{S('sellScrap')}</h4>
@@ -78,7 +78,7 @@ export default function ScrapView({ ctx, done }: { ctx: MfgContext; done: Done }
       <h4>{S('scrapClass')}</h4>
       <div style={row}>
         <Sel l={S('item')} v={cls.item} set={(x) => setCls({ item: x, cls: item(x)?.mf_scrap_class ?? '' })} o={opt(ctx.items, (x) => x.id, (x) => x.name)} x={200} d="class-item" />
-        <Sel l={S('class')} v={cls.cls} set={(x) => setCls({ ...cls, cls: x })} o={[['', '—'], ...SCRAP_CLASSES.map((c) => [c, S(`sc.${c}`)] as const)]} x={200} d="class-value" />
+        <Sel l={S('class')} v={cls.cls} set={(x) => setCls({ ...cls, cls: x })} o={[['', '-'], ...SCRAP_CLASSES.map((c) => [c, S(`sc.${c}`)] as const)]} x={200} d="class-value" />
         {cls.cls && <span className={controls.hint}>{(() => { const r = scrapClassRate(cls.cls as never, f.date); return r.rate === null ? S('noRate') : S('classRate', { rate: r.rate, hsn: r.hsn }); })()}</span>}
         <button type="button" className={B.ps} data-mfb-save-class disabled={!cls.item} onClick={() => run(() => { patchItem(cls.item, { mf_scrap_class: cls.cls || undefined }); })}>{S('save')}</button>
       </div>

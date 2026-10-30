@@ -95,7 +95,7 @@ export function applyDeposit(dep: DepositBal, invoiceId: string, date?: string) 
 }
 
 /** C2: refund what is left of a deposit (Refund Voucher) with the job in the narration. */
-export const refundDeposit = (dep: DepositBal, jobNo: string, date: string, method: string) => refundAdvance(dep.id, { amount: dep.open, date, method, note: `Excess duty deposit — job ${jobNo}` });
+export const refundDeposit = (dep: DepositBal, jobNo: string, date: string, method: string) => refundAdvance(dep.id, { amount: dep.open, date, method, note: `Excess duty deposit: job ${jobNo}` });
 
 /** C4: the client's IEC and KYC (numbers and dates only, LG27). */
 export function saveKyc(c: Client, lg: NonNullable<Client['lg']>): void {

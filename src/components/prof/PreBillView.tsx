@@ -72,7 +72,7 @@ export default function PreBillView({ notify }: Pick<PsDeskProps, 'notify'>) {
       <div className={surface.cardBody}>
         <div className={controls.row3}>
           <Field label={pwT('pick')}><select className={controls.select} value={key} onChange={(e) => { setKey(e.target.value); setProject(''); setEdits({}); }} data-prebill-client>{keys.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></Field>
-          <Field label={psT('matter')}><select className={controls.select} value={project} onChange={(e) => { setProject(e.target.value); setEdits({}); setMs([]); }} data-prebill-matter><option value="">{pwT('all')}</option>{matters.map((c) => <option key={c.id} value={c.id}>{c.ps?.code ? `${c.ps.code} — ` : ''}{c.name}</option>)}</select></Field>
+          <Field label={psT('matter')}><select className={controls.select} value={project} onChange={(e) => { setProject(e.target.value); setEdits({}); setMs([]); }} data-prebill-matter><option value="">{pwT('all')}</option>{matters.map((c) => <option key={c.id} value={c.id}>{c.ps?.code ? `${c.ps.code}: ` : ''}{c.name}</option>)}</select></Field>
           {eng && <Field label={psT('engagement')}><input className={controls.input} readOnly value={`${eng.number} · ${psT(`m.${eng.model}`)}`} /></Field>}
           {(!eng || eng.model === 'hourly' || eng.model === 'blended') && <Field label={pwT('target')}><input type="number" min={0} className={controls.input} value={target} onChange={(e) => setTarget(e.target.value)} data-prebill-target /></Field>}
           <Field label={psT('reason')}><select className={controls.select} value={reason} onChange={(e) => setReason(e.target.value)}><option value="">{psT('none')}</option>{wipRules().reasons.map((r) => <option key={r} value={r}>{r}</option>)}</select></Field>
@@ -91,7 +91,7 @@ export default function PreBillView({ notify }: Pick<PsDeskProps, 'notify'>) {
             <tbody>
               {view?.sel.time.map((e) => (
                 <tr key={e.id} data-prebill-row>
-                  <td>{e.date}</td><td>{e.staff_id ? staff.get(e.staff_id) ?? '' : ''}</td><td>{[e.project, e.description].filter(Boolean).join(' — ')}</td>
+                  <td>{e.date}</td><td>{e.staff_id ? staff.get(e.staff_id) ?? '' : ''}</td><td>{[e.project, e.description].filter(Boolean).join(': ')}</td>
                   <td className={surface.numeric}>{round2(e.minutes / 60)}</td><td className={surface.numeric}>{money(entryStandard(e, prefs))}</td>
                   <td><input type="number" min={0} step="0.25" className={controls.input} aria-label={pwT('billH')} value={edits[e.id]?.minutes !== undefined ? round2(edits[e.id].minutes! / 60) : ''} onChange={(x) => ed(e.id, { minutes: x.target.value === '' ? undefined : Number(x.target.value) * 60 })} /></td>
                   <td><input type="number" min={0} className={controls.input} aria-label={psT('rate')} value={edits[e.id]?.rate ?? ''} placeholder={String(e.hourly_rate)} onChange={(x) => ed(e.id, { rate: x.target.value === '' ? undefined : Number(x.target.value) })} /></td>

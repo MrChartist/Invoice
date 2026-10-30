@@ -122,7 +122,7 @@ export function bookReferral(doctor: Pick<Doctor, 'name'>, amount: number, date:
   const remind194R = kind === 'benefit' && needs194R(doctor.name, date, amount);
   const v = saveVoucher({
     type: 'JOURNAL', date,
-    narration: `${kind === 'benefit' ? 'Referral benefit in kind' : 'Referral payment'} to ${doctor.name} — ${rule.caution}`,
+    narration: `${kind === 'benefit' ? 'Referral benefit in kind' : 'Referral payment'} to ${doctor.name}: ${rule.caution}`,
     lines: [{ account_id: referralAccount(rule.ledger), dr: paise, cr: 0 }, { account_id: A.creditors, dr: 0, cr: paise, party: doctor.name }],
     voucher_class: kind === 'benefit' ? BENEFIT_CLASS : REF_CLASS,
   });

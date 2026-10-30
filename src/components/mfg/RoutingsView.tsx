@@ -69,7 +69,7 @@ export default function RoutingsView({ ctx }: { ctx: MfgContext }) {
           <Grid attr="ops" head={[fT('seq'), fT('operation'), fT('centre'), fT('setupMin'), fT('runMin'), fT('perHour'), fT('batch'), fT('pieceRate'), fT('inspect'), '']} rows={d.ops.map((o, i) => [
             <In key="q" v={String(o.seq)} set={(x) => setOp(i, { seq: Math.round(num(x)) })} inputMode="numeric" style={{ width: 56 }} />,
             <In key="n" v={o.name} set={(x) => setOp(i, { name: x })} data-mf={`op-name-${i}`} />,
-            <Sel key="c" v={o.work_centre_id} set={(x) => setOp(i, { work_centre_id: x })} o={[['', '—'], ...centres.map((c) => [c.id, c.name] as const)]} data-mf={`op-centre-${i}`} />,
+            <Sel key="c" v={o.work_centre_id} set={(x) => setOp(i, { work_centre_id: x })} o={[['', '-'], ...centres.map((c) => [c.id, c.name] as const)]} data-mf={`op-centre-${i}`} />,
             <In key="s" v={String(o.setup_min)} set={(x) => setOp(i, { setup_min: num(x) })} inputMode="decimal" style={{ width: 64 }} />,
             <In key="r" v={s(o.run_min_per_unit)} set={(x) => setOp(i, { run_min_per_unit: n(x) })} inputMode="decimal" style={{ width: 64 }} data-mf={`op-run-${i}`} />,
             <In key="u" v={s(o.run_units_per_hour)} set={(x) => setOp(i, { run_units_per_hour: n(x) })} inputMode="decimal" style={{ width: 64 }} />,

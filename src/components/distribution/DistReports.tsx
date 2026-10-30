@@ -47,8 +47,8 @@ export default function DistReports({ view }: { view: 'reports' | 'plan' }) {
         {plan.length === 0 && <p className={own.muted}>{distT('noBeatsDay')}</p>}
         {plan.map((p) => (
           <div key={p.beat.id} className={own.day} data-plan-beat={p.beat.name}>
-            <h4>{p.beat.name}{p.route ? ` · ${p.route}` : ''}{p.area ? ` · ${p.area}` : ''}{p.agent ? ` · ${p.agent}` : ''} — {formatCurrency(p.outstanding)}</h4>
-            <ul>{p.parties.map((c) => <li key={c.id ?? c.name}>{c.name}{c.phone ? ` · ${c.phone}` : ''} — {formatCurrency(c.outstanding)}</li>)}</ul>
+            <h4>{p.beat.name}{p.route ? ` · ${p.route}` : ''}{p.area ? ` · ${p.area}` : ''}{p.agent ? ` · ${p.agent}` : ''} : {formatCurrency(p.outstanding)}</h4>
+            <ul>{p.parties.map((c) => <li key={c.id ?? c.name}>{c.name}{c.phone ? ` · ${c.phone}` : ''} : {formatCurrency(c.outstanding)}</li>)}</ul>
           </div>
         ))}
         <h4>{distT('weekPlan')}</h4>
@@ -56,7 +56,7 @@ export default function DistReports({ view }: { view: 'reports' | 'plan' }) {
           {week.map((w) => (
             <div key={w.d} className={own.day}>
               <h4>{distT(`d${w.d as 0 | 1 | 2 | 3 | 4 | 5 | 6}`)}</h4>
-              <ul>{w.beats.length ? w.beats.map((b) => <li key={b.beat.id}>{b.beat.name} ({b.parties.length}){b.agent ? ` · ${b.agent}` : ''}</li>) : <li>—</li>}</ul>
+              <ul>{w.beats.length ? w.beats.map((b) => <li key={b.beat.id}>{b.beat.name} ({b.parties.length}){b.agent ? ` · ${b.agent}` : ''}</li>) : <li>-</li>}</ul>
             </div>
           ))}
         </div>
@@ -86,7 +86,7 @@ export default function DistReports({ view }: { view: 'reports' | 'plan' }) {
             <label className={controls.field}><span className={controls.label}>{distT('to')}</span><input type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></label>
           </>
         )}
-        <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => downloadText(`${measure}-by-${by}.csv`, distCsv(`${distT(measure === 'sales' ? 'mSales' : measure === 'returns' ? 'mReturns' : measure === 'collections' ? 'mCollections' : 'mOutstanding')} — ${groupLabel}${measure !== 'outstanding' ? ` ${period.from} – ${period.to}` : ''}`, rows, groupLabel, distT('notAssigned')), 'text/csv')}>
+        <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => downloadText(`${measure}-by-${by}.csv`, distCsv(`${distT(measure === 'sales' ? 'mSales' : measure === 'returns' ? 'mReturns' : measure === 'collections' ? 'mCollections' : 'mOutstanding')}: ${groupLabel}${measure !== 'outstanding' ? ` ${period.from} – ${period.to}` : ''}`, rows, groupLabel, distT('notAssigned')), 'text/csv')}>
           <Download size={14} aria-hidden="true" /> CSV
         </button>
       </div>

@@ -13,7 +13,7 @@ export const vtT = defineArea(
     create: 'Create voucher type',
     alter: 'Alter',
     delete: 'Delete',
-    none: 'No voucher types yet — every document uses the standard series.',
+    none: 'No voucher types yet: every document uses the standard series.',
     name: 'Name',
     base: 'Base type',
     prefix: 'Prefix',
@@ -35,7 +35,7 @@ export const vtT = defineArea(
     deleted: 'Voucher type "{name}" deleted',
     used: 'used {n}×',
     pos: 'POS',
-    keep: '— none —',
+    keep: '(none)',
     save: 'Save',
     cancel: 'Cancel',
     back: 'Back',
@@ -53,7 +53,7 @@ export const vtT = defineArea(
 
     /* Gateway 7.19 */
     voucherClass: 'Voucher class',
-    classHint: 'Optional — a register filter (Tally voucher class).',
+    classHint: 'Optional: a register filter (Tally voucher class).',
     singleEntry: 'Single entry',
     doubleEntry: 'Double entry',
     modeLabel: 'Entry mode',
@@ -93,7 +93,7 @@ export const vtT = defineArea(
 
     /* 7.49 */
     stockMoves: 'Stock quantities',
-    stockMovesHint: 'Quantities of sales, purchase, note and stock-journal vouchers become stock moves where the item matches — never GST documents.',
+    stockMovesHint: 'Quantities of sales, purchase, note and stock-journal vouchers become stock moves where the item matches: never GST documents.',
     stockMovesCount: '{ok} stock moves to add · {skip} skipped',
   } as const,
   {
@@ -102,7 +102,7 @@ export const vtT = defineArea(
     create: 'वाउचर प्रकार बनाएँ',
     alter: 'बदलें',
     delete: 'हटाएँ',
-    none: 'अभी कोई वाउचर प्रकार नहीं — हर दस्तावेज़ मानक श्रृंखला में है।',
+    none: 'अभी कोई वाउचर प्रकार नहीं: हर दस्तावेज़ मानक श्रृंखला में है।',
     name: 'नाम',
     base: 'मूल प्रकार',
     prefix: 'प्रीफ़िक्स',
@@ -124,7 +124,7 @@ export const vtT = defineArea(
     deleted: 'वाउचर प्रकार "{name}" हटाया गया',
     used: '{n}× उपयोग',
     pos: 'POS',
-    keep: '— कोई नहीं —',
+    keep: '(कोई नहीं)',
     save: 'सहेजें',
     cancel: 'रद्द करें',
     back: 'वापस',
@@ -140,7 +140,7 @@ export const vtT = defineArea(
     defaultType: 'डिफ़ॉल्ट ({prefix} श्रृंखला)',
 
     voucherClass: 'वाउचर क्लास',
-    classHint: 'वैकल्पिक — रजिस्टर फ़िल्टर (Tally वाउचर क्लास)।',
+    classHint: 'वैकल्पिक: रजिस्टर फ़िल्टर (Tally वाउचर क्लास)।',
     singleEntry: 'एकल प्रविष्टि',
     doubleEntry: 'दोहरी प्रविष्टि',
     modeLabel: 'प्रविष्टि मोड',
@@ -178,7 +178,7 @@ export const vtT = defineArea(
     undone: 'आयात पूर्ववत किया गया।',
 
     stockMoves: 'स्टॉक मात्रा',
-    stockMovesHint: 'बिक्री, खरीद, नोट और स्टॉक जर्नल वाउचरों की मात्राएँ, जहाँ आइटम मिलता है, स्टॉक मूव बनती हैं — कभी GST दस्तावेज़ नहीं।',
+    stockMovesHint: 'बिक्री, खरीद, नोट और स्टॉक जर्नल वाउचरों की मात्राएँ, जहाँ आइटम मिलता है, स्टॉक मूव बनती हैं: कभी GST दस्तावेज़ नहीं।',
     stockMovesCount: '{ok} स्टॉक मूव जोड़े जाएँगे · {skip} छोड़े गए',
   },
 );

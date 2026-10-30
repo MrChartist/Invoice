@@ -86,7 +86,7 @@ export function MapColumnsStep({ kind, table, mapping, confidence, presetId, mis
                       value={mapped ? String(col) : ''}
                       onChange={(e) => dispatch({ type: 'setColumn', key: f.key, col: e.target.value === '' ? undefined : Number(e.target.value) })}
                     >
-                      <option value="">— not mapped —</option>
+                      <option value="">(not mapped)</option>
                       {table.headers.map((h, i) => (
                         <option key={i} value={i}>
                           {h}
@@ -102,7 +102,7 @@ export function MapColumnsStep({ kind, table, mapping, confidence, presetId, mis
                     )}
                   </td>
                   <td className={styles.samples}>
-                    {samples.length ? samples.map((s, i) => <code key={i}>{s}</code>) : <span className={ctl.hint}>—</span>}
+                    {samples.length ? samples.map((s, i) => <code key={i}>{s}</code>) : <span className={ctl.hint}>-</span>}
                   </td>
                 </tr>
               );

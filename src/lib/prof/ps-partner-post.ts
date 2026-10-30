@@ -82,7 +82,7 @@ export function postRun(res: RunResult, adjustments: readonly { label: string; a
     if (credit.length) {
       vouchers.push(saveVoucher({
         type: 'JOURNAL', date, voucher_class: PS_D_CLASSES.appropriation,
-        narration: `Partners' remuneration ₹${rem} and interest on capital ₹${int} for FY ${res.fy}-${String(res.fy + 1).slice(2)} (Sec 40(b) working paper)${tdsTotal ? `, TDS u/s 194T ₹${round2(tdsTotal)}` : ''} — verify with your CA`,
+        narration: `Partners' remuneration ₹${rem} and interest on capital ₹${int} for FY ${res.fy}-${String(res.fy + 1).slice(2)} (Sec 40(b) working paper)${tdsTotal ? `, TDS u/s 194T ₹${round2(tdsTotal)}` : ''}: verify with your CA`,
         lines: [
           ...(rem > 0 ? [{ account_id: ensureLedger(PS_D_ACCOUNTS.remuneration, 'INDIRECT_EXPENSES', 6180), dr: p2(rem), cr: 0 }] : []),
           ...(int > 0 ? [{ account_id: ensureLedger(PS_D_ACCOUNTS.interest, 'FINANCE', 6290), dr: p2(int), cr: 0 }] : []),
@@ -96,7 +96,7 @@ export function postRun(res: RunResult, adjustments: readonly { label: string; a
     if (di.length) {
       vouchers.push(saveVoucher({
         type: 'JOURNAL', date, voucher_class: PS_D_CLASSES.appropriation,
-        narration: `Interest on partners' drawings for FY ${res.fy}-${String(res.fy + 1).slice(2)} (product method) — verify with your CA`,
+        narration: `Interest on partners' drawings for FY ${res.fy}-${String(res.fy + 1).slice(2)} (product method): verify with your CA`,
         lines: [...di.map((l) => ({ account_id: partners.get(l.partner_id)!.current_account_id, dr: p2(l.drawings_interest), cr: 0 })), { account_id: ensureLedger(PS_D_ACCOUNTS.drawingsInterest, 'OTHER_INCOME', 4190), dr: 0, cr: p2(res.drawingsInterestTotal) }],
       }).id);
     }
@@ -107,7 +107,7 @@ export function postRun(res: RunResult, adjustments: readonly { label: string; a
       const profit = res.residual > 0;
       vouchers.push(saveVoucher({
         type: 'JOURNAL', date, voucher_class: PS_D_CLASSES.appropriation,
-        narration: `Residual ${profit ? 'profit' : 'loss'} ₹${Math.abs(res.residual)} shared in the profit-sharing ratio, FY ${res.fy}-${String(res.fy + 1).slice(2)} — verify with your CA`,
+        narration: `Residual ${profit ? 'profit' : 'loss'} ₹${Math.abs(res.residual)} shared in the profit-sharing ratio, FY ${res.fy}-${String(res.fy + 1).slice(2)}: verify with your CA`,
         lines: [
           { account_id: app, dr: profit ? p2(res.residual) : 0, cr: profit ? 0 : p2(-res.residual) },
           ...shares.map((l) => ({ account_id: partners.get(l.partner_id)!.current_account_id, dr: l.share < 0 ? p2(-l.share) : 0, cr: l.share > 0 ? p2(l.share) : 0 })),

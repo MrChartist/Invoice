@@ -22,8 +22,8 @@ export interface GtaRate {
  * Verify the notification and dates with your CA (§7 Q1/Q2 of the Round 5 PRD).
  */
 export const GTA_RATE_RULES: readonly Versioned<Record<GtaOption, GtaRate> & { sac: string }>[] = [
-  { from: '2017-07-01', value: { rcm: { rate: 5, itc: false, rcm: true }, fcm_5: { rate: 5, itc: false, rcm: false }, fcm_18: { rate: 12, itc: true, rcm: false }, sac: '996791' }, source: 'N 11/2017-CT(R) entry 9(iii) / 13/2017-CT(R) entry 1; 03/2022-CT(R) — verify' },
-  { from: '2025-09-22', value: { rcm: { rate: 5, itc: false, rcm: true }, fcm_5: { rate: 5, itc: false, rcm: false }, fcm_18: { rate: 18, itc: true, rcm: false }, sac: '996791' }, source: 'GST rate rationalisation from 22 Sep 2025 (N 15/2025-CT(R) as understood) — verify' },
+  { from: '2017-07-01', value: { rcm: { rate: 5, itc: false, rcm: true }, fcm_5: { rate: 5, itc: false, rcm: false }, fcm_18: { rate: 12, itc: true, rcm: false }, sac: '996791' }, source: 'N 11/2017-CT(R) entry 9(iii) / 13/2017-CT(R) entry 1; 03/2022-CT(R): verify' },
+  { from: '2025-09-22', value: { rcm: { rate: 5, itc: false, rcm: true }, fcm_5: { rate: 5, itc: false, rcm: false }, fcm_18: { rate: 18, itc: true, rcm: false }, sac: '996791' }, source: 'GST rate rationalisation from 22 Sep 2025 (N 15/2025-CT(R) as understood): verify' },
 ];
 
 export const gtaRate = (option: GtaOption, date?: string): GtaRate => ruleAt(GTA_RATE_RULES, date)[option];
@@ -31,7 +31,7 @@ export const gtaSac = (date?: string): string => ruleAt(GTA_RATE_RULES, date).sa
 
 /** Annexure V (forward charge) / VI (back to RCM) window for the NEXT financial year: month-day range inside the current one. */
 export const GTA_OPTION_WINDOW_RULES: readonly Versioned<{ start: string; end: string }>[] = [
-  { from: '2017-07-01', value: { start: '01-01', end: '03-31' }, source: 'Annexure V / VI by 31 Mar of the preceding FY (N 03/2022-CT(R) as understood) — verify' },
+  { from: '2017-07-01', value: { start: '01-01', end: '03-31' }, source: 'Annexure V / VI by 31 Mar of the preceding FY (N 03/2022-CT(R) as understood): verify' },
 ];
 
 /** Is `day` inside the option window (filing for the next FY)? */
@@ -45,24 +45,24 @@ export function inGtaWindow(day: string): boolean {
 export type GtaRecipientKind = 'factory' | 'society' | 'cooperative' | 'registered' | 'body_corporate' | 'partnership' | 'casual' | 'unregistered';
 
 export const GTA_RCM_RECIPIENT_KINDS: readonly Versioned<readonly GtaRecipientKind[]>[] = [
-  { from: '2017-07-01', value: ['factory', 'society', 'cooperative', 'registered', 'body_corporate', 'partnership', 'casual'], source: 'N 13/2017-CT(R) entry 1 — verify (composition-registered recipients: §7 Q2)' },
+  { from: '2017-07-01', value: ['factory', 'society', 'cooperative', 'registered', 'body_corporate', 'partnership', 'casual'], source: 'N 13/2017-CT(R) entry 1, verify (composition-registered recipients: §7 Q2)' },
 ];
 
 /** GST TDS u/s 51: rate on the value excluding GST, and the contract-value threshold. */
 export const GST_TDS_51_RULES: readonly Versioned<{ rate: number; threshold: number } | null>[] = [
   { from: '2017-07-01', value: null },
-  { from: '2018-10-01', value: { rate: 2, threshold: 250000 }, source: 'Sec 51 CGST Act; N 50/2018-CT (from 1 Oct 2018) — verify' },
+  { from: '2018-10-01', value: { rate: 2, threshold: 250000 }, source: 'Sec 51 CGST Act; N 50/2018-CT (from 1 Oct 2018): verify' },
 ];
 
 /** BOCW labour cess (Building and Other Construction Workers Welfare Cess Act 1996): % of the cost of construction. */
 export const LABOUR_CESS_RULES: readonly Versioned<number>[] = [
-  { from: '2017-07-01', value: 1, source: 'BOCW Cess Act 1996, Sec 3 (1%), state-agnostic default — verify the state practice' },
+  { from: '2017-07-01', value: 1, source: 'BOCW Cess Act 1996, Sec 3 (1%), state-agnostic default: verify the state practice' },
   // R11 (CN5): same 1% under the Code on Social Security 2020 (in force 21 Nov 2025)
-  { from: '2025-11-21', value: 1, source: 'Code on Social Security 2020 Sec 100; S.O. 2322(E) 8 May 2026 as reported — verify (CN5)' },
+  { from: '2025-11-21', value: 1, source: 'Code on Social Security 2020 Sec 100; S.O. 2322(E) 8 May 2026 as reported: verify (CN5)' },
 ];
 
 /** Default GST rate for works-contract BOQ lines (general / government works). */
 export const WORKS_CONTRACT_RATE_RULES: readonly Versioned<{ general: number; government: number }>[] = [
-  { from: '2017-07-01', value: { general: 18, government: 12 }, source: 'N 11/2017-CT(R) entry 3(ii) / 3(iv) — verify' },
-  { from: '2025-09-22', value: { general: 18, government: 18 }, source: 'Rate change from 22 Sep 2025 as understood — verify (§7 Q6)' },
+  { from: '2017-07-01', value: { general: 18, government: 12 }, source: 'N 11/2017-CT(R) entry 3(ii) / 3(iv): verify' },
+  { from: '2025-09-22', value: { general: 18, government: 18 }, source: 'Rate change from 22 Sep 2025 as understood: verify (§7 Q6)' },
 ];

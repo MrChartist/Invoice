@@ -78,7 +78,7 @@ export const en = {
   'nav.inventory': 'Inventory',
   'nav.manufacturing': 'Manufacturing', // R6-B2
   'nav.distribution': 'Distribution', // R6-B2
-  'nav.moreFeatures': '{n} more features — Show',
+  'nav.moreFeatures': '{n} more features: Show',
   'nav.books': 'Books',
   'nav.reconcile': 'Reconcile',
   'nav.cheques': 'Cheques',
@@ -144,7 +144,7 @@ export const en = {
   // ── Login / PIN ───────────────────────────────────────────────────
   'login.headline': 'Invoices & books,',
   'login.headlineEm': 'on your device.',
-  'login.lede': 'GST-ready invoicing, ledgers and reports that work offline. Nothing is uploaded — your PIN only unlocks this browser.',
+  'login.lede': 'GST-ready invoicing, ledgers and reports that work offline. Nothing is uploaded: your PIN only unlocks this browser.',
   'login.pointOffline': 'Works fully offline, zero tracking',
   'login.pointHash': 'PIN stored as a salted PBKDF2 hash',
   'login.pointLock': 'Auto-locks when you step away',
@@ -155,7 +155,7 @@ export const en = {
   'login.forgotText': 'Your data lives only in this browser, so there is no server to reset it. The only way back in is to erase everything on this device and start fresh.',
   'login.eraseWarn': 'This permanently deletes every invoice, client, item, profile and your PIN. If you have a backup file, you can restore it afterwards from Settings.',
   'login.eraseButton': 'Erase everything and start over',
-  'login.remembered': 'I remembered it — go back',
+  'login.remembered': 'I remembered it: go back',
   'login.createTitle': 'Create your account',
   'login.welcomeBackName': 'Welcome back, {name}',
   'login.welcomeBack': 'Welcome back',
@@ -263,7 +263,7 @@ export const en = {
   'dash.profilesBackupHint': 'Business details, bank, UPI',
 
   // ── Missing page (404 inside the shell) ──
-  'notFound.docTitle': 'Page not found — Mr. Chartist Invoice',
+  'notFound.docTitle': 'Page not found: Mr. Chartist Invoice',
   'notFound.title': 'We can’t find that page',
   'notFound.text': 'Nothing lives at {path}. It may have moved, or the link is mistyped.',
   'notFound.back': 'Back to dashboard',

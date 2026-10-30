@@ -639,7 +639,7 @@ export function trialBalanceCsv(tb: TrialBalance, prev?: TrialBalance): string {
   const rows = prev ? [...tb.rows, ...prev.rows.filter((x) => !tb.rows.some((y) => y.account.id === x.account.id)).map((x) => ({ ...x, opening: 0, debit: 0, credit: 0, closing: 0 }))] : tb.rows;
   const p = (paise: number | undefined) => (prev ? [drCr(paise ?? 0)] : []);
   return toCsv([
-    ['Trial balance', `${tb.period.start} to ${tb.period.end}`, 'Working paper — verify with your CA'],
+    ['Trial balance', `${tb.period.start} to ${tb.period.end}`, 'Working paper: verify with your CA'],
     ['Code', 'Account', 'Group', 'Opening', 'Debit', 'Credit', 'Closing', ...(prev ? [`Closing ${prev.period.start} to ${prev.period.end}`] : [])],
     ...rows.map((x) => [x.account.code, x.account.name, groupOf(x.account.group).label, drCr(x.opening), r(x.debit), r(x.credit), drCr(x.closing), ...p(before.get(x.account.id))]),
     ['', 'Total', '', '', r(tb.totals.debit), r(tb.totals.credit), '', ...(prev ? [''] : [])],
@@ -661,7 +661,7 @@ export function bsPreviousAmounts(prev: LedgerBalanceSheet): Map<string, number>
 
 export function accountStatementCsv(s: AccountStatement): string {
   return toCsv([
-    [`Ledger: ${s.account.code} ${s.account.name}${s.party ? ` — ${s.party}` : ''}`, `${s.period.start} to ${s.period.end}`],
+    [`Ledger: ${s.account.code} ${s.account.name}${s.party ? `: ${s.party}` : ''}`, `${s.period.start} to ${s.period.end}`],
     ['Date', 'Voucher', 'Vch no.', 'Party', 'Particulars', 'Narration', 'Debit', 'Credit', 'Balance'],
     ['', 'Opening balance', '', '', '', '', '', '', drCr(s.opening)],
     ...s.rows.map((x) => [x.voucher.date, x.voucher.kind, x.voucher.number, x.voucher.party, x.particulars, x.voucher.narration, r(x.debit), r(x.credit), drCr(x.balance)]),
@@ -674,7 +674,7 @@ export function balanceSheetLedgerCsv(b: LedgerBalanceSheet, prev?: LedgerBalanc
   const before = prev ? bsPreviousAmounts(prev) : undefined;
   const p = (k: string) => (before ? [r(before.get(k) ?? 0)] : []);
   const blank = before ? [''] : [];
-  const rows: unknown[][] = [['Balance sheet (Schedule III format)', `As at ${b.asOf}`, 'Working paper — verify with your CA'], ['Particulars', `As at ${b.asOf}`, ...(prev ? [`As at ${prev.asOf}`] : [])]];
+  const rows: unknown[][] = [['Balance sheet (Schedule III format)', `As at ${b.asOf}`, 'Working paper: verify with your CA'], ['Particulars', `As at ${b.asOf}`, ...(prev ? [`As at ${prev.asOf}`] : [])]];
   const section = (title: string, list: BsSection[], total: number, totalKey: string) => {
     rows.push([title, '', ...blank]);
     for (const s of list) {
@@ -691,7 +691,7 @@ export function balanceSheetLedgerCsv(b: LedgerBalanceSheet, prev?: LedgerBalanc
 
 export function cashFlowCsv(c: CashFlowStatement): string {
   return toCsv([
-    ['Cash-flow statement (AS 3, indirect method)', `${c.period.start} to ${c.period.end}`, 'Working paper — verify with your CA'],
+    ['Cash-flow statement (AS 3, indirect method)', `${c.period.start} to ${c.period.end}`, 'Working paper: verify with your CA'],
     ['Particulars', 'Amount'],
     ['A. Cash flow from operating activities', ''],
     ['Net profit / (loss)', r(c.netProfit)],

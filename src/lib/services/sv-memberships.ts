@@ -78,7 +78,7 @@ export function valueNote(inv: InvoiceRecord, taxable: number, date: string, rea
   const lines = calc.lines.filter((c) => num(c.taxable) > 0 && (!only || only(inv.items.find((l) => l.id === c.id)!)));
   const base = lines.reduce((s, c) => s + num(c.taxable), 0);
   if (!(taxable > 0) || !(base > 0)) throw new Error('Nothing to credit.');
-  if (date > sec34Limit(inv.issue_date)) throw new Error(`Past the Sec 34(2) date (${sec34Limit(inv.issue_date)}) for ${inv.invoice_number}: no GST credit note — ask your CA.`);
+  if (date > sec34Limit(inv.issue_date)) throw new Error(`Past the Sec 34(2) date (${sec34Limit(inv.issue_date)}) for ${inv.invoice_number}: no GST credit note, ask your CA.`);
   let left = round2(Math.min(taxable, base));
   const items = lines.map((c, i) => {
     const v = i === lines.length - 1 ? left : round2((Math.min(taxable, base) * num(c.taxable)) / base);
@@ -156,7 +156,7 @@ export function freeze(id: string, from: string, to: string, reason = '', date =
   if (err) throw new Error(err);
   return withTablesRollback(TABLES, () => {
     const fee = num(m.plan.freeze?.fee);
-    const inv = fee > 0 ? bill(clientOf(m), [planLine({ ...m.plan, name: `Freeze fee — ${m.number}` }, date, fee, `${fmt(from)} – ${fmt(to)}`)], date, `Freeze of ${m.number}`) : undefined;
+    const inv = fee > 0 ? bill(clientOf(m), [planLine({ ...m.plan, name: `Freeze fee: ${m.number}` }, date, fee, `${fmt(from)} – ${fmt(to)}`)], date, `Freeze of ${m.number}`) : undefined;
     put({ ...m, freezes: [...(m.freezes ?? []), { from, to, ...(reason ? { reason } : {}), ...(inv ? { invoice_id: inv.id } : {}) }] });
     return find(id);
   });
@@ -199,7 +199,7 @@ export function transfer(id: string, to: { client_id?: string; client_name: stri
   if (!to.client_name.trim()) throw new Error('Choose the new member.');
   return withTablesRollback(TABLES, () => {
     const fee = num(m.plan.transfer_fee);
-    const inv = fee > 0 ? bill(clientOf(m), [planLine({ ...m.plan, name: `Transfer fee — ${m.number}` }, date, fee, `To ${to.client_name}`)], date, `Transfer of ${m.number}`) : undefined;
+    const inv = fee > 0 ? bill(clientOf(m), [planLine({ ...m.plan, name: `Transfer fee: ${m.number}` }, date, fee, `To ${to.client_name}`)], date, `Transfer of ${m.number}`) : undefined;
     put({ ...m, client_id: to.client_id, client_name: to.client_name.trim(), phone: to.phone, history: event(m, { date, kind: 'transfer', note: `${m.client_name} → ${to.client_name}`, ...(inv ? { invoice_id: inv.id } : {}) }) });
     return find(id);
   });

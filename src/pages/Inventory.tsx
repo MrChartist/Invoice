@@ -468,12 +468,12 @@ export function Inventory() {
                     <tr key={p.item.id}>
                       <td>{nameCell(p)}</td>
                       <td className={cn(surface.numeric, p.isNegative && styles.negative)}>
-                        {p.item.track_stock ? `${p.qty} ${p.item.unit}` : '—'}
+                        {p.item.track_stock ? `${p.qty} ${p.item.unit}` : '-'}
                         {p.item.track_stock && p.item.alt_units?.length ? <span className={styles.itemMeta} style={{ display: 'block' }}>{compoundText(p.qty, p.item)}</span> : null}
                       </td>
-                      <td className={surface.numeric}>{p.item.track_stock ? formatMoney(p.avgCost) : '—'}</td>
-                      <td className={cn(surface.numeric, p.value < 0 && styles.negative)}>{p.item.track_stock ? formatMoney(p.value) : '—'}</td>
-                      <td className={surface.numeric}>{p.item.track_stock && p.item.reorder_level ? p.item.reorder_level : '—'}</td>
+                      <td className={surface.numeric}>{p.item.track_stock ? formatMoney(p.avgCost) : '-'}</td>
+                      <td className={cn(surface.numeric, p.value < 0 && styles.negative)}>{p.item.track_stock ? formatMoney(p.value) : '-'}</td>
+                      <td className={surface.numeric}>{p.item.track_stock && p.item.reorder_level ? p.item.reorder_level : '-'}</td>
                       <td><StockChip status={p.status} /></td>
                       <td>
                         <span className={surface.rowActions}>

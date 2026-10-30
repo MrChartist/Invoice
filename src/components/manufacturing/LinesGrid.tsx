@@ -186,7 +186,7 @@ export function LinesGrid({ lines, items, onChange, opts }: {
                   <td>
                     <select className={controls.select} aria-label={`${opts.label} ${n} ${mfgT('godown')}`} value={l.godown_id ?? ''}
                       onChange={(e) => patch(l.id, { godown_id: e.target.value || undefined })} onKeyDown={createGodown(l.id)} aria-keyshortcuts="Alt+C">
-                      <option value="">—</option>
+                      <option value="">-</option>
                       {godownList.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                     </select>
                   </td>
@@ -196,7 +196,7 @@ export function LinesGrid({ lines, items, onChange, opts }: {
                     {item?.track_batches ? (
                       <input className={controls.input} aria-label={`${opts.label} ${n} ${mfgT('batch')}`} value={l.batch_no ?? ''}
                         onChange={(e) => patch(l.id, { batch_no: e.target.value || undefined })} />
-                    ) : <span className={styles.muted}>—</span>}
+                    ) : <span className={styles.muted}>-</span>}
                   </td>
                 )}
                 {anySerial && (
@@ -207,7 +207,7 @@ export function LinesGrid({ lines, items, onChange, opts }: {
                         pool={opts.serials === 'out' && opts.serialPool ? () => opts.serialPool!(l.item_id, l.godown_id) : undefined}
                         onChange={(serials) => patch(l.id, { serials })}
                       />
-                    ) : <span className={styles.muted}>—</span>}
+                    ) : <span className={styles.muted}>-</span>}
                   </td>
                 )}
                 <td>

@@ -222,7 +222,7 @@ export function diffProfile(before: Partial<SenderProfile>, after: Partial<Sende
 
 /** Plain-text one-liner for the first few changes of a diff. */
 export function summarizeChanges(changes: AuditChange[], max = 3): string {
-  const shown = changes.slice(0, max).map((c) => `${c.field} ${c.from ?? '—'} → ${c.to ?? '—'}`);
+  const shown = changes.slice(0, max).map((c) => `${c.field} ${c.from ?? '-'} → ${c.to ?? '-'}`);
   const more = changes.length - max;
   return shown.join('; ') + (more > 0 ? `; +${more} more` : '');
 }
@@ -496,7 +496,7 @@ export function invoiceCreated(inv: InvoiceRecord): AuditInput {
     entity_id: inv.id,
     action: 'create',
     doc_number: inv.invoice_number,
-    summary: `Created ${docLabel(inv)}${inv.client?.name ? ` for ${inv.client.name}` : ''} — ${money(inv.total, inv.currency)}`,
+    summary: `Created ${docLabel(inv)}${inv.client?.name ? ` for ${inv.client.name}` : ''}: ${money(inv.total, inv.currency)}`,
     changes: [
       { field: 'Status', from: null, to: inv.status },
       { field: 'Total', from: null, to: money(inv.total, inv.currency) },
@@ -529,7 +529,7 @@ export function invoiceDeleted(inv: InvoiceRecord, paymentsRemoved: number, note
     action: 'delete',
     doc_number: inv.invoice_number,
     summary:
-      `Deleted ${docLabel(inv)}${inv.client?.name ? ` (${inv.client.name})` : ''} — ${money(inv.total, inv.currency)}` +
+      `Deleted ${docLabel(inv)}${inv.client?.name ? ` (${inv.client.name})` : ''}: ${money(inv.total, inv.currency)}` +
       `${paymentsRemoved ? `, with ${paymentsRemoved} payment${paymentsRemoved === 1 ? '' : 's'}` : ''}${note}`,
     changes: [
       { field: 'Status', from: inv.status, to: null },

@@ -557,7 +557,7 @@ export const useInvoiceStore = create<InvoiceState>((set, get) => {
         errors.push('Due date cannot be before the issue date.');
       }
       if (s.total <= 0 && s.doc_type !== 'DELIVERY_CHALLAN') {
-        errors.push('Document total is zero — check the rates.');
+        errors.push('Document total is zero: check the rates.');
       }
       if (s.amount_paid > s.total - (s.tds_amount ?? 0)) errors.push('Amount received is more than the total.');
 

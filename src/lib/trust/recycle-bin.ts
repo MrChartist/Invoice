@@ -649,7 +649,7 @@ const savePurchase = (bill: PurchaseRecord) => void purchasesDb.save(bill);
 const REFUSAL_TEXT: Record<RestoreRefusal, (e: BinEntry, p: RestorePlan) => string> = {
   exists: (e) => `${tableLabel(e.table)} ${describeEntry(e).number || ''} is already back in the books.`.replace(/\s+/g, ' '),
   numberReused: (_e, p) => `${p.number} has been reused by another record, so this one cannot come back with it.`,
-  parentMissing: (e, p) => (p.parentEntry ? `Restore ${describeEntry(p.parentEntry).number || tableLabel(p.parentEntry.table)} first — or restore both together.` : `The record ${tableLabel(e.table).toLowerCase()} belongs to is gone and not in the bin.`),
+  parentMissing: (e, p) => (p.parentEntry ? `Restore ${describeEntry(p.parentEntry).number || tableLabel(p.parentEntry.table)} first: or restore both together.` : `The record ${tableLabel(e.table).toLowerCase()} belongs to is gone and not in the bin.`),
   module: (_e, p) => p.message ?? 'The module that owns this record refuses the restore.',
   locked: (_e, p) => `The books are locked up to ${getLockUntil()}; this record is dated ${p.day}. Unlock with the PIN to restore it.`,
 };

@@ -100,7 +100,7 @@ function Body({ line, onClose, onChanged, onSettled }: Omit<CreateReceiptModalPr
       <div className={styles.lineBrief}>
         <strong className={styles.amt}>+₹{formatMoney(line.credit)} · {formatDate(line.date)} · {inferMode(line.narration)}</strong>
         <span className={styles.muted}>{line.narration}</span>
-        <span className={styles.muted}>{bankT('refToRecord')} <strong>{referenceFor(line) || '—'}</strong></span>
+        <span className={styles.muted}>{bankT('refToRecord')} <strong>{referenceFor(line) || '-'}</strong></span>
       </div>
 
       {created.length > 0 && (

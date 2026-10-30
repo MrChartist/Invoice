@@ -44,12 +44,12 @@ function copy(lr: ConsignmentNote, ctx: LrPrintContext, label: string): string {
   const option = optionFor(lr.date, ctx.options);
   return `<section class="lr">
   <div class="head"><h1>${esc(ctx.company.name || 'Goods transport agency')}</h1><div class="sub">${esc([ctx.company.address, ctx.company.gstin ? `GSTIN: ${ctx.company.gstin}` : ''].filter(Boolean).join(' · '))}</div></div>
-  <div class="title">Consignment note — ${esc(label)}</div>
-  <div class="meta"><span>LR no.: <strong>${esc(lr.number)}</strong></span><span>Date: <strong>${esc(lr.date)}</strong></span><span>Vehicle: <strong>${esc(lr.vehicle_no || '—')}</strong></span></div>
+  <div class="title">Consignment note: ${esc(label)}</div>
+  <div class="meta"><span>LR no.: <strong>${esc(lr.number)}</strong></span><span>Date: <strong>${esc(lr.date)}</strong></span><span>Vehicle: <strong>${esc(lr.vehicle_no || '-')}</strong></span></div>
   <div class="meta"><span>From: <strong>${esc(lr.from.place)}</strong> (${esc(lr.from.state)})</span><span>To: <strong>${esc(lr.to.place)}</strong> (${esc(lr.to.state)})</span>${lr.driver ? `<span>Driver: ${esc(lr.driver)}</span>` : ''}</div>
   <table class="parties"><tr>${party('Consignor', ctx.consignor)}${party('Consignee', ctx.consignee)}${party('Billing party', ctx.billingParty)}</tr></table>
   <table><thead><tr><th>Goods</th><th class="n">Pkgs</th><th>Packing</th><th class="n">Actual kg</th><th class="n">Charged kg</th><th class="n">Value ₹</th></tr></thead><tbody>${goods}</tbody></table>
-  <div class="meta"><span>Invoice no(s).: ${esc(lr.invoice_nos || '—')}</span><span>E-way bill no(s).: ${esc(lr.eway_nos || '—')}</span></div>
+  <div class="meta"><span>Invoice no(s).: ${esc(lr.invoice_nos || '-')}</span><span>E-way bill no(s).: ${esc(lr.eway_nos || '-')}</span></div>
   <div class="meta"><span>Freight: ₹${money(f.freight)}</span><span>Charges: ₹${money(round(f.charges + f.ownLine))}</span><span>Total: <strong>₹${money(f.total)}</strong></span><span>${esc(PAY[lr.payment_basis])}</span></div>
   <div class="liable"><strong>Person liable to pay GST:</strong> ${esc(liableText(lr))}${lr.liable_override_reason ? ` (${esc(lr.liable_override_reason)})` : ''}<br><small>${esc(optionLine(option, lr.date))}</small></div>
   <div class="decl">We have received the goods described above in apparent good order and condition for carriage, subject to the conditions overleaf. The goods transport agency is not responsible for leakage, breakage or damage due to the nature of the goods or their packing.</div>
@@ -73,11 +73,11 @@ td.n,th.n{text-align:right}.parties td{width:33%;border-right:1px solid #ddd}.li
 export function lrHtml(lr: ConsignmentNote, ctx: LrPrintContext): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(lr.number)}</title><style>${PRINT_FONT_FACE}${CSS}</style></head><body>
 ${LR_COPIES.map((c) => copy(lr, ctx, c)).join('\n')}
-<p class="note">Printed on the issuer's device. Working paper — verify the consignment-note contents with your CA.</p></body></html>`;
+<p class="note">Printed on the issuer's device. Working paper: verify the consignment-note contents with your CA.</p></body></html>`;
 }
 
 /** Short text for Web Share / WhatsApp. */
 export function lrShareText(lr: ConsignmentNote, ctx: Pick<LrPrintContext, 'company' | 'consignee'>): string {
   const f = freightOf(lr);
-  return `${ctx.company.name}: LR ${lr.number} dated ${lr.date}, ${lr.from.place} → ${lr.to.place}, ${lr.lines.reduce((s, l) => s + l.packages, 0)} pkgs for ${ctx.consignee.name}. Vehicle ${lr.vehicle_no || '—'}. Freight ₹${money(f.total)} (${PAY[lr.payment_basis]}). GST payable by: ${liableText(lr)}.`;
+  return `${ctx.company.name}: LR ${lr.number} dated ${lr.date}, ${lr.from.place} → ${lr.to.place}, ${lr.lines.reduce((s, l) => s + l.packages, 0)} pkgs for ${ctx.consignee.name}. Vehicle ${lr.vehicle_no || '-'}. Freight ₹${money(f.total)} (${PAY[lr.payment_basis]}). GST payable by: ${liableText(lr)}.`;
 }

@@ -72,6 +72,6 @@ export function liablePerson(option: GtaOption, kind: GtaRecipientKind, day: str
 /** The printed option line ("GTA option FY 26-27: reverse charge — 5% payable by the recipient"). */
 export function optionLine(option: GtaOption, day: string): string {
   const r = gtaRate(option, day);
-  const what = r.rcm ? `reverse charge — ${r.rate}% payable by the recipient` : `forward charge — ${r.rate}% ${r.itc ? 'with' : 'without'} ITC, paid by the GTA`;
+  const what = r.rcm ? `reverse charge: ${r.rate}% payable by the recipient` : `forward charge: ${r.rate}% ${r.itc ? 'with' : 'without'} ITC, paid by the GTA`;
   return `GTA option FY ${fyOf(day)}: ${what}`;
 }

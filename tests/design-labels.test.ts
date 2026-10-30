@@ -39,7 +39,7 @@ test('designForDoc flattens the type labels into one map the template reads', ()
 
 test('statutory title is kept: the suffix only appends', () => {
   const d = resolveDesignFrom(rows, 'p1');
-  assert.equal(docTitleText('Tax Invoice', d, 'TAX_INVOICE'), 'Tax Invoice — Professional Services');
+  assert.equal(docTitleText('Tax Invoice', d, 'TAX_INVOICE'), 'Tax Invoice: Professional Services');
   assert.equal(docTitleText('Bill of Supply', d, 'BILL_OF_SUPPLY'), 'Bill of Supply');
   assert.equal(docTitleText('Tax Invoice', null, 'TAX_INVOICE'), 'Tax Invoice');
   const sneaky = sanitizeDesign({ title_suffix: { TAX_INVOICE: '   ' } });

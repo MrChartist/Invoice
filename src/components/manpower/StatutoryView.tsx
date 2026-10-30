@@ -72,7 +72,7 @@ export default function StatutoryView({ notify }: MpViewProps) {
             <span className={controls.hint}>{mdT('pass')}:</span>
             {d.sites.map((x) => <label key={x.id} className={controls.check}><input type="checkbox" checked={passesThrough(x, rev)} disabled={x.mp.contract?.escalation === 'vda_pass_through'} onChange={(e) => save({ wage_revisions: revs.map((r) => (r.id === rev.id ? { ...r, site_ids: e.target.checked ? [...(r.site_ids ?? []), x.id] : (r.site_ids ?? []).filter((y) => y !== x.id) } : r)) })} data-mp-arr-site={x.mp.code} /> {x.mp.code}</label>)}
           </div>
-          {d.plan.notes.length ? <Tbl data-mp-arrears="" head={list('cols')} rows={d.plan.notes.map((n) => [n.of.invoice_number || n.of.issue_date, [...new Set(n.lines.map((l) => l.site.mp.code))].join(', '), n.of.mp?.month, <span key="a" data-mp-arr-amt={n.of.id}>{n.lines.filter((l) => l.duties).map((l) => `${l.duties} × ₹${l.delta}`).join(' + ')} = {formatCurrency(n.amount)}</span>, n.raised.map((r) => <Link key={r.id} to={`/invoice/${r.id}`} data-mp-arr-raised>{r.invoice_number || '—'}</Link>)])} /> : <p className={controls.hint}>{mdT('none')}</p>}
+          {d.plan.notes.length ? <Tbl data-mp-arrears="" head={list('cols')} rows={d.plan.notes.map((n) => [n.of.invoice_number || n.of.issue_date, [...new Set(n.lines.map((l) => l.site.mp.code))].join(', '), n.of.mp?.month, <span key="a" data-mp-arr-amt={n.of.id}>{n.lines.filter((l) => l.duties).map((l) => `${l.duties} × ₹${l.delta}`).join(' + ')} = {formatCurrency(n.amount)}</span>, n.raised.map((r) => <Link key={r.id} to={`/invoice/${r.id}`} data-mp-arr-raised>{r.invoice_number || '-'}</Link>)])} /> : <p className={controls.hint}>{mdT('none')}</p>}
           {d.plan.notes.some((n) => !n.raised.length) && <button type="button" className={controls.btnPrimary} onClick={() => run(() => notify(mdT('made', { n: makeArrears(rev.id).length })))} data-mp-arr-make>{s.arrears_doc === 'invoice' ? mdT('makeInv') : mdT('make')}</button>}
           {owed.length > 0 && <p className={controls.hint}>{mdT('staff', { n: owed.length, a: formatCurrency(owed.reduce((t, o) => t + o.amount, 0)) })} · <Link to="/payroll?tab=arrears">{mdT('payroll')}</Link></p>}
         </>
@@ -89,7 +89,7 @@ export default function StatutoryView({ notify }: MpViewProps) {
         <button type="button" className={controls.btnOutline} disabled={!f.no?.trim() || !f.till} onClick={() => save({ licences: [...(s.licences ?? []), { id: generateId(), kind: f.kind as MpLicence['kind'], no: f.no.trim(), valid_till: f.till, ...(f.state?.trim() ? { state: f.state.trim() } : {}) }] })} data-mp-lic-add>{mdT('add')}</button>
       </div>
       <div style={bar}>
-        <Field label={mdT('guard')}><select className={controls.select} value={f.emp ?? ''} onChange={(e) => setF({ ...f, emp: e.target.value })}><option value="">—</option>{d.staff.map((e) => <option key={e.id} value={e.id}>{e.code} {e.name}</option>)}</select></Field>
+        <Field label={mdT('guard')}><select className={controls.select} value={f.emp ?? ''} onChange={(e) => setF({ ...f, emp: e.target.value })}><option value="">-</option>{d.staff.map((e) => <option key={e.id} value={e.id}>{e.code} {e.name}</option>)}</select></Field>
         {fld('gno', mdT('no'))}{fld('gtill', mdT('till'), 'date')}
         <button type="button" className={controls.btnOutline} disabled={!f.emp} onClick={() => run(() => setGuardLicence(f.emp, f.gno?.trim() ? { no: f.gno, valid_till: f.gtill ?? '' } : null))}>{mpT('save')}</button>
       </div>

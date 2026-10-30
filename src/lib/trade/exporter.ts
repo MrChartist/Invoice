@@ -37,7 +37,7 @@ export const countryLabel = (v: unknown): string => {
   const c = countryCode(v);
   if (!c) return String(v ?? '').trim();
   const name = BY_CODE.get(c);
-  return name ? `${c} — ${name}` : c;
+  return name ? `${c}: ${name}` : c;
 };
 
 /* ── IEC / AD code ───────────────────────────────────────────── */

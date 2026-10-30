@@ -235,7 +235,7 @@ export function revalueReceivables(
 
 /* ── CSV ────────────────────────────────────────────────────── */
 
-const NOTE = 'Working paper — verify with your CA. GST figures keep the invoice-date rate.';
+const NOTE = 'Working paper: verify with your CA. GST figures keep the invoice-date rate.';
 
 export function realisedCsv(rows: readonly ForeignReceiptRow[], period: { start: string; end: string }): string {
   const t = realisedTotals(rows);
@@ -249,7 +249,7 @@ export function realisedCsv(rows: readonly ForeignReceiptRow[], period: { start:
 
 export function revaluationCsv(rev: Revaluation): string {
   return toCsv([
-    [`Revaluation of foreign-currency receivables as on ${rev.asOf} (unrealised — not posted)`, NOTE],
+    [`Revaluation of foreign-currency receivables as on ${rev.asOf} (unrealised: not posted)`, NOTE],
     ['Invoice', 'Date', 'Party', 'Currency', 'Open (foreign)', 'Invoice rate', 'Closing rate', 'At invoice rate (₹)', 'At closing rate (₹)', 'Unrealised gain / (loss) (₹)'],
     ...rev.rows.map((r) => [r.invoiceNumber, r.issueDate, r.party, r.currency, r.openForeign, r.bookRate, r.closingRate ?? '', r.bookInr, r.closingInr ?? '', r.unrealised ?? 'closing rate not entered']),
     ['', '', '', '', '', '', 'Total', rev.totals.bookInr, rev.totals.closingInr, rev.totals.unrealised],

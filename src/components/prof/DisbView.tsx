@@ -42,7 +42,7 @@ export default function DisbView({ notify }: Pick<PsDeskProps, 'notify'>) {
     return { p, live, open: unrecoveredDisbursements(p, billed, today), off: (g: DisbFilter) => writtenOff(p, billed, today, g) };
   }, [tick, today]);
   const clients = useMemo(() => new Map(localDb.clients.getAll().map((c) => [c.id, c.name])), []);
-  const centres = useMemo(() => new Map(loadCostCentres().map((c) => [c.id, c.ps?.code ? `${c.ps.code} — ${c.name}` : c.name])), []);
+  const centres = useMemo(() => new Map(loadCostCentres().map((c) => [c.id, c.ps?.code ? `${c.ps.code}: ${c.name}` : c.name])), []);
   const v = disbView(data.open, f);
   const off = data.off(f);
   const notes = useMemo(() => localDb.invoices.getAll().filter((i) => data.live.has(i.id) && (!f.client || i.client?.id === f.client) && disbursementSchedule(i, data.p).length), [data, f.client]);
@@ -51,7 +51,7 @@ export default function DisbView({ notify }: Pick<PsDeskProps, 'notify'>) {
   const print = () => {
     const inv = notes.find((i) => i.id === note);
     if (!inv) return;
-    const t = `${r16bT('schedT')} — ${inv.invoice_number}`;
+    const t = `${r16bT('schedT')}: ${inv.invoice_number}`;
     const rows = disbursementSchedule(inv, data.p).map((s) => `<tr><td>${escHtml(s.date)}</td><td>${escHtml(s.kind ? psbT(`k.${s.kind}`) : '')}</td><td>${escHtml(s.ref)}</td><td>${escHtml(s.name)}</td><td align="right">${escHtml(formatCurrency(s.amount))}</td></tr>`).join('');
     printHtmlDocument(`<!doctype html><meta charset="utf-8"><title>${escHtml(t)}</title><body><h2>${escHtml(t)}</h2><p>${escHtml(inv.client?.name)}</p><table border="1" cellpadding="4"><tr><th>${escHtml(psT('date'))}</th><th>${escHtml(r16bT('kind'))}</th><th>${escHtml(r16bT('ref'))}</th><th></th><th>${escHtml(psT('amount'))}</th></tr>${rows}</table><p>${escHtml(psT('wp'))}</p></body>`, (h) => downloadText('disbursements.html', h, 'text/html'));
   };
@@ -60,8 +60,8 @@ export default function DisbView({ notify }: Pick<PsDeskProps, 'notify'>) {
     <div className={surface.card} data-disb-view>
       <div className={surface.cardBody}>
         <div className={controls.row3}>
-          <Field label={psT('client')}><select className={controls.select} value={f.client ?? ''} onChange={(e) => setF({ ...f, client: e.target.value || undefined })} data-disb-client><option value="">—</option>{ids('clientId').map((id) => <option key={id} value={id}>{clients.get(id) ?? id.replace(/^name:/, '')}</option>)}</select></Field>
-          <Field label={psT('matter')}><select className={controls.select} value={f.matter ?? ''} onChange={(e) => setF({ ...f, matter: e.target.value || undefined })}><option value="">—</option>{ids('matterId').map((id) => <option key={id} value={id}>{centres.get(id) ?? id}</option>)}</select></Field>
+          <Field label={psT('client')}><select className={controls.select} value={f.client ?? ''} onChange={(e) => setF({ ...f, client: e.target.value || undefined })} data-disb-client><option value="">-</option>{ids('clientId').map((id) => <option key={id} value={id}>{clients.get(id) ?? id.replace(/^name:/, '')}</option>)}</select></Field>
+          <Field label={psT('matter')}><select className={controls.select} value={f.matter ?? ''} onChange={(e) => setF({ ...f, matter: e.target.value || undefined })}><option value="">-</option>{ids('matterId').map((id) => <option key={id} value={id}>{centres.get(id) ?? id}</option>)}</select></Field>
         </div>
         <div className={surface.tableWrap}>
           <table className={surface.table} data-disb-buckets>
@@ -98,7 +98,7 @@ export default function DisbView({ notify }: Pick<PsDeskProps, 'notify'>) {
         )}
         {notes.length > 0 && (
           <div className={controls.row}>
-            <Field label={r16bT('sched')}><select className={controls.select} value={note} onChange={(e) => setNote(e.target.value)}><option value="">—</option>{notes.map((i) => <option key={i.id} value={i.id}>{i.invoice_number} · {i.client?.name}</option>)}</select></Field>
+            <Field label={r16bT('sched')}><select className={controls.select} value={note} onChange={(e) => setNote(e.target.value)}><option value="">-</option>{notes.map((i) => <option key={i.id} value={i.id}>{i.invoice_number} · {i.client?.name}</option>)}</select></Field>
             <button type="button" className={controls.btnOutline} disabled={!note} onClick={print}>{psT('print')}</button>
           </div>
         )}

@@ -47,7 +47,7 @@ export function PurchasesTable({ rows, today, onPay, onEdit, onDelete }: Purchas
               <tr key={p.id} {...list.row(i)}>
                 <td>
                   <div className={tabStyles.name}>
-                    <span>{p.vendor_name || '—'}</span>
+                    <span>{p.vendor_name || '-'}</span>
                     <span className={styles.kindTag}>{p.kind === 'EXPENSE' ? purT('kindExpense') : purT('kindBill')}</span>
                     {p.attachments?.length ? (
                       <span className={styles.kindTag} title={purT(p.attachments.length === 1 ? 'attachedOne' : 'attachedMany', { n: p.attachments.length })} aria-label={purT(p.attachments.length === 1 ? 'attachedOne' : 'attachedMany', { n: p.attachments.length })}>
@@ -66,11 +66,11 @@ export function PurchasesTable({ rows, today, onPay, onEdit, onDelete }: Purchas
                 <td>{purCategory(p.category)}</td>
                 <td><PurchaseStatusBadge status={status} /></td>
                 <td className={surface.numeric}>
-                  {tax > 0 ? formatCurrency(tax) : '—'}
+                  {tax > 0 ? formatCurrency(tax) : '-'}
                   {p.itc_eligible && tax > 0 && <div><span className={styles.itcTag}>ITC</span></div>}
                 </td>
                 <td className={surface.numeric}>{formatCurrency(p.total)}</td>
-                <td className={surface.numeric}>{balance > 0 ? formatCurrency(balance) : '—'}</td>
+                <td className={surface.numeric}>{balance > 0 ? formatCurrency(balance) : '-'}</td>
                 <td>
                   <div className={surface.rowActions}>
                     <button

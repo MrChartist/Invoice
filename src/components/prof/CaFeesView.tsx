@@ -23,13 +23,13 @@ export default function CaFeesView({ ctx }: { ctx: PsDeskCtx }) {
     <>
       <Tbl empty={caT('none')} head={[caT('event'), caT('item'), caT('rate')]} rows={CA_FEE_EVENTS.map((k) => [caT(`e.${k}`), (
         <select key="i" className={controls.select} value={flagged.get(k)?.id ?? ''} onChange={(e) => ctx.run(() => setFeeEvent(e.target.value || flagged.get(k)!.id, e.target.value ? k : ''))} data-ps={`fee-item-${k}`}>
-          <option value="">—</option>{d.items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+          <option value="">-</option>{d.items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
         </select>
-      ), flagged.get(k)?.rate ?? '—'])} />
+      ), flagged.get(k)?.rate ?? '-'])} />
       <div style={row}>
         <Fld l={caT('client')}>
           <select className={controls.select} value={client} onChange={(e) => setClient(e.target.value)} data-ps="fee-client">
-            <option value="">—</option>{d.clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            <option value="">-</option>{d.clients.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
           </select>
         </Fld>
       </div>

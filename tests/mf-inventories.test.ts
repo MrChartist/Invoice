@@ -36,7 +36,7 @@ test('the split sums to the valuer total; WIP-godown stock moves to WIP; heads i
   assert.equal(s.memoConversion, 12345, 'memo kept apart from the total');
   const s2 = inventorySplit(positions, '2026-04-30', (i) => classOf(i, d));
   assert.equal(s2.total, inventoryValuer(positions).value('2026-04-30'));
-  assert.deepEqual(noteRows(s2, s).map((r) => r.label), ['Raw materials', 'Work-in-progress', 'Finished goods', 'Stock-in-trade (goods acquired for trading)', 'Others — packing materials', 'Others — scrap']);
+  assert.deepEqual(noteRows(s2, s).map((r) => r.label), ['Raw materials', 'Work-in-progress', 'Finished goods', 'Stock-in-trade (goods acquired for trading)', 'Others: packing materials', 'Others: scrap']);
 });
 
 test('inventory note: unchanged without rows; with rows the sub-heads, a balancing row and the balance-sheet total', () => {

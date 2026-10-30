@@ -91,7 +91,7 @@ function Outstanding({ version, today }: { version: number; today: string }) {
                     <tr key={`${r.orderId}:${r.lineId}`}>
                       <td><Link to={`/invoice/${r.orderId}`}>{r.number}</Link><div className={styles.muted}>{formatDate(r.date)}</div></td>
                       <td>{by === 'party' ? r.item : r.party}{by === 'due' && <div className={styles.muted}>{r.item}</div>}</td>
-                      <td className={cn(r.overdueDays > 0 && styles.overdue)}>{r.due ? formatDate(r.due) : '—'}{r.overdueDays > 0 && <div>{imT('overdueDays', { n: r.overdueDays })}</div>}</td>
+                      <td className={cn(r.overdueDays > 0 && styles.overdue)}>{r.due ? formatDate(r.due) : '-'}{r.overdueDays > 0 && <div>{imT('overdueDays', { n: r.overdueDays })}</div>}</td>
                       <td className={surface.numeric}>{r.ordered} {r.unit}</td>
                       <td className={surface.numeric}>{r.delivered || ''}</td>
                       <td className={surface.numeric}>{r.pendingDelivery || ''}</td>

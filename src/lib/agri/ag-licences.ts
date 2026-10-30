@@ -46,7 +46,7 @@ export function unlicensedWarnings(lines: readonly { name: string; ag_class?: st
     const cls = l.ag_class ?? classOf(l.name.trim().toLowerCase());
     const need = cls ? rules[cls]?.licence : undefined;
     if (!need || (licences ?? []).some((x) => need.includes(x.kind) && validOn(x, date))) continue;
-    out.push(`${l.name}: no valid ${need.join(' / ').replace(/_/g, ' ')} licence on ${date} — renew or add it (verify AG21).`);
+    out.push(`${l.name}: no valid ${need.join(' / ').replace(/_/g, ' ')} licence on ${date}, renew or add it (verify AG21).`);
   }
   return [...new Set(out)];
 }

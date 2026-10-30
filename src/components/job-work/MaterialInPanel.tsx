@@ -48,8 +48,8 @@ export function MaterialInPanel({ data }: { data: JwData }) {
                 <td className={styles.mono}>{v.number}</td>
                 <td>{formatDate(v.date)}</td>
                 <td>{v.party_name}{v.jw_challan_no ? <div className={styles.muted}>{v.jw_challan_no}</div> : null}</td>
-                <td>{[...v.received, ...(v.supplied ?? [])].map((l) => `${name(l.item_id)} × ${qtyText(num(l.qty))}${l.unit ? ` ${l.unit}` : ''}`).join(', ') || '—'}</td>
-                <td className={styles.num}>{v.charges ? formatMoney(v.charges) : '—'}</td>
+                <td>{[...v.received, ...(v.supplied ?? [])].map((l) => `${name(l.item_id)} × ${qtyText(num(l.qty))}${l.unit ? ` ${l.unit}` : ''}`).join(', ') || '-'}</td>
+                <td className={styles.num}>{v.charges ? formatMoney(v.charges) : '-'}</td>
                 <td className={surface.rowActions}>
                   {ctx.canBooks && (
                     <>

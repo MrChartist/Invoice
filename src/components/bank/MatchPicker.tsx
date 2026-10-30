@@ -87,7 +87,7 @@ function Body({ line, candidates, onClose, onApply }: Omit<MatchPickerProps, 'li
                     </span>
                     <br />
                     <span className={styles.pickSub}>
-                      {formatDate(c.date)} ({days === 0 ? bankT('sameDay') : bankT(days > 0 ? 'daysLater' : 'daysEarlier', { n: Math.abs(days) })}) · {c.method || '—'}
+                      {formatDate(c.date)} ({days === 0 ? bankT('sameDay') : bankT(days > 0 ? 'daysLater' : 'daysEarlier', { n: Math.abs(days) })}) · {c.method || '-'}
                       {c.reference ? ` · ${c.reference}` : ''}
                     </span>
                   </span>

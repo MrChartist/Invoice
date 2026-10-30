@@ -65,7 +65,7 @@ export function LedgerTab({ ledger, period, accountId, party, onSelect, onOpenVo
       {st && (
         <>
           <StatementToolbar csv={() => accountStatementCsv(st)} filename={`ledger-${account.code}-${period.start}_to_${period.end}.csv`} />
-          <PrintTitle title={ledgerT('ledgerTitle', { account: `${account.code} ${account.name}${party ? ` — ${party}` : ''}` })} sub={`${formatDate(period.start)} – ${formatDate(period.end)}`} />
+          <PrintTitle title={ledgerT('ledgerTitle', { account: `${account.code} ${account.name}${party ? `: ${party}` : ''}` })} sub={`${formatDate(period.start)} – ${formatDate(period.end)}`} />
           <div className={surface.card}>
             {st.rows.length === 0 && !st.opening ? (
               <EmptyState icon={BookText} title={ledgerT('ledgerEmptyTitle')} text={ledgerT('ledgerEmptyText')} />
@@ -93,7 +93,7 @@ export function LedgerTab({ ledger, period, accountId, party, onSelect, onOpenVo
                       <tr key={r.voucher.id}>
                         <td>{formatDate(r.voucher.date)}</td>
                         <td>
-                          <div>{r.particulars || '—'}</div>
+                          <div>{r.particulars || '-'}</div>
                           <div className={books.narration}>{[r.voucher.party, r.voucher.narration].filter(Boolean).join(' · ')}</div>
                         </td>
                         <td>

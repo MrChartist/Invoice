@@ -32,7 +32,7 @@ export function VoucherList<T extends { id: string; number: string; date: string
                 <td className={surface.mono}>{r.number}</td>
                 <td>{formatDate(r.date)}</td>
                 <td>{describe(r)}</td>
-                {value && <td className={styles.num}>{v === undefined ? '—' : money(v)}</td>}
+                {value && <td className={styles.num}>{v === undefined ? '-' : money(v)}</td>}
                 <td className={surface.rowActions}>{actions?.(r)}</td>
               </tr>
             );

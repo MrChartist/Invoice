@@ -27,7 +27,7 @@ export function AddressBookEditor({ value, onChange }: { value: PartyAddress[]; 
           <input className={controls.input} inputMode="numeric" maxLength={6} value={a.zip ?? ''} onChange={(e) => set(a.id, { zip: e.target.value.replace(/\D/g, '') })} placeholder={s2T('c.pin')} aria-label={`${s2T('c.pin')} ${i + 1}`} />
           <select className={controls.select} value={a.state_code ?? ''} onChange={(e) => set(a.id, { state_code: e.target.value || undefined })} aria-label={`${s2T('c.state')} ${i + 1}`}>
             <option value="">{s2T('c.state')}</option>
-            {INDIAN_STATES.map((st) => <option key={st.code} value={st.code}>{st.code} — {st.name}</option>)}
+            {INDIAN_STATES.map((st) => <option key={st.code} value={st.code}>{st.code} : {st.name}</option>)}
           </select>
           <input className={`${controls.input} ${controls.inputMono}`} value={a.gstin ?? ''} maxLength={15} onChange={(e) => set(a.id, { gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') })} placeholder={s2T('c.gstin')} aria-label={`${s2T('c.gstin')} ${i + 1}`} />
           <div className={styles.flags}>

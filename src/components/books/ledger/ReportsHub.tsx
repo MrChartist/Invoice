@@ -127,7 +127,7 @@ function VoucherTable({ vouchers, ledger }: { vouchers: LedgerVoucher[]; ledger:
                 <tr key={r.voucher.id} {...nav.row(i)}>
                   <td>{formatDate(r.voucher.date)}</td>
                   <td>{r.voucher.party || r.voucher.narration || r.voucher.kind}</td>
-                  <td className={surface.mono}>{r.voucher.number || '—'}</td>
+                  <td className={surface.mono}>{r.voucher.number || '-'}</td>
                   {columnar ? r.values.map((v, k) => <td key={k} className={surface.numeric}>{drCr(v)}</td>) : <td className={surface.numeric}>{money(r.amount)}</td>}
                 </tr>
               ))}
@@ -230,7 +230,7 @@ function ExceptionsView({ period, data, today, positions }: Props) {
           <tbody>
             {ex.negativeLedgers.map((n, i) => (
               <tr key={i}>
-                <td><button type="button" className={styles.rowButton} onClick={() => drill.push(ledgerFrame(ledger, n.accountId, period, n.party))}>{n.label}{n.party ? ` — ${n.party}` : ''}</button></td>
+                <td><button type="button" className={styles.rowButton} onClick={() => drill.push(ledgerFrame(ledger, n.accountId, period, n.party))}>{n.label}{n.party ? `: ${n.party}` : ''}</button></td>
                 <td>{reasons[n.reason]}{n.firstDate ? ` · ${reportsT('exFrom', { date: formatDate(n.firstDate) })}` : ''}</td>
                 <td className={surface.numeric}>{drCr(n.lowest ?? n.balance)}</td>
               </tr>
@@ -285,7 +285,7 @@ function ExceptionsView({ period, data, today, positions }: Props) {
             {ex.duplicateBills.slice(0, 200).map((d) => (
               <tr key={`${d.a.id}-${d.b.id}`}>
                 <td>{d.b.vendor_name}</td>
-                <td className={surface.mono}>{d.a.bill_number || '—'} / {d.b.bill_number || '—'}</td>
+                <td className={surface.mono}>{d.a.bill_number || '-'} / {d.b.bill_number || '-'}</td>
                 <td>{formatDate(d.a.date)} / {formatDate(d.b.date)} · {d.kind === 'exact' ? capT('exDupExact') : capT('exDupNear')}</td>
                 <td className={surface.numeric}>{money(Math.round(d.b.total * 100))}</td>
               </tr>

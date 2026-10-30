@@ -21,7 +21,7 @@ export default function LoyaltyLiability() {
   const today = todayInput();
   const l = useMemo(() => loyaltyLiability(peekTable<InvoiceRecord>('invoices'), adjustmentsDb.all(), readProgram(), today), [today]);
   const csv = () => downloadText(`loyalty-liability-${today}.csv`, toCsv([
-    ['Loyalty liability — working paper (verify with your CA)', today],
+    ['Loyalty liability: working paper (verify with your CA)', today],
     ['Customer', 'Tier', 'Points', 'Value', 'Expiring this month'],
     ...l.rows.map((r) => [r.name, r.tier ?? '', r.points, r.value, r.expiring]),
     [], ['Total', '', l.points, l.value, l.expiringPoints],
@@ -43,7 +43,7 @@ export default function LoyaltyLiability() {
           <table className={surface.table}>
             <thead><tr><th>{sT('customer')}</th><th>{sT('lyTier')}</th><th className={css.num}>{sT('lyPoints')}</th><th className={css.num}>{sT('lyValue')}</th><th className={css.num}>{sT('lyExpiring')}</th></tr></thead>
             <tbody>{l.rows.slice(0, 20).map((r) => (
-              <tr key={r.name}><td>{r.name}</td><td>{r.tier ?? '—'}</td><td className={css.num}>{r.points}</td><td className={css.num}>{formatCurrency(r.value)}</td><td className={css.num}>{r.expiring || ''}</td></tr>
+              <tr key={r.name}><td>{r.name}</td><td>{r.tier ?? '-'}</td><td className={css.num}>{r.points}</td><td className={css.num}>{formatCurrency(r.value)}</td><td className={css.num}>{r.expiring || ''}</td></tr>
             ))}</tbody>
           </table>
         </div>

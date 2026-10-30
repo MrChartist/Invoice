@@ -761,7 +761,7 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     );
   }
   if (missingFxRate(rec)) {
-    push('error', 'FX_RATE_MISSING', `amounts are in ${docCurrency(rec)} but the invoice has no exchange rate; GST returns need INR values. Reported at face value — add the CBIC / shipping-bill rate on the invoice.`);
+    push('error', 'FX_RATE_MISSING', `amounts are in ${docCurrency(rec)} but the invoice has no exchange rate; GST returns need INR values. Reported at face value: add the CBIC / shipping-bill rate on the invoice.`);
   }
   if (isExport && !isNote && (st === 'EXPORT_LUT' || st === 'EXPORT_WITH_PAYMENT') && !(rec.shipping_bill_no && rec.shipping_bill_date && rec.port_code)) {
     push('info', 'EXP_SHIPPING_BILL', 'export of goods without shipping-bill details (port code, number, date); add them on the invoice or amend the EXP entry once the shipping bill is filed.');
@@ -790,7 +790,7 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
   if (gstinRaw && !chk.valid && !uin) {
     push('error', 'GSTIN_INVALID', `client GSTIN "${gstinRaw}" is invalid (${chk.message}); treated as unregistered.`, '/clients', 'Fix client');
   }
-  if (uin) push('info', 'UIN_RECIPIENT', `recipient UIN ${gstinRaw} (UN body / embassy): reported in B2B with the UIN and in GSTR-3B Table 3.2 (UIN holders). The UIN is checked for shape only — verify with your CA.`);
+  if (uin) push('info', 'UIN_RECIPIENT', `recipient UIN ${gstinRaw} (UN body / embassy): reported in B2B with the UIN and in GSTR-3B Table 3.2 (UIN holders). The UIN is checked for shape only: verify with your CA.`);
   const registered = chk.valid || uin;
   if (registered && chk.stateCode && pos && chk.stateCode !== pos && !isExport && !freight96) {
     push('info', 'POS_VS_GSTIN', `place of supply ${pos} differs from client GSTIN state ${chk.stateCode}; correct only for ship-to / bill-to cases.`);
@@ -834,8 +834,8 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
   const marginCost = new Set((rec.items ?? []).filter(isMarginCostLine).map((i) => i.id));
   if (agent.size || marginCost.size) {
     for (let k = lines.length - 1; k >= 0; k--) if (agent.has(calc.lines[k].id) || marginCost.has(calc.lines[k].id)) lines.splice(k, 1);
-    if (agent.size) push('info', 'PURE_AGENT', 'pure-agent reimbursement line(s) (Rule 33) are left out of the supply value, Table 8 and the HSN summary; they stay in the invoice value — verify with your CA.');
-    if (marginCost.size) push('info', 'MARGIN_SCHEME', 'margin scheme (Rule 32(5)): the used goods\' purchase value is left out of the supply value, Table 8, 3.1(c), the HSN summary and the Rule 42 exempt turnover; only the margin is reported as a taxable supply — verify with your CA.');
+    if (agent.size) push('info', 'PURE_AGENT', 'pure-agent reimbursement line(s) (Rule 33) are left out of the supply value, Table 8 and the HSN summary; they stay in the invoice value: verify with your CA.');
+    if (marginCost.size) push('info', 'MARGIN_SCHEME', 'margin scheme (Rule 32(5)): the used goods\' purchase value is left out of the supply value, Table 8, 3.1(c), the HSN summary and the Rule 42 exempt turnover; only the margin is reported as a taxable supply, verify with your CA.');
   }
   // Taxable freight / other charges: part of the principal supply's value, so no quantity of its own.
   if (calc.charges_line) lines.push({ ...toPLine(calc.charges_line), qty: 0 });
@@ -860,11 +860,11 @@ function prepare(rec: InvoiceRecord, opts: BuildOptions, issues: ReconIssue[]): 
     if (eco.section === 'PAY_9_5') {
       if (isExport) push('warning', 'ECO_95_EXPORT', 'marked "operator pays tax u/s 9(5)" but it is an export; reported as an export (Sec 9(5) covers notified domestic services).');
       else if (calc.lines.some((l) => l.igst + l.cgst + l.sgst + l.cess > 0)) {
-        push('warning', 'ECO_95_TAXED', 'the e-commerce operator pays the tax u/s 9(5), but tax was charged on this document. Only the value is reported (Table 14(b), 3B 3.1.1(ii)); tax you collected must still be deposited — check with your CA.');
+        push('warning', 'ECO_95_TAXED', 'the e-commerce operator pays the tax u/s 9(5), but tax was charged on this document. Only the value is reported (Table 14(b), 3B 3.1.1(ii)); tax you collected must still be deposited: check with your CA.');
       }
     }
     const rules = ecoReporting(String(rec.issue_date).slice(0, 10));
-    if (!rules.gstr1Table14) push('info', 'ECO_BEFORE_TABLE14', 'supplies through e-commerce operators were reported only with the ECO GSTIN column (B2B / B2CL / B2CS) before GSTR-1 Table 14 — Table 14 here is for reference.');
+    if (!rules.gstr1Table14) push('info', 'ECO_BEFORE_TABLE14', 'supplies through e-commerce operators were reported only with the ECO GSTIN column (B2B / B2CL / B2CS) before GSTR-1 Table 14: Table 14 here is for reference.');
   }
   const bos = rec.doc_type === 'BILL_OF_SUPPLY';
   if (bos && calc.lines.some((l) => l.nominal_rate > 0 && l.taxable !== 0)) {
@@ -1411,11 +1411,11 @@ function buildAmendments(
     const flag = (severity: Severity, code: string, message: string) =>
       issues.push({ id: `${code}:${rec.id}`, severity, code, message: `${label}: ${message}`, invoiceId: rec.id, invoiceNumber: rec.invoice_number, link: `/invoice/${rec.id}`, linkLabel: 'Open document' });
     if (rec.status === 'Draft' || rec.status === 'Cancelled') {
-      flag('warning', 'AMEND_NOT_LIVE', `amended version is ${rec.status.toLowerCase()}, so no amendment is reported. A filed document cannot be withdrawn by amendment — raise a credit note instead.`);
+      flag('warning', 'AMEND_NOT_LIVE', `amended version is ${rec.status.toLowerCase()}, so no amendment is reported. A filed document cannot be withdrawn by amendment: raise a credit note instead.`);
       continue;
     }
     if (inPeriod(a.original_date, opts.period)) {
-      flag('warning', 'AMEND_SAME_PERIOD', 'is amended in the same period it was issued in. An amendment is only needed once the original return is filed — here it is reported both as filed and as amended.');
+      flag('warning', 'AMEND_SAME_PERIOD', 'is amended in the same period it was issued in. An amendment is only needed once the original return is filed: here it is reported both as filed and as amended.');
     }
     const cur = prepare(rec, opts, issues);
     const orig = a.original ? prepare(asFiled(rec), opts, []) : null;
@@ -1435,7 +1435,7 @@ function buildAmendments(
     if (isEco95(cur) || (orig && isEco95(orig))) {
       // PENDING 44: Table 14A(b) — the revised 14(b) value (all lines, as 14(b)) per operator × original period (0 once it left 9(5)).
       (tables.eco95a ??= []).push({ ...row, etin: (isEco95(cur) ? cur.etin : orig!.etin) ?? '', ...(cur.isNote ? { noteType: cur.noteType } : {}), ...(isEco95(cur) ? { taxable: round2(cur.lines.reduce((t, l) => t + l.taxable, 0)) } : { taxable: 0, value: 0, items: [], igst: 0, cgst: 0, sgst: 0, cess: 0 }) });
-      flag('info', 'AMEND_ECO_95', 'supply through an e-commerce operator paying tax u/s 9(5): the amendment is in the Table 14A(b) working paper (E-commerce tab); its JSON is not generated — enter it on the portal. GSTR-3B 3.1.1(ii) of this period takes the difference.');
+      flag('info', 'AMEND_ECO_95', 'supply through an e-commerce operator paying tax u/s 9(5): the amendment is in the Table 14A(b) working paper (E-commerce tab); its JSON is not generated, enter it on the portal. GSTR-3B 3.1.1(ii) of this period takes the difference.');
     }
     if (orig) {
       for (const [d, f] of [[cur, 1], [orig, -1]] as const) {

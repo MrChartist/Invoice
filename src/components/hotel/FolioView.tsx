@@ -63,7 +63,7 @@ function Folios({ ctx }: { ctx: Ctx }) {
   return (
     <>
       <Row>
-        <Fields v={q} set={(p) => setQ({ ...q, ...p })} spec={[['q', 'search'], ['house', bT('house'), [['', '—'], ...d.clients]]]} />
+        <Fields v={q} set={(p) => setQ({ ...q, ...p })} spec={[['q', 'search'], ['house', bT('house'), [['', '-'], ...d.clients]]]} />
         <button type="button" className={B.o} disabled={!q.house} onClick={() => ctx.run(() => setQ({ ...q, sel: openHouseFolio({ client_id: String(q.house), name: d.clients.find((c) => c[0] === q.house)?.[1] ?? '' }).id }))}><Wallet size={16} aria-hidden="true" /> {bT('house')}</button>
       </Row>
       <Tbl head={[bT('folio'), bT('payer'), hT('total'), bT('toBill')]} rows={d.folios.filter((x) => x.status === 'open' && `${x.name} ${x.payer.name}`.toLowerCase().includes(s)).map((x) => [
@@ -116,14 +116,14 @@ function Panel({ ctx, f, all, clients, out0 = '' }: { ctx: Ctx; f: Folio; all: F
         l.qty, money(l.amount), l.tax_rate ?? '',
       ])} />
       {pick.length > 0 && <Row>
-        <Fields v={op} set={(p) => setOp({ ...op, ...p })} spec={[...(f.line_id ? [['window', bT('window'), ['1', '2', '3', '4']] as Spec] : []), ['to', bT('toFolio'), [['', '—'], ...all.filter((x) => x.status === 'open' && x.id !== f.id).map((x) => [x.id, `${x.name} · ${x.payer.name}`] as const)]], ['amount', 'amount', 'n'], ['qty', bT('qty'), 'n'], ['reason', 'reason']]} />
+        <Fields v={op} set={(p) => setOp({ ...op, ...p })} spec={[...(f.line_id ? [['window', bT('window'), ['1', '2', '3', '4']] as Spec] : []), ['to', bT('toFolio'), [['', '-'], ...all.filter((x) => x.status === 'open' && x.id !== f.id).map((x) => [x.id, `${x.name} · ${x.payer.name}`] as const)]], ['amount', 'amount', 'n'], ['qty', bT('qty'), 'n'], ['reason', 'reason']]} />
         <button type="button" className={B.os} disabled={pick.length !== 1 || !f.line_id} onClick={() => run(() => splitLine(f.id, pick[0], op.qty ? { qty: num(op.qty) } : { amount: num(op.amount) }, num(op.window)))}><Split size={14} aria-hidden="true" /> {bT('split')}</button>
         <button type="button" className={B.os} onClick={() => run(() => transferLines(f.id, pick, op.to ? { folioId: String(op.to) } : { window: num(op.window) }))}><ArrowLeftRight size={14} aria-hidden="true" /> {bT('transfer')}</button>
         <button type="button" className={B.gs} disabled={pick.length !== 1} onClick={() => void doVoid()}><XCircle size={14} aria-hidden="true" /> {bT('void')}</button>
         {order && <button type="button" className={B.os} onClick={() => run(() => undoRoomCharge(order))} data-undo-room-charge>{bT('undo')}</button>}
       </Row>}
       <Row>
-        <Fields v={c} set={(p) => setC({ ...c, ...p })} spec={[['kind', 'kind', POST_KINDS], ['item', bT('item'), [['', '—'], ...items.map((i) => [i.id, i.name] as const)]], ['desc', bT('desc')], ['qty', bT('qty'), 'n'], ['rate', bT('rate'), 'n'], ['gst', bT('gst'), 'n']]} />
+        <Fields v={c} set={(p) => setC({ ...c, ...p })} spec={[['kind', 'kind', POST_KINDS], ['item', bT('item'), [['', '-'], ...items.map((i) => [i.id, i.name] as const)]], ['desc', bT('desc')], ['qty', bT('qty'), 'n'], ['rate', bT('rate'), 'n'], ['gst', bT('gst'), 'n']]} />
         <button type="button" className={B.p} onClick={post} data-post-charge><Receipt size={16} aria-hidden="true" /> {bT('post')}</button>
       </Row>
       {res && <BillTo ctx={ctx} res={res} clients={clients} />}
@@ -154,7 +154,7 @@ function BillTo({ ctx, res, clients }: { ctx: Ctx; res: Reservation; clients: re
       <Row>
         <Fields v={b} set={(p) => setB({ ...b, ...p })} spec={[
           ['kind', 'billTo', (['guest', 'company', 'agent'] as const).map((k) => [k, bT(`bk.${k}`)] as const)],
-          ...(b.kind === 'guest' ? [] : [['client', bT('client'), [['', '—'], ...clients]], ['tds', bT('tdsDefault'), TDS_DEFAULTS], ['pct', bT('commissionPct'), 'n']] as Spec[]),
+          ...(b.kind === 'guest' ? [] : [['client', bT('client'), [['', '-'], ...clients]], ['tds', bT('tdsDefault'), TDS_DEFAULTS], ['pct', bT('commissionPct'), 'n']] as Spec[]),
           ...[2, 3, 4].map((w) => [`w${w}`, bT('routing', { w })] as Spec),
         ]} />
         <button type="button" className={B.o} onClick={save}>{hT('save')}</button>

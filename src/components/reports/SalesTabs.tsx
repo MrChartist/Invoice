@@ -68,11 +68,11 @@ export function CustomersTab({ report, period }: { report: CustomerReport; perio
     { id: 'taxable', label: repT('colTaxable'), numeric: true, sort: (r) => r.taxable, cell: (r) => money(r.taxable), total: money(totals.taxable) },
     { id: 'tax', label: repT('colGstCess'), numeric: true, sort: (r) => r.tax, cell: (r) => money(r.tax), total: money(totals.tax) },
     { id: 'total', label: repT('colTotal'), numeric: true, sort: (r) => r.total, cell: (r) => money(r.total), total: money(totals.total) },
-    { id: 'avg', label: repT('colAvgInvoice'), numeric: true, sort: (r) => r.avg, cell: (r) => (r.count ? money(r.avg) : '—') },
+    { id: 'avg', label: repT('colAvgInvoice'), numeric: true, sort: (r) => r.avg, cell: (r) => (r.count ? money(r.avg) : '-') },
     { id: 'share', label: repT('colShare'), numeric: true, sort: (r) => r.share, cell: (r) => <Share value={r.share} />, total: '100%' },
     {
       id: 'last', label: repT('colLastInvoice'), sort: (r) => r.lastDate,
-      cell: (r) => (r.lastDate ? <InvoiceLink id={r.lastId}>{formatDate(r.lastDate)}</InvoiceLink> : '—'),
+      cell: (r) => (r.lastDate ? <InvoiceLink id={r.lastId}>{formatDate(r.lastDate)}</InvoiceLink> : '-'),
     },
   ];
   return (
@@ -103,11 +103,11 @@ export function ItemsTab({ docs, period, index }: { docs: readonly SalesDoc[]; p
   const rep = useMemo(() => salesByItem(docs, period, by, index), [docs, period, by, index]);
   const cols: Column<ItemRow>[] = [
     { id: 'name', label: by === 'hsn' ? repT('colHsn') : repT('colItem'), sort: (r) => r.name, cell: (r) => r.name, total: repT('total') },
-    ...(by === 'item' ? [{ id: 'hsn', label: repT('colHsn'), sort: (r: ItemRow) => r.hsn, cell: (r: ItemRow) => r.hsn || '—' } as Column<ItemRow>] : []),
+    ...(by === 'item' ? [{ id: 'hsn', label: repT('colHsn'), sort: (r: ItemRow) => r.hsn, cell: (r: ItemRow) => r.hsn || '-' } as Column<ItemRow>] : []),
     { id: 'qty', label: repT('colQty'), numeric: true, sort: (r) => r.quantity, cell: (r) => `${formatQuantity(r.quantity)}${by === 'item' && r.unit ? ` ${r.unit.toLowerCase()}` : ''}`, total: formatQuantity(rep.totals.quantity) },
     { id: 'taxable', label: repT('colTaxable'), numeric: true, sort: (r) => r.taxable, cell: (r) => money(r.taxable), total: money(rep.totals.taxable) },
     { id: 'tax', label: repT('colGstCess'), numeric: true, sort: (r) => r.tax, cell: (r) => money(r.tax), total: money(rep.totals.tax) },
-    { id: 'avg', label: repT('colAvgRate'), numeric: true, sort: (r) => r.avgRate, cell: (r) => (r.quantity > 0 ? money(r.avgRate) : '—') },
+    { id: 'avg', label: repT('colAvgRate'), numeric: true, sort: (r) => r.avgRate, cell: (r) => (r.quantity > 0 ? money(r.avgRate) : '-') },
     { id: 'docs', label: repT('colInvoices'), numeric: true, sort: (r) => r.docs, cell: (r) => r.docs },
     { id: 'share', label: repT('colShare'), numeric: true, sort: (r) => r.share, cell: (r) => <Share value={r.share} />, total: '100%' },
   ];

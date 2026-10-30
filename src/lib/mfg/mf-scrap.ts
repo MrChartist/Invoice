@@ -133,7 +133,7 @@ export function scrapSaleDraft(i: ScrapSaleInput, items: readonly StockItem[]): 
   const tds = gstTdsNote(i.date, { buyerGstin: client.gstin, metal, taxable });
   const declaration = i.declaration?.trim() || (client.tcs_declaration ? `Form 127 / 27C${client.tcs_declaration.ref ? ` ${client.tcs_declaration.ref}` : ''} of ${client.tcs_declaration.on}` : '');
   const rows = lines.map((l) => ({ item: items.find((x) => x.id === l.item_id)?.name ?? 'Scrap', ...(num(l.gross_kg) > 0 ? { gross_kg: r3(l.gross_kg!) } : {}), ...(num(l.tare_kg) > 0 ? { tare_kg: r3(l.tare_kg!) } : {}), net_kg: r3(l.net_kg) }));
-  const notes = [declaration ? `Buyer's declaration of use in manufacturing (${declaration}) received — TCS not collected (MF10).` : TCS_SCOPE_NOTE, tds].filter(Boolean).join('\n');
+  const notes = [declaration ? `Buyer's declaration of use in manufacturing (${declaration}) received: TCS not collected (MF10).` : TCS_SCOPE_NOTE, tds].filter(Boolean).join('\n');
   return mfDraft('INVOICE', i.date, client, sale, mfSnapshot('scrap', { scrap: { rows, tcs: !!tcs, ...(declaration ? { declaration } : {}), ...(tds ? { gst_tds: true } : {}) } }), {
     notes, ...(tcs ? { tcs_enabled: true, tcs_rate: tcs.rate, tcs_label: tcs.label, tcs_base: 'total' as const } : {}),
   });

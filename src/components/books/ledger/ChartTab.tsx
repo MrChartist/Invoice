@@ -92,7 +92,7 @@ export function ChartTab({ ledger, asOf, onChanged, onOpenAccount, notify }: Pro
 
   const csv = () =>
     toCsv([
-      ['Chart of accounts', `Balances as at ${asOf}`, 'Working paper — verify with your CA'],
+      ['Chart of accounts', `Balances as at ${asOf}`, 'Working paper: verify with your CA'],
       ['Code', 'Account', 'Group', 'Schedule III head', 'Balance'],
       ...ledger.accounts.map((a) => [a.code, a.name, groupOf(immediateGroupOf(a), userGroups).label, groupOf(a.group).head, drCr(balances.get(a.id) ?? 0)]),
     ]);
@@ -128,7 +128,7 @@ export function ChartTab({ ledger, asOf, onChanged, onOpenAccount, notify }: Pro
       </div>
       {openingDiff !== 0 && (
         <div className={controls.error} role="status">
-          {openingDifferenceText(openingDiff)} — {mastersT('differenceNote')}
+          {openingDifferenceText(openingDiff)} : {mastersT('differenceNote')}
         </div>
       )}
 

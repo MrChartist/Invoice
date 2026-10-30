@@ -138,11 +138,11 @@ export function recordFinance(input: FinanceInput): FinanceDeal {
   const deals = loadDeals();
   return withTablesRollback(['transactions', 'invoices', 'vouchers', 'bank_accounts', 'series_counters', FINANCE_TABLE], () => {
     const clearing = financeClearing();
-    const pay = localDb.payments.record({ invoiceId: inv.id, amount: loan, method: FINANCE_METHOD, date, bankAccountId: clearing, reference: input.doNo.trim(), note: `${financier} — DO ${input.doNo.trim()}` });
+    const pay = localDb.payments.record({ invoiceId: inv.id, amount: loan, method: FINANCE_METHOD, date, bankAccountId: clearing, reference: input.doNo.trim(), note: `${financier}: DO ${input.doNo.trim()}` });
     const p = rupeesToPaise(loan);
     const v = saveVoucher({
       type: 'JOURNAL', date, voucher_class: TRANSFER_CLASS,
-      narration: `${inv.invoice_number}: finance part ₹${loan.toFixed(2)} moved from ${inv.client?.name ?? 'the customer'} to ${financier} (DO ${input.doNo.trim()}) — verify with your CA`,
+      narration: `${inv.invoice_number}: finance part ₹${loan.toFixed(2)} moved from ${inv.client?.name ?? 'the customer'} to ${financier} (DO ${input.doNo.trim()}), verify with your CA`,
       lines: [{ account_id: A.debtors, dr: p, cr: 0, party: financier }, { account_id: bankLedgerId(clearing), dr: 0, cr: p }],
     });
     setTable('transactions', getTable<Payment>('transactions').map((x) => (x.id === pay.id ? { ...x, ra_journal_id: v.id } : x)));
@@ -179,7 +179,7 @@ export function recordDisbursement(dealId: string, input: { date: string; amount
   return withTablesRollback(['vouchers', 'series_counters', PURCHASE_DRAFTS_TABLE, FINANCE_TABLE], () => {
     const v = saveVoucher({
       type: 'RECEIPT', date: input.date, voucher_class: DISBURSE_CLASS,
-      narration: `${deal.financier}: DO ${deal.do_no} (${deal.invoice_number}) — received ₹${amount.toFixed(2)}${fee ? `, fee ₹${fee.toFixed(2)} withheld` : ''} — verify with your CA`,
+      narration: `${deal.financier}: DO ${deal.do_no} (${deal.invoice_number}), received ₹${amount.toFixed(2)}${fee ? `, fee ₹${fee.toFixed(2)} withheld` : ''}, verify with your CA`,
       lines: [
         ...(amount > 0 ? [{ account_id: cash ? A.cash : bankLedgerId(input.bankAccountId), dr: rupeesToPaise(amount), cr: 0 }] : []),
         ...(fee > 0 ? [{ account_id: A.creditors, dr: rupeesToPaise(fee), cr: 0, party: deal.financier }] : []),
@@ -191,10 +191,10 @@ export function recordDisbursement(dealId: string, input: { date: string; amount
       const f = feeSplit(fee, input.date);
       draftId = draftsDb.save({
         kind: 'EXPENSE', vendor_name: deal.financier, bill_number: `DO ${deal.do_no}`, date: input.date, category: 'Finance charges (subvention / processing)',
-        lines: [{ id: generateId(), name: `Subvention / processing fee — DO ${deal.do_no}`, hsn: f.sac, unit: 'OTH', quantity: 1, rate: f.taxable, tax_rate: f.rate }],
+        lines: [{ id: generateId(), name: `Subvention / processing fee: DO ${deal.do_no}`, hsn: f.sac, unit: 'OTH', quantity: 1, rate: f.taxable, tax_rate: f.rate }],
         taxable: f.taxable, cgst: round2(f.gst / 2), sgst: round2(f.gst - round2(f.gst / 2)), igst: 0, total: fee, amount_paid: 0, itc_eligible: true,
         settled_by_voucher: v.number, // QA10 R15: posted, it shows as paid (the disbursement voucher settled it)
-        notes: `Withheld by ${deal.financier} from DO ${deal.do_no}: settled against its creditor balance by ${v.number}. Check IGST / CGST + SGST and the GSTIN on its invoice — verify with your CA (RT10).`,
+        notes: `Withheld by ${deal.financier} from DO ${deal.do_no}: settled against its creditor balance by ${v.number}. Check IGST / CGST + SGST and the GSTIN on its invoice: verify with your CA (RT10).`,
         draft: { source: 'manual', created_at: new Date().toISOString() },
       }).id;
     }

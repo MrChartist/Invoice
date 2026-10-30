@@ -25,7 +25,7 @@ export interface GuardAlertInput {
   timeBars: readonly TimeBarRow[];
 }
 
-const nums = (list: readonly IrnPending[]) => list.slice(0, 3).map((p) => `${p.invoice.invoice_number || '—'} (${formatDate(p.window.deadline)})`).join(', ') + (list.length > 3 ? ` +${list.length - 3}` : '');
+const nums = (list: readonly IrnPending[]) => list.slice(0, 3).map((p) => `${p.invoice.invoice_number || '-'} (${formatDate(p.window.deadline)})`).join(', ') + (list.length > 3 ? ` +${list.length - 3}` : '');
 
 export function gstGuardNotices(i: GuardAlertInput): AppNotification[] {
   const out: AppNotification[] = [];

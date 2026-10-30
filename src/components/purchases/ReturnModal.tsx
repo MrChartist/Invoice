@@ -163,7 +163,7 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, initialQty, onClo
             <option value="">{kind === 'DEBIT_NOTE' ? prT('chooseBill') : prT('noBill')}</option>
             {bills.map((b) => (
               <option key={b.id} value={b.id}>
-                {b.vendor_name} · {b.bill_number || '—'} · {formatDate(b.date)} · {formatCurrency(b.total)}
+                {b.vendor_name} · {b.bill_number || '-'} · {formatDate(b.date)} · {formatCurrency(b.total)}
               </option>
             ))}
           </select>
@@ -214,7 +214,7 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, initialQty, onClo
           <label className={controls.label} htmlFor="rn-reason">{prT('reason')}</label>
           <select id="rn-reason" className={controls.select} value={reason} onChange={(e) => pickReason(e.target.value as NoteReasonCode)}>
             {GST_NOTE_REASONS.map((r) => (
-              <option key={r.value} value={r.value}>{r.value} — {prReason(r.value)}</option>
+              <option key={r.value} value={r.value}>{r.value} : {prReason(r.value)}</option>
             ))}
           </select>
         </div>

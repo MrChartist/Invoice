@@ -113,9 +113,9 @@ function Guards({ period, gstin, g1, g3, invoices, notify }: Extract<Gst8dProps,
             rows={pending}
             rowKey={(x) => x.invoice.id}
             columns={[
-              { key: 'n', label: ggT('colDoc'), render: (x) => <Link to={`/invoice/${x.invoice.id}`}>{x.invoice.invoice_number || '—'}</Link> },
+              { key: 'n', label: ggT('colDoc'), render: (x) => <Link to={`/invoice/${x.invoice.id}`}>{x.invoice.invoice_number || '-'}</Link> },
               { key: 'd', label: ggT('colDate'), render: (x) => formatDate(x.invoice.issue_date) },
-              { key: 'c', label: ggT('colParty'), render: (x) => x.invoice.client?.company || x.invoice.client?.name || '—' },
+              { key: 'c', label: ggT('colParty'), render: (x) => x.invoice.client?.company || x.invoice.client?.name || '-' },
               { key: 'l', label: ggT('colLastDay'), render: (x) => formatDate(x.window.deadline) },
               {
                 key: 's', label: ggT('colStatus'), render: (x) => (
@@ -141,7 +141,7 @@ function Guards({ period, gstin, g1, g3, invoices, notify }: Extract<Gst8dProps,
             { key: 's', label: ggT('colSeverity'), render: (e) => <span className={e.severity === 'error' ? styles.pillBad : styles.pillWarn}>{e.severity === 'error' ? ggT('sevError') : ggT('sevReview')}</span> },
             { key: 'n', label: ggT('colDoc'), render: (e) => <Link to={`/invoice/${e.invoiceId}`}>{e.number}</Link> },
             { key: 'd', label: ggT('colDate'), render: (e) => formatDate(e.date) },
-            { key: 'm', label: ggT('colIssue'), render: (e) => ggT(EX_KEY[e.code], { ...e.vars, deadline: e.vars.deadline ? formatDate(String(e.vars.deadline)) : '—' }) },
+            { key: 'm', label: ggT('colIssue'), render: (e) => ggT(EX_KEY[e.code], { ...e.vars, deadline: e.vars.deadline ? formatDate(String(e.vars.deadline)) : '-' }) },
           ]}
         />
       </section>
@@ -208,9 +208,9 @@ function Gstr1aSection({ period, gstin, g1, g3, notify }: { period: ReportPeriod
                 { key: 'k', label: ggT('colChange'), render: (r) => <span className={r.kind === 'removed' ? styles.pillBad : r.kind === 'added' ? styles.pillWarn : styles.pill}>{kindLabel(r)}</span> },
                 { key: 's', label: ggT('colTable'), render: (r) => r.section.toUpperCase() },
                 { key: 'n', label: ggT('colDoc'), render: (r) => (r.kind === 'removed' ? r.number : <Link to={`/invoice/${r.id}`}>{r.number}</Link>) },
-                { key: 'f', label: ggT('colFields'), render: (r) => r.fields.join(', ') || '—' },
-                { key: 'b', label: ggT('colFiled'), numeric: true, render: (r) => (r.before ? <Money value={r.before.taxable} /> : '—') },
-                { key: 'a', label: ggT('colNow'), numeric: true, render: (r) => (r.after ? <Money value={r.after.taxable} /> : '—') },
+                { key: 'f', label: ggT('colFields'), render: (r) => r.fields.join(', ') || '-' },
+                { key: 'b', label: ggT('colFiled'), numeric: true, render: (r) => (r.before ? <Money value={r.before.taxable} /> : '-') },
+                { key: 'a', label: ggT('colNow'), numeric: true, render: (r) => (r.after ? <Money value={r.after.taxable} /> : '-') },
               ]}
             />
             {paper.b2cs.length > 0 && (
@@ -222,8 +222,8 @@ function Gstr1aSection({ period, gstin, g1, g3, notify }: { period: ReportPeriod
                 columns={[
                   { key: 'k', label: ggT('colChange'), render: (r) => (r.kind === 'added' ? ggT('kAdded') : r.kind === 'changed' ? ggT('kChanged') : ggT('kRemoved')) },
                   { key: 'p', label: 'B2CS', render: (r) => { const x = r.after ?? r.before!; return `${x.supply} · POS ${x.pos} · ${x.rate}%`; } },
-                  { key: 'b', label: ggT('colFiled'), numeric: true, render: (r) => (r.before ? <Money value={r.before.txval} /> : '—') },
-                  { key: 'a', label: ggT('colNow'), numeric: true, render: (r) => (r.after ? <Money value={r.after.txval} /> : '—') },
+                  { key: 'b', label: ggT('colFiled'), numeric: true, render: (r) => (r.before ? <Money value={r.before.txval} /> : '-') },
+                  { key: 'a', label: ggT('colNow'), numeric: true, render: (r) => (r.after ? <Money value={r.after.txval} /> : '-') },
                 ]}
               />
             )}
@@ -270,10 +270,10 @@ function ThreeBExtras({ period, gstin, g3 }: Extract<Gst8dProps, { view: '3b' }>
           rowKey={(r) => r.pos}
           columns={[
             { key: 'p', label: ggT('colPos'), render: (r) => r.pos },
-            { key: 'g', label: ggT('colPerG1'), numeric: true, render: (r) => (r.gstr1Taxable === null ? '—' : <Money value={r.gstr1Taxable} />), total: (r) => r.gstr1Taxable ?? 0 },
+            { key: 'g', label: ggT('colPerG1'), numeric: true, render: (r) => (r.gstr1Taxable === null ? '-' : <Money value={r.gstr1Taxable} />), total: (r) => r.gstr1Taxable ?? 0 },
             { key: 'b', label: ggT('colBooks'), numeric: true, render: (r) => <Money value={r.booksTaxable} />, total: (r) => r.booksTaxable },
             { key: 'd', label: ggT('colDiff'), numeric: true, render: (r) => <Money value={r.diffTaxable} />, total: (r) => r.diffTaxable },
-            { key: 'gi', label: ggT('colIgstG1'), numeric: true, render: (r) => (r.gstr1Igst === null ? '—' : <Money value={r.gstr1Igst} />) },
+            { key: 'gi', label: ggT('colIgstG1'), numeric: true, render: (r) => (r.gstr1Igst === null ? '-' : <Money value={r.gstr1Igst} />) },
             { key: 'bi', label: ggT('colIgstBooks'), numeric: true, render: (r) => <Money value={r.booksIgst} /> },
           ]}
         />

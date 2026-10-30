@@ -68,7 +68,7 @@ export default function CompositionView({ invoices, purchases, period, gstin, fi
   const cmpRows: Row[] = [
     { table: '3(1)', label: 'Outward supplies (including exempt supplies)', value: cmp.outward.value, igst: 0, cgst: cmp.outward.cgst, sgst: cmp.outward.sgst },
     ...cmp.byRate.map((x): Row => ({ table: '3(1)', label: `of which taxed at ${x.rate}% (${x.rate / 2}% CGST + ${x.rate / 2}% SGST)`, value: x.base, cgst: x.cgst, sgst: x.sgst })),
-    ...(cmp.outward.exempt ? [{ table: '3(1)', label: 'of which exempt (trader — not taxed)', value: cmp.outward.exempt } as Row] : []),
+    ...(cmp.outward.exempt ? [{ table: '3(1)', label: 'of which exempt (trader: not taxed)', value: cmp.outward.exempt } as Row] : []),
     heads('3(2)', 'Inward supplies attracting reverse charge, incl. import of services', cmp.rcm),
     { table: '3(3)', label: 'Tax payable (1 + 2)', igst: cmp.payable.igst, cgst: cmp.payable.cgst, sgst: cmp.payable.sgst },
   ];
@@ -79,7 +79,7 @@ export default function CompositionView({ invoices, purchases, period, gstin, fi
     heads('4D', 'Import of services', g4.inward.importServices),
     ...g4.quarters.map((q): Row => ({ table: '5', label: `CMP-08 ${q.label}`, value: q.outward.value, igst: q.payable.igst, cgst: q.payable.cgst, sgst: q.payable.sgst })),
     ...g4.outwardByRate.map((x): Row => ({ table: '6', label: `Outward supplies taxed at ${x.rate}%`, value: x.base, cgst: x.cgst, sgst: x.sgst })),
-    ...(g4.totals.exempt ? [{ table: '6', label: 'Exempt outward supplies (trader — not taxed)', value: g4.totals.exempt } as Row] : []),
+    ...(g4.totals.exempt ? [{ table: '6', label: 'Exempt outward supplies (trader: not taxed)', value: g4.totals.exempt } as Row] : []),
   ];
   const issues = view === 'cmp08' ? cmp.issues : g4.issues;
 
@@ -107,7 +107,7 @@ export default function CompositionView({ invoices, purchases, period, gstin, fi
         </button>
       </div>
       <p className={controls.hint}>
-        {gvT('compHint', { category: COMPOSITION_CATEGORY_LABELS[category ?? 'trader'], rate: rate ?? '—' })}
+        {gvT('compHint', { category: COMPOSITION_CATEGORY_LABELS[category ?? 'trader'], rate: rate ?? '-' })}
       </p>
       {issues.length > 0 && (
         <ul className={local.gapList}>

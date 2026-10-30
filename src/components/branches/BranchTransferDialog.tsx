@@ -73,13 +73,13 @@ export default function BranchTransferDialog({ transfer, from, to, items, onClos
           <tbody>
             {transfer.lines.map((l) => (
               <tr key={l.id}>
-                <td>{byId.get(l.item_id)?.name ?? '—'}</td>
+                <td>{byId.get(l.item_id)?.name ?? '-'}</td>
                 <td className={surface.numeric}>{transferBaseQty(l)} {byId.get(l.item_id)?.unit ?? ''}</td>
                 <td className={surface.numeric}>
                   <input
                     className={controls.input}
                     inputMode="decimal"
-                    aria-label={`${branchT('taxPairRate')} — ${byId.get(l.item_id)?.name ?? ''}`}
+                    aria-label={`${branchT('taxPairRate')}: ${byId.get(l.item_id)?.name ?? ''}`}
                     value={rates[l.id] ?? ''}
                     onChange={(e) => setRates((r) => ({ ...r, [l.id]: e.target.value }))}
                   />

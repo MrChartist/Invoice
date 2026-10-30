@@ -140,7 +140,7 @@ export const covers = (plan: Pick<MemberPlan, 'covers'>, name: string, category?
   !plan.covers?.length || plan.covers.some((c) => norm(c) === norm(name) || (!!category && norm(c) === norm(category)));
 
 /** Printed on a redemption line: "Session 3 of 6 — MEM/FY26-27/0031". */
-export const sessionText = (n: number, of: number, number: string) => `Session ${n} of ${of} — ${number}`;
+export const sessionText = (n: number, of: number, number: string) => `Session ${n} of ${of}: ${number}`;
 
 /**
  * The redemption of one session on `line`: the line becomes ₹0 (no second tax), prints the session text and carries
@@ -150,7 +150,7 @@ export function redeemPatch(m: Membership, line: Pick<InvoiceItem, 'sv' | 'name'
   const of = num(m.plan.sessions);
   const st = statusOf(m, today, used, invoices);
   if (!of) throw new Error(`${m.number} has no sessions.`);
-  if (st !== 'active') throw new Error(`${m.number} is ${st}${st === 'expired' ? ' — renew it' : ''}.`);
+  if (st !== 'active') throw new Error(`${m.number} is ${st}${st === 'expired' ? ': renew it' : ''}.`);
   if (!covers(m.plan, line.name)) throw new Error(`${m.plan.name} does not cover ${line.name}.`);
   const n = used + 1;
   return { rate: 0, amount: 0, discount_percent: 0, quantity: 1, description: sessionText(n, of, m.number), sv: { ...line.sv, redeem: { membership_id: m.id, session: n, of, value: round2(num(m.plan.price) / of) } } };

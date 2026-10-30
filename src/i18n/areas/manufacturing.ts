@@ -7,7 +7,7 @@ import { defineArea } from '../area';
 
 export const mfgT = defineArea({
   title: 'Manufacturing & stock vouchers',
-  subtitle: 'BOM, Manufacturing / Stock Journal, Physical Stock, reorder. Stock only — no books posting.',
+  subtitle: 'BOM, Manufacturing / Stock Journal, Physical Stock, reorder. Stock only: no books posting.',
   tabBoms: 'Bill of materials',
   tabMfg: 'Manufacturing journal',
   tabSj: 'Stock journal',
@@ -157,7 +157,7 @@ export const mfgT = defineArea({
   ledgerNote: 'Moves stock only. Record labour / overheads as expenses; the ledger does not value stock.',
 } as const, {
   title: 'निर्माण और स्टॉक वाउचर',
-  subtitle: 'BOM, मैन्युफैक्चरिंग / स्टॉक जर्नल, फिज़िकल स्टॉक, रीऑर्डर। केवल स्टॉक — बही में पोस्टिंग नहीं।',
+  subtitle: 'BOM, मैन्युफैक्चरिंग / स्टॉक जर्नल, फिज़िकल स्टॉक, रीऑर्डर। केवल स्टॉक: बही में पोस्टिंग नहीं।',
   tabBoms: 'बिल ऑफ़ मटीरियल्स',
   tabMfg: 'मैन्युफैक्चरिंग जर्नल',
   tabSj: 'स्टॉक जर्नल',

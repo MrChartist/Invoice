@@ -13,7 +13,7 @@ export interface MpPaper { rows: [string, string][]; posts: MpPostRow[]; decl: s
 
 export function mpPaper(mp: MpSnapshot): MpPaper {
   const rows: [string, string][] = [];
-  if (mp.site) rows.push(['Site', `${mp.site.code} — ${mp.site.name}`]);
+  if (mp.site) rows.push(['Site', `${mp.site.code}: ${mp.site.name}`]);
   if (monthText(mp.month)) rows.push(['Service month', monthText(mp.month)]);
   return { rows, posts: (mp.posts ?? []).slice(0, 12), decl: mp.decl ?? '' };
 }

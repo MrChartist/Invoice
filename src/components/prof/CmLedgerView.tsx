@@ -24,7 +24,7 @@ export default function CmLedgerView({ ctx }: { ctx: CmCtx }) {
       {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
     </select>
   );
-  const clientOpts: [string, string][] = [['', '—'], ...ctx.clients.map((c) => [c.id, c.name] as [string, string])];
+  const clientOpts: [string, string][] = [['', '-'], ...ctx.clients.map((c) => [c.id, c.name] as [string, string])];
   const save = () => ctx.run(() => {
     const r = recordClientMoney({ ...f, ...(f.kind === 'interest' && f.interest_to === 'firm' ? { client_id: '' } : {}) }, { override_reason: override });
     setF((x) => ({ ...x, amount: 0, ref: '', narration: '' }));
@@ -38,7 +38,7 @@ export default function CmLedgerView({ ctx }: { ctx: CmCtx }) {
         <Fld l={cmT('kind')}>{sel('kind', CM_KINDS.map((k) => [k, cmT(`k.${k}` as 'k.receipt')]))}</Fld>
         <Fld l={cmT('date')}><input type="date" className={controls.input} value={f.date} onChange={(e) => set({ date: e.target.value })} data-cm="date" /></Fld>
         {!(f.kind === 'interest' && f.interest_to === 'firm') && <Fld l={cmT('client')}>{sel('client_id', clientOpts, 'client')}</Fld>}
-        <Fld l={cmT('matter')}>{sel('matter_id', [['', '—'], ...ctx.matters.filter((m) => !m.client_id || m.client_id === f.client_id).map((m) => [m.id, m.name] as [string, string])])}</Fld>
+        <Fld l={cmT('matter')}>{sel('matter_id', [['', '-'], ...ctx.matters.filter((m) => !m.client_id || m.client_id === f.client_id).map((m) => [m.id, m.name] as [string, string])])}</Fld>
         {f.kind === 'transfer' && <Fld l={cmT('toClient')}>{sel('to_client_id', clientOpts, 'to')}</Fld>}
         <Fld l={cmT('amount')}><NumberInput className={controls.input} style={{ maxWidth: 140 }} value={f.amount} onChange={(v) => set({ amount: v })} data-cm="amount" /></Fld>
         <Fld l={cmT('account')}>{sel('bank_account_id', ctx.accounts.map((a) => [a.id, a.name]))}</Fld>
@@ -49,10 +49,10 @@ export default function CmLedgerView({ ctx }: { ctx: CmCtx }) {
       </div>
       {f.kind === 'to_fees' && (
         <div style={row}>
-          <Fld l={cmT('invoice')}>{sel('invoice_id', [['', '—'], ...invoices.map((i) => [i.id, `${i.invoice_number} · ₹${rs(Number(i.balance_due))}`] as [string, string])], 'invoice')}</Fld>
+          <Fld l={cmT('invoice')}>{sel('invoice_id', [['', '-'], ...invoices.map((i) => [i.id, `${i.invoice_number} · ₹${rs(Number(i.balance_due))}`] as [string, string])], 'invoice')}</Fld>
           <Fld l={cmT('auth')}>
             <select className={controls.select} value={f.authority?.mode ?? ''} onChange={(e) => set({ authority: e.target.value ? { date: f.authority?.date || f.date, ref: f.authority?.ref ?? '', mode: e.target.value as 'written' } : undefined })} data-cm="auth">
-              <option value="">—</option>
+              <option value="">-</option>
               {(['written', 'email', 'engagement'] as const).map((m) => <option key={m} value={m}>{cmT(`a.${m}`)}</option>)}
             </select>
           </Fld>

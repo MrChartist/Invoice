@@ -35,7 +35,7 @@ export default function RecoView({ boq, notify }: { boq: InvoiceRecord; notify: 
         <button type="button" className={B.os} onClick={() => csvDownload(`reco_${site.name}_${p.to}.csv`, recoCsvRows(rows, name))}>CSV</button>
         <button type="button" className={B.os} onClick={() => printHtml(recoHtml(rows, name, { site: site.name, from: p.from, to: p.to, company: localDb.settings.activeProfile()?.companyName ?? '' }), `reco_${site.name}`)}>{T('print')}</button>
       </div>
-      <Table d="reco" head={[T('material'), T('opening'), T('own'), T('free'), T('recIssue'), T('theo'), T('actual'), T('var'), T('band'), T('beyond'), T('recRate'), T('recovery'), T('closing')]} rows={rows.map((r) => [name(r.itemId), r.opening, r.own, r.clientFree, r.clientRecovery, r.theoretical, r.actual, r.variancePct === null ? '—' : `${r.variancePct}%`, `−${r.lo}% / +${r.hi}%`, r.excess, r.recoveryRate, r.recovery, r.closing])} />
+      <Table d="reco" head={[T('material'), T('opening'), T('own'), T('free'), T('recIssue'), T('theo'), T('actual'), T('var'), T('band'), T('beyond'), T('recRate'), T('recovery'), T('closing')]} rows={rows.map((r) => [name(r.itemId), r.opening, r.own, r.clientFree, r.clientRecovery, r.theoretical, r.actual, r.variancePct === null ? '-' : `${r.variancePct}%`, `−${r.lo}% / +${r.hi}%`, r.excess, r.recoveryRate, r.recovery, r.closing])} />
       <h4>{T('terms')}</h4>
       <div style={row} data-sd-terms>
         <Sel l={T('material')} v={t.item} set={(v) => setT({ ...t, item: v })} o={io} n={200} />
@@ -55,7 +55,7 @@ export default function RecoView({ boq, notify }: { boq: InvoiceRecord; notify: 
         <Txt l={T('ref')} v={x.ref} set={(v) => setX({ ...x, ref: v })} n={140} />
         <button type="button" className={B.p} onClick={() => run(() => addIssue(site.id, { date: x.date, item_id: x.item, qty: n(x.qty), mode: x.mode as 'free' | 'recovery', rate: n(x.rate), ref: x.ref || undefined }))} data-sd-add-issue>{T('add')}</button>
       </div>
-      <Table d="issues" head={[T('date'), T('material'), T('qty'), T('mode'), T('issueRate'), '']} rows={(site.cn_reco?.issues ?? []).map((i) => [i.date, name(i.item_id), i.qty, T(i.mode === 'free' ? 'free' : 'recIssue'), i.rate ?? '—', <button key="d" type="button" className={B.gs} onClick={() => run(() => removeIssue(site.id, i.id))}>{T('del')}</button>])} />
+      <Table d="issues" head={[T('date'), T('material'), T('qty'), T('mode'), T('issueRate'), '']} rows={(site.cn_reco?.issues ?? []).map((i) => [i.date, name(i.item_id), i.qty, T(i.mode === 'free' ? 'free' : 'recIssue'), i.rate ?? '-', <button key="d" type="button" className={B.gs} onClick={() => run(() => removeIssue(site.id, i.id))}>{T('del')}</button>])} />
       <h4>{T('starters')}</h4>
       <Table d="starters" head={[T('work'), T('unit'), T('material'), T('perUnit')]} rows={starters(p.to).map((s) => [s.work, s.unit, s.material, s.qty])} />
       <p className={controls.hint}>{T('recoNote')}</p>

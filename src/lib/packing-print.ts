@@ -38,16 +38,16 @@ export function packingListHtml(pl: PackingList, company: PackingPrintCompany, a
       const contents = p.contents
         .map((c) => {
           const l = byId.get(c.line_id);
-          return `<div>${esc(l?.name ?? c.line_id)} — ${esc(qty(c.qty))}${l?.unit ? ` ${esc(l.unit)}` : ''}</div>`;
+          return `<div>${esc(l?.name ?? c.line_id)}: ${esc(qty(c.qty))}${l?.unit ? ` ${esc(l.unit)}` : ''}</div>`;
         })
         .join('');
-      const dims = p.length_cm || p.breadth_cm || p.height_cm ? `${esc(p.length_cm)} × ${esc(p.breadth_cm)} × ${esc(p.height_cm)}` : '—';
+      const dims = p.length_cm || p.breadth_cm || p.height_cm ? `${esc(p.length_cm)} × ${esc(p.breadth_cm)} × ${esc(p.height_cm)}` : '-';
       return `<tr><td>${esc(boxRange(p))}</td><td>${esc(p.type_name)}${p.count > 1 ? ` × ${esc(p.count)}` : ''}</td><td>${dims}</td><td>${esc(p.marks ?? '')}</td><td>${contents}</td>` +
         `<td class="n">${esc(kg(f.net_kg))}</td><td class="n">${esc(kg(f.gross_kg))}</td><td class="n">${esc(cbm(f.cbm))}</td></tr>`;
     })
     .join('');
   const lineRows = pl.lines
-    .map((l) => `<tr><td>${esc(l.name)}</td><td>${esc(l.hsn ?? '')}</td><td class="n">${esc(qty(l.quantity))} ${esc(l.unit ?? '')}</td><td class="n">${l.net_kg ? esc(kg(l.net_kg * l.quantity * (l.unit_factor ?? 1))) : '—'}</td></tr>`)
+    .map((l) => `<tr><td>${esc(l.name)}</td><td>${esc(l.hsn ?? '')}</td><td class="n">${esc(qty(l.quantity))} ${esc(l.unit ?? '')}</td><td class="n">${l.net_kg ? esc(kg(l.net_kg * l.quantity * (l.unit_factor ?? 1))) : '-'}</td></tr>`)
     .join('');
   const sub = [company.address, company.gstin ? `GSTIN: ${company.gstin}` : ''].filter(Boolean).join('\n');
   return `<!doctype html>
@@ -80,8 +80,8 @@ export function packingListHtml(pl: PackingList, company: PackingPrintCompany, a
   <div class="meta">
     <div><b>Date</b>${esc(formatDate(pl.date))}</div>
     <div><b>Against</b>${esc(pl.source.number)} (${esc(pl.source.kind === 'challan' ? 'Delivery challan' : 'Invoice')})</div>
-    <div><b>Consignee</b>${esc(pl.party || '—')}</div>
-    <div><b>Ship to</b>${esc(pl.ship_to || '—')}</div>
+    <div><b>Consignee</b>${esc(pl.party || '-')}</div>
+    <div><b>Ship to</b>${esc(pl.ship_to || '-')}</div>
     ${extraMeta.map(([k, v]) => `<div><b>${esc(k)}</b>${esc(v)}</div>`).join('')}
   </div>
   <table><thead><tr><th>Box no.</th><th>Package</th><th>L × B × H (cm)</th><th>Marks &amp; numbers</th><th>Contents (each)</th><th class="n">Net kg</th><th class="n">Gross kg</th><th class="n">CBM</th></tr></thead>

@@ -324,7 +324,7 @@ export function Reconcile() {
         <StatCard
           label={bankT('statBalStatement')}
           icon={Landmark}
-          value={closing.balance === null ? '—' : rupees(closing.balance)}
+          value={closing.balance === null ? '-' : rupees(closing.balance)}
           hint={closing.balance === null ? bankT('enterUnderStatements') : bankT('asOn', { date: formatDate(closing.asOf) })}
         />
         <StatCard
@@ -337,7 +337,7 @@ export function Reconcile() {
           label={bankT('statDiff')}
           icon={Scale}
           tone={diff === null ? 'default' : Math.abs(diff) <= 0.01 ? 'profit' : 'warning'}
-          value={diff === null ? '—' : rupees(diff)}
+          value={diff === null ? '-' : rupees(diff)}
           hint={bankT('diffHint')}
         />
         <StatCard
@@ -379,7 +379,7 @@ export function Reconcile() {
             <select id="rec-scope" className={controls.select} value={scope} onChange={(e) => setScope(e.target.value)}>
               <option value="all">{bankT('allStatements', { n: acctStatements.length })}</option>
               {acctStatements.map((s) => (
-                <option key={s.id} value={s.id}>{s.bank_label} — {s.file_name}</option>
+                <option key={s.id} value={s.id}>{s.bank_label} : {s.file_name}</option>
               ))}
             </select>
           </div>

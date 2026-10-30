@@ -34,8 +34,8 @@ export function reissueLines(old: TvTicket, i: ReissueInput): { items: InvoiceIt
   const pa = { description: PURE_AGENT_CHARGE, charge_head_id: 'rule33' };
   const tag = `${old.sector ? `${old.sector} ` : ''}(re-issue ${i.new_no})`;
   const items = [
-    ...(i.diff > 0 ? [ln(`Fare difference — ${tag}`, round2(i.diff), pa)] : []),
-    ...(i.penalty > 0 ? [ln(`Airline change penalty — ${tag}`, round2(i.penalty), pa)] : []),
+    ...(i.diff > 0 ? [ln(`Fare difference: ${tag}`, round2(i.diff), pa)] : []),
+    ...(i.penalty > 0 ? [ln(`Airline change penalty: ${tag}`, round2(i.penalty), pa)] : []),
     ...(i.fee > 0 ? [ln('Re-issue fee', round2(i.fee), { hsn: ruleAt(COMMISSION_SAC_RULES, i.date).sac.airline, tax_rate: ruleAt(COMMISSION_SAC_RULES, i.date).rate })] : []),
   ];
   const { basic: _b, taxes: _t, airline_gst: _g, reissued_by: _r, ...rest } = old;
@@ -66,7 +66,7 @@ export function reissueTicket(bookingId: string, i: ReissueInput): { draft: Invo
   const client = (trip?.client_id && localDb.clients.getById(trip.client_id)) || prev?.client || { ...blankClient(), name: trip?.name ?? '' };
   const tv = { ...(trip ? tvSnapshot(trip, 'agent', i.date) : { regime: 'agent' as const }), ...(items[0] ? { lines: { [items[0].id]: { tkt } } } : {}) };
   return withTablesRollback(['invoices', 'doc_links', 'series_counters', TV_TABLES.bookings], () => {
-    const credit = i.diff < 0 ? createCreditNote(prev!, { lines: [{ itemId: line!.id, quantity: -i.diff / line!.rate, amount: round2(-i.diff) }], reason: 'Ticket re-issued — fare difference refunded', goodsReturned: false, date: i.date }) : null;
+    const credit = i.diff < 0 ? createCreditNote(prev!, { lines: [{ itemId: line!.id, quantity: -i.diff / line!.rate, amount: round2(-i.diff) }], reason: 'Ticket re-issued: fare difference refunded', goodsReturned: false, date: i.date }) : null;
     const draft = items.length ? localDb.invoices.save(buildBillDraft({ ...base, id: generateId(), issue_date: i.date, ...(trip ? { cost_centre_id: trip.id } : {}), tv }, client, items, sender)) : null;
     const now = new Date().toISOString();
     setTable(TV_TABLES.bookings, getTable<TravelBooking>(TV_TABLES.bookings).map((x) => (x.id === b.id ? { ...x, tkt: [...(x.tkt ?? []).map((t) => (t.ticket_no === old.ticket_no ? { ...t, reissued_by: no } : t)), tkt], updated_at: now } : x)));

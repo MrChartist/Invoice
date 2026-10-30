@@ -116,7 +116,7 @@ export function billVisit(id: string, extra: InvoiceItem[] = [], date?: string):
   if (liveInvoice(v.invoice_id)) throw new Error(`Visit ${v.number} is already billed.`);
   const day = date || v.date;
   const doctor = v.doctor_id ? doctorsDb.get(v.doctor_id) : undefined;
-  const consult = clinicLine(`Consultation${v.kind === 'follow-up' ? ' (follow-up)' : ''}${v.doctor_name ? ` — Dr ${v.doctor_name.replace(/^dr\.?\s+/i, '')}` : ''}`, v.fee, { date: day, hsn: ruleAt(HEALTH_CLASS_RULES, day).consultSac, ...doctorStaff(doctor) });
+  const consult = clinicLine(`Consultation${v.kind === 'follow-up' ? ' (follow-up)' : ''}${v.doctor_name ? `: Dr ${v.doctor_name.replace(/^dr\.?\s+/i, '')}` : ''}`, v.fee, { date: day, hsn: ruleAt(HEALTH_CLASS_RULES, day).consultSac, ...doctorStaff(doctor) });
   const lines = [...(v.fee > 0 ? [consult] : []), ...extra];
   if (!lines.length) throw new Error('Nothing to bill: set the doctor\'s fee or add a service.');
   return withTablesRollback([SV_TABLES.visits, 'invoices', 'series_counters'], () => {

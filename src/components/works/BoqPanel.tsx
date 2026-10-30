@@ -81,7 +81,7 @@ export function BoqPanel({ boq, notify, refresh, tick, onCreated }: PanelProps &
             <p className={styles.note}>{twT('boqPreview', { n: imp.lines.length, skipped: imp.skipped.length })}</p>
             <div className={styles.grid}>
               <F l={twT('client')}>
-                <select className={controls.select} value={f.client} onChange={(e) => setF({ ...f, client: e.target.value })}><option value="">—</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></F>
+                <select className={controls.select} value={f.client} onChange={(e) => setF({ ...f, client: e.target.value })}><option value="">-</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></F>
               <F l={twT('date')}><input className={controls.input} type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></F>
               <F l={twT('workOrder')}><input className={controls.input} value={f.wo} onChange={(e) => setF({ ...f, wo: e.target.value })} /></F>
               <label className={controls.check}><input type="checkbox" checked={f.govt} onChange={(e) => setF({ ...f, govt: e.target.checked })} /> {twT('govtWorks')}</label>

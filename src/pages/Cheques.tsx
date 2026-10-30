@@ -204,7 +204,7 @@ export function Cheques() {
                         {c.party_name}
                         {bounces > 0 && <span className={`${surface.badge} ${styles.flag}`} style={{ marginLeft: '0.375rem' }} title={chqT('partyBounced')}>{chqT('nBounced', { n: bounces })}</span>}
                       </td>
-                      <td>{doc ? (doc.to ? <Link to={doc.to}>{doc.text}</Link> : doc.text) : <span className={styles.sub}>—</span>}</td>
+                      <td>{doc ? (doc.to ? <Link to={doc.to}>{doc.text}</Link> : doc.text) : <span className={styles.sub}>-</span>}</td>
                       <td className={styles.numeric}>{formatMoney(c.amount)}</td>
                       <td>
                         <span className={`${surface.badge} ${STATUS_TONE[c.status]}`}>{chqT(`st.${c.status}`)}</span>
@@ -260,7 +260,7 @@ export function Cheques() {
         onClose={() => setAction(null)}
         onDone={(r) => {
           refresh();
-          notify(chqT('moved', { number: r.cheque.number, status: chqT(`st.${r.cheque.status}`).toLowerCase() }) + (r.note ? ` — ${r.note}` : ''));
+          notify(chqT('moved', { number: r.cheque.number, status: chqT(`st.${r.cheque.status}`).toLowerCase() }) + (r.note ? `: ${r.note}` : ''));
         }}
       />
       <ChequePrintModal key={printing?.id ?? 'none'} cheque={printing} onClose={() => setPrinting(null)} />

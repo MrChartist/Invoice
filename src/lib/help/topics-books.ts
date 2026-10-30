@@ -35,7 +35,7 @@ export const TOPICS: readonly HelpTopic[] = [
     related: rel(['Gateway', '/gateway'], ['Settings', '/settings']),
   }),
   // R20-B: entry keys in the invoice editor, bill / PO / GRN forms and Gateway vouchers (Tally keys on).
-  t('tally-keys:entry', 'Entry keys', 'एंट्री कुंजियाँ', 'Ctrl+A saves, Alt+D deletes, Alt+X cancels, Alt+2 copies, Ctrl+D removes a line — each with Undo (Alt+Z).', 'While entering a document or voucher.', {
+  t('tally-keys:entry', 'Entry keys', 'एंट्री कुंजियाँ', 'Ctrl+A saves, Alt+D deletes, Alt+X cancels, Alt+2 copies, Ctrl+D removes a line: each with Undo (Alt+Z).', 'While entering a document or voucher.', {
     steps: ['Alt+C on a party or item creates it; Ctrl+Enter edits it.', 'On a voucher: Alt+T post-dated, Ctrl+L optional, Ctrl+H single / double entry, Alt+2 a copy.', 'Ctrl+R in the narration repeats the last one; Alt+S stock, Alt+A tax break-up, Alt+Q edit log.'],
     related: rel(['Gateway', '/gateway'], ['Books', '/books']),
   }),

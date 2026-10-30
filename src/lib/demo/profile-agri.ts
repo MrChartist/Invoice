@@ -67,13 +67,13 @@ export function agriExtras(ctx: ProfileContext): DemoExtras {
       { id: 'o2', item_id: 'demo-bran', qty: 7, kind: 'by_product' as const, rate: 1500 },
       { id: 'o3', item_id: 'demo-husk', qty: 22, kind: 'by_product' as const, rate: 400 },
     ];
-    add('boms', [{ id: 'demo-bom-rice', demo: true, item_id: 'demo-rice', name: 'Rice mill starter (practice — adjust)', batch_qty: 64, is_default: true, components: [{ id: 'c1', item_id: 'demo-paddy', qty: 100 }], outputs }]);
+    add('boms', [{ id: 'demo-bom-rice', demo: true, item_id: 'demo-rice', name: 'Rice mill starter (practice: adjust)', batch_qty: 64, is_default: true, components: [{ id: 'c1', item_id: 'demo-paddy', qty: 100 }], outputs }]);
     add('production_orders', [{ id: 'demo-wo-1', demo: true, number: `WO/FY${fy(d2)}/0001`, date: d2, item_id: 'demo-rice', bom_id: 'demo-bom-rice', planned_qty: 64, wip_godown_id: '', status: 'completed', log: [], ag: { mill: { standard_outturn_pct: 67, std_source: 'own', input_moisture: 14, output_moisture: 13 } } }]);
     add('manufacturing_vouchers', [{ id: 'demo-mfg-1', demo: true, number: `MFG/FY${fy(d2)}/0001`, date: d2, item_id: 'demo-rice', bom_id: 'demo-bom-rice', qty: 64, production_order_id: 'demo-wo-1', components: [{ id: 'c1', item_id: 'demo-paddy', qty: 100 }], outputs, costs: [] }]);
     add('weighbridge_slips', [{ id: 'demo-wbs-1', demo: true, number: `WBS/FY${fy(d1)}/0001`, date: d1, vehicle: 'PB10AB1234', party_kind: 'farmer', party_name: 'Gurdev Singh (demo)', commodity: 'Paddy', gross_kg: 8640, gross_at: `${d1}T09:10`, tare_kg: 6000, tare_at: `${d1}T13:30`, net_kg: 2640, bags: 52, readings: { moisture: 19.2, foreign: 1 }, use: 'purchase', status: 'done' }]);
-    const paddy = 'Paddy — CMR Kharif (demo)';
+    const paddy = 'Paddy: CMR Kharif (demo)';
     add('job_work_principal', [
-      { id: 'demo-jwp-1', demo: true, number: `JWP/FY${fy(d1)}/0001`, date: d1, kind: 'receipt', party_name: 'State Civil Supplies (demo)', lines: [{ id: 'l1', name: paddy, qty: 50, unit: 'QTL' }], narration: 'Custom milling — paddy received' },
+      { id: 'demo-jwp-1', demo: true, number: `JWP/FY${fy(d1)}/0001`, date: d1, kind: 'receipt', party_name: 'State Civil Supplies (demo)', lines: [{ id: 'l1', name: paddy, qty: 50, unit: 'QTL' }], narration: 'Custom milling: paddy received' },
       { id: 'demo-jwp-2', demo: true, number: `JWP/FY${fy(d3)}/0002`, date: d3, kind: 'return', party_name: 'State Civil Supplies (demo)', challan_no: `CMR/FY${fy(d3)}/0001`, lines: [{ id: 'l1', name: paddy, qty: 14.925, unit: 'QTL', processed: true }], narration: 'Custom-milled rice 10 qtl delivered (lot L-1) = paddy 14.925 qtl at 67%' },
     ]);
     add('cmr_agreements', [{

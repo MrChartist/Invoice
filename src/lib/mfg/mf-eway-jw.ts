@@ -20,7 +20,7 @@ import { EWAY_SUB_JOB_WORK_RETURN, EWAY_THRESHOLD, type EwayBill, type EwayTrans
 import { buildJobWorkEway, type JobWorkEwayBuild, type JobWorkEwaySender } from '../eway-job-work';
 import type { UnitMaster } from '../units';
 
-export const JW_EWAY_CA = 'Job-work e-Way JSON (returns sub-type 6 / dispatch-from a job worker) — not validated against the portal; verify with your CA (MF11).';
+export const JW_EWAY_CA = 'Job-work e-Way JSON (returns sub-type 6 / dispatch-from a job worker): not validated against the portal; verify with your CA (MF11).';
 type Party = Pick<Vendor, 'name' | 'gstin' | 'state_code' | 'address'>;
 const codeNum = (c?: string) => (Number.isFinite(parseInt(c ?? '', 10)) ? parseInt(c ?? '', 10) : 0);
 const stateOf = (p?: Pick<Party, 'gstin' | 'state_code'>) => p?.state_code || (/^\d{2}/.test(p?.gstin ?? '') ? p!.gstin!.slice(0, 2) : '');
@@ -28,7 +28,7 @@ const stateOf = (p?: Pick<Party, 'gstin' | 'state_code'>) => p?.state_code || (/
 /** Needed under Rule 138: inter-State always; intra-State above ₹50,000 unless the State exempts job work (setting). */
 export function jwEwayNeeded(fromState: string, toState: string, value: number, intraExempt = false): { needed: boolean; note: string } {
   if (fromState && toState && fromState !== toState) return { needed: true, note: 'Inter-State movement for job work: e-Way bill needed whatever the value (Rule 138(1) proviso).' };
-  if (intraExempt) return { needed: false, note: 'Your State exempts intra-State job-work movement (setting) — verify the notification with your CA (MF11).' };
+  if (intraExempt) return { needed: false, note: 'Your State exempts intra-State job-work movement (setting): verify the notification with your CA (MF11).' };
   return num(value) > EWAY_THRESHOLD ? { needed: true, note: 'Intra-State above ₹50,000: e-Way bill needed.' } : { needed: false, note: 'Intra-State up to ₹50,000: not needed (check your State\'s rules).' };
 }
 
@@ -64,9 +64,9 @@ export function buildJwReturnEway(m: PrincipalMovement, principal: Party | undef
   const need = jwEwayNeeded(String(bill.actFromStateCode).padStart(2, '0'), String(bill.actToStateCode).padStart(2, '0'), bill.totInvValue, o.intraExempt);
   const notes = b.notes.filter((n) => !/job worker has no GSTIN|job worker's address/.test(n));
   if (!principal?.address) notes.push("The principal's address is not in the customer master: add it before uploading.");
-  notes.push('Values are the principal\'s goods as on his challan (MF11: a GSTAT ruling left them out of a return\'s value — verify).', need.note);
+  notes.push('Values are the principal\'s goods as on his challan (MF11: a GSTAT ruling left them out of a return\'s value, verify).', need.note);
   // QA16: references disagree on whether "job work returns" is valid with an OUTWARD supply type (MF92).
-  notes.push('Outward + sub-type 6 (job work returns): if the portal refuses the combination (error 203), the principal generates it as Inward / job work returns instead — verify MF92.');
+  notes.push('Outward + sub-type 6 (job work returns): if the portal refuses the combination (error 203), the principal generates it as Inward / job work returns instead, verify MF92.');
   return { payload: { ...b.payload, billLists: [bill] }, bill, notes, required: need.needed };
 }
 

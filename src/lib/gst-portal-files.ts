@@ -476,7 +476,7 @@ export const portalFilesDb = {
     withTablesRollback([PORTAL_FILES_TABLE], () => {
       setTable(PORTAL_FILES_TABLE, [...portalFilesDb.all().filter((r) => r.file_hash !== rec.file_hash && r.id !== rec.id), rec]);
     });
-    audit.record({ entity: 'gst', entity_id: rec.id, action: 'import', summary: `GSTR-1 portal file read (${rec.kind === 'gstr1_error' ? 'error report' : 'downloaded data'}, ${rec.period || 'no period'}, ${rec.findings.length} finding(s)) — working paper` });
+    audit.record({ entity: 'gst', entity_id: rec.id, action: 'import', summary: `GSTR-1 portal file read (${rec.kind === 'gstr1_error' ? 'error report' : 'downloaded data'}, ${rec.period || 'no period'}, ${rec.findings.length} finding(s)): working paper` });
     return rec;
   },
   setResolved(id: string, key: string, on: boolean): void {

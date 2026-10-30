@@ -74,13 +74,13 @@ export function marginLines(line: InvoiceItem, purchase: { id: string; value: nu
   const value = round2(num(purchase.value));
   const margin = round2(price - value);
   const tag = { purchase_id: purchase.id, purchase_value: value };
-  const cost: InvoiceItem = { ...line, rate: margin > 0 ? value : price, tax_rate: 0, discount_percent: 0, amount: margin > 0 ? value : price, margin: { ...tag, part: 'cost' }, description: 'Margin scheme — no GST on this part (Rule 32(5))' };
+  const cost: InvoiceItem = { ...line, rate: margin > 0 ? value : price, tax_rate: 0, discount_percent: 0, amount: margin > 0 ? value : price, margin: { ...tag, part: 'cost' }, description: 'Margin scheme: no GST on this part (Rule 32(5))' };
   delete cost.band_rate;
   if (!(margin > 0)) return [cost];
   const r = num(line.tax_rate);
   const rate = inclusive ? margin : round2(margin * 100 / (100 + r));
   const m: InvoiceItem = {
-    id: newId(), name: `Margin — ${line.name}`, description: 'GST on margin under Rule 32(5) — verify with your CA', type: line.type || 'Product', hsn: line.hsn, unit: line.unit,
+    id: newId(), name: `Margin: ${line.name}`, description: 'GST on margin under Rule 32(5): verify with your CA', type: line.type || 'Product', hsn: line.hsn, unit: line.unit,
     quantity: 1, rate, tax_rate: r, discount_percent: 0, amount: rate, margin: { ...tag, part: 'margin' },
   };
   return [cost, m];
@@ -143,7 +143,7 @@ export function recordBuyBack(input: BuyBackInput): PurchaseRecord {
       kind: 'PURCHASE', vendor_id: vendor.id, vendor_name: vendor.name, bill_number: number, date: input.date, category: 'Used goods (buy-back)',
       lines: [{ id: generateId(), name: item.name, item_id: item.id, hsn: input.hsn ?? '', unit: 'NOS', quantity: 1, rate: value, tax_rate: 0, serials: [serial], godown_id: godown }],
       taxable: value, cgst: 0, sgst: 0, igst: 0, total: value, amount_paid: 0, exchange_paid: 0, itc_eligible: false, used_goods: goods,
-      notes: `Purchase voucher ${number}: used device bought from an unregistered person — no GST, no ITC, no reverse charge (RT11). Verify with your CA.`,
+      notes: `Purchase voucher ${number}: used device bought from an unregistered person, no GST, no ITC, no reverse charge (RT11). Verify with your CA.`,
     });
     recordUrd(number);
     return saved;
@@ -157,7 +157,7 @@ export function applyExchange(invoiceId: string, purchaseId: string, amount?: nu
   const bb = purchasesDb.get(purchaseId);
   if (!inv) throw new Error('The bill was not found.');
   if (!bb || !(bb.used_goods || bb.old_metal)) throw new Error('Pick the buy-back voucher.');
-  if (String(inv.client?.name ?? '').trim().toLowerCase() !== bb.vendor_name.trim().toLowerCase()) throw new Error(`The buy-back is from ${bb.vendor_name}; put that name on the bill (it is now ${inv.client?.name ?? '—'}).`);
+  if (String(inv.client?.name ?? '').trim().toLowerCase() !== bb.vendor_name.trim().toLowerCase()) throw new Error(`The buy-back is from ${bb.vendor_name}; put that name on the bill (it is now ${inv.client?.name ?? '-'}).`);
   const left = urdLeft(bb, getTable<Payment>('transactions')); // QA10 R1: what was paid out in cash is not left
   if (!(left > 0.004)) throw new Error(`Nothing left to adjust: ${bb.bill_number} is already settled (paid or used in an exchange).`);
   const amt = round2(num(amount ?? Math.min(left, invoiceOpen(inv))));

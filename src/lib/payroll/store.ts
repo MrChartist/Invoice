@@ -645,7 +645,7 @@ export function reopenRun(runId: string): PayrollRun {
   const next: PayrollRun = { ...run, status: 'draft', updated_at: now() };
   delete next.finalized_at;
   writeRuns(runs.map((r) => (r.id === runId ? next : r)));
-  audit.record({ entity: 'payroll', entity_id: run.id, action: 'update', doc_number: run.number, summary: `Payroll ${run.number} (${run.month}) reopened — removed from the books until finalized again${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
+  audit.record({ entity: 'payroll', entity_id: run.id, action: 'update', doc_number: run.number, summary: `Payroll ${run.number} (${run.month}) reopened: removed from the books until finalized again${lock === 'overridden' ? ' (period lock overridden)' : ''}` });
   return next;
 }
 

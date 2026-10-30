@@ -9,7 +9,7 @@ export const rPosT = defineArea(
     copyImage: 'Copy image',
     imageHint: 'JPG / PNG for WhatsApp',
     imageCopied: 'Bill image copied',
-    imageFailed: 'Could not make the image — try Share PDF.',
+    imageFailed: 'Could not make the image: try Share PDF.',
   } as const,
   {
     tables: 'टेबल',
@@ -18,6 +18,6 @@ export const rPosT = defineArea(
     copyImage: 'इमेज कॉपी करें',
     imageHint: 'WhatsApp के लिए JPG / PNG',
     imageCopied: 'बिल की इमेज कॉपी हुई',
-    imageFailed: 'इमेज नहीं बन सकी — Share PDF आज़माएँ।',
+    imageFailed: 'इमेज नहीं बन सकी: Share PDF आज़माएँ।',
   },
 );

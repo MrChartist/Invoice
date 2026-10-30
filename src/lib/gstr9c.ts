@@ -14,7 +14,7 @@ import { round2 } from './invoice-calc';
 import type { Gstr9Report } from './gstr9';
 
 export const GSTR9C_DISCLAIMER =
-  'GSTR-9C working paper: books vs GSTR-9 differences only — not the certified / filed reconciliation statement. Verify every figure and the applicability threshold with your CA.';
+  'GSTR-9C working paper: books vs GSTR-9 differences only, not the certified / filed reconciliation statement. Verify every figure and the applicability threshold with your CA.';
 
 /** Aggregate turnover above which GSTR-9C is filed (₹5 crore, Notification 30/2021-CT onwards — verify). */
 export const GSTR9C_THRESHOLD = 5_00_00_000;

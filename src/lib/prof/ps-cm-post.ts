@@ -87,7 +87,7 @@ export function recordClientMoney(input: CmInput, opts: RecordOptions = {}): Cli
     if (isClientMoneyAccount(office, banks)) throw new Error('Fees go into an office account, not a client-money account.');
     if (!input.authority?.date || !input.authority.ref?.trim()) {
       override = (opts.override_reason ?? '').trim();
-      if (!override) throw new Error('Record the client\'s authority to apply the money to fees (date, how, reference) — or the owner may override with a reason.');
+      if (!override) throw new Error('Record the client\'s authority to apply the money to fees (date, how, reference): or the owner may override with a reason.');
       if (!can('settings.manage')) throw new Error('Only the owner may move client money to fees without the client\'s authority.');
     }
   }
@@ -112,7 +112,7 @@ export function recordClientMoney(input: CmInput, opts: RecordOptions = {}): Cli
     const lines = cmLines(row, { bank: bankLedgerId(row.bank_account_id), held: row.kind === 'interest' && row.interest_to === 'firm' ? '' : heldLedgerId(), interest: A.interestIncome });
     if (lines.length) {
       const type: ManualVoucherInput['type'] = row.kind === 'receipt' || row.kind === 'interest' ? 'RECEIPT' : 'PAYMENT';
-      const v = saveVoucher({ type, date: row.date, voucher_class: CM_CLASS, narration: `${number} — client money ${row.kind.replace('_', ' ')}${row.narration ? `: ${row.narration}` : ''}`, lines });
+      const v = saveVoucher({ type, date: row.date, voucher_class: CM_CLASS, narration: `${number}: client money ${row.kind.replace('_', ' ')}${row.narration ? `: ${row.narration}` : ''}`, lines });
       row.voucher_ids = [v.id];
     }
     if (row.kind === 'to_fees') {
@@ -121,7 +121,7 @@ export function recordClientMoney(input: CmInput, opts: RecordOptions = {}): Cli
     }
     setTable(CLIENT_MONEY_TABLE, [...rows, row]);
     recordSeries(number);
-    if (override) audit.record({ entity: 'payment', entity_id: row.id, action: 'create', doc_number: number, summary: `Client money ${number}: ₹${amount} moved to fees without the client's recorded authority — owner override: ${override}` });
+    if (override) audit.record({ entity: 'payment', entity_id: row.id, action: 'create', doc_number: number, summary: `Client money ${number}: ₹${amount} moved to fees without the client's recorded authority, owner override: ${override}` });
     return row;
   });
 }

@@ -37,7 +37,7 @@ test('domestic transport: registered recipient → its State (IGST across States
   assert.deepEqual([un.pos, un.mode], ['27', 'CGST_SGST']);
 });
 
-test('other heads: Sec 12(2) — the recipient\'s State; local charges of an export job stay local (LG9)', () => {
+test('other heads: Sec 12(2), the recipient\'s State; local charges of an export job stay local (LG9)', () => {
   for (const k of ['origin', 'documentation', 'clearance'] as const) {
     const g = lgRegime(head(k), job(), ctx('2026-11-05'));
     assert.deepEqual([g.key, g.pos, g.mode, g.rate], ['general', '27', 'CGST_SGST', 18], k);
@@ -48,7 +48,7 @@ test('other heads: Sec 12(2) — the recipient\'s State; local charges of an exp
 test('recipient outside India: 13(9) destination to 30 Sep 2023, 13(2) from 1 Oct 2023; LUT when 2(6) holds', () => {
   const imp = job({ dir: 'import', dest_country: 'IN', mode: 'sea_fcl', origin: 'SIN', destination: 'INNSA' });
   const old = lgRegime(head('freight_sea'), imp, ctx('2023-09-30', { recipient: ABROAD }));
-  assert.deepEqual([old.pos, old.mode], ['27', 'CGST_SGST'], '13(9): an import to India — the destination is in India');
+  assert.deepEqual([old.pos, old.mode], ['27', 'CGST_SGST'], '13(9): an import to India, the destination is in India');
   assert.match(old.reason, /13\(9\)/);
   const now = lgRegime(head('freight_sea'), imp, ctx('2023-10-01', { recipient: ABROAD, exportOk: true, lut: true }));
   assert.deepEqual([now.pos, now.supply, now.ca], ['96', 'EXPORT_LUT', 'LG3']);
@@ -67,7 +67,7 @@ test('intermediary (commission): our location until 29 Mar 2026, 13(2) from 30 M
   assert.deepEqual([b.key, b.pos, b.supply], ['cross_border', '96', 'EXPORT_LUT']);
 });
 
-test('multimodal: 12 % to 21 Sep 2025; then 5 % without an air leg, 18 % with one — domestic only; international takes the leg rate', () => {
+test('multimodal: 12 % to 21 Sep 2025; then 5 % without an air leg, 18 % with one, domestic only; international takes the leg rate', () => {
   const mm = head('freight_multimodal', { id: 'mm' });
   const dom = job({ dir: 'domestic', mode: 'multimodal', dest_country: 'IN', legs: ['road', 'rail'] });
   assert.equal(lgRegime(mm, dom, ctx('2025-09-21')).rate, 12);
@@ -83,7 +83,7 @@ test('pure agent, exempt agri storage, GTA leg, unregistered sender, composite h
   const agri = lgRegime(head('storage', { exempt_if: 'agri_produce' }), job({ dir: 'domestic', dest_country: 'IN' }), ctx('2026-11-05'));
   assert.deepEqual([agri.key, agri.rate, agri.mode, agri.ca], ['exempt', 0, 'NONE', 'LG21']);
   assert.match(agri.reason, /Sl\. 54\(e\)/);
-  assert.equal(lgRegime(head('storage', { exempt_if: 'rice' }), job(), ctx('2026-11-05')).reason, 'Exempt — N 12/2017-CT(R) Sl. 24');
+  assert.equal(lgRegime(head('storage', { exempt_if: 'rice' }), job(), ctx('2026-11-05')).reason, 'Exempt: N 12/2017-CT(R) Sl. 24');
   assert.equal(lgRegime(head('gta'), job({ dir: 'domestic', dest_country: 'IN', mode: 'road' }), ctx('2026-11-05', { gta: 18 })).rate, 18, 'GTA option rate from the context (LG8)');
   const un = lgRegime(head('freight_air'), job(), ctx('2026-11-05', { sender: { state: '27', registered: false } }));
   assert.deepEqual([un.mode, un.rate], ['NONE', 0]);

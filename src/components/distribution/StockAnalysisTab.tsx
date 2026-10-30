@@ -87,7 +87,7 @@ export default function StockAnalysisTab({ positions, from, to }: { positions: S
                   <td>{r.name}</td><td><span className={own.chip}>{skT(CLS[r.cls])}</span></td>
                   <td className={own.num}>{r.outQty} {r.unit}</td><td className={own.num}>{formatCurrency(r.outValue)}</td>
                   <td className={own.num}>{r.closingQty}</td><td className={own.num}>{r.turnover >= 999 ? '∞' : r.turnover}</td>
-                  <td className={own.num}>{r.daysCover ?? '—'}</td><td>{r.lastOut || '—'}</td>
+                  <td className={own.num}>{r.daysCover ?? '-'}</td><td>{r.lastOut || '-'}</td>
                 </tr>
               ))}
             </tbody>

@@ -140,10 +140,10 @@ export function integrityText(i: IntegrityInput): { text: string; sha256: string
   const inFy = sliceFy(i.chain, i.fy);
   const restores = inFy.filter((e) => e.action === 'restore' && e.entity === 'system');
   const lines = [
-    `Edit log integrity — ${i.company || 'this company'} — ${i.fy} (${from} to ${to})`,
+    `Edit log integrity: ${i.company || 'this company'}, ${i.fy} (${from} to ${to})`,
     `Generated: ${i.generatedAt}`,
     '',
-    `Chain check: ${report.ok ? 'INTACT' : 'BROKEN'} — ${describeChain(report)}`,
+    `Chain check: ${report.ok ? 'INTACT' : 'BROKEN'}, ${describeChain(report)}`,
     ...(report.broken ? [`Break: entry ${report.broken.index + 1} of ${report.total} (${report.broken.reason})`] : []),
     `Entries in the whole chain: ${report.total} (sealed ${report.chained}, sealed as a block ${report.legacy})`,
     `Entries dated in ${i.fy}: ${inFy.length}`,
@@ -159,7 +159,7 @@ export function integrityText(i: IntegrityInput): { text: string; sha256: string
     'The edit log cannot be disabled in this app: every change to documents, payments, masters and books tables is',
     'recorded with the user, the time and the field-level before / after, hash-chained so an edit or removal of an',
     'entry is detected. Contact and bank details are recorded as "changed", never copied.',
-    'This file is a working paper for Rule 11(g) reporting — verify with your CA.',
+    'This file is a working paper for Rule 11(g) reporting: verify with your CA.',
   ];
   const body = lines.join('\n');
   const hash = sha256(body);
@@ -167,7 +167,7 @@ export function integrityText(i: IntegrityInput): { text: string; sha256: string
 }
 
 export const PACK_README = (fy: string, days: number) => [
-  `Auditor pack — ${fy}`,
+  `Auditor pack: ${fy}`,
   '',
   `audit-log-${fy}.csv     Every edit-log entry dated in the year (archive segments included): when, user, area, action,`,
   '                        document, summary and the field-level before / after.',
@@ -179,7 +179,7 @@ export const PACK_README = (fy: string, days: number) => [
   'users.csv               Local users and their roles (no PIN data).',
   '',
   'Note the SHA-256 shown on screen when the pack was made: a later copy of integrity.txt with the same hash is unchanged.',
-  'Working papers — verify with your CA.',
+  'Working papers: verify with your CA.',
 ].join('\n');
 
 export interface PackInput extends IntegrityInput {

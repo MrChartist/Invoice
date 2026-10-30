@@ -14,7 +14,7 @@ export const TRIP_STATUSES: readonly TripStatus[] = ['enquiry', 'confirmed', 'tr
 export type Trip = CostCentre & { tv: TripInfo };
 
 export const isTrip = (c: Pick<CostCentre, 'tv'> | undefined): c is Trip => !!c?.tv?.code;
-export const tripLabel = (c: Pick<CostCentre, 'name' | 'tv'>): string => (c.tv?.code ? `${c.tv.code} — ${c.name}` : c.name);
+export const tripLabel = (c: Pick<CostCentre, 'name' | 'tv'>): string => (c.tv?.code ? `${c.tv.code}: ${c.name}` : c.name);
 
 /** `<YY><MM>-<seq>` of the start month: the next free sequence (3 digits). */
 export function suggestTripCode(start: string, centres: readonly Pick<CostCentre, 'tv'>[]): string {

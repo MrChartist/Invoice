@@ -41,7 +41,7 @@ export default function LotPicker({ item, index }: { item: InvoiceItem; index: n
   return (
     <div>
       <select className={controls.ghost} value={item.arrival_id ?? ''} onChange={(e) => pick(e.target.value)} aria-label={`${trT('lot')} ${index + 1}`} data-lot-picker={index}>
-        <option value="">{trT('lot')}: —</option>
+        <option value="">{trT('lot')}: -</option>
         {lots.filter((l) => l.balance > 0 || l.arrival.id === item.arrival_id).map((l) => (
           <option key={l.arrival.id} value={l.arrival.id}>{`${l.arrival.lot_no} · ${l.arrival.principal_name} · ${l.arrival.item_name} (${l.balance} ${l.arrival.unit})`}</option>
         ))}

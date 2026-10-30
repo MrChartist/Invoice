@@ -50,7 +50,7 @@ const cell = (v: unknown) => { const s = String(v ?? ''); return /[",\n\r]/.test
 export const registerCsv = (rows: readonly RegisterRow[]): string => [REGISTER_HEAD, ...rows.map((r) => REGISTER_COLS.map((k) => r[k]))].map((l) => l.map(cell).join(',')).join('\r\n');
 
 /** The register's title line, by the rule in force on `date`. */
-export const registerTitle = (date: string): string => { const r = keyedAt(CBLR_RULES, 'records', date)?.value; return r ? `Customs broker register — CBLR 2018 ${r.reg}: ${r.text}` : 'Customs broker register'; };
+export const registerTitle = (date: string): string => { const r = keyedAt(CBLR_RULES, 'records', date)?.value; return r ? `Customs broker register, CBLR 2018 ${r.reg}: ${r.text}` : 'Customs broker register'; };
 
 /** True when the client has no KYC date (Reg 10(n) hint on its jobs). */
 export const kycMissing = (c: Pick<Client, 'lg'> | undefined): boolean => !c?.lg?.kyc?.verified_on;

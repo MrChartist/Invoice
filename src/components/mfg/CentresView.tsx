@@ -56,7 +56,7 @@ export default function CentresView({ ctx }: { ctx: MfgContext }) {
           <div style={row}>
             <F label={fT('name')}><In v={d.name} set={(x) => set({ name: x })} data-mf="c-name" /></F>
             <F label={fT('kind')}><Sel v={d.kind} set={(x) => set({ kind: x as WorkCentre['kind'] })} o={KINDS.map((k) => [k, fT(`kind.${k}`)] as const)} /></F>
-            {d.kind === 'outside' && <F label={fT('vendor')}><Sel v={d.vendor} set={(x) => set({ vendor: x })} o={[['', '—'], ...vendors.map((x) => [x.id, x.name] as const)]} /></F>}
+            {d.kind === 'outside' && <F label={fT('vendor')}><Sel v={d.vendor} set={(x) => set({ vendor: x })} o={[['', '-'], ...vendors.map((x) => [x.id, x.name] as const)]} /></F>}
           </div>
           <div style={row}>
             <F label={fT('rateMachine')} w={130}><In v={d.rate} set={(x) => set({ rate: x })} inputMode="decimal" data-mf="c-rate" /></F>

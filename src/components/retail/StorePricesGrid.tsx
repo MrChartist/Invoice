@@ -82,7 +82,7 @@ export default function StorePricesGrid({ onClose, notify }: { onClose: () => vo
                       return (
                         <td key={b.id} className={css.num}>
                           <input className={cn(controls.input, controls.inputNumeric, css.gridInput)} inputMode="decimal" aria-label={sT('spCell', { item: i.name, store: b.name })}
-                            value={edits[k] ?? (cur !== undefined ? String(cur) : '')} placeholder="—"
+                            value={edits[k] ?? (cur !== undefined ? String(cur) : '')} placeholder="-"
                             onChange={(e) => setEdits((x) => ({ ...x, [k]: e.target.value }))} />
                         </td>
                       );

@@ -100,7 +100,7 @@ export default function ComplianceView({ notify }: MpViewProps) {
   const ms = readManpowerSettings();
   const short = m && data.run ? shortfalls(site, m, data.musters, data.run.lines, ms.wage_revisions ?? []) : [];
   const hints = data.run ? labourHints({ month, lines: data.run.lines, staff: data.staff, sites: [site], musters: data.musters, licences: ms.licences ?? [] }) : [];
-  const print = () => void import('../../lib/voucher-print').then(({ printHtmlDocument }) => printHtmlDocument(annexHtml(`${siteLabel(site)} · ${month}`, shares, t, `${mcT('trrn')}: ${cur.pf?.trrn ?? '—'} · ${mcT('chal')}: ${cur.esi?.challan ?? '—'}`), () => notify(mdT('popup'), 'error')));
+  const print = () => void import('../../lib/voucher-print').then(({ printHtmlDocument }) => printHtmlDocument(annexHtml(`${siteLabel(site)} · ${month}`, shares, t, `${mcT('trrn')}: ${cur.pf?.trrn ?? '-'} · ${mcT('chal')}: ${cur.esi?.challan ?? '-'}`), () => notify(mdT('popup'), 'error')));
   return (
     <section data-mp-compliance={data.comp?.status ?? 'none'}>
       <div style={bar}>

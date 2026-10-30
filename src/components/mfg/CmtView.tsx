@@ -95,7 +95,7 @@ export default function CmtView({ ctx }: { ctx: MfgContext }) {
       <h3>{gT('cmtIn')}</h3>
       <div style={stack}>
         <div style={row}>
-          <F label={gT('challan')}><Sel v={recv} set={setRecv} o={[['', '—'], ...cmtOuts.flatMap((o) => o.lines.filter((l) => cmtTag(l)?.lot).map((l) => [`${o.id}|${l.id}`, `${o.number} · ${o.party_name} · ${cmtTag(l)?.pieces}`] as const))]} data-mfc="cmt-recv" /></F>
+          <F label={gT('challan')}><Sel v={recv} set={setRecv} o={[['', '-'], ...cmtOuts.flatMap((o) => o.lines.filter((l) => cmtTag(l)?.lot).map((l) => [`${o.id}|${l.id}`, `${o.number} · ${o.party_name} · ${cmtTag(l)?.pieces}`] as const))]} data-mfc="cmt-recv" /></F>
           <F label={gT('rate')} w={110}><In v={rate} set={setRate} inputMode="decimal" /></F>
           <F label={gT('scrapJw')} w={160}><In v={scrap} set={setScrap} inputMode="decimal" /></F>
         </div>
@@ -122,7 +122,7 @@ export default function CmtView({ ctx }: { ctx: MfgContext }) {
         <F label={gT('to')} w={160}><In type="date" v={to} set={setTo} /></F>
         <span>{gT('scrapInPeriod', { q: x.scrapInPeriod })}</span>
       </div>
-      <Grid attr="itc04-recon" head={[gT('party'), gT('sent0'), gT('back'), gT('balance'), gT('oldest'), gT('expired')]} rows={x.byParty.map((r) => [r.party, n2(r.sent), n2(r.back), n2(r.balance), r.oldest || '—', r.expired])} />
+      <Grid attr="itc04-recon" head={[gT('party'), gT('sent0'), gT('back'), gT('balance'), gT('oldest'), gT('expired')]} rows={x.byParty.map((r) => [r.party, n2(r.sent), n2(r.back), n2(r.balance), r.oldest || '-', r.expired])} />
       {x.idle.length > 0 && <p data-mfc-idle>{gT('idle')}: {x.idle.map((r) => r.number).join(', ')}</p>}
     </section>
   );

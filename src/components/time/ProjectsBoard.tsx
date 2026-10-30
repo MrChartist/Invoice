@@ -197,7 +197,7 @@ export default function ProjectsBoard({ clients, prefs, entries, invoices, proje
       >
         <span className={styles.cardTitle}>{t.title}</span>
         <div className={styles.cardMeta}>
-          <span>{svcT('trackedVsEstimate', { tracked: formatMinutes(p.tracked), estimate: p.estimate ? formatMinutes(p.estimate) : '–' })}</span>
+          <span>{svcT('trackedVsEstimate', { tracked: formatMinutes(p.tracked), estimate: p.estimate ? formatMinutes(p.estimate) : '-' })}</span>
           {t.due && <span>{formatDate(t.due)}</span>}
         </div>
         <Bar pct={p.pct} />
@@ -305,10 +305,10 @@ export default function ProjectsBoard({ clients, prefs, entries, invoices, proje
                         <tr key={t.id}>
                           <td>{t.title}</td>
                           <td>{colLabel(displayColumn(t, entries, live))}</td>
-                          <td className={surface.numeric}>{p.estimate ? formatMinutes(p.estimate) : '–'}</td>
+                          <td className={surface.numeric}>{p.estimate ? formatMinutes(p.estimate) : '-'}</td>
                           <td className={surface.numeric}>{formatMinutes(p.tracked)}{p.pct !== null ? ` · ${Math.round(p.pct)}%` : ''}</td>
-                          <td>{t.due ? formatDate(t.due) : '–'}</td>
-                          <td>{personName(t.assignee_id) || '–'}</td>
+                          <td>{t.due ? formatDate(t.due) : '-'}</td>
+                          <td>{personName(t.assignee_id) || '-'}</td>
                         </tr>
                       );
                     })}

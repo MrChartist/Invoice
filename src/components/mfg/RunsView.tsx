@@ -22,7 +22,7 @@ export default function RunsView({ ctx, done }: { ctx: MfgContext; done: Done })
   const [m, setM] = useState({ name: '', item: '', cav: '', cycle: '', shot: '', runner: '', life: '', done: '' });
   const [f, setF] = useState({ date: today(), shift: '', mould: '', item: '', order: '', hours: '', cycle: '', cav: '', part: '', good: '', reject: '', runner: '', purge: '', rgOut: '', rgItem: readMfgSettings().regrind_item_id ?? '' });
   const [ins, setIns] = useState<In[]>([{ item: '', kind: 'virgin', kg: '' }]);
-  const name = (id?: string) => ctx.items.find((i) => i.id === id)?.name ?? '—';
+  const name = (id?: string) => ctx.items.find((i) => i.id === id)?.name ?? '-';
   const mould = d.moulds.find((x) => x.id === f.mould);
   const set = (k: keyof typeof f) => (x: string) => setF({ ...f, [k]: x });
   const draft: ProcessRun = {
@@ -87,7 +87,7 @@ export default function RunsView({ ctx, done }: { ctx: MfgContext; done: Done })
 
       <h4>{M('runs')}</h4>
       <Table d="runs" empty={M('none')} head={[M('date'), M('mould'), M('part'), M('hours'), M('good'), M('expected'), '']} rows={[...d.runs].reverse().map((r) => [
-        r.date, d.moulds.find((x) => x.id === r.mould_id)?.name ?? '—', name(r.item_id), r.hours, fmt(r.good_qty), fmt(expectedOutput(r.hours, r.cycle_s ?? 0, r.cavities ?? 1)),
+        r.date, d.moulds.find((x) => x.id === r.mould_id)?.name ?? '-', name(r.item_id), r.hours, fmt(r.good_qty), fmt(expectedOutput(r.hours, r.cycle_s ?? 0, r.cavities ?? 1)),
         <button key="x" type="button" className={B.gs} onClick={() => run(() => { removeRun(r.id); })}>{M('del')}</button>,
       ])} />
     </div>

@@ -21,7 +21,7 @@ export default function JobPick({ value, onChange }: { value: Tag; onChange: (v:
   return (
     <label className={controls.field}><span className={controls.label}>{lgT('job')}</span>
       <select className={controls.select} value={value?.job_id ?? ''} onChange={(e) => onChange(e.target.value ? { ...value, job_id: e.target.value } : undefined)} data-lg-bill-job-pick>
-        <option value="">—</option>
+        <option value="">-</option>
         {jobs.map((j) => <option key={j.id} value={j.id}>{j.number} · {j.origin} → {j.destination}</option>)}
       </select>
     </label>

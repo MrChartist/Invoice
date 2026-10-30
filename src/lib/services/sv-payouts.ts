@@ -86,7 +86,7 @@ export function postPayout(staff: ServiceStaff, month: string, st: Pick<Statemen
     const v = saveVoucher({
       type: 'JOURNAL',
       date: opts.date,
-      narration: `Commission payable to ${staff.name} for ${month} (${st.lines.length} line(s))${tips ? `, incl. tips ₹${tips} passed through` : ''}${tds ? ` — TDS u/s ${section}` : ''}: verify with your CA`,
+      narration: `Commission payable to ${staff.name} for ${month} (${st.lines.length} line(s))${tips ? `, incl. tips ₹${tips} passed through` : ''}${tds ? `: TDS u/s ${section}` : ''}: verify with your CA`,
       lines: [
         { account_id: expense, dr: paise, cr: 0 },
         { account_id: A.creditors, dr: 0, cr: paise - tdsPaise, party: staff.name },

@@ -69,8 +69,8 @@ export function PartyBookPickers() {
               const a = addresses.find((x) => x.id === e.target.value);
               if (a) patch({ ship_to: addressToShipTo(a, master) });
             }}>
-            <option value="">—</option>
-            {addresses.map((a) => <option key={a.id} value={a.id}>{a.label}{a.city ? ` — ${a.city}` : ''}</option>)}
+            <option value="">-</option>
+            {addresses.map((a) => <option key={a.id} value={a.id}>{a.label}{a.city ? `: ${a.city}` : ''}</option>)}
           </select>
         </label>
       )}

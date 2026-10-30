@@ -24,7 +24,7 @@ const blank = (): D => ({ date: today(), style: '', colour: '', order: '', fabri
 export default function CutPlansView({ ctx }: { ctx: MfgContext }) {
   const plans = useMemo(() => (void ctx.version, loadCutPlans()), [ctx.version]);
   const styles = useMemo(() => styleItems(ctx.items), [ctx.items]);
-  const name = (id?: string) => ctx.items.find((i) => i.id === id)?.name ?? '—';
+  const name = (id?: string) => ctx.items.find((i) => i.id === id)?.name ?? '-';
   const [d, setD] = useState<D | null>(null);
   const [waste, setWaste] = useState<{ id: string; m: string; rate: string } | null>(null);
   const set = (p: Partial<D>) => setD((x) => (x ? { ...x, ...p } : x));
@@ -65,8 +65,8 @@ export default function CutPlansView({ ctx }: { ctx: MfgContext }) {
           <div style={row}>
             <F label={gT('date')} w={160}><In type="date" v={d.date} set={(x) => set({ date: x })} /></F>
             <F label={gT('style')}><Sel v={d.style} set={(x) => set({ style: x, colour: '', order: '' })} o={opts(styles)} data-mfc="cut-style" /></F>
-            <F label={gT('order')}><Sel v={d.order} set={(x) => set({ order: x })} o={[['', '—'], ...orders.map((o) => [o.id, `${o.number} · ${o.planned_qty}`] as const)]} data-mfc="cut-order" /></F>
-            <F label={gT('colour')}><Sel v={d.colour} set={pickColour} o={[['', '—'], ...(axes?.colours ?? []).map((c) => [c, c] as const)]} data-mfc="cut-colour" /></F>
+            <F label={gT('order')}><Sel v={d.order} set={(x) => set({ order: x })} o={[['', '-'], ...orders.map((o) => [o.id, `${o.number} · ${o.planned_qty}`] as const)]} data-mfc="cut-order" /></F>
+            <F label={gT('colour')}><Sel v={d.colour} set={pickColour} o={[['', '-'], ...(axes?.colours ?? []).map((c) => [c, c] as const)]} data-mfc="cut-colour" /></F>
             <F label={gT('fabric')}><Sel v={d.fabric} set={(x) => set({ fabric: x })} o={opts(ctx.items.filter((i) => i.track_stock && !i.variant_of && !i.variant_axes?.length))} data-mfc="cut-fabric" /></F>
           </div>
           <div style={row}>

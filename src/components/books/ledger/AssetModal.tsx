@@ -80,7 +80,7 @@ export function AssetModal({ accounts, asset, defaultDate, onClose, onSaved }: P
               }}
             >
               {BLOCKS.map((b) => (
-                <option key={b} value={b}>{DEPRECIATION_BLOCK_LABELS[b]} — {depreciationRate(b, form.put_to_use)}%</option>
+                <option key={b} value={b}>{DEPRECIATION_BLOCK_LABELS[b]} : {depreciationRate(b, form.put_to_use)}%</option>
               ))}
             </select>
           </div>

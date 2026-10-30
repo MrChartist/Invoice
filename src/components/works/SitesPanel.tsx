@@ -44,13 +44,13 @@ export function SitesPanel({ boq, notify, refresh, tick }: PanelProps & { boq: I
   }) : []), [site, f.from, f.to, boq.id, coeffs, tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const itemSelect = (value: string, on: (v: string) => void, label: string) => (
     <F l={label}>
-      <select className={controls.select} value={value} onChange={(e) => on(e.target.value)}><option value="">—</option>{items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select></F>
+      <select className={controls.select} value={value} onChange={(e) => on(e.target.value)}><option value="">-</option>{items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select></F>
   );
   return (
     <div className={styles.stack}>
       <div className={styles.toolbar}>
         <F l={twT('site')}>
-          <select className={controls.select} value={site?.id ?? ''} onChange={(e) => setSiteId(e.target.value)}>{sites.length === 0 && <option value="">—</option>}{sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></F>
+          <select className={controls.select} value={site?.id ?? ''} onChange={(e) => setSiteId(e.target.value)}>{sites.length === 0 && <option value="">-</option>}{sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></F>
         <F l={twT('siteName')}><input className={controls.input} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></F>
         <button type="button" className={B.o} onClick={() => run(() => addSite(boq.id, f.name || `${boq.client?.name ?? ''} site`, boq.boq_terms?.cost_centre_id), twT('siteAdded'))}><Building2 size={16} aria-hidden="true" /> {twT('addSite')}</button>
       </div>
@@ -87,7 +87,7 @@ export function SitesPanel({ boq, notify, refresh, tick }: PanelProps & { boq: I
           <div className={surface.tableWrap}>
             <table className={surface.table}>
               <thead><tr><th>{twT('item')}</th><th className={surface.numeric}>{twT('issued')}</th><th className={surface.numeric}>{twT('consumed')}</th><th className={surface.numeric}>{twT('theoretical')}</th><th className={surface.numeric}>{twT('variance')}</th><th className={surface.numeric}>{twT('closingAtSite')}</th></tr></thead>
-              <tbody>{rows.map((r) => <tr key={r.itemId}><td>{itemName(r.itemId)}</td><td className={surface.numeric}>{r.issued}</td><td className={surface.numeric}>{r.consumed}</td><td className={surface.numeric}>{r.theoretical}</td><td className={`${surface.numeric} ${r.variancePct !== null && r.variancePct > 0 ? styles.bad : ''}`}>{r.variancePct === null ? '—' : `${r.variancePct}%`}</td><td className={surface.numeric}>{r.closing}</td></tr>)}</tbody>
+              <tbody>{rows.map((r) => <tr key={r.itemId}><td>{itemName(r.itemId)}</td><td className={surface.numeric}>{r.issued}</td><td className={surface.numeric}>{r.consumed}</td><td className={surface.numeric}>{r.theoretical}</td><td className={`${surface.numeric} ${r.variancePct !== null && r.variancePct > 0 ? styles.bad : ''}`}>{r.variancePct === null ? '-' : `${r.variancePct}%`}</td><td className={surface.numeric}>{r.closing}</td></tr>)}</tbody>
             </table>
           </div>
         </section>

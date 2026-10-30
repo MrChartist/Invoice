@@ -26,7 +26,7 @@ import {
 } from './eway';
 import type { UnitMaster } from './units';
 
-export const JOB_WORK_EWAY_CA_NOTE = 'e-Way bill JSON for a job-work challan (sub-type Job Work, document CHL) — not validated against the portal; verify with your CA.';
+export const JOB_WORK_EWAY_CA_NOTE = 'e-Way bill JSON for a job-work challan (sub-type Job Work, document CHL): not validated against the portal; verify with your CA.';
 
 export interface JobWorkEwaySender {
   name: string;
@@ -90,7 +90,7 @@ export function buildJobWorkEway(o: MaterialOut, opts: JobWorkEwayOptions): JobW
     if (!(value > 0)) notes.push(`${it.name}: no value per unit on the challan line.`);
     itemList.push({
       productName: it.name.slice(0, 100),
-      productDesc: (o.process ? `${it.name} — for ${o.process}` : it.name).slice(0, 100),
+      productDesc: (o.process ? `${it.name}: for ${o.process}` : it.name).slice(0, 100),
       hsnCode: codeNum(hsn),
       quantity: Math.round(qty * 1000) / 1000,
       qtyUnit: portalUqc(l.unit || it.unit, opts.units),

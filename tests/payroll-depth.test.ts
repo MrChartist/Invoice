@@ -101,7 +101,7 @@ test('arrears: back-dated revision recomputed per month, PF / ESI on the differe
   assert.equal(l.pt, 200, 'PT on the regular gross only');
   assert.ok(l.taxable_gross >= 27000);
   const html = payslipHtml(run, l);
-  assert.match(html, /Arrears — revision from May 2025 to June 2025 \(2 months\)/);
+  assert.match(html, /Arrears: revision from May 2025 to June 2025 \(2 months\)/);
   const final = finalizeRun(run.id);
   assert.equal(voucherDiff(payrollVoucher(final)!), 0);
   const pf = payableBalances(loadRuns(), []).find((b) => b.kind === 'pf')!;
@@ -245,7 +245,7 @@ test('gratuity: 15/26 × last drawn × years (part above six months), 5-year rul
   assert.equal(gratuityFor({ doj: '1980-01-01', asOf: '2017-03-31', lastDrawn: 300000 }).amount, 1000000, '₹10 lakh before 29 Mar 2018');
 });
 
-test('bonus: Payment of Bonus Act — ₹21,000 eligibility, ₹7,000 calculation ceiling, 8.33% minimum', () => {
+test('bonus: Payment of Bonus Act, ₹21,000 eligibility, ₹7,000 calculation ceiling, 8.33% minimum', () => {
   const line = (month: string, basic: number) => ({ employee_id: 'e1', code: 'E001', name: 'A', tax_regime: 'new', days_in_month: 30, days_employed: 30, lop: 0, payable_days: 30, units: {}, earnings: [{ pay_head_id: 'ph_basic', name: 'Basic', amount: basic, account_id: A.salaries }], deductions: [], employer: [], gross: basic, total_deductions: 0, net: basic, taxable_gross: basic, pf_wages: 0, eps_wages: 0, edli_wages: 0, pf_ee: 0, eps: 0, epf_er: 0, edli: 0, pf_admin: 0, esi_wages: 0, esi_covered: false, esi_ee: 0, esi_er: 0, pt: 0, tds: 0 });
   const runs = [line('2025-04', 12000), line('2025-05', 12000)].map((l, i) => ({ id: `r${i}`, month: i ? '2025-05' : '2025-04', number: '', date: '2025-05-31', status: 'final', lines: [l], created_at: '' })) as PayrollRun[];
   const [r] = bonusWorking(runs, [emp()], heads, 2025, 8.33);
@@ -275,7 +275,7 @@ test('PF 7Q / 14B estimate', () => {
 
 /* ── Full & final ─────────────────────────────────────────── */
 
-test('full & final: notice recovery, leave encashment, gratuity, loan recovery, final TDS — one run, one statement', () => {
+test('full & final: notice recovery, leave encashment, gratuity, loan recovery, final TDS, one run, one statement', () => {
   const e = saveEmployee(input({ code: 'E009', name: 'Meena', doj: '2019-04-01', esi: false, pt: false }));
   saveStructure({ employee_id: e.id, effective_from: '2019-04-01', lines: [{ pay_head_id: 'ph_basic', amount: 30000 }] });
   const el = saveLeaveType({ code: 'EL', name: 'Earned leave', paid: true, accrual: 1.25, encashable: true });

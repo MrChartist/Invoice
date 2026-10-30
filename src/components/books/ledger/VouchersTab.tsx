@@ -63,7 +63,7 @@ export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }
 
   const csv = () =>
     toCsv([
-      ['Vouchers', `${period.start} to ${period.end}`, 'Working paper — verify with your CA'],
+      ['Vouchers', `${period.start} to ${period.end}`, 'Working paper: verify with your CA'],
       ['Date', 'Type', 'Vch no.', 'Party', 'Narration', 'Account', 'Line party', 'Debit', 'Credit'],
       ...list.flatMap((v) =>
         v.lines.map((l) => [v.date, v.kind, v.number, v.party, v.narration, ledger.byId.get(l.account)?.name ?? l.account, l.party ?? '', l.dr / 100, l.cr / 100]),
@@ -136,7 +136,7 @@ export function VouchersTab({ ledger, period, onChanged, onOpenAccount, notify }
                         <td>{formatDate(v.date)}</td>
                         <td><span className={v.source === 'manual' ? styles.badgeManual : styles.badge}>{voucherTypeLabel(v.kind)}</span></td>
                         <td>
-                          {v.link ? <Link className={books.link} to={v.link}>{v.number || ledgerT('open')}</Link> : <span className={surface.mono}>{v.number || '—'}</span>}
+                          {v.link ? <Link className={books.link} to={v.link}>{v.number || ledgerT('open')}</Link> : <span className={surface.mono}>{v.number || '-'}</span>}
                         </td>
                         <td>
                           {v.party && <div>{v.party}</div>}

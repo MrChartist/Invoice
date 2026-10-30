@@ -33,14 +33,14 @@ export function agdNotices(today: string, at: string, packs: { inputs: boolean; 
   }
   if (packs.loans && peekTable(LOANS_TABLE).length) {
     const late = overdueLoans(loadLoans(), today);
-    if (late.length) out.push({ id: `agd:loans:${today}:${late.length}`, severity: 'warning', title: agdT('lienDue', { n: late.map((l) => l.number).join(', ') }), detail: `₹${late.reduce((t, l) => t + loanState(l, today).total, 0).toFixed(2)} — ${agdT('dueDate')}`, href: `/inventory?tab=${packs.loansTab ?? 'cold'}&view=loans`, cta: agdT('v.loans'), at });
+    if (late.length) out.push({ id: `agd:loans:${today}:${late.length}`, severity: 'warning', title: agdT('lienDue', { n: late.map((l) => l.number).join(', ') }), detail: `₹${late.reduce((t, l) => t + loanState(l, today).total, 0).toFixed(2)}: ${agdT('dueDate')}`, href: `/inventory?tab=${packs.loansTab ?? 'cold'}&view=loans`, cta: agdT('v.loans'), at });
   }
   if (packs.members) {
     const from = shift(today, -30), to = shift(today, 30);
     const fy = +today.slice(0, 4) - (+today.slice(5, 7) >= 4 ? 0 : 1);
     for (const c of [...membersCalendar(packs.members, fy - 1, s.calendar), ...membersCalendar(packs.members, fy, s.calendar)]) {
       if (c.due < from || c.due > to) continue;
-      out.push({ id: `agd:cal:${c.key}:${c.due}`, severity: c.due < today ? 'critical' : 'info', title: `${c.label}: ${c.due}${c.due < today ? ` — ${agdT('pastDue')}` : ''}`, detail: agdT('calendarNote'), href: '/inventory?tab=members&view=papers', cta: agdT('v.papers'), at });
+      out.push({ id: `agd:cal:${c.key}:${c.due}`, severity: c.due < today ? 'critical' : 'info', title: `${c.label}: ${c.due}${c.due < today ? `: ${agdT('pastDue')}` : ''}`, detail: agdT('calendarNote'), href: '/inventory?tab=members&view=papers', cta: agdT('v.papers'), at });
     }
   }
   return out;

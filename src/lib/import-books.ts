@@ -239,7 +239,7 @@ export function buildBooksPreview(params: BooksPreviewParams): ImportPreview {
       if (!number) issues.push({ level: 'error', field: 'voucher_no', message: 'Voucher number is required (rows of one voucher share it)' });
       if (!date) issues.push({ level: 'error', field: 'date', message: dateText ? `Date "${dateText}" is not readable` : 'Date is required' });
       const type = Object.hasOwn(VOUCHER_TYPES, fold(typeText)) ? VOUCHER_TYPES[fold(typeText)] : undefined;
-      if (!type) issues.push({ level: 'error', field: 'type', message: `Voucher type "${typeText}" — use Journal, Payment, Receipt or Contra (sales / purchase come in as documents, not vouchers)` });
+      if (!type) issues.push({ level: 'error', field: 'type', message: `Voucher type "${typeText}": use Journal, Payment, Receipt or Contra (sales / purchase come in as documents, not vouchers)` });
       const lines: ManualVoucherLine[] = [];
       const centres: string[] = [];
       let narration = '';
@@ -268,7 +268,7 @@ export function buildBooksPreview(params: BooksPreviewParams): ImportPreview {
             party = vendor.name;
           }
         }
-        if (!account) return void issues.push({ level: 'error', field: 'ledger', message: `${at}: ledger "${ledger}" is not in the books — import ledgers first` });
+        if (!account) return void issues.push({ level: 'error', field: 'ledger', message: `${at}: ledger "${ledger}" is not in the books, import ledgers first` });
         const cc = cell(mapping, r, 'cost_centre');
         const centre = cc ? existing.costCentres.find((x) => fold(x.name) === fold(cc)) : undefined;
         if (cc && !centre && !centres.some((x) => fold(x) === fold(cc))) centres.push(cc);
@@ -283,7 +283,7 @@ export function buildBooksPreview(params: BooksPreviewParams): ImportPreview {
         row.label = `${typeText} ${number} · ${date}`;
         if (number && (taken.has(fold(number)) || seenNo.has(fold(number)))) {
           row.action = 'skip';
-          row.skipReason = taken.has(fold(number)) ? 'Voucher number already in the books — never overwritten' : 'Voucher number used twice in this file';
+          row.skipReason = taken.has(fold(number)) ? 'Voucher number already in the books: never overwritten' : 'Voucher number used twice in this file';
         }
         if (number) seenNo.add(fold(number));
       }

@@ -36,7 +36,7 @@ export function postRegime(sac: string | undefined, c: RegimeCtx): RegimeResult 
   const date = c.date.slice(0, 10);
   const s = String(sac ?? '').trim();
   const rate = ruleAt(MP_GST_RATE_RULES, date);
-  if (c.manual?.trim()) return { regime: 'manual_exempt', rate: 0, decl: `Exempt — ${c.manual.trim()}. Verify with your CA.`, ca: ['MP8'] };
+  if (c.manual?.trim()) return { regime: 'manual_exempt', rate: 0, decl: `Exempt: ${c.manual.trim()}. Verify with your CA.`, ca: ['MP8'] };
   const edu = ruleAt(EDU_EXEMPT_RULES, date);
   if (c.client?.mp?.school && edu.sacs.some((p) => s.startsWith(p))) return { regime: 'exempt66', rate: 0, decl: edu.decl, ca: ['MP7'] };
   const rcm = ruleAt(SECURITY_RCM_RULES, date);

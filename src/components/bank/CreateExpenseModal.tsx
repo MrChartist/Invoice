@@ -178,7 +178,7 @@ function PayBill({ line, onError, onChanged, onSettled, onClose }: PartProps) {
 
   return (
     <div className={styles.stack}>
-      <p className={styles.muted}>{bankT('refRecorded')} <strong>{referenceFor(line) || '—'}</strong>. {bankT('billsFirst')}</p>
+      <p className={styles.muted}>{bankT('refRecorded')} <strong>{referenceFor(line) || '-'}</strong>. {bankT('billsFirst')}</p>
       <div className={controls.field}>
         <label className={controls.label} htmlFor="pb-q">{bankT('searchBills')}</label>
         <input id="pb-q" className={controls.input} placeholder={bankT('searchBillsPh')} value={query} onChange={(e) => setQuery(e.target.value)} />

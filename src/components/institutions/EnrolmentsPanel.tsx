@@ -39,7 +39,7 @@ export function EnrolmentsPanel({ plan, notify, tick, refresh }: { plan: FeePlan
         const left = sessionsLeft(s, plan);
         return [s.name, s.roll_no, s.class_label, [s.guardian?.name, s.guardian?.phone].filter(Boolean).join(' · '),
           (enrolmentOf(s, plan.id)?.concessions ?? []).map((x) => `${x.reason} ${x.kind === 'pct' ? `${x.value}%` : `₹${x.value}`}`).join('; '),
-          left ? `${left.left} / ${left.total}` : '—',
+          left ? `${left.left} / ${left.total}` : '-',
           <>{left && <B sm l={iT('visit')} on={() => run(() => recordVisit(s.id!, plan.id, today(), left.total), iT('saved'))} />}<B g sm l={iT('remove')} on={() => run(() => unenrol(s.id!, plan.id))} /></>];
       })} />
     </div>

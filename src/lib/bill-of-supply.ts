@@ -25,7 +25,7 @@ export const COMPOSITION_CATEGORY_LABELS = {
   manufacturer: 'Manufacturer (other than notified goods)',
   trader: 'Trader (goods)',
   restaurant: 'Restaurant service (not serving alcohol)',
-  service: 'Service provider / mixed supplier — Sec 10(2A)',
+  service: 'Service provider / mixed supplier: Sec 10(2A)',
 } as const;
 
 export const EXEMPT_KIND_LABELS: Record<ExemptKind, string> = {
@@ -109,8 +109,8 @@ export function compositionWarnings(
       out.push({
         code: 'INTER_STATE_GOODS',
         message: service
-          ? `Place of supply (${pos}) is outside your state (${home}): a Sec 10(2A) composition dealer cannot make inter-state outward supplies (Sec 10(2A)(c)). Saving is allowed — check with your CA.`
-          : `Place of supply (${pos}) is outside your state (${home}): a composition dealer cannot make inter-state outward supplies of goods (Sec 10(2)(c)). Saving is allowed — check with your CA.`,
+          ? `Place of supply (${pos}) is outside your state (${home}): a Sec 10(2A) composition dealer cannot make inter-state outward supplies (Sec 10(2A)(c)). Saving is allowed: check with your CA.`
+          : `Place of supply (${pos}) is outside your state (${home}): a composition dealer cannot make inter-state outward supplies of goods (Sec 10(2)(c)). Saving is allowed: check with your CA.`,
       });
     }
     if (senderCompositionRate(sender, rec.issue_date) === null) {

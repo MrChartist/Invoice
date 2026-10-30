@@ -18,22 +18,22 @@ const table = (head: readonly string[], rows: readonly (readonly unknown[])[]) =
 
 /** Quality-cut rows (also on the voucher's statement page). */
 export const qualityRows = (q: readonly AgQualityReading[]): string[][] =>
-  q.map((r) => [r.label ?? r.key, `${r.reading}%`, `${r.norm}%`, `${r.cut_pct}%`, r.cut_kg ? `${r.cut_kg} kg` : r.cut_rs ? rs(r.cut_rs) : '—', r.reject ? 'Above reject line' : '']);
+  q.map((r) => [r.label ?? r.key, `${r.reading}%`, `${r.norm}%`, `${r.cut_pct}%`, r.cut_kg ? `${r.cut_kg} kg` : r.cut_rs ? rs(r.cut_rs) : '-', r.reject ? 'Above reject line' : '']);
 
 /** The farmer purchase voucher (FPV) as a print page. */
 export function voucherHtml(bill: PurchaseRecord, business: { name: string; address?: string; gstin?: string }, farmer?: { code?: string; village?: string }): string {
   const v = bill.ag?.voucher;
   const goods = bill.lines.filter((l) => !l.charge_head_id && Number(l.rate) > 0);
   const body = [
-    `<h1>${esc(business.name)} — Farmer purchase voucher</h1>`,
+    `<h1>${esc(business.name)}: Farmer purchase voucher</h1>`,
     `<p>${esc(business.address ?? '')}${business.gstin ? ` · GSTIN ${esc(business.gstin)}` : ''}</p>`,
     `<p><b>${esc(bill.bill_number)}</b> · ${esc(bill.date)} · Farmer: <b>${esc(bill.vendor_name)}</b>${farmer?.code ? ` (${esc(farmer.code)})` : ''}${farmer?.village ? `, ${esc(farmer.village)}` : ''}${v?.vehicle ? ` · Vehicle ${esc(v.vehicle)}` : ''}</p>`,
-    table(['Produce', 'Weighment', 'Accepted', 'Rate', 'Amount'], goods.map((l) => [l.name, weightText(l.wt) || '—', `${l.quantity} ${l.unit ?? ''}`, rs(l.rate), rs(Number(l.quantity) * Number(l.rate))])),
+    table(['Produce', 'Weighment', 'Accepted', 'Rate', 'Amount'], goods.map((l) => [l.name, weightText(l.wt) || '-', `${l.quantity} ${l.unit ?? ''}`, rs(l.rate), rs(Number(l.quantity) * Number(l.rate))])),
     v?.quality.length ? `<h1>Quality cuts</h1>${table(['Parameter', 'Reading', 'Norm', 'Cut', 'Cut amount', ''], qualityRows(v.quality))}<p>Weight cut ${esc(v.cut_kg)} kg · accepted ${esc(v.accepted_kg)} kg</p>` : '',
     v?.charges?.length ? table(['Charge', 'Paid by', 'Amount'], v.charges.map((c) => [c.name, c.by === 'us' ? 'Us (memo)' : 'Recovered from the farmer', rs(c.amount)])) : '',
     `<p><b>Total payable ${rs(bill.total)}</b></p>`,
     v?.declaration ? `<p>${esc(v.declaration)}</p>` : '',
-    '<p class="note">Farmer\'s signature / thumb impression: ____________ · Working paper — verify with your CA.</p>',
+    '<p class="note">Farmer\'s signature / thumb impression: ____________ · Working paper, verify with your CA.</p>',
   ];
   return page(bill.bill_number, body.join(''));
 }
@@ -42,7 +42,7 @@ export function voucherHtml(bill: PurchaseRecord, business: { name: string; addr
 export function slipHtml(c: FarmerCycle, l: FarmerCycleLine, business: string, code?: string, narrow = false): string {
   const ded = l.deductions.map((d) => [d.kind, d.note ?? '', rs(d.amount)]);
   const body = [
-    `<h1>${esc(business)} — Payment slip</h1>`,
+    `<h1>${esc(business)}: Payment slip</h1>`,
     `<p>${esc(c.number)} · ${esc(c.period_from)} to ${esc(c.period_to)}<br>${esc(l.name ?? '')}${code ? ` (${esc(code)})` : ''}</p>`,
     l.shifts?.length ? table(['Date', 'Shift', 'Qty', 'Fat', 'SNF', 'Amount'], l.shifts.map((s) => [s.date, s.shift, s.qty, s.fat ?? '', s.snf ?? '', rs(s.amount)])) : '',
     table(['', '', ''], [['Quantity', '', `${l.qty} ${l.unit}`], ['Amount', '', rs(l.amount)], ...(l.bonus ? [['Bonus', '', rs(l.bonus)]] : []), ...(l.carried ? [['Carried from last cycle', '', rs(l.carried)]] : []), ...ded.map((d) => [`Less: ${d[0]}`, d[1], d[2]])]),

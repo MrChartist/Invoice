@@ -269,7 +269,7 @@ export function kotRegister(orders: readonly TableOrder[], filter: RegisterFilte
       const qty = round2(k.lines.reduce((s, l) => s + num(l.qty), 0));
       reg.rows.push({ day: k.day, number: k.number, station: k.station, captain: k.by, where, kind: k.kind, items: k.lines.length, qty, ...(k.reason ? { reason: k.reason } : {}) });
       const st = (reg.byStation[k.station] ??= { kots: 0, qty: 0, cancels: 0 });
-      const cp = (reg.byCaptain[k.by || '—'] ??= { kots: 0, cancels: 0, cancelValue: 0 });
+      const cp = (reg.byCaptain[k.by || '-'] ??= { kots: 0, cancels: 0, cancelValue: 0 });
       if (k.kind === 'cancel') {
         st.cancels++;
         cp.cancels++;
@@ -294,7 +294,7 @@ export function kotRegister(orders: readonly TableOrder[], filter: RegisterFilte
         if (e.kind === 'cancel') {
           reg.totals.cancels++;
           reg.totals.cancelValue = round2(reg.totals.cancelValue + num(e.value));
-          const cp = (reg.byCaptain[e.by || '—'] ??= { kots: 0, cancels: 0, cancelValue: 0 });
+          const cp = (reg.byCaptain[e.by || '-'] ??= { kots: 0, cancels: 0, cancelValue: 0 });
           cp.cancelValue = round2(cp.cancelValue + num(e.value));
         } else if (e.kind === 'move' || e.kind === 'transfer' || e.kind === 'merge') reg.totals.moves++;
       }

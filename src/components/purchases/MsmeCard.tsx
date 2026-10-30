@@ -55,7 +55,7 @@ export function MsmeCard({ purchases, vendors, payments, today }: MsmeCardProps)
                     {b.daysOverdue > 0 && <span className={`${surface.badge} ${surface.badgeOverdue}`}>{purT('msmeLate', { n: b.daysOverdue })}</span>}
                   </td>
                   <td className={surface.numeric}>{formatCurrency(b.unpaid)}</td>
-                  <td className={surface.numeric}>{b.interest > 0 ? formatCurrency(b.interest) : '—'}</td>
+                  <td className={surface.numeric}>{b.interest > 0 ? formatCurrency(b.interest) : '-'}</td>
                 </tr>
               ))}
             </tbody>

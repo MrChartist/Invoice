@@ -46,7 +46,7 @@ export function TripsPanel({ notify, refresh, tick }: PanelProps) {
         <div className={styles.box}>
           <div className={styles.grid}>
             <F l={twT('vehicle')}>
-              <select className={controls.select} value={f.vehicle} onChange={(e) => setF({ ...f, vehicle: e.target.value })}><option value="">—</option>{vehicles.map((v) => <option key={v.id} value={v.id}>{v.reg_no}{v.own ? '' : ` (${twT('hired')})`}</option>)}</select></F>
+              <select className={controls.select} value={f.vehicle} onChange={(e) => setF({ ...f, vehicle: e.target.value })}><option value="">-</option>{vehicles.map((v) => <option key={v.id} value={v.id}>{v.reg_no}{v.own ? '' : ` (${twT('hired')})`}</option>)}</select></F>
             <F l={twT('driver')}><input className={controls.input} value={f.driver} onChange={(e) => setF({ ...f, driver: e.target.value })} /></F>
             <F l={twT('startDate')}><input className={controls.input} type="date" value={f.start} onChange={(e) => setF({ ...f, start: e.target.value })} /></F>
             <F l={twT('startKm')}><input className={controls.input} type="number" value={f.km} onChange={(e) => setF({ ...f, km: e.target.value })} /></F>
@@ -85,10 +85,10 @@ export function TripsPanel({ notify, refresh, tick }: PanelProps) {
               {pnl.map((p) => (
                 <tr key={p.trip.id}>
                   <td><button type="button" className={B.gs} onClick={() => setOpen(p.trip.id)}>{p.trip.number}</button></td>
-                  <td>{p.vehicle?.reg_no ?? '—'}</td><td>{p.trip.start_date}</td><td>{twT(`ts.${p.trip.status}`)}</td>
+                  <td>{p.vehicle?.reg_no ?? '-'}</td><td>{p.trip.start_date}</td><td>{twT(`ts.${p.trip.status}`)}</td>
                   <td className={surface.numeric}>{fmtMoney(p.freight)}</td><td className={surface.numeric}>{fmtMoney(p.expenses)}</td><td className={surface.numeric}>{fmtMoney(p.hire)}</td>
                   <td className={`${surface.numeric} ${p.margin < 0 ? styles.bad : styles.good}`}>{fmtMoney(p.margin)}</td>
-                  <td className={p.mileageFlag ? styles.bad : undefined}>{p.kmpl ?? '—'}{p.mileageFlag ? ` (${twT(`mileage.${p.mileageFlag}`)})` : ''}</td>
+                  <td className={p.mileageFlag ? styles.bad : undefined}>{p.kmpl ?? '-'}{p.mileageFlag ? ` (${twT(`mileage.${p.mileageFlag}`)})` : ''}</td>
                 </tr>
               ))}
             </tbody>

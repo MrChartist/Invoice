@@ -155,11 +155,11 @@ export const incentiveClaimsDb = {
     const prev = input.id ? rows.find((r) => r.id === input.id) : undefined;
     if (prev) assertUnlocked({ issue_date: prev.period_to }, 'edit');
     assertUnlocked({ issue_date: input.period_to }, prev ? 'edit' : 'create');
-    if (prev?.recognised_on && (input.kind !== prev.kind || round2(num(input.approved) || num(input.claimed)) !== round2(num(prev.approved) || num(prev.claimed)))) throw new Error('This claim is recognised in the books — its amount and kind can no longer change.');
+    if (prev?.recognised_on && (input.kind !== prev.kind || round2(num(input.approved) || num(input.claimed)) !== round2(num(prev.approved) || num(prev.claimed)))) throw new Error('This claim is recognised in the books: its amount and kind can no longer change.');
     // The asset ledger applies to a capital grant only; it must be a fixed-asset ledger.
     const asset = input.kind === 'capital' ? input.asset_account_id || undefined : undefined;
     if (asset && !grantAssetLedgers().some((a) => a.id === asset)) throw new Error('Pick a fixed-asset ledger for the capital grant.');
-    if (prev?.recognised_on && asset !== (prev.asset_account_id || undefined)) throw new Error('This claim is recognised in the books — its asset ledger can no longer change.');
+    if (prev?.recognised_on && asset !== (prev.asset_account_id || undefined)) throw new Error('This claim is recognised in the books: its asset ledger can no longer change.');
     const now = new Date().toISOString();
     const row: IncentiveClaim = {
       ...prev, ...input, asset_account_id: asset, id: prev?.id ?? generateId(), claimed: round2(num(input.claimed)),
@@ -177,7 +177,7 @@ export const incentiveClaimsDb = {
     const rows = incentiveClaimsDb.all();
     const row = rows.find((r) => r.id === id);
     if (!row) return;
-    if (row.voucher_ids.length) throw new Error('Journals are posted for this claim — it can no longer be deleted.');
+    if (row.voucher_ids.length) throw new Error('Journals are posted for this claim: it can no longer be deleted.');
     assertUnlocked({ issue_date: row.period_to }, 'delete');
     setTable(INCENTIVE_CLAIMS_TABLE, rows.filter((r) => r.id !== id));
   },
@@ -204,7 +204,7 @@ export function recogniseClaim(id: string, date: string): IncentiveClaim {
     const credit = row.kind === 'income' ? ensureGrantLedger('income') : row.asset_account_id || ensureGrantLedger('capital');
     const v = saveVoucher({
       type: 'JOURNAL', date, voucher_class: GRANT_CLASS,
-      narration: `${row.name} — grant recognised on reasonable assurance (Ind AS 20 / AS 12); verify with your CA (MF19)`,
+      narration: `${row.name}: grant recognised on reasonable assurance (Ind AS 20 / AS 12); verify with your CA (MF19)`,
       lines: recognitionLines(amount, { receivable: ensureGrantLedger('receivable'), credit }),
     });
     return update(id, (r) => ({ ...r, recognised_on: date, recognised: amount, voucher_ids: [...r.voucher_ids, v.id] }));
@@ -218,10 +218,10 @@ export function receiveClaim(id: string, amount: number, date: string): Incentiv
   return withTablesRollback(TABLES, () => {
     const row = incentiveClaimsDb.all().find((r) => r.id === id);
     if (!row) throw new Error('Claim not found.');
-    if (!row.recognised_on) throw new Error('Record reasonable assurance first (money received is itself assurance — use the same date).');
+    if (!row.recognised_on) throw new Error('Record reasonable assurance first (money received is itself assurance: use the same date).');
     const f = claimFigures(row, date);
     if (round2(f.received + amount) > f.recognised + 0.005) throw new Error('More than the amount recognised.');
-    const v = saveVoucher({ type: 'RECEIPT', date, voucher_class: GRANT_CLASS, narration: `${row.name} — grant received`, lines: receiptLines(amount, { receivable: ensureGrantLedger('receivable'), bank: A.bank }) });
+    const v = saveVoucher({ type: 'RECEIPT', date, voucher_class: GRANT_CLASS, narration: `${row.name}: grant received`, lines: receiptLines(amount, { receivable: ensureGrantLedger('receivable'), bank: A.bank }) });
     return update(id, (r) => ({ ...r, received: round2(num(r.received) + amount), received_on: date, voucher_ids: [...r.voucher_ids, v.id] }));
   });
 }

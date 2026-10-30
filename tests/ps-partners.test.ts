@@ -44,7 +44,7 @@ test('shares must total 100 % on every date; more than 100 is refused on save', 
 test('capital and current ledgers are created under Capital; drawings post Dr current / Cr cash', () => {
   const p = partner('Asha', 100);
   const chart = chartOf(loadUserAccounts());
-  assert.equal(chart.find((a) => a.id === p.capital_account_id)?.name, 'Capital — Asha');
+  assert.equal(chart.find((a) => a.id === p.capital_account_id)?.name, 'Capital: Asha');
   assert.equal(chart.find((a) => a.id === p.current_account_id)?.group, 'CAPITAL');
   const v = postDrawings(p.id, 25000, '2025-06-10', A.cash);
   assert.equal(v.voucher_class, 'Partner drawings');

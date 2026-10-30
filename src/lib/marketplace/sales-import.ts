@@ -253,7 +253,7 @@ const docTypeFor = (r: SalesRow): DocumentType => (r.kind === 'return' ? 'CREDIT
 
 const SUMMARY_PREFIX = 'SUMMARY:';
 const summaryKey = (day: string, pos: string, rate: number) => `${SUMMARY_PREFIX}${day}:${pos}:${rate}`;
-const summaryNote = (channelName: string, ids: readonly string[]) => `Marketplace summary (${channelName}): ${ids.length} orders — ${ids.join(', ')}`;
+const summaryNote = (channelName: string, ids: readonly string[]) => `Marketplace summary (${channelName}): ${ids.length} orders, ${ids.join(', ')}`;
 
 /**
  * The order ids a stored summary document covers (QA6 F2): `channel_order_ids`, else read back from the summary note
@@ -261,7 +261,7 @@ const summaryNote = (channelName: string, ids: readonly string[]) => `Marketplac
  */
 export function summaryOrderIds(doc: Pick<InvoiceRecord, 'channel_order_ids' | 'notes'>): string[] | null {
   if (Array.isArray(doc.channel_order_ids) && doc.channel_order_ids.length) return doc.channel_order_ids;
-  const m = /^Marketplace summary \(.*\): (\d+) orders — (.+)$/.exec(doc.notes ?? '');
+  const m = /^Marketplace summary \(.*\): (\d+) orders(?: —|:) (.+)$/.exec(doc.notes ?? '');
   if (!m) return null;
   const ids = m[2].split(', ').map((x) => x.trim()).filter(Boolean);
   return ids.length === Number(m[1]) ? ids : null;
@@ -317,11 +317,11 @@ export function planSalesImport(table: FileTable, cols: ColumnMap, presetId: str
   for (const r of rows) {
     if (r.kind === 'cancel') {
       cancelled++;
-      skipped.push({ line: r.line, message: `Order ${r.order_id || '?'} cancelled before invoicing — skipped.` });
+      skipped.push({ line: r.line, message: `Order ${r.order_id || '?'} cancelled before invoicing: skipped.` });
       continue;
     }
     if (r.kind === 'skip' || (r.taxable === 0 && r.total === 0)) {
-      skipped.push({ line: r.line, message: `Order ${r.order_id || '?'}: no value (free replacement / zero row) — skipped.` });
+      skipped.push({ line: r.line, message: `Order ${r.order_id || '?'}: no value (free replacement / zero row), skipped.` });
       continue;
     }
     if (!r.order_id) {
@@ -336,7 +336,7 @@ export function planSalesImport(table: FileTable, cols: ColumnMap, presetId: str
     if (!to || r.date > to) to = r.date;
     const type = docTypeFor(r);
     const number = r.invoice_no || `${preset.prefix}${r.kind === 'return' ? '-CN' : ''}/${r.order_id}`;
-    if (!r.invoice_no) warnings.push({ line: r.line, message: `Order ${r.order_id}: the file has no ${r.kind === 'return' ? 'credit note' : 'invoice'} number — recorded as ${number} (verify with your CA).` });
+    if (!r.invoice_no) warnings.push({ line: r.line, message: `Order ${r.order_id}: the file has no ${r.kind === 'return' ? 'credit note' : 'invoice'} number, recorded as ${number} (verify with your CA).` });
     const k = docKey(channel.id, r.order_id, type, number);
     if (existing.has(k)) {
       already++;
@@ -354,7 +354,7 @@ export function planSalesImport(table: FileTable, cols: ColumnMap, presetId: str
         const pos = stateOf(r.ship_to)?.code ?? senderStateCode(profileFor(ctx.settings, stateOf(r.ship_from)?.code ?? ''));
         const covering = summaryRanges.get(summaryKey(r.date, pos, r.tax_rate));
         if (covering) {
-          errors.push({ line: r.line, message: `Order ${r.order_id}: summary document ${covering} already covers ${r.date} · state ${pos || '?'} · GST ${r.tax_rate}% and its order list cannot be read — refused so the sale is not booked twice. Undo that import to re-import per order.` });
+          errors.push({ line: r.line, message: `Order ${r.order_id}: summary document ${covering} already covers ${r.date} · state ${pos || '?'} · GST ${r.tax_rate}% and its order list cannot be read, refused so the sale is not booked twice. Undo that import to re-import per order.` });
           continue;
         }
       }
@@ -375,7 +375,7 @@ export function planSalesImport(table: FileTable, cols: ColumnMap, presetId: str
     g.rows.push(r);
     if (ctx.isLocked(r.date)) {
       g.bad = true;
-      errors.push({ line: r.line, message: `Order ${r.order_id}: ${r.date} is inside the period lock — refused.` });
+      errors.push({ line: r.line, message: `Order ${r.order_id}: ${r.date} is inside the period lock, refused.` });
     }
     const hit = lookupSku(ctx.skuMap, channel.id, { sku: r.sku, listingId: r.listing_id }, ctx.catalogue);
     if (!hit || !catalogueById.has(hit.item_id)) {
@@ -385,7 +385,7 @@ export function planSalesImport(table: FileTable, cols: ColumnMap, presetId: str
     } else {
       const item = catalogueById.get(hit.item_id)!;
       if (item.tax_rate !== undefined && item.tax_rate !== null && Number(item.tax_rate) !== r.tax_rate) {
-        warnings.push({ line: r.line, message: `${item.name}: file GST ${r.tax_rate}% vs item ${Number(item.tax_rate)}% — check the HSN rate.` });
+        warnings.push({ line: r.line, message: `${item.name}: file GST ${r.tax_rate}% vs item ${Number(item.tax_rate)}%, check the HSN rate.` });
       }
     }
   }
@@ -410,7 +410,7 @@ export function planSalesImport(table: FileTable, cols: ColumnMap, presetId: str
     const stateName = stateByCode(pos)?.name ?? pos;
     const client: Client = isB2B
       ? { name: first.buyer_name || first.buyer_gstin, email: '', address: '', city: '', zip: '', gstin: first.buyer_gstin, state_code: first.buyer_gstin.slice(0, 2), state: stateByCode(first.buyer_gstin.slice(0, 2))?.name ?? '' }
-      : { name: `${channel.name} customer — ${stateName}`, email: '', address: '', city: '', zip: '', state_code: pos, state: stateName };
+      : { name: `${channel.name} customer: ${stateName}`, email: '', address: '', city: '', zip: '', state_code: pos, state: stateName };
     const damaged = g.type === 'CREDIT_NOTE' && g.rows.some((r) => r.damaged);
     const godown = g.type === 'CREDIT_NOTE' && damaged ? channel.damaged_godown_id || channel.godown_id : channel.godown_id;
     const items: InvoiceItem[] = g.rows.map((r, idx) => {
@@ -467,7 +467,7 @@ export function planSalesImport(table: FileTable, cols: ColumnMap, presetId: str
       const planned = plannedSaleByOrder.get(o);
       if (stored) doc.originalId = stored;
       else if (planned) doc.originalKey = planned;
-      else warnings.push({ line: first.line, message: `Order ${first.order_id}: the original invoice is not in the books — the credit note is saved on its own.` });
+      else warnings.push({ line: first.line, message: `Order ${first.order_id}: the original invoice is not in the books, the credit note is saved on its own.` });
     }
     docs.push(doc);
   }
@@ -611,7 +611,7 @@ export function undoSalesImport(importId: string, reason = 'Marketplace import u
   if (row.undone_at) throw new SalesImportError('This import was already undone.');
   const docs = (row.doc_ids ?? []).map((id) => localDb.invoices.getById(id)).filter((d): d is InvoiceRecord => !!d && d.status !== 'Cancelled');
   const paid = docs.find((d) => localDb.payments.listFor(d.id).length > 0);
-  if (paid) throw new SalesImportError(`${paid.invoice_number} has a payment recorded — unpost the settlement or remove the payment first.`);
+  if (paid) throw new SalesImportError(`${paid.invoice_number} has a payment recorded: unpost the settlement or remove the payment first.`);
   return withTablesRollback(['invoices', 'transactions', 'doc_links', MARKETPLACE_IMPORTS_TABLE, MARKETPLACE_RETURNS_TABLE], () => {
     const order = [...docs.filter((d) => d.doc_type === 'CREDIT_NOTE'), ...docs.filter((d) => d.doc_type !== 'CREDIT_NOTE')];
     for (const d of order) cancelDocument(localDb.invoices.getById(d.id) ?? d, reason, { acknowledgeStock: true });

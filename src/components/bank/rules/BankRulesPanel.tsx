@@ -164,7 +164,7 @@ function RuleForm({ initial, onClose, onSaved }: { initial: RuleDraft; onClose: 
           {(a.kind === 'voucher' || a.kind === 'contra') && (
             <label className={controls.field}><span className={controls.label}>{a.kind === 'contra' ? capT('otherAccount') : capT('ledger')}</span>
               <select className={controls.select} value={a.ledger_id ?? ''} onChange={(e) => setA({ ledger_id: e.target.value })}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {ledgers.map((x) => <option key={x.id} value={x.id}>{x.code} · {x.name}</option>)}
               </select>
             </label>
@@ -172,7 +172,7 @@ function RuleForm({ initial, onClose, onSaved }: { initial: RuleDraft; onClose: 
           {(a.kind === 'expense' || a.kind === 'voucher') && (
             <label className={controls.field}><span className={controls.label}>{capT('supplier')}</span>
               <select className={controls.select} value={a.vendor_id ?? ''} onChange={(e) => { const v = vendors.find((x) => x.id === e.target.value); setA({ vendor_id: v?.id, vendor_name: v?.name }); }}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
             </label>
@@ -180,7 +180,7 @@ function RuleForm({ initial, onClose, onSaved }: { initial: RuleDraft; onClose: 
           {a.kind === 'receipt' && (
             <label className={controls.field}><span className={controls.label}>{capT('customer')}</span>
               <select className={controls.select} value={a.client_id ?? ''} onChange={(e) => setA({ client_id: e.target.value })}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </label>

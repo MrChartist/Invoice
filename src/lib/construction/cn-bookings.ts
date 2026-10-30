@@ -165,7 +165,7 @@ export function recordReceipt(bookingId: string, r: ReceiptInput): { advance: Ad
   const advance = saveAdvance({
     date: r.date, client: client ? { ...client, name: client.name } : { name: b.client_name }, place_of_supply: project?.state_code || '', supply: 'services',
     tax_rate: r.passThrough ? 0 : receiptRate(b, project, r.date), amount: r.amount, method: r.method, reference: r.reference, bankAccountId: r.bankAccountId,
-    description: `${r.passThrough ? 'Pass-through collection (pure agent)' : 'Advance towards'} ${unit?.unit_no ?? ''} — booking ${b.number}`.trim(),
+    description: `${r.passThrough ? 'Pass-through collection (pure agent)' : 'Advance towards'} ${unit?.unit_no ?? ''}: booking ${b.number}`.trim(),
     ...(r.payer?.trim() ? { note: `Paid by ${r.payer.trim()}` } : {}),
     booking: { booking_id: b.id, ...(r.passThrough ? { pass_through: true } : {}) },
   });

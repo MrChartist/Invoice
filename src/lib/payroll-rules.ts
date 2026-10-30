@@ -476,7 +476,7 @@ export const PF_LATE_RULES: readonly Versioned<PfLateRule>[] = [
   {
     from: '2008-09-26',
     value: { due_day: 15, interest_pct: 12, damages: [{ up_to_months: 2, pct: 5 }, { up_to_months: 4, pct: 10 }, { up_to_months: 6, pct: 15 }, { up_to_months: null, pct: 25 }] },
-    source: 'EPF Scheme para 32A — estimate only; UNVERIFIED, EPFO levies damages by order',
+    source: 'EPF Scheme para 32A: estimate only; UNVERIFIED, EPFO levies damages by order',
   },
 ];
 
@@ -519,10 +519,10 @@ const NEW_2020: RegimeRule = {
  * Form 10E figures must be checked against the employee's returns of those years.
  */
 export const TDS_SALARY_EARLIER_RULES: readonly Versioned<{ new: RegimeRule; old: RegimeRule }>[] = [
-  { from: '2017-04-01', value: { old: OLD_2017, new: OLD_2017 }, source: 'Finance Act 2017 (87A ₹2,500 up to ₹3.5 lakh; cess 3%) — UNVERIFIED' },
-  { from: '2018-04-01', value: { old: OLD_2018, new: OLD_2018 }, source: 'Finance Act 2018 (standard deduction ₹40,000; cess 4%) — UNVERIFIED' },
-  { from: '2019-04-01', value: { old: OLD_2019, new: OLD_2019 }, source: 'Finance (No. 2) Act 2019 (₹50,000; 87A ₹12,500 up to ₹5 lakh) — UNVERIFIED' },
-  { from: '2020-04-01', value: { old: OLD_2019, new: NEW_2020 }, source: 'Finance Act 2020 (s. 115BAC optional regime) — UNVERIFIED' },
+  { from: '2017-04-01', value: { old: OLD_2017, new: OLD_2017 }, source: 'Finance Act 2017 (87A ₹2,500 up to ₹3.5 lakh; cess 3%): UNVERIFIED' },
+  { from: '2018-04-01', value: { old: OLD_2018, new: OLD_2018 }, source: 'Finance Act 2018 (standard deduction ₹40,000; cess 4%): UNVERIFIED' },
+  { from: '2019-04-01', value: { old: OLD_2019, new: OLD_2019 }, source: 'Finance (No. 2) Act 2019 (₹50,000; 87A ₹12,500 up to ₹5 lakh): UNVERIFIED' },
+  { from: '2020-04-01', value: { old: OLD_2019, new: NEW_2020 }, source: 'Finance Act 2020 (s. 115BAC optional regime): UNVERIFIED' },
 ];
 
 /** Rates for any FY start (`YYYY-04-01`), reaching into the earlier table before FY 2023-24. */
@@ -552,7 +552,7 @@ export interface CarPerqRule {
 /** Rule 3(2) Table II — motor car owned / hired by the employer, used partly for private purposes. */
 export const CAR_PERQ_RULES: readonly Versioned<CarPerqRule>[] = [
   { from: '2008-04-01', value: { small_cc: 1600, employer_small: 1800, employer_large: 2400, employee_small: 600, employee_large: 900, chauffeur: 900 }, source: 'Rule 3(2) Table II (₹1,800 / ₹2,400, chauffeur ₹900)' },
-  { from: '2025-04-01', value: { small_cc: 1600, employer_small: 8000, employer_large: 10000, employee_small: 3000, employee_large: 4000, chauffeur: 3000 }, source: 'Income-tax amendment rules 2025 (₹8,000 / ₹10,000, chauffeur ₹3,000) — UNVERIFIED: confirm the notification and its effective date' },
+  { from: '2025-04-01', value: { small_cc: 1600, employer_small: 8000, employer_large: 10000, employee_small: 3000, employee_large: 4000, chauffeur: 3000 }, source: 'Income-tax amendment rules 2025 (₹8,000 / ₹10,000, chauffeur ₹3,000), UNVERIFIED: confirm the notification and its effective date' },
 ];
 
 export function carPerqRule(date: string): CarPerqRule {
@@ -573,7 +573,7 @@ export interface AccommodationPerqRule {
 /** Rule 3(1) Table I — accommodation provided by a private-sector employer. */
 export const ACCOMMODATION_PERQ_RULES: readonly Versioned<AccommodationPerqRule>[] = [
   { from: '2001-04-01', value: { owned: [{ min_population: 2500000, pct: 15 }, { min_population: 1000000, pct: 10 }, { min_population: 0, pct: 7.5 }], census: '2001', leased_pct: 15, furniture_pct: 10 }, source: 'Rule 3(1) Table I (15% / 10% / 7.5%, 2001 census)' },
-  { from: '2023-09-01', value: { owned: [{ min_population: 4000000, pct: 10 }, { min_population: 1500000, pct: 7.5 }, { min_population: 0, pct: 5 }], census: '2011', leased_pct: 15, furniture_pct: 10 }, source: 'Notification 65/2023 (10% / 7.5% / 5%, 2011 census); leased 15% kept — UNVERIFIED' },
+  { from: '2023-09-01', value: { owned: [{ min_population: 4000000, pct: 10 }, { min_population: 1500000, pct: 7.5 }, { min_population: 0, pct: 5 }], census: '2011', leased_pct: 15, furniture_pct: 10 }, source: 'Notification 65/2023 (10% / 7.5% / 5%, 2011 census); leased 15% kept: UNVERIFIED' },
 ];
 
 export function accommodationPerqRule(date: string): AccommodationPerqRule {
@@ -582,7 +582,7 @@ export function accommodationPerqRule(date: string): AccommodationPerqRule {
 
 /** Rule 3(7)(iii) free meals (per meal exempt) and 3(7)(iv) gifts (aggregate a year below which exempt). */
 export const MEAL_GIFT_PERQ_RULES: readonly Versioned<{ meal_exempt: number; gift_exempt_below: number }>[] = [
-  { from: '2001-04-01', value: { meal_exempt: 50, gift_exempt_below: 5000 }, source: 'Rule 3(7)(iii) ₹50 a meal; 3(7)(iv) gifts below ₹5,000 a year — the whole value taxable at ₹5,000 or more (UNVERIFIED reading)' },
+  { from: '2001-04-01', value: { meal_exempt: 50, gift_exempt_below: 5000 }, source: 'Rule 3(7)(iii) ₹50 a meal; 3(7)(iv) gifts below ₹5,000 a year: the whole value taxable at ₹5,000 or more (UNVERIFIED reading)' },
 ];
 
 export function mealGiftRule(date: string): { meal_exempt: number; gift_exempt_below: number } {
@@ -613,13 +613,13 @@ export function s17viiLimit(fyStart: string): number | null {
  * Read from a secondary reproduction of the notification, not the Gazette text — UNVERIFIED.
  */
 export const S17_2_VIIA_RULES: readonly Versioned<{ first_fy: string }>[] = [
-  { from: '2020-04-01', value: { first_fy: '2020-04-01' }, verified: false, source: 'Income-tax Rules 1962, Rule 3B (Notification 11/2021, 5 Mar 2021; from secondary text) — UNVERIFIED' },
-  { from: '2026-04-01', value: { first_fy: '2020-04-01' }, verified: false, source: 'Income-tax Rules 2026, Rule 16 (accretion rule under the 2025 Act; same formula per secondary sources) — UNVERIFIED' },
+  { from: '2020-04-01', value: { first_fy: '2020-04-01' }, verified: false, source: 'Income-tax Rules 1962, Rule 3B (Notification 11/2021, 5 Mar 2021; from secondary text): UNVERIFIED' },
+  { from: '2026-04-01', value: { first_fy: '2020-04-01' }, verified: false, source: 'Income-tax Rules 2026, Rule 16 (accretion rule under the 2025 Act; same formula per secondary sources): UNVERIFIED' },
 ];
 
 /** Rule 3(1) Table I: hotel accommodation — the lower of `pct`% of salary and the charges; nil on transfer within `free_days`. */
 export const HOTEL_PERQ_RULES: readonly Versioned<{ pct: number; free_days: number }>[] = [
-  { from: '2001-04-01', value: { pct: 24, free_days: 15 }, verified: false, source: 'Income-tax Rules 1962, Rule 3(1) Table I (hotel: 24% of salary or charges, lower; nil on transfer for 15 days or less) — UNVERIFIED; 2026 Rules not checked' },
+  { from: '2001-04-01', value: { pct: 24, free_days: 15 }, verified: false, source: 'Income-tax Rules 1962, Rule 3(1) Table I (hotel: 24% of salary or charges, lower; nil on transfer for 15 days or less), UNVERIFIED; 2026 Rules not checked' },
 ];
 
 /* ── ESI: employee share not deducted on low daily wages ─────────────── */
@@ -629,9 +629,9 @@ export const HOTEL_PERQ_RULES: readonly Versioned<{ pct: number; free_days: numb
  * still pays its share. UNVERIFIED dates of the ₹137 / ₹176 revisions — confirm with your CA.
  */
 export const ESI_LOW_WAGE_RULES: readonly Versioned<{ daily_limit: number }>[] = [
-  { from: '2010-05-01', value: { daily_limit: 100 }, source: 'ESI (Central) Rules r. 51 — ₹100 a day (UNVERIFIED)' },
-  { from: '2017-01-01', value: { daily_limit: 137 }, source: 'ESI (Central) Amendment — ₹137 a day (UNVERIFIED date)' },
-  { from: '2019-01-01', value: { daily_limit: 176 }, source: 'ESI (Central) Amendment — ₹176 a day (UNVERIFIED date)' },
+  { from: '2010-05-01', value: { daily_limit: 100 }, source: 'ESI (Central) Rules r. 51: ₹100 a day (UNVERIFIED)' },
+  { from: '2017-01-01', value: { daily_limit: 137 }, source: 'ESI (Central) Amendment: ₹137 a day (UNVERIFIED date)' },
+  { from: '2019-01-01', value: { daily_limit: 176 }, source: 'ESI (Central) Amendment: ₹176 a day (UNVERIFIED date)' },
 ];
 
 export function esiLowWageLimit(date: string): number {
@@ -652,7 +652,7 @@ export interface Tds201Rule {
 }
 
 export const TDS_201_RULES: readonly Versioned<Tds201Rule>[] = [
-  { from: '2010-07-01', value: { late_deduction_pct: 1, late_deposit_pct: 1.5, due_day: 7, march_due_day: 30 }, source: 's. 201(1A) (Finance Act 2010: 1.5% a month for late deposit); Rule 30(2). Calendar-month counting as TRACES does — UNVERIFIED' },
+  { from: '2010-07-01', value: { late_deduction_pct: 1, late_deposit_pct: 1.5, due_day: 7, march_due_day: 30 }, source: 's. 201(1A) (Finance Act 2010: 1.5% a month for late deposit); Rule 30(2). Calendar-month counting as TRACES does: UNVERIFIED' },
 ];
 
 export function tds201Rule(date: string): Tds201Rule {

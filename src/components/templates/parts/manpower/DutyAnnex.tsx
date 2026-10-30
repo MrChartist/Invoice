@@ -16,7 +16,7 @@ export default function DutyAnnex({ mp }: { mp: MpSnapshot }) {
           <tbody>{mp.annex.map((r, i) => <tr key={i}><td>{r.name}</td><td>{r.code}</td><td>{r.post ?? ''}</td><td>{r.duties}</td><td>{r.ot ?? ''}</td></tr>)}</tbody>
         </table>
       )}
-      {mp.tds_print && mp.tds && <p className={styles.decl} data-manpower-tds>TDS expected: ₹{formatMoney(mp.tds.expected)} ({mp.tds.rate} %, {mp.tds.label ?? mp.tds.section}) — verify with your CA.</p>}
+      {mp.tds_print && mp.tds && <p className={styles.decl} data-manpower-tds>TDS expected: ₹{formatMoney(mp.tds.expected)} ({mp.tds.rate} %, {mp.tds.label ?? mp.tds.section}): verify with your CA.</p>}
     </>
   );
 }

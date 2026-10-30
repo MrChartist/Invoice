@@ -51,7 +51,7 @@ export type DisbKind = 'court_fee' | 'stamp' | 'govt_fee' | 'filing' | 'notary' 
 
 /** Kinds paid on the client's behalf by default (pure agent, no GST, no ITC); the rest are part of the fee (PS3). */
 export const DISB_DEFAULTS: readonly PsRule<{ on_behalf: readonly DisbKind[] }>[] = [
-  { from: '2017-07-01', value: { on_behalf: ['court_fee', 'stamp', 'govt_fee', 'filing'] }, source: 'Rule 33 CGST Rules (pure agent) — practice default', verified: false },
+  { from: '2017-07-01', value: { on_behalf: ['court_fee', 'stamp', 'govt_fee', 'filing'] }, source: 'Rule 33 CGST Rules (pure agent): practice default', verified: false },
 ];
 
 /* B2 legal services ────────────────────────────────────────── */
@@ -82,7 +82,7 @@ export const DESIGN_STAGE_EXAMPLE: readonly PsRule<readonly { id: string; label:
       { id: 's4', label: 'Construction stage', cum_pct: 75 },
       { id: 's5', label: 'Completion', cum_pct: 100 },
     ],
-    source: 'Example only — not a rule (PS30)',
+    source: 'Example only: not a rule (PS30)',
     verified: false,
   },
 ];
@@ -109,7 +109,7 @@ export const MEDIA_RULES: readonly PsRule<MediaRule>[] = [
  */
 export const INTERMEDIARY_POS_RULES: readonly PsRule<'supplier' | 'recipient'>[] = [
   { from: '2017-07-01', value: 'supplier', source: 'Sec 13(8)(b) IGST Act', verified: true },
-  { from: '2026-03-30', value: 'recipient', source: 'Sec 157 Finance Act 2026 (Sec 13(8)(b) omitted) — verify the date (PS4)', verified: false },
+  { from: '2026-03-30', value: 'recipient', source: 'Sec 157 Finance Act 2026 (Sec 13(8)(b) omitted): verify the date (PS4)', verified: false },
 ];
 export const intermediaryPos = (date?: string) => ruleAt(INTERMEDIARY_POS_RULES, date);
 
@@ -123,8 +123,8 @@ export interface EdfRule {
   smallValue: number;
 }
 export const EDF_RULES: readonly PsRule<EdfRule | null>[] = [
-  { from: '2000-01-01', value: null, source: 'SOFTEX (FEMA 23(R)/2015-RB) — history only', verified: true },
-  { from: '2026-10-01', value: { days: 30, byReceipt: true, smallValue: 1000000 }, source: 'FEMA 23(R)/2026-RB Reg 3(2), 4(2) — verify (PS16)', verified: false },
+  { from: '2000-01-01', value: null, source: 'SOFTEX (FEMA 23(R)/2015-RB): history only', verified: true },
+  { from: '2026-10-01', value: { days: 30, byReceipt: true, smallValue: 1000000 }, source: 'FEMA 23(R)/2026-RB Reg 3(2), 4(2): verify (PS16)', verified: false },
 ];
 export const edfRule = (date?: string) => ruleAt(EDF_RULES, date);
 
@@ -141,7 +141,7 @@ export const REGISTRATION_THRESHOLD_RULES: readonly PsRule<ThresholdRule>[] = [
   {
     from: '2017-07-01',
     value: { limit: 2000000, special: 1000000, specialStates: ['13', '14', '15', '16'], warnPct: 80 },
-    source: 'Sec 22 CGST Act (₹20 lakh; ₹10 lakh in Nagaland, Manipur, Mizoram, Tripura); N 10/2017-IT — verify (PS13)',
+    source: 'Sec 22 CGST Act (₹20 lakh; ₹10 lakh in Nagaland, Manipur, Mizoram, Tripura); N 10/2017-IT: verify (PS13)',
     verified: false,
   },
 ];
@@ -162,7 +162,7 @@ export const PURPOSE_CODE_EXAMPLES: readonly PsRule<readonly (readonly [code: st
       ['P1009', 'Architectural services'],
       ['P1019', 'Engineering services'],
     ],
-    source: 'RBI purpose codes for services — an example list, the bank decides (PS39)',
+    source: 'RBI purpose codes for services: an example list, the bank decides (PS39)',
     verified: false,
   },
 ];
@@ -190,14 +190,14 @@ export interface RemunerationLimit { floor: number; slab: number; firstPct: numb
 
 export const PARTNER_REMUNERATION_RULES: readonly PsRule<RemunerationLimit>[] = [
   { from: '2009-04-01', value: { floor: 150000, slab: 300000, firstPct: 90, restPct: 60 }, source: 'Sec 40(b)(v) as amended by Finance (No. 2) Act 2009 (AY 2010-11)', verified: true },
-  { from: '2024-04-01', value: { floor: 300000, slab: 600000, firstPct: 90, restPct: 60 }, source: 'Finance (No. 2) Act 2024 (AY 2025-26) — taxadda, taxmann', verified: true },
-  { from: '2026-04-01', value: { floor: 300000, slab: 600000, firstPct: 90, restPct: 60 }, source: 'Income-tax Act 2025 Sec 35(e) as reported (PS20) — verify', verified: false },
+  { from: '2024-04-01', value: { floor: 300000, slab: 600000, firstPct: 90, restPct: 60 }, source: 'Finance (No. 2) Act 2024 (AY 2025-26): taxadda, taxmann', verified: true },
+  { from: '2026-04-01', value: { floor: 300000, slab: 600000, firstPct: 90, restPct: 60 }, source: 'Income-tax Act 2025 Sec 35(e) as reported (PS20): verify', verified: false },
 ];
 
 /** Interest on partners' capital allowed under Sec 40(b)(iv), % a year simple. */
 export const PARTNER_INTEREST_CAP_RULES: readonly PsRule<number>[] = [
   { from: '1997-04-01', value: 12, source: 'Sec 40(b)(iv) (12 % from AY 1997-98)', verified: true },
-  { from: '2026-04-01', value: 12, source: 'Income-tax Act 2025 Sec 35 as reported (PS20) — verify', verified: false },
+  { from: '2026-04-01', value: 12, source: 'Income-tax Act 2025 Sec 35 as reported (PS20): verify', verified: false },
 ];
 
 /**
@@ -208,8 +208,8 @@ export interface PresumptiveLimit { limit: number; raisedLimit: number | null; c
 
 export const PRESUMPTIVE_PROF_RULES: readonly PsRule<PresumptiveLimit>[] = [
   { from: '2016-04-01', value: { limit: 5000000, raisedLimit: null, cashPct: null, deemedPct: 50, section: '44ADA' }, source: 'Finance Act 2016 (Sec 44ADA)', verified: true },
-  { from: '2023-04-01', value: { limit: 5000000, raisedLimit: 7500000, cashPct: 5, deemedPct: 50, section: '44ADA' }, source: 'Finance Act 2023 (₹75 lakh when cash ≤ 5 %) — taxguru, cleartax', verified: true },
-  { from: '2026-04-01', value: { limit: 5000000, raisedLimit: 7500000, cashPct: 5, deemedPct: 50, section: 'Sec 58' }, source: 'Income-tax Act 2025 Sec 58(2) Table Sl. 3 as reported (PS22) — verify', verified: false },
+  { from: '2023-04-01', value: { limit: 5000000, raisedLimit: 7500000, cashPct: 5, deemedPct: 50, section: '44ADA' }, source: 'Finance Act 2023 (₹75 lakh when cash ≤ 5 %): taxguru, cleartax', verified: true },
+  { from: '2026-04-01', value: { limit: 5000000, raisedLimit: 7500000, cashPct: 5, deemedPct: 50, section: 'Sec 58' }, source: 'Income-tax Act 2025 Sec 58(2) Table Sl. 3 as reported (PS22): verify', verified: false },
 ];
 
 /** Advance tax for presumptive professionals: one instalment by `due` (MM-DD of the March in the FY). */
@@ -222,6 +222,6 @@ export const PRESUMPTIVE_ADVANCE_TAX_RULES: readonly PsRule<{ due: string; insta
  * FAQs as read; ICSI / ICMAI patterns not confirmed — PS29).
  */
 export const UDIN_FORMAT_RULES: readonly PsRule<{ length: number; yearDigits: number; memberDigits: number }>[] = [
-  { from: '2019-02-01', value: { length: 18, yearDigits: 2, memberDigits: 6 }, source: 'ICAI UDIN FAQs (Jul 2024) — verify (PS29)', verified: false },
+  { from: '2019-02-01', value: { length: 18, yearDigits: 2, memberDigits: 6 }, source: 'ICAI UDIN FAQs (Jul 2024): verify (PS29)', verified: false },
 ];
 

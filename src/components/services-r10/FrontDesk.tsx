@@ -94,7 +94,7 @@ function Appointments({ view, notify }: { view: View; notify: Notify }) {
   const chip = (a: Appointment) => (
     <button key={a.id} type="button" className={styles.chip} data-status={status(a)} draggable onDragStart={(e) => e.dataTransfer.setData('text/plain', a.id)}
       onClick={(e) => { e.stopPropagation(); setDialog({ appt: a }); }} data-appt-chip={a.client_name}>
-      <strong>{a.start}</strong> {a.client_name}{a.token ? ` #${a.token}` : ''} · {a.services.map((s) => s.name).join(', ') || '—'} · {svT(`s.${status(a)}`)}
+      <strong>{a.start}</strong> {a.client_name}{a.token ? ` #${a.token}` : ''} · {a.services.map((s) => s.name).join(', ') || '-'} · {svT(`s.${status(a)}`)}
     </button>
   );
 
@@ -213,7 +213,7 @@ function Appointments({ view, notify }: { view: View; notify: Notify }) {
 
         {view === 'queue' && (
           <>
-            <p className={styles.now} data-now-serving>{serving ? svT('nowServing', { n: serving.token! }) : '—'}</p>
+            <p className={styles.now} data-now-serving>{serving ? svT('nowServing', { n: serving.token! }) : '-'}</p>
             {serving && <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => window.print()}>{svT('printNow')}</button>}
             {!queue.length ? <p className={controls.hint}>{svT('noQueue')}</p> : (
               <ul className={styles.list}>

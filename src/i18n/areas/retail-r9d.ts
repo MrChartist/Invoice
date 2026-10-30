@@ -6,7 +6,7 @@ import { defineArea } from '../area';
 
 export const rtdT = defineArea(
   {
-    wp: 'Working paper — verify with your CA.',
+    wp: 'Working paper: verify with your CA.',
     'view.imei': 'IMEI',
     'view.finance': 'Finance (EMI)',
     'view.buyback': 'Buy-back',
@@ -85,7 +85,7 @@ export const rtdT = defineArea(
     billIt: 'Bill job',
     noCharge: 'Covered by warranty: no sale, no GST.',
     print: 'Job card',
-    waMsg: 'Your {model} (job {number}) is {status}. — {shop}',
+    waMsg: 'Your {model} (job {number}) is {status}. {shop}',
     overdue: 'overdue',
     sacNote: 'Labour SAC {sac} at {rate}% (unverified); parts at their own rates; warranty parts are no sale.',
     cardNote: 'Bring this card to collect the device.',
@@ -95,7 +95,7 @@ export const rtdT = defineArea(
     needName: 'Put the customer\'s name on the bill ({name}).',
   } as const,
   {
-    wp: 'कार्य-पत्र — अपने CA से जाँचें।',
+    wp: 'कार्य-पत्र: अपने CA से जाँचें।',
     'view.imei': 'IMEI',
     'view.finance': 'फ़ाइनेंस (EMI)',
     'view.buyback': 'बाय-बैक',
@@ -174,7 +174,7 @@ export const rtdT = defineArea(
     billIt: 'जॉब का बिल',
     noCharge: 'वारंटी में: बिक्री नहीं, GST नहीं।',
     print: 'जॉब कार्ड',
-    waMsg: 'आपका {model} (जॉब {number}) {status} है। — {shop}',
+    waMsg: 'आपका {model} (जॉब {number}) {status} है। {shop}',
     overdue: 'देर',
     sacNote: 'मज़दूरी SAC {sac} पर {rate}% (अपुष्ट); पार्ट्स अपनी दर पर; वारंटी पार्ट्स बिक्री नहीं।',
     cardNote: 'डिवाइस लेने के लिए यह कार्ड लाएँ।',

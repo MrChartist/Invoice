@@ -95,7 +95,7 @@ export function validateChannel(c: Pick<SalesChannel, 'name' | 'gstins' | 'tan'>
   for (const g of c.gstins ?? []) {
     const chk = checkEcoGstin(g.gstin);
     if (!chk.valid) errors.push(`${g.gstin || '(blank)'}: ${chk.message}`);
-    else if (!chk.tcsRegistration) notes.push(`${g.gstin}: place 14 is not "C" — an operator's TCS registration usually has "C". Check the GSTIN on the operator's TCS statement.`);
+    else if (!chk.tcsRegistration) notes.push(`${g.gstin}: place 14 is not "C", an operator's TCS registration usually has "C". Check the GSTIN on the operator's TCS statement.`);
     const st = g.gstin.slice(0, 2);
     if (seen.has(st)) errors.push(`Two operator GSTINs for state ${st}.`);
     seen.add(st);

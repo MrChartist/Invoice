@@ -192,7 +192,7 @@ export function applyTransporterUpdate(meta: readonly EInvoiceMeta[], invoiceIds
 export function recordBulkUpdate(kind: 'vehicle' | 'transporter', next: EInvoiceMeta[], count: number, detail: string): void {
   requireAccess('books.edit');
   withTablesRollback([META_TABLE], () => setTable(META_TABLE, next));
-  audit.record({ entity: 'invoice', entity_id: `eway-bulk-${localDay(new Date())}`, action: 'update', summary: `e-Way desk: ${kind === 'vehicle' ? 'Part-B vehicle' : 'transporter'} update prepared for ${count} e-Way Bill(s) — ${detail} (working paper)` });
+  audit.record({ entity: 'invoice', entity_id: `eway-bulk-${localDay(new Date())}`, action: 'update', summary: `e-Way desk: ${kind === 'vehicle' ? 'Part-B vehicle' : 'transporter'} update prepared for ${count} e-Way Bill(s), ${detail} (working paper)` });
 }
 
 export const loadMeta = (): EInvoiceMeta[] => getTable<EInvoiceMeta>(META_TABLE);

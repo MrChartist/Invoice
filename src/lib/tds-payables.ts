@@ -205,8 +205,8 @@ export function tdsRateFor(code: string, date: string, payee: Payee = {}): TdsRa
     notes.push(`Sec 197 certificate ${payee.lowerCert}: ${rate}%.`);
   } else if (payee.lowerCert?.trim() && typeof payee.lowerRate === 'number') {
     notes.push(certificateInForce(payee, date)
-      ? `Sec 197 certificate ${payee.lowerCert}: its limit is used up — normal rate.`
-      : `Sec 197 certificate ${payee.lowerCert} is not valid on this date — normal rate.`);
+      ? `Sec 197 certificate ${payee.lowerCert}: its limit is used up, normal rate.`
+      : `Sec 197 certificate ${payee.lowerCert} is not valid on this date: normal rate.`);
   }
   const ab = ruleAt(TDS_206AB_RULES, date);
   if (payee.nonFiler && reason !== 'A') {
@@ -218,7 +218,7 @@ export function tdsRateFor(code: string, date: string, payee: Payee = {}): TdsRa
       }
       notes.push(`Non-filer (Sec 206AB): ${abRate}%.`);
     } else {
-      notes.push('Sec 206AB is not in force on this date — normal rate.');
+      notes.push('Sec 206AB is not in force on this date: normal rate.');
     }
   }
   return { rate, actRate: act, reason, notes, deducteeType, panValid };

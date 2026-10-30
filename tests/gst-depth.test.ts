@@ -89,7 +89,7 @@ test('purchase HSN register spreads bill heads over lines and totals equal the b
   assert.deepEqual(reg.rows.map((r) => [r.hsn, r.rate, r.taxable, r.igst + r.cgst + r.sgst, r.description]), [
     ['847130', 18, 600, 108, 'Laptops'],
     ['847160', 18, 400, 72, 'Mouse'],
-    ['—', 5, 500, 25, 'W'],
+    ['-', 5, 500, 25, 'W'],
   ]);
   assert.equal(reg.linesWithoutHsn, 1);
   assert.deepEqual(reg.totals, { taxable: 1500, igst: 180, cgst: 12.5, sgst: 12.5, cess: 0 });

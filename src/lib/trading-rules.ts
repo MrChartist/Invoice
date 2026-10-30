@@ -48,7 +48,7 @@ export const TCS_SPECIFIED_GOODS_RULES: readonly Versioned<Record<TcsGoods, TcsG
   {
     from: '2026-04-01',
     value: goods({ liquor: 2, tendu: 2, timber_lease: 2, timber_other: 2, forest: 2, scrap: 2, minerals: 2 }, ['timber_lease', 'timber_other', 'forest']),
-    source: 'Income-tax Act 2025 Sec 394(1) Table Sl. 1–5 as amended by the Finance Act 2026 (tdsman; taxguru) — timber / forest produce unverified (TR14)',
+    source: 'Income-tax Act 2025 Sec 394(1) Table Sl. 1–5 as amended by the Finance Act 2026 (tdsman; taxguru): timber / forest produce unverified (TR14)',
   },
 ];
 
@@ -73,7 +73,7 @@ export const TCS_1F_RULES: Readonly<Record<Tcs1fKind, readonly Versioned<Tcs1fRo
   ],
   luxury: [
     { from: '2016-06-01', value: null, source: 'Not notified before 22 Apr 2025' },
-    { from: '2025-04-22', value: { rate: 1, above: 1_000_000, code: '', verified: false }, source: 'Notification 36/2025 (taxmann, taxguru — secondary); 27EQ code not confirmed (TR15)' },
+    { from: '2025-04-22', value: { rate: 1, above: 1_000_000, code: '', verified: false }, source: 'Notification 36/2025 (taxmann, taxguru: secondary); 27EQ code not confirmed (TR15)' },
   ],
 };
 /** The notified luxury goods (N 36/2025) — printed as a hint. */
@@ -81,7 +81,7 @@ export const LUXURY_GOODS_TEXT = 'wrist watch, art piece, collectible, yacht / b
 
 /** 206CC (no PAN): twice the rate or 5%, whichever is higher (unverified row, TR16). */
 export const TCS_NO_PAN_RULES: readonly Versioned<{ multiple: number; floor: number }>[] = [
-  { from: '2017-07-01', value: { multiple: 2, floor: 5 }, source: 'Sec 206CC (developers\' reading) — unverified (TR16)' },
+  { from: '2017-07-01', value: { multiple: 2, floor: 5 }, source: 'Sec 206CC (developers\' reading): unverified (TR16)' },
 ];
 
 /* ── 194Q: the buyer's own turnover test ── */
@@ -89,7 +89,7 @@ export const TCS_NO_PAN_RULES: readonly Versioned<{ multiple: number; floor: num
 export const BUYER_194Q_TURNOVER_RULES: readonly Versioned<number | null>[] = [
   { from: '2017-07-01', value: null, source: '194Q not in force before 1 Jul 2021' },
   { from: '2021-07-01', value: 100_000_000, source: 'Sec 194Q (Finance Act 2021): buyer\'s total sales / turnover above ₹10 crore in the preceding FY' },
-  { from: '2026-04-01', value: 100_000_000, source: 'Act 2025 Sec 393(1) Table Sl. 8(ii) — turnover test repeated; Act 2025 text to confirm (TR13)' },
+  { from: '2026-04-01', value: 100_000_000, source: 'Act 2025 Sec 393(1) Table Sl. 8(ii): turnover test repeated; Act 2025 text to confirm (TR13)' },
 ];
 
 /* ── RCM on notified goods (Sec 9(3), N 4/2017-CT(R)) ── */
@@ -113,7 +113,7 @@ export const RCM_NOTIFIED_GOODS_RULES: readonly Versioned<readonly RcmGoodsRow[]
   {
     from: '2017-07-01',
     value: [
-      { hsn: ['080131'], goods: 'Cashew nuts, not shelled or peeled', from: ['agriculturist'], words: ['cashew', 'kaju', 'काजू'], notification: 'N 4/2017-CT(R) (0801 31: in shell — QA8 T14)', verified: true },
+      { hsn: ['080131'], goods: 'Cashew nuts, not shelled or peeled', from: ['agriculturist'], words: ['cashew', 'kaju', 'काजू'], notification: 'N 4/2017-CT(R) (0801 31: in shell, QA8 T14)', verified: true },
       { hsn: ['14049010'], goods: 'Bidi wrapper leaves (tendu)', from: ['agriculturist'], notification: 'N 4/2017-CT(R)', verified: true },
       { hsn: ['2401'], goods: 'Tobacco leaves', from: ['agriculturist'], notification: 'N 4/2017-CT(R)', verified: true },
       { hsn: ['5004', '5005', '5006'], goods: 'Silk yarn', from: ['maker', 'agriculturist', 'unregistered'], notification: 'N 4/2017-CT(R)', verified: true },
@@ -123,7 +123,7 @@ export const RCM_NOTIFIED_GOODS_RULES: readonly Versioned<readonly RcmGoodsRow[]
   {
     from: '2017-11-15',
     value: [
-      { hsn: ['080131'], goods: 'Cashew nuts, not shelled or peeled', from: ['agriculturist'], words: ['cashew', 'kaju', 'काजू'], notification: 'N 4/2017-CT(R) (0801 31: in shell — QA8 T14)', verified: true },
+      { hsn: ['080131'], goods: 'Cashew nuts, not shelled or peeled', from: ['agriculturist'], words: ['cashew', 'kaju', 'काजू'], notification: 'N 4/2017-CT(R) (0801 31: in shell, QA8 T14)', verified: true },
       { hsn: ['14049010'], goods: 'Bidi wrapper leaves (tendu)', from: ['agriculturist'], notification: 'N 4/2017-CT(R)', verified: true },
       { hsn: ['2401'], goods: 'Tobacco leaves', from: ['agriculturist'], notification: 'N 4/2017-CT(R)', verified: true },
       { hsn: ['5004', '5005', '5006'], goods: 'Silk yarn', from: ['maker', 'agriculturist', 'unregistered'], notification: 'N 4/2017-CT(R)', verified: true },

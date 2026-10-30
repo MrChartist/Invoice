@@ -235,7 +235,7 @@ function CashRefundsView({ period, gstin, g1, g3, notify }: Gst7rPanelProps) {
                   <td>{GST_HEAD_LABELS[t.from.head]} · {MINOR_HEAD_LABELS[t.from.minor]}</td>
                   <td>{GST_HEAD_LABELS[t.to.head]} · {MINOR_HEAD_LABELS[t.to.minor]}</td>
                   <td>{formatMoney(t.amount)}</td>
-                  <td>{t.arn ?? '—'}</td>
+                  <td>{t.arn ?? '-'}</td>
                   <td><button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} aria-label={r7T('delete')} onClick={() => run(() => deletePmt09(t.id), r7T('deleted'))}><Trash2 size={14} aria-hidden /></button></td>
                 </tr>
               ))}
@@ -269,12 +269,12 @@ function CashRefundsView({ period, gstin, g1, g3, notify }: Gst7rPanelProps) {
                 <tr key={r.id} data-refund-status={r.status}>
                   <td>{r7T(CATEGORY_KEY[r.category])}</td>
                   <td>{formatDate(r.period_from)} – {formatDate(r.period_to)}</td>
-                  <td>{r.arn ?? '—'}</td>
+                  <td>{r.arn ?? '-'}</td>
                   <td>{formatMoney(headsTotal(r.claimed))}</td>
-                  <td>{r.sanctioned ? formatMoney(headsTotal(r.sanctioned)) : '—'}</td>
-                  <td title={r.history.map((e) => `${e.date} ${REFUND_STATUS_FORM[e.status]} ${e.status}${e.note ? ` — ${e.note}` : ''}`).join('\n')}>{r7T(STATUS_KEY[r.status])} ({REFUND_STATUS_FORM[r.status]}){r.voucher_number ? ` · ${r.voucher_number}` : ''}</td>
-                  <td className={dl.late ? styles.bad : undefined}>{dl.lastDay ? formatDate(dl.lastDay) : '—'}</td>
-                  <td>{delay.daysLate > 0 && r.status !== 'REJECTED' && r.status !== 'WITHDRAWN' ? r7T('rfDelay', { days: delay.daysLate, amount: formatMoney(delay.interest) }) : '—'}</td>
+                  <td>{r.sanctioned ? formatMoney(headsTotal(r.sanctioned)) : '-'}</td>
+                  <td title={r.history.map((e) => `${e.date} ${REFUND_STATUS_FORM[e.status]} ${e.status}${e.note ? `: ${e.note}` : ''}`).join('\n')}>{r7T(STATUS_KEY[r.status])} ({REFUND_STATUS_FORM[r.status]}){r.voucher_number ? ` · ${r.voucher_number}` : ''}</td>
+                  <td className={dl.late ? styles.bad : undefined}>{dl.lastDay ? formatDate(dl.lastDay) : '-'}</td>
+                  <td>{delay.daysLate > 0 && r.status !== 'REJECTED' && r.status !== 'WITHDRAWN' ? r7T('rfDelay', { days: delay.daysLate, amount: formatMoney(delay.interest) }) : '-'}</td>
                   <td>
                     <span className={styles.actions}>
                       {nextRefundStatuses(r.status).length > 0 && <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={() => setStep({ id: r.id, status: nextRefundStatuses(r.status).find((x) => x === 'SANCTIONED' || x === 'PAID') ?? nextRefundStatuses(r.status)[0], date: today, sanctioned: { igst: String(r.claimed.igst || ''), cgst: String(r.claimed.cgst || ''), sgst: String(r.claimed.sgst || ''), cess: String(r.claimed.cess || '') }, bank: r.bank_ledger_id ?? A.bank })}>{r7T('rfStep')}</button>}
@@ -575,7 +575,7 @@ function ConsolidatedEwbView({ gstin, invoices, notify }: Gst7rPanelProps) {
         <label className={controls.field}><span className={controls.label}>{r7T('cewbPlace')}</span><input className={controls.input} maxLength={50} value={form.fromPlace} onChange={(e) => setForm({ ...form, fromPlace: e.target.value })} /></label>
         <label className={controls.field}><span className={controls.label}>{r7T('cewbState')}</span>
           <select className={controls.select} value={form.fromState} onChange={(e) => setForm({ ...form, fromState: e.target.value })}>
-            <option value="">—</option>
+            <option value="">-</option>
             {INDIAN_STATES.map((s) => <option key={s.code} value={s.code}>{s.code} · {s.name}</option>)}
           </select>
         </label>
@@ -602,8 +602,8 @@ function ConsolidatedEwbView({ gstin, invoices, notify }: Gst7rPanelProps) {
                   else next.delete(c.ewb);
                   setPicked(next);
                 }} /></td>
-                <td>{c.ewb}</td><td>{c.number}</td><td>{c.date ? formatDate(c.date) : '—'}</td><td>{c.party || '—'}</td>
-                <td className={c.validUpto && c.validUpto < todayIso() ? styles.bad : undefined}>{c.validUpto ? formatDate(c.validUpto) : '—'}</td>
+                <td>{c.ewb}</td><td>{c.number}</td><td>{c.date ? formatDate(c.date) : '-'}</td><td>{c.party || '-'}</td>
+                <td className={c.validUpto && c.validUpto < todayIso() ? styles.bad : undefined}>{c.validUpto ? formatDate(c.validUpto) : '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -661,7 +661,7 @@ function ByGstinView({ period, invoices, purchases }: Gst7rPanelProps) {
           <thead>
             <tr>
               <th scope="col">{r7T('byGstinRow')}</th>
-              {result.columns.map((c) => <th key={c.gstin || 'none'} scope="col">{c.label}<br /><span className={styles.muted}>{c.gstin || '—'}</span></th>)}
+              {result.columns.map((c) => <th key={c.gstin || 'none'} scope="col">{c.label}<br /><span className={styles.muted}>{c.gstin || '-'}</span></th>)}
               <th scope="col">{r7T('colTotal')}</th>
             </tr>
           </thead>

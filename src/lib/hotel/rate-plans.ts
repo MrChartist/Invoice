@@ -35,7 +35,7 @@ export function saveRatePlans(rows: RatePlan[], reservations: readonly Reservati
   }
   const used = usedIds(reservations);
   const gone = hotelDb.ratePlans().find((p) => used.has(p.id) && !rows.some((x) => x.id === p.id));
-  if (gone) throw new Error(`${gone.code} is used by a booking — make it inactive instead.`);
+  if (gone) throw new Error(`${gone.code} is used by a booking: make it inactive instead.`);
   if (usingStarter()) persistStarters();
   hotelDb.saveRatePlans(rows.map((p) => ({ ...p, id: p.id || generateId(), name: p.name.trim(), code: p.code.trim().toUpperCase() })));
 }

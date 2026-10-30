@@ -68,10 +68,10 @@ export function brokerageStatement(broker: SalesAgent, period: { from: string; t
 
 export function brokerageCsv(broker: SalesAgent, period: { from: string; to: string }, st: ReturnType<typeof brokerageStatement>): string {
   return toCsv([
-    [`Brokerage statement — ${broker.name} ${period.from} to ${period.to}${st.memoTotal ? ' (paid by the other party: memo only)' : ''}`],
+    [`Brokerage statement: ${broker.name} ${period.from} to ${period.to}${st.memoTotal ? ' (paid by the other party: memo only)' : ''}`],
     ['Side', 'Date', 'Document', 'Party', 'Base', 'Rate', 'Brokerage'],
     ...st.lines.map((l) => [l.side, l.date, l.number, l.party, l.base, n(broker.brokerage_rate), l.brokerage.toFixed(2)]),
     ['', '', '', '', '', 'Total', (st.total || st.memoTotal).toFixed(2)],
-    ['TDS u/s 194H on posting — working paper, verify with your CA.'],
+    ['TDS u/s 194H on posting: working paper, verify with your CA.'],
   ]);
 }

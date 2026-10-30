@@ -42,7 +42,7 @@ export function machines(assets: readonly AssetRow[] = getTable<AssetRow>(ASSETS
       const e = a.cn_equipment!;
       return { ref: `fa:${a.id}`, name: `${a.name ?? ''}${e.reg_no ? ` (${e.reg_no})` : ''}`, own: true, internal: num(e.internal_rate), hireOut: num(e.hire_rate), fuel_min: e.fuel_min, fuel_max: e.fuel_max };
     }),
-    ...hired.map((h) => ({ ref: `hire:${h.id}`, name: `${h.description} — ${h.vendor_name}`, own: false, internal: 0, hireOut: h.basis === 'hour' ? num(h.rate) : 0, fuel_min: h.fuel_min, fuel_max: h.fuel_max, hired: h })),
+    ...hired.map((h) => ({ ref: `hire:${h.id}`, name: `${h.description}: ${h.vendor_name}`, own: false, internal: 0, hireOut: h.basis === 'hour' ? num(h.rate) : 0, fuel_min: h.fuel_min, fuel_max: h.fuel_max, hired: h })),
   ];
 }
 

@@ -25,8 +25,8 @@ export default function TicketsView({ ctx, done }: { ctx: MfgContext; done: Done
         return [
           e.number, e.job,
           o ? fmt(o.planned_qty) : <select key="q" className={controls.select} aria-label={P('qty')} value={qty[e.id] ?? String(bs[0]?.qty ?? '')} onChange={(x) => setQty({ ...qty, [e.id]: x.target.value })}>{bs.map((x) => <option key={x.qty} value={x.qty}>{x.qty}</option>)}</select>,
-          o ? <Link key="o" to={`/manufacturing?tab=orders&order=${o.id}`}>{o.number}</Link> : '—',
-          b ? `${fmt(b.sheets)}${actual !== undefined ? ` · ${P('issued', { n: fmt(actual) })}` : ''}` : '—',
+          o ? <Link key="o" to={`/manufacturing?tab=orders&order=${o.id}`}>{o.number}</Link> : '-',
+          b ? `${fmt(b.sheets)}${actual !== undefined ? ` · ${P('issued', { n: fmt(actual) })}` : ''}` : '-',
           <span key="a" style={row}>
             {!o && <button type="button" className={B.ps} data-mfb-make-ticket onClick={() => run(() => P('ticketMade', { n: makeJobTicket(e.id, b?.qty ?? 0, ctx.items).number }))}>{P('makeTicket')}</button>}
             {b && <button type="button" className={B.gs} onClick={() => printHtml(ticketHtml(e, b, o, actual), o?.number ?? e.number)}>{P('print')}</button>}

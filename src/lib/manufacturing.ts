@@ -250,7 +250,7 @@ export function validateStockJournal(j: Pick<StockJournal, 'date' | 'consume' | 
   const err = lineShapeErrors(src, byId, 'Source', true) || lineShapeErrors(dst, byId, 'Destination', true);
   if (err) return err;
   if (dst.reduce((s, l) => s + Math.max(num(l.cost_pct), 0), 0) > 100 + EPS) return 'Destination cost shares cannot exceed 100%.';
-  if (isPureTransfer(j)) return 'This only moves stock between godowns — save it as a godown transfer instead.';
+  if (isPureTransfer(j)) return 'This only moves stock between godowns: save it as a godown transfer instead.';
   return serialShapeError([...src, ...dst], items);
 }
 
@@ -413,7 +413,7 @@ export function validatePhysical(v: { date: string; lines: readonly PhysicalDraf
     if (!item) return 'Choose a stock item that tracks stock.';
     if (item.track_serials) {
       // 7.167: serial items are counted by serial, in the base unit, one line per godown.
-      if (item.track_batches) return `${item.name} tracks batches and serials — count it with a stock adjustment.`;
+      if (item.track_batches) return `${item.name} tracks batches and serials: count it with a stock adjustment.`;
       if (lineFactor(l) !== 1) return `${item.name}: count serials in ${item.unit || 'the base unit'}.`;
       const list = (l.serials ?? []).map((x) => String(x ?? '').trim()).filter(Boolean);
       const dup = list.find((x, i) => list.findIndex((y) => skey(y) === skey(x)) !== i);

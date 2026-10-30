@@ -39,7 +39,7 @@ export interface RegimeCtx {
 
 export interface LgRegime { key: LgRegimeKey; pos: string; mode: LgGstMode; rate: number; supply?: 'EXPORT_LUT' | 'EXPORT_WITH_PAYMENT'; itc_note?: string; reason: string; ca: string; /** GST payable by the recipient (GTA under RCM). */ rcm?: boolean }
 
-const R184 = 'Place of supply outside India — Sec 12(8) proviso; IGST (Circular 184/16/2022-GST)';
+const R184 = 'Place of supply outside India: Sec 12(8) proviso; IGST (Circular 184/16/2022-GST)';
 const R203 = 'Sec 13(2) IGST Act (13(9) omitted from 1 Oct 2023, Circular 203/15/2023-GST)';
 const abroad = (j: Pick<LgJob, 'dest_country'>) => !!j.dest_country && j.dest_country !== 'IN';
 
@@ -64,10 +64,10 @@ export function lgRegime(h: LgHead, j: LgJob, c: RegimeCtx): LgRegime {
   if (h.role === 'pure_agent') return make('pure_agent', home, 'Rule 33 CGST Rules', 'LG10', { mode: 'NONE', rate: 0 });
   if (h.role === 'exempt' || h.exempt_if) {
     const row = keyedAt(LG_EXEMPT_RULES, h.exempt_if ?? 'agri_produce', date);
-    return make('exempt', home, `Exempt — ${h.exempt_if && row ? row.value.serial : 'N 12/2017-CT(R)'}`, 'LG21', { mode: 'NONE', rate: 0 });
+    return make('exempt', home, `Exempt: ${h.exempt_if && row ? row.value.serial : 'N 12/2017-CT(R)'}`, 'LG21', { mode: 'NONE', rate: 0 });
   }
   if (r.foreign) {
-    if (rule === 'intermediary' && c.inter === 'supplier') return make('intermediary', s.state, 'Sec 13(8)(b) IGST Act — location of the supplier (intermediary)', 'LG4');
+    if (rule === 'intermediary' && c.inter === 'supplier') return make('intermediary', s.state, 'Sec 13(8)(b) IGST Act: location of the supplier (intermediary)', 'LG4');
     const cb = keyedAt(LG_POS_RULES, 'cross_border', date);
     // 13(9) (to 30 Sep 2023): transport of goods other than mail / courier — the destination of the goods.
     const dest = rule === 'transport' && h.kind !== 'courier' && cb?.value.pos === 'destination';

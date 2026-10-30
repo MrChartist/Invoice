@@ -22,7 +22,7 @@ import { numIn, row } from './lg-form';
 
 const BY: readonly PnlBy[] = ['client', 'lane', 'salesperson', 'month'];
 const inr = (n: number) => formatCurrency(n, 'INR');
-const pc = (p: number | null) => (p === null ? '—' : `${p} %`);
+const pc = (p: number | null) => (p === null ? '-' : `${p} %`);
 
 export default function CostingView({ notify }: LgViewProps) {
   useT();
@@ -66,7 +66,7 @@ export default function CostingView({ notify }: LgViewProps) {
       <div className={surface.tableWrap}>
         <table className={surface.table}>
           <thead><tr><th>{lgbT('by').split(',')[BY.indexOf(by)]}</th><th>{lgT('jobs')}</th>{(['revenue', 'cost', 'margin', 'pct'] as const).map((k) => <th key={k}>{lgbT(k)}</th>)}</tr></thead>
-          <tbody>{groupPnl(d.rows, by).map((g) => <tr key={g.key}><td>{by === 'client' ? d.name.get(g.key) ?? g.key : g.key || '—'}</td><td>{g.jobs}</td><td>{inr(g.revenue)}</td><td>{inr(g.cost)}</td><td>{inr(g.margin)}</td><td>{pc(g.pct)}</td></tr>)}</tbody>
+          <tbody>{groupPnl(d.rows, by).map((g) => <tr key={g.key}><td>{by === 'client' ? d.name.get(g.key) ?? g.key : g.key || '-'}</td><td>{g.jobs}</td><td>{inr(g.revenue)}</td><td>{inr(g.cost)}</td><td>{inr(g.margin)}</td><td>{pc(g.pct)}</td></tr>)}</tbody>
         </table>
       </div>
     </section>

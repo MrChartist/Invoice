@@ -114,7 +114,7 @@ export function postPackageDeferral(month: string, today: string): ManualVoucher
   if (!r.net) throw new Error('Nothing to post for this month.');
   return withTablesRollback(['vouchers', 'accounts'], () => saveVoucher({
     type: 'JOURNAL', date: monthEnd(month), voucher_class: PACKAGE_CLASS,
-    narration: `Package income ${tag(month)}: sold ₹${r.deferred} deferred, ₹${r.recognised} recognised (sessions ₹${r.redeemed}, expired ₹${r.forfeited}, cancelled / upgraded ₹${r.closed}) — verify with your CA (SV44)`,
+    narration: `Package income ${tag(month)}: sold ₹${r.deferred} deferred, ₹${r.recognised} recognised (sessions ₹${r.redeemed}, expired ₹${r.forfeited}, cancelled / upgraded ₹${r.closed}), verify with your CA (SV44)`,
     lines: deferralLines(r.net, { sales: A.sales, deferred: ensureDeferredLedger() }),
   }));
 }

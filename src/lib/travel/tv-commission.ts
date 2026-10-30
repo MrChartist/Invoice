@@ -70,7 +70,7 @@ export function billCommission(bookingId: string, date?: string): { invoice: Inv
   const day = date ?? base.issue_date;
   const rule = ruleAt(COMMISSION_SAC_RULES, day);
   const client = principalClient(v);
-  const item = { id: generateId(), name: `Commission — ${b.component} ${b.ref ?? ''}`.trim(), description: trip ? `${trip.tv.code} — ${trip.name}` : '', type: 'Service' as const, hsn: rule.sac[p], unit: 'NOS', quantity: 1, rate: amount, amount, tax_rate: rule.rate, discount_percent: 0 };
+  const item = { id: generateId(), name: `Commission: ${b.component} ${b.ref ?? ''}`.trim(), description: trip ? `${trip.tv.code}: ${trip.name}` : '', type: 'Service' as const, hsn: rule.sac[p], unit: 'NOS', quantity: 1, rate: amount, amount, tax_rate: rule.rate, discount_percent: 0 };
   const tds = commissionTds(p, client, day, amount, all);
   const rcm = p === 'insurer' && ruleAt(INSURANCE_AGENT_RCM_RULES, day);
   const draft = buildBillDraft({

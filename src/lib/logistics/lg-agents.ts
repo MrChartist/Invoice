@@ -40,15 +40,15 @@ export function agentNote(i: NoteInput, ctx: DocCtx): InvoiceRecord {
   // QA22 W4: an agent in India ("outside India" unticked) is billed as a domestic supply (Sec 12(2)), never as an export.
   if (!i.agent.vendor.lg?.foreign) {
     const c = i.agent.client, b2b = /^\d{2}[0-9A-Z]{13}$/i.test(c.gstin?.trim() ?? '');
-    return lgDoc(ctx, c, [item], partyPos(c, ctx.home), { currency: i.currency.toUpperCase(), ...(i.currency.toUpperCase() !== 'INR' ? { exchange_rate: i.rate } : {}), supply_type: b2b ? 'B2B' : 'B2C', notes: `${name} — ${jobText(i.job)}`.trim(),
-      lg: { ...(i.job ? { job_id: i.job.id, job_no: i.job.number } : {}), agent: { id: i.agent.vendor.id, name: i.agent.vendor.name, kind: i.kind }, regime: 'general', pos_reason: 'Place of supply: the recipient\'s location — Sec 12(2) IGST Act.' } });
+    return lgDoc(ctx, c, [item], partyPos(c, ctx.home), { currency: i.currency.toUpperCase(), ...(i.currency.toUpperCase() !== 'INR' ? { exchange_rate: i.rate } : {}), supply_type: b2b ? 'B2B' : 'B2C', notes: `${name}: ${jobText(i.job)}`.trim(),
+      lg: { ...(i.job ? { job_id: i.job.id, job_no: i.job.number } : {}), agent: { id: i.agent.vendor.id, name: i.agent.vendor.name, kind: i.kind }, regime: 'general', pos_reason: 'Place of supply: the recipient\'s location, Sec 12(2) IGST Act.' } });
   }
   return lgDoc(ctx, i.agent.client, [item], '96', {
     currency: i.currency.toUpperCase(), exchange_rate: i.rate, supply_type: i.lut ? 'EXPORT_LUT' : 'EXPORT_WITH_PAYMENT', ...(i.lut ?? {}),
-    notes: `${name} — ${jobText(i.job)}`.trim(),
+    notes: `${name}: ${jobText(i.job)}`.trim(),
     lg: {
       ...(i.job ? { job_id: i.job.id, job_no: i.job.number } : {}), agent: { id: i.agent.vendor.id, name: i.agent.vendor.name, kind: i.kind }, regime: i.lut ? 'export_lut' : 'export_igst',
-      fx: { currency: i.currency.toUpperCase(), rate: i.rate }, pos_reason: `Place of supply: the recipient's location outside India (96) — Sec 13(2) IGST Act; export of services${i.lut ? ` under LUT ${i.lut.lut_number}` : ''}.`,
+      fx: { currency: i.currency.toUpperCase(), rate: i.rate }, pos_reason: `Place of supply: the recipient's location outside India (96), Sec 13(2) IGST Act; export of services${i.lut ? ` under LUT ${i.lut.lut_number}` : ''}.`,
     },
   });
 }
@@ -59,7 +59,7 @@ export function agentBill(i: BillInput, id: string): PurchaseRecord {
   const taxable = round2(i.amount * i.rate), gst = i.gst_rate ?? 18, igst = round2((taxable * gst) / 100);
   return {
     id, kind: 'EXPENSE', vendor_id: i.agent.vendor.id, vendor_name: i.agent.vendor.name, bill_number: i.bill_no.trim(), date: i.date, place_of_supply: i.home, category: 'Freight & forwarding',
-    lines: [{ id: `${id}-1`, name: `Agent charges — ${jobText(i.job)}`, unit: 'NOS', quantity: 1, rate: taxable, tax_rate: gst }],
+    lines: [{ id: `${id}-1`, name: `Agent charges: ${jobText(i.job)}`, unit: 'NOS', quantity: 1, rate: taxable, tax_rate: gst }],
     taxable, cgst: 0, sgst: 0, igst, itc_eligible: true, reverse_charge: true, import_type: 'SERVICES', total: round2(taxable + igst), amount_paid: 0,
     notes: `${i.currency.toUpperCase()} ${i.amount.toFixed(2)} @ ₹${i.rate}`, created_at: new Date().toISOString(), lg: { job_id: i.job.id, fx: { currency: i.currency.toUpperCase(), amount: round2(i.amount), rate: i.rate } },
   };

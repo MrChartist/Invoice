@@ -26,12 +26,12 @@ export default function PricesView({ onDone }: { onDone: Done }) {
   const rows = readPrices();
   const now = new Date().toTimeString().slice(0, 5);
   const act = (fn: () => unknown) => { try { const r = fn(); setN(n + 1); onDone(typeof r === 'number' ? fuT('copied', { n: r }) : fuT('saved')); } catch (e) { onDone((e as Error).message, true); } };
-  const name = (id: string) => items.find((i) => i.id === id)?.name ?? '—';
+  const name = (id: string) => items.find((i) => i.id === id)?.name ?? '-';
   const num = (k: string) => (d[k] ? Number(d[k]) : undefined);
   return (
     <div data-fuel-prices key={n}>
       <Row>
-        {items.map((i) => { const p = priceAt(rows, i.id, day, now); return <span key={i.id} className={controls.hint} data-fu-board>{i.name}: {p ? `₹${p.rsp}` : '—'}</span>; })}
+        {items.map((i) => { const p = priceAt(rows, i.id, day, now); return <span key={i.id} className={controls.hint} data-fu-board>{i.name}: {p ? `₹${p.rsp}` : '-'}</span>; })}
         <button type="button" className={controls.btnOutline} onClick={() => act(() => copyYesterday(items.map((i) => i.id), day, shiftDay(day, -1), time))}>{fuT('copy')}</button>
       </Row>
       <Row>

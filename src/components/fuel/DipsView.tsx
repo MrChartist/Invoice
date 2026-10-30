@@ -39,15 +39,15 @@ export default function DipsView({ onDone }: { onDone: Done }) {
   const tank = tanks.find((t) => t.id === d.tank);
   const item = items.find((i) => i.id === tank?.fu?.product_item_id);
   const bills = item ? omcBills(item).slice(0, 20) : [];
-  const name = (id?: string) => items.find((i) => i.id === id)?.name ?? '—';
-  const where = (l: FuelTankLog) => tanks.find((t) => t.id === l.tank_id)?.name ?? nozzles.filter((z) => z.id === l.nozzle_id).map(nozzleLabel)[0] ?? '—';
+  const name = (id?: string) => items.find((i) => i.id === id)?.name ?? '-';
+  const where = (l: FuelTankLog) => tanks.find((t) => t.id === l.tank_id)?.name ?? nozzles.filter((z) => z.id === l.nozzle_id).map(nozzleLabel)[0] ?? '-';
   const save = (input: Omit<FuelTankLog, 'id'>) => {
     try {
       const r = saveLog(input, tank, sub);
       const c = r.kind === 'receipt' ? receiptCheck(r, tol) : null;
       const bill = bills.find((b) => b.id === r.purchase_id);
       setK(k + 1);
-      onDone([fuT('saved'), c && fcT('recv', { i: c.invoice_l, r: c.received_l ?? '—' }), c && debitFor(c.short_l, bill?.rate ?? 0) ? fcT('short', { l: c.short_l!, a: debitFor(c.short_l, bill!.rate) }) : '', c?.flags.length ? fcT('flag', { t: tol }) : ''].filter(Boolean).join(' '), !!c?.flags.length);
+      onDone([fuT('saved'), c && fcT('recv', { i: c.invoice_l, r: c.received_l ?? '-' }), c && debitFor(c.short_l, bill?.rate ?? 0) ? fcT('short', { l: c.short_l!, a: debitFor(c.short_l, bill!.rate) }) : '', c?.flags.length ? fcT('flag', { t: tol }) : ''].filter(Boolean).join(' '), !!c?.flags.length);
     } catch (e) { onDone((e as Error).message, true); }
   };
   const base = { date: d.date, ...(d.time ? { time: d.time } : {}), tank_id: d.tank };

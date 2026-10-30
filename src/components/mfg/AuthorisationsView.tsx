@@ -32,7 +32,7 @@ export default function AuthorisationsView({ ctx }: { ctx: MfgContext }) {
   });
   const itemSel = (k: 'exp' | 'imp') => (
     <select className={controls.select} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} data-mfd={`aa-${k}`}>
-      <option value="">—</option>
+      <option value="">-</option>
       {ctx.items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
     </select>
   );
@@ -76,13 +76,13 @@ export default function AuthorisationsView({ ctx }: { ctx: MfgContext }) {
       <div style={row}>
         <Fld l={sdT('tagInv')}>
           <select className={controls.select} value={tag.inv} onChange={(e) => setTag({ ...tag, inv: e.target.value })} data-mfd="aa-inv">
-            <option value="">—</option>
+            <option value="">-</option>
             {data.invoices.filter((i) => i.doc_type === 'INVOICE' || i.doc_type === 'TAX_INVOICE').slice(-200).map((i) => <option key={i.id} value={i.id}>{i.invoice_number} · {i.client?.name}</option>)}
           </select>
         </Fld>
         <Fld l={sdT('tagBill')}>
           <select className={controls.select} value={tag.bill} onChange={(e) => setTag({ ...tag, bill: e.target.value })} data-mfd="aa-bill">
-            <option value="">—</option>
+            <option value="">-</option>
             {data.bills.slice(-200).map((b) => <option key={b.id} value={b.id}>{b.bill_number} · {b.vendor_name}</option>)}
           </select>
         </Fld>

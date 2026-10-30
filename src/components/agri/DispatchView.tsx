@@ -73,7 +73,7 @@ export default function DispatchView({ onDone }: { onDone: Done }) {
           <tbody>{list.map((d) => (
             <tr key={d.id}>
               <td>{d.number}</td><td>{d.date} {d.shift}</td><td>{d.buyer_name}{d.tanker ? ` · ${d.tanker}` : ''}</td><td>{d.sent.qty} {d.sent.unit} · {d.sent.fat} / {d.sent.snf}</td>
-              <td>{d.invoice_id ? `${d.received?.qty ?? '—'} · ${d.received?.ack_no ?? ''}` : <Ack d={d} run={run} />}</td>
+              <td>{d.invoice_id ? `${d.received?.qty ?? '-'} · ${d.received?.ack_no ?? ''}` : <Ack d={d} run={run} />}</td>
               <td>
                 {d.invoice_id ? <Link className={sm} to={`/invoice/${d.invoice_id}`}>{bT('openBill')}</Link>
                   : <button type="button" className={sm} data-dairy="bill" onClick={() => run(() => bT('billed', { no: billDispatch(d.id).invoice_number }))}>{bT('bill')}</button>}

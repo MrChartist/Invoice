@@ -25,5 +25,5 @@ export function parseRatio(s: string): Record<string, number> {
   return out;
 }
 export const ratioText = (r: Record<string, number> | undefined) => Object.entries(r ?? {}).map(([k, v]) => `${k}${v}`).join(' ');
-export const opts = (list: readonly { id: string; name: string }[], blank = true): (readonly [string, string])[] => [...(blank ? [['', '—'] as const] : []), ...list.map((x) => [x.id, x.name] as const)];
+export const opts = (list: readonly { id: string; name: string }[], blank = true): (readonly [string, string])[] => [...(blank ? [['', '-'] as const] : []), ...list.map((x) => [x.id, x.name] as const)];
 export { todayInput as today } from '../../lib/utils';

@@ -91,7 +91,7 @@ export default function BillsView({ notify }: MpViewProps) {
               return (
                 <tr key={s.id} data-mp-bill-site={s.mp.code}>
                   <td><Link to={`/time?tab=deploy&view=muster&site=${s.id}&month=${month}`}>{siteLabel(s)}</Link></td>
-                  <td>{data.clients.find((c) => c.id === s.client_id)?.name ?? '—'}</td>
+                  <td>{data.clients.find((c) => c.id === s.client_id)?.name ?? '-'}</td>
                   <td>{!m ? mbT('none') : m.status === 'locked' ? mbT('locked') : mbT('lockFirst')}</td>
                   <td className={surface.numeric}>{inv.map((i) => <Link key={i.id} to={`/invoice/${i.id}`} style={{ display: 'block' }} data-mp-bill-link>{i.invoice_number || mbT('draft')} {formatCurrency(i.taxable_value ?? 0)}</Link>)}</td>
                   <td className={surface.numeric}>{!inv.length && plan ? formatCurrency(plan) : ''}</td>

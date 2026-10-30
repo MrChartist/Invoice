@@ -74,13 +74,13 @@ export function draftPieceBill(v: Vendor, lines: readonly MfPieceLine[], x: { da
   const piece: MfPieceBill = { period: x.period, lines: live.map((l) => ({ ...l, amount: round2(num(l.pieces) * num(l.rate)) })), ...(advance ? { advance_recovered: advance } : {}) };
   const bill: Omit<PurchaseRecord, 'id'> = {
     kind: 'PURCHASE', vendor_id: v.id, vendor_name: v.name, ...(v.gstin ? { vendor_gstin: v.gstin } : {}), bill_number: x.number ?? '', date: x.date, category: PIECE_CATEGORY,
-    lines: live.map((l) => ({ id: generateId(), name: `${l.op}${l.style ? ` — ${l.style}` : ''}`, hsn: '9988', unit: 'PCS', quantity: num(l.pieces), rate: num(l.rate), tax_rate: rate })),
+    lines: live.map((l) => ({ id: generateId(), name: `${l.op}${l.style ? `: ${l.style}` : ''}`, hsn: '9988', unit: 'PCS', quantity: num(l.pieces), rate: num(l.rate), tax_rate: rate })),
     taxable, cgst, sgst: inter ? 0 : round2(tax - cgst), igst: inter ? tax : 0, itc_eligible: rate > 0, total, amount_paid: advance,
-    ...r.fields, notes: `Karigar piece bill ${x.period.from} to ${x.period.to}. Working paper — verify with your CA (MF28).`,
+    ...r.fields, notes: `Karigar piece bill ${x.period.from} to ${x.period.to}. Working paper: verify with your CA (MF28).`,
     mf: { kind: 'piece_bill', piece },
   } as Omit<PurchaseRecord, 'id'>;
   const code = tdsIn.section;
-  const note = code ? `TDS ${sectionText(code, x.date)} may apply — ${r.suggestion?.applies ? `₹${tdsAmount.toFixed(2)}` : 'below the threshold'}. Verify with your CA (MF28).` : '';
+  const note = code ? `TDS ${sectionText(code, x.date)} may apply: ${r.suggestion?.applies ? `₹${tdsAmount.toFixed(2)}` : 'below the threshold'}. Verify with your CA (MF28).` : '';
   return { bill, tds: { fields: r.fields, note, applies: tdsAmount > 0 }, net: round2(net - advance) };
 }
 
@@ -143,5 +143,5 @@ export function pieceUploadRows(bills: readonly { vendor: Vendor; net: number }[
 /** WhatsApp slip text: pieces by operation, amount, deductions, net. */
 export function slipText(v: Pick<Vendor, 'name'>, number: string, piece: MfPieceBill, b: { total: number; tds: number; net: number }): string {
   const rows = piece.lines.map((l) => `${l.op}${l.style ? ` (${l.style})` : ''}: ${l.pieces} × ₹${num(l.rate).toFixed(2)} = ₹${num(l.amount).toFixed(2)}`);
-  return [`${v.name} — ${number}`, `${piece.period.from} to ${piece.period.to}`, ...rows, `Total ₹${b.total.toFixed(2)}`, ...(b.tds ? [`TDS ₹${b.tds.toFixed(2)}`] : []), ...(piece.advance_recovered ? [`Advance recovered ₹${num(piece.advance_recovered).toFixed(2)}`] : []), `Net ₹${b.net.toFixed(2)}`].join('\n');
+  return [`${v.name}: ${number}`, `${piece.period.from} to ${piece.period.to}`, ...rows, `Total ₹${b.total.toFixed(2)}`, ...(b.tds ? [`TDS ₹${b.tds.toFixed(2)}`] : []), ...(piece.advance_recovered ? [`Advance recovered ₹${num(piece.advance_recovered).toFixed(2)}`] : []), `Net ₹${b.net.toFixed(2)}`].join('\n');
 }

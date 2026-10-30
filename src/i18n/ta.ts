@@ -206,7 +206,7 @@ export const ta: Catalogue = {
     'Scan barcode or search items': 'பார்கோடை ஸ்கேன் செய் அல்லது பொருளைத் தேடு',
     'Scan an item or search by name to start the bill.': 'பில்லைத் தொடங்க ஒரு பொருளை ஸ்கேன் செய்யவும் அல்லது பெயரால் தேடவும்.',
     Customer: 'வாடிக்கையாளர்',
-    'Walk-in customer — or search saved customers': 'நேரடி வாடிக்கையாளர் — அல்லது சேமித்த வாடிக்கையாளர்களைத் தேடு',
+    'Walk-in customer: or search saved customers': 'நேரடி வாடிக்கையாளர்: அல்லது சேமித்த வாடிக்கையாளர்களைத் தேடு',
     'Name (optional)': 'பெயர் (விருப்பத்தேர்வு)',
     'Phone (optional)': 'தொலைபேசி (விருப்பத்தேர்வு)',
     Totals: 'மொத்தங்கள்',

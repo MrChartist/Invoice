@@ -60,7 +60,7 @@ export function LrForm({ lr, notify, onSaved, onCancel }: { lr?: ConsignmentNote
   const party = (k: 'consignor' | 'consignee' | 'billing', label: string) => (
     <F l={label}>
       <select className={controls.select} value={f[k]} onChange={set(k)} data-lr-party={k}>
-        <option value="">—</option>
+        <option value="">-</option>
         {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.gstin ? ` · ${c.gstin}` : ''}</option>)}
       </select></F>
   );

@@ -50,7 +50,7 @@ export default function ReportsView(_: LgViewProps) {
   const fys = [...new Set([fy, ...d.jobs.map((j) => getIndianFY(j.date).label)])].sort().reverse();
   const name = (id: string) => d.clients.find((c) => c.id === id)?.name ?? id;
   const [h1, h2, h3] = [lgdT('hMargin'), lgdT('hAgents'), lgdT('hAgeing')].map((h) => h.split(','));
-  const margin: Rows = [h1, ...groupPnl(jobPnls(jobs.filter((j) => j.status !== 'cancelled')), by).map((r) => [by === 'client' ? name(r.key) : r.key || '—', r.jobs, r.revenue, r.cost, r.margin, r.pct ?? ''])];
+  const margin: Rows = [h1, ...groupPnl(jobPnls(jobs.filter((j) => j.status !== 'cancelled')), by).map((r) => [by === 'client' ? name(r.key) : r.key || '-', r.jobs, r.revenue, r.cost, r.margin, r.pct ?? ''])];
   const agents: Rows = [h2, ...d.agents.map((a) => { const s = agentStatement(a, d.inv, d.pur); return [a.vendor.name, s.ours, s.theirs, s.net]; })];
   const ageing: Rows = [h3, ...disbAgeing(jobs, loadDisb(todayInput())).map((r) => [r.job, ...r.b, r.total])];
   return (

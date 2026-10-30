@@ -47,7 +47,7 @@ export function mapFunds(): NonNullable<SocietySettings['funds']> {
 
 /** The period / FY a transfer journal was posted for (its narration's `— <period>`), else its own day. */
 const coverOf = (v: Pick<ManualVoucher, 'date' | 'narration'>): { p: string; from: string; to: string } => {
-  const p = /— (\S+)$/.exec(v.narration ?? '')?.[1] ?? '';
+  const p = /(?:—|:) (\S+)$/.exec(v.narration ?? '')?.[1] ?? '';
   return { p: p || v.date, ...(rangeOf(p) ?? { from: v.date, to: v.date }) };
 };
 
@@ -80,7 +80,7 @@ export function postFundTransfer(p: string): ManualVoucher | null {
     return [{ account_id: 'sales', dr: into ? n : 0, cr: into ? 0 : n, cost_centre_id: cc[k] }, { account_id: acc[k], dr: into ? 0 : n, cr: into ? n : 0, cost_centre_id: cc[k] }];
   });
   if (!lines.length) return null;
-  return saveVoucher({ type: 'JOURNAL', date: r.to, narration: `Society fund transfer (contributions billed) — ${p}`, voucher_class: FUND_CLASS, lines });
+  return saveVoucher({ type: 'JOURNAL', date: r.to, narration: `Society fund transfer (contributions billed): ${p}`, voucher_class: FUND_CLASS, lines });
 }
 
 export interface FundRow { key: FundKey; name: string; opening: number; billed: number; transferred: number; spent: number; closing: number }

@@ -68,7 +68,7 @@ export function stepProblem(step: WizardStep, a: WizardAnswers): string {
       if (a.gstRegistered) {
         const g = checkGstin(a.companyGstin);
         if (!g.valid) return g.message ?? 'That GSTIN is not valid.';
-      } else if (!a.stateCode) return 'Choose your state — it decides CGST + SGST vs IGST.';
+      } else if (!a.stateCode) return 'Choose your state: it decides CGST + SGST vs IGST.';
       return '';
     case 'payment':
       if (a.upiId && !isValidUpi(a.upiId)) return 'The UPI ID should look like name@bank.';

@@ -151,8 +151,8 @@ export function boardTable(rows: readonly PracticeRow[]): (string | number)[][] 
   return [
     ['Company', 'GSTIN(s)', 'Filing', 'Next due return', 'Due on', 'Overdue returns', 'Last TDS/TCS return filed', 'TDS/TCS returns filed this FY', 'Last voucher', 'Books locked up to', 'Drafts', 'Checklist done', 'Checklist items', 'Nearest DSC expiry', 'DSC holder', 'Note'],
     ...rows.map((r) => r.missing || r.locked
-      ? [r.name, '', '', '', '', '', '', '', '', '', '', '', '', '', '', r.missing ? 'No data on this device' : 'Locked — open the company to see']
-      : [r.name, r.gstins.join(' '), r.frequency, r.nextDue ? `${r.nextDue.form} ${r.nextDue.label}` : '', r.nextDue?.due ?? '', r.overdue, r.lastTds ?? '', r.tdsFiledThisFy, r.lastVoucher ?? '', r.lockUntil ?? '', r.drafts, r.checklist.done, r.checklist.total, r.dsc?.validTo ?? '', r.dsc?.holder ?? '', 'Due dates as per the standard calendar; check notified extensions — verify with your CA']),
+      ? [r.name, '', '', '', '', '', '', '', '', '', '', '', '', '', '', r.missing ? 'No data on this device' : 'Locked: open the company to see']
+      : [r.name, r.gstins.join(' '), r.frequency, r.nextDue ? `${r.nextDue.form} ${r.nextDue.label}` : '', r.nextDue?.due ?? '', r.overdue, r.lastTds ?? '', r.tdsFiledThisFy, r.lastVoucher ?? '', r.lockUntil ?? '', r.drafts, r.checklist.done, r.checklist.total, r.dsc?.validTo ?? '', r.dsc?.holder ?? '', 'Due dates as per the standard calendar; check notified extensions: verify with your CA']),
   ];
 }
 

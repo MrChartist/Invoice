@@ -25,7 +25,7 @@ function Row({ item }: { item: PreflightIssue }) {
       />
       <span>
         <span className={styles.srOnly}>{isError ? einvT('blockingError') : einvT('warningPrefix')}</span>
-        <span className={styles.checkField}>{item.field}</span> — {item.message}
+        <span className={styles.checkField}>{item.field}</span> : {item.message}
       </span>
     </li>
   );

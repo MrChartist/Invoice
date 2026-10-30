@@ -39,7 +39,7 @@ export function ceilingAt(list: readonly Ceiling[] | undefined, day: string): Ce
 export function addCeiling(list: readonly Ceiling[] | undefined, row: Ceiling): Ceiling[] {
   if (!isDay(row.from)) throw new Error('Choose the date of the price order.');
   if (!(num(row.price_per_unit) > 0)) throw new Error('Type the ceiling price per unit (ex-GST).');
-  if ((list ?? []).some((c) => c.from === row.from)) throw new Error(`A ceiling from ${row.from} is already recorded (rows are never edited — add a new date).`);
+  if ((list ?? []).some((c) => c.from === row.from)) throw new Error(`A ceiling from ${row.from} is already recorded (rows are never edited: add a new date).`);
   return [...(list ?? []), { from: row.from, price_per_unit: round2(num(row.price_per_unit)), ...(row.unit?.trim() ? { unit: row.unit.trim() } : {}) }].sort((a, b) => a.from.localeCompare(b.from));
 }
 
@@ -162,7 +162,7 @@ export function marginRows(purchases: readonly unknown[], items: readonly Pick<S
 
 export function marginCsv(rows: readonly MarginRow[]): string {
   return toCsv([
-    ['Margins on purchase rate (PTR) — working paper, verify with your CA'],
+    ['Margins on purchase rate (PTR): working paper, verify with your CA'],
     ['Item', 'Batch', 'PTR', 'Cost after free', 'PTS', 'MRP', 'Selling rate', 'Margin % on PTR', 'Margin % after free', 'Scheme', 'Last bill'],
     ...rows.map((r) => [r.item, r.batch, r.ptr, r.cost, r.pts ?? '', r.mrp, r.sell, r.margin ?? '', r.marginNet ?? '', r.scheme, r.bill]),
   ]);
@@ -223,7 +223,7 @@ export function applyLoosePrice(stockItemId: string, packMrp: number): number {
   if (!(num(packMrp) > 0)) throw new Error('Type the MRP printed on the strip.');
   const catalog = getTable<InvoiceItem>(CATALOG);
   const cat = catalog.find((c) => norm(c?.name) === norm(it.name));
-  if (!cat) throw new Error(`${it.name} is not in the item list (catalogue) — add it there first.`);
+  if (!cat) throw new Error(`${it.name} is not in the item list (catalogue): add it there first.`);
   const rate = looseRate(packMrp, pack.factor, cat.mrp_less_percent);
   const setRate = !(num(cat.rate) > 0) || num(cat.mrp_less_percent) > 0;
   setTable(CATALOG, catalog.map((c) => (c === cat ? { ...c, mrp: round2(num(packMrp) / pack.factor), ...(setRate ? { rate } : {}) } : c)));

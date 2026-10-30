@@ -24,7 +24,7 @@ export default function ExchangeTender({ value, vouchers, onChange }: { value: E
         const v = vouchers.find((x) => x.purchase.id === e.target.value);
         onChange(v ? { purchaseId: v.purchase.id, amount: v.left, party: v.purchase.vendor_name } : null);
       }} data-pos-exchange-pick>
-        <option value="">—</option>
+        <option value="">-</option>
         {vouchers.map((x) => <option key={x.purchase.id} value={x.purchase.id}>{`${x.purchase.bill_number} · ${x.purchase.vendor_name} · ${x.purchase.used_goods?.model ?? x.purchase.old_metal?.metal ?? ''} · ${formatCurrency(x.left)}`}</option>)}
       </select>
     </label>

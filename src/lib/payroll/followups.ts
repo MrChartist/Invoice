@@ -110,7 +110,7 @@ export function arrearEcrRows(lines: readonly ArrearEcrLine[], payMonth: string)
   const out: Row[] = [['UAN', 'Member name', 'Arrear months', 'Arrear EPF wages', 'Arrear EPS wages', 'Arrear EDLI wages', 'Arrear EE share', 'Arrear EPS share', 'Arrear ER share (EPF − EPS)']];
   for (const l of lines) out.push([l.uan, l.name, l.months.join(' '), l.epf_wages, l.eps_wages, l.edli_wages, l.ee, l.eps, l.er]);
   for (const c of arrearEcrChecks(lines, payMonth)) out.push([`Check: ${c}`]);
-  out.push([`Arrears paid with ${payMonth}. Layout not validated against the EPFO portal — verify with your CA.`]);
+  out.push([`Arrears paid with ${payMonth}. Layout not validated against the EPFO portal: verify with your CA.`]);
   return out;
 }
 
@@ -124,13 +124,13 @@ export function arrearEcrChecks(lines: readonly ArrearEcrLine[], payMonth: strin
   const out: string[] = [];
   const seen = new Set<string>();
   for (const l of lines) {
-    const who = `${l.uan || '—'} ${l.name}`;
+    const who = `${l.uan || '-'} ${l.name}`;
     const off = (got: number, want: number) => Math.abs(got - want) > Math.max(1, l.months.length);
     if (!/^\d{12}$/.test(l.uan)) out.push(`${who}: UAN must be 12 digits.`);
     else if (seen.has(l.uan)) out.push(`${who}: UAN appears twice.`);
     seen.add(l.uan);
     if (!l.name.trim()) out.push(`${who}: no member name.`);
-    if ([l.epf_wages, l.eps_wages, l.edli_wages, l.ee, l.eps, l.er].some((v) => v < 0)) out.push(`${who}: a negative arrear (downward revision) — check how EPFO takes it before uploading.`);
+    if ([l.epf_wages, l.eps_wages, l.edli_wages, l.ee, l.eps, l.er].some((v) => v < 0)) out.push(`${who}: a negative arrear (downward revision), check how EPFO takes it before uploading.`);
     if (l.eps_wages > l.epf_wages || l.edli_wages > l.epf_wages) out.push(`${who}: EPS / EDLI wages exceed EPF wages.`);
     if (off(l.ee, (l.epf_wages * r.employee_pct) / 100)) out.push(`${who}: EE share ${l.ee} is not ${r.employee_pct}% of EPF wages.`);
     if (off(l.eps, (l.eps_wages * r.eps_pct) / 100)) out.push(`${who}: EPS share ${l.eps} is not ${r.eps_pct}% of EPS wages.`);
@@ -190,19 +190,19 @@ export function relief89(input: Relief89Input): Relief89Result {
   const earlier = [...years].sort((a, b) => a.fy - b.fy).map((y): Relief89Row => {
     const without = taxOn(y.income, y.regime, y.fy, input.dob);
     const withA = taxOn(y.income + Math.max(0, y.arrears), y.regime, y.fy, input.dob);
-    if (y.fy < 2017) notes.push(`FY ${fyLabel(y.fy)}: slabs before FY 2017-18 are not kept — the FY 2017-18 table was used; type the tax from that year's return instead.`);
+    if (y.fy < 2017) notes.push(`FY ${fyLabel(y.fy)}: slabs before FY 2017-18 are not kept, the FY 2017-18 table was used; type the tax from that year's return instead.`);
     return { fy: y.fy, label: fyLabel(y.fy), regime: y.regime, income: round2(y.income), arrears: round2(Math.max(0, y.arrears)), tax_without: without, tax_with: withA, difference: round2(withA - without) };
   });
   const diffEarlier = round2(earlier.reduce((s, r) => s + r.difference, 0));
   const relief = Math.max(0, round2(receipt.difference - diffEarlier));
   if (!arrearsTotal) notes.push('No arrears of earlier years entered.');
   else if (diffEarlier >= receipt.difference) notes.push('No relief: the arrears cost as much or more tax when spread back over their years.');
-  notes.push('Form 10E must be filed online by the employee before the relief is claimed in the return — verify with your CA.');
+  notes.push('Form 10E must be filed online by the employee before the relief is claimed in the return: verify with your CA.');
   return { receipt, earlier, arrears_total: arrearsTotal, difference_receipt: receipt.difference, difference_earlier: diffEarlier, relief, notes };
 }
 
 export function relief89Rows(r: Relief89Result, employee: Pick<Employee, 'code' | 'name' | 'pan'>): Row[] {
-  const out: Row[] = [[`Relief u/s 89(1) — Form 10E working: ${employee.code} ${employee.name}${employee.pan ? ` (PAN ${employee.pan})` : ''}`]];
+  const out: Row[] = [[`Relief u/s 89(1), Form 10E working: ${employee.code} ${employee.name}${employee.pan ? ` (PAN ${employee.pan})` : ''}`]];
   out.push(['Year of receipt', r.receipt.label, `regime ${r.receipt.regime}`]);
   out.push(['1. Total income excluding arrears', r.receipt.income]);
   out.push(['2. Arrears of earlier years received', r.arrears_total]);
@@ -213,7 +213,7 @@ export function relief89Rows(r: Relief89Result, employee: Pick<Employee, 'code' 
   out.push(['7. Tax on arrears spread over their years (Annexure I, Table A)', r.difference_earlier]);
   out.push(['8. Relief u/s 89(1) (6 − 7, nil if negative)', r.relief]);
   out.push([]);
-  out.push(['Annexure I, Table A — FY', 'Regime', 'Total income of that year', 'Arrears relating to it', 'Tax without arrears', 'Tax with arrears', 'Difference']);
+  out.push(['Annexure I, Table A: FY', 'Regime', 'Total income of that year', 'Arrears relating to it', 'Tax without arrears', 'Tax with arrears', 'Difference']);
   for (const y of r.earlier) out.push([y.label, y.regime, y.income, y.arrears, y.tax_without, y.tax_with, y.difference]);
   for (const n of r.notes) out.push([n]);
   return out;
@@ -278,7 +278,7 @@ export interface CarPerqInput {
 export function carPerquisite(i: CarPerqInput): PerqValuation {
   const r = carPerqRule(i.date);
   const source = ruleSource(CAR_PERQ_RULES, i.date);
-  if (i.use === 'official') return { monthly: 0, basis: 'Car used wholly for official duties — not a perquisite (keep the log book / employer certificate).', source };
+  if (i.use === 'official') return { monthly: 0, basis: 'Car used wholly for official duties: not a perquisite (keep the log book / employer certificate).', source };
   if (i.use === 'private') {
     const v = Math.max(0, round2((i.private_cost ?? 0) - (i.recovered ?? 0)));
     return { monthly: v, basis: `Car used wholly for private purposes: actual cost ${money(i.private_cost ?? 0)} less recovered ${money(i.recovered ?? 0)} a month.`, source };
@@ -335,7 +335,7 @@ export function accommodationPerquisite(i: AccommodationPerqInput): PerqValuatio
 export function hotelPerquisite(i: { date: string; salary: number; charges: number; days: number; on_transfer: boolean; recovered?: number }): PerqValuation {
   const r = ruleAt(HOTEL_PERQ_RULES, i.date);
   const source = ruleSource(HOTEL_PERQ_RULES, i.date);
-  if (i.on_transfer && i.days <= r.free_days) return { monthly: 0, basis: `Hotel on transfer for ${i.days} days (${r.free_days} or less in all) — not a perquisite.`, source };
+  if (i.on_transfer && i.days <= r.free_days) return { monthly: 0, basis: `Hotel on transfer for ${i.days} days (${r.free_days} or less in all): not a perquisite.`, source };
   const cap = round2((Math.max(0, i.salary) * r.pct) / 100);
   const v = Math.max(0, round2(Math.min(Math.max(0, i.charges), cap) - (i.recovered ?? 0)));
   return { monthly: v, basis: `Hotel: lower of charges ${money(i.charges)} and ${r.pct}% of salary ${money(cap)}${i.recovered ? ` − recovered ${money(i.recovered)}` : ''} a month.`, source };
@@ -357,7 +357,7 @@ export function giftPerquisite(i: { date: string; value: number; earlier_this_ye
   const r = mealGiftRule(i.date);
   const total = round2(i.earlier_this_year + i.value);
   const source = ruleSource(MEAL_GIFT_PERQ_RULES, i.date);
-  if (total < r.gift_exempt_below) return { monthly: 0, basis: `Gifts this year ${money(total)} — below ${money(r.gift_exempt_below)}, exempt.`, source };
+  if (total < r.gift_exempt_below) return { monthly: 0, basis: `Gifts this year ${money(total)}: below ${money(r.gift_exempt_below)}, exempt.`, source };
   const crossing = i.earlier_this_year < r.gift_exempt_below;
   const v = crossing ? total : round2(i.value);
   return { monthly: v, basis: `Gifts this year ${money(total)} reach ${money(r.gift_exempt_below)}: ${crossing ? `the year's gifts (${money(total)}) become taxable now` : `this gift ${money(i.value)} is taxable`}.`, source };
@@ -376,7 +376,7 @@ export function employerRetirementContrib(l: Pick<PayslipLine, 'eps' | 'epf_er' 
 /** Per employee for FY `fy` from FINAL runs: contributions, the limit and the excess taxed u/s 17(2)(vii). */
 export function s17viiRows(runs: readonly PayrollRun[], employees: readonly Employee[], fy: number): Row[] {
   const limit = s17viiLimit(`${fy}-04-01`);
-  const out: Row[] = [['Code', 'Employee', 'Employer PF (EPF + EPS)', 'Employer NPS', 'Superannuation', 'Total', 'Limit', 'Excess — perquisite u/s 17(2)(vii)']];
+  const out: Row[] = [['Code', 'Employee', 'Employer PF (EPF + EPS)', 'Employer NPS', 'Superannuation', 'Total', 'Limit', 'Excess: perquisite u/s 17(2)(vii)']];
   for (const e of employees) {
     const t = { pf: 0, nps: 0, superannuation: 0, total: 0 };
     let any = false;
@@ -393,7 +393,7 @@ export function s17viiRows(runs: readonly PayrollRun[], employees: readonly Empl
     if (!any) continue;
     out.push([e.code, e.name, round2(t.pf), round2(t.nps), round2(t.superannuation), round2(t.total), limit ?? 'n/a', limit === null ? 0 : Math.max(0, round2(t.total - limit))]);
   }
-  out.push(['EPS share included in employer PF (UNVERIFIED — some exclude the pension share). s. 17(2)(viia): the annual accretion on the excess (Rule 3B) is worked on the "Form 10E · Rule 3" tab from the fund statements and saved as a perquisite. Verify with your CA.']);
+  out.push(['EPS share included in employer PF (UNVERIFIED: some exclude the pension share). s. 17(2)(viia): the annual accretion on the excess (Rule 3B) is worked on the "Form 10E · Rule 3" tab from the fund statements and saved as a perquisite. Verify with your CA.']);
   return out;
 }
 
@@ -495,7 +495,7 @@ export function perqStatementRows(runs: readonly PayrollRun[], perqs: readonly P
     if (v) out.push([label, v]);
   }
   out.push(['Total value of perquisites (Form 16 Part B 1(b))', round2(total)]);
-  out.push([`Grouped as ${formLabel} groups perquisites; its row numbers and layout are not reproduced — copy the amounts into the notified form. Perquisites typed after a month was finalized show in "Other" as a correction. Verify with your CA.`]);
+  out.push([`Grouped as ${formLabel} groups perquisites; its row numbers and layout are not reproduced: copy the amounts into the notified form. Perquisites typed after a month was finalized show in "Other" as a correction. Verify with your CA.`]);
   return out;
 }
 

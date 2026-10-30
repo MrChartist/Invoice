@@ -74,7 +74,7 @@ export function bookRcmDraft(project: Pick<RealtyProject, 'name' | 'cost_centre_
   const p = Math.round(t.rcm * 100);
   return saveVoucher({
     type: 'JOURNAL', date, variant: 'OPTIONAL', voucher_class: 'RCM — 80% procurement shortfall',
-    narration: `RCM on the FY ${t.fy} procurement shortfall of ${project.name} (cement at its rate; the rest at 18%) — working paper, verify with your CA (CN20).`,
+    narration: `RCM on the FY ${t.fy} procurement shortfall of ${project.name} (cement at its rate; the rest at 18%): working paper, verify with your CA (CN20).`,
     lines: [{ account_id: ledger('RCM on procurement shortfall (no ITC)', 'DIRECT_EXPENSES', 5810), dr: p, cr: 0, ...(project.cost_centre_id ? { cost_centre_id: project.cost_centre_id } : {}) }, { account_id: A.rcmPayable, dr: 0, cr: p }],
   });
 }

@@ -46,7 +46,7 @@ const BADGE: Record<CertStatus, string> = {
   overdue: surface.badgeOverdue,
 };
 
-const money = (n: number) => (n ? formatMoney(n, 'INR') : '—');
+const money = (n: number) => (n ? formatMoney(n, 'INR') : '-');
 
 function loadCerts(): TdsCertificate[] {
   try {
@@ -206,7 +206,7 @@ function QuarterCard({ block, onToggle }: {
                       ) : <span>{rcvT('noTan')}</span>}
                     </span>
                   </th>
-                  <td className={surface.mono}>{r.section ? sectionText(r.section, quarterStart(block.fy, block.quarter), ita25Words()) : '—'}</td>
+                  <td className={surface.mono}>{r.section ? sectionText(r.section, quarterStart(block.fy, block.quarter), ita25Words()) : '-'}</td>
                   <td className={surface.numeric} title={r.invoices.map((l) => l.number).join(', ')}>{r.invoiceCount}</td>
                   <td className={surface.numeric}>{money(r.taxable)}</td>
                   <td className={surface.numeric}>{money(r.total)}</td>
@@ -337,8 +337,8 @@ function Reconcile({ data, notify }: TdsTabProps) {
                   key: `m${i}`,
                   cells: [
                     `Q${m.quarter} ${fyLabel(m.fy)}`, m.partyName, m.invoices.map((l) => l.number).join(', '),
-                    money(m.tds26as), money(m.tdsBooks), m.diff ? formatMoney(m.diff, 'INR') : '—',
-                    [m.kind === 'group' ? rcvT('qTotal') : '', m.quarterShift ? rcvT('otherQuarter') : ''].filter(Boolean).join(' · ') || '—',
+                    money(m.tds26as), money(m.tdsBooks), m.diff ? formatMoney(m.diff, 'INR') : '-',
+                    [m.kind === 'group' ? rcvT('qTotal') : '', m.quarterShift ? rcvT('otherQuarter') : ''].filter(Boolean).join(' · ') || '-',
                   ],
                 }))} />
             )}
@@ -346,7 +346,7 @@ function Reconcile({ data, notify }: TdsTabProps) {
               <ReconTable title={rcvT('only26asTitle')} numeric={[4, 5]} head={[rcvT('date'), rcvT('deductor'), rcvT('tan'), rcvT('section'), rcvT('amountPaid'), rcvT('tds'), rcvT('note')]}
                 rows={recon.only26as.map((c) => ({
                   key: `c${c.line}`,
-                  cells: [formatDate(c.date), c.partyName, c.tan || '—', c.section || '—', money(c.amountPaid), money(c.tds),
+                  cells: [formatDate(c.date), c.partyName, c.tan || '-', c.section || '-', money(c.amountPaid), money(c.tds),
                     c.known ? rcvT('knownNote') : rcvT('unknownNote')],
                 }))} />
             )}
@@ -354,7 +354,7 @@ function Reconcile({ data, notify }: TdsTabProps) {
               <ReconTable title={rcvT('onlyBooksTitle')} numeric={[5]} head={[rcvT('quarter'), rcvT('deductor'), rcvT('invoice'), rcvT('date'), rcvT('section'), rcvT('tds'), rcvT('note')]}
                 rows={recon.onlyBooks.map((l) => ({
                   key: `b${l.invoiceId}`,
-                  cells: [`${quarterLabel(l.quarter)} ${fyLabel(l.fy)}`, l.partyName, l.number, formatDate(l.date), l.section || '—', money(l.tds),
+                  cells: [`${quarterLabel(l.quarter)} ${fyLabel(l.fy)}`, l.partyName, l.number, formatDate(l.date), l.section || '-', money(l.tds),
                     l.settled ? rcvT('paidNote') : rcvT('notPaidNote')],
                 }))} />
             )}

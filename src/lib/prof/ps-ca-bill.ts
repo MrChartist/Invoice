@@ -76,7 +76,7 @@ export function draftLines(events: readonly CaEvent[], client: unknown, catalog:
     const fee = covered && e.kind !== 'retainer' ? 0 : round2(num(fees[e.kind] ?? it?.rate ?? 0));
     const note = [e.udin ? `UDIN ${e.udin}` : '', covered && e.kind !== 'retainer' ? 'Covered by the monthly retainer' : ''].filter(Boolean).join(' · ');
     return {
-      id: generateId(), type: 'Service', name: `${it?.name || 'Professional fees'} — ${e.label}`, description: note, hsn: it?.hsn || '9982',
+      id: generateId(), type: 'Service', name: `${it?.name || 'Professional fees'}: ${e.label}`, description: note, hsn: it?.hsn || '9982',
       unit: 'NOS', quantity: 1, rate: fee, amount: fee, tax_rate: it ? num(it.tax_rate) : 18, discount_percent: 0, bill_refs: [e.key],
     } as InvoiceItem;
   });

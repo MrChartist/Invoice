@@ -602,13 +602,13 @@ export function Transactions() {
                       <td className={styles.cClient}>
                         <div className={styles.client}>
                           <Avatar name={inv.client?.name || '?'} size={28} square />
-                          <span>{inv.client?.name || '—'}</span>
+                          <span>{inv.client?.name || '-'}</span>
                         </div>
                       </td>
                       <td className={cn(styles.nowrap, styles.cDate)}>
                         {formatDate(inv.issue_date)}
                         <div className={cn(styles.docType, status === 'Overdue' && styles.overdueText)}>
-                          {salesT(inv.doc_type === 'QUOTATION' ? 'tx.validUntil' : 'tx.due', { date: formatDate(inv.due_date) || '—' })}
+                          {salesT(inv.doc_type === 'QUOTATION' ? 'tx.validUntil' : 'tx.due', { date: formatDate(inv.due_date) || '-' })}
                         </div>
                       </td>
                       <td className={styles.cStatus}>
@@ -632,7 +632,7 @@ export function Transactions() {
                       </td>
                       <td className={cn(surface.numeric, styles.cTotal)}>{formatCurrency(inv.total, inv.currency)}</td>
                       <td className={cn(surface.numeric, styles.cBal)}>
-                        {isRevenueDoc(inv) ? formatCurrency(due, inv.currency) : '—'}
+                        {isRevenueDoc(inv) ? formatCurrency(due, inv.currency) : '-'}
                       </td>
                       <td className={styles.cAct}>
                         <div className={surface.rowActions}>

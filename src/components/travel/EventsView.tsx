@@ -76,7 +76,7 @@ export default function EventsView({ notify }: TvViewProps) {
         <ul data-tv-vendor-tds>
           {bk.filter((b) => b.status !== 'cancelled').map((b) => {
             const h = vendorTdsHint(b.component, b.start || todayInput());
-            return <li key={b.id}>{comp(b.component)} · {vendors.get(b.vendor_id ?? '') ?? '—'} · {h ? tvdT('tdsHint', { label: h.label }) : '—'}</li>;
+            return <li key={b.id}>{comp(b.component)} · {vendors.get(b.vendor_id ?? '') ?? '-'} · {h ? tvdT('tdsHint', { label: h.label }) : '-'}</li>;
           })}
         </ul>
       )}
@@ -98,7 +98,7 @@ function EventForm({ trip, notify, onSaved }: { trip: Trip; notify: TvViewProps[
         {txt('venue', 'data-tv-ev-venue')}{txt('city', 'data-tv-ev-city')}
         <Field label={tvdT('state')}>
           <select className={controls.select} value={e.state ?? ''} onChange={(x) => set({ state: x.target.value })} data-tv-ev-state>
-            <option value="">—</option>
+            <option value="">-</option>
             {INDIAN_STATES.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}
             <option value="96">{tvdT('abroad')}</option>
           </select>

@@ -54,7 +54,7 @@ export default function AdvancesView({ notify, refresh, tick, boqId }: PanelProp
       </div>
       <section className={styles.box}>
         <Fields spec={[
-          ['advance_id', cbT('advance'), [['', '—'], ...advances.filter((a) => samePartyAs(a.client, { id: c.client_id, name: c.client_name })).map((a) => [a.id, `${a.number} · ${fmtMoney(a.amount)}`] as const)]],
+          ['advance_id', cbT('advance'), [['', '-'], ...advances.filter((a) => samePartyAs(a.client, { id: c.client_id, name: c.client_name })).map((a) => [a.id, `${a.number} · ${fmtMoney(a.amount)}`] as const)]],
           ['kind', twT('kind'), kinds], ['interest_pct', cbT('interestPct'), 'number'], ['recover_from_pct', cbT('recoverFrom'), 'number'], ['recover_by_pct', cbT('recoverBy'), 'number'],
         ]} v={t} set={setT} />
         <div className={styles.toolbar}>

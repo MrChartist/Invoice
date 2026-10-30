@@ -43,6 +43,6 @@ test('pure-agent recoveries out, credit notes in, drafts / other FY out, no-cash
   assert.equal(p.recoveriesOut, 2450);
   assert.equal(p.cashPct, 0, 'the advance adjustment moved no money');
   assert.equal(p.cashBasis, 100000);
-  assert.match(p.notes[0], /Not available to an LLP — verify/);
+  assert.match(p.notes[0], /Not available to an LLP: verify/);
   assert.match(presumptive({ fy: 2025, invoices: [], receipts: [], firmForm: 'partnership' }).notes[0], /remuneration and interest/);
 });

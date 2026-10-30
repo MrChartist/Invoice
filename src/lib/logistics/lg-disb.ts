@@ -50,9 +50,9 @@ export function disbRecord(i: DisbInput): Omit<PurchaseRecord, 'id'> {
   const lg: NonNullable<PurchaseRecord['lg']> = { job_id: i.job.id, disb: i.kind, on_behalf: true, ...(ref ? { ref } : {}), ...(i.in_client_name ? { in_client_name: true } : {}) };
   return {
     kind: 'EXPENSE', vendor_name: i.payee.trim(), bill_number: ref || i.job.number, date: i.date, category: DISB_CATEGORY,
-    lines: [{ id: generateId(), name: `${LABEL[i.kind]} — ${i.job.number}`, quantity: 1, rate: amount, tax_rate: 0 }],
+    lines: [{ id: generateId(), name: `${LABEL[i.kind]}: ${i.job.number}`, quantity: 1, rate: amount, tax_rate: 0 }],
     taxable: amount, cgst: 0, sgst: 0, igst: 0, itc_eligible: false, total: amount, amount_paid: 0,
-    billable_to_client_id: i.job.client_id, pure_agent: true, notes: `Paid on the client's behalf — job ${i.job.number}`, lg,
+    billable_to_client_id: i.job.client_id, pure_agent: true, notes: `Paid on the client's behalf: job ${i.job.number}`, lg,
   };
 }
 

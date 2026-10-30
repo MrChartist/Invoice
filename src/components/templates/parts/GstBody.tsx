@@ -110,9 +110,9 @@ export function GstBody({ invoice, sender, totals, skipEway, works }: Props) {
         <div className={styles.gMeta}>
           <Cell label={isQuote ? 'Quotation No.' : invoice.doc_type === 'SALES_ORDER' ? 'Order No.' : 'Invoice No.'}>{invoice.invoice_number || 'DRAFT'}</Cell>
           <Cell label="Dated">{date(invoice.issue_date)}</Cell>
-          <Cell label={isQuote ? 'Valid until' : invoice.doc_type === 'SALES_ORDER' ? 'Delivery by' : 'Due date'}>{date(invoice.due_date) || '—'}</Cell>
-          <Cell label="Buyer's Ref / PO">{invoice.po_number || '—'}</Cell>
-          {show.place && <Cell label="Place of supply">{place || '—'}</Cell>}
+          <Cell label={isQuote ? 'Valid until' : invoice.doc_type === 'SALES_ORDER' ? 'Delivery by' : 'Due date'}>{date(invoice.due_date) || '-'}</Cell>
+          <Cell label="Buyer's Ref / PO">{invoice.po_number || '-'}</Cell>
+          {show.place && <Cell label="Place of supply">{place || '-'}</Cell>}
           <Cell label="Reverse charge">{invoice.reverse_charge ? 'Yes' : 'No'}</Cell>
           {/* Tally's "Dispatch details" (P1-24): only when the document carries transport details. */}
           {transportRows(invoice.transport, (d) => date(d), { skipEway }).map((r) => (
@@ -186,13 +186,13 @@ export function GstBody({ invoice, sender, totals, skipEway, works }: Props) {
               <tr key={line.id}>
                 <td className={cn(styles.center, styles.num)}>{i + 1}</td>
                 <td>
-                  <div className={styles.itemName}>{line.name || '—'}</div>
+                  <div className={styles.itemName}>{line.name || '-'}</div>
                   {src?.description && <div className={styles.itemDesc}>{src.description}</div>}
                   <ItemCustomLine values={src?.custom_values} />
                   {show.tracking && trackingText(src, invoice.ag, invoice.mf, invoice.ps, invoice.tv, invoice.mp, invoice.hs, invoice.lg) && <div className={styles.itemDesc}>{trackingText(src, invoice.ag, invoice.mf, invoice.ps, invoice.tv, invoice.mp, invoice.hs, invoice.lg)}</div>}
                   {worksLineText(src, invoice.boq_terms?.cn) && <div className={styles.itemDesc} data-works-line>{worksLineText(src, invoice.boq_terms?.cn)}</div>}
                 </td>
-                {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '—'}</td>}
+                {showHsn && <td className={cn(styles.center, styles.num)}>{line.hsn || '-'}</td>}
                 <td className={cn(styles.right, styles.num)}>{formatQuantity(line.quantity)}</td>
                 <td className={cn(styles.right, styles.num)}>{money(line.rate, cur)}</td>
                 {showUnit && <td className={styles.center}>{line.unit || ''}</td>}

@@ -86,7 +86,7 @@ export function jobLines(job: ServiceJob, date: string, newId: () => string = ge
   const labour = round2(num(job.labour));
   if (labour > 0) {
     const r = repairRule(job.kind, date, job.sac);
-    out.push({ id: newId(), name: `Repair — ${job.asset.model}`, description: job.number, type: 'Service', hsn: r.sac, unit: 'NOS', quantity: 1, rate: labour, tax_rate: r.rate, discount_percent: 0, amount: labour });
+    out.push({ id: newId(), name: `Repair: ${job.asset.model}`, description: job.number, type: 'Service', hsn: r.sac, unit: 'NOS', quantity: 1, rate: labour, tax_rate: r.rate, discount_percent: 0, amount: labour });
   }
   for (const p of job.parts) {
     if (p.warranty && free) continue;
@@ -101,7 +101,7 @@ export function warrantyMoves(job: ServiceJob, date: string): StockMove[] {
   if (!warrantyCovers(job)) return [];
   return job.parts.filter((p) => p.warranty && p.item_id && num(p.qty) > 0).map((p) => ({
     id: generateId(), item_id: p.item_id!, date, qty: -Math.abs(num(p.qty)), rate: 0, kind: 'adjustment' as const, ref_type: 'service_job', ref_id: job.id,
-    note: `Warranty replacement — ${job.number} (no sale, no GST; verify with your CA)`, ...(p.serials?.length ? { serials: p.serials } : {}),
+    note: `Warranty replacement: ${job.number} (no sale, no GST; verify with your CA)`, ...(p.serials?.length ? { serials: p.serials } : {}),
   }));
 }
 
@@ -211,8 +211,8 @@ export function replacementSwap(id: string, input: { itemId: string; outSerial: 
   if (!input.outSerial.trim() || !input.inSerial.trim()) throw new Error('Type both serials.');
   const base = { item_id: input.itemId, date: input.date, rate: 0, kind: 'adjustment' as const, ref_type: 'service_job', ref_id: j.id };
   const moves: StockMove[] = [
-    { ...base, id: generateId(), qty: -1, serials: [input.outSerial.trim()], note: `Warranty swap out — ${j.number}` },
-    { ...base, id: generateId(), qty: 1, serials: [input.inSerial.trim()], note: `Warranty swap in — ${j.number} (no value; verify with your CA)` },
+    { ...base, id: generateId(), qty: -1, serials: [input.outSerial.trim()], note: `Warranty swap out: ${j.number}` },
+    { ...base, id: generateId(), qty: 1, serials: [input.inSerial.trim()], note: `Warranty swap in: ${j.number} (no value; verify with your CA)` },
   ];
   for (const m of moves) stockDb.addMove(m);
   write(all.map((x) => (x.id === id ? { ...j, swap_move_ids: [...(j.swap_move_ids ?? []), ...moves.map((m) => m.id)], updated_at: new Date().toISOString() } : x)));

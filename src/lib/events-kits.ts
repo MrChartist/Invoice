@@ -82,7 +82,7 @@ export function kitStockEvents(
           kind: eff === 'out' ? 'sale' : 'return',
           qty: eff === 'out' ? -q : q,
           saleRate: q > 0 ? (lineValue * c.share) / q : 0,
-          particulars: `${eff === 'out' ? 'Kit sale' : 'Kit return'} — ${line.name} · ${inv.invoice_number ?? ''}${inv.client?.name ? ` · ${inv.client.name}` : ''}`,
+          particulars: `${eff === 'out' ? 'Kit sale' : 'Kit return'}: ${line.name} · ${inv.invoice_number ?? ''}${inv.client?.name ? ` · ${inv.client.name}` : ''}`,
           refType: 'invoice',
           refId: inv.id,
           refNumber: inv.invoice_number ?? '',

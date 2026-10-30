@@ -104,7 +104,7 @@ export function ChallanList({ challans, gstin, defaultPeriodKey, seed, onSeedUse
                 <tr key={c.id}>
                   <td className={surface.mono}>{c.cpin}</td>
                   <td>{formatDate(c.generated_on)}</td>
-                  <td>{c.period_key ?? '—'}</td>
+                  <td>{c.period_key ?? '-'}</td>
                   {GST_HEADS.map((h) => <td key={h}>{formatMoney(headTotal(c.amounts, h))}</td>)}
                   <td><strong>{formatMoney(challanTotal(c))}</strong></td>
                   <td>

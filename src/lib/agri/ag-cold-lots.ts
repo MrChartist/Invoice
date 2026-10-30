@@ -53,11 +53,11 @@ export function smallPaper(title: string, head: string, rows: readonly [string, 
 /** Storage receipt (A5): "Non-negotiable receipt — not a WDRA e-NWR" (AG23) and the terms typed in settings. */
 export function receiptHtml(l: ColdLot, ctx: { company: string; chamber?: string; plan?: string; terms?: string }): string {
   return smallPaper(`Storage receipt ${l.number}`, ctx.company, [
-    ['Depositor', l.depositor_name], ['Date in', l.date_in], ['Commodity', [l.commodity, l.variety].filter(Boolean).join(' — ')], ['Bags', l.bags],
+    ['Depositor', l.depositor_name], ['Date in', l.date_in], ['Commodity', [l.commodity, l.variety].filter(Boolean).join(', ')], ['Bags', l.bags],
     ['Weight (kg)', l.weight_kg ?? (l.bag_kg ? q3(l.bags * l.bag_kg) : '')], ['Chamber / location', [ctx.chamber, l.location].filter(Boolean).join(' · ')],
     ['Grade / marks', [l.grade, l.marks].filter(Boolean).join(' · ')], ['Season', l.season], ['Rent', ctx.plan ?? ''],
-    ['Insured', l.insured ? `${l.insured.by} — ₹${l.insured.value}` : ''],
-  ], `Non-negotiable receipt — not a WDRA e-NWR. ${ctx.terms ?? ''}`.trim());
+    ['Insured', l.insured ? `${l.insured.by}: ₹${l.insured.value}` : ''],
+  ], `Non-negotiable receipt: not a WDRA e-NWR. ${ctx.terms ?? ''}`.trim());
 }
 
 /* ── Storage ── */

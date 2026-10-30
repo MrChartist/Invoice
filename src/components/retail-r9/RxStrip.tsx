@@ -71,7 +71,7 @@ function RxFields({ rx, onRx, x, onImage }: { rx: Rx; onRx: (r: Rx) => void; x: 
         <NumberInput className={controls.input} value={rx.age ?? 0} onChange={(age) => set({ age: age > 0 ? Math.round(age) : undefined })} /></label>
       <label className={controls.field} style={{ maxWidth: 110 }}><span className={controls.label}>{rtbT('gender')}</span>
         <select className={controls.select} value={rx.gender ?? ''} onChange={(e) => set({ gender: (e.target.value || undefined) as Rx['gender'] })}>
-          <option value="">—</option><option value="F">{rtbT('g.F')}</option><option value="M">{rtbT('g.M')}</option><option value="O">{rtbT('g.O')}</option>
+          <option value="">-</option><option value="F">{rtbT('g.F')}</option><option value="M">{rtbT('g.M')}</option><option value="O">{rtbT('g.O')}</option>
         </select></label>
       <label className={controls.field}><span className={controls.label}>{x ? rtbT('addressX') : rtbT('address')}</span>
         <input className={controls.input} value={rx.patient_address ?? ''} onChange={(e) => set({ patient_address: e.target.value })} data-rx-address /></label>

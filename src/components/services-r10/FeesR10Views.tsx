@@ -59,7 +59,7 @@ export default function FeesR10Views({ view, notify }: { view: 'batches' | 'atte
         <>
           <ClassForm notify={notify} onSaved={refresh} kind="batch" feePlanId={plan.id} />
           <Timetable classes={batches} />
-          <Tbl h={[mcT('student'), mcT('batch')]} rows={enrolled.map((s) => [s.name, <select key="b" value={s.enrolments?.find((e) => e.plan_id === plan.id)?.class_id ?? ''} onChange={(e) => attempt(notify, () => { setBatch(s.id!, plan.id, e.target.value); refresh(); })} aria-label={mcT('put')}><option value="">—</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>])} />
+          <Tbl h={[mcT('student'), mcT('batch')]} rows={enrolled.map((s) => [s.name, <select key="b" value={s.enrolments?.find((e) => e.plan_id === plan.id)?.class_id ?? ''} onChange={(e) => attempt(notify, () => { setBatch(s.id!, plan.id, e.target.value); refresh(); })} aria-label={mcT('put')}><option value="">-</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>])} />
         </>
       )}
       {view === 'attendance' && batch && (
@@ -71,7 +71,7 @@ export default function FeesR10Views({ view, notify }: { view: 'batches' | 'atte
           </div>
           <Tbl d="att-table" h={[mcT('student'), mcT('present'), mcT('pct')]} rows={students.map((s) => {
             const p = attendanceOf(s.id!, day.slice(0, 7), d, [batch], loadAttendance());
-            return [s.name, <span key="m">{MARKS.map((m) => <B key={m} sm p={shown[s.id!] === m} g={shown[s.id!] !== m} l={mcT(m)} on={() => setMarks({ ...marks, [s.id!]: m })} />)}</span>, p.held ? `${p.present} / ${p.held}` : '—'];
+            return [s.name, <span key="m">{MARKS.map((m) => <B key={m} sm p={shown[s.id!] === m} g={shown[s.id!] !== m} l={mcT(m)} on={() => setMarks({ ...marks, [s.id!]: m })} />)}</span>, p.held ? `${p.present} / ${p.held}` : '-'];
           })} />
         </>
       )}

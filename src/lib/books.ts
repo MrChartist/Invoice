@@ -502,8 +502,8 @@ export function buildVouchers(data: BooksData): Voucher[] {
       // An on-account receipt (no invoice, 8.2 / bill-wise RV) names its party on the row itself.
       party: inv ? partyOfInvoice(inv) : str((t as { client_name?: unknown }).client_name) || 'Unknown customer',
       narration: inv || !(t as { client_name?: unknown }).client_name
-        ? `Against ${inv?.invoice_number || 'invoice'}${t.note ? ` — ${t.note}` : ''}`
-        : `On account${t.note && t.note !== 'On account' ? ` — ${t.note}` : ''}`,
+        ? `Against ${inv?.invoice_number || 'invoice'}${t.note ? `: ${t.note}` : ''}`
+        : `On account${t.note && t.note !== 'On account' ? `: ${t.note}` : ''}`,
       debit: 0,
       credit: amount,
       method: str(t.method) || 'Bank transfer',

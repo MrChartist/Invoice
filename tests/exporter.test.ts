@@ -107,7 +107,8 @@ test('the LUT store needs settings.manage, refuses duplicates and is audited as 
 
 test('e-Invoice CntCode is pre-filled from the destination; the printed block is hidden without export data', () => {
   assert.equal(cntCodeOf({ country_of_destination: 'AE' }), 'AE');
-  assert.equal(cntCodeOf({ country_of_destination: 'us — United States' }), 'US');
+  assert.equal(cntCodeOf({ country_of_destination: 'us — United States' }), 'US', 'old stored text still reads');
+  assert.equal(cntCodeOf({ country_of_destination: 'us: United States' }), 'US');
   assert.equal(cntCodeOf({ country_of_destination: 'USA' }), '', 'not an ISO-2 code');
   assert.equal(cntCodeOf({}), '');
   assert.deepEqual(exportPrintRows({ supply_type: 'B2B', place_of_supply: '27' }, { iec: 'AAPFU0939F' }), [], 'domestic: nothing printed');
@@ -117,7 +118,7 @@ test('e-Invoice CntCode is pre-filled from the destination; the printed block is
     { iec: 'AAPFU0939F', ad_code: '05100052900009', ad_bank: 'HDFC Fort' },
   );
   assert.deepEqual(rows.map((r) => r.key), ['iec', 'ad_code', 'incoterm', 'port_of_loading', 'country_of_origin', 'country_of_destination', 'marks_numbers']);
-  assert.equal(rows.find((r) => r.key === 'country_of_origin')?.value, 'IN — India', 'origin defaults to India');
+  assert.equal(rows.find((r) => r.key === 'country_of_origin')?.value, 'IN: India', 'origin defaults to India');
   assert.equal(rows.find((r) => r.key === 'ad_code')?.value, '05100052900009 (HDFC Fort)');
   assert.deepEqual(exportPrintRows({ supply_type: 'EXPORT_LUT' }, { iec: 'AAPFU0939F' }).map((r) => r.key), ['iec'], 'IEC alone on an export');
   assert.equal(countryLabel('ZZ'), 'ZZ');

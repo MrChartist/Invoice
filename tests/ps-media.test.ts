@@ -48,7 +48,7 @@ test('principal at the media class instead of the service rate; commission line;
   purchasesDb.save(bill('np', 100000, {}));
   const [l] = mediaLines(unbilledMedia(purchasesDb.all(), 'c-mh', () => false), { fee_pct: 0, sac: '998361', gst_rate: 18, media_rate: 5, media_hsn: '998363' });
   assert.deepEqual([l.hsn, l.tax_rate], ['998363', 5]);
-  assert.deepEqual(commissionLine('Times of India', 200000, 15, { sac: '998363', gst_rate: 18 }), { name: 'Media commission 15% — Times of India', hsn: '998363', unit: 'NOS', quantity: 1, rate: 30000, tax_rate: 18, discount_percent: 0 });
+  assert.deepEqual(commissionLine('Times of India', 200000, 15, { sac: '998363', gst_rate: 18 }), { name: 'Media commission 15%: Times of India', hsn: '998363', unit: 'NOS', quantity: 1, rate: 30000, tax_rate: 18, discount_percent: 0 });
   assert.deepEqual(mediaTds('2026-10-01'), { section: '194C', levy: false });
   assert.equal(mediaTds('2024-10-01').levy, true);
 });

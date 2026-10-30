@@ -162,7 +162,7 @@ export function buildBackToBackPos(so: InvoiceRecord, picks: readonly PoPick[], 
       ...(clean(pick.vendor_gstin) ? { vendor_gstin: clean(pick.vendor_gstin).toUpperCase() } : {}),
       ...(pos ? { place_of_supply: pos } : {}),
       lines, taxable: t.taxable, cgst: t.cgst, sgst: t.sgst, igst: t.igst, total: t.total,
-      notes: `Against sales order ${so.invoice_number} (${so.client?.name ?? ''})${opts.dropShip ? ' — deliver directly to the customer' : ''}`,
+      notes: `Against sales order ${so.invoice_number} (${so.client?.name ?? ''})${opts.dropShip ? ': deliver directly to the customer' : ''}`,
       so_id: so.id,
       ...(opts.dropShip ? { drop_ship: true, ship_to: Object.fromEntries(Object.entries(ship).filter(([, v]) => clean(v))) } : {}),
     };

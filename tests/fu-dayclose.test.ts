@@ -81,7 +81,7 @@ test('shortage: written off (no cash) or recovered; undo restores closed, cancel
   assert.throws(() => settleShort(s1.id, 0, 'cash'), /already settled/);
   assert.throws(() => settleShort(s1.id, 1, 'cash'), /Nothing short/);
   const wo = localDb.payments.listFor(b1.id).find((p) => p.write_off);
-  assert.ok(wo && movedNoCash(wo) && /Shortage at pump — Ravi/.test(wo.note ?? ''));
+  assert.ok(wo && movedNoCash(wo) && /Shortage at pump: Ravi/.test(wo.note ?? ''));
   assert.equal(localDb.invoices.getById(b1.id)?.status, 'Paid');
   settleShort(s2.id, 0, 'cash');
   assert.equal(localDb.payments.listFor(shiftBill(s2.id)!.id).filter((p) => p.method === 'Cash').length, 2);

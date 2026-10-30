@@ -883,7 +883,7 @@ export function reinstateIssues(
         const overD = l.delivered > l.ordered + 1e-6 && l.delivered > (prev?.delivered ?? 0);
         const overI = l.invoiced > l.ordered + 1e-6 && l.invoiced > (prev?.invoiced ?? 0);
         if (overD || overI) {
-          errors.push(`"${l.item.name || 'Item'}" on sales order ${so.invoice_number}: ${overI ? `${l.invoiced} would be invoiced` : `${l.delivered} would be delivered`} against ${l.ordered} ordered — other documents fulfilled it meanwhile.`);
+          errors.push(`"${l.item.name || 'Item'}" on sales order ${so.invoice_number}: ${overI ? `${l.invoiced} would be invoiced` : `${l.delivered} would be delivered`} against ${l.ordered} ordered, other documents fulfilled it meanwhile.`);
         }
       }
     }

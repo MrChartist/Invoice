@@ -72,7 +72,7 @@ export function ReturnsPanel(props: PanelProps) {
                     <td>{r.expected_on ?? ''}</td>
                     <td>{r.received_on ? `${r.received_on} · ${r.condition ? mT(`cond.${r.condition}`) : ''}` : ''}</td>
                     <td>{mT(`ds.${st}`)}{r.claim ? ` · ${mT(`claim.${r.claim.status}`)}` : ''}</td>
-                    <td>{claimDeadline(r, channel) || '—'}</td>
+                    <td>{claimDeadline(r, channel) || '-'}</td>
                     <td className={surface.rowActions}>
                       {st === 'pending' && <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => act(() => markReceived(r.id, today(), cond, godown || undefined))}>{mT('rtMarkReceived')}</button>}
                       {!r.credit_note_id && r.doc_id && st !== 'closed' && <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => restock(r.id)}>{mT('rtRestock')}</button>}

@@ -282,7 +282,7 @@ export const missingGstinProvider: NotificationProvider = (ctx) => {
       id: `client-gstin:${[...names.keys()].sort().join('|')}`,
       severity: 'info',
       title: `${plural(list.length, 'client')} missing GSTIN on large invoices`,
-      detail: `${shown} — invoices of ${formatCurrency(LARGE_INVOICE_THRESHOLD)}+ usually need the buyer's GSTIN for input tax credit.`,
+      detail: `${shown}: invoices of ${formatCurrency(LARGE_INVOICE_THRESHOLD)}+ usually need the buyer's GSTIN for input tax credit.`,
       href: '/clients',
       cta: 'Add GSTIN',
       at: ctx.now.toISOString(),
@@ -322,7 +322,7 @@ export const gstReturnsProvider: NotificationProvider = (ctx) => {
 };
 
 const PDC_COPY: Record<PdcKind, { severity: NotificationSeverity; title: (n: number) => string; tail: string }> = {
-  stale: { severity: 'critical', title: (n) => `${plural(n, 'cheque')} about to expire`, tail: 'A cheque is valid for 3 months from its date — deposit it or ask for a fresh one.' },
+  stale: { severity: 'critical', title: (n) => `${plural(n, 'cheque')} about to expire`, tail: 'A cheque is valid for 3 months from its date: deposit it or ask for a fresh one.' },
   'deposit-now': { severity: 'warning', title: (n) => `${plural(n, 'cheque')} ready to deposit`, tail: 'Deposit them, then mark them deposited.' },
   'deposit-soon': { severity: 'info', title: (n) => `${plural(n, 'post-dated cheque')} due within ${DUE_SOON_DAYS} days`, tail: 'Keep them ready for deposit on their date.' },
   'issued-due': { severity: 'warning', title: (n) => `${plural(n, 'issued cheque')} due for presentation`, tail: 'Keep enough balance in the bank so they do not bounce.' },

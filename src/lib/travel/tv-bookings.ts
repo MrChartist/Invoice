@@ -63,7 +63,7 @@ export function removeBooking(id: string, live: ReadonlySet<string>): void {
   const rows = loadBookings();
   const b = rows.find((x) => x.id === id);
   if (!b) return;
-  if (isBilled(b, live)) throw new Error('This booking is billed — cancel it instead.');
+  if (isBilled(b, live)) throw new Error('This booking is billed: cancel it instead.');
   assertUnlocked({ issue_date: b.start }, 'delete');
   setTable(TV_TABLES.bookings, rows.filter((x) => x.id !== id));
 }

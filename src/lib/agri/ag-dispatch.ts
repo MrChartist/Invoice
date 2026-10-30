@@ -115,7 +115,7 @@ export function billDispatch(id: string, date?: string): InvoiceRecord {
   const { item, ag } = dispatchBillParts(d, getTable<MilkRateChart>(AG_TABLES.rateCharts));
   const client = localDb.clients.getById(d.buyer_id) ?? { ...blankClient(), name: d.buyer_name ?? 'Union' };
   return withTablesRollback([T, 'invoices', 'clients', 'series_counters'], () => {
-    const inv = milkSaleBill(client, [item], date ?? d.received?.date ?? d.date, ag, `Milk dispatch ${d.number}${d.received?.ack_no ? ` · acknowledgement ${d.received.ack_no}` : ''}. Nil-rated fresh milk (N 2/2017-CT(R)) — verify with your CA.`);
+    const inv = milkSaleBill(client, [item], date ?? d.received?.date ?? d.date, ag, `Milk dispatch ${d.number}${d.received?.ack_no ? ` · acknowledgement ${d.received.ack_no}` : ''}. Nil-rated fresh milk (N 2/2017-CT(R)): verify with your CA.`);
     setTable(T, loadDispatches().map((x) => (x.id === id ? { ...x, invoice_id: inv.id, updated_at: new Date().toISOString() } : x)));
     return inv;
   });

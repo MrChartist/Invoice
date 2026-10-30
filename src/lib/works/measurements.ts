@@ -120,7 +120,7 @@ export function splitExtras(items: readonly InvoiceItem[], boq: Pick<InvoiceReco
     const within = roundQty(Math.max(num(src.quantity) - (previous.get(src.id) ?? 0), 0));
     const extra = roundQty(num(it.quantity) - within);
     if (within > EPS) out.push({ ...it, quantity: within, amount: round2(within * num(it.rate)) });
-    if (extra > EPS) out.push({ ...it, id: `${it.id}-x`, name: `Extra item — ${it.name}`, description: `${m.extra.reason}`, quantity: extra, amount: round2(extra * num(it.rate)) });
+    if (extra > EPS) out.push({ ...it, id: `${it.id}-x`, name: `Extra item: ${it.name}`, description: `${m.extra.reason}`, quantity: extra, amount: round2(extra * num(it.rate)) });
   }
   return out;
 }
@@ -225,7 +225,7 @@ export function saveRaBill(boqId: string, req: RaRequest): { measurement: RaMeas
       ...(final ? { ra_final: true } : {}),
       boq_id: boqId,
       ...(release ? { retention_release_on: release } : {}),
-      notes: [`RA bill no. ${raNo}${final ? ' (final)' : ''} — ${boq.invoice_number}${terms.work_order ? ` · work order ${terms.work_order}` : ''}`, (stage.notes ?? '').split('\n').slice(1).join('\n')].filter((s) => s.trim()).join('\n'),
+      notes: [`RA bill no. ${raNo}${final ? ' (final)' : ''}: ${boq.invoice_number}${terms.work_order ? ` · work order ${terms.work_order}` : ''}`, (stage.notes ?? '').split('\n').slice(1).join('\n')].filter((s) => s.trim()).join('\n'),
     };
     bill = { ...bill, boq_terms: { ...bill.boq_terms, cn: snap.build(bill, invoices, lines) } }; // R11: the paper's snapshot
     const invoice = localDb.invoices.save(bill);
