@@ -471,7 +471,8 @@ export function NotificationBell({ onNavigate, pollMs = 60000, className }: Noti
         <div
           ref={panelRef}
           id={panelId}
-          className={styles.panel}
+          className={cn('material', styles.popover)}
+          data-mat="regular"
           role="dialog"
           aria-label="Notifications"
           tabIndex={-1}

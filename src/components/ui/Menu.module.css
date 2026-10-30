@@ -1,0 +1,123 @@
+/* Menu / context menu / action sheet (docs/theme/IOS-UI.md 2.6). Tokens from src/styles/ios.css only. */
+.wrap {
+  position: relative;
+  display: inline-block;
+}
+
+/* Popover: regular material (the .material class paints it), 6px inside, items 32px with a pointer. */
+.menu {
+  position: absolute;
+  top: calc(100% + var(--sp-1));
+  z-index: var(--z-dropdown);
+  min-width: 15rem;
+  max-width: calc(100vw - 2 * var(--gutter));
+  padding: 6px;
+  color: var(--label);
+  border: var(--card-edge);
+  border-radius: var(--r-12);
+  box-shadow: var(--elev-2);
+  transform-origin: top right;
+  animation: menuIn var(--dur-2) var(--spring-soft) both;
+}
+.end { right: 0; }
+.start { left: 0; transform-origin: top left; }
+.atPoint {
+  position: fixed;
+  /* Opened at the pointer, kept inside the viewport. */
+  left: max(var(--sp-2), min(var(--x), 100vw - 15rem - var(--sp-2)));
+  top: max(var(--sp-2), min(var(--y), 100dvh - 20rem));
+  max-height: calc(100dvh - 2 * var(--sp-2));
+  overflow-y: auto;
+  transform-origin: top left;
+}
+
+.slot { display: contents; }
+
+.sep {
+  height: var(--hairline);
+  margin: 6px calc(-1 * 6px);
+  background: var(--sep);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  min-height: 2rem;
+  padding: var(--sp-1) var(--sp-2);
+  border: 0;
+  border-radius: var(--r-8);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-md);
+  text-align: start;
+  cursor: pointer;
+}
+.item:hover:not(:disabled),
+.item:focus-visible {
+  background: var(--fill-3);
+  outline: none;
+}
+.item:focus-visible {
+  outline: 2px solid var(--tint);
+  outline-offset: -2px;
+}
+.item:disabled {
+  color: var(--label-3);
+  cursor: not-allowed;
+}
+
+.icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--label-2);
+}
+.label {
+  flex: 1;
+  min-width: 0;
+}
+.hint {
+  flex-shrink: 0;
+  margin-inline-start: var(--sp-3);
+  font-size: var(--text-sm);
+  color: var(--label-2);
+}
+.destructive,
+.destructive .icon {
+  color: var(--sys-red-ink);
+}
+
+/* Action sheet (phone): full-width rows in a grouped list, Cancel in the sheet footer. */
+.sheetList {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-12);
+  background: var(--bg-elevated-2);
+  overflow: hidden;
+}
+.sheetList .item {
+  min-height: 2.75rem;
+  padding-inline: var(--sp-4);
+  border-radius: 0;
+  font-size: var(--text-lg);
+}
+.sheetList .sep {
+  margin: 0;
+}
+.sheetList .slot + .slot .item {
+  border-top: var(--hairline) solid var(--sep);
+}
+.sheetList .slot + .slot .sep + .item {
+  border-top: 0;
+}
+
+@media (pointer: coarse) {
+  .item { min-height: 2.75rem; }
+}
+
+@keyframes menuIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}

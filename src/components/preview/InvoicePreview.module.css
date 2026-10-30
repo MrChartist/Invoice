@@ -1,12 +1,11 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 9500;
+  z-index: var(--z-sheet);
   display: flex;
   flex-direction: column;
-  background: color-mix(in srgb, var(--background) 82%, #000);
-  backdrop-filter: blur(6px);
-  animation: fadeIn 160ms ease both;
+  background: var(--bg-grouped-3);
+  animation: fadeIn var(--dur-2) var(--ease-out) both;
 }
 
 .toolbar {
@@ -14,9 +13,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.625rem 1rem;
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
+  padding: calc(0.625rem + var(--safe-t)) calc(1rem + var(--safe-r)) 0.625rem calc(1rem + var(--safe-l));
+  /* The chrome material (.material, ios.css) paints the bar; its menus float above the paper. */
+  position: relative;
+  z-index: var(--z-raised);
+  border-bottom: var(--hairline) solid var(--sep);
   flex-shrink: 0;
 }
 
@@ -34,8 +35,8 @@
   min-width: 0;
   padding: 0 0.5rem;
   background: var(--card-inner);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-8);
 }
 
 .swatch {
@@ -43,7 +44,7 @@
   height: 12px;
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 0 0 2px var(--card);
+  outline: 2px solid var(--bg-grouped-2);
 }
 
 .templateName select {
@@ -59,8 +60,8 @@
 }
 
 .templateName:focus-within {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px var(--primary-glow);
+  outline: 2px solid var(--tint);
+  outline-offset: 2px;
 }
 
 .zoom {
@@ -72,8 +73,8 @@
 .zoomValue {
   min-width: 3.25rem;
   padding: 0.35rem 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-8);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -94,7 +95,7 @@
   font-weight: 500;
   color: var(--loss);
   background: color-mix(in srgb, var(--loss) 10%, var(--card));
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
 }
 
 /* Scrolls vertically; the paper is scaled to fit the width. */
@@ -111,9 +112,9 @@
   position: relative;
   flex-shrink: 0;
   margin: 0 auto;
-  box-shadow: var(--shadow-xl);
-  border-radius: 2px;
-  background: #fff;
+  box-shadow: var(--elev-3);
+  border-radius: 0;
+  background: #fff; /* printed paper is white in every theme */
 }
 
 .paperScale {
@@ -124,14 +125,14 @@
 }
 
 .spin {
-  animation: spin 900ms linear infinite;
+  animation: spin calc(var(--dur-4) * 2) linear infinite;
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .hideSm { display: none; }
   .templateName select { max-width: 150px; }
   /* Two rows on phones: design + zoom on top, actions below. */
@@ -149,10 +150,9 @@
     position: static !important;
     display: block !important;
     background: none !important;
-    backdrop-filter: none !important;
   }
   .stage { display: block !important; overflow: visible !important; padding: 0 !important; }
-  .paperFrame { width: auto !important; height: auto !important; box-shadow: none !important; }
+  .paperFrame { width: auto !important; height: auto !important; box-shadow: none; }
   .paperScale { position: static !important; transform: none !important; width: auto !important; }
   @page { size: A4; margin: 0; }
 }
@@ -171,17 +171,17 @@
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
-  z-index: 5;
+  z-index: var(--z-dropdown);
   width: min(320px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
   padding: 0.875rem;
-  background: var(--popover);
-  color: var(--popover-foreground);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-xl);
+  /* The regular material (.material, ios.css) paints the surface. */
+  color: var(--label);
+  border: var(--card-edge);
+  border-radius: var(--r-12);
+  box-shadow: var(--elev-2);
 }
 
 .optsGroup {

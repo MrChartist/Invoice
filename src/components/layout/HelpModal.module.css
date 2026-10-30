@@ -15,7 +15,7 @@
 .version {
   margin: 0.15rem 0 0;
   font-size: var(--text-base);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .features {
@@ -29,14 +29,14 @@
   gap: 0.75rem;
   padding: 0.75rem 0.875rem;
   background: var(--card-inner);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
 }
 
 .featureIcon {
   width: 30px;
   height: 30px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-8);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -52,7 +52,7 @@
 
 .featureText {
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   line-height: 1.5;
   margin-top: 0.1rem;
 }
@@ -63,9 +63,7 @@
   gap: 0.4rem;
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   margin-bottom: 0.5rem;
 }
 
@@ -82,21 +80,20 @@
 }
 
 .shortcut dd {
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 kbd {
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-sm);
   padding: 0.15rem 0.5rem;
-  border: 1px solid var(--border);
-  border-bottom-width: 2px;
-  border-radius: var(--radius-xs);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-6);
   background: var(--card-inner);
 }
 
 .footer {
-  border-top: 1px solid var(--border);
+  border-top: var(--hairline) solid var(--sep);
   padding-top: 1rem;
   display: grid;
   gap: 0.5rem;
@@ -112,7 +109,7 @@ kbd {
 .legal {
   font-size: var(--text-xs);
   line-height: 1.6;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   margin: 0;
 }
 
@@ -143,24 +140,23 @@ kbd {
   gap: 0.75rem;
   width: 100%;
   padding: 0.75rem 0.875rem;
-  border: 1px dashed var(--input-border);
-  border-radius: var(--radius-md);
-  background: transparent;
+  border: 0;
+  border-radius: var(--r-12);
+  background: var(--fill-4);
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
+  transition: background-color var(--dur-1) linear;
 }
 
 .reportBtn:hover {
-  background: var(--card-inner);
-  border-color: var(--ring);
+  background: var(--fill-3);
 }
 
 .reportBtn:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-glow);
+  outline: 2px solid var(--tint);
+  outline-offset: 2px;
 }
 
 .reportBtn > span:last-child {

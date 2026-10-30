@@ -241,7 +241,7 @@ const P0: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion
 const PL: Ceil = { colour: 0, radius: 2, border: 1, shadow: 1, zIndex: 0, motion: 1, media: 0, material: 0, frame: 26, weight: 1 };
 const P1: Ceil = { colour: 4, radius: 19, border: 20, shadow: 5, zIndex: 9, motion: 4, media: 4, material: 2, frame: 1, weight: 10 };
 const P2: Ceil = { colour: 1, radius: 22, border: 31, shadow: 11, zIndex: 2, motion: 9, media: 10, material: 0, frame: 1, weight: 9 };
-const P3: Ceil = { colour: 6, radius: 51, border: 51, shadow: 19, zIndex: 11, motion: 14, media: 16, material: 4, frame: 1, weight: 9 };
+const P3: Ceil = { colour: 1, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 1 };
 const P4: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 1, material: 0, frame: 0, weight: 0 }; // media: PL's .grid rule in Dashboard.module.css
 const P5a: Ceil = { colour: 4, radius: 67, border: 69, shadow: 10, zIndex: 6, motion: 6, media: 17, material: 0, frame: 0, weight: 26 };
 const P5b: Ceil = { colour: 13, radius: 248, border: 239, shadow: 18, zIndex: 4, motion: 17, media: 62, material: 0, frame: 0, weight: 82 };
@@ -294,7 +294,7 @@ const FIND: Record<Rule, () => Hit[]> = {
   // 8. Motion: durations only --dur-*, easings only the four tokens (linear allowed for spinners / shimmers).
   motion: () => [
     ...UI_DECLS.filter((d) => /^(transition|animation)(-(duration|timing-function|delay))?$/.test(d.prop))
-      .filter((d) => /(^|[\s,])\d*\.?\d+m?s\b|\b(ease|ease-in|ease-out|ease-in-out|cubic-bezier|steps)\b|var\(--transition-/.test(d.value.replace(/\b0m?s\b/g, '')))
+      .filter((d) => /(^|[\s,])\d*\.?\d+m?s\b|(?<![-\w])(ease|ease-in|ease-out|ease-in-out|cubic-bezier|steps)\b|var\(--transition-/.test(d.value.replace(/\b0m?s\b/g, '')))
       .map(fromDecl),
     ...tsxHits(/\b(transition|animation):\s*['"`][^'"`]*\d+m?s[^'"`]*['"`]/g, 'inline motion'),
   ],
