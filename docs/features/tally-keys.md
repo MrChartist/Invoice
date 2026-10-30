@@ -199,3 +199,54 @@ cancel (no cancelled state for a voucher without a data change). Tests: `tests/k
 | Core precache | 3,277.2 kB | 3,285.5 kB | +8.3 kB: own code +7.1 (`f-keys` +2.1 entry-actions + `keys-r20b` English, `EntrySheets` 1.5, editor hook 1.5, `VoucherEntry` 1.1, bill / PO / GRN forms 0.6, help + palette 0.3); ≈ +1.3 hash churn across ≈ 700 chunks (the first-paint chunk's hash moves with `KEY_CLAIMS`). Cap 7 kB: own code at the cap after the ranked cuts |
 | Hindi pack | 376.6 kB | 377.1 kB | +0.5 kB (`keys-r20b`) |
 | Hindi in core | 21.8 kB | 21.9 kB | +0.1 |
+
+## R20-C — report keys
+
+Built on every Books report that uses `useDrillRows` (trial balance, P&L, balance sheet, group summary, registers,
+Day Book, group / ledger vouchers, the Reports hub). All work only with Tally keys on
+(rows `pkg: 'C'`, none global, so `KEY_CLAIMS` is unchanged) and are **never saved** except views (PRD Q7).
+
+| Key | What | Where it lives |
+|---|---|---|
+| Ctrl+F / Alt+F12 | Filter sheet: amount from / up to, party / ledger text, Dr / Cr side, and on voucher reports date from / to and narration. A strip under the report: "Filtered: n of m rows · Clear"; Esc on the report clears it | `filterRows` (`src/lib/keys/report-actions.ts`), `ReportSheets.tsx` |
+| (Ctrl+F12) | "Totals of what you see" (Dr, Cr, net) whenever rows are filtered, ticked or hidden; ticked rows total on their own. A parent row followed by its own shown child is not counted twice | `totalsOf` |
+| Space, Shift+↑ / ↓ | Tick rows (ticked rows take the cursor's highlight and `aria-selected`; the strip counts them; Ctrl / ⌘ + click is the mouse twin), extend | `useDrillRows` |
+| Ctrl+R, Ctrl+U, Alt+U | Hide the ticked (else the focused) rows; restore the last batch / all. ↑ ↓ skip hidden rows; print leaves them out with a note; the Day Book CSV exports only the shown rows | `hideRows`, `unhideLast`, `unhideAll` |
+| Ctrl+H / Ctrl+L | Saved-views sheet (8G storage, `mrchartist_report_views`): open (`?view=`, applied by the views bar), delete, save this view with the name box focused | `ViewsSheet` (`ReportSheets.tsx`) |
+| + / − (] / [) | Step the report period: a month / quarter / FY by the preset; a custom range of whole months by its months, else by its days | `stepPeriod`, `PeriodBar.tsx` |
+| Alt+F5 | = Alt+F1 detailed / short | `ReportToolbar.tsx` |
+| Alt+N / Alt+C / Alt+D | Period columns (focus the picker) / next column set / back to none, on reports with the columns picker | `ReportToolbar.tsx` |
+| Shift+Enter | Day Book: one voucher's ledger lines | `DayBookTab.tsx` (`opts.expand`) |
+| Ctrl+Enter | Group summary ledger row: alter the ledger master; elsewhere = Enter | `opts.master` |
+| Alt+I / Alt+A, Alt+2 | Day Book, group / ledger vouchers: Alt+2 opens an unsaved copy of the row's voucher / document (B's `duplicateRoute`); a new entry of the row's type (its usual new form) | `opts.voucher` |
+| Ctrl+P / Ctrl+E | Print; press the report's own Export (CSV / Excel) button — no new output code | `useDrillRows` |
+
+**API (D and later reports).** `useDrillRows(count, onActivate, opts?)` keeps its signature and behaviour; the optional
+`opts` adds `fact(i)` (filter / totals facts, else read from the row's cells), `voucher(i)`, `master(i)`, `expand(i)`.
+`nav.row(i)` now also returns `data-ri`, `aria-selected` (while ticking) and `hidden`; `nav.shown(i)` says whether a row
+is on screen. Report parts join the keys with `useReportKeys(scope, el, handlers)` (`src/lib/keys/report-keys.ts`):
+one registration per scope, and a key goes to the visible part holding the focus, else the newest visible one, so a
+report hidden under a drill level never answers. The strip mounts through `ReportStrip` (`report-keys.ts`;
+DrillStack and the Day Book render one).
+
+**Held / cut.** `HELD` in `registry.ts` keeps built-package rows hidden: `delete.row`, `cancel.row` (Alt+D / Alt+X from
+a report row: B's `deleteEntry` / `cancelEntry` exist, but a report row needs the Y / N confirm, the reason box, the Undo
+toast and a ledger refresh of the open report — a follow-up; remove the ids when they ship). Alt+2 (`dup.row`) is live
+through B's `duplicateRoute`. Cut at the 7 kB cap: `basis` (Ctrl+B, PRD cut 3 — including optional / post-dated
+vouchers also needs a ledger-build change outside C's files), `invert` (Ctrl+Alt+I, PRD cut 2), `except` (Ctrl+J: an
+exceptions sheet over `negativeLedgers`; Books → Reports → Exception reports stays the twin), `share` / `share.alias`
+(Ctrl+M / Ctrl+Alt+W: no report has a share sheet to press). Also left out: the Gateway Display viewer (its own row
+model and keys), "Open by default" / "Show original" in the views sheet, Alt+I carrying the row's day into the Gateway
+date, C8 bank / GST report F-keys (PRD cut 1), long-press ticking on touch (the Key bar's "Tick a row" and Ctrl / ⌘ +
+click are the twins). The strip has no stylesheet of its own (inline styles; ticked rows share the cursor highlight):
+a new CSS file or a statically imported shared chunk (report-views, the Gateway period) joins the first-paint preload
+list of every report route.
+
+Tests: `tests/keys-report-actions.test.ts` (filter, totals, ticks / hide, period stepping, held rows), e2e
+step "R20-C" in `tests/e2e/smoke.mjs` (TB: Ctrl+F chip and Esc, Space ×2 strip, Ctrl+R / Ctrl+U, Ctrl+L view, Ctrl+E CSV, +).
+
+R20-C sizes (gzip; master `bef8125` and this branch both built here): first paint 182,254 → 182,251 B (−3 B); core
+3,288.5 → 3,295.0 kB (**+6.5 kB**, cap 7: `ReportSheets` chunk +2.1, LedgerPanel (drill-hooks, Day Book, report views,
+toolbar) +1.9, `f-keys` (`report-actions`, `report-keys`, `keys-r20c` English) +1.9, PeriodBar +0.5, help topic +0.15,
+`report-views` +0.06); Hindi pack 391.7 → 392.1 kB (`keys-r20c`); Hindi in core 9.8 kB (0); lazy-leaves 19.1, lazy-leaves-ui
+27.7 kB (unchanged). On master `a711585` (#127): 177.4 / 3,285.2 → 177.4 / 3,291.6 kB (+6.4 kB core), Hindi pack 391.4 kB.

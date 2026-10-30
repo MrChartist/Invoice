@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef } from 'react';
+import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   periodForPreset,
   type Period,
@@ -10,6 +11,11 @@ import controls from '../../styles/controls.module.css';
 import styles from './books.module.css';
 import { useT } from '../../i18n';
 import { booksT, presetLabel } from '../../i18n/areas/books';
+import { useReportKeys } from '../../lib/keys/report-keys';
+import { stepPeriod } from '../../lib/keys/report-actions';
+
+// R20-C: Ctrl+H / Ctrl+L saved-views sheet (lazy).
+const ViewsSheet = lazy(() => import('../keys/ReportSheets').then((m) => ({ default: m.ViewsSheet })));
 
 export interface PeriodBarProps {
   preset: PeriodPreset;
@@ -47,12 +53,33 @@ export function PeriodBar({ preset, period, onChange }: PeriodBarProps) {
     }
   }, [preset]);
 
+  // R20-C (Tally keys): + / − (and ] / [) step the period; Ctrl+H views, Ctrl+L save this view.
+  const card = useRef<HTMLDivElement | null>(null);
+  const [views, setViews] = useState(false);
+  const { pathname } = useLocation();
+  const [params] = useSearchParams();
+  const tab = params.get('tab') ?? '';
+  const step = (dir: 1 | -1) => () => onChange('custom', stepPeriod(preset, period, dir));
+  useReportKeys('report', () => card.current, {
+    stepNext: step(1),
+    'stepNext.alias': step(1),
+    stepPrev: step(-1),
+    'stepPrev.alias': step(-1),
+    views: () => setViews(true),
+    saveView: () => setViews(true),
+  });
+
   const pick = (p: PeriodPreset) => {
     onChange(p, p === 'custom' ? period : periodForPreset(p));
   };
 
   return (
-    <div className={`${surface.card} ${styles.periodBar}`}>
+    <div ref={card} className={`${surface.card} ${styles.periodBar}`}>
+      {views && (
+        <Suspense fallback={null}>
+          <ViewsSheet route={pathname} tab={tab} preset={preset} period={period} onClose={() => setViews(false)} />
+        </Suspense>
+      )}
       <div className={styles.presets} role="group" aria-label={booksT('period')}>
         {PRESETS.map((p) => (
           <button

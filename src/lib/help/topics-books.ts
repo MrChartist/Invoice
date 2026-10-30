@@ -44,6 +44,10 @@ export const TOPICS: readonly HelpTopic[] = [
     steps: ['Alt+G, type "trial" or "day book", Enter. Ctrl+G goes there with no chip.', 'F3 switches company; Ctrl+F3 locks; Ctrl+Alt+N opens notifications.', 'On invoices, clients, bills and suppliers: ↑ ↓ and Enter open a row.'],
     related: rel(['Gateway', '/gateway']),
   }),
+  // R20-C: report keys (Tally keys on; the Key bar lists them on every report).
+  t('tally-keys:reports', 'Report keys', 'रिपोर्ट कुंजियाँ', 'On a report: Ctrl+F filter, Space tick, Ctrl+R hide (Ctrl+U / Alt+U bring back), + / − period, Ctrl+H / Ctrl+L views, Ctrl+P print, Ctrl+E export.', 'To look at part of a report. Only views are saved.', {
+    steps: ['A strip under the report shows the filter, ticks, hidden rows and their totals; Esc clears the filter.'],
+  }),
   t('reconcile','Bank reconciliation', 'बैंक मिलान', 'Match bank statement lines with your books, and bank documents.', 'Monthly, when the statement arrives.'),
   t('reconcile:reconcile', 'Reconcile', 'मिलान', 'Statement lines matched, to review or ignored.', 'After importing a statement.'),
   t('reconcile:brs', 'BRS', 'BRS', 'Bank reconciliation statement: book balance against bank balance.', 'Month end.'),

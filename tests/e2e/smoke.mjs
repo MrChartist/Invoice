@@ -6685,6 +6685,67 @@ try {
     for (const k of keys) await writeJson(page, k, prev[k]);
   });
 
+  // R20-C: report keys on the trial balance — Ctrl+F filter chip (Esc clears), Space ticks with a totals strip, Ctrl+R
+  // hides and Ctrl+U restores, Ctrl+L saves a view, Ctrl+E presses the CSV button, + steps the period.
+  await step('R20-C: report filter, ticks, hide / restore, saved view, export and period keys', async () => {
+    await page.evaluate(() => localStorage.setItem('mrchartist_tally_keys', 'on'));
+    await page.goto(srv.origin + '/books?tab=tb');
+    const table = page.locator('table[tabindex="0"]').first();
+    await table.waitFor();
+    const focus = () => table.evaluate((t) => t.focus());
+    await focus();
+    await page.keyboard.press('Control+f');
+    const fs = page.getByRole('dialog', { name: 'Filter this report' });
+    await fs.waitFor();
+    await fs.locator('[data-filter="min"]').fill('0.01');
+    await fs.locator('[data-filter-apply]').click();
+    const strip = page.locator('[data-report-strip]');
+    await strip.getByText(/Filtered: \d+ of \d+ rows/).waitFor();
+    check(await strip.locator('[data-shown-totals]').count() === 1, 'Ctrl+F: the filter chip and "Totals of what you see" show');
+    await focus();
+    await page.keyboard.press('Escape');
+    await strip.waitFor({ state: 'detached' });
+    check(true, 'Esc on the report clears the filter');
+    const rows = await page.locator('tbody > tr[data-ri]').count();
+    if (rows >= 2) {
+      await focus();
+      await page.keyboard.press('Space');
+      await page.keyboard.press('Space');
+      await strip.getByText('2 ticked').first().waitFor();
+      check(await page.locator('tbody > tr[data-ri][aria-selected="true"]').count() === 2, 'Space ticks two rows; the strip shows their totals');
+      await page.keyboard.press('Control+r');
+      await page.locator('[data-hidden-count="2"]').waitFor();
+      check(await page.locator('tbody > tr[data-ri][hidden]').count() === 2 && page.url().includes('tab=tb'), 'Ctrl+R hides the ticked rows (no reload)');
+      await page.keyboard.press('Control+u');
+      await strip.waitFor({ state: 'detached' });
+      check(await page.locator('tbody > tr[data-ri][hidden]').count() === 0, 'Ctrl+U brings them back');
+    } else check(false, `trial balance has rows to tick (${rows})`);
+    await focus();
+    await page.keyboard.press('Control+l');
+    const vs = page.getByRole('dialog', { name: 'Saved views' });
+    await vs.waitFor();
+    await vs.locator('[data-view-name]').fill('E2E view');
+    await vs.locator('[data-view-name]').press('Enter');
+    await vs.locator('[data-views-list]').getByText('E2E view').waitFor();
+    check(await page.evaluate(() => JSON.parse(localStorage.getItem('mrchartist_report_views') ?? '[]').some((v) => v.name === 'E2E view' && v.tab === 'tb')), 'Ctrl+L saves a view of this tab');
+    await page.keyboard.press('Escape');
+    await vs.waitFor({ state: 'detached' });
+    await focus();
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+e')]);
+    check(/trial-balance.*\.csv$/.test(dl.suggestedFilename()), `Ctrl+E downloads the TB CSV (${dl.suggestedFilename()})`);
+    const before = await page.evaluate(() => localStorage.getItem('mrchartist_report_period'));
+    await focus();
+    await page.keyboard.press('+');
+    await page.waitForFunction((b) => localStorage.getItem('mrchartist_report_period') !== b, before);
+    check(/"custom"/.test(await page.evaluate(() => localStorage.getItem('mrchartist_report_period') ?? '')), '+ steps the report period');
+    await page.evaluate((b) => {
+      if (b) localStorage.setItem('mrchartist_report_period', b);
+      else localStorage.removeItem('mrchartist_report_period');
+      localStorage.removeItem('mrchartist_report_views');
+      localStorage.setItem('mrchartist_tally_keys', 'off');
+    }, before);
+  });
+
 } catch {
   /* already reported */
 } finally {

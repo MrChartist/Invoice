@@ -16,6 +16,7 @@ import { useT } from '../../../i18n';
 import styles from './ledger.module.css';
 
 import { DrillContext, dialogOpen, typing, type DrillApi, type DrillEntry as Entry, type DrillFrame } from './drill-hooks';
+import { ReportStrip } from '../../../lib/keys/report-keys';
 
 export type { DrillApi, DrillFrame };
 
@@ -125,6 +126,7 @@ export function DrillStack({ rootTitle, resetKey, children }: { rootTitle: strin
       {/* The root stays mounted (hidden) so its own state survives a drill and an Esc. */}
       <div hidden={depth > 0}>{children}</div>
       {top && <div key={`${top.frame.key}-${depth}`}>{top.frame.render()}</div>}
+      <ReportStrip />
     </DrillContext.Provider>
   );
 }

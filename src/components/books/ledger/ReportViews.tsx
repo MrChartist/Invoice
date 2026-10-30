@@ -52,7 +52,10 @@ export function GroupSummaryView({ groupId, period, reportId = 'group-summary' }
   );
   const rows = useMemo(() => flattenRows(gs.rows, prefs.detailed), [gs, prefs.detailed]);
   const list = cols ? cols.rows : rows;
-  const nav = useDrillRows(list.length, (i) => open(list[i]));
+  // R20-C: Ctrl+Enter on a ledger row alters its master (parties open in the ledger as Enter does).
+  const nav = useDrillRows(list.length, (i) => open(list[i]), {
+    master: (i) => (list[i]?.kind === 'ledger' && list[i].accountId ? `/books?tab=coa&m=ledger-alter&mid=${encodeURIComponent(list[i].accountId!)}` : undefined),
+  });
   const title = drillTitle({ kind: 'group', groupId, period }, ledger);
 
   return (
@@ -144,7 +147,13 @@ export function GroupVouchersView({ groupId, period }: { groupId: string; period
   const { ledger } = useReportEnv();
   const openVoucher = useOpenVoucher();
   const gv = useMemo(() => groupVouchers(ledger, period, groupId), [ledger, period, groupId]);
-  const nav = useDrillRows(gv.rows.length, (i) => openVoucher(gv.rows[i].voucher));
+  const nav = useDrillRows(gv.rows.length, (i) => openVoucher(gv.rows[i].voucher), {
+    fact: (i) => {
+      const r = gv.rows[i];
+      return { text: [r.accounts.join(' '), r.voucher.party, r.voucher.number, r.voucher.kind].join(' '), date: r.voucher.date, narr: r.voucher.narration, amt: r.debit - r.credit };
+    },
+    voucher: (i) => gv.rows[i]?.voucher,
+  });
   return (
     <div className={surface.card}>
       <div className={`${surface.tableWrap} ${styles.wrap}`}>
@@ -251,7 +260,13 @@ export function LedgerVouchersView({ accountId, party, period }: { accountId: st
   const [prefs, setPrefs] = useReportPrefs('ledger-vouchers');
   const st = useMemo(() => accountStatement(ledger, accountId, period, party), [ledger, accountId, period, party]);
   const rows = st?.rows ?? [];
-  const nav = useDrillRows(rows.length, (i) => openVoucher(rows[i].voucher));
+  const nav = useDrillRows(rows.length, (i) => openVoucher(rows[i].voucher), {
+    fact: (i) => {
+      const r = rows[i];
+      return { text: [r.particulars, r.voucher.party, r.voucher.number, r.voucher.kind].join(' '), date: r.voucher.date, narr: r.voucher.narration, amt: r.debit - r.credit };
+    },
+    voucher: (i) => rows[i]?.voucher,
+  });
   if (!st) return null;
   return (
     <div className={books.stack}>

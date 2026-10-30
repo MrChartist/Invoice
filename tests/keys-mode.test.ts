@@ -67,10 +67,11 @@ test('engine: mode off fires nothing but Gateway keys on /gateway; a screen hand
   const typing = { tagName: 'INPUT', closest: () => null } as unknown as EventTarget;
   assert.equal(candidates('f8', typing).length, 0, 'never while typing');
   const off = registerKeyActions('voucher', { 'contra.voucher': () => true, 'dup.voucher': () => true });
-  const offC = registerKeyActions('reportRow', { 'dup.row': () => true }); // R20-B: B is built; C is the unbuilt one
+  const offC = registerKeyActions('reportRow', { 'dup.row': () => true }); // R20-C: every package is built now
   const c = candidates('f4', null);
   assert.equal(c[0].row.id, 'contra', 'an ext row (handled by the Gateway itself) is not run by the engine');
-  assert.deepEqual(candidates('alt+2', null).map((x) => x.row.id), ['dup.voucher'], 'rows of an unbuilt package (C) never fire, even with a handler');
+  assert.deepEqual(candidates('alt+2', null).map((x) => x.row.id), ['dup.row', 'dup.voucher'], 'a row scope beats a screen scope (both built)');
+  assert.ok(!candidates('alt+d', null).some((x) => x.row.id === 'delete.row'), 'a HELD row never fires');
   off();
   offC();
   stub.setKeysLayout('erp9');
