@@ -209,11 +209,11 @@ Rules:
 1. **Nested corners**: inner radius = outer radius minus the inset (card 16, 8px inset, inner 8). Never the same radius
    inside and out.
 2. **Concentric bars**: a full-width bar touching the window edge has square corners on that edge (tab bar, top bar).
-3. **Continuous corners** (D8): in `ios.css`, `@supports (corner-shape: squircle) { .card, .group, .sheet, .tile, … {
-   corner-shape: squircle; } }`, with the radius multiplied by `--squircle-boost` (1.6, the factor at which a squircle
-   is a starting value: a squircle of the same radius looks tighter, so P0 tunes the factor until a card's corner
-   matches today's visual size in a side-by-side screenshot). Buttons are excluded
-   (the rulebook owns them).
+3. **Continuous corners** (D8): in `ios.css`, `@supports (corner-shape: squircle) { .continuous, .tile {
+   corner-shape: squircle; } }`, with the radius multiplied by `--squircle-boost` (a squircle of the same radius looks
+   tighter; P0 tuned the starting 1.6 to **1.8** in a Chromium side-by-side: a 16px round corner and a 28.8px squircle
+   read the same size). CSS-module classes take part by `composes: continuous from global;` plus `--rc: var(--r-16)`
+   (the radius token they would have used); `.tile` takes it built in. Buttons are excluded (the rulebook owns them).
 4. No raw radius in a module: only tokens, `50%` for circles, `0`, `inherit`.
 
 ### 1.9 Elevation
@@ -322,7 +322,7 @@ uses in a module uses the right-hand column.
 | `--card` | `--bg-grouped-2` | |
 | `--card-inner` | `--bg-grouped-3` | |
 | `--popover` | `--bg-elevated` | |
-| `--muted`, `--secondary`, `--accent` (as fills) | `--fill-3` (fields, wells), `--fill-4` (hover) | Pick by role |
+| `--muted`, `--secondary`, `--accent` (as fills) | `--fill-3` (fields, wells), `--fill-4` (hover) | Pick by role. The P0 alias is `--fill-3` composited over `--bg-grouped-2` (opaque), because sticky table heads paint `--muted` (`ImportWizard.module.css`) and must not turn see-through |
 | `--border` | `--sep` | Width becomes `--hairline` |
 | `--input-border` | `--field-edge` | |
 | `--ring` | `--tint` | |
@@ -344,7 +344,8 @@ uses in a module uses the right-hand column.
 | `--pal-azurite`, `--pal-lapis`, `--pal-topaz`, `--pal-macaw`, `--pal-gold`, `--pal-clay`, `--pal-on-gold` | unchanged | Brand palette; `--tint` light = `--pal-topaz`, HC light = `--pal-lapis` |
 | raw `rgba(…)` scrims (`Modal.module.css:5`, `DashboardLayout.module.css:334`) | `--scrim` | |
 | Avatar's ten raw hex colours (`Avatar.tsx:7-8`) | `--sys-<c>-tile` in a fixed order (blue, green, indigo, orange, pink, purple, teal, red, brown, cyan) | |
-| meta `theme-color` (`useTheme.ts:26` `#06080a` / `#f4f5f0` vs `theme-init.js` `#000000` / `#f6f6f7`) | `--bg-grouped` values in both files | The two disagree today |
+| meta `theme-color` (`useTheme.ts:26` `#06080a` / `#f4f5f0` vs `theme-init.js` `#000000` / `#f6f6f7`) | `--bg-grouped` values in both files | Done in P0 (`#f2f2f7` / `#000000`, also `index.html`) |
+| `--topbar-height` | `--bar-h` | P0 keeps 60px; PL moves the shell to `--bar-h`. `--tab-bar-h` stays the shell's runtime value (set by `DashboardLayout.tsx`, absent = 0), so the 49px iOS height is the token `--tab-bar-size` |
 
 ## 2. Components
 

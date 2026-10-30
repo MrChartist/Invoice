@@ -1,0 +1,386 @@
+/* ================================================================
+   iOS-grade tokens (docs/theme/IOS-UI.md section 1; lock-in tests/ios-ui.test.ts).
+   First paint: imported by src/main.tsx after index.css, before buttons.css.
+   Four theme blocks: :root (light), .dark, html.a11y-contrast:not(.dark) (HC light), html.dark.a11y-contrast (HC dark).
+   A token missing from a later block inherits the earlier one (HC light = light + HC light; HC dark = dark + HC dark).
+   index.css keeps the old names as aliases of these (spec 1.13). Shared-file protocol (docs/prd/ios-ui.md section 4):
+   a later package appends its tokens at the END of a family, in a commit touching only this file.
+   ================================================================ */
+
+:root {
+  /* ── 1.1 System colours: fill / -ink (text) / -tile (icon tile) / -soft (pill) ── */
+  --soft-pct: 14%;
+  --sys-blue: #007aff;   --sys-blue-ink: #0a5fd1;   --sys-blue-tile: #007aff;
+  --sys-green: #34c759;  --sys-green-ink: #1a6f2f;  --sys-green-tile: #248a3d;
+  --sys-indigo: #5856d6; --sys-indigo-ink: #4b49c4; --sys-indigo-tile: #5856d6;
+  --sys-orange: #ff9500; --sys-orange-ink: #a84300; --sys-orange-tile: #c45500;
+  --sys-pink: #ff2d55;   --sys-pink-ink: #c2183f;   --sys-pink-tile: #e0294f;
+  --sys-purple: #af52de; --sys-purple-ink: #8231b0; --sys-purple-tile: #af52de;
+  --sys-red: #ff3b30;    --sys-red-ink: #c4161c;    --sys-red-tile: #e0302a;
+  --sys-teal: #30b0c7;   --sys-teal-ink: #006b78;   --sys-teal-tile: #00829a;
+  --sys-mint: #00c7be;   --sys-mint-ink: #00706b;   --sys-mint-tile: #0a7d78;
+  --sys-cyan: #32ade6;   --sys-cyan-ink: #00668f;   --sys-cyan-tile: #0071a4;
+  --sys-yellow: #ffcc00; --sys-yellow-ink: #855600; --sys-yellow-tile: #ffcc00;
+  --sys-brown: #a2845e;  --sys-brown-ink: #7a5a36;  --sys-brown-tile: #8a6a45;
+  --sys-gray: #8e8e93;   --sys-gray-ink: #636366;   --sys-gray-tile: #6c6c70;
+  --sys-gray2: #aeaeb2;
+  --sys-gray3: #c7c7cc;
+  --sys-gray4: #d1d1d6;
+  --sys-gray5: #e5e5ea;
+  --sys-gray6: #f2f2f7;
+  --sys-blue-soft: color-mix(in srgb, var(--sys-blue) var(--soft-pct), transparent);
+  --sys-green-soft: color-mix(in srgb, var(--sys-green) var(--soft-pct), transparent);
+  --sys-indigo-soft: color-mix(in srgb, var(--sys-indigo) var(--soft-pct), transparent);
+  --sys-orange-soft: color-mix(in srgb, var(--sys-orange) var(--soft-pct), transparent);
+  --sys-pink-soft: color-mix(in srgb, var(--sys-pink) var(--soft-pct), transparent);
+  --sys-purple-soft: color-mix(in srgb, var(--sys-purple) var(--soft-pct), transparent);
+  --sys-red-soft: color-mix(in srgb, var(--sys-red) var(--soft-pct), transparent);
+  --sys-teal-soft: color-mix(in srgb, var(--sys-teal) var(--soft-pct), transparent);
+  --sys-mint-soft: color-mix(in srgb, var(--sys-mint) var(--soft-pct), transparent);
+  --sys-cyan-soft: color-mix(in srgb, var(--sys-cyan) var(--soft-pct), transparent);
+  --sys-yellow-soft: color-mix(in srgb, var(--sys-yellow) var(--soft-pct), transparent);
+  --sys-brown-soft: color-mix(in srgb, var(--sys-brown) var(--soft-pct), transparent);
+  --sys-gray-soft: color-mix(in srgb, var(--sys-gray) var(--soft-pct), transparent);
+  /* Glyph on an icon tile (yellow takes --on-tile-yellow). */
+  --on-tile: #ffffff;
+  --on-tile-yellow: #000000;
+  /* Brand accent (never interactive, D2): logo area, Gateway cursor, gold-coded data. */
+  --brand-gold: #d5a25e;
+  /* Chart series (2.9): light uses the -tile values for green, orange and teal (3:1 on white). */
+  --chart-1: var(--sys-blue);
+  --chart-2: var(--sys-green-tile);
+  --chart-3: var(--sys-orange-tile);
+  --chart-4: var(--sys-purple);
+  --chart-5: var(--sys-teal-tile);
+  --chart-6: var(--sys-pink);
+  --chart-7: var(--sys-indigo);
+  --chart-8: var(--sys-brown);
+
+  /* ── 1.2 Tint (one app tint, D2) ── */
+  --tint: #1a4d94;
+  --tint-soft-pct: 12%;
+  --tint-soft: color-mix(in srgb, var(--tint) var(--tint-soft-pct), transparent);
+  --on-tint: #ffffff;
+
+  /* ── 1.3 Labels (opaque, D3) ── */
+  --label: #000000;
+  --label-2: #5c5c63;
+  --label-3: #636366;
+  --label-4: rgb(60 60 67 / 0.18);
+
+  /* ── 1.4 Backgrounds: plain and grouped ── */
+  --bg: #ffffff;
+  --bg-2: #f2f2f7;
+  --bg-3: #ffffff;
+  --bg-grouped: #f2f2f7;
+  --bg-grouped-2: #ffffff;
+  --bg-grouped-3: #f2f2f7;
+  --bg-elevated: #ffffff;
+  --bg-elevated-2: #f2f2f7;
+
+  /* ── 1.5 Fills (behind controls, never a page) ── */
+  --fill: rgb(120 120 128 / 0.2);
+  --fill-2: rgb(120 120 128 / 0.16);
+  --fill-3: rgb(118 118 128 / 0.12);
+  --fill-4: rgb(116 116 128 / 0.08);
+
+  /* ── 1.6 Separators and edges ── */
+  --sep: rgb(60 60 67 / 0.29);
+  --sep-opaque: #c6c6c8;
+  --hairline: 1px;
+  --field-edge: rgb(60 60 67 / 0.29);
+  --card-edge: none;
+
+  /* ── 1.7 Materials: background + blur pairs (use .material, never your own blur) ── */
+  --mat-ultrathin: rgb(255 255 255 / 0.48);
+  --mat-ultrathin-blur: blur(12px) saturate(180%);
+  --mat-thin: rgb(255 255 255 / 0.64);
+  --mat-thin-blur: blur(20px) saturate(180%);
+  --mat-regular: rgb(246 246 248 / 0.78);
+  --mat-regular-blur: blur(24px) saturate(180%);
+  --mat-thick: rgb(246 246 248 / 0.9);
+  --mat-thick-blur: blur(30px) saturate(180%);
+  --mat-chrome: rgb(249 249 249 / 0.94);
+  --mat-chrome-blur: blur(20px) saturate(180%);
+
+  /* ── 1.8 Radii and shape ── */
+  --r-4: 4px;
+  --r-6: 6px;
+  --r-8: 8px;
+  --r-10: 10px;
+  --r-12: 12px;
+  --r-16: 16px;
+  --r-20: 20px;
+  --r-28: 28px;
+  --r-full: 9999px;
+  --r-tile: 22.5%;
+  /* D8: a squircle of the same radius looks tighter; .continuous / .tile multiply their radius by this where supported.
+     Spec start 1.6; tuned to 1.8 (Chromium side by side: a 16px card corner reads the same size as squircle 28.8px). */
+  --squircle-boost: 1.8;
+
+  /* ── 1.9 Elevation (cards have none, D4) ── */
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.06), 0 1px 1px rgb(0 0 0 / 0.04);
+  --elev-2: 0 4px 16px rgb(0 0 0 / 0.08), 0 1px 4px rgb(0 0 0 / 0.04);
+  --elev-3: 0 16px 48px rgb(0 0 0 / 0.14), 0 4px 12px rgb(0 0 0 / 0.06);
+  --scrim: rgb(0 0 0 / 0.2);
+
+  /* ── 1.10 Spacing (rem, so the text-size pref scales it) and layout margins ── */
+  --sp-0-5: 0.125rem;
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.25rem;
+  --sp-6: 1.5rem;
+  --sp-8: 2rem;
+  --sp-10: 2.5rem;
+  --sp-12: 3rem;
+  --sp-16: 4rem;
+  --gutter: 16px;
+  --row-inset: 16px;
+  --row-inset-tile: 60px;
+  --section-gap: var(--sp-6);
+
+  /* ── 1.11 Motion, layers ── */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.2, 1);
+  --spring: cubic-bezier(0.3, 1.45, 0.55, 1);
+  --spring-soft: cubic-bezier(0.32, 1.15, 0.5, 1);
+  --dur-1: 100ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --dur-4: 450ms;
+  --z-base: 0;
+  --z-raised: 1;
+  --z-sticky: 10;
+  --z-bar: 20;
+  --z-sidebar: 30;
+  --z-dropdown: 40;
+  --z-scrim: 50;
+  --z-sheet: 60;
+  --z-palette: 70;
+  --z-toast: 80;
+  --z-alert: 90;
+  --z-skip: 100;
+
+  /* ── 3.1 Device classes. CSS cannot read variables in @media: these document the only width queries allowed
+        (tests/ios-ui.test.ts), written in em so the text-size pref moves them. ── */
+  --bp-phone: 23.4375em;      /* 375: phone (below = small phone) */
+  --bp-phone-lg: 26.9375em;   /* 431: large phone / folded foldable */
+  --bp-sidebar: 37.5em;       /* 600: small tablet, icon rail replaces the tab bar (D7) */
+  --bp-tablet: 52.125em;      /* 834: tablet, full sidebar, master-detail */
+  --bp-laptop: 74.6875em;     /* 1195: laptop, compact density by default */
+  --bp-desktop: 90em;         /* 1440: desktop */
+  --bp-wide: 120em;           /* 1920: wide, inspector by default */
+  --bp-short: 31.25em;        /* height 500: phone landscape */
+  /* Safe areas (index.html has viewport-fit=cover). */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  /* Shell sizes (section 2.5 / 3); PL wires the shell to them. --tab-bar-h stays the shell's runtime value. */
+  --bar-h: 52px;
+  --tab-bar-size: 49px;
+  --sidebar-w: 248px;
+  --rail-w: 72px;
+  /* 3.2 Page-width tiers (bleed = --page-max: none on the page). */
+  --page-max: 120rem;
+  --form-max: 45rem;
+  --measure: 70ch;
+  --inspector-w: clamp(22rem, 24vw, 30rem);
+
+  /* ── 3.5 Density: comfortable (default); html.density-compact below ── */
+  --row-h: 2.75rem;
+  --field-h: 2.75rem;
+  --card-pad: var(--sp-5);
+  --cell-py: var(--sp-3);
+  --cell-px: var(--sp-4);
+}
+
+/* ── Dark ─────────────────────────────────────────────────────── */
+.dark {
+  --soft-pct: 20%;
+  --sys-blue: #0a84ff;   --sys-blue-ink: #5aa9ff;
+  --sys-green: #30d158;  --sys-green-ink: #30d158;
+  --sys-indigo: #5e5ce6; --sys-indigo-ink: #9d9bff;
+  --sys-orange: #ff9f0a; --sys-orange-ink: #ff9f0a;
+  --sys-pink: #ff375f;   --sys-pink-ink: #ff7a93;
+  --sys-purple: #bf5af2; --sys-purple-ink: #da8fff;
+  --sys-red: #ff453a;    --sys-red-ink: #ff7b73;
+  --sys-teal: #40c8e0;   --sys-teal-ink: #40c8e0;
+  --sys-mint: #63e6e2;   --sys-mint-ink: #63e6e2;
+  --sys-cyan: #64d2ff;   --sys-cyan-ink: #64d2ff;
+  --sys-yellow: #ffd60a; --sys-yellow-ink: #ffd60a;
+  --sys-brown: #ac8e68;  --sys-brown-ink: #c4a47c;
+  --sys-gray: #8e8e93;   --sys-gray-ink: #a1a1a6;
+  --sys-gray2: #636366;
+  --sys-gray3: #48484a;
+  --sys-gray4: #3a3a3c;
+  --sys-gray5: #2c2c2e;
+  --sys-gray6: #1c1c1e;
+  --chart-2: var(--sys-green);
+  --chart-3: var(--sys-orange);
+  --chart-5: var(--sys-teal);
+
+  --tint: #7fb0ff;
+  --tint-soft-pct: 20%;
+  --on-tint: #000000;
+
+  --label: #ffffff;
+  --label-2: #aeaeb2;
+  --label-3: #a1a1a6;
+  --label-4: rgb(235 235 245 / 0.16);
+
+  --bg: #000000;
+  --bg-2: #1c1c1e;
+  --bg-3: #2c2c2e;
+  --bg-grouped: #000000;
+  --bg-grouped-2: #1c1c1e;
+  --bg-grouped-3: #2c2c2e;
+  --bg-elevated: #1c1c1e;
+  --bg-elevated-2: #2c2c2e;
+
+  --fill: rgb(120 120 128 / 0.36);
+  --fill-2: rgb(120 120 128 / 0.32);
+  --fill-3: rgb(118 118 128 / 0.24);
+  --fill-4: rgb(118 118 128 / 0.18);
+
+  --sep: rgb(84 84 88 / 0.65);
+  --sep-opaque: #38383a;
+  --field-edge: rgb(84 84 88 / 0.65);
+
+  --mat-ultrathin: rgb(28 28 30 / 0.48);
+  --mat-thin: rgb(28 28 30 / 0.64);
+  --mat-regular: rgb(30 30 32 / 0.78);
+  --mat-thick: rgb(30 30 32 / 0.9);
+  --mat-chrome: rgb(18 18 18 / 0.94);
+
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.5);
+  --elev-2: 0 4px 16px rgb(0 0 0 / 0.55), 0 0 0 0.5px rgb(255 255 255 / 0.08);
+  --elev-3: 0 16px 48px rgb(0 0 0 / 0.7), 0 0 0 0.5px rgb(255 255 255 / 0.1);
+  --scrim: rgb(0 0 0 / 0.48);
+}
+
+/* ── High contrast light: backgrounds kept; labels, inks, tint and separators stronger ── */
+html.a11y-contrast:not(.dark) {
+  --sys-blue-ink: #0040dd;
+  --sys-green-ink: #145a26;
+  --sys-indigo-ink: #3634a3;
+  --sys-orange-ink: #8f3900;
+  --sys-pink-ink: #a3002f;
+  --sys-purple-ink: #6c2a91;
+  --sys-red-ink: #a50010;
+  --sys-teal-ink: #005866;
+  --sys-mint-ink: #005a56;
+  --sys-cyan-ink: #00516f;
+  --sys-yellow-ink: #6e4700;
+  --sys-brown-ink: #5e4529;
+  --sys-gray-ink: #48484a;
+  --tint: #072b6b;
+  --tint-soft-pct: 18%;
+  --label-2: #3a3a3f;
+  --label-3: #48484a;
+  --label-4: rgb(60 60 67 / 0.4);
+  --sep: rgb(60 60 67 / 0.6);
+  --sep-opaque: #8e8e93;
+  --field-edge: #6c6c70;
+  --card-edge: 1px solid var(--sep-opaque);
+}
+
+/* ── High contrast dark ── */
+html.dark.a11y-contrast {
+  --sys-blue-ink: #8cc4ff;
+  --sys-green-ink: #5ef08a;
+  --sys-indigo-ink: #b8b6ff;
+  --sys-orange-ink: #ffc266;
+  --sys-pink-ink: #ff9fb2;
+  --sys-purple-ink: #e6b0ff;
+  --sys-red-ink: #ff9c96;
+  --sys-teal-ink: #7ce8ff;
+  --sys-mint-ink: #8ff0ec;
+  --sys-cyan-ink: #92e0ff;
+  --sys-yellow-ink: #ffe066;
+  --sys-brown-ink: #dcc09a;
+  --sys-gray-ink: #c7c7cc;
+  --tint: #a9c9ff;
+  --tint-soft-pct: 26%;
+  --label-2: #d1d1d6;
+  --label-3: #c7c7cc;
+  --label-4: rgb(235 235 245 / 0.4);
+  --sep: rgb(235 235 245 / 0.6);
+  --sep-opaque: #8e8e93;
+  --field-edge: #aeaeb2;
+  --card-edge: 1px solid var(--sep-opaque);
+}
+
+/* ── Hairline: 0.5px on 2x screens ── */
+@media (min-resolution: 2dppx) {
+  :root { --hairline: 0.5px; }
+}
+
+/* ── Layout margins by device class (3.1) ── */
+@media (min-width: 26.9375em) { :root { --gutter: 20px; } }
+@media (min-width: 37.5em) { :root { --gutter: 24px; } }
+@media (min-width: 74.6875em) { :root { --gutter: 32px; } }
+@media (max-height: 31.25em) and (orientation: landscape) { :root { --gutter: 20px; } }
+@media (pointer: coarse) { :root { --section-gap: var(--sp-5); } }
+
+/* ── Density: compact (pointer devices; class set before first paint by theme-init.js, PL) ── */
+html.density-compact {
+  --row-h: 2.375rem;
+  --field-h: 2.25rem;
+  --card-pad: var(--sp-4);
+  --cell-py: var(--sp-2);
+  --cell-px: var(--sp-3);
+}
+
+/* ── 1.7 Materials: <div class="material" data-mat="chrome|thick|regular|thin|ultrathin"> ── */
+.material {
+  --mat-bg: var(--mat-chrome);
+  --mat-blur: var(--mat-chrome-blur);
+  --mat-solid: var(--bg-grouped-2);
+  background: var(--mat-bg);
+  -webkit-backdrop-filter: var(--mat-blur);
+  backdrop-filter: var(--mat-blur);
+}
+.material[data-mat='thick'] { --mat-bg: var(--mat-thick); --mat-blur: var(--mat-thick-blur); }
+.material[data-mat='regular'] { --mat-bg: var(--mat-regular); --mat-blur: var(--mat-regular-blur); --mat-solid: var(--bg-elevated); }
+.material[data-mat='thin'] { --mat-bg: var(--mat-thin); --mat-blur: var(--mat-thin-blur); --mat-solid: var(--bg-elevated); }
+.material[data-mat='ultrathin'] { --mat-bg: var(--mat-ultrathin); --mat-blur: var(--mat-ultrathin-blur); --mat-solid: var(--bg-elevated); }
+/* Opaque fallback: no backdrop-filter, high contrast, reduced motion (stands in for reduce transparency), or the OS pref. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .material { background: var(--mat-solid); }
+}
+html.a11y-contrast .material,
+html.a11y-motion-reduce .material {
+  background: var(--mat-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .material { background: var(--mat-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* ── 2.11 Icon tile: <span class="tile" style="--tile: var(--sys-blue-tile)"> (P4 adds sizes / uses) ── */
+.tile {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 29px;
+  height: 29px;
+  border-radius: var(--r-tile);
+  background: var(--tile, var(--sys-gray-tile));
+  color: var(--on-tile);
+}
+
+/* ── D8 continuous corners: compose `continuous` from global and set --rc to a radius token ── */
+.continuous { border-radius: var(--rc, var(--r-16)); }
+@supports (corner-shape: squircle) {
+  .continuous,
+  .tile {
+    corner-shape: squircle;
+  }
+  .continuous { border-radius: calc(var(--rc, var(--r-16)) * var(--squircle-boost)); }
+  .tile { border-radius: calc(var(--r-tile) * var(--squircle-boost)); }
+}

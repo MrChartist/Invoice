@@ -29,6 +29,7 @@
   size, `.join`, `.seg`, `.chip`, `.lk`) is drawn by `src/styles/buttons.css` (first paint, after `index.css`); the
   `controls.btn*` / `segment*` module classes only compose it, primary = ink (black / white), destructive = `danger`
   (loss red), no gold / blue / tinted buttons; `tests/button-system.test.ts` guards it. `<Button>` in `src/components/ui/Button.tsx` for new code.
+  **iOS-grade interface** (`docs/theme/IOS-UI.md`): tokens in `src/styles/ios.css` (old `index.css` names are aliases), contrast + per-package ratchets in `tests/ios-ui.test.ts`.
 
 ## Stack
 - **React 19** + **TypeScript** + **Vite 8** (rolldown bundler — `vite.config.ts` uses

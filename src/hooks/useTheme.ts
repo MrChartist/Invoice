@@ -21,9 +21,12 @@ function readTheme(): Theme {
 let current: Theme = typeof window === 'undefined' ? 'light' : readTheme();
 const listeners = new Set<() => void>();
 
+/** Browser chrome colour = --bg-grouped (src/styles/ios.css); public/theme-init.js writes the same two at first paint. */
+const THEME_COLOR = { light: '#f2f2f7', dark: '#000000' } as const;
+
 function apply(theme: Theme) {
   document.documentElement.classList.toggle('dark', theme === 'dark');
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#06080a' : '#f4f5f0');
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? THEME_COLOR.dark : THEME_COLOR.light);
 }
 
 function setShared(next: Theme) {

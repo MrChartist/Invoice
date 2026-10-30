@@ -1,7 +1,7 @@
 /* ================================================================
    Mr. Chartist Invoice — Global Design System
-   Tokens are lifted from mrchartist.com: warm "paper" light theme, near-black
-   "void" dark theme, ink-wine text, and the brand orange for primary actions.
+   Fonts, type scale, the brand palette and the aliases of the old token names. Colour, surface, shape,
+   depth, motion and layout tokens live in src/styles/ios.css (docs/theme/IOS-UI.md).
    Tokens + resets only — component styling lives in CSS Modules.
    ================================================================ */
 
@@ -39,7 +39,7 @@
   --text-lg: 0.9375rem;
   --text-xl: 1rem;
 
-  /* Palette (fixed in both themes) */
+  /* Palette (fixed in both themes): the brand blue / gold. --tint light = --pal-topaz, HC light = --pal-lapis. */
   --pal-azurite: #071742;
   --pal-lapis: #072b6b;
   --pal-topaz: #1a4d94;
@@ -49,135 +49,87 @@
   /* Text on a --pal-gold fill (selection bars): dark in both themes. */
   --pal-on-gold: #0a0a0b;
 
-  /* Brand */
-  --brand: #1a4d94;
-  --brand-strong: #072b6b;
-  --brand-soft: rgba(26, 77, 148, 0.10);
-  --brand-text: #072b6b;
-  --ink: #0a0a0b;
+  /* ── Aliases (docs/theme/IOS-UI.md 1.13) ─────────────────────────
+     The values live in src/styles/ios.css (light / dark / high contrast). Old names stay so no module breaks;
+     a module being migrated uses the right-hand token directly. The logo and the Ember template keep orange
+     (design-prefs.ts), never these. */
+  --brand: var(--tint);
+  --brand-strong: var(--primary-hover);
+  --brand-soft: var(--tint-soft);
+  --brand-text: var(--tint);
+  --ink: var(--label);
 
-  /* ── Light ("paper") ───────────────────────────────────────── */
-  --background: #f6f6f7;
-  --foreground: #0a0a0b;
+  --background: var(--bg-grouped);
+  --foreground: var(--label);
+  --card: var(--bg-grouped-2);
+  --card-foreground: var(--label);
+  --card-inner: var(--bg-grouped-3);
+  --popover: var(--bg-elevated);
+  --popover-foreground: var(--label);
 
-  --card: #fefefe;
-  --card-foreground: #0a0a0b;
-  --card-inner: #f1f1f3;
+  --primary: var(--tint);
+  --primary-hover: var(--pal-lapis);
+  --primary-foreground: var(--on-tint);
+  --primary-glow: var(--tint-soft);
 
-  --popover: #fefefe;
-  --popover-foreground: #0a0a0b;
+  /* Wells and hover fills: --fill-3 composited over a card, kept opaque so sticky heads stay solid. */
+  --muted: color-mix(in srgb, rgb(118 118 128) 12%, var(--bg-grouped-2));
+  --secondary: var(--muted);
+  --accent: var(--muted);
+  --muted-foreground: var(--label-2);
+  --secondary-foreground: var(--label);
+  --accent-foreground: var(--label);
 
-  --primary: #1a4d94;
-  --primary-hover: #072b6b;
-  --primary-foreground: #ffffff;
-  --primary-glow: rgba(26, 77, 148, 0.24);
+  --destructive: var(--sys-red-ink);
+  --destructive-foreground: var(--on-tint);
 
-  --secondary: #efeff1;
-  --secondary-foreground: #0a0a0b;
+  --border: var(--sep);
+  --input-border: var(--field-edge);
+  --ring: var(--tint);
 
-  --muted: #efeff1;
-  --muted-foreground: #52525b;
+  --profit: var(--sys-green-ink);
+  --loss: var(--sys-red-ink);
+  --warning: var(--sys-orange-ink);
+  --info: var(--sys-blue-ink);
 
-  --accent: #f1f1f3;
-  --accent-foreground: #0a0a0b;
+  --radius-xs: var(--r-6);
+  --radius-sm: var(--r-8);
+  --radius-md: var(--r-12);
+  --radius-lg: var(--r-16);
+  --radius-xl: var(--r-20);
+  --radius-full: var(--r-full);
 
-  --destructive: #b74443;
-  --destructive-foreground: #ffffff;
+  /* Cards lose their shadow (D4); knobs keep --elev-1; floating things --elev-2 / --elev-3. */
+  --shadow-xs: var(--elev-1);
+  --shadow-sm: var(--elev-1);
+  --shadow-card: var(--elev-0);
+  --shadow-md: var(--elev-2);
+  --shadow-lg: var(--elev-2);
+  --shadow-xl: var(--elev-3);
+  --shadow-glow: 0 0 0 2px var(--tint);
 
-  --border: #e4e4e7;
-  --input-border: #d4d4d8;
-  --ring: #357cb6;
+  --transition-fast: var(--dur-1) var(--ease-out);
+  --transition-base: var(--dur-2) var(--ease-out);
+  --transition-smooth: var(--dur-3) var(--ease-in-out);
+  --transition-spring: var(--dur-3) var(--spring-soft);
 
-  --profit: #1e5038;
-  --loss: #b74443;
-  --warning: #8a5a14;
-  --info: #357cb6;
-
-  /* Radius */
-  --radius-xs: 6px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
-  --radius-full: 9999px;
-
-  /* Shadows */
-  --shadow-xs: 0 1px 2px rgba(10, 10, 11, 0.05);
-  --shadow-sm: 0 1px 3px rgba(10, 10, 11, 0.07), 0 1px 2px rgba(10, 10, 11, 0.04);
-  --shadow-md: 0 6px 16px rgba(10, 10, 11, 0.08), 0 2px 4px rgba(10, 10, 11, 0.04);
-  --shadow-lg: 0 14px 28px rgba(10, 10, 11, 0.1), 0 4px 8px rgba(10, 10, 11, 0.05);
-  --shadow-xl: 0 24px 48px rgba(10, 10, 11, 0.16), 0 8px 16px rgba(10, 10, 11, 0.07);
-  --shadow-glow: 0 0 0 4px rgba(53, 124, 182, 0.22);
-  --shadow-card: 0 1px 2px rgba(10, 10, 11, 0.04);
-
-  /* Transitions */
-  --transition-fast: 120ms ease;
-  --transition-base: 200ms ease;
-  --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
-
-  /* Layout */
-  --sidebar-width: 248px;
+  /* Layout: --sidebar-width = --sidebar-w; the top bar keeps 60px until the shell package (PL) moves it to --bar-h. */
+  --sidebar-width: var(--sidebar-w);
   --topbar-height: 60px;
 }
 
-/* ── Dark ("void") ───────────────────────────────────────────── */
+/* ── Dark ("void"): colours come from ios.css; only non-colour overrides here ── */
 .dark {
   color-scheme: dark;
 
   /* Light text on black looks bolder, so reading text steps down 20 in dark mode. */
   --fw-body: 380;
 
-  --brand: #d5a25e;
-  --brand-strong: #e3b97e;
-  --brand-soft: rgba(213, 162, 94, 0.16);
-  --brand-text: #e3b97e;
-  --ink: #fafafa;
-
-  --background: #000000;
-  --foreground: #fafafa;
-
-  --card: #0e0e10;
-  --card-foreground: #fafafa;
-  --card-inner: #080809;
-
-  --popover: #0e0e10;
-  --popover-foreground: #fafafa;
-
-  --primary: #d5a25e;
-  --primary-hover: #e3b97e;
-  --primary-foreground: #0a0a0b;
-  --primary-glow: rgba(213, 162, 94, 0.32);
-
-  --secondary: #1a1a1d;
-  --secondary-foreground: #f4f4f5;
-
-  --muted: #1a1a1d;
-  --muted-foreground: #a1a1aa;
-
-  --accent: #1a1a1d;
-  --accent-foreground: #fafafa;
-
-  --destructive: #dca9a4;
-  --destructive-foreground: #071742;
-
-  --border: #26262b;
-  --input-border: #3a3a40;
-  --ring: #357cb6;
-
-  --profit: #77cca0;
-  --loss: #dca9a4;
-  --warning: #dfc38c;
-  --info: #9db4de;
-
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.45);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.55), 0 2px 4px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 14px 28px rgba(0, 0, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4);
-  --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.7), 0 8px 16px rgba(0, 0, 0, 0.45);
-  --shadow-glow: 0 0 0 4px rgba(213, 162, 94, 0.28);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --primary-hover: #a9c9ff;
+  --muted: color-mix(in srgb, rgb(118 118 128) 24%, var(--bg-grouped-2));
 }
+html.a11y-contrast:not(.dark) { --primary-hover: var(--pal-azurite); }
+html.dark.a11y-contrast { --primary-hover: #d4e4ff; }
 
 /* Numbers line up in tables, totals and stat cards */
 table, td, th, [data-money], .tabular { font-variant-numeric: tabular-nums; }
@@ -205,16 +157,14 @@ body {
   letter-spacing: -0.006em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--background);
-  color: var(--foreground);
+  background-color: var(--bg-grouped);
+  color: var(--label);
   transition: background-color var(--transition-smooth), color var(--transition-smooth);
   overflow: hidden; /* Prevent body scroll — panels scroll independently */
-  height: 100vh;
   height: 100dvh;
 }
 
 #root {
-  height: 100vh;
   height: 100dvh;
   overflow: hidden;
 }
@@ -238,23 +188,24 @@ h5, h6, b, strong, th { font-weight: 600; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--input-border);
-  border-radius: 999px;
+  background: var(--sys-gray3);
+  border-radius: var(--r-full);
 }
-::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
-* { scrollbar-width: thin; scrollbar-color: var(--input-border) transparent; }
+::-webkit-scrollbar-thumb:hover { background: var(--sys-gray2); }
+* { scrollbar-width: thin; scrollbar-color: var(--sys-gray3) transparent; }
 
 /* ── Focus Ring ──────────────────────────────────────────────── */
+/* One tint (D2); the ring follows the element's own corners (no forced radius). Buttons draw theirs inside
+   (buttons.css). */
 :focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--tint);
   outline-offset: 2px;
-  border-radius: var(--radius-xs);
 }
 
 /* ── Selection ───────────────────────────────────────────────── */
 ::selection {
-  background: var(--primary-glow);
-  color: var(--foreground);
+  background: var(--tint-soft);
+  color: var(--label);
 }
 
 /* ── Animations (globally available) ─────────────────────────── */
@@ -304,25 +255,7 @@ html.a11y-motion-reduce *, html.a11y-motion-reduce *::before, html.a11y-motion-r
   scroll-behavior: auto !important;
 }
 
-/* High contrast: stronger text, borders and focus ring in both themes. */
-html.a11y-contrast {
-  --muted-foreground: #27272a;
-  --border: #71717a;
-  --input-border: #52525b;
-  --ring: #072b6b;
-  --primary: #072b6b;
-  --primary-hover: #071742;
-}
-html.dark.a11y-contrast {
-  --foreground: #ffffff;
-  --card-foreground: #ffffff;
-  --muted-foreground: #e4e4e7;
-  --border: #a1a1aa;
-  --input-border: #d4d4d8;
-  --ring: #e3b97e;
-  --primary: #e3b97e;
-  --primary-hover: #f0d2a6;
-}
+/* High contrast: the token values live in src/styles/ios.css (html.a11y-contrast blocks). */
 
 html.a11y-underline a,
 html.a11y-underline [role='link'] { text-decoration: underline; text-underline-offset: 2px; }
@@ -338,7 +271,7 @@ html.a11y-targets input[type='checkbox'],
 html.a11y-targets input[type='radio'] { min-width: 1.25rem; min-height: 1.25rem; }
 
 html.a11y-focus :focus {
-  outline: 3px solid var(--ring);
+  outline: 3px solid var(--tint);
   outline-offset: 2px;
 }
 

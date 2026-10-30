@@ -1,10 +1,11 @@
 /* ================================================================
    Shared surfaces — page scaffolding, cards, badges, tables.
    Imported by every page so the app has ONE visual language.
+   iOS-grade work (docs/prd/ios-ui.md section 4): each package edits only the sections marked with its name.
    Controls (inputs/buttons) live in ./controls.module.css
    ================================================================ */
 
-/* ── Page scaffolding ─────────────────────────────────────────── */
+/* ── Page scaffolding (owner: PL) ─────────────────────────────── */
 .page {
   display: flex;
   flex-direction: column;
@@ -45,7 +46,7 @@
   flex-wrap: wrap;
 }
 
-/* ── Cards ────────────────────────────────────────────────────── */
+/* ── Cards (owner: P2) ────────────────────────────────────────── */
 .card {
   background-color: var(--card);
   border: 1px solid var(--border);
@@ -104,7 +105,7 @@
   margin: 0;
 }
 
-/* ── Stat tiles ───────────────────────────────────────────────── */
+/* ── Stat tiles (owner: P4) ───────────────────────────────────── */
 .statGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -162,7 +163,7 @@
   color: var(--muted-foreground);
 }
 
-/* ── Badges ───────────────────────────────────────────────────── */
+/* ── Badges (owner: P4) ───────────────────────────────────────── */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -186,7 +187,7 @@
 .badgeOverdue { background-color: color-mix(in srgb, var(--loss) 14%, transparent); color: var(--loss); }
 .badgeCancelled { background-color: var(--muted); color: var(--muted-foreground); text-decoration: line-through; }
 
-/* ── Tables ───────────────────────────────────────────────────── */
+/* ── Tables (owner: P2) ───────────────────────────────────────── */
 .tableWrap {
   width: 100%;
   overflow-x: auto;
@@ -249,7 +250,7 @@
   align-items: center;
 }
 
-/* ── Empty state ──────────────────────────────────────────────── */
+/* ── Empty state (owner: P4) ──────────────────────────────────── */
 .empty {
   display: flex;
   flex-direction: column;
@@ -284,6 +285,9 @@
   margin: 0;
   line-height: 1.6;
 }
+
+/* ── Groups (owner: P2) ───────────────────────────────────────── */
+/* Inset grouped lists: .group, .row, .rowValue, .chevron, .groupHeader, .groupFooter, .tile (IOS-UI.md 2.1). */
 
 /* ── Misc ─────────────────────────────────────────────────────── */
 .srOnly {
