@@ -239,7 +239,7 @@ type Ceil = Record<Rule, number>;
 // ── Ceilings: today's counts (30 Oct 2026, P0). Each package lowers ONLY its own const. ──────────────────────────
 const P0: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 0 };
 const PL: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 1 }; // weight: LoginPage h1 (full-screen route, outside the shell)
-const P1: Ceil = { colour: 4, radius: 19, border: 20, shadow: 5, zIndex: 9, motion: 4, media: 4, material: 2, frame: 1, weight: 10 };
+const P1: Ceil = { colour: 3, radius: 1, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 2 }; // all in the logo (brand/Logo.*: wordmark colours, tile, "INVOICE" lockup), kept as drawn
 const P2: Ceil = { colour: 1, radius: 22, border: 31, shadow: 11, zIndex: 2, motion: 9, media: 10, material: 0, frame: 1, weight: 9 };
 const P3: Ceil = { colour: 1, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 1 };
 const P4: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 0 };
