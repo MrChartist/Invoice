@@ -19,7 +19,7 @@
 }
 
 .field {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-weight: 600;
 }
 
@@ -36,20 +36,20 @@
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
   padding: 0.05rem 0.4rem;
-  border-radius: var(--radius-xs);
+  border-radius: var(--r-6);
   overflow-wrap: anywhere;
 }
 
 .from {
-  background: color-mix(in srgb, var(--loss) 10%, var(--card));
-  color: var(--loss);
+  background: color-mix(in srgb, var(--sys-red-ink) 10%, var(--bg-grouped-2));
+  color: var(--sys-red-ink);
   text-decoration: line-through;
   text-decoration-thickness: 1px;
 }
 
 .to {
-  background: color-mix(in srgb, var(--profit) 12%, var(--card));
-  color: var(--profit);
+  background: color-mix(in srgb, var(--sys-green-ink) 12%, var(--bg-grouped-2));
+  color: var(--sys-green-ink);
 }
 
 .none {
@@ -58,7 +58,7 @@
 }
 
 .arrow {
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 /* ── Timeline (per document) ───────────────────────────── */
@@ -84,35 +84,35 @@
   top: 1.5rem;
   bottom: 0;
   width: 1px;
-  background: var(--border);
+  background: var(--sep);
 }
 
 .dot {
   flex: none;
   width: 1.375rem;
   height: 1.375rem;
-  border-radius: var(--radius-full);
+  border-radius: var(--r-full);
   display: grid;
   place-items: center;
-  background: var(--card-inner);
-  border: 1px solid var(--border);
-  color: var(--muted-foreground);
+  background: var(--bg-grouped-3);
+  border: var(--hairline) solid var(--sep);
+  color: var(--label-2);
 }
 
 .dotCreate,
 .dotPay {
-  color: var(--profit);
-  border-color: color-mix(in srgb, var(--profit) 45%, var(--border));
+  color: var(--sys-green-ink);
+  border-color: color-mix(in srgb, var(--sys-green-ink) 45%, var(--sep));
 }
 
 .dotDanger {
-  color: var(--loss);
-  border-color: color-mix(in srgb, var(--loss) 45%, var(--border));
+  color: var(--sys-red-ink);
+  border-color: color-mix(in srgb, var(--sys-red-ink) 45%, var(--sep));
 }
 
 .dotLock {
-  color: var(--warning);
-  border-color: color-mix(in srgb, var(--warning) 50%, var(--border));
+  color: var(--sys-orange-ink);
+  border-color: color-mix(in srgb, var(--sys-orange-ink) 50%, var(--sep));
 }
 
 .tBody {
@@ -130,7 +130,7 @@
   display: block;
   margin-top: 0.1rem;
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .more {
@@ -139,7 +139,7 @@
   padding: 0;
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--brand-text);
+  color: var(--tint);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -147,7 +147,7 @@
 .emptyNote {
   margin: 0;
   font-size: var(--text-base);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 /* ── Activity panel ────────────────────────────────────── */
@@ -172,7 +172,7 @@
 
 .count {
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .logTable {
@@ -184,48 +184,46 @@
 .logTable th {
   text-align: left;
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
   white-space: nowrap;
 }
 
 .logTable td {
   padding: 0.625rem 0.75rem;
   vertical-align: top;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
 }
 
 .when {
   white-space: nowrap;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
 }
 
 .tag {
   display: inline-block;
   padding: 0.1rem 0.5rem;
-  border-radius: var(--radius-full);
+  border-radius: var(--r-full);
   font-size: var(--text-xs);
   font-weight: 600;
-  background: var(--card-inner);
-  border: 1px solid var(--border);
+  background: var(--bg-grouped-3);
+  border: var(--hairline) solid var(--sep);
   white-space: nowrap;
 }
 
 .tagCreate,
 .tagPay {
-  color: var(--profit);
+  color: var(--sys-green-ink);
 }
 
 .tagDanger {
-  color: var(--loss);
+  color: var(--sys-red-ink);
 }
 
 .tagLock {
-  color: var(--warning);
+  color: var(--sys-orange-ink);
 }
 
 .docNo {
@@ -245,9 +243,9 @@
 
 .expand:focus-visible,
 .more:focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--tint);
   outline-offset: 2px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--r-6);
 }
 
 .cards {
@@ -256,11 +254,11 @@
 
 .limit {
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   margin: 0;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 52.0625em) {
   .searchField {
     grid-column: 1 / -1;
   }
@@ -276,7 +274,7 @@
 
   .card {
     padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: var(--hairline) solid var(--sep);
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
@@ -295,16 +293,16 @@
   gap: 0.75rem;
   flex-wrap: wrap;
   padding: 0.875rem 1rem;
-  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
-  background: color-mix(in srgb, var(--warning) 9%, var(--card));
-  border-radius: var(--radius-md);
+  border: var(--hairline) solid color-mix(in srgb, var(--sys-orange-ink) 35%, var(--sep));
+  background: color-mix(in srgb, var(--sys-orange-ink) 9%, var(--bg-grouped-2));
+  border-radius: var(--r-12);
   font-size: var(--text-md);
 }
 
 .lockBanner svg {
   flex: none;
   margin-top: 0.15rem;
-  color: var(--warning);
+  color: var(--sys-orange-ink);
 }
 
 .lockText {
@@ -318,7 +316,7 @@
 }
 
 .lockText span {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-base);
 }
 
@@ -329,12 +327,12 @@
 }
 
 .overrideBanner {
-  border-color: color-mix(in srgb, var(--info) 35%, var(--border));
-  background: color-mix(in srgb, var(--info) 8%, var(--card));
+  border-color: color-mix(in srgb, var(--sys-blue-ink) 35%, var(--sep));
+  background: color-mix(in srgb, var(--sys-blue-ink) 8%, var(--bg-grouped-2));
 }
 
 .overrideBanner svg {
-  color: var(--info);
+  color: var(--sys-blue-ink);
 }
 
 .frozen {
@@ -358,7 +356,7 @@
   align-items: flex-start;
   font-size: var(--text-sm);
   line-height: 1.4;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .numberHint svg {
@@ -367,11 +365,11 @@
 }
 
 .numberBad {
-  color: var(--loss);
+  color: var(--sys-red-ink);
 }
 
 .numberGap {
-  color: var(--warning);
+  color: var(--sys-orange-ink);
 }
 
 /* ── Saved toast ─────────────────────────────────────── */
@@ -379,16 +377,16 @@
   position: fixed;
   bottom: calc(1.25rem + var(--bottom-bar-h, 0px) + var(--tab-bar-h, 0px));
   right: 1.25rem;
-  z-index: 10000;
+  z-index: var(--z-toast);
   max-width: min(440px, calc(100vw - 2rem));
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
   padding: 0.875rem 1rem;
-  background: var(--card);
-  border: 1px solid color-mix(in srgb, var(--profit) 35%, var(--border));
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-xl);
+  background: var(--bg-grouped-2);
+  border: var(--hairline) solid color-mix(in srgb, var(--sys-green-ink) 35%, var(--sep));
+  border-radius: var(--r-12);
+  box-shadow: var(--elev-3);
   font-size: var(--text-md);
 }
 
@@ -399,7 +397,7 @@
 }
 
 .savedTop svg {
-  color: var(--profit);
+  color: var(--sys-green-ink);
   flex: none;
   margin-top: 0.1rem;
 }
@@ -415,7 +413,7 @@
   margin-top: 0.15rem;
   font-weight: 400;
   font-size: var(--text-sm);
-  color: var(--warning);
+  color: var(--sys-orange-ink);
 }
 
 .savedActions {
@@ -424,7 +422,7 @@
   flex-wrap: wrap;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 26.875em) {
   .saved {
     right: 1rem;
     left: 1rem;
@@ -445,19 +443,19 @@
   align-items: flex-start;
   gap: 0.1rem;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
-  color: var(--foreground);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-2);
+  color: var(--label);
   text-align: left;
   min-height: 44px;
-  transition: border-color var(--transition-fast), background var(--transition-fast);
+  transition: border-color var(--dur-1) var(--ease-out), background var(--dur-1) var(--ease-out);
 }
 
-.presetBtn:hover { border-color: var(--foreground); }
+.presetBtn:hover { border-color: var(--label); }
 
 .presetBtn small {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-xs);
 }
 
@@ -467,15 +465,15 @@
   gap: 0.5rem;
   flex-wrap: wrap;
   padding: 0.625rem 0.875rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--card-inner);
+  border-radius: var(--r-12);
+  border: var(--hairline) solid var(--sep);
+  background: var(--bg-grouped-3);
   font-size: var(--text-md);
 }
 
 .lockStateOn {
-  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
-  background: color-mix(in srgb, var(--warning) 9%, var(--card));
+  border-color: color-mix(in srgb, var(--sys-orange-ink) 45%, var(--sep));
+  background: color-mix(in srgb, var(--sys-orange-ink) 9%, var(--bg-grouped-2));
 }
 
 .pinInput {
@@ -490,9 +488,9 @@
   flex-direction: column;
   gap: 0.625rem;
   padding: 0.75rem 0.875rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--card-inner);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-8);
+  background: var(--bg-grouped-3);
 }
 
 .integrityHead {
@@ -506,7 +504,7 @@
 .integrityNote {
   margin: 0;
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .headRow {
@@ -535,17 +533,17 @@
   gap: 0.5rem;
   align-items: flex-start;
   padding: 0.5rem 0.625rem;
-  border-radius: var(--radius-xs);
+  border-radius: var(--r-6);
   font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 
 .integrityOk {
-  color: var(--profit);
-  background: color-mix(in srgb, var(--profit) 10%, var(--card));
+  color: var(--sys-green-ink);
+  background: color-mix(in srgb, var(--sys-green-ink) 10%, var(--bg-grouped-2));
 }
 
 .integrityBad {
-  color: var(--loss);
-  background: color-mix(in srgb, var(--loss) 10%, var(--card));
+  color: var(--sys-red-ink);
+  background: color-mix(in srgb, var(--sys-red-ink) 10%, var(--bg-grouped-2));
 }

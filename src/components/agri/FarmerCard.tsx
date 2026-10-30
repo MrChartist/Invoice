@@ -23,7 +23,7 @@ export default function FarmerCard({ farmers, centre, onClose }: { farmers: read
       <div ref={ref} style={{ maxHeight: 320, overflow: 'auto' }}>
         <div className="cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
           {farmers.map((f) => (
-            <div key={f.id} className="card" style={{ display: 'flex', gap: 8, alignItems: 'center', border: '1px solid var(--border)', padding: 8 }}>
+            <div key={f.id} className="card" style={{ display: 'flex', gap: 8, alignItems: 'center', border: '1px solid var(--sep)', padding: 8 }}>
               <QRCodeSVG value={f.ag.code} size={72} />
               <div><strong>{f.ag.code}</strong><br />{f.name}<br />{[f.ag.village, centre(f.ag.centre_id)].filter(Boolean).join(' · ')}{f.ag.member_no ? <><br />{agT('memberNo')} {f.ag.member_no}</> : null}</div>
             </div>

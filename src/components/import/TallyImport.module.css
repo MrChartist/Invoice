@@ -8,7 +8,7 @@
 .how {
   margin: 0;
   padding-left: 1.2rem;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
   line-height: 1.5;
 }
@@ -16,31 +16,31 @@
 .note {
   margin: 0;
   padding: 0.6rem 0.75rem;
-  border-radius: var(--radius-md);
-  background: var(--card-inner);
-  border: 1px solid var(--border);
-  color: var(--muted-foreground);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-3);
+  border: var(--hairline) solid var(--sep);
+  color: var(--label-2);
   font-size: var(--text-sm);
 }
 
 .warnBox {
   composes: note;
-  border-color: var(--warning);
-  color: var(--foreground);
+  border-color: var(--sys-orange-ink);
+  color: var(--label);
 }
 
 .errBox {
   composes: note;
-  border-color: var(--destructive);
-  color: var(--foreground);
+  border-color: var(--sys-red-ink);
+  color: var(--label);
 }
 
 .okText {
-  color: var(--profit);
+  color: var(--sys-green-ink);
 }
 
 .badText {
-  color: var(--loss);
+  color: var(--sys-red-ink);
 }
 
 .options {
@@ -59,9 +59,9 @@
   flex-direction: column;
   gap: 0.15rem;
   padding: 0.6rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-2);
 }
 
 .tileValue {
@@ -72,34 +72,46 @@
 
 .tileLabel {
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .tabs {
   display: flex;
-  gap: 0.25rem;
-  border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
+  gap: var(--sp-1);
+  border-bottom: var(--hairline) solid var(--sep);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .tab {
+  position: relative;
+  flex: none;
   border: 0;
   background: none;
   padding: 0.45rem 0.7rem;
   font: inherit;
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
-  border-bottom: 2px solid transparent;
+  color: var(--label-2);
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.tabActive { composes: tab; color: var(--foreground); border-bottom-color: var(--btn-ink); }
+.tabActive { composes: tab; color: var(--label); font-weight: 600; }
+.tabActive::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0.7rem;
+  bottom: 0;
+  height: 2px;
+  border-radius: var(--r-full);
+  background: var(--tint);
+}
 
 .tableWrap {
   max-height: 22rem;
   overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
 }
 
 .table {
@@ -112,17 +124,17 @@
 .table td {
   padding: 0.4rem 0.6rem;
   text-align: left;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
   vertical-align: top;
 }
 
 .table th {
   position: sticky;
   top: 0;
-  background: var(--card-inner);
+  background: var(--bg-grouped-3);
   font-weight: 600;
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .num {
@@ -132,35 +144,35 @@
 }
 
 .muted {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-xs);
 }
 
 .chip {
   display: inline-block;
   padding: 0.05rem 0.45rem;
-  border-radius: var(--radius-full);
+  border-radius: var(--r-full);
   font-size: var(--text-2xs);
-  border: 1px solid var(--border);
+  border: var(--hairline) solid var(--sep);
   white-space: nowrap;
 }
 
 .chipOk {
   composes: chip;
-  border-color: var(--profit);
-  color: var(--profit);
+  border-color: var(--sys-green-ink);
+  color: var(--sys-green-ink);
 }
 
 .chipWarn {
   composes: chip;
-  border-color: var(--warning);
-  color: var(--warning);
+  border-color: var(--sys-orange-ink);
+  color: var(--sys-orange-ink);
 }
 
 .chipBad {
   composes: chip;
-  border-color: var(--destructive);
-  color: var(--destructive);
+  border-color: var(--sys-red-ink);
+  color: var(--sys-red-ink);
 }
 
 .list {
@@ -177,13 +189,13 @@
 }
 
 .step {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
   padding: 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  background: var(--card);
+  background: var(--bg-grouped-2);
 }
 
 .stepHead {
@@ -201,7 +213,7 @@
 .facts {
   margin: 0;
   padding-left: 1.1rem;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
 }
 
@@ -212,7 +224,7 @@
   flex-wrap: wrap;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

@@ -6,22 +6,22 @@
   align-items: center;
   gap: 0.75rem 1rem;
   padding: 1rem 1.125rem;
-  border: 1.5px dashed var(--input-border);
-  border-radius: var(--radius-md);
-  background: var(--card-inner);
+  border: var(--hairline) dashed var(--field-edge);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-3);
 }
 
 .dropOn {
   composes: drop;
-  border-color: var(--ring);
-  background: var(--brand-soft);
+  border-color: var(--tint);
+  background: var(--tint-soft);
 }
 
 .dropText {
   flex: 1 1 18rem;
   min-width: 0;
   margin: 0;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-base);
 }
 
@@ -30,18 +30,18 @@
   flex-wrap: wrap;
   gap: 0.375rem 1.25rem;
   font-size: var(--text-base);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
-.meta strong { color: var(--foreground); }
+.meta strong { color: var(--label); }
 
 .warn {
   margin: 0;
   padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
-  background: color-mix(in srgb, var(--warning) 8%, transparent);
-  color: var(--warning);
+  border-radius: var(--r-8);
+  border: var(--hairline) solid color-mix(in srgb, var(--sys-orange-ink) 35%, var(--sep));
+  background: color-mix(in srgb, var(--sys-orange-ink) 8%, transparent);
+  color: var(--sys-orange-ink);
   font-size: var(--text-base);
 }
 
@@ -61,19 +61,19 @@
   font-size: var(--text-xs);
   font-weight: 600;
   padding: 0.125rem 0.5rem;
-  border-radius: var(--radius-full);
-  border: 1px solid currentColor;
+  border-radius: var(--r-full);
+  border: var(--hairline) solid currentColor;
 }
 
-.matched { composes: badge; color: var(--profit); background: color-mix(in srgb, var(--profit) 10%, transparent); }
-.mismatch { composes: badge; color: var(--warning); background: color-mix(in srgb, var(--warning) 10%, transparent); }
-.missing_in_books { composes: badge; color: var(--info); background: color-mix(in srgb, var(--info) 10%, transparent); }
-.not_in_2b { composes: badge; color: var(--loss); background: color-mix(in srgb, var(--loss) 10%, transparent); }
-.itc_unavailable { composes: badge; color: var(--muted-foreground); background: var(--muted); }
+.matched { composes: badge; color: var(--sys-green-ink); background: color-mix(in srgb, var(--sys-green-ink) 10%, transparent); }
+.mismatch { composes: badge; color: var(--sys-orange-ink); background: color-mix(in srgb, var(--sys-orange-ink) 10%, transparent); }
+.missing_in_books { composes: badge; color: var(--sys-blue-ink); background: color-mix(in srgb, var(--sys-blue-ink) 10%, transparent); }
+.not_in_2b { composes: badge; color: var(--sys-red-ink); background: color-mix(in srgb, var(--sys-red-ink) 10%, transparent); }
+.itc_unavailable { composes: badge; color: var(--label-2); background: var(--muted); }
 
 .sub {
   display: block;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
 }
 

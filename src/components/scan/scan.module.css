@@ -16,7 +16,7 @@
 .field svg {
   position: absolute;
   left: 0.65rem;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   pointer-events: none;
 }
 
@@ -27,24 +27,24 @@
 
 .status {
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   min-height: 1.1em;
   flex-basis: 100%;
   margin: 0;
 }
 
 .statusError {
-  color: var(--destructive);
+  color: var(--sys-red-ink);
 }
 
 .statusOk {
-  color: var(--profit);
+  color: var(--sys-green-ink);
 }
 
 .video {
   width: 100%;
-  max-height: 60vh;
-  border-radius: var(--radius-md);
+  max-height: 60dvh;
+  border-radius: var(--r-12);
   background: var(--ink);
   object-fit: cover;
   display: block;
@@ -57,13 +57,14 @@
 .aim {
   position: absolute;
   inset: 30% 12%;
-  border: 2px solid var(--pal-gold);
-  border-radius: var(--radius-sm);
+  outline: 2px solid var(--brand-gold);
+  outline-offset: -2px;
+  border-radius: var(--r-8);
   pointer-events: none;
 }
 
 .note {
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   margin: 0.5rem 0 0;
 }

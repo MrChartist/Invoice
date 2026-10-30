@@ -111,7 +111,7 @@ export function RcmDocsPanel({ notify }: RcmDocsPanelProps) {
   return (
     <div className={local.tabBody} style={{ padding: 0 }} data-rcm-docs>
       <div className={`${surface.card} ${local.disclaimer}`} role="note">
-        <AlertTriangle size={16} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
+        <AlertTriangle size={16} aria-hidden style={{ flexShrink: 0, color: 'var(--sys-orange-ink)' }} />
         <span>{RCM_DISCLAIMER}</span>
       </div>
       <p className={styles.muted}>{o7T('rcmIntro')}</p>

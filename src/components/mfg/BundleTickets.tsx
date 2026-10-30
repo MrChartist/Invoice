@@ -34,12 +34,12 @@ export default function BundleTickets({ plan, styleName, onClose }: { plan: CutP
           {(plan.bundles ?? []).map((b) => {
             const id = bundleId(plan.number, b.no);
             return (
-              <div key={b.no} className="k" data-mfc-ticket={id} style={{ border: '1px dashed var(--border)', padding: 8 }}>
+              <div key={b.no} className="k" data-mfc-ticket={id} style={{ border: '1px dashed var(--sep)', padding: 8 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <QRCodeSVG value={id} size={64} />
                   <div><strong>{id}</strong><br />{styleName}<br />{b.size} · {b.colour}{b.shade ? ` · ${b.shade}` : ''}<br />{gT('pieces')}: {livePieces(b)}</div>
                 </div>
-                {coupons.map(([n, r]) => <div key={n} className="c" style={{ borderTop: '1px dashed var(--border)', marginTop: 4 }}>{id} · {n}{r ? ` · ₹${r}` : ''} · {livePieces(b)} {gT('pcs')}</div>)}
+                {coupons.map(([n, r]) => <div key={n} className="c" style={{ borderTop: '1px dashed var(--sep)', marginTop: 4 }}>{id} · {n}{r ? ` · ₹${r}` : ''} · {livePieces(b)} {gT('pcs')}</div>)}
               </div>
             );
           })}

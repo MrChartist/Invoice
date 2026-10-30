@@ -4,20 +4,20 @@
 .list { display: flex; flex-direction: column; gap: 0.375rem; margin: 0; padding: 0; list-style: none; }
 .listItem {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
-  padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card-inner);
+  padding: 0.5rem 0.75rem; border: var(--hairline) solid var(--sep); border-radius: var(--r-8); background: var(--bg-grouped-3);
 }
 .listItem strong { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: var(--text-base); }
-.muted { color: var(--muted-foreground); font-size: var(--text-sm); }
+.muted { color: var(--label-2); font-size: var(--text-sm); }
 .grow { flex: 1 1 auto; }
 .num { width: 5.5rem; }
 .narrow { width: 4.5rem; }
 .wide { min-width: 9rem; }
 .warn {
-  margin: 0; padding: 0.5rem 0.75rem; border-radius: var(--radius-sm);
-  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
-  background: color-mix(in srgb, var(--warning) 8%, transparent);
-  color: var(--warning); font-size: var(--text-base);
+  margin: 0; padding: 0.5rem 0.75rem; border-radius: var(--r-8);
+  border: var(--hairline) solid color-mix(in srgb, var(--sys-orange-ink) 35%, var(--sep));
+  background: color-mix(in srgb, var(--sys-orange-ink) 8%, transparent);
+  color: var(--sys-orange-ink); font-size: var(--text-base);
 }
-.ok { color: var(--profit); font-weight: 600; }
-.bad { color: var(--loss); font-weight: 600; }
+.ok { color: var(--sys-green-ink); font-weight: 600; }
+.bad { color: var(--sys-red-ink); font-weight: 600; }
 .totals { font-weight: 600; font-size: var(--text-md); }

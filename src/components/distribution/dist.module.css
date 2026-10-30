@@ -20,20 +20,20 @@
 .notice {
   margin: 0;
   padding: 0.5rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--warning) 9%, transparent);
+  border: var(--hairline) solid color-mix(in srgb, var(--sys-orange-ink) 45%, var(--sep));
+  border-radius: var(--r-12);
+  background: color-mix(in srgb, var(--sys-orange-ink) 9%, transparent);
   font-size: var(--text-sm);
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .danger {
-  border-color: color-mix(in srgb, var(--destructive) 50%, var(--border));
-  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+  border-color: color-mix(in srgb, var(--sys-red-ink) 50%, var(--sep));
+  background: color-mix(in srgb, var(--sys-red-ink) 8%, transparent);
 }
 
 .muted {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
   margin: 0;
 }
@@ -47,13 +47,13 @@
 .table th,
 .table td {
   padding: 0.375rem 0.5rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
   text-align: left;
   vertical-align: top;
 }
 
 .table th {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-weight: 600;
 }
 
@@ -76,9 +76,9 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.0625rem 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--muted);
-  color: var(--foreground);
+  color: var(--label);
   font-size: var(--text-xs);
 }
 
@@ -91,9 +91,9 @@
 .qr {
   display: inline-block;
   padding: 0.75rem;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  background: var(--bg-grouped-2);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
 }
 
 .textarea {
@@ -111,9 +111,9 @@
 
 .day {
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-2);
 }
 
 .day h4 {

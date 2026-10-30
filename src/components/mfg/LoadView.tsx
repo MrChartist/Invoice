@@ -73,10 +73,10 @@ export default function LoadView({ ctx }: { ctx: MfgContext }) {
             {centreBuckets(c, result.load, from, to, by).map((b) => (
               <div key={b.key} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: 'var(--text-sm)' }}>
                 <span style={{ width: 92 }}>{b.key}</span>
-                <span style={{ flex: 1, background: 'var(--muted)', borderRadius: 'var(--radius-xs)', height: 12, overflow: 'hidden' }}>
-                  <span style={{ display: 'block', height: '100%', width: `${Math.min(b.pct, 100)}%`, background: b.pct > 100 ? 'var(--destructive)' : 'var(--primary)' }} />
+                <span style={{ flex: 1, background: 'var(--muted)', borderRadius: 'var(--r-6)', height: 12, overflow: 'hidden' }}>
+                  <span style={{ display: 'block', height: '100%', width: `${Math.min(b.pct, 100)}%`, background: b.pct > 100 ? 'var(--sys-red-ink)' : 'var(--tint)' }} />
                 </span>
-                <span style={{ width: 150, color: b.pct > 100 ? 'var(--destructive)' : undefined }} data-mf-pct={b.pct}>{fmt(b.load)} / {fmt(b.available)} h · {b.pct}%</span>
+                <span style={{ width: 150, color: b.pct > 100 ? 'var(--sys-red-ink)' : undefined }} data-mf-pct={b.pct}>{fmt(b.load)} / {fmt(b.available)} h · {b.pct}%</span>
               </div>
             ))}
           </div>

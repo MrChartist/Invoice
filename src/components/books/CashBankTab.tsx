@@ -110,7 +110,7 @@ export function CashBankTab({ vouchers, openings, period, onEditOpening }: CashB
         <div className={surface.stat}>
           <div className={surface.statTop}>
             <span className={surface.statLabel}>{booksT('statReceipts')}</span>
-            <span className={surface.statIcon}><ArrowDownLeft size={15} color="var(--profit)" /></span>
+            <span className={surface.statIcon}><ArrowDownLeft size={15} color="var(--sys-green-ink)" /></span>
           </div>
           <div className={`${surface.statValue} ${styles.pos}`}>{formatMoney(book.totalReceipts)}</div>
           <div className={surface.statHint}>{booksT('moneyIn')}</div>
@@ -118,7 +118,7 @@ export function CashBankTab({ vouchers, openings, period, onEditOpening }: CashB
         <div className={surface.stat}>
           <div className={surface.statTop}>
             <span className={surface.statLabel}>{booksT('statPayments')}</span>
-            <span className={surface.statIcon}><ArrowUpRight size={15} color="var(--loss)" /></span>
+            <span className={surface.statIcon}><ArrowUpRight size={15} color="var(--sys-red-ink)" /></span>
           </div>
           <div className={`${surface.statValue} ${styles.neg}`}>{formatMoney(book.totalPayments)}</div>
           <div className={surface.statHint}>{booksT('moneyOut')}</div>

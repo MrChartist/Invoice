@@ -200,7 +200,7 @@ function MatrixView() {
           </div>
           {parent && (
             <GridTables axes={gridAxes(parent)} cells={cells} render={(c) => (
-              <span data-matrix-cell={c.key} style={c.qty <= 0 ? { color: 'var(--loss)' } : undefined}>
+              <span data-matrix-cell={c.key} style={c.qty <= 0 ? { color: 'var(--sys-red-ink)' } : undefined}>
                 <strong>{c.qty}</strong>{c.qty <= 0 && <small> {rtcT('soldOut')}</small>}<br /><small>{rtcT('sold30', { n: c.sold })}</small>
               </span>
             )} />
@@ -290,7 +290,7 @@ function AlterationsView({ onDone }: { onDone: Done }) {
                     <td>{[j.customer, j.phone].filter(Boolean).join(' · ')}</td>
                     <td>{j.garment}{j.notes ? <><br /><small>{j.notes}</small></> : null}</td>
                     <td>{j.tailor_name ?? '-'}</td>
-                    <td>{j.due}{j.due < day && (j.status === 'received' || j.status === 'with_tailor') ? <small style={{ color: 'var(--loss)' }}> {rtcT('overdue')}</small> : null}</td>
+                    <td>{j.due}{j.due < day && (j.status === 'received' || j.status === 'with_tailor') ? <small style={{ color: 'var(--sys-red-ink)' }}> {rtcT('overdue')}</small> : null}</td>
                     <td className={surface.numeric}>{j.charge > 0 ? formatCurrency(j.charge) : rtcT('free')}</td>
                     <td style={{ textAlign: 'right' }}>
                       {nx && <button type="button" className={sm} onClick={() => run(() => (moveAlteration(j.id, nx, day), rtcT(`st.${nx}`)))} data-alt-next={nx}>{rtcT(`go.${nx as Exclude<AlterationStatus, 'received' | 'cancelled'>}`)}</button>}

@@ -64,7 +64,7 @@ export default function UtilisationView({ notify }: Pick<PsDeskProps, 'notify'>)
               {rows.map((r, i) => (
                 <tr key={r.id} data-util-row={r.name}>
                   {csv[i].slice(0, 4).map((c, j) => <td key={j} className={j ? surface.numeric : undefined}>{c}</td>)}
-                  <td><span style={{ display: 'inline-block', width: 80, height: 8, background: 'var(--border)', verticalAlign: 'middle' }}><span style={{ display: 'block', height: 8, width: `${Math.min(r.pct ?? 0, 100)}%`, background: r.under ? 'var(--warning)' : 'var(--primary)' }} /></span> {csv[i][4]}</td>
+                  <td><span style={{ display: 'inline-block', width: 80, height: 8, background: 'var(--sep)', verticalAlign: 'middle' }}><span style={{ display: 'block', height: 8, width: `${Math.min(r.pct ?? 0, 100)}%`, background: r.under ? 'var(--sys-orange-ink)' : 'var(--tint)' }} /></span> {csv[i][4]}</td>
                   <td>{csv[i][5]}</td>
                   <td><button type="button" className={controls.btnGhost} onClick={() => setD(draftOf(staff.find((s) => s.id === r.id)))}>{psT('open')}</button></td>
                 </tr>

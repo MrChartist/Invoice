@@ -6,17 +6,15 @@
 
 .summary > div {
   padding: 0.75rem 0.875rem;
-  background: var(--card-inner);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  background: var(--bg-grouped-3);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
 }
 
 .summary dt {
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .summary dd {
@@ -28,8 +26,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.good { color: var(--profit); }
-.due { color: var(--warning); }
+.good { color: var(--sys-green-ink); }
+.due { color: var(--sys-orange-ink); }
 
 .form {
   display: flex;
@@ -40,16 +38,14 @@
 .historyLabel {
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   margin-bottom: 0.5rem;
 }
 
 .history {
   list-style: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
   overflow: hidden;
 }
 
@@ -59,7 +55,7 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.625rem 0.875rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
 }
 
 .history li:last-child {
@@ -74,10 +70,10 @@
 
 .history span {
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
-@media (max-width: 480px) {
+@media (max-width: 26.875em) {
   .summary dd { font-size: var(--text-lg); }
 }
 
@@ -87,16 +83,16 @@
   align-items: flex-start;
   gap: 0.75rem;
   padding: 0.75rem 0.875rem;
-  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
-  background: color-mix(in srgb, var(--warning) 9%, var(--card));
-  border-radius: var(--radius-md);
+  border: var(--hairline) solid color-mix(in srgb, var(--sys-orange-ink) 35%, var(--sep));
+  background: color-mix(in srgb, var(--sys-orange-ink) 9%, var(--bg-grouped-2));
+  border-radius: var(--r-12);
   font-size: var(--text-md);
 }
 
 .lockBanner svg {
   flex: none;
   margin-top: 0.15rem;
-  color: var(--warning);
+  color: var(--sys-orange-ink);
 }
 
 .lockText {
@@ -108,7 +104,7 @@
 }
 
 .lockText span {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-base);
 }
 
@@ -116,19 +112,19 @@
   display: grid;
   gap: 0.375rem;
   padding: 0.875rem 1rem;
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--profit) 10%, var(--card));
-  border: 1px solid color-mix(in srgb, var(--profit) 35%, var(--border));
+  border-radius: var(--r-12);
+  background: color-mix(in srgb, var(--sys-green-ink) 10%, var(--bg-grouped-2));
+  border: var(--hairline) solid color-mix(in srgb, var(--sys-green-ink) 35%, var(--sep));
   font-size: var(--text-sm);
 }
 
 .paidPanel strong {
-  color: var(--profit);
+  color: var(--sys-green-ink);
   font-size: var(--text-md);
 }
 
 .paidPanel span {
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .paidActions {

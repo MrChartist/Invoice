@@ -7,5 +7,5 @@ const REGIMES: readonly HsRegime[] = ['unregistered', 'agency', 'exempt77c', 'ta
 export default function RegimeChip({ regime }: { regime?: HsRegime }) {
   if (!regime) return null;
   const tax = regime !== 'exempt77c' && regime !== 'unregistered';
-  return <span data-hs-regime={regime} style={{ padding: '0 0.4rem', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', background: tax ? 'var(--brand-soft)' : 'var(--muted)', whiteSpace: 'nowrap' }}>{hsbT('regimes').split(',')[REGIMES.indexOf(regime)]}</span>;
+  return <span data-hs-regime={regime} style={{ padding: '0 0.4rem', borderRadius: 'var(--r-8)', fontSize: 'var(--text-xs)', background: tax ? 'var(--tint-soft)' : 'var(--muted)', whiteSpace: 'nowrap' }}>{hsbT('regimes').split(',')[REGIMES.indexOf(regime)]}</span>;
 }

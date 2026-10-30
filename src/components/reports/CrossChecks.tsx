@@ -43,9 +43,9 @@ export function CrossChecks({ checks }: { checks: CrossCheck[] }) {
               <span className={styles.checkNum}>₹{formatMoney(c.other)}</span>
               <span className={styles.checkIcon}>
                 {agree ? (
-                  <CheckCircle2 size={16} color="var(--profit)" aria-label={repT('ccAgrees')} />
+                  <CheckCircle2 size={16} color="var(--sys-green-ink)" aria-label={repT('ccAgrees')} />
                 ) : (
-                  <AlertTriangle size={16} color="var(--loss)" aria-label={repT('ccDiffers', { amount: formatMoney(Math.abs(c.report - c.other)) })} />
+                  <AlertTriangle size={16} color="var(--sys-red-ink)" aria-label={repT('ccDiffers', { amount: formatMoney(Math.abs(c.report - c.other)) })} />
                 )}
               </span>
             </li>

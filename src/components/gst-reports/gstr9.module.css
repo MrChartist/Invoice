@@ -18,18 +18,18 @@
   gap: 0.5rem;
   align-items: flex-start;
   padding: 0.75rem 0.875rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--card-inner);
+  border-radius: var(--r-12);
+  border: var(--hairline) solid var(--sep);
+  background: var(--bg-grouped-3);
   font-size: var(--text-sm);
   line-height: 1.5;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .bannerIcon {
   flex-shrink: 0;
   margin-top: 2px;
-  color: var(--warning);
+  color: var(--sys-orange-ink);
 }
 
 .section {
@@ -43,20 +43,20 @@
   font-family: var(--font-display);
   font-size: var(--text-base);
   font-weight: 600;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .rowId {
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   white-space: nowrap;
 }
 
 .note {
   display: block;
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .total td {
@@ -64,7 +64,7 @@
 }
 
 .diff {
-  color: var(--loss);
+  color: var(--sys-red-ink);
   font-weight: 600;
 }
 
@@ -79,10 +79,10 @@
   padding-left: 1.1rem;
   font-size: var(--text-sm);
   line-height: 1.5;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .actions > * {
     flex: 1 1 100%;
   }
