@@ -1,16 +1,19 @@
+/* Sidebar switcher: an inset grouped row (spec 2.5) with a sentence-case label (D5) over the select. */
 .switcher {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  margin: 0 0.75rem 0.75rem;
+  gap: var(--sp-1);
+  margin: 0 0 var(--sp-4);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border: var(--card-edge);
+  border-radius: var(--r-12);
+  background: var(--bg-3);
 }
 
 .switcherLabel {
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--label-2);
 }
 
 .list {
@@ -25,10 +28,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--sp-3);
   flex-wrap: wrap;
-  padding: 0.75rem 0;
-  border-top: 1px solid var(--border);
+  padding: var(--sp-3) 0;
+  border-top: var(--hairline) solid var(--sep);
 }
 
 .row:first-child {
@@ -38,32 +41,33 @@
 .name {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   font-weight: 600;
   min-width: 0;
 }
 
+/* "Open" status pill: green meaning (spec 1.1), soft fill, ink text. */
 .active {
   font-size: var(--text-xs);
-  font-weight: 600;
-  padding: 0.125rem 0.5rem;
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--profit) 14%, transparent);
-  color: var(--profit);
+  font-weight: 500;
+  padding: var(--sp-0-5) var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--sys-green-soft);
+  color: var(--sys-green-ink);
 }
 
 .actions {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   flex-wrap: wrap;
 }
 
 .form {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   align-items: flex-end;
   flex-wrap: wrap;
-  margin-top: 0.75rem;
+  margin-top: var(--sp-3);
 }
 
 .form > :first-child {
