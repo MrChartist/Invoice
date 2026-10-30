@@ -32,4 +32,6 @@
       if (p.focus_always === true) c.add('a11y-focus');
     }
   } catch (e) {}
+  // Density (docs/theme/IOS-UI.md 3.5, PL): compact on pointer + hover laptops and up, unless the stored pref says otherwise.
+  try { var dn = (JSON.parse(localStorage.getItem('mrchartist_display_prefs') || 'null') || {}).density; if (dn === 'compact' || (dn !== 'comfortable' && window.matchMedia('(pointer: fine) and (hover: hover) and (min-width: 74.6875em)').matches)) document.documentElement.classList.add('density-compact'); } catch (e) {}
 })();

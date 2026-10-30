@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link, useSearchParams } from 'react-router-dom';
 import { History, Keyboard, Minus, Pause, Plus, Printer, ReceiptText, RotateCcw, Save, Tags, Trash2, UserRound, X } from 'lucide-react';
 import { Camera, Clock, MessageCircle, Monitor, Pencil, Settings2, Store } from 'lucide-react';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { useToast } from '../components/ui/useToast';
 import { NumberInput } from '../components/ui/NumberInput';
 import { Typeahead } from '../components/ui/Typeahead';
@@ -862,64 +862,65 @@ export function Pos() {
   const docLabel = record.doc_type in DOCUMENT_LABELS ? docName(record.doc_type) : DOCUMENT_LABELS.INVOICE;
 
   return (
-    <div className={cn(surface.page, styles.page)}>
-      <Suspense fallback={null}><ScreenTip id="pos" /></Suspense>
-      <PageHeader
-        title={posT('title')}
-        subtitle={posT('subtitle', { doc: docLabel, business: sender?.companyName || posT('setUp') })}
-        actions={
-          // QA-3 F26: on a phone the counter tools are one scrolling row, so the cart total and Save stay in view.
-          <div className={counter.tools} data-pos-tools>
-            {lastBill && (
-              <button type="button" className={controls.btnOutline} onClick={() => setPrinting(lastBill)}>
-                <Printer size={16} /> {posT('reprint', { number: lastBill.invoice_number })}
-              </button>
-            )}
-            {lastBill && (posWhatsappHref(lastBill) ? (
-              <a className={controls.btnOutline} href={posWhatsappHref(lastBill) ?? undefined} target="_blank" rel="noopener noreferrer" data-pos-whatsapp>
-                <MessageCircle size={16} /> {retailT('whatsapp')}
-              </a>
-            ) : (
-              <button type="button" className={controls.btnOutline} onClick={() => sendWhatsapp(lastBill)} data-pos-whatsapp>
-                <MessageCircle size={16} /> {retailT('whatsapp')}
-              </button>
-            ))}
-            {lastBill && posSignable(lastBill) && (
-              <button type="button" className={controls.btnOutline} onClick={() => setSignFor(lastBill)} data-pos-signature>
-                <Pencil size={16} /> {posT('signature')}
-              </button>
-            )}
-            {lastShare && (
-              <button type="button" className={controls.btnOutline} onClick={() => setImageFor(lastShare)} data-pos-share-image>
-                <Camera size={16} /> {rPosT('shareImage')}
-              </button>
-            )}
-            <Link className={controls.btnOutline} to="/tables" data-pos-tables><Store size={16} /> {rPosT('tables')}</Link>
-            <button type="button" className={controls.btnOutline} onClick={() => setShiftOpen(true)} data-pos-shift>
-              <Clock size={16} /> {shift ? retailT('shiftN', { n: shift.number }) : retailT('shift')}
+    <Page
+      title={posT('title')}
+      subtitle={posT('subtitle', { doc: docLabel, business: sender?.companyName || posT('setUp') })}
+      actions={
+        // QA-3 F26: on a phone the counter tools are one scrolling row, so the cart total and Save stay in view.
+        <div className={counter.tools} data-pos-tools>
+          {lastBill && (
+            <button type="button" className={controls.btnOutline} onClick={() => setPrinting(lastBill)}>
+              <Printer size={16} /> {posT('reprint', { number: lastBill.invoice_number })}
             </button>
-            <button type="button" className={controls.btnOutline} onClick={openDisplay} title={keys.display} data-pos-display-open>
-              <Monitor size={16} /> {retailT('display')}
+          )}
+          {lastBill && (posWhatsappHref(lastBill) ? (
+            <a className={controls.btnOutline} href={posWhatsappHref(lastBill) ?? undefined} target="_blank" rel="noopener noreferrer" data-pos-whatsapp>
+              <MessageCircle size={16} /> {retailT('whatsapp')}
+            </a>
+          ) : (
+            <button type="button" className={controls.btnOutline} onClick={() => sendWhatsapp(lastBill)} data-pos-whatsapp>
+              <MessageCircle size={16} /> {retailT('whatsapp')}
             </button>
-            <button type="button" className={controls.btnIcon} onClick={() => setSettingsOpen(true)} aria-label={retailT('setTitle')} title={retailT('setTitle')} data-pos-settings>
-              <Settings2 size={16} />
+          ))}
+          {lastBill && posSignable(lastBill) && (
+            <button type="button" className={controls.btnOutline} onClick={() => setSignFor(lastBill)} data-pos-signature>
+              <Pencil size={16} /> {posT('signature')}
             </button>
-            <button type="button" className={controls.btnOutline} onClick={hold} disabled={items.length === 0} title="Shift+F8" data-pos-hold>
-              <Pause size={16} /> {posT('hold')}
+          )}
+          {lastShare && (
+            <button type="button" className={controls.btnOutline} onClick={() => setImageFor(lastShare)} data-pos-share-image>
+              <Camera size={16} /> {rPosT('shareImage')}
             </button>
-            <button type="button" className={controls.btnOutline} onClick={() => act('held')} title="F1" data-pos-held>
-              <History size={16} /> {posT('heldBills')} {held.length > 0 && <span className={counter.badge}>{held.length}</span>}
-            </button>
-            <button type="button" className={controls.btnOutline} onClick={() => setRetOpen(true)}>
-              <RotateCcw size={16} /> {returnsT('title')}
-            </button>
-            <Suspense fallback={null}><PosPrinterButton /></Suspense>
-            <button type="button" className={controls.btnOutline} onClick={() => setZOpen(true)}>
-              <ReceiptText size={16} /> {posT('zReport')}
-            </button>
-          </div>
-        }
-      />
+          )}
+          <Link className={controls.btnOutline} to="/tables" data-pos-tables><Store size={16} /> {rPosT('tables')}</Link>
+          <button type="button" className={controls.btnOutline} onClick={() => setShiftOpen(true)} data-pos-shift>
+            <Clock size={16} /> {shift ? retailT('shiftN', { n: shift.number }) : retailT('shift')}
+          </button>
+          <button type="button" className={controls.btnOutline} onClick={openDisplay} title={keys.display} data-pos-display-open>
+            <Monitor size={16} /> {retailT('display')}
+          </button>
+          <button type="button" className={controls.btnIcon} onClick={() => setSettingsOpen(true)} aria-label={retailT('setTitle')} title={retailT('setTitle')} data-pos-settings>
+            <Settings2 size={16} />
+          </button>
+          <button type="button" className={controls.btnOutline} onClick={hold} disabled={items.length === 0} title="Shift+F8" data-pos-hold>
+            <Pause size={16} /> {posT('hold')}
+          </button>
+          <button type="button" className={controls.btnOutline} onClick={() => act('held')} title="F1" data-pos-held>
+            <History size={16} /> {posT('heldBills')} {held.length > 0 && <span className={counter.badge}>{held.length}</span>}
+          </button>
+          <button type="button" className={controls.btnOutline} onClick={() => setRetOpen(true)}>
+            <RotateCcw size={16} /> {returnsT('title')}
+          </button>
+          <Suspense fallback={null}><PosPrinterButton /></Suspense>
+          <button type="button" className={controls.btnOutline} onClick={() => setZOpen(true)}>
+            <ReceiptText size={16} /> {posT('zReport')}
+          </button>
+        </div>
+      }
+      className={styles.page}
+      tier="bleed"
+      notices={<Suspense fallback={null}><ScreenTip id="pos" /></Suspense>}
+    >
 
       <div className={styles.layout}>
         <section className={cn(surface.card, styles.cart)} aria-label={posT('billItems')}>
@@ -1399,6 +1400,6 @@ export function Pos() {
           </label>
         </Modal>
       )}
-    </div>
+    </Page>
   );
 }

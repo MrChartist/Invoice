@@ -8,7 +8,7 @@
 import { Suspense, useCallback, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Ban, Building2, CalendarDays, ClipboardList, Clock, KeyRound } from 'lucide-react';
-import { PageHeader } from '../ui/PageHeader';
+import { Page } from '../ui/Page';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/useToast';
 import { useT } from '../../i18n';
@@ -126,9 +126,8 @@ export default function FrontDesk() {
   const ctx: Ctx = { tick, day, refresh, notify, open: setDialog, go, run };
   const Extra = EXTRA_VIEWS[view];
   return (
-    <div className={surface.page} data-front-desk-view={view}>
-      <PageHeader title={hT('tab.frontdesk')} subtitle={hT('bizDate', { d: day })}
-        actions={<Link className={controls.btnOutline} to="/tables"><Building2 size={16} aria-hidden="true" /> {hT('restaurant')}</Link>} />
+    <Page data-front-desk-view={view} title={hT('tab.frontdesk')} subtitle={hT('bizDate', { d: day })}
+      actions={<Link className={controls.btnOutline} to="/tables"><Building2 size={16} aria-hidden="true" /> {hT('restaurant')}</Link>}>
       <div className={styles.stack}>
         {!isPackOn(localDb.settings.get(), 'hotel') && <p className={styles.warn}>{hT('packOff')}</p>}
         <div className={styles.row} role="tablist">
@@ -147,7 +146,7 @@ export default function FrontDesk() {
         <p className={styles.note}>{hT('workingPaper')}</p>
       </div>
       {toastNode}
-    </div>
+    </Page>
   );
 }
 

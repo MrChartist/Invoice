@@ -1,0 +1,244 @@
+/* ================================================================
+   Page frame (package PL, docs/theme/IOS-UI.md section 3).
+   ONE frame for every route: the shell (`DashboardLayout` `.content`) owns the gutter and the width tier,
+   `<Page>` (src/components/ui/Page.tsx) owns the slot order:
+   back link · large title + subtitle + actions · page tabs · notices · content (+ inspector).
+   Pages never set max-width, side padding or margin-inline on their root: they pick a `tier`.
+   Width media queries are in em (they follow the text-size pref); card-level layout uses container queries.
+   ================================================================ */
+
+.page {
+  /* Every page is an inline-size container, so blocks inside respond to the frame, not the window. */
+  container: page / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--section-gap);
+  width: 100%;
+  min-width: 0;
+}
+
+/* ── Header: the same height, position and weight on every route ─────────── */
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-3) var(--sp-4);
+  flex-wrap: wrap;
+  min-height: 2.75rem;
+}
+
+.headText {
+  min-width: 0;
+  flex: 1 1 18rem;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.625rem; /* title-2: 26px */
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.subtitle {
+  margin: var(--sp-1) 0 0;
+  max-width: var(--measure);
+  color: var(--label-2);
+  font-size: var(--text-md);
+  line-height: 1.45;
+}
+
+/* Actions sit on the title row; on phones they become one scrollable row, never two rows of capsules. */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* Back link above the large title (phones, nested pages). */
+.back {
+  align-self: flex-start;
+  margin-bottom: calc(var(--sp-4) * -0.5);
+}
+
+/* Notices slot: demo banner, one-time tips, "About this tab" strips, period-lock notices. Below the header,
+   so a tip never pushes the title down. Each notice is its own block in the page's gap; an empty slot takes
+   no space. */
+.notices {
+  display: contents;
+}
+
+/* ── Width tiers ─────────────────────────────────────────────────────────── */
+/* Form tier: a single form, left-aligned at the frame's leading edge (the header keeps the full frame). */
+.page[data-tier='form'] > :not(.head, .back) {
+  width: 100%;
+  max-width: var(--form-max);
+}
+
+/* A paragraph block that should keep the reading measure. */
+.measure {
+  max-width: var(--measure);
+}
+
+/* ── Inspector (wide screens): content + a trailing pane instead of empty margins ───────────── */
+.withInspector {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--section-gap);
+  align-items: start;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--section-gap);
+  min-width: 0;
+}
+
+.inspector {
+  display: none;
+  min-width: 0;
+}
+
+@container page (min-width: 74.6875em) {
+  .withInspector {
+    grid-template-columns: minmax(0, 1fr) var(--inspector-w);
+  }
+  .inspector {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+    position: sticky;
+    top: calc(var(--bar-h) + var(--sp-4));
+  }
+}
+
+/* ── Report list + report (Books, Reports): on a wide frame the tab strip becomes a list beside the report ── */
+.sideNav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--section-gap);
+  min-width: 0;
+}
+
+@container page (min-width: 90em) {
+  .sideNav {
+    display: grid;
+    grid-template-columns: minmax(12rem, 15rem) minmax(0, 1fr);
+    align-items: start;
+  }
+  .sideNav > [role='tablist'] {
+    grid-row: 1 / span 9;
+    position: sticky;
+    top: calc(var(--bar-h) + var(--sp-4));
+    flex-direction: column;
+    overflow: visible;
+    border-bottom: 0;
+  }
+  .sideNav > [role='tablist'] > [role='tab'] {
+    justify-content: flex-start;
+    text-align: start;
+  }
+  .sideNav > :not([role='tablist']) {
+    grid-column: 2;
+    min-width: 0;
+  }
+}
+
+/* ── Tables: column priority + sticky head / totals (P2 styles the look) ─────────────────────────
+   Wrap a table in `.scroller`. Cells declare `data-priority="2"` (hidden under a 37.5em scroller) or "3"
+   (hidden under 52.125em; container widths use the breakpoint values); p1 cells always show. Horizontal scroll happens only inside the scroller, and only
+   when even the p1 columns do not fit. With `.pinned` the head sticks to the top of the scroller and a `tfoot`
+   totals row to its bottom. */
+.scroller {
+  container: table / inline-size;
+  width: 100%;
+  overflow: auto;
+  overscroll-behavior-x: contain;
+}
+
+/* `.pinned` makes the scroller its own vertical scroller too, so the head and totals stay in view (long registers). */
+@media (width >= 37.5em) {
+  .pinned {
+    max-height: calc(100dvh - var(--bar-h) - var(--sp-8));
+  }
+}
+
+.scroller > table {
+  min-width: 0;
+}
+
+.scroller > table > thead > tr > th {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-raised);
+}
+
+.scroller > table > tfoot > tr > :is(th, td) {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-raised);
+  background-color: var(--bg-grouped-2);
+}
+
+/* Phones (under 37.5em) turn tables into row cards that show every cell, so priorities apply from tablets up. */
+@media (min-width: 37.5em) {
+  @container table (width < 52.125em) {
+    .scroller :is(th, td)[data-priority='3'] {
+      display: none;
+    }
+  }
+
+  @container table (width < 37.5em) {
+    .scroller :is(th, td)[data-priority='2'] {
+      display: none;
+    }
+  }
+}
+
+/* The row shown in a SplitView detail pane. */
+.scroller tr[data-current] {
+  background-color: var(--tint-soft);
+}
+
+/* Identifiers (invoice numbers, GSTINs) never break mid-token. */
+.nowrap {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Phones ──────────────────────────────────────────────────────────────── */
+@media (width < 37.5em) {
+  .title {
+    font-size: 1.875rem; /* phone large title: 30px */
+  }
+  .actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    width: 100%;
+    scrollbar-width: none;
+  }
+  .actions > * {
+    flex-shrink: 0;
+  }
+}
+
+/* Phone landscape: the large title is off, so the content starts high. */
+@media (height < 31.25em) and (width < 74.6875em) {
+  .title {
+    font-size: 1.25rem;
+  }
+  .head {
+    min-height: 0;
+  }
+}

@@ -14,11 +14,49 @@
   background: var(--card);
 }
 
+/* Package PL: the editor grid follows the page frame's width (container queries on <Page>), not the window.
+   Narrow: one column. 37.5em+: form + summary column (a 1024px iPad keeps its summary). With live preview on
+   (the page bleeds): form + preview as a split, the summary column under the form; 100em+: all three side by side. */
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-5);
   align-items: start;
+}
+
+@container page (min-width: 37.5em) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) minmax(15rem, 22.5rem);
+  }
+}
+
+@container page (min-width: 52.125em) {
+  .layoutWithPane {
+    grid-template-columns: minmax(32rem, 1fr) minmax(24rem, 0.8fr);
+  }
+  .layoutWithPane > .side {
+    grid-column: 1;
+    position: static;
+  }
+  .layoutWithPane > :nth-child(3) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+  }
+}
+
+@container page (min-width: 120em) {
+  .layoutWithPane {
+    grid-template-columns: minmax(32rem, 1fr) 22.5rem minmax(24rem, 0.8fr);
+  }
+  .layoutWithPane > .side {
+    grid-column: 2;
+    position: sticky;
+  }
+  .layoutWithPane > :nth-child(3) {
+    grid-column: 3;
+    grid-row: 1;
+  }
 }
 
 .main,
@@ -31,7 +69,7 @@
 
 .side {
   position: sticky;
-  top: 1rem;
+  top: calc(var(--bar-h) + var(--sp-4));
 }
 
 .sideActions {
@@ -118,11 +156,7 @@
   display: none;
 }
 
-@media (max-width: 1100px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
+@container page (width < 37.5em) {
   .side {
     position: static;
   }
@@ -241,12 +275,6 @@ fieldset.main {
   display: flex;
   justify-content: flex-end;
   margin-bottom: -0.5rem;
-}
-
-@media (min-width: 1280px) {
-  .layoutWithPane {
-    grid-template-columns: minmax(0, 1fr) 340px minmax(320px, 0.9fr);
-  }
 }
 
 .paneSlot {

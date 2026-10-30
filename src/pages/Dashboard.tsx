@@ -11,7 +11,7 @@ import {
   Receipt,
   Users,
 } from 'lucide-react';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -132,18 +132,17 @@ export function Dashboard() {
   const hasData = invoices.some(isRevenueDoc);
 
   return (
-    <div className={surface.page}>
-      <PageHeader
-        title={t('dash.greeting', { greeting: t(greeting(now.getHours())), name: user?.name?.split(' ')[0] || t('dash.there') })}
-        subtitle={t('dash.subtitle', { fy: fy.label, date: now.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' }) })}
-        actions={
-          can('doc.create') ? (
-            <Link to="/invoice" className={controls.btnPrimary}>
-              <FilePlus2 size={16} /> {t('nav.newInvoice')}
-            </Link>
-          ) : undefined
-        }
-      />
+    <Page
+      title={t('dash.greeting', { greeting: t(greeting(now.getHours())), name: user?.name?.split(' ')[0] || t('dash.there') })}
+      subtitle={t('dash.subtitle', { fy: fy.label, date: now.toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' }) })}
+      actions={
+        can('doc.create') ? (
+          <Link to="/invoice" className={controls.btnPrimary}>
+            <FilePlus2 size={16} /> {t('nav.newInvoice')}
+          </Link>
+        ) : undefined
+      }
+    >
 
       <Suspense fallback={null}>
         <DemoNotice />
@@ -350,6 +349,6 @@ export function Dashboard() {
           <DashboardTiles />
         </Suspense>
       )}
-    </div>
+    </Page>
   );
 }

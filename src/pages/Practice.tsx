@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Download, Lock, RefreshCw } from 'lucide-react';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { EmptyState } from '../components/ui/EmptyState';
 import { LearnMore, practiceEmpty } from '../components/discover';
 import { discoverT } from '../i18n/areas/discover-r6';
@@ -90,8 +90,7 @@ export function Practice() {
   };
 
   return (
-    <div className={surface.page} data-practice>
-      <PageHeader title={dkT('pr.title')} subtitle={dkT('pr.subtitle')} />
+    <Page title={dkT('pr.title')} subtitle={dkT('pr.subtitle')} data-practice>
       {/* R6-B3: the desk shows every company on the device — with one company, say how to add the next. */}
       {practiceEmpty(realCompanies().length) && (
         <EmptyState
@@ -177,7 +176,7 @@ export function Practice() {
         <ChecklistPanel onChanged={refresh} />
       </div>
       <p className={styles.note}>{dkT('pr.privacy')}</p>
-    </div>
+    </Page>
   );
 }
 

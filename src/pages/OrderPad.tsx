@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { Download, Plus, Share2, Trash2 } from 'lucide-react';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { useToast } from '../components/ui/useToast';
 import { ORDER_FILE_EXT, outboxDb, signOrderFile, type PadLine } from '../lib/order-pad';
 import { beatsDb } from '../lib/distribution';
@@ -92,8 +92,7 @@ export function OrderPad() {
   };
 
   return (
-    <div className={surface.page} data-order-pad>
-      <PageHeader title={distT('padTitle')} subtitle={distT('padSubtitle')} actions={<Link to="/distribution?tab=orders" className={controls.btnOutline}>{distT('officeImport')}</Link>} />
+    <Page title={distT('padTitle')} subtitle={distT('padSubtitle')} actions={<Link to="/distribution?tab=orders" className={controls.btnOutline}>{distT('officeImport')}</Link>} data-order-pad>
       <section className={surface.card}>
         <div className={`${surface.cardBody} ${own.stack}`}>
           <div className={own.row}>
@@ -165,6 +164,6 @@ export function OrderPad() {
         </div>
       </section>
       {toastNode}
-    </div>
+    </Page>
   );
 }

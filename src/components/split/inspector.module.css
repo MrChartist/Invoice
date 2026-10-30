@@ -1,0 +1,75 @@
+/* Package PL: the Invoices detail pane of SplitView (src/components/split/panes.tsx). */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--card-pad);
+  border: var(--card-edge);
+  border-radius: var(--r-16);
+  background: var(--bg-grouped-2);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  min-width: 0;
+}
+
+.id {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sub {
+  color: var(--label-2);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--sp-3);
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--label-2);
+  font-size: var(--text-sm);
+}
+
+.facts dd {
+  margin: 0;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.paper {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-8);
+  box-shadow: var(--elev-1);
+}
+
+.sheet {
+  transform-origin: top left;
+}

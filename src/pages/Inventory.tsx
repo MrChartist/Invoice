@@ -17,7 +17,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { LearnMore } from '../components/discover';
 import { useToast } from '../components/ui/useToast';
 import { can } from '../lib/access';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { StatCard } from '../components/ui/StatCard';
 import { ItemFormModal } from '../components/inventory/ItemFormModal';
 import { AdjustModal } from '../components/inventory/AdjustModal';
@@ -260,26 +260,25 @@ export function Inventory() {
   );
 
   return (
-    <div className={surface.page}>
-      <Suspense fallback={null}><ScreenTip id="inventory" /></Suspense>
-      <PageHeader
-        title={invT('title')}
-        subtitle={invT('subtitle')}
-        actions={
-          <>
-            {/* Phase 7: BOM, Manufacturing / Stock Journal, Physical Stock, Reorder Status, stock reports */}
-            <Link to="/manufacturing" className={controls.btnOutline}>{invT('manufacturing')}</Link>
-            {/* R6-C1 (line added by R6-B): landed cost vouchers live under Manufacturing. */}
-            <Link to="/manufacturing?tab=landed" className={controls.btnOutline} data-landed-link>{discoverT('invLanded')}</Link>
-            <button type="button" className={controls.btnOutline} onClick={() => download(`stock-summary-${todayInput()}.csv`, stockSummaryCsv(positions))} disabled={!hasItems}>
-              <Download size={16} aria-hidden="true" /> {invT('exportCsv')}
-            </button>
-            <button type="button" className={controls.btnPrimary} onClick={() => setEditing({ item: blankStockItem(), isNew: true })}>
-              <Plus size={16} aria-hidden="true" /> {invT('addItem')}
-            </button>
-          </>
-        }
-      />
+    <Page
+      title={invT('title')}
+      subtitle={invT('subtitle')}
+      actions={
+        <>
+          {/* Phase 7: BOM, Manufacturing / Stock Journal, Physical Stock, Reorder Status, stock reports */}
+          <Link to="/manufacturing" className={controls.btnOutline}>{invT('manufacturing')}</Link>
+          {/* R6-C1 (line added by R6-B): landed cost vouchers live under Manufacturing. */}
+          <Link to="/manufacturing?tab=landed" className={controls.btnOutline} data-landed-link>{discoverT('invLanded')}</Link>
+          <button type="button" className={controls.btnOutline} onClick={() => download(`stock-summary-${todayInput()}.csv`, stockSummaryCsv(positions))} disabled={!hasItems}>
+            <Download size={16} aria-hidden="true" /> {invT('exportCsv')}
+          </button>
+          <button type="button" className={controls.btnPrimary} onClick={() => setEditing({ item: blankStockItem(), isNew: true })}>
+            <Plus size={16} aria-hidden="true" /> {invT('addItem')}
+          </button>
+        </>
+      }
+      notices={<Suspense fallback={null}><ScreenTip id="inventory" /></Suspense>}
+    >
 
       <div className={surface.statGrid}>
         <StatCard label={invT('statValue')} value={`₹ ${formatMoney(totals.stockValue)}`} hint={settings.method === 'FIFO' ? invT('costingFifo') : invT('costingAvg')} icon={Boxes} />
@@ -674,6 +673,6 @@ export function Inventory() {
       />
       {toastNode}
       <Suspense fallback={null}><UndoDeleted /></Suspense>
-    </div>
+    </Page>
   );
 }
