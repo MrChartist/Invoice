@@ -13,7 +13,8 @@ import { setPeriodContext, usePeriodContext } from '../lib/period-context';
 import { getAllReportPrefs, setAllReportPrefs } from '../lib/report-prefs';
 import { StorageWriteError, getTable } from '../lib/storage';
 import { useToast } from '../components/ui/useToast';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
+import page from '../styles/page.module.css';
 import { PeriodBar } from '../components/books/PeriodBar';
 import { CashBankTab } from '../components/books/CashBankTab';
 import { OpeningBalanceModal } from '../components/books/OpeningBalanceModal';
@@ -167,22 +168,21 @@ export function Books() {
   };
 
   return (
-    <div className={surface.page}>
-      <Suspense fallback={null}><ScreenTip id="books" /></Suspense>
-      <PageHeader
-        title={booksT('title')}
-        subtitle={booksT('subtitle')}
-        actions={
-          <>
-            {can('books.edit') && (
-              <button type="button" className={controls.btnOutline} onClick={() => setWizard('yearend')}>{wireT('startNewYear')}</button>
-            )}
-            {can('data.restore') && (
-              <button type="button" className={controls.btnGhost} onClick={() => setWizard('tally')}>{wireT('importTally')}</button>
-            )}
-          </>
-        }
-      />
+    <Page
+      title={booksT('title')}
+      subtitle={booksT('subtitle')}
+      actions={
+        <>
+          {can('books.edit') && (
+            <button type="button" className={controls.btnOutline} onClick={() => setWizard('yearend')}>{wireT('startNewYear')}</button>
+          )}
+          {can('data.restore') && (
+            <button type="button" className={controls.btnGhost} onClick={() => setWizard('tally')}>{wireT('importTally')}</button>
+          )}
+        </>
+      }
+      notices={<Suspense fallback={null}><ScreenTip id="books" /></Suspense>}
+    >
       {wizard && (
         <Suspense fallback={null}>
           {wizard === 'tally' ? (
@@ -214,6 +214,7 @@ export function Books() {
       />
       </div>
 
+      <div className={page.sideNav}>
       <div className={`${styles.tabs} no-print`} role="tablist" aria-label={booksT('tablist')}>
         {shown.map((t, i) => (
           <button
@@ -305,6 +306,7 @@ export function Books() {
           </Suspense>
         )}
       </div>
+      </div>
 
       <OpeningBalanceModal
         open={openingOpen}
@@ -315,6 +317,6 @@ export function Books() {
       />
       {toastNode}
       <Suspense fallback={null}><UndoDeleted /></Suspense>
-    </div>
+    </Page>
   );
 }

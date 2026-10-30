@@ -111,6 +111,7 @@ keys listed in `DEVICE_LOCAL_KEYS`, and `theme`). Never use `localStorage` direc
   per kitchen station, R3-A), `mrchartist_editor_layout` (live-preview toggle, R3-C) and `mrchartist_checklist_default`
   (practice-desk default checklist, R3-C); `mrchartist_pos_branch` (POS "This counter is branch", R4-B).
   `mrchartist_ageing_prefs` (Receivables Aging tab: age by due / bill date, user slabs, interest column; PENDING 34).
+  iOS PL: `mrchartist_sidebar` (`rail` / `full`: the tablet-and-up sidebar collapsed to its icon rail).
   Round 20 (R20-A): `mrchartist_tally_keys` (`off` / `on` / `on:collapsed` — the "Tally keys" switch; absent → decided once:
   off on a fresh device, on for a device used before) and `mrchartist_tally_layout` (`prime` / `erp9` key layout). Key
   rows live in ONE registry `src/lib/keys/registry.ts` (labels in `keys-r20a`); screens handle rows with

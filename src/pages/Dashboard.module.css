@@ -1,7 +1,22 @@
+/* Package PL: the dashboard grid answers the page frame (container query on <Page>), so it is the same in a
+   narrow window, beside an expanded sidebar or on a 2560px screen: one column, then chart + attention side by side,
+   then on a wide frame the chart takes two of three tracks. */
 .grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+}
+
+@container page (min-width: 52.125em) {
+  .grid {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+}
+
+@container page (min-width: 90em) {
+  .grid {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
 }
 
 .muted {
@@ -261,12 +276,6 @@
 
 .quickItem > svg:last-child {
   color: var(--muted-foreground);
-}
-
-@media (max-width: 1000px) {
-  .grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (max-width: 560px) {

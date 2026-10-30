@@ -2,7 +2,7 @@ import { isStockDependencyError } from '../lib/stock-timeline';
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Download, FilePlus2, Landmark, PiggyBank, Receipt, ScanLine, Search, Tags, Wallet, Zap } from 'lucide-react';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { StatCard } from '../components/ui/StatCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -192,33 +192,32 @@ export function Expenses() {
     filter.query || filter.from || filter.to || filter.kind !== 'ALL' || filter.status !== 'ALL' || filter.category !== 'ALL';
 
   return (
-    <div className={surface.page}>
-      <Suspense fallback={null}><ScreenTip id="expenses" /></Suspense>
-      <PageHeader
-        title={purT('title')}
-        subtitle={purT('subtitle')}
-        actions={
-          <>
-            <button type="button" className={controls.btnOutline} onClick={exportCsv} disabled={tab !== 'bills' || rows.length === 0}>
-              <Download size={16} /> {purT('exportCsv')}
-            </button>
-            {/* Local roles (6.21): a viewer cannot record bills; the data layer refuses it too. */}
-            {can('books.edit') && (
-              <>
-                <button type="button" className={controls.btnOutline} onClick={() => setExpenseOpen(true)}>
-                  <Zap size={16} /> {purT('quickExpense')}
-                </button>
-                <button type="button" className={controls.btnOutline} onClick={() => setScanOpen(true)} data-testid="scan-bill">
-                  <ScanLine size={16} aria-hidden /> {bsT('scanBill')}
-                </button>
-                <button type="button" className={controls.btnPrimary} onClick={() => setBillOpen(true)}>
-                  <FilePlus2 size={16} /> {purT('addBill')}
-                </button>
-              </>
-            )}
-          </>
-        }
-      />
+    <Page
+      title={purT('title')}
+      subtitle={purT('subtitle')}
+      actions={
+        <>
+          <button type="button" className={controls.btnOutline} onClick={exportCsv} disabled={tab !== 'bills' || rows.length === 0}>
+            <Download size={16} /> {purT('exportCsv')}
+          </button>
+          {/* Local roles (6.21): a viewer cannot record bills; the data layer refuses it too. */}
+          {can('books.edit') && (
+            <>
+              <button type="button" className={controls.btnOutline} onClick={() => setExpenseOpen(true)}>
+                <Zap size={16} /> {purT('quickExpense')}
+              </button>
+              <button type="button" className={controls.btnOutline} onClick={() => setScanOpen(true)} data-testid="scan-bill">
+                <ScanLine size={16} aria-hidden /> {bsT('scanBill')}
+              </button>
+              <button type="button" className={controls.btnPrimary} onClick={() => setBillOpen(true)}>
+                <FilePlus2 size={16} /> {purT('addBill')}
+              </button>
+            </>
+          )}
+        </>
+      }
+      notices={<Suspense fallback={null}><ScreenTip id="expenses" /></Suspense>}
+    >
 
       {scanOpen && (
         <Suspense fallback={null}>
@@ -449,6 +448,6 @@ export function Expenses() {
       />
       {toastNode}
       <Suspense fallback={null}><UndoDeleted /></Suspense>
-    </div>
+    </Page>
   );
 }

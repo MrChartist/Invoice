@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ClipboardList, ScanBarcode, Settings2 } from 'lucide-react';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { Modal } from '../components/ui/Modal';
 import { NumberInput } from '../components/ui/NumberInput';
 import { useToast } from '../components/ui/useToast';
@@ -177,18 +177,17 @@ function RestaurantFloor() {
   const [group86, setGroup86] = useState('');
 
   return (
-    <div className={surface.page}>
-      <PageHeader
-        title={rT('title')}
-        subtitle={rT('subtitle')}
-        actions={
-          <>
-            <Link className={controls.btnOutline} to="/pos"><ScanBarcode size={16} /> {rT('posLink')}</Link>
-            <button type="button" className={controls.btnOutline} onClick={() => setRegisterOpen(true)} data-kot-register><ClipboardList size={16} /> {rT('register')}</button>
-            <button type="button" className={controls.btnIcon} onClick={() => setSettingsOpen(true)} aria-label={rT('settings')} title={rT('settings')} data-tables-settings><Settings2 size={16} /></button>
-          </>
-        }
-      />
+    <Page
+      title={rT('title')}
+      subtitle={rT('subtitle')}
+      actions={
+        <>
+          <Link className={controls.btnOutline} to="/pos"><ScanBarcode size={16} /> {rT('posLink')}</Link>
+          <button type="button" className={controls.btnOutline} onClick={() => setRegisterOpen(true)} data-kot-register><ClipboardList size={16} /> {rT('register')}</button>
+          <button type="button" className={controls.btnIcon} onClick={() => setSettingsOpen(true)} aria-label={rT('settings')} title={rT('settings')} data-tables-settings><Settings2 size={16} /></button>
+        </>
+      }
+    >
 
       <div className={styles.tabs} role="tablist" aria-label={rT('title')}>
         {hotel && <Link className={styles.tab} to="/tables?tab=frontdesk" data-front-desk>{t('nav.frontDesk')}</Link>}
@@ -324,7 +323,7 @@ function RestaurantFloor() {
         {registerOpen && <KotRegisterModal orders={orders} day={day} whereOf={whereOf} onClose={() => setRegisterOpen(false)} />}
       </Suspense>
       {toastNode}
-    </div>
+    </Page>
   );
 }
 

@@ -29,7 +29,8 @@ import {
 } from '../lib/sales-reports';
 import { summarize } from '../lib/stats';
 import { formatMoney } from '../lib/utils';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
+import page from '../styles/page.module.css';
 import { StatCard } from '../components/ui/StatCard';
 import { PeriodBar } from '../components/books/PeriodBar';
 import { CrossChecks, type CrossCheck } from '../components/reports/CrossChecks';
@@ -152,12 +153,11 @@ export function Reports() {
 
   const t = customers.totals;
   return (
-    <div className={surface.page}>
-      <Suspense fallback={null}><ScreenTip id="reports" /></Suspense>
-      <PageHeader
-        title={repT('title')}
-        subtitle={repT('subtitle')}
-      />
+    <Page
+      title={repT('title')}
+      subtitle={repT('subtitle')}
+      notices={<Suspense fallback={null}><ScreenTip id="reports" /></Suspense>}
+    >
 
       <Suspense fallback={null}>
         <ReportViewsBar
@@ -221,6 +221,7 @@ export function Reports() {
         </div>
       )}
 
+      <div className={page.sideNav}>
       <div className={styles.tabs} role="tablist" aria-label={repT('tablist')}>
         {TABS.map((x, i) => (
           <button
@@ -255,8 +256,9 @@ export function Reports() {
         {tab === 'party' && <PartyProfitTab rep={partyProfit} period={period} />}
         {tab === 'stockstatement' && <Suspense fallback={null}><StockStatementTab /></Suspense>}
       </div>
+      </div>
 
       <CrossChecks checks={checks} />
-    </div>
+    </Page>
   );
 }

@@ -171,11 +171,8 @@ export function GatewayMenu() {
   let index = -1;
   return (
     <>
+      {/* PL: the title and subtitle are the page's (src/pages/Gateway.tsx); this row keeps the menu's switches. */}
       <div className={styles.head}>
-        <div>
-          <h1 className={styles.title}>{gwT('title')}</h1>
-          <p className={styles.sub}>{gwT('subtitle')}</p>
-        </div>
         <label className={styles.toggle} title={gwT('termsHint')}>
           <input type="checkbox" role="switch" checked={terms} onChange={(e) => setTallyTerms(e.target.checked)} />
           {gwT('termsLabel')}
