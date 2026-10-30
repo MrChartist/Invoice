@@ -1,0 +1,26 @@
+/* Skeleton (2.10, <Skeleton>): --fill-3 blocks the size of the real element; they appear only after --dur-3, so a
+   quick load never flashes; the --fill-4 shimmer stops under reduced motion (index.css ends every animation). */
+.skeleton {
+  display: block;
+  max-width: 100%;
+  border-radius: var(--r-6);
+  background:
+    linear-gradient(90deg, transparent 30%, var(--fill-4) 50%, transparent 70%) 0 0 / 300% 100% no-repeat,
+    var(--fill-3);
+  animation:
+    skeletonIn var(--dur-2) linear var(--dur-3) both,
+    skeletonShimmer calc(var(--dur-4) * 3) linear var(--dur-3) infinite;
+}
+
+.skeletonPill { border-radius: var(--r-full); }
+.skeletonBlock { border-radius: var(--r-16); }
+
+@keyframes skeletonIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes skeletonShimmer {
+  from { background-position: 100% 0, 0 0; }
+  to { background-position: 0 0, 0 0; }
+}

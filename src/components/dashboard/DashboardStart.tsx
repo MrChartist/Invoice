@@ -13,7 +13,7 @@ import { useT } from '../../i18n';
 import { reachT } from '../../i18n/areas/reach';
 import controls from '../../styles/controls.module.css';
 import own from '../layout/QuickCreate.module.css';
-import styles from '../../pages/Dashboard.module.css';
+import styles from './start.module.css';
 
 // R6-A4 / A6: the What's-new card (once after an upgrade), the Dashboard tip and Help on "What's new" — all lazy.
 const WhatsNewCard = lazy(() => import('./WhatsNewCard'));
