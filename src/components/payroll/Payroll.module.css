@@ -22,9 +22,9 @@
 .inline { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.5rem; }
 
 .h2 { font-size: var(--text-md); font-weight: 600; margin: 0 0 0.5rem; }
-.h3 { font-size: var(--text-sm); font-weight: 600; margin: 1rem 0 0.5rem; color: var(--muted-foreground); }
+.h3 { font-size: var(--text-sm); font-weight: 600; margin: 1rem 0 0.5rem; color: var(--label-2); }
 
-.note { font-size: var(--text-xs); color: var(--muted-foreground); margin: 0.5rem 1rem; }
+.note { font-size: var(--text-xs); color: var(--label-2); margin: 0.5rem 1rem; }
 
 .num {
   text-align: right;
@@ -36,7 +36,7 @@
 .strong { font-weight: 600; }
 .muted { opacity: 0.6; }
 
-.sub { display: block; font-size: var(--text-xs); color: var(--muted-foreground); }
+.sub { display: block; font-size: var(--text-xs); color: var(--label-2); }
 
 .rowActions { display: flex; gap: 0.375rem; justify-content: flex-end; }
 
@@ -49,7 +49,7 @@
 
 .checks { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-bottom: 0.75rem; }
 
-.fieldset { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.5rem 0.75rem; margin: 0 0 0.75rem; }
+.fieldset { border: var(--hairline) solid var(--sep); border-radius: var(--r-12); padding: 0.5rem 0.75rem; margin: 0 0 0.75rem; }
 
 .chips { list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0; margin: 0 0 0.75rem; }
 
@@ -58,17 +58,17 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.125rem 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-full);
   font-size: var(--text-sm);
 }
 
 .cell { width: 7rem; min-width: 5rem; }
-.overridden { border-color: var(--warning); }
+.overridden { border-color: var(--sys-orange-ink); }
 
 .grid td, .grid th { padding-inline: 0.5rem; }
 
-.warnings { margin: 0; padding-left: 1.25rem; color: var(--warning); font-size: var(--text-sm); }
+.warnings { margin: 0; padding-left: 1.25rem; color: var(--sys-orange-ink); font-size: var(--text-sm); }
 
 .slip { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
 .netPay { font-size: var(--text-lg); font-weight: 600; margin: 1rem 0 0.25rem; }
@@ -82,7 +82,7 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.625rem 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
 }
 
 .report:last-child { border-bottom: 0; }

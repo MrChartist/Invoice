@@ -244,7 +244,10 @@ const P2: Ceil = { colour: 1, radius: 22, border: 31, shadow: 11, zIndex: 2, mot
 const P3: Ceil = { colour: 1, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 1 };
 const P4: Ceil = { colour: 11, radius: 19, border: 10, shadow: 2, zIndex: 1, motion: 5, media: 5, material: 0, frame: 0, weight: 8 };
 const P5a: Ceil = { colour: 4, radius: 67, border: 69, shadow: 10, zIndex: 6, motion: 6, media: 17, material: 0, frame: 0, weight: 26 };
-const P5b: Ceil = { colour: 13, radius: 248, border: 239, shadow: 18, zIndex: 4, motion: 17, media: 62, material: 0, frame: 0, weight: 82 };
+// P5b left: colour 5 = printed BRS / bank-doc rules and the job-card paper vars; radius 3 = inline token radii the
+// inline-radius regex cannot tell from raw ones; border 2 = the cheque leaf's crossing lines (printed); weight 7 = h1s of
+// printed documents (BRS, pay-in slip, advice, alteration slip) and full-screen gates (error boundary, vault).
+const P5b: Ceil = { colour: 5, radius: 3, border: 2, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 7 };
 const QA: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 0 };
 const CEILINGS: Record<string, Ceil> = { P0, PL, P1, P2, P3, P4, P5a, P5b, QA };
 

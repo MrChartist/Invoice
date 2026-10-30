@@ -103,7 +103,7 @@ export default function MusterView({ notify }: MpViewProps) {
         </table>
       </div>
       <p className={controls.hint} data-mp-muster-totals>{postTotals(site, cur, days).map((t) => `${t.post.name}: ${mbT('total', { d: t.duties, f: t.full })}`).join(' · ')}</p>
-      {warn.map((w, i) => <p key={i} className={controls.hint} style={{ color: 'var(--destructive)' }} data-mp-muster-warn>{w.text}</p>)}
+      {warn.map((w, i) => <p key={i} className={controls.hint} style={{ color: 'var(--sys-red-ink)' }} data-mp-muster-warn>{w.text}</p>)}
       <div style={bar}>
         {!ro && (
           <>

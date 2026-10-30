@@ -1,9 +1,14 @@
+/* ── Underline tab strip (IOS-UI 2.4): one line that scrolls inside itself, a fade at the trailing edge, the
+   selected tab marked by a 2px tint bar (drawn, not a border) ── */
 .tabs {
   display: flex;
-  gap: 0.25rem;
-  border-bottom: 1px solid var(--border);
+  gap: var(--sp-1);
+  padding-inline-end: var(--sp-6);
+  border-bottom: var(--hairline) solid var(--sep);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
+  mask-image: linear-gradient(to right, black calc(100% - var(--sp-6)), transparent);
 }
 
 .tabs::-webkit-scrollbar {
@@ -11,46 +16,64 @@
 }
 
 .tab {
-  border: none;
+  position: relative;
+  flex: none;
+  border: 0;
   background: transparent;
-  color: var(--muted-foreground);
-  font-family: var(--font-display);
-  font-weight: 600;
+  color: var(--label-2);
+  font-weight: 500;
   font-size: var(--text-lg);
-  padding: 0.75rem 1rem;
+  padding: var(--sp-3);
   min-height: 44px;
   cursor: pointer;
   white-space: nowrap;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  transition: color var(--transition-fast), border-color var(--transition-fast);
+  transition: color var(--dur-1) var(--ease-out);
 }
 
 .tab:hover {
-  color: var(--foreground);
+  color: var(--label);
 }
 
-.tabActive { composes: tab; color: var(--foreground); border-bottom-color: var(--btn-ink); }
+.tabActive { composes: tab; color: var(--label); font-weight: 600; }
+
+.tabActive::after {
+  content: '';
+  position: absolute;
+  inset-inline: var(--sp-3);
+  bottom: 0;
+  height: 2px;
+  border-radius: var(--r-full);
+  background: var(--tint);
+}
 
 .tab:focus-visible,
 .tabActive:focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--tint);
   outline-offset: -2px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--r-8);
 }
 
+/* Wide frame: Page's sideNav stands the strip up as a report list; the selection becomes a fill. */
+@container page (min-width: 90em) {
+  .tabs { gap: var(--sp-0-5); padding-inline-end: 0; mask-image: none; }
+  .tab { min-height: 36px; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-8); }
+  .tab:hover { background: var(--fill-4); }
+  .tabActive { background: var(--tint-soft); }
+  .tabActive:hover { background: var(--tint-soft); }
+  .tabActive::after { display: none; }
+}
 .panel {
   outline: none;
   min-width: 0;
 }
 
 .loading {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-base);
   padding: 1rem 0;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .tab {
     padding: 0.75rem 0.75rem;
     font-size: var(--text-md);

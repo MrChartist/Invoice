@@ -9,36 +9,65 @@
 
 .inline { display: flex; flex-direction: column; gap: 0.25rem; }
 
-/* ── Tabs ─────────────────────────────────────────────────────── */
+/* ── Underline tab strip (IOS-UI 2.4): one line that scrolls inside itself, a fade at the trailing edge, the
+   selected tab marked by a 2px tint bar (drawn, not a border) ── */
 .tabs {
   display: flex;
-  gap: 0.25rem;
-  border-bottom: 1px solid var(--border);
+  gap: var(--sp-1);
+  padding-inline-end: var(--sp-6);
+  border-bottom: var(--hairline) solid var(--sep);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  mask-image: linear-gradient(to right, black calc(100% - var(--sp-6)), transparent);
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  padding: 0.75rem 1.125rem;
-  min-height: 44px;
-  font-family: var(--font-display);
-  font-weight: 600;
+  position: relative;
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--label-2);
+  font-weight: 500;
   font-size: var(--text-lg);
-  color: var(--muted-foreground);
+  padding: var(--sp-3);
+  min-height: 44px;
   cursor: pointer;
   white-space: nowrap;
-  transition: color var(--transition-fast), border-color var(--transition-fast);
+  transition: color var(--dur-1) var(--ease-out);
 }
-.tab:hover { color: var(--foreground); }
-.tab:focus-visible, .expand:focus-visible, .linkBtn:focus-visible {
-  outline: 2px solid var(--ring);
+
+.tab:hover {
+  color: var(--label);
+}
+
+.tabActive { composes: tab; color: var(--label); font-weight: 600; }
+
+.tabActive::after {
+  content: '';
+  position: absolute;
+  inset-inline: var(--sp-3);
+  bottom: 0;
+  height: 2px;
+  border-radius: var(--r-full);
+  background: var(--tint);
+}
+
+.tab:focus-visible,
+.tabActive:focus-visible {
+  outline: 2px solid var(--tint);
+  outline-offset: -2px;
+  border-radius: var(--r-8);
+}
+.expand:focus-visible, .linkBtn:focus-visible {
+  outline: 2px solid var(--tint);
   outline-offset: 2px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--r-6);
 }
-.tabActive { composes: tab; color: var(--foreground); border-bottom-color: var(--btn-ink); }
 
 /* ── Top debtors ──────────────────────────────────────────────── */
 .debtors { list-style: none; margin: 0; padding: 0.5rem 1.25rem 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
@@ -47,40 +76,39 @@
 .amt { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
 .linkBtn {
   background: none; border: none; padding: 0; cursor: pointer;
-  font: inherit; font-weight: 600; color: var(--foreground); text-align: left;
+  font: inherit; font-weight: 600; color: var(--label); text-align: left;
 }
-.linkBtn:hover { color: var(--brand-text); text-decoration: underline; }
+.linkBtn:hover { color: var(--tint); text-decoration: underline; }
 
 /* ── Aging table ──────────────────────────────────────────────── */
 .agingTable { min-width: 860px; }
-.agingTable th[scope='row'], .agingTable tfoot th { text-align: left; text-transform: none; letter-spacing: 0; font-size: var(--text-md); color: var(--foreground); font-weight: 600; }
+.agingTable th[scope='row'], .agingTable tfoot th { text-align: left; text-transform: none; letter-spacing: 0; font-size: var(--text-md); color: var(--label); font-weight: 600; }
 .partyCell { padding: 0 !important; }
 .partyLine { display: flex; align-items: center; padding-right: 0.5rem; }
 .partyLine > :first-child { flex: 1; min-width: 0; }
 .expand {
   display: flex; align-items: center; gap: 0.375rem; width: 100%;
   background: none; border: none; cursor: pointer; font: inherit; font-weight: 600;
-  color: var(--foreground); padding: 0.875rem 1.25rem; min-height: 44px; text-align: left;
+  color: var(--label); padding: 0.875rem 1.25rem; min-height: 44px; text-align: left;
 }
 .noExpand { display: block; padding: 0.875rem 1.25rem 0.875rem 2.375rem; }
-.chev { transition: transform var(--transition-fast); flex-shrink: 0; color: var(--muted-foreground); }
+.chev { transition: transform var(--dur-1) var(--ease-out); flex-shrink: 0; color: var(--label-2); }
 .chevOpen { composes: chev; transform: rotate(90deg); }
-.credit { color: var(--profit); }
+.credit { color: var(--sys-green-ink); }
 
-.billsRow td { background-color: var(--card-inner); padding: 0.5rem 1.25rem 1rem; }
-.billsRow:hover td { background-color: var(--card-inner); }
+.billsRow td { background-color: var(--bg-grouped-3); padding: 0.5rem 1.25rem 1rem; }
+.billsRow:hover td { background-color: var(--bg-grouped-3); }
 .bills { width: 100%; border-collapse: collapse; font-size: var(--text-base); }
 .bills th {
-  text-align: left; padding: 0.5rem 0.75rem; font-size: var(--text-xs); text-transform: uppercase;
-  letter-spacing: 0.05em; color: var(--muted-foreground); border-bottom: 1px solid var(--border);
+  text-align: left; padding: 0.5rem 0.75rem; font-size: var(--text-xs); color: var(--label-2); border-bottom: var(--hairline) solid var(--sep);
 }
 .bills th:nth-child(n + 4):nth-child(-n + 6) { text-align: right; }
-.bills td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+.bills td { padding: 0.5rem 0.75rem; border-bottom: var(--hairline) solid var(--sep); }
 .bills tr:last-child td { border-bottom: none; }
 
 .totalRow th, .totalRow td {
-  border-top: 2px solid var(--border);
-  background-color: var(--card-inner);
+  border-top: var(--hairline) solid var(--sep-opaque);
+  background-color: var(--bg-grouped-3);
   font-weight: 600;
 }
 
@@ -108,20 +136,20 @@
   font-weight: 600;
   font-size: 1.0625rem;
 }
-.miniStrong { color: var(--brand-text); font-size: 1.1875rem; }
-.openingRow td { color: var(--muted-foreground); }
+.miniStrong { color: var(--tint); font-size: 1.1875rem; }
+.openingRow td { color: var(--label-2); }
 .note { padding: 0.75rem 1.25rem 1rem; }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .filters { grid-template-columns: 1fr 1fr; }
   .filters > div:first-child { grid-column: 1 / -1; }
 }
 
 /* ── Touch targets (coarse pointers) ──────────────────────── */
-@media (pointer: coarse), (max-width: 640px) {
+@media (pointer: coarse), (max-width: 37.4375em) {
   .linkBtn { min-height: 40px; display: inline-flex; align-items: center; }
 }
 
-.presetOn { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--foreground); font-weight: 600; }
+.presetOn { background: color-mix(in srgb, var(--tint) 14%, transparent); color: var(--label); font-weight: 600; }
 /* PENDING 34: ageing basis / slabs / interest controls in the party-wise card head */
 .ageingPrefs { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }

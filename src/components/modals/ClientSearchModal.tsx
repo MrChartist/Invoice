@@ -58,7 +58,7 @@ export function ClientSearchModal({ isOpen, onClose }: Props) {
           {clients.length === 0
             ? areaNodes(salesT('pick.noClients'), {
                 link: (
-                  <Link to="/clients" onClick={onClose} style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
+                  <Link to="/clients" onClick={onClose} style={{ color: 'var(--tint)', fontWeight: 600 }}>
                     {salesT('pick.addInDirectory')}
                   </Link>
                 ),

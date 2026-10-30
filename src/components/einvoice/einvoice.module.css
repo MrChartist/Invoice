@@ -25,35 +25,35 @@
   align-items: center;
   gap: 0.35rem;
   padding: 0.25rem 0.625rem;
-  border-radius: var(--radius-full);
+  border-radius: var(--r-full);
   font-size: var(--text-sm);
   font-weight: 600;
   background: var(--muted);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .pillOk {
   composes: pill;
-  background: color-mix(in srgb, var(--profit) 14%, transparent);
-  color: var(--profit);
+  background: color-mix(in srgb, var(--sys-green-ink) 14%, transparent);
+  color: var(--sys-green-ink);
 }
 
 .pillBad {
   composes: pill;
-  background: color-mix(in srgb, var(--loss) 14%, transparent);
-  color: var(--loss);
+  background: color-mix(in srgb, var(--sys-red-ink) 14%, transparent);
+  color: var(--sys-red-ink);
 }
 
 .pillWarn {
   composes: pill;
-  background: color-mix(in srgb, var(--warning) 16%, transparent);
-  color: var(--warning);
+  background: color-mix(in srgb, var(--sys-orange-ink) 16%, transparent);
+  color: var(--sys-orange-ink);
 }
 
 .section {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card-inner);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-3);
   padding: 0.875rem;
   display: flex;
   flex-direction: column;
@@ -65,7 +65,7 @@
   font-family: var(--font-display);
   font-size: var(--text-base);
   font-weight: 600;
-  color: var(--foreground);
+  color: var(--label);
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -87,7 +87,7 @@
   align-items: start;
   font-size: var(--text-base);
   line-height: 1.45;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .checkIcon {
@@ -95,9 +95,9 @@
   flex-shrink: 0;
 }
 
-.iconOk { color: var(--profit); }
-.iconErr { color: var(--loss); }
-.iconWarn { color: var(--warning); }
+.iconOk { color: var(--sys-green-ink); }
+.iconErr { color: var(--sys-red-ink); }
+.iconWarn { color: var(--sys-orange-ink); }
 
 .checkField {
   font-weight: 600;
@@ -113,14 +113,14 @@
   margin: 0;
   max-height: 220px;
   overflow: auto;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  background: var(--bg-grouped-2);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-8);
   padding: 0.75rem;
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
   line-height: 1.55;
-  color: var(--foreground);
+  color: var(--label);
   white-space: pre;
 }
 
@@ -140,7 +140,7 @@
   margin: 0;
   font-size: var(--text-sm);
   line-height: 1.5;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .statusLine {
@@ -165,7 +165,7 @@
   width: 100%;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .grid2,
   .grid3 {
     grid-template-columns: 1fr;

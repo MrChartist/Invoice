@@ -4,12 +4,12 @@
 }
 
 .held {
-  color: var(--warning);
+  color: var(--sys-orange-ink);
   font-weight: 600;
 }
 
 .due {
-  color: var(--loss);
+  color: var(--sys-red-ink);
   font-weight: 600;
 }
 

@@ -3,23 +3,23 @@
   align-items: center;
   gap: 0.4rem;
   padding: 0.25rem 0.65rem;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--foreground);
+  border-radius: var(--r-full);
+  border: var(--hairline) solid var(--sep);
+  background: var(--bg-grouped-2);
+  color: var(--label);
   font-size: var(--text-sm);
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
 }
-.pill:hover { border-color: var(--primary); }
-.pill:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.pill:hover { border-color: var(--tint); }
+.pill:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
 .dot {
   width: 0.5rem;
   height: 0.5rem;
-  border-radius: var(--radius-full);
-  background: var(--destructive);
-  animation: pulse 1.6s ease-in-out infinite;
+  border-radius: var(--r-full);
+  background: var(--sys-red-ink);
+  animation: pulse calc(var(--dur-4) * 3.5) var(--ease-in-out) infinite;
 }
 .time { font-variant-numeric: tabular-nums; }
 @keyframes pulse { 50% { opacity: 0.35; } }

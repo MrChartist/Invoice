@@ -29,8 +29,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           display: 'grid',
           placeItems: 'center',
           padding: '1.5rem',
-          background: 'var(--background)',
-          color: 'var(--foreground)',
+          background: 'var(--bg-grouped)',
+          color: 'var(--label)',
         }}
       >
         <div style={{ maxWidth: 440, textAlign: 'center', display: 'grid', gap: '1rem', justifyItems: 'center' }}>
@@ -38,16 +38,16 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.375rem', margin: 0 }}>
             Something went wrong
           </h1>
-          <p style={{ color: 'var(--muted-foreground)', margin: 0, lineHeight: 1.6 }}>
+          <p style={{ color: 'var(--label-2)', margin: 0, lineHeight: 1.6 }}>
             Your saved invoices are safe in this browser. Reload the page to continue.
           </p>
           <code
             style={{
               fontSize: '0.75rem',
-              color: 'var(--muted-foreground)',
-              background: 'var(--card-inner)',
+              color: 'var(--label-2)',
+              background: 'var(--bg-grouped-3)',
               padding: '0.5rem 0.75rem',
-              borderRadius: 'var(--radius-sm)',
+              borderRadius: 'var(--r-8)',
               maxWidth: '100%',
               overflow: 'hidden',
               textOverflow: 'ellipsis',

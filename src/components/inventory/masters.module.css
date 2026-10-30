@@ -10,7 +10,7 @@
 
 .groupRow td {
   font-weight: 600;
-  background: var(--card-inner);
+  background: var(--bg-grouped-3);
 }
 
 .rows {
@@ -27,7 +27,7 @@
 }
 
 .muted {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
 }
 
@@ -47,9 +47,9 @@
 }
 
 .card {
-  background: var(--card-inner);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  background: var(--bg-grouped-3);
+  border: var(--card-edge);
+  border-radius: var(--r-12);
   padding: 0.75rem 0.875rem;
   min-width: 0;
 }
@@ -70,10 +70,10 @@
 .mini td {
   text-align: left;
   padding: 0.3rem 0.25rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
 }
 .mini th {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-weight: 600;
 }
 .num {
@@ -84,11 +84,11 @@
 }
 
 .overdue {
-  color: var(--loss);
+  color: var(--sys-red-ink);
   font-weight: 600;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 37.4375em) {
   .pairRow {
     grid-template-columns: 1fr;
   }

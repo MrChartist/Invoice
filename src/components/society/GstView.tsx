@@ -56,7 +56,7 @@ export default function GstView(_: HsViewProps) {
           ))}
         </tbody>
       </table>
-      {!d.registered && d.pos.hint && <p className={controls.hint} style={{ color: 'var(--warning)' }} data-hs-reg-hint>{hsbT('regHint')}</p>}
+      {!d.registered && d.pos.hint && <p className={controls.hint} style={{ color: 'var(--sys-orange-ink)' }} data-hs-reg-hint>{hsbT('regHint')}</p>}
       <p className={controls.hint}>
         {d.p}: {hsbT('exempt')} {m(d.pt.exempt)} · {hsbT('taxable')} {m(d.pt.taxable)} · <Link to={`/gst-reports?tab=common-credit`}>{hsbT('itc')}</Link>
       </p>

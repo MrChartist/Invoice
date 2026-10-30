@@ -111,7 +111,7 @@ export function Gstr9cView({ fyStart, gstin, filerStateCode, turnover }: Gstr9cV
   return (
     <div className={local.tabBody} style={{ padding: 0 }} data-gst-9c>
       <div className={`${surface.card} ${local.disclaimer}`} role="note">
-        <AlertTriangle size={16} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
+        <AlertTriangle size={16} aria-hidden style={{ flexShrink: 0, color: 'var(--sys-orange-ink)' }} />
         <span>{soT('c9Intro')} {soT('disclaimer')}</span>
       </div>
       <p className={styles.muted}>{report.required ? soT('c9Required') : soT('c9NotRequired')} {soT('c9BooksHint')}</p>

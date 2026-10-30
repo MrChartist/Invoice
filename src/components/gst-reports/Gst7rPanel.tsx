@@ -87,7 +87,7 @@ const emptyHeadInputs = (): Record<GstHead, string> => ({ igst: '', cgst: '', sg
 function Disclaimer({ text }: { text: string }) {
   return (
     <div className={`${surface.card} ${local.disclaimer}`} role="note">
-      <AlertTriangle size={16} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
+      <AlertTriangle size={16} aria-hidden style={{ flexShrink: 0, color: 'var(--sys-orange-ink)' }} />
       <span>{text}</span>
     </div>
   );

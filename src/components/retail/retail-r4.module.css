@@ -24,9 +24,9 @@
   flex-direction: column;
   gap: 0.625rem;
   padding: 0.75rem 0.875rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card-inner);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-3);
 }
 
 .boxHead {
@@ -49,14 +49,14 @@
   flex-direction: column;
   gap: 0.125rem;
   padding: 0.5rem 0.625rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--card);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-8);
+  background: var(--bg-grouped-2);
 }
 
 .statLabel {
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .statValue {
@@ -83,13 +83,13 @@
 }
 
 .muted {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
 }
 
 .note {
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   margin: 0;
 }
 
@@ -98,37 +98,37 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.0625rem 0.5rem;
-  border-radius: var(--radius-full);
+  border-radius: var(--r-full);
   font-size: var(--text-xs);
   font-weight: 600;
   background: var(--muted);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   white-space: nowrap;
 }
 
 .active,
 .requested,
-.approved { background: var(--brand-soft); color: var(--brand-text); }
+.approved { background: var(--tint-soft); color: var(--tint); }
 .redeemed,
 .received,
-.closed { background: var(--secondary); color: var(--profit); }
+.closed { background: var(--secondary); color: var(--sys-green-ink); }
 .expired,
 .partly_dispatched,
-.dispatched { background: var(--secondary); color: var(--warning); }
+.dispatched { background: var(--secondary); color: var(--sys-orange-ink); }
 .cancelled,
-.rejected { background: var(--muted); color: var(--loss); text-decoration: line-through; }
+.rejected { background: var(--muted); color: var(--sys-red-ink); text-decoration: line-through; }
 
 .warn {
-  color: var(--warning);
+  color: var(--sys-orange-ink);
   font-weight: 600;
 }
 
 .bad {
-  color: var(--loss);
+  color: var(--sys-red-ink);
 }
 
 .good {
-  color: var(--profit);
+  color: var(--sys-green-ink);
 }
 
 .applied {
@@ -154,7 +154,7 @@
   gap: 0.375rem;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .gridInput {
     width: 5rem;
   }

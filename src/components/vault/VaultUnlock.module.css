@@ -1,11 +1,11 @@
 .shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1.5rem 1rem;
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg-grouped);
+  color: var(--label);
 }
 
 .card {
@@ -15,10 +15,10 @@
   flex-direction: column;
   gap: 1rem;
   padding: 1.75rem 1.5rem;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
+  background: var(--bg-grouped-2);
+  border: var(--card-edge);
+  border-radius: var(--r-16);
+  box-shadow: none;
 }
 
 .icon {
@@ -26,9 +26,9 @@
   height: 2.75rem;
   display: grid;
   place-items: center;
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--brand) 14%, transparent);
-  color: var(--brand);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--tint) 14%, transparent);
+  color: var(--tint);
 }
 
 .title {
@@ -39,7 +39,7 @@
 
 .text {
   margin: 0;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-base);
   line-height: 1.55;
 }
@@ -55,7 +55,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font: inherit;
   font-size: var(--text-sm);
   text-decoration: underline;
@@ -64,9 +64,9 @@
 
 .danger {
   padding: 0.875rem;
-  border: 1px solid color-mix(in srgb, var(--loss) 40%, var(--border));
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--loss) 8%, var(--card));
+  border: var(--hairline) solid color-mix(in srgb, var(--sys-red-ink) 40%, var(--sep));
+  border-radius: var(--r-12);
+  background: color-mix(in srgb, var(--sys-red-ink) 8%, var(--bg-grouped-2));
   display: flex;
   flex-direction: column;
   gap: 0.75rem;

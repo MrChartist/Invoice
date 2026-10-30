@@ -27,39 +27,39 @@
 .sub {
   display: block;
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .pdc {
-  background-color: color-mix(in srgb, var(--warning) 16%, transparent);
-  color: var(--warning);
+  background-color: color-mix(in srgb, var(--sys-orange-ink) 16%, transparent);
+  color: var(--sys-orange-ink);
 }
 
 .flag {
-  background-color: color-mix(in srgb, var(--loss) 14%, transparent);
-  color: var(--loss);
+  background-color: color-mix(in srgb, var(--sys-red-ink) 14%, transparent);
+  color: var(--sys-red-ink);
 }
 
 .note {
   margin: 0 1rem 1rem;
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 /* ── Print preview (mm-positioned, scaled to fit) ──────────── */
 .previewWrap {
   overflow-x: auto;
   padding: 0.5rem;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card-inner);
+  border: var(--hairline) dashed var(--sep);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-3);
 }
 
 .leaf {
   position: relative;
-  background: var(--card);
-  color: var(--foreground);
-  outline: 1px solid var(--border);
+  background: var(--bg-grouped-2);
+  color: var(--label);
+  outline: 1px solid var(--sep);
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: 11pt;
   font-weight: 600;
@@ -71,7 +71,7 @@
   white-space: nowrap;
   overflow: hidden;
   line-height: 1.2;
-  outline: 1px dotted var(--border);
+  outline: 1px dotted var(--sep);
 }
 
 .leafDate { display: flex; }
@@ -81,8 +81,8 @@
   height: 12mm;
   transform: rotate(-30deg);
   transform-origin: left top;
-  border-top: 2px solid var(--foreground);
-  border-bottom: 2px solid var(--foreground);
+  border-top: 2px solid var(--label);
+  border-bottom: 2px solid var(--label);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -104,7 +104,7 @@
   font-size: var(--text-sm);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .nudgeRow { grid-template-columns: 1fr 5rem 5rem; }
   .leaf { zoom: 0.45; }
 }

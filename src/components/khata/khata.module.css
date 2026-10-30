@@ -15,14 +15,14 @@
   justify-content: space-between;
   gap: 0.25rem 1rem;
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
-.balances strong { color: var(--foreground); font-variant-numeric: tabular-nums; }
+.balances strong { color: var(--label); font-variant-numeric: tabular-nums; }
 
 .alloc {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--card-inner);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-8);
+  background: var(--bg-grouped-3);
   padding: 0.625rem 0.75rem;
   display: flex;
   flex-direction: column;
@@ -37,17 +37,17 @@
   font-size: var(--text-sm);
 }
 .allocRef { font-family: var(--font-num); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.allocSub { display: block; color: var(--muted-foreground); font-size: var(--text-xs, 0.75rem); }
+.allocSub { display: block; color: var(--label-2); font-size: var(--text-xs, 0.75rem); }
 .allocInput { text-align: right; font-variant-numeric: tabular-nums; padding: 0.35rem 0.5rem; }
-.onAccount { font-size: var(--text-sm); color: var(--muted-foreground); }
+.onAccount { font-size: var(--text-sm); color: var(--label-2); }
 
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 
 .notice {
   padding: 0.625rem 0.75rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--card-inner);
+  border-radius: var(--r-8);
+  border: var(--hairline) solid var(--sep);
+  background: var(--bg-grouped-3);
   font-size: var(--text-sm);
 }
 
@@ -55,10 +55,10 @@
 .queue {
   position: fixed;
   inset: 0;
-  z-index: 9000;
+  z-index: var(--z-sheet);
   display: flex;
   flex-direction: column;
-  background: var(--background);
+  background: var(--bg-grouped);
 }
 .queueBar {
   display: flex;
@@ -66,8 +66,8 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.625rem 1rem;
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
+  background: var(--bg-grouped-2);
+  border-bottom: var(--hairline) solid var(--sep);
 }
 .queueTitle { font-family: var(--font-display); font-weight: 600; font-size: var(--text-lg); }
 .queueBody {
@@ -86,19 +86,19 @@
 }
 .progress {
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--muted);
   overflow: hidden;
 }
-.progressFill { height: 100%; background: var(--brand-text); transition: width var(--transition-fast); }
+.progressFill { height: 100%; background: var(--tint); transition: width var(--dur-1) var(--ease-out); }
 .partyName { font-family: var(--font-display); font-weight: 600; font-size: 1.35rem; }
-.partyAmount { font-size: 1.6rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--brand-text); }
-.meta { font-size: var(--text-sm); color: var(--muted-foreground); }
+.partyAmount { font-size: 1.6rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--tint); }
+.meta { font-size: var(--text-sm); color: var(--label-2); }
 .message { min-height: 11rem; font-size: var(--text-md); }
 .queueActions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .queueActions > :first-child { flex: 1 1 100%; }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .grid2 { grid-template-columns: 1fr; }
   .allocRow { grid-template-columns: minmax(0, 1fr) 7rem; }
   .queueBody { padding: 0.75rem; }
