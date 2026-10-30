@@ -18,7 +18,7 @@ import lg from '../books/ledger/ledger.module.css';
 
 // Inline styles: no stylesheet of its own (a new CSS file would join every report route's preload list).
 const s = {
-  strip: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.375rem 0.75rem', marginTop: '0.5rem', padding: '0.5rem 0.75rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', background: 'var(--card)', fontSize: 'var(--text-sm)' },
+  strip: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.375rem 0.75rem', marginTop: '0.5rem', padding: '0.5rem 0', borderTop: 'var(--hairline) solid var(--sep)', fontSize: 'var(--text-sm)' },
   chip: { display: 'inline-flex', alignItems: 'center', gap: '0.375rem' },
   totals: { marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' },
   form: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(10rem, 1fr))', gap: '0.75rem' },

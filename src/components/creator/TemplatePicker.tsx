@@ -111,7 +111,7 @@ export function TemplatePicker() {
                     </InView>
                   ) : staticThumb}
                   <span className={styles.name}>{t.name}</span>
-                  {active && <Check size={13} className={styles.check} />}
+                  {active && <Check size={14} className={styles.check} />}
                 </button>
               );
             })}

@@ -130,14 +130,14 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
             <span id="number-hint" aria-live="polite">
               {numberTaken ? (
                 <span className={cn(styles.numberHint, styles.numberBad)}>
-                  <AlertTriangle size={13} aria-hidden="true" />
+                  <AlertTriangle size={14} aria-hidden="true" />
                   <span>
                     {t('meta.numberTaken', { number: numberTaken.invoice_number, client: numberTaken.client?.name ? ` (${numberTaken.client.name})` : '' })}
                   </span>
                 </span>
               ) : numberCheck?.gap ? (
                 <span className={cn(styles.numberHint, styles.numberGap)}>
-                  <AlertTriangle size={13} aria-hidden="true" />
+                  <AlertTriangle size={14} aria-hidden="true" />
                   <span>
                     {t('meta.numberGap', {
                       numbers:

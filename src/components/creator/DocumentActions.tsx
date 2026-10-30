@@ -166,15 +166,15 @@ export function DocumentActions({
               <>
                 <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={locked} aria-pressed={saved.quote_status === 'Accepted'}
                   onClick={() => setOutcome(saved.quote_status === 'Accepted' ? undefined : 'Accepted')}>
-                  <ThumbsUp size={15} /> {edT('daAccepted')}
+                  <ThumbsUp size={16} /> {edT('daAccepted')}
                 </button>
                 <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={locked} aria-pressed={saved.quote_status === 'Declined'}
                   onClick={() => setOutcome(saved.quote_status === 'Declined' ? undefined : 'Declined')}>
-                  <ThumbsDown size={15} /> {edT('daDeclined')}
+                  <ThumbsDown size={16} /> {edT('daDeclined')}
                 </button>
                 {!saved.acceptance && saved.status !== 'Draft' && (
                   <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={locked} onClick={() => setAcceptOpen(true)} data-sign-accept>
-                    <Pencil size={15} /> {uxT('accButton')}
+                    <Pencil size={16} /> {uxT('accButton')}
                   </button>
                 )}
               </>

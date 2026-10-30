@@ -196,7 +196,7 @@ export function DisplayReport() {
               </button>
               {path.length > 0 && <span>{crumbs[0]}</span>}
             </div>
-            <h1 className={styles.reportTitle} id="gw-report-title">{title}</h1>
+            <h2 className={styles.reportTitle} id="gw-report-title">{title}</h2>
           </div>
           <Suspense fallback={null}>
             <BranchFilter

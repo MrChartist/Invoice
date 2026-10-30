@@ -6,7 +6,7 @@
  *     own pill; icon tiles reach 3:1 with their glyph;
  *  3-12. ratchets: raw colour, radii, borders, shadows, z-index, motion, media queries / vh, materials, page frame,
  *     common weight. Each counts today's offenders per owning package; a count may only go DOWN. A package lowers only
- *     its own const below (shared-file protocol, docs/prd/ios-ui.md section 4); QA set them to 0 (P5a still open)
+ *     its own const below (shared-file protocol, docs/prd/ios-ui.md section 4); QA set them all to 0
  *     and moved the legitimate leftovers to ALLOW, each with its reason;
  * 13. shell facts: viewport-fit=cover and one pair of theme colours equal to --bg-grouped.
  *
@@ -237,7 +237,7 @@ type Rule = 'colour' | 'radius' | 'border' | 'shadow' | 'zIndex' | 'motion' | 'm
 const RULES: Rule[] = ['colour', 'radius', 'border', 'shadow', 'zIndex', 'motion', 'media', 'material', 'frame', 'weight'];
 type Ceil = Record<Rule, number>;
 
-// ── Ceilings (QA, 30 Oct 2026): every package is at 0 except P5a, still being built. Each package lowers ONLY its own
+// ── Ceilings (QA, 30 Oct 2026): every package is at 0. Each package lowers ONLY its own
 // const. A legitimate exception goes into ALLOW below with its reason, never into a ceiling. ──────────────────────────
 const ZERO: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 0 };
 const P0: Ceil = ZERO;
@@ -246,7 +246,7 @@ const P1: Ceil = ZERO;
 const P2: Ceil = ZERO;
 const P3: Ceil = ZERO;
 const P4: Ceil = ZERO;
-const P5a: Ceil = { colour: 4, radius: 67, border: 69, shadow: 10, zIndex: 6, motion: 6, media: 17, material: 0, frame: 0, weight: 26 };
+const P5a: Ceil = ZERO;
 const P5b: Ceil = ZERO;
 const QA: Ceil = ZERO;
 const CEILINGS: Record<string, Ceil> = { P0, PL, P1, P2, P3, P4, P5a, P5b, QA };

@@ -594,9 +594,9 @@ export function VoucherEntry() {
       />
       <section ref={rootRef} className={cn(styles.card, styles.voucher)} aria-labelledby="gw-v-title">
         <div className={styles.vHead}>
-          <h1 className={styles.vType} id="gw-v-title">
+          <h2 className={styles.vType} id="gw-v-title">
             {existing ? gwT('vAlter', { type: typeName, number: existing.number }) : gwT('vTitle', { type: typeName })}
-          </h1>
+          </h2>
           <div className={styles.vMeta}>
             <label className={styles.vField}>
               {gwT('vNo')}
@@ -782,7 +782,7 @@ export function VoucherEntry() {
                           aria-label={gwT('vRemoveLine', { n })}
                           onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}
                         >
-                          <Trash2 size={15} aria-hidden="true" />
+                          <Trash2 size={16} aria-hidden="true" />
                         </button>
                       )}
                     </td>
@@ -835,7 +835,7 @@ export function VoucherEntry() {
                 ) : <span />}
                 <input className={cn(controls.input, styles.amountInput)} inputMode="decimal" value={r.amount} aria-label={`${vtT('amount')} ${i + 1}`} onChange={(e) => setRefs((rs) => rs.map((x) => (x.key === r.key ? { ...x, amount: e.target.value.replace(/[^0-9.,]/g, '') } : x)))} data-testid={`gw-ref-${i + 1}-amount`} />
                 <button type="button" className={controls.btnIcon} aria-label={vtT('removeRef', { n: i + 1 })} onClick={() => setRefs((rs) => rs.filter((x) => x.key !== r.key))}>
-                  <Trash2 size={15} aria-hidden="true" />
+                  <Trash2 size={16} aria-hidden="true" />
                 </button>
               </div>
             ))}

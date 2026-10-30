@@ -54,13 +54,13 @@ export default function AnnexureActions({ invoice, onChanged }: { invoice: Invoi
     <div className={styles.row} role="group" aria-label={svcT('annexure')} data-annexure-actions>
       <span>{svcT('annexure')} · {svcT('annexureRows', { n: a.rows.length, e: a.expenses?.length ?? 0 })}</span>
       <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => void download('csv')} data-download-annexure>
-        <Download size={15} /> {svcT('downloadAnnexure')} CSV
+        <Download size={16} /> {svcT('downloadAnnexure')} CSV
       </button>
       <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => void download('xlsx')}>
-        <FileSpreadsheet size={15} /> Excel
+        <FileSpreadsheet size={16} /> Excel
       </button>
       <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} disabled={isLocked(invoice) || !can('doc.edit')} onClick={refresh}>
-        <RefreshCw size={15} /> {svcT('refreshAnnexure')}
+        <RefreshCw size={16} /> {svcT('refreshAnnexure')}
       </button>
       {tie && !tie.ok && <span role="status" data-annexure-mismatch>{svcT('annexureMismatch', { a: money(tie.annexure_amount), l: money(tie.line_amount) })}</span>}
       {error && <span role="alert">{error}</span>}
