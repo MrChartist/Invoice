@@ -18,6 +18,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field } from './ps-ui';
 import { runWith, type PsDeskProps } from './ps-run';
+import { SelectField } from '../ui/SelectField';
 
 export default function WipView({ notify }: Pick<PsDeskProps, 'notify'>) {
   const run = runWith(notify);
@@ -47,7 +48,7 @@ export default function WipView({ notify }: Pick<PsDeskProps, 'notify'>) {
     <div className={surface.card}>
       <div className={surface.cardBody}>
         <div className={controls.row3}>
-          <Field label={pwT('by')}><select className={controls.select} value={by} onChange={(e) => { setBy(e.target.value as WipGroup); setSel(new Set()); }}>{(['matter', 'client', 'partner'] as const).map((k) => <option key={k} value={k}>{pwT(`by.${k}`)}</option>)}</select></Field>
+          <Field label={pwT('by')}><SelectField className={controls.select} value={by} onChange={(e) => { setBy(e.target.value as WipGroup); setSel(new Set()); }}>{(['matter', 'client', 'partner'] as const).map((k) => <option key={k} value={k}>{pwT(`by.${k}`)}</option>)}</SelectField></Field>
           <Field label={psT('reason')}><input className={controls.input} list="ps-wo-reasons" value={reason} onChange={(e) => setReason(e.target.value)} data-wo-reason /><datalist id="ps-wo-reasons">{reasons.map((r) => <option key={r} value={r} />)}</datalist></Field>
         </div>
         <div className={controls.row}>

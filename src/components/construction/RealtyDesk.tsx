@@ -39,6 +39,8 @@ import { shiftDay } from '../../lib/collections';
 import { NumberInput } from '../ui/NumberInput';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { TypedInput } from '../ui/TypedInput';
+import { SelectField } from '../ui/SelectField';
 
 type Done = (msg: string, tone?: 'success' | 'error') => void;
 const VIEWS = [['projects', Building2], ['units', ClipboardList], ['bookings', FileText], ['plans', CalendarDays], ['demands', Receipt], ['rera', Landmark], ['cancellations', XCircle], ['procurement', Scale]] as const;
@@ -53,10 +55,10 @@ const csv = (name: string, text: string) => downloadText(name, `\uFEFF${text}`, 
 const fyOf = (d: string) => (+d.slice(5, 7) >= 4 ? +d.slice(0, 4) : +d.slice(0, 4) - 1);
 
 const F = ({ l, w, children }: { l: string; w?: number; children: ReactNode }) => <label className={controls.field} style={w ? { maxWidth: w } : undefined}><span className={controls.label}>{l}</span>{children}</label>;
-const Txt = ({ l, v, set, w, type = 'text', d }: { l: string; v: string; set: (s: string) => void; w?: number; type?: string; d?: string }) => <F l={l} w={w}><input type={type} className={controls.input} value={v} onChange={(e) => set(e.target.value)} data-rc={d} /></F>;
+const Txt = ({ l, v, set, w, type = 'text', d }: { l: string; v: string; set: (s: string) => void; w?: number; type?: string; d?: string }) => <F l={l} w={w}><TypedInput type={type} className={controls.input} value={v} onChange={(e) => set(e.target.value)} data-rc={d} /></F>;
 const Num = ({ l, v, set, w = 130, d }: { l: string; v: number; set: (n: number) => void; w?: number; d?: string }) => <F l={l} w={w}><NumberInput className={controls.input} value={v} onChange={set} data-rc={d} /></F>;
 function Sel<K extends string>({ l, v, set, o, w, d }: { l: string; v: K; set: (k: K) => void; o: readonly (readonly [K, string])[]; w?: number; d?: string }) {
-  return <F l={l} w={w}><select className={controls.select} value={v} onChange={(e) => set(e.target.value as K)} data-rc={d}>{o.map(([k, s]) => <option key={k} value={k}>{s}</option>)}</select></F>;
+  return <F l={l} w={w}><SelectField className={controls.select} value={v} onChange={(e) => set(e.target.value as K)} data-rc={d}>{o.map(([k, s]) => <option key={k} value={k}>{s}</option>)}</SelectField></F>;
 }
 const Table = ({ head, rows, d }: { head: string[]; rows: ReactNode[][]; d?: string }) => rows.length ? (
   <div className={surface.tableWrap}><table className={surface.table} data-rc-table={d}><thead><tr>{head.map((h) => <th key={h}>{h}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody></table></div>

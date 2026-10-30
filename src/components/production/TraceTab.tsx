@@ -14,6 +14,7 @@ import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import mfg from '../manufacturing/manufacturing.module.css';
 import styles from './production.module.css';
+import { SelectField } from '../ui/SelectField';
 
 type Dir = 'back' | 'fwd';
 
@@ -63,10 +64,10 @@ export function TraceTab({ ctx }: { ctx: MfgContext }) {
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="tr-item">{pT('item')}</label>
-          <select id="tr-item" className={controls.select} value={itemId} onChange={(e) => { setItemId(e.target.value); setBatch(''); }}>
+          <SelectField id="tr-item" className={controls.select} value={itemId} onChange={(e) => { setItemId(e.target.value); setBatch(''); }}>
             <option value="">{pT('choose')}</option>
             {tracked.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-          </select>
+          </SelectField>
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="tr-batch">{pT('batch')}</label>

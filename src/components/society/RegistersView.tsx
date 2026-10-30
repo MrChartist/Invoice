@@ -23,6 +23,8 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field as F, type HsViewProps } from './hs-ui';
 import { row } from './hs-form';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Reg = 'j' | 'iReg' | 'share' | 'nomination';
 
@@ -51,9 +53,9 @@ export default function RegistersView({ notify }: HsViewProps) {
   return (
     <section data-hs-registers>
       <div style={row}>
-        <select className={controls.select} value={reg} onChange={(e) => setReg(e.target.value as Reg)} data-hs-reg>
+        <SelectField className={controls.select} value={reg} onChange={(e) => setReg(e.target.value as Reg)} data-hs-reg>
           {(['j', ...(formJ ? ['iReg'] : []), 'share', 'nomination'] as Reg[]).map((k) => <option key={k} value={k}>{k === 'j' ? (formJ ? hsdT('j') : hsdT('members')) : hsdT(k)}</option>)}
-        </select>
+        </SelectField>
         <button type="button" className={controls.btnOutline} data-hs-print-reg onClick={() => printText(title, rows.map(line))}>{hsdT('print')}</button>
       </div>
       <div className={surface.tableWrap}>
@@ -67,7 +69,7 @@ export default function RegistersView({ notify }: HsViewProps) {
       </div>
       {edit && (
         <div style={row}>
-          <F label={hsdT('admitted')}><input type="date" className={controls.input} value={edit.admitted} onChange={(e) => setEdit({ ...edit, admitted: e.target.value })} /></F>
+          <F label={hsdT('admitted')}><DateField className={controls.input} value={edit.admitted} onChange={(e) => setEdit({ ...edit, admitted: e.target.value })} /></F>
           <F label={hsdT('cert')}><input className={controls.input} value={edit.cert} onChange={(e) => setEdit({ ...edit, cert: e.target.value })} /></F>
           <F label={hsdT('nominees')}><input className={controls.input} value={edit.nom} onChange={(e) => setEdit({ ...edit, nom: e.target.value })} /></F>
           <button type="button" className={controls.btnPrimary} onClick={() => act(() => { const u = units.find((x) => x.id === edit.id)!; saveUnit({ ...u, admitted_on: edit.admitted || undefined, share_cert: edit.cert.trim() || undefined, nominees: parseNominees(edit.nom) }); setEdit(null); })}>{hsdT('save')}</button>
@@ -78,7 +80,7 @@ export default function RegistersView({ notify }: HsViewProps) {
         <F label={hsdT('fy')}><input className={controls.input} value={fy} onChange={(e) => setFy(e.target.value.trim())} placeholder="2025-26" /></F>
         <F label={hsdT('auditor')}><input className={controls.input} value={cur.auditor ?? ''} onChange={(e) => set('auditor', e.target.value)} data-hs-auditor /></F>
         {(['appointed_on', 'due_on', 'report_on', ...(formJ ? ['rectified_on'] : [])] as (keyof HsAudit)[]).map((k) => (
-          <F key={k} label={hsdT(({ appointed_on: 'appointed', due_on: 'dueOn', report_on: 'report', rectified_on: 'rectified' } as const)[k as 'due_on'])}><input type="date" className={controls.input} value={k === 'due_on' ? cur.due_on ?? due : (cur[k] as string) ?? ''} onChange={(e) => set(k, e.target.value)} data-hs-audit-field={k} /></F>
+          <F key={k} label={hsdT(({ appointed_on: 'appointed', due_on: 'dueOn', report_on: 'report', rectified_on: 'rectified' } as const)[k as 'due_on'])}><DateField className={controls.input} value={k === 'due_on' ? cur.due_on ?? due : (cur[k] as string) ?? ''} onChange={(e) => set(k, e.target.value)} data-hs-audit-field={k} /></F>
         ))}
         {st.code && <span className={controls.hint}>{hsdT(st.code, { n: st.n ?? 0 })}</span>}
         <button type="button" className={controls.btnPrimary} data-hs-save-audit onClick={() => act(() => saveAudit(cur))}>{hsdT('save')}</button>

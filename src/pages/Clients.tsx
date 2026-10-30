@@ -37,6 +37,7 @@ import { svcT } from '../i18n/areas/service-r3';
 import { loadQuietSettings, quietCustomers } from '../lib/quiet-customers';
 import { DOC_DEFAULT_COLUMNS, docDefaultsToCells } from '../lib/party-defaults'; // R3-B5 CSV columns
 import { useListKeys } from '../lib/keys/use-list-keys'; // R20-D5
+import { SelectField } from '../components/ui/SelectField';
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
@@ -234,11 +235,11 @@ export function Clients() {
             </button>
             <label className={styles.sort}>
               <span className={surface.srOnly}>{khataT('sort')}</span>
-              <select className={controls.select} value={sort} onChange={(e) => setSort(e.target.value as KhataSort)} aria-label={khataT('sort')}>
+              <SelectField className={controls.select} value={sort} onChange={(e) => setSort(e.target.value as KhataSort)} aria-label={khataT('sort')}>
                 <option value="balance">{khataT('sortBalance')}</option>
                 <option value="overdue">{khataT('sortOverdue')}</option>
                 <option value="name">{khataT('sortName')}</option>
-              </select>
+              </SelectField>
             </label>
           </div>
         </div>

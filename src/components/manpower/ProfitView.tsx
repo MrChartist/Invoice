@@ -18,6 +18,7 @@ import { siteBills } from '../../lib/manpower/mp-sites-io';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field, type MpViewProps } from './mp-ui';
+import { DateField } from '../ui/DateField';
 
 const K = ['billed', 'wages', 'relief', 'statutory', 'bills', 'margin'] as const;
 
@@ -31,7 +32,7 @@ export default function ProfitView(_: MpViewProps) {
   }, [month]);
   return (
     <section data-mp-profit>
-      <Field label={mpT('month')}><input type="month" className={controls.input} value={month} onChange={(e) => e.target.value && setParams({ tab: 'deploy', view: 'profit', month: e.target.value }, { replace: true })} /></Field>
+      <Field label={mpT('month')}><DateField mode="month" className={controls.input} value={month} onChange={(e) => e.target.value && setParams({ tab: 'deploy', view: 'profit', month: e.target.value }, { replace: true })} /></Field>
       {!d.run && <p className={controls.hint} role="note">{mcT('noRun', { m: month })}</p>}
       <div className={surface.tableWrap}>
         <table className={surface.table}>

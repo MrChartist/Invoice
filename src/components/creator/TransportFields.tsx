@@ -1,4 +1,4 @@
-import { useMemo, type ChangeEvent } from 'react';
+import { useMemo } from 'react';
 import { Truck } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { pick } from '../../store/pick';
@@ -9,6 +9,8 @@ import type { TransportDetails, TransportMode } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { printT } from '../../i18n/areas/printing';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const MODE_KEY: Record<TransportMode, 'road' | 'rail' | 'air' | 'ship'> = { ROAD: 'road', RAIL: 'rail', AIR: 'air', SHIP: 'ship' };
 
@@ -31,7 +33,7 @@ export function TransportFields() {
   };
   const text = (key: keyof TransportDetails) => ({
     value: (t[key] as string | undefined) ?? '',
-    onChange: (e: ChangeEvent<HTMLInputElement>) => set({ [key]: e.target.value }),
+    onChange: (e: { target: { value: string } }) => set({ [key]: e.target.value }),
   });
 
   return (
@@ -43,12 +45,12 @@ export function TransportFields() {
       <div className={controls.row3}>
         <label className={controls.field}>
           <span className={controls.label}>{printT('mode')}</span>
-          <select className={controls.select} value={t.mode ?? ''} onChange={(e) => set({ mode: (e.target.value || undefined) as TransportMode | undefined })}>
+          <SelectField className={controls.select} value={t.mode ?? ''} onChange={(e) => set({ mode: (e.target.value || undefined) as TransportMode | undefined })}>
             <option value="">{printT('modeNone')}</option>
             {TRANSPORT_MODES.map((m) => (
               <option key={m} value={m}>{printT(MODE_KEY[m])}</option>
             ))}
-          </select>
+          </SelectField>
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{printT('vehicle')}</span>
@@ -94,7 +96,7 @@ export function TransportFields() {
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{printT('lrDate')}</span>
-          <input className={controls.input} type="date" {...text('lr_date')} />
+          <DateField className={controls.input} {...text('lr_date')} />
         </label>
         <div className={controls.field} style={{ justifyContent: 'flex-end', flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
           {canPrefill && (

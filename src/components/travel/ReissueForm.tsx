@@ -11,6 +11,7 @@ import type { TravelBooking } from '../../types/travel-r15';
 import { reissueTicket } from '../../lib/travel/tv-reissue';
 import controls from '../../styles/controls.module.css';
 import { Field } from './tv-ui';
+import { SelectField } from '../ui/SelectField';
 
 export default function ReissueForm({ booking, date, onDone }: { booking: TravelBooking; date: string; onDone: (r: ReturnType<typeof reissueTicket>) => void }) {
   useT();
@@ -23,7 +24,7 @@ export default function ReissueForm({ booking, date, onDone }: { booking: Travel
   };
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginTop: '0.5rem' }} data-tv-reissue>
-      <Field label={cvT('tno')}><select className={controls.select} value={f.old_no} onChange={(e) => setF({ ...f, old_no: e.target.value })}>{open.map((t) => <option key={t.ticket_no} value={t.ticket_no}>{[t.ticket_no, t.pax, t.sector].filter(Boolean).join(' · ')}</option>)}</select></Field>
+      <Field label={cvT('tno')}><SelectField className={controls.select} value={f.old_no} onChange={(e) => setF({ ...f, old_no: e.target.value })}>{open.map((t) => <option key={t.ticket_no} value={t.ticket_no}>{[t.ticket_no, t.pax, t.sector].filter(Boolean).join(' · ')}</option>)}</SelectField></Field>
       {inp('new_no', r16cT('newNo'))}{inp('diff', r16cT('diff'))}{inp('penalty', r16cT('penalty'))}{inp('fee', r16cT('fee'))}
       <button type="button" className={controls.btnPrimary} onClick={go} data-tv-re-go>{r16cT('reissue')}</button>
       {err && <p className={controls.hint} role="alert">{err}</p>}

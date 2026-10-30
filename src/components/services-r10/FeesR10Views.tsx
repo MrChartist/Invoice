@@ -17,6 +17,7 @@ import { B, S, T, Tbl } from '../institutions/Views';
 import { attempt, rs, today, type Notify } from '../institutions/ui';
 import styles from '../institutions/institutions.module.css';
 import { ClassForm, Timetable } from './MembersDesk';
+import { SelectField } from '../ui/SelectField';
 
 const MARKS: AttendanceMark[] = ['P', 'A', 'L'];
 
@@ -59,7 +60,7 @@ export default function FeesR10Views({ view, notify }: { view: 'batches' | 'atte
         <>
           <ClassForm notify={notify} onSaved={refresh} kind="batch" feePlanId={plan.id} />
           <Timetable classes={batches} />
-          <Tbl h={[mcT('student'), mcT('batch')]} rows={enrolled.map((s) => [s.name, <select key="b" value={s.enrolments?.find((e) => e.plan_id === plan.id)?.class_id ?? ''} onChange={(e) => attempt(notify, () => { setBatch(s.id!, plan.id, e.target.value); refresh(); })} aria-label={mcT('put')}><option value="">-</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select>])} />
+          <Tbl h={[mcT('student'), mcT('batch')]} rows={enrolled.map((s) => [s.name, <SelectField key="b" value={s.enrolments?.find((e) => e.plan_id === plan.id)?.class_id ?? ''} onChange={(e) => attempt(notify, () => { setBatch(s.id!, plan.id, e.target.value); refresh(); })} aria-label={mcT('put')}><option value="">-</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</SelectField>])} />
         </>
       )}
       {view === 'attendance' && batch && (

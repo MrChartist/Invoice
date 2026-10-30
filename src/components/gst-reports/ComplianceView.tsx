@@ -33,6 +33,8 @@ import local from './gst-reports.module.css';
 import { useT } from '../../i18n';
 import { gvT } from '../../i18n/areas/gst-views';
 import { nodes } from '../../i18n/areas/nodes';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 // 7O (7.96): TDS deposit / 26Q due dates — loads the TDS engine only when this tab is open.
 const TdsDueCalendar = lazy(() => import('../tds/TdsDueCalendar'));
@@ -147,11 +149,11 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
       <div className={local.toolbar}>
         <label className={local.periodField}>
           <span className={controls.label}>{gvT('filingFrequency')}</span>
-          <select className={controls.select} value={frequency} onChange={(e) => changeFrequency(e.target.value as FilerFrequency)}>
+          <SelectField className={controls.select} value={frequency} onChange={(e) => changeFrequency(e.target.value as FilerFrequency)}>
             <option value="monthly">{gvT('freqMonthly')}</option>
             <option value="qrmp">{gvT('freqQrmp', { day: qrmp3bDay(stateCode, today) })}</option>
             <option value="composition">{gvT('freqComposition')}</option>
-          </select>
+          </SelectField>
         </label>
         <p className={controls.hint} style={{ margin: 0 }}>
           <CalendarClock size={14} aria-hidden style={{ verticalAlign: '-2px' }} /> {open.length
@@ -185,7 +187,7 @@ export function ComplianceView({ invoices, purchases, gstin, stateCode, turnover
                     <input type="checkbox" checked={!!x.filed} onChange={(e) => mark(x.r, e.target.checked ? today : null)} aria-label={gvT('filedAria', { form: FORM_LABELS[x.r.form], period: x.r.label })} />
                   </label>
                   {x.filed && (
-                    <input type="date" className={controls.input} style={{ width: 'auto' }} value={x.filed.filed_on} max={today}
+                    <DateField className={controls.input} style={{ width: 'auto' }} value={x.filed.filed_on} max={today}
                       aria-label={gvT('filedOn')} onChange={(e) => e.target.value && mark(x.r, e.target.value)} />
                   )}
                 </span>

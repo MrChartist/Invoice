@@ -5,6 +5,8 @@ import { cbT } from '../../i18n/areas/construction-r11b';
 import { F } from '../transport/Field';
 import controls from '../../styles/controls.module.css';
 import styles from '../transport/transport.module.css';
+import { SelectField } from '../ui/SelectField';
+import { TypedInput } from '../ui/TypedInput';
 
 export type Vals = Record<string, string | boolean | undefined>;
 /** [field, label, input type | select options] — 'check' renders a checkbox. */
@@ -17,8 +19,8 @@ export function Fields({ spec, v, set }: { spec: readonly Spec[]; v: Vals; set: 
       {spec.map(([k, l, t]) => (t === 'check'
         ? <label key={k} className={controls.check}><input type="checkbox" checked={!!v[k]} onChange={(e) => on(k, e.target.checked)} /> {l}</label>
         : <F key={k} l={l}>{Array.isArray(t)
-          ? <select className={controls.select} value={String(v[k] ?? '')} onChange={(e) => on(k, e.target.value)} data-cn-f={k}>{t.map(([x, y]) => <option key={x} value={x}>{y}</option>)}</select>
-          : <input className={controls.input} type={(t as string) || 'text'} value={String(v[k] ?? '')} onChange={(e) => on(k, e.target.value)} data-cn-f={k} />}</F>))}
+          ? <SelectField className={controls.select} value={String(v[k] ?? '')} onChange={(e) => on(k, e.target.value)} data-cn-f={k}>{t.map(([x, y]) => <option key={x} value={x}>{y}</option>)}</SelectField>
+          : <TypedInput className={controls.input} type={(t as string) || 'text'} value={String(v[k] ?? '')} onChange={(e) => on(k, e.target.value)} data-cn-f={k} />}</F>))}
     </div>
   );
 }
@@ -26,10 +28,10 @@ export function Fields({ spec, v, set }: { spec: readonly Spec[]; v: Vals; set: 
 export function ContractPick({ contracts, value, onChange }: { contracts: readonly WorksContract[]; value: string; onChange: (id: string) => void }) {
   return (
     <F l={cbT('contract')}>
-      <select className={controls.select} value={value} onChange={(e) => onChange(e.target.value)} data-cn-contract>
+      <SelectField className={controls.select} value={value} onChange={(e) => onChange(e.target.value)} data-cn-contract>
         {!contracts.length && <option value="">{cbT('noContract')}</option>}
         {contracts.map((c) => <option key={c.id} value={c.id}>{c.agreement_no ? `${c.agreement_no} · ` : ''}{c.name_of_work}</option>)}
-      </select>
+      </SelectField>
     </F>
   );
 }

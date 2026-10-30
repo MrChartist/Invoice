@@ -28,6 +28,8 @@ import { useT } from '../../i18n';
 import { dkT } from '../../i18n/areas/desks-r3';
 import controls from '../../styles/controls.module.css';
 import styles from './desks-r3.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Notify = (msg: string, tone?: 'success' | 'error' | 'info') => void;
 
@@ -166,15 +168,15 @@ export default function EwayDesk({ notify }: { notify: Notify }) {
             <label className={controls.field}><span className={controls.label}>{dkT('ew.state')}</span>
               <input className={controls.input} value={input.stateCode} inputMode="numeric" maxLength={2} onChange={(e) => setInput({ ...input, stateCode: e.target.value })} placeholder="27" /></label>
             <label className={controls.field}><span className={controls.label}>{dkT('ew.reason')}</span>
-              <select className={controls.select} value={input.reason} onChange={(e) => setInput({ ...input, reason: e.target.value as VehicleReason })}>
+              <SelectField className={controls.select} value={input.reason} onChange={(e) => setInput({ ...input, reason: e.target.value as VehicleReason })}>
                 {REASONS.map((r) => <option key={r} value={r}>{dkT(`ew.r.${r}` as const)}</option>)}
-              </select></label>
+              </SelectField></label>
             <label className={controls.field}><span className={controls.label}>{dkT('ew.remark')}</span>
               <input className={controls.input} value={input.remark} maxLength={50} onChange={(e) => setInput({ ...input, remark: e.target.value })} /></label>
             <label className={controls.field}><span className={controls.label}>{dkT('ew.docNo')}</span>
               <input className={controls.input} value={input.docNo} maxLength={15} onChange={(e) => setInput({ ...input, docNo: e.target.value })} /></label>
             <label className={controls.field}><span className={controls.label}>{dkT('ew.docDate')}</span>
-              <input className={controls.input} type="date" value={input.docDate} onChange={(e) => setInput({ ...input, docDate: e.target.value })} /></label>
+              <DateField className={controls.input} value={input.docDate} onChange={(e) => setInput({ ...input, docDate: e.target.value })} /></label>
           </div>
         ) : (
           <div className={styles.grid2}>

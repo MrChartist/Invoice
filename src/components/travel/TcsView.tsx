@@ -17,6 +17,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field } from './tv-ui';
 import { runWith, type TvViewProps } from './tv-run';
+import { SelectField } from '../ui/SelectField';
 
 const BASES = ['total', 'taxable'] as const;
 const money = (n: number) => formatCurrency(n);
@@ -32,15 +33,15 @@ export default function TcsView({ notify }: TvViewProps) {
     <section data-tv-tcs-view>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.75rem' }}>
         <Field label={tvdT('fy')}>
-          <select className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))}>
+          <SelectField className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))}>
             {[0, 1, 2, 3].map((d) => fyOf(todayInput()) - d).map((y) => <option key={y} value={y}>{fyText(y)}</option>)}
-          </select>
+          </SelectField>
         </Field>
         {can('settings.manage') && (
           <Field label={tvdT('tcsBase')}>
-            <select className={controls.select} value={base} onChange={(e) => { const b = e.target.value as typeof base; setBase(b); runWith(notify)(() => saveTravelSettings({ tcs: { base: b } })); }} data-tv-tcs-base>
+            <SelectField className={controls.select} value={base} onChange={(e) => { const b = e.target.value as typeof base; setBase(b); runWith(notify)(() => saveTravelSettings({ tcs: { base: b } })); }} data-tv-tcs-base>
               {BASES.map((b) => <option key={b} value={b}>{tvdList('bases', BASES, b)}</option>)}
-            </select>
+            </SelectField>
           </Field>
         )}
         <Link to="/tds" className={`${controls.btnOutline} ${controls.btnSm}`}>{tvdT('challans')}</Link>

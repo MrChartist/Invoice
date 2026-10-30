@@ -18,6 +18,8 @@ import { peekTable } from '../../lib/storage';
 import { activeMoves, chargeUnreturned, loadPackMoves, orphanCharge, loadPackTypes, packBalances, recordPackMove, removePackMove, savePackType, type MoveInput } from '../../lib/trade/tr-packaging';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const F = ({ label, children }: { label: string; children: ReactNode }) => (
   <label className={controls.field}>
@@ -72,33 +74,33 @@ export default function PackagingTab({ onDone }: { onDone: (msg: string, error?:
       </details>
       {types.length > 0 && (
         <div className={own.row} data-pack-move-form>
-          <F label={aT('date')}><input type="date" className={controls.input} value={m.date} onChange={(e) => setM({ ...m, date: e.target.value })} /></F>
+          <F label={aT('date')}><DateField className={controls.input} value={m.date} onChange={(e) => setM({ ...m, date: e.target.value })} /></F>
           <F label={aT('party')}>
-            <select className={controls.select} value={m.party} onChange={(e) => setM({ ...m, party: e.target.value })} data-pack-party>
+            <SelectField className={controls.select} value={m.party} onChange={(e) => setM({ ...m, party: e.target.value })} data-pack-party>
               <option value="">-</option>
               {parties.map((p) => <option key={`${p.kind}:${p.id}`} value={`${p.kind}:${p.id}`}>{p.name}</option>)}
-            </select>
+            </SelectField>
           </F>
           <F label={aT('crates')}>
-            <select className={controls.select} value={m.type} onChange={(e) => setM({ ...m, type: e.target.value })}>
+            <SelectField className={controls.select} value={m.type} onChange={(e) => setM({ ...m, type: e.target.value })}>
               {types.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-            </select>
+            </SelectField>
           </F>
           <F label={aT('out')}><input type="number" min={0} className={controls.input} value={m.out} onChange={(e) => setM({ ...m, out: e.target.value })} data-pack-move-out /></F>
           <F label={aT('in')}><input type="number" min={0} className={controls.input} value={m.in} onChange={(e) => setM({ ...m, in: e.target.value })} data-pack-move-in /></F>
           <F label={aT('depositMove')}><input type="number" className={controls.input} value={m.deposit} onChange={(e) => setM({ ...m, deposit: e.target.value })} /></F>
           {n(m.deposit) !== 0 && (
             <F label={aT('cashBank')}>
-              <select className={controls.select} value={m.cash} onChange={(e) => setM({ ...m, cash: e.target.value })}>
+              <SelectField className={controls.select} value={m.cash} onChange={(e) => setM({ ...m, cash: e.target.value })}>
                 {cash.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              </SelectField>
             </F>
           )}
           <div><button type="button" className={controls.btnPrimary} onClick={record} data-pack-move-save>{aT('record')}</button></div>
         </div>
       )}
       <div className={own.row}>
-        <F label={aT('asOf')}><input type="date" className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value)} /></F>
+        <F label={aT('asOf')}><DateField className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value)} /></F>
         <F label={aT('ageDays')}><input type="number" min={1} className={controls.input} value={age} onChange={(e) => setAge(Math.max(n(e.target.value), 1))} /></F>
       </div>
       <div className={own.tableWrap}>

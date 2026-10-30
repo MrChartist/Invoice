@@ -19,6 +19,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './CatalogPanel.module.css';
 import { printWhenReady } from '../../lib/print-fonts';
+import { SelectField } from '../ui/SelectField';
 
 interface Row {
   key: string;
@@ -150,18 +151,18 @@ export function LabelSheetModal({ open, onClose, onChanged, preselected }: {
         <div className={controls.row3}>
           <label className={controls.field}>
             <span className={controls.label}>{setT('labelSheet')}</span>
-            <select className={controls.select} value={layoutId} onChange={(e) => setLayoutId(e.target.value)}>
+            <SelectField className={controls.select} value={layoutId} onChange={(e) => setLayoutId(e.target.value)}>
               {LABEL_LAYOUTS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{setT('priceOnLabel')}</span>
-            <select className={controls.select} value={price} onChange={(e) => setPrice(e.target.value as PriceShown)}>
+            <SelectField className={controls.select} value={price} onChange={(e) => setPrice(e.target.value as PriceShown)}>
               <option value="sale">{setT('priceSale')}</option>
               <option value="mrp">{setT('priceMrp')}</option>
               <option value="both">{setT('priceBoth')}</option>
               <option value="none">{setT('priceNone')}</option>
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{setT('skipUsed')}</span>

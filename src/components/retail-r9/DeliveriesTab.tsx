@@ -21,6 +21,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { escHtml as esc } from '../../lib/html-esc';
 import { PRINT_FONT, PRINT_FONT_FACE, printWhenReady } from '../../lib/print-fonts';
+import { SelectField } from '../ui/SelectField';
 
 const STATUSES: DeliveryStatus[] = ['new', 'packed', 'out', 'delivered', 'returned', 'cancelled'];
 
@@ -73,10 +74,10 @@ export default function DeliveriesTab({ onDone }: { onDone: (msg: string, error?
       <div className={surface.cardBody}>
         <div className={controls.row} style={{ gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <label className={controls.field}><span className={controls.label}>{rtaT('rider')}</span>
-            <select className={controls.select} value={riderFilter} onChange={(e) => setRiderFilter(e.target.value)}>
+            <SelectField className={controls.select} value={riderFilter} onChange={(e) => setRiderFilter(e.target.value)}>
               <option value="">-</option>
               {riders.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
+            </SelectField>
           </label>
           {riderFilter && <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => printRun(riderFilter)}><Printer size={14} aria-hidden="true" /> {rtaT('printRun')}</button>}
         </div>
@@ -124,10 +125,10 @@ export default function DeliveriesTab({ onDone }: { onDone: (msg: string, error?
           <summary>{rtaT('settleTitle')}</summary>
           <div className={controls.row} style={{ gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <label className={controls.field}><span className={controls.label}>{rtaT('settleRider')}</span>
-              <select className={controls.select} value={settle.rider} onChange={(e) => setSettle({ rider: e.target.value, counted: riderOpenReceipts(payments, settlements, e.target.value, day).reduce((s, p) => s + p.amount, 0), account: '' })} data-settle-rider>
+              <SelectField className={controls.select} value={settle.rider} onChange={(e) => setSettle({ rider: e.target.value, counted: riderOpenReceipts(payments, settlements, e.target.value, day).reduce((s, p) => s + p.amount, 0), account: '' })} data-settle-rider>
                 <option value="">-</option>
                 {riders.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-              </select>
+              </SelectField>
             </label>
             {settle.rider && (open.length === 0 ? <p className={controls.hint}>{rtaT('nothingToSettle')}</p> : (
               <>
@@ -138,10 +139,10 @@ export default function DeliveriesTab({ onDone }: { onDone: (msg: string, error?
                 <span>{rtaT('difference')}: {formatCurrency(settle.counted - expected)}</span>
                 {Math.abs(settle.counted - expected) > 0.004 && (
                   <label className={controls.field}><span className={controls.label}>{rtaT('diffLedger')}</span>
-                    <select className={controls.select} value={settle.account} onChange={(e) => setSettle({ ...settle, account: e.target.value })}>
+                    <SelectField className={controls.select} value={settle.account} onChange={(e) => setSettle({ ...settle, account: e.target.value })}>
                       <option value="">{rtaT('pickLedger')}</option>
                       {ledgers.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                    </select>
+                    </SelectField>
                   </label>
                 )}
                 <button type="button" className={controls.btnPrimary} onClick={() => run(() => { const s = settleRider({ riderId: settle.rider, day, counted: settle.counted, differenceAccountId: settle.account || undefined }); setSettle({ rider: '', counted: 0, account: '' }); return rtaT('settled', { amount: formatCurrency(s.counted), rider: s.rider_name }); })} data-settle-save>{rtaT('settle')}</button>

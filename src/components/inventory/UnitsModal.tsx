@@ -10,6 +10,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './masters.module.css';
 import { errText } from '../../i18n/lib-msg';
+import { SelectField } from '../ui/SelectField';
 
 type SimpleDraft = { id?: string; symbol: string; name: string; uqc: string; decimals: string; locked?: boolean };
 type CompoundDraft = { id?: string; first: string; factor: string; second: string };
@@ -108,10 +109,10 @@ export function UnitsModal({ open, items, onClose, onChanged }: {
             <div className={controls.row}>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="un-uqc">{imT('uqc')}</label>
-                <select id="un-uqc" className={controls.select} value={simple.uqc} onChange={(e) => setSimple({ ...simple, uqc: e.target.value })}>
+                <SelectField id="un-uqc" className={controls.select} value={simple.uqc} onChange={(e) => setSimple({ ...simple, uqc: e.target.value })}>
                   <option value="">{imT('uqcAuto', { uqc: mapUnitToUqc(simple.symbol) })}</option>
                   {UQC_CODES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+                </SelectField>
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="un-dec">{imT('decimals')}</label>
@@ -157,10 +158,10 @@ export function UnitsModal({ open, items, onClose, onChanged }: {
             <div className={controls.row3}>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="cu-first">{imT('first')}</label>
-                <select id="cu-first" className={controls.select} value={compound.first} onChange={(e) => setCompound({ ...compound, first: e.target.value })}>
+                <SelectField id="cu-first" className={controls.select} value={compound.first} onChange={(e) => setCompound({ ...compound, first: e.target.value })}>
                   <option value="" />
                   {units.map((u) => <option key={u.id} value={u.symbol}>{u.symbol}</option>)}
-                </select>
+                </SelectField>
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="cu-factor">{imT('factor')}</label>
@@ -168,10 +169,10 @@ export function UnitsModal({ open, items, onClose, onChanged }: {
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="cu-second">{imT('second')}</label>
-                <select id="cu-second" className={controls.select} value={compound.second} onChange={(e) => setCompound({ ...compound, second: e.target.value })}>
+                <SelectField id="cu-second" className={controls.select} value={compound.second} onChange={(e) => setCompound({ ...compound, second: e.target.value })}>
                   <option value="" />
                   {units.map((u) => <option key={u.id} value={u.symbol}>{u.symbol}</option>)}
-                </select>
+                </SelectField>
               </div>
             </div>
             <div className={surface.pageActions}>

@@ -21,6 +21,7 @@ import { loadCollectionNotes, openPromises, receiptsByParty } from '../../lib/co
 import { localDayOf } from '../../lib/dates';
 import { colT } from '../../i18n/areas/collections';
 import type { ReminderMode } from '../../types/invoice';
+import { SelectField } from '../ui/SelectField';
 
 // R2-A4: "Log follow-up" from the queue (promise to pay / next action), loaded on first use.
 const FollowUpDialog = lazy(() => import('../collections/FollowUpDialog'));
@@ -145,7 +146,7 @@ export function RemindQueue({ kind, onClose, onChanged }: RemindQueueProps) {
               {item.client?.id && can('master.edit') && (
                 <label className={controls.field}>
                   <span className={controls.label}>{colT('rmSetMode', { name: item.party.name })}</span>
-                  <select className={controls.select} value={(item.party.key in modes ? modes[item.party.key] : item.client.reminder_mode) ?? 'auto'}
+                  <SelectField className={controls.select} value={(item.party.key in modes ? modes[item.party.key] : item.client.reminder_mode) ?? 'auto'}
                     onChange={(e) => {
                       const mode = e.target.value === 'auto' ? undefined : (e.target.value as ReminderMode);
                       try {
@@ -156,7 +157,7 @@ export function RemindQueue({ kind, onClose, onChanged }: RemindQueueProps) {
                     <option value="auto">{colT('rmAuto')}</option>
                     <option value="manual">{colT('rmManual')}</option>
                     <option value="never">{colT('rmNever')}</option>
-                  </select>
+                  </SelectField>
                 </label>
               )}
               <div className={controls.field}>

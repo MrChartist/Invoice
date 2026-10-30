@@ -18,6 +18,7 @@ import { useT } from '../../i18n';
 import '../../i18n/en-pages'; // page strings (5.4)
 import controls from '../../styles/controls.module.css';
 import styles from './PartiesSection.module.css';
+import { SelectField } from '../ui/SelectField';
 
 // R3-B5 / B6: party defaults (once, with Undo) + repeat last bill / usual items — lazy, loads on a party pick.
 const PartyHabitsStrip = lazy(() => import('./PartyHabitsStrip'));
@@ -74,7 +75,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
         <div className={styles.colHead}>
           <span className={controls.label}>{t('parties.from')}</span>
           {profiles.length > 1 && (
-            <select
+            <SelectField
               className={`${controls.select} ${styles.profileSelect}`}
               value={sender?.id ?? ''}
               onChange={(e) => {
@@ -88,7 +89,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
                   {p.companyName || t('parties.untitled')}
                 </option>
               ))}
-            </select>
+            </SelectField>
           )}
         </div>
 
@@ -169,7 +170,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
           <textarea className={controls.textarea} rows={2} value={client.address} onChange={(e) => setClient({ address: e.target.value })} placeholder={t('parties.billingAddress')} aria-label={t('parties.billingAddress')} />
           <div className={controls.row}>
             <input className={controls.input} value={client.city} onChange={(e) => setClient({ city: e.target.value })} placeholder={t('parties.city')} aria-label={t('parties.city')} />
-            <select
+            <SelectField
               className={controls.select}
               value={client.state_code ?? ''}
               onChange={(e) => setClient({ state_code: e.target.value, state: stateByCode(e.target.value)?.name ?? '' })}
@@ -181,7 +182,7 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
                   {s.code} : {s.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <input className={controls.input} type="email" value={client.email} onChange={(e) => setClient({ email: e.target.value })} placeholder={t('parties.email')} aria-label={t('parties.clientEmail')} />
           <label className={styles.shipToggle}>
@@ -201,14 +202,14 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
                 <input className={controls.input} value={shipTo.city ?? ''} onChange={(e) => setShip({ city: e.target.value })} placeholder={t('parties.city')} aria-label={t('parties.shipCity')} />
                 <input className={controls.input} inputMode="numeric" maxLength={6} value={shipTo.zip ?? ''} onChange={(e) => setShip({ zip: e.target.value.replace(/\D/g, '') })} placeholder={t('parties.pin')} aria-label={t('parties.shipPin')} />
               </div>
-              <select className={controls.select} value={shipTo.state_code ?? ''} onChange={(e) => setShip({ state_code: e.target.value })} aria-label={t('parties.shipState')}>
+              <SelectField className={controls.select} value={shipTo.state_code ?? ''} onChange={(e) => setShip({ state_code: e.target.value })} aria-label={t('parties.shipState')}>
                 <option value="">{t('parties.state')}</option>
                 {INDIAN_STATES.map((s) => (
                   <option key={s.code} value={s.code}>
                     {s.code} : {s.name}
                   </option>
                 ))}
-              </select>
+              </SelectField>
               <GstinInput value={shipTo.gstin ?? ''} onChange={(v) => setShip({ gstin: v })} placeholder={t('parties.consigneeGstinPh')} />
             </fieldset>
           )}
@@ -220,14 +221,14 @@ export function PartiesSection({ profiles, onSearchClients }: Props) {
       <div className={styles.supply}>
         <label className={controls.field}>
           <span className={controls.label}>{t('parties.placeOfSupply')}</span>
-          <select className={controls.select} value={placeOfSupply} onChange={(e) => setPlaceOfSupply(e.target.value)}>
+          <SelectField className={controls.select} value={placeOfSupply} onChange={(e) => setPlaceOfSupply(e.target.value)}>
             <option value="">{t('parties.notSet')}</option>
             {INDIAN_STATES.map((s) => (
               <option key={s.code} value={s.code}>
                 {s.code} : {s.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
         <p className={styles.supplyNote}>
           {gstMode === 'CGST_SGST' && t('parties.supplyIntra', { state: stateByCode(placeOfSupply)?.name ?? t('parties.sameState') })}

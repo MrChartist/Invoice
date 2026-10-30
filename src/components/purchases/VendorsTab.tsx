@@ -30,6 +30,8 @@ import styles from './purchases.module.css';
 import tabStyles from './VendorsTab.module.css';
 import { errText, libMsg } from '../../i18n/lib-msg';
 import { useListKeys } from '../../lib/keys/use-list-keys'; // R20-D5
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 // R14 (PS-B2): "advocate / firm of advocates" tick (inward reverse charge on legal services) — one lazy row.
 const NettingLinkRow = lazy(() => import('../receivables/NettingDialog').then((m) => ({ default: m.NettingLinkRow }))); // R15-A3
@@ -211,12 +213,12 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="v-state">{purT('state')}</label>
-          <select id="v-state" className={controls.select} value={draft.state_code ?? ''} onChange={(e) => set({ state_code: e.target.value })}>
+          <SelectField id="v-state" className={controls.select} value={draft.state_code ?? ''} onChange={(e) => set({ state_code: e.target.value })}>
             <option value="">{purT('notSpecified')}</option>
             {INDIAN_STATES.map((s) => (
               <option key={s.code} value={s.code}>{s.code} : {s.name}</option>
             ))}
-          </select>
+          </SelectField>
         </div>
       </div>
       <div className={controls.row}>
@@ -232,12 +234,12 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
       <div className={controls.row}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="v-msme">{purT('msmeCategory')}</label>
-          <select id="v-msme" className={controls.select} value={draft.msme_category ?? ''} onChange={(e) => set({ msme_category: (e.target.value || undefined) as MsmeCategory | undefined })}>
+          <SelectField id="v-msme" className={controls.select} value={draft.msme_category ?? ''} onChange={(e) => set({ msme_category: (e.target.value || undefined) as MsmeCategory | undefined })}>
             <option value="">{purT('notMsme')}</option>
             <option value="MICRO">{purT('msmeMicro')}</option>
             <option value="SMALL">{purT('msmeSmall')}</option>
             <option value="MEDIUM">{purT('msmeMedium')}</option>
-          </select>
+          </SelectField>
           <span className={controls.hint}>{purT('msmeHint')}</span>
         </div>
         <div className={controls.field}>
@@ -279,19 +281,19 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="v-deductee">{o7T('vDeductee')}</label>
-            <select id="v-deductee" className={controls.select} value={draft.deductee_type ?? ''} onChange={(e) => set({ deductee_type: (e.target.value || undefined) as DeducteeType | undefined })}>
+            <SelectField id="v-deductee" className={controls.select} value={draft.deductee_type ?? ''} onChange={(e) => set({ deductee_type: (e.target.value || undefined) as DeducteeType | undefined })}>
               <option value="">{o7T('vDeducteeAuto', { type: deducteeTypeFromPan(draft.pan) ? o7T(`dt${deducteeTypeFromPan(draft.pan)}` as 'dtOTHER') : '-' })}</option>
               {DEDUCTEE_TYPES.map((t) => <option key={t} value={t}>{o7T(`dt${t}` as 'dtOTHER')}</option>)}
-            </select>
+            </SelectField>
           </div>
         </div>
         <div className={controls.row}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="v-tds-sec">{o7T('vSection')}</label>
-            <select id="v-tds-sec" className={controls.select} value={draft.tds_section ?? ''} onChange={(e) => set({ tds_section: e.target.value || undefined })}>
+            <SelectField id="v-tds-sec" className={controls.select} value={draft.tds_section ?? ''} onChange={(e) => set({ tds_section: e.target.value || undefined })}>
               <option value="">{tdsT('noTds')}</option>
               {TDS_PAYABLE_SECTIONS.map((x) => <option key={x.code} value={x.code}>{x.label}</option>)}
-            </select>
+            </SelectField>
           </div>
           <Suspense fallback={null}><NettingLinkRow vendor={draft} onChange={(client_id) => set({ client_id })} /></Suspense>
           <div className={controls.field}>
@@ -323,11 +325,11 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="v-cert-from">{o7T('vCertFrom')}</label>
-            <input id="v-cert-from" type="date" className={controls.input} value={draft.tds_lower_from ?? ''} onChange={(e) => set({ tds_lower_from: e.target.value || undefined })} />
+            <DateField id="v-cert-from" className={controls.input} value={draft.tds_lower_from ?? ''} onChange={(e) => set({ tds_lower_from: e.target.value || undefined })} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="v-cert-to">{o7T('vCertTo')}</label>
-            <input id="v-cert-to" type="date" className={controls.input} value={draft.tds_lower_to ?? ''} onChange={(e) => set({ tds_lower_to: e.target.value || undefined })} />
+            <DateField id="v-cert-to" className={controls.input} value={draft.tds_lower_to ?? ''} onChange={(e) => set({ tds_lower_to: e.target.value || undefined })} />
           </div>
         </div>
         <span className={controls.hint}>{o7T('vTdsHint')}</span>
@@ -351,7 +353,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="v-nr-trc-to">{r7T('vNrTrcTo')}</label>
-                <input id="v-nr-trc-to" type="date" className={controls.input} value={draft.nr_trc_to ?? ''} onChange={(e) => set({ nr_trc_to: e.target.value || undefined })} />
+                <DateField id="v-nr-trc-to" className={controls.input} value={draft.nr_trc_to ?? ''} onChange={(e) => set({ nr_trc_to: e.target.value || undefined })} />
               </div>
             </div>
             <div className={controls.row}>

@@ -19,6 +19,8 @@ import { deviationWarnings } from '../../lib/construction/cn-abstract';
 import { deviationPct } from '../../lib/construction/cn-snapshot';
 import { readConstructionSettings } from '../../lib/construction/cn-settings';
 import type { CnRecoveryInput } from '../../types/construction-r11';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 // R11 (CN-B2 / B4): recoveries typed on this bill (lazy).
 const BillRecoveries = lazy(() => import('../construction/BillRecoveries'));
@@ -71,9 +73,9 @@ export function MeasurementForm({ boq, notify, refresh, tick }: PanelProps & { b
                   <td><input className={`${controls.input} ${own.qty}`} value={c?.mb ?? ''} onChange={(e) => set(l.id, { mb: e.target.value })} aria-label={twT('mbRef')} /></td>
                   <td>{over && <input className={controls.input} value={c?.extra ?? ''} onChange={(e) => set(l.id, { extra: e.target.value })} aria-label={twT('excessReason')} />}</td>
                   <td>
-                    <select className={controls.select} value={c?.kind ?? ''} onChange={(e) => set(l.id, { kind: e.target.value as Cell['kind'] })} aria-label={cnT('lineKind')} data-ra-kind={l.boq_ref || l.name}>
+                    <SelectField className={controls.select} value={c?.kind ?? ''} onChange={(e) => set(l.id, { kind: e.target.value as Cell['kind'] })} aria-label={cnT('lineKind')} data-ra-kind={l.boq_ref || l.name}>
                       <option value="">{cnT('kind.boq')}</option><option value="extra">{cnT('kind.extra')}</option><option value="substituted">{cnT('kind.substituted')}</option>
-                    </select>
+                    </SelectField>
                     {c?.kind && <input className={controls.input} value={c.approval ?? ''} placeholder={cnT('approval')} onChange={(e) => set(l.id, { approval: e.target.value })} aria-label={cnT('approval')} />}
                     {c?.kind === 'substituted' && <input className={controls.input} value={c.subs ?? ''} placeholder={cnT('substitutes')} onChange={(e) => set(l.id, { subs: e.target.value })} aria-label={cnT('substitutes')} />}
                   </td>
@@ -87,13 +89,13 @@ export function MeasurementForm({ boq, notify, refresh, tick }: PanelProps & { b
         <p key={w.line_id} className={styles.warn} role="status" data-ra-deviation>{cnT('deviationWarn', { name: w.name, cum: w.cumulative, limit: w.limit, pct: w.pct })}</p>
       ))}
       <div className={styles.toolbar}>
-        <F l={cnT('periodFrom')}><input className={controls.input} type="date" value={period.from} onChange={(e) => setPeriod({ ...period, from: e.target.value })} /></F>
-        <F l={cnT('periodTo')}><input className={controls.input} type="date" value={period.to} onChange={(e) => setPeriod({ ...period, to: e.target.value })} /></F>
-        <F l={cnT('measuredOn')}><input className={controls.input} type="date" value={period.measured} onChange={(e) => setPeriod({ ...period, measured: e.target.value })} /></F>
+        <F l={cnT('periodFrom')}><DateField className={controls.input} value={period.from} onChange={(e) => setPeriod({ ...period, from: e.target.value })} /></F>
+        <F l={cnT('periodTo')}><DateField className={controls.input} value={period.to} onChange={(e) => setPeriod({ ...period, to: e.target.value })} /></F>
+        <F l={cnT('measuredOn')}><DateField className={controls.input} value={period.measured} onChange={(e) => setPeriod({ ...period, measured: e.target.value })} /></F>
       </div>
       <Suspense fallback={null}><BillRecoveries key={raNo} boqId={boq.id} onChange={setRecoveries} /></Suspense>
       <div className={styles.toolbar}>
-        <F l={twT('date')}><input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></F>
+        <F l={twT('date')}><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></F>
         <label className={controls.check}><input type="checkbox" checked={final} onChange={(e) => setFinal(e.target.checked)} /> {twT('finalBill')}</label>
         <label className={controls.check}><input type="checkbox" checked={draft} onChange={(e) => setDraft(e.target.checked)} /> {twT('saveAsDraft')}</label>
         <button type="button" className={B.p} onClick={save} data-ra-save>{twT('saveRa')}</button>

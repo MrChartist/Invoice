@@ -11,6 +11,7 @@ import { isTipLine, linesWithoutStaff, setTip, withStaff } from '../../lib/servi
 import { useT } from '../../i18n';
 import { svT } from '../../i18n/areas/services-r10a';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export default function PosStaff({ items, setItems, onBlock }: { items: InvoiceItem[]; setItems: (f: (prev: InvoiceItem[]) => InvoiceItem[]) => void; onBlock?: (errors: string[]) => void }) {
   useT();
@@ -29,17 +30,17 @@ export default function PosStaff({ items, setItems, onBlock }: { items: InvoiceI
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'center' }} data-pos-staff>
       <span className={controls.hint}>{svT('posStaff')}:</span>
       {items.filter((l) => !isTipLine(l) && !l.free_of && !l.modifier_of).map((l, i) => (
-        <select key={l.id} className={controls.ghost} value={l.sv?.staff_id ?? ''} onChange={(e) => put(l.id, e.target.value)} aria-label={`${svT('staff')}: ${l.name || i + 1}`} data-pos-staff-line={i}>
+        <SelectField key={l.id} className={controls.ghost} value={l.sv?.staff_id ?? ''} onChange={(e) => put(l.id, e.target.value)} aria-label={`${svT('staff')}: ${l.name || i + 1}`} data-pos-staff-line={i}>
           <option value="">{l.name || `#${i + 1}`}: -</option>
           {staff.map((s) => <option key={s.id} value={s.id}>{l.name || `#${i + 1}`}: {s.name}</option>)}
-        </select>
+        </SelectField>
       ))}
       {settings.tips === 'pass-through' && (
         <>
-          <select className={controls.ghost} value={tip.staff} onChange={(e) => setTipF({ ...tip, staff: e.target.value })} aria-label={`${svT('tip')}: ${svT('staff')}`} data-pos-tip-staff>
+          <SelectField className={controls.ghost} value={tip.staff} onChange={(e) => setTipF({ ...tip, staff: e.target.value })} aria-label={`${svT('tip')}: ${svT('staff')}`} data-pos-tip-staff>
             <option value="">{svT('tip')}: -</option>
             {staff.map((s) => <option key={s.id} value={s.id}>{svT('tip')}: {s.name}</option>)}
-          </select>
+          </SelectField>
           <input className={controls.input} style={{ maxWidth: '6rem' }} type="number" min={0} step="any" inputMode="decimal" value={tip.amount} onChange={(e) => setTipF({ ...tip, amount: e.target.value })} aria-label={svT('tip')} data-pos-tip-amount />
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setItems((prev) => setTip(prev, staff.find((s) => s.id === tip.staff), Number(tip.amount)))} data-pos-tip-add>{svT('addTip')}</button>
         </>

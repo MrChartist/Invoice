@@ -38,6 +38,7 @@ import { useT } from '../../i18n';
 import { desT } from '../../i18n/areas/design';
 import controls from '../../styles/controls.module.css';
 import styles from './DesignPanel.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface DesignPanelProps {
   /** Sender profile id this design belongs to (GLOBAL_PROFILE_ID for the default). */
@@ -410,7 +411,7 @@ export function DesignPanel({
           <div className={styles.grid2}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor={`${uid}-wm`}>{desT('watermark')}</label>
-              <select
+              <SelectField
                 id={`${uid}-wm`}
                 className={controls.select}
                 value={watermarkMode}
@@ -424,7 +425,7 @@ export function DesignPanel({
                 <option value="none">{desT('none')}</option>
                 <option value="auto">{desT('stamp')}</option>
                 <option value="custom">{desT('customText')}</option>
-              </select>
+              </SelectField>
             </div>
             {watermarkMode === 'custom' && (
               <div className={controls.field}>
@@ -479,7 +480,7 @@ export function DesignPanel({
             />
             <div className={controls.field}>
               <label className={controls.label} htmlFor={`${uid}-df`}>{desT('dateFormat')}</label>
-              <select
+              <SelectField
                 id={`${uid}-df`}
                 className={controls.select}
                 value={design.date_format}
@@ -490,7 +491,7 @@ export function DesignPanel({
                     {f} : {formatDatePref('2026-04-05', f)}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </div>
           </div>
         </Section>

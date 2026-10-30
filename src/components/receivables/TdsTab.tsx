@@ -31,6 +31,7 @@ import { rcvT } from '../../i18n/areas/receivables';
 import { ita25Words } from '../../i18n/areas/ita2025';
 import { formText, quarterStart, sectionText } from '../../lib/ita2025';
 import styles from './TdsTab.module.css';
+import { SelectField } from '../ui/SelectField';
 
 // R14 (PS-D3): certificates to chase (Form 131 / 16A) with a chase letter — lazy panel.
 const ChasePanel = lazy(() => import('../prof/TdsChasePanel'));
@@ -113,11 +114,11 @@ export default function TdsTab({ data: rawData, notify }: TdsTabProps) {
       <div className={styles.toolbar}>
         <label className={styles.inline}>
           <span className={controls.label}>{rcvT('fy')}</span>
-          <select className={controls.select} value={String(fy)}
+          <SelectField className={controls.select} value={String(fy)}
             onChange={(e) => setFyPick(e.target.value === 'all' ? 'all' : Number(e.target.value))}>
             {all.fys.map((y) => <option key={y} value={y}>{fyLabel(y)}</option>)}
             {all.fys.length > 1 && <option value="all">{rcvT('allYears')}</option>}
-          </select>
+          </SelectField>
         </label>
         <button type="button" className={`${controls.btn} ${controls.btnOutline}`}
           onClick={() => downloadTextFile(`TDS_register_${fy === 'all' ? 'all' : fyLabel(fy)}_${todayInput()}.csv`, tdsRegisterCsv(reg))}>

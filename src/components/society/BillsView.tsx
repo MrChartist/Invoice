@@ -19,6 +19,8 @@ import surface from '../../styles/surface.module.css';
 import { Field as F, type HsViewProps } from './hs-ui';
 import { numIn, row } from './hs-form';
 import RegimeChip from './parts/RegimeChip';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const LEVY_BASES = BASES.filter((b) => ['per_unit', 'area_carpet', 'area_super', 'undivided_pct'].includes(b));
 
@@ -45,15 +47,15 @@ export default function BillsView({ notify }: HsViewProps) {
     <section data-hs-bills>
       <div style={row}>
         <F label={hsbT('period')}><input className={controls.input} value={p} onChange={(e) => pick(e.target.value.trim())} placeholder="2026-10 / 2026-Q3" data-hs-run-period disabled={!!levy} /></F>
-        <F label={hsbT('billDate')}><input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} data-hs-bill-date /></F>
-        <F label={hsbT('due')}><input type="date" className={controls.input} value={due} onChange={(e) => setDue(e.target.value)} data-hs-due /></F>
+        <F label={hsbT('billDate')}><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} data-hs-bill-date /></F>
+        <F label={hsbT('due')}><DateField className={controls.input} value={due} onChange={(e) => setDue(e.target.value)} data-hs-due /></F>
         <label className={controls.check}><input type="checkbox" checked={!!levy} onChange={(e) => setLevy(e.target.checked ? { name: '', kind: 'major_repair', basis: 'area_carpet', total: 0 } : null)} /> {hsbT('levy')}</label>
       </div>
       {levy && (
         <div style={row} data-hs-levy>
           <F label={hsbT('levyName')}><input className={controls.input} value={levy.name} onChange={(e) => lv({ name: e.target.value })} /></F>
-          <F label={hsT('kind')}><select className={controls.select} value={levy.kind} onChange={(e) => lv({ kind: e.target.value as HsHeadKind })}>{HEAD_KINDS.map((k) => <option key={k} value={k}>{hsList('kinds', HEAD_KINDS, k)}</option>)}</select></F>
-          <F label={hsT('basis')}><select className={controls.select} value={levy.basis} onChange={(e) => lv({ basis: e.target.value as HsBasis })}>{LEVY_BASES.map((b) => <option key={b} value={b}>{hsList('bases', BASES, b)}</option>)}</select></F>
+          <F label={hsT('kind')}><SelectField className={controls.select} value={levy.kind} onChange={(e) => lv({ kind: e.target.value as HsHeadKind })}>{HEAD_KINDS.map((k) => <option key={k} value={k}>{hsList('kinds', HEAD_KINDS, k)}</option>)}</SelectField></F>
+          <F label={hsT('basis')}><SelectField className={controls.select} value={levy.basis} onChange={(e) => lv({ basis: e.target.value as HsBasis })}>{LEVY_BASES.map((b) => <option key={b} value={b}>{hsList('bases', BASES, b)}</option>)}</SelectField></F>
           <F label={hsT('total')}><input type="number" min={0} className={controls.input} value={levy.total || ''} onChange={(e) => lv({ total: numIn(e.target.value) ?? 0 })} /></F>
         </div>
       )}

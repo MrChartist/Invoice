@@ -6,6 +6,8 @@ import { localDb } from '../../lib/localDb';
 import c from '../../styles/controls.module.css';
 import s from '../../styles/surface.module.css';
 import styles from './institutions.module.css';
+import { TypedInput } from '../ui/TypedInput';
+import { SelectField } from '../ui/SelectField';
 
 export function Views<T extends string>({ views, value, onChange, label }: { views: readonly T[]; value: T; onChange: (v: T) => void; label: (v: T) => string }) {
   return (
@@ -31,7 +33,7 @@ export function T({ l, v, on, t, d, bad, ph }: { l: string; v: string | number |
   return (
     <label className={c.field}>
       <span className={c.label}>{l}</span>
-      <input className={bad ? `${c.input} ${c.inputInvalid}` : c.input} type={t} value={v ?? ''} placeholder={ph} onChange={(e) => on(e.target.value)} {...data(d)} />
+      <TypedInput className={bad ? `${c.input} ${c.inputInvalid}` : c.input} type={t} value={v ?? ''} placeholder={ph} onChange={(e) => on(e.target.value)} {...data(d)} />
     </label>
   );
 }
@@ -41,9 +43,9 @@ export function S({ l, v, on, o, d }: { l: string; v: string | number | undefine
   return (
     <label className={c.field}>
       <span className={c.label}>{l}</span>
-      <select className={c.select} value={v ?? ''} onChange={(e) => on(e.target.value)} {...data(d)}>
+      <SelectField className={c.select} value={v ?? ''} onChange={(e) => on(e.target.value)} {...data(d)}>
         {o.map(([k, x]) => <option key={k} value={k}>{x}</option>)}
-      </select>
+      </SelectField>
     </label>
   );
 }

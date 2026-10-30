@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { gT } from '../../i18n/areas/mfg-r13c';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { TypedInput } from '../ui/TypedInput';
+import { SelectField } from '../ui/SelectField';
 
 
 export function Grid({ head, rows, attr }: { head: readonly ReactNode[]; rows: readonly ReactNode[][]; attr?: string }) {
@@ -22,11 +24,11 @@ export function F({ label, children, w }: { label: string; children: ReactNode; 
 }
 
 export function In({ v, set, type = 'text', ...rest }: { v: string; set: (s: string) => void; type?: string } & Record<string, unknown>) {
-  return <input className={controls.input} type={type} value={v} onChange={(e) => set(e.target.value)} {...rest} />;
+  return <TypedInput className={controls.input} type={type} value={v} onChange={(e) => set(e.target.value)} {...rest} />;
 }
 
 export function Sel({ v, set, o, ...rest }: { v: string; set: (s: string) => void; o: readonly (readonly [string, string])[] } & Record<string, unknown>) {
-  return <select className={controls.select} value={v} onChange={(e) => set(e.target.value)} {...rest}>{o.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>;
+  return <SelectField className={controls.select} value={v} onChange={(e) => set(e.target.value)} {...rest}>{o.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</SelectField>;
 }
 
 export const Btn = ({ on, children, kind = 'btnOutline', ...rest }: { on: () => void; children: ReactNode; kind?: 'btnPrimary' | 'btnOutline' | 'btnDanger' | 'btnGhost' } & Record<string, unknown>) => (

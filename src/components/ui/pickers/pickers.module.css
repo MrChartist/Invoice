@@ -1,0 +1,267 @@
+/* Pickers: inline calendar, month grid, time wheels, pop-up list (docs/theme/IOS-UI.md, Pickers). Tokens only. */
+
+/* Popover from 600px: regular material (the .material class paints it), anchored to the field. */
+.pop {
+  position: fixed;
+  z-index: var(--z-dropdown);
+  max-width: calc(100vw - 2 * var(--sp-2));
+  max-height: calc(100dvh - 2 * var(--sp-2));
+  overflow: auto;
+  padding: var(--sp-2);
+  color: var(--label);
+  border: var(--card-edge);
+  border-radius: var(--r-12);
+  box-shadow: var(--elev-2);
+  animation: popIn var(--dur-2) var(--spring-soft) both;
+}
+.popList {
+  display: flex;
+  flex-direction: column;
+  max-width: min(26rem, calc(100vw - 2 * var(--sp-2)));
+  max-height: min(26rem, calc(100dvh - 2 * var(--sp-2)));
+  padding: 6px;
+  overflow: hidden;
+}
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.97); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pop { animation: none; }
+}
+:global(html.a11y-contrast) .pop { border: var(--hairline) solid var(--sep-opaque); }
+
+.sheetFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  width: 100%;
+}
+
+/* ── Calendar ─────────────────────────────────────────────────── */
+.cal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  width: 20rem;
+  max-width: 100%;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+.calWide { width: 40rem; }
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-height: 2.75rem;
+  padding-inline-start: var(--sp-2);
+}
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--label);
+  font: inherit;
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  cursor: pointer;
+}
+.title:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; border-radius: var(--r-6); }
+.titleGlyph { color: var(--tint); transition: transform var(--dur-2) var(--ease-out); }
+.titleOpen { transform: rotate(90deg); }
+.nav { display: inline-flex; gap: var(--sp-1); }
+
+.months { display: flex; gap: var(--sp-4); }
+.month { flex: 1; min-width: 0; }
+.monthName {
+  padding: 0 var(--sp-2) var(--sp-1);
+  color: var(--label-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 2px;
+  table-layout: fixed;
+}
+.wd {
+  padding: var(--sp-1) 0;
+  color: var(--label-2);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-align: center;
+  text-transform: none;
+}
+.cell { padding: 0; text-align: center; }
+.inRange { background: var(--tint-soft); }
+.rangeStart { background: linear-gradient(to right, transparent 50%, var(--tint-soft) 50%); }
+.rangeEnd { background: linear-gradient(to left, transparent 50%, var(--tint-soft) 50%); }
+.day {
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  max-width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: var(--hairline) solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--label);
+  font: inherit;
+  font-size: var(--text-lg);
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease-out);
+}
+.day:hover:not(.selected):not(.disabled) { background: var(--fill-3); }
+.day:focus-visible { outline: 2px solid var(--tint); outline-offset: -2px; }
+.outside { color: var(--label-3); }
+.today { color: var(--tint); font-weight: 600; border-color: var(--tint); }
+.selected,
+.selected.today {
+  background: var(--tint);
+  color: var(--on-tint);
+  font-weight: 600;
+}
+.disabled {
+  color: var(--label-3);
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+.hint { margin: 0; padding-inline: var(--sp-2); color: var(--label-2); font-size: var(--text-sm); }
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: var(--hairline) solid var(--sep);
+}
+.foot { display: flex; justify-content: flex-end; padding-inline: var(--sp-2); }
+
+/* Month / year grid */
+.mgrid { display: flex; flex-direction: column; gap: var(--sp-2); }
+.yearRow { display: flex; align-items: center; justify-content: space-between; }
+.year { font-family: var(--font-heading); font-size: var(--text-lg); font-weight: 600; }
+.monthsGrid { display: flex; flex-direction: column; gap: var(--sp-1); }
+.mrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-1); }
+.mrow > span { display: contents; }
+.mcell {
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: var(--r-10);
+  background: var(--fill-3);
+  color: var(--label);
+  font: inherit;
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+.mcell:hover:not(:disabled):not(.selected) { background: var(--fill-4); }
+.mcell:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
+.mcell:disabled { color: var(--label-3); cursor: not-allowed; }
+
+/* ── Time wheels ──────────────────────────────────────────────── */
+.time { display: flex; flex-direction: column; gap: var(--sp-2); width: 16rem; max-width: 100%; }
+.wheels {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+.colon { color: var(--label-2); font-size: var(--text-lg); }
+.wheel {
+  position: relative; /* the items' offsetTop is measured from the wheel */
+  flex: 1;
+  height: 13.75rem;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior: contain;
+  padding-block: 5.5rem;
+  border-radius: var(--r-10);
+  background: var(--fill-3);
+  scrollbar-width: none;
+}
+.wheel:focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
+.wheelItem {
+  display: grid;
+  place-items: center;
+  height: 2.75rem;
+  scroll-snap-align: center;
+  color: var(--label-2);
+  font-size: var(--text-lg);
+  cursor: pointer;
+}
+.wheelItem.selected { border-radius: var(--r-8); color: var(--on-tint); font-weight: 600; }
+
+/* ── List (pop-up button) ─────────────────────────────────────── */
+.list { display: flex; flex-direction: column; min-height: 0; min-width: 12rem; }
+.searchRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.searchGlyph { position: absolute; left: var(--sp-2); color: var(--label-2); pointer-events: none; }
+.search {
+  width: 100%;
+  min-height: 2.25rem;
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-8);
+  border: 0;
+  border-radius: var(--r-10);
+  background: var(--fill-3);
+  color: var(--label);
+  font: inherit;
+  font-size: var(--text-md);
+}
+.search::placeholder { color: var(--label-3); opacity: 1; }
+.search:focus { outline: 2px solid var(--tint); outline-offset: 0; }
+.options {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  outline: none;
+}
+.options:focus-visible { box-shadow: 0 0 0 2px var(--tint); border-radius: var(--r-8); }
+.group {
+  padding: var(--sp-2) var(--sp-2) var(--sp-1) var(--sp-8);
+  color: var(--label-2);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.opt {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: 2rem;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-8);
+  color: var(--label);
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+.active { background: var(--fill-3); }
+.checked { font-weight: 600; }
+.check { display: inline-flex; flex-shrink: 0; width: 1.25rem; color: var(--tint); }
+.optLabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mark { background: var(--sys-yellow-soft); color: inherit; border-radius: var(--r-4); }
+.empty { padding: var(--sp-4) var(--sp-2); color: var(--label-2); font-size: var(--text-md); text-align: center; }
+
+/* Touch: 44px rows and days; the sheet's list fills it. */
+@media (pointer: coarse) {
+  .opt { min-height: 2.75rem; }
+  .search { min-height: 2.75rem; }
+}
+@media (max-width: 37.4375em) {
+  .cal, .time { width: 100%; }
+  .list { padding: var(--sp-2); }
+  .day { width: 100%; max-width: 2.75rem; }
+}

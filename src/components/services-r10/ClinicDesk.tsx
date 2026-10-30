@@ -38,6 +38,9 @@ import { LabReportPrint } from './LabReportPrint';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './services.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
+import { TimeField } from '../ui/TimeField';
 
 const ClaimsView = lazy(() => import('./ClaimsView'));
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
@@ -101,16 +104,16 @@ function PatientPick({ patients, value, onChange }: { patients: Client[]; value:
     <>
       <F k="find"><input className={controls.input} value={q} onChange={(e) => setQ(e.target.value)} data-patient-search /></F>
       <F k="patient">
-        <select className={controls.select} value={value} onChange={(e) => onChange(patients.find((p) => p.id === e.target.value))} data-patient-pick>
+        <SelectField className={controls.select} value={value} onChange={(e) => onChange(patients.find((p) => p.id === e.target.value))} data-patient-pick>
           <option value="">-</option>
           {list.map((p) => <option key={p.id} value={p.id}>{[uhidOf(p), p.name, p.phone].filter(Boolean).join(' · ')}</option>)}
-        </select>
+        </SelectField>
       </F>
     </>
   );
 }
 const DocPick = ({ doctors, value, onChange, k = 'doctor' }: { doctors: Doctor[]; value: string; onChange: (id: string) => void; k?: BKey }) => (
-  <F k={k}><select className={controls.select} value={value} onChange={(e) => onChange(e.target.value)} data-doctor-pick={k}><option value="">-</option>{doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></F>
+  <F k={k}><SelectField className={controls.select} value={value} onChange={(e) => onChange(e.target.value)} data-doctor-pick={k}><option value="">-</option>{doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</SelectField></F>
 );
 const refOf = (doctors: Doctor[], id: string) => (id ? { doctor_id: id, name: doctors.find((d) => d.id === id)?.name } : undefined);
 const open = (nav: (to: string) => void, inv: InvoiceRecord) => nav(`/invoice/${inv.id}`);
@@ -143,8 +146,8 @@ function Patients({ run, patients, doctors }: Ctx) {
         <F k="uhid"><input className={controls.input} value={f.uhid} placeholder={bT('auto')} onChange={(e) => set({ uhid: e.target.value })} /></F>
         <F k="phone"><input className={controls.input} value={f.phone} onChange={(e) => set({ phone: e.target.value })} /></F>
         <F k="age"><input className={controls.input} type="number" min={0} value={f.age} onChange={(e) => set({ age: e.target.value })} /></F>
-        <F k="dob"><input className={controls.input} type="date" value={f.dob} onChange={(e) => set({ dob: e.target.value })} /></F>
-        <F k="sex"><select className={controls.select} value={f.sex} onChange={(e) => set({ sex: e.target.value })} data-patient-sex><option value="">-</option><option value="F">F</option><option value="M">M</option><option value="O">O</option></select></F>
+        <F k="dob"><DateField className={controls.input} value={f.dob} onChange={(e) => set({ dob: e.target.value })} /></F>
+        <F k="sex"><SelectField className={controls.select} value={f.sex} onChange={(e) => set({ sex: e.target.value })} data-patient-sex><option value="">-</option><option value="F">F</option><option value="M">M</option><option value="O">O</option></SelectField></F>
         <F k="guardian"><input className={controls.input} value={f.guardian} onChange={(e) => set({ guardian: e.target.value })} /></F>
         <F k="blood"><input className={controls.input} value={f.blood} onChange={(e) => set({ blood: e.target.value })} /></F>
         <DocPick doctors={doctors} value={f.referred_by} onChange={(id) => set({ referred_by: id })} k="referredBy" />
@@ -198,7 +201,7 @@ function Opd({ run, patients, doctors, tick }: Ctx) {
   return (
     <>
       <div className={styles.form}>
-        <F k="date"><input className={controls.input} type="date" value={day} onChange={(e) => e.target.value && setDay(e.target.value)} /></F>
+        <F k="date"><DateField className={controls.input} value={day} onChange={(e) => e.target.value && setDay(e.target.value)} /></F>
         <PatientPick patients={patients} value={pt} onChange={(c) => setPt(c?.id ?? '')} />
         <DocPick doctors={doctors} value={doc} onChange={setDoc} />
         <DocPick doctors={doctors} value={ref} onChange={setRef} k="referredBy" />
@@ -219,9 +222,9 @@ function Opd({ run, patients, doctors, tick }: Ctx) {
                     {(x.status === 'waiting' || x.status === 'with_doctor') && <button type="button" className={btn} onClick={() => run(() => updateVisit(x.id, { status: NEXT[x.status as keyof typeof NEXT] }))}>{bT(`vs.${NEXT[x.status as keyof typeof NEXT]}`)}</button>}
                     {x.status !== 'billed' && (
                       <>
-                        <select className={controls.select} value="" aria-label={bT('addItem')} onChange={(e) => e.target.value && setExtra({ ...extra, [x.id]: [...(extra[x.id] ?? []), e.target.value] })}>
+                        <SelectField className={controls.select} value="" aria-label={bT('addItem')} onChange={(e) => e.target.value && setExtra({ ...extra, [x.id]: [...(extra[x.id] ?? []), e.target.value] })}>
                           <option value="">+ {bT('addItem')}</option>{catalogue.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-                        </select>
+                        </SelectField>
                         {(extra[x.id] ?? []).join(', ')}
                         <button type="button" className={`${controls.btnPrimary} ${controls.btnSm}`} onClick={() => bill(x.id)} data-visit-bill>{svT('bill')}</button>
                       </>
@@ -257,7 +260,7 @@ function Doctors({ run, doctors }: Pick<Ctx, 'run' | 'doctors'>) {
       <div className={styles.form}>
         {txt('name', 'name')}{txt('qualification', 'qual')}{txt('council', 'council')}{txt('reg_no', 'regNo')}{txt('speciality', 'speciality')}
         {numF('consult_fee', 'consultFee')}{numF('follow_up_fee', 'fuFee')}{numF('follow_up_days', 'fuDays')}
-        <F k="staffLink"><select className={controls.select} value={f.staff_id} onChange={(e) => set({ staff_id: e.target.value })}><option value="">-</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></F>
+        <F k="staffLink"><SelectField className={controls.select} value={f.staff_id} onChange={(e) => set({ staff_id: e.target.value })}><option value="">-</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</SelectField></F>
         <label className={controls.check}><input type="checkbox" checked={f.in_house} onChange={(e) => set({ in_house: e.target.checked })} /> {bT('inHouse')}</label>
         {numF('pct', 'sharePct')}{numF('per_visit', 'sharePer')}
       </div>
@@ -314,10 +317,10 @@ function Ipd({ run, patients, doctors, tick, notify }: Ctx) {
       <div className={styles.form}>
         <PatientPick patients={patients} value={f.pt} onChange={(c) => setF({ ...f, pt: c?.id ?? '' })} />
         <DocPick doctors={doctors} value={f.doc} onChange={(doc) => setF({ ...f, doc })} />
-        <F k="room"><select className={controls.select} value={f.room} onChange={(e) => setF({ ...f, room: e.target.value })} data-admit-room><option value="">-</option>{rooms.map((r) => <option key={r.id} value={r.id}>{`${r.name} · ${r.kind} · ${money(r.rate)}`}</option>)}</select></F>
-        <F k="date"><input className={controls.input} type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></F>
-        <F k="time"><input className={controls.input} type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} /></F>
-        <F k="claim"><select className={controls.select} value={f.claim} onChange={(e) => setF({ ...f, claim: e.target.value })}><option value="">-</option>{claims.map((c) => <option key={c.id} value={c.id}>{`${c.number} · ${c.payer_name}`}</option>)}</select></F>
+        <F k="room"><SelectField className={controls.select} value={f.room} onChange={(e) => setF({ ...f, room: e.target.value })} data-admit-room><option value="">-</option>{rooms.map((r) => <option key={r.id} value={r.id}>{`${r.name} · ${r.kind} · ${money(r.rate)}`}</option>)}</SelectField></F>
+        <F k="date"><DateField className={controls.input} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></F>
+        <F k="time"><TimeField className={controls.input} value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} /></F>
+        <F k="claim"><SelectField className={controls.select} value={f.claim} onChange={(e) => setF({ ...f, claim: e.target.value })}><option value="">-</option>{claims.map((c) => <option key={c.id} value={c.id}>{`${c.number} · ${c.payer_name}`}</option>)}</SelectField></F>
         <DocPick doctors={doctors} value={f.ref} onChange={(ref) => setF({ ...f, ref })} k="referredBy" />
       </div>
       <div className={styles.actions}><button type="button" className={controls.btnPrimary} onClick={admit} data-admit>{bT('admit')}</button></div>
@@ -339,7 +342,7 @@ function Ipd({ run, patients, doctors, tick, notify }: Ctx) {
           <ul className={styles.list}>{admissionLines(a, today, mode).map((l) => <li key={l.id}>{l.name} · {l.quantity} × {money(Number(l.rate))}{Number(l.tax_rate) ? ` + ${l.tax_rate}%` : ` · ${bT('exempt')}`}</li>)}</ul>
           {a.status !== 'billed' && (
             <div className={styles.bar}>
-              <select className={controls.select} value={ch.item} onChange={(e) => setCh({ ...ch, item: e.target.value })} aria-label={bT('medicine')}><option value="">{bT('medicine')}</option>{stock.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+              <SelectField className={controls.select} value={ch.item} onChange={(e) => setCh({ ...ch, item: e.target.value })} aria-label={bT('medicine')}><option value="">{bT('medicine')}</option>{stock.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</SelectField>
               <input className={controls.input} placeholder={bT('charge')} value={ch.name} onChange={(e) => setCh({ ...ch, name: e.target.value })} data-charge-name />
               <input className={controls.input} type="number" min={0} placeholder={bT('qty')} value={ch.qty} onChange={(e) => setCh({ ...ch, qty: e.target.value })} style={{ maxWidth: '5rem' }} />
               <input className={controls.input} type="number" min={0} placeholder={bT('rate')} value={ch.rate} onChange={(e) => setCh({ ...ch, rate: e.target.value })} style={{ maxWidth: '7rem' }} data-charge-rate />
@@ -360,7 +363,7 @@ function Ipd({ run, patients, doctors, tick, notify }: Ctx) {
         <details style={{ marginTop: '1rem' }}>
           <summary>{bT('roomsSetup')}</summary>
           <F k="roomsHint"><textarea className={controls.textarea} rows={4} defaultValue={rooms.map((r) => `${r.name}, ${r.kind}, ${r.rate}`).join('\n')} onBlur={(e) => saveRooms(e.target.value)} data-rooms /></F>
-          <F k="roomDay"><select className={controls.select} value={mode} onChange={(e) => run(() => saveClinicSettings({ room_day: e.target.value as ClinicSettings['room_day'] }))}><option value="midnight">{bT('midnight')}</option><option value="24h">{bT('h24')}</option></select></F>
+          <F k="roomDay"><SelectField className={controls.select} value={mode} onChange={(e) => run(() => saveClinicSettings({ room_day: e.target.value as ClinicSettings['room_day'] }))}><option value="midnight">{bT('midnight')}</option><option value="24h">{bT('h24')}</option></SelectField></F>
           <F k="depositAlert"><input className={controls.input} type="number" min={0} defaultValue={s.deposit_alert ?? 0} onBlur={(e) => run(() => saveClinicSettings({ deposit_alert: Number(e.target.value) }))} /></F>
         </details>
       )}
@@ -393,7 +396,7 @@ function Lab({ run, patients, doctors, tick }: Ctx) {
   return (
     <>
       <div className={styles.form}>
-        <F k="date"><input className={controls.input} type="date" value={day} onChange={(e) => e.target.value && setDay(e.target.value)} /></F>
+        <F k="date"><DateField className={controls.input} value={day} onChange={(e) => e.target.value && setDay(e.target.value)} /></F>
         <PatientPick patients={patients} value={pt} onChange={(c) => setPt(c?.id ?? '')} />
         <DocPick doctors={doctors} value={ref} onChange={setRef} k="referredBy" />
       </div>
@@ -417,8 +420,8 @@ function Lab({ run, patients, doctors, tick }: Ctx) {
       <details style={{ marginTop: '1rem' }}>
         <summary>{bT('outsourced')}</summary>
         <div className={styles.bar}>
-          <input className={controls.input} type="date" value={period.from} onChange={(e) => setPeriod({ ...period, from: e.target.value })} aria-label={bT('from')} />
-          <input className={controls.input} type="date" value={period.to} onChange={(e) => setPeriod({ ...period, to: e.target.value })} aria-label={bT('to')} />
+          <DateField className={controls.input} value={period.from} onChange={(e) => setPeriod({ ...period, from: e.target.value })} aria-label={bT('from')} />
+          <DateField className={controls.input} value={period.to} onChange={(e) => setPeriod({ ...period, to: e.target.value })} aria-label={bT('to')} />
           <input className={controls.input} placeholder={bT('billNo')} value={period.bill} onChange={(e) => setPeriod({ ...period, bill: e.target.value })} />
         </div>
         <ul className={styles.list}>{due.map((d) => <li key={d.vendor_id || d.vendor}>{d.vendor} · {money(d.cost)} · {d.orders.length} <button type="button" className={btn} onClick={() => run(() => bookOutsourcedBill(d.vendor_id || d.vendor, period.from, period.to, period.bill))}>{bT('bookBill')}</button></li>)}</ul>
@@ -441,7 +444,7 @@ function Results({ o, run, onBill }: { o: LabOrder; run: Run; onBill: () => void
   const input = (tid: string, p: LabParam) => {
     const k = resultKey(tid, p.code);
     const props = { className: controls.input, value: vals[k] ?? '', 'aria-label': p.name, 'data-result': p.code, onChange: (e: { target: { value: string } }) => setVals({ ...vals, [k]: e.target.value }) };
-    return p.kind === 'option' ? <select {...props} className={controls.select}><option value="" />{(p.options ?? []).map((x) => <option key={x}>{x}</option>)}</select> : <input {...props} inputMode={p.kind === 'numeric' ? 'decimal' : undefined} />;
+    return p.kind === 'option' ? <SelectField {...props} className={controls.select}><option value="" />{(p.options ?? []).map((x) => <option key={x}>{x}</option>)}</SelectField> : <input {...props} inputMode={p.kind === 'numeric' ? 'decimal' : undefined} />;
   };
   return (
     <div className={surface.card} data-results={o.number}>
@@ -457,7 +460,7 @@ function Results({ o, run, onBill }: { o: LabOrder; run: Run; onBill: () => void
       <F k="csvPaste"><textarea className={controls.textarea} rows={2} value={csv} onChange={(e) => setCsv(e.target.value)} /></F>
       <div className={styles.actions}>
         <button type="button" className={btn} onClick={() => { const r = parseResultsCsv(csv, o.tests); setVals({ ...vals, ...r.results }); if (r.unknown.length) window.alert(bT('unknown', { list: r.unknown.join(', ') })); }}>{bT('applyCsv')}</button>
-        {[0, 1].map((i) => <select key={i} className={controls.select} value={by[i] ?? ''} onChange={(e) => { const n = [...by]; n[i] = e.target.value; setBy(n); }} aria-label={bT('verifiedBy')}><option value="">{bT('verifiedBy')}</option>{staff.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}</select>)}
+        {[0, 1].map((i) => <SelectField key={i} className={controls.select} value={by[i] ?? ''} onChange={(e) => { const n = [...by]; n[i] = e.target.value; setBy(n); }} aria-label={bT('verifiedBy')}><option value="">{bT('verifiedBy')}</option>{staff.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}</SelectField>)}
         <button type="button" className={controls.btnPrimary} onClick={save} data-results-save>{svT('save')}</button>
         <button type="button" className={btn} onClick={() => setShow(!show)} data-report-preview>{bT('report')}</button>
         {!liveInvoice(o.invoice_id) && <button type="button" className={btn} onClick={onBill}>{svT('bill')}</button>}
@@ -523,7 +526,7 @@ function Referrals({ run, doctors, tick, notify }: Ctx) {
   return (
     <>
       <div className={styles.bar}>
-        <input className={controls.input} type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} aria-label={svT('month')} style={{ maxWidth: '11rem' }} />
+        <DateField className={controls.input} mode="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} aria-label={svT('month')} style={{ maxWidth: '11rem' }} />
         <button type="button" className={btn} onClick={() => downloadText(`referrals-${month}.csv`, toCsv(referralCsvRows(rows)), 'text/csv')}>{svT('csv')}</button>
       </div>
       <div className={surface.tableWrap}>
@@ -547,9 +550,9 @@ function Referrals({ run, doctors, tick, notify }: Ctx) {
       {can('settings.manage') && <label className={controls.check}><input type="checkbox" checked={!!s.record_referral_payments} onChange={(e) => run(() => saveClinicSettings({ record_referral_payments: e.target.checked }))} /> {bT('refSwitch', { ledger: rule.ledger })}</label>}
       {s.record_referral_payments && (
         <div className={styles.bar}>
-          <select className={controls.select} value={rf.doc} onChange={(e) => setRf({ ...rf, doc: e.target.value })} aria-label={bT('doctor')}><option value="">{bT('doctor')}</option>{doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+          <SelectField className={controls.select} value={rf.doc} onChange={(e) => setRf({ ...rf, doc: e.target.value })} aria-label={bT('doctor')}><option value="">{bT('doctor')}</option>{doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</SelectField>
           <input className={controls.input} type="number" min={0} value={rf.amount} onChange={(e) => setRf({ ...rf, amount: e.target.value })} aria-label={bT('value')} style={{ maxWidth: '8rem' }} />
-          <select className={controls.select} value={rf.kind} onChange={(e) => setRf({ ...rf, kind: e.target.value as 'cash' })}><option value="cash">{bT('refCash')}</option><option value="benefit">{bT('refKind')}</option></select>
+          <SelectField className={controls.select} value={rf.kind} onChange={(e) => setRf({ ...rf, kind: e.target.value as 'cash' })}><option value="cash">{bT('refCash')}</option><option value="benefit">{bT('refKind')}</option></SelectField>
           <button type="button" className={btn} onClick={() => { const d = doctors.find((x) => x.id === rf.doc); if (d) run(() => { const r = bookReferral(d, Number(rf.amount), today, rf.kind, true); if (r.remind194R) notify(bT('r194'), 'info'); }); }}>{bT('book')}</button>
         </div>
       )}
@@ -576,7 +579,7 @@ function Rates({ run, tick }: Ctx) {
       {ratesOutOfDate(rows, s) && <p className={controls.hint} role="alert" data-rates-stale>{bT('stale')}</p>}
       <div className={styles.bar}>
         <F k="lang"><input className={controls.input} value={lang} onChange={(e) => setLang(e.target.value)} /></F>
-        <select className={controls.select} value={size} onChange={(e) => setSize(e.target.value as 'A4')} aria-label="A4 / A3"><option>A4</option><option>A3</option></select>
+        <SelectField className={controls.select} value={size} onChange={(e) => setSize(e.target.value as 'A4')} aria-label="A4 / A3"><option>A4</option><option>A3</option></SelectField>
         <button type="button" className={controls.btnPrimary} onClick={print}>{svT('print')}</button>
       </div>
       {!rows.length && <p className={controls.hint}>{bT('noRates')}</p>}

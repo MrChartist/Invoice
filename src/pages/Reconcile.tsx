@@ -56,6 +56,7 @@ import { capT } from '../i18n/areas/capture';
 import { paymentsDb, purchasesDb } from '../lib/purchases';
 import { RECONCILE_TABS, type ReconcileTab } from './page-tabs'; // R6-B1
 import { discoverT } from '../i18n/areas/discover-r6';
+import { SelectField } from '../components/ui/SelectField';
 
 // WP-5: deposit slip, payment advice, e-payments, cash tally — loaded only when the tab opens.
 const BankingDocs = lazy(() => import('../components/bank/docs/BankingDocs'));
@@ -263,11 +264,11 @@ export function Reconcile() {
   const accountPicker = multi && (
     <div className={controls.field} style={{ maxWidth: 360, marginBottom: '1rem' }}>
       <label className={controls.label} htmlFor="rec-account">{bankT('bankAccount')}</label>
-      <select id="rec-account" className={controls.select} value={accountId} onChange={(e) => { setAccountId(e.target.value); setScope('all'); }}>
+      <SelectField id="rec-account" className={controls.select} value={accountId} onChange={(e) => { setAccountId(e.target.value); setScope('all'); }}>
         {pickableBankAccounts('brs', accounts.filter((a) => a.active !== false || a.id === accountId)).map((a) => (
           <option key={a.id} value={a.id}>{a.name}{a.number ? ` (${a.number})` : ''}</option>
         ))}
-      </select>
+      </SelectField>
     </div>
   );
   const accountsCard = (
@@ -374,12 +375,12 @@ export function Reconcile() {
         {tab !== 'import' && tab !== 'statements' && acctStatements.length > 1 && (
           <div className={controls.field} style={{ maxWidth: 360, marginBottom: '1rem' }}>
             <label className={controls.label} htmlFor="rec-scope">{bankT('statement')}</label>
-            <select id="rec-scope" className={controls.select} value={scope} onChange={(e) => setScope(e.target.value)}>
+            <SelectField id="rec-scope" className={controls.select} value={scope} onChange={(e) => setScope(e.target.value)}>
               <option value="all">{bankT('allStatements', { n: acctStatements.length })}</option>
               {acctStatements.map((s) => (
                 <option key={s.id} value={s.id}>{s.bank_label} : {s.file_name}</option>
               ))}
-            </select>
+            </SelectField>
           </div>
         )}
 

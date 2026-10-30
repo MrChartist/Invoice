@@ -20,6 +20,8 @@ import surface from '../../../styles/surface.module.css';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './tally.module.css';
+import { SelectField } from '../../ui/SelectField';
+import { DateField } from '../../ui/DateField';
 
 const BUCKET_KEY: Record<AgeBucket, 'notDue' | 'd0_30' | 'd31_60' | 'd61_90' | 'd90plus'> = { notDue: 'notDue', d0_30: 'd0_30', d31_60: 'd31_60', d61_90: 'd61_90', d90plus: 'd90plus' };
 const rs = (n: number) => formatMoney(n);
@@ -64,14 +66,14 @@ export function BillwiseTab({ asOf, notify, onChanged }: { asOf: string; notify:
           <span className={books.muted}>{tallyT('asOf', { date: formatDate(asOf) })}</span>
         </div>
         <div className={books.toolbarGroup}>
-          <select aria-label={tallyT('supplier')} className={controls.select} value={supplier} onChange={(e) => setSupplier(e.target.value)}>
+          <SelectField aria-label={tallyT('supplier')} className={controls.select} value={supplier} onChange={(e) => setSupplier(e.target.value)}>
             <option value="">{tallyT('allSuppliers')}</option>
             {parties.map((p) => <option key={partyKey(p)} value={partyKey(p)}>{p.vendor}</option>)}
-          </select>
-          <select aria-label={tallyT('ageBy')} className={controls.select} value={ageBy} onChange={(e) => setAgeBy(e.target.value === 'bill' ? 'bill' : 'due')}>
+          </SelectField>
+          <SelectField aria-label={tallyT('ageBy')} className={controls.select} value={ageBy} onChange={(e) => setAgeBy(e.target.value === 'bill' ? 'bill' : 'due')}>
             <option value="due">{tallyT('ageBy')}: {tallyT('byDue')}</option>
             <option value="bill">{tallyT('ageBy')}: {tallyT('byBill')}</option>
-          </select>
+          </SelectField>
           <label className={controls.check}><input type="checkbox" checked={settled} onChange={(e) => setSettled(e.target.checked)} /> {tallyT('showSettled')}</label>
           {canEdit && <button type="button" className={controls.btnPrimary} onClick={() => setPaying(true)}><Wallet size={16} /> {tallyT('payBills')}</button>}
         </div>
@@ -247,14 +249,14 @@ function PayBillsModal({ parties, onClose, onSaved }: { parties: PartyPayables[]
         <div className={styles.grid}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="bw-vendor">{tallyT('supplier')}</label>
-            <select id="bw-vendor" className={controls.select} value={vendorId} onChange={(e) => { setVendorId(e.target.value); setAlloc({}); }}>
+            <SelectField id="bw-vendor" className={controls.select} value={vendorId} onChange={(e) => { setVendorId(e.target.value); setAlloc({}); }}>
               <option value="">{tallyT('chooseSupplier')}</option>
               {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
+            </SelectField>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="bw-date">{tallyT('date')}</label>
-            <input id="bw-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="bw-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="bw-amt">{tallyT('amountPaid')}</label>
@@ -262,9 +264,9 @@ function PayBillsModal({ parties, onClose, onSaved }: { parties: PartyPayables[]
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="bw-method">{tallyT('method')}</label>
-            <select id="bw-method" className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
+            <SelectField id="bw-method" className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
               {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
+            </SelectField>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="bw-ref">{tallyT('reference')}</label>
@@ -292,11 +294,11 @@ function PayBillsModal({ parties, onClose, onSaved }: { parties: PartyPayables[]
           <div className={styles.grid}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="bw-kind">{tallyT('remainderAs')}</label>
-              <select id="bw-kind" className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as VendorPayment['kind'])}>
+              <SelectField id="bw-kind" className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as VendorPayment['kind'])}>
                 <option value="ON_ACCOUNT">{tallyT('kOnAccount')}</option>
                 <option value="ADVANCE">{tallyT('kAdvance')}</option>
                 <option value="NEW_REF">{tallyT('kNewRef')}</option>
-              </select>
+              </SelectField>
             </div>
             {kind === 'NEW_REF' && (
               <div className={controls.field}>
@@ -343,9 +345,9 @@ function AdjustModal({ vp, party, onClose, onSaved }: { vp: VendorPayment; party
       <div className={books.stack}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="adj-bill">{tallyT('bill')}</label>
-          <select id="adj-bill" className={controls.select} value={billId} onChange={(e) => setBillId(e.target.value)}>
+          <SelectField id="adj-bill" className={controls.select} value={billId} onChange={(e) => setBillId(e.target.value)}>
             {bills.map((b) => <option key={b.purchaseId} value={b.purchaseId}>{b.number} · {tallyT('balance')} ₹{rs(b.balance)}</option>)}
-          </select>
+          </SelectField>
         </div>
         <div className={styles.grid}>
           <div className={controls.field}>
@@ -354,7 +356,7 @@ function AdjustModal({ vp, party, onClose, onSaved }: { vp: VendorPayment; party
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="adj-date">{tallyT('date')}</label>
-            <input id="adj-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="adj-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
         </div>
         {error && <div className={controls.error} role="alert">{error}</div>}

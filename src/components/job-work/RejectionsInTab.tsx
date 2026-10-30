@@ -16,6 +16,8 @@ import { qtyText } from './lines';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './job-work.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Link = { from_id: string; to_id: string; relation: string };
 
@@ -129,13 +131,13 @@ function RejectionModal({ ctx, doc, onClose }: { ctx: MfgContext; doc: Rejection
             <div className={controls.row3}>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="rji-ch">{jwT('challan')}</label>
-                <select id="rji-ch" className={controls.select} value={challanId} onChange={(e) => { setChallanId(e.target.value); setQty({}); }} disabled={!!doc}>
+                <SelectField id="rji-ch" className={controls.select} value={challanId} onChange={(e) => { setChallanId(e.target.value); setQty({}); }} disabled={!!doc}>
                   {challans.map((d) => <option key={d.id} value={d.id}>{d.invoice_number} · {d.client?.name ?? ''} · {formatDate(d.issue_date)}</option>)}
-                </select>
+                </SelectField>
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="rji-date">{jwT('date')}</label>
-                <input id="rji-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+                <DateField id="rji-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="rji-why">{jwT('reason')}</label>

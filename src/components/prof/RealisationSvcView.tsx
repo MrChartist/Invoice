@@ -18,6 +18,7 @@ import { Field } from './ps-ui';
 import { runner, type Notify } from './pc-run';
 import controls from '../../styles/controls.module.css';
 import css from './exportsvc.module.css';
+import { SelectField } from '../ui/SelectField';
 
 type Irm = ExportIrm & { ps?: PsIrm };
 
@@ -44,7 +45,7 @@ export default function RealisationSvcView({ notify }: { notify: Notify }) {
             <span key="d" data-ps-real-due={b.dueDate}>{b.dueDate} · {pcT('months', { n: r.months })}{r.inrRule ? ` · ${pcT('inrRule')}` : ''}</span>, b.status, b.fira.join(', '), b.ebrc.map((e) => e.no).join(', ')];
         })} />
       <div className={css.bar}>
-        <Field label="IRM"><select className={controls.select} value={f.irm} onChange={(e) => setF({ irm: e.target.value, fira: d.irms.find((m) => m.id === e.target.value)?.ps?.fira_no ?? '' })}><option value="">-</option>{d.irms.map((m) => <option key={m.id} value={m.id}>{`${m.irm_no} · ${m.currency} ${m.fcy}`}</option>)}</select></Field>
+        <Field label="IRM"><SelectField className={controls.select} value={f.irm} onChange={(e) => setF({ irm: e.target.value, fira: d.irms.find((m) => m.id === e.target.value)?.ps?.fira_no ?? '' })}><option value="">-</option>{d.irms.map((m) => <option key={m.id} value={m.id}>{`${m.irm_no} · ${m.currency} ${m.fcy}`}</option>)}</SelectField></Field>
         <Field label={pcT('fira')}><input className={controls.input} value={f.fira} onChange={(e) => setF({ ...f, fira: e.target.value.slice(0, 40) })} /></Field>
         <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!f.irm} onClick={() => run(() => {
           const m = d.irms.find((x) => x.id === f.irm)!;

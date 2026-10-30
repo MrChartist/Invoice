@@ -18,6 +18,8 @@ import { recT } from '../../i18n/areas/recurring';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './batch.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const BatchPdfModal = lazy(() => import('../preview/BatchPdfModal').then((m) => ({ default: m.BatchPdfModal })));
 const RemindQueue = lazy(() => import('../khata/RemindQueue'));
@@ -166,18 +168,18 @@ export function BatchTab() {
           <div className={controls.row}>
             <label className={controls.field}>
               <span className={controls.label}>{s2T('b.source')}</span>
-              <select className={controls.select} value={kind} onChange={(e) => { setKind(e.target.value as BatchSourceKind); setSourceId(''); }} data-batch-kind>
+              <SelectField className={controls.select} value={kind} onChange={(e) => { setKind(e.target.value as BatchSourceKind); setSourceId(''); }} data-batch-kind>
                 <option value="invoice">{s2T('b.kindInvoice')}</option>
                 <option value="quotation">{s2T('b.kindQuote')}</option>
                 <option value="recurring">{s2T('b.kindRecurring')}</option>
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{s2T('b.pickSource')}</span>
-              <select className={controls.select} value={sourceId} onChange={(e) => setSourceId(e.target.value)} data-batch-source>
+              <SelectField className={controls.select} value={sourceId} onChange={(e) => setSourceId(e.target.value)} data-batch-source>
                 <option value="">-</option>
                 {sources.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-              </select>
+              </SelectField>
             </label>
           </div>
           {sources.length === 0 && <p className={styles.muted}>{s2T('b.noSources')}</p>}
@@ -186,22 +188,22 @@ export function BatchTab() {
           <div className={styles.filters}>
             <input className={controls.input} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={s2T('b.search')} aria-label={s2T('b.search')} data-batch-search />
             {areas.length > 0 && (
-              <select className={controls.select} value={area} onChange={(e) => setArea(e.target.value)} aria-label={s2T('b.area')}>
+              <SelectField className={controls.select} value={area} onChange={(e) => setArea(e.target.value)} aria-label={s2T('b.area')}>
                 <option value="">{s2T('b.area')}: {s2T('b.all')}</option>
                 {areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              </SelectField>
             )}
             {beats.length > 0 && (
-              <select className={controls.select} value={beat} onChange={(e) => setBeat(e.target.value)} aria-label={s2T('b.beat')}>
+              <SelectField className={controls.select} value={beat} onChange={(e) => setBeat(e.target.value)} aria-label={s2T('b.beat')}>
                 <option value="">{s2T('b.beat')}: {s2T('b.all')}</option>
                 {beats.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+              </SelectField>
             )}
             {groups.length > 0 && (
-              <select className={controls.select} value={group} onChange={(e) => setGroup(e.target.value)} aria-label={s2T('b.group')}>
+              <SelectField className={controls.select} value={group} onChange={(e) => setGroup(e.target.value)} aria-label={s2T('b.group')}>
                 <option value="">{s2T('b.group')}: {s2T('b.all')}</option>
                 {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
+              </SelectField>
             )}
             <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => { const next = new Map(selected); shown.forEach((c) => next.set(partyKey(c), c)); setSelected(next); }} data-batch-select-all>
               {s2T('b.selectShown')}
@@ -262,14 +264,14 @@ export function BatchTab() {
           <div className={controls.row}>
             <label className={controls.field}>
               <span className={controls.label}>{s2T('b.issueDate')}</span>
-              <input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value || todayInput())} />
+              <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value || todayInput())} />
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{s2T('b.mode')}</span>
-              <select className={controls.select} value={mode} onChange={(e) => setMode(e.target.value as RecurringMode)} data-batch-mode>
+              <SelectField className={controls.select} value={mode} onChange={(e) => setMode(e.target.value as RecurringMode)} data-batch-mode>
                 <option value="draft">{s2T('b.modeDraft')}</option>
                 <option value="issue">{s2T('b.modeIssue')}</option>
-              </select>
+              </SelectField>
             </label>
           </div>
         </div>
@@ -315,13 +317,13 @@ export function BatchTab() {
               <div className={controls.row}>
                 <label className={controls.field}>
                   <span className={controls.label}>{s2T('b.frequency')}</span>
-                  <select className={controls.select} value={rec.freq} onChange={(e) => setRec({ ...rec, freq: e.target.value as Frequency })}>
+                  <SelectField className={controls.select} value={rec.freq} onChange={(e) => setRec({ ...rec, freq: e.target.value as Frequency })}>
                     {FREQS.map((f) => <option key={f} value={f}>{recT(`freq.${f}` as Parameters<typeof recT>[0])}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
                 <label className={controls.field}>
                   <span className={controls.label}>{s2T('b.start')}</span>
-                  <input className={controls.input} type="date" value={rec.start} onChange={(e) => setRec({ ...rec, start: e.target.value || todayInput() })} />
+                  <DateField className={controls.input} value={rec.start} onChange={(e) => setRec({ ...rec, start: e.target.value || todayInput() })} />
                 </label>
                 <button type="button" className={controls.btnPrimary} onClick={toRecurring}>{s2T('save')}</button>
               </div>

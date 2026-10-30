@@ -38,6 +38,7 @@ import { nodes } from '../../i18n/areas/nodes';
 import { VendorFollowUp } from './VendorFollowUp';
 import { ImsCell, ImsEditor, ImsSummaryPanel } from './ImsDetails'; // R2-C3
 import { imsT } from '../../i18n/areas/gst-r2';
+import { SelectField } from '../ui/SelectField';
 
 const MATCH_KEY = {
   matched: 'mMatched',
@@ -219,7 +220,7 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
       label: gvT('colIms'),
       render: (r) =>
         r.line ? (
-          <select
+          <SelectField
             className={`${controls.select} ${styles.actionSelect}`}
             aria-label={gvT('imsAria', { number: r.line.number })}
             value={effectiveAction(actions, actionPeriod, r.line)}
@@ -228,7 +229,7 @@ export function Gstr2bView({ period, gstin, filerStateCode, notify }: Gstr2bView
             {ACTIONS.map((a) => (
               <option key={a} value={a}>{gvT(IMS_KEY[a])}</option>
             ))}
-          </select>
+          </SelectField>
         ) : (
           ''
         ),

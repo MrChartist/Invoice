@@ -12,6 +12,7 @@ import { fxbT } from '../../../i18n/areas/extras-7u';
 import controls from '../../../styles/controls.module.css';
 import surface from '../../../styles/surface.module.css';
 import styles from './bankdocs.module.css';
+import { SelectField } from '../../ui/SelectField';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
@@ -83,9 +84,9 @@ export default function EpayConfirmPanel({ notify, version, onFile }: { notify: 
       <div className={`${surface.cardBody} ${styles.stack}`}>
         <p className={styles.muted}>{fxbT('confirmIntro')}</p>
         <label className={controls.field}><span className={controls.label}>{fxbT('batch')}</span>
-          <select className={controls.select} value={batch?.id ?? ''} onChange={(e) => { setBatchId(e.target.value); setResponse(null); }}>
+          <SelectField className={controls.select} value={batch?.id ?? ''} onChange={(e) => { setBatchId(e.target.value); setResponse(null); }}>
             {batches.map((b) => <option key={b.id} value={b.id}>{b.number} · {formatDate(b.date)} · ₹{formatMoney(b.total)} · {b.rows.filter((r) => r.status === 'sent').length} {fxbT('open')}</option>)}
-          </select></label>
+          </SelectField></label>
         {ap && ap.state !== 'approved' && (
           <div className={styles.toolbar} data-epay-approval={ap.state}>
             <span className={styles.warn}>{ap.state === 'pending' ? fxbT('apPending') : fxbT('apRejected', { note: ap.note ?? '' })}</span>

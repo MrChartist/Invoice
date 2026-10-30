@@ -19,6 +19,7 @@ import { useT } from '../../i18n';
 import { trErr, trT } from '../../i18n/areas/trade-trust-r4';
 import controls from '../../styles/controls.module.css';
 import styles from './trust.module.css';
+import { SelectField } from '../ui/SelectField';
 
 type Row = Record<string, unknown>;
 const s = (v: unknown) => (typeof v === 'string' ? v : '');
@@ -86,7 +87,7 @@ export default function AuditorPackDialog({ onClose }: { onClose: () => void }) 
         <div className={styles.inline}>
           <label className={controls.field}>
             <span className={controls.label}>{trT('packFy')}</span>
-            <select className={controls.select} value={fy} onChange={(e) => setFy(e.target.value)}>{fys.map((f) => <option key={f} value={f}>{f}</option>)}</select>
+            <SelectField className={controls.select} value={fy} onChange={(e) => setFy(e.target.value)}>{fys.map((f) => <option key={f} value={f}>{f}</option>)}</SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{trT('packDays')}</span>

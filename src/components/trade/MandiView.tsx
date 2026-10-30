@@ -13,6 +13,8 @@ import type { ChargeHead } from '../../types/trade-r8';
 import type { InvoiceRecord } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Done = (msg: string, error?: boolean) => void;
 const F = ({ label, children }: { label: string; children: ReactNode }) => (
@@ -69,10 +71,10 @@ export default function MandiTab({ onDone }: { onDone: Done }) {
       )}
       <div className={own.row} data-head-form>
         <F label={tbT('name')}><input className={controls.input} value={form.name} onChange={(e) => set({ name: e.target.value })} data-head-name /></F>
-        <F label={tbT('side')}><select className={controls.select} value={form.side} onChange={(e) => set({ side: e.target.value as ChargeHead['side'] })}>{SIDES.map((x) => <option key={x} value={x}>{tbT(`side.${x}`)}</option>)}</select></F>
-        <F label={tbT('basis')}><select className={controls.select} value={form.basis} onChange={(e) => set({ basis: e.target.value as ChargeHead['basis'] })} data-head-basis>{BASES.map((x) => <option key={x} value={x}>{tbT(`basis.${x}`)}</option>)}</select></F>
+        <F label={tbT('side')}><SelectField className={controls.select} value={form.side} onChange={(e) => set({ side: e.target.value as ChargeHead['side'] })}>{SIDES.map((x) => <option key={x} value={x}>{tbT(`side.${x}`)}</option>)}</SelectField></F>
+        <F label={tbT('basis')}><SelectField className={controls.select} value={form.basis} onChange={(e) => set({ basis: e.target.value as ChargeHead['basis'] })} data-head-basis>{BASES.map((x) => <option key={x} value={x}>{tbT(`basis.${x}`)}</option>)}</SelectField></F>
         <F label={tbT('rate')}><input type="number" min={0} step="0.01" className={controls.input} value={form.rate ?? ''} onChange={(e) => set({ rate: Number(e.target.value) })} data-head-rate /></F>
-        <F label="GST"><select className={controls.select} value={form.gst} onChange={(e) => set({ gst: e.target.value as ChargeHead['gst'] })}>{GSTS.map((x) => <option key={x} value={x}>{tbT(`gst.${x}`)}</option>)}</select></F>
+        <F label="GST"><SelectField className={controls.select} value={form.gst} onChange={(e) => set({ gst: e.target.value as ChargeHead['gst'] })}>{GSTS.map((x) => <option key={x} value={x}>{tbT(`gst.${x}`)}</option>)}</SelectField></F>
         {form.gst === 'own_rate' && <F label="SAC"><input className={controls.input} value={form.sac ?? ''} onChange={(e) => set({ sac: e.target.value.replace(/\D/g, '') })} /></F>}
         {form.gst === 'own_rate' && <F label="GST %"><input type="number" min={0} className={controls.input} value={form.gst_rate ?? ''} onChange={(e) => set({ gst_rate: Number(e.target.value) })} /></F>}
         <label className={controls.check}><input type="checkbox" checked={!!form.payable} onChange={(e) => set({ payable: e.target.checked })} /> {tbT('payable')} (M)</label>
@@ -82,8 +84,8 @@ export default function MandiTab({ onDone }: { onDone: Done }) {
       </div>
       <h3>{tbT('register')}</h3>
       <div className={own.row}>
-        <F label={tbT('from')}><input type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></F>
-        <F label={tbT('to')}><input type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></F>
+        <F label={tbT('from')}><DateField className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></F>
+        <F label={tbT('to')}><DateField className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></F>
         <button type="button" className={controls.btnOutline} disabled={!rows.length} onClick={() => downloadText(`market-fee-register-${from}-${to}.csv`, registerCsv(rows, { from, to }), 'text/csv')}>CSV</button>
       </div>
       {rows.length === 0 ? <p className={own.muted}>{tbT('noRows')}</p> : (

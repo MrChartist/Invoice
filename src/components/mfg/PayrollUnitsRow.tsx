@@ -8,6 +8,7 @@ import { loadCards, unitsByEmployee } from '../../lib/mfg/mf-jobcards';
 import { useT } from '../../i18n';
 import { defineArea } from '../../i18n/area';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const uT = defineArea(
   { import: 'Import production units from job cards', into: 'Into column', done: '{n} employee(s) filled from job cards: check and save.' } as const,
@@ -26,7 +27,7 @@ export default function PayrollUnitsRow({ month, cols, onUnits }: { month: strin
     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', flexWrap: 'wrap', padding: '0 1rem' }} data-mf-payroll-units>
       <label className={controls.field}>
         <span className={controls.label}>{uT('into')}</span>
-        <select className={controls.select} value={col} onChange={(e) => setCol(e.target.value)}>{cols.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
+        <SelectField className={controls.select} value={col} onChange={(e) => setCol(e.target.value)}>{cols.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</SelectField>
       </label>
       <button type="button" className={controls.btnOutline} onClick={run}>{uT('import')}</button>
     </div>

@@ -33,6 +33,8 @@ import { rcvT, refLabel } from '../../i18n/areas/receivables';
 import { methodLabel } from '../../i18n/labels';
 import { areaNodes } from '../../i18n/areas/nodes';
 import styles from './advances.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 export interface AdvancesTabProps {
   /** Optional party filter (client id or "name:<lowercased>"), as the statements tab uses. */
@@ -274,15 +276,15 @@ function RefundModal({ row, onClose, onDone }: { row: AdvanceRow; onClose: () =>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{rcvT('date')}</span>
-            <input className={controls.input} type="date" value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
+            <DateField className={controls.input} value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
           </label>
         </div>
         <div className={controls.row}>
           <label className={controls.field}>
             <span className={controls.label}>{rcvT('method')}</span>
-            <select className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
+            <SelectField className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
               {METHODS.map((m) => <option key={m} value={m}>{methodLabel(m)}</option>)}
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{rcvT('optional', { label: refLabel(method) })}</span>

@@ -10,6 +10,8 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
 import { inr, parseAmount, runAction, type TabProps } from './shared';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const FIGURES = [
   ['opening', 'act.opening'],
@@ -72,19 +74,19 @@ export function ActuarialPanel({ version, refresh, notify }: TabProps) {
         <div className={styles.formGrid}>
           <label className={controls.field}>
             <span className={controls.label}>{mT('act.kind')}</span>
-            <select className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as ActuarialKind)}>
+            <SelectField className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as ActuarialKind)}>
               <option value="gratuity">{mT('act.gratuity')}</option>
               <option value="leave">{mT('act.leave')}</option>
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{mT('act.standard')}</span>
-            <select className={controls.select} value={standard} onChange={(e) => setStandard(e.target.value as ActuarialStandard)}>
+            <SelectField className={controls.select} value={standard} onChange={(e) => setStandard(e.target.value as ActuarialStandard)}>
               <option value="as15">{mT('act.as15')}</option>
               <option value="indas19">{mT('act.indas19')}</option>
-            </select>
+            </SelectField>
           </label>
-          <label className={controls.field}><span className={controls.label}>{mT('act.date')}</span><input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+          <label className={controls.field}><span className={controls.label}>{mT('act.date')}</span><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
           <label className={controls.field}><span className={controls.label}>{mT('act.actuary')}</span><input className={controls.input} value={actuary} onChange={(e) => setActuary(e.target.value)} /></label>
           <label className={controls.field}><span className={controls.label}>{mT('act.report')}</span><input className={controls.input} value={report} onChange={(e) => setReport(e.target.value)} /></label>
           <label className={controls.field}><span className={controls.label}>{mT('act.discount')}</span><input className={controls.inputNumeric} type="number" step="0.01" value={discount} onChange={(e) => setDiscount(e.target.value)} /></label>

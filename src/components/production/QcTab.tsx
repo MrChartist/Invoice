@@ -21,6 +21,8 @@ import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import mfg from '../manufacturing/manufacturing.module.css';
 import styles from './production.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 /** /manufacturing?tab=qc — the QC desk (R4-A4): stock in QC godowns with age; release or reject per lot. */
 export function QcTab({ ctx }: { ctx: MfgContext }) {
@@ -170,7 +172,7 @@ function QcDecision({ ctx, row, mode, onClose }: { ctx: MfgContext; row: QcRow; 
         <div className={controls.row}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="qc-date">{pT('date')}</label>
-            <input id="qc-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="qc-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="qc-qty">{pT('qty')} ({item?.unit ?? ''})</label>
@@ -180,9 +182,9 @@ function QcDecision({ ctx, row, mode, onClose }: { ctx: MfgContext; row: QcRow; 
         {mode === 'release' && (
           <div className={controls.field}>
             <label className={controls.label} htmlFor="qc-target">{pT('releaseTo')}</label>
-            <select id="qc-target" className={controls.select} value={target} onChange={(e) => setTarget(e.target.value)}>
+            <SelectField id="qc-target" className={controls.select} value={target} onChange={(e) => setTarget(e.target.value)}>
               {ctx.godowns.filter((g) => g.kind !== 'qc' && g.kind !== 'transit' && g.kind !== 'wip').map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
+            </SelectField>
           </div>
         )}
         {mode === 'reject' && (

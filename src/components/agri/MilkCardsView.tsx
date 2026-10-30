@@ -13,6 +13,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { clientOpts, milkOpts, sm, useRun, wrap, type Done } from './dairy-kit';
 import { F, N, Sel } from './dairy-ui';
+import { DateField } from '../ui/DateField';
 
 const prevMonth = (m: string) => {
   const d = new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 2, 1);
@@ -45,7 +46,7 @@ export default function MilkCardsView({ onDone }: { onDone: Done }) {
   return (
     <>
       <div className={controls.row} style={wrap}>
-        <F l={bT('month')} w={160}><input type="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} data-dairy="card-month" /></F>
+        <F l={bT('month')} w={160}><DateField mode="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} data-dairy="card-month" /></F>
         <button type="button" className={sm} onClick={() => run(() => bT('copied', { n: copyCards(prevMonth(month), month) }))}>{bT('copyLast')}</button>
         <button type="button" className={controls.btnPrimary} data-dairy="bill-month" onClick={() => run(() => {
           const r = billMonth(month, todayInput());

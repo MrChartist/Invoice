@@ -17,6 +17,8 @@ import type { MfgContext } from '../manufacturing/context';
 import { Fld, Tbl } from './mfd-ui';
 import { row, rs, run, sm } from './mfd-util';
 import controls from '../../styles/controls.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 export default function MsmeView({ ctx }: { ctx: MfgContext }) {
   const [asOf, setAsOf] = useState(todayInput());
@@ -43,7 +45,7 @@ export default function MsmeView({ ctx }: { ctx: MfgContext }) {
       {!mse ? <p className={controls.hint}>{sdT('notMse')}</p> : (
         <>
           <div style={row}>
-            <Fld l={sdT('asOf')}><input type="date" className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value)} /></Fld>
+            <Fld l={sdT('asOf')}><DateField className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value)} /></Fld>
             <label><input type="checkbox" checked={sam} onChange={(e) => setSam(e.target.checked)} /> {sdT('samadhaan')}</label>
           </div>
           {groups.map((g) => (
@@ -63,9 +65,9 @@ export default function MsmeView({ ctx }: { ctx: MfgContext }) {
       {!company && <p className={controls.hint}>{sdT('notCompany')}</p>}
       <div style={row}>
         <Fld l={sdT('half')}>
-          <select className={controls.select} value={half.id} onChange={(e) => { const [h, y] = e.target.value.split('-'); setHalf(form1Half(h === 'H1' ? `${y}-06-01` : `${y}-12-01`)); }} data-mfd="form1-half">
+          <SelectField className={controls.select} value={half.id} onChange={(e) => { const [h, y] = e.target.value.split('-'); setHalf(form1Half(h === 'H1' ? `${y}-06-01` : `${y}-12-01`)); }} data-mfd="form1-half">
             {[0, 1, 2, 3].map((n) => { let h = form1Half(todayInput()); for (let i = 0; i < n; i++) h = previousHalf(h); return <option key={h.id} value={h.id}>{h.label}</option>; })}
-          </select>
+          </SelectField>
         </Fld>
         <span className={controls.hint}>{sdT('dueOn', { date: half.due })}</span>
         <button type="button" className={sm} onClick={() => downloadText(`MSME-Form1-${half.id}.csv`, toCsv(form1Sheet(f1, half)), 'text/csv')} data-mfd-b="form1-csv">{sdT('csv')}</button>

@@ -13,6 +13,7 @@ import { SerialCell } from '../manufacturing/SerialCell';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './job-work.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface JwGridOptions {
   label: string;
@@ -95,20 +96,20 @@ export function JwLinesGrid({ lines, items, onChange, opts }: {
             return (
               <tr key={l.id}>
                 <td>
-                  <select id={`jw-${l.id}`} className={controls.select} disabled={opts.disabled} aria-label={jwT('lineItem', { label: L, n })} value={l.item_id}
+                  <SelectField id={`jw-${l.id}`} className={controls.select} disabled={opts.disabled} aria-label={jwT('lineItem', { label: L, n })} value={l.item_id}
                     onChange={(e) => {
                       const next = byId.get(e.target.value);
                       patch(l.id, { item_id: e.target.value, unit: undefined, unit_factor: undefined, serials: undefined, ...(opts.value && next ? { hsn: next.hsn, tax_rate: next.tax_rate, rate: l.rate || next.opening_rate || undefined } : {}) });
                     }}>
                     <option value="">{jwT('choose')}</option>
                     {items.map((x) => <option key={x.id} value={x.id}>{x.name}{x.unit ? ` (${x.unit})` : ''}</option>)}
-                  </select>
+                  </SelectField>
                 </td>
                 {opts.kinds && (
                   <td>
-                    <select className={controls.select} disabled={opts.disabled} aria-label={jwT('lineType', { label: L, n })} value={l.kind ?? 'processed'} onChange={(e) => patch(l.id, { kind: e.target.value as JobWorkReceiptKind })}>
+                    <SelectField className={controls.select} disabled={opts.disabled} aria-label={jwT('lineType', { label: L, n })} value={l.kind ?? 'processed'} onChange={(e) => patch(l.id, { kind: e.target.value as JobWorkReceiptKind })}>
                       {rkinds.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
-                    </select>
+                    </SelectField>
                   </td>
                 )}
                 <td>
@@ -120,13 +121,13 @@ export function JwLinesGrid({ lines, items, onChange, opts }: {
                 {anyAlt && (
                   <td>
                     {it && choices.length > 1 ? (
-                      <select className={controls.select} disabled={opts.disabled} aria-label={jwT('lineUnit', { label: L, n })} value={unit}
+                      <SelectField className={controls.select} disabled={opts.disabled} aria-label={jwT('lineUnit', { label: L, n })} value={unit}
                         onChange={(e) => {
                           const p = lineUnitPatch(it, l, e.target.value);
                           patch(l.id, { unit: p.unit_factor ? p.unit : undefined, unit_factor: p.unit_factor, ...(opts.value || opts.kinds ? { rate: p.rate || undefined } : {}), qty: roundTypedQty(l.qty, p.unit, opts.units) });
                         }}>
                         {choices.map((c) => <option key={c.unit} value={c.unit}>{c.unit}</option>)}
-                      </select>
+                      </SelectField>
                     ) : <span className={styles.muted}>{unit}</span>}
                   </td>
                 )}
@@ -138,9 +139,9 @@ export function JwLinesGrid({ lines, items, onChange, opts }: {
                 )}
                 {opts.value && (
                   <td>
-                    <select className={controls.select} disabled={opts.disabled} aria-label={jwT('lineKind', { label: L, n })} value={l.goods_kind ?? 'input'} onChange={(e) => patch(l.id, { goods_kind: e.target.value === 'input' ? undefined : e.target.value as JobWorkGoodsKind })}>
+                    <SelectField className={controls.select} disabled={opts.disabled} aria-label={jwT('lineKind', { label: L, n })} value={l.goods_kind ?? 'input'} onChange={(e) => patch(l.id, { goods_kind: e.target.value === 'input' ? undefined : e.target.value as JobWorkGoodsKind })}>
                       {kinds.map(([k, t]) => <option key={k} value={k}>{t}</option>)}
-                    </select>
+                    </SelectField>
                   </td>
                 )}
                 {opts.kinds && (
@@ -152,18 +153,18 @@ export function JwLinesGrid({ lines, items, onChange, opts }: {
                 )}
                 {opts.challans && (
                   <td>
-                    <select className={controls.select} disabled={opts.disabled} aria-label={jwT('lineChallan', { label: L, n })} value={l.out_line_id ?? ''} onChange={(e) => patch(l.id, { out_line_id: e.target.value || undefined })}>
+                    <SelectField className={controls.select} disabled={opts.disabled} aria-label={jwT('lineChallan', { label: L, n })} value={l.out_line_id ?? ''} onChange={(e) => patch(l.id, { out_line_id: e.target.value || undefined })}>
                       <option value="">{jwT('anyChallan')}</option>
                       {opts.challans.filter((c) => c.item_id === l.item_id).map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                    </select>
+                    </SelectField>
                   </td>
                 )}
                 {multi && (
                   <td>
-                    <select className={controls.select} disabled={opts.disabled} aria-label={jwT('lineGodown', { label: L, n })} value={l.godown_id ?? ''} onChange={(e) => patch(l.id, { godown_id: e.target.value || undefined })}>
+                    <SelectField className={controls.select} disabled={opts.disabled} aria-label={jwT('lineGodown', { label: L, n })} value={l.godown_id ?? ''} onChange={(e) => patch(l.id, { godown_id: e.target.value || undefined })}>
                       <option value="">-</option>
                       {opts.godowns?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                    </select>
+                    </SelectField>
                   </td>
                 )}
                 {opts.batch && (

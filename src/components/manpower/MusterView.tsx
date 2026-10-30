@@ -20,6 +20,8 @@ import { readFileTables } from '../marketplace/file-read';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field, type MpViewProps } from './mp-ui';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const bar = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.5rem 0' } as const;
 const sm = `${controls.btnOutline} ${controls.btnSm}`;
@@ -69,11 +71,11 @@ export default function MusterView({ notify }: MpViewProps) {
     <section data-mp-muster={m?.status ?? 'new'}>
       <div style={bar}>
         <Field label={mpT('site')}>
-          <select className={controls.select} value={site.id} onChange={(e) => go({ site: e.target.value })} data-mp-muster-site>
+          <SelectField className={controls.select} value={site.id} onChange={(e) => go({ site: e.target.value })} data-mp-muster-site>
             {sites.map((s) => <option key={s.id} value={s.id}>{siteLabel(s)}</option>)}
-          </select>
+          </SelectField>
         </Field>
-        <Field label={mpT('month')}><input type="month" className={controls.input} value={month} onChange={(e) => e.target.value && go({ month: e.target.value })} data-mp-muster-month /></Field>
+        <Field label={mpT('month')}><DateField mode="month" className={controls.input} value={month} onChange={(e) => e.target.value && go({ month: e.target.value })} data-mp-muster-month /></Field>
         <span className={controls.hint}>{m ? (ro ? mbT('locked') : mbT('draft')) : ''}</span>
       </div>
       <div className={surface.tableWrap}>
@@ -83,15 +85,15 @@ export default function MusterView({ notify }: MpViewProps) {
             {cur.map((r, i) => (
               <tr key={i} data-mp-muster-row={name(r.employee_id)?.code ?? i}>
                 <td>
-                  <select className={controls.select} aria-label={mbT('person')} disabled={ro} value={r.employee_id} onChange={(e) => set(i, { employee_id: e.target.value })} data-mp-row-person>
+                  <SelectField className={controls.select} aria-label={mbT('person')} disabled={ro} value={r.employee_id} onChange={(e) => set(i, { employee_id: e.target.value })} data-mp-row-person>
                     <option value="">-</option>
                     {staff.map((e) => <option key={e.id} value={e.id}>{e.code} {e.name}</option>)}
-                  </select>
+                  </SelectField>
                 </td>
                 <td>
-                  <select className={controls.select} aria-label={mpT('post')} disabled={ro} value={r.post_id} onChange={(e) => set(i, { post_id: e.target.value })} data-mp-row-post>
+                  <SelectField className={controls.select} aria-label={mpT('post')} disabled={ro} value={r.post_id} onChange={(e) => set(i, { post_id: e.target.value })} data-mp-row-post>
                     {site.mp.posts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
+                  </SelectField>
                 </td>
                 <td><input type="number" min={0} step={0.5} className={controls.input} aria-label={mpT('duties')} disabled={ro} value={r.duties} onChange={(e) => set(i, { duties: Number(e.target.value) })} data-mp-row-duties /></td>
                 <td><input type="number" min={0} className={controls.input} aria-label={mbT('ot')} disabled={ro} value={r.ot_hours ?? ''} onChange={(e) => set(i, { ot_hours: Number(e.target.value) || undefined })} data-mp-row-ot /></td>

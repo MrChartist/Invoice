@@ -8,6 +8,7 @@ import controls from '../../styles/controls.module.css';
 import styles from './gst-setoff.module.css';
 import { useT } from '../../i18n';
 import { soT } from '../../i18n/areas/gst-setoff';
+import { DateField } from '../ui/DateField';
 
 export interface SetOffDialogProps {
   plan: SetOffPlan;
@@ -60,7 +61,7 @@ export function SetOffDialog({ plan, periodText, gstin, defaultDate, onClose, on
       <div className={styles.formGrid}>
         <label className={controls.field}>
           <span className={controls.label}>{soT('dlgDate')}</span>
-          <input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{soT('dlgNarration')}</span>

@@ -17,6 +17,8 @@ import { svT, type SvKey } from '../../i18n/areas/services-r10a';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './services.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 const KINDS: ClaimKind[] = ['motor', 'health_tpa', 'corporate', 'other'];
@@ -65,10 +67,10 @@ export default function ClaimsView({ notify }: { notify: Notify }) {
         <h3>{svT('c.title')}</h3>
         <p className={controls.hint}>{svT('c.note')}</p>
         <div className={styles.form}>
-          {field('c.kind', <select className={controls.select} value={f.kind} onChange={(e) => set({ kind: e.target.value as ClaimKind })}>{KINDS.map((k) => <option key={k} value={k}>{svT(`ck.${k}`)}</option>)}</select>)}
-          {field('date', <input className={controls.input} type="date" value={f.date} onChange={(e) => set({ date: e.target.value })} />)}
-          {field('c.payer', <select className={controls.select} value={f.payer_id} onChange={(e) => set({ payer_id: e.target.value })} data-claim-payer><option value="">-</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>)}
-          {field('c.beneficiary', <select className={controls.select} value={f.beneficiary_id} onChange={(e) => set({ beneficiary_id: e.target.value })} data-claim-beneficiary><option value="">-</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>)}
+          {field('c.kind', <SelectField className={controls.select} value={f.kind} onChange={(e) => set({ kind: e.target.value as ClaimKind })}>{KINDS.map((k) => <option key={k} value={k}>{svT(`ck.${k}`)}</option>)}</SelectField>)}
+          {field('date', <DateField className={controls.input} value={f.date} onChange={(e) => set({ date: e.target.value })} />)}
+          {field('c.payer', <SelectField className={controls.select} value={f.payer_id} onChange={(e) => set({ payer_id: e.target.value })} data-claim-payer><option value="">-</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SelectField>)}
+          {field('c.beneficiary', <SelectField className={controls.select} value={f.beneficiary_id} onChange={(e) => set({ beneficiary_id: e.target.value })} data-claim-beneficiary><option value="">-</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SelectField>)}
           {field('c.policy', <input className={controls.input} value={f.policy_no} onChange={(e) => set({ policy_no: e.target.value })} />)}
           {field('c.claimNo', <input className={controls.input} value={f.claim_no} onChange={(e) => set({ claim_no: e.target.value })} />)}
           {field('c.ref', <input className={controls.input} value={f.reference} onChange={(e) => set({ reference: e.target.value })} />)}
@@ -90,10 +92,10 @@ export default function ClaimsView({ notify }: { notify: Notify }) {
                       <td>
                         {!c.payer_invoice_id && !c.beneficiary_invoice_id && (
                           <>
-                            <select className={controls.select} value={src[c.id] ?? ''} onChange={(e) => setSrc({ ...src, [c.id]: e.target.value })} aria-label={svT('c.source')} data-claim-source>
+                            <SelectField className={controls.select} value={src[c.id] ?? ''} onChange={(e) => setSrc({ ...src, [c.id]: e.target.value })} aria-label={svT('c.source')} data-claim-source>
                               <option value="">{svT('c.source')}</option>
                               {drafts.map((d) => <option key={d.id} value={d.id}>{`${d.invoice_number || '-'} · ${d.client?.name ?? ''} · ${formatCurrency(Number(d.total) || 0)}`}</option>)}
-                            </select>
+                            </SelectField>
                             <button type="button" className={`${controls.btnPrimary} ${controls.btnSm}`} onClick={() => bill(c)} data-claim-bill>{svT('c.bill')}</button>
                           </>
                         )}

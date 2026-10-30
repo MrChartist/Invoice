@@ -26,6 +26,7 @@ import { rT } from '../i18n/areas/restaurant';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/restaurant/restaurant.module.css';
+import { SelectField } from '../components/ui/SelectField';
 
 const TablesSettings = lazy(() => import('../components/restaurant/TablesSettings').then((m) => ({ default: m.TablesSettings })));
 const KotRegisterModal = lazy(() => import('../components/restaurant/KotRegister').then((m) => ({ default: m.KotRegisterModal })));
@@ -221,10 +222,10 @@ function RestaurantFloor() {
               <div className={styles.editRow}>
                 <label className={controls.field}>
                   <span className={controls.label}>{rT('mark86')}</span>
-                  <select className={controls.select} value={pick86} onChange={(e) => setPick86(e.target.value)} data-86-pick>
+                  <SelectField className={controls.select} value={pick86} onChange={(e) => setPick86(e.target.value)} data-86-pick>
                     <option value="">-</option>
                     {data.catalog.filter((c) => !isUnavailable(c, day)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
                 <button type="button" className={controls.btnOutline} disabled={!pick86} onClick={() => { toggle86([pick86], true); setPick86(''); }}>{rT('mark86')}</button>
               </div>
@@ -232,10 +233,10 @@ function RestaurantFloor() {
                 <div className={styles.editRow}>
                   <label className={controls.field}>
                     <span className={controls.label}>{rT('appliesGroups')}</span>
-                    <select className={controls.select} value={group86} onChange={(e) => setGroup86(e.target.value)}>
+                    <SelectField className={controls.select} value={group86} onChange={(e) => setGroup86(e.target.value)}>
                       <option value="">-</option>
                       {data.groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                    </select>
+                    </SelectField>
                   </label>
                   <button type="button" className={controls.btnOutline} disabled={!group86} onClick={() => toggle86(idsInGroup(data.catalog, data.stock, group86, data.groups), true)}>{rT('group86')}</button>
                   <button type="button" className={controls.btnGhost} disabled={!group86} onClick={() => toggle86(idsInGroup(data.catalog, data.stock, group86, data.groups), false)}>{rT('group86On')}</button>
@@ -296,9 +297,9 @@ function RestaurantFloor() {
             )}
             <label className={controls.field}>
               <span className={controls.label}>{rT('captain')}</span>
-              <select className={controls.select} value={captainId} onChange={(e) => setCaptainId(e.target.value)}>
+              <SelectField className={controls.select} value={captainId} onChange={(e) => setCaptainId(e.target.value)}>
                 {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
+              </SelectField>
             </label>
             {opening.channel === 'aggregator' ? (
               <>

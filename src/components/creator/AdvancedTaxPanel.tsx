@@ -26,6 +26,8 @@ import { edT } from '../../i18n/areas/editor';
 import { ita25Words } from '../../i18n/areas/ita2025';
 import { sectionText, withActRef } from '../../lib/ita2025';
 import styles from './AdvancedTaxPanel.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 
 /**
@@ -53,7 +55,7 @@ export function AdvancedTaxPanel() {
       <div className={styles.body}>
         <div className={styles.group}>
           <div className={styles.groupTitle}>{edT('atNature')}</div>
-          <select
+          <SelectField
             className={styles.field}
             aria-label={edT('atNature')}
             value={s.supply_type ?? 'B2B'}
@@ -62,12 +64,12 @@ export function AdvancedTaxPanel() {
             {(Object.keys(SUPPLY_TYPE_LABELS) as SupplyType[]).map((k) => (
               <option key={k} value={k}>{edT(`supply.${k}`)}</option>
             ))}
-          </select>
+          </SelectField>
           {(s.supply_type === 'EXPORT_LUT' || s.supply_type === 'SEZ_WITHOUT_PAYMENT') && (
             <div className={styles.row}>
               <input className={styles.field} aria-label={edT('atLut')} placeholder={edT('atLut')} value={s.lut_number ?? ''}
                 onChange={(e) => s.setLut(e.target.value, s.lut_date ?? '')} />
-              <input className={styles.field} type="date" aria-label={edT('atLutDate')} value={s.lut_date ?? ''}
+              <DateField className={styles.field} aria-label={edT('atLutDate')} value={s.lut_date ?? ''}
                 onChange={(e) => s.setLut(s.lut_number ?? '', e.target.value)} />
             </div>
           )}
@@ -92,17 +94,17 @@ export function AdvancedTaxPanel() {
           </label>
           {s.tcs_enabled && (
             <div className={styles.row}>
-              <select className={styles.field} aria-label={edT('atTcsPreset')} value="" onChange={(e) => { const p = TCS_PRESETS[Number(e.target.value)]; if (e.target.value && p) s.setTcs({ rate: p.rate, ...('section' in p ? { label: p.label } : {}) }); }}>
+              <SelectField className={styles.field} aria-label={edT('atTcsPreset')} value="" onChange={(e) => { const p = TCS_PRESETS[Number(e.target.value)]; if (e.target.value && p) s.setTcs({ rate: p.rate, ...('section' in p ? { label: p.label } : {}) }); }}>
                 <option value="">{edT('atPreset')}</option>
                 {TCS_PRESETS.map((p, i) => <option key={p.label} value={i}>{withActRef(p.label, p.label, s.issue_date, ita25Words())}</option>)}
-              </select>
+              </SelectField>
               <input className={styles.field} type="number" min={0} step="0.01" value={s.tcs_rate ?? 0}
                 aria-label={edT('atTcsRate')} onChange={(e) => s.setTcs({ rate: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
-              <select className={styles.field} aria-label={edT('atTcsBase')} value={s.tcs_base ?? 'total'}
+              <SelectField className={styles.field} aria-label={edT('atTcsBase')} value={s.tcs_base ?? 'total'}
                 onChange={(e) => s.setTcs({ base: e.target.value as 'taxable' | 'total' })}>
                 <option value="total">{edT('atOnTotal')}</option>
                 <option value="taxable">{edT('atOnTaxable')}</option>
-              </select>
+              </SelectField>
               <input className={styles.field} value={s.tcs_label ?? 'TCS'} aria-label={edT('atTcsLabel')}
                 onChange={(e) => s.setTcs({ label: e.target.value })} />
             </div>
@@ -118,13 +120,13 @@ export function AdvancedTaxPanel() {
           {s.tds_enabled && (
             <>
               <div className={styles.row}>
-                <select className={styles.field} aria-label={edT('atTdsSection')} value={s.tds_section ?? '194J'}
+                <SelectField className={styles.field} aria-label={edT('atTdsSection')} value={s.tds_section ?? '194J'}
                   onChange={(e) => {
                     const sec = TDS_SECTIONS.find((x) => x.section === e.target.value);
                     s.setTds({ section: e.target.value, ...(sec && sec.section !== 'CUSTOM' ? { rate: sec.rate } : {}) });
                   }}>
                   {TDS_SECTIONS.map((x) => <option key={x.section} value={x.section}>{withActRef(x.label, x.section, s.issue_date, ita25Words())}</option>)}
-                </select>
+                </SelectField>
                 <input className={styles.field} type="number" min={0} step="0.01" value={s.tds_rate ?? 0}
                   aria-label={edT('atTdsRate')} onChange={(e) => s.setTds({ rate: Math.min(100, Math.max(0, Number(e.target.value) || 0)), section: 'CUSTOM' })} />
               </div>
@@ -145,9 +147,9 @@ export function AdvancedTaxPanel() {
 
         <div className={styles.group}>
           <div className={styles.groupTitle}>{edT('atRounding')}</div>
-          <select className={styles.field} aria-label={edT('atRounding')} value={roundMode} onChange={(e) => s.setRoundMode(e.target.value as RoundMode)}>
+          <SelectField className={styles.field} aria-label={edT('atRounding')} value={roundMode} onChange={(e) => s.setRoundMode(e.target.value as RoundMode)}>
             {ROUND_MODES.map((k) => <option key={k} value={k}>{edT(`round.${k}`)}</option>)}
-          </select>
+          </SelectField>
         </div>
 
         {(t.cess_amount > 0 || t.tcs_amount > 0 || t.tds_amount > 0) && (

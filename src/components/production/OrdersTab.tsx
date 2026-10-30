@@ -26,6 +26,8 @@ import mfg from '../manufacturing/manufacturing.module.css';
 import styles from './production.module.css';
 import { impliedPacks } from '../../lib/shop-mode';
 import { localDb } from '../../lib/localDb';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const YieldPanel = lazy(() => import('../agri/YieldPanel')); // R12 AG-C2: mill yield on a milling batch (mill pack)
 
@@ -114,10 +116,10 @@ export function OrdersTab({ ctx }: { ctx: MfgContext }) {
           <div className={styles.inline}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="mto-so">{pT('salesOrder')}</label>
-              <select id="mto-so" className={controls.select} value={soId} onChange={(e) => setSoId(e.target.value)}>
+              <SelectField id="mto-so" className={controls.select} value={soId} onChange={(e) => setSoId(e.target.value)}>
                 <option value="">{pT('choose')}</option>
                 {salesOrders.map((d) => <option key={d.id} value={d.id}>{d.invoice_number} · {d.client?.name ?? ''}</option>)}
-              </select>
+              </SelectField>
             </div>
             <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} disabled={!mtoDrafts.length} onClick={createMto} data-testid="mto-create">
               <Factory size={14} aria-hidden="true" /> {pT('createOrders', { n: mtoDrafts.length })}
@@ -277,14 +279,14 @@ function CloseDialog({ ctx, order, mode, onClose }: { ctx: MfgContext; order: Pr
       <div className={mfg.form}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="wo-close-date">{pT('date')}</label>
-          <input id="wo-close-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField id="wo-close-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
         {mode === 'return' && (
           <div className={controls.field}>
             <label className={controls.label} htmlFor="wo-ret-to">{pT('returnTo')}</label>
-            <select id="wo-ret-to" className={controls.select} value={to} onChange={(e) => setTo(e.target.value)}>
+            <SelectField id="wo-ret-to" className={controls.select} value={to} onChange={(e) => setTo(e.target.value)}>
               {ctx.godowns.filter((g) => g.id !== order.wip_godown_id).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
+            </SelectField>
           </div>
         )}
         {held.length > 0 ? (

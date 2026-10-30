@@ -25,6 +25,8 @@ import { s7T } from '../../i18n/areas/inventory-7s';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './job-work.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 /** Material Out: delivery challans (Rule 55) sending inputs / capital goods to a job worker. */
 export function MaterialOutPanel({ data }: { data: JwData }) {
@@ -205,14 +207,14 @@ function OutModal({ data, doc, prefill, onClose, onPrint }: { data: JwData; doc:
         <div className={controls.row3}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwc-date">{jwT('date')}</label>
-            <input id="jwc-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="jwc-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwc-order">{jwT('order')}</label>
-            <select id="jwc-order" className={controls.select} value={orderId} onChange={(e) => pickOrder(e.target.value)}>
+            <SelectField id="jwc-order" className={controls.select} value={orderId} onChange={(e) => pickOrder(e.target.value)}>
               <option value="">{jwT('noOrder')}</option>
               {orders.map((o) => <option key={o.id} value={o.id}>{o.number} · {o.party_name}</option>)}
-            </select>
+            </SelectField>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwc-proc">{jwT('process')}</label>
@@ -244,7 +246,7 @@ function OutModal({ data, doc, prefill, onClose, onPrint }: { data: JwData; doc:
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwc-ext">{jwT('extendedUntil')}</label>
-            <input id="jwc-ext" type="date" className={controls.input} value={extended} onChange={(e) => setExtended(e.target.value)} />
+            <DateField id="jwc-ext" className={controls.input} value={extended} onChange={(e) => setExtended(e.target.value)} />
             <span className={styles.muted}>{jwT('extendedHint')}</span>
           </div>
           <div className={controls.field}>

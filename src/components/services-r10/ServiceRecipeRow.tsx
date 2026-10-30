@@ -10,6 +10,7 @@ import type { StockItem } from '../../lib/inventory';
 import { getTable } from '../../lib/storage';
 import { recipeOf, recipeProblem, saveRecipe, type RecipeLine } from '../../lib/services/sv-recipe-form';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface RecipeState { lines: RecipeLine[]; problem: string; commit: (itemId: string) => void }
 
@@ -28,10 +29,10 @@ export default function ServiceRecipeRow({ item, onChange }: { item: StockItem; 
       <span className={controls.label}>{mcT('recipeRow')}</span>
       {lines.map((l, n) => (
         <div key={n} className={controls.row}>
-          <select className={controls.select} value={l.item_id} onChange={(e) => put(lines.map((x, i) => (i === n ? { ...x, item_id: e.target.value } : x)))} aria-label={`${mcT('product')} ${n + 1}`} data-sv-recipe-product={n}>
+          <SelectField className={controls.select} value={l.item_id} onChange={(e) => put(lines.map((x, i) => (i === n ? { ...x, item_id: e.target.value } : x)))} aria-label={`${mcT('product')} ${n + 1}`} data-sv-recipe-product={n}>
             <option value="">-</option>
             {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          </SelectField>
           <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={l.qty} onChange={(e) => put(lines.map((x, i) => (i === n ? { ...x, qty: e.target.value } : x)))} aria-label={`${mcT('recipeQty')} ${n + 1}`} data-sv-recipe-qty={n} />
           <span className={controls.hint}>{unit(l.item_id)}</span>
           <button type="button" className={controls.btnGhost} onClick={() => put(lines.filter((_, i) => i !== n))}>{mcT('del')}</button>

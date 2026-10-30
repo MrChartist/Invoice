@@ -19,6 +19,8 @@ import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { rcvT } from '../../i18n/areas/receivables';
 import styles from './advances.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export interface ApplyAdvancePanelProps {
   /** Apply one of this invoice's client's advances to it (payment dialog)… */
@@ -104,7 +106,7 @@ export function ApplyAdvancePanel({ invoice, advance, version = 0, onApplied, ba
         <>
           <label className={controls.field}>
             <span className={controls.label}>{invoice ? rcvT('apAdvance') : rcvT('apInvoice')}</span>
-            <select className={controls.select} value={pick} onChange={(e) => { setPick(e.target.value); setError(''); }}>
+            <SelectField className={controls.select} value={pick} onChange={(e) => { setPick(e.target.value); setError(''); }}>
               {invoice
                 ? advanceOptions.map((o) => (
                     <option key={o.advance.id} value={o.advance.id}>
@@ -116,7 +118,7 @@ export function ApplyAdvancePanel({ invoice, advance, version = 0, onApplied, ba
                       {rcvT('apInvOption', { number: i.invoice_number, date: formatDate(i.issue_date), amount: formatCurrency(invoiceOpen(i), 'INR') })}
                     </option>
                   ))}
-            </select>
+            </SelectField>
           </label>
           <div className={controls.row}>
             <label className={controls.field}>
@@ -125,7 +127,7 @@ export function ApplyAdvancePanel({ invoice, advance, version = 0, onApplied, ba
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{rcvT('apDate')}</span>
-              <input className={controls.input} type="date" value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
+              <DateField className={controls.input} value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
             </label>
           </div>
           <span className={controls.hint}>

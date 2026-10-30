@@ -13,6 +13,8 @@ import { F } from '../transport/Field';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../transport/transport.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 type Row = { on: boolean; rate: string; amount: string; extra: string };
 const EXTRA: Partial<Record<RaDeductionKind, keyof DeductionRule>> = { retention: 'cap_pct', advance_recovery: 'start_after_pct', it_tds: 'section' };
@@ -70,14 +72,14 @@ export function DeductionSetEditor({ boq, notify, refresh }: PanelProps & { boq:
       </div>
       <div className={styles.grid}>
         <F l={twT('dlpMonths')}><input className={controls.input} type="number" value={f.dlp} onChange={(e) => setF({ ...f, dlp: e.target.value })} data-ded-dlp /></F>
-        <F l={twT('completedOn')}><input className={controls.input} type="date" value={f.done} onChange={(e) => setF({ ...f, done: e.target.value })} /></F>
-        <F l={twT('releaseOn')}><input className={controls.input} type="date" value={f.release} onChange={(e) => setF({ ...f, release: e.target.value })} /></F>
+        <F l={twT('completedOn')}><DateField className={controls.input} value={f.done} onChange={(e) => setF({ ...f, done: e.target.value })} /></F>
+        <F l={twT('releaseOn')}><DateField className={controls.input} value={f.release} onChange={(e) => setF({ ...f, release: e.target.value })} /></F>
         <F l={twT('mobAdvance')}>
-          <select className={controls.select} value={f.adv} onChange={(e) => setF({ ...f, adv: e.target.value })}><option value="">-</option>{advances.map((a) => <option key={a.id} value={a.id}>{a.number} · {a.amount}</option>)}</select></F>
+          <SelectField className={controls.select} value={f.adv} onChange={(e) => setF({ ...f, adv: e.target.value })}><option value="">-</option>{advances.map((a) => <option key={a.id} value={a.id}>{a.number} · {a.amount}</option>)}</SelectField></F>
         <F l={twT('project')}>
-          <select className={controls.select} value={f.cc} onChange={(e) => setF({ ...f, cc: e.target.value })}><option value="">-</option>{projects.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></F>
+          <SelectField className={controls.select} value={f.cc} onChange={(e) => setF({ ...f, cc: e.target.value })}><option value="">-</option>{projects.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SelectField></F>
         <F l={twT('cessMode')}>
-          <select className={controls.select} value={f.cess} onChange={(e) => setF({ ...f, cess: e.target.value as 'expense' | 'recoverable' })}><option value="expense">{twT('cess.expense')}</option><option value="recoverable">{twT('cess.recoverable')}</option></select></F>
+          <SelectField className={controls.select} value={f.cess} onChange={(e) => setF({ ...f, cess: e.target.value as 'expense' | 'recoverable' })}><option value="expense">{twT('cess.expense')}</option><option value="recoverable">{twT('cess.recoverable')}</option></SelectField></F>
         <label className={controls.check}><input type="checkbox" checked={f.deductor} onChange={(e) => setF({ ...f, deductor: e.target.checked })} /> {twT('gstTdsDeductor')}</label>
       </div>
       <p className={styles.note}>{twT('deductionHint')}</p>

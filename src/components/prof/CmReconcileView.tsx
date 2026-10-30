@@ -11,6 +11,7 @@ import { Fld, Tbl } from '../mfg/mfd-ui';
 import { row, rs } from '../mfg/mfd-util';
 import type { CmCtx } from './ClientMoneyDesk';
 import controls from '../../styles/controls.module.css';
+import { DateField } from '../ui/DateField';
 
 export default function CmReconcileView({ ctx }: { ctx: CmCtx }) {
   const [date, setDate] = useState(todayInput());
@@ -31,7 +32,7 @@ export default function CmReconcileView({ ctx }: { ctx: CmCtx }) {
   return (
     <>
       <div style={row}>
-        <Fld l={cmT('asOn')}><input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></Fld>
+        <Fld l={cmT('asOn')}><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></Fld>
         <Fld l={cmT('stmt')}><input className={controls.input} inputMode="decimal" value={stmt} onChange={(e) => setStmt(e.target.value.replace(/[^0-9.-]/g, ''))} data-cm="stmt" /></Fld>
       </div>
       <Tbl empty="" head={['', '₹']} rows={[[cmT('stmt'), r.reco.statement === null ? '-' : rs(r.reco.statement)], [cmT('ledgerBal'), rs(r.reco.ledger)], [cmT('clientsBal'), rs(r.reco.clients)]]} />

@@ -32,6 +32,8 @@ import local from './gst-reports.module.css';
 import styles from './gst-setoff.module.css';
 import { useT } from '../../i18n';
 import { soT } from '../../i18n/areas/gst-setoff';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 export interface ChallanListProps {
   challans: GstChallan[];
@@ -196,7 +198,7 @@ function ChallanDialog({ draft, onClose, onSaved, notify }: { draft: Draft; onCl
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{soT('chGenerated')}</span>
-          <input type="date" className={controls.input} value={d.generated_on} onChange={(e) => set('generated_on', e.target.value)} />
+          <DateField className={controls.input} value={d.generated_on} onChange={(e) => set('generated_on', e.target.value)} />
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{soT('chPeriod')}</span>
@@ -204,9 +206,9 @@ function ChallanDialog({ draft, onClose, onSaved, notify }: { draft: Draft; onCl
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{soT('chMode')}</span>
-          <select className={controls.select} value={d.mode ?? 'E_PAYMENT'} onChange={(e) => set('mode', e.target.value as ChallanMode)}>
+          <SelectField className={controls.select} value={d.mode ?? 'E_PAYMENT'} onChange={(e) => set('mode', e.target.value as ChallanMode)}>
             {CHALLAN_MODES.map((mo) => <option key={mo} value={mo}>{CHALLAN_MODE_LABELS[mo]}</option>)}
-          </select>
+          </SelectField>
         </label>
       </div>
 
@@ -254,7 +256,7 @@ function ChallanDialog({ draft, onClose, onSaved, notify }: { draft: Draft; onCl
       <div className={styles.formGrid}>
         <label className={controls.field}>
           <span className={controls.label}>{soT('chDeposited')}</span>
-          <input type="date" className={controls.input} value={d.deposited_on ?? ''} onChange={(e) => set('deposited_on', e.target.value)} />
+          <DateField className={controls.input} value={d.deposited_on ?? ''} onChange={(e) => set('deposited_on', e.target.value)} />
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{soT('chCin')}</span>
@@ -266,9 +268,9 @@ function ChallanDialog({ draft, onClose, onSaved, notify }: { draft: Draft; onCl
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{soT('chBank')}</span>
-          <select className={controls.select} value={d.bank_ledger_id ?? A.bank} onChange={(e) => set('bank_ledger_id', e.target.value)}>
+          <SelectField className={controls.select} value={d.bank_ledger_id ?? A.bank} onChange={(e) => set('bank_ledger_id', e.target.value)}>
             {banks.map((b) => <option key={b.id} value={b.id}>{b.code} · {b.name}</option>)}
-          </select>
+          </SelectField>
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{soT('chNotes')}</span>

@@ -25,6 +25,7 @@ import { syncT } from '../../i18n/areas/sync';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Sync.module.css';
+import { SelectField } from '../ui/SelectField';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
@@ -452,7 +453,7 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
             <div className={controls.row}>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="sync-profile">{syncT('issuesAs')}</label>
-                <select
+                <SelectField
                   id="sync-profile"
                   className={controls.select}
                   value={prefs.profile_id ?? ''}
@@ -467,7 +468,7 @@ export function SyncPanel({ notify }: { notify?: Notify }) {
                       {p.companyName || syncT('untitled')} ({p.invoicePrefix || settings.invoicePrefix || 'INV'})
                     </option>
                   ))}
-                </select>
+                </SelectField>
                 <span className={controls.hint}>{syncT('numberAs', { prefix: myPrefix })}</span>
               </div>
               <div className={controls.field}>

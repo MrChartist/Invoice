@@ -5,6 +5,7 @@ import { formatCurrency } from '../../lib/utils';
 import { unitT } from '../../i18n/areas/units';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface LandedValue {
   costs: { label: string; amount: string }[];
@@ -42,10 +43,10 @@ export function LandedCostFields({ value, onChange }: { value: LandedValue; onCh
           <Plus size={14} aria-hidden="true" /> {unitT('landedMore')}
         </button>
         <label className={controls.label} htmlFor={`${uid}-basis`}>{unitT('landedBasis')}</label>
-        <select id={`${uid}-basis`} className={controls.select} value={value.basis} onChange={(e) => onChange({ ...value, basis: e.target.value === 'qty' ? 'qty' : 'value' })}>
+        <SelectField id={`${uid}-basis`} className={controls.select} value={value.basis} onChange={(e) => onChange({ ...value, basis: e.target.value === 'qty' ? 'qty' : 'value' })}>
           <option value="value">{unitT('landedByValue')}</option>
           <option value="qty">{unitT('landedByQty')}</option>
-        </select>
+        </SelectField>
         <strong>{formatCurrency(landedTotal(value.costs.map((c) => ({ label: c.label, amount: Number(c.amount) }))))}</strong>
       </div>
     </fieldset>

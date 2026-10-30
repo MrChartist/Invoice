@@ -10,6 +10,7 @@ import { branchT } from '../../i18n/areas/extras';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from '../dashboard/tiles.module.css';
+import { SelectField } from '../ui/SelectField';
 
 // R4-B3: each store's price list (one of the price levels). Inline strings: this tile stays light.
 const storeT = defineArea(
@@ -29,7 +30,7 @@ function StorePriceLists({ onChanged, notify }: { onChanged: () => void; notify:
         {branches.map((b) => (
           <label key={b.id} className={controls.field}>
             <span className={controls.label}>{b.name}</span>
-            <select className={controls.select} value={b.price_level_id ?? ''} onChange={(e) => {
+            <SelectField className={controls.select} value={b.price_level_id ?? ''} onChange={(e) => {
               try {
                 branchesDb.save({ ...b, price_level_id: e.target.value || undefined });
                 notify(storeT('saved', { name: b.name }));
@@ -41,7 +42,7 @@ function StorePriceLists({ onChanged, notify }: { onChanged: () => void; notify:
             }}>
               <option value="">{storeT('none')}</option>
               {levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
+            </SelectField>
           </label>
         ))}
         <p className={controls.hint}>{storeT('hint')}</p>
@@ -104,10 +105,10 @@ export function BranchesPanel({ rows, canEdit, onChanged, notify, icon }: {
             <div className={own.form}>
               <input className={controls.input} value={name} onChange={(e) => setName(e.target.value)} placeholder={branchT('name')} aria-label={branchT('name')} />
               <input className={cn(controls.input, controls.inputMono)} value={gstin} onChange={(e) => setGstin(e.target.value.toUpperCase())} placeholder={branchT('gstin')} aria-label={branchT('gstin')} maxLength={15} />
-              <select className={controls.select} value={profile} onChange={(e) => setProfile(e.target.value)} aria-label={branchT('profile')}>
+              <SelectField className={controls.select} value={profile} onChange={(e) => setProfile(e.target.value)} aria-label={branchT('profile')}>
                 <option value="">{branchT('profileNone')}</option>
                 {profiles.map((p) => <option key={p.id} value={p.id}>{p.companyName || p.id}</option>)}
-              </select>
+              </SelectField>
               <p className={controls.hint}>{branchT('hint')}</p>
               <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={add} disabled={!name.trim()}><Plus size={14} /> {branchT('save')}</button>
             </div>

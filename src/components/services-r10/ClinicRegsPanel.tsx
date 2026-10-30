@@ -7,6 +7,7 @@ import type { SenderProfile } from '../../types/invoice';
 import { useT } from '../../i18n';
 import { defineArea } from '../../i18n/area';
 import controls from '../../styles/controls.module.css';
+import { TypedInput } from '../ui/TypedInput';
 
 const rT = defineArea(
   { title: 'Clinic registrations (printed when set)', cea: 'Clinical establishment / state registration no.', valid: 'Valid till', council: "Doctor's council registration (single-doctor clinic)", nabl: 'NABL no. (labs)', pcpndt: 'PCPNDT no. (imaging)' } as const,
@@ -24,7 +25,7 @@ export default function ClinicRegsPanel({ profile, onChange }: { profile: Sender
   const field = (k: keyof Regs, type = 'text') => (
     <label className={controls.field} key={k}>
       <span className={controls.label}>{rT(k === 'cea_valid' ? 'valid' : k)}</span>
-      <input className={controls.input} type={type} value={r[k] ?? ''} onChange={(e) => set(k, e.target.value)} data-sv-reg={k} />
+      <TypedInput className={controls.input} type={type} value={r[k] ?? ''} onChange={(e) => set(k, e.target.value)} data-sv-reg={k} />
     </label>
   );
   return (

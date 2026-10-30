@@ -28,6 +28,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
 import { exportRows, type Rows } from './shared';
+import { SelectField } from '../ui/SelectField';
 
 interface Props {
   month: string;
@@ -119,9 +120,9 @@ export function ReportsTab({ month, version, refresh, notify }: Props) {
               fyFirstDay(fyStart) >= ITA2025_FROM ? ita25T('annex1', { form: formText('24Q', fyFirstDay(fyStart), ita25Words()) }) : pT('rep.q24'),
               pT('rep.q24Hint'),
               <span className={styles.inline}>
-                <select className={controls.select} aria-label={pT('rep.quarter')} value={quarter} onChange={(e) => setQuarter(Number(e.target.value) as 1 | 2 | 3 | 4)}>
+                <SelectField className={controls.select} aria-label={pT('rep.quarter')} value={quarter} onChange={(e) => setQuarter(Number(e.target.value) as 1 | 2 | 3 | 4)}>
                   {[1, 2, 3, 4].map((q) => <option key={q} value={q}>Q{q}</option>)}
-                </select>
+                </SelectField>
                 {out(`form24Q-annexure1-FY${fyLabel}-Q${quarter}`, form24QAnnexure1Rows(fyRuns, fyStart, quarter), '24Q Annexure I')}
               </span>,
             )}
@@ -136,9 +137,9 @@ export function ReportsTab({ month, version, refresh, notify }: Props) {
               pT('rep.f16Hint'),
               emp ? (
                 <span className={styles.inline}>
-                  <select className={controls.select} aria-label={pT('rep.employee')} value={emp.id} onChange={(e) => setEmpId(e.target.value)}>
+                  <SelectField className={controls.select} aria-label={pT('rep.employee')} value={emp.id} onChange={(e) => setEmpId(e.target.value)}>
                     {employees.map((e) => <option key={e.id} value={e.id}>{e.code} · {e.name}</option>)}
-                  </select>
+                  </SelectField>
                   {out(`form16-partB-${emp.code}-FY${fyLabel}`, form16PartBRows(fyRuns, emp, fyStart), 'Form 16 Part B')}
                 </span>
               ) : noRun,

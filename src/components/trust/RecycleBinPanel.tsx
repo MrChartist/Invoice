@@ -21,6 +21,7 @@ import { useT } from '../../i18n';
 import { trErr, trT } from '../../i18n/areas/trade-trust-r4';
 import controls from '../../styles/controls.module.css';
 import styles from './trust.module.css';
+import { SelectField } from '../ui/SelectField';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
@@ -119,7 +120,7 @@ export default function RecycleBinPanel({ onClose, notify }: { onClose: () => vo
           {can('settings.manage') && (
             <label className={controls.field}>
               <span className={controls.label}>{trT('binRetention')}</span>
-              <select className={controls.select} value={days} onChange={(e) => {
+              <SelectField className={controls.select} value={days} onChange={(e) => {
                 try {
                   setBinRetentionDays(Number(e.target.value));
                   setDays(binRetentionDays());
@@ -128,7 +129,7 @@ export default function RecycleBinPanel({ onClose, notify }: { onClose: () => vo
                 }
               }}>
                 {[BIN_RETENTION.min, 14, BIN_RETENTION.days, 60, BIN_RETENTION.max].map((d) => <option key={d} value={d}>{trT('binDays', { n: d })}</option>)}
-              </select>
+              </SelectField>
             </label>
           )}
         </div>

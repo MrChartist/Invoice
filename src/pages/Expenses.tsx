@@ -50,6 +50,8 @@ import surface from '../styles/surface.module.css';
 import styles from './Expenses.module.css';
 import { errText } from '../i18n/lib-msg';
 import { EXPENSES_TABS, type ExpensesTab } from './page-tabs'; // R6-B1
+import { SelectField } from '../components/ui/SelectField';
+import { DateField } from '../components/ui/DateField';
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
@@ -362,26 +364,26 @@ export function Expenses() {
               </div>
             </div>
             <div className={styles.toolbarRow}>
-              <select className={`${controls.select} ${styles.filterSelect}`} value={filter.status} onChange={(e) => patch({ status: e.target.value as PurchaseFilter['status'] })} aria-label={purT('filterStatus')}>
+              <SelectField className={`${controls.select} ${styles.filterSelect}`} value={filter.status} onChange={(e) => patch({ status: e.target.value as PurchaseFilter['status'] })} aria-label={purT('filterStatus')}>
                 <option value="ALL">{purT('allStatuses')}</option>
                 {PURCHASE_STATUSES.map((s) => (
                   <option key={s} value={s}>{purStatus(s)}</option>
                 ))}
-              </select>
-              <select className={`${controls.select} ${styles.filterSelect}`} value={filter.category} onChange={(e) => patch({ category: e.target.value })} aria-label={purT('filterCategory')}>
+              </SelectField>
+              <SelectField className={`${controls.select} ${styles.filterSelect}`} value={filter.category} onChange={(e) => patch({ category: e.target.value })} aria-label={purT('filterCategory')}>
                 <option value="ALL">{purT('allCategories')}</option>
                 {PURCHASE_CATEGORIES.map((c) => (
                   <option key={c} value={c}>{purCategory(c)}</option>
                 ))}
-              </select>
+              </SelectField>
               <BranchFilter value={branch} onChange={setBranch} className={`${controls.select} ${styles.filterSelect}`} testId="pur-branch" />
               <label className={styles.dateField}>
                 {purT('from')}
-                <input type="date" className={controls.input} value={filter.from ?? ''} max={filter.to || undefined} onChange={(e) => patch({ from: e.target.value })} />
+                <DateField className={controls.input} value={filter.from ?? ''} max={filter.to || undefined} onChange={(e) => patch({ from: e.target.value })} />
               </label>
               <label className={styles.dateField}>
                 {purT('to')}
-                <input type="date" className={controls.input} value={filter.to ?? ''} min={filter.from || undefined} onChange={(e) => patch({ to: e.target.value })} />
+                <DateField className={controls.input} value={filter.to ?? ''} min={filter.from || undefined} onChange={(e) => patch({ to: e.target.value })} />
               </label>
               {hasFilters && (
                 <button type="button" className={controls.btnGhost} onClick={() => setFilter({ kind: 'ALL', status: 'ALL', category: 'ALL' })}>

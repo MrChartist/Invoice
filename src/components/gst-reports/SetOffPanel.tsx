@@ -39,6 +39,8 @@ import { soT } from '../../i18n/areas/gst-setoff';
 import { ChallanList } from './ChallanList';
 import { o7T } from '../../i18n/areas/gst-tds-7o';
 import { p40T } from '../../i18n/areas/statutory-p40';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const SetOffDialog = lazy(() => import('./SetOffDialog'));
 
@@ -142,14 +144,14 @@ export function SetOffPanel({ report, period, gstin, stateCode, turnover, notify
           <div className={styles.bar}>
             <label>
               {soT('frequency')}
-              <select className={controls.select} value={frequency} onChange={(e) => setFrequency(e.target.value as FilerFrequency)} disabled={period.kind === 'quarter'}>
+              <SelectField className={controls.select} value={frequency} onChange={(e) => setFrequency(e.target.value as FilerFrequency)} disabled={period.kind === 'quarter'}>
                 <option value="monthly">{soT('freqMonthly')}</option>
                 <option value="qrmp">{soT('freqQrmp')}</option>
-              </select>
+              </SelectField>
             </label>
             <label>
               {soT('paidOn')}
-              <input type="date" className={controls.input} value={effectivePaidOn} onChange={(e) => setPaidOn(e.target.value)} />
+              <DateField className={controls.input} value={effectivePaidOn} onChange={(e) => setPaidOn(e.target.value)} />
             </label>
             <div className={styles.checks}>
               <label className={controls.check}>

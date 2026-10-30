@@ -5,6 +5,7 @@ import { useT } from '../../i18n';
 import { pwaT } from '../../i18n/areas/pwa';
 import controls from '../../styles/controls.module.css';
 import styles from './companies.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /** Sidebar switcher (6.20), loaded by `CompanySwitcher` once a second company exists. */
 export default function CompanySwitcherList() {
@@ -18,11 +19,11 @@ export default function CompanySwitcherList() {
   return (
     <div className={styles.switcher}>
       <label className={styles.switcherLabel} htmlFor="company-switch">{pwaT('company')}</label>
-      <select id="company-switch" className={controls.select} value={activeCompanyId()} onChange={(e) => switchCompany(e.target.value)}>
+      <SelectField id="company-switch" className={controls.select} value={activeCompanyId()} onChange={(e) => switchCompany(e.target.value)}>
         {reg.list.map((c) => (
           <option key={c.id} value={c.id}>{c.name}</option>
         ))}
-      </select>
+      </SelectField>
     </div>
   );
 }

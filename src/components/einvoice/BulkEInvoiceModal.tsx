@@ -28,6 +28,7 @@ import { useT } from '../../i18n';
 import { einvT } from '../../i18n/areas/einvoice';
 import { plural } from '../../i18n/areas/plural';
 import { IrpWindowPill } from './IrpWindowNote';
+import { SelectField } from '../ui/SelectField';
 
 export interface BulkEInvoiceModalProps {
   open: boolean;
@@ -256,9 +257,9 @@ function BulkBody({ onClose, from, to, periodLabel }: BulkEInvoiceModalProps) {
                 <h3 className={styles.sectionTitle}><Truck size={14} aria-hidden="true" /> {einvT('ewayBulkFile')}</h3>
                 <div className={styles.grid3}>
                   <Field label={einvT('mode')}>
-                    <select className={controls.select} value={transport.mode} onChange={(e) => setTransport({ ...transport, mode: e.target.value as EwayTransMode })}>
+                    <SelectField className={controls.select} value={transport.mode} onChange={(e) => setTransport({ ...transport, mode: e.target.value as EwayTransMode })}>
                       <option value="ROAD">{einvT('road')}</option><option value="RAIL">{einvT('rail')}</option><option value="AIR">{einvT('air')}</option><option value="SHIP">{einvT('ship')}</option>
-                    </select>
+                    </SelectField>
                   </Field>
                   <Field label={einvT('vehicleAll')}>
                     <input className={`${controls.input} ${controls.inputMono}`} value={transport.vehicle} placeholder="MH12AB1234"

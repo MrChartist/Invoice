@@ -17,6 +17,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { clientOpts, milkCentres, milkOpts, sm, useRun, wrap, type Done } from './dairy-kit';
 import { CentrePick, F, N, Sel } from './dairy-ui';
+import { DateField } from '../ui/DateField';
 
 const blank = { date: todayInput(), shift: 'M' as MilkShiftId, buyer: '', milk: 'cow' as MilkKind, tanker: '', qty: 0, unit: 'L' as MilkUnit, fat: 0, snf: 0, temp: 0 };
 
@@ -51,7 +52,7 @@ export default function DispatchView({ onDone }: { onDone: Done }) {
     <>
       <div className={controls.row} style={wrap}>
         <CentrePick v={centreId} set={setCentre} />
-        <F l={bT('date')} w={160}><input type="date" className={controls.input} value={f.date} onChange={(e) => set({ date: e.target.value })} /></F>
+        <F l={bT('date')} w={160}><DateField className={controls.input} value={f.date} onChange={(e) => set({ date: e.target.value })} /></F>
         <Sel l={bT('shift')} v={f.shift} set={(shift) => set({ shift })} opts={[['M', 'M'], ['E', 'E']]} w={70} />
         <Sel l={bT('buyer')} v={buyer} set={(b) => set({ buyer: b })} opts={clientOpts()} w={200} d="buyer" />
         <Sel l={bT('milk')} v={f.milk} set={(milk) => set({ milk })} opts={milkOpts()} w={110} />
@@ -85,7 +86,7 @@ export default function DispatchView({ onDone }: { onDone: Done }) {
       </div>
       <h3 className={surface.cardHeadIcon}>{bT('recoTitle')}</h3>
       <div className={controls.row} style={wrap}>
-        <F l={bT('month')} w={160}><input type="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} /></F>
+        <F l={bT('month')} w={160}><DateField mode="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} /></F>
         <Sel l={bT('groupBy')} v={group} set={setGroup} opts={[['day', bT('by.day')], ['month', bT('by.month')]]} />
       </div>
       <div className={surface.tableWrap}>

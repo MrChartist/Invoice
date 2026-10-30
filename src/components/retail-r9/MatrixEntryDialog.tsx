@@ -18,6 +18,7 @@ import type { PurchaseLine } from '../../types/purchases';
 import { num } from '../../lib/invoice-calc';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { SelectField } from '../ui/SelectField';
 
 type AnyLine = { id: string; name: string; quantity: number; rate: number; item_id?: string };
 
@@ -85,10 +86,10 @@ export default function MatrixEntryDialog<L extends AnyLine>({ open, onClose, li
         <>
           <div className={controls.row} style={{ flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
             <label className={controls.field}><span className={controls.label}>{rtcT('gridStyle')}</span>
-              <select className={controls.select} value={parent?.id ?? ''} onChange={(e) => setPid(e.target.value)} data-grid-style>
+              <SelectField className={controls.select} value={parent?.id ?? ''} onChange={(e) => setPid(e.target.value)} data-grid-style>
                 <option value="">-</option>
                 {parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field} style={{ maxWidth: 140 }}><span className={controls.label}>{rtcT('gridRate')}</span>
               <NumberInput className={controls.input} value={rate ?? 0} onChange={setRate} data-grid-rate />

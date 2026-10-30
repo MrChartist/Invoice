@@ -15,6 +15,8 @@ import type { MpRegime } from '../../types/manpower-r17';
 import { loadSites, siteLabel } from '../../lib/manpower/mp-sites';
 import { firmForm, forcedRegime, mpRegime, mpRegimePatch } from '../../lib/manpower/mp-regime';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const REGS = ['', 'fwd', 'rcm', 'exempt66', 'manual_exempt'] as const;
 
@@ -48,16 +50,16 @@ export default function ManpowerRows() {
   const forced = (s.mp?.regime_note ? s.mp.regime : '') as MpRegime | '';
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }} data-mp-rows>
-      <select className={controls.select} aria-label={mpT('site')} value={siteId ?? ''} onChange={(e) => pick(e.target.value)} data-mp-pick-site>
+      <SelectField className={controls.select} aria-label={mpT('site')} value={siteId ?? ''} onChange={(e) => pick(e.target.value)} data-mp-pick-site>
         <option value="">{mpT('site')} -</option>
         {sites.map((x) => <option key={x.id} value={x.id}>{siteLabel(x)}</option>)}
-      </select>
+      </SelectField>
       {s.mp && (
         <>
-          <input type="month" className={controls.input} aria-label={mpT('month')} value={s.mp.month ?? ''} onChange={(e) => useInvoiceStore.getState().patch({ mp: { ...s.mp, month: e.target.value || undefined } })} data-mp-month />
-          <select className={controls.select} aria-label={mpT('regime')} value={forced} onChange={(e) => apply(e.target.value as MpRegime | '')} data-mp-pick-regime>
+          <DateField mode="month" className={controls.input} aria-label={mpT('month')} value={s.mp.month ?? ''} onChange={(e) => useInvoiceStore.getState().patch({ mp: { ...s.mp, month: e.target.value || undefined } })} data-mp-month />
+          <SelectField className={controls.select} aria-label={mpT('regime')} value={forced} onChange={(e) => apply(e.target.value as MpRegime | '')} data-mp-pick-regime>
             {REGS.map((r) => <option key={r} value={r}>{mpList('regs', REGS, r)}</option>)}
-          </select>
+          </SelectField>
           {forced && <input className={controls.input} aria-label={mpT('note')} placeholder={mpT('note')} value={note} onChange={(e) => setNote(e.target.value)} onBlur={() => apply(forced, note)} data-mp-regime-note />}
           {!forced && ((r) => <span className={controls.hint} data-mp-regime={r.regime}>{mpT(`reg.${r.regime}`, { r: r.rate })}{r.split ? `: ${mpT('split')}` : ''}</span>)(mpRegime({ date: s.date, entityType: entity, client }, sacs()))}
         </>

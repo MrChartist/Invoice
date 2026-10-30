@@ -19,6 +19,8 @@ import { capT } from '../../i18n/areas/capture';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 import { errText, libMsg } from '../../i18n/lib-msg';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 export interface PurchasePaymentModalProps {
   /** Id of the bill; the latest copy is read from storage on every change. */
@@ -131,17 +133,17 @@ function PaymentBody({ purchaseId, onClose, onChanged }: PurchasePaymentModalPro
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="pp-date">{purT('date')}</label>
-              <input id="pp-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+              <DateField id="pp-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
           </div>
           <div className={controls.row}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="pp-method">{purT('method')}</label>
-              <select id="pp-method" className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
+              <SelectField id="pp-method" className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
                 {PAYMENT_METHODS.map((m) => (
                   <option key={m} value={m}>{methodLabel(m)}</option>
                 ))}
-              </select>
+              </SelectField>
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="pp-ref">{purT('reference')}</label>

@@ -20,6 +20,7 @@ import { retailT } from '../../i18n/areas/retail';
 import { impliedPacks } from '../../lib/shop-mode';
 import { localDb } from '../../lib/localDb';
 import { errText, libMsg } from '../../i18n/lib-msg';
+import { SelectField } from '../ui/SelectField';
 
 const LeadTimeRow = lazy(() => import('../mfg/LeadTimeRow')); // R13 MF-A4: lead / make days (shopfloor pack)
 const PackSizeRow = lazy(() => import('../agri/PackSizeRow')); // R12 AG-C4: agri class, pack size, labelled (mill / agri pack)
@@ -225,9 +226,9 @@ function ItemForm({ open, item, isNew, takenNames, onSave, onClose }: ItemFormMo
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-unit`}>{invT('unit')}</label>
-            <select id={`${uid}-unit`} className={controls.select} value={d.unit} onChange={(e) => set('unit', e.target.value)}>
+            <SelectField id={`${uid}-unit`} className={controls.select} value={d.unit} onChange={(e) => set('unit', e.target.value)}>
               {masters.units.map((u) => <option key={u} value={u}>{u}</option>)}
-            </select>
+            </SelectField>
           </div>
         </div>
 

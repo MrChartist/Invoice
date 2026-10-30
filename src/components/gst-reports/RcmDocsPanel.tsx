@@ -29,6 +29,8 @@ import styles from './gst-setoff.module.css';
 import { useT } from '../../i18n';
 import { o7T } from '../../i18n/areas/gst-tds-7o';
 import { printWhenReady } from '../../lib/print-fonts';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export interface RcmDocsPanelProps {
   notify: (msg: string, tone?: 'success' | 'error' | 'info') => void;
@@ -126,13 +128,13 @@ export function RcmDocsPanel({ notify }: RcmDocsPanelProps) {
         {months.length > 0 && (
           <label>
             {o7T('rcmConsolidate')}
-            <select className={controls.select} value="" onChange={(e) => {
+            <SelectField className={controls.select} value="" onChange={(e) => {
               const m = e.target.value;
               if (m) startSelf(bills.filter((b) => b.unregistered && !b.selfInvoice && b.date.startsWith(m)).map((b) => b.id), m);
             }}>
               <option value="">{o7T('rcmPickMonth')}</option>
               {months.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
+            </SelectField>
           </label>
         )}
       </div>
@@ -147,7 +149,7 @@ export function RcmDocsPanel({ notify }: RcmDocsPanelProps) {
           <div className={styles.bar}>
             <label>
               {o7T('rcmDate')}
-              <input type="date" className={controls.input} value={draft.date} onChange={(e) => setDate(e.target.value)} required />
+              <DateField className={controls.input} value={draft.date} onChange={(e) => setDate(e.target.value)} required />
             </label>
             <label>
               {o7T('rcmNumber')}

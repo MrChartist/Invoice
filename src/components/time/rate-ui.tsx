@@ -5,6 +5,7 @@ import type { RateMasters } from './rate-masters';
 import controls from '../../styles/controls.module.css';
 import styles from './service-r3.module.css';
 import { svcT } from '../../i18n/areas/service-r3';
+import { SelectField } from '../ui/SelectField';
 
 export function RateSourceTag({ source }: { source: RateSource | 'manual' }) {
   return <span className={styles.source} data-rate-source={source}>{svcT(`src.${source}` as const)}</span>;
@@ -16,10 +17,10 @@ export function WorkTypeSelect({ id, workTypes, value, onChange }: { id: string;
   return (
     <div className={controls.field}>
       <label className={controls.label} htmlFor={id}>{svcT('workType')}</label>
-      <select id={id} className={controls.select} value={value} onChange={(e) => onChange(e.target.value)}>
+      <SelectField id={id} className={controls.select} value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">{svcT('noWorkType')}</option>
         {list.map((w) => <option key={w.id} value={w.id}>{w.name}{w.rate ? ` · ₹${w.rate}` : ''}{w.inactive ? ' (inactive)' : ''}</option>)}
-      </select>
+      </SelectField>
     </div>
   );
 }
@@ -32,14 +33,14 @@ export function TaskSelect({ id, masters, clientId, value, onChange }: { id: str
   return (
     <div className={controls.field}>
       <label className={controls.label} htmlFor={id}>{svcT('task')}</label>
-      <select id={id} className={controls.select} value={value} onChange={(e) => onChange(e.target.value)} title={svcT('taskPickHint')}>
+      <SelectField id={id} className={controls.select} value={value} onChange={(e) => onChange(e.target.value)} title={svcT('taskPickHint')}>
         <option value="">{svcT('noTask')}</option>
         {groups.map((g) => (
           <optgroup key={g.p.id} label={costCentreLabel(g.p, masters.centres)}>
             {g.tasks.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
           </optgroup>
         ))}
-      </select>
+      </SelectField>
     </div>
   );
 }

@@ -10,6 +10,8 @@ import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { chqT, reasonLabel } from '../../i18n/areas/cheques';
 import { bnkT } from '../../i18n/areas/banking';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const BOUNCE_REASONS = ['Funds insufficient', 'Signature differs', 'Payment stopped by drawer', 'Account closed', 'Exceeds arrangement', 'Alterations / overwriting', 'Other'];
 
@@ -88,7 +90,7 @@ export function ChequeActionModal({ cheque, to, onClose, onDone }: ChequeActionM
       <form id="cheque-action" onSubmit={submit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
         <label className={controls.field}>
           <span className={controls.label}>{chqT('date')}</span>
-          <input className={controls.input} type="date" value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} aria-invalid={problems.length > 0 || undefined} />
+          <DateField className={controls.input} value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} aria-invalid={problems.length > 0 || undefined} />
         </label>
         {willRecord && (
           <label className={controls.check}>
@@ -110,11 +112,11 @@ export function ChequeActionModal({ cheque, to, onClose, onDone }: ChequeActionM
         {(to === 'bounced' || to === 'cancelled') && (
           <label className={controls.field}>
             <span className={controls.label}>{chqT('reason')}</span>
-            <select className={controls.select} value={reason} onChange={(e) => setReason(e.target.value)}>
+            <SelectField className={controls.select} value={reason} onChange={(e) => setReason(e.target.value)}>
               {(to === 'bounced' ? BOUNCE_REASONS : ['Stop payment', 'Leaf spoiled / torn', 'Paid another way', 'Other']).map((r) => (
                 <option key={r} value={r}>{reasonLabel(r)}</option>
               ))}
-            </select>
+            </SelectField>
           </label>
         )}
         {to === 'bounced' && (
@@ -125,10 +127,10 @@ export function ChequeActionModal({ cheque, to, onClose, onDone }: ChequeActionM
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{bnkT('chargesTo')}</span>
-              <select className={controls.select} value={chargesTo} onChange={(e) => setChargesTo(e.target.value as 'expense' | 'party')}>
+              <SelectField className={controls.select} value={chargesTo} onChange={(e) => setChargesTo(e.target.value as 'expense' | 'party')}>
                 <option value="expense">{bnkT('chargesExpense')}</option>
                 <option value="party">{bnkT('chargesParty')}</option>
-              </select>
+              </SelectField>
             </label>
           </div>
         )}

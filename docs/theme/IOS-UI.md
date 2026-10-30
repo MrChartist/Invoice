@@ -737,6 +737,64 @@ Screenshots: `before/` set listed in the work plan (section 7).
 4. No page scrolls sideways; the title does not move between pages.
 5. `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` pass; the button, type and em-dash tests stay green.
 
+## 5. Pickers (dates, times, pop-up lists)
+
+_Package PK, 30 Oct 2026. Owner's report: "the calendar / date UI has issues", and every dropdown should be brought
+up to iOS._
+
+**Audit (master `f544d3f`).** 333 `<input type="date">`, 27 `type="month"`, 5 `type="time"`, 2 `datetime-local`, about
+30 field renderers taking the type from data (`type={kind}`), and 862 native `<select>`s. Native date inputs show
+`mm/dd/yyyy` in US-locale browsers (the wrong order for Indian users), differ on every OS, are small on phones, start
+the week on Sunday and know nothing of the financial year; native selects open the OS menu or wheel, which looks
+nothing like the rest of the app. Before shots: `scratchpad/pickers/before/`.
+
+**Plan and rules.**
+
+1. **`DateField`** (`src/components/ui/DateField.tsx`): a text field that shows `30 Oct 2026` (`formatDate`; other
+   languages via `dateLocale`, so Hindi reads `30 अक्टू॰ 2026`), never `mm/dd/yyyy`. Typing is day first and always
+   works: `30/10/2026`, `30-10-26`, `30.10`, `30 oct`, `oct 30 2026`, `301026`, ISO `2026-10-30`, `today`,
+   `yesterday`, `tomorrow`, `+7`, `-3`, `+2w`, `+1m` (`src/lib/date-input.ts`, `tests/date-field.test.ts`). A whole
+   date (ISO, or day / month / four-digit year) commits while typing, so `fill('2026-10-30')` and paste work at once;
+   shorter forms commit on blur or Enter; Escape restores the text. The value stays a bare local `YYYY-MM-DD` (rule 8)
+   and `onChange` hands `e.target.value` exactly as the native input did. `mode="month"` is the same field for
+   `YYYY-MM` (`Oct 2026`, month grid). `data-date-field="date" | "month"` is the stable hook for tests and keys.
+2. **Inline calendar** (UIDatePicker `.inline`): month title (tap for a month / year grid), ‹ › in quiet icon buttons,
+   weekday row from **Monday** (`WEEK_START = 1`), today in tint with a hairline ring, the selected day a filled tint
+   circle, other months' days in `--label-3`, min / max / `isDisabled` days struck through. ARIA grid with one roving
+   tab stop: arrows, PgUp / PgDn (Shift = a year), Home / End (week), Enter / Space, Escape. Quick chips (rulebook
+   `.chip`): Today and Yesterday by default; callers add `+7 / +15 / +30 / +45 / +60 / +90 days`, `monthStart`,
+   `monthEnd`, `fyStart`, `fyEnd` (Indian FY via `day-math.ts`), counted from `chipBase`.
+3. **Range** (`DateRangeField`, or `range` on two existing `DateField`s so labels stay where they are): two months
+   side by side from 600px, one on phones, the span in `--tint-soft`; presets This month, Last month, This quarter,
+   This FY, Last FY, Last 7 / 30 days. The first pick sets From, the second To. Callers keep writing the shared
+   report period (`mrchartist_report_period`, Alt+F2) themselves, so it stays compatible.
+4. **`TimeField`**: shows `9:30 am` (12h where the language writes am / pm), types `9:30`, `930`, `9.30 pm`,
+   `21:30`, `noon`; opens hour / minute (/ am pm) wheels: scroll-snap listboxes, arrows / PgUp / PgDn / Home / End.
+5. **`SelectField`**: the iOS pop-up button. The real `<select>` stays in the page (its value, `name`, `id`, labels,
+   `data-*`, `onChange`, form posting, and letter keys picking natively all unchanged, so `selectOption` in the e2e
+   smoke keeps working); a click, a tap, Space or Alt+Down opens the app's list instead of the browser's, and a
+   pick sets the select and fires `input` + `change`. The list: current value checkmarked (`Check`), a search box
+   with the match highlighted above 8 options, `<optgroup>` labels as section headers, type-ahead, arrows / PgUp /
+   PgDn / Home / End / Enter / Escape, `role="listbox"` with `aria-activedescendant` (the search box is a
+   `combobox`), "No match" empty state, one-line rows with an ellipsis and the full text in `title`, disabled options
+   dimmed, 44px rows on touch. The trigger draws chevron.up.chevron.down (the `ChevronsUpDown` glyph) in
+   `--label-2` with four CSS triangles in `controls.select`, so it follows every theme without a new icon.
+6. **Where it opens.** Phones (under 600px): the P3 `Modal` bottom sheet (lists at the medium detent), Clear (quiet)
+   and Done (ink) in the footer. From 600px: a regular-material popover anchored under the field (above when there is
+   no room), `--z-dropdown`, `--elev-2`, `--r-12`, on the modal stack so Escape closes it before any dialog under it,
+   outside click closes, Tab closes and returns to the field. React events inside the popup stop at its root, so row
+   clicks, form keys and Gateway keys under the field never see them. A mouse click keeps the caret in a date field
+   (type or click a day); a touch opens the sheet without raising the keyboard.
+7. **Size.** The field shells (`DateField`, `TimeField`, `SelectField`, `TypedInput`, `pickers/shell.ts`, `pickers/Popup.tsx`,
+   `date-input.ts`) are small; the calendar, month grid, time wheels, list and their CSS and strings are ONE lazy
+   chunk (`pickers/PickerPopup.tsx`, `pickers.module.css`, `i18n/areas/pickers.ts`), warmed on the first focus.
+8. **Left native.** A `multiple` select (`extras7u/OffersPanel.tsx`: a list box, not a pop-up), the two
+   `datetime-local` inputs (e-Way generated-at stamp, workshop promised / visit time: rare, combined stamps) and
+   printed templates. Everything else goes through the pickers (`tests/ios-ui.test.ts` PK).
+9. Strings via `defineArea(en, hi)` with literal Hindi; no em dashes; no new lucide names (`Check`, `ChevronLeft`,
+   `ChevronRight`, `Search` are already imported); buttons are rulebook `.btn` / `.chip` / `.lk`; reduced motion
+   drops the popover's scale-in.
+
 ---
 
 Reference: Apple Human Interface Guidelines (colour, materials, layout, typography, motion), as public documentation.

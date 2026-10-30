@@ -4,6 +4,7 @@ import { gwT } from '../../i18n/areas/gateway';
 import { GROUPS, type GroupId } from '../../lib/ledger/accounts';
 import { createLedgerInline, type LedgerKind, type LedgerOption } from '../../lib/gateway/voucher-entry';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 interface Props {
   kind: LedgerKind;
@@ -49,11 +50,11 @@ export function CreateLedgerDialog({ kind: initialKind, initialName = '', defaul
       <form id="gw-create-ledger" onSubmit={submit} style={{ display: 'grid', gap: '0.75rem' }}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="gw-cl-kind">{gwT('cType')}</label>
-          <select id="gw-cl-kind" className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as LedgerKind)}>
+          <SelectField id="gw-cl-kind" className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as LedgerKind)}>
             <option value="account">{gwT('vKindAccount')}</option>
             <option value="customer">{gwT(terms ? 'customerTally' : 'customer')}</option>
             <option value="vendor">{gwT(terms ? 'vendorTally' : 'vendor')}</option>
-          </select>
+          </SelectField>
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="gw-cl-name">{gwT('cName')}</label>
@@ -62,11 +63,11 @@ export function CreateLedgerDialog({ kind: initialKind, initialName = '', defaul
         {kind === 'account' ? (
           <div className={controls.field}>
             <label className={controls.label} htmlFor="gw-cl-group">{gwT('cGroup')}</label>
-            <select id="gw-cl-group" className={controls.select} value={group} onChange={(e) => setGroup(e.target.value as GroupId)}>
+            <SelectField id="gw-cl-group" className={controls.select} value={group} onChange={(e) => setGroup(e.target.value as GroupId)}>
               {GROUPS.map((g) => (
                 <option key={g.id} value={g.id}>{g.label}</option>
               ))}
-            </select>
+            </SelectField>
           </div>
         ) : (
           <div className={controls.field}>

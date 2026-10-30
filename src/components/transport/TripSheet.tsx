@@ -14,6 +14,8 @@ import { B, errText, fmtMoney, today, type PanelProps } from './shared';
 import { F } from './Field';
 import controls from '../../styles/controls.module.css';
 import styles from './transport.module.css';
+import { TypedInput } from '../ui/TypedInput';
+import { SelectField } from '../ui/SelectField';
 
 export function TripSheet({ trip, pnl, notify, refresh, tick, onBack }: PanelProps & { trip: Trip; pnl?: TripPnl; onBack: () => void }) {
   const lrs = useMemo(() => loadLrs().filter((l) => trip.lr_ids.includes(l.id)), [trip, tick]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -34,7 +36,7 @@ export function TripSheet({ trip, pnl, notify, refresh, tick, onBack }: PanelPro
   };
   const open = trip.status === 'open';
   const field = (k: keyof typeof f, label: string, type = 'number') => (
-    <F l={label}><input className={controls.input} type={type} value={f[k]} onChange={set(k)} /></F>
+    <F l={label}><TypedInput className={controls.input} type={type} value={f[k]} onChange={set(k)} /></F>
   );
   const spentDefault = Math.min(expenses.reduce((s, e) => s + e.amount, 0), adv.given);
   return (
@@ -51,7 +53,7 @@ export function TripSheet({ trip, pnl, notify, refresh, tick, onBack }: PanelPro
         {open && (
           <div className={styles.lineRow}>
             {field('day', twT('date'), 'date')}
-            <F l={twT('kind')}><select className={controls.select} value={f.kind} onChange={set('kind')}>{TRIP_EXPENSE_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select></F>
+            <F l={twT('kind')}><SelectField className={controls.select} value={f.kind} onChange={set('kind')}>{TRIP_EXPENSE_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</SelectField></F>
             {field('amount', twT('amount'))}{f.kind === 'Diesel' && field('litres', twT('litres'))}
             <button type="button" className={B.o} onClick={() => run(() => addTripExpense(trip.id, { date: f.day, kind: f.kind, amount: Number(f.amount), litres: Number(f.litres) || undefined }), twT('expenseAdded'))}>{twT('add')}</button>
           </div>
@@ -71,7 +73,7 @@ export function TripSheet({ trip, pnl, notify, refresh, tick, onBack }: PanelPro
           <h4>{twT('hire')}</h4>
           {hire ? <p className={styles.note}>{hire.vendor_name} · {fmtMoney(hire.total)} · {hire.tds_reason === 'T' ? twT('tds194c6Nil') : hire.tds_amount ? `TDS ${sectionText(hire.tds_section, hire.date)} ${fmtMoney(hire.tds_amount)}` : twT('noTds')}</p> : (
             <div className={styles.lineRow}>
-              <F l={twT('owner')}><select className={controls.select} value={f.vendor} onChange={set('vendor')}><option value="">-</option>{vendorsDb.all().map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></F>
+              <F l={twT('owner')}><SelectField className={controls.select} value={f.vendor} onChange={set('vendor')}><option value="">-</option>{vendorsDb.all().map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</SelectField></F>
               {field('hire', twT('amount'))}{field('billNo', twT('billNo'), 'text')}
               <button type="button" className={B.o} onClick={() => run(() => recordLorryHire(trip.id, { date: f.day, vendorId: f.vendor, amount: Number(f.hire), billNumber: f.billNo }), twT('hireSaved'))}>{twT('add')}</button>
             </div>

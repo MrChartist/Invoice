@@ -23,6 +23,8 @@ import { businessOf, costIndex, nameOfGodown, type TransferCtx } from './transfe
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import css from './retail-r4.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const DispatchDialog = lazy(() => import('./DispatchDialog'));
 const ReceiveDialog = lazy(() => import('./ReceiveDialog'));
@@ -57,9 +59,9 @@ export default function RequestsTab({ ctx }: { ctx: TransferCtx }) {
     <div className={css.stack}>
       <div className={css.bar}>
         <label className={controls.field}><span className={controls.label}>{sT('store')}</span>
-          <select className={controls.select} value={store} onChange={(e) => setStore(e.target.value)}>
+          <SelectField className={controls.select} value={store} onChange={(e) => setStore(e.target.value)}>
             <option value="">{sT('allStores')}</option>{stores.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
+          </SelectField>
         </label>
         <span className={css.grow} />
         {can('doc.create') && (
@@ -214,28 +216,28 @@ function RequestForm({ ctx, onClose }: { ctx: TransferCtx; onClose: () => void }
       footer={<><button type="button" className={controls.btnOutline} onClick={onClose}>{sT('cancel')}</button><button type="button" className={controls.btnPrimary} onClick={save} data-trq-save><ArrowLeftRight size={16} aria-hidden="true" /> {sT('raise')}</button></>}>
       <div className={css.stack}>
         <div className={controls.row}>
-          <label className={controls.field}><span className={controls.label}>{sT('date')}</span><input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
+          <label className={controls.field}><span className={controls.label}>{sT('date')}</span><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
           <label className={controls.field}><span className={controls.label}>{sT('fromGodown')}</span>
-            <select className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)} data-trq-from>{stores.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
+            <SelectField className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)} data-trq-from>{stores.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</SelectField>
           </label>
           <label className={controls.field}><span className={controls.label}>{sT('toGodown')}</span>
-            <select className={controls.select} value={to} onChange={(e) => setTo(e.target.value)} data-trq-to><option value="">-</option>{stores.filter((g) => g.id !== from).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
+            <SelectField className={controls.select} value={to} onChange={(e) => setTo(e.target.value)} data-trq-to><option value="">-</option>{stores.filter((g) => g.id !== from).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</SelectField>
           </label>
-          <label className={controls.field}><span className={controls.label}>{sT('neededBy')}</span><input type="date" className={controls.input} value={neededBy} onChange={(e) => setNeededBy(e.target.value)} /></label>
+          <label className={controls.field}><span className={controls.label}>{sT('neededBy')}</span><DateField className={controls.input} value={neededBy} onChange={(e) => setNeededBy(e.target.value)} /></label>
         </div>
         {lines.map((l, i) => {
           const item = items.find((x) => x.id === l.item_id);
           const units = item ? unitChoices(item) : [];
           return (
             <div key={l.id} className={controls.row}>
-              <select className={controls.select} value={l.item_id} aria-label={sT('itemN', { n: i + 1 })} onChange={(e) => patch(l.id, { item_id: e.target.value, unit: undefined, unit_factor: undefined })} data-trq-item>
+              <SelectField className={controls.select} value={l.item_id} aria-label={sT('itemN', { n: i + 1 })} onChange={(e) => patch(l.id, { item_id: e.target.value, unit: undefined, unit_factor: undefined })} data-trq-item>
                 <option value="">{sT('chooseItem')}</option>{items.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-              </select>
+              </SelectField>
               <NumberInput className={cn(controls.input, controls.inputNumeric)} value={l.qty} onChange={(v) => patch(l.id, { qty: v })} aria-label={sT('qtyN', { n: i + 1 })} data-trq-qty />
               {item && units.length > 1 && (
-                <select className={controls.select} value={l.unit || item.unit} aria-label={sT('unitN', { n: i + 1 })} onChange={(e) => { const f = factorFor(item, e.target.value) ?? 1; patch(l.id, f === 1 ? { unit: undefined, unit_factor: undefined } : { unit: e.target.value, unit_factor: f }); }}>
+                <SelectField className={controls.select} value={l.unit || item.unit} aria-label={sT('unitN', { n: i + 1 })} onChange={(e) => { const f = factorFor(item, e.target.value) ?? 1; patch(l.id, f === 1 ? { unit: undefined, unit_factor: undefined } : { unit: e.target.value, unit_factor: f }); }}>
                   {units.map((u) => <option key={u.unit} value={u.unit}>{u.unit}</option>)}
-                </select>
+                </SelectField>
               )}
               <button type="button" className={controls.btnDanger} aria-label={sT('removeLine', { n: i + 1 })} disabled={lines.length === 1} onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}><Trash2 size={14} /></button>
             </div>

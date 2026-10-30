@@ -9,6 +9,7 @@ import { useT } from '../../i18n';
 import { colT } from '../../i18n/areas/collections';
 import controls from '../../styles/controls.module.css';
 import styles from './collections.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const TERM_DOCS = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY', 'PROFORMA', 'QUOTATION', 'SALES_ORDER', 'DEBIT_NOTE']);
 
@@ -65,11 +66,11 @@ export function TermsPicker() {
     <div className={styles.stack} data-terms-picker>
       <label className={controls.field}>
         <span className={controls.label}>{colT('tpLabel')}</span>
-        <select className={controls.select} value={termId} onChange={(ev) => choose(ev.target.value)} data-terms-select>
+        <SelectField className={controls.select} value={termId} onChange={(ev) => choose(ev.target.value)} data-terms-select>
           <option value="">{colT('tpCustom')}</option>
           {terms.filter((t) => !t.inactive || t.id === termId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           {termId && !term && <option value={termId}>{s.payment_terms?.name}</option>}
-        </select>
+        </SelectField>
         {e && <span className={controls.hint}>{colT('tpEarly', { percent: e.percent, date: formatDate(e.until), amount: formatCurrency(e.amount, s.currency) })}</span>}
       </label>
       {msme && <p className={styles.warn} role="note" data-msme-note>{colT('tpMsme')}</p>}

@@ -11,6 +11,7 @@ import { agencySales, loadArrivals, lotBalances, lotShortage } from '../../lib/t
 import { useT } from '../../i18n';
 import { trT } from '../../i18n/areas/trade-r8c';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export default function LotPicker({ item, index }: { item: InvoiceItem; index: number }) {
   useT();
@@ -40,12 +41,12 @@ export default function LotPicker({ item, index }: { item: InvoiceItem; index: n
   const short = item.arrival_id ? lotShortage(lot, others, Number(item.quantity) || 0) : '';
   return (
     <div>
-      <select className={controls.ghost} value={item.arrival_id ?? ''} onChange={(e) => pick(e.target.value)} aria-label={`${trT('lot')} ${index + 1}`} data-lot-picker={index}>
+      <SelectField className={controls.ghost} value={item.arrival_id ?? ''} onChange={(e) => pick(e.target.value)} aria-label={`${trT('lot')} ${index + 1}`} data-lot-picker={index}>
         <option value="">{trT('lot')}: -</option>
         {lots.filter((l) => l.balance > 0 || l.arrival.id === item.arrival_id).map((l) => (
           <option key={l.arrival.id} value={l.arrival.id}>{`${l.arrival.lot_no} · ${l.arrival.principal_name} · ${l.arrival.item_name} (${l.balance} ${l.arrival.unit})`}</option>
         ))}
-      </select>
+      </SelectField>
       {short && <small role="alert">{short}</small>}
     </div>
   );

@@ -18,6 +18,7 @@ import type { Unmapped } from './MarketplaceTab';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './marketplace.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const SHOW = 12;
 
@@ -115,23 +116,23 @@ export function ImportPanel(props: PanelProps & { onUnmapped: (u: Unmapped) => v
       <div className={styles.toolbar}>
         <ChannelPicker {...props} />
         <label className={controls.field}><span className={controls.label}>{mT('impKind')}</span>
-          <select className={controls.select} value={kind} onChange={(e) => { const k = e.target.value as 'sales' | 'returns'; setKind(k); setPreset(k === 'sales' ? 'amazon_mtr_b2c' : 'amazon_returns'); }}>
+          <SelectField className={controls.select} value={kind} onChange={(e) => { const k = e.target.value as 'sales' | 'returns'; setKind(k); setPreset(k === 'sales' ? 'amazon_mtr_b2c' : 'amazon_returns'); }}>
             <option value="sales">{mT('impKind.sales')}</option>
             <option value="returns">{mT('impKind.returns')}</option>
-          </select></label>
+          </SelectField></label>
         <label className={controls.field}><span className={controls.label}>{mT('preset')}</span>
-          <select className={controls.select} value={preset} onChange={(e) => setPreset(e.target.value as SalesPresetId)} data-mkt-preset>
+          <SelectField className={controls.select} value={preset} onChange={(e) => setPreset(e.target.value as SalesPresetId)} data-mkt-preset>
             {presets.map((p) => <option key={p} value={p}>{mT(`preset.${p}` as Parameters<typeof mT>[0])}</option>)}
-          </select></label>
+          </SelectField></label>
         <label className={`${controls.btn} ${controls.btnOutline}`}>
           <FileSpreadsheet size={16} aria-hidden="true" /> {mT('file')}
           <input type="file" accept=".csv,.txt,.xlsx,.xlsm" hidden onChange={onFile} disabled={busy} data-mkt-sales-file />
         </label>
         {tables.length > 1 && (
           <label className={controls.field}><span className={controls.label}>{mT('sheet')}</span>
-            <select className={controls.select} value={sheet} onChange={(e) => pickTable(tables, Number(e.target.value))}>
+            <SelectField className={controls.select} value={sheet} onChange={(e) => pickTable(tables, Number(e.target.value))}>
               {tables.map((t, i) => <option key={t.name} value={i}>{t.name}</option>)}
-            </select></label>
+            </SelectField></label>
         )}
       </div>
 
@@ -141,10 +142,10 @@ export function ImportPanel(props: PanelProps & { onUnmapped: (u: Unmapped) => v
           <div className={styles.grid}>
             {Object.keys(SALES_FIELDS).map((f) => (
               <label key={f} className={controls.field}><span className={controls.label}>{f}</span>
-                <select className={controls.select} value={cols.get(f) ?? ''} onChange={(e) => { const next = new Map(cols); if (e.target.value === '') next.delete(f); else next.set(f, Number(e.target.value)); setCols(next); }}>
+                <SelectField className={controls.select} value={cols.get(f) ?? ''} onChange={(e) => { const next = new Map(cols); if (e.target.value === '') next.delete(f); else next.set(f, Number(e.target.value)); setCols(next); }}>
                   <option value="">{mT('notInFile')}</option>
                   {table.headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
-                </select></label>
+                </SelectField></label>
             ))}
           </div>
         </details>

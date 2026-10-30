@@ -8,6 +8,7 @@ import { ita25Words } from '../../i18n/areas/ita2025';
 import { withActRef } from '../../lib/ita2025';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const numOrUndef = (text: string): number | undefined => {
   if (text.trim() === '') return undefined;
@@ -43,20 +44,20 @@ export function TdsBillPanel({ value, onChange, suggestion, payableNet, nonResid
         <div className={controls.row}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-sec`}>{tdsT('section')}</label>
-            <select id={`${uid}-sec`} className={controls.select} value={value.section} onChange={(e) => set({ section: e.target.value, rate: undefined, base: undefined, amount: undefined })}>
+            <SelectField id={`${uid}-sec`} className={controls.select} value={value.section} onChange={(e) => set({ section: e.target.value, rate: undefined, base: undefined, amount: undefined })}>
               <option value="">{tdsT('noTds')}</option>
               {TDS_PAYABLE_SECTIONS.map((s) => (
                 <option key={s.code} value={s.code}>{date ? withActRef(s.label, s.code, date, ita25Words()) : s.label}</option>
               ))}
-            </select>
+            </SelectField>
           </div>
           {on && (
             <div className={controls.field}>
               <label className={controls.label} htmlFor={`${uid}-on`}>{tdsT('deductOn')}</label>
-              <select id={`${uid}-on`} className={controls.select} value={value.on} onChange={(e) => set({ on: e.target.value === 'PAYMENT' ? 'PAYMENT' : 'BILL' })}>
+              <SelectField id={`${uid}-on`} className={controls.select} value={value.on} onChange={(e) => set({ on: e.target.value === 'PAYMENT' ? 'PAYMENT' : 'BILL' })}>
                 <option value="BILL">{tdsT('onBill')}</option>
                 <option value="PAYMENT">{tdsT('onPayment')}</option>
-              </select>
+              </SelectField>
             </div>
           )}
         </div>

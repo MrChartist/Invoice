@@ -47,6 +47,7 @@ import styles from './planning.module.css';
 import { useT } from '../../../i18n';
 import { planT } from '../../../i18n/areas/books-planning';
 import { plural } from '../../../i18n/areas/plural';
+import { SelectField } from '../../ui/SelectField';
 
 interface Props {
   ledger: Ledger;
@@ -115,9 +116,9 @@ export function BudgetsTab({ ledger, notify }: Props) {
           <div className={styles.controls}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="bud-fy">{planT('financialYear')}</label>
-              <select id="bud-fy" className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))}>
+              <SelectField id="bud-fy" className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))}>
                 {fyOptions.map((y) => <option key={y} value={y}>{planT('fyOption', { fy: fyLabelOf(y), from: y, to: y + 1 })}</option>)}
-              </select>
+              </SelectField>
             </div>
             <div className={controls.field}>
               <span className={controls.label} id="bud-view">{planT('view')}</span>
@@ -132,9 +133,9 @@ export function BudgetsTab({ ledger, notify }: Props) {
             {mode !== 'year' && (
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="bud-month">{mode === 'ytd' ? planT('upTo') : mode === 'quarter' ? planT('quarterOf') : planT('modeMonth')}</label>
-                <select id="bud-month" className={controls.select} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+                <SelectField id="bud-month" className={controls.select} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
                   {MONTH_LABELS.map((m, i) => <option key={m} value={i}>{m} {i <= 8 ? fy : fy + 1}</option>)}
-                </select>
+                </SelectField>
               </div>
             )}
             {centres.length > 0 && (
@@ -306,7 +307,7 @@ function BudgetEditor({ budget, fy, scope, accounts, allAccounts, centres, onClo
         <div className={controls.row}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="bud-acct">{planT('colAccount')}</label>
-            <select id="bud-acct" className={controls.select} value={accountId} onChange={(e) => setAccountId(e.target.value)} autoFocus>
+            <SelectField id="bud-acct" className={controls.select} value={accountId} onChange={(e) => setAccountId(e.target.value)} autoFocus>
               <option value="">{planT('chooseAccount')}</option>
               {GROUPS.map((g) => {
                 const list = accounts.filter((a) => a.group === g.id);
@@ -316,7 +317,7 @@ function BudgetEditor({ budget, fy, scope, accounts, allAccounts, centres, onClo
                   </optgroup>
                 ) : null;
               })}
-            </select>
+            </SelectField>
           </div>
           <CostCentreSelect id="bud-cc" label={planT('ccOptional')} centres={centres} value={cc} onChange={setCc} emptyLabel={planT('wholeBusiness')} />
         </div>

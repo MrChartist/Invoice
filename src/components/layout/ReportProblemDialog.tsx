@@ -32,6 +32,7 @@ import { getLanguage, useT } from '../../i18n';
 import { betaT } from '../../i18n/areas/beta';
 import controls from '../../styles/controls.module.css';
 import styles from './HelpModal.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /** `mci-shell-<id>` caches (public/sw.js): the precache build this tab was installed from. */
 async function precacheBuild(): Promise<string | null> {
@@ -261,12 +262,12 @@ export default function ReportProblemDialog({ onClose, area = '' }: { onClose: (
       </div>
       <label className={controls.field}>
         <span className={controls.label}>{betaT('area')}</span>
-        <select className={controls.select} value={draft.area} onChange={(e) => patch({ area: e.target.value })} data-report-area>
+        <SelectField className={controls.select} value={draft.area} onChange={(e) => patch({ area: e.target.value })} data-report-area>
           <option value="">{betaT('areaNone')}</option>
           {areaOptions.map((a) => (
             <option key={a} value={a}>{a}</option>
           ))}
-        </select>
+        </SelectField>
       </label>
       <label className={controls.field}>
         <span className={controls.label}>{draft.kind === 'idea' ? betaT('didIdea') : draft.kind === 'question' ? betaT('didQuestion') : betaT('did')}</span>
@@ -284,11 +285,11 @@ export default function ReportProblemDialog({ onClose, area = '' }: { onClose: (
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{betaT('severity')}</span>
-            <select className={controls.select} value={draft.severity} onChange={(e) => patch({ severity: e.target.value as FeedbackSeverity })}>
+            <SelectField className={controls.select} value={draft.severity} onChange={(e) => patch({ severity: e.target.value as FeedbackSeverity })}>
               {SEVERITIES.map(([v, label]) => (
                 <option key={v} value={v}>{betaT(label)}</option>
               ))}
-            </select>
+            </SelectField>
           </label>
         </>
       )}

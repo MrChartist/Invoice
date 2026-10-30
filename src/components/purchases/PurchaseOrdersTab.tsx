@@ -40,6 +40,8 @@ import tabStyles from './VendorsTab.module.css';
 import { errText, libMsg } from '../../i18n/lib-msg';
 import { printWhenReady } from '../../lib/print-fonts';
 import { acceptForm, entryKeyDown, focusFormDate } from '../../lib/keys/entry-actions';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const PO_KEYS = entryKeyDown({ 'accept.bill': acceptForm, 'date.bill': focusFormDate });
 
@@ -127,12 +129,12 @@ export function PurchaseOrdersTab({ orders, vendors, purchases, businessState, o
   return (
     <section className={surface.card}>
       <div className={styles.poBar}>
-        <select className={controls.select} value={stateFilter} onChange={(e) => setStateFilter(e.target.value as PoState | '')} aria-label={purT('poFilter')}>
+        <SelectField className={controls.select} value={stateFilter} onChange={(e) => setStateFilter(e.target.value as PoState | '')} aria-label={purT('poFilter')}>
           <option value="">{purT('poAll')}</option>
           {PO_STATES.map((s) => (
             <option key={s} value={s}>{poStateLabel(s)}</option>
           ))}
-        </select>
+        </SelectField>
         <button type="button" className={controls.btnPrimary} onClick={() => setEditing('new')}>
           <FilePlus2 size={16} /> {purT('poNew')}
         </button>
@@ -342,21 +344,21 @@ function PoForm({
       <div className={controls.row3}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="po-date">{purT('orderDate')}</label>
-          <input id="po-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField id="po-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           {!po && <span className={controls.hint}>{purT('poNumber', { number: purchaseOrdersDb.nextNumber(date) })}</span>}
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="po-expected">{purT('expectedBy')}</label>
-          <input id="po-expected" type="date" className={controls.input} value={expected} onChange={(e) => setExpected(e.target.value)} />
+          <DateField id="po-expected" className={controls.input} value={expected} onChange={(e) => setExpected(e.target.value)} />
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="po-pos">{purT('placeOfSupply')}</label>
-          <select id="po-pos" className={controls.select} value={pos} onChange={(e) => setPos(e.target.value)}>
+          <SelectField id="po-pos" className={controls.select} value={pos} onChange={(e) => setPos(e.target.value)}>
             <option value="">{purT('notSpecified')}</option>
             {INDIAN_STATES.map((s) => (
               <option key={s.code} value={s.code}>{s.code} : {s.name}</option>
             ))}
-          </select>
+          </SelectField>
         </div>
       </div>
 

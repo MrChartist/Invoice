@@ -12,6 +12,7 @@ import { B, today } from '../transport/shared';
 import { money } from '../manufacturing/context';
 import { Num, Sel, Table, Txt } from './mfb-ui';
 import { fmt, n, opt, row, useRun, type Done } from './mfb-util';
+import { SelectField } from '../ui/SelectField';
 
 const SHAPES: readonly MfShape['kind'][] = ['plate', 'round', 'tube', 'ring', 'section'];
 const DIMS: Record<MfShape['kind'], readonly Exclude<keyof MfShape, 'kind'>[]> = { plate: ['l', 'w', 't'], round: ['d', 'l'], tube: ['od', 'id', 'l'], ring: ['od', 'id', 't'], section: ['kg_per_m', 'l'] };
@@ -87,7 +88,7 @@ export default function QuotesView({ ctx, done }: { ctx: MfgContext; done: Done 
             return S('quotationsMade', { n: docs.length });
           })}>{S('makeQuotation')}</button>
           {(q.quote_ids ?? []).slice(-1).map((id) => <Link key={id} to={`/invoice/${id}`}>{S('open')}</Link>)}
-          <select aria-label={S('materialItem')} value={won[q.id] ?? ''} onChange={(e) => setWon({ ...won, [q.id]: e.target.value })}>{opt(ctx.items, (i) => i.id, (i) => i.name).map(([k, s]) => <option key={k} value={k}>{s}</option>)}</select>
+          <SelectField aria-label={S('materialItem')} value={won[q.id] ?? ''} onChange={(e) => setWon({ ...won, [q.id]: e.target.value })}>{opt(ctx.items, (i) => i.id, (i) => i.name).map(([k, s]) => <option key={k} value={k}>{s}</option>)}</SelectField>
           <button type="button" className={B.gs} onClick={() => run(() => { markWon(q.id, won[q.id] || undefined); return S('won'); })}>{S('markWon')}</button>
           <button type="button" className={B.gs} onClick={() => run(() => { removeQuote(q.id); })}>{S('del')}</button>
         </span>,

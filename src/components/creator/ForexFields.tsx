@@ -9,6 +9,7 @@ import { inrValue } from '../../lib/fx';
 import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { edT } from '../../i18n/areas/editor';
+import { DateField } from '../ui/DateField';
 
 // R4-C1: Incoterms / ports / countries / marks — lazy, export documents only.
 const ExportDetailsFields = lazy(() => import('../trade/ExportDetailsFields'));
@@ -74,7 +75,7 @@ export function ForexFields() {
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{edT('fxBillDate')}</span>
-            <input className={controls.input} type="date" value={s.shipping_bill_date ?? ''} onChange={(e) => s.patch({ shipping_bill_date: e.target.value || undefined })} />
+            <DateField className={controls.input} value={s.shipping_bill_date ?? ''} onChange={(e) => s.patch({ shipping_bill_date: e.target.value || undefined })} />
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{edT('fxPort')}</span>

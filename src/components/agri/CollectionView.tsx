@@ -19,6 +19,7 @@ import AnalyserSetup from './AnalyserSetup';
 import { farmers, milkCentres, sm, useRun, wrap, type Done } from './dairy-kit';
 import { CentrePick, F, Sel } from './dairy-ui';
 import { PRINT_FONT, PRINT_FONT_FACE } from '../../lib/print-fonts';
+import { DateField } from '../ui/DateField';
 
 const SHIFT_OPTS = [['M', 'M'], ['E', 'E']] as const;
 
@@ -49,7 +50,7 @@ export default function CollectionView({ onDone }: { onDone: Done }) {
     <>
       <div className={controls.row} style={wrap}>
         <CentrePick v={centreId} set={setCentre} />
-        <F l={bT('date')} w={160}><input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} data-dairy="date" /></F>
+        <F l={bT('date')} w={160}><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} data-dairy="date" /></F>
         <Sel l={bT('shift')} v={shift} set={setShift} opts={SHIFT_OPTS} w={70} d="shift" />
         <Sel l={bT('slip')} v={String(mm)} set={(v) => setMm(Number(v))} opts={[['58', '58 mm'], ['80', '80 mm']]} w={90} />
       </div>

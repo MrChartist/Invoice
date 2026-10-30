@@ -15,6 +15,8 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
 import { inr, parseAmount } from './shared';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 interface Props {
   month: string;
@@ -106,13 +108,13 @@ export function PaymentsTab({ month, version, refresh, notify }: Props) {
           <div className={styles.formGrid}>
             <label className={controls.field}>
               <span className={controls.label}>{pT('ppay.kind')}</span>
-              <select className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as PayrollPaymentKind)}>
+              <SelectField className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as PayrollPaymentKind)}>
                 {PAY_HERE.map((k) => <option key={k} value={k}>{pT(KIND_KEY[k])}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('ppay.date')}</span>
-              <input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('ppay.amount')}</span>
@@ -120,21 +122,21 @@ export function PaymentsTab({ month, version, refresh, notify }: Props) {
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('ppay.from')}</span>
-              <select className={controls.select} value={paidFrom} onChange={(e) => setPaidFrom(e.target.value)}>
+              <SelectField className={controls.select} value={paidFrom} onChange={(e) => setPaidFrom(e.target.value)}>
                 {cashBank.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              </SelectField>
             </label>
             {kind === 'salary' ? (
               <label className={controls.field}>
                 <span className={controls.label}>{pT('ppay.run')}</span>
-                <select className={controls.select} value={runId} onChange={(e) => setRunId(e.target.value)}>
+                <SelectField className={controls.select} value={runId} onChange={(e) => setRunId(e.target.value)}>
                   {finals.map((r) => <option key={r.id} value={r.id}>{r.number} · {r.month}</option>)}
-                </select>
+                </SelectField>
               </label>
             ) : (
               <label className={controls.field}>
                 <span className={controls.label}>{pT('ppay.period')}</span>
-                <input className={controls.input} type="month" value={period} onChange={(e) => setPeriod(e.target.value)} />
+                <DateField className={controls.input} mode="month" value={period} onChange={(e) => setPeriod(e.target.value)} />
               </label>
             )}
             <label className={controls.field}>

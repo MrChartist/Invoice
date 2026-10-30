@@ -14,6 +14,7 @@ import styles from './cashflow.module.css';
 import { useT } from '../../../i18n';
 import { planT } from '../../../i18n/areas/books-planning';
 import { nodes } from '../../../i18n/areas/nodes';
+import { DateField } from '../../ui/DateField';
 
 const inr = (n: number) => `₹${formatMoney(n)}`;
 const signed = (n: number) => <span className={n < 0 ? styles.neg : n > 0 ? styles.pos : ''}>{n < 0 ? `(${formatMoney(-n)})` : formatMoney(n)}</span>;
@@ -140,7 +141,7 @@ export default function FxTab({ data, period, onChanged, notify }: { data: Books
           <div className={styles.group}>
             <label className={controls.field}>
               <span className={controls.label}>{planT('asOn')}</span>
-              <input className={controls.input} type="date" value={asOf} onChange={(e) => e.target.value && setAsOf(e.target.value)} />
+              <DateField className={controls.input} value={asOf} onChange={(e) => e.target.value && setAsOf(e.target.value)} />
             </label>
             {rev.currencies.map((c) => (
               <label key={c} className={controls.field}>

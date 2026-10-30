@@ -130,7 +130,7 @@ export function useEditorEntryKeys({ id, save, notify, onChanged }: { id?: strin
     'editLog.editor': () => (id ? setSheet({ kind: 'log', id, name: st().invoice_number }) : false),
     'date.editor': () => {
       document.querySelector<HTMLElement>('[data-meta-edit]')?.click();
-      setTimeout(() => document.querySelector<HTMLElement>('[data-meta-open] input[type="date"]')?.focus());
+      setTimeout(() => document.querySelector<HTMLElement>('[data-meta-open] input[data-date-field="date"]')?.focus());
     },
   });
   useKeyActions('line', {

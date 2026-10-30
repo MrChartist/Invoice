@@ -5,6 +5,7 @@ import { useT } from '../../i18n';
 import { rT } from '../../i18n/areas/restaurant';
 import controls from '../../styles/controls.module.css';
 import styles from './restaurant.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface StationsPanelProps {
   settings: RestaurantSettings;
@@ -29,9 +30,9 @@ export function StationsPanel({ settings, groups, onSave }: StationsPanelProps) 
       {groups.map((g) => (
         <label key={g.id} className={styles.partRow}>
           <span>{rT('groupStation', { group: g.name })}</span>
-          <select className={controls.select} value={map[g.id] ?? KITCHEN} onChange={(e) => setMap((m) => ({ ...m, [g.id]: e.target.value }))}>
+          <SelectField className={controls.select} value={map[g.id] ?? KITCHEN} onChange={(e) => setMap((m) => ({ ...m, [g.id]: e.target.value }))}>
             {list.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          </SelectField>
         </label>
       ))}
       <div>

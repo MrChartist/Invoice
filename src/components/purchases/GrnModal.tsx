@@ -20,6 +20,8 @@ import styles from './purchases.module.css';
 import local from './returns.module.css';
 import { errText } from '../../i18n/lib-msg';
 import { acceptForm, entryKeyDown, focusFormDate } from '../../lib/keys/entry-actions';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 /** R20-B: Ctrl+A accepts, F2 goes to the date (Tally keys on; the dialog reads its own keys). */
 const GRN_KEYS = entryKeyDown({ 'accept.bill': acceptForm, 'date.bill': focusFormDate });
@@ -121,17 +123,17 @@ function GrnForm({ vendors, orders, purchases, notes, onVendorCreated, onClose, 
       <div className={controls.row3}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="grn-date">{prT('grnDate')}</label>
-          <input id="grn-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField id="grn-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           <span className={controls.hint}>{prT('noteNumber', { number: receiptNotesDb.nextNumber('GRN', date) })}</span>
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="grn-po">{prT('againstPo')}</label>
-          <select id="grn-po" className={controls.select} value={poId} onChange={(e) => pickPo(e.target.value)}>
+          <SelectField id="grn-po" className={controls.select} value={poId} onChange={(e) => pickPo(e.target.value)}>
             <option value="">{prT('noPo')}</option>
             {openPos.map((o) => (
               <option key={o.id} value={o.id}>{o.po_number} · {o.vendor_name} · {formatDate(o.date)}</option>
             ))}
-          </select>
+          </SelectField>
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="grn-challan">{prT('challanNo')}</label>
@@ -186,16 +188,16 @@ function RejectionForm({ grnId, purchases, notes, onClose, onSaved }: Rest & { g
       <div className={controls.row}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="rj-grn">{prT('fromGrn')}</label>
-          <select id="rj-grn" className={controls.select} value={id} onChange={(e) => { setId(e.target.value); setQty({}); }}>
+          <SelectField id="rj-grn" className={controls.select} value={id} onChange={(e) => { setId(e.target.value); setQty({}); }}>
             <option value="">{prT('chooseGrn')}</option>
             {grns.map((g) => (
               <option key={g.id} value={g.id}>{g.number} · {g.vendor_name} · {formatDate(g.date)}</option>
             ))}
-          </select>
+          </SelectField>
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="rj-date">{prT('rjDate')}</label>
-          <input id="rj-date" type="date" className={controls.input} value={date} min={grn?.date} onChange={(e) => setDate(e.target.value)} />
+          <DateField id="rj-date" className={controls.input} value={date} min={grn?.date} onChange={(e) => setDate(e.target.value)} />
           <span className={controls.hint}>{prT('noteNumber', { number: receiptNotesDb.nextNumber('REJECTION_OUT', date) })}</span>
         </div>
       </div>

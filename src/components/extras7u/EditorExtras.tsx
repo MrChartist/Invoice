@@ -17,6 +17,7 @@ import { useT } from '../../i18n';
 import { x7T } from '../../i18n/areas/extras-7u';
 import controls from '../../styles/controls.module.css';
 import own from './x7u.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const RxEditorExtra = lazy(() => import('../retail-r9/PharmacyDesk').then((m) => ({ default: m.RxEditorExtra })));
 
@@ -65,10 +66,10 @@ export default function EditorExtras() {
     <div className={own.form} data-editor-extras>
       {liveAgents.length > 0 && (
         <label className={controls.field}><span className={controls.label}>{x7T('salesAgent')}</span>
-          <select className={controls.select} value={s.agent_id ?? ''} onChange={(e) => s.patch({ agent_id: e.target.value || undefined })}>
+          <SelectField className={controls.select} value={s.agent_id ?? ''} onChange={(e) => s.patch({ agent_id: e.target.value || undefined })}>
             <option value="">{x7T('noAgent')}</option>
             {liveAgents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select></label>
+          </SelectField></label>
       )}
       {offers.length > 0 && OFFER_DOCS.has(s.doc_type) && (s.offer || skipOffer) && (
         <div className={own.offerLine} data-offer-line>

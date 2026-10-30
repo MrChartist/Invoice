@@ -28,6 +28,7 @@ import controls from '../styles/controls.module.css';
 import styles from '../components/payroll/Payroll.module.css';
 import tabs from '../styles/tabs.module.css';
 import { PAYROLL_TABS, type PayrollTab } from './page-tabs'; // R6-B1
+import { DateField } from '../components/ui/DateField';
 
 const TABS = PAYROLL_TABS; // R6-B1: list in payroll-tabs.ts
 type Tab = PayrollTab;
@@ -73,7 +74,7 @@ export function Payroll() {
         MONTH_TABS.includes(tab) ? (
           <label className={controls.field}>
             <span className={controls.label}>{pT('month')}</span>
-            <input className={controls.input} type="month" value={month} onChange={(e) => e.target.value && set('month', e.target.value)} />
+            <DateField className={controls.input} mode="month" value={month} onChange={(e) => e.target.value && set('month', e.target.value)} />
           </label>
         ) : undefined
       }

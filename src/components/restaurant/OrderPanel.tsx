@@ -29,6 +29,7 @@ import { rT } from '../../i18n/areas/restaurant';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './restaurant.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const SplitBillDialog = lazy(() => import('./SplitBillDialog').then((m) => ({ default: m.SplitBillDialog })));
 const ModifierPicker = lazy(() => import('./ModifierPicker').then((m) => ({ default: m.ModifierPicker })));
@@ -401,9 +402,9 @@ export function OrderPanel(p: OrderPanelProps) {
             <p className={styles.muted}>{rT('payersNote')}</p>
             <label className={controls.field}>
               <span className={controls.label}>{rT('method')}</span>
-              <select className={controls.select} value={payerMethod} onChange={(e) => setPayerMethod(e.target.value as TenderMethod)}>
+              <SelectField className={controls.select} value={payerMethod} onChange={(e) => setPayerMethod(e.target.value as TenderMethod)}>
                 {METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
+              </SelectField>
             </label>
             {order.payers.map((r, i) => (
               <div key={i} className={styles.partRow}>
@@ -546,9 +547,9 @@ export function OrderPanel(p: OrderPanelProps) {
           </p>
           <label className={controls.field}>
             <span className={controls.label}>{rT('reason')}</span>
-            <select className={controls.select} value={reason} onChange={(e) => setReason(e.target.value as CancelReason)} id="cancel-reason">
+            <SelectField className={controls.select} value={reason} onChange={(e) => setReason(e.target.value as CancelReason)} id="cancel-reason">
               {CANCEL_REASONS.map((r) => <option key={r} value={r}>{rT(`r.${r}`)}</option>)}
-            </select>
+            </SelectField>
           </label>
         </Modal>
       )}
@@ -587,17 +588,17 @@ export function OrderPanel(p: OrderPanelProps) {
         >
           {moveOpen === 'move' ? (
             freeTables.length ? (
-              <select className={controls.select} value={target} onChange={(e) => setTarget(e.target.value)} aria-label={rT('pickTable')}>
+              <SelectField className={controls.select} value={target} onChange={(e) => setTarget(e.target.value)} aria-label={rT('pickTable')}>
                 <option value="">-</option>
                 {freeTables.map((t) => <option key={t.id} value={t.id}>{rT('tableN', { name: t.name })}</option>)}
-              </select>
+              </SelectField>
             ) : <p>{rT('noFree')}</p>
           ) : others.length ? (
             <>
-              <select className={controls.select} value={target} onChange={(e) => setTarget(e.target.value)} aria-label={rT('pickOrder')}>
+              <SelectField className={controls.select} value={target} onChange={(e) => setTarget(e.target.value)} aria-label={rT('pickOrder')}>
                 <option value="">-</option>
                 {others.map((o) => <option key={o.id} value={o.id}>{p.whereOf(o)}</option>)}
-              </select>
+              </SelectField>
               {moveOpen === 'transfer' && (
                 <div className={styles.parts}>
                   {order.lines.filter((l) => !l.modifier_of).map((l) => (

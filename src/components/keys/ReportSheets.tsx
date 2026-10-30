@@ -15,6 +15,8 @@ import type { LiveReport } from '../../lib/keys/report-keys';
 import { Modal } from '../ui/Modal';
 import controls from '../../styles/controls.module.css';
 import lg from '../books/ledger/ledger.module.css';
+import { TypedInput } from '../ui/TypedInput';
+import { SelectField } from '../ui/SelectField';
 
 // Inline styles: no stylesheet of its own (a new CSS file would join every report route's preload list).
 const s = {
@@ -97,7 +99,7 @@ function FilterSheet({ live }: { live: LiveReport }) {
   const box = (k: keyof typeof f, label: string, type = 'text') => (
     <label className={controls.field}>
       <span className={controls.label}>{label}</span>
-      <input className={controls.input} type={type} inputMode={type === 'number' ? 'decimal' : undefined} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} data-filter={k} />
+      <TypedInput className={controls.input} type={type} inputMode={type === 'number' ? 'decimal' : undefined} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} data-filter={k} />
     </label>
   );
   return (
@@ -122,11 +124,11 @@ function FilterSheet({ live }: { live: LiveReport }) {
         {live.dated && box('narr', T('narr'))}
         <label className={controls.field}>
           <span className={controls.label}>{T('side')}</span>
-          <select className={controls.select} value={f.side} onChange={(e) => setF({ ...f, side: e.target.value })}>
+          <SelectField className={controls.select} value={f.side} onChange={(e) => setF({ ...f, side: e.target.value })}>
             <option value="">{T('any')}</option>
             <option value="dr">{T('dr')}</option>
             <option value="cr">{T('cr')}</option>
-          </select>
+          </SelectField>
         </label>
         <button type="submit" hidden />
       </form>

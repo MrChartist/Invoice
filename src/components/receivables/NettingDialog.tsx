@@ -12,6 +12,8 @@ import { useT } from '../../i18n';
 import { netT } from '../../i18n/areas/netting-r15a';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 /** R15-A3 vendor form row: link the supplier to the client it also is, and open Netting for that party. */
 export function NettingLinkRow({ vendor, onChange }: { vendor: Vendor; onChange: (clientId: string | undefined) => void }) {
@@ -21,10 +23,10 @@ export function NettingLinkRow({ vendor, onChange }: { vendor: Vendor; onChange:
   return (
     <div className={controls.field}>
       <label className={controls.label} htmlFor="v-netting">{netT('link')}</label>
-        <select id="v-netting" className={controls.select} value={vendor.client_id ?? ''} onChange={(e) => onChange(e.target.value || undefined)} data-netting-link>
+        <SelectField id="v-netting" className={controls.select} value={vendor.client_id ?? ''} onChange={(e) => onChange(e.target.value || undefined)} data-netting-link>
           <option value="">{netT('linkNone')}{!vendor.client_id && match ? ` ${match.name}` : ''}</option>
           {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        </SelectField>
       {match && vendor.id && <Link className={controls.btnGhost} to={`/receivables?netting=${encodeURIComponent(match.id ?? '')}`}>{netT('title')}</Link>}
     </div>
   );
@@ -92,9 +94,9 @@ export default function NettingDialog({ clientId, vendorId, onClose, onDone }: {
         {!pair && <p className={controls.hint}>{netT('none')}</p>}
         {pairs.length > 1 && (
           <label className={controls.field}>
-            <select className={controls.select} aria-label={netT('title')} value={pick} onChange={(e) => { setPick(Number(e.target.value)); setInv(new Set()); setBil(new Set()); }}>
+            <SelectField className={controls.select} aria-label={netT('title')} value={pick} onChange={(e) => { setPick(Number(e.target.value)); setInv(new Set()); setBil(new Set()); }}>
               {pairs.map((p, i) => <option key={p.vendor.id} value={i}>{p.client.name}{p.vendor.name !== p.client.name ? ` / ${p.vendor.name}` : ''}</option>)}
-            </select>
+            </SelectField>
           </label>
         )}
         {pair && (
@@ -108,7 +110,7 @@ export default function NettingDialog({ clientId, vendorId, onClose, onDone }: {
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{netT('date')}</span>
-                <input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
               </label>
             </div>
             {bills.some((b) => bil.has(b.id) && b.rcm) && (

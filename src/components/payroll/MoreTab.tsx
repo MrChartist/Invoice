@@ -30,6 +30,8 @@ import styles from './Payroll.module.css';
 import { ActuarialPanel } from './ActuarialPanel';
 import { Out } from './Out';
 import { inr, parseAmount, runAction, type TabProps } from './shared';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type YearRow = { fy: string; regime: TaxRegime; income: string; arrears: string };
 const toRow = (y: Relief89Year): YearRow => ({ fy: String(y.fy), regime: y.regime, income: String(y.income), arrears: String(y.arrears) });
@@ -99,16 +101,16 @@ function ReliefPanel({ month, version, refresh, notify }: TabProps) {
         <div className={styles.formGrid}>
           <label className={controls.field}>
             <span className={controls.label}>{pT('rep.employee')}</span>
-            <select className={controls.select} value={emp?.id ?? ''} onChange={(e) => load(e.target.value)}>
+            <SelectField className={controls.select} value={emp?.id ?? ''} onChange={(e) => load(e.target.value)}>
               {employees.map((e) => <option key={e.id} value={e.id}>{e.code} · {e.name}</option>)}
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{mT('r89.regime', { fy: fyText })}</span>
-            <select className={controls.select} value={regime} onChange={(e) => setRegime(e.target.value as TaxRegime)}>
+            <SelectField className={controls.select} value={regime} onChange={(e) => setRegime(e.target.value as TaxRegime)}>
               <option value="new">{mT('regime.new')}</option>
               <option value="old">{mT('regime.old')}</option>
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{mT('r89.incomeWith')}</span>
@@ -129,10 +131,10 @@ function ReliefPanel({ month, version, refresh, notify }: TabProps) {
                   <tr key={i}>
                     <td><input className={controls.inputNumeric} type="number" min="1990" max={fy - 1} aria-label={mT('r89.year')} value={y.fy} onChange={(e) => setYear(i, { fy: e.target.value })} /></td>
                     <td>
-                      <select className={controls.select} aria-label={mT('r89.regimeCol')} value={y.regime} onChange={(e) => setYear(i, { regime: e.target.value as TaxRegime })}>
+                      <SelectField className={controls.select} aria-label={mT('r89.regimeCol')} value={y.regime} onChange={(e) => setYear(i, { regime: e.target.value as TaxRegime })}>
                         <option value="new">{mT('regime.new')}</option>
                         <option value="old">{mT('regime.old')}</option>
-                      </select>
+                      </SelectField>
                     </td>
                     <td className={styles.num}><input className={controls.inputNumeric} type="number" aria-label={mT('r89.income')} value={y.income} onChange={(e) => setYear(i, { income: e.target.value })} /></td>
                     <td className={styles.num}><input className={controls.inputNumeric} type="number" min="0" aria-label={mT('r89.arrears')} value={y.arrears} onChange={(e) => setYear(i, { arrears: e.target.value })} /></td>
@@ -235,9 +237,9 @@ function PerqPanel({ month, version, refresh, notify }: TabProps) {
   const pick = (k: string, label: string, opts: [string, string][]) => (
     <label className={controls.field} key={k}>
       <span className={controls.label}>{label}</span>
-      <select className={controls.select} value={f[k] ?? opts[0][0]} onChange={(e) => set(k, e.target.value)}>
+      <SelectField className={controls.select} value={f[k] ?? opts[0][0]} onChange={(e) => set(k, e.target.value)}>
         {opts.map(([val, text]) => <option key={val} value={val}>{text}</option>)}
-      </select>
+      </SelectField>
     </label>
   );
   const employee = empId || employees[0]?.id || '';
@@ -253,18 +255,18 @@ function PerqPanel({ month, version, refresh, notify }: TabProps) {
         <div className={styles.formGrid}>
           <label className={controls.field}>
             <span className={controls.label}>{pT('rep.employee')}</span>
-            <select className={controls.select} value={employee} onChange={(e) => setEmpId(e.target.value)}>
+            <SelectField className={controls.select} value={employee} onChange={(e) => setEmpId(e.target.value)}>
               {employees.map((e) => <option key={e.id} value={e.id}>{e.code} · {e.name}</option>)}
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{pT('ext.perqKind')}</span>
-            <select className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as CalcKind)}>
+            <SelectField className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as CalcKind)}>
               {PERQ_KINDS.map((k) => <option key={k} value={k}>{pT(KIND_KEY[k])}</option>)}
-            </select>
+            </SelectField>
           </label>
-          <label className={controls.field}><span className={controls.label}>{pT('ext.perqFrom')}</span><input className={controls.input} type="month" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-          {!oneOff && <label className={controls.field}><span className={controls.label}>{pT('ext.perqTo')}</span><input className={controls.input} type="month" value={to} onChange={(e) => setTo(e.target.value)} /></label>}
+          <label className={controls.field}><span className={controls.label}>{pT('ext.perqFrom')}</span><DateField className={controls.input} mode="month" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+          {!oneOff && <label className={controls.field}><span className={controls.label}>{pT('ext.perqTo')}</span><DateField className={controls.input} mode="month" value={to} onChange={(e) => setTo(e.target.value)} /></label>}
         </div>
         <div className={styles.formGrid}>
           {kind === 'car' && [

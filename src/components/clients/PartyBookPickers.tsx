@@ -9,6 +9,7 @@ import { useT } from '../../i18n';
 import { s2T } from '../../i18n/areas/sales-r2';
 import controls from '../../styles/controls.module.css';
 import styles from './clients.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /**
  * R2-B4 in the editor: "Kind attn." contact picker and a ship-to picker from the party's address book,
@@ -49,7 +50,7 @@ export function PartyBookPickers() {
       {(contacts.length > 0 || attention) && (
         <label className={controls.field}>
           <span className={controls.label}>{s2T('c.pickContact')}</span>
-          <select className={controls.select} value={currentContact} data-attention-pick
+          <SelectField className={controls.select} value={currentContact} data-attention-pick
             onChange={(e) => {
               const c = contacts.find((x) => x.id === e.target.value);
               if (e.target.value === '__snap') return;
@@ -58,20 +59,20 @@ export function PartyBookPickers() {
             <option value="">{s2T('c.noContact')}</option>
             {currentContact === '__snap' && attention && <option value="__snap">{attentionText(attention)}</option>}
             {contacts.map((c) => <option key={c.id} value={c.id}>{[c.name, c.role].filter(Boolean).join(', ')}</option>)}
-          </select>
+          </SelectField>
         </label>
       )}
       {addresses.length > 0 && (
         <label className={controls.field}>
           <span className={controls.label}>{s2T('c.pickShip')}</span>
-          <select className={controls.select} value="" data-ship-pick
+          <SelectField className={controls.select} value="" data-ship-pick
             onChange={(e) => {
               const a = addresses.find((x) => x.id === e.target.value);
               if (a) patch({ ship_to: addressToShipTo(a, master) });
             }}>
             <option value="">-</option>
             {addresses.map((a) => <option key={a.id} value={a.id}>{a.label}{a.city ? `: ${a.city}` : ''}</option>)}
-          </select>
+          </SelectField>
         </label>
       )}
       {canSave && (

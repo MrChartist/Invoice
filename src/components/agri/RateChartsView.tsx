@@ -9,6 +9,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { clientOpts, milkOpts, sm, useRun, wrap, type Done } from './dairy-kit';
 import { F, N, Sel } from './dairy-ui';
+import { DateField } from '../ui/DateField';
 
 type Basis = MilkRateChart['basis'];
 const BASES: readonly Basis[] = ['matrix', 'two_axis', 'fat_kg', 'ts_kg', 'flat'];
@@ -72,7 +73,7 @@ export default function RateChartsView({ onDone }: { onDone: Done }) {
         <Sel l={bT('milk')} v={c.milk} set={(milk) => set({ milk })} opts={milkOpts()} />
         <Sel l={bT('basis')} v={c.basis} set={(basis) => set({ basis })} opts={BASES.map((b) => [b, bT(`basis.${b}`)] as const)} w={180} d="chart-basis" />
         <Sel l={bT('unit')} v={c.unit} set={(unit) => set({ unit })} opts={[['L', 'L'], ['KG', 'kg']]} w={80} d="chart-unit" />
-        <F l={bT('from')} w={160}><input type="date" className={controls.input} value={c.from} onChange={(e) => set({ from: e.target.value })} data-dairy="chart-from" /></F>
+        <F l={bT('from')} w={160}><DateField className={controls.input} value={c.from} onChange={(e) => set({ from: e.target.value })} data-dairy="chart-from" /></F>
         <Sel l={bT('buyer')} v={c.buyer} set={(buyer) => set({ buyer })} opts={[['', bT('farmersChart')], ...clientOpts()]} w={200} d="chart-buyer" />
       </div>
       {c.basis === 'matrix' ? (

@@ -18,6 +18,7 @@ import { payrollT as pT } from '../../i18n/areas/payroll';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
+import { SelectField } from '../ui/SelectField';
 
 interface Props {
   version: number;
@@ -223,24 +224,24 @@ function PayHeadModal({
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{pT('heads.type')}</span>
-          <select className={controls.select} value={f.kind} disabled={statutory} onChange={(e) => set('kind', e.target.value as PayHeadKind)}>
+          <SelectField className={controls.select} value={f.kind} disabled={statutory} onChange={(e) => set('kind', e.target.value as PayHeadKind)}>
             {(['earning', 'deduction', 'employer'] as const).map((k) => <option key={k} value={k}>{pT(KIND_KEY[k])}</option>)}
-          </select>
+          </SelectField>
         </label>
         {!statutory && (
           <label className={controls.field}>
             <span className={controls.label}>{pT('heads.calc')}</span>
-            <select className={controls.select} value={f.calc} onChange={(e) => set('calc', e.target.value as PayHeadCalc)}>
+            <SelectField className={controls.select} value={f.calc} onChange={(e) => set('calc', e.target.value as PayHeadCalc)}>
               {(['attendance', 'flat', 'percent', 'production', 'computed', 'user'] as const).map((c) => <option key={c} value={c}>{pT(CALC_KEY[c])}</option>)}
-            </select>
+            </SelectField>
           </label>
         )}
         <label className={controls.field}>
           <span className={controls.label}>{pT('heads.account')}</span>
-          <select className={controls.select} value={f.account_id ?? ''} onChange={(e) => set('account_id', e.target.value || undefined)}>
+          <SelectField className={controls.select} value={f.account_id ?? ''} onChange={(e) => set('account_id', e.target.value || undefined)}>
             <option value="">{pT('heads.defaultAccount')}</option>
             {accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
-          </select>
+          </SelectField>
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{pT('heads.order')}</span>
@@ -255,11 +256,11 @@ function PayHeadModal({
         {f.calc === 'production' && !statutory && (
           <label className={controls.field}>
             <span className={controls.label}>{pT('heads.unitType')}</span>
-            <select className={controls.select} value={f.unit_type ?? ''} onChange={(e) => set('unit_type', e.target.value || undefined)}>
+            <SelectField className={controls.select} value={f.unit_type ?? ''} onChange={(e) => set('unit_type', e.target.value || undefined)}>
               <option value="">-</option>
               <option value={OT_HOURS_TYPE}>{pT('att.ot')}</option>
               {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+            </SelectField>
           </label>
         )}
       </div>

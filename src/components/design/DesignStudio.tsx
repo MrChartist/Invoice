@@ -11,6 +11,7 @@ import { useT } from '../../i18n';
 import { desT } from '../../i18n/areas/design';
 import { Page } from '../ui/Page';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /**
  * Route-level page for the Design Studio: pick a scope (every profile, or one
@@ -75,24 +76,24 @@ export function DesignStudio() {
         <>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="ds-scope">{desT('appliesTo')}</label>
-            <select id="ds-scope" className={controls.select} value={scope} onChange={(e) => changeScope(e.target.value)}>
+            <SelectField id="ds-scope" className={controls.select} value={scope} onChange={(e) => changeScope(e.target.value)}>
               <option value={GLOBAL_PROFILE_ID}>{desT('allProfiles')}</option>
               {profiles.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.companyName || desT('untitled')}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="ds-template">{desT('previewTemplate')}</label>
-            <select id="ds-template" className={controls.select} value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+            <SelectField id="ds-template" className={controls.select} value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
               {TEMPLATES.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <button type="button" className={cn(controls.btn, controls.btnPrimary)} onClick={save} disabled={!dirty}>
             <Save size={15} aria-hidden="true" /> {desT('saveDesign')}

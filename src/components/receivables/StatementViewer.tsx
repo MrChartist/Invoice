@@ -18,6 +18,7 @@ import styles from './StatementViewer.module.css';
 import { STATEMENT_STYLES, loadStatementPrefs, saveStatementPrefs, type StatementStyle } from '../../lib/statement-styles';
 import { rcv2T as colT } from '../../i18n/areas/collections-rcv';
 import { localDayOf } from '../../lib/dates';
+import { SelectField } from '../ui/SelectField';
 
 export interface StatementViewerProps extends StatementDocumentProps {
   open: boolean;
@@ -146,9 +147,9 @@ export function StatementViewer({ open, onClose, onError, autoWeb, ...doc }: Sta
       <div className={`material ${styles.toolbar} no-print`}>
         <span className={styles.title}>{rcvT('svTitle')}</span>
         <div className={styles.actions}>
-          <select className={controls.select} value={styleKind} aria-label={colT('stStyle')} onChange={(e) => remember(e.target.value as StatementStyle, ageingOn)} data-viewer-style>
+          <SelectField className={controls.select} value={styleKind} aria-label={colT('stStyle')} onChange={(e) => remember(e.target.value as StatementStyle, ageingOn)} data-viewer-style>
             {STATEMENT_STYLES.map((st) => <option key={st} value={st}>{colT(`st.${st}`)}</option>)}
-          </select>
+          </SelectField>
           <label className={controls.check}>
             <input type="checkbox" checked={ageingOn} onChange={(e) => remember(styleKind, e.target.checked)} />
             {colT('stAgeing')}

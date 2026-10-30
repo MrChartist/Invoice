@@ -21,6 +21,8 @@ import type { ManpowerSettings } from '../../types/manpower-r17';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field, type MpViewProps } from './mp-ui';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const bar = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.5rem 0' } as const;
 const CP = ['pf_pct', 'esi_pct', 'bonus_pct', 'leave_pct', 'relieving_pct', 'uniform_per_head'] as const;
@@ -33,14 +35,14 @@ function Settings({ notify }: MpViewProps) {
       <summary className={controls.label}>{mbT('set')}</summary>
       <div style={bar}>
         <Field label={mbT('days')}>
-          <select className={controls.select} value={String(s.billing_days ?? 'calendar')} onChange={(e) => setS({ ...s, billing_days: e.target.value === 'calendar' ? 'calendar' : (Number(e.target.value) as 26 | 30) })}>
+          <SelectField className={controls.select} value={String(s.billing_days ?? 'calendar')} onChange={(e) => setS({ ...s, billing_days: e.target.value === 'calendar' ? 'calendar' : (Number(e.target.value) as 26 | 30) })}>
             <option value="calendar">{mbT('cal')}</option><option value="26">26</option><option value="30">30</option>
-          </select>
+          </SelectField>
         </Field>
         <Field label={mbT('date')}>
-          <select className={controls.select} value={s.bill_date ?? 'month_end'} onChange={(e) => setS({ ...s, bill_date: e.target.value as ManpowerSettings['bill_date'] })}>
+          <SelectField className={controls.select} value={s.bill_date ?? 'month_end'} onChange={(e) => setS({ ...s, bill_date: e.target.value as ManpowerSettings['bill_date'] })}>
             <option value="month_end">{mbT('end')}</option><option value="next_1">{mbT('next')}</option>
-          </select>
+          </SelectField>
         </Field>
         <Field label={`${mpT('serviceCharge')} %`}><input type="number" min={0} max={100} className={controls.input} value={s.service_charge_pct ?? ''} onChange={(e) => setS({ ...s, service_charge_pct: n(e.target.value) })} /></Field>
         <Field label={mbT('extra')}><input className={controls.input} value={s.extra_duty_type_id ?? ''} onChange={(e) => setS({ ...s, extra_duty_type_id: e.target.value.trim() || undefined })} /></Field>
@@ -76,7 +78,7 @@ export default function BillsView({ notify }: MpViewProps) {
   return (
     <section data-mp-bills>
       <div style={bar}>
-        <Field label={mpT('month')}><input type="month" className={controls.input} value={month} onChange={(e) => e.target.value && setParams({ tab: 'deploy', view: 'bills', month: e.target.value }, { replace: true })} data-mp-bills-month /></Field>
+        <Field label={mpT('month')}><DateField mode="month" className={controls.input} value={month} onChange={(e) => e.target.value && setParams({ tab: 'deploy', view: 'bills', month: e.target.value }, { replace: true })} data-mp-bills-month /></Field>
         <button type="button" className={controls.btnPrimary} onClick={() => bill()} data-mp-bill-all>{mbT('billAll')}</button>
       </div>
       {can('settings.manage') && <Settings notify={notify} />}

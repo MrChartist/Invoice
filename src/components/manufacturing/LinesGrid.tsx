@@ -16,6 +16,7 @@ import { isAltC } from '../masters/useMasterKeys';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './manufacturing.module.css';
+import { SelectField } from '../ui/SelectField';
 
 
 export interface GridOptions {
@@ -127,11 +128,11 @@ export function LinesGrid({ lines, items, onChange, opts }: {
             return (
               <tr key={l.id}>
                 <td>
-                  <select id={`ln-${l.id}`} className={controls.select} aria-label={`${opts.label} ${mfgT('lineItem', { n })}`} value={l.item_id} onChange={(e) => patch(l.id, { item_id: e.target.value, unit: undefined, unit_factor: undefined, serials: undefined })}
+                  <SelectField id={`ln-${l.id}`} className={controls.select} aria-label={`${opts.label} ${mfgT('lineItem', { n })}`} value={l.item_id} onChange={(e) => patch(l.id, { item_id: e.target.value, unit: undefined, unit_factor: undefined, serials: undefined })}
                     onKeyDown={createItem(l.id)} aria-keyshortcuts="Alt+C" title={s7T('altCHint')}>
                     <option value="">{mfgT('choose')}</option>
                     {allItems.map((it) => <option key={it.id} value={it.id}>{it.name}{it.unit ? ` (${it.unit})` : ''}</option>)}
-                  </select>
+                  </SelectField>
                 </td>
                 <td>
                   <input
@@ -144,13 +145,13 @@ export function LinesGrid({ lines, items, onChange, opts }: {
                 {anyAlt && (
                   <td>
                     {item && cleanAltUnits(item.alt_units, item.unit || 'NOS') ? (
-                      <select className={controls.select} aria-label={`${opts.label} ${mfgT('lineUnit', { n })}`} value={l.unit || item.unit}
+                      <SelectField className={controls.select} aria-label={`${opts.label} ${mfgT('lineUnit', { n })}`} value={l.unit || item.unit}
                         onChange={(e) => {
                           const p = lineUnitPatch(item, l, e.target.value);
                           patch(l.id, { unit: p.unit_factor ? p.unit : undefined, unit_factor: p.unit_factor, ...(l.rate ? { rate: p.rate || undefined } : {}), qty: roundTypedQty(l.qty, p.unit, opts.units ?? []) });
                         }}>
                         {unitChoices(item).map((c) => <option key={c.unit} value={c.unit}>{c.unit}</option>)}
-                      </select>
+                      </SelectField>
                     ) : <span className={styles.muted}>{item?.unit ?? ''}</span>}
                   </td>
                 )}
@@ -162,10 +163,10 @@ export function LinesGrid({ lines, items, onChange, opts }: {
                 )}
                 {opts.outputs && (
                   <td>
-                    <select className={controls.select} aria-label={`${opts.label} ${n} ${mfgT('kind')}`} value={kind}
+                    <SelectField className={controls.select} aria-label={`${opts.label} ${n} ${mfgT('kind')}`} value={kind}
                       onChange={(e) => patch(l.id, { kind: e.target.value as BomOutputKind })}>
                       {kinds.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-                    </select>
+                    </SelectField>
                   </td>
                 )}
                 {(opts.outputs || opts.valuation) && (
@@ -184,11 +185,11 @@ export function LinesGrid({ lines, items, onChange, opts }: {
                 )}
                 {multi && (
                   <td>
-                    <select className={controls.select} aria-label={`${opts.label} ${n} ${mfgT('godown')}`} value={l.godown_id ?? ''}
+                    <SelectField className={controls.select} aria-label={`${opts.label} ${n} ${mfgT('godown')}`} value={l.godown_id ?? ''}
                       onChange={(e) => patch(l.id, { godown_id: e.target.value || undefined })} onKeyDown={createGodown(l.id)} aria-keyshortcuts="Alt+C">
                       <option value="">-</option>
                       {godownList.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                    </select>
+                    </SelectField>
                   </td>
                 )}
                 {opts.batch && (

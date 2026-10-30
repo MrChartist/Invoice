@@ -13,6 +13,8 @@ import type { JwData, PartyValue } from './lines';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './job-work.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 /** Job Work Out / In orders: what a job worker is to process, or what a principal sent us to process. */
 export function OrdersPanel({ data, goTo }: { data: JwData; goTo: (s: 'out' | 'in' | 'principal') => void }) {
@@ -133,7 +135,7 @@ function OrderModal({ data, order, onClose }: { data: JwData; order: JobWorkOrde
         <div className={controls.row3}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwo-date">{jwT('date')}</label>
-            <input id="jwo-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="jwo-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <PartyField label={direction === 'out' ? jwT('jobWorker') : jwT('principal')} value={party} onChange={setParty} parties={direction === 'out' ? data.parties : data.clients} kind={direction === 'out' ? 'vendor' : 'client'} />
         </div>
@@ -148,17 +150,17 @@ function OrderModal({ data, order, onClose }: { data: JwData; order: JobWorkOrde
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwo-due">{jwT('dueDate')}</label>
-            <input id="jwo-due" type="date" className={controls.input} value={due} onChange={(e) => setDue(e.target.value)} />
+            <DateField id="jwo-due" className={controls.input} value={due} onChange={(e) => setDue(e.target.value)} />
           </div>
         </div>
         {direction === 'out' && (
           <div className={controls.row3}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="jwo-item">{jwT('finishedItem')}</label>
-              <select id="jwo-item" className={controls.select} value={finished} onChange={(e) => { setFinished(e.target.value); setBomId(bomsDb.forItem(e.target.value)[0]?.id ?? ''); }}>
+              <SelectField id="jwo-item" className={controls.select} value={finished} onChange={(e) => { setFinished(e.target.value); setBomId(bomsDb.forItem(e.target.value)[0]?.id ?? ''); }}>
                 <option value="">{jwT('none')}</option>
                 {tracked.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-              </select>
+              </SelectField>
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="jwo-qty">{jwT('finishedQty')}</label>
@@ -166,10 +168,10 @@ function OrderModal({ data, order, onClose }: { data: JwData; order: JobWorkOrde
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="jwo-bom">{jwT('bom')}</label>
-              <select id="jwo-bom" className={controls.select} value={bomId} onChange={(e) => setBomId(e.target.value)} disabled={!finished}>
+              <SelectField id="jwo-bom" className={controls.select} value={bomId} onChange={(e) => setBomId(e.target.value)} disabled={!finished}>
                 <option value="">{jwT('noBom')}</option>
                 {boms.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+              </SelectField>
             </div>
           </div>
         )}

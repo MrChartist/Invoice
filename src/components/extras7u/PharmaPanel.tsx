@@ -21,6 +21,8 @@ import { phT } from '../../i18n/areas/pharma-ops';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from './x7u.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Notify = (m: string, tone?: 'success' | 'error' | 'info') => void;
 
@@ -90,10 +92,10 @@ export function PharmaPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
                   {shown.map((i) => (
                     <li key={i.id} className={own.item}>
                       <span>{i.name}</span>
-                      <select className={cn(controls.select, own.auto)} value={i.drug_schedule ?? ''} disabled={!can('master.edit')} onChange={(e) => flag(i.id, e.target.value as DrugSchedule | '')} aria-label={x7T('scheduleOf', { name: i.name })}>
+                      <SelectField className={cn(controls.select, own.auto)} value={i.drug_schedule ?? ''} disabled={!can('master.edit')} onChange={(e) => flag(i.id, e.target.value as DrugSchedule | '')} aria-label={x7T('scheduleOf', { name: i.name })}>
                         <option value="">{x7T('noSchedule')}</option>
                         {DRUG_SCHEDULES.map((x) => <option key={x} value={x}>{x7T('scheduleX', { s: x })}</option>)}
-                      </select>
+                      </SelectField>
                     </li>
                   ))}
                 </ul>
@@ -103,9 +105,9 @@ export function PharmaPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
             <p className={own.sub}>{x7T('h1Register')}</p>
             <div className={own.row}>
               <label className={controls.field}><span className={controls.label}>{x7T('from')}</span>
-                <input className={controls.input} type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+                <DateField className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
               <label className={controls.field}><span className={controls.label}>{x7T('to')}</span>
-                <input className={controls.input} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+                <DateField className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></label>
               <label className={controls.check}><input type="checkbox" checked={withX} onChange={(e) => setWithX(e.target.checked)} /> {x7T('includeX')}</label>
             </div>
             {rows.length === 0 ? <p className={own.muted}>{x7T('noH1')}</p> : (

@@ -16,6 +16,7 @@ import controls from '../../styles/controls.module.css';
 import styles from './restaurant.module.css';
 import { StationsPanel } from './StationsPanel';
 import { ModifiersPanel } from './ModifiersPanel';
+import { SelectField } from '../ui/SelectField';
 
 type Tab = 'areas' | 'stations' | 'modifiers' | 'printers' | 'rules';
 
@@ -78,10 +79,10 @@ export function TablesSettings({ catalog, stockGroups, onClose, onSaved, notify 
               <label className={controls.field}><span className={controls.label}>{rT('areaName')}</span><input className={controls.input} value={a.name} onChange={(e) => setAreas((r) => r.map((x) => (x.id === a.id ? { ...x, name: e.target.value } : x)))} /></label>
               <label className={controls.field}>
                 <span className={controls.label}>{rT('priceLevel')}</span>
-                <select className={controls.select} value={a.price_level_id ?? ''} onChange={(e) => setAreas((r) => r.map((x) => (x.id === a.id ? { ...x, price_level_id: e.target.value || undefined } : x)))}>
+                <SelectField className={controls.select} value={a.price_level_id ?? ''} onChange={(e) => setAreas((r) => r.map((x) => (x.id === a.id ? { ...x, price_level_id: e.target.value || undefined } : x)))}>
                   <option value="">{rT('noLevel')}</option>
                   {levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-                </select>
+                </SelectField>
               </label>
               <label className={cn(controls.field, styles.narrow)} title={rT('scHelp')}><span className={controls.label}>{rT('scPct')}</span><NumberInput className={controls.input} value={a.service_charge_pct ?? 0} onChange={(v) => setAreas((r) => r.map((x) => (x.id === a.id ? { ...x, service_charge_pct: v > 0 ? v : undefined } : x)))} /></label>
               <button type="button" className={controls.btnDanger} disabled={areas.length < 2 || tables.some((t) => t.area_id === a.id)} onClick={() => setAreas((r) => r.filter((x) => x.id !== a.id))} aria-label={rT('remove', { name: a.name })}><Trash2 size={14} /></button>
@@ -96,9 +97,9 @@ export function TablesSettings({ catalog, stockGroups, onClose, onSaved, notify 
               <label className={cn(controls.field, styles.narrow)}><span className={controls.label}>{rT('seats')}</span><NumberInput className={controls.input} value={t.seats} blankZero={false} onChange={(v) => setTables((r) => r.map((x) => (x.id === t.id ? { ...x, seats: v } : x)))} /></label>
               <label className={controls.field}>
                 <span className={controls.label}>{rT('areaName')}</span>
-                <select className={controls.select} value={t.area_id} onChange={(e) => setTables((r) => r.map((x) => (x.id === t.id ? { ...x, area_id: e.target.value } : x)))}>
+                <SelectField className={controls.select} value={t.area_id} onChange={(e) => setTables((r) => r.map((x) => (x.id === t.id ? { ...x, area_id: e.target.value } : x)))}>
                   {areas.map((a) => <option key={a.id} value={a.id}>{(a.name === STARTER_AREA_NAME ? rT('chDine') : a.name) || '-'}</option>)}
-                </select>
+                </SelectField>
               </label>
               <button type="button" className={controls.btnDanger} onClick={() => setTables((r) => r.filter((x) => x.id !== t.id))} aria-label={rT('remove', { name: t.name })}><Trash2 size={14} /></button>
             </div>
@@ -124,16 +125,16 @@ export function TablesSettings({ catalog, stockGroups, onClose, onSaved, notify 
                 <strong className={styles.narrow}>{s}</strong>
                 <label className={controls.field}>
                   <span className={controls.label}>{rT('pMode')}</span>
-                  <select className={controls.select} value={p.mode} onChange={(e) => setPrinters((x) => ({ ...x, [s]: { ...p, mode: e.target.value as PrinterMode } }))}>
+                  <SelectField className={controls.select} value={p.mode} onChange={(e) => setPrinters((x) => ({ ...x, [s]: { ...p, mode: e.target.value as PrinterMode } }))}>
                     {(['browser', 'raw', 'serial', 'bluetooth'] as PrinterMode[]).map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
                 <label className={controls.field}>
                   <span className={controls.label}>{rT('pWidth')}</span>
-                  <select className={controls.select} value={p.width} onChange={(e) => setPrinters((x) => ({ ...x, [s]: { ...p, width: Number(e.target.value) === 58 ? 58 : 80 } }))}>
+                  <SelectField className={controls.select} value={p.width} onChange={(e) => setPrinters((x) => ({ ...x, [s]: { ...p, width: Number(e.target.value) === 58 ? 58 : 80 } }))}>
                     <option value={80}>80 mm</option>
                     <option value={58}>58 mm</option>
-                  </select>
+                  </SelectField>
                 </label>
               </div>
             );

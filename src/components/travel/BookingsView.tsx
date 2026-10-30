@@ -30,6 +30,8 @@ import ReissueForm from './ReissueForm';
 import { billCommission, commBilled } from '../../lib/travel/tv-commission';
 import { r16cT } from '../../i18n/areas/travel-r16c';
 import { sectionText } from '../../lib/ita2025';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const FILTERS = ['all', 'unconfirmed', 'unbilled', 'unpaid', 'next7'] as const;
 const BSTS = ['held', 'confirmed', 'cancelled'] as const;
@@ -116,13 +118,13 @@ function BookingForm({ tripId, vendors, onAdd }: { tripId: string; vendors: { id
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginTop: '0.75rem' }} data-tv-booking-form>
       <Field label={tvT('component')}><ListSelect list="comps" ids={TV_COMPONENTS} value={f.component} onChange={(component) => set({ component })} attr="data-tv-b-comp" /></Field>
       <Field label={tvT('supplier')}>
-        <select className={controls.select} value={f.vendor_id} onChange={(e) => set({ vendor_id: e.target.value })}>
+        <SelectField className={controls.select} value={f.vendor_id} onChange={(e) => set({ vendor_id: e.target.value })}>
           <option value="">-</option>
           {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-        </select>
+        </SelectField>
       </Field>
       <Field label={tvT('ref')}><input className={controls.input} value={f.ref} onChange={(e) => set({ ref: e.target.value })} /></Field>
-      <Field label={tvT('from')}><input type="date" className={controls.input} value={f.start} onChange={(e) => set({ start: e.target.value })} /></Field>
+      <Field label={tvT('from')}><DateField className={controls.input} value={f.start} onChange={(e) => set({ start: e.target.value })} /></Field>
       {num('cost', 'data-tv-b-cost')}
       <Field label="₹ / FX"><input className={controls.input} value={f.cost_currency} maxLength={3} onChange={(e) => set({ cost_currency: e.target.value.toUpperCase() })} /></Field>
       {f.cost_currency !== 'INR' && num('fx', 'data-tv-b-fx')}

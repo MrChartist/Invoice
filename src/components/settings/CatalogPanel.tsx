@@ -45,6 +45,7 @@ import { reachT } from '../../i18n/areas/reach';
 import { itemImageData, storeItemImage } from '../../lib/item-images';
 import { stockGroupsDb } from '../../lib/stock-groups';
 import { errText, libMsg } from '../../i18n/lib-msg';
+import { SelectField } from '../ui/SelectField';
 
 const LabelSheetModal = lazy(() => import('./LabelSheetModal').then((m) => ({ default: m.LabelSheetModal })));
 
@@ -310,10 +311,10 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
             <div className={controls.row}>
               <label className={controls.field}>
                 <span className={controls.label}>{setT('type')}</span>
-                <select className={controls.select} value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })}>
+                <SelectField className={controls.select} value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })}>
                   <option value="Service">{setT('type.Service')}</option>
                   <option value="Product">{setT('type.Product')}</option>
-                </select>
+                </SelectField>
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{setT('thHsn')}</span>
@@ -341,21 +342,21 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{setT('gstRate')}</span>
-                <select className={controls.select} value={draft.tax_rate} onChange={(e) => setDraft({ ...draft, tax_rate: Number(e.target.value) })}>
+                <SelectField className={controls.select} value={draft.tax_rate} onChange={(e) => setDraft({ ...draft, tax_rate: Number(e.target.value) })}>
                   {gstRateOptions(undefined, draft.tax_rate).map((r) => (
                     <option key={r} value={r}>
                       {r}%
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{setT('unit')}</span>
-                <select className={controls.select} value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })}>
+                <SelectField className={controls.select} value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })}>
                   {UNITS.map((u) => (
                     <option key={u}>{u}</option>
                   ))}
-                </select>
+                </SelectField>
               </label>
             </div>
             <div className={controls.row3}>
@@ -459,10 +460,10 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
               />
               <label className={controls.field}>
                 <span className={controls.label}>{reachT('category')}</span>
-                <select className={controls.select} value={draft.group_id ?? ''} onChange={(e) => setDraft({ ...draft, group_id: e.target.value })}>
+                <SelectField className={controls.select} value={draft.group_id ?? ''} onChange={(e) => setDraft({ ...draft, group_id: e.target.value })}>
                   <option value="">{reachT('noCategory')}</option>
                   {stockGroupsDb.all().map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                </select>
+                </SelectField>
               </label>
             </div>
 
@@ -479,10 +480,10 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                 </label>
                 <label className={controls.field}>
                   <span className={controls.label}>{pkT('weightUnit')}</span>
-                  <select className={controls.select} value={weights.unit} onChange={(e) => setWeights({ ...weights, unit: e.target.value === 'g' ? 'g' : 'kg' })}>
+                  <SelectField className={controls.select} value={weights.unit} onChange={(e) => setWeights({ ...weights, unit: e.target.value === 'g' ? 'g' : 'kg' })}>
                     <option value="kg">kg</option>
                     <option value="g">g</option>
-                  </select>
+                  </SelectField>
                 </label>
               </div>
             </fieldset>
@@ -575,13 +576,13 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{setT('roundTo')}</span>
-            <select className={controls.select} value={roundMode} onChange={(e) => setRoundMode(e.target.value as RoundTo)}>
+            <SelectField className={controls.select} value={roundMode} onChange={(e) => setRoundMode(e.target.value as RoundTo)}>
               {ROUNDS.map((k) => (
                 <option key={k} value={k}>
                   {setT(`round.${k}`)}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
         </div>
         <p className={controls.hint}>

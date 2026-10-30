@@ -18,6 +18,8 @@ import { interestText, loadInterestRuns, loadInterestSettings, overlaps, partyIn
 import { downloadCsv } from './desk-shared';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const money = (n: number) => formatCurrency(n);
 
@@ -68,14 +70,14 @@ export default function InterestTab({ onDone }: { onDone: (msg: string, error?: 
   return (
     <div className={own.stack} data-interest-tab>
       <div className={own.row}>
-        <label className={controls.field}><span className={controls.label}>{aT('asOf')}</span><input type="date" className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value)} /></label>
+        <label className={controls.field}><span className={controls.label}>{aT('asOf')}</span><DateField className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value)} /></label>
         <label className={controls.field}><span className={controls.label}>{aT('rate')}</span><input type="number" min={0} max={100} className={controls.input} value={s.rate ?? ''} onChange={(e) => set({ rate: Number(e.target.value) || 0 })} data-interest-rate /></label>
         <label className={controls.field}><span className={controls.label}>{aT('grace')}</span><input type="number" min={0} className={controls.input} value={s.grace_days ?? ''} onChange={(e) => set({ grace_days: Number(e.target.value) || 0 })} /></label>
         <label className={controls.field}><span className={controls.label}>{aT('basisFrom')}</span>
-          <select className={controls.select} value={s.basis ?? 'due'} onChange={(e) => set({ basis: e.target.value as 'due' | 'bill' })}>
+          <SelectField className={controls.select} value={s.basis ?? 'due'} onChange={(e) => set({ basis: e.target.value as 'due' | 'bill' })}>
             <option value="due">{aT('fromDue')}</option>
             <option value="bill">{aT('fromBill')}</option>
-          </select>
+          </SelectField>
         </label>
         <label className={controls.field}><span className={controls.label}>{aT('minAmount')}</span><input type="number" min={0} className={controls.input} value={s.min_amount ?? ''} onChange={(e) => set({ min_amount: Number(e.target.value) || 0 })} /></label>
       </div>

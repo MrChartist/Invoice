@@ -22,6 +22,8 @@ import { formatWhen, toneOf } from './audit-format';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './audit.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 // R4-C5 / C4: auditor pack per FY and the recycle bin (clerks see their own deletes) — lazy dialogs.
 const AuditorPackDialog = lazy(() => import('../trust/AuditorPackDialog'));
@@ -154,33 +156,33 @@ export function ActivityPanel() {
           </label>
           <label className={controls.field}>
             <span className={controls.label}>Area</span>
-            <select className={controls.select} value={entity} onChange={(e) => setEntity(e.target.value as AuditEntity | 'all')}>
+            <SelectField className={controls.select} value={entity} onChange={(e) => setEntity(e.target.value as AuditEntity | 'all')}>
               <option value="all">Everything</option>
               {AUDIT_ENTITIES.filter((x) => payrollOk || !isPayrollAudit({ entity: x })).map((x) => (
                 <option key={x} value={x}>
                   {AUDIT_ENTITY_LABELS[x]}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>Action</span>
-            <select className={controls.select} value={action} onChange={(e) => setAction(e.target.value as AuditAction | 'all')}>
+            <SelectField className={controls.select} value={action} onChange={(e) => setAction(e.target.value as AuditAction | 'all')}>
               <option value="all">Any action</option>
               {AUDIT_ACTIONS.map((x) => (
                 <option key={x} value={x}>
                   {AUDIT_ACTION_LABELS[x]}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>From</span>
-            <input className={controls.input} type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
+            <DateField className={controls.input} value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
           </label>
           <label className={controls.field}>
             <span className={controls.label}>To</span>
-            <input className={controls.input} type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
+            <DateField className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
           </label>
         </div>
 

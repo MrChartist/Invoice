@@ -13,6 +13,8 @@ import { brokerageCsv, brokerageStatement, loadBrokeragePostings, loadBrokers } 
 import type { InvoiceRecord } from '../../types/invoice';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Done = (msg: string, error?: boolean) => void;
 const F = ({ label, children }: { label: string; children: ReactNode }) => (
@@ -59,19 +61,19 @@ export default function BrokersTab({ onDone }: { onDone: Done }) {
       <div className={own.row} data-broker-form>
         <F label={tbT('name')}><input className={controls.input} value={form.name} onChange={(e) => set({ name: e.target.value })} data-broker-name /></F>
         <F label="PAN"><input className={controls.input} value={form.pan ?? ''} onChange={(e) => set({ pan: e.target.value.toUpperCase() })} /></F>
-        <F label={tbT('basis')}><select className={controls.select} value={form.brokerage_basis} onChange={(e) => set({ brokerage_basis: e.target.value as SalesAgent['brokerage_basis'] })} data-broker-basis>{BASES.map((x) => <option key={x} value={x}>{tbT(`basis.${x}`)}</option>)}</select></F>
+        <F label={tbT('basis')}><SelectField className={controls.select} value={form.brokerage_basis} onChange={(e) => set({ brokerage_basis: e.target.value as SalesAgent['brokerage_basis'] })} data-broker-basis>{BASES.map((x) => <option key={x} value={x}>{tbT(`basis.${x}`)}</option>)}</SelectField></F>
         <F label={tbT('rate')}><input type="number" min={0} step="0.01" className={controls.input} value={form.brokerage_rate ?? ''} onChange={(e) => set({ brokerage_rate: Number(e.target.value) })} data-broker-rate /></F>
-        <F label={tbT('paidBy')}><select className={controls.select} value={form.paid_by ?? 'us'} onChange={(e) => set({ paid_by: e.target.value as 'us' })}>{(['us', 'other_party'] as const).map((x) => <option key={x} value={x}>{tbT(`paidBy.${x}`)}</option>)}</select></F>
-        <F label={tbT('payee')}><select className={controls.select} value={form.vendor_id ?? ''} onChange={(e) => set({ vendor_id: e.target.value || undefined })}><option value="">{tbT('none')}</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></F>
+        <F label={tbT('paidBy')}><SelectField className={controls.select} value={form.paid_by ?? 'us'} onChange={(e) => set({ paid_by: e.target.value as 'us' })}>{(['us', 'other_party'] as const).map((x) => <option key={x} value={x}>{tbT(`paidBy.${x}`)}</option>)}</SelectField></F>
+        <F label={tbT('payee')}><SelectField className={controls.select} value={form.vendor_id ?? ''} onChange={(e) => set({ vendor_id: e.target.value || undefined })}><option value="">{tbT('none')}</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</SelectField></F>
         <button type="button" className={controls.btnPrimary} onClick={() => run((m) => { m.saveBroker(form); setForm(blank()); return tbT('done'); })} data-broker-save>{tbT('save')}</button>
         {form.id && <button type="button" className={controls.btnOutline} onClick={() => setForm(blank())}>+ {tbT('broker')}</button>}
       </div>
       {broker && st && (
         <>
           <div className={own.row}>
-            <F label={tbT('broker')}><select className={controls.select} value={broker.id} onChange={(e) => setPick(e.target.value)}>{brokers.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></F>
-            <F label={tbT('from')}><input type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></F>
-            <F label={tbT('to')}><input type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></F>
+            <F label={tbT('broker')}><SelectField className={controls.select} value={broker.id} onChange={(e) => setPick(e.target.value)}>{brokers.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</SelectField></F>
+            <F label={tbT('from')}><DateField className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></F>
+            <F label={tbT('to')}><DateField className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></F>
           </div>
           {st.lines.length === 0 ? <p className={own.muted}>{tbT('noRows')}</p> : (
             <div className={own.tableWrap}>

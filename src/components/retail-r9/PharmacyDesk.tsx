@@ -32,6 +32,8 @@ import type { Doctor, DrugLicence, DrugLicenceForm, Pharmacist } from '../../typ
 import { NumberInput } from '../ui/NumberInput';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 type Done = (msg: string, error?: boolean) => void;
 const VIEWS = ['rx', 'doctors', 'registers', 'refills', 'prices'] as const;
@@ -61,8 +63,8 @@ function useRun(onDone: Done) {
 function Period({ from, to, onFrom, onTo }: { from: string; to: string; onFrom: (v: string) => void; onTo: (v: string) => void }) {
   return (
     <>
-      <label className={controls.field}><span className={controls.label}>{rtbT('from')}</span><input type="date" className={controls.input} value={from} onChange={(e) => onFrom(e.target.value)} /></label>
-      <label className={controls.field}><span className={controls.label}>{rtbT('to')}</span><input type="date" className={controls.input} value={to} onChange={(e) => onTo(e.target.value)} /></label>
+      <label className={controls.field}><span className={controls.label}>{rtbT('from')}</span><DateField className={controls.input} value={from} onChange={(e) => onFrom(e.target.value)} /></label>
+      <label className={controls.field}><span className={controls.label}>{rtbT('to')}</span><DateField className={controls.input} value={to} onChange={(e) => onTo(e.target.value)} /></label>
     </>
   );
 }
@@ -198,10 +200,10 @@ function RegistersView({ onDone }: { onDone: Done }) {
       {kind === 'narcotic' && (
         <div style={wrap}>
           <label className={controls.field}><span className={controls.label}>{rtbT('reg.narcotic')}</span>
-            <select className={controls.select} value={pick} onChange={(e) => setPick(e.target.value)}>
+            <SelectField className={controls.select} value={pick} onChange={(e) => setPick(e.target.value)}>
               <option value="">-</option>
               {items.filter((i) => !i.narcotic).map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select></label>
+            </SelectField></label>
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!pick} onClick={() => run(() => { patchStockItem(pick, { narcotic: true }); setPick(''); return rtbT('saved'); })}>{rtbT('markNarcotic')}</button>
           {items.filter((i) => i.narcotic).map((i) => <button key={i.id} type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => run(() => { patchStockItem(i.id, { narcotic: false }); return rtbT('saved'); })}>{i.name} ✕</button>)}
         </div>
@@ -227,10 +229,10 @@ function Licences({ onDone }: { onDone: Done }) {
       {lics.map((l, i) => (
         <div key={i} style={wrap}>
           <label className={controls.field} style={{ maxWidth: 110 }}><span className={controls.label}>{rtbT('form')}</span>
-            <select className={controls.select} value={l.form} onChange={(e) => patch(i, { form: e.target.value as DrugLicenceForm })}>{FORMS.map((f) => <option key={f} value={f}>{f === 'other' ? rtbT('other') : `Form ${f}`}</option>)}</select></label>
+            <SelectField className={controls.select} value={l.form} onChange={(e) => patch(i, { form: e.target.value as DrugLicenceForm })}>{FORMS.map((f) => <option key={f} value={f}>{f === 'other' ? rtbT('other') : `Form ${f}`}</option>)}</SelectField></label>
           <label className={controls.field}><span className={controls.label}>{rtbT('licenceNo')}</span><input className={controls.input} value={l.number} onChange={(e) => patch(i, { number: e.target.value })} data-rtb-lic-no /></label>
-          <label className={controls.field}><span className={controls.label}>{rtbT('validFrom')}</span><input type="date" className={controls.input} value={l.valid_from ?? ''} onChange={(e) => patch(i, { valid_from: e.target.value || undefined })} /></label>
-          <label className={controls.field}><span className={controls.label}>{rtbT('validTo')}</span><input type="date" className={controls.input} value={l.valid_to ?? ''} onChange={(e) => patch(i, { valid_to: e.target.value || undefined })} data-rtb-lic-to /></label>
+          <label className={controls.field}><span className={controls.label}>{rtbT('validFrom')}</span><DateField className={controls.input} value={l.valid_from ?? ''} onChange={(e) => patch(i, { valid_from: e.target.value || undefined })} /></label>
+          <label className={controls.field}><span className={controls.label}>{rtbT('validTo')}</span><DateField className={controls.input} value={l.valid_to ?? ''} onChange={(e) => patch(i, { valid_to: e.target.value || undefined })} data-rtb-lic-to /></label>
           <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} aria-label={rtbT('delete')} onClick={() => setLics(lics.filter((_, n) => n !== i))}><Trash2 size={14} aria-hidden="true" /></button>
         </div>
       ))}
@@ -309,19 +311,19 @@ function PricesView({ onDone }: { onDone: Done }) {
     <>
       <div style={wrap}>
         <label className={controls.field}><span className={controls.label}>{rtbT('item')}</span>
-          <select className={controls.select} value={id} onChange={(e) => setId(e.target.value)} data-rtb-price-item>
+          <SelectField className={controls.select} value={id} onChange={(e) => setId(e.target.value)} data-rtb-price-item>
             <option value="">-</option>
             {items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-          </select></label>
+          </SelectField></label>
       </div>
       {it && (
         <section className={surface.panel}>
           <p className={controls.hint}>{(it.ceiling_prices ?? []).map((x) => rtbT('ceilingRow', { from: x.from, price: x.price_per_unit.toFixed(2), unit: x.unit || it.unit || '' })).join(' · ') || rtbT('noCeiling')}</p>
           <div style={wrap}>
-            <label className={controls.field}><span className={controls.label}>{rtbT('orderDate')}</span><input type="date" className={controls.input} value={c.from} onChange={(e) => setC({ ...c, from: e.target.value })} /></label>
+            <label className={controls.field}><span className={controls.label}>{rtbT('orderDate')}</span><DateField className={controls.input} value={c.from} onChange={(e) => setC({ ...c, from: e.target.value })} /></label>
             <label className={controls.field} style={{ maxWidth: 140 }}><span className={controls.label}>{rtbT('ceiling')}</span><NumberInput className={controls.input} value={c.price} onChange={(price) => setC({ ...c, price })} data-rtb-ceiling /></label>
             <label className={controls.field} style={{ maxWidth: 120 }}><span className={controls.label}>{rtbT('unit')}</span>
-              <select className={controls.select} value={c.unit} onChange={(e) => setC({ ...c, unit: e.target.value })}>{unitChoices(it).map((u) => <option key={u.unit} value={u.factor === 1 ? '' : u.unit}>{u.unit}</option>)}</select></label>
+              <SelectField className={controls.select} value={c.unit} onChange={(e) => setC({ ...c, unit: e.target.value })}>{unitChoices(it).map((u) => <option key={u.unit} value={u.factor === 1 ? '' : u.unit}>{u.unit}</option>)}</SelectField></label>
             <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!(c.price > 0)} onClick={() => run(() => { patchStockItem(it.id, { ceiling_prices: addCeiling(it.ceiling_prices, { from: c.from, price_per_unit: c.price, unit: c.unit || undefined }) }); return rtbT('saved'); })} data-rtb-ceiling-add>{rtbT('addCeiling')}</button>
           </div>
           <div style={wrap}>

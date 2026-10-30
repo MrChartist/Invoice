@@ -14,6 +14,7 @@ import styles from './ledger.module.css';
 import { useT } from '../../../i18n';
 import { ledgerT } from '../../../i18n/areas/books-ledger';
 import { voucherTypeLabel } from '../../../i18n/areas/books';
+import { SelectField } from '../../ui/SelectField';
 
 interface Props {
   ledger: Ledger;
@@ -36,7 +37,7 @@ export function LedgerTab({ ledger, period, accountId, party, onSelect, onOpenVo
       <div className={`${styles.filters} no-print`}>
         <div className={`${controls.field} ${styles.filterField}`}>
           <label className={controls.label} htmlFor={`${uid}-acct`}>{ledgerT('account')}</label>
-          <select id={`${uid}-acct`} className={controls.select} value={account.id} onChange={(e) => onSelect(e.target.value)}>
+          <SelectField id={`${uid}-acct`} className={controls.select} value={account.id} onChange={(e) => onSelect(e.target.value)}>
             {GROUPS.map((g) => {
               const list = ledger.accounts.filter((a) => a.group === g.id);
               return list.length ? (
@@ -47,17 +48,17 @@ export function LedgerTab({ ledger, period, accountId, party, onSelect, onOpenVo
                 </optgroup>
               ) : null;
             })}
-          </select>
+          </SelectField>
         </div>
         {parties.length > 0 && (
           <div className={`${controls.field} ${styles.filterField}`}>
             <label className={controls.label} htmlFor={`${uid}-party`}>{ledgerT('party')}</label>
-            <select id={`${uid}-party`} className={controls.select} value={party} onChange={(e) => onSelect(account.id, e.target.value)}>
+            <SelectField id={`${uid}-party`} className={controls.select} value={party} onChange={(e) => onSelect(account.id, e.target.value)}>
               <option value="">{ledgerT('allParties')}</option>
               {parties.map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
-            </select>
+            </SelectField>
           </div>
         )}
       </div>

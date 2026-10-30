@@ -24,6 +24,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
 import { gridKeyDown, inr, parseAmount } from './shared';
+import { DateField } from '../ui/DateField';
 
 interface Props {
   month: string;
@@ -122,7 +123,7 @@ export function RunTab({ month, version, refresh, notify }: Props) {
               <>
                 <label className={controls.field}>
                   <span className={controls.label}>{pT('run.date')}</span>
-                  <input className={controls.input} type="date" value={run.date} onChange={(e) => act(() => updateRunDate(run.id, e.target.value))} />
+                  <DateField className={controls.input} value={run.date} onChange={(e) => act(() => updateRunDate(run.id, e.target.value))} />
                 </label>
                 <button type="button" className={controls.btnPrimary} onClick={() => act(() => { const f = finalizeRun(run.id); notify(pT('run.finalized', { number: f.number })); })}>
                   <Lock size={15} /> {pT('run.finalize')}

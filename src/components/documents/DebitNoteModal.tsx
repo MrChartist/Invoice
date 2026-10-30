@@ -10,6 +10,7 @@ import { useT } from '../../i18n';
 import { salesT } from '../../i18n/areas/sales';
 import controls from '../../styles/controls.module.css';
 import styles from './documents.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface DebitNoteModalProps {
   invoice: InvoiceRecord;
@@ -61,9 +62,9 @@ export function DebitNoteModal({ invoice, open, onClose, onCreated }: DebitNoteM
             <input className={controls.input} aria-label={salesT('dn.lineDesc', { n: i + 1 })} value={l.name} onChange={(e) => set(i, { name: e.target.value })} placeholder={salesT('dn.descPh')} />
             <input className={controls.input} aria-label={salesT('dn.lineQty', { n: i + 1 })} type="number" min={0} step="any" value={l.quantity} onChange={(e) => set(i, { quantity: Number(e.target.value) })} />
             <input className={controls.input} aria-label={salesT('dn.lineRate', { n: i + 1 })} type="number" min={0} step="any" value={l.rate || ''} onChange={(e) => set(i, { rate: Number(e.target.value) })} placeholder={salesT('rate')} />
-            <select className={controls.select} aria-label={salesT('dn.lineGst', { n: i + 1 })} value={l.tax_rate} onChange={(e) => set(i, { tax_rate: Number(e.target.value) })}>
+            <SelectField className={controls.select} aria-label={salesT('dn.lineGst', { n: i + 1 })} value={l.tax_rate} onChange={(e) => set(i, { tax_rate: Number(e.target.value) })}>
               {gstRateOptions(undefined, l.tax_rate).map((r) => <option key={r} value={r}>{r}%</option>)}
-            </select>
+            </SelectField>
             {lines.length > 1 && (
               <button type="button" className={controls.btnDanger} aria-label={salesT('dn.removeLine', { n: i + 1 })} onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>
                 <Trash2 size={15} />

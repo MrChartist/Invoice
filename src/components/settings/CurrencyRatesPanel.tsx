@@ -8,6 +8,7 @@ import { reachT } from '../../i18n/areas/reach';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './ShopModePanel.module.css';
+import { DateField } from '../ui/DateField';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
@@ -67,7 +68,7 @@ export function CurrencyRatesPanel({ notify }: { notify: Notify }) {
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{reachT('ratesDate')}</span>
-              <input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{reachT('ratesRate')}</span>

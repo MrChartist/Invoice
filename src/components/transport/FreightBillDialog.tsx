@@ -15,6 +15,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './transport.module.css';
 import { PRINT_FONT, PRINT_FONT_FACE } from '../../lib/print-fonts';
+import { DateField } from '../ui/DateField';
 
 export default function FreightBillDialog({ notify, refresh, tick }: PanelProps) {
   const [range, setRange] = useState({ from: '', to: '' });
@@ -55,9 +56,9 @@ export default function FreightBillDialog({ notify, refresh, tick }: PanelProps)
   return (
     <div className={styles.stack}>
       <div className={styles.toolbar}>
-        <F l={twT('from')}><input className={controls.input} type="date" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} /></F>
-        <F l={twT('to')}><input className={controls.input} type="date" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} /></F>
-        <F l={twT('billDate')}><input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></F>
+        <F l={twT('from')}><DateField className={controls.input} value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} /></F>
+        <F l={twT('to')}><DateField className={controls.input} value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} /></F>
+        <F l={twT('billDate')}><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></F>
       </div>
       {pickable.length === 0 ? <p className={styles.note}>{twT('nothingToBill')}</p> : (
         <div className={surface.tableWrap}>

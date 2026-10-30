@@ -8,6 +8,8 @@ import { dkT } from '../../i18n/areas/desks-r3';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './practice.module.css';
+import { TypedInput } from '../ui/TypedInput';
+import { SelectField } from '../ui/SelectField';
 
 const BLANK: Partial<DscRow> = { holder: '', role: 'director', dsc_class: 'Class 3', token: '', issuer: '', valid_from: '', valid_to: '' };
 const TONE = { expired: styles.bad, urgent: styles.bad, soon: styles.warn, ok: styles.ok } as const;
@@ -36,7 +38,7 @@ export function DscRegister({ onChanged }: { onChanged?: () => void }) {
   const field = (k: keyof DscRow, label: string, type = 'text') => (
     <label className={controls.field}>
       <span className={controls.label}>{label}</span>
-      <input className={controls.input} type={type} value={String(draft[k] ?? '')} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} data-dsc-field={k} />
+      <TypedInput className={controls.input} type={type} value={String(draft[k] ?? '')} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} data-dsc-field={k} />
     </label>
   );
   return (
@@ -79,9 +81,9 @@ export function DscRegister({ onChanged }: { onChanged?: () => void }) {
         {field('holder', dkT('dsc.holder'))}
         <label className={controls.field}>
           <span className={controls.label}>{dkT('dsc.role')}</span>
-          <select className={controls.select} value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value as DscRole })}>
+          <SelectField className={controls.select} value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value as DscRole })}>
             {DSC_ROLES.map((r) => <option key={r} value={r}>{dkT(`dsc.r.${r}` as const)}</option>)}
-          </select>
+          </SelectField>
         </label>
         {field('dsc_class', dkT('dsc.class'))}
         {field('token', dkT('dsc.token'))}

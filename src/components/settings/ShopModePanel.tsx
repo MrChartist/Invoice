@@ -8,6 +8,7 @@ import { PACK_IDS, activePacks, type PackId } from '../../lib/industry-packs';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './ShopModePanel.module.css';
+import { SelectField } from '../ui/SelectField';
 
 interface Props {
   settings: AppSettings;
@@ -44,12 +45,12 @@ export function ShopModePanel({ settings, onChange }: Props) {
         <div className={controls.row}>
           <label className={controls.field}>
             <span className={controls.label}>{reachT('businessType')}</span>
-            <select className={controls.select} value={settings.business_type ?? ''} onChange={(e) => pickType(e.target.value)}>
+            <SelectField className={controls.select} value={settings.business_type ?? ''} onChange={(e) => pickType(e.target.value)}>
               <option value="">{reachT('notSet')}</option>
               {BUSINESS_TYPES.map((b) => (
                 <option key={b} value={b}>{reachT(`type.${b}`)}</option>
               ))}
-            </select>
+            </SelectField>
           </label>
           <div className={styles.actions}>
             {settings.business_type && settings.business_type !== 'full' && (

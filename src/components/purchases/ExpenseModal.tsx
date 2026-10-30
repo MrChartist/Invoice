@@ -27,6 +27,8 @@ import { localDb } from '../../lib/localDb';
 import { SnapshotFields } from '../custom-fields/SnapshotFields';
 import { customFieldsDb, finalizeValues } from '../../lib/custom-fields';
 import { errText } from '../../i18n/lib-msg';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 // R14 PS-B1: the disbursement row (kind, on the client's behalf) — professional companies only, one lazy chunk.
 const DisbursementRow = lazy(() => import('../prof/DisbursementRow'));
@@ -171,15 +173,15 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
       <div className={controls.row}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="exp-cat">{purT('category')}</label>
-          <select id="exp-cat" className={controls.select} value={category} onChange={(e) => setCategory(e.target.value)}>
+          <SelectField id="exp-cat" className={controls.select} value={category} onChange={(e) => setCategory(e.target.value)}>
             {PURCHASE_CATEGORIES.map((c) => (
               <option key={c} value={c}>{purCategory(c)}</option>
             ))}
-          </select>
+          </SelectField>
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="exp-date">{purT('date')}</label>
-          <input id="exp-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField id="exp-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
       </div>
 
@@ -190,11 +192,11 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="exp-tax">{purT('gstRate')}</label>
-          <select id="exp-tax" className={controls.select} value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value))}>
+          <SelectField id="exp-tax" className={controls.select} value={taxRate} onChange={(e) => setTaxRate(Number(e.target.value))}>
             {gstRateOptions(date, taxRate).map((s) => (
               <option key={s} value={s}>{s === 0 ? purT('noGst') : `${s}%`}</option>
             ))}
-          </select>
+          </SelectField>
         </div>
       </div>
 
@@ -219,12 +221,12 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
 
       <div className={controls.field}>
         <label className={controls.label} htmlFor="exp-vendor">{purT('paidTo')}</label>
-        <select id="exp-vendor" className={controls.select} value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+        <SelectField id="exp-vendor" className={controls.select} value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
           <option value="">{purT('notLinked')}</option>
           {vendors.map((v) => (
             <option key={v.id} value={v.id}>{v.name}</option>
           ))}
-        </select>
+        </SelectField>
         {!vendorId && (
           <input
             className={controls.input}
@@ -243,11 +245,11 @@ function ExpenseForm({ expense, vendors, businessState, onSaved, onClose, attach
             {purT('alreadyPaid')}
           </label>
           {paidNow && (
-            <select className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)} aria-label={purT('paymentMethod')}>
+            <SelectField className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)} aria-label={purT('paymentMethod')}>
               {PAYMENT_METHODS.map((m) => (
                 <option key={m} value={m}>{methodLabel(m)}</option>
               ))}
-            </select>
+            </SelectField>
           )}
         </div>
       )}

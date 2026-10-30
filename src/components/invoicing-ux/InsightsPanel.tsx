@@ -17,6 +17,7 @@ import ux from './ux.module.css';
 import { svcT } from '../../i18n/areas/service-r3'; // R3-B7
 import { loadQuietSettings } from '../../lib/quiet-customers';
 import type { Client } from '../../types/invoice';
+import { SelectField } from '../ui/SelectField';
 
 // R14 PS-C5: the registration-threshold card, for a freelancer profile only (lazy).
 const ThresholdView = lazy(() => import('../prof/ThresholdView'));
@@ -72,11 +73,11 @@ export function InsightsPanel({ books, stock }: { books: BooksData; stock: Stock
       <div className={surface.cardHead}>
         <span className={surface.cardHeadIcon}><TrendingUp size={16} /> {uxT('inTitle')}</span>
         {branches.length > 0 && (
-          <select className={controls.select} value={branch} onChange={(e) => setBranch(e.target.value)} aria-label={uxT('inBranch')} data-insight-branch>
+          <SelectField className={controls.select} value={branch} onChange={(e) => setBranch(e.target.value)} aria-label={uxT('inBranch')} data-insight-branch>
             <option value="">{uxT('inAllBranches')}</option>
             {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             <option value={UNASSIGNED}>{uxT('inNoBranch')}</option>
-          </select>
+          </SelectField>
         )}
       </div>
       <div className={surface.cardBody}>

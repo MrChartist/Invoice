@@ -8,6 +8,7 @@ import type { PurchaseRecord } from '../../types/purchases';
 import { rtdT } from '../../i18n/areas/retail-r9d';
 import { formatCurrency } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface ExTender {
   purchaseId: string;
@@ -20,13 +21,13 @@ export default function ExchangeTender({ value, vouchers, onChange }: { value: E
   return (
     <label className={controls.field} data-pos-exchange>
       <span className={controls.label}><RefreshCw size={14} aria-hidden="true" /> {rtdT('exTender')}</span>
-      <select className={controls.select} value={value?.purchaseId ?? ''} onChange={(e) => {
+      <SelectField className={controls.select} value={value?.purchaseId ?? ''} onChange={(e) => {
         const v = vouchers.find((x) => x.purchase.id === e.target.value);
         onChange(v ? { purchaseId: v.purchase.id, amount: v.left, party: v.purchase.vendor_name } : null);
       }} data-pos-exchange-pick>
         <option value="">-</option>
         {vouchers.map((x) => <option key={x.purchase.id} value={x.purchase.id}>{`${x.purchase.bill_number} · ${x.purchase.vendor_name} · ${x.purchase.used_goods?.model ?? x.purchase.old_metal?.metal ?? ''} · ${formatCurrency(x.left)}`}</option>)}
-      </select>
+      </SelectField>
     </label>
   );
 }

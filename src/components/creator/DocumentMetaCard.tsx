@@ -11,7 +11,7 @@ import { localDb } from '../../lib/localDb';
 import { getTable } from '../../lib/storage';
 import { VOUCHER_TYPES_TABLE, baseOfDoc, type VoucherSeries } from '../../lib/voucher-series';
 import { STATUS_OPTIONS } from '../../lib/invoice-status';
-import { addDaysInput, CURRENCIES, cn } from '../../lib/utils';
+import { CURRENCIES, cn } from '../../lib/utils';
 import { dueAfterIssueChange } from '../../lib/dates';
 import { DOCUMENT_LABELS, type DocumentType, type InvoiceStatus } from '../../types/invoice';
 import { useT } from '../../i18n';
@@ -21,6 +21,8 @@ import { khataT } from '../../i18n/areas/khata';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../../pages/InvoiceCreator.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 // WP-9: branch picker, loaded only once a branch exists (single-location users never download it).
 const BranchSelect = lazy(() => import('../branches/BranchSelect').then((m) => ({ default: m.BranchSelect })));
@@ -32,7 +34,6 @@ const TermsPicker = lazy(() => import('../collections/TermsPicker'));
 const ContractPanel = lazy(() => import('./ContractPanel'));
 
 const DOC_TYPES = Object.keys(DOCUMENT_LABELS) as DocumentType[];
-const DUE_PRESETS = [0, 7, 15, 30, 45];
 
 interface Props {
   editing: boolean;
@@ -97,7 +98,7 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
         <div className={controls.row3}>
           <label className={controls.field}>
             <span className={controls.label}>{t('meta.type')}</span>
-            <select
+            <SelectField
               className={controls.select}
               value={s.doc_type}
               onChange={(e) => {
@@ -114,7 +115,7 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
                   {docLabel(d)}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{t('meta.number')}</span>
@@ -160,24 +161,17 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
         <div className={controls.row3}>
           <label className={controls.field}>
             <span className={controls.label}>{t('meta.issueDate')}</span>
-            <input className={controls.input} type="date" value={s.issue_date} onChange={(e) => s.setDates(e.target.value, dueAfterIssueChange(s.issue_date, s.due_date, e.target.value))} />
+            <DateField className={controls.input} value={s.issue_date} onChange={(e) => s.setDates(e.target.value, dueAfterIssueChange(s.issue_date, s.due_date, e.target.value))} />
           </label>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="due-date">{s.doc_type === 'SALES_ORDER' ? t('meta.deliveryBy') : t('meta.dueDate')}</label>
-            <input id="due-date" className={controls.input} type="date" value={s.due_date} min={s.issue_date} onChange={(e) => setDue(e.target.value)} />
+            <DateField id="due-date" className={controls.input} value={s.due_date} min={s.issue_date} chips={['onReceipt', '+7', '+15', '+30', '+45', 'monthEnd']} chipBase={s.issue_date} onChange={(e) => setDue(e.target.value)} />
             {/* 8.6: an unpaid bill with no credit period nudges for a due date (ageing / reminders use it). */}
             {(s.doc_type === 'INVOICE' || s.doc_type === 'TAX_INVOICE' || s.doc_type === 'BILL_OF_SUPPLY') &&
               s.status !== 'Paid' && s.status !== 'Cancelled' && (Number(s.balance_due) || 0) > 0.004 &&
               (!s.due_date || s.due_date <= s.issue_date) && (
                 <span className={controls.hint} role="note" data-due-nudge>{khataT('dueNudge')}</span>
               )}
-            <div className={styles.chips}>
-              {DUE_PRESETS.map((d) => (
-                <button key={d} type="button" aria-label={d === 0 ? t('meta.dueOnReceipt') : t('meta.dueInDays', { n: d })} className={styles.chip} onClick={() => setDue(addDaysInput(d, s.issue_date))}>
-                  {d === 0 ? t('meta.now') : t('meta.daysShort', { n: d })}
-                </button>
-              ))}
-            </div>
             <Suspense fallback={null}>
               <TermsPicker />
             </Suspense>
@@ -185,21 +179,21 @@ export function DocumentMetaCard({ editing, saveTick }: Props) {
           <div className={styles.pair}>
             <label className={controls.field}>
               <span className={controls.label}>{t('meta.currency')}</span>
-              <select className={controls.select} value={s.currency} onChange={(e) => s.setCurrency(e.target.value)}>
+              <SelectField className={controls.select} value={s.currency} onChange={(e) => s.setCurrency(e.target.value)}>
                 {CURRENCIES.map((c) => (
                   <option key={c.code} value={c.code}>
                     {c.symbol} {c.code}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{t('meta.status')}</span>
-              <select className={controls.select} value={s.status === 'Overdue' ? 'Sent' : s.status} onChange={(e) => s.setStatus(e.target.value as InvoiceStatus)}>
+              <SelectField className={controls.select} value={s.status === 'Overdue' ? 'Sent' : s.status} onChange={(e) => s.setStatus(e.target.value as InvoiceStatus)}>
                 {STATUS_OPTIONS.map((o) => (
                   <option key={o} value={o}>{statusLabel(o)}</option>
                 ))}
-              </select>
+              </SelectField>
             </label>
           </div>
         </div>

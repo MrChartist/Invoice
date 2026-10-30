@@ -24,6 +24,8 @@ import surface from '../../styles/surface.module.css';
 import { Field, ListSelect } from './tv-ui';
 import { pct, runWith, type TvViewProps } from './tv-run';
 import { BookingTable } from './BookingsView';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const SCOPES = ['domestic', 'outbound', 'inbound'] as const;
 const money = (n: number) => formatCurrency(n);
@@ -69,10 +71,10 @@ export default function TripsView({ notify }: TvViewProps) {
       <TripForm regime={data.settings.regime_default ?? 'to18'} clients={data.clients} notify={notify} onSaved={(t) => { refresh(); setOpen(t.id); }} />
       <div style={row}>
         <Field label={tvT('status')}>
-          <select className={controls.select} value={status} onChange={(e) => setStatus(e.target.value as TripStatus | '')}>
+          <SelectField className={controls.select} value={status} onChange={(e) => setStatus(e.target.value as TripStatus | '')}>
             <option value="">-</option>
             {TRIP_STATUSES.map((s) => <option key={s} value={s}>{tvList('sts', TRIP_STATUSES, s)}</option>)}
-          </select>
+          </SelectField>
         </Field>
       </div>
       {shown.length ? (
@@ -100,7 +102,7 @@ export default function TripsView({ notify }: TvViewProps) {
       ) : <p className={controls.hint}>{tvT('none')}</p>}
       {sel && <TripFile trip={sel} c={costing(sel)} notify={notify} onChanged={refresh} />}
       <h3>{tvT('margins')}</h3>
-      <div style={row}><Field label={tvT('month')}><input type="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} /></Field></div>
+      <div style={row}><Field label={tvT('month')}><DateField mode="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} /></Field></div>
       <div className={surface.tableWrap}>
         <table className={surface.table} data-tv-margins>
           <thead><tr><th>{tvT('trip')}</th><th className={surface.numeric}>{tvT('sell')}</th><th className={surface.numeric}>{tvT('cost')}</th><th className={surface.numeric}>{tvT('loss')}</th><th className={surface.numeric}>{tvT('commission')}</th><th className={surface.numeric}>{tvT('margin')}</th></tr></thead>
@@ -140,16 +142,16 @@ function TripForm({ regime, clients, notify, onSaved }: { regime: TvRegime; clie
       <div style={row}>
         <Field label={tvT('name')}><input className={controls.input} value={f.name} onChange={(e) => set({ name: e.target.value })} data-tv-trip-name /></Field>
         <Field label={tvT('client')}>
-          <select className={controls.select} value={f.client_id} onChange={(e) => set({ client_id: e.target.value })} data-tv-trip-client>
+          <SelectField className={controls.select} value={f.client_id} onChange={(e) => set({ client_id: e.target.value })} data-tv-trip-client>
             <option value="">-</option>
             {clients.map((c) => <option key={c.id} value={c.id ?? ''}>{c.name}</option>)}
-          </select>
+          </SelectField>
         </Field>
         <Field label={tvT('code')}><input className={controls.input} value={f.code} placeholder={suggestTripCode(f.start || todayInput(), loadCostCentres())} onChange={(e) => set({ code: e.target.value })} /></Field>
         <Field label={tvT('scope')}><ListSelect list="scopes" ids={SCOPES} value={f.scope} onChange={(scope) => set({ scope })} /></Field>
         <Field label={tvT('destination')}><input className={controls.input} value={f.destination} onChange={(e) => set({ destination: e.target.value })} data-tv-trip-dest /></Field>
-        <Field label={tvT('from')}><input type="date" className={controls.input} value={f.start} onChange={(e) => set({ start: e.target.value })} /></Field>
-        <Field label={tvT('to')}><input type="date" className={controls.input} value={f.end} onChange={(e) => set({ end: e.target.value })} /></Field>
+        <Field label={tvT('from')}><DateField className={controls.input} value={f.start} onChange={(e) => set({ start: e.target.value })} /></Field>
+        <Field label={tvT('to')}><DateField className={controls.input} value={f.end} onChange={(e) => set({ end: e.target.value })} /></Field>
         <Field label={tvT('paxNames')}><input className={controls.input} value={f.pax} onChange={(e) => set({ pax: e.target.value })} data-tv-trip-pax /></Field>
         <Field label={tvT('regime')}><ListSelect list="regs" ids={TV_REGIMES} value={f.regime} onChange={(r) => set({ regime: r })} attr="data-tv-trip-regime" /></Field>
         <label className={controls.check}><input type="checkbox" checked={f.event} onChange={(e) => set({ event: e.target.checked })} /> {tvT('event')}</label>

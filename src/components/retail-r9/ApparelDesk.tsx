@@ -34,6 +34,8 @@ import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { AlterationJob, AlterationStatus } from '../../types/retail-r9';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Done = (msg: string, error?: boolean) => void;
 const VIEWS = [['alterations', Package], ['matrix', Boxes], ['bands', Percent]] as const;
@@ -94,11 +96,11 @@ function BandsView({ onDone }: { onDone: Done }) {
                   <td>{i.name}</td>
                   <td className={surface.mono}>{i.hsn ?? ''}</td>
                   <td>
-                    <select className={controls.select} value={i.gst_band ?? ''} aria-label={`${rtcT('colBand')} ${i.name}`} data-band-item={i.name}
+                    <SelectField className={controls.select} value={i.gst_band ?? ''} aria-label={`${rtcT('colBand')} ${i.name}`} data-band-item={i.name}
                       onChange={(e) => run(() => (setBands([{ id: i.id, band: (e.target.value || undefined) as PriceBandKind | undefined }]), rtcT('bandSaved', { name: i.name })))}>
                       <option value="">{rtcT('bandNone')}</option>
                       {BAND_KINDS.map((k) => <option key={k} value={k}>{rtcT(`band.${k}`)}</option>)}
-                    </select>
+                    </SelectField>
                   </td>
                 </tr>
               ))}
@@ -189,11 +191,11 @@ function MatrixView() {
         <>
           <div className={controls.row} style={{ flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
             <label className={controls.field}><span className={controls.label}>{rtcT('gridStyle')}</span>
-              <select className={controls.select} value={pid} onChange={(e) => setPid(e.target.value)} data-matrix-style>{parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+              <SelectField className={controls.select} value={pid} onChange={(e) => setPid(e.target.value)} data-matrix-style>{parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</SelectField>
             </label>
             {godowns.length > 1 && (
               <label className={controls.field}><span className={controls.label}>{rtcT('godown')}</span>
-                <select className={controls.select} value={godown} onChange={(e) => setGodown(e.target.value)}><option value="">{rtcT('allGodowns')}</option>{godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
+                <SelectField className={controls.select} value={godown} onChange={(e) => setGodown(e.target.value)}><option value="">{rtcT('allGodowns')}</option>{godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</SelectField>
               </label>
             )}
             {parent && <button type="button" className={sm} onClick={() => downloadTextFile(`Stock_grid_${parent.name.replace(/\W+/g, '_')}_${today}.csv`, stockGridCsv(parent, cells))}>{rtcT('csv')}</button>}
@@ -265,9 +267,9 @@ function AlterationsView({ onDone }: { onDone: Done }) {
         <label className={controls.field} style={{ maxWidth: 150 }}><span className={controls.label}>{rtcT('invoiceNo')}</span><input className={controls.input} value={form.invoice_number} onChange={f('invoice_number')} /></label>
         <label className={controls.field}><span className={controls.label}>{rtcT('notes')}</span><input className={controls.input} value={form.notes} onChange={f('notes')} /></label>
         <label className={controls.field}><span className={controls.label}>{rtcT('tailor')}</span>
-          <select className={controls.select} value={form.tailor_id} onChange={f('tailor_id')}><option value="">{rtcT('tailorNone')}</option>{tailors.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+          <SelectField className={controls.select} value={form.tailor_id} onChange={f('tailor_id')}><option value="">{rtcT('tailorNone')}</option>{tailors.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</SelectField>
         </label>
-        <label className={controls.field}><span className={controls.label}>{rtcT('due')}</span><input type="date" className={controls.input} value={form.due} onChange={f('due')} /></label>
+        <label className={controls.field}><span className={controls.label}>{rtcT('due')}</span><DateField className={controls.input} value={form.due} onChange={f('due')} /></label>
         <label className={controls.field} style={{ maxWidth: 130 }}><span className={controls.label}>{rtcT('charge')}</span><NumberInput className={controls.input} value={form.charge} onChange={(charge) => setForm({ ...form, charge })} data-alt-charge /></label>
         <label className={controls.field} style={{ maxWidth: 110 }}><span className={controls.label}>{rtcT('tailorRate')}</span><NumberInput className={controls.input} value={form.tailor_rate} onChange={(tailor_rate) => setForm({ ...form, tailor_rate })} /></label>
         <button type="button" className={controls.btnPrimary} disabled={!form.customer.trim() || !form.garment.trim()} onClick={save} data-alt-save>{rtcT('save')}</button>
@@ -309,10 +311,10 @@ function AlterationsView({ onDone }: { onDone: Done }) {
       {tailors.length > 0 && (
         <div className={controls.row} style={{ flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginTop: '0.75rem' }}>
           <label className={controls.field}><span className={controls.label}>{rtcT('tailor')}</span>
-            <select className={controls.select} value={tb.tailor} onChange={(e) => setTb({ ...tb, tailor: e.target.value })}><option value="">-</option>{tailors.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+            <SelectField className={controls.select} value={tb.tailor} onChange={(e) => setTb({ ...tb, tailor: e.target.value })}><option value="">-</option>{tailors.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</SelectField>
           </label>
-          <label className={controls.field}><span className={controls.label}>{rtcT('from')}</span><input type="date" className={controls.input} value={tb.from} onChange={(e) => setTb({ ...tb, from: e.target.value })} /></label>
-          <label className={controls.field}><span className={controls.label}>{rtcT('to')}</span><input type="date" className={controls.input} value={tb.to} onChange={(e) => setTb({ ...tb, to: e.target.value })} /></label>
+          <label className={controls.field}><span className={controls.label}>{rtcT('from')}</span><DateField className={controls.input} value={tb.from} onChange={(e) => setTb({ ...tb, from: e.target.value })} /></label>
+          <label className={controls.field}><span className={controls.label}>{rtcT('to')}</span><DateField className={controls.input} value={tb.to} onChange={(e) => setTb({ ...tb, to: e.target.value })} /></label>
           <button type="button" className={sm} disabled={!tb.tailor} onClick={() => run(async () => {
             const t = tailors.find((x) => x.id === tb.tailor)!;
             const r = await makeTailorBill({ id: t.id, name: t.name }, tb.from, tb.to);

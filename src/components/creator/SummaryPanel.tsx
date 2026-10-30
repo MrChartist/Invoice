@@ -29,6 +29,7 @@ const PayModeChips = lazy(() => import('../invoicing-ux/PayModeChips'));
 const PackagingStrip = lazy(() => import('../trade/PackagingStrip'));
 import { localDb } from '../../lib/localDb';
 import { impliedPacks } from '../../lib/shop-mode';
+import { SelectField } from '../ui/SelectField';
 // R8-B (TR-B2/B3): bill charges, broker and weight slip (commodity / agency pack, lazy).
 const ChargesStrip = lazy(() => import('../trade/tr-b-hub').then((m) => ({ default: m.ChargesStrip })));
 // R9 (RT-A3): home delivery (Retail checks "Home delivery" on, or a document that carries one; lazy).
@@ -122,13 +123,13 @@ export function SummaryPanel() {
       {!challan && s.doc_type !== 'BILL_OF_SUPPLY' && (
         <div className={styles.inputRow}>
           <span>{tr('summary.gstTreatment')}</span>
-          <select className={cn(controls.select, styles.gstSelect)} value={s.gst_mode} onChange={(e) => s.setGstMode(e.target.value as GstMode)} aria-label={tr('summary.gstTreatment')}>
+          <SelectField className={cn(controls.select, styles.gstSelect)} value={s.gst_mode} onChange={(e) => s.setGstMode(e.target.value as GstMode)} aria-label={tr('summary.gstTreatment')}>
             {GST_MODES.map((m) => (
               <option key={m.id} value={m.id}>
                 {tr(m.label)}
               </option>
             ))}
-          </select>
+          </SelectField>
         </div>
       )}
 

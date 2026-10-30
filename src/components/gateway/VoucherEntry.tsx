@@ -62,6 +62,8 @@ import { CreateLedgerDialog } from './CreateLedgerDialog';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Gateway.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const TYPE_LABEL: Record<ManualVoucherType, GwKey> = { CONTRA: 'contra', PAYMENT: 'payment', RECEIPT: 'receipt', JOURNAL: 'journal' };
 const FKEY_TYPE: Record<string, ManualVoucherType> = { f4: 'CONTRA', f5: 'PAYMENT', f6: 'RECEIPT', f7: 'JOURNAL' };
@@ -612,26 +614,26 @@ export function VoucherEntry() {
             {branches.length > 0 && (
               <label className={styles.vField}>
                 {wireT('branch')}
-                <select data-field="branch" className={controls.select} value={branchId} onChange={(e) => setBranchId(e.target.value)} data-testid="gw-v-branch">
+                <SelectField data-field="branch" className={controls.select} value={branchId} onChange={(e) => setBranchId(e.target.value)} data-testid="gw-v-branch">
                   <option value="">{wireT('branchAuto')}</option>
                   {branches.filter((b) => !b.inactive || b.id === branchId).map((b) => (
                     <option key={b.id} value={b.id}>{b.code ? `${b.code} · ${b.name}` : b.name}</option>
                   ))}
-                </select>
+                </SelectField>
               </label>
             )}
             <label className={styles.vField}>
               {gwT('vDate')}
-              <input data-field="date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} aria-keyshortcuts="F2" />
+              <DateField data-field="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} aria-keyshortcuts="F2" />
             </label>
             <label className={styles.vField}>
               {kbT('kind')}
-              <select data-field="variant" className={controls.select} value={variant} onChange={(e) => setVariant(e.target.value as Variant)} data-testid="gw-v-variant">
+              <SelectField data-field="variant" className={controls.select} value={variant} onChange={(e) => setVariant(e.target.value as Variant)} data-testid="gw-v-variant">
                 <option value="">{kbT('regular')}</option>
                 <option value="OPTIONAL">{keysT('optional')} (Ctrl+L)</option>
                 <option value="PD">{keysT('postDated')} (Alt+T)</option>
                 <option value="MEMO">{kbT('memo')}</option>
-              </select>
+              </SelectField>
             </label>
             {hasTypes && (
               <label className={styles.vField}>
@@ -662,10 +664,10 @@ export function VoucherEntry() {
         {single && (
           <label className={styles.vField}>
             {vtT('account')}
-            <select data-field="account" className={controls.select} value={accountId} onChange={(e) => setAccountId(e.target.value)} data-testid="gw-v-account" aria-describedby="gw-v-account-hint">
+            <SelectField data-field="account" className={controls.select} value={accountId} onChange={(e) => setAccountId(e.target.value)} data-testid="gw-v-account" aria-describedby="gw-v-account-hint">
               <option value="">-</option>
               {cashBank.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+            </SelectField>
             <span id="gw-v-account-hint" className={styles.hint}>{vtT('accountHint')}</span>
           </label>
         )}
@@ -693,7 +695,7 @@ export function VoucherEntry() {
                 return (
                   <tr key={l.key}>
                     <td>
-                      {single ? <span className={styles.hint}>{sideLabel(l.side)}</span> : <select
+                      {single ? <span className={styles.hint}>{sideLabel(l.side)}</span> : <SelectField
                         data-field={`${l.key}:side`}
                         className={cn(controls.select, styles.sideSel)}
                         value={l.side}
@@ -702,7 +704,7 @@ export function VoucherEntry() {
                       >
                         <option value="dr">{sideLabel('dr')}</option>
                         <option value="cr">{sideLabel('cr')}</option>
-                      </select>}
+                      </SelectField>}
                     </td>
                     <td className={styles.ledgerCell}>
                       <input
@@ -757,7 +759,7 @@ export function VoucherEntry() {
                     {showCc && (
                       <td>
                         {isPnl(l.account_id) && (
-                          <select
+                          <SelectField
                             data-field={`${l.key}:cc`}
                             className={controls.select}
                             value={l.cost_centre_id ?? ''}
@@ -768,7 +770,7 @@ export function VoucherEntry() {
                             {pickableCentres(centres, l.cost_centre_id).map((c) => (
                               <option key={c.id} value={c.id}>{costCentreLabel(c, centres)}</option>
                             ))}
-                          </select>
+                          </SelectField>
                         )}
                       </td>
                     )}
@@ -822,14 +824,14 @@ export function VoucherEntry() {
             {!openBills.length && <p className={styles.hint}>{vtT('noOpenBills')}</p>}
             {refs.map((r, i) => (
               <div key={r.key} className={styles.refRow}>
-                <select className={controls.select} value={r.kind} aria-label={`${vtT('refType')} ${i + 1}`} onChange={(e) => setRefs((rs) => rs.map((x) => (x.key === r.key ? { ...x, kind: e.target.value as RefKind } : x)))} data-testid={`gw-ref-${i + 1}-kind`}>
+                <SelectField className={controls.select} value={r.kind} aria-label={`${vtT('refType')} ${i + 1}`} onChange={(e) => setRefs((rs) => rs.map((x) => (x.key === r.key ? { ...x, kind: e.target.value as RefKind } : x)))} data-testid={`gw-ref-${i + 1}-kind`}>
                   {REF_KINDS.map((k) => <option key={k} value={k}>{vtT(REF_LABEL[k])}</option>)}
-                </select>
+                </SelectField>
                 {r.kind === 'agst' ? (
-                  <select className={controls.select} value={r.bill_id ?? ''} aria-label={`${vtT('bill')} ${i + 1}`} onChange={(e) => setRefs((rs) => rs.map((x) => (x.key === r.key ? { ...x, bill_id: e.target.value || undefined } : x)))} data-testid={`gw-ref-${i + 1}-bill`}>
+                  <SelectField className={controls.select} value={r.bill_id ?? ''} aria-label={`${vtT('bill')} ${i + 1}`} onChange={(e) => setRefs((rs) => rs.map((x) => (x.key === r.key ? { ...x, bill_id: e.target.value || undefined } : x)))} data-testid={`gw-ref-${i + 1}-bill`}>
                     <option value="">-</option>
                     {openBills.map((b) => <option key={b.id} value={b.id}>{`${b.ref} · ${vtT('due', { amount: formatMoney(b.outstanding) })}`}</option>)}
-                  </select>
+                  </SelectField>
                 ) : r.kind === 'new' ? (
                   <input className={controls.input} value={r.name ?? ''} placeholder={vtT('refName')} aria-label={`${vtT('refName')} ${i + 1}`} onChange={(e) => setRefs((rs) => rs.map((x) => (x.key === r.key ? { ...x, name: e.target.value } : x)))} />
                 ) : <span />}

@@ -4,6 +4,7 @@ import { loadPaymentTerms } from '../../lib/payment-terms';
 import { useT } from '../../i18n';
 import { colT } from '../../i18n/areas/collections';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const MODES: ReminderMode[] = ['auto', 'manual', 'never'];
 const label = (m: ReminderMode) => (m === 'auto' ? colT('rmAuto') : m === 'manual' ? colT('rmManual') : colT('rmNever'));
@@ -24,16 +25,16 @@ export function ReminderModeField({ client, onChange }: { client: Patch; onChang
     <div className={controls.row}>
       <label className={controls.field}>
         <span className={controls.label}>{colT('tpLabel')}</span>
-        <select className={controls.select} value={term} onChange={(e) => onChange({ payment_terms_id: e.target.value || undefined })} data-client-terms>
+        <SelectField className={controls.select} value={term} onChange={(e) => onChange({ payment_terms_id: e.target.value || undefined })} data-client-terms>
           <option value="">{colT('fuNone')}</option>
           {terms.filter((t) => !t.inactive || t.id === term).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        </SelectField>
       </label>
       <label className={controls.field}>
         <span className={controls.label}>{colT('rmMode')}</span>
-        <select className={controls.select} value={value} onChange={(e) => onChange({ reminder_mode: e.target.value === 'auto' ? undefined : (e.target.value as ReminderMode) })} data-reminder-mode>
+        <SelectField className={controls.select} value={value} onChange={(e) => onChange({ reminder_mode: e.target.value === 'auto' ? undefined : (e.target.value as ReminderMode) })} data-reminder-mode>
           {MODES.map((m) => <option key={m} value={m}>{label(m)}</option>)}
-        </select>
+        </SelectField>
       </label>
     </div>
   );

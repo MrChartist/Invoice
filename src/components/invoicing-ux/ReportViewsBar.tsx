@@ -11,6 +11,8 @@ import { uxT } from '../../i18n/areas/invoicing-ux';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import ux from './ux.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const isFolderBackupSupported = () => typeof window !== 'undefined' && typeof (window as unknown as { showDirectoryPicker?: unknown }).showDirectoryPicker === 'function';
 
@@ -102,7 +104,7 @@ export function ReportViewsBar({ current, onApply, initialViewId, openPacks, ini
           <div className={ux.row} data-report-packs>
             <label className={controls.field}>
               <span className={controls.label}>{uxT('rvMonth')}</span>
-              <input type="month" className={controls.input} value={month} max={localDayOf(new Date()).slice(0, 7)} onChange={(e) => e.target.value && setMonth(e.target.value)} />
+              <DateField mode="month" className={controls.input} value={month} max={localDayOf(new Date()).slice(0, 7)} onChange={(e) => e.target.value && setMonth(e.target.value)} />
             </label>
             <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} disabled={busy} onClick={() => void download()} data-pack-download>
               <Download size={14} /> {busy ? uxT('rvBuilding') : uxT('rvDownload')}
@@ -112,10 +114,10 @@ export function ReportViewsBar({ current, onApply, initialViewId, openPacks, ini
             </button>
             <label className={controls.field}>
               <span className={controls.label}>{uxT('rvSchedule')}</span>
-              <select className={controls.select} value={sched.day} onChange={(e) => setSchedule({ day: Number(e.target.value) })}>
+              <SelectField className={controls.select} value={sched.day} onChange={(e) => setSchedule({ day: Number(e.target.value) })}>
                 <option value={0}>{uxT('rvOff')}</option>
                 {[1, 2, 3, 5, 7, 10].map((d) => <option key={d} value={d}>{uxT('rvDay', { n: d })}</option>)}
-              </select>
+              </SelectField>
             </label>
             {sched.day > 0 && isFolderBackupSupported() && (
               <label className={controls.check}>

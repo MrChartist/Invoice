@@ -18,6 +18,8 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field } from './ps-ui';
 import { runWith, type PsDeskProps } from './ps-run';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 // PS-B: the client-money balance per matter, read only when its module exists (never a hard dependency).
 const cmMods = import.meta.glob<{ matterBalance?: (id: string) => number }>('../../lib/prof/ps-client-money.ts');
@@ -75,21 +77,21 @@ export default function MattersView({ notify }: Pick<PsDeskProps, 'notify'>) {
           <div data-matter-form>
             <div className={controls.row3}>
               <Field label={pmT('name')}><input className={controls.input} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-matter-name /></Field>
-              <Field label={psT('client')}><select className={controls.select} value={f.client_id} onChange={(e) => pickClient(e.target.value)} data-matter-client><option value="">{psT('none')}</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+              <Field label={psT('client')}><SelectField className={controls.select} value={f.client_id} onChange={(e) => pickClient(e.target.value)} data-matter-client><option value="">{psT('none')}</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SelectField></Field>
               <Field label={pmT('code')}><input className={`${controls.input} ${controls.inputMono}`} value={f.ps.code} onChange={(e) => set({ code: e.target.value.toUpperCase() })} data-matter-code /></Field>
-              <Field label={pmT('kind')}><select className={controls.select} value={f.ps.kind} onChange={(e) => set({ kind: e.target.value as MatterInfo['kind'] })}>{(['matter', 'assignment', 'project'] as const).map((k) => <option key={k} value={k}>{pmT(`k.${k}`)}</option>)}</select></Field>
+              <Field label={pmT('kind')}><SelectField className={controls.select} value={f.ps.kind} onChange={(e) => set({ kind: e.target.value as MatterInfo['kind'] })}>{(['matter', 'assignment', 'project'] as const).map((k) => <option key={k} value={k}>{pmT(`k.${k}`)}</option>)}</SelectField></Field>
               <Field label={pmT('court')}><input className={controls.input} value={f.ps.court ?? ''} onChange={(e) => set({ court: e.target.value })} /></Field>
               <Field label={pmT('caseNo')}><input className={controls.input} value={f.ps.case_no ?? ''} onChange={(e) => set({ case_no: e.target.value })} /></Field>
-              <Field label={pmT('responsible')}><select className={controls.select} value={f.ps.responsible_id ?? ''} onChange={(e) => set({ responsible_id: e.target.value || undefined })}><option value="">{psT('none')}</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
-              <Field label={pmT('opened')}><input type="date" className={controls.input} value={f.ps.opened} onChange={(e) => set({ opened: e.target.value })} /></Field>
-              <Field label={pmT('check')}><select className={controls.select} value={f.ps.conflict_id ?? ''} onChange={(e) => set({ conflict_id: e.target.value || undefined })} data-matter-check><option value="">{psT('none')}</option>{checks.map((c) => <option key={c.id} value={c.id}>{c.date} · {c.terms.join(', ')} · {pmT(`res.${c.result}`)}</option>)}</select></Field>
+              <Field label={pmT('responsible')}><SelectField className={controls.select} value={f.ps.responsible_id ?? ''} onChange={(e) => set({ responsible_id: e.target.value || undefined })}><option value="">{psT('none')}</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</SelectField></Field>
+              <Field label={pmT('opened')}><DateField className={controls.input} value={f.ps.opened} onChange={(e) => set({ opened: e.target.value })} /></Field>
+              <Field label={pmT('check')}><SelectField className={controls.select} value={f.ps.conflict_id ?? ''} onChange={(e) => set({ conflict_id: e.target.value || undefined })} data-matter-check><option value="">{psT('none')}</option>{checks.map((c) => <option key={c.id} value={c.id}>{c.date} · {c.terms.join(', ')} · {pmT(`res.${c.result}`)}</option>)}</SelectField></Field>
               {(needsConflictCheck(f.ps) || f.ps.skip_reason) && can('settings.manage') && <Field label={pmT('skip')}><input className={controls.input} value={f.ps.skip_reason ?? ''} onChange={(e) => set({ skip_reason: e.target.value || undefined })} data-matter-skip /></Field>}
             </div>
             <span className={controls.label}>{pmT('parties')}</span>
             {f.ps.parties.map((p, i) => (
               <div key={i} className={controls.row3}>
                 <input className={controls.input} aria-label={pmT('party')} placeholder={pmT('party')} value={p.name} onChange={(e) => party(i, { name: e.target.value })} data-party-name />
-                <select className={controls.select} aria-label={pmT('role')} value={p.role} onChange={(e) => party(i, { role: e.target.value as MatterParty['role'] })}>{ROLES.map((r) => <option key={r} value={r}>{pmT(`r.${r}`)}</option>)}</select>
+                <SelectField className={controls.select} aria-label={pmT('role')} value={p.role} onChange={(e) => party(i, { role: e.target.value as MatterParty['role'] })}>{ROLES.map((r) => <option key={r} value={r}>{pmT(`r.${r}`)}</option>)}</SelectField>
                 <input className={`${controls.input} ${controls.inputMono}`} aria-label={pmT('pan')} placeholder={pmT('pan')} value={p.pan ?? ''} onChange={(e) => party(i, { pan: e.target.value })} />
               </div>
             ))}

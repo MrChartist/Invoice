@@ -8,6 +8,7 @@ import { psPickT } from '../../i18n/areas/prof-r14a-pick';
 import { FIRM_FORMS, PROF_KINDS, PROF_SUBS, type ProfKindId } from '../../lib/shop-presets';
 import type { ProfIds } from '../../lib/prof/ps-profile';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 type K = Parameters<typeof psPickT>[0];
 
@@ -53,17 +54,17 @@ export function ProfKindPicker({ value, onPick, sub, onSub, form, onForm, ids, o
           {subs && onSub && (
             <label className={controls.field}>
               <span className={controls.label}>{psPickT('sub')}</span>
-              <select className={controls.select} value={sub && subs.includes(sub) ? sub : subs[0]} disabled={disabled} onChange={(e) => onSub(e.target.value)} data-prof-sub>
+              <SelectField className={controls.select} value={sub && subs.includes(sub) ? sub : subs[0]} disabled={disabled} onChange={(e) => onSub(e.target.value)} data-prof-sub>
                 {subs.map((s) => <option key={s} value={s}>{psPickT(`sub.${s}` as K)}</option>)}
-              </select>
+              </SelectField>
             </label>
           )}
           {onForm && (
             <label className={controls.field}>
               <span className={controls.label}>{psPickT('form')}</span>
-              <select className={controls.select} value={form ?? 'proprietorship'} disabled={disabled} onChange={(e) => onForm(e.target.value)} data-prof-form>
+              <SelectField className={controls.select} value={form ?? 'proprietorship'} disabled={disabled} onChange={(e) => onForm(e.target.value)} data-prof-form>
                 {FIRM_FORMS.map((f) => <option key={f} value={f}>{psPickT(`form.${f}`)}</option>)}
-              </select>
+              </SelectField>
             </label>
           )}
           {onIds && value === 'legal' && <>{id('enrolment', 'enrolment')}{id('bar_council', 'barCouncil')}</>}

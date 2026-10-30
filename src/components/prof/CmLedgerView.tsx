@@ -11,6 +11,8 @@ import { Fld, Tbl } from '../mfg/mfd-ui';
 import { row, rs, sm } from '../mfg/mfd-util';
 import type { CmCtx } from './ClientMoneyDesk';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export default function CmLedgerView({ ctx }: { ctx: CmCtx }) {
   const rows = useMemo(() => { void ctx.version; return cmDb.all(); }, [ctx.version]);
@@ -20,9 +22,9 @@ export default function CmLedgerView({ ctx }: { ctx: CmCtx }) {
   const name = (id?: string) => ctx.clients.find((c) => c.id === id)?.name ?? '';
   const invoices = useMemo(() => (f.kind === 'to_fees' && f.client_id ? localDb.invoices.getAll().filter((i) => i.client?.id === f.client_id && isRevenueDoc(i) && i.status !== 'Draft' && Number(i.balance_due) > 0) : []), [f.kind, f.client_id]);
   const sel = (k: keyof CmInput, opts: readonly [string, string][], tag?: string) => (
-    <select className={controls.select} value={String(f[k] ?? '')} onChange={(e) => set({ [k]: e.target.value || undefined } as Partial<CmInput>)} data-cm={tag ?? k}>
+    <SelectField className={controls.select} value={String(f[k] ?? '')} onChange={(e) => set({ [k]: e.target.value || undefined } as Partial<CmInput>)} data-cm={tag ?? k}>
       {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-    </select>
+    </SelectField>
   );
   const clientOpts: [string, string][] = [['', '-'], ...ctx.clients.map((c) => [c.id, c.name] as [string, string])];
   const save = () => ctx.run(() => {
@@ -36,7 +38,7 @@ export default function CmLedgerView({ ctx }: { ctx: CmCtx }) {
       <p className={controls.hint} data-cm-total>{cmT('total', { amount: rs(totalHeld(rows)) })}</p>
       <div style={row}>
         <Fld l={cmT('kind')}>{sel('kind', CM_KINDS.map((k) => [k, cmT(`k.${k}` as 'k.receipt')]))}</Fld>
-        <Fld l={cmT('date')}><input type="date" className={controls.input} value={f.date} onChange={(e) => set({ date: e.target.value })} data-cm="date" /></Fld>
+        <Fld l={cmT('date')}><DateField className={controls.input} value={f.date} onChange={(e) => set({ date: e.target.value })} data-cm="date" /></Fld>
         {!(f.kind === 'interest' && f.interest_to === 'firm') && <Fld l={cmT('client')}>{sel('client_id', clientOpts, 'client')}</Fld>}
         <Fld l={cmT('matter')}>{sel('matter_id', [['', '-'], ...ctx.matters.filter((m) => !m.client_id || m.client_id === f.client_id).map((m) => [m.id, m.name] as [string, string])])}</Fld>
         {f.kind === 'transfer' && <Fld l={cmT('toClient')}>{sel('to_client_id', clientOpts, 'to')}</Fld>}
@@ -51,13 +53,13 @@ export default function CmLedgerView({ ctx }: { ctx: CmCtx }) {
         <div style={row}>
           <Fld l={cmT('invoice')}>{sel('invoice_id', [['', '-'], ...invoices.map((i) => [i.id, `${i.invoice_number} · ₹${rs(Number(i.balance_due))}`] as [string, string])], 'invoice')}</Fld>
           <Fld l={cmT('auth')}>
-            <select className={controls.select} value={f.authority?.mode ?? ''} onChange={(e) => set({ authority: e.target.value ? { date: f.authority?.date || f.date, ref: f.authority?.ref ?? '', mode: e.target.value as 'written' } : undefined })} data-cm="auth">
+            <SelectField className={controls.select} value={f.authority?.mode ?? ''} onChange={(e) => set({ authority: e.target.value ? { date: f.authority?.date || f.date, ref: f.authority?.ref ?? '', mode: e.target.value as 'written' } : undefined })} data-cm="auth">
               <option value="">-</option>
               {(['written', 'email', 'engagement'] as const).map((m) => <option key={m} value={m}>{cmT(`a.${m}`)}</option>)}
-            </select>
+            </SelectField>
           </Fld>
           {f.authority && <Fld l={cmT('authRef')}><input className={controls.input} value={f.authority.ref} onChange={(e) => set({ authority: { ...f.authority!, ref: e.target.value } })} data-cm="auth-ref" /></Fld>}
-          {f.authority && <Fld l={cmT('authDate')}><input type="date" className={controls.input} value={f.authority.date} onChange={(e) => set({ authority: { ...f.authority!, date: e.target.value } })} /></Fld>}
+          {f.authority && <Fld l={cmT('authDate')}><DateField className={controls.input} value={f.authority.date} onChange={(e) => set({ authority: { ...f.authority!, date: e.target.value } })} /></Fld>}
           {!f.authority && <Fld l={cmT('override')}><input className={controls.input} value={override} onChange={(e) => setOverride(e.target.value)} /></Fld>}
           <p className={controls.hint} role="note">{cmT('feesWarn')}</p>
         </div>

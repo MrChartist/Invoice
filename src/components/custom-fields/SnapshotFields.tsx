@@ -6,6 +6,7 @@ import { useT } from '../../i18n';
 import { fldT } from '../../i18n/areas/fields';
 import controls from '../../styles/controls.module.css';
 import styles from './custom-fields.module.css';
+import { TypedInput } from '../ui/TypedInput';
 
 type Row = Pick<CustomFieldDef, 'id' | 'label' | 'type' | 'print'> & { stored?: CustomFieldValue };
 
@@ -43,7 +44,7 @@ export function SnapshotFields({ scope, values, onChange, idPrefix, compact }: {
               {label}
               {(row.stored ? row.stored.print : row.print) && <Printer size={12} className={styles.printIcon} aria-label={fldT('printed')} />}
             </label>
-            <input
+            <TypedInput
               id={id}
               className={row.type === 'number' ? controls.inputNumeric : controls.input}
               type={row.type === 'date' ? 'date' : 'text'}

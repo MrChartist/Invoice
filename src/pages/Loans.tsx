@@ -26,6 +26,8 @@ import { loansT } from '../i18n/areas/loans';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/settings/ShopModePanel.module.css';
+import { DateField } from '../components/ui/DateField';
+import { SelectField } from '../components/ui/SelectField';
 
 interface Draft {
   lender: string;
@@ -130,15 +132,15 @@ export function Loans() {
             </div>
             <div className={controls.row3}>
               <label className={controls.field}><span className={controls.label}>{loansT('tenure')}</span><input className={`${controls.input} ${controls.inputNumeric}`} inputMode="numeric" value={draft.tenure} onChange={(e) => setDraft({ ...draft, tenure: e.target.value })} /></label>
-              <label className={controls.field}><span className={controls.label}>{loansT('date')}</span><input className={controls.input} type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></label>
-              <label className={controls.field}><span className={controls.label}>{loansT('firstEmi')}</span><input className={controls.input} type="date" value={draft.firstEmi} onChange={(e) => setDraft({ ...draft, firstEmi: e.target.value })} /></label>
+              <label className={controls.field}><span className={controls.label}>{loansT('date')}</span><DateField className={controls.input} value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></label>
+              <label className={controls.field}><span className={controls.label}>{loansT('firstEmi')}</span><DateField className={controls.input} value={draft.firstEmi} onChange={(e) => setDraft({ ...draft, firstEmi: e.target.value })} /></label>
             </div>
             <div className={controls.row}>
               <label className={controls.field}>
                 <span className={controls.label}>{loansT('payFrom')}</span>
-                <select className={controls.select} value={draft.payFrom} onChange={(e) => setDraft({ ...draft, payFrom: e.target.value })}>
+                <SelectField className={controls.select} value={draft.payFrom} onChange={(e) => setDraft({ ...draft, payFrom: e.target.value })}>
                   {cashBank.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
+                </SelectField>
               </label>
               <label className={controls.field}><span className={controls.label}>{loansT('notes')}</span><input className={controls.input} value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></label>
             </div>
@@ -178,9 +180,9 @@ export function Loans() {
                     <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => run(() => (postDisbursement(loan.id), loansT('disbursed')))}>{loansT('disburse')}</button>
                   )}
                   <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => statementCsv(loan)}><Download size={14} /> {loansT('statement')}</button>
-                  <select className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))} aria-label={loansT('certPeriod')}>
+                  <SelectField className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))} aria-label={loansT('certPeriod')}>
                     {[0, 1, 2, 3].map((k) => getIndianFY(today).startYear - k).map((y) => <option key={y} value={y}>FY {y}-{String((y + 1) % 100).padStart(2, '0')}</option>)}
-                  </select>
+                  </SelectField>
                   <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => certificateCsv(loan)} data-loan-cert><Download size={14} /> {loansT('certificate')}</button>
                   {editable && loan.payments.length === 0 && (
                     <button type="button" className={controls.btnDanger} onClick={() => run(() => (deleteLoan(loan.id), loansT('delete')))} aria-label={loansT('delete')}><Trash2 size={16} /></button>
@@ -220,13 +222,13 @@ export function Loans() {
                     <label className={controls.field}><span className={controls.label}>{loansT('prepayAmount')}</span>
                       <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={prepay.amount} onChange={(e) => setPrepay({ ...prepay, amount: e.target.value })} /></label>
                     <label className={controls.field}><span className={controls.label}>{loansT('colDate')}</span>
-                      <input className={controls.input} type="date" value={prepay.date} onChange={(e) => setPrepay({ ...prepay, date: e.target.value })} /></label>
+                      <DateField className={controls.input} value={prepay.date} onChange={(e) => setPrepay({ ...prepay, date: e.target.value })} /></label>
                     <label className={controls.field}><span className={controls.label}>{loansT('reschedule')}</span>
-                      <select className={controls.select} value={prepay.mode} onChange={(e) => setPrepay({ ...prepay, mode: e.target.value as '' | 'emi' | 'tenure' })}>
+                      <SelectField className={controls.select} value={prepay.mode} onChange={(e) => setPrepay({ ...prepay, mode: e.target.value as '' | 'emi' | 'tenure' })}>
                         <option value="tenure">{loansT('reTenure')}</option>
                         <option value="emi">{loansT('reEmi')}</option>
                         <option value="">{loansT('reNone')}</option>
-                      </select></label>
+                      </SelectField></label>
                     <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!(Number(prepay.amount) > 0)} onClick={() => run(() => {
                       const p = payEmi(loan.id, 0, { date: prepay.date, principal: Number(prepay.amount), interest: 0, ...(prepay.mode ? { reschedule: prepay.mode } : {}) });
                       setPrepay({ ...prepay, amount: '' });

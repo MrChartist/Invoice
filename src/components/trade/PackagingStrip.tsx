@@ -14,6 +14,7 @@ import { useT } from '../../i18n';
 import { aT } from '../../i18n/areas/trade-r8a';
 import controls from '../../styles/controls.module.css';
 import own from './trade.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const SALES = new Set(['INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY', 'DELIVERY_CHALLAN', 'CREDIT_NOTE']);
 
@@ -63,9 +64,9 @@ export default function PackagingStrip() {
       {packOn && SALES.has(s.doc_type) && types.length > 0 && !!s.client?.name && (
         <div className={own.inline} data-pack-strip>
           <span>{aT('crates')}</span>
-          <select className={controls.ghost} value={mv.type} onChange={(e) => setMv({ ...mv, type: e.target.value })} aria-label={aT('crates')}>
+          <SelectField className={controls.ghost} value={mv.type} onChange={(e) => setMv({ ...mv, type: e.target.value })} aria-label={aT('crates')}>
             {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          </SelectField>
           <input className={controls.ghost} type="number" min={0} size={4} placeholder={aT('out')} value={mv.out} onChange={(e) => setMv({ ...mv, out: e.target.value })} aria-label={aT('out')} data-pack-out />
           <input className={controls.ghost} type="number" min={0} size={4} placeholder={aT('in')} value={mv.in} onChange={(e) => setMv({ ...mv, in: e.target.value })} aria-label={aT('in')} />
           <button type="button" className={controls.btnGhost} onClick={record} data-pack-record>{aT('record')}</button>

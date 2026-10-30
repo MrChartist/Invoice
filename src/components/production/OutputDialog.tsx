@@ -14,6 +14,7 @@ import { parseSerials } from '../../lib/stock-tracking';
 import { foodOutputDefaults, outputFoodDates } from '../../lib/mfg/mf-food';
 import controls from '../../styles/controls.module.css';
 import mfg from '../manufacturing/manufacturing.module.css';
+import { DateField } from '../ui/DateField';
 
 // R13 (MF-A3): job-card figures (inline; the job-card module itself loads only for an order with a routing).
 const jcT = defineArea(
@@ -83,7 +84,7 @@ export function OutputDialog({ ctx, order, boms, onClose }: { ctx: MfgContext; o
         <div className={controls.row3}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="out-date">{pT('date')}</label>
-            <input id="out-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="out-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="out-qty">{pT('qtyMade')}{item ? ` (${item.unit})` : ''}</label>
@@ -99,7 +100,7 @@ export function OutputDialog({ ctx, order, boms, onClose }: { ctx: MfgContext; o
         {item?.track_batches && (
           <div className={controls.field}>
             <label className={controls.label} htmlFor="out-exp">{pT('expiry')}</label>
-            <input id="out-exp" type="date" className={controls.input} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+            <DateField id="out-exp" className={controls.input} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
           </div>
         )}
         {item?.track_serials && (

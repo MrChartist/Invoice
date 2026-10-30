@@ -21,6 +21,7 @@ import { booksT, voucherTypeLabel } from '../../i18n/areas/books';
 import { methodLabel } from '../../i18n/labels';
 import { bankAccountsDb } from '../../lib/bank-accounts';
 import { bnkT } from '../../i18n/areas/banking';
+import { SelectField } from '../ui/SelectField';
 
 export interface CashBankTabProps {
   vouchers: Voucher[];
@@ -64,12 +65,12 @@ export function CashBankTab({ vouchers, openings, period, onEditOpening }: CashB
           </button>
         </div>
         {account === 'bank' && banks.length > 1 && (
-          <select className={controls.select} style={{ width: 'auto' }} aria-label={bnkT('bankAccount')} value={bankId} onChange={(e) => setBankId(e.target.value)}>
+          <SelectField className={controls.select} style={{ width: 'auto' }} aria-label={bnkT('bankAccount')} value={bankId} onChange={(e) => setBankId(e.target.value)}>
             <option value="">{bnkT('allBanks')}</option>
             {banks.map((b) => (
               <option key={b.id} value={b.id}>{b.name}</option>
             ))}
-          </select>
+          </SelectField>
         )}
         <div className={styles.toolbarGroup}>
           <button type="button" className={controls.btnOutline} onClick={onEditOpening}>

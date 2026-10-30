@@ -19,6 +19,8 @@ import { money, qtyText, type MfgContext } from './context';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './manufacturing.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 /** Physical Stock voucher (Tally Ctrl+F7): counted vs book on a date; the difference is posted. */
 export function PhysicalStockTab({ ctx }: { ctx: MfgContext }) {
@@ -152,7 +154,7 @@ function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Ph
         <div className={controls.row3}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="phy-date">{mfgT('date')}</label>
-            <input id="phy-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="phy-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
         </div>
         <div>
@@ -179,17 +181,17 @@ function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Ph
                 return (
                   <tr key={l.id}>
                     <td>
-                      <select className={controls.select} aria-label={mfgT('lineItem', { n })} value={l.item_id} onChange={(e) => patch(l.id, { item_id: e.target.value, unit: undefined, unit_factor: undefined, serials: undefined })}>
+                      <SelectField className={controls.select} aria-label={mfgT('lineItem', { n })} value={l.item_id} onChange={(e) => patch(l.id, { item_id: e.target.value, unit: undefined, unit_factor: undefined, serials: undefined })}>
                         <option value="">{mfgT('choose')}</option>
                         {tracked.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
-                      </select>
+                      </SelectField>
                     </td>
                     {multi && (
                       <td>
-                        <select className={controls.select} aria-label={`${n} ${mfgT('godown')}`} value={l.godown_id ?? ''} onChange={(e) => patch(l.id, { godown_id: e.target.value || undefined })}>
+                        <SelectField className={controls.select} aria-label={`${n} ${mfgT('godown')}`} value={l.godown_id ?? ''} onChange={(e) => patch(l.id, { godown_id: e.target.value || undefined })}>
                           <option value="">-</option>
                           {ctx.godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                        </select>
+                        </SelectField>
                       </td>
                     )}
                     {anyBatch && (
@@ -215,13 +217,13 @@ function PhysicalModal({ ctx, voucher, onClose }: { ctx: MfgContext; voucher: Ph
                       <td>
                         {item && cleanAltUnits(item.alt_units, item.unit || 'NOS') ? (
                           <>
-                            <select className={controls.select} aria-label={`${s7T('unit')} ${n}`} value={l.unit || item.unit}
+                            <SelectField className={controls.select} aria-label={`${s7T('unit')} ${n}`} value={l.unit || item.unit}
                               onChange={(e) => {
                                 const f = factorFor(item, e.target.value) ?? 1;
                                 patch(l.id, f === 1 ? { unit: undefined, unit_factor: undefined } : { unit: e.target.value, unit_factor: f });
                               }}>
                               {unitChoices(item).map((u) => <option key={u.unit} value={u.unit}>{u.unit}</option>)}
-                            </select>
+                            </SelectField>
                             {c && l.unit_factor ? <span className={styles.muted}>{s7T('inBase', { qty: qtyText(c.counted), unit: item.unit })}</span> : null}
                           </>
                         ) : <span className={styles.muted}>{item?.unit ?? ''}</span>}

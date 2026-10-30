@@ -18,6 +18,8 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field as F, type HsViewProps } from './hs-ui';
 import { numIn, row } from './hs-form';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 type Mode = 'receipt' | 'cert' | 'transfer' | 'waive';
 
@@ -43,9 +45,9 @@ export default function DuesView({ notify }: HsViewProps) {
   return (
     <section data-hs-dues>
       <div style={row}>
-        <F label={hscT('asOf')}><input type="date" className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value)} data-hs-asof /></F>
-        <F label={hsT('wing')}><select className={controls.select} value={wing} onChange={(e) => setWing(e.target.value)}><option value="">{hsT('all')}</option>{wingsOf(all.map((l) => l.unit)).map((w) => <option key={w}>{w}</option>)}</select></F>
-        <F label={hscT('overdue')}><select className={controls.select} value={age} onChange={(e) => setAge(Number(e.target.value))}><option value={0}>{hsT('all')}</option><option value={1}>{hscT('m1')}</option><option value={3}>{hscT('m3')}</option></select></F>
+        <F label={hscT('asOf')}><DateField className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value)} data-hs-asof /></F>
+        <F label={hsT('wing')}><SelectField className={controls.select} value={wing} onChange={(e) => setWing(e.target.value)}><option value="">{hsT('all')}</option>{wingsOf(all.map((l) => l.unit)).map((w) => <option key={w}>{w}</option>)}</SelectField></F>
+        <F label={hscT('overdue')}><SelectField className={controls.select} value={age} onChange={(e) => setAge(Number(e.target.value))}><option value={0}>{hsT('all')}</option><option value={1}>{hscT('m1')}</option><option value={3}>{hscT('m3')}</option></SelectField></F>
         <button type="button" className={controls.btnOutline} onClick={() => printText(hscT('notice'), lines.map((l) => `${l.unit.code}: ${formatCurrency(l.open)}`))}>{hscT('notice')}</button>
         <button type="button" className={controls.btnOutline} onClick={() => act(() => { applySocietyWording(); return hscT('worded'); })}>{hscT('wording')}</button>
       </div>
@@ -71,7 +73,7 @@ export default function DuesView({ notify }: HsViewProps) {
       )}
       {sel && (
         <div style={row} data-hs-form={sel.mode}>
-          {sel.mode !== 'cert' && <F label={hscT('date')}><input type="date" className={controls.input} value={v('date')} onChange={(e) => set('date', e.target.value)} /></F>}
+          {sel.mode !== 'cert' && <F label={hscT('date')}><DateField className={controls.input} value={v('date')} onChange={(e) => set('date', e.target.value)} /></F>}
           {(sel.mode === 'receipt' || sel.mode === 'waive') && <F label={hscT('amount')}><input type="number" min={0} className={controls.input} value={v('amount')} onChange={(e) => (sel.mode === 'receipt' ? amt(e.target.value) : set('amount', e.target.value))} data-hs-amount /></F>}
           {sel.mode === 'receipt' && (
             <>
@@ -89,7 +91,7 @@ export default function DuesView({ notify }: HsViewProps) {
           )}
           {sel.mode === 'transfer' && (
             <>
-              <F label={hscT('to')}><select className={controls.select} value={v('to')} onChange={(e) => set('to', e.target.value)}><option value="" />{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></F>
+              <F label={hscT('to')}><SelectField className={controls.select} value={v('to')} onChange={(e) => set('to', e.target.value)}><option value="" />{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SelectField></F>
               <F label={hscT('premium')}><input type="number" min={0} className={controls.input} value={v('premium')} onChange={(e) => set('premium', e.target.value)} /></F>
               <label className={controls.check}><input type="checkbox" checked={v('settled') === '1'} onChange={(e) => set('settled', e.target.checked ? '1' : '')} /> {hscT('settled')}</label>
               <button type="button" className={controls.btnPrimary} onClick={() => act(() => { transferMembership(sel.id, { date: v('date'), to_id: v('to'), premium: numIn(v('premium')), dues_settled: v('settled') === '1' }); return hscT('done'); })}>{hscT('transfer')}</button>

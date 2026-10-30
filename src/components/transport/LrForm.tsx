@@ -11,6 +11,8 @@ import { B, errText, fmtMoney, today, type Notify } from './shared';
 import { F } from './Field';
 import controls from '../../styles/controls.module.css';
 import styles from './transport.module.css';
+import { SelectField } from '../ui/SelectField';
+import { TypedInput } from '../ui/TypedInput';
 
 const KINDS: GtaRecipientKind[] = ['registered', 'factory', 'society', 'cooperative', 'body_corporate', 'partnership', 'casual', 'unregistered'];
 const blankLine = (): LrLine => ({ description: '', packages: 1 });
@@ -59,13 +61,13 @@ export function LrForm({ lr, notify, onSaved, onCancel }: { lr?: ConsignmentNote
   };
   const party = (k: 'consignor' | 'consignee' | 'billing', label: string) => (
     <F l={label}>
-      <select className={controls.select} value={f[k]} onChange={set(k)} data-lr-party={k}>
+      <SelectField className={controls.select} value={f[k]} onChange={set(k)} data-lr-party={k}>
         <option value="">-</option>
         {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.gstin ? ` · ${c.gstin}` : ''}</option>)}
-      </select></F>
+      </SelectField></F>
   );
   const field = (k: keyof typeof f, label: string, type = 'text') => (
-    <F l={label}><input className={controls.input} type={type} value={String(f[k])} onChange={set(k)} data-lr-field={k} /></F>
+    <F l={label}><TypedInput className={controls.input} type={type} value={String(f[k])} onChange={set(k)} data-lr-field={k} /></F>
   );
   return (
     <div className={styles.box} data-lr-form>
@@ -78,10 +80,10 @@ export function LrForm({ lr, notify, onSaved, onCancel }: { lr?: ConsignmentNote
         {party('consignor', twT('consignor'))}{party('consignee', twT('consignee'))}{party('billing', twT('billingParty'))}
         {field('invoiceNos', twT('invoiceNos'))}{field('ewayNos', twT('ewayNos'))}
         <F l={twT('vehicle')}>
-          <select className={controls.select} value={f.vehicleId} onChange={set('vehicleId')}>
+          <SelectField className={controls.select} value={f.vehicleId} onChange={set('vehicleId')}>
             <option value="">{twT('typed')}</option>
             {vehicles.map((v) => <option key={v.id} value={v.id}>{v.reg_no}</option>)}
-          </select></F>
+          </SelectField></F>
         {!f.vehicleId && field('vehicleNo', twT('vehicleNo'))}
         {field('driver', twT('driver'))}
       </div>
@@ -99,17 +101,17 @@ export function LrForm({ lr, notify, onSaved, onCancel }: { lr?: ConsignmentNote
       <div className={styles.toolbar}><button type="button" className={B.gs} onClick={() => setLines((ls) => [...ls, blankLine()])}><Plus size={14} aria-hidden="true" /> {twT('addLine')}</button></div>
       <div className={styles.grid}>
         <F l={twT('basis')}>
-          <select className={controls.select} value={f.basis} onChange={set('basis')}>{FREIGHT_BASES.map((b) => <option key={b} value={b}>{twT(`basis.${b}`)}</option>)}</select></F>
+          <SelectField className={controls.select} value={f.basis} onChange={set('basis')}>{FREIGHT_BASES.map((b) => <option key={b} value={b}>{twT(`basis.${b}`)}</option>)}</SelectField></F>
         {field('rate', twT('rate'), 'number')}
         {CHARGE_KINDS.map((k) => (
           <label key={k} className={controls.field}><span className={controls.label}>{twT(`charge.${k}`)}</span><input className={controls.input} type="number" value={charges[k] ?? ''} onChange={(e) => setCharges((c) => ({ ...c, [k]: e.target.value }))} /></label>
         ))}
         <F l={twT('payBasis')}>
-          <select className={controls.select} value={f.pay} onChange={set('pay')} data-lr-pay>{PAYMENT_BASES.map((b) => <option key={b} value={b}>{twT(`pay.${b}`)}</option>)}</select></F>
+          <SelectField className={controls.select} value={f.pay} onChange={set('pay')} data-lr-pay>{PAYMENT_BASES.map((b) => <option key={b} value={b}>{twT(`pay.${b}`)}</option>)}</SelectField></F>
         <F l={twT('recipientKind')}>
-          <select className={controls.select} value={f.kind} onChange={set('kind')}><option value="">{twT('fromGstin')}</option>{KINDS.map((k) => <option key={k} value={k}>{twT(`rk.${k}`)}</option>)}</select></F>
+          <SelectField className={controls.select} value={f.kind} onChange={set('kind')}><option value="">{twT('fromGstin')}</option>{KINDS.map((k) => <option key={k} value={k}>{twT(`rk.${k}`)}</option>)}</SelectField></F>
         <F l={twT('liableOverride')}>
-          <select className={controls.select} value={f.override} onChange={set('override')}><option value="">{twT('asDerived')}</option><option value="recipient">{twT('liable.recipient')}</option><option value="gta">{twT('liable.gta')}</option></select></F>
+          <SelectField className={controls.select} value={f.override} onChange={set('override')}><option value="">{twT('asDerived')}</option><option value="recipient">{twT('liable.recipient')}</option><option value="gta">{twT('liable.gta')}</option></SelectField></F>
         {f.override && field('reason', twT('reason'))}
       </div>
       <p className={styles.note}>{twT('freightTotal')}: <strong>{fmtMoney(total)}</strong> · {twT('liable')}: <strong data-lr-liable>{twT(`liable.${f.override || derived}`)}</strong></p>

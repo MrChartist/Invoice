@@ -20,6 +20,8 @@ import { errText, fmtMoney, readFileTables, today, type NamedTable, type PanelPr
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './marketplace.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export function SettlementsPanel(props: PanelProps) {
   const { channel, notify, refresh } = props;
@@ -104,9 +106,9 @@ export function SettlementsPanel(props: PanelProps) {
       <div className={styles.toolbar}>
         <ChannelPicker {...props} />
         <label className={controls.field}><span className={controls.label}>{mT('preset')}</span>
-          <select className={controls.select} value={preset} onChange={(e) => setPreset(e.target.value as SettlementPresetId)}>
+          <SelectField className={controls.select} value={preset} onChange={(e) => setPreset(e.target.value as SettlementPresetId)}>
             {SETTLEMENT_PRESETS.map((p) => <option key={p.id} value={p.id}>{mT(`preset.${p.id}`)}</option>)}
-          </select></label>
+          </SelectField></label>
         <label className={`${controls.btn} ${controls.btnOutline}`}>
           <FileUp size={16} aria-hidden="true" /> {mT('stImport')}
           <input type="file" accept=".csv,.txt,.tsv,.xlsx,.xlsm" hidden onChange={onFile} data-mkt-settlement-file />
@@ -124,7 +126,7 @@ export function SettlementsPanel(props: PanelProps) {
             <label className={controls.field}><span className={controls.label}>{mT('stId')}</span>
               <input className={controls.input} value={typed.id || parsed.settlement_id} onChange={(e) => setTyped({ ...typed, id: e.target.value })} /></label>
             <label className={controls.field}><span className={controls.label}>{mT('stDeposit')}</span>
-              <input type="date" className={controls.input} value={typed.date || parsed.deposit_date} onChange={(e) => setTyped({ ...typed, date: e.target.value })} /></label>
+              <DateField className={controls.input} value={typed.date || parsed.deposit_date} onChange={(e) => setTyped({ ...typed, date: e.target.value })} /></label>
             <label className={controls.field}><span className={controls.label}>{mT('stPayout')}</span>
               <input className={controls.input} inputMode="decimal" value={typed.payout || String(parsed.payout)} onChange={(e) => setTyped({ ...typed, payout: e.target.value })} /></label>
           </div>
@@ -137,9 +139,9 @@ export function SettlementsPanel(props: PanelProps) {
               <h4>{mT('stUnknown')}</h4>
               {parsed.unknown.slice(0, 20).map((d) => (
                 <label key={d} className={styles.inline}>{d}
-                  <select className={controls.select} value={teach.get(d) ?? 'other'} onChange={(e) => setTeach(new Map(teach).set(d, e.target.value as SettlementBucket))}>
+                  <SelectField className={controls.select} value={teach.get(d) ?? 'other'} onChange={(e) => setTeach(new Map(teach).set(d, e.target.value as SettlementBucket))}>
                     {BUCKETS.map((b) => <option key={b} value={b}>{mT(`bucket.${b}`)}</option>)}
-                  </select></label>
+                  </SelectField></label>
               ))}
               <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={saveRules}>{mT('stApplyRules')}</button>
             </div>
@@ -151,9 +153,9 @@ export function SettlementsPanel(props: PanelProps) {
       <div className={styles.toolbar}>
         <label className={controls.check}><input type="checkbox" checked={feeInv} onChange={(e) => setFeeInv(e.target.checked)} /> {mT('stFeeInv')}</label>
         <label className={controls.field}><span className={controls.label}>{mT('stBank')}</span>
-          <select className={controls.select} value={bankId} onChange={(e) => setBankId(e.target.value)}>
+          <SelectField className={controls.select} value={bankId} onChange={(e) => setBankId(e.target.value)}>
             {banks.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select></label>
+          </SelectField></label>
         <span data-mkt-clearing-total><Scale size={14} aria-hidden="true" /> {mT('stClearingTotal')}: <strong>{fmtMoney(clearingBalance(channel.clearing_bank_id))}</strong></span>
       </div>
       {list.length === 0 ? <p className={styles.note}>{mT('stEmpty')}</p> : (
@@ -184,9 +186,9 @@ export function SettlementsPanel(props: PanelProps) {
       {feeBill && (
         <div className={styles.toolbar}>
           <label className={controls.field}><span className={controls.label}>{mT('stFeeBillNo')}</span><input className={controls.input} value={feeBill.no} onChange={(e) => setFeeBill({ ...feeBill, no: e.target.value })} /></label>
-          <label className={controls.field}><span className={controls.label}>{mT('date')}</span><input type="date" className={controls.input} value={feeBill.date} onChange={(e) => setFeeBill({ ...feeBill, date: e.target.value })} /></label>
+          <label className={controls.field}><span className={controls.label}>{mT('date')}</span><DateField className={controls.input} value={feeBill.date} onChange={(e) => setFeeBill({ ...feeBill, date: e.target.value })} /></label>
           <label className={controls.field}><span className={controls.label}>{mT('stFeeSac')}</span>
-            <select className={controls.select} value={feeBill.sac} onChange={(e) => setFeeBill({ ...feeBill, sac: e.target.value })}><option value="9985">9985</option><option value="9967">9967</option></select></label>
+            <SelectField className={controls.select} value={feeBill.sac} onChange={(e) => setFeeBill({ ...feeBill, sac: e.target.value })}><option value="9985">9985</option><option value="9967">9967</option></SelectField></label>
           <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} onClick={() => act(() => { recordFeeInvoice(feeBill.id, { bill_number: feeBill.no, date: feeBill.date, hsn: feeBill.sac }); setFeeBill(null); })}>{mT('save')}</button>
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setFeeBill(null)}>{mT('cancel')}</button>
         </div>
@@ -196,10 +198,10 @@ export function SettlementsPanel(props: PanelProps) {
         <div className={styles.toolbar}>
           <h4>{mT('stOrders')}</h4>
           <label className={controls.field}><span className={controls.label}>{mT('stFilter')}</span>
-            <select className={controls.select} value={filter} onChange={(e) => setFilter(e.target.value as OrderStatus | 'all')}>
+            <SelectField className={controls.select} value={filter} onChange={(e) => setFilter(e.target.value as OrderStatus | 'all')}>
               <option value="all">{mT('all')} ({orders.length})</option>
               {ORDER_STATUSES.map((s) => <option key={s} value={s}>{mT(`os.${s}`)} ({counts[s]})</option>)}
-            </select></label>
+            </SelectField></label>
           <button type="button" className={`${controls.btn} ${controls.btnOutline} ${controls.btnSm}`} onClick={() => downloadTextFile(`marketplace_orders_${channel.name}_${today()}.csv`, orderReconCsv(shown))}><Download size={14} aria-hidden="true" /> {mT('exportCsv')}</button>
         </div>
         {shown.length > 0 && (

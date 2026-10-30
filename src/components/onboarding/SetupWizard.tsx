@@ -49,6 +49,7 @@ import { applyTallyAnswer } from '../../lib/keys/nav-actions'; // R20-D4
 import { navT } from '../../i18n/areas/keys-r20d';
 import controls from '../../styles/controls.module.css';
 import styles from './SetupWizard.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /** Suggested starting designs (the full gallery stays in the editor and Design Studio). */
 const PICKS = ['classic_orange', 'corporate_navy', 'minimal_clean', 'modern_teal', 'freelancer_light', 'tech_startup', 'retail_receipt', 'gst_tax_invoice'];
@@ -306,9 +307,9 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
           <>
             <label className={controls.field}>
               <span className={controls.label}>{lang === 'en' ? `${reachT('language')} / भाषा` : reachT('language')}</span>
-              <select className={controls.select} value={lang} onChange={(e) => isLang(e.target.value) && void setLanguage(e.target.value).catch(() => undefined)}>
+              <SelectField className={controls.select} value={lang} onChange={(e) => isLang(e.target.value) && void setLanguage(e.target.value).catch(() => undefined)}>
                 {LANGUAGES.map((l) => <option key={l.code} value={l.code} lang={l.code}>{l.native}</option>)}
-              </select>
+              </SelectField>
             </label>
             <p className={controls.hint}>{reachT('shopLede')}</p>
             <div className={styles.shopGrid} role="radiogroup" aria-label={reachT('title.shop')}>
@@ -429,12 +430,12 @@ export function SetupWizard({ open, onClose }: SetupWizardProps) {
             ) : (
               <label className={controls.field}>
                 <span className={controls.label}>{setupT('stateReq')}</span>
-                <select className={controls.select} value={a.stateCode} onChange={(e) => set({ stateCode: e.target.value })}>
+                <SelectField className={controls.select} value={a.stateCode} onChange={(e) => set({ stateCode: e.target.value })}>
                   <option value="">{setupT('choose')}</option>
                   {INDIAN_STATES.map((s) => (
                     <option key={s.code} value={s.code}>{s.name}</option>
                   ))}
-                </select>
+                </SelectField>
                 <span className={controls.hint}>{setupT('noGstHint')}</span>
               </label>
             )}

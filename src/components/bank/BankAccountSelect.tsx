@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DEFAULT_BANK_ID, pickableBankAccounts, type BankPickPurpose } from '../../lib/bank-accounts';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /**
  * "Received into / paid from" picker for a receipt or supplier payment (multi-account BRS).
@@ -20,11 +21,11 @@ export function BankAccountSelect({ id, label, method, value, onChange, purpose 
   return (
     <div className={controls.field}>
       <label className={controls.label} htmlFor={id}>{label}</label>
-      <select id={id} className={controls.select} value={value || DEFAULT_BANK_ID} onChange={(e) => onChange(e.target.value)}>
+      <SelectField id={id} className={controls.select} value={value || DEFAULT_BANK_ID} onChange={(e) => onChange(e.target.value)}>
         {accounts.map((a) => (
           <option key={a.id} value={a.id}>{a.name}{a.number ? ` (${a.number})` : ''}</option>
         ))}
-      </select>
+      </SelectField>
     </div>
   );
 }

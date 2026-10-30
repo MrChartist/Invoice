@@ -23,6 +23,8 @@ import { lineForScheme, liveScopeItems } from '../../lib/trade/tr-schemes';
 import { downloadCsv } from './desk-shared';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const VIEWS = ['schemes', 'pricedrop', 'claims'] as const;
 type View = (typeof VIEWS)[number];
@@ -76,10 +78,10 @@ export default function ClaimsTab({ onDone }: { onDone: Done }) {
 
 type Vendors = { id: string; name: string }[];
 const VendorSelect = ({ value, onChange, vendors, data }: { value: string; onChange: (v: string) => void; vendors: Vendors; data?: string }) => (
-  <select className={controls.select} value={value} onChange={(e) => onChange(e.target.value)} data-principal={data}>
+  <SelectField className={controls.select} value={value} onChange={(e) => onChange(e.target.value)} data-principal={data}>
     <option value="">{aT('principal')}: -</option>
     {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-  </select>
+  </SelectField>
 );
 
 const blank = (): Scheme => ({ id: '', item_id: '', item_name: '', buy_qty: 10, free_qty: 1, scope: {}, claim_basis: 'free_goods_at_cost' });
@@ -108,17 +110,17 @@ function Schemes({ run, vendors }: { run: Run; vendors: Vendors }) {
         <summary>{aT('newScheme')}</summary>
         <div className={own.row}>
           <F label={aT('group')}>
-            <select className={controls.select} value={f.scope?.group_ids?.[0] ?? ''} onChange={(e) => scope({ group_ids: e.target.value ? [e.target.value] : [] })} data-scheme-group>
+            <SelectField className={controls.select} value={f.scope?.group_ids?.[0] ?? ''} onChange={(e) => scope({ group_ids: e.target.value ? [e.target.value] : [] })} data-scheme-group>
               <option value="">-</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
+            </SelectField>
           </F>
           <F label={aT('brand')}><input className={controls.input} value={f.scope?.brand ?? ''} onChange={(e) => scope({ brand: e.target.value })} data-scheme-brand /></F>
           <F label={aT('party')}>
-            <select className={controls.select} value={f.scope?.client_ids?.[0] ?? ''} onChange={(e) => scope({ client_ids: e.target.value ? [e.target.value] : [] })}>
+            <SelectField className={controls.select} value={f.scope?.client_ids?.[0] ?? ''} onChange={(e) => scope({ client_ids: e.target.value ? [e.target.value] : [] })}>
               <option value="">{aT('everyone')}</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </SelectField>
           </F>
           <F label={aT('buyFree')}>
             <span className={own.row}>
@@ -127,13 +129,13 @@ function Schemes({ run, vendors }: { run: Run; vendors: Vendors }) {
             </span>
           </F>
           <F label={aT('slabs')}><input className={controls.input} value={slabs} placeholder="10:1, 25:3" onChange={(e) => setSlabs(e.target.value)} /></F>
-          <F label={aT('from')}><input type="date" className={controls.input} value={f.valid_from ?? ''} onChange={(e) => set({ valid_from: e.target.value || undefined })} /></F>
-          <F label={aT('to')}><input type="date" className={controls.input} value={f.valid_to ?? ''} onChange={(e) => set({ valid_to: e.target.value || undefined })} /></F>
+          <F label={aT('from')}><DateField className={controls.input} value={f.valid_from ?? ''} onChange={(e) => set({ valid_from: e.target.value || undefined })} /></F>
+          <F label={aT('to')}><DateField className={controls.input} value={f.valid_to ?? ''} onChange={(e) => set({ valid_to: e.target.value || undefined })} /></F>
           <F label={aT('principal')}><VendorSelect vendors={vendors} value={f.principal_vendor_id ?? ''} onChange={(v) => set({ principal_vendor_id: v || undefined })} /></F>
           <F label={aT('basis')}>
-            <select className={controls.select} value={f.claim_basis} onChange={(e) => set({ claim_basis: e.target.value as ClaimBasis })}>
+            <SelectField className={controls.select} value={f.claim_basis} onChange={(e) => set({ claim_basis: e.target.value as ClaimBasis })}>
               {BASES.map((b) => <option key={b} value={b}>{aT(`basis.${b}`)}</option>)}
-            </select>
+            </SelectField>
           </F>
           <F label={aT('claimRate')}><input className={controls.input} type="number" min={0} value={f.claim_rate ?? ''} onChange={(e) => set({ claim_rate: Number(e.target.value) || undefined })} /></F>
         </div>
@@ -149,9 +151,9 @@ function Schemes({ run, vendors }: { run: Run; vendors: Vendors }) {
                 <td>{[s.item_name, s.scope?.group_ids?.map((g) => groups.find((x) => x.id === g)?.name).join(', '), s.scope?.brand, s.scope?.client_ids?.length ? clients.find((c) => c.id === s.scope!.client_ids![0])?.name : ''].filter(Boolean).join(' · ')}</td>
                 <td><VendorSelect vendors={vendors} value={s.principal_vendor_id ?? ''} onChange={(v) => save({ ...s, principal_vendor_id: v || undefined, claim_basis: s.claim_basis ?? 'free_goods_at_cost' })} /></td>
                 <td>
-                  <select className={controls.select} value={s.claim_basis ?? 'free_goods_at_cost'} disabled={!s.principal_vendor_id} onChange={(e) => save({ ...s, claim_basis: e.target.value as ClaimBasis })}>
+                  <SelectField className={controls.select} value={s.claim_basis ?? 'free_goods_at_cost'} disabled={!s.principal_vendor_id} onChange={(e) => save({ ...s, claim_basis: e.target.value as ClaimBasis })}>
                     {BASES.map((b) => <option key={b} value={b}>{aT(`basis.${b}`)}</option>)}
-                  </select>
+                  </SelectField>
                 </td>
               </tr>
             ))}
@@ -180,14 +182,14 @@ function PriceDrop({ run, vendors }: { run: Run; vendors: Vendors }) {
   return (
     <>
       <div className={own.row}>
-        <F label={aT('effective')}><input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></F>
+        <F label={aT('effective')}><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></F>
         <F label={aT('lookBack')}><input type="number" min={1} className={controls.input} value={days} onChange={(e) => setDays(Math.max(Number(e.target.value) || 1, 1))} /></F>
         <F label={aT('dropItems')}><textarea className={controls.input} rows={2} value={items} placeholder="Ceiling fan 1200mm, 150" onChange={(e) => setItems(e.target.value)} data-drop-items /></F>
         <F label={aT('mode')}>
-          <select className={controls.select} value={mode} onChange={(e) => setMode(e.target.value as 'financial' | 'gst')} data-drop-mode>
+          <SelectField className={controls.select} value={mode} onChange={(e) => setMode(e.target.value as 'financial' | 'gst')} data-drop-mode>
             <option value="financial">{aT('mode.financial')}</option>
             <option value="gst">{aT('mode.gst')}</option>
-          </select>
+          </SelectField>
         </F>
         {mode === 'gst' && <label className={controls.check}><input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} /> {aT('agreed')}</label>}
       </div>
@@ -244,8 +246,8 @@ function Claims({ run, vendors }: { run: Run; vendors: Vendors }) {
     <>
       <div className={own.row}>
         <F label={aT('principal')}><VendorSelect vendors={vendors} value={principal} onChange={setPrincipal} data="claim" /></F>
-        <F label={aT('from')}><input type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></F>
-        <F label={aT('to')}><input type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></F>
+        <F label={aT('from')}><DateField className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></F>
+        <F label={aT('to')}><DateField className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></F>
         <div><button type="button" className={controls.btnPrimary} disabled={!rows.length} onClick={make} data-claim-make>{aT('makeClaim', { n: rows.length, amount: money(rows.reduce((t, r) => t + r.value, 0)) })}</button></div>
       </div>
       <div className={own.tableWrap}>
@@ -274,13 +276,13 @@ function Claims({ run, vendors }: { run: Run; vendors: Vendors }) {
       {settle && (
         <div className={own.row} data-settle-form>
           <F label={aT('mode')}>
-            <select className={controls.select} value={settle.mode} onChange={(e) => setSettle({ ...settle, mode: e.target.value as 'financial' | 'gst' })}>
+            <SelectField className={controls.select} value={settle.mode} onChange={(e) => setSettle({ ...settle, mode: e.target.value as 'financial' | 'gst' })}>
               <option value="financial">{aT('settle.financial')}</option>
               <option value="gst">{aT('settle.gst')}</option>
-            </select>
+            </SelectField>
           </F>
           <F label={aT('noteNo')}><input className={controls.input} value={settle.note_no} onChange={(e) => setSettle({ ...settle, note_no: e.target.value })} /></F>
-          <F label={aT('date')}><input type="date" className={controls.input} value={settle.date} onChange={(e) => setSettle({ ...settle, date: e.target.value })} /></F>
+          <F label={aT('date')}><DateField className={controls.input} value={settle.date} onChange={(e) => setSettle({ ...settle, date: e.target.value })} /></F>
           <F label={aT('amount')}><input type="number" className={controls.input} value={settle.amount} onChange={(e) => setSettle({ ...settle, amount: e.target.value })} /></F>
           {settle.mode === 'gst' && <F label="GST %"><input type="number" className={controls.input} value={settle.gst_rate} onChange={(e) => setSettle({ ...settle, gst_rate: e.target.value })} /></F>}
           <div><button type="button" className={controls.btnPrimary} onClick={() => run(() => { const c = settleClaim(settle.id, { ...settle, amount: Number(settle.amount), gst_rate: Number(settle.gst_rate) }); setSettle(null); return `${c.number}: ${aT(`st.${c.status}`)}`; })}>{aT('save')}</button></div>

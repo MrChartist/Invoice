@@ -32,6 +32,8 @@ import { s7mT } from '../../i18n/areas/inventory-7s-mini';
 import { useSearchParams } from 'react-router-dom';
 import { defineArea } from '../../i18n/area';
 import { errText, libMsg } from '../../i18n/lib-msg';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 // WP-9: Sec 25(4) tax invoice + bill for a transfer between two GSTINs (lazy dialog).
 const BranchTransferDialog = lazy(() => import('../branches/BranchTransferDialog'));
@@ -279,20 +281,20 @@ function TransferModal({ godowns: baseGodowns, items: baseItems, inputs, onClose
         <div className={controls.row3}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="tr-date">{invT('date')}</label>
-            <input id="tr-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="tr-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="tr-from">{invT('fromGodown')}</label>
-            <select id="tr-from" className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)} onKeyDown={createGodown(setFrom)} aria-keyshortcuts="Alt+C">
+            <SelectField id="tr-from" className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)} onKeyDown={createGodown(setFrom)} aria-keyshortcuts="Alt+C">
               {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
+            </SelectField>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="tr-to">{invT('toGodown')}</label>
-            <select id="tr-to" className={controls.select} value={to} onChange={(e) => setTo(e.target.value)} onKeyDown={createGodown(setTo)} aria-keyshortcuts="Alt+C">
+            <SelectField id="tr-to" className={controls.select} value={to} onChange={(e) => setTo(e.target.value)} onKeyDown={createGodown(setTo)} aria-keyshortcuts="Alt+C">
               <option value="">{invT('choose')}</option>
               {godowns.filter((g) => g.id !== from).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
+            </SelectField>
           </div>
         </div>
 
@@ -305,7 +307,7 @@ function TransferModal({ godowns: baseGodowns, items: baseItems, inputs, onClose
               <div className={`${styles.lineRow} ${item && !item.track_serials && cleanAltUnits(item.alt_units, item.unit || 'NOS') ? styles.lineRowUnit : ''}`}>
                 <div className={controls.field}>
                   <label className={controls.label} htmlFor={`tr-item-${l.id}`}>{invT('itemN', { n: i + 1 })}</label>
-                  <select
+                  <SelectField
                     id={`tr-item-${l.id}`}
                     className={controls.select}
                     value={l.item_id}
@@ -315,7 +317,7 @@ function TransferModal({ godowns: baseGodowns, items: baseItems, inputs, onClose
                   >
                     <option value="">{invT('chooseItem')}</option>
                     {sortedItems.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                  </select>
+                  </SelectField>
                   {item && <span className={controls.hint}>{invT('inSource', { qty: available, unit: item.unit })}</span>}
                 </div>
                 <div className={controls.field}>
@@ -333,24 +335,24 @@ function TransferModal({ godowns: baseGodowns, items: baseItems, inputs, onClose
                 {item && !item.track_serials && cleanAltUnits(item.alt_units, item.unit || 'NOS') && (
                   <div className={controls.field}>
                     <label className={controls.label} htmlFor={`tr-unit-${l.id}`}>{unitT('lineUnit', { n: i + 1 })}</label>
-                    <select id={`tr-unit-${l.id}`} className={controls.select} value={l.unit || item.unit}
+                    <SelectField id={`tr-unit-${l.id}`} className={controls.select} value={l.unit || item.unit}
                       onChange={(e) => {
                         const f = factorFor(item, e.target.value) ?? 1;
                         patch(l.id, { unit: f === 1 ? undefined : e.target.value, unit_factor: f === 1 ? undefined : f, qty: roundTypedQty(l.qty, e.target.value, units) });
                       }}>
                       {unitChoices(item).map((c) => <option key={c.unit} value={c.unit}>{c.unit}</option>)}
-                    </select>
+                    </SelectField>
                   </div>
                 )}
                 {item?.track_batches ? (
                   <div className={controls.field}>
                     <label className={controls.label} htmlFor={`tr-batch-${l.id}`}>{invT('batch')}</label>
-                    <select id={`tr-batch-${l.id}`} className={controls.select} value={l.batch_no ?? ''} onChange={(e) => patch(l.id, { batch_no: e.target.value || undefined })}>
+                    <SelectField id={`tr-batch-${l.id}`} className={controls.select} value={l.batch_no ?? ''} onChange={(e) => patch(l.id, { batch_no: e.target.value || undefined })}>
                       <option value="">{invT('choose')}</option>
                       {batchOptions(t, date, from).map((b) => (
                         <option key={b.batch} value={b.batch}>{b.batch}{b.expiry ? ` · ${invT('exp', { date: b.expiry })}` : ''} · {b.qty}{b.expired ? ` · ${invT('expired')}` : ''}</option>
                       ))}
-                    </select>
+                    </SelectField>
                   </div>
                 ) : <span />}
                 <button type="button" className={controls.btnDanger} aria-label={invT('removeLine', { n: i + 1 })} disabled={lines.length === 1} onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}>

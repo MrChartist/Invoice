@@ -13,6 +13,8 @@ import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
 import { Out } from './Out';
 import { inr, parseAmount, runAction, type TabProps } from './shared';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const TAG_KEY = { reimb: 'ext.tag.reimb', bonus: 'ext.tag.bonus', adjust: 'ext.tag.adjust' } as const;
 const PERQ_KEY = { accommodation: 'ext.perq.accommodation', car: 'ext.perq.car', meals: 'ext.perq.meals', gift: 'ext.perq.gift', accretion: 'ext.perq.accretion', other: 'ext.perq.other' } as const;
@@ -66,31 +68,31 @@ export function ExtrasTab({ month, version, refresh, notify }: TabProps) {
           <div className={styles.formGrid}>
             <label className={controls.field}>
               <span className={controls.label}>{pT('rep.employee')}</span>
-              <select className={controls.select} value={employee} onChange={(e) => setEmpId(e.target.value)}>
+              <SelectField className={controls.select} value={employee} onChange={(e) => setEmpId(e.target.value)}>
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.code} · {e.name}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('ext.tag')}</span>
-              <select className={controls.select} value={tag} onChange={(e) => { const v = e.target.value as AdjustmentTag; setTag(v); if (v !== 'adjust') setKind('earning'); }}>
+              <SelectField className={controls.select} value={tag} onChange={(e) => { const v = e.target.value as AdjustmentTag; setTag(v); if (v !== 'adjust') setKind('earning'); }}>
                 {(Object.keys(TAG_KEY) as AdjustmentTag[]).map((k) => <option key={k} value={k}>{pT(TAG_KEY[k])}</option>)}
-              </select>
+              </SelectField>
             </label>
             {tag === 'adjust' && (
               <label className={controls.field}>
                 <span className={controls.label}>{pT('ext.kind')}</span>
-                <select className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as 'earning' | 'deduction')}>
+                <SelectField className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as 'earning' | 'deduction')}>
                   <option value="earning">{pT('ext.earning')}</option>
                   <option value="deduction">{pT('ext.deduction')}</option>
-                </select>
+                </SelectField>
               </label>
             )}
             {tag === 'reimb' && (
               <label className={controls.field}>
                 <span className={controls.label}>{pT('ext.head')}</span>
-                <select className={controls.select} value={head} onChange={(e) => setHead(e.target.value)}>
+                <SelectField className={controls.select} value={head} onChange={(e) => setHead(e.target.value)}>
                   {REIMBURSEMENT_HEADS.map((h) => <option key={h.key} value={h.key}>{h.name}</option>)}
-                </select>
+                </SelectField>
               </label>
             )}
             <label className={controls.field}><span className={controls.label}>{pT('ext.desc')}</span><input className={controls.input} value={desc} onChange={(e) => setDesc(e.target.value)} /></label>
@@ -169,19 +171,19 @@ export function ExtrasTab({ month, version, refresh, notify }: TabProps) {
           <div className={styles.formGrid}>
             <label className={controls.field}>
               <span className={controls.label}>{pT('rep.employee')}</span>
-              <select className={controls.select} value={pEmp || employee} onChange={(e) => setPEmp(e.target.value)}>
+              <SelectField className={controls.select} value={pEmp || employee} onChange={(e) => setPEmp(e.target.value)}>
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.code} · {e.name}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('ext.perqKind')}</span>
-              <select className={controls.select} value={pKind} onChange={(e) => setPKind(e.target.value as PerquisiteKind)}>
+              <SelectField className={controls.select} value={pKind} onChange={(e) => setPKind(e.target.value as PerquisiteKind)}>
                 {(Object.keys(PERQ_KEY) as PerquisiteKind[]).map((k) => <option key={k} value={k}>{pT(PERQ_KEY[k])}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}><span className={controls.label}>{pT('ext.desc')}</span><input className={controls.input} value={pDesc} onChange={(e) => setPDesc(e.target.value)} /></label>
-            <label className={controls.field}><span className={controls.label}>{pT('ext.perqFrom')}</span><input className={controls.input} type="month" value={pFrom} onChange={(e) => setPFrom(e.target.value)} /></label>
-            <label className={controls.field}><span className={controls.label}>{pT('ext.perqTo')}</span><input className={controls.input} type="month" value={pTo} onChange={(e) => setPTo(e.target.value)} /></label>
+            <label className={controls.field}><span className={controls.label}>{pT('ext.perqFrom')}</span><DateField className={controls.input} mode="month" value={pFrom} onChange={(e) => setPFrom(e.target.value)} /></label>
+            <label className={controls.field}><span className={controls.label}>{pT('ext.perqTo')}</span><DateField className={controls.input} mode="month" value={pTo} onChange={(e) => setPTo(e.target.value)} /></label>
             <label className={controls.field}><span className={controls.label}>{pT('ext.perqValue')}</span><input className={controls.inputNumeric} type="number" min="0" step="0.01" value={pValue} onChange={(e) => setPValue(e.target.value)} /></label>
           </div>
           <button

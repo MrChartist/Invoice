@@ -15,6 +15,7 @@ import controls from '../../styles/controls.module.css';
 import { isPackOn } from '../../lib/industry-packs';
 import { localDb } from '../../lib/localDb';
 import styles from './Settings.module.css';
+import { SelectField } from '../ui/SelectField';
 
 // R4-C1: IEC / AD code and the LUT register — their own lazy chunk.
 const ExportSettingsPanel = lazy(() => import('../trade/ExportSettingsPanel'));
@@ -176,21 +177,21 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{setT('stateOfBusiness')}</span>
-            <select className={controls.select} value={profile.stateCode ?? ''} onChange={(e) => onChange({ stateCode: e.target.value })}>
+            <SelectField className={controls.select} value={profile.stateCode ?? ''} onChange={(e) => onChange({ stateCode: e.target.value })}>
               <option value="">{setT('selectState')}</option>
               {INDIAN_STATES.map((s) => (
                 <option key={s.code} value={s.code}>
                   {s.code} : {s.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
         </div>
         <p className={controls.hint}>{setT('gstinHint')}</p>
         <div className={controls.row}>
           <label className={controls.field}>
             <span className={controls.label}>{setT('gstScheme')}</span>
-            <select
+            <SelectField
               className={controls.select}
               value={profile.gst_scheme ?? 'regular'}
               onChange={(e) => {
@@ -200,16 +201,16 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
             >
               <option value="regular">{setT('schemeRegular')}</option>
               <option value="composition">{setT('schemeComposition')}</option>
-            </select>
+            </SelectField>
           </label>
           {profile.gst_scheme === 'composition' && (
             <label className={controls.field}>
               <span className={controls.label}>{setT('compositionCategory')}</span>
-              <select className={controls.select} value={profile.composition_category ?? 'trader'} onChange={(e) => onChange({ composition_category: e.target.value as CompositionCategory })}>
+              <SelectField className={controls.select} value={profile.composition_category ?? 'trader'} onChange={(e) => onChange({ composition_category: e.target.value as CompositionCategory })}>
                 {(Object.keys(COMPOSITION_CATEGORY_LABELS) as CompositionCategory[]).map((k) => (
                   <option key={k} value={k}>{COMPOSITION_CATEGORY_LABELS[k]}</option>
                 ))}
-              </select>
+              </SelectField>
             </label>
           )}
         </div>

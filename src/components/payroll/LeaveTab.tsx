@@ -14,6 +14,8 @@ import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
 import { Out } from './Out';
 import { parseAmount, runAction, type TabProps } from './shared';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const KINDS: LeaveEntryKind[] = ['opening', 'taken', 'encash', 'adjust'];
 const KIND_KEY = { opening: 'leave.k.opening', taken: 'leave.k.taken', encash: 'leave.k.encash', adjust: 'leave.k.adjust' } as const;
@@ -120,27 +122,27 @@ export function LeaveTab({ month, version, refresh, notify }: TabProps) {
               <div className={styles.formGrid}>
                 <label className={controls.field}>
                   <span className={controls.label}>{pT('rep.employee')}</span>
-                  <select className={controls.select} value={employee} onChange={(e) => setEmpId(e.target.value)}>
+                  <SelectField className={controls.select} value={employee} onChange={(e) => setEmpId(e.target.value)}>
                     {employees.map((e) => <option key={e.id} value={e.id}>{e.code} · {e.name}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
                 <label className={controls.field}>
                   <span className={controls.label}>{pT('leave.type')}</span>
-                  <select className={controls.select} value={type} onChange={(e) => setTypeId(e.target.value)}>
+                  <SelectField className={controls.select} value={type} onChange={(e) => setTypeId(e.target.value)}>
                     {types.map((x) => <option key={x.id} value={x.id}>{x.code} · {x.name}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
                 <label className={controls.field}>
                   <span className={controls.label}>{pT('leave.kind')}</span>
-                  <select className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as LeaveEntryKind)}>
+                  <SelectField className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as LeaveEntryKind)}>
                     {KINDS.map((k) => <option key={k} value={k}>{pT(KIND_KEY[k])}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
-                <label className={controls.field}><span className={controls.label}>{pT('ppay.date')}</span><input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+                <label className={controls.field}><span className={controls.label}>{pT('ppay.date')}</span><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
                 <label className={controls.field}><span className={controls.label}>{pT('leave.days')}</span><input className={controls.inputNumeric} type="number" step="0.5" value={days} onChange={(e) => setDays(e.target.value)} /></label>
                 {kind === 'encash' && (
                   <>
-                    <label className={controls.field}><span className={controls.label}>{pT('leave.payMonth')}</span><input className={controls.input} type="month" value={payMonth} onChange={(e) => setPayMonth(e.target.value)} /></label>
+                    <label className={controls.field}><span className={controls.label}>{pT('leave.payMonth')}</span><DateField className={controls.input} mode="month" value={payMonth} onChange={(e) => setPayMonth(e.target.value)} /></label>
                     <label className={controls.field}><span className={controls.label}>{pT('leave.amount')}</span><input className={controls.inputNumeric} type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /><span className={controls.hint}>{pT('leave.amountHint')}</span></label>
                   </>
                 )}

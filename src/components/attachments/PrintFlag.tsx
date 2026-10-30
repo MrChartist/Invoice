@@ -7,6 +7,7 @@ import { useT } from '../../i18n';
 import { d3T } from '../../i18n/areas/docs-r3';
 import controls from '../../styles/controls.module.css';
 import styles from './PrintFlag.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /** R3-C2: mark an image attachment "Print on document" with a caption and a group (Before / After / Other). */
 export default function PrintFlag({ refs, target, disabled, onChange }: { refs: AttachmentRef[]; target: AttachmentRef; disabled?: boolean; onChange: (next: AttachmentRef[]) => void }) {
@@ -27,9 +28,9 @@ export default function PrintFlag({ refs, target, disabled, onChange }: { refs: 
       </label>
       {print && (
         <>
-          <select className={controls.select} value={print.group} disabled={disabled} aria-label={d3T('ph.group')} onChange={(e) => apply({ ...print, group: e.target.value as PhotoGroup })}>
+          <SelectField className={controls.select} value={print.group} disabled={disabled} aria-label={d3T('ph.group')} onChange={(e) => apply({ ...print, group: e.target.value as PhotoGroup })}>
             {PHOTO_GROUPS.map((g) => <option key={g} value={g}>{d3T(`ph.${g}` as const)}</option>)}
-          </select>
+          </SelectField>
           <input className={cn(controls.input, styles.caption)} value={print.caption ?? ''} placeholder={d3T('ph.caption')} aria-label={d3T('ph.caption')} disabled={disabled} maxLength={80} onChange={(e) => apply({ ...print, caption: e.target.value })} />
         </>
       )}

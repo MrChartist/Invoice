@@ -4,6 +4,7 @@ import { LANGUAGES, LANG_PACK_OFFLINE, isLang, setLanguage, useT } from '../../i
 import { cn } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import styles from './LanguageSwitch.module.css';
+import { SelectField } from './SelectField';
 
 /**
  * Interface language picker (5.4). The accessible name is bilingual on purpose, so it can be
@@ -18,7 +19,7 @@ export function LanguageSwitch({ className, compact }: { className?: string; com
   return (
     <label className={cn(styles.wrap, className)}>
       <Languages size={16} aria-hidden="true" className={styles.icon} />
-      <select
+      <SelectField
         className={cn(controls.select, styles.select, compact && styles.compact)}
         aria-label="Language / भाषा"
         value={lang}
@@ -40,7 +41,7 @@ export function LanguageSwitch({ className, compact }: { className?: string; com
             {l.native}
           </option>
         ))}
-      </select>
+      </SelectField>
       {needsOnline && (
         <span role="alert" className={styles.offline} data-lang-offline>
           {needsOnline} needs one online visit to download: connect to the internet and try again.{' '}

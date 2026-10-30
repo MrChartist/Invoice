@@ -18,6 +18,8 @@ import { F } from '../transport/Field';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../transport/transport.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const monthStart = () => `${today().slice(0, 7)}-01`;
 
@@ -44,13 +46,13 @@ export function SitesPanel({ boq, notify, refresh, tick }: PanelProps & { boq: I
   }) : []), [site, f.from, f.to, boq.id, coeffs, tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const itemSelect = (value: string, on: (v: string) => void, label: string) => (
     <F l={label}>
-      <select className={controls.select} value={value} onChange={(e) => on(e.target.value)}><option value="">-</option>{items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select></F>
+      <SelectField className={controls.select} value={value} onChange={(e) => on(e.target.value)}><option value="">-</option>{items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</SelectField></F>
   );
   return (
     <div className={styles.stack}>
       <div className={styles.toolbar}>
         <F l={twT('site')}>
-          <select className={controls.select} value={site?.id ?? ''} onChange={(e) => setSiteId(e.target.value)}>{sites.length === 0 && <option value="">-</option>}{sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></F>
+          <SelectField className={controls.select} value={site?.id ?? ''} onChange={(e) => setSiteId(e.target.value)}>{sites.length === 0 && <option value="">-</option>}{sites.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</SelectField></F>
         <F l={twT('siteName')}><input className={controls.input} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></F>
         <button type="button" className={B.o} onClick={() => run(() => addSite(boq.id, f.name || `${boq.client?.name ?? ''} site`, boq.boq_terms?.cost_centre_id), twT('siteAdded'))}><Building2 size={16} aria-hidden="true" /> {twT('addSite')}</button>
       </div>
@@ -59,7 +61,7 @@ export function SitesPanel({ boq, notify, refresh, tick }: PanelProps & { boq: I
         <section className={styles.box}>
           <h4>{twT('bookConsumption')}</h4>
           <div className={styles.lineRow}>
-            <F l={twT('date')}><input className={controls.input} type="date" value={f.day} onChange={(e) => setF({ ...f, day: e.target.value })} /></F>
+            <F l={twT('date')}><DateField className={controls.input} value={f.day} onChange={(e) => setF({ ...f, day: e.target.value })} /></F>
             {itemSelect(f.item, (v) => setF({ ...f, item: v }), twT('item'))}
             <F l={twT('qty')}><input className={controls.input} type="number" value={f.qty} onChange={(e) => setF({ ...f, qty: e.target.value })} /></F>
             <button type="button" className={B.p} onClick={() => run(() => bookConsumption(site, { date: f.day, lines: [{ item_id: f.item, qty: Number(f.qty) }] }, items), twT('consumptionBooked'))}>{twT('save')}</button>
@@ -80,8 +82,8 @@ export function SitesPanel({ boq, notify, refresh, tick }: PanelProps & { boq: I
       {site && (
         <section className={styles.stack}>
           <div className={styles.toolbar}>
-            <F l={twT('from')}><input className={controls.input} type="date" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></F>
-            <F l={twT('to')}><input className={controls.input} type="date" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></F>
+            <F l={twT('from')}><DateField className={controls.input} value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></F>
+            <F l={twT('to')}><DateField className={controls.input} value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></F>
             <button type="button" className={B.o} onClick={() => csvDownload(`site_${site.name}_${f.to}.csv`, siteCsvRows(rows, itemName))}><Download size={14} aria-hidden="true" /> CSV</button>
           </div>
           <div className={surface.tableWrap}>

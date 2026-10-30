@@ -18,6 +18,8 @@ import { useT } from '../../i18n';
 import { phT } from '../../i18n/areas/pharma-ops';
 import controls from '../../styles/controls.module.css';
 import own from './dist.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Section = 'issue' | 'claims' | 'receive' | 'destroy';
 
@@ -86,10 +88,10 @@ export default function ExpiryOpsTab({ items, positions, tracking, today, onChan
       <p className={own.muted}>{label}</p>
       {lines.map((l, i) => (
         <div key={l.id} className={own.row}>
-          <select className={controls.select} aria-label={phT('item')} value={l.item_id} onChange={(e) => set(lines.map((x, j) => (j === i ? { ...x, item_id: e.target.value } : x)))}>
+          <SelectField className={controls.select} aria-label={phT('item')} value={l.item_id} onChange={(e) => set(lines.map((x, j) => (j === i ? { ...x, item_id: e.target.value } : x)))}>
             <option value="">{phT('item')}</option>
             {items.filter((it) => it.track_stock).map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
-          </select>
+          </SelectField>
           <input className={controls.input} aria-label={phT('batch')} placeholder={phT('batch')} value={l.batch_no ?? ''} onChange={(e) => set(lines.map((x, j) => (j === i ? { ...x, batch_no: e.target.value } : x)))} />
           <input type="number" min={0} className={controls.input} aria-label={phT('qty')} placeholder={phT('qty')} value={l.qty || ''} onChange={(e) => set(lines.map((x, j) => (j === i ? { ...x, qty: Number(e.target.value) || 0 } : x)))} />
           <button type="button" className={controls.btnIcon} aria-label={phT('removeLine')} onClick={() => set(lines.filter((_, j) => j !== i))}><Trash2 size={14} /></button>
@@ -125,7 +127,7 @@ export default function ExpiryOpsTab({ items, positions, tracking, today, onChan
             <label className={controls.field}><span className={controls.label}>{phT('withinDays')}</span>
               <input type="number" min={0} className={controls.input} value={days} onChange={(e) => setDays(Math.max(Number(e.target.value) || 0, 0))} /></label>
             <label className={controls.field}><span className={controls.label}>{phT('noteDate')}</span>
-              <input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
+              <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
           </div>
           {groups.length === 0 && <p className={own.muted}>{phT('nothingDue')}</p>}
           {groups.map((g) => (
@@ -200,24 +202,24 @@ export default function ExpiryOpsTab({ items, positions, tracking, today, onChan
           )}
           <div className={own.row}>
             <label className={controls.field}><span className={controls.label}>{phT('customer')}</span>
-              <select className={controls.select} value={rc.client} onChange={(e) => setRc({ ...rc, client: e.target.value })}>
+              <SelectField className={controls.select} value={rc.client} onChange={(e) => setRc({ ...rc, client: e.target.value })}>
                 <option value="">{phT('choose')}</option>
                 {clients.map((c) => <option key={c.id ?? c.name} value={c.id ?? c.name}>{c.name}</option>)}
-              </select></label>
+              </SelectField></label>
             <label className={controls.field}><span className={controls.label}>{phT('intoGodown')}</span>
-              <select className={controls.select} value={rc.godown || expiryGodowns[0]?.id || ''} onChange={(e) => setRc({ ...rc, godown: e.target.value })}>
+              <SelectField className={controls.select} value={rc.godown || expiryGodowns[0]?.id || ''} onChange={(e) => setRc({ ...rc, godown: e.target.value })}>
                 {expiryGodowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select></label>
+              </SelectField></label>
             <label className={controls.field}><span className={controls.label}>{phT('date')}</span>
-              <input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
+              <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
           </div>
           {lineEditor(rLines, setRLines, phT('received'))}
           {lineEditor(repl, setRepl, phT('replacement'))}
           {repl.length > 0 && (
             <label className={controls.field}><span className={controls.label}>{phT('replaceFrom')}</span>
-              <select className={controls.select} value={rc.from || saleable[0]?.id || ''} onChange={(e) => setRc({ ...rc, from: e.target.value })}>
+              <SelectField className={controls.select} value={rc.from || saleable[0]?.id || ''} onChange={(e) => setRc({ ...rc, from: e.target.value })}>
                 {saleable.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select></label>
+              </SelectField></label>
           )}
           <button type="button" className={controls.btnPrimary} onClick={() => run(() => {
             const client = clients.find((c) => (c.id ?? c.name) === rc.client);

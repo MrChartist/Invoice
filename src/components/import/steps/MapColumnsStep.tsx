@@ -6,6 +6,7 @@ import type { ImportTable } from '../../../lib/importers';
 import type { WizardAction } from '../wizard-state';
 import ctl from '../../../styles/controls.module.css';
 import styles from '../ImportWizard.module.css';
+import { SelectField } from '../../ui/SelectField';
 
 interface Props {
   kind: ImportKind;
@@ -28,13 +29,13 @@ export function MapColumnsStep({ kind, table, mapping, confidence, presetId, mis
           <label className={ctl.label} htmlFor="import-preset">
             Source / saved mapping
           </label>
-          <select id="import-preset" className={cn(ctl.input, ctl.select)} value={presetId} onChange={(e) => dispatch({ type: 'applyPreset', presetId: e.target.value })}>
+          <SelectField id="import-preset" className={cn(ctl.input, ctl.select)} value={presetId} onChange={(e) => dispatch({ type: 'applyPreset', presetId: e.target.value })}>
             {IMPORT_PRESETS.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label}
               </option>
             ))}
-          </select>
+          </SelectField>
           <span className={ctl.hint}>{IMPORT_PRESETS.find((p) => p.id === presetId)?.description}</span>
         </div>
         <p className={styles.mapNote}>
@@ -80,7 +81,7 @@ export function MapColumnsStep({ kind, table, mapping, confidence, presetId, mis
                     {f.hint && <span className={styles.fieldHint}>{f.hint}</span>}
                   </th>
                   <td>
-                    <select
+                    <SelectField
                       id={selectId}
                       className={cn(ctl.input, ctl.select, f.required && !mapped && ctl.inputInvalid)}
                       value={mapped ? String(col) : ''}
@@ -92,7 +93,7 @@ export function MapColumnsStep({ kind, table, mapping, confidence, presetId, mis
                           {h}
                         </option>
                       ))}
-                    </select>
+                    </SelectField>
                   </td>
                   <td>
                     {mapped && (

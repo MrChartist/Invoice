@@ -7,6 +7,8 @@ import { NumberInput } from '../ui/NumberInput';
 import { btn, wrap } from './agd-ui';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { SelectField } from '../ui/SelectField';
+import { TypedInput } from '../ui/TypedInput';
 
 type Opts = readonly (readonly [string, string])[];
 /** A field: key in the state object, label key, kind (n number, d date, m month, c checkbox, t / absent text, or options), width. */
@@ -20,10 +22,10 @@ export function F({ label, w, children }: { label: string; w?: number; children:
 
 export function Sel({ value, onChange, opts, blank, ...rest }: { value: string; onChange: (v: string) => void; opts: Opts; blank?: string; 'data-agd'?: string }) {
   return (
-    <select className={controls.select} value={value} onChange={(e) => onChange(e.target.value)} {...rest}>
+    <SelectField className={controls.select} value={value} onChange={(e) => onChange(e.target.value)} {...rest}>
       {blank !== undefined && <option value="">{blank}</option>}
       {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-    </select>
+    </SelectField>
   );
 }
 
@@ -38,7 +40,7 @@ export function Form({ v, set, f, children }: { v: Obj; set: (v: Obj) => void; f
         const input = kind === 'n' ? <NumberInput className={controls.input} value={Number(v[k]) || 0} onChange={on} data-agd={k} />
           : kind === 'c' ? <input type="checkbox" checked={!!v[k]} onChange={(e) => on(e.target.checked)} data-agd={k} />
           : Array.isArray(kind) ? <Sel value={String(v[k] ?? '')} onChange={on} opts={kind} blank="-" data-agd={k} />
-          : <input type={kind === 'd' ? 'date' : kind === 'm' ? 'month' : 'text'} className={controls.input} value={String(v[k] ?? '')} onChange={(e) => on(e.target.value)} data-agd={k} />;
+          : <TypedInput type={kind === 'd' ? 'date' : kind === 'm' ? 'month' : 'text'} className={controls.input} value={String(v[k] ?? '')} onChange={(e) => on(e.target.value)} data-agd={k} />;
         return <F key={k} label={agdT(label)} w={w}>{input}</F>;
       })}
       {children}

@@ -14,6 +14,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../collections/collections.module.css';
 import { errText } from '../../i18n/lib-msg';
+import { SelectField } from '../ui/SelectField';
 
 // R13 (MF-A5): Udyam category, print switch and FSSAI number (lazy row beside the Udyam number).
 const MfProfileRow = lazy(() => import('../mfg/MfProfileRow'));
@@ -125,11 +126,11 @@ export function PaymentTermsPanel({ notify }: { notify: (m: string, tone?: 'succ
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{colT('ptKind')}</span>
-                <select className={controls.select} value={edit.kind}
+                <SelectField className={controls.select} value={edit.kind}
                   onChange={(e) => { const kind = e.target.value as TermKind; setEdit({ ...edit, kind, ...(kind === 'instalments' && !edit.instalments?.length ? { instalments: blankRows() } : {}), ...(kind === 'day_next_month' && !edit.day ? { day: 10 } : {}) }); }}
                   data-term-kind>
                   {TERM_KINDS.map((k) => <option key={k} value={k}>{colT(`kind.${k}`)}</option>)}
-                </select>
+                </SelectField>
               </label>
               {(edit.kind === 'net' || edit.kind === 'eom') && (
                 <label className={controls.field}>
@@ -155,9 +156,9 @@ export function PaymentTermsPanel({ notify }: { notify: (m: string, tone?: 'succ
                       <td>
                         <span className={styles.inlineActions}>
                           <input className={`${controls.input} ${controls.inputNumeric}`} type="number" min="0" value={r.offset} aria-label={colT('ptOffset')} onChange={(e) => setRow(i, { offset: Number(e.target.value) })} />
-                          <select className={controls.select} value={r.offset_kind} aria-label={colT('ptOffset')} onChange={(e) => setRow(i, { offset_kind: e.target.value as OffsetKind })}>
+                          <SelectField className={controls.select} value={r.offset_kind} aria-label={colT('ptOffset')} onChange={(e) => setRow(i, { offset_kind: e.target.value as OffsetKind })}>
                             {OFFSETS.map((o) => <option key={o} value={o}>{colT(`off.${o}`)}</option>)}
-                          </select>
+                          </SelectField>
                         </span>
                       </td>
                       <td>
@@ -236,9 +237,9 @@ export function PaymentTermsPanel({ notify }: { notify: (m: string, tone?: 'succ
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{colT('ssShort')}</span>
-                <select className={controls.select} value={settings.short_pay_account} onChange={(e) => setSettings({ ...settings, short_pay_account: e.target.value })}>
+                <SelectField className={controls.select} value={settings.short_pay_account} onChange={(e) => setSettings({ ...settings, short_pay_account: e.target.value })}>
                   {SHORT_PAY_ACCOUNTS.map((a) => <option key={a} value={a}>{colT(`acc.${a}`)}</option>)}
-                </select>
+                </SelectField>
               </label>
             </div>
             <p className={styles.note}>{colT('ssCapHint')}</p>

@@ -12,6 +12,8 @@ import { F } from '../transport/Field';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../transport/transport.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export function BoqPanel({ boq, notify, refresh, tick, onCreated }: PanelProps & { boq?: InvoiceRecord; onCreated: (id: string) => void }) {
   const clients = useMemo(() => localDb.clients.getAll().filter((c) => c.id && c.name?.trim()), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -81,8 +83,8 @@ export function BoqPanel({ boq, notify, refresh, tick, onCreated }: PanelProps &
             <p className={styles.note}>{twT('boqPreview', { n: imp.lines.length, skipped: imp.skipped.length })}</p>
             <div className={styles.grid}>
               <F l={twT('client')}>
-                <select className={controls.select} value={f.client} onChange={(e) => setF({ ...f, client: e.target.value })}><option value="">-</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></F>
-              <F l={twT('date')}><input className={controls.input} type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></F>
+                <SelectField className={controls.select} value={f.client} onChange={(e) => setF({ ...f, client: e.target.value })}><option value="">-</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SelectField></F>
+              <F l={twT('date')}><DateField className={controls.input} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></F>
               <F l={twT('workOrder')}><input className={controls.input} value={f.wo} onChange={(e) => setF({ ...f, wo: e.target.value })} /></F>
               <label className={controls.check}><input type="checkbox" checked={f.govt} onChange={(e) => setF({ ...f, govt: e.target.checked })} /> {twT('govtWorks')}</label>
             </div>

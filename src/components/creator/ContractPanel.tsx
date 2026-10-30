@@ -22,6 +22,8 @@ import { resolveStateCode } from '../../lib/india-states';
 import type { CnHeader, CnLine, CnSnapshot, RaPaperStyle } from '../../types/construction-r11';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 type TextKey = 'name_of_work' | 'agreement_no' | 'work_order_no' | 'tender_ref' | 'client_office' | 'engineer' | 'ra_label';
 type DateKey = 'agreement_date' | 'work_order_date' | 'stipulated_start' | 'stipulated_completion' | 'extended_completion' | 'period_from' | 'period_to' | 'measured_on';
@@ -62,21 +64,21 @@ export default function ContractPanel() {
         ))}
         {DATES.map(([k, l]) => (
           <label key={k} className={controls.field}><span className={controls.label}>{lbl(l)} ({k.replace(/_/g, ' ')})</span>
-            <input className={controls.input} type="date" value={h[k] ?? ''} onChange={(e) => setH({ [k]: e.target.value || undefined })} /></label>
+            <DateField className={controls.input} value={h[k] ?? ''} onChange={(e) => setH({ [k]: e.target.value || undefined })} /></label>
         ))}
         <label className={controls.field}><span className={controls.label}>{lbl('p.contractValue')}</span>
           <input className={controls.input} type="number" value={h.contract_value ?? ''} onChange={(e) => setH({ contract_value: Number(e.target.value) || undefined })} /></label>
         <label className={controls.field}><span className={controls.label}>{cnT('siteAddress')}</span>
           <input className={controls.input} value={h.site?.address ?? ''} onChange={(e) => setH({ site: { ...h.site, address: e.target.value || undefined } })} data-cn-site /></label>
         <label className={controls.field}><span className={controls.label}>{cnT('siteState')}</span>
-          <select className={controls.select} value={h.site?.state_code ?? ''} onChange={(e) => setH({ site: { ...h.site, state_code: e.target.value || undefined } })}>
+          <SelectField className={controls.select} value={h.site?.state_code ?? ''} onChange={(e) => setH({ site: { ...h.site, state_code: e.target.value || undefined } })}>
             <option value="">-</option>
             {INDIAN_STATES.map((st) => <option key={st.code} value={st.code}>{st.name}</option>)}
-          </select></label>
+          </SelectField></label>
         <label className={controls.field}><span className={controls.label}>{cnT('paperStyle')}</span>
-          <select className={controls.select} value={cn.paper ?? 'standard'} onChange={(e) => setCn({ ...cn, paper: e.target.value as RaPaperStyle })} data-cn-paper>
+          <SelectField className={controls.select} value={cn.paper ?? 'standard'} onChange={(e) => setCn({ ...cn, paper: e.target.value as RaPaperStyle })} data-cn-paper>
             {PAPERS.map((p) => <option key={p} value={p}>{cnT(`paper.${p}`)}</option>)}
-          </select></label>
+          </SelectField></label>
       </div>
       {h.site?.state_code && h.site.state_code !== s.place_of_supply && (
         <button type="button" className={controls.btnOutline} onClick={() => s.patch({ place_of_supply: h.site!.state_code })}>{cnT('useSitePos')}</button>
@@ -95,7 +97,7 @@ export default function ContractPanel() {
                   <td><input className={controls.input} value={l.ref ?? it.boq_ref ?? ''} onChange={(e) => setLine(it.id, { ref: e.target.value || undefined })} aria-label={cnT('boqRef')} /></td>
                   <td><input className={controls.input} value={l.mb ?? ''} onChange={(e) => setLine(it.id, { mb: e.target.value || undefined })} aria-label={cnT('mbRef')} /></td>
                   <td>
-                    <select className={controls.select} value={l.cls ?? ''} onChange={(e) => {
+                    <SelectField className={controls.select} value={l.cls ?? ''} onChange={(e) => {
                       const cls = (e.target.value || undefined) as CnLine['cls'];
                       setLine(it.id, { cls });
                       const r = classRate(cls, s.issue_date);
@@ -103,14 +105,14 @@ export default function ContractPanel() {
                     }} aria-label={cnT('cls')}>
                       <option value="">{cnT('cls.none')}</option>
                       {CN_CLASSES.map((c) => <option key={c} value={c}>{cnT(`cls.${c}` as 'cls.wc_general')}</option>)}
-                    </select>
+                    </SelectField>
                     {classConflicts(l.cls) && <span className={controls.hint}>{cnT('conflict')}</span>}
                     {rateDiffers(Number(it.tax_rate) || 0, l.cls, s.issue_date) && <span className={controls.hint}>{cnT('rateDiffers', { name: it.name, rate: classRate(l.cls, s.issue_date)?.rate ?? '' })}</span>}
                   </td>
                   <td>
-                    <select className={controls.select} value={l.kind ?? 'boq'} onChange={(e) => setLine(it.id, { kind: e.target.value as CnLine['kind'] })} aria-label={cnT('kind')}>
+                    <SelectField className={controls.select} value={l.kind ?? 'boq'} onChange={(e) => setLine(it.id, { kind: e.target.value as CnLine['kind'] })} aria-label={cnT('kind')}>
                       {(['boq', 'extra', 'substituted', 'deviation'] as const).map((k) => <option key={k} value={k}>{cnT(`kind.${k}`)}</option>)}
-                    </select>
+                    </SelectField>
                   </td>
                   <td><input className={controls.input} value={l.approval ?? ''} onChange={(e) => setLine(it.id, { approval: e.target.value || undefined })} aria-label={cnT('approval')} /></td>
                 </tr>

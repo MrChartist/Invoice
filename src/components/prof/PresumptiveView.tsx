@@ -17,6 +17,7 @@ import { Fld, Tbl } from './ps-d-ui';
 import { inr, row } from './ps-desk';
 import controls from '../../styles/controls.module.css';
 import { escHtml as esc } from '../../lib/html-esc';
+import { SelectField } from '../ui/SelectField';
 
 
 export default function PresumptiveView() {
@@ -45,7 +46,7 @@ export default function PresumptiveView() {
     <>
       <div style={row}>
         <Fld l={fdT('fy')}>
-          <select className={controls.select} value={fy} onChange={(e) => setFy(+e.target.value)} data-ps="pr-fy">{[cur, cur - 1, cur - 2].map((y) => <option key={y} value={y}>{`FY ${y}-${String(y + 1).slice(2)}`}</option>)}</select>
+          <SelectField className={controls.select} value={fy} onChange={(e) => setFy(+e.target.value)} data-ps="pr-fy">{[cur, cur - 1, cur - 2].map((y) => <option key={y} value={y}>{`FY ${y}-${String(y + 1).slice(2)}`}</option>)}</SelectField>
         </Fld>
         <button type="button" className={controls.btnOutline} onClick={print}>{fdT('print')}</button>
       </div>

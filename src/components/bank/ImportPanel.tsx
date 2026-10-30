@@ -17,6 +17,7 @@ import { bankT } from '../../i18n/areas/bank';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './reconcile.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface ImportPanelProps {
   existing: readonly BankStatement[];
@@ -231,7 +232,7 @@ function MappingStep({ parsed, onApply }: { parsed: ParsedStatement; onApply: (c
       <p className={styles.muted}>{bankT('mapIntro')}</p>
       <div className={controls.field} style={{ maxWidth: 520 }}>
         <label className={controls.label} htmlFor={`${id}-hr`}>{bankT('headerRow')}</label>
-        <select
+        <SelectField
           id={`${id}-hr`}
           className={controls.select}
           value={headerRow}
@@ -243,13 +244,13 @@ function MappingStep({ parsed, onApply }: { parsed: ParsedStatement; onApply: (c
           {rows.slice(0, 25).map((r, i) => (
             <option key={i} value={i}>{bankT('rowN', { n: i + 1, text: r.filter(Boolean).join(' | ').slice(0, 70) || bankT('blank') })}</option>
           ))}
-        </select>
+        </SelectField>
       </div>
       <div className={styles.mapGrid}>
         {MAP_FIELDS.map((f) => (
           <div key={f} className={controls.field}>
             <label className={controls.label} htmlFor={`${id}-${f}`}>{bankT(`col.${f}`) || COLUMN_FIELD_LABELS[f]}</label>
-            <select
+            <SelectField
               id={`${id}-${f}`}
               className={controls.select}
               value={cols[f] ?? -1}
@@ -267,7 +268,7 @@ function MappingStep({ parsed, onApply }: { parsed: ParsedStatement; onApply: (c
               {header.map((h, i) => (
                 <option key={i} value={i}>{bankT('columnN', { n: i + 1, text: h || bankT('blank') })}</option>
               ))}
-            </select>
+            </SelectField>
           </div>
         ))}
       </div>

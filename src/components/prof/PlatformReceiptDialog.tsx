@@ -16,6 +16,8 @@ import { pcT, type PcKey } from '../../i18n/areas/prof-r14c-export';
 import type { Notify } from './pc-run';
 import controls from '../../styles/controls.module.css';
 import css from './exportsvc.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 /** The "Receive via platform" button and its dialog (nothing without the `svcexport` pack). */
 export default function PlatformReceiptDialog(props: Props) {
@@ -69,12 +71,12 @@ function Dialog({ invoice, onClose, onDone, notify }: Props & { onClose: () => v
       footer={<><button type="button" className={controls.btnOutline} onClick={onClose}>✕</button><button type="button" className={controls.btnPrimary} disabled={!pf} onClick={save} data-ps-plat-save>{pcT('save')}</button></>}>
       {!platforms.length ? <p className={controls.hint}>{pcT('noPlatforms')}</p> : (
         <div className={css.form}>
-          {fld(pcT('pkind'), <select className={controls.select} value={f.platform} onChange={(e) => setF({ ...f, platform: e.target.value })}>{platforms.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}</select>)}
+          {fld(pcT('pkind'), <SelectField className={controls.select} value={f.platform} onChange={(e) => setF({ ...f, platform: e.target.value })}>{platforms.map((p) => <option key={p.name} value={p.name}>{p.name}</option>)}</SelectField>)}
           {num('gross', pcT('gross', { cur }))}
           {num('fee', pcT('fee', { cur }))}
           {num('conv', pcT('conv', { cur }))}
           {num('inr', pcT('inr'))}
-          {fld(pcT('date'), <input type="date" className={controls.input} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />)}
+          {fld(pcT('date'), <DateField className={controls.input} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />)}
           {fld(pcT('ref'), <input className={controls.input} value={f.ref} onChange={(e) => setF({ ...f, ref: e.target.value })} />)}
         </div>
       )}

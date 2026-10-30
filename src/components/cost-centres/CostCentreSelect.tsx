@@ -2,6 +2,7 @@ import { costCentreLabel, pickableCentres, type CostCentre } from '../../lib/cos
 import { useT } from '../../i18n';
 import { fldT } from '../../i18n/areas/fields';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 interface Props {
   id: string;
@@ -26,7 +27,7 @@ export function CostCentreSelect({ id, value, onChange, centres, label, ariaLabe
   if (!centres.length) return null;
   const options = pickableCentres(centres, value);
   const select = (
-    <select
+    <SelectField
       id={id}
       className={className ?? controls.select}
       value={value ?? ''}
@@ -41,7 +42,7 @@ export function CostCentreSelect({ id, value, onChange, centres, label, ariaLabe
           {c.active ? '' : fldT('inactive')}
         </option>
       ))}
-    </select>
+    </SelectField>
   );
   if (!label) return select;
   return (

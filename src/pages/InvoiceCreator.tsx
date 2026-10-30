@@ -56,6 +56,7 @@ import { docLabel } from '../i18n/labels';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './InvoiceCreator.module.css';
+import { SelectField } from '../components/ui/SelectField';
 
 // QA10: release a retail bill's exchange receipts / finance DO on delete or cancel, even before any retail screen opened.
 ensureRetailHooks();
@@ -507,12 +508,12 @@ export function InvoiceCreator() {
                   <button type="button" className={cn(controls.btnPrimary, controls.btnLg, controls.btnBlock)} onClick={() => saveWith(saveChoice)} disabled={readOnly} data-save-main>
                     <Save size={18} /> {saveChoice === 'print' ? uxT('savePrint') : saveChoice === 'whatsapp' ? uxT('saveWhatsapp') : t('editor.saveDoc', { doc: lang === 'en' ? label.toLowerCase() : label })}
                   </button>
-                  <select className={cn(controls.select, styles.splitPick)} value={saveChoice} disabled={readOnly} aria-label={uxT('saveChoose')} onChange={(e) => setSaveChoiceState(setSaveChoice(e.target.value as SaveChoice))} data-save-choice>
+                  <SelectField className={cn(controls.select, styles.splitPick)} value={saveChoice} disabled={readOnly} aria-label={uxT('saveChoose')} onChange={(e) => setSaveChoiceState(setSaveChoice(e.target.value as SaveChoice))} data-save-choice>
                     {/* QA-3 F21: the picker names what happens AFTER saving, so it does not read as another Save. */}
                     <option value="save">{uxT('saveOptOnly')}</option>
                     <option value="print">{uxT('saveOptPrint')}</option>
                     <option value="whatsapp">{uxT('saveOptWhatsapp')}</option>
-                  </select>
+                  </SelectField>
                 </div>
                 <button type="button" className={cn(controls.btnOutline, controls.btnBlock)} onClick={() => save(false, true)} disabled={readOnly}>
                   <FilePlus2 size={16} /> {t('editor.saveNew')}

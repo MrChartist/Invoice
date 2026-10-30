@@ -13,6 +13,7 @@ import { useT } from '../../i18n';
 import { uxT } from '../../i18n/areas/invoicing-ux';
 import controls from '../../styles/controls.module.css';
 import ux from './ux.module.css';
+import { DateField } from '../ui/DateField';
 
 /**
  * 8.106 bulk actions on a filtered list (Transactions / Receivables):
@@ -102,7 +103,7 @@ export function BulkCollectDialog({ mode, invoices, onClose, onDone }: { mode: '
       <div className={ux.sheet}>
         <label className={controls.field}>
           <span className={controls.label}>{uxT('bkDate')}</span>
-          <input type="date" className={controls.input} value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
+          <DateField className={controls.input} value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{uxT('bkReason')}</span>

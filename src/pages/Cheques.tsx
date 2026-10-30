@@ -30,6 +30,7 @@ import surface from '../styles/surface.module.css';
 import styles from '../components/cheques/Cheques.module.css';
 import { useT } from '../i18n';
 import { chqT } from '../i18n/areas/cheques';
+import { SelectField } from '../components/ui/SelectField';
 
 const actionLabel = (s: ChequeStatus): string =>
   s === 'deposited' || s === 'presented' || s === 'cleared' || s === 'bounced' || s === 'cancelled' ? chqT(`act.${s}`) : chqT(`st.${s}`);
@@ -145,14 +146,14 @@ export function Cheques() {
           </div>
           <label className={controls.field}>
             <span className={controls.label}>{chqT('show')}</span>
-            <select className={controls.select} value={status} onChange={(e) => setParam('status', e.target.value === 'open' ? '' : e.target.value)}>
+            <SelectField className={controls.select} value={status} onChange={(e) => setParam('status', e.target.value === 'open' ? '' : e.target.value)}>
               <option value="open">{chqT('open')}</option>
               <option value="pdc">{chqT('pdcOnly')}</option>
               <option value="all">{chqT('allCheques')}</option>
               {(['received', 'deposited', 'cleared', 'bounced', 'issued', 'presented', 'cancelled'] as ChequeStatus[]).map((s) => (
                 <option key={s} value={s}>{chqT(`st.${s}`)}</option>
               ))}
-            </select>
+            </SelectField>
           </label>
           <label className={`${controls.field} ${styles.search}`}>
             <span className={controls.label}>{chqT('search')}</span>

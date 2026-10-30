@@ -19,6 +19,7 @@ import { withStaff } from '../../lib/services/sv-pos';
 import { useT } from '../../i18n';
 import { svT } from '../../i18n/areas/services-r10a';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const EXEMPTS: SvExempt[] = ['EXEMPT', 'NIL', 'NON_GST'];
 
@@ -37,23 +38,23 @@ export function SvLineRow({ item, index, date }: { item: InvoiceItem; index: num
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }} data-sv-line={index}>
       {!!staff.length && (
-        <select className={controls.ghost} value={sv.staff_id ?? ''} aria-label={`${svT('e.staff')} ${index + 1}`} data-sv-staff={index}
+        <SelectField className={controls.ghost} value={sv.staff_id ?? ''} aria-label={`${svT('e.staff')} ${index + 1}`} data-sv-staff={index}
           onChange={(e) => patch({ sv: withStaff(item, staff.find((s) => s.id === e.target.value), !!readServiceSettings().print_staff).sv })}>
           <option value="">{svT('e.staff')}: -</option>
           {staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
+        </SelectField>
       )}
-      <select className={controls.ghost} value={sv.cls ?? ''} aria-label={`${svT('e.cls')} ${index + 1}`} data-sv-class={index}
+      <SelectField className={controls.ghost} value={sv.cls ?? ''} aria-label={`${svT('e.cls')} ${index + 1}`} data-sv-class={index}
         onChange={(e) => patch(classPatch(item, e.target.value as SvClass | '', date, typed))}>
         <option value="">{svT('e.cls')}: -</option>
         {SV_CLASSES.map((c) => <option key={c} value={c}>{svT(`cl.${c}`)}</option>)}
-      </select>
+      </SelectField>
       {Number(item.tax_rate) === 0 && (
-        <select className={controls.ghost} value={sv.exempt ?? ''} aria-label={`${svT('e.exempt')} ${index + 1}`} data-sv-exempt={index}
+        <SelectField className={controls.ghost} value={sv.exempt ?? ''} aria-label={`${svT('e.exempt')} ${index + 1}`} data-sv-exempt={index}
           onChange={(e) => setSv({ exempt: (e.target.value || undefined) as SvExempt | undefined })}>
           <option value="">{svT('e.exempt')}: {svT('x.none')}</option>
           {EXEMPTS.map((x) => <option key={x} value={x}>{svT(`x.${x}`)}</option>)}
-        </select>
+        </SelectField>
       )}
     </div>
   );

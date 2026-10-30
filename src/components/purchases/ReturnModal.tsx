@@ -27,6 +27,8 @@ import styles from './purchases.module.css';
 import local from './returns.module.css';
 import { defineArea } from '../../i18n/area';
 import { errText } from '../../i18n/lib-msg';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const freeRetT = defineArea({ msg: '{n} free unit(s) go back at zero value.' } as const, { msg: '{n} फ़्री इकाई शून्य मूल्य पर वापस जाएँगी।' }); // R9 (RT-A4)
 
@@ -159,19 +161,19 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, initialQty, onClo
       <div className={controls.row}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="rn-bill">{prT('againstBill')}</label>
-          <select id="rn-bill" className={controls.select} value={purchaseId} onChange={(e) => pickBill(e.target.value)}>
+          <SelectField id="rn-bill" className={controls.select} value={purchaseId} onChange={(e) => pickBill(e.target.value)}>
             <option value="">{kind === 'DEBIT_NOTE' ? prT('chooseBill') : prT('noBill')}</option>
             {bills.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.vendor_name} · {b.bill_number || '-'} · {formatDate(b.date)} · {formatCurrency(b.total)}
               </option>
             ))}
-          </select>
+          </SelectField>
           {bill && <span className={controls.hint}>{prT('billHint', { room: formatCurrency(Math.max(room, 0)), itc: bill.itc_eligible ? prT('itcClaimed') : prT('itcNotClaimed') })}</span>}
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="rn-date">{prT('noteDate')}</label>
-          <input id="rn-date" type="date" className={controls.input} value={date} min={bill?.date} onChange={(e) => setDate(e.target.value)} />
+          <DateField id="rn-date" className={controls.input} value={date} min={bill?.date} onChange={(e) => setDate(e.target.value)} />
           <span className={controls.hint}>{prT('noteNumber', { number: purchaseReturnsDb.nextNumber(date) })}</span>
         </div>
       </div>
@@ -180,20 +182,20 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, initialQty, onClo
         <div className={controls.row}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="rn-vendor">{prT('supplier')}</label>
-            <select id="rn-vendor" className={controls.select} value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+            <SelectField id="rn-vendor" className={controls.select} value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
               <option value="">{prT('chooseSupplier')}</option>
               {vendors.map((v) => (
                 <option key={v.id} value={v.id}>{v.name}{v.gstin ? ` · ${v.gstin}` : ''}</option>
               ))}
-            </select>
+            </SelectField>
             <span className={controls.hint}>{prT('onAccountHint')}</span>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="rn-mode">{prT('taxType')}</label>
-            <select id="rn-mode" className={controls.select} value={mode} onChange={(e) => setMode(e.target.value as 'IGST' | 'CGST_SGST')}>
+            <SelectField id="rn-mode" className={controls.select} value={mode} onChange={(e) => setMode(e.target.value as 'IGST' | 'CGST_SGST')}>
               <option value="CGST_SGST">CGST + SGST</option>
               <option value="IGST">IGST</option>
-            </select>
+            </SelectField>
           </div>
         </div>
       )}
@@ -205,18 +207,18 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, initialQty, onClo
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="rn-supdate">{prT('supDate')}</label>
-          <input id="rn-supdate" type="date" className={controls.input} value={supDate} onChange={(e) => setSupDate(e.target.value)} />
+          <DateField id="rn-supdate" className={controls.input} value={supDate} onChange={(e) => setSupDate(e.target.value)} />
         </div>
       </div>
 
       <div className={controls.row}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="rn-reason">{prT('reason')}</label>
-          <select id="rn-reason" className={controls.select} value={reason} onChange={(e) => pickReason(e.target.value as NoteReasonCode)}>
+          <SelectField id="rn-reason" className={controls.select} value={reason} onChange={(e) => pickReason(e.target.value as NoteReasonCode)}>
             {GST_NOTE_REASONS.map((r) => (
               <option key={r.value} value={r.value}>{r.value} : {prReason(r.value)}</option>
             ))}
-          </select>
+          </SelectField>
         </div>
         <div className={controls.field}>
           <span className={controls.label}>{prT('stock')}</span>
@@ -288,11 +290,11 @@ function ReturnForm({ kind, purchases, vendors, notes, billId, initialQty, onClo
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="rn-rate">{prT('gstRate')}</label>
-            <select id="rn-rate" className={controls.select} value={valueRate} onChange={(e) => setValueRate(Number(e.target.value))}>
+            <SelectField id="rn-rate" className={controls.select} value={valueRate} onChange={(e) => setValueRate(Number(e.target.value))}>
               {gstRateOptions(date, valueRate).map((s) => (
                 <option key={s} value={s}>{s}%</option>
               ))}
-            </select>
+            </SelectField>
           </div>
         </div>
       )}

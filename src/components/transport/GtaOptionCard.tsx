@@ -10,6 +10,8 @@ import { F } from './Field';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './transport.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export function GtaOptionCard({ notify, refresh, tick }: PanelProps) {
   const rows = useMemo(() => [...loadGtaOptions()].sort((a, b) => b.fy.localeCompare(a.fy)), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -33,8 +35,8 @@ export function GtaOptionCard({ notify, refresh, tick }: PanelProps) {
       <div className={styles.grid}>
         <F l={twT('fy')}><input className={controls.input} value={f.fy} onChange={set('fy')} placeholder="26-27" /></F>
         <F l={twT('option')}>
-          <select className={controls.select} value={f.option} onChange={set('option')}>{GTA_OPTIONS.map((o) => <option key={o} value={o}>{twT(`opt.${o}`)}</option>)}</select></F>
-        <F l={twT('filedOn')}><input className={controls.input} type="date" value={f.filed} onChange={set('filed')} /></F>
+          <SelectField className={controls.select} value={f.option} onChange={set('option')}>{GTA_OPTIONS.map((o) => <option key={o} value={o}>{twT(`opt.${o}`)}</option>)}</SelectField></F>
+        <F l={twT('filedOn')}><DateField className={controls.input} value={f.filed} onChange={set('filed')} /></F>
         <F l={"ARN"}><input className={controls.input} value={f.arn} onChange={set('arn')} /></F>
         <F l={twT('note')}><input className={controls.input} value={f.note} onChange={set('note')} /></F>
       </div>

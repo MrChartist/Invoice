@@ -219,6 +219,7 @@ const surfaceOwners = (() => {
   return marks;
 })();
 const OWNERS: [RegExp, string][] = [
+  [/^src\/components\/ui\/((DateField|SelectField|TimeField|TypedInput)\.tsx|pickers\/)/, 'PK'],
   [/^src\/(index\.css|styles\/ios\.css|main\.tsx|hooks\/useTheme\.ts)$/, 'P0'],
   [/^src\/(components\/ui\/(Page|SplitView|PageHeader)\.tsx|styles\/page\.module\.css|components\/creator\/LivePreviewPane\.module\.css)$/, 'PL'],
   [/^src\/(layouts\/|components\/(companies|brand|demo)\/|components\/keys\/(nav|keys)\.module\.css)/, 'P1'],
@@ -248,8 +249,9 @@ const P3: Ceil = ZERO;
 const P4: Ceil = ZERO;
 const P5a: Ceil = ZERO;
 const P5b: Ceil = ZERO;
+const PK: Ceil = ZERO; // Pickers: DateField / SelectField / TimeField and their one lazy popup
 const QA: Ceil = ZERO;
-const CEILINGS: Record<string, Ceil> = { P0, PL, P1, P2, P3, P4, P5a, P5b, QA };
+const CEILINGS: Record<string, Ceil> = { P0, PL, P1, P2, P3, P4, P5a, P5b, PK, QA };
 
 // ── 3-12. Offender finders ────────────────────────────────────────────────────────────────────────────────────
 
@@ -495,4 +497,22 @@ test('PL: one frame (title before tips, tiers by name), the shell in em with dvh
   assert.match(read('src/layouts/DashboardLayout.tsx'), /PHONE_MEDIA = '\(width < 37\.5em\)/, 'phone shell under 37.5em only (D7)');
   assert.match(read('public/theme-init.js'), /classList\.add\('density-compact'\)/, 'density class set before first paint');
   assert.match(IOS, /html\.density-compact \{/);
+});
+
+test('PK: dates, months and times go through DateField / TimeField; selects through SelectField; one lazy popup', () => {
+  const PICKER = /^src\/components\/ui\/((DateField|SelectField|TimeField|TypedInput)\.tsx|pickers\/)/;
+  const NATIVE_SELECT_OK = new Set(['src/components/extras7u/OffersPanel.tsx']); // a `multiple` list: stays a native list box
+  const bad: string[] = [];
+  for (const f of TSX.filter((x) => !PICKER.test(x))) {
+    read(f).split('\n').forEach((t, i) => {
+      if (/<input\b[^>]*\btype="(date|month|time)"/.test(t)) bad.push(`${f}:${i + 1} native date / month / time input`);
+      if (/<select\b/.test(t) && !NATIVE_SELECT_OK.has(f)) bad.push(`${f}:${i + 1} native <select> (use SelectField)`);
+    });
+  }
+  assert.deepEqual(bad, []);
+  const shell = read('src/components/ui/pickers/Popup.tsx');
+  assert.match(shell, /lazy\(\(\) => import\('\.\/PickerPopup'\)\)/, 'the calendar / list / time popups load as one lazy chunk');
+  for (const f of ['DateField', 'SelectField', 'TimeField']) {
+    assert.doesNotMatch(read(`src/components/ui/${f}.tsx`), /from '\.\/pickers\/PickerPopup'/, `${f} must not import the popup statically`);
+  }
 });

@@ -6,6 +6,7 @@ import { useMasterKeys, type MasterKeyHandlers } from './useMasterKeys';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './masters.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /** Framed Tally-like screen with the key bindings wired to its body. */
 export function MasterFrame({
@@ -63,7 +64,7 @@ export function GroupSelect({
 }) {
   const list = allGroups(userGroups).filter((g) => !exclude?.has(g.id) && (!only || only.has(g.primary ?? g.id)));
   return (
-    <select id={id} className={controls.select} value={value} disabled={disabled} aria-label={label} data-create="group" onChange={(e) => onChange(e.target.value)}>
+    <SelectField id={id} className={controls.select} value={value} disabled={disabled} aria-label={label} data-create="group" onChange={(e) => onChange(e.target.value)}>
       {list.map((g) => (
         <option key={g.id} value={g.id}>
           {'  '.repeat(g.depth ?? 0)}
@@ -71,7 +72,7 @@ export function GroupSelect({
           {g.system ? ` (${mastersT('primary')})` : ''}
         </option>
       ))}
-    </select>
+    </SelectField>
   );
 }
 
@@ -104,10 +105,10 @@ export function DrCrAmount({
         placeholder="0.00"
         onChange={(e) => onAmount(e.target.value)}
       />
-      <select className={`${controls.select} ${styles.drcr}`} aria-label={`${label} Dr / Cr`} value={side} disabled={disabled} onChange={(e) => onSide(e.target.value === 'Cr' ? 'Cr' : 'Dr')}>
+      <SelectField className={`${controls.select} ${styles.drcr}`} aria-label={`${label} Dr / Cr`} value={side} disabled={disabled} onChange={(e) => onSide(e.target.value === 'Cr' ? 'Cr' : 'Dr')}>
         <option value="Dr">{mastersT('dr')}</option>
         <option value="Cr">{mastersT('cr')}</option>
-      </select>
+      </SelectField>
     </div>
   );
 }

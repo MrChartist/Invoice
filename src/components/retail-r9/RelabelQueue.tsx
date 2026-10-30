@@ -15,6 +15,8 @@ import { relabelQueue, setMrpBasis, suggestedBasis } from '../../lib/retail/rt-m
 import { NumberInput } from '../ui/NumberInput';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const LabelSheetModal = lazy(() => import('../settings/LabelSheetModal').then((m) => ({ default: m.LabelSheetModal })));
 
@@ -69,10 +71,10 @@ export function MrpBasisTool({ onDone }: { onDone: (msg: string, error?: boolean
       <div className={controls.row} style={{ flexWrap: 'wrap', alignItems: 'flex-end', gap: '0.5rem' }}>
         <label className={controls.field}>
           <span className={controls.label}>{rtaT('basisItem')}</span>
-          <select className={controls.select} value={name} onChange={(e) => pick(e.target.value)} data-mrp-basis-item>
+          <SelectField className={controls.select} value={name} onChange={(e) => pick(e.target.value)} data-mrp-basis-item>
             <option value="">-</option>
             {items.map((i) => <option key={i.id} value={i.name}>{i.name}{i.mrp_tax_basis ? ` (${i.mrp_tax_basis.rate}%)` : ''}</option>)}
-          </select>
+          </SelectField>
         </label>
         <label className={controls.field} style={{ maxWidth: 120 }}>
           <span className={controls.label}>{rtaT('basisOld')}</span>
@@ -80,7 +82,7 @@ export function MrpBasisTool({ onDone }: { onDone: (msg: string, error?: boolean
         </label>
         <label className={controls.field} style={{ maxWidth: 180 }}>
           <span className={controls.label}>{rtaT('basisUntil')}</span>
-          <input type="date" className={controls.input} value={until} onChange={(e) => setUntil(e.target.value)} />
+          <DateField className={controls.input} value={until} onChange={(e) => setUntil(e.target.value)} />
         </label>
         <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!name || !(rate > 0)} onClick={() => apply()} data-mrp-basis-apply>{rtaT('basisApply')}</button>
         <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} disabled={!name} onClick={() => apply(true)}>{rtaT('basisClear')}</button>

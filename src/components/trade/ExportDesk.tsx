@@ -22,6 +22,8 @@ import { useT } from '../../i18n';
 import { trErr, trT } from '../../i18n/areas/trade-trust-r4';
 import controls from '../../styles/controls.module.css';
 import styles from './trade.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const IrmsTab = lazy(() => import('./IrmsTab'));
 const IncentivesTab = lazy(() => import('./IncentivesTab'));
@@ -124,10 +126,10 @@ function RegisterView({ rows, today, notify, changed }: { rows: RealisationRow[]
         <div className={styles.inline}>
           <label className={`${controls.field} ${styles.grow}`}>
             <span className={controls.label}>{trT('forBankParty')}</span>
-            <select className={controls.select} value={party} onChange={(e) => setParty(e.target.value)}>
+            <SelectField className={controls.select} value={party} onChange={(e) => setParty(e.target.value)}>
               <option value="">-</option>
               {parties.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
+            </SelectField>
           </label>
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!party} onClick={() => csv(`open-shipping-bills-${party.replace(/\W+/g, '-')}-${today}.csv`, bankStatementSheet(rows, party))}><Download size={14} aria-hidden="true" /> {trT('downloadCsv')}</button>
         </div>
@@ -139,7 +141,7 @@ function RegisterView({ rows, today, notify, changed }: { rows: RealisationRow[]
         <div className={styles.inline}>
           <label className={`${controls.field} ${styles.narrow}`}>
             <span className={controls.label}>{trT('asAtTitle')}</span>
-            <input className={controls.input} type="date" value={asAt} onChange={(e) => setAsAt(e.target.value || lastMarch31(today))} />
+            <DateField className={controls.input} value={asAt} onChange={(e) => setAsAt(e.target.value || lastMarch31(today))} />
           </label>
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!unrealised.length} onClick={() => csv(`unrealised-exports-${asAt}.csv`, registerSheet(unrealised))}><Download size={14} aria-hidden="true" /> {trT('downloadCsv')} ({unrealised.length})</button>
         </div>
@@ -171,7 +173,7 @@ function WriteOffDialog({ row, onClose, onDone }: { row: RealisationRow; onClose
         <label className={controls.field}><span className={controls.label}>{trT('writeOffReason')}</span><textarea className={controls.textarea} rows={2} value={reason} placeholder={trT('writeOffReasonPh')} onChange={(e) => setReason(e.target.value)} /></label>
         <div className={styles.inline}>
           <label className={`${controls.field} ${styles.grow}`}><span className={controls.label}>{trT('writeOffAmount', { currency: row.currency })}</span><NumberInput className={`${controls.input} ${controls.inputNumeric}`} value={amount} onChange={setAmount} /></label>
-          <label className={`${controls.field} ${styles.narrow}`}><span className={controls.label}>{trT('writeOffDate')}</span><input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+          <label className={`${controls.field} ${styles.narrow}`}><span className={controls.label}>{trT('writeOffDate')}</span><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
         </div>
         <p className={styles.muted}>{trT('overdueNote')}</p>
         {error && <p className={controls.error} role="alert">{error}</p>}
@@ -240,9 +242,9 @@ function ImportsView({ notify, changed, version }: { notify: Notify; changed: ()
                   {canBooks && scrips.length > 0 && <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => { setScripFor(r.billId); setScripId(scrips[0].id); setScripAmt(Math.min(incentiveFigures(scrips[0]).scripBalance, r.duty)); }}>{trT('boeScrip')}</button>}
                   {scripFor === r.billId && (
                     <div className={styles.inline}>
-                      <select className={controls.select} aria-label={trT('boeScripPick')} value={scripId} onChange={(e) => setScripId(e.target.value)}>
+                      <SelectField className={controls.select} aria-label={trT('boeScripPick')} value={scripId} onChange={(e) => setScripId(e.target.value)}>
                         {scrips.map((s) => <option key={s.id} value={s.id}>{s.scrip_no || s.id.slice(0, 6)} · {money(incentiveFigures(s).scripBalance)}</option>)}
-                      </select>
+                      </SelectField>
                       <NumberInput className={`${controls.input} ${controls.inputNumeric}`} aria-label={trT('boeScripAmount')} value={scripAmt} onChange={setScripAmt} />
                       <button type="button" className={`${controls.btnPrimary} ${controls.btnSm}`} onClick={() => applyScrip(r.billId, r.boeDate)}>{trT('boeScripUse')}</button>
                     </div>

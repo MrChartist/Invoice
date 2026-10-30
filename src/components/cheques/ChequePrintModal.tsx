@@ -17,6 +17,7 @@ import styles from './Cheques.module.css';
 import { useT } from '../../i18n';
 import { chqT } from '../../i18n/areas/cheques';
 import { printWhenReady } from '../../lib/print-fonts';
+import { SelectField } from '../ui/SelectField';
 
 const FIELDS: ChequeField[] = ['date', 'payee', 'words1', 'words2', 'figures', 'crossing'];
 const fieldLabel = (f: ChequeField) => chqT(`f.${f}`);
@@ -101,11 +102,11 @@ export function ChequePrintModal({ cheque, onClose }: { cheque: Cheque | null; o
         <div className={controls.row3}>
           <label className={controls.field}>
             <span className={controls.label}>{chqT('pLayout')}</span>
-            <select className={controls.select} value={prefs.layout} onChange={(e) => update({ ...prefs, layout: e.target.value })}>
+            <SelectField className={controls.select} value={prefs.layout} onChange={(e) => update({ ...prefs, layout: e.target.value })}>
               {CHEQUE_LAYOUTS.map((l) => (
                 <option key={l.id} value={l.id}>{l.label}</option>
               ))}
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{chqT('pRight')}</span>

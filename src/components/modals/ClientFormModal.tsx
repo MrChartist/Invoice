@@ -22,6 +22,7 @@ import { ContactsEditor } from '../clients/ContactsEditor';
 import { AddressBookEditor } from '../clients/AddressBookEditor';
 import { normalizeAddresses, normalizeContacts } from '../../lib/contacts';
 import { s2T } from '../../i18n/areas/sales-r2';
+import { SelectField } from '../ui/SelectField';
 
 // R2-A: payment term + reminder mode fields, loaded with their own strings.
 const ReminderModeField = lazy(() => import('../collections/ReminderModeField'));
@@ -207,14 +208,14 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{salesT('cf.state')}</span>
-            <select className={controls.select} value={form.state_code ?? ''} onChange={(e) => setStateCode(e.target.value)}>
+            <SelectField className={controls.select} value={form.state_code ?? ''} onChange={(e) => setStateCode(e.target.value)}>
               <option value="">{salesT('cf.selectState')}</option>
               {INDIAN_STATES.map((s) => (
                 <option key={s.code} value={s.code}>
                   {s.code} : {s.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{salesT('cf.pin')}</span>
@@ -230,11 +231,11 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         </div>
         <label className={controls.field}>
           <span className={controls.label}>{salesT('cf.regType')}</span>
-          <select className={controls.select} value={form.gst_reg_type ?? ''} onChange={(e) => set('gst_reg_type', (e.target.value || undefined) as Client['gst_reg_type'])} data-client-reg-type>
+          <SelectField className={controls.select} value={form.gst_reg_type ?? ''} onChange={(e) => set('gst_reg_type', (e.target.value || undefined) as Client['gst_reg_type'])} data-client-reg-type>
             <option value="">{salesT('cf.regRegular')}</option>
             <option value="composition">{salesT('cf.regComposition')}</option>
             <option value="uin">{salesT('cf.regUin')}</option>
-          </select>
+          </SelectField>
           <span className={controls.hint}>{salesT('cf.regHint')}</span>
         </label>
         <div className={controls.row}>
@@ -264,11 +265,11 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
           <div className={controls.row3}>
             <label className={controls.field}>
               <span className={controls.label}>{salesT('cf.lateFee')}</span>
-              <select className={controls.select} value={fee.mode} onChange={(e) => setFee((f) => ({ ...f, mode: e.target.value as '' | ClientLateFeeMode }))}>
+              <SelectField className={controls.select} value={fee.mode} onChange={(e) => setFee((f) => ({ ...f, mode: e.target.value as '' | ClientLateFeeMode }))}>
                 <option value="">{salesT('cf.noLateFee')}</option>
                 <option value="percent_pa">{salesT('cf.interestPa')}</option>
                 <option value="flat">{salesT('cf.flatFee')}</option>
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{fee.mode === 'flat' ? salesT('cf.feeRs') : salesT('cf.ratePa')}</span>
@@ -305,10 +306,10 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         {levels.length > 0 && (
           <label className={controls.field}>
             <span className={controls.label}>{salesT('cf.priceLevel')}</span>
-            <select className={controls.select} value={form.price_level ?? ''} onChange={(e) => set('price_level', e.target.value || undefined)}>
+            <SelectField className={controls.select} value={form.price_level ?? ''} onChange={(e) => set('price_level', e.target.value || undefined)}>
               <option value="">{salesT('cf.defaultRates')}</option>
               {levels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </select>
+            </SelectField>
             <span className={controls.hint}>{salesT('cf.priceHint')}</span>
           </label>
         )}
@@ -319,10 +320,10 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
         {(legalOn || !!(form as { ps?: unknown }).ps) && <Suspense fallback={null}><ClientLegalRow value={form as { ps?: unknown }} onChange={(p) => setForm((f) => ({ ...f, ...p }))} /></Suspense>}
         <label className={controls.field}>
           <span className={controls.label}>{reachT('msgLang')}</span>
-          <select className={controls.select} value={form.message_lang ?? ''} onChange={(e) => set('message_lang', isMessageLang(e.target.value) ? e.target.value : undefined)}>
+          <SelectField className={controls.select} value={form.message_lang ?? ''} onChange={(e) => set('message_lang', isMessageLang(e.target.value) ? e.target.value : undefined)}>
             <option value="">{reachT('msgLangDefault')}</option>
             {MESSAGE_LANGS.map((l) => <option key={l.code} value={l.code} lang={l.code === 'hinglish' ? 'en' : l.code}>{l.label}</option>)}
-          </select>
+          </SelectField>
           <span className={controls.hint}>{reachT('msgLangHint')}</span>
         </label>
         <label className={controls.field}>

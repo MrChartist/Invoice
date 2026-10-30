@@ -14,7 +14,6 @@
   margin: 0;
   padding: var(--sp-1);
   list-style: none;
-  background: var(--bg-elevated);
   color: var(--label);
   border: var(--card-edge);
   border-radius: var(--r-12);
@@ -35,8 +34,19 @@
 }
 
 .option[aria-selected='true'] {
-  background: var(--tint-soft);
+  background: var(--fill-3);
   color: var(--label);
+}
+
+/* Same match mark as the pickers' list. */
+.mark {
+  background: var(--sys-yellow-soft);
+  color: inherit;
+  border-radius: var(--r-4);
+}
+
+@media (pointer: coarse) {
+  .option { min-height: 2.75rem; align-items: center; }
 }
 
 .label {

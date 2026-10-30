@@ -18,6 +18,8 @@ import type { InvoiceRecord, Payment } from '../../types/invoice';
 import { svT, type SvKey } from '../../i18n/areas/services-r10a';
 import controls from '../../styles/controls.module.css';
 import styles from './services.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 const SOURCES: AppointmentSource[] = ['call', 'walk-in', 'whatsapp', 'online-typed'];
@@ -103,12 +105,12 @@ export function AppointmentDialog({ appt, preset, staff, settings, all, billed, 
       <div className={styles.form}>
         {field('client', <><input className={controls.input} list="sv-clients" value={f.client_name} onChange={(e) => pickClient(e.target.value)} data-appt-client /><datalist id="sv-clients">{clients.map((c) => <option key={c.id} value={c.name} />)}</datalist></>)}
         {field('phone', <input className={controls.input} type="tel" value={f.phone} onChange={(e) => set({ phone: e.target.value })} />)}
-        {field('date', <input className={controls.input} type="date" value={f.date} onChange={(e) => set({ date: e.target.value })} />)}
-        {field('start', <select className={controls.select} value={f.start} onChange={(e) => set({ start: e.target.value })} data-appt-start><option value="">-</option>{slots.map((s) => <option key={s}>{s}</option>)}</select>)}
-        {field('staff', <select className={controls.select} value={f.staff_id} onChange={(e) => set({ staff_id: e.target.value })} data-appt-staff><option value="">{svT('unassigned')}</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>)}
-        {!!settings.resources?.length && field('resource', <select className={controls.select} value={f.resource_id} onChange={(e) => set({ resource_id: e.target.value })}><option value="">-</option>{settings.resources.filter((r) => r.active !== false).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select>)}
-        {field('source', <select className={controls.select} value={f.source} onChange={(e) => set({ source: e.target.value as AppointmentSource })}>{SOURCES.map((s) => <option key={s} value={s}>{svT(`src.${s}`)}</option>)}</select>)}
-        {client && (deposits.length > 0 || !!f.advance_id) && field('deposit', <select className={controls.select} value={f.advance_id} onChange={(e) => set({ advance_id: e.target.value })} data-appt-deposit><option value="">{svT('noDeposit')}</option>{f.advance_id && !deposits.some((d) => d.advance.id === f.advance_id) && <option value={f.advance_id}>{f.advance_id}</option>}{deposits.map((d) => <option key={d.advance.id} value={d.advance.id}>{svT('depositOpen', { n: d.advance.number, amount: formatCurrency(d.balance.open) })}</option>)}</select>)}
+        {field('date', <DateField className={controls.input} value={f.date} onChange={(e) => set({ date: e.target.value })} />)}
+        {field('start', <SelectField className={controls.select} value={f.start} onChange={(e) => set({ start: e.target.value })} data-appt-start><option value="">-</option>{slots.map((s) => <option key={s}>{s}</option>)}</SelectField>)}
+        {field('staff', <SelectField className={controls.select} value={f.staff_id} onChange={(e) => set({ staff_id: e.target.value })} data-appt-staff><option value="">{svT('unassigned')}</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</SelectField>)}
+        {!!settings.resources?.length && field('resource', <SelectField className={controls.select} value={f.resource_id} onChange={(e) => set({ resource_id: e.target.value })}><option value="">-</option>{settings.resources.filter((r) => r.active !== false).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</SelectField>)}
+        {field('source', <SelectField className={controls.select} value={f.source} onChange={(e) => set({ source: e.target.value as AppointmentSource })}>{SOURCES.map((s) => <option key={s} value={s}>{svT(`src.${s}`)}</option>)}</SelectField>)}
+        {client && (deposits.length > 0 || !!f.advance_id) && field('deposit', <SelectField className={controls.select} value={f.advance_id} onChange={(e) => set({ advance_id: e.target.value })} data-appt-deposit><option value="">{svT('noDeposit')}</option>{f.advance_id && !deposits.some((d) => d.advance.id === f.advance_id) && <option value={f.advance_id}>{f.advance_id}</option>}{deposits.map((d) => <option key={d.advance.id} value={d.advance.id}>{svT('depositOpen', { n: d.advance.number, amount: formatCurrency(d.balance.open) })}</option>)}</SelectField>)}
         {client && field('dob', <input className={controls.input} placeholder="MM-DD" value={dob} onChange={(e) => setDob(e.target.value)} />)}
         {client && field('anniversary', <input className={controls.input} placeholder="MM-DD" value={ann} onChange={(e) => setAnn(e.target.value)} />)}
       </div>
@@ -121,8 +123,8 @@ export function AppointmentDialog({ appt, preset, staff, settings, all, billed, 
               <td><input className={controls.input} list="sv-items" value={s.name} onChange={(e) => pickService(i, e.target.value)} aria-label={svT('service')} data-appt-service={i} /></td>
               <td><input className={controls.input} type="number" min={0} step={5} value={s.minutes} onChange={(e) => setSvc(i, { minutes: Number(e.target.value) })} aria-label={svT('minutes')} /></td>
               <td><input className={controls.input} type="number" min={0} value={s.price} onChange={(e) => setSvc(i, { price: Number(e.target.value) })} aria-label={svT('price')} /></td>
-              <td><select className={controls.select} value={s.sv_class ?? ''} onChange={(e) => setSvc(i, { sv_class: (e.target.value || undefined) as SvClass | undefined })} aria-label={svT('cls')}><option value="">-</option>{SV_CLASSES.map((c) => <option key={c} value={c}>{svT(`cl.${c}`)}</option>)}</select></td>
-              <td><select className={controls.select} value={s.staff_id ?? ''} onChange={(e) => setSvc(i, { staff_id: e.target.value || undefined })} aria-label={svT('staff')}><option value="">-</option>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></td>
+              <td><SelectField className={controls.select} value={s.sv_class ?? ''} onChange={(e) => setSvc(i, { sv_class: (e.target.value || undefined) as SvClass | undefined })} aria-label={svT('cls')}><option value="">-</option>{SV_CLASSES.map((c) => <option key={c} value={c}>{svT(`cl.${c}`)}</option>)}</SelectField></td>
+              <td><SelectField className={controls.select} value={s.staff_id ?? ''} onChange={(e) => setSvc(i, { staff_id: e.target.value || undefined })} aria-label={svT('staff')}><option value="">-</option>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</SelectField></td>
               <td><button type="button" className={controls.btnGhost} onClick={() => setServices((l) => l.filter((_x, k) => k !== i))} aria-label={svT('del')}>×</button></td>
             </tr>
           ))}

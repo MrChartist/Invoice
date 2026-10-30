@@ -16,6 +16,8 @@ import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
 import { Out } from './Out';
 import { inr, parseAmount, runAction, type TabProps } from './shared';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 /** Loans & salary advances to employees (7P): EMI schedules recovered in the payroll runs. */
 export function LoansTab({ month, version, refresh, notify }: TabProps) {
@@ -74,20 +76,20 @@ export function LoansTab({ month, version, refresh, notify }: TabProps) {
           <div className={styles.formGrid}>
             <label className={controls.field}>
               <span className={controls.label}>{pT('rep.employee')}</span>
-              <select className={controls.select} value={employee} onChange={(e) => setEmpId(e.target.value)}>
+              <SelectField className={controls.select} value={employee} onChange={(e) => setEmpId(e.target.value)}>
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.code} · {e.name}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('loan.kind')}</span>
-              <select className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as LoanKind)}>
+              <SelectField className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as LoanKind)}>
                 <option value="loan">{pT('loan.kindLoan')}</option>
                 <option value="advance">{pT('loan.kindAdvance')}</option>
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('loan.date')}</span>
-              <input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('loan.amount')}</span>
@@ -103,13 +105,13 @@ export function LoansTab({ month, version, refresh, notify }: TabProps) {
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('loan.start')}</span>
-              <input className={controls.input} type="month" value={start} onChange={(e) => setStart(e.target.value)} />
+              <DateField className={controls.input} mode="month" value={start} onChange={(e) => setStart(e.target.value)} />
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('ppay.from')}</span>
-              <select className={controls.select} value={paidFrom} onChange={(e) => setPaidFrom(e.target.value)}>
+              <SelectField className={controls.select} value={paidFrom} onChange={(e) => setPaidFrom(e.target.value)}>
                 {cashBank.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('loan.sbi')}</span>

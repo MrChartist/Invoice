@@ -15,6 +15,8 @@ import { useT } from '../../i18n';
 import { chqT } from '../../i18n/areas/cheques';
 import { bnkT } from '../../i18n/areas/banking';
 import { allocatedTotal } from '../../lib/cheques';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 export interface ChequeFormModalProps {
   open: boolean;
@@ -199,7 +201,7 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{chqT('fDate')}</span>
-            <input className={controls.input} type="date" value={form.cheque_date} onChange={(e) => set('cheque_date', e.target.value)} />
+            <DateField className={controls.input} value={form.cheque_date} onChange={(e) => set('cheque_date', e.target.value)} />
           </label>
         </div>
         {form.cheque_date && (
@@ -237,12 +239,12 @@ export function ChequeFormModal({ open, direction, cheque, onClose, onSaved }: C
         {!form.multi && (
         <label className={controls.field}>
           <span className={controls.label}>{received ? chqT('fAgainstInv') : chqT('fAgainstBill')}</span>
-          <select className={controls.select} value={form.link} disabled={frozen} onChange={(e) => pickLink(e.target.value)}>
+          <SelectField className={controls.select} value={form.link} disabled={frozen} onChange={(e) => pickLink(e.target.value)}>
             <option value="">{received ? chqT('fNotLinkedAdv') : chqT('fNotLinked')}</option>
             {options.map((o) => (
               <option key={o.id} value={o.id}>{o.label}</option>
             ))}
-          </select>
+          </SelectField>
           <span className={controls.hint}>
             {received
               ? chqT('fHintReceived')

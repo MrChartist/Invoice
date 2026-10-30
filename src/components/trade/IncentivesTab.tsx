@@ -16,6 +16,8 @@ import { trErr, trT } from '../../i18n/areas/trade-trust-r4';
 import controls from '../../styles/controls.module.css';
 import styles from './trade.module.css';
 import { downloadCsv, money, type Notify } from './desk-shared';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const voucherNo = (id?: string) => getTable<{ id: string; number: string }>('vouchers').find((v) => v.id === id)?.number ?? '';
 
@@ -65,16 +67,16 @@ export default function IncentivesTab({ rows, notify, changed }: { rows: Realisa
           <strong>{trT('incAdd')}</strong>
           <div className={styles.inline}>
             <label className={`${controls.field} ${styles.narrow}`}><span className={controls.label}>{trT('incKind')}</span>
-              <select className={controls.select} value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as IncentiveKind })}>
+              <SelectField className={controls.select} value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as IncentiveKind })}>
                 {INCENTIVE_KINDS.map((k) => <option key={k} value={k}>{trT(`k_${k}`)}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={`${controls.field} ${styles.grow}`}><span className={controls.label}>{trT('incInvoice')}</span>
-              <select className={controls.select} value={draft.invoice_id ?? ''} onChange={(e) => setDraft({ ...draft, invoice_id: e.target.value })}>
+              <SelectField className={controls.select} value={draft.invoice_id ?? ''} onChange={(e) => setDraft({ ...draft, invoice_id: e.target.value })}>
                 {rows.map((r) => <option key={r.invoiceId} value={r.invoiceId}>{r.number}{r.sbNo ? ` · SB ${r.sbNo}` : ''}</option>)}
-              </select>
+              </SelectField>
             </label>
-            <label className={`${controls.field} ${styles.narrow}`}><span className={controls.label}>{trT('incDate')}</span><input className={controls.input} type="date" value={draft.date ?? ''} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></label>
+            <label className={`${controls.field} ${styles.narrow}`}><span className={controls.label}>{trT('incDate')}</span><DateField className={controls.input} value={draft.date ?? ''} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></label>
             <label className={`${controls.field} ${styles.narrow}`}><span className={controls.label}>{trT('incRate')}</span><NumberInput className={`${controls.input} ${controls.inputNumeric}`} value={Number(draft.rate) || 0} onChange={(n) => setDraft({ ...draft, rate: n || undefined })} /></label>
             <label className={`${controls.field} ${styles.narrow}`}><span className={controls.label}>{trT('incClaimed')}</span><NumberInput className={`${controls.input} ${controls.inputNumeric}`} value={Number(draft.claimed) || 0} onChange={(n) => setDraft({ ...draft, claimed: n })} /></label>
             <button type="button" className={`${controls.btnPrimary} ${controls.btnSm}`} onClick={() => run(() => {
@@ -112,7 +114,7 @@ export default function IncentivesTab({ rows, notify, changed }: { rows: Realisa
                           <NumberInput className={`${controls.input} ${controls.inputNumeric}`} aria-label={acting.mode === 'credit' ? trT('incCreditAmount') : trT('incTransferAmount')} value={amount} onChange={setAmount} />
                           {acting.mode === 'sell' && <NumberInput className={`${controls.input} ${controls.inputNumeric}`} aria-label={trT('incTransferValue')} value={value} onChange={setValue} />}
                           {acting.mode === 'credit' && r.kind === 'rodtep' && <input className={controls.input} aria-label={trT('incScrip')} placeholder={trT('incScrip')} value={scripNo} onChange={(e) => setScripNo(e.target.value)} />}
-                          <input className={controls.input} type="date" aria-label={trT('incCreditDate')} value={day} onChange={(e) => setDay(e.target.value)} />
+                          <DateField className={controls.input} aria-label={trT('incCreditDate')} value={day} onChange={(e) => setDay(e.target.value)} />
                           <button type="button" className={`${controls.btnPrimary} ${controls.btnSm}`} onClick={() => run(() => {
                             if (acting.mode === 'credit') recordIncentiveCredit(r.id, amount, day, scripNo ? { no: scripNo, date: day } : undefined);
                             else transferScrip(r.id, amount, value, day);

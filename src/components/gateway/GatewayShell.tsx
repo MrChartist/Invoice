@@ -7,6 +7,7 @@ import { useT } from '../../i18n';
 import { getGatewaySession, setGatewayPeriod, setVoucherDate, validatePeriod, isCalendarDay } from '../../lib/gateway/period';
 import { GatewayContext, hasModal, type GatewayContextValue, type ScreenKeyHandler } from './context';
 import controls from '../../styles/controls.module.css';
+import { DateField } from '../ui/DateField';
 
 type Dialog = null | 'date' | 'period';
 
@@ -98,7 +99,7 @@ function DateDialog({ onClose }: { onClose: () => void }) {
     >
       <form id="gw-date-form" onSubmit={submit} className={controls.field}>
         <label className={controls.label} htmlFor="gw-date">{gwT('dateLabel')}</label>
-        <input id="gw-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} autoFocus />
+        <DateField id="gw-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} autoFocus />
         {error && <p className={controls.error} role="alert">{error}</p>}
       </form>
     </Modal>
@@ -134,11 +135,11 @@ function PeriodDialog({ onClose }: { onClose: () => void }) {
         <div className={controls.row}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="gw-from">{gwT('periodFrom')}</label>
-            <input id="gw-from" type="date" className={controls.input} value={start} onChange={(e) => setStart(e.target.value)} autoFocus />
+            <DateField id="gw-from" className={controls.input} value={start} onChange={(e) => setStart(e.target.value)} autoFocus />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="gw-to">{gwT('periodTo')}</label>
-            <input id="gw-to" type="date" className={controls.input} value={end} onChange={(e) => setEnd(e.target.value)} />
+            <DateField id="gw-to" className={controls.input} value={end} onChange={(e) => setEnd(e.target.value)} />
           </div>
         </div>
         {error && <p className={controls.error} role="alert">{error}</p>}

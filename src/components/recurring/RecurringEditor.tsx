@@ -31,6 +31,8 @@ import { SnapshotFields } from '../custom-fields/SnapshotFields';
 import { customFieldsDb, finalizeValues } from '../../lib/custom-fields';
 import { areaNodes } from '../../i18n/areas/nodes';
 import { loadPaymentTerms } from '../../lib/payment-terms';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export interface RecurringEditorProps {
   open: boolean;
@@ -268,7 +270,7 @@ function EditorBody({
           {!schedule && (
             <div className={controls.field}>
               <label className={controls.label} htmlFor="rec-source">{recT('startFrom')}</label>
-              <select
+              <SelectField
                 id="rec-source"
                 className={controls.select}
                 value={sourceId}
@@ -280,7 +282,7 @@ function EditorBody({
                     {i.invoice_number || recT('unnumbered')} · {i.client.name || recT('noClient')} · {formatCurrency(i.total, i.currency)}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </div>
           )}
 
@@ -303,7 +305,7 @@ function EditorBody({
               {hasClientName && !clients.some((c) => c.id === template.client.id) ? (
                 <input id="rec-client" className={controls.input} value={template.client.name} readOnly />
               ) : (
-                <select
+                <SelectField
                   id="rec-client"
                   className={controls.select}
                   value={template.client.id ?? ''}
@@ -313,7 +315,7 @@ function EditorBody({
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
-                </select>
+                </SelectField>
               )}
             </div>
           </div>
@@ -355,7 +357,7 @@ function EditorBody({
                   value={item.rate}
                   onChange={(e) => patchItem(item.id, { rate: num(e.target.value), amount: num(e.target.value) * num(item.quantity) })}
                 />
-                <select
+                <SelectField
                   className={controls.select}
                   aria-label={recT('itemGst', { n: idx + 1 })}
                   value={item.tax_rate ?? 0}
@@ -364,7 +366,7 @@ function EditorBody({
                   {gstRateOptions(undefined, item.tax_rate ?? 0).map((s) => (
                     <option key={s} value={s}>{s}%</option>
                   ))}
-                </select>
+                </SelectField>
                 <button
                   type="button"
                   className={controls.btnDanger}
@@ -402,7 +404,7 @@ function EditorBody({
           <div className={controls.row}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="rec-freq">{recT('repeats')}</label>
-              <select
+              <SelectField
                 id="rec-freq"
                 className={controls.select}
                 value={frequency}
@@ -411,7 +413,7 @@ function EditorBody({
                 {FREQUENCIES.map((f) => (
                   <option key={f} value={f}>{recT(`freq.${f}`)}</option>
                 ))}
-              </select>
+              </SelectField>
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="rec-interval">
@@ -431,7 +433,7 @@ function EditorBody({
           <div className={controls.row}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="rec-start">{recT('firstDate')}</label>
-              <input id="rec-start" className={controls.input} type="date" value={startDate} onChange={(e) => setStartPick(e.target.value)} />
+              <DateField id="rec-start" className={controls.input} value={startDate} onChange={(e) => setStartPick(e.target.value)} />
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="rec-due">{recT('dueAfter')}</label>
@@ -449,16 +451,16 @@ function EditorBody({
           <div className={controls.row}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="rec-term">{recT('instTerm')}</label>
-              <select id="rec-term" className={controls.select} value={termId} onChange={(e) => setTermId(e.target.value)} data-rec-term>
+              <SelectField id="rec-term" className={controls.select} value={termId} onChange={(e) => setTermId(e.target.value)} data-rec-term>
                 <option value="">{template.instalments?.length ? recT('instFromDoc', { n: template.instalments.length }) : recT('instNone')}</option>
                 {terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+              </SelectField>
             </div>
           </div>
           <div className={controls.row}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="rec-end">{recT('endDate')}</label>
-              <input id="rec-end" className={controls.input} type="date" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
+              <DateField id="rec-end" className={controls.input} value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} />
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="rec-max">{recT('stopAfter')}</label>

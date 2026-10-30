@@ -19,6 +19,8 @@ import { uxT } from '../../i18n/areas/invoicing-ux';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import ux from './ux.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const SCHEDULED_DOCS = new Set(['QUOTATION', 'PROFORMA', 'SALES_ORDER', 'INVOICE', 'TAX_INVOICE', 'BILL_OF_SUPPLY']);
 
@@ -107,7 +109,7 @@ export function PaymentScheduleCard({ notify }: { notify: (m: string, tone?: 'su
                 return (
                   <tr key={r.id}>
                     <td><input className={cn(controls.input, ux.grow)} value={r.label ?? ''} onChange={(e) => update(r.id, { label: e.target.value })} aria-label={uxT('psLabel')} /></td>
-                    <td><input type="date" className={controls.input} value={r.due_date} onChange={(e) => e.target.value && update(r.id, { due_date: e.target.value })} aria-label={uxT('psDue')} /></td>
+                    <td><DateField className={controls.input} value={r.due_date} onChange={(e) => e.target.value && update(r.id, { due_date: e.target.value })} aria-label={uxT('psDue')} /></td>
                     <td>
                       <div className={ux.row}>
                         <div className={controls.segment}>
@@ -144,13 +146,13 @@ export function PaymentScheduleCard({ notify }: { notify: (m: string, tone?: 'su
           <div className={ux.row}>
             <label className={controls.field}>
               <span className={controls.label}>{uxT('psDate')}</span>
-              <input type="date" className={controls.input} value={deposit.date} max={todayInput()} onChange={(e) => setDeposit({ ...deposit, date: e.target.value })} />
+              <DateField className={controls.input} value={deposit.date} max={todayInput()} onChange={(e) => setDeposit({ ...deposit, date: e.target.value })} />
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{uxT('psMethod')}</span>
-              <select className={controls.select} value={deposit.method} onChange={(e) => setDeposit({ ...deposit, method: e.target.value })}>
+              <SelectField className={controls.select} value={deposit.method} onChange={(e) => setDeposit({ ...deposit, method: e.target.value })}>
                 {['UPI', 'Cash', 'Bank Transfer', 'Cheque', 'Card'].map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
+              </SelectField>
             </label>
             <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} onClick={recordDeposit}>{uxT('psSaveVoucher')}</button>
             <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setDeposit(null)}>{uxT('cancel')}</button>

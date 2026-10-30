@@ -8,6 +8,7 @@ import { purT } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
 import { errText, libMsg } from '../../i18n/lib-msg';
+import { SelectField } from '../ui/SelectField';
 
 export interface VendorPickerProps {
   vendors: Vendor[];
@@ -52,7 +53,7 @@ export function VendorPicker({ vendors, value, onSelect, onCreated, id }: Vendor
     <div className={controls.field}>
       <label className={controls.label} htmlFor={id}>{purT('vendor')}</label>
       <div className={styles.vendorRow}>
-        <select
+        <SelectField
           id={id}
           className={controls.select}
           value={value ?? ''}
@@ -64,7 +65,7 @@ export function VendorPicker({ vendors, value, onSelect, onCreated, id }: Vendor
               {v.name}{v.gstin ? ` · ${v.gstin}` : ''}
             </option>
           ))}
-        </select>
+        </SelectField>
         {!creating && (
           <button type="button" className={controls.btnOutline} onClick={() => setCreating(true)}>
             <Plus size={16} /> {purT('newVendor')}

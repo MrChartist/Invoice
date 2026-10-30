@@ -12,6 +12,7 @@ import type { Unmapped } from './MarketplaceTab';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './marketplace.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const LISTING_FIELDS = { sku: ['seller sku', 'sku', 'sku id', 'sku code'], listing_id: ['asin', 'fsn', 'listing id', 'product id'], title: ['item name', 'product title', 'title', 'product name'] };
 
@@ -70,10 +71,10 @@ export function SkuMapPanel(props: PanelProps & { unmapped: Unmapped }) {
     notify(mT('itemCreated', { name }));
   };
   const itemSelect = (value: string, onChange: (v: string) => void) => (
-    <select className={controls.select} value={value} onChange={(e) => onChange(e.target.value)}>
+    <SelectField className={controls.select} value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">-</option>
       {catalogue.map((c) => <option key={c.id} value={c.id}>{c.name}{c.sku ? ` (${c.sku})` : ''}</option>)}
-    </select>
+    </SelectField>
   );
 
   return (

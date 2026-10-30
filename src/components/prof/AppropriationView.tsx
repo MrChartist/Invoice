@@ -10,6 +10,7 @@ import { NumberInput } from '../ui/NumberInput';
 import { Fld, Tbl } from './ps-d-ui';
 import { inr, sm, type PsDeskCtx, row } from './ps-desk';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export default function AppropriationView({ ctx }: { ctx: PsDeskCtx }) {
   const cur = getIndianFY(todayInput()).startYear;
@@ -26,12 +27,12 @@ export default function AppropriationView({ ctx }: { ctx: PsDeskCtx }) {
     <>
       <div style={row}>
         <Fld l={fdT('fy')}>
-          <select className={controls.select} value={fy} onChange={(e) => { setFy(+e.target.value); setRes(null); }} data-ps="a-fy">
+          <SelectField className={controls.select} value={fy} onChange={(e) => { setFy(+e.target.value); setRes(null); }} data-ps="a-fy">
             {[cur, cur - 1, cur - 2].map((y) => <option key={y} value={y}>{`FY ${y}-${String(y + 1).slice(2)}`}</option>)}
-          </select>
+          </SelectField>
         </Fld>
         <Fld l={fdT('capitalMode')}>
-          <select className={controls.select} value={mode} onChange={(e) => setMode(e.target.value as 'opening')}><option value="opening">{fdT('opening')}</option><option value="daily">{fdT('daily')}</option></select>
+          <SelectField className={controls.select} value={mode} onChange={(e) => setMode(e.target.value as 'opening')}><option value="opening">{fdT('opening')}</option><option value="daily">{fdT('daily')}</option></SelectField>
         </Fld>
         <Fld l={fdT('adjLabel')}><input className={controls.input} value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} /></Fld>
         <Fld l={fdT('amount')}><NumberInput className={controls.input} style={{ maxWidth: 120 }} value={draft.amount} onChange={(v) => setDraft({ ...draft, amount: v })} /></Fld>

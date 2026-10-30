@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { agT } from '../../i18n/areas/agri-r12a';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { TypedInput } from '../ui/TypedInput';
 
 export function Grid({ head, rows, attr }: { head: readonly ReactNode[]; rows: readonly ReactNode[][]; attr?: string }) {
   if (!rows.length) return <p className={controls.hint}>{agT('none')}</p>;
@@ -22,5 +23,5 @@ export function F({ label, children }: { label: string; children: ReactNode }) {
 
 /** A text / number input bound to a string state. */
 export function In({ v, set, type = 'text', w, ...rest }: { v: string; set: (s: string) => void; type?: string; w?: number } & Record<string, unknown>) {
-  return <input className={controls.input} type={type} value={v} onChange={(e) => set(e.target.value)} style={w ? { width: w } : undefined} {...rest} />;
+  return <TypedInput className={controls.input} type={type} value={v} onChange={(e) => set(e.target.value)} style={w ? { width: w } : undefined} {...rest} />;
 }

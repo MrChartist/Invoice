@@ -11,6 +11,7 @@ import { readRetailSettings, saveRetailSettings } from '../../lib/retail/rt-sett
 import type { GuardMode, RetailSettings } from '../../types/retail-r9';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export default function RetailChecks({ notify }: { notify: (msg: string, kind?: 'error') => void }) {
   useT();
@@ -38,9 +39,9 @@ export default function RetailChecks({ notify }: { notify: (msg: string, kind?: 
         <p className={surface.sectionNote}>{rtaT('checksSub')}</p>
         <label className={controls.field} style={{ maxWidth: 320 }}>
           <span className={controls.label}>{rtaT('mrpGuard')}</span>
-          <select className={controls.select} value={s.mrp_guard ?? 'off'} disabled={!owner} onChange={(e) => save({ mrp_guard: e.target.value as GuardMode })} data-retail-mrp-guard>
+          <SelectField className={controls.select} value={s.mrp_guard ?? 'off'} disabled={!owner} onChange={(e) => save({ mrp_guard: e.target.value as GuardMode })} data-retail-mrp-guard>
             {(['off', 'warn', 'block'] as const).map((m) => <option key={m} value={m}>{rtaT(`mrp.${m}`)}</option>)}
-          </select>
+          </SelectField>
         </label>
         {check(rtaT('deliveriesOn'), !!s.delivery?.enabled, (v) => ({ delivery: v ? { enabled: true } : undefined }), 'delivery')}
         {check(rtaT('shortBookOn'), !!s.short_book?.enabled, (v) => ({ short_book: v ? { enabled: true } : undefined }), 'shortbook')}

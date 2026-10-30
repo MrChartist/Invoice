@@ -16,6 +16,8 @@ import { blankJwLine, cleanJw, qtyText, type JwData, type JwGridLine } from './l
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './job-work.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const DRAFT = '__jw_draft__';
 
@@ -173,20 +175,20 @@ function InModal({ data, doc, onClose }: { data: JwData; doc: MaterialIn | null;
         <div className={controls.row3}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwr-date">{jwT('date')}</label>
-            <input id="jwr-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="jwr-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwr-jw">{jwT('jobWorker')}</label>
-            <select id="jwr-jw" className={controls.select} value={godown} onChange={(e) => setGodown(e.target.value)} disabled={!!doc}>
+            <SelectField id="jwr-jw" className={controls.select} value={godown} onChange={(e) => setGodown(e.target.value)} disabled={!!doc}>
               {data.jwGodowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
+            </SelectField>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwr-order">{jwT('order')}</label>
-            <select id="jwr-order" className={controls.select} value={orderId} onChange={(e) => setOrderId(e.target.value)}>
+            <SelectField id="jwr-order" className={controls.select} value={orderId} onChange={(e) => setOrderId(e.target.value)}>
               <option value="">{jwT('noOrder')}</option>
               {orders.map((o) => <option key={o.id} value={o.id}>{o.number} · {o.party_name}</option>)}
-            </select>
+            </SelectField>
           </div>
         </div>
         <div className={controls.row3}>
@@ -196,7 +198,7 @@ function InModal({ data, doc, onClose }: { data: JwData; doc: MaterialIn | null;
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwr-dt">{jwT('jwChallanDate')}</label>
-            <input id="jwr-dt" type="date" className={controls.input} value={jwDate} onChange={(e) => setJwDate(e.target.value)} />
+            <DateField id="jwr-dt" className={controls.input} value={jwDate} onChange={(e) => setJwDate(e.target.value)} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwr-ch">{jwT('charges')}</label>

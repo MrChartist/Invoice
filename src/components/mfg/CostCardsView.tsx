@@ -13,6 +13,8 @@ import type { MfgContext } from '../manufacturing/context';
 import { Fld, Tbl } from './mfd-ui';
 import { row, rs, run, sm } from './mfd-util';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Draft = Omit<CostCard, 'id'> & { id?: string };
 const blank = (item_id = ''): Draft => ({ item_id, name: '', effective_from: todayInput(), lines: [], output_kg: 0, conversion_per_kg: 0, overhead_pct: 0, packs: [] });
@@ -47,12 +49,12 @@ export default function CostCardsView({ ctx }: { ctx: MfgContext }) {
       {lic.map((l) => <p key={l.number} className={controls.hint}>{l.expired ? fdT('fssaiExpired', { no: l.number }) : l.soon ? fdT('fssaiLic', { no: l.number, days: l.days ?? 0 }) : null}</p>)}
       <div style={row}>
         <Fld l={fdT('item')}>
-          <select className={controls.select} value={d.item_id} onChange={(e) => pick(e.target.value)} data-mfd="card-item">
+          <SelectField className={controls.select} value={d.item_id} onChange={(e) => pick(e.target.value)} data-mfd="card-item">
             <option value="">-</option>
             {made.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-          </select>
+          </SelectField>
         </Fld>
-        <Fld l={fdT('from')}><input type="date" className={controls.input} value={d.effective_from} onChange={(e) => set({ effective_from: e.target.value })} /></Fld>
+        <Fld l={fdT('from')}><DateField className={controls.input} value={d.effective_from} onChange={(e) => set({ effective_from: e.target.value })} /></Fld>
         <button type="button" className={sm} disabled={!d.item_id} onClick={fromBom} data-mfd-b="bom">{fdT('loadBom')}</button>
         <Fld l={fdT('outputKg')}>{num(d.output_kg, (v) => set({ output_kg: v }), 'output')}</Fld>
         <Fld l={fdT('convKg')}>{num(d.conversion_per_kg, (v) => set({ conversion_per_kg: v }), 'conv')}</Fld>

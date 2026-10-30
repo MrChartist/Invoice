@@ -23,6 +23,7 @@ import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { DeliveryInfo, DeliveryRider } from '../../types/retail-r9';
 import { NumberInput } from '../ui/NumberInput';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const riders = (): DeliveryRider[] => getTable<DeliveryRider>(RT_TABLES.deliveryRiders).filter((r) => r?.active !== false);
 
@@ -45,10 +46,10 @@ export function DeliveryFields({ value, onChange, onCharge }: { value: DeliveryI
       <div className={controls.row} style={{ gap: '0.5rem', flexWrap: 'wrap' }}>
         <input className={controls.input} inputMode="tel" placeholder={rtaT('phone')} aria-label={rtaT('phone')} value={value.phone ?? ''} onChange={(e) => set({ phone: e.target.value })} />
         <input className={controls.input} placeholder={rtaT('slot')} aria-label={rtaT('slot')} value={value.slot ?? ''} onChange={(e) => set({ slot: e.target.value })} />
-        <select className={controls.select} aria-label={rtaT('rider')} value={value.rider_id ?? ''} onChange={(e) => set({ rider_id: e.target.value || undefined })} data-delivery-rider>
+        <SelectField className={controls.select} aria-label={rtaT('rider')} value={value.rider_id ?? ''} onChange={(e) => set({ rider_id: e.target.value || undefined })} data-delivery-rider>
           <option value="">{list.length ? rtaT('rider') : rtaT('noRider')}</option>
           {list.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-        </select>
+        </SelectField>
       </div>
       <div className={controls.row} style={{ gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <label className={controls.check}><input type="checkbox" checked={!!value.cod} onChange={(e) => set({ cod: e.target.checked || undefined })} data-delivery-cod /> {rtaT('cod')}</label>

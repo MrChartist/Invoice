@@ -13,6 +13,8 @@ import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
 import { Out } from './Out';
 import { inr, runAction, type TabProps } from './shared';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 /** Arrears of a back-dated salary revision (7P): difference per finalized month, paid in a chosen month. */
 export function ArrearsTab({ month, version, refresh, notify }: TabProps) {
@@ -47,17 +49,17 @@ export function ArrearsTab({ month, version, refresh, notify }: TabProps) {
           <div className={styles.formGrid}>
             <label className={controls.field}>
               <span className={controls.label}>{pT('rep.employee')}</span>
-              <select className={controls.select} value={employee} onChange={(e) => { setEmpId(e.target.value); setPreview(null); }}>
+              <SelectField className={controls.select} value={employee} onChange={(e) => { setEmpId(e.target.value); setPreview(null); }}>
                 {employees.map((e) => <option key={e.id} value={e.id}>{e.code} · {e.name}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('arr.from')}</span>
-              <input className={controls.input} type="month" value={from} onChange={(e) => { setFrom(e.target.value); setPreview(null); }} />
+              <DateField className={controls.input} mode="month" value={from} onChange={(e) => { setFrom(e.target.value); setPreview(null); }} />
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('arr.payIn')}</span>
-              <input className={controls.input} type="month" value={payIn} onChange={(e) => { setPayIn(e.target.value); setPreview(null); }} />
+              <DateField className={controls.input} mode="month" value={payIn} onChange={(e) => { setPayIn(e.target.value); setPreview(null); }} />
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{pT('arr.note')}</span>

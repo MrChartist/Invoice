@@ -13,6 +13,7 @@ import { dlT } from '../../i18n/areas/design-r2';
 import { cn } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import styles from './DesignPanel.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const COMMON: readonly OverridableLabel[] = ['desc', 'hsn', 'qty', 'rate', 'amount', 'billTo', 'shipTo', 'issueDate', 'dueDate', 'invoiceNo', 'poRef', 'total', 'balanceDue', 'notes', 'terms', 'signatory'];
 
@@ -57,10 +58,10 @@ export function DesignLabels({ design, onChange }: { design: DesignPrefs; onChan
       <div className={styles.grid2}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor={`${uid}-scope`}>{dlT('scope')}</label>
-          <select id={`${uid}-scope`} className={controls.select} value={scope} onChange={(e) => setScope(e.target.value as '' | DocumentType)}>
+          <SelectField id={`${uid}-scope`} className={controls.select} value={scope} onChange={(e) => setScope(e.target.value as '' | DocumentType)}>
             <option value="">{dlT('allDocs')}</option>
             {LABEL_DOC_TYPES.map((d) => <option key={d} value={d}>{DOCUMENT_LABELS[d]}</option>)}
-          </select>
+          </SelectField>
         </div>
         {scope && (
           <div className={controls.field}>

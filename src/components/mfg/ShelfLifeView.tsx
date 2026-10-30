@@ -12,6 +12,7 @@ import type { MfgContext } from '../manufacturing/context';
 import { Fld, Tbl } from './mfd-ui';
 import { row, rs, run, sm } from './mfd-util';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export default function ShelfLifeView({ ctx }: { ctx: MfgContext }) {
   const today = todayInput();
@@ -37,10 +38,10 @@ export default function ShelfLifeView({ ctx }: { ctx: MfgContext }) {
       <h3>{fdT('clientFloor')}</h3>
       <div style={row}>
         <Fld l={fdT('client')}>
-          <select className={controls.select} value={f.client} onChange={(e) => pickClient(e.target.value)} data-mfd="floor-client">
+          <SelectField className={controls.select} value={f.client} onChange={(e) => pickClient(e.target.value)} data-mfd="floor-client">
             <option value="">-</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          </SelectField>
         </Fld>
         <Fld l={fdT('minPct')}><NumberInput className={controls.input} style={{ maxWidth: 90 }} value={f.pct} onChange={(v) => setF({ ...f, pct: v })} data-mfd="floor-pct" /></Fld>
         <Fld l={fdT('minDays')}><NumberInput className={controls.input} style={{ maxWidth: 90 }} value={f.days} onChange={(v) => setF({ ...f, days: v })} data-mfd="floor-days" /></Fld>

@@ -16,6 +16,7 @@ import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { edT } from '../../i18n/areas/editor';
 import styles from './ItemsTable.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /**
  * Batch (FEFO), serial / IMEI and godown pickers for one editor line (6.6 / 6.10 / 6.11).
@@ -63,7 +64,7 @@ export function LineTracking({ item, index, ctx }: { item: InvoiceItem; index: n
       {ctx.multi && (
         <label className={styles.trackField}>
           <span>{ctx.outgoing ? edT('ltFrom') : edT('ltReturn')}</span>
-          <select
+          <SelectField
             className={controls.ghost}
             value={godown}
             aria-label={edT('ltGodown', { n })}
@@ -74,14 +75,14 @@ export function LineTracking({ item, index, ctx }: { item: InvoiceItem; index: n
             }}
           >
             {ctx.godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
+          </SelectField>
         </label>
       )}
 
       {stock.track_batches && ctx.outgoing && (
         <label className={styles.trackField}>
           <span>{edT('ltBatch')}</span>
-          <select
+          <SelectField
             className={controls.ghost}
             value={item.batch_no ?? ''}
             aria-label={edT('ltBatchAria', { n })}
@@ -97,7 +98,7 @@ export function LineTracking({ item, index, ctx }: { item: InvoiceItem; index: n
                 {o.batch}{o.expiry ? edT('ltExp', { date: formatDate(o.expiry) }) : ''}{edT('ltLeft', { n: o.qty })}{o.expired ? edT('ltExpired') : o.batch === fefo?.batch ? ' · FEFO' : ''}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
       )}
       {stock.track_batches && ctx.incoming && (

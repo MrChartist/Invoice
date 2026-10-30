@@ -22,6 +22,7 @@ import TicketRows from './TicketRows'; // R15-C1 air tickets (Rule 32(3))
 // R15-D: place-of-supply and outbound TCS chips (in this lazy chunk; a nested Suspense here left the items footer
 // without a layout box after reveal in Chromium — container-query invalidation).
 import TvChips from './TvChips';
+import { SelectField } from '../ui/SelectField';
 
 export default function TravelRows() {
   useT();
@@ -39,18 +40,18 @@ export default function TravelRows() {
   // R15-C1: the ticket rows open on demand (also without a trip)
   const have = Object.entries(s.tv?.lines ?? {}).filter(([id]) => s.items.some((l) => l.id === id)).map(([, v]) => v.tkt!).filter(Boolean);
   // PENDING 13: the ticket list as a following page (off / list / with the fare split), kept in the `tv` snapshot.
-  const annex = have.length > 0 && <select className={`${controls.select} ${controls.btnSm}`} aria-label={cvT('annexPage')} value={s.tv?.ticket_annexure ?? ''} onChange={(e) => useInvoiceStore.getState().patch({ tv: { ...s.tv, ticket_annexure: (e.target.value || undefined) as 'list' | undefined } })} data-tv-ticket-annexure>
+  const annex = have.length > 0 && <SelectField className={`${controls.select} ${controls.btnSm}`} aria-label={cvT('annexPage')} value={s.tv?.ticket_annexure ?? ''} onChange={(e) => useInvoiceStore.getState().patch({ tv: { ...s.tv, ticket_annexure: (e.target.value || undefined) as 'list' | undefined } })} data-tv-ticket-annexure>
     <option value="">{cvT('annexPage')} -</option><option value="list">{cvT('annexList')}</option><option value="fares">{cvT('annexFares')}</option>
-  </select>;
+  </SelectField>;
   const tickets = <><button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} aria-expanded={tk} onClick={() => setTk(!tk)} data-tv-tickets-open>{cvT('tickets')}</button>{annex}{tk && <div style={{ flexBasis: '100%' }}><TicketRows date={s.issue_date} method0={s.tv?.air?.method} have={have} onAdd={(t, o) => { const m = mergeTickets(s.items.filter((l) => l.name?.trim() || Number(l.rate)), s.tv, t, o); useInvoiceStore.getState().patch({ items: m.items, tv: m.tv }); }} /></div>}</>;
   if (!trips.length && !s.tv) return <div data-tv-rows>{tickets}</div>;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }} data-tv-rows>
       {tickets}
-      <select className={controls.select} aria-label={tvT('trip')} value={tripId ?? ''} onChange={(e) => apply(e.target.value)} data-tv-pick-trip>
+      <SelectField className={controls.select} aria-label={tvT('trip')} value={tripId ?? ''} onChange={(e) => apply(e.target.value)} data-tv-pick-trip>
         <option value="">{tvT('trip')} -</option>
         {trips.map((t) => <option key={t.id} value={t.id}>{tripLabel(t)}</option>)}
-      </select>
+      </SelectField>
       {tripId && <ListSelect list="regs" ids={TV_REGIMES} value={s.tv?.regime ?? 'to18'} onChange={(r) => apply(tripId, r)} attr="data-tv-pick-regime" />}
       {regimeMix(s.items, s.tv?.regime) && <span className={controls.hint} role="note" data-tv-mix>{tvT('mix')}</span>}
       {/* R15-D */}

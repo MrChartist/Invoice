@@ -23,6 +23,7 @@ import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import local from './returns.module.css';
 import { errText } from '../../i18n/lib-msg';
+import { DateField } from '../ui/DateField';
 
 export interface ReturnsTabProps {
   purchases: PurchaseRecord[];
@@ -123,7 +124,7 @@ export function ReturnsTab({ purchases, vendors, orders, onConvert, onVendorCrea
         {section === 'pending' && (
           <label className={local.barGroup}>
             {prT('asOf')}
-            <input type="date" className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value || todayInput())} />
+            <DateField className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value || todayInput())} />
           </label>
         )}
       </div>
@@ -374,7 +375,7 @@ function SupplierNoteForm({ note, onClose, onSaved, onError }: { note: PurchaseR
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="sup-date">{prT('supDate')}</label>
-          <input id="sup-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField id="sup-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
       </div>
       <div className={styles.inlineActions}>

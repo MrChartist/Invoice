@@ -17,6 +17,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../collections/collections.module.css';
 import { errText } from '../../i18n/lib-msg';
+import { SelectField } from '../ui/SelectField';
 
 const LANGS: ReminderLanguage[] = ['en', 'hinglish'];
 
@@ -103,15 +104,15 @@ export function ReminderSchedulePanel({ notify }: { notify: (m: string, tone?: '
           <div className={styles.grid2}>
             <label className={controls.field}>
               <span className={controls.label}>{colT('rsStage')}</span>
-              <select className={controls.select} value={stage} onChange={(e) => setStage(e.target.value as ScheduledStage)}>
+              <SelectField className={controls.select} value={stage} onChange={(e) => setStage(e.target.value as ScheduledStage)}>
                 {SCHEDULED_STAGES.map((st) => <option key={st} value={st}>{remindT(`stage.${st}`)}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{colT('rsLang')}</span>
-              <select className={controls.select} value={lang} onChange={(e) => setLang(e.target.value as ReminderLanguage)}>
+              <SelectField className={controls.select} value={lang} onChange={(e) => setLang(e.target.value as ReminderLanguage)}>
                 {LANGS.map((l) => <option key={l} value={l}>{l === 'en' ? 'English' : 'Hinglish'}</option>)}
-              </select>
+              </SelectField>
             </label>
           </div>
           <label className={controls.field}>

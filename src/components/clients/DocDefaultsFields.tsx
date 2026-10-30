@@ -6,6 +6,7 @@ import { CURRENCIES } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { svcT } from '../../i18n/areas/service-r3';
+import { SelectField } from '../ui/SelectField';
 
 /**
  * R3-B5: the party's document defaults in the client form (collapsed until opened or set). Emits the
@@ -31,17 +32,17 @@ export default function DocDefaultsFields({ value, onChange }: { value?: DocDefa
           <div className={controls.row}>
             <label className={controls.field}>
               <span className={controls.label}>{svcT('ddTemplate')}</span>
-              <select className={controls.select} value={v.template_id ?? ''} onChange={(e) => set('template_id', e.target.value || undefined)} data-dd-template>
+              <SelectField className={controls.select} value={v.template_id ?? ''} onChange={(e) => set('template_id', e.target.value || undefined)} data-dd-template>
                 <option value="">{svcT('ddTemplateNone')}</option>
                 {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{svcT('ddCurrency')}</span>
-              <select className={controls.select} value={v.currency ?? ''} onChange={(e) => set('currency', e.target.value || undefined)} data-dd-currency>
+              <SelectField className={controls.select} value={v.currency ?? ''} onChange={(e) => set('currency', e.target.value || undefined)} data-dd-currency>
                 <option value="">{svcT('ddCurrencyNone')}</option>
                 {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.label}</option>)}
-              </select>
+              </SelectField>
             </label>
           </div>
           <div className={controls.row}>
@@ -67,11 +68,11 @@ export default function DocDefaultsFields({ value, onChange }: { value?: DocDefa
           <div className={controls.row}>
             <label className={controls.field}>
               <span className={controls.label}>{svcT('ddPrintLang')}</span>
-              <select className={controls.select} value={v.print_lang ?? ''} onChange={(e) => set('print_lang', (e.target.value || undefined) as DocDefaults['print_lang'])}>
+              <SelectField className={controls.select} value={v.print_lang ?? ''} onChange={(e) => set('print_lang', (e.target.value || undefined) as DocDefaults['print_lang'])}>
                 <option value="">{svcT('ddLangDefault')}</option>
                 <option value="en">{svcT('ddLangEn')}</option>
                 <option value="hi">{svcT('ddLangHi')}</option>
-              </select>
+              </SelectField>
             </label>
             <label className={controls.check}>
               <input type="checkbox" checked={!!v.annexure} onChange={(e) => set('annexure', e.target.checked || undefined)} data-dd-annexure />

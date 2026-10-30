@@ -11,6 +11,8 @@ import { useT } from '../../i18n';
 import { s2T } from '../../i18n/areas/sales-r2';
 import controls from '../../styles/controls.module.css';
 import styles from './sales-r2.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 /**
  * R2-B2: raise the next stage invoice of a quotation / sales order — by % of the whole, by an amount
@@ -68,14 +70,14 @@ export function ProgressInvoiceDialog({ source, onClose, onCreated }: { source: 
         {open.length > 0 && (
           <label className={controls.field}>
             <span className={controls.label}>{s2T('p.milestone')}</span>
-            <select className={controls.select} value={milestone} onChange={(e) => {
+            <SelectField className={controls.select} value={milestone} onChange={(e) => {
               setMilestone(e.target.value);
               const m = open.find((x) => x.id === e.target.value);
               if (m?.expected_date) setDate(m.expected_date);
             }}>
               <option value="">{s2T('p.noMilestone')}</option>
               {open.map((m) => <option key={m.id} value={m.id}>{m.name} : {m.percent}%</option>)}
-            </select>
+            </SelectField>
           </label>
         )}
         {!milestone && (
@@ -118,7 +120,7 @@ export function ProgressInvoiceDialog({ source, onClose, onCreated }: { source: 
         <p className={styles.muted}>{s2T('p.complete', { pct: summary.percent })} · {s2T('p.remaining')} {formatCurrency(summary.remaining, cur)}</p>
         <label className={controls.field}>
           <span className={controls.label}>{s2T('p.invoiceDate')}</span>
-          <input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value || localDayOf(new Date()))} />
+          <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value || localDayOf(new Date()))} />
         </label>
         <label className={controls.check}>
           <input type="checkbox" checked={allowOver} onChange={(e) => setAllowOver(e.target.checked)} /> {s2T('p.allowOver')}

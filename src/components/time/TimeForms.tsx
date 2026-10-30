@@ -15,6 +15,8 @@ import { RateSourceTag, TaskSelect, WorkTypeSelect } from './rate-ui'; // R3-B1 
 import { rateFor, useRateMasters } from './rate-masters';
 import { isPackOn } from '../../lib/industry-packs';
 import { localDb } from '../../lib/localDb';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 // R14 (PS-A4): "Who" (the timekeeper) while the `practice` pack is on.
 const WhoRow = lazy(() => import('../prof/WhoRow'));
@@ -27,10 +29,10 @@ export function ClientSelect({ id, clients, value, onChange }: {
   onChange: (clientId: string) => void;
 }) {
   return (
-    <select id={id} className={controls.select} value={value} onChange={(e) => onChange(e.target.value)}>
+    <SelectField id={id} className={controls.select} value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">{timeT('chooseClient')}</option>
       {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-    </select>
+    </SelectField>
   );
 }
 
@@ -148,7 +150,7 @@ function EntryForm({ entry, clients, prefs, onClose, onSaved }: {
       <div className={controls.row3}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="te-date">{timeT('date')}</label>
-          <input id="te-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField id="te-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="te-dur">{timeT('duration')}</label>
@@ -235,7 +237,7 @@ function MileageForm({ trip, clients, prefs, onClose, onSaved }: {
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="mi-date">{timeT('date')}</label>
-          <input id="mi-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField id="mi-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
       </div>
       <div className={controls.row}>
