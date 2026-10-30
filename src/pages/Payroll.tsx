@@ -1,6 +1,6 @@
 import { Suspense, lazy, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { useToast } from '../components/ui/useToast';
 import { EmployeesTab } from '../components/payroll/EmployeesTab';
 import { PayHeadsTab } from '../components/payroll/PayHeadsTab';
@@ -25,7 +25,6 @@ const ScreenTip = lazy(() => import('../components/help/ScreenTip'));
 import { useT } from '../i18n';
 import { payrollT as pT } from '../i18n/areas/payroll';
 import controls from '../styles/controls.module.css';
-import surface from '../styles/surface.module.css';
 import styles from '../components/payroll/Payroll.module.css';
 import { PAYROLL_TABS, type PayrollTab } from './page-tabs'; // R6-B1
 
@@ -66,20 +65,19 @@ export function Payroll() {
   const common = { version, refresh, notify };
 
   return (
-    <div className={surface.page}>
-      <PageHeader
-        title={pT('title')}
-        subtitle={pT('subtitle')}
-        actions={
-          MONTH_TABS.includes(tab) ? (
-            <label className={controls.field}>
-              <span className={controls.label}>{pT('month')}</span>
-              <input className={controls.input} type="month" value={month} onChange={(e) => e.target.value && set('month', e.target.value)} />
-            </label>
-          ) : undefined
-        }
-      />
-      <Suspense fallback={null}><ScreenTip id="payroll" /></Suspense>
+    <Page
+      title={pT('title')}
+      subtitle={pT('subtitle')}
+      actions={
+        MONTH_TABS.includes(tab) ? (
+          <label className={controls.field}>
+            <span className={controls.label}>{pT('month')}</span>
+            <input className={controls.input} type="month" value={month} onChange={(e) => e.target.value && set('month', e.target.value)} />
+          </label>
+        ) : undefined
+      }
+      notices={<Suspense fallback={null}><ScreenTip id="payroll" /></Suspense>}
+    >
       <div className={styles.tabs} role="tablist" aria-label={pT('title')}>
         {TABS.map((t) => (
           <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => set('tab', t)}>
@@ -107,6 +105,6 @@ export function Payroll() {
       </div>
       <p className={styles.note}>{pT('footer')}</p>
       {toastNode}
-    </div>
+    </Page>
   );
 }

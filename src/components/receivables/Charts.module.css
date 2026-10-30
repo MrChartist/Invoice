@@ -20,6 +20,7 @@
 .seg {
   background-color: var(--tone);
   min-width: 3px;
+  transition: flex-grow var(--dur-3) var(--ease-out);
 }
 
 .legend {

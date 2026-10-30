@@ -19,7 +19,10 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page, SplitView } from '../components/ui/Page';
+import { useMedia } from '../hooks/useMedia';
+import { splitT } from '../i18n/areas/split-pl';
+import page from '../styles/page.module.css';
 import { uxT } from '../i18n/areas/invoicing-ux';
 import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -69,6 +72,8 @@ import { useListKeys } from '../lib/keys/use-list-keys'; // R20-D5
 ensureRetailHooks();
 
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
+// PL: the selected invoice beside the list on tablets and up (SplitView detail).
+const InvoiceInspector = lazy(() => import('../components/split/panes').then((m) => ({ default: m.InvoiceInspector })));
 
 // The preview pulls in the template engine and QR code; load it only when opened.
 const InvoicePreviewModal = lazy(() =>
@@ -230,11 +235,20 @@ export function Transactions() {
     del: (i) => mayDelete(rows[i]) && !isLocked(rows[i]) && setDeleting([rows[i]]),
     dup: (i) => can('doc.create') && handleDuplicate(rows[i]),
   });
+  // PL master-detail: a tap on a row (not on its links / buttons) shows it beside the list on tablets and up;
+  // on a wide screen (120em) the first row is shown by default. Phones keep the list as it is.
+  const tablet = useMedia('(min-width: 37.5em)');
+  const wideScreen = useMedia('(min-width: 120em)');
+  const [peek, setPeek] = useState<string | null>(null);
+  const peekRow = tablet ? rows.find((r) => r.id === peek) ?? (wideScreen && peek === null ? rows[0] : undefined) : undefined;
+  const pickRow = (id: string) => (e: { target: EventTarget }) => {
+    if (tablet && !(e.target as Element).closest('a, button, input, select, label')) setPeek(id);
+  };
   const sortBy = (key: SortKey) =>
     setSort((prev) => ({ key, dir: prev.key === key ? (prev.dir === 'asc' ? 'desc' : 'asc') : key === 'client' || key === 'number' ? 'asc' : 'desc' }));
   const ariaSort = (key: SortKey) => (sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
-  const sortHead = (k: SortKey, label: string, numeric = false) => (
-    <th className={numeric ? surface.numeric : undefined} aria-sort={ariaSort(k)}>
+  const sortHead = (k: SortKey, label: string, numeric = false, priority?: string) => (
+    <th className={numeric ? surface.numeric : undefined} aria-sort={ariaSort(k)} data-priority={priority}>
       <button type="button" className={styles.sortBtn} onClick={() => sortBy(k)}>
         {label}
         {sort.key === k && (sort.dir === 'asc' ? <ArrowUp size={12} aria-hidden="true" /> : <ArrowDown size={12} aria-hidden="true" />)}
@@ -246,6 +260,28 @@ export function Transactions() {
     () => Object.fromEntries(FILTERS.map((f) => [f.id, invoices.filter((i) => matchesFilter(i, f.id, now)).length])) as Record<Filter, number>,
     [invoices], // eslint-disable-line react-hooks/exhaustive-deps
   );
+
+  /** The status pill of a row (also shown in the inspector). */
+  const statusOf = (inv: InvoiceRecord) => {
+    const status = effectiveStatus(inv, now);
+    return inv.doc_type === 'QUOTATION' ? (
+        (() => {
+          const q = quoteState(inv, links, now);
+          return <StatusBadge status={stateLabel(q)} tone={quoteTone(q)} />;
+        })()
+      ) : inv.doc_type === 'SALES_ORDER' ? (
+        (() => {
+          const o = orderStates.get(inv.id) ?? 'Open';
+          return <StatusBadge status={stateLabel(o)} tone={orderTone(o)} />;
+        })()
+      ) : isPendingApproval(inv) ? (
+        <StatusBadge status={wireT('pendingApproval')} tone="partial" />
+      ) : inv.approval?.state === 'rejected' && status === 'Draft' ? (
+        <StatusBadge status={wireT('rejectedApproval')} tone="overdue" />
+      ) : (
+        <StatusBadge status={status} />
+      );
+  };
 
   const handlePreview = (inv: InvoiceRecord) => {
     if (loadInvoice(inv.id)) setPreviewOpen(true);
@@ -392,32 +428,31 @@ export function Transactions() {
   };
 
   return (
-    <div className={surface.page}>
-      <Suspense fallback={null}><ScreenTip id="invoices" /></Suspense>
-      <PageHeader
-        title={salesT('tx.title')}
-        subtitle={salesT('tx.subtitle')}
-        actions={
-          <>
-            <button type="button" className={controls.btnOutline} onClick={() => exportCsv()} disabled={rows.length === 0}>
-              <Download size={16} /> {salesT('exportCsv')}
+    <Page
+      title={salesT('tx.title')}
+      subtitle={salesT('tx.subtitle')}
+      actions={
+        <>
+          <button type="button" className={controls.btnOutline} onClick={() => exportCsv()} disabled={rows.length === 0}>
+            <Download size={16} /> {salesT('exportCsv')}
+          </button>
+          <button type="button" className={controls.btnOutline} onClick={() => void exportXlsx()} disabled={rows.length === 0}>
+            <Download size={16} /> {salesT('exportXlsx')}
+          </button>
+          {hasStages && (
+            <button type="button" className={controls.btnOutline} onClick={() => setProgressOpen(true)} data-progress-report-open>
+              <Layers size={16} /> {s2T('p.report')}
             </button>
-            <button type="button" className={controls.btnOutline} onClick={() => void exportXlsx()} disabled={rows.length === 0}>
-              <Download size={16} /> {salesT('exportXlsx')}
-            </button>
-            {hasStages && (
-              <button type="button" className={controls.btnOutline} onClick={() => setProgressOpen(true)} data-progress-report-open>
-                <Layers size={16} /> {s2T('p.report')}
-              </button>
-            )}
-            {can('doc.create') && (
-              <Link to="/invoice" className={controls.btnPrimary}>
-                <FilePlus2 size={16} /> {salesT('tx.newInvoice')}
-              </Link>
-            )}
-          </>
-        }
-      />
+          )}
+          {can('doc.create') && (
+            <Link to="/invoice" className={controls.btnPrimary}>
+              <FilePlus2 size={16} /> {salesT('tx.newInvoice')}
+            </Link>
+          )}
+        </>
+      }
+      notices={<Suspense fallback={null}><ScreenTip id="invoices" /></Suspense>}
+    >
 
       <div className={surface.statGrid}>
         <StatCard label={salesT('tx.billed')} value={formatCurrency(summary.billed)} icon={FileText} hint={salesT('tx.issued', { n: summary.count })} />
@@ -425,6 +460,23 @@ export function Transactions() {
         <StatCard label={salesT('tx.outstanding')} value={formatCurrency(summary.outstanding)} icon={FileText} tone="warning" />
       </div>
 
+      <SplitView
+        id="invoices"
+        label={splitT('preview')}
+        onClose={() => setPeek('')}
+        detail={
+          peekRow ? (
+            <Suspense fallback={null}>
+              <InvoiceInspector
+                invoice={peekRow}
+                due={isRevenueDoc(peekRow) ? amountDue(peekRow, credits.get(peekRow.id)) : null}
+                status={statusOf(peekRow)}
+                onPreview={() => handlePreview(peekRow)}
+              />
+            </Suspense>
+          ) : undefined
+        }
+      >
       <section className={surface.card}>
         <div className={styles.toolbar}>
           <label className={styles.search}>
@@ -556,7 +608,7 @@ export function Transactions() {
         ) : rows.length === 0 ? (
           <EmptyState icon={Search} title={t('common.noMatches')} text={t('common.tryOtherSearchFilter')} />
         ) : (
-          <div className={surface.tableWrap}>
+          <div className={cn(surface.tableWrap, page.scroller)}>
             <table className={cn(surface.table, styles.ledger)} aria-rowcount={virtual.ariaRowCount(1)}>
               <thead>
                 <tr aria-rowindex={virtual.enabled ? 1 : undefined}>
@@ -570,9 +622,9 @@ export function Transactions() {
                   </th>
                   {sortHead('number', salesT('tx.colDocument'))}
                   {sortHead('client', salesT('tx.colClient'))}
-                  {sortHead('date', salesT('tx.colDate'))}
-                  <th>{salesT('tx.colStatus')}</th>
-                  {sortHead('total', salesT('tx.colTotal'), true)}
+                  {sortHead('date', salesT('tx.colDate'), false, '2')}
+                  <th data-priority="2">{salesT('tx.colStatus')}</th>
+                  {sortHead('total', salesT('tx.colTotal'), true, '3')}
                   {sortHead('balance', salesT('tx.colBalance'), true)}
                   <th aria-label={salesT('actions')} />
                 </tr>
@@ -588,7 +640,7 @@ export function Transactions() {
                   const lockedTitle = salesT('tx.lockedTitle');
                   const num = { number: inv.invoice_number };
                   return (
-                    <tr key={inv.id} aria-selected={selected.has(inv.id)} {...virtual.rowProps(slot.index)} {...list.row(slot.index)}>
+                    <tr key={inv.id} aria-selected={selected.has(inv.id)} data-current={peekRow?.id === inv.id || undefined} onClick={pickRow(inv.id)} {...virtual.rowProps(slot.index)} {...list.row(slot.index)}>
                       <td className={styles.cCheck}>
                         <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggle(inv.id)} aria-label={salesT('tx.select', num)} />
                       </td>
@@ -605,32 +657,14 @@ export function Transactions() {
                           <span>{inv.client?.name || '-'}</span>
                         </div>
                       </td>
-                      <td className={cn(styles.nowrap, styles.cDate)}>
+                      <td className={cn(styles.nowrap, styles.cDate)} data-priority="2">
                         {formatDate(inv.issue_date)}
                         <div className={cn(styles.docType, status === 'Overdue' && styles.overdueText)}>
                           {salesT(inv.doc_type === 'QUOTATION' ? 'tx.validUntil' : 'tx.due', { date: formatDate(inv.due_date) || '-' })}
                         </div>
                       </td>
-                      <td className={styles.cStatus}>
-                        {inv.doc_type === 'QUOTATION' ? (
-                          (() => {
-                            const q = quoteState(inv, links, now);
-                            return <StatusBadge status={stateLabel(q)} tone={quoteTone(q)} />;
-                          })()
-                        ) : inv.doc_type === 'SALES_ORDER' ? (
-                          (() => {
-                            const o = orderStates.get(inv.id) ?? 'Open';
-                            return <StatusBadge status={stateLabel(o)} tone={orderTone(o)} />;
-                          })()
-                        ) : isPendingApproval(inv) ? (
-                          <StatusBadge status={wireT('pendingApproval')} tone="partial" />
-                        ) : inv.approval?.state === 'rejected' && status === 'Draft' ? (
-                          <StatusBadge status={wireT('rejectedApproval')} tone="overdue" />
-                        ) : (
-                          <StatusBadge status={status} />
-                        )}
-                      </td>
-                      <td className={cn(surface.numeric, styles.cTotal)}>{formatCurrency(inv.total, inv.currency)}</td>
+                      <td className={styles.cStatus} data-priority="2">{statusOf(inv)}</td>
+                      <td className={cn(surface.numeric, styles.cTotal)} data-priority="3">{formatCurrency(inv.total, inv.currency)}</td>
                       <td className={cn(surface.numeric, styles.cBal)}>
                         {isRevenueDoc(inv) ? formatCurrency(due, inv.currency) : '-'}
                       </td>
@@ -670,6 +704,7 @@ export function Transactions() {
           </div>
         )}
       </section>
+      </SplitView>
 
       {previewOpen && (
         <Suspense fallback={null}>
@@ -737,6 +772,6 @@ export function Transactions() {
         )}
       </Modal>
       {toastNode}
-    </div>
+    </Page>
   );
 }

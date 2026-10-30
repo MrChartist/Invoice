@@ -4,7 +4,7 @@ import { CalendarClock, Pause, Plus, Repeat, TrendingUp } from 'lucide-react';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/useToast';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { StatCard } from '../components/ui/StatCard';
 import { RecurringEditor } from '../components/recurring/RecurringEditor';
 import { ScheduleCard } from '../components/recurring/ScheduleCard';
@@ -191,16 +191,15 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
   }[confirm.kind];
 
   return (
-    <div className={surface.page}>
-      <PageHeader
-        title={recT('title')}
-        subtitle={recT('subtitle')}
-        actions={
-          <button type="button" className={controls.btnPrimary} onClick={openCreate}>
-            <Plus size={16} aria-hidden="true" /> {recT('newSchedule')}
-          </button>
-        }
-      />
+    <Page
+      title={recT('title')}
+      subtitle={recT('subtitle')}
+      actions={
+        <button type="button" className={controls.btnPrimary} onClick={openCreate}>
+          <Plus size={16} aria-hidden="true" /> {recT('newSchedule')}
+        </button>
+      }
+    >
 
       {/* R2-B1: Schedules | Batch invoices */}
       <div className={controls.segment} role="tablist" aria-label={recT('title')}>
@@ -284,6 +283,6 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
         />
       )}
       {toastNode}
-    </div>
+    </Page>
   );
 }

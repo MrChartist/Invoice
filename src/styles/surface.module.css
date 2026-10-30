@@ -6,45 +6,13 @@
    ================================================================ */
 
 /* ── Page scaffolding (owner: PL) ─────────────────────────────── */
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding-bottom: 2rem;
-  animation: fadeInUp 360ms ease both;
-}
-
-.pageHead {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.pageTitle {
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  margin: 0;
-}
-
-.pageSubtitle {
-  color: var(--muted-foreground);
-  font-size: var(--text-md);
-  margin: 0.25rem 0 0;
-}
-
-.pageActions {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  flex-wrap: wrap;
-}
+/* The frame lives in ./page.module.css (`<Page>`, src/components/ui/Page.tsx). These names stay for older
+   markup and compose the same rules, so a legacy `surface.page` looks exactly like `<Page>`. */
+.page { composes: page from './page.module.css'; }
+.pageHead { composes: head from './page.module.css'; }
+.pageTitle { composes: title from './page.module.css'; }
+.pageSubtitle { composes: subtitle from './page.module.css'; }
+.pageActions { composes: actions from './page.module.css'; }
 
 /* ── Cards (owner: P2) ────────────────────────────────────────── */
 .card {
@@ -409,6 +377,5 @@
 
 @media (max-width: 780px) {
   .cardBody { padding: 1rem; }
-  .pageTitle { font-size: 1.25rem; }
   .table th, .table td { padding: 0.75rem 1rem; }
 }

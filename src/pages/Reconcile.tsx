@@ -30,7 +30,6 @@ import { StorageWriteError } from '../lib/storage';
 import { DEFAULT_BANK_ID, accountIdOf, bankAccountsDb, pickableBankAccounts, type BankAccount } from '../lib/bank-accounts';
 import { BankAccountsCard } from '../components/bank/BankAccountsCard';
 import { formatDate, formatMoney } from '../lib/utils';
-import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { LearnMore } from '../components/discover';
@@ -46,6 +45,7 @@ import { StatementsPanel } from '../components/bank/StatementsPanel';
 import { useT } from '../i18n';
 import { bankT } from '../i18n/areas/bank';
 import controls from '../styles/controls.module.css';
+import { Page, PageHead } from '../components/ui/Page';
 import surface from '../styles/surface.module.css';
 import bank from '../components/bank/reconcile.module.css';
 import styles from './Reconcile.module.css';
@@ -247,7 +247,7 @@ export function Reconcile() {
   };
 
   const header = (
-    <PageHeader
+    <PageHead
       title={bankT('title')}
       subtitle={bankT('subtitle')}
       actions={
@@ -285,8 +285,7 @@ export function Reconcile() {
 
   if (statements.length === 0 && tab !== 'documents' && tab !== 'rules') {
     return (
-      <div className={surface.page}>
-        {header}
+      <Page head={header}>
         {/* R6-B3: nothing imported yet — what the screen needs, and the two first steps. */}
         <EmptyState
           icon={Landmark}
@@ -310,15 +309,14 @@ export function Reconcile() {
           <ImportPanel existing={statements} onImport={importStatement} />
         </div>
         {toastNode}
-      </div>
+      </Page>
     );
   }
 
   const diff = closing.balance === null ? null : Math.round((closing.balance - booksBalance) * 100) / 100;
 
   return (
-    <div className={surface.page}>
-      {header}
+    <Page head={header}>
 
       <div className={surface.statGrid}>
         <StatCard
@@ -535,6 +533,6 @@ export function Reconcile() {
         onClose={() => setBulkOpen(false)}
       />
       {toastNode}
-    </div>
+    </Page>
   );
 }

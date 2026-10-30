@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { useToast } from '../components/ui/useToast';
 import { CalendarRange, Download, FileJson, FileSpreadsheet, Files, Printer, ShieldAlert } from 'lucide-react';
 import { getTable, peekTable, readRaw, writeRaw } from '../lib/storage';
@@ -734,42 +734,42 @@ export function GstReports() {
   ];
 
   return (
-    <div className={surface.page}>
-      <PageHeader
-        title={gstT('title')}
-        subtitle={gstT('subtitle')}
-        actions={
-          <>
-          <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} disabled={!hasData || !gstin} title={!gstin ? gstT('needGstin1') : undefined}
-            onClick={() => guarded('GSTR1', downloadGstr1)} data-gstr1-json>
-            <FileJson size={16} aria-hidden /> GSTR-1 JSON {badge}
+    <Page
+      title={gstT('title')}
+      subtitle={gstT('subtitle')}
+      actions={
+        <>
+        <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} disabled={!hasData || !gstin} title={!gstin ? gstT('needGstin1') : undefined}
+          onClick={() => guarded('GSTR1', downloadGstr1)} data-gstr1-json>
+          <FileJson size={16} aria-hidden /> GSTR-1 JSON {badge}
+        </button>
+        {period.kind === 'month' && isIffMonth(period) && (
+          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData || !gstin} title={o7T('iffTitle')} data-iff-json
+            onClick={() => guarded('IFF', downloadIff)}>
+            <FileJson size={16} aria-hidden /> IFF JSON {badge}
           </button>
-          {period.kind === 'month' && isIffMonth(period) && (
-            <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData || !gstin} title={o7T('iffTitle')} data-iff-json
-              onClick={() => guarded('IFF', downloadIff)}>
-              <FileJson size={16} aria-hidden /> IFF JSON {badge}
-            </button>
-          )}
-          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData}
-            onClick={() => download(`GSTR3B_${gstin || 'all'}_${g1.fp}.csv`, 'text/csv', gstr3bCsv(g3))}>
-            <FileSpreadsheet size={16} aria-hidden /> GSTR-3B CSV
-          </button>
-          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData || !gstin} title={!gstin ? gstT('needGstin3b') : gstT('json3bTitle')}
-            onClick={() => guarded('GSTR3B', downloadGstr3b)} data-gstr3b-json>
-            <FileJson size={16} aria-hidden /> GSTR-3B JSON {badge}
-          </button>
-          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData} onClick={printSummary}>
-            <Printer size={16} aria-hidden /> {gstT('printSummary')}
-          </button>
-          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setAnnualOpen('gstr9')} title={gstT('gstr9Title')}>
-            <CalendarRange size={16} aria-hidden /> GSTR-9
-          </button>
-          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setAnnualOpen('bulk')} title={gstT('bulkTitle')}>
-            <Files size={16} aria-hidden /> {gstT('bulk')}
-          </button>
-          </>
-        }
-      />
+        )}
+        <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData}
+          onClick={() => download(`GSTR3B_${gstin || 'all'}_${g1.fp}.csv`, 'text/csv', gstr3bCsv(g3))}>
+          <FileSpreadsheet size={16} aria-hidden /> GSTR-3B CSV
+        </button>
+        <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData || !gstin} title={!gstin ? gstT('needGstin3b') : gstT('json3bTitle')}
+          onClick={() => guarded('GSTR3B', downloadGstr3b)} data-gstr3b-json>
+          <FileJson size={16} aria-hidden /> GSTR-3B JSON {badge}
+        </button>
+        <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hasData} onClick={printSummary}>
+          <Printer size={16} aria-hidden /> {gstT('printSummary')}
+        </button>
+        <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setAnnualOpen('gstr9')} title={gstT('gstr9Title')}>
+          <CalendarRange size={16} aria-hidden /> GSTR-9
+        </button>
+        <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setAnnualOpen('bulk')} title={gstT('bulkTitle')}>
+          <Files size={16} aria-hidden /> {gstT('bulk')}
+        </button>
+        </>
+      }
+      notices={<Suspense fallback={null}><ScreenTip id="gst" /></Suspense>}
+    >
 
       {annualOpen && (
         <Suspense fallback={null}>
@@ -840,7 +840,6 @@ export function GstReports() {
           {gstT('disclaimer')}
         </details>
       </div>
-      <Suspense fallback={null}><ScreenTip id="gst" /></Suspense>
       {!hasData && !g3.purchasesConsidered && (
         <div className={surface.card} data-gst-empty>
           <EmptyState
@@ -945,7 +944,7 @@ export function GstReports() {
         </div>
       </section>
       {toastNode}
-    </div>
+    </Page>
   );
 
   function Overview() {

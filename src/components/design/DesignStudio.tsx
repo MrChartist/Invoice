@@ -9,7 +9,7 @@ import { cn } from '../../lib/utils';
 import { useToast } from '../ui/useToast';
 import { useT } from '../../i18n';
 import { desT } from '../../i18n/areas/design';
-import surface from '../../styles/surface.module.css';
+import { Page } from '../ui/Page';
 import controls from '../../styles/controls.module.css';
 
 /**
@@ -64,17 +64,15 @@ export function DesignStudio() {
   };
 
   return (
-    <div className={surface.page}>
-      <div className={surface.pageHead}>
-        <div>
-          <h1 className={surface.pageTitle}>
-            <Palette size={22} aria-hidden="true" /> {desT('title')}
-          </h1>
-          <p className={surface.pageSubtitle}>
-            {desT('subtitle')}
-          </p>
-        </div>
-        <div className={surface.pageActions}>
+    <Page
+      title={
+        <>
+          <Palette size={22} aria-hidden="true" /> {desT('title')}
+        </>
+      }
+      subtitle={desT('subtitle')}
+      actions={
+        <>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="ds-scope">{desT('appliesTo')}</label>
             <select id="ds-scope" className={controls.select} value={scope} onChange={(e) => changeScope(e.target.value)}>
@@ -99,8 +97,9 @@ export function DesignStudio() {
           <button type="button" className={cn(controls.btn, controls.btnPrimary)} onClick={save} disabled={!dirty}>
             <Save size={15} aria-hidden="true" /> {desT('saveDesign')}
           </button>
-        </div>
-      </div>
+        </>
+      }
+    >
 
       <DesignPanel
         profileId={scope}
@@ -114,6 +113,6 @@ export function DesignStudio() {
         templateId={templateId}
       />
       {toastNode}
-    </div>
+    </Page>
   );
 }

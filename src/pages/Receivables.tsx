@@ -29,7 +29,6 @@ import {
 } from '../lib/receivables';
 import { formatMoney, formatCurrency, formatDate, todayInput, toDateInput } from '../lib/utils';
 import { EmptyState } from '../components/ui/EmptyState';
-import { PageHeader } from '../components/ui/PageHeader';
 import { StatCard } from '../components/ui/StatCard';
 import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
@@ -41,6 +40,7 @@ import { StatementViewer } from '../components/receivables/StatementViewer';
 import { downloadTextFile } from '../components/receivables/exportUtils';
 import { VirtualGap } from '../components/ui/VirtualGap';
 import { useVirtualRows } from '../hooks/useVirtualRows';
+import { Page, PageHead } from '../components/ui/Page';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Receivables.module.css';
@@ -234,8 +234,7 @@ export function Receivables() {
 
   if (report.parties.length === 0 && tab !== 'advances' && tab !== 'giftvouchers') {
     return (
-      <div className={surface.page}>
-        <Header />
+      <Page head={<Header />}>
         <div className={surface.card}>
           <EmptyState
             icon={Scale}
@@ -249,44 +248,47 @@ export function Receivables() {
             }
           />
         </div>
-      </div>
+      </Page>
     );
   }
 
   return (
-    <div className={surface.page}>
-      <Header>
-        {currencies.length > 1 && (
-          <label className={styles.inline}>
-            <span className={controls.label}>{rcvT('currency')}</span>
-            <select className={controls.select} value={currency} onChange={(e) => setCurrencyPick(e.target.value)}>
-              {currencies.map((c) => <option key={c}>{c}</option>)}
-            </select>
-          </label>
-        )}
-        <button type="button" className={`${controls.btn} ${controls.btnOutline}`}
-          onClick={() => downloadTextFile(`Receivables_aging_${todayInput()}.csv`, agingCsv(report, Object.fromEntries(AGING_BUCKETS.map((b) => [b, bucketLabel(b, ageing)])), interest))}>
-          <Download size={16} /> {rcvT('exportCsv')}
-        </button>
-        <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setBulkOpen(true)} disabled={report.parties.length === 0}>
-          <FileStack size={16} /> {printT('bulkStatements')}
-        </button>
-        {currency === 'INR' && (
-          <>
-            <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setQueue('overdue')} disabled={report.totals.overdue <= 0}>
-              <BellRing size={16} /> {khataT('remindAll')}
-            </button>
-            <button type="button" className={`${controls.btn} ${controls.btnGhost}`} onClick={() => setQueue('balance')} disabled={report.totals.net <= 0}>
-              <Send size={16} /> {khataT('sendBalances')}
-            </button>
-            {can('payment.record') && (
-              <button type="button" className={`${controls.btn} ${controls.btnGhost}`} onClick={() => setBulkAct(true)} disabled={report.totals.billCount === 0} data-receivables-bulk-open>
-                <ListChecks size={16} /> {uxT('bkOpenBtn')}
+    <Page
+      head={
+        <Header>
+          {currencies.length > 1 && (
+            <label className={styles.inline}>
+              <span className={controls.label}>{rcvT('currency')}</span>
+              <select className={controls.select} value={currency} onChange={(e) => setCurrencyPick(e.target.value)}>
+                {currencies.map((c) => <option key={c}>{c}</option>)}
+              </select>
+            </label>
+          )}
+          <button type="button" className={`${controls.btn} ${controls.btnOutline}`}
+            onClick={() => downloadTextFile(`Receivables_aging_${todayInput()}.csv`, agingCsv(report, Object.fromEntries(AGING_BUCKETS.map((b) => [b, bucketLabel(b, ageing)])), interest))}>
+            <Download size={16} /> {rcvT('exportCsv')}
+          </button>
+          <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setBulkOpen(true)} disabled={report.parties.length === 0}>
+            <FileStack size={16} /> {printT('bulkStatements')}
+          </button>
+          {currency === 'INR' && (
+            <>
+              <button type="button" className={`${controls.btn} ${controls.btnOutline}`} onClick={() => setQueue('overdue')} disabled={report.totals.overdue <= 0}>
+                <BellRing size={16} /> {khataT('remindAll')}
               </button>
-            )}
-          </>
-        )}
-      </Header>
+              <button type="button" className={`${controls.btn} ${controls.btnGhost}`} onClick={() => setQueue('balance')} disabled={report.totals.net <= 0}>
+                <Send size={16} /> {khataT('sendBalances')}
+              </button>
+              {can('payment.record') && (
+                <button type="button" className={`${controls.btn} ${controls.btnGhost}`} onClick={() => setBulkAct(true)} disabled={report.totals.billCount === 0} data-receivables-bulk-open>
+                  <ListChecks size={16} /> {uxT('bkOpenBtn')}
+                </button>
+              )}
+            </>
+          )}
+        </Header>
+      }
+    >
       {bulkAct && (
         <Suspense fallback={null}>
           <ReceivablesBulk report={report} invoices={data.invoices} onClose={() => setBulkAct(false)} onDone={(m) => { notify(m, 'success'); setData(loadData()); }} />
@@ -412,13 +414,13 @@ export function Receivables() {
         {tab === 'interest' && <Suspense fallback={null}><div className={surface.card}><InterestTab onDone={(m, e) => notify(m, e ? 'error' : 'success')} /></div></Suspense>}
       </div>
       {toastNode}
-    </div>
+    </Page>
   );
 }
 
 function Header({ children }: { children?: ReactNode }) {
   return (
-    <PageHeader
+    <PageHead
       title={rcvT('title')}
       subtitle={rcvT('subtitle')}
       actions={children}

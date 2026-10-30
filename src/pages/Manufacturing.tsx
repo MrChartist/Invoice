@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Boxes } from 'lucide-react';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { useToast } from '../components/ui/useToast';
 import { stockDb } from '../lib/inventory';
 import { liveTrackingInputs } from '../lib/stock-tracking';
@@ -95,12 +95,11 @@ export function Manufacturing() {
   const tracked = ctx.items.filter((i) => i.track_stock);
 
   return (
-    <div className={surface.page}>
-      <PageHeader
-        title={mfgT('title')}
-        subtitle={mfgT('subtitle')}
-        actions={<Link to="/inventory" className={cn(controls.btnOutline, controls.btnSm)}><Boxes size={14} aria-hidden="true" /> {mfgT('inventory')}</Link>}
-      />
+    <Page
+      title={mfgT('title')}
+      subtitle={mfgT('subtitle')}
+      actions={<Link to="/inventory" className={cn(controls.btnOutline, controls.btnSm)}><Boxes size={14} aria-hidden="true" /> {mfgT('inventory')}</Link>}
+    >
       <div className={surface.card}>
         <div className={surface.cardBody}>
           <div className={cn(controls.segment, styles.tabs)} role="tablist" aria-label={mfgT('sections')}>
@@ -140,6 +139,6 @@ export function Manufacturing() {
         </div>
       </div>
       {toastNode}
-    </div>
+    </Page>
   );
 }

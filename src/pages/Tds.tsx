@@ -7,7 +7,7 @@ import { vendorsDb } from '../lib/vendors';
 import { getTable } from '../lib/storage';
 import { todayInput } from '../lib/utils';
 import type { InvoiceRecord } from '../types/invoice';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { useToast } from '../components/ui/useToast';
 import { useCan } from '../hooks/useCan';
 import { ChallansTab, DeductionsTab, Form16aTab, OverviewTab, ReturnsTab, type TdsData } from '../components/tds/TdsTabs';
@@ -87,9 +87,7 @@ export function Tds() {
   };
 
   return (
-    <div className={surface.page}>
-      <PageHeader title={tdsT('title')} subtitle={tdsT('subtitle')} />
-      <Suspense fallback={null}><ScreenTip id="tds" /></Suspense>
+    <Page title={tdsT('title')} subtitle={tdsT('subtitle')} notices={<Suspense fallback={null}><ScreenTip id="tds" /></Suspense>}>
       <div className={`${styles.tabs} no-print`}>
         <label className={controls.field}>
           <span className={controls.label}>{tdsT('fy')}</span>
@@ -156,6 +154,6 @@ export function Tds() {
         )}
       </div>
       {toastNode}
-    </div>
+    </Page>
   );
 }

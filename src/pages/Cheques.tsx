@@ -17,7 +17,7 @@ import { purchasesDb } from '../lib/purchases';
 import { downloadText } from '../lib/download';
 import { formatDate, formatMoney, todayInput } from '../lib/utils';
 import type { Cheque, ChequeDirection, ChequeStatus } from '../types/cheques';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { StatCard } from '../components/ui/StatCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -108,24 +108,23 @@ export function Cheques() {
   };
 
   return (
-    <div className={surface.page}>
-      <PageHeader
-        title={chqT('title')}
-        subtitle={chqT('subtitle')}
-        actions={
-          <>
-            <button type="button" className={controls.btnOutline} disabled={!all.length} onClick={() => downloadText(`cheque-register-${today}.csv`, chequesCsv(rows), 'text/csv')}>
-              <Download size={16} /> CSV
-            </button>
-            <button type="button" className={controls.btnOutline} onClick={() => setForm({ open: true, direction: 'issued', cheque: null })}>
-              <ArrowUpRight size={16} /> {chqT('issue')}
-            </button>
-            <button type="button" className={controls.btnPrimary} onClick={() => setForm({ open: true, direction: 'received', cheque: null })}>
-              <ArrowDownLeft size={16} /> {chqT('receivedBtn')}
-            </button>
-          </>
-        }
-      />
+    <Page
+      title={chqT('title')}
+      subtitle={chqT('subtitle')}
+      actions={
+        <>
+          <button type="button" className={controls.btnOutline} disabled={!all.length} onClick={() => downloadText(`cheque-register-${today}.csv`, chequesCsv(rows), 'text/csv')}>
+            <Download size={16} /> CSV
+          </button>
+          <button type="button" className={controls.btnOutline} onClick={() => setForm({ open: true, direction: 'issued', cheque: null })}>
+            <ArrowUpRight size={16} /> {chqT('issue')}
+          </button>
+          <button type="button" className={controls.btnPrimary} onClick={() => setForm({ open: true, direction: 'received', cheque: null })}>
+            <ArrowDownLeft size={16} /> {chqT('receivedBtn')}
+          </button>
+        </>
+      }
+    >
 
       <div className={surface.statGrid}>
         <StatCard label={chqT('inHand')} icon={Wallet} value={inr(summary.inHand.amount)} hint={chqT('toDeposit', { n: summary.inHand.count })} />
@@ -277,6 +276,6 @@ export function Cheques() {
         onClose={() => setDeleting(null)}
       />
       {toastNode}
-    </div>
+    </Page>
   );
 }

@@ -1,8 +1,17 @@
+/* ================================================================
+   App shell. Rules marked "layout" are package PL's structure (shell grid, breakpoints in em, sidebar rail /
+   collapse, safe areas, dvh, tab-bar visibility): visual packages (P1) leave them as they are.
+   Device classes (docs/theme/IOS-UI.md 3.1): phone < 37.5em (and short landscape < 74.6875em wide);
+   small tablet 37.5em to 52.125em (72px rail, expands as an overlay); tablet 52.125em+ (sidebar, collapsible
+   to the rail, remembered). Gutters, bar sizes and the rail width are tokens (src/styles/ios.css).
+   ================================================================ */
+
+/* layout */
 .layout {
   display: flex;
-  height: 100vh;
   height: 100dvh;
   width: 100%;
+  padding-inline: var(--safe-l) var(--safe-r);
   background-color: var(--background);
   color: var(--foreground);
   overflow: hidden;
@@ -10,14 +19,16 @@
 
 /* ── Sidebar ─────────────────────────────────────────────────── */
 .sidebar {
-  width: var(--sidebar-width);
-  background-color: var(--card);
-  border-right: 1px solid var(--border);
+  /* layout */
+  width: var(--sidebar-w);
   display: flex;
   flex-direction: column;
-  padding: 1.25rem 0.875rem 1rem;
+  padding: calc(1.25rem + var(--safe-t)) 0.875rem calc(1rem + var(--safe-b));
   flex-shrink: 0;
-  z-index: 40;
+  z-index: var(--z-sidebar);
+  /* visual */
+  background-color: var(--card);
+  border-right: 1px solid var(--border);
 }
 
 .brand {
@@ -62,7 +73,7 @@
   position: fixed;
   top: 0.5rem;
   left: 0.5rem;
-  z-index: 100;
+  z-index: var(--z-skip);
   padding: 0.5rem 0.875rem;
   border-radius: var(--radius-sm);
   background: var(--primary);
@@ -205,6 +216,7 @@
 .iconBtn { composes: btn quiet icon sm from global; flex-shrink: 0; }
 
 /* ── Main ────────────────────────────────────────────────────── */
+/* layout */
 .main {
   flex: 1;
   min-width: 0;
@@ -215,14 +227,17 @@
 }
 
 .utilBar {
+  /* layout */
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: var(--z-bar);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.625rem 2rem;
+  flex-shrink: 0;
+  min-height: calc(var(--bar-h) + var(--safe-t));
+  padding: var(--safe-t) var(--gutter) 0;
   background: color-mix(in srgb, var(--background) 88%, transparent);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
@@ -270,48 +285,144 @@
   gap: 0.25rem;
 }
 
-.content {
-  width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem 2rem 3rem;
+/* layout: the sidebar toggle and the search share the bar's leading side. */
+.utilLead {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
 }
 
-/* ── Mobile top bar + drawer ─────────────────────────────────── */
+/* layout: THE page frame. Each page picks a width tier (<Page tier>); the gutter, the top and the max width
+   are the same on every route, so the title never moves. Bleed pages (POS, the editor with live preview,
+   Gateway display) drop the cap; pages with an inspector widen by the inspector instead of leaving margins. */
+.content {
+  width: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding: var(--sp-8) var(--gutter) var(--sp-12);
+}
+
+.content:has([data-tier='bleed']) {
+  max-width: none;
+}
+
+.content:has([data-inspector]) {
+  max-width: calc(var(--page-max) + var(--inspector-w));
+}
+
+/* layout: sidebar toggle (tablet and up); parts of the sidebar a rail hides. */
+.company,
+.install {
+  display: contents;
+}
+
+/* ── Rail: tablets get a 72px icon sidebar (D7), not the phone shell ───── */
+/* layout */
+.rail {
+  width: var(--rail-w);
+  padding-inline: 0.75rem;
+}
+
+.rail .navItem {
+  justify-content: center;
+  padding-inline: 0;
+  min-height: 2.75rem;
+}
+
+/* Labels leave the screen but stay the item's accessible name (the hover title shows them). */
+.rail .navItem > span,
+.rail .groupTitle,
+.rail .userMeta {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.rail .navItemActive::before {
+  left: -0.75rem;
+}
+
+.rail .brandRow,
+.rail .company,
+.rail .install {
+  display: none;
+}
+
+.rail .userCard {
+  flex-direction: column;
+  padding: 0.5rem 0;
+  border: 0;
+  background: none;
+}
+
+/* Small tablets: the rail expands over the content; the rail's room stays reserved, so nothing jumps. */
+.sidebarOverlay {
+  position: fixed;
+  inset: 0 auto 0 var(--safe-l);
+  z-index: var(--z-sheet);
+  box-shadow: var(--elev-3);
+}
+
+.overlayOpen .main {
+  margin-inline-start: var(--rail-w);
+}
+
+/* ── Phone shell: top bar + drawer + tab bar ─────────────────────────── */
 .topbar,
 .scrim {
   display: none;
 }
 
-@media (max-width: 900px) {
+/* layout: the scrim under an expanded rail. */
+.overlayOpen .scrim {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-scrim);
+  background: var(--scrim);
+  animation: fadeIn var(--dur-2) var(--ease-out) both;
+}
+
+@media (width < 37.5em), (height < 31.25em) and (width < 74.6875em) {
+  /* layout */
   .layout {
     flex-direction: column;
   }
 
   .topbar {
+    /* layout */
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: var(--topbar-height);
-    padding: 0 0.75rem;
+    height: calc(var(--bar-h) + var(--safe-t));
+    padding: var(--safe-t) 0.75rem 0;
+    flex-shrink: 0;
+    z-index: var(--z-bar);
+    /* visual */
     background: var(--card);
     border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-    z-index: 30;
   }
 
   .sidebar {
     position: fixed;
     inset: 0 auto 0 0;
-    width: min(288px, 86vw);
+    width: min(18rem, 86vw);
+    padding-left: calc(0.875rem + var(--safe-l));
+    overflow-y: auto;
     transform: translateX(-100%);
-    transition: transform var(--transition-smooth);
+    transition: transform var(--dur-3) var(--spring-soft);
     box-shadow: none;
   }
 
   .sidebarOpen {
+    z-index: var(--z-sheet);
     transform: translateX(0);
-    box-shadow: var(--shadow-xl);
+    box-shadow: var(--elev-3);
   }
 
   .navItemActive::before {
@@ -330,10 +441,10 @@
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 35;
-    background: rgba(9, 9, 11, 0.55);
+    z-index: var(--z-scrim);
+    background: var(--scrim);
     backdrop-filter: blur(2px);
-    animation: fadeIn 160ms ease both;
+    animation: fadeIn var(--dur-2) var(--ease-out) both;
   }
 
   .utilBar {
@@ -341,17 +452,19 @@
   }
 
   .content {
-    padding: 1.25rem 1rem calc(2.5rem + var(--tab-bar-h, 0px));
+    padding: var(--sp-4) var(--gutter) calc(var(--sp-12) + var(--tab-bar-h, 0px) + var(--safe-b));
   }
 
   .tabBar {
+    /* layout */
     position: fixed;
     inset: auto 0 0 0;
-    z-index: 25;
+    z-index: var(--z-bar);
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    height: calc(var(--tab-bar-h, 3.75rem) + env(safe-area-inset-bottom, 0px));
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    height: calc(var(--tab-bar-size) + var(--safe-b));
+    padding: 0 var(--safe-r) var(--safe-b) var(--safe-l);
+    /* visual */
     background: var(--card);
     border-top: 1px solid var(--border);
     box-shadow: var(--shadow-md);
@@ -396,8 +509,36 @@
   }
 }
 
+/* layout: phone landscape keeps the bars compact (44px top bar, 40px tab bar with icons only): 84px of chrome. */
+@media (height < 31.25em) and (width < 74.6875em) {
+  :root {
+    --tab-bar-size: 2.5rem;
+  }
+
+  .topbar {
+    height: calc(2.75rem + var(--safe-t));
+  }
+
+  .tab {
+    min-height: 0;
+  }
+
+  .tab > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .content {
+    padding-top: var(--sp-3);
+  }
+}
+
 /* Short windows: tighten the rail so every group fits without scrolling. */
-@media (min-width: 901px) and (max-height: 960px) {
+@media (width >= 37.5em) and (height < 60em) {
   .sidebar {
     padding-top: 0.75rem;
     padding-bottom: 0.625rem;
@@ -424,7 +565,7 @@
   }
 }
 
-@media (min-width: 901px) and (max-height: 740px) {
+@media (width >= 37.5em) and (height < 46.25em) {
   .nav {
     gap: 0.375rem;
   }
