@@ -1,8 +1,8 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 1.25rem;
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
 }
 
 .head {
@@ -10,13 +10,13 @@
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sp-2);
 }
 
 .title {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--sp-2);
   margin: 0;
   font-size: 1rem;
   font-family: var(--font-display);
@@ -25,7 +25,7 @@
 .tools {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   align-items: center;
 }
 
@@ -40,34 +40,34 @@
 
 .picker summary {
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--fw-label);
   font-size: 0.875rem;
-  padding: 0.35rem 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-full);
+  background: var(--fill-3);
+  color: var(--label);
   list-style: none;
 }
 
 .pickerBody {
   position: absolute;
   right: 0;
-  z-index: 5;
-  margin-top: 0.35rem;
+  z-index: var(--z-dropdown);
+  margin-top: var(--sp-1);
   min-width: 15rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.75rem;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md, 0 6px 20px color-mix(in srgb, var(--foreground) 12%, transparent));
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--bg-elevated);
+  border-radius: var(--r-12);
+  box-shadow: var(--elev-2);
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
-  gap: 0.75rem;
+  gap: var(--sp-4);
   align-items: start;
 }
 
@@ -77,24 +77,31 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: var(--sp-2);
 }
 
 .list li {
   display: flex;
   justify-content: space-between;
-  gap: 0.5rem;
-  font-size: 0.9rem;
+  gap: var(--sp-2);
+  font-size: 0.875rem;
+}
+
+.list strong {
+  font-family: var(--font-num);
+  font-weight: var(--fw-num);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .list small {
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--sp-2);
 }
 
 .table {
@@ -102,7 +109,7 @@
   font-size: 0.875rem;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .pickerBody {
     position: static;
   }
