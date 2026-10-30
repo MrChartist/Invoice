@@ -228,7 +228,7 @@ function DateBody({ spec, phone, close }: { spec: DatePopupSpec; phone: boolean;
   const wantFocus = useRef(spec.focus);
   const titleId = useId();
   const today = todayIso();
-  const wd = useMemo(weekdays, []);
+  const wd = useMemo(() => weekdays(), []);
 
   const disabled = (iso: string) => (!!spec.min && iso < spec.min) || (!!spec.max && iso > spec.max) || !!spec.isDisabled?.(iso);
 

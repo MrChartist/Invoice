@@ -749,7 +749,7 @@ nothing like the rest of the app. Before shots: `scratchpad/pickers/before/`.
    outside click closes, Tab closes and returns to the field. React events inside the popup stop at its root, so row
    clicks, form keys and Gateway keys under the field never see them. A mouse click keeps the caret in a date field
    (type or click a day); a touch opens the sheet without raising the keyboard.
-7. **Size.** The field shells (`DateField`, `TimeField`, `SelectField`, `TypedInput`, `pickers/shell.tsx`,
+7. **Size.** The field shells (`DateField`, `TimeField`, `SelectField`, `TypedInput`, `pickers/shell.ts`, `pickers/Popup.tsx`,
    `date-input.ts`) are small; the calendar, month grid, time wheels, list and their CSS and strings are ONE lazy
    chunk (`pickers/PickerPopup.tsx`, `pickers.module.css`, `i18n/areas/pickers.ts`), warmed on the first focus.
 8. **Left native.** A `multiple` select (`extras7u/OffersPanel.tsx`: a list box, not a pop-up), the two

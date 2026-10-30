@@ -1,7 +1,9 @@
 import { useRef, useState, type InputHTMLAttributes, type KeyboardEvent, type PointerEvent, type Ref } from 'react';
 import { useT } from '../../i18n';
 import { isWholeDate, parseDateInput, parseMonthInput } from '../../lib/date-input';
-import { change, nameOf, Popup, preloadPopup, setRef, showDay, showMonth } from './pickers/shell';
+import { change, nameOf, preloadPopup, setRef } from './pickers/shell';
+import { showDay, showMonth } from './pickers/format';
+import { Popup } from './pickers/Popup';
 import type { DateChip, PickerChange, PopupSpec, RangeSpec } from './pickers/types';
 
 export type { DateChip, PickerChange, RangePreset } from './pickers/types';

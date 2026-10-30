@@ -1,7 +1,9 @@
 import { useRef, useState, type InputHTMLAttributes, type Ref } from 'react';
 import { useT } from '../../i18n';
 import { parseTimeInput } from '../../lib/date-input';
-import { change, hour12, nameOf, Popup, preloadPopup, setRef, showTime } from './pickers/shell';
+import { change, nameOf, preloadPopup, setRef } from './pickers/shell';
+import { hour12, showTime } from './pickers/format';
+import { Popup } from './pickers/Popup';
 import type { PickerChange, PopupSpec } from './pickers/types';
 
 export interface TimeFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'defaultValue' | 'onChange' | 'type'> {

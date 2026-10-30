@@ -465,7 +465,7 @@ test('PK: dates, months and times go through DateField / TimeField; selects thro
     });
   }
   assert.deepEqual(bad, []);
-  const shell = read('src/components/ui/pickers/shell.tsx');
+  const shell = read('src/components/ui/pickers/Popup.tsx');
   assert.match(shell, /lazy\(\(\) => import\('\.\/PickerPopup'\)\)/, 'the calendar / list / time popups load as one lazy chunk');
   for (const f of ['DateField', 'SelectField', 'TimeField']) {
     assert.doesNotMatch(read(`src/components/ui/${f}.tsx`), /from '\.\/pickers\/PickerPopup'/, `${f} must not import the popup statically`);

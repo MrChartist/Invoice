@@ -1,5 +1,6 @@
 import { useRef, useState, type Ref, type SelectHTMLAttributes } from 'react';
-import { nameOf, Popup, preloadPopup, setRef } from './pickers/shell';
+import { nameOf, preloadPopup, setRef } from './pickers/shell';
+import { Popup } from './pickers/Popup';
 import type { PopupSpec } from './pickers/types';
 
 export interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
