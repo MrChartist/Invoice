@@ -288,7 +288,7 @@ const PreviewBody = ({ isOpen, onClose, autoAction }: InvoicePreviewModalProps) 
 
   return createPortal(
     <div ref={overlayRef} className={cn(styles.overlay, 'print-host')} role="dialog" aria-modal="true" aria-label="Document preview">
-      <div className={cn(styles.toolbar, 'no-print')}>
+      <div className={cn('material', styles.toolbar, 'no-print')}>
         <div className={styles.templatePicker}>
           <button type="button" className={controls.btnIcon} onClick={() => step(-1)} aria-label="Previous template">
             <ChevronLeft size={18} />

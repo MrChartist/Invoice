@@ -1,44 +1,61 @@
+/* The one sheet / dialog / alert of the app (docs/theme/IOS-UI.md 2.6). Tokens from src/styles/ios.css only. */
+
+/* ── Scrim: no blur, the sheet carries the focus ── */
 .backdrop {
   position: fixed;
   inset: 0;
-  z-index: 9000;
-  background: rgba(10, 12, 18, 0.6);
-  backdrop-filter: blur(4px);
+  z-index: var(--z-sheet);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.25rem;
+  padding: var(--sp-8) var(--sp-5);
   overflow-y: auto;
-  animation: fadeIn 160ms ease both;
+  animation: fadeIn var(--dur-2) var(--ease-out) both;
 }
 
+/* Confirms and alerts sit above any sheet. */
+.alertLayer {
+  z-index: var(--z-alert);
+}
+
+/* ── Desktop dialog: centred card, elevated surface ── */
 .dialog {
-  background: var(--card);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
+  position: relative;
+  background: var(--bg-elevated);
+  color: var(--label);
+  border: var(--card-edge);
+  border-radius: var(--r-16);
+  box-shadow: var(--elev-3);
   width: 100%;
-  max-height: calc(100vh - 2.5rem);
+  max-height: calc(100dvh - 2 * var(--sp-8));
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: scaleIn 200ms cubic-bezier(0.34, 1.2, 0.64, 1) both;
+  animation: scaleIn var(--dur-3) var(--spring-soft) both;
 }
 
 .sm { max-width: 420px; }
 .md { max-width: 560px; }
 .lg { max-width: 760px; }
-.xl { max-width: 1040px; }
+.xl { max-width: min(1040px, 90vw); border-radius: var(--r-28); }
+
+/* The grabber shows on phone sheets only. */
+.grabber {
+  display: none;
+}
 
 .head {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1.125rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+  gap: var(--sp-4);
+  padding: var(--sp-5) var(--sp-5) var(--sp-2);
   flex-shrink: 0;
+}
+
+.headText {
+  min-width: 0;
 }
 
 .title {
@@ -48,40 +65,28 @@
   letter-spacing: -0.015em;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   margin: 0;
 }
 
 .subtitle {
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
-  margin: 0.15rem 0 0;
+  color: var(--label-2);
+  margin: var(--sp-0-5) 0 0;
   font-weight: 400;
 }
 
 .close {
-  background: transparent;
-  border: none;
-  color: var(--muted-foreground);
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: var(--radius-sm);
-  display: flex;
-  flex-shrink: 0;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.close:hover {
-  background: var(--accent);
-  color: var(--foreground);
+  margin: calc(-1 * var(--sp-2)) calc(-1 * var(--sp-2)) calc(-1 * var(--sp-2)) 0;
 }
 
 .body {
-  padding: 1.25rem;
+  padding: var(--sp-3) var(--sp-5) var(--sp-5);
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--sp-4);
 }
 
 .bodyFlush {
@@ -92,15 +97,122 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.625rem;
-  padding: 1rem 1.25rem;
-  border-top: 1px solid var(--border);
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-top: var(--hairline) solid transparent;
   flex-shrink: 0;
   flex-wrap: wrap;
 }
 
-@media (max-width: 560px) {
-  .backdrop { padding: 0.75rem; align-items: flex-end; }
-  .dialog { max-height: calc(100vh - 1.5rem); }
+/* The footer's hairline shows only while the body scrolls under it. */
+.footRule {
+  border-top-color: var(--sep);
+}
+
+/* ── Alert / confirm: 300px, centred title and message, actions side by side ── */
+.alert {
+  max-width: 300px;
+  text-align: center;
+}
+
+.alert .head {
+  grid-template-columns: minmax(0, 1fr);
+  padding: var(--sp-5) var(--sp-4) var(--sp-1);
+}
+
+.alert .title {
+  justify-content: center;
+}
+
+.alert .body {
+  padding: var(--sp-1) var(--sp-4) var(--sp-4);
+  gap: var(--sp-3);
+  font-size: var(--text-sm);
+  text-align: start;
+}
+
+.alert .foot {
+  padding: 0 var(--sp-4) var(--sp-4);
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.alert .foot > * {
+  flex: 1 1 auto;
+}
+
+/* ── Small tablet: md / lg dialogs become a centred form sheet ── */
+@media (min-width: 37.5em) and (max-width: 52.0625em) {
+  .md,
+  .lg {
+    max-width: 90vw;
+  }
+}
+
+/* ── Phone: a bottom sheet with a grabber and detents ── */
+@media (max-width: 37.4375em) {
+  .backdrop {
+    align-items: flex-end;
+    padding: calc(var(--safe-t) + var(--sp-3)) 0 0;
+    overflow: hidden;
+  }
+  .dialog {
+    max-width: none;
+    max-height: calc(100svh - var(--safe-t) - var(--sp-3));
+    border-radius: var(--r-20) var(--r-20) 0 0;
+    animation: sheetUp var(--dur-3) var(--ease-out) backwards;
+  }
+  .large { height: calc(100svh - var(--safe-t) - var(--sp-3)); }
+  .medium { height: 50dvh; }
+  .grabber {
+    display: block;
+    flex-shrink: 0;
+    height: var(--sp-4);
+    touch-action: none;
+    cursor: grab;
+  }
+  .grabber::before {
+    content: '';
+    display: block;
+    width: 36px;
+    height: 5px;
+    margin: 6px auto 0;
+    border-radius: var(--r-full);
+    background: var(--label-4);
+  }
+  .head {
+    grid-template-columns: var(--sp-10) minmax(0, 1fr) var(--sp-10);
+    padding: var(--sp-1) var(--sp-4) var(--sp-2);
+    touch-action: none;
+    text-align: center;
+  }
+  .headText { grid-column: 2; }
+  .title { justify-content: center; }
+  .close { grid-column: 3; justify-self: end; margin: 0; }
+  .body { padding: var(--sp-2) var(--sp-4) var(--sp-4); }
+  .noFoot .body { padding-bottom: calc(var(--sp-4) + var(--safe-b)); }
+  .foot {
+    padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + var(--safe-b));
+    border-top-color: var(--sep);
+  }
   .foot > * { flex: 1; }
+
+  /* An alert stays a centred card on a phone. */
+  .alertLayer {
+    align-items: center;
+    padding: var(--sp-4);
+  }
+  .alert {
+    max-width: 320px;
+    border-radius: var(--r-16);
+    animation: scaleIn var(--dur-3) var(--spring-soft) both;
+  }
+  .alert .head { grid-template-columns: minmax(0, 1fr); padding: var(--sp-5) var(--sp-4) var(--sp-1); touch-action: auto; }
+  .alert .headText { grid-column: 1; }
+  .alert .foot { padding: 0 var(--sp-4) var(--sp-4); border-top-color: transparent; }
+}
+
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }

@@ -20,15 +20,15 @@
 .muted {
   margin: 0;
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .warn {
   padding: 0.75rem;
-  border: 1px solid var(--warning);
-  border-radius: var(--radius-sm);
+  background: var(--sys-orange-soft);
+  border-radius: var(--r-12);
   font-size: var(--text-sm);
-  color: var(--warning);
+  color: var(--sys-orange-ink);
 }
 
 .warn p {
@@ -42,8 +42,8 @@
   width: 100%;
   margin: 0 0 1rem;
   padding: 0.625rem 0.875rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -53,14 +53,14 @@
 }
 
 .line:focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--tint);
   outline-offset: 2px;
 }
 
 .compact {
   margin: 0;
   border-radius: 0;
-  border-width: 0 0 1px;
+  border-width: 0 0 var(--hairline);
   font-size: var(--text-sm);
 }
 

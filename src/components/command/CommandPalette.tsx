@@ -420,7 +420,8 @@ export function CommandPalette({ open, onClose, navItems = [], actions = [], onN
     >
       <div
         ref={dialogRef}
-        className={styles.dialog}
+        className={cn('material', styles.dialog)}
+        data-mat="regular"
         role="dialog"
         aria-modal="true"
         aria-label={mode ? navT(mode === 'goto' ? 'gotoTitle' : 'switchTitle') : 'Command palette'}

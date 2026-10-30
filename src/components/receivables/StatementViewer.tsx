@@ -143,7 +143,7 @@ export function StatementViewer({ open, onClose, onError, autoWeb, ...doc }: Sta
   const btn = `${controls.btn} ${controls.btnOutline} ${controls.btnSm}`;
   return createPortal(
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-label={rcvT('svAria', { name: doc.party.name })}>
-      <div className={`${styles.toolbar} no-print`}>
+      <div className={`material ${styles.toolbar} no-print`}>
         <span className={styles.title}>{rcvT('svTitle')}</span>
         <div className={styles.actions}>
           <select className={controls.select} value={styleKind} aria-label={colT('stStyle')} onChange={(e) => remember(e.target.value as StatementStyle, ageingOn)} data-viewer-style>

@@ -17,7 +17,7 @@ export interface ConfirmDialogProps {
   onClose: () => void;
 }
 
-/** Explicit confirmation for anything that destroys data. */
+/** Explicit confirmation for anything that destroys data: an alert card above any sheet (spec 2.6). */
 export function ConfirmDialog({
   open,
   title,
@@ -40,16 +40,17 @@ export function ConfirmDialog({
     <Modal
       open={open}
       onClose={close}
-      size="sm"
+      kind="alert"
       title={
         <>
-          {destructive && <AlertTriangle size={17} color="var(--destructive)" />}
+          {destructive && <AlertTriangle size={17} color="var(--sys-red-ink)" aria-hidden="true" />}
           {title}
         </>
       }
       footer={
         <>
-          <button type="button" className={controls.btnOutline} onClick={close}>
+          {/* The safe choice takes the first focus; a destructive action is never the default (spec 2.6). */}
+          <button type="button" className={controls.btnOutline} onClick={close} data-autofocus={requireText ? undefined : true}>
             {cancelLabel ?? t('common.cancel')}
           </button>
           <button
@@ -66,11 +67,11 @@ export function ConfirmDialog({
         </>
       }
     >
-      <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--muted-foreground)', margin: 0 }}>
+      <p style={{ lineHeight: 1.5, color: 'var(--label)', margin: 0, textAlign: 'center' }}>
         {message}
       </p>
       {requireText && (
-        <label className={controls.field} style={{ marginTop: '0.75rem' }}>
+        <label className={controls.field}>
           <span className={controls.label}>{t('common.typeToConfirm', { word: requireText })}</span>
           <input className={controls.input} value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} />
         </label>

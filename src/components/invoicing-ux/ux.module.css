@@ -3,16 +3,16 @@
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .grow { flex: 1 1 8rem; min-width: 0; }
 .narrow { width: 7rem; max-width: 100%; }
-.muted { color: var(--muted-foreground); font-size: var(--text-sm); }
+.muted { color: var(--label-2); font-size: var(--text-sm); }
 .warn { color: var(--warning); font-size: var(--text-sm); }
 .good { color: var(--profit); }
 .bad { color: var(--loss); }
 .table { width: 100%; border-collapse: collapse; font-size: var(--text-base); }
-.table th, .table td { padding: 0.375rem 0.25rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
+.table th, .table td { padding: 0.375rem 0.25rem; border-bottom: var(--hairline) solid var(--sep); text-align: left; vertical-align: middle; }
 .table td.num, .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .chip {
-  display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem; border-radius: var(--radius-full);
-  border: 1px solid var(--border); background: var(--card-inner); color: var(--foreground); font-size: var(--text-sm);
+  display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem; border-radius: var(--r-full);
+  border: var(--hairline) solid var(--sep); background: var(--card-inner); color: var(--foreground); font-size: var(--text-sm);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .chipGood { composes: chip; border-color: color-mix(in srgb, var(--profit) 40%, var(--border)); color: var(--profit); }
@@ -20,38 +20,29 @@
 .chipBad { composes: chip; border-color: color-mix(in srgb, var(--loss) 45%, var(--border)); color: var(--loss); }
 .linkBtn { padding: 0; border: 0; background: none; color: var(--primary); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .notice {
-  margin: 0 1rem 1rem; padding: 0.625rem 0.875rem; border-radius: var(--radius-md);
-  border: 1px solid color-mix(in srgb, var(--info) 40%, var(--border)); background: color-mix(in srgb, var(--info) 7%, transparent);
+  margin: 0 1rem 1rem; padding: 0.625rem 0.875rem; border-radius: var(--r-12);
+  border: var(--hairline) solid var(--sep); background: var(--sys-blue-soft);
   font-size: var(--text-base);
 }
 .list { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.375rem; }
 .list li { display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline; }
 .cards { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); }
 .card {
-  display: grid; gap: 0.25rem; padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border);
+  display: grid; gap: 0.25rem; padding: 0.75rem; border-radius: var(--r-12); border: var(--hairline) solid var(--sep);
   background: var(--card); color: var(--card-foreground); text-decoration: none;
 }
 .card:hover { border-color: var(--ring); }
-.cardTitle { font-size: var(--text-sm); color: var(--muted-foreground); font-weight: 600; }
+.cardTitle { font-size: var(--text-sm); color: var(--label-2); font-weight: 600; }
 .cardValue { font-size: var(--text-xl); font-weight: 600; font-variant-numeric: tabular-nums; }
 .cardWarn { composes: card; border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
 .cardGood { composes: card; border-color: color-mix(in srgb, var(--profit) 40%, var(--border)); }
 .sheet { display: grid; gap: 0.75rem; }
-.kbdHint { font-size: var(--text-xs); color: var(--muted-foreground); }
+.kbdHint { font-size: var(--text-xs); color: var(--label-2); }
 @media print { .noPrint { display: none !important; } }
 
-/* A1 post-save sheet: centred dialog, bottom sheet on phones. */
-.sheetBackdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--ink) 45%, transparent); }
-.sheetPanel {
-  width: min(100%, 30rem); max-height: calc(100dvh - 32px); overflow: auto; display: grid; gap: 0.75rem; padding: 1rem;
-  border-radius: var(--radius-lg); background: var(--card); color: var(--card-foreground); box-shadow: var(--shadow-lg);
-}
+/* A1 post-save sheet: the big action grid inside the Modal sheet (SendSheet). */
 .bigGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr)); gap: 0.5rem; }
 .bigBtn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3rem; font-size: var(--text-md); text-decoration: none; }
-@media (max-width: 640px) {
-  .sheetBackdrop { place-items: end stretch; padding: 0; }
-  .sheetPanel { width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
-}
 
 /* QA-3 F21: document strip — inline type picker; the due chip never wraps on its own line */
 .typePick { width: auto; min-width: 0; max-width: 12rem; font-weight: 600; }

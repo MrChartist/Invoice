@@ -64,7 +64,7 @@ export function PrintOptions({ setting, nature, onChange, preprinted, onPreprint
         <Copy size={16} /> <span>{count === 1 ? printT('copiesSingle') : printT('copiesSummary', { n: count })}</span>
       </button>
       {open && (
-        <div className={styles.optsPanel} role="dialog" aria-label={printT('printOptions')}>
+        <div className={`material ${styles.optsPanel}`} data-mat="regular" role="dialog" aria-label={printT('printOptions')}>
           <fieldset className={styles.optsGroup}>
             <legend className={controls.label}>{printT('copies')}</legend>
             <div className={styles.optsRow}>
