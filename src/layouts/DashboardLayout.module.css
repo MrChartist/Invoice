@@ -26,37 +26,35 @@
   padding: calc(1.25rem + var(--safe-t)) 0.875rem calc(1rem + var(--safe-b));
   flex-shrink: 0;
   z-index: var(--z-sidebar);
-  /* visual */
-  background-color: var(--card);
-  border-right: 1px solid var(--border);
+  /* visual: a column of the window (spec 2.5), not a card: no edge (its own level in dark), a line in high contrast */
+  background-color: var(--bg-2);
+  border-right: var(--card-edge);
 }
 
 .brand {
   display: inline-flex;
-  padding: 0.25rem 0.5rem 1.5rem;
-  border-radius: var(--radius-md);
+  padding: var(--sp-1) var(--sp-3) var(--sp-5);
+  border-radius: var(--r-8);
 }
 
 /* Logo + the private-beta badge. */
 .brandRow {
   display: flex;
   align-items: flex-start;
-  gap: 0.375rem;
+  gap: var(--sp-1);
 }
 
+/* A quiet gray capsule (sentence case, D5): a status word, never pressable. */
 .beta {
   flex-shrink: 0;
-  margin-top: 0.25rem;
-  padding: 0.0625rem 0.4375rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  background: var(--brand-soft);
-  color: var(--brand-text);
+  margin-top: var(--sp-1);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--fill-3);
+  color: var(--label-2);
   font-size: var(--text-2xs);
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-weight: 500;
   line-height: 1.5;
-  text-transform: uppercase;
   cursor: default;
   user-select: none;
 }
@@ -71,11 +69,11 @@
 
 .skipLink {
   position: fixed;
-  top: 0.5rem;
-  left: 0.5rem;
+  top: var(--sp-2);
+  left: var(--sp-2);
   z-index: var(--z-skip);
-  padding: 0.5rem 0.875rem;
-  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--r-10);
   background: var(--primary);
   color: var(--primary-foreground);
   font-weight: 600;
@@ -95,101 +93,87 @@
   outline: none;
 }
 
+/* iPadOS sidebar: groups with a sentence-case title (D5), rows on --r-8, selection = a soft tint fill. */
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 0.875rem;
+  gap: var(--sp-4);
   flex-grow: 1;
   overflow-y: auto;
-  padding-bottom: 0.75rem;
+  padding-bottom: var(--sp-3);
   min-height: 0;
 }
 
 .group {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
 }
 
 .groupTitle {
-  padding: 0 0.75rem 0.25rem;
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
-  opacity: 0.8;
+  padding: 0 var(--sp-3) var(--sp-1);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--label-2);
 }
 
 .navItem {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-sm);
-  color: var(--muted-foreground);
+  gap: var(--sp-3);
+  min-height: 2.25rem;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-8);
+  color: var(--label);
   font-weight: 500;
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
   background: transparent;
   border: none;
   text-align: left;
   width: 100%;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--dur-1) var(--ease-out);
 }
 
 .navItem:hover {
-  background-color: var(--accent);
-  color: var(--foreground);
+  background-color: var(--fill-4);
 }
 
-.navItemActive {
-  background-color: var(--accent);
-  color: var(--foreground);
+.navItemActive,
+.navItemActive:hover {
+  background-color: var(--tint-soft);
   font-weight: 600;
-}
-
-/* The brand-orange tick is the one accent in the chrome. */
-.navItemActive::before {
-  content: '';
-  position: absolute;
-  left: -0.875rem;
-  top: 22%;
-  bottom: 22%;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--brand);
-}
-
-.navItemActive .navIcon {
-  color: var(--brand-text);
 }
 
 .navIcon {
   flex-shrink: 0;
+  color: var(--label-2);
+}
+
+.navItemActive .navIcon {
+  color: var(--tint);
 }
 
 .bottom {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding-top: 0.875rem;
-  border-top: 1px solid var(--border);
+  padding-top: var(--sp-3);
+  border-top: var(--hairline) solid var(--sep);
 }
 
 .mobileOnly {
   display: none;
 }
 
+/* The user and the lock: one inset grouped row (the third level on the sidebar's panel). */
 .userCard {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  margin-top: 0.5rem;
-  padding: 0.625rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card-inner);
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
+  border: var(--card-edge);
+  border-radius: var(--r-12);
+  background: var(--bg-3);
 }
 
 .userMeta {
@@ -197,12 +181,12 @@
   flex-direction: column;
   min-width: 0;
   flex: 1;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .userName {
   font-weight: 600;
-  font-size: var(--text-base);
+  font-size: var(--text-md);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -210,10 +194,15 @@
 
 .userSub {
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .iconBtn { composes: btn quiet icon sm from global; flex-shrink: 0; }
+
+/* Bars float on the chrome material (spec 1.7); the hairline edge shows once content scrolls under it. */
+.utilBar { composes: material from global; }
+.topbar { composes: material from global; }
+.tabBar { composes: material from global; }
 
 /* ── Main ────────────────────────────────────────────────────── */
 /* layout */
@@ -238,28 +227,35 @@
   flex-shrink: 0;
   min-height: calc(var(--bar-h) + var(--safe-t));
   padding: var(--safe-t) var(--gutter) 0;
-  background: color-mix(in srgb, var(--background) 88%, transparent);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  /* visual */
+  border-bottom: var(--hairline) solid var(--sep);
 }
 
+/* The search field of the bar: filled capsule (spec 2.3 / 2.5), 16px glyph, 36px pointer / 44px touch. */
 .searchBtn {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: var(--sp-2);
   width: min(420px, 100%);
-  padding: 0.5rem 0.75rem;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--muted-foreground);
-  font-size: var(--text-base);
+  min-height: var(--field-h);
+  padding: 0 var(--sp-2) 0 var(--sp-3);
+  background: var(--fill-3);
+  border: 0;
+  border-radius: var(--r-full);
+  color: var(--label-2);
+  font-size: var(--text-md);
   text-align: left;
-  transition: border-color var(--transition-fast);
+  transition: background-color var(--dur-1) var(--ease-out);
 }
 
 .searchBtn:hover {
-  border-color: var(--muted-foreground);
+  background: var(--fill-2);
+}
+
+.searchBtn svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
 }
 
 .searchBtn span {
@@ -272,10 +268,10 @@
 .searchBtn kbd {
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
-  padding: 0.1rem 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  background: var(--card-inner);
+  padding: 0 var(--sp-1);
+  border-radius: var(--r-6);
+  background: var(--bg-grouped-2);
+  color: var(--label-2);
 }
 
 .utilActions,
@@ -318,6 +314,24 @@
   display: contents;
 }
 
+/* Scroll edge (spec 2.5): at the top the bar melts into the page; the material and the hairline arrive as the
+   page scrolls under it. Without scroll timelines (and on the phone bar, which sits outside the scroller) the bar
+   keeps both. */
+@supports (animation-timeline: scroll()) {
+  .utilBar {
+    animation: barEdge linear both;
+    animation-timeline: scroll();
+    animation-range: 0 var(--sp-2);
+  }
+}
+
+@keyframes barEdge {
+  from {
+    background-color: transparent;
+    border-bottom-color: transparent;
+  }
+}
+
 /* ── Rail: tablets get a 72px icon sidebar (D7), not the phone shell ───── */
 /* layout */
 .rail {
@@ -343,10 +357,6 @@
   white-space: nowrap;
 }
 
-.rail .navItemActive::before {
-  left: -0.75rem;
-}
-
 .rail .brandRow,
 .rail .company,
 .rail .install {
@@ -355,7 +365,7 @@
 
 .rail .userCard {
   flex-direction: column;
-  padding: 0.5rem 0;
+  padding: var(--sp-2) 0;
   border: 0;
   background: none;
 }
@@ -404,8 +414,7 @@
     flex-shrink: 0;
     z-index: var(--z-bar);
     /* visual */
-    background: var(--card);
-    border-bottom: 1px solid var(--border);
+    border-bottom: var(--hairline) solid var(--sep);
   }
 
   .sidebar {
@@ -425,12 +434,8 @@
     box-shadow: var(--elev-3);
   }
 
-  .navItemActive::before {
-    left: -0.875rem;
-  }
-
   .navItem {
-    min-height: 44px;
+    min-height: var(--row-h);
   }
 
   .mobileOnly {
@@ -443,7 +448,6 @@
     inset: 0;
     z-index: var(--z-scrim);
     background: var(--scrim);
-    backdrop-filter: blur(2px);
     animation: fadeIn var(--dur-2) var(--ease-out) both;
   }
 
@@ -464,10 +468,8 @@
     grid-template-columns: repeat(5, 1fr);
     height: calc(var(--tab-bar-size) + var(--safe-b));
     padding: 0 var(--safe-r) var(--safe-b) var(--safe-l);
-    /* visual */
-    background: var(--card);
-    border-top: 1px solid var(--border);
-    box-shadow: var(--shadow-md);
+    /* visual: chrome material, hairline top, no shadow (spec 2.5) */
+    border-top: var(--hairline) solid var(--sep);
   }
 
   .tab {
@@ -475,37 +477,45 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.15rem;
+    gap: var(--sp-0-5);
     min-height: 44px;
     border: 0;
     background: none;
-    color: var(--muted-foreground);
+    color: var(--label-2);
     font: inherit;
     font-size: var(--text-2xs);
-    font-weight: 600;
+    font-weight: 500;
+    line-height: 1.2;
     text-decoration: none;
     cursor: pointer;
   }
 
-  .tabActive {
-    color: var(--brand-text);
+  .tab svg {
+    width: 22px;
+    height: 22px;
   }
 
-  /* The phone bar's "New" is the ink round button of the button system (src/styles/buttons.css). */
+  .tabActive {
+    color: var(--tint);
+  }
+
+  /* The phone bar's "New" is the ink round button of the button system (src/styles/buttons.css): ink disc,
+     paper glyph, its label under it in --label. */
   .tabNew {
     color: var(--btn-paper);
   }
 
   .tabNew svg {
     box-sizing: content-box;
-    padding: 0.45rem;
-    border-radius: var(--radius-full);
+    width: 18px;
+    height: 18px;
+    padding: calc(var(--sp-1) + var(--sp-0-5));
+    border-radius: 50%;
     background: var(--btn-ink);
-    box-shadow: var(--btn-shadow);
   }
 
   .tabNew span {
-    color: var(--foreground);
+    color: var(--label);
   }
 }
 
@@ -537,40 +547,45 @@
   }
 }
 
-/* Short windows: tighten the rail so every group fits without scrolling. */
+/* Short windows: tighten the sidebar so every group fits without scrolling. */
 @media (width >= 37.5em) and (height < 60em) {
   .sidebar {
-    padding-top: 0.75rem;
-    padding-bottom: 0.625rem;
+    padding-top: var(--sp-3);
+    padding-bottom: var(--sp-2);
   }
   .brand {
-    padding-bottom: 0.5rem;
+    padding-bottom: var(--sp-2);
   }
   .nav {
-    gap: 0.5rem;
+    gap: var(--sp-2);
   }
   .groupTitle {
-    padding-bottom: 0.125rem;
+    padding-bottom: 0;
   }
   .navItem {
-    padding-top: 0.3125rem;
-    padding-bottom: 0.3125rem;
+    min-height: 2rem;
   }
   .bottom {
-    padding-top: 0.5rem;
+    padding-top: var(--sp-2);
   }
   .userCard {
-    margin-top: 0.25rem;
-    padding: 0.4375rem 0.625rem;
+    margin-top: var(--sp-1);
+    padding-block: var(--sp-1);
   }
 }
 
 @media (width >= 37.5em) and (height < 46.25em) {
   .nav {
-    gap: 0.375rem;
+    gap: var(--sp-1);
   }
   .navItem {
-    padding-top: 0.25rem;
-    padding-bottom: 0.25rem;
+    min-height: 1.875rem;
+  }
+}
+
+/* Touch keeps 44px rows even in a short window (the nav scrolls instead). */
+@media (pointer: coarse) {
+  .navItem {
+    min-height: var(--row-h);
   }
 }
