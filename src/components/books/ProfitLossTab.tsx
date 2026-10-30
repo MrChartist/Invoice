@@ -72,7 +72,7 @@ export function ProfitLossTab({ data, period }: { data: BooksData; period: Perio
         <div className={surface.stat}>
           <div className={surface.statTop}>
             <span className={surface.statLabel}>{booksT('income')}</span>
-            <span className={surface.statIcon}><TrendingUp size={15} color="var(--profit)" /></span>
+            <span className={surface.statIcon}><TrendingUp size={15} color="var(--sys-green-ink)" /></span>
           </div>
           <div className={surface.statValue}>{formatMoney(pnl.income)}</div>
           <div className={surface.statHint}>{booksT('incomeHint')}</div>
@@ -80,7 +80,7 @@ export function ProfitLossTab({ data, period }: { data: BooksData; period: Perio
         <div className={surface.stat}>
           <div className={surface.statTop}>
             <span className={surface.statLabel}>{booksT('expenses')}</span>
-            <span className={surface.statIcon}><TrendingDown size={15} color="var(--loss)" /></span>
+            <span className={surface.statIcon}><TrendingDown size={15} color="var(--sys-red-ink)" /></span>
           </div>
           <div className={surface.statValue}>{formatMoney(pnl.totalExpenses)}</div>
           <div className={surface.statHint}>{booksT('expensesHint')}</div>

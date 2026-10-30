@@ -1,20 +1,20 @@
 /* Double-entry ledger tabs (Books). Tokens only — no raw colours. */
 
 .groupRow td {
-  background-color: var(--card-inner);
+  background-color: var(--bg-grouped-3);
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--text-base);
 }
 
 .groupRow:hover td {
-  background-color: var(--card-inner);
+  background-color: var(--bg-grouped-3);
 }
 
 .code {
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-base);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   white-space: nowrap;
 }
 
@@ -23,7 +23,7 @@
   background: none;
   padding: 0;
   font: inherit;
-  color: var(--brand-text);
+  color: var(--tint);
   font-weight: 600;
   cursor: pointer;
   text-align: left;
@@ -35,9 +35,9 @@
 }
 
 .rowButton:focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--tint);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: var(--r-4);
 }
 
 .badge {
@@ -46,18 +46,16 @@
   font-size: var(--text-xs);
   font-weight: 600;
   padding: 0.1875rem 0.5rem;
-  border-radius: var(--radius-full);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  border-radius: var(--r-full);
   white-space: nowrap;
   background: var(--muted);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .badgeManual {
   composes: badge;
-  background: var(--primary-glow);
-  color: var(--brand-text);
+  background: var(--tint-soft);
+  color: var(--tint);
 }
 
 .linesTable td,
@@ -66,11 +64,11 @@
 }
 
 .detail td {
-  background-color: var(--card-inner);
+  background-color: var(--bg-grouped-3);
 }
 
 .detail:hover td {
-  background-color: var(--card-inner);
+  background-color: var(--bg-grouped-3);
 }
 
 .subLines {
@@ -117,9 +115,7 @@
   composes: editorLine;
   font-size: var(--text-xs);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .editorTotals {
@@ -132,12 +128,12 @@
 }
 
 .balanced {
-  color: var(--profit);
+  color: var(--sys-green-ink);
   font-weight: 600;
 }
 
 .unbalanced {
-  color: var(--loss);
+  color: var(--sys-red-ink);
   font-weight: 600;
 }
 
@@ -149,12 +145,12 @@
 }
 
 .tieOk {
-  color: var(--profit);
+  color: var(--sys-green-ink);
   font-weight: 600;
 }
 
 .tieBad {
-  color: var(--loss);
+  color: var(--sys-red-ink);
   font-weight: 600;
 }
 
@@ -177,7 +173,7 @@
 }
 
 .summary:focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--tint);
   outline-offset: -2px;
 }
 
@@ -188,7 +184,7 @@
   margin: 0;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 52.0625em) {
   .editorLine {
     grid-template-columns: 1fr 1fr;
   }
@@ -240,11 +236,11 @@
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .crumbs li [aria-current='page'] {
-  color: var(--foreground);
+  color: var(--label);
   font-weight: 600;
 }
 
@@ -254,9 +250,9 @@
   background: none;
   padding: 0.125rem 0.25rem;
   font: inherit;
-  color: var(--brand-text);
+  color: var(--tint);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--r-4);
 }
 
 .crumb:hover,
@@ -267,7 +263,7 @@
 .crumb:focus-visible,
 .crumbBack:focus-visible,
 .drillTable:focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--tint);
   outline-offset: 2px;
 }
 
@@ -278,18 +274,18 @@
 .rowSel > td,
 li.rowSel,
 details.rowSel > summary {
-  background-color: var(--primary-glow);
+  background-color: var(--tint-soft);
 }
 
 .rowSel:hover > td {
-  background-color: var(--primary-glow);
+  background-color: var(--tint-soft);
 }
 
 .rowButtonGroup {
   composes: rowButton;
   font-family: var(--font-display);
   font-weight: 600;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .inlineField {
@@ -316,16 +312,16 @@ details.rowSel > summary {
   position: absolute;
   right: 0;
   top: calc(100% + 0.25rem);
-  z-index: 5;
+  z-index: var(--z-dropdown);
   min-width: 15rem;
   margin: 0;
   padding: 0.75rem 1rem;
   display: grid;
   gap: 0.5rem;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
+  background: var(--bg-grouped-2);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
+  box-shadow: var(--elev-2);
 }
 
 .optionsPanel legend {
@@ -347,10 +343,10 @@ details.rowSel > summary {
   display: inline-block;
   min-width: 7rem;
   margin-left: 1rem;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .optionsPanel {
     left: 0;
     right: auto;

@@ -17,15 +17,15 @@
 }
 
 .bucket {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md, 8px);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
   padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
-  background: var(--card);
+  background: var(--bg-grouped-2);
 }
 
 .bucketLabel {
   font-size: var(--text-xs, 0.75rem);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .bucketValue {
@@ -40,7 +40,7 @@
 
 .alloc {
   font-size: var(--text-xs, 0.75rem);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .allocList {
@@ -59,10 +59,10 @@
 
 .formula {
   font-size: var(--text-xs, 0.75rem);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .allocRow {
     grid-template-columns: 1fr;
   }

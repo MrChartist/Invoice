@@ -15,32 +15,37 @@
 
 .muted {
   margin: 0;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
 }
 
+/* Leading status bar of an alert row (spec 1.6: the one 3px accent). */
+.noteAlertBar {
+  border-left: 3px solid var(--sys-orange);
+}
+
 .note {
+  composes: noteAlertBar;
   margin: 0;
   padding: 0.5rem 0.75rem;
-  border-left: 3px solid var(--warning);
-  background: var(--card-inner);
-  border-radius: var(--radius-sm);
+  background: var(--bg-grouped-3);
+  border-radius: var(--r-8);
   font-size: var(--text-sm);
 }
 
 .ok {
-  color: var(--profit);
+  color: var(--sys-green-ink);
 }
 
 .bad {
-  color: var(--loss);
+  color: var(--sys-red-ink);
 }
 
 .tableWrap {
   overflow-x: auto;
-  max-height: 55vh;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  max-height: 55dvh;
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
 }
 
 .table {
@@ -52,7 +57,7 @@
 .table th,
 .table td {
   padding: 0.4rem 0.5rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
   text-align: left;
   vertical-align: top;
 }
@@ -60,11 +65,9 @@
 .table th {
   position: sticky;
   top: 0;
-  background: var(--card-inner);
+  background: var(--bg-grouped-3);
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .actions {
@@ -78,9 +81,9 @@
   font-size: var(--text-xs);
   word-break: break-all;
   padding: 0.5rem;
-  border-radius: var(--radius-sm);
-  background: var(--card-inner);
-  border: 1px solid var(--border);
+  border-radius: var(--r-8);
+  background: var(--bg-grouped-3);
+  border: var(--hairline) solid var(--sep);
 }
 
 .merge {
@@ -88,9 +91,9 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.625rem;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card-inner);
+  border: var(--hairline) dashed var(--sep);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-3);
 }
 
 .mergeRow {
@@ -115,13 +118,11 @@
 
 .group {
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--brand-text);
+  color: var(--tint);
   margin-top: 0.25rem;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .mergeRow {
     grid-template-columns: 1fr;
   }

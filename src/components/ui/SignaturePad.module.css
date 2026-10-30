@@ -2,9 +2,9 @@
   width: 100%;
   max-width: 32rem;
   height: 10rem;
-  border: 1px dashed var(--input-border);
-  border-radius: var(--radius-sm);
-  background: var(--card);
+  border: var(--hairline) dashed var(--field-edge);
+  border-radius: var(--r-8);
+  background: var(--bg-grouped-2);
   touch-action: none;
   cursor: crosshair;
 }

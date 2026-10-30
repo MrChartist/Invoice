@@ -6,6 +6,6 @@
   padding: 1rem 1.25rem;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .filters { padding: 0.875rem 0.75rem; }
 }

@@ -63,7 +63,7 @@ export default function EventsView({ notify }: TvViewProps) {
           <thead><tr><th>{tvdT('head')}</th><th className={surface.numeric}>{tvdT('approved')}</th><th className={surface.numeric}>{tvdT('booked')}</th><th className={surface.numeric}>{tvdT('billedV')}</th><th className={surface.numeric}>{tvdT('paid')}</th></tr></thead>
           <tbody>
             {sheet.rows.map((r) => (
-              <tr key={r.head} data-tv-head={r.head} data-over={r.over ? '1' : undefined} style={r.over ? { color: 'var(--destructive)' } : undefined}>
+              <tr key={r.head} data-tv-head={r.head} data-over={r.over ? '1' : undefined} style={r.over ? { color: 'var(--sys-red-ink)' } : undefined}>
                 <td>{comp(r.head)}{r.over ? ` · ${tvdT('over')}` : ''}</td><td className={surface.numeric}>{money(r.approved)}</td><td className={surface.numeric}>{money(r.booked)}</td><td className={surface.numeric}>{money(r.billed)}</td><td className={surface.numeric}>{money(r.paid)}</td>
               </tr>
             ))}

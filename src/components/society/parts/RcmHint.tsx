@@ -10,5 +10,5 @@ import controls from '../../../styles/controls.module.css';
 export default function RcmHint({ lines, vendor, date, rcm }: { lines: readonly { hsn?: string }[]; vendor?: { gstin?: string; pan?: string }; date: string; rcm: boolean }) {
   useT();
   const on = rcmHint({ lines, reverse_charge: rcm }, vendor, !!localDb.settings.activeProfile()?.companyGstin?.trim(), ruleAt(SECURITY_RCM_RULES, date));
-  return on ? <p className={controls.hint} style={{ color: 'var(--warning)' }} role="note" data-hs-rcm-hint>{hsbT('rcm')}</p> : null;
+  return on ? <p className={controls.hint} style={{ color: 'var(--sys-orange-ink)' }} role="note" data-hs-rcm-hint>{hsbT('rcm')}</p> : null;
 }

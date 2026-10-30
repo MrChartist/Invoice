@@ -31,11 +31,11 @@
 .sub {
   display: block;
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .open {
-  color: var(--warning);
+  color: var(--sys-orange-ink);
   font-weight: 600;
 }
 
@@ -43,7 +43,7 @@
   margin: 0;
   padding: 0.75rem 1rem;
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .form {
@@ -54,9 +54,9 @@
 
 .taxBox {
   padding: 0.625rem 0.875rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card-inner);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-3);
   font-size: var(--text-sm);
 }
 
@@ -65,9 +65,9 @@
   flex-direction: column;
   gap: 0.625rem;
   padding: 0.75rem 0.875rem;
-  border: 1px solid color-mix(in srgb, var(--info) 40%, var(--border));
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--info) 7%, transparent);
+  border: var(--hairline) solid color-mix(in srgb, var(--sys-blue-ink) 40%, var(--sep));
+  border-radius: var(--r-12);
+  background: color-mix(in srgb, var(--sys-blue-ink) 7%, transparent);
 }
 
 .panelTitle {

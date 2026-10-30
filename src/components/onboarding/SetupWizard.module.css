@@ -7,12 +7,12 @@
 .dot {
   flex: 1;
   height: 4px;
-  border-radius: var(--radius-full);
+  border-radius: var(--r-full);
   background: var(--muted);
 }
 
 .dotDone {
-  background: var(--brand);
+  background: var(--tint);
 }
 
 .body {
@@ -37,24 +37,24 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.6rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
-  color: var(--foreground);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-2);
+  color: var(--label);
   font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
 }
 
 .template[aria-pressed='true'] {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 1px var(--brand);
+  border-color: var(--tint);
+  box-shadow: 0 0 0 2px var(--tint);
 }
 
 .swatch {
   width: 14px;
   height: 14px;
-  border-radius: var(--radius-full);
+  border-radius: var(--r-full);
   flex: none;
 }
 
@@ -81,21 +81,21 @@
   flex-direction: column;
   gap: 0.25rem;
   padding: 0.7rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
-  color: var(--foreground);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-2);
+  color: var(--label);
   font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
 }
 
 .shopCard span {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-xs);
 }
 
 .shopCard[aria-checked='true'] {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 1px var(--brand);
+  border-color: var(--tint);
+  box-shadow: 0 0 0 2px var(--tint);
 }

@@ -3,13 +3,13 @@
 .row { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); gap: 0.5rem; align-items: end; }
 .tools { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .list { display: flex; flex-direction: column; gap: 0.35rem; margin: 0; padding: 0; list-style: none; }
-.item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: var(--text-sm); }
-.muted { color: var(--muted-foreground); font-size: var(--text-sm); margin: 0; }
-.warn { color: var(--loss); font-size: var(--text-sm); margin: 0; }
-.ok { color: var(--profit); }
+.item { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: var(--hairline) solid var(--sep); font-size: var(--text-sm); }
+.muted { color: var(--label-2); font-size: var(--text-sm); margin: 0; }
+.warn { color: var(--sys-red-ink); font-size: var(--text-sm); margin: 0; }
+.ok { color: var(--sys-green-ink); }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .sub { font-weight: 600; font-size: var(--text-sm); margin: 0.25rem 0 0; }
-.box { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.6rem; border: 1px dashed var(--border); border-radius: var(--radius-sm); background: var(--card); }
-.offerLine { display: flex; justify-content: space-between; gap: 0.5rem; color: var(--profit); font-size: var(--text-sm); }
-.dialog { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card); box-shadow: var(--shadow-md); }
+.box { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.6rem; border: var(--hairline) dashed var(--sep); border-radius: var(--r-8); background: var(--bg-grouped-2); }
+.offerLine { display: flex; justify-content: space-between; gap: 0.5rem; color: var(--sys-green-ink); font-size: var(--text-sm); }
+.dialog { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.75rem; border: var(--hairline) solid var(--sep); border-radius: var(--r-8); background: var(--bg-grouped-2); box-shadow: var(--elev-2); }
 .auto { width: auto; }

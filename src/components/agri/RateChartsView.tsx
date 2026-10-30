@@ -82,7 +82,7 @@ export default function RateChartsView({ onDone }: { onDone: Done }) {
           {matrix && (
             <table className={surface.table} data-dairy="heat">
               <tbody><tr><th>{bT('fatSnf')}</th>{matrix.snf_steps.map((s) => <th key={s}>{s}</th>)}</tr>
-                {matrix.fat_steps.map((f, i) => <tr key={f}><th>{f}</th>{matrix.rates[i].map((r, j) => <td key={j} style={{ background: `color-mix(in srgb, var(--primary) ${Math.round((r / max) * 40)}%, transparent)` }}>{r}</td>)}</tr>)}</tbody>
+                {matrix.fat_steps.map((f, i) => <tr key={f}><th>{f}</th>{matrix.rates[i].map((r, j) => <td key={j} style={{ background: `color-mix(in srgb, var(--tint) ${Math.round((r / max) * 40)}%, transparent)` }}>{r}</td>)}</tr>)}</tbody>
             </table>
           )}
         </>

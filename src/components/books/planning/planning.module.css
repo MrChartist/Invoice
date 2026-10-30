@@ -12,17 +12,17 @@
 }
 
 .fav {
-  color: var(--profit);
+  color: var(--sys-green-ink);
   font-weight: 600;
 }
 
 .adv {
-  color: var(--loss);
+  color: var(--sys-red-ink);
   font-weight: 600;
 }
 
 .inactive {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-style: italic;
 }
 
@@ -33,7 +33,7 @@
 .sticky {
   position: sticky;
   left: 0;
-  background-color: var(--card);
+  background-color: var(--bg-grouped-2);
   z-index: 1;
 }
 
@@ -63,7 +63,7 @@
   white-space: nowrap;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 52.0625em) {
   .months {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

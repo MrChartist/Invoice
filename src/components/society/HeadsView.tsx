@@ -70,7 +70,7 @@ export default function HeadsView({ notify }: HsViewProps) {
         <label className={controls.check}><input type="checkbox" checked={s.explain !== false} onChange={(e) => set({ explain: e.target.checked })} data-hs-explain /> {hsT('explain')}</label>
       </div>
       {tariffHints(heads, rule, !!pendingStateRule(s.state, today, s.confirmed)).map((h) => (
-        <p key={h.code + h.value} className={controls.hint} style={{ color: 'var(--warning)' }} data-hs-hint={h.code}>
+        <p key={h.code + h.value} className={controls.hint} style={{ color: 'var(--sys-orange-ink)' }} data-hs-hint={h.code}>
           {hsT(h.code, { h: h.head ?? '', v: h.value ?? '', m: h.limit ?? '', s: stName, ca: h.ca })}
           {h.code === 'proposed' && <label className={controls.check}> <input type="checkbox" onChange={(e) => e.target.checked && set({ confirmed: [...(s.confirmed ?? []), s.state!] })} data-hs-confirm /> {hsT('confirm')}</label>}
         </p>

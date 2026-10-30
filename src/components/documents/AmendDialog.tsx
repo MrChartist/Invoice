@@ -79,7 +79,7 @@ function AmendForm({ invoice, onClose, onDone }: AmendDialogProps) {
         </p>
         {!check.needed && !invoice.amends && (
           <div className={styles.warn} role="note">
-            <AlertTriangle size={16} color="var(--warning)" aria-hidden="true" />
+            <AlertTriangle size={16} color="var(--sys-orange-ink)" aria-hidden="true" />
             <div>
               {salesT('am.notNeeded')}
             </div>

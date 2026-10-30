@@ -834,7 +834,7 @@ export function GstReports() {
 
       {/* R6-A3: one fixed line; the scope / limits text moved behind "Scope and limits" and into Help on this screen. */}
       <div className={`${surface.card} ${local.disclaimer}`} role="note" data-gst-working-paper>
-        <ShieldAlert size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
+        <ShieldAlert size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--sys-orange-ink)' }} />
         <details>
           <summary>{helpT('workingPaper')} <strong>{gstT('disclaimerStrong')}</strong> {helpT('scope')}</summary>
           {gstT('disclaimer')}
@@ -859,7 +859,7 @@ export function GstReports() {
 
       {compositionProfile && (
         <div className={`${surface.card} ${local.disclaimer}`} role="note" data-composition-banner>
-          <ShieldAlert size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
+          <ShieldAlert size={18} aria-hidden style={{ flexShrink: 0, color: 'var(--sys-orange-ink)' }} />
           <span>
             <strong>{gstT('compositionStrong', { name: compositionProfile.companyName || gstT('thisProfile') })}</strong> {gstT('compositionText')}
           </span>
