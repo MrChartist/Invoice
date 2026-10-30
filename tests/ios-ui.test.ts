@@ -243,7 +243,7 @@ const P1: Ceil = { colour: 3, radius: 1, border: 0, shadow: 0, zIndex: 0, motion
 const P2: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 1 }; // weight: .inputMono keeps capitals (statutory identifiers as typed values)
 const P3: Ceil = { colour: 1, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 1 };
 const P4: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 0 };
-const P5a: Ceil = { colour: 4, radius: 67, border: 69, shadow: 10, zIndex: 6, motion: 6, media: 17, material: 0, frame: 0, weight: 26 };
+const P5a: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 0 }; // P5a: POS, editor chrome, Gateway, restaurant at 0
 // P5b left: colour 5 = printed BRS / bank-doc rules and the job-card paper vars; radius 3 = inline token radii the
 // inline-radius regex cannot tell from raw ones; border 2 = the cheque leaf's crossing lines (printed); weight 7 = h1s of
 // printed documents (BRS, pay-in slip, advice, alteration slip) and full-screen gates (error boundary, vault).

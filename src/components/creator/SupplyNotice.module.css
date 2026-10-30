@@ -1,40 +1,40 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem 0.875rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--muted);
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: var(--card-edge);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-2);
 }
 
 .line,
 .warn {
   display: flex;
   align-items: flex-start;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   margin: 0;
   font-size: var(--text-base);
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .line svg {
-  color: var(--brand-text);
+  color: var(--sys-indigo);
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: var(--sp-0-5);
 }
 
 .warn svg {
-  color: var(--warning);
+  color: var(--sys-orange);
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: var(--sp-0-5);
 }
 
 .kind {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   font-size: var(--text-base);
 }
 
@@ -43,6 +43,6 @@
 }
 
 .muted {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
 }

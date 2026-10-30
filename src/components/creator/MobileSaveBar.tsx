@@ -14,7 +14,8 @@ interface Props {
 }
 
 /**
- * Fixed total + Preview + Save bar shown on phones and tablets (CSS hides it on desktop).
+ * Total + Preview + Save bar (InvoiceCreator.module.css `.mobileBar`): fixed at the bottom while the editor is one
+ * column, the form column's sticky footer while the live preview is on, hidden otherwise (the summary is beside).
  * The page reserves room for it with useBottomBarInset().
  */
 export function MobileSaveBar({ total, currency, readOnly, onPreview, onSave }: Props) {

@@ -3,7 +3,7 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sp-2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -13,18 +13,18 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--sp-3);
   flex-wrap: wrap;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius, 10px);
-  background: var(--card);
+  padding: var(--sp-2) var(--sp-4);
+  border: var(--card-edge);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-2);
 }
 
 .rowMain {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-0-5);
   min-width: 0;
 }
 
@@ -33,8 +33,8 @@
 }
 
 .meta {
-  font-size: 0.8rem;
-  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  color: var(--label-2);
   overflow-wrap: anywhere;
 }
 
@@ -44,24 +44,24 @@
 
 .badge {
   display: inline-block;
-  margin-left: 6px;
-  padding: 0 6px;
-  border-radius: 999px;
-  font-size: 12px;
-  background: var(--muted);
-  color: var(--muted-foreground);
+  margin-left: var(--sp-2);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  font-size: var(--text-xs);
+  background: var(--fill-3);
+  color: var(--label-2);
 }
 
 .actions {
   display: flex;
-  gap: 6px;
+  gap: var(--sp-2);
   flex-wrap: wrap;
 }
 
 .form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+  gap: var(--sp-3);
 }
 
 .wide {
@@ -70,10 +70,10 @@
 
 .example {
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .error {
-  color: var(--destructive);
+  color: var(--sys-red-ink);
   margin: 0;
 }

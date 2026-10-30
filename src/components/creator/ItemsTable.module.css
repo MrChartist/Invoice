@@ -14,20 +14,18 @@
 .row {
   display: grid;
   grid-template-columns: minmax(170px, 3fr) 84px 64px 72px 96px 56px 68px minmax(100px, 1.2fr) 112px;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   align-items: start;
-  padding: 0.625rem 1rem;
+  padding: var(--sp-3) var(--sp-4);
 }
 
+/* Head: sentence case, 400 --label-2, an opaque hairline under it (spec 2.2). */
 .head {
-  padding-block: 0.625rem;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted-foreground);
-  border-bottom: 1px solid var(--border);
-  background: var(--card-inner);
+  padding-block: var(--sp-2);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--label-2);
+  border-bottom: var(--hairline) solid var(--sep-opaque);
 }
 
 .r {
@@ -35,12 +33,12 @@
 }
 
 .body {
-  border-bottom: 1px solid var(--border);
-  transition: background-color var(--transition-fast);
+  border-bottom: var(--hairline) solid var(--sep);
+  transition: background-color var(--dur-1) var(--ease-out);
 }
 
 .body:focus-within {
-  background: color-mix(in srgb, var(--brand) 4%, transparent);
+  background: var(--fill-4);
 }
 
 .cell {
@@ -50,7 +48,7 @@
 .cName {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  gap: var(--sp-0-5);
 }
 
 .nameWrap {
@@ -58,31 +56,31 @@
 }
 
 .nameWrap input {
-  padding-right: 2rem;
+  padding-right: var(--sp-8);
   font-weight: 600;
 }
 
 .catalogBtn {
   position: absolute;
-  right: 0.25rem;
+  right: var(--sp-1);
   top: 50%;
   transform: translateY(-50%);
   display: flex;
-  padding: 0.3rem;
+  padding: var(--sp-1);
   border: none;
-  border-radius: var(--radius-xs);
+  border-radius: var(--r-6);
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .catalogBtn:hover {
-  color: var(--brand-text);
-  background: var(--accent);
+  color: var(--tint);
+  background: var(--fill-4);
 }
 
 .desc {
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .mono {
@@ -93,7 +91,7 @@
 .unit,
 .rate {
   cursor: pointer;
-  padding-inline: 0.25rem;
+  padding-inline: var(--sp-1);
 }
 
 .rate {
@@ -103,11 +101,11 @@
 
 .amount {
   text-align: right;
-  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   font-size: var(--text-base);
-  padding-top: 0.55rem;
-  font-variant-numeric: tabular-nums;
+  padding-top: var(--sp-2);
   overflow-wrap: anywhere;
 }
 
@@ -115,7 +113,7 @@
   display: flex;
   justify-content: flex-end;
   opacity: 0.55;
-  transition: opacity var(--transition-fast);
+  transition: opacity var(--dur-1) var(--ease-out);
 }
 
 .body:hover .actions,
@@ -124,33 +122,33 @@
 }
 
 .actions button {
-  padding: 0.3rem;
+  padding: var(--sp-1);
   min-width: 0;
 }
 
 .footer {
-  padding: 0.875rem 1rem;
+  padding: var(--sp-3) var(--sp-4);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem 1rem;
+  gap: var(--sp-2) var(--sp-4);
 }
 
 .keyHint {
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   line-height: 1.8;
 }
 
 .keyHint kbd {
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-2xs);
-  padding: 0.05rem 0.35rem;
-  border: 1px solid var(--border);
-  border-bottom-width: 2px;
-  border-radius: var(--radius-xs);
-  background: var(--card-inner);
-  color: var(--foreground);
+  padding: 0 var(--sp-1);
+  border: var(--hairline) solid var(--sep-opaque);
+  border-radius: var(--r-4);
+  background: var(--bg-grouped-2);
+  box-shadow: var(--elev-1);
+  color: var(--label);
 }
 
 @media (hover: none) {
@@ -159,17 +157,18 @@
   }
 }
 
-/* Narrow card: each line becomes a labelled mini-form (3 fields per row). */
-@container (max-width: 920px) {
+/* Narrow card: each line becomes a labelled mini-form (3 fields per row). The table needs about 920px, so it
+   shows from the 1195px (74.6875em) container breakpoint (spec 3.1). */
+@container (max-width: 74.625em) {
   .head {
     display: none;
   }
 
   .body {
     grid-template-columns: repeat(6, minmax(0, 1fr));
-    padding: 1rem;
-    row-gap: 0.75rem;
-    column-gap: 0.625rem;
+    padding: var(--sp-4);
+    row-gap: var(--sp-3);
+    column-gap: var(--sp-3);
   }
 
   .cName {
@@ -179,19 +178,17 @@
   .cell[data-label]:not(.cName)::before {
     content: attr(data-label);
     display: block;
-    font-size: var(--text-2xs);
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--muted-foreground);
-    margin-bottom: 0.25rem;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--label-2);
+    margin-bottom: var(--sp-1);
   }
 
   .cell input,
   .cell select {
-    border-color: var(--input-border);
-    background: var(--card);
-    min-height: 40px;
+    border-color: var(--field-edge);
+    background: var(--bg-grouped-2);
+    min-height: 2.75rem;
   }
 
   .cell[data-label='HSN / SAC'],
@@ -216,14 +213,14 @@
   }
 
   .actions button {
-    min-width: 40px;
-    min-height: 40px;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
     justify-content: center;
   }
 }
 
 /* Mid width: two compact rows of fields instead of three. */
-@container (min-width: 560px) and (max-width: 920px) {
+@container (min-width: 37.5em) and (max-width: 74.625em) {
   .body {
     grid-template-columns: repeat(12, minmax(0, 1fr));
   }
@@ -241,49 +238,50 @@
   align-self: flex-start;
   border: none;
   background: transparent;
-  padding: 0.125rem 0.5rem;
+  padding: var(--sp-0-5) var(--sp-2);
   font-size: var(--text-xs);
   font-weight: 600;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .cessToggle:hover {
-  color: var(--brand-text);
+  color: var(--tint);
 }
 
 .cessRow {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0 0.5rem;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-2);
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .cessInput {
   width: 4.5rem;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-sm);
-  background: var(--card);
-  color: var(--foreground);
-  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  padding: var(--sp-1) var(--sp-2);
+  border: var(--hairline) solid var(--field-edge);
+  border-radius: var(--r-8);
+  background: var(--bg-grouped-2);
+  color: var(--label);
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-base);
   text-align: right;
 }
 
 .cessInput:focus {
   outline: none;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 2px var(--primary-glow);
+  border-color: var(--tint);
+  box-shadow: 0 0 0 2px var(--tint);
 }
 
 /* Item custom fields (6.23) copied from the catalogue. */
 .customLine {
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
-  padding: 0 0.5rem;
+  color: var(--label-2);
+  padding: 0 var(--sp-2);
   overflow-wrap: anywhere;
 }
 
@@ -292,20 +290,20 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: 0.5rem 0.75rem;
-  padding: 0.25rem 0.5rem;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-1) var(--sp-2);
   font-size: var(--text-sm);
 }
 
 .trackField {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
-  min-width: 140px;
-  flex: 1 1 160px;
-  color: var(--muted-foreground);
+  gap: var(--sp-0-5);
+  min-width: 8.75rem;
+  flex: 1 1 10rem;
+  color: var(--label-2);
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .trackWide {
@@ -319,26 +317,26 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.375rem;
+  gap: var(--sp-2);
   margin: 0;
   font-size: var(--text-sm);
 }
 
 .trackAlert {
-  color: var(--loss);
+  color: var(--sys-red-ink);
   font-weight: 600;
 }
 
 .trackNote {
-  color: var(--warning);
+  color: var(--sys-orange-ink);
 }
 
 /* Scan box + price level note above the items (6.7 / 6.9). */
 .scanBar {
-  padding: 0.75rem 1rem 0;
+  padding: var(--sp-3) var(--sp-4) 0;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: var(--sp-1);
 }
 
 .levelNote {
@@ -346,16 +344,16 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--sp-2);
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 /* WP-8: base-unit reading under a line typed in an alternate unit ("= 24 NOS"). */
 .unitHint {
   display: block;
   font-size: var(--text-2xs);
-  color: var(--muted-foreground);
-  margin-top: 0.15rem;
+  color: var(--label-2);
+  margin-top: var(--sp-0-5);
   white-space: nowrap;
 }

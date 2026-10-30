@@ -3,83 +3,70 @@
 .strip {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.625rem 0.75rem;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--primary) 4%, transparent);
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-3);
 }
 
 .row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.375rem;
+  gap: var(--sp-2);
   align-items: center;
 }
 
 .label {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .hint {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
 }
 
 .chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.625rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--foreground);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.chip:hover,
-.chip:focus-visible {
-  border-color: var(--primary);
+  /* "Use usual defaults": a rulebook chip. */
+  composes: chip from global;
 }
 
 .applied {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.25rem 0.625rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--info) 12%, transparent);
-  color: var(--foreground);
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-full);
+  background: var(--sys-blue-soft);
+  color: var(--label);
   font-size: var(--text-sm);
 }
 
 .tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
-  gap: 0.375rem;
+  gap: var(--sp-2);
 }
 
 .tile {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.125rem;
-  padding: 0.5rem 0.625rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--card);
-  color: var(--foreground);
+  gap: var(--sp-0-5);
+  min-height: 2.75rem;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-radius: var(--r-8);
+  background: var(--bg-grouped-2);
+  color: var(--label);
   font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
 }
 
 .tile span {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-xs, 0.75rem);
 }

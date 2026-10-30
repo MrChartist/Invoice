@@ -1,7 +1,7 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--sp-2);
 }
 
 .row,
@@ -9,64 +9,64 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--sp-3);
   font-size: var(--text-md);
   min-height: 2rem;
 }
 
 .row > span:first-child,
 .inputRow > span:first-child {
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .value {
-  font-family: var(--font-num); font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
   text-align: right;
 }
 
 .good .value,
 .good > span:first-child {
-  color: var(--profit);
+  color: var(--sys-green-ink);
 }
 
 .muted .value {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-weight: 500;
 }
 
 .strong {
   font-weight: 600;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--border);
+  padding-top: var(--sp-2);
+  border-top: var(--hairline) solid var(--sep-opaque);
 }
 
 .strong > span:first-child {
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .small {
-  width: 120px;
-  padding-block: 0.4rem;
+  width: 7.5rem;
+  padding-block: var(--sp-1);
 }
 
 .inline {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sp-2);
 }
 
 .gstSelect {
   width: auto;
-  max-width: 190px;
-  padding-block: 0.4rem;
+  max-width: 12rem;
+  padding-block: var(--sp-1);
   font-size: var(--text-base);
 }
 
 .checkRow {
-  margin-block: 0.25rem;
-  color: var(--muted-foreground);
+  margin-block: var(--sp-1);
+  color: var(--label-2);
 }
 
 .roundVal {
@@ -79,21 +79,20 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 1rem;
-  margin-top: 0.5rem;
-  padding: 0.875rem 1rem;
-  border-radius: var(--radius-md);
-  background: var(--foreground);
-  color: var(--background);
+  gap: var(--sp-4);
+  margin-top: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-12);
+  /* The grand total: an inverted ink well (not a button; the type system's num-hero, scaled for the card). */
+  background: var(--label);
+  color: var(--bg);
   font-family: var(--font-display);
 }
 
 .total span:first-child {
   font-size: var(--text-sm);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.7;
+  font-weight: 500;
+  opacity: 0.8;
 }
 
 .total span:last-child {
@@ -106,9 +105,9 @@
 .words {
   font-size: var(--text-sm);
   line-height: 1.5;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-style: italic;
-  margin: 0 0 0.25rem;
+  margin: 0 0 var(--sp-1);
 }
 
 /* Hindi amount in words (5.4): no synthetic italic for Devanagari. */

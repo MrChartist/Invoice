@@ -199,7 +199,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                     aria-label={t('items.itemName', { n: index + 1 })}
                   />
                   <button type="button" className={styles.catalogBtn} onClick={() => onPickCatalog(item.id)} title={t('items.pickCatalog')} aria-label={t('items.pickCatalog')}>
-                    <Library size={15} />
+                    <Library size={16} />
                   </button>
                 </div>
                 <input

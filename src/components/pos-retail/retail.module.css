@@ -2,13 +2,13 @@
 
 .grid {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--sp-3);
 }
 
 .keyList {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-  gap: 0.25rem 1rem;
+  gap: var(--sp-1) var(--sp-4);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -17,62 +17,61 @@
 
 .keyList li {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   align-items: baseline;
 }
 
 .kbd {
   display: inline-block;
   min-width: 2.25rem;
-  padding: 0.05rem 0.4rem;
-  border: 1px solid var(--border);
-  border-bottom-width: 2px;
-  border-radius: var(--radius-sm);
-  background: var(--card-inner);
+  padding: 0 var(--sp-1);
+  border: var(--hairline) solid var(--sep-opaque);
+  border-radius: var(--r-4);
+  background: var(--bg-grouped-2);
+  box-shadow: var(--elev-1);
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: 0.75rem;
   text-align: center;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .section {
-  margin: 0.25rem 0 0;
+  margin: var(--sp-1) 0 0;
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .muted {
   margin: 0;
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-  gap: 0.5rem;
+  gap: var(--sp-2);
 }
 
 .stat {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card-inner);
+  gap: var(--sp-0-5);
+  padding: var(--sp-3);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-3);
 }
 
 .stat span {
   font-size: 0.75rem;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .stat strong {
   font-family: var(--font-display);
   font-size: 1.125rem;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .table {
@@ -83,8 +82,8 @@
 
 .table th,
 .table td {
-  padding: 0.35rem 0.5rem;
-  border-bottom: 1px solid var(--border);
+  padding: var(--sp-2);
+  border-bottom: var(--hairline) solid var(--sep);
   text-align: left;
   vertical-align: middle;
 }
@@ -101,16 +100,17 @@
 }
 
 .conflict {
-  color: var(--destructive);
+  color: var(--sys-red-ink);
 }
 
 .warn {
   margin: 0;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-sm);
-  background: var(--card-inner);
-  border-left: 3px solid var(--warning);
-  color: var(--foreground);
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-8);
+  background: var(--sys-orange-soft);
+  color: var(--label);
   font-size: var(--text-sm);
 }
 
@@ -118,24 +118,24 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   font-size: var(--text-sm);
 }
 
 .next {
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .pending {
   display: inline-flex;
-  gap: 0.35rem;
+  gap: var(--sp-1);
   align-items: center;
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius-sm);
-  background: var(--card-inner);
+  padding: var(--sp-0-5) var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--fill-3);
   font-size: var(--text-sm);
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .grossInput {
@@ -144,18 +144,18 @@
 
 /* Customer-facing display window (`/pos-display`): large type, readable from across the counter. */
 .display {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr auto;
-  gap: 1rem;
-  padding: 1rem;
-  background: var(--background);
-  color: var(--foreground);
+  gap: var(--sp-4);
+  padding: calc(var(--sp-4) + var(--safe-t)) calc(var(--sp-4) + var(--safe-r)) calc(var(--sp-4) + var(--safe-b)) calc(var(--sp-4) + var(--safe-l));
+  background: var(--bg-grouped);
+  color: var(--label);
   font-family: var(--font-body);
 }
 
-@media (min-width: 900px) {
+@media (width >= 52.125em) {
   .display.withQr {
     grid-template-columns: minmax(0, 1fr) 22rem;
   }
@@ -170,9 +170,9 @@
 
 .displayLines {
   overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
+  border: var(--card-edge);
+  border-radius: var(--r-16);
+  background: var(--bg-grouped-2);
 }
 
 .displayLines table {
@@ -182,8 +182,8 @@
 }
 
 .displayLines td {
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--border);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: var(--hairline) solid var(--sep);
 }
 
 .displayLines td:last-child,
@@ -198,18 +198,19 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border: var(--card-edge);
+  border-radius: var(--r-16);
+  background: var(--bg-grouped-2);
   text-align: center;
 }
 
 .qrBox {
-  padding: 0.75rem;
-  border-radius: var(--radius-sm);
-  background: var(--primary-foreground);
+  padding: var(--sp-3);
+  border-radius: var(--r-8);
+  /* White quiet zone in every theme. */
+  background: var(--on-tile);
   line-height: 0;
 }
 
@@ -218,10 +219,11 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  padding: 1rem 1.25rem;
-  border-radius: var(--radius-md);
-  background: var(--primary);
-  color: var(--primary-foreground);
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-16);
+  /* Inverted ink panel, readable from across the counter. */
+  background: var(--label);
+  color: var(--bg);
   font-family: var(--font-display);
   font-size: 2.5rem;
   font-weight: 600;
@@ -230,10 +232,10 @@
 .displayServing {
   grid-column: 1 / -1;
   margin: 0;
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius, 8px);
-  background: var(--primary);
-  color: var(--primary-foreground);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--r-12);
+  background: var(--label);
+  color: var(--bg);
   font-family: var(--font-display);
   font-size: 1.75rem;
   font-weight: 600;
@@ -246,7 +248,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   font-family: var(--font-display);
   font-size: 2rem;
   text-align: center;
@@ -255,7 +257,7 @@
 .displayIdle small {
   font-family: var(--font-body);
   font-size: 1.25rem;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 /* 8.147: the change to give, full width for 3 seconds after F9. */
@@ -264,22 +266,23 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 70;
-  padding: 1.25rem 1rem;
-  background: var(--primary);
-  color: var(--primary-foreground);
+  /* Under sheets and dialogs (same layer, earlier in the DOM), above the bars. */
+  z-index: var(--z-sheet);
+  padding: var(--sp-5) var(--sp-4) calc(var(--sp-5) + var(--safe-b));
+  background: var(--label);
+  color: var(--bg);
   font-family: var(--font-display);
   font-size: clamp(1.5rem, 5vw, 2.75rem);
   font-weight: 600;
   text-align: center;
-  box-shadow: var(--shadow-lg, none);
+  box-shadow: var(--elev-3);
 }
 
 /* Payment-in party picker */
 .pickList {
   display: grid;
-  gap: 0.15rem;
-  margin: 0.5rem 0 0;
+  gap: var(--sp-0-5);
+  margin: var(--sp-2) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -288,6 +291,6 @@
   display: flex;
   justify-content: space-between;
   width: 100%;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   text-align: left;
 }

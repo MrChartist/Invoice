@@ -1,17 +1,18 @@
 .page {
-  padding-bottom: 5rem;
+  padding-bottom: var(--sp-16);
 }
 
+/* The document number beside the title: a tag (fill capsule), never a framed chip. */
 .number {
-  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-md);
   font-weight: 600;
   letter-spacing: 0;
-  color: var(--muted-foreground);
-  padding: 0.2rem 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  background: var(--card);
+  color: var(--label-2);
+  padding: var(--sp-0-5) var(--sp-3);
+  border-radius: var(--r-full);
+  background: var(--fill-3);
 }
 
 /* Package PL: the editor grid follows the page frame's width (container queries on <Page>), not the window.
@@ -63,7 +64,7 @@
 .side {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: var(--sp-5);
   min-width: 0;
 }
 
@@ -75,84 +76,75 @@
 .sideActions {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
 }
 
 /* 8G A4: Save + remembered "then" choice. */
-.splitSave { display: flex; gap: 0.375rem; align-items: stretch; }
+.splitSave { display: flex; gap: var(--sp-2); align-items: stretch; }
 .splitPick { flex: 0 0 auto; width: auto; max-width: 9.5rem; }
 
 .muted {
   font-family: var(--font-body);
   font-size: var(--text-sm);
   font-weight: 500;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .chips {
   display: flex;
-  gap: 0.25rem;
+  gap: var(--sp-1);
   flex-wrap: wrap;
 }
 
-.chip {
-  padding: 0.15rem 0.5rem;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  background: var(--card);
-  color: var(--muted-foreground);
-  transition: border-color var(--transition-fast), color var(--transition-fast);
-}
+/* Due-date shortcuts: rulebook chips. */
+.chip { composes: chip from global; }
 
-.chip:hover {
-  border-color: var(--brand);
-  color: var(--brand-text);
-}
-
+/* Restore-draft notice: a frameless grouped surface. */
 .banner {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--sp-3);
   flex-wrap: wrap;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
+  padding: var(--sp-3) var(--sp-4);
+  border: var(--card-edge);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-2);
   font-size: var(--text-md);
-  box-shadow: var(--shadow-sm);
 }
 
 .banner span {
   flex: 1;
-  min-width: 180px;
+  min-width: 11.25rem;
 }
 
+/* Validation errors: a red-tinted well; the title and the list say what is wrong (colour is not alone). */
 .errors {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.875rem 1rem;
-  border: 1px solid color-mix(in srgb, var(--loss) 40%, var(--border));
-  background: color-mix(in srgb, var(--loss) 8%, var(--card));
-  border-radius: var(--radius-md);
-  color: var(--loss);
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--sys-red-soft);
+  border-radius: var(--r-12);
+  color: var(--sys-red-ink);
   font-size: var(--text-md);
 }
 
 .errors strong {
   display: block;
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--sp-1);
 }
 
 .errors ul {
-  margin-left: 1.1rem;
-  color: var(--foreground);
+  margin-left: var(--sp-5);
+  color: var(--label);
 }
 
+/* Total + Preview + Save bar. One-column editor (phones, narrow tablets): fixed above the home indicator. With the live preview on
+   (wide frames): the summary docks as a sticky footer of the form column (it spans the column's rows and sticks to
+   the bottom of the window), so Save and the total stay in reach while the paper takes the second column. */
 .mobileBar {
+  composes: material from global; /* chrome material: translucent bar with the opaque fallback (spec 1.7) */
   display: none;
 }
 
@@ -160,17 +152,10 @@
   .side {
     position: static;
   }
-}
 
-@media (max-width: 900px) {
-  .page {
-    padding-bottom: 5.5rem;
-  }
-
-  .chip {
-    min-height: 40px;
-    padding-inline: 0.875rem;
-    font-size: var(--text-sm);
+  /* One column (phones, narrow tablets): the summary is below the form, so the bar is fixed at the bottom. */
+  .layout {
+    padding-bottom: var(--sp-8);
   }
 
   .mobileBar {
@@ -178,40 +163,64 @@
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 30;
+    z-index: var(--z-bar);
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 1rem calc(0.625rem + env(safe-area-inset-bottom));
-    background: var(--card);
-    border-top: 1px solid var(--border);
-    box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.08);
+    gap: var(--sp-2);
+    padding: var(--sp-3) calc(var(--sp-4) + var(--safe-r)) calc(var(--sp-3) + var(--safe-b)) calc(var(--sp-4) + var(--safe-l));
+    border-top: var(--hairline) solid var(--sep);
+  }
+}
+
+@container page (min-width: 52.125em) and (max-width: 119.9375em) {
+  /* Explicit rows, so the footer (placed over rows 1-2) does not push the form below it. */
+  .layoutWithPane > .main {
+    grid-area: 1 / 1;
   }
 
-  .mobileBar > div {
-    flex: 1;
+  .layoutWithPane > .side {
+    grid-row: 2;
+    padding-bottom: calc(var(--sp-16) + var(--sp-4));
+  }
+
+  .layoutWithPane > .mobileBar {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    align-self: end;
+    position: sticky;
+    bottom: var(--sp-4);
+    z-index: var(--z-sticky);
     display: flex;
-    flex-direction: column;
-    line-height: 1.2;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
+    border-radius: var(--r-full);
+    box-shadow: var(--elev-2);
   }
+}
 
-  .mobileBar span {
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--muted-foreground);
-  }
+.mobileBar > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
 
-  .mobileBar strong {
-    font-family: var(--font-display);
-    font-size: 1.0625rem;
-  }
+.mobileBar span {
+  font-size: var(--text-xs);
+  color: var(--label-2);
+}
+
+.mobileBar strong {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
+  gap: var(--sp-4);
 }
 
 /* <fieldset> used purely to disable a block of controls at once (locked documents). */
@@ -225,7 +234,7 @@
 fieldset.main {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: var(--sp-5);
 }
 
 /* Locked document + number hints */
@@ -236,29 +245,29 @@ fieldset.main {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: var(--sp-5);
 }
 
 .numberHint {
   display: flex;
-  gap: 0.35rem;
+  gap: var(--sp-1);
   align-items: flex-start;
   font-size: var(--text-sm);
   line-height: 1.4;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .numberBad {
-  color: var(--loss);
+  color: var(--sys-red-ink);
 }
 
 .numberGap {
-  color: var(--warning);
+  color: var(--sys-orange-ink);
 }
 
 .numberHint svg {
   flex: none;
-  margin-top: 0.1rem;
+  margin-top: var(--sp-0-5);
 }
 
 .frozen:disabled {
@@ -270,11 +279,11 @@ fieldset.main {
   min-height: 4.25rem;
 }
 
-/* R3-C1: live paper preview pane beside the form (≥ 1280 px, toggle). */
+/* R3-C1: the live preview switch, trailing above the form + preview split. */
 .paneBar {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: -0.5rem;
+  margin-bottom: calc(var(--sp-2) * -1);
 }
 
 .paneSlot {
