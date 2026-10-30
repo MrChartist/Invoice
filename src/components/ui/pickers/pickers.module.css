@@ -178,6 +178,7 @@
 }
 .colon { color: var(--label-2); font-size: var(--text-lg); }
 .wheel {
+  position: relative; /* the items' offsetTop is measured from the wheel */
   flex: 1;
   height: 13.75rem;
   overflow-y: auto;
@@ -198,7 +199,7 @@
   font-size: var(--text-lg);
   cursor: pointer;
 }
-.wheelItem.selected { border-radius: var(--r-8); }
+.wheelItem.selected { border-radius: var(--r-8); color: var(--on-tint); font-weight: 600; }
 
 /* ── List (pop-up button) ─────────────────────────────────────── */
 .list { display: flex; flex-direction: column; min-height: 0; min-width: 12rem; }

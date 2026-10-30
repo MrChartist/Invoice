@@ -498,8 +498,15 @@ function Wheel({ label, items, value, onPick, focus }: { label: string; items: {
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
   useLayoutEffect(() => {
-    const el = ref.current?.querySelector<HTMLElement>(`[data-v="${value}"]`);
-    if (el && ref.current) ref.current.scrollTop = el.offsetTop - ref.current.clientHeight / 2 + el.offsetHeight / 2;
+    const centre = () => {
+      const box = ref.current;
+      const el = box?.querySelector<HTMLElement>(`[data-v="${value}"]`);
+      if (el && box) box.scrollTop = el.offsetTop - box.clientHeight / 2 + el.offsetHeight / 2;
+    };
+    centre();
+    // A phone sheet is still rising on the first frame: centre again once it has its height.
+    const raf = requestAnimationFrame(() => requestAnimationFrame(centre));
+    return () => cancelAnimationFrame(raf);
   }, [value]);
   useEffect(() => {
     if (focus) ref.current?.focus({ preventScroll: true });
