@@ -249,4 +249,4 @@ R20-C sizes (gzip; master `bef8125` and this branch both built here): first pain
 3,288.5 → 3,295.0 kB (**+6.5 kB**, cap 7: `ReportSheets` chunk +2.1, LedgerPanel (drill-hooks, Day Book, report views,
 toolbar) +1.9, `f-keys` (`report-actions`, `report-keys`, `keys-r20c` English) +1.9, PeriodBar +0.5, help topic +0.15,
 `report-views` +0.06); Hindi pack 391.7 → 392.1 kB (`keys-r20c`); Hindi in core 9.8 kB (0); lazy-leaves 19.1, lazy-leaves-ui
-27.7 kB (unchanged).
+27.7 kB (unchanged). On master `a711585` (#127): 177.4 / 3,285.2 → 177.4 / 3,291.6 kB (+6.4 kB core), Hindi pack 391.4 kB.
