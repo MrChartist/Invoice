@@ -16,6 +16,7 @@ import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
+import { SYS } from '../components/ui/sys-colour';
 import { localDb } from '../lib/localDb';
 import { shouldShowWizard } from '../lib/onboarding';
 import { KEYS, getTable, peekTable } from '../lib/storage';
@@ -27,7 +28,7 @@ import { useCan } from '../hooks/useCan';
 import { getIndianFY } from '../lib/invoice-number';
 import { effectiveStatus } from '../lib/invoice-status';
 import { attentionList, compactInr, foreignWithoutRate, isRevenueDoc, monthlyBilled, summarize } from '../lib/stats';
-import { daysOverdue, formatCurrency, formatDate } from '../lib/utils';
+import { cn, daysOverdue, formatCurrency, formatDate } from '../lib/utils';
 import { dateLocale, useT, type MessageKey } from '../i18n';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
@@ -167,7 +168,7 @@ export function Dashboard() {
       </Suspense>
 
       <div className={surface.statGrid}>
-        <StatCard label={t('dash.billed')} value={formatCurrency(summary.billed)} hint={`${summary.count === 1 ? t('dash.issuedOne') : t('dash.issuedMany', { n: summary.count })}${noRate ? t('dash.noRate', { n: noRate }) : ''}`} icon={Receipt} />
+        <StatCard label={t('dash.billed')} value={formatCurrency(summary.billed)} hint={`${summary.count === 1 ? t('dash.issuedOne') : t('dash.issuedMany', { n: summary.count })}${noRate ? t('dash.noRate', { n: noRate }) : ''}`} icon={Receipt} tile="blue" />
         <StatCard label={t('dash.received')} value={formatCurrency(summary.received)} hint={t('dash.collected', { pct: collectedPct })} icon={Banknote} tone="profit" />
         <StatCard label={t('dash.outstanding')} value={formatCurrency(summary.outstanding)} hint={t('dash.yetToBePaid')} icon={Hourglass} tone="warning" />
         <StatCard
@@ -190,23 +191,25 @@ export function Dashboard() {
             <span className={styles.muted}>{formatCurrency(months.reduce((s, m) => s + m.billed, 0))}</span>
           </div>
           <div className={styles.chart} role="img" aria-label={t('dash.chartAria')}>
-            {months.map((m, i) => {
-              const height = Math.max((m.billed / peak) * 100, m.billed > 0 ? 4 : 0);
-              const latest = i === months.length - 1;
-              return (
-                <div key={m.key} className={styles.barCol}>
-                  <span className={styles.barValue}>{m.billed > 0 ? compactInr(m.billed) : ''}</span>
-                  <div className={styles.barTrack}>
-                    <div
-                      className={latest ? styles.barLatest : styles.bar}
-                      style={{ height: `${height}%` }}
-                      title={`${monthName(m.key)}: ${formatCurrency(m.billed)}`}
-                    />
+            <div className={styles.columns}>
+              {months.map((m, i) => {
+                const height = Math.max((m.billed / peak) * 100, m.billed > 0 ? 4 : 0);
+                const latest = i === months.length - 1;
+                return (
+                  <div key={m.key} className={styles.column}>
+                    <span className={styles.value}>{m.billed > 0 ? compactInr(m.billed) : ''}</span>
+                    <div className={styles.track}>
+                      <div
+                        className={cn(styles.bar, !latest && styles.barPast)}
+                        style={{ height: `${height}%` }}
+                        title={`${monthName(m.key)}: ${formatCurrency(m.billed)}`}
+                      />
+                    </div>
+                    <span className={cn(styles.axis, latest && styles.axisNow)}>{monthName(m.key)}</span>
                   </div>
-                  <span className={styles.barLabel}>{monthName(m.key)}</span>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
           {!hasData && <p className={styles.chartEmpty}>{t('dash.chartEmpty')}</p>}
         </section>
@@ -221,6 +224,7 @@ export function Dashboard() {
           {attention.length === 0 ? (
             <EmptyState
               icon={CheckCircle2}
+              tone="green"
               title={t('dash.allClear')}
               text={chasing.size > 0 ? t('dash.allInReminders') : t('dash.noUnpaid')}
             />
@@ -231,7 +235,7 @@ export function Dashboard() {
                 return (
                   <li key={inv.id}>
                     <Link to={`/invoice/${inv.id}`} className={styles.row}>
-                      <Avatar name={inv.client?.name || '?'} size={34} square />
+                      <Avatar name={inv.client?.name || '?'} size={34} />
                       <div className={styles.rowMain}>
                         <span className={styles.rowTitle}>{inv.client?.name || t('dash.unknownClient')}</span>
                         <span className={late ? styles.late : styles.muted}>
@@ -251,7 +255,7 @@ export function Dashboard() {
       <section className={surface.card}>
         <div className={surface.cardHead}>
           <span className={surface.cardHeadIcon}>
-            <FileText size={16} /> {t('dash.recent')}
+            <FileText size={16} aria-hidden="true" /> {t('dash.recent')}
           </span>
           <Link to="/transactions" className={styles.link}>
             {t('dash.openLedger')} <ArrowRight size={13} />
@@ -306,7 +310,9 @@ export function Dashboard() {
 
       <div className={styles.quick}>
         <Link to="/books?tab=pnl" className={styles.quickItem}>
-          <Receipt size={18} />
+          <span className={cn('tile', SYS.green)} aria-hidden="true">
+            <Receipt size={18} />
+          </span>
           <div>
             <strong>{profit ? t('dash.netProfit', { amount: formatCurrency(profit.netProfit) }) : t('dash.pnl')}</strong>
             <span>
@@ -315,33 +321,39 @@ export function Dashboard() {
                 : t('dash.openBooks', { fy: fy.label })}
             </span>
           </div>
-          <ArrowRight size={16} />
+          <ArrowRight size={16} aria-hidden="true" />
         </Link>
         {lowStock > 0 && (
           <Link to="/inventory" className={styles.quickItem}>
-            <AlertTriangle size={18} />
+            <span className={cn('tile', SYS.orange)} aria-hidden="true">
+              <AlertTriangle size={18} />
+            </span>
             <div>
               <strong>{lowStock === 1 ? t('dash.lowStockOne') : t('dash.lowStockMany', { n: lowStock })}</strong>
               <span>{t('dash.reviewReorder')}</span>
             </div>
-            <ArrowRight size={16} />
+            <ArrowRight size={16} aria-hidden="true" />
           </Link>
         )}
         <Link to="/clients" className={styles.quickItem}>
-          <Users size={18} />
+          <span className={cn('tile', SYS.pink)} aria-hidden="true">
+            <Users size={18} />
+          </span>
           <div>
             <strong>{clientCount === 1 ? t('dash.clientsOne') : t('dash.clientsMany', { n: clientCount })}</strong>
             <span>{t('dash.manageDirectory')}</span>
           </div>
-          <ArrowRight size={16} />
+          <ArrowRight size={16} aria-hidden="true" />
         </Link>
         <Link to="/settings" className={styles.quickItem}>
-          <FileText size={18} />
+          <span className={cn('tile', SYS.gray)} aria-hidden="true">
+            <FileText size={18} />
+          </span>
           <div>
             <strong>{t('dash.profilesBackup')}</strong>
             <span>{t('dash.profilesBackupHint')}</span>
           </div>
-          <ArrowRight size={16} />
+          <ArrowRight size={16} aria-hidden="true" />
         </Link>
       </div>
       {tilesReady && (

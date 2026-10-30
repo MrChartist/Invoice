@@ -1,9 +1,10 @@
-/* Cash-flow forecast (6.18) and exchange gain/loss (6.19) tabs. Tokens only. */
+/* Cash-flow forecast (6.18) and exchange gain/loss (6.19) tabs. Tokens only; chart look per IOS-UI.md 2.9 (owner: P4):
+   money in / out may use green / red (a profit / loss chart), the balance line is series 1. */
 
 .stack {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--sp-4);
 }
 
 .toolbar {
@@ -11,78 +12,78 @@
   flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--sp-3);
 }
 
 .group {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sp-2);
 }
 
+/* "This is an estimate" note: orange soft well, orange glyph beside the words. */
 .estimate {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   align-items: flex-start;
-  padding: 0.75rem 1rem;
-  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-12);
+  background: var(--sys-orange-soft);
   font-size: var(--text-base);
-  color: var(--foreground);
+  color: var(--label);
   line-height: 1.5;
 }
 
 .estimate svg {
-  color: var(--warning);
+  color: var(--sys-orange-ink);
   flex-shrink: 0;
-  margin-top: 0.15rem;
+  margin-top: var(--sp-0-5);
 }
 
 .muted {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
   margin: 0;
   line-height: 1.5;
 }
 
-.pos { color: var(--profit); }
-.neg { color: var(--loss); }
+.pos { color: var(--sys-green-ink); }
+.neg { color: var(--sys-red-ink); }
 
 .kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 0.75rem;
+  gap: var(--sp-3);
 }
 
+/* KPI cards (2.8): frameless, label 13px / 500 sentence case, figure 350 tabular. */
 .kpi {
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
+  padding: var(--sp-3) var(--sp-4);
+  border: var(--card-edge);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-2);
 }
 
 .kpiLabel {
   display: block;
-  font-size: var(--text-xs);
-  color: var(--muted-foreground);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 0.8125rem;
+  font-weight: var(--fw-label);
+  color: var(--label-2);
 }
 
 .kpiValue {
   display: block;
-  margin-top: 0.25rem;
-  font-family: var(--font-num); font-variant-numeric: tabular-nums;
-  font-size: var(--text-lg);
-  font-weight: 600;
+  margin-top: var(--sp-1);
+  font-family: var(--font-num);
+  font-size: 1.25rem;
+  font-weight: var(--fw-num);
   font-variant-numeric: tabular-nums;
 }
 
 /* ── Chart ─────────────────────────────────────────────────── */
 .chartWrap {
-  padding: 1rem;
+  padding: var(--sp-4);
   overflow-x: auto;
 }
 
@@ -93,39 +94,40 @@
   height: auto;
 }
 
-.barIn { fill: var(--profit); opacity: 0.8; }
-.barOut { fill: var(--loss); opacity: 0.75; }
-.line { fill: none; stroke: var(--brand); stroke-width: 2; }
-.dot { fill: var(--brand); }
-.zero { stroke: var(--foreground); stroke-width: 1; opacity: 0.5; }
-.grid { stroke: var(--border); stroke-width: 1; }
-.axisText { fill: var(--muted-foreground); font-size: 12px; font-family: var(--font-body); }
+.barIn { fill: var(--chart-2); rx: 3px; }
+.barOut { fill: var(--sys-red); rx: 3px; }
+.line { fill: none; stroke: var(--chart-1); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.dot { fill: var(--chart-1); }
+.zero { stroke: var(--sep-opaque); stroke-width: var(--hairline); vector-effect: non-scaling-stroke; }
+.grid { stroke: var(--sep); stroke-width: var(--hairline); stroke-dasharray: 2 4; vector-effect: non-scaling-stroke; }
+.axisText { fill: var(--label-2); font-size: 12px; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
 
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
-  margin-top: 0.5rem;
+  gap: var(--sp-1) var(--sp-4);
+  margin-top: var(--sp-2);
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .legendItem {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: var(--sp-2);
 }
 
+/* Legend marks: 8px dots for the bars, a short rounded stroke for the line; every one named. */
 .swatch {
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   display: inline-block;
 }
 
-.swIn { background: var(--profit); }
-.swOut { background: var(--loss); }
-.swLine { background: var(--brand); height: 0.2rem; }
+.swIn { background: var(--chart-2); }
+.swOut { background: var(--sys-red); }
+.swLine { background: var(--chart-1); width: 12px; height: 2px; border-radius: var(--r-full); }
 
 .numeric {
   text-align: right;
@@ -140,17 +142,17 @@
 
 .overdue {
   font-size: var(--text-xs);
-  color: var(--warning);
-  font-weight: 600;
-  margin-left: 0.375rem;
+  color: var(--sys-orange-ink);
+  font-weight: var(--fw-label);
+  margin-left: var(--sp-2);
 }
 
 details.more > summary {
   cursor: pointer;
-  font-weight: 600;
-  padding: 0.75rem 1rem;
+  font-weight: var(--fw-label);
+  padding: var(--sp-3) var(--sp-4);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .toolbar { align-items: stretch; }
 }
