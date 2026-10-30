@@ -3,7 +3,8 @@
  *  - every rule for a pressable kind lives in src/styles/buttons.css, loaded at first paint after index.css;
  *  - the app's CSS-module button classes (controls.btnPrimary …) only compose those kinds, never paint a button;
  *  - a module class that composes a kind never adds its own background / border / radius / shadow / colour;
- *  - no button, chip, tab or toggle is filled with the blue / gold palette or a tint of it (no wine, gold or tint);
+ *  - no button, chip, tab or toggle is filled with the blue / gold palette or a tint of it (no wine, gold or tint), nor
+ *    with the app tint (`--tint`, `--tint-soft`) or a system colour (`--sys-*`), except a selected item's selection fill;
  *  - the legacy hand-styled button rules do not grow (a ratchet: convert one, lower the number).
  * Invoice templates and printed documents are out of scope (they are not interactive UI).
  */
@@ -112,6 +113,36 @@ test('no button, chip, tab or toggle is filled with the palette or a tint (no go
   assert.deepEqual(stale, [], 'remove allow-list entries that no longer match');
   const bad = hits.filter((k) => !COLOUR_ALLOW[k]);
   assert.deepEqual(bad, [], 'use a kind from src/styles/buttons.css (primary = ink, danger = loss red) instead');
+});
+
+/** The app tint and the system colours (`--tint`, `--tint-soft`, `--sys-*`) never fill a pressable either. */
+const TINT_FILL = /background(-color)?\s*:[^;]*(--tint|--sys-)/i;
+/** `tab` but not `table` (a table row is not a pressable kind). */
+const PRESSABLE_NOT_TABLE = /(btn|Btn|button|Button|chip|Chip|tab(?!le)|Tab(?!le)|seg|Seg|toggle|Toggle|cta|Cta)/;
+/**
+ * Spec-allowed tint: the 2px selected bar drawn by a pseudo-element, and the `--tint-soft` selection fill of a selected
+ * item in a side list (IOS-UI.md: "selected = --tint-soft fill", sidebar and wide-frame section lists).
+ */
+const SELECTION = /\[aria-(selected|current|checked|pressed)(='true')?\]|Active\b|Selected\b/;
+const isIndicator = (r: Rule) => /::(after|before)$/.test(r.selector);
+const isSelectionFill = (r: Rule) =>
+  SELECTION.test(r.selector) && [...r.body.matchAll(/background(-color)?\s*:\s*([^;]+)/g)].every((m) => m[2].trim() === 'var(--tint-soft)');
+const TINT_ALLOW: Record<string, string> = {
+  'src/components/ui/Toggle.module.css .toggle:checked': 'switch on state is system green (spec controls): a switch track, not a button fill',
+  'src/components/inventory/inventory.module.css .chipOk': 'stock status badge (span, StockChip), not pressable',
+  'src/components/inventory/inventory.module.css .chipOut': 'stock status badge (span, StockChip), not pressable',
+  'src/components/inventory/inventory.module.css .chipNegative': 'stock status badge (span, StockChip), not pressable',
+};
+
+test('no button, chip, tab or toggle is filled with the tint or a system colour (tinted buttons)', () => {
+  const hits = all
+    .filter((r) => r.file !== SHARED && PRESSABLE_NOT_TABLE.test(r.selector) && TINT_FILL.test(r.body))
+    .filter((r) => !isIndicator(r) && !isSelectionFill(r))
+    .map((r) => `${r.file} ${r.selector}`);
+  const stale = Object.keys(TINT_ALLOW).filter((k) => !hits.includes(k));
+  assert.deepEqual(stale, [], 'remove allow-list entries that no longer match');
+  const bad = hits.filter((k) => !TINT_ALLOW[k]);
+  assert.deepEqual(bad, [], 'buttons are ink / quiet / glass / danger (src/styles/buttons.css), never tinted');
 });
 
 test('no inline coloured fill on a button in TSX', () => {

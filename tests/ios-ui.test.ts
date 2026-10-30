@@ -6,7 +6,8 @@
  *     own pill; icon tiles reach 3:1 with their glyph;
  *  3-12. ratchets: raw colour, radii, borders, shadows, z-index, motion, media queries / vh, materials, page frame,
  *     common weight. Each counts today's offenders per owning package; a count may only go DOWN. A package lowers only
- *     its own const below (shared-file protocol, docs/prd/ios-ui.md section 4); QA sets the final values;
+ *     its own const below (shared-file protocol, docs/prd/ios-ui.md section 4); QA set them to 0 (P5a still open)
+ *     and moved the legitimate leftovers to ALLOW, each with its reason;
  * 13. shell facts: viewport-fit=cover and one pair of theme colours equal to --bg-grouped.
  *
  * Out of scope: src/components/templates/ (printed paper) and the printed documents allow-listed in PRINTED.
@@ -236,19 +237,18 @@ type Rule = 'colour' | 'radius' | 'border' | 'shadow' | 'zIndex' | 'motion' | 'm
 const RULES: Rule[] = ['colour', 'radius', 'border', 'shadow', 'zIndex', 'motion', 'media', 'material', 'frame', 'weight'];
 type Ceil = Record<Rule, number>;
 
-// ── Ceilings: today's counts (30 Oct 2026, P0). Each package lowers ONLY its own const. ──────────────────────────
-const P0: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 0 };
-const PL: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 1 }; // weight: LoginPage h1 (full-screen route, outside the shell)
-const P1: Ceil = { colour: 3, radius: 1, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 2 }; // all in the logo (brand/Logo.*: wordmark colours, tile, "INVOICE" lockup), kept as drawn
-const P2: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 1 }; // weight: .inputMono keeps capitals (statutory identifiers as typed values)
-const P3: Ceil = { colour: 1, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 1 };
-const P4: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 0 };
+// ── Ceilings (QA, 30 Oct 2026): every package is at 0 except P5a, still being built. Each package lowers ONLY its own
+// const. A legitimate exception goes into ALLOW below with its reason, never into a ceiling. ──────────────────────────
+const ZERO: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 0 };
+const P0: Ceil = ZERO;
+const PL: Ceil = ZERO;
+const P1: Ceil = ZERO;
+const P2: Ceil = ZERO;
+const P3: Ceil = ZERO;
+const P4: Ceil = ZERO;
 const P5a: Ceil = { colour: 4, radius: 67, border: 69, shadow: 10, zIndex: 6, motion: 6, media: 17, material: 0, frame: 0, weight: 26 };
-// P5b left: colour 5 = printed BRS / bank-doc rules and the job-card paper vars; radius 3 = inline token radii the
-// inline-radius regex cannot tell from raw ones; border 2 = the cheque leaf's crossing lines (printed); weight 7 = h1s of
-// printed documents (BRS, pay-in slip, advice, alteration slip) and full-screen gates (error boundary, vault).
-const P5b: Ceil = { colour: 5, radius: 3, border: 2, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 7 };
-const QA: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 0 };
+const P5b: Ceil = ZERO;
+const QA: Ceil = ZERO;
 const CEILINGS: Record<string, Ceil> = { P0, PL, P1, P2, P3, P4, P5a, P5b, QA };
 
 // ── 3-12. Offender finders ────────────────────────────────────────────────────────────────────────────────────
@@ -267,7 +267,8 @@ const FIND: Record<Rule, () => Hit[]> = {
     ...UI_DECLS.filter((d) => /^border(-[a-z]+)*-radius$/.test(d.prop))
       .filter((d) => d.value.split(/\s+(?![^(]*\))/).some((v) => !/^(var\(--(r|b)-[\w-]+\)|50%|0|inherit)$/.test(v)))
       .map(fromDecl),
-    ...tsxHits(/\bborderRadius:\s*(?!['"]?var\(--r-)[^,}\n]+/g, 'inline radius'),
+    // The lookahead sits before the spaces: with `\s*` first, backtracking let `borderRadius: 'var(--r-8)'` count as raw.
+    ...tsxHits(/\bborderRadius:(?!\s*['"]?var\(--r-)\s*[^,}\n]+/g, 'inline radius'),
   ],
   // 5. Borders: widths only --hairline, 0, none, --card-edge; 2px / 3px only on focus / selected / alertBar selectors.
   border: () =>
@@ -365,6 +366,45 @@ const FIND: Record<Rule, () => Hit[]> = {
   },
 };
 
+/**
+ * Legitimate leftovers, each with its reason: printed paper, the brand logo, full-screen gates and statutory identifiers.
+ * An entry names the rule, the file and a piece of the offender's text (`what`); a stale entry fails its own test.
+ */
+const ALLOW: { rule: Rule; file: string; what: string; why: string }[] = [
+  // Printed paper keeps fixed ink and rules in every theme.
+  { rule: 'colour', file: 'src/components/bank/docs/bankdocs.module.css', what: 'border-color: #888', why: 'printed bank documents (pay-in slip, advice): table rules on paper' },
+  { rule: 'colour', file: 'src/components/bank/reconcile.module.css', what: 'border-color: #bbb', why: 'printed BRS statement: row rules on paper' },
+  { rule: 'colour', file: 'src/components/production/production.module.css', what: '--paper-ink: #16181d', why: 'printed job card: paper ink' },
+  { rule: 'colour', file: 'src/components/production/production.module.css', what: '--paper-line: #dcdfe4', why: 'printed job card: paper rules' },
+  { rule: 'colour', file: 'src/components/production/production.module.css', what: '--paper-bg: #ffffff', why: 'printed job card: paper white' },
+  { rule: 'colour', file: 'src/components/preview/InvoicePreview.module.css', what: 'background: #fff', why: 'the preview shows printed paper, white in every theme' },
+  { rule: 'border', file: 'src/components/cheques/Cheques.module.css', what: '.leafCrossing { border-top: 2px', why: 'cheque leaf: the crossing lines are printed' },
+  { rule: 'border', file: 'src/components/cheques/Cheques.module.css', what: '.leafCrossing { border-bottom: 2px', why: 'cheque leaf: the crossing lines are printed' },
+  { rule: 'weight', file: 'src/components/bank/BrsView.tsx', what: 'page title outside <Page>', why: 'h1 of the printed BRS statement' },
+  { rule: 'weight', file: 'src/components/bank/docs/BankingDocs.tsx', what: 'page title outside <Page>', why: 'h1s of the printed pay-in slip and payment advice' },
+  { rule: 'weight', file: 'src/components/retail-r9/AlterationSlip.tsx', what: 'page title outside <Page>', why: 'h1 of the printed alteration slip' },
+  // The brand logo is drawn as the brand book draws it.
+  { rule: 'colour', file: 'src/components/brand/Logo.tsx', what: '#0d0d0d', why: 'logo tile ink (brand book)' },
+  { rule: 'colour', file: 'src/components/brand/Logo.tsx', what: '#ffffff', why: 'logo symbol on its tile (brand book)' },
+  { rule: 'colour', file: 'src/components/brand/Logo.module.css', what: 'color: #b9bbb6', why: 'wordmark grey on dark (brand book)' },
+  { rule: 'radius', file: 'src/components/brand/Logo.module.css', what: 'border-radius: 22.7%', why: 'logo tile corner, proportional to its size' },
+  { rule: 'weight', file: 'src/components/brand/Logo.module.css', what: '.product { text-transform: uppercase', why: 'the "INVOICE" lockup of the logo' },
+  { rule: 'weight', file: 'src/components/brand/Logo.module.css', what: '.product { letter-spacing: 0.26em', why: 'the "INVOICE" lockup of the logo' },
+  // Full-screen gates render outside the shell, so outside <Page>; their h1 is the screen's only title.
+  { rule: 'weight', file: 'src/pages/LoginPage.tsx', what: 'page title outside <Page>', why: 'PIN lock screen, full screen outside the shell' },
+  { rule: 'weight', file: 'src/components/ui/ErrorBoundary.tsx', what: 'page title outside <Page>', why: 'error boundary: the shell itself may have failed' },
+  { rule: 'weight', file: 'src/components/vault/VaultUnlock.tsx', what: 'page title outside <Page>', why: 'vault unlock gate, before any data loads' },
+  { rule: 'weight', file: 'src/components/layout/NotFound.tsx', what: 'page title outside <Page>', why: 'the 404 empty state is the page title, rendered inside <Page>' },
+  // Statutory identifiers are capitals by definition (the typed value, not a label).
+  { rule: 'weight', file: 'src/styles/controls.module.css', what: '.inputMono { text-transform: uppercase', why: 'GSTIN / PAN / IFSC fields show the value in capitals' },
+];
+const ALLOW_USED = new Set<number>();
+const allowed = (r: Rule, h: Hit) => {
+  const i = ALLOW.findIndex((a) => a.rule === r && a.file === h.file && h.what.includes(a.what));
+  if (i >= 0) ALLOW_USED.add(i);
+  return i >= 0;
+};
+
 const COUNTS: Record<string, Ceil> = {};
 const HITS: Record<string, Record<Rule, Hit[]>> = {};
 for (const pkg of Object.keys(CEILINGS)) {
@@ -373,6 +413,7 @@ for (const pkg of Object.keys(CEILINGS)) {
 }
 for (const r of RULES) {
   for (const h of FIND[r]()) {
+    if (allowed(r, h)) continue;
     const pkg = h.pkg ?? ownerOf(h.file, h.line);
     COUNTS[pkg][r]++;
     HITS[pkg][r].push(h);
@@ -397,6 +438,10 @@ for (const r of RULES) {
     assert.deepEqual(over, [], 'a ratchet rose (fix the new value, or use a token)');
   });
 }
+
+test('every allow-list entry still matches an offender (drop stale ones)', () => {
+  assert.deepEqual(ALLOW.filter((_, i) => !ALLOW_USED.has(i)).map((a) => `${a.rule} ${a.file} ${a.what}`), []);
+});
 
 test('the token files themselves stay inside the rules they define', () => {
   // ios.css is the only home of backdrop-filter (besides the rulebook) and of the materials' fallback.
