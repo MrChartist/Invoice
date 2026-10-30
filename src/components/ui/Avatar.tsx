@@ -2,18 +2,12 @@
  * Offline initials avatar. Replaces the old external avatar service — this app
  * must not make network calls, and a placeholder image is not worth one.
  */
+import { initialsOf } from '../../lib/initials';
+import { cn } from '../../lib/utils';
+import styles from '../../styles/surface.module.css';
 
-const PALETTE = [
-  '#f07020', '#6366f1', '#25a05a', '#0ea5e9', '#ec4899',
-  '#8b5cf6', '#e69a06', '#0f766e', '#d946ef', '#475569',
-];
-
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
+/** Icon-tile colours in a fixed order (IOS-UI.md 1.13): the same in every theme, white initials at 3:1 or more. */
+const PALETTE = ['blue', 'green', 'indigo', 'orange', 'pink', 'purple', 'teal', 'red', 'brown', 'cyan'].map((c) => `var(--sys-${c}-tile)`);
 
 /** Stable colour per name so the same client always looks the same. */
 function colourOf(name: string): string {
@@ -25,7 +19,7 @@ function colourOf(name: string): string {
 export interface AvatarProps {
   name: string;
   size?: number;
-  /** Square with rounded corners instead of a circle. */
+  /** Rounded square (icon-tile shape) instead of a circle. */
   square?: boolean;
   /** Optional image (a profile logo) shown instead of the initials. */
   src?: string;
@@ -33,34 +27,14 @@ export interface AvatarProps {
 
 export function Avatar({ name, size = 36, square, src }: AvatarProps) {
   const label = name?.trim() || 'Unknown';
-  const colour = colourOf(label);
 
   return (
     <div
       aria-hidden="true"
-      style={{
-        width: size,
-        height: size,
-        flexShrink: 0,
-        borderRadius: square ? Math.max(6, size * 0.22) : '50%',
-        background: src ? 'var(--card-inner)' : `linear-gradient(135deg, ${colour}, ${colour}c0)`,
-        color: '#fff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: 'var(--font-display)',
-        fontWeight: 600,
-        fontSize: Math.max(10, size * 0.38),
-        letterSpacing: '-0.02em',
-        overflow: 'hidden',
-        border: '1px solid var(--border)',
-      }}
+      className={cn(styles.avatar, square && styles.avatarSquare, src && styles.avatarImage)}
+      style={{ width: size, height: size, fontSize: Math.max(12, Math.round(size * 0.38)), ...(src ? undefined : { background: colourOf(label) }) }}
     >
-      {src ? (
-        <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-      ) : (
-        initialsOf(label)
-      )}
+      {src ? <img src={src} alt="" /> : initialsOf(label)}
     </div>
   );
 }

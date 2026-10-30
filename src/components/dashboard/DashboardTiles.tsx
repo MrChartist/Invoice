@@ -21,6 +21,7 @@ import { uxT } from '../../i18n/areas/invoicing-ux';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from './tiles.module.css';
+import { SYS, type SysColour } from '../ui/sys-colour';
 import { defineArea } from '../../i18n/area';
 
 const ApprovalsPanel = lazy(() => import('../approvals/ApprovalsPanel').then((m) => ({ default: m.ApprovalsPanel })));
@@ -114,11 +115,12 @@ export function DashboardTiles() {
   };
 
   const money = (n: number) => formatCurrency(n);
-  const stat = (id: TileId, icon: ReactNode, value: string, hint: string, to?: string) => (
+  // Tile colour per module (IOS-UI.md 1.1): receivables / payables orange (money due), cash and bank cyan, GST indigo.
+  const stat = (id: TileId, tile: SysColour, icon: ReactNode, value: string, hint: string, to?: string) => (
     <div className={surface.stat} data-tile={id} key={id}>
       <div className={surface.statTop}>
         <span className={surface.statLabel}>{tileLabel(id)}</span>
-        <span className={surface.statIcon}>{icon}</span>
+        <span className={cn(surface.statIcon, SYS[tile])} aria-hidden="true">{icon}</span>
       </div>
       <div className={surface.statValue}>{to ? <Link to={to}>{value}</Link> : value}</div>
       <div className={surface.statHint}>{hint}</div>
@@ -128,7 +130,7 @@ export function DashboardTiles() {
   return (
     <section className={own.wrap} aria-label={tilesT('title')}>
       <div className={own.head}>
-        <h2 className={own.title}><Boxes size={16} /> {tilesT('title')}</h2>
+        <h2 className={own.title}><Boxes size={16} aria-hidden="true" /> {tilesT('title')}</h2>
         <div className={own.tools}>
           {branches.length > 0 && (
             <select className={controls.select} value={branch} onChange={(e) => setBranch(e.target.value)} aria-label={tilesT('branchFilter')}>
@@ -168,10 +170,10 @@ export function DashboardTiles() {
       </div>
 
       <div className={surface.statGrid}>
-        {on('receivables') && stat('receivables', <Receipt size={16} />, money(v.receivables.outstanding), tilesT('overdueHint', { amount: money(v.receivables.overdue), n: String(v.receivables.overdueCount) }), '/receivables')}
-        {on('payables') && stat('payables', <Wallet size={16} />, money(v.payables.due), tilesT('billsHint', { n: String(v.payables.bills) }), '/expenses')}
-        {on('cashBank') && stat('cashBank', <Landmark size={16} />, money(v.cashBank.cash + v.cashBank.bank), tilesT('cashBankHint', { cash: money(v.cashBank.cash), bank: money(v.cashBank.bank) }), '/books')}
-        {on('gstDue') && stat('gstDue', <IndianRupee size={16} />, money(v.gstDue.payable + v.gstDue.cess), tilesT('gstHint', { month: v.gstDue.month }), '/gst-reports')}
+        {on('receivables') && stat('receivables', 'orange', <Receipt size={16} />, money(v.receivables.outstanding), tilesT('overdueHint', { amount: money(v.receivables.overdue), n: String(v.receivables.overdueCount) }), '/receivables')}
+        {on('payables') && stat('payables', 'orange', <Wallet size={16} />, money(v.payables.due), tilesT('billsHint', { n: String(v.payables.bills) }), '/expenses')}
+        {on('cashBank') && stat('cashBank', 'cyan', <Landmark size={16} />, money(v.cashBank.cash + v.cashBank.bank), tilesT('cashBankHint', { cash: money(v.cashBank.cash), bank: money(v.cashBank.bank) }), '/books')}
+        {on('gstDue') && stat('gstDue', 'indigo', <IndianRupee size={16} />, money(v.gstDue.payable + v.gstDue.cess), tilesT('gstHint', { month: v.gstDue.month }), '/gst-reports')}
       </div>
 
       <div className={own.grid}>
