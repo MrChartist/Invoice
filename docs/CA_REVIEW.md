@@ -53,7 +53,8 @@ Items marked ★ are the ones beta testers' figures are most likely to depend on
 | 18. Co-operative housing societies, apartment associations and RWAs (Round 18, planned) | HS1–HS70 | 70 | 19 |
 | 19. Freight forwarders, customs brokers, courier and warehouses (Round 19, planned) | LG1–LG44 | 44 | 13 |
 | 21. Petrol pumps, CNG stations and LPG distributors (Round 21, planned) | FU1–FU30 | 30 | 9 |
-| **Total** | | **770** | **193** |
+| 22. Solar rooftop installers, EPC contractors and solar-pump vendors (Round 22, planned) | SO1–SO36 | 36 | 14 |
+| **Total** | | **806** | **207** |
 
 ---
 
@@ -1490,6 +1491,61 @@ whole (`tests/docs-links.test.ts`).
 | FU30 | Presumptive taxation (44AD) for a pump: turnover = gross receipts including excise / VAT built into the price? The app's turnover reports show gross; a "net of duties" figure is shown beside it. | Gross, with net shown | (R21-D) | — | — |
 
 `FU` ids are counted once here. The ★ items (FU1, FU2, FU3, FU4, FU12, FU18, FU20, FU21, FU23) change what a document prints or a return reports.
+
+## 22. Solar rooftop installers, solar EPC contractors and solar-pump vendors (Round 22, ids SO1–SO36)
+
+Added with `docs/prd/round-22.md` (§9: SO1–SO36) when the PRD was drafted (nothing built yet). It covers PM Surya Ghar
+rooftop vendors, C&I solar EPC contractors and PM-KUSUM solar-pump vendors. `SO` ("solar") ends in `O`, and no prefix
+is `O` (`S` is in neither CA-id pattern): the patterns read `SO1` whole (`tests/docs-links.test.ts`).
+
+- Every file named under "Where" with a package in brackets is planned by that package (R22-A … R22-D). Every rule row
+  planned for `src/lib/solar-rules.ts` is `verified: false` unless its value was read in a primary text in Round 22: the
+  MNRE guidelines for PM Surya Ghar CFA to residential consumers (June 2024 text), read for SO9–SO13, SO15 and SO31. GST
+  slabs, 194C / 194Q, Act labels and GST TDS u/s 51 stay in their own rule files and are not edited.
+- Scheme values (CFA slabs, DCR, CMC) decide estimates and hints only, never the GST a bill charges. Every output is a
+  working paper.
+- ★ = changes what a document prints or a return reports. Sources: §2.8 of the PRD (P = primary text read, S = secondary).
+
+| Id | Question | App's assumption | Where | From | Source used |
+|---|---|---|---|---|---|
+| SO1 ★ | A solar power generating system supplied with its installation: 70 % of the gross consideration is deemed goods (N 9/2025-CT(R) Sch I S. No. 437 Explanation, 5 % from 22 Sep 2025) and 30 % an installation service (N 11/2017-CT(R) S. No. 38, 18 %), whatever the actual cost break-up. Right, for homes, RWAs and C&I alike? | As stated: two lines (goods HSN, service SAC), printed as one contract | (R22-A) `solar-rules.ts` `SOLAR_SPLIT_RULES`; `solar/so-split.ts` `soSplit` | 2025-09-22 | S taxguru (quotes the Explanation), taxgarden, taxheal (unverified) |
+| SO2 ★ | Earlier rows: 70:30 from 1 Jan 2019 (N 24/2018-CT(R)) with goods at 5 %, 12 % from 1 Oct 2021 (N 8/2021-CT(R)), 5 % from 22 Sep 2025; no deemed split before 2019. For a contract straddling 22 Sep 2025, does the invoice date decide (Sec 14)? | Rate of the invoice date; before 2019 the user types the split | (R22-A) `SOLAR_SPLIT_RULES` earlier rows | 2017-07-01, 2019-01-01, 2021-10-01 | S taxheal, taxgarden, AAR summaries (unverified) |
+| SO3 ★ | "Gross consideration charged for all such supplies": every line of the contract (BOS, extra cable, structure, net meter) joins the gross; lines marked "separate supply" and pure-agent fees stay out. Right? | As stated | (R22-A) `solar/so-split.ts`; `so.lines[id].part` | 2019-01-01 | Developers' reading of the Explanation |
+| SO4 ★ | HSN / SAC printed: goods share under the kit's HSN (default 8541), service share under SAC 9954. Which HSN and SAC should a rooftop contract carry (8541 43 / 8502 / 85…, and 9954 / 995461 / 9987)? | 8541 and 9954, editable in `solar_settings` | (R22-A) `solar_settings.goods_hsn`, `svc_sac` | - | - |
+| SO5 ★ | Inclusive prices: gross = price ÷ 1.089 (from 22 Sep 2025); goods = gross × 70 % rounded to paise, service = gross − goods. Acceptable rounding? | As stated | (R22-A) `solar/so-split.ts` | 2025-09-22 | Developers' reading |
+| SO6 ★ | Standalone supplies (no installation supplied): modules 5 % (Sch I 437(h)), inverters 8504 18 % (Sch II 477), steel structures 7308 18 % (Sch II 286), installation only 18 % (S. No. 38). Right? | Hints; each line at its own slab | (R22-A) `SOLAR_STANDALONE_HINTS` | 2025-09-22 | S taxgarden (unverified) |
+| SO7 ★ | e-Way bill for a 70:30 contract: value = the goods share (70 %) with its tax, the service share left out. Material moved to the site before the invoice: delivery challan (Rule 55) at the kit's value? | Goods share; challan at kit cost | (R22-A) `eway.ts` hook through `solar/so-tax-io.ts` | - | Developers' reading |
+| SO8 ★ | Advance on a 70:30 contract: no GST on the goods share (N 66/2017-CT), GST at 18 % on the service share (30 %) of the advance. Right? | As stated, with the working shown | (R22-B) `solar/so-bill.ts` `soAdvanceTax`; `advances.ts` (not edited) | 2017-11-15 | Developers' reading |
+| SO9 ★ | The PM Surya Ghar CFA is paid by the Government to the consumer (or the loan account), not to the vendor: the vendor bills the full contract value and the CFA never reduces it (Sec 15(2)(e) not relevant). Right, also for "net of subsidy" quotes? | Full value billed | (R22-A) quote print block; (R22-B) subsidy tracker | 2024-02-13 | P MNRE guideline 6(p), 6(s) |
+| SO10 | The "subsidy part" the customer pays after the CFA is credited is an ordinary debtor balance, shown as "Waiting for subsidy" until then. Any GST, interest or income-tax point? | Debtor; no tax event | (R22-B) `solar/so-subsidy.ts` | - | P guideline 6(t) (15 days) for the expected date |
+| SO11 | CFA slabs (guideline 5(h)): ₹30,000 / kWp first 2 kWp, ₹18,000 next 1 kWp, cap 3 kWp; special category ₹33,000 / ₹19,800; RWA ₹18,000 (₹19,800) per kWp, ≤ 500 kWp at 3 kWp per house; scheme till FY 2026-27. Has the 13 Feb 2025 revision changed any value? | As stated (estimate only) | (R22-A) `PMSG_CFA_RULES`; `solar/so-cfa.ts` `cfaFor` | 2024-02-13 | P MNRE guideline 1(a), 5(h) (June 2024 text) |
+| SO12 | Special-category list (guideline 5(g)) mapped to GST State codes 01, 02, 05, 11–18, 31, 35, 38. Right mapping? | As stated | (R22-A) `PMSG_SPECIAL_STATES` | 2024-02-13 | P guideline 5(g); mapping by the developers |
+| SO13 | Eligibility hints: DCR modules, grid-connected only, once per installation, relocated not eligible, prior CFA capacity counts to 3 kW, CFA on DC module capacity. Anything else that should zero the estimate? | Hints with reasons | (R22-A) `PMSG_ELIGIBILITY_RULES` | 2024-02-13 | P guideline 5(k)–(p), 6(o) |
+| SO14 | ALMM List-II cells for CFA installations commissioned from 1 Jun 2026; "Give It Up" installs exempt till 31 Mar 2027. Right? | Hint only | (R22-C) `ALMM_CELL_RULES`; install record | 2026-06-01 | S SolarQuarter, TaiyangNews, Angel One (unverified) |
+| SO15 ★ | The free 5-year CMC (guideline 7(d)) is included in the contract price: (a) defer part of the revenue (AS 9 / Ind AS 115) or provide for the expected cost (AS 29 / Ind AS 37)? (b) Any separate GST on the CMC element? | No split for GST; provision optional, off | (R22-C) `solar/so-cmc.ts`, `so-provision.ts`; `PMSG_CMC_RULES` | 2024-02-13 | P guideline 7(d) for the duty; accounting by the developers |
+| SO16 | Paid AMC after the 5-year CMC: 18 %, which SAC (998719 / 998729)? | 18 %, SAC typed | (R22-C) CMC renewal through `amc.ts` (not edited) | - | - |
+| SO17 | OEM warranty replacement given free to the customer within warranty: no GST, no invoice (Circular 195/07/2023-GST)? The app records a stock swap at zero value. | As stated | (R22-C) `solar/so-cmc.ts` | 2023-07-17 | Circular 195/07/2023-GST (recalled, unverified) |
+| SO18 | DISCOM fees (application, meter testing, net-meter fee) paid in the customer's name and recovered at actual: pure agent (Rule 33), outside the value? | As stated (`charge_head_id: 'rule33'`) | (R22-B) DISCOM fee helper | - | Existing R8 / R14 rule |
+| SO19 ★ | A net meter bought by the vendor and fitted with the system: part of the 70:30 gross, or a separate supply of a meter (9028) at its own rate? | Inside the gross; switch "Bill the net meter separately" | (R22-B) `solar/so-bill.ts` | - | Developers' reading |
+| SO20 | 194C on payments by business customers (1 % / 2 %; Sec 393 Table S. No. 6 from 1 Apr 2026): right section for a supply-dominant contract, or 194Q / none on the goods share? Individuals paying for personal purposes do not deduct. | 194C on the whole | `tds-rules.ts`, `ita2025.ts` (not edited) | 2026-04-01 | Existing rows; S taxgarden |
+| SO21 | 194Q on the vendor's purchases of modules / inverters (buyer turnover > ₹10 crore, > ₹50 lakh from one seller, 0.1 %). Existing hint enough? | Existing hint | `tds-rules.ts` (not edited) | - | Existing rows |
+| SO22 | May a solar installer opt for the 6 % scheme (N 2/2019-CT(R)) when 70 % of the contract is deemed goods? Or composition at all? | Hint "check with your CA"; not blocked | (R22-A) Features row help | 2019-04-01 | Existing composition rows |
+| SO23 ★ | KUSUM: one invoice per pump to the State agency for the full value, the farmer's share collected by the agency. When the vendor collects the farmer's share, a separate invoice to the farmer (same split) for that share. Right? | As stated | (R22-D) `solar/so-kusum.ts`; `solar_work_orders.farmer_share_by` | - | S Vikaspedia, Drishti (unverified) |
+| SO24 ★ | Solar water-pumping system (KUSUM) with installation: entry 437 at 5 % with the 70:30 split? | As stated | (R22-D) `SOLAR_SPLIT_RULES` | 2025-09-22 | Developers' reading |
+| SO25 | GST TDS u/s 51 (2 %) by State agencies on KUSUM / Government rooftop bills above ₹2.5 lakh: on the value of both shares excluding GST? | Existing works rule | `works/deductions.ts` (not edited) | - | Existing R5-B5 rows |
+| SO26 | KUSUM performance security / retention and the agency's CMC holdback: accounted as works retention (existing). Right? | As stated | (R22-D) `solar/so-kusum.ts`; `works/deductions.ts` | - | S press (shares, unverified) |
+| SO27 | C&I EPC RA bills: 70:30 applied to the gross RA value before retention and other deductions. Right? | As stated | (R22-D) `solar/so-ra.ts` | - | Developers' reading |
+| SO28 ★ | Batteries (8507, 18 %) in a hybrid system: inside the 70:30 gross (part of the "solar power generating system") or a separate line at 18 %? | Separate at 18 %, hint | (R22-A) `SOLAR_STANDALONE_HINTS` | - | - |
+| SO29 | Solar water heaters (Sch I S. No. 428, 5 %) with installation: the Explanation is to entry 437 only, so no 70:30 split? | No split | (R22-A) `SOLAR_STANDALONE_HINTS` | 2025-09-22 | S taxgarden (unverified) |
+| SO30 | Income tax: the vendor's turnover (44AD, audit limits) is the full invoice value; the CFA is the consumer's receipt. 44AD available to an installer (not engineering consultancy)? | As stated | Existing reports | - | S taxgarden |
+| SO31 | A lender's disbursement paid straight to the vendor for the customer: a receipt on the customer's bill; the CFA then goes to the loan account (guideline 6(s)(i)). Any TDS or accounting point? | As stated | (R22-B) `solar/so-subsidy.ts` | 2024-02-13 | P guideline 6(s)(i) |
+| SO32 | National vendor registration bank guarantee (₹25 lakh reported) and its margin money: accounting only (deposit), alert on expiry. Right? | Alert only | (R22-D) `solar/so-statutory.ts`; `VENDOR_REG_HINTS` | - | S energetica-india (unverified) |
+| SO33 | Electrical contractor licence (State) and CEA safety regulations: any consequence the app should state on bills? | Alert only | (R22-D) statutory list | - | - |
+| SO34 | (Market) 34,219 registered vendors (29,469 active) and 26–40 lakh installations (reports disagree). Official count? | - | - | - | S SolarQuarter, Swarajya, press |
+| SO35 | Records: serials, DCR certificates and geo-tagged photos kept per job for scheme inspections; any retention period beyond the 72 months of Sec 36? | Keep all | (R22-C) install record, attachments | - | - |
+| SO36 | Section labels by date on TDS working papers (194C → Sec 393 Table S. No. 6 from 1 Apr 2026). | Existing labels | `ita2025.ts` (not edited) | 2026-04-01 | Existing rows |
+
+`SO` ids are counted once here. The ★ items (SO1, SO2, SO3, SO4, SO5, SO6, SO7, SO8, SO9, SO15, SO19, SO23, SO24, SO28) change what a document prints or a return reports.
 
 ## Answers log
 

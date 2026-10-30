@@ -14,8 +14,9 @@ const read = (p: string) => readFileSync(p, 'utf8');
 // R18: HS ids (housing societies); no id is a bare S, so "HS1" is never read as "S1".
 // R19: LG ids (logistics). LG ends in G and CA_LIST_RE has no leading \b, so LG sits before G: "LG1" is never read as "G1".
 // R21: FU ids (fuel). FU ends in U and no prefix is U or F, so "FU1" is never read as a shorter id.
-const CITED_RE = /CA_REVIEW[^\n]*?\b((?:MF|MP|HS|LG|FU|AG|G|TV|T|PS|PF|P|AC|I|X|CN|SV)\d{1,2})\b/g;
-const CA_LIST_RE = /(?:MF|MP|HS|CN|SV|AG|LG|FU|G|TV|T|PS|PF|P|AC|I|X)\d{1,2}/g;
+// R22: SO ids (solar). SO ends in O and no prefix is O; S is in neither pattern, so "SO1" is never read as a shorter id.
+const CITED_RE = /CA_REVIEW[^\n]*?\b((?:MF|MP|HS|LG|FU|SO|AG|G|TV|T|PS|PF|P|AC|I|X|CN|SV)\d{1,2})\b/g;
+const CA_LIST_RE = /(?:MF|MP|HS|CN|SV|AG|LG|FU|SO|G|TV|T|PS|PF|P|AC|I|X)\d{1,2}/g;
 
 test('every docs/features/*.md path named in the roadmap exists', () => {
   const roadmap = read('docs/ROADMAP.md');
@@ -103,4 +104,15 @@ test('R21: CA-id patterns read FU ids whole', () => {
   assert.deepEqual([...'see CA_REVIEW FU12 and CA_REVIEW P1'.matchAll(CITED_RE)].map((m) => m[1]), ['FU12', 'P1']);
   const row = /^\| ((?:G|TR|TV|T|PS|PF|P|AC|I|X|HT|RT|CN|SV|AG|MF|MP|HS|LG|FU)\d+)\b/gm;
   assert.deepEqual([...'| FU1 ★ | x |\n| P1 | y |\n| FU30 | z |'.matchAll(row)].map((m) => m[1]), ['FU1', 'P1', 'FU30']);
+});
+
+test('R22: CA-id patterns read SO ids whole', () => {
+  assert.deepEqual("ca: ['SO1', 'P1', 'SO36']".match(CA_LIST_RE), ['SO1', 'P1', 'SO36']);
+  assert.equal('SOZ1'.match(CA_LIST_RE), null, 'SO needs a digit');
+  assert.deepEqual('SOX1'.match(CA_LIST_RE), ['X1'], 'never an SO id without its digit');
+  assert.equal('Sl. 66'.match(CA_LIST_RE), null, 'a notification serial is not an id');
+  assert.deepEqual([...'see CA_REVIEW SO11 and CA_REVIEW P1'.matchAll(CITED_RE)].map((m) => m[1]), ['SO11', 'P1']);
+  const full = readFileSync('docs/CA_REVIEW.md', 'utf8');
+  const so = [...full.matchAll(/^\| (SO\d+)(?: ★)? \|/gm)].map((m) => m[1]);
+  assert.deepEqual(so, Array.from({ length: 36 }, (_, i) => `SO${i + 1}`), 'SO1–SO36 listed once, in order');
 });
