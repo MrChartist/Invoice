@@ -20,157 +20,92 @@
 }
 
 .muted {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-base);
-  font-weight: 500;
+  font-weight: var(--fw-label);
 }
 
 .link {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--sp-1);
   font-family: var(--font-body);
   font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--brand-text);
+  font-weight: var(--fw-label);
+  color: var(--tint);
 }
 
 .link:hover {
   text-decoration: underline;
 }
 
-/* ── Checklist ───────────────────────────────────────────────── */
-.checklist {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--card);
-  padding: 1rem 1.25rem;
-  box-shadow: var(--shadow-card);
-}
-
-.checklistHead {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 0.5rem;
-}
-
-.checklistHead h2 {
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 600;
-}
-
-.checklistHead span {
-  font-size: var(--text-sm);
-  color: var(--muted-foreground);
-}
-
-.checklist ul {
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 0.25rem 1rem;
-}
-
-.step,
-.stepDone {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0.5rem 0.25rem;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-md);
-  font-weight: 500;
-}
-
-.step svg:first-child {
-  color: var(--input-border);
-}
-
-.step:hover {
-  background: var(--accent);
-}
-
-.stepDone {
-  color: var(--muted-foreground);
-  text-decoration: line-through;
-  pointer-events: none;
-}
-
-.stepDone svg {
-  color: var(--profit);
-}
-
-.stepArrow {
-  margin-left: auto;
-  color: var(--muted-foreground);
-}
-
-/* ── Chart ───────────────────────────────────────────────────── */
+/* ── Chart: the look of styles/charts.module.css (IOS-UI.md 2.9), restated here so the shared chart sheet stays out
+   of first paint. Series 1 (blue), rounded tops, dashed soft grid, solid zero line, past months stepped back. ── */
 .chart {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 0.75rem;
-  padding: 1.25rem 1.25rem 1rem;
   height: 240px;
+  padding: var(--sp-5) var(--card-pad) var(--sp-4);
 }
 
-.barCol {
+.columns {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+.column {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.375rem;
   min-width: 0;
+  text-align: center;
 }
 
-.barValue {
-  height: 1rem;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  font-family: var(--font-num); font-variant-numeric: tabular-nums;
-  color: var(--muted-foreground);
-}
-
-.barTrack {
+.track {
   flex: 1;
-  width: 100%;
-  max-width: 56px;
   display: flex;
   align-items: flex-end;
-  border-bottom: 1px solid var(--border);
+  justify-content: center;
+  padding-inline: var(--sp-1);
+  border-bottom: var(--hairline) solid var(--sep-opaque);
+  background:
+    repeating-linear-gradient(90deg, var(--sep) 0 2px, transparent 2px 6px) 0 0 / 100% var(--hairline) no-repeat,
+    repeating-linear-gradient(90deg, var(--sep) 0 2px, transparent 2px 6px) 0 50% / 100% var(--hairline) no-repeat;
 }
 
-.bar,
-.barLatest {
+.bar {
   width: 100%;
-  border-radius: 6px 6px 2px 2px;
-  background: var(--input-border);
-  transition: height var(--transition-smooth);
-  min-height: 0;
+  max-width: 32px;
+  border-radius: var(--r-6) var(--r-6) 0 0;
+  background-color: var(--chart-1);
 }
 
-.barLatest {
-  background: var(--brand);
-}
+.barPast { opacity: 0.45; }
 
-.barLabel {
+.value,
+.axis {
+  font-family: var(--font-num);
   font-size: var(--text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted-foreground);
+  font-weight: var(--fw-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--label-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
+.value { min-height: 1.125rem; }
+.axis { padding-top: var(--sp-2); }
+.axisNow { color: var(--label); font-weight: var(--fw-label); }
 
 .chartEmpty {
   text-align: center;
   font-size: var(--text-base);
-  color: var(--muted-foreground);
-  padding: 0 1rem 1.25rem;
-  margin-top: -0.5rem;
+  color: var(--label-2);
+  padding: 0 var(--sp-4) var(--sp-5);
+  margin-top: calc(-1 * var(--sp-2));
 }
 
-/* ── Attention list ──────────────────────────────────────────── */
+/* ── Attention list: inset grouped rows, hairline inset past the avatar ─ */
 .list {
   list-style: none;
 }
@@ -178,18 +113,26 @@
 .row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1.25rem;
-  border-bottom: 1px solid var(--border);
-  transition: background-color var(--transition-fast);
+  gap: var(--sp-3);
+  min-height: var(--row-h);
+  padding: var(--sp-3) var(--card-pad);
 }
 
-.list li:last-child .row {
-  border-bottom: none;
+.list li + li .row {
+  background-image: linear-gradient(var(--sep), var(--sep));
+  background-repeat: no-repeat;
+  background-position: right top;
+  background-size: calc(100% - var(--card-pad) - 34px - var(--sp-3)) var(--hairline);
 }
 
-.row:hover {
-  background: var(--accent);
+@media (hover: hover) {
+  .row:hover {
+    background-color: var(--fill-4);
+  }
+}
+
+.row:active {
+  background-color: var(--fill-2);
 }
 
 .rowMain {
@@ -200,34 +143,39 @@
 }
 
 .rowTitle {
-  font-weight: 600;
+  font-weight: var(--fw-label);
   font-size: var(--text-md);
+  color: var(--label);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* "12 days late": the words carry the meaning, the red ink repeats it. */
 .late {
   font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--loss);
+  font-weight: var(--fw-label);
+  color: var(--sys-red-ink);
 }
 
 .amount {
-  font-family: var(--font-num); font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  font-size: var(--text-base);
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-num);
+  font-size: var(--text-md);
+  color: var(--label);
   white-space: nowrap;
 }
 
 .docLink {
-  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-base);
-  font-weight: 600;
+  font-weight: var(--fw-label);
+  color: var(--tint);
 }
 
 .docLink:hover {
-  color: var(--brand-text);
   text-decoration: underline;
 }
 
@@ -238,54 +186,54 @@
   gap: 1rem;
 }
 
+/* Frameless cards with a leading icon tile; pressing lays --fill-2 over the card, nothing moves (2.12). */
 .quickItem {
+  composes: continuous from global;
+  --rc: var(--r-16);
   display: flex;
   align-items: center;
-  gap: 0.875rem;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--card);
-  transition: border-color var(--transition-fast), transform var(--transition-fast);
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--card-pad);
+  border: var(--card-edge);
+  background-color: var(--bg-grouped-2);
+  color: var(--label);
 }
 
-.quickItem:hover {
-  border-color: var(--muted-foreground);
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .quickItem:hover {
+    background-image: linear-gradient(var(--fill-4), var(--fill-4));
+  }
+}
+
+.quickItem:active {
+  background-image: linear-gradient(var(--fill-2), var(--fill-2));
 }
 
 .quickItem > div {
   display: flex;
   flex-direction: column;
   flex: 1;
+  gap: var(--sp-0-5);
+  min-width: 0;
   line-height: 1.35;
 }
 
 .quickItem strong {
   font-size: var(--text-md);
+  font-weight: var(--fw-label);
 }
 
-.quickItem span {
+.quickItem > div > span {
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
-}
-
-.quickItem > svg:first-child {
-  color: var(--brand-text);
+  color: var(--label-2);
 }
 
 .quickItem > svg:last-child {
-  color: var(--muted-foreground);
+  flex: none;
+  color: var(--label-3);
 }
 
-@media (max-width: 560px) {
-  .chart {
-    gap: 0.375rem;
-    padding-inline: 0.75rem;
-  }
-}
-
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   table.recent { min-width: 0; display: block; }
   table.recent thead { display: none; }
   table.recent tbody { display: block; }
@@ -293,16 +241,16 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas: 'doc status' 'client amt' 'date amt';
-    gap: 0.25rem 0.75rem;
+    gap: var(--sp-1) var(--sp-3);
     align-items: center;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--border);
+    padding: var(--sp-3) var(--sp-4);
+    border-bottom: var(--hairline) solid var(--sep);
   }
   table.recent tbody tr:last-child { border-bottom: none; }
   table.recent td { display: block; padding: 0; border: none; min-width: 0; }
   table.recent td.rDoc { grid-area: doc; }
   table.recent td.rClient { grid-area: client; }
-  table.recent td.rDate { grid-area: date; font-size: var(--text-sm); color: var(--muted-foreground); }
+  table.recent td.rDate { grid-area: date; font-size: var(--text-sm); color: var(--label-2); }
   table.recent td.rStatus { grid-area: status; justify-self: end; }
-  table.recent td.rAmt { grid-area: amt; align-self: end; justify-self: end; font-weight: 600; }
+  table.recent td.rAmt { grid-area: amt; align-self: end; justify-self: end; font-weight: var(--fw-num); }
 }
