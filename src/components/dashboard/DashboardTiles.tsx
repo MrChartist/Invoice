@@ -22,6 +22,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from './tiles.module.css';
 import { SYS, type SysColour } from '../ui/sys-colour';
+import { Skeleton } from '../ui/Skeleton';
 import { defineArea } from '../../i18n/area';
 
 const ApprovalsPanel = lazy(() => import('../approvals/ApprovalsPanel').then((m) => ({ default: m.ApprovalsPanel })));
@@ -201,7 +202,8 @@ export function DashboardTiles() {
             </div>
           </div>
         )}
-        <Suspense fallback={null}>
+        {/* A panel's chunk is still loading: a card-sized placeholder, only after 300ms (2.10). */}
+        <Suspense fallback={<Skeleton height={160} block />}>
           {on('today') && <TodayPanel books={data.books} />}
           {on('insights') && <InsightsPanel books={data.books} stock={data.stock.filter((x) => x.tracked)} />}
           {on('branches') && (

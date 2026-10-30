@@ -1,5 +1,5 @@
 import { cn } from '../../lib/utils';
-import styles from '../../styles/surface.module.css';
+import styles from './Skeleton.module.css';
 
 export interface SkeletonProps {
   /** Width of the real element (CSS length or px), e.g. '60%' for a line of text, 120 for a figure. */
@@ -8,6 +8,8 @@ export interface SkeletonProps {
   height?: number | string;
   /** Capsule ends (a pill, a button, a line of text in a row). */
   pill?: boolean;
+  /** Card corners (a whole card or panel still loading). */
+  block?: boolean;
   className?: string;
 }
 
@@ -16,6 +18,6 @@ export interface SkeletonProps {
  * shimmer, and nothing at all for the first --dur-3, so a quick load never flashes. Hidden from assistive tech: the
  * container that is loading carries `aria-busy`.
  */
-export function Skeleton({ width = '100%', height = 14, pill, className }: SkeletonProps) {
-  return <span aria-hidden="true" className={cn(styles.skeleton, pill && styles.skeletonPill, className)} style={{ width, height }} />;
+export function Skeleton({ width = '100%', height = 14, pill, block, className }: SkeletonProps) {
+  return <span aria-hidden="true" className={cn(styles.skeleton, pill && styles.skeletonPill, block && styles.skeletonBlock, className)} style={{ width, height }} />;
 }

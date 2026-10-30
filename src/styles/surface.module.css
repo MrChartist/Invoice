@@ -75,20 +75,20 @@
 
 /* ── Stat tiles (owner: P4) ───────────────────────────────────── */
 /* Meaning colours (IOS-UI.md 1.1; map in src/components/ui/sys-colour.ts). One class sets the mark, text, pill and tile
-   variants for whatever sits inside it: a global .tile, a .badge, a chart dot. */
-.sysBlue { --tone: var(--sys-blue); --tone-ink: var(--sys-blue-ink); --tone-soft: var(--sys-blue-soft); --tile: var(--sys-blue-tile); }
-.sysGreen { --tone: var(--sys-green); --tone-ink: var(--sys-green-ink); --tone-soft: var(--sys-green-soft); --tile: var(--sys-green-tile); }
-.sysIndigo { --tone: var(--sys-indigo); --tone-ink: var(--sys-indigo-ink); --tone-soft: var(--sys-indigo-soft); --tile: var(--sys-indigo-tile); }
-.sysOrange { --tone: var(--sys-orange); --tone-ink: var(--sys-orange-ink); --tone-soft: var(--sys-orange-soft); --tile: var(--sys-orange-tile); }
-.sysPink { --tone: var(--sys-pink); --tone-ink: var(--sys-pink-ink); --tone-soft: var(--sys-pink-soft); --tile: var(--sys-pink-tile); }
-.sysPurple { --tone: var(--sys-purple); --tone-ink: var(--sys-purple-ink); --tone-soft: var(--sys-purple-soft); --tile: var(--sys-purple-tile); }
-.sysRed { --tone: var(--sys-red); --tone-ink: var(--sys-red-ink); --tone-soft: var(--sys-red-soft); --tile: var(--sys-red-tile); }
-.sysTeal { --tone: var(--sys-teal); --tone-ink: var(--sys-teal-ink); --tone-soft: var(--sys-teal-soft); --tile: var(--sys-teal-tile); }
-.sysMint { --tone: var(--sys-mint); --tone-ink: var(--sys-mint-ink); --tone-soft: var(--sys-mint-soft); --tile: var(--sys-mint-tile); }
-.sysCyan { --tone: var(--sys-cyan); --tone-ink: var(--sys-cyan-ink); --tone-soft: var(--sys-cyan-soft); --tile: var(--sys-cyan-tile); }
-.sysYellow { --tone: var(--sys-yellow); --tone-ink: var(--sys-yellow-ink); --tone-soft: var(--sys-yellow-soft); --tile: var(--sys-yellow-tile); --on-tile: var(--on-tile-yellow); }
-.sysBrown { --tone: var(--sys-brown); --tone-ink: var(--sys-brown-ink); --tone-soft: var(--sys-brown-soft); --tile: var(--sys-brown-tile); }
-.sysGray { --tone: var(--sys-gray); --tone-ink: var(--sys-gray-ink); --tone-soft: var(--sys-gray-soft); --tile: var(--sys-gray-tile); }
+   variants for whatever sits inside it: a global .tile, a .badge, a chart dot. A pill's soft fill is mixed from --tone
+   by the same --soft-pct as the --sys-*-soft tokens (see .badgeDot). Mint and yellow (highlight fill only) have no
+   class: use their tokens directly. */
+.sysBlue { --tone: var(--sys-blue); --tone-ink: var(--sys-blue-ink); --tile: var(--sys-blue-tile); }
+.sysGreen { --tone: var(--sys-green); --tone-ink: var(--sys-green-ink); --tile: var(--sys-green-tile); }
+.sysIndigo { --tone: var(--sys-indigo); --tone-ink: var(--sys-indigo-ink); --tile: var(--sys-indigo-tile); }
+.sysOrange { --tone: var(--sys-orange); --tone-ink: var(--sys-orange-ink); --tile: var(--sys-orange-tile); }
+.sysPink { --tone: var(--sys-pink); --tone-ink: var(--sys-pink-ink); --tile: var(--sys-pink-tile); }
+.sysPurple { --tone: var(--sys-purple); --tone-ink: var(--sys-purple-ink); --tile: var(--sys-purple-tile); }
+.sysRed { --tone: var(--sys-red); --tone-ink: var(--sys-red-ink); --tile: var(--sys-red-tile); }
+.sysTeal { --tone: var(--sys-teal); --tone-ink: var(--sys-teal-ink); --tile: var(--sys-teal-tile); }
+.sysCyan { --tone: var(--sys-cyan); --tone-ink: var(--sys-cyan-ink); --tile: var(--sys-cyan-tile); }
+.sysBrown { --tone: var(--sys-brown); --tone-ink: var(--sys-brown-ink); --tile: var(--sys-brown-tile); }
+.sysGray { --tone: var(--sys-gray); --tone-ink: var(--sys-gray-ink); --tile: var(--sys-gray-tile); }
 
 /* KPI grid (2.8), sized by its own width so it behaves the same in a pane, a sheet or a page: 1 column under 360px,
    2 up to 56rem, then 4 (and 6 from about 1350px). Never 3 + 1. */
@@ -198,9 +198,11 @@
   line-height: 1.2;
   border-radius: var(--r-full);
   white-space: nowrap;
-  background-color: var(--tone-soft, var(--fill-3));
+  background-color: var(--fill-3);
   color: var(--tone-ink, var(--label-2));
 }
+
+.badgeDot { background-color: color-mix(in srgb, var(--tone) var(--soft-pct), transparent); }
 
 .badgeDot::before {
   content: '';
@@ -322,32 +324,6 @@
   max-width: 32ch;
   margin: 0;
   line-height: 1.5;
-}
-
-/* Skeleton (2.10, <Skeleton>): --fill-3 blocks the size of the real element; they appear only after --dur-3, so a
-   quick load never flashes; the --fill-4 shimmer stops under reduced motion (index.css ends every animation). */
-.skeleton {
-  display: block;
-  max-width: 100%;
-  border-radius: var(--r-6);
-  background:
-    linear-gradient(90deg, transparent 30%, var(--fill-4) 50%, transparent 70%) 0 0 / 300% 100% no-repeat,
-    var(--fill-3);
-  animation:
-    skeletonIn var(--dur-2) linear var(--dur-3) both,
-    skeletonShimmer calc(var(--dur-4) * 3) linear var(--dur-3) infinite;
-}
-
-.skeletonPill { border-radius: var(--r-full); }
-
-@keyframes skeletonIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes skeletonShimmer {
-  from { background-position: 100% 0, 0 0; }
-  to { background-position: 0 0, 0 0; }
 }
 
 /* ── Groups (owner: P2) ───────────────────────────────────────── */

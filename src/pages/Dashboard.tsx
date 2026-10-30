@@ -16,7 +16,6 @@ import { StatCard } from '../components/ui/StatCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
-import { Skeleton } from '../components/ui/Skeleton';
 import { SYS } from '../components/ui/sys-colour';
 import { localDb } from '../lib/localDb';
 import { shouldShowWizard } from '../lib/onboarding';
@@ -85,17 +84,14 @@ export function Dashboard() {
   });
 
   // Profit and stock live in larger modules; load them after first paint so the dashboard opens fast.
-  // undefined while loading (a skeleton after 300ms), null if the chunks failed (the plain links stay).
-  const [extras, setExtras] = useState<{ lowStock: number; profit: { netProfit: number; income: number; expenses: number } } | null>();
+  const [extras, setExtras] = useState<{ lowStock: number; profit: { netProfit: number; income: number; expenses: number } } | null>(null);
   useEffect(() => {
     let alive = true;
     Promise.all([import('../lib/books'), import('../lib/inventory')])
       .then(([books, inventory]) => {
         if (alive) setExtras({ lowStock: inventory.lowStockCount(), profit: books.getProfitSnapshot('this_fy', 'accrual') });
       })
-      .catch(() => {
-        if (alive) setExtras(null);
-      });
+      .catch(() => undefined);
     return () => {
       alive = false;
     };
@@ -319,15 +315,11 @@ export function Dashboard() {
           </span>
           <div>
             <strong>{profit ? t('dash.netProfit', { amount: formatCurrency(profit.netProfit) }) : t('dash.pnl')}</strong>
-            {extras === undefined ? (
-              <Skeleton width="80%" height={12} />
-            ) : (
-              <span>
-                {profit
-                  ? t('dash.pnlHint', { fy: fy.label, income: formatCurrency(profit.income), expenses: formatCurrency(profit.expenses) })
-                  : t('dash.openBooks', { fy: fy.label })}
-              </span>
-            )}
+            <span>
+              {profit
+                ? t('dash.pnlHint', { fy: fy.label, income: formatCurrency(profit.income), expenses: formatCurrency(profit.expenses) })
+                : t('dash.openBooks', { fy: fy.label })}
+            </span>
           </div>
           <ArrowRight size={16} aria-hidden="true" />
         </Link>
