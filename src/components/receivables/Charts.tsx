@@ -3,6 +3,7 @@ import { AGING_BUCKETS, compactMoney, niceMax, type AgingBucketLabel, type Month
 import { formatMoney } from '../../lib/utils';
 import { bucketLabel, rcvT } from '../../i18n/areas/receivables';
 import { dateLocale, getLanguage } from '../../i18n';
+import charts from '../../styles/charts.module.css';
 import styles from './Charts.module.css';
 
 const TONE = [styles.b0, styles.b1, styles.b2, styles.b3, styles.b4];
@@ -40,7 +41,7 @@ export function AgingStack({
       <ul className={styles.legend}>
         {AGING_BUCKETS.map((b, i) => (
           <li key={b} className={`${styles.legendItem} ${TONE[i]}`}>
-            <span className={styles.legendLabel}><span className={styles.dot} />{bucketLabel(b, ageing)}</span>
+            <span className={styles.legendLabel}><span className={charts.dot} />{bucketLabel(b, ageing)}</span>
             <span className={styles.legendValue}>{formatMoney(buckets[b], currency)}</span>
             <span className={styles.legendPct}>{total > 0 ? rcvT('chPctBills', { pct: Math.round((buckets[b] / total) * 100) }) : '-'}</span>
           </li>
@@ -63,6 +64,13 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const monthName = (m: number): string =>
   getLanguage() === 'hi' ? new Date(2000, m - 1, 1).toLocaleDateString(dateLocale(), { month: 'short' }) : MONTHS[m - 1];
 
+/** A bar with rounded top corners only (Swift Charts look): r 4 under 16 units wide, 6 from there. */
+function topBar(x: number, y: number, w: number, h: number): string {
+  if (h <= 0 || w <= 0) return '';
+  const r = Math.min(w >= 16 ? 6 : 4, w / 2, h);
+  return `M${x},${y + h}V${y + r}A${r},${r} 0 0 1 ${x + r},${y}H${x + w - r}A${r},${r} 0 0 1 ${x + w},${y + r}V${y + h}Z`;
+}
+
 /** Grouped bars: billed vs received per month, efficiency % above each group. Plain SVG. */
 export function CollectionsChart({ rows, currency }: { rows: MonthRow[]; currency: string }) {
   const W = 720, H = 280;
@@ -77,16 +85,16 @@ export function CollectionsChart({ rows, currency }: { rows: MonthRow[]; currenc
 
   return (
     <div>
-      <div className={styles.keys}>
-        <span className={styles.key}><span className={styles.keyBilled} />{rcvT('chBilledNet')}</span>
-        <span className={styles.key}><span className={styles.keyReceived} />{rcvT('received')}</span>
-      </div>
+      <ul className={charts.legend}>
+        <li className={`${charts.legendItem} ${charts.s1}`}><span className={charts.dot} />{rcvT('chBilledNet')}</li>
+        <li className={`${charts.legendItem} ${charts.s2}`}><span className={charts.dot} />{rcvT('received')}</li>
+      </ul>
       <div className={styles.chartScroll}>
         <svg className={styles.svg} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={rcvT('chAria')}>
           {ticks.map((t) => (
             <g key={t}>
-              <line className={styles.grid} x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} />
-              <text className={styles.axisText} x={pad.l - 8} y={y(t) + 4} textAnchor="end">{compactMoney(t, currency)}</text>
+              <line className={t === 0 ? charts.svgZero : charts.svgGrid} x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} />
+              <text className={charts.svgText} x={pad.l - 8} y={y(t) + 4} textAnchor="end">{compactMoney(t, currency)}</text>
             </g>
           ))}
           {rows.map((r, i) => {
@@ -96,12 +104,12 @@ export function CollectionsChart({ rows, currency }: { rows: MonthRow[]; currenc
             return (
               <g key={r.month} className={styles.bar}>
                 <title>{rcvT('chBarTitle', { month: `${monthName(Number(mm))} ${yy}`, billed: formatMoney(billed, currency), received: formatMoney(r.received, currency) }) + (r.efficiency !== null ? ` (${r.efficiency}%)` : '')}</title>
-                <rect className={styles.barBilled} x={cx - bw - 1} width={bw} y={y(billed)} height={Math.max(ih - (y(billed) - pad.t), 0)} rx={2} />
-                <rect className={styles.barReceived} x={cx + 1} width={bw} y={y(r.received)} height={Math.max(ih - (y(r.received) - pad.t), 0)} rx={2} />
+                <path className={`${charts.svgMark} ${charts.s1}`} d={topBar(cx - bw - 1, y(billed), bw, Math.max(ih - (y(billed) - pad.t), 0))} />
+                <path className={`${charts.svgMark} ${charts.s2}`} d={topBar(cx + 1, y(r.received), bw, Math.max(ih - (y(r.received) - pad.t), 0))} />
                 {r.efficiency !== null && (
-                  <text className={styles.effText} x={cx} y={Math.min(y(billed), y(r.received)) - 5} textAnchor="middle">{Math.round(r.efficiency)}%</text>
+                  <text className={charts.svgText} x={cx} y={Math.min(y(billed), y(r.received)) - 5} textAnchor="middle">{Math.round(r.efficiency)}%</text>
                 )}
-                <text className={styles.axisText} x={cx} y={H - 10} textAnchor="middle">{monthName(Number(mm))}</text>
+                <text className={charts.svgText} x={cx} y={H - 10} textAnchor="middle">{monthName(Number(mm))}</text>
               </g>
             );
           })}
