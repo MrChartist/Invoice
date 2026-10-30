@@ -134,6 +134,8 @@ console.log(`all JS ${kb(coreGz + hiGz + regionalGz).toFixed(1)} kB in ${all.len
 if (!langs.hi.length || !langs.regional.length) fail('lang-manifest.json lists no Hindi or no regional pack (is scripts/vite-hi-split.mjs in vite.config.ts?)');
 for (const f of all) if (/^lang-/.test(f) && !packOf.has(`assets/${f}`)) fail(`assets/${f} looks like a language pack but is not in lang-manifest.json`);
 for (const f of initial) if (packOf.has(f)) fail(`${f} is a language pack loaded at first paint`);
+// PERF-7: every preload list is in the short form (scripts/vite-preload-trim.mjs `mapDepsCompact`).
+for (const f of all) if (readFileSync(join(dist, 'assets', f), 'utf8').includes('__vite__mapDeps')) fail(`assets/${f} still has a long preload list (is mapDepsCompact() in vite.config.ts?)`);
 
 // ── R16-A1: Hindi leak check ─────────────────────────────────────────────────────────────────────────
 /** gz estimate of a file's Devanagari text: gzip size minus the gzip size with every Devanagari run blanked. */

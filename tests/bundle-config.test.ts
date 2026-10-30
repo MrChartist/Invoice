@@ -7,7 +7,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { UI_LEAF, createGraph, cssIsLocal, cssMapGroup, familyRe, initialSet, isLeaf, leafGroup, loadEffects, safeFamilyGroup, safeSet } from '../scripts/vite-safe-groups.mjs';
-import { preloadTrim } from '../scripts/vite-preload-trim.mjs';
+import { MAP_NAME, compactMapDeps, mapDepsCompact, preloadTrim } from '../scripts/vite-preload-trim.mjs';
+import { CJS_IDS, ESM_IDS, PRELOAD_HELPER, cjsNames, importedNames, vendorEsm, vendorEsmCode } from '../scripts/vite-vendor-esm.mjs';
 
 const cfg = readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8');
 type Group = { name: string | ((id: string, ctx?: unknown) => string | null); test?: RegExp; tags?: string[]; priority?: number; maxModuleSize?: number };
@@ -23,7 +24,7 @@ test('Vite 8 rolldown options with codeSplitting.groups, no manualChunks / rollu
   assert.match(cfg, /codeSplitting:\s*\{/);
   assert.doesNotMatch(cfg, /manualChunks\s*\(/);
   assert.doesNotMatch(cfg, /rollupOptions\s*:/);
-  assert.match(cfg, /plugins: \[react\(\), cspMeta\(\), hiSplit\(\), graphPlugin\(graph\), preload\.plugin\]/, 'the Hindi split, the graph and the preload-trim plugins are wired');
+  assert.match(cfg, /plugins: \[react\(\), vendorEsm\(\{ root: [^}]+\}\), cspMeta\(\), hiSplit\(\), graphPlugin\(graph\), preload\.plugin, mapDepsCompact\(\)\]/, 'the vendor-ESM, Hindi split, graph, preload-trim and preload-list plugins are wired');
 });
 
 test('the groups, in order, with their priorities', () => {
@@ -305,4 +306,57 @@ test('R21-A: the f-fuel family captures the engines, rules and areas; not the re
   const re = familyRe('fuel', 'fuel-rules', 'fuel-r21', 'fu-registry');
   assert.ok(re.test('/x/src/lib/fuel/fu-tank.ts') && re.test('/x/src/lib/fuel-rules.ts') && re.test('/x/src/i18n/areas/fuel-r21a.ts'));
   assert.ok(!re.test('/x/src/lib/fuel/fu-registry.ts') && !re.test('/x/src/i18n/areas/fuel-r21a-pick.ts'));
+});
+
+test('PERF-7: preload lists in the short form, same files for the same calls', () => {
+  const list = ['assets/A-1.js', 'assets/b-2.css'];
+  const code = `const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=${JSON.stringify(list)})))=>i.map(i=>d[i]);\nimport{a as e}from"./index-x.js";var t=()=>e(()=>import("./A-1.js"),__vite__mapDeps([0,1])),n=()=>e(()=>import("./C.js"),__vite__mapDeps([1]));`;
+  const out = compactMapDeps(code, 'x.js')!;
+  assert.ok(out.startsWith(`const ${MAP_NAME}=(i,d=["A-1.js","b-2.css"])=>i.map(i=>"assets/"+d[i]);`));
+  assert.doesNotMatch(out, /__vite__mapDeps/);
+  // Evaluate both helpers: identical file lists for every call.
+  const run = (src: string, name: string) => new Function(`${src.split('\n')[0]}; return [${name}([0,1]), ${name}([1]), ${name}([])];`)();
+  assert.deepEqual(run(out, MAP_NAME), run(code, '__vite__mapDeps'));
+  assert.equal(compactMapDeps('import"./a.js";', 'y.js'), null, 'a chunk without a list is left alone');
+  assert.throws(() => compactMapDeps('const __vite__mapDeps=(i)=>[];__vite__mapDeps([0])', 'z.js'), /expected form/);
+  assert.throws(() => compactMapDeps(code.replace('var t', `var ${MAP_NAME}`), 'w.js'), /already uses/);
+  assert.throws(() => compactMapDeps(code.replace('assets/A-1.js', 'other/A-1.js'), 'v.js'), /outside assets/);
+  const gen = mapDepsCompact().generateBundle as { order: string; handler: (o: unknown, b: Record<string, unknown>) => void };
+  assert.equal(gen.order, 'post', 'runs after Vite wrote the lists');
+  const bundle = { 'assets/x.js': { type: 'chunk', fileName: 'assets/x.js', code }, 'assets/y.css': { type: 'asset', fileName: 'assets/y.css', source: 'a{}' } };
+  gen.handler({}, bundle);
+  assert.equal((bundle['assets/x.js'] as { code: string }).code, out);
+});
+
+test('PERF-7: React / router / preload helper reach src/ through first-paint ES re-exports', async () => {
+  const p = vendorEsm({ root: '/nowhere' }) as unknown as { apply: string; resolveId: { order: string; handler: (s: string, i?: string) => string | null }; load: (id: string) => { code: string } | null };
+  assert.equal(p.apply, 'build', 'dev and tests keep the packages as they are');
+  assert.equal(p.resolveId.order, 'pre');
+  const r = (s: string, i?: string) => p.resolveId.handler(s, i);
+  for (const id of [...Object.keys(CJS_IDS), ...ESM_IDS, PRELOAD_HELPER]) assert.equal(r(id, '/app/src/pages/X.tsx'), `\0vendor-esm:${id}`);
+  assert.equal(r('react', '/app/node_modules/react-dom/index.js'), null, 'node modules keep the originals');
+  assert.equal(r('react', '\0vendor-esm:react'), null, 'the re-export module itself reads the original');
+  assert.equal(r('react', undefined), null);
+  assert.equal(r('lucide-react', '/app/src/a.tsx'), null, 'icons stay in vendor-ui (measured: first paint +2.6 kB, core ±0)');
+  assert.equal(r('zustand/react/shallow', '/app/src/a.tsx'), null);
+  // CommonJS: every public export of the production build, never the internals.
+  const names = cjsNames('react');
+  for (const n of ['useState', 'useEffect', 'lazy', 'Suspense', 'createContext', 'Fragment']) assert.ok(names.includes(n), n);
+  assert.ok(!names.some((n) => n.startsWith('__')));
+  assert.deepEqual(cjsNames('react/jsx-runtime').sort(), ['Fragment', 'jsx', 'jsxs']);
+  assert.ok(cjsNames('react-dom').includes('createPortal'));
+  assert.equal(vendorEsmCode('react', ['a', 'b'], { cjs: true }), 'import M from "react";\nexport default M;\nexport const { a, b } = M;\n');
+  assert.equal(vendorEsmCode('react-router-dom', ['Link', 'useNavigate']), 'import { Link as v0, useNavigate as v1 } from "react-router-dom";\nexport const Link = v0, useNavigate = v1;\n');
+  // ESM names: the value imports src makes (type-only specifiers skipped); namespace / default imports refused.
+  const got = importedNames("import { Link, type NavigateFunction, useNavigate } from 'react-router-dom';\nimport type { Location } from 'react-router-dom';\nimport { X } from 'lucide-react';", 'a.tsx', ESM_IDS);
+  assert.deepEqual([...(got.get('react-router-dom') ?? [])].sort(), ['Link', 'useNavigate']);
+  assert.throws(() => importedNames("import * as R from 'react-router-dom';", 'b.ts', ESM_IDS), /named imports/);
+  // The re-exported values are the very same functions / objects the packages export.
+  const jsx = await import('react/jsx-runtime');
+  const mod = { exports: {} as Record<string, unknown> };
+  new Function('M', 'module', vendorEsmCode('react/jsx-runtime', cjsNames('react/jsx-runtime'), { cjs: true }).replace(/^import M from .*\nexport default M;\nexport const (\{[^}]*\}) = M;\n$/, 'const $1 = M; module.exports = { jsx, jsxs, Fragment };'))(jsx, mod);
+  assert.equal(mod.exports.jsx, jsx.jsx);
+  assert.equal(mod.exports.Fragment, jsx.Fragment);
+  assert.equal(p.load('\0vendor-esm:' + PRELOAD_HELPER)!.code, `import { __vitePreload as p } from ${JSON.stringify(PRELOAD_HELPER)};\nexport const __vitePreload = p;\n`);
+  assert.equal(p.load('/app/src/x.ts'), null);
 });

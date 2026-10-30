@@ -44,7 +44,10 @@
   tips' positional Hindi moves too (`splitHelp`, `HELP_SPLIT`; read back through `src/lib/help/hi-tables.ts` — keep
   their Hindi literal); `css-maps` groups class maps of small shared CSS modules whose every rule is local (`cssIsLocal`:
   never a `:global`, element or `@page` rule); `lazy-leaves-ui` takes leaves ≤ 2,500 B with no load effect
-  (`loadEffects`), cap 28 kB. Budgets: first paint 185 kB, core 3,300 kB,
+  (`loadEffects`), cap 28 kB. PERF-7: `src/` imports of `react`, `react/jsx-runtime`, `react-dom`, `react-router-dom` and
+  Vite's preload helper resolve to entry-chunk ES re-exports (`scripts/vite-vendor-esm.mjs`, build only; only named imports
+  of the ESM ids; no per-chunk CommonJS interop); `mapDepsCompact` (`vite-preload-trim.mjs`) writes the preload lists as
+  `__vmd` without the `assets/` prefix (exact-text rewrite, fails loud). Budgets: first paint 185 kB, core 3,300 kB,
   Hindi pack 400 kB, Hindi left in English chunks ≤ 36 kB, leaves 20 / 28 kB (`scripts/check-bundle-size.mjs`). HTML escaping: `escHtml`
   (`src/lib/html-esc.ts`, escapes `'` too).
 - **State**: Zustand — `src/store/useInvoiceStore.ts` is the single live global store.
