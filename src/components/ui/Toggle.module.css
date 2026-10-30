@@ -1,0 +1,73 @@
+/* iOS switch (IOS-UI.md 2.3; owner: P2). Lazy: only screens that render <Toggle> load it. */
+
+/* ── Toggle (2.3, iOS switch): <input type="checkbox" role="switch" class={toggle}>; rendered by ui/Toggle.tsx ── */
+.toggle {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 51px;
+  height: 31px;
+  margin: 0;
+  border: var(--card-edge);
+  border-radius: var(--r-full);
+  background-color: var(--fill);
+  cursor: pointer;
+  transition: background-color var(--dur-2) var(--ease-out);
+}
+
+.toggle::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background-color: var(--on-tile);
+  box-shadow: var(--elev-1);
+  transition: transform var(--dur-2) var(--spring);
+}
+
+.toggle:checked {
+  background-color: var(--sys-green);
+}
+
+.toggle:checked::before {
+  transform: translateX(20px);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--tint);
+  outline-offset: 2px;
+}
+
+.toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* A label with a toggle trailing: the row of a settings list, also usable alone. */
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: 2.75rem;
+  cursor: pointer;
+}
+
+.toggleText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-0-5);
+  min-width: 0;
+  font-size: var(--text-md);
+  color: var(--label);
+}
+
+.hint {
+  font-size: var(--text-sm);
+  color: var(--label-2);
+  line-height: 1.5;
+}

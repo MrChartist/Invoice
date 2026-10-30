@@ -2,52 +2,28 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--sp-3);
   flex-wrap: wrap;
 }
 
 .toolbar {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.875rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--card-pad) var(--sp-3);
 }
 
 .toolbarRow {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: var(--sp-3);
   flex-wrap: wrap;
 }
 
 .search {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  composes: search from '../styles/controls.module.css';
   flex: 1 1 240px;
   max-width: 380px;
-  padding: 0 0.75rem;
-  background: var(--card-inner);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--muted-foreground);
-}
-
-.search:focus-within {
-  border-color: var(--brand-text);
-  box-shadow: 0 0 0 3px var(--primary-glow);
-}
-
-.search input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: var(--foreground);
-  padding: 0.55rem 0;
-  font-size: var(--text-md);
 }
 
 .filterSelect {
@@ -58,9 +34,9 @@
 .dateField {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: var(--sp-2);
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .dateField input {
@@ -68,13 +44,14 @@
 }
 
 .count {
-  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
-  opacity: 0.6;
-  margin-left: 0.15rem;
+  opacity: 0.7;
+  margin-left: var(--sp-0-5);
 }
 
-@media (max-width: 780px) {
+@media (max-width: 52.0625em) {
   .search {
     max-width: none;
   }
@@ -89,6 +66,6 @@
 }
 
 /* Touch targets: segmented controls reach 40px on phones / coarse pointers. */
-@media (pointer: coarse), (max-width: 640px) {
+@media (pointer: coarse), (max-width: 37.4375em) {
   .touchSeg > button { min-height: 40px; }
 }

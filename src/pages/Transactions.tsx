@@ -489,7 +489,7 @@ export function Transactions() {
               aria-label={salesT('tx.searchAria')}
             />
           </label>
-          <div className={controls.segment} role="group" aria-label={salesT('tx.filterAria')}>
+          <div className={cn(controls.segment, styles.filterSeg)} role="group" aria-label={salesT('tx.filterAria')}>
             {FILTERS.filter((f) => f.id !== 'approval' || counts.approval > 0 || filter === 'approval').map((f) => (
               <button
                 key={f.id}
@@ -645,16 +645,19 @@ export function Transactions() {
                         <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggle(inv.id)} aria-label={salesT('tx.select', num)} />
                       </td>
                       <td className={styles.cDoc}>
-                        <Link to={`/invoice/${inv.id}`} className={styles.docLink}>
+                        <Link to={`/invoice/${inv.id}`} className={styles.docLink} title={inv.invoice_number}>
                           {inv.invoice_number}
                         </Link>
-                        {locked && <Lock size={12} aria-label={salesT('tx.lockedPeriod')} style={{ marginLeft: 6, verticalAlign: '-1px', color: 'var(--warning)' }} />}
+                        {locked && <Lock size={12} aria-label={salesT('tx.lockedPeriod')} className={styles.lockIcon} />}
                         <div className={styles.docType}>{docLabel(inv.doc_type in DOCUMENT_LABELS ? inv.doc_type : 'INVOICE')}</div>
+                        <div className={cn(surface.foldP2, styles.docType, styles.nowrap, status === 'Overdue' && styles.overdueText)}>
+                          {salesT(inv.doc_type === 'QUOTATION' ? 'tx.validUntil' : 'tx.due', { date: formatDate(inv.due_date) || '-' })}
+                        </div>
                       </td>
                       <td className={styles.cClient}>
                         <div className={styles.client}>
                           <Avatar name={inv.client?.name || '?'} size={28} square />
-                          <span>{inv.client?.name || '-'}</span>
+                          <span title={inv.client?.name || undefined}>{inv.client?.name || '-'}</span>
                         </div>
                       </td>
                       <td className={cn(styles.nowrap, styles.cDate)} data-priority="2">
@@ -667,6 +670,7 @@ export function Transactions() {
                       <td className={cn(surface.numeric, styles.cTotal)} data-priority="3">{formatCurrency(inv.total, inv.currency)}</td>
                       <td className={cn(surface.numeric, styles.cBal)}>
                         {isRevenueDoc(inv) ? formatCurrency(due, inv.currency) : '-'}
+                        <div className={cn(surface.foldP3, styles.docType)}>{salesT('tx.colTotal')} {formatCurrency(inv.total, inv.currency)}</div>
                       </td>
                       <td className={styles.cAct}>
                         <div className={surface.rowActions}>

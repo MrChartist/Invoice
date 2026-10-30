@@ -6,6 +6,7 @@ import { LockBooksCard } from './LockBooksCard';
 import { useT } from '../../i18n';
 import { setT } from '../../i18n/areas/settings';
 import controls from '../../styles/controls.module.css';
+import { Toggle } from '../ui/Toggle';
 import surface from '../../styles/surface.module.css';
 import styles from './Settings.module.css';
 
@@ -56,10 +57,7 @@ export function DefaultsPanel({ settings, onChange }: Props) {
               <span className={controls.hint}>{setT('prefixHint')}</span>
             </label>
           </div>
-          <label className={controls.check}>
-            <input type="checkbox" checked={settings.roundOff} onChange={(e) => onChange({ roundOff: e.target.checked })} />
-            <span>{setT('roundOff')}</span>
-          </label>
+          <Toggle checked={settings.roundOff} onChange={(v) => onChange({ roundOff: v })} label={setT('roundOff')} />
           <label className={controls.field}>
             <span className={controls.label}>{setT('defaultTerms')}</span>
             <textarea className={controls.textarea} rows={3} value={settings.defaultTerms} onChange={(e) => onChange({ defaultTerms: e.target.value })} />
