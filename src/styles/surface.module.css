@@ -15,60 +15,69 @@
 .pageActions { composes: actions from './page.module.css'; }
 
 /* ── Cards (owner: P2) ────────────────────────────────────────── */
+/* IOS-UI.md 2.1: frameless inset card on the grouped page (D4: --card-edge is a frame only in high contrast). */
 .card {
-  background-color: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
+  composes: continuous from global;
+  --rc: var(--r-16);
+  background-color: var(--bg-grouped-2);
+  border: var(--card-edge);
 }
 
 .cardHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 1.125rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--card-pad);
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--text-lg);
   letter-spacing: -0.01em;
+  color: var(--label);
 }
 
 .cardHeadIcon {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--foreground);
+  gap: var(--sp-2);
+  color: var(--label);
 }
 
 .cardBody {
-  padding: 1.25rem;
+  padding: var(--card-pad);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--sp-4);
+}
+
+/* No rule under the head: the body tucks up under it (a flush table keeps its own head hairline). */
+.cardHead + .cardBody:not(.cardBodyFlush) {
+  padding-top: var(--sp-1);
 }
 
 .cardBodyFlush {
   padding: 0;
 }
 
+/* A well inside a card (iOS grouped level 3). */
 .panel {
-  background-color: var(--card-inner);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 1rem;
+  composes: continuous from global;
+  --rc: var(--r-12);
+  background-color: var(--bg-grouped-3);
+  border: var(--card-edge);
+  padding: var(--sp-4);
 }
 
+/* Drop zones and "add" placeholders only (spec 1.6). */
 .panelDashed {
   composes: panel;
-  border-style: dashed;
+  border: var(--hairline) dashed var(--sep);
   background-color: transparent;
 }
 
 .sectionNote {
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   line-height: 1.55;
   margin: 0;
 }
@@ -221,6 +230,12 @@
 .badgeCancelled { composes: sysGray badgeDot; text-decoration: line-through; }
 
 /* ── Tables (owner: P2) ───────────────────────────────────────── */
+/*
+ * IOS-UI.md 2.2: the look. A table sits flush in its card: head on the card colour with an opaque hairline,
+ * sentence case; hairline rows; tabular numbers; 600 totals. Column priority, sticky head / totals and the scroller
+ * are PL's (page.module.css `.scroller` / `.pinned`, `data-priority="2|3"` on th and td). .foldP2 / .foldP3 put a
+ * hidden column back as a second line inside a p1 cell, in the same container band that hides it.
+ */
 .tableWrap {
   width: 100%;
   overflow-x: auto;
@@ -228,27 +243,27 @@
 
 .table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   text-align: left;
   font-size: var(--text-md);
   min-width: 640px;
 }
 
 .table th {
-  padding: 0.875rem 1.25rem;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted-foreground);
-  border-bottom: 1px solid var(--border);
+  padding: var(--cell-py) var(--cell-px);
+  font-size: 0.78125rem;
+  font-weight: 400;
+  color: var(--label-2);
+  border-bottom: var(--hairline) solid var(--sep-opaque);
   white-space: nowrap;
-  background-color: var(--card);
+  vertical-align: bottom;
+  background-color: var(--bg-grouped-2);
 }
 
 .table td {
-  padding: 0.875rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+  padding: var(--cell-py) var(--cell-px);
+  border-bottom: var(--hairline) solid var(--sep);
   vertical-align: middle;
 }
 
@@ -257,30 +272,70 @@
 }
 
 .table tbody tr {
-  transition: background-color var(--transition-fast);
+  transition: background-color var(--dur-1) var(--ease-out);
 }
 
-.table tbody tr:hover {
-  background-color: var(--accent);
+@media (hover: hover) {
+  .table tbody tr:hover {
+    background-color: var(--fill-4);
+  }
+}
+
+.table tbody tr[aria-selected='true'] {
+  background-color: var(--tint-soft);
+}
+
+.table tfoot :is(td, th),
+.table .totalRow td {
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--label);
+  border-top: var(--hairline) solid var(--sep-opaque);
+  border-bottom: none;
+  background-color: var(--bg-grouped-2);
 }
 
 .numeric {
   text-align: right;
+  font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
-  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-num);
   white-space: nowrap;
 }
 
 .mono {
-  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-base);
   letter-spacing: -0.01em;
 }
 
+/* Identifiers (invoice numbers, GSTINs) never break mid-token; give the element a title. */
+.ident {
+  composes: nowrap from './page.module.css';
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
+}
+
 .rowActions {
   display: inline-flex;
-  gap: 0.125rem;
+  gap: var(--sp-0-5);
   align-items: center;
+}
+
+.foldP2,
+.foldP3 {
+  display: none;
+}
+
+@media (min-width: 37.5em) {
+  @container table (width < 52.125em) {
+    .foldP3 { display: block; }
+  }
+  @container table (width < 37.5em) {
+    .foldP2 { display: block; }
+  }
 }
 
 /* ── Empty state (owner: P4) ──────────────────────────────────── */
@@ -327,7 +382,7 @@
 }
 
 /* ── Groups (owner: P2) ───────────────────────────────────────── */
-/* Inset grouped lists: .group, .row, .rowValue, .chevron, .groupHeader, .groupFooter, .tile (IOS-UI.md 2.1). */
+/* Inset grouped lists live in ./groups.module.css (lazy: only the screens that use them load it). */
 
 /* ── Misc ─────────────────────────────────────────────────────── */
 .srOnly {
@@ -351,7 +406,6 @@
   position: relative;
 }
 
-@media (max-width: 780px) {
-  .cardBody { padding: 1rem; }
-  .table th, .table td { padding: 0.75rem 1rem; }
+@media (max-width: 37.4375em) {
+  .card { --rc: var(--r-12); --card-pad: var(--sp-4); }
 }

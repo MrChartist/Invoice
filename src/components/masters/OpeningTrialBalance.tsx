@@ -142,7 +142,7 @@ export function OpeningTrialBalance({ onDone, onBack, onBillwise, notify }: Open
       <div className={diff ? styles.diffBad : styles.diffOk} role="status" aria-live="polite">
         {diff ? mastersT('difference', { amount: `₹${formatMoney(Math.abs(diff) / 100)} ${diff > 0 ? 'Dr' : 'Cr'}` }) : mastersT('balanced')}
       </div>
-      <div className={surface.tableWrap} style={{ maxHeight: '60vh', overflow: 'auto' }}>
+      <div className={surface.tableWrap} style={{ maxHeight: '60dvh', overflow: 'auto' }}>
         <table className={surface.table}>
           <caption className={surface.srOnly}>{mastersT('openingTb')}</caption>
           <thead>

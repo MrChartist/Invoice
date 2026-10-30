@@ -16,7 +16,9 @@ import {
 import { useT } from '../../i18n';
 import { dispT } from '../../i18n/areas/display-r2';
 import controls from '../../styles/controls.module.css';
+import { Toggle } from '../ui/Toggle';
 import surface from '../../styles/surface.module.css';
+import groups from '../../styles/groups.module.css';
 
 export function DisplayPanel() {
   useT();
@@ -76,22 +78,12 @@ export function DisplayPanel() {
             ))}
           </div>
         </div>
-        <label className={controls.check}>
-          <input type="checkbox" checked={prefs.high_contrast} onChange={(e) => update({ high_contrast: e.target.checked })} />
-          {dispT('contrast')} <span className={controls.hint}>{dispT('contrastHint')}</span>
-        </label>
-        <label className={controls.check}>
-          <input type="checkbox" checked={prefs.underline_links} onChange={(e) => update({ underline_links: e.target.checked })} />
-          {dispT('underline')}
-        </label>
-        <label className={controls.check}>
-          <input type="checkbox" checked={prefs.large_targets} onChange={(e) => update({ large_targets: e.target.checked })} />
-          {dispT('targets')} <span className={controls.hint}>{dispT('targetsHint')}</span>
-        </label>
-        <label className={controls.check}>
-          <input type="checkbox" checked={prefs.focus_always} onChange={(e) => update({ focus_always: e.target.checked })} />
-          {dispT('focus')}
-        </label>
+        <div className={groups.groupPlain}>
+          <Toggle rowClassName={groups.row} checked={prefs.high_contrast} onChange={(v) => update({ high_contrast: v })} label={dispT('contrast')} hint={dispT('contrastHint')} />
+          <Toggle rowClassName={groups.row} checked={prefs.underline_links} onChange={(v) => update({ underline_links: v })} label={dispT('underline')} />
+          <Toggle rowClassName={groups.row} checked={prefs.large_targets} onChange={(v) => update({ large_targets: v })} label={dispT('targets')} hint={dispT('targetsHint')} />
+          <Toggle rowClassName={groups.row} checked={prefs.focus_always} onChange={(v) => update({ focus_always: v })} label={dispT('focus')} />
+        </div>
         <div>
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => update({ ...DEFAULT_DISPLAY_PREFS })}>
             <RotateCcw size={14} aria-hidden /> {dispT('reset')}

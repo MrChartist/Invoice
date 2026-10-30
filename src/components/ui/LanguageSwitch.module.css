@@ -2,8 +2,8 @@
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--muted-foreground);
+  gap: var(--sp-2);
+  color: var(--label-2);
 }
 
 .icon {
@@ -18,13 +18,13 @@
 .compact {
   min-width: 6.5rem;
   min-height: 2rem;
-  padding-top: 0.25rem;
-  padding-bottom: 0.25rem;
+  padding-top: var(--sp-1);
+  padding-bottom: var(--sp-1);
 }
 
 /* R16-A1: offline switch to a language pack that is not on this device. */
 .offline {
   flex-basis: 100%;
-  font-size: 0.8125rem;
-  color: var(--destructive);
+  font-size: var(--text-base);
+  color: var(--sys-red-ink);
 }

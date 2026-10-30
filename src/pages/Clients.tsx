@@ -283,8 +283,12 @@ export function Clients() {
                         <div className={styles.who}>
                           <Avatar name={c.name} size={34} square />
                           <div>
-                            <div className={styles.name}>{c.name}</div>
-                            {c.company && <div className={styles.sub}>{c.company}</div>}
+                            <div className={styles.name} title={c.name}>{c.name}</div>
+                            {c.company && <div className={`${styles.sub} ${styles.oneLine}`}>{c.company}</div>}
+                            {(c.phone || c.email) && <div className={`${surface.foldP2} ${styles.sub} ${styles.oneLine}`}>{c.phone || c.email}</div>}
+                            {(c.city || c.gstin) && (
+                              <div className={`${surface.foldP3} ${styles.sub} ${styles.oneLine}`}>{[c.city, c.gstin].filter(Boolean).join(' · ')}</div>
+                            )}
                           </div>
                         </div>
                       </td>

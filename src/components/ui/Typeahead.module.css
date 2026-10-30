@@ -6,19 +6,19 @@
 
 .list {
   position: absolute;
-  z-index: 40;
-  top: calc(100% + 4px);
+  z-index: var(--z-dropdown);
+  top: calc(100% + var(--sp-1));
   left: 0;
   right: 0;
   min-width: 14rem;
   margin: 0;
-  padding: 0.25rem;
+  padding: var(--sp-1);
   list-style: none;
-  background: var(--popover);
-  color: var(--popover-foreground);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
+  background: var(--bg-elevated);
+  color: var(--label);
+  border: var(--card-edge);
+  border-radius: var(--r-12);
+  box-shadow: var(--elev-2);
   max-height: 16rem;
   overflow-y: auto;
 }
@@ -27,20 +27,20 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 0.75rem;
-  padding: 0.45rem 0.6rem;
-  border-radius: var(--radius-sm);
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-8);
   cursor: pointer;
-  font-size: var(--text-sm);
+  font-size: var(--text-md);
 }
 
 .option[aria-selected='true'] {
-  background: var(--brand-soft);
-  color: var(--brand-text);
+  background: var(--tint-soft);
+  color: var(--label);
 }
 
 .label {
-  font-weight: 600;
+  font-weight: 500;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -48,14 +48,14 @@
 }
 
 .sub {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-xs);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
 .hint {
-  padding: 0.3rem 0.6rem 0.15rem;
-  color: var(--muted-foreground);
+  padding: var(--sp-1) var(--sp-3) var(--sp-0-5);
+  color: var(--label-2);
   font-size: var(--text-2xs);
 }

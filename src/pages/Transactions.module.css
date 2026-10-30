@@ -1,123 +1,88 @@
+/* Invoices list (IOS-UI.md 2.2, 3.6; owner: P2). Tokens only. */
 .toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--sp-3);
   flex-wrap: wrap;
-  padding: 0.875rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+  padding: var(--sp-4) var(--card-pad) var(--sp-3);
 }
 
 .search {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  composes: search from '../styles/controls.module.css';
   flex: 1 1 240px;
   max-width: 380px;
-  padding: 0 0.75rem;
-  background: var(--card-inner);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--muted-foreground);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.search:focus-within {
-  border-color: var(--brand-text);
-  box-shadow: 0 0 0 3px var(--primary-glow);
-}
-
-.search input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: var(--foreground);
-  padding: 0.55rem 0;
-  font-size: var(--text-md);
 }
 
 .count {
-  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
-  opacity: 0.6;
-  margin-left: 0.15rem;
+  opacity: 0.7;
+  margin-left: var(--sp-0-5);
 }
 
+/* Document number: one line, never broken mid-token ("INV/FY26-27/0025"). */
 .docLink {
-  font-family: var(--font-num); font-variant-numeric: tabular-nums;
+  composes: ident from '../styles/surface.module.css';
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-base);
   font-weight: 600;
+  color: var(--label);
 }
 
 .docLink:hover {
-  color: var(--brand-text);
+  color: var(--tint);
   text-decoration: underline;
 }
 
 .docType {
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
-  margin-top: 0.1rem;
+  color: var(--label-2);
+  margin-top: var(--sp-0-5);
 }
 
 .overdueText {
-  color: var(--loss);
+  color: var(--sys-red-ink);
   font-weight: 600;
 }
 
 .client {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: var(--sp-2);
+  min-width: 0;
   font-weight: 500;
+}
+
+.client > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.client > span {
+  max-width: 12rem;
 }
 
 .nowrap {
   white-space: nowrap;
 }
 
-/* ── Phone: each ledger row becomes a compact card ─────────────── */
-@media (max-width: 640px) {
-  .toolbar { padding: 0.75rem 1rem; }
-  .search { max-width: none; flex-basis: 100%; }
-
-  table.ledger { min-width: 0; display: block; }
-  table.ledger thead { display: none; }
-  table.ledger tbody { display: block; }
-  table.ledger tbody tr {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'doc status'
-      'client total'
-      'date bal'
-      'act act';
-    gap: 0.4rem 0.75rem;
-    align-items: center;
-    padding: 0.875rem 1rem 0.5rem;
-    border-bottom: 1px solid var(--border);
-  }
-  table.ledger tbody tr:last-child { border-bottom: none; }
-  table.ledger td { display: block; padding: 0; border: none; min-width: 0; }
-  table.ledger td.cDoc { grid-area: doc; }
-  table.ledger td.cClient { grid-area: client; }
-  table.ledger td.cDate { grid-area: date; white-space: normal; font-size: var(--text-base); }
-  table.ledger td.cStatus { grid-area: status; justify-self: end; }
-  table.ledger td.cTotal { grid-area: total; font-weight: 600; }
-  table.ledger td.cBal { grid-area: bal; font-size: var(--text-base); color: var(--muted-foreground); }
-  table.ledger td.cBal::before { content: 'Balance '; font-family: var(--font-body); font-size: var(--text-xs); }
-  table.ledger td.cAct { grid-area: act; margin: 0 -0.5rem; }
-  table.ledger td.cAct > div { display: flex; justify-content: space-between; }
+.lockIcon {
+  margin-left: var(--sp-1);
+  vertical-align: -1px;
+  color: var(--sys-orange);
 }
 
 .filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0 1.25rem 0.75rem;
+  gap: var(--sp-2);
+  padding: 0 var(--card-pad) var(--sp-3);
 }
 
 .filters > select {
@@ -128,44 +93,43 @@
 .range {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: var(--sp-2);
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .range input {
   width: auto;
 }
 
+/* Bulk actions for the selected rows: a tinted well above the table. */
 .bulkBar {
+  composes: continuous from global;
+  --rc: var(--r-12);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0 1.25rem 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--brand-soft);
+  gap: var(--sp-2);
+  margin: 0 var(--card-pad) var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--tint-soft);
   font-size: var(--text-sm);
 }
 
 .bulkBar strong {
   margin-right: auto;
-  color: var(--brand-text);
+  color: var(--label);
 }
 
 .sortBtn {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: var(--sp-1);
   padding: 0;
   border: 0;
   background: none;
   color: inherit;
   font: inherit;
-  text-transform: inherit;
-  letter-spacing: inherit;
   cursor: pointer;
 }
 
@@ -173,13 +137,53 @@
   width: 2rem;
 }
 
-@media (max-width: 640px) {
-  .filters { padding: 0 1rem 0.75rem; }
-  .bulkBar { margin: 0 1rem 0.75rem; }
-}
-
 /* 8I quick win: phones show a visible label on the record-payment (Banknote) row button. */
 .payLabel { display: none; }
-@media (max-width: 640px) {
-  .payLabel { display: inline; margin-left: 0.25rem; font-weight: 600; white-space: nowrap; }
+
+/* ── Phones (page.module.css shows every cell under 37.5em): each ledger row becomes a compact card ── */
+@media (max-width: 37.4375em) {
+  table.ledger { display: block; }
+  table.ledger thead { display: none; }
+  table.ledger tbody { display: block; }
+  table.ledger tbody tr {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'doc status'
+      'client total'
+      'date bal'
+      'act act';
+    gap: var(--sp-1) var(--sp-3);
+    align-items: center;
+    padding: var(--sp-3) var(--sp-4) var(--sp-2);
+  }
+  table.ledger tbody tr + tr::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: var(--row-inset);
+    border-top: var(--hairline) solid var(--sep);
+  }
+  table.ledger td { display: block; padding: 0; border: none; min-width: 0; max-width: none; }
+  table.ledger td.cDoc { grid-area: doc; }
+  table.ledger td.cClient { grid-area: client; }
+  table.ledger td.cStatus { grid-area: status; justify-self: end; }
+  table.ledger td.cTotal { grid-area: total; font-weight: 600; }
+  table.ledger td.cDate { grid-area: date; white-space: normal; font-size: var(--text-base); }
+  table.ledger td.cBal { grid-area: bal; font-size: var(--text-base); color: var(--label-2); }
+  table.ledger td.cBal::before { content: 'Balance '; font-family: var(--font-body); font-size: var(--text-xs); }
+  table.ledger td.cAct { grid-area: act; margin: 0 calc(-1 * var(--sp-2)); }
+  table.ledger td.cAct > div { display: flex; justify-content: space-between; }
+  .payLabel { display: inline; margin-left: var(--sp-1); font-weight: 600; white-space: nowrap; }
+  .search { max-width: none; flex-basis: 100%; }
+}
+
+/* The filter segments stay one line and scroll sideways on a phone (spec 3.7: never two lines). */
+.filterSeg {
+  max-width: 100%;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
