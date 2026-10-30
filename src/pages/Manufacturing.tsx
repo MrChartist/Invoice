@@ -21,6 +21,7 @@ import { StockReportsTab } from '../components/manufacturing/StockReportsTab';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from '../components/manufacturing/manufacturing.module.css';
+import tabs from '../styles/tabs.module.css';
 import { MFG_PACK_TABS, MFG_TABS, type MfgPackTab, type MfgTab } from './page-tabs'; // R6-B1; R13 desks
 import { localDb } from '../lib/localDb';
 import { visibleTabs } from '../lib/industry-packs';
@@ -102,9 +103,9 @@ export function Manufacturing() {
     >
       <div className={surface.card}>
         <div className={surface.cardBody}>
-          <div className={cn(controls.segment, styles.tabs)} role="tablist" aria-label={mfgT('sections')}>
+          <div className={cn(tabs.tabStrip, styles.tabs)} role="tablist" aria-label={mfgT('sections')}>
             {[...MFG_TABS, ...visibleTabs(MFG_PACK_TABS, localDb.settings.get(), tab).map((t) => t.id)].map((k) => (
-              <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab(k)} data-mfg-tab={k}>
+              <button key={k} type="button" role="tab" aria-selected={tab === k} className={tabs.tabItem} onClick={() => setTab(k)} data-mfg-tab={k}>
                 {isDesk(k) ? deskT(k) : isR4a(k) ? r4aTabT(k) : mfgT(LABEL[k])}
               </button>
             ))}

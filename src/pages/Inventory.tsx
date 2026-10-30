@@ -438,7 +438,7 @@ export function Inventory() {
             title={invT('emptyTitle')}
             text={invT('emptyText')}
             action={
-              <div className={surface.pageActions} style={{ justifyContent: 'center' }}>
+              <div className={surface.pageActions} style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button type="button" className={controls.btnPrimary} onClick={() => setEditing({ item: blankStockItem(), isNew: true })}><Plus size={16} /> {invT('addFirst')}</button>
                 {catalogueMissing.length > 0 && (
                   <button type="button" className={controls.btnOutline} onClick={importCatalogue}><ArrowDownToLine size={16} /> {invT('importFromCatalogue')}</button>

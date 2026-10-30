@@ -42,6 +42,7 @@ import { BillClientModal } from '../components/time/BillClientModal';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from '../components/time/time.module.css';
+import tabs from '../styles/tabs.module.css';
 import { dateLocale, useT } from '../i18n';
 import { timeT } from '../i18n/areas/time';
 import { areaNodes } from '../i18n/areas/nodes';
@@ -283,10 +284,10 @@ export function Time() {
         <StatCard label={timeT('kmMonth')} value={String(stats.km)} icon={Car} />
       </div>
 
-      <div className={controls.segment} role="tablist" aria-label={timeT('sections')}>
+      <div className={tabs.tabStrip} role="tablist" aria-label={timeT('sections')}>
         {visiblePackTabs(TABS, localDb.settings.get(), tab).map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
-            className={tab === t.id ? controls.segmentBtnActive : controls.segmentBtn}
+            className={tabs.tabItem}
             onClick={() => setParams(t.id === 'timesheet' ? {} : { tab: t.id }, { replace: true })}>
             {t.label()}
           </button>

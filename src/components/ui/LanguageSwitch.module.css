@@ -1,6 +1,6 @@
 .wrap {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--sp-2);
   color: var(--label-2);
@@ -23,6 +23,10 @@
 }
 
 /* R16-A1: offline switch to a language pack that is not on this device. */
+.wrap:has(.offline) {
+  flex-wrap: wrap;
+}
+
 .offline {
   flex-basis: 100%;
   font-size: var(--text-base);

@@ -24,6 +24,17 @@ export interface WhatsNewEntry {
 
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
   {
+    version: '3.2.0',
+    date: '2026-10-30',
+    label: 'New look',
+    items: [
+      { title: 'New look: calmer screens', hi: 'नया रूप: शांत स्क्रीन', text: 'Soft grey pages with clean white cards (near black in dark mode), thin lines, one blue for links and selection, and colours that mean something: green paid, orange due, red overdue.', href: '/' },
+      { title: 'Every page in the same frame', hi: 'हर पेज एक ही ढाँचे में', text: 'Titles sit in the same place on every screen. On a big display the extra room becomes columns and panes, not empty margins.', href: '/transactions' },
+      { title: 'Easier lists and forms', hi: 'आसान सूचियाँ और फ़ॉर्म', text: 'Tables keep the important columns and fold the rest into a second line on smaller screens. Fields are filled, labels are in normal case, settings switch with toggles.', href: '/settings' },
+      { title: 'A tablet sidebar and readable contrast', hi: 'टैबलेट साइडबार और साफ़ पढ़ने लायक रंग', text: 'An iPad in portrait gets a sidebar instead of the phone layout. Text reads clearly in light, dark and high contrast.' },
+    ],
+  },
+  {
     version: '3.1.0',
     date: '2026-10-26',
     label: 'Round 6: help and first steps',

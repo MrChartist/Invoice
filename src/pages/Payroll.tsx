@@ -26,6 +26,7 @@ import { useT } from '../i18n';
 import { payrollT as pT } from '../i18n/areas/payroll';
 import controls from '../styles/controls.module.css';
 import styles from '../components/payroll/Payroll.module.css';
+import tabs from '../styles/tabs.module.css';
 import { PAYROLL_TABS, type PayrollTab } from './page-tabs'; // R6-B1
 
 const TABS = PAYROLL_TABS; // R6-B1: list in payroll-tabs.ts
@@ -78,9 +79,9 @@ export function Payroll() {
       }
       notices={<Suspense fallback={null}><ScreenTip id="payroll" /></Suspense>}
     >
-      <div className={styles.tabs} role="tablist" aria-label={pT('title')}>
+      <div className={`${tabs.tabStrip} ${styles.tabs}`} role="tablist" aria-label={pT('title')}>
         {TABS.map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => set('tab', t)}>
+          <button key={t} type="button" role="tab" aria-selected={tab === t} className={tabs.tabItem} onClick={() => set('tab', t)}>
             {pT(TAB_KEY[t])}
           </button>
         ))}

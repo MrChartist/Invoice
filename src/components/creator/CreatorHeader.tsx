@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Eye, FilePlus2, Save, X } from 'lucide-react';
 import { PageHeader } from '../ui/PageHeader';
 import { StatusBadge } from '../ui/StatusBadge';
@@ -20,10 +21,12 @@ interface Props {
   onSaveDraft: () => void;
   onSave: () => void;
   onClose: () => void;
+  /** The live-preview Show / Hide toggle (wide screens only), first in the action row. */
+  paneToggle?: ReactNode;
 }
 
 /** Title, save state and the top action row of the invoice editor. */
-export function CreatorHeader({ label, editing, invoiceNumber, status, dirty, readOnly, onNew, onPreview, onSaveDraft, onSave, onClose }: Props) {
+export function CreatorHeader({ label, editing, invoiceNumber, status, dirty, readOnly, onNew, onPreview, onSaveDraft, onSave, onClose, paneToggle }: Props) {
   const { t, lang } = useT();
   // English writes the type in lower case mid-sentence ("New tax invoice"); Hindi has no case.
   const doc = lang === 'en' ? label.toLowerCase() : label;
@@ -39,6 +42,7 @@ export function CreatorHeader({ label, editing, invoiceNumber, status, dirty, re
       subtitle={dirty ? t('editor.subDirty') : editing ? t('editor.subSaved') : t('editor.subNew')}
       actions={
         <>
+          {paneToggle}
           {editing && (
             <button type="button" className={controls.btnOutline} onClick={onNew}>
               <FilePlus2 size={16} /> {t('common.new')}

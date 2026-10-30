@@ -25,6 +25,7 @@ import { RECURRING_RAN_EVENT, RECURRING_RUN_EVENT } from '../hooks/useRecurringR
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Recurring.module.css';
+import tabs from '../styles/tabs.module.css';
 import { useT } from '../i18n';
 import { recT } from '../i18n/areas/recurring';
 import { s2T } from '../i18n/areas/sales-r2';
@@ -202,9 +203,9 @@ export function Recurring({ fromInvoiceId }: RecurringPageProps = {}) {
     >
 
       {/* R2-B1: Schedules | Batch invoices */}
-      <div className={controls.segment} role="tablist" aria-label={recT('title')}>
+      <div className={tabs.tabStrip} role="tablist" aria-label={recT('title')}>
         {visibleTabs(REC_TABS, localDb.settings.get(), tab).map(({ id: k, label }) => (
-          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? controls.segmentBtnActive : controls.segmentBtn}
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tabs.tabItem}
             onClick={() => { const next = new URLSearchParams(params); next.delete('view'); if (k !== 'schedules') next.set('tab', k); else next.delete('tab'); setParams(next, { replace: true }); }}>
             {label()}
           </button>

@@ -98,7 +98,7 @@ export function Practice() {
           title={discoverT('practiceTitle')}
           text={discoverT('practiceText')}
           action={
-            <div className={surface.pageActions} style={{ justifyContent: 'center' }} data-practice-empty>
+            <div className={surface.pageActions} style={{ justifyContent: 'center', flexWrap: 'wrap' }} data-practice-empty>
               <Link to="/settings?tab=data" className={controls.btnPrimary}>{discoverT('practiceAdd')}</Link>
               <LearnMore topic="practice" />
             </div>
