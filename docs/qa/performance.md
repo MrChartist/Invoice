@@ -587,3 +587,71 @@ and `hi-tables.ts` joined), `lazy-leaves-ui` 13.4 → **27.0 / 28 kB** (64 → 9
    no importer in `src/`, `tests/` or `scripts/` total ≈ 4.7 kB of source (≈ 1 kB gz at most) across 13 feature files
    that R20 B–D / Round 21 may start calling (`PERIOD_PRESET_LABELS`, `paiseToRupees` …), so the stop rule (< 0.5 kB
    per safe step) applies. Unbundled orphans (`R8Stub` … `R13Stub`, `payroll/index.ts`) cost 0 bytes.
+
+### PERF-7 core-precache reclaim (2026-10-30)
+
+Core was 3,297.0 / 3,300 kB after the iOS UI (#130–#138), and Round 22 plus the iOS date picker need room. The bundle
+has no duplicated module (PERF-5), so this round measured what every lazy chunk *repeats*. Each chunk is gzipped on its
+own, so a few dozen bytes of boilerplate per chunk cost tens of kB over ~910 core files. On `99ea41d` (scratch script
+over `dist/`): cross-chunk `import{…}from"…"` statements cost ≈ 175 kB gz, the `__vite__mapDeps` preload lists ≈ 71 kB,
+`export{…}` statements ≈ 33 kB. No lever changes what the app does or when it loads anything. All three are build-time
+rewrites of how chunks refer to code that is already loaded.
+
+Every row below was built with `npx vite build` + `gen-precache` + `check-bundle-size` in the same checkout,
+cumulative, on base `f544d3f` (`origin/master` after #138).
+
+| # | Change | Core (gz kB) | Saved | First paint | Entry |
+|---|---|---|---|---|---|
+| 0 | base `f544d3f` | 3,297.0 | — | 178.8 | 90.5 |
+| L1 | `react` / `react/jsx-runtime` / `react-dom` and Vite's preload helper as entry-chunk ES bindings | 3,261.5 | −35.5 | 179.0 | 90.6 |
+| L2 | the same for `react-router-dom` | 3,260.0 | −1.5 | 179.1 | 90.7 |
+| L3 | preload lists in a short form (`mapDepsCompact`) | 3,253.9 | −6.1 | 178.9 | 90.5 |
+| | **total** | **3,253.9** | **−43.1** | **178.9 (+0.1)** | **90.5 (±0)** |
+
+Earlier bases, same levers: on `99ea41d` (#128) 3,291.6 → 3,247.1 (−44.5: L1 −36.0, L2 −2.4, L3 −6.1); on
+`a711585` 3,285.2 → 3,240.7 (React −34.0, preload helper −2.2, router −2.3, preload lists −6.0). On `f544d3f`:
+Hindi pack 391.9 → 391.9, Hindi in core 9.9 → 10.0, `lazy-leaves` 19.1 → 19.0, `lazy-leaves-ui` 27.8 → **27.5 / 28**,
+initial files 4 → 4, JS files 1,017 → 1,017.
+
+1. **React as ES bindings (L1, `scripts/vite-vendor-esm.mjs`).** React and react-dom ship as CommonJS. In every chunk
+   that used them, rolldown wrote `import{r as e}from"./rolldown-runtime-….js";…var p=e(t(),1)` (the `__toESM` interop,
+   ~420 chunks), and every use was a property read through that wrapper: `(0,m.jsx)(…)` and `(0,p.useState)(…)`, about
+   37,000 JSX calls. `vendorEsm()` (build only, `resolveId` `order: 'pre'`, importers under `src/` only) resolves the
+   three ids to a virtual module, `import M from 'react'; export default M; export const { useState, … } = M`. The names
+   are read from the installed production build at config time, with internal `__…` names left out. Because the shell
+   imports it, it lands in the entry (`$initial`). Lazy chunks then import `jsx` / `useState` from the entry like any other
+   first-paint export and call them directly (`n(…)`). The values are the same functions and objects (React never
+   reassigns an export). Node modules (react-dom, react-router) keep requiring the originals. Vite's preload helper
+   (`\0vite/preload-helper.js`) sits in `vendor-react` because react-router has an `import()`. That meant ~170 chunks
+   imported `vendor-react` for it alone. As an entry binding (`export const __vitePreload = p`) it joins the entry
+   import those chunks already have.
+2. **Router (L2).** For ESM ids, the same plugin re-exports only the names that `src/` imports. It scans with
+   `parseAst` at build start, skips `type` specifiers, keeps only names the package exports, and refuses a namespace or
+   default import. One import statement fewer in ~130 chunks.
+3. **Short preload lists (L3, `mapDepsCompact` in `scripts/vite-preload-trim.mjs`, `generateBundle` `order: 'post'`).**
+   Vite writes `const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/a.js",…])))=>i.map(i=>d[i]);` and
+   `__vite__mapDeps([0,3])` at each `import()`. The rewrite gives
+   `const __vmd=(i,d=["a.js",…])=>i.map(i=>"assets/"+d[i]);` and `__vmd([0,3])`: the same files for every call. The array
+   is rebuilt per call instead of memoised, a few strings per dynamic import. The rewrite is exact-text: it fails the
+   build if Vite changes the form, if a list names a file outside `assets/`, if `__vmd` is already used in the chunk, or if
+   `__vite__mapDeps` appears other than as a call. `check-bundle-size` fails if any long list is left.
+   `tests/bundle-config.test.ts` evaluates both helpers and compares their output.
+
+Measured and rejected:
+- **`lucide-react` through the same plugin.** Core ±0.0, first paint +2.6 kB: the icons' bindings move into the entry.
+  Left in `vendor-ui`.
+- **`zustand/react/shallow`.** Core +0.4 kB (only 33 importers, most already import `vendor-ui`).
+- **The rolldown runtime inside `vendor-react`** (so `__exportAll` users import one chunk fewer). Rolldown keeps
+  `\0rolldown/runtime.js` in its own chunk whatever the group says. ±0.
+- **Rule-row `source` citations in a lazy side table** (Round 22 PRD author's suggestion). The 401 long citations in
+  the `*-rules.ts` modules weigh 12.2 kB gz inline. As one JSON side table they gzip to 12.0 kB, and that table is
+  still core precache (offline). The key per row and an async read in the readers that show or copy them (`lg-heads`,
+  retail made-ups, rule cards) would cost more than the 0.2 kB. Net ≈ 0.
+- **Namespace objects of mixed static + dynamic imports.** 171 chunks build `__exportAll({…})` objects because one
+  module is both `import()`ed and statically imported elsewhere (rolldown's INEFFECTIVE_DYNAMIC_IMPORT warnings). Upper
+  bound ≈ 19.8 kB gz. Removing them means changing those imports in `src/` (a load-time change per screen), so it is
+  left as the next candidate, one importer at a time, each measured.
+
+Checks on the merged tree: `tsc -b`, `eslint .` (0 errors), 4,314 / 4,314 tests, `gen-precache` + `check-whats-new` +
+`check-bundle-size`, `verify-offline` (all passed), e2e smoke (all passed). A Hindi walk of the production build passed:
+13 routes (`f544d3f` + PERF-7), the B2CL glossary popover, Help and What's new all in Devanagari, no CSP violations or page errors.

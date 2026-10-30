@@ -7,7 +7,8 @@ import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { hiSplit, langChunkName } from './scripts/vite-hi-split.mjs'
 import { UI_LEAF, createGraph, cssMapGroup, familyRe, graphPlugin, leafGroup, safeFamilyGroup } from './scripts/vite-safe-groups.mjs'
-import { preloadTrim } from './scripts/vite-preload-trim.mjs'
+import { mapDepsCompact, preloadTrim } from './scripts/vite-preload-trim.mjs'
+import { vendorEsm } from './scripts/vite-vendor-esm.mjs'
 
 // R6-A4: the version shown in Help, What's new and the diagnostic report comes from package.json.
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
@@ -38,7 +39,8 @@ const preload = preloadTrim()
 // https://vite.dev/config/
 export default defineConfig({
   // R16-A1: hi-split moves defineArea Hindi into lang-hi-* chunks (build only; dev keeps it inline).
-  plugins: [react(), cspMeta(), hiSplit(), graphPlugin(graph), preload.plugin],
+  // PERF-7: React, the router and the preload helper reach src/ as entry-chunk ES bindings (vite-vendor-esm.mjs).
+  plugins: [react(), vendorEsm({ root: fileURLToPath(new URL('.', import.meta.url)) }), cspMeta(), hiSplit(), graphPlugin(graph), preload.plugin, mapDepsCompact()],
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   css: {
     // PERF-5: CSS-module class names `_<local>_<file hash>` (Vite's default adds `_<line>`). The file hash is the
